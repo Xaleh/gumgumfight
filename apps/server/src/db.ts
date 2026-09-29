@@ -79,6 +79,8 @@ function migrate(db: DB) {
   const cols = (db.prepare('PRAGMA table_info(cards)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   // raw: resposta original da API, para poder remapear sem baixar de novo.
   if (!cols.includes('raw')) db.exec('ALTER TABLE cards ADD COLUMN raw TEXT');
+  const deckCols = (db.prepare('PRAGMA table_info(decks)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!deckCols.includes('kind')) db.exec("ALTER TABLE decks ADD COLUMN kind TEXT NOT NULL DEFAULT 'builtin'");
 }
 
 // ------------------------------------------------------------------ cartas
@@ -182,25 +184,43 @@ export function getTranslations(db: DB, lang: string, ids?: string[]): Map<strin
 
 // ------------------------------------------------------------------ decks
 
-export function upsertDeck(db: DB, deck: DeckList) {
+/** builtin = vem de data/decks (recriado a cada início); user = montado pelo jogador. */
+export type DeckKind = 'builtin' | 'user';
+export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string };
+
+export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin') {
   db.prepare(`
-    INSERT INTO decks (id, name, leader, cards, updated_at)
-    VALUES (?, ?, ?, ?, datetime('now'))
+    INSERT INTO decks (id, name, leader, cards, kind, updated_at)
+    VALUES (?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET name = excluded.name, leader = excluded.leader,
-      cards = excluded.cards, updated_at = excluded.updated_at
-  `).run(deck.id, deck.name, deck.leader, JSON.stringify(deck.cards));
+      cards = excluded.cards, kind = excluded.kind, updated_at = excluded.updated_at
+  `).run(deck.id, deck.name, deck.leader, JSON.stringify(deck.cards), kind);
 }
 
-type DeckRow = { id: string; name: string; leader: string; cards: string };
-const toDeck = (r: DeckRow): DeckList => ({ id: r.id, name: r.name, leader: r.leader, cards: JSON.parse(r.cards) });
+type DeckRow = { id: string; name: string; leader: string; cards: string; kind: DeckKind; updated_at: string };
+const DECK_COLS = 'id, name, leader, cards, kind, updated_at';
+const toDeck = (r: DeckRow): StoredDeck => ({
+  id: r.id,
+  name: r.name,
+  leader: r.leader,
+  cards: JSON.parse(r.cards),
+  kind: r.kind,
+  updatedAt: r.updated_at,
+});
 
-export function listDecks(db: DB): DeckList[] {
-  return (db.prepare('SELECT id, name, leader, cards FROM decks ORDER BY id').all() as unknown as DeckRow[]).map(toDeck);
+export function listDecks(db: DB): StoredDeck[] {
+  return (
+    db.prepare(`SELECT ${DECK_COLS} FROM decks ORDER BY kind = 'builtin', updated_at DESC, id`).all() as unknown as DeckRow[]
+  ).map(toDeck);
 }
 
-export function getDeck(db: DB, id: string): DeckList | null {
-  const row = db.prepare('SELECT id, name, leader, cards FROM decks WHERE id = ?').get(id) as unknown as DeckRow | undefined;
+export function getDeck(db: DB, id: string): StoredDeck | null {
+  const row = db.prepare(`SELECT ${DECK_COLS} FROM decks WHERE id = ?`).get(id) as unknown as DeckRow | undefined;
   return row ? toDeck(row) : null;
+}
+
+export function deleteDeck(db: DB, id: string): boolean {
+  return Number(db.prepare(`DELETE FROM decks WHERE id = ? AND kind = 'user'`).run(id).changes) > 0;
 }
 
 // ------------------------------------------------------------------ partidas

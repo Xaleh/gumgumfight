@@ -1,20 +1,21 @@
 import { useState } from 'react';
+import { DeckBuilder } from './components/DeckBuilder';
 import { GameScreen } from './components/GameScreen';
 import { Menu } from './components/Menu';
 import type { GameSetup } from './game/useGame';
 
+type Screen = { name: 'menu' } | { name: 'builder' } | { name: 'game'; setup: GameSetup; key: number };
+
 export function App() {
-  const [setup, setSetup] = useState<GameSetup | null>(null);
-  const [gameKey, setGameKey] = useState(0);
-  if (!setup) {
-    return (
-      <Menu
-        onStart={(s) => {
-          setSetup(s);
-          setGameKey((k) => k + 1);
-        }}
-      />
-    );
+  const [screen, setScreen] = useState<Screen>({ name: 'menu' });
+  if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'game') {
+    return <GameScreen key={screen.key} setup={screen.setup} onExit={() => setScreen({ name: 'menu' })} />;
   }
-  return <GameScreen key={gameKey} setup={setup} onExit={() => setSetup(null)} />;
+  return (
+    <Menu
+      onStart={(setup) => setScreen({ name: 'game', setup, key: Date.now() })}
+      onBuildDecks={() => setScreen({ name: 'builder' })}
+    />
+  );
 }

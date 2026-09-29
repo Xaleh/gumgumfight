@@ -33,7 +33,41 @@ async function buildSetup(
   };
 }
 
-export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
+const LAST_DECKS = 'gumgum.lastDecks';
+
+function DeckSelect({ decks, value, onChange }: { decks: DeckSummary[]; value: string; onChange: (id: string) => void }) {
+  const groups: Array<[string, DeckSummary[]]> = [
+    ['Meus decks', decks.filter((d) => d.kind === 'user')],
+    ['Decks prontos', decks.filter((d) => d.kind === 'builtin')],
+  ];
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
+      {groups
+        .filter(([, list]) => list.length)
+        .map(([label, list]) => (
+          <optgroup key={label} label={label}>
+            {list.map((d) => (
+              <option key={d.id} value={d.id} disabled={!d.valid}>
+                {d.name}
+                {d.valid ? '' : ` (incompleto: ${d.size}/50)`}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+    </select>
+  );
+}
+
+function DeckWarning({ deck }: { deck?: DeckSummary }) {
+  if (!deck || !deck.unscripted) return null;
+  return (
+    <div className="muted small deck-warning" title="Essas cartas entram no jogo, mas sem o efeito">
+      ⚙ {deck.unscripted} carta(s) sem efeito automatizado
+    </div>
+  );
+}
+
+export function Menu({ onStart, onBuildDecks }: { onStart: (s: GameSetup) => void; onBuildDecks: () => void }) {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<GameMode>('bot');
@@ -54,8 +88,17 @@ export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
           if (cancelled) return;
           setError(null);
           setDecks(d);
-          setDeck0(d[0]?.id ?? '');
-          setDeck1(d[1]?.id ?? d[0]?.id ?? '');
+          // Recupera a última escolha (se ainda for válida).
+          let last: string[] = [];
+          try {
+            last = JSON.parse(localStorage.getItem(LAST_DECKS) ?? '[]');
+          } catch {
+            /* sem armazenamento */
+          }
+          const valid = d.filter((x) => x.valid).map((x) => x.id);
+          const builtin = d.filter((x) => x.valid && x.kind === 'builtin').map((x) => x.id);
+          setDeck0(valid.includes(last[0]) ? last[0] : (builtin[0] ?? valid[0] ?? ''));
+          setDeck1(valid.includes(last[1]) ? last[1] : (builtin[1] ?? valid[1] ?? valid[0] ?? ''));
         })
         .catch(() => {
           if (cancelled) return;
@@ -76,6 +119,11 @@ export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
 
   const start = async () => {
     setLoading(true);
+    try {
+      localStorage.setItem(LAST_DECKS, JSON.stringify([deck0, deck1]));
+    } catch {
+      /* sem armazenamento */
+    }
     try {
       const names: [string, string] = mode === 'demo' ? ['Bot A', 'Bot B'] : ['Você', 'Bot'];
       onStart(await buildSetup(mode, [deck0, deck1], names, seed, first === 'random' ? undefined : (Number(first) as PlayerId)));
@@ -120,46 +168,27 @@ export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
         <div className="field two">
           <div>
             <label>{mode === 'demo' ? 'Deck do Bot A' : 'Seu deck'}</label>
-            <select value={deck0} onChange={(e) => setDeck0(e.target.value)}>
-              {decks.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+            <DeckSelect decks={decks} value={deck0} onChange={setDeck0} />
+            <DeckWarning deck={decks.find((d) => d.id === deck0)} />
           </div>
           <div>
             <label>{mode === 'demo' ? 'Deck do Bot B' : 'Deck do bot'}</label>
-            <select value={deck1} onChange={(e) => setDeck1(e.target.value)}>
-              {decks.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+            <DeckSelect decks={decks} value={deck1} onChange={setDeck1} />
+            <DeckWarning deck={decks.find((d) => d.id === deck1)} />
           </div>
         </div>
 
-        <div className="field two">
-          <div>
-            <label title="A mesma seed gera o mesmo embaralhamento — útil para repetir um cenário de teste">
-              Seed (roteiro)
-            </label>
-            <div className="seed">
-              <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value) || 0)} />
-              <button className="btn small" onClick={() => setSeed(randomSeed())} title="Nova seed">
-                🎲
-              </button>
-            </div>
-          </div>
-          <div>
-            <label>Quem começa</label>
-            <select value={first} onChange={(e) => setFirst(e.target.value as typeof first)}>
-              <option value="random">Sorteio</option>
-              <option value="0">{mode === 'demo' ? 'Bot A' : 'Você'}</option>
-              <option value="1">{mode === 'demo' ? 'Bot B' : 'Bot'}</option>
-            </select>
-          </div>
+        <button className="btn build-decks" onClick={onBuildDecks}>
+          🃏 Montar / editar decks
+        </button>
+
+        <div className="field">
+          <label>Quem começa</label>
+          <select value={first} onChange={(e) => setFirst(e.target.value as typeof first)}>
+            <option value="random">Sorteio</option>
+            <option value="0">{mode === 'demo' ? 'Bot A' : 'Você'}</option>
+            <option value="1">{mode === 'demo' ? 'Bot B' : 'Bot'}</option>
+          </select>
         </div>
 
         <div className="field">
@@ -170,10 +199,26 @@ export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
           {loading ? 'Carregando…' : 'Começar partida'}
         </button>
 
-        <label className="replay-load">
-          ou carregar um replay/roteiro (.json)
-          <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && loadReplay(e.target.files[0])} />
-        </label>
+        <details className="advanced">
+          <summary>Opções de teste</summary>
+          <div className="field">
+            <label>Seed do embaralhamento</label>
+            <div className="seed">
+              <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value) || 0)} />
+              <button className="btn small" onClick={() => setSeed(randomSeed())} title="Sortear outra">
+                🎲
+              </button>
+            </div>
+            <p className="muted small">
+              Número que define a ordem dos decks e o sorteio de quem começa. A mesma seed com as mesmas jogadas repete a
+              partida exatamente, o que é útil para reproduzir um problema. Para jogar normalmente, ignore este campo.
+            </p>
+          </div>
+          <label className="replay-load">
+            Carregar um replay (.json baixado durante uma partida)
+            <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && loadReplay(e.target.files[0])} />
+          </label>
+        </details>
 
         <p className="disclaimer">
           Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para

@@ -13,6 +13,7 @@ import { api } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
+import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
 
 type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don' };
@@ -412,9 +413,6 @@ function PromptBar(props: {
 }
 
 function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
-  const { lang } = useSettings();
-  const [showOriginal, setShowOriginal] = useState(false);
-  useEffect(() => setShowOriginal(false), [uid]);
   if (!uid) {
     return (
       <div className="detail empty">
@@ -424,46 +422,12 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
   }
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
-  const shown = cardText(def, showOriginal ? 'en' : lang);
-  const translated = lang === 'pt' && shown.source !== 'original';
   return (
     <div className="detail">
       <div className="detail-card">
         <CardView state={state} uid={uid} fc={loc?.fc} />
       </div>
-      <div className="detail-text">
-        <div className="detail-name">{def.name}</div>
-        <div className="muted small">
-          {def.id} · {def.types.join(' / ')}
-          {def.attributes?.length ? ` · ${def.attributes.join('/')}` : ''}
-        </div>
-        <div className="detail-stats">
-          {def.cost !== undefined && <span>Custo {def.cost}</span>}
-          {def.life !== undefined && <span>Vida {def.life}</span>}
-          {def.power !== undefined && (
-            <span>
-              Poder {loc ? getPower(state, uid) : def.power}
-              {loc && getPower(state, uid) !== def.power ? ` (base ${def.power})` : ''}
-            </span>
-          )}
-          {def.counter ? <span>Counter +{def.counter}</span> : null}
-        </div>
-        {shown.text && <p className="effect">{shown.text}</p>}
-        {shown.trigger && (
-          <p className="effect trigger">
-            <b>[Trigger]</b> {shown.trigger}
-          </p>
-        )}
-        {lang === 'pt' && (def.text || def.trigger) && (
-          <p className="small muted translation-note">
-            {translated && shown.source === 'partial' && '⚠ Tradução automática parcial. '}
-            {translated && shown.source === 'auto' && 'Tradução automática. '}
-            {translated && shown.source === 'manual' && 'Tradução revisada. '}
-            <a onClick={() => setShowOriginal((v) => !v)}>{showOriginal ? 'ver em português' : 'ver original (inglês)'}</a>
-          </p>
-        )}
-        {!def.scripted && def.text && <p className="warn small">⚠ Efeito ainda não automatizado.</p>}
-      </div>
+      <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} />
     </div>
   );
 }

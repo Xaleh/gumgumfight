@@ -1,5 +1,15 @@
-import { cardDef, type FieldCard, type GameState, getPower, hasKeyword, type Keyword } from '@gumgum/engine';
-import { useState } from 'react';
+import {
+  buildCardDef,
+  type CardData,
+  type CardDef,
+  cardDef,
+  type FieldCard,
+  type GameState,
+  getPower,
+  hasKeyword,
+  type Keyword,
+} from '@gumgum/engine';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useSettings } from '../settings';
 
 export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | null;
@@ -80,7 +90,7 @@ function CardFace({
   keywords,
   fc,
 }: {
-  def: ReturnType<typeof cardDef>;
+  def: CardDef;
   power: number | undefined;
   delta: number;
   keywords: Keyword[];
@@ -121,6 +131,69 @@ function CardFace({
       </div>
       {fc && fc.don > 0 && <div className="don-badge">DON!! ×{fc.don}</div>}
     </>
+  );
+}
+
+/** Carta fora de uma partida (construtor de deck, painel de detalhes). */
+export function StaticCard({
+  card,
+  highlight,
+  dimmed,
+  badge,
+  onClick,
+  onContextMenu,
+  onHover,
+}: {
+  card: CardData;
+  highlight?: Highlight;
+  dimmed?: boolean;
+  badge?: ReactNode;
+  onClick?: () => void;
+  onContextMenu?: () => void;
+  onHover?: (card: CardData | null) => void;
+}) {
+  const def = useMemo(() => buildCardDef(card), [card]);
+  const { showImages } = useSettings();
+  const [imageFailed, setImageFailed] = useState(false);
+  const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
+  return (
+    <div
+      className={[
+        'card',
+        `c-${def.colors[0] ?? 'red'}`,
+        highlight ? `hl-${highlight}` : '',
+        onClick ? 'clickable' : '',
+        withImage ? 'with-image' : '',
+        dimmed ? 'dimmed' : '',
+      ].join(' ')}
+      onClick={onClick}
+      onContextMenu={
+        onContextMenu
+          ? (e) => {
+              e.preventDefault();
+              onContextMenu();
+            }
+          : undefined
+      }
+      onMouseEnter={() => onHover?.(card)}
+      onMouseLeave={() => onHover?.(null)}
+      title={def.name}
+    >
+      {withImage ? (
+        <img
+          className="card-img"
+          src={def.imageUrl}
+          alt={def.name}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          draggable={false}
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <CardFace def={def} power={def.power} delta={0} keywords={def.keywords} />
+      )}
+      {badge}
+    </div>
   );
 }
 

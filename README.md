@@ -54,6 +54,21 @@ Para manter o processo rodando, use o gerenciador que preferir, por exemplo o **
 (`pm2 start npm --name gumgum -- start`) ou um serviço **systemd**. Com um domínio, coloque um Nginx/Caddy na
 frente fazendo proxy para a porta 3001. O **backup** é só copiar o arquivo `.db`.
 
+## Montando decks
+
+No menu, **Montar / editar decks** abre o construtor:
+
+1. **Novo deck** → escolha o Líder (o catálogo mostra só Líderes até você escolher um).
+2. Clique nas cartas para adicionar e use o botão direito (ou os botões −/+ na lista) para remover. Por padrão
+   aparecem só cartas com a cor do Líder. Dá para filtrar por nome/texto, cor, tipo, custo e coleção.
+3. O painel à direita mostra o total, a curva de custo, os Counters e os problemas do deck. **Salvar** grava
+   no banco. Decks incompletos ficam salvos como rascunho e aparecem desabilitados no menu.
+
+Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por número e toda carta com ao menos uma
+cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
+Decks prontos (`data/decks`) não são alterados: ao mexer em um, o construtor cria uma cópia.
+**Exportar/Importar lista** usa o formato de texto da comunidade (`4xOP01-016`, uma carta por linha).
+
 ## Como jogar
 
 - **Mulligan:** no início, mantenha ou troque a mão (uma vez).
@@ -62,8 +77,8 @@ frente fazendo proxy para a porta 3001. O **backup** é só copiar o arquivo `.d
 - **Atacar:** selecione o líder ou um personagem ativo, clique em "⚔ Atacar" e escolha o alvo (líder ou personagem virado).
 - **Defesa:** quando for atacado, o jogo pede Blocker, Counter e [Trigger] quando aplicável.
 - **Desfazer** volta para antes da sua última ação. **Replay** baixa um `.json` com todas as ações.
-- A **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas reproduz a mesma partida. Um replay
-  carregado no menu funciona como um "roteiro" que se joga sozinho.
+- Em **Opções de teste** (no menu), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
+  reproduz a mesma partida. Um replay carregado ali funciona como um "roteiro" que se joga sozinho.
 
 ## Estrutura
 
@@ -164,8 +179,11 @@ npm run typecheck
 | GET    | `/api/config`      | Configurações públicas (imagens ligadas?)   |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
 | GET    | `/api/cards/:id`   | Uma carta                                   |
-| GET    | `/api/decks`       | Lista decks                                 |
+| GET    | `/api/decks`       | Lista decks, com validação                  |
 | GET    | `/api/decks/:id`   | Deck + definições das cartas usadas         |
+| POST   | `/api/decks`       | Cria um deck (`{ name, leader, cards }`)    |
+| PUT    | `/api/decks/:id`   | Atualiza um deck do jogador                 |
+| DELETE | `/api/decks/:id`   | Apaga um deck do jogador                    |
 | POST   | `/api/matches`     | Registra o resultado de uma partida         |
 | GET    | `/api/matches`     | Últimas partidas                            |
 | GET    | `/api/translations/pending` | Cartas com tradução automática parcial |
