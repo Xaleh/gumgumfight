@@ -1,22 +1,34 @@
 // Banco local SQLite (arquivo único, sem custo de serviço externo).
+// Usa o SQLite embutido no Node (`node:sqlite`): nenhum módulo nativo para
+// compilar ou baixar, então funciona igual no Windows, Linux e macOS.
 // Toda a SQL fica aqui; se um dia for preciso migrar para Postgres, só este
 // arquivo muda.
 
-import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { CardData, DeckList } from '@gumgum/engine';
+import { DatabaseSync } from 'node:sqlite';
 import { DB_PATH } from './paths';
 
-export type DB = Database.Database;
+export type DB = DatabaseSync;
 
 export function openDb(path = DB_PATH): DB {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
-  const db = new Database(path);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  const db = new DatabaseSync(path);
+  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   migrate(db);
   return db;
+}
+
+function transaction(db: DB, fn: () => void) {
+  db.exec('BEGIN');
+  try {
+    fn();
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 function migrate(db: DB) {
@@ -73,7 +85,7 @@ export function upsertCards(
   `);
   let written = 0;
   let skipped = 0;
-  const tx = db.transaction(() => {
+  transaction(db, () => {
     for (const c of cards) {
       const row = existing.get(c.id) as { provisional: number } | undefined;
       // Dados provisórios nunca sobrescrevem dados vindos da API.
@@ -93,7 +105,6 @@ export function upsertCards(
       written++;
     }
   });
-  tx();
   return { written, skipped };
 }
 
@@ -101,9 +112,11 @@ type CardRow = { data: string; provisional: number };
 const toCard = (r: CardRow) => ({ ...(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
 
 export function listCards(db: DB, set?: string) {
-  const rows = set
-    ? (db.prepare('SELECT data, provisional FROM cards WHERE set_code = ? ORDER BY id').all(set) as CardRow[])
-    : (db.prepare('SELECT data, provisional FROM cards ORDER BY id').all() as CardRow[]);
+  const rows = (
+    set
+      ? db.prepare('SELECT data, provisional FROM cards WHERE set_code = ? ORDER BY id').all(set)
+      : db.prepare('SELECT data, provisional FROM cards ORDER BY id').all()
+  ) as unknown as CardRow[];
   return rows.map(toCard);
 }
 
@@ -111,12 +124,12 @@ export function getCards(db: DB, ids: string[]) {
   if (!ids.length) return [];
   const rows = db
     .prepare(`SELECT data, provisional FROM cards WHERE id IN (${ids.map(() => '?').join(',')})`)
-    .all(...ids) as CardRow[];
+    .all(...ids) as unknown as CardRow[];
   return rows.map(toCard);
 }
 
 export function countCards(db: DB): number {
-  return (db.prepare('SELECT COUNT(*) AS n FROM cards').get() as { n: number }).n;
+  return (db.prepare('SELECT COUNT(*) AS n FROM cards').get() as unknown as { n: number }).n;
 }
 
 // ------------------------------------------------------------------ decks
@@ -134,11 +147,11 @@ type DeckRow = { id: string; name: string; leader: string; cards: string };
 const toDeck = (r: DeckRow): DeckList => ({ id: r.id, name: r.name, leader: r.leader, cards: JSON.parse(r.cards) });
 
 export function listDecks(db: DB): DeckList[] {
-  return (db.prepare('SELECT id, name, leader, cards FROM decks ORDER BY id').all() as DeckRow[]).map(toDeck);
+  return (db.prepare('SELECT id, name, leader, cards FROM decks ORDER BY id').all() as unknown as DeckRow[]).map(toDeck);
 }
 
 export function getDeck(db: DB, id: string): DeckList | null {
-  const row = db.prepare('SELECT id, name, leader, cards FROM decks WHERE id = ?').get(id) as DeckRow | undefined;
+  const row = db.prepare('SELECT id, name, leader, cards FROM decks WHERE id = ?').get(id) as unknown as DeckRow | undefined;
   return row ? toDeck(row) : null;
 }
 
@@ -159,7 +172,7 @@ export function insertMatch(db: DB, m: MatchRecord): number {
     .prepare(
       'INSERT INTO matches (seed, mode, deck0, deck1, winner, turns, reason) VALUES (@seed, @mode, @deck0, @deck1, @winner, @turns, @reason)',
     )
-    .run(m);
+    .run({ ...m });
   return Number(r.lastInsertRowid);
 }
 

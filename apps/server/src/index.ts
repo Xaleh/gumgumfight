@@ -11,8 +11,7 @@ try {
   db = openDb();
 } catch (err) {
   console.error(`\nFalha ao abrir o banco SQLite (${DB_PATH}).`);
-  console.error('Se o erro mencionar "better-sqlite3" ou "NODE_MODULE_VERSION", rode `npm rebuild better-sqlite3`');
-  console.error('(isso acontece quando o Node foi trocado de versão depois do npm install).\n');
+  console.error('Verifique se a pasta tem permissão de escrita e se o Node é 22.13 ou mais recente (node -v).\n');
   throw err;
 }
 // Sempre sincroniza os decks e cartas provisórias (nunca sobrescreve cartas da API).

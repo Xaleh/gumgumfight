@@ -8,8 +8,8 @@ Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](http
 
 ## Requisitos
 
-- Node.js 20 ou mais recente (testado com 22)
-- Nenhum serviço externo: o banco é um arquivo SQLite local
+- Node.js 22.13 ou mais recente (recomendado: a LTS atual)
+- Nenhum serviço externo nem módulo nativo: o banco é um arquivo SQLite local, usando o SQLite embutido no Node (`node:sqlite`)
 
 ## Rodando em desenvolvimento
 
@@ -28,8 +28,8 @@ O Vite só sobe depois que a API responde em `/api/health`.
 
 - **`http proxy error ... ECONNREFUSED`**: a API (porta 3001) não está no ar. Procure no terminal as linhas `[server]`,
   que mostram o motivo real.
-- **Erro com `better-sqlite3` / `NODE_MODULE_VERSION`**: a versão do Node mudou depois do `npm install`.
-  Rode `npm rebuild better-sqlite3`.
+- **`No such built-in module: node:sqlite`**: o Node é antigo demais. Atualize para 22.13+.
+- **`ExperimentalWarning: SQLite is an experimental feature`**: aviso do Node 22, pode ser ignorado.
 - **`A porta 3001 já está em uso`**: outro processo está usando a porta (por exemplo, um `npm run dev` antigo).
 
 ## Rodando no seu servidor (produção)
@@ -67,7 +67,7 @@ frente fazendo proxy para a porta 3001. O **backup** é só copiar o arquivo `.d
 
 ```
 packages/engine   Motor de regras em TypeScript puro (sem dependências), bot e testes
-apps/server       API Fastify + SQLite (better-sqlite3); serve a interface compilada em produção
+apps/server       API Fastify + SQLite (node:sqlite); serve a interface compilada em produção
 apps/web          Interface React + Vite
 data/cards        Cartas provisórias (JSON)
 data/decks        Listas dos decks
