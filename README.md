@@ -22,6 +22,15 @@ npm run dev
 - API: http://localhost:3001 (Fastify + SQLite)
 
 Na primeira execução o servidor cria o banco `apps/server/var/gumgum.db` e carrega as cartas e os decks de `data/`.
+O Vite só sobe depois que a API responde em `/api/health`.
+
+### Problemas comuns
+
+- **`http proxy error ... ECONNREFUSED`**: a API (porta 3001) não está no ar. Procure no terminal as linhas `[server]`,
+  que mostram o motivo real.
+- **Erro com `better-sqlite3` / `NODE_MODULE_VERSION`**: a versão do Node mudou depois do `npm install`.
+  Rode `npm rebuild better-sqlite3`.
+- **`A porta 3001 já está em uso`**: outro processo está usando a porta (por exemplo, um `npm run dev` antigo).
 
 ## Rodando no seu servidor (produção)
 

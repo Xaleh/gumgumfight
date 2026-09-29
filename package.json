@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @gumgum/server\" \"npm run dev -w @gumgum/web\"",
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @gumgum/server\" \"wait-on -t 60000 http-get://127.0.0.1:3001/api/health && npm run dev -w @gumgum/web\"",
     "build": "npm run build -w @gumgum/web",
     "start": "npm run start -w @gumgum/server",
     "test": "npm run test -w @gumgum/engine",
@@ -20,7 +20,8 @@
   "devDependencies": {
     "@types/node": "^22.20.4",
     "concurrently": "^9.1.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "wait-on": "^9.0.0"
   },
   "engines": {
     "node": ">=20"

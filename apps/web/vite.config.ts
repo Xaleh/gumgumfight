@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    proxy: { '/api': 'http://localhost:3001' },
+    // 127.0.0.1 em vez de localhost: evita tentar IPv6 (::1) quando o servidor escuta só em IPv4.
+    proxy: { '/api': 'http://127.0.0.1:3001' },
   },
 });

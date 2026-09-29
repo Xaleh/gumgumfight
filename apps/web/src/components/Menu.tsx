@@ -42,15 +42,35 @@ export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
   const [loading, setLoading] = useState(false);
 
+  // O servidor pode ainda estar subindo: tenta de novo por até ~30s antes de desistir.
   useEffect(() => {
-    api
-      .decks()
-      .then((d) => {
-        setDecks(d);
-        setDeck0(d[0]?.id ?? '');
-        setDeck1(d[1]?.id ?? d[0]?.id ?? '');
-      })
-      .catch(() => setError('Não foi possível conectar ao servidor. Ele está rodando? (npm run dev)'));
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const load = (attempt: number) => {
+      api
+        .decks()
+        .then((d) => {
+          if (cancelled) return;
+          setError(null);
+          setDecks(d);
+          setDeck0(d[0]?.id ?? '');
+          setDeck1(d[1]?.id ?? d[0]?.id ?? '');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (attempt < 15) {
+            setError('Conectando ao servidor…');
+            timer = setTimeout(() => load(attempt + 1), 2000);
+          } else {
+            setError('Não foi possível conectar ao servidor. Veja as mensagens [server] no terminal do npm run dev.');
+          }
+        });
+    };
+    load(0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
 
   const start = async () => {
