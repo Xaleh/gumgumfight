@@ -1,20 +1,44 @@
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { existsSync } from 'node:fs';
-import { type DB, getCards, getDeck, insertMatch, listCards, listDecks, type MatchRecord, recentMatches } from './db';
+import { type ServerOptions, serverOptions } from './config';
+import {
+  type DB,
+  getCards,
+  getDeck,
+  getTranslations,
+  insertMatch,
+  listCards,
+  listDecks,
+  type MatchRecord,
+  recentMatches,
+} from './db';
 import { WEB_DIST } from './paths';
+import { type ApiCard, presentCards } from './present';
 
-export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
+export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOptions } = {}) {
   const app = Fastify({ logger: opts.logger ?? false });
+  const server = opts.server ?? serverOptions;
+  const present = (cards: ApiCard[]) =>
+    presentCards(cards, getTranslations(db, 'pt', cards.length > 200 ? undefined : cards.map((c) => c.id)), server);
 
   app.get('/api/health', async () => ({ ok: true }));
 
-  app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => listCards(db, req.query.set));
+  app.get('/api/config', async () => ({ cardImages: server.cardImages, languages: ['pt', 'en'] }));
+
+  app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => present(listCards(db, req.query.set)));
 
   app.get<{ Params: { id: string } }>('/api/cards/:id', async (req, reply) => {
-    const [card] = getCards(db, [req.params.id]);
+    const [card] = present(getCards(db, [req.params.id]));
     return card ?? reply.code(404).send({ error: 'Carta não encontrada' });
   });
+
+  /** Cartas cuja tradução automática ficou parcial: lista de trabalho para revisão manual. */
+  app.get('/api/translations/pending', async () =>
+    present(listCards(db))
+      .filter((c) => c.i18n?.pt?.source === 'partial')
+      .map((c) => ({ id: c.id, name: c.name, text: c.text, trigger: c.trigger, auto: c.i18n?.pt })),
+  );
 
   app.get('/api/decks', async () =>
     listDecks(db).map((d) => ({ id: d.id, name: d.name, leader: d.leader, size: d.cards.reduce((s, c) => s + c.count, 0) })),
@@ -24,7 +48,7 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
   app.get<{ Params: { id: string } }>('/api/decks/:id', async (req, reply) => {
     const deck = getDeck(db, req.params.id);
     if (!deck) return reply.code(404).send({ error: 'Deck não encontrado' });
-    const cards = getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]);
+    const cards = present(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]));
     return { deck, cards };
   });
 

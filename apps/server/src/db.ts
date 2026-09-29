@@ -64,7 +64,21 @@ function migrate(db: DB) {
       reason     TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Traduções revisadas manualmente (têm prioridade sobre a tradução automática).
+    CREATE TABLE IF NOT EXISTS card_translations (
+      card_id    TEXT NOT NULL,
+      lang       TEXT NOT NULL,
+      text       TEXT NOT NULL,
+      trigger    TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (card_id, lang)
+    );
   `);
+  // Colunas adicionadas depois da primeira versão.
+  const cols = (db.prepare('PRAGMA table_info(cards)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  // raw: resposta original da API, para poder remapear sem baixar de novo.
+  if (!cols.includes('raw')) db.exec('ALTER TABLE cards ADD COLUMN raw TEXT');
 }
 
 // ------------------------------------------------------------------ cartas
@@ -72,16 +86,16 @@ function migrate(db: DB) {
 export function upsertCards(
   db: DB,
   cards: CardData[],
-  opts: { provisional: boolean; source: string },
+  opts: { provisional: boolean; source: string; raw?: Map<string, unknown> },
 ): { written: number; skipped: number } {
   const existing = db.prepare('SELECT provisional FROM cards WHERE id = ?');
   const write = db.prepare(`
-    INSERT INTO cards (id, set_code, name, category, data, provisional, source, updated_at)
-    VALUES (@id, @set_code, @name, @category, @data, @provisional, @source, datetime('now'))
+    INSERT INTO cards (id, set_code, name, category, data, provisional, source, raw, updated_at)
+    VALUES (@id, @set_code, @name, @category, @data, @provisional, @source, @raw, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       set_code = excluded.set_code, name = excluded.name, category = excluded.category,
       data = excluded.data, provisional = excluded.provisional, source = excluded.source,
-      updated_at = excluded.updated_at
+      raw = excluded.raw, updated_at = excluded.updated_at
   `);
   let written = 0;
   let skipped = 0;
@@ -101,6 +115,7 @@ export function upsertCards(
         data: JSON.stringify(c),
         provisional: opts.provisional ? 1 : 0,
         source: opts.source,
+        raw: opts.raw?.has(c.id) ? JSON.stringify(opts.raw.get(c.id)) : null,
       });
       written++;
     }
@@ -130,6 +145,39 @@ export function getCards(db: DB, ids: string[]) {
 
 export function countCards(db: DB): number {
   return (db.prepare('SELECT COUNT(*) AS n FROM cards').get() as unknown as { n: number }).n;
+}
+
+// ------------------------------------------------------------------ traduções
+
+export interface TranslationRow {
+  card_id: string;
+  text: string;
+  trigger: string | null;
+}
+
+export function upsertTranslations(db: DB, lang: string, rows: Array<{ id: string; text: string; trigger?: string }>) {
+  const write = db.prepare(`
+    INSERT INTO card_translations (card_id, lang, text, trigger, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(card_id, lang) DO UPDATE SET text = excluded.text, trigger = excluded.trigger,
+      updated_at = excluded.updated_at
+  `);
+  transaction(db, () => {
+    for (const r of rows) write.run(r.id, lang, r.text, r.trigger ?? null);
+  });
+}
+
+export function getTranslations(db: DB, lang: string, ids?: string[]): Map<string, TranslationRow> {
+  const rows = (
+    ids
+      ? ids.length
+        ? db
+            .prepare(`SELECT card_id, text, trigger FROM card_translations WHERE lang = ? AND card_id IN (${ids.map(() => '?').join(',')})`)
+            .all(lang, ...ids)
+        : []
+      : db.prepare('SELECT card_id, text, trigger FROM card_translations WHERE lang = ?').all(lang)
+  ) as unknown as TranslationRow[];
+  return new Map(rows.map((r) => [r.card_id, r]));
 }
 
 // ------------------------------------------------------------------ decks

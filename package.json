@@ -12,10 +12,10 @@
     "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @gumgum/server\" \"wait-on -t 60000 http-get://127.0.0.1:3001/api/health && npm run dev -w @gumgum/web\"",
     "build": "npm run build -w @gumgum/web",
     "start": "npm run start -w @gumgum/server",
-    "test": "npm run test -w @gumgum/engine",
+    "test": "npm run test -w @gumgum/engine && npm run test -w @gumgum/server",
     "typecheck": "tsc -p packages/engine && tsc -p apps/server && tsc -p apps/web",
-    "db:seed": "npm run db:seed -w @gumgum/server",
-    "cards:import": "npm run cards:import -w @gumgum/server"
+    "db:seed": "npm run db:seed -w @gumgum/server --",
+    "cards:import": "npm run cards:import -w @gumgum/server --"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

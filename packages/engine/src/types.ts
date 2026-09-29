@@ -25,6 +25,15 @@ export interface CardData {
   set?: string;
   rarity?: string;
   imageUrl?: string;
+  /** Textos traduzidos (preenchidos pelo servidor). */
+  i18n?: Partial<Record<'pt', CardTextTranslation>>;
+}
+
+export interface CardTextTranslation {
+  text: string;
+  trigger?: string;
+  /** manual = revisada por uma pessoa; auto = regras completas; partial = sobrou inglês. */
+  source: 'manual' | 'auto' | 'partial';
 }
 
 // ---------------------------------------------------------------------------

@@ -16,6 +16,7 @@ async function get<T>(url: string): Promise<T> {
 }
 
 export const api = {
+  config: () => get<{ cardImages: boolean; languages: string[] }>('/api/config'),
   decks: () => get<DeckSummary[]>('/api/decks'),
   deck: (id: string) => get<{ deck: DeckList; cards: ApiCard[] }>(`/api/decks/${encodeURIComponent(id)}`),
   saveMatch: (m: {

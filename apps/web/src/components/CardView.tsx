@@ -1,4 +1,6 @@
 import { cardDef, type FieldCard, type GameState, getPower, hasKeyword, type Keyword } from '@gumgum/engine';
+import { useState } from 'react';
+import { useSettings } from '../settings';
 
 export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | null;
 
@@ -23,6 +25,9 @@ interface Props {
 
 export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover }: Props) {
   const def = cardDef(state, uid);
+  const { showImages } = useSettings();
+  const [imageFailed, setImageFailed] = useState(false);
+  const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
   const power = fc ? getPower(state, uid) : def.power;
   const delta = fc && def.power !== undefined && power !== undefined ? power - def.power : 0;
   const keywords = (Object.keys(KEYWORD_LABEL) as Keyword[]).filter((k) =>
@@ -38,6 +43,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         fc?.rested ? 'rested' : '',
         highlight ? `hl-${highlight}` : '',
         onClick ? 'clickable' : '',
+        withImage ? 'with-image' : '',
       ].join(' ')}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
@@ -45,7 +51,43 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
       onMouseLeave={() => onHover?.(null)}
       title={def.name}
     >
-      {def.imageUrl ? <img className="card-img" src={def.imageUrl} alt={def.name} loading="lazy" /> : null}
+      {withImage && (
+        <>
+          <img
+            className="card-img"
+            src={def.imageUrl}
+            alt={def.name}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            draggable={false}
+            onError={() => setImageFailed(true)}
+          />
+          {delta !== 0 && power !== undefined && (
+            <span className={['img-power', delta > 0 ? 'up' : 'down'].join(' ')}>{power}</span>
+          )}
+          {fc && fc.don > 0 && <div className="don-badge">DON!! ×{fc.don}</div>}
+        </>
+      )}
+      {!withImage && <CardFace def={def} power={power} delta={delta} keywords={keywords} fc={fc} />}
+    </div>
+  );
+}
+
+function CardFace({
+  def,
+  power,
+  delta,
+  keywords,
+  fc,
+}: {
+  def: ReturnType<typeof cardDef>;
+  power: number | undefined;
+  delta: number;
+  keywords: Keyword[];
+  fc?: FieldCard;
+}) {
+  return (
+    <>
       <div className="card-top">
         {def.category === 'leader' ? (
           <span className="badge life-badge" title="Vida">
@@ -78,7 +120,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         {def.counter ? <span className="counter-badge">+{def.counter / 1000}k</span> : null}
       </div>
       {fc && fc.don > 0 && <div className="don-badge">DON!! ×{fc.don}</div>}
-    </div>
+    </>
   );
 }
 

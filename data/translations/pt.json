@@ -1,0 +1,4 @@
+{
+  "_leia": "Traduções revisadas manualmente. Têm prioridade sobre a tradução automática. Formato: \"ID\": { \"text\": \"...\", \"trigger\": \"...\" }. Veja GET /api/translations/pending para a lista de cartas com tradução automática parcial.",
+  "cards": {}
+}

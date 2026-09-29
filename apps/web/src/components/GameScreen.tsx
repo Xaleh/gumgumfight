@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
+import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardView, type Highlight } from './CardView';
 
@@ -225,6 +226,7 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
             </label>
           )}
         </div>
+        <SettingsControls compact />
         {game.error && (
           <div className="error" onClick={() => game.setError(null)}>
             {game.error}
@@ -308,6 +310,7 @@ function PromptBar(props: {
   onDispatch: (a: Action) => void;
 }) {
   const { state, human, picked, onDispatch } = props;
+  const { lang } = useSettings();
   const pending = state.pending;
   if (state.phase === 'gameover') return null;
   if (props.acting !== null && props.acting !== human) {
@@ -394,7 +397,7 @@ function PromptBar(props: {
       return (
         <div className="prompt">
           <div className="prompt-title">[Trigger] revelado: {cardDef(state, pending.card).name}</div>
-          <p className="muted">{cardDef(state, pending.card).trigger}</p>
+          <p className="muted">{cardText(cardDef(state, pending.card), lang).trigger}</p>
           <div className="btn-row">
             <button className="btn primary" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
               Ativar [Trigger]
@@ -409,6 +412,9 @@ function PromptBar(props: {
 }
 
 function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
+  const { lang } = useSettings();
+  const [showOriginal, setShowOriginal] = useState(false);
+  useEffect(() => setShowOriginal(false), [uid]);
   if (!uid) {
     return (
       <div className="detail empty">
@@ -418,6 +424,8 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
   }
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
+  const shown = cardText(def, showOriginal ? 'en' : lang);
+  const translated = lang === 'pt' && shown.source !== 'original';
   return (
     <div className="detail">
       <div className="detail-card">
@@ -440,10 +448,18 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
           )}
           {def.counter ? <span>Counter +{def.counter}</span> : null}
         </div>
-        {def.text && <p className="effect">{def.text}</p>}
-        {def.trigger && (
+        {shown.text && <p className="effect">{shown.text}</p>}
+        {shown.trigger && (
           <p className="effect trigger">
-            <b>[Trigger]</b> {def.trigger}
+            <b>[Trigger]</b> {shown.trigger}
+          </p>
+        )}
+        {lang === 'pt' && (def.text || def.trigger) && (
+          <p className="small muted translation-note">
+            {translated && shown.source === 'partial' && '⚠ Tradução automática parcial. '}
+            {translated && shown.source === 'auto' && 'Tradução automática. '}
+            {translated && shown.source === 'manual' && 'Tradução revisada. '}
+            <a onClick={() => setShowOriginal((v) => !v)}>{showOriginal ? 'ver em português' : 'ver original (inglês)'}</a>
           </p>
         )}
         {!def.scripted && def.text && <p className="warn small">⚠ Efeito ainda não automatizado.</p>}

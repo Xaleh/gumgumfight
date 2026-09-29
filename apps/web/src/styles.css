@@ -858,3 +858,73 @@ input[type='number'] {
     grid-template-columns: 1fr;
   }
 }
+
+/* ------------------------------------------------------------------ cartas com imagem */
+
+.card.with-image {
+  background: #111;
+  border-width: 0;
+  padding: 0;
+}
+.card.with-image .card-img {
+  border-radius: 7px;
+}
+.img-power {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  font-weight: 800;
+  font-size: 0.95em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+}
+.img-power.up {
+  color: #6dffa8;
+}
+.img-power.down {
+  color: #ff8a8a;
+}
+.detail-card .card.with-image {
+  --cw: 110px;
+}
+
+/* ------------------------------------------------------------------ configurações */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.settings.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.setting label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.seg.small button {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.check.disabled {
+  opacity: 0.55;
+}
+.translation-note a {
+  font-size: 12px;
+}
+.field label.check {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: var(--text);
+  display: flex;
+}

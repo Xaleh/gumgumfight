@@ -1,93 +1,77 @@
-// Importa cartas de uma API externa para o banco local.
+// Importa cartas da optcgapi.com para o banco local.
 //
-// Uso:
-//   CARD_API_URL="https://..." npm run cards:import
-//   CARD_API_URL="https://..." CARD_API_KEY="..." npm run cards:import
+//   npm run cards:import                     # ST-01 e ST-02 (decks de teste)
+//   npm run cards:import -- ST-01 OP-01      # coleções específicas
+//   npm run cards:import -- --all            # todas as coleções e starter decks
+//   npm run cards:import -- --file resp.json # importa de um arquivo salvo (sem rede)
+//   npm run cards:import -- --dry-run ST-01  # só mostra o resultado, não grava
 //
-// O formato exato da API ainda não foi definido. `mapApiCard` tenta reconhecer os
-// nomes de campo mais comuns; quando a API for escolhida, ajuste apenas essa função.
+// Variável opcional: CARD_API_BASE (padrão https://optcgapi.com/api).
 
-import type { CardCategory, CardData, Color } from '@gumgum/engine';
+import { readFileSync } from 'node:fs';
+import { type CardData, hasScript, translateToPt } from '@gumgum/engine';
 import { openDb, upsertCards } from './db';
+import { allEndpoints, DEFAULT_API_BASE, mapApiResponse, setEndpoint } from './optcgapi';
+import { fromUserCwd } from './paths';
 
-const COLORS: Color[] = ['red', 'green', 'blue', 'purple', 'black', 'yellow'];
-
-const pick = (raw: Record<string, unknown>, ...keys: string[]): unknown => {
-  for (const k of keys) if (raw[k] !== undefined && raw[k] !== null && raw[k] !== '') return raw[k];
-  return undefined;
-};
-
-const num = (v: unknown): number | undefined => {
-  if (v === undefined) return undefined;
-  const n = Number(String(v).replace(/[^\d-]/g, ''));
-  return Number.isFinite(n) && String(v).trim() !== '-' ? n : undefined;
-};
-
-const list = (v: unknown): string[] => {
-  if (Array.isArray(v)) return v.map(String);
-  if (typeof v === 'string') return v.split(/[/;,]/).map((s) => s.trim()).filter(Boolean);
-  return [];
-};
-
-export function mapApiCard(raw: Record<string, unknown>): CardData | null {
-  const id = pick(raw, 'id', 'card_id', 'cardId', 'code', 'card_set_id', 'number');
-  const name = pick(raw, 'name', 'card_name', 'cardName');
-  const categoryRaw = String(pick(raw, 'category', 'type', 'card_type', 'cardType') ?? '').toLowerCase();
-  if (!id || !name) return null;
-
-  const category = (['leader', 'character', 'event', 'stage'] as CardCategory[]).find((c) => categoryRaw.includes(c));
-  if (!category) return null; // ignora DON!! e tipos desconhecidos
-
-  const colors = list(pick(raw, 'colors', 'color', 'card_color'))
-    .map((c) => c.toLowerCase())
-    .filter((c): c is Color => COLORS.includes(c as Color));
-
-  const text = String(pick(raw, 'text', 'effect', 'card_text', 'ability') ?? '');
-  const trigger = pick(raw, 'trigger', 'trigger_text');
-
-  return {
-    id: String(id),
-    name: String(name),
-    category,
-    colors,
-    cost: category === 'leader' ? undefined : num(pick(raw, 'cost', 'card_cost')),
-    life: category === 'leader' ? num(pick(raw, 'life', 'cost', 'card_cost')) : undefined,
-    power: num(pick(raw, 'power', 'card_power')),
-    counter: num(pick(raw, 'counter', 'counter_amount', 'card_counter')),
-    attributes: list(pick(raw, 'attributes', 'attribute')),
-    types: list(pick(raw, 'types', 'traits', 'feature', 'sub_types', 'family')),
-    text,
-    trigger: trigger ? String(trigger) : undefined,
-    set: String(pick(raw, 'set', 'set_id', 'set_code') ?? String(id).split('-')[0]),
-    rarity: pick(raw, 'rarity') ? String(pick(raw, 'rarity')) : undefined,
-    imageUrl: pick(raw, 'imageUrl', 'image_url', 'image', 'img', 'card_image') as string | undefined,
-  };
+async function fetchJson(url: string): Promise<unknown> {
+  const res = await fetch(url, { headers: { accept: 'application/json', 'user-agent': 'gumgumfight-importer' } });
+  if (!res.ok) throw new Error(`${url} respondeu ${res.status} ${res.statusText}`);
+  return res.json();
 }
 
 async function main() {
-  const url = process.env.CARD_API_URL;
-  if (!url) {
-    console.error('Defina CARD_API_URL com o endereço da API de cartas.');
-    process.exit(1);
+  const args = process.argv.slice(2);
+  const base = (process.env.CARD_API_BASE ?? DEFAULT_API_BASE).replace(/\/$/, '');
+  const dryRun = args.includes('--dry-run');
+  const files: string[] = [];
+  const sets: string[] = [];
+  let all = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--file') files.push(fromUserCwd(args[++i]));
+    else if (a === '--all') all = true;
+    else if (!a.startsWith('--')) sets.push(a);
   }
-  const headers: Record<string, string> = { accept: 'application/json' };
-  if (process.env.CARD_API_KEY) headers['x-api-key'] = process.env.CARD_API_KEY;
+  if (!files.length && !all && !sets.length) sets.push('ST-01', 'ST-02');
 
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`API respondeu ${res.status} ${res.statusText}`);
-  const body = (await res.json()) as unknown;
-  const rows = (Array.isArray(body) ? body : ((body as { data?: unknown[]; cards?: unknown[] }).data ??
-    (body as { cards?: unknown[] }).cards ?? [])) as Record<string, unknown>[];
+  const sources: Array<{ label: string; load: () => Promise<unknown> }> = [
+    ...files.map((f) => ({ label: f, load: async () => JSON.parse(readFileSync(f, 'utf8')) as unknown })),
+    ...(all ? allEndpoints(base) : sets.map((s) => setEndpoint(base, s))).map((url) => ({
+      label: url,
+      load: () => fetchJson(url),
+    })),
+  ];
 
-  const cards = rows.map(mapApiCard).filter((c): c is CardData => c !== null);
+  const cards = new Map<string, CardData>();
+  const raw = new Map<string, unknown>();
+  for (const src of sources) {
+    const r = mapApiResponse(await src.load());
+    console.log(`${src.label}: ${r.cards.length} cartas${r.ignored ? ` (${r.ignored} entradas ignoradas)` : ''}`);
+    for (const c of r.cards) {
+      cards.set(c.id, c);
+      raw.set(c.id, r.raw.get(c.id));
+    }
+  }
+
+  const list = [...cards.values()];
+  const scripted = list.filter((c) => hasScript(c.id)).length;
+  const partialPt = list.filter((c) => !translateToPt(c.text).complete || (c.trigger && !translateToPt(c.trigger).complete));
+  console.log(`\nTotal: ${list.length} cartas únicas`);
+  console.log(`Com efeito automatizado: ${scripted} | tradução automática parcial: ${partialPt.length}`);
+
+  if (dryRun) {
+    for (const c of list.slice(0, 5)) console.log(JSON.stringify(c, null, 2));
+    console.log('\n--dry-run: nada foi gravado.');
+    return;
+  }
   const db = openDb();
-  const r = upsertCards(db, cards, { provisional: false, source: `api:${new URL(url).host}` });
-  console.log(`Recebidas ${rows.length} entradas; ${cards.length} cartas válidas; gravadas ${r.written}.`);
+  const r = upsertCards(db, list, { provisional: false, source: `api:${files.length ? 'arquivo' : new URL(base).host}`, raw });
+  console.log(`Gravadas ${r.written} cartas no banco.`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
-}
+main().catch((err) => {
+  console.error(`\nFalha na importação: ${err instanceof Error ? err.message : err}`);
+  console.error('Se a URL mudou, ajuste CARD_API_BASE ou baixe a resposta no navegador e use --file.');
+  process.exit(1);
+});

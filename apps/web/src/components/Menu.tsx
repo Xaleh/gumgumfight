@@ -2,6 +2,7 @@ import type { Action, CardData, PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import { api, type DeckSummary } from '../api';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
+import { SettingsControls } from '../settings';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 
@@ -161,6 +162,10 @@ export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
           </div>
         </div>
 
+        <div className="field">
+          <SettingsControls />
+        </div>
+
         <button className="btn primary big" disabled={!deck0 || !deck1 || loading} onClick={start}>
           {loading ? 'Carregando…' : 'Começar partida'}
         </button>
@@ -171,8 +176,8 @@ export function Menu({ onStart }: { onStart: (s: GameSetup) => void }) {
         </label>
 
         <p className="disclaimer">
-          Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. Os dados das cartas
-          desta versão são provisórios.
+          Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para
+          português são automáticas e não oficiais.
         </p>
       </div>
     </div>

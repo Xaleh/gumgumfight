@@ -169,6 +169,15 @@ export function hasKeyword(state: GameState, uid: string, kw: Keyword): boolean 
   return def.abilities.some((a) => a.timing === 'static' && a.staticKeyword === kw && conditionsMet(state, uid, a));
 }
 
+/**
+ * Verifica o tipo ({Straw Hat Crew}). Tolera listas mal separadas vindas de APIs
+ * (ex.: "Supernovas Straw Hat Crew" como um único item).
+ */
+export function hasType(def: CardDef, type: string): boolean {
+  if (def.types.includes(type)) return true;
+  return ` ${def.types.join(' ')} `.includes(` ${type} `);
+}
+
 function canAttackActive(state: GameState, uid: string): boolean {
   return cardDef(state, uid).abilities.some(
     (a) => a.timing === 'static' && a.staticCanAttackActive && conditionsMet(state, uid, a),
@@ -268,7 +277,7 @@ export function targetCandidates(state: GameState, controller: PlayerId, source:
       if (spec.maxPower !== undefined && getPower(state, fc.uid) > spec.maxPower) return false;
       if (spec.maxCost !== undefined && (def.cost === undefined || def.cost > spec.maxCost)) return false;
       if (spec.rested !== undefined && fc.rested !== spec.rested) return false;
-      if (spec.hasType && !def.types.includes(spec.hasType)) return false;
+      if (spec.hasType && !hasType(def, spec.hasType)) return false;
       if (spec.keyword && !hasKeyword(state, fc.uid, spec.keyword)) return false;
       return true;
     })

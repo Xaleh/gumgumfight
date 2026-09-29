@@ -3,8 +3,8 @@
 Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](https://duels.ink/) (Lorcana).
 
 > **Status: Fase 1, protótipo solo.** Dois decks iniciais (Luffy vermelho ST01 e Kid verde ST02), partidas
-> contra um bot, modo demonstração bot x bot e replays. Os dados das cartas ainda são **provisórios**
-> (veja [Dados das cartas](#dados-das-cartas)).
+> contra um bot, modo demonstração bot x bot e replays. Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
+> com textos em português (tradução automática) ou inglês e imagens opcionais.
 
 ## Requisitos
 
@@ -47,6 +47,8 @@ Variáveis de ambiente:
 | `PORT`    | `3001`                        | Porta HTTP                   |
 | `HOST`    | `0.0.0.0`                     | Interface de rede            |
 | `DB_PATH` | `apps/server/var/gumgum.db`   | Caminho do arquivo SQLite    |
+| `CARD_IMAGES` | `on`                      | `off` desliga as imagens oficiais das cartas (as URLs nem chegam ao navegador) |
+| `CARD_API_BASE` | `https://optcgapi.com/api` | Endereço da API usada pelo importador |
 
 Para manter o processo rodando, use o gerenciador que preferir, por exemplo o **pm2**
 (`pm2 start npm --name gumgum -- start`) ou um serviço **systemd**. Com um domínio, coloque um Nginx/Caddy na
@@ -110,23 +112,46 @@ custos DON!! −X em cartas reais, cartas com efeitos fora da DSL (aparecem com 
 
 ## Dados das cartas
 
-Os arquivos em `data/cards` foram **reconstruídos de memória** só para testar a interface. Números e textos
-(principalmente do ST02) podem estar errados. Quando a API de cartas for definida:
+As cartas vêm da [optcgapi.com](https://optcgapi.com/documentation) e ficam salvas no SQLite local. O jogo não
+consulta a API durante as partidas.
 
 ```bash
-CARD_API_URL="https://sua-api/cards" npm run cards:import
-# opcional: CARD_API_KEY="..." (enviado no cabeçalho x-api-key)
+npm run cards:import                      # ST-01 e ST-02 (os decks de teste)
+npm run cards:import -- ST-03 OP-01       # coleções específicas (ST-xx = starter deck, OP/EB/PRB = boosters)
+npm run cards:import -- --all             # tudo
+npm run cards:import -- --dry-run ST-01   # mostra o resultado sem gravar
+npm run cards:import -- --file resp.json  # importa uma resposta da API salva em arquivo (sem rede)
 ```
 
-O importador (`apps/server/src/import-cards.ts`) grava as cartas no SQLite marcadas como não provisórias.
-Dados provisórios nunca sobrescrevem dados vindos da API. A função `mapApiCard` tenta reconhecer os nomes
-de campo mais comuns; ajuste-a ao formato real da API. Depois da importação, os scripts de efeito em
-`packages/engine/src/cards/scripts.ts` precisam ser conferidos contra o texto oficial.
+- Versões com arte alternativa (mesmo ID) são unificadas; cartas DON!! são ignoradas.
+- A resposta original de cada carta fica guardada (coluna `raw`) para poder remapear sem baixar de novo.
+- Antes da primeira importação, o jogo usa dados **provisórios** de `data/cards` (escritos de memória). Eles nunca
+  sobrescrevem cartas vindas da API.
+- Os scripts de efeito (`packages/engine/src/cards/scripts.ts`) precisam ser conferidos contra o texto oficial.
+
+### Imagens
+
+Com `CARD_IMAGES=on` (padrão), o navegador carrega as imagens direto das URLs informadas pela API, e cada jogador
+pode desligá-las nas configurações. Com `CARD_IMAGES=off`, o servidor remove as URLs de todas as respostas e o
+jogo usa só as cartas desenhadas em HTML (nome, custo, poder, texto). Se uma imagem falhar ao carregar, a carta
+desenhada é usada automaticamente.
+
+### Textos em português
+
+Cada jogador escolhe "Português" ou "English" no menu ou durante a partida (a escolha fica salva no navegador).
+
+- **Tradução automática:** feita por regras em `packages/engine/src/i18n/pt.ts`. Os textos do jogo seguem modelos
+  fixos, então a maior parte é traduzida sem serviço externo. Trechos não reconhecidos ficam em inglês e a carta é
+  marcada como "tradução parcial". O painel da carta sempre tem o link "ver original".
+- **Traduções revisadas:** `data/translations/pt.json` (`{ "cards": { "OP01-001": { "text": "...", "trigger": "..." } } }`)
+  tem prioridade sobre a automática. `GET /api/translations/pending` lista as cartas com tradução parcial, para revisão.
+- Nomes de cartas, tipos ({Straw Hat Crew}) e palavras-chave (Rush, Blocker, Counter, Trigger...) ficam no original,
+  como nas cartas físicas.
 
 ## Testes
 
 ```bash
-npm test                                   # regras + 200 partidas bot x bot verificando invariantes
+npm test                                   # regras, tradução, importador, API e 200 partidas bot x bot
 npm run simulate -w @gumgum/engine -- 500  # estatísticas de N partidas bot x bot
 npm run typecheck
 ```
@@ -136,12 +161,14 @@ npm run typecheck
 | Método | Rota               | Descrição                                   |
 |--------|--------------------|---------------------------------------------|
 | GET    | `/api/health`      | Verificação de saúde                        |
+| GET    | `/api/config`      | Configurações públicas (imagens ligadas?)   |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
 | GET    | `/api/cards/:id`   | Uma carta                                   |
 | GET    | `/api/decks`       | Lista decks                                 |
 | GET    | `/api/decks/:id`   | Deck + definições das cartas usadas         |
 | POST   | `/api/matches`     | Registra o resultado de uma partida         |
 | GET    | `/api/matches`     | Últimas partidas                            |
+| GET    | `/api/translations/pending` | Cartas com tradução automática parcial |
 
 ## Aviso
 

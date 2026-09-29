@@ -1,0 +1,38 @@
+[
+  {
+    "card_set_id": "ST01-001", "card_image_id": "ST01-001", "card_name": "Monkey.D.Luffy",
+    "set_id": "ST-01", "set_name": "Starter Deck 1: Straw Hat Crew", "rarity": "L",
+    "card_type": "Leader", "card_color": "Red", "card_cost": null, "life": "5", "card_power": "5000",
+    "counter_amount": null, "attribute": "Strike", "sub_types": "Supernovas Straw Hat Crew",
+    "card_text": "[Activate: Main] [Once Per Turn] Give this Leader or 1 of your Characters up to 1 rested DON!! card.",
+    "card_image": "https://example.test/ST01-001.png"
+  },
+  {
+    "card_set_id": "ST01-001", "card_image_id": "ST01-001_p1", "card_name": "Monkey.D.Luffy (Parallel)",
+    "set_id": "ST-01", "card_type": "Leader", "card_color": "Red", "life": "5", "card_power": "5000",
+    "sub_types": "Supernovas Straw Hat Crew", "card_text": "texto da versão alternativa",
+    "card_image": "https://example.test/ST01-001_p1.png"
+  },
+  {
+    "card_set_id": "ST01-015", "card_image_id": "ST01-015", "card_name": "Gum-Gum Jet Pistol",
+    "set_id": "ST-01", "card_type": "Event", "card_color": "Red", "card_cost": "4", "card_power": null,
+    "counter_amount": null, "sub_types": "Supernovas/Straw Hat Crew",
+    "card_text": "[Main] K.O. up to 1 of your opponent's Characters with 6000 power or less.<br>[Trigger] Activate this card's [Main] effect.",
+    "card_image": "https://example.test/ST01-015.png"
+  },
+  {
+    "card_set_id": "ST01-013", "card_image_id": "ST01-013", "card_name": "Roronoa Zoro",
+    "set_id": "ST-01", "card_type": "Character", "card_color": "Red", "card_cost": "3", "card_power": "5000",
+    "counter_amount": "-", "attribute": "Slash", "sub_types": "Supernovas Straw Hat Crew",
+    "card_text": "[DON!! x1] This Character gains +1000 power.",
+    "card_image": "https://example.test/ST01-013.png"
+  },
+  {
+    "card_set_id": "ST01-006", "card_image_id": "ST01-006", "card_name": "Tony Tony.Chopper",
+    "set_id": "ST-01", "card_type": "Character", "card_color": "Red", "card_cost": "1", "card_power": "1000",
+    "counter_amount": "1000", "sub_types": "Animal Straw Hat Crew",
+    "card_text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+    "card_image": "https://example.test/ST01-006.png"
+  },
+  { "card_set_id": "DON-001", "card_name": "DON!!", "card_type": "DON!!", "card_text": "" }
+]
