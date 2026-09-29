@@ -1,0 +1,321 @@
+{
+  "set": "ST01",
+  "title": "Starter Deck 01 - Straw Hat Crew",
+  "provisional": true,
+  "note": "DADOS PROVISÓRIOS reconstruídos de memória apenas para testar a interface. Serão substituídos pela importação da API oficial de cartas (npm run cards:import).",
+  "cards": [
+    {
+      "id": "ST01-001",
+      "name": "Monkey.D.Luffy",
+      "category": "leader",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Supernovas",
+        "Straw Hat Crew"
+      ],
+      "text": "[Activate: Main] [Once Per Turn] Give this Leader or 1 of your Characters up to 1 rested DON!! card.",
+      "set": "ST01",
+      "power": 5000,
+      "life": 5,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-002",
+      "name": "Usopp",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x1] [When Attacking] Your opponent cannot activate a [Blocker] Character that has 5000 or more power during this battle.",
+      "set": "ST01",
+      "cost": 2,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Ranged"
+      ]
+    },
+    {
+      "id": "ST01-003",
+      "name": "Karoo",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Animal",
+        "Alabasta"
+      ],
+      "text": "[Activate: Main] You may rest this Character: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "set": "ST01",
+      "cost": 1,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-004",
+      "name": "Sanji",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x2] This Character gains [Rush].",
+      "set": "ST01",
+      "cost": 2,
+      "power": 4000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-005",
+      "name": "Jinbe",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Fish-Man",
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x1] [When Attacking] Up to 1 of your Leader or Character cards other than this card gains +1000 power during this turn.",
+      "set": "ST01",
+      "cost": 3,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-006",
+      "name": "Tony Tony.Chopper",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Animal",
+        "Straw Hat Crew"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "ST01",
+      "cost": 1,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-007",
+      "name": "Nami",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Activate: Main] [Once Per Turn] Give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "set": "ST01",
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ]
+    },
+    {
+      "id": "ST01-008",
+      "name": "Nico Robin",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x1] [When Attacking] K.O. up to 1 of your opponent's Characters with 2000 power or less.",
+      "set": "ST01",
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-009",
+      "name": "Nefeltari Vivi",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Alabasta"
+      ],
+      "text": "",
+      "set": "ST01",
+      "cost": 2,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ]
+    },
+    {
+      "id": "ST01-010",
+      "name": "Franky",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x1] This Character can also attack your opponent's active Characters.",
+      "set": "ST01",
+      "cost": 4,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-011",
+      "name": "Brook",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[On Play] Give up to 2 rested DON!! cards to your Leader or 1 of your Characters.",
+      "set": "ST01",
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ]
+    },
+    {
+      "id": "ST01-012",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Supernovas",
+        "Straw Hat Crew"
+      ],
+      "text": "[Rush] (This card can attack on the turn in which it is played.)\n[DON!! x2] [When Attacking] Your opponent cannot activate [Blocker] during this battle.",
+      "set": "ST01",
+      "cost": 5,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ]
+    },
+    {
+      "id": "ST01-013",
+      "name": "Roronoa Zoro",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Supernovas",
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x1] This Character gains +1000 power.",
+      "set": "ST01",
+      "cost": 3,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ]
+    },
+    {
+      "id": "ST01-014",
+      "name": "Guard Point",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Animal",
+        "Straw Hat Crew"
+      ],
+      "text": "[Counter] Up to 1 of your Leader or Character cards gains +3000 power during this battle.",
+      "set": "ST01",
+      "cost": 1,
+      "trigger": "Up to 1 of your Leader or Character cards gains +1000 power during this turn."
+    },
+    {
+      "id": "ST01-015",
+      "name": "Gum-Gum Jet Pistol",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Supernovas",
+        "Straw Hat Crew"
+      ],
+      "text": "[Main] K.O. up to 1 of your opponent's Characters with 6000 power or less.",
+      "set": "ST01",
+      "cost": 4,
+      "trigger": "Activate this card's [Main] effect."
+    },
+    {
+      "id": "ST01-016",
+      "name": "Diable Jambe",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Main] Select up to 1 of your {Straw Hat Crew} type Leader or Character cards. Your opponent cannot activate [Blocker] if that Leader or Character attacks during this turn.",
+      "set": "ST01",
+      "cost": 1,
+      "trigger": "K.O. up to 1 of your opponent's Characters with a cost of 3 or less and [Blocker]."
+    },
+    {
+      "id": "ST01-017",
+      "name": "Thousand Sunny",
+      "category": "stage",
+      "colors": [
+        "red"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Activate: Main] You may rest this Stage: Up to 1 {Straw Hat Crew} type Leader or Character card gains +1000 power during this turn.",
+      "set": "ST01",
+      "cost": 2
+    }
+  ]
+}

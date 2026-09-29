@@ -1,0 +1,17 @@
+{
+  "name": "@gumgum/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "simulate": "tsx scripts/simulate.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "vitest": "^3.0.0"
+  }
+}

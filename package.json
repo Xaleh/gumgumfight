@@ -1,0 +1,28 @@
+{
+  "name": "gumgumfight",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Simulador de One Piece Card Game no navegador (projeto de fã)",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w @gumgum/server\" \"npm run dev -w @gumgum/web\"",
+    "build": "npm run build -w @gumgum/web",
+    "start": "npm run start -w @gumgum/server",
+    "test": "npm run test -w @gumgum/engine",
+    "typecheck": "tsc -p packages/engine && tsc -p apps/server && tsc -p apps/web",
+    "db:seed": "npm run db:seed -w @gumgum/server",
+    "cards:import": "npm run cards:import -w @gumgum/server"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
