@@ -10,7 +10,7 @@ import {
   validateDeck,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, type ApiCard, type DeckSummary } from '../api';
+import { api, type ApiCard, deckGroups, type DeckSummary } from '../api';
 import { SettingsControls } from '../settings';
 import { CardInfo } from './CardInfo';
 import { StaticCard } from './CardView';
@@ -20,7 +20,8 @@ interface Draft {
   name: string;
   leader: string;
   cards: Map<string, number>;
-  kind: 'builtin' | 'user';
+  /** user = meu (editável); builtin/community = somente leitura, editar cria uma cópia. */
+  kind: 'builtin' | 'community' | 'user';
 }
 
 const emptyDraft = (): Draft => ({ id: null, name: 'Novo deck', leader: '', cards: new Map(), kind: 'user' });
@@ -120,9 +121,15 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
 
   /** Decks prontos são somente leitura: a primeira alteração cria uma cópia. */
   const edit = (fn: (d: Draft) => Draft) => {
-    if (draft.kind === 'builtin') setNotice('Decks prontos não são alterados: você está editando uma cópia.');
+    if (draft.kind !== 'user') {
+      setNotice(
+        draft.kind === 'builtin'
+          ? 'Decks prontos não são alterados: você está editando uma cópia.'
+          : 'Este deck é de outro jogador: você está editando uma cópia sua.',
+      );
+    }
     setDraft((d) => {
-      const base = d.kind === 'builtin' ? { ...d, id: null, kind: 'user' as const, name: `${d.name} (cópia)` } : d;
+      const base = d.kind !== 'user' ? { ...d, id: null, kind: 'user' as const, name: `${d.name} (cópia)` } : d;
       return fn({ ...base, cards: new Map(base.cards) });
     });
     setDirty(true);
@@ -163,10 +170,16 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         name: deck.name,
         leader: deck.leader,
         cards: new Map(deck.cards.map((c) => [c.id, c.count])),
-        kind: deck.kind,
+        kind: deck.kind === 'builtin' ? 'builtin' : deck.mine ? 'user' : 'community',
       });
       setDirty(false);
-      setNotice(deck.kind === 'builtin' ? 'Deck pronto: ao alterar, uma cópia será criada.' : null);
+      setNotice(
+        deck.kind === 'builtin'
+          ? 'Deck pronto: ao alterar, uma cópia será criada.'
+          : deck.mine
+            ? null
+            : 'Deck de outro jogador: ao alterar, uma cópia sua será criada.',
+      );
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -277,11 +290,10 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
             + Novo deck
           </button>
           <div className="deck-list">
-            {(['user', 'builtin'] as const).map((kind) => {
-              const group = decks.filter((d) => d.kind === kind);
-              return (
-                <div key={kind}>
-                  <div className="deck-list-title">{kind === 'user' ? 'Meus decks' : 'Decks prontos'}</div>
+            {deckGroups(decks).map(([title, group]) =>
+              title === 'Decks da comunidade' && !group.length ? null : (
+                <div key={title}>
+                  <div className="deck-list-title">{title}</div>
                   {group.length === 0 && <div className="muted small">Nenhum deck ainda.</div>}
                   {group.map((d) => (
                     <button
@@ -301,9 +313,13 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                     </button>
                   ))}
                 </div>
-              );
-            })}
+              ),
+            )}
           </div>
+          <p className="muted small owner-hint">
+            Seus decks ficam ligados a este navegador: limpar os dados do site faz perder a edição deles (continuam
+            visíveis e podem ser duplicados).
+          </p>
           <CardInfo card={hovered} />
         </aside>
 

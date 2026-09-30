@@ -34,25 +34,79 @@ O Vite só sobe depois que a API responde em `/api/health`.
 
 ## Rodando no seu servidor (produção)
 
+O comando `npm run build:release` gera `release/`, um pacote autocontido (servidor empacotado com esbuild, interface
+e dados). O pacote não tem módulos nativos, então funciona em x64 e ARM, e só precisa de **Node ≥ 22.13** (sem `npm install`):
+
 ```bash
-npm ci
-npm run build          # compila a interface em apps/web/dist
-PORT=3001 npm start    # o servidor entrega a API e a interface na mesma porta
+npm ci && npm run build:release
+DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data PORT=3310 node release/server/index.mjs
 ```
 
-Variáveis de ambiente:
+| Variável        | Padrão                        | Descrição                                   |
+|-----------------|-------------------------------|---------------------------------------------|
+| `PORT`          | `3001`                        | Porta HTTP                                  |
+| `HOST`          | `0.0.0.0`                     | Interface de rede (`127.0.0.1` atrás do Nginx) |
+| `DB_PATH`       | `apps/server/var/gumgum.db`   | Arquivo SQLite                              |
+| `WEB_DIST`      | `apps/web/dist`               | Interface compilada                         |
+| `DATA_DIR`      | `data`                        | Decks prontos, cartas provisórias e traduções |
+| `CARD_IMAGES`   | `on`                          | `off` desliga as imagens oficiais das cartas |
+| `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
 
-| Variável  | Padrão                        | Descrição                    |
-|-----------|-------------------------------|------------------------------|
-| `PORT`    | `3001`                        | Porta HTTP                   |
-| `HOST`    | `0.0.0.0`                     | Interface de rede            |
-| `DB_PATH` | `apps/server/var/gumgum.db`   | Caminho do arquivo SQLite    |
-| `CARD_IMAGES` | `on`                      | `off` desliga as imagens oficiais das cartas (as URLs nem chegam ao navegador) |
-| `CARD_API_BASE` | `https://optcgapi.com/api` | Endereço da API usada pelo importador |
+O backup é só copiar o arquivo `.db`.
 
-Para manter o processo rodando, use o gerenciador que preferir, por exemplo o **pm2**
-(`pm2 start npm --name gumgum -- start`) ou um serviço **systemd**. Com um domínio, coloque um Nginx/Caddy na
-frente fazendo proxy para a porta 3001. O **backup** é só copiar o arquivo `.db`.
+## Deploy automático (GitHub Actions → VM da Oracle)
+
+O workflow `.github/workflows/ci-deploy.yml` roda os testes em todo push. Em push na **main** (ou em "Run workflow"),
+ele publica em **https://gumgumfight.duckdns.org**:
+
+1. Monta o pacote e o testa (sobe o servidor e consulta a API) antes de enviar.
+2. Copia o pacote por SSH para `~/apps/gumgumfight/releases/<commit>` e troca o link `current`.
+3. Recarrega o app `gumgumfight` no pm2 e confere `/api/health`. **Se falhar, volta sozinho para a versão anterior.**
+4. Mantém os 5 últimos releases. O banco fica em `~/apps/gumgumfight/shared/gumgum.db` e sobrevive aos deploys.
+
+O app escuta só em `127.0.0.1:3310`, atrás do Nginx. Os outros apps da VM não são tocados: o deploy usa
+um Node ≥ 22.13 próprio (via nvm, se o Node padrão da VM for mais antigo) e um arquivo de site separado no Nginx.
+
+### Configuração inicial (uma vez)
+
+1. **Chave de deploy dedicada** (na sua máquina, não use a chave principal da instância):
+   ```bash
+   ssh-keygen -t ed25519 -f gumgum_deploy -N "" -C github-actions-gumgumfight
+   ```
+2. **DuckDNS:** `gumgumfight.duckdns.org` deve apontar para `167.234.249.51`.
+3. **Na VM** (`ssh ubuntu@167.234.249.51`), prepare tudo. O script cria as pastas, instala o Node 22 se preciso,
+   cria o site no Nginx, gera o HTTPS com certbot e autoriza a chave:
+   ```bash
+   curl -fsSLO https://raw.githubusercontent.com/Xaleh/gumgumfight/main/deploy/setup-vm.sh
+   bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
+   ```
+   Opcional: `CERTBOT_EMAIL=voce@exemplo.com` (avisos do Let's Encrypt), `PORT=...` (se a 3310 estiver ocupada).
+4. **No GitHub** → Settings → Secrets and variables → Actions → *New repository secret*:
+
+   | Secret               | Valor                                               |
+   |----------------------|-----------------------------------------------------|
+   | `DEPLOY_HOST`        | `167.234.249.51`                                    |
+   | `DEPLOY_USER`        | `ubuntu`                                            |
+   | `DEPLOY_SSH_KEY`     | conteúdo do arquivo `gumgum_deploy` (chave privada) |
+   | `DEPLOY_KNOWN_HOSTS` | saída de `ssh-keyscan -t ed25519 167.234.249.51`    |
+
+5. **No GitHub** → Settings → General → *Default branch*: `main`.
+6. **Primeiro deploy:** Actions → "CI e deploy" → *Run workflow* (branch `main`), com `import_sets` = `ST-01 ST-02`
+   para já importar as cartas reais. Depois disso, todo push na `main` publica sozinho.
+
+Enquanto os secrets não existirem, o job de deploy é pulado com um aviso (os testes continuam rodando).
+
+### Operação
+
+```bash
+pm2 logs gumgumfight                      # logs
+pm2 restart gumgumfight                   # reiniciar
+cd ~/apps/gumgumfight && ls releases      # versões disponíveis
+# importar mais coleções no servidor:
+source shared/deploy.env && DB_PATH=shared/gumgum.db $NODE_BIN current/server/import-cards.mjs OP-01 OP-02
+# desligar as imagens: CARD_IMAGES=off em shared/deploy.env e depois:
+pm2 startOrReload ~/apps/gumgumfight/current/deploy/ecosystem.config.cjs --update-env
+```
 
 ## Montando decks
 
@@ -67,6 +121,10 @@ No menu, **Montar / editar decks** abre o construtor:
 Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por número e toda carta com ao menos uma
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
 Decks prontos (`data/decks`) não são alterados: ao mexer em um, o construtor cria uma cópia.
+
+Não há login: cada navegador recebe um código aleatório (guardado no navegador) e só ele pode editar ou apagar os
+decks que criou. Decks de outros jogadores aparecem em "Decks da comunidade": dá para jogar com eles e duplicá-los.
+Limpar os dados do site no navegador faz perder a edição dos próprios decks.
 **Exportar/Importar lista** usa o formato de texto da comunidade (`4xOP01-016`, uma carta por linha).
 
 ## Como jogar

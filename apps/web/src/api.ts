@@ -12,6 +12,44 @@ export interface DeckSummary {
   errors: string[];
   unscripted: number;
   updatedAt: string;
+  /** Deck criado neste navegador (só o dono edita/apaga). */
+  mine: boolean;
+}
+
+/** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. */
+export function deckGroups(decks: DeckSummary[]): Array<[string, DeckSummary[]]> {
+  return [
+    ['Meus decks', decks.filter((d) => d.kind === 'user' && d.mine)],
+    ['Decks da comunidade', decks.filter((d) => d.kind === 'user' && !d.mine)],
+    ['Decks prontos', decks.filter((d) => d.kind === 'builtin')],
+  ];
+}
+
+// ------------------------------------------------------------------ dono dos decks
+
+const OWNER_KEY = 'gumgum.owner';
+let ownerMemo: string | null = null;
+
+/**
+ * Código aleatório deste navegador, enviado em x-deck-owner. Quem o tem pode editar
+ * os decks criados aqui. Usa getRandomValues porque randomUUID exige HTTPS.
+ */
+export function ownerToken(): string {
+  if (ownerMemo) return ownerMemo;
+  try {
+    const saved = localStorage.getItem(OWNER_KEY);
+    if (saved && saved.length >= 16) return (ownerMemo = saved);
+  } catch {
+    /* armazenamento indisponível */
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  ownerMemo = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  try {
+    localStorage.setItem(OWNER_KEY, ownerMemo);
+  } catch {
+    /* vale só nesta sessão */
+  }
+  return ownerMemo;
 }
 
 export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards'>;
@@ -19,7 +57,7 @@ export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards'>;
 export type ApiCard = CardData & { provisional?: boolean };
 
 async function get<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: { 'x-deck-owner': ownerToken() } });
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -27,7 +65,10 @@ async function get<T>(url: string): Promise<T> {
 async function send<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
-    headers: body ? { 'content-type': 'application/json' } : undefined,
+    headers: {
+      'x-deck-owner': ownerToken(),
+      ...(body ? { 'content-type': 'application/json' } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -41,7 +82,7 @@ export const api = {
   config: () => get<{ cardImages: boolean; languages: string[] }>('/api/config'),
   decks: () => get<DeckSummary[]>('/api/decks'),
   deck: (id: string) =>
-    get<{ deck: DeckList & { kind: DeckSummary['kind'] }; cards: ApiCard[]; summary: DeckSummary }>(
+    get<{ deck: DeckList & { kind: DeckSummary['kind']; mine: boolean }; cards: ApiCard[]; summary: DeckSummary }>(
       `/api/decks/${encodeURIComponent(id)}`,
     ),
   cards: () => get<ApiCard[]>('/api/cards'),

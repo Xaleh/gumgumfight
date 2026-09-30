@@ -1,7 +1,8 @@
 import fastifyStatic from '@fastify/static';
 import { type CardData, type DeckList, validateDeck } from '@gumgum/engine';
 import Fastify from 'fastify';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import type { FastifyRequest } from 'fastify';
 import { existsSync } from 'node:fs';
 import { type ServerOptions, serverOptions } from './config';
 import {
@@ -22,7 +23,8 @@ import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
 
 export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOptions } = {}) {
-  const app = Fastify({ logger: opts.logger ?? false });
+  // trustProxy: em produção o servidor fica atrás do Nginx.
+  const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
   const server = opts.server ?? serverOptions;
   const present = (cards: ApiCard[]) =>
     presentCards(cards, getTranslations(db, 'pt', cards.length > 200 ? undefined : cards.map((c) => c.id)), server);
@@ -45,8 +47,21 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
       .map((c) => ({ id: c.id, name: c.name, text: c.text, trigger: c.trigger, auto: c.i18n?.pt })),
   );
 
+  /**
+   * Dono do deck: cada navegador gera um código aleatório e o envia no header
+   * x-deck-owner. Só guardamos o hash; só quem tem o código edita/apaga o deck.
+   */
+  const viewerHash = (req: FastifyRequest): string | null => {
+    const token = req.headers['x-deck-owner'];
+    if (typeof token !== 'string' || token.length < 16 || token.length > 128) return null;
+    return createHash('sha256').update(token).digest('hex');
+  };
+  const isMine = (deck: StoredDeck, viewer: string | null) =>
+    deck.kind === 'user' && deck.ownerHash !== null && deck.ownerHash === viewer;
+  const publicDeck = ({ ownerHash: _hidden, ...deck }: StoredDeck) => deck;
+
   /** Deck com resumo de validação (usado nas listas). */
-  const summarize = (deck: StoredDeck, cards: Map<string, CardData>) => {
+  const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null) => {
     const report = validateDeck(deck, cards);
     const leader = cards.get(deck.leader);
     return {
@@ -61,6 +76,7 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
       errors: report.issues.filter((i) => i.level === 'error').map((i) => i.message),
       unscripted: report.unscripted.length,
       updatedAt: deck.updatedAt,
+      mine: isMine(deck, viewer),
     };
   };
   const cardsFor = (decks: DeckList[]) =>
@@ -71,10 +87,11 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
       ]),
     );
 
-  app.get('/api/decks', async () => {
+  app.get('/api/decks', async (req) => {
     const decks = listDecks(db);
     const cards = cardsFor(decks);
-    return decks.map((d) => summarize(d, cards));
+    const viewer = viewerHash(req);
+    return decks.map((d) => summarize(d, cards, viewer));
   });
 
   /** Deck + definições de todas as cartas usadas (o que o cliente precisa para jogar). */
@@ -82,7 +99,8 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
     const deck = getDeck(db, req.params.id);
     if (!deck) return reply.code(404).send({ error: 'Deck não encontrado' });
     const cards = present(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]));
-    return { deck, cards, summary: summarize(deck, new Map(cards.map((c) => [c.id, c]))) };
+    const summary = summarize(deck, new Map(cards.map((c) => [c.id, c])), viewerHash(req));
+    return { deck: { ...publicDeck(deck), mine: summary.mine }, cards, summary };
   });
 
   type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown };
@@ -104,29 +122,38 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
 
   // Decks incompletos podem ser salvos (rascunho); só decks válidos aparecem para jogar.
   app.post<{ Body: DeckBody }>('/api/decks', async (req, reply) => {
+    const owner = viewerHash(req);
+    if (!owner) return reply.code(400).send({ error: 'Navegador sem código de dono (header x-deck-owner).' });
     const parsed = parseDeckBody(req.body);
     if (typeof parsed === 'string') return reply.code(400).send({ error: parsed });
     const deck = { id: `u-${randomUUID().slice(0, 8)}`, ...parsed };
-    upsertDeck(db, deck, 'user');
+    upsertDeck(db, deck, 'user', owner);
     const stored = getDeck(db, deck.id)!;
-    return reply.code(201).send(summarize(stored, cardsFor([stored])));
+    return reply.code(201).send(summarize(stored, cardsFor([stored]), owner));
   });
 
   app.put<{ Params: { id: string }; Body: DeckBody }>('/api/decks/:id', async (req, reply) => {
     const existing = getDeck(db, req.params.id);
     if (!existing) return reply.code(404).send({ error: 'Deck não encontrado' });
     if (existing.kind !== 'user') return reply.code(403).send({ error: 'Decks prontos não podem ser alterados; duplique-o.' });
+    const viewer = viewerHash(req);
+    if (!isMine(existing, viewer)) {
+      return reply.code(403).send({ error: 'Este deck pertence a outro jogador; duplique-o para editar.' });
+    }
     const parsed = parseDeckBody(req.body);
     if (typeof parsed === 'string') return reply.code(400).send({ error: parsed });
     upsertDeck(db, { id: existing.id, ...parsed }, 'user');
     const stored = getDeck(db, existing.id)!;
-    return summarize(stored, cardsFor([stored]));
+    return summarize(stored, cardsFor([stored]), viewer);
   });
 
   app.delete<{ Params: { id: string } }>('/api/decks/:id', async (req, reply) => {
     const existing = getDeck(db, req.params.id);
     if (!existing) return reply.code(404).send({ error: 'Deck não encontrado' });
     if (existing.kind !== 'user') return reply.code(403).send({ error: 'Decks prontos não podem ser apagados.' });
+    if (!isMine(existing, viewerHash(req))) {
+      return reply.code(403).send({ error: 'Este deck pertence a outro jogador.' });
+    }
     deleteDeck(db, existing.id);
     return reply.code(204).send();
   });
@@ -152,7 +179,14 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
 
   // Em produção, o próprio servidor entrega a interface web compilada.
   if (existsSync(WEB_DIST)) {
-    app.register(fastifyStatic, { root: WEB_DIST });
+    app.register(fastifyStatic, {
+      root: WEB_DIST,
+      // Arquivos de /assets têm hash no nome: podem ficar em cache por 1 ano.
+      setHeaders: (res, path) => {
+        if (/[\\/]assets[\\/]/.test(path)) res.setHeader('cache-control', 'public, max-age=31536000, immutable');
+        else res.setHeader('cache-control', 'no-cache');
+      },
+    });
     app.setNotFoundHandler((req, reply) =>
       req.url.startsWith('/api/') ? reply.code(404).send({ error: 'Não encontrado' }) : reply.sendFile('index.html'),
     );

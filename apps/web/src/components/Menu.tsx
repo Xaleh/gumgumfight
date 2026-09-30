@@ -1,6 +1,6 @@
 import type { Action, CardData, PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, type DeckSummary } from '../api';
+import { api, deckGroups, type DeckSummary } from '../api';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
 import { SettingsControls } from '../settings';
 
@@ -36,10 +36,7 @@ async function buildSetup(
 const LAST_DECKS = 'gumgum.lastDecks';
 
 function DeckSelect({ decks, value, onChange }: { decks: DeckSummary[]; value: string; onChange: (id: string) => void }) {
-  const groups: Array<[string, DeckSummary[]]> = [
-    ['Meus decks', decks.filter((d) => d.kind === 'user')],
-    ['Decks prontos', decks.filter((d) => d.kind === 'builtin')],
-  ];
+  const groups = deckGroups(decks);
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
       {groups

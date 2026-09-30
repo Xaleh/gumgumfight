@@ -1,0 +1,147 @@
+name: CI e deploy
+
+# Todo push/PR roda os testes e monta o pacote.
+# Push na main (ou "Run workflow" na main) publica na VM da Oracle.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      import_sets:
+        description: 'Coleções para importar da optcgapi após o deploy (ex.: ST-01 ST-02). Vazio = não importa.'
+        required: false
+        default: ''
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  SITE_URL: https://gumgumfight.duckdns.org
+
+jobs:
+  test:
+    name: Testes e pacote
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build:release
+
+      - name: Smoke test do pacote (o mesmo que vai para a VM)
+        run: |
+          export DB_PATH="$RUNNER_TEMP/smoke.db" WEB_DIST="$PWD/release/web" DATA_DIR="$PWD/release/data"
+          export PORT=3399 HOST=127.0.0.1 NODE_ENV=production
+          node release/server/index.mjs > "$RUNNER_TEMP/server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true; cat "$RUNNER_TEMP/server.log"' EXIT
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:3399/api/health >/dev/null 2>&1 && break; sleep 1; done
+          curl -fsS http://127.0.0.1:3399/api/health
+          curl -fsS http://127.0.0.1:3399/api/decks | grep -q st01-luffy
+          curl -fsS http://127.0.0.1:3399/ | grep -q '<div id="root">'
+          node release/server/import-cards.mjs --dry-run --file apps/server/test/fixtures/optcgapi-sample.json
+
+      - name: Empacota
+        run: tar -czf "gumgumfight-${GITHUB_SHA}.tgz" -C release .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: gumgumfight-${{ github.sha }}.tgz
+          retention-days: 7
+
+  deploy:
+    name: Deploy na VM
+    needs: test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://gumgumfight.duckdns.org
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      REMOTE_DIR: apps/gumgumfight/releases/${{ github.sha }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Verifica os secrets de deploy
+        id: check
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER_NAME: ${{ secrets.DEPLOY_USER }}
+        run: |
+          missing=""
+          for v in SSH_KEY KNOWN_HOSTS HOST USER_NAME; do [ -n "${!v}" ] || missing="$missing $v"; done
+          if [ -n "$missing" ]; then
+            echo "::warning::Deploy pulado: faltam secrets (DEPLOY_*):$missing. Veja a seção Deploy do README."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configura o SSH
+        if: steps.check.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER_NAME: ${{ secrets.DEPLOY_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CFG
+          Host vm
+            HostName $HOST
+            User $USER_NAME
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 15
+          CFG
+
+      - name: Envia o pacote
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          ssh vm "mkdir -p '$REMOTE_DIR'"
+          scp "gumgumfight-${GITHUB_SHA}.tgz" "vm:$REMOTE_DIR.tgz"
+          ssh vm "tar -xzf '$REMOTE_DIR.tgz' -C '$REMOTE_DIR' && rm -f '$REMOTE_DIR.tgz'"
+
+      - name: Ativa a nova versão (com rollback automático)
+        if: steps.check.outputs.ready == 'true'
+        env:
+          IMPORT_SETS: ${{ github.event.inputs.import_sets }}
+        run: |
+          if [ -n "$IMPORT_SETS" ] && ! [[ "$IMPORT_SETS" =~ ^[A-Za-z0-9\ -]+$ ]]; then
+            echo "::error::import_sets inválido: use só letras, números, hífen e espaço (ex.: ST-01 ST-02)"
+            exit 1
+          fi
+          ssh vm "IMPORT_SETS='$IMPORT_SETS' bash '$REMOTE_DIR/deploy/remote-deploy.sh' '$REMOTE_DIR'"
+
+      - name: Verifica o site público
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          for _ in $(seq 1 10); do
+            curl -fsS "$SITE_URL/api/health" && exit 0
+            sleep 3
+          done
+          echo "::error::$SITE_URL não respondeu. O app está no ar na VM, confira o Nginx/HTTPS (deploy/setup-vm.sh)."
+          exit 1

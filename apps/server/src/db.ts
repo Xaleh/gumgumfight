@@ -81,6 +81,8 @@ function migrate(db: DB) {
   if (!cols.includes('raw')) db.exec('ALTER TABLE cards ADD COLUMN raw TEXT');
   const deckCols = (db.prepare('PRAGMA table_info(decks)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!deckCols.includes('kind')) db.exec("ALTER TABLE decks ADD COLUMN kind TEXT NOT NULL DEFAULT 'builtin'");
+  // SHA-256 do código de dono do navegador que criou o deck (nunca o código em si).
+  if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
 }
 
 // ------------------------------------------------------------------ cartas
@@ -186,19 +188,28 @@ export function getTranslations(db: DB, lang: string, ids?: string[]): Map<strin
 
 /** builtin = vem de data/decks (recriado a cada início); user = montado pelo jogador. */
 export type DeckKind = 'builtin' | 'user';
-export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string };
+export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHash: string | null };
 
-export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin') {
+/** Grava um deck. O dono só é definido na criação (um update nunca troca o dono). */
+export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', ownerHash: string | null = null) {
   db.prepare(`
-    INSERT INTO decks (id, name, leader, cards, kind, updated_at)
-    VALUES (?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO decks (id, name, leader, cards, kind, owner_hash, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET name = excluded.name, leader = excluded.leader,
       cards = excluded.cards, kind = excluded.kind, updated_at = excluded.updated_at
-  `).run(deck.id, deck.name, deck.leader, JSON.stringify(deck.cards), kind);
+  `).run(deck.id, deck.name, deck.leader, JSON.stringify(deck.cards), kind, ownerHash);
 }
 
-type DeckRow = { id: string; name: string; leader: string; cards: string; kind: DeckKind; updated_at: string };
-const DECK_COLS = 'id, name, leader, cards, kind, updated_at';
+type DeckRow = {
+  id: string;
+  name: string;
+  leader: string;
+  cards: string;
+  kind: DeckKind;
+  updated_at: string;
+  owner_hash: string | null;
+};
+const DECK_COLS = 'id, name, leader, cards, kind, updated_at, owner_hash';
 const toDeck = (r: DeckRow): StoredDeck => ({
   id: r.id,
   name: r.name,
@@ -206,6 +217,7 @@ const toDeck = (r: DeckRow): StoredDeck => ({
   cards: JSON.parse(r.cards),
   kind: r.kind,
   updatedAt: r.updated_at,
+  ownerHash: r.owner_hash,
 });
 
 export function listDecks(db: DB): StoredDeck[] {
