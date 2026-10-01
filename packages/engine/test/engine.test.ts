@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, getPower, IllegalActionError } from '../src/engine';
+import { applyAction, getPower, IllegalActionError, locate } from '../src/engine';
 import { legalActions } from '../src/actions';
 import { fetchToHand, newGame, putOnField, started, toTurn } from './helpers';
 
@@ -111,44 +111,44 @@ describe('batalha', () => {
 
   it('Counter de personagem impede o dano', () => {
     let s = readyToAttack();
-    const counter = fetchToHand(s, 1, 'ST02-004'); // counter 1000
+    s.players[1].hand = [];
+    const counter = fetchToHand(s, 1, 'ST02-005'); // Killer, counter +1000
+    fetchToHand(s, 1, 'ST02-011'); // um segundo Counter mantém a etapa aberta
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
     expect(s.pending?.kind).toBe('counter');
     s = applyAction(s, { type: 'counter', player: 1, uid: counter });
     expect(getPower(s, s.players[1].leader.uid)).toBe(6000);
-    s = applyAction(s, { type: 'pass', player: 1 });
+    if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 1 });
     expect(s.players[1].life).toHaveLength(5);
     expect(s.players[1].trash).toContain(counter);
     // Modificador de batalha expira.
     expect(getPower(s, s.players[1].leader.uid)).toBe(5000);
   });
-
-  it('evento [Counter] paga custo e aplica +3000', () => {
+  it('evento [Counter] (Repel) paga o custo, dá +4000 e desvira 1 DON!!', () => {
     let s = readyToAttack();
     s.players[1].hand = [];
-    const repel = fetchToHand(s, 1, 'ST02-014');
-    s.players[1].donActive = 1;
+    const repel = fetchToHand(s, 1, 'ST02-016');
+    s.players[1].donActive = 2;
+    s.players[1].donRested = 0;
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
     s = applyAction(s, { type: 'counter', player: 1, uid: repel });
     expect(s.pending?.kind).toBe('selectTargets');
     s = applyAction(s, { type: 'choose', player: 1, uids: [s.players[1].leader.uid] });
-    expect(s.pending).toBeNull(); // sem mais counters disponíveis, segue para o dano
     expect(s.players[1].life).toHaveLength(5);
-    expect(s.players[1].donActive).toBe(0);
+    expect(s.players[1].donActive).toBe(1); // pagou 2, desvirou 1
+    expect(s.players[1].donRested).toBe(1);
   });
-
   it('[Blocker] redireciona o ataque e o bloqueador é nocauteado', () => {
     let s = readyToAttack();
     s.players[1].hand = [];
-    const law = putOnField(s, 1, 'ST02-007');
+    const bege = putOnField(s, 1, 'ST02-004'); // Capone"Gang"Bege: [Blocker] detectado no texto
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
-    expect(s.pending).toEqual({ kind: 'block', player: 1, options: [law] });
-    s = applyAction(s, { type: 'choose', player: 1, uids: [law] });
+    expect(s.pending).toEqual({ kind: 'block', player: 1, options: [bege] });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [bege] });
     expect(s.players[1].characters).toHaveLength(0);
-    expect(s.players[1].trash).toContain(law);
+    expect(s.players[1].trash).toContain(bege);
     expect(s.players[1].life).toHaveLength(5);
   });
-
   it('Usopp com DON!! x1 impede [Blocker] com 5000+ de poder', () => {
     let s = readyToAttack();
     s.players[1].hand = [];
@@ -160,22 +160,33 @@ describe('batalha', () => {
     expect(s.pending?.kind).not.toBe('block');
   });
 
-  it('[Trigger] da Vida pode ser ativado', () => {
+  it('[Trigger] da Vida pode ser ativado (Scalpel desvira 2 DON!!)', () => {
     let s = readyToAttack();
     s.players[1].hand = [];
-    const gibson = fetchToHand(s, 1, 'ST02-013');
+    const scalpel = fetchToHand(s, 1, 'ST02-015');
     s.players[1].hand = [];
-    s.players[1].life.push(gibson); // topo da Vida
-    const zoro = putOnField(s, 0, 'ST01-013', { rested: false });
+    s.players[1].life.push(scalpel); // topo da Vida
+    s.players[1].donActive = 0;
+    s.players[1].donRested = 2;
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
-    expect(s.pending).toEqual({ kind: 'trigger', player: 1, card: gibson });
+    expect(s.pending).toEqual({ kind: 'trigger', player: 1, card: scalpel });
     s = applyAction(s, { type: 'answer', player: 1, yes: true });
-    expect(s.pending?.kind).toBe('selectTargets');
-    s = applyAction(s, { type: 'choose', player: 1, uids: [zoro] });
-    expect(s.players[0].characters[0].rested).toBe(true);
-    expect(s.players[1].trash).toContain(gibson);
+    expect(s.players[1].donActive).toBe(2);
+    expect(s.players[1].trash).toContain(scalpel);
   });
 
+  it('[Trigger] "Play this card" coloca o Personagem em campo (Killer)', () => {
+    let s = readyToAttack();
+    s.players[1].hand = [];
+    const killer = fetchToHand(s, 1, 'ST02-005');
+    s.players[1].hand = [];
+    s.players[1].life.push(killer);
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    // [On Play] do Killer: sem alvos virados, nada a escolher.
+    expect(s.players[1].characters.map((c) => c.uid)).toContain(killer);
+    expect(s.players[1].trash).not.toContain(killer);
+  });
   it('dano com 0 de Vida encerra a partida', () => {
     let s = readyToAttack();
     s.players[1].hand = [];
@@ -188,24 +199,24 @@ describe('batalha', () => {
   it('Double Attack causa 2 de dano', () => {
     let s = toTurn(started(), 4); // turno do Kid
     s.players[0].hand = [];
-    const kidChar = putOnField(s, 1, 'ST02-012');
-    s = applyAction(s, { type: 'attachDon', player: 1, target: kidChar });
+    const heat = putOnField(s, 1, 'ST02-011');
+    s.defs['ST02-011'] = { ...s.defs['ST02-011'], keywords: ['doubleAttack'] }; // nenhuma carta do ST01/02 tem
+    s.modifiers.push({ uid: heat, kind: 'power', amount: 2000, duration: 'turn' }); // 4000 → 6000
     s.players[0].life = s.players[0].life.filter((u) => !s.defs[s.cards[u].cardId].abilities.some((a) => a.timing === 'trigger'));
     const before = s.players[0].life.length;
-    s = applyAction(s, { type: 'attack', player: 1, attacker: kidChar, target: s.players[0].leader.uid });
+    s = applyAction(s, { type: 'attack', player: 1, attacker: heat, target: s.players[0].leader.uid });
+    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
     expect(s.players[0].life.length).toBe(before - 2);
   });
-
-  it('Robin (When Attacking) nocauteia personagem com 2000 ou menos', () => {
-    let s = readyToAttack();
-    s.players[1].hand = [];
-    const robin = putOnField(s, 0, 'ST01-008');
-    const apoo = putOnField(s, 1, 'ST02-006');
-    s = applyAction(s, { type: 'attachDon', player: 0, target: robin });
-    s = applyAction(s, { type: 'attack', player: 0, attacker: robin, target: s.players[1].leader.uid });
-    expect(s.pending?.kind).toBe('selectTargets');
-    s = applyAction(s, { type: 'choose', player: 0, uids: [apoo] });
-    expect(s.players[1].trash).toContain(apoo);
+  it('Killer [On Play] nocauteia personagem virado de custo 3 ou menos', () => {
+    let s = toTurn(started(), 4);
+    const chopper = putOnField(s, 0, 'ST01-006', { rested: true });
+    const killer = fetchToHand(s, 1, 'ST02-005');
+    s.players[1].donActive = 3;
+    s = applyAction(s, { type: 'playCard', player: 1, uid: killer });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', options: [chopper] });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [chopper] });
+    expect(s.players[0].trash).toContain(chopper);
   });
 });
 
@@ -231,18 +242,116 @@ describe('efeitos', () => {
     );
   });
 
-  it('Kid ③ desvira o líder', () => {
+  it('Kid: ③ + descartar 1 da mão desvira o líder', () => {
     let s = toTurn(started(), 6);
     s.players[0].hand = [];
     const leader = s.players[1].leader.uid;
     s = applyAction(s, { type: 'attack', player: 1, attacker: leader, target: s.players[0].leader.uid });
     if (s.pending?.kind === 'trigger') s = applyAction(s, { type: 'answer', player: 0, yes: false });
     expect(s.players[1].leader.rested).toBe(true);
+    const handBefore = s.players[1].hand.length;
     s = applyAction(s, { type: 'activate', player: 1, uid: leader, ability: 0 });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', intent: 'discard', min: 1, max: 1 });
+    const discard = s.players[1].hand[0];
+    s = applyAction(s, { type: 'choose', player: 1, uids: [discard] });
     expect(s.players[1].leader.rested).toBe(false);
     expect(s.players[1].donRested).toBe(3);
+    expect(s.players[1].hand).toHaveLength(handBefore - 1);
+    expect(s.players[1].trash).toContain(discard);
   });
 
+  it('Kid não ativa sem carta na mão', () => {
+    let s = toTurn(started(), 6);
+    s.players[1].leader.rested = true;
+    s.players[0].hand.push(...s.players[1].hand.splice(0)); // mantém a contagem total
+    expect(() => applyAction(s, { type: 'activate', player: 1, uid: s.players[1].leader.uid, ability: 0 })).toThrow(/mão/);
+  });
+
+  it('Jewelry Bonney busca um {Supernovas} entre as 5 do topo e manda o resto para o fundo', () => {
+    let s = toTurn(started(), 4);
+    const bonney = putOnField(s, 1, 'ST02-007');
+    const top5 = s.players[1].deck.slice(0, 5);
+    s = applyAction(s, { type: 'activate', player: 1, uid: bonney, ability: 0 });
+    const pend = s.pending;
+    const supernovas = top5.filter((u) => s.defs[s.cards[u].cardId].types.includes('Supernovas'));
+    if (!supernovas.length) {
+      expect(pend).toBeNull();
+      return;
+    }
+    expect(pend).toMatchObject({ kind: 'selectTargets', options: supernovas, max: 1 });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [supernovas[0]] });
+    expect(s.players[1].hand).toContain(supernovas[0]);
+    const rest = top5.filter((u) => u !== supernovas[0]);
+    expect(s.players[1].deck.slice(-4)).toEqual(rest);
+    expect(locate(s, bonney)!.fc.rested).toBe(true);
+  });
+
+  it('Urouge ganha +2000 com DON!! x1 e 3 ou mais personagens', () => {
+    const s = toTurn(started(), 4);
+    const urouge = putOnField(s, 1, 'ST02-003');
+    locate(s, urouge)!.fc.don = 1;
+    expect(getPower(s, urouge)).toBe(3000 + 1000);
+    putOnField(s, 1, 'ST02-011');
+    putOnField(s, 1, 'ST02-012');
+    expect(getPower(s, urouge)).toBe(3000 + 1000 + 2000);
+  });
+
+  it('X.Drake virado com DON!! dá +1000 aos {Supernovas}/{Navy} no seu turno', () => {
+    const s = toTurn(started(), 4);
+    const drake = putOnField(s, 1, 'ST02-014');
+    const heat = putOnField(s, 1, 'ST02-011'); // {Kid Pirates}: não recebe
+    const koby = putOnField(s, 1, 'ST02-006'); // {Navy}: recebe
+    locate(s, drake)!.fc.don = 1;
+    const leader = s.players[1].leader.uid; // Kid: {Supernovas}
+    expect(getPower(s, koby)).toBe(6000);
+    locate(s, drake)!.fc.rested = true;
+    expect(getPower(s, koby)).toBe(7000);
+    expect(getPower(s, leader)).toBe(6000);
+    expect(getPower(s, heat)).toBe(4000);
+    expect(getPower(s, drake)).toBe(5000 + 1000 + 1000); // DON!! + a própria aura
+  });
+
+  it('Basil Hawkins desvira depois de batalhar com um Personagem do oponente', () => {
+    let s = toTurn(started(), 4);
+    s.players[0].hand = [];
+    const target = putOnField(s, 0, 'ST01-009', { rested: true });
+    const hawkins = putOnField(s, 1, 'ST02-010');
+    s = applyAction(s, { type: 'attachDon', player: 1, target: hawkins });
+    s = applyAction(s, { type: 'attack', player: 1, attacker: hawkins, target });
+    if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 0 });
+    expect(s.players[0].trash).toContain(target);
+    expect(locate(s, hawkins)!.fc.rested).toBe(false);
+  });
+
+  it('Kid (personagem) com DON!! x1 desvira no fim do turno', () => {
+    let s = toTurn(started(), 4);
+    s.players[0].hand = [];
+    const kid = putOnField(s, 1, 'ST02-013');
+    s = applyAction(s, { type: 'attachDon', player: 1, target: kid });
+    s = applyAction(s, { type: 'attack', player: 1, attacker: kid, target: s.players[0].leader.uid });
+    while (s.pending) {
+      const p = s.pending;
+      if (p.kind === 'trigger') s = applyAction(s, { type: 'answer', player: p.player, yes: false });
+      else if (p.kind === 'counter') s = applyAction(s, { type: 'pass', player: p.player });
+      else if (p.kind === 'block') s = applyAction(s, { type: 'choose', player: p.player, uids: [] });
+      else break;
+    }
+    expect(locate(s, kid)!.fc.rested).toBe(true);
+    s = applyAction(s, { type: 'endTurn', player: 1 });
+    expect(locate(s, kid)!.fc.rested).toBe(false);
+  });
+
+  it('Law desvira um {Supernovas}/{Heart Pirates} virado de custo 5 ou menos', () => {
+    let s = toTurn(started(), 4);
+    const urouge = putOnField(s, 1, 'ST02-003', { rested: true }); // Supernovas
+    putOnField(s, 1, 'ST02-011', { rested: true }); // Kid Pirates: não serve
+    const law = fetchToHand(s, 1, 'ST02-009');
+    s.players[1].donActive = 5;
+    s = applyAction(s, { type: 'playCard', player: 1, uid: law });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', options: [urouge] });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [urouge] });
+    expect(locate(s, urouge)!.fc.rested).toBe(false);
+  });
   it('com 5 personagens, jogar outro exige descartar um', () => {
     let s = toTurn(started(), 3);
     for (let i = 0; i < 5; i++) putOnField(s, 0, i < 4 ? 'ST01-002' : 'ST01-003');

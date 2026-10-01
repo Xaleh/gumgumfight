@@ -50,6 +50,7 @@ const REMINDERS: Array<[RegExp, string]> = [
 
 const plural = (n: string | number, one: string, many: string) => (Number(n) === 1 ? one : many);
 const manyTargets = (who: string) => {
+  if (/Leaders and Characters/i.test(who)) return true;
   const n = who.match(/up to (\d+)/i);
   return n ? Number(n[1]) > 1 : /\b(cards|Characters)\b/.test(who) && !/\b1 of\b/.test(who);
 };
@@ -88,10 +89,8 @@ const SENTENCES: Rule[] = [
     /^Look at (\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to your hand\.?$/i,
     (_, n, m, what) => `Olhe as ${n} cartas do topo do seu deck; revele até ${m} ${what} e adicione à sua mão.`,
   ],
-  [
-    /^Then, place the rest at the bottom of your deck in any order\.?$/i,
-    'Depois, coloque o resto no fundo do seu deck em qualquer ordem.',
-  ],
+  [/^Place the rest at the bottom of your deck in any order\.?$/i, 'Coloque o resto no fundo do seu deck em qualquer ordem.'],
+  [/^Trash the rest\.?$/i, 'Descarte o resto.'],
   [
     /^Your opponent cannot activate a \[Blocker\] Character that has (\d+) or more power during this battle\.?$/i,
     (_, n) => `Seu oponente não pode ativar um Personagem com [Blocker] que tenha ${n} ou mais de poder durante esta batalha.`,
@@ -117,8 +116,18 @@ const SENTENCES: Rule[] = [
 ];
 
 /** Regras de trechos (sujeitos, filtros, durações). Aplicadas em sequência. */
+const typeList = (list: string) => list.replace(/\s+or\s+/g, ' ou ').replace(/\s+and\s+/g, ' e ');
+
 const PHRASES: Rule[] = [
   [/If you have (\d+) or less Life cards,\s*/gi, (_, n) => `Se você tiver ${n} ou menos cartas de Vida, `],
+  [/If you have (\d+) or more Characters,\s*/gi, (_, n) => `Se você tiver ${n} ou mais Personagens, `],
+  [/If this Character is rested,\s*/gi, 'Se este Personagem estiver virado, '],
+  [/If this Character battles your opponent's Character,\s*/gi, 'Se este Personagem batalhar com um Personagem do oponente, '],
+  [/You may rest this card/gi, 'Você pode virar esta carta'],
+  [/up to (\d+) of your opponent's \[Blocker\] Characters/gi, (_, n) => `até ${n} ${plural(n, 'Personagem', 'Personagens')} com [Blocker] do oponente`],
+  [/up to (\d+) of your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type rested Characters/gi, (_, n, t) => `até ${n} dos seus Personagens virados do tipo ${typeList(t)}`],
+  [/your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type Leaders and Characters/gi, (_, t) => `seus Líderes e Personagens do tipo ${typeList(t)}`],
+  [/on your field/gi, 'no seu campo'],
   [/If your Leader is \[([^\]]+)\],\s*/gi, (_, n) => `Se o seu Líder for [${n}], `],
   [/You may rest this (Character|Stage|Leader)/gi, (_, w) => `Você pode virar ${w === 'Stage' ? 'este Stage' : w === 'Leader' ? 'este Líder' : 'este Personagem'}`],
   [/You may trash (\d+) cards? from your hand/gi, (_, n) => `Você pode descartar ${n} ${plural(n, 'carta', 'cartas')} da sua mão`],
@@ -172,6 +181,11 @@ function applyPhrases(s: string): string {
 function translateSentence(sentence: string): string {
   const s = sentence.trim();
   if (!s) return s;
+  const then = s.match(/^Then,\s*(.+)$/i);
+  if (then) {
+    const rest = translateSentence(then[1]);
+    return `Depois, ${rest.charAt(0).toLowerCase()}${rest.slice(1)}`;
+  }
   for (const [re, rep] of SENTENCES) {
     const m = s.match(re);
     if (m) {

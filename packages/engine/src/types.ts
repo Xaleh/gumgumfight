@@ -55,6 +55,31 @@ export interface TargetSpec {
   hasType?: string; // ex.: "Straw Hat Crew"
   excludeSelf?: boolean;
   keyword?: Keyword;
+  /** Pelo menos um destes tipos ("{Supernovas} or {Heart Pirates} type"). */
+  hasAnyType?: string[];
+}
+
+/** Filtro de cartas fora do campo (busca no deck, mão...). */
+export interface CardFilter {
+  hasAnyType?: string[];
+  maxCost?: number;
+  minCost?: number;
+  category?: CardCategory;
+  /** "other than [Nome]" */
+  excludeName?: string;
+}
+
+/** Condições extras de uma habilidade ("If you have 3 or more Characters", "If this Character is rested"). */
+export interface AbilityCondition {
+  minCharacters?: number;
+  selfRested?: boolean;
+}
+
+/** Bônus contínuo para outras cartas do mesmo jogador ("your {Navy} type Characters gain +1000"). */
+export interface Aura {
+  kinds: Array<'leader' | 'character'>;
+  hasAnyType?: string[];
+  power: number;
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -83,7 +108,15 @@ export type EffectStep =
   /** Resolve os passos do efeito [Main] da própria carta (usado por [Trigger]). */
   | { do: 'useMainEffect' }
   /** Efeito ainda não automatizado: o jogador aplica à mão com as ferramentas manuais. */
-  | { do: 'manual'; text: string };
+  | { do: 'manual'; text: string }
+  /** "Play this card" (ex.: [Trigger]): joga a própria carta, sem custo. */
+  | { do: 'playThis' }
+  /** Descartar cartas da mão (custo "You may trash N card from your hand"). */
+  | { do: 'trashFromHand'; count: number }
+  /** "Set up to N of your DON!! cards as active." */
+  | { do: 'setDonActive'; count: number }
+  /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' };
 
 export type AbilityTiming =
   | 'onPlay'
@@ -95,12 +128,14 @@ export type AbilityTiming =
   | 'onKO'
   | 'onBlock'
   | 'endOfTurn' // [End of Your Turn]
+  | 'battlesCharacter' // "If this Character battles your opponent's Character" (ao fim da batalha)
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
   restSelf?: boolean; // "You may rest this Character/Stage"
   restDon?: number; // ① ② ③ ... (virar DON!! ativos da área de custo)
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
+  trashFromHand?: number; // "You may trash N card from your hand:"
 }
 
 export interface Ability {
@@ -112,7 +147,9 @@ export interface Ability {
   opponentsTurn?: boolean;
   cost?: AbilityCost;
   steps: EffectStep[];
+  condition?: AbilityCondition;
   /** Efeitos estáticos (timing = 'static'). */
+  aura?: Aura;
   staticPower?: number;
   staticKeyword?: Keyword;
   staticCanAttackActive?: boolean;
@@ -189,6 +226,8 @@ export interface BattleState {
   blocked: boolean;
   noBlocker: boolean;
   noBlockerMinPower: number | null;
+  /** Personagens que batalharam entre si (registrado no dano, vale mesmo se um sair de campo). */
+  fought?: string[];
 }
 
 /** Escolhas que o motor aguarda de um jogador. */

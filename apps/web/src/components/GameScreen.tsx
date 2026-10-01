@@ -8,6 +8,7 @@ import {
   locate,
   manualAllowed,
   translateToPt,
+  zoneOf,
   type PlayerId,
 } from '@gumgum/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -175,6 +176,8 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
           acting={acting}
           picked={picked}
           onDispatch={dispatch}
+          onCard={onCard}
+          highlight={highlight}
         />
         {state.phase === 'gameover' && (
           <div className="overlay">
@@ -318,6 +321,8 @@ function PromptBar(props: {
   acting: PlayerId | null;
   picked: string[];
   onDispatch: (a: Action) => void;
+  onCard: (uid: string) => void;
+  highlight: (uid: string) => Highlight;
 }) {
   const { state, human, picked, onDispatch } = props;
   const { lang } = useSettings();
@@ -354,13 +359,28 @@ function PromptBar(props: {
           </div>
         </div>
       );
-    case 'selectTargets':
+    case 'selectTargets': {
+      // Opções fora do tabuleiro (topo do deck, descarte, Vida) aparecem dentro do prompt.
+      const offBoard = pending.options.filter((u) => ['deck', 'trash', 'life'].includes(zoneOf(state, u) ?? ''));
       return (
         <div className="prompt">
           <div className="prompt-title">{pending.prompt}</div>
           <p className="muted">
             Clique nas cartas destacadas ({picked.length}/{pending.max}).
           </p>
+          {offBoard.length > 0 && (
+            <div className="prompt-options">
+              {offBoard.map((uid) => (
+                <CardView
+                  key={uid}
+                  state={state}
+                  uid={uid}
+                  highlight={props.highlight(uid)}
+                  onClick={() => props.onCard(uid)}
+                />
+              ))}
+            </div>
+          )}
           <div className="btn-row">
             <button
               className="btn primary"
@@ -377,6 +397,7 @@ function PromptBar(props: {
           </div>
         </div>
       );
+    }
     case 'block':
       return (
         <div className="prompt">

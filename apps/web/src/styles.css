@@ -1496,3 +1496,10 @@ input[type='number'] {
   margin: 0;
   box-shadow: none;
 }
+.prompt-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+  --cw: 70px;
+}

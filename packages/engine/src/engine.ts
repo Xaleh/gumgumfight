@@ -150,7 +150,41 @@ function conditionsMet(state: GameState, uid: string, ability: Ability): boolean
   if (ability.don && (!loc || loc.fc.don < ability.don)) return false;
   if (ability.yourTurn && state.activePlayer !== owner) return false;
   if (ability.opponentsTurn && state.activePlayer === owner) return false;
+  const cond = ability.condition;
+  if (cond?.minCharacters !== undefined && state.players[owner].characters.length < cond.minCharacters) return false;
+  if (cond?.selfRested && !loc?.fc.rested) return false;
   return true;
+}
+
+/** Bate com um filtro de tipos ("{A} or {B} type")? Tolerante a tipos mal separados. */
+export function matchesAnyType(def: CardDef, types: string[] | undefined): boolean {
+  return !types?.length || types.some((t) => hasType(def, t));
+}
+
+/** Filtro de cartas fora do campo (busca no deck etc.). */
+export function matchesFilter(def: CardDef, f: import('./types').CardFilter): boolean {
+  if (!matchesAnyType(def, f.hasAnyType)) return false;
+  if (f.category && def.category !== f.category) return false;
+  if (f.maxCost !== undefined && (def.cost ?? 0) > f.maxCost) return false;
+  if (f.minCost !== undefined && (def.cost ?? 0) < f.minCost) return false;
+  if (f.excludeName && def.name === f.excludeName) return false;
+  return true;
+}
+
+/** Soma das auras ativas que afetam a carta (bônus de outras cartas do mesmo jogador). */
+function auraPower(state: GameState, uid: string, zone: 'leader' | 'character' | 'stage'): number {
+  if (zone === 'stage') return 0;
+  const ps = state.players[ownerOf(state, uid)];
+  const target = cardDef(state, uid);
+  let bonus = 0;
+  for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
+    for (const a of cardDef(state, fc.uid).abilities) {
+      if (a.timing !== 'static' || !a.aura || !a.aura.kinds.includes(zone)) continue;
+      if (!matchesAnyType(target, a.aura.hasAnyType) || !conditionsMet(state, fc.uid, a)) continue;
+      bonus += a.aura.power;
+    }
+  }
+  return bonus;
 }
 
 export function getPower(state: GameState, uid: string): number {
@@ -162,6 +196,7 @@ export function getPower(state: GameState, uid: string): number {
   for (const a of def.abilities) {
     if (a.timing === 'static' && a.staticPower && conditionsMet(state, uid, a)) power += a.staticPower;
   }
+  power += auraPower(state, uid, loc.zone);
   for (const m of state.modifiers) if (m.uid === uid && m.kind === 'power') power += m.amount;
   return power;
 }
@@ -238,6 +273,7 @@ export function activateError(state: GameState, player: PlayerId, uid: string, i
   if (ability.cost?.restSelf && loc.fc.rested) return 'A carta já está virada.';
   if ((ability.cost?.restDon ?? 0) > ps.donActive) return 'DON!! ativos insuficientes.';
   if ((ability.cost?.donMinus ?? 0) > totalDonOnField(ps)) return 'DON!! insuficientes em campo.';
+  if ((ability.cost?.trashFromHand ?? 0) > ps.hand.length) return 'Cartas insuficientes na mão.';
   return null;
 }
 
@@ -282,6 +318,7 @@ export function targetCandidates(state: GameState, controller: PlayerId, source:
       if (spec.rested !== undefined && fc.rested !== spec.rested) return false;
       if (spec.hasType && !hasType(def, spec.hasType)) return false;
       if (spec.keyword && !hasKeyword(state, fc.uid, spec.keyword)) return false;
+      if (!matchesAnyType(def, spec.hasAnyType)) return false;
       return true;
     })
     .map((fc) => fc.uid);
@@ -499,7 +536,11 @@ function handleMainAction(state: GameState, action: Action) {
       if (ability.cost?.donMinus) returnDon(ps, ability.cost.donMinus);
       if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(action.uid, action.ability));
       log(state, p, `${cardDef(state, action.uid).name}: ${ability.label ?? 'efeito ativado'}.`);
-      pushEffect(state, action.uid, p, ability.steps);
+      // Descartar da mão também é custo: resolve antes do efeito.
+      const costSteps: EffectStep[] = ability.cost?.trashFromHand
+        ? [{ do: 'trashFromHand', count: ability.cost.trashFromHand }]
+        : [];
+      pushEffect(state, action.uid, p, [...costSteps, ...ability.steps]);
       return;
     }
 
@@ -695,6 +736,9 @@ function stepBattle(state: GameState) {
 
     case 'damage': {
       b.step = 'end';
+      if (locate(state, b.attacker)?.zone === 'character' && locate(state, b.target)?.zone === 'character') {
+        b.fought = [b.attacker, b.target];
+      }
       const ap = getPower(state, b.attacker);
       const tp = getPower(state, b.target);
       const target = locate(state, b.target)!;
@@ -717,11 +761,15 @@ function stepBattle(state: GameState) {
       return;
     }
 
-    case 'end':
+    case 'end': {
+      // "If this Character battles your opponent's Character": dispara ao fim da batalha.
+      const fought = (b.fought ?? []).filter((uid) => locate(state, uid));
       state.modifiers = state.modifiers.filter((m) => m.duration !== 'battle');
       state.battle = null;
       state.stack.pop();
+      for (const uid of fought) pushAbilities(state, uid, 'battlesCharacter');
       return;
+    }
   }
 }
 
@@ -902,6 +950,82 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha quem ataca sem poder ser bloqueado.`);
       if (!t) return false;
       for (const uid of t) state.modifiers.push({ uid, kind: 'noBlockerWhenAttacking', amount: 0, duration: 'turn' });
+      return true;
+    }
+    case 'playThis': {
+      const def = cardDef(state, frame.source);
+      if (zoneOf(state, frame.source) === 'character' || zoneOf(state, frame.source) === 'stage') return true;
+      if (def.category === 'character') {
+        detach(state, frame.source);
+        log(state, frame.controller, `${def.name} entra em campo.`);
+        state.stack.push({ kind: 'play', uid: frame.source });
+      } else if (def.category === 'stage') {
+        detach(state, frame.source);
+        if (ps.stage) {
+          const old = ps.stage.uid;
+          detach(state, old);
+          ps.trash.push(old);
+        }
+        ps.stage = { uid: frame.source, rested: false, don: 0, playedOnTurn: state.turn };
+        pushAbilities(state, frame.source, 'onPlay');
+      }
+      return true;
+    }
+    case 'trashFromHand': {
+      const n = Math.min(step.count, ps.hand.length);
+      if (n === 0) return true;
+      if (!frame.choice) {
+        state.pending = {
+          kind: 'selectTargets',
+          player: frame.controller,
+          options: [...ps.hand],
+          min: n,
+          max: n,
+          prompt: `${srcName}: escolha ${n} carta(s) da mão para descartar.`,
+          intent: 'discard',
+          source: frame.source,
+        };
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => ps.hand.includes(u))) {
+        removeFrom(ps.hand, uid);
+        ps.trash.push(uid);
+        log(state, frame.controller, `${ps.name} descarta ${cardDef(state, uid).name}.`);
+      }
+      return true;
+    }
+    case 'setDonActive': {
+      const n = Math.min(step.count, ps.donRested);
+      ps.donRested -= n;
+      ps.donActive += n;
+      if (n) log(state, frame.controller, `${n} DON!! de ${ps.name} fica(m) ativo(s).`);
+      return true;
+    }
+    case 'search': {
+      const top = ps.deck.slice(0, step.look);
+      const options = top.filter((u) => matchesFilter(cardDef(state, u), step.filter));
+      if (!frame.choice && options.length) {
+        state.pending = {
+          kind: 'selectTargets',
+          player: frame.controller,
+          options,
+          min: 0,
+          max: Math.min(step.upTo, options.length),
+          prompt: `${srcName}: olhe as ${top.length} cartas do topo e escolha até ${step.upTo} para adicionar à mão.`,
+          intent: 'help',
+          source: frame.source,
+        };
+        return false;
+      }
+      const chosen = (frame.choice ?? []).filter((u) => options.includes(u));
+      for (const uid of top) removeFrom(ps.deck, uid);
+      for (const uid of chosen) {
+        ps.hand.push(uid);
+        log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`);
+      }
+      const rest = top.filter((u) => !chosen.includes(u));
+      if (step.rest === 'bottom') ps.deck.push(...rest);
+      else ps.trash.push(...rest);
       return true;
     }
     case 'manual':
