@@ -188,6 +188,10 @@ export interface Condition {
   lifeLeqOpponent?: boolean;
   /** "If you have N or less cards in your deck" */
   deckMax?: number;
+  /** "If you have a total of N or more given DON!! cards" */
+  minGivenDon?: number;
+  /** "If your opponent has any DON!! cards given" */
+  opponentAnyDonGiven?: boolean;
   /** "If you have N or more rested {X} type Characters" (type opcional) */
   minRestedTyped?: { count: number; types?: string[] };
 }
@@ -220,6 +224,15 @@ export type TargetRef =
  * untilYourNextTurn = "until the start of your next turn"; endOfYourNextTurn = "until the end of your next turn".
  */
 export type Duration = 'turn' | 'battle' | 'nextOpponentTurn' | 'untilYourNextTurn' | 'endOfYourNextTurn';
+
+/** Efeito de substituição: protege 'self' ou Personagens seus que batem com `spec`. */
+export interface Replacement {
+  who: 'self' | TargetSpec;
+  /** ko = só K.O.; removal = sair do campo por efeito do oponente (inclui K.O. por efeito do oponente). */
+  event: 'ko' | 'removal' | 'koOrRemoval';
+  /** any = qualquer K.O.; battle = em batalha; effect = por efeito; opponentEffect = por efeito do oponente. */
+  by: 'any' | 'battle' | 'effect' | 'opponentEffect';
+}
 
 /** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
 export type GameEvent =
@@ -304,6 +317,14 @@ type EffectStepBody =
   | { do: 'opponentLifeToHand'; count: number }
   /** "your opponent places N card from their hand at the bottom of their deck" */
   | { do: 'opponentHandToBottom'; count: number }
+  /** Pergunta do efeito de substituição (o motor cria; não vem do texto). */
+  | {
+      do: 'replaceRemoval';
+      victim: string;
+      ability: number;
+      action: 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
+      inBattle?: boolean;
+    }
   /** "… at the end of this turn": passos adiados para o fim do turno. */
   | { do: 'delayed'; steps: EffectStep[] }
   /** Virar N Personagens ativos seus (custo "You may rest 2 of your Characters"). */
@@ -370,6 +391,7 @@ export type AbilityTiming =
   | 'battlesCharacter' // "If this Character battles your opponent's Character" (ao fim da batalha)
   | 'event' // "When …": reação a um acontecimento (Ability.event)
   | 'onOpponentAttack' // [On Your Opponent's Attack]
+  | 'replace' // "If … would be K.O.'d / removed from the field, you may … instead" (Ability.replace + cost)
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
@@ -440,10 +462,14 @@ export interface Ability {
   noBattleKOByLeader?: boolean;
   /** "This Character gains +N cost." */
   staticCost?: number;
+  /** "This Character gains +N power for every M <coisas>" */
+  powerPer?: { power: number; every: number; what: 'hand' | 'restedDon' | 'trash' | 'trashEvents' };
   /** "When this Character battles {attribute} attribute Characters, this Character gains +N power". */
   battleVsAttribute?: { attribute: string; power: number };
   /** Para timing 'event': o acontecimento que dispara a habilidade. */
   event?: GameEvent;
+  /** Para timing 'replace': o que é substituído. */
+  replace?: Replacement;
   /** Texto curto exibido na interface. */
   label?: string;
   /** Habilidade derivada do texto, resolvida manualmente pelo jogador. */

@@ -25,6 +25,7 @@ const extra: CardData[] = [
   { id: 'PX-017', name: 'Rakuyo', category: 'character', colors: ['red'], cost: 1, power: 2000, types: ['Whitebeard Pirates'], text: '[Your Turn] All of your Characters with a type including "Whitebeard" gain +1000 power.' },
   { id: 'PX-018', name: 'Isuka', category: 'character', colors: ['red'], cost: 1, power: 9000, types: [], text: "[Once Per Turn] When this Character battles and K.O.'s your opponent's Character, set this Character as active." },
   { id: 'PX-019', name: 'StageX', category: 'stage', colors: ['red'], cost: 1, types: [], text: '' },
+  { id: 'PX-020', name: 'Guard', category: 'character', colors: ['red'], cost: 1, power: 1000, types: [], text: "[Once Per Turn] If this Character would be K.O.'d, you may trash 1 card from your hand instead." },
 ];
 const cards = [...baseCards, ...extra];
 const deck = (leader: string, fill: string): DeckList => ({
@@ -234,5 +235,27 @@ describe('efeitos lidos automaticamente', () => {
     s = applyAction(s, { type: 'attack', player: 0, attacker: isuka, target: victim });
     expect(s.players[1].trash).toContain(victim);
     expect(s.players[0].characters.find((c) => c.uid === isuka)?.rested).toBe(false);
+  });
+
+  it('substituição: "If this Character would be K.O.\'d, you may trash 1 card from your hand instead"', () => {
+    let s = toTurn(game(), 4);
+    const guard = field(s, 0, 'PX-020', true);
+    s.players[0].hand = s.players[0].hand.slice(0, 2);
+    const hand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: guard });
+    // Etapa de Counter do defensor (tem cartas na mão): passa.
+    if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 0 });
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].hand[0]] });
+    expect(s.players[0].characters.some((c) => c.uid === guard)).toBe(true);
+    expect(s.players[0].hand).toHaveLength(hand - 1);
+    // Recusando, é nocauteado.
+    let t = toTurn(game(), 4);
+    const g2 = field(t, 0, 'PX-020', true);
+    t = applyAction(t, { type: 'attack', player: 1, attacker: t.players[1].leader.uid, target: g2 });
+    if (t.pending?.kind === 'counter') t = applyAction(t, { type: 'pass', player: 0 });
+    t = applyAction(t, { type: 'answer', player: 0, yes: false });
+    expect(t.players[0].trash).toContain(g2);
   });
 });

@@ -230,6 +230,9 @@ export function conditionHolds(state: GameState, controller: PlayerId, source: s
     return false;
   }
   if (cond.lifeLeqOpponent && ps.life.length > opp.life.length) return false;
+  const given = (pl: PlayerState) => [pl.leader, ...pl.characters].reduce((n, c) => n + c.don, 0);
+  if (cond.minGivenDon !== undefined && given(ps) < cond.minGivenDon) return false;
+  if (cond.opponentAnyDonGiven && given(opp) === 0) return false;
   if (cond.deckMax !== undefined && ps.deck.length > cond.deckMax) return false;
   const rt = cond.minRestedTyped;
   if (
@@ -337,6 +340,19 @@ export function getPower(state: GameState, uid: string): number {
   if (loc.player === state.activePlayer) power += loc.fc.don * 1000;
   for (const a of def.abilities) {
     if (a.timing === 'static' && a.staticPower && conditionsMet(state, uid, a)) power += a.staticPower;
+    if (a.timing === 'static' && a.powerPer && conditionsMet(state, uid, a)) {
+      const ps = state.players[loc.player];
+      const p = a.powerPer;
+      const n =
+        p.what === 'hand'
+          ? ps.hand.length
+          : p.what === 'restedDon'
+            ? ps.donRested
+            : p.what === 'trash'
+              ? ps.trash.length
+              : ps.trash.filter((u) => cardDef(state, u).category === 'event').length;
+      power += p.power * Math.floor(n / p.every);
+    }
     if (a.timing === 'static' && a.battleVsAttribute && state.battle && conditionsMet(state, uid, a)) {
       const b = state.battle;
       const other = b.attacker === uid ? b.target : b.target === uid ? b.attacker : null;
@@ -1341,7 +1357,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       for (const uid of t) {
         const zone = locate(state, uid)?.zone;
-        if (zone === 'character') koCharacter(state, uid);
+        if (zone === 'character') koCharacter(state, uid, { byPlayer: frame.controller });
         else if (zone === 'stage') {
           // Stages nocauteados vão para o descarte (sem [On K.O.]).
           detach(state, uid);
@@ -1415,6 +1431,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         const loc = locate(state, uid);
         if (loc?.zone !== 'character') continue;
+        if (offerReplacement(state, uid, 'hand', { byPlayer: frame.controller })) continue;
         const owner = state.players[loc.player];
         owner.donRested += loc.fc.don;
         removeCharacter(state, uid);
@@ -1679,6 +1696,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const t = resolveTargets(state, frame, step.target, 'harm', `${srcName}: escolha um Personagem para o descarte.`);
       if (!t) return false;
       for (const uid of t.filter((u) => locate(state, u)?.zone === 'character')) {
+        if (offerReplacement(state, uid, 'trash', { byPlayer: frame.controller })) continue;
         const owner = state.players[ownerOf(state, uid)];
         detach(state, uid);
         owner.trash.push(uid);
@@ -1817,6 +1835,33 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         opp.deck.push(uid);
       }
       log(state, opp.id, `${opp.name} coloca ${n} carta(s) da mão no fundo do deck.`);
+      return true;
+    }
+    case 'replaceRemoval': {
+      const ability = cardDef(state, frame.source).abilities[step.ability];
+      const owner = state.players[frame.controller];
+      if (!locate(state, step.victim) || !ability) return true;
+      if (!frame.choice) {
+        if (ability.cost && !canPayCost(state, owner.id, frame.source, ability.cost)) {
+          performRemoval(state, step.victim, step.action, step.inBattle);
+          return true;
+        }
+        state.pending = {
+          kind: 'confirm',
+          player: owner.id,
+          source: frame.source,
+          prompt: `${srcName}: ${cardDef(state, step.victim).name} vai sair do campo. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
+        };
+        return false;
+      }
+      if (!frame.choice.length) {
+        performRemoval(state, step.victim, step.action, step.inBattle);
+        return true;
+      }
+      if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(frame.source, step.ability));
+      log(state, owner.id, `${srcName}: ${cardDef(state, step.victim).name} fica em campo (efeito de substituição).`);
+      const costSteps = ability.cost ? payImmediateCost(state, owner.id, frame.source, ability.cost) : [];
+      frame.steps.splice(frame.i + 1, 0, ...costSteps, ...ability.steps);
       return true;
     }
     case 'delayed':
@@ -2011,6 +2056,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       for (const uid of t) {
         if (locate(state, uid)?.zone !== 'character') continue;
+        if (offerReplacement(state, uid, 'deckBottom', { byPlayer: frame.controller })) continue;
         const owner = state.players[ownerOf(state, uid)];
         detach(state, uid);
         owner.deck.push(uid);
@@ -2291,6 +2337,66 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
 // Utilitários de zonas
 // ---------------------------------------------------------------------------
 
+type RemovalAction = 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
+
+/**
+ * Efeito de substituição disponível para o Personagem que vai sair do campo? Se houver,
+ * empilha a pergunta ("pagar … em vez disso?") e devolve true: a remoção fica para depois da resposta.
+ */
+function offerReplacement(
+  state: GameState,
+  victim: string,
+  action: RemovalAction,
+  ctx: { inBattle?: boolean; byPlayer?: PlayerId },
+): boolean {
+  const loc = locate(state, victim);
+  if (!loc || loc.zone !== 'character') return false;
+  const owner = state.players[loc.player];
+  const byOpponentEffect = !ctx.inBattle && ctx.byPlayer !== undefined && ctx.byPlayer !== loc.player;
+  for (const fc of [owner.leader, ...owner.characters, ...(owner.stage ? [owner.stage] : [])]) {
+    const abilities = cardDef(state, fc.uid).abilities;
+    for (let i = 0; i < abilities.length; i++) {
+      const a = abilities[i];
+      const r = a.replace;
+      if (a.timing !== 'replace' || !r) continue;
+      if (r.who === 'self' ? fc.uid !== victim : !targetCandidates(state, owner.id, fc.uid, { ...r.who, side: 'own' }).includes(victim)) continue;
+      const isKO = action === 'ko';
+      const eventOk =
+        (r.event !== 'removal' && isKO) || (r.event !== 'ko' && byOpponentEffect);
+      if (!eventOk) continue;
+      if (isKO && r.event === 'ko') {
+        if (r.by === 'battle' && !ctx.inBattle) continue;
+        if (r.by === 'effect' && ctx.inBattle) continue;
+        if (r.by === 'opponentEffect' && !byOpponentEffect) continue;
+      }
+      if (!conditionsMet(state, fc.uid, a)) continue;
+      if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) continue;
+      if (a.cost && !canPayCost(state, owner.id, fc.uid, a.cost)) continue;
+      pushEffect(state, fc.uid, owner.id, [
+        { do: 'replaceRemoval', victim, ability: i, action, ...(ctx.inBattle ? { inBattle: true } : {}) },
+      ]);
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Executa a remoção (depois de recusada a substituição). */
+function performRemoval(state: GameState, victim: string, action: RemovalAction, inBattle?: boolean) {
+  if (locate(state, victim)?.zone !== 'character') return;
+  if (action === 'ko') {
+    koCharacter(state, victim, { inBattle, noReplace: true });
+    return;
+  }
+  const owner = state.players[ownerOf(state, victim)];
+  detach(state, victim);
+  if (action === 'hand') owner.hand.push(victim);
+  else if (action === 'deckBottom') owner.deck.push(victim);
+  else if (action === 'trash') owner.trash.push(victim);
+  else owner.life.push(victim);
+  log(state, null, `${cardDef(state, victim).name} sai do campo.`);
+}
+
 /** O personagem está protegido de K.O. ("cannot be K.O.'d [in battle]")? */
 export function koProtected(state: GameState, uid: string, inBattle: boolean, by?: string): boolean {
   const kinds = inBattle ? ['cannotBeKO', 'cannotBeKOInBattle'] : ['cannotBeKO'];
@@ -2306,13 +2412,18 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
   );
 }
 
-function koCharacter(state: GameState, uid: string, opts: { inBattle?: boolean; force?: boolean; by?: string } = {}) {
+function koCharacter(
+  state: GameState,
+  uid: string,
+  opts: { inBattle?: boolean; force?: boolean; by?: string; byPlayer?: PlayerId; noReplace?: boolean } = {},
+) {
   const loc = locate(state, uid);
   if (!loc || loc.zone !== 'character') return;
   if (!opts.force && koProtected(state, uid, Boolean(opts.inBattle), opts.by)) {
     log(state, loc.player, `${cardDef(state, uid).name} não pode ser nocauteado.`);
     return;
   }
+  if (!opts.force && !opts.noReplace && offerReplacement(state, uid, 'ko', { inBattle: opts.inBattle, byPlayer: opts.byPlayer })) return;
   const ps = state.players[loc.player];
   ps.donRested += loc.fc.don;
   removeCharacter(state, uid);

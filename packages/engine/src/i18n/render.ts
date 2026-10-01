@@ -355,6 +355,12 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'opponentMinRestedCharacters':
         out.push(`o oponente tiver ${c.opponentMinRestedCharacters} ou mais Personagens virados`);
         break;
+      case 'minGivenDon':
+        out.push(`você tiver ${c.minGivenDon} ou mais DON!! anexados no total`);
+        break;
+      case 'opponentAnyDonGiven':
+        out.push('o oponente tiver algum DON!! anexado');
+        break;
       case 'minActiveDon':
         out.push(`você tiver ${c.minActiveDon} ou mais DON!! ativos`);
         break;
@@ -631,6 +637,10 @@ function staticText(a: Ability, ctx: Ctx): string {
   const parts: string[] = [];
   if (a.staticPower) parts.push(a.staticPower > 0 ? `recebe +${a.staticPower} de poder` : `recebe −${-a.staticPower} de poder`);
   if (a.staticCost) parts.push(`recebe +${a.staticCost} de custo`);
+  if (a.powerPer) {
+    const what = { hand: 'carta na sua mão', restedDon: 'DON!! virado seu', trash: 'carta no seu descarte', trashEvents: 'Evento no seu descarte' }[a.powerPer.what];
+    parts.push(`recebe +${a.powerPer.power} de poder para cada ${a.powerPer.every > 1 ? `${a.powerPer.every} × ` : ''}${what}`);
+  }
   if (a.staticKeyword) parts.push(`ganha ${KW[a.staticKeyword]}`);
   if (a.staticCanAttackActive) parts.push('também pode atacar Personagens ativos do oponente');
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
@@ -663,7 +673,14 @@ function ability(a: Ability, ctx: Ctx): string {
   let body: string;
   if (a.timing === 'static') body = staticText(a, ctx);
   else if (a.timing === 'event') body = `Quando ${event(a.event!, ctx)}, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
-  else if (a.timing === 'battlesCharacter') body = `Se ${ctx.self} batalhar com um Personagem do oponente, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
+  else if (a.timing === 'replace' && a.replace) {
+    const r = a.replace;
+    const who = r.who === 'self' ? ctx.self : target({ ...r.who, upTo: 1 }, ctx).replace(/^até 1 dos seus Personagens/, 'um Personagem seu');
+    const what = r.event === 'ko' ? 'for nocauteado' : r.event === 'removal' ? 'for removido do campo' : 'for nocauteado ou removido do campo';
+    const by = r.by === 'battle' ? ' em batalha' : r.by === 'effect' ? ' por um efeito' : r.by === 'opponentEffect' ? ' por um efeito do oponente' : '';
+    const c = a.cost ? cost(a.cost, ctx).replace(/^Você pode /, '') : '';
+    body = `Se ${who} ${what}${by}, você pode ${c} em vez disso.`;
+  } else if (a.timing === 'battlesCharacter') body = `Se ${ctx.self} batalhar com um Personagem do oponente, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
   else {
     const c = a.cost ? cost(a.cost, ctx) : '';
     body = (c ? `${c}: ` : '') + steps(a.steps, ctx);

@@ -18,6 +18,7 @@ import type {
   Duration,
   EffectStep,
   GameEvent,
+  Replacement,
   Keyword,
   TargetRef,
   TargetSpec,
@@ -172,6 +173,7 @@ export function parseTarget(phrase: string): TargetRef | null {
   if (/^your leader$/i.test(p)) return 'ownLeader';
   if (/^(?:that|the selected) (character|card|leader|leader or character)$/i.test(p) || /^it$/i.test(p)) return 'chosen';
   if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
+  if (/^your Leader or \d+ of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
   if (/^your Leader and all of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 99, all: true };
   const named = p.match(/^your \[([^\]]+)\] Leader$/i);
   if (named) return { side: 'own', kinds: ['leader'], upTo: 1, name: named[1] };
@@ -325,6 +327,8 @@ export function parseCondition(text: string): Condition | null {
   }
   if ((m = t.match(/^you have no other \[([^\]]+)\] Characters$/i))) return { noOtherNamed: m[1] };
   if ((m = t.match(/^you have (\d+) or less Characters$/i))) return { maxCharacters: Number(m[1]) };
+  if ((m = t.match(/^you have a total of (\d+) or more given DON!! cards$/i))) return { minGivenDon: Number(m[1]) };
+  if (/^your opponent has any DON!! cards given$/i.test(t)) return { opponentAnyDonGiven: true };
   if ((m = t.match(/^you have (\d+) or more active DON!! cards$/i))) return { minActiveDon: Number(m[1]) };
   if ((m = t.match(/^you have (\d+) or more Events in your trash$/i))) return { trashEventsMin: Number(m[1]) };
   if ((m = t.match(/^you have a Character with (\d+) power or more$/i))) return { ownCharacterMinPower: Number(m[1]) };
@@ -875,6 +879,8 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
   if (/^rest this (?:Character|Stage|card|Leader)$/i.test(part)) cost.restSelf = true;
   else if (/^trash this (?:Character|Stage|card)$/i.test(part)) cost.trashSelf = true;
   else if (/^place this Character at the bottom of (?:the owner's|your) deck$/i.test(part)) cost.selfToBottom = true;
+  else if ((m = part.match(/^return (\d+) DON!! cards? from your field to your DON!! deck$/i))) cost.donMinus = Number(m[1]);
+  else if ((m = part.match(/^rest (\d+) of your active DON!! cards?$/i))) cost.restDon = (cost.restDon ?? 0) + Number(m[1]);
   else if (/^rest your (?:1 )?Leader$/i.test(part)) cost.restOwn = { count: 1, spec: { side: 'own', kinds: ['leader'], upTo: 1 } };
   else if ((m = part.match(/^K\.O\. (\d+) of your (.+)$/i))) {
     const spec = parseTarget(`up to ${m[1]} of your ${m[2]}`);
@@ -998,6 +1004,25 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];
   }
+  // "If this Character would be K.O.'d (in battle / by an effect / by your opponent's effect), you may X instead."
+  const repl = s.match(
+    /^If (this Character|your .+?|any of your Characters) would (be K\.O\.'d or (?:would )?be removed from the field|be K\.O\.'d|be removed from the field)( in battle| by an effect| by your opponent's effect)?(?: during this turn)?, you may (.+) instead$/i,
+  );
+  if (repl) {
+    let who: Replacement['who'] = 'self';
+    if (!/^this Character$/i.test(repl[1])) {
+      const spec = parseTarget(repl[1].replace(/^any of your Characters$/i, 'your Characters'));
+      if (!spec || typeof spec !== 'object' || spec.side !== 'own') return null;
+      who = { ...spec, upTo: 99 };
+    }
+    const cost: AbilityCost = {};
+    for (const part of repl[4].split(/ and (?=(?:rest|trash|add|place|return|turn|reveal) )/i)) if (!parseCostPart(part.trim(), cost)) return null;
+    const event: Replacement['event'] = /or/i.test(repl[2]) ? 'koOrRemoval' : /removed/i.test(repl[2]) ? 'removal' : 'ko';
+    const by: Replacement['by'] = !repl[3] ? 'any' : /battle/i.test(repl[3]) ? 'battle' : /opponent/i.test(repl[3]) ? 'opponentEffect' : 'effect';
+    const ab: Ability = { ...base, timing: 'replace', replace: { who, event, by }, cost, steps: [] };
+    if (h.oncePerTurn) ab.oncePerTurn = true;
+    return [ab];
+  }
   const when = s.match(/^When ([^,]+), (.+)$/i);
   // "[Opponent's Turn] When this Character is K.O.'d, …" = [On K.O.] restrito ao turno.
   if (when && /^this Character is K\.O\.'d$/i.test(when[1])) {
@@ -1028,6 +1053,13 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     s = ifm ? ifm[2] : (tailIf as RegExpMatchArray)[1];
   }
   if ((m = s.match(POWER_SELF))) return [{ ...base, staticPower: Number(m[1]) }];
+  m = s.match(
+    /^this (?:Character|Leader) gains \+(\d+) power for every (\d+ )?(?:of your )?(rested DON!! cards|cards? in your hand|cards? in your trash|Events? in your trash)$/i,
+  );
+  if (m) {
+    const what = /DON/i.test(m[3]) ? 'restedDon' : /hand/i.test(m[3]) ? 'hand' : /Event/i.test(m[3]) ? 'trashEvents' : 'trash';
+    return [{ ...base, powerPer: { power: Number(m[1]), every: Number(m[2] ?? 1), what } }];
+  }
   if ((m = s.match(/^this (?:Character|card|Leader) gains \[(Rush|Blocker|Double Attack|Banish)\]$/i))) {
     return [{ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] }];
   }
