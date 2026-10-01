@@ -673,7 +673,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         timing: 'counter',
         steps: [
           { do: 'power', target: ownLeaderOrChar({ hasAnyType: ['FILM'] }), amount: 4000, duration: 'battle' },
-          { do: 'cannotBeKO', target: 'chosen', duration: 'turn' },
+          { do: 'cannotBeKO', target: 'chosen', duration: 'turn', if: { chosenMatches: { category: 'character' } } },
         ],
       },
       { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },

@@ -9,7 +9,7 @@
 // Variável opcional: CARD_API_BASE (padrão https://optcgapi.com/api).
 
 import { readFileSync } from 'node:fs';
-import { automationStatus, type CardData, translateToPt } from '@gumgum/engine';
+import { automationStatus, type CardData, translateCardPt } from '@gumgum/engine';
 import { openDb, upsertCards } from './db';
 import { allEndpoints, DEFAULT_API_BASE, mapApiResponse, rowsOf, setEndpoint, typeVocabulary } from './optcgapi';
 import { join } from 'node:path';
@@ -76,7 +76,7 @@ async function main() {
   const list = [...cards.values()];
   const count = (st: string) => list.filter((c) => automationStatus(c) === st).length;
   const scripted = count('scripted') + count('auto');
-  const partialPt = list.filter((c) => !translateToPt(c.text).complete || (c.trigger && !translateToPt(c.trigger).complete));
+  const partialPt = list.filter((c) => !translateCardPt(c).complete);
   console.log(`\nTotal: ${list.length} cartas únicas`);
   console.log(
     `Com efeito automatizado: ${scripted} | parcial: ${count('partial')} | manual: ${count('manual')} | tradução automática parcial: ${partialPt.length}`,

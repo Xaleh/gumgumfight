@@ -1,12 +1,14 @@
 // Partidas bot x bot com decks aleatórios (válidos) de toda a base de cartas.
 // Serve para achar travamentos e quebras de invariantes depois de importar coleções novas.
 //
-//   npm run simulate:all -w @gumgum/engine -- <cards.json | URL> [partidas=300]
+//   npm run simulate:all -w @gumgum/engine -- <cards.json | URL> [partidas=300] [aleatoriedade=0]
+//   aleatoriedade (0 a 1): chance de cada ação ser uma ação legal qualquer, para exercitar efeitos que o bot não usa.
 //   ex.: npm run simulate:all -w @gumgum/engine -- https://gumgumfight.duckdns.org/api/cards 500
 
 import { readFileSync } from 'node:fs';
 import {
   actingPlayer,
+  legalActions,
   applyAction,
   type CardData,
   chooseBotAction,
@@ -18,7 +20,8 @@ import {
 } from '../src';
 import { nextRandom } from '../src/rng';
 
-const [source, gamesArg] = process.argv.slice(2);
+const [source, gamesArg, randomArg] = process.argv.slice(2);
+const randomness = Number(randomArg ?? 0);
 if (!source) {
   console.error('Uso: simulate-all <cards.json | URL> [partidas]');
   process.exit(1);
@@ -87,7 +90,14 @@ async function main() {
       });
       let i = 0;
       for (; i < 4000 && s.phase !== 'gameover'; i++) {
-        s = applyAction(s, chooseBotAction(s, actingPlayer(s)!));
+        const player = actingPlayer(s)!;
+        let action = chooseBotAction(s, player);
+        if (randomness > 0 && nextRandom(rng) < randomness) {
+          // Ação legal qualquer (sem encerrar o turno, para a partida avançar pelo bot).
+          const legal = legalActions(s, player).filter((a) => a.type !== 'endTurn');
+          if (legal.length) action = legal[Math.floor(nextRandom(rng) * legal.length)];
+        }
+        s = applyAction(s, action);
         for (const p of [0, 1] as const) {
           if (countCards(s, p) !== 51) throw new Error(`cartas do jogador ${p}: ${countCards(s, p)}`);
         }

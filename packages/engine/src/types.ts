@@ -69,6 +69,8 @@ export interface TargetSpec {
   name?: string;
   /** "base cost" / "base power": compara com os valores impressos, sem modificadores. */
   base?: boolean;
+  /** "with a cost equal to or less than the number of your opponent's Life cards" */
+  maxCostDynamic?: 'opponentLife' | 'ownLife' | 'totalLife';
   color?: Color;
   /** "with a type including "Whitebeard Pirates"" (parte do nome do tipo) */
   typeIncludes?: string;
@@ -90,6 +92,10 @@ export interface CardFilter {
   typeIncludes?: string;
   /** "no base effect": carta sem texto de efeito */
   noEffect?: boolean;
+  maxPower?: number;
+  minPower?: number;
+  /** "and a [Trigger]" */
+  hasTrigger?: boolean;
 }
 
 /**
@@ -140,6 +146,50 @@ export interface Condition {
   haveCharacterNamed?: string;
   /** "If your opponent has N or more DON!! cards on their field" */
   opponentMinDonOnField?: number;
+  /** "If you have N or more cards in your trash" */
+  trashMin?: number;
+  /** "If the number of DON!! cards on your field is equal to or less than the number on your opponent's field" */
+  donLeqOpponent?: boolean;
+  /** "If your Leader has the {A} or {B} type" */
+  leaderHasAnyType?: string[];
+  /** "If you have a Character with a cost of N or more" */
+  ownCharacterMinCost?: number;
+  /** "If your opponent has N or more cards in their hand" */
+  opponentHandMin?: number;
+  /** "If this Character has N power or more" */
+  selfMinPower?: number;
+  /** "If you have any DON!! cards given" */
+  anyDonGiven?: boolean;
+  /** "If this Character was played on this turn" */
+  selfPlayedThisTurn?: boolean;
+  /** "If you have N or more {X} type Characters" */
+  minTypedCharacters?: { count: number; type: string };
+  /** "If your opponent has N or more Life cards" */
+  opponentLifeMin?: number;
+  /** "If the revealed card / that card is …": testa a carta escolhida/revelada no passo anterior. */
+  chosenMatches?: CardFilter;
+  /** "If you have a {X} type Character with a cost of N or more" */
+  ownTypedCharacterMinCost?: { type: string; cost: number };
+  /** "If your opponent has a Character with a cost of N or more" */
+  opponentCharacterMinCost?: number;
+  /** "If your Leader has the {X} type or is [Y]" */
+  leaderTypeOrName?: { type: string; name: string };
+  /** "If you have no other [X] Characters" */
+  noOtherNamed?: string;
+  /** "If you have N or less Characters" */
+  maxCharacters?: number;
+  /** "If you have N or more active DON!! cards" */
+  minActiveDon?: number;
+  /** "If you have N or more Events in your trash" */
+  trashEventsMin?: number;
+  /** "If you have a Character with N power or more" */
+  ownCharacterMinPower?: number;
+  /** "If the number of your Life cards is equal to or less than the number of your opponent's Life cards" */
+  lifeLeqOpponent?: boolean;
+  /** "If you have N or less cards in your deck" */
+  deckMax?: number;
+  /** "If you have N or more rested {X} type Characters" (type opcional) */
+  minRestedTyped?: { count: number; types?: string[] };
 }
 
 export type AbilityCondition = Condition;
@@ -151,6 +201,10 @@ export interface Aura {
   hasAnyType?: string[];
   typeIncludes?: string;
   power: number;
+  /** Afeta as cartas do oponente ("Give all of your opponent's Characters −5 cost"). */
+  side?: 'own' | 'opponent';
+  /** Custo em vez de poder. */
+  cost?: number;
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -212,13 +266,46 @@ type EffectStepBody =
   /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */
   | { do: 'lifeToHand'; count: number; choose?: boolean }
   /** "add up to 1 card from your hand to the top of your Life cards" */
-  | { do: 'handToLife'; upTo: number }
+  | { do: 'handToLife'; upTo: number; filter?: CardFilter }
   /** "Add up to 1 of your Characters … to the top of the owner's Life cards" */
   | { do: 'fieldToLife'; target: TargetRef; choose?: boolean }
   /** "Look at up to 1 card from the top of your or your opponent's Life cards, and place it at the top or bottom" */
   | { do: 'peekLife'; whose: 'either' | 'own' | 'opponent' }
   /** "Choose one: • … • …" / "Your opponent chooses one: …" */
   | { do: 'chooseOne'; chooser: 'self' | 'opponent'; options: EffectStep[][]; labels: string[] }
+  /** Custos com escolha (ver AbilityCost): */
+  | { do: 'restOwn'; count: number; spec: TargetSpec }
+  | { do: 'returnOwn'; count: number; spec: TargetSpec }
+  | { do: 'trashSelf' }
+  | { do: 'returnSelfToHand' }
+  | { do: 'trashToDeckBottom'; count: number; filter?: CardFilter }
+  | { do: 'lifeToTrash'; count: number; choose?: boolean }
+  | { do: 'revealFromHand'; count: number; filter?: CardFilter }
+  | { do: 'lifeFace'; count: number; up: boolean }
+  /** "… will not become active in your opponent's next Refresh Phase" */
+  | { do: 'skipRefresh'; target: TargetRef }
+  /** "Trash up to 1 of your opponent's Characters" (vai para o descarte sem ser K.O.) */
+  | { do: 'trashTarget'; target: TargetRef }
+  /** "trash N cards from your opponent's hand" (escolhidas ao acaso: a mão é oculta) */
+  | { do: 'trashRandomFromOpponentHand'; count: number }
+  /** Custos: "K.O. N of your …", "trash N of your Characters", "place this Character at the bottom of the owner's deck" */
+  | { do: 'koOwn'; count: number; spec: TargetSpec }
+  | { do: 'trashOwn'; count: number; spec: TargetSpec }
+  | { do: 'selfToDeckBottom' }
+  /** "Reveal 1 card from the top of your deck." (a carta vira 'chosen') */
+  | { do: 'revealTop' }
+  /** "you may play that card (rested)" / "play up to 1 … (dentre as reveladas)" */
+  | { do: 'playRevealed'; filter?: CardFilter; rested?: boolean }
+  /** "place the revealed card at the bottom of your deck" */
+  | { do: 'revealedToBottom' }
+  /** "… cannot be rested until the end of your opponent's next turn" */
+  | { do: 'cannotBeRested'; target: TargetRef; duration: Duration }
+  /** "add up to N card from the top of your opponent's Life cards to the owner's hand" */
+  | { do: 'opponentLifeToHand'; count: number }
+  /** "your opponent places N card from their hand at the bottom of their deck" */
+  | { do: 'opponentHandToBottom'; count: number }
+  /** "… at the end of this turn": passos adiados para o fim do turno. */
+  | { do: 'delayed'; steps: EffectStep[] }
   /** Virar N Personagens ativos seus (custo "You may rest 2 of your Characters"). */
   | { do: 'restOwnCharacters'; count: number }
   /** Colocar cartas da mão no fundo do deck (custo "You may place 1 card from your hand at the bottom of your deck"). */
@@ -234,7 +321,7 @@ type EffectStepBody =
   /** "Add up to N … from your trash to your hand." */
   | { do: 'fromTrashToHand'; upTo: number; filter: CardFilter }
   /** "Play up to N … from your deck/hand/trash" (sem pagar custo). */
-  | { do: 'playFrom'; from: 'deck' | 'hand' | 'trash'; upTo: number; filter: CardFilter; rested?: boolean }
+  | { do: 'playFrom'; from: 'deck' | 'hand' | 'trash' | 'handOrTrash'; upTo: number; filter: CardFilter; rested?: boolean }
   /** "… then shuffle your deck." */
   | { do: 'shuffleDeck' }
   /** "Look at N cards from the top of your deck and return them to the top or bottom of the deck in any order." */
@@ -243,7 +330,7 @@ type EffectStepBody =
    * Custo opcional no meio de um efeito automático ("[On Play] DON!! −1: …", "You may trash 1 card from your
    * hand: …"). O jogador decide se paga; se não pagar (ou não puder), o resto do efeito não acontece.
    */
-  | { do: 'payCost'; cost: AbilityCost }
+  | { do: 'payCost'; cost: AbilityCost; scope?: number }
   /** "Trash up to N of your opponent's Life cards." (do topo) */
   | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
   /** "This Character gains [Rush] during this turn." */
@@ -282,6 +369,7 @@ export type AbilityTiming =
   | 'endOfTurn' // [End of Your Turn]
   | 'battlesCharacter' // "If this Character battles your opponent's Character" (ao fim da batalha)
   | 'event' // "When …": reação a um acontecimento (Ability.event)
+  | 'onOpponentAttack' // [On Your Opponent's Attack]
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
@@ -299,6 +387,30 @@ export interface AbilityCost {
   lifeChoice?: boolean;
   /** "You may rest N of your Characters:" (o jogador escolhe quais) */
   restCharacters?: number;
+  /** "You may rest N of your {X} type Leader or Stage cards:" (filtro de alvo) */
+  restOwn?: { count: number; spec: TargetSpec };
+  /** "You may return N of your Characters … to the owner's hand:" */
+  returnOwn?: { count: number; spec: TargetSpec };
+  /** "You may trash this Character:" */
+  trashSelf?: boolean;
+  /** "You may place this Character at the bottom of the owner's deck:" */
+  selfToBottom?: boolean;
+  /** "You may K.O. N of your … Characters:" */
+  koOwn?: { count: number; spec: TargetSpec };
+  /** "You may trash N of your Characters:" */
+  trashOwn?: { count: number; spec: TargetSpec };
+  /** "You may return this Character to the owner's hand:" */
+  returnSelf?: boolean;
+  /** "You may trash N cards from the top of your deck:" */
+  mill?: number;
+  /** "You may place N cards (filtro) from your trash at the bottom of your deck in any order:" */
+  trashToBottom?: { count: number; filter?: CardFilter };
+  /** "You may trash N card from the top (or bottom) of your Life cards:" */
+  lifeToTrash?: { count: number; choose?: boolean };
+  /** "You may reveal N … from your hand:" */
+  reveal?: { count: number; filter?: CardFilter };
+  /** "You may turn N card from the top of your Life cards face-up / face-down:" */
+  lifeFace?: { count: number; up: boolean };
 }
 
 export interface Ability {
@@ -388,6 +500,8 @@ export interface PlayerState {
   donActive: number;
   donRested: number;
   mulliganDone: boolean;
+  /** Cartas de Vida viradas para cima. */
+  lifeFaceUp?: string[];
 }
 
 export interface Modifier {
@@ -400,7 +514,9 @@ export interface Modifier {
     | 'cannotBeKO'
     | 'cannotBeKOInBattle'
     | 'canAttackActive'
-    | 'cannotAttack';
+    | 'cannotAttack'
+    | 'skipRefresh'
+    | 'cannotBeRested';
   amount: number;
   /** Para 'nextOpponentTurn': o efeito acaba no fim deste turno. */
   untilTurn?: number;
@@ -490,6 +606,8 @@ export interface GameState {
   pending: Pending | null;
   modifiers: Modifier[];
   usedThisTurn: string[];
+  /** Efeitos adiados para o fim do turno ("at the end of this turn"). */
+  delayed?: Array<{ controller: PlayerId; source: string; steps: EffectStep[] }>;
   winner: PlayerId | null;
   winReason: string | null;
   log: LogEntry[];

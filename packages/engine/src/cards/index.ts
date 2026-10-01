@@ -67,4 +67,4 @@ function computeStatus(card: CardData): AutomationStatus {
 
 export { CARD_SCRIPTS };
 export { detectKeywords, manualAbilities, splitEffects } from './split';
-export { parseBody, parseCard, parseCardFilter, parseCondition, parseTarget, type ParsedCard } from './parser';
+export { diagnoseLine, parseBody, parseCard, parseCardFilter, parseCondition, parseTarget, type ParsedCard } from './parser';
