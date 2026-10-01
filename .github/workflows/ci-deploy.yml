@@ -84,14 +84,22 @@ jobs:
         id: check
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          HOST: ${{ secrets.DEPLOY_HOST }}
-          USER_NAME: ${{ secrets.DEPLOY_USER }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS || vars.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST || vars.DEPLOY_HOST }}
+          USER_NAME: ${{ secrets.DEPLOY_USER || vars.DEPLOY_USER }}
+          SSH_KEY_AS_VARIABLE: ${{ vars.DEPLOY_SSH_KEY != '' }}
         run: |
+          if [ "$SSH_KEY_AS_VARIABLE" = true ]; then
+            echo "::error::DEPLOY_SSH_KEY foi cadastrada em Variables (visível para quem lê o repositório). Apague-a de Variables e cadastre em Secrets."
+            exit 1
+          fi
           missing=""
-          for v in SSH_KEY KNOWN_HOSTS HOST USER_NAME; do [ -n "${!v}" ] || missing="$missing $v"; done
+          for pair in SSH_KEY:DEPLOY_SSH_KEY KNOWN_HOSTS:DEPLOY_KNOWN_HOSTS HOST:DEPLOY_HOST USER_NAME:DEPLOY_USER; do
+            var="${pair%%:*}"
+            [ -n "${!var}" ] || missing="$missing ${pair#*:}"
+          done
           if [ -n "$missing" ]; then
-            echo "::warning::Deploy pulado: faltam secrets (DEPLOY_*):$missing. Veja a seção Deploy do README."
+            echo "::warning::Deploy pulado: o workflow não encontrou:$missing. Cadastre em Settings → Secrets and variables → Actions → aba Secrets → Repository secrets (não em Codespaces/Dependabot nem em outro Environment)."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
@@ -101,9 +109,9 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-          HOST: ${{ secrets.DEPLOY_HOST }}
-          USER_NAME: ${{ secrets.DEPLOY_USER }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS || vars.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST || vars.DEPLOY_HOST }}
+          USER_NAME: ${{ secrets.DEPLOY_USER || vars.DEPLOY_USER }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
