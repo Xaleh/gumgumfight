@@ -101,9 +101,9 @@ const SENTENCES: Rule[] = [
     (_, n) => `Descarte ${n} ${plural(n, 'carta', 'cartas')} da sua mão.`,
   ],
   [
-    /^Add up to (\d+) DON!! cards? from your DON!! deck and (?:set (?:it|them) as active|rest (?:it|them))\.?$/i,
-    (m, n) =>
-      `Adicione até ${n} DON!! do seu deck de DON!! ${/active/i.test(m) ? 'como ativo' : 'virado'}${Number(n) > 1 ? 's' : ''}.`,
+    /^Add (up to )?(\d+) DON!! cards? from your DON!! deck and (?:set (?:it|them) as active|rest (?:it|them))\.?$/i,
+    (m, upTo, n) =>
+      `Adicione ${upTo ? 'até ' : ''}${n} DON!! do seu deck de DON!! ${/active/i.test(m) ? 'como ativo' : 'virado'}${Number(n) > 1 ? 's' : ''}.`,
   ],
   [
     /^Look at (\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to your hand\.?$/i,
@@ -132,6 +132,11 @@ const SENTENCES: Rule[] = [
     'Este Personagem também pode atacar Personagens ativos do oponente.',
   ],
   [/^Select (.+?)\.?$/i, (_, who) => `Escolha ${who}.`],
+  [/^(.+?) cannot be K\.O\.'d in battle\.?$/i, (_, who) => `${who} não pode ser nocauteado em batalha.`],
+  [
+    /^(.+?) cannot be K\.O\.'d(?: (during this turn))?\.?$/i,
+    (_, who, dur) => `${who} não pode ser nocauteado${dur ? ` ${dur}` : ''}.`,
+  ],
   [
     /^(.+?) gains? \+(\d+) power(?: (during this turn|during this battle|until the end of your opponent's next turn))?\.?$/i,
     (_, who, n, dur) => `${who} ${manyTargets(who) ? 'recebem' : 'recebe'} +${n} de poder${dur ? ` ${dur}` : ''}.`,
@@ -146,6 +151,22 @@ const PHRASES: Rule[] = [
   [/If you have (\d+) or less Life cards,\s*/gi, (_, n) => `Se você tiver ${n} ou menos cartas de Vida, `],
   [/If you have (\d+) or more Characters,\s*/gi, (_, n) => `Se você tiver ${n} ou mais Personagens, `],
   [/If this Character is rested,\s*/gi, 'Se este Personagem estiver virado, '],
+  [/If you have (\d+) or more DON!! cards on your field,\s*/gi, (_, n) => `Se você tiver ${n} ou mais DON!! no seu campo, `],
+  [/If your opponent has more DON!! cards on their field than you,\s*/gi, 'Se o seu oponente tiver mais DON!! no campo do que você, '],
+  [/If that card is a Character,\s*/gi, 'Se essa carta for um Personagem, '],
+  [
+    /When this Character battles "?([A-Za-z]+)"? attribute Characters,\s*/gi,
+    (_, attr) => `Quando este Personagem batalhar com Personagens de atributo ${attr}, `,
+  ],
+  [
+    /You may rest this Character and trash (\d+) ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type cards? from your hand/gi,
+    (_, n, t) => `Você pode virar este Personagem e descartar ${n} ${plural(n, 'carta', 'cartas')} do tipo ${typeList(t)} da sua mão`,
+  ],
+  [
+    /All of your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type Characters/gi,
+    (_, t) => `Todos os seus Personagens do tipo ${typeList(t)}`,
+  ],
+  [/that Character/gi, 'esse Personagem'],
   [/If your Leader has the (\{[^}]+\}) type,\s*/gi, (_, t) => `Se o seu Líder tiver o tipo ${t}, `],
   [/If this Character battles your opponent's Character,\s*/gi, 'Se este Personagem batalhar com um Personagem do oponente, '],
   [/You may rest this card/gi, 'Você pode virar esta carta'],
@@ -243,7 +264,7 @@ function translateBody(body: string): string {
   if (cost) return `${applyPhrases(cost[1])}: ${translateBody(cost[2])}`;
 
   // Condicional no início da frase.
-  const cond = body.match(/^(If [^,]+,)\s*(.*)$/);
+  const cond = body.match(/^((?:If|When) [^,]+,)\s*(.*)$/);
   if (cond) {
     const rest = translateBody(cond[2]);
     return applyPhrases(cond[1] + ' ') + rest.charAt(0).toLowerCase() + rest.slice(1);

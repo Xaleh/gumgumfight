@@ -1,0 +1,71 @@
+{
+  "id": "st05-shanks",
+  "name": "Shanks Roxo (ST05)",
+  "leader": "ST05-001",
+  "cards": [
+    {
+      "id": "ST05-002",
+      "count": 4
+    },
+    {
+      "id": "ST05-003",
+      "count": 4
+    },
+    {
+      "id": "ST05-004",
+      "count": 4
+    },
+    {
+      "id": "ST05-005",
+      "count": 2
+    },
+    {
+      "id": "ST05-006",
+      "count": 2
+    },
+    {
+      "id": "ST05-007",
+      "count": 4
+    },
+    {
+      "id": "ST05-008",
+      "count": 2
+    },
+    {
+      "id": "ST05-009",
+      "count": 4
+    },
+    {
+      "id": "ST05-010",
+      "count": 2
+    },
+    {
+      "id": "ST05-011",
+      "count": 2
+    },
+    {
+      "id": "ST05-012",
+      "count": 4
+    },
+    {
+      "id": "ST05-013",
+      "count": 4
+    },
+    {
+      "id": "ST05-014",
+      "count": 4
+    },
+    {
+      "id": "ST05-015",
+      "count": 2
+    },
+    {
+      "id": "ST05-016",
+      "count": 2
+    },
+    {
+      "id": "ST05-017",
+      "count": 4
+    }
+  ]
+}

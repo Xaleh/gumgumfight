@@ -58,6 +58,8 @@ export interface TargetSpec {
   keyword?: Keyword;
   /** Pelo menos um destes tipos ("{Supernovas} or {Heart Pirates} type"). */
   hasAnyType?: string[];
+  /** "All of your …": afeta todas as cartas válidas, sem escolha. */
+  all?: boolean;
 }
 
 /** Filtro de cartas fora do campo (busca no deck, mão...). */
@@ -77,12 +79,16 @@ export interface StepCondition {
   handMax?: number;
   /** "If your Leader has the {X} type" */
   leaderHasType?: string;
+  /** "If your opponent has more DON!! cards on their field than you" */
+  opponentMoreDon?: boolean;
 }
 
 /** Condições extras de uma habilidade ("If you have 3 or more Characters", "If this Character is rested"). */
 export interface AbilityCondition {
   minCharacters?: number;
   selfRested?: boolean;
+  /** "If you have N or more DON!! cards on your field" */
+  minDonOnField?: number;
 }
 
 /** Bônus contínuo para outras cartas do mesmo jogador ("your {Navy} type Characters gain +1000"). */
@@ -96,6 +102,7 @@ export interface Aura {
 export type TargetRef =
   | 'self' // a carta fonte do efeito
   | 'ownLeader'
+  | 'chosen' // as cartas escolhidas no passo anterior ("that card", "that Character")
   | 'battleTarget' // a carta sendo atacada na batalha atual
   | TargetSpec; // o jogador escolhe
 
@@ -122,7 +129,7 @@ type EffectStepBody =
   /** "Play this card" (ex.: [Trigger]): joga a própria carta, sem custo. */
   | { do: 'playThis' }
   /** Descartar cartas da mão (custo "You may trash N card from your hand"). */
-  | { do: 'trashFromHand'; count: number }
+  | { do: 'trashFromHand'; count: number; filter?: CardFilter }
   /** "Set up to N of your DON!! cards as active." */
   | { do: 'setDonActive'; count: number }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
@@ -147,7 +154,9 @@ type EffectStepBody =
   /** "Trash up to N of your opponent's Life cards." (do topo) */
   | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
   /** "This Character gains [Rush] during this turn." */
-  | { do: 'gainKeyword'; target: TargetRef; keyword: Keyword; duration: Duration };
+  | { do: 'gainKeyword'; target: TargetRef; keyword: Keyword; duration: Duration }
+  /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
+  | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean };
 
 /** Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado). */
 export type EffectStep = EffectStepBody & { if?: StepCondition };
@@ -172,6 +181,8 @@ export interface AbilityCost {
   restDon?: number; // ① ② ③ ... (virar DON!! ativos da área de custo)
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
   trashFromHand?: number; // "You may trash N card from your hand:"
+  /** Filtro das cartas descartadas como custo ("trash 1 {FILM} type card from your hand"). */
+  trashFilter?: CardFilter;
 }
 
 export interface Ability {
@@ -189,6 +200,10 @@ export interface Ability {
   staticPower?: number;
   staticKeyword?: Keyword;
   staticCanAttackActive?: boolean;
+  /** "This Character cannot be K.O.'d in battle." */
+  staticNoBattleKO?: boolean;
+  /** "When this Character battles {attribute} attribute Characters, this Character gains +N power". */
+  battleVsAttribute?: { attribute: string; power: number };
   /** Texto curto exibido na interface. */
   label?: string;
   /** Habilidade derivada do texto, resolvida manualmente pelo jogador. */
@@ -249,7 +264,7 @@ export interface PlayerState {
 
 export interface Modifier {
   uid: string;
-  kind: 'power' | 'noBlockerWhenAttacking' | 'keyword';
+  kind: 'power' | 'noBlockerWhenAttacking' | 'keyword' | 'cannotBeKO' | 'cannotBeKOInBattle';
   amount: number;
   keyword?: Keyword;
   duration: Duration;
@@ -300,6 +315,8 @@ export type Frame =
       choice?: string[];
       /** Memória de passos com mais de uma escolha (ex.: arrangeTop). */
       memo?: string[];
+      /** Alvos do último passo com alvo (para 'chosen'). */
+      last?: string[];
     }
   | { kind: 'battle' }
   | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean }

@@ -532,4 +532,148 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
       },
     ],
   },
+
+  // ------------------------------------------------------------ ST05 ONE PIECE FILM edition (roxo)
+  // Sem efeito: ST05-007 Gordon, ST05-012 Baccarat, ST05-013 Bins, ST05-015 Dr. Indigo. ST05-003 Ann: só [Blocker].
+  'ST05-001': {
+    // [Activate: Main] [Once Per Turn] DON!! −3: All of your {FILM} type Characters gain +2000 power during this turn.
+    abilities: [
+      {
+        timing: 'activateMain',
+        oncePerTurn: true,
+        cost: { donMinus: 3 },
+        label: 'DON!! −3: +2000 a todos os {FILM}',
+        steps: [
+          {
+            do: 'power',
+            target: { side: 'own', kinds: ['character'], upTo: 99, hasAnyType: ['FILM'], all: true },
+            amount: 2000,
+            duration: 'turn',
+          },
+        ],
+      },
+    ],
+  },
+  'ST05-002': {
+    // [On Play] Add up to 1 DON!! card from your DON!! deck and rest it.
+    abilities: [{ timing: 'onPlay', steps: [{ do: 'addDonFromDeck', count: 1, rested: true }] }],
+  },
+  'ST05-004': {
+    // [Blocker] / [On Block] DON!! −1: Rest up to 1 of your opponent's Characters with a cost of 5 or less.
+    keywords: ['blocker'],
+    abilities: [
+      {
+        timing: 'onBlock',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 1 } },
+          { do: 'rest', target: oppChar({ maxCost: 5 }) },
+        ],
+      },
+    ],
+  },
+  'ST05-005': {
+    // [Activate: Main] [Once Per Turn] You may rest this Character and trash 1 {FILM} type card from your hand: If your
+    // opponent has more DON!! cards on their field than you, add 2 DON!! cards from your DON!! deck and rest them.
+    abilities: [
+      {
+        timing: 'activateMain',
+        oncePerTurn: true,
+        cost: { restSelf: true, trashFromHand: 1, trashFilter: { hasAnyType: ['FILM'] } },
+        label: 'Virar + descartar {FILM}: +2 DON!! virados',
+        steps: [{ do: 'addDonFromDeck', count: 2, rested: true, if: { opponentMoreDon: true } }],
+      },
+    ],
+  },
+  'ST05-006': {
+    // [When Attacking] DON!! −2: Draw 2 cards.
+    abilities: [
+      {
+        timing: 'whenAttacking',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 2 } },
+          { do: 'draw', count: 2 },
+        ],
+      },
+    ],
+  },
+  'ST05-008': {
+    // If you have 8 or more DON!! cards on your field, this Character cannot be K.O.'d in battle.
+    abilities: [{ timing: 'static', condition: { minDonOnField: 8 }, staticNoBattleKO: true, steps: [] }],
+  },
+  'ST05-009': {
+    // [Trigger] Play this card.
+    abilities: [{ timing: 'trigger', steps: [{ do: 'playThis' }] }],
+  },
+  'ST05-010': {
+    // When this Character battles "Strike" attribute Characters, this Character gains +3000 power during this turn.
+    // [Activate: Main] [Once Per Turn] DON!! −1: This Character gains +2000 power during this turn.
+    // (O bônus contra Strike vale durante a batalha, que é quando o poder importa.)
+    abilities: [
+      { timing: 'static', battleVsAttribute: { attribute: 'Strike', power: 3000 }, steps: [] },
+      {
+        timing: 'activateMain',
+        oncePerTurn: true,
+        cost: { donMinus: 1 },
+        label: 'DON!! −1: +2000 de poder',
+        steps: [{ do: 'power', target: 'self', amount: 2000, duration: 'turn' }],
+      },
+    ],
+  },
+  'ST05-011': {
+    // [Activate: Main] [Once Per Turn] DON!! −4: Rest up to 2 of your opponent's Characters with a cost of 6 or less.
+    // Then, this Character gains [Double Attack] during this turn.
+    abilities: [
+      {
+        timing: 'activateMain',
+        oncePerTurn: true,
+        cost: { donMinus: 4 },
+        label: 'DON!! −4: virar 2 e ganhar [Double Attack]',
+        steps: [
+          { do: 'rest', target: oppChar({ maxCost: 6, upTo: 2 }) },
+          { do: 'gainKeyword', target: 'self', keyword: 'doubleAttack', duration: 'turn' },
+        ],
+      },
+    ],
+  },
+  'ST05-014': {
+    // [On Play] Look at 5 cards from the top of your deck; reveal up to 1 {FILM} type card other than [Buena Festa] and
+    // add it to your hand. Then, place the rest at the bottom of your deck in any order.
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'search', look: 5, upTo: 1, filter: { hasAnyType: ['FILM'], excludeName: 'Buena Festa' }, rest: 'bottom' },
+        ],
+      },
+    ],
+  },
+  'ST05-016': {
+    // [Main] DON!! −2: K.O. up to 1 of your opponent's Characters with a cost of 5 or less.
+    // [Trigger] Add up to 1 DON!! card from your DON!! deck and set it as active.
+    abilities: [
+      {
+        timing: 'main',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 2 } },
+          { do: 'ko', target: oppChar({ maxCost: 5 }) },
+        ],
+      },
+      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },
+    ],
+  },
+  'ST05-017': {
+    // [Counter] Up to 1 of your {FILM} type Leader or Character cards gains +4000 power during this battle. If that card
+    // is a Character, that Character cannot be K.O.'d during this turn.
+    // [Trigger] Add up to 1 DON!! card from your DON!! deck and set it as active.
+    abilities: [
+      {
+        timing: 'counter',
+        steps: [
+          { do: 'power', target: ownLeaderOrChar({ hasAnyType: ['FILM'] }), amount: 4000, duration: 'battle' },
+          { do: 'cannotBeKO', target: 'chosen', duration: 'turn' },
+        ],
+      },
+      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },
+    ],
+  },
 };

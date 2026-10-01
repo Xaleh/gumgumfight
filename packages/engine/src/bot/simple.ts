@@ -158,7 +158,15 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
     if (!step || !canBattle) return false;
     if (step.do === 'rest') return opp.characters.some((c) => !c.rested);
     if (step.do === 'giveRestedDon') return me.donRested > 0;
-    if (step.do === 'power') return !me.leader.rested;
+    if (step.do === 'power') {
+      // Custos de DON!! −X só valem se o bônus ajudar vários ataques.
+      if (ab.cost?.donMinus) {
+        if (typeof step.target !== 'object' || !step.target.all) return false;
+        const ready = targetCandidates(state, player, a.uid, step.target).filter((u) => !locate(state, u)?.fc.rested);
+        return ready.length >= 2;
+      }
+      return !me.leader.rested;
+    }
     // Devolver personagens custa caro (ex.: DON!! −4): só vale contra alvos de custo 3+.
     if (step.do === 'returnToHand' || step.do === 'toDeckBottom') return hitsOpponent(state, player, a.uid, step, 3);
     if (step.do === 'playFrom') return me.characters.length < 5;
