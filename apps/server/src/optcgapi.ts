@@ -49,9 +49,19 @@ export function allEndpoints(base: string): string[] {
   return [`${base}/allSetCards/`, `${base}/allSTCards/`];
 }
 
-/** Separa o texto do [Trigger], que às vezes vem junto do texto principal. */
-function splitTrigger(text: string): { text: string; trigger?: string } {
-  const i = text.search(/\[Trigger\]/i);
+/**
+ * Separa o texto do [Trigger], que às vezes vem junto do texto principal. Só conta o
+ * [Trigger] que abre uma linha ou vem depois do fim de uma frase: "trash 1 card with
+ * a [Trigger] from your hand" fala de cartas com Trigger e continua no texto principal.
+ */
+export function splitTrigger(text: string): { text: string; trigger?: string } {
+  let i = -1;
+  for (const m of text.matchAll(/\[Trigger\]/gi)) {
+    if (/(?:^|\n|[.)!])\s*$/.test(text.slice(0, m.index))) {
+      i = m.index!;
+      break;
+    }
+  }
   if (i < 0) return { text };
   return {
     text: text.slice(0, i).trim(),

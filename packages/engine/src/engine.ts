@@ -529,6 +529,7 @@ export function targetCandidates(state: GameState, controller: PlayerId, source:
       if (spec.rested !== undefined && fc.rested !== spec.rested) return false;
       if (spec.hasType && !hasType(def, spec.hasType)) return false;
       if (spec.keyword && !hasKeyword(state, fc.uid, spec.keyword)) return false;
+      if (spec.hasTrigger && !def.trigger?.trim()) return false;
       if (!matchesAnyType(def, spec.hasAnyType)) return false;
       return true;
     })

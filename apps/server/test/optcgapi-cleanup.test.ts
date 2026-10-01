@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractNotes, mapApiCard, normalizeTypeQuotes, splitTypes, typeVocabulary } from '../src/optcgapi';
+import { extractNotes, mapApiCard, normalizeTypeQuotes, splitTrigger, splitTypes, typeVocabulary } from '../src/optcgapi';
 
 describe('limpeza dos dados da optcgapi', () => {
   it('separa notas de errata/reimpressão do texto do efeito', () => {
@@ -8,6 +8,17 @@ describe('limpeza dos dados da optcgapi', () => {
     );
     expect(r.text).toBe('[On Play] Draw 1 card.');
     expect(r.notes).toHaveLength(2);
+  });
+
+  it('só separa o [Trigger] que abre uma linha ou vem depois do fim de uma frase', () => {
+    expect(splitTrigger('[On Play] You may trash 1 card with a [Trigger] from your hand: Draw 3 cards.')).toEqual({
+      text: '[On Play] You may trash 1 card with a [Trigger] from your hand: Draw 3 cards.',
+    });
+    expect(splitTrigger('[Main] K.O. up to 1 Character with a cost of 3 or less and a [Trigger].\n[Trigger] Draw 1 card.')).toEqual({
+      text: '[Main] K.O. up to 1 Character with a cost of 3 or less and a [Trigger].',
+      trigger: 'Draw 1 card.',
+    });
+    expect(splitTrigger('[Counter] Draw 1 card. [Trigger] Play this card.')).toEqual({ text: '[Counter] Draw 1 card.', trigger: 'Play this card.' });
   });
 
   it('converte "X" type para {X} type', () => {

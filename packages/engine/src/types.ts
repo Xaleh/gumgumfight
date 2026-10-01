@@ -71,6 +71,8 @@ export interface TargetSpec {
   base?: boolean;
   /** "with a cost equal to or less than the number of your opponent's Life cards" */
   maxCostDynamic?: 'opponentLife' | 'ownLife' | 'totalLife';
+  /** "with a [Trigger]" */
+  hasTrigger?: boolean;
   color?: Color;
   /** "with a type including "Whitebeard Pirates"" (parte do nome do tipo) */
   typeIncludes?: string;

@@ -104,10 +104,14 @@ function clean(raw: string): string {
 }
 
 function sentencesOf(body: string): string[] {
-  return body
-    .split(/(?<=[a-z0-9)\]}'"]\.)\s+(?=[A-Z[])/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const out: string[] = [];
+  for (const piece of body.split(/(?<=[a-z0-9)\]}'"]\.)\s+(?=[A-Z[])/)) {
+    // "[Dr. Hogback]": o ponto dentro de um nome não termina a frase.
+    const prev = out[out.length - 1];
+    if (prev !== undefined && (prev.match(/\[/g)?.length ?? 0) > (prev.match(/\]/g)?.length ?? 0)) out[out.length - 1] = `${prev} ${piece}`;
+    else out.push(piece);
+  }
+  return out.map((s) => s.trim()).filter(Boolean);
 }
 
 const capitalizeFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -150,8 +154,8 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       spec.excludeName = m[1];
     } else if ((m = rest.match(/^\s*with a type including "([^"]+)"/i))) {
       spec.typeIncludes = m[1];
-    } else if ((m = rest.match(/^\s*(?:and )?a \[Trigger\]/i)) && !onField) {
-      (spec as CardFilter).hasTrigger = true;
+    } else if ((m = rest.match(/^\s*(?:and |with )?an? \[Trigger\]/i))) {
+      spec.hasTrigger = true;
     } else if ((m = rest.match(/^\s*with (\d+) power or less/i)) && !onField) {
       (spec as CardFilter).maxPower = Number(m[1]);
     } else if ((m = rest.match(/^\s*with (\d+) power or more/i)) && !onField) {
