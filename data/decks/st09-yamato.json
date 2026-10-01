@@ -1,0 +1,63 @@
+{
+  "id": "st09-yamato",
+  "name": "Yamato Amarelo (ST09)",
+  "leader": "ST09-001",
+  "cards": [
+    {
+      "id": "ST09-002",
+      "count": 4
+    },
+    {
+      "id": "ST09-003",
+      "count": 4
+    },
+    {
+      "id": "ST09-004",
+      "count": 4
+    },
+    {
+      "id": "ST09-005",
+      "count": 2
+    },
+    {
+      "id": "ST09-006",
+      "count": 4
+    },
+    {
+      "id": "ST09-007",
+      "count": 4
+    },
+    {
+      "id": "ST09-008",
+      "count": 2
+    },
+    {
+      "id": "ST09-009",
+      "count": 4
+    },
+    {
+      "id": "ST09-010",
+      "count": 2
+    },
+    {
+      "id": "ST09-011",
+      "count": 4
+    },
+    {
+      "id": "ST09-012",
+      "count": 4
+    },
+    {
+      "id": "ST09-013",
+      "count": 4
+    },
+    {
+      "id": "ST09-014",
+      "count": 4
+    },
+    {
+      "id": "ST09-015",
+      "count": 4
+    }
+  ]
+}

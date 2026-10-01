@@ -79,6 +79,17 @@ type Rule = [RegExp, string | ((...m: string[]) => string)];
 
 /** Regras de frase inteira (verbo no início). Aplicadas uma vez, na ordem. */
 const SENTENCES: Rule[] = [
+  [/^you may (.+?) instead\.?$/i, (_, what) => `você pode ${infinitive(translateSentence(what)).replace(/\.$/, '')} em vez disso.`],
+  [
+    /^you may K\.O\. the opponent's Character you battled with\.?(?=\s|$)/i,
+    'você pode nocautear o Personagem do oponente com quem batalhou.',
+  ],
+  [/^trash (\d+) cards? from your opponent's hand\.?$/i, (_, n) => `Descarte ${n} ${plural(n, 'carta', 'cartas')} da mão do oponente.`],
+  [
+    /^trash (\d+) cards? from the top or bottom of your Life cards\.?$/i,
+    (_, n) => `Descarte ${n} ${plural(n, 'carta', 'cartas')} do topo ou do fundo da sua Vida.`,
+  ],
+  [/^(.+?) and add this card to your hand\.?$/i, (_, first) => `${translateSentence(first).replace(/\.$/, '')} e adicione esta carta à sua mão.`],
   [/^Draw (\d+) cards?\.?$/i, (_, n) => `Compre ${n} ${plural(n, 'carta', 'cartas')}.`],
   [/^Draw a card\.?$/i, 'Compre 1 carta.'],
   [
@@ -209,6 +220,11 @@ const SENTENCES: Rule[] = [
   [/^Select (.+?)\.?$/i, (_, who) => `Escolha ${who}.`],
   [/^(.+?) cannot be K\.O\.'d in battle\.?$/i, (_, who) => `${who} não pode ser nocauteado em batalha.`],
   [/^(.+?) cannot be K\.O\.'d by effects\.?$/i, (_, who) => `${who} não pode ser nocauteado por efeitos.`],
+  [/^(.+?) cannot be K\.O\.'d in battle by Leaders\.?$/i, (_, who) => `${who} não pode ser nocauteado em batalha por Líderes.`],
+  [
+    /^Add (.+?) to the top or bottom of (?:the owner's|your) Life cards( face-up)?\.?$/i,
+    (_, who, up) => `Coloque ${who} no topo ou no fundo da Vida do dono${up ? ', com a face para cima' : ''}.`,
+  ],
   [
     /^none of your Characters can be K\.O\.'d during this turn\.?$/i,
     'Nenhum dos seus Personagens pode ser nocauteado durante este turno.',
@@ -223,9 +239,31 @@ const SENTENCES: Rule[] = [
   ],
   [/^Trash (\d+) cards? from the top of your deck\.?$/i, (_, n) => `Descarte ${n} ${plural(n, 'carta', 'cartas')} do topo do seu deck.`],
   [
-    /^Add up to (\d+) cards? from the top of your deck to the top of your Life cards\.?$/i,
-    (_, n) => `Adicione até ${n} ${plural(n, 'carta', 'cartas')} do topo do seu deck ao topo das suas cartas de Vida.`,
+    /^Add (up to )?(\d+) cards? from the top of your deck to the top of your Life cards\.?$/i,
+    (_, upTo, n) => `Adicione ${upTo ? 'até ' : ''}${n} ${plural(n, 'carta', 'cartas')} do topo do seu deck ao topo das suas cartas de Vida.`,
   ],
+  [
+    /^Trash (up to )?(\d+) cards? from the top of your opponent's Life cards\.?$/i,
+    (_, upTo, n) => `Descarte ${upTo ? 'até ' : ''}${n} ${plural(n, 'carta', 'cartas')} do topo da Vida do oponente.`,
+  ],
+  [
+    /^Add up to (\d+) cards? from your hand to the top of your Life cards\.?$/i,
+    (_, n) => `Coloque até ${n} ${plural(n, 'carta', 'cartas')} da sua mão no topo da sua Vida.`,
+  ],
+  [
+    /^Look at up to 1 card from the top of (your or your opponent's|your opponent's|your) Life cards,? and place it at the top or bottom of the Life cards\.?$/i,
+    (_, whose) =>
+      `Olhe até 1 carta do topo ${/or/i.test(whose) ? 'da sua Vida ou da Vida do oponente' : /opponent/i.test(whose) ? 'da Vida do oponente' : 'da sua Vida'} e coloque-a no topo ou no fundo dessa Vida.`,
+  ],
+  [
+    /^Add (.+?) to the top of (?:the owner's|your) Life cards( face-up)?\.?$/i,
+    (_, who, up) => `Coloque ${who} no topo da Vida do dono${up ? ', com a face para cima' : ''}.`,
+  ],
+  [
+    /^(.+?) gains? (\[[^\]]+\]) and \+(\d+) power(?: (during this turn|during this battle))?\.?$/i,
+    (_, who, kw, n, dur) => `${who} ganha ${kw} e +${n} de poder${dur ? ` ${dur}` : ''}.`,
+  ],
+  [/^Draw (\d+) cards?, (?!then )(.+)$/i, (_, n, rest) => `Compre ${n} ${plural(n, 'carta', 'cartas')} e ${lower(translateSentence(rest))}`],
   [/^Activate this card's \[On Play\] effect\.?$/i, 'Ative o efeito [Ao Jogar] desta carta.'],
   [/^Activate this card's \[On K\.O\.\] effect\.?$/i, 'Ative o efeito [Ao ser Nocauteado] desta carta.'],
   [/^(.+?) gains? \+(\d+) cost\.?$/i, (_, who, n) => `${who} recebe +${n} de custo.`],
@@ -235,7 +273,7 @@ const SENTENCES: Rule[] = [
     (_, who, dur) => `${who} não pode ser nocauteado${dur ? ` ${dur}` : ''}.`,
   ],
   [
-    /^(.+?) gains? \+(\d+) power(?: (during this turn|during this battle|until the end of your opponent's next turn))?\.?$/i,
+    /^(.+?) gains? \+(\d+) power(?: (during this turn|during this battle|until the end of your opponent's next turn|until the start of your next turn|until the end of your next turn))?\.?$/i,
     (_, who, n, dur) => `${who} ${manyTargets(who) ? 'recebem' : 'recebe'} +${n} de poder${dur ? ` ${dur}` : ''}.`,
   ],
   [/^(.+?) gains? (\[[^\]]+\])(?: (during this turn))?\.?$/i, (_, who, kw, dur) => `${who} ganha ${kw}${dur ? ` ${dur}` : ''}.`],
@@ -245,11 +283,43 @@ const SENTENCES: Rule[] = [
 const typeList = (list: string) => list.replace(/\s+or\s+/g, ' ou ').replace(/\s+and\s+/g, ' e ');
 
 const PHRASES: Rule[] = [
+  [/If this (Character|Leader) would be K\.O\.'d,\s*/gi, (_, w) => `Se ${w === 'Leader' ? 'este Líder' : 'este Personagem'} for nocauteado, `],
+  [
+    /At the end of a battle in which this Character battles your opponent's Character,\s*/gi,
+    'Ao fim de uma batalha em que este Personagem batalhar com um Personagem do oponente, ',
+  ],
+  [/If you do,\s*/gi, 'Se fizer isso, '],
+  [
+    /If you have (\d+) DON!! cards on your field or (\d+) or more DON!! cards on your field,\s*/gi,
+    (_, a, b) => `Se você tiver ${a} DON!! no seu campo ou ${b} ou mais DON!! no seu campo, `,
+  ],
+  [/If your opponent has (\d+) or more cards in their hand,\s*/gi, (_, n) => `Se o oponente tiver ${n} ou mais cartas na mão, `],
+  // Reações ("When …,"): antes das regras de trechos genéricos.
+  [/When a DON!! card on your field is returned to your DON!! deck(?: by your effect)?,\s*/gi, 'Quando um DON!! do seu campo voltar ao seu deck de DON!!, '],
+  [/When a Character is K\.?O\.?'d,\s*/gi, 'Quando um Personagem for nocauteado, '],
+  [/When (?:your opponent's Character|one of your opponent's Characters) is K\.?O\.?'d,\s*/gi, 'Quando um Personagem do oponente for nocauteado, '],
+  [/When your opponent activates a \[Blocker\],\s*/gi, 'Quando o oponente ativar um [Blocker], '],
+  [/When your opponent activates an Event,\s*/gi, 'Quando o oponente ativar um Evento, '],
+  [/When you activate an Event,\s*/gi, 'Quando você ativar um Evento, '],
+  [/When this Character becomes rested,\s*/gi, 'Quando este Personagem for virado, '],
+  [/When this (Character|Leader)'s attack deals damage to your opponent's Life,\s*/gi, (_, w) => `Quando o ataque deste ${w === 'Leader' ? 'Líder' : 'Personagem'} causar dano à Vida do oponente, `],
+  [/If you have (\d+) or less DON!! cards on your field,\s*/gi, (_, n) => `Se você tiver ${n} ou menos DON!! no seu campo, `],
+  [/If you have (\d+) or more Life cards,\s*/gi, (_, n) => `Se você tiver ${n} ou mais cartas de Vida, `],
+  [/If your opponent has a Character with (\d+) or more power,\s*/gi, (_, n) => `Se o oponente tiver um Personagem com ${n} ou mais de poder, `],
+  [/up to (\d+) of your Leader\b(?! or)/gi, (_, n) => `até ${n} Líder seu`],
+  [/all Characters/gi, 'todos os Personagens'],
+  [/until the end of your next turn/gi, 'até o fim do seu próximo turno'],
   [/If you have (\d+) or less Life cards,\s*/gi, (_, n) => `Se você tiver ${n} ou menos cartas de Vida, `],
   [/If you have (\d+) or more Characters,\s*/gi, (_, n) => `Se você tiver ${n} ou mais Personagens, `],
   [/If this Character is rested,\s*/gi, 'Se este Personagem estiver virado, '],
   [/If you have (\d+) or more DON!! cards on your field,\s*/gi, (_, n) => `Se você tiver ${n} ou mais DON!! no seu campo, `],
   [/If you have (\d+) DON!! cards on your field,\s*/gi, (_, n) => `Se você tiver ${n} DON!! no seu campo, `],
+  [/If you have less Life cards than your opponent,\s*/gi, 'Se você tiver menos cartas de Vida que o oponente, '],
+  [
+    /(You may|and) add (\d+) cards? from the top or bottom of your Life cards to your hand/gi,
+    (_, w, n) => `${/and/i.test(w) ? 'e colocar' : 'Você pode colocar'} ${n} ${plural(n, 'carta', 'cartas')} do topo ou do fundo da sua Vida na mão`,
+  ],
+  [/up to (\d+) of your (\[[^\]]+\]) cards/gi, (_, n, name) => `até ${n} das suas cartas ${name}`],
   [/If you don't have (\[[^\]]+\]),\s*/gi, (_, n) => `Se você não tiver ${n}, `],
   [/If you have (\d+) or more rested Characters,\s*/gi, (_, n) => `Se você tiver ${n} ou mais Personagens virados, `],
   [/If your opponent has (\d+) or more rested Characters,\s*/gi, (_, n) => `Se o seu oponente tiver ${n} ou mais Personagens virados, `],
@@ -386,9 +456,10 @@ function translateSentence(sentence: string): string {
   const s = sentence.trim();
   if (!s) return s;
   const ifm = s.match(/^if ([^,]+), (.+)$/i);
-  if (ifm && /^if/.test(s)) {
+  if (ifm) {
     const rest = translateSentence(ifm[2]);
-    return `se ${condPt(ifm[1])}, ${rest.charAt(0).toLowerCase()}${rest.slice(1)}`;
+    const out = `se ${condPt(ifm[1])}, ${rest.charAt(0).toLowerCase()}${rest.slice(1)}`;
+    return /^If/.test(s) ? capitalize(out) : out;
   }
   const then = s.match(/^Then,\s*(.+)$/i);
   if (then) {
@@ -398,7 +469,7 @@ function translateSentence(sentence: string): string {
   for (const [re, rep] of SENTENCES) {
     const m = s.match(re);
     // Um trecho capturado com ", then …" são duas ações: tratadas juntas abaixo.
-    if (m && !m.slice(1).some((g) => /, then /i.test(g ?? ''))) {
+    if (m && !m.slice(1).some((g) => /, (?:then |and (?!place it at the top or bottom))/i.test(g ?? ''))) {
       const replaced = typeof rep === 'string' ? rep : rep(...(m as unknown as string[]));
       return capitalize(applyPhrases(replaced));
     }
@@ -410,24 +481,51 @@ function translateSentence(sentence: string): string {
     const second = translateSentence(andPair[2]);
     if (!RESIDUE.test(first + second)) return `${first} e ${second.charAt(0).toLowerCase()}${second.slice(1)}`;
   }
-  // "X, then Y." (duas ações na mesma frase)
-  const pair = s.match(/^(.+?), then (.+)$/i);
+  // "X, then Y." / "X, and Y." (duas ações na mesma frase)
+  const pair = s.match(/^(.+?), (then|and) (.+)$/i);
   if (pair) {
     const first = translateSentence(pair[1]).replace(/\.$/, '');
-    const second = translateSentence(pair[2]);
-    return `${first} e depois ${second.charAt(0).toLowerCase()}${second.slice(1)}`;
+    const second = translateSentence(pair[3]);
+    return `${first} e ${/then/i.test(pair[2]) ? 'depois ' : ''}${second.charAt(0).toLowerCase()}${second.slice(1)}`;
   }
   return capitalize(applyPhrases(s));
 }
 
+const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+
+/** Imperativo → infinitivo, para frases como "você pode descartar …". */
+const INFINITIVE: Record<string, string> = {
+  descarte: 'descartar',
+  coloque: 'colocar',
+  devolva: 'devolver',
+  compre: 'comprar',
+  vire: 'virar',
+  adicione: 'adicionar',
+  jogue: 'jogar',
+  nocauteie: 'nocautear',
+  dê: 'dar',
+  deixe: 'deixar',
+  olhe: 'olhar',
+  revele: 'revelar',
+  embaralhe: 'embaralhar',
+  escolha: 'escolher',
+};
+const infinitive = (t: string) => t.replace(/^(\S+)/, (w) => INFINITIVE[w.toLowerCase()] ?? w.toLowerCase());
+
 /** Traduz um trecho sem tags: separa custo ("X: Y"), frases e condicionais. */
 function translateBody(body: string): string {
+  // "Choose one: • A • B" / "Your opponent chooses one: • A • B"
+  const modal = body.match(/^(Your opponent chooses|Choose) one:\s*(•.+)$/i);
+  if (modal) {
+    const options = modal[2].split(/\s*•\s*/).filter(Boolean).map((o) => `• ${translateBody(o.trim())}`);
+    return `${/opponent/i.test(modal[1]) ? 'Seu oponente escolhe um' : 'Escolha um'}: ${options.join(' ')}`;
+  }
   // Custo de ativação: "You may rest this Character: Give ..." / "① You may ...: ..."
   const cost = body.match(/^(You may [^:]+?):\s*(.*)$/);
   if (cost) return `${applyPhrases(cost[1])}: ${translateBody(cost[2])}`;
 
   // Condicional no início da frase.
-  const cond = body.match(/^((?:If|When) [^,]+,)\s*(.*)$/);
+  const cond = body.match(/^((?:If|When) [^,]+,|At the end of a battle in which this Character battles your opponent's Character,)\s*(.*)$/);
   if (cond) {
     const rest = translateBody(cond[2]);
     return applyPhrases(cond[1] + ' ') + rest.charAt(0).toLowerCase() + rest.slice(1);

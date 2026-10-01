@@ -1,0 +1,63 @@
+{
+  "id": "st08-luffy",
+  "name": "Luffy Preto (ST08)",
+  "leader": "ST08-001",
+  "cards": [
+    {
+      "id": "ST08-002",
+      "count": 4
+    },
+    {
+      "id": "ST08-003",
+      "count": 4
+    },
+    {
+      "id": "ST08-004",
+      "count": 4
+    },
+    {
+      "id": "ST08-005",
+      "count": 2
+    },
+    {
+      "id": "ST08-006",
+      "count": 4
+    },
+    {
+      "id": "ST08-007",
+      "count": 4
+    },
+    {
+      "id": "ST08-008",
+      "count": 4
+    },
+    {
+      "id": "ST08-009",
+      "count": 4
+    },
+    {
+      "id": "ST08-010",
+      "count": 2
+    },
+    {
+      "id": "ST08-011",
+      "count": 4
+    },
+    {
+      "id": "ST08-012",
+      "count": 4
+    },
+    {
+      "id": "ST08-013",
+      "count": 2
+    },
+    {
+      "id": "ST08-014",
+      "count": 4
+    },
+    {
+      "id": "ST08-015",
+      "count": 4
+    }
+  ]
+}

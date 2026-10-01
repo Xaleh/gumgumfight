@@ -91,7 +91,7 @@ describe('API', () => {
 
   it('lista traduções pendentes', async () => {
     const db = openDb(':memory:');
-    upsertCards(db, [{ id: 'T-1', name: 'X', category: 'event', colors: ['red'], types: [], text: '[Main] Swap all Characters.' }], {
+    upsertCards(db, [{ id: 'T-1', name: 'X', category: 'event', colors: ['red'], types: [], text: '[Main] Swap the hands of both players.' }], {
       provisional: false,
       source: 't',
     });

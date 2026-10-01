@@ -121,6 +121,14 @@ export interface Condition {
   minRestedCharacters?: number;
   /** "If your opponent has N or more rested Characters" */
   opponentMinRestedCharacters?: number;
+  /** "if you have less Life cards than your opponent" */
+  lifeLessThanOpponent?: boolean;
+  /** "If you have N or less DON!! cards on your field" */
+  maxDonOnField?: number;
+  /** "If you have N or more Life cards" */
+  lifeMin?: number;
+  /** "If your opponent has a Character with N or more power" */
+  opponentCharacterMinPower?: number;
 }
 
 export type AbilityCondition = Condition;
@@ -141,8 +149,20 @@ export type TargetRef =
   | 'battleTarget' // a carta sendo atacada na batalha atual
   | TargetSpec; // o jogador escolhe
 
-/** nextOpponentTurn = "until the end of your opponent's next turn". */
-export type Duration = 'turn' | 'battle' | 'nextOpponentTurn';
+/**
+ * nextOpponentTurn = "until the end of your opponent's next turn";
+ * untilYourNextTurn = "until the start of your next turn"; endOfYourNextTurn = "until the end of your next turn".
+ */
+export type Duration = 'turn' | 'battle' | 'nextOpponentTurn' | 'untilYourNextTurn' | 'endOfYourNextTurn';
+
+/** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
+export type GameEvent =
+  | { kind: 'donReturned' } // DON!! do seu campo voltou ao deck de DON!!
+  | { kind: 'characterKO'; whose: 'any' | 'own' | 'opponent' }
+  | { kind: 'eventActivated'; who: 'self' | 'opponent' }
+  | { kind: 'blockerActivated'; who: 'self' | 'opponent' }
+  | { kind: 'selfRested' } // "When this Character becomes rested"
+  | { kind: 'attackDamage' }; // "When this Character's attack deals damage to your opponent's Life"
 
 type EffectStepBody =
   | { do: 'power'; target: TargetRef; amount: number; duration: Duration }
@@ -172,6 +192,16 @@ type EffectStepBody =
   | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash'; play?: boolean }
   /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */
   | { do: 'tutor'; upTo: number; filter: CardFilter }
+  /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */
+  | { do: 'lifeToHand'; count: number; choose?: boolean }
+  /** "add up to 1 card from your hand to the top of your Life cards" */
+  | { do: 'handToLife'; upTo: number }
+  /** "Add up to 1 of your Characters … to the top of the owner's Life cards" */
+  | { do: 'fieldToLife'; target: TargetRef; choose?: boolean }
+  /** "Look at up to 1 card from the top of your or your opponent's Life cards, and place it at the top or bottom" */
+  | { do: 'peekLife'; whose: 'either' | 'own' | 'opponent' }
+  /** "Choose one: • … • …" / "Your opponent chooses one: …" */
+  | { do: 'chooseOne'; chooser: 'self' | 'opponent'; options: EffectStep[][]; labels: string[] }
   /** Virar N Personagens ativos seus (custo "You may rest 2 of your Characters"). */
   | { do: 'restOwnCharacters'; count: number }
   /** Colocar cartas da mão no fundo do deck (custo "You may place 1 card from your hand at the bottom of your deck"). */
@@ -234,6 +264,7 @@ export type AbilityTiming =
   | 'onBlock'
   | 'endOfTurn' // [End of Your Turn]
   | 'battlesCharacter' // "If this Character battles your opponent's Character" (ao fim da batalha)
+  | 'event' // "When …": reação a um acontecimento (Ability.event)
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
@@ -247,6 +278,8 @@ export interface AbilityCost {
   handToBottom?: number;
   /** "You may add 1 card from your Life area to your hand:" (do topo) */
   lifeToHand?: number;
+  /** "… from the top or bottom of your Life cards …": o jogador escolhe de onde. */
+  lifeChoice?: boolean;
   /** "You may rest N of your Characters:" (o jogador escolhe quais) */
   restCharacters?: number;
 }
@@ -274,10 +307,14 @@ export interface Ability {
   staticCannotAttack?: boolean;
   /** "This Character cannot be K.O.'d in battle by "Strike" attribute Characters." */
   noBattleKOVsAttribute?: string;
+  /** "This Character cannot be K.O.'d in battle by Leaders." */
+  noBattleKOByLeader?: boolean;
   /** "This Character gains +N cost." */
   staticCost?: number;
   /** "When this Character battles {attribute} attribute Characters, this Character gains +N power". */
   battleVsAttribute?: { attribute: string; power: number };
+  /** Para timing 'event': o acontecimento que dispara a habilidade. */
+  event?: GameEvent;
   /** Texto curto exibido na interface. */
   label?: string;
   /** Habilidade derivada do texto, resolvida manualmente pelo jogador. */
@@ -388,6 +425,8 @@ export type Pending =
   | { kind: 'trigger'; player: PlayerId; card: string }
   /** Pergunta sim/não (ex.: pagar um custo opcional). Responder com `answer`. */
   | { kind: 'confirm'; player: PlayerId; source: string; prompt: string }
+  /** Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`. */
+  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[] }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
 
@@ -455,7 +494,8 @@ export type Action =
   | { type: 'pass'; player: PlayerId }
   | { type: 'concede'; player: PlayerId }
   | { type: 'manual'; player: PlayerId; op: ManualOp }
-  | { type: 'manualDone'; player: PlayerId };
+  | { type: 'manualDone'; player: PlayerId }
+  | { type: 'option'; player: PlayerId; index: number };
 
 /** Destinos de uma carta movida manualmente (sempre nas zonas do dono da carta). */
 export type ManualZone = 'hand' | 'trash' | 'deckTop' | 'deckBottom' | 'life' | 'character' | 'stage';

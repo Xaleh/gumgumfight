@@ -1,0 +1,357 @@
+{
+  "set": "ST10",
+  "title": "Ultra Deck - The Three Captains",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "ST10-001",
+      "name": "Trafalgar Law",
+      "category": "leader",
+      "colors": [
+        "purple",
+        "red"
+      ],
+      "life": 4,
+      "power": 5000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Heart Pirates"
+      ],
+      "text": "[Activate:Main] [Once Per Turn] DON!! -3 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Place up to 1 of your opponent's Characters with 3000 power or less at the bottom of the owner's deck, and play up to 1 Character card with a cost of 4 or less from your hand.",
+      "set": "ST10",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-001.jpg"
+    },
+    {
+      "id": "ST10-002",
+      "name": "Monkey.D.Luffy",
+      "category": "leader",
+      "colors": [
+        "purple",
+        "red"
+      ],
+      "life": 3,
+      "power": 6000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Activate:Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, add up to 1 DON!! card from your DON!! deck and set it as active.",
+      "set": "ST10",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-002.jpg"
+    },
+    {
+      "id": "ST10-003",
+      "name": "Eustass\"Captain\"Kid",
+      "category": "leader",
+      "colors": [
+        "purple",
+        "red"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Kid Pirates"
+      ],
+      "text": "[Your Turn] If you have 4 or more Life cards, give this Leader -1000 power. [When Attacking] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): This Leader gains +2000 power during this turn.",
+      "set": "ST10",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-003.jpg"
+    },
+    {
+      "id": "ST10-004",
+      "name": "Sanji",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 6,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[On Play] If your opponent has a Character with 5000 or more power, this Character gains [Rush] during this turn. (This card can attack on the turn in which it is played.)",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-004.jpg"
+    },
+    {
+      "id": "ST10-005",
+      "name": "Jinbe",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 2,
+      "power": 2000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Fish-Man",
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x1] [When Attacking] Give up to 1 of your opponent's Characters -2000 power during this turn.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-005.jpg"
+    },
+    {
+      "id": "ST10-006",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 10,
+      "power": 11000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Rush] (This card can attack on the turn in which it is played.) [Once Per Turn] When your opponent activates a [Blocker], K.O. up to 1 of your opponent's Characters with 8000 power or less.",
+      "set": "ST10",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-006.jpg"
+    },
+    {
+      "id": "ST10-007",
+      "name": "Killer",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Kid Pirates"
+      ],
+      "text": "[Your Turn] [Once Per Turn] When a DON!! card on your field is returned to your DON!! deck, K.O. up to 1 of your opponent's rested Characters with a cost of 3 or less.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-007.jpg"
+    },
+    {
+      "id": "ST10-008",
+      "name": "Shachi & Penguin",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Heart Pirates"
+      ],
+      "text": "[On Play] If you have 3 or less DON!! cards on your field, add up to 2 DON!! cards from your DON!! deck and rest them.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-008.jpg"
+    },
+    {
+      "id": "ST10-009",
+      "name": "Jean Bart",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Heart Pirates"
+      ],
+      "text": "[On Play] ① (You may rest the specified number of DON!! cards in your cost area.): Add up to 1 DON!! card from your DON!! deck and set it as active.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-009.jpg"
+    },
+    {
+      "id": "ST10-010",
+      "name": "Trafalgar Law",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Heart Pirates"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): If your opponent has 7 or more cards in their hand, trash 2 cards from your opponent's hand.",
+      "set": "ST10",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-010_7CxTZxR.jpg"
+    },
+    {
+      "id": "ST10-011",
+      "name": "Heat",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Kid Pirates"
+      ],
+      "text": "[Your Turn] [Once Per Turn] When a DON!! card on your field is returned to your DON!! deck, this Character gains +2000 power until the start of your next turn.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-011.jpg"
+    },
+    {
+      "id": "ST10-012",
+      "name": "Bepo",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Heart Pirates",
+        "Minks"
+      ],
+      "text": "[On Play] / [When Attacking] If your opponent has more DON!! cards on their field than you, add up to 1 DON!! card from your DON!! deck and rest it.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-012.jpg"
+    },
+    {
+      "id": "ST10-013",
+      "name": "Eustass\"Captain\"Kid",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 7,
+      "power": 8000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Kid Pirates"
+      ],
+      "text": "[On Play] / [When Attacking] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Up to 1 of your Leader gains +1000 power until the start of your next turn.",
+      "set": "ST10",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-013.jpg"
+    },
+    {
+      "id": "ST10-014",
+      "name": "Wire",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Kid Pirates"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [Once Per Turn] When a DON!! card on your field is returned to your DON!! deck, draw 1 card and trash 1 card from your hand.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-014.jpg"
+    },
+    {
+      "id": "ST10-015",
+      "name": "Gum-Gum Giant Sumo Slap",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Counter] Up to 1 of your Leader or Character cards gains +2000 power during this battle, and K.O. up to 1 of your opponent's Characters with 2000 power or less.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-015.jpg"
+    },
+    {
+      "id": "ST10-016",
+      "name": "Gum-Gum Kong Gatling",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "cost": 5,
+      "attributes": [],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Main] K.O. up to 1 of your opponent's Characters with 7000 power or less.",
+      "trigger": "Up to 1 of your Leader gains +1000 power until the end of your next turn.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-016.jpg"
+    },
+    {
+      "id": "ST10-017",
+      "name": "Punk Vise",
+      "category": "event",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "attributes": [],
+      "types": [
+        "Kid Pirates"
+      ],
+      "text": "[Main] Rest up to 1 of your opponent's Characters with a cost of 2 or less, and add up to 1 DON!! card from your DON!! deck and rest it.",
+      "trigger": "Add up to 1 DON!! card from your DON!! deck and set it as active.",
+      "set": "ST10",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST10-017.jpg"
+    }
+  ]
+}

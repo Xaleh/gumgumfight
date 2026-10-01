@@ -6,13 +6,16 @@ import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
 const DATA = join(__dirname, '../../../data');
 const load = (p: string) => JSON.parse(readFileSync(join(DATA, p), 'utf8'));
 
-export const cards: CardData[] = ['st01', 'st02', 'st03', 'st04', 'st05', 'st06'].flatMap((set) => load(`cards/${set}.json`).cards as CardData[]);
+export const cards: CardData[] = ['st01', 'st02', 'st03', 'st04', 'st05', 'st06', 'st07', 'st08', 'st09', 'st10'].flatMap((set) => load(`cards/${set}.json`).cards as CardData[]);
 export const luffy: DeckList = load('decks/st01-luffy.json');
 export const kid: DeckList = load('decks/st02-kid.json');
 export const crocodile: DeckList = load('decks/st03-crocodile.json');
 export const kaido: DeckList = load('decks/st04-kaido.json');
 export const shanks: DeckList = load('decks/st05-shanks.json');
 export const sakazuki: DeckList = load('decks/st06-sakazuki.json');
+export const bigMom: DeckList = load('decks/st07-bigmom.json');
+export const luffyBlack: DeckList = load('decks/st08-luffy.json');
+export const yamato: DeckList = load('decks/st09-yamato.json');
 
 export function newGame(seed = 1, firstPlayer: PlayerId = 0): GameState {
   return createGame({

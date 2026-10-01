@@ -99,6 +99,16 @@ a {
   padding: 12px;
   font-size: 16px;
 }
+.btn-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+.btn-col .btn {
+  text-align: left;
+  white-space: normal;
+}
 .btn-row {
   display: flex;
   gap: 8px;

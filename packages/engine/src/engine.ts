@@ -19,6 +19,7 @@ import type {
   FieldCard,
   Frame,
   GameConfig,
+  GameEvent,
   GameState,
   Keyword,
   ManualOp,
@@ -185,6 +186,15 @@ export function conditionHolds(state: GameState, controller: PlayerId, source: s
   if (cond.noCharacterNamed && ps.characters.some((c) => hasName(cardDef(state, c.uid), cond.noCharacterNamed!))) return false;
   if (cond.leaderMulticolor && cardDef(state, ps.leader.uid).colors.length < 2) return false;
   if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return false;
+  if (cond.lifeLessThanOpponent && ps.life.length >= opp.life.length) return false;
+  if (cond.maxDonOnField !== undefined && totalDonOnField(ps) > cond.maxDonOnField) return false;
+  if (cond.lifeMin !== undefined && ps.life.length < cond.lifeMin) return false;
+  if (
+    cond.opponentCharacterMinPower !== undefined &&
+    !opp.characters.some((c) => getPower(state, c.uid) >= cond.opponentCharacterMinPower!)
+  ) {
+    return false;
+  }
   if (cond.minRestedCharacters !== undefined && ps.characters.filter((c) => c.rested).length < cond.minRestedCharacters) {
     return false;
   }
@@ -522,12 +532,12 @@ function handlePendingResponse(state: GameState, action: Action) {
       const blocker = action.uids[0];
       if (blocker) {
         if (!pending.options.includes(blocker)) throw new IllegalActionError('Bloqueador inválido.');
-        const loc = locate(state, blocker)!;
-        loc.fc.rested = true;
+        restCard(state, blocker);
         state.battle!.target = blocker;
         state.battle!.blocked = true;
         log(state, p, `${cardDef(state, blocker).name} bloqueia o ataque!`);
         pushAbilities(state, blocker, 'onBlock');
+        emit(state, { kind: 'blockerActivated', player: p, card: blocker });
       }
       return;
     }
@@ -554,7 +564,19 @@ function handlePendingResponse(state: GameState, action: Action) {
         const ability = def.abilities.find((a) => a.timing === 'counter')!;
         log(state, p, `${ps.name} usa o evento ${def.name}.`);
         pushEffect(state, action.uid, p, ability.steps);
+        emit(state, { kind: 'eventActivated', player: p, card: action.uid });
       }
+      return;
+    }
+
+    case 'option': {
+      if (action.type !== 'option') throw new IllegalActionError('Escolha uma das opções.');
+      if (!Number.isInteger(action.index) || action.index < 0 || action.index >= pending.options.length) {
+        throw new IllegalActionError('Opção inválida.');
+      }
+      const top = state.stack[state.stack.length - 1];
+      if (top?.kind === 'effect') top.choice = [String(action.index)];
+      state.pending = null;
       return;
     }
 
@@ -624,6 +646,7 @@ function handleMainAction(state: GameState, action: Action) {
         log(state, p, `${ps.name} usa o evento ${def.name}.`);
         const main = def.abilities.find((a) => a.timing === 'main')!;
         pushEffect(state, action.uid, p, main.steps);
+        emit(state, { kind: 'eventActivated', player: p, card: action.uid });
       }
       return;
     }
@@ -642,9 +665,9 @@ function handleMainAction(state: GameState, action: Action) {
       if (err) throw new IllegalActionError(err);
       const loc = locate(state, action.uid)!;
       const ability = cardDef(state, action.uid).abilities[action.ability];
-      if (ability.cost?.restSelf) loc.fc.rested = true;
+      if (ability.cost?.restSelf) restCard(state, action.uid);
       if (ability.cost?.restDon) payDon(ps, ability.cost.restDon);
-      if (ability.cost?.donMinus) returnDon(ps, ability.cost.donMinus);
+      if (ability.cost?.donMinus) returnDonAndEmit(state, ps, ability.cost.donMinus);
       if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(action.uid, action.ability));
       log(state, p, `${cardDef(state, action.uid).name}: ${ability.label ?? 'efeito ativado'}.`);
       // Descartar da mão também é custo: resolve antes do efeito.
@@ -654,7 +677,9 @@ function handleMainAction(state: GameState, action: Action) {
       }
       if (ability.cost?.handToBottom) costSteps.push({ do: 'handToDeckBottom', count: ability.cost.handToBottom });
       if (ability.cost?.restCharacters) costSteps.push({ do: 'restOwnCharacters', count: ability.cost.restCharacters });
-      for (let i = 0; i < (ability.cost?.lifeToHand ?? 0) && ps.life.length; i++) ps.hand.push(ps.life.pop()!);
+      if (ability.cost?.lifeToHand) {
+        costSteps.push({ do: 'lifeToHand', count: ability.cost.lifeToHand, choose: ability.cost.lifeChoice });
+      }
       pushEffect(state, action.uid, p, [...costSteps, ...ability.steps]);
       return;
     }
@@ -662,8 +687,6 @@ function handleMainAction(state: GameState, action: Action) {
     case 'attack': {
       const err = attackError(state, p, action.attacker, action.target);
       if (err) throw new IllegalActionError(err);
-      const attacker = locate(state, action.attacker)!;
-      attacker.fc.rested = true;
       state.battle = {
         attacker: action.attacker,
         target: action.target,
@@ -679,6 +702,8 @@ function handleMainAction(state: GameState, action: Action) {
         `${cardDef(state, action.attacker).name} (${getPower(state, action.attacker)}) ataca ${cardDef(state, action.target).name} (${getPower(state, action.target)}).`,
       );
       state.stack.push({ kind: 'battle' });
+      // Virar o atacante pode disparar "When this Character becomes rested" (resolve antes da batalha seguir).
+      restCard(state, action.attacker);
       return;
     }
 
@@ -703,6 +728,7 @@ function handleMainAction(state: GameState, action: Action) {
 function startTurn(state: GameState) {
   const ps = state.players[state.activePlayer];
   state.phase = 'main';
+  state.modifiers = state.modifiers.filter((m) => !(m.duration === 'untilYourNextTurn' && (m.untilTurn ?? 0) <= state.turn));
   log(state, ps.id, `— Turno ${state.turn}: ${ps.name} —`);
 
   // Refresh: DON!! anexados voltam à área de custo e tudo fica ativo.
@@ -729,7 +755,9 @@ function endTurn(state: GameState) {
   const ps = state.players[state.activePlayer];
   log(state, ps.id, `${ps.name} encerra o turno.`);
   state.modifiers = state.modifiers.filter(
-    (m) => m.duration !== 'turn' && !(m.duration === 'nextOpponentTurn' && (m.untilTurn ?? 0) <= state.turn),
+    (m) =>
+      m.duration !== 'turn' &&
+      !((m.duration === 'nextOpponentTurn' || m.duration === 'endOfYourNextTurn') && (m.untilTurn ?? 0) <= state.turn),
   );
   state.usedThisTurn = [];
   state.activePlayer = opponent(state.activePlayer);
@@ -770,6 +798,56 @@ function run(state: GameState) {
 
 function pushEffect(state: GameState, source: string, controller: PlayerId, steps: EffectStep[]) {
   if (steps.length) state.stack.push({ kind: 'effect', source, controller, steps, i: 0 });
+}
+
+/** Dados de um acontecimento: quem causou/sofreu (player) e a carta envolvida. */
+type EmittedEvent = { kind: GameEvent['kind']; player: PlayerId; card?: string };
+
+/** Dispara as habilidades "When …" de todas as cartas em campo que reagem ao acontecimento. */
+function emit(state: GameState, ev: EmittedEvent) {
+  for (const ps of state.players) {
+    for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
+      const def = cardDef(state, fc.uid);
+      def.abilities.forEach((a, i) => {
+        if (a.timing !== 'event' || !a.event || a.event.kind !== ev.kind) return;
+        if (!eventMatches(a.event, ev, ps.id, fc.uid)) return;
+        if (!conditionsMet(state, fc.uid, a)) return;
+        if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) return;
+        if (a.oncePerTurn) state.usedThisTurn.push(usedKey(fc.uid, i));
+        pushEffect(state, fc.uid, ps.id, a.steps);
+      });
+    }
+  }
+}
+
+function eventMatches(e: GameEvent, ev: EmittedEvent, owner: PlayerId, uid: string): boolean {
+  switch (e.kind) {
+    case 'donReturned':
+      return ev.player === owner;
+    case 'characterKO':
+      return e.whose === 'any' || (e.whose === 'own') === (ev.player === owner);
+    case 'eventActivated':
+    case 'blockerActivated':
+      return (e.who === 'self') === (ev.player === owner);
+    case 'selfRested':
+    case 'attackDamage':
+      return ev.card === uid;
+  }
+}
+
+/** Vira uma carta em campo (dispara "When this Character becomes rested"). */
+function restCard(state: GameState, uid: string) {
+  const loc = locate(state, uid);
+  if (!loc || loc.fc.rested) return;
+  loc.fc.rested = true;
+  emit(state, { kind: 'selfRested', player: loc.player, card: uid });
+}
+
+/** Devolve DON!! ao deck de DON!! (dispara "When a DON!! card on your field is returned…"). */
+function returnDonAndEmit(state: GameState, ps: PlayerState, n: number) {
+  if (n <= 0) return;
+  returnDon(ps, n);
+  emit(state, { kind: 'donReturned', player: ps.id });
 }
 
 /** Empilha as habilidades automáticas de uma carta (onPlay, whenAttacking, ...). */
@@ -866,6 +944,8 @@ function stepBattle(state: GameState) {
       if (target.zone === 'leader') {
         const n = hasKeyword(state, b.attacker, 'doubleAttack') ? 2 : 1;
         log(state, null, `O ataque acerta o líder (${ap} contra ${tp})${n > 1 ? ' — Double Attack!' : ''}.`);
+        // Empilhado antes do dano: resolve depois dele.
+        if (state.players[defender].life.length) emit(state, { kind: 'attackDamage', player: attackerOwner, card: b.attacker });
         state.stack.push({
           kind: 'damage',
           defender,
@@ -939,9 +1019,11 @@ function resolveTargets(
   intent: 'harm' | 'help',
   prompt: string,
 ): string[] | null {
-  if (ref === 'self') return locate(state, frame.source) ? [frame.source] : [];
-  if (ref === 'ownLeader') return [state.players[frame.controller].leader.uid];
-  if (ref === 'battleTarget') return state.battle && locate(state, state.battle.target) ? [state.battle.target] : [];
+  if (ref === 'self') return (frame.last = locate(state, frame.source) ? [frame.source] : []);
+  if (ref === 'ownLeader') return (frame.last = [state.players[frame.controller].leader.uid]);
+  if (ref === 'battleTarget') {
+    return (frame.last = state.battle && locate(state, state.battle.target) ? [state.battle.target] : []);
+  }
   if (ref === 'chosen') return (frame.last ?? []).filter((u) => locate(state, u));
   const options = targetCandidates(state, frame.controller, frame.source, ref);
   if (ref.all) return (frame.last = options);
@@ -1019,11 +1101,20 @@ function useOwnEffect(state: GameState, frame: EffectFrame, timing: 'main' | 'co
 
 /** Registra um modificador; "until the end of your opponent's next turn" calcula o turno em que acaba. */
 function addModifier(state: GameState, controller: PlayerId, m: Modifier) {
+  const mine = state.activePlayer === controller;
   if (m.duration === 'nextOpponentTurn') {
     // No seu turno: acaba no fim do próximo turno (do oponente). No turno do oponente: no fim do turno seguinte a ele.
-    m.untilTurn = state.turn + (state.activePlayer === controller ? 1 : 2);
+    m.untilTurn = state.turn + (mine ? 1 : 2);
+  } else if (m.duration === 'untilYourNextTurn' || m.duration === 'endOfYourNextTurn') {
+    // Turno em que começa o seu próximo turno.
+    m.untilTurn = state.turn + (mine ? 2 : 1);
   }
   state.modifiers.push(m);
+}
+
+/** Pergunta com opções de texto; a resposta chega em frame.choice = [índice]. */
+function askOption(state: GameState, frame: EffectFrame, player: PlayerId, prompt: string, options: string[]) {
+  state.pending = { kind: 'option', player, source: frame.source, prompt, options };
 }
 
 /** Interrompe o efeito: os passos restantes não acontecem. */
@@ -1092,7 +1183,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         const loc = locate(state, uid);
         if (loc) {
-          loc.fc.rested = true;
+          restCard(state, uid);
           log(state, frame.controller, `${cardDef(state, uid).name} é virado.`);
         }
       }
@@ -1260,7 +1351,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             kind: 'confirm',
             player: frame.controller,
             source: frame.source,
-            prompt: `${srcName}: usar o efeito? Custo: ${describeCost(cost)}.`,
+            prompt: Object.keys(cost).length
+              ? `${srcName}: usar o efeito? Custo: ${describeCost(cost)}.`
+              : `${srcName}: usar o efeito?`,
           };
           return false;
         }
@@ -1269,15 +1362,17 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           return abortEffect(frame);
         }
         const loc = locate(state, frame.source);
-        if (cost.restSelf && loc) loc.fc.rested = true;
+        if (cost.restSelf && loc) restCard(state, frame.source);
         if (cost.restDon) payDon(ps, cost.restDon);
         if (cost.donMinus) {
-          returnDon(ps, cost.donMinus);
+          returnDonAndEmit(state, ps, cost.donMinus);
           log(state, frame.controller, `${ps.name} devolve ${cost.donMinus} DON!! ao deck de DON!!.`);
         }
         if (cost.handToBottom) frame.steps.splice(frame.i + 1, 0, { do: 'handToDeckBottom', count: cost.handToBottom });
         if (cost.restCharacters) frame.steps.splice(frame.i + 1, 0, { do: 'restOwnCharacters', count: cost.restCharacters });
-        for (let i = 0; i < (cost.lifeToHand ?? 0) && ps.life.length; i++) ps.hand.push(ps.life.pop()!);
+        if (cost.lifeToHand) {
+          frame.steps.splice(frame.i + 1, 0, { do: 'lifeToHand', count: cost.lifeToHand, choose: cost.lifeChoice });
+        }
         if (!cost.trashFromHand) return true;
         frame.memo = ['trash'];
         frame.choice = undefined;
@@ -1373,6 +1468,109 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       return true;
     }
+    case 'lifeToHand': {
+      const n = Math.min(step.count, ps.life.length);
+      if (n === 0) return true;
+      if (step.choose && ps.life.length > 1 && !frame.choice) {
+        askOption(state, frame, frame.controller, `${srcName}: de onde tirar a carta de Vida?`, ['Topo da Vida', 'Fundo da Vida']);
+        return false;
+      }
+      const fromBottom = frame.choice?.[0] === '1';
+      for (let i = 0; i < n; i++) ps.hand.push(fromBottom ? ps.life.shift()! : ps.life.pop()!);
+      log(state, frame.controller, `${ps.name} coloca ${n} carta(s) da Vida (${fromBottom ? 'fundo' : 'topo'}) na mão.`);
+      return true;
+    }
+    case 'handToLife': {
+      if (!frame.choice) {
+        if (!ps.hand.length) return true;
+        askCards(state, frame, [...ps.hand], step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) da mão para o topo da Vida.`);
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => ps.hand.includes(u))) {
+        removeFrom(ps.hand, uid);
+        ps.life.push(uid);
+      }
+      if (frame.choice.length) log(state, frame.controller, `${ps.name} coloca ${frame.choice.length} carta(s) da mão na Vida.`);
+      return true;
+    }
+    case 'fieldToLife': {
+      // Com "top or bottom": primeiro o alvo (memo), depois a posição.
+      let targets = frame.memo;
+      if (!targets) {
+        const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha um Personagem para a Vida.`);
+        if (!t) return false;
+        targets = t.filter((u) => locate(state, u)?.zone === 'character');
+        if (step.choose && targets.length) {
+          frame.memo = targets;
+          frame.choice = undefined;
+          askOption(state, frame, frame.controller, `${srcName}: colocar no topo ou no fundo da Vida?`, ['Topo da Vida', 'Fundo da Vida']);
+          return false;
+        }
+      }
+      const bottom = Boolean(step.choose) && frame.choice?.[0] === '1';
+      for (const uid of targets.filter((u) => locate(state, u)?.zone === 'character')) {
+        const owner = state.players[ownerOf(state, uid)];
+        detach(state, uid);
+        if (bottom) owner.life.unshift(uid);
+        else owner.life.push(uid);
+        log(state, frame.controller, `${cardDef(state, uid).name} vai para o ${bottom ? 'fundo' : 'topo'} da Vida de ${owner.name}.`);
+      }
+      return true;
+    }
+    case 'peekLife': {
+      const opp = state.players[opponent(frame.controller)];
+      // Etapa 1: de quem é a Vida (memo[0] = 'own' | 'opp').
+      if (!frame.memo) {
+        const sides = (step.whose === 'either' ? ['own', 'opp'] : [step.whose === 'own' ? 'own' : 'opp']).filter(
+          (side) => (side === 'own' ? ps : opp).life.length > 0,
+        );
+        if (!sides.length) return true;
+        if (!frame.choice) {
+          const labels = sides.map((side) => (side === 'own' ? 'Olhar a sua Vida' : 'Olhar a Vida do oponente'));
+          askOption(state, frame, frame.controller, `${srcName}: olhar a carta do topo de qual Vida?`, [...labels, 'Não olhar']);
+          frame.memo = ['pick', ...sides];
+          return false;
+        }
+      }
+      if (frame.memo?.[0] === 'pick') {
+        const sides = frame.memo.slice(1);
+        const side = sides[Number(frame.choice?.[0])];
+        if (!side) return true; // "Não olhar"
+        frame.memo = [side];
+        frame.choice = undefined;
+      }
+      const side = frame.memo![0];
+      const life = (side === 'own' ? ps : opp).life;
+      if (!frame.choice) {
+        const card = life[life.length - 1];
+        askOption(state, frame, frame.controller, `${srcName}: a carta do topo é ${cardDef(state, card).name}. Onde deixar?`, [
+          'Manter no topo',
+          'Colocar no fundo',
+        ]);
+        return false;
+      }
+      if (frame.choice[0] === '1') life.unshift(life.pop()!);
+      log(
+        state,
+        frame.controller,
+        `${ps.name} olha a carta do topo da Vida ${side === 'own' ? 'própria' : 'do oponente'} e a deixa no ${frame.choice[0] === '1' ? 'fundo' : 'topo'}.`,
+      );
+      return true;
+    }
+    case 'chooseOne': {
+      const chooser = step.chooser === 'self' ? frame.controller : opponent(frame.controller);
+      if (!frame.choice) {
+        askOption(state, frame, chooser, `${srcName}: escolha um efeito.`, step.labels);
+        return false;
+      }
+      const picked = step.options[Number(frame.choice[0])] ?? [];
+      log(state, chooser, `Escolhido: ${step.labels[Number(frame.choice[0])] ?? '-'}`);
+      frame.i++;
+      frame.choice = undefined;
+      frame.memo = undefined;
+      pushEffect(state, frame.source, frame.controller, picked);
+      return false;
+    }
     case 'restOwnCharacters': {
       const options = ps.characters.filter((c) => !c.rested && c.uid !== frame.source).map((c) => c.uid);
       const n = Math.min(step.count, options.length);
@@ -1381,7 +1579,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         askCards(state, frame, options, n, `${srcName}: escolha ${n} Personagem(ns) seu(s) para virar.`, { min: n });
         return false;
       }
-      for (const uid of frame.choice.filter((u) => options.includes(u))) locate(state, uid)!.fc.rested = true;
+      for (const uid of frame.choice.filter((u) => options.includes(u))) restCard(state, uid);
       return true;
     }
     case 'handToDeckBottom': {
@@ -1681,7 +1879,7 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
       return;
     }
     case 'donToDeck': {
-      returnDon(ps, Math.max(1, op.count));
+      returnDonAndEmit(state, ps, Math.max(1, op.count));
       log(state, p, `${tag} DON!! −${op.count}.`);
       return;
     }
@@ -1728,7 +1926,8 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
     (a) =>
       a.timing === 'static' &&
       ((inBattle ? a.staticNoBattleKO : a.staticNoEffectKO) ||
-        (inBattle && a.noBattleKOVsAttribute !== undefined && byAttrs.includes(a.noBattleKOVsAttribute))) &&
+        (inBattle && a.noBattleKOVsAttribute !== undefined && byAttrs.includes(a.noBattleKOVsAttribute)) ||
+        (inBattle && a.noBattleKOByLeader && by !== undefined && locate(state, by)?.zone === 'leader')) &&
       conditionsMet(state, uid, a),
   );
 }
@@ -1745,6 +1944,7 @@ function koCharacter(state: GameState, uid: string, opts: { inBattle?: boolean; 
   removeCharacter(state, uid);
   ps.trash.push(uid);
   log(state, loc.player, `${cardDef(state, uid).name} foi nocauteado (K.O.).`);
+  emit(state, { kind: 'characterKO', player: loc.player, card: uid });
   const def = cardDef(state, uid);
   def.abilities.forEach((a) => {
     if (a.timing === 'onKO') pushEffect(state, uid, loc.player, a.steps);

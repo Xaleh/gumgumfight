@@ -35,6 +35,12 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
     case 'confirm':
       return { type: 'answer', player, yes: true };
 
+    case 'option': {
+      // Opções do próprio efeito: a primeira; escolhendo pelo oponente ("Your opponent chooses one"): a última.
+      const own = state.cards[pending.source]?.owner === player;
+      return { type: 'option', player, index: own ? 0 : pending.options.length - 1 };
+    }
+
     case 'manual':
       // O bot ainda não sabe aplicar efeitos manuais: só confirma.
       return { type: 'manualDone', player };

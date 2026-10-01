@@ -445,6 +445,24 @@ function PromptBar(props: {
           </div>
         </div>
       );
+    case 'option':
+      return (
+        <div className="prompt">
+          <div className="prompt-title">{pending.prompt}</div>
+          {battleLine}
+          <div className="btn-col">
+            {pending.options.map((label, index) => (
+              <button
+                key={index}
+                className={`btn${index === 0 ? ' primary' : ''}`}
+                onClick={() => onDispatch({ type: 'option', player: human, index })}
+              >
+                {lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
     case 'confirm':
       return (
         <div className="prompt">
