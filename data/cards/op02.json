@@ -1,0 +1,2546 @@
+{
+  "set": "OP02",
+  "title": "Paramount War (OP-02)",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "OP02-001",
+      "name": "Edward.Newgate",
+      "category": "leader",
+      "colors": [
+        "red"
+      ],
+      "life": 6,
+      "power": 6000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "The Four Emperors",
+        "Whitebeard Pirates"
+      ],
+      "text": "[End of Your Turn] Add 1 card from the top of your Life cards to your hand.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-001.jpg"
+    },
+    {
+      "id": "OP02-002",
+      "name": "Monkey.D.Garp",
+      "category": "leader",
+      "colors": [
+        "red",
+        "black"
+      ],
+      "life": 4,
+      "power": 5000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Your Turn] When this Leader or 1 of your Characters is given a DON!! card, give up to 1 of your opponent's Characters with a cost of 7 or less -1 cost during this turn.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-002.jpg"
+    },
+    {
+      "id": "OP02-003",
+      "name": "Atmos",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-003.jpg"
+    },
+    {
+      "id": "OP02-004",
+      "name": "Edward.Newgate",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 9,
+      "power": 10000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "The Four Emperors",
+        "Whitebeard Pirates"
+      ],
+      "text": "[On Play] Up to 1 of your Leader gains +2000 power until the start of your next turn. Then, you cannot add Life cards to your hand using your own effects during this turn. [DON!! x2] [When Attacking] K.O. up to 1 of your opponent's Characters with 3000 power or less.",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-004.jpg"
+    },
+    {
+      "id": "OP02-005",
+      "name": "Curly.Dadan",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Mountain Bandits"
+      ],
+      "text": "[On Play] Look at up to 5 cards from the top of your deck; reveal up to 1 red Character with a cost of 1 and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-005.jpg"
+    },
+    {
+      "id": "OP02-006",
+      "name": "Kingdew",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 5,
+      "power": 7000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-006.jpg"
+    },
+    {
+      "id": "OP02-007",
+      "name": "Thatch",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 6,
+      "power": 8000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-007.jpg"
+    },
+    {
+      "id": "OP02-008",
+      "name": "Jozu",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 4,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[DON!! x1] If you have 2 or less Life cards and your Leader's type includes \"Whitebeard Pirates\", this Character gains [Rush]. (This card can attack on the turn in which it is played.)",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-008.jpg"
+    },
+    {
+      "id": "OP02-009",
+      "name": "Squard",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "[On Play] If your Leader's type includes \"Whitebeard Pirates\", give up to 1 of your opponent's Characters -4000 power during this turn and add 1 card from the top of your Life cards to your hand.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-009.jpg"
+    },
+    {
+      "id": "OP02-010",
+      "name": "Dogura",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Mountain Bandits"
+      ],
+      "text": "[Activate:Main] You may rest this Character: Play up to 1 red Character other than [Dogura] with a cost of 1 from your hand.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-010.jpg"
+    },
+    {
+      "id": "OP02-011",
+      "name": "Vista",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[On Play] K.O. up to 1 of your opponent's Characters with 3000 power or less.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-011.jpg"
+    },
+    {
+      "id": "OP02-012",
+      "name": "Blenheim",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-012.jpg"
+    },
+    {
+      "id": "OP02-013",
+      "name": "Portgas.D.Ace",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 7,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[On Play] Give up to 2 of your opponent's Characters -3000 power during this turn. Then, if your Leader's type includes \"Whitebeard Pirates\", this Character gains [Rush] during this turn. (This card can attack on the turn in which it is played.)",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-013.jpg"
+    },
+    {
+      "id": "OP02-014",
+      "name": "Whitey Bay",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "[DON!! x1] This Character can also attack your opponent's active Characters.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-014.jpg"
+    },
+    {
+      "id": "OP02-015",
+      "name": "Makino",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "power": 0,
+      "counter": 2000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Windmill Village"
+      ],
+      "text": "[Activate:Main] You may rest this Character: Up to 1 of your red Characters with a cost of 1 gains +3000 power during this turn.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-015.jpg"
+    },
+    {
+      "id": "OP02-016",
+      "name": "Magura",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Mountain Bandits"
+      ],
+      "text": "[On Play] Up to 1 of your red Characters with a cost of 1 gains +3000 power during this turn.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-016.jpg"
+    },
+    {
+      "id": "OP02-017",
+      "name": "Masked Deuce",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Spade Pirates"
+      ],
+      "text": "[DON!! x2] [When Attacking] K.O. up to 1 of your opponent's Characters with 2000 power or less.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-017.jpg"
+    },
+    {
+      "id": "OP02-018",
+      "name": "Marco",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On K.O.] You may trash 1 card with a type including \"Whitebeard Pirates\" from your hand: If you have 2 or less Life cards, play this Character card from your trash rested.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-018.jpg"
+    },
+    {
+      "id": "OP02-019",
+      "name": "Rakuyo",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[DON!! x1] [Your Turn] All of your Characters with a type including \"Whitebeard Pirates\" gain +1000 power.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-019.jpg"
+    },
+    {
+      "id": "OP02-020",
+      "name": "LittleOars Jr.",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 7,
+      "power": 9000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Giant",
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-020.jpg"
+    },
+    {
+      "id": "OP02-021",
+      "name": "Seaquake",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "The Four Emperors",
+        "Whitebeard Pirates"
+      ],
+      "text": "[Main] If your Leader's type includes \"Whitebeard Pirates\", K.O. up to 1 of your opponent's Characters with 3000 power or less.",
+      "trigger": "Give up to 1 of your opponent's Leader or Character cards -3000 power during this turn.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-021.jpg"
+    },
+    {
+      "id": "OP02-022",
+      "name": "Whitebeard Pirates",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Main] Look at 5 cards from the top of your deck; reveal up to 1 Character card with a type including \"Whitebeard Pirates\" and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "trigger": "Activate this card's [Main] effect.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-022.jpg"
+    },
+    {
+      "id": "OP02-023",
+      "name": "You May Be a Fool...but I Still Love You",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "The Four Emperors",
+        "Whitebeard Pirates"
+      ],
+      "text": "[Main] If you have 3 or less Life cards, you cannot add Life cards to your hand using your own effects during this turn.",
+      "trigger": "Up to 1 of your Leader gains +1000 power during this turn.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-023.jpg"
+    },
+    {
+      "id": "OP02-024",
+      "name": "Moby Dick",
+      "category": "stage",
+      "colors": [
+        "red"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Your Turn] If you have 1 or less Life cards, your [Edward.Newgate] and all your Characters with a type including \"Whitebeard Pirates\" gain +2000 power.",
+      "trigger": "Play this card.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-024.jpg"
+    },
+    {
+      "id": "OP02-025",
+      "name": "Kin'emon",
+      "category": "leader",
+      "colors": [
+        "green"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "The Akazaya Nine"
+      ],
+      "text": "[Activate:Main] [Once Per Turn] If you have 1 or less Characters, the next time you play a {Land of Wano} type Character card with a cost of 3 or more from your hand during this turn, the cost will be reduced by 1.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-025.jpg"
+    },
+    {
+      "id": "OP02-026",
+      "name": "Sanji",
+      "category": "leader",
+      "colors": [
+        "blue",
+        "green"
+      ],
+      "life": 4,
+      "power": 5000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[Once Per Turn] When you play a Character with no base effect from your hand, if you have 3 or less Characters, set up to 2 of your DON!! cards as active.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-026.jpg"
+    },
+    {
+      "id": "OP02-027",
+      "name": "Inuarashi",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "Minks",
+        "The Akazaya Nine"
+      ],
+      "text": "If all of your DON!! cards are rested, this Character cannot be removed from the field by your opponent's effects.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-027.jpg"
+    },
+    {
+      "id": "OP02-028",
+      "name": "Usopp",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Film",
+        "Straw Hat Crew"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-028.jpg"
+    },
+    {
+      "id": "OP02-029",
+      "name": "Carrot",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 5,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Minks"
+      ],
+      "text": "[End of Your Turn] Set up to 1 of your DON!! cards as active.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-029.jpg"
+    },
+    {
+      "id": "OP02-030",
+      "name": "Kouzuki Oden",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 8,
+      "power": 8000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "Kouzuki Clan"
+      ],
+      "text": "[Activate:Main] [Once Per Turn] ③ (You may rest the specified number of DON!! cards in your cost area.): Set this Character as active. [On K.O.] Play up to 1 green {Land of Wano} type Character card with a cost of 3 from your deck. Then, shuffle your deck.",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-030.jpg"
+    },
+    {
+      "id": "OP02-031",
+      "name": "Kouzuki Toki",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 1,
+      "power": 0,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Land of Wano",
+        "Kouzuki Clan"
+      ],
+      "text": "If you have a [Kouzuki Oden] Character, this Character gains [Blocker]. (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-031.jpg"
+    },
+    {
+      "id": "OP02-032",
+      "name": "Shishilian",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Minks"
+      ],
+      "text": "[On Play] ② (You may rest the specified number of DON!! cards in your cost area.): Set up to 1 of your {Minks} type Characters with a cost of 5 or less as active.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-032.jpg"
+    },
+    {
+      "id": "OP02-033",
+      "name": "Jinbe",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Film",
+        "Fish-Man",
+        "Straw Hat Crew"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-033.jpg"
+    },
+    {
+      "id": "OP02-034",
+      "name": "Tony Tony.Chopper",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 2000,
+      "counter": 2000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Animal",
+        "Film",
+        "Straw Hat Crew"
+      ],
+      "text": "[DON!! x1] [When Attacking] Rest up to 1 of your opponent's Characters with a cost of 2 or less.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-034.jpg"
+    },
+    {
+      "id": "OP02-035",
+      "name": "Trafalgar Law",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Film",
+        "Heart Pirates",
+        "Supernovas"
+      ],
+      "text": "[Activate:Main] ① (You may rest the specified number of DON!! cards in your cost area.) You may return this Character to the owner's hand: Play up to 1 Character with a cost of 3 from your hand.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-035.jpg"
+    },
+    {
+      "id": "OP02-036",
+      "name": "Nami",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Film",
+        "Straw Hat Crew"
+      ],
+      "text": "[On Play]/[When Attacking] ① (You may rest the specified number of DON!! cards in your cost area.): Look at 3 cards from the top of your deck; reveal up to 1 {FILM} type card other than [Nami] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-036.jpg"
+    },
+    {
+      "id": "OP02-037",
+      "name": "Nico Robin",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Film",
+        "Straw Hat Crew"
+      ],
+      "text": "[On Play] Play up to 1 {FILM} or {Straw Hat Crew} type Character card with a cost of 2 or less from your hand.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-037.jpg"
+    },
+    {
+      "id": "OP02-038",
+      "name": "Nekomamushi",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "Minks",
+        "The Akazaya Nine"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-038.jpg"
+    },
+    {
+      "id": "OP02-039",
+      "name": "Franky",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 5,
+      "power": 7000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Film",
+        "Straw Hat Crew"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-039.jpg"
+    },
+    {
+      "id": "OP02-040",
+      "name": "Brook",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "[On Play] Play up to 1 {FILM} or {Straw Hat Crew} type Character card with a cost of 3 or less from your hand.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-040.jpg"
+    },
+    {
+      "id": "OP02-041",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 7,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew",
+        "Supernovas"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] Play up to 1 {FILM} or {Straw Hat Crew} type Character card with a cost of 4 or less from your hand.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-041.jpg"
+    },
+    {
+      "id": "OP02-042",
+      "name": "Yamato",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Land of Wano"
+      ],
+      "text": "Also treat this card's name as [Kouzuki Oden] according to the rules. [On Play] Rest up to 1 of your opponent's Characters with a cost of 6 or less.",
+      "aliases": [
+        "Kouzuki Oden"
+      ],
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-042.jpg"
+    },
+    {
+      "id": "OP02-043",
+      "name": "Roronoa Zoro",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Film",
+        "Straw Hat Crew",
+        "Supernovas"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-043.jpg"
+    },
+    {
+      "id": "OP02-044",
+      "name": "Wanda",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Minks"
+      ],
+      "text": "[On Play] Play up to 1 {Minks} type Character card other than [Wanda] with a cost of 3 or less from your hand.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-044.jpg"
+    },
+    {
+      "id": "OP02-045",
+      "name": "Three Sword Style Oni Giri",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "attributes": [],
+      "types": [
+        "Film",
+        "Straw Hat Crew",
+        "Supernovas"
+      ],
+      "text": "[Counter] Up to 1 of your Leader or Character cards gains +6000 power during this battle. Then, play up to 1 Character card with a cost of 3 or less and no base effect from your hand.",
+      "trigger": "Rest up to 1 of your opponent's Leader or Character cards with a cost of 5 or less.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-045.jpg"
+    },
+    {
+      "id": "OP02-046",
+      "name": "Diable Jambe Venaison Shoot",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "Film",
+        "Straw Hat Crew"
+      ],
+      "text": "[Main] K.O. up to 1 of your opponent's rested Characters with a cost of 4 or less.",
+      "trigger": "Play up to 1 Character card with a cost of 4 or less and no base effect from your hand.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-046.jpg"
+    },
+    {
+      "id": "OP02-047",
+      "name": "Paradise Totsuka",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Land of Wano",
+        "Kouzuki Clan"
+      ],
+      "text": "[Main] Rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+      "trigger": "K.O. up to 1 of your opponent's rested Characters with a cost of 3 or less.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-047.jpg"
+    },
+    {
+      "id": "OP02-048",
+      "name": "Land of Wano",
+      "category": "stage",
+      "colors": [
+        "green"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Land of Wano"
+      ],
+      "text": "[Activate:Main] You may trash 1 {Land of Wano} type card from your hand and rest this Stage: Set up to 1 of your DON!! cards as active.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-048.jpg"
+    },
+    {
+      "id": "OP02-049",
+      "name": "Emporio.Ivankov",
+      "category": "leader",
+      "colors": [
+        "blue"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army",
+        "Impel Down"
+      ],
+      "text": "[End of Your Turn] If you have 0 cards in your hand, draw 2 cards.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-049.jpg"
+    },
+    {
+      "id": "OP02-050",
+      "name": "Inazuma",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Revolutionary Army",
+        "Impel Down"
+      ],
+      "text": "If you have 1 or less cards in your hand, this Character gains +2000 power. [Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-050.jpg"
+    },
+    {
+      "id": "OP02-051",
+      "name": "Emporio.Ivankov",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 7,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army",
+        "Impel Down"
+      ],
+      "text": "[On Play] Draw card(s) so that you have 3 cards in your hand and then play up to 1 blue {Impel Down} type Character card with a cost of 6 or less from your hand.",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-051.jpg"
+    },
+    {
+      "id": "OP02-052",
+      "name": "Cabaji",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Buggy Pirates"
+      ],
+      "text": "[On Play] If you have [Mohji], draw 2 cards and trash 1 card from your hand.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-052.jpg"
+    },
+    {
+      "id": "OP02-053",
+      "name": "Crocodile",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 5,
+      "power": 7000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Impel Down",
+        "Former Baroque Works"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-053.jpg"
+    },
+    {
+      "id": "OP02-054",
+      "name": "Gecko Moria",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "The Seven Warlords of the Sea",
+        "Thriller Bark Pirates"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-054.jpg"
+    },
+    {
+      "id": "OP02-055",
+      "name": "Dracule Mihawk",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 6,
+      "power": 8000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "The Seven Warlords of the Sea"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-055.jpg"
+    },
+    {
+      "id": "OP02-056",
+      "name": "Donquixote Doflamingo",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Donquixote Pirates",
+        "The Seven Warlords of the Sea"
+      ],
+      "text": "[On Play] Look at 3 cards from the top of your deck and place them at the top or bottom of the deck in any order. [DON!! x1] [When Attacking] You may trash 1 card from your hand: Place up to 1 of your opponent's Characters with a cost of 1 or less at the bottom of the owner's deck.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-056.jpg"
+    },
+    {
+      "id": "OP02-057",
+      "name": "Bartholomew Kuma",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Revolutionary Army",
+        "The Seven Warlords of the Sea"
+      ],
+      "text": "[On Play] Look at 2 cards from the top of your deck; reveal up to 1 {The Seven Warlords of the Sea} type card and add it to your hand. Then, place the rest at the top or bottom of the deck in any order.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-057.jpg"
+    },
+    {
+      "id": "OP02-058",
+      "name": "Buggy",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Buggy Pirates",
+        "Impel Down"
+      ],
+      "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 blue {Impel Down} type card other than [Buggy] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-058.jpg"
+    },
+    {
+      "id": "OP02-059",
+      "name": "Boa Hancock",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Kuja Pirates",
+        "The Seven Warlords of the Sea",
+        "Impel Down"
+      ],
+      "text": "[When Attacking] Draw 1 card and trash 1 card from your hand. Then, trash up to 3 cards from your hand.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-059.jpg"
+    },
+    {
+      "id": "OP02-060",
+      "name": "Mohji",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Buggy Pirates"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-060.jpg"
+    },
+    {
+      "id": "OP02-061",
+      "name": "Morley",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Giant",
+        "Revolutionary Army"
+      ],
+      "text": "[When Attacking] If you have 1 or less cards in your hand, your opponent cannot activate the [Blocker] of any Character with a cost of 5 or less during this battle.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-061.jpg"
+    },
+    {
+      "id": "OP02-062",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 6,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew",
+        "Impel Down"
+      ],
+      "text": "[On Play] / [When Attacking] You may trash 2 cards from your hand: Return up to 1 Character with a cost of 4 or less to the owner's hand. Then, this Character gains [Double Attack] during this turn. (This card deals 2 damage.)",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-062.jpg"
+    },
+    {
+      "id": "OP02-063",
+      "name": "Mr.1 (Daz.Bonez)",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Impel Down",
+        "Former Baroque Works"
+      ],
+      "text": "[On Play] Add up to 1 blue Event card with a cost of 1 from your trash to your hand.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-063.jpg"
+    },
+    {
+      "id": "OP02-064",
+      "name": "Mr.2.Bon.Kurei (Bentham)",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 5,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Impel Down",
+        "Former Baroque Works"
+      ],
+      "text": "[DON!! x1] [When Attacking] You may trash 1 card from your hand: Place up to 1 Character with a cost of 2 or less at the bottom of the owner's deck. Then, at the end of this battle, place this Character at the bottom of the owner's deck.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-064.jpg"
+    },
+    {
+      "id": "OP02-065",
+      "name": "Mr.3 (Galdino)",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Impel Down",
+        "Former Baroque Works"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [End of Your Turn] You may trash 1 card from your hand: Set this Character as active.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-065.jpg"
+    },
+    {
+      "id": "OP02-066",
+      "name": "Impel Down All Stars",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Main] You may trash 2 cards from your hand: If your Leader has the {Impel Down} type, draw up to 2 cards.",
+      "trigger": "Draw 2 cards.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-066.jpg"
+    },
+    {
+      "id": "OP02-067",
+      "name": "Arabesque Brick Fist",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "Fish-Man",
+        "Impel Down"
+      ],
+      "text": "[Main] Return up to 1 Character with a cost of 4 or less to the owner's hand.",
+      "trigger": "Activate this card's [Main] effect.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-067.jpg"
+    },
+    {
+      "id": "OP02-068",
+      "name": "Gum-Gum Rain",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 0,
+      "attributes": [],
+      "types": [
+        "Straw Hat Crew",
+        "Impel Down"
+      ],
+      "text": "[Counter] You may trash 1 card from your hand: Up to 1 of your Leader or Character cards gains +3000 power during this battle.",
+      "trigger": "Return up to 1 Character with a cost of 2 or less to the owner's hand.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-068.jpg"
+    },
+    {
+      "id": "OP02-069",
+      "name": "DEATH WINK",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 3,
+      "attributes": [],
+      "types": [
+        "Revolutionary Army",
+        "Impel Down"
+      ],
+      "text": "[Counter] Up to 1 of your Leader or Character cards gains +6000 power during this battle. Then, draw cards so that you have 2 cards in your hand.",
+      "trigger": "Return up to 1 Character with a cost of 7 or less to the owner's hand.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-069.jpg"
+    },
+    {
+      "id": "OP02-070",
+      "name": "New Kama Land",
+      "category": "stage",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Activate:Main] You may rest this Stage: If your Leader is [Emporio.Ivankov], draw 1 card and trash 1 card from your hand. Then, trash up to 3 cards from your hand.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-070.jpg"
+    },
+    {
+      "id": "OP02-071",
+      "name": "Magellan",
+      "category": "leader",
+      "colors": [
+        "purple"
+      ],
+      "life": 5,
+      "power": 6000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Your Turn] [Once Per Turn] When a DON!! card on your field is returned to your DON!! deck, this Leader gains +1000 power during this turn.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-071.jpg"
+    },
+    {
+      "id": "OP02-072",
+      "name": "Zephyr",
+      "category": "leader",
+      "colors": [
+        "purple",
+        "black"
+      ],
+      "life": 4,
+      "power": 5000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Film",
+        "Neo Navy"
+      ],
+      "text": "[When Attacking] DON!! -4 (You may return the specified number of DON!! cards from your field to your DON!! deck.): K.O. up to 1 of your opponent's Characters with a cost of 3 or less. Then, this Leader gains +1000 power during this turn.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-072.jpg"
+    },
+    {
+      "id": "OP02-073",
+      "name": "Little Sadi",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[On Play] Play up to 1 {Jailer Beast} type Character card from your hand.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-073.jpg"
+    },
+    {
+      "id": "OP02-074",
+      "name": "Saldeath",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "Your [Blugori] gains [Blocker]. (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-074.jpg"
+    },
+    {
+      "id": "OP02-075",
+      "name": "Shiki",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "FILM",
+        "Golden Lion Pirates"
+      ],
+      "text": "",
+      "trigger": "DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Play this card.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-075.jpg"
+    },
+    {
+      "id": "OP02-076",
+      "name": "Shiryu",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): K.O. up to 1 of your opponent's Characters with a cost of 1 or less.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-076.jpg"
+    },
+    {
+      "id": "OP02-077",
+      "name": "Solitaire",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Animal Kingdom Pirates",
+        "SMILE"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-077.jpg"
+    },
+    {
+      "id": "OP02-078",
+      "name": "Daifugo",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Animal Kingdom Pirates",
+        "SMILE"
+      ],
+      "text": "[On Play] DON!! -2 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Play up to 1 {SMILE} type Character card other than [Daifugo] with a cost of 3 or less from your hand.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-078.jpg"
+    },
+    {
+      "id": "OP02-079",
+      "name": "Douglas Bullet",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "FILM",
+        "The Pirates Fest"
+      ],
+      "text": "[On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-079.jpg"
+    },
+    {
+      "id": "OP02-080",
+      "name": "Dobon",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 2,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Animal Kingdom Pirates",
+        "SMILE"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-080.jpg"
+    },
+    {
+      "id": "OP02-081",
+      "name": "Domino",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 2,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-081.jpg"
+    },
+    {
+      "id": "OP02-082",
+      "name": "Byrnndi World",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 8,
+      "power": 8000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "World Pirates"
+      ],
+      "text": "[Activate:Main] DON!! -8 (You may return the specified number of DON!! cards from your field to your DON!! deck.): This Character gains +792000 power during this turn.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-082.jpg"
+    },
+    {
+      "id": "OP02-083",
+      "name": "Hannyabal",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 purple {Impel Down} type card other than [Hannyabal] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-083.jpg"
+    },
+    {
+      "id": "OP02-084",
+      "name": "Blugori",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Animal",
+        "Impel Down"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-084.jpg"
+    },
+    {
+      "id": "OP02-085",
+      "name": "Magellan",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Your opponent returns 1 DON!! card from their field to their DON!! deck. [Opponent's Turn] When this Character is K.O.'d, your opponent returns 2 DON!! cards from their field to their DON!! deck.",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-085.jpg"
+    },
+    {
+      "id": "OP02-086",
+      "name": "Minokoala",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Impel Down",
+        "Jailer Beast"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On K.O.] If your Leader has the {Impel Down} type, add up to 1 DON!! card from your DON!! deck and rest it.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-086.jpg"
+    },
+    {
+      "id": "OP02-087",
+      "name": "Minotaur",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Impel Down",
+        "Jailer Beast"
+      ],
+      "text": "[Double Attack] (This card deals 2 damage.) [On K.O.] If your Leader has the {Impel Down} type, add up to 1 DON!! card from your DON!! deck and rest it.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-087.jpg"
+    },
+    {
+      "id": "OP02-088",
+      "name": "Sphinx",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Animal",
+        "Impel Down"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-088.jpg"
+    },
+    {
+      "id": "OP02-089",
+      "name": "Judgment of Hell",
+      "category": "event",
+      "colors": [
+        "purple"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Counter] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Give up to a total of 2 of your opponent's Leader or Character cards -3000 power during this turn.",
+      "trigger": "If your opponent has 6 or more DON!! cards on their field, your opponent returns 1 DON!! card from their field to their DON!! deck.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-089.jpg"
+    },
+    {
+      "id": "OP02-090",
+      "name": "Hydra",
+      "category": "event",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Main] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Give up to 1 of your opponent's Characters -3000 power during this turn.",
+      "trigger": "If your opponent has 6 or more DON!! cards on their field, your opponent returns 1 DON!! card from their field to their DON!! deck.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-090.jpg"
+    },
+    {
+      "id": "OP02-091",
+      "name": "Venom Road",
+      "category": "event",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "attributes": [],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Main] Add up to 1 DON!! card from your DON!! deck and set it as active.",
+      "trigger": "If your opponent has 6 or more DON!! cards on their field, your opponent returns 1 DON!! card from their field to their DON!! deck.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-091.jpg"
+    },
+    {
+      "id": "OP02-092",
+      "name": "Impel Down",
+      "category": "stage",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Impel Down"
+      ],
+      "text": "[Activate:Main] You may trash 1 card from your hand and rest this Stage: Look at 3 cards from the top of your deck; reveal up to 1 {Impel Down} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-092.jpg"
+    },
+    {
+      "id": "OP02-093",
+      "name": "Smoker",
+      "category": "leader",
+      "colors": [
+        "black"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[DON!! x1] [Activate:Main] [Once Per Turn] Give up to 1o of your opponent's Characters -1 cost during this turn. Then, if there is a Character with a cost of 0, this Leader gains +1000 power during this turn.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-093.jpg"
+    },
+    {
+      "id": "OP02-094",
+      "name": "Isuka",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[DON!! x1] [Once Per Turn] When this Character battles and K.O.'s your opponent's Character, set this Character as active.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-094.jpg"
+    },
+    {
+      "id": "OP02-095",
+      "name": "Onigumo",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "If there is a Character with a cost of 0, this Character gains [Banish]. (When this card deals damage, the target card is trashed without activating its Trigger.)",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-095.jpg"
+    },
+    {
+      "id": "OP02-096",
+      "name": "Kuzan",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] Draw 1 card. [When Attacking] Give up to 1 of your opponent's Characters -4 cost during this turn.",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-096.jpg"
+    },
+    {
+      "id": "OP02-097",
+      "name": "Komille",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-097.jpg"
+    },
+    {
+      "id": "OP02-098",
+      "name": "Koby",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] You may trash 1 card from your hand: K.O. up to 1 of your opponent's Characters with a cost of 3 or less.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-098.jpg"
+    },
+    {
+      "id": "OP02-099",
+      "name": "Sakazuki",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 6,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] You may trash 1 card from your hand: K.O. up to 1 of your opponent's Characters with a cost of 5 or less.",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-099.jpg"
+    },
+    {
+      "id": "OP02-100",
+      "name": "Jango",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "If you have [Fullbody], this Character cannot be K.O.'d in battle.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-100.jpg"
+    },
+    {
+      "id": "OP02-101",
+      "name": "Strawberry",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[When Attacking] If there is a Character with a cost of 0, your opponent cannot activate the [Blocker] of any Character with a cost of 5 or less during this battle.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-101.jpg"
+    },
+    {
+      "id": "OP02-102",
+      "name": "Smoker",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "This Character cannot be K.O.'d by effects. [When Attacking] If there is a Character with a cost of 0, this Character gains +2000 power during this battle.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-102.jpg"
+    },
+    {
+      "id": "OP02-103",
+      "name": "Sengoku",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[DON!! x1] [When Attacking] Give up to 1 of your opponent's Characters -2 cost during this turn.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-103.jpg"
+    },
+    {
+      "id": "OP02-104",
+      "name": "Sentomaru",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "",
+      "trigger": "Play this card.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-104.jpg"
+    },
+    {
+      "id": "OP02-105",
+      "name": "Tashigi",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[DON!! x1] [When Attacking] Give up to 1 of your opponent's Characters -3 cost during this turn.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-105.jpg"
+    },
+    {
+      "id": "OP02-106",
+      "name": "Tsuru",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 0,
+      "counter": 2000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] Give up to 1 of your opponent's Characters -2 cost during this turn.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-106.jpg"
+    },
+    {
+      "id": "OP02-107",
+      "name": "Doberman",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-107.jpg"
+    },
+    {
+      "id": "OP02-108",
+      "name": "Donquixote Rosinante",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Donquixote Pirates",
+        "Navy"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-108.jpg"
+    },
+    {
+      "id": "OP02-109",
+      "name": "Jaguar.D.Saul",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Giant",
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-109.jpg"
+    },
+    {
+      "id": "OP02-110",
+      "name": "Hina",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Block] Select up to 1 of your opponent's Characters with a cost of 6 or less. The selected Character cannot attack during this turn.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-110.jpg"
+    },
+    {
+      "id": "OP02-111",
+      "name": "Fullbody",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[When Attacking] If you have [Jango], this card gains +3000 power during this battle.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-111.jpg"
+    },
+    {
+      "id": "OP02-112",
+      "name": "Bell-mere",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Activate:Main] You may rest this Character: Give up to 1 of your opponent's Characters -1 cost during this turn. Then, up to 1 of your Leader or Character cards gains +1000 power during this turn.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-112.jpg"
+    },
+    {
+      "id": "OP02-113",
+      "name": "Helmeppo",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[When Attacking] Give up to 1 of your opponent's Characters -2 cost during this turn. Then, if there is a Character with a cost of 0, this Character gains +2000 power during this battle.",
+      "trigger": "Play this card.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-113.jpg"
+    },
+    {
+      "id": "OP02-114",
+      "name": "Borsalino",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Opponent's Turn] This Character gains +1000 power and cannot be K.O.'d by effects. [Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-114.jpg"
+    },
+    {
+      "id": "OP02-115",
+      "name": "Monkey.D.Garp",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[DON!! x2] [When Attacking] K.O. up to 1 of your opponent's Characters with a cost of 0.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-115.jpg"
+    },
+    {
+      "id": "OP02-116",
+      "name": "Yamakaji",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-116.jpg"
+    },
+    {
+      "id": "OP02-117",
+      "name": "Ice Age",
+      "category": "event",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Main] Give up to 1 of your opponent's Characters -5 cost during this turn.",
+      "trigger": "K.O. up to 1 of your opponent's Characters with a cost of 3 or less.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-117.jpg"
+    },
+    {
+      "id": "OP02-118",
+      "name": "Yasakani Sacred Jewel",
+      "category": "event",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Counter] You may trash 1 card from your hand: Select up to 1 of your Characters. The selected Character cannot be K.O.'d during this battle.",
+      "trigger": "K.O. up to 1 of your opponent's Stages with a cost of 3 or less.",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-118.jpg"
+    },
+    {
+      "id": "OP02-119",
+      "name": "Meteor Volcano",
+      "category": "event",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Main] K.O. up to 1 of your opponent's Characters with a cost of 1 or less.",
+      "trigger": "Draw 2 cards and trash 1 card from your hand.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-119.jpg"
+    },
+    {
+      "id": "OP02-120",
+      "name": "Uta",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 8,
+      "power": 8000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "FILM"
+      ],
+      "text": "[On Play] DON!! -2 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Your Leader and all of your Characters gain +1000 power until the start of your next turn.",
+      "set": "OP02",
+      "rarity": "SEC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-120.jpg"
+    },
+    {
+      "id": "OP02-121",
+      "name": "Kuzan",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 10,
+      "power": 10000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Former Navy"
+      ],
+      "text": "[Your Turn] Give all of your opponent's Characters -5 cost. [On Play] K.O. up to 1 of your opponent's Characters with a cost of 0.",
+      "set": "OP02",
+      "rarity": "SEC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-121.jpg"
+    }
+  ]
+}

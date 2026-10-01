@@ -65,7 +65,61 @@ const COLOR_PT: Record<string, string> = {
   yellow: 'amarelo',
 };
 /** Condição solta ("you have 5 or more cards in your hand") usando as mesmas regras do "If …,". */
+const lessMore = (q: string) => (/more/i.test(q) ? 'mais' : 'menos');
+/** Condições (o "X" de "If X,"), as mesmas que o leitor de efeitos entende. */
+const CONDITIONS: Rule[] = [
+  [/^you have (\d+) or (more|less) Characters$/i, (_, n, q) => `você tiver ${n} ou ${lessMore(q)} Personagens`],
+  [/^you have (\d+) Characters$/i, (_, n) => `você tiver ${n} Personagens`],
+  [/^this (Character|Leader) is rested$/i, (_, w) => `${w === 'Leader' ? 'este Líder' : 'este Personagem'} estiver virado`],
+  [/^you have (\d+) or (more|less) DON!! cards on your field$/i, (_, n, q) => `você tiver ${n} ou ${lessMore(q)} DON!! no seu campo`],
+  [/^you have (\d+) DON!! cards on your field$/i, (_, n) => `você tiver ${n} DON!! no seu campo`],
+  [/^your opponent has more DON!! cards on their field than you$/i, 'o seu oponente tiver mais DON!! no campo do que você'],
+  [/^your opponent has (\d+) or (more|less) DON!! cards on their field$/i, (_, n, q) => `o oponente tiver ${n} ou ${lessMore(q)} DON!! no campo`],
+  [/^your Leader has the (\{[^}]+\}) type$/i, (_, t) => `o seu Líder tiver o tipo ${t}`],
+  [/^your Leader's type includes "([^"]+)"$/i, (_, t) => `o tipo do seu Líder incluir "${t}"`],
+  [/^your Leader is (\[[^\]]+\])$/i, (_, n) => `o seu Líder for ${n}`],
+  [/^your Leader is multicolored$/i, 'o seu Líder for multicolorido'],
+  [/^you have (\d+) or (more|less) cards in your hand$/i, (_, n, q) => `você tiver ${n} ou ${lessMore(q)} cartas na mão`],
+  [/^you have (\d+) cards in your hand$/i, (_, n) => `você tiver ${n} cartas na mão`],
+  [/^your opponent has (\d+) or (more|less) cards in their hand$/i, (_, n, q) => `o oponente tiver ${n} ou ${lessMore(q)} cartas na mão`],
+  [/^you have (\d+) or (more|less) Life cards$/i, (_, n, q) => `você tiver ${n} ou ${lessMore(q)} cartas de Vida`],
+  [/^your opponent has (\d+) or (more|less) Life cards$/i, (_, n, q) => `o oponente tiver ${n} ou ${lessMore(q)} cartas de Vida`],
+  [/^you have less Life cards than your opponent$/i, 'você tiver menos cartas de Vida que o oponente'],
+  [
+    /^you and your opponent have a total of (\d+) or (more|less) Life cards$/i,
+    (_, n, q) => `você e o oponente tiverem, juntos, ${n} ou ${lessMore(q)} cartas de Vida`,
+  ],
+  [
+    /^there is a Character with a cost of (\d+)( or more| or less)?$/i,
+    (_, n, q) => `houver um Personagem com custo ${n}${q ? ` ou ${lessMore(q)}` : ''}`,
+  ],
+  [/^you don't have (\[[^\]]+\])$/i, (_, n) => `você não tiver ${n}`],
+  [/^you have (?:a )?(\[[^\]]+\])(?: Character)?$/i, (_, n) => `você tiver ${n}`],
+  [/^you have (\d+) or (more|less) rested Characters$/i, (_, n, q) => `você tiver ${n} ou ${lessMore(q)} Personagens virados`],
+  [/^your opponent has (\d+) or (more|less) rested Characters$/i, (_, n, q) => `o oponente tiver ${n} ou ${lessMore(q)} Personagens virados`],
+  [/^your opponent has a Character with (\d+) or more power$/i, (_, n) => `o oponente tiver um Personagem com ${n} ou mais de poder`],
+  [/^that card is a Character$/i, 'essa carta for um Personagem'],
+  [/^you do$/i, 'fizer isso'],
+  [/^this (Character|Leader) would be K\.O\.'d$/i, (_, w) => `${w === 'Leader' ? 'este Líder' : 'este Personagem'} for nocauteado`],
+];
+
+/** Traduz uma condição; combinações com "and" são traduzidas por partes. */
+function condText(cond: string): string | null {
+  const c = cond.trim();
+  for (const [re, rep] of CONDITIONS) {
+    const m = c.match(re);
+    if (m) return typeof rep === 'string' ? rep : rep(...(m as unknown as string[]));
+  }
+  const parts = c.split(/ and (?=you |your |there |this )/i);
+  if (parts.length > 1) {
+    const out = parts.map(condText);
+    if (out.every(Boolean)) return out.join(' e ');
+  }
+  return null;
+}
+
 const condPt = (cond: string) =>
+  condText(cond) ??
   applyPhrases(`If ${cond}, `)
     .replace(/^Se /, '')
     .replace(/,\s*$/, '');
@@ -79,6 +133,42 @@ type Rule = [RegExp, string | ((...m: string[]) => string)];
 
 /** Regras de frase inteira (verbo no início). Aplicadas uma vez, na ordem. */
 const SENTENCES: Rule[] = [
+  [
+    /^Add (\d+) cards? from the top of your Life cards to your hand\.?$/i,
+    (_, n) => `Coloque ${n} ${plural(n, 'carta', 'cartas')} do topo da sua Vida na mão.`,
+  ],
+  [
+    /^you cannot add Life cards to your hand using your own effects during this turn\.?$/i,
+    'Você não pode colocar cartas de Vida na mão com os seus próprios efeitos durante este turno.',
+  ],
+  [
+    /^Draw (?:cards?|card\(s\)) so that you have (\d+) cards in your hand\.?$/i,
+    (_, n) => `Compre cartas até ficar com ${n} cartas na mão.`,
+  ],
+  [/^trash up to (\d+) cards? from your hand\.?$/i, (_, n) => `Descarte até ${n} ${plural(n, 'carta', 'cartas')} da sua mão.`],
+  [/^draw up to (\d+) cards?\.?$/i, (_, n) => `Compre até ${n} ${plural(n, 'carta', 'cartas')}.`],
+  [
+    /^place the rest at the top or bottom of the deck in any order\.?$/i,
+    'Coloque o resto no topo ou no fundo do deck, em qualquer ordem.',
+  ],
+  [
+    /^Your opponent cannot activate the \[Blocker\] of any Character with a cost of (\d+) or less during this battle\.?$/i,
+    (_, n) => `Seu oponente não pode ativar o [Blocker] de nenhum Personagem com custo ${n} ou menos durante esta batalha.`,
+  ],
+  [
+    /^Your opponent returns (\d+) DON!! cards? from their field to their DON!! deck\.?$/i,
+    (_, n) => `Seu oponente devolve ${n} DON!! do campo ao deck de DON!!.`,
+  ],
+  [
+    /^(.+?) gains? \+(\d+) power and cannot be K\.O\.'d by effects\.?$/i,
+    (_, who, n) => `${who} recebe +${n} de poder e não pode ser nocauteado por efeitos.`,
+  ],
+  [
+    /^(.+?) cannot be K\.O\.'d (during this turn|during this battle)\.?$/i,
+    (_, who, dur) => `${who} não pode ser nocauteado ${dur}.`,
+  ],
+  [/^(.+?) cannot attack (during this turn)\.?$/i, (_, who, dur) => `${who} não pode atacar ${dur}.`],
+  [/^(.+?) gains? (\[[^\]]+\]) if (.+?)\.?$/i, (_, who, kw, cond) => `${who} ganha ${kw} se ${condPt(cond)}.`],
   [/^you may (.+?) instead\.?$/i, (_, what) => `você pode ${infinitive(translateSentence(what)).replace(/\.$/, '')} em vez disso.`],
   [
     /^you may K\.O\. the opponent's Character you battled with\.?(?=\s|$)/i,
@@ -162,6 +252,12 @@ const SENTENCES: Rule[] = [
   [/^Return (.+?) to (?:the owner's|its owner's) hand\.?$/i, (_, who) => `Devolva ${who} à mão do dono.`],
   [/^Play (.+?) from your hand\.?$/i, (_, what) => `Jogue ${what} da sua mão.`],
   [
+    /^Play (.+?) from your (deck|trash|hand or trash)( rested)?\.?$/i,
+    (_, what, from, rested) =>
+      `Jogue ${what} ${from === 'deck' ? 'do seu deck' : from === 'trash' ? 'do seu descarte' : 'da sua mão ou do descarte'}${rested ? ', virado' : ''}.`,
+  ],
+  [/^play this Character card from your trash rested\.?$/i, 'Jogue este Personagem do seu descarte, virado.'],
+  [
     /^Play (.+?) from your deck, then shuffle your deck\.?$/i,
     (_, what) => `Jogue ${what} do seu deck e depois embaralhe o seu deck.`,
   ],
@@ -184,7 +280,7 @@ const SENTENCES: Rule[] = [
       `Adicione ${upTo ? 'até ' : ''}${n} DON!! do seu deck de DON!! ${/active/i.test(m) ? 'como ativo' : 'virado'}${Number(n) > 1 ? 's' : ''}.`,
   ],
   [
-    /^Look at (\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to your hand\.?$/i,
+    /^Look at (?:up to )?(\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to your hand\.?$/i,
     (_, n, m, what) => `Olhe as ${n} cartas do topo do seu deck; revele até ${m} ${what} e adicione à sua mão.`,
   ],
   [/^Place the rest at the bottom of your deck in any order\.?$/i, 'Coloque o resto no fundo do seu deck em qualquer ordem.'],
@@ -283,6 +379,7 @@ const SENTENCES: Rule[] = [
 const typeList = (list: string) => list.replace(/\s+or\s+/g, ' ou ').replace(/\s+and\s+/g, ' e ');
 
 const PHRASES: Rule[] = [
+  [/Your Leader and all of your Characters/gi, 'O seu Líder e todos os seus Personagens'],
   [/If this (Character|Leader) would be K\.O\.'d,\s*/gi, (_, w) => `Se ${w === 'Leader' ? 'este Líder' : 'este Personagem'} for nocauteado, `],
   [
     /At the end of a battle in which this Character battles your opponent's Character,\s*/gi,
@@ -339,6 +436,35 @@ const PHRASES: Rule[] = [
 
   [/If your opponent has more DON!! cards on their field than you,\s*/gi, 'Se o seu oponente tiver mais DON!! no campo do que você, '],
   [/If that card is a Character,\s*/gi, 'Se essa carta for um Personagem, '],
+  [/When this Character battles and K\.O\.'s your opponent's Character,\s*/gi, 'Quando este Personagem batalhar e nocautear um Personagem do oponente, '],
+  [/When this Character is K\.O\.'d,\s*/gi, 'Quando este Personagem for nocauteado, '],
+  [/You may return this Character to the owner's hand/gi, 'Você pode devolver este Personagem à mão do dono'],
+  [
+    /You may trash (\d+) cards? with a type including "([^"]+)" from your hand/gi,
+    (_, n, t) => `Você pode descartar ${n} ${plural(n, 'carta', 'cartas')} com um tipo que inclua "${t}" da sua mão`,
+  ],
+  [/ and rest this (Stage|Character|card)/gi, (_, w) => ` e virar ${w === 'Stage' ? 'este Stage' : w === 'card' ? 'esta carta' : 'este Personagem'}`],
+  [/up to a total of (\d+) of your opponent's Leader or Character cards/gi, (_, n) => `até um total de ${n} Líderes ou Personagens do oponente`],
+  [/up to (\d+) of your opponent's Stages/gi, (_, n) => `até ${n} ${plural(n, 'Stage', 'Stages')} do oponente`],
+  [
+    /up to (\d+) of your (red|green|blue|purple|black|yellow) Characters/gi,
+    (_, n, c) => `até ${n} dos seus Personagens ${COLOR_PT[c.toLowerCase()]}${Number(n) > 1 ? 's' : 's'}`,
+  ],
+  [
+    /up to (\d+) of your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type Characters/gi,
+    (_, n, t) => `até ${n} dos seus Personagens do tipo ${typeList(t)}`,
+  ],
+  [/ with a type including "([^"]+)"/gi, (_, t) => ` com um tipo que inclua "${t}"`],
+  [/ and no base effect/gi, ' e sem efeito'],
+  [
+    /(red|green|blue|purple|black|yellow) ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type (Character|Event) cards?/gi,
+    (_, c, t, k) => `${k === 'Event' ? 'Evento' : 'Personagem'} ${COLOR_PT[c.toLowerCase()]} do tipo ${typeList(t)}`,
+  ],
+  [
+    /(red|green|blue|purple|black|yellow) ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type cards?/gi,
+    (_, c, t) => `carta ${COLOR_PT[c.toLowerCase()]} do tipo ${typeList(t)}`,
+  ],
+  [/(red|green|blue|purple|black|yellow) (Character|Event)(?: cards?)?/gi, (_, c, k) => `${k === 'Event' ? 'Evento' : 'Personagem'} ${COLOR_PT[c.toLowerCase()]}`],
   [/If there is a Character with a cost of (\d+)( or more| or less)?,\s*/gi, (_, n, q) => `Se houver um Personagem com custo ${n}${q ? (/more/i.test(q) ? ' ou mais' : ' ou menos') : ''}, `],
   [
     /You may trash (\d+) cards? from your hand and rest this (Character|Stage|card)/gi,
@@ -431,6 +557,12 @@ const PHRASES: Rule[] = [
   [/your Leader/gi, 'seu Líder'],
   [/your opponent/gi, 'seu oponente'],
   [/that card/gi, 'essa carta'],
+  [
+    /((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type Character(?: cards?)?/gi,
+    (_, t) => `Personagem do tipo ${typeList(t)}`,
+  ],
+  [/Character cards?/g, 'Personagem'],
+  [/Event cards?/g, 'Evento'],
   [/\bIt (?=recebe|ganha)/g, 'Ele '],
   [/\bup to (\d+) /gi, (_, n) => `até ${n} `],
 ];
@@ -482,11 +614,11 @@ function translateSentence(sentence: string): string {
     if (!RESIDUE.test(first + second)) return `${first} e ${second.charAt(0).toLowerCase()}${second.slice(1)}`;
   }
   // "X, then Y." / "X, and Y." (duas ações na mesma frase)
-  const pair = s.match(/^(.+?), (then|and) (.+)$/i);
+  const pair = s.match(/^(.+?)(?:, (then|and)| (and then)) (.+)$/i);
   if (pair) {
     const first = translateSentence(pair[1]).replace(/\.$/, '');
-    const second = translateSentence(pair[3]);
-    return `${first} e ${/then/i.test(pair[2]) ? 'depois ' : ''}${second.charAt(0).toLowerCase()}${second.slice(1)}`;
+    const second = translateSentence(pair[4]);
+    return `${first} e ${/then/i.test(pair[2] ?? pair[3]) ? 'depois ' : ''}${second.charAt(0).toLowerCase()}${second.slice(1)}`;
   }
   return capitalize(applyPhrases(s));
 }
@@ -528,7 +660,8 @@ function translateBody(body: string): string {
   const cond = body.match(/^((?:If|When) [^,]+,|At the end of a battle in which this Character battles your opponent's Character,)\s*(.*)$/);
   if (cond) {
     const rest = translateBody(cond[2]);
-    return applyPhrases(cond[1] + ' ') + rest.charAt(0).toLowerCase() + rest.slice(1);
+    const known = /^If /.test(cond[1]) ? condText(cond[1].slice(3, -1)) : null;
+    return (known ? `Se ${known}, ` : applyPhrases(cond[1] + ' ')) + rest.charAt(0).toLowerCase() + rest.slice(1);
   }
 
   // Divide em frases sem quebrar em "K.O." (a próxima frase começa com maiúscula).

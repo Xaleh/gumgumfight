@@ -69,6 +69,9 @@ export interface TargetSpec {
   name?: string;
   /** "base cost" / "base power": compara com os valores impressos, sem modificadores. */
   base?: boolean;
+  color?: Color;
+  /** "with a type including "Whitebeard Pirates"" (parte do nome do tipo) */
+  typeIncludes?: string;
 }
 
 /** Filtro de cartas fora do campo (busca no deck, mão...). */
@@ -83,6 +86,10 @@ export interface CardFilter {
   name?: string;
   /** "red Character card" */
   color?: Color;
+  /** "with a type including "X"" */
+  typeIncludes?: string;
+  /** "no base effect": carta sem texto de efeito */
+  noEffect?: boolean;
 }
 
 /**
@@ -129,6 +136,10 @@ export interface Condition {
   lifeMin?: number;
   /** "If your opponent has a Character with N or more power" */
   opponentCharacterMinPower?: number;
+  /** "If you have [X]" / "If you have a [X] Character" */
+  haveCharacterNamed?: string;
+  /** "If your opponent has N or more DON!! cards on their field" */
+  opponentMinDonOnField?: number;
 }
 
 export type AbilityCondition = Condition;
@@ -138,6 +149,7 @@ export type StepCondition = Condition;
 export interface Aura {
   kinds: Array<'leader' | 'character'>;
   hasAnyType?: string[];
+  typeIncludes?: string;
   power: number;
 }
 
@@ -162,7 +174,8 @@ export type GameEvent =
   | { kind: 'eventActivated'; who: 'self' | 'opponent' }
   | { kind: 'blockerActivated'; who: 'self' | 'opponent' }
   | { kind: 'selfRested' } // "When this Character becomes rested"
-  | { kind: 'attackDamage' }; // "When this Character's attack deals damage to your opponent's Life"
+  | { kind: 'attackDamage' } // "When this Character's attack deals damage to your opponent's Life"
+  | { kind: 'battleKO' }; // "When this Character battles and K.O.'s your opponent's Character"
 
 type EffectStepBody =
   | { do: 'power'; target: TargetRef; amount: number; duration: Duration }
@@ -175,7 +188,7 @@ type EffectStepBody =
   | { do: 'restOpponentDon'; count: number }
   | { do: 'returnToHand'; target: TargetRef }
   /** A batalha atual não permite [Blocker] (opcionalmente só de quem tem >= minPower). */
-  | { do: 'noBlockerThisBattle'; minPower?: number; maxPower?: number }
+  | { do: 'noBlockerThisBattle'; minPower?: number; maxPower?: number; maxCost?: number }
   /** Se o alvo atacar neste turno, o oponente não pode usar [Blocker]. */
   | { do: 'noBlockerWhenAttacking'; target: TargetRef }
   /** Resolve os passos do efeito [Main] da própria carta (usado por [Trigger]). */
@@ -185,11 +198,15 @@ type EffectStepBody =
   /** "Play this card" (ex.: [Trigger]): joga a própria carta, sem custo. */
   | { do: 'playThis' }
   /** Descartar cartas da mão (custo "You may trash N card from your hand"). */
-  | { do: 'trashFromHand'; count: number; filter?: CardFilter }
+  | { do: 'trashFromHand'; count: number; filter?: CardFilter; upTo?: boolean }
+  /** "Draw cards so that you have N cards in your hand." */
+  | { do: 'drawUntil'; count: number }
+  /** "Your opponent returns N DON!! cards from their field to their DON!! deck." */
+  | { do: 'opponentReturnsDon'; count: number }
   /** "Set up to N of your DON!! cards as active." */
   | { do: 'setDonActive'; count: number }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
-  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash'; play?: boolean }
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean }
   /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */
   | { do: 'tutor'; upTo: number; filter: CardFilter }
   /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */
@@ -401,6 +418,8 @@ export interface BattleState {
   noBlockerMinPower: number | null;
   /** "cannot activate a [Blocker] Character that has N or less power" */
   noBlockerMaxPower?: number;
+  /** "cannot activate the [Blocker] of any Character with a cost of N or less" */
+  noBlockerMaxCost?: number;
   /** Personagens que batalharam entre si (registrado no dano, vale mesmo se um sair de campo). */
   fought?: string[];
 }

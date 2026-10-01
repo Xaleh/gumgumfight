@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, attackError, createGame, getCost, hasKeyword, koProtected } from '../src/engine';
+import { applyAction, attackError, createGame, getCost, getPower, hasKeyword, koProtected } from '../src/engine';
 import { parseCard } from '../src/cards';
 import type { CardData, DeckList, GameState } from '../src/types';
 import { cards as baseCards, toTurn } from './helpers';
@@ -18,6 +18,13 @@ const extra: CardData[] = [
   { id: 'PX-010', name: 'Luffy', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: 'This Character cannot be K.O.\'d in battle by "Strike" attribute Characters.' },
   { id: 'PX-011', name: 'Orochi', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Reveal up to 1 [Big] from your deck and add it to your hand. Then, shuffle your deck.' },
   { id: 'PX-012', name: 'Smile', category: 'event', colors: ['red'], cost: 0, types: [], text: '[Main] Look at 5 cards from the top of your deck; play up to 1 Character card with a cost of 2 or less. Then, place the rest at the bottom of your deck in any order.' },
+  { id: 'PX-013', name: 'DeathWink', category: 'event', colors: ['red'], cost: 0, types: [], text: '[Main] Draw cards so that you have 6 cards in your hand.' },
+  { id: 'PX-014', name: 'Magellan', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Your opponent returns 1 DON!! card from their field to their DON!! deck.' },
+  { id: 'PX-015', name: 'StageBreaker', category: 'event', colors: ['red'], cost: 0, types: [], text: "[Main] K.O. up to 1 of your opponent's Stages with a cost of 3 or less." },
+  { id: 'PX-016', name: 'Kuma', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Look at 2 cards from the top of your deck; reveal up to 1 Character card and add it to your hand. Then, place the rest at the top or bottom of the deck in any order.' },
+  { id: 'PX-017', name: 'Rakuyo', category: 'character', colors: ['red'], cost: 1, power: 2000, types: ['Whitebeard Pirates'], text: '[Your Turn] All of your Characters with a type including "Whitebeard" gain +1000 power.' },
+  { id: 'PX-018', name: 'Isuka', category: 'character', colors: ['red'], cost: 1, power: 9000, types: [], text: "[Once Per Turn] When this Character battles and K.O.'s your opponent's Character, set this Character as active." },
+  { id: 'PX-019', name: 'StageX', category: 'stage', colors: ['red'], cost: 1, types: [], text: '' },
 ];
 const cards = [...baseCards, ...extra];
 const deck = (leader: string, fill: string): DeckList => ({
@@ -179,5 +186,53 @@ describe('efeitos lidos automaticamente', () => {
       text: '[When Attacking] Your opponent cannot activate a [Blocker] Character that has 2000 or less power during this battle.',
     });
     expect(p.abilities[0].steps).toEqual([{ do: 'noBlockerThisBattle', maxPower: 2000 }]);
+  });
+
+  it('comprar até ter N cartas; o oponente devolve DON!! (e dispara reações dele)', () => {
+    let s = toTurn(game(), 3);
+    s.players[0].hand = s.players[0].hand.slice(0, 3);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-013') });
+    expect(s.players[0].hand).toHaveLength(6);
+
+    let t = toTurn(game(), 5);
+    const oppDon = t.players[1].donActive + t.players[1].donRested;
+    t = applyAction(t, { type: 'playCard', player: 0, uid: give(t, 0, 'PX-014') });
+    expect(t.players[1].donActive + t.players[1].donRested).toBe(oppDon - 1);
+  });
+
+  it('K.O. de Stage do oponente', () => {
+    let s = toTurn(game(), 3);
+    const st = s.players[1].deck.pop()!;
+    s.cards[st] = { ...s.cards[st], cardId: 'PX-019' };
+    s.players[1].stage = { uid: st, rested: false, don: 0, playedOnTurn: 0 };
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-015') });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [st] });
+    expect(s.players[1].stage).toBeNull();
+    expect(s.players[1].trash).toContain(st);
+  });
+
+  it('busca com o resto "no topo ou no fundo": em seguida o jogador ordena', () => {
+    let s = toTurn(game(), 3);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-016') });
+    if (s.pending?.kind === 'selectTargets' && s.pending.ordered !== true) s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', ordered: true });
+  });
+
+  it('aura por "type including"', () => {
+    const s = toTurn(game(), 3);
+    const rak = field(s, 0, 'PX-017');
+    const other = field(s, 0, 'PX-001');
+    expect(getPower(s, rak)).toBe(3000);
+    expect(getPower(s, other)).toBe(2000);
+  });
+
+  it('"battles and K.O.\'s": desvira depois de nocautear em batalha', () => {
+    let s = toTurn(game(), 3);
+    const isuka = field(s, 0, 'PX-018');
+    const victim = field(s, 1, 'PX-001', true);
+    s.players[1].hand = [];
+    s = applyAction(s, { type: 'attack', player: 0, attacker: isuka, target: victim });
+    expect(s.players[1].trash).toContain(victim);
+    expect(s.players[0].characters.find((c) => c.uid === isuka)?.rested).toBe(false);
   });
 });
