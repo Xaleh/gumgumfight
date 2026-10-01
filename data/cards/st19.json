@@ -1,0 +1,305 @@
+{
+  "set": "ST19",
+  "title": "Starter Deck 19: BLACK Smoker",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "OP02-093",
+      "name": "Smoker",
+      "category": "leader",
+      "colors": [
+        "black"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[DON!! x1] [Activate: Main] [Once Per Turn] Give up to 1 of your opponent's Characters 1 cost during this turn. Then, if there is a Character with a cost of 0, this Leader gains +1000 power during this turn.",
+      "set": "OP02",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-093_p2.jpg"
+    },
+    {
+      "id": "OP02-098",
+      "name": "Koby",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] You may trash 1 card from your hand: K.O. up to 1 of your opponent's Characters with a cost of 3 or less.",
+      "set": "OP02",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-098_r1.jpg"
+    },
+    {
+      "id": "OP02-106",
+      "name": "Tsuru",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 0,
+      "counter": 2000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] Give up to 1 of your opponent's Characters 2 cost during this turn.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-106_r1.jpg"
+    },
+    {
+      "id": "OP02-108",
+      "name": "Donquixote Rosinante",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Donquixote Pirates",
+        "Navy"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-108_r1.jpg"
+    },
+    {
+      "id": "OP02-109",
+      "name": "Jaguar.D.Saul",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Giant",
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-109_r1.jpg"
+    },
+    {
+      "id": "OP02-113",
+      "name": "Helmeppo",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[When Attacking] Give up to 1 of your opponent's Characters 2 cost during this turn. Then, if there is a Character with a cost of 0, this Character gains +2000 power during this battle.",
+      "trigger": "Play this card.",
+      "set": "OP02",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-113_r1.jpg"
+    },
+    {
+      "id": "OP02-116",
+      "name": "Yamakaji",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP02",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-116_r1.jpg"
+    },
+    {
+      "id": "OP03-079",
+      "name": "Vergo",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 5,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Donquixote Pirates",
+        "Navy"
+      ],
+      "text": "[DON!! x1] This Character cannot be K.O.'d in battle.",
+      "set": "OP03",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP03-079_r1.jpg"
+    },
+    {
+      "id": "OP03-089",
+      "name": "Brannew",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] Look at 3 cards from the top of your deck; reveal up to 1 {Navy} type card other than [Brannew] and add it to your hand. Then, trash the rest.",
+      "set": "OP03",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP03-089_r1.jpg"
+    },
+    {
+      "id": "ST19-001",
+      "name": "Smoker",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 6,
+      "power": 8000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] You may trash 1 black {Navy} type card from your hand: Up to 2 of your opponent's Characters with a cost of 4 or less cannot attack until the end of your opponent's next turn.",
+      "set": "ST19",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST19-001.jpg"
+    },
+    {
+      "id": "ST19-002",
+      "name": "Sengoku",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] You may trash 2 black {Navy} type cards from your hand: If your Leader has the {Navy} type, draw 3 cards.",
+      "set": "ST19",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST19-002.jpg"
+    },
+    {
+      "id": "ST19-003",
+      "name": "Tashigi",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] If your Leader is [Smoker], give up to 1 of your opponent's Characters 4 cost during this turn.\n\n[Activate: Main] [Once Per Turn] If this Character was played on this turn, trash up to 1 of your opponent's Characters with a cost of 0.",
+      "set": "ST19",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST19-003.jpg"
+    },
+    {
+      "id": "ST19-004",
+      "name": "Hina",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[DON!! x1] [Opponent's Turn] This Character gains +4 cost.\n\n[Activate: Main] [Once Per Turn] You may place 1 card from your trash at the bottom of your deck: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "set": "ST19",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST19-004.jpg"
+    },
+    {
+      "id": "ST19-005",
+      "name": "Monkey.D.Garp",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n\n[Activate: Main] [Once Per Turn] You may place 1 card from your trash at the bottom of your deck: Give up to 1 of your opponent's Characters 1 cost during this turn.",
+      "set": "ST19",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST19-005.jpg"
+    }
+  ]
+}

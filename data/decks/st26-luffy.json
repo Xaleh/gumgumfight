@@ -1,0 +1,63 @@
+{
+  "id": "st26-luffy",
+  "name": "Luffy Roxo/Preto (ST26)",
+  "leader": "OP09-061",
+  "cards": [
+    {
+      "id": "OP05-065",
+      "count": 4
+    },
+    {
+      "id": "OP05-066",
+      "count": 4
+    },
+    {
+      "id": "OP05-070",
+      "count": 4
+    },
+    {
+      "id": "OP09-063",
+      "count": 4
+    },
+    {
+      "id": "OP09-070",
+      "count": 4
+    },
+    {
+      "id": "OP09-076",
+      "count": 4
+    },
+    {
+      "id": "OP09-077",
+      "count": 4
+    },
+    {
+      "id": "OP09-078",
+      "count": 4
+    },
+    {
+      "id": "ST14-010",
+      "count": 4
+    },
+    {
+      "id": "ST26-001",
+      "count": 2
+    },
+    {
+      "id": "ST26-002",
+      "count": 4
+    },
+    {
+      "id": "ST26-003",
+      "count": 4
+    },
+    {
+      "id": "ST26-004",
+      "count": 2
+    },
+    {
+      "id": "ST26-005",
+      "count": 2
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "id": "st25-buggy",
+  "name": "Buggy Azul (ST25)",
+  "leader": "OP09-042",
+  "cards": [
+    {
+      "id": "OP09-043",
+      "count": 4
+    },
+    {
+      "id": "OP09-045",
+      "count": 4
+    },
+    {
+      "id": "OP09-051",
+      "count": 2
+    },
+    {
+      "id": "OP09-053",
+      "count": 4
+    },
+    {
+      "id": "OP09-054",
+      "count": 4
+    },
+    {
+      "id": "OP09-055",
+      "count": 4
+    },
+    {
+      "id": "OP09-056",
+      "count": 4
+    },
+    {
+      "id": "OP09-057",
+      "count": 4
+    },
+    {
+      "id": "ST25-001",
+      "count": 4
+    },
+    {
+      "id": "ST25-002",
+      "count": 4
+    },
+    {
+      "id": "ST25-003",
+      "count": 4
+    },
+    {
+      "id": "ST25-004",
+      "count": 4
+    },
+    {
+      "id": "ST25-005",
+      "count": 4
+    }
+  ]
+}

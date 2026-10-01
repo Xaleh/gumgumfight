@@ -161,8 +161,12 @@ function conditionsMet(state: GameState, uid: string, ability: Ability): boolean
 /** Avalia uma condição do ponto de vista de `controller`; `source` é a carta do efeito. */
 export function conditionHolds(state: GameState, controller: PlayerId, source: string, cond: Condition | undefined): boolean {
   if (!cond) return true;
+  if (cond.anyOf && !cond.anyOf.some((c) => conditionHolds(state, controller, source, c))) return false;
   const ps = state.players[controller];
   const opp = state.players[opponent(controller)];
+  if (cond.ownCharacterMinBasePower !== undefined && !ps.characters.some((c) => (cardDef(state, c.uid).power ?? 0) >= cond.ownCharacterMinBasePower!)) {
+    return false;
+  }
   if (cond.minCharacters !== undefined && ps.characters.length < cond.minCharacters) return false;
   if (cond.selfRested && !locate(state, source)?.fc.rested) return false;
   if (cond.minDonOnField !== undefined && totalDonOnField(ps) < cond.minDonOnField) return false;
@@ -325,6 +329,7 @@ function auraPower(state: GameState, uid: string, zone: 'leader' | 'character' |
         if (what === 'cost' ? a.aura.cost === undefined : a.aura.cost !== undefined) continue;
         if (!matchesAnyType(target, a.aura.hasAnyType) || !conditionsMet(state, fc.uid, a)) continue;
         if (a.aura.typeIncludes && !typeIncludes(target, a.aura.typeIncludes)) continue;
+        if (a.aura.names && !a.aura.names.some((n) => hasName(target, n))) continue;
         bonus += what === 'cost' ? a.aura.cost! : a.aura.power;
       }
     }
@@ -1792,6 +1797,24 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (card && ps.deck.includes(card) && (!step.filter || matchesFilter(cardDef(state, card), step.filter))) {
         const def = cardDef(state, card);
         if (def.category === 'character' || def.category === 'stage') playFree(state, card, step.rested);
+      }
+      return true;
+    }
+    case 'revealedToHand': {
+      const card = frame.last?.[0];
+      if (card && ps.deck.includes(card) && (!step.filter || matchesFilter(cardDef(state, card), step.filter))) {
+        removeFrom(ps.deck, card);
+        ps.hand.push(card);
+        log(state, frame.controller, `${ps.name} adiciona ${cardDef(state, card).name} à mão.`);
+      }
+      return true;
+    }
+    case 'lookOpponentTop': {
+      const deck = state.players[opponent(frame.controller)].deck;
+      if (!deck.length) return true;
+      if (!frame.choice) {
+        askOption(state, frame, frame.controller, `${srcName}: a carta do topo do deck do oponente é ${cardDef(state, deck[0]).name}.`, ['OK']);
+        return false;
       }
       return true;
     }

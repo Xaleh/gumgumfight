@@ -156,6 +156,10 @@ export interface Condition {
   leaderHasAnyType?: string[];
   /** "If you have a Character with a cost of N or more" */
   ownCharacterMinCost?: number;
+  /** "you have a Character with 7000 base power or more" */
+  ownCharacterMinBasePower?: number;
+  /** Basta uma das condições. */
+  anyOf?: Condition[];
   /** "If your opponent has N or more cards in their hand" */
   opponentHandMin?: number;
   /** "If this Character has N power or more" */
@@ -213,6 +217,8 @@ export interface Aura {
   side?: 'own' | 'opponent';
   /** Custo em vez de poder. */
   cost?: number;
+  /** Só cartas com um destes nomes ("All of your [Portgas.D.Ace] and [Monkey.D.Luffy] cards"). */
+  names?: string[];
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -268,6 +274,8 @@ type EffectStepBody =
   | { do: 'manual'; text: string }
   /** "Play this card" (ex.: [Trigger]): joga a própria carta, sem custo. */
   | { do: 'playThis'; rested?: boolean }
+  | { do: 'revealedToHand'; filter?: CardFilter }
+  | { do: 'lookOpponentTop' }
   /** Descartar cartas da mão (custo "You may trash N card from your hand"). */
   | { do: 'trashFromHand'; count: number; filter?: CardFilter; upTo?: boolean }
   /** "Draw cards so that you have N cards in your hand." */

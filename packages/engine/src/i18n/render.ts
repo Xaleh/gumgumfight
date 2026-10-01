@@ -311,6 +311,12 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'opponentCharacterMinCost':
         out.push(`o oponente tiver um Personagem com custo ${c.opponentCharacterMinCost} ou mais`);
         break;
+      case 'anyOf':
+        out.push(c.anyOf!.map((x) => condition(x, ctx)).join(' ou '));
+        break;
+      case 'ownCharacterMinBasePower':
+        out.push(`você tiver um Personagem com ${c.ownCharacterMinBasePower} de poder base ou mais`);
+        break;
       case 'ownCharacterMinCost':
         out.push(`você tiver um Personagem com custo ${c.ownCharacterMinCost} ou mais`);
         break;
@@ -368,7 +374,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push('fizer isso');
         break;
       case 'chosenMatches':
-        out.push(`essa carta for ${filter(c.chosenMatches!, 1, false).replace(/^1 /, 'um ')}`);
+        out.push(`essa carta for ${filter(c.chosenMatches!, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')}`);
         break;
       default:
         unknown(`condição ${key}`);
@@ -557,7 +563,11 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'revealTop':
       return 'Revele 1 carta do topo do seu deck.';
     case 'playRevealed':
-      return `Jogue essa carta${s.filter ? ` se for ${filter(s.filter, 1, false).replace(/^1 /, 'um ')}` : ''}${s.rested ? ', virada' : ''}.`;
+      return `Jogue essa carta${s.filter ? ` se for ${filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')}` : ''}${s.rested ? ', virada' : ''}.`;
+    case 'revealedToHand':
+      return `Se for ${s.filter ? filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ') : 'uma carta'}, adicione-a à sua mão.`;
+    case 'lookOpponentTop':
+      return 'Olhe a carta do topo do deck do oponente.';
     case 'revealedToBottom':
       return 'Coloque a carta revelada no fundo do seu deck.';
     case 'skipRefresh':
@@ -660,7 +670,11 @@ function staticText(a: Ability, ctx: Ctx): string {
     const au = a.aura;
     const many = au.kinds.length > 1 ? 'Líderes e Personagens' : au.kinds[0] === 'leader' ? 'Líder' : 'Personagens';
     const whose = au.side === 'opponent' ? `todos os ${many} do oponente` : `os seus ${many}`;
-    const filt = [au.hasAnyType?.length ? `do tipo ${types(au.hasAnyType)}` : '', au.typeIncludes ? `com um tipo que inclua "${au.typeIncludes}"` : '']
+    const filt = [
+      au.names?.length ? `chamados ${au.names.map((n) => `[${n}]`).join(' ou ')}` : '',
+      au.hasAnyType?.length ? `do tipo ${types(au.hasAnyType)}` : '',
+      au.typeIncludes ? `com um tipo que inclua "${au.typeIncludes}"` : '',
+    ]
       .filter(Boolean)
       .join(' ');
     const effect = au.cost !== undefined ? `${au.cost > 0 ? '+' : '−'}${Math.abs(au.cost)} de custo` : `+${au.power} de poder`;
@@ -695,6 +709,10 @@ function ability(a: Ability, ctx: Ctx): string {
 
 /** Várias habilidades da mesma linha (ex.: "[On Play]/[When Attacking]"): mesmo corpo, marcações juntas. */
 function line(abilities: Ability[], ctx: Ctx): string {
+  // Várias frases estáticas da mesma linha: as marcações aparecem uma vez só.
+  if (abilities.length > 1 && abilities.every((a) => a.timing === 'static')) {
+    return [...header(abilities[0]), ...abilities.map((a) => staticText(a, ctx))].join(' ');
+  }
   if (abilities.length > 1 && abilities.every((a) => JSON.stringify(a.steps) === JSON.stringify(abilities[0].steps))) {
     const timings = abilities.map((a) => TIMING[a.timing]).join('/');
     const first = ability(abilities[0], ctx);

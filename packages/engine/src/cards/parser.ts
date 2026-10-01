@@ -136,6 +136,10 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       if (m[1] && onField) (spec as TargetSpec).base = true;
     } else if ((m = rest.match(/^\s*with a cost equal to or less than the (?:number|total) of (your opponent's|your|your and your opponent's) Life cards/i)) && onField) {
       (spec as TargetSpec).maxCostDynamic = /and/i.test(m[1]) ? 'totalLife' : /opponent/i.test(m[1]) ? 'opponentLife' : 'ownLife';
+    } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+) to (\d+)/i))) {
+      spec.minCost = Number(m[2]);
+      spec.maxCost = Number(m[3]);
+      if (m[1] && onField) (spec as TargetSpec).base = true;
     } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+) or more/i))) {
       spec.minCost = Number(m[2]);
       if (m[1] && onField) (spec as TargetSpec).base = true;
@@ -281,6 +285,13 @@ export function parseCardFilter(phrase: string): { upTo: number; filter: CardFil
 // ---------------------------------------------------------------------------
 
 export function parseCondition(text: string): Condition | null {
+  // "you have 0 DON!! cards on your field or 8 or more DON!! cards on your field"
+  const or = text.trim().match(/^(you have) (.+?) or (\d+ or (?:more|less) .+)$/i);
+  if (or) {
+    const a = parseCondition(`${or[1]} ${or[2]}`);
+    const b = parseCondition(`${or[1]} ${or[3]}`);
+    if (a && b) return { anyOf: [a, b] };
+  }
   const t = text.trim();
   let m: RegExpMatchArray | null;
   if ((m = t.match(/^you have (\d+) or more Characters$/i))) return { minCharacters: Number(m[1]) };
@@ -309,6 +320,7 @@ export function parseCondition(text: string): Condition | null {
   }
   if ((m = t.match(/^your Leader has the ((?:\{[^}]+\})(?:\s*(?:,|or)\s*\{[^}]+\})+) type$/i))) return { leaderHasAnyType: typesOf(m[1]) };
   if ((m = t.match(/^you have a Character with a cost of (\d+) or more$/i))) return { ownCharacterMinCost: Number(m[1]) };
+  if ((m = t.match(/^you have a Character with (\d+) base power or more$/i))) return { ownCharacterMinBasePower: Number(m[1]) };
   if ((m = t.match(/^your opponent has (\d+) or more cards in their hand$/i))) return { opponentHandMin: Number(m[1]) };
   if ((m = t.match(/^this (?:Character|Leader) has (\d+) power or more$/i))) return { selfMinPower: Number(m[1]) };
   if (/^you have any DON!! cards given$/i.test(t)) return { anyDonGiven: true };
@@ -512,6 +524,14 @@ const CLAUSES: ClauseRule[] = [
       return f && [{ do: 'revealTop' }, { do: 'playRevealed', filter: f.filter }];
     },
   ],
+  [
+    /^Reveal 1 card from the top of your deck and add (up to 1 .+) to your hand$/i,
+    (m) => {
+      const f = parseCardFilter(m[1]);
+      return f && [{ do: 'revealTop' }, { do: 'revealedToHand', filter: f.filter }];
+    },
+  ],
+  [/^Look at 1 card from the top of your opponent's deck$/i, () => [{ do: 'lookOpponentTop' }]],
   [/^play (?:that|the revealed) card( rested)?$/i, (m) => [m[1] ? { do: 'playRevealed', rested: true } : { do: 'playRevealed' }]],
   [/^place (?:the revealed card|the rest|that card) at the bottom of your deck$/i, () => [{ do: 'revealedToBottom' }]],
   [/^Play this Character card from your trash( rested)?$/i, (m) => [m[1] ? { do: 'playThis', rested: true } : { do: 'playThis' }]],
@@ -997,6 +1017,20 @@ const POWER_SELF = /^this (?:Character|card|Leader) gains \+(\d+) power$/i;
 
 function parseStatic(h: Header, body: string): Ability[] | null {
   const sentences = sentencesOf(body);
+  const opp = body.match(/^This effect can be activated when your opponent attacks\. (.+)$/i);
+  if (opp) {
+    const steps = parseBody(opp[1]);
+    if (!steps) return null;
+    const ab: Ability = { timing: 'onOpponentAttack', steps };
+    if (h.don) ab.don = h.don;
+    if (h.oncePerTurn) ab.oncePerTurn = true;
+    return [ab];
+  }
+  // Várias frases independentes ("All of your Characters gain +1 cost. If …, this Leader gains +1000 power.").
+  if (sentences.length > 1 && !h.oncePerTurn && !sentences.some((t) => /^(Then|That|This effect)\b/i.test(t))) {
+    const parts = sentences.map((t) => parseStatic(h, t));
+    return parts.every((p) => p) ? parts.flatMap((p) => p!) : null;
+  }
   if (sentences.length !== 1) return null;
   let s = sentences[0].replace(/\.$/, '');
   // Regras de construção / nome alternativo: não são efeitos de jogo (tratados na importação e no deck).
@@ -1093,14 +1127,21 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   if ((m = s.match(/^all of your Characters with a type including "([^"]+)" gain \+(\d+) power$/i))) {
     return [{ ...base, aura: { kinds: ['character'], power: Number(m[2]), typeIncludes: m[1] } as NonNullable<Ability['aura']> }];
   }
-  if ((m = s.match(/^give this (?:Leader|Character) [−-](\d+) power$/i))) return [{ ...base, staticPower: -Number(m[1]) }];
+  if ((m = s.match(/^give this (?:Leader|Character) [−-]?(\d+) power$/i))) return [{ ...base, staticPower: -Number(m[1]) }];
+  if ((m = s.match(/^all of your ((?:\[[^\]]+\](?:,? and |, )?)+) cards gain \+(\d+) power$/i))) {
+    const names = [...m[1].matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]);
+    return [{ ...base, aura: { kinds: ['leader', 'character'], power: Number(m[2]), names } }];
+  }
+  if ((m = s.match(/^all of your Characters gain \+(\d+) cost$/i))) {
+    return [{ ...base, aura: { kinds: ['character'], power: 0, cost: Number(m[1]) } }];
+  }
   if ((m = s.match(/^this Character gains \+(\d+) cost$/i))) return [{ ...base, staticCost: Number(m[1]) }];
   if ((m = s.match(/^this Character gains \[(Rush|Blocker|Double Attack|Banish)\] and \+(\d+) (cost|power)$/i))) {
     const second = m[3].toLowerCase() === 'cost' ? { staticCost: Number(m[2]) } : { staticPower: Number(m[2]) };
     return [{ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] }, { ...base, ...second }];
   }
   m = s.match(
-    /^(?:all of )?your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})* type )?(Leaders? and Characters|Leader or Character cards|Characters|Leader) gains? \+(\d+) power$/i,
+    /^(?:all of )?your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})* type )?(Leaders? and Characters|Leader and all of your Characters|Leader or Character cards|Characters|Leader) gains? \+(\d+) power$/i,
   );
   if (m) {
     const kinds: Array<'leader' | 'character'> = /Leader/i.test(m[2]) && /Character/i.test(m[2]) ? ['leader', 'character'] : /Leader/i.test(m[2]) ? ['leader'] : ['character'];

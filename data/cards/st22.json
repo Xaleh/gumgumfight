@@ -1,0 +1,361 @@
+{
+  "set": "ST22",
+  "title": "Starter Deck 22: Ace & Newgate",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "ST22-001",
+      "name": "Ace & Newgate",
+      "category": "leader",
+      "colors": [
+        "blue"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "The Four Emperors",
+        "Whitebeard Pirates"
+      ],
+      "text": "[Activate: Main] [Once Per Turn] You may reveal 1 card with a type including \"Whitebeard Pirates\" from your hand: Draw 1 card and place the revealed card at the top of your deck.",
+      "set": "ST22",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-001_asHW7pp.jpg"
+    },
+    {
+      "id": "ST22-002",
+      "name": "Izo",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 0,
+      "counter": 1000,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Land of Wano",
+        "Whitebeard Pirates"
+      ],
+      "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 card with a type including \"Whitebeard Pirates\" other than [Izo] and add it to your hand. Then, place the rest at the bottom of your deck in any order.[On Your Opponent's Attack] You may trash this Character: Draw 1 card and place 1 card from your hand at the bottom of your deck.",
+      "set": "ST22",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-002_ueGeOHq.jpg"
+    },
+    {
+      "id": "ST22-003",
+      "name": "Edward.Newgate",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 9,
+      "power": 10000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "The Four Emperors",
+        "Whitebeard Pirates"
+      ],
+      "text": "[Double Attack] (This card deals 2 damage.)\n[On Play] Reveal 1 card from the top of your deck. If that card's type includes \"Whitebeard Pirates\", draw 2 cards.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-003_FtZ9J3z.jpg"
+    },
+    {
+      "id": "ST22-004",
+      "name": "Elmy",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-004_egX9ClW.jpg"
+    },
+    {
+      "id": "ST22-005",
+      "name": "Kouzuki Oden",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 7,
+      "power": 8000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "Kouzuki Clan",
+        "Whitebeard Pirates"
+      ],
+      "text": "If this Character would be removed from the field by your opponent's effect, you may trash 2 cards from your hand instead.\n[Activate: Main] [Once Per Turn] You may rest 3 of your DON!! cards and return 1 of your Characters other than this Character to the owner's hand: Set this Character as active.",
+      "set": "ST22",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-005_hlRSUwy.jpg"
+    },
+    {
+      "id": "ST22-006",
+      "name": "Jozu",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 7,
+      "power": 8000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[On Play] Reveal 1 card from the top of your deck. If that card's type includes \"Whitebeard Pirates\", draw 2 cards and trash 1 card from your hand.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-006_XgCfdIF.jpg"
+    },
+    {
+      "id": "ST22-007",
+      "name": "Squard",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "[Activate: Main] [Once Per Turn] Reveal 1 card from the top of your deck. If that card's type includes \"Whitebeard Pirates\", give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-007_5FYuDwo.jpg"
+    },
+    {
+      "id": "ST22-008",
+      "name": "Decalvan Brothers",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 2,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-008_nGxbWvt.jpg"
+    },
+    {
+      "id": "ST22-009",
+      "name": "Vista",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 1000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-009_Tx4EwPa.jpg"
+    },
+    {
+      "id": "ST22-010",
+      "name": "Portgas.D.Ace",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-010_FXG05g9.jpg"
+    },
+    {
+      "id": "ST22-011",
+      "name": "Whitey Bay",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "power": 1000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Your Turn] [On Play] Up to 1 of your Leader with a type including \"Whitebeard Pirates\" gains +2000 power during this turn.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-011_3WsEP3f.jpg"
+    },
+    {
+      "id": "ST22-012",
+      "name": "Marco",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Once Per Turn] If this Character would be K.O.'d by your opponent's effect, you may trash 1 card from your hand instead.\n[When Attacking] Reveal 1 card from the top of your deck. If that card's type includes \"Whitebeard Pirates\", this Character gains +1000 power until the end of your opponent's next turn.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-012_s0zjHB8.jpg"
+    },
+    {
+      "id": "ST22-013",
+      "name": "LittleOars Jr.",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 5,
+      "power": 7000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Giant",
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-013_YPvVGjK.jpg"
+    },
+    {
+      "id": "ST22-014",
+      "name": "A.O.",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Whitebeard Pirates Allies"
+      ],
+      "text": "",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-014_lR5EUaR.jpg"
+    },
+    {
+      "id": "ST22-015",
+      "name": "I Am Whitebeard!!",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 8,
+      "attributes": [],
+      "types": [
+        "The Four Emperors",
+        "Whitebeard Pirates"
+      ],
+      "text": "[Main] If your Leader's type includes \"Whitebeard Pirates\", play up to 1 [Edward.Newgate] from your hand. Then, you may add 1 card from the top or bottom of your Life cards to your hand. If you do, up to 1 of your Leader gains +2000 power until the end of your opponent's next turn.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-015_BW30ro7.jpg"
+    },
+    {
+      "id": "ST22-016",
+      "name": "Take That Back!! Take Back What You Said!!",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Counter] Reveal 1 card from the top of your deck. If that card's type includes \"Whitebeard Pirates\", up to 1 of your Leader or Character cards gains +4000 power during this battle.",
+      "trigger": "Draw 1 card.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-016_U3s6JW3.jpg"
+    },
+    {
+      "id": "ST22-017",
+      "name": "Fire Fist",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 5,
+      "attributes": [],
+      "types": [
+        "Whitebeard Pirates"
+      ],
+      "text": "[Main] You may reveal 2 cards with a type including \"Whitebeard Pirates\" from your hand: Draw 1 card. Then, place up to 1 Character with a cost of 5 or less at the bottom of the owner's deck.",
+      "trigger": "Return up to 1 Character with a cost of 3 or less to the owner's hand.",
+      "set": "ST22",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST22-017_9bIz5J7.jpg"
+    }
+  ]
+}

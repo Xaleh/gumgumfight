@@ -1,0 +1,59 @@
+{
+  "id": "st19-smoker",
+  "name": "Smoker Preto (ST19)",
+  "leader": "OP02-093",
+  "cards": [
+    {
+      "id": "OP02-098",
+      "count": 4
+    },
+    {
+      "id": "OP02-106",
+      "count": 4
+    },
+    {
+      "id": "OP02-108",
+      "count": 4
+    },
+    {
+      "id": "OP02-109",
+      "count": 4
+    },
+    {
+      "id": "OP02-113",
+      "count": 4
+    },
+    {
+      "id": "OP02-116",
+      "count": 4
+    },
+    {
+      "id": "OP03-079",
+      "count": 4
+    },
+    {
+      "id": "OP03-089",
+      "count": 4
+    },
+    {
+      "id": "ST19-001",
+      "count": 2
+    },
+    {
+      "id": "ST19-002",
+      "count": 4
+    },
+    {
+      "id": "ST19-003",
+      "count": 4
+    },
+    {
+      "id": "ST19-004",
+      "count": 4
+    },
+    {
+      "id": "ST19-005",
+      "count": 4
+    }
+  ]
+}

@@ -1,0 +1,325 @@
+{
+  "set": "ST34",
+  "title": "Starter Deck 34: PURPLE Charlotte Katakuri",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "EB03-032",
+      "name": "Charlotte Flampe",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[Your Turn] [On Play] Up to 1 of your [Charlotte Katakuri] cards gains +2000 power during this turn.",
+      "set": "EB03",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB03-032_r1.jpg"
+    },
+    {
+      "id": "EB03-035",
+      "name": "Charlotte Pudding",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[Blocker][On Play] If the number of DON!! cards on your field is equal to or less than the number on your opponent's field, add up to 1 DON!! card from your DON!! deck and rest it.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "EB03",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB03-035_r1.jpg"
+    },
+    {
+      "id": "OP11-062",
+      "name": "Charlotte Katakuri",
+      "category": "leader",
+      "colors": [
+        "purple"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[When Attacking]/[On Your Opponent's Attack] [Once Per Turn] DON!! 1: Look at 1 card from the top of your opponent's deck. Then, this Leader gains +1000 power during this battle.",
+      "set": "OP11",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-062_p2.jpg"
+    },
+    {
+      "id": "OP11-065",
+      "name": "Charlotte Anana",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "If you have a purple {Big Mom Pirates} type Character other than [Charlotte Anana], this Character gains [Blocker]. (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP11",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-065_r1.jpg"
+    },
+    {
+      "id": "OP11-066",
+      "name": "Charlotte Oven",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[Activate: Main] You may rest this Character: Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, K.O. up to 1 of your opponent's Characters with a base cost of 3 or less. Then, add up to 1 DON!! card from your DON!! deck and rest it.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "OP11",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-066_r1.jpg"
+    },
+    {
+      "id": "OP11-068",
+      "name": "Charlotte Daifuku",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 6,
+      "power": 7000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "",
+      "set": "OP11",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-068_r1.jpg"
+    },
+    {
+      "id": "OP11-071",
+      "name": "Charlotte Perospero",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 5,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[Activate: Main] [Once Per Turn] You may trash 1 card from your hand: Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, draw 1 card and add up to 1 DON!! card from your DON!! deck and set it as active.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "OP11",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-071_r1.jpg"
+    },
+    {
+      "id": "OP11-079",
+      "name": "When Two Men Are Fighting the Last Thing I Need Is Some Half-Hearted Assistance!!!!",
+      "category": "event",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[Counter] Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, up to 1 of your Leader or Character cards gains +5000 power during this battle.",
+      "set": "OP11",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-079_r1.jpg"
+    },
+    {
+      "id": "OP11-081",
+      "name": "Cognac Mama-Mash",
+      "category": "event",
+      "colors": [
+        "purple"
+      ],
+      "cost": 6,
+      "attributes": [],
+      "types": [
+        "The Four Emperors",
+        "Big Mom Pirates"
+      ],
+      "text": "[Main] Choose a cost and reveal 1 card from the top of your opponent's deck. If the revealed card has the chosen cost, K.O. up to 1 of your opponent's Characters with a base cost of 8 or less.",
+      "set": "OP11",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-081_r1.jpg"
+    },
+    {
+      "id": "P-090",
+      "name": "Charlotte Smoothie",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 7,
+      "power": 7000,
+      "counter": 1000,
+      "attributes": [],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[Opponent's Turn] [On K.O.] DON!! 1: Play up to 1 {Big Mom Pirates} type Character card with a cost equal to or less than the number of DON!! cards on your opponent's field other than [Charlotte Smoothie] from your hand.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-090_r1.jpg"
+    },
+    {
+      "id": "ST34-001",
+      "name": "Charlotte Katakuri",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 5,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[Your Turn] [Once Per Turn] When a DON!! card on your field is returned to your DON!! deck, if your Leader has the {Big Mom Pirates} type, add up to 2 DON!! cards from your DON!! deck and rest them.[On K.O.] Play up to 1 Character card with 8000 power or less from your hand.",
+      "set": "ST34",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST34-001.jpg"
+    },
+    {
+      "id": "ST34-002",
+      "name": "Charlotte Cracker",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[On Play] If your Leader has the {Big Mom Pirates} type, add up to 1 DON!! card from your DON!! deck and rest it. Then, K.O. up to 1 of your opponent's Characters with a cost of 2 or less.",
+      "set": "ST34",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST34-002.jpg"
+    },
+    {
+      "id": "ST34-003",
+      "name": "Charlotte Brulee",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Big Mom Pirates"
+      ],
+      "text": "[On Play] Look at 3 cards from the top of your deck; reveal up to 1 {Big Mom Pirates} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "set": "ST34",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST34-003.jpg"
+    },
+    {
+      "id": "ST34-004",
+      "name": "Charlotte Linlin",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 10,
+      "power": 12000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "The Four Emperors",
+        "Big Mom Pirates"
+      ],
+      "text": "[On Play] DON!! 4, you may trash 1 card from your hand: Add up to 1 card from the top of your deck to the top of your Life cards. Then, up to 1 of your opponent's Characters' base power becomes 0 during this turn.",
+      "set": "ST34",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST34-004.jpg"
+    },
+    {
+      "id": "ST34-005",
+      "name": "Baron Tamago & Pekoms",
+      "category": "character",
+      "colors": [
+        "purple"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Minks",
+        "Big Mom Pirates"
+      ],
+      "text": "[When Attacking] DON!! 1: K.O. up to 1 of your opponent's Characters with 2000 base power or less.",
+      "set": "ST34",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST34-005.jpg"
+    }
+  ]
+}

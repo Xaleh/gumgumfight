@@ -27,6 +27,9 @@ const extra: CardData[] = [
   { id: 'PX-019', name: 'StageX', category: 'stage', colors: ['red'], cost: 1, types: [], text: '' },
   { id: 'PX-020', name: 'Guard', category: 'character', colors: ['red'], cost: 1, power: 1000, types: [], text: "[Once Per Turn] If this Character would be K.O.'d, you may trash 1 card from your hand instead." },
   { id: 'PX-021', name: 'Koala', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Play up to 1 Character card with a cost of 1 or less from your hand. If you do, draw 1 card.' },
+  { id: 'PX-022', name: 'Heavy', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: 'All of your Characters gain +1 cost.' },
+  { id: 'PX-023', name: 'Uta', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Reveal 1 card from the top of your deck and add up to 1 Character card to your hand. Then, place the rest at the bottom of your deck.' },
+  { id: 'PX-024', name: 'Law', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, draw 1 card.' },
 ];
 const cards = [...baseCards, ...extra];
 const deck = (leader: string, fill: string): DeckList => ({
@@ -273,5 +276,38 @@ describe('efeitos lidos automaticamente', () => {
     t = applyAction(s, { type: 'choose', player: 0, uids: [other] });
     expect(t.players[0].characters.some((c) => c.uid === other)).toBe(true);
     expect(t.players[0].hand).toHaveLength(hand - 1);
+  });
+
+  it('aura de custo nos seus Personagens', () => {
+    const s = toTurn(game(), 3);
+    const other = field(s, 0, 'PX-001');
+    expect(getCost(s, other)).toBe(1);
+    field(s, 0, 'PX-022');
+    expect(getCost(s, other)).toBe(2);
+  });
+
+  it('revela o topo e adiciona à mão se combinar com o filtro', () => {
+    const s = toTurn(game(), 3);
+    const top = s.players[0].deck[0];
+    s.cards[top] = { ...s.cards[top], cardId: 'PX-001' };
+    const t = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-023') });
+    expect(t.players[0].hand).toContain(top);
+    const u = toTurn(game(), 3);
+    const top2 = u.players[0].deck[0];
+    u.cards[top2] = { ...u.cards[top2], cardId: 'PX-015' }; // Evento: vai para o fundo
+    const v = applyAction(u, { type: 'playCard', player: 0, uid: give(u, 0, 'PX-023') });
+    expect(v.players[0].deck[v.players[0].deck.length - 1]).toBe(top2);
+  });
+
+  it('condição com "ou": 0 DON!! ou 8 ou mais', () => {
+    const s = toTurn(game(), 3);
+    const law = field(s, 0, 'PX-024');
+    const hand = s.players[0].hand.length;
+    const t = applyAction(s, { type: 'activate', player: 0, uid: law, ability: 0 });
+    expect(t.players[0].hand).toHaveLength(hand);
+    s.players[0].donActive = 0;
+    s.players[0].donRested = 0;
+    const u = applyAction(s, { type: 'activate', player: 0, uid: law, ability: 0 });
+    expect(u.players[0].hand).toHaveLength(hand + 1);
   });
 });

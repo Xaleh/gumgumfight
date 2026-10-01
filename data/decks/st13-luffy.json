@@ -1,0 +1,71 @@
+{
+  "id": "st13-luffy",
+  "name": "Luffy Amarelo (ST13)",
+  "leader": "ST13-003",
+  "cards": [
+    {
+      "id": "ST13-004",
+      "count": 2
+    },
+    {
+      "id": "ST13-005",
+      "count": 4
+    },
+    {
+      "id": "ST13-006",
+      "count": 2
+    },
+    {
+      "id": "ST13-007",
+      "count": 4
+    },
+    {
+      "id": "ST13-008",
+      "count": 2
+    },
+    {
+      "id": "ST13-009",
+      "count": 2
+    },
+    {
+      "id": "ST13-010",
+      "count": 4
+    },
+    {
+      "id": "ST13-011",
+      "count": 2
+    },
+    {
+      "id": "ST13-012",
+      "count": 4
+    },
+    {
+      "id": "ST13-013",
+      "count": 4
+    },
+    {
+      "id": "ST13-014",
+      "count": 4
+    },
+    {
+      "id": "ST13-015",
+      "count": 2
+    },
+    {
+      "id": "ST13-016",
+      "count": 2
+    },
+    {
+      "id": "ST13-017",
+      "count": 4
+    },
+    {
+      "id": "ST13-018",
+      "count": 4
+    },
+    {
+      "id": "ST13-019",
+      "count": 4
+    }
+  ]
+}

@@ -1,0 +1,301 @@
+{
+  "set": "ST33",
+  "title": "Starter Deck 33: BLUE Kuzan",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "EB04-026",
+      "name": "Bluegrass",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Egghead",
+        "Navy"
+      ],
+      "text": "[On Play] Place up to 1 of your opponent's Characters with a cost of 1 or less at the bottom of the owner's deck. [When Attacking] Draw 1 card and trash 1 card from your hand.",
+      "set": "EB04",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB04-026_r1.jpg"
+    },
+    {
+      "id": "EB04-028",
+      "name": "Ice Time",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 5,
+      "attributes": [],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Main] You may trash 1 card from your hand: If your Leader has the {Navy} type, up to 2 of your opponent's Characters with 10000 power or less cannot attack until the end of your opponent's next End Phase.",
+      "trigger": "Return up to 1 Character with a cost of 5 or less to the owner's hand.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "EB04",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB04-028_p2.jpg"
+    },
+    {
+      "id": "OP12-040",
+      "name": "Kuzan",
+      "category": "leader",
+      "colors": [
+        "blue"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "When a card is trashed from your hand by your {Navy} type card's effect, draw cards equal to the number of cards trashed.",
+      "set": "OP12",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-040_p2.jpg"
+    },
+    {
+      "id": "OP12-045",
+      "name": "Jango",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 6,
+      "power": 8000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP12",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-045_r1.jpg"
+    },
+    {
+      "id": "OP12-046",
+      "name": "Zephyr(Navy)",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 5,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "FILM",
+        "Navy"
+      ],
+      "text": "[On Play] Trash 2 cards from your hand. [Activate: Main] You may trash this Character: Return up to 1 Character with a cost of 5 or less to the owner's hand.",
+      "set": "OP12",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-046_r1.jpg"
+    },
+    {
+      "id": "OP12-047",
+      "name": "Sengoku",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] You may trash 1 card from your hand: Look at 5 cards from the top of your deck; reveal up to 2 {Navy} type cards other than [Sengoku] and add them to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "OP12",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-047_r1.jpg"
+    },
+    {
+      "id": "OP12-050",
+      "name": "Jaguar.D.Saul",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 6,
+      "power": 7000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Giant",
+        "Ohara",
+        "Navy"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP12",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-050_r1.jpg"
+    },
+    {
+      "id": "OP12-052",
+      "name": "Fullbody",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "",
+      "set": "OP12",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-052_r1.jpg"
+    },
+    {
+      "id": "OP12-057",
+      "name": "Ice Block Pheasant Peck",
+      "category": "event",
+      "colors": [
+        "blue"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle. Then, trash 1 card from your hand.",
+      "set": "OP12",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-057_r1.jpg"
+    },
+    {
+      "id": "ST33-001",
+      "name": "Koby",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 2,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)[On Play] You may trash 1 card from your hand: Draw 1 card.",
+      "set": "ST33",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST33-001.jpg"
+    },
+    {
+      "id": "ST33-002",
+      "name": "Sakazuki",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[When Attacking] You may trash 1 card from your hand: If your opponent has 6 or more cards in their hand, your opponent trashes 1 card from their hand.[On K.O.] Play up to 1 {Navy} type Character card with a cost of 4 or less from your hand.",
+      "set": "ST33",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST33-002.jpg"
+    },
+    {
+      "id": "ST33-003",
+      "name": "Smoker",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] You may trash 1 card from your hand: Place up to 2 of your opponent's Characters with a cost of 2 or less at the bottom of the owner's deck.",
+      "set": "ST33",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST33-003.jpg"
+    },
+    {
+      "id": "ST33-004",
+      "name": "Borsalino",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 6,
+      "power": 6000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "During the turn in which a card in your hand is trashed by an effect, give this card in your hand 3 cost.[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "ST33",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST33-004.jpg"
+    },
+    {
+      "id": "ST33-005",
+      "name": "Monkey.D.Garp",
+      "category": "character",
+      "colors": [
+        "blue"
+      ],
+      "cost": 6,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Navy"
+      ],
+      "text": "[On Play] If your Leader has the {Navy} type, play up to 1 blue {Navy} type Character card with 8000 power or less other than [Monkey.D.Garp] from your hand.",
+      "set": "ST33",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST33-005.jpg"
+    }
+  ]
+}

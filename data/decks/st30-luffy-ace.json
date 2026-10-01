@@ -1,0 +1,71 @@
+{
+  "id": "st30-luffy-ace",
+  "name": "Luffy & Ace Verde/Vermelho (ST30)",
+  "leader": "ST30-001",
+  "cards": [
+    {
+      "id": "ST30-002",
+      "count": 4
+    },
+    {
+      "id": "ST30-003",
+      "count": 2
+    },
+    {
+      "id": "ST30-004",
+      "count": 4
+    },
+    {
+      "id": "ST30-005",
+      "count": 2
+    },
+    {
+      "id": "ST30-006",
+      "count": 2
+    },
+    {
+      "id": "ST30-007",
+      "count": 2
+    },
+    {
+      "id": "ST30-008",
+      "count": 2
+    },
+    {
+      "id": "ST30-009",
+      "count": 4
+    },
+    {
+      "id": "ST30-010",
+      "count": 2
+    },
+    {
+      "id": "ST30-011",
+      "count": 4
+    },
+    {
+      "id": "ST30-012",
+      "count": 2
+    },
+    {
+      "id": "ST30-013",
+      "count": 4
+    },
+    {
+      "id": "ST30-014",
+      "count": 4
+    },
+    {
+      "id": "ST30-015",
+      "count": 4
+    },
+    {
+      "id": "ST30-016",
+      "count": 4
+    },
+    {
+      "id": "ST30-017",
+      "count": 4
+    }
+  ]
+}

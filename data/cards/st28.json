@@ -1,0 +1,364 @@
+{
+  "set": "ST28",
+  "title": "Starter Deck 28: GREEN/YELLOW Yamato",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "OP06-022",
+      "name": "Yamato",
+      "category": "leader",
+      "colors": [
+        "green",
+        "yellow"
+      ],
+      "life": 4,
+      "power": 5000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Land of Wano"
+      ],
+      "text": "[Double Attack] (This card deals 2 damage.)\n[Activate:Main] [Once Per Turn] If your opponent has 3 or less Life cards, give up to 2 rested DON!! cards to 1 of your Characters.",
+      "set": "OP06",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-022_p3.jpg"
+    },
+    {
+      "id": "OP06-100",
+      "name": "Inuarashi",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "Minks",
+        "The Akazaya Nine"
+      ],
+      "text": "[DON!! x2][When Attacking] You may trash 1 card from your hand: K.O. up to 1 of your opponent's Characters with a cost equal to or less than the number of your opponent's Life cards.",
+      "trigger": "If your opponent has 3 or less Life cards, play this card.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP06 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP06",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-100_r2.jpg"
+    },
+    {
+      "id": "OP06-103",
+      "name": "Kawamatsu",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 3,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Fish-Man",
+        "Land of Wano",
+        "The Akazaya Nine"
+      ],
+      "text": "[When Attacking] You may trash 2 cards from your hand: Add up to 1 of your Characters with 0 power to the top or bottom of the owner's Life cards face-up.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP06 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP06",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-103_r1.jpg"
+    },
+    {
+      "id": "OP06-104",
+      "name": "Kikunojo",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "The Akazaya Nine"
+      ],
+      "text": "[On K.O.] If your opponent has 3 or less Life cards, add up to 1 card from the top of your deck to the top of your Life cards.",
+      "trigger": "If your opponent has 3 or less Life cards, play this card.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP06 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP06",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-104_r1.jpg"
+    },
+    {
+      "id": "OP06-109",
+      "name": "Denjiro",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "The Akazaya Nine"
+      ],
+      "text": "[DON!! x2] If your opponent has 3 or less Life cards, this Character cannot be K.O.'d by effects.",
+      "trigger": "If your opponent has 3 or less Life cards, play this card.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP06 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP06",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-109_r1.jpg"
+    },
+    {
+      "id": "OP06-110",
+      "name": "Nekomamushi",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "Minks",
+        "The Akazaya Nine"
+      ],
+      "text": "[DON!! x2] This Character can also attack your opponent's active Characters.",
+      "trigger": "If your opponent has 3 or less Life cards, play this card.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP06 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP06",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-110_r2.jpg"
+    },
+    {
+      "id": "OP06-112",
+      "name": "Raizo",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "The Akazaya Nine"
+      ],
+      "text": "[When Attacking] You may trash 1 card from your hand: Rest up to 1 of your opponent's DON!! cards.",
+      "trigger": "If your opponent has 3 or less Life cards, play this card.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP06 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP06",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-112_r1.jpg"
+    },
+    {
+      "id": "OP07-116",
+      "name": "Blaze Slice",
+      "category": "event",
+      "colors": [
+        "yellow"
+      ],
+      "attributes": [],
+      "types": [],
+      "text": "[Main] / [Counter] Up to 1 of your Leader or Character cards gains +1000 power during this turn. Then, if your opponent has 2 or less Life cards, rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+      "trigger": "Rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-116_p1.jpg"
+    },
+    {
+      "id": "OP09-035",
+      "name": "Portgas.D.Ace",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 5,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Whitebeard Pirates",
+        "ODYSSEY"
+      ],
+      "text": "[On Play] If you have 2 or more rested Characters, rest up to 1 of your opponent's Characters with a cost of 5 or less.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP09",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP09-035_r1.jpg"
+    },
+    {
+      "id": "ST13-016",
+      "name": "Yamato",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 5,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Land of Wano"
+      ],
+      "text": "[Rush] (This card can attack on the turn in which it is played.)[On Play] Look at all your Life cards; place 1 at the top of your deck and place the rest back in your Life area in any order.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the ST13 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "ST13",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST13-016_r1.jpg"
+    },
+    {
+      "id": "ST28-001",
+      "name": "Ashura Doji",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "The Akazaya Nine"
+      ],
+      "text": "[On Play] If your Leader has the {Land of Wano} type and your opponent has 3 or more Life cards, K.O. up to 1 of your opponent's Characters with a base cost of 5 or less.",
+      "set": "ST28",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST28-001.jpg"
+    },
+    {
+      "id": "ST28-002",
+      "name": "Izo",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 2,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Former Whitebeard Pirates",
+        "Land of Wano"
+      ],
+      "text": "[DON!! x2] This Character gains [Blocker].\n[On Play] Your {Land of Wano} type Leader gains [Banish] during this turn.",
+      "set": "ST28",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST28-002.jpg"
+    },
+    {
+      "id": "ST28-003",
+      "name": "Kin'emon",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "The Akazaya Nine"
+      ],
+      "text": "",
+      "trigger": "If your Leader has the {Land of Wano} type and your opponent has 3 or less Life cards, play this card.",
+      "set": "ST28",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST28-003.jpg"
+    },
+    {
+      "id": "ST28-004",
+      "name": "Kouzuki Momonosuke",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 6,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Land of Wano",
+        "Kouzuki Clan"
+      ],
+      "text": "[Your Turn] If you have 2 or less Life cards, your Leader gains +1000 power.\n[Activate: Main] [Once Per Turn] You may return 2 total of your currently given DON!! cards to your cost area rested: This Character gains [Rush] and +1000 power during this turn.\n(This card can attack on the turn in which it is played.)",
+      "set": "ST28",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST28-004.jpg"
+    },
+    {
+      "id": "ST28-005",
+      "name": "Yamato",
+      "category": "character",
+      "colors": [
+        "yellow"
+      ],
+      "cost": 1,
+      "power": 0,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Land of Wano"
+      ],
+      "text": "[DON!! x2] [Your Turn] This Character gains +3000 power.\n[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Land of Wano} type card with a cost of 2 or more and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "set": "ST28",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST28-005.jpg"
+    }
+  ]
+}

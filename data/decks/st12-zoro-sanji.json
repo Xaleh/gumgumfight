@@ -1,0 +1,71 @@
+{
+  "id": "st12-zoro-sanji",
+  "name": "Zoro & Sanji Azul/Verde (ST12)",
+  "leader": "ST12-001",
+  "cards": [
+    {
+      "id": "ST12-002",
+      "count": 2
+    },
+    {
+      "id": "ST12-003",
+      "count": 2
+    },
+    {
+      "id": "ST12-004",
+      "count": 2
+    },
+    {
+      "id": "ST12-005",
+      "count": 2
+    },
+    {
+      "id": "ST12-006",
+      "count": 4
+    },
+    {
+      "id": "ST12-007",
+      "count": 4
+    },
+    {
+      "id": "ST12-008",
+      "count": 2
+    },
+    {
+      "id": "ST12-009",
+      "count": 4
+    },
+    {
+      "id": "ST12-010",
+      "count": 2
+    },
+    {
+      "id": "ST12-011",
+      "count": 4
+    },
+    {
+      "id": "ST12-012",
+      "count": 4
+    },
+    {
+      "id": "ST12-013",
+      "count": 2
+    },
+    {
+      "id": "ST12-014",
+      "count": 4
+    },
+    {
+      "id": "ST12-015",
+      "count": 4
+    },
+    {
+      "id": "ST12-016",
+      "count": 4
+    },
+    {
+      "id": "ST12-017",
+      "count": 4
+    }
+  ]
+}

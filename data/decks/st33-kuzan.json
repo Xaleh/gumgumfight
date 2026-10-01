@@ -1,0 +1,59 @@
+{
+  "id": "st33-kuzan",
+  "name": "Kuzan Azul (ST33)",
+  "leader": "OP12-040",
+  "cards": [
+    {
+      "id": "EB04-026",
+      "count": 4
+    },
+    {
+      "id": "EB04-028",
+      "count": 4
+    },
+    {
+      "id": "OP12-045",
+      "count": 4
+    },
+    {
+      "id": "OP12-046",
+      "count": 4
+    },
+    {
+      "id": "OP12-047",
+      "count": 4
+    },
+    {
+      "id": "OP12-050",
+      "count": 4
+    },
+    {
+      "id": "OP12-052",
+      "count": 4
+    },
+    {
+      "id": "OP12-057",
+      "count": 4
+    },
+    {
+      "id": "ST33-001",
+      "count": 4
+    },
+    {
+      "id": "ST33-002",
+      "count": 4
+    },
+    {
+      "id": "ST33-003",
+      "count": 4
+    },
+    {
+      "id": "ST33-004",
+      "count": 2
+    },
+    {
+      "id": "ST33-005",
+      "count": 4
+    }
+  ]
+}

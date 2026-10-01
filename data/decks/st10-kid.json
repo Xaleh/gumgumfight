@@ -1,0 +1,63 @@
+{
+  "id": "st10-kid",
+  "name": "Kid Roxo/Vermelho (ST10)",
+  "leader": "ST10-003",
+  "cards": [
+    {
+      "id": "ST10-004",
+      "count": 2
+    },
+    {
+      "id": "ST10-005",
+      "count": 4
+    },
+    {
+      "id": "ST10-006",
+      "count": 2
+    },
+    {
+      "id": "ST10-007",
+      "count": 4
+    },
+    {
+      "id": "ST10-008",
+      "count": 4
+    },
+    {
+      "id": "ST10-009",
+      "count": 4
+    },
+    {
+      "id": "ST10-010",
+      "count": 4
+    },
+    {
+      "id": "ST10-011",
+      "count": 4
+    },
+    {
+      "id": "ST10-012",
+      "count": 4
+    },
+    {
+      "id": "ST10-013",
+      "count": 2
+    },
+    {
+      "id": "ST10-014",
+      "count": 4
+    },
+    {
+      "id": "ST10-015",
+      "count": 4
+    },
+    {
+      "id": "ST10-016",
+      "count": 4
+    },
+    {
+      "id": "ST10-017",
+      "count": 4
+    }
+  ]
+}

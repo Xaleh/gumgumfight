@@ -1,0 +1,63 @@
+{
+  "id": "st27-teach",
+  "name": "Teach Preto (ST27)",
+  "leader": "OP09-081",
+  "cards": [
+    {
+      "id": "OP09-083",
+      "count": 4
+    },
+    {
+      "id": "OP09-086",
+      "count": 4
+    },
+    {
+      "id": "OP09-088",
+      "count": 4
+    },
+    {
+      "id": "OP09-089",
+      "count": 4
+    },
+    {
+      "id": "OP09-090",
+      "count": 4
+    },
+    {
+      "id": "OP09-091",
+      "count": 4
+    },
+    {
+      "id": "OP09-095",
+      "count": 4
+    },
+    {
+      "id": "OP09-099",
+      "count": 2
+    },
+    {
+      "id": "OP10-084",
+      "count": 4
+    },
+    {
+      "id": "ST27-001",
+      "count": 4
+    },
+    {
+      "id": "ST27-002",
+      "count": 4
+    },
+    {
+      "id": "ST27-003",
+      "count": 2
+    },
+    {
+      "id": "ST27-004",
+      "count": 4
+    },
+    {
+      "id": "ST27-005",
+      "count": 2
+    }
+  ]
+}

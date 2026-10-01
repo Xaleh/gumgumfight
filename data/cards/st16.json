@@ -1,0 +1,312 @@
+{
+  "set": "ST16",
+  "title": "Starter Deck 16: GREEN Uta",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "P-029_r1",
+      "name": "Bartolomeo",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "FILM",
+        "Supernovas",
+        "Barto Club"
+      ],
+      "text": "[End of Your Turn] You may rest this Character: Set up to 1 of your {FILM} type Characters other than [Bartolomeo] as active.",
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-029_r1.jpg"
+    },
+    {
+      "id": "P-057_p1",
+      "name": "Fleeting Lullaby",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "attributes": [],
+      "types": [
+        "FILM",
+        "Music"
+      ],
+      "text": "[Main] If your Leader is [Uta], up to 2 of your opponent's rested Characters with a cost of 4 or less will not become active in your opponent's next Refresh Phase.",
+      "trigger": "Activate this card's [Main] effect.",
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-057_p1.jpg"
+    },
+    {
+      "id": "P-058_p1",
+      "name": "Where the Wind Blows",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "FILM",
+        "Music"
+      ],
+      "text": "[Main] If your Leader is [Uta], set all of your {FILM} type Characters as active at the end of this turn.",
+      "trigger": "Set all of your {FILM} type Characters as active.",
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-058_p1.jpg"
+    },
+    {
+      "id": "P-059_p1",
+      "name": "The World's Continuation",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "FILM",
+        "Music"
+      ],
+      "text": "[Counter] If your Leader is [Uta], you may return any number of Characters on your field to the owner's hand. Up to 1 of your Leader or Character cards gains +2000 power during this battle for every returned Character.",
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-059_p1.jpg"
+    },
+    {
+      "id": "P-060_p1",
+      "name": "Tot Musica",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "FILM",
+        "Music"
+      ],
+      "text": "[Main] You may rest 1 of your [Uta] cards: Rest up to 2 of your opponent's DON!! cards.",
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-060_p1.jpg"
+    },
+    {
+      "id": "P-061_r1",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 8,
+      "power": 10000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "FILM",
+        "Straw Hat Crew"
+      ],
+      "text": "",
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-061_r1.jpg"
+    },
+    {
+      "id": "ST11-001",
+      "name": "Uta",
+      "category": "leader",
+      "colors": [
+        "green"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "FILM"
+      ],
+      "text": "[DON!! x1] [When Attacking] [Once Per Turn] Reveal 1 card from the top of your deck and add up to 1 {FILM} type card to your hand. Then, place the rest at the bottom of your deck.",
+      "set": "ST11",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST11-001_p1.jpg"
+    },
+    {
+      "id": "ST11-003",
+      "name": "Backlight",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "FILM",
+        "Music"
+      ],
+      "text": "[Main] If your Leader is [Uta], choose one:\n\n• Rest up to 1 of your opponent's Characters with a cost of 5 or less.\n\n• K.O. up to 1 of your opponent's rested Characters with a cost of 5 or less.",
+      "set": "ST11",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST11-003_p2.jpg"
+    },
+    {
+      "id": "ST11-004",
+      "name": "New Genesis",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "FILM",
+        "Music"
+      ],
+      "text": "[Main] If your Leader is [Uta], look at 3 cards from the top of your deck; reveal up to 1 {FILM} type card other than [New Genesis] and add it to your hand. Then, place the rest at the bottom of your deck in any order and set up to 1 of your DON!! cards as active.",
+      "set": "ST11",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST11-004_p2.jpg"
+    },
+    {
+      "id": "ST11-005",
+      "name": "I'm invincible",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "attributes": [],
+      "types": [
+        "FILM",
+        "Music"
+      ],
+      "text": "[Main] Set up to 1 of your [Uta] Leader as active.",
+      "trigger": "Up to 1 of your Leader or Character cards gains +1000 power during this turn.",
+      "set": "ST11",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST11-005_p2.jpg"
+    },
+    {
+      "id": "ST16-001",
+      "name": "Uta",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "FILM"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n\n[Activate: Main] [Once Per Turn] You may trash 1 {FILM} type card from your hand: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "set": "ST16",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST16-001.jpg"
+    },
+    {
+      "id": "ST16-002",
+      "name": "Gordon",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 0,
+      "counter": 1000,
+      "attributes": [
+        "Wisdom"
+      ],
+      "types": [
+        "FILM"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)[On Your Opponent's Attack] You may trash any number of {Music} type cards from your hand. Your Leader or 1 of your Characters gains +1000 power during this battle for every card trashed.",
+      "set": "ST16",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST16-002.jpg"
+    },
+    {
+      "id": "ST16-003",
+      "name": "Charlotte Katakuri",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "FILM",
+        "Big Mom Pirates"
+      ],
+      "text": "If your Leader has the {FILM} type and you have 6 or more rested cards, this Character gains +2000 power.",
+      "set": "ST16",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST16-003.jpg"
+    },
+    {
+      "id": "ST16-004",
+      "name": "Shanks",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 9,
+      "power": 11000,
+      "counter": 0,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "FILM",
+        "The Four Emperors",
+        "Red-Haired Pirates"
+      ],
+      "text": "[On Play] K.O. up to 1 of your opponent's rested Characters.",
+      "set": "ST16",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST16-004.jpg"
+    },
+    {
+      "id": "ST16-005",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "FILM",
+        "Straw Hat Crew",
+        "Supernovas"
+      ],
+      "text": "If you have a rested [Uta], this Character gains +1000 power.",
+      "set": "ST16",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST16-005.jpg"
+    }
+  ]
+}

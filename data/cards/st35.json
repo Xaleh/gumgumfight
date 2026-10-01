@@ -1,0 +1,334 @@
+{
+  "set": "ST35",
+  "title": "Starter Deck 35: RED/BLACK Sabo",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "OP12-090",
+      "name": "Belo Betty",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army"
+      ],
+      "text": "[When Attacking] You may trash 2 cards from the top of your deck: Give up to 1 of your opponent's Characters −2 cost during this turn.",
+      "set": "OP12",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-090_r1.jpg"
+    },
+    {
+      "id": "OP12-093",
+      "name": "Morley",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Giant",
+        "Revolutionary Army"
+      ],
+      "text": "If your Leader has the {Revolutionary Army} type, this Character gains +4 cost.",
+      "set": "OP12",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-093_r1.jpg"
+    },
+    {
+      "id": "OP12-098",
+      "name": "Hair Removal Fist",
+      "category": "event",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Impel Down",
+        "Revolutionary Army"
+      ],
+      "text": "[Counter] Up to 1 of your Leader or Character cards gains +2000 power during this battle. Then, if you have a {Revolutionary Army} type Character with a cost of 8 or more, that card gains an additional +2000 power during this battle.",
+      "trigger": "Draw 1 card and trash 1 card from the top of your deck.",
+      "set": "OP12",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-098_r1.jpg"
+    },
+    {
+      "id": "OP13-004",
+      "name": "Sabo",
+      "category": "leader",
+      "colors": [
+        "red",
+        "black"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army",
+        "Dressrosa"
+      ],
+      "text": "If you have 4 or more Life cards, give this Leader 1000 power.[DON!! x1] If you have a Character with a cost of 8 or more, your Leader and all of your Characters gain +1000 power.",
+      "set": "OP13",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP13-004_p2.jpg"
+    },
+    {
+      "id": "OP13-005",
+      "name": "Inazuma",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Revolutionary Army"
+      ],
+      "text": "[On Play] Give up to 1 rested DON!! card to your Leader.",
+      "set": "OP13",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP13-005_r1.jpg"
+    },
+    {
+      "id": "OP13-008",
+      "name": "Emporio.Ivankov",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army"
+      ],
+      "text": "If your {Revolutionary Army} type Character would be K.O.'d by your opponent's effect, you may trash this Character instead.",
+      "set": "OP13",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP13-008_r1.jpg"
+    },
+    {
+      "id": "OP13-017",
+      "name": "Monkey.D.Dragon",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 6,
+      "power": 7000,
+      "counter": 1000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army"
+      ],
+      "text": "[Once Per Turn] If your {Revolutionary Army} type Character would be removed from the field by your opponent's effect, you may give this Character 2000 power during this turn instead.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "OP13",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP13-017_r1.jpg"
+    },
+    {
+      "id": "OP13-019",
+      "name": "But Ace Here Said You Deserved It!!",
+      "category": "event",
+      "colors": [
+        "red"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [
+        "Revolutionary Army",
+        "Dressrosa"
+      ],
+      "text": "[Main] You may rest 4 of your DON!! cards: Give up to 1 of your opponent's Characters 3000 power during this turn. Then, K.O. up to 1 of your opponent's Characters with 3000 power or less.[Counter] Your Leader gains +3000 power during this battle.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "OP13",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP13-019_p2.jpg"
+    },
+    {
+      "id": "OP13-081",
+      "name": "Koala",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Dressrosa",
+        "Revolutionary Army"
+      ],
+      "text": "If your Leader has the {Revolutionary Army} type, this Character gains +3 cost. [Activate: Main] [Once Per Turn] You may place 1 card from your trash at the bottom of your deck: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "set": "OP13",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP13-081_r1.jpg"
+    },
+    {
+      "id": "P-105",
+      "name": "Sabo",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army"
+      ],
+      "text": "If your Leader has the {Revolutionary Army} type, this Character gains [Blocker] and +4 cost.[On Play] You may add 1 card from the top or bottom of your Life cards to your hand: Give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+      "notes": [
+        "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
+      ],
+      "set": "P",
+      "rarity": "PR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-105_r1.jpg"
+    },
+    {
+      "id": "ST35-001",
+      "name": "Hack",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 4,
+      "power": 4000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Fish-Man",
+        "Revolutionary Army",
+        "Dressrosa"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)[On Play] K.O. up to 1 of your opponent's Characters with 2000 base power or less.",
+      "set": "ST35",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST35-001.jpg"
+    },
+    {
+      "id": "ST35-002",
+      "name": "Lindbergh",
+      "category": "character",
+      "colors": [
+        "red"
+      ],
+      "cost": 4,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Minks",
+        "Revolutionary Army"
+      ],
+      "text": "[On Play] Give up to 1 of your opponent's Characters 3000 power during this turn.",
+      "set": "ST35",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST35-002.jpg"
+    },
+    {
+      "id": "ST35-003",
+      "name": "Karasu",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Revolutionary Army"
+      ],
+      "text": "[When Attacking] You may trash 2 cards from the top of your deck: If your opponent has 7 or more cards in their hand, your opponent trashes 1 card from their hand.",
+      "set": "ST35",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST35-003.jpg"
+    },
+    {
+      "id": "ST35-004",
+      "name": "Koala",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 7,
+      "power": 6000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Revolutionary Army",
+        "Dressrosa"
+      ],
+      "text": "This Character gains [Blocker] and +1 cost.[On Play] Give up to 1 rested DON!! card to your Leader. Then, play up to 1 Character card with 4000 power or less and the {Revolutionary Army} type from your hand or trash.",
+      "set": "ST35",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST35-004.jpg"
+    },
+    {
+      "id": "ST35-005",
+      "name": "Bartholomew Kuma",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 5,
+      "power": 5000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Revolutionary Army"
+      ],
+      "text": "This Character gains +3 cost.[On Play] Give up to 1 rested DON!! card to your Leader. Then, play up to 1 Character card with 4000 power or less and the {Revolutionary Army} type from your hand or trash.",
+      "set": "ST35",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST35-005.jpg"
+    }
+  ]
+}

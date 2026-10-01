@@ -1,0 +1,71 @@
+{
+  "id": "st22-ace-newgate",
+  "name": "Ace & Newgate Azul (ST22)",
+  "leader": "ST22-001",
+  "cards": [
+    {
+      "id": "ST22-002",
+      "count": 4
+    },
+    {
+      "id": "ST22-003",
+      "count": 2
+    },
+    {
+      "id": "ST22-004",
+      "count": 4
+    },
+    {
+      "id": "ST22-005",
+      "count": 2
+    },
+    {
+      "id": "ST22-006",
+      "count": 2
+    },
+    {
+      "id": "ST22-007",
+      "count": 4
+    },
+    {
+      "id": "ST22-008",
+      "count": 4
+    },
+    {
+      "id": "ST22-009",
+      "count": 4
+    },
+    {
+      "id": "ST22-010",
+      "count": 2
+    },
+    {
+      "id": "ST22-011",
+      "count": 4
+    },
+    {
+      "id": "ST22-012",
+      "count": 4
+    },
+    {
+      "id": "ST22-013",
+      "count": 2
+    },
+    {
+      "id": "ST22-014",
+      "count": 4
+    },
+    {
+      "id": "ST22-015",
+      "count": 2
+    },
+    {
+      "id": "ST22-016",
+      "count": 4
+    },
+    {
+      "id": "ST22-017",
+      "count": 2
+    }
+  ]
+}

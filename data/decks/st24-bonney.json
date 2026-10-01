@@ -1,0 +1,63 @@
+{
+  "id": "st24-bonney",
+  "name": "Bonney Verde (ST24)",
+  "leader": "OP07-019",
+  "cards": [
+    {
+      "id": "EB01-015",
+      "count": 4
+    },
+    {
+      "id": "OP07-021",
+      "count": 4
+    },
+    {
+      "id": "OP07-023",
+      "count": 4
+    },
+    {
+      "id": "OP07-025",
+      "count": 4
+    },
+    {
+      "id": "OP07-031",
+      "count": 4
+    },
+    {
+      "id": "OP07-033",
+      "count": 2
+    },
+    {
+      "id": "OP07-034",
+      "count": 4
+    },
+    {
+      "id": "OP07-036",
+      "count": 4
+    },
+    {
+      "id": "OP07-037",
+      "count": 4
+    },
+    {
+      "id": "ST24-001",
+      "count": 4
+    },
+    {
+      "id": "ST24-002",
+      "count": 4
+    },
+    {
+      "id": "ST24-003",
+      "count": 4
+    },
+    {
+      "id": "ST24-004",
+      "count": 2
+    },
+    {
+      "id": "ST24-005",
+      "count": 2
+    }
+  ]
+}

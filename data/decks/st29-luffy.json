@@ -1,0 +1,71 @@
+{
+  "id": "st29-luffy",
+  "name": "Luffy Amarelo (ST29)",
+  "leader": "ST29-001",
+  "cards": [
+    {
+      "id": "ST29-002",
+      "count": 4
+    },
+    {
+      "id": "ST29-003",
+      "count": 4
+    },
+    {
+      "id": "ST29-004",
+      "count": 2
+    },
+    {
+      "id": "ST29-005",
+      "count": 2
+    },
+    {
+      "id": "ST29-006",
+      "count": 2
+    },
+    {
+      "id": "ST29-007",
+      "count": 4
+    },
+    {
+      "id": "ST29-008",
+      "count": 4
+    },
+    {
+      "id": "ST29-009",
+      "count": 2
+    },
+    {
+      "id": "ST29-010",
+      "count": 2
+    },
+    {
+      "id": "ST29-011",
+      "count": 4
+    },
+    {
+      "id": "ST29-012",
+      "count": 4
+    },
+    {
+      "id": "ST29-013",
+      "count": 2
+    },
+    {
+      "id": "ST29-014",
+      "count": 2
+    },
+    {
+      "id": "ST29-015",
+      "count": 4
+    },
+    {
+      "id": "ST29-016",
+      "count": 4
+    },
+    {
+      "id": "ST29-017",
+      "count": 4
+    }
+  ]
+}

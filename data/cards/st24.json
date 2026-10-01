@@ -1,0 +1,357 @@
+{
+  "set": "ST24",
+  "title": "Starter Deck 24: GREEN Jewelry Bonney",
+  "provisional": true,
+  "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
+  "cards": [
+    {
+      "id": "EB01-015",
+      "name": "Scratchmen Apoo",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 1,
+      "power": 1000,
+      "counter": 2000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "On-Air Pirates",
+        "Supernovas"
+      ],
+      "text": "[On Play] Rest up to 1 of your opponent's Characters with a cost of 2 or less.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the EB01 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "EB01",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB01-015_p3.jpg"
+    },
+    {
+      "id": "OP07-019",
+      "name": "Jewelry Bonney",
+      "category": "leader",
+      "colors": [
+        "green"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Bonney Pirates",
+        "Supernovas"
+      ],
+      "text": "[On Your Opponent's Attack] [Once Per Turn] ① (You may rest the specified number of DON!! cards in your cost area.): Rest up to 1 of your opponent's Leader or Character cards.",
+      "set": "OP07",
+      "rarity": "L",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-019_p3.jpg"
+    },
+    {
+      "id": "OP07-021",
+      "name": "Urouge",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Fallen Monk Pirates",
+        "Supernovas"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)[End of Your Turn] Set up to 1 of your DON!! cards as active.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-021_r1.jpg"
+    },
+    {
+      "id": "OP07-023",
+      "name": "Caribou",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 4,
+      "power": 5000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Caribou Pirates",
+        "Supernovas"
+      ],
+      "text": "If you have 6 or more rested DON!! cards, this Character gains +1000 power.[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-023_r1.jpg"
+    },
+    {
+      "id": "OP07-025",
+      "name": "Coribou",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 3000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Caribou Pirates",
+        "Supernovas"
+      ],
+      "text": "[On Play] Play up to 1 [Caribou] with a cost of 4 or less from your hand rested.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-025_r1.jpg"
+    },
+    {
+      "id": "OP07-031",
+      "name": "Bartolomeo",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 3,
+      "power": 4000,
+      "counter": 0,
+      "attributes": [
+        "Special"
+      ],
+      "types": [
+        "Supernovas",
+        "Barto Club"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)[Your Turn] [Once Per Turn] If a Character is rested by your effect, draw 1 card and trash 1 card from your hand.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-031_r1.jpg"
+    },
+    {
+      "id": "OP07-033",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 5,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew",
+        "Supernovas"
+      ],
+      "text": "If you have 3 or more Characters, your Characters with a cost of 3 or less other than [Monkey.D.Luffy] cannot be K.O.'d by your opponent's effects.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-033_r1.jpg"
+    },
+    {
+      "id": "OP07-034",
+      "name": "Roronoa Zoro",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Straw Hat Crew",
+        "Supernovas"
+      ],
+      "text": "[When Attacking] If you have 3 or more Characters, this Character gains +2000 power during this turn.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-034_r1.jpg"
+    },
+    {
+      "id": "OP07-036",
+      "name": "Demonic Aura Nine-Sword Style Asura Demon Nine Flash",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "attributes": [],
+      "types": [
+        "Supernovas",
+        "Straw Hat Crew"
+      ],
+      "text": "[Main] Up to 1 of your Leader or Character cards gains +3000 power during this turn. Then, you may rest 1 of your Characters with a cost of 3 or more. If you do, rest up to 1 of your opponent's Characters with a cost of 5 or less.",
+      "trigger": "Rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "R",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-036_p1.jpg"
+    },
+    {
+      "id": "OP07-037",
+      "name": "More Pizza!!",
+      "category": "event",
+      "colors": [
+        "green"
+      ],
+      "cost": 1,
+      "attributes": [],
+      "types": [],
+      "text": "[Main] Look at 5 cards from the top of your deck; reveal up to 1 {Supernovas} type card other than [More Pizza!!] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "trigger": "Draw 1 card.",
+      "notes": [
+        "DISCLAIMER: This card is a reprint of the pre-existing card in the OP07 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
+      ],
+      "set": "OP07",
+      "rarity": "UC",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP07-037_r1.jpg"
+    },
+    {
+      "id": "ST24-001",
+      "name": "Capone\"Gang\"Bege",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 1000,
+      "counter": 1000,
+      "attributes": [
+        "Ranged"
+      ],
+      "types": [
+        "Firetank Pirates",
+        "Supernovas"
+      ],
+      "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[On Play] If you have 6 or more rested cards, draw 1 card and trash 1 card from your hand.",
+      "set": "ST24",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST24-001.jpg"
+    },
+    {
+      "id": "ST24-002",
+      "name": "Kid & Killer",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 2,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Slash Special"
+      ],
+      "types": [
+        "Kid Pirates",
+        "Supernovas"
+      ],
+      "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Supernovas} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.\n[On Your Opponent's Attack] You may trash this Character: Set up to 1 of your DON!! cards as active.",
+      "set": "ST24",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST24-002.jpg"
+    },
+    {
+      "id": "ST24-003",
+      "name": "Basil Hawkins",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 4,
+      "power": 4000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Hawkins Pirates",
+        "Supernovas"
+      ],
+      "text": "[End of Your Turn] Set up to 1 of your DON!! cards as active.",
+      "set": "ST24",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST24-003.jpg"
+    },
+    {
+      "id": "ST24-004",
+      "name": "Law & Bepo",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 10,
+      "power": 11000,
+      "counter": 0,
+      "attributes": [
+        "Slash Strike"
+      ],
+      "types": [
+        "Heart Pirates",
+        "Minks",
+        "Supernovas"
+      ],
+      "text": "[On Play] Rest up to 1 of your opponent's Characters and that Character will not become active in your opponent's next Refresh Phase. Then, if your opponent has 2 or more rested Characters, your Leader gains +2000 power until the end of your opponent's next End Phase.",
+      "set": "ST24",
+      "rarity": "SR",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST24-004.jpg"
+    },
+    {
+      "id": "ST24-005",
+      "name": "X.Drake",
+      "category": "character",
+      "colors": [
+        "green"
+      ],
+      "cost": 5,
+      "power": 5000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Drake Pirates",
+        "Navy",
+        "Supernovas"
+      ],
+      "text": "[On Play] If your Leader has the {Supernovas} type, rest up to 1 of your opponent's Characters with a cost of 5 or less. Then, set up to 1 of your DON!! cards as active at the end of this turn.",
+      "set": "ST24",
+      "rarity": "C",
+      "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST24-005.jpg"
+    }
+  ]
+}

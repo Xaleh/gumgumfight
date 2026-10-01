@@ -1,0 +1,63 @@
+{
+  "id": "st18-luffy",
+  "name": "Luffy Roxo (ST18)",
+  "leader": "OP05-060",
+  "cards": [
+    {
+      "id": "OP05-061",
+      "count": 4
+    },
+    {
+      "id": "OP05-063",
+      "count": 4
+    },
+    {
+      "id": "OP05-066",
+      "count": 4
+    },
+    {
+      "id": "OP05-067",
+      "count": 4
+    },
+    {
+      "id": "OP05-068",
+      "count": 4
+    },
+    {
+      "id": "OP05-070",
+      "count": 4
+    },
+    {
+      "id": "OP05-072",
+      "count": 4
+    },
+    {
+      "id": "OP05-076",
+      "count": 4
+    },
+    {
+      "id": "P-041_r1",
+      "count": 2
+    },
+    {
+      "id": "ST18-001",
+      "count": 4
+    },
+    {
+      "id": "ST18-002",
+      "count": 4
+    },
+    {
+      "id": "ST18-003",
+      "count": 2
+    },
+    {
+      "id": "ST18-004",
+      "count": 4
+    },
+    {
+      "id": "ST18-005",
+      "count": 2
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "id": "st31-luffy",
+  "name": "Luffy Vermelho (ST31)",
+  "leader": "ST21-001",
+  "cards": [
+    {
+      "id": "OP01-016",
+      "count": 4
+    },
+    {
+      "id": "OP04-016",
+      "count": 4
+    },
+    {
+      "id": "OP11-003",
+      "count": 4
+    },
+    {
+      "id": "OP11-009",
+      "count": 4
+    },
+    {
+      "id": "OP11-012",
+      "count": 4
+    },
+    {
+      "id": "OP14-015",
+      "count": 4
+    },
+    {
+      "id": "P-101",
+      "count": 4
+    },
+    {
+      "id": "ST23-004",
+      "count": 4
+    },
+    {
+      "id": "ST31-001",
+      "count": 4
+    },
+    {
+      "id": "ST31-002",
+      "count": 4
+    },
+    {
+      "id": "ST31-003",
+      "count": 4
+    },
+    {
+      "id": "ST31-004",
+      "count": 4
+    },
+    {
+      "id": "ST31-005",
+      "count": 2
+    }
+  ]
+}
