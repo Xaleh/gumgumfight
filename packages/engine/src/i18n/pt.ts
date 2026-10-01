@@ -61,6 +61,14 @@ type Rule = [RegExp, string | ((...m: string[]) => string)];
 const SENTENCES: Rule[] = [
   [/^Draw (\d+) cards?\.?$/i, (_, n) => `Compre ${n} ${plural(n, 'carta', 'cartas')}.`],
   [
+    /^Draw (\d+) cards? if you have (\d+) or less cards in your hand\.?$/i,
+    (_, n, m) => `Compre ${n} ${plural(n, 'carta', 'cartas')} se você tiver ${m} ou menos cartas na mão.`,
+  ],
+  [
+    /^Draw (\d+) cards? and trash (\d+) cards? from your hand\.?$/i,
+    (_, n, m) => `Compre ${n} ${plural(n, 'carta', 'cartas')} e descarte ${m} ${plural(m, 'carta', 'cartas')} da sua mão.`,
+  ],
+  [
     /^Give (.+?) up to (\d+) rested DON!! cards?\.?$/i,
     (_, who, n) => `Dê até ${n} DON!! ${plural(n, 'virado', 'virados')} a ${who}.`,
   ],
@@ -73,9 +81,19 @@ const SENTENCES: Rule[] = [
   [/^Set (.+?) as active\.?$/i, (_, who) => `Deixe ${who} ativo.`],
   [/^Return (.+?) to (?:the owner's|its owner's) hand\.?$/i, (_, who) => `Devolva ${who} à mão do dono.`],
   [/^Play (.+?) from your hand\.?$/i, (_, what) => `Jogue ${what} da sua mão.`],
+  [
+    /^Play (.+?) from your deck, then shuffle your deck\.?$/i,
+    (_, what) => `Jogue ${what} do seu deck e depois embaralhe o seu deck.`,
+  ],
+  [/^Place (.+?) at the bottom of the owner's deck\.?$/i, (_, who) => `Coloque ${who} no fundo do deck do dono.`],
+  [/^Add (.+?) from your trash to your hand\.?$/i, (_, what) => `Adicione ${what} do seu descarte à sua mão.`],
+  [
+    /^Look at (\d+) cards from the top of your deck and return them to the top or bottom of the deck in any order\.?$/i,
+    (_, n) => `Olhe as ${n} cartas do topo do seu deck e devolva-as ao topo ou ao fundo do deck, em qualquer ordem.`,
+  ],
   [/^Play this card\.?$/i, 'Jogue esta carta.'],
   [/^Add this card to your hand\.?$/i, 'Adicione esta carta à sua mão.'],
-  [/^Activate this card's \[Main\] effect\.?$/i, 'Ative o efeito [Principal] desta carta.'],
+  [/^Activate this card's \[(Main|Counter)\] effect\.?$/i, (_, t) => `Ative o efeito [${t}] desta carta.`],
   [
     /^Trash (\d+) cards? from your hand\.?$/i,
     (_, n) => `Descarte ${n} ${plural(n, 'carta', 'cartas')} da sua mão.`,
@@ -139,13 +157,16 @@ const PHRASES: Rule[] = [
   [/up to (\d+) of your opponent's DON!! cards/gi, (_, n) => `até ${n} DON!! do oponente`],
   [/up to (\d+) of your DON!! cards/gi, (_, n) => `até ${n} dos seus DON!!`],
   [/up to (\d+) of your Characters/gi, (_, n) => `até ${n} dos seus Personagens`],
-  [/up to (\d+) (\{[^}]+\}) type Character cards?/gi, (_, n, t) => `até ${n} ${plural(n, 'Personagem', 'Personagens')} do tipo ${t}`],
+  [/up to (\d+) ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type Character(?: cards?)?/gi, (_, n, t) => `até ${n} ${plural(n, 'Personagem', 'Personagens')} do tipo ${typeList(t)}`],
   [/up to (\d+) (\{[^}]+\}) type cards?/gi, (_, n, t) => `até ${n} ${plural(n, 'carta', 'cartas')} do tipo ${t}`],
   [/(\{[^}]+\}) type cards/gi, (_, t) => `cartas do tipo ${t}`],
   [/(\{[^}]+\}) type card/gi, (_, t) => `carta do tipo ${t}`],
   [/up to (\d+) Characters?/gi, (_, n) => `até ${n} ${plural(n, 'Personagem', 'Personagens')}`],
+  [/up to (\d+) (\[[^\]]+\])/gi, (_, n, name) => `até ${n} ${name}`],
   [/this Leader or 1 of your Characters/gi, 'este Líder ou 1 dos seus Personagens'],
   [/your Leader or 1 of your Characters/gi, 'seu Líder ou 1 dos seus Personagens'],
+  // "or less than [Gecko Moria]": erro do texto da API para "or less other than [Gecko Moria]".
+  [/with a cost of (\d+) or less (?:than|other than) (\[[^\]]+\])/gi, (_, n, name) => `com custo ${n} ou menos, exceto ${name}`],
   [/with a cost of (\d+) or less/gi, (_, n) => `com custo ${n} ou menos`],
   [/with a cost of (\d+) or more/gi, (_, n) => `com custo ${n} ou mais`],
   [/with (\d+) power or less/gi, (_, n) => `com ${n} de poder ou menos`],
@@ -165,8 +186,12 @@ const PHRASES: Rule[] = [
   [/your opponent/gi, 'seu oponente'],
 ];
 
-const RESIDUE =
-  /\b(the|your|of|up to|gains?|with|cards?|opponent's|this|and|from|power|cost|less|more|during|may|you|if|then|character|characters|leader|rest|play|give|draw|trash|select|set|active|look|reveal|place|add|return|when|each|all|can|cannot|instead)\b/i;
+// Palavras em inglês que denunciam trecho sem tradução (limites Unicode: "Até" não é "at").
+const RESIDUE_WORDS =
+  "the|your|of|up to|gains?|with|cards?|opponent's|this|and|from|power|cost|less|more|during|may|you|if|then|" +
+  'character|characters|leader|rest|play|give|draw|trash|select|set|active|look|reveal|place|add|return|when|each|' +
+  "all|can|cannot|instead|activate|effect|hand|top|bottom|order|shuffle|than|type|owner|to|at|in|any|or|it|them|card's";
+const RESIDUE = new RegExp(`(?<!\\p{L})(${RESIDUE_WORDS})(?!\\p{L})`, 'iu');
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);

@@ -368,6 +368,9 @@ function PromptBar(props: {
           <p className="muted">
             Clique nas cartas destacadas ({picked.length}/{pending.max}).
           </p>
+          {pending.ordered && picked.length > 0 && (
+            <p className="muted">Ordem: {picked.map((u, i) => `${i + 1}. ${cardDef(state, u).name}`).join(' → ')}</p>
+          )}
           {offBoard.length > 0 && (
             <div className="prompt-options">
               {offBoard.map((uid) => (

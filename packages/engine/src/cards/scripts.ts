@@ -20,6 +20,14 @@ const oppChar = (extra: Partial<TargetSpec> = {}): TargetSpec => ({
   ...extra,
 });
 
+/** "up to 1 Character" sem dono especificado: personagem de qualquer jogador. */
+const anyChar = (extra: Partial<TargetSpec> = {}): TargetSpec => ({
+  side: 'any',
+  kinds: ['character'],
+  upTo: 1,
+  ...extra,
+});
+
 export const CARD_SCRIPTS: Record<string, CardScript> = {
   // ------------------------------------------------------------ ST01 Straw Hat Crew (vermelho)
   // Sem efeito: ST01-003 Karoo, ST01-008 Nico Robin, ST01-009 Nefeltari Vivi, ST01-010 Franky.
@@ -245,5 +253,126 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
   'ST02-017': {
     // [Main] Rest up to 1 of your opponent's Characters.
     abilities: [{ timing: 'main', steps: [{ do: 'rest', target: oppChar() }] }],
+  },
+
+  // ------------------------------------------------------------ ST03 The Seven Warlords of the Sea (azul)
+  // Sem efeito: ST03-002 Edward Weevil, ST03-006 Jinbe, ST03-011 Buggy, ST03-012 Pacifista.
+  // ST03-008 Trafalgar Law: só [Blocker].
+  'ST03-001': {
+    // [Activate: Main] [Once Per Turn] DON!! −4: Return up to 1 Character with a cost of 5 or less to the owner's hand.
+    abilities: [
+      {
+        timing: 'activateMain',
+        oncePerTurn: true,
+        cost: { donMinus: 4 },
+        label: 'DON!! −4: devolver personagem de custo até 5',
+        steps: [{ do: 'returnToHand', target: anyChar({ maxCost: 5 }) }],
+      },
+    ],
+  },
+  'ST03-003': {
+    // [Blocker] / [DON!! x1] [On Block] Place up to 1 Character with a cost of 2 or less at the bottom of the owner's deck.
+    keywords: ['blocker'],
+    abilities: [{ timing: 'onBlock', don: 1, steps: [{ do: 'toDeckBottom', target: anyChar({ maxCost: 2 }) }] }],
+  },
+  'ST03-004': {
+    // [On Play] Add up to 1 {The Seven Warlords of the Sea} or {Thriller Bark Pirates} type Character with a cost of 4
+    // or less other than [Gecko Moria] from your trash to your hand. (O texto da API diz "or less than [Gecko Moria]".)
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          {
+            do: 'fromTrashToHand',
+            upTo: 1,
+            filter: {
+              category: 'character',
+              maxCost: 4,
+              hasAnyType: ['The Seven Warlords of the Sea', 'Thriller Bark Pirates'],
+              excludeName: 'Gecko Moria',
+            },
+          },
+        ],
+      },
+    ],
+  },
+  'ST03-005': {
+    // [DON!! x1] [When Attacking] Draw 2 cards and trash 2 cards from your hand.
+    abilities: [
+      {
+        timing: 'whenAttacking',
+        don: 1,
+        steps: [
+          { do: 'draw', count: 2 },
+          { do: 'trashFromHand', count: 2 },
+        ],
+      },
+    ],
+  },
+  'ST03-007': {
+    // [DON!! x1] [Activate: Main] [Once Per Turn] ②: Play up to 1 [Pacifista] with a cost of 4 or less from your deck,
+    // then shuffle your deck.
+    abilities: [
+      {
+        timing: 'activateMain',
+        don: 1,
+        oncePerTurn: true,
+        cost: { restDon: 2 },
+        label: '②: jogar [Pacifista] do deck',
+        steps: [
+          { do: 'playFrom', from: 'deck', upTo: 1, filter: { name: 'Pacifista', maxCost: 4 } },
+          { do: 'shuffleDeck' },
+        ],
+      },
+    ],
+  },
+  'ST03-009': {
+    // [On Play] Return up to 1 Character with a cost of 7 or less to the owner's hand.
+    abilities: [{ timing: 'onPlay', steps: [{ do: 'returnToHand', target: anyChar({ maxCost: 7 }) }] }],
+  },
+  'ST03-010': {
+    // [On Play] Look at 3 cards from the top of your deck and return them to the top or bottom of the deck in any order.
+    // [Trigger] Play this card.
+    abilities: [
+      { timing: 'onPlay', steps: [{ do: 'arrangeTop', look: 3 }] },
+      { timing: 'trigger', steps: [{ do: 'playThis' }] },
+    ],
+  },
+  'ST03-013': {
+    // [Blocker] / [Trigger] Play this card.
+    keywords: ['blocker'],
+    abilities: [{ timing: 'trigger', steps: [{ do: 'playThis' }] }],
+  },
+  'ST03-014': {
+    // [On Play] Return up to 1 Character with a cost of 3 or less to the owner's hand.
+    abilities: [{ timing: 'onPlay', steps: [{ do: 'returnToHand', target: anyChar({ maxCost: 3 }) }] }],
+  },
+  'ST03-015': {
+    // [Main] Return up to 1 Character with a cost of 7 or less to the owner's hand. [Trigger] Activate this card's [Main] effect.
+    abilities: [
+      { timing: 'main', steps: [{ do: 'returnToHand', target: anyChar({ maxCost: 7 }) }] },
+      { timing: 'trigger', steps: [{ do: 'useMainEffect' }] },
+    ],
+  },
+  'ST03-016': {
+    // [Counter] Return up to 1 Character with a cost of 3 or less to the owner's hand.
+    // [Trigger] Activate this card's [Counter] effect.
+    abilities: [
+      { timing: 'counter', steps: [{ do: 'returnToHand', target: anyChar({ maxCost: 3 }) }] },
+      { timing: 'trigger', steps: [{ do: 'useCounterEffect' }] },
+    ],
+  },
+  'ST03-017': {
+    // [Counter] Up to 1 of your Leader or Character cards gains +4000 power during this battle.
+    // Then, draw 1 card if you have 3 or less cards in your hand.
+    abilities: [
+      {
+        timing: 'counter',
+        steps: [
+          { do: 'power', target: ownLeaderOrChar(), amount: 4000, duration: 'battle' },
+          { do: 'draw', count: 1, if: { handMax: 3 } },
+        ],
+      },
+    ],
   },
 };

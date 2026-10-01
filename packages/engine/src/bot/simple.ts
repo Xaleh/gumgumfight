@@ -2,8 +2,8 @@
 // plausíveis para testar a interface e o motor.
 
 import { legalActions } from '../actions';
-import { cardDef, getPower, locate, opponent } from '../engine';
-import type { Action, GameState, PlayerId } from '../types';
+import { cardDef, getPower, locate, opponent, targetCandidates } from '../engine';
+import type { Action, EffectStep, GameState, PlayerId } from '../types';
 
 export function chooseBotAction(state: GameState, player: PlayerId): Action {
   const actions = legalActions(state, player);
@@ -39,25 +39,13 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       return { type: 'manualDone', player };
 
     case 'selectTargets': {
-      const opts = [...pending.options];
-      if (pending.intent === 'discard') {
-        opts.sort((a, b) => value(state, a) - value(state, b));
-        return { type: 'choose', player, uids: [opts[0]] };
+      const uids = chooseTargets(state, player, pending);
+      // Completa escolhas obrigatórias de várias cartas (ex.: "trash 2 cards").
+      for (const u of [...pending.options].sort((a, b) => value(state, a) - value(state, b))) {
+        if (uids.length >= pending.min) break;
+        if (!uids.includes(u)) uids.push(u);
       }
-      if (pending.intent === 'harm') {
-        opts.sort((a, b) => value(state, b) - value(state, a));
-        return { type: 'choose', player, uids: [opts[0]] };
-      }
-      // help: prioriza quem está na batalha, depois quem ainda pode atacar.
-      const b = state.battle;
-      if (b && opts.includes(b.target) && locate(state, b.target)?.player === player) {
-        return { type: 'choose', player, uids: [b.target] };
-      }
-      if (b && opts.includes(b.attacker)) return { type: 'choose', player, uids: [b.attacker] };
-      const active = opts.filter((u) => !locate(state, u)?.fc.rested);
-      const pool = active.length ? active : opts;
-      const leader = pool.find((u) => u === me.leader.uid);
-      return { type: 'choose', player, uids: [leader ?? pool[0]] };
+      return { type: 'choose', player, uids: uids.slice(0, pending.max) };
     }
 
     case 'block': {
@@ -84,7 +72,9 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       const need = ap - tp + 1;
       const boost = (uid: string) => {
         const d = cardDef(state, uid);
-        return d.category === 'character' ? d.counter ?? 0 : 3000;
+        if (d.category === 'character') return d.counter ?? 0;
+        const steps = d.abilities.find((a) => a.timing === 'counter')?.steps ?? [];
+        return steps.reduce((sum, st) => sum + (st.do === 'power' ? st.amount : 0), 0);
       };
       const total = pending.options.reduce((s, u) => s + boost(u), 0);
       if (total < need) return { type: 'pass', player };
@@ -94,6 +84,38 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       return { type: 'counter', player, uid: single ?? sorted[sorted.length - 1] };
     }
   }
+}
+
+type SelectPending = Extract<NonNullable<GameState['pending']>, { kind: 'selectTargets' }>;
+
+function chooseTargets(state: GameState, player: PlayerId, pending: SelectPending): string[] {
+  const me = state.players[player];
+  const opts = [...pending.options];
+  if (pending.intent === 'discard') {
+    opts.sort((a, b) => value(state, a) - value(state, b));
+    return opts.slice(0, Math.max(1, pending.min));
+  }
+  if (pending.intent === 'harm') {
+    // Efeitos que atingem "qualquer personagem": só mira os do oponente.
+    const theirs = opts.filter((u) => state.cards[u].owner !== player);
+    if (!theirs.length) return [];
+    theirs.sort((a, b) => value(state, b) - value(state, a));
+    return [theirs[0]];
+  }
+  // Cartas fora do campo (busca no deck, descarte): a mais valiosa.
+  if (opts.every((u) => !locate(state, u))) {
+    if (pending.ordered) return [];
+    opts.sort((a, b) => value(state, b) - value(state, a));
+    return opts.slice(0, pending.max);
+  }
+  // help: prioriza quem está na batalha, depois quem ainda pode atacar.
+  const b = state.battle;
+  if (b && opts.includes(b.target) && locate(state, b.target)?.player === player) return [b.target];
+  if (b && opts.includes(b.attacker)) return [b.attacker];
+  const active = opts.filter((u) => !locate(state, u)?.fc.rested);
+  const pool = active.length ? active : opts;
+  const leader = pool.find((u) => u === me.leader.uid);
+  return [leader ?? pool[0]];
 }
 
 function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Action {
@@ -121,6 +143,7 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
       const step = main?.steps[0];
       if (!step) return false;
       if (step.do === 'ko' || step.do === 'rest') return opp.characters.length > 0 && canBattle;
+      if (step.do === 'returnToHand' || step.do === 'toDeckBottom') return hitsOpponent(state, player, a.uid, step, 1);
       return false;
     })
     .sort((a, b) => (cardDef(state, b.uid).cost ?? 0) - (cardDef(state, a.uid).cost ?? 0));
@@ -134,6 +157,9 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
     if (step.do === 'rest') return opp.characters.some((c) => !c.rested);
     if (step.do === 'giveRestedDon') return me.donRested > 0;
     if (step.do === 'power') return !me.leader.rested;
+    // Devolver personagens custa caro (ex.: DON!! −4): só vale contra alvos de custo 3+.
+    if (step.do === 'returnToHand' || step.do === 'toDeckBottom') return hitsOpponent(state, player, a.uid, step, 3);
+    if (step.do === 'playFrom') return me.characters.length < 5;
     return false;
   });
   if (other) return other;
@@ -174,6 +200,14 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
   }
 
   return { type: 'endTurn', player };
+}
+
+/** O efeito atinge algum personagem do oponente com custo >= minCost? */
+function hitsOpponent(state: GameState, player: PlayerId, source: string, step: EffectStep, minCost: number): boolean {
+  if (!('target' in step) || typeof step.target !== 'object') return false;
+  return targetCandidates(state, player, source, step.target).some(
+    (u) => state.cards[u].owner !== player && (cardDef(state, u).cost ?? 0) >= minCost,
+  );
 }
 
 /** Reserva DON!! para habilidades do líder que custam DON!! (ex.: ③ do Kid). */

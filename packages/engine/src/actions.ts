@@ -27,6 +27,11 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
       case 'selectTargets': {
         const out: Action[] = [];
         if (pending.min === 0) out.push({ type: 'choose', player, uids: [] });
+        if (pending.min > 1) {
+          // Escolha obrigatória de várias cartas: uma combinação basta como exemplo.
+          out.push({ type: 'choose', player, uids: pending.options.slice(0, pending.min) });
+          return out;
+        }
         for (const uid of pending.options) out.push({ type: 'choose', player, uids: [uid] });
         return out;
       }

@@ -46,7 +46,8 @@ export interface CardTextTranslation {
 
 /** Filtro para escolha de alvos. */
 export interface TargetSpec {
-  side: 'own' | 'opponent';
+  /** 'any' = personagens de qualquer jogador ("Return up to 1 Character…"). */
+  side: 'own' | 'opponent' | 'any';
   kinds: Array<'leader' | 'character' | 'stage'>;
   upTo: number;
   maxPower?: number;
@@ -67,6 +68,13 @@ export interface CardFilter {
   category?: CardCategory;
   /** "other than [Nome]" */
   excludeName?: string;
+  /** "[Pacifista]": nome exato (ou nome alternativo). */
+  name?: string;
+}
+
+/** Condição verificada quando o passo vai resolver ("draw 1 card if you have 3 or less cards in your hand"). */
+export interface StepCondition {
+  handMax?: number;
 }
 
 /** Condições extras de uma habilidade ("If you have 3 or more Characters", "If this Character is rested"). */
@@ -91,7 +99,7 @@ export type TargetRef =
 
 export type Duration = 'turn' | 'battle';
 
-export type EffectStep =
+type EffectStepBody =
   | { do: 'power'; target: TargetRef; amount: number; duration: Duration }
   | { do: 'ko'; target: TargetRef }
   | { do: 'rest'; target: TargetRef }
@@ -116,7 +124,24 @@ export type EffectStep =
   /** "Set up to N of your DON!! cards as active." */
   | { do: 'setDonActive'; count: number }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
-  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' };
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' }
+  /** Resolve os passos do efeito [Counter] da própria carta (usado por [Trigger]). */
+  | { do: 'useCounterEffect' }
+  /** "Place … at the bottom of the owner's deck." */
+  | { do: 'toDeckBottom'; target: TargetRef }
+  /** "Add up to N … from your trash to your hand." */
+  | { do: 'fromTrashToHand'; upTo: number; filter: CardFilter }
+  /** "Play up to N … from your deck/hand/trash" (sem pagar custo). */
+  | { do: 'playFrom'; from: 'deck' | 'hand' | 'trash'; upTo: number; filter: CardFilter; rested?: boolean }
+  /** "… then shuffle your deck." */
+  | { do: 'shuffleDeck' }
+  /** "Look at N cards from the top of your deck and return them to the top or bottom of the deck in any order." */
+  | { do: 'arrangeTop'; look: number };
+
+/** Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado). */
+export type EffectStep = EffectStepBody & { if?: StepCondition };
+
+
 
 export type AbilityTiming =
   | 'onPlay'
@@ -242,6 +267,8 @@ export type Pending =
       prompt: string;
       intent: 'harm' | 'help' | 'discard';
       source: string;
+      /** A ordem dos cliques importa (ex.: ordem das cartas no topo do deck). */
+      ordered?: boolean;
     }
   | { kind: 'block'; player: PlayerId; options: string[] }
   | { kind: 'counter'; player: PlayerId; options: string[] }
@@ -257,10 +284,12 @@ export type Frame =
       steps: EffectStep[];
       i: number;
       choice?: string[];
+      /** Memória de passos com mais de uma escolha (ex.: arrangeTop). */
+      memo?: string[];
     }
   | { kind: 'battle' }
   | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean }
-  | { kind: 'play'; uid: string; replaceChoice?: string[] }
+  | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean }
   /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
   | { kind: 'endTurn' };
 

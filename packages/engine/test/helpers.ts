@@ -6,9 +6,10 @@ import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
 const DATA = join(__dirname, '../../../data');
 const load = (p: string) => JSON.parse(readFileSync(join(DATA, p), 'utf8'));
 
-export const cards: CardData[] = [...load('cards/st01.json').cards, ...load('cards/st02.json').cards];
+export const cards: CardData[] = ['st01', 'st02', 'st03'].flatMap((set) => load(`cards/${set}.json`).cards as CardData[]);
 export const luffy: DeckList = load('decks/st01-luffy.json');
 export const kid: DeckList = load('decks/st02-kid.json');
+export const crocodile: DeckList = load('decks/st03-crocodile.json');
 
 export function newGame(seed = 1, firstPlayer: PlayerId = 0): GameState {
   return createGame({
@@ -22,9 +23,19 @@ export function newGame(seed = 1, firstPlayer: PlayerId = 0): GameState {
   });
 }
 
-/** Partida já depois dos mulligans, no turno 1 do jogador 0. */
-export function started(seed = 1): GameState {
-  let s = newGame(seed, 0);
+/** Partida já depois dos mulligans, no turno 1 do jogador 0 (por padrão Luffy x Kid). */
+export function started(seed = 1, decks?: [DeckList, DeckList]): GameState {
+  let s = decks
+    ? createGame({
+        seed,
+        firstPlayer: 0,
+        cards,
+        players: [
+          { name: 'P0', deck: decks[0] },
+          { name: 'P1', deck: decks[1] },
+        ],
+      })
+    : newGame(seed, 0);
   s = applyAction(s, { type: 'mulligan', player: 0, redraw: false });
   s = applyAction(s, { type: 'mulligan', player: 1, redraw: false });
   return s;

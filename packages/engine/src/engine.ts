@@ -168,6 +168,7 @@ export function matchesFilter(def: CardDef, f: import('./types').CardFilter): bo
   if (f.maxCost !== undefined && (def.cost ?? 0) > f.maxCost) return false;
   if (f.minCost !== undefined && (def.cost ?? 0) < f.minCost) return false;
   if (f.excludeName && def.name === f.excludeName) return false;
+  if (f.name && def.name !== f.name && !def.aliases?.includes(f.name)) return false;
   return true;
 }
 
@@ -304,11 +305,14 @@ export function counterOptions(state: GameState, defender: PlayerId): string[] {
 }
 
 export function targetCandidates(state: GameState, controller: PlayerId, source: string, spec: TargetSpec): string[] {
-  const ps = state.players[spec.side === 'own' ? controller : opponent(controller)];
+  const sides: PlayerId[] =
+    spec.side === 'own' ? [controller] : spec.side === 'opponent' ? [opponent(controller)] : [opponent(controller), controller];
   const pool: FieldCard[] = [];
-  if (spec.kinds.includes('leader')) pool.push(ps.leader);
-  if (spec.kinds.includes('character')) pool.push(...ps.characters);
-  if (spec.kinds.includes('stage') && ps.stage) pool.push(ps.stage);
+  for (const ps of sides.map((id) => state.players[id])) {
+    if (spec.kinds.includes('leader')) pool.push(ps.leader);
+    if (spec.kinds.includes('character')) pool.push(...ps.characters);
+    if (spec.kinds.includes('stage') && ps.stage) pool.push(ps.stage);
+  }
   return pool
     .filter((fc) => {
       const def = cardDef(state, fc.uid);
@@ -696,7 +700,7 @@ function stepPlay(state: GameState, frame: PlayFrame) {
     ps.trash.push(out);
     log(state, owner, `${cardDef(state, out).name} é descartado para abrir espaço.`);
   }
-  ps.characters.push({ uid: frame.uid, rested: false, don: 0, playedOnTurn: state.turn });
+  ps.characters.push({ uid: frame.uid, rested: Boolean(frame.rested), don: 0, playedOnTurn: state.turn });
   state.stack.pop();
   pushAbilities(state, frame.uid, 'onPlay');
 }
@@ -810,6 +814,7 @@ function stepEffect(state: GameState, frame: EffectFrame) {
   if (done) {
     frame.i++;
     frame.choice = undefined;
+    frame.memo = undefined;
   }
 }
 
@@ -840,9 +845,71 @@ function resolveTargets(
   return null;
 }
 
+function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
+  const cond = step.if;
+  if (!cond) return true;
+  const ps = state.players[frame.controller];
+  if (cond.handMax !== undefined && ps.hand.length > cond.handMax) return false;
+  return true;
+}
+
+/** Pede ao controlador do efeito que escolha cartas fora do campo (deck, descarte...). */
+function askCards(
+  state: GameState,
+  frame: EffectFrame,
+  options: string[],
+  max: number,
+  prompt: string,
+  extra: { min?: number; intent?: 'help' | 'harm' | 'discard'; ordered?: boolean } = {},
+) {
+  state.pending = {
+    kind: 'selectTargets',
+    player: frame.controller,
+    options,
+    min: extra.min ?? 0,
+    max: Math.min(max, options.length),
+    prompt,
+    intent: extra.intent ?? 'help',
+    source: frame.source,
+    ...(extra.ordered ? { ordered: true } : {}),
+  };
+}
+
+/** Coloca em campo uma carta (de qualquer zona), sem pagar o custo. */
+function playFree(state: GameState, uid: string, rested = false) {
+  const def = cardDef(state, uid);
+  const ps = state.players[ownerOf(state, uid)];
+  if (def.category === 'character') {
+    detach(state, uid);
+    log(state, ps.id, `${def.name} entra em campo.`);
+    state.stack.push({ kind: 'play', uid, ...(rested ? { rested: true } : {}) });
+  } else if (def.category === 'stage') {
+    detach(state, uid);
+    if (ps.stage) {
+      const old = ps.stage.uid;
+      detach(state, old);
+      ps.trash.push(old);
+    }
+    ps.stage = { uid, rested, don: 0, playedOnTurn: state.turn };
+    log(state, ps.id, `${def.name} entra em campo.`);
+    pushAbilities(state, uid, 'onPlay');
+  }
+}
+
+/** Resolve os passos de outro efeito da própria carta ("Activate this card's [Main] effect"). */
+function useOwnEffect(state: GameState, frame: EffectFrame, timing: 'main' | 'counter'): false {
+  const ability = cardDef(state, frame.source).abilities.find((a) => a.timing === timing);
+  frame.i++;
+  frame.choice = undefined;
+  frame.memo = undefined;
+  if (ability) pushEffect(state, frame.source, frame.controller, ability.steps);
+  return false; // o índice já avançou
+}
+
 function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   const ps = state.players[frame.controller];
   const srcName = cardDef(state, frame.source).name;
+  if (!frame.choice && !frame.memo && !stepConditionMet(state, frame, step)) return true;
 
   switch (step.do) {
     case 'power': {
@@ -953,22 +1020,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'playThis': {
-      const def = cardDef(state, frame.source);
       if (zoneOf(state, frame.source) === 'character' || zoneOf(state, frame.source) === 'stage') return true;
-      if (def.category === 'character') {
-        detach(state, frame.source);
-        log(state, frame.controller, `${def.name} entra em campo.`);
-        state.stack.push({ kind: 'play', uid: frame.source });
-      } else if (def.category === 'stage') {
-        detach(state, frame.source);
-        if (ps.stage) {
-          const old = ps.stage.uid;
-          detach(state, old);
-          ps.trash.push(old);
-        }
-        ps.stage = { uid: frame.source, rested: false, don: 0, playedOnTurn: state.turn };
-        pushAbilities(state, frame.source, 'onPlay');
-      }
+      playFree(state, frame.source);
       return true;
     }
     case 'trashFromHand': {
@@ -1032,11 +1085,99 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (frame.choice) return true; // o jogador já confirmou
       state.pending = { kind: 'manual', player: frame.controller, source: frame.source, text: step.text };
       return false;
-    case 'useMainEffect': {
-      const main = cardDef(state, frame.source).abilities.find((a) => a.timing === 'main');
-      frame.i++;
-      if (main) pushEffect(state, frame.source, frame.controller, main.steps);
-      return false; // já avançamos o índice manualmente
+    case 'useMainEffect':
+      return useOwnEffect(state, frame, 'main');
+    case 'useCounterEffect':
+      return useOwnEffect(state, frame, 'counter');
+    case 'toDeckBottom': {
+      const t = resolveTargets(state, frame, step.target, 'harm', `${srcName}: escolha um personagem para o fundo do deck.`);
+      if (!t) return false;
+      for (const uid of t) {
+        if (locate(state, uid)?.zone !== 'character') continue;
+        const owner = state.players[ownerOf(state, uid)];
+        detach(state, uid);
+        owner.deck.push(uid);
+        log(state, frame.controller, `${cardDef(state, uid).name} vai para o fundo do deck de ${owner.name}.`);
+      }
+      return true;
+    }
+    case 'fromTrashToHand': {
+      const options = ps.trash.filter((u) => matchesFilter(cardDef(state, u), step.filter));
+      if (!frame.choice) {
+        if (!options.length) return true;
+        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) do descarte para a mão.`);
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => options.includes(u))) {
+        removeFrom(ps.trash, uid);
+        ps.hand.push(uid);
+        log(state, frame.controller, `${ps.name} adiciona ${cardDef(state, uid).name} do descarte à mão.`);
+      }
+      return true;
+    }
+    case 'playFrom': {
+      const zone = step.from === 'deck' ? ps.deck : step.from === 'hand' ? ps.hand : ps.trash;
+      const options = zone.filter((u) => {
+        const def = cardDef(state, u);
+        return (def.category === 'character' || def.category === 'stage') && matchesFilter(def, step.filter);
+      });
+      if (!frame.choice) {
+        if (!options.length) return true;
+        const where = step.from === 'deck' ? 'do deck' : step.from === 'hand' ? 'da mão' : 'do descarte';
+        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) ${where} para jogar.`);
+        return false;
+      }
+      // Empilhadas ao contrário para entrarem na ordem escolhida.
+      const chosen = frame.choice.filter((u) => options.includes(u));
+      for (const uid of chosen.reverse()) playFree(state, uid, step.rested);
+      return true;
+    }
+    case 'shuffleDeck':
+      shuffleInPlace(state, ps.deck);
+      log(state, frame.controller, `${ps.name} embaralha o deck.`);
+      return true;
+    case 'arrangeTop': {
+      // 1ª escolha: cartas que vão para o fundo. 2ª (se sobrar 2+ no topo): ordem do topo.
+      if (!frame.memo) {
+        const top = ps.deck.slice(0, step.look);
+        if (!top.length) return true;
+        if (!frame.choice) {
+          askCards(
+            state,
+            frame,
+            top,
+            top.length,
+            `${srcName}: estas são as ${top.length} cartas do topo. Escolha as que vão para o fundo do deck (na ordem); as demais ficam no topo.`,
+            { ordered: true },
+          );
+          return false;
+        }
+        const bottom = frame.choice.filter((u) => top.includes(u));
+        const keep = top.filter((u) => !bottom.includes(u));
+        // As que ficam continuam no topo (visíveis) até a escolha da ordem.
+        for (const uid of bottom) removeFrom(ps.deck, uid);
+        ps.deck.push(...bottom);
+        if (bottom.length) log(state, frame.controller, `${ps.name} coloca ${bottom.length} carta(s) no fundo do deck.`);
+        if (keep.length <= 1) return true;
+        frame.memo = keep;
+        frame.choice = undefined;
+        askCards(
+          state,
+          frame,
+          keep,
+          keep.length,
+          `${srcName}: clique nas cartas na ordem em que ficarão no topo (a primeira fica por cima).`,
+          { min: keep.length, ordered: true },
+        );
+        return false;
+      }
+      const keep = frame.memo;
+      const chosen = (frame.choice ?? []).filter((u) => keep.includes(u));
+      const order = [...chosen, ...keep.filter((u) => !chosen.includes(u))];
+      for (const uid of order) removeFrom(ps.deck, uid);
+      ps.deck.unshift(...order);
+      log(state, frame.controller, `${ps.name} devolve ${order.length} carta(s) ao topo do deck.`);
+      return true;
     }
   }
 }
