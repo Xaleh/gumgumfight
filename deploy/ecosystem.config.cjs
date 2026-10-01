@@ -39,7 +39,8 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'production',
-        HOST: '127.0.0.1', // acessível só pelo Nginx
+        // 127.0.0.1 (Nginx no host) ou 0.0.0.0 (Nginx Proxy Manager em Docker, protegido pelo firewall)
+        HOST: env.HOST || '127.0.0.1',
         PORT: env.PORT || '3310',
         DB_PATH: path.join(SHARED, 'gumgum.db'),
         WEB_DIST: path.join(RELEASE, 'web'),

@@ -64,8 +64,9 @@ ele publica em **https://gumgumfight.duckdns.org**:
 3. Recarrega o app `gumgumfight` no pm2 e confere `/api/health`. **Se falhar, volta sozinho para a versão anterior.**
 4. Mantém os 5 últimos releases. O banco fica em `~/apps/gumgumfight/shared/gumgum.db` e sobrevive aos deploys.
 
-O app escuta só em `127.0.0.1:3310`, atrás do Nginx. Os outros apps da VM não são tocados: o deploy usa
-um Node ≥ 22.13 próprio (via nvm, se o Node padrão da VM for mais antigo) e um arquivo de site separado no Nginx.
+O app fica atrás do proxy reverso, na porta 3310: em `127.0.0.1` com Nginx no host, ou acessível à rede Docker
+com Nginx Proxy Manager. Os outros apps da VM não são tocados: o deploy usa um Node ≥ 22.13 próprio (via nvm, se
+o Node padrão da VM for mais antigo) e um site separado no proxy.
 
 ### Configuração inicial (uma vez)
 
@@ -81,6 +82,13 @@ um Node ≥ 22.13 próprio (via nvm, se o Node padrão da VM for mais antigo) e 
    bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
    ```
    Opcional: `CERTBOT_EMAIL=voce@exemplo.com` (avisos do Let's Encrypt), `PORT=...` (se a 3310 estiver ocupada).
+
+   **Com Nginx Proxy Manager** (Nginx em Docker, painel na porta 81), o script detecta o container sozinho e:
+   - faz o app escutar numa porta que a rede Docker do proxy alcança;
+   - libera no firewall (iptables) só a porta 3310, e só para essa rede.
+
+   Ele não mexe na configuração do proxy. No fim, mostra os campos para criar o *Proxy Host* no painel
+   (domínio, `Forward Hostname/IP`, porta 3310 e o certificado SSL na aba SSL).
 4. **No GitHub** → Settings → Secrets and variables → Actions → *New repository secret*:
 
    | Secret               | Valor                                               |

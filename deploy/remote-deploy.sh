@@ -19,6 +19,7 @@ set -a
 . "$ENV_FILE"
 set +a
 PORT="${PORT:-3310}"
+case "${HOST:-127.0.0.1}" in 0.0.0.0 | 127.0.0.1 | "") CHECK_HOST=127.0.0.1 ;; *) CHECK_HOST="$HOST" ;; esac
 NODE_BIN="${NODE_BIN:-node}"
 PM2_BIN="${PM2_BIN:-pm2}"
 # O pm2 é um script Node: garante que o Node dele esteja no PATH (instalações via nvm).
@@ -42,7 +43,7 @@ activate() {
 
 healthy() {
   for _ in $(seq 1 30); do
-    if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then return 0; fi
+    if curl -fsS "http://$CHECK_HOST:$PORT/api/health" >/dev/null 2>&1; then return 0; fi
     sleep 1
   done
   return 1
@@ -60,7 +61,7 @@ if ! healthy; then
   die "Deploy falhou."
 fi
 "$PM2_BIN" save >/dev/null
-log "Online em 127.0.0.1:$PORT"
+log "Online em $CHECK_HOST:$PORT"
 
 if [ -n "${IMPORT_SETS:-}" ]; then
   log "Importando cartas: $IMPORT_SETS"
