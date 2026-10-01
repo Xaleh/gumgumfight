@@ -135,6 +135,26 @@ decks que criou. Decks de outros jogadores aparecem em "Decks da comunidade": d�
 Limpar os dados do site no navegador faz perder a edição dos próprios decks.
 **Exportar/Importar lista** usa o formato de texto da comunidade (`4xOP01-016`, uma carta por linha).
 
+## Efeitos automáticos e modo manual
+
+Toda carta da base é jogável:
+
+- **Efeito automatizado:** cartas com script (`packages/engine/src/cards/scripts.ts`) resolvem tudo sozinhas.
+- **Modo manual** (cartas com ⚙): o motor lê os momentos marcados no texto ([On Play], [When Attacking],
+  [Activate: Main], [Main], [Counter], [Trigger], [On K.O.], [End of Your Turn]…). Na hora certa, o jogo pausa,
+  mostra o efeito no painel lateral e libera as **ferramentas manuais**: comprar, nocautear, mover cartas entre
+  mão, campo, deck, descarte e Vida, virar/desvirar, ±poder, DON!!, ver o topo do deck e o descarte. O jogador
+  aplica o efeito e clica em **Concluir**. As ferramentas também ficam disponíveis no próprio turno, para
+  efeitos contínuos. Toda operação passa pelo motor, então nenhuma carta some nem duplica.
+- **Cobertura:** a tela "📊 Cobertura das cartas" (no menu) e `GET /api/coverage` mostram, por coleção,
+  quantas cartas são automáticas, quantas são manuais e como está a tradução.
+
+Para checar a robustez depois de importar coleções novas (decks aleatórios de toda a base, bot x bot):
+
+```bash
+npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a URL de /api/cards
+```
+
 ## Como jogar
 
 - **Mulligan:** no início, mantenha ou troque a mão (uma vez).
@@ -205,6 +225,11 @@ npm run cards:import -- --file resp.json  # importa uma resposta da API salva em
 ```
 
 - Versões com arte alternativa (mesmo ID) são unificadas; cartas DON!! são ignoradas.
+- **Limpeza:** o importador remove do nome a versão de impressão ("(Parallel)", "(025)", "(OP01-060)"…),
+  separa do texto as notas de errata/reimpressão (campo `notes`), converte `"X" type` para `{X} type` e
+  reconhece "Also treat this card's name as [X]" (campo `aliases`).
+- **Tipos:** a API junta vários tipos com espaço ("Heart Pirates Supernovas"). O importador separa pelo maior
+  tipo conhecido em `data/card-types.json` mais os tipos citados nos textos. Inclua tipos novos nessa lista.
 - A resposta original de cada carta fica guardada (coluna `raw`) para poder remapear sem baixar de novo.
 - Antes da primeira importação, o jogo usa dados **provisórios** de `data/cards` (escritos de memória). Eles nunca
   sobrescrevem cartas vindas da API.

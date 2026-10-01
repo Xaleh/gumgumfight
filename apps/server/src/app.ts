@@ -1,5 +1,5 @@
 import fastifyStatic from '@fastify/static';
-import { type CardData, type DeckList, validateDeck } from '@gumgum/engine';
+import { automationStatus, type CardData, type DeckList, validateDeck } from '@gumgum/engine';
 import Fastify from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
@@ -38,6 +38,36 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
   app.get<{ Params: { id: string } }>('/api/cards/:id', async (req, reply) => {
     const [card] = present(getCards(db, [req.params.id]));
     return card ?? reply.code(404).send({ error: 'Carta não encontrada' });
+  });
+
+  /**
+   * Cobertura por coleção: quantas cartas têm efeito automatizado, quantas são
+   * resolvidas com as ferramentas manuais e como está a tradução.
+   */
+  app.get('/api/coverage', async () => {
+    type Row = { set: string; total: number; vanilla: number; scripted: number; manual: number; ptComplete: number };
+    const bySet = new Map<string, Row>();
+    for (const c of present(listCards(db))) {
+      const set = c.set ?? c.id.split('-')[0];
+      const row = bySet.get(set) ?? { set, total: 0, vanilla: 0, scripted: 0, manual: 0, ptComplete: 0 };
+      row.total++;
+      row[automationStatus(c)]++;
+      if (c.i18n?.pt?.source !== 'partial') row.ptComplete++;
+      bySet.set(set, row);
+    }
+    const sets = [...bySet.values()].sort((a, b) => a.set.localeCompare(b.set, 'en', { numeric: true }));
+    const total = sets.reduce(
+      (acc, r) => ({
+        set: 'TOTAL',
+        total: acc.total + r.total,
+        vanilla: acc.vanilla + r.vanilla,
+        scripted: acc.scripted + r.scripted,
+        manual: acc.manual + r.manual,
+        ptComplete: acc.ptComplete + r.ptComplete,
+      }),
+      { set: 'TOTAL', total: 0, vanilla: 0, scripted: 0, manual: 0, ptComplete: 0 },
+    );
+    return { total, sets };
   });
 
   /** Cartas cuja tradução automática ficou parcial: lista de trabalho para revisão manual. */

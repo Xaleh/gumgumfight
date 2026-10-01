@@ -11,8 +11,18 @@
 import { readFileSync } from 'node:fs';
 import { type CardData, hasScript, translateToPt } from '@gumgum/engine';
 import { openDb, upsertCards } from './db';
-import { allEndpoints, DEFAULT_API_BASE, mapApiResponse, setEndpoint } from './optcgapi';
-import { fromUserCwd } from './paths';
+import { allEndpoints, DEFAULT_API_BASE, mapApiResponse, rowsOf, setEndpoint, typeVocabulary } from './optcgapi';
+import { join } from 'node:path';
+import { DATA_DIR, fromUserCwd } from './paths';
+
+/** Lista curada de tipos (data/card-types.json), usada para separar o sub_types da API. */
+function knownTypes(): string[] {
+  try {
+    return (JSON.parse(readFileSync(join(DATA_DIR, 'card-types.json'), 'utf8')) as { types: string[] }).types;
+  } catch {
+    return [];
+  }
+}
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, { headers: { accept: 'application/json', 'user-agent': 'gumgumfight-importer' } });
@@ -45,8 +55,17 @@ async function main() {
 
   const cards = new Map<string, CardData>();
   const raw = new Map<string, unknown>();
-  for (const src of sources) {
-    const r = mapApiResponse(await src.load());
+  // Baixa tudo antes de mapear: o vocabulário de tipos vem dos textos de todas as fontes.
+  const bodies: Array<{ label: string; body: unknown }> = [];
+  for (const src of sources) bodies.push({ label: src.label, body: await src.load() });
+  const vocab = typeVocabulary(
+    bodies.flatMap((b) => rowsOf(b.body)),
+    knownTypes(),
+  );
+
+  for (const { label, body } of bodies) {
+    const r = mapApiResponse(body, vocab);
+    const src = { label };
     console.log(`${src.label}: ${r.cards.length} cartas${r.ignored ? ` (${r.ignored} entradas ignoradas)` : ''}`);
     for (const c of r.cards) {
       cards.set(c.id, c);

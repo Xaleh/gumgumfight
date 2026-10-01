@@ -52,6 +52,15 @@ export function ownerToken(): string {
   return ownerMemo;
 }
 
+export interface CoverageRow {
+  set: string;
+  total: number;
+  vanilla: number;
+  scripted: number;
+  manual: number;
+  ptComplete: number;
+}
+
 export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards'>;
 
 export type ApiCard = CardData & { provisional?: boolean };
@@ -86,6 +95,7 @@ export const api = {
       `/api/decks/${encodeURIComponent(id)}`,
     ),
   cards: () => get<ApiCard[]>('/api/cards'),
+  coverage: () => get<{ total: CoverageRow; sets: CoverageRow[] }>('/api/coverage'),
   createDeck: (d: DeckInput) => send<DeckSummary>('POST', '/api/decks', d),
   updateDeck: (id: string, d: DeckInput) => send<DeckSummary>('PUT', `/api/decks/${encodeURIComponent(id)}`, d),
   deleteDeck: (id: string) => send<void>('DELETE', `/api/decks/${encodeURIComponent(id)}`),

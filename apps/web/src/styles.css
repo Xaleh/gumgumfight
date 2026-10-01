@@ -1349,3 +1349,150 @@ input[type='number'] {
   margin: 0;
   line-height: 1.4;
 }
+
+/* ------------------------------------------------------------------ modo manual */
+
+.manual-tools {
+  border-color: rgba(242, 193, 78, 0.45);
+}
+.tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tool-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.tool-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tool-buttons .btn.small {
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.prompt.manual {
+  border-color: #c9a20c;
+}
+.prompt.manual .effect {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.card .manual-badge {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.9em;
+  z-index: 1;
+}
+.viewer {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+.viewer-count {
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.viewer-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 4px;
+  margin-bottom: 10px;
+}
+.viewer-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  --cw: 84px;
+  width: 120px;
+}
+.viewer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+}
+.viewer-actions .btn.small {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+/* ------------------------------------------------------------------ cobertura */
+
+.link-btn {
+  margin-top: 12px;
+  width: 100%;
+  background: transparent;
+}
+.coverage {
+  min-height: 100%;
+}
+.coverage-body {
+  padding: 14px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+.cov-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cov-table th,
+.cov-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.cov-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+}
+.cov-table td:nth-child(3) {
+  width: 40%;
+}
+.cov-total td {
+  background: rgba(242, 193, 78, 0.08);
+  font-weight: 700;
+}
+.cov-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg2);
+}
+.cov-scripted {
+  background: var(--ok);
+}
+.cov-vanilla {
+  background: #4b7aa6;
+}
+.cov-manual {
+  background: #c9a20c;
+}
+.legend {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin: 0 3px 0 8px;
+  vertical-align: middle;
+}
+.prompt.in-panel {
+  position: static;
+  width: auto;
+  margin: 0;
+  box-shadow: none;
+}

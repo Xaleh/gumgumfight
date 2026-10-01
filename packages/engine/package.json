@@ -8,7 +8,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "simulate": "tsx scripts/simulate.ts"
+    "simulate": "tsx scripts/simulate.ts",
+    "simulate:all": "tsx scripts/simulate-all.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

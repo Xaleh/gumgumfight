@@ -64,7 +64,15 @@ function DeckWarning({ deck }: { deck?: DeckSummary }) {
   );
 }
 
-export function Menu({ onStart, onBuildDecks }: { onStart: (s: GameSetup) => void; onBuildDecks: () => void }) {
+export function Menu({
+  onStart,
+  onBuildDecks,
+  onCoverage,
+}: {
+  onStart: (s: GameSetup) => void;
+  onBuildDecks: () => void;
+  onCoverage: () => void;
+}) {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<GameMode>('bot');
@@ -194,6 +202,10 @@ export function Menu({ onStart, onBuildDecks }: { onStart: (s: GameSetup) => voi
 
         <button className="btn primary big" disabled={!deck0 || !deck1 || loading} onClick={start}>
           {loading ? 'Carregando…' : 'Começar partida'}
+        </button>
+
+        <button className="btn small link-btn" onClick={onCoverage}>
+          📊 Cobertura das cartas (automação e tradução)
         </button>
 
         <details className="advanced">

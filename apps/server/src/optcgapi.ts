@@ -68,7 +68,103 @@ const cleanText = (v: unknown) =>
         .replace(/[ \t]+\n/g, '\n')
         .trim();
 
-export function mapApiCard(raw: Raw): CardData | null {
+/** Observações que a API anexa ao texto e que não são efeito da carta. */
+const NOTE_PATTERNS = [
+  /\s*This card has been officially errata'd\.?/gi,
+  /\s*DISCLAIMER:.*$/gims,
+  /\s*While the original print is exclusively available.*$/gims,
+  /\s*The main difference between this card and the original print.*$/gims,
+];
+
+/**
+ * A API anexa ao nome a versão de impressão: "(Parallel)", "(Alternate Art)",
+ * "(Reprint)", "(SP)", "(Manga)", "(025)"... Nenhuma faz parte do nome da carta.
+ */
+const VERSION_SUFFIX = new RegExp(
+  '\\s*\\((?:' +
+    [
+      '\\d+', // (025)
+      '[A-Z]+\\d*(?:-\\d+)?', // (OP01-060), (P-041), (OP08), (SP), (SPR), (TR)
+      '[^()]*\\b(?:Art|Reprint|Parallel|Foil|Manga|Pack|Topper|Poster|Promo|Version|Gold|Silver|Gem|Signature)\\b[^()]*',
+    ].join('|') +
+    ')\\)\\s*$',
+  // sem flag "i": "(SP)"/"(TR)" são siglas em maiúsculas; "(Zala)", "(Mikita)" fazem parte do nome
+);
+
+export function cleanName(name: string): string {
+  let out = name.trim();
+  for (;;) {
+    const next = out.replace(VERSION_SUFFIX, '');
+    if (next === out) return out;
+    out = next.trim();
+  }
+}
+
+/** Separa as observações da API do texto do efeito. */
+export function extractNotes(text: string): { text: string; notes: string[] } {
+  const notes: string[] = [];
+  let out = text;
+  for (const re of NOTE_PATTERNS) {
+    out = out.replace(re, (m) => {
+      notes.push(m.trim());
+      return '';
+    });
+  }
+  return { text: out.trim(), notes };
+}
+
+/** "Straw Hat Crew" type -> {Straw Hat Crew} type (forma oficial das cartas). */
+export const normalizeTypeQuotes = (text: string) => text.replace(/"([^"\n]+)"(\s+type)/g, '{$1}$2');
+
+/**
+ * Vocabulário de tipos para separar o campo sub_types: tipos citados nos textos
+ * ({X} type / "X" type) + a lista curada (data/card-types.json).
+ */
+export function typeVocabulary(rows: Raw[], known: Iterable<string> = []): Set<string> {
+  const vocab = new Set(known);
+  for (const r of rows) {
+    const text = String(r.card_text ?? r.text ?? '');
+    for (const m of text.matchAll(/[{"]([^}"\n]+)[}"]\s+type/g)) vocab.add(m[1].trim());
+  }
+  return vocab;
+}
+
+/**
+ * A API junta os tipos com espaço ("Heart Pirates Supernovas"). Separa pelo maior
+ * tipo conhecido em cada posição; palavras desconhecidas ficam agrupadas.
+ */
+export function splitTypes(raw: string, vocab: Set<string>): string[] {
+  const trimmed = raw.trim().replace(/\s+/g, ' ');
+  // Valores sem sentido vindos da API ("5000", "?", "NULL") não são tipos.
+  if (!trimmed || trimmed === 'NULL' || /^[\d?\s-]+$/.test(trimmed)) return [];
+  if (/[/;,]/.test(trimmed)) return trimmed.split(/\s*[/;,]\s*/).filter(Boolean);
+  if (vocab.has(trimmed)) return [trimmed];
+  const words = trimmed.split(/\s+/);
+  const out: string[] = [];
+  let unknown: string[] = [];
+  for (let i = 0; i < words.length; ) {
+    let end = 0;
+    for (let j = words.length; j > i; j--) {
+      if (vocab.has(words.slice(i, j).join(' '))) {
+        end = j;
+        break;
+      }
+    }
+    if (end) {
+      if (unknown.length) out.push(unknown.join(' '));
+      unknown = [];
+      out.push(words.slice(i, end).join(' '));
+      i = end;
+    } else {
+      unknown.push(words[i]);
+      i++;
+    }
+  }
+  if (unknown.length) out.push(unknown.join(' '));
+  return out;
+}
+
+export function mapApiCard(raw: Raw, vocab: Set<string> = new Set()): CardData | null {
   const id = pick(raw, 'card_set_id', 'id', 'card_id', 'code', 'number');
   const name = pick(raw, 'card_name', 'name');
   const typeRaw = String(pick(raw, 'card_type', 'category', 'type') ?? '').toLowerCase();
@@ -81,17 +177,20 @@ export function mapApiCard(raw: Raw): CardData | null {
     .map((c) => c.toLowerCase())
     .filter((c): c is Color => COLORS.includes(c as Color));
 
-  // Tipos: separados por "/" quando possível; senão ficam como um item só
-  // (o motor sabe procurar "Straw Hat Crew" dentro de "Supernovas Straw Hat Crew").
-  const types = splitList(pick(raw, 'sub_types', 'types', 'traits', 'feature'), /\s*[/;,]\s*/);
+  // Tipos: a API junta vários tipos com espaço; o vocabulário vindo dos textos separa.
+  // (Mesmo se sobrar algo junto, o motor procura "Straw Hat Crew" dentro de "Supernovas Straw Hat Crew".)
+  const typesRaw = pick(raw, 'sub_types', 'types', 'traits', 'feature');
+  const types = Array.isArray(typesRaw) ? splitList(typesRaw, /,/) : splitTypes(String(typesRaw ?? ''), vocab);
 
   const explicitTrigger = pick(raw, 'trigger', 'trigger_text');
-  const split = splitTrigger(cleanText(pick(raw, 'card_text', 'text', 'effect')));
+  const { text: effectText, notes } = extractNotes(cleanText(pick(raw, 'card_text', 'text', 'effect')));
+  const split = splitTrigger(normalizeTypeQuotes(effectText));
+  const aliases = [...split.text.matchAll(/Also treat this card's name as \[([^\]]+)\]/g)].map((m) => m[1]);
   const cardId = String(id).trim();
 
   return {
     id: cardId,
-    name: String(name).replace(/\s*\((?:Parallel|Alternate Art)\)\s*$/i, '').trim(),
+    name: cleanName(String(name)),
     category,
     colors,
     cost: category === 'leader' ? undefined : num(pick(raw, 'card_cost', 'cost')),
@@ -101,7 +200,9 @@ export function mapApiCard(raw: Raw): CardData | null {
     attributes: splitList(pick(raw, 'attribute', 'attributes'), /\s*[/;,]\s*/),
     types,
     text: split.text,
-    trigger: explicitTrigger ? cleanText(explicitTrigger) : split.trigger,
+    trigger: explicitTrigger ? normalizeTypeQuotes(cleanText(explicitTrigger)) : split.trigger,
+    ...(notes.length ? { notes } : {}),
+    ...(aliases.length ? { aliases } : {}),
     set: cardId.split('-')[0],
     rarity: pick(raw, 'rarity') ? String(pick(raw, 'rarity')) : undefined,
     imageUrl: pick(raw, 'card_image', 'image_url', 'imageUrl', 'image') as string | undefined,
@@ -112,14 +213,24 @@ export function mapApiCard(raw: Raw): CardData | null {
  * Converte uma resposta da API em cartas únicas. Versões alternativas (arte
  * paralela) têm o mesmo card_set_id: fica a versão cujo card_image_id é o próprio ID.
  */
-export function mapApiResponse(body: unknown): { cards: CardData[]; raw: Map<string, unknown>; ignored: number } {
+export function rowsOf(body: unknown): Raw[] {
+  return (
+    Array.isArray(body) ? body : ((body as { data?: unknown[] })?.data ?? (body as { cards?: unknown[] })?.cards ?? [])
+  ) as Raw[];
+}
+
+export function mapApiResponse(
+  body: unknown,
+  vocab?: Set<string>,
+): { cards: CardData[]; raw: Map<string, unknown>; ignored: number } {
   const rows = (
     Array.isArray(body) ? body : ((body as { data?: unknown[] })?.data ?? (body as { cards?: unknown[] })?.cards ?? [])
   ) as Raw[];
   const byId = new Map<string, { card: CardData; raw: Raw; primary: boolean }>();
+  const types = vocab ?? typeVocabulary(rows);
   let ignored = 0;
   for (const raw of rows) {
-    const card = mapApiCard(raw);
+    const card = mapApiCard(raw, types);
     if (!card) {
       ignored++;
       continue;

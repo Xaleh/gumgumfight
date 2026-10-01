@@ -6,6 +6,8 @@ import {
   getPower,
   legalActions,
   locate,
+  manualAllowed,
+  translateToPt,
   type PlayerId,
 } from '@gumgum/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +17,7 @@ import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
+import { ManualTools } from './ManualTools';
 
 type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don' };
 
@@ -246,6 +249,12 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
             onAttackMode={(attacker) => setMode({ kind: 'attack', attacker })}
           />
         )}
+        {pending?.kind === 'manual' && pending.player === human && (
+          <ManualPrompt state={state} onDone={() => dispatch({ type: 'manualDone', player: human })} />
+        )}
+        {human !== null && manualAllowed(state, human) && (
+          <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} />
+        )}
         <LogPanel state={state} />
       </aside>
     </div>
@@ -394,6 +403,9 @@ function PromptBar(props: {
           </div>
         </div>
       );
+    case 'manual':
+      // Fica no painel lateral (ManualPrompt), para não cobrir a mão e o campo.
+      return null;
     case 'trigger':
       return (
         <div className="prompt">
@@ -410,6 +422,26 @@ function PromptBar(props: {
         </div>
       );
   }
+}
+
+function ManualPrompt({ state, onDone }: { state: GameState; onDone: () => void }) {
+  const { lang } = useSettings();
+  const pending = state.pending;
+  if (pending?.kind !== 'manual') return null;
+  const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
+  return (
+    <div className="prompt manual in-panel">
+      <div className="prompt-title">⚙ Efeito manual: {cardDef(state, pending.source).name}</div>
+      <p className="effect">{text}</p>
+      <p className="muted small">
+        Ainda não é automático: aplique com as ferramentas abaixo (clique numa carta do tabuleiro para ver as opções dela)
+        e depois conclua. Se não se aplicar, só conclua.
+      </p>
+      <button className="btn primary" onClick={onDone}>
+        Concluir efeito
+      </button>
+    </div>
+  );
 }
 
 function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {

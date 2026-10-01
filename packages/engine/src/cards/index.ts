@@ -1,4 +1,4 @@
-import type { CardData, CardDef, Keyword } from '../types';
+import type { Ability, AbilityTiming, CardData, CardDef, Keyword } from '../types';
 import { CARD_SCRIPTS } from './scripts';
 
 const KEYWORD_PATTERNS: Array<[Keyword, RegExp]> = [
@@ -8,13 +8,19 @@ const KEYWORD_PATTERNS: Array<[Keyword, RegExp]> = [
   ['banish', /\[Banish\]/i],
 ];
 
+const splitLines = (text: string) =>
+  text
+    .split(/\n|<br\s*\/?>/i)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
 /**
  * Palavras-chave "incondicionais" detectadas no texto: só conta se a palavra-chave
  * aparece no início de uma linha (ex.: "[Blocker] (After your opponent declares...)").
  * Palavras-chave condicionais ("[DON!! x2] This Character gains [Rush]") exigem script.
  */
 export function detectKeywords(text: string): Keyword[] {
-  const lines = text.split(/\n|<br\s*\/?>/i).map((l) => l.trim());
+  const lines = splitLines(text);
   const found: Keyword[] = [];
   for (const [kw, re] of KEYWORD_PATTERNS) {
     if (lines.some((l) => re.test(l) && l.search(re) === 0)) found.push(kw);
@@ -22,18 +28,75 @@ export function detectKeywords(text: string): Keyword[] {
   return found;
 }
 
+/** Marcações de momento → quando o motor pausa para o jogador aplicar o efeito. */
+const TIMING_TAGS: Array<[RegExp, AbilityTiming]> = [
+  [/\[Activate: ?Main\]/i, 'activateMain'],
+  [/\[On Play\]/i, 'onPlay'],
+  [/\[When Attacking\]/i, 'whenAttacking'],
+  [/\[On K\.O\.\]/i, 'onKO'],
+  [/\[On Block\]/i, 'onBlock'],
+  [/\[End of Your Turn\]/i, 'endOfTurn'],
+  [/\[Counter\]/i, 'counter'],
+  [/\[Main\]/i, 'main'],
+];
+
+/** Só palavras-chave e lembretes, sem efeito a aplicar ("[Blocker] (After your...)"). */
+const KEYWORD_ONLY = /^(\[(Rush|Blocker|Double Attack|Banish)\]\s*(\([^)]*\))?\s*)+$/i;
+
+/**
+ * Habilidades manuais derivadas do texto de uma carta sem script: em cada momento
+ * marcado no texto ([On Play], [When Attacking]...), o motor pausa e o jogador
+ * aplica o efeito com as ferramentas manuais. Linhas sem momento (efeitos contínuos
+ * como "[DON!! x1] This Character gains +1000 power") viram 'static', só informativas.
+ */
+export function manualAbilities(card: Pick<CardData, 'category' | 'text' | 'trigger'>): Ability[] {
+  const abilities: Ability[] = [];
+  for (const line of splitLines(card.text ?? '')) {
+    if (KEYWORD_ONLY.test(line)) continue;
+    const found = TIMING_TAGS.find(([re]) => re.test(line));
+    // [Main] e [Counter] só valem como momento em eventos.
+    let timing: AbilityTiming = found ? found[1] : 'static';
+    if ((timing === 'main' || timing === 'counter') && card.category !== 'event') timing = 'static';
+    const don = line.match(/\[DON!! x(\d+)\]/i);
+    abilities.push({
+      timing,
+      manual: true,
+      text: line,
+      don: don ? Number(don[1]) : undefined,
+      oncePerTurn: /\[Once Per Turn\]/i.test(line) || undefined,
+      yourTurn: /\[Your Turn\]/i.test(line) || undefined,
+      opponentsTurn: /\[Opponent's Turn\]/i.test(line) || undefined,
+      label: timing === 'activateMain' ? 'Ativar efeito (manual)' : undefined,
+      steps: timing === 'static' ? [] : [{ do: 'manual', text: line }],
+    });
+  }
+  if (card.trigger?.trim()) {
+    abilities.push({ timing: 'trigger', manual: true, text: card.trigger, steps: [{ do: 'manual', text: card.trigger }] });
+  }
+  return abilities;
+}
+
 export function buildCardDef(data: CardData): CardDef {
   const script = CARD_SCRIPTS[data.id];
+  const abilities = script?.abilities ?? manualAbilities(data);
   return {
     ...data,
     keywords: script?.keywords ?? detectKeywords(data.text ?? ''),
-    abilities: script?.abilities ?? [],
+    abilities,
     scripted: Boolean(script),
+    manual: abilities.some((a) => a.manual),
   };
 }
 
 export function hasScript(cardId: string): boolean {
   return cardId in CARD_SCRIPTS;
+}
+
+/** Situação de automação de uma carta (para relatórios de cobertura). */
+export function automationStatus(card: CardData): 'vanilla' | 'scripted' | 'manual' {
+  if (hasScript(card.id)) return 'scripted';
+  const meaningful = splitLines(card.text ?? '').some((l) => !KEYWORD_ONLY.test(l)) || Boolean(card.trigger?.trim());
+  return meaningful ? 'manual' : 'vanilla';
 }
 
 export { CARD_SCRIPTS };

@@ -18,6 +18,7 @@ import type {
   GameConfig,
   GameState,
   Keyword,
+  ManualOp,
   PlayerId,
   PlayerState,
   TargetRef,
@@ -41,8 +42,10 @@ type PlayFrame = Extract<Frame, { kind: 'play' }>;
 // ---------------------------------------------------------------------------
 
 export function createGame(config: GameConfig): GameState {
+  // Só as cartas dos dois decks entram no estado (que é copiado a cada ação).
+  const used = new Set(config.players.flatMap((p) => [p.deck.leader, ...p.deck.cards.map((c) => c.id)]));
   const defs: Record<string, CardDef> = {};
-  for (const c of config.cards) defs[c.id] = buildCardDef(c);
+  for (const c of config.cards) if (used.has(c.id)) defs[c.id] = buildCardDef(c);
 
   const holder = { rng: config.seed | 0 };
   const cards: GameState['cards'] = {};
@@ -300,6 +303,15 @@ export function applyAction(prev: GameState, action: Action): GameState {
     return state;
   }
 
+  if (action.type === 'manual') {
+    if (!manualAllowed(prev, p)) throw new IllegalActionError('Ferramentas manuais indisponíveis agora.');
+    applyManualOp(state, p, action.op);
+    checkDefeat(state);
+    run(state);
+    state.actionCount++;
+    return state;
+  }
+
   if (pending) {
     if (pending.player !== p) throw new IllegalActionError('Aguardando o outro jogador.');
     handlePendingResponse(state, action);
@@ -406,6 +418,15 @@ function handlePendingResponse(state: GameState, action: Action) {
       return;
     }
 
+    case 'manual': {
+      if (action.type !== 'manualDone') throw new IllegalActionError('Aplique o efeito e clique em Concluir.');
+      const top = state.stack[state.stack.length - 1];
+      if (top?.kind === 'effect') top.choice = [];
+      state.pending = null;
+      log(state, p, `Efeito de ${cardDef(state, pending.source).name} resolvido manualmente.`);
+      return;
+    }
+
     case 'trigger': {
       if (action.type !== 'answer') throw new IllegalActionError('Responda se ativa o [Trigger].');
       const frame = state.stack[state.stack.length - 1] as DamageFrame;
@@ -506,7 +527,11 @@ function handleMainAction(state: GameState, action: Action) {
     }
 
     case 'endTurn': {
-      endTurn(state);
+      // Efeitos de [End of Your Turn] resolvem antes de o turno passar.
+      state.stack.push({ kind: 'endTurn' });
+      for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
+        pushAbilities(state, fc.uid, 'endOfTurn');
+      }
       return;
     }
 
@@ -575,6 +600,10 @@ function run(state: GameState) {
         break;
       case 'play':
         stepPlay(state, frame);
+        break;
+      case 'endTurn':
+        state.stack.pop();
+        endTurn(state);
         break;
     }
     checkDefeat(state);
@@ -875,12 +904,202 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) state.modifiers.push({ uid, kind: 'noBlockerWhenAttacking', amount: 0, duration: 'turn' });
       return true;
     }
+    case 'manual':
+      if (frame.choice) return true; // o jogador já confirmou
+      state.pending = { kind: 'manual', player: frame.controller, source: frame.source, text: step.text };
+      return false;
     case 'useMainEffect': {
       const main = cardDef(state, frame.source).abilities.find((a) => a.timing === 'main');
       frame.i++;
       if (main) pushEffect(state, frame.source, frame.controller, main.steps);
       return false; // já avançamos o índice manualmente
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ferramentas manuais (efeitos ainda não automatizados)
+// ---------------------------------------------------------------------------
+
+/**
+ * Quando o jogador pode usar as ferramentas manuais: ao resolver um efeito manual,
+ * na etapa de Counter (efeitos contínuos do defensor) e livremente no próprio turno.
+ */
+export function manualAllowed(state: GameState, player: PlayerId): boolean {
+  if (state.phase !== 'main') return false;
+  const pending = state.pending;
+  if (pending) return (pending.kind === 'manual' || pending.kind === 'counter') && pending.player === player;
+  return isIdle(state) && state.activePlayer === player;
+}
+
+type CardZone = 'hand' | 'deck' | 'trash' | 'life' | 'leader' | 'character' | 'stage';
+
+export function zoneOf(state: GameState, uid: string): CardZone | null {
+  const loc = locate(state, uid);
+  if (loc) return loc.zone;
+  const ps = state.players[ownerOf(state, uid)];
+  if (ps.hand.includes(uid)) return 'hand';
+  if (ps.deck.includes(uid)) return 'deck';
+  if (ps.trash.includes(uid)) return 'trash';
+  if (ps.life.includes(uid)) return 'life';
+  return null;
+}
+
+/** Tira a carta de onde estiver (DON!! anexados voltam virados à área de custo). */
+function detach(state: GameState, uid: string) {
+  const ps = state.players[ownerOf(state, uid)];
+  const loc = locate(state, uid);
+  if (loc?.zone === 'character') {
+    ps.donRested += loc.fc.don;
+    removeCharacter(state, uid);
+    return;
+  }
+  if (loc?.zone === 'stage') {
+    ps.donRested += loc.fc.don;
+    ps.stage = null;
+    state.modifiers = state.modifiers.filter((m) => m.uid !== uid);
+    return;
+  }
+  for (const zone of [ps.hand, ps.deck, ps.trash, ps.life]) removeFrom(zone, uid);
+}
+
+const ZONE_LABEL: Record<string, string> = {
+  hand: 'a mão',
+  trash: 'o descarte',
+  deckTop: 'o topo do deck',
+  deckBottom: 'o fundo do deck',
+  life: 'a Vida',
+  character: 'o campo',
+  stage: 'o campo (Stage)',
+};
+
+function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
+  const ps = state.players[p];
+  const tag = '(manual)';
+  const fieldCard = (uid: string) => {
+    const loc = locate(state, uid);
+    if (!loc) throw new IllegalActionError('A carta precisa estar em campo.');
+    return loc;
+  };
+
+  switch (op.op) {
+    case 'draw': {
+      const n = Math.max(1, Math.min(10, Math.floor(op.count)));
+      drawCards(state, p, n);
+      log(state, p, `${tag} ${ps.name} compra ${n} carta(s).`);
+      return;
+    }
+    case 'move': {
+      if (!state.cards[op.uid]) throw new IllegalActionError('Carta inválida.');
+      const owner = ownerOf(state, op.uid);
+      const from = zoneOf(state, op.uid);
+      const def = cardDef(state, op.uid);
+      if (!from || from === 'leader') throw new IllegalActionError('Essa carta não pode ser movida.');
+      if (owner !== p && !['character', 'stage', 'life'].includes(from)) {
+        throw new IllegalActionError('Do oponente, só é possível mover cartas em campo ou da Vida.');
+      }
+      const os = state.players[owner];
+      if (op.to === 'character') {
+        if (def.category !== 'character') throw new IllegalActionError('Só Personagens vão para a área de personagens.');
+        if (from !== 'character' && os.characters.length >= MAX_CHARACTERS) {
+          throw new IllegalActionError('Área de personagens cheia: descarte um antes.');
+        }
+      }
+      if (op.to === 'stage' && def.category !== 'stage') throw new IllegalActionError('Só Stages vão para a área de Stage.');
+      detach(state, op.uid);
+      switch (op.to) {
+        case 'hand':
+          os.hand.push(op.uid);
+          break;
+        case 'trash':
+          os.trash.push(op.uid);
+          break;
+        case 'deckTop':
+          os.deck.unshift(op.uid);
+          break;
+        case 'deckBottom':
+          os.deck.push(op.uid);
+          break;
+        case 'life':
+          os.life.push(op.uid);
+          break;
+        case 'character':
+          os.characters.push({ uid: op.uid, rested: Boolean(op.rested), don: 0, playedOnTurn: state.turn });
+          break;
+        case 'stage':
+          if (os.stage) {
+            const old = os.stage.uid;
+            detach(state, old);
+            os.trash.push(old);
+          }
+          os.stage = { uid: op.uid, rested: Boolean(op.rested), don: 0, playedOnTurn: state.turn };
+          break;
+      }
+      const shown = ['deck', 'hand', 'life'].includes(from) && owner !== p ? 'Uma carta' : def.name;
+      log(state, p, `${tag} ${shown} vai para ${ZONE_LABEL[op.to]}${owner !== p ? ` de ${os.name}` : ''}.`);
+      if (op.to === 'character' || op.to === 'stage') pushAbilities(state, op.uid, 'onPlay');
+      return;
+    }
+    case 'ko': {
+      const loc = fieldCard(op.uid);
+      if (loc.zone !== 'character') throw new IllegalActionError('Só Personagens podem ser nocauteados.');
+      log(state, p, `${tag} K.O. em ${cardDef(state, op.uid).name}.`);
+      koCharacter(state, op.uid);
+      return;
+    }
+    case 'setRested': {
+      const loc = fieldCard(op.uid);
+      loc.fc.rested = op.rested;
+      log(state, p, `${tag} ${cardDef(state, op.uid).name} fica ${op.rested ? 'virado' : 'ativo'}.`);
+      return;
+    }
+    case 'power': {
+      fieldCard(op.uid);
+      const duration = op.duration === 'battle' && !state.battle ? 'turn' : op.duration;
+      state.modifiers.push({ uid: op.uid, kind: 'power', amount: op.amount, duration });
+      log(state, p, `${tag} ${cardDef(state, op.uid).name}: ${op.amount > 0 ? '+' : ''}${op.amount} de poder.`);
+      return;
+    }
+    case 'donFromDeck': {
+      const n = Math.min(Math.max(1, op.count), ps.donDeck);
+      ps.donDeck -= n;
+      if (op.rested) ps.donRested += n;
+      else ps.donActive += n;
+      log(state, p, `${tag} +${n} DON!! ${op.rested ? 'virado' : 'ativo'}.`);
+      return;
+    }
+    case 'donToDeck': {
+      returnDon(ps, Math.max(1, op.count));
+      log(state, p, `${tag} DON!! −${op.count}.`);
+      return;
+    }
+    case 'donGive': {
+      const loc = fieldCard(op.uid);
+      if (loc.player !== p || loc.zone === 'stage') throw new IllegalActionError('Escolha seu Líder ou um Personagem seu.');
+      if (op.from === 'active' ? ps.donActive < 1 : ps.donRested < 1) throw new IllegalActionError('Sem DON!! disponível.');
+      if (op.from === 'active') ps.donActive--;
+      else ps.donRested--;
+      loc.fc.don++;
+      log(state, p, `${tag} ${cardDef(state, op.uid).name} recebe 1 DON!! ${op.from === 'active' ? 'ativo' : 'virado'}.`);
+      return;
+    }
+    case 'donSetState': {
+      const target = state.players[op.player];
+      const n = Math.min(Math.max(1, op.count), op.rested ? target.donActive : target.donRested);
+      if (op.rested) {
+        target.donActive -= n;
+        target.donRested += n;
+      } else {
+        target.donRested -= n;
+        target.donActive += n;
+      }
+      log(state, p, `${tag} ${n} DON!! de ${target.name} fica ${op.rested ? 'virado' : 'ativo'}.`);
+      return;
+    }
+    case 'shuffle':
+      shuffleInPlace(state, ps.deck);
+      log(state, p, `${tag} ${ps.name} embaralha o deck.`);
+      return;
   }
 }
 

@@ -79,6 +79,11 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         </>
       )}
       {!withImage && <CardFace def={def} power={power} delta={delta} keywords={keywords} fc={fc} />}
+      {def.manual && (
+        <span className="manual-badge" title="Efeito ainda não automatizado: resolvido com as ferramentas manuais">
+          ⚙
+        </span>
+      )}
     </div>
   );
 }

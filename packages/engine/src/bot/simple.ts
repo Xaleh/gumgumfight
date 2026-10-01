@@ -34,6 +34,10 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
     case 'trigger':
       return { type: 'answer', player, yes: true };
 
+    case 'manual':
+      // O bot ainda não sabe aplicar efeitos manuais: só confirma.
+      return { type: 'manualDone', player };
+
     case 'selectTargets': {
       const opts = [...pending.options];
       if (pending.intent === 'discard') {

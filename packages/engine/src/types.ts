@@ -25,6 +25,10 @@ export interface CardData {
   set?: string;
   rarity?: string;
   imageUrl?: string;
+  /** Observações da fonte que não fazem parte do efeito (errata, reimpressão...). */
+  notes?: string[];
+  /** "Also treat this card's name as [X]": nomes alternativos para regras e efeitos. */
+  aliases?: string[];
   /** Textos traduzidos (preenchidos pelo servidor). */
   i18n?: Partial<Record<'pt', CardTextTranslation>>;
 }
@@ -77,7 +81,9 @@ export type EffectStep =
   /** Se o alvo atacar neste turno, o oponente não pode usar [Blocker]. */
   | { do: 'noBlockerWhenAttacking'; target: TargetRef }
   /** Resolve os passos do efeito [Main] da própria carta (usado por [Trigger]). */
-  | { do: 'useMainEffect' };
+  | { do: 'useMainEffect' }
+  /** Efeito ainda não automatizado: o jogador aplica à mão com as ferramentas manuais. */
+  | { do: 'manual'; text: string };
 
 export type AbilityTiming =
   | 'onPlay'
@@ -88,6 +94,7 @@ export type AbilityTiming =
   | 'trigger' // [Trigger] (ativado ao ser revelado da Vida)
   | 'onKO'
   | 'onBlock'
+  | 'endOfTurn' // [End of Your Turn]
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
@@ -111,6 +118,10 @@ export interface Ability {
   staticCanAttackActive?: boolean;
   /** Texto curto exibido na interface. */
   label?: string;
+  /** Habilidade derivada do texto, resolvida manualmente pelo jogador. */
+  manual?: boolean;
+  /** Trecho do texto da carta a que a habilidade corresponde. */
+  text?: string;
 }
 
 export interface CardScript {
@@ -125,6 +136,8 @@ export interface CardDef extends CardData {
   keywords: Keyword[];
   abilities: Ability[];
   scripted: boolean;
+  /** Tem efeito resolvido manualmente (sem script). */
+  manual: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +206,9 @@ export type Pending =
     }
   | { kind: 'block'; player: PlayerId; options: string[] }
   | { kind: 'counter'; player: PlayerId; options: string[] }
-  | { kind: 'trigger'; player: PlayerId; card: string };
+  | { kind: 'trigger'; player: PlayerId; card: string }
+  /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
+  | { kind: 'manual'; player: PlayerId; source: string; text: string };
 
 export type Frame =
   | {
@@ -206,7 +221,9 @@ export type Frame =
     }
   | { kind: 'battle' }
   | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean }
-  | { kind: 'play'; uid: string; replaceChoice?: string[] };
+  | { kind: 'play'; uid: string; replaceChoice?: string[] }
+  /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
+  | { kind: 'endTurn' };
 
 export interface LogEntry {
   turn: number;
@@ -251,7 +268,25 @@ export type Action =
   | { type: 'answer'; player: PlayerId; yes: boolean }
   | { type: 'counter'; player: PlayerId; uid: string }
   | { type: 'pass'; player: PlayerId }
-  | { type: 'concede'; player: PlayerId };
+  | { type: 'concede'; player: PlayerId }
+  | { type: 'manual'; player: PlayerId; op: ManualOp }
+  | { type: 'manualDone'; player: PlayerId };
+
+/** Destinos de uma carta movida manualmente (sempre nas zonas do dono da carta). */
+export type ManualZone = 'hand' | 'trash' | 'deckTop' | 'deckBottom' | 'life' | 'character' | 'stage';
+
+/** Operações das ferramentas manuais (para efeitos ainda não automatizados). */
+export type ManualOp =
+  | { op: 'draw'; count: number }
+  | { op: 'move'; uid: string; to: ManualZone; rested?: boolean }
+  | { op: 'ko'; uid: string }
+  | { op: 'setRested'; uid: string; rested: boolean }
+  | { op: 'power'; uid: string; amount: number; duration: Duration }
+  | { op: 'donFromDeck'; count: number; rested: boolean }
+  | { op: 'donToDeck'; count: number }
+  | { op: 'donGive'; uid: string; from: 'active' | 'rested' }
+  | { op: 'donSetState'; player: PlayerId; rested: boolean; count: number }
+  | { op: 'shuffle' };
 
 export interface DeckList {
   id: string;

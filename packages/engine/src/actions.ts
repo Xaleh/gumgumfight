@@ -45,6 +45,9 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
           { type: 'answer', player, yes: true },
           { type: 'answer', player, yes: false },
         ];
+      case 'manual':
+        // As ferramentas manuais ficam fora da lista (são livres); aqui só a confirmação.
+        return [{ type: 'manualDone', player }];
     }
   }
 
