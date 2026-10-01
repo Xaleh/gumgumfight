@@ -364,6 +364,9 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'minActiveDon':
         out.push(`você tiver ${c.minActiveDon} ou mais DON!! ativos`);
         break;
+      case 'lastDone':
+        out.push('fizer isso');
+        break;
       case 'chosenMatches':
         out.push(`essa carta for ${filter(c.chosenMatches!, 1, false).replace(/^1 /, 'um ')}`);
         break;
@@ -450,7 +453,9 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'setActive':
       return `Deixe ${target(s.target, ctx)} ativo.`;
     case 'giveRestedDon':
-      return `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a ${target(s.target, ctx)}.`;
+      return s.fromOpponent
+        ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} do seu oponente a ${target(s.target, ctx)}.`
+        : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a ${target(s.target, ctx)}.`;
     case 'draw':
       return `Compre ${cards(s.count)}.`;
     case 'drawUntil':
@@ -479,7 +484,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'useOwnEffect':
       return `Ative o efeito ${TIMING[s.timing]} desta carta.`;
     case 'playThis':
-      return 'Jogue esta carta.';
+      return s.rested ? 'Jogue esta carta virada.' : 'Jogue esta carta.';
     case 'addThisToHand':
       return 'Adicione esta carta à sua mão.';
     case 'trashFromHand': {

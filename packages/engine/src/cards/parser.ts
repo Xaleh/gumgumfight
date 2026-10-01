@@ -99,6 +99,7 @@ function clean(raw: string): string {
     .replace(/\[Activate: ?Main\]/gi, '[Activate: Main]')
     .replace(/\bYou can (?=trash|rest|place|return|add)/g, 'You may ')
     .replace(/\{Supernova\}/g, '{Supernovas}')
+    .replace(/\bPiratess\b/g, 'Pirates')
     .replace(/’/g, "'");
 }
 
@@ -184,7 +185,7 @@ export function parseTarget(phrase: string): TargetRef | null {
   if ((m = p.match(/^up to (?:a total of )?(\d+) (?:of )?/i))) {
     spec.upTo = Number(m[1]);
     quantified = true;
-  } else if ((m = p.match(/^all (?:of )?/i))) {
+  } else if ((m = p.match(/^(?:all|each) (?:of )?/i))) {
     spec.all = true;
     spec.upTo = 99;
     quantified = true;
@@ -433,6 +434,10 @@ const CLAUSES: ClauseRule[] = [
     (m) => withTarget(m[1], (target) => ({ do: 'toDeckBottom', target }), true),
   ],
   [
+    /^Give up to (\d+) of your opponent's rested DON!! cards? to (.+)$/i,
+    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target, count: Number(m[1]), fromOpponent: true })),
+  ],
+  [
     /^Give up to (\d+) rested DON!! cards? to (.+)$/i,
     (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target, count: Number(m[1]) })),
   ],
@@ -505,7 +510,7 @@ const CLAUSES: ClauseRule[] = [
   ],
   [/^play (?:that|the revealed) card( rested)?$/i, (m) => [m[1] ? { do: 'playRevealed', rested: true } : { do: 'playRevealed' }]],
   [/^place (?:the revealed card|the rest|that card) at the bottom of your deck$/i, () => [{ do: 'revealedToBottom' }]],
-  [/^Play this Character card from your trash( rested)?$/i, () => [{ do: 'playThis' }]],
+  [/^Play this Character card from your trash( rested)?$/i, (m) => [m[1] ? { do: 'playThis', rested: true } : { do: 'playThis' }]],
   [
     new RegExp(`^(.+?) cannot be rested ${DUR}$`, 'i'),
     (m) => withTarget(m[1], (target) => ({ do: 'cannotBeRested', target, duration: durationOf(m[2]) }), true),
@@ -833,6 +838,8 @@ export function parseBody(body: string): EffectStep[] | null {
       // Estende o trecho do último "you may" para incluir o "If you do, …".
       const opt = [...steps.slice(0, before)].reverse().find((st) => st.do === 'payCost' && st.scope !== undefined);
       if (opt && opt.do === 'payCost') opt.scope! += steps.length - before;
+      // Sem "you may" antes: "Y" só acontece se o passo anterior afetou alguma carta.
+      else for (let k = before; k < steps.length; k++) steps[k] = { ...steps[k], if: { ...steps[k].if, lastDone: true } };
     }
   }
   return steps;
@@ -898,7 +905,7 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
     cost.restOwn = { count: Number(m[1]), spec: { side: 'own', kinds: ['leader', 'character', 'stage'], upTo: 99 } };
   } else if ((m = part.match(/^(rest|return) (\d+) of your (.+?)(?: to (?:the owner's|your) hand)?$/i))) {
     const spec = parseTarget(`up to ${m[2]} of your ${m[3]}`);
-    if (!spec || typeof spec !== 'object') return false;
+    if (!spec || typeof spec !== 'object' || spec.side !== 'own') return false;
     const rest = m[1].toLowerCase() === 'rest';
     if (!rest && (!/hand/i.test(part) || spec.kinds.some((k) => k !== 'character'))) return false;
     if (rest) cost.restOwn = { count: Number(m[2]), spec };

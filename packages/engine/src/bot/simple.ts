@@ -135,7 +135,7 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
   // 1) Habilidades que dão DON!! virados (só vale se houver DON!! virados e ataques possíveis).
   const giveDon = find('activate', (a) => {
     const ab = cardDef(state, a.uid).abilities[a.ability];
-    return ab.steps[0]?.do === 'giveRestedDon' && me.donRested > 0 && canBattle && !ab.cost?.restSelf;
+    return ab.steps[0]?.do === 'giveRestedDon' && !ab.steps[0].fromOpponent && me.donRested > 0 && canBattle && !ab.cost?.restSelf;
   });
   if (giveDon) return giveDon;
 
@@ -163,7 +163,7 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
     const step = ab.steps[0];
     if (!step || !canBattle) return false;
     if (step.do === 'rest') return opp.characters.some((c) => !c.rested);
-    if (step.do === 'giveRestedDon') return me.donRested > 0;
+    if (step.do === 'giveRestedDon') return !step.fromOpponent && me.donRested > 0;
     if (step.do === 'power') {
       // Custos de DON!! −X só valem se o bônus ajudar vários ataques.
       if (ab.cost?.donMinus) {

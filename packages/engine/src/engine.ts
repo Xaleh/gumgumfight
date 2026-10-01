@@ -1146,6 +1146,7 @@ function resolveTargets(
 }
 
 function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
+  if (step.if?.lastDone && !frame.last?.length) return false;
   const filter = step.if?.chosenMatches;
   if (filter) {
     const card = frame.last?.[0];
@@ -1392,14 +1393,15 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'giveRestedDon': {
-      if (ps.donRested === 0) return true;
-      const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha quem recebe DON!! virado(s).`);
+      const giver = step.fromOpponent ? state.players[1 - frame.controller] : ps;
+      if (giver.donRested === 0) return true;
+      const t = resolveTargets(state, frame, step.target, step.fromOpponent ? 'harm' : 'help', `${srcName}: escolha quem recebe DON!! virado(s).`);
       if (!t) return false;
       for (const uid of t) {
         const loc = locate(state, uid);
-        const n = Math.min(step.count, ps.donRested);
+        const n = Math.min(step.count, giver.donRested);
         if (loc && n > 0) {
-          ps.donRested -= n;
+          giver.donRested -= n;
           loc.fc.don += n;
           log(state, frame.controller, `${cardDef(state, uid).name} recebe ${n} DON!!.`);
         }
@@ -1463,7 +1465,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'playThis': {
       if (zoneOf(state, frame.source) === 'character' || zoneOf(state, frame.source) === 'stage') return true;
-      playFree(state, frame.source);
+      playFree(state, frame.source, step.rested);
       return true;
     }
     case 'trashFromHand': {
@@ -2086,7 +2088,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return (def.category === 'character' || def.category === 'stage') && matchesFilter(def, step.filter);
       });
       if (!frame.choice) {
-        if (!options.length) return true;
+        if (!options.length) return !!(frame.last = []);
         const where =
           step.from === 'deck' ? 'do deck' : step.from === 'hand' ? 'da mão' : step.from === 'trash' ? 'do descarte' : 'da mão ou do descarte';
         askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) ${where} para jogar.`);
@@ -2094,6 +2096,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       // Empilhadas ao contrário para entrarem na ordem escolhida.
       const chosen = frame.choice.filter((u) => options.includes(u));
+      frame.last = [...chosen];
       for (const uid of chosen.reverse()) playFree(state, uid, step.rested);
       return true;
     }

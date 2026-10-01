@@ -26,6 +26,7 @@ const extra: CardData[] = [
   { id: 'PX-018', name: 'Isuka', category: 'character', colors: ['red'], cost: 1, power: 9000, types: [], text: "[Once Per Turn] When this Character battles and K.O.'s your opponent's Character, set this Character as active." },
   { id: 'PX-019', name: 'StageX', category: 'stage', colors: ['red'], cost: 1, types: [], text: '' },
   { id: 'PX-020', name: 'Guard', category: 'character', colors: ['red'], cost: 1, power: 1000, types: [], text: "[Once Per Turn] If this Character would be K.O.'d, you may trash 1 card from your hand instead." },
+  { id: 'PX-021', name: 'Koala', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Play up to 1 Character card with a cost of 1 or less from your hand. If you do, draw 1 card.' },
 ];
 const cards = [...baseCards, ...extra];
 const deck = (leader: string, fill: string): DeckList => ({
@@ -257,5 +258,20 @@ describe('efeitos lidos automaticamente', () => {
     if (t.pending?.kind === 'counter') t = applyAction(t, { type: 'pass', player: 0 });
     t = applyAction(t, { type: 'answer', player: 0, yes: false });
     expect(t.players[0].trash).toContain(g2);
+  });
+
+  it('"If you do" depois de jogar: só compra se jogou alguém', () => {
+    let s = toTurn(game(), 3);
+    const koala = give(s, 0, 'PX-021');
+    const other = s.players[0].hand[1];
+    s.cards[other] = { ...s.cards[other], cardId: 'PX-001' };
+    const hand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: koala });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    let t = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    expect(t.players[0].hand).toHaveLength(hand - 1);
+    t = applyAction(s, { type: 'choose', player: 0, uids: [other] });
+    expect(t.players[0].characters.some((c) => c.uid === other)).toBe(true);
+    expect(t.players[0].hand).toHaveLength(hand - 1);
   });
 });

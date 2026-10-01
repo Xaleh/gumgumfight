@@ -168,6 +168,8 @@ export interface Condition {
   opponentLifeMin?: number;
   /** "If the revealed card / that card is …": testa a carta escolhida/revelada no passo anterior. */
   chosenMatches?: CardFilter;
+  /** "If you do": o passo anterior afetou ao menos uma carta. */
+  lastDone?: boolean;
   /** "If you have a {X} type Character with a cost of N or more" */
   ownTypedCharacterMinCost?: { type: string; cost: number };
   /** "If your opponent has a Character with a cost of N or more" */
@@ -249,7 +251,7 @@ type EffectStepBody =
   | { do: 'ko'; target: TargetRef }
   | { do: 'rest'; target: TargetRef }
   | { do: 'setActive'; target: TargetRef }
-  | { do: 'giveRestedDon'; target: TargetRef; count: number }
+  | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean }
   | { do: 'draw'; count: number }
   | { do: 'addDonFromDeck'; count: number; rested?: boolean }
   | { do: 'restOpponentDon'; count: number }
@@ -263,7 +265,7 @@ type EffectStepBody =
   /** Efeito ainda não automatizado: o jogador aplica à mão com as ferramentas manuais. */
   | { do: 'manual'; text: string }
   /** "Play this card" (ex.: [Trigger]): joga a própria carta, sem custo. */
-  | { do: 'playThis' }
+  | { do: 'playThis'; rested?: boolean }
   /** Descartar cartas da mão (custo "You may trash N card from your hand"). */
   | { do: 'trashFromHand'; count: number; filter?: CardFilter; upTo?: boolean }
   /** "Draw cards so that you have N cards in your hand." */
