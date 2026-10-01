@@ -75,6 +75,8 @@ export interface CardFilter {
 /** Condição verificada quando o passo vai resolver ("draw 1 card if you have 3 or less cards in your hand"). */
 export interface StepCondition {
   handMax?: number;
+  /** "If your Leader has the {X} type" */
+  leaderHasType?: string;
 }
 
 /** Condições extras de uma habilidade ("If you have 3 or more Characters", "If this Character is rested"). */
@@ -136,7 +138,16 @@ type EffectStepBody =
   /** "… then shuffle your deck." */
   | { do: 'shuffleDeck' }
   /** "Look at N cards from the top of your deck and return them to the top or bottom of the deck in any order." */
-  | { do: 'arrangeTop'; look: number };
+  | { do: 'arrangeTop'; look: number }
+  /**
+   * Custo opcional no meio de um efeito automático ("[On Play] DON!! −1: …", "You may trash 1 card from your
+   * hand: …"). O jogador decide se paga; se não pagar (ou não puder), o resto do efeito não acontece.
+   */
+  | { do: 'payCost'; cost: AbilityCost }
+  /** "Trash up to N of your opponent's Life cards." (do topo) */
+  | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
+  /** "This Character gains [Rush] during this turn." */
+  | { do: 'gainKeyword'; target: TargetRef; keyword: Keyword; duration: Duration };
 
 /** Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado). */
 export type EffectStep = EffectStepBody & { if?: StepCondition };
@@ -238,8 +249,9 @@ export interface PlayerState {
 
 export interface Modifier {
   uid: string;
-  kind: 'power' | 'noBlockerWhenAttacking';
+  kind: 'power' | 'noBlockerWhenAttacking' | 'keyword';
   amount: number;
+  keyword?: Keyword;
   duration: Duration;
 }
 
@@ -273,6 +285,8 @@ export type Pending =
   | { kind: 'block'; player: PlayerId; options: string[] }
   | { kind: 'counter'; player: PlayerId; options: string[] }
   | { kind: 'trigger'; player: PlayerId; card: string }
+  /** Pergunta sim/não (ex.: pagar um custo opcional). Responder com `answer`. */
+  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
 

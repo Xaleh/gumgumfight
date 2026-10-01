@@ -32,6 +32,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
     }
 
     case 'trigger':
+    case 'confirm':
       return { type: 'answer', player, yes: true };
 
     case 'manual':
@@ -144,6 +145,7 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
       if (!step) return false;
       if (step.do === 'ko' || step.do === 'rest') return opp.characters.length > 0 && canBattle;
       if (step.do === 'returnToHand' || step.do === 'toDeckBottom') return hitsOpponent(state, player, a.uid, step, 1);
+      if (step.do === 'draw') return me.deck.length > 5;
       return false;
     })
     .sort((a, b) => (cardDef(state, b.uid).cost ?? 0) - (cardDef(state, a.uid).cost ?? 0));
@@ -160,6 +162,8 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
     // Devolver personagens custa caro (ex.: DON!! −4): só vale contra alvos de custo 3+.
     if (step.do === 'returnToHand' || step.do === 'toDeckBottom') return hitsOpponent(state, player, a.uid, step, 3);
     if (step.do === 'playFrom') return me.characters.length < 5;
+    if (step.do === 'trashLife') return opp.life.length > 0;
+    if (step.do === 'addDonFromDeck') return me.donDeck > 0;
     return false;
   });
   if (other) return other;

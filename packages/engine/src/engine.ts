@@ -9,6 +9,7 @@ import { buildCardDef } from './cards';
 import { shuffleInPlace } from './rng';
 import type {
   Ability,
+  AbilityCost,
   AbilityTiming,
   Action,
   CardDef,
@@ -205,6 +206,7 @@ export function getPower(state: GameState, uid: string): number {
 export function hasKeyword(state: GameState, uid: string, kw: Keyword): boolean {
   const def = cardDef(state, uid);
   if (def.keywords.includes(kw)) return true;
+  if (state.modifiers.some((m) => m.uid === uid && m.kind === 'keyword' && m.keyword === kw)) return true;
   return def.abilities.some((a) => a.timing === 'static' && a.staticKeyword === kw && conditionsMet(state, uid, a));
 }
 
@@ -456,6 +458,14 @@ function handlePendingResponse(state: GameState, action: Action) {
         log(state, p, `${ps.name} usa o evento ${def.name}.`);
         pushEffect(state, action.uid, p, ability.steps);
       }
+      return;
+    }
+
+    case 'confirm': {
+      if (action.type !== 'answer') throw new IllegalActionError('Responda sim ou não.');
+      const top = state.stack[state.stack.length - 1];
+      if (top?.kind === 'effect') top.choice = action.yes ? ['yes'] : [];
+      state.pending = null;
       return;
     }
 
@@ -850,6 +860,7 @@ function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep
   if (!cond) return true;
   const ps = state.players[frame.controller];
   if (cond.handMax !== undefined && ps.hand.length > cond.handMax) return false;
+  if (cond.leaderHasType && !hasType(cardDef(state, ps.leader.uid), cond.leaderHasType)) return false;
   return true;
 }
 
@@ -904,6 +915,32 @@ function useOwnEffect(state: GameState, frame: EffectFrame, timing: 'main' | 'co
   frame.memo = undefined;
   if (ability) pushEffect(state, frame.source, frame.controller, ability.steps);
   return false; // o índice já avançou
+}
+
+/** Interrompe o efeito: os passos restantes não acontecem. */
+function abortEffect(frame: EffectFrame): false {
+  frame.i = frame.steps.length;
+  frame.choice = undefined;
+  frame.memo = undefined;
+  return false;
+}
+
+export function canPayCost(state: GameState, player: PlayerId, source: string, cost: AbilityCost): boolean {
+  const ps = state.players[player];
+  if (cost.restSelf && (!locate(state, source) || locate(state, source)!.fc.rested)) return false;
+  if ((cost.restDon ?? 0) > ps.donActive) return false;
+  if ((cost.donMinus ?? 0) > totalDonOnField(ps)) return false;
+  if ((cost.trashFromHand ?? 0) > ps.hand.length) return false;
+  return true;
+}
+
+export function describeCost(cost: AbilityCost): string {
+  const parts: string[] = [];
+  if (cost.donMinus) parts.push(`DON!! −${cost.donMinus} (devolver ${cost.donMinus} DON!! ao deck de DON!!)`);
+  if (cost.restDon) parts.push(`virar ${cost.restDon} DON!!`);
+  if (cost.restSelf) parts.push('virar esta carta');
+  if (cost.trashFromHand) parts.push(`descartar ${cost.trashFromHand} carta(s) da mão`);
+  return parts.join(' e ');
 }
 
 function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
@@ -1085,6 +1122,59 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (frame.choice) return true; // o jogador já confirmou
       state.pending = { kind: 'manual', player: frame.controller, source: frame.source, text: step.text };
       return false;
+    case 'payCost': {
+      const cost = step.cost;
+      if (!frame.memo) {
+        if (!frame.choice) {
+          if (!canPayCost(state, frame.controller, frame.source, cost)) return abortEffect(frame);
+          state.pending = {
+            kind: 'confirm',
+            player: frame.controller,
+            source: frame.source,
+            prompt: `${srcName}: usar o efeito? Custo: ${describeCost(cost)}.`,
+          };
+          return false;
+        }
+        if (!frame.choice.length) {
+          log(state, frame.controller, `${ps.name} não usa o efeito de ${srcName}.`);
+          return abortEffect(frame);
+        }
+        const loc = locate(state, frame.source);
+        if (cost.restSelf && loc) loc.fc.rested = true;
+        if (cost.restDon) payDon(ps, cost.restDon);
+        if (cost.donMinus) {
+          returnDon(ps, cost.donMinus);
+          log(state, frame.controller, `${ps.name} devolve ${cost.donMinus} DON!! ao deck de DON!!.`);
+        }
+        if (!cost.trashFromHand) return true;
+        frame.memo = ['trash'];
+        frame.choice = undefined;
+        askCards(state, frame, [...ps.hand], cost.trashFromHand, `${srcName}: escolha ${cost.trashFromHand} carta(s) da mão para descartar.`, {
+          min: cost.trashFromHand,
+          intent: 'discard',
+        });
+        return false;
+      }
+      for (const uid of (frame.choice ?? []).filter((u) => ps.hand.includes(u))) {
+        removeFrom(ps.hand, uid);
+        ps.trash.push(uid);
+        log(state, frame.controller, `${ps.name} descarta ${cardDef(state, uid).name}.`);
+      }
+      return true;
+    }
+    case 'trashLife': {
+      const target = state.players[step.side === 'own' ? frame.controller : opponent(frame.controller)];
+      const n = Math.min(step.count, target.life.length);
+      for (let i = 0; i < n; i++) target.trash.push(target.life.pop()!);
+      if (n) log(state, frame.controller, `${n} carta(s) de Vida de ${target.name} vão para o descarte.`);
+      return true;
+    }
+    case 'gainKeyword': {
+      const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha quem ganha [${step.keyword}].`);
+      if (!t) return false;
+      for (const uid of t) state.modifiers.push({ uid, kind: 'keyword', keyword: step.keyword, amount: 0, duration: step.duration });
+      return true;
+    }
     case 'useMainEffect':
       return useOwnEffect(state, frame, 'main');
     case 'useCounterEffect':

@@ -46,6 +46,7 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
           ...pending.options.map((uid): Action => ({ type: 'counter', player, uid })),
         ];
       case 'trigger':
+      case 'confirm':
         return [
           { type: 'answer', player, yes: true },
           { type: 'answer', player, yes: false },

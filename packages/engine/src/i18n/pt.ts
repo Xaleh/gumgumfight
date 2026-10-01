@@ -6,6 +6,8 @@
 // reconhecido fica em inglês e o resultado é marcado como parcial; traduções manuais
 // (data/translations/pt.json) sempre têm prioridade.
 
+import { normalizeTypeQuotes } from '../text';
+
 export interface Translation {
   text: string;
   /** false quando sobrou trecho em inglês. */
@@ -110,6 +112,10 @@ const SENTENCES: Rule[] = [
   [/^Place the rest at the bottom of your deck in any order\.?$/i, 'Coloque o resto no fundo do seu deck em qualquer ordem.'],
   [/^Trash the rest\.?$/i, 'Descarte o resto.'],
   [
+    /^Trash up to (\d+) of your opponent's Life cards?\.?$/i,
+    (_, n) => `Descarte até ${n} ${plural(n, 'carta', 'cartas')} de Vida do oponente.`,
+  ],
+  [
     /^Your opponent cannot activate a \[Blocker\] Character that has (\d+) or more power during this battle\.?$/i,
     (_, n) => `Seu oponente não pode ativar um Personagem com [Blocker] que tenha ${n} ou mais de poder durante esta batalha.`,
   ],
@@ -140,6 +146,7 @@ const PHRASES: Rule[] = [
   [/If you have (\d+) or less Life cards,\s*/gi, (_, n) => `Se você tiver ${n} ou menos cartas de Vida, `],
   [/If you have (\d+) or more Characters,\s*/gi, (_, n) => `Se você tiver ${n} ou mais Personagens, `],
   [/If this Character is rested,\s*/gi, 'Se este Personagem estiver virado, '],
+  [/If your Leader has the (\{[^}]+\}) type,\s*/gi, (_, t) => `Se o seu Líder tiver o tipo ${t}, `],
   [/If this Character battles your opponent's Character,\s*/gi, 'Se este Personagem batalhar com um Personagem do oponente, '],
   [/You may rest this card/gi, 'Você pode virar esta carta'],
   [/up to (\d+) of your opponent's \[Blocker\] Characters/gi, (_, n) => `até ${n} ${plural(n, 'Personagem', 'Personagens')} com [Blocker] do oponente`],
@@ -162,7 +169,7 @@ const PHRASES: Rule[] = [
   [/(\{[^}]+\}) type cards/gi, (_, t) => `cartas do tipo ${t}`],
   [/(\{[^}]+\}) type card/gi, (_, t) => `carta do tipo ${t}`],
   [/up to (\d+) Characters?/gi, (_, n) => `até ${n} ${plural(n, 'Personagem', 'Personagens')}`],
-  [/up to (\d+) (\[[^\]]+\])/gi, (_, n, name) => `até ${n} ${name}`],
+  [/up to (\d+) (\[[^\]]+\])(?: cards?)?/gi, (_, n, name) => `até ${n} ${name}`],
   [/this Leader or 1 of your Characters/gi, 'este Líder ou 1 dos seus Personagens'],
   [/your Leader or 1 of your Characters/gi, 'seu Líder ou 1 dos seus Personagens'],
   // "or less than [Gecko Moria]": erro do texto da API para "or less other than [Gecko Moria]".
@@ -213,10 +220,18 @@ function translateSentence(sentence: string): string {
   }
   for (const [re, rep] of SENTENCES) {
     const m = s.match(re);
-    if (m) {
+    // Um trecho capturado com ", then …" são duas ações: tratadas juntas abaixo.
+    if (m && !m.slice(1).some((g) => /, then /i.test(g ?? ''))) {
       const replaced = typeof rep === 'string' ? rep : rep(...(m as unknown as string[]));
       return capitalize(applyPhrases(replaced));
     }
+  }
+  // "X, then Y." (duas ações na mesma frase)
+  const pair = s.match(/^(.+?), then (.+)$/i);
+  if (pair) {
+    const first = translateSentence(pair[1]).replace(/\.$/, '');
+    const second = translateSentence(pair[2]);
+    return `${first} e depois ${second.charAt(0).toLowerCase()}${second.slice(1)}`;
   }
   return capitalize(applyPhrases(s));
 }
@@ -256,7 +271,8 @@ export function translateToPt(text: string): Translation {
   if (!text.trim()) return { text, complete: true };
   // Protege os lembretes (entre parênteses) já traduzidos.
   const saved: string[] = [];
-  let src = text.replace(/<br\s*\/?>/gi, '\n');
+  // Textos importados antes da normalização ainda podem ter "X" type e "(3) (You may rest…)".
+  let src = normalizeTypeQuotes(text).replace(/<br\s*\/?>/gi, '\n');
   for (const [re, rep] of REMINDERS) {
     src = src.replace(re, () => {
       saved.push(rep);

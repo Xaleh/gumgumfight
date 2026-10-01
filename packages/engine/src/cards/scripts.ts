@@ -375,4 +375,161 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
       },
     ],
   },
+
+  // ------------------------------------------------------------ ST04 Animal Kingdom Pirates (roxo)
+  // Sem efeito: ST04-007 Sheepshead, ST04-009 Ginrummy, ST04-012 Page One, ST04-013 X.Drake.
+  // ST04-011 Black Maria: só [Blocker].
+  'ST04-001': {
+    // [Activate: Main] [Once Per Turn] DON!! −7: Trash up to 1 of your opponent's Life cards.
+    abilities: [
+      {
+        timing: 'activateMain',
+        oncePerTurn: true,
+        cost: { donMinus: 7 },
+        label: 'DON!! −7: descartar 1 Vida do oponente',
+        steps: [{ do: 'trashLife', side: 'opponent', count: 1 }],
+      },
+    ],
+  },
+  'ST04-002': {
+    // [On Play] DON!! −1: Play up to 1 [Page One] card with a cost of 4 or less from your hand.
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 1 } },
+          { do: 'playFrom', from: 'hand', upTo: 1, filter: { name: 'Page One', maxCost: 4 } },
+        ],
+      },
+    ],
+  },
+  'ST04-003': {
+    // [On Play] DON!! −5: K.O. up to 1 of your opponent's Characters with a cost of 6 or less.
+    // This Character gains [Rush] during this turn.
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 5 } },
+          { do: 'ko', target: oppChar({ maxCost: 6 }) },
+          { do: 'gainKeyword', target: 'self', keyword: 'rush', duration: 'turn' },
+        ],
+      },
+    ],
+  },
+  'ST04-004': {
+    // [On Play] DON!! −1: K.O. up to 1 of your opponent's Characters with a cost of 4 or less.
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 1 } },
+          { do: 'ko', target: oppChar({ maxCost: 4 }) },
+        ],
+      },
+    ],
+  },
+  'ST04-005': {
+    // [Blocker] / [On Play] DON!! −1: Draw 2 cards and trash 1 card from your hand.
+    keywords: ['blocker'],
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 1 } },
+          { do: 'draw', count: 2 },
+          { do: 'trashFromHand', count: 1 },
+        ],
+      },
+    ],
+  },
+  'ST04-006': {
+    // [On Play] DON!! −1: Draw 1 card.
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 1 } },
+          { do: 'draw', count: 1 },
+        ],
+      },
+    ],
+  },
+  'ST04-008': {
+    // [On Play] You may trash 1 card from your hand: Add up to 1 DON!! card from your DON!! deck and set it as active.
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'payCost', cost: { trashFromHand: 1 } },
+          { do: 'addDonFromDeck', count: 1 },
+        ],
+      },
+    ],
+  },
+  'ST04-010': {
+    // [On Play] DON!! −1: K.O. up to 1 of your opponent's Characters with a cost of 3 or less. [Trigger] Play this card.
+    abilities: [
+      {
+        timing: 'onPlay',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 1 } },
+          { do: 'ko', target: oppChar({ maxCost: 3 }) },
+        ],
+      },
+      { timing: 'trigger', steps: [{ do: 'playThis' }] },
+    ],
+  },
+  'ST04-014': {
+    // [Main] Draw 1 card, then add up to 1 DON!! card from your DON!! deck and set it as active.
+    // [Trigger] Activate this card's [Main] effect.
+    abilities: [
+      {
+        timing: 'main',
+        steps: [
+          { do: 'draw', count: 1 },
+          { do: 'addDonFromDeck', count: 1 },
+        ],
+      },
+      { timing: 'trigger', steps: [{ do: 'useMainEffect' }] },
+    ],
+  },
+  'ST04-015': {
+    // [Main] K.O. up to 1 of your opponent's Characters with a cost of 6 or less, then add up to 1 DON!! card from your
+    // DON!! deck and set it as active. [Trigger] Add up to 1 DON!! card from your DON!! deck and set it as active.
+    abilities: [
+      {
+        timing: 'main',
+        steps: [
+          { do: 'ko', target: oppChar({ maxCost: 6 }) },
+          { do: 'addDonFromDeck', count: 1 },
+        ],
+      },
+      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },
+    ],
+  },
+  'ST04-016': {
+    // [Counter] DON!! −1: Up to 1 of your Leader or Character cards gains +4000 power during this battle.
+    abilities: [
+      {
+        timing: 'counter',
+        steps: [
+          { do: 'payCost', cost: { donMinus: 1 } },
+          { do: 'power', target: ownLeaderOrChar(), amount: 4000, duration: 'battle' },
+        ],
+      },
+    ],
+  },
+  'ST04-017': {
+    // [Activate: Main] You may rest this Stage: If your Leader has the {Animal Kingdom Pirates} type, add up to 1 DON!!
+    // card from your DON!! deck and rest it.
+    abilities: [
+      {
+        timing: 'activateMain',
+        cost: { restSelf: true },
+        label: 'Virar: +1 DON!! virado',
+        steps: [{ do: 'addDonFromDeck', count: 1, rested: true, if: { leaderHasType: 'Animal Kingdom Pirates' } }],
+      },
+    ],
+  },
 };

@@ -445,6 +445,21 @@ function PromptBar(props: {
           </div>
         </div>
       );
+    case 'confirm':
+      return (
+        <div className="prompt">
+          <div className="prompt-title">{pending.prompt}</div>
+          {battleLine}
+          <div className="btn-row">
+            <button className="btn primary" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+              Pagar e usar
+            </button>
+            <button className="btn" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+              Não usar
+            </button>
+          </div>
+        </div>
+      );
   }
 }
 
