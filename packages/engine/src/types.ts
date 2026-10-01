@@ -6,7 +6,8 @@ export type PlayerId = 0 | 1;
 
 export type Color = 'red' | 'green' | 'blue' | 'purple' | 'black' | 'yellow';
 export type CardCategory = 'leader' | 'character' | 'event' | 'stage';
-export type Keyword = 'rush' | 'blocker' | 'doubleAttack' | 'banish';
+/** rushCharacter = [Rush: Character] (pode atacar Personagens no turno em que entra). */
+export type Keyword = 'rush' | 'blocker' | 'doubleAttack' | 'banish' | 'rushCharacter';
 
 /** Dados "crus" de uma carta, como vêm da API / banco de dados. */
 export interface CardData {
@@ -60,6 +61,14 @@ export interface TargetSpec {
   hasAnyType?: string[];
   /** "All of your …": afeta todas as cartas válidas, sem escolha. */
   all?: boolean;
+  minCost?: number;
+  minPower?: number;
+  /** "other than [Nome]" */
+  excludeName?: string;
+  /** "[Nome]" */
+  name?: string;
+  /** "base cost" / "base power": compara com os valores impressos, sem modificadores. */
+  base?: boolean;
 }
 
 /** Filtro de cartas fora do campo (busca no deck, mão...). */
@@ -74,22 +83,40 @@ export interface CardFilter {
   name?: string;
 }
 
-/** Condição verificada quando o passo vai resolver ("draw 1 card if you have 3 or less cards in your hand"). */
-export interface StepCondition {
-  handMax?: number;
-  /** "If your Leader has the {X} type" */
-  leaderHasType?: string;
-  /** "If your opponent has more DON!! cards on their field than you" */
-  opponentMoreDon?: boolean;
-}
-
-/** Condições extras de uma habilidade ("If you have 3 or more Characters", "If this Character is rested"). */
-export interface AbilityCondition {
+/**
+ * Condição de uma habilidade ("If you have 3 or more Characters, …") ou de um passo
+ * ("draw 1 card if you have 3 or less cards in your hand"). Todas as condições presentes precisam valer.
+ */
+export interface Condition {
   minCharacters?: number;
+  /** "If this Character is rested" */
   selfRested?: boolean;
   /** "If you have N or more DON!! cards on your field" */
   minDonOnField?: number;
+  /** "if you have N or less cards in your hand" */
+  handMax?: number;
+  /** "If your Leader has the {X} type" */
+  leaderHasType?: string;
+  /** "If your Leader is [X]" */
+  leaderName?: string;
+  /** "If your opponent has more DON!! cards on their field than you" */
+  opponentMoreDon?: boolean;
+  /** "If you have N or less Life cards" */
+  lifeMax?: number;
+  /** "If your opponent has N or less Life cards" */
+  opponentLifeMax?: number;
+  /** "you and your opponent have a total of N or less Life cards" */
+  totalLifeMax?: number;
+  /** "If there is a Character with a cost of N or more" (de qualquer jogador) */
+  anyCharacterMinCost?: number;
+  /** "If you don't have [X]" (nenhum Personagem seu com esse nome) */
+  noCharacterNamed?: string;
+  /** "If your Leader is multicolored" */
+  leaderMulticolor?: boolean;
 }
+
+export type AbilityCondition = Condition;
+export type StepCondition = Condition;
 
 /** Bônus contínuo para outras cartas do mesmo jogador ("your {Navy} type Characters gain +1000"). */
 export interface Aura {
@@ -155,6 +182,18 @@ type EffectStepBody =
   | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
   /** "This Character gains [Rush] during this turn." */
   | { do: 'gainKeyword'; target: TargetRef; keyword: Keyword; duration: Duration }
+  /** "Select up to 1 …": só escolhe (o passo seguinte usa 'chosen'). */
+  | { do: 'select'; target: TargetRef }
+  /** "Give up to 1 of your opponent's Characters −2 cost during this turn." */
+  | { do: 'cost'; target: TargetRef; amount: number; duration: Duration }
+  /** "Trash N cards from the top of your deck." */
+  | { do: 'millDeck'; count: number }
+  /** "Activate this card's [On Play] effect." (usado por [Trigger]) */
+  | { do: 'useOwnEffect'; timing: 'onPlay' | 'onKO' | 'main' | 'counter' }
+  /** "… and add this card to your hand." ([Trigger]) */
+  | { do: 'addThisToHand' }
+  /** "Add up to N card from the top of your deck to the top of your Life cards." */
+  | { do: 'addLifeFromDeck'; count: number }
   /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
   | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean };
 
@@ -202,6 +241,12 @@ export interface Ability {
   staticCanAttackActive?: boolean;
   /** "This Character cannot be K.O.'d in battle." */
   staticNoBattleKO?: boolean;
+  /** "This Character cannot be K.O.'d by effects." */
+  staticNoEffectKO?: boolean;
+  /** "This Leader cannot attack." */
+  staticCannotAttack?: boolean;
+  /** "This Character gains +N cost." */
+  staticCost?: number;
   /** "When this Character battles {attribute} attribute Characters, this Character gains +N power". */
   battleVsAttribute?: { attribute: string; power: number };
   /** Texto curto exibido na interface. */
@@ -264,7 +309,7 @@ export interface PlayerState {
 
 export interface Modifier {
   uid: string;
-  kind: 'power' | 'noBlockerWhenAttacking' | 'keyword' | 'cannotBeKO' | 'cannotBeKOInBattle';
+  kind: 'power' | 'cost' | 'noBlockerWhenAttacking' | 'keyword' | 'cannotBeKO' | 'cannotBeKOInBattle';
   amount: number;
   keyword?: Keyword;
   duration: Duration;

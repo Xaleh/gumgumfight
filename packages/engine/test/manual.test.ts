@@ -8,7 +8,7 @@ import { cards as baseCards, countCards, countDon, fetchToHand, putOnField, toTu
 // Cartas sintéticas sem script (efeitos resolvidos à mão).
 const extra: CardData[] = [
   { id: 'MAN-001', name: 'Manual OnPlay', category: 'character', colors: ['red'], cost: 1, power: 2000, counter: 1000, types: [], text: '[On Play] Look at 3 cards from the top of your deck and do something unusual.' },
-  { id: 'MAN-002', name: 'Manual Main', category: 'event', colors: ['red'], cost: 1, types: [], text: '[Main] Swap something strange.', trigger: 'Play this card.' },
+  { id: 'MAN-002', name: 'Manual Main', category: 'event', colors: ['red'], cost: 1, types: [], text: '[Main] Swap something strange.', trigger: 'Do something unusual with this card.' },
   { id: 'MAN-003', name: 'Manual Counter', category: 'event', colors: ['green'], cost: 0, types: [], text: '[Counter] Something odd happens during this battle.' },
   { id: 'MAN-004', name: 'Manual EOT', category: 'character', colors: ['red'], cost: 1, power: 1000, types: [], text: '[End of Your Turn] Set up to 1 of your DON!! cards as active, weirdly.' },
   { id: 'MAN-005', name: 'Static only', category: 'character', colors: ['red'], cost: 1, power: 1000, types: [], text: '[DON!! x1] This Character gains +1000 power in a new way.\n[Blocker] (After your opponent declares an attack...)' },

@@ -7,7 +7,7 @@
 //  - cada carta precisa ter ao menos uma cor em comum com o Líder.
 // Listas de cartas banidas/restritas ainda não são aplicadas.
 
-import { hasScript } from './cards';
+import { needsManual } from './cards';
 import { DECK_SIZE } from './engine';
 import type { CardData, DeckList } from './types';
 
@@ -46,7 +46,7 @@ export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Reco
   else if (!leader) issues.push({ level: 'error', message: `Líder desconhecido: ${deck.leader}.`, cardId: deck.leader });
   else if (leader.category !== 'leader') {
     issues.push({ level: 'error', message: `${leader.name} não é um Líder.`, cardId: leader.id });
-  } else if (leader.text && !hasScript(leader.id)) unscripted.add(leader.id);
+  } else if (needsManual(leader)) unscripted.add(leader.id);
 
   if (total !== DECK_SIZE) {
     issues.push({
@@ -77,13 +77,13 @@ export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Reco
     if (leader?.category === 'leader' && !isColorCompatible(leader, card)) {
       issues.push({ level: 'error', message: `${card.name} (${id}) não tem a cor do Líder.`, cardId: id });
     }
-    if (card.text && !hasScript(id)) unscripted.add(id);
+    if (needsManual(card)) unscripted.add(id);
   }
 
   if (unscripted.size) {
     issues.push({
       level: 'warning',
-      message: `${unscripted.size} carta(s) com efeito ainda não automatizado (jogam sem o efeito).`,
+      message: `${unscripted.size} carta(s) com efeito ainda não automatizado (aplicado à mão, com as ferramentas manuais).`,
     });
   }
 

@@ -13,4 +13,8 @@ export const normalizeTypeQuotes = (text: string) =>
     .replace(/"([^"\n]+)"((?:\s*(?:,|or|and)\s*(?:"[^"\n]+"|\{[^}\n]+\}))*\s+type)/g, (_m, first: string, rest: string) =>
       `{${first}}${rest.replace(/"([^"\n]+)"/g, '{$1}')}`,
     )
-    .replace(/\((\d{1,2})\)(?=\s*\(You may rest the specified)/g, (m, n: string) => CIRCLED[Number(n)] ?? m);
+    .replace(/\((\d{1,2})\)(?=\s*\(You may rest the specified)/g, (m, n: string) => CIRCLED[Number(n)] ?? m)
+    // Algumas cartas trazem o tipo entre colchetes: "[Supernovas] type" -> "{Supernovas} type".
+    .replace(/\[([^\]\n]+)\]((?:\s*(?:,|or|and)\s*\[[^\]\n]+\])*\s+type)/g, (_m, first: string, rest: string) =>
+      `{${first}}${rest.replace(/\[([^\]\n]+)\]/g, '{$1}')}`,
+    );

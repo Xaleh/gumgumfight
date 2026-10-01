@@ -111,7 +111,10 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
     abilities: [
       {
         timing: 'main',
-        steps: [{ do: 'noBlockerWhenAttacking', target: ownLeaderOrChar({ hasType: 'Straw Hat Crew' }) }],
+        steps: [
+          { do: 'select', target: ownLeaderOrChar({ hasAnyType: ['Straw Hat Crew'] }) },
+          { do: 'noBlockerWhenAttacking', target: 'chosen' },
+        ],
       },
       { timing: 'trigger', steps: [{ do: 'ko', target: oppChar({ maxCost: 3, keyword: 'blocker' }) }] },
     ],
@@ -125,7 +128,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         cost: { restSelf: true },
         label: 'Virar: +1000 de poder',
         steps: [
-          { do: 'power', target: ownLeaderOrChar({ hasType: 'Straw Hat Crew' }), amount: 1000, duration: 'turn' },
+          { do: 'power', target: ownLeaderOrChar({ hasAnyType: ['Straw Hat Crew'] }), amount: 1000, duration: 'turn' },
         ],
       },
     ],

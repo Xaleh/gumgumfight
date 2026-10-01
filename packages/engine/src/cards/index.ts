@@ -1,104 +1,27 @@
-import type { Ability, AbilityTiming, CardData, CardDef, Keyword } from '../types';
+import type { CardData, CardDef } from '../types';
+import { parseCard } from './parser';
 import { CARD_SCRIPTS } from './scripts';
-
-const KEYWORD_PATTERNS: Array<[Keyword, RegExp]> = [
-  ['rush', /\[Rush\]/i],
-  ['blocker', /\[Blocker\]/i],
-  ['doubleAttack', /\[Double Attack\]/i],
-  ['banish', /\[Banish\]/i],
-];
-
-/** Marcações que podem iniciar um efeito novo. */
-const EFFECT_START =
-  /(?<=^|[.)]\s*|\n)\s*(?=\[(?:DON!! x\d+|On Play|When Attacking|Activate: ?Main|Main|Counter|On K\.O\.|On Block|End of Your Turn|Your Turn|Opponent's Turn|Once Per Turn|Rush|Blocker|Double Attack|Banish|On Your Opponent's Attack)\])/;
-
-/**
- * Separa o texto em efeitos. A API não usa quebras de linha
- * ("[Rush] (…) [DON!! x2] [When Attacking] …"): um efeito novo começa numa marcação
- * logo após o fim de uma frase. Marcações no meio da frase ("cannot activate
- * [Blocker]", "this card's [Main] effect") não quebram.
- */
-export function splitEffects(text: string): string[] {
-  return text
-    .split(/\n|<br\s*\/?>/i)
-    .flatMap((line) => line.split(new RegExp(EFFECT_START.source, 'g')))
-    .map((l) => l.trim())
-    .filter(Boolean);
-}
-
-const splitLines = splitEffects;
-
-/**
- * Palavras-chave "incondicionais" detectadas no texto: só conta se a palavra-chave
- * aparece no início de uma linha (ex.: "[Blocker] (After your opponent declares...)").
- * Palavras-chave condicionais ("[DON!! x2] This Character gains [Rush]") exigem script.
- */
-export function detectKeywords(text: string): Keyword[] {
-  const lines = splitLines(text);
-  const found: Keyword[] = [];
-  for (const [kw, re] of KEYWORD_PATTERNS) {
-    if (lines.some((l) => re.test(l) && l.search(re) === 0)) found.push(kw);
-  }
-  return found;
-}
-
-/** Marcações de momento → quando o motor pausa para o jogador aplicar o efeito. */
-const TIMING_TAGS: Array<[RegExp, AbilityTiming]> = [
-  [/\[Activate: ?Main\]/i, 'activateMain'],
-  [/\[On Play\]/i, 'onPlay'],
-  [/\[When Attacking\]/i, 'whenAttacking'],
-  [/\[On K\.O\.\]/i, 'onKO'],
-  [/\[On Block\]/i, 'onBlock'],
-  [/\[End of Your Turn\]/i, 'endOfTurn'],
-  [/\[Counter\]/i, 'counter'],
-  [/\[Main\]/i, 'main'],
-];
-
-/** Só palavras-chave e lembretes, sem efeito a aplicar ("[Blocker] (After your...)"). */
-const KEYWORD_ONLY = /^(\[(Rush|Blocker|Double Attack|Banish)\]\s*(\([^)]*\))?\s*)+$/i;
-
-/**
- * Habilidades manuais derivadas do texto de uma carta sem script: em cada momento
- * marcado no texto ([On Play], [When Attacking]...), o motor pausa e o jogador
- * aplica o efeito com as ferramentas manuais. Linhas sem momento (efeitos contínuos
- * como "[DON!! x1] This Character gains +1000 power") viram 'static', só informativas.
- */
-export function manualAbilities(card: Pick<CardData, 'category' | 'text' | 'trigger'>): Ability[] {
-  const abilities: Ability[] = [];
-  for (const line of splitLines(card.text ?? '')) {
-    if (KEYWORD_ONLY.test(line)) continue;
-    const found = TIMING_TAGS.find(([re]) => re.test(line));
-    // [Main] e [Counter] só valem como momento em eventos.
-    let timing: AbilityTiming = found ? found[1] : 'static';
-    if ((timing === 'main' || timing === 'counter') && card.category !== 'event') timing = 'static';
-    const don = line.match(/\[DON!! x(\d+)\]/i);
-    abilities.push({
-      timing,
-      manual: true,
-      text: line,
-      don: don ? Number(don[1]) : undefined,
-      oncePerTurn: /\[Once Per Turn\]/i.test(line) || undefined,
-      yourTurn: /\[Your Turn\]/i.test(line) || undefined,
-      opponentsTurn: /\[Opponent's Turn\]/i.test(line) || undefined,
-      label: timing === 'activateMain' ? 'Ativar efeito (manual)' : undefined,
-      steps: timing === 'static' ? [] : [{ do: 'manual', text: line }],
-    });
-  }
-  if (card.trigger?.trim()) {
-    abilities.push({ timing: 'trigger', manual: true, text: card.trigger, steps: [{ do: 'manual', text: card.trigger }] });
-  }
-  return abilities;
-}
+import { detectKeywords, KEYWORD_ONLY, splitEffects } from './split';
 
 export function buildCardDef(data: CardData): CardDef {
   const script = CARD_SCRIPTS[data.id];
-  const abilities = script?.abilities ?? manualAbilities(data);
+  if (script) {
+    return {
+      ...data,
+      keywords: script.keywords ?? detectKeywords(data.text ?? ''),
+      abilities: script.abilities,
+      scripted: true,
+      manual: script.abilities.some((a) => a.manual),
+    };
+  }
+  // Sem script: o leitor automático; o que ele não reconhecer fica manual.
+  const parsed = parseCard(data);
   return {
     ...data,
-    keywords: script?.keywords ?? detectKeywords(data.text ?? ''),
-    abilities,
-    scripted: Boolean(script),
-    manual: abilities.some((a) => a.manual),
+    keywords: parsed.keywords,
+    abilities: parsed.abilities,
+    scripted: parsed.unparsed.length === 0 && parsed.abilities.length > 0,
+    manual: parsed.unparsed.length > 0,
   };
 }
 
@@ -106,11 +29,42 @@ export function hasScript(cardId: string): boolean {
   return cardId in CARD_SCRIPTS;
 }
 
-/** Situação de automação de uma carta (para relatórios de cobertura). */
-export function automationStatus(card: CardData): 'vanilla' | 'scripted' | 'manual' {
+export type AutomationStatus = 'vanilla' | 'scripted' | 'auto' | 'partial' | 'manual';
+
+/**
+ * Situação de automação de uma carta (para relatórios de cobertura):
+ * scripted = script escrito à mão; auto = lida por completo pelo leitor automático;
+ * partial = parte dos efeitos automática, parte manual; manual = nada reconhecido.
+ */
+export function automationStatus(card: CardData): AutomationStatus {
+  const key = `${card.id}\u0000${card.text}\u0000${card.trigger ?? ''}`;
+  let status = statusCache.get(key);
+  if (!status) {
+    status = computeStatus(card);
+    if (statusCache.size > 20000) statusCache.clear();
+    statusCache.set(key, status);
+  }
+  return status;
+}
+
+/** A carta tem algum efeito que o jogador precisa aplicar à mão? */
+export function needsManual(card: CardData): boolean {
+  const st = automationStatus(card);
+  return st === 'partial' || st === 'manual';
+}
+
+const statusCache = new Map<string, AutomationStatus>();
+
+function computeStatus(card: CardData): AutomationStatus {
   if (hasScript(card.id)) return 'scripted';
-  const meaningful = splitLines(card.text ?? '').some((l) => !KEYWORD_ONLY.test(l)) || Boolean(card.trigger?.trim());
-  return meaningful ? 'manual' : 'vanilla';
+  const meaningful = splitEffects(card.text ?? '').some((l) => !KEYWORD_ONLY.test(l)) || Boolean(card.trigger?.trim());
+  if (!meaningful) return 'vanilla';
+  const parsed = parseCard(card);
+  const lines = parsed.abilities.length;
+  if (!parsed.unparsed.length) return 'auto';
+  return parsed.unparsed.length < lines ? 'partial' : 'manual';
 }
 
 export { CARD_SCRIPTS };
+export { detectKeywords, manualAbilities, splitEffects } from './split';
+export { parseBody, parseCard, parseCardFilter, parseCondition, parseTarget, type ParsedCard } from './parser';

@@ -45,28 +45,20 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
    * resolvidas com as ferramentas manuais e como está a tradução.
    */
   app.get('/api/coverage', async () => {
-    type Row = { set: string; total: number; vanilla: number; scripted: number; manual: number; ptComplete: number };
+    const empty = (set: string) => ({ set, total: 0, vanilla: 0, scripted: 0, auto: 0, partial: 0, manual: 0, ptComplete: 0 });
+    type Row = ReturnType<typeof empty>;
     const bySet = new Map<string, Row>();
     for (const c of present(listCards(db))) {
       const set = c.set ?? c.id.split('-')[0];
-      const row = bySet.get(set) ?? { set, total: 0, vanilla: 0, scripted: 0, manual: 0, ptComplete: 0 };
+      const row = bySet.get(set) ?? empty(set);
       row.total++;
       row[automationStatus(c)]++;
       if (c.i18n?.pt?.source !== 'partial') row.ptComplete++;
       bySet.set(set, row);
     }
     const sets = [...bySet.values()].sort((a, b) => a.set.localeCompare(b.set, 'en', { numeric: true }));
-    const total = sets.reduce(
-      (acc, r) => ({
-        set: 'TOTAL',
-        total: acc.total + r.total,
-        vanilla: acc.vanilla + r.vanilla,
-        scripted: acc.scripted + r.scripted,
-        manual: acc.manual + r.manual,
-        ptComplete: acc.ptComplete + r.ptComplete,
-      }),
-      { set: 'TOTAL', total: 0, vanilla: 0, scripted: 0, manual: 0, ptComplete: 0 },
-    );
+    const total = empty('TOTAL');
+    for (const r of sets) for (const k of Object.keys(total) as Array<keyof Row>) if (k !== 'set') total[k] += r[k];
     return { total, sets };
   });
 

@@ -3,7 +3,7 @@ import {
   type Color,
   DECK_SIZE,
   formatDeckList,
-  hasScript,
+  needsManual,
   isColorCompatible,
   MAX_COPIES,
   parseDeckList,
@@ -101,7 +101,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         if (cost !== '' && (cost === '10' ? (c.cost ?? -1) < 10 : c.cost !== Number(cost))) return false;
         if (set && (c.set ?? c.id.split('-')[0]) !== set) return false;
         if (onlyCompatible && leader && c.category !== 'leader' && !isColorCompatible(leader, c)) return false;
-        if (onlyAutomated && c.text && !hasScript(c.id)) return false;
+        if (onlyAutomated && needsManual(c)) return false;
         if (q) {
           const hay = `${c.id} ${c.name} ${c.types.join(' ')} ${c.text} ${c.i18n?.pt?.text ?? ''}`.toLowerCase();
           if (!hay.includes(q)) return false;
@@ -404,7 +404,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                     badge={
                       <>
                         {n > 0 && <span className="copies">{n}/{MAX_COPIES}</span>}
-                        {c.text && !hasScript(c.id) && (
+                        {needsManual(c) && (
                           <span className="manual-badge" title="Efeito ainda não automatizado">
                             ⚙
                           </span>
@@ -494,7 +494,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                       {e.card?.name ?? e.id}
                       <small>
                         {e.id}
-                        {e.card?.text && !hasScript(e.id) ? ' · ⚙ manual' : ''}
+                        {e.card && needsManual(e.card) ? ' · ⚙ manual' : ''}
                       </small>
                     </span>
                     <button className="qty" onClick={() => remove(e.id)} aria-label="Remover uma">

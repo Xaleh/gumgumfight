@@ -1479,6 +1479,9 @@ input[type='number'] {
 .cov-vanilla {
   background: #4b7aa6;
 }
+.cov-partial {
+  background: #8fb83a;
+}
 .cov-manual {
   background: #c9a20c;
 }

@@ -56,7 +56,12 @@ export interface CoverageRow {
   set: string;
   total: number;
   vanilla: number;
+  /** Script escrito à mão. */
   scripted: number;
+  /** Lida por completo pelo leitor automático de efeitos. */
+  auto: number;
+  /** Parte automática, parte manual. */
+  partial: number;
   manual: number;
   ptComplete: number;
 }

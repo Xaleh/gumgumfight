@@ -45,7 +45,13 @@ export function CardTextInfo({ def, power }: { def: CardDef; power?: number }) {
           <a onClick={() => setShowOriginal((v) => !v)}>{showOriginal ? 'ver em português' : 'ver original (inglês)'}</a>
         </p>
       )}
-      {!def.scripted && def.text && <p className="warn small">⚠ Efeito ainda não automatizado.</p>}
+      {def.manual && (
+        <p className="warn small">
+          {def.abilities.some((a) => !a.manual && a.steps.length)
+            ? '⚠ Parte do efeito ainda não é automática (⚙ aplicada à mão).'
+            : '⚠ Efeito ainda não automatizado.'}
+        </p>
+      )}
     </div>
   );
 }

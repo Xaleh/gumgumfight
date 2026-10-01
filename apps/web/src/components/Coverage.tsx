@@ -27,7 +27,7 @@ export function Coverage({ onExit }: { onExit: () => void }) {
   }, []);
 
   const row = (r: CoverageRow, strong = false) => {
-    const auto = r.scripted + r.vanilla;
+    const auto = r.scripted + r.auto + r.vanilla;
     return (
       <tr key={r.set} className={strong ? 'cov-total' : ''}>
         <td>{r.set}</td>
@@ -35,14 +35,18 @@ export function Coverage({ onExit }: { onExit: () => void }) {
         <td>
           <Bar
             parts={[
-              { n: r.scripted, cls: 'cov-scripted', title: 'Efeito automatizado' },
+              { n: r.scripted + r.auto, cls: 'cov-scripted', title: 'Efeito automatizado' },
               { n: r.vanilla, cls: 'cov-vanilla', title: 'Sem efeito' },
+              { n: r.partial, cls: 'cov-partial', title: 'Parcial (parte automática, parte manual)' },
               { n: r.manual, cls: 'cov-manual', title: 'Manual' },
             ]}
           />
         </td>
         <td>
-          <b>{pct(auto, r.total)}%</b> <span className="muted small">({r.manual} manuais)</span>
+          <b>{pct(auto, r.total)}%</b>{' '}
+          <span className="muted small">
+            ({r.partial} parciais, {r.manual} manuais)
+          </span>
         </td>
         <td>
           <b>{pct(r.ptComplete, r.total)}%</b>
@@ -62,8 +66,9 @@ export function Coverage({ onExit }: { onExit: () => void }) {
       <div className="coverage-body">
         <p className="muted">
           <span className="legend cov-scripted" /> efeito automatizado <span className="legend cov-vanilla" /> sem efeito
-          (nada a automatizar) <span className="legend cov-manual" /> manual (o jogador aplica o efeito com as ferramentas
-          manuais). "Jogável" = automatizadas + sem efeito.
+          (nada a automatizar) <span className="legend cov-partial" /> parcial (parte dos efeitos é automática){' '}
+          <span className="legend cov-manual" /> manual (o jogador aplica o efeito com as ferramentas manuais).
+          "Automático" = automatizadas + sem efeito.
         </p>
         {error && <div className="error">{error}</div>}
         {!data && !error && <div className="muted">Carregando…</div>}
