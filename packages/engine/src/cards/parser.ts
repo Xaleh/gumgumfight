@@ -13,6 +13,7 @@ import type {
   CardCategory,
   CardData,
   CardFilter,
+  Color,
   Condition,
   EffectStep,
   Keyword,
@@ -84,6 +85,8 @@ function clean(raw: string): string {
     // A API às vezes perde o sinal de menos: "DON!! 1:" = "DON!! −1:".
     .replace(/DON!! (\d+)(?=\s*:)/g, 'DON!! -$1')
     .replace(/\[Activate: ?Main\]/gi, '[Activate: Main]')
+    .replace(/\bYou can (?=trash|rest|place|return|add)/g, 'You may ')
+    .replace(/\{Supernova\}/g, '{Supernovas}')
     .replace(/’/g, "'");
 }
 
@@ -141,7 +144,7 @@ export function parseTarget(phrase: string): TargetRef | null {
   let p = phrase.trim().replace(/\.$/, '');
   if (/^this (character|card|leader|stage)$/i.test(p)) return 'self';
   if (/^your leader$/i.test(p)) return 'ownLeader';
-  if (/^that (character|card|leader|leader or character)$/i.test(p)) return 'chosen';
+  if (/^(?:that|the selected) (character|card|leader|leader or character)$/i.test(p) || /^it$/i.test(p)) return 'chosen';
   if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
 
   const spec: TargetSpec = { side: 'any', kinds: [], upTo: 1 };
@@ -214,7 +217,8 @@ export function parseCardFilter(phrase: string): { upTo: number; filter: CardFil
   }
   const filter: CardFilter = {};
   for (let guard = 0; guard < 4; guard++) {
-    if ((m = p.match(TYPE_LIST))) filter.hasAnyType = typesOf(m[1]);
+    if ((m = p.match(/^(red|green|blue|purple|black|yellow) /i))) filter.color = m[1].toLowerCase() as Color;
+    else if ((m = p.match(TYPE_LIST))) filter.hasAnyType = typesOf(m[1]);
     else if ((m = p.match(/^\[([^\]]+)\]\s*/))) filter.name = m[1];
     else break;
     p = p.slice(m[0].length);
@@ -256,6 +260,9 @@ export function parseCondition(text: string): Condition | null {
   }
   if ((m = t.match(/^you don't have \[([^\]]+)\]$/i))) return { noCharacterNamed: m[1] };
   if (/^your Leader is multicolored$/i.test(t)) return { leaderMulticolor: true };
+  if ((m = t.match(/^you have (\d+) or more cards in your hand$/i))) return { handMin: Number(m[1]) };
+  if ((m = t.match(/^you have (\d+) or more rested Characters$/i))) return { minRestedCharacters: Number(m[1]) };
+  if ((m = t.match(/^your opponent has (\d+) or more rested Characters$/i))) return { opponentMinRestedCharacters: Number(m[1]) };
   if ((m = t.match(/^your Leader's type includes "([^"]+)"$/i))) return { leaderHasType: m[1] };
   // "If that card is a Character, that Character …": o passo seguinte já só vale para Personagens.
   if (/^that card is a Character$/i.test(t)) return {};
@@ -287,6 +294,15 @@ const withTarget = (phrase: string, make: (t: TargetRef) => EffectStep, characte
 const durationOf = (d: string): 'turn' | 'battle' => (/battle/i.test(d) ? 'battle' : 'turn');
 
 const CLAUSES: ClauseRule[] = [
+  [
+    // "K.O. up to 1 … with a cost of 3 or less and up to 1 … with a cost of 2 or less"
+    /^K\.O\. (up to \d+ .+?) and (up to \d+ .+)$/i,
+    (m) => {
+      const a = parseTarget(m[1]);
+      const b = parseTarget(m[2]);
+      return onlyCharacters(a) && onlyCharacters(b) ? [{ do: 'ko', target: a }, { do: 'ko', target: b }] : null;
+    },
+  ],
   [/^K\.O\. (.+)$/i, (m) => withTarget(m[1], (target) => ({ do: 'ko', target }), true)],
   [/^Rest up to (\d+) of your opponent's DON!! cards?$/i, (m) => [{ do: 'restOpponentDon', count: Number(m[1]) }]],
   [/^Rest (.+)$/i, (m) => withTarget(m[1], (target) => ({ do: 'rest', target }))],
@@ -338,6 +354,43 @@ const CLAUSES: ClauseRule[] = [
     ],
   ],
   [/^Draw (\d+) cards?$/i, (m) => [{ do: 'draw', count: Number(m[1]) }]],
+  [/^Draw a card$/i, () => [{ do: 'draw', count: 1 }]],
+  [
+    /^Your opponent trashes (\d+) cards? from their hand$/i,
+    (m) => [{ do: 'opponentDiscards', count: Number(m[1]) }],
+  ],
+  [
+    /^Reveal (up to \d+ .+?) from your deck and add (?:it|them) to your hand$/i,
+    (m) => {
+      const f = parseCardFilter(m[1]);
+      return f ? [{ do: 'tutor', upTo: f.upTo, filter: f.filter }] : null;
+    },
+  ],
+  [
+    /^(.+?) can also attack your opponent's active Characters during this turn$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'canAttackActive', target, duration: 'turn' })),
+  ],
+  [
+    /^(.+?) cannot attack until the end of your opponent's next turn$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'cannotAttack', target, duration: 'nextOpponentTurn' }), true),
+  ],
+  [
+    /^(.+?) cannot attack during this turn$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'cannotAttack', target, duration: 'turn' }), true),
+  ],
+  [
+    /^(.+?) gains? \+(\d+) power until the end of your opponent's next turn$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'power', target, amount: Number(m[2]), duration: 'nextOpponentTurn' })),
+  ],
+  [
+    /^Give (.+?) [−-]?(\d+) power until the end of your opponent's next turn$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'power', target, amount: -Number(m[2]), duration: 'nextOpponentTurn' })),
+  ],
+  [
+    // "Then, if …, that card gains an additional +2000 power." (Counter: vale durante a batalha)
+    /^(.+?) gains? an additional \+(\d+) power(?: during this (turn|battle))?$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'power', target, amount: Number(m[2]), duration: m[3] ? durationOf(m[3]) : 'battle' })),
+  ],
   [/^Trash (\d+) cards? from your hand$/i, (m) => [{ do: 'trashFromHand', count: Number(m[1]) }]],
   [
     /^Add (?:up to )?(\d+) DON!! cards? from your DON!! deck and (set (?:it|them) as active|rest (?:it|them))$/i,
@@ -389,6 +442,10 @@ const CLAUSES: ClauseRule[] = [
   [
     /^Your opponent cannot activate a \[Blocker\] Character that has (\d+) or more power during this battle$/i,
     (m) => [{ do: 'noBlockerThisBattle', minPower: Number(m[1]) }],
+  ],
+  [
+    /^Your opponent cannot activate a \[Blocker\] Character that has (\d+) or less power during this battle$/i,
+    (m) => [{ do: 'noBlockerThisBattle', maxPower: Number(m[1]) }],
   ],
   [
     /^Your opponent cannot activate \[Blocker\] if that Leader or Character attacks during this turn$/i,
@@ -444,8 +501,12 @@ export function parseBody(body: string): EffectStep[] | null {
   for (let i = 0; i < sentences.length; i++) {
     let s = sentences[i].replace(/\.$/, '').replace(/^Then,\s*/i, '');
     // "Look at N cards…; reveal up to M … and add it to your hand. Then, place the rest at the bottom…"
-    const look = s.match(/^Look at (\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to your hand$/i);
+    const look =
+      s.match(/^Look at (\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to your hand$/i) ??
+      s.match(/^Look at (\d+) cards from the top of your deck; (play) up to (\d+) (.+?)$/i);
     if (look) {
+      const play = look[2] === 'play';
+      if (play) look.splice(2, 1);
       const f = parseCardFilter(look[3]);
       const next = sentences[i + 1] ?? '';
       const rest = /^Then, place the rest at the bottom of your deck in any order\.?$/i.test(next)
@@ -454,7 +515,9 @@ export function parseBody(body: string): EffectStep[] | null {
           ? 'trash'
           : null;
       if (!f || !rest) return null;
-      steps.push({ do: 'search', look: Number(look[1]), upTo: Number(look[2]), filter: f.filter, rest });
+      const search: EffectStep = { do: 'search', look: Number(look[1]), upTo: Number(look[2]), filter: f.filter, rest };
+      if (play) search.play = true;
+      steps.push(search);
       i++;
       continue;
     }
@@ -526,6 +589,18 @@ function parseCost(rest: string): { cost?: AbilityCost; body: string } | null {
     cost.donMinus = Number(m[1]);
     c = c.slice(m[0].length);
   }
+  if ((m = c.match(/^You may add (\d+) cards? from (?:the top of )?your Life (?:area|cards) to your hand$/i))) {
+    cost.lifeToHand = Number(m[1]);
+    c = '';
+  }
+  if ((m = c.match(/^You may rest (\d+) of your Characters$/i))) {
+    cost.restCharacters = Number(m[1]);
+    c = '';
+  }
+  if ((m = c.match(/^You may place (\d+) cards? from your hand at the bottom of your deck$/i))) {
+    cost.handToBottom = Number(m[1]);
+    c = '';
+  }
   if ((m = c.match(/^You may rest (\d+) of your DON!! cards?$/i))) {
     cost.restDon = (cost.restDon ?? 0) + Number(m[1]);
     c = '';
@@ -577,11 +652,12 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [{ ...base, battleVsAttribute: { attribute: m[1], power: Number(m[2]) } }];
   }
   const ifm = s.match(/^If ([^,]+), (.+)$/i);
-  if (ifm) {
-    const cond = parseCondition(ifm[1]);
+  const tailIf = !ifm && s.match(/^(this (?:Character|card|Leader) gains .+?) if (.+)$/i);
+  if (ifm || tailIf) {
+    const cond = parseCondition(ifm ? ifm[1] : (tailIf as RegExpMatchArray)[2]);
     if (!cond) return null;
     base.condition = cond;
-    s = ifm[2];
+    s = ifm ? ifm[2] : (tailIf as RegExpMatchArray)[1];
   }
   if ((m = s.match(POWER_SELF))) return [{ ...base, staticPower: Number(m[1]) }];
   if ((m = s.match(/^this (?:Character|card|Leader) gains \[(Rush|Blocker|Double Attack|Banish)\]$/i))) {
@@ -592,6 +668,9 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   }
   if (/^this Character cannot be K\.O\.'d in battle$/i.test(s)) return [{ ...base, staticNoBattleKO: true }];
   if (/^this Character cannot be K\.O\.'d by effects$/i.test(s)) return [{ ...base, staticNoEffectKO: true }];
+  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards)$/i))) {
+    return [{ ...base, noBattleKOVsAttribute: m[1] }];
+  }
   if (/^this (?:Leader|Character) cannot attack$/i.test(s)) return [{ ...base, staticCannotAttack: true }];
   if ((m = s.match(/^this Character gains \+(\d+) cost$/i))) return [{ ...base, staticCost: Number(m[1]) }];
   if ((m = s.match(/^this Character gains \[(Rush|Blocker|Double Attack|Banish)\] and \+(\d+) cost$/i))) {

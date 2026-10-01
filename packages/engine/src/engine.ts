@@ -22,6 +22,7 @@ import type {
   GameState,
   Keyword,
   ManualOp,
+  Modifier,
   PlayerId,
   PlayerState,
   TargetRef,
@@ -183,6 +184,16 @@ export function conditionHolds(state: GameState, controller: PlayerId, source: s
   }
   if (cond.noCharacterNamed && ps.characters.some((c) => hasName(cardDef(state, c.uid), cond.noCharacterNamed!))) return false;
   if (cond.leaderMulticolor && cardDef(state, ps.leader.uid).colors.length < 2) return false;
+  if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return false;
+  if (cond.minRestedCharacters !== undefined && ps.characters.filter((c) => c.rested).length < cond.minRestedCharacters) {
+    return false;
+  }
+  if (
+    cond.opponentMinRestedCharacters !== undefined &&
+    opp.characters.filter((c) => c.rested).length < cond.opponentMinRestedCharacters
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -216,6 +227,7 @@ export function matchesFilter(def: CardDef, f: import('./types').CardFilter): bo
   if (f.minCost !== undefined && (def.cost ?? 0) < f.minCost) return false;
   if (f.excludeName && hasName(def, f.excludeName)) return false;
   if (f.name && !hasName(def, f.name)) return false;
+  if (f.color && !def.colors.includes(f.color)) return false;
   return true;
 }
 
@@ -274,6 +286,7 @@ export function hasType(def: CardDef, type: string): boolean {
 }
 
 function canAttackActive(state: GameState, uid: string): boolean {
+  if (state.modifiers.some((m) => m.uid === uid && m.kind === 'canAttackActive')) return true;
   return cardDef(state, uid).abilities.some(
     (a) => a.timing === 'static' && a.staticCanAttackActive && conditionsMet(state, uid, a),
   );
@@ -294,7 +307,10 @@ export function attackError(state: GameState, player: PlayerId, attacker: string
   const a = locate(state, attacker);
   if (!a || a.player !== player || a.zone === 'stage') return 'Atacante inválido.';
   if (a.fc.rested) return 'O atacante está virado.';
-  if (cardDef(state, attacker).abilities.some((x) => x.timing === 'static' && x.staticCannotAttack && conditionsMet(state, attacker, x))) {
+  if (
+    state.modifiers.some((m) => m.uid === attacker && m.kind === 'cannotAttack') ||
+    cardDef(state, attacker).abilities.some((x) => x.timing === 'static' && x.staticCannotAttack && conditionsMet(state, attacker, x))
+  ) {
     return 'Esta carta não pode atacar.';
   }
   const t = locate(state, target);
@@ -335,8 +351,15 @@ export function activateError(state: GameState, player: PlayerId, uid: string, i
   if (ability.cost?.restSelf && loc.fc.rested) return 'A carta já está virada.';
   if ((ability.cost?.restDon ?? 0) > ps.donActive) return 'DON!! ativos insuficientes.';
   if ((ability.cost?.donMinus ?? 0) > totalDonOnField(ps)) return 'DON!! insuficientes em campo.';
-  if ((ability.cost?.trashFromHand ?? 0) > discardable(state, player, ability.cost?.trashFilter).length) {
+  if (
+    (ability.cost?.trashFromHand ?? 0) + (ability.cost?.handToBottom ?? 0) >
+    discardable(state, player, ability.cost?.trashFilter).length
+  ) {
     return 'Cartas insuficientes na mão.';
+  }
+  if ((ability.cost?.lifeToHand ?? 0) > ps.life.length) return 'Cartas de Vida insuficientes.';
+  if ((ability.cost?.restCharacters ?? 0) > ps.characters.filter((c) => !c.rested && c.uid !== uid).length) {
+    return 'Personagens ativos insuficientes.';
   }
   return null;
 }
@@ -358,6 +381,7 @@ export function blockerOptions(state: GameState, defender: PlayerId): string[] {
   return state.players[defender].characters
     .filter((c) => !c.rested && c.uid !== b.target && hasKeyword(state, c.uid, 'blocker'))
     .filter((c) => b.noBlockerMinPower === null || getPower(state, c.uid) < b.noBlockerMinPower)
+    .filter((c) => b.noBlockerMaxPower === undefined || getPower(state, c.uid) > b.noBlockerMaxPower)
     .map((c) => c.uid);
 }
 
@@ -624,9 +648,13 @@ function handleMainAction(state: GameState, action: Action) {
       if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(action.uid, action.ability));
       log(state, p, `${cardDef(state, action.uid).name}: ${ability.label ?? 'efeito ativado'}.`);
       // Descartar da mão também é custo: resolve antes do efeito.
-      const costSteps: EffectStep[] = ability.cost?.trashFromHand
-        ? [{ do: 'trashFromHand', count: ability.cost.trashFromHand, filter: ability.cost.trashFilter }]
-        : [];
+      const costSteps: EffectStep[] = [];
+      if (ability.cost?.trashFromHand) {
+        costSteps.push({ do: 'trashFromHand', count: ability.cost.trashFromHand, filter: ability.cost.trashFilter });
+      }
+      if (ability.cost?.handToBottom) costSteps.push({ do: 'handToDeckBottom', count: ability.cost.handToBottom });
+      if (ability.cost?.restCharacters) costSteps.push({ do: 'restOwnCharacters', count: ability.cost.restCharacters });
+      for (let i = 0; i < (ability.cost?.lifeToHand ?? 0) && ps.life.length; i++) ps.hand.push(ps.life.pop()!);
       pushEffect(state, action.uid, p, [...costSteps, ...ability.steps]);
       return;
     }
@@ -700,7 +728,9 @@ function startTurn(state: GameState) {
 function endTurn(state: GameState) {
   const ps = state.players[state.activePlayer];
   log(state, ps.id, `${ps.name} encerra o turno.`);
-  state.modifiers = state.modifiers.filter((m) => m.duration !== 'turn');
+  state.modifiers = state.modifiers.filter(
+    (m) => m.duration !== 'turn' && !(m.duration === 'nextOpponentTurn' && (m.untilTurn ?? 0) <= state.turn),
+  );
   state.usedThisTurn = [];
   state.activePlayer = opponent(state.activePlayer);
   state.turn++;
@@ -843,7 +873,7 @@ function stepBattle(state: GameState) {
           banish: hasKeyword(state, b.attacker, 'banish'),
         });
       } else {
-        koCharacter(state, b.target, { inBattle: true });
+        koCharacter(state, b.target, { inBattle: true, by: b.attacker });
       }
       return;
     }
@@ -987,6 +1017,15 @@ function useOwnEffect(state: GameState, frame: EffectFrame, timing: 'main' | 'co
   return false; // o índice já avançou
 }
 
+/** Registra um modificador; "until the end of your opponent's next turn" calcula o turno em que acaba. */
+function addModifier(state: GameState, controller: PlayerId, m: Modifier) {
+  if (m.duration === 'nextOpponentTurn') {
+    // No seu turno: acaba no fim do próximo turno (do oponente). No turno do oponente: no fim do turno seguinte a ele.
+    m.untilTurn = state.turn + (state.activePlayer === controller ? 1 : 2);
+  }
+  state.modifiers.push(m);
+}
+
 /** Interrompe o efeito: os passos restantes não acontecem. */
 function abortEffect(frame: EffectFrame): false {
   frame.i = frame.steps.length;
@@ -1001,6 +1040,9 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if ((cost.restDon ?? 0) > ps.donActive) return false;
   if ((cost.donMinus ?? 0) > totalDonOnField(ps)) return false;
   if ((cost.trashFromHand ?? 0) > discardable(state, player, cost.trashFilter).length) return false;
+  if ((cost.handToBottom ?? 0) > ps.hand.length) return false;
+  if ((cost.lifeToHand ?? 0) > ps.life.length) return false;
+  if ((cost.restCharacters ?? 0) > ps.characters.filter((c) => !c.rested && c.uid !== source).length) return false;
   return true;
 }
 
@@ -1010,6 +1052,9 @@ export function describeCost(cost: AbilityCost): string {
   if (cost.restDon) parts.push(`virar ${cost.restDon} DON!!`);
   if (cost.restSelf) parts.push('virar esta carta');
   if (cost.trashFromHand) parts.push(`descartar ${cost.trashFromHand} carta(s) da mão`);
+  if (cost.handToBottom) parts.push(`colocar ${cost.handToBottom} carta(s) da mão no fundo do deck`);
+  if (cost.lifeToHand) parts.push(`colocar ${cost.lifeToHand} carta(s) da Vida na mão`);
+  if (cost.restCharacters) parts.push(`virar ${cost.restCharacters} Personagem(ns) seu(s)`);
   return parts.join(' e ');
 }
 
@@ -1030,7 +1075,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       const duration = step.duration === 'battle' && !state.battle ? 'turn' : step.duration;
       for (const uid of t) {
-        state.modifiers.push({ uid, kind: 'power', amount: step.amount, duration });
+        addModifier(state, frame.controller, { uid, kind: 'power', amount: step.amount, duration });
         log(state, frame.controller, `${cardDef(state, uid).name} recebe ${step.amount > 0 ? '+' : ''}${step.amount} de poder.`);
       }
       return true;
@@ -1116,6 +1161,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'noBlockerThisBattle':
       if (state.battle) {
         if (step.minPower !== undefined) state.battle.noBlockerMinPower = step.minPower;
+        else if (step.maxPower !== undefined) state.battle.noBlockerMaxPower = step.maxPower;
         else state.battle.noBlocker = true;
         log(
           state,
@@ -1178,7 +1224,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           options,
           min: 0,
           max: Math.min(step.upTo, options.length),
-          prompt: `${srcName}: olhe as ${top.length} cartas do topo e escolha até ${step.upTo} para adicionar à mão.`,
+          prompt: `${srcName}: olhe as ${top.length} cartas do topo e escolha até ${step.upTo} para ${step.play ? 'jogar' : 'adicionar à mão'}.`,
           intent: 'help',
           source: frame.source,
         };
@@ -1187,8 +1233,14 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const chosen = (frame.choice ?? []).filter((u) => options.includes(u));
       for (const uid of top) removeFrom(ps.deck, uid);
       for (const uid of chosen) {
-        ps.hand.push(uid);
-        log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`);
+        if (step.play) {
+          // "play up to 1 … Then, place the rest at the bottom": joga a carta (o resto vai para o fundo antes).
+          ps.hand.push(uid);
+          playFree(state, uid);
+        } else {
+          ps.hand.push(uid);
+          log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`);
+        }
       }
       const rest = top.filter((u) => !chosen.includes(u));
       if (step.rest === 'bottom') ps.deck.push(...rest);
@@ -1223,6 +1275,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           returnDon(ps, cost.donMinus);
           log(state, frame.controller, `${ps.name} devolve ${cost.donMinus} DON!! ao deck de DON!!.`);
         }
+        if (cost.handToBottom) frame.steps.splice(frame.i + 1, 0, { do: 'handToDeckBottom', count: cost.handToBottom });
+        if (cost.restCharacters) frame.steps.splice(frame.i + 1, 0, { do: 'restOwnCharacters', count: cost.restCharacters });
+        for (let i = 0; i < (cost.lifeToHand ?? 0) && ps.life.length; i++) ps.hand.push(ps.life.pop()!);
         if (!cost.trashFromHand) return true;
         frame.memo = ['trash'];
         frame.choice = undefined;
@@ -1249,7 +1304,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'gainKeyword': {
       const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha quem ganha [${step.keyword}].`);
       if (!t) return false;
-      for (const uid of t) state.modifiers.push({ uid, kind: 'keyword', keyword: step.keyword, amount: 0, duration: step.duration });
+      for (const uid of t) addModifier(state, frame.controller, { uid, kind: 'keyword', keyword: step.keyword, amount: 0, duration: step.duration });
       return true;
     }
     case 'select': {
@@ -1260,7 +1315,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha quem não pode ser nocauteado.`);
       if (!t) return false;
       for (const uid of t.filter((u) => locate(state, u)?.zone === 'character')) {
-        state.modifiers.push({ uid, kind: step.inBattle ? 'cannotBeKOInBattle' : 'cannotBeKO', amount: 0, duration: step.duration });
+        addModifier(state, frame.controller, { uid, kind: step.inBattle ? 'cannotBeKOInBattle' : 'cannotBeKO', amount: 0, duration: step.duration });
         log(state, frame.controller, `${cardDef(state, uid).name} não pode ser nocauteado${step.inBattle ? ' em batalha' : ''} neste turno.`);
       }
       return true;
@@ -1275,7 +1330,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       );
       if (!t) return false;
       for (const uid of t) {
-        state.modifiers.push({ uid, kind: 'cost', amount: step.amount, duration: step.duration });
+        addModifier(state, frame.controller, { uid, kind: 'cost', amount: step.amount, duration: step.duration });
         log(state, frame.controller, `${cardDef(state, uid).name}: ${step.amount > 0 ? '+' : ''}${step.amount} de custo.`);
       }
       return true;
@@ -1302,6 +1357,56 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         opp.trash.push(uid);
         log(state, opp.id, `${opp.name} descarta ${cardDef(state, uid).name}.`);
       }
+      return true;
+    }
+    case 'tutor': {
+      const options = ps.deck.filter((u) => matchesFilter(cardDef(state, u), step.filter));
+      if (!frame.choice) {
+        if (!options.length) return true;
+        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) do deck para adicionar à mão.`);
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => options.includes(u))) {
+        removeFrom(ps.deck, uid);
+        ps.hand.push(uid);
+        log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} do deck e adiciona à mão.`);
+      }
+      return true;
+    }
+    case 'restOwnCharacters': {
+      const options = ps.characters.filter((c) => !c.rested && c.uid !== frame.source).map((c) => c.uid);
+      const n = Math.min(step.count, options.length);
+      if (n === 0) return true;
+      if (!frame.choice) {
+        askCards(state, frame, options, n, `${srcName}: escolha ${n} Personagem(ns) seu(s) para virar.`, { min: n });
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => options.includes(u))) locate(state, uid)!.fc.rested = true;
+      return true;
+    }
+    case 'handToDeckBottom': {
+      const n = Math.min(step.count, ps.hand.length);
+      if (n === 0) return true;
+      if (!frame.choice) {
+        askCards(state, frame, [...ps.hand], n, `${srcName}: escolha ${n} carta(s) da mão para o fundo do deck.`, {
+          min: n,
+          intent: 'discard',
+        });
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => ps.hand.includes(u))) {
+        removeFrom(ps.hand, uid);
+        ps.deck.push(uid);
+      }
+      log(state, frame.controller, `${ps.name} coloca ${n} carta(s) da mão no fundo do deck.`);
+      return true;
+    }
+    case 'canAttackActive':
+    case 'cannotAttack': {
+      const harm = step.do === 'cannotAttack';
+      const t = resolveTargets(state, frame, step.target, harm ? 'harm' : 'help', `${srcName}: escolha o alvo do efeito.`);
+      if (!t) return false;
+      for (const uid of t) addModifier(state, frame.controller, { uid, kind: step.do, amount: 0, duration: step.duration });
       return true;
     }
     case 'millDeck': {
@@ -1615,18 +1720,23 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
 // ---------------------------------------------------------------------------
 
 /** O personagem está protegido de K.O. ("cannot be K.O.'d [in battle]")? */
-export function koProtected(state: GameState, uid: string, inBattle: boolean): boolean {
+export function koProtected(state: GameState, uid: string, inBattle: boolean, by?: string): boolean {
   const kinds = inBattle ? ['cannotBeKO', 'cannotBeKOInBattle'] : ['cannotBeKO'];
   if (state.modifiers.some((m) => m.uid === uid && kinds.includes(m.kind))) return true;
+  const byAttrs = by ? (cardDef(state, by).attributes ?? []) : [];
   return cardDef(state, uid).abilities.some(
-    (a) => a.timing === 'static' && (inBattle ? a.staticNoBattleKO : a.staticNoEffectKO) && conditionsMet(state, uid, a),
+    (a) =>
+      a.timing === 'static' &&
+      ((inBattle ? a.staticNoBattleKO : a.staticNoEffectKO) ||
+        (inBattle && a.noBattleKOVsAttribute !== undefined && byAttrs.includes(a.noBattleKOVsAttribute))) &&
+      conditionsMet(state, uid, a),
   );
 }
 
-function koCharacter(state: GameState, uid: string, opts: { inBattle?: boolean; force?: boolean } = {}) {
+function koCharacter(state: GameState, uid: string, opts: { inBattle?: boolean; force?: boolean; by?: string } = {}) {
   const loc = locate(state, uid);
   if (!loc || loc.zone !== 'character') return;
-  if (!opts.force && koProtected(state, uid, Boolean(opts.inBattle))) {
+  if (!opts.force && koProtected(state, uid, Boolean(opts.inBattle), opts.by)) {
     log(state, loc.player, `${cardDef(state, uid).name} não pode ser nocauteado.`);
     return;
   }

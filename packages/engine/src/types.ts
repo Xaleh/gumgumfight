@@ -81,6 +81,8 @@ export interface CardFilter {
   excludeName?: string;
   /** "[Pacifista]": nome exato (ou nome alternativo). */
   name?: string;
+  /** "red Character card" */
+  color?: Color;
 }
 
 /**
@@ -113,6 +115,12 @@ export interface Condition {
   noCharacterNamed?: string;
   /** "If your Leader is multicolored" */
   leaderMulticolor?: boolean;
+  /** "If you have N or more cards in your hand" */
+  handMin?: number;
+  /** "If you have N or more rested Characters" */
+  minRestedCharacters?: number;
+  /** "If your opponent has N or more rested Characters" */
+  opponentMinRestedCharacters?: number;
 }
 
 export type AbilityCondition = Condition;
@@ -133,7 +141,8 @@ export type TargetRef =
   | 'battleTarget' // a carta sendo atacada na batalha atual
   | TargetSpec; // o jogador escolhe
 
-export type Duration = 'turn' | 'battle';
+/** nextOpponentTurn = "until the end of your opponent's next turn". */
+export type Duration = 'turn' | 'battle' | 'nextOpponentTurn';
 
 type EffectStepBody =
   | { do: 'power'; target: TargetRef; amount: number; duration: Duration }
@@ -146,7 +155,7 @@ type EffectStepBody =
   | { do: 'restOpponentDon'; count: number }
   | { do: 'returnToHand'; target: TargetRef }
   /** A batalha atual não permite [Blocker] (opcionalmente só de quem tem >= minPower). */
-  | { do: 'noBlockerThisBattle'; minPower?: number }
+  | { do: 'noBlockerThisBattle'; minPower?: number; maxPower?: number }
   /** Se o alvo atacar neste turno, o oponente não pode usar [Blocker]. */
   | { do: 'noBlockerWhenAttacking'; target: TargetRef }
   /** Resolve os passos do efeito [Main] da própria carta (usado por [Trigger]). */
@@ -160,7 +169,17 @@ type EffectStepBody =
   /** "Set up to N of your DON!! cards as active." */
   | { do: 'setDonActive'; count: number }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
-  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' }
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash'; play?: boolean }
+  /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */
+  | { do: 'tutor'; upTo: number; filter: CardFilter }
+  /** Virar N Personagens ativos seus (custo "You may rest 2 of your Characters"). */
+  | { do: 'restOwnCharacters'; count: number }
+  /** Colocar cartas da mão no fundo do deck (custo "You may place 1 card from your hand at the bottom of your deck"). */
+  | { do: 'handToDeckBottom'; count: number }
+  /** "This Character can also attack your opponent's active Characters during this turn." */
+  | { do: 'canAttackActive'; target: TargetRef; duration: Duration }
+  /** "… cannot attack until the end of your opponent's next turn." */
+  | { do: 'cannotAttack'; target: TargetRef; duration: Duration }
   /** Resolve os passos do efeito [Counter] da própria carta (usado por [Trigger]). */
   | { do: 'useCounterEffect' }
   /** "Place … at the bottom of the owner's deck." */
@@ -224,6 +243,12 @@ export interface AbilityCost {
   trashFromHand?: number; // "You may trash N card from your hand:"
   /** Filtro das cartas descartadas como custo ("trash 1 {FILM} type card from your hand"). */
   trashFilter?: CardFilter;
+  /** "You may place N cards from your hand at the bottom of your deck:" */
+  handToBottom?: number;
+  /** "You may add 1 card from your Life area to your hand:" (do topo) */
+  lifeToHand?: number;
+  /** "You may rest N of your Characters:" (o jogador escolhe quais) */
+  restCharacters?: number;
 }
 
 export interface Ability {
@@ -247,6 +272,8 @@ export interface Ability {
   staticNoEffectKO?: boolean;
   /** "This Leader cannot attack." */
   staticCannotAttack?: boolean;
+  /** "This Character cannot be K.O.'d in battle by "Strike" attribute Characters." */
+  noBattleKOVsAttribute?: string;
   /** "This Character gains +N cost." */
   staticCost?: number;
   /** "When this Character battles {attribute} attribute Characters, this Character gains +N power". */
@@ -311,8 +338,18 @@ export interface PlayerState {
 
 export interface Modifier {
   uid: string;
-  kind: 'power' | 'cost' | 'noBlockerWhenAttacking' | 'keyword' | 'cannotBeKO' | 'cannotBeKOInBattle';
+  kind:
+    | 'power'
+    | 'cost'
+    | 'noBlockerWhenAttacking'
+    | 'keyword'
+    | 'cannotBeKO'
+    | 'cannotBeKOInBattle'
+    | 'canAttackActive'
+    | 'cannotAttack';
   amount: number;
+  /** Para 'nextOpponentTurn': o efeito acaba no fim deste turno. */
+  untilTurn?: number;
   keyword?: Keyword;
   duration: Duration;
 }
@@ -325,6 +362,8 @@ export interface BattleState {
   blocked: boolean;
   noBlocker: boolean;
   noBlockerMinPower: number | null;
+  /** "cannot activate a [Blocker] Character that has N or less power" */
+  noBlockerMaxPower?: number;
   /** Personagens que batalharam entre si (registrado no dano, vale mesmo se um sair de campo). */
   fought?: string[];
 }

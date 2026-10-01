@@ -13,6 +13,11 @@ import type { CardData, DeckList } from './types';
 
 export const MAX_COPIES = 4;
 
+/** "Under the rules of this game, you may have any number of this card in your deck." */
+export function anyNumberAllowed(card: Pick<CardData, 'text'>): boolean {
+  return /you may have any number of this card in your deck/i.test(card.text ?? '');
+}
+
 export interface DeckIssue {
   level: 'error' | 'warning';
   message: string;
@@ -71,7 +76,7 @@ export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Reco
     if (card.category === 'leader') {
       issues.push({ level: 'error', message: `${card.name} é um Líder e não pode ir no deck.`, cardId: id });
     }
-    if (count > MAX_COPIES) {
+    if (count > MAX_COPIES && !anyNumberAllowed(card)) {
       issues.push({ level: 'error', message: `${card.name} (${id}): máximo de ${MAX_COPIES} cópias.`, cardId: id });
     }
     if (leader?.category === 'leader' && !isColorCompatible(leader, card)) {

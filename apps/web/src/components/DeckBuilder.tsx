@@ -6,6 +6,7 @@ import {
   needsManual,
   isColorCompatible,
   MAX_COPIES,
+  anyNumberAllowed,
   parseDeckList,
   validateDeck,
 } from '@gumgum/engine';
@@ -141,7 +142,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
       return;
     }
     const current = draft.cards.get(card.id) ?? 0;
-    if (current >= MAX_COPIES) {
+    if (current >= MAX_COPIES && !anyNumberAllowed(card)) {
       setNotice(`Máximo de ${MAX_COPIES} cópias de ${card.name}.`);
       return;
     }
@@ -397,7 +398,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                   <StaticCard
                     card={c}
                     highlight={c.id === draft.leader ? 'selected' : n > 0 ? 'playable' : null}
-                    dimmed={Boolean(incompatible) || (n >= MAX_COPIES && c.category !== 'leader')}
+                    dimmed={Boolean(incompatible) || (n >= MAX_COPIES && c.category !== 'leader' && !anyNumberAllowed(c))}
                     onClick={() => add(c)}
                     onContextMenu={() => remove(c.id)}
                     onHover={setHovered}
@@ -504,7 +505,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                     <button
                       className="qty"
                       onClick={() => e.card && add(e.card)}
-                      disabled={e.count >= MAX_COPIES}
+                      disabled={e.count >= MAX_COPIES && !(e.card && anyNumberAllowed(e.card))}
                       aria-label="Adicionar uma"
                     >
                       +

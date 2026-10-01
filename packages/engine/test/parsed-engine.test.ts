@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, attackError, createGame, getCost, koProtected } from '../src/engine';
+import { applyAction, attackError, createGame, getCost, hasKeyword, koProtected } from '../src/engine';
+import { parseCard } from '../src/cards';
 import type { CardData, DeckList, GameState } from '../src/types';
 import { cards as baseCards, toTurn } from './helpers';
 
@@ -11,6 +12,12 @@ const extra: CardData[] = [
   { id: 'PX-004', name: 'Wall', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "This Character cannot be K.O.'d by effects.\nThis Character cannot attack." },
   { id: 'PX-005', name: 'Charger', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Rush: Character] (This card can attack Characters on the turn in which it is played.)' },
   { id: 'PX-006', name: 'Big', category: 'character', colors: ['red'], cost: 2, power: 3000, types: [], text: 'This Character gains +3 cost.' },
+  { id: 'PX-007', name: 'Cavendish', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] You may add 1 card from your Life area to your hand: This Character gains [Rush] during this turn.' },
+  { id: 'PX-008', name: 'Samurai', category: 'event', colors: ['red'], cost: 0, types: [], text: '[Main] You may rest 2 of your Characters: Draw 2 cards.' },
+  { id: 'PX-009', name: 'Galdino', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Select up to 1 of your opponent's Characters with a cost of 4 or less. The selected Character cannot attack until the end of your opponent's next turn." },
+  { id: 'PX-010', name: 'Luffy', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: 'This Character cannot be K.O.\'d in battle by "Strike" attribute Characters.' },
+  { id: 'PX-011', name: 'Orochi', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Reveal up to 1 [Big] from your deck and add it to your hand. Then, shuffle your deck.' },
+  { id: 'PX-012', name: 'Smile', category: 'event', colors: ['red'], cost: 0, types: [], text: '[Main] Look at 5 cards from the top of your deck; play up to 1 Character card with a cost of 2 or less. Then, place the rest at the bottom of your deck in any order.' },
 ];
 const cards = [...baseCards, ...extra];
 const deck = (leader: string, fill: string): DeckList => ({
@@ -101,5 +108,76 @@ describe('efeitos lidos automaticamente', () => {
   it('custo contínuo (+3)', () => {
     const s = toTurn(game(), 3);
     expect(getCost(s, field(s, 0, 'PX-006'))).toBe(5);
+  });
+
+  it('custo de tirar 1 carta da Vida para a mão', () => {
+    let s = toTurn(game(), 3);
+    const life = s.players[0].life.length;
+    const hand = s.players[0].hand.length;
+    const uid = give(s, 0, 'PX-007');
+    s = applyAction(s, { type: 'playCard', player: 0, uid });
+    expect(s.pending).toMatchObject({ kind: 'confirm' });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    expect(s.players[0].life.length).toBe(life - 1);
+    expect(s.players[0].hand.length).toBe(hand); // jogou 1, recebeu 1 da Vida
+    expect(hasKeyword(s, uid, 'rush')).toBe(true);
+  });
+
+  it('custo de virar 2 Personagens seus', () => {
+    let s = toTurn(game(), 3);
+    const a = field(s, 0, 'PX-001');
+    const b = field(s, 0, 'PX-006');
+    const hand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-008') });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', min: 2, max: 2 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [a, b] });
+    expect(s.players[0].characters.filter((c) => c.rested)).toHaveLength(2);
+    expect(s.players[0].hand.length).toBe(hand - 1 + 2);
+  });
+
+  it('"cannot attack until the end of your opponent\'s next turn" vale no turno do oponente e depois acaba', () => {
+    let s = toTurn(game(), 3);
+    const enemy = field(s, 1, 'PX-001');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-009') });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [enemy] });
+    s = toTurn(s, 4);
+    expect(attackError(s, 1, enemy, s.players[0].leader.uid)).toMatch(/não pode atacar/);
+    s = toTurn(s, 6);
+    expect(attackError(s, 1, enemy, s.players[0].leader.uid)).toBeNull();
+  });
+
+  it('não é nocauteado em batalha por atacante Strike', () => {
+    const s = toTurn(game(), 3);
+    const luffy = field(s, 0, 'PX-010');
+    const strike = s.players[1].leader.uid; // Kid: Special... troca o atributo para o teste
+    s.defs[s.cards[strike].cardId] = { ...s.defs[s.cards[strike].cardId], attributes: ['Strike'] };
+    expect(koProtected(s, luffy, true, strike)).toBe(true);
+    expect(koProtected(s, luffy, true)).toBe(false);
+  });
+
+  it('busca no deck inteiro e embaralha; olhar o topo e jogar', () => {
+    let s = toTurn(game(), 3);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-011') });
+    const big = s.pending?.kind === 'selectTargets' ? s.pending.options : [];
+    expect(big.length).toBe(1);
+    s = applyAction(s, { type: 'choose', player: 0, uids: big });
+    expect(s.players[0].hand).toContain(big[0]);
+
+    let t = toTurn(game(), 3);
+    const top = t.players[0].deck[0];
+    t.cards[top] = { ...t.cards[top], cardId: 'PX-001' };
+    t = applyAction(t, { type: 'playCard', player: 0, uid: give(t, 0, 'PX-012') });
+    expect(t.pending?.kind === 'selectTargets' && t.pending.options).toContain(top);
+    t = applyAction(t, { type: 'choose', player: 0, uids: [top] });
+    expect(t.players[0].characters.map((c) => c.uid)).toContain(top);
+  });
+
+  it('[Blocker] com 2000 de poder ou menos não pode bloquear', () => {
+    const p = parseCard({
+      category: 'character',
+      text: '[When Attacking] Your opponent cannot activate a [Blocker] Character that has 2000 or less power during this battle.',
+    });
+    expect(p.abilities[0].steps).toEqual([{ do: 'noBlockerThisBattle', maxPower: 2000 }]);
   });
 });
