@@ -171,9 +171,13 @@ export function conditionHolds(state: GameState, controller: PlayerId, source: s
   if (cond.lifeMax !== undefined && ps.life.length > cond.lifeMax) return false;
   if (cond.opponentLifeMax !== undefined && opp.life.length > cond.opponentLifeMax) return false;
   if (cond.totalLifeMax !== undefined && ps.life.length + opp.life.length > cond.totalLifeMax) return false;
+  const range = cond.anyCharacterCost;
   if (
-    cond.anyCharacterMinCost !== undefined &&
-    ![...ps.characters, ...opp.characters].some((c) => getCost(state, c.uid) >= cond.anyCharacterMinCost!)
+    range &&
+    ![...ps.characters, ...opp.characters].some((c) => {
+      const cost = getCost(state, c.uid);
+      return (range.min === undefined || cost >= range.min) && (range.max === undefined || cost <= range.max);
+    })
   ) {
     return false;
   }
@@ -1273,6 +1277,30 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         state.modifiers.push({ uid, kind: 'cost', amount: step.amount, duration: step.duration });
         log(state, frame.controller, `${cardDef(state, uid).name}: ${step.amount > 0 ? '+' : ''}${step.amount} de custo.`);
+      }
+      return true;
+    }
+    case 'opponentDiscards': {
+      const opp = state.players[opponent(frame.controller)];
+      const n = Math.min(step.count, opp.hand.length);
+      if (n === 0) return true;
+      if (!frame.choice) {
+        state.pending = {
+          kind: 'selectTargets',
+          player: opp.id,
+          options: [...opp.hand],
+          min: n,
+          max: n,
+          prompt: `${srcName}: escolha ${n} carta(s) da sua mão para descartar.`,
+          intent: 'discard',
+          source: frame.source,
+        };
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => opp.hand.includes(u))) {
+        removeFrom(opp.hand, uid);
+        opp.trash.push(uid);
+        log(state, opp.id, `${opp.name} descarta ${cardDef(state, uid).name}.`);
       }
       return true;
     }

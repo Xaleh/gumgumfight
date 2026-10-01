@@ -250,7 +250,10 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^you have (\d+) or less Life cards$/i))) return { lifeMax: Number(m[1]) };
   if ((m = t.match(/^your opponent has (\d+) or less Life cards$/i))) return { opponentLifeMax: Number(m[1]) };
   if ((m = t.match(/^you and your opponent have a total of (\d+) or less Life cards$/i))) return { totalLifeMax: Number(m[1]) };
-  if ((m = t.match(/^there is a Character with a cost of (\d+) or more$/i))) return { anyCharacterMinCost: Number(m[1]) };
+  if ((m = t.match(/^there is a Character with a cost of (\d+)( or more| or less)?$/i))) {
+    const n = Number(m[1]);
+    return { anyCharacterCost: /more/i.test(m[2] ?? '') ? { min: n } : /less/i.test(m[2] ?? '') ? { max: n } : { min: n, max: n } };
+  }
   if ((m = t.match(/^you don't have \[([^\]]+)\]$/i))) return { noCharacterNamed: m[1] };
   if (/^your Leader is multicolored$/i.test(t)) return { leaderMulticolor: true };
   if ((m = t.match(/^your Leader's type includes "([^"]+)"$/i))) return { leaderHasType: m[1] };
@@ -348,6 +351,14 @@ const CLAUSES: ClauseRule[] = [
   [/^Activate this card's \[On K\.O\.\] effect$/i, () => [{ do: 'useOwnEffect', timing: 'onKO' }]],
   [/^Trash (\d+) cards? from the top of your deck$/i, (m) => [{ do: 'millDeck', count: Number(m[1]) }]],
   [
+    /^Your opponent chooses (\d+) cards? from their hand and trashes (?:it|them)$/i,
+    (m) => [{ do: 'opponentDiscards', count: Number(m[1]) }],
+  ],
+  [
+    /^none of your Characters can be K\.O\.'d during this turn$/i,
+    () => [{ do: 'cannotBeKO', target: { side: 'own', kinds: ['character'], upTo: 99, all: true }, duration: 'turn' }],
+  ],
+  [
     /^Add up to (\d+) cards? from the top of your deck to the top of your Life cards$/i,
     (m) => [{ do: 'addLifeFromDeck', count: Number(m[1]) }],
   ],
@@ -408,6 +419,12 @@ function parseClause(clause: string): EffectStep[] | null {
       const steps = make(m);
       if (steps) return steps;
     }
+  }
+  // Duas ações com "and": "Draw 1 card and none of your Characters can be K.O.'d during this turn"
+  for (const at of [...c.matchAll(/ and /gi)].map((x) => x.index!)) {
+    const first = parseClause(c.slice(0, at));
+    const second = first && parseClause(c.slice(at + 5));
+    if (first && second) return [...first, ...second];
   }
   // Condição no fim: "draw 1 card if you have 3 or less cards in your hand"
   const tail = c.match(/^(.+?) if (.+)$/i);
@@ -514,6 +531,9 @@ function parseCost(rest: string): { cost?: AbilityCost; body: string } | null {
     c = '';
   }
   if (c) {
+    // "You may trash 1 card from your hand and rest this Character" = mesma coisa na outra ordem.
+    const swapped = c.match(/^You may (trash .+? from your hand) and rest this (Character|Stage|card|Leader)$/i);
+    if (swapped) c = `You may rest this ${swapped[2]} and ${swapped[1]}`;
     const rs = c.match(/^You may rest this (?:Character|Stage|card|Leader)(?: and (.+))?$/i);
     const trash = (rs ? rs[1] : c.replace(/^You may /i, ''))?.match(/^trash (\d+) (.+?) from your hand$/i);
     if (rs) cost.restSelf = true;

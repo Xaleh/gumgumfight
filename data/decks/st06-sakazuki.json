@@ -1,0 +1,71 @@
+{
+  "id": "st06-sakazuki",
+  "name": "Sakazuki Preto (ST06)",
+  "leader": "ST06-001",
+  "cards": [
+    {
+      "id": "ST06-002",
+      "count": 4
+    },
+    {
+      "id": "ST06-003",
+      "count": 4
+    },
+    {
+      "id": "ST06-004",
+      "count": 2
+    },
+    {
+      "id": "ST06-005",
+      "count": 2
+    },
+    {
+      "id": "ST06-006",
+      "count": 4
+    },
+    {
+      "id": "ST06-007",
+      "count": 4
+    },
+    {
+      "id": "ST06-008",
+      "count": 4
+    },
+    {
+      "id": "ST06-009",
+      "count": 4
+    },
+    {
+      "id": "ST06-010",
+      "count": 4
+    },
+    {
+      "id": "ST06-011",
+      "count": 2
+    },
+    {
+      "id": "ST06-012",
+      "count": 2
+    },
+    {
+      "id": "ST06-013",
+      "count": 4
+    },
+    {
+      "id": "ST06-014",
+      "count": 2
+    },
+    {
+      "id": "ST06-015",
+      "count": 4
+    },
+    {
+      "id": "ST06-016",
+      "count": 2
+    },
+    {
+      "id": "ST06-017",
+      "count": 2
+    }
+  ]
+}

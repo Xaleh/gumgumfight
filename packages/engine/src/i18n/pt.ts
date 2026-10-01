@@ -6,6 +6,7 @@
 // reconhecido fica em inglês e o resultado é marcado como parcial; traduções manuais
 // (data/translations/pt.json) sempre têm prioridade.
 
+import { splitEffects } from '../cards/split';
 import { normalizeTypeQuotes } from '../text';
 
 export interface Translation {
@@ -133,6 +134,28 @@ const SENTENCES: Rule[] = [
   ],
   [/^Select (.+?)\.?$/i, (_, who) => `Escolha ${who}.`],
   [/^(.+?) cannot be K\.O\.'d in battle\.?$/i, (_, who) => `${who} não pode ser nocauteado em batalha.`],
+  [/^(.+?) cannot be K\.O\.'d by effects\.?$/i, (_, who) => `${who} não pode ser nocauteado por efeitos.`],
+  [
+    /^none of your Characters can be K\.O\.'d during this turn\.?$/i,
+    'Nenhum dos seus Personagens pode ser nocauteado durante este turno.',
+  ],
+  [
+    /^Give (.+?) [−-]?(\d+) (power|cost)(?: (during this turn|during this battle))?\.?$/i,
+    (_, who, n, what, dur) => `Dê −${n} de ${what.toLowerCase() === 'power' ? 'poder' : 'custo'} a ${who}${dur ? ` ${dur}` : ''}.`,
+  ],
+  [
+    /^Your opponent chooses (\d+) cards? from their hand and trashes (?:it|them)\.?$/i,
+    (_, n) => `Seu oponente escolhe ${n} ${plural(n, 'carta', 'cartas')} da própria mão e ${plural(n, 'a descarta', 'as descarta')}.`,
+  ],
+  [/^Trash (\d+) cards? from the top of your deck\.?$/i, (_, n) => `Descarte ${n} ${plural(n, 'carta', 'cartas')} do topo do seu deck.`],
+  [
+    /^Add up to (\d+) cards? from the top of your deck to the top of your Life cards\.?$/i,
+    (_, n) => `Adicione até ${n} ${plural(n, 'carta', 'cartas')} do topo do seu deck ao topo das suas cartas de Vida.`,
+  ],
+  [/^Activate this card's \[On Play\] effect\.?$/i, 'Ative o efeito [Ao Jogar] desta carta.'],
+  [/^Activate this card's \[On K\.O\.\] effect\.?$/i, 'Ative o efeito [Ao ser Nocauteado] desta carta.'],
+  [/^(.+?) gains? \+(\d+) cost\.?$/i, (_, who, n) => `${who} recebe +${n} de custo.`],
+  [/^(.+?) cannot attack\.?$/i, (_, who) => `${who} não pode atacar.`],
   [
     /^(.+?) cannot be K\.O\.'d(?: (during this turn))?\.?$/i,
     (_, who, dur) => `${who} não pode ser nocauteado${dur ? ` ${dur}` : ''}.`,
@@ -154,6 +177,12 @@ const PHRASES: Rule[] = [
   [/If you have (\d+) or more DON!! cards on your field,\s*/gi, (_, n) => `Se você tiver ${n} ou mais DON!! no seu campo, `],
   [/If your opponent has more DON!! cards on their field than you,\s*/gi, 'Se o seu oponente tiver mais DON!! no campo do que você, '],
   [/If that card is a Character,\s*/gi, 'Se essa carta for um Personagem, '],
+  [/If there is a Character with a cost of (\d+)( or more| or less)?,\s*/gi, (_, n, q) => `Se houver um Personagem com custo ${n}${q ? (/more/i.test(q) ? ' ou mais' : ' ou menos') : ''}, `],
+  [
+    /You may trash (\d+) cards? from your hand and rest this (Character|Stage|card)/gi,
+    (_, n, w) => `Você pode descartar ${n} ${plural(n, 'carta', 'cartas')} da sua mão e virar ${w === 'Stage' ? 'este Stage' : w === 'card' ? 'esta carta' : 'este Personagem'}`,
+  ],
+  [/up to (\d+) of your opponent's active Characters/gi, (_, n) => `até ${n} ${plural(n, 'Personagem ativo', 'Personagens ativos')} do oponente`],
   [
     /When this Character battles "?([A-Za-z]+)"? attribute Characters,\s*/gi,
     (_, attr) => `Quando este Personagem batalhar com Personagens de atributo ${attr}, `,
@@ -197,6 +226,7 @@ const PHRASES: Rule[] = [
   [/with a cost of (\d+) or less (?:than|other than) (\[[^\]]+\])/gi, (_, n, name) => `com custo ${n} ou menos, exceto ${name}`],
   [/with a cost of (\d+) or less/gi, (_, n) => `com custo ${n} ou menos`],
   [/with a cost of (\d+) or more/gi, (_, n) => `com custo ${n} ou mais`],
+  [/with a (?:base )?cost of (\d+)(?! or)/gi, (_, n) => `com custo ${n}`],
   [/with (\d+) power or less/gi, (_, n) => `com ${n} de poder ou menos`],
   [/with (\d+) power or more/gi, (_, n) => `com ${n} de poder ou mais`],
   [/and \[Blocker\]/g, 'e com [Blocker]'],
@@ -246,6 +276,13 @@ function translateSentence(sentence: string): string {
       const replaced = typeof rep === 'string' ? rep : rep(...(m as unknown as string[]));
       return capitalize(applyPhrases(replaced));
     }
+  }
+  // "X and Y." (duas ações): só se a segunda parte começar com uma ação conhecida.
+  const andPair = s.match(/^(.+?) and ((?:draw|trash|rest|K\.O\.|give|add|play|return|set|none of|place)\b.+)$/i);
+  if (andPair) {
+    const first = translateSentence(andPair[1]).replace(/\.$/, '');
+    const second = translateSentence(andPair[2]);
+    if (!RESIDUE.test(first + second)) return `${first} e ${second.charAt(0).toLowerCase()}${second.slice(1)}`;
   }
   // "X, then Y." (duas ações na mesma frase)
   const pair = s.match(/^(.+?), then (.+)$/i);
@@ -302,10 +339,17 @@ export function translateToPt(text: string): Translation {
   }
   let out = src
     .split('\n')
-    .map((line) => {
-      const parts = line.split(/(§\d+§)/);
-      return parts.map((p) => (/^§\d+§$/.test(p) ? p : p.trim() ? translateLine(p.trim()) : p)).join(' ').replace(/\s+/g, ' ').trim();
-    })
+    .map((line) =>
+      // Vários efeitos na mesma linha ("… during this turn. [Activate: Main] …"): traduz um por um.
+      splitEffects(line)
+        .map((effect) => {
+          const parts = effect.split(/(§\d+§)/);
+          return parts.map((p) => (/^§\d+§$/.test(p) ? p : p.trim() ? translateLine(p.trim()) : p)).join(' ');
+        })
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
     .join('\n');
   // Tags soltas no meio do texto (ex.: "Activate this card's [Main] effect" já tratado).
   for (const [re, rep] of TAGS) out = out.replace(re, rep);

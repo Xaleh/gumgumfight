@@ -3,7 +3,7 @@ import { actingPlayer, legalActions } from '../src/actions';
 import { chooseBotAction } from '../src/bot/simple';
 import { applyAction, createGame } from '../src/engine';
 import type { DeckList, GameState } from '../src/types';
-import { cards, countCards, countDon, crocodile, kaido, kid, luffy, shanks } from './helpers';
+import { cards, countCards, countDon, crocodile, kaido, kid, luffy, sakazuki, shanks } from './helpers';
 
 function playOut(seed: number, decks: [DeckList, DeckList]): GameState {
   let s = createGame({
@@ -38,6 +38,8 @@ describe('simulação bot x bot', () => {
     [crocodile, kaido],
     [shanks, kid],
     [kaido, shanks],
+    [sakazuki, luffy],
+    [crocodile, sakazuki],
   ];
   for (const decks of pairs) {
     it(`${decks[0].name} x ${decks[1].name}: 100 partidas terminam com vencedor e sem violar invariantes`, () => {

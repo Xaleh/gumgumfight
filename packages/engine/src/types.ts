@@ -107,8 +107,8 @@ export interface Condition {
   opponentLifeMax?: number;
   /** "you and your opponent have a total of N or less Life cards" */
   totalLifeMax?: number;
-  /** "If there is a Character with a cost of N or more" (de qualquer jogador) */
-  anyCharacterMinCost?: number;
+  /** "If there is a Character with a cost of N (or more / or less)" (de qualquer jogador) */
+  anyCharacterCost?: { min?: number; max?: number };
   /** "If you don't have [X]" (nenhum Personagem seu com esse nome) */
   noCharacterNamed?: string;
   /** "If your Leader is multicolored" */
@@ -186,6 +186,8 @@ type EffectStepBody =
   | { do: 'select'; target: TargetRef }
   /** "Give up to 1 of your opponent's Characters −2 cost during this turn." */
   | { do: 'cost'; target: TargetRef; amount: number; duration: Duration }
+  /** "Your opponent chooses N cards from their hand and trashes them." (quem escolhe é o oponente) */
+  | { do: 'opponentDiscards'; count: number }
   /** "Trash N cards from the top of your deck." */
   | { do: 'millDeck'; count: number }
   /** "Activate this card's [On Play] effect." (usado por [Trigger]) */
