@@ -23,6 +23,8 @@ const EFFECT_START =
  */
 export function splitEffects(text: string): string[] {
   return text
+    // "[Blocker][On Play] …": palavra-chave colada na marcação seguinte.
+    .replace(/(\[(?:Blocker|Rush|Double Attack|Banish|Unblockable|Rush: ?Character)\])\s*(?=\[(?!DON))/gi, '$1\n')
     .split(/\n|<br\s*\/?>/i)
     .flatMap((line) => line.split(new RegExp(EFFECT_START.source, 'gi')))
     .map((l) => l.trim())

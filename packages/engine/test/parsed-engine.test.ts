@@ -46,6 +46,8 @@ const extra: CardData[] = [
   { id: 'PX-038', name: 'Ghost', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Unblockable] (This card cannot be blocked.)' },
   { id: 'PX-039', name: 'Payer', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] You may give your 1 active Leader -5000 power during this turn: Draw 1 card.' },
   { id: 'PX-040', name: 'Rester', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 3 or less." },
+  { id: 'PX-041', name: 'NoBlock', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Up to 1 of your opponent's Characters with 4000 power or less cannot activate [Blocker] during this turn." },
+  { id: 'PX-042', name: 'Shield', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "Your Characters with a cost of 3 or less other than [Shield] cannot be K.O.'d by your opponent's effects." },
   { id: 'PX-024', name: 'Law', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, draw 1 card.' },
 ];
 const cards = [...baseCards, ...extra];
@@ -494,5 +496,21 @@ describe('efeitos lidos automaticamente', () => {
     expect(s.pending).toMatchObject({ kind: 'option', player: 0 });
     s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.players[1].donRested).toBe(1);
+  });
+
+  it('Personagem do oponente não pode bloquear neste turno', () => {
+    let s = toTurn(game(), 3);
+    const blocker = field(s, 1, 'PX-001'); // 2000 de poder
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-041') });
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [blocker] });
+    expect(s.modifiers.some((m) => m.uid === blocker && m.kind === 'cannotBlock')).toBe(true);
+  });
+
+  it('aura: seus Personagens de custo baixo não podem ser nocauteados por efeitos do oponente', () => {
+    const s = toTurn(game(), 3);
+    field(s, 0, 'PX-042');
+    const small = field(s, 0, 'PX-001');
+    expect(koProtected(s, small, false)).toBe(true);
+    expect(koProtected(s, small, true)).toBe(false);
   });
 });

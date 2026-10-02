@@ -78,6 +78,8 @@ export interface TargetSpec {
   minDon?: number;
   /** "your {X} type Characters or Characters with a [Trigger]": basta atender a um dos filtros. */
   either?: Array<Partial<TargetSpec>>;
+  /** "[San-Gorou] or [Sanji] Character": um destes nomes. */
+  names?: string[];
   /** "your Characters or [X]": o Líder só vale se tiver este nome. */
   leaderOnlyNamed?: string;
   /** "without an [On Play] effect" */
@@ -111,6 +113,10 @@ export interface CardFilter {
   maxCostDon?: boolean;
   /** "{Neptunian} type Character card or "Megalo"": este nome dispensa o tipo. */
   orName?: string;
+  /** "[Sabo], [Portgas.D.Ace], or [Monkey.D.Luffy]" */
+  names?: string[];
+  /** custo até o número de DON!! do oponente */
+  maxCostOppDon?: boolean;
   /** "with different card names" (várias cartas escolhidas) */
   distinctNames?: boolean;
 }
@@ -248,6 +254,7 @@ export interface Condition {
   /** "If your opponent has any DON!! cards given" */
   opponentAnyDonGiven?: boolean;
   /** "If you have N or more rested {X} type Characters" (type opcional) */
+  minRestedDon?: number;
   minRestedTyped?: { count: number; types?: string[] };
 }
 
@@ -295,6 +302,14 @@ export interface Aura {
   names?: string[];
   /** Só cartas com custo impresso a partir deste. */
   minCost?: number;
+  /** Filtros pelos valores impressos (cor, custo máximo, poder base). */
+  color?: Color;
+  maxCost?: number;
+  minPower?: number;
+  maxPower?: number;
+  /** "cannot be K.O.'d by your opponent's effects" */
+  noEffectKO?: boolean;
+  excludeName?: string;
   /** Concede uma palavra-chave em vez de poder ("All of your Characters with a cost of 12 or more gain [Blocker]"). */
   keyword?: Keyword;
   /** "cannot be removed from the field by your opponent's effects" */
@@ -330,6 +345,7 @@ export type GameEvent =
   | { kind: 'characterPlayed'; who: 'self' | 'opponent'; filter?: CardFilter; from?: 'trash'; byEffect?: boolean }
   | { kind: 'lifeRemoved'; whose: 'any' | 'own' | 'opponent' } // "a card is removed from your (or your opponent's) Life cards"
   | { kind: 'lifeZero' } // "When your number of Life cards becomes 0"
+  | { kind: 'restedByEffect' } // "If a Character is rested by your effect"
   /** "When a card is trashed from your hand by your {Navy} type card's effect" */
   | { kind: 'handTrashedByEffect'; sourceType?: string }
   | { kind: 'donGiven' } // "When this Leader or 1 of your Characters is given a DON!! card"
@@ -382,6 +398,10 @@ type EffectStepBody =
   | { do: 'swapBasePower'; spec: TargetSpec; duration: Duration }
   | { do: 'trashFaceUpLife' }
   | { do: 'lastToDeckTop' }
+  | { do: 'revealedToTopOrBottom' }
+  | { do: 'lifeOneToDeckTop' }
+  | { do: 'cannotBlock'; target: TargetRef; duration: Duration }
+  | { do: 'returnGivenDon'; count: number }
   | { do: 'chooseCost' }
   | { do: 'opponentTrashToBottom'; count: number }
   | { do: 'arrangeLife'; whose: 'own' | 'opponent' }
@@ -395,7 +415,14 @@ type EffectStepBody =
   | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
   /** "base power becomes N" ou "the same as your opponent's Leader('s power)" */
   | { do: 'basePower'; target: TargetRef; amount?: number; copy?: 'opponentLeader'; duration: Duration }
-  | { do: 'trashAnyForPower'; categories: Array<'event' | 'stage' | 'character'>; power: number; duration: Duration }
+  | {
+      do: 'trashAnyForPower';
+      categories?: Array<'event' | 'stage' | 'character'>;
+      filter?: CardFilter;
+      power: number;
+      duration: Duration;
+      target?: TargetRef;
+    }
   /** "Change the attack target to your Leader or 1 of your … Characters" */
   | { do: 'redirectAttack'; spec: TargetSpec }
   | { do: 'handToDeck'; count: number; where: 'top' | 'bottom' | 'choose' }
@@ -538,7 +565,8 @@ export interface AbilityCost {
   ownToBottom?: { count: number; spec: TargetSpec }; // "place 1 of your Characters at the bottom of the owner's deck"
   ownToLife?: { count: number; spec: TargetSpec }; // "add 1 of your Characters … to the top of your Life cards face-up"
   either?: AbilityCost[]; // "trash 1 card from your hand or rest 1 of your DON!! cards"
-  victimPowerMinus?: number; // substituição: "give that Character −1000 power during this turn instead"
+  victimPowerMinus?: number;
+  returnGivenDon?: number; // "return 2 total of your currently given DON!! cards to your cost area rested" // substituição: "give that Character −1000 power during this turn instead"
   restDon?: number; // ① ② ③ ... (virar DON!! ativos da área de custo)
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
   trashFromHand?: number; // "You may trash N card from your hand:"
@@ -694,7 +722,8 @@ export interface Modifier {
     | 'cannotBeRested'
     | 'negated' // "Negate the effect of …"
     | 'basePower' // "base power becomes N" (amount = novo poder base)
-  | 'cannotAttackCharMaxCost'; // "cannot attack your opponent's Characters with a base cost of N or less"
+  | 'cannotAttackCharMaxCost' // "cannot attack your opponent's Characters with a base cost of N or less"
+    | 'cannotBlock'; // "cannot activate [Blocker]"
   amount: number;
   /** Para 'nextOpponentTurn': o efeito acaba no fim deste turno. */
   untilTurn?: number;
