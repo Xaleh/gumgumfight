@@ -76,6 +76,8 @@ export interface TargetSpec {
   hasTrigger?: boolean;
   /** "that has 2 or more DON!! cards given" */
   minDon?: number;
+  /** "your {X} type Characters or Characters with a [Trigger]": basta atender a um dos filtros. */
+  either?: Array<Partial<TargetSpec>>;
   /** "your Characters or [X]": o Líder só vale se tiver este nome. */
   leaderOnlyNamed?: string;
   /** "without an [On Play] effect" */
@@ -107,6 +109,8 @@ export interface CardFilter {
   hasTrigger?: boolean;
   /** "with a cost equal to or less than the number of DON!! cards on your field" (calculado na hora) */
   maxCostDon?: boolean;
+  /** "{Neptunian} type Character card or "Megalo"": este nome dispensa o tipo. */
+  orName?: string;
   /** "with different card names" (várias cartas escolhidas) */
   distinctNames?: boolean;
 }
@@ -145,6 +149,11 @@ export interface Condition {
   leaderAttribute?: string;
   faceUpLifeMin?: number;
   anyCharacterMinPower?: number;
+  /** Negação: vale quando a condição interna NÃO vale. */
+  not?: Condition;
+  /** "If this Leader battles your opponent's Character during this turn" */
+  selfBattledCharacter?: boolean;
+  maxActiveDon?: number;
   /** "you have [Satori] and [Hotori]" */
   haveNamed?: string[];
   /** "If the revealed card has the chosen cost" (passos chooseCost + revealOpponentTop) */
@@ -270,7 +279,8 @@ export type LeaderRule =
   | { kind: 'faceUpLifeToDeck' }
   | { kind: 'counterBonus'; type: string; amount: number }
   | { kind: 'deckMaxCost'; cost: number; category?: 'event' }
-  | { kind: 'startStage'; type: string };
+  | { kind: 'startStage'; type: string }
+  | { kind: 'ownOnPlayNegated' };
 
 export interface Aura {
   kinds: Array<'leader' | 'character'>;
@@ -317,7 +327,11 @@ export interface Replacement {
 /** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
 export type GameEvent =
   | { kind: 'donReturned'; min?: number } // DON!! do seu campo voltou ao deck de DON!! ("2 or more")
-  | { kind: 'characterPlayed'; who: 'self' | 'opponent'; filter?: CardFilter; from?: 'trash' }
+  | { kind: 'characterPlayed'; who: 'self' | 'opponent'; filter?: CardFilter; from?: 'trash'; byEffect?: boolean }
+  | { kind: 'lifeRemoved'; whose: 'any' | 'own' | 'opponent' } // "a card is removed from your (or your opponent's) Life cards"
+  | { kind: 'lifeZero' } // "When your number of Life cards becomes 0"
+  /** "When a card is trashed from your hand by your {Navy} type card's effect" */
+  | { kind: 'handTrashedByEffect'; sourceType?: string }
   | { kind: 'donGiven' } // "When this Leader or 1 of your Characters is given a DON!! card"
   | { kind: 'damageTaken' } // "When you take damage"
   | { kind: 'anyOf'; events: GameEvent[] }
@@ -355,6 +369,19 @@ type EffectStepBody =
   | { do: 'activateEventFromHand'; filter: CardFilter }
   | { do: 'revealLifeTop' }
   | { do: 'koSelf' }
+  /** "Give up to 2 total of your currently given DON!! cards to 1 of your Characters" */
+  | { do: 'moveGivenDon'; count: number; target: TargetRef }
+  /** "Select up to 1 X card from your hand and play it or add it to the top of your Life cards face-up" */
+  | { do: 'handPlayOrLife'; filter: CardFilter }
+  /** "Your opponent's [On Play] effects are negated until …" */
+  | { do: 'negateOnPlay'; who: 'opponent' | 'self'; duration: Duration }
+  | { do: 'cannotAttackCharacters'; maxBaseCost: number; duration: Duration }
+  | { do: 'drawEventCount' }
+  | { do: 'restDonForPower'; power: number; target: TargetRef }
+  | { do: 'payEither'; options: AbilityCost[] }
+  | { do: 'swapBasePower'; spec: TargetSpec; duration: Duration }
+  | { do: 'trashFaceUpLife' }
+  | { do: 'lastToDeckTop' }
   | { do: 'chooseCost' }
   | { do: 'opponentTrashToBottom'; count: number }
   | { do: 'arrangeLife'; whose: 'own' | 'opponent' }
@@ -362,7 +389,7 @@ type EffectStepBody =
   | { do: 'restDonOrCharacter'; spec: TargetSpec }
   | { do: 'revealOpponentTop' }
   | { do: 'giveActiveDon'; count: number; target: TargetRef }
-  | { do: 'ownToBottom'; count: number; spec: TargetSpec }
+  | { do: 'ownToBottom'; count: number; spec: TargetSpec; toLife?: boolean }
   | { do: 'negate'; target: TargetRef; duration: Duration }
   | { do: 'restrict'; kind: RestrictionKind; minCost?: number }
   | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
@@ -381,13 +408,13 @@ type EffectStepBody =
   /** "Set up to N of your DON!! cards as active." */
   | { do: 'setDonActive'; count: number }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
-  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean }
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean }
   /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */
   | { do: 'tutor'; upTo: number; filter: CardFilter }
   /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */
   | { do: 'lifeToHand'; count: number; choose?: boolean }
   /** "add up to 1 card from your hand to the top of your Life cards" */
-  | { do: 'handToLife'; upTo: number; filter?: CardFilter }
+  | { do: 'handToLife'; upTo: number; filter?: CardFilter; faceUp?: boolean; fromTrash?: boolean }
   /** "Add up to 1 of your Characters … to the top of the owner's Life cards" */
   | { do: 'fieldToLife'; target: TargetRef; choose?: boolean }
   /** "Look at up to 1 card from the top of your or your opponent's Life cards, and place it at the top or bottom" */
@@ -450,7 +477,7 @@ type EffectStepBody =
   /** "Add up to N … from your trash to your hand." */
   | { do: 'fromTrashToHand'; upTo: number; filter: CardFilter }
   /** "Play up to N … from your deck/hand/trash" (sem pagar custo). */
-  | { do: 'playFrom'; from: 'deck' | 'hand' | 'trash' | 'handOrTrash'; upTo: number; filter: CardFilter; rested?: boolean }
+  | { do: 'playFrom'; from: 'deck' | 'hand' | 'trash' | 'handOrTrash'; upTo: number; filter: CardFilter; rested?: boolean; notColorOfLast?: boolean }
   /** "… then shuffle your deck." */
   | { do: 'shuffleDeck' }
   /** "Look at N cards from the top of your deck and return them to the top or bottom of the deck in any order." */
@@ -509,6 +536,9 @@ export interface AbilityCost {
   leaderPowerMinus?: number; // "give your 1 active Leader −5000 power during this turn"
   giveDon?: { count: number; spec: TargetSpec }; // "give 1 active DON!! card to 1 of your [X]"
   ownToBottom?: { count: number; spec: TargetSpec }; // "place 1 of your Characters at the bottom of the owner's deck"
+  ownToLife?: { count: number; spec: TargetSpec }; // "add 1 of your Characters … to the top of your Life cards face-up"
+  either?: AbilityCost[]; // "trash 1 card from your hand or rest 1 of your DON!! cards"
+  victimPowerMinus?: number; // substituição: "give that Character −1000 power during this turn instead"
   restDon?: number; // ① ② ③ ... (virar DON!! ativos da área de custo)
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
   trashFromHand?: number; // "You may trash N card from your hand:"
@@ -663,7 +693,8 @@ export interface Modifier {
     | 'skipRefresh'
     | 'cannotBeRested'
     | 'negated' // "Negate the effect of …"
-    | 'basePower'; // "base power becomes N" (amount = novo poder base)
+    | 'basePower' // "base power becomes N" (amount = novo poder base)
+  | 'cannotAttackCharMaxCost'; // "cannot attack your opponent's Characters with a base cost of N or less"
   amount: number;
   /** Para 'nextOpponentTurn': o efeito acaba no fim deste turno. */
   untilTurn?: number;
@@ -726,10 +757,12 @@ export type Frame =
       last?: string[];
       /** Custo escolhido em "Choose a cost". */
       chosenCost?: number;
+      /** Quantidade do acontecimento que disparou o efeito (ex.: cartas descartadas). */
+      eventCount?: number;
     }
   | { kind: 'battle' }
-  | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean }
-  | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash' }
+  | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean; lost?: number }
+  | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash'; byEffect?: boolean }
   /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
   | { kind: 'endTurn' };
 
@@ -759,6 +792,10 @@ export interface GameState {
   restrictions?: Restriction[];
   /** "The next time you play X from your hand during this turn, the cost will be reduced by N." */
   costReductions?: Array<{ player: PlayerId; filter: CardFilter; amount: number }>;
+  /** "[On Play] effects are negated" até o turno indicado (inclusive). */
+  onPlayNegated?: Array<{ player: PlayerId; untilTurn: number }>;
+  /** Cartas que batalharam com um Personagem do oponente neste turno. */
+  battledCharacter?: string[];
   /** Eventos ativados neste turno (custo base), para "if you have activated an Event … during this turn". */
   eventsThisTurn?: Array<{ player: PlayerId; cost: number }>;
   /** Efeitos adiados para o fim do turno ("at the end of this turn"). */

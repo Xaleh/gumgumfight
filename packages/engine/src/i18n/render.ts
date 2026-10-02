@@ -132,6 +132,14 @@ function limits(f: CardFilter & Partial<TargetSpec>, many: boolean): string[] {
   if (f.typeIncludes) out.push(`com um tipo que inclua "${f.typeIncludes}"`);
   if (f.noEffect) out.push('sem efeito');
   if (f.hasTrigger) out.push('com [Trigger]');
+  if (f.either) {
+    const part = (p: Partial<TargetSpec>) =>
+      [p.name ? `[${p.name}]` : '', p.hasAnyType?.length ? `do tipo ${types(p.hasAnyType)}` : '', p.typeIncludes ? `com um tipo que inclua "${p.typeIncludes}"` : '', p.hasTrigger ? 'com [Trigger]' : '']
+        .filter(Boolean)
+        .join(' ');
+    out.push(`(${f.either.map(part).join(' ou ')})`);
+  }
+  if (f.orName) out.push(`ou [${f.orName}]`);
   if (f.leaderOnlyNamed) out.push(`(o Líder só se for [${f.leaderOnlyNamed}])`);
   if (f.withoutTiming) out.push(f.withoutTiming === 'onPlay' ? 'sem efeito [Ao Jogar]' : 'sem efeito [Ao Atacar]');
   if (f.maxCostDon) out.push('com custo igual ou menor ao número de DON!! no seu campo');
@@ -241,10 +249,10 @@ function condition(c: Condition, ctx: Ctx): string {
   for (const key of Object.keys(c) as Array<keyof Condition>) {
     switch (key) {
       case 'minCharacters':
-        out.push(`você tiver ${c.minCharacters} ou mais Personagens`);
+        out.push(c.maxCharacters === c.minCharacters ? `você tiver ${c.minCharacters} Personagens` : `você tiver ${c.minCharacters} ou mais Personagens`);
         break;
       case 'maxCharacters':
-        out.push(`você tiver ${c.maxCharacters} ou menos Personagens`);
+        if (c.minCharacters !== c.maxCharacters) out.push(`você tiver ${c.maxCharacters} ou menos Personagens`);
         break;
       case 'selfRested':
         out.push(`${ctx.self} estiver virado`);
@@ -350,6 +358,15 @@ function condition(c: Condition, ctx: Ctx): string {
       }
       case 'anyCharacterMinPower':
         out.push(`houver um Personagem com ${c.anyCharacterMinPower} de poder ou mais`);
+        break;
+      case 'not':
+        out.push(`não ${condition(c.not!, ctx)}`.replace(/^não você tiver/, 'você não tiver'));
+        break;
+      case 'selfBattledCharacter':
+        out.push(`${ctx.self} tiver batalhado com um Personagem do oponente neste turno`);
+        break;
+      case 'maxActiveDon':
+        out.push(`você tiver ${c.maxActiveDon} ou menos DON!! ativos`);
         break;
       case 'faceUpLifeMin':
         out.push('você tiver uma carta de Vida virada para cima');
@@ -469,11 +486,22 @@ function event(e: GameEvent, ctx: Ctx): string {
       return 'este Líder ou 1 dos seus Personagens receber um DON!!';
     case 'damageTaken':
       return 'você receber dano';
+    case 'lifeZero':
+      return 'o número das suas cartas de Vida chegar a 0';
+    case 'lifeRemoved':
+      return e.whose === 'any'
+        ? 'uma carta for removida das suas cartas de Vida ou das do oponente'
+        : e.whose === 'own'
+          ? 'uma carta for removida das suas cartas de Vida'
+          : 'uma carta for removida das cartas de Vida do oponente';
+    case 'handTrashedByEffect':
+      return e.sourceType ? `uma carta for descartada da sua mão pelo efeito de uma carta sua do tipo {${e.sourceType}}` : 'uma carta for descartada da sua mão por um efeito';
     case 'anyOf':
       return e.events.map((x) => event(x, ctx)).join(' ou ');
     case 'characterPlayed': {
       const what = e.filter ? filter(e.filter, 1, false).replace(/^1 /, 'um ') : 'um Personagem';
       if (e.from === 'trash') return `${what} for jogado do seu descarte`;
+      if (e.byEffect) return e.who === 'self' ? `você jogar ${what} usando o efeito de um Personagem` : `o oponente jogar ${what} usando o efeito de um Personagem`;
       return e.who === 'self' ? `você jogar ${what}` : `o oponente jogar ${what}`;
     }
     case 'characterRemoved': {
@@ -537,6 +565,15 @@ function cost(c: AbilityCost, ctx: Ctx): string {
   if (c.koSelf) parts.push(`nocautear ${ctx.self}`);
   if (c.leaderPowerMinus) parts.push(`dar −${c.leaderPowerMinus} de poder ao seu Líder ativo durante este turno`);
   if (c.giveDon) parts.push(`dar ${c.giveDon.count} DON!! ativo a ${target(c.giveDon.spec, ctx)}`);
+  if (c.victimPowerMinus) parts.push(`dar −${c.victimPowerMinus} de poder a esse Personagem durante este turno`);
+  if (c.ownToLife) parts.push(`colocar ${target({ ...c.ownToLife.spec, upTo: c.ownToLife.count }, ctx).replace(/^até /, '')} no topo da sua Vida, com a face para cima`);
+  if (c.either) {
+    parts.push(
+      c.either
+        .map((x) => (x.restDon && Object.keys(x).length === 1 ? `virar ${x.restDon} DON!!` : cost(x, ctx).replace(/^Você pode /, '').replace(/:$/, '')))
+        .join(' ou '),
+    );
+  }
   if (c.ownToBottom) parts.push(`colocar ${target({ ...c.ownToBottom.spec, upTo: c.ownToBottom.count }, ctx).replace(/^até /, '')} no fundo do deck do dono`);
   if (c.selfToBottom) parts.push(`colocar ${ctx.self} no fundo do deck do dono`);
   if (c.trashSelf) parts.push(`descartar ${ctx.self}`);
@@ -607,7 +644,7 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Deixe ${qty(s.count)} dos seus DON!! ${plural(s.count, 'ativo', 'ativos')}.`;
     case 'search': {
       const verb = s.play ? 'jogue' : 'revele';
-      const tail = s.play ? '' : ' e adicione à sua mão';
+      const tail = s.play ? '' : s.toLife ? ' e coloque-a no topo da sua Vida, com a face para cima' : ' e adicione à sua mão';
       const rest =
         s.rest === 'bottom'
           ? 'Depois, coloque o resto no fundo do seu deck em qualquer ordem.'
@@ -622,7 +659,7 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Adicione ${filter(s.filter, s.upTo)} do seu descarte à sua mão.`;
     case 'playFrom': {
       const from = s.from === 'deck' ? 'do seu deck' : s.from === 'hand' ? 'da sua mão' : s.from === 'trash' ? 'do seu descarte' : 'da sua mão ou do descarte';
-      return `Jogue ${filter(s.filter, s.upTo)} ${from}${s.rested ? ', virado' : ''}.`;
+      return `Jogue ${filter(s.filter, s.upTo)} ${from}${s.notColorOfLast ? ' de uma cor diferente da do Personagem devolvido' : ''}${s.rested ? ', virado' : ''}.`;
     }
     case 'shuffleDeck':
       return 'Embaralhe o seu deck.';
@@ -659,7 +696,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'lifeToHand':
       return `Coloque ${cards(s.count)} do ${s.choose ? 'topo ou do fundo' : 'topo'} da sua Vida na mão.`;
     case 'handToLife':
-      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} da sua mão no topo da sua Vida.`;
+      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} da sua mão${s.fromTrash ? ' ou do seu descarte' : ''} no topo da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'fieldToLife':
       return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono.`;
     case 'peekLife':
@@ -674,6 +711,26 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Se for ${s.filter ? filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ') : 'uma carta'}, adicione-a à sua mão.`;
     case 'koSelf':
       return `Nocauteie ${ctx.self}.`;
+    case 'moveGivenDon':
+      return `Passe até ${s.count} DON!! já anexados às suas cartas para ${target(s.target, ctx)}.`;
+    case 'handPlayOrLife':
+      return `Escolha até ${filter(s.filter, 1, false)} da sua mão e jogue-a ou coloque-a no topo da sua Vida, com a face para cima.`;
+    case 'negateOnPlay':
+      return `Os efeitos [Ao Jogar] ${s.who === 'opponent' ? 'do oponente' : 'seus'} ficam anulados ${dur(s.duration)}.`;
+    case 'cannotAttackCharacters':
+      return `${cap(ctx.self)} não pode atacar Personagens do oponente com custo base ${s.maxBaseCost} ou menos ${dur(s.duration)}.`;
+    case 'drawEventCount':
+      return 'Compre tantas cartas quanto as descartadas.';
+    case 'restDonForPower':
+      return `Você pode virar quantos DON!! quiser. Para cada DON!! virado assim, ${target(s.target, ctx)} recebe +${s.power} de poder durante esta batalha.`;
+    case 'payEither':
+      return '';
+    case 'swapBasePower':
+      return `Escolha 2 ${target({ ...s.spec, upTo: 2 }, ctx).replace(/^até 2 /, '')} e troque o poder base deles ${dur(s.duration)}.`;
+    case 'trashFaceUpLife':
+      return 'Descarte todas as suas cartas de Vida viradas para cima.';
+    case 'lastToDeckTop':
+      return 'Coloque a carta revelada no topo do seu deck.';
     case 'opponentTrashToBottom':
       return `O oponente coloca ${cards(s.count)} do descarte dele no fundo do deck dele, na ordem que quiser.`;
     case 'arrangeLife':
@@ -840,6 +897,8 @@ function staticText(a: Ability, ctx: Ctx): string {
         return `Os seus Personagens do tipo {${r.type}} sem Counter têm Counter +${r.amount}, pelas regras.`;
       case 'deckMaxCost':
         return `Pelas regras desta partida, você não pode incluir ${r.category === 'event' ? 'Eventos' : 'cartas'} com custo ${r.cost + 1} ou mais no seu deck.`;
+      case 'ownOnPlayNegated':
+        return 'Os seus efeitos [Ao Jogar] são anulados.';
       case 'startStage':
         return `No início da partida, jogue até 1 Palco do tipo {${r.type}} do seu deck.`;
     }
