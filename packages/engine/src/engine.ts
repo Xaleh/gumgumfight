@@ -399,8 +399,14 @@ function matchesPartial(state: GameState, uid: string, f: Partial<TargetSpec>): 
   return true;
 }
 
+const hasAttribute = (def: CardDef, a: string) => (def.attributes ?? []).some((x) => x.toLowerCase() === a.toLowerCase());
+
 export function matchesFilter(def: CardDef, f: import('./types').CardFilter): boolean {
-  if (!(f.orName && hasName(def, f.orName)) && !matchesAnyType(def, f.hasAnyType)) return false;
+  if (f.either && !f.either.some((x) => matchesFilter(def, x))) return false;
+  const byName = Boolean(f.orName && hasName(def, f.orName));
+  const byAttr = Boolean(f.orAttribute && hasAttribute(def, f.orAttribute));
+  if (!byName && !byAttr && !matchesAnyType(def, f.hasAnyType)) return false;
+  if (f.attribute && !byName && !hasAttribute(def, f.attribute)) return false;
   if (f.names && !f.names.some((n) => hasName(def, n))) return false;
   if (f.category && def.category !== f.category) return false;
   if (f.maxCost !== undefined && (def.cost ?? 0) > f.maxCost) return false;
@@ -710,6 +716,7 @@ export function targetCandidates(state: GameState, controller: PlayerId, source:
       if (spec.withoutTiming && def.abilities.some((a) => a.timing === spec.withoutTiming)) return false;
       if (spec.leaderOnlyNamed && def.category === 'leader' && !hasName(def, spec.leaderOnlyNamed)) return false;
       if (spec.names && !spec.names.some((n) => hasName(def, n))) return false;
+      if (spec.attribute && !hasAttribute(def, spec.attribute)) return false;
       if (spec.either && !spec.either.some((f) => matchesPartial(state, fc.uid, f))) return false;
       if (!matchesAnyType(def, spec.hasAnyType)) return false;
       return true;

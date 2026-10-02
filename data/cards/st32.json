@@ -110,7 +110,7 @@
         "East Blue",
         "Frost Moon Village"
       ],
-      "text": "If your attribute Character with a cost of 5 or less other than this Character would be K.O.'d by your opponent's effect, you may rest this Character instead. [Blocker]",
+      "text": "If your \"Slash\" attribute Character with a cost of 5 or less other than this Character would be K.O.'d by your opponent's effect, you may rest this Character instead. [Blocker]",
       "set": "OP12",
       "rarity": "UC",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP12-027_r1.jpg"
@@ -128,7 +128,7 @@
         "Wisdom"
       ],
       "types": [],
-      "text": "[Activate: Main] You may rest 1 of your DON!! cards and this Character: If your Leader is [Roronoa Zoro], look at 5 cards from the top of your deck; reveal up to 1 attribute card or green Event and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "text": "[Activate: Main] You may rest 1 of your DON!! cards and this Character: If your Leader is [Roronoa Zoro], look at 5 cards from the top of your deck; reveal up to 1 \"Slash\" attribute card or green Event and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
       "notes": [
         "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
       ],
@@ -244,7 +244,7 @@
         "Land of Wano",
         "The Akazaya Nine"
       ],
-      "text": "[On Play] You may rest your attribute Leader or 1 of your DON!! cards: Draw 2 cards and trash 1 card from your hand.",
+      "text": "[On Play] You may rest your \"Slash\" attribute Leader or 1 of your DON!! cards: Draw 2 cards and trash 1 card from your hand.",
       "set": "ST32",
       "rarity": "C",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST32-001.jpg"
@@ -288,7 +288,7 @@
         "The Seven Warlords of the Sea",
         "Muggy Kingdom"
       ],
-      "text": "[Your Turn] When this Character becomes rested, draw 1 card and trash 1 card from your hand.[On Play] If your Leader has the attribute, play up to 1 Character card with a cost of 5 or less that is either [Perona] or has the attribute from your hand.",
+      "text": "[Your Turn] When this Character becomes rested, draw 1 card and trash 1 card from your hand.[On Play] If your Leader has the \"Slash\" attribute, play up to 1 Character card with a cost of 5 or less that is either [Perona] or has the \"Slash\" attribute from your hand.",
       "set": "ST32",
       "rarity": "SR",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST32-003.jpg"
@@ -309,7 +309,7 @@
       "types": [
         "Former Roger Pirates"
       ],
-      "text": "If your Leader has the attribute, this Character gains [Rush: Character].(This card can attack Characters on the turn in which it is played.)[On Play] Rest up to 2 of your opponent's Characters with a cost of 2 or less.",
+      "text": "If your Leader has the \"Slash\" attribute, this Character gains [Rush: Character].(This card can attack Characters on the turn in which it is played.)[On Play] Rest up to 2 of your opponent's Characters with a cost of 2 or less.",
       "set": "ST32",
       "rarity": "C",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST32-004.jpg"
@@ -331,7 +331,7 @@
         "Straw Hat Crew",
         "Supernovas"
       ],
-      "text": "[Rush: Character] (This card can attack Characters on the turn in which it is played.)[On Play] If your Leader has the attribute, rest up to 1 of your opponent's Characters with a cost of 2 or less.",
+      "text": "[Rush: Character] (This card can attack Characters on the turn in which it is played.)[On Play] If your Leader has the \"Slash\" attribute, rest up to 1 of your opponent's Characters with a cost of 2 or less.",
       "set": "ST32",
       "rarity": "C",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST32-005.jpg"

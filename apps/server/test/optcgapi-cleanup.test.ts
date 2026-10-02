@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractNotes, mapApiCard, normalizeTypeQuotes, splitTrigger, splitTypes, typeVocabulary } from '../src/optcgapi';
+import { extractNotes, mapApiCard, normalizeTypeQuotes, repairMissingAttribute, splitTrigger, splitTypes, typeVocabulary } from '../src/optcgapi';
 
 describe('limpeza dos dados da optcgapi', () => {
   it('separa notas de errata/reimpressão do texto do efeito', () => {
@@ -19,6 +19,13 @@ describe('limpeza dos dados da optcgapi', () => {
       trigger: 'Draw 1 card.',
     });
     expect(splitTrigger('[Counter] Draw 1 card. [Trigger] Play this card.')).toEqual({ text: '[Counter] Draw 1 card.', trigger: 'Play this card.' });
+  });
+
+  it('preenche o atributo "Slash" que a API perde nas cartas verdes', () => {
+    expect(repairMissingAttribute('If your Leader has the attribute, draw 1 card.', ['green'])).toBe('If your Leader has the "Slash" attribute, draw 1 card.');
+    expect(repairMissingAttribute('rest your attribute Leader', ['green'])).toBe('rest your "Slash" attribute Leader');
+    expect(repairMissingAttribute('your "Slash" attribute Characters', ['green'])).toBe('your "Slash" attribute Characters');
+    expect(repairMissingAttribute('If your Leader has the attribute', ['red'])).toBe('If your Leader has the attribute');
   });
 
   it('converte "X" type para {X} type', () => {

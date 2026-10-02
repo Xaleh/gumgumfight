@@ -139,7 +139,10 @@ function limits(f: CardFilter & Partial<TargetSpec>, many: boolean): string[] {
         .join(' ');
     out.push(`(${f.either.map(part).join(' ou ')})`);
   }
-  if (f.orName) out.push(`ou [${f.orName}]`);
+  if (f.attribute && !f.orName) out.push(`do atributo ${f.attribute}`);
+  if (f.attribute && f.orName) out.push(`que seja [${f.orName}] ou tenha o atributo ${f.attribute}`);
+  if (f.orAttribute) out.push(`ou do atributo ${f.orAttribute}`);
+  if (f.orName && !f.attribute) out.push(`ou [${f.orName}]`);
   if (f.maxCostOppDon) out.push('com custo igual ou menor ao número de DON!! no campo do oponente');
   if (f.leaderOnlyNamed) out.push(`(o Líder só se for [${f.leaderOnlyNamed}])`);
   if (f.withoutTiming) out.push(f.withoutTiming === 'onPlay' ? 'sem efeito [Ao Jogar]' : 'sem efeito [Ao Atacar]');
@@ -207,6 +210,10 @@ function target(ref: TargetRef, ctx: Ctx): string {
 
 /** Cartas fora do campo ("até 1 Personagem do tipo {X} com custo 3 ou menos"). */
 function filter(f: CardFilter, n: number, upTo = true): string {
+  if (f.either?.length) {
+    const parts = f.either.map((x) => filter(x, n, false).replace(/^\d+ /, ''));
+    return `${upTo ? `até ${n}` : String(n)} ${parts.join(' ou ')}`;
+  }
   const many = n > 1;
   const nounText =
     f.category === 'character'

@@ -80,6 +80,8 @@ export interface TargetSpec {
   either?: Array<Partial<TargetSpec>>;
   /** "[San-Gorou] or [Sanji] Character": um destes nomes. */
   names?: string[];
+  /** "your "Slash" attribute Characters" */
+  attribute?: string;
   /** "your Characters or [X]": o Líder só vale se tiver este nome. */
   leaderOnlyNamed?: string;
   /** "without an [On Play] effect" */
@@ -115,6 +117,12 @@ export interface CardFilter {
   orName?: string;
   /** "[Sabo], [Portgas.D.Ace], or [Monkey.D.Luffy]" */
   names?: string[];
+  /** "Slash" attribute (ou, com orName, "either [Perona] or has the "Slash" attribute") */
+  attribute?: string;
+  /** "{Muggy Kingdom} type or "Slash" attribute": o atributo dispensa o tipo. */
+  orAttribute?: string;
+  /** "a "Slash" attribute card or green Event": basta um dos filtros. */
+  either?: CardFilter[];
   /** custo até o número de DON!! do oponente */
   maxCostOppDon?: boolean;
   /** "with different card names" (várias cartas escolhidas) */

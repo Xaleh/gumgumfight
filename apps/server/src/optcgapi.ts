@@ -50,6 +50,15 @@ export function allEndpoints(base: string): string[] {
 }
 
 /**
+ * A API perde o nome do atributo em algumas cartas verdes ("If your Leader has the attribute",
+ * "your attribute Character"): são todas do atributo "Slash" (decks do Zoro).
+ */
+export function repairMissingAttribute(text: string, colors: string[]): string {
+  if (!colors.includes('green')) return text;
+  return text.replace(/\b(the|your|\d+) attribute\b/g, '$1 "Slash" attribute');
+}
+
+/**
  * Separa o texto do [Trigger], que às vezes vem junto do texto principal. Só conta o
  * [Trigger] que abre uma linha ou vem depois do fim de uma frase: "trash 1 card with
  * a [Trigger] from your hand" fala de cartas com Trigger e continua no texto principal.
@@ -209,7 +218,7 @@ export function mapApiCard(raw: Raw, vocab: Set<string> = new Set()): CardData |
     counter: category === 'character' ? num(pick(raw, 'counter_amount', 'counter')) : undefined,
     attributes: splitList(pick(raw, 'attribute', 'attributes'), /\s*[/;,]\s*/),
     types,
-    text: split.text,
+    text: repairMissingAttribute(split.text, colors),
     trigger: explicitTrigger ? normalizeTypeQuotes(cleanText(explicitTrigger)) : split.trigger,
     ...(notes.length ? { notes } : {}),
     ...(aliases.length ? { aliases } : {}),

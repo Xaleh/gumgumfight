@@ -246,6 +246,9 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       if (/less/i.test(m[3])) spec.maxCost = Number(m[2]);
       else spec.minCost = Number(m[2]);
       if (m[1] && onField) (spec as TargetSpec).base = true;
+    } else if ((m = rest.match(/^\s*that is either \[([^\]]+)\] or has the "(\w+)" attribute/i)) && !onField) {
+      (spec as CardFilter).orName = m[1];
+      (spec as CardFilter).attribute = m[2];
     } else if ((m = rest.match(/^\s*or \[([^\]]+)\]/i)) && !onField) {
       (spec as CardFilter).orName = m[1];
     } else if ((m = rest.match(/^\s*and (\d+) (base )?power or (more|less)/i))) {
@@ -338,6 +341,7 @@ function parseTargetBase(phrase: string): TargetRef | null {
     else if ((m = p.match(/^active /i))) spec.rested = false;
     else if ((m = p.match(/^\[(Rush|Blocker|Double Attack|Banish|Unblockable)\] /i))) spec.keyword = KEYWORDS[m[1].toLowerCase()];
     else if ((m = p.match(/^\[([^\]]+)\] (?:or|and) \[([^\]]+)\]\s*/))) spec.names = [m[1], m[2]];
+    else if ((m = p.match(/^"(\w+)" attribute\s*/i))) spec.attribute = m[1];
     else if ((m = p.match(/^\[([^\]]+)\]\s*/))) spec.name = m[1];
     else break;
     p = p.slice(m[0].length);
@@ -376,6 +380,17 @@ function parseTargetBase(phrase: string): TargetRef | null {
 // ---------------------------------------------------------------------------
 
 export function parseCardFilter(phrase: string): { upTo: number; filter: CardFilter } | null {
+  const base = parseCardFilterBase(phrase);
+  if (base) return base;
+  // "up to 1 "Slash" attribute card or green Event"
+  const m = phrase.trim().match(/^((?:up to )?\d+ |)(.+?) or (.+)$/i);
+  if (!m) return null;
+  const a = parseCardFilterBase(`${m[1]}${m[2]}`);
+  const b = parseCardFilterBase(`${m[1]}${m[3]}`);
+  return a && b ? { upTo: a.upTo, filter: { either: [a.filter, b.filter] } } : null;
+}
+
+function parseCardFilterBase(phrase: string): { upTo: number; filter: CardFilter } | null {
   let p = phrase.trim();
   let upTo = 1;
   let m: RegExpMatchArray | null;
@@ -388,6 +403,10 @@ export function parseCardFilter(phrase: string): { upTo: number; filter: CardFil
   const filter: CardFilter = {};
   for (let guard = 0; guard < 4; guard++) {
     if ((m = p.match(/^(red|green|blue|purple|black|yellow) /i))) filter.color = m[1].toLowerCase() as Color;
+    else if ((m = p.match(/^((?:\{[^}]+\})(?:\s*(?:,|or)\s*\{[^}]+\})*) type or "(\w+)" attribute\s*/i))) {
+      filter.hasAnyType = typesOf(m[1]);
+      filter.orAttribute = m[2];
+    } else if ((m = p.match(/^"(\w+)" attribute\s*/i))) filter.attribute = m[1];
     else if ((m = p.match(TYPE_LIST))) filter.hasAnyType = typesOf(m[1]);
     else if ((m = p.match(/^((?:\[[^\]]+\],? )+(?:or|and) \[[^\]]+\])\s*/))) filter.names = [...m[1].matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]);
     else if ((m = p.match(/^\[([^\]]+)\]\s*/))) filter.name = m[1];
@@ -398,7 +417,7 @@ export function parseCardFilter(phrase: string): { upTo: number; filter: CardFil
     filter.category = m[1].toLowerCase() as CardCategory;
   } else if ((m = p.match(/^cards?/i))) {
     // qualquer categoria
-  } else if (filter.name || filter.names || filter.hasAnyType) {
+  } else if (filter.name || filter.names || filter.hasAnyType || filter.attribute) {
     m = p.match(/^/);
   } else {
     return null;
@@ -1352,6 +1371,11 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
   }
   else if ((m = part.match(/^rest (\d+) of your active DON!! cards?$/i))) cost.restDon = (cost.restDon ?? 0) + Number(m[1]);
   else if (/^rest your (?:1 )?Leader$/i.test(part)) cost.restOwn = { count: 1, spec: { side: 'own', kinds: ['leader'], upTo: 1 } };
+  else if ((m = part.match(/^rest your (.+? Leader)$/i))) {
+    const spec = parseTarget(`your ${m[1]}`);
+    if (!spec || typeof spec !== 'object' || spec.kinds.join() !== 'leader') return false;
+    cost.restOwn = { count: 1, spec };
+  }
   else if ((m = part.match(/^K\.O\. (\d+) of your (.+)$/i))) {
     const spec = parseTarget(`up to ${m[1]} of your ${m[2]}`);
     if (!spec || typeof spec !== 'object') return false;
@@ -1689,6 +1713,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     const what = /DON/i.test(m[3]) ? 'restedDon' : /hand/i.test(m[3]) ? 'hand' : /Event/i.test(m[3]) ? 'trashEvents' : 'trash';
     return [{ ...base, powerPer: { power: Number(m[1]), every: Number(m[2] ?? 1), what } }];
   }
+  if (/^this Character gains \[Rush: ?Character\]$/i.test(s)) return [{ ...base, staticKeyword: 'rushCharacter' }];
   if ((m = s.match(/^this (?:Character|card|Leader) gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\]$/i))) {
     return [{ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] }];
   }
