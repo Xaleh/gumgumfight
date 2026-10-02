@@ -45,6 +45,7 @@ const extra: CardData[] = [
   { id: 'PX-037', name: 'Lifter', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Your Leader's base power becomes 7000 during this turn." },
   { id: 'PX-038', name: 'Ghost', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Unblockable] (This card cannot be blocked.)' },
   { id: 'PX-039', name: 'Payer', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] You may give your 1 active Leader -5000 power during this turn: Draw 1 card.' },
+  { id: 'PX-040', name: 'Rester', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 3 or less." },
   { id: 'PX-024', name: 'Law', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, draw 1 card.' },
 ];
 const cards = [...baseCards, ...extra];
@@ -481,5 +482,17 @@ describe('efeitos lidos automaticamente', () => {
     s = applyAction(s, { type: 'activate', player: 0, uid: payer, ability: 0 });
     expect(getPower(s, s.players[0].leader.uid)).toBe(0);
     expect(s.players[0].hand).toHaveLength(hand + 1);
+  });
+
+  it('vira um DON!! ou um Personagem do oponente, à escolha', () => {
+    let s = toTurn(game(), 4);
+    s = toTurn(s, 5);
+    const oppActive = s.players[1].donActive + s.players[1].donRested;
+    s.players[1].donActive = oppActive;
+    s.players[1].donRested = 0;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-040') });
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0 });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
+    expect(s.players[1].donRested).toBe(1);
   });
 });

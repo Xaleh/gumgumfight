@@ -348,6 +348,9 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você tiver ${c.ownMatchingMax!.count} ou menos ${t}`);
         break;
       }
+      case 'faceUpLifeMin':
+        out.push('você tiver uma carta de Vida virada para cima');
+        break;
       case 'leaderMonocolor':
         out.push('o seu Líder for de uma só cor');
         break;
@@ -668,6 +671,12 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Se for ${s.filter ? filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ') : 'uma carta'}, adicione-a à sua mão.`;
     case 'koSelf':
       return `Nocauteie ${ctx.self}.`;
+    case 'opponentTrashToBottom':
+      return `O oponente coloca ${cards(s.count)} do descarte dele no fundo do deck dele, na ordem que quiser.`;
+    case 'arrangeLife':
+      return `Olhe todas as cartas de Vida ${s.whose === 'own' ? 'suas' : 'do oponente'} e devolva-as na ordem que quiser.`;
+    case 'restDonOrCharacter':
+      return `Vire até 1 DON!! do oponente ou ${target({ ...s.spec, side: 'opponent', upTo: 1 }, ctx)}.`;
     case 'chooseCost':
       return 'Escolha um custo.';
     case 'revealOpponentTop':

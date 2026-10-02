@@ -267,6 +267,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.noCharacterNamed && ps.characters.some((c) => hasName(cardDef(state, c.uid), cond.noCharacterNamed!))) return false;
   if (cond.leaderMulticolor && cardDef(state, ps.leader.uid).colors.length < 2) return false;
   if (cond.leaderMonocolor && cardDef(state, ps.leader.uid).colors.length !== 1) return false;
+  if (cond.faceUpLifeMin !== undefined && ps.life.filter((u) => ps.lifeFaceUp?.includes(u)).length < cond.faceUpLifeMin) return false;
   if (cond.leaderAttribute && !(cardDef(state, ps.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.leaderAttribute!.toLowerCase())) {
     return false;
   }
@@ -2051,6 +2052,76 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         ps.hand.push(card);
         log(state, frame.controller, `${ps.name} adiciona ${cardDef(state, card).name} à mão.`);
       }
+      return true;
+    }
+    case 'opponentTrashToBottom': {
+      const opp = state.players[opponent(frame.controller)];
+      const n = Math.min(step.count, opp.trash.length);
+      if (!n) return true;
+      if (!frame.choice) {
+        state.pending = {
+          kind: 'selectTargets',
+          player: opp.id,
+          options: [...opp.trash],
+          min: n,
+          max: n,
+          prompt: `${srcName}: escolha ${n} carta(s) do seu descarte para o fundo do deck.`,
+          intent: 'discard',
+          source: frame.source,
+          ordered: true,
+        };
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => opp.trash.includes(u))) {
+        removeFrom(opp.trash, uid);
+        opp.deck.push(uid);
+      }
+      log(state, opp.id, `${opp.name} coloca ${n} carta(s) do descarte no fundo do deck.`);
+      return true;
+    }
+    case 'arrangeLife': {
+      const owner = step.whose === 'own' ? ps : state.players[opponent(frame.controller)];
+      if (owner.life.length < 2) return true;
+      if (!frame.choice) {
+        // Do topo para o fundo, na ordem dos cliques.
+        askCards(state, frame, [...owner.life].reverse(), owner.life.length, `${srcName}: ordene as cartas de Vida (a primeira escolhida fica no topo).`, {
+          min: owner.life.length,
+          ordered: true,
+        });
+        return false;
+      }
+      const order = frame.choice.filter((u) => owner.life.includes(u));
+      if (order.length === owner.life.length) owner.life = [...order].reverse();
+      log(state, frame.controller, `${ps.name} reorganiza as cartas de Vida de ${owner.name}.`);
+      return true;
+    }
+    case 'restDonOrCharacter': {
+      const opp = state.players[opponent(frame.controller)];
+      const chars = targetCandidates(state, frame.controller, frame.source, { ...step.spec, side: 'opponent' }).filter((u) => !locate(state, u)?.fc.rested);
+      if (!frame.memo) {
+        if (!opp.donActive && !chars.length) return true;
+        if (!frame.choice) {
+          const opts = [...(opp.donActive ? ['Virar 1 DON!! ativo do oponente'] : []), ...(chars.length ? ['Virar um Personagem do oponente'] : []), 'Nenhum'];
+          askOption(state, frame, frame.controller, `${srcName}: o que virar?`, opts);
+          frame.memo = ['pick', ...(opp.donActive ? ['don'] : []), ...(chars.length ? ['char'] : [])];
+          return false;
+        }
+      }
+      if (frame.memo?.[0] === 'pick') {
+        const pick = frame.memo[1 + Number(frame.choice?.[0])];
+        frame.choice = undefined;
+        if (pick === 'don') {
+          opp.donActive--;
+          opp.donRested++;
+          log(state, frame.controller, `1 DON!! de ${opp.name} é virado.`);
+          return true;
+        }
+        if (pick !== 'char') return true;
+        frame.memo = ['char'];
+      }
+      const t = resolveTargets(state, frame, { ...step.spec, side: 'opponent', upTo: 1 }, 'harm', `${srcName}: escolha o Personagem a virar.`);
+      if (!t) return false;
+      for (const uid of t) restCard(state, uid);
       return true;
     }
     case 'chooseCost':

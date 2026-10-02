@@ -129,7 +129,7 @@ function clean(raw: string): string {
     )
     // "up to 1 of your Leader with a type including "X" or up to 1 of your Characters with a type including "X""
     .replace(
-      /up to (\d+) of your Leader with a type including "([^"]+)" or up to \1 of your Characters? with a type including "\2"/g,
+      /up to (\d+) of your Leader with a type including "([^"]+)" or up to \1 of your Characters? with a type including "\2"/gi,
       'up to $1 of your Leader or Character cards with a type including "$2"',
     )
     .replace(/’/g, "'");
@@ -199,6 +199,12 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       (spec as CardFilter).maxCostDon = true;
     } else if ((m = rest.match(/^\s*(?:and )?without an? \[(On Play|When Attacking)\] effect/i)) && onField) {
       (spec as TargetSpec).withoutTiming = /Play/i.test(m[1]) ? 'onPlay' : 'whenAttacking';
+    } else if ((m = rest.match(/^\s*and the ((?:\{[^}]+\})(?:\s*(?:,|or)\s*\{[^}]+\})*) type/i))) {
+      spec.hasAnyType = typesOf(m[1]);
+    } else if ((m = rest.match(/^\s*and a (base )?cost of (\d+) or (less|more)/i))) {
+      if (/less/i.test(m[3])) spec.maxCost = Number(m[2]);
+      else spec.minCost = Number(m[2]);
+      if (m[1] && onField) (spec as TargetSpec).base = true;
     } else if ((m = rest.match(/^\s*with different card names/i)) && !onField) {
       (spec as CardFilter).distinctNames = true;
     } else if ((m = rest.match(/^\s*and (?=with )/i))) {
@@ -390,7 +396,8 @@ export function parseCondition(text: string): Condition | null {
     return { anyOf: [{ anyCharacterCost: { min: Number(m[1]), max: Number(m[1]) } }, { anyCharacterCost: { min: Number(m[2]) } }] };
   }
   if ((m = t.match(/^the revealed card has the chosen cost$/i))) return { revealedHasChosenCost: true };
-  if ((m = t.match(/^you have (\d+) or less (.+?Characters.*)$/i))) {
+  if (/^you have a face-up Life card$/i.test(t)) return { faceUpLifeMin: 1 };
+  if ((m = t.match(/^you have (\d+) or less (.*?Characters? with .*)$/i))) {
     const spec = parseTarget(`up to 99 of your ${m[2]}`);
     if (spec && typeof spec === 'object') return { ownMatchingMax: { count: Number(m[1]), spec: { ...spec, side: 'own', upTo: 99 } } };
   }
@@ -654,6 +661,23 @@ const CLAUSES: ClauseRule[] = [
     },
   ],
   [/^Reveal 1 card from the top of your Life cards$/i, () => [{ do: 'revealLifeTop' }]],
+  [
+    /^Your opponent places (\d+) cards? from their trash at the bottom of their deck(?: in any order)?$/i,
+    (m) => [{ do: 'opponentTrashToBottom', count: Number(m[1]) }],
+  ],
+  [
+    /^Look at all of (your|your opponent's) Life cards and place them back in (?:your|their) Life area in any order$/i,
+    (m) => [{ do: 'arrangeLife', whose: /opponent/i.test(m[1]) ? 'opponent' : 'own' }],
+  ],
+  [
+    /^rest up to (?:a total of )?(\d+) of your opponent's (?:DON!! cards or (.+?)|(Characters) or DON!! cards)$/i,
+    (m) => {
+      const what = m[2] ?? m[3];
+      const spec = parseTarget(`up to 1 of your opponent's ${what}`);
+      if (!spec || typeof spec !== 'object') return null;
+      return Array.from({ length: Number(m[1]) }, () => ({ do: 'restDonOrCharacter', spec }) as EffectStep);
+    },
+  ],
   [
     /^Choose a cost and reveal 1 card from the top of your opponent's deck$/i,
     () => [{ do: 'chooseCost' }, { do: 'revealOpponentTop' }],
@@ -933,7 +957,7 @@ const CLAUSES: ClauseRule[] = [
       ),
   ],
   [
-    /^Look at (\d+) cards from the top of your deck and (?:return|place) them (?:at|to) the top or bottom of the deck in any order$/i,
+    /^Look at (\d+) cards from the top of your deck and (?:return|place) them (?:at|to) the top or bottom of (?:the|your) deck in any order$/i,
     (m) => [{ do: 'arrangeTop', look: Number(m[1]) }],
   ],
   [/^Select (.+)$/i, (m) => withTarget(m[1], (target) => ({ do: 'select', target }))],
@@ -1014,7 +1038,7 @@ export function parseBody(body: string): EffectStep[] | null {
         ? 'bottom'
         : /^Then, trash the rest\.?$/i.test(next)
           ? 'trash'
-          : /^Then, place the rest at the top or bottom of the deck in any order\.?$/i.test(next)
+          : /^Then, place the rest at the top or bottom of (?:the|your) deck in any order\.?$/i.test(next)
             ? 'topOrBottom'
             : null;
       if (!f || !rest) return fail(`search: ${s} | ${next}`);
@@ -1475,6 +1499,12 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [{ ...base, aura }];
   }
   if ((m = s.match(/^give this card in your hand [−-]?(\d+) cost$/i))) return [{ ...base, handCost: -Number(m[1]) }];
+  if (/^this Character can attack Characters on the turn in which it is played$/i.test(s)) return [{ ...base, staticKeyword: 'rushCharacter' }];
+  if ((m = s.match(/^this Character cannot be K\.O\.'d by your opponent's effects(?: and gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\])?$/i))) {
+    const out: Ability[] = [{ ...base, staticNoEffectKO: true }];
+    if (m[1]) out.push({ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] });
+    return out;
+  }
   if ((m = s.match(/^give this (?:Leader|Character) [−-]?(\d+) power$/i))) return [{ ...base, staticPower: -Number(m[1]) }];
   if ((m = s.match(/^all of your ((?:\[[^\]]+\](?:,? and |, )?)+) cards gain \+(\d+) power$/i))) {
     const names = [...m[1].matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]);

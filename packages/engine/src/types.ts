@@ -143,6 +143,7 @@ export interface Condition {
   leaderMulticolor?: boolean;
   leaderMonocolor?: boolean;
   leaderAttribute?: string;
+  faceUpLifeMin?: number;
   /** "you have [Satori] and [Hotori]" */
   haveNamed?: string[];
   /** "If the revealed card has the chosen cost" (passos chooseCost + revealOpponentTop) */
@@ -354,6 +355,10 @@ type EffectStepBody =
   | { do: 'revealLifeTop' }
   | { do: 'koSelf' }
   | { do: 'chooseCost' }
+  | { do: 'opponentTrashToBottom'; count: number }
+  | { do: 'arrangeLife'; whose: 'own' | 'opponent' }
+  /** "Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 3 or less" */
+  | { do: 'restDonOrCharacter'; spec: TargetSpec }
   | { do: 'revealOpponentTop' }
   | { do: 'giveActiveDon'; count: number; target: TargetRef }
   | { do: 'ownToBottom'; count: number; spec: TargetSpec }
