@@ -92,6 +92,7 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
       kind: deck.kind,
       leader: deck.leader,
       leaderName: leader?.name ?? null,
+      leaderImage: (server.cardImages && leader?.imageUrl) || null,
       colors: leader?.colors ?? [],
       size: report.total,
       valid: report.valid,

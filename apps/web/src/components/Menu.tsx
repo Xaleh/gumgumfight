@@ -2,7 +2,7 @@ import type { Action, CardData, PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import { api, deckGroups, type DeckSummary } from '../api';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
-import { SettingsControls } from '../settings';
+import { SettingsControls, useSettings } from '../settings';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 
@@ -35,23 +35,96 @@ async function buildSetup(
 
 const LAST_DECKS = 'gumgum.lastDecks';
 
-function DeckSelect({ decks, value, onChange }: { decks: DeckSummary[]; value: string; onChange: (id: string) => void }) {
-  const groups = deckGroups(decks);
+const RANDOM = 'random';
+
+/** Arte do Líder em círculo (ou a inicial, sem imagens). */
+function LeaderArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
+  const { showImages } = useSettings();
+  const [failed, setFailed] = useState(false);
+  if (!deck) {
+    return <div className={['leader-art', 'random', small ? 'small' : ''].join(' ')}>?</div>;
+  }
+  const color = deck.colors[0] === 'blue' ? 'blue-card' : (deck.colors[0] ?? 'red');
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}>
-      {groups
-        .filter(([, list]) => list.length)
-        .map(([label, list]) => (
-          <optgroup key={label} label={label}>
-            {list.map((d) => (
-              <option key={d.id} value={d.id} disabled={!d.valid}>
-                {d.name}
-                {d.valid ? '' : ` (incompleto: ${d.size}/50)`}
-              </option>
+    <div className={['leader-art', small ? 'small' : ''].join(' ')} style={{ ['--card-color' as string]: `var(--${color})` }}>
+      {showImages && deck.leaderImage && !failed ? (
+        <img src={deck.leaderImage} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+      ) : (
+        (deck.leaderName ?? deck.name).slice(0, 1)
+      )}
+    </div>
+  );
+}
+
+function DeckPick({ who, deck, random, onClick }: { who: string; deck?: DeckSummary; random?: boolean; onClick: () => void }) {
+  return (
+    <button className="deck-pick" onClick={onClick}>
+      <span className="who">{who}</span>
+      <LeaderArt deck={random ? undefined : deck} />
+      <span className="name">{random ? 'Aleatório' : (deck?.name ?? 'Escolher deck')}</span>
+      {!random && <DeckWarning deck={deck} />}
+    </button>
+  );
+}
+
+function DeckPicker({
+  title,
+  decks,
+  value,
+  allowRandom,
+  onPick,
+  onClose,
+}: {
+  title: string;
+  decks: DeckSummary[];
+  value: string;
+  allowRandom?: boolean;
+  onPick: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop sheet-backdrop page-sheet" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h3>{title}</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">
+          {allowRandom && (
+            <div className="picker-grid">
+              <button className={['deck-pick', value === RANDOM ? 'on' : ''].join(' ')} onClick={() => onPick(RANDOM)}>
+                <LeaderArt small />
+                <span className="name">Aleatório</span>
+              </button>
+            </div>
+          )}
+          {deckGroups(decks)
+            .filter(([, list]) => list.length)
+            .map(([label, list]) => (
+              <div key={label} className="picker-group">
+                <label className="sheet-label">{label}</label>
+                <div className="picker-grid">
+                  {list.map((d) => (
+                    <button
+                      key={d.id}
+                      className={['deck-pick', d.id === value ? 'on' : ''].join(' ')}
+                      disabled={!d.valid}
+                      onClick={() => onPick(d.id)}
+                      title={d.valid ? d.name : `Incompleto: ${d.size}/50`}
+                    >
+                      <LeaderArt deck={d} small />
+                      <span className="name">{d.name}</span>
+                      {!d.valid && <span className="muted small">{d.size}/50</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
-          </optgroup>
-        ))}
-    </select>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -59,7 +132,7 @@ function DeckWarning({ deck }: { deck?: DeckSummary }) {
   if (!deck || !deck.unscripted) return null;
   return (
     <div className="muted small deck-warning" title="Essas cartas entram no jogo, mas sem o efeito">
-      ⚙ {deck.unscripted} carta(s) sem efeito automatizado
+      ⚙ {deck.unscripted} sem efeito automático
     </div>
   );
 }
@@ -81,6 +154,7 @@ export function Menu({
   const [seed, setSeed] = useState(randomSeed());
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
   const [loading, setLoading] = useState(false);
+  const [picking, setPicking] = useState<null | 0 | 1>(null);
 
   // O servidor pode ainda estar subindo: tenta de novo por até ~30s antes de desistir.
   useEffect(() => {
@@ -103,7 +177,7 @@ export function Menu({
           const valid = d.filter((x) => x.valid).map((x) => x.id);
           const builtin = d.filter((x) => x.valid && x.kind === 'builtin').map((x) => x.id);
           setDeck0(valid.includes(last[0]) ? last[0] : (builtin[0] ?? valid[0] ?? ''));
-          setDeck1(valid.includes(last[1]) ? last[1] : (builtin[1] ?? valid[1] ?? valid[0] ?? ''));
+          setDeck1(last[1] === RANDOM || valid.includes(last[1]) ? last[1] : (builtin[1] ?? valid[1] ?? valid[0] ?? ''));
         })
         .catch(() => {
           if (cancelled) return;
@@ -131,7 +205,9 @@ export function Menu({
     }
     try {
       const names: [string, string] = mode === 'demo' ? ['Bot A', 'Bot B'] : ['Você', 'Bot'];
-      onStart(await buildSetup(mode, [deck0, deck1], names, seed, first === 'random' ? undefined : (Number(first) as PlayerId)));
+      const pool = decks.filter((d) => d.valid && d.kind === 'builtin');
+      const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
+      onStart(await buildSetup(mode, [deck0, opp], names, seed, first === 'random' ? undefined : (Number(first) as PlayerId)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setLoading(false);
@@ -148,67 +224,81 @@ export function Menu({
     }
   };
 
+  const d0 = decks.find((d) => d.id === deck0);
+  const d1 = decks.find((d) => d.id === deck1);
+
   return (
     <div className="menu">
       <div className="menu-box">
-        <h1 className="logo">
-          GumGum <span>Fight</span>
-        </h1>
-        <p className="tagline">Simulador de One Piece Card Game no navegador</p>
+        <header className="menu-hero">
+          <h1 className="logo">
+            GumGum <span>Fight</span>
+          </h1>
+          <p className="tagline">One Piece Card Game no navegador</p>
+        </header>
 
         {error && <div className="error">{error}</div>}
 
-        <div className="field">
-          <label>Modo</label>
+        <section className="menu-card">
           <div className="seg">
             <button className={mode === 'bot' ? 'on' : ''} onClick={() => setMode('bot')}>
               Contra o bot
             </button>
             <button className={mode === 'demo' ? 'on' : ''} onClick={() => setMode('demo')}>
-              Bot x Bot (demonstração)
+              Bot x Bot
             </button>
           </div>
-        </div>
 
-        <div className="field two">
-          <div>
-            <label>{mode === 'demo' ? 'Deck do Bot A' : 'Seu deck'}</label>
-            <DeckSelect decks={decks} value={deck0} onChange={setDeck0} />
-            <DeckWarning deck={decks.find((d) => d.id === deck0)} />
+          <div className="matchup">
+            <DeckPick who={mode === 'demo' ? 'Bot A' : 'Seu deck'} deck={d0} onClick={() => setPicking(0)} />
+            <span className="vs-badge">VS</span>
+            <DeckPick
+              who={mode === 'demo' ? 'Bot B' : 'Oponente'}
+              deck={d1}
+              random={deck1 === RANDOM}
+              onClick={() => setPicking(1)}
+            />
           </div>
-          <div>
-            <label>{mode === 'demo' ? 'Deck do Bot B' : 'Deck do bot'}</label>
-            <DeckSelect decks={decks} value={deck1} onChange={setDeck1} />
-            <DeckWarning deck={decks.find((d) => d.id === deck1)} />
+
+          <div className="field">
+            <label>Quem começa</label>
+            <div className="seg small">
+              {(
+                [
+                  ['random', 'Sorteio'],
+                  ['0', mode === 'demo' ? 'Bot A' : 'Você'],
+                  ['1', mode === 'demo' ? 'Bot B' : 'Bot'],
+                ] as const
+              ).map(([v, label]) => (
+                <button key={v} className={first === v ? 'on' : ''} onClick={() => setFirst(v)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          <button className="btn primary battle-btn" disabled={!deck0 || !deck1 || loading} onClick={start}>
+            {loading ? 'Carregando…' : 'Batalhar!'}
+          </button>
+        </section>
+
+        <div className="menu-links">
+          <button className="btn" onClick={onBuildDecks}>
+            <span className="ico">🃏</span>
+            Montar decks
+          </button>
+          <button className="btn" onClick={onCoverage}>
+            <span className="ico">📊</span>
+            Cobertura das cartas
+          </button>
         </div>
 
-        <button className="btn build-decks" onClick={onBuildDecks}>
-          🃏 Montar / editar decks
-        </button>
-
-        <div className="field">
-          <label>Quem começa</label>
-          <select value={first} onChange={(e) => setFirst(e.target.value as typeof first)}>
-            <option value="random">Sorteio</option>
-            <option value="0">{mode === 'demo' ? 'Bot A' : 'Você'}</option>
-            <option value="1">{mode === 'demo' ? 'Bot B' : 'Bot'}</option>
-          </select>
-        </div>
-
-        <div className="field">
+        <section className="menu-card">
+          <h2>Configurações</h2>
           <SettingsControls />
-        </div>
+        </section>
 
-        <button className="btn primary big" disabled={!deck0 || !deck1 || loading} onClick={start}>
-          {loading ? 'Carregando…' : 'Começar partida'}
-        </button>
-
-        <button className="btn small link-btn" onClick={onCoverage}>
-          📊 Cobertura das cartas (automação e tradução)
-        </button>
-
-        <details className="advanced">
+        <details className="menu-card advanced">
           <summary>Opções de teste</summary>
           <div className="field">
             <label>Seed do embaralhamento</label>
@@ -234,6 +324,21 @@ export function Menu({
           português são automáticas e não oficiais.
         </p>
       </div>
+
+      {picking !== null && (
+        <DeckPicker
+          title={picking === 0 ? (mode === 'demo' ? 'Deck do Bot A' : 'Seu deck') : mode === 'demo' ? 'Deck do Bot B' : 'Deck do oponente'}
+          decks={decks}
+          value={picking === 0 ? deck0 : deck1}
+          allowRandom={picking === 1}
+          onPick={(id) => {
+            if (picking === 0) setDeck0(id);
+            else setDeck1(id);
+            setPicking(null);
+          }}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </div>
   );
 }

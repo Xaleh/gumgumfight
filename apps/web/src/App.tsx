@@ -12,7 +12,24 @@ export function App() {
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'coverage') return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'game') {
-    return <GameScreen key={screen.key} setup={screen.setup} onExit={() => setScreen({ name: 'menu' })} />;
+    const { setup } = screen;
+    return (
+      <GameScreen
+        key={screen.key}
+        setup={setup}
+        onExit={() => setScreen({ name: 'menu' })}
+        onRematch={
+          setup.mode === 'replay'
+            ? undefined
+            : () =>
+                setScreen({
+                  name: 'game',
+                  key: Date.now(),
+                  setup: { ...setup, config: { ...setup.config, seed: Math.floor(Math.random() * 1_000_000) } },
+                })
+        }
+      />
+    );
   }
   return (
     <Menu

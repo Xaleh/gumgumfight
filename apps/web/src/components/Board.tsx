@@ -1,5 +1,6 @@
 import { cardDef, type GameState, MAX_CHARACTERS, type PlayerId } from '@gumgum/engine';
-import { CardBack, CardView, type Highlight } from './CardView';
+import type { CSSProperties, ReactNode } from 'react';
+import { CardBack, CardView, type Highlight, JollyRoger } from './CardView';
 
 export interface BoardHandlers {
   highlight: (uid: string) => Highlight;
@@ -8,163 +9,159 @@ export interface BoardHandlers {
   onHover: (uid: string | null) => void;
   onDon: (player: PlayerId) => void;
   donHighlight: (player: PlayerId) => boolean;
+  /** Abre a lista do descarte de um jogador. */
+  onTrash: (player: PlayerId) => void;
+  /** Cartas da mão que podem ser arrastadas para a mesa. */
+  canDragHand: (uid: string) => boolean;
+  /** Personagens/Líder que podem ser arrastados até um alvo de ataque. */
+  canDragAttacker: (uid: string) => boolean;
+  /** DON!! que podem ser arrastados até uma carta. */
+  canDragDon: (player: PlayerId) => boolean;
+  /** Algo arrastado pode ser solto na mesa deste jogador (jogar carta). */
+  fieldDrop: (player: PlayerId) => boolean;
 }
 
 interface SideProps extends BoardHandlers {
   state: GameState;
   player: PlayerId;
   position: 'top' | 'bottom';
-  revealHand: boolean;
 }
 
-function PlayerSide({ state, player, position, revealHand, ...h }: SideProps) {
+const vars = (v: Record<string, string | number>) => v as CSSProperties;
+
+function PlayerSide({ state, player, position, ...h }: SideProps) {
   const ps = state.players[player];
-  const isActive = state.activePlayer === player && state.phase !== 'mulligan';
+  const isActive = state.activePlayer === player && state.phase === 'main';
   const trashTop = ps.trash[ps.trash.length - 1];
-
   const slots = Array.from({ length: MAX_CHARACTERS }, (_, i) => ps.characters[i] ?? null);
+  const maxLife = cardDef(state, ps.leader.uid).life ?? ps.life.length;
 
-  const hand = (
-    <div className="row hand-row">
-      {ps.hand.map((uid) =>
-        revealHand ? (
-          <div key={uid} className="hand-card">
-            <CardView
-              state={state}
-              uid={uid}
-              highlight={h.highlight(uid)}
-              onClick={() => h.onCard(uid)}
-              onDoubleClick={() => h.onCardDouble(uid)}
-              onHover={h.onHover}
-            />
-          </div>
-        ) : (
-          <div key={uid} className="hand-card">
-            <CardBack small />
-          </div>
-        ),
-      )}
-      {ps.hand.length === 0 && <div className="empty-hint">Mão vazia</div>}
+  const fieldCard = (uid: string, fc: (typeof ps.characters)[number]) => (
+    <div key={uid} className="enter">
+      <CardView
+        state={state}
+        uid={uid}
+        fc={fc}
+        highlight={h.highlight(uid)}
+        onClick={() => h.onCard(uid)}
+        onHover={h.onHover}
+        drag={h.canDragAttacker(uid) ? 'attacker' : undefined}
+      />
+    </div>
+  );
+
+  const life = (
+    <div className="zone life-zone" title={`Vida: ${ps.life.length}`}>
+      <div className="life-stack" key={ps.life.length}>
+        {ps.life.map((uid, i) => (
+          <div key={uid} className="life-card" style={vars({ '--i': i })} />
+        ))}
+      </div>
+      <span className={['life-count', ps.life.length === 0 ? 'zero' : ''].join(' ')}>
+        ♥ {ps.life.length}
+        <small>/{Math.max(maxLife, ps.life.length)}</small>
+      </span>
+    </div>
+  );
+
+  const stage = (
+    <div className="zone stage-zone">
+      {ps.stage ? fieldCard(ps.stage.uid, ps.stage) : <div className="slot-empty">Stage</div>}
+    </div>
+  );
+
+  const leader = (
+    <div className={['zone', 'leader-zone', isActive ? 'active' : ''].join(' ')}>
+      {fieldCard(ps.leader.uid, ps.leader)}
+    </div>
+  );
+
+  const don = (
+    <div
+      className={['zone', 'don-zone', h.donHighlight(player) ? 'hl-option clickable' : ''].join(' ')}
+      onClick={() => h.onDon(player)}
+      data-drag={h.canDragDon(player) ? 'don' : undefined}
+      title="DON!! ativos: arraste (ou toque e escolha) até o Líder ou um Personagem para dar +1000 no seu turno"
+    >
+      <div className="don-coin">
+        <span>DON!!</span>
+        <b>{ps.donActive}</b>
+      </div>
+      <div className="don-pips">
+        {Array.from({ length: Math.min(ps.donActive + ps.donRested, 10) }, (_, i) => (
+          <span key={i} className={i < ps.donActive ? 'on' : ''} />
+        ))}
+      </div>
+      <div className="don-sub">
+        {ps.donRested} virado{ps.donRested === 1 ? '' : 's'} · {ps.donDeck} no deck
+      </div>
+    </div>
+  );
+
+  const piles = (
+    <div className="zone piles">
+      <div className="pile" title={`Deck: ${ps.deck.length} cartas`}>
+        <CardBack />
+        <span className="pile-count">{ps.deck.length}</span>
+      </div>
+      <div
+        className="pile clickable"
+        onClick={() => h.onTrash(player)}
+        title={`Descarte: ${ps.trash.length} cartas (toque para ver)`}
+      >
+        {trashTop ? <CardView state={state} uid={trashTop} /> : <div className="slot-empty">Lixo</div>}
+        <span className="pile-count">{ps.trash.length}</span>
+      </div>
     </div>
   );
 
   const base = (
-    <div className="row base-row">
-      <div className="zone">
-        <div className="zone-label">Vida</div>
-        <div className="life-stack">
-          {ps.life.map((uid, i) => (
-            <div key={uid} className="life-card" style={{ ['--i' as string]: i }} />
-          ))}
-          <span className="life-count">{ps.life.length}</span>
-        </div>
-      </div>
-      <div className="zone leader-zone">
-        <div className="zone-label">Líder</div>
-        <div className="slot">
-          <CardView
-            state={state}
-            uid={ps.leader.uid}
-            fc={ps.leader}
-            highlight={h.highlight(ps.leader.uid)}
-            onClick={() => h.onCard(ps.leader.uid)}
-            onHover={h.onHover}
-          />
-        </div>
-      </div>
-      <div className="zone">
-        <div className="zone-label">Stage</div>
-        <div className="slot">
-          {ps.stage ? (
-            <CardView
-              state={state}
-              uid={ps.stage.uid}
-              fc={ps.stage}
-              highlight={h.highlight(ps.stage.uid)}
-              onClick={() => h.onCard(ps.stage!.uid)}
-              onHover={h.onHover}
-            />
-          ) : (
-            <div className="slot-empty" />
-          )}
-        </div>
-      </div>
-      <div
-        className={['zone', 'don-zone', h.donHighlight(player) ? 'hl-option clickable' : ''].join(' ')}
-        onClick={() => h.onDon(player)}
-        title="DON!! ativos podem ser anexados ao líder ou a personagens (+1000 no seu turno)"
-      >
-        <div className="zone-label">DON!!</div>
-        <div className="don-tokens">
-          {Array.from({ length: ps.donActive }, (_, i) => (
-            <span key={`a${i}`} className="don active" />
-          ))}
-          {Array.from({ length: ps.donRested }, (_, i) => (
-            <span key={`r${i}`} className="don rested" />
-          ))}
-        </div>
-        <div className="don-count">
-          <b>{ps.donActive}</b> ativos · {ps.donRested} virados · {ps.donDeck} no deck
-        </div>
-      </div>
-      <div className="zone">
-        <div className="zone-label">Deck</div>
-        <div className="slot">
-          <CardBack label={ps.deck.length} />
-        </div>
-      </div>
-      <div className="zone">
-        <div className="zone-label">Descarte ({ps.trash.length})</div>
-        <div className="slot">
-          {trashTop ? (
-            <div className="trash-top">
-              <CardView state={state} uid={trashTop} onHover={h.onHover} />
-            </div>
-          ) : (
-            <div className="slot-empty" />
-          )}
-        </div>
-      </div>
+    <div className="base-row">
+      {position === 'bottom' ? (
+        <>
+          <div className="base-side left">
+            {life}
+            {stage}
+          </div>
+          {leader}
+          <div className="base-side right">
+            {don}
+            {piles}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="base-side left">
+            {piles}
+            {don}
+          </div>
+          {leader}
+          <div className="base-side right">
+            {stage}
+            {life}
+          </div>
+        </>
+      )}
     </div>
   );
 
   const field = (
-    <div className="row field-row">
+    <div className="field-row">
       {slots.map((fc, i) => (
-        <div key={fc?.uid ?? `empty${i}`} className="slot char-slot">
-          {fc ? (
-            <CardView
-              state={state}
-              uid={fc.uid}
-              fc={fc}
-              highlight={h.highlight(fc.uid)}
-              onClick={() => h.onCard(fc.uid)}
-              onHover={h.onHover}
-            />
-          ) : (
-            <div className="slot-empty" />
-          )}
+        <div key={fc?.uid ?? `empty${i}`} className="slot">
+          {fc ? fieldCard(fc.uid, fc) : <div className="slot-empty" />}
         </div>
       ))}
     </div>
   );
 
   return (
-    <section className={['side', position, isActive ? 'active-side' : ''].join(' ')}>
-      <header className="side-header">
-        <span className="player-name">
-          {isActive && <span className="turn-dot" />}
-          {ps.name}
-          {ps.isBot && <span className="tag">BOT</span>}
-        </span>
-        <span className="side-leader">{cardDef(state, ps.leader.uid).name}</span>
-        <span className="side-stats">
-          ❤ {ps.life.length} · ✋ {ps.hand.length} · 🂠 {ps.deck.length}
-        </span>
-      </header>
+    <section
+      className={['side', position, isActive ? 'active-side' : '', h.fieldDrop(player) ? 'drop-ok' : ''].join(' ')}
+      data-drop={position === 'bottom' ? 'field' : undefined}
+    >
       {position === 'top' ? (
         <>
-          {hand}
           {base}
           {field}
         </>
@@ -172,10 +169,71 @@ function PlayerSide({ state, player, position, revealHand, ...h }: SideProps) {
         <>
           {field}
           {base}
-          {hand}
         </>
       )}
     </section>
+  );
+}
+
+/** Mão em leque (a do jogador de baixo fica grande; a de cima, pequena no topo). */
+export function Hand({
+  state,
+  player,
+  reveal,
+  position,
+  ...h
+}: Pick<BoardHandlers, 'highlight' | 'onCard' | 'onCardDouble' | 'onHover' | 'canDragHand'> & {
+  state: GameState;
+  player: PlayerId;
+  reveal: boolean;
+  position: 'top' | 'bottom';
+}) {
+  const hand = state.players[player].hand;
+  const n = hand.length;
+  return (
+    <div className={['hand', position].join(' ')} style={vars({ '--n': n })}>
+      {hand.map((uid, i) => {
+        const offset = i - (n - 1) / 2;
+        return (
+          <div key={uid} className="hand-card" style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}>
+            {reveal ? (
+              <CardView
+                state={state}
+                uid={uid}
+                highlight={h.highlight(uid)}
+                onClick={() => h.onCard(uid)}
+                onDoubleClick={() => h.onCardDouble(uid)}
+                onHover={h.onHover}
+                drag={h.canDragHand(uid) ? 'hand' : undefined}
+              />
+            ) : (
+              <CardBack />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Faixa do jogador: nome, Líder, Vida e mão. */
+export function PlayerBanner({ state, player, align }: { state: GameState; player: PlayerId; align: 'left' | 'right' }) {
+  const ps = state.players[player];
+  const max = Math.max(cardDef(state, ps.leader.uid).life ?? 0, ps.life.length);
+  const isActive = state.activePlayer === player && state.phase === 'main';
+  return (
+    <div className={['banner', align, isActive ? 'active' : ''].join(' ')}>
+      <div className="banner-life" title={`Vida: ${ps.life.length}`}>
+        {Array.from({ length: max }, (_, i) => (
+          <span key={i} className={i < ps.life.length ? 'on' : ''} />
+        ))}
+      </div>
+      <div className="banner-name">
+        {ps.name}
+        {ps.isBot && <span className="tag">BOT</span>}
+        <small>✋ {ps.hand.length}</small>
+      </div>
+    </div>
   );
 }
 
@@ -184,16 +242,36 @@ interface BoardProps extends BoardHandlers {
   bottom: PlayerId;
   revealTop: boolean;
   revealBottom: boolean;
-  center: React.ReactNode;
+  /** Botões do canto superior esquerdo (menu, Auto). */
+  corner: ReactNode;
+  center: ReactNode;
 }
 
-export function Board({ state, bottom, revealTop, revealBottom, center, ...handlers }: BoardProps) {
+export function Board({ state, bottom, revealTop, revealBottom, corner, center, ...handlers }: BoardProps) {
   const top = (bottom === 0 ? 1 : 0) as PlayerId;
   return (
-    <div className="board">
-      <PlayerSide state={state} player={top} position="top" revealHand={revealTop} {...handlers} />
-      <div className="center-bar">{center}</div>
-      <PlayerSide state={state} player={bottom} position="bottom" revealHand={revealBottom} {...handlers} />
+    <div className="mat">
+      <div className="top-strip">
+        <div className="corner">{corner}</div>
+        <Hand state={state} player={top} reveal={revealTop} position="top" {...handlers} />
+        <PlayerBanner state={state} player={top} align="right" />
+      </div>
+      <div className="arena">
+        <div className="arena-deco" aria-hidden="true">
+          <div className="wheel">
+            <JollyRoger />
+          </div>
+        </div>
+        <PlayerSide state={state} player={top} position="top" {...handlers} />
+        <div className="center-band" data-drop="field">
+          {center}
+        </div>
+        <PlayerSide state={state} player={bottom} position="bottom" {...handlers} />
+      </div>
+      <div className="bottom-strip">
+        <PlayerBanner state={state} player={bottom} align="left" />
+        <Hand state={state} player={bottom} reveal={revealBottom} position="bottom" {...handlers} />
+      </div>
     </div>
   );
 }

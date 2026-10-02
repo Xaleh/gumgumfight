@@ -46,6 +46,8 @@ export function useGame(setup: GameSetup) {
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
+  /** "Auto": o bot joga pelo humano até o modo ser desligado. */
+  const [auto, setAuto] = useState(false);
 
   const human: PlayerId | null = setup.mode === 'bot' ? 0 : null;
 
@@ -92,14 +94,14 @@ export function useGame(setup: GameSetup) {
     let next: Action | undefined;
     if (setup.mode === 'replay') {
       next = setup.script?.[actionsRef.current.length];
-    } else if (state.players[p].isBot) {
+    } else if (state.players[p].isBot || (auto && p === human)) {
       next = chooseBotAction(state, p);
     }
     if (!next) return;
     const delay = (state.pending ? 500 : 800) / speed;
     const t = setTimeout(() => dispatch(next!), delay);
     return () => clearTimeout(t);
-  }, [state, paused, speed, setup, dispatch]);
+  }, [state, paused, speed, setup, dispatch, auto, human]);
 
   const exportReplay = useCallback((): ReplayFile => {
     const first = entries[0].state;
@@ -114,5 +116,24 @@ export function useGame(setup: GameSetup) {
     };
   }, [entries, setup.deckIds]);
 
-  return { state, dispatch, error, setError, human, paused, setPaused, speed, setSpeed, undo, canUndo, exportReplay };
+  /** Todas as ações da partida até agora (para as estatísticas do fim de jogo). */
+  const actions = useCallback(() => actionsRef.current, []);
+
+  return {
+    state,
+    dispatch,
+    error,
+    setError,
+    human,
+    paused,
+    setPaused,
+    speed,
+    setSpeed,
+    auto,
+    setAuto,
+    undo,
+    canUndo,
+    exportReplay,
+    actions,
+  };
 }

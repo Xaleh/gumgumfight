@@ -6,6 +6,8 @@ export interface DeckSummary {
   kind: 'builtin' | 'user';
   leader: string;
   leaderName: string | null;
+  /** Imagem do Líder (null quando o servidor desliga as imagens). */
+  leaderImage: string | null;
   colors: string[];
   size: number;
   valid: boolean;

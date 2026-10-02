@@ -12,7 +12,7 @@ import {
 import { type ReactNode, useMemo, useState } from 'react';
 import { useSettings } from '../settings';
 
-export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | null;
+export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | 'ready' | null;
 
 const KEYWORD_LABEL: Record<Keyword, string> = {
   rush: 'Rush',
@@ -33,12 +33,15 @@ interface Props {
   onClick?: () => void;
   onDoubleClick?: () => void;
   onHover?: (uid: string | null) => void;
+  /** Arrastável na mesa: 'hand' (jogar) ou 'attacker' (atacar). */
+  drag?: 'hand' | 'attacker';
 }
 
-export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover }: Props) {
+export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover, drag }: Props) {
   const def = cardDef(state, uid);
   const { showImages } = useSettings();
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
   const power = fc ? getPower(state, uid) : def.power;
   const delta = fc && def.power !== undefined && power !== undefined ? power - def.power : 0;
@@ -62,6 +65,8 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
       onMouseEnter={() => onHover?.(uid)}
       onMouseLeave={() => onHover?.(null)}
       title={def.name}
+      data-uid={uid}
+      data-drag={drag}
     >
       {withImage && (
         <>
@@ -72,6 +77,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
             loading="lazy"
             referrerPolicy="no-referrer"
             draggable={false}
+            onLoad={() => setImageLoaded(true)}
             onError={() => setImageFailed(true)}
           />
           {delta !== 0 && power !== undefined && (
@@ -80,7 +86,10 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
           {fc && fc.don > 0 && <div className="don-badge">DON!! ×{fc.don}</div>}
         </>
       )}
-      {!withImage && <CardFace def={def} power={power} delta={delta} keywords={keywords} fc={fc} />}
+      {/* Enquanto a imagem carrega, a face desenhada fica por baixo. */}
+      {(!withImage || !imageLoaded) && (
+        <CardFace def={def} power={power} delta={delta} keywords={keywords} fc={withImage ? undefined : fc} />
+      )}
       {def.manual && (
         <span className="manual-badge" title="Efeito ainda não automatizado: resolvido com as ferramentas manuais">
           ⚙
@@ -162,6 +171,7 @@ export function StaticCard({
   const def = useMemo(() => buildCardDef(card), [card]);
   const { showImages } = useSettings();
   const [imageFailed, setImageFailed] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
   return (
     <div
@@ -186,7 +196,7 @@ export function StaticCard({
       onMouseLeave={() => onHover?.(null)}
       title={def.name}
     >
-      {withImage ? (
+      {withImage && (
         <img
           className="card-img"
           src={def.imageUrl}
@@ -194,11 +204,11 @@ export function StaticCard({
           loading="lazy"
           referrerPolicy="no-referrer"
           draggable={false}
+          onLoad={() => setImageLoaded(true)}
           onError={() => setImageFailed(true)}
         />
-      ) : (
-        <CardFace def={def} power={def.power} delta={0} keywords={def.keywords} />
       )}
+      {(!withImage || !imageLoaded) && <CardFace def={def} power={def.power} delta={0} keywords={def.keywords} />}
       {badge}
     </div>
   );
@@ -207,8 +217,26 @@ export function StaticCard({
 export function CardBack({ label, small }: { label?: string | number; small?: boolean }) {
   return (
     <div className={['card', 'back', small ? 'small' : ''].join(' ')}>
-      <div className="back-emblem">☠</div>
+      <div className="back-emblem">
+        <JollyRoger />
+      </div>
       {label !== undefined && <div className="back-label">{label}</div>}
     </div>
+  );
+}
+
+/** Caveira com chapéu de palha (verso das cartas e mesa). */
+export function JollyRoger() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M8 44 56 20M8 20l48 24" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+      <ellipse cx="32" cy="34" rx="15" ry="14" fill="currentColor" />
+      <rect x="25" y="42" width="14" height="9" rx="3" fill="currentColor" />
+      <circle cx="26.5" cy="34" r="4" fill="var(--back-bg, #1c3d63)" />
+      <circle cx="37.5" cy="34" r="4" fill="var(--back-bg, #1c3d63)" />
+      <path d="M17 25c2-9 28-9 30 0" fill="#f2c14e" />
+      <ellipse cx="32" cy="25.5" rx="22" ry="4.5" fill="#f2c14e" />
+      <rect x="17" y="21.5" width="30" height="3.5" fill="#d1402f" />
+    </svg>
   );
 }

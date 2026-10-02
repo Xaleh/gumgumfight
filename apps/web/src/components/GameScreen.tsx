@@ -7,34 +7,68 @@ import {
   legalActions,
   locate,
   manualAllowed,
+  type PlayerId,
   translateToPt,
   zoneOf,
-  type PlayerId,
 } from '@gumgum/engine';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
+import { GameResult } from './GameResult';
 import { ManualTools } from './ManualTools';
 
 type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don' };
+type DragKind = 'hand' | 'attacker' | 'don';
+interface Drag {
+  kind: DragKind;
+  uid: string | null;
+  x: number;
+  y: number;
+  /** Carta (uid) ou 'field' sob o dedo, se for um destino válido. */
+  over: string | null;
+}
+type Sheet = null | 'menu' | 'log' | 'tools' | { trash: PlayerId };
 
-export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => void }) {
+const LONG_PRESS_MS = 420;
+const DRAG_THRESHOLD = 9;
+
+function useMediaQuery(query: string) {
+  const [match, setMatch] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatch(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}
+
+export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onExit: () => void; onRematch?: () => void }) {
   const game = useGame(setup);
   const { state, dispatch, human } = game;
+  const wide = useMediaQuery('(min-width: 1000px)');
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>(null);
   const [picked, setPicked] = useState<string[]>([]);
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
   const [showBotHand, setShowBotHand] = useState(setup.mode !== 'bot');
+  const [banner, setBanner] = useState<{ text: string; mine: boolean; key: number } | null>(null);
+  const [showResult, setShowResult] = useState(false);
 
   const pending = state.pending;
   const myPending = pending && human !== null && pending.player === human ? pending : null;
   const legal = useMemo(() => (human !== null ? legalActions(state, human) : []), [state, human]);
-  const myTurnIdle = human !== null && !pending && state.activePlayer === human && state.phase === 'main' && !state.stack.length;
+  const myTurnIdle =
+    human !== null && !game.auto && !pending && state.activePlayer === human && state.phase === 'main' && !state.stack.length;
+  const acting = actingPlayer(state);
+  const bottom: PlayerId = human ?? 0;
 
   // Limpa seleções quando a situação muda.
   useEffect(() => setPicked([]), [pending]);
@@ -47,16 +81,44 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
       if (e.key === 'Escape') {
         setMode(null);
         setSelected(null);
+        setZoom(null);
+        setSheet(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Registra o resultado no servidor quando a partida termina.
+  // Faixa "Seu turno" / "Você joga primeiro" a cada troca de turno.
+  const turnKey = state.phase === 'main' ? `${state.turn}:${state.activePlayer}` : null;
+  useEffect(() => {
+    if (turnKey === null) return;
+    const p = state.activePlayer;
+    const mine = human === null ? p === 0 : p === human;
+    const name = state.players[p].name;
+    const text =
+      state.turn === 1
+        ? human !== null && p === human
+          ? 'Você jogará primeiro.'
+          : `${name} jogará primeiro.`
+        : human !== null && p === human
+          ? 'Seu turno!'
+          : `Turno de ${name}`;
+    setBanner({ text, mine, key: state.turn });
+    const t = setTimeout(() => setBanner(null), 1700);
+    return () => clearTimeout(t);
+    // Só muda na troca de turno (não a cada ação).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnKey, human]);
+
+  // Registra o resultado no servidor quando a partida termina e mostra o resumo após o último golpe.
   const saved = useRef(false);
   useEffect(() => {
-    if (state.phase === 'gameover' && !saved.current) {
+    if (state.phase !== 'gameover') {
+      setShowResult(false);
+      return;
+    }
+    if (!saved.current) {
       saved.current = true;
       void api.saveMatch({
         seed: state.seed,
@@ -68,11 +130,28 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
         reason: state.winReason,
       });
     }
+    const t = setTimeout(() => setShowResult(true), 1200);
+    return () => clearTimeout(t);
   }, [state, setup]);
 
-  const has = (pred: (a: Action) => boolean) => legal.some(pred);
+  const has = useCallback((pred: (a: Action) => boolean) => legal.some(pred), [legal]);
+  const canPlay = (uid: string) => myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid);
+  const canAttackWith = (uid: string) => myTurnIdle && has((a) => a.type === 'attack' && a.attacker === uid);
+
+  /** Destinos válidos para o que está sendo arrastado. */
+  const dropValid = (d: Pick<Drag, 'kind' | 'uid'>, over: string | null): boolean => {
+    if (!over) return false;
+    if (d.kind === 'hand') return over === 'field' && d.uid !== null && canPlay(d.uid);
+    if (d.kind === 'attacker') return has((a) => a.type === 'attack' && a.attacker === d.uid && a.target === over);
+    return has((a) => a.type === 'attachDon' && a.target === over);
+  };
 
   const highlight = (uid: string): Highlight => {
+    if (drag) {
+      if (uid === drag.uid) return 'selected';
+      if (drag.kind !== 'hand' && dropValid(drag, uid)) return 'option';
+      return null;
+    }
     if (myPending) {
       if (myPending.kind === 'selectTargets') {
         if (picked.includes(uid)) return 'selected';
@@ -92,8 +171,10 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
     if (mode?.kind === 'don') {
       return has((a) => a.type === 'attachDon' && a.target === uid) ? 'option' : null;
     }
+    if (uid === selected && !wide) return null;
     if (uid === selected) return 'selected';
-    if (myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid)) return 'playable';
+    if (canPlay(uid)) return 'playable';
+    if (canAttackWith(uid)) return 'ready';
     return null;
   };
 
@@ -118,22 +199,31 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
       if (has((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === uid)) {
         dispatch({ type: 'attack', player: human!, attacker: mode.attacker, target: uid });
         setSelected(null);
+        setMode(null);
+        return;
       }
       setMode(null);
-      return;
+      if (uid === mode.attacker) return;
     }
     if (mode?.kind === 'don') {
-      if (has((a) => a.type === 'attachDon' && a.target === uid)) dispatch({ type: 'attachDon', player: human!, target: uid });
-      else setMode(null);
-      return;
+      if (has((a) => a.type === 'attachDon' && a.target === uid)) {
+        dispatch({ type: 'attachDon', player: human!, target: uid });
+        return;
+      }
+      setMode(null);
     }
-    setSelected(uid === selected ? null : uid);
+    // Carta escondida (mão do oponente) não abre.
+    const owner = state.cards[uid]?.owner;
+    if (owner !== undefined && owner !== human && zoneOf(state, uid) === 'hand' && !showBotHand) return;
+    setSelected(uid);
+    setZoom(uid);
   };
 
   const onCardDouble = (uid: string) => {
-    if (myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid)) {
+    if (canPlay(uid)) {
       dispatch({ type: 'playCard', player: human!, uid });
       setSelected(null);
+      setZoom(null);
     }
   };
 
@@ -142,343 +232,701 @@ export function GameScreen({ setup, onExit }: { setup: GameSetup; onExit: () => 
     setMode((m) => (m?.kind === 'don' ? null : has((a) => a.type === 'attachDon') ? { kind: 'don' } : null));
   };
 
-  const acting = actingPlayer(state);
-  const detailUid = hovered ?? selected ?? (pending?.kind === 'trigger' ? pending.card : null);
+  // ------------------------------------------------------------ gestos: toque longo e arrastar
+
+  const press = useRef<{
+    x: number;
+    y: number;
+    uid: string | null;
+    kind: DragKind | null;
+    timer: ReturnType<typeof setTimeout>;
+    moved: boolean;
+  } | null>(null);
+  const dragRef = useRef<Drag | null>(null);
+  const suppressClick = useRef(false);
+  const dropRef = useRef<(d: Drag) => void>(() => undefined);
+  const dropValidRef = useRef(dropValid);
+  dropValidRef.current = dropValid;
+
+  dropRef.current = (d: Drag) => {
+    if (!d.over || !dropValid(d, d.over) || human === null) return;
+    if (d.kind === 'hand') dispatch({ type: 'playCard', player: human, uid: d.uid! });
+    else if (d.kind === 'attacker') dispatch({ type: 'attack', player: human, attacker: d.uid!, target: d.over });
+    else dispatch({ type: 'attachDon', player: human, target: d.over });
+    setMode(null);
+    setSelected(null);
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.target as HTMLElement;
+    const dragEl = el.closest<HTMLElement>('[data-drag]');
+    const cardEl = el.closest<HTMLElement>('[data-uid]');
+    if (!dragEl && !cardEl) return;
+    const uid = (dragEl ?? cardEl)!.dataset.uid ?? null;
+    const kind = (dragEl?.dataset.drag as DragKind | undefined) ?? null;
+    if (press.current) clearTimeout(press.current.timer);
+    const timer = setTimeout(() => {
+      const p = press.current;
+      if (!p || p.moved || !cardEl?.dataset.uid) return;
+      suppressClick.current = true;
+      press.current = null;
+      setZoom(cardEl.dataset.uid);
+      navigator.vibrate?.(12);
+    }, LONG_PRESS_MS);
+    press.current = { x: e.clientX, y: e.clientY, uid, kind, timer, moved: false };
+  };
+
+  useEffect(() => {
+    const findOver = (x: number, y: number, d: Drag): string | null => {
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      if (!el) return null;
+      if (d.kind === 'hand') return el.closest('[data-drop="field"]') ? 'field' : null;
+      const uid = el.closest<HTMLElement>('[data-uid]')?.dataset.uid ?? null;
+      return uid && dropValidRef.current(d, uid) ? uid : null;
+    };
+    const move = (e: PointerEvent) => {
+      const p = press.current;
+      if (!p) return;
+      if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) {
+        p.moved = true;
+        clearTimeout(p.timer);
+        if (!p.kind) return;
+        dragRef.current = { kind: p.kind, uid: p.uid, x: e.clientX, y: e.clientY, over: null };
+        setZoom(null);
+        setMode(null);
+      }
+      const d = dragRef.current;
+      if (!d) return;
+      const next = { ...d, x: e.clientX, y: e.clientY, over: findOver(e.clientX, e.clientY, d) };
+      dragRef.current = next;
+      setDrag(next);
+    };
+    const up = () => {
+      const p = press.current;
+      if (p) clearTimeout(p.timer);
+      press.current = null;
+      const d = dragRef.current;
+      if (d) {
+        dragRef.current = null;
+        setDrag(null);
+        suppressClick.current = true;
+        dropRef.current(d);
+      }
+      // O clique (se houver) chega logo depois do pointerup; depois disso, libera.
+      setTimeout(() => (suppressClick.current = false), 60);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, []);
+
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  };
+
+  // ------------------------------------------------------------ render
+
+  const handlers = {
+    highlight,
+    onCard,
+    onCardDouble,
+    onHover: setHovered,
+    onDon,
+    onTrash: (p: PlayerId) => setSheet({ trash: p }),
+    donHighlight: (p: PlayerId) =>
+      p === human && (mode?.kind === 'don' || (drag?.kind === 'don') || (myTurnIdle && has((a) => a.type === 'attachDon'))),
+    canDragHand: (uid: string) => canPlay(uid),
+    canDragAttacker: (uid: string) => canAttackWith(uid),
+    canDragDon: (p: PlayerId) => p === human && myTurnIdle && has((a) => a.type === 'attachDon'),
+    fieldDrop: (p: PlayerId) => p === human && drag?.kind === 'hand',
+  };
+
+  const corner = (
+    <>
+      <button className="round-btn" onClick={() => setSheet('menu')} aria-label="Menu da partida">
+        <span className="burger" />
+      </button>
+      {human !== null && (
+        <button
+          className={['auto-toggle', game.auto ? 'on' : ''].join(' ')}
+          onClick={() => game.setAuto((a) => !a)}
+          title="O bot joga por você enquanto estiver ligado"
+        >
+          <span className="knob" />
+          Auto
+        </button>
+      )}
+    </>
+  );
+
+  const detailUid = hovered ?? selected;
 
   return (
-    <div className="game">
-      <div className="board-wrap">
+    <div
+      className={['game', wide ? 'wide' : '', drag ? 'dragging' : ''].join(' ')}
+      onPointerDown={onPointerDown}
+      onClickCapture={onClickCapture}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <div className="board-col">
         <Board
           state={state}
-          bottom={0}
+          bottom={bottom}
           revealBottom
           revealTop={showBotHand}
-          highlight={highlight}
-          onCard={onCard}
-          onCardDouble={onCardDouble}
-          onHover={setHovered}
-          onDon={onDon}
-          donHighlight={(p) => p === human && (mode?.kind === 'don' || (myTurnIdle && state.players[p].donActive > 0))}
+          corner={corner}
           center={
-            <CenterBar
+            <CenterBand
               state={state}
               human={human}
+              acting={acting}
               mode={mode}
+              paused={game.paused}
               canEnd={myTurnIdle}
               onEnd={() => dispatch({ type: 'endTurn', player: human! })}
               onCancelMode={() => setMode(null)}
+              onTogglePause={() => game.setPaused((p) => !p)}
             />
           }
+          {...handlers}
         />
-        <PromptBar
+
+        {banner && state.phase === 'main' && (
+          <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs'].join(' ')}>
+            {banner.text}
+          </div>
+        )}
+
+        {game.error && (
+          <div className="toast error" onClick={() => game.setError(null)}>
+            {game.error}
+          </div>
+        )}
+
+        <Prompt
           state={state}
           human={human}
-          acting={acting}
           picked={picked}
           onDispatch={dispatch}
           onCard={onCard}
           highlight={highlight}
+          onTools={() => setSheet('tools')}
         />
-        {state.phase === 'gameover' && (
-          <div className="overlay">
-            <div className="overlay-box">
-              <h2>{state.winner === human ? 'Vitória!' : human === null ? 'Fim de jogo' : 'Derrota'}</h2>
-              <p>
-                <b>{state.players[state.winner!].name}</b> venceu no turno {state.turn}.
-              </p>
-              <p className="muted">{state.winReason}</p>
-              <div className="btn-row">
-                <button className="btn primary" onClick={onExit}>
-                  Voltar ao menu
+
+        {drag && (
+          <div
+            className={['drag-ghost', `ghost-${drag.kind}`, drag.over ? 'over' : ''].join(' ')}
+            style={{ left: drag.x, top: drag.y }}
+          >
+            {drag.kind === 'don' ? <div className="don-token">DON!!</div> : drag.uid && <CardView state={state} uid={drag.uid} />}
+          </div>
+        )}
+
+        {zoom && state.cards[zoom] && (
+          <CardZoom
+            state={state}
+            uid={zoom}
+            legal={myTurnIdle ? legal : []}
+            canManual={human !== null && manualAllowed(state, human)}
+            onClose={() => setZoom(null)}
+            onDispatch={(a) => {
+              dispatch(a);
+              setZoom(null);
+              setSelected(null);
+            }}
+            onAttackMode={(attacker) => {
+              setMode({ kind: 'attack', attacker });
+              setZoom(null);
+            }}
+            onTools={() => {
+              setZoom(null);
+              setSheet('tools');
+            }}
+          />
+        )}
+
+        {sheet === 'menu' && (
+          <SheetFrame title="Partida" onClose={() => setSheet(null)}>
+            <div className="menu-grid">
+              {human !== null && (
+                <button className="btn" onClick={game.undo} disabled={!game.canUndo}>
+                  ↶ Desfazer
                 </button>
-                <button className="btn" onClick={() => downloadReplay(game.exportReplay())}>
-                  Baixar replay
+              )}
+              <button className="btn" onClick={() => game.setPaused((p) => !p)}>
+                {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
+              </button>
+              <button className="btn" onClick={() => setSheet('log')}>
+                📜 Histórico
+              </button>
+              {human !== null && manualAllowed(state, human) && (
+                <button className="btn" onClick={() => setSheet('tools')}>
+                  ⚙ Ferramentas manuais
                 </button>
+              )}
+              <button className="btn" onClick={() => downloadReplay(game.exportReplay())}>
+                ⤓ Baixar replay
+              </button>
+              {human !== null && state.phase === 'main' && (
+                <button
+                  className="btn danger"
+                  onClick={() => {
+                    if (window.confirm('Desistir desta partida?')) {
+                      dispatch({ type: 'concede', player: human });
+                      setSheet(null);
+                    }
+                  }}
+                >
+                  🏳 Desistir
+                </button>
+              )}
+              <button className="btn" onClick={onExit}>
+                ← Sair para o menu
+              </button>
+            </div>
+            <div className="sheet-section">
+              <label className="sheet-label">Velocidade do bot</label>
+              <div className="seg small">
+                {[0.5, 1, 2, 4].map((v) => (
+                  <button key={v} className={game.speed === v ? 'on' : ''} onClick={() => game.setSpeed(v)}>
+                    {v}×
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
+            {setup.mode === 'bot' && (
+              <label className="check">
+                <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> Ver a mão do bot
+              </label>
+            )}
+            <div className="sheet-section">
+              <SettingsControls compact />
+            </div>
+          </SheetFrame>
+        )}
+
+        {sheet === 'log' && (
+          <SheetFrame title="Histórico" onClose={() => setSheet(null)}>
+            <LogPanel state={state} />
+          </SheetFrame>
+        )}
+
+        {sheet === 'tools' && human !== null && (
+          <SheetFrame title="Ferramentas manuais" onClose={() => setSheet(null)}>
+            <ManualPrompt state={state} onDone={() => dispatch({ type: 'manualDone', player: human })} />
+            {manualAllowed(state, human) ? (
+              <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} />
+            ) : (
+              <p className="muted">As ferramentas ficam disponíveis no seu turno, num efeito manual ou na etapa de Counter.</p>
+            )}
+          </SheetFrame>
+        )}
+
+        {sheet !== null && typeof sheet === 'object' && (
+          <SheetFrame
+            title={`Descarte de ${state.players[sheet.trash].name} (${state.players[sheet.trash].trash.length})`}
+            onClose={() => setSheet(null)}
+          >
+            <div className="card-list">
+              {[...state.players[sheet.trash].trash].reverse().map((uid) => (
+                <CardView key={uid} state={state} uid={uid} onClick={() => setZoom(uid)} onHover={setHovered} />
+              ))}
+              {state.players[sheet.trash].trash.length === 0 && <p className="muted">Nenhuma carta no descarte.</p>}
+            </div>
+          </SheetFrame>
+        )}
+
+        {state.phase === 'gameover' && showResult && (
+          <GameResult
+            state={state}
+            human={human}
+            actions={game.actions()}
+            onExit={onExit}
+            onRematch={onRematch}
+            onReplay={() => downloadReplay(game.exportReplay())}
+            onLog={() => setSheet('log')}
+          />
         )}
       </div>
 
-      <aside className="side-panel">
-        <div className="panel-controls">
-          <button className="btn small" onClick={onExit}>
-            ← Menu
-          </button>
-          {human !== null && (
-            <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
-              ↶ Desfazer
+      {wide && (
+        <aside className="side-panel">
+          <div className="panel-controls">
+            <button className="btn small" onClick={onExit}>
+              ← Menu
             </button>
-          )}
-          <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
-            {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
-          </button>
-          <select
-            className="speed"
-            value={game.speed}
-            onChange={(e) => game.setSpeed(Number(e.target.value))}
-            title="Velocidade do bot"
-          >
-            <option value={0.5}>0.5×</option>
-            <option value={1}>1×</option>
-            <option value={2}>2×</option>
-            <option value={4}>4×</option>
-          </select>
-          <button className="btn small" onClick={() => downloadReplay(game.exportReplay())} title="Salvar as ações como roteiro">
-            ⤓ Replay
-          </button>
-          {setup.mode === 'bot' && (
-            <label className="check">
-              <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> Ver mão do bot
-            </label>
-          )}
-        </div>
-        <SettingsControls compact />
-        {game.error && (
-          <div className="error" onClick={() => game.setError(null)}>
-            {game.error}
+            {human !== null && (
+              <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
+                ↶ Desfazer
+              </button>
+            )}
+            <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
+              {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
+            </button>
+            <select
+              className="speed"
+              value={game.speed}
+              onChange={(e) => game.setSpeed(Number(e.target.value))}
+              title="Velocidade do bot"
+            >
+              <option value={0.5}>0.5×</option>
+              <option value={1}>1×</option>
+              <option value={2}>2×</option>
+              <option value={4}>4×</option>
+            </select>
+            <button className="btn small" onClick={() => downloadReplay(game.exportReplay())} title="Salvar as ações como roteiro">
+              ⤓ Replay
+            </button>
           </div>
-        )}
-        <CardDetail state={state} uid={detailUid} />
-        {myTurnIdle && selected && (
-          <SelectedActions
-            state={state}
-            uid={selected}
-            legal={legal}
-            onDispatch={(a) => {
-              dispatch(a);
-              setSelected(null);
-            }}
-            onAttackMode={(attacker) => setMode({ kind: 'attack', attacker })}
-          />
-        )}
-        {pending?.kind === 'manual' && pending.player === human && (
-          <ManualPrompt state={state} onDone={() => dispatch({ type: 'manualDone', player: human })} />
-        )}
-        {human !== null && manualAllowed(state, human) && (
-          <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} />
-        )}
-        <LogPanel state={state} />
-      </aside>
+          <CardDetail state={state} uid={detailUid && state.cards[detailUid] ? detailUid : null} />
+          {human !== null && manualAllowed(state, human) && pending?.kind !== 'manual' && (
+            <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} />
+          )}
+          <LogPanel state={state} />
+        </aside>
+      )}
     </div>
   );
 }
 
-function CenterBar(props: {
+// ------------------------------------------------------------------ faixa central
+
+function CenterBand(props: {
   state: GameState;
   human: PlayerId | null;
+  acting: PlayerId | null;
   mode: Mode;
+  paused: boolean;
   canEnd: boolean;
   onEnd: () => void;
   onCancelMode: () => void;
+  onTogglePause: () => void;
 }) {
-  const { state, mode } = props;
+  const { state, human, mode, acting } = props;
   const b = state.battle;
-  const active = state.players[state.activePlayer];
+  const mineTurn = human === null ? state.activePlayer === 0 : state.activePlayer === human;
+
+  let middle: ReactNode = null;
+  if (b) middle = <BattleInfo state={state} human={human} />;
+  else if (mode?.kind === 'attack')
+    middle = (
+      <button className="hint-pill" onClick={props.onCancelMode}>
+        Escolha o alvo do ataque <small>(toque aqui para cancelar)</small>
+      </button>
+    );
+  else if (mode?.kind === 'don')
+    middle = (
+      <button className="hint-pill" onClick={props.onCancelMode}>
+        Toque no Líder ou num Personagem para dar 1 DON!! <small>(toque aqui para concluir)</small>
+      </button>
+    );
+  else if (props.paused) middle = <span className="hint-pill">Pausado</span>;
+  else if (acting !== null && acting !== human && state.players[acting].isBot && state.phase === 'main')
+    middle = (
+      <span className="hint-pill thinking">
+        {state.players[acting].name} está pensando<span className="dots" />
+      </span>
+    );
+  else if (props.canEnd)
+    middle = (
+      <span className="hint-pill soft">
+        {state.turn <= 2 ? 'Primeiro turno: sem ataques. ' : ''}Toque numa carta para agir ou arraste-a.
+      </span>
+    );
+
   return (
     <>
-      <div className="turn-info">
-        {state.phase === 'mulligan' ? (
-          <span>Preparação — mulligan</span>
-        ) : (
-          <span>
-            Turno <b>{state.turn}</b> · vez de <b>{active.name}</b>
-          </span>
-        )}
+      <div className={['turn-chip', mineTurn ? 'mine' : 'theirs'].join(' ')}>
+        <small>Turno</small>
+        <b>{state.phase === 'mulligan' ? '—' : state.turn}</b>
       </div>
-      <div className="battle-info">
-        {b ? (
-          <span className="battle">
-            ⚔ {cardDef(state, b.attacker).name} <b>{getPower(state, b.attacker)}</b> → {cardDef(state, b.target).name}{' '}
-            <b>{getPower(state, b.target)}</b>
-            {b.blocked && <em> (bloqueado)</em>}
-          </span>
-        ) : mode?.kind === 'attack' ? (
-          <span className="hint">
-            Escolha o alvo do ataque (líder ou personagem virado) ·{' '}
-            <a onClick={props.onCancelMode}>cancelar</a>
-          </span>
-        ) : mode?.kind === 'don' ? (
-          <span className="hint">
-            Clique no líder ou num personagem para anexar 1 DON!! · <a onClick={props.onCancelMode}>concluir</a>
-          </span>
-        ) : props.canEnd ? (
-          <span className="hint">
-            {state.turn <= 2 ? 'Primeiro turno: não é possível atacar. ' : ''}Selecione uma carta para ver as ações.
-          </span>
-        ) : null}
-      </div>
-      <button className="btn primary end-turn" disabled={!props.canEnd} onClick={props.onEnd}>
-        Encerrar turno
-      </button>
+      <div className="band-middle">{middle}</div>
+      {human !== null ? (
+        <button className="end-turn" disabled={!props.canEnd} onClick={props.onEnd}>
+          Encerrar
+          <br />
+          turno
+        </button>
+      ) : (
+        <button className="end-turn" onClick={props.onTogglePause}>
+          {props.paused ? '▶' : '❚❚'}
+        </button>
+      )}
     </>
   );
 }
 
-function PromptBar(props: {
+/** Poder do atacante contra o alvo, com o que falta para defender (como o "Dano previsto" do Pocket). */
+function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null }) {
+  const b = state.battle!;
+  const atk = getPower(state, b.attacker) ?? 0;
+  const def = getPower(state, b.target) ?? 0;
+  const defender = state.cards[b.target].owner;
+  const hits = atk >= def;
+  const need = atk - def + 1000;
+  let status: string;
+  if (human !== null && defender === human) status = hits ? `Faltam +${need} para defender` : 'Defendido!';
+  else status = hits ? 'O ataque vai acertar' : `Faltam +${def - atk} para acertar`;
+  return (
+    <div className="battle-info">
+      <div className="battle-row">
+        <span className="pow atk">
+          <em>{cardDef(state, b.attacker).name}</em>
+          <b>{atk}</b>
+        </span>
+        <span className="vs">⚔</span>
+        <span className="pow def">
+          <em>{cardDef(state, b.target).name}</em>
+          <b>{def}</b>
+        </span>
+      </div>
+      <div className={['battle-status', hits ? 'hit' : 'safe'].join(' ')}>
+        {b.blocked ? 'Bloqueado · ' : ''}
+        {status}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ prompts
+
+function Prompt(props: {
   state: GameState;
   human: PlayerId | null;
-  acting: PlayerId | null;
   picked: string[];
   onDispatch: (a: Action) => void;
   onCard: (uid: string) => void;
   highlight: (uid: string) => Highlight;
+  onTools: () => void;
 }) {
   const { state, human, picked, onDispatch } = props;
   const { lang } = useSettings();
   const pending = state.pending;
-  if (state.phase === 'gameover') return null;
-  if (props.acting !== null && props.acting !== human) {
-    const who = state.players[props.acting];
-    if (!who.isBot) return null;
-    return <div className="prompt thinking">{who.name} está pensando…</div>;
-  }
-  if (!pending || human === null) return null;
-
-  const b = state.battle;
-  const battleLine = b ? (
-    <div className="prompt-battle">
-      {cardDef(state, b.attacker).name} ({getPower(state, b.attacker)}) ataca {cardDef(state, b.target).name} (
-      {getPower(state, b.target)})
-    </div>
-  ) : null;
+  if (state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
 
   switch (pending.kind) {
-    case 'mulligan':
+    case 'mulligan': {
+      const first = state.firstPlayer === human;
       return (
-        <div className="prompt">
-          <div className="prompt-title">Mão inicial</div>
-          <p>Você pode trocar sua mão uma única vez (as 5 cartas voltam ao deck, que é embaralhado).</p>
-          <div className="btn-row">
-            <button className="btn primary" onClick={() => onDispatch({ type: 'mulligan', player: human, redraw: false })}>
-              Manter mão
-            </button>
-            <button className="btn" onClick={() => onDispatch({ type: 'mulligan', player: human, redraw: true })}>
-              Trocar mão
-            </button>
-          </div>
-        </div>
-      );
-    case 'selectTargets': {
-      // Opções fora do tabuleiro (topo do deck, descarte, Vida) aparecem dentro do prompt.
-      const offBoard = pending.options.filter((u) => ['deck', 'trash', 'life'].includes(zoneOf(state, u) ?? ''));
-      return (
-        <div className="prompt">
-          <div className="prompt-title">{pending.prompt}</div>
-          <p className="muted">
-            Clique nas cartas destacadas ({picked.length}/{pending.max}).
-          </p>
-          {pending.ordered && picked.length > 0 && (
-            <p className="muted">Ordem: {picked.map((u, i) => `${i + 1}. ${cardDef(state, u).name}`).join(' → ')}</p>
-          )}
-          {offBoard.length > 0 && (
-            <div className="prompt-options">
-              {offBoard.map((uid) => (
-                <CardView
-                  key={uid}
-                  state={state}
-                  uid={uid}
-                  highlight={props.highlight(uid)}
-                  onClick={() => props.onCard(uid)}
-                />
+        <div className="modal-backdrop">
+          <div className="modal-card mulligan">
+            <div className="modal-kicker">{first ? 'Você jogará primeiro' : `${state.players[state.firstPlayer].name} jogará primeiro`}</div>
+            <h2>Mão inicial</h2>
+            <div className="mulligan-hand">
+              {state.players[human].hand.map((uid, i) => (
+                <div key={uid} className="deal" style={{ animationDelay: `${i * 70}ms` }}>
+                  <CardView state={state} uid={uid} onClick={() => props.onCard(uid)} />
+                </div>
               ))}
             </div>
-          )}
-          <div className="btn-row">
-            <button
-              className="btn primary"
-              disabled={picked.length < pending.min}
-              onClick={() => onDispatch({ type: 'choose', player: human, uids: picked })}
-            >
-              Confirmar
-            </button>
-            {pending.min === 0 && (
-              <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-                Não escolher
+            <p className="muted small">Toque numa carta para ler. Você pode trocar a mão uma única vez.</p>
+            <div className="btn-row center">
+              <button className="btn primary big" onClick={() => onDispatch({ type: 'mulligan', player: human, redraw: false })}>
+                Manter mão
               </button>
-            )}
+              <button className="btn big" onClick={() => onDispatch({ type: 'mulligan', player: human, redraw: true })}>
+                Trocar mão
+              </button>
+            </div>
           </div>
         </div>
       );
     }
+    case 'selectTargets': {
+      // Opções fora da mesa (topo do deck, descarte, Vida) aparecem dentro do prompt.
+      const offBoard = pending.options.filter((u) => ['deck', 'trash', 'life'].includes(zoneOf(state, u) ?? ''));
+      const confirm = (
+        <div className="btn-row">
+          {pending.min === 0 && (
+            <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+              Não escolher
+            </button>
+          )}
+          <button
+            className="btn primary"
+            disabled={picked.length < pending.min}
+            onClick={() => onDispatch({ type: 'choose', player: human, uids: picked })}
+          >
+            Confirmar {pending.max > 1 ? `(${picked.length}/${pending.max})` : ''}
+          </button>
+        </div>
+      );
+      const order = pending.ordered && picked.length > 0 && (
+        <p className="muted small">Ordem: {picked.map((u, i) => `${i + 1}. ${cardDef(state, u).name}`).join(' → ')}</p>
+      );
+      const options = (
+        <div className="prompt-options">
+          {offBoard.map((uid) => (
+            <CardView key={uid} state={state} uid={uid} highlight={props.highlight(uid)} onClick={() => props.onCard(uid)} />
+          ))}
+        </div>
+      );
+      if (offBoard.length === pending.options.length) {
+        return (
+          <div className="modal-backdrop">
+            <div className="modal-card">
+              <SourceLine state={state} uid={pending.source} />
+              <h3>{pending.prompt}</h3>
+              <p className="muted small">Toque nas cartas para escolher. Segure para ler.</p>
+              {options}
+              {order}
+              {confirm}
+            </div>
+          </div>
+        );
+      }
+      return (
+        <PromptPill title={pending.prompt} subtitle={`Toque nas cartas destacadas (${picked.length}/${pending.max}).`}>
+          {offBoard.length > 0 && options}
+          {order}
+          {confirm}
+        </PromptPill>
+      );
+    }
     case 'block':
       return (
-        <div className="prompt">
-          <div className="prompt-title">Bloquear?</div>
-          {battleLine}
-          <p className="muted">Clique em um personagem com [Blocker] para redirecionar o ataque.</p>
+        <PromptPill title="Bloquear?" subtitle="Toque num Personagem com [Blocker] para receber o ataque.">
           <div className="btn-row">
             <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
               Não bloquear
             </button>
           </div>
-        </div>
+        </PromptPill>
       );
     case 'counter':
       return (
-        <div className="prompt">
-          <div className="prompt-title">Etapa de Counter</div>
-          {battleLine}
-          <p className="muted">Clique em cartas da mão com Counter (ou eventos [Counter]) para aumentar o poder do alvo.</p>
+        <PromptPill title="Etapa de Counter" subtitle="Toque nas cartas da mão com Counter (ou eventos [Counter]) para aumentar o poder do alvo.">
           <div className="btn-row">
+            <button className="btn" onClick={props.onTools}>
+              ⚙
+            </button>
             <button className="btn primary" onClick={() => onDispatch({ type: 'pass', player: human })}>
               Concluir counters
             </button>
           </div>
-        </div>
+        </PromptPill>
       );
-    case 'manual':
-      // Fica no painel lateral (ManualPrompt), para não cobrir a mão e o campo.
-      return null;
+    case 'manual': {
+      const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
+      return (
+        <PromptPill title={`⚙ Efeito manual: ${cardDef(state, pending.source).name}`} subtitle={text} clamp>
+          <div className="btn-row">
+            <button className="btn" onClick={props.onTools}>
+              Ferramentas
+            </button>
+            <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
+              Concluir efeito
+            </button>
+          </div>
+        </PromptPill>
+      );
+    }
     case 'trigger':
       return (
-        <div className="prompt">
-          <div className="prompt-title">[Trigger] revelado: {cardDef(state, pending.card).name}</div>
-          <p className="muted">{cardText(cardDef(state, pending.card), lang).trigger}</p>
-          <div className="btn-row">
-            <button className="btn primary" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-              Ativar [Trigger]
-            </button>
-            <button className="btn" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-              Adicionar à mão
-            </button>
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-kicker">[Trigger] revelado da Vida</div>
+            <div className="modal-feature">
+              <CardView state={state} uid={pending.card} />
+            </div>
+            <h3>{cardDef(state, pending.card).name}</h3>
+            <p className="effect trigger">{cardText(cardDef(state, pending.card), lang).trigger}</p>
+            <div className="btn-row center">
+              <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                Ativar [Trigger]
+              </button>
+              <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+                Adicionar à mão
+              </button>
+            </div>
           </div>
         </div>
       );
     case 'option':
       return (
-        <div className="prompt">
-          <div className="prompt-title">{pending.prompt}</div>
-          {battleLine}
-          <div className="btn-col">
-            {pending.options.map((label, index) => (
-              <button
-                key={index}
-                className={`btn${index === 0 ? ' primary' : ''}`}
-                onClick={() => onDispatch({ type: 'option', player: human, index })}
-              >
-                {lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
-              </button>
-            ))}
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <SourceLine state={state} uid={pending.source} />
+            <h3>{pending.prompt}</h3>
+            <div className="btn-col">
+              {pending.options.map((label, index) => (
+                <button
+                  key={index}
+                  className={`btn${index === 0 ? ' primary' : ''}`}
+                  onClick={() => onDispatch({ type: 'option', player: human, index })}
+                >
+                  {lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       );
     case 'confirm':
       return (
-        <div className="prompt">
-          <div className="prompt-title">{pending.prompt}</div>
-          {battleLine}
-          <div className="btn-row">
-            <button className="btn primary" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-              Pagar e usar
-            </button>
-            <button className="btn" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-              Não usar
-            </button>
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <SourceLine state={state} uid={pending.source} />
+            <h3>{pending.prompt}</h3>
+            <div className="btn-row center">
+              <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                Pagar e usar
+              </button>
+              <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+                Não usar
+              </button>
+            </div>
           </div>
         </div>
       );
   }
+}
+
+function SourceLine({ state, uid }: { state: GameState; uid: string }) {
+  if (!state.cards[uid]) return null;
+  return (
+    <div className="source-line">
+      <div className="source-thumb">
+        <CardView state={state} uid={uid} />
+      </div>
+      <span>{cardDef(state, uid).name}</span>
+    </div>
+  );
+}
+
+function PromptPill({
+  title,
+  subtitle,
+  clamp,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  clamp?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="prompt-pill">
+      <div className="prompt-title">{title}</div>
+      {subtitle && (
+        <p className={['prompt-sub', clamp && !open ? 'clamp' : ''].join(' ')} onClick={() => setOpen((o) => !o)}>
+          {subtitle}
+        </p>
+      )}
+      {children}
+    </div>
+  );
 }
 
 function ManualPrompt({ state, onDone }: { state: GameState; onDone: () => void }) {
@@ -487,12 +935,12 @@ function ManualPrompt({ state, onDone }: { state: GameState; onDone: () => void 
   if (pending?.kind !== 'manual') return null;
   const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
   return (
-    <div className="prompt manual in-panel">
+    <div className="manual-box">
       <div className="prompt-title">⚙ Efeito manual: {cardDef(state, pending.source).name}</div>
       <p className="effect">{text}</p>
       <p className="muted small">
-        Ainda não é automático: aplique com as ferramentas abaixo (clique numa carta do tabuleiro para ver as opções dela)
-        e depois conclua. Se não se aplicar, só conclua.
+        Ainda não é automático: aplique com as ferramentas abaixo (toque numa carta da mesa e depois em ⚙ para ver as opções
+        dela) e depois conclua. Se não se aplicar, só conclua.
       </p>
       <button className="btn primary" onClick={onDone}>
         Concluir efeito
@@ -501,13 +949,77 @@ function ManualPrompt({ state, onDone }: { state: GameState; onDone: () => void 
   );
 }
 
+// ------------------------------------------------------------------ zoom da carta
+
+function CardZoom(props: {
+  state: GameState;
+  uid: string;
+  legal: Action[];
+  canManual: boolean;
+  onClose: () => void;
+  onDispatch: (a: Action) => void;
+  onAttackMode: (attacker: string) => void;
+  onTools: () => void;
+}) {
+  const { state, uid, legal } = props;
+  const def = cardDef(state, uid);
+  const loc = locate(state, uid);
+  const play = legal.find((a) => a.type === 'playCard' && a.uid === uid);
+  const activates = legal.filter((a): a is Extract<Action, { type: 'activate' }> => a.type === 'activate' && a.uid === uid);
+  const canAttack = legal.some((a) => a.type === 'attack' && a.attacker === uid);
+  const attach = legal.find((a) => a.type === 'attachDon' && a.target === uid);
+  const owner = state.cards[uid].owner;
+  const hasActions = Boolean(play || activates.length || canAttack || attach || props.canManual);
+
+  return (
+    <div className="modal-backdrop zoom-backdrop" onClick={props.onClose}>
+      <div className="zoom" onClick={(e) => e.stopPropagation()}>
+        <button className="zoom-close" onClick={props.onClose} aria-label="Fechar">
+          ✕
+        </button>
+        <div className="zoom-card">
+          <CardView state={state} uid={uid} fc={loc?.fc} />
+        </div>
+        {hasActions && (
+          <div className="zoom-actions">
+            {play && (
+              <button className="btn primary big" onClick={() => props.onDispatch(play)}>
+                {def.category === 'event' ? 'Usar evento' : 'Jogar'} <span className="cost-chip">{def.cost}</span>
+              </button>
+            )}
+            {canAttack && (
+              <button className="btn attack big" onClick={() => props.onAttackMode(uid)}>
+                ⚔ Atacar <span className="cost-chip">{getPower(state, uid)}</span>
+              </button>
+            )}
+            {activates.map((a) => (
+              <button key={a.ability} className="btn big" onClick={() => props.onDispatch(a)}>
+                ✦ {def.abilities[a.ability].label ?? 'Ativar efeito'}
+              </button>
+            ))}
+            {attach && (
+              <button className="btn don big" onClick={() => props.onDispatch(attach)}>
+                + 1 DON!! <small>({state.players[owner].donActive} ativos)</small>
+              </button>
+            )}
+            {props.canManual && (
+              <button className="btn small" onClick={props.onTools}>
+                ⚙ Ferramentas manuais
+              </button>
+            )}
+          </div>
+        )}
+        <div className="zoom-text">
+          <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
   if (!uid) {
-    return (
-      <div className="detail empty">
-        Passe o mouse sobre uma carta para ver os detalhes.
-      </div>
-    );
+    return <div className="detail empty">Passe o mouse sobre uma carta para ver os detalhes. Clique para agir.</div>;
   }
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
@@ -521,43 +1033,20 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
   );
 }
 
-function SelectedActions(props: {
-  state: GameState;
-  uid: string;
-  legal: Action[];
-  onDispatch: (a: Action) => void;
-  onAttackMode: (attacker: string) => void;
-}) {
-  const { state, uid, legal } = props;
-  const def = cardDef(state, uid);
-  const play = legal.find((a) => a.type === 'playCard' && a.uid === uid);
-  const activates = legal.filter((a): a is Extract<Action, { type: 'activate' }> => a.type === 'activate' && a.uid === uid);
-  const canAttack = legal.some((a) => a.type === 'attack' && a.attacker === uid);
-  const attach = legal.find((a) => a.type === 'attachDon' && a.target === uid);
-  if (!play && !activates.length && !canAttack && !attach) return null;
+// ------------------------------------------------------------------ folhas
+
+function SheetFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="actions">
-      <div className="actions-title">Ações: {def.name}</div>
-      {play && (
-        <button className="btn primary" onClick={() => props.onDispatch(play)}>
-          Jogar (custo {def.cost})
-        </button>
-      )}
-      {canAttack && (
-        <button className="btn danger" onClick={() => props.onAttackMode(uid)}>
-          ⚔ Atacar
-        </button>
-      )}
-      {activates.map((a) => (
-        <button key={a.ability} className="btn" onClick={() => props.onDispatch(a)}>
-          ✦ {def.abilities[a.ability].label ?? 'Ativar efeito'}
-        </button>
-      ))}
-      {attach && (
-        <button className="btn" onClick={() => props.onDispatch(attach)}>
-          + Anexar 1 DON!!
-        </button>
-      )}
+    <div className="modal-backdrop sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h3>{title}</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">{children}</div>
+      </div>
     </div>
   );
 }
@@ -578,7 +1067,7 @@ function LogPanel({ state }: { state: GameState }) {
   );
 }
 
-function downloadReplay(data: unknown) {
+export function downloadReplay(data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
