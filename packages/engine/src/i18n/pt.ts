@@ -41,6 +41,7 @@ const REMINDERS: Array<[RegExp, string]> = [
     /\(This card can attack Characters on the turn in which it is played\.\)/g,
     '(Esta carta pode atacar Personagens no turno em que for jogada.)',
   ],
+  [/\(This card cannot be blocked\.\)/g, '(Esta carta não pode ser bloqueada.)'],
   [
     /\(When this card deals damage, the target card is trashed without activating its Trigger\.\)/g,
     '(Quando esta carta causa dano, a carta de Vida vai para o descarte sem ativar seu [Trigger].)',

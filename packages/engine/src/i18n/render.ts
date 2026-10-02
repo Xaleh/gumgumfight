@@ -29,6 +29,7 @@ const KW: Record<Keyword, string> = {
   doubleAttack: '[Double Attack]',
   banish: '[Banish]',
   rushCharacter: '[Rush: Character]',
+  unblockable: '[Unblockable]',
 };
 
 const TIMING: Record<string, string> = {
@@ -131,6 +132,7 @@ function limits(f: CardFilter & Partial<TargetSpec>, many: boolean): string[] {
   if (f.typeIncludes) out.push(`com um tipo que inclua "${f.typeIncludes}"`);
   if (f.noEffect) out.push('sem efeito');
   if (f.hasTrigger) out.push('com [Trigger]');
+  if (f.leaderOnlyNamed) out.push(`(o Líder só se for [${f.leaderOnlyNamed}])`);
   if (f.withoutTiming) out.push(f.withoutTiming === 'onPlay' ? 'sem efeito [Ao Jogar]' : 'sem efeito [Ao Atacar]');
   if (f.maxCostDon) out.push('com custo igual ou menor ao número de DON!! no seu campo');
   if (f.distinctNames) out.push('com nomes diferentes');
@@ -332,6 +334,20 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'activatedEventMinCost':
         out.push(`você tiver ativado neste turno um Evento com custo base ${c.activatedEventMinCost} ou mais`);
         break;
+      case 'leaderAttribute':
+        out.push(`o seu Líder tiver o atributo ${c.leaderAttribute}`);
+        break;
+      case 'haveNamed':
+        out.push(`você tiver ${c.haveNamed!.map((n) => `[${n}]`).join(' e ')}`);
+        break;
+      case 'revealedHasChosenCost':
+        out.push('a carta revelada tiver o custo escolhido');
+        break;
+      case 'ownMatchingMax': {
+        const t = target({ ...c.ownMatchingMax!.spec, side: 'own', upTo: 2 }, ctx).replace(/^até \d+ dos seus /, '');
+        out.push(`você tiver ${c.ownMatchingMax!.count} ou menos ${t}`);
+        break;
+      }
       case 'leaderMonocolor':
         out.push('o seu Líder for de uma só cor');
         break;
@@ -513,6 +529,9 @@ function cost(c: AbilityCost, ctx: Ctx): string {
   if (c.reveal) parts.push(`revelar ${c.reveal.filter ? filter(c.reveal.filter, c.reveal.count, false) : cards(c.reveal.count)} da sua mão`);
   if (c.returnSelf) parts.push(`devolver ${ctx.self} à mão do dono`);
   if (c.koSelf) parts.push(`nocautear ${ctx.self}`);
+  if (c.leaderPowerMinus) parts.push(`dar −${c.leaderPowerMinus} de poder ao seu Líder ativo durante este turno`);
+  if (c.giveDon) parts.push(`dar ${c.giveDon.count} DON!! ativo a ${target(c.giveDon.spec, ctx)}`);
+  if (c.ownToBottom) parts.push(`colocar ${target({ ...c.ownToBottom.spec, upTo: c.ownToBottom.count }, ctx).replace(/^até /, '')} no fundo do deck do dono`);
   if (c.selfToBottom) parts.push(`colocar ${ctx.self} no fundo do deck do dono`);
   if (c.trashSelf) parts.push(`descartar ${ctx.self}`);
   const text = parts.length ? `Você pode ${parts.join(' e ')}` : '';
@@ -649,6 +668,14 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Se for ${s.filter ? filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ') : 'uma carta'}, adicione-a à sua mão.`;
     case 'koSelf':
       return `Nocauteie ${ctx.self}.`;
+    case 'chooseCost':
+      return 'Escolha um custo.';
+    case 'revealOpponentTop':
+      return 'Revele a carta do topo do deck do oponente.';
+    case 'giveActiveDon':
+      return `Dê ${qty(s.count)} DON!! ${plural(s.count, 'ativo', 'ativos')} a ${target(s.target, ctx)}.`;
+    case 'ownToBottom':
+      return `Coloque ${target({ ...s.spec, upTo: s.count }, ctx).replace(/^até /, '')} no fundo do deck do dono.`;
     case 'negate':
       return `Anule o efeito de ${target(s.target, ctx)} ${dur(s.duration)}.`;
     case 'restrict': {

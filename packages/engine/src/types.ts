@@ -7,7 +7,8 @@ export type PlayerId = 0 | 1;
 export type Color = 'red' | 'green' | 'blue' | 'purple' | 'black' | 'yellow';
 export type CardCategory = 'leader' | 'character' | 'event' | 'stage';
 /** rushCharacter = [Rush: Character] (pode atacar Personagens no turno em que entra). */
-export type Keyword = 'rush' | 'blocker' | 'doubleAttack' | 'banish' | 'rushCharacter';
+/** unblockable = [Unblockable] (não pode ser bloqueado). */
+export type Keyword = 'rush' | 'blocker' | 'doubleAttack' | 'banish' | 'rushCharacter' | 'unblockable';
 
 /** Dados "crus" de uma carta, como vêm da API / banco de dados. */
 export interface CardData {
@@ -75,6 +76,8 @@ export interface TargetSpec {
   hasTrigger?: boolean;
   /** "that has 2 or more DON!! cards given" */
   minDon?: number;
+  /** "your Characters or [X]": o Líder só vale se tiver este nome. */
+  leaderOnlyNamed?: string;
   /** "without an [On Play] effect" */
   withoutTiming?: 'onPlay' | 'whenAttacking';
   color?: Color;
@@ -139,6 +142,12 @@ export interface Condition {
   /** "If your Leader is multicolored" */
   leaderMulticolor?: boolean;
   leaderMonocolor?: boolean;
+  leaderAttribute?: string;
+  /** "you have [Satori] and [Hotori]" */
+  haveNamed?: string[];
+  /** "If the revealed card has the chosen cost" (passos chooseCost + revealOpponentTop) */
+  revealedHasChosenCost?: boolean;
+  ownMatchingMax?: { count: number; spec: TargetSpec };
   /** "If you have N or more cards in your hand" */
   handMin?: number;
   /** "If you have N or more rested Characters" */
@@ -344,6 +353,10 @@ type EffectStepBody =
   | { do: 'activateEventFromHand'; filter: CardFilter }
   | { do: 'revealLifeTop' }
   | { do: 'koSelf' }
+  | { do: 'chooseCost' }
+  | { do: 'revealOpponentTop' }
+  | { do: 'giveActiveDon'; count: number; target: TargetRef }
+  | { do: 'ownToBottom'; count: number; spec: TargetSpec }
   | { do: 'negate'; target: TargetRef; duration: Duration }
   | { do: 'restrict'; kind: RestrictionKind; minCost?: number }
   | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
@@ -487,6 +500,9 @@ export type AbilityTiming =
 export interface AbilityCost {
   restSelf?: boolean; // "You may rest this Character/Stage"
   koSelf?: boolean; // "K.O. this Character" (custo de substituição)
+  leaderPowerMinus?: number; // "give your 1 active Leader −5000 power during this turn"
+  giveDon?: { count: number; spec: TargetSpec }; // "give 1 active DON!! card to 1 of your [X]"
+  ownToBottom?: { count: number; spec: TargetSpec }; // "place 1 of your Characters at the bottom of the owner's deck"
   restDon?: number; // ① ② ③ ... (virar DON!! ativos da área de custo)
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
   trashFromHand?: number; // "You may trash N card from your hand:"
@@ -702,6 +718,8 @@ export type Frame =
       memo?: string[];
       /** Alvos do último passo com alvo (para 'chosen'). */
       last?: string[];
+      /** Custo escolhido em "Choose a cost". */
+      chosenCost?: number;
     }
   | { kind: 'battle' }
   | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean }

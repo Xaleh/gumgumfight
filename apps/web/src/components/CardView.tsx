@@ -20,6 +20,7 @@ const KEYWORD_LABEL: Record<Keyword, string> = {
   doubleAttack: 'Double Attack',
   banish: 'Banish',
   rushCharacter: 'Rush: Character',
+  unblockable: 'Unblockable',
 };
 
 const CATEGORY_LABEL = { leader: 'LÍDER', character: 'PERSONAGEM', event: 'EVENTO', stage: 'STAGE' };

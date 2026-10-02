@@ -267,6 +267,16 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.noCharacterNamed && ps.characters.some((c) => hasName(cardDef(state, c.uid), cond.noCharacterNamed!))) return false;
   if (cond.leaderMulticolor && cardDef(state, ps.leader.uid).colors.length < 2) return false;
   if (cond.leaderMonocolor && cardDef(state, ps.leader.uid).colors.length !== 1) return false;
+  if (cond.leaderAttribute && !(cardDef(state, ps.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.leaderAttribute!.toLowerCase())) {
+    return false;
+  }
+  if (cond.haveNamed && !cond.haveNamed.every((n) => ps.characters.some((c) => hasName(cardDef(state, c.uid), n)))) return false;
+  if (
+    cond.ownMatchingMax &&
+    targetCandidates(state, controller, source, { ...cond.ownMatchingMax.spec, side: 'own' }).length > cond.ownMatchingMax.count
+  ) {
+    return false;
+  }
   if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return false;
   if (cond.lifeLessThanOpponent && ps.life.length >= opp.life.length) return false;
   if (cond.maxDonOnField !== undefined && totalDonOnField(ps) > cond.maxDonOnField) return false;
@@ -612,7 +622,7 @@ function totalDonOnField(ps: PlayerState): number {
 
 export function blockerOptions(state: GameState, defender: PlayerId): string[] {
   const b = state.battle;
-  if (!b || b.noBlocker) return [];
+  if (!b || b.noBlocker || hasKeyword(state, b.attacker, 'unblockable')) return [];
   return state.players[defender].characters
     .filter((c) => !c.rested && c.uid !== b.target && hasKeyword(state, c.uid, 'blocker'))
     .filter((c) => b.noBlockerMinPower === null || getPower(state, c.uid) < b.noBlockerMinPower)
@@ -668,6 +678,7 @@ export function targetCandidates(state: GameState, controller: PlayerId, source:
       if (spec.hasTrigger && !def.trigger?.trim()) return false;
       if (spec.minDon !== undefined && fc.don < spec.minDon) return false;
       if (spec.withoutTiming && def.abilities.some((a) => a.timing === spec.withoutTiming)) return false;
+      if (spec.leaderOnlyNamed && def.category === 'leader' && !hasName(def, spec.leaderOnlyNamed)) return false;
       if (!matchesAnyType(def, spec.hasAnyType)) return false;
       return true;
     })
@@ -1352,6 +1363,10 @@ function resolveTargets(
 
 function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   if (step.if?.lastDone && !frame.last?.length) return false;
+  if (step.if?.revealedHasChosenCost) {
+    const card = frame.last?.[0];
+    if (!card || frame.chosenCost === undefined || (cardDef(state, card).cost ?? 0) !== frame.chosenCost) return false;
+  }
   const filter = step.if?.chosenMatches;
   if (filter) {
     const card = frame.last?.[0];
@@ -1466,6 +1481,12 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
   if (cost.reveal) steps.push({ do: 'revealFromHand', ...cost.reveal });
   if (cost.returnSelf) steps.push({ do: 'returnSelfToHand' });
   if (cost.koSelf) steps.push({ do: 'koSelf' });
+  if (cost.leaderPowerMinus) {
+    addModifier(state, player, { uid: ps.leader.uid, kind: 'power', amount: -cost.leaderPowerMinus, duration: 'turn' });
+    log(state, player, `${cardDef(state, ps.leader.uid).name} recebe −${cost.leaderPowerMinus} de poder (custo).`);
+  }
+  if (cost.giveDon) steps.push({ do: 'giveActiveDon', count: cost.giveDon.count, target: cost.giveDon.spec });
+  if (cost.ownToBottom) steps.push({ do: 'ownToBottom', ...cost.ownToBottom });
   if (cost.koOwn) steps.push({ do: 'koOwn', ...cost.koOwn });
   if (cost.trashOwn) steps.push({ do: 'trashOwn', ...cost.trashOwn });
   if (cost.selfToBottom) steps.push({ do: 'selfToDeckBottom' });
@@ -1487,6 +1508,9 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if ((cost.handToBottom ?? 0) > ps.hand.length) return false;
   if ((cost.lifeToHand ?? 0) > ps.life.length) return false;
   if (cost.lifeToHand && restricted(state, ps.id, 'noLifeToHand')) return false;
+  if (cost.leaderPowerMinus && ps.leader.rested) return false;
+  if (cost.giveDon && (ps.donActive < cost.giveDon.count || !targetCandidates(state, ps.id, source, { ...cost.giveDon.spec, side: 'own' }).length)) return false;
+  if (cost.ownToBottom && targetCandidates(state, ps.id, source, { ...cost.ownToBottom.spec, side: 'own' }).length < cost.ownToBottom.count) return false;
   if ((cost.restCharacters ?? 0) > ps.characters.filter((c) => !c.rested && c.uid !== source).length) return false;
   if (cost.restOwn && ownCostOptions(state, player, source, cost.restOwn.spec, true).length < cost.restOwn.count) return false;
   if (cost.returnOwn && ownCostOptions(state, player, source, cost.returnOwn.spec, false).length < cost.returnOwn.count) {
@@ -1526,6 +1550,10 @@ export function describeCost(cost: AbilityCost): string {
   if (cost.restOwn) parts.push(`virar ${cost.restOwn.count} carta(s) sua(s)`);
   if (cost.returnOwn) parts.push(`devolver ${cost.returnOwn.count} Personagem(ns) seu(s) à mão`);
   if (cost.trashSelf) parts.push('descartar esta carta');
+  if (cost.koSelf) parts.push('nocautear esta carta');
+  if (cost.leaderPowerMinus) parts.push(`dar −${cost.leaderPowerMinus} de poder ao seu Líder`);
+  if (cost.giveDon) parts.push(`dar ${cost.giveDon.count} DON!! ativo(s)`);
+  if (cost.ownToBottom) parts.push(`colocar ${cost.ownToBottom.count} carta(s) sua(s) no fundo do deck`);
   if (cost.selfToBottom) parts.push('colocar esta carta no fundo do deck');
   if (cost.koOwn) parts.push(`nocautear ${cost.koOwn.count} Personagem(ns) seu(s)`);
   if (cost.trashOwn) parts.push(`descartar ${cost.trashOwn.count} Personagem(ns) seu(s)`);
@@ -2022,6 +2050,57 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(ps.deck, card);
         ps.hand.push(card);
         log(state, frame.controller, `${ps.name} adiciona ${cardDef(state, card).name} à mão.`);
+      }
+      return true;
+    }
+    case 'chooseCost':
+      if (!frame.choice) {
+        askOption(state, frame, frame.controller, `${srcName}: escolha um custo.`, Array.from({ length: 11 }, (_, i) => String(i)));
+        return false;
+      }
+      frame.chosenCost = Number(frame.choice[0]);
+      log(state, frame.controller, `${ps.name} escolhe o custo ${frame.chosenCost}.`);
+      return true;
+    case 'revealOpponentTop': {
+      const card = state.players[opponent(frame.controller)].deck[0];
+      frame.last = card ? [card] : [];
+      if (card) log(state, frame.controller, `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`);
+      return true;
+    }
+    case 'giveActiveDon': {
+      const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha quem recebe DON!! ativo(s).`);
+      if (!t) return false;
+      for (const uid of t) {
+        const loc = locate(state, uid);
+        const n = Math.min(step.count, ps.donActive);
+        if (loc && n) {
+          ps.donActive -= n;
+          loc.fc.don += n;
+          emit(state, { kind: 'donGiven', player: loc.player, card: uid });
+        }
+      }
+      return true;
+    }
+    case 'ownToBottom': {
+      const options = targetCandidates(state, frame.controller, frame.source, { ...step.spec, side: 'own' });
+      if (!options.length) return true;
+      if (!frame.choice) {
+        state.pending = {
+          kind: 'selectTargets',
+          player: frame.controller,
+          options,
+          min: Math.min(step.count, options.length),
+          max: Math.min(step.count, options.length),
+          prompt: `${srcName}: escolha o que vai para o fundo do deck (custo).`,
+          intent: 'discard',
+          source: frame.source,
+        };
+        return false;
+      }
+      for (const uid of frame.choice.filter((u) => options.includes(u))) {
+        detach(state, uid);
+        state.players[ownerOf(state, uid)].deck.push(uid);
+        log(state, frame.controller, `${cardDef(state, uid).name} vai para o fundo do deck.`);
       }
       return true;
     }

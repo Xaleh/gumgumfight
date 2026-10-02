@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, attackError, createGame, getCost, getPower, hasKeyword, koProtected, playCost, playError } from '../src/engine';
+import { applyAction, attackError, blockerOptions, createGame, getCost, getPower, hasKeyword, koProtected, playCost, playError } from '../src/engine';
 import { parseCard } from '../src/cards';
 import { chooseBotAction } from '../src/bot/simple';
 import type { CardData, DeckList, GameState } from '../src/types';
@@ -43,6 +43,8 @@ const extra: CardData[] = [
   { id: 'PX-035', name: 'Limiter', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Set up to 1 of your DON!! cards as active. Then, you cannot play Character cards during this turn.' },
   { id: 'PX-036', name: 'Cheap', category: 'character', colors: ['red'], cost: 3, power: 2000, types: [], text: 'If you have 1 or less Life cards, give this card in your hand -2 cost.' },
   { id: 'PX-037', name: 'Lifter', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Your Leader's base power becomes 7000 during this turn." },
+  { id: 'PX-038', name: 'Ghost', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Unblockable] (This card cannot be blocked.)' },
+  { id: 'PX-039', name: 'Payer', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] You may give your 1 active Leader -5000 power during this turn: Draw 1 card.' },
   { id: 'PX-024', name: 'Law', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, draw 1 card.' },
 ];
 const cards = [...baseCards, ...extra];
@@ -460,5 +462,24 @@ describe('efeitos lidos automaticamente', () => {
     expect(getPower(s, s.players[0].leader.uid)).toBe(7000);
     s = toTurn(s, 4);
     expect(getPower(s, s.players[0].leader.uid)).toBe(5000);
+  });
+
+  it('[Unblockable] não pode ser bloqueado', () => {
+    let s = toTurn(game(), 3);
+    const ghost = field(s, 0, 'PX-038');
+    field(s, 1, 'ST01-006'); // qualquer Personagem do oponente
+    s.players[1].characters.forEach((c) => (s.cards[c.uid] = { ...s.cards[c.uid], cardId: 'ST02-009' }));
+    expect(hasKeyword(s, ghost, 'unblockable')).toBe(true);
+    s = applyAction(s, { type: 'attack', player: 0, attacker: ghost, target: s.players[1].leader.uid });
+    expect(blockerOptions(s, 1)).toEqual([]);
+  });
+
+  it('custo: dar −5000 ao seu Líder ativo', () => {
+    let s = toTurn(game(), 3);
+    const payer = field(s, 0, 'PX-039');
+    const hand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'activate', player: 0, uid: payer, ability: 0 });
+    expect(getPower(s, s.players[0].leader.uid)).toBe(0);
+    expect(s.players[0].hand).toHaveLength(hand + 1);
   });
 });

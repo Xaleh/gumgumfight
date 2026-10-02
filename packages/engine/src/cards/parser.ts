@@ -40,6 +40,7 @@ const KEYWORDS: Record<string, Keyword> = {
   banish: 'banish',
   'rush: character': 'rushCharacter',
   'rush:character': 'rushCharacter',
+  unblockable: 'unblockable',
 };
 
 const TIMINGS: Record<string, AbilityTiming> = {
@@ -95,6 +96,8 @@ const CIRCLED_DIGITS = '①②③④⑤⑥⑦⑧⑨⑩';
 
 function clean(raw: string): string {
   const fixed = raw
+    // "(Slash) attribute": o atributo entre parênteses não é lembrete.
+    .replace(/\((Slash|Strike|Ranged|Special|Wisdom)\) attribute/g, '"$1" attribute')
     // "[When Attacking ① (…)", "[When Attacking] [1] (…)", "[When Attacking] 2 (…)": custo de DON!! virados mal formatado.
     .replace(/\[When Attacking ([①-⑩])/g, '[When Attacking] $1')
     .replace(/(?:\[(\d)\]|(?<=\] )(\d)) (?=\(You may rest the specified)/g, (_, a, b) => `${CIRCLED_DIGITS[Number(a ?? b) - 1]} `);
@@ -120,6 +123,10 @@ function clean(raw: string): string {
     )
     .replace(/ is K\.O\.'d add /g, " is K.O.'d, add ")
     .replace(/\bK\.O'd\b/g, "K.O.'d")
+    .replace(
+      /look at (\d+) cards from the top of your deck and add up to (\d+) cards? to your hand/gi,
+      'look at $1 cards from the top of your deck; reveal up to $2 card and add it to your hand',
+    )
     // "up to 1 of your Leader with a type including "X" or up to 1 of your Characters with a type including "X""
     .replace(
       /up to (\d+) of your Leader with a type including "([^"]+)" or up to \1 of your Characters? with a type including "\2"/g,
@@ -225,6 +232,8 @@ export function parseTarget(phrase: string): TargetRef | null {
   if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
   if (/^your Leader or \d+ of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
   if (/^your Leader and all of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 99, all: true };
+  const orNamed = p.match(/^up to (\d+) of your Characters or \[([^\]]+)\]$/i);
+  if (orNamed) return { side: 'own', kinds: ['leader', 'character'], upTo: Number(orNamed[1]), leaderOnlyNamed: orNamed[2] };
   const named = p.match(/^your \[([^\]]+)\] Leader$/i);
   if (named) return { side: 'own', kinds: ['leader'], upTo: 1, name: named[1] };
 
@@ -254,7 +263,7 @@ export function parseTarget(phrase: string): TargetRef | null {
     else if ((m = p.match(/^(red|green|blue|purple|black|yellow) /i))) spec.color = m[1].toLowerCase() as Color;
     else if ((m = p.match(/^rested /i))) spec.rested = true;
     else if ((m = p.match(/^active /i))) spec.rested = false;
-    else if ((m = p.match(/^\[(Rush|Blocker|Double Attack|Banish)\] /i))) spec.keyword = KEYWORDS[m[1].toLowerCase()];
+    else if ((m = p.match(/^\[(Rush|Blocker|Double Attack|Banish|Unblockable)\] /i))) spec.keyword = KEYWORDS[m[1].toLowerCase()];
     else if ((m = p.match(/^\[([^\]]+)\]\s*/))) spec.name = m[1];
     else break;
     p = p.slice(m[0].length);
@@ -375,6 +384,16 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^you don't have \[([^\]]+)\]$/i))) return { noCharacterNamed: m[1] };
   if (/^your Leader is multicolored$/i.test(t)) return { leaderMulticolor: true };
   if (/^your Leader is monocolored$/i.test(t)) return { leaderMonocolor: true };
+  if ((m = t.match(/^your Leader has the "?(\w+)"? attribute$/i))) return { leaderAttribute: m[1] };
+  if ((m = t.match(/^you have \[([^\]]+)\] and \[([^\]]+)\]$/i))) return { haveNamed: [m[1], m[2]] };
+  if ((m = t.match(/^there is a Character with a cost of (\d+) or with a cost of (\d+) or more$/i))) {
+    return { anyOf: [{ anyCharacterCost: { min: Number(m[1]), max: Number(m[1]) } }, { anyCharacterCost: { min: Number(m[2]) } }] };
+  }
+  if ((m = t.match(/^the revealed card has the chosen cost$/i))) return { revealedHasChosenCost: true };
+  if ((m = t.match(/^you have (\d+) or less (.+?Characters.*)$/i))) {
+    const spec = parseTarget(`up to 99 of your ${m[2]}`);
+    if (spec && typeof spec === 'object') return { ownMatchingMax: { count: Number(m[1]), spec: { ...spec, side: 'own', upTo: 99 } } };
+  }
   if ((m = t.match(/^that Character has (.+)$/i))) {
     const f = parseCardFilter(`1 Character with ${m[1]}`);
     return f ? { chosenMatches: f.filter } : null;
@@ -574,7 +593,7 @@ const CLAUSES: ClauseRule[] = [
     (m) => withTarget(m[1], (target) => ({ do: 'power', target, amount: Number(m[2]), duration: durationOf(m[3]) })),
   ],
   [
-    new RegExp(`^(.+?) gains? \\[(Rush|Blocker|Double Attack|Banish)\\] ${DUR}$`, 'i'),
+    new RegExp(`^(.+?) gains? \\[(Rush|Blocker|Double Attack|Banish|Unblockable)\\] ${DUR}$`, 'i'),
     (m) =>
       withTarget(m[1], (target) => ({ do: 'gainKeyword', target, keyword: KEYWORDS[m[2].toLowerCase()], duration: durationOf(m[3]) })),
   ],
@@ -635,6 +654,10 @@ const CLAUSES: ClauseRule[] = [
     },
   ],
   [/^Reveal 1 card from the top of your Life cards$/i, () => [{ do: 'revealLifeTop' }]],
+  [
+    /^Choose a cost and reveal 1 card from the top of your opponent's deck$/i,
+    () => [{ do: 'chooseCost' }, { do: 'revealOpponentTop' }],
+  ],
   [
     new RegExp(`^Negate the effects? of (.+?) and give that card [−-]?(\\d+) power ${DUR}$`, 'i'),
     (m) =>
@@ -859,7 +882,7 @@ const CLAUSES: ClauseRule[] = [
     },
   ],
   [
-    /^(.+?) gains? \[(Rush|Blocker|Double Attack|Banish)\] and \+(\d+) power during this (turn|battle)$/i,
+    /^(.+?) gains? \[(Rush|Blocker|Double Attack|Banish|Unblockable)\] and \+(\d+) power during this (turn|battle)$/i,
     (m) => {
       const duration = durationOf(m[4]);
       const kw = withTarget(m[1], (target) => ({ do: 'gainKeyword', target, keyword: KEYWORDS[m[2].toLowerCase()], duration }));
@@ -1087,7 +1110,17 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
   else if (/^trash this (?:Character|Stage|card)$/i.test(part)) cost.trashSelf = true;
   else if (/^K\.O\. this Character$/i.test(part)) cost.koSelf = true;
   else if (/^place this Character at the bottom of (?:the owner's|your) deck$/i.test(part)) cost.selfToBottom = true;
-  else if ((m = part.match(/^return (\d+) (?:of your active )?DON!! cards?(?: from your field)? to your DON!! deck$/i))) cost.donMinus = Number(m[1]);
+  else if ((m = part.match(/^return (\d+)(?: or more)? (?:of your active )?DON!! cards?(?: from your field)? to your DON!! deck$/i))) cost.donMinus = Number(m[1]);
+  else if ((m = part.match(/^give your (?:1 )?active Leader [−-](\d+) power during this turn$/i))) cost.leaderPowerMinus = Number(m[1]);
+  else if ((m = part.match(/^give (\d+) active DON!! cards? to (\d+ of your .+)$/i))) {
+    const spec = parseTarget(`up to ${m[2]}`);
+    if (!spec || typeof spec !== 'object') return false;
+    cost.giveDon = { count: Number(m[1]), spec };
+  } else if ((m = part.match(/^place (\d+) (?:of your (.+?)|(Stage .+?)) at the bottom of (?:the owner's|your) deck$/i))) {
+    const spec = parseTarget(`up to ${m[1]} of your ${m[2] ?? m[3]}`);
+    if (!spec || typeof spec !== 'object') return false;
+    cost.ownToBottom = { count: Number(m[1]), spec };
+  }
   else if ((m = part.match(/^rest (\d+) of your active DON!! cards?$/i))) cost.restDon = (cost.restDon ?? 0) + Number(m[1]);
   else if (/^rest your (?:1 )?Leader$/i.test(part)) cost.restOwn = { count: 1, spec: { side: 'own', kinds: ['leader'], upTo: 1 } };
   else if ((m = part.match(/^K\.O\. (\d+) of your (.+)$/i))) {
@@ -1167,7 +1200,8 @@ function parseCost(rest: string): { cost?: AbilityCost; body: string } | null {
     const parts = c
       .replace(/^You may /i, '')
       .replace(/ and this (Character|Stage|card)$/i, ' and rest this $1')
-      .split(/ and (?=(?:rest|trash|add|place|return|turn|reveal) )/i);
+      .replace(/^(rest|trash|return) this (Character|Stage|card) and (\d+ of your )/i, '$1 this $2 and $1 $3')
+      .split(/ and (?=(?:rest|trash|add|place|return|turn|reveal|give) )/i);
     for (const part of parts) if (!parseCostPart(part.trim(), cost)) return null;
   }
   return { cost, body };
@@ -1402,7 +1436,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     const what = /DON/i.test(m[3]) ? 'restedDon' : /hand/i.test(m[3]) ? 'hand' : /Event/i.test(m[3]) ? 'trashEvents' : 'trash';
     return [{ ...base, powerPer: { power: Number(m[1]), every: Number(m[2] ?? 1), what } }];
   }
-  if ((m = s.match(/^this (?:Character|card|Leader) gains \[(Rush|Blocker|Double Attack|Banish)\]$/i))) {
+  if ((m = s.match(/^this (?:Character|card|Leader) gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\]$/i))) {
     return [{ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] }];
   }
   if (/^this Character can also attack (?:your opponent's )?active Characters$/i.test(s)) {
@@ -1424,7 +1458,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   if ((m = s.match(/^all of your Characters with a type including "([^"]+)" gain \+(\d+) power$/i))) {
     return [{ ...base, aura: { kinds: ['character'], power: Number(m[2]), typeIncludes: m[1] } as NonNullable<Ability['aura']> }];
   }
-  m = s.match(/^this Character cannot be removed from the field by your opponent's effects(?: and gains (\[(?:Rush|Blocker|Double Attack|Banish)\]|\+\d+ power))?$/i);
+  m = s.match(/^this Character cannot be removed from the field by your opponent's effects(?: and gains (\[(?:Rush|Blocker|Double Attack|Banish|Unblockable)\]|\+\d+ power))?$/i);
   if (m) {
     const out: Ability[] = [{ ...base, staticNoRemoval: true }];
     if (m[1]?.startsWith('[')) out.push({ ...base, staticKeyword: KEYWORDS[m[1].slice(1, -1).toLowerCase()] });
@@ -1452,7 +1486,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   // "All of your {Dressrosa} type Characters with a cost of 2 or more gain +1 cost", "... gain [Blocker]",
   // "Your {SWORD} type Characters can attack Characters on the turn in which they are played"
   m = s.match(
-    /^(?:all of )?your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})* type )?Characters( with a cost of \d+ or more)? (?:gain (\+\d+ cost|\[(?:Rush|Blocker|Double Attack|Banish)\])|(can attack Characters on the turn in which they are played))$/i,
+    /^(?:all of )?your ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})* type )?Characters( with a cost of \d+ or more)? (?:gain (\+\d+ cost|\[(?:Rush|Blocker|Double Attack|Banish|Unblockable)\])|(can attack Characters on the turn in which they are played))$/i,
   );
   if (m && (m[2] || m[4] || /\[/.test(m[3] ?? ''))) {
     const aura: NonNullable<Ability['aura']> = { kinds: ['character'], power: 0 };
@@ -1467,7 +1501,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [{ ...base, aura: { kinds: ['character'], power: 0, cost: Number(m[1]) } }];
   }
   if ((m = s.match(/^this Character gains \+(\d+) cost$/i))) return [{ ...base, staticCost: Number(m[1]) }];
-  if ((m = s.match(/^this Character gains \[(Rush|Blocker|Double Attack|Banish)\] and \+(\d+) (cost|power)$/i))) {
+  if ((m = s.match(/^this Character gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\] and \+(\d+) (cost|power)$/i))) {
     const second = m[3].toLowerCase() === 'cost' ? { staticCost: Number(m[2]) } : { staticPower: Number(m[2]) };
     return [{ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] }, { ...base, ...second }];
   }
