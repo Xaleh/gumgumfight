@@ -19,6 +19,16 @@ describe('limpeza dos dados da optcgapi', () => {
       trigger: 'Draw 1 card.',
     });
     expect(splitTrigger('[Counter] Draw 1 card. [Trigger] Play this card.')).toEqual({ text: '[Counter] Draw 1 card.', trigger: 'Play this card.' });
+    // Sem colchetes, numa linha própria.
+    expect(splitTrigger('[On Play] Draw 1 card.\nTrigger Play this card.')).toEqual({ text: '[On Play] Draw 1 card.', trigger: 'Play this card.' });
+    expect(splitTrigger('[On Play] Trigger the effect.')).toEqual({ text: '[On Play] Trigger the effect.' });
+  });
+
+  it('converte listas de tipos entre colchetes com ", or" sem confundir com nomes', () => {
+    expect(normalizeTypeQuotes('reveal up to 1 [Straw Hat Crew], [Kid Pirates], or {Heart Pirates} type card')).toBe(
+      'reveal up to 1 {Straw Hat Crew}, {Kid Pirates}, or {Heart Pirates} type card',
+    );
+    expect(normalizeTypeQuotes('reveal up to 1 [Sanji] or {Big Mom Pirates} type card')).toBe('reveal up to 1 [Sanji] or {Big Mom Pirates} type card');
   });
 
   it('preenche o atributo "Slash" que a API perde nas cartas verdes', () => {

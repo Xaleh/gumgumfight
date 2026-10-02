@@ -105,6 +105,10 @@ function clean(raw: string): string {
     .replace(/\((Slash|Strike|Ranged|Special|Wisdom)\) attribute/g, '"$1" attribute')
     // "[When Attacking ① (…)", "[When Attacking] [1] (…)", "[When Attacking] 2 (…)": custo de DON!! virados mal formatado.
     .replace(/\[When Attacking ([①-⑩])/g, '[When Attacking] $1')
+    // "[End of Your Turn] (1): …": custo de DON!! virados sem o símbolo.
+    .replace(/(\]\s*)\((\d)\)(?=\s*:)/g, (_, pre: string, n: string) => `${pre}${CIRCLED_DIGITS[Number(n) - 1]}`)
+    // "[DON!! x1] [This Character gains [Blocker]. (…)": colchete a mais antes do efeito.
+    .replace(/\[This Character gains \[(\w+)\]\./g, 'This Character gains [$1].')
     .replace(/(?:\[(\d)\]|(?<=\] )(\d)) (?=\(You may rest the specified)/g, (_, a, b) => `${CIRCLED_DIGITS[Number(a ?? b) - 1]} `);
   return stripReminders(normalizeTypeQuotes(fixed))
     .replace(/DON!! ?[−–-] ?(\d+)/g, 'DON!! -$1')
@@ -161,7 +165,7 @@ function clean(raw: string): string {
       /look at (\d+) cards from the top of your deck and add up to (\d+) (.+?) to the top of your Life cards face-up/gi,
       'look at $1 cards from the top of your deck; reveal up to $2 $3 and add it to the top of your Life cards face-up',
     )
-    .replace(/(\{[^}]+\} type Character cards?) or "([^"]+)"/g, '$1 or [$2]')
+    .replace(/(\{[^}]+\} type (?:Character )?cards?) or "([^"]+)"/g, '$1 or [$2]')
     .replace(
       /look at (\d+) cards from the top of your deck and add up to (\d+) cards? to your hand/gi,
       'look at $1 cards from the top of your deck; reveal up to $2 card and add it to your hand',
@@ -171,6 +175,35 @@ function clean(raw: string): string {
       /up to (\d+) of your Leader with a type including "([^"]+)" or up to \1 of your Characters? with a type including "\2"/gi,
       'up to $1 of your Leader or Character cards with a type including "$2"',
     )
+    // Erros de digitação da API.
+    .replace(/\bAd up to\b/g, 'Add up to')
+    .replace(/\bSAtage\b/g, 'Stage')
+    .replace(/\btour opponent's\b/g, "your opponent's")
+    .replace(/ poser\b/g, ' power')
+    .replace(/\bCharactes\b/g, 'Characters')
+    .replace(/\bK\.O up to\b/g, 'K.O. up to')
+    .replace(/ (?:N|1)ith a cost\b/g, ' with a cost')
+    .replace(/\ba cost (\d+) or (less|more)\b/g, 'a cost of $1 or $2')
+    .replace(/\bcost or (\d+) or (less|more)\b/g, 'cost of $1 or $2')
+    .replace(/\bthe rest a the bottom\b/g, 'the rest at the bottom')
+    .replace(/ from their trash at bottom of their deck/g, ' from their trash at the bottom of their deck')
+    .replace(/\bplace them as the top or bottom of the deck\b/g, 'place them at the top or bottom of the deck')
+    .replace(/\btype include "/g, 'type includes "')
+    .replace(/\bgains Rush during\b/g, 'gains [Rush] during')
+    .replace(/\bthis Character has played on this turn\b/g, 'this Character was played on this turn')
+    .replace(/\bplaces (\d+) cards? from your hand at the bottom of their deck\b/g, 'places $1 cards from their hand at the bottom of their deck')
+    .replace(/\bexcept this Character\b/g, 'other than this Character')
+    .replace(/\bDraw (\d+) cards? when your opponent activates an Event\.?$/, 'When your opponent activates an Event, draw $1 card.')
+    .replace(/(your Leader) has (\d+) power or more and the (\{[^}]+\}) type\b/g, '$1 has the $3 type and your Leader has $2 power or more')
+    .replace(/\[Rush Character\]/g, '[Rush: Character]')
+    // "Look at the top 5 cards of your deck"
+    .replace(/\bLook at the top (\d+) cards of your deck\b/gi, 'Look at $1 cards from the top of your deck')
+    .replace(/\b(?:they|your opponent must) place (\d+) cards? from their hand/g, 'your opponent places $1 cards from their hand')
+    .replace(/(your Leader has the \{[^}]+\} type) and is active\b/g, '$1 and your Leader is active')
+    .replace(/(your Leader has the \{[^}]+\} type) and have /g, '$1 and you have ')
+    .replace(/(you have \d+ or (?:more|less) DON!! cards on your field) and (\d+ or (?:more|less) cards in your hand)/g, '$1 and you have $2')
+    .replace(/\bgive -(\d+) power during this turn to (up to .+?)(?=\.|$)/g, 'give $2 -$1 power during this turn')
+    .replace(/(Look at \d+ cards from the top of your deck); add up to (\d+) cards? to the top of your Life cards\b/g, '$1; reveal up to $2 card and add it to the top of your Life cards')
     .replace(/’/g, "'");
 }
 
@@ -187,7 +220,7 @@ function sentencesOf(body: string): string[] {
 
 const capitalizeFirst = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const typesOf = (list: string) => [...list.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]);
-const TYPE_LIST = /^((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type\s*/i;
+const TYPE_LIST = /^((?:\{[^}]+\})(?:\s*(?:,\s*(?:or|and)?|or|and)\s*\{[^}]+\})*) type\s*/i;
 
 // ---------------------------------------------------------------------------
 // Alvos em campo
@@ -225,6 +258,15 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       if (m[1] || m[4]) (spec as TargetSpec).base = true;
     } else if ((m = rest.match(/^\s*(?:that has|with) (\d+|a) (?:or more )?DON!! cards? given/i)) && onField) {
       (spec as TargetSpec).minDon = m[1] === 'a' ? 1 : Number(m[1]);
+    } else if ((m = rest.match(/^\s*with a (base )?power of (\d+)(?! or)/i)) && onField) {
+      (spec as TargetSpec).minPower = (spec as TargetSpec).maxPower = Number(m[2]);
+      if (m[1]) (spec as TargetSpec).base = true;
+    } else if ((m = rest.match(/^\s*with a cost equal to or less than your number of Life cards/i)) && onField) {
+      (spec as TargetSpec).maxCostDynamic = 'ownLife';
+    } else if ((m = rest.match(/^\s*on (?:their|your opponent's) field/i)) && onField && (spec as TargetSpec).side === 'opponent') {
+      // "all of your opponent's Characters on their field"
+    } else if ((m = rest.match(/^\s*other than "([^"]+)"/i))) {
+      spec.excludeName = m[1];
     } else if ((m = rest.match(/^\s*with (\d+) (base )?power(?! or)/i)) && onField) {
       (spec as TargetSpec).minPower = (spec as TargetSpec).maxPower = Number(m[1]);
       if (m[2]) (spec as TargetSpec).base = true;
@@ -308,6 +350,9 @@ function parseTargetBase(phrase: string): TargetRef | null {
   if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
   if (/^your Leader or \d+ of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
   if (/^your Leader and all of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 99, all: true };
+  if (/^your opponent's Leader and all of (?:their|your opponent's) Characters$/i.test(p)) {
+    return { side: 'opponent', kinds: ['leader', 'character'], upTo: 99, all: true };
+  }
   const orNamed = p.match(/^up to (\d+) of your Characters or \[([^\]]+)\]$/i);
   if (orNamed) return { side: 'own', kinds: ['leader', 'character'], upTo: Number(orNamed[1]), leaderOnlyNamed: orNamed[2] };
   const named = p.match(/^your \[([^\]]+)\] Leader$/i);
@@ -338,6 +383,7 @@ function parseTargetBase(phrase: string): TargetRef | null {
     if ((m = p.match(TYPE_LIST))) spec.hasAnyType = typesOf(m[1]);
     else if ((m = p.match(/^(red|green|blue|purple|black|yellow) /i))) spec.color = m[1].toLowerCase() as Color;
     else if ((m = p.match(/^rested /i))) spec.rested = true;
+    else if ((m = p.match(/^(\d+) cost (?=Characters?\b)/i))) spec.minCost = spec.maxCost = Number(m[1]);
     else if ((m = p.match(/^active /i))) spec.rested = false;
     else if ((m = p.match(/^\[(Rush|Blocker|Double Attack|Banish|Unblockable)\] /i))) spec.keyword = KEYWORDS[m[1].toLowerCase()];
     else if ((m = p.match(/^\[([^\]]+)\] (?:or|and) \[([^\]]+)\]\s*/))) spec.names = [m[1], m[2]];
@@ -359,7 +405,7 @@ function parseTargetBase(phrase: string): TargetRef | null {
     spec.kinds = ['character'];
   } else if ((m = p.match(/^Leaders?/i))) {
     spec.kinds = ['leader'];
-  } else if ((m = p.match(/^Stages?/i))) {
+  } else if ((m = p.match(/^Stages?(?: cards?)?/i))) {
     spec.kinds = ['stage'];
   } else if (spec.name || spec.names) {
     // "[Charlotte Linlin] cards" pode ser o Líder com esse nome; "[Pacifista]" sozinho, só Personagens.
@@ -367,6 +413,11 @@ function parseTargetBase(phrase: string): TargetRef | null {
     spec.kinds = m![0] && spec.side === 'own' ? ['leader', 'character'] : ['character'];
   } else {
     return null;
+  }
+  // "Your Characters with a cost of 7 or less cannot be K.O.'d": sem quantidade, o plural vale para todos.
+  if (!quantified && /^Characters$/i.test(m![0])) {
+    spec.all = true;
+    spec.upTo = 99;
   }
   p = p.slice(m![0].length);
   if (applyTrailing(p, spec, true) === null) return null;
@@ -400,6 +451,8 @@ function parseCardFilterBase(phrase: string): { upTo: number; filter: CardFilter
   } else if ((m = p.match(/^an? /i))) {
     p = p.slice(m[0].length);
   }
+  // "up to 1 of your Character cards … from your trash"
+  if ((m = p.match(/^of your (?=.*\b(?:cards?|Characters?|Events?|Stages?)\b)/i))) p = p.slice(m[0].length);
   const filter: CardFilter = {};
   for (let guard = 0; guard < 4; guard++) {
     if ((m = p.match(/^(red|green|blue|purple|black|yellow) /i))) filter.color = m[1].toLowerCase() as Color;
@@ -446,6 +499,35 @@ export function parseCondition(text: string): Condition | null {
   const t = text.trim();
   let m: RegExpMatchArray | null;
   if ((m = t.match(/^you have (\d+) or more Characters$/i))) return { minCharacters: Number(m[1]) };
+  if (/^your Leader is active$/i.test(t)) return { leaderActive: true };
+  if (/^this Character is active$/i.test(t)) return { selfActive: true };
+  if ((m = t.match(/^your Leader's colors include (red|green|blue|purple|black|yellow)$/i))) return { leaderColor: m[1].toLowerCase() as Color };
+  if ((m = t.match(/^your Leader has (\d+) power or less$/i))) return { leaderMaxPower: Number(m[1]) };
+  if ((m = t.match(/^your opponent's Leader has (\d+) power or more$/i))) return { opponentLeaderMinPower: Number(m[1]) };
+  if ((m = t.match(/^you and your opponent have a total of (\d+) or more Life cards$/i))) return { totalLifeMin: Number(m[1]) };
+  if ((m = t.match(/^your opponent has (\d+) or less DON!! cards on their field$/i))) return { opponentMaxDonOnField: Number(m[1]) };
+  if ((m = t.match(/^your opponent has (\d+) Life cards?$/i))) return { opponentLifeMin: Number(m[1]), opponentLifeMax: Number(m[1]) };
+  if ((m = t.match(/^your Leader is "([^"]+)"$/i))) return { leaderName: m[1] };
+  if ((m = t.match(/^your Leader's card name includes "([^"]+)"$/i))) return { leaderNameIncludes: m[1] };
+  if ((m = t.match(/^your Leader has (\d+) power or more$/i))) return { leaderMinPower: Number(m[1]) };
+  if (/^you have less Characters than your opponent$/i.test(t)) return { fewerCharacters: true };
+  if ((m = t.match(/^there are (\d+) or more Characters with a cost of (\d+) or more$/i))) {
+    return { anyCharactersWithCost: { count: Number(m[1]), cost: Number(m[2]) } };
+  }
+  if ((m = t.match(/^your Leader is \[([^\]]+)\] or multicolored$/i))) return { anyOf: [{ leaderName: m[1] }, { leaderMulticolor: true }] };
+  if ((m = t.match(/^you have \[([^\]]+)\] on your field$/i))) return { haveCharacterNamed: m[1] };
+  if ((m = t.match(/^you only have \{([^}]+)\} type Characters$/i))) return { onlyTypedCharacters: m[1] };
+  if ((m = t.match(/^you have no other \[([^\]]+)\](?: Characters?)?$/i))) return { noOtherNamed: m[1] };
+  if ((m = t.match(/^your Leader has the \{([^}]+)\} type or the "(\w+)" attribute$/i))) {
+    return { anyOf: [{ leaderHasType: m[1] }, { leaderAttribute: m[2] }] };
+  }
+  if ((m = t.match(/^your Leader has the \{([^}]+)\} type or a type including "([^"]+)"$/i))) {
+    return { anyOf: [{ leaderHasType: m[1] }, { leaderHasType: m[2] }] };
+  }
+  if ((m = t.match(/^your opponent has a Character with a cost of (\d+) or with a cost of (\d+) or more$/i))) {
+    const spec = (min: number, max?: number): TargetSpec => ({ side: 'opponent', kinds: ['character'], upTo: 99, minCost: min, ...(max !== undefined ? { maxCost: max } : {}) });
+    return { anyOf: [{ opponentMatching: { count: 1, spec: spec(Number(m[1]), Number(m[1])) } }, { opponentMatching: { count: 1, spec: spec(Number(m[2])) } }] };
+  }
   if ((m = t.match(/^you have (\d+) Characters$/i))) return { minCharacters: Number(m[1]), maxCharacters: Number(m[1]) };
   if ((m = t.match(/^the only Characters on your field are \{([^}]+)\} type Characters$/i))) return { onlyTypedCharacters: m[1] };
   if ((m = t.match(/^you have an? \{([^}]+)\} type Character$/i))) return { minTypedCharacters: { count: 1, type: m[1] } };
@@ -522,7 +604,7 @@ export function parseCondition(text: string): Condition | null {
   }
   if ((m = t.match(/^your opponent has (\d+) or more Life cards$/i))) return { opponentLifeMin: Number(m[1]) };
   if ((m = t.match(/^(?:the revealed card|that card) (?:is|has) (.+)$/i))) {
-    const what = m[1].replace(/^an? /i, '');
+    const what = m[1].replace(/^an? (?!cost of)/i, '');
     const f = /^a cost of/i.test(what) ? parseCardFilter(`1 card with ${what}`) : parseCardFilter(`1 ${what}`);
     return f ? { chosenMatches: f.filter } : null;
   }
@@ -621,13 +703,222 @@ const DUR =
   "(during this turn|during this battle|until the end of your opponent's next turn|until the end of your opponent's next End Phase|until the start of your next turn|until the end of your next turn)";
 
 const CLAUSES: ClauseRule[] = [
+  [/^Return all cards in your hand to your deck and shuffle your deck$/i, () => [{ do: 'handAllToDeck', who: 'self' }]],
+  [/^Your opponent returns all cards in their hand to their deck and shuffles their deck$/i, () => [{ do: 'handAllToDeck', who: 'opponent' }]],
+  [/^draw cards equal to the number you returned to your deck$/i, () => [{ do: 'drawEventCount', returned: true }]],
+  [/^your opponent draws (\d+) cards?$/i, (m) => [{ do: 'opponentDraws', count: Number(m[1]) }]],
+  [/^trash all cards from your hand$/i, () => [{ do: 'trashHand' }]],
+  [/^you take (\d+) damage$/i, (m) => [{ do: 'takeDamage', count: Number(m[1]) }]],
+  [/^Trash cards from your hand until you have (\d+) cards? in your hand$/i, (m) => [{ do: 'trashHandUntil', count: Number(m[1]) }]],
+  [
+    /^you and your opponent trash cards from your hands until you each have (\d+) cards? in your hands$/i,
+    (m) => [{ do: 'trashHandUntil', count: Number(m[1]), both: true }],
+  ],
+  [
+    /^Your opponent (?:returns|chooses) (\d+) of their (.+?)(?: and return)? to the owner's hand$/i,
+    (m) => {
+      const spec = parseTarget(`up to ${m[1]} of your ${m[2].replace(/\bCharacter\b/, 'Characters')}`);
+      return spec && typeof spec === 'object' && spec.kinds.join() === 'character'
+        ? [{ do: 'opponentChoosesOwn', count: Number(m[1]), spec: { ...spec, side: 'own' }, action: 'hand' }]
+        : null;
+    },
+  ],
+  [
+    /^Your opponent places (\d+) of their (.+?) at the bottom of (?:the owner's|their) deck$/i,
+    (m) => {
+      const spec = parseTarget(`up to ${m[1]} of your ${m[2]}`);
+      return spec && typeof spec === 'object' && spec.kinds.join() === 'character'
+        ? [{ do: 'opponentChoosesOwn', count: Number(m[1]), spec: { ...spec, side: 'own' }, action: 'bottom' }]
+        : null;
+    },
+  ],
+  [/^Set all of your DON!! cards as active$/i, () => [{ do: 'setDonActive', count: 99 }]],
+  [/^turn all of your Life cards face-down$/i, () => [{ do: 'lifeFace', count: 99, up: false }]],
+  [/^(?:you may )?deal (\d+) damage to your opponent$/i, (m) => [{ do: 'takeDamage', count: Number(m[1]), opponent: true }]],
+  [/^trash cards from the top of your Life cards until you have (\d+) Life cards?$/i, (m) => [{ do: 'lifeTrashUntil', count: Number(m[1]) }]],
+  [/^trash this (?:Character|Stage|card)$/i, () => [{ do: 'trashSelf' }]],
+  [/^the selected Character will not become active in your next Refresh Phase$/i, () => [{ do: 'skipRefresh', target: 'chosen' }]],
+  [
+    new RegExp(`^Give (.+?) \\+(\\d+) cost ${DUR}$`, 'i'),
+    (m) => withTarget(m[1], (target) => ({ do: 'cost', target, amount: Number(m[2]), duration: durationOf(m[3]) }), true),
+  ],
+  [
+    /^Set (up to \d+ of your .+?) and your Leader as active$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'setActive', target }))?.concat([{ do: 'setActive', target: 'ownLeader' }]) ?? null,
+  ],
+  [
+    /^Rest this Character and (up to \d+ of your opponent's .+)$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'rest', target }))?.concat([{ do: 'rest', target: 'self' }]) ?? null,
+  ],
+  [
+    /^Your opponent trashes (\d+) cards? from their hand and reveals their hand$/i,
+    (m) => [{ do: 'opponentDiscards', count: Number(m[1]) }],
+  ],
+  [
+    /^(up to \d+ of your .+?) can attack Characters on the turn in which (?:it is|they are) played$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'gainKeyword', target, keyword: 'rushCharacter', duration: 'turn' }), true),
+  ],
+  [
+    /^trash (\d+) of your (.+? Characters?)$/i,
+    (m) => {
+      const spec = parseTarget(`up to ${m[1]} of your ${m[2]}`);
+      return spec && typeof spec === 'object' ? [{ do: 'trashOwn', count: Number(m[1]), spec }] : null;
+    },
+  ],
+  [
+    /^Trash (\d+) (.+?) from your hand$/i,
+    (m) => {
+      if (/^cards?$/i.test(m[2])) return null;
+      const f = parseCardFilter(`1 ${m[2]}`);
+      return f ? [{ do: 'trashFromHand', count: Number(m[1]), filter: f.filter }] : null;
+    },
+  ],
+  [
+    /^Look at (\d+) cards from the top of your deck and place them at the top of your deck in any order$/i,
+    (m) => [{ do: 'arrangeTop', look: Number(m[1]), topOnly: true }],
+  ],
+  [/^Add this (?:Character )?card from your trash to your hand$/i, () => [{ do: 'addThisToHand' }]],
+  [/^this Character will not become active in your next Refresh Phase$/i, () => [{ do: 'skipRefresh', target: 'self' }]],
+  [
+    /^(.+?) cannot attack until the start of your next turn$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'cannotAttack', target, duration: 'untilYourNextTurn' })),
+  ],
+  [
+    new RegExp(`^(?:none of )?(.+?) (?:can|cannot) be K\\.O\\.'d by (?:your opponent's )?effects ${DUR}$`, 'i'),
+    (m) => {
+      if (!/^none of /i.test(m[0]) && !/cannot/i.test(m[0])) return null;
+      const phrase = m[1].replace(/^your /i, 'all of your ');
+      return withTarget(phrase, (target) => ({ do: 'cannotBeKO', target, duration: durationOf(m[2]), byEffect: true }), true);
+    },
+  ],
+  [
+    new RegExp(`^this Character cannot be K\\.O\\.'d in battle and gains \\+(\\d+) power ${DUR}$`, 'i'),
+    (m) => [
+      { do: 'cannotBeKO', target: 'self', duration: durationOf(m[2]), inBattle: true },
+      { do: 'power', target: 'self', amount: Number(m[1]), duration: durationOf(m[2]) },
+    ],
+  ],
+  [
+    /^(?:this|the) Character(?:'s)? effect is negated during this turn$/i,
+    () => [{ do: 'negate', target: 'self', duration: 'turn' }],
+  ],
+  [
+    /^The Character played with this effect gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\] during this turn$/i,
+    (m) => [{ do: 'gainKeyword', target: 'chosen', keyword: KEYWORDS[m[1].toLowerCase()], duration: 'turn' }],
+  ],
+  [
+    new RegExp(`^Your Leader and this Character's base power becomes (\\d+) ${DUR}$`, 'i'),
+    (m) => [
+      { do: 'basePower', target: 'ownLeader', amount: Number(m[1]), duration: durationOf(m[2]) },
+      { do: 'basePower', target: 'self', amount: Number(m[1]), duration: durationOf(m[2]) },
+    ],
+  ],
+  [
+    new RegExp(`^(all of your .+?)(?:'s|') base power becomes (\\d+) ${DUR}$`, 'i'),
+    (m) => withTarget(m[1], (target) => ({ do: 'basePower', target, amount: Number(m[2]), duration: durationOf(m[3]) })),
+  ],
+  [
+    // "Choose up to 1 of your opponent's Characters with a cost of 4 or less and K.O. it"
+    /^Choose (up to \d+ .+?) and K\.O\. it$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'ko', target }), true),
+  ],
+  [
+    // "K.O. or rest up to 1 …": o jogador escolhe a carta e depois o que fazer.
+    /^K\.O\. or rest (up to \d+ .+)$/i,
+    (m) =>
+      withTarget(m[1], (target) => ({ do: 'select', target }), true)?.concat([
+        { do: 'chooseOne', chooser: 'self', options: [[{ do: 'ko', target: 'chosen' }], [{ do: 'rest', target: 'chosen' }]], labels: ['K.O.', 'Virar'] },
+      ]) ?? null,
+  ],
+  [
+    // "K.O. up to 1 … or return it to the owner's hand"
+    /^K\.O\. (up to \d+ .+?),? or return it to the owner's hand$/i,
+    (m) =>
+      withTarget(m[1], (target) => ({ do: 'select', target }), true)?.concat([
+        {
+          do: 'chooseOne',
+          chooser: 'self',
+          options: [[{ do: 'ko', target: 'chosen' }], [{ do: 'returnToHand', target: 'chosen' }]],
+          labels: ['K.O.', 'Devolver à mão'],
+        },
+      ]) ?? null,
+  ],
+  [
+    // "Return up to 1 Character … to the owner's hand or (place it at) the bottom of their deck"
+    /^Return (up to \d+ .+?) to the owner's hand or (?:place it at )?the bottom of (?:their|the owner's) deck$/i,
+    (m) =>
+      withTarget(m[1], (target) => ({ do: 'select', target }), true)?.concat([
+        {
+          do: 'chooseOne',
+          chooser: 'self',
+          options: [[{ do: 'returnToHand', target: 'chosen' }], [{ do: 'toDeckBottom', target: 'chosen' }]],
+          labels: ['Devolver à mão', 'Fundo do deck'],
+        },
+      ]) ?? null,
+  ],
+  [
+    // "Set this Character or up to 1 of your DON!! cards as active"
+    /^Set this Character or up to (\d+) of your DON!! cards? as active$/i,
+    (m) => [
+      {
+        do: 'chooseOne',
+        chooser: 'self',
+        options: [[{ do: 'setActive', target: 'self' }], [{ do: 'setDonActive', count: Number(m[1]) }]],
+        labels: ['Desvirar este Personagem', `Desvirar ${m[1]} DON!!`],
+      },
+    ],
+  ],
+  [
+    // "Give up to 1 each of your opponent's Leader and Character cards −2000 power during this turn"
+    new RegExp(`^Give up to (\\d+) each of your opponent's Leader and Character cards [−-]?(\\d+) power ${DUR}$`, 'i'),
+    (m) => [
+      { do: 'power', target: { side: 'opponent', kinds: ['leader'], upTo: 1 }, amount: -Number(m[2]), duration: durationOf(m[3]) },
+      { do: 'power', target: { side: 'opponent', kinds: ['character'], upTo: Number(m[1]) }, amount: -Number(m[2]), duration: durationOf(m[3]) },
+    ],
+  ],
+  [
+    new RegExp(`^Negate the effect of up to (\\d+) of each of your opponent's Leader and Character cards ${DUR}$`, 'i'),
+    (m) => [
+      { do: 'negate', target: { side: 'opponent', kinds: ['leader'], upTo: 1 }, duration: durationOf(m[2]) },
+      { do: 'negate', target: { side: 'opponent', kinds: ['character'], upTo: Number(m[1]) }, duration: durationOf(m[2]) },
+    ],
+  ],
+  [
+    /^Reveal 1 card from the top of your deck and place it at the top or bottom of your deck$/i,
+    () => [{ do: 'revealTop' }, { do: 'revealedToTopOrBottom' }],
+  ],
+  [
+    /^Look at (\d+) cards from the top of your deck,? (?:reorganize them in any order and )?place them at the top or bottom of your deck$/i,
+    (m) => [{ do: 'arrangeTop', look: Number(m[1]) }],
+  ],
+  [
+    /^Select (up to \d+ .+?) from your trash and play it or add it to the top of your Life cards face-up$/i,
+    (m) => {
+      const f = parseCardFilter(m[1]);
+      return f && [{ do: 'handPlayOrLife', filter: f.filter, from: 'trash' }];
+    },
+  ],
+  [
+    /^(?:Place|Add) (.+?) (?:at|to) the top or bottom of (?:the owner's|their|your opponent's) Life cards face-(up|down)$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true }), true),
+  ],
+  [
+    /^(?:Place|Return) (.+?) at the bottom of (?:the owner's|its owner's|your|your opponent's) deck in any order$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'toDeckBottom', target }), true),
+  ],
+  [/^rest (\d+) of your DON!! cards?$/i, (m) => [{ do: 'payCost', cost: { restDon: Number(m[1]) } }]],
+  [
+    /^Place up to (\d+) cards? from your opponent's trash at the bottom of (?:the owner's|their) deck$/i,
+    (m) => [{ do: 'opponentTrashToBottom', count: Number(m[1]), upTo: true, chooser: 'self' }],
+  ],
   [
     // "K.O. up to 1 … with a cost of 3 or less and up to 1 … with a cost of 2 or less"
     /^K\.O\. (up to \d+ .+?) and (up to \d+ .+)$/i,
     (m) => {
       const a = parseTarget(m[1]);
       const b = parseTarget(m[2]);
-      return onlyCharacters(a) && onlyCharacters(b) ? [{ do: 'ko', target: a }, { do: 'ko', target: b }] : null;
+      const noLeader = (t: TargetRef | null): t is TargetRef => t !== null && (typeof t !== 'object' || !t.kinds.includes('leader'));
+      return noLeader(a) && noLeader(b) ? [{ do: 'ko', target: a }, { do: 'ko', target: b }] : null;
     },
   ],
   [
@@ -650,7 +941,7 @@ const CLAUSES: ClauseRule[] = [
     },
   ],
   [
-    /^Give (up to \d+ of your .+?) up to (\d+) rested DON!! cards? each$/i,
+    /^Give (up to \d+ of your .+?|your Leader and all of your Characters) up to (\d+) rested DON!! cards? each$/i,
     (m) => withTarget(m[1], (target) => ({ do: 'giveRestedDon', target, count: Number(m[2]) })),
   ],
   [
@@ -696,7 +987,7 @@ const CLAUSES: ClauseRule[] = [
     (m) => withTarget(m[1], (target) => ({ do: 'power', target, amount: Number(m[2]), duration: durationOf(m[3]) })),
   ],
   [
-    new RegExp(`^(.+?) gains? \\[(Rush|Blocker|Double Attack|Banish|Unblockable)\\] ${DUR}$`, 'i'),
+    new RegExp(`^(.+?) gains? \\[(Rush|Blocker|Double Attack|Banish|Unblockable|Rush: Character)\\] ${DUR}$`, 'i'),
     (m) =>
       withTarget(m[1], (target) => ({ do: 'gainKeyword', target, keyword: KEYWORDS[m[2].toLowerCase()], duration: durationOf(m[3]) })),
   ],
@@ -949,7 +1240,7 @@ const CLAUSES: ClauseRule[] = [
     (m) => [{ do: 'opponentLifeToHand', count: Number(m[1]) }],
   ],
   [
-    /^your opponent places (\d+) cards? from their hand at the bottom of their deck$/i,
+    /^your opponent places (\d+) cards? from their hand at the bottom of their deck(?: in any order)?$/i,
     (m) => [{ do: 'opponentHandToBottom', count: Number(m[1]) }],
   ],
   [
@@ -961,19 +1252,20 @@ const CLAUSES: ClauseRule[] = [
     (m) => withTarget(m[1], (target) => ({ do: 'cost', target, amount: Number(m[2]), duration: durationOf(m[3]) }), true),
   ],
   [
-    /^Add (up to \d+ .+?) from your hand( or trash)? to the top of your Life cards( face-(?:up|down))?$/i,
+    /^Add (up to \d+ .+?) from your (hand or trash|hand|trash) to the top of your Life cards( face-(?:up|down))?$/i,
     (m) => {
       const f = parseCardFilter(m[1]);
       if (!f) return null;
       const step: EffectStep = { do: 'handToLife', upTo: f.upTo, filter: f.filter };
-      if (m[2]) step.fromTrash = true;
+      if (/or/i.test(m[2])) step.fromTrash = true;
+      else if (/trash/i.test(m[2])) step.trashOnly = true;
       if (/up/i.test(m[3] ?? '')) step.faceUp = true;
       return [step];
     },
   ],
 
   [
-    /^(.+?) will not become active in your opponent's next Refresh Phase$/i,
+    /^(.+?) will not become active in (?:your opponent's|the) next Refresh Phase$/i,
     (m) => withTarget(m[1], (target) => ({ do: 'skipRefresh', target })),
   ],
   [
@@ -1022,11 +1314,11 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^(.+?) cannot attack until the end of your opponent's next (?:turn|End Phase)$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'cannotAttack', target, duration: 'nextOpponentTurn' }), true),
+    (m) => withTarget(m[1], (target) => ({ do: 'cannotAttack', target, duration: 'nextOpponentTurn' })),
   ],
   [
     /^(.+?) cannot attack during this turn$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'cannotAttack', target, duration: 'turn' }), true),
+    (m) => withTarget(m[1], (target) => ({ do: 'cannotAttack', target, duration: 'turn' })),
   ],
 
   [
@@ -1076,6 +1368,8 @@ const CLAUSES: ClauseRule[] = [
     /^you may (.+)$/i,
     (m) => {
       const rest = parseClause(m[1]);
+      // "you may rest 1 of your DON!! cards": o próprio custo pergunta (sem confirmar duas vezes).
+      if (rest?.length === 1 && rest[0].do === 'payCost' && rest[0].scope === undefined) return [{ ...rest[0], scope: 0 }];
       // scope: se recusar, pula só estes passos (o resto do efeito continua).
       return rest && [{ do: 'payCost', cost: {}, scope: rest.length }, ...rest];
     },
@@ -1092,7 +1386,7 @@ const CLAUSES: ClauseRule[] = [
     },
   ],
   [
-    /^(.+?) gains? \[(Rush|Blocker|Double Attack|Banish|Unblockable)\] and \+(\d+) power during this (turn|battle)$/i,
+    new RegExp(`^(.+?) gains? \\[(Rush|Blocker|Double Attack|Banish|Unblockable)\\] and \\+(\\d+) power ${DUR}$`, 'i'),
     (m) => {
       const duration = durationOf(m[4]);
       const kw = withTarget(m[1], (target) => ({ do: 'gainKeyword', target, keyword: KEYWORDS[m[2].toLowerCase()], duration }));
@@ -1226,7 +1520,7 @@ export function parseBody(body: string): EffectStep[] | null {
       sentences.splice(i + 1, 0, `Then, ${oneSentence[2]}.`);
     }
     const look =
-      s.match(/^Look at (?:up to )?(\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to (?:your hand|the top of your Life cards face-up)$/i) ??
+      s.match(/^Look at (?:up to )?(\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to (?:your hand|the top of your Life cards(?: face-up)?)$/i) ??
       s.match(/^Look at (\d+) cards from the top of your deck; (play) up to (\d+) (.+?)$/i);
     if (look) {
       const play = look[2] === 'play';
@@ -1234,7 +1528,7 @@ export function parseBody(body: string): EffectStep[] | null {
       const f = parseCardFilter(look[3]);
       let next = sentences[i + 1] ?? '';
       // "Then, place the rest at the bottom of your deck in any order and play up to 1 [X] from your hand."
-      const tail = next.match(/^(Then, place the rest at the bottom of your deck in any order) and (.+?)\.?$/i);
+      const tail = next.match(/^(Then, (?:place the rest at the bottom of your deck in any order|trash the rest)),? and (.+?)\.?$/i);
       let extra: EffectStep[] | null = null;
       if (tail) {
         extra = parseClause(tail[2]);
@@ -1252,6 +1546,10 @@ export function parseBody(body: string): EffectStep[] | null {
       const search: EffectStep = { do: 'search', look: Number(look[1]), upTo: Number(look[2]), filter: f.filter, rest };
       if (play) search.play = true;
       if (/Life cards face-up$/i.test(s)) search.toLife = true;
+      else if (/Life cards$/i.test(s)) {
+        search.toLife = true;
+        search.lifeFaceDown = true;
+      }
       steps.push(search);
       if (extra) steps.push(...extra);
       i++;
@@ -1341,9 +1639,12 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
   if (/^rest this (?:Character|Stage|card|Leader)$/i.test(part)) cost.restSelf = true;
   else if (/^trash this (?:Character|Stage|card)$/i.test(part)) cost.trashSelf = true;
   else if (/^K\.O\. this Character$/i.test(part)) cost.koSelf = true;
-  else if (/^place this Character at the bottom of (?:the owner's|your) deck$/i.test(part)) cost.selfToBottom = true;
+  else if (/^place this (?:Character|Stage) at the bottom of (?:the owner's|your) deck$/i.test(part)) cost.selfToBottom = true;
   else if ((m = part.match(/^return (\d+)(?: or more)? (?:of your active )?DON!! cards?(?: from your field)? to your DON!! deck$/i))) cost.donMinus = Number(m[1]);
-  else if ((m = part.match(/^give your (?:1 )?active Leader [−-](\d+) power during this turn$/i))) cost.leaderPowerMinus = Number(m[1]);
+  else if ((m = part.match(/^give your (?:1 )?active Leader [−-]?(\d+) power during this turn$/i))) cost.leaderPowerMinus = Number(m[1]);
+  else if ((m = part.match(/^return (\d+) Characters? to your hand$/i))) {
+    cost.returnOwn = { count: Number(m[1]), spec: { side: 'own', kinds: ['character'], upTo: Number(m[1]) } };
+  }
   else if ((m = part.match(/^give that Character [−-]?(\d+) power during this turn$/i))) cost.victimPowerMinus = Number(m[1]);
   else if ((m = part.match(/^turn (\d+) of your face-up Life cards face-down$/i))) cost.lifeFace = { count: Number(m[1]), up: false };
   else if ((m = part.match(/^turn (\d+) cards? from the top or bottom of your Life cards face-(up|down)$/i))) {
@@ -1364,7 +1665,7 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
     const spec = parseTarget(`up to ${m[2]}`);
     if (!spec || typeof spec !== 'object') return false;
     cost.giveDon = { count: Number(m[1]), spec };
-  } else if ((m = part.match(/^place (\d+) (?:of your (.+?)|(Stage .+?)) at the bottom of (?:the owner's|your) deck$/i))) {
+  } else if ((m = part.match(/^place (\d+) (?:of your (.+?)|((?:Stage|Character) .+?)) at the bottom of (?:the owner's|your) deck$/i))) {
     const spec = parseTarget(`up to ${m[1]} of your ${m[2] ?? m[3]}`);
     if (!spec || typeof spec !== 'object') return false;
     cost.ownToBottom = { count: Number(m[1]), spec };
@@ -1415,7 +1716,7 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
     if (!f) return false;
     cost.reveal = { count: Number(m[1]), filter: f.filter };
   }
-  else if ((m = part.match(/^place (\d+) cards? from your hand at the bottom of your deck$/i))) cost.handToBottom = Number(m[1]);
+  else if ((m = part.match(/^place (\d+) cards? from your hand at the bottom of your deck(?: in any order)?$/i))) cost.handToBottom = Number(m[1]);
   else if ((m = part.match(/^add (\d+) cards? from (the top or bottom of |the top of )?your Life (?:area|cards) to your hand$/i))) {
     cost.lifeToHand = Number(m[1]);
     if (/bottom/i.test(m[2] ?? '')) cost.lifeChoice = true;
@@ -1455,7 +1756,7 @@ function parseCost(rest: string): { cost?: AbilityCost; body: string } | null {
       .replace(/ and this (Character|Stage|card)$/i, ' and rest this $1')
       .replace(/^(rest|trash|return) this (Character|Stage|card) and (\d+ of your )/i, '$1 this $2 and $1 $3')
       .split(/ and (?=(?:rest|trash|add|place|return|turn|reveal|give) )/i);
-    for (const part of parts) if (!parseCostPart(part.trim(), cost)) return null;
+    for (const part of parts) if (!parseCostPart(part.trim().replace(/\.$/, ''), cost)) return null;
   }
   return { cost, body };
 }
@@ -1644,6 +1945,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   // Regras de construção / nome alternativo: não são efeitos de jogo (tratados na importação e no deck).
   if (/^Also treat this card's name as \[[^\]]+\] according to the rules$/i.test(s)) return [];
   if (/^Under the rules of this game, you may have any number of this card in your deck$/i.test(s)) return [];
+  if (/^Under the rules of this game, also treat this card's name as \[[^\]]+\] and \[[^\]]+\]$/i.test(s)) return [];
   const base: Ability = { timing: 'static', steps: [] };
   if (h.don) base.don = h.don;
   if (h.yourTurn) base.yourTurn = true;
@@ -1765,8 +2067,9 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   m = s.match(/^(?:all of )?your (.*?Characters.*?) (?:gain (\+\d+ (?:power|cost)|\[(?:Rush|Blocker|Double Attack|Banish|Unblockable)\])|(cannot be K\.O\.'d by (?:your opponent's )?effects))$/i);
   if (m) {
     const spec = parseTarget(`up to 99 of your ${m[1]}`);
-    if (spec && typeof spec === 'object' && spec.kinds.join() === 'character' && !spec.excludeSelf && !spec.either && !spec.maxCostDynamic) {
+    if (spec && typeof spec === 'object' && spec.kinds.join() === 'character' && !spec.either && !spec.maxCostDynamic) {
       const aura: NonNullable<Ability['aura']> = { kinds: ['character'], power: 0 };
+      if (spec.excludeSelf) aura.excludeSelf = true;
       if (spec.hasAnyType) aura.hasAnyType = spec.hasAnyType;
       if (spec.typeIncludes) aura.typeIncludes = spec.typeIncludes;
       if (spec.color) aura.color = spec.color;
@@ -1811,6 +2114,17 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [{ ...base, aura: { kinds: ['character'], power: 0, cost: Number(m[1]) } }];
   }
   if ((m = s.match(/^this Character gains \+(\d+) cost$/i))) return [{ ...base, staticCost: Number(m[1]) }];
+  if ((m = s.match(/^your \[([^\]]+)\] gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\]$/i))) {
+    return [{ ...base, aura: { kinds: ['character'], power: 0, names: [m[1]], keyword: KEYWORDS[m[2].toLowerCase()] } }];
+  }
+  if ((m = s.match(/^this Character gains \+(\d+) power and \+(\d+) cost$/i))) {
+    return [{ ...base, staticPower: Number(m[1]) }, { ...base, staticCost: Number(m[2]) }];
+  }
+  if ((m = s.match(/^your Leader gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\](?: and \+(\d+) power)?$/i))) {
+    const out: Ability[] = [{ ...base, aura: { kinds: ['leader'], power: 0, keyword: KEYWORDS[m[1].toLowerCase()] } }];
+    if (m[2]) out.push({ ...base, aura: { kinds: ['leader'], power: Number(m[2]) } });
+    return out;
+  }
   if ((m = s.match(/^this Character gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\] and \+(\d+) (cost|power)$/i))) {
     const second = m[3].toLowerCase() === 'cost' ? { staticCost: Number(m[2]) } : { staticPower: Number(m[2]) };
     return [{ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] }, { ...base, ...second }];

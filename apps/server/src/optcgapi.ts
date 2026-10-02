@@ -71,10 +71,12 @@ export function splitTrigger(text: string): { text: string; trigger?: string } {
       break;
     }
   }
+  // Sem colchetes numa linha própria: "…\nTrigger Play this card."
+  if (i < 0) i = text.search(/\n\s*Trigger\s+(?=[A-Z])/);
   if (i < 0) return { text };
   return {
     text: text.slice(0, i).trim(),
-    trigger: text.slice(i).replace(/^\[Trigger\]\s*/i, '').trim() || undefined,
+    trigger: text.slice(i).replace(/^\s*\[?Trigger\]?\s*/i, '').trim() || undefined,
   };
 }
 
@@ -204,7 +206,7 @@ export function mapApiCard(raw: Raw, vocab: Set<string> = new Set()): CardData |
   const explicitTrigger = pick(raw, 'trigger', 'trigger_text');
   const { text: effectText, notes } = extractNotes(cleanText(pick(raw, 'card_text', 'text', 'effect')));
   const split = splitTrigger(normalizeTypeQuotes(effectText));
-  const aliases = [...split.text.matchAll(/Also treat this card's name as \[([^\]]+)\]/g)].map((m) => m[1]);
+  const aliases = [...split.text.matchAll(/[Aa]lso treat this card's name as \[([^\]]+)\](?: and \[([^\]]+)\])?/g)].flatMap((m) => m.slice(1).filter(Boolean));
   const cardId = String(id).trim();
 
   return {

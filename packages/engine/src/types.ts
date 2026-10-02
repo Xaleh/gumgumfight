@@ -135,6 +135,28 @@ export interface CardFilter {
  */
 export interface Condition {
   minCharacters?: number;
+  /** "If your Leader is active" */
+  leaderActive?: boolean;
+  /** "If your Leader's colors include blue" */
+  leaderColor?: Color;
+  /** "If your Leader has N power or less" */
+  leaderMaxPower?: number;
+  /** "If your opponent's Leader has N power or more" */
+  opponentLeaderMinPower?: number;
+  /** "If you and your opponent have a total of N or more Life cards" */
+  totalLifeMin?: number;
+  /** "If your opponent has N or less DON!! cards on their field" */
+  opponentMaxDonOnField?: number;
+  /** "If this Character is active" */
+  selfActive?: boolean;
+  /** "If your Leader's card name includes "X"" */
+  leaderNameIncludes?: string;
+  /** "If your Leader has N power or more" */
+  leaderMinPower?: number;
+  /** "If you have less Characters than your opponent" */
+  fewerCharacters?: boolean;
+  /** "If there are N or more Characters with a cost of N or more" (dos dois jogadores) */
+  anyCharactersWithCost?: { count: number; cost: number };
   /** "If this Character is rested" */
   selfRested?: boolean;
   /** "If you have N or more DON!! cards on your field" */
@@ -322,6 +344,8 @@ export interface Aura {
   keyword?: Keyword;
   /** "cannot be removed from the field by your opponent's effects" */
   noRemoval?: boolean;
+  /** "other than this Character" */
+  excludeSelf?: boolean;
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -396,11 +420,24 @@ type EffectStepBody =
   /** "Give up to 2 total of your currently given DON!! cards to 1 of your Characters" */
   | { do: 'moveGivenDon'; count: number; target: TargetRef }
   /** "Select up to 1 X card from your hand and play it or add it to the top of your Life cards face-up" */
-  | { do: 'handPlayOrLife'; filter: CardFilter }
+  | { do: 'handPlayOrLife'; filter: CardFilter; from?: 'trash' }
+  /** "Return all cards in your hand to your deck and shuffle your deck" (eventCount = cartas devolvidas). */
+  | { do: 'handAllToDeck'; who: 'self' | 'opponent' }
+  | { do: 'opponentDraws'; count: number }
+  /** "trash all cards from your hand" */
+  | { do: 'trashHand' }
+  /** "Your opponent returns 1 of their Characters to the owner's hand" (o oponente escolhe). */
+  | { do: 'opponentChoosesOwn'; count: number; spec: TargetSpec; action: 'hand' | 'bottom' }
+  /** "you take 1 damage" / "deal 1 damage to your opponent" */
+  | { do: 'takeDamage'; count: number; opponent?: boolean }
+  /** "trash cards from the top of your Life cards until you have N Life card" */
+  | { do: 'lifeTrashUntil'; count: number }
+  /** "Trash cards from your hand until you have N cards in your hand" (both: os dois jogadores). */
+  | { do: 'trashHandUntil'; count: number; both?: boolean }
   /** "Your opponent's [On Play] effects are negated until …" */
   | { do: 'negateOnPlay'; who: 'opponent' | 'self'; duration: Duration }
   | { do: 'cannotAttackCharacters'; maxBaseCost: number; duration: Duration }
-  | { do: 'drawEventCount' }
+  | { do: 'drawEventCount'; returned?: boolean }
   | { do: 'restDonForPower'; power: number; target: TargetRef }
   | { do: 'payEither'; options: AbilityCost[] }
   | { do: 'swapBasePower'; spec: TargetSpec; duration: Duration }
@@ -411,7 +448,8 @@ type EffectStepBody =
   | { do: 'cannotBlock'; target: TargetRef; duration: Duration }
   | { do: 'returnGivenDon'; count: number }
   | { do: 'chooseCost' }
-  | { do: 'opponentTrashToBottom'; count: number }
+  /** chooser 'self': "Place up to 1 card from your opponent's trash at the bottom of the owner's deck" (você escolhe). */
+  | { do: 'opponentTrashToBottom'; count: number; upTo?: boolean; chooser?: 'self' }
   | { do: 'arrangeLife'; whose: 'own' | 'opponent' }
   /** "Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 3 or less" */
   | { do: 'restDonOrCharacter'; spec: TargetSpec }
@@ -443,13 +481,13 @@ type EffectStepBody =
   /** "Set up to N of your DON!! cards as active." */
   | { do: 'setDonActive'; count: number }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
-  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean }
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean; lifeFaceDown?: boolean }
   /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */
   | { do: 'tutor'; upTo: number; filter: CardFilter }
   /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */
   | { do: 'lifeToHand'; count: number; choose?: boolean }
   /** "add up to 1 card from your hand to the top of your Life cards" */
-  | { do: 'handToLife'; upTo: number; filter?: CardFilter; faceUp?: boolean; fromTrash?: boolean }
+  | { do: 'handToLife'; upTo: number; filter?: CardFilter; faceUp?: boolean; fromTrash?: boolean; trashOnly?: boolean }
   /** "Add up to 1 of your Characters … to the top of the owner's Life cards" */
   | { do: 'fieldToLife'; target: TargetRef; choose?: boolean }
   /** "Look at up to 1 card from the top of your or your opponent's Life cards, and place it at the top or bottom" */
@@ -516,7 +554,7 @@ type EffectStepBody =
   /** "… then shuffle your deck." */
   | { do: 'shuffleDeck' }
   /** "Look at N cards from the top of your deck and return them to the top or bottom of the deck in any order." */
-  | { do: 'arrangeTop'; look: number }
+  | { do: 'arrangeTop'; look: number; topOnly?: boolean }
   /**
    * Custo opcional no meio de um efeito automático ("[On Play] DON!! −1: …", "You may trash 1 card from your
    * hand: …"). O jogador decide se paga; se não pagar (ou não puder), o resto do efeito não acontece.
@@ -541,7 +579,7 @@ type EffectStepBody =
   /** "Add up to N card from the top of your deck to the top of your Life cards." */
   | { do: 'addLifeFromDeck'; count: number }
   /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
-  | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean };
+  | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: boolean };
 
 /** Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado). */
 export type EffectStep = EffectStepBody & { if?: StepCondition };
@@ -724,6 +762,7 @@ export interface Modifier {
     | 'keyword'
     | 'cannotBeKO'
     | 'cannotBeKOInBattle'
+    | 'cannotBeKOByEffect'
     | 'canAttackActive'
     | 'cannotAttack'
     | 'skipRefresh'
@@ -796,6 +835,8 @@ export type Frame =
       chosenCost?: number;
       /** Quantidade do acontecimento que disparou o efeito (ex.: cartas descartadas). */
       eventCount?: number;
+      /** Carta revelada do topo do deck ("place the revealed card …" depois de outras escolhas). */
+      revealed?: string[];
     }
   | { kind: 'battle' }
   | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean; lost?: number }

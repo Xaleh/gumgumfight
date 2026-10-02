@@ -64,7 +64,10 @@ const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩';
 
 /** Sinaliza que algo não tem descrição: a linha cai na tradução por regras. */
 class Unknown extends Error {}
+/** Ferramentas de análise: o que ficou sem descrição. */
+export const unknownSeen: Record<string, number> = {};
 const unknown = (what: string): never => {
+  unknownSeen[what] = (unknownSeen[what] ?? 0) + 1;
   throw new Unknown(what);
 };
 
@@ -383,6 +386,42 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'leaderMonocolor':
         out.push('o seu Líder for de uma só cor');
         break;
+      case 'leaderActive':
+        out.push('o seu Líder estiver ativo');
+        break;
+      case 'selfActive':
+        out.push(`${ctx.self} estiver ativo`);
+        break;
+      case 'leaderColor':
+        out.push(`as cores do seu Líder incluírem ${COLOR_M[c.leaderColor!]?.[0] ?? c.leaderColor}`);
+        break;
+      case 'leaderMaxPower':
+        out.push(`o seu Líder tiver ${c.leaderMaxPower} ou menos de poder`);
+        break;
+      case 'leaderMinPower':
+        out.push(`o seu Líder tiver ${c.leaderMinPower} ou mais de poder`);
+        break;
+      case 'opponentLeaderMinPower':
+        out.push(`o Líder do oponente tiver ${c.opponentLeaderMinPower} ou mais de poder`);
+        break;
+      case 'totalLifeMin':
+        out.push(`você e o oponente tiverem, juntos, ${c.totalLifeMin} ou mais cartas de Vida`);
+        break;
+      case 'opponentMaxDonOnField':
+        out.push(`o oponente tiver ${c.opponentMaxDonOnField} ou menos DON!! no campo`);
+        break;
+      case 'leaderNameIncludes':
+        out.push(`o nome do seu Líder incluir "${c.leaderNameIncludes}"`);
+        break;
+      case 'fewerCharacters':
+        out.push('você tiver menos Personagens que o oponente');
+        break;
+      case 'anyCharactersWithCost':
+        out.push(`houver ${c.anyCharactersWithCost!.count} ou mais Personagens com custo ${c.anyCharactersWithCost!.cost} ou mais`);
+        break;
+      case 'minRestedDon':
+        out.push(`você tiver ${c.minRestedDon} ou mais DON!! virados`);
+        break;
       case 'ownMatching':
       case 'opponentMatching': {
         const mm = (key === 'ownMatching' ? c.ownMatching : c.opponentMatching)!;
@@ -656,7 +695,7 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Deixe ${qty(s.count)} dos seus DON!! ${plural(s.count, 'ativo', 'ativos')}.`;
     case 'search': {
       const verb = s.play ? 'jogue' : 'revele';
-      const tail = s.play ? '' : s.toLife ? ' e coloque-a no topo da sua Vida, com a face para cima' : ' e adicione à sua mão';
+      const tail = s.play ? '' : s.toLife ? ` e coloque-a no topo da sua Vida${s.lifeFaceDown ? '' : ', com a face para cima'}` : ' e adicione à sua mão';
       const rest =
         s.rest === 'bottom'
           ? 'Depois, coloque o resto no fundo do seu deck em qualquer ordem.'
@@ -676,13 +715,17 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'shuffleDeck':
       return 'Embaralhe o seu deck.';
     case 'arrangeTop':
-      return `Olhe as ${s.look} cartas do topo do seu deck e devolva-as ao topo ou ao fundo do deck, em qualquer ordem.`;
+      return s.topOnly
+        ? `Olhe as ${s.look} cartas do topo do seu deck e devolva-as ao topo do deck, em qualquer ordem.`
+        : `Olhe as ${s.look} cartas do topo do seu deck e devolva-as ao topo ou ao fundo do deck, em qualquer ordem.`;
     case 'trashLife':
       return `Descarte ${qty(s.count)} ${plural(s.count, 'carta', 'cartas')} do topo da Vida ${s.side === 'own' ? 'sua' : 'do oponente'}.`;
     case 'gainKeyword':
       return `${cap(target(s.target, ctx))} ganha ${KW[s.keyword]} ${dur(s.duration)}.`;
-    case 'cannotBeKO':
-      return `${cap(target(s.target, ctx))} não pode ser nocauteado${s.inBattle ? ' em batalha' : ''} ${dur(s.duration)}.`;
+    case 'cannotBeKO': {
+      const many = typeof s.target === 'object' && s.target.all;
+      return `${cap(target(s.target, ctx))} ${many ? 'não podem ser nocauteados' : 'não pode ser nocauteado'}${s.inBattle ? ' em batalha' : s.byEffect ? ' por efeitos' : ''} ${dur(s.duration)}.`;
+    }
     case 'cannotAttack':
       return `${cap(target(s.target, ctx))} não pode atacar ${dur(s.duration)}.`;
     case 'canAttackActive':
@@ -708,7 +751,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'lifeToHand':
       return `Coloque ${cards(s.count)} do ${s.choose ? 'topo ou do fundo' : 'topo'} da sua Vida na mão.`;
     case 'handToLife':
-      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} da sua mão${s.fromTrash ? ' ou do seu descarte' : ''} no topo da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
+      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} ${s.trashOnly ? 'do seu descarte' : `da sua mão${s.fromTrash ? ' ou do seu descarte' : ''}`} no topo da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'fieldToLife':
       return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono.`;
     case 'peekLife':
@@ -726,13 +769,13 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'moveGivenDon':
       return `Passe até ${s.count} DON!! já anexados às suas cartas para ${target(s.target, ctx)}.`;
     case 'handPlayOrLife':
-      return `Escolha até ${filter(s.filter, 1, false)} da sua mão e jogue-a ou coloque-a no topo da sua Vida, com a face para cima.`;
+      return `Escolha até ${filter(s.filter, 1, false)} ${s.from === 'trash' ? 'do seu descarte' : 'da sua mão'} e jogue-a ou coloque-a no topo da sua Vida, com a face para cima.`;
     case 'negateOnPlay':
       return `Os efeitos [Ao Jogar] ${s.who === 'opponent' ? 'do oponente' : 'seus'} ficam anulados ${dur(s.duration)}.`;
     case 'cannotAttackCharacters':
       return `${cap(ctx.self)} não pode atacar Personagens do oponente com custo base ${s.maxBaseCost} ou menos ${dur(s.duration)}.`;
     case 'drawEventCount':
-      return 'Compre tantas cartas quanto as descartadas.';
+      return s.returned ? 'Compre tantas cartas quanto as devolvidas ao deck.' : 'Compre tantas cartas quanto as descartadas.';
     case 'restDonForPower':
       return `Você pode virar quantos DON!! quiser. Para cada DON!! virado assim, ${target(s.target, ctx)} recebe +${s.power} de poder durante esta batalha.`;
     case 'payEither':
@@ -754,7 +797,9 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'lastToDeckTop':
       return 'Coloque a carta revelada no topo do seu deck.';
     case 'opponentTrashToBottom':
-      return `O oponente coloca ${cards(s.count)} do descarte dele no fundo do deck dele, na ordem que quiser.`;
+      return s.chooser === 'self'
+        ? `Coloque até ${cards(s.count)} do descarte do oponente no fundo do deck dele.`
+        : `O oponente coloca ${cards(s.count)} do descarte dele no fundo do deck dele, na ordem que quiser.`;
     case 'arrangeLife':
       return `Olhe todas as cartas de Vida ${s.whose === 'own' ? 'suas' : 'do oponente'} e devolva-as na ordem que quiser.`;
     case 'restDonOrCharacter':
@@ -807,7 +852,39 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'revealedToBottom':
       return 'Coloque a carta revelada no fundo do seu deck.';
     case 'skipRefresh':
-      return `${cap(target(s.target, ctx))} não fica ativo na próxima Fase de Renovação do oponente.`;
+      return s.target === 'self'
+        ? `${cap(ctx.self)} não fica ativo na sua próxima Fase de Renovação.`
+        : s.target === 'chosen'
+          ? 'Essa carta não fica ativa na sua próxima Fase de Renovação.'
+          : `${cap(target(s.target, ctx))} não fica ativo na próxima Fase de Renovação do oponente.`;
+    case 'handToDeckBottom':
+      return `Coloque ${cards(s.count)} da sua mão no fundo do seu deck, na ordem que quiser.`;
+    case 'opponentChoosesOwn':
+      return `O oponente escolhe ${target({ ...s.spec, side: 'own', upTo: s.count }, ctx).replace(/^até /, '').replace(/ dos seus /, ' dos próprios ')} e ${s.action === 'hand' ? 'devolve à mão do dono' : 'coloca no fundo do deck do dono'}.`;
+    case 'trashSelf':
+      return `Descarte ${ctx.self}.`;
+    case 'lifeFace':
+      return s.count >= 99
+        ? `Vire todas as suas cartas de Vida com a face para ${s.up ? 'cima' : 'baixo'}.`
+        : `Vire ${cards(s.count)} do topo da sua Vida com a face para ${s.up ? 'cima' : 'baixo'}.`;
+    case 'takeDamage':
+      return s.opponent ? `Cause ${s.count} de dano ao oponente.` : `Você recebe ${s.count} de dano.`;
+    case 'handAllToDeck':
+      return s.who === 'self'
+        ? 'Devolva todas as cartas da sua mão ao deck e embaralhe o seu deck.'
+        : 'O oponente devolve todas as cartas da mão ao deck e embaralha o deck.';
+    case 'opponentDraws':
+      return `O oponente compra ${cards(s.count)}.`;
+    case 'trashHand':
+      return 'Descarte todas as cartas da sua mão.';
+    case 'trashHandUntil':
+      return s.both
+        ? `Você e o oponente descartam cartas da mão até cada um ficar com ${cards(s.count)}.`
+        : `Descarte cartas da sua mão até ficar com ${cards(s.count)} na mão.`;
+    case 'lifeTrashUntil':
+      return `Descarte cartas do topo da sua Vida até ficar com ${cards(s.count)} de Vida.`;
+    case 'trashOwn':
+      return `Descarte ${target({ ...s.spec, upTo: s.count }, ctx).replace(/^até /, '')}.`;
     case 'delayed':
       return `No fim deste turno: ${steps(s.steps, ctx)}`;
     default:
@@ -821,6 +898,7 @@ function steps(list: EffectStep[], ctx: Ctx): string {
   const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
   const noDot = (t: string) => t.replace(/\.$/, '');
   let sentences = 0; // frases de efeito já escritas (para o "Depois,")
+  let ifDone = 0; // passos cobertos por um custo opcional no meio do efeito ("Se fizer isso, …")
   for (let i = 0; i < list.length; i++) {
     const s = list[i];
     if (s.do === 'payCost') {
@@ -835,6 +913,14 @@ function steps(list: EffectStep[], ctx: Ctx): string {
         i += scope;
         continue;
       }
+      if (scope !== undefined && c && i > 0) {
+        // "Then, you may rest 1 of your DON!! cards. If you do, …" no meio do efeito.
+        const only = Object.keys(s.cost);
+        const what = only.length === 1 && s.cost.restDon ? `você pode virar ${s.cost.restDon} dos seus DON!!` : lower(c);
+        out.push(sentences++ ? `Depois, ${what}.` : `${cap(what)}.`);
+        ifDone = scope;
+        continue;
+      }
       out.push(`${c || 'Você pode usar este efeito'}:`);
       continue;
     }
@@ -846,7 +932,11 @@ function steps(list: EffectStep[], ctx: Ctx): string {
     }
     const body = group.map((g, k) => (k ? lower(noDot(step(g, ctx))) : noDot(step(g, ctx)))).join(' e ');
     let text = key ? `Se ${condition(s.if!, ctx)}, ${lower(body)}.` : `${body}.`;
-    if (sentences++ && !/^(Olhe|Revele)/.test(text)) text = `Depois, ${lower(text)}`;
+    if (ifDone > 0) {
+      text = `Se fizer isso, ${lower(text)}`;
+      sentences++;
+    } else if (sentences++ && !/^(Olhe|Revele)/.test(text)) text = `Depois, ${lower(text)}`;
+    ifDone = 0;
     out.push(text);
   }
   return out.join(' ').replace(/\s+/g, ' ').trim();
@@ -965,7 +1055,8 @@ function staticText(a: Ability, ctx: Ctx): string {
             ? `recebem ${au.cost > 0 ? '+' : '−'}${Math.abs(au.cost)} de custo`
             : `recebem ${au.power >= 0 ? '+' : '−'}${Math.abs(au.power)} de poder`;
     const sing = leaderOnly ? effect.replace(/^recebem/, 'recebe').replace(/^ganham/, 'ganha') : effect;
-    text = `${cap([whose, extra, filt].filter(Boolean).join(' '))} ${sing}.`;
+    const except = au.excludeSelf ? `, exceto ${ctx.self},` : '';
+    text = `${cap([whose, extra, filt].filter(Boolean).join(' '))}${except} ${sing}.`;
   } else if (parts.length) {
     text = `${cap(ctx.self)} ${parts.join(' e ')}.`;
   } else {

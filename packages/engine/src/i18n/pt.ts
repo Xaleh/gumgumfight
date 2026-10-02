@@ -224,6 +224,10 @@ const SENTENCES: Rule[] = [
     (_, n) => `Pelas regras, o nome desta carta também é considerado ${n}.`,
   ],
   [
+    /^Under the rules of this game, also treat this card's name as (\[[^\]]+\]) and (\[[^\]]+\])\.?$/i,
+    (_, a, b) => `Pelas regras do jogo, o nome desta carta também é considerado ${a} e ${b}.`,
+  ],
+  [
     /^(.+?) cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards)\.?$/i,
     (_, who, attr) => `${who} não pode ser nocauteado em batalha por Personagens de atributo ${attr}.`,
   ],
