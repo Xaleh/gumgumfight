@@ -89,6 +89,11 @@ async function main() {
           { name: l1.name, deck: d1, isBot: true },
         ],
       });
+      const donTotal = (st: GameState, p: 0 | 1) => {
+        const pl = st.players[p];
+        return pl.donDeck + pl.donActive + pl.donRested + [pl.leader, ...pl.characters, ...(pl.stage ? [pl.stage] : [])].reduce((n, c) => n + c.don, 0);
+      };
+      const don0 = [donTotal(s, 0), donTotal(s, 1)];
       let i = 0;
       for (; i < 4000 && s.phase !== 'gameover'; i++) {
         const player = actingPlayer(s)!;
@@ -101,6 +106,7 @@ async function main() {
         s = applyAction(s, action);
         for (const p of [0, 1] as const) {
           if (countCards(s, p) !== 51) throw new Error(`cartas do jogador ${p}: ${countCards(s, p)}`);
+          if (donTotal(s, p) !== don0[p]) throw new Error(`DON!! do jogador ${p}: ${donTotal(s, p)} (esperado ${don0[p]}) após ${action.type}`);
         }
       }
       actions += i;

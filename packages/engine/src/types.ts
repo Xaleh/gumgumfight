@@ -89,6 +89,12 @@ export interface TargetSpec {
   color?: Color;
   /** "with a type including "Whitebeard Pirates"" (parte do nome do tipo) */
   typeIncludes?: string;
+  /** "with a total power of 4000 or less": soma das cartas escolhidas. */
+  totalMaxPower?: number;
+  /** "with a total cost of 4 or less" */
+  totalMaxCost?: number;
+  /** "with no base effect" (sem texto de efeito impresso) */
+  noEffect?: boolean;
 }
 
 /** Filtro de cartas fora do campo (busca no deck, mão...). */
@@ -127,6 +133,10 @@ export interface CardFilter {
   maxCostOppDon?: boolean;
   /** "with different card names" (várias cartas escolhidas) */
   distinctNames?: boolean;
+  /** "and a total cost of 9 or less" (várias cartas escolhidas) */
+  totalMaxCost?: number;
+  /** "the same card name as the trashed card" (a carta descartada no custo) */
+  sameNameAsChosen?: boolean;
 }
 
 /**
@@ -135,6 +145,38 @@ export interface CardFilter {
  */
 export interface Condition {
   minCharacters?: number;
+  /** "If there is a [X] Character" (de qualquer jogador) */
+  anyCharacterNamed?: string;
+  /** "If you only have Characters with a type including "X"" */
+  onlyTypeIncludes?: string;
+  /** "If all of your DON!! cards are rested" */
+  allDonRested?: boolean;
+  /** "the number of … on your field is at least N less than the number on your opponent's field" */
+  deficit?: { what: 'don' | 'hand' | 'characters'; n: number };
+  /** "If you have [X] and [Y] in your trash" */
+  trashHasNames?: string[];
+  /** "If there is a Character with N base power or more" */
+  anyCharacterMinBasePower?: number;
+  /** "If your opponent's Character has been K.O.'d during this turn" */
+  opponentCharacterKOThisTurn?: boolean;
+  /** "If you have 5 {X} type Characters with different card names" */
+  distinctTyped?: { type: string; count: number };
+  /** haveNamed: "… Characters with 6000 base power" */
+  haveNamedBasePower?: number;
+  /** "If the chosen Character has a cost equal to the number of DON!! cards given to it" */
+  chosenCostEqualsDon?: boolean;
+  /** "your opponent's Character attacks" ([On Your Opponent's Attack] só contra Personagens) */
+  attackerCharacter?: boolean;
+  /** "If that Character has the "Slash" attribute" (o atacante) */
+  attackerAttribute?: string;
+  /** "During the turn in which a card in your hand is trashed by an effect" */
+  handTrashedThisTurn?: boolean;
+  /** "your opponent has 5 or more rested cards" (cartas + DON!!) */
+  opponentRestedCardsMin?: number;
+  /** "If your Leader is [A] or [B]" */
+  leaderNames?: string[];
+  /** "If you only have Characters without a Counter" */
+  onlyCharactersWithoutCounter?: boolean;
   /** "If your Leader is active" */
   leaderActive?: boolean;
   /** "If your Leader's colors include blue" */
@@ -346,6 +388,24 @@ export interface Aura {
   noRemoval?: boolean;
   /** "other than this Character" */
   excludeSelf?: boolean;
+  /** "… base power becomes N" (poder base em vez de bônus) */
+  basePower?: number;
+  /** "base power becomes the same as your Leader's base power" */
+  basePowerCopyLeader?: boolean;
+  /** "cannot be K.O.'d in battle" */
+  noBattleKO?: boolean;
+  /** "have their effects negated" */
+  negate?: boolean;
+  /** "that do not have a type including "X"" */
+  notTypeIncludes?: string;
+  /** "cannot attack" */
+  cannotAttack?: boolean;
+  /** Vale para as cartas dos dois jogadores. */
+  bothSides?: boolean;
+  /** "with a [Trigger]" */
+  hasTrigger?: boolean;
+  /** Custo exato / mínimo além de maxCost */
+  exactCosts?: number[];
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -366,7 +426,7 @@ export type Duration = 'turn' | 'battle' | 'nextOpponentTurn' | 'untilYourNextTu
 export interface Replacement {
   who: 'self' | TargetSpec;
   /** ko = só K.O.; removal = sair do campo por efeito do oponente (inclui K.O. por efeito do oponente). */
-  event: 'ko' | 'removal' | 'koOrRemoval';
+  event: 'ko' | 'removal' | 'koOrRemoval' | 'rest';
   /** any = qualquer K.O.; battle = em batalha; effect = por efeito; opponentEffect = por efeito do oponente. */
   by: 'any' | 'battle' | 'effect' | 'opponentEffect';
 }
@@ -388,16 +448,22 @@ export type GameEvent =
   | { kind: 'characterKO'; whose: 'any' | 'own' | 'opponent'; filter?: CardFilter }
   | { kind: 'eventActivated'; who: 'self' | 'opponent' }
   | { kind: 'blockerActivated'; who: 'self' | 'opponent' }
-  | { kind: 'selfRested' } // "When this Character becomes rested"
+  | { kind: 'selfRested'; byOpponent?: boolean; byCharacter?: boolean } // "When this Character becomes rested"
   | { kind: 'attackDamage' } // "When this Character's attack deals damage to your opponent's Life"
-  | { kind: 'battleKO' }; // "When this Character battles and K.O.'s your opponent's Character"
+  | { kind: 'battleKO' } // "When this Character battles and K.O.'s your opponent's Character"
+  | { kind: 'triggerActivated'; who: 'any' | 'opponent' } // "When a [Trigger] activates"
+  | { kind: 'drawByEffect' } // "When you draw a card outside of your Draw Phase"
+  | { kind: 'damageDealt' } // "When you deal damage to your opponent's Life"
+  | { kind: 'leaderBattle'; filter?: CardFilter } // "When your Leader … attacks or is attacked"
+  | { kind: 'lifeToHand' } // "When a card is added to your hand from your Life"
+  | { kind: 'returnedToHand'; whose: 'opponent'; by: 'self' }; // "When your opponent's Character is returned to the owner's hand by your effect"
 
 type EffectStepBody =
-  | { do: 'power'; target: TargetRef; amount: number; duration: Duration }
+  | { do: 'power'; target: TargetRef; amount: number; duration: Duration; per?: TargetSpec }
   | { do: 'ko'; target: TargetRef }
   | { do: 'rest'; target: TargetRef }
   | { do: 'setActive'; target: TargetRef }
-  | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean }
+  | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; anyState?: boolean }
   | { do: 'draw'; count: number }
   | { do: 'addDonFromDeck'; count: number; rested?: boolean }
   | { do: 'restOpponentDon'; count: number }
@@ -421,6 +487,54 @@ type EffectStepBody =
   | { do: 'moveGivenDon'; count: number; target: TargetRef }
   /** "Select up to 1 X card from your hand and play it or add it to the top of your Life cards face-up" */
   | { do: 'handPlayOrLife'; filter: CardFilter; from?: 'trash' }
+  /** "Draw a card for each of your {X} type Characters" (eventCount = cartas compradas) */
+  | { do: 'drawPerMatching'; spec: TargetSpec }
+  /** "trash the same number of cards from your hand" / "from the top of your deck" (usa eventCount) */
+  | { do: 'trashEventCount'; from: 'hand' | 'deck' }
+  /** "Your opponent chooses 1 card from your hand; trash that card" */
+  | { do: 'opponentPicksFromHand'; count: number }
+  /** "Choose 1 card from your opponent's hand; your opponent reveals that card" (ao acaso) */
+  | { do: 'revealOpponentHand'; count: number }
+  /** "place up to 1 card from your opponent's Life area at the bottom of the owner's deck" */
+  | { do: 'opponentLifeToBottom'; count: number }
+  /** "you may K.O./return/place any number of … . +N power for every …" */
+  | {
+      do: 'anyNumberForPower';
+      source: 'field' | 'trash';
+      action: 'ko' | 'hand' | 'bottom';
+      spec?: TargetSpec;
+      filter?: CardFilter;
+      power: number;
+      every: number;
+      target: TargetRef;
+      duration: Duration;
+    }
+  /** "up to 1 of your opponent's rested DON!! cards will not become active in your opponent's next Refresh Phase" */
+  | { do: 'skipRefreshDon'; count: number }
+  | { do: 'winGame' }
+  | { do: 'extraTurn' }
+  /** "Your opponent may trash N … . If they do not, …" */
+  | { do: 'opponentMay'; pay: 'lifeTrash' | 'discard' | 'returnDon'; count: number; otherwise: EffectStep[] }
+  /** "your opponent plays up to 1 Character card … from their hand" */
+  | { do: 'opponentPlays'; upTo: number; filter: CardFilter }
+  /** "your opponent may add 1 DON!! card from their DON!! deck and set it as active" */
+  | { do: 'opponentAddDon'; count: number }
+  /** "return DON!! cards … until you have the same number of DON!! cards on your field as your opponent" */
+  | { do: 'donMatchOpponent' }
+  /** "give all of your opponent's Characters -1000 power … for every DON!! card given to that Character" */
+  | { do: 'powerPerDon'; target: TargetRef; amount: number; duration: Duration }
+  /** "This Character gains +1000 power during this turn per 1 cost on the revealed card" */
+  | { do: 'powerPerRevealedCost'; target: TargetRef; amount: number; duration: Duration }
+  /** "… gains the "Slash" attribute during this turn" */
+  | { do: 'gainAttribute'; target: TargetRef; attribute: string; duration: Duration }
+  /** "activate the [Main] effect of up to 1 Event card … in your trash" */
+  | { do: 'activateEventFromTrash'; filter: CardFilter }
+  /** "If any of your Characters would be K.O.'d in battle during this turn, you may trash 1 card from your hand instead." */
+  | { do: 'tempReplace'; by: 'battle' | 'any'; cost: AbilityCost }
+  /** "If this Character would be rested by your opponent's Character's effect, you may … instead." */
+  | { do: 'replaceRest'; victim: string; ability: number; byPlayer: PlayerId }
+  /** "none of the selected Characters can attack unless your opponent trashes 2 cards from their hand whenever they attack" */
+  | { do: 'attackTax'; target: TargetRef; count: number; duration: Duration }
   /** "Return all cards in your hand to your deck and shuffle your deck" (eventCount = cartas devolvidas). */
   | { do: 'handAllToDeck'; who: 'self' | 'opponent' }
   | { do: 'opponentDraws'; count: number }
@@ -440,7 +554,7 @@ type EffectStepBody =
   | { do: 'drawEventCount'; returned?: boolean }
   | { do: 'restDonForPower'; power: number; target: TargetRef }
   | { do: 'payEither'; options: AbilityCost[] }
-  | { do: 'swapBasePower'; spec: TargetSpec; duration: Duration }
+  | { do: 'swapBasePower'; spec: TargetSpec; duration: Duration; withLeader?: boolean }
   | { do: 'trashFaceUpLife' }
   | { do: 'lastToDeckTop' }
   | { do: 'revealedToTopOrBottom' }
@@ -449,7 +563,7 @@ type EffectStepBody =
   | { do: 'returnGivenDon'; count: number }
   | { do: 'chooseCost' }
   /** chooser 'self': "Place up to 1 card from your opponent's trash at the bottom of the owner's deck" (você escolhe). */
-  | { do: 'opponentTrashToBottom'; count: number; upTo?: boolean; chooser?: 'self' }
+  | { do: 'opponentTrashToBottom'; count: number; upTo?: boolean; chooser?: 'self'; filter?: CardFilter }
   | { do: 'arrangeLife'; whose: 'own' | 'opponent' }
   /** "Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 3 or less" */
   | { do: 'restDonOrCharacter'; spec: TargetSpec }
@@ -460,7 +574,7 @@ type EffectStepBody =
   | { do: 'restrict'; kind: RestrictionKind; minCost?: number }
   | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
   /** "base power becomes N" ou "the same as your opponent's Leader('s power)" */
-  | { do: 'basePower'; target: TargetRef; amount?: number; copy?: 'opponentLeader'; duration: Duration }
+  | { do: 'basePower'; target: TargetRef; amount?: number; copy?: 'opponentLeader' | 'chosen' | 'attacker'; duration: Duration }
   | {
       do: 'trashAnyForPower';
       categories?: Array<'event' | 'stage' | 'character'>;
@@ -470,18 +584,18 @@ type EffectStepBody =
       target?: TargetRef;
     }
   /** "Change the attack target to your Leader or 1 of your … Characters" */
-  | { do: 'redirectAttack'; spec: TargetSpec }
+  | { do: 'redirectAttack'; spec: TargetSpec; toChosen?: boolean; noLeader?: boolean }
   | { do: 'handToDeck'; count: number; where: 'top' | 'bottom' | 'choose' }
   /** Descartar cartas da mão (custo "You may trash N card from your hand"). */
   | { do: 'trashFromHand'; count: number; filter?: CardFilter; upTo?: boolean }
   /** "Draw cards so that you have N cards in your hand." */
   | { do: 'drawUntil'; count: number }
   /** "Your opponent returns N DON!! cards from their field to their DON!! deck." */
-  | { do: 'opponentReturnsDon'; count: number }
+  | { do: 'opponentReturnsDon'; count: number; activeOnly?: boolean }
   /** "Set up to N of your DON!! cards as active." */
   | { do: 'setDonActive'; count: number }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
-  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean; lifeFaceDown?: boolean }
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean; lifeFaceDown?: boolean; rested?: boolean; toTrash?: boolean }
   /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */
   | { do: 'tutor'; upTo: number; filter: CardFilter }
   /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */
@@ -532,9 +646,11 @@ type EffectStepBody =
       ability: number;
       action: 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
       inBattle?: boolean;
+      /** Substituição criada por efeito (sem habilidade na carta): o custo vem aqui. */
+      inlineCost?: AbilityCost;
     }
   /** "… at the end of this turn": passos adiados para o fim do turno. */
-  | { do: 'delayed'; steps: EffectStep[] }
+  | { do: 'delayed'; steps: EffectStep[]; when?: 'battle'; keepChosen?: boolean }
   /** Virar N Personagens ativos seus (custo "You may rest 2 of your Characters"). */
   | { do: 'restOwnCharacters'; count: number }
   /** Colocar cartas da mão no fundo do deck (custo "You may place 1 card from your hand at the bottom of your deck"). */
@@ -650,6 +766,22 @@ export interface AbilityCost {
   reveal?: { count: number; filter?: CardFilter };
   /** "You may turn N card from the top of your Life cards face-up / face-down:" */
   lifeFace?: { count: number; up: boolean };
+  /** "you may rest 1 of your opponent's Characters instead" */
+  restOpponentChars?: number;
+  /** "give this Character −2000 power during this turn" */
+  selfPowerMinus?: number;
+  /** "return 20 cards from your trash to your deck and shuffle it" */
+  trashToDeck?: number;
+  /** "play 1 [Kotori] from your hand" */
+  playFromHand?: CardFilter;
+  /** "give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters" */
+  giveOppDon?: number;
+  /** "place 1 card from your hand at the top of your deck" */
+  handToTop?: number;
+  /** "trash this Character with a cost of 20 or more": exige este custo mínimo da carta. */
+  selfMinCost?: number;
+  /** "rest your Leader or 1 [Corrida Coliseum]": substituição que vira a carta escolhida (ver either). */
+  victimToLife?: boolean;
 }
 
 export interface Ability {
@@ -685,8 +817,34 @@ export interface Ability {
   noBattleKOByLeader?: boolean;
   /** "This Character gains +N cost." */
   staticCost?: number;
+  /** "this Character's base power becomes 9000" / "… the same as your Leader's base power" */
+  staticBasePower?: number | 'leader';
+  /** "this Character gains +N cost for every M cards in your trash" (N pode ser negativo) */
+  costPer?: { cost: number; every: number; what: 'trash' };
+  /** [On K.O.] só quando nocauteado por efeito (do oponente). */
+  koBy?: 'effect' | 'opponentEffect';
+  /** "If this Character is rested, your opponent cannot attack any card other than this Character." */
+  staticTaunt?: boolean;
+  /** "This card in your hand cannot be played by effects." */
+  noPlayByEffect?: boolean;
+  /** "This Character cannot attack a Leader on the turn in which it is played." */
+  noLeaderAttackOnPlayTurn?: boolean;
+  /** "cannot be K.O.'d by effects of Characters without the "Special" attribute" */
+  noEffectKOUnlessAttribute?: string;
+  /** "cannot be K.O.'d by effects of your opponent's Characters with 5000 base power or less" */
+  noEffectKOByMaxBasePower?: number;
+  /** "This Character cannot be rested by your opponent's effects." */
+  staticNoRest?: boolean;
+  /** Counter das suas cartas na mão: "+1000 Counter" para as sem Counter, ou "becomes +2000" (set). */
+  handCounter?: { filter: CardFilter; amount: number; set?: boolean; withoutCounter?: boolean };
+  /** "this card in your hand has a +2000 Counter" (com a condição da habilidade) */
+  selfHandCounter?: number;
+  /** "all Characters with a cost of 5 or less do not become active in your and your opponent's Refresh Phases" */
+  noRefreshMaxCost?: number;
+  /** "Give blue Events in your hand -1 cost", "The cost of playing … will be reduced by 1" */
+  handCostAura?: { filter: CardFilter; amount: number };
   /** "This Character gains +N power for every M <coisas>" */
-  powerPer?: { power: number; every: number; what: 'hand' | 'restedDon' | 'trash' | 'trashEvents' };
+  powerPer?: { power: number; every: number; what: 'hand' | 'restedDon' | 'trash' | 'trashEvents' | 'distinctCharacters' };
   /** "When this Character battles {attribute} attribute Characters, this Character gains +N power". */
   battleVsAttribute?: { attribute: string; power: number };
   /** Para timing 'event': o acontecimento que dispara a habilidade. */
@@ -770,11 +928,15 @@ export interface Modifier {
     | 'negated' // "Negate the effect of …"
     | 'basePower' // "base power becomes N" (amount = novo poder base)
   | 'cannotAttackCharMaxCost' // "cannot attack your opponent's Characters with a base cost of N or less"
-    | 'cannotBlock'; // "cannot activate [Blocker]"
+    | 'cannotBlock' // "cannot activate [Blocker]"
+    | 'attribute' // "gains the "Slash" attribute" (keyword = atributo)
+    | 'attackTax'; // "cannot attack unless your opponent trashes N cards"
   amount: number;
   /** Para 'nextOpponentTurn': o efeito acaba no fim deste turno. */
   untilTurn?: number;
   keyword?: Keyword;
+  /** kind 'attribute': o atributo ganho. */
+  attribute?: string;
   duration: Duration;
 }
 
@@ -792,6 +954,8 @@ export interface BattleState {
   noBlockerMaxCost?: number;
   /** Personagens que batalharam entre si (registrado no dano, vale mesmo se um sair de campo). */
   fought?: string[];
+  /** "at the end of this battle, …" */
+  after?: Array<{ controller: PlayerId; source: string; steps: EffectStep[]; last?: string[] }>;
 }
 
 /** Escolhas que o motor aguarda de um jogador. */
@@ -837,6 +1001,8 @@ export type Frame =
       eventCount?: number;
       /** Carta revelada do topo do deck ("place the revealed card …" depois de outras escolhas). */
       revealed?: string[];
+      /** Cartas descartadas da mão neste efeito ("the same card name as the trashed card"). */
+      trashed?: string[];
     }
   | { kind: 'battle' }
   | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean; lost?: number }
@@ -877,7 +1043,17 @@ export interface GameState {
   /** Eventos ativados neste turno (custo base), para "if you have activated an Event … during this turn". */
   eventsThisTurn?: Array<{ player: PlayerId; cost: number }>;
   /** Efeitos adiados para o fim do turno ("at the end of this turn"). */
-  delayed?: Array<{ controller: PlayerId; source: string; steps: EffectStep[] }>;
+  delayed?: Array<{ controller: PlayerId; source: string; steps: EffectStep[]; last?: string[] }>;
+  /** Jogadores que tiveram Personagens nocauteados neste turno. */
+  koThisTurn?: PlayerId[];
+  /** Jogadores que descartaram da mão por efeito neste turno. */
+  handTrashedThisTurn?: PlayerId[];
+  /** "take an extra turn after this one" */
+  extraTurn?: PlayerId;
+  /** Substituições criadas por efeitos até o fim do turno. */
+  tempReplacements?: Array<{ player: PlayerId; source: string; by: 'battle' | 'any'; cost: AbilityCost }>;
+  /** DON!! que não ficam ativos na próxima Renovação do jogador. */
+  donSkipRefresh?: Array<{ player: PlayerId; count: number }>;
   winner: PlayerId | null;
   winReason: string | null;
   log: LogEntry[];

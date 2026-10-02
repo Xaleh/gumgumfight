@@ -216,6 +216,11 @@ const SENTENCES: Rule[] = [
     (_, n, what) => `Olhe as ${n} cartas do topo do seu deck; jogue ${what}.`,
   ],
   [
+    /^Apply each of the following effects based on the number of cards in your trash: • If there are (\d+) or more cards, this Character's base power becomes (\d+) and it gains \+(\d+) cost\. • If you have (\d+) or more cards, during your opponent's turn, your Leader's base power becomes (\d+)\. • If you have (\d+) or more cards, this Character gains \+(\d+) power\.?$/i,
+    (_, a, b, c, d, e, f, g) =>
+      `Aplique cada um dos efeitos a seguir conforme o número de cartas no seu descarte: • Com ${a} ou mais cartas, o poder base deste Personagem passa a ser ${b} e ele recebe +${c} de custo. • Com ${d} ou mais cartas, durante o turno do oponente, o poder base do seu Líder passa a ser ${e}. • Com ${f} ou mais cartas, este Personagem recebe +${g} de poder.`,
+  ],
+  [
     /^Under the rules of this game, you may have any number of this card in your deck\.?$/i,
     'Pelas regras do jogo, você pode ter qualquer quantidade desta carta no deck.',
   ],

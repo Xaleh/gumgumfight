@@ -679,4 +679,18 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
       { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },
     ],
   },
+  // ------------------------------------------------------------ Cartas com estrutura própria
+  'OP15-092': {
+    // Apply each of the following effects based on the number of cards in your trash:
+    // • If there are 10 or more cards, this Character's base power becomes 9000 and it gains +10 cost.
+    // • If you have 20 or more cards, during your opponent's turn, your Leader's base power becomes 7000.
+    // • If you have 30 or more cards, this Character gains +1000 power.
+    abilities: [
+      { timing: 'static', steps: [], condition: { trashMin: 10 }, staticBasePower: 9000 },
+      { timing: 'static', steps: [], condition: { trashMin: 10 }, staticCost: 10 },
+      { timing: 'static', steps: [], condition: { trashMin: 20 }, opponentsTurn: true, aura: { kinds: ['leader'], power: 0, basePower: 7000 } },
+      { timing: 'static', steps: [], condition: { trashMin: 30 }, staticPower: 1000 },
+    ],
+    complete: true,
+  },
 };
