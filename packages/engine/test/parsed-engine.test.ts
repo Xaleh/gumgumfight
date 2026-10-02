@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, attackError, createGame, getCost, getPower, hasKeyword, koProtected } from '../src/engine';
+import { applyAction, attackError, createGame, getCost, getPower, hasKeyword, koProtected, playCost, playError } from '../src/engine';
 import { parseCard } from '../src/cards';
 import { chooseBotAction } from '../src/bot/simple';
 import type { CardData, DeckList, GameState } from '../src/types';
@@ -38,6 +38,11 @@ const extra: CardData[] = [
   { id: 'PX-030', name: 'Thrower', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[When Attacking] You may trash any number of Event or Stage cards from your hand. This Character gains +1000 power during this battle for every card trashed.' },
   { id: 'PX-031', name: 'Caller', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] Activate up to 1 Event with a base cost of 3 or less from your hand.' },
   { id: 'PX-032', name: 'Early', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: 'This effect can be activated at the start of your turn. If you have 2 or less cards in your hand, draw 1 card.' },
+  { id: 'PX-033', name: 'Negator', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Negate the effect of up to 1 of your opponent's Characters during this turn." },
+  { id: 'PX-034', name: 'Sticky', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "This Character cannot be removed from the field by your opponent's effects." },
+  { id: 'PX-035', name: 'Limiter', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Set up to 1 of your DON!! cards as active. Then, you cannot play Character cards during this turn.' },
+  { id: 'PX-036', name: 'Cheap', category: 'character', colors: ['red'], cost: 3, power: 2000, types: [], text: 'If you have 1 or less Life cards, give this card in your hand -2 cost.' },
+  { id: 'PX-037', name: 'Lifter', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Your Leader's base power becomes 7000 during this turn." },
   { id: 'PX-024', name: 'Law', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, draw 1 card.' },
 ];
 const cards = [...baseCards, ...extra];
@@ -179,9 +184,13 @@ describe('efeitos lidos automaticamente', () => {
 
   it('busca no deck inteiro e embaralha; olhar o topo e jogar', () => {
     let s = toTurn(game(), 3);
+    // Garante exatamente uma cópia de [Big] no deck.
+    for (const u of s.players[0].deck) if (s.cards[u].cardId === 'PX-006') s.cards[u] = { ...s.cards[u], cardId: 'PX-001' };
+    const planted = s.players[0].deck[5];
+    s.cards[planted] = { ...s.cards[planted], cardId: 'PX-006' };
     s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-011') });
     const big = s.pending?.kind === 'selectTargets' ? s.pending.options : [];
-    expect(big.length).toBe(1);
+    expect(big).toEqual([planted]);
     s = applyAction(s, { type: 'choose', player: 0, uids: big });
     expect(s.players[0].hand).toContain(big[0]);
 
@@ -406,5 +415,50 @@ describe('efeitos lidos automaticamente', () => {
     s = toTurn(s, 6);
     expect(s.defs).toBe(defs);
     expect(JSON.stringify(s.defs)).toBe(before);
+  });
+
+  it('anula o efeito de um Personagem do oponente', () => {
+    let s = toTurn(game(), 3);
+    const big = field(s, 1, 'PX-006'); // +3 de custo
+    expect(getCost(s, big)).toBe(5);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-033') });
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [big] });
+    expect(getCost(s, big)).toBe(2);
+  });
+
+  it('não pode ser removido do campo por efeitos do oponente', () => {
+    let s = toTurn(game(), 3);
+    const sticky = field(s, 1, 'PX-034');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-027') });
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [sticky] });
+    expect(s.players[1].characters.some((c) => c.uid === sticky)).toBe(true);
+  });
+
+  it('restrição: não pode jogar Personagens neste turno', () => {
+    let s = toTurn(game(), 3);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-035') });
+    const other = s.players[0].hand[0];
+    s.cards[other] = { ...s.cards[other], cardId: 'PX-001' };
+    expect(playError(s, 0, other)).toMatch(/não pode jogar/);
+    s = toTurn(s, 5);
+    const again = s.players[0].hand[0];
+    s.cards[again] = { ...s.cards[again], cardId: 'PX-001' };
+    expect(playError(s, 0, again)).toBeNull();
+  });
+
+  it('custo menor na mão com a condição', () => {
+    const s = toTurn(game(), 3);
+    const cheap = give(s, 0, 'PX-036');
+    expect(playCost(s, cheap)).toBe(3);
+    s.players[0].life = s.players[0].life.slice(0, 1);
+    expect(playCost(s, cheap)).toBe(1);
+  });
+
+  it('poder base do Líder passa a ser N', () => {
+    let s = toTurn(game(), 3);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-037') });
+    expect(getPower(s, s.players[0].leader.uid)).toBe(7000);
+    s = toTurn(s, 4);
+    expect(getPower(s, s.players[0].leader.uid)).toBe(5000);
   });
 });

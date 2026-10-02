@@ -138,6 +138,7 @@ export interface Condition {
   noCharacterNamed?: string;
   /** "If your Leader is multicolored" */
   leaderMulticolor?: boolean;
+  leaderMonocolor?: boolean;
   /** "If you have N or more cards in your hand" */
   handMin?: number;
   /** "If you have N or more rested Characters" */
@@ -170,6 +171,9 @@ export interface Condition {
   /** Cartas de Vida + mão, no máximo. */
   lifeHandMax?: number;
   totalCharacterCostMin?: number;
+  /** "you have 2 or more Characters with 6000 base power" — contagem de cartas suas (ou do oponente) que atendem ao alvo. */
+  ownMatching?: { count: number; spec: TargetSpec };
+  opponentMatching?: { count: number; spec: TargetSpec };
   /** "you have 2 or more Characters with a cost of 8 or more" */
   charactersWithCost?: { count: number; cost: number };
   /** Você ativou neste turno um Evento com custo base a partir deste. */
@@ -231,6 +235,21 @@ export type AbilityCondition = Condition;
 export type StepCondition = Condition;
 
 /** Bônus contínuo para outras cartas do mesmo jogador ("your {Navy} type Characters gain +1000"). */
+export type RestrictionKind =
+  | 'noPlayCharacters'
+  | 'noPlayFromHand'
+  | 'noLifeToHand'
+  | 'noAttackLeader'
+  | 'noDrawByEffect'
+  | 'noSetDonActiveByCharacter';
+
+export interface Restriction {
+  player: PlayerId;
+  kind: RestrictionKind;
+  /** noPlayCharacters: só os de custo base a partir deste. */
+  minCost?: number;
+}
+
 export type LeaderRule =
   | { kind: 'donDeck'; size: number }
   | { kind: 'deckOutWin' }
@@ -257,6 +276,8 @@ export interface Aura {
   minCost?: number;
   /** Concede uma palavra-chave em vez de poder ("All of your Characters with a cost of 12 or more gain [Blocker]"). */
   keyword?: Keyword;
+  /** "cannot be removed from the field by your opponent's effects" */
+  noRemoval?: boolean;
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -322,6 +343,12 @@ type EffectStepBody =
   | { do: 'lookOpponentTop' }
   | { do: 'activateEventFromHand'; filter: CardFilter }
   | { do: 'revealLifeTop' }
+  | { do: 'koSelf' }
+  | { do: 'negate'; target: TargetRef; duration: Duration }
+  | { do: 'restrict'; kind: RestrictionKind; minCost?: number }
+  | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
+  /** "base power becomes N" ou "the same as your opponent's Leader('s power)" */
+  | { do: 'basePower'; target: TargetRef; amount?: number; copy?: 'opponentLeader'; duration: Duration }
   | { do: 'trashAnyForPower'; categories: Array<'event' | 'stage' | 'character'>; power: number; duration: Duration }
   /** "Change the attack target to your Leader or 1 of your … Characters" */
   | { do: 'redirectAttack'; spec: TargetSpec }
@@ -459,6 +486,7 @@ export type AbilityTiming =
 
 export interface AbilityCost {
   restSelf?: boolean; // "You may rest this Character/Stage"
+  koSelf?: boolean; // "K.O. this Character" (custo de substituição)
   restDon?: number; // ① ② ③ ... (virar DON!! ativos da área de custo)
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
   trashFromHand?: number; // "You may trash N card from your hand:"
@@ -510,6 +538,10 @@ export interface Ability {
   condition?: AbilityCondition;
   /** Efeitos estáticos (timing = 'static'). */
   aura?: Aura;
+  /** "This Character cannot be removed from the field by your opponent's effects." */
+  staticNoRemoval?: boolean;
+  /** "give this card in your hand −N cost" (vale na mão, com a condição da habilidade) */
+  handCost?: number;
   /** Regra especial do Líder (texto "according to the rules" / "Under the rules of this game"). */
   rule?: LeaderRule;
   staticPower?: number;
@@ -607,7 +639,9 @@ export interface Modifier {
     | 'canAttackActive'
     | 'cannotAttack'
     | 'skipRefresh'
-    | 'cannotBeRested';
+    | 'cannotBeRested'
+    | 'negated' // "Negate the effect of …"
+    | 'basePower'; // "base power becomes N" (amount = novo poder base)
   amount: number;
   /** Para 'nextOpponentTurn': o efeito acaba no fim deste turno. */
   untilTurn?: number;
@@ -697,6 +731,10 @@ export interface GameState {
   pending: Pending | null;
   modifiers: Modifier[];
   usedThisTurn: string[];
+  /** Restrições ao jogador até o fim do turno ("you cannot play Character cards during this turn"). */
+  restrictions?: Restriction[];
+  /** "The next time you play X from your hand during this turn, the cost will be reduced by N." */
+  costReductions?: Array<{ player: PlayerId; filter: CardFilter; amount: number }>;
   /** Eventos ativados neste turno (custo base), para "if you have activated an Event … during this turn". */
   eventsThisTurn?: Array<{ player: PlayerId; cost: number }>;
   /** Efeitos adiados para o fim do turno ("at the end of this turn"). */

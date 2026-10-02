@@ -85,6 +85,11 @@ function selfName(category: CardCategory): string {
 // Durações, alvos e filtros
 // ---------------------------------------------------------------------------
 
+/** "de" + artigo/demonstrativo contraídos ("do seu Líder", "deste Personagem"). */
+function de(t: string): string {
+  return `de ${t}`.replace(/^de o /, 'do ').replace(/^de a /, 'da ').replace(/^de este /, 'deste ').replace(/^de esta /, 'desta ').replace(/^de essa /, 'dessa ').replace(/^de esse /, 'desse ');
+}
+
 function dur(d: Duration): string {
   switch (d) {
     case 'turn':
@@ -327,6 +332,26 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'activatedEventMinCost':
         out.push(`você tiver ativado neste turno um Evento com custo base ${c.activatedEventMinCost} ou mais`);
         break;
+      case 'leaderMonocolor':
+        out.push('o seu Líder for de uma só cor');
+        break;
+      case 'ownMatching':
+      case 'opponentMatching': {
+        const mm = (key === 'ownMatching' ? c.ownMatching : c.opponentMatching)!;
+        const who = key === 'ownMatching' ? 'você tiver' : 'o oponente tiver';
+        if (mm.count === 1) {
+          const one = target({ ...mm.spec, side: 'own', upTo: 1 }, ctx)
+            .replace(/^até 1 dos seus Personagens/, 'um Personagem')
+            .replace(/^até 1 dos seus Líderes ou Personagens/, 'um Líder ou Personagem')
+            .replace(/^até 1 carta sua/, 'uma carta')
+            .replace(/^até 1 /, 'um ');
+          out.push(`${who} ${one}`);
+        } else {
+          const t = target({ ...mm.spec, side: 'own', upTo: mm.count }, ctx).replace(/^até \d+ dos seus /, '').replace(/^até \d+ /, '');
+          out.push(`${who} ${mm.count} ou mais ${t}`);
+        }
+        break;
+      }
       case 'charactersWithCost':
         out.push(`você tiver ${c.charactersWithCost!.count} ou mais Personagens com custo ${c.charactersWithCost!.cost} ou mais`);
         break;
@@ -487,6 +512,7 @@ function cost(c: AbilityCost, ctx: Ctx): string {
   }
   if (c.reveal) parts.push(`revelar ${c.reveal.filter ? filter(c.reveal.filter, c.reveal.count, false) : cards(c.reveal.count)} da sua mão`);
   if (c.returnSelf) parts.push(`devolver ${ctx.self} à mão do dono`);
+  if (c.koSelf) parts.push(`nocautear ${ctx.self}`);
   if (c.selfToBottom) parts.push(`colocar ${ctx.self} no fundo do deck do dono`);
   if (c.trashSelf) parts.push(`descartar ${ctx.self}`);
   const text = parts.length ? `Você pode ${parts.join(' e ')}` : '';
@@ -621,14 +647,35 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Jogue essa carta${s.filter ? ` se for ${filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')}` : ''}${s.rested ? ', virada' : ''}.`;
     case 'revealedToHand':
       return `Se for ${s.filter ? filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ') : 'uma carta'}, adicione-a à sua mão.`;
+    case 'koSelf':
+      return `Nocauteie ${ctx.self}.`;
+    case 'negate':
+      return `Anule o efeito de ${target(s.target, ctx)} ${dur(s.duration)}.`;
+    case 'restrict': {
+      const txt: Record<string, string> = {
+        noPlayCharacters: s.minCost !== undefined ? `você não pode jogar Personagens com custo base ${s.minCost} ou mais neste turno` : 'você não pode jogar Personagens neste turno',
+        noPlayFromHand: 'você não pode jogar cartas da sua mão neste turno',
+        noLifeToHand: 'você não pode colocar cartas de Vida na mão com os seus próprios efeitos neste turno',
+        noAttackLeader: 'você não pode atacar um Líder neste turno',
+        noDrawByEffect: 'você não pode comprar cartas com os seus próprios efeitos neste turno',
+        noSetDonActiveByCharacter: 'você não pode deixar DON!! ativos com efeitos de Personagens neste turno',
+      };
+      return `${cap(txt[s.kind])}.`;
+    }
+    case 'nextPlayDiscount':
+      return `Na próxima vez que você jogar ${filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')} da sua mão neste turno, o custo será reduzido em ${s.amount}.`;
+    case 'basePower':
+      return s.copy
+        ? `O poder base ${de(target(s.target, ctx))} passa a ser igual ao poder do Líder do oponente ${dur(s.duration)}.`
+        : `O poder base ${de(target(s.target, ctx))} passa a ser ${s.amount} ${dur(s.duration)}.`;
     case 'revealLifeTop':
       return 'Revele a carta do topo da sua Vida.';
     case 'activateEventFromHand':
       return `Ative até 1 ${filter(s.filter, 1, false).replace(/^1 /, '')} da sua mão.`;
     case 'trashAnyForPower': {
       const what = s.categories.map((k) => ({ event: 'Eventos', stage: 'Palcos', character: 'Personagens' })[k]).join(' ou ');
-      const dur = s.duration === 'battle' ? 'esta batalha' : 'este turno';
-      return `Você pode descartar quantos ${what} quiser da sua mão. ${cap(ctx.self)} recebe +${s.power} de poder durante ${dur} para cada carta descartada.`;
+      const during = s.duration === 'battle' ? 'esta batalha' : 'este turno';
+      return `Você pode descartar quantos ${what} quiser da sua mão. ${cap(ctx.self)} recebe +${s.power} de poder durante ${during} para cada carta descartada.`;
     }
     case 'redirectAttack':
       return `Mude o alvo do ataque para o seu Líder ou para ${target({ ...s.spec, upTo: 1 }, ctx)}.`;
@@ -727,6 +774,8 @@ function staticText(a: Ability, ctx: Ctx): string {
   }
   if (a.staticKeyword) parts.push(`ganha ${KW[a.staticKeyword]}`);
   if (a.staticCanAttackActive) parts.push('também pode atacar Personagens ativos do oponente');
+  if (a.staticNoRemoval) parts.push('não pode ser removido do campo por efeitos do oponente');
+  if (a.handCost) parts.push(`custa ${-a.handCost} a menos na sua mão`);
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
   if (a.staticNoEffectKO) parts.push('não pode ser nocauteado por efeitos');
   if (a.staticCannotAttack) parts.push('não pode atacar');
@@ -770,8 +819,9 @@ function staticText(a: Ability, ctx: Ctx): string {
     ]
       .filter(Boolean)
       .join(' ');
-    const effect =
-      au.keyword === 'rushCharacter'
+    const effect = au.noRemoval
+      ? `não podem ser removidos do campo por efeitos ${au.side === 'opponent' ? 'seus' : 'do oponente'}`
+      : au.keyword === 'rushCharacter'
         ? 'podem atacar Personagens no turno em que forem jogados'
         : au.keyword
           ? `ganham ${KW[au.keyword]}`
@@ -797,7 +847,12 @@ function ability(a: Ability, ctx: Ctx): string {
   }
   else if (a.timing === 'replace' && a.replace) {
     const r = a.replace;
-    const who = r.who === 'self' ? ctx.self : target({ ...r.who, upTo: 1 }, ctx).replace(/^até 1 dos seus Personagens/, 'um Personagem seu');
+    const who =
+      r.who === 'self'
+        ? ctx.self
+        : target({ ...r.who, upTo: 1 }, ctx)
+            .replace(/^até 1 dos seus Personagens/, 'um Personagem seu')
+            .replace(/^até 1 carta sua (\[[^\]]+\])/, 'o seu $1');
     const what = r.event === 'ko' ? 'for nocauteado' : r.event === 'removal' ? 'for removido do campo' : 'for nocauteado ou removido do campo';
     const by = r.by === 'battle' ? ' em batalha' : r.by === 'effect' ? ' por um efeito' : r.by === 'opponentEffect' ? ' por um efeito do oponente' : '';
     const c = a.cost ? cost(a.cost, ctx).replace(/^Você pode /, '') : '';
