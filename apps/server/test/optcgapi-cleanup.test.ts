@@ -36,6 +36,7 @@ describe('limpeza dos dados da optcgapi', () => {
     expect(repairMissingAttribute('rest your attribute Leader', ['green'])).toBe('rest your "Slash" attribute Leader');
     expect(repairMissingAttribute('your "Slash" attribute Characters', ['green'])).toBe('your "Slash" attribute Characters');
     expect(repairMissingAttribute('If your Leader has the attribute', ['red'])).toBe('If your Leader has the attribute');
+    expect(repairMissingAttribute('cannot be K.O.\'d in battle by attribute cards', ['yellow'], 'OP08-114')).toBe('cannot be K.O.\'d in battle by "Slash" attribute cards');
   });
 
   it('converte "X" type para {X} type', () => {

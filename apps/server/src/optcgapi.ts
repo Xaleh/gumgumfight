@@ -53,9 +53,13 @@ export function allEndpoints(base: string): string[] {
  * A API perde o nome do atributo em algumas cartas verdes ("If your Leader has the attribute",
  * "your attribute Character"): são todas do atributo "Slash" (decks do Zoro).
  */
-export function repairMissingAttribute(text: string, colors: string[]): string {
-  if (!colors.includes('green')) return text;
-  return text.replace(/\b(the|your|\d+) attribute\b/g, '$1 "Slash" attribute');
+/** Cartas de outras cores em que a API também perde o atributo (confirmado à mão). */
+const MISSING_ATTRIBUTE: Record<string, string> = { 'OP08-114': 'Slash' };
+
+export function repairMissingAttribute(text: string, colors: string[], id?: string): string {
+  const attr = (id && MISSING_ATTRIBUTE[id]) ?? (colors.includes('green') ? 'Slash' : null);
+  if (!attr) return text;
+  return text.replace(/\b(the|your|by|\d+) attribute\b/g, `$1 "${attr}" attribute`);
 }
 
 /**
@@ -220,7 +224,7 @@ export function mapApiCard(raw: Raw, vocab: Set<string> = new Set()): CardData |
     counter: category === 'character' ? num(pick(raw, 'counter_amount', 'counter')) : undefined,
     attributes: splitList(pick(raw, 'attribute', 'attributes'), /\s*[/;,]\s*/),
     types,
-    text: repairMissingAttribute(split.text, colors),
+    text: repairMissingAttribute(split.text, colors, cardId),
     trigger: explicitTrigger ? normalizeTypeQuotes(cleanText(explicitTrigger)) : split.trigger,
     ...(notes.length ? { notes } : {}),
     ...(aliases.length ? { aliases } : {}),
