@@ -12,7 +12,7 @@ const KEYWORD_PATTERNS: Array<[Keyword, RegExp]> = [
 
 /** Marcações que podem iniciar um efeito novo. */
 const EFFECT_START =
-  /(?<=^|[.)]\s*|\n)\s*(?=\[(?:DON!! x\d+|On Play|When Attacking|Activate: ?Main|Main|Counter|On K\.O\.|On Block|End of Your Turn|Your Turn|Opponent's Turn|Once Per Turn|Rush|Rush: ?Character|Blocker|Double Attack|Banish|On Your Opponent's Attack)\])/;
+  /(?<=^|[.)]\s*|\n)\s*(?=\[(?:DON!! ?[x×]\d+|On Play|When Attacking|Activate: ?Main|Main|Counter|On K\.O\.|On Block|End of Your Turn|Your Turn|Opponent's Turn|Once Per Turn|Rush|Rush: ?Character|Blocker|Double Attack|Banish|On Your Opponent's Attack)\])/;
 
 /**
  * Separa o texto em efeitos. A API não usa quebras de linha
@@ -23,7 +23,7 @@ const EFFECT_START =
 export function splitEffects(text: string): string[] {
   return text
     .split(/\n|<br\s*\/?>/i)
-    .flatMap((line) => line.split(new RegExp(EFFECT_START.source, 'g')))
+    .flatMap((line) => line.split(new RegExp(EFFECT_START.source, 'gi')))
     .map((l) => l.trim())
     .filter(Boolean);
 }

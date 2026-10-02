@@ -16,6 +16,7 @@ import {
   type DeckList,
   type GameState,
   isColorCompatible,
+  leaderAllows,
   validateDeck,
 } from '../src';
 import { nextRandom } from '../src/rng';
@@ -34,7 +35,7 @@ async function loadCards(): Promise<CardData[]> {
 }
 
 function randomDeck(rng: { rng: number }, leader: CardData, pool: CardData[]): DeckList | null {
-  const options = pool.filter((c) => c.category !== 'leader' && isColorCompatible(leader, c));
+  const options = pool.filter((c) => c.category !== 'leader' && isColorCompatible(leader, c) && leaderAllows(leader, c));
   if (options.length < 13) return null;
   const counts = new Map<string, number>();
   let total = 0;

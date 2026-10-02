@@ -8,6 +8,8 @@
 import { buildCardDef } from './cards';
 import { nextRandom, shuffleInPlace } from './rng';
 import type {
+  Aura,
+  LeaderRule,
   Ability,
   AbilityCost,
   AbilityTiming,
@@ -88,7 +90,7 @@ export function createGame(config: GameConfig): GameState {
       deck,
       trash: [],
       life: [],
-      donDeck: DON_DECK_SIZE,
+      donDeck: (leaderDef.abilities.find((a) => a.rule?.kind === 'donDeck')?.rule as { size: number } | undefined)?.size ?? DON_DECK_SIZE,
       donActive: 0,
       donRested: 0,
       mulliganDone: false,
@@ -120,6 +122,16 @@ export function createGame(config: GameConfig): GameState {
     actionCount: 0,
   };
 
+  // "At the start of the game, play up to 1 {X} type Stage card from your deck."
+  for (const p of players) {
+    const rule = leaderRule(state, p.id, 'startStage');
+    const stage = rule && p.deck.find((u) => cardDef(state, u).category === 'stage' && hasType(cardDef(state, u), rule.type));
+    if (stage) {
+      removeFrom(p.deck, stage);
+      p.stage = { uid: stage, rested: false, don: 0, playedOnTurn: 0 };
+      log(state, p.id, `${p.name} começa com ${cardDef(state, stage).name} em campo.`);
+    }
+  }
   for (const p of players) drawCards(state, p.id, HAND_SIZE);
   log(state, null, `${players[firstPlayer].name} joga primeiro.`);
   return state;
@@ -130,6 +142,21 @@ export function createGame(config: GameConfig): GameState {
 // ---------------------------------------------------------------------------
 
 export const opponent = (p: PlayerId): PlayerId => (p === 0 ? 1 : 0);
+
+/** Regra especial do Líder do jogador, se houver. */
+export function leaderRule<K extends LeaderRule['kind']>(state: GameState, player: PlayerId, kind: K): Extract<LeaderRule, { kind: K }> | undefined {
+  const def = cardDef(state, state.players[player].leader.uid);
+  return def.abilities.find((a) => a.rule?.kind === kind)?.rule as Extract<LeaderRule, { kind: K }> | undefined;
+}
+
+/** Valor de Counter de um Personagem na mão (com o bônus de regra do Líder). */
+export function counterValue(state: GameState, uid: string): number {
+  const def = cardDef(state, uid);
+  if (def.category !== 'character') return 0;
+  if (def.counter) return def.counter;
+  const bonus = leaderRule(state, ownerOf(state, uid), 'counterBonus');
+  return bonus && hasType(def, bonus.type) ? bonus.amount : 0;
+}
 
 export function cardDef(state: GameState, uid: string): CardDef {
   return state.defs[state.cards[uid].cardId];
@@ -168,6 +195,28 @@ export function conditionHolds(state: GameState, controller: PlayerId, source: s
     return false;
   }
   if (cond.minCharacters !== undefined && ps.characters.length < cond.minCharacters) return false;
+  if (
+    cond.onlyTypedCharacters &&
+    (!ps.characters.length || ps.characters.some((c) => !hasType(cardDef(state, c.uid), cond.onlyTypedCharacters!)))
+  ) {
+    return false;
+  }
+  const tp = cond.ownTypedCharacterMinPower;
+  if (tp && !ps.characters.some((c) => hasType(cardDef(state, c.uid), tp.type) && getPower(state, c.uid) >= tp.power)) return false;
+  if (cond.lifeHandMax !== undefined && ps.life.length + ps.hand.length > cond.lifeHandMax) return false;
+  if (cond.minTurn !== undefined && state.turn < cond.minTurn) return false;
+  if (cond.totalCharacterCostMin !== undefined && ps.characters.reduce((n, c) => n + getCost(state, c.uid), 0) < cond.totalCharacterCostMin) {
+    return false;
+  }
+  if (cond.activatedEventMinCost !== undefined && !(state.eventsThisTurn ?? []).some((e) => e.player === controller && e.cost >= cond.activatedEventMinCost!)) {
+    return false;
+  }
+  if (cond.attackingLeader && state.battle?.target !== opp.leader.uid) return false;
+  const wc = cond.charactersWithCost;
+  if (wc && ps.characters.filter((c) => getCost(state, c.uid) >= wc.cost).length < wc.count) return false;
+  if (cond.opponentLeaderAttribute && !(cardDef(state, opp.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.opponentLeaderAttribute!.toLowerCase())) {
+    return false;
+  }
   if (cond.selfRested && !locate(state, source)?.fc.rested) return false;
   if (cond.minDonOnField !== undefined && totalDonOnField(ps) < cond.minDonOnField) return false;
   if (cond.handMax !== undefined && ps.hand.length > cond.handMax) return false;
@@ -315,25 +364,49 @@ export function typeIncludes(def: CardDef, part: string): boolean {
 }
 
 /** Soma das auras ativas que afetam a carta (bônus de outras cartas do mesmo jogador). */
-function auraPower(state: GameState, uid: string, zone: 'leader' | 'character' | 'stage', what: 'power' | 'cost' = 'power'): number {
-  if (zone === 'stage') return 0;
+/** Auras ativas (de qualquer jogador) que afetam a carta. */
+let auraDepth = 0;
+
+function aurasOn(state: GameState, uid: string, zone: 'leader' | 'character' | 'stage', want: (au: Aura) => boolean): Aura[] {
+  if (zone === 'stage') return [];
+  // Condições de auras podem depender de custo/poder, que dependem de auras: corta ciclos.
+  if (auraDepth > 8) return [];
+  auraDepth++;
+  try {
+    return collectAuras(state, uid, zone, want);
+  } finally {
+    auraDepth--;
+  }
+}
+
+function collectAuras(state: GameState, uid: string, zone: 'leader' | 'character', want: (au: Aura) => boolean): Aura[] {
   const owner = ownerOf(state, uid);
   const target = cardDef(state, uid);
-  let bonus = 0;
+  const out: Aura[] = [];
   for (const ps of state.players) {
     for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
       for (const a of cardDef(state, fc.uid).abilities) {
         if (a.timing !== 'static' || !a.aura || !a.aura.kinds.includes(zone)) continue;
         // Aura própria afeta as suas cartas; aura 'opponent' afeta as do oponente.
         if (((a.aura.side ?? 'own') === 'own') !== (ps.id === owner)) continue;
-        if (what === 'cost' ? a.aura.cost === undefined : a.aura.cost !== undefined) continue;
+        // O tipo de aura é filtrado antes das condições (que podem consultar custo/poder e voltar aqui).
+        if (!want(a.aura)) continue;
         if (!matchesAnyType(target, a.aura.hasAnyType) || !conditionsMet(state, fc.uid, a)) continue;
         if (a.aura.typeIncludes && !typeIncludes(target, a.aura.typeIncludes)) continue;
         if (a.aura.names && !a.aura.names.some((n) => hasName(target, n))) continue;
-        bonus += what === 'cost' ? a.aura.cost! : a.aura.power;
+        // Custo impresso (o custo atual depende das próprias auras de custo).
+        if (a.aura.minCost !== undefined && (target.cost ?? 0) < a.aura.minCost) continue;
+        out.push(a.aura);
       }
     }
   }
+  return out;
+}
+
+function auraPower(state: GameState, uid: string, zone: 'leader' | 'character' | 'stage', what: 'power' | 'cost' = 'power'): number {
+  let bonus = 0;
+  const want = (au: Aura) => (what === 'cost' ? au.cost !== undefined : au.cost === undefined && !au.keyword);
+  for (const au of aurasOn(state, uid, zone, want)) bonus += what === 'cost' ? au.cost! : au.power;
   return bonus;
 }
 
@@ -375,7 +448,9 @@ export function hasKeyword(state: GameState, uid: string, kw: Keyword): boolean 
   const def = cardDef(state, uid);
   if (def.keywords.includes(kw)) return true;
   if (state.modifiers.some((m) => m.uid === uid && m.kind === 'keyword' && m.keyword === kw)) return true;
-  return def.abilities.some((a) => a.timing === 'static' && a.staticKeyword === kw && conditionsMet(state, uid, a));
+  if (def.abilities.some((a) => a.timing === 'static' && a.staticKeyword === kw && conditionsMet(state, uid, a))) return true;
+  const loc = locate(state, uid);
+  return !!loc && aurasOn(state, uid, loc.zone, (au) => au.keyword === kw).length > 0;
 }
 
 /**
@@ -494,7 +569,7 @@ export function counterOptions(state: GameState, defender: PlayerId): string[] {
   const ps = state.players[defender];
   return ps.hand.filter((uid) => {
     const def = cardDef(state, uid);
-    if (def.category === 'character') return (def.counter ?? 0) > 0;
+    if (def.category === 'character') return counterValue(state, uid) > 0;
     if (def.category === 'event') {
       return def.abilities.some((a) => a.timing === 'counter') && (def.cost ?? 0) <= ps.donActive;
     }
@@ -535,6 +610,8 @@ export function targetCandidates(state: GameState, controller: PlayerId, source:
       if (spec.hasType && !hasType(def, spec.hasType)) return false;
       if (spec.keyword && !hasKeyword(state, fc.uid, spec.keyword)) return false;
       if (spec.hasTrigger && !def.trigger?.trim()) return false;
+      if (spec.minDon !== undefined && fc.don < spec.minDon) return false;
+      if (spec.withoutTiming && def.abilities.some((a) => a.timing === spec.withoutTiming)) return false;
       if (!matchesAnyType(def, spec.hasAnyType)) return false;
       return true;
     })
@@ -547,7 +624,10 @@ export function targetCandidates(state: GameState, controller: PlayerId, source:
 
 export function applyAction(prev: GameState, action: Action): GameState {
   if (prev.phase === 'gameover') throw new IllegalActionError('A partida já terminou.');
-  const state: GameState = structuredClone(prev);
+  // As definições das cartas não mudam durante a partida: são compartilhadas, não copiadas.
+  const { defs, ...rest } = prev;
+  const state = structuredClone(rest) as GameState;
+  state.defs = defs;
   const p = action.player;
   const pending = state.pending;
 
@@ -661,14 +741,16 @@ function handlePendingResponse(state: GameState, action: Action) {
       state.pending = null;
       if (def.category === 'character') {
         const target = state.battle!.target;
-        state.modifiers.push({ uid: target, kind: 'power', amount: def.counter!, duration: 'battle' });
-        log(state, p, `Counter: ${def.name} dá +${def.counter} a ${cardDef(state, target).name}.`);
+        const amount = counterValue(state, action.uid);
+        state.modifiers.push({ uid: target, kind: 'power', amount, duration: 'battle' });
+        log(state, p, `Counter: ${def.name} dá +${amount} a ${cardDef(state, target).name}.`);
       } else {
         payDon(ps, def.cost ?? 0);
         const ability = def.abilities.find((a) => a.timing === 'counter')!;
         log(state, p, `${ps.name} usa o evento ${def.name}.`);
         pushEffect(state, action.uid, p, ability.steps);
         emit(state, { kind: 'eventActivated', player: p, card: action.uid });
+        (state.eventsThisTurn ??= []).push({ player: p, cost: def.cost ?? 0 });
       }
       return;
     }
@@ -751,6 +833,7 @@ function handleMainAction(state: GameState, action: Action) {
         const main = def.abilities.find((a) => a.timing === 'main')!;
         pushEffect(state, action.uid, p, main.steps);
         emit(state, { kind: 'eventActivated', player: p, card: action.uid });
+        (state.eventsThisTurn ??= []).push({ player: p, cost: def.cost ?? 0 });
       }
       return;
     }
@@ -761,6 +844,7 @@ function handleMainAction(state: GameState, action: Action) {
       if (!loc || loc.player !== p || loc.zone === 'stage') throw new IllegalActionError('Alvo inválido.');
       ps.donActive--;
       loc.fc.don++;
+      emit(state, { kind: 'donGiven', player: p, card: action.target });
       return;
     }
 
@@ -827,6 +911,17 @@ function startTurn(state: GameState) {
   state.modifiers = state.modifiers.filter((m) => !(m.duration === 'untilYourNextTurn' && (m.untilTurn ?? 0) <= state.turn));
   log(state, ps.id, `— Turno ${state.turn}: ${ps.name} —`);
 
+  // "This effect can be activated at the start of your turn": a condição é vista agora (antes de Renovar/DON!!).
+  for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
+    for (const a of cardDef(state, fc.uid).abilities) {
+      if (a.timing !== 'startOfTurn' || !conditionsMet(state, fc.uid, a) || !a.steps.length) continue;
+      const first = JSON.stringify(a.steps[0].if ?? null);
+      if (a.steps[0].if && !conditionHolds(state, ps.id, fc.uid, a.steps[0].if)) continue;
+      const steps = a.steps.map((st) => (JSON.stringify(st.if ?? null) === first ? { ...st, if: undefined } : st));
+      pushEffect(state, fc.uid, ps.id, steps);
+    }
+  }
+
   // Refresh: DON!! anexados voltam à área de custo e tudo fica ativo.
   const fieldCards = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])];
   for (const fc of fieldCards) {
@@ -845,8 +940,13 @@ function startTurn(state: GameState) {
 
   // DON!!: 2 por turno (1 no primeiro turno do primeiro jogador).
   const n = Math.min(state.turn === 1 ? 1 : 2, ps.donDeck);
+  const hadDon = totalDonOnField(ps) > 0;
   ps.donDeck -= n;
   ps.donActive += n;
+  if (n && hadDon && leaderRule(state, ps.id, 'donPhaseToLeader')) {
+    ps.donActive--;
+    ps.leader.don++;
+  }
   checkDefeat(state);
 }
 
@@ -859,6 +959,14 @@ function endTurn(state: GameState) {
       !((m.duration === 'nextOpponentTurn' || m.duration === 'endOfYourNextTurn') && (m.untilTurn ?? 0) <= state.turn),
   );
   state.usedThisTurn = [];
+  state.eventsThisTurn = [];
+  // "You lose at the end of the turn in which your deck becomes 0 cards."
+  for (const pl of state.players) {
+    if (pl.deck.length === 0 && leaderRule(state, pl.id, 'deckOutEndOfTurn')) {
+      gameOver(state, opponent(pl.id), `${pl.name} terminou o turno sem cartas no deck.`);
+      return;
+    }
+  }
   state.activePlayer = opponent(state.activePlayer);
   state.turn++;
   startTurn(state);
@@ -896,11 +1004,11 @@ function run(state: GameState) {
 }
 
 function pushEffect(state: GameState, source: string, controller: PlayerId, steps: EffectStep[]) {
-  if (steps.length) state.stack.push({ kind: 'effect', source, controller, steps, i: 0 });
+  if (steps.length) state.stack.push({ kind: 'effect', source, controller, steps: [...steps], i: 0 }); // cópia: passos podem ser inseridos durante a resolução
 }
 
 /** Dados de um acontecimento: quem causou/sofreu (player) e a carta envolvida. */
-type EmittedEvent = { kind: GameEvent['kind']; player: PlayerId; card?: string };
+type EmittedEvent = { kind: GameEvent['kind']; player: PlayerId; card?: string; count?: number; byPlayer?: PlayerId; inBattle?: boolean; from?: string };
 
 /** Dispara as habilidades "When …" de todas as cartas em campo que reagem ao acontecimento. */
 function emit(state: GameState, ev: EmittedEvent) {
@@ -908,23 +1016,46 @@ function emit(state: GameState, ev: EmittedEvent) {
     for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
       const def = cardDef(state, fc.uid);
       def.abilities.forEach((a, i) => {
-        if (a.timing !== 'event' || !a.event || a.event.kind !== ev.kind) return;
-        if (!eventMatches(a.event, ev, ps.id, fc.uid)) return;
+        if (a.timing !== 'event' || !a.event) return;
+        const matches = (e: GameEvent): boolean =>
+          e.kind === 'anyOf' ? e.events.some(matches) : e.kind === ev.kind && eventMatches(state, e, ev, ps.id, fc.uid);
+        if (!matches(a.event)) return;
         if (!conditionsMet(state, fc.uid, a)) return;
         if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) return;
         if (a.oncePerTurn) state.usedThisTurn.push(usedKey(fc.uid, i));
         pushEffect(state, fc.uid, ps.id, a.steps);
+        // "that Character" no efeito se refere à carta do acontecimento.
+        const top = state.stack[state.stack.length - 1];
+        if (ev.card && a.steps.length && top?.kind === 'effect' && top.source === fc.uid) top.last = [ev.card];
       });
     }
   }
 }
 
-function eventMatches(e: GameEvent, ev: EmittedEvent, owner: PlayerId, uid: string): boolean {
+function eventMatches(state: GameState, e: GameEvent, ev: EmittedEvent, owner: PlayerId, uid: string): boolean {
   switch (e.kind) {
     case 'donReturned':
+      return ev.player === owner && (ev.count ?? 1) >= (e.min ?? 1);
+    case 'donGiven':
+    case 'damageTaken':
       return ev.player === owner;
+    case 'anyOf':
+      return false;
+    case 'characterPlayed':
+      return (
+        (e.who === 'self') === (ev.player === owner) &&
+        (!e.filter || matchesFilter(cardDef(state, ev.card!), e.filter)) &&
+        (!e.from || e.from === ev.from)
+      );
+    case 'characterRemoved': {
+      if (e.whose !== 'any' && (e.whose === 'own') !== (ev.player === owner)) return false;
+      if (e.filter && !matchesFilter(cardDef(state, ev.card!), e.filter)) return false;
+      if (ev.inBattle) return Boolean(e.orKO);
+      if (ev.byPlayer === undefined) return false;
+      return e.by === 'any' || (e.by === 'self') === (ev.byPlayer === owner);
+    }
     case 'characterKO':
-      return e.whose === 'any' || (e.whose === 'own') === (ev.player === owner);
+      return (e.whose === 'any' || (e.whose === 'own') === (ev.player === owner)) && (!e.filter || matchesFilter(cardDef(state, ev.card!), e.filter));
     case 'eventActivated':
     case 'blockerActivated':
       return (e.who === 'self') === (ev.player === owner);
@@ -949,7 +1080,7 @@ function restCard(state: GameState, uid: string) {
 function returnDonAndEmit(state: GameState, ps: PlayerState, n: number) {
   if (n <= 0) return;
   returnDon(ps, n);
-  emit(state, { kind: 'donReturned', player: ps.id });
+  emit(state, { kind: 'donReturned', player: ps.id, count: n });
 }
 
 /** Empilha as habilidades automáticas de uma carta (onPlay, whenAttacking, ...). */
@@ -993,9 +1124,11 @@ function stepPlay(state: GameState, frame: PlayFrame) {
     ps.trash.push(out);
     log(state, owner, `${cardDef(state, out).name} é descartado para abrir espaço.`);
   }
-  ps.characters.push({ uid: frame.uid, rested: Boolean(frame.rested), don: 0, playedOnTurn: state.turn });
+  const rested = Boolean(frame.rested) || Boolean(leaderRule(state, owner, 'playRested'));
+  ps.characters.push({ uid: frame.uid, rested, don: 0, playedOnTurn: state.turn });
   state.stack.pop();
   pushAbilities(state, frame.uid, 'onPlay');
+  emit(state, { kind: 'characterPlayed', player: owner, card: frame.uid, from: frame.from });
 }
 
 function stepBattle(state: GameState) {
@@ -1091,10 +1224,15 @@ function stepDamage(state: GameState, frame: DamageFrame) {
   }
   const card = ps.life.pop()!;
   frame.remaining--;
+  emit(state, { kind: 'damageTaken', player: ps.id });
   const def = cardDef(state, card);
   if (frame.banish) {
     ps.trash.push(card);
     log(state, frame.defender, `[Banish] A carta de Vida vai para o descarte.`);
+    return;
+  }
+  if (ps.lifeFaceUp?.includes(card) && leaderRule(state, ps.id, 'faceUpLifeToDeck')) {
+    lifeToHandCard(state, ps.id, card);
     return;
   }
   if (def.abilities.some((a) => a.timing === 'trigger')) {
@@ -1102,7 +1240,7 @@ function stepDamage(state: GameState, frame: DamageFrame) {
     state.pending = { kind: 'trigger', player: frame.defender, card };
     return;
   }
-  ps.hand.push(card);
+  lifeToHandCard(state, ps.id, card);
   log(state, frame.defender, `${ps.name} perde 1 Vida (${ps.life.length} restante(s)).`);
 }
 
@@ -1187,10 +1325,11 @@ function askCards(
 function playFree(state: GameState, uid: string, rested = false) {
   const def = cardDef(state, uid);
   const ps = state.players[ownerOf(state, uid)];
+  const from = ps.trash.includes(uid) ? 'trash' : undefined;
   if (def.category === 'character') {
     detach(state, uid);
     log(state, ps.id, `${def.name} entra em campo.`);
-    state.stack.push({ kind: 'play', uid, ...(rested ? { rested: true } : {}) });
+    state.stack.push({ kind: 'play', uid, ...(rested ? { rested: true } : {}), ...(from ? { from } : {}) });
   } else if (def.category === 'stage') {
     detach(state, uid);
     if (ps.stage) {
@@ -1409,6 +1548,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (loc && n > 0) {
           giver.donRested -= n;
           loc.fc.don += n;
+          emit(state, { kind: 'donGiven', player: loc.player, card: uid });
           log(state, frame.controller, `${cardDef(state, uid).name} recebe ${n} DON!!.`);
         }
       }
@@ -1445,6 +1585,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeCharacter(state, uid);
         owner.hand.push(uid);
         log(state, frame.controller, `${cardDef(state, uid).name} volta para a mão.`);
+        emit(state, { kind: 'characterRemoved', player: loc.player, card: uid, byPlayer: frame.controller });
       }
       return true;
     }
@@ -1709,6 +1850,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         detach(state, uid);
         owner.trash.push(uid);
         log(state, frame.controller, `${cardDef(state, uid).name} vai para o descarte.`);
+        emit(state, { kind: 'characterRemoved', player: owner.id, card: uid, byPlayer: frame.controller });
       }
       return true;
     }
@@ -1794,8 +1936,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'playRevealed': {
       const card = frame.last?.[0];
-      if (card && ps.deck.includes(card) && (!step.filter || matchesFilter(cardDef(state, card), step.filter))) {
+      if (card && (ps.deck.includes(card) || ps.life.includes(card)) && (!step.filter || matchesFilter(cardDef(state, card), step.filter))) {
         const def = cardDef(state, card);
+        if (ps.lifeFaceUp?.includes(card)) removeFrom(ps.lifeFaceUp, card);
         if (def.category === 'character' || def.category === 'stage') playFree(state, card, step.rested);
       }
       return true;
@@ -1807,6 +1950,106 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         ps.hand.push(card);
         log(state, frame.controller, `${ps.name} adiciona ${cardDef(state, card).name} à mão.`);
       }
+      return true;
+    }
+    case 'revealLifeTop': {
+      const card = ps.life[ps.life.length - 1];
+      frame.last = card ? [card] : [];
+      if (card) log(state, frame.controller, `${ps.name} revela ${cardDef(state, card).name} do topo da Vida.`);
+      return true;
+    }
+    case 'activateEventFromHand': {
+      const options = ps.hand.filter((u) => {
+        const def = cardDef(state, u);
+        return def.category === 'event' && matchesFilter(def, step.filter) && def.abilities.some((a) => a.timing === 'main');
+      });
+      if (!options.length) return true;
+      if (!frame.choice) {
+        askCards(state, frame, options, 1, `${srcName}: escolha um Evento da mão para ativar.`);
+        return false;
+      }
+      const uid = frame.choice.find((u) => options.includes(u));
+      frame.i++;
+      frame.choice = undefined;
+      frame.memo = undefined;
+      if (!uid) return false;
+      const def = cardDef(state, uid);
+      removeFrom(ps.hand, uid);
+      ps.trash.push(uid);
+      log(state, frame.controller, `${ps.name} ativa ${def.name} da mão.`);
+      pushEffect(state, uid, frame.controller, def.abilities.find((a) => a.timing === 'main')!.steps);
+      emit(state, { kind: 'eventActivated', player: frame.controller, card: uid });
+      (state.eventsThisTurn ??= []).push({ player: frame.controller, cost: def.cost ?? 0 });
+      return false; // o índice já avançou
+    }
+    case 'trashAnyForPower': {
+      const options = ps.hand.filter((u) => step.categories.includes(cardDef(state, u).category as 'event' | 'stage' | 'character'));
+      if (!options.length) return true;
+      if (!frame.choice) {
+        askCards(state, frame, options, options.length, `${srcName}: descarte quantas cartas quiser (+${step.power} de poder para cada).`, { intent: 'discard' });
+        return false;
+      }
+      const chosen = frame.choice.filter((u) => options.includes(u));
+      for (const uid of chosen) {
+        removeFrom(ps.hand, uid);
+        ps.trash.push(uid);
+      }
+      if (chosen.length && locate(state, frame.source)) {
+        addModifier(state, frame.controller, { uid: frame.source, kind: 'power', amount: step.power * chosen.length, duration: step.duration });
+        log(state, frame.controller, `${srcName} descarta ${chosen.length} carta(s) e recebe +${step.power * chosen.length} de poder.`);
+      }
+      return true;
+    }
+    case 'redirectAttack': {
+      if (!state.battle) return true;
+      const options = [ps.leader.uid, ...targetCandidates(state, frame.controller, frame.source, step.spec)].filter((u) => u !== state.battle!.target);
+      if (!options.length) return true;
+      if (!frame.choice) {
+        state.pending = {
+          kind: 'selectTargets',
+          player: frame.controller,
+          options,
+          min: 0,
+          max: 1,
+          prompt: `${srcName}: escolha o novo alvo do ataque.`,
+          intent: 'help',
+          source: frame.source,
+        };
+        return false;
+      }
+      const target = frame.choice.find((u) => options.includes(u));
+      if (target && locate(state, target)) {
+        state.battle.target = target;
+        log(state, frame.controller, `O ataque agora mira ${cardDef(state, target).name}.`);
+      }
+      return true;
+    }
+    case 'handToDeck': {
+      if (!frame.memo) {
+        const n = Math.min(step.count, ps.hand.length);
+        if (!n) return true;
+        if (!frame.choice) {
+          askCards(state, frame, [...ps.hand], n, `${srcName}: escolha ${n} carta(s) da mão para colocar no deck.`, { min: n, intent: 'discard' });
+          return false;
+        }
+        frame.memo = frame.choice.filter((u) => ps.hand.includes(u)).slice(0, n);
+        frame.choice = undefined;
+      }
+      let where = step.where;
+      if (where === 'choose') {
+        if (!frame.choice) {
+          askOption(state, frame, frame.controller, `${srcName}: colocar no topo ou no fundo do deck?`, ['Topo do deck', 'Fundo do deck']);
+          return false;
+        }
+        where = frame.choice[0] === '0' ? 'top' : 'bottom';
+      }
+      for (const uid of frame.memo) {
+        removeFrom(ps.hand, uid);
+        if (where === 'top') ps.deck.unshift(uid);
+        else ps.deck.push(uid);
+      }
+      log(state, frame.controller, `${ps.name} coloca ${frame.memo.length} carta(s) da mão no ${where === 'top' ? 'topo' : 'fundo'} do deck.`);
+      frame.memo = undefined;
       return true;
     }
     case 'lookOpponentTop': {
@@ -1835,7 +2078,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'opponentLifeToHand': {
       const opp = state.players[opponent(frame.controller)];
       const n = Math.min(step.count, opp.life.length);
-      for (let i = 0; i < n; i++) opp.hand.push(opp.life.pop()!);
+      for (let i = 0; i < n; i++) lifeToHandCard(state, opp.id, opp.life.pop()!);
       if (n) log(state, frame.controller, `${opp.name} coloca ${n} carta(s) da Vida na mão.`);
       return true;
     }
@@ -1901,7 +2144,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       const fromBottom = frame.choice?.[0] === '1';
-      for (let i = 0; i < n; i++) ps.hand.push(fromBottom ? ps.life.shift()! : ps.life.pop()!);
+      for (let i = 0; i < n; i++) lifeToHandCard(state, ps.id, fromBottom ? ps.life.shift()! : ps.life.pop()!);
       log(state, frame.controller, `${ps.name} coloca ${n} carta(s) da Vida (${fromBottom ? 'fundo' : 'topo'}) na mão.`);
       return true;
     }
@@ -2087,6 +2330,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         detach(state, uid);
         owner.deck.push(uid);
         log(state, frame.controller, `${cardDef(state, uid).name} vai para o fundo do deck de ${owner.name}.`);
+        emit(state, { kind: 'characterRemoved', player: owner.id, card: uid, byPlayer: frame.controller });
       }
       return true;
     }
@@ -2107,9 +2351,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'playFrom': {
       const zone =
         step.from === 'deck' ? ps.deck : step.from === 'hand' ? ps.hand : step.from === 'trash' ? ps.trash : [...ps.hand, ...ps.trash];
+      const filter = step.filter.maxCostDon ? { ...step.filter, maxCost: Math.min(step.filter.maxCost ?? 99, totalDonOnField(ps)) } : step.filter;
       const options = zone.filter((u) => {
         const def = cardDef(state, u);
-        return (def.category === 'character' || def.category === 'stage') && matchesFilter(def, step.filter);
+        return (def.category === 'character' || def.category === 'stage') && matchesFilter(def, filter);
       });
       if (!frame.choice) {
         if (!options.length) return !!(frame.last = []);
@@ -2119,7 +2364,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       // Empilhadas ao contrário para entrarem na ordem escolhida.
-      const chosen = frame.choice.filter((u) => options.includes(u));
+      let chosen = frame.choice.filter((u) => options.includes(u));
+      if (step.filter.distinctNames) chosen = chosen.filter((u, k) => !chosen.slice(0, k).some((v) => cardDef(state, v).name === cardDef(state, u).name));
       frame.last = [...chosen];
       for (const uid of chosen.reverse()) playFree(state, uid, step.rested);
       return true;
@@ -2457,6 +2703,9 @@ function koCharacter(
   ps.trash.push(uid);
   log(state, loc.player, `${cardDef(state, uid).name} foi nocauteado (K.O.).`);
   emit(state, { kind: 'characterKO', player: loc.player, card: uid });
+  if (opts.inBattle || opts.byPlayer !== undefined) {
+    emit(state, { kind: 'characterRemoved', player: loc.player, card: uid, byPlayer: opts.byPlayer, inBattle: opts.inBattle });
+  }
   const def = cardDef(state, uid);
   def.abilities.forEach((a) => {
     // [On K.O.] com [Your Turn]/[Opponent's Turn]: a carta já saiu do campo, só o turno é checado.
@@ -2494,6 +2743,17 @@ function returnDon(ps: PlayerState, n: number) {
   }
 }
 
+/** Carta de Vida indo para a mão (ou para o fundo do deck, se estiver virada para cima e o Líder mandar). */
+function lifeToHandCard(state: GameState, player: PlayerId, uid: string) {
+  const ps = state.players[player];
+  const faceUp = ps.lifeFaceUp?.includes(uid);
+  if (faceUp) removeFrom(ps.lifeFaceUp!, uid);
+  if (faceUp && leaderRule(state, player, 'faceUpLifeToDeck')) {
+    ps.deck.push(uid);
+    log(state, player, `${cardDef(state, uid).name} (Vida virada para cima) vai para o fundo do deck.`);
+  } else ps.hand.push(uid);
+}
+
 function removeFrom(arr: string[], uid: string) {
   const i = arr.indexOf(uid);
   if (i >= 0) arr.splice(i, 1);
@@ -2503,6 +2763,11 @@ function checkDefeat(state: GameState) {
   if (state.phase === 'gameover' || state.phase === 'mulligan') return;
   for (const ps of state.players) {
     if (ps.deck.length === 0) {
+      if (leaderRule(state, ps.id, 'deckOutEndOfTurn')) continue;
+      if (leaderRule(state, ps.id, 'deckOutWin')) {
+        gameOver(state, ps.id, `${ps.name} ficou sem cartas no deck e vence pela regra do Líder.`);
+        return;
+      }
       gameOver(state, opponent(ps.id), `${ps.name} ficou sem cartas no deck.`);
       return;
     }

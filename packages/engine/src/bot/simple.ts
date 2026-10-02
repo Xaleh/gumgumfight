@@ -2,7 +2,7 @@
 // plausíveis para testar a interface e o motor.
 
 import { legalActions } from '../actions';
-import { cardDef, getPower, locate, opponent, targetCandidates } from '../engine';
+import { cardDef, counterValue, getPower, locate, opponent, targetCandidates } from '../engine';
 import type { Action, EffectStep, GameState, PlayerId } from '../types';
 
 export function chooseBotAction(state: GameState, player: PlayerId): Action {
@@ -79,7 +79,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       const need = ap - tp + 1;
       const boost = (uid: string) => {
         const d = cardDef(state, uid);
-        if (d.category === 'character') return d.counter ?? 0;
+        if (d.category === 'character') return counterValue(state, uid);
         const steps = d.abilities.find((a) => a.timing === 'counter')?.steps ?? [];
         return steps.reduce((sum, st) => sum + (st.do === 'power' ? st.amount : 0), 0);
       };

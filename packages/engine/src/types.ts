@@ -73,6 +73,10 @@ export interface TargetSpec {
   maxCostDynamic?: 'opponentLife' | 'ownLife' | 'totalLife';
   /** "with a [Trigger]" */
   hasTrigger?: boolean;
+  /** "that has 2 or more DON!! cards given" */
+  minDon?: number;
+  /** "without an [On Play] effect" */
+  withoutTiming?: 'onPlay' | 'whenAttacking';
   color?: Color;
   /** "with a type including "Whitebeard Pirates"" (parte do nome do tipo) */
   typeIncludes?: string;
@@ -98,6 +102,10 @@ export interface CardFilter {
   minPower?: number;
   /** "and a [Trigger]" */
   hasTrigger?: boolean;
+  /** "with a cost equal to or less than the number of DON!! cards on your field" (calculado na hora) */
+  maxCostDon?: boolean;
+  /** "with different card names" (várias cartas escolhidas) */
+  distinctNames?: boolean;
 }
 
 /**
@@ -156,6 +164,21 @@ export interface Condition {
   leaderHasAnyType?: string[];
   /** "If you have a Character with a cost of N or more" */
   ownCharacterMinCost?: number;
+  /** "the only Characters on your field are {X} type Characters" (e pelo menos um). */
+  onlyTypedCharacters?: string;
+  ownTypedCharacterMinPower?: { type: string; power: number };
+  /** Cartas de Vida + mão, no máximo. */
+  lifeHandMax?: number;
+  totalCharacterCostMin?: number;
+  /** "you have 2 or more Characters with a cost of 8 or more" */
+  charactersWithCost?: { count: number; cost: number };
+  /** Você ativou neste turno um Evento com custo base a partir deste. */
+  activatedEventMinCost?: number;
+  /** O ataque atual é contra o Líder do oponente. */
+  attackingLeader?: boolean;
+  /** A partir deste número de turno da partida ("it is your second turn or later" = 3). */
+  minTurn?: number;
+  opponentLeaderAttribute?: string;
   /** "you have a Character with 7000 base power or more" */
   ownCharacterMinBasePower?: number;
   /** Basta uma das condições. */
@@ -208,6 +231,17 @@ export type AbilityCondition = Condition;
 export type StepCondition = Condition;
 
 /** Bônus contínuo para outras cartas do mesmo jogador ("your {Navy} type Characters gain +1000"). */
+export type LeaderRule =
+  | { kind: 'donDeck'; size: number }
+  | { kind: 'deckOutWin' }
+  | { kind: 'deckOutEndOfTurn' }
+  | { kind: 'donPhaseToLeader' }
+  | { kind: 'playRested' }
+  | { kind: 'faceUpLifeToDeck' }
+  | { kind: 'counterBonus'; type: string; amount: number }
+  | { kind: 'deckMaxCost'; cost: number; category?: 'event' }
+  | { kind: 'startStage'; type: string };
+
 export interface Aura {
   kinds: Array<'leader' | 'character'>;
   hasAnyType?: string[];
@@ -219,6 +253,10 @@ export interface Aura {
   cost?: number;
   /** Só cartas com um destes nomes ("All of your [Portgas.D.Ace] and [Monkey.D.Luffy] cards"). */
   names?: string[];
+  /** Só cartas com custo impresso a partir deste. */
+  minCost?: number;
+  /** Concede uma palavra-chave em vez de poder ("All of your Characters with a cost of 12 or more gain [Blocker]"). */
+  keyword?: Keyword;
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -246,8 +284,14 @@ export interface Replacement {
 
 /** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
 export type GameEvent =
-  | { kind: 'donReturned' } // DON!! do seu campo voltou ao deck de DON!!
-  | { kind: 'characterKO'; whose: 'any' | 'own' | 'opponent' }
+  | { kind: 'donReturned'; min?: number } // DON!! do seu campo voltou ao deck de DON!! ("2 or more")
+  | { kind: 'characterPlayed'; who: 'self' | 'opponent'; filter?: CardFilter; from?: 'trash' }
+  | { kind: 'donGiven' } // "When this Leader or 1 of your Characters is given a DON!! card"
+  | { kind: 'damageTaken' } // "When you take damage"
+  | { kind: 'anyOf'; events: GameEvent[] }
+  /** Personagem saiu do campo por efeito (byWho) — com orKO, também nocauteado em batalha. */
+  | { kind: 'characterRemoved'; whose: 'any' | 'own' | 'opponent'; by: 'self' | 'opponent' | 'any'; filter?: CardFilter; orKO?: boolean }
+  | { kind: 'characterKO'; whose: 'any' | 'own' | 'opponent'; filter?: CardFilter }
   | { kind: 'eventActivated'; who: 'self' | 'opponent' }
   | { kind: 'blockerActivated'; who: 'self' | 'opponent' }
   | { kind: 'selfRested' } // "When this Character becomes rested"
@@ -276,6 +320,12 @@ type EffectStepBody =
   | { do: 'playThis'; rested?: boolean }
   | { do: 'revealedToHand'; filter?: CardFilter }
   | { do: 'lookOpponentTop' }
+  | { do: 'activateEventFromHand'; filter: CardFilter }
+  | { do: 'revealLifeTop' }
+  | { do: 'trashAnyForPower'; categories: Array<'event' | 'stage' | 'character'>; power: number; duration: Duration }
+  /** "Change the attack target to your Leader or 1 of your … Characters" */
+  | { do: 'redirectAttack'; spec: TargetSpec }
+  | { do: 'handToDeck'; count: number; where: 'top' | 'bottom' | 'choose' }
   /** Descartar cartas da mão (custo "You may trash N card from your hand"). */
   | { do: 'trashFromHand'; count: number; filter?: CardFilter; upTo?: boolean }
   /** "Draw cards so that you have N cards in your hand." */
@@ -404,6 +454,7 @@ export type AbilityTiming =
   | 'event' // "When …": reação a um acontecimento (Ability.event)
   | 'onOpponentAttack' // [On Your Opponent's Attack]
   | 'replace' // "If … would be K.O.'d / removed from the field, you may … instead" (Ability.replace + cost)
+  | 'startOfTurn' // "This effect can be activated at the start of your turn"
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
@@ -459,6 +510,8 @@ export interface Ability {
   condition?: AbilityCondition;
   /** Efeitos estáticos (timing = 'static'). */
   aura?: Aura;
+  /** Regra especial do Líder (texto "according to the rules" / "Under the rules of this game"). */
+  rule?: LeaderRule;
   staticPower?: number;
   staticKeyword?: Keyword;
   staticCanAttackActive?: boolean;
@@ -618,7 +671,7 @@ export type Frame =
     }
   | { kind: 'battle' }
   | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean }
-  | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean }
+  | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash' }
   /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
   | { kind: 'endTurn' };
 
@@ -644,6 +697,8 @@ export interface GameState {
   pending: Pending | null;
   modifiers: Modifier[];
   usedThisTurn: string[];
+  /** Eventos ativados neste turno (custo base), para "if you have activated an Event … during this turn". */
+  eventsThisTurn?: Array<{ player: PlayerId; cost: number }>;
   /** Efeitos adiados para o fim do turno ("at the end of this turn"). */
   delayed?: Array<{ controller: PlayerId; source: string; steps: EffectStep[] }>;
   winner: PlayerId | null;

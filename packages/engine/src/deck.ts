@@ -7,7 +7,7 @@
 //  - cada carta precisa ter ao menos uma cor em comum com o Líder.
 // Listas de cartas banidas/restritas ainda não são aplicadas.
 
-import { needsManual } from './cards';
+import { buildCardDef, needsManual } from './cards';
 import { DECK_SIZE } from './engine';
 import type { CardData, DeckList } from './types';
 
@@ -40,6 +40,19 @@ export function isColorCompatible(leader: CardData, card: CardData): boolean {
   return card.colors.some((c) => leader.colors.includes(c));
 }
 
+/** Regras de construção do Líder ("you cannot include cards with a cost of 5 or more in your deck"). */
+const leaderRuleCache = new WeakMap<CardData, ReturnType<typeof buildCardDef>['abilities']>();
+
+export function leaderAllows(leader: CardData, card: CardData): boolean {
+  let abilities = leaderRuleCache.get(leader);
+  if (!abilities) leaderRuleCache.set(leader, (abilities = buildCardDef(leader).abilities));
+  for (const a of abilities) {
+    const r = a.rule;
+    if (r?.kind === 'deckMaxCost' && (!r.category || card.category === r.category) && (card.cost ?? 0) > r.cost) return false;
+  }
+  return true;
+}
+
 export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Record<string, CardData>): DeckReport {
   const get = (id: string) => (cards instanceof Map ? cards.get(id) : cards[id]);
   const issues: DeckIssue[] = [];
@@ -63,6 +76,7 @@ export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Reco
     });
   }
 
+  const leaderRules = leader?.category === 'leader' ? buildCardDef(leader).abilities.flatMap((a) => (a.rule ? [a.rule] : [])) : [];
   const counts = new Map<string, number>();
   for (const entry of deck.cards) counts.set(entry.id, (counts.get(entry.id) ?? 0) + entry.count);
 
@@ -78,6 +92,14 @@ export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Reco
     }
     if (count > MAX_COPIES && !anyNumberAllowed(card)) {
       issues.push({ level: 'error', message: `${card.name} (${id}): máximo de ${MAX_COPIES} cópias.`, cardId: id });
+    }
+    const maxCost = leaderRules.find((r) => r.kind === 'deckMaxCost');
+    if (maxCost?.kind === 'deckMaxCost' && leader && !leaderAllows(leader, card)) {
+      issues.push({
+        level: 'error',
+        message: `${card.name} (${id}): o Líder não permite ${maxCost.category === 'event' ? 'Eventos' : 'cartas'} com custo ${maxCost.cost + 1} ou mais.`,
+        cardId: id,
+      });
     }
     if (leader?.category === 'leader' && !isColorCompatible(leader, card)) {
       issues.push({ level: 'error', message: `${card.name} (${id}) não tem a cor do Líder.`, cardId: id });

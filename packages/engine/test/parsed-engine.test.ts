@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, attackError, createGame, getCost, getPower, hasKeyword, koProtected } from '../src/engine';
 import { parseCard } from '../src/cards';
+import { chooseBotAction } from '../src/bot/simple';
 import type { CardData, DeckList, GameState } from '../src/types';
 import { cards as baseCards, toTurn } from './helpers';
 
@@ -29,6 +30,14 @@ const extra: CardData[] = [
   { id: 'PX-021', name: 'Koala', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Play up to 1 Character card with a cost of 1 or less from your hand. If you do, draw 1 card.' },
   { id: 'PX-022', name: 'Heavy', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: 'All of your Characters gain +1 cost.' },
   { id: 'PX-023', name: 'Uta', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Reveal 1 card from the top of your deck and add up to 1 Character card to your hand. Then, place the rest at the bottom of your deck.' },
+  { id: 'PX-025', name: 'Garp', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Your Turn] When this Leader or 1 of your Characters is given a DON!! card, draw 1 card.' },
+  { id: 'PX-026', name: 'Doffy', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Your Turn] [Once Per Turn] This effect can be activated when a Character is removed from the field by your effect. Draw 1 card.' },
+  { id: 'PX-027', name: 'Bouncer', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Return up to 1 of your opponent's Characters to the owner's hand." },
+  { id: 'PX-028', name: 'Watcher', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Opponent\'s Turn] When your opponent plays a Character, draw 1 card.' },
+  { id: 'PX-029', name: 'Guard2', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Your Opponent's Attack] Change the target of that attack to this Leader or to one of your Characters." },
+  { id: 'PX-030', name: 'Thrower', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[When Attacking] You may trash any number of Event or Stage cards from your hand. This Character gains +1000 power during this battle for every card trashed.' },
+  { id: 'PX-031', name: 'Caller', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] Activate up to 1 Event with a base cost of 3 or less from your hand.' },
+  { id: 'PX-032', name: 'Early', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: 'This effect can be activated at the start of your turn. If you have 2 or less cards in your hand, draw 1 card.' },
   { id: 'PX-024', name: 'Law', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, draw 1 card.' },
 ];
 const cards = [...baseCards, ...extra];
@@ -309,5 +318,93 @@ describe('efeitos lidos automaticamente', () => {
     s.players[0].donRested = 0;
     const u = applyAction(s, { type: 'activate', player: 0, uid: law, ability: 0 });
     expect(u.players[0].hand).toHaveLength(hand + 1);
+  });
+
+  it('gatilho: receber DON!!', () => {
+    let s = toTurn(game(), 3);
+    field(s, 0, 'PX-025');
+    const hand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'attachDon', player: 0, target: s.players[0].leader.uid });
+    expect(s.players[0].hand).toHaveLength(hand + 1);
+  });
+
+  it('gatilho: Personagem removido do campo por efeito seu', () => {
+    let s = toTurn(game(), 3);
+    field(s, 0, 'PX-026');
+    const enemy = field(s, 1, 'PX-001');
+    const bouncer = give(s, 0, 'PX-027');
+    const hand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: bouncer });
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [enemy] });
+    expect(s.players[1].hand).toContain(enemy);
+    expect(s.players[0].hand).toHaveLength(hand); // −1 jogada, +1 compra
+  });
+
+  it('gatilho: oponente joga um Personagem', () => {
+    let s = toTurn(game(), 4);
+    field(s, 0, 'PX-028');
+    const hand = s.players[0].hand.length;
+    s = applyAction(s, { type: 'playCard', player: 1, uid: give(s, 1, 'PX-001') });
+    expect(s.players[0].hand).toHaveLength(hand + 1);
+  });
+
+  it('muda o alvo do ataque', () => {
+    let s = toTurn(game(), 4);
+    field(s, 0, 'PX-029');
+    const decoy = field(s, 0, 'PX-001');
+    s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: s.players[0].leader.uid });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    const life = s.players[0].life.length;
+    s = applyAction(s, { type: 'choose', player: 0, uids: [decoy] });
+    if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 0 });
+    // O Personagem escolhido recebe o ataque (e é nocauteado); o Líder não perde Vida.
+    expect(s.players[0].trash).toContain(decoy);
+    expect(s.players[0].life).toHaveLength(life);
+  });
+
+  it('descarta quantas cartas quiser por +1000 cada', () => {
+    let s = toTurn(game(), 3);
+    const thrower = field(s, 0, 'PX-030');
+    const [a, b] = s.players[0].hand;
+    s.cards[a] = { ...s.cards[a], cardId: 'PX-008' };
+    s.cards[b] = { ...s.cards[b], cardId: 'PX-013' };
+    s = applyAction(s, { type: 'attack', player: 0, attacker: thrower, target: s.players[1].leader.uid });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [a, b] });
+    expect(getPower(s, thrower)).toBe(4000);
+    expect(s.players[0].trash).toEqual(expect.arrayContaining([a, b]));
+  });
+
+  it('ativa um Evento da mão sem pagar o custo', () => {
+    let s = toTurn(game(), 3);
+    const caller = field(s, 0, 'PX-031');
+    const ev = s.players[0].hand[0];
+    s.cards[ev] = { ...s.cards[ev], cardId: 'PX-013' }; // compra até ter 6 cartas
+    s.players[0].hand = s.players[0].hand.slice(0, 2);
+    const don = s.players[0].donActive;
+    s = applyAction(s, { type: 'activate', player: 0, uid: caller, ability: 0 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [ev] });
+    expect(s.players[0].trash).toContain(ev);
+    expect(s.players[0].hand).toHaveLength(6);
+    expect(s.players[0].donActive).toBe(don);
+  });
+
+  it('efeito no início do turno usa a situação antes da compra', () => {
+    let s = toTurn(game(), 2);
+    field(s, 0, 'PX-032');
+    s.players[0].hand = s.players[0].hand.slice(0, 1);
+    s = applyAction(s, { type: 'endTurn', player: 1 });
+    expect(s.players[0].hand).toHaveLength(3);
+  });
+
+  it('as definições das cartas são compartilhadas entre estados e nunca mudam', () => {
+    let s = toTurn(game(), 3);
+    const before = JSON.stringify(s.defs);
+    const defs = s.defs;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-016') }); // insere passos durante a resolução
+    while (s.pending) s = applyAction(s, chooseBotAction(s, s.pending.player));
+    s = toTurn(s, 6);
+    expect(s.defs).toBe(defs);
+    expect(JSON.stringify(s.defs)).toBe(before);
   });
 });

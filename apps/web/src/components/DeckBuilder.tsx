@@ -5,6 +5,7 @@ import {
   formatDeckList,
   needsManual,
   isColorCompatible,
+  leaderAllows,
   MAX_COPIES,
   anyNumberAllowed,
   parseDeckList,
@@ -101,7 +102,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         if (colors.length && !c.colors.some((col) => colors.includes(col))) return false;
         if (cost !== '' && (cost === '10' ? (c.cost ?? -1) < 10 : c.cost !== Number(cost))) return false;
         if (set && (c.set ?? c.id.split('-')[0]) !== set) return false;
-        if (onlyCompatible && leader && c.category !== 'leader' && !isColorCompatible(leader, c)) return false;
+        if (onlyCompatible && leader && c.category !== 'leader' && (!isColorCompatible(leader, c) || !leaderAllows(leader, c))) return false;
         if (onlyAutomated && needsManual(c)) return false;
         if (q) {
           const hay = `${c.id} ${c.name} ${c.types.join(' ')} ${c.text} ${c.i18n?.pt?.text ?? ''}`.toLowerCase();
@@ -392,7 +393,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
           <div className="card-grid">
             {filtered.slice(0, limit).map((c) => {
               const n = draft.cards.get(c.id) ?? 0;
-              const incompatible = leader && c.category !== 'leader' && !isColorCompatible(leader, c);
+              const incompatible = leader && c.category !== 'leader' && (!isColorCompatible(leader, c) || !leaderAllows(leader, c));
               return (
                 <div key={c.id} className="grid-cell">
                   <StaticCard
