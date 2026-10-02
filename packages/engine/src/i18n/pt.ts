@@ -566,6 +566,59 @@ const PHRASES: Rule[] = [
   [/Event cards?/g, 'Evento'],
   [/\bIt (?=recebe|ganha)/g, 'Ele '],
   [/\bup to (\d+) /gi, (_, n) => `até ${n} `],
+  // --- Expressões genéricas (última prioridade): reduzem o inglês nas frases que nenhuma regra cobre inteira.
+  [/\bat the top or bottom of your deck in any order\b/gi, 'no topo ou no fundo do seu deck, em qualquer ordem'],
+  [/\bat the top or bottom of your deck\b/gi, 'no topo ou no fundo do seu deck'],
+  [/\bat the bottom of your deck in any order\b/gi, 'no fundo do seu deck, em qualquer ordem'],
+  [/\bat the bottom of (?:your|the owner's) deck\b/gi, 'no fundo do deck'],
+  [/\bat the bottom of their deck(?: in any order)?\b/gi, 'no fundo do deck dele'],
+  [/\bto the top of your Life cards face-up\b/gi, 'ao topo da sua Vida, com a face para cima'],
+  [/\bto the top of your Life cards\b/gi, 'ao topo da sua Vida'],
+  [/\bto the top of your opponent's Life cards face-up\b/gi, 'ao topo da Vida do oponente, com a face para cima'],
+  [/\bfrom the top of your Life cards\b/gi, 'do topo da sua Vida'],
+  [/\bfrom the top of your deck\b/gi, 'do topo do seu deck'],
+  [/\bfrom the top of your opponent's deck\b/gi, 'do topo do deck do oponente'],
+  [/\bto the top of your deck\b/gi, 'ao topo do seu deck'],
+  [/\bfrom your hand or trash\b/gi, 'da sua mão ou do seu descarte'],
+  [/\bfrom your hand\b/gi, 'da sua mão'],
+  [/\bfrom their hand\b/gi, 'da mão dele'],
+  [/\bfrom your trash\b/gi, 'do seu descarte'],
+  [/\bfrom their trash\b/gi, 'do descarte dele'],
+  [/\bin your hand\b/gi, 'na sua mão'],
+  [/\bin your trash\b/gi, 'no seu descarte'],
+  [/\bto your hand\b/gi, 'à sua mão'],
+  [/\bto the owner's hand\b/gi, 'à mão do dono'],
+  [/\bin any order\b/gi, 'em qualquer ordem'],
+  [/\bremoved from the field\b/gi, 'removido do campo'],
+  [/\bon your field\b/gi, 'no seu campo'],
+  [/\byour Life cards\b/gi, 'as suas cartas de Vida'],
+  [/\byour opponent's Life cards\b/gi, 'as cartas de Vida do oponente'],
+  [/\bwith a base cost of (\d+) or (less|more)\b/gi, (_, n, w) => `com custo base ${n} ou ${w.toLowerCase() === 'less' ? 'menos' : 'mais'}`],
+  [/\bwith a cost of (\d+) or (less|more)\b/gi, (_, n, w) => `com custo ${n} ou ${w.toLowerCase() === 'less' ? 'menos' : 'mais'}`],
+  [/\bwith a cost of (\d+)\b/gi, (_, n) => `com custo ${n}`],
+  [/\bwith (\d+) (base )?power or (less|more)\b/gi, (_, n, b, w) => `com ${n} de poder${b ? ' base' : ''} ou ${w.toLowerCase() === 'less' ? 'menos' : 'mais'}`],
+  [/\bwith (\d+) (base )?power\b/gi, (_, n, b) => `com ${n} de poder${b ? ' base' : ''}`],
+  [/\b(\d+) or more\b/gi, (_, n) => `${n} ou mais`],
+  [/\b(\d+) or less\b/gi, (_, n) => `${n} ou menos`],
+  [/\bduring this turn\b/gi, 'durante este turno'],
+  [/\bduring this battle\b/gi, 'durante esta batalha'],
+  [/\buntil the end of your opponent's next (?:End Phase|turn)\b/gi, 'até o fim do próximo turno do oponente'],
+  [/\buntil the start of your next turn\b/gi, 'até o início do seu próximo turno'],
+  [/\bat the end of this turn\b/gi, 'no fim deste turno'],
+  [/\bIf you have\b/g, 'Se você tiver'],
+  [/\bif you have\b/g, 'se você tiver'],
+  [/\bYou may\b/g, 'Você pode'],
+  [/\byou may\b/g, 'você pode'],
+  [/\bthis Character\b/gi, 'este Personagem'],
+  [/\bthis Leader\b/gi, 'este Líder'],
+  [/\byour Leader\b/gi, 'o seu Líder'],
+  [/\b(\d+) cards\b/g, (_, n) => `${n} cartas`],
+  [/\b1 card\b/g, '1 carta'],
+  [/\bIf there is a Character with (\d+) power or more,\s*/g, (_, n) => `Se houver um Personagem com ${n} de poder ou mais, `],
+  [/\bLook at the top (\d+) cartas of your deck\b/g, (_, n) => `Olhe as ${n} cartas do topo do seu deck`],
+  [/\band add it à sua mão\b/g, 'e adicione-a à sua mão'],
+  [/\bseu oponente's\b/g, 'do oponente'],
+  [/\bEste Personagem's base power\b/g, 'O poder base deste Personagem'],
 ];
 
 // Palavras em inglês que denunciam trecho sem tradução (limites Unicode: "Até" não é "at").
@@ -693,6 +746,7 @@ export function translateToPt(text: string): Translation {
     .replace(/\[Activate:Main\]/g, '[Activate: Main]')
     .replace(/\bYou can (?=trash|rest|place|return|add)/g, 'You may ')
     .replace(/\{Supernova\}/g, '{Supernovas}')
+    .replace(/\bPiratess\b/g, 'Pirates')
     .replace(/DON!! (\d+)(?=\s*[:(])/g, 'DON!! -$1');
   for (const [re, rep] of REMINDERS) {
     src = src.replace(re, () => {
@@ -717,6 +771,8 @@ export function translateToPt(text: string): Translation {
   // Tags soltas no meio do texto (ex.: "Activate this card's [Main] effect" já tratado).
   for (const [re, rep] of TAGS) out = out.replace(re, rep);
 
+  // Condicional duplicada ("Se If …") quando uma regra já começou a frase.
+  out = out.replace(/\b([Ss]e) If /g, '$1 ').replace(/\b([Ss]e) if /g, '$1 ');
   const check = out.replace(/\[[^\]]*\]|\{[^}]*\}|§\d+§/g, '');
   out = out.replace(/§(\d+)§/g, (_, i) => saved[Number(i)]).replace(/\)\s+:/g, '):');
   return { text: out, complete: !RESIDUE.test(check) };

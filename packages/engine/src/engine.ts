@@ -267,6 +267,9 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.noCharacterNamed && ps.characters.some((c) => hasName(cardDef(state, c.uid), cond.noCharacterNamed!))) return false;
   if (cond.leaderMulticolor && cardDef(state, ps.leader.uid).colors.length < 2) return false;
   if (cond.leaderMonocolor && cardDef(state, ps.leader.uid).colors.length !== 1) return false;
+  if (cond.anyCharacterMinPower !== undefined && ![...ps.characters, ...opp.characters].some((c) => getPower(state, c.uid) >= cond.anyCharacterMinPower!)) {
+    return false;
+  }
   if (cond.faceUpLifeMin !== undefined && ps.life.filter((u) => ps.lifeFaceUp?.includes(u)).length < cond.faceUpLifeMin) return false;
   if (cond.leaderAttribute && !(cardDef(state, ps.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.leaderAttribute!.toLowerCase())) {
     return false;

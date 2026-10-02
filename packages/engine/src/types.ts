@@ -144,6 +144,7 @@ export interface Condition {
   leaderMonocolor?: boolean;
   leaderAttribute?: string;
   faceUpLifeMin?: number;
+  anyCharacterMinPower?: number;
   /** "you have [Satori] and [Hotori]" */
   haveNamed?: string[];
   /** "If the revealed card has the chosen cost" (passos chooseCost + revealOpponentTop) */

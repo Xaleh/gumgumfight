@@ -5,7 +5,7 @@
 // exatamente o que o jogo vai fazer. Linhas não reconhecidas usam o tradutor por
 // regras de frase (pt.ts).
 
-import { effectLines, parseEffectLine, parseTriggerText } from '../cards/parser';
+import { cleanEffectText, effectLines, parseBody, parseEffectLine, parseTriggerText } from '../cards/parser';
 import { KEYWORD_ONLY } from '../cards/split';
 import type {
   Ability,
@@ -348,6 +348,9 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você tiver ${c.ownMatchingMax!.count} ou menos ${t}`);
         break;
       }
+      case 'anyCharacterMinPower':
+        out.push(`houver um Personagem com ${c.anyCharacterMinPower} de poder ou mais`);
+        break;
       case 'faceUpLifeMin':
         out.push('você tiver uma carta de Vida virada para cima');
         break;
@@ -928,6 +931,53 @@ export interface CardTranslation {
  * Tradução de uma carta: cada linha que o leitor entende é descrita a partir dos passos;
  * as demais usam o tradutor por regras.
  */
+/**
+ * Linha que o leitor não entende inteira: as frases que ele entende são descritas a partir
+ * dos passos e o resto (marcações, custo, frases desconhecidas) vai para o tradutor por regras.
+ */
+function mixedLine(raw: string, ctx: Ctx): { text: string; complete: boolean; parsed: number } {
+  const head = raw.match(/^((?:\s*\[[^\]]*\]\s*\/?)*)/)![1];
+  let rest = raw.slice(head.length).trim();
+  let costPart = '';
+  const colon = rest.indexOf(':');
+  const firstStop = rest.search(/\.\s/);
+  if (colon > 0 && (firstStop < 0 || colon < firstStop)) {
+    costPart = rest.slice(0, colon + 1);
+    rest = rest.slice(colon + 1).trim();
+  }
+  const pieces: string[] = [];
+  let complete = true;
+  let parsed = 0;
+  const prefix = `${head}${costPart}`.trim();
+  if (prefix) {
+    const r = translateToPt(prefix);
+    complete &&= r.complete;
+    pieces.push(r.text);
+  }
+  const sentences = rest.split(/(?<=[a-z0-9)\]}'"]\.)\s+(?=[A-Z[])/).filter(Boolean);
+  for (const sentence of sentences) {
+    const then = /^Then,\s*/i.test(sentence);
+    const body = sentence.replace(/^Then,\s*/i, '');
+    let text: string | null = null;
+    const st = parseBody(cleanEffectText(body.charAt(0).toUpperCase() + body.slice(1)));
+    if (st?.length) {
+      try {
+        text = steps(st, ctx);
+        parsed++;
+      } catch (e) {
+        if (!(e instanceof Unknown)) throw e;
+      }
+    }
+    if (text === null) {
+      const r = translateToPt(body);
+      complete &&= r.complete;
+      text = r.text;
+    }
+    pieces.push(then ? `Depois, ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text);
+  }
+  return { text: pieces.join(' ').replace(/\s+/g, ' ').trim(), complete, parsed };
+}
+
 export function translateCardPt(card: Pick<CardData, 'category' | 'text' | 'trigger'>): CardTranslation {
   const ctx: Ctx = { self: selfName(card.category) };
   let complete = true;
@@ -944,6 +994,13 @@ export function translateCardPt(card: Pick<CardData, 'category' | 'text' | 'trig
       }
     }
     const r = translateToPt(l);
+    if (!r.complete && !KEYWORD_ONLY.test(l)) {
+      const mixed = mixedLine(l, ctx);
+      if (mixed.parsed) {
+        complete &&= mixed.complete;
+        return mixed.text;
+      }
+    }
     complete &&= r.complete;
     return r.text;
   });

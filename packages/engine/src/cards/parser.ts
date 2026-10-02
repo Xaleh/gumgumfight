@@ -94,6 +94,11 @@ function stripReminders(s: string): string {
 
 const CIRCLED_DIGITS = '①②③④⑤⑥⑦⑧⑨⑩';
 
+/** Normaliza o texto da API (tipos, lembretes, sinais de DON!!) antes da leitura. */
+export function cleanEffectText(raw: string): string {
+  return clean(raw);
+}
+
 function clean(raw: string): string {
   const fixed = raw
     // "(Slash) attribute": o atributo entre parênteses não é lembrete.
@@ -388,6 +393,7 @@ export function parseCondition(text: string): Condition | null {
     return { anyCharacterCost: /more/i.test(m[2] ?? '') ? { min: n } : /less/i.test(m[2] ?? '') ? { max: n } : { min: n, max: n } };
   }
   if ((m = t.match(/^you don't have \[([^\]]+)\]$/i))) return { noCharacterNamed: m[1] };
+  if ((m = t.match(/^there is a Character with (\d+) power or more$/i))) return { anyCharacterMinPower: Number(m[1]) };
   if (/^your Leader is multicolored$/i.test(t)) return { leaderMulticolor: true };
   if (/^your Leader is monocolored$/i.test(t)) return { leaderMonocolor: true };
   if ((m = t.match(/^your Leader has the "?(\w+)"? attribute$/i))) return { leaderAttribute: m[1] };
