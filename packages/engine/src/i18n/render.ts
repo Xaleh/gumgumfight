@@ -734,6 +734,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Escolha 2 ${target({ ...s.spec, upTo: 2 }, ctx).replace(/^até 2 /, '')} e troque o poder base deles ${dur(s.duration)}.`;
     case 'trashFaceUpLife':
       return 'Descarte todas as suas cartas de Vida viradas para cima.';
+    case 'lifeToTrash':
+      return `Descarte ${cards(s.count)} do ${s.choose ? 'topo ou do fundo' : 'topo'} da sua Vida.`;
     case 'revealedToTopOrBottom':
       return 'Coloque a carta revelada no topo ou no fundo do seu deck.';
     case 'lifeOneToDeckTop':

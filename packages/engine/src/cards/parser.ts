@@ -784,6 +784,9 @@ const CLAUSES: ClauseRule[] = [
   [/^Trash all (?:of )?your face-up Life cards$/i, () => [{ do: 'trashFaceUpLife' }]],
   [/^place the revealed card at the top of your deck$/i, () => [{ do: 'lastToDeckTop' }]],
   [/^place the rest at the top or bottom of your deck$/i, () => [{ do: 'revealedToTopOrBottom' }]],
+  // "[On Play] … this Character gains [Rush]." sem duração: vale no turno em que entra.
+  [/^this Character gains \[Rush\]$/i, () => [{ do: 'gainKeyword', target: 'self', keyword: 'rush', duration: 'turn' }]],
+  [/^trash (\d+) cards? from the top of your Life cards$/i, (m) => [{ do: 'lifeToTrash', count: Number(m[1]) }]],
   [
     /^look at all (?:of )?your Life cards; place 1 (?:card )?at the top of your deck and place the rest back in your Life area in any order$/i,
     () => [{ do: 'lifeOneToDeckTop' }],
@@ -821,7 +824,7 @@ const CLAUSES: ClauseRule[] = [
     (m) => [{ do: 'opponentTrashToBottom', count: Number(m[1]) }],
   ],
   [
-    /^Look at all of (your|your opponent's) Life cards and place them back in (?:your|their) Life area in any order$/i,
+    /^Look at all (?:of )?(your|your opponent's) Life cards and place them back in (?:your|their) Life area in any order$/i,
     (m) => [{ do: 'arrangeLife', whose: /opponent/i.test(m[1]) ? 'opponent' : 'own' }],
   ],
   [
