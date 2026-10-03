@@ -9,6 +9,7 @@ import {
   type PlayerId,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { FormatId } from '../api';
 
 export type GameMode = 'bot' | 'demo' | 'replay';
 
@@ -16,6 +17,8 @@ export interface GameSetup {
   mode: GameMode;
   config: GameConfig;
   deckIds: [string, string];
+  /** Formato escolhido no menu (vai para as estatísticas). */
+  format: FormatId;
   /** Ações gravadas (modo replay / roteiro). */
   script?: Action[];
 }

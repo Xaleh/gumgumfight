@@ -1,6 +1,6 @@
 import type { Action, CardData, PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, deckGroups, type DeckSummary } from '../api';
+import { api, deckGroups, type DeckSummary, type FormatId } from '../api';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
 import { SettingsControls, useSettings } from '../settings';
 
@@ -11,6 +11,7 @@ async function buildSetup(
   deckIds: [string, string],
   names: [string, string],
   seed: number,
+  format: FormatId,
   firstPlayer?: PlayerId,
   script?: Action[],
 ): Promise<GameSetup> {
@@ -20,6 +21,7 @@ async function buildSetup(
   return {
     mode,
     deckIds,
+    format,
     script,
     config: {
       seed,
@@ -34,6 +36,20 @@ async function buildSetup(
 }
 
 const LAST_DECKS = 'gumgum.lastDecks';
+const LAST_FORMAT = 'gumgum.format';
+
+const FORMATS: Array<[FormatId, string]> = [
+  ['standard', 'Standard'],
+  ['egb', 'Extra Grand Battle'],
+];
+
+function savedFormat(): FormatId {
+  try {
+    return localStorage.getItem(LAST_FORMAT) === 'egb' ? 'egb' : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
 
 const RANDOM = 'random';
 
@@ -141,10 +157,12 @@ export function Menu({
   onStart,
   onBuildDecks,
   onCoverage,
+  onStats,
 }: {
   onStart: (s: GameSetup) => void;
   onBuildDecks: () => void;
   onCoverage: () => void;
+  onStats: () => void;
 }) {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -153,6 +171,7 @@ export function Menu({
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
+  const [format, setFormat] = useState<FormatId>(savedFormat);
   const [loading, setLoading] = useState(false);
   const [picking, setPicking] = useState<null | 0 | 1>(null);
 
@@ -200,6 +219,7 @@ export function Menu({
     setLoading(true);
     try {
       localStorage.setItem(LAST_DECKS, JSON.stringify([deck0, deck1]));
+      localStorage.setItem(LAST_FORMAT, format);
     } catch {
       /* sem armazenamento */
     }
@@ -207,7 +227,7 @@ export function Menu({
       const names: [string, string] = mode === 'demo' ? ['Bot A', 'Bot B'] : ['Você', 'Bot'];
       const pool = decks.filter((d) => d.valid && d.kind === 'builtin');
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
-      onStart(await buildSetup(mode, [deck0, opp], names, seed, first === 'random' ? undefined : (Number(first) as PlayerId)));
+      onStart(await buildSetup(mode, [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setLoading(false);
@@ -218,7 +238,7 @@ export function Menu({
     try {
       const r = JSON.parse(await file.text()) as ReplayFile;
       if (r.format !== 'gumgumfight-replay') throw new Error('Arquivo não é um replay do GumGum Fight.');
-      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, r.firstPlayer, r.actions));
+      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', r.firstPlayer, r.actions));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -277,6 +297,17 @@ export function Menu({
             </div>
           </div>
 
+          <div className="field">
+            <label>Formato</label>
+            <div className="seg small">
+              {FORMATS.map(([v, label]) => (
+                <button key={v} className={format === v ? 'on' : ''} onClick={() => setFormat(v)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button className="btn primary battle-btn" disabled={!deck0 || !deck1 || loading} onClick={start}>
             {loading ? 'Carregando…' : 'Batalhar!'}
           </button>
@@ -286,6 +317,10 @@ export function Menu({
           <button className="btn" onClick={onBuildDecks}>
             <span className="ico">🃏</span>
             Montar decks
+          </button>
+          <button className="btn" onClick={onStats}>
+            <span className="ico">📈</span>
+            Estatísticas
           </button>
           <button className="btn" onClick={onCoverage}>
             <span className="ico">📊</span>

@@ -152,16 +152,17 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       setShowResult(false);
       return;
     }
-    if (!saved.current) {
+    // Replays não contam de novo; o servidor refaz a partida a partir das ações.
+    if (!saved.current && setup.mode !== 'replay') {
       saved.current = true;
       void api.saveMatch({
-        seed: state.seed,
         mode: setup.mode,
-        deck0: setup.deckIds[0],
-        deck1: setup.deckIds[1],
-        winner: state.winner,
-        turns: state.turn,
-        reason: state.winReason,
+        format: setup.format,
+        seed: setup.config.seed,
+        firstPlayer: setup.config.firstPlayer,
+        deckIds: setup.deckIds,
+        decks: [setup.config.players[0].deck, setup.config.players[1].deck],
+        actions: game.actions(),
       });
     }
     const t = setTimeout(() => setShowResult(true), 1200);
