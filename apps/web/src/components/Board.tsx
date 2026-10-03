@@ -294,6 +294,8 @@ interface BoardProps extends BoardHandlers {
   handOrder?: string[];
   lifted?: string | null;
   ghost?: string | null;
+  /** Abre a mão inteira em tamanho grande (mãos com muitas cartas). */
+  onExpandHand?: () => void;
   bottom: PlayerId;
   revealTop: boolean;
   revealBottom: boolean;
@@ -312,6 +314,7 @@ export function Board({
   handOrder,
   lifted,
   ghost,
+  onExpandHand,
   ...handlers
 }: BoardProps) {
   const top = (bottom === 0 ? 1 : 0) as PlayerId;
@@ -338,6 +341,11 @@ export function Board({
         <div className="my-bar">
           <PlayerBanner state={state} player={bottom} align="left" />
         </div>
+        {onExpandHand && state.players[bottom].hand.length > 0 && (
+          <button className="hand-expand" onClick={onExpandHand} title="Ver todas as cartas da mão em tamanho grande">
+            ⤢ Ver mão <b>{state.players[bottom].hand.length}</b>
+          </button>
+        )}
         <Hand
           state={state}
           player={bottom}

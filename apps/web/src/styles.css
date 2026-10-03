@@ -1320,6 +1320,46 @@ button.hint-pill {
   flex: none;
   height: 26px;
 }
+.hand-expand {
+  position: absolute;
+  right: 4px;
+  top: 0;
+  z-index: 61;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 11px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.2);
+}
+.hand-expand b {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-left: 3px;
+  border-radius: 999px;
+  background: var(--slate);
+  color: #fff;
+  text-align: center;
+  font-size: 11px;
+}
+.hand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--cw), 1fr));
+  justify-items: center;
+  gap: 10px 8px;
+  --cw: min(104px, calc((100vw - 64px) / 3));
+}
+.hand-sheet-hint {
+  margin: 0;
+  text-align: center;
+}
+.sheet-body > .battle-info {
+  align-self: center;
+}
 .my-bar .banner {
   padding-top: 3px;
   padding-bottom: 3px;
@@ -1348,10 +1388,13 @@ button.hint-pill {
   z-index: var(--z);
   width: var(--hcw);
   height: calc(var(--hcw) * 1.396);
+  /* Margem lateral (34px) para a inclinação das pontas não sair da tela. */
   left: calc(
-    50% - var(--hcw) / 2 + var(--o) * min(var(--hcw) * 0.9, (100% - var(--hcw) - 12px) / max(var(--n) - 1, 1))
+    50% - var(--hcw) / 2 + var(--o) * min(var(--hcw) * 0.9, (100% - var(--hcw) - 34px) / max(var(--n) - 1, 1))
   );
-  transform: translateY(calc(var(--a) * var(--a) * 1.6px)) rotate(calc(var(--o) * 2.2deg));
+  /* Curva e inclinação limitadas nas pontas, qualquer que seja o tamanho da mão. */
+  transform: translateY(calc(var(--a) * var(--a) / (var(--n) * var(--n)) * 56px))
+    rotate(calc(var(--o) / var(--n) * 12deg));
   transform-origin: 50% 130%;
   transition: transform 0.18s, left 0.25s;
 }
@@ -1918,6 +1961,7 @@ button.hint-pill {
 /* zoom da carta (toque) */
 .zoom-backdrop {
   align-items: start;
+  z-index: 55;
 }
 .zoom {
   position: relative;
@@ -3103,6 +3147,15 @@ button.hint-pill {
   }
   .my-bar {
     display: none;
+  }
+  .hand-expand {
+    top: auto;
+    bottom: 6px;
+    right: auto;
+    left: max(6px, env(safe-area-inset-left));
+  }
+  .hand-grid {
+    --cw: min(96px, calc((100vw - 120px) / 6));
   }
   .hand.bottom {
     width: min(100%, calc(var(--hcw) * 8));

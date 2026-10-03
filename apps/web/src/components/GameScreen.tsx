@@ -36,7 +36,7 @@ interface Drag {
   /** Quantos DON!! estão sendo arrastados juntos. */
   count?: number;
 }
-type Sheet = null | 'menu' | 'log' | 'tools' | { trash: PlayerId };
+type Sheet = null | 'menu' | 'log' | 'tools' | 'hand' | { trash: PlayerId };
 
 const LONG_PRESS_MS = 420;
 const DRAG_THRESHOLD = 9;
@@ -361,7 +361,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       const n = box.querySelectorAll('.hand-card').length;
       const w = box.clientWidth;
       const cw = card.offsetWidth;
-      const step = n > 1 ? Math.min(cw * 0.9, (w - cw - 12) / (n - 1)) : 1;
+      const step = n > 1 ? Math.min(cw * 0.9, (w - cw - 34) / (n - 1)) : 1;
       const left = box.getBoundingClientRect().left;
       return Math.max(0, Math.min(n - 1, Math.round((x - left - w / 2) / step + (n - 1) / 2)));
     };
@@ -509,6 +509,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
           revealTop={showBotHand}
           corner={corner}
           handOrder={handView}
+          onExpandHand={human !== null ? () => setSheet('hand') : undefined}
           lifted={lifted}
           ghost={drag?.kind === 'hand' ? drag.uid : null}
           center={
@@ -646,6 +647,24 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             )}
             <div className="sheet-section">
               <SettingsControls compact />
+            </div>
+          </SheetFrame>
+        )}
+
+        {sheet === 'hand' && human !== null && (
+          <SheetFrame title={`Sua mão (${orderedHand.length})`} onClose={() => setSheet(null)}>
+            {state.battle && <BattleInfo state={state} human={human} />}
+            <p className="muted small hand-sheet-hint">
+              {myPending?.kind === 'counter'
+                ? 'Toque nas cartas destacadas para usar o Counter.'
+                : myPending?.kind === 'selectTargets'
+                  ? myPending.prompt
+                  : 'Toque numa carta para ver as ações. Segure para ler.'}
+            </p>
+            <div className="hand-grid">
+              {orderedHand.map((uid) => (
+                <CardView key={uid} state={state} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} />
+              ))}
             </div>
           </SheetFrame>
         )}
