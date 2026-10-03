@@ -1,3 +1,4 @@
+import './env';
 import { buildApp } from './app';
 import { spoilerSyncHours } from './config';
 import { countCards, type DB, openDb } from './db';

@@ -52,6 +52,7 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `CARD_IMAGES`   | `on`                          | `off` desliga as imagens oficiais das cartas |
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
+| `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 
 O backup é só copiar o arquivo `.db`.
 
@@ -93,6 +94,7 @@ Node padrão for mais antigo) e um site separado no proxy.
    | `DEPLOY_KNOWN_HOSTS` | saída de `ssh-keyscan -t ed25519 <endereço do servidor>` |
 
    Use sempre **Secrets** (nunca *Variables*, que ficam visíveis para quem lê o repositório).
+   A exceção é a Variable `GOOGLE_CLIENT_ID` do login com Google, que é pública (veja [Contas](#contas-login-com-google)).
 5. **No GitHub** → Settings → General → *Default branch*: `main`.
 6. **Primeiro deploy:** Actions → "CI e deploy" → *Run workflow* (branch `main`), com `import_sets` = `ST-01 ST-02`
    para já importar as cartas reais. Depois disso, todo push na `main` publica sozinho.
@@ -124,9 +126,10 @@ Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por nú
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
 Decks prontos (`data/decks`) não são alterados: ao mexer em um, o construtor cria uma cópia.
 
-Não há login: cada navegador recebe um código aleatório (guardado no navegador) e só ele pode editar ou apagar os
-decks que criou. Decks de outros jogadores aparecem em "Decks da comunidade": dá para jogar com eles e duplicá-los.
-Limpar os dados do site no navegador faz perder a edição dos próprios decks.
+Quem entra com a conta Google (veja [Contas](#contas-login-com-google)) edita os próprios decks em qualquer aparelho.
+Sem login, cada navegador recebe um código aleatório (guardado no navegador) e só ele pode editar ou apagar os decks
+que criou; limpar os dados do site faz perder a edição deles. Decks de outros jogadores aparecem em "Decks da
+comunidade": dá para jogar com eles e duplicá-los.
 **Exportar/Importar lista** usa o formato de texto da comunidade (`4xOP01-016`, uma carta por linha).
 
 ## Estatísticas
@@ -156,8 +159,36 @@ partidas bot x bot, que ficam fora das estatísticas de pessoas.
   Shichibukai e Yonkou). Na ranqueada a recompensa sobe e desce no estilo Elo (vencer quem vale mais rende mais).
   O tier gravado é o da hora da partida. Partidas enviadas pelo navegador são sempre casuais: a ranqueada será
   gravada pelo servidor de partidas online (com `recordMatch`), que será a autoridade.
-- Sem login, o jogador é o navegador (o mesmo código de dono dos decks). O nome do cartaz de "WANTED" pode ser trocado
-  na tela de estatísticas.
+- O jogador é a conta Google ou, sem login, o navegador (o mesmo código de dono dos decks). O nome do cartaz de
+  "WANTED" é o nome público e pode ser trocado na tela de estatísticas (o nome da conta Google não aparece para os outros).
+
+## Contas (login com Google)
+
+O único login é com a conta Google, pelo botão oficial do [Google Identity Services](https://developers.google.com/identity/gsi/web).
+Não há senha nem cadastro: o botão entrega ao navegador um ID token assinado pelo Google, o servidor confere a
+assinatura (com as chaves públicas do Google), o emissor, o Client ID e a validade, e abre uma sessão de 60 dias num
+cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o id da conta Google, nome, e-mail e foto
+(`users`) e o hash do token de cada sessão (`sessions`). O login é opcional: sem ele tudo continua funcionando como antes.
+
+- **No primeiro login**, os decks e o perfil de estatísticas criados naquele navegador passam para a conta. Se a conta
+  já tinha perfil, as partidas do navegador vão para ele.
+- **Sair** apaga a sessão. Os decks continuam na conta (no navegador, aparecem como "da comunidade" até entrar de novo).
+- Código: `apps/server/src/auth/` (verificação do token, sessões e rotas) e `apps/web/src/auth.tsx` (botão e estado).
+
+### Configurar o Client ID (uma vez)
+
+1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie (ou escolha) um projeto e
+   configure a **tela de consentimento OAuth** (tipo *Externo*; só os escopos básicos: e-mail, perfil e openid).
+2. **Credenciais → Criar credenciais → ID do cliente OAuth**, tipo **Aplicativo da Web**. Em **Origens JavaScript
+   autorizadas**, inclua `https://gumgumfight.duckdns.org`, `http://localhost:5173` e `http://localhost` (o botão do
+   Google exige as duas formas do localhost). Não é preciso URI de redirecionamento nem a chave secreta.
+3. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`). Ele não é segredo: vai para todo navegador.
+   - **Desenvolvimento:** crie um arquivo `.env` na raiz do projeto com `GOOGLE_CLIENT_ID=...` (o arquivo é ignorado
+     pelo git) e reinicie o `npm run dev`.
+   - **Produção:** no GitHub → Settings → Secrets and variables → Actions → aba **Variables** → *New repository
+     variable* `GOOGLE_CLIENT_ID`. O próximo deploy grava o valor em `shared/deploy.env` na VM.
+
+Sem `GOOGLE_CLIENT_ID`, o botão não aparece e `POST /api/auth/google` responde 503.
 
 ## Efeitos automáticos e modo manual
 
@@ -328,7 +359,10 @@ npm run typecheck
 | Método | Rota               | Descrição                                   |
 |--------|--------------------|---------------------------------------------|
 | GET    | `/api/health`      | Verificação de saúde                        |
-| GET    | `/api/config`      | Configurações públicas (imagens ligadas?)   |
+| GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google) |
+| GET    | `/api/auth/me`     | Usuário logado (`{ user }`, `null` sem sessão) |
+| POST   | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie |
+| POST   | `/api/auth/logout` | Sai (apaga a sessão)                        |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
 | GET    | `/api/cards/:id`   | Uma carta                                   |
 | GET    | `/api/decks`       | Lista decks, com validação                  |
@@ -338,7 +372,7 @@ npm run typecheck
 | DELETE | `/api/decks/:id`   | Apaga um deck do jogador                    |
 | POST   | `/api/matches`     | Envia o replay de uma partida (verificado pelo servidor) |
 | GET    | `/api/matches`     | Últimas partidas                            |
-| GET    | `/api/players/me`  | Perfil do navegador (nome, recompensa, tier) |
+| GET    | `/api/players/me`  | Perfil do jogador: conta ou navegador (nome, recompensa, tier) |
 | PUT    | `/api/players/me`  | Troca o nome (`{ name }`)                   |
 | GET    | `/api/stats/meta`  | Opções dos filtros: formatos, filas, tiers, Líderes |
 | GET    | `/api/stats`       | Totais, Líderes e matchups (filtros na query) |
