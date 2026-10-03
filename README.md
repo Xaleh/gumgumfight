@@ -51,6 +51,7 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `DATA_DIR`      | `data`                        | Decks prontos, cartas provisórias e traduções |
 | `CARD_IMAGES`   | `on`                          | `off` desliga as imagens oficiais das cartas |
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
+| `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 
 O backup é só copiar o arquivo `.db`.
 
@@ -105,7 +106,8 @@ pm2 logs gumgumfight        # logs
 pm2 restart gumgumfight     # reiniciar
 ```
 
-Para importar mais coleções, use `import-cards.mjs` do release atual com o `DB_PATH` do banco compartilhado;
+Para importar mais coleções, use `import-cards.mjs` do release atual com o `DB_PATH` do banco compartilhado
+(para `--spoilers`, informe também `DATA_DIR=<release>/data`; o app no pm2 já recebe essa variável);
 para desligar as imagens, defina `CARD_IMAGES=off` no ambiente do app e recarregue-o no pm2.
 
 ## Montando decks
@@ -256,6 +258,43 @@ npm run cards:import -- --file resp.json  # importa uma resposta da API salva em
 - Antes da primeira importação, o jogo usa dados **provisórios** de `data/cards` (escritos de memória). Eles nunca
   sobrescrevem cartas vindas da API.
 - Os scripts de efeito (`packages/engine/src/cards/scripts.ts`) precisam ser conferidos contra o texto oficial.
+
+### Spoilers (coleções ainda não lançadas)
+
+A optcgapi só publica uma coleção depois do lançamento. As cartas já anunciadas (hoje EB05 e OP18) entram no jogo como
+**spoilers**, com a etiqueta **SPOILER**, e viram cartas oficiais sozinhas quando a API publica a coleção.
+
+Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
+
+```json
+{
+  "set": "OP18",
+  "title": "The Dominance of God (OP-18)",
+  "feed": "optcgleaks",
+  "source": "optcgleaks.com",
+  "url": "https://optcgleaks.com/op18",
+  "cards": []
+}
+```
+
+- **Busca automática** (`"feed": "optcgleaks"`): o servidor baixa as cartas reveladas de
+  [optcgleaks.com](https://optcgleaks.com/) (`https://images.optcgleaks.com/<coleção>/<coleção>.json`), com textos em
+  inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX") e as reimpressões de outras coleções. Uma carta
+  que sai do site sai do banco; uma resposta vazia ou com erro não apaga nada. Para acompanhar uma coleção nova, basta
+  criar o arquivo dela.
+- **Cartas escritas à mão** (`cards`): mesmos campos de `data/cards` (`CardData`) e têm prioridade sobre as baixadas,
+  para corrigir um erro do site ou incluir uma carta de outra fonte. `source`/`url` do arquivo valem para essas cartas;
+  cada uma pode ter o seu `"spoiler": { "source": "...", "url": "..." }`. Cartas sem número, nome ou categoria são ignoradas
+  e aparecem no log. Uma carta apagada do arquivo sai do banco.
+- **Troca automática:** ao iniciar e a cada `SPOILER_SYNC` horas, o servidor primeiro baixa os spoilers e depois procura as
+  coleções na API (`/allSets/`, `/allDecks/` e, se a coleção ainda não estiver listada, `/sets/card/<id>/`). Quando a
+  coleção sai, ela é importada inteira: os dados e a imagem oficiais substituem os do spoiler e a etiqueta some. Os decks
+  continuam iguais, porque o número da carta não muda. Coleções já oficiais não são mais buscadas no site de spoilers.
+  Para fazer tudo na hora: `npm run cards:import -- --spoilers`.
+- Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
+- No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
+- O [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) tem as mesmas cartas, mas errou contador, cor e poder em algumas
+  e as imagens dele só abrem no próprio site; por isso não é usado na busca automática.
 
 ### Imagens
 

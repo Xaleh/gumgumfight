@@ -33,6 +33,18 @@ export interface CardData {
   aliases?: string[];
   /** Textos traduzidos (preenchidos pelo servidor). */
   i18n?: Partial<Record<'pt', CardTextTranslation>>;
+  /**
+   * Carta já anunciada que ainda não está na API oficial (dados de sites de spoiler).
+   * Some sozinho quando a API publica a carta: os dados oficiais substituem os do spoiler.
+   */
+  spoiler?: CardSpoiler;
+}
+
+export interface CardSpoiler {
+  /** Site de onde vieram os dados (ex.: "optcgleaks.com"). */
+  source: string;
+  /** Página da carta ou da lista de spoilers. */
+  url?: string;
 }
 
 export interface CardTextTranslation {
