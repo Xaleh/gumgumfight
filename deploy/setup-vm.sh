@@ -145,6 +145,8 @@ fi
 ENV_FILE="$APP_DIR/shared/deploy.env"
 CARD_IMAGES="on"
 [ -f "$ENV_FILE" ] && CARD_IMAGES="$(sed -n 's/^CARD_IMAGES=//p' "$ENV_FILE" | tail -1)" && CARD_IMAGES="${CARD_IMAGES:-on}"
+GOOGLE_CLIENT_ID=""
+[ -f "$ENV_FILE" ] && GOOGLE_CLIENT_ID="$(sed -n 's/^GOOGLE_CLIENT_ID=//p' "$ENV_FILE" | tail -1)"
 cat > "$ENV_FILE" <<EOF
 # Gerado por deploy/setup-vm.sh — lido a cada deploy.
 PORT=$PORT
@@ -154,6 +156,8 @@ NODE_BIN=$NODE_BIN
 PM2_BIN=$PM2_BIN
 # on | off (off: o site não mostra imagens oficiais das cartas)
 CARD_IMAGES=$CARD_IMAGES
+# Login com Google (preenchido pelo deploy a partir da Variable GOOGLE_CLIENT_ID do GitHub)
+GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 EOF
 info "Configuração salva em $ENV_FILE"
 

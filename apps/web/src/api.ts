@@ -14,7 +14,7 @@ export interface DeckSummary {
   errors: string[];
   unscripted: number;
   updatedAt: string;
-  /** Deck criado neste navegador (só o dono edita/apaga). */
+  /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
   mine: boolean;
 }
 
@@ -33,8 +33,9 @@ const OWNER_KEY = 'gumgum.owner';
 let ownerMemo: string | null = null;
 
 /**
- * Código aleatório deste navegador, enviado em x-deck-owner. Quem o tem pode editar
- * os decks criados aqui. Usa getRandomValues porque randomUUID exige HTTPS.
+ * Código aleatório deste navegador, enviado em x-deck-owner. Sem login, quem o tem
+ * pode editar os decks criados aqui; no login, esses decks passam para a conta.
+ * Usa getRandomValues porque randomUUID exige HTTPS.
  */
 export function ownerToken(): string {
   if (ownerMemo) return ownerMemo;
@@ -94,8 +95,20 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
   return (res.status === 204 ? undefined : res.json()) as Promise<T>;
 }
 
+export interface User {
+  id: string;
+  /** Nome da conta Google (só você vê; o nome público é o do perfil de estatísticas). */
+  name: string | null;
+  email: string | null;
+  picture: string | null;
+}
+
 export const api = {
-  config: () => get<{ cardImages: boolean; languages: string[] }>('/api/config'),
+  config: () => get<{ cardImages: boolean; languages: string[]; googleClientId: string | null }>('/api/config'),
+  me: () => get<{ user: User | null }>('/api/auth/me'),
+  /** Troca o ID token do botão do Google por uma sessão (cookie). */
+  googleLogin: (credential: string) => send<{ user: User; claimedDecks: number }>('POST', '/api/auth/google', { credential }),
+  logout: () => send<void>('POST', '/api/auth/logout'),
   decks: () => get<DeckSummary[]>('/api/decks'),
   deck: (id: string) =>
     get<{ deck: DeckList & { kind: DeckSummary['kind']; mine: boolean }; cards: ApiCard[]; summary: DeckSummary }>(
@@ -108,7 +121,7 @@ export const api = {
   deleteDeck: (id: string) => send<void>('DELETE', `/api/decks/${encodeURIComponent(id)}`),
   /** Envia o replay de uma partida terminada; o servidor refaz a partida antes de gravar as estatísticas. */
   saveMatch: (m: MatchUpload) => send<{ id: number }>('POST', '/api/matches', m).catch(() => undefined),
-  me: () => get<PlayerProfile | null>('/api/players/me'),
+  player: () => get<PlayerProfile | null>('/api/players/me'),
   rename: (name: string) => send<PlayerProfile>('PUT', '/api/players/me', { name }),
   statsMeta: () => get<StatsMeta>('/api/stats/meta'),
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),

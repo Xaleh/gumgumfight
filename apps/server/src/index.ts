@@ -1,3 +1,4 @@
+import './env';
 import { buildApp } from './app';
 import { countCards, type DB, openDb } from './db';
 import { DB_PATH } from './paths';

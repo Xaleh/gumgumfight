@@ -4,6 +4,9 @@ import Fastify from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
 import { existsSync } from 'node:fs';
+import { type GoogleKeys, googleKeyStore } from './auth/google';
+import { registerAuth } from './auth/routes';
+import { accountOwnerKey } from './auth/store';
 import { type ServerOptions, serverOptions } from './config';
 import {
   type DB,
@@ -21,7 +24,7 @@ import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
 import { registerStatsRoutes } from './stats/routes';
 
-export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOptions } = {}) {
+export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOptions; googleKeys?: GoogleKeys } = {}) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
   const server = opts.server ?? serverOptions;
@@ -30,7 +33,11 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
 
   app.get('/api/health', async () => ({ ok: true }));
 
-  app.get('/api/config', async () => ({ cardImages: server.cardImages, languages: ['pt', 'en'] }));
+  app.get('/api/config', async () => ({
+    cardImages: server.cardImages,
+    languages: ['pt', 'en'],
+    googleClientId: server.googleClientId ?? null,
+  }));
 
   app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => present(listCards(db, req.query.set)));
 
@@ -69,13 +76,27 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
   );
 
   /**
-   * Dono do deck: cada navegador gera um código aleatório e o envia no header
-   * x-deck-owner. Só guardamos o hash; só quem tem o código edita/apaga o deck.
+   * Código do navegador: cada navegador gera um código aleatório e o envia no
+   * header x-deck-owner. Só guardamos o hash.
    */
-  const viewerHash = (req: FastifyRequest): string | null => {
+  const browserHash = (req: FastifyRequest): string | null => {
     const token = req.headers['x-deck-owner'];
     if (typeof token !== 'string' || token.length < 16 || token.length > 128) return null;
     return createHash('sha256').update(token).digest('hex');
+  };
+  const auth = registerAuth(app, {
+    db,
+    clientId: server.googleClientId ?? null,
+    keys: opts.googleKeys ?? googleKeyStore(),
+    browserHash,
+  });
+  /**
+   * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o
+   * navegador. Só o dono edita/apaga os decks que criou.
+   */
+  const viewerHash = (req: FastifyRequest): string | null => {
+    const user = auth.viewer(req);
+    return user ? accountOwnerKey(user.id) : browserHash(req);
   };
   const isMine = (deck: StoredDeck, viewer: string | null) =>
     deck.kind === 'user' && deck.ownerHash !== null && deck.ownerHash === viewer;

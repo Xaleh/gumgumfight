@@ -137,12 +137,19 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         env:
           IMPORT_SETS: ${{ github.event.inputs.import_sets }}
+          # Client ID do OAuth do Google (público: vai para todo navegador), em Settings → Variables.
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: |
           if [ -n "$IMPORT_SETS" ] && ! [[ "$IMPORT_SETS" =~ ^[A-Za-z0-9\ -]+$ ]]; then
             echo "::error::import_sets inválido: use só letras, números, hífen e espaço (ex.: ST-01 ST-02)"
             exit 1
           fi
-          ssh vm "IMPORT_SETS='$IMPORT_SETS' bash '$REMOTE_DIR/deploy/remote-deploy.sh' '$REMOTE_DIR'"
+          if [ -n "$GOOGLE_CLIENT_ID" ] && ! [[ "$GOOGLE_CLIENT_ID" =~ ^[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::GOOGLE_CLIENT_ID inválido: copie o Client ID (termina em .apps.googleusercontent.com)"
+            exit 1
+          fi
+          [ -n "$GOOGLE_CLIENT_ID" ] || echo "::notice::Variable GOOGLE_CLIENT_ID vazia: o login com Google fica como estava no servidor."
+          ssh vm "IMPORT_SETS='$IMPORT_SETS' GOOGLE_CLIENT_ID='$GOOGLE_CLIENT_ID' bash '$REMOTE_DIR/deploy/remote-deploy.sh' '$REMOTE_DIR'"
 
       - name: Verifica o site público
         if: steps.check.outputs.ready == 'true'

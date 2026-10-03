@@ -1,6 +1,7 @@
 import type { Action, CardData, PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import { api, deckGroups, type DeckSummary, type FormatId } from '../api';
+import { AccountBar, useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
 import { SettingsControls } from '../settings';
 import { LeaderArt } from './LeaderArt';
@@ -168,6 +169,7 @@ export function Menu({
   const [format, setFormat] = useState<FormatId>(savedFormat);
   const [loading, setLoading] = useState(false);
   const [picking, setPicking] = useState<null | 0 | 1>(null);
+  const userId = useAuth().user?.id;
 
   // O servidor pode ainda estar subindo: tenta de novo por até ~30s antes de desistir.
   useEffect(() => {
@@ -207,7 +209,8 @@ export function Menu({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, []);
+    // Entrar ou sair da conta muda quais decks são "meus".
+  }, [userId]);
 
   const start = async () => {
     setLoading(true);
@@ -252,6 +255,8 @@ export function Menu({
         </header>
 
         {error && <div className="error">{error}</div>}
+
+        <AccountBar />
 
         <section className="menu-card">
           <div className="seg">

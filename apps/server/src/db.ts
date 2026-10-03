@@ -1,8 +1,9 @@
 // Banco local SQLite (arquivo único, sem custo de serviço externo).
 // Usa o SQLite embutido no Node (`node:sqlite`): nenhum módulo nativo para
 // compilar ou baixar, então funciona igual no Windows, Linux e macOS.
-// Toda a SQL fica aqui e em stats/store.ts (consultas das estatísticas); se um
-// dia for preciso migrar para Postgres, só esses arquivos mudam.
+// Toda a SQL fica aqui, em stats/store.ts (consultas das estatísticas) e em
+// auth/store.ts (contas e sessões); se um dia for preciso migrar para Postgres,
+// só esses arquivos mudam.
 
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -82,9 +83,34 @@ function migrate(db: DB) {
   if (!cols.includes('raw')) db.exec('ALTER TABLE cards ADD COLUMN raw TEXT');
   const deckCols = (db.prepare('PRAGMA table_info(decks)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!deckCols.includes('kind')) db.exec("ALTER TABLE decks ADD COLUMN kind TEXT NOT NULL DEFAULT 'builtin'");
-  // SHA-256 do código de dono do navegador que criou o deck (nunca o código em si).
+  // Dono do deck: SHA-256 do código do navegador (nunca o código em si) ou
+  // "user:<id>" quando o deck pertence a uma conta (ver auth/store.ts).
   if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
   migrateStats(db);
+  migrateAuth(db);
+}
+
+/** Contas (login com Google) e sessões abertas. Do token de sessão só o hash é guardado. */
+function migrateAuth(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY,
+      google_sub    TEXT NOT NULL UNIQUE,       -- id permanente da conta Google
+      email         TEXT,
+      name          TEXT,                       -- nome da conta Google (só o próprio usuário vê)
+      picture       TEXT,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      last_login_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+  `);
 }
 
 /**
@@ -101,7 +127,7 @@ function migrateStats(db: DB) {
   // JSON { seed, firstPlayer, decks, actions }: permite recalcular as estatísticas.
   if (!cols.includes('replay')) db.exec('ALTER TABLE matches ADD COLUMN replay TEXT');
   db.exec(`
-    -- Jogador = navegador (código de dono), até existir login. Só o hash é guardado.
+    -- Jogador = conta ("user:<id>") ou, sem login, o navegador (hash do código de dono).
     CREATE TABLE IF NOT EXISTS players (
       id           TEXT PRIMARY KEY,
       owner_hash   TEXT NOT NULL UNIQUE,

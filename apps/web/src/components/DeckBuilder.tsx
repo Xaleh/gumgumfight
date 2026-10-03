@@ -13,6 +13,7 @@ import {
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type ApiCard, deckGroups, type DeckSummary } from '../api';
+import { useAuth } from '../auth';
 import { SettingsControls } from '../settings';
 import { CardInfo } from './CardInfo';
 import { StaticCard } from './CardView';
@@ -44,6 +45,7 @@ const PAGE = 60;
 export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const [allCards, setAllCards] = useState<ApiCard[]>([]);
   const [decks, setDecks] = useState<DeckSummary[]>([]);
+  const auth = useAuth();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -319,8 +321,9 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
             )}
           </div>
           <p className="muted small owner-hint">
-            Seus decks ficam ligados a este navegador: limpar os dados do site faz perder a edição deles (continuam
-            visíveis e podem ser duplicados).
+            {auth.user
+              ? 'Seus decks ficam na sua conta Google: entre com ela em qualquer aparelho para editá-los.'
+              : `Sem login, seus decks ficam ligados a este navegador: limpar os dados do site faz perder a edição deles (continuam visíveis e podem ser duplicados).${auth.clientId ? ' Entre com o Google no menu para guardá-los na sua conta.' : ''}`}
           </p>
           <CardInfo card={hovered} />
         </aside>

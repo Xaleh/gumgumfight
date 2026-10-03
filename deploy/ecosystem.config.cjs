@@ -46,6 +46,8 @@ module.exports = {
         WEB_DIST: path.join(RELEASE, 'web'),
         DATA_DIR: path.join(RELEASE, 'data'),
         CARD_IMAGES: env.CARD_IMAGES || 'on',
+        // Client ID do login com Google (vazio = login desligado).
+        GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID || '',
       },
     },
   ],
