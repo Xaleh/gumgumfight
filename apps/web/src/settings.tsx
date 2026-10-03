@@ -10,15 +10,17 @@ export interface Settings {
   images: boolean;
   /** O servidor permite imagens? (CARD_IMAGES) */
   serverImages: boolean;
+  /** Etapa de Counter: tocar/arrastar usa a carta na hora, sem confirmar. */
+  quickCounter: boolean;
 }
 
 interface Ctx extends Settings {
   showImages: boolean;
-  update: (patch: Partial<Pick<Settings, 'lang' | 'images'>>) => void;
+  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter'>>) => void;
 }
 
 const KEY = 'gumgum.settings';
-const DEFAULTS: Settings = { lang: 'pt', images: true, serverImages: false };
+const DEFAULTS: Settings = { lang: 'pt', images: true, serverImages: false, quickCounter: false };
 
 function load(): Settings {
   try {
@@ -56,7 +58,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((s) => {
       const next = { ...s, ...patch };
       try {
-        localStorage.setItem(KEY, JSON.stringify({ lang: next.lang, images: next.images }));
+        localStorage.setItem(KEY, JSON.stringify({ lang: next.lang, images: next.images, quickCounter: next.quickCounter }));
       } catch {
         /* armazenamento indisponível: vale só nesta sessão */
       }
@@ -103,6 +105,10 @@ export function SettingsControls({ compact }: { compact?: boolean }) {
           onChange={(e) => s.update({ images: e.target.checked })}
         />
         Imagens das cartas{!s.serverImages && !compact ? ' (desativadas no servidor)' : ''}
+      </label>
+      <label className="check" title="Na etapa de Counter, tocar numa carta ou arrastá-la até a mesa usa o Counter na hora">
+        <input type="checkbox" checked={s.quickCounter} onChange={(e) => s.update({ quickCounter: e.target.checked })} />
+        Counter sem confirmação
       </label>
     </div>
   );

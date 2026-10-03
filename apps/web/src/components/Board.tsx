@@ -325,7 +325,8 @@ export function Board({
         <Hand state={state} player={top} reveal={revealTop} position="top" {...handlers} />
         <PlayerBanner state={state} player={top} align="right" />
       </div>
-      <div className="arena">
+      {/* A arena inteira aceita cartas arrastadas da mão (jogar ou usar Counter). */}
+      <div className="arena" data-drop="field">
         <div className="arena-deco" aria-hidden="true">
           <div className="wheel">
             <JollyRoger />

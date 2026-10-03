@@ -2,6 +2,7 @@ import {
   type Action,
   actingPlayer,
   cardDef,
+  counterValue,
   type GameState,
   getPower,
   legalActions,
@@ -58,6 +59,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   const game = useGame(setup);
   const { state, dispatch, human } = game;
   const wide = useMediaQuery('(min-width: 1000px)');
+  const { quickCounter } = useSettings();
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
@@ -169,11 +171,20 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   const has = useCallback((pred: (a: Action) => boolean) => legal.some(pred), [legal]);
   const canPlay = (uid: string) => myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid);
   const canAttackWith = (uid: string) => myTurnIdle && has((a) => a.type === 'attack' && a.attacker === uid);
+  /** Etapa de Counter: esta carta da mão pode ser usada como Counter agora? */
+  const canCounter = (uid: string) => myPending?.kind === 'counter' && myPending.options.includes(uid);
+  const useCounter = (uid: string) => {
+    dispatch({ type: 'counter', player: human!, uid });
+    setZoom(null);
+    setSelected(null);
+  };
 
   /** Destinos válidos para o que está sendo arrastado. */
   const dropValid = (d: Pick<Drag, 'kind' | 'uid'>, over: string | null): boolean => {
     if (!over) return false;
-    if (d.kind === 'hand') return over === 'hand' || (over === 'field' && d.uid !== null && canPlay(d.uid));
+    if (d.kind === 'hand') {
+      return over === 'hand' || (over === 'field' && d.uid !== null && (canPlay(d.uid) || canCounter(d.uid)));
+    }
     if (d.kind === 'attacker') return has((a) => a.type === 'attack' && a.attacker === d.uid && a.target === over);
     return has((a) => a.type === 'attachDon' && a.target === over);
   };
@@ -223,7 +234,12 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
         return;
       }
       if (myPending.kind === 'counter' && myPending.options.includes(uid)) {
-        dispatch({ type: 'counter', player: human!, uid });
+        // Sem a opção "Counter sem confirmação", abre a carta com o botão de usar.
+        if (quickCounter) useCounter(uid);
+        else {
+          setSelected(uid);
+          setZoom(uid);
+        }
         return;
       }
     }
@@ -307,6 +323,11 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     if (!d.over || !dropValid(d, d.over) || human === null) return;
     if (d.kind === 'hand' && d.over === 'hand') {
       if (d.uid && d.insert !== undefined) setHandOrder(reorder(d.uid, d.insert));
+      return;
+    }
+    if (d.kind === 'hand' && d.uid && canCounter(d.uid)) {
+      if (quickCounter) useCounter(d.uid);
+      else setZoom(d.uid);
       return;
     }
     if (d.kind === 'hand') dispatch({ type: 'playCard', player: human, uid: d.uid! });
@@ -471,7 +492,8 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     canDragHand: (uid: string) => human !== null && state.cards[uid]?.owner === human,
     canDragAttacker: (uid: string) => canAttackWith(uid),
     canDragDon: (p: PlayerId) => p === human && myTurnIdle && has((a) => a.type === 'attachDon'),
-    fieldDrop: (p: PlayerId) => p === human && drag?.kind === 'hand' && drag.uid !== null && canPlay(drag.uid),
+    fieldDrop: (p: PlayerId) =>
+      p === human && drag?.kind === 'hand' && drag.uid !== null && (canPlay(drag.uid) || canCounter(drag.uid)),
   };
 
   const corner = (
@@ -574,6 +596,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             uid={zoom}
             legal={myTurnIdle ? legal : []}
             canManual={human !== null && manualAllowed(state, human)}
+            onCounter={canCounter(zoom) ? () => useCounter(zoom) : undefined}
             onClose={() => setZoom(null)}
             onDispatch={(a) => {
               dispatch(a);
@@ -656,7 +679,9 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             {state.battle && <BattleInfo state={state} human={human} />}
             <p className="muted small hand-sheet-hint">
               {myPending?.kind === 'counter'
-                ? 'Toque nas cartas destacadas para usar o Counter.'
+                ? quickCounter
+                  ? 'Toque numa carta destacada para usar o Counter na hora.'
+                  : 'Toque numa carta destacada e confirme para usar o Counter.'
                 : myPending?.kind === 'selectTargets'
                   ? myPending.prompt
                   : 'Toque numa carta para ver as ações. Segure para ler.'}
@@ -966,7 +991,7 @@ function Prompt(props: {
   onTools: () => void;
 }) {
   const { state, human, picked, onDispatch } = props;
-  const { lang } = useSettings();
+  const { lang, quickCounter } = useSettings();
   const pending = state.pending;
   if (state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
 
@@ -1061,7 +1086,14 @@ function Prompt(props: {
       );
     case 'counter':
       return (
-        <PromptPill title="Etapa de Counter" subtitle="Toque nas cartas da mão com Counter (ou eventos [Counter]) para aumentar o poder do alvo.">
+        <PromptPill
+          title="Etapa de Counter"
+          subtitle={
+            quickCounter
+              ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter na hora.'
+              : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme para usar o Counter.'
+          }
+        >
           <div className="btn-row">
             <button className="btn" onClick={props.onTools}>
               ⚙
@@ -1212,6 +1244,8 @@ function CardZoom(props: {
   uid: string;
   legal: Action[];
   canManual: boolean;
+  /** Etapa de Counter: confirma o uso desta carta como Counter. */
+  onCounter?: () => void;
   onClose: () => void;
   onDispatch: (a: Action) => void;
   onAttackMode: (attacker: string) => void;
@@ -1225,7 +1259,8 @@ function CardZoom(props: {
   const canAttack = legal.some((a) => a.type === 'attack' && a.attacker === uid);
   const attach = legal.find((a) => a.type === 'attachDon' && a.target === uid);
   const owner = state.cards[uid].owner;
-  const hasActions = Boolean(play || activates.length || canAttack || attach || props.canManual);
+  const hasActions = Boolean(play || activates.length || canAttack || attach || props.canManual || props.onCounter);
+  const counter = counterValue(state, uid);
 
   return (
     <div className="modal-backdrop zoom-backdrop" onClick={props.onClose}>
@@ -1238,6 +1273,12 @@ function CardZoom(props: {
         </div>
         {hasActions && (
           <div className="zoom-actions">
+            {props.onCounter && (
+              <button className="btn primary big" onClick={props.onCounter}>
+                🛡 {def.category === 'event' ? 'Usar evento [Counter]' : 'Usar como Counter'}
+                {counter > 0 && <span className="cost-chip">+{counter}</span>}
+              </button>
+            )}
             {play && (
               <button className="btn primary big" onClick={() => props.onDispatch(play)}>
                 {def.category === 'event' ? 'Usar evento' : 'Jogar'} <span className="cost-chip">{def.cost}</span>
