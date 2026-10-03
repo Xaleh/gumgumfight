@@ -113,6 +113,7 @@ export const api = {
   statsMeta: () => get<StatsMeta>('/api/stats/meta'),
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
   cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
+  trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
 };
 
 // ------------------------------------------------------------------ estatísticas
@@ -179,6 +180,7 @@ export interface StatsQuery {
   days?: string;
   mine?: boolean;
   deck?: string;
+  weeks?: string;
 }
 
 export interface StatsSummary extends WinCount {
@@ -193,7 +195,7 @@ export interface StatsSummary extends WinCount {
 export interface StatsOverview {
   summary: StatsSummary;
   leaders: Array<WinCount & { leader: string; lists: number; firstGames: number; firstWins: number }>;
-  matchups: Array<WinCount & { leader: string; oppLeader: string }>;
+  matchups: Array<WinCount & { leader: string; oppLeader: string; firstGames: number; firstWins: number }>;
   cards: Record<string, CardInfo>;
 }
 
@@ -214,6 +216,13 @@ export interface CardStatRow extends WinCount {
 export interface CardStatsResponse {
   summary: StatsSummary;
   rows: CardStatRow[];
+  cards: Record<string, CardInfo>;
+}
+
+export interface TrendResponse {
+  /** Segunda-feira de cada semana (AAAA-MM-DD), da mais antiga à atual. */
+  weeks: string[];
+  rows: Array<WinCount & { week: string; leader: string }>;
   cards: Record<string, CardInfo>;
 }
 

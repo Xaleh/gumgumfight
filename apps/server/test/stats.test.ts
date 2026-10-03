@@ -117,6 +117,12 @@ describe('API de estatísticas', () => {
     expect(cardsRes.rows.reduce((s: number, c: { openingGames: number }) => s + c.openingGames, 0)).toBeGreaterThan(0);
     expect((await app.inject('/api/stats/cards')).statusCode).toBe(400);
 
+    const trend = (await app.inject('/api/stats/trend?weeks=4')).json();
+    expect(trend.weeks).toHaveLength(4);
+    expect(new Date(`${trend.weeks[3]}T00:00:00Z`).getUTCDay()).toBe(1);
+    expect(trend.rows).toEqual([expect.objectContaining({ week: trend.weeks[3], leader: 'ST01-001', games: 1 })]);
+    expect(all.matchups[0]).toMatchObject({ firstGames: expect.any(Number), firstWins: expect.any(Number) });
+
     const meta = (await app.inject({ url: '/api/stats/meta', headers: ALICE })).json();
     expect(meta.tiers.length).toBeGreaterThan(2);
     expect(meta.me).toMatchObject({ bounty: 0, tier: 'east-blue' });

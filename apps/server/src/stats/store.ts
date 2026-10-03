@@ -245,11 +245,38 @@ export function matchupStats(db: DB, f: StatsFilter) {
   const w = where(f);
   return db
     .prepare(
-      `SELECT leader, opp_leader AS oppLeader, COUNT(*) AS games, SUM(won) AS wins
+      `SELECT leader, opp_leader AS oppLeader, COUNT(*) AS games, SUM(won) AS wins,
+              SUM(went_first) AS firstGames, SUM(went_first * won) AS firstWins
        FROM match_seats s WHERE ${w.sql}
        GROUP BY leader, opp_leader ORDER BY games DESC`,
     )
-    .all(...w.params) as unknown as Array<{ leader: string; oppLeader: string } & WinRow>;
+    .all(...w.params) as unknown as Array<{ leader: string; oppLeader: string; firstGames: number; firstWins: number } & WinRow>;
+}
+
+/** Semana (começando na segunda) de uma data do SQLite. */
+const WEEK = "date(s.played_at, '-6 days', 'weekday 1')";
+
+/**
+ * Uso e vitórias por Líder em cada uma das últimas `weeks` semanas (a atual
+ * incluída), para ver quem sobe e quem cai no meta. Ignora o filtro de dias.
+ */
+export function trendStats(db: DB, f: StatsFilter, weeks: number) {
+  const w = where({ ...f, days: undefined });
+  const since = `-${(weeks - 1) * 7} days`;
+  const rows = db
+    .prepare(
+      `SELECT ${WEEK} AS week, leader, COUNT(*) AS games, SUM(won) AS wins
+       FROM match_seats s
+       WHERE ${w.sql} AND s.played_at >= date('now', '-6 days', 'weekday 1', ?)
+       GROUP BY week, leader ORDER BY week, games DESC`,
+    )
+    .all(...w.params, since) as unknown as Array<{ week: string; leader: string } & WinRow>;
+  const start = (db.prepare("SELECT date('now', '-6 days', 'weekday 1', ?) AS d").get(since) as { d: string }).d;
+  const list: string[] = [];
+  for (let i = 0; i < weeks; i++) {
+    list.push((db.prepare('SELECT date(?, ?) AS d').get(start, `+${i * 7} days`) as { d: string }).d);
+  }
+  return { weeks: list, rows };
 }
 
 export interface CardStatRow {

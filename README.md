@@ -143,7 +143,11 @@ partidas bot x bot, que ficam fora das estatísticas de pessoas.
   carta do deck, as cópias, quantas estavam na mão mantida, quantas passaram pela mão e quantas vezes foi jogada;
   `deck_lists` guarda cada lista exata (hash), já que o deck salvo pode mudar depois; `players` tem o perfil de
   cada navegador e a recompensa.
-- **Cartas:** vitórias com a carta no deck, na mão inicial, comprada, não comprada e jogada, e o "Δ comprada"
+- **Inspirado no Duels.ink:** resumo do meta em frases (mais jogado, melhor taxa entre Líderes com amostra suficiente,
+  muito jogados mas perdendo, vantagem de quem começa), aba **Tendência** (participação semanal de cada Líder, quem
+  sobe e quem cai), matriz de matchups com o espelho na diagonal (taxa de quem começou) e um **mínimo de partidas**
+  para uma linha aparecer (como o mínimo de exibição deles).
+- **Cartas:** vitórias com a carta no deck, o **lift** (vitórias com a carta no deck menos as do Líder em geral), na mão inicial, comprada, não comprada e jogada, e o "Δ comprada"
   (vitórias quando comprada menos quando não comprada), que mostra se a carta ajuda quando aparece.
 - **Tiers e recompensa:** cada jogador tem uma recompensa em Beries; o tier é a faixa em que ela está
   (`apps/server/src/stats/catalog.ts`: East Blue até ฿ 5.000, Paradise até ฿ 20.000, Novo Mundo, Supernova,
@@ -299,6 +303,7 @@ npm run typecheck
 | PUT    | `/api/players/me`  | Troca o nome (`{ name }`)                   |
 | GET    | `/api/stats/meta`  | Opções dos filtros: formatos, filas, tiers, Líderes |
 | GET    | `/api/stats`       | Totais, Líderes e matchups (filtros na query) |
+| GET    | `/api/stats/trend?weeks=` | Uso e vitórias por Líder em cada semana (padrão 6) |
 | GET    | `/api/stats/cards?leader=` | Desempenho das cartas de um Líder (ou `deck=` hash da lista) |
 | GET    | `/api/translations/pending` | Cartas com tradução automática parcial |
 

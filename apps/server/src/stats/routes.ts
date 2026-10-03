@@ -19,6 +19,7 @@ import {
   type StatsFilter,
   statsDimensions,
   summary,
+  trendStats,
 } from './store';
 
 interface Deps {
@@ -162,6 +163,13 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
       matchups,
       cards: cardInfo([...leaders.map((l) => l.leader), ...matchups.map((m) => m.oppLeader)]),
     };
+  });
+
+  /** Tendência semanal: uso e vitórias por Líder nas últimas semanas (padrão 6, máximo 26). */
+  app.get<{ Querystring: Query }>('/api/stats/trend', async (req) => {
+    const weeks = Math.min(26, Math.max(2, Math.floor(Number(req.query.weeks) || 6)));
+    const t = trendStats(db, parseFilter(req), weeks);
+    return { ...t, cards: cardInfo(t.rows.map((r) => r.leader)) };
   });
 
   /** Cartas de um Líder (ou de uma lista): efetividade no deck, na mão inicial, compradas e jogadas. */

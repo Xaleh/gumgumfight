@@ -3182,7 +3182,21 @@ tr.clickable:hover td {
   font-weight: 700;
 }
 .stats-tabs {
-  max-width: 420px;
+  max-width: 540px;
+}
+.meta-summary {
+  margin: 0 0 12px;
+  padding: 10px 14px 10px 28px;
+  background: var(--panel2);
+  border-radius: 12px;
+  line-height: 1.5;
+}
+.spark {
+  display: block;
+}
+.matrix td.mirror {
+  outline: 1px dashed var(--muted);
+  outline-offset: -3px;
 }
 .stats-sub {
   margin: 12px 0 8px;
