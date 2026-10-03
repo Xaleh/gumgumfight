@@ -13,3 +13,13 @@ export const serverOptions: ServerOptions = {
   cardImages: !off(process.env.CARD_IMAGES),
   googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
 };
+
+/**
+ * SPOILER_SYNC: de quantas em quantas horas o servidor procura na API as cartas de
+ * spoiler que viraram oficiais (padrão 6). "off" desliga. Nunca roda nos testes.
+ */
+export function spoilerSyncHours(env = process.env): number | null {
+  if (off(env.SPOILER_SYNC) || env.NODE_ENV === 'test' || env.VITEST) return null;
+  const hours = Number(env.SPOILER_SYNC ?? 6);
+  return Number.isFinite(hours) && hours > 0 ? hours : 6;
+}

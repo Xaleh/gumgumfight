@@ -97,7 +97,18 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
           ⚙
         </span>
       )}
+      <SpoilerTag card={def} />
     </div>
+  );
+}
+
+/** Etiqueta das cartas anunciadas que ainda não saíram na API oficial. */
+export function SpoilerTag({ card }: { card: CardData }) {
+  if (!card.spoiler) return null;
+  return (
+    <span className="spoiler-tag" title={`Spoiler (${card.spoiler.source}): a carta ainda não foi lançada oficialmente`}>
+      SPOILER
+    </span>
   );
 }
 
@@ -211,6 +222,7 @@ export function StaticCard({
         />
       )}
       {(!withImage || !imageLoaded) && <CardFace def={def} power={def.power} delta={0} keywords={def.keywords} />}
+      <SpoilerTag card={card} />
       {badge}
     </div>
   );

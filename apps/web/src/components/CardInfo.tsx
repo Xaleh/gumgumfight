@@ -45,6 +45,19 @@ export function CardTextInfo({ def, power }: { def: CardDef; power?: number }) {
           <a onClick={() => setShowOriginal((v) => !v)}>{showOriginal ? 'ver em português' : 'ver original (inglês)'}</a>
         </p>
       )}
+      {def.spoiler && (
+        <p className="spoiler-note small">
+          🔍 <b>Spoiler</b>: carta anunciada que ainda não foi lançada oficialmente. Dados de{' '}
+          {def.spoiler.url ? (
+            <a href={def.spoiler.url} target="_blank" rel="noreferrer noopener">
+              {def.spoiler.source}
+            </a>
+          ) : (
+            def.spoiler.source
+          )}
+          ; podem mudar até o lançamento, quando a carta oficial substitui esta.
+        </p>
+      )}
       {def.manual && (
         <p className="warn small">
           {def.abilities.some((a) => !a.manual && a.steps.length)

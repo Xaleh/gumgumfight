@@ -2607,6 +2607,26 @@ button.hint-pill {
   padding: 0 6px;
   font-size: 11px;
 }
+.spoiler-tag {
+  position: absolute;
+  top: 3%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0 0.45em;
+  border-radius: 999px;
+  background: #7b2ff7;
+  color: #fff;
+  font-size: max(8px, calc(var(--cw) * 0.1));
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.spoiler-note {
+  color: #6a2bd1;
+}
 .manual-badge {
   position: absolute;
   top: 3px;
