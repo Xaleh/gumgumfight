@@ -5,7 +5,7 @@
 //   npm run cards:import -- --all            # todas as coleções e starter decks
 //   npm run cards:import -- --file resp.json # importa de um arquivo salvo (sem rede)
 //   npm run cards:import -- --dry-run ST-01  # só mostra o resultado, não grava
-//   npm run cards:import -- --spoilers       # troca os spoilers que já saíram na API pelas cartas oficiais
+//   npm run cards:import -- --spoilers       # baixa os spoilers e troca os que já saíram na API pelos oficiais
 //
 // Variável opcional: CARD_API_BASE (padrão https://optcgapi.com/api).
 
@@ -14,15 +14,20 @@ import { automationStatus, type CardData, translateCardPt } from '@gumgum/engine
 import { fetchJson, knownTypes } from './card-import';
 import { openDb, upsertCards } from './db';
 import { allEndpoints, DEFAULT_API_BASE, mapApiResponse, rowsOf, setEndpoint, typeVocabulary } from './optcgapi';
-import { fromUserCwd } from './paths';
-import { syncSpoilers } from './spoiler-sync';
+import { join } from 'node:path';
+import { DATA_DIR, fromUserCwd } from './paths';
+import { refreshSpoilerFeeds, syncSpoilers } from './spoiler-sync';
 
 async function main() {
   const args = process.argv.slice(2);
   const base = (process.env.CARD_API_BASE ?? DEFAULT_API_BASE).replace(/\/$/, '');
   const dryRun = args.includes('--dry-run');
   if (args.includes('--spoilers')) {
-    const r = await syncSpoilers(openDb(), { base });
+    const db = openDb();
+    const feed = await refreshSpoilerFeeds(db, join(DATA_DIR, 'spoilers'));
+    for (const s of feed.sets) console.log(`Spoilers ${s.set}: ${s.written} cartas baixadas, ${s.removed} removidas`);
+    for (const e of feed.errors) console.error(`Erro ao baixar spoilers: ${e}`);
+    const r = await syncSpoilers(db, { base });
     if (!r.pending.length) return console.log('Nenhuma carta de spoiler pendente.');
     console.log(`Coleções com spoilers: ${r.pending.join(', ')}`);
     console.log(`Cartas gravadas da API: ${r.imported} | spoilers que viraram oficiais: ${r.official.length}`);

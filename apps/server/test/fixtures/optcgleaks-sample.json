@@ -1,0 +1,257 @@
+{
+ "eb05": {
+  "data": {
+   "id": "EB05",
+   "name": "ONE PIECE HEROINES EDITION vol.2",
+   "description": "The second Extra Booster featuring Heroines!",
+   "japan_release": "",
+   "global_release": "October 30th, 2026",
+   "rarities": {
+    "L": 1,
+    "C": 29,
+    "UC": 0,
+    "R": 21,
+    "SR": 9,
+    "SEC": 1,
+    "SP": 8
+   }
+  },
+  "cards": [
+   {
+    "id": "EB05-010",
+    "name": "Nico Robin",
+    "category": "LEADER",
+    "color": [
+     "Green",
+     "Yellow"
+    ],
+    "attribute": [
+     "Wisdom"
+    ],
+    "rarity": "L",
+    "type": [
+     "Straw Hat Crew"
+    ],
+    "power": 5000,
+    "effect": "[Once Per Turn] When one of your Characters with the &lt;Wisdom&gt; attribute and without <Blocker> is K.O.'d, add up to 1 card from the top of your deck to the top of your Life cards.\n[Activate: Main] [Once Per Turn] Set up to 1 of your Characters with the &lt;Wisdom&gt; attribute and 6000 power or less as active.",
+    "trigger": "",
+    "cost": 0,
+    "counter": "0",
+    "life": 4,
+    "images": [
+     {
+      "name": "Base Art",
+      "id": "eb05-010_v2"
+     },
+     {
+      "name": "Alt-Art",
+      "id": "eb05-010a"
+     }
+    ],
+    "translation_credit": ""
+   },
+   {
+    "id": "EB05-016",
+    "name": "Nico Robin",
+    "category": "CHARACTER",
+    "color": [
+     "Green"
+    ],
+    "attribute": [
+     "Wisdom"
+    ],
+    "rarity": "SR",
+    "type": [
+     "Straw Hat Crew"
+    ],
+    "power": 6000,
+    "effect": "[Your Turn] [On Play] Play up to 1 Character card with a cost of 5 or less and the &lt;Wisdom&gt; attribute from your hand.",
+    "trigger": "[Trigger] Rest up to 1 of your opponent's Characters with a cost of 6 or less.",
+    "cost": 6,
+    "counter": "+1000",
+    "life": 0,
+    "images": [
+     {
+      "name": "Base Art",
+      "id": "eb05-016v2"
+     },
+     {
+      "name": "SP Alt-Art",
+      "id": "eb05-016sp_v2"
+     }
+    ],
+    "translation_credit": ""
+   },
+   {
+    "id": "EB05-056",
+    "name": "Nico Olvia",
+    "category": "CHARACTER",
+    "color": [
+     "Yellow"
+    ],
+    "attribute": [
+     "Wisdom"
+    ],
+    "rarity": "C",
+    "type": [
+     "Ohara"
+    ],
+    "power": 0,
+    "effect": "[On Play] You may trash 1 card with a [Trigger] from your hand: If your Leader is [Nico Robin], draw 2 cards.",
+    "trigger": "[Trigger] Play this card.",
+    "cost": 1,
+    "counter": "+2000",
+    "life": 0,
+    "images": [
+     {
+      "name": "Base Art",
+      "id": "eb05-056"
+     }
+    ],
+    "translation_credit": ""
+   }
+  ],
+  "sp_cards": [
+   {
+    "id": "OP01-016",
+    "name": "Nami",
+    "category": "CHARACTER",
+    "color": [
+     "Red"
+    ],
+    "attribute": [
+     "Special"
+    ],
+    "rarity": "SP",
+    "type": [
+     "Straw Hat Crew"
+    ],
+    "power": 2000,
+    "effect": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Straw Hat Crew} type card other than [Nami] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+    "trigger": "",
+    "cost": 1,
+    "counter": "+1000",
+    "life": 0,
+    "images": [
+     {
+      "name": "SP Alt-Art",
+      "id": "op01-016sp_v2"
+     }
+    ],
+    "translation_credit": ""
+   }
+  ],
+  "unknown_id_cards": [
+   {
+    "id": "EB05-XXX",
+    "name": "Nico Robin",
+    "category": "CHARACTER",
+    "color": [
+     "Purple"
+    ],
+    "attribute": [
+     "Strike"
+    ],
+    "rarity": "?",
+    "type": [
+     "Straw Hat Crew"
+    ],
+    "power": 2000,
+    "effect": "[On Play] If your Leader has the {Straw Hat Crew} type, and the number of DON!! cards on your field is at least 6 less than the number on your opponent's field, draw 3 cards and trash 2 cards from your hand. Then, add up to 4 DON!! cards from your DON!! deck and rest them.\n\nNOTE: This translation may be inaccurate due to low image quality.",
+    "trigger": "",
+    "cost": 1,
+    "counter": "+2000",
+    "life": 0,
+    "images": [
+     {
+      "name": "Base Art",
+      "id": "eb05-xxx"
+     }
+    ],
+    "translation_credit": "Kyle697"
+   }
+  ]
+ },
+ "op18": {
+  "data": {
+   "id": "OP18",
+   "name": "THE DOMINANCE OF GOD",
+   "description": "A Booster Pack with many cards from Big Three Themes!",
+   "japan_release": "",
+   "global_release": "November 20th, 2026",
+   "rarities": {
+    "L": 6,
+    "C": 45,
+    "UC": 30,
+    "R": 26,
+    "SR": 10,
+    "SEC": 2,
+    "SP": 6
+   }
+  },
+  "cards": [
+   {
+    "id": "OP18-078",
+    "name": "Mini-Merry",
+    "category": "STAGE",
+    "color": [
+     "Purple"
+    ],
+    "attribute": [],
+    "rarity": "UC",
+    "type": [
+     "Straw Hat Crew"
+    ],
+    "power": 0,
+    "effect": "[On Play] Draw 1 card, then add up to 1 DON!! card as rested from your DON!! deck.\n[Activate: Main] You may rest this Stage: Give up to a total of 4 of your Leader or Characters 1 rested DON!! Card each.",
+    "trigger": "",
+    "cost": 5,
+    "counter": "0",
+    "life": 0,
+    "images": [
+     {
+      "name": "Base Art",
+      "id": "op18-078"
+     }
+    ],
+    "translation_credit": ""
+   },
+   {
+    "id": "OP18-060",
+    "name": "Saint Gunko",
+    "category": "LEADER",
+    "color": [
+     "Purple",
+     "Black"
+    ],
+    "attribute": [
+     "Special"
+    ],
+    "rarity": "L",
+    "type": [
+     "Celestial Dragons",
+     "Holy Knights of God"
+    ],
+    "power": 5000,
+    "effect": "[Once Per Turn] When a Character is played from your trash, draw 2 cards and trash 1 card from your hand.\n[Activate: Main] [Once Per Turn] You may trash 1 card from your hand: If you have a Character with  8000 base power or more, add up to 1 DON!! card as active from your DON!! deck.",
+    "trigger": "",
+    "cost": 0,
+    "counter": "0",
+    "life": 4,
+    "images": [
+     {
+      "name": "Base Art",
+      "id": "op18-060v2"
+     },
+     {
+      "name": "Alt-Art",
+      "id": "op18-060a"
+     }
+    ],
+    "translation_credit": ""
+   }
+  ],
+  "sp_cards": [],
+  "unknown_id_cards": []
+ }
+}

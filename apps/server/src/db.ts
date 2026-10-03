@@ -214,13 +214,24 @@ export function pendingSpoilers(db: DB): string[] {
   ).map((r) => r.id);
 }
 
-/** Apaga as cartas de spoiler que saíram dos arquivos (número corrigido, carta desmentida). */
-export function pruneSpoilers(db: DB, keep: Iterable<string>): number {
+/**
+ * Apaga as cartas de spoiler de uma origem que não estão mais nela (número corrigido,
+ * carta desmentida). `source` é um padrão LIKE; `set` limita a uma coleção.
+ */
+export function pruneSpoilers(db: DB, keep: Iterable<string>, where: { source: string; set?: string }): number {
   const keepSet = new Set(keep);
-  const gone = pendingSpoilers(db).filter((id) => !keepSet.has(id));
+  const rows = db
+    .prepare(`SELECT id FROM cards WHERE provisional = 1 AND source LIKE ? ${where.set ? 'AND set_code = ?' : ''}`)
+    .all(...[where.source, ...(where.set ? [where.set] : [])]) as unknown as Array<{ id: string }>;
+  const gone = rows.map((r) => r.id).filter((id) => !keepSet.has(id));
   const del = db.prepare('DELETE FROM cards WHERE id = ? AND provisional = 1');
   transaction(db, () => gone.forEach((id) => del.run(id)));
   return gone.length;
+}
+
+/** A coleção já tem cartas vindas da API oficial. */
+export function hasOfficialCards(db: DB, set: string): boolean {
+  return Boolean(db.prepare('SELECT 1 FROM cards WHERE set_code = ? AND provisional = 0 LIMIT 1').get(set));
 }
 
 type CardRow = { data: string; provisional: number };

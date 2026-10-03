@@ -2,7 +2,8 @@ import { buildApp } from './app';
 import { spoilerSyncHours } from './config';
 import { countCards, type DB, openDb } from './db';
 import { DEFAULT_API_BASE } from './optcgapi';
-import { DB_PATH } from './paths';
+import { join } from 'node:path';
+import { DATA_DIR, DB_PATH } from './paths';
 import { seed } from './seed';
 import { scheduleSpoilerSync } from './spoiler-sync';
 
@@ -27,11 +28,12 @@ if (r.spoilers.written || r.spoilers.removed || r.spoilers.invalid.length) {
   );
 }
 
-// Troca os spoilers pelas cartas oficiais quando a API as publicar.
+// Busca os spoilers novos e troca pelas cartas oficiais quando a API as publicar.
 const syncHours = spoilerSyncHours();
 if (syncHours) {
   scheduleSpoilerSync(db, {
     base: process.env.CARD_API_BASE ?? DEFAULT_API_BASE,
+    dir: join(DATA_DIR, 'spoilers'),
     hours: syncHours,
     log: (msg) => console.log(msg),
   });
