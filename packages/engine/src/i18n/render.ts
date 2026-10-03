@@ -135,6 +135,8 @@ function limits(f: CardFilter & Partial<TargetSpec>, many: boolean): string[] {
   if (f.typeIncludes) out.push(`com um tipo que inclua "${f.typeIncludes}"`);
   if (f.noEffect) out.push('sem efeito');
   if (f.hasTrigger) out.push('com [Trigger]');
+  if (f.hasAllTypes?.length) out.push(`com os tipos ${f.hasAllTypes.map((t) => `{${t}}`).join(' e ')}`);
+  if (f.withoutKeyword) out.push(`sem ${KW[f.withoutKeyword]}`);
   if (f.either) {
     const part = (p: Partial<TargetSpec>) =>
       [
@@ -743,7 +745,9 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'giveRestedDon':
       return s.fromOpponent
         ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} do seu oponente a ${target(s.target, ctx)}.`
-        : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a ${target(s.target, ctx)}.`;
+        : typeof s.target === 'object' && (s.target.all || s.target.upTo > 1)
+          ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a cada um ${target(s.target, ctx).replace(/^todos os /, 'dos ').replace(/^até /, 'de até ')}.`
+          : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a ${target(s.target, ctx)}.`;
     case 'draw':
       return `Compre ${cards(s.count)}.`;
     case 'drawUntil':
@@ -1157,7 +1161,9 @@ function staticText(a: Ability, ctx: Ctx): string {
   if (a.noPlayByEffect) special = 'Esta carta não pode ser jogada da mão por efeitos.';
   if (a.selfHandCounter) special = `Esta carta na sua mão tem Counter +${a.selfHandCounter}.`;
   if (a.handCounter) {
-    special = a.handCounter.set
+    special = a.handCounter.set && a.handCounter.filter.category === 'stage' && Object.keys(a.handCounter.filter).length === 1
+      ? `Todas as Stages na sua mão têm Counter +${a.handCounter.amount}.`
+      : a.handCounter.set
       ? `O Counter das suas cartas na mão (${filter(a.handCounter.filter, 2, false).replace(/^2 /, '')}) passa a ser +${a.handCounter.amount}.`
       : `As suas cartas de Personagem na mão sem Counter têm Counter +${a.handCounter.amount}.`;
   }
@@ -1220,6 +1226,7 @@ function staticText(a: Ability, ctx: Ctx): string {
       au.minCost !== undefined ? `com custo ${au.minCost} ou mais` : '',
       au.exactCosts ? `com custo ${au.exactCosts.join(' ou ')}` : '',
       au.hasTrigger ? 'com [Trigger]' : '',
+      au.hasAllTypes?.length ? `com os tipos ${au.hasAllTypes.map((t) => `{${t}}`).join(' e ')}` : '',
       au.notTypeIncludes ? `sem um tipo que inclua "${au.notTypeIncludes}"` : '',
     ]
       .filter(Boolean)
@@ -1262,7 +1269,10 @@ function ability(a: Ability, ctx: Ctx): string {
     const cond = a.condition && Object.keys(a.condition).length ? `se ${condition(a.condition, ctx)}, ` : '';
     body = `Quando ${event(a.event!, ctx)}, ${cond}${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
   }
-  else if (a.timing === 'replace' && a.replace) {
+  else if (a.timing === 'replace' && a.replace?.event === 'damage') {
+    const c = a.cost ? cost(a.cost, ctx).replace(/^Você pode /, '') : 'evitar isso';
+    body = `Se você fosse sofrer dano, você pode ${c} em vez disso.`;
+  } else if (a.timing === 'replace' && a.replace) {
     const r = a.replace;
     const who =
       r.who === 'self'

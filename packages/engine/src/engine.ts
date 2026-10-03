@@ -151,10 +151,13 @@ export function leaderRule<K extends LeaderRule['kind']>(state: GameState, playe
   return def.abilities.find((a) => a.rule?.kind === kind)?.rule as Extract<LeaderRule, { kind: K }> | undefined;
 }
 
-/** Valor de Counter de um Personagem na mão (com o bônus de regra do Líder). */
+/**
+ * Valor de Counter de uma carta na mão (com o bônus de regra do Líder). Personagens têm o
+ * Counter impresso; Stages só com efeitos como "All Stage cards in your hand have a +3000 Counter".
+ */
 export function counterValue(state: GameState, uid: string): number {
   const def = cardDef(state, uid);
-  if (def.category !== 'character') return 0;
+  if (def.category !== 'character' && def.category !== 'stage') return 0;
   const owner = ownerOf(state, uid);
   const ps = state.players[owner];
   let value = def.counter ?? 0;
@@ -171,7 +174,7 @@ export function counterValue(state: GameState, uid: string): number {
       else if (hc.withoutCounter && !def.counter) value = Math.max(value, hc.amount);
     }
   }
-  if (value) return value;
+  if (value || def.category !== 'character') return value;
   const bonus = leaderRule(state, owner, 'counterBonus');
   return bonus && hasType(def, bonus.type) ? bonus.amount : 0;
 }
@@ -501,6 +504,8 @@ export function matchesFilter(def: CardDef, f: import('./types').CardFilter): bo
   if (f.maxPower !== undefined && (def.power ?? 0) > f.maxPower) return false;
   if (f.minPower !== undefined && (def.power ?? 0) < f.minPower) return false;
   if (f.hasTrigger && !def.trigger?.trim()) return false;
+  if (f.hasAllTypes && !f.hasAllTypes.every((t) => hasType(def, t))) return false;
+  if (f.withoutKeyword && def.keywords.includes(f.withoutKeyword)) return false;
   return true;
 }
 
@@ -548,6 +553,7 @@ function collectAuras(state: GameState, uid: string, zone: 'leader' | 'character
         if (a.aura.excludeName && hasName(target, a.aura.excludeName)) continue;
         if (a.aura.excludeSelf && fc.uid === uid) continue;
         if (a.aura.hasTrigger && !target.trigger?.trim()) continue;
+        if (a.aura.hasAllTypes && !a.aura.hasAllTypes.every((t) => hasType(target, t))) continue;
         if (a.aura.notTypeIncludes && typeIncludes(target, a.aura.notTypeIncludes)) continue;
         if (a.aura.exactCosts && !a.aura.exactCosts.includes(target.cost ?? -1)) continue;
         if (a.aura.minPower !== undefined && (target.power ?? 0) < a.aura.minPower) continue;
@@ -798,7 +804,7 @@ export function counterOptions(state: GameState, defender: PlayerId): string[] {
   const ps = state.players[defender];
   return ps.hand.filter((uid) => {
     const def = cardDef(state, uid);
-    if (def.category === 'character') return counterValue(state, uid) > 0;
+    if (def.category === 'character' || def.category === 'stage') return counterValue(state, uid) > 0;
     if (def.category === 'event') {
       return def.abilities.some((a) => a.timing === 'counter') && (def.cost ?? 0) <= ps.donActive;
     }
@@ -850,6 +856,8 @@ function fieldCardMatches(state: GameState, source: string, fc: FieldCard, spec:
   if (spec.noEffect && def.text?.replace(/\[[^\]]+\]|\([^)]*\)/g, '').trim()) return false;
   if (spec.either && !spec.either.some((f) => matchesPartial(state, fc.uid, f, source))) return false;
   if (!matchesAnyType(def, spec.hasAnyType)) return false;
+  if (spec.hasAllTypes && !spec.hasAllTypes.every((t) => hasType(def, t))) return false;
+  if (spec.withoutKeyword && hasKeyword(state, fc.uid, spec.withoutKeyword)) return false;
   return true;
 }
 
@@ -981,7 +989,7 @@ function handlePendingResponse(state: GameState, action: Action) {
       removeFrom(ps.hand, action.uid);
       ps.trash.push(action.uid);
       state.pending = null;
-      if (def.category === 'character') {
+      if (def.category !== 'event') {
         const target = state.battle!.target;
         const amount = counterValue(state, action.uid);
         state.modifiers.push({ uid: target, kind: 'power', amount, duration: 'battle' });
@@ -1588,6 +1596,11 @@ function stepDamage(state: GameState, frame: DamageFrame) {
       lifeRemoved(state, frame.defender);
     }
     return;
+  }
+  // "If you would take damage, you may … instead": oferecida uma vez, antes da primeira Vida (e da derrota).
+  if (!frame.replaceAsked && !frame.lost) {
+    frame.replaceAsked = true;
+    if (offerDamageReplacement(state, frame.defender)) return;
   }
   const ps = state.players[frame.defender];
   if (ps.life.length === 0) {
@@ -3400,6 +3413,29 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       frame.steps.splice(frame.i + 1, 0, ...costSteps, ...ability.steps);
       return true;
     }
+    case 'replaceDamage': {
+      const ability = cardDef(state, frame.source).abilities[step.ability];
+      const owner = state.players[frame.controller];
+      // O dano em resolução (logo abaixo deste efeito na pilha).
+      const damage = [...state.stack].reverse().find((f): f is DamageFrame => f.kind === 'damage' && f.defender === owner.id);
+      if (!locate(state, frame.source) || !ability || !damage || (ability.cost && !canPayCost(state, owner.id, frame.source, ability.cost))) return true;
+      if (!frame.choice) {
+        state.pending = {
+          kind: 'confirm',
+          player: owner.id,
+          source: frame.source,
+          prompt: `${srcName}: você vai sofrer ${damage.remaining} de dano. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
+        };
+        return false;
+      }
+      if (!frame.choice.length) return true;
+      if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(frame.source, step.ability));
+      log(state, owner.id, `${srcName}: ${owner.name} não sofre o dano (efeito de substituição).`);
+      damage.remaining = 0;
+      const costSteps = ability.cost ? payImmediateCost(state, owner.id, frame.source, ability.cost) : [];
+      frame.steps.splice(frame.i + 1, 0, ...costSteps, ...ability.steps);
+      return true;
+    }
     case 'delayed': {
       const entry = { controller: frame.controller, source: frame.source, steps: step.steps, ...(step.keepChosen && frame.last ? { last: [...frame.last] } : {}) };
       if (step.when === 'battle' && state.battle) (state.battle.after ??= []).push(entry);
@@ -3958,7 +3994,7 @@ function offerReplacement(
     for (let i = 0; i < abilities.length; i++) {
       const a = abilities[i];
       const r = a.replace;
-      if (a.timing !== 'replace' || !r || r.event === 'rest') continue;
+      if (a.timing !== 'replace' || !r || r.event === 'rest' || r.event === 'damage') continue;
       if (r.who === 'self' ? fc.uid !== victim : !targetCandidates(state, owner.id, fc.uid, { ...r.who, side: 'own' }).includes(victim)) continue;
       const isKO = action === 'ko';
       const eventOk =
@@ -3984,6 +4020,24 @@ function offerReplacement(
     if (!canPayCost(state, owner.id, t.source, t.cost)) continue;
     pushEffect(state, t.source, owner.id, [{ do: 'replaceRemoval', victim, ability: -1, action, inlineCost: t.cost, ...(ctx.inBattle ? { inBattle: true } : {}) }]);
     return true;
+  }
+  return false;
+}
+
+/** Procura "If you would take damage, you may … instead" no campo do defensor e pergunta. */
+function offerDamageReplacement(state: GameState, defender: PlayerId): boolean {
+  const owner = state.players[defender];
+  for (const fc of [owner.leader, ...owner.characters, ...(owner.stage ? [owner.stage] : [])]) {
+    const abilities = cardDef(state, fc.uid).abilities;
+    for (let i = 0; i < abilities.length; i++) {
+      const a = abilities[i];
+      if (a.timing !== 'replace' || a.replace?.event !== 'damage') continue;
+      if (!conditionsMet(state, fc.uid, a)) continue;
+      if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) continue;
+      if (a.cost && !canPayCost(state, owner.id, fc.uid, a.cost)) continue;
+      pushEffect(state, fc.uid, owner.id, [{ do: 'replaceDamage', ability: i }]);
+      return true;
+    }
   }
   return false;
 }
