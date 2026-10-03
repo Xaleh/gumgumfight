@@ -54,67 +54,59 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 
 O backup é só copiar o arquivo `.db`.
 
-## Deploy automático (GitHub Actions → VM da Oracle)
+## Deploy automático (GitHub Actions)
 
 O workflow `.github/workflows/ci-deploy.yml` roda os testes em todo push. Em push na **main** (ou em "Run workflow"),
-ele publica em **https://gumgumfight.duckdns.org**:
+ele publica o site no servidor de produção:
 
 1. Monta o pacote e o testa (sobe o servidor e consulta a API) antes de enviar.
-2. Copia o pacote por SSH para `~/apps/gumgumfight/releases/<commit>` e troca o link `current`.
-3. Recarrega o app `gumgumfight` no pm2 e confere `/api/health`. **Se falhar, volta sozinho para a versão anterior.**
-4. Mantém os 5 últimos releases. O banco fica em `~/apps/gumgumfight/shared/gumgum.db` e sobrevive aos deploys.
+2. Copia o pacote por SSH para uma pasta de releases no servidor e troca o link `current`.
+3. Recarrega o app no pm2 e confere `/api/health`. **Se falhar, volta sozinho para a versão anterior.**
+4. Mantém os 5 últimos releases. O banco fica numa pasta compartilhada e sobrevive aos deploys.
 
-O app fica atrás do proxy reverso, na porta 3310: em `127.0.0.1` com Nginx no host, ou acessível à rede Docker
-com Nginx Proxy Manager. Os outros apps da VM não são tocados: o deploy usa um Node ≥ 22.13 próprio (via nvm, se
-o Node padrão da VM for mais antigo) e um site separado no proxy.
+O app fica atrás de um proxy reverso (Nginx no host ou Nginx Proxy Manager em Docker), sem porta exposta
+diretamente. Os outros apps do servidor não são tocados: o deploy usa um Node ≥ 22.13 próprio (via nvm, se o
+Node padrão for mais antigo) e um site separado no proxy.
 
 ### Configuração inicial (uma vez)
 
-1. **Chave de deploy dedicada** (na sua máquina, não use a chave principal da instância):
+1. **Chave de deploy dedicada** (na sua máquina, não use a chave principal do servidor):
    ```bash
    ssh-keygen -t ed25519 -f gumgum_deploy -N "" -C github-actions-gumgumfight
    ```
-2. **DuckDNS:** `gumgumfight.duckdns.org` deve apontar para `167.234.249.51`.
-3. **Na VM** (`ssh ubuntu@167.234.249.51`), prepare tudo. O script cria as pastas, instala o Node 22 se preciso,
-   cria o site no Nginx, gera o HTTPS com certbot e autoriza a chave:
+2. **Domínio:** aponte o domínio do site para o servidor.
+3. **No servidor**, rode `deploy/setup-vm.sh` com a chave pública de deploy. O script cria as pastas, instala o
+   Node 22 se preciso, configura o proxy (ou mostra os campos para o Nginx Proxy Manager), gera o HTTPS com
+   certbot e autoriza a chave:
    ```bash
-   curl -fsSLO https://raw.githubusercontent.com/Xaleh/gumgumfight/main/deploy/setup-vm.sh
    bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
    ```
-   Opcional: `CERTBOT_EMAIL=voce@exemplo.com` (avisos do Let's Encrypt), `PORT=...` (se a 3310 estiver ocupada).
-
-   **Com Nginx Proxy Manager** (Nginx em Docker, painel na porta 81), o script detecta o container sozinho e:
-   - faz o app escutar numa porta que a rede Docker do proxy alcança;
-   - libera no firewall (iptables) só a porta 3310, e só para essa rede.
-
-   Ele não mexe na configuração do proxy. No fim, mostra os campos para criar o *Proxy Host* no painel
-   (domínio, `Forward Hostname/IP`, porta 3310 e o certificado SSL na aba SSL).
+   Variáveis opcionais: `DOMAIN`, `PORT`, `CERTBOT_EMAIL` (veja o início do script).
 4. **No GitHub** → Settings → Secrets and variables → Actions → *New repository secret*:
 
-   | Secret               | Valor                                               |
-   |----------------------|-----------------------------------------------------|
-   | `DEPLOY_HOST`        | `167.234.249.51`                                    |
-   | `DEPLOY_USER`        | `ubuntu`                                            |
-   | `DEPLOY_SSH_KEY`     | conteúdo do arquivo `gumgum_deploy` (chave privada) |
-   | `DEPLOY_KNOWN_HOSTS` | saída de `ssh-keyscan -t ed25519 167.234.249.51`    |
+   | Secret               | Valor                                                  |
+   |----------------------|--------------------------------------------------------|
+   | `DEPLOY_HOST`        | endereço do servidor                                   |
+   | `DEPLOY_USER`        | usuário SSH do deploy                                  |
+   | `DEPLOY_SSH_KEY`     | conteúdo do arquivo `gumgum_deploy` (chave privada)    |
+   | `DEPLOY_KNOWN_HOSTS` | saída de `ssh-keyscan -t ed25519 <endereço do servidor>` |
 
+   Use sempre **Secrets** (nunca *Variables*, que ficam visíveis para quem lê o repositório).
 5. **No GitHub** → Settings → General → *Default branch*: `main`.
 6. **Primeiro deploy:** Actions → "CI e deploy" → *Run workflow* (branch `main`), com `import_sets` = `ST-01 ST-02`
    para já importar as cartas reais. Depois disso, todo push na `main` publica sozinho.
 
 Enquanto os secrets não existirem, o job de deploy é pulado com um aviso (os testes continuam rodando).
 
-### Operação
+### Operação (no servidor)
 
 ```bash
-pm2 logs gumgumfight                      # logs
-pm2 restart gumgumfight                   # reiniciar
-cd ~/apps/gumgumfight && ls releases      # versões disponíveis
-# importar mais coleções no servidor:
-source shared/deploy.env && DB_PATH=shared/gumgum.db $NODE_BIN current/server/import-cards.mjs OP-01 OP-02
-# desligar as imagens: CARD_IMAGES=off em shared/deploy.env e depois:
-pm2 startOrReload ~/apps/gumgumfight/current/deploy/ecosystem.config.cjs --update-env
+pm2 logs gumgumfight        # logs
+pm2 restart gumgumfight     # reiniciar
 ```
+
+Para importar mais coleções, use `import-cards.mjs` do release atual com o `DB_PATH` do banco compartilhado;
+para desligar as imagens, defina `CARD_IMAGES=off` no ambiente do app e recarregue-o no pm2.
 
 ## Montando decks
 

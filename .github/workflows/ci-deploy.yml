@@ -1,7 +1,7 @@
 name: CI e deploy
 
 # Todo push/PR roda os testes e monta o pacote.
-# Push na main (ou "Run workflow" na main) publica na VM da Oracle.
+# Push na main (ou "Run workflow" na main) publica no servidor de produção.
 on:
   push:
     branches: ['**']
