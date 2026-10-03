@@ -79,7 +79,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       const need = ap - tp + 1;
       const boost = (uid: string) => {
         const d = cardDef(state, uid);
-        if (d.category === 'character') return counterValue(state, uid);
+        if (d.category !== 'event') return counterValue(state, uid);
         const steps = d.abilities.find((a) => a.timing === 'counter')?.steps ?? [];
         return steps.reduce((sum, st) => sum + (st.do === 'power' ? st.amount : 0), 0);
       };

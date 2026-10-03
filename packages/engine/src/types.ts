@@ -107,6 +107,10 @@ export interface TargetSpec {
   totalMaxCost?: number;
   /** "with no base effect" (sem texto de efeito impresso) */
   noEffect?: boolean;
+  /** "with both the {A} and {B} types": todos estes tipos. */
+  hasAllTypes?: string[];
+  /** "without [Blocker]" */
+  withoutKeyword?: Keyword;
 }
 
 /** Filtro de cartas fora do campo (busca no deck, mão...). */
@@ -149,6 +153,10 @@ export interface CardFilter {
   totalMaxCost?: number;
   /** "the same card name as the trashed card" (a carta descartada no custo) */
   sameNameAsChosen?: boolean;
+  /** "with both the {A} and {B} types": todos estes tipos. */
+  hasAllTypes?: string[];
+  /** "without [Blocker]" */
+  withoutKeyword?: Keyword;
 }
 
 /**
@@ -418,6 +426,8 @@ export interface Aura {
   hasTrigger?: boolean;
   /** Custo exato / mínimo além de maxCost */
   exactCosts?: number[];
+  /** "with both the {A} and {B} types": todos estes tipos. */
+  hasAllTypes?: string[];
 }
 
 /** Referência a cartas em um passo de efeito. */
@@ -437,8 +447,11 @@ export type Duration = 'turn' | 'battle' | 'nextOpponentTurn' | 'untilYourNextTu
 /** Efeito de substituição: protege 'self' ou Personagens seus que batem com `spec`. */
 export interface Replacement {
   who: 'self' | TargetSpec;
-  /** ko = só K.O.; removal = sair do campo por efeito do oponente (inclui K.O. por efeito do oponente). */
-  event: 'ko' | 'removal' | 'koOrRemoval' | 'rest';
+  /**
+   * ko = só K.O.; removal = sair do campo por efeito do oponente (inclui K.O. por efeito do oponente);
+   * damage = "If you would take damage": o dono da carta sofreria dano.
+   */
+  event: 'ko' | 'removal' | 'koOrRemoval' | 'rest' | 'damage';
   /** any = qualquer K.O.; battle = em batalha; effect = por efeito; opponentEffect = por efeito do oponente. */
   by: 'any' | 'battle' | 'effect' | 'opponentEffect';
 }
@@ -661,6 +674,8 @@ type EffectStepBody =
       /** Substituição criada por efeito (sem habilidade na carta): o custo vem aqui. */
       inlineCost?: AbilityCost;
     }
+  /** Pergunta da substituição de dano ("If you would take damage, you may … instead"). */
+  | { do: 'replaceDamage'; ability: number }
   /** "… at the end of this turn": passos adiados para o fim do turno. */
   | { do: 'delayed'; steps: EffectStep[]; when?: 'battle'; keepChosen?: boolean }
   /** Virar N Personagens ativos seus (custo "You may rest 2 of your Characters"). */
@@ -1022,7 +1037,17 @@ export type Frame =
       trashed?: string[];
     }
   | { kind: 'battle' }
-  | { kind: 'damage'; defender: PlayerId; remaining: number; banish: boolean; lifeCard?: string; answered?: boolean; lost?: number }
+  | {
+      kind: 'damage';
+      defender: PlayerId;
+      remaining: number;
+      banish: boolean;
+      lifeCard?: string;
+      answered?: boolean;
+      lost?: number;
+      /** A substituição de dano já foi oferecida para este dano. */
+      replaceAsked?: boolean;
+    }
   | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash'; byEffect?: boolean }
   /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
   | { kind: 'endTurn' };

@@ -63,6 +63,8 @@ export function normalizeLeaksText(raw: string): { text: string; notes: string[]
       return '';
     })
     .replace(/<([A-Za-z][A-Za-z ]*)>/g, (_m, word: string) => (ATTRIBUTES.includes(word) ? `"${word}"` : `[${word}]`))
+    // Opções de "Choose one:" como nas cartas impressas ("• …").
+    .replace(/^[ \t]*-[ \t]+/gm, '• ')
     .replace(/[ \t]+/g, ' ')
     .replace(/ *\n */g, '\n')
     .trim();

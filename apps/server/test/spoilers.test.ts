@@ -217,6 +217,10 @@ describe('spoilers do optcgleaks', () => {
       text: 'with 8000 power. [On Play] {Navy} type',
       notes: ['NOTE: This translation may be inaccurate.'],
     });
+    // Opções de "Choose one" com "-" viram "•", como nas cartas impressas.
+    expect(normalizeLeaksText('Choose one:\n- Draw 1 card.\n- Give up to 1 Character -4000 power during this turn.').text).toBe(
+      'Choose one:\n• Draw 1 card.\n• Give up to 1 Character -4000 power during this turn.',
+    );
   });
 
   it('mapeia Líder, Personagem com [Trigger] e Stage', () => {
