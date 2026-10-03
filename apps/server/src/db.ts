@@ -1,8 +1,8 @@
 // Banco local SQLite (arquivo único, sem custo de serviço externo).
 // Usa o SQLite embutido no Node (`node:sqlite`): nenhum módulo nativo para
 // compilar ou baixar, então funciona igual no Windows, Linux e macOS.
-// Toda a SQL fica aqui; se um dia for preciso migrar para Postgres, só este
-// arquivo muda.
+// Toda a SQL fica aqui e em stats/store.ts (consultas das estatísticas); se um
+// dia for preciso migrar para Postgres, só esses arquivos mudam.
 
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -20,11 +20,12 @@ export function openDb(path = DB_PATH): DB {
   return db;
 }
 
-function transaction(db: DB, fn: () => void) {
+export function transaction<T>(db: DB, fn: () => T): T {
   db.exec('BEGIN');
   try {
-    fn();
+    const out = fn();
     db.exec('COMMIT');
+    return out;
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
@@ -83,6 +84,80 @@ function migrate(db: DB) {
   if (!deckCols.includes('kind')) db.exec("ALTER TABLE decks ADD COLUMN kind TEXT NOT NULL DEFAULT 'builtin'");
   // SHA-256 do código de dono do navegador que criou o deck (nunca o código em si).
   if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
+  migrateStats(db);
+}
+
+/**
+ * Estatísticas. `matches` guarda a partida e o replay; `match_seats` é a tabela de
+ * fatos: uma linha por lado da partida, com todas as dimensões dos filtros
+ * (formato, fila, tier, Líderes, quem começou), para que as consultas não
+ * precisem de joins. `match_cards` detalha cada carta do deck daquele lado.
+ */
+function migrateStats(db: DB) {
+  const cols = (db.prepare('PRAGMA table_info(matches)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!cols.includes('format')) db.exec('ALTER TABLE matches ADD COLUMN format TEXT');
+  if (!cols.includes('queue')) db.exec('ALTER TABLE matches ADD COLUMN queue TEXT');
+  if (!cols.includes('first_player')) db.exec('ALTER TABLE matches ADD COLUMN first_player INTEGER');
+  // JSON { seed, firstPlayer, decks, actions }: permite recalcular as estatísticas.
+  if (!cols.includes('replay')) db.exec('ALTER TABLE matches ADD COLUMN replay TEXT');
+  db.exec(`
+    -- Jogador = navegador (código de dono), até existir login. Só o hash é guardado.
+    CREATE TABLE IF NOT EXISTS players (
+      id           TEXT PRIMARY KEY,
+      owner_hash   TEXT NOT NULL UNIQUE,
+      name         TEXT NOT NULL,
+      bounty       INTEGER NOT NULL DEFAULT 0,  -- recompensa em Beries (ranqueada)
+      ranked_games INTEGER NOT NULL DEFAULT 0,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Listas exatas usadas em partidas (imutáveis; o deck salvo pode mudar depois).
+    CREATE TABLE IF NOT EXISTS deck_lists (
+      hash       TEXT PRIMARY KEY,
+      leader     TEXT NOT NULL,
+      cards      TEXT NOT NULL,                 -- JSON: [{ id, count }]
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS match_seats (
+      match_id       INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      seat           INTEGER NOT NULL,
+      controller     TEXT NOT NULL,             -- human | bot
+      player_id      TEXT REFERENCES players(id),
+      deck_id        TEXT,
+      deck_hash      TEXT NOT NULL REFERENCES deck_lists(hash),
+      leader         TEXT NOT NULL,
+      opp_leader     TEXT NOT NULL,
+      opp_controller TEXT NOT NULL,
+      tier           TEXT,                      -- tier do jogador no momento da partida
+      bounty_before  INTEGER,
+      bounty_after   INTEGER,
+      went_first     INTEGER NOT NULL,
+      won            INTEGER NOT NULL,
+      mulligan       INTEGER NOT NULL,
+      format         TEXT NOT NULL,
+      queue          TEXT NOT NULL,
+      played_at      TEXT NOT NULL,
+      PRIMARY KEY (match_id, seat)
+    );
+    CREATE INDEX IF NOT EXISTS seats_dims ON match_seats(format, queue, controller, leader);
+    CREATE INDEX IF NOT EXISTS seats_matchup ON match_seats(leader, opp_leader);
+    CREATE INDEX IF NOT EXISTS seats_player ON match_seats(player_id);
+
+    CREATE TABLE IF NOT EXISTS match_cards (
+      match_id INTEGER NOT NULL,
+      seat     INTEGER NOT NULL,
+      card_id  TEXT NOT NULL,
+      copies   INTEGER NOT NULL,                -- cópias no deck
+      opening  INTEGER NOT NULL,                -- cópias na mão mantida após o mulligan
+      drawn    INTEGER NOT NULL,                -- cópias que passaram pela mão
+      played   INTEGER NOT NULL,                -- vezes jogada da mão (inclui Counter)
+      PRIMARY KEY (match_id, seat, card_id),
+      FOREIGN KEY (match_id, seat) REFERENCES match_seats(match_id, seat) ON DELETE CASCADE
+    ) WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS match_cards_card ON match_cards(card_id);
+  `);
 }
 
 // ------------------------------------------------------------------ cartas
@@ -237,25 +312,11 @@ export function deleteDeck(db: DB, id: string): boolean {
 
 // ------------------------------------------------------------------ partidas
 
-export interface MatchRecord {
-  seed: number;
-  mode: string;
-  deck0: string;
-  deck1: string;
-  winner: number | null;
-  turns: number;
-  reason: string | null;
-}
-
-export function insertMatch(db: DB, m: MatchRecord): number {
-  const r = db
-    .prepare(
-      'INSERT INTO matches (seed, mode, deck0, deck1, winner, turns, reason) VALUES (@seed, @mode, @deck0, @deck1, @winner, @turns, @reason)',
-    )
-    .run({ ...m });
-  return Number(r.lastInsertRowid);
-}
-
 export function recentMatches(db: DB, limit = 20) {
-  return db.prepare('SELECT * FROM matches ORDER BY id DESC LIMIT ?').all(limit);
+  return db
+    .prepare(
+      `SELECT id, seed, mode, deck0, deck1, winner, turns, reason, format, queue, first_player, created_at
+       FROM matches ORDER BY id DESC LIMIT ?`,
+    )
+    .all(limit);
 }

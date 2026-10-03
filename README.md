@@ -127,6 +127,36 @@ decks que criou. Decks de outros jogadores aparecem em "Decks da comunidade": d�
 Limpar os dados do site no navegador faz perder a edição dos próprios decks.
 **Exportar/Importar lista** usa o formato de texto da comunidade (`4xOP01-016`, uma carta por linha).
 
+## Estatísticas
+
+No menu, **📈 Estatísticas** mostra vitórias por Líder, por matchup (Líder x Líder) e por carta, com filtros por
+formato (Standard ou Extra Grand Battle, escolhido no menu antes da partida), fila (casual ou ranqueada), oponente
+(bot ou jogador), ordem do turno, período, tier e "só as minhas partidas". A opção "Bots (simulações)" mostra as
+partidas bot x bot, que ficam fora das estatísticas de pessoas.
+
+- **Coleta confiável:** no fim da partida o navegador envia o replay (seed, listas e ações). O servidor refaz a
+  partida com o motor e só grava o que a simulação confirma; um replay que não confere é recusado (422). Assim, a
+  mão inicial, as cartas compradas e jogadas e o vencedor nunca vêm do navegador.
+- **Modelo de dados** (`apps/server/src/db.ts`): `matches` guarda a partida e o replay (permite recalcular tudo);
+  `match_seats` é a tabela de fatos, uma linha por lado com todas as dimensões dos filtros (formato, fila, quem
+  controla cada lado, Líderes, tier na hora da partida, quem começou, mulligan, vitória); `match_cards` tem, por
+  carta do deck, as cópias, quantas estavam na mão mantida, quantas passaram pela mão e quantas vezes foi jogada;
+  `deck_lists` guarda cada lista exata (hash), já que o deck salvo pode mudar depois; `players` tem o perfil de
+  cada navegador e a recompensa.
+- **Inspirado no Duels.ink:** resumo do meta em frases (mais jogado, melhor taxa entre Líderes com amostra suficiente,
+  muito jogados mas perdendo, vantagem de quem começa), aba **Tendência** (participação semanal de cada Líder, quem
+  sobe e quem cai), matriz de matchups com o espelho na diagonal (taxa de quem começou) e um **mínimo de partidas**
+  para uma linha aparecer (como o mínimo de exibição deles).
+- **Cartas:** vitórias com a carta no deck, o **lift** (vitórias com a carta no deck menos as do Líder em geral), na mão inicial, comprada, não comprada e jogada, e o "Δ comprada"
+  (vitórias quando comprada menos quando não comprada), que mostra se a carta ajuda quando aparece.
+- **Tiers e recompensa:** cada jogador tem uma recompensa em Beries; o tier é a faixa em que ela está
+  (`apps/server/src/stats/catalog.ts`: East Blue até ฿ 5.000, Paradise até ฿ 20.000, Novo Mundo, Supernova,
+  Shichibukai e Yonkou). Na ranqueada a recompensa sobe e desce no estilo Elo (vencer quem vale mais rende mais).
+  O tier gravado é o da hora da partida. Partidas enviadas pelo navegador são sempre casuais: a ranqueada será
+  gravada pelo servidor de partidas online (com `recordMatch`), que será a autoridade.
+- Sem login, o jogador é o navegador (o mesmo código de dono dos decks). O nome do cartaz de "WANTED" pode ser trocado
+  na tela de estatísticas.
+
 ## Efeitos automáticos e modo manual
 
 Toda carta da base é jogável:
@@ -267,9 +297,19 @@ npm run typecheck
 | POST   | `/api/decks`       | Cria um deck (`{ name, leader, cards }`)    |
 | PUT    | `/api/decks/:id`   | Atualiza um deck do jogador                 |
 | DELETE | `/api/decks/:id`   | Apaga um deck do jogador                    |
-| POST   | `/api/matches`     | Registra o resultado de uma partida         |
+| POST   | `/api/matches`     | Envia o replay de uma partida (verificado pelo servidor) |
 | GET    | `/api/matches`     | Últimas partidas                            |
+| GET    | `/api/players/me`  | Perfil do navegador (nome, recompensa, tier) |
+| PUT    | `/api/players/me`  | Troca o nome (`{ name }`)                   |
+| GET    | `/api/stats/meta`  | Opções dos filtros: formatos, filas, tiers, Líderes |
+| GET    | `/api/stats`       | Totais, Líderes e matchups (filtros na query) |
+| GET    | `/api/stats/trend?weeks=` | Uso e vitórias por Líder em cada semana (padrão 6) |
+| GET    | `/api/stats/cards?leader=` | Desempenho das cartas de um Líder (ou `deck=` hash da lista) |
 | GET    | `/api/translations/pending` | Cartas com tradução automática parcial |
+
+Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked), `opponent` (bot,
+human), `by` (human = padrão, bot = simulações), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,
+`first` (first, second), `days`, `mine=1` e `deck`.
 
 ## Aviso
 

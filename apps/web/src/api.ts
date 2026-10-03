@@ -1,4 +1,4 @@
-import type { CardData, DeckList } from '@gumgum/engine';
+import type { Action, CardData, DeckList, PlayerId } from '@gumgum/engine';
 
 export interface DeckSummary {
   id: string;
@@ -106,18 +106,133 @@ export const api = {
   createDeck: (d: DeckInput) => send<DeckSummary>('POST', '/api/decks', d),
   updateDeck: (id: string, d: DeckInput) => send<DeckSummary>('PUT', `/api/decks/${encodeURIComponent(id)}`, d),
   deleteDeck: (id: string) => send<void>('DELETE', `/api/decks/${encodeURIComponent(id)}`),
-  saveMatch: (m: {
-    seed: number;
-    mode: string;
-    deck0: string;
-    deck1: string;
-    winner: number | null;
-    turns: number;
-    reason: string | null;
-  }) =>
-    fetch('/api/matches', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(m),
-    }).catch(() => undefined),
+  /** Envia o replay de uma partida terminada; o servidor refaz a partida antes de gravar as estatísticas. */
+  saveMatch: (m: MatchUpload) => send<{ id: number }>('POST', '/api/matches', m).catch(() => undefined),
+  me: () => get<PlayerProfile | null>('/api/players/me'),
+  rename: (name: string) => send<PlayerProfile>('PUT', '/api/players/me', { name }),
+  statsMeta: () => get<StatsMeta>('/api/stats/meta'),
+  stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
+  cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
+  trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
 };
+
+// ------------------------------------------------------------------ estatísticas
+
+export type FormatId = 'standard' | 'egb';
+
+export interface MatchUpload {
+  mode: 'bot' | 'demo';
+  format: FormatId;
+  seed: number;
+  firstPlayer?: PlayerId;
+  deckIds: [string, string];
+  decks: [DeckList, DeckList];
+  actions: Action[];
+}
+
+export interface PlayerProfile {
+  id: string;
+  name: string;
+  /** Recompensa em Beries (ranqueada). */
+  bounty: number;
+  rankedGames: number;
+  tier: string;
+}
+
+export interface Tier {
+  id: string;
+  label: string;
+  min: number;
+  max: number | null;
+}
+
+export interface CardInfo {
+  name: string;
+  category: string;
+  colors: string[];
+  imageUrl?: string;
+}
+
+export interface WinCount {
+  games: number;
+  wins: number;
+}
+
+export interface StatsMeta {
+  formats: Array<{ id: FormatId; label: string }>;
+  queues: Array<{ id: string; label: string }>;
+  tiers: Tier[];
+  leaders: Array<{ leader: string; games: number }>;
+  me: PlayerProfile | null;
+  myDecks: Array<WinCount & { hash: string; leader: string; deckId: string | null; lastPlayed: string }>;
+  cards: Record<string, CardInfo>;
+}
+
+export interface StatsQuery {
+  format?: string;
+  queue?: string;
+  by?: 'human' | 'bot';
+  opponent?: string;
+  tiers?: string[];
+  leader?: string;
+  oppLeader?: string;
+  first?: string;
+  days?: string;
+  mine?: boolean;
+  deck?: string;
+  weeks?: string;
+}
+
+export interface StatsSummary extends WinCount {
+  matches: number;
+  players: number;
+  first: WinCount;
+  second: WinCount;
+  mulligan: WinCount;
+  keep: WinCount;
+}
+
+export interface StatsOverview {
+  summary: StatsSummary;
+  leaders: Array<WinCount & { leader: string; lists: number; firstGames: number; firstWins: number }>;
+  matchups: Array<WinCount & { leader: string; oppLeader: string; firstGames: number; firstWins: number }>;
+  cards: Record<string, CardInfo>;
+}
+
+export interface CardStatRow extends WinCount {
+  cardId: string;
+  avgCopies: number;
+  openingGames: number;
+  openingWins: number;
+  drawnGames: number;
+  drawnWins: number;
+  notDrawnGames: number;
+  notDrawnWins: number;
+  playedGames: number;
+  playedWins: number;
+  timesPlayed: number;
+}
+
+export interface CardStatsResponse {
+  summary: StatsSummary;
+  rows: CardStatRow[];
+  cards: Record<string, CardInfo>;
+}
+
+export interface TrendResponse {
+  /** Segunda-feira de cada semana (AAAA-MM-DD), da mais antiga à atual. */
+  weeks: string[];
+  rows: Array<WinCount & { week: string; leader: string }>;
+  cards: Record<string, CardInfo>;
+}
+
+function statsQs(f: StatsQuery): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(f)) {
+    if (v === undefined || v === '' || v === false) continue;
+    if (Array.isArray(v)) {
+      if (v.length) q.set(k, v.join(','));
+    } else q.set(k, v === true ? '1' : String(v));
+  }
+  return q.toString();
+}

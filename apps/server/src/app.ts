@@ -11,16 +11,15 @@ import {
   getCards,
   getDeck,
   getTranslations,
-  insertMatch,
   listCards,
   listDecks,
-  type MatchRecord,
   recentMatches,
   type StoredDeck,
   upsertDeck,
 } from './db';
 import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
+import { registerStatsRoutes } from './stats/routes';
 
 export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOptions } = {}) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
@@ -181,22 +180,7 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
     return reply.code(204).send();
   });
 
-  app.post<{ Body: MatchRecord }>('/api/matches', async (req, reply) => {
-    const b = req.body;
-    if (!b || typeof b.seed !== 'number' || !b.deck0 || !b.deck1) {
-      return reply.code(400).send({ error: 'Dados de partida inválidos' });
-    }
-    const id = insertMatch(db, {
-      seed: b.seed,
-      mode: String(b.mode ?? 'solo'),
-      deck0: String(b.deck0),
-      deck1: String(b.deck1),
-      winner: b.winner ?? null,
-      turns: Number(b.turns ?? 0),
-      reason: b.reason ?? null,
-    });
-    return { id };
-  });
+  registerStatsRoutes(app, { db, viewerHash, present });
 
   app.get('/api/matches', async () => recentMatches(db));
 
