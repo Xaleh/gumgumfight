@@ -302,6 +302,7 @@ function GameTable({
       if (myPending.kind === 'selectTargets') {
         if (picked.includes(uid)) return 'selected';
         if (myPending.options.includes(uid)) return 'option';
+        if (myPending.shown?.includes(uid)) return 'disabled';
       }
       if ((myPending.kind === 'block' || myPending.kind === 'counter') && myPending.options.includes(uid)) return 'option';
     }
@@ -1156,21 +1157,32 @@ function Prompt(props: {
     }
     case 'selectTargets': {
       // Opções fora da mesa (topo do deck, descarte, Vida) aparecem dentro do prompt.
-      const offBoard = pending.options.filter((u) => ['deck', 'trash', 'life'].includes(zoneOf(state, u) ?? ''));
+      // Numa busca, todas as cartas olhadas aparecem; as que não podem ser escolhidas ficam apagadas.
+      const shown = pending.shown?.length ? pending.shown : null;
+      const offBoard = shown ?? pending.options.filter((u) => ['deck', 'trash', 'life'].includes(zoneOf(state, u) ?? ''));
+      const blocked = shown ? shown.filter((u) => !pending.options.includes(u)).length : 0;
       const confirm = (
         <div className="btn-row">
-          {pending.min === 0 && (
-            <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-              Não escolher
+          {pending.max === 0 ? (
+            <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+              Continuar
             </button>
+          ) : (
+            <>
+              {pending.min === 0 && (
+                <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+                  Não escolher
+                </button>
+              )}
+              <button
+                className="btn primary"
+                disabled={picked.length < pending.min}
+                onClick={() => onDispatch({ type: 'choose', player: human, uids: picked })}
+              >
+                Confirmar {pending.max > 1 ? `(${picked.length}/${pending.max})` : ''}
+              </button>
+            </>
           )}
-          <button
-            className="btn primary"
-            disabled={picked.length < pending.min}
-            onClick={() => onDispatch({ type: 'choose', player: human, uids: picked })}
-          >
-            Confirmar {pending.max > 1 ? `(${picked.length}/${pending.max})` : ''}
-          </button>
         </div>
       );
       const order = pending.ordered && picked.length > 0 && (
@@ -1183,13 +1195,20 @@ function Prompt(props: {
           ))}
         </div>
       );
-      if (offBoard.length === pending.options.length) {
+      if (shown || offBoard.length === pending.options.length) {
         return (
           <div className="modal-backdrop">
             <div className="modal-card">
               <SourceLine state={state} uid={pending.source} />
               <h3>{pending.prompt}</h3>
-              <p className="muted small">Toque nas cartas para escolher. Segure para ler.</p>
+              <p className="muted small">
+                {pending.max === 0
+                  ? 'Toque numa carta para ler.'
+                  : pending.ordered
+                    ? 'Toque nas cartas na ordem desejada. Segure para ler.'
+                    : 'Toque nas cartas para escolher. Segure para ler.'}
+                {blocked > 0 && ' As cartas apagadas não podem ser escolhidas.'}
+              </p>
               {options}
               {order}
               {confirm}

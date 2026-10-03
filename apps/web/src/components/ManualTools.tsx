@@ -56,6 +56,8 @@ export function ManualTools({ state, human, selected, onDispatch, onSelect, peek
   const def = selected ? cardDef(state, selected) : null;
   const onField = zone === 'character' || zone === 'leader' || zone === 'stage';
   const rested = selected && onField ? fieldRested(state, selected) : false;
+  // Na etapa de Counter, a carta da mão só vale como Counter (o motor recusa jogá-la no campo).
+  const counterStep = state.pending?.kind === 'counter' && zone === 'hand';
 
   return (
     <div className="actions manual-tools">
@@ -102,13 +104,16 @@ export function ManualTools({ state, human, selected, onDispatch, onSelect, peek
                 <button className="btn small" onClick={() => move(selected, 'deckBottom')}>→ Fundo do deck</button>
                 <button className="btn small" onClick={() => move(selected, 'deckTop')}>→ Topo do deck</button>
                 {zone !== 'life' && <button className="btn small" onClick={() => move(selected, 'life')}>→ Vida</button>}
-                {def.category === 'character' && zone !== 'character' && mine && (
+                {counterStep && (def.category === 'character' || def.category === 'stage') && (
+                  <span className="muted small">Na etapa de Counter, use “Usar como Counter” (a carta vai para o descarte).</span>
+                )}
+                {def.category === 'character' && zone !== 'character' && mine && !counterStep && (
                   <>
                     <button className="btn small primary" onClick={() => move(selected, 'character')}>Jogar no campo</button>
                     <button className="btn small" onClick={() => move(selected, 'character', true)}>Jogar virado</button>
                   </>
                 )}
-                {def.category === 'stage' && zone !== 'stage' && mine && (
+                {def.category === 'stage' && zone !== 'stage' && mine && !counterStep && (
                   <button className="btn small primary" onClick={() => move(selected, 'stage')}>Jogar Stage</button>
                 )}
               </>

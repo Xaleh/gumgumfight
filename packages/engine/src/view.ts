@@ -74,6 +74,7 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
   const p = state.pending;
   if (p && viewer !== null && p.player === viewer) {
     if (p.kind === 'selectTargets' || p.kind === 'block' || p.kind === 'counter') for (const u of p.options) out.add(u);
+    if (p.kind === 'selectTargets') for (const u of p.shown ?? []) out.add(u);
     if (p.kind === 'trigger') out.add(p.card);
   }
   return out;
@@ -172,8 +173,8 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
       return p;
     case 'selectTargets':
       return mine
-        ? { ...p, options: p.options.map(ref), source: ref(p.source) }
-        : { ...p, options: [], min: 0, max: 0, prompt: '', source: ref(p.source) };
+        ? { ...p, options: p.options.map(ref), source: ref(p.source), ...(p.shown ? { shown: p.shown.map(ref) } : {}) }
+        : { ...p, options: [], min: 0, max: 0, prompt: '', source: ref(p.source), shown: undefined };
     case 'block':
     case 'counter':
       return { ...p, options: mine ? p.options.map(ref) : [] };

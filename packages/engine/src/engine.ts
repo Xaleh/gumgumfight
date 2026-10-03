@@ -2117,20 +2117,47 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'search': {
       const top = ps.deck.slice(0, step.look);
       const options = top.filter((u) => matchesFilter(cardDef(state, u), step.filter));
-      if (!frame.choice && options.length) {
-        state.pending = {
-          kind: 'selectTargets',
-          player: frame.controller,
-          options,
-          min: 0,
-          max: Math.min(step.upTo, options.length),
-          prompt: `${srcName}: olhe as ${top.length} cartas do topo e escolha até ${step.upTo} para ${step.play ? 'jogar' : step.toTrash ? 'descartar' : 'adicionar à mão'}.`,
-          intent: 'help',
-          source: frame.source,
-        };
-        return false;
+      // 1ª escolha (memo vazio): as cartas pegas. 2ª (resto no fundo, 2+ cartas): a ordem do fundo.
+      if (!frame.memo) {
+        if (!frame.choice) {
+          if (!top.length) return true;
+          // Mostra todas as cartas olhadas, mesmo sem opção válida: o jogador vê o que vai para o fundo.
+          state.pending = {
+            kind: 'selectTargets',
+            player: frame.controller,
+            options,
+            min: 0,
+            max: Math.min(step.upTo, options.length),
+            prompt: options.length
+              ? `${srcName}: olhe as ${top.length} cartas do topo e escolha até ${step.upTo} para ${step.play ? 'jogar' : step.toTrash ? 'descartar' : 'adicionar à mão'}.`
+              : `${srcName}: nenhuma das ${top.length} cartas do topo pode ser escolhida.`,
+            intent: 'help',
+            source: frame.source,
+            shown: top,
+          };
+          return false;
+        }
+        frame.memo = frame.choice.filter((u) => options.includes(u));
+        frame.choice = undefined;
+        const rest = top.filter((u) => !frame.memo!.includes(u));
+        if (step.rest === 'bottom' && rest.length > 1) {
+          askCards(
+            state,
+            frame,
+            rest,
+            rest.length,
+            `${srcName}: escolha a ordem das cartas que vão para o fundo do deck (a primeira fica mais acima; a última, no fundo).`,
+            { min: rest.length, ordered: true },
+          );
+          return false;
+        }
       }
-      const chosen = (frame.choice ?? []).filter((u) => options.includes(u));
+      const chosen = frame.memo.filter((u) => top.includes(u));
+      let rest = top.filter((u) => !chosen.includes(u));
+      if (frame.choice) {
+        const order = frame.choice.filter((u) => rest.includes(u));
+        rest = [...order, ...rest.filter((u) => !order.includes(u))];
+      }
       for (const uid of top) removeFrom(ps.deck, uid);
       for (const uid of chosen) {
         if (step.toTrash) {
@@ -2152,9 +2179,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`);
         }
       }
-      const rest = top.filter((u) => !chosen.includes(u));
-      if (step.rest === 'bottom') ps.deck.push(...rest);
-      else if (step.rest === 'trash') ps.trash.push(...rest);
+      if (step.rest === 'bottom') {
+        ps.deck.push(...rest);
+        if (rest.length) log(state, frame.controller, `${ps.name} coloca ${rest.length} carta(s) no fundo do deck.`);
+      } else if (step.rest === 'trash') ps.trash.push(...rest);
       else if (rest.length) {
         // "place the rest at the top or bottom of the deck in any order": o jogador ordena em seguida.
         ps.deck.unshift(...rest);
@@ -3787,6 +3815,11 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
         throw new IllegalActionError('Do oponente, só é possível mover cartas em campo ou da Vida.');
       }
       const os = state.players[owner];
+      // Na etapa de Counter, uma carta da mão só sai como Counter (vai para o descarte):
+      // jogá-la no campo ativaria o [Ao Jogar] no meio do ataque.
+      if (state.pending?.kind === 'counter' && from === 'hand' && (op.to === 'character' || op.to === 'stage')) {
+        throw new IllegalActionError('Na etapa de Counter, use a carta como Counter (ela vai para o descarte), não a jogue no campo.');
+      }
       if (op.to === 'character') {
         if (def.category !== 'character') throw new IllegalActionError('Só Personagens vão para a área de personagens.');
         if (from !== 'character' && os.characters.length >= MAX_CHARACTERS) {

@@ -984,6 +984,11 @@ export type Pending =
       source: string;
       /** A ordem dos cliques importa (ex.: ordem das cartas no topo do deck). */
       ordered?: boolean;
+      /**
+       * Todas as cartas olhadas, na ordem (ex.: topo do deck numa busca). As que não
+       * estão em `options` aparecem desabilitadas, para o jogador saber o que vai para o fundo.
+       */
+      shown?: string[];
     }
   | { kind: 'block'; player: PlayerId; options: string[] }
   | { kind: 'counter'; player: PlayerId; options: string[] }
