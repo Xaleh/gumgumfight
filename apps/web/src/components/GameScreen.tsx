@@ -21,7 +21,8 @@ import { CardView, type Highlight } from './CardView';
 import { GameResult } from './GameResult';
 import { ManualTools } from './ManualTools';
 
-type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don' };
+/** Modo 'don': `count` DON!! ativos escolhidos para anexar de uma vez. */
+type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; count: number };
 type DragKind = 'hand' | 'attacker' | 'don';
 interface Drag {
   kind: DragKind;
@@ -32,6 +33,8 @@ interface Drag {
   over: string | null;
   /** Posição na mão onde a carta arrastada vai entrar (reorganizar). */
   insert?: number;
+  /** Quantos DON!! estão sendo arrastados juntos. */
+  count?: number;
 }
 type Sheet = null | 'menu' | 'log' | 'tools' | { trash: PlayerId };
 
@@ -99,7 +102,11 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   useEffect(() => setPicked([]), [pending]);
   useEffect(() => {
     if (!myTurnIdle) setMode(null);
-    if (mode?.kind === 'don' && human !== null && state.players[human].donActive === 0) setMode(null);
+    if (mode?.kind === 'don' && human !== null) {
+      const max = state.players[human].donActive;
+      if (max === 0) setMode(null);
+      else if (mode.count > max) setMode({ kind: 'don', count: max });
+    }
   }, [myTurnIdle, state, human, mode]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -231,11 +238,11 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       if (uid === mode.attacker) return;
     }
     if (mode?.kind === 'don') {
+      setMode(null);
       if (has((a) => a.type === 'attachDon' && a.target === uid)) {
-        dispatch({ type: 'attachDon', player: human!, target: uid });
+        attachDons(uid, mode.count);
         return;
       }
-      setMode(null);
     }
     // Carta escondida (mão do oponente) não abre.
     const owner = state.cards[uid]?.owner;
@@ -252,10 +259,25 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     }
   };
 
-  const onDon = (player: PlayerId) => {
-    if (player !== human || !myTurnIdle) return;
-    setMode((m) => (m?.kind === 'don' ? null : has((a) => a.type === 'attachDon') ? { kind: 'don' } : null));
+  /** Anexa vários DON!! ativos de uma vez (uma ação do motor para cada). */
+  const attachDons = (target: string, count: number) => {
+    if (human === null) return;
+    const n = Math.min(count, state.players[human].donActive);
+    for (let i = 0; i < n; i++) dispatch({ type: 'attachDon', player: human, target });
   };
+
+  /** Toque num DON!! ativo: marca mais um (ou desmarca, se já estava marcado). */
+  const onDon = (player: PlayerId, index: number) => {
+    if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
+    const max = state.players[human].donActive;
+    setMode((m) => {
+      const cur = m?.kind === 'don' ? m.count : 0;
+      const next = Math.min(index < cur ? cur - 1 : cur + 1, max);
+      return next > 0 ? { kind: 'don', count: next } : null;
+    });
+  };
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   // ------------------------------------------------------------ gestos: toque longo e arrastar
 
@@ -289,7 +311,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     }
     if (d.kind === 'hand') dispatch({ type: 'playCard', player: human, uid: d.uid! });
     else if (d.kind === 'attacker') dispatch({ type: 'attack', player: human, attacker: d.uid!, target: d.over });
-    else dispatch({ type: 'attachDon', player: human, target: d.over });
+    else attachDons(d.over, d.count ?? 1);
     setMode(null);
     setSelected(null);
   };
@@ -355,7 +377,9 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     };
     const startDrag = (p: NonNullable<typeof press.current>, e: PointerEvent) => {
       clearTimeout(p.timer);
-      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null };
+      const m = modeRef.current;
+      const count = p.kind === 'don' && m?.kind === 'don' ? m.count : 1;
+      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null, count };
       setLifted(null);
       setZoom(null);
       setMode(null);
@@ -441,6 +465,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     onHover: setHovered,
     onDon,
     onTrash: (p: PlayerId) => setSheet({ trash: p }),
+    donPicked: (p: PlayerId) => (p === human && drag?.kind === 'don' ? (drag.count ?? 1) : p === human && mode?.kind === 'don' ? mode.count : 0),
     donHighlight: (p: PlayerId) =>
       p === human && (mode?.kind === 'don' || (drag?.kind === 'don') || (myTurnIdle && has((a) => a.type === 'attachDon'))),
     canDragHand: (uid: string) => human !== null && state.cards[uid]?.owner === human,
@@ -531,7 +556,14 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             className={['drag-ghost', `ghost-${drag.kind}`, drag.over ? 'over' : ''].join(' ')}
             style={{ left: drag.x, top: drag.y }}
           >
-            {drag.kind === 'don' ? <span className="don-card" /> : drag.uid && <CardView state={state} uid={drag.uid} />}
+            {drag.kind === 'don' ? (
+              <div className="don-stack">
+                {Array.from({ length: Math.min(drag.count ?? 1, 4) }, (_, i) => (
+                  <span key={i} className="don-card" style={{ ['--k' as string]: i }} />
+                ))}
+                {(drag.count ?? 1) > 1 && <b>×{drag.count}</b>}
+              </div>
+            ) : drag.uid && <CardView state={state} uid={drag.uid} />}
           </div>
         )}
 
@@ -730,7 +762,8 @@ function CenterBand(props: {
   else if (mode?.kind === 'don')
     middle = (
       <button className="hint-pill" onClick={props.onCancelMode}>
-        Toque no Líder ou num Personagem para dar 1 DON!! <small>(toque aqui para concluir)</small>
+        {mode.count} DON!! · toque no alvo ou arraste
+        <small>toque aqui para cancelar</small>
       </button>
     );
   else if (props.paused) middle = <span className="hint-pill">Pausado</span>;

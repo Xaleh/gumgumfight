@@ -7,7 +7,10 @@ export interface BoardHandlers {
   onCard: (uid: string) => void;
   onCardDouble: (uid: string) => void;
   onHover: (uid: string | null) => void;
-  onDon: (player: PlayerId) => void;
+  /** Toque no i-ésimo DON!! ativo (marca/desmarca para anexar vários). */
+  onDon: (player: PlayerId, index: number) => void;
+  /** Quantos DON!! ativos estão marcados (os primeiros da fileira). */
+  donPicked: (player: PlayerId) => number;
   donHighlight: (player: PlayerId) => boolean;
   /** Abre a lista do descarte de um jogador. */
   onTrash: (player: PlayerId) => void;
@@ -87,6 +90,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
 
   const canDragDon = h.canDragDon(player);
   const donGlow = h.donHighlight(player);
+  const picked = h.donPicked(player);
   const don = (
     <div
       className={['don-row', position, donGlow ? 'glow' : ''].join(' ')}
@@ -102,9 +106,13 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
         {Array.from({ length: ps.donActive }, (_, i) => (
           <span
             key={`a${i}`}
-            className={['don-card', donGlow ? 'hl-option' : '', canDragDon ? 'clickable' : ''].join(' ')}
+            className={[
+              'don-card',
+              i < picked ? 'picked' : donGlow ? 'hl-option' : '',
+              canDragDon ? 'clickable' : '',
+            ].join(' ')}
             data-drag={canDragDon ? 'don' : undefined}
-            onClick={() => h.onDon(player)}
+            onClick={() => h.onDon(player, i)}
           />
         ))}
         {Array.from({ length: ps.donRested }, (_, i) => (

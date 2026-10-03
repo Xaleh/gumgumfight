@@ -894,6 +894,36 @@ input[type='number'] {
 .don-row.glow .don-card:not(.rested) {
   transform: translateY(-3px);
 }
+.don-card.picked {
+  transform: translateY(-26%) scale(1.06);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ffc634, 0 8px 16px rgba(160, 110, 0, 0.45);
+  z-index: 2;
+}
+.game.dragging .don-card.picked {
+  opacity: 0.35;
+}
+.don-stack {
+  position: relative;
+  width: calc(var(--cw) * 0.62 + 18px);
+  height: calc(var(--cw) * 0.62 * 1.396 + 18px);
+}
+.don-stack .don-card {
+  position: absolute;
+  left: calc(var(--k) * 6px);
+  top: calc(var(--k) * 6px);
+}
+.don-stack b {
+  position: absolute;
+  right: -10px;
+  bottom: -6px;
+  background: radial-gradient(circle at 35% 30%, #fff6c4 0 12%, #ffd75a 45%, #e3a10f 100%);
+  color: #4a3200;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-weight: 900;
+  font-size: 15px;
+}
 .don-card.rested {
   transform: rotate(90deg) scale(0.86);
   margin-left: calc(var(--dw) * -0.5);
@@ -948,6 +978,31 @@ input[type='number'] {
 }
 .don-card.flat::after {
   transform: none;
+}
+/* No Líder, os DON!! aparecem pela direita (embaixo fica a fileira de DON!!). */
+.leader-zone .attached-don {
+  left: auto;
+  right: calc(var(--cw) * -0.44);
+  bottom: 10%;
+  transform: none;
+  width: calc(var(--fw) + 9px);
+  height: calc(var(--fw) * 1.396 + 9px);
+}
+.leader-zone .don-card.flat {
+  width: var(--fw);
+  height: calc(var(--fw) * 1.396);
+  left: calc(var(--k) * 3px);
+  bottom: calc(var(--k) * 3px);
+}
+.leader-zone .don-card.flat::after {
+  transform: rotate(-90deg);
+}
+.leader-zone .attached-don b {
+  right: -8px;
+  bottom: -10px;
+}
+.base-side.right {
+  padding-left: calc(var(--cw) * 0.42);
 }
 .attached-don b {
   position: absolute;
