@@ -8,6 +8,8 @@ import { type Action, applyAction, type CardData, createGame, type DeckList, typ
 
 export interface ReplayInput {
   seed: number;
+  /** Seed de 128 bits das partidas online (substitui `seed`). */
+  seed128?: number[];
   /** Como veio na configuração da partida (omitido = sorteado pelo RNG). */
   firstPlayer?: PlayerId;
   decks: [DeckList, DeckList];
@@ -47,6 +49,7 @@ export function deckHash(deck: Pick<DeckList, 'leader' | 'cards'>): string {
 export function deriveMatch(input: ReplayInput, cards: CardData[]): MatchFacts {
   let state = createGame({
     seed: input.seed,
+    seed128: input.seed128,
     firstPlayer: input.firstPlayer,
     cards,
     players: [

@@ -6,7 +6,7 @@
 // motor para e registra `state.pending` até a próxima ação.
 
 import { buildCardDef } from './cards';
-import { nextRandom, shuffleInPlace } from './rng';
+import { nextRandom, type RngHolder, seedRng128, shuffleInPlace } from './rng';
 import type {
   Aura,
   LeaderRule,
@@ -55,7 +55,7 @@ export function createGame(config: GameConfig): GameState {
   const defs: Record<string, CardDef> = {};
   for (const c of config.cards) if (used.has(c.id)) defs[c.id] = buildCardDef(c);
 
-  const holder = { rng: config.seed | 0 };
+  const holder: RngHolder = { rng: config.seed | 0, ...(config.seed128 ? { rng128: seedRng128(config.seed128) } : {}) };
   const cards: GameState['cards'] = {};
   let counter = 0;
   const makeInstance = (cardId: string, owner: PlayerId) => {
@@ -99,12 +99,13 @@ export function createGame(config: GameConfig): GameState {
     return p;
   }) as [PlayerState, PlayerState];
 
-  const firstPlayer: PlayerId = config.firstPlayer ?? (holder.rng & 1 ? 0 : 1);
+  const firstPlayer: PlayerId = config.firstPlayer ?? (holder.rng128 ? (nextRandom(holder) < 0.5 ? 0 : 1) : holder.rng & 1 ? 0 : 1);
 
   const state: GameState = {
     version: 1,
     seed: config.seed,
     rng: holder.rng,
+    ...(holder.rng128 ? { rng128: holder.rng128 } : {}),
     turn: 0,
     firstPlayer,
     activePlayer: firstPlayer,
@@ -867,6 +868,13 @@ export function applyAction(prev: GameState, action: Action): GameState {
 
   if (action.type === 'concede') {
     gameOver(state, opponent(p), `${state.players[p].name} desistiu.`);
+    state.actionCount++;
+    return state;
+  }
+
+  if (action.type === 'timeout') {
+    const name = state.players[p].name;
+    gameOver(state, opponent(p), action.abandoned ? `${name} abandonou a partida.` : `${name} ficou sem tempo.`);
     state.actionCount++;
     return state;
   }
@@ -3104,7 +3112,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of (frame.last ?? []).filter((u) => ps.hand.includes(u))) {
         removeFrom(ps.hand, uid);
         ps.deck.unshift(uid);
-        log(state, frame.controller, `${cardDef(state, uid).name} volta ao topo do deck.`);
+        logSecret(state, frame.controller, `${ps.name} coloca 1 carta da mão no topo do deck.`, `${cardDef(state, uid).name} volta ao topo do deck.`);
       }
       return true;
     }
@@ -3751,6 +3759,7 @@ const ZONE_LABEL: Record<string, string> = {
   character: 'o campo',
   stage: 'o campo (Stage)',
 };
+const ZONE_FROM = { deck: 'do deck', hand: 'da mão', life: 'da Vida' } as const;
 
 function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
   const ps = state.players[p];
@@ -3814,8 +3823,12 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
           os.stage = { uid: op.uid, rested: Boolean(op.rested), don: 0, playedOnTurn: state.turn };
           break;
       }
-      const shown = ['deck', 'hand', 'life'].includes(from) && owner !== p ? 'Uma carta' : def.name;
-      log(state, p, `${tag} ${shown} vai para ${ZONE_LABEL[op.to]}${owner !== p ? ` de ${os.name}` : ''}.`);
+      // De uma zona escondida para outra: o oponente só fica sabendo que "uma carta" se moveu.
+      const hiddenMove = ['deck', 'hand', 'life'].includes(from) && ['hand', 'deckTop', 'deckBottom', 'life'].includes(op.to);
+      const where = `vai para ${ZONE_LABEL[op.to]}${owner !== p ? ` de ${os.name}` : ''}.`;
+      if (!hiddenMove) log(state, p, `${tag} ${def.name} ${where}`);
+      else if (owner !== p) log(state, p, `${tag} Uma carta ${where}`);
+      else logSecret(state, p, `${tag} Uma carta (${ZONE_FROM[from as 'deck' | 'hand' | 'life']}) ${where}`, `${tag} ${def.name} ${where}`);
       if (op.to === 'character' || op.to === 'stage') pushAbilities(state, op.uid, 'onPlay');
       return;
     }
@@ -3879,6 +3892,11 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
       shuffleInPlace(state, ps.deck);
       log(state, p, `${tag} ${ps.name} embaralha o deck.`);
       return;
+    case 'peek': {
+      const n = Math.min(Math.max(1, Math.floor(op.count) || 1), ps.deck.length);
+      log(state, p, `${tag} ${ps.name} olha ${n} carta(s) do topo do deck.`);
+      return;
+    }
   }
 }
 
@@ -4108,4 +4126,9 @@ function gameOver(state: GameState, winner: PlayerId, reason: string) {
 
 function log(state: GameState, player: PlayerId | null, text: string) {
   state.log.push({ turn: state.turn, player, text });
+}
+
+/** Linha do log com cartas que só `player` vê; o oponente recebe `text` (no online). */
+function logSecret(state: GameState, player: PlayerId, text: string, secret: string) {
+  state.log.push({ turn: state.turn, player, text, secret });
 }

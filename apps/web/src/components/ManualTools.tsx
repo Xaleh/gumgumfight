@@ -27,19 +27,29 @@ interface Props {
   selected: string | null;
   onDispatch: (a: Action) => void;
   onSelect: (uid: string | null) => void;
+  /**
+   * Online: o servidor só mostra o topo do deck depois de um pedido (que fica no log
+   * do oponente). Valor = quantas cartas o servidor está mostrando agora.
+   */
+  peek?: number;
 }
 
 /**
  * Ferramentas para aplicar à mão efeitos ainda não automatizados.
  * Cada botão vira uma ação 'manual' validada pelo motor (nenhuma carta some ou duplica).
  */
-export function ManualTools({ state, human, selected, onDispatch, onSelect }: Props) {
+export function ManualTools({ state, human, selected, onDispatch, onSelect, peek }: Props) {
   const [viewer, setViewer] = useState<null | 'deck' | 'trash' | 'oppTrash'>(null);
   const [deckCount, setDeckCount] = useState(5);
   const me = state.players[human];
   const opp = state.players[opponent(human)];
   const run = (op: ManualOp) => onDispatch({ type: 'manual', player: human, op });
   const move = (uid: string, to: ManualZone, rested?: boolean) => run({ op: 'move', uid, to, rested });
+  const showTop = (n: number) => {
+    setDeckCount(n);
+    setViewer('deck');
+    if (peek !== undefined && n > peek) run({ op: 'peek', count: n });
+  };
 
   const zone = selected ? zoneOf(state, selected) : null;
   const mine = selected ? state.cards[selected].owner === human : false;
@@ -111,7 +121,7 @@ export function ManualTools({ state, human, selected, onDispatch, onSelect }: Pr
         <div className="tool-label">Cartas</div>
         <div className="tool-buttons">
           <button className="btn small" onClick={() => run({ op: 'draw', count: 1 })}>Comprar 1</button>
-          <button className="btn small" onClick={() => setViewer('deck')}>Ver topo do deck</button>
+          <button className="btn small" onClick={() => showTop(deckCount)}>Ver topo do deck</button>
           <button className="btn small" onClick={() => setViewer('trash')}>Ver meu descarte ({me.trash.length})</button>
           <button className="btn small" onClick={() => setViewer('oppTrash')}>Descarte do oponente ({opp.trash.length})</button>
           <button className="btn small" onClick={() => run({ op: 'shuffle' })}>Embaralhar deck</button>
@@ -160,7 +170,7 @@ export function ManualTools({ state, human, selected, onDispatch, onSelect }: Pr
             {viewer === 'deck' && (
               <div className="btn-row viewer-count">
                 {[1, 3, 5, 10].map((n) => (
-                  <button key={n} className={['btn small', n === deckCount ? 'primary' : ''].join(' ')} onClick={() => setDeckCount(n)}>
+                  <button key={n} className={['btn small', n === deckCount ? 'primary' : ''].join(' ')} onClick={() => showTop(n)}>
                     {n}
                   </button>
                 ))}

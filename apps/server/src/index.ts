@@ -41,6 +41,16 @@ if (syncHours) {
 }
 
 const app = buildApp(db, { logger: process.env.NODE_ENV !== 'test' });
+// pm2 reload / Ctrl+C: fecha os canais das partidas online (os navegadores reconectam no
+// processo novo, que refaz as salas a partir do banco).
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    const force = setTimeout(() => process.exit(0), 1500);
+    force.unref();
+    app.close().finally(() => process.exit(0));
+  });
+}
+
 app.listen({ port: PORT, host: HOST }).catch((err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`\nA porta ${PORT} já está em uso. Feche o outro processo ou use PORT=<outra porta>.\n`);

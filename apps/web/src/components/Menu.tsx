@@ -1,10 +1,14 @@
-import type { Action, CardData, PlayerId } from '@gumgum/engine';
+import type { Action, CardData, DeckList, PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, deckGroups, type DeckSummary, type FormatId } from '../api';
+import { api, deckGroups, type DeckSummary, type FormatId, type OnlineSeat } from '../api';
 import { AccountBar, useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
 import { SettingsControls } from '../settings';
 import { LeaderArt } from './LeaderArt';
+import { OnlineMenu, roomCodeFromUrl } from './OnlineMenu';
+
+/** Código de sala do link de convite (lido uma vez, ao carregar a página). */
+const URL_ROOM_CODE = roomCodeFromUrl();
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 
@@ -16,8 +20,20 @@ async function buildSetup(
   format: FormatId,
   firstPlayer?: PlayerId,
   script?: Action[],
+  /** Replay online: listas exatas da partida e a seed de 128 bits. */
+  online?: { decks: [DeckList, DeckList]; seed128: number[] },
 ): Promise<GameSetup> {
-  const [a, b] = await Promise.all(deckIds.map((id) => api.deck(id)));
+  let a: { deck: DeckList; cards: CardData[] };
+  let b: typeof a;
+  if (online) {
+    const all = await api.cards();
+    const used = new Set(online.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]));
+    const pool = all.filter((c) => used.has(c.id));
+    a = { deck: online.decks[0], cards: pool };
+    b = { deck: online.decks[1], cards: [] };
+  } else {
+    [a, b] = await Promise.all(deckIds.map((id) => api.deck(id)));
+  }
   const cards = new Map<string, CardData>();
   for (const c of [...a.cards, ...b.cards]) cards.set(c.id, c);
   return {
@@ -27,6 +43,7 @@ async function buildSetup(
     script,
     config: {
       seed,
+      ...(online ? { seed128: online.seed128 } : {}),
       firstPlayer,
       cards: [...cards.values()],
       players: [
@@ -153,15 +170,17 @@ export function Menu({
   onBuildDecks,
   onCoverage,
   onStats,
+  onOnline,
 }: {
   onStart: (s: GameSetup) => void;
+  onOnline: (s: OnlineSeat) => void;
   onBuildDecks: () => void;
   onCoverage: () => void;
   onStats: () => void;
 }) {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<GameMode>('bot');
+  const [mode, setMode] = useState<Exclude<GameMode, 'replay'> | 'online'>(URL_ROOM_CODE ? 'online' : 'bot');
   const [deck0, setDeck0] = useState('');
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
@@ -224,6 +243,7 @@ export function Menu({
       const names: [string, string] = mode === 'demo' ? ['Bot A', 'Bot B'] : ['Você', 'Bot'];
       const pool = decks.filter((d) => d.valid && d.kind === 'builtin');
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
+      if (mode === 'online') return;
       onStart(await buildSetup(mode, [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -235,7 +255,8 @@ export function Menu({
     try {
       const r = JSON.parse(await file.text()) as ReplayFile;
       if (r.format !== 'gumgumfight-replay') throw new Error('Arquivo não é um replay do GumGum Fight.');
-      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', r.firstPlayer, r.actions));
+      const online = r.seed128 && r.decks ? { seed128: r.seed128, decks: r.decks } : undefined;
+      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', r.firstPlayer, r.actions, online));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -266,8 +287,43 @@ export function Menu({
             <button className={mode === 'demo' ? 'on' : ''} onClick={() => setMode('demo')}>
               Bot x Bot
             </button>
+            <button className={mode === 'online' ? 'on' : ''} onClick={() => setMode('online')}>
+              Online
+            </button>
           </div>
 
+          {mode === 'online' ? (
+            <>
+              <div className="matchup single">
+                <DeckPick who="Seu deck" deck={d0} onClick={() => setPicking(0)} />
+              </div>
+              <div className="field">
+                <label>Formato</label>
+                <div className="seg small">
+                  {FORMATS.map(([v, label]) => (
+                    <button key={v} className={format === v ? 'on' : ''} onClick={() => setFormat(v)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <OnlineMenu
+                deck={d0?.valid ? d0 : undefined}
+                format={format}
+                initialCode={URL_ROOM_CODE}
+                onEnter={(s) => {
+                  try {
+                    localStorage.setItem(LAST_DECKS, JSON.stringify([deck0, deck1]));
+                    localStorage.setItem(LAST_FORMAT, format);
+                  } catch {
+                    /* sem armazenamento */
+                  }
+                  onOnline(s);
+                }}
+              />
+            </>
+          ) : (
+          <>
           <div className="matchup">
             <DeckPick who={mode === 'demo' ? 'Bot A' : 'Seu deck'} deck={d0} onClick={() => setPicking(0)} />
             <span className="vs-badge">VS</span>
@@ -310,6 +366,8 @@ export function Menu({
           <button className="btn primary battle-btn" disabled={!deck0 || !deck1 || loading} onClick={start}>
             {loading ? 'Carregando…' : 'Batalhar!'}
           </button>
+          </>
+          )}
         </section>
 
         <div className="menu-links">

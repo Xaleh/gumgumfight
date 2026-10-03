@@ -269,7 +269,18 @@ export function Hand({
 }
 
 /** Faixa do jogador: nome, Líder, Vida e mão. */
-export function PlayerBanner({ state, player, align }: { state: GameState; player: PlayerId; align: 'left' | 'right' }) {
+export function PlayerBanner({
+  state,
+  player,
+  align,
+  extra,
+}: {
+  state: GameState;
+  player: PlayerId;
+  align: 'left' | 'right';
+  /** Online: relógio e conexão do jogador. */
+  extra?: ReactNode;
+}) {
   const ps = state.players[player];
   const max = Math.max(cardDef(state, ps.leader.uid).life ?? 0, ps.life.length);
   const isActive = state.activePlayer === player && state.phase === 'main';
@@ -285,6 +296,7 @@ export function PlayerBanner({ state, player, align }: { state: GameState; playe
         {ps.isBot && <span className="tag">BOT</span>}
         <small>✋ {ps.hand.length}</small>
       </div>
+      {extra}
     </div>
   );
 }
@@ -302,6 +314,8 @@ interface BoardProps extends BoardHandlers {
   /** Botões do canto superior esquerdo (menu, Auto). */
   corner: ReactNode;
   center: ReactNode;
+  /** Conteúdo a mais na faixa de cada jogador (partidas online). */
+  bannerExtra?: (player: PlayerId) => ReactNode;
 }
 
 export function Board({
@@ -315,6 +329,7 @@ export function Board({
   lifted,
   ghost,
   onExpandHand,
+  bannerExtra,
   ...handlers
 }: BoardProps) {
   const top = (bottom === 0 ? 1 : 0) as PlayerId;
@@ -323,7 +338,7 @@ export function Board({
       <div className="top-strip">
         <div className="corner">{corner}</div>
         <Hand state={state} player={top} reveal={revealTop} position="top" {...handlers} />
-        <PlayerBanner state={state} player={top} align="right" />
+        <PlayerBanner state={state} player={top} align="right" extra={bannerExtra?.(top)} />
       </div>
       {/* A arena inteira aceita cartas arrastadas da mão (jogar ou usar Counter). */}
       <div className="arena" data-drop="field">
@@ -340,7 +355,7 @@ export function Board({
       </div>
       <div className="bottom-strip">
         <div className="my-bar">
-          <PlayerBanner state={state} player={bottom} align="left" />
+          <PlayerBanner state={state} player={bottom} align="left" extra={bannerExtra?.(bottom)} />
         </div>
         {onExpandHand && state.players[bottom].hand.length > 0 && (
           <button className="hand-expand" onClick={onExpandHand} title="Ver todas as cartas da mão em tamanho grande">

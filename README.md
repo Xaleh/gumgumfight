@@ -2,8 +2,8 @@
 
 Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](https://duels.ink/) (Lorcana).
 
-> **Status: Fase 1, protótipo solo.** Dois decks iniciais (Luffy vermelho ST01 e Kid verde ST02), partidas
-> contra um bot, modo demonstração bot x bot e replays. Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
+> **Status:** partidas contra um bot, bot x bot, replays e **multiplayer online** (salas privadas, fila casual e
+> ranqueada). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
 > com textos em português (tradução automática) ou inglês e imagens opcionais.
 
 ## Requisitos
@@ -157,10 +157,39 @@ partidas bot x bot, que ficam fora das estatísticas de pessoas.
 - **Tiers e recompensa:** cada jogador tem uma recompensa em Beries; o tier é a faixa em que ela está
   (`apps/server/src/stats/catalog.ts`: East Blue até ฿ 5.000, Paradise até ฿ 20.000, Novo Mundo, Supernova,
   Shichibukai e Yonkou). Na ranqueada a recompensa sobe e desce no estilo Elo (vencer quem vale mais rende mais).
-  O tier gravado é o da hora da partida. Partidas enviadas pelo navegador são sempre casuais: a ranqueada será
-  gravada pelo servidor de partidas online (com `recordMatch`), que será a autoridade.
+  O tier gravado é o da hora da partida. Partidas enviadas pelo navegador são sempre casuais; as online são gravadas
+  pelo próprio servidor de partidas (modo `online`), o único que grava a ranqueada.
 - O jogador é a conta Google ou, sem login, o navegador (o mesmo código de dono dos decks). O nome do cartaz de
   "WANTED" é o nome público e pode ser trocado na tela de estatísticas (o nome da conta Google não aparece para os outros).
+
+## Multiplayer online
+
+No menu, a aba **Online** tem a fila **casual**, a **ranqueada** e as **salas privadas** (criar uma sala gera um código de
+6 letras e um link `/?sala=CÓDIGO` para enviar a quem vai jogar). Quem recarrega a página ou troca de aparelho encontra
+"Voltar à partida" no mesmo menu.
+
+- **O servidor é a autoridade.** Ele guarda o estado completo e aplica as ações com o motor; cada jogador recebe só a
+  própria visão (`packages/engine/src/view.ts`): mão do oponente, decks e Vida virada para baixo chegam como cartas
+  escondidas, sem seed nem RNG. Os ids das cartas viram apelidos aleatórios por partida, porque os ids do motor seguem a
+  ordem da lista do deck. Uma ação com uma carta fora de vista é recusada.
+- **Embaralhamento:** as partidas online usam um RNG de 128 bits (sfc32) com seed do `crypto`. A seed de 32 bits das
+  partidas locais poderia ser descoberta por força bruta a partir da mão inicial. Replays e estatísticas antigos não mudam.
+- **Relógio:** cada jogador tem **17:30** na partida inteira. O tempo só corre quando a ação ou a decisão (incluindo
+  mulligan, Blocker, Counter e escolhas de efeitos) é daquele jogador. Sem tempo, ele perde. Se o jogador da vez ficar
+  2 minutos desconectado, perde por abandono.
+- **Ranqueada:** só com login Google e sem modo manual: decks com cartas ⚙ (efeito ainda não automatizado) não entram na
+  fila, e as ferramentas manuais ficam bloqueadas. O pareamento junta recompensas parecidas e a faixa abre com o tempo de
+  espera. No casual e nas salas privadas as ferramentas manuais funcionam, e o que é feito com elas aparece no log do
+  oponente (cartas movidas entre zonas escondidas aparecem como "uma carta").
+- **Sem desfazer, Auto ou pausa** no online. Mensagens rápidas (emotes de uma lista fixa), revanche nas salas privadas e
+  o replay completo para baixar no fim.
+- **Transporte:** SSE (`EventSource`) do servidor para o navegador e POST para as ações. Funciona atrás do Nginx / Nginx
+  Proxy Manager sem configuração extra (header `X-Accel-Buffering: no` e um `ping` a cada 20 s, abaixo do
+  `proxy_read_timeout` de 60 s).
+- **Deploy no meio de uma partida:** as salas ficam gravadas na tabela `live_matches` (seed, decks e ações). O processo
+  novo refaz cada partida com o motor e os navegadores reconectam sozinhos; o tempo fora do ar não conta para ninguém.
+- Código: `apps/server/src/online/` (`room.ts`: uma partida e o relógio; `lobby.ts`: salas, filas e gravação;
+  `routes.ts`: rotas e SSE) e `apps/web/src/game/useOnlineGame.ts` (canal e ações).
 
 ## Contas (login com Google)
 
@@ -249,8 +278,8 @@ data/decks        Listas dos decks
 },
 ```
 
-Como o motor é independente da interface, o mesmo código vai rodar no servidor quando entrar o multiplayer
-online, com o servidor como autoridade para esconder mão e deck.
+Como o motor é independente da interface, o mesmo código roda no servidor nas partidas online, com o servidor como
+autoridade; `viewFor(estado, jogador, apelidos)` gera a visão de cada jogador, sem as cartas escondidas.
 
 ### Regras implementadas
 
@@ -379,6 +408,15 @@ npm run typecheck
 | GET    | `/api/stats/trend?weeks=` | Uso e vitórias por Líder em cada semana (padrão 6) |
 | GET    | `/api/stats/cards?leader=` | Desempenho das cartas de um Líder (ou `deck=` hash da lista) |
 | GET    | `/api/translations/pending` | Cartas com tradução automática parcial |
+| GET    | `/api/online/active` | Partidas online em andamento do jogador (com o token do assento) |
+| POST   | `/api/online/rooms` | Cria uma sala privada (`{ deckId, format }`) |
+| POST   | `/api/online/rooms/join` | Entra numa sala (`{ code, deckId }`) |
+| POST   | `/api/online/queue` | Entra na fila (`{ deckId, format, queue: casual \| ranked }`) |
+| GET / DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela |
+| GET    | `/api/online/rooms/:id/events?t=` | Canal SSE: visão do jogador, relógios, presença, emotes |
+| POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
+| POST   | `/api/online/rooms/:id/emote` · `/rematch` · `/leave` | Emote, revanche (salas privadas) e cancelar a sala |
+| GET    | `/api/online/rooms/:id/replay?t=` | Replay completo (só depois do fim) |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked), `opponent` (bot,
 human), `by` (human = padrão, bot = simulações), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,

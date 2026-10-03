@@ -74,6 +74,8 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
     if (typeof b?.seed !== 'number' || !Array.isArray(b.actions) || decks.length !== 2 || decks.some((d) => !d)) {
       return reply.code(400).send({ error: 'Dados de partida inválidos' });
     }
+    // Tempo esgotado só existe nas partidas online, gravadas pelo próprio servidor.
+    if ((b.actions as Action[]).some((a) => a?.type === 'timeout')) return reply.code(400).send({ error: 'Dados de partida inválidos' });
     const pair = decks as [DeckList, DeckList];
     const cards = getCards(db, [...new Set(pair.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))]) as CardData[];
     const byId = new Map(cards.map((c) => [c.id, c]));

@@ -5,6 +5,7 @@ import {
   counterValue,
   type GameState,
   getPower,
+  HIDDEN_CARD,
   legalActions,
   locate,
   manualAllowed,
@@ -13,14 +14,16 @@ import {
   zoneOf,
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../api';
+import { api, type OnlineSeat } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
+import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
 import { GameResult } from './GameResult';
 import { ManualTools } from './ManualTools';
+import { EmoteBar, EmoteBubbles, OnlineBanner, OnlineResultInfo, OnlineStatus, OnlineWaiting } from './Online';
 
 /** Modo 'don': `count` DON!! ativos escolhidos para anexar de uma vez. */
 type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; count: number };
@@ -55,9 +58,120 @@ function useMediaQuery(query: string) {
   return match;
 }
 
+/** O que a mesa precisa de uma partida, local (useGame) ou online (useOnlineGame). */
+interface TableGame {
+  state: GameState;
+  dispatch: (a: Action) => void;
+  error: string | null;
+  setError: (e: string | null) => void;
+  human: PlayerId | null;
+  paused: boolean;
+  setPaused: (f: (p: boolean) => boolean) => void;
+  speed: number;
+  setSpeed: (v: number) => void;
+  auto: boolean;
+  setAuto: (f: (a: boolean) => boolean) => void;
+  undo: () => void;
+  canUndo: boolean;
+  actions: () => Action[];
+  downloadReplay: () => void;
+}
+
+type TableKind = GameSetup['mode'] | 'online';
+
+/** Partida no navegador: contra o bot, bot x bot ou replay. */
 export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onExit: () => void; onRematch?: () => void }) {
   const game = useGame(setup);
+  // Registra o resultado no servidor (que refaz a partida a partir das ações). Replays não contam de novo.
+  const saved = useRef(false);
+  useEffect(() => {
+    if (game.state.phase !== 'gameover' || saved.current || setup.mode === 'replay') return;
+    saved.current = true;
+    void api.saveMatch({
+      mode: setup.mode,
+      format: setup.format,
+      seed: setup.config.seed,
+      firstPlayer: setup.config.firstPlayer,
+      deckIds: setup.deckIds,
+      decks: [setup.config.players[0].deck, setup.config.players[1].deck],
+      actions: game.actions(),
+    });
+  }, [game.state, setup, game.actions]);
+  return (
+    <GameTable
+      game={{ ...game, downloadReplay: () => downloadReplay(game.exportReplay()) }}
+      kind={setup.mode}
+      onExit={onExit}
+      onRematch={onRematch}
+    />
+  );
+}
+
+const noop = () => undefined;
+
+/** Partida online: a mesa recebe só a visão deste jogador, vinda do servidor. */
+export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat; onExit: () => void; onSwitch: (s: OnlineSeat) => void }) {
+  const online = useOnlineGame(seat);
+  const { state, room } = online;
+  // Os dois pediram revanche: vai para a sala nova.
+  useEffect(() => {
+    if (online.rematch) onSwitch(online.rematch);
+  }, [online.rematch, onSwitch]);
+  if (!state || !room || room.status === 'waiting') {
+    return (
+      <OnlineWaiting
+        online={online}
+        onCancel={() => {
+          void online.leave();
+          onExit();
+        }}
+      />
+    );
+  }
+  const game: TableGame = {
+    state,
+    dispatch: online.dispatch,
+    error: online.error,
+    setError: online.setError,
+    human: room.you,
+    paused: false,
+    setPaused: noop,
+    speed: 1,
+    setSpeed: noop,
+    auto: false,
+    setAuto: noop,
+    undo: noop,
+    canUndo: false,
+    actions: () => online.actions,
+    downloadReplay: () => void online.downloadReplay(),
+  };
+  return (
+    <GameTable
+      game={game}
+      kind="online"
+      online={online}
+      onExit={onExit}
+      onRematch={room.queue === 'private' ? () => void online.askRematch() : undefined}
+    />
+  );
+}
+
+function GameTable({
+  game,
+  kind,
+  online,
+  onExit,
+  onRematch,
+}: {
+  game: TableGame;
+  kind: TableKind;
+  online?: OnlineGame;
+  onExit: () => void;
+  onRematch?: () => void;
+}) {
   const { state, dispatch, human } = game;
+  const isOnline = kind === 'online';
+  const ranked = online?.room?.queue === 'ranked';
   const wide = useMediaQuery('(min-width: 1000px)');
   const { quickCounter } = useSettings();
   const [selected, setSelected] = useState<string | null>(null);
@@ -67,7 +181,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   const [picked, setPicked] = useState<string[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
-  const [showBotHand, setShowBotHand] = useState(setup.mode !== 'bot');
+  const [showBotHand, setShowBotHand] = useState(kind === 'demo' || kind === 'replay');
   const [banner, setBanner] = useState<{ text: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
@@ -145,29 +259,17 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnKey, human]);
 
-  // Registra o resultado no servidor quando a partida termina e mostra o resumo após o último golpe.
-  const saved = useRef(false);
+  // Mostra o resumo logo após o último golpe.
+  const over = state.phase === 'gameover';
   useEffect(() => {
-    if (state.phase !== 'gameover') {
+    if (!over) {
       setShowResult(false);
       return;
     }
-    // Replays não contam de novo; o servidor refaz a partida a partir das ações.
-    if (!saved.current && setup.mode !== 'replay') {
-      saved.current = true;
-      void api.saveMatch({
-        mode: setup.mode,
-        format: setup.format,
-        seed: setup.config.seed,
-        firstPlayer: setup.config.firstPlayer,
-        deckIds: setup.deckIds,
-        decks: [setup.config.players[0].deck, setup.config.players[1].deck],
-        actions: game.actions(),
-      });
-    }
     const t = setTimeout(() => setShowResult(true), 1200);
     return () => clearTimeout(t);
-  }, [state, setup]);
+  }, [over]);
+  const manualOk = human !== null && !ranked && manualAllowed(state, human);
 
   const has = useCallback((pred: (a: Action) => boolean) => legal.some(pred), [legal]);
   const canPlay = (uid: string) => myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid);
@@ -262,6 +364,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       }
     }
     // Carta escondida (mão do oponente) não abre.
+    if (state.cards[uid]?.cardId === HIDDEN_CARD) return;
     const owner = state.cards[uid]?.owner;
     if (owner !== undefined && owner !== human && zoneOf(state, uid) === 'hand' && !showBotHand) return;
     setSelected(uid);
@@ -502,7 +605,8 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       <button className="round-btn" onClick={() => setSheet('menu')} aria-label="Menu da partida">
         <span className="burger" />
       </button>
-      {human !== null && (
+      {online && <EmoteBar online={online} />}
+      {human !== null && !isOnline && (
         <button
           className={['auto-toggle', game.auto ? 'on' : ''].join(' ')}
           onClick={() => game.setAuto((a) => !a)}
@@ -531,6 +635,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
           revealBottom
           revealTop={showBotHand}
           corner={corner}
+          bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}
           lifted={lifted}
@@ -556,6 +661,9 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             {banner.text}
           </div>
         )}
+
+        {online && <EmoteBubbles online={online} bottom={bottom} />}
+        {online && <OnlineStatus online={online} />}
 
         {game.error && (
           <div className="toast error" onClick={() => game.setError(null)}>
@@ -596,7 +704,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             state={state}
             uid={zoom}
             legal={myTurnIdle ? legal : []}
-            canManual={human !== null && manualAllowed(state, human)}
+            canManual={manualOk}
             onCounter={canCounter(zoom) ? () => useCounter(zoom) : undefined}
             onClose={() => setZoom(null)}
             onDispatch={(a) => {
@@ -618,25 +726,29 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
         {sheet === 'menu' && (
           <SheetFrame title="Partida" onClose={() => setSheet(null)}>
             <div className="menu-grid">
-              {human !== null && (
+              {human !== null && !isOnline && (
                 <button className="btn" onClick={game.undo} disabled={!game.canUndo}>
                   ↶ Desfazer
                 </button>
               )}
-              <button className="btn" onClick={() => game.setPaused((p) => !p)}>
-                {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
-              </button>
+              {!isOnline && (
+                <button className="btn" onClick={() => game.setPaused((p) => !p)}>
+                  {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
+                </button>
+              )}
               <button className="btn" onClick={() => setSheet('log')}>
                 📜 Histórico
               </button>
-              {human !== null && manualAllowed(state, human) && (
+              {manualOk && (
                 <button className="btn" onClick={() => setSheet('tools')}>
                   ⚙ Ferramentas manuais
                 </button>
               )}
-              <button className="btn" onClick={() => downloadReplay(game.exportReplay())}>
-                ⤓ Baixar replay
-              </button>
+              {(!isOnline || over) && (
+                <button className="btn" onClick={game.downloadReplay}>
+                  ⤓ Baixar replay
+                </button>
+              )}
               {human !== null && state.phase === 'main' && (
                 <button
                   className="btn danger"
@@ -654,17 +766,19 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
                 ← Sair para o menu
               </button>
             </div>
-            <div className="sheet-section">
-              <label className="sheet-label">Velocidade do bot</label>
-              <div className="seg small">
-                {[0.5, 1, 2, 4].map((v) => (
-                  <button key={v} className={game.speed === v ? 'on' : ''} onClick={() => game.setSpeed(v)}>
-                    {v}×
-                  </button>
-                ))}
+            {!isOnline && (
+              <div className="sheet-section">
+                <label className="sheet-label">Velocidade do bot</label>
+                <div className="seg small">
+                  {[0.5, 1, 2, 4].map((v) => (
+                    <button key={v} className={game.speed === v ? 'on' : ''} onClick={() => game.setSpeed(v)}>
+                      {v}×
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            {setup.mode === 'bot' && (
+            )}
+            {kind === 'bot' && (
               <label className="check">
                 <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> Ver a mão do bot
               </label>
@@ -704,8 +818,10 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
         {sheet === 'tools' && human !== null && (
           <SheetFrame title="Ferramentas manuais" onClose={() => setSheet(null)}>
             <ManualPrompt state={state} onDone={() => dispatch({ type: 'manualDone', player: human })} />
-            {manualAllowed(state, human) ? (
-              <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} />
+            {ranked ? (
+              <p className="muted">As ferramentas manuais não são permitidas na ranqueada.</p>
+            ) : manualOk ? (
+              <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} peek={online?.peek} />
             ) : (
               <p className="muted">As ferramentas ficam disponíveis no seu turno, num efeito manual ou na etapa de Counter.</p>
             )}
@@ -733,8 +849,10 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             actions={game.actions()}
             onExit={onExit}
             onRematch={onRematch}
-            onReplay={() => downloadReplay(game.exportReplay())}
+            rematchLabel={online ? (online.room?.rematch[human ?? 0] ? 'Aguardando o oponente…' : 'Pedir revanche') : undefined}
+            onReplay={game.downloadReplay}
             onLog={() => setSheet('log')}
+            extra={online ? <OnlineResultInfo online={online} /> : undefined}
           />
         )}
       </div>
@@ -745,32 +863,38 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
             <button className="btn small" onClick={onExit}>
               ← Menu
             </button>
-            {human !== null && (
+            {human !== null && !isOnline && (
               <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
                 ↶ Desfazer
               </button>
             )}
-            <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
-              {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
-            </button>
-            <select
-              className="speed"
-              value={game.speed}
-              onChange={(e) => game.setSpeed(Number(e.target.value))}
-              title="Velocidade do bot"
-            >
-              <option value={0.5}>0.5×</option>
-              <option value={1}>1×</option>
-              <option value={2}>2×</option>
-              <option value={4}>4×</option>
-            </select>
-            <button className="btn small" onClick={() => downloadReplay(game.exportReplay())} title="Salvar as ações como roteiro">
-              ⤓ Replay
-            </button>
+            {!isOnline && (
+              <>
+                <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
+                  {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
+                </button>
+                <select
+                  className="speed"
+                  value={game.speed}
+                  onChange={(e) => game.setSpeed(Number(e.target.value))}
+                  title="Velocidade do bot"
+                >
+                  <option value={0.5}>0.5×</option>
+                  <option value={1}>1×</option>
+                  <option value={2}>2×</option>
+                  <option value={4}>4×</option>
+                </select>
+              </>
+            )}
+            {(!isOnline || over) && (
+              <button className="btn small" onClick={game.downloadReplay} title="Salvar as ações como roteiro">
+                ⤓ Replay
+              </button>
+            )}
           </div>
           <CardDetail state={state} uid={detailUid && state.cards[detailUid] ? detailUid : null} />
-          {human !== null && manualAllowed(state, human) && pending?.kind !== 'manual' && (
-            <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} />
+          {manualOk && pending?.kind !== 'manual' && (
+            <ManualTools state={state} human={human!} selected={selected} onDispatch={dispatch} onSelect={setSelected} peek={online?.peek} />
           )}
           <LogPanel state={state} />
         </aside>
@@ -812,10 +936,16 @@ function CenterBand(props: {
       </button>
     );
   else if (props.paused) middle = <span className="hint-pill">Pausado</span>;
-  else if (acting !== null && acting !== human && state.players[acting].isBot && state.phase === 'main')
+  else if (acting !== null && acting !== human && (state.players[acting].isBot || human !== null) && state.phase === 'main')
     middle = (
       <span className="hint-pill thinking">
         {state.players[acting].name} está pensando<span className="dots" />
+      </span>
+    );
+  else if (state.phase === 'mulligan' && human !== null && acting !== null && acting !== human)
+    middle = (
+      <span className="hint-pill thinking">
+        {state.players[acting].name} está escolhendo a mão inicial<span className="dots" />
       </span>
     );
   else if (props.canEnd)
@@ -1358,7 +1488,7 @@ function LogPanel({ state }: { state: GameState }) {
     <div className="log" ref={ref}>
       {state.log.map((e, i) => (
         <div key={i} className={['log-line', e.player === null ? '' : `p${e.player}`, e.text.startsWith('—') ? 'turn' : ''].join(' ')}>
-          {e.text}
+          {e.secret ?? e.text}
         </div>
       ))}
     </div>

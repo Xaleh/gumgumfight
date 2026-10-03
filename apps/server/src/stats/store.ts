@@ -335,3 +335,11 @@ export function myDecks(db: DB, playerId: string) {
     )
     .all(playerId) as unknown as Array<{ hash: string; leader: string; deckId: string | null; lastPlayed: string } & WinRow>;
 }
+
+/** Recompensa antes e depois de cada lado de uma partida gravada. */
+export function matchBounties(db: DB, matchId: number): Array<{ before: number | null; after: number | null }> {
+  const rows = db
+    .prepare('SELECT seat, bounty_before, bounty_after FROM match_seats WHERE match_id = ? ORDER BY seat')
+    .all(matchId) as Array<{ seat: number; bounty_before: number | null; bounty_after: number | null }>;
+  return rows.map((r) => ({ before: r.bounty_before, after: r.bounty_after }));
+}

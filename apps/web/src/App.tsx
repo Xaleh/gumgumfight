@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import type { OnlineSeat } from './api';
 import { Coverage } from './components/Coverage';
 import { DeckBuilder } from './components/DeckBuilder';
-import { GameScreen } from './components/GameScreen';
+import { GameScreen, OnlineGameScreen } from './components/GameScreen';
 import { Menu } from './components/Menu';
 import { Stats } from './components/Stats';
 import type { GameSetup } from './game/useGame';
@@ -11,13 +12,24 @@ type Screen =
   | { name: 'builder' }
   | { name: 'coverage' }
   | { name: 'stats' }
-  | { name: 'game'; setup: GameSetup; key: number };
+  | { name: 'game'; setup: GameSetup; key: number }
+  | { name: 'online'; seat: OnlineSeat };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'menu' });
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'coverage') return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'online') {
+    return (
+      <OnlineGameScreen
+        key={screen.seat.roomId}
+        seat={screen.seat}
+        onExit={() => setScreen({ name: 'menu' })}
+        onSwitch={(seat) => setScreen({ name: 'online', seat })}
+      />
+    );
+  }
   if (screen.name === 'game') {
     const { setup } = screen;
     return (
@@ -44,6 +56,7 @@ export function App() {
       onBuildDecks={() => setScreen({ name: 'builder' })}
       onCoverage={() => setScreen({ name: 'coverage' })}
       onStats={() => setScreen({ name: 'stats' })}
+      onOnline={(seat) => setScreen({ name: 'online', seat })}
     />
   );
 }
