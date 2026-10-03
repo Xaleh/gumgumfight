@@ -12,6 +12,8 @@ const extra: CardData[] = [
   { id: 'PX-003', name: 'Echo', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Add up to 1 card from the top of your deck to the top of your Life cards.', trigger: "Activate this card's [On Play] effect." },
   { id: 'PX-004', name: 'Wall', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "This Character cannot be K.O.'d by effects.\nThis Character cannot attack." },
   { id: 'PX-005', name: 'Charger', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Rush: Character] (This card can attack Characters on the turn in which it is played.)' },
+  // Grafia da API (OP17-027 Benn.Beckman): "[Rush Character]" sem os dois-pontos e colado no [On Play].
+  { id: 'PX-043', name: 'Beckman', category: 'character', colors: ['green'], cost: 1, power: 9000, types: ['Red-Haired Pirates'], text: "[Rush Character] (This card can attack Characters on the turn in which it is played.)[On Play] If your Leader has the {Red-Haired Pirates} type, draw 1 card and rest up to 2 of your opponent's Characters." },
   { id: 'PX-006', name: 'Big', category: 'character', colors: ['red'], cost: 2, power: 3000, types: [], text: 'This Character gains +3 cost.' },
   { id: 'PX-007', name: 'Cavendish', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] You may add 1 card from your Life area to your hand: This Character gains [Rush] during this turn.' },
   { id: 'PX-008', name: 'Samurai', category: 'event', colors: ['red'], cost: 0, types: [], text: '[Main] You may rest 2 of your Characters: Draw 2 cards.' },
@@ -132,6 +134,16 @@ describe('efeitos lidos automaticamente', () => {
     const enemy = field(s, 1, 'ST02-009', true);
     const uid = give(s, 0, 'PX-005');
     s = applyAction(s, { type: 'playCard', player: 0, uid });
+    expect(attackError(s, 0, uid, enemy)).toBeNull();
+    expect(attackError(s, 0, uid, s.players[1].leader.uid)).toMatch(/Rush/);
+  });
+
+  it('[Rush Character] sem dois-pontos (grafia da API) também vale', () => {
+    let s = toTurn(game(), 3);
+    const enemy = field(s, 1, 'ST02-009', true);
+    const uid = give(s, 0, 'PX-043');
+    s = applyAction(s, { type: 'playCard', player: 0, uid });
+    expect(hasKeyword(s, uid, 'rushCharacter')).toBe(true);
     expect(attackError(s, 0, uid, enemy)).toBeNull();
     expect(attackError(s, 0, uid, s.players[1].leader.uid)).toMatch(/Rush/);
   });

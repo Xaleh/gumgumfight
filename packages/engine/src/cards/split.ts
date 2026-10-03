@@ -7,13 +7,13 @@ const KEYWORD_PATTERNS: Array<[Keyword, RegExp]> = [
   ['blocker', /\[Blocker\]/i],
   ['doubleAttack', /\[Double Attack\]/i],
   ['banish', /\[Banish\]/i],
-  ['rushCharacter', /\[Rush: ?Character\]/i],
+  ['rushCharacter', /\[Rush:? ?Character\]/i],
   ['unblockable', /\[Unblockable\]/i],
 ];
 
 /** Marcações que podem iniciar um efeito novo. */
 const EFFECT_START =
-  /(?<=^|[.)]\s*|\n)\s*(?=\[(?:DON!! ?[x×]\d+|On Play|When Attacking|Activate: ?Main|Main|Counter|On K\.O\.|On Block|End of Your Turn|Your Turn|Opponent's Turn|Once Per Turn|Rush|Rush: ?Character|Blocker|Double Attack|Banish|Unblockable|On Your Opponent's Attack)\])/;
+  /(?<=^|[.)]\s*|\n)\s*(?=\[(?:DON!! ?[x×]\d+|On Play|When Attacking|Activate: ?Main|Main|Counter|On K\.O\.|On Block|End of Your Turn|Your Turn|Opponent's Turn|Once Per Turn|Rush|Rush:? ?Character|Blocker|Double Attack|Banish|Unblockable|On Your Opponent's Attack)\])/;
 
 /**
  * Separa o texto em efeitos. A API não usa quebras de linha
@@ -24,7 +24,7 @@ const EFFECT_START =
 export function splitEffects(text: string): string[] {
   return text
     // "[Blocker][On Play] …": palavra-chave colada na marcação seguinte.
-    .replace(/(\[(?:Blocker|Rush|Double Attack|Banish|Unblockable|Rush: ?Character)\])\s*(?=\[(?!DON))/gi, '$1\n')
+    .replace(/(\[(?:Blocker|Rush|Double Attack|Banish|Unblockable|Rush:? ?Character)\])\s*(?=\[(?!DON))/gi, '$1\n')
     .split(/\n|<br\s*\/?>/i)
     .flatMap((line) => line.split(new RegExp(EFFECT_START.source, 'gi')))
     .map((l) => l.trim())
@@ -58,7 +58,7 @@ const TIMING_TAGS: Array<[RegExp, AbilityTiming]> = [
 ];
 
 /** Só palavras-chave e lembretes, sem efeito a aplicar ("[Blocker] (After your...)"). */
-export const KEYWORD_ONLY = /^(\[(Rush|Blocker|Double Attack|Banish|Rush: ?Character|Unblockable)\]\s*(\([^)]*\))?\s*)+$|^\([^()]*\)$/i;
+export const KEYWORD_ONLY = /^(\[(Rush|Blocker|Double Attack|Banish|Rush:? ?Character|Unblockable)\]\s*(\([^)]*\))?\s*)+$|^\([^()]*\)$/i;
 
 /**
  * Habilidade manual para uma linha de efeito: no momento marcado ([On Play], [When Attacking]...),
