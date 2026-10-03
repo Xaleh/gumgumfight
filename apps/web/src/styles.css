@@ -845,18 +845,23 @@ input[type='number'] {
   --dw: calc(var(--cw) * 0.44);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: calc(var(--cw) * 0.12);
   min-height: calc(var(--dw) * 1.396);
-  max-width: calc(var(--cw) * 5.4);
+  width: calc(var(--cw) * 5.4);
 }
 .don-row.top {
   --dw: calc(var(--cw) * 0.3);
 }
 .don-cards {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: calc(var(--dw) * 0.1);
+}
+/* Espaço entre os DON!!; com muitos, eles se sobrepõem para caber na fileira. */
+.don-cards > .don-card + .don-card {
+  margin-left: min(calc(var(--dw) * 0.12), calc((100% - var(--n) * var(--dw)) / max(var(--n) - 1, 1)));
 }
 .don-card {
   position: relative;
@@ -925,13 +930,17 @@ input[type='number'] {
   font-size: 15px;
 }
 .don-card.rested {
-  transform: rotate(90deg) scale(0.86);
-  margin-left: calc(var(--dw) * -0.5);
+  transform: rotate(90deg) scale(0.8);
   filter: grayscale(0.6) brightness(0.8);
 }
-.don-cards > .don-card.rested:first-of-type,
-.don-cards > .don-card:not(.rested) + .don-card.rested {
-  margin-left: calc(var(--dw) * 0.25);
+.don-card.empty {
+  background: rgba(255, 255, 255, 0.35);
+  border: 2px dashed rgba(116, 128, 158, 0.45);
+  box-shadow: none;
+}
+.don-card.empty::after {
+  color: rgba(116, 128, 158, 0.55);
+  text-shadow: none;
 }
 .don-card.back {
   background: repeating-linear-gradient(45deg, #2b3550 0 4px, #222a40 4px 8px);
@@ -945,10 +954,42 @@ input[type='number'] {
   position: relative;
   flex: none;
 }
-.don-empty {
-  font-family: Bangers, Impact, sans-serif;
-  color: rgba(116, 128, 158, 0.5);
-  font-size: calc(var(--dw) * 0.4);
+.don-stats {
+  flex: none;
+  margin: 0;
+  display: grid;
+  gap: 1px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 2px 6px rgba(43, 54, 86, 0.12);
+  font-size: max(8.5px, calc(var(--cw) * 0.125));
+  line-height: 1.15;
+}
+.don-stats div {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.don-stats dd {
+  order: -1;
+  margin: 0;
+  min-width: 1.4em;
+  text-align: right;
+  font-weight: 900;
+}
+.don-stats dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+.don-stats .act dd {
+  color: #b77900;
+}
+.don-stats .rest dd {
+  color: #7a849c;
+}
+.don-stats .att dd {
+  color: #d9481f;
 }
 /* DON!! anexados: deitados por baixo da carta, aparecendo na borda de baixo */
 .field-card {
@@ -2995,17 +3036,41 @@ button.hint-pill {
     right: calc(var(--cw) * -0.38);
   }
 
-  /* DON!! em duas fileiras de até 5 */
+  /* DON!!: deck à esquerda, até 5 por fileira, contadores embaixo */
   .don-row,
   .don-row.top {
-    --dw: calc(var(--cw) * 0.34);
-    gap: calc(var(--cw) * 0.08);
-    max-width: none;
+    --dw: calc(var(--cw) * 0.32);
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-areas: 'deck cards' 'stats stats';
+    align-items: start;
+    column-gap: calc(var(--cw) * 0.1);
+    row-gap: 3px;
+    width: auto;
+    min-height: 0;
+  }
+  .don-deck {
+    grid-area: deck;
   }
   .don-cards {
+    grid-area: cards;
     flex-wrap: wrap;
-    width: calc(var(--dw) * 5 * 1.1 + 2px);
-    row-gap: calc(var(--dw) * 0.15);
+    width: calc(var(--dw) * 5 * 1.12 + 2px);
+    gap: calc(var(--dw) * 0.12);
+  }
+  .don-cards > .don-card + .don-card {
+    margin-left: 0;
+  }
+  .don-stats {
+    grid-area: stats;
+    grid-template-columns: auto auto;
+    column-gap: 8px;
+    padding: 2px 6px;
+    font-size: 9px;
+    justify-self: start;
+  }
+  .don-stats div {
+    gap: 2px;
   }
   .don-row.glow .don-card:not(.rested) {
     transform: translateY(-2px);

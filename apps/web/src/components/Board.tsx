@@ -91,18 +91,19 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
   const canDragDon = h.canDragDon(player);
   const donGlow = h.donHighlight(player);
   const picked = h.donPicked(player);
+  const attached = ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
+  const onField = ps.donActive + ps.donRested;
   const don = (
     <div
       className={['don-row', position, donGlow ? 'glow' : ''].join(' ')}
-      title={`DON!!: ${ps.donActive} ativos, ${ps.donRested} virados, ${ps.donDeck} no deck de DON!!`}
+      title={`DON!!: ${ps.donDeck} no deck, ${ps.donActive} ativos, ${ps.donRested} virados, ${attached} anexados`}
     >
-      {ps.donDeck > 0 && (
-        <div className="don-deck">
-          <span className="don-card back" />
-          <span className="pile-count">{ps.donDeck}</span>
-        </div>
-      )}
-      <div className="don-cards">
+      {/* Deck de DON!! fixo à esquerda; os DON!! entram à direita dele. */}
+      <div className="don-deck">
+        {ps.donDeck > 0 ? <span className="don-card back" /> : <span className="don-card empty" />}
+        <span className="pile-count">{ps.donDeck}</span>
+      </div>
+      <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })}>
         {Array.from({ length: ps.donActive }, (_, i) => (
           <span
             key={`a${i}`}
@@ -118,8 +119,25 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
         {Array.from({ length: ps.donRested }, (_, i) => (
           <span key={`r${i}`} className="don-card rested" />
         ))}
-        {ps.donActive + ps.donRested === 0 && <span className="don-empty">DON!!</span>}
       </div>
+      <dl className="don-stats" aria-label="DON!!">
+        <div>
+          <dt>Deck</dt>
+          <dd>{ps.donDeck}</dd>
+        </div>
+        <div className="act">
+          <dt>Ativos</dt>
+          <dd>{ps.donActive}</dd>
+        </div>
+        <div className="rest">
+          <dt>Virados</dt>
+          <dd>{ps.donRested}</dd>
+        </div>
+        <div className="att">
+          <dt>Anexados</dt>
+          <dd>{attached}</dd>
+        </div>
+      </dl>
     </div>
   );
 
