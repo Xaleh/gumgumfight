@@ -1,6 +1,6 @@
 // Rotas de partidas, perfil e estatísticas.
 
-import { type Action, type CardData, type DeckList, type PlayerId, validateDeck } from '@gumgum/engine';
+import { type Action, type CardData, type DeckList, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { type DB, getCards } from '../db';
 import type { ApiCard } from '../present';
@@ -79,7 +79,9 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
     const pair = decks as [DeckList, DeckList];
     const cards = getCards(db, [...new Set(pair.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))]) as CardData[];
     const byId = new Map(cards.map((c) => [c.id, c]));
-    if (pair.some((d) => !validateDeck(d, byId).valid)) return reply.code(400).send({ error: 'Deck inválido.' });
+    if (pair.some((d) => !validateDeck(d, byId, { format }).valid)) {
+      return reply.code(400).send({ error: `Deck inválido ou não permitido no formato ${formatLabel(format)}.` });
+    }
 
     const firstPlayer = b.firstPlayer === 0 || b.firstPlayer === 1 ? (b.firstPlayer as PlayerId) : undefined;
     const replay = { seed: b.seed, firstPlayer, decks: pair, actions: b.actions as Action[] };

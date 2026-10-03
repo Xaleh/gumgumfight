@@ -89,7 +89,7 @@ describe('API de estatísticas', () => {
       method: 'POST',
       url: '/api/matches',
       headers: ALICE,
-      payload: { mode: 'bot', format: 'standard', seed: r.seed, deckIds: ['st01-luffy', 'st02-kid'], decks, actions: r.actions },
+      payload: { mode: 'bot', format: 'egb', seed: r.seed, deckIds: ['st01-luffy', 'st02-kid'], decks, actions: r.actions },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ winner: r.winner, turns: r.turns });
@@ -103,7 +103,8 @@ describe('API de estatísticas', () => {
 
     // O lado do bot só aparece pedindo "jogado por bots".
     expect((await get('by=bot')).leaders).toEqual([expect.objectContaining({ leader: 'ST02-001', games: 1 })]);
-    expect((await get('format=egb')).summary.games).toBe(0);
+    expect((await get('format=standard')).summary.games).toBe(0);
+    expect((await get('format=egb')).summary.games).toBe(1);
     expect((await get('queue=ranked')).summary.games).toBe(0);
     expect((await get('opponent=human')).summary.games).toBe(0);
     expect((await get('opponent=bot&tiers=east-blue,paradise')).summary.games).toBe(1);
@@ -133,13 +134,17 @@ describe('API de estatísticas', () => {
     const { app } = setup();
     const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
     const r = playOut(decks, cards, 3);
-    const post = (payload: object) => app.inject({ method: 'POST', url: '/api/matches', headers: ALICE, payload });
+    const post = (payload: object) => app.inject({ method: 'POST', url: '/api/matches', headers: ALICE, payload: { format: 'egb', ...payload } });
     const truncated = await post({ mode: 'bot', seed: r.seed, decks, actions: r.actions.slice(0, -1) });
     expect(truncated.statusCode).toBe(422);
     const otherSeed = await post({ mode: 'bot', seed: r.seed + 1, decks, actions: r.actions });
     expect(otherSeed.statusCode).toBe(422);
     const smallDeck = await post({ mode: 'bot', seed: r.seed, decks: [{ ...decks[0], cards: decks[0].cards.slice(1) }, decks[1]], actions: r.actions });
     expect(smallDeck.statusCode).toBe(400);
+    // ST-01 e ST-02 têm o bloco ①: a partida não vale no Standard.
+    const rotated = await post({ mode: 'bot', format: 'standard', seed: r.seed, decks, actions: r.actions });
+    expect(rotated.statusCode).toBe(400);
+    expect(rotated.json().error).toMatch(/Standard/);
     expect((await app.inject('/api/stats')).json().summary.games).toBe(0);
   });
 
@@ -147,7 +152,7 @@ describe('API de estatísticas', () => {
     const { app } = setup();
     const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
     const r = playOut(decks, cards, 5);
-    await app.inject({ method: 'POST', url: '/api/matches', headers: ALICE, payload: { mode: 'demo', seed: r.seed, decks, actions: r.actions } });
+    await app.inject({ method: 'POST', url: '/api/matches', headers: ALICE, payload: { mode: 'demo', format: 'egb', seed: r.seed, decks, actions: r.actions } });
     expect((await app.inject('/api/stats')).json().summary.games).toBe(0);
     expect((await app.inject('/api/stats?by=bot')).json().summary.games).toBe(2);
   });

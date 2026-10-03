@@ -63,7 +63,7 @@ function client(seat: PlayerId) {
 }
 
 async function privateMatch(app: App, decks: [string, string] = ['st01-luffy', 'st02-kid']) {
-  const created = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: ALICE, payload: { deckId: decks[0] } });
+  const created = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: ALICE, payload: { deckId: decks[0], format: 'egb' } });
   expect(created.statusCode).toBe(201);
   const { roomId, code, token: t0 } = created.json();
   expect(code).toMatch(/^[A-Z2-9]{6}$/);
@@ -150,14 +150,35 @@ describe('partidas online: salas privadas', () => {
     expect((db.prepare('SELECT mode FROM matches').get() as { mode: string }).mode).toBe('online');
   }, 120_000);
 
+  it('o deck precisa valer no formato da fila ou da sala', async () => {
+    const { app } = setup();
+    const post = (url: string, headers: Record<string, string>, payload: object) => app.inject({ method: 'POST', url, headers, payload });
+    // ST-01 tem o bloco ①: rotacionou e não vale no Standard (o padrão quando o formato não vem).
+    const std = await post('/api/online/queue', ALICE, { deckId: 'st01-luffy', queue: 'casual' });
+    expect(std.statusCode).toBe(400);
+    expect(std.json().error).toMatch(/não é permitido no formato Standard/);
+    expect((await post('/api/online/rooms', ALICE, { deckId: 'st01-luffy', format: 'standard' })).statusCode).toBe(400);
+    // Carta banida: nem no Extra Grand Battle.
+    const banned = await post('/api/online/rooms', ALICE, { deckId: 'st10-law', format: 'egb' });
+    expect(banned.statusCode).toBe(400);
+    expect(banned.json().error).toMatch(/banida/);
+
+    // Quem entra numa sala joga no formato dela, não no que pediu.
+    const room = (await post('/api/online/rooms', ALICE, { deckId: 'st13-ace', format: 'standard' })).json();
+    const join = await post('/api/online/rooms/join', BOB, { code: room.code, deckId: 'st02-kid', format: 'egb' });
+    expect(join.statusCode).toBe(400);
+    expect(join.json().error).toMatch(/Standard/);
+    expect((await post('/api/online/rooms/join', BOB, { code: room.code, deckId: 'st13-luffy' })).statusCode).toBe(200);
+  });
+
   it('não dá para entrar na própria sala nem com código errado', async () => {
     const { app } = setup();
-    const created = (await app.inject({ method: 'POST', url: '/api/online/rooms', headers: ALICE, payload: { deckId: 'st01-luffy' } })).json();
+    const created = (await app.inject({ method: 'POST', url: '/api/online/rooms', headers: ALICE, payload: { deckId: 'st01-luffy', format: 'egb' } })).json();
     const self = await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: ALICE, payload: { code: created.code, deckId: 'st02-kid' } });
     expect(self.statusCode).toBe(409);
     const wrong = await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: BOB, payload: { code: 'ZZZZZZ', deckId: 'st02-kid' } });
     expect(wrong.statusCode).toBe(404);
-    const noDeck = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: 'nope' } });
+    const noDeck = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: 'nope', format: 'egb' } });
     expect(noDeck.statusCode).toBe(400);
     // "Partida em andamento" devolve a sala de espera com o token.
     const active = (await app.inject({ url: '/api/online/active', headers: ALICE })).json();
@@ -206,23 +227,23 @@ describe('partidas online: salas privadas', () => {
 describe('partidas online: filas', () => {
   it('casual: dois jogadores na fila formam uma partida', async () => {
     const { app } = setup();
-    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'casual' } })).json();
+    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } })).json();
     expect((await app.inject(`/api/online/queue/${a.ticket}`)).json().status).toBe('waiting');
-    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: BOB, payload: { deckId: 'st02-kid', queue: 'casual' } })).json();
+    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: BOB, payload: { deckId: 'st02-kid', queue: 'casual', format: 'egb' } })).json();
     const ma = (await app.inject(`/api/online/queue/${a.ticket}`)).json();
     const mb = (await app.inject(`/api/online/queue/${b.ticket}`)).json();
     expect(ma.status).toBe('matched');
     expect(mb.roomId).toBe(ma.roomId);
     expect(ma.token).not.toBe(mb.token);
     // Já está numa partida: não entra em outra fila.
-    const again = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'casual' } });
+    const again = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } });
     expect(again.statusCode).toBe(409);
     expect(again.json().roomId).toBe(ma.roomId);
   });
 
   it('ranqueada: só com login, sem cartas manuais e sem ferramentas manuais', async () => {
     const { app, db } = setup();
-    const anon = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'ranked' } });
+    const anon = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'ranked', format: 'egb' } });
     expect(anon.statusCode).toBe(401);
 
     const login = (sub: string) => {
@@ -241,14 +262,14 @@ describe('partidas online: filas', () => {
     const luffy = getDeck(db, 'st01-luffy')!;
     const cards = luffy.cards.map((c, i) => (i === 0 ? { ...c, count: c.count - 1 } : c)).concat({ id: 'TEST-001', count: 1 });
     const deck = (await app.inject({ method: 'POST', url: '/api/decks', headers: zoro, payload: { name: 'Manual', leader: luffy.leader, cards } })).json();
-    const manual = await app.inject({ method: 'POST', url: '/api/online/queue', headers: zoro, payload: { deckId: deck.id, queue: 'ranked' } });
+    const manual = await app.inject({ method: 'POST', url: '/api/online/queue', headers: zoro, payload: { deckId: deck.id, queue: 'ranked', format: 'egb' } });
     expect(manual.statusCode).toBe(400);
     expect(manual.json().error).toContain('manual');
     // No casual, o mesmo deck pode.
-    expect((await app.inject({ method: 'POST', url: '/api/online/rooms', headers: zoro, payload: { deckId: deck.id } })).statusCode).toBe(201);
+    expect((await app.inject({ method: 'POST', url: '/api/online/rooms', headers: zoro, payload: { deckId: deck.id, format: 'egb' } })).statusCode).toBe(201);
 
-    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: zoro, payload: { deckId: 'st01-luffy', queue: 'ranked' } })).json();
-    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: sanji, payload: { deckId: 'st02-kid', queue: 'ranked' } })).json();
+    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: zoro, payload: { deckId: 'st01-luffy', queue: 'ranked', format: 'egb' } })).json();
+    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: sanji, payload: { deckId: 'st02-kid', queue: 'ranked', format: 'egb' } })).json();
     const ma = (await app.inject(`/api/online/queue/${a.ticket}`)).json();
     const mb = (await app.inject(`/api/online/queue/${b.ticket}`)).json();
     expect(ma.status).toBe('matched');

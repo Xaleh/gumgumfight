@@ -1,4 +1,6 @@
-import type { Action, CardData, DeckList, PlayerId } from '@gumgum/engine';
+import type { Action, CardData, DeckList, FormatId, PlayerId } from '@gumgum/engine';
+
+export type { FormatId };
 
 export interface DeckSummary {
   id: string;
@@ -12,10 +14,24 @@ export interface DeckSummary {
   size: number;
   valid: boolean;
   errors: string[];
+  /** Por formato: o que impede o deck de ser usado nele (vazio = permitido). */
+  formats: Record<FormatId, string[]>;
   unscripted: number;
   updatedAt: string;
   /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
   mine: boolean;
+}
+
+/** Deck completo e permitido no formato (cartas banidas ou rotacionadas impedem). */
+export function canPlay(deck: DeckSummary, format: FormatId): boolean {
+  return deck.valid && !deck.formats?.[format]?.length;
+}
+
+/** Por que o deck não pode ser usado no formato (null = pode). */
+export function whyNotPlayable(deck: DeckSummary, format: FormatId): string | null {
+  if (!deck.valid) return `Incompleto: ${deck.size}/50`;
+  const issues = deck.formats?.[format] ?? [];
+  return issues.length ? issues.join('\n') : null;
 }
 
 /** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. */
@@ -190,8 +206,6 @@ export interface OnlineRoomInfo {
 }
 
 // ------------------------------------------------------------------ estatísticas
-
-export type FormatId = 'standard' | 'egb';
 
 export interface MatchUpload {
   mode: 'bot' | 'demo';

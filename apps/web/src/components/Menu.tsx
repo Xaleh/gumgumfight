@@ -1,6 +1,6 @@
-import type { Action, CardData, DeckList, PlayerId } from '@gumgum/engine';
+import { type Action, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, deckGroups, type DeckSummary, type FormatId, type OnlineSeat } from '../api';
+import { api, canPlay, deckGroups, type DeckSummary, type FormatId, type OnlineSeat, whyNotPlayable } from '../api';
 import { AccountBar, useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
 import { SettingsControls } from '../settings';
@@ -57,11 +57,6 @@ async function buildSetup(
 const LAST_DECKS = 'gumgum.lastDecks';
 const LAST_FORMAT = 'gumgum.format';
 
-const FORMATS: Array<[FormatId, string]> = [
-  ['standard', 'Standard'],
-  ['egb', 'Extra Grand Battle'],
-];
-
 function savedFormat(): FormatId {
   try {
     return localStorage.getItem(LAST_FORMAT) === 'egb' ? 'egb' : 'standard';
@@ -84,14 +79,37 @@ function DeckArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
   );
 }
 
-function DeckPick({ who, deck, random, onClick }: { who: string; deck?: DeckSummary; random?: boolean; onClick: () => void }) {
+function DeckPick({
+  who,
+  deck,
+  random,
+  format,
+  onClick,
+}: {
+  who: string;
+  deck?: DeckSummary;
+  random?: boolean;
+  format: FormatId;
+  onClick: () => void;
+}) {
   return (
     <button className="deck-pick" onClick={onClick}>
       <span className="who">{who}</span>
       <DeckArt deck={random ? undefined : deck} />
       <span className="name">{random ? 'Aleatório' : (deck?.name ?? 'Escolher deck')}</span>
+      {!random && <FormatWarning deck={deck} format={format} />}
       {!random && <DeckWarning deck={deck} />}
     </button>
+  );
+}
+
+/** Aviso de deck que não vale no formato escolhido (cartas banidas ou rotacionadas). */
+function FormatWarning({ deck, format }: { deck?: DeckSummary; format: FormatId }) {
+  if (!deck?.valid || canPlay(deck, format)) return null;
+  return (
+    <div className="small deck-warning bad" title={whyNotPlayable(deck, format) ?? undefined}>
+      🚫 Não permitido no {formatLabel(format)}
+    </div>
   );
 }
 
@@ -99,6 +117,7 @@ function DeckPicker({
   title,
   decks,
   value,
+  format,
   allowRandom,
   onPick,
   onClose,
@@ -106,6 +125,7 @@ function DeckPicker({
   title: string;
   decks: DeckSummary[];
   value: string;
+  format: FormatId;
   allowRandom?: boolean;
   onPick: (id: string) => void;
   onClose: () => void;
@@ -138,13 +158,14 @@ function DeckPicker({
                     <button
                       key={d.id}
                       className={['deck-pick', d.id === value ? 'on' : ''].join(' ')}
-                      disabled={!d.valid}
+                      disabled={!canPlay(d, format)}
                       onClick={() => onPick(d.id)}
-                      title={d.valid ? d.name : `Incompleto: ${d.size}/50`}
+                      title={whyNotPlayable(d, format) ?? d.name}
                     >
                       <DeckArt deck={d} small />
                       <span className="name">{d.name}</span>
                       {!d.valid && <span className="muted small">{d.size}/50</span>}
+                      {d.valid && !canPlay(d, format) && <span className="muted small">🚫 {formatLabel(format)}</span>}
                     </button>
                   ))}
                 </div>
@@ -208,8 +229,8 @@ export function Menu({
           } catch {
             /* sem armazenamento */
           }
-          const valid = d.filter((x) => x.valid).map((x) => x.id);
-          const builtin = d.filter((x) => x.valid && x.kind === 'builtin').map((x) => x.id);
+          const valid = d.filter((x) => canPlay(x, format)).map((x) => x.id);
+          const builtin = d.filter((x) => canPlay(x, format) && x.kind === 'builtin').map((x) => x.id);
           setDeck0(valid.includes(last[0]) ? last[0] : (builtin[0] ?? valid[0] ?? ''));
           setDeck1(last[1] === RANDOM || valid.includes(last[1]) ? last[1] : (builtin[1] ?? valid[1] ?? valid[0] ?? ''));
         })
@@ -241,7 +262,8 @@ export function Menu({
     }
     try {
       const names: [string, string] = mode === 'demo' ? ['Bot A', 'Bot B'] : ['Você', 'Bot'];
-      const pool = decks.filter((d) => d.valid && d.kind === 'builtin');
+      const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
+      if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
       if (mode === 'online') return;
       onStart(await buildSetup(mode, [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId)));
@@ -264,6 +286,8 @@ export function Menu({
 
   const d0 = decks.find((d) => d.id === deck0);
   const d1 = decks.find((d) => d.id === deck1);
+  /** Os dois decks precisam valer no formato escolhido. */
+  const ready = Boolean(d0 && canPlay(d0, format) && (deck1 === RANDOM || (d1 && canPlay(d1, format))));
 
   return (
     <div className="menu">
@@ -295,20 +319,21 @@ export function Menu({
           {mode === 'online' ? (
             <>
               <div className="matchup single">
-                <DeckPick who="Seu deck" deck={d0} onClick={() => setPicking(0)} />
+                <DeckPick who="Seu deck" deck={d0} format={format} onClick={() => setPicking(0)} />
               </div>
               <div className="field">
                 <label>Formato</label>
                 <div className="seg small">
-                  {FORMATS.map(([v, label]) => (
-                    <button key={v} className={format === v ? 'on' : ''} onClick={() => setFormat(v)}>
-                      {label}
+                  {FORMATS.map((f) => (
+                    <button key={f.id} className={format === f.id ? 'on' : ''} onClick={() => setFormat(f.id)}>
+                      {f.label}
                     </button>
                   ))}
                 </div>
               </div>
               <OnlineMenu
                 deck={d0?.valid ? d0 : undefined}
+                formatProblem={d0?.valid && !canPlay(d0, format) ? `Este deck não é permitido no ${formatLabel(format)}.` : null}
                 format={format}
                 initialCode={URL_ROOM_CODE}
                 onEnter={(s) => {
@@ -325,12 +350,13 @@ export function Menu({
           ) : (
           <>
           <div className="matchup">
-            <DeckPick who={mode === 'demo' ? 'Bot A' : 'Seu deck'} deck={d0} onClick={() => setPicking(0)} />
+            <DeckPick who={mode === 'demo' ? 'Bot A' : 'Seu deck'} deck={d0} format={format} onClick={() => setPicking(0)} />
             <span className="vs-badge">VS</span>
             <DeckPick
               who={mode === 'demo' ? 'Bot B' : 'Oponente'}
               deck={d1}
               random={deck1 === RANDOM}
+              format={format}
               onClick={() => setPicking(1)}
             />
           </div>
@@ -355,15 +381,20 @@ export function Menu({
           <div className="field">
             <label>Formato</label>
             <div className="seg small">
-              {FORMATS.map(([v, label]) => (
-                <button key={v} className={format === v ? 'on' : ''} onClick={() => setFormat(v)}>
-                  {label}
+              {FORMATS.map((f) => (
+                <button key={f.id} className={format === f.id ? 'on' : ''} onClick={() => setFormat(f.id)}>
+                  {f.label}
                 </button>
               ))}
             </div>
+            {format === 'standard' ? (
+              <p className="muted small">Sem cartas banidas nem cartas com o bloco ① (rotacionadas), salvo as exceções oficiais.</p>
+            ) : (
+              <p className="muted small">Todas as cartas lançadas, menos as banidas.</p>
+            )}
           </div>
 
-          <button className="btn primary battle-btn" disabled={!deck0 || !deck1 || loading} onClick={start}>
+          <button className="btn primary battle-btn" disabled={!ready || loading} onClick={start}>
             {loading ? 'Carregando…' : 'Batalhar!'}
           </button>
           </>
@@ -422,6 +453,7 @@ export function Menu({
           title={picking === 0 ? (mode === 'demo' ? 'Deck do Bot A' : 'Seu deck') : mode === 'demo' ? 'Deck do Bot B' : 'Deck do oponente'}
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
+          format={format}
           allowRandom={picking === 1}
           onPick={(id) => {
             if (picking === 0) setDeck0(id);

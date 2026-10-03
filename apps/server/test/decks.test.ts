@@ -24,6 +24,18 @@ describe('API de decks', () => {
     expect(d).toMatchObject({ kind: 'builtin', valid: true, size: 50, leaderName: 'Monkey.D.Luffy', colors: ['red'] });
   });
 
+  it('informa em quais formatos cada deck pode ser usado', async () => {
+    const list = (await app().inject('/api/decks')).json();
+    const byId = (id: string) => list.find((x: { id: string }) => x.id === id);
+    // ST-01 tem o bloco ①: só vale no Extra Grand Battle.
+    expect(byId('st01-luffy').formats.egb).toEqual([]);
+    expect(byId('st01-luffy').formats.standard.length).toBeGreaterThan(0);
+    expect(byId('st13-ace').formats).toEqual({ standard: [], egb: [] });
+    // O Líder ST10-001 (Law) está banido: não vale em nenhum formato.
+    expect(byId('st10-law').formats.standard).toEqual([expect.stringMatching(/ST10-001 está banida/)]);
+    expect(byId('st10-law').formats.egb).toEqual([expect.stringMatching(/ST10-001 está banida/)]);
+  });
+
   it('cria, edita e apaga um deck do jogador', async () => {
     const a = app();
     const created = await a.inject({ method: 'POST', url: '/api/decks', headers: ALICE, payload: { name: 'Rascunho', leader: 'ST01-001', cards: [{ id: 'st01-002', count: 4 }] } });
