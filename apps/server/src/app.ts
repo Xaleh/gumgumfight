@@ -22,9 +22,13 @@ import {
 } from './db';
 import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
+import { registerOnlineRoutes } from './online/routes';
 import { registerStatsRoutes } from './stats/routes';
 
-export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOptions; googleKeys?: GoogleKeys } = {}) {
+export function buildApp(
+  db: DB,
+  opts: { logger?: boolean; server?: ServerOptions; googleKeys?: GoogleKeys; /** Testes: relógio e limite de ações das partidas online. */ now?: () => number; onlineRateLimit?: number } = {},
+) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
   const server = opts.server ?? serverOptions;
@@ -202,6 +206,8 @@ export function buildApp(db: DB, opts: { logger?: boolean; server?: ServerOption
   });
 
   registerStatsRoutes(app, { db, viewerHash, present });
+  // Exposto para os testes (o estado das salas fica só na memória do servidor).
+  app.decorate('onlineLobby', registerOnlineRoutes(app, { db, viewerHash, user: auth.viewer, present, now: opts.now, rateLimit: opts.onlineRateLimit }));
 
   app.get('/api/matches', async () => recentMatches(db));
 

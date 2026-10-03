@@ -1,4 +1,5 @@
 import { type Action, cardDef, type GameState, type PlayerId } from '@gumgum/engine';
+import type { ReactNode } from 'react';
 import { CardView } from './CardView';
 
 interface Props {
@@ -7,12 +8,16 @@ interface Props {
   actions: Action[];
   onExit: () => void;
   onRematch?: () => void;
+  /** Texto do botão de revanche (online: "Pedir revanche"). */
+  rematchLabel?: string;
   onReplay: () => void;
   onLog: () => void;
+  /** Informações a mais (online: recompensa da ranqueada). */
+  extra?: ReactNode;
 }
 
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
-export function GameResult({ state, human, actions, onExit, onRematch, onReplay, onLog }: Props) {
+export function GameResult({ state, human, actions, onExit, onRematch, rematchLabel, onReplay, onLog, extra }: Props) {
   const me: PlayerId = human ?? state.winner ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
   const won = state.winner === me;
@@ -102,11 +107,12 @@ export function GameResult({ state, human, actions, onExit, onRematch, onReplay,
           <dd>{played}</dd>
         </dl>
         {state.winReason && <p className="muted small result-reason">{state.winReason}</p>}
+        {extra}
 
         <div className="result-actions">
           {onRematch && (
             <button className="btn primary big" onClick={onRematch}>
-              Jogar de novo
+              {rematchLabel ?? 'Jogar de novo'}
             </button>
           )}
           <button className="btn big" onClick={onExit}>

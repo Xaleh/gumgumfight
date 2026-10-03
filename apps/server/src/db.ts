@@ -183,7 +183,31 @@ function migrateStats(db: DB) {
       FOREIGN KEY (match_id, seat) REFERENCES match_seats(match_id, seat) ON DELETE CASCADE
     ) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS match_cards_card ON match_cards(card_id);
+
+    -- Partidas online em andamento (seed, decks e ações): refeitas ao reiniciar o servidor.
+    CREATE TABLE IF NOT EXISTS live_matches (
+      id         TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,                 -- JSON (online/room.ts: RoomData)
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
+}
+
+// ------------------------------------------------------------------ partidas online
+
+export function saveLiveMatch(db: DB, id: string, data: unknown) {
+  db.prepare(
+    `INSERT INTO live_matches (id, data, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
+  ).run(id, JSON.stringify(data));
+}
+
+export function deleteLiveMatch(db: DB, id: string) {
+  db.prepare('DELETE FROM live_matches WHERE id = ?').run(id);
+}
+
+export function listLiveMatches(db: DB): Array<{ id: string; data: string }> {
+  return db.prepare('SELECT id, data FROM live_matches').all() as Array<{ id: string; data: string }>;
 }
 
 // ------------------------------------------------------------------ cartas

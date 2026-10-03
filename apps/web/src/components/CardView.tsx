@@ -6,6 +6,7 @@ import {
   type FieldCard,
   type GameState,
   getPower,
+  HIDDEN_CARD,
   hasKeyword,
   type Keyword,
 } from '@gumgum/engine';
@@ -50,6 +51,17 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   const keywords = (Object.keys(KEYWORD_LABEL) as Keyword[]).filter((k) =>
     fc ? hasKeyword(state, uid, k) : def.keywords.includes(k),
   );
+
+  // Carta que este jogador não vê (partida online): só o verso.
+  if (def.id === HIDDEN_CARD) {
+    return (
+      <div className={['card', 'back', highlight ? `hl-${highlight}` : '', onClick ? 'clickable' : ''].join(' ')} onClick={onClick} data-uid={uid}>
+        <div className="back-emblem">
+          <JollyRoger />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

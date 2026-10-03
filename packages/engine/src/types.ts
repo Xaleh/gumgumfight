@@ -1026,12 +1026,19 @@ export interface LogEntry {
   turn: number;
   player: PlayerId | null;
   text: string;
+  /**
+   * Texto com cartas que só `player` pode ver. Os outros jogadores (no online)
+   * recebem `text`, sem os nomes das cartas.
+   */
+  secret?: string;
 }
 
 export interface GameState {
   version: 1;
   seed: number;
   rng: number;
+  /** Estado do RNG de 128 bits (partidas online); ausente = mulberry32 com `rng`. */
+  rng128?: [number, number, number, number];
   turn: number; // 1 = primeiro turno do primeiro jogador
   firstPlayer: PlayerId;
   activePlayer: PlayerId;
@@ -1088,6 +1095,8 @@ export type Action =
   | { type: 'counter'; player: PlayerId; uid: string }
   | { type: 'pass'; player: PlayerId }
   | { type: 'concede'; player: PlayerId }
+  /** O jogador ficou sem tempo (só o servidor das partidas online envia). */
+  | { type: 'timeout'; player: PlayerId; abandoned?: boolean }
   | { type: 'manual'; player: PlayerId; op: ManualOp }
   | { type: 'manualDone'; player: PlayerId }
   | { type: 'option'; player: PlayerId; index: number };
@@ -1106,7 +1115,9 @@ export type ManualOp =
   | { op: 'donToDeck'; count: number }
   | { op: 'donGive'; uid: string; from: 'active' | 'rested' }
   | { op: 'donSetState'; player: PlayerId; rested: boolean; count: number }
-  | { op: 'shuffle' };
+  | { op: 'shuffle' }
+  /** Olhar as N cartas do topo do próprio deck (o oponente vê no log que você olhou). */
+  | { op: 'peek'; count: number };
 
 export interface DeckList {
   id: string;
@@ -1127,4 +1138,9 @@ export interface GameConfig {
   cards: CardData[];
   /** Se omitido, decidido pelo RNG (equivalente ao pedra-papel-tesoura). */
   firstPlayer?: PlayerId;
+  /**
+   * Seed de 128 bits (4 inteiros de 32 bits) para o RNG sfc32. Usada nas partidas
+   * online, em que a seed de 32 bits poderia ser descoberta por força bruta.
+   */
+  seed128?: number[];
 }

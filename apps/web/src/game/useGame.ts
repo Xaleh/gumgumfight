@@ -4,6 +4,7 @@ import {
   applyAction,
   chooseBotAction,
   createGame,
+  type DeckList,
   type GameConfig,
   type GameState,
   type PlayerId,
@@ -27,6 +28,9 @@ export interface ReplayFile {
   format: 'gumgumfight-replay';
   version: 1;
   seed: number;
+  /** Partidas online: seed de 128 bits e as listas exatas usadas. */
+  seed128?: number[];
+  decks?: [DeckList, DeckList];
   firstPlayer: PlayerId;
   names: [string, string];
   deckIds: [string, string];

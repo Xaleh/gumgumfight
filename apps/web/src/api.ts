@@ -79,6 +79,17 @@ async function get<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Erro da API com o status e o corpo da resposta (ex.: a sala da partida em andamento). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly data: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}
+
 async function send<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
@@ -89,8 +100,8 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    const err = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(err?.error ?? `${method} ${url}: ${res.status}`);
+    const err = (await res.json().catch(() => null)) as ({ error?: string } & Record<string, unknown>) | null;
+    throw new ApiError(err?.error ?? `${method} ${url}: ${res.status}`, res.status, err ?? {});
   }
   return (res.status === 204 ? undefined : res.json()) as Promise<T>;
 }
@@ -127,7 +138,56 @@ export const api = {
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
   cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
+  online: {
+    active: () => get<ActiveRoom[]>('/api/online/active'),
+    createRoom: (deckId: string, format: FormatId) =>
+      send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format }),
+    joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
+    enqueue: (deckId: string, format: FormatId, queue: QueueKind) =>
+      send<{ ticket: string }>('POST', '/api/online/queue', { deckId, format, queue }),
+    poll: (ticket: string) => get<QueuePoll>(`/api/online/queue/${encodeURIComponent(ticket)}`),
+    cancel: (ticket: string) => send<void>('DELETE', `/api/online/queue/${encodeURIComponent(ticket)}`),
+    act: (roomId: string, t: string, seq: number, action: Action) =>
+      send<{ ok: true; actionCount: number }>('POST', `/api/online/rooms/${roomId}/action`, { t, seq, action }),
+    emote: (roomId: string, t: string, emote: string) => send<void>('POST', `/api/online/rooms/${roomId}/emote`, { t, emote }),
+    rematch: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/rematch`, { t }),
+    leave: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/leave`, { t }),
+    replay: (roomId: string, t: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay?t=${encodeURIComponent(t)}`),
+    eventsUrl: (roomId: string, t: string) => `/api/online/rooms/${roomId}/events?t=${encodeURIComponent(t)}`,
+  },
 };
+
+// ------------------------------------------------------------------ online
+
+export type QueueKind = 'casual' | 'ranked';
+
+export interface OnlineSeat {
+  roomId: string;
+  token: string;
+}
+
+export interface ActiveRoom extends OnlineSeat {
+  status: 'waiting' | 'playing';
+  queue: 'private' | QueueKind;
+  code: string | null;
+}
+
+export type QueuePoll =
+  | { status: 'waiting'; waited: number; players: number }
+  | { status: 'matched'; roomId: string; token: string };
+
+export interface OnlineRoomInfo {
+  id: string;
+  code: string | null;
+  queue: 'private' | QueueKind;
+  format: FormatId;
+  status: 'waiting' | 'playing' | 'finished';
+  you: PlayerId;
+  players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean }>;
+  clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null };
+  result: { matchId: number | null; bounty: Array<{ before: number | null; after: number | null }> | null; error?: string } | null;
+  rematch: [boolean, boolean];
+}
 
 // ------------------------------------------------------------------ estatísticas
 

@@ -18,3 +18,4 @@ export { translateToPt, type Translation } from './i18n/pt';
 export { translateCardPt, type CardTranslation } from './i18n/render';
 export * from './deck';
 export { normalizeTypeQuotes } from './text';
+export * from './view';
