@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, attackError, blockerOptions, createGame, getCost, getPower, hasKeyword, koProtected, playCost, playError } from '../src/engine';
-import { parseCard } from '../src/cards';
+import { applyAction, attackError, blockerOptions, cannotBeRested, createGame, getCost, getPower, hasKeyword, koProtected, playCost, playError } from '../src/engine';
+import { buildCardDef, parseCard } from '../src/cards';
 import { chooseBotAction } from '../src/bot/simple';
 import type { CardData, DeckList, GameState } from '../src/types';
 import { cards as baseCards, toTurn } from './helpers';
@@ -85,6 +85,18 @@ const field = (s: GameState, player: 0 | 1, cardId: string, rested = false) => {
   return uid;
 };
 
+// ST32-002 Kouzuki Oden (texto da API).
+const oden: CardData = {
+  id: 'PX-044',
+  name: 'Oden',
+  category: 'character',
+  colors: ['red'],
+  cost: 1,
+  power: 6000,
+  types: [],
+  text: "[On Play] Draw 1 card and up to 1 of your opponent's Characters with a base cost of 6 or less cannot be rested until the end of your opponent's next End Phase.",
+};
+
 describe('efeitos lidos automaticamente', () => {
   it('moer o deck', () => {
     let s = toTurn(game(), 3);
@@ -146,6 +158,35 @@ describe('efeitos lidos automaticamente', () => {
     expect(hasKeyword(s, uid, 'rushCharacter')).toBe(true);
     expect(attackError(s, 0, uid, enemy)).toBeNull();
     expect(attackError(s, 0, uid, s.players[1].leader.uid)).toMatch(/Rush/);
+  });
+
+  it('"cannot be rested" impede atacar e bloquear até o fim do próximo turno do oponente', () => {
+    let s = toTurn(game(), 3);
+    // Fora do deck de teste (para não mudar o embaralhamento dos outros testes): registra as definições.
+    s.defs['ST02-004'] = buildCardDef(cards.find((c) => c.id === 'ST02-004')!); // Capone"Gang"Bege, [Blocker]
+    s.defs['PX-044'] = buildCardDef(oden);
+    const capone = field(s, 1, 'ST02-004');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-044') });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets' });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [capone] });
+    expect(cannotBeRested(s, capone)).toBe(true);
+
+    // Bloquear vira a carta: o [Blocker] travado não é opção.
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    expect(blockerOptions(s, 1)).not.toContain(capone);
+    while (s.pending) {
+      const p = s.pending;
+      s = applyAction(s, p.kind === 'block' ? { type: 'choose', player: p.player, uids: [] } : p.kind === 'trigger' ? { type: 'answer', player: p.player, yes: false } : { type: 'pass', player: p.player });
+    }
+
+    // No turno do oponente: atacar vira a carta, então não pode atacar.
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(attackError(s, 1, capone, s.players[0].leader.uid)).toMatch(/não pode ser virada/);
+
+    // Depois da End Phase do oponente, volta ao normal.
+    s = toTurn(s, 6);
+    expect(cannotBeRested(s, capone)).toBe(false);
+    expect(attackError(s, 1, capone, s.players[0].leader.uid)).toBeNull();
   });
 
   it('custo contínuo (+3)', () => {

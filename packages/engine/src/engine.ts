@@ -654,6 +654,7 @@ export function attackError(state: GameState, player: PlayerId, attacker: string
   const a = locate(state, attacker);
   if (!a || a.player !== player || a.zone === 'stage') return 'Atacante inválido.';
   if (a.fc.rested) return 'O atacante está virado.';
+  if (cannotBeRested(state, attacker)) return 'Esta carta não pode ser virada, então não pode atacar.';
   if (
     state.modifiers.some((m) => m.uid === attacker && m.kind === 'cannotAttack') ||
     cardDef(state, attacker).abilities.some((x) => x.timing === 'static' && x.staticCannotAttack && conditionsMet(state, attacker, x))
@@ -750,6 +751,7 @@ export function activateError(state: GameState, player: PlayerId, uid: string, i
   if (ability.oncePerTurn && state.usedThisTurn.includes(usedKey(uid, index))) return 'Já usada neste turno.';
   const ps = state.players[player];
   if (ability.cost?.restSelf && loc.fc.rested) return 'A carta já está virada.';
+  if (ability.cost?.restSelf && cannotBeRested(state, uid)) return 'Esta carta não pode ser virada.';
   if ((ability.cost?.restDon ?? 0) > ps.donActive) return 'DON!! ativos insuficientes.';
   if ((ability.cost?.donMinus ?? 0) > totalDonOnField(ps)) return 'DON!! insuficientes em campo.';
   if (
@@ -783,6 +785,8 @@ export function blockerOptions(state: GameState, defender: PlayerId): string[] {
   return state.players[defender].characters
     .filter((c) => !c.rested && c.uid !== b.target && hasKeyword(state, c.uid, 'blocker'))
     .filter((c) => !state.modifiers.some((m) => m.uid === c.uid && m.kind === 'cannotBlock'))
+    // Bloquear vira o [Blocker].
+    .filter((c) => !cannotBeRested(state, c.uid))
     .filter((c) => b.noBlockerMinPower === null || getPower(state, c.uid) < b.noBlockerMinPower)
     .filter((c) => b.noBlockerMaxPower === undefined || getPower(state, c.uid) > b.noBlockerMaxPower)
     .filter((c) => b.noBlockerMaxCost === undefined || getCost(state, c.uid) > b.noBlockerMaxCost)
@@ -1367,12 +1371,19 @@ function eventMatches(state: GameState, e: GameEvent, ev: EmittedEvent, owner: P
   }
 }
 
+/**
+ * "… cannot be rested": a carta não pode ser virada de jeito nenhum — nem por efeitos,
+ * nem para atacar, bloquear ou pagar custos.
+ */
+export function cannotBeRested(state: GameState, uid: string): boolean {
+  return state.modifiers.some((m) => m.uid === uid && m.kind === 'cannotBeRested');
+}
+
 /** Vira uma carta em campo (dispara "When this Character becomes rested"). */
 function restCard(state: GameState, uid: string, byEffectOf?: PlayerId, restSource?: string) {
   const loc = locate(state, uid);
   if (!loc || loc.fc.rested) return;
-  // "cannot be rested" vale contra efeitos do oponente; custos/ataques do próprio jogador continuam.
-  if (state.activePlayer !== loc.player && state.modifiers.some((m) => m.uid === uid && m.kind === 'cannotBeRested')) return;
+  if (cannotBeRested(state, uid)) return;
   if (
     byEffectOf !== undefined &&
     byEffectOf !== loc.player &&
@@ -1811,7 +1822,7 @@ function faceDownLife(ps: PlayerState): string[] {
 
 export function canPayCost(state: GameState, player: PlayerId, source: string, cost: AbilityCost): boolean {
   const ps = state.players[player];
-  if (cost.restSelf && (!locate(state, source) || locate(state, source)!.fc.rested)) return false;
+  if (cost.restSelf && (!locate(state, source) || locate(state, source)!.fc.rested || cannotBeRested(state, source))) return false;
   if ((cost.restDon ?? 0) > ps.donActive) return false;
   if ((cost.donMinus ?? 0) > totalDonOnField(ps)) return false;
   if ((cost.trashFromHand ?? 0) > discardable(state, player, cost.trashFilter).length) return false;
@@ -1824,7 +1835,7 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if (cost.ownToLife && targetCandidates(state, ps.id, source, { ...cost.ownToLife.spec, side: 'own' }).length < cost.ownToLife.count) return false;
   if (cost.either && !cost.either.some((c) => canPayCost(state, ps.id, source, c))) return false;
   if (cost.returnGivenDon && [ps.leader, ...ps.characters].reduce((n, c) => n + c.don, 0) < cost.returnGivenDon) return false;
-  if ((cost.restCharacters ?? 0) > ps.characters.filter((c) => !c.rested && c.uid !== source).length) return false;
+  if ((cost.restCharacters ?? 0) > ps.characters.filter((c) => !c.rested && c.uid !== source && !cannotBeRested(state, c.uid)).length) return false;
   if (cost.restOwn && ownCostOptions(state, player, source, cost.restOwn.spec, true).length < cost.restOwn.count) return false;
   if (cost.returnOwn && ownCostOptions(state, player, source, cost.returnOwn.spec, false).length < cost.returnOwn.count) {
     return false;
@@ -1832,7 +1843,12 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if ((cost.trashSelf || cost.selfToBottom) && locate(state, source)?.zone !== 'character' && locate(state, source)?.zone !== 'stage') return false;
   if (cost.returnSelf && locate(state, source)?.zone !== 'character') return false;
   if (cost.selfMinCost !== undefined && (!locate(state, source) || getCost(state, source) < cost.selfMinCost)) return false;
-  if (cost.restOpponentChars && state.players[opponent(player)].characters.filter((c) => !c.rested).length < cost.restOpponentChars) return false;
+  if (
+    cost.restOpponentChars &&
+    state.players[opponent(player)].characters.filter((c) => !c.rested && !cannotBeRested(state, c.uid)).length < cost.restOpponentChars
+  ) {
+    return false;
+  }
   if ((cost.trashToDeck ?? 0) > ps.trash.length) return false;
   if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(cardDef(state, u), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
   if (cost.giveOppDon && (state.players[opponent(player)].donRested < cost.giveOppDon || !state.players[opponent(player)].characters.length)) return false;
@@ -1855,7 +1871,7 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
 /** Cartas suas que podem pagar um custo de "rest/return N of your …". */
 function ownCostOptions(state: GameState, player: PlayerId, source: string, spec: TargetSpec, needActive: boolean): string[] {
   return targetCandidates(state, player, source, { ...spec, side: 'own' }).filter(
-    (u) => u !== source && (!needActive || !locate(state, u)?.fc.rested),
+    (u) => u !== source && (!needActive || (!locate(state, u)?.fc.rested && !cannotBeRested(state, u))),
   );
 }
 
@@ -3469,7 +3485,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return false;
     }
     case 'restOwnCharacters': {
-      const options = ps.characters.filter((c) => !c.rested && c.uid !== frame.source).map((c) => c.uid);
+      const options = ps.characters
+        .filter((c) => !c.rested && c.uid !== frame.source && !cannotBeRested(state, c.uid))
+        .map((c) => c.uid);
       const n = Math.min(step.count, options.length);
       if (n === 0) return true;
       if (!frame.choice) {
