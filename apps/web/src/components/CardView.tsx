@@ -13,7 +13,8 @@ import {
 import { type ReactNode, useMemo, useState } from 'react';
 import { useSettings } from '../settings';
 
-export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | 'ready' | null;
+/** 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. */
+export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | 'ready' | 'disabled' | null;
 
 const KEYWORD_LABEL: Record<Keyword, string> = {
   rush: 'Rush',

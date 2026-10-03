@@ -124,6 +124,23 @@ describe('batalha', () => {
     // Modificador de batalha expira.
     expect(getPower(s, s.players[1].leader.uid)).toBe(5000);
   });
+
+  it('na etapa de Counter, a ferramenta manual não joga a carta da mão no campo (Killer não ativa o [Ao Jogar])', () => {
+    let s = readyToAttack();
+    const usopp = putOnField(s, 0, 'ST01-002');
+    s.players[1].hand = [];
+    const killer = fetchToHand(s, 1, 'ST02-005');
+    s = applyAction(s, { type: 'attack', player: 0, attacker: usopp, target: s.players[1].leader.uid });
+    expect(s.pending?.kind).toBe('counter');
+    for (const to of ['character', 'stage'] as const) {
+      expect(() => applyAction(s, { type: 'manual', player: 1, op: { op: 'move', uid: killer, to } })).toThrow(IllegalActionError);
+    }
+    s = applyAction(s, { type: 'counter', player: 1, uid: killer });
+    expect(s.players[1].trash).toContain(killer);
+    expect(s.players[1].characters.map((c) => c.uid)).not.toContain(killer);
+    expect(locate(s, usopp)).toBeTruthy();
+  });
+
   it('evento [Counter] (Repel) paga o custo, dá +4000 e desvira 1 DON!!', () => {
     let s = readyToAttack();
     s.players[1].hand = [];
@@ -274,16 +291,36 @@ describe('efeitos', () => {
     s = applyAction(s, { type: 'activate', player: 1, uid: bonney, ability: 0 });
     const pend = s.pending;
     const supernovas = top5.filter((u) => s.defs[s.cards[u].cardId].types.includes('Supernovas'));
-    if (!supernovas.length) {
-      expect(pend).toBeNull();
-      return;
-    }
-    expect(pend).toMatchObject({ kind: 'selectTargets', options: supernovas, max: 1 });
-    s = applyAction(s, { type: 'choose', player: 1, uids: [supernovas[0]] });
-    expect(s.players[1].hand).toContain(supernovas[0]);
-    const rest = top5.filter((u) => u !== supernovas[0]);
-    expect(s.players[1].deck.slice(-4)).toEqual(rest);
+    // Todas as 5 aparecem (as que não são {Supernovas} ficam desabilitadas).
+    expect(pend).toMatchObject({ kind: 'selectTargets', options: supernovas, shown: top5, max: Math.min(1, supernovas.length) });
+    const picked = supernovas.slice(0, 1);
+    s = applyAction(s, { type: 'choose', player: 1, uids: picked });
+    // O jogador escolhe a ordem do fundo do deck (a primeira fica mais acima).
+    const rest = top5.filter((u) => !picked.includes(u));
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1, ordered: true, min: rest.length });
+    expect(s.pending?.kind === 'selectTargets' && [...s.pending.options].sort()).toEqual([...rest].sort());
+    const order = [...rest].reverse();
+    s = applyAction(s, { type: 'choose', player: 1, uids: order });
+    expect(s.players[1].deck.slice(-rest.length)).toEqual(order);
+    for (const u of picked) expect(s.players[1].hand).toContain(u);
     expect(locate(s, bonney)!.fc.rested).toBe(true);
+  });
+
+  it('busca sem nenhuma carta válida ainda mostra as cartas olhadas', () => {
+    let s = toTurn(started(), 4);
+    const bonney = putOnField(s, 1, 'ST02-007');
+    // Nenhum {Supernovas} entre as 5 do topo.
+    const deck = s.players[1].deck;
+    const isSuper = (u: string) => s.defs[s.cards[u].cardId].types.includes('Supernovas');
+    const others = deck.filter((u) => !isSuper(u));
+    s.players[1].deck = [...others.slice(0, 5), ...deck.filter((u) => !others.slice(0, 5).includes(u))];
+    const top5 = s.players[1].deck.slice(0, 5);
+    s = applyAction(s, { type: 'activate', player: 1, uid: bonney, ability: 0 });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', options: [], shown: top5, max: 0 });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [] });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', ordered: true, min: 5 });
+    s = applyAction(s, { type: 'choose', player: 1, uids: top5 });
+    expect(s.players[1].deck.slice(-5)).toEqual(top5);
   });
 
   it('Urouge ganha +2000 com DON!! x1 e 3 ou mais personagens', () => {

@@ -258,6 +258,10 @@ describe('efeitos lidos automaticamente', () => {
     t = applyAction(t, { type: 'playCard', player: 0, uid: give(t, 0, 'PX-012') });
     expect(t.pending?.kind === 'selectTargets' && t.pending.options).toContain(top);
     t = applyAction(t, { type: 'choose', player: 0, uids: [top] });
+    // O resto vai para o fundo na ordem escolhida pelo jogador.
+    if (t.pending?.kind === 'selectTargets' && t.pending.ordered) {
+      t = applyAction(t, { type: 'choose', player: 0, uids: t.pending.options });
+    }
     expect(t.players[0].characters.map((c) => c.uid)).toContain(top);
   });
 

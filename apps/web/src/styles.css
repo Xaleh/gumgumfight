@@ -1652,6 +1652,10 @@ button.hint-pill {
   animation: glow 1.3s ease-in-out infinite;
   cursor: pointer;
 }
+.hl-disabled {
+  opacity: 0.45;
+  filter: grayscale(0.85);
+}
 .hl-playable {
   box-shadow: 0 0 0 2.5px #5fdcff, 0 0 16px 3px rgba(54, 200, 255, 0.65) !important;
 }
