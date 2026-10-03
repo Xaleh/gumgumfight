@@ -37,11 +37,20 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
   const maxLife = cardDef(state, ps.leader.uid).life ?? ps.life.length;
 
   const fieldCard = (uid: string, fc: (typeof ps.characters)[number]) => (
-    <div key={uid} className="enter">
+    <div key={uid} className="enter field-card">
+      {fc.don > 0 && (
+        <div className="attached-don" title={`${fc.don} DON!! anexado(s)`}>
+          {Array.from({ length: Math.min(fc.don, 4) }, (_, i) => (
+            <span key={i} className="don-card flat" style={vars({ '--k': i })} />
+          ))}
+          <b>+{fc.don}</b>
+        </div>
+      )}
       <CardView
         state={state}
         uid={uid}
         fc={fc}
+        hideDon
         highlight={h.highlight(uid)}
         onClick={() => h.onCard(uid)}
         onHover={h.onHover}
@@ -76,24 +85,32 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
     </div>
   );
 
+  const canDragDon = h.canDragDon(player);
+  const donGlow = h.donHighlight(player);
   const don = (
     <div
-      className={['zone', 'don-zone', h.donHighlight(player) ? 'hl-option clickable' : ''].join(' ')}
-      onClick={() => h.onDon(player)}
-      data-drag={h.canDragDon(player) ? 'don' : undefined}
-      title="DON!! ativos: arraste (ou toque e escolha) até o Líder ou um Personagem para dar +1000 no seu turno"
+      className={['don-row', position, donGlow ? 'glow' : ''].join(' ')}
+      title={`DON!!: ${ps.donActive} ativos, ${ps.donRested} virados, ${ps.donDeck} no deck de DON!!`}
     >
-      <div className="don-coin">
-        <span>DON!!</span>
-        <b>{ps.donActive}</b>
-      </div>
-      <div className="don-pips">
-        {Array.from({ length: Math.min(ps.donActive + ps.donRested, 10) }, (_, i) => (
-          <span key={i} className={i < ps.donActive ? 'on' : ''} />
+      {ps.donDeck > 0 && (
+        <div className="don-deck">
+          <span className="don-card back" />
+          <span className="pile-count">{ps.donDeck}</span>
+        </div>
+      )}
+      <div className="don-cards">
+        {Array.from({ length: ps.donActive }, (_, i) => (
+          <span
+            key={`a${i}`}
+            className={['don-card', donGlow ? 'hl-option' : '', canDragDon ? 'clickable' : ''].join(' ')}
+            data-drag={canDragDon ? 'don' : undefined}
+            onClick={() => h.onDon(player)}
+          />
         ))}
-      </div>
-      <div className="don-sub">
-        {ps.donRested} virado{ps.donRested === 1 ? '' : 's'} · {ps.donDeck} no deck
+        {Array.from({ length: ps.donRested }, (_, i) => (
+          <span key={`r${i}`} className="don-card rested" />
+        ))}
+        {ps.donActive + ps.donRested === 0 && <span className="don-empty">DON!!</span>}
       </div>
     </div>
   );
@@ -124,17 +141,11 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
             {stage}
           </div>
           {leader}
-          <div className="base-side right">
-            {don}
-            {piles}
-          </div>
+          <div className="base-side right">{piles}</div>
         </>
       ) : (
         <>
-          <div className="base-side left">
-            {piles}
-            {don}
-          </div>
+          <div className="base-side left">{piles}</div>
           {leader}
           <div className="base-side right">
             {stage}
@@ -162,6 +173,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
     >
       {position === 'top' ? (
         <>
+          {don}
           {base}
           {field}
         </>
@@ -169,6 +181,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
         <>
           {field}
           {base}
+          {don}
         </>
       )}
     </section>
@@ -181,21 +194,34 @@ export function Hand({
   player,
   reveal,
   position,
+  order,
+  lifted,
+  ghost,
   ...h
 }: Pick<BoardHandlers, 'highlight' | 'onCard' | 'onCardDouble' | 'onHover' | 'canDragHand'> & {
   state: GameState;
   player: PlayerId;
   reveal: boolean;
   position: 'top' | 'bottom';
+  /** Ordem escolhida pelo jogador (só muda a exibição). */
+  order?: string[];
+  /** Carta erguida sob o dedo. */
+  lifted?: string | null;
+  /** Carta sendo arrastada (fica apagada no lugar onde vai cair). */
+  ghost?: string | null;
 }) {
-  const hand = state.players[player].hand;
+  const hand = order ?? state.players[player].hand;
   const n = hand.length;
   return (
     <div className={['hand', position].join(' ')} style={vars({ '--n': n })}>
       {hand.map((uid, i) => {
         const offset = i - (n - 1) / 2;
         return (
-          <div key={uid} className="hand-card" style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}>
+          <div
+            key={uid}
+            className={['hand-card', uid === lifted ? 'lifted' : '', uid === ghost ? 'ghosted' : ''].join(' ')}
+            style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}
+          >
             {reveal ? (
               <CardView
                 state={state}
@@ -239,6 +265,9 @@ export function PlayerBanner({ state, player, align }: { state: GameState; playe
 
 interface BoardProps extends BoardHandlers {
   state: GameState;
+  handOrder?: string[];
+  lifted?: string | null;
+  ghost?: string | null;
   bottom: PlayerId;
   revealTop: boolean;
   revealBottom: boolean;
@@ -247,7 +276,18 @@ interface BoardProps extends BoardHandlers {
   center: ReactNode;
 }
 
-export function Board({ state, bottom, revealTop, revealBottom, corner, center, ...handlers }: BoardProps) {
+export function Board({
+  state,
+  bottom,
+  revealTop,
+  revealBottom,
+  corner,
+  center,
+  handOrder,
+  lifted,
+  ghost,
+  ...handlers
+}: BoardProps) {
   const top = (bottom === 0 ? 1 : 0) as PlayerId;
   return (
     <div className="mat">
@@ -269,8 +309,19 @@ export function Board({ state, bottom, revealTop, revealBottom, corner, center, 
         <PlayerSide state={state} player={bottom} position="bottom" {...handlers} />
       </div>
       <div className="bottom-strip">
-        <PlayerBanner state={state} player={bottom} align="left" />
-        <Hand state={state} player={bottom} reveal={revealBottom} position="bottom" {...handlers} />
+        <div className="my-bar">
+          <PlayerBanner state={state} player={bottom} align="left" />
+        </div>
+        <Hand
+          state={state}
+          player={bottom}
+          reveal={revealBottom}
+          position="bottom"
+          order={handOrder}
+          lifted={lifted}
+          ghost={ghost}
+          {...handlers}
+        />
       </div>
     </div>
   );

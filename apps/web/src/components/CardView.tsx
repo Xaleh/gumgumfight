@@ -35,9 +35,11 @@ interface Props {
   onHover?: (uid: string | null) => void;
   /** Arrastável na mesa: 'hand' (jogar) ou 'attacker' (atacar). */
   drag?: 'hand' | 'attacker';
+  /** Os DON!! anexados são desenhados pela mesa (cartas por baixo). */
+  hideDon?: boolean;
 }
 
-export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover, drag }: Props) {
+export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover, drag, hideDon }: Props) {
   const def = cardDef(state, uid);
   const { showImages } = useSettings();
   const [imageFailed, setImageFailed] = useState(false);
@@ -83,12 +85,12 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
           {delta !== 0 && power !== undefined && (
             <span className={['img-power', delta > 0 ? 'up' : 'down'].join(' ')}>{power}</span>
           )}
-          {fc && fc.don > 0 && <div className="don-badge">DON!! ×{fc.don}</div>}
+          {fc && fc.don > 0 && !hideDon && <div className="don-badge">DON!! ×{fc.don}</div>}
         </>
       )}
       {/* Enquanto a imagem carrega, a face desenhada fica por baixo. */}
       {(!withImage || !imageLoaded) && (
-        <CardFace def={def} power={power} delta={delta} keywords={keywords} fc={withImage ? undefined : fc} />
+        <CardFace def={def} power={power} delta={delta} keywords={keywords} fc={withImage || hideDon ? undefined : fc} />
       )}
       {def.manual && (
         <span className="manual-badge" title="Efeito ainda não automatizado: resolvido com as ferramentas manuais">

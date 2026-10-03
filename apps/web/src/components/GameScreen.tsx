@@ -11,7 +11,7 @@ import {
   translateToPt,
   zoneOf,
 } from '@gumgum/engine';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
@@ -28,13 +28,17 @@ interface Drag {
   uid: string | null;
   x: number;
   y: number;
-  /** Carta (uid) ou 'field' sob o dedo, se for um destino válido. */
+  /** Carta (uid), 'field' ou 'hand' sob o dedo, se for um destino válido. */
   over: string | null;
+  /** Posição na mão onde a carta arrastada vai entrar (reorganizar). */
+  insert?: number;
 }
 type Sheet = null | 'menu' | 'log' | 'tools' | { trash: PlayerId };
 
 const LONG_PRESS_MS = 420;
 const DRAG_THRESHOLD = 9;
+/** Quanto puxar a carta da mão para cima até ela "sair" (arrastar). */
+const HAND_PULL = 22;
 
 function useMediaQuery(query: string) {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches);
@@ -61,6 +65,10 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   const [showBotHand, setShowBotHand] = useState(setup.mode !== 'bot');
   const [banner, setBanner] = useState<{ text: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
+  /** Ordem da mão escolhida pelo jogador (só exibição). */
+  const [handOrder, setHandOrder] = useState<string[]>([]);
+  /** Carta da mão erguida sob o dedo. */
+  const [lifted, setLifted] = useState<string | null>(null);
 
   const pending = state.pending;
   const myPending = pending && human !== null && pending.player === human ? pending : null;
@@ -69,6 +77,23 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     human !== null && !game.auto && !pending && state.activePlayer === human && state.phase === 'main' && !state.stack.length;
   const acting = actingPlayer(state);
   const bottom: PlayerId = human ?? 0;
+
+  // Mão na ordem do jogador: cartas novas entram no fim.
+  const myHand = state.players[bottom].hand;
+  const orderedHand = useMemo(() => {
+    const inHand = new Set(myHand);
+    const kept = handOrder.filter((u) => inHand.has(u));
+    const keptSet = new Set(kept);
+    return [...kept, ...myHand.filter((u) => !keptSet.has(u))];
+  }, [handOrder, myHand]);
+  const reorder = (uid: string, index: number) => {
+    const rest = orderedHand.filter((u) => u !== uid);
+    rest.splice(Math.max(0, Math.min(index, rest.length)), 0, uid);
+    return rest;
+  };
+  const handView = drag?.kind === 'hand' && drag.over === 'hand' && drag.uid && drag.insert !== undefined
+    ? reorder(drag.uid, drag.insert)
+    : orderedHand;
 
   // Limpa seleções quando a situação muda.
   useEffect(() => setPicked([]), [pending]);
@@ -141,7 +166,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   /** Destinos válidos para o que está sendo arrastado. */
   const dropValid = (d: Pick<Drag, 'kind' | 'uid'>, over: string | null): boolean => {
     if (!over) return false;
-    if (d.kind === 'hand') return over === 'field' && d.uid !== null && canPlay(d.uid);
+    if (d.kind === 'hand') return over === 'hand' || (over === 'field' && d.uid !== null && canPlay(d.uid));
     if (d.kind === 'attacker') return has((a) => a.type === 'attack' && a.attacker === d.uid && a.target === over);
     return has((a) => a.type === 'attachDon' && a.target === over);
   };
@@ -237,25 +262,48 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   const press = useRef<{
     x: number;
     y: number;
+    /** Âncora do toque longo (recomeça quando o dedo anda). */
+    ax: number;
+    ay: number;
     uid: string | null;
     kind: DragKind | null;
     timer: ReturnType<typeof setTimeout>;
     moved: boolean;
+    /** Começou na própria mão: deslizar ergue a carta sob o dedo. */
+    hand: boolean;
+    browsed: boolean;
   } | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const suppressClick = useRef(false);
   const dropRef = useRef<(d: Drag) => void>(() => undefined);
   const dropValidRef = useRef(dropValid);
   dropValidRef.current = dropValid;
+  const onCardRef = useRef(onCard);
+  onCardRef.current = onCard;
 
   dropRef.current = (d: Drag) => {
     if (!d.over || !dropValid(d, d.over) || human === null) return;
+    if (d.kind === 'hand' && d.over === 'hand') {
+      if (d.uid && d.insert !== undefined) setHandOrder(reorder(d.uid, d.insert));
+      return;
+    }
     if (d.kind === 'hand') dispatch({ type: 'playCard', player: human, uid: d.uid! });
     else if (d.kind === 'attacker') dispatch({ type: 'attack', player: human, attacker: d.uid!, target: d.over });
     else dispatch({ type: 'attachDon', player: human, target: d.over });
     setMode(null);
     setSelected(null);
   };
+
+  const armLongPress = (uid: string | null) =>
+    setTimeout(() => {
+      const p = press.current;
+      if (!p || !uid || dragRef.current) return;
+      suppressClick.current = true;
+      press.current = null;
+      setLifted(null);
+      setZoom(uid);
+      navigator.vibrate?.(12);
+    }, LONG_PRESS_MS);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -265,40 +313,85 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     if (!dragEl && !cardEl) return;
     const uid = (dragEl ?? cardEl)!.dataset.uid ?? null;
     const kind = (dragEl?.dataset.drag as DragKind | undefined) ?? null;
+    const hand = Boolean(cardEl && el.closest('.hand.bottom'));
     if (press.current) clearTimeout(press.current.timer);
-    const timer = setTimeout(() => {
-      const p = press.current;
-      if (!p || p.moved || !cardEl?.dataset.uid) return;
-      suppressClick.current = true;
-      press.current = null;
-      setZoom(cardEl.dataset.uid);
-      navigator.vibrate?.(12);
-    }, LONG_PRESS_MS);
-    press.current = { x: e.clientX, y: e.clientY, uid, kind, timer, moved: false };
+    if (hand && uid) setLifted(uid);
+    press.current = {
+      x: e.clientX,
+      y: e.clientY,
+      ax: e.clientX,
+      ay: e.clientY,
+      uid,
+      kind,
+      timer: armLongPress(cardEl?.dataset.uid ?? null),
+      moved: false,
+      hand,
+      browsed: false,
+    };
   };
 
   useEffect(() => {
-    const findOver = (x: number, y: number, d: Drag): string | null => {
+    /** Posição na mão sob o dedo, pelas mesmas contas do leque no CSS. */
+    const handSlot = (x: number): number | undefined => {
+      const box = document.querySelector<HTMLElement>('.hand.bottom');
+      const card = box?.querySelector<HTMLElement>('.hand-card');
+      if (!box || !card) return undefined;
+      const n = box.querySelectorAll('.hand-card').length;
+      const w = box.clientWidth;
+      const cw = card.offsetWidth;
+      const step = n > 1 ? Math.min(cw * 0.9, (w - cw - 12) / (n - 1)) : 1;
+      const left = box.getBoundingClientRect().left;
+      return Math.max(0, Math.min(n - 1, Math.round((x - left - w / 2) / step + (n - 1) / 2)));
+    };
+    const findOver = (x: number, y: number, d: Drag): Pick<Drag, 'over' | 'insert'> => {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
-      if (!el) return null;
-      if (d.kind === 'hand') return el.closest('[data-drop="field"]') ? 'field' : null;
+      if (!el) return { over: null };
+      if (d.kind === 'hand') {
+        if (el.closest('.bottom-strip')) return { over: 'hand', insert: handSlot(x) };
+        return { over: el.closest('[data-drop="field"]') && dropValidRef.current(d, 'field') ? 'field' : null };
+      }
       const uid = el.closest<HTMLElement>('[data-uid]')?.dataset.uid ?? null;
-      return uid && dropValidRef.current(d, uid) ? uid : null;
+      return { over: uid && dropValidRef.current(d, uid) ? uid : null };
+    };
+    const startDrag = (p: NonNullable<typeof press.current>, e: PointerEvent) => {
+      clearTimeout(p.timer);
+      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null };
+      setLifted(null);
+      setZoom(null);
+      setMode(null);
     };
     const move = (e: PointerEvent) => {
       const p = press.current;
       if (!p) return;
-      if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) {
+      if (p.hand && !dragRef.current) {
+        // Na mão: puxar para cima tira a carta; para os lados, ergue a carta sob o dedo.
+        if (p.kind && p.y - e.clientY > HAND_PULL) startDrag(p, e);
+        else {
+          if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) p.moved = true;
+          if (Math.hypot(e.clientX - p.ax, e.clientY - p.ay) > 8) {
+            clearTimeout(p.timer);
+            p.ax = e.clientX;
+            p.ay = e.clientY;
+            const hit = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+            const under = hit?.closest('.hand.bottom') ? hit.closest<HTMLElement>('[data-uid]')?.dataset.uid : undefined;
+            if (under && under !== p.uid) {
+              p.uid = under;
+              p.browsed = true;
+              setLifted(under);
+            }
+            p.timer = armLongPress(p.uid);
+          }
+          return;
+        }
+      } else if (!p.moved && Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) {
         p.moved = true;
         clearTimeout(p.timer);
         if (!p.kind) return;
-        dragRef.current = { kind: p.kind, uid: p.uid, x: e.clientX, y: e.clientY, over: null };
-        setZoom(null);
-        setMode(null);
+        startDrag(p, e);
       }
       const d = dragRef.current;
       if (!d) return;
-      const next = { ...d, x: e.clientX, y: e.clientY, over: findOver(e.clientX, e.clientY, d) };
+      const next = { ...d, x: e.clientX, y: e.clientY, ...findOver(e.clientX, e.clientY, d) };
       dragRef.current = next;
       setDrag(next);
     };
@@ -306,12 +399,17 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       const p = press.current;
       if (p) clearTimeout(p.timer);
       press.current = null;
+      setLifted(null);
       const d = dragRef.current;
       if (d) {
         dragRef.current = null;
         setDrag(null);
         suppressClick.current = true;
         dropRef.current(d);
+      } else if (p?.hand && p.browsed && p.uid) {
+        // Deslizou pela mão e soltou numa carta: age como um toque nela.
+        suppressClick.current = true;
+        onCardRef.current(p.uid);
       }
       // O clique (se houver) chega logo depois do pointerup; depois disso, libera.
       setTimeout(() => (suppressClick.current = false), 60);
@@ -345,10 +443,10 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
     onTrash: (p: PlayerId) => setSheet({ trash: p }),
     donHighlight: (p: PlayerId) =>
       p === human && (mode?.kind === 'don' || (drag?.kind === 'don') || (myTurnIdle && has((a) => a.type === 'attachDon'))),
-    canDragHand: (uid: string) => canPlay(uid),
+    canDragHand: (uid: string) => human !== null && state.cards[uid]?.owner === human,
     canDragAttacker: (uid: string) => canAttackWith(uid),
     canDragDon: (p: PlayerId) => p === human && myTurnIdle && has((a) => a.type === 'attachDon'),
-    fieldDrop: (p: PlayerId) => p === human && drag?.kind === 'hand',
+    fieldDrop: (p: PlayerId) => p === human && drag?.kind === 'hand' && drag.uid !== null && canPlay(drag.uid),
   };
 
   const corner = (
@@ -385,6 +483,9 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
           revealBottom
           revealTop={showBotHand}
           corner={corner}
+          handOrder={handView}
+          lifted={lifted}
+          ghost={drag?.kind === 'hand' ? drag.uid : null}
           center={
             <CenterBand
               state={state}
@@ -423,12 +524,14 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
           onTools={() => setSheet('tools')}
         />
 
-        {drag && (
+        <AttackArrow state={state} drag={drag} mode={mode} hovered={hovered} legal={legal} />
+
+        {drag && drag.kind !== 'attacker' && (
           <div
             className={['drag-ghost', `ghost-${drag.kind}`, drag.over ? 'over' : ''].join(' ')}
             style={{ left: drag.x, top: drag.y }}
           >
-            {drag.kind === 'don' ? <div className="don-token">DON!!</div> : drag.uid && <CardView state={state} uid={drag.uid} />}
+            {drag.kind === 'don' ? <span className="don-card" /> : drag.uid && <CardView state={state} uid={drag.uid} />}
           </div>
         )}
 
@@ -695,6 +798,107 @@ function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null
         {status}
       </div>
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ seta de ataque
+
+/**
+ * Seta do atacante até o alvo: durante a batalha, enquanto o jogador arrasta um
+ * atacante (segue o dedo) e, no modo de ataque, até o alvo sob o mouse.
+ */
+function AttackArrow({
+  state,
+  drag,
+  mode,
+  hovered,
+  legal,
+}: {
+  state: GameState;
+  drag: Drag | null;
+  mode: Mode;
+  hovered: string | null;
+  legal: Action[];
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [path, setPath] = useState<{ d: string; key: string } | null>(null);
+  const [, setTick] = useState(0);
+
+  let from: string | null = null;
+  let to: string | { x: number; y: number } | null = null;
+  let kind = 'battle';
+  if (drag?.kind === 'attacker' && drag.uid) {
+    from = drag.uid;
+    to = drag.over ?? { x: drag.x, y: drag.y };
+    kind = drag.over ? 'aim locked' : 'aim';
+  } else if (state.battle) {
+    from = state.battle.attacker;
+    to = state.battle.target;
+  } else if (mode?.kind === 'attack' && hovered) {
+    const ok = legal.some((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === hovered);
+    if (ok) {
+      from = mode.attacker;
+      to = hovered;
+      kind = 'aim locked';
+    }
+  }
+
+  useEffect(() => {
+    const onResize = () => setTick((t) => t + 1);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Mede as cartas depois do layout; refaz quando a animação de entrada termina.
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !from || !to) {
+      if (path) setPath(null);
+      return;
+    }
+    const base = svg.getBoundingClientRect();
+    const center = (uid: string) => {
+      const el = document.querySelector<HTMLElement>(`.mat [data-uid="${CSS.escape(uid)}"]`);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2 - base.left, y: r.top + r.height / 2 - base.top };
+    };
+    const a = center(from);
+    const b = typeof to === 'string' ? center(to) : { x: to.x - base.left, y: to.y - base.top };
+    if (!a || !b) return;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 12) return;
+    // Curva suave: ponto de controle deslocado para o lado.
+    const bend = Math.min(60, len * 0.18);
+    const cx = (a.x + b.x) / 2 - (dy / len) * bend;
+    const cy = (a.y + b.y) / 2 + (dx / len) * bend;
+    const d = `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+    if (d !== path?.d) setPath({ d, key: `${from}>${typeof to === 'string' ? to : 'ptr'}` });
+  });
+
+  // A carta atacante pode estar animando (virar): mede de novo logo depois.
+  useEffect(() => {
+    if (!from) return;
+    const t = setTimeout(() => setTick((x) => x + 1), 380);
+    return () => clearTimeout(t);
+  }, [from, typeof to === 'string' ? to : null]);
+
+  return (
+    <svg ref={svgRef} className={['attack-arrow', kind].join(' ')} aria-hidden="true">
+      <defs>
+        <marker id="arrow-head" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 L2.5 5 Z" fill="#ff4d2e" stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+        </marker>
+      </defs>
+      {path && from && to && (
+        <g key={path.key}>
+          <path className="arrow-shadow" d={path.d} />
+          <path className="arrow-line" d={path.d} markerEnd="url(#arrow-head)" />
+        </g>
+      )}
+    </svg>
   );
 }
 

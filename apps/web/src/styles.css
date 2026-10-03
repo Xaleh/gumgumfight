@@ -483,7 +483,7 @@ input[type='number'] {
   min-width: 0;
   min-height: 0;
   container-type: size;
-  --cw: max(38px, min(calc((100cqw - 20px) / 5.45), calc((100cqh - 120px) / 8.7), 112px));
+  --cw: max(38px, min(calc((100cqw - 20px) / 5.45), calc((100cqh - 136px) / 9.9), 112px));
   --ch: calc(var(--cw) * 1.396);
   --hcw: calc(var(--cw) * 1.2);
 }
@@ -613,7 +613,7 @@ input[type='number'] {
 }
 .banner.left {
   left: 0;
-  bottom: calc(env(safe-area-inset-bottom) + 6px);
+  top: 0;
   z-index: 60;
   border-radius: 0 999px 999px 0;
   flex-direction: row-reverse;
@@ -840,81 +840,172 @@ input[type='number'] {
   color: #ffd0d0;
 }
 
-/* DON!! */
-.don-zone {
-  width: calc(var(--cw) * 1.02);
-  padding: calc(var(--cw) * 0.06) 2px;
-  gap: calc(var(--cw) * 0.05);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.45);
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  transition: box-shadow 0.2s;
-}
-.don-zone[data-drag] {
-  cursor: grab;
-}
-.don-zone.hl-option {
-  box-shadow: 0 0 0 2px var(--sky), 0 0 16px rgba(54, 200, 255, 0.7);
-  animation: glow 1.4s ease-in-out infinite;
-}
-.don-coin {
-  width: calc(var(--cw) * 0.66);
-  height: calc(var(--cw) * 0.66);
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff6c4 0 12%, #ffd75a 38%, #e3a10f 100%);
-  border: 2px solid #fff;
-  box-shadow: 0 3px 8px rgba(160, 110, 0, 0.35);
+/* DON!! em cartas */
+.don-row {
+  --dw: calc(var(--cw) * 0.44);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #5a3a00;
-  line-height: 1;
+  gap: calc(var(--cw) * 0.12);
+  min-height: calc(var(--dw) * 1.396);
+  max-width: calc(var(--cw) * 5.4);
 }
-.don-coin span {
-  font-family: Bangers, Impact, sans-serif;
-  font-size: max(8px, calc(var(--cw) * 0.12));
-  letter-spacing: 0.5px;
+.don-row.top {
+  --dw: calc(var(--cw) * 0.3);
 }
-.don-coin b {
-  font-size: max(14px, calc(var(--cw) * 0.28));
-  font-weight: 900;
-}
-.don-pips {
+.don-cards {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 2px;
-  max-width: 100%;
+  align-items: center;
+  gap: calc(var(--dw) * 0.1);
 }
-.don-pips span {
-  width: max(5px, calc(var(--cw) * 0.075));
-  height: max(5px, calc(var(--cw) * 0.075));
-  border-radius: 50%;
-  background: rgba(116, 128, 158, 0.35);
-}
-.don-pips span.on {
-  background: #f2b928;
-}
-.don-sub {
-  font-size: max(8px, calc(var(--cw) * 0.12));
-  color: var(--muted);
-  text-align: center;
-  line-height: 1.15;
-  font-weight: 700;
-}
-.don-token {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff6c4 0 12%, #ffd75a 38%, #e3a10f 100%);
-  border: 2px solid #fff;
+.don-card {
+  position: relative;
+  flex: none;
   display: grid;
   place-items: center;
+  width: var(--dw);
+  height: calc(var(--dw) * 1.396);
+  border-radius: calc(var(--dw) * 0.12);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 215, 90, 0.35) 0 28%, transparent 60%),
+    linear-gradient(160deg, #3a2a10 0%, #1a1206 100%);
+  border: max(1.5px, calc(var(--dw) * 0.05)) solid #f2c14e;
+  box-shadow: 0 2px 5px rgba(60, 40, 0, 0.35);
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
+}
+.drag-ghost .don-card {
+  --dw: calc(var(--cw) * 0.62);
+}
+.don-card::after {
+  content: 'DON!!';
   font-family: Bangers, Impact, sans-serif;
-  color: #5a3a00;
-  font-size: 15px;
-  box-shadow: 0 6px 18px rgba(160, 110, 0, 0.45);
+  color: #ffd75a;
+  font-size: calc(var(--dw) * 0.34);
+  letter-spacing: 0.5px;
+  transform: rotate(-90deg);
+  white-space: nowrap;
+  text-shadow: 0 1px 0 #7a4c00;
+}
+.don-card[data-drag] {
+  cursor: grab;
+  touch-action: none;
+}
+.don-row.glow .don-card:not(.rested) {
+  transform: translateY(-3px);
+}
+.don-card.rested {
+  transform: rotate(90deg) scale(0.86);
+  margin-left: calc(var(--dw) * -0.5);
+  filter: grayscale(0.6) brightness(0.8);
+}
+.don-cards > .don-card.rested:first-of-type,
+.don-cards > .don-card:not(.rested) + .don-card.rested {
+  margin-left: calc(var(--dw) * 0.25);
+}
+.don-card.back {
+  background: repeating-linear-gradient(45deg, #2b3550 0 4px, #222a40 4px 8px);
+  border-color: #c9d2e6;
+}
+.don-card.back::after {
+  color: rgba(255, 255, 255, 0.35);
+  text-shadow: none;
+}
+.don-deck {
+  position: relative;
+  flex: none;
+}
+.don-empty {
+  font-family: Bangers, Impact, sans-serif;
+  color: rgba(116, 128, 158, 0.5);
+  font-size: calc(var(--dw) * 0.4);
+}
+/* DON!! anexados: deitados por baixo da carta, aparecendo na borda de baixo */
+.field-card {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+}
+.attached-don {
+  --fw: calc(var(--cw) * 0.34);
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--cw) * -0.2);
+  width: calc(var(--fw) * 1.396 + 9px);
+  height: calc(var(--fw) + 9px);
+  transform: translateX(-50%);
+  z-index: -1;
+}
+.don-card.flat {
+  position: absolute;
+  left: calc(var(--k) * 3px);
+  bottom: calc(var(--k) * -3px + 9px);
+  width: calc(var(--fw) * 1.396);
+  height: var(--fw);
+  border-radius: calc(var(--fw) * 0.12);
+  --dw: var(--fw);
+}
+.don-card.flat::after {
+  transform: none;
+}
+.attached-don b {
+  position: absolute;
+  right: calc(var(--fw) * -0.55);
+  bottom: 0;
+  background: radial-gradient(circle at 35% 30%, #fff6c4 0 12%, #ffd75a 45%, #e3a10f 100%);
+  color: #4a3200;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  font-size: max(9px, calc(var(--cw) * 0.14));
+  font-weight: 900;
+  padding: 0 5px;
+  line-height: 1.35;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* seta de ataque */
+.attack-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* Acima das cartas, abaixo da faixa central (poder da batalha) e da mão. */
+  z-index: 1;
+  overflow: visible;
+}
+.attack-arrow path {
+  fill: none;
+  stroke-linecap: round;
+}
+.arrow-shadow {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 13;
+  filter: drop-shadow(0 3px 6px rgba(160, 40, 0, 0.35));
+}
+.arrow-line {
+  stroke: #ff5a2e;
+  stroke-width: 7;
+  stroke-dasharray: 15 9;
+  animation: arrow-flow 0.45s linear infinite;
+}
+.attack-arrow.battle .arrow-shadow,
+.attack-arrow.battle .arrow-line {
+  animation: arrow-draw 0.35s ease-out backwards, arrow-flow 0.45s linear infinite;
+}
+.attack-arrow.aim:not(.locked) .arrow-line {
+  stroke: #8f9bbd;
+}
+@keyframes arrow-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes arrow-draw {
+  from {
+    opacity: 0;
+  }
 }
 
 /* deck e descarte */
@@ -1122,14 +1213,38 @@ button.hint-pill {
 .bottom-strip {
   position: relative;
   flex: none;
-  height: calc(var(--hcw) * 1.396 * 0.8);
+  height: calc(var(--hcw) * 1.396 * 0.8 + 28px);
   z-index: 3;
   margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.my-bar {
+  position: relative;
+  flex: none;
+  height: 26px;
+}
+.my-bar .banner {
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 .hand {
   position: relative;
+  flex: 1;
   height: 100%;
   width: 100%;
+}
+.hand.bottom .hand-card.lifted {
+  transform: translateY(-20%) rotate(0deg) scale(1.12);
+  z-index: 80;
+  transition: transform 0.12s ease-out, left 0.25s;
+}
+.hand.bottom .hand-card.lifted > .card {
+  box-shadow: 0 14px 26px rgba(30, 40, 80, 0.35);
+}
+.hand.bottom .hand-card.ghosted {
+  opacity: 0.28;
+  transform: translateY(-6%) rotate(0deg);
 }
 .hand-card {
   position: absolute;
