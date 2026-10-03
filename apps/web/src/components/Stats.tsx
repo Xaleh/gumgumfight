@@ -11,7 +11,7 @@ import {
   type TrendResponse,
   type WinCount,
 } from '../api';
-import { useSettings } from '../settings';
+import { LeaderArt } from './LeaderArt';
 
 /** Abaixo disso, a taxa é mostrada esmaecida (amostra pequena). */
 const MIN_GAMES = 10;
@@ -87,18 +87,9 @@ function WinBar({ w }: { w: WinCount }) {
 }
 
 function CardName({ id, info }: { id: string; info?: CardInfo }) {
-  const { showImages } = useSettings();
-  const [failed, setFailed] = useState(false);
-  const color = info?.colors[0] === 'blue' ? 'blue-card' : (info?.colors[0] ?? 'black');
   return (
     <span className="stat-card" title={id}>
-      <span className="stat-thumb" style={{ ['--card-color' as string]: `var(--${color})` }}>
-        {showImages && info?.imageUrl && !failed ? (
-          <img src={info.imageUrl} alt="" referrerPolicy="no-referrer" loading="lazy" onError={() => setFailed(true)} />
-        ) : (
-          (info?.name ?? id).slice(0, 1)
-        )}
-      </span>
+      <LeaderArt name={info?.name ?? id} image={info?.imageUrl} colors={info?.colors} size="tiny" />
       <span className="stat-card-name">
         {info?.name ?? id}
         <span className="muted small"> {id}</span>

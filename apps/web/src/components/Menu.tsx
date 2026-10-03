@@ -2,7 +2,8 @@ import type { Action, CardData, PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import { api, deckGroups, type DeckSummary, type FormatId } from '../api';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
-import { SettingsControls, useSettings } from '../settings';
+import { SettingsControls } from '../settings';
+import { LeaderArt } from './LeaderArt';
 
 const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 
@@ -53,22 +54,15 @@ function savedFormat(): FormatId {
 
 const RANDOM = 'random';
 
-/** Arte do Líder em círculo (ou a inicial, sem imagens). */
-function LeaderArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
-  const { showImages } = useSettings();
-  const [failed, setFailed] = useState(false);
-  if (!deck) {
-    return <div className={['leader-art', 'random', small ? 'small' : ''].join(' ')}>?</div>;
-  }
-  const color = deck.colors[0] === 'blue' ? 'blue-card' : (deck.colors[0] ?? 'red');
+/** Arte do Líder do deck (ou o "?" do sorteio). */
+function DeckArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
   return (
-    <div className={['leader-art', small ? 'small' : ''].join(' ')} style={{ ['--card-color' as string]: `var(--${color})` }}>
-      {showImages && deck.leaderImage && !failed ? (
-        <img src={deck.leaderImage} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
-      ) : (
-        (deck.leaderName ?? deck.name).slice(0, 1)
-      )}
-    </div>
+    <LeaderArt
+      name={deck ? (deck.leaderName ?? deck.name) : undefined}
+      image={deck?.leaderImage}
+      colors={deck?.colors}
+      size={small ? 'small' : undefined}
+    />
   );
 }
 
@@ -76,7 +70,7 @@ function DeckPick({ who, deck, random, onClick }: { who: string; deck?: DeckSumm
   return (
     <button className="deck-pick" onClick={onClick}>
       <span className="who">{who}</span>
-      <LeaderArt deck={random ? undefined : deck} />
+      <DeckArt deck={random ? undefined : deck} />
       <span className="name">{random ? 'Aleatório' : (deck?.name ?? 'Escolher deck')}</span>
       {!random && <DeckWarning deck={deck} />}
     </button>
@@ -111,7 +105,7 @@ function DeckPicker({
           {allowRandom && (
             <div className="picker-grid">
               <button className={['deck-pick', value === RANDOM ? 'on' : ''].join(' ')} onClick={() => onPick(RANDOM)}>
-                <LeaderArt small />
+                <DeckArt small />
                 <span className="name">Aleatório</span>
               </button>
             </div>
@@ -130,7 +124,7 @@ function DeckPicker({
                       onClick={() => onPick(d.id)}
                       title={d.valid ? d.name : `Incompleto: ${d.size}/50`}
                     >
-                      <LeaderArt deck={d} small />
+                      <DeckArt deck={d} small />
                       <span className="name">{d.name}</span>
                       {!d.valid && <span className="muted small">{d.size}/50</span>}
                     </button>
