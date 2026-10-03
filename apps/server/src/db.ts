@@ -202,6 +202,27 @@ export function upsertCards(
   return { written, skipped };
 }
 
+/** Origem das cartas de spoiler (data/spoilers). Elas são provisórias: a API oficial as substitui. */
+export const SPOILER_SOURCE = 'spoiler:';
+
+/** Cartas de spoiler que ainda não chegaram na API oficial. */
+export function pendingSpoilers(db: DB): string[] {
+  return (
+    db.prepare(`SELECT id FROM cards WHERE provisional = 1 AND source LIKE '${SPOILER_SOURCE}%' ORDER BY id`).all() as unknown as Array<{
+      id: string;
+    }>
+  ).map((r) => r.id);
+}
+
+/** Apaga as cartas de spoiler que saíram dos arquivos (número corrigido, carta desmentida). */
+export function pruneSpoilers(db: DB, keep: Iterable<string>): number {
+  const keepSet = new Set(keep);
+  const gone = pendingSpoilers(db).filter((id) => !keepSet.has(id));
+  const del = db.prepare('DELETE FROM cards WHERE id = ? AND provisional = 1');
+  transaction(db, () => gone.forEach((id) => del.run(id)));
+  return gone.length;
+}
+
 type CardRow = { data: string; provisional: number };
 const toCard = (r: CardRow) => ({ ...(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
 

@@ -51,6 +51,7 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `DATA_DIR`      | `data`                        | Decks prontos, cartas provisórias e traduções |
 | `CARD_IMAGES`   | `on`                          | `off` desliga as imagens oficiais das cartas |
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
+| `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 
 O backup é só copiar o arquivo `.db`.
 
@@ -256,6 +257,37 @@ npm run cards:import -- --file resp.json  # importa uma resposta da API salva em
 - Antes da primeira importação, o jogo usa dados **provisórios** de `data/cards` (escritos de memória). Eles nunca
   sobrescrevem cartas vindas da API.
 - Os scripts de efeito (`packages/engine/src/cards/scripts.ts`) precisam ser conferidos contra o texto oficial.
+
+### Spoilers (coleções ainda não lançadas)
+
+A optcgapi só publica uma coleção depois do lançamento. As cartas já anunciadas (por exemplo EB05 e OP18, vistas em
+[optcgleaks.com](https://optcgleaks.com/) e [cardkaizoku.com](https://www.cardkaizoku.com/spoilers)) ficam em
+`data/spoilers/<coleção>.json`:
+
+```json
+{
+  "set": "OP18",
+  "title": "The Dominance of God (OP-18)",
+  "source": "optcgleaks.com",
+  "url": "https://optcgleaks.com/",
+  "cards": [
+    { "id": "OP18-001", "name": "Karoo", "category": "character", "colors": ["red"], "cost": 1, "power": 2000,
+      "counter": 1000, "types": ["Alabasta"], "text": "[On Play] ...", "imageUrl": "https://..." }
+  ]
+}
+```
+
+- Os campos de cada carta são os mesmos de `data/cards` (`CardData`). `source`/`url` do arquivo valem para todas as cartas;
+  uma carta pode ter o seu próprio `"spoiler": { "source": "...", "url": "..." }`. Cartas sem número (`OP18-001`),
+  nome ou categoria são ignoradas e aparecem no log.
+- A cada início do servidor os arquivos são carregados como cartas **provisórias**: elas entram no catálogo e nos decks
+  com a etiqueta **SPOILER**, e o painel da carta mostra a fonte. Uma carta apagada do arquivo sai do banco.
+- **Troca automática:** o servidor procura as coleções dos spoilers na API ao iniciar e a cada `SPOILER_SYNC` horas
+  (`/allSets/`, `/allDecks/` e, se a coleção ainda não estiver listada, `/sets/card/<id>/`). Quando a coleção sai,
+  ela é importada inteira: os dados e a imagem oficiais substituem os do spoiler e a etiqueta some. Os decks continuam
+  iguais, porque o número da carta não muda. Para forçar na hora: `npm run cards:import -- --spoilers`.
+- Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
+- No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
 
 ### Imagens
 

@@ -40,6 +40,8 @@ const COLORS: Array<{ id: Color; label: string }> = [
 const CATEGORY_ORDER = { leader: 0, character: 1, event: 2, stage: 3 };
 const CATEGORY_LABEL = { leader: 'Líderes', character: 'Personagens', event: 'Eventos', stage: 'Stages' };
 const PAGE = 60;
+/** Valor do filtro de coleção que mostra só as cartas de spoiler. */
+const SPOILERS = '__spoilers';
 
 export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const [allCards, setAllCards] = useState<ApiCard[]>([]);
@@ -88,6 +90,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const confirmDiscard = () => !dirty || window.confirm('Descartar as alterações não salvas deste deck?');
 
   const sets = useMemo(() => [...new Set(allCards.map((c) => c.set ?? c.id.split('-')[0]))].sort(), [allCards]);
+  /** Coleções que ainda têm cartas de spoiler (não lançadas na API oficial). */
+  const spoilerSets = useMemo(() => new Set(allCards.filter((c) => c.spoiler).map((c) => c.set ?? c.id.split('-')[0])), [allCards]);
 
   /** Sem Líder escolhido, a lista mostra só Líderes. */
   const choosingLeader = !draft.leader;
@@ -101,7 +105,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         if (!choosingLeader && !category && c.category === 'leader') return false;
         if (colors.length && !c.colors.some((col) => colors.includes(col))) return false;
         if (cost !== '' && (cost === '10' ? (c.cost ?? -1) < 10 : c.cost !== Number(cost))) return false;
-        if (set && (c.set ?? c.id.split('-')[0]) !== set) return false;
+        if (set === SPOILERS ? !c.spoiler : set && (c.set ?? c.id.split('-')[0]) !== set) return false;
         if (onlyCompatible && leader && c.category !== 'leader' && (!isColorCompatible(leader, c) || !leaderAllows(leader, c))) return false;
         if (onlyAutomated && needsManual(c)) return false;
         if (q) {
@@ -365,9 +369,11 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
             </select>
             <select value={set} onChange={(e) => setSet(e.target.value)}>
               <option value="">Todas as coleções</option>
+              {spoilerSets.size > 0 && <option value={SPOILERS}>Só spoilers (não lançadas)</option>}
               {sets.map((s) => (
                 <option key={s} value={s}>
                   {s}
+                  {spoilerSets.has(s) ? ' (spoilers)' : ''}
                 </option>
               ))}
             </select>
