@@ -3314,23 +3314,18 @@ tr.clickable:hover td {
 /* ------------------------------------------------------------------ celular deitado (paisagem) */
 
 /*
- * Com pouca altura, cada lado vira uma faixa horizontal:
+ * Mesa mais larga que alta (desktop, celular deitado): cada lado vira uma faixa horizontal
+ * e as cartas crescem até ocupar a largura da tela:
  * você = [Vida · Stage · Líder · deck] [5 Personagens] [DON!!];
  * oponente espelhado = [DON!!] [5 Personagens] [deck · Líder · Stage · Vida].
+ * Fica no .mat (e não no .board-col) porque a consulta vale para os filhos do contêiner.
  */
-@media (orientation: landscape) and (max-height: 600px) {
-  .board-col {
-    --cw: max(
-      34px,
-      min(
-        calc((100cqw - 44px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 11.7),
-        calc((100cqh - 112px) / 3.9),
-        112px
-      )
-    );
-    --hcw: calc(var(--cw) * 1.08);
-  }
+@container (min-aspect-ratio: 1/1) {
   .mat {
+    /* Cartas medidas pela largura da mesa (a altura raramente limita). */
+    --cw: max(34px, min(calc((100cqw - 44px) / 11.7), calc((100cqh - 112px) / 5), 160px));
+    --ch: calc(var(--cw) * 1.396);
+    --hcw: calc(var(--cw) * 1.2);
     width: 100%;
     padding: 0 max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
     background:
@@ -3339,41 +3334,6 @@ tr.clickable:hover td {
       radial-gradient(120% 70% at 50% -30%, rgba(255, 224, 212, 0.9) 0 66%, transparent 66.4%),
       radial-gradient(120% 70% at 50% 130%, rgba(214, 232, 255, 0.95) 0 66%, transparent 66.4%),
       linear-gradient(180deg, #e9e6f7 0%, #e3e7f8 50%, #dfe8fa 100%);
-  }
-
-  /* faixa de cima mais baixa; menu e Auto lado a lado */
-  .top-strip {
-    height: 34px;
-  }
-  .corner {
-    flex-direction: row;
-    align-items: center;
-    top: 3px;
-    left: max(4px, env(safe-area-inset-left));
-  }
-  .round-btn {
-    width: 32px;
-    height: 32px;
-  }
-  .burger,
-  .burger::before,
-  .burger::after {
-    width: 15px;
-  }
-  .burger::before {
-    top: -5px;
-  }
-  .burger::after {
-    top: 5px;
-  }
-  .banner.right {
-    top: 3px;
-    padding-top: 3px;
-    padding-bottom: 3px;
-  }
-  .banner-life span {
-    width: 11px;
-    height: 11px;
   }
 
   /* cada lado numa linha só */
@@ -3463,7 +3423,7 @@ tr.clickable:hover td {
     grid-template-columns: auto auto;
     column-gap: 8px;
     padding: 2px 6px;
-    font-size: 9px;
+    font-size: max(9px, calc(var(--cw) * 0.1));
     justify-self: start;
   }
   .don-stats div {
@@ -3471,6 +3431,56 @@ tr.clickable:hover td {
   }
   .don-row.glow .don-card:not(.rested) {
     transform: translateY(-2px);
+  }
+}
+
+/* Com pouca altura (celular deitado): faixas, mão e janelas mais compactas. */
+@media (orientation: landscape) and (max-height: 600px) {
+  .board-col,
+  .mat {
+    --cw: max(
+      34px,
+      min(
+        calc((100cqw - 44px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 11.7),
+        calc((100cqh - 112px) / 3.9),
+        112px
+      )
+    );
+    --hcw: calc(var(--cw) * 1.08);
+  }
+  /* faixa de cima mais baixa; menu e Auto lado a lado */
+  .top-strip {
+    height: 34px;
+  }
+  .corner {
+    flex-direction: row;
+    align-items: center;
+    top: 3px;
+    left: max(4px, env(safe-area-inset-left));
+  }
+  .round-btn {
+    width: 32px;
+    height: 32px;
+  }
+  .burger,
+  .burger::before,
+  .burger::after {
+    width: 15px;
+  }
+  .burger::before {
+    top: -5px;
+  }
+  .burger::after {
+    top: 5px;
+  }
+  .banner.right {
+    top: 3px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+  .banner-life span {
+    width: 11px;
+    height: 11px;
   }
 
   /* faixa central e mão mais baixas */
