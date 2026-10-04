@@ -122,12 +122,23 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
   return (res.status === 204 ? undefined : res.json()) as Promise<T>;
 }
 
+/** player: joga e assiste sem ver as mãos; streamer: assiste vendo as mãos; admin: também muda os perfis. */
+export type Role = 'player' | 'streamer' | 'admin';
+
+export const ROLE_LABEL: Record<Role, string> = { player: 'Player', streamer: 'Streamer', admin: 'Admin' };
+
 export interface User {
   id: string;
   /** Nome da conta Google (só você vê; o nome público é o do perfil de estatísticas). */
   name: string | null;
   email: string | null;
   picture: string | null;
+  role: Role;
+}
+
+export interface AdminUser extends User {
+  createdAt: string;
+  lastLoginAt: string;
 }
 
 export const api = {
@@ -154,8 +165,20 @@ export const api = {
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
   cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
+  admin: {
+    users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
+    setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
+  },
   online: {
+    config: () => get<{ timeBankMs: number; botRooms: boolean }>('/api/online/config'),
     active: () => get<ActiveRoom[]>('/api/online/active'),
+    /** Treino contra o bot jogado pelo servidor (pode ser assistido). */
+    botRoom: (deckId: string, botDeckId: string, format: FormatId) =>
+      send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, format }),
+    live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
+    byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
+    room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
+    watchUrl: (roomId: string, hands: boolean) => `/api/online/rooms/${roomId}/watch${hands ? '?hands=1' : ''}`,
     createRoom: (deckId: string, format: FormatId) =>
       send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format }),
     joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
@@ -168,7 +191,7 @@ export const api = {
     emote: (roomId: string, t: string, emote: string) => send<void>('POST', `/api/online/rooms/${roomId}/emote`, { t, emote }),
     rematch: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/rematch`, { t }),
     leave: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/leave`, { t }),
-    replay: (roomId: string, t: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay?t=${encodeURIComponent(t)}`),
+    replay: (roomId: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay`),
     eventsUrl: (roomId: string, t: string) => `/api/online/rooms/${roomId}/events?t=${encodeURIComponent(t)}`,
   },
 };
@@ -182,10 +205,41 @@ export interface OnlineSeat {
   token: string;
 }
 
+/** Espectador: assiste a uma sala (com as mãos à mostra, se for streamer ou admin). */
+export interface WatchTarget {
+  roomId: string;
+  hands: boolean;
+}
+
+export type RoomQueue = 'private' | QueueKind | 'bot';
+
 export interface ActiveRoom extends OnlineSeat {
   status: 'waiting' | 'playing';
-  queue: 'private' | QueueKind;
+  queue: RoomQueue;
   code: string | null;
+}
+
+/** Partida na lista "Assistir". */
+export interface LiveRoom {
+  id: string;
+  queue: RoomQueue;
+  format: FormatId;
+  status: 'playing' | 'finished';
+  players: Array<{
+    name: string;
+    leader: string;
+    leaderName: string | null;
+    leaderImage: string | null;
+    colors: string[];
+    tier: string;
+    bounty: number;
+    bot: boolean;
+    life: number;
+    hand: number;
+  }>;
+  turn: number;
+  spectators: number;
+  createdAt: number;
 }
 
 export type QueuePoll =
@@ -195,11 +249,13 @@ export type QueuePoll =
 export interface OnlineRoomInfo {
   id: string;
   code: string | null;
-  queue: 'private' | QueueKind;
+  queue: RoomQueue;
   format: FormatId;
   status: 'waiting' | 'playing' | 'finished';
-  you: PlayerId;
-  players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean }>;
+  /** Seu assento; null = você está assistindo. */
+  you: PlayerId | null;
+  players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean }>;
+  spectators: number;
   clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null };
   result: { matchId: number | null; bounty: Array<{ before: number | null; after: number | null }> | null; error?: string } | null;
   rematch: [boolean, boolean];

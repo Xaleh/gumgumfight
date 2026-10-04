@@ -66,6 +66,10 @@ export function OnlineStatus({ online }: { online: OnlineGame }) {
   if (conn === 'lost') return <div className="toast online-toast">Conexão perdida. Reconectando…</div>;
   if (conn === 'gone' && room?.status !== 'finished') return <div className="toast error online-toast">A partida não existe mais.</div>;
   if (!room || room.status !== 'playing') return null;
+  if (room.you === null) {
+    const away = room.players.find((p) => !p.connected && !p.bot);
+    return away ? <div className="toast online-toast">{away.name} desconectou.</div> : null;
+  }
   const opp = room.players[room.you === 0 ? 1 : 0];
   if (opp && !opp.connected) {
     return (
@@ -121,6 +125,21 @@ export function EmoteBubbles({ online, bottom }: { online: OnlineGame; bottom: P
 export function OnlineResultInfo({ online }: { online: OnlineGame }) {
   const { room } = online;
   if (!room) return null;
+  if (room.you === null) {
+    // Espectador: a recompensa dos dois.
+    const change = room.queue === 'ranked' ? room.result?.bounty : null;
+    return change ? (
+      <div className="online-result">
+        {change.map((c, i) =>
+          c.before !== null && c.after !== null ? (
+            <p key={i} className="bounty-change">
+              {room.players[i]?.name}: {bounty(c.before)} → <b>{bounty(c.after)}</b>
+            </p>
+          ) : null,
+        )}
+      </div>
+    ) : null;
+  }
   const me = room.you;
   const opp = me === 0 ? 1 : 0;
   const mine = room.result?.bounty?.[me];
@@ -165,8 +184,8 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
         <section className="menu-card online-wait">
           {conn === 'gone' ? (
             <>
-              <h2>Partida não encontrada</h2>
-              <p className="muted">A sala foi cancelada ou expirou.</p>
+              <h2>{online.watching && online.error ? 'Não foi possível assistir' : 'Partida não encontrada'}</h2>
+              <p className="muted">{online.error ?? 'A sala foi cancelada ou expirou.'}</p>
             </>
           ) : room?.status === 'waiting' ? (
             <>
@@ -195,6 +214,46 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/** Quantos estão assistindo (aparece para jogadores e espectadores). */
+export function SpectatorCount({ online }: { online: OnlineGame }) {
+  const n = online.room?.spectators ?? 0;
+  if (!n) return null;
+  return (
+    <span className="spectator-count" title={n === 1 ? '1 pessoa assistindo' : `${n} pessoas assistindo`}>
+      👁 {n}
+    </span>
+  );
+}
+
+/** Faixa do espectador: aviso de que está assistindo e, para streamer/admin, o botão "Ver mãos". */
+export function SpectatorBar({
+  online,
+  canHands,
+  onToggleHands,
+}: {
+  online: OnlineGame;
+  canHands: boolean;
+  onToggleHands: () => void;
+}) {
+  return (
+    <div className="spectator-bar">
+      <span className="spectator-tag" title={`${online.room?.spectators ?? 1} assistindo`}>
+        👁 Assistindo · {online.room?.spectators ?? 1}
+      </span>
+      {canHands && (
+        <button
+          className={['auto-toggle', online.hands ? 'on' : ''].join(' ')}
+          onClick={onToggleHands}
+          title="Mostra as mãos dos dois jogadores (perfil Streamer ou Admin)"
+        >
+          <span className="knob" />
+          Ver mãos
+        </button>
+      )}
     </div>
   );
 }

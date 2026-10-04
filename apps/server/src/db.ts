@@ -111,6 +111,9 @@ function migrateAuth(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
   `);
+  // Perfil da conta: player (padrão), streamer (assiste vendo as mãos) ou admin.
+  const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!userCols.includes('role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'player'");
 }
 
 /**

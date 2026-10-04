@@ -2,7 +2,7 @@
 // que o servidor confere e troca por uma sessão em cookie httpOnly.
 
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { api, type User } from './api';
+import { api, ROLE_LABEL, type User } from './api';
 
 interface GsiButtonOptions {
   theme?: 'outline' | 'filled_blue' | 'filled_black';
@@ -170,7 +170,10 @@ export function AccountBar() {
             <span className="account-avatar">{(user.name ?? user.email ?? '?').slice(0, 1).toUpperCase()}</span>
           )}
           <span className="account-who">
-            <strong>{user.name ?? 'Conta Google'}</strong>
+            <strong>
+              {user.name ?? 'Conta Google'}
+              {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{ROLE_LABEL[user.role]}</span>}
+            </strong>
             {user.email && <span className="muted small">{user.email}</span>}
           </span>
           <button className="btn small" onClick={signOut}>

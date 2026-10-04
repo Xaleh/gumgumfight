@@ -14,7 +14,7 @@ import {
   zoneOf,
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, type OnlineSeat } from '../api';
+import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
@@ -23,7 +23,16 @@ import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
 import { GameResult } from './GameResult';
 import { ManualTools } from './ManualTools';
-import { EmoteBar, EmoteBubbles, OnlineBanner, OnlineResultInfo, OnlineStatus, OnlineWaiting } from './Online';
+import {
+  EmoteBar,
+  EmoteBubbles,
+  OnlineBanner,
+  OnlineResultInfo,
+  OnlineStatus,
+  OnlineWaiting,
+  SpectatorBar,
+  SpectatorCount,
+} from './Online';
 
 /** Modo 'don': `count` DON!! ativos escolhidos para anexar de uma vez. */
 type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; count: number };
@@ -115,7 +124,7 @@ export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat;
   const { state, room } = online;
   // Os dois pediram revanche: vai para a sala nova.
   useEffect(() => {
-    if (online.rematch) onSwitch(online.rematch);
+    if (online.rematch?.token) onSwitch({ roomId: online.rematch.roomId, token: online.rematch.token });
   }, [online.rematch, onSwitch]);
   if (!state || !room || room.status === 'waiting') {
     return (
@@ -129,19 +138,12 @@ export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat;
     );
   }
   const game: TableGame = {
+    ...onlineTable,
     state,
     dispatch: online.dispatch,
     error: online.error,
     setError: online.setError,
     human: room.you,
-    paused: false,
-    setPaused: noop,
-    speed: 1,
-    setSpeed: noop,
-    auto: false,
-    setAuto: noop,
-    undo: noop,
-    canUndo: false,
     actions: () => online.actions,
     downloadReplay: () => void online.downloadReplay(),
   };
@@ -156,21 +158,79 @@ export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat;
   );
 }
 
+/** O que a mesa online não usa (pausa, velocidade, desfazer e "Auto" são do jogo no navegador). */
+const onlineTable = {
+  paused: false,
+  setPaused: noop,
+  speed: 1,
+  setSpeed: noop,
+  auto: false,
+  setAuto: noop,
+  undo: noop,
+  canUndo: false,
+};
+
+/**
+ * Modo espectador: a mesa de uma partida online vista de fora (sem as mãos, ou com
+ * as duas mãos para streamer e admin). Ninguém age; na revanche, segue para a sala nova.
+ */
+export function WatchGameScreen({
+  target,
+  canHands,
+  onExit,
+  onSwitch,
+}: {
+  target: WatchTarget;
+  canHands: boolean;
+  onExit: () => void;
+  onSwitch: (t: WatchTarget) => void;
+}) {
+  const online = useOnlineGame(target);
+  const { state, room } = online;
+  useEffect(() => {
+    if (online.rematch) onSwitch({ roomId: online.rematch.roomId, hands: target.hands });
+  }, [online.rematch, onSwitch, target.hands]);
+  if (!state || !room) return <OnlineWaiting online={online} onCancel={onExit} />;
+  const game: TableGame = {
+    ...onlineTable,
+    state,
+    dispatch: noop,
+    error: online.error,
+    setError: online.setError,
+    human: null,
+    actions: () => online.actions,
+    downloadReplay: () => void online.downloadReplay(),
+  };
+  return (
+    <GameTable
+      game={game}
+      kind="online"
+      online={online}
+      onExit={onExit}
+      spectator={{ canHands, onToggleHands: () => onSwitch({ ...target, hands: !target.hands }) }}
+    />
+  );
+}
+
 function GameTable({
   game,
   kind,
   online,
   onExit,
   onRematch,
+  spectator,
 }: {
   game: TableGame;
   kind: TableKind;
   online?: OnlineGame;
   onExit: () => void;
   onRematch?: () => void;
+  /** Modo espectador (partida online vista de fora). */
+  spectator?: { canHands: boolean; onToggleHands: () => void };
 }) {
   const { state, dispatch, human } = game;
   const isOnline = kind === 'online';
+  const watching = Boolean(spectator);
   const ranked = online?.room?.queue === 'ranked';
   const wide = useMediaQuery('(min-width: 1000px)');
   const { quickCounter } = useSettings();
@@ -181,7 +241,8 @@ function GameTable({
   const [picked, setPicked] = useState<string[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
-  const [showBotHand, setShowBotHand] = useState(kind === 'demo' || kind === 'replay');
+  // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
+  const [showBotHand, setShowBotHand] = useState(kind === 'demo' || kind === 'replay' || watching);
   const [banner, setBanner] = useState<{ text: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
@@ -606,7 +667,9 @@ function GameTable({
       <button className="round-btn" onClick={() => setSheet('menu')} aria-label="Menu da partida">
         <span className="burger" />
       </button>
-      {online && <EmoteBar online={online} />}
+      {online && !watching && <EmoteBar online={online} />}
+      {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
+      {online && !watching && <SpectatorCount online={online} />}
       {human !== null && !isOnline && (
         <button
           className={['auto-toggle', game.auto ? 'on' : ''].join(' ')}
@@ -645,6 +708,7 @@ function GameTable({
             <CenterBand
               state={state}
               human={human}
+              watching={watching}
               acting={acting}
               mode={mode}
               paused={game.paused}
@@ -850,7 +914,7 @@ function GameTable({
             actions={game.actions()}
             onExit={onExit}
             onRematch={onRematch}
-            rematchLabel={online ? (online.room?.rematch[human ?? 0] ? 'Aguardando o oponente…' : 'Pedir revanche') : undefined}
+            rematchLabel={online && human !== null ? (online.room?.rematch[human] ? 'Aguardando o oponente…' : 'Pedir revanche') : undefined}
             onReplay={game.downloadReplay}
             onLog={() => setSheet('log')}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
@@ -909,6 +973,8 @@ function GameTable({
 function CenterBand(props: {
   state: GameState;
   human: PlayerId | null;
+  /** Espectador de partida online: sem botão de pausa e com "pensando" para os dois. */
+  watching?: boolean;
   acting: PlayerId | null;
   mode: Mode;
   paused: boolean;
@@ -917,7 +983,7 @@ function CenterBand(props: {
   onCancelMode: () => void;
   onTogglePause: () => void;
 }) {
-  const { state, human, mode, acting } = props;
+  const { state, human, mode, acting, watching } = props;
   const b = state.battle;
   const mineTurn = human === null ? state.activePlayer === 0 : state.activePlayer === human;
 
@@ -937,13 +1003,13 @@ function CenterBand(props: {
       </button>
     );
   else if (props.paused) middle = <span className="hint-pill">Pausado</span>;
-  else if (acting !== null && acting !== human && (state.players[acting].isBot || human !== null) && state.phase === 'main')
+  else if (acting !== null && acting !== human && (state.players[acting].isBot || human !== null || watching) && state.phase === 'main')
     middle = (
       <span className="hint-pill thinking">
         {state.players[acting].name} está pensando<span className="dots" />
       </span>
     );
-  else if (state.phase === 'mulligan' && human !== null && acting !== null && acting !== human)
+  else if (state.phase === 'mulligan' && (human !== null || watching) && acting !== null && acting !== human)
     middle = (
       <span className="hint-pill thinking">
         {state.players[acting].name} está escolhendo a mão inicial<span className="dots" />
@@ -969,6 +1035,10 @@ function CenterBand(props: {
           <br />
           turno
         </button>
+      ) : watching ? (
+        <span className="end-turn watching" title="Você está assistindo">
+          👁
+        </span>
       ) : (
         <button className="end-turn" onClick={props.onTogglePause}>
           {props.paused ? '▶' : '❚❚'}

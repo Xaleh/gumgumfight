@@ -1,5 +1,6 @@
-// Salas online: salas privadas com código, filas casual e ranqueada e a gravação
-// das salas no banco (para sobreviver a reinícios e deploys).
+// Salas online: salas privadas com código, filas casual e ranqueada, treino contra o
+// bot do servidor, a lista de partidas para assistir e a gravação das salas no banco
+// (para sobreviver a reinícios e deploys).
 
 import { randomBytes, randomInt } from 'node:crypto';
 import type { CardData, PlayerId } from '@gumgum/engine';
@@ -29,6 +30,30 @@ export interface LobbyDeps {
   now?: () => number;
   log?: (msg: string) => void;
   rateLimit?: number;
+  botDelayMs?: number;
+}
+
+/** Partida em andamento na lista "Assistir". */
+export interface LiveRoom {
+  id: string;
+  queue: RoomData['queue'];
+  format: FormatId;
+  status: 'playing' | 'finished';
+  players: Array<{
+    name: string;
+    leader: string;
+    leaderName: string | null;
+    leaderImage: string | null;
+    colors: string[];
+    tier: string;
+    bounty: number;
+    bot: boolean;
+    life: number;
+    hand: number;
+  }>;
+  turn: number;
+  spectators: number;
+  createdAt: number;
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -64,6 +89,7 @@ export class Lobby {
       save: (r) => this.deps.save?.(r.data),
       finish: this.deps.finish,
       rateLimit: this.deps.rateLimit,
+      botDelayMs: this.deps.botDelayMs,
     });
     this.rooms.set(room.id, room);
     if (data.code) this.codes.set(data.code, room.id);
@@ -148,6 +174,70 @@ export class Lobby {
     room.data.seats.push({ ...seat, token });
     room.start();
     return { room, token };
+  }
+
+  /** Treino contra o bot do servidor: começa na hora; a partida pode ser assistida. */
+  createBotRoom(seat: SeatRequest, bot: SeatRequest, format: FormatId): { room: Room; token: string } | LobbyError {
+    const busy = this.busy(seat.ownerHash);
+    if (busy) return busy;
+    for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
+    this.leaveQueue(seat.ownerHash);
+    const token = randomToken();
+    const room = this.makeRoom(
+      newRoomData({ queue: 'bot', format, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
+    );
+    room.start();
+    return { room, token };
+  }
+
+  // ------------------------------------------------------------------ espectadores
+
+  /**
+   * Partidas para assistir: as das filas (e as de treino contra o bot, se `bots`).
+   * Salas privadas não aparecem; para assisti-las é preciso o código (byCode).
+   */
+  live(opts: { bots: boolean }): LiveRoom[] {
+    const out: LiveRoom[] = [];
+    for (const room of this.rooms.values()) {
+      if (room.status !== 'playing' || !room.state) continue;
+      if (room.data.queue === 'private' || (room.data.queue === 'bot' && !opts.bots)) continue;
+      out.push(this.summary(room));
+    }
+    // Ranqueadas primeiro; dentro de cada fila, as mais novas.
+    const rank = (q: string) => (q === 'ranked' ? 0 : q === 'casual' ? 1 : 2);
+    return out.sort((a, b) => rank(a.queue) - rank(b.queue) || b.createdAt - a.createdAt);
+  }
+
+  summary(room: Room): LiveRoom {
+    const st = room.state;
+    return {
+      id: room.id,
+      queue: room.data.queue,
+      format: room.data.format,
+      status: room.status === 'finished' ? 'finished' : 'playing',
+      players: room.data.seats.map((s, i) => ({
+        name: s.name,
+        leader: s.deck.leader,
+        leaderName: st?.defs[s.deck.leader]?.name ?? null,
+        leaderImage: st?.defs[s.deck.leader]?.imageUrl ?? null,
+        colors: st?.defs[s.deck.leader]?.colors ?? [],
+        tier: s.tier,
+        bounty: s.bounty,
+        bot: Boolean(s.bot),
+        life: st?.players[i].life.length ?? 0,
+        hand: st?.players[i].hand.length ?? 0,
+      })),
+      turn: st?.turn ?? 0,
+      spectators: room.spectators,
+      createdAt: room.data.createdAt,
+    };
+  }
+
+  /** Sala privada pelo código do convite, para assistir (já começada ou terminada). */
+  byCode(code: string): Room | null {
+    const id = this.codes.get(code.trim().toUpperCase());
+    const room = id ? this.rooms.get(id) : undefined;
+    return room && room.status !== 'waiting' ? room : null;
   }
 
   // ------------------------------------------------------------------ filas
@@ -253,7 +343,8 @@ export class Lobby {
       const next = this.makeRoom(newRoomData({ queue: 'private', format: room.data.format, code: null, seats }));
       next.start();
       room.data.rematchRoom = next.id;
-      room.notify('rematch', (p) => ({ roomId: next.id, token: next.data.seats[p === 0 ? 1 : 0].token }));
+      // Espectadores seguem para a sala nova (sem token: continuam só assistindo).
+      room.notify('rematch', (p) => (p === null ? { roomId: next.id } : { roomId: next.id, token: next.data.seats[p === 0 ? 1 : 0].token }));
     }
     this.deps.save?.(room.data);
     room.broadcast();

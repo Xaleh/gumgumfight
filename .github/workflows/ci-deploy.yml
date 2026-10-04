@@ -139,6 +139,8 @@ jobs:
           IMPORT_SETS: ${{ github.event.inputs.import_sets }}
           # Client ID do OAuth do Google (público: vai para todo navegador), em Settings → Variables.
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          # E-mails das contas Google que são sempre admin (separados por vírgula), em Settings → Variables.
+          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
         run: |
           if [ -n "$IMPORT_SETS" ] && ! [[ "$IMPORT_SETS" =~ ^[A-Za-z0-9\ -]+$ ]]; then
             echo "::error::import_sets inválido: use só letras, números, hífen e espaço (ex.: ST-01 ST-02)"
@@ -149,7 +151,11 @@ jobs:
             exit 1
           fi
           [ -n "$GOOGLE_CLIENT_ID" ] || echo "::notice::Variable GOOGLE_CLIENT_ID vazia: o login com Google fica como estava no servidor."
-          ssh vm "IMPORT_SETS='$IMPORT_SETS' GOOGLE_CLIENT_ID='$GOOGLE_CLIENT_ID' bash '$REMOTE_DIR/deploy/remote-deploy.sh' '$REMOTE_DIR'"
+          if [ -n "$ADMIN_EMAILS" ] && ! [[ "$ADMIN_EMAILS" =~ ^[A-Za-z0-9.@_+,-]+$ ]]; then
+            echo "::error::ADMIN_EMAILS inválido: e-mails separados por vírgula, sem espaços"
+            exit 1
+          fi
+          ssh vm "IMPORT_SETS='$IMPORT_SETS' GOOGLE_CLIENT_ID='$GOOGLE_CLIENT_ID' ADMIN_EMAILS='$ADMIN_EMAILS' bash '$REMOTE_DIR/deploy/remote-deploy.sh' '$REMOTE_DIR'"
 
       - name: Verifica o site público
         if: steps.check.outputs.ready == 'true'

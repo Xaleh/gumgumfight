@@ -35,10 +35,10 @@ function idToken(claims: Record<string, unknown> = {}, opts: { kid?: string; key
   return `${head}.${body}.${sig}`;
 }
 
-function setup(clientId: string | null = CLIENT_ID) {
+function setup(clientId: string | null = CLIENT_ID, adminEmails: string[] = []) {
   const db = openDb(':memory:');
   seed(db);
-  return { db, app: buildApp(db, { server: { cardImages: true, googleClientId: clientId }, googleKeys: keys }) };
+  return { db, app: buildApp(db, { server: { cardImages: true, googleClientId: clientId, adminEmails }, googleKeys: keys }) };
 }
 const app = (clientId?: string | null) => setup(clientId).app;
 
@@ -182,5 +182,40 @@ describe('login e sessão', () => {
     expect((await a.inject({ url: '/api/players/me', headers: cookie })).json()).toMatchObject({ id: before.id, name: 'Nami' });
     expect((await a.inject({ url: '/api/stats?mine=1', headers: cookie })).json().summary.games).toBe(1);
     expect((db.prepare('SELECT COUNT(*) AS n FROM players').get() as { n: number }).n).toBe(1);
+  });
+});
+
+describe('perfis (player, streamer, admin)', () => {
+  it('ADMIN_EMAILS vira admin ao entrar; o admin muda os perfis dos outros', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const admin = await login(a, {});
+    expect(admin.res.json().user.role).toBe('admin');
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    expect(zoro.res.json().user.role).toBe('player');
+    const zoroId = zoro.res.json().user.id;
+
+    // Quem não é admin não vê nem muda perfis.
+    expect((await a.inject({ url: '/api/admin/users' })).statusCode).toBe(401);
+    expect((await a.inject({ url: '/api/admin/users', headers: zoro.cookie })).statusCode).toBe(403);
+
+    const list = (await a.inject({ url: '/api/admin/users?q=zor', headers: admin.cookie })).json();
+    expect(list.map((u: { email: string }) => u.email)).toEqual(['zoro@example.com']);
+    const put = (id: string, role: string, headers = admin.cookie) =>
+      a.inject({ method: 'PUT', url: `/api/admin/users/${id}/role`, headers, payload: { role } });
+    expect((await put(zoroId, 'chef')).statusCode).toBe(400);
+    expect((await put('u-nope', 'streamer')).statusCode).toBe(404);
+    expect((await put(admin.res.json().user.id, 'player')).statusCode).toBe(409);
+    expect((await put(zoroId, 'streamer', zoro.cookie)).statusCode).toBe(403);
+    expect((await put(zoroId, 'streamer')).json().role).toBe('streamer');
+    expect((await a.inject({ url: '/api/auth/me', headers: zoro.cookie })).json().user.role).toBe('streamer');
+    // Admins e streamers aparecem primeiro na lista.
+    const all = (await a.inject({ url: '/api/admin/users', headers: admin.cookie })).json();
+    expect(all.map((u: { role: string }) => u.role)).toEqual(['admin', 'streamer']);
+  });
+
+  it('e-mail não verificado pelo Google não vira admin', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const r = await login(a, { email_verified: false });
+    expect(r.res.json().user.role).toBe('player');
   });
 });

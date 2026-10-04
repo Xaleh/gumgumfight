@@ -11,7 +11,8 @@ import {
 } from '@gumgum/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
-import { createSession, upsertGoogleUser } from '../src/auth/store';
+import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
+import type { ServerOptions } from '../src/config';
 import { type DB, getDeck, openDb, upsertCards } from '../src/db';
 import { Lobby, type SeatRequest } from '../src/online/lobby';
 import { ABANDON_MS, type Connection, TIME_BANK_MS } from '../src/online/room';
@@ -20,9 +21,9 @@ import { seed } from '../src/seed';
 const ALICE = { 'x-deck-owner': 'alice-0123456789abcdef' };
 const BOB = { 'x-deck-owner': 'bob-0123456789abcdef00' };
 
-function setup(db: DB = freshDb()) {
+function setup(db: DB = freshDb(), server: Partial<ServerOptions> = {}) {
   // Os bots jogam muito mais rápido que uma pessoa: sem limite de ações por segundo.
-  return { db, app: buildApp(db, { server: { cardImages: true }, onlineRateLimit: 1e9 }) };
+  return { db, app: buildApp(db, { server: { cardImages: true, ...server }, onlineRateLimit: 1e9, botDelayMs: 0 }) };
 }
 function freshDb() {
   const db = openDb(':memory:');
@@ -32,13 +33,14 @@ function freshDb() {
 type App = ReturnType<typeof buildApp>;
 
 /** Conexão de teste: guarda o último estado como o navegador montaria (defs e log acumulados). */
-function client(seat: PlayerId) {
+function client(seat: PlayerId | null, hands = false) {
   const events: Array<{ event: string; data: any }> = [];
   let defs: Record<string, CardDef> = {};
   let log: LogEntry[] = [];
   let latest: any = null;
   const conn: Connection = {
     seat,
+    hands,
     sentDefs: new Set(),
     sentLog: 0,
     send: (event, data: any) => {
@@ -94,7 +96,7 @@ describe('partidas online: salas privadas', () => {
     const v1 = c1.view!;
     expect(c0.room.status).toBe('playing');
     expect(c1.room.players.map((p: { connected: boolean }) => p.connected)).toEqual([true, true]);
-    expect(c0.events.filter((e) => e.event === 'presence').pop()!.data).toEqual({ connected: [true, true] });
+    expect(c0.events.filter((e) => e.event === 'presence').pop()!.data).toEqual({ connected: [true, true], spectators: 0 });
     // Minha mão aparece; a do oponente e os decks, não.
     expect(v0.players[0].hand.every((u) => v0.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
     expect(v0.players[1].hand.every((u) => v0.cards[u].cardId === HIDDEN_CARD)).toBe(true);
@@ -379,6 +381,132 @@ describe('partidas online: canal SSE', () => {
     const bad = await fetch(`http://127.0.0.1:${port}/api/online/rooms/${roomId}/events?t=nope`, { headers: { connection: 'close' } });
     expect(bad.status).toBe(404);
     await app.close();
+  });
+});
+
+describe('modo espectador', () => {
+  const login = (db: DB, sub: string, role: Role = 'player') => {
+    const u = upsertGoogleUser(db, { sub, email: `${sub}@example.com`, emailVerified: true, name: sub, picture: null });
+    setUserRole(db, u.id, role);
+    return { cookie: `gg_session=${createSession(db, u.id)}`, id: u.id };
+  };
+  const hidden = (v: GameState, p: PlayerId) => v.players[p].hand.every((u) => v.cards[u].cardId === HIDDEN_CARD);
+
+  it('espectador vê a mesa sem as mãos; com "ver mãos", vê as duas (mas não os decks)', async () => {
+    const { app } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    const player = client(0);
+    const watcher = client(null);
+    const streamer = client(null, true);
+    for (const c of [player, watcher, streamer]) room.attach(c.conn);
+    expect(watcher.room.you).toBeNull();
+    expect(watcher.room.spectators).toBe(1);
+    expect(watcher.events.filter((e) => e.event === 'presence').pop()!.data.spectators).toBe(2);
+    expect(player.events.filter((e) => e.event === 'presence').pop()!.data.spectators).toBe(2);
+    const w = watcher.view!;
+    expect(hidden(w, 0) && hidden(w, 1)).toBe(true);
+    const s = streamer.view!;
+    expect(s.players[0].hand.length).toBeGreaterThan(0);
+    expect(s.players.every((p) => p.hand.every((u) => s.cards[u].cardId !== HIDDEN_CARD))).toBe(true);
+    expect(s.players.every((p) => p.deck.every((u) => s.cards[u].cardId === HIDDEN_CARD))).toBe(true);
+    // O espectador acompanha as jogadas.
+    const first = actingPlayer(w)!;
+    await act(app, roomId, tokens[first], 0, { type: 'mulligan', player: first, redraw: true });
+    expect(watcher.view!.actionCount).toBe(1);
+    expect(hidden(watcher.view!, first)).toBe(true);
+    room.detach(watcher.conn);
+    expect(room.spectators).toBe(1);
+  });
+
+  it('lista de partidas: filas e treino contra o bot aparecem; salas privadas só pelo código', async () => {
+    const { app, db } = setup();
+    const { roomId } = await privateMatch(app);
+    const code = getRoom(app, roomId).data.code!;
+    const bot = await app.inject({ method: 'POST', url: '/api/online/bot', headers: { ...ALICE, ...{ 'x-deck-owner': 'carol-0123456789abcdef' } }, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' } });
+    expect(bot.statusCode, bot.body).toBe(201);
+    const live = (await app.inject('/api/online/live')).json();
+    expect(live.hands).toBe(false);
+    expect(live.rooms.map((r: { id: string }) => r.id)).toEqual([bot.json().roomId]);
+    expect(live.rooms[0].players.map((p: { name: string; bot: boolean }) => p.bot)).toEqual([false, true]);
+    expect((await app.inject(`/api/online/watch/${code}`)).json().id).toBe(roomId);
+    expect((await app.inject('/api/online/watch/ZZZZZZ')).statusCode).toBe(404);
+    const streamer = login(db, 'nami', 'streamer');
+    expect((await app.inject({ url: '/api/online/live', headers: { cookie: streamer.cookie } })).json().hands).toBe(true);
+
+    // Com o treino desligado, as salas contra o bot somem da lista e não podem ser criadas.
+    const off = setup(freshDb(), { onlineBotRooms: false }).app;
+    expect((await off.inject('/api/online/config')).json().botRooms).toBe(false);
+    const refused = await off.inject({ method: 'POST', url: '/api/online/bot', headers: ALICE, payload: { deckId: 'st01-luffy', format: 'egb' } });
+    expect(refused.statusCode).toBe(404);
+  });
+
+  it('o bot do servidor joga a partida inteira e ela entra nas estatísticas como partida contra o bot', async () => {
+    const { app, db } = setup();
+    const r = await app.inject({ method: 'POST', url: '/api/online/bot', headers: ALICE, payload: { deckId: 'st03-crocodile', botDeckId: 'random', format: 'egb' } });
+    expect(r.statusCode, r.body).toBe(201);
+    const { roomId, token } = r.json();
+    const room = getRoom(app, roomId);
+    const me = client(0);
+    const watcher = client(null);
+    room.attach(me.conn);
+    room.attach(watcher.conn);
+    expect(me.room.players[1]).toMatchObject({ bot: true, connected: true });
+    for (let i = 0; i < 4000 && me.view!.phase !== 'gameover'; i++) {
+      const v = me.view!;
+      if (actingPlayer(v) === 0) {
+        const res = await act(app, roomId, token, v.actionCount, chooseBotAction(v, 0));
+        expect(res.statusCode, res.body).toBe(200);
+      } else await new Promise((done) => setTimeout(done, 1));
+    }
+    expect(watcher.view!.phase).toBe('gameover');
+    const seats = db.prepare('SELECT controller FROM match_seats ORDER BY seat').all();
+    expect(seats).toEqual([{ controller: 'human' }, { controller: 'bot' }]);
+    expect((db.prepare('SELECT mode FROM matches').get() as { mode: string }).mode).toBe('bot');
+    // Depois do fim, o espectador também baixa o replay.
+    expect((await app.inject(`/api/online/rooms/${roomId}/replay`)).statusCode).toBe(200);
+  }, 120_000);
+
+  it('ver mãos: só streamer ou admin, e nunca na própria partida', async () => {
+    const { app, db } = setup();
+    const nami = login(db, 'nami', 'streamer');
+    const usopp = login(db, 'usopp');
+    const created = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: { ...ALICE, cookie: nami.cookie }, payload: { deckId: 'st01-luffy', format: 'egb' } });
+    const { roomId, code } = created.json();
+    await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: BOB, payload: { code, deckId: 'st02-kid' } });
+    const admin = login(db, 'robin', 'admin');
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = app.server.address() as { port: number };
+    const open = async (cookie?: string, hands = true) => {
+      const ctrl = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${port}/api/online/rooms/${roomId}/watch${hands ? '?hands=1' : ''}`, {
+        signal: ctrl.signal,
+        headers: cookie ? { cookie } : {},
+      });
+      const status = res.status;
+      ctrl.abort();
+      return status;
+    };
+    expect(await open()).toBe(403);
+    expect(await open(usopp.cookie)).toBe(403);
+    expect(await open(nami.cookie)).toBe(403); // nami joga esta partida
+    expect(await open(nami.cookie, false)).toBe(200);
+    expect(await open(admin.cookie)).toBe(200);
+    expect(await open(undefined, false)).toBe(200);
+    await app.close();
+  });
+
+  it('revanche: os espectadores seguem para a sala nova', async () => {
+    const { app } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    const watcher = client(null);
+    room.attach(watcher.conn);
+    await act(app, roomId, tokens[0], 0, { type: 'concede', player: 0 });
+    for (const t of tokens) await app.inject({ method: 'POST', url: `/api/online/rooms/${roomId}/rematch`, payload: { t } });
+    const msg = watcher.events.find((e) => e.event === 'rematch')!.data;
+    expect(msg.token).toBeUndefined();
+    expect(getRoom(app, msg.roomId).status).toBe('playing');
   });
 });
 
