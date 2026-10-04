@@ -1,5 +1,13 @@
 import fastifyStatic from '@fastify/static';
-import { automationStatus, type CardData, type DeckList, validateDeck } from '@gumgum/engine';
+import {
+  automationStatus,
+  type CardData,
+  type DeckList,
+  FORMATS,
+  type FormatId,
+  formatIssues,
+  validateDeck,
+} from '@gumgum/engine';
 import Fastify from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyRequest } from 'fastify';
@@ -121,6 +129,11 @@ export function buildApp(
       size: report.total,
       valid: report.valid,
       errors: report.issues.filter((i) => i.level === 'error').map((i) => i.message),
+      /** Por formato: o que impede o deck de ser usado nele (vazio = permitido). */
+      formats: Object.fromEntries(FORMATS.map((f) => [f.id, formatIssues(deck, f.id).map((i) => i.message)])) as Record<
+        FormatId,
+        string[]
+      >,
       unscripted: report.unscripted.length,
       updatedAt: deck.updatedAt,
       mine: isMine(deck, viewer),

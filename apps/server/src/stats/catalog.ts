@@ -2,11 +2,8 @@
 // e o cálculo da recompensa (Beries) na ranqueada. A interface lê tudo isto de
 // GET /api/stats/meta, então mudar uma faixa ou um formato é só mexer aqui.
 
-export const FORMATS = [
-  { id: 'standard', label: 'Standard' },
-  { id: 'egb', label: 'Extra Grand Battle' },
-] as const;
-export type FormatId = (typeof FORMATS)[number]['id'];
+// Formatos: definidos no motor, junto das regras de cartas banidas e rotacionadas.
+export { FORMATS, type FormatId, isFormat } from '@gumgum/engine';
 
 export const QUEUES = [
   { id: 'casual', label: 'Casual' },
@@ -39,7 +36,6 @@ export function tierFor(bounty: number): Tier {
   return TIERS.find((t) => bounty >= t.min && (t.max === null || bounty <= t.max)) ?? TIERS[0];
 }
 
-export const isFormat = (v: unknown): v is FormatId => FORMATS.some((f) => f.id === v);
 export const isQueue = (v: unknown): v is QueueId => QUEUES.some((q) => q.id === v);
 export const isTier = (v: unknown): v is string => TIERS.some((t) => t.id === v);
 

@@ -126,6 +126,21 @@ Regras verificadas: 1 Líder, exatamente 50 cartas, no máximo 4 cópias por nú
 cor do Líder. Cartas cujo efeito ainda não é automatizado aparecem com ⚙: elas entram no jogo, mas sem o efeito.
 Decks prontos (`data/decks`) não são alterados: ao mexer em um, o construtor cria uma cópia.
 
+### Formatos
+
+A partida é sempre num formato, escolhido no menu, e os dois decks precisam valer nele (contra o bot, bot x bot,
+filas e salas online; quem entra numa sala privada joga no formato dela). O servidor confere de novo antes de
+começar uma partida online e antes de gravar uma partida nas estatísticas.
+
+- **Extra Grand Battle (EGB):** todas as cartas lançadas, menos as banidas.
+- **Standard:** além das banidas, ficam de fora as cartas com o ícone de bloco ① (OP-01 a OP-04 e ST-01 a ST-09),
+  que rotacionaram em 1º/04/2026, salvo as exceções oficiais (bloco X e cartas tratadas como bloco ④).
+
+As cartas banidas (com data de início, quando a proibição ainda não vale), os pares proibidos e as exceções da
+rotação ficam em `packages/engine/src/formats.ts`: atualizar a lista é só mexer lá. O construtor mostra em quais
+formatos o deck vale, marca no catálogo as cartas banidas (🚫) e rotacionadas (①), e o menu desabilita os decks que
+não valem no formato escolhido.
+
 Quem entra com a conta Google (veja [Contas](#contas-login-com-google)) edita os próprios decks em qualquer aparelho.
 Sem login, cada navegador recebe um código aleatório (guardado no navegador) e só ele pode editar ou apagar os decks
 que criou; limpar os dados do site faz perder a edição deles. Decks de outros jogadores aparecem em "Decks da

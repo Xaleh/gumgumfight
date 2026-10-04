@@ -4,11 +4,13 @@
 //  - 1 Líder, fora do deck principal;
 //  - deck principal com exatamente 50 cartas (sem Líderes);
 //  - no máximo 4 cópias do mesmo número de carta;
-//  - cada carta precisa ter ao menos uma cor em comum com o Líder.
-// Listas de cartas banidas/restritas ainda não são aplicadas.
+//  - cada carta precisa ter ao menos uma cor em comum com o Líder;
+//  - com um formato informado, cartas banidas, pares proibidos e (no Standard)
+//    cartas rotacionadas também invalidam o deck (veja formats.ts).
 
 import { buildCardDef, needsManual } from './cards';
 import { DECK_SIZE } from './engine';
+import { type FormatId, formatIssues } from './formats';
 import type { CardData, DeckList } from './types';
 
 export const MAX_COPIES = 4;
@@ -53,7 +55,18 @@ export function leaderAllows(leader: CardData, card: CardData): boolean {
   return true;
 }
 
-export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Record<string, CardData>): DeckReport {
+export interface ValidateOptions {
+  /** Formato da partida: sem ele, só as regras de construção são conferidas. */
+  format?: FormatId;
+  /** Data usada nas proibições com data marcada (padrão: agora). */
+  now?: Date;
+}
+
+export function validateDeck(
+  deck: DeckList,
+  cards: Map<string, CardData> | Record<string, CardData>,
+  options: ValidateOptions = {},
+): DeckReport {
   const get = (id: string) => (cards instanceof Map ? cards.get(id) : cards[id]);
   const issues: DeckIssue[] = [];
   const unscripted = new Set<string>();
@@ -105,6 +118,10 @@ export function validateDeck(deck: DeckList, cards: Map<string, CardData> | Reco
       issues.push({ level: 'error', message: `${card.name} (${id}) não tem a cor do Líder.`, cardId: id });
     }
     if (needsManual(card)) unscripted.add(id);
+  }
+
+  if (options.format) {
+    for (const i of formatIssues(deck, options.format, options.now)) issues.push({ level: 'error', ...i });
   }
 
   if (unscripted.size) {

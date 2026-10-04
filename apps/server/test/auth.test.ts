@@ -174,7 +174,7 @@ describe('login e sessão', () => {
       actions.push(act);
       state = applyAction(state, act);
     }
-    const saved = await a.inject({ method: 'POST', url: '/api/matches', headers: BROWSER, payload: { mode: 'bot', seed: 7, decks, actions } });
+    const saved = await a.inject({ method: 'POST', url: '/api/matches', headers: BROWSER, payload: { mode: 'bot', format: 'egb', seed: 7, decks, actions } });
     expect(saved.statusCode).toBe(200);
     expect((await a.inject({ url: '/api/stats?mine=1', headers: BROWSER })).json().summary.games).toBe(1);
 

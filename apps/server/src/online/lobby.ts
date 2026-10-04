@@ -125,10 +125,21 @@ export class Lobby {
     return { room, token };
   }
 
-  joinPrivate(code: string, seat: SeatRequest): { room: Room; token: string } | LobbyError {
+  /** Sala privada à espera de oponente, pelo código do convite. */
+  private waitingRoom(code: string): Room | undefined {
     const id = this.codes.get(code.trim().toUpperCase());
     const room = id ? this.rooms.get(id) : undefined;
-    if (!room || room.status !== 'waiting') return { code: 404, error: 'Sala não encontrada ou já começou.' };
+    return room?.status === 'waiting' ? room : undefined;
+  }
+
+  /** Formato da sala privada do código (quem entra joga no formato de quem criou). */
+  privateFormat(code: string): FormatId | null {
+    return this.waitingRoom(code)?.data.format ?? null;
+  }
+
+  joinPrivate(code: string, seat: SeatRequest): { room: Room; token: string } | LobbyError {
+    const room = this.waitingRoom(code);
+    if (!room) return { code: 404, error: 'Sala não encontrada ou já começou.' };
     if (room.data.seats[0].ownerHash === seat.ownerHash) return { code: 409, error: 'Esta sala é sua: envie o código para outra pessoa.' };
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;

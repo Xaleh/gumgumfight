@@ -1,7 +1,10 @@
 import {
   type CardData,
+  cardLegality,
   type Color,
   DECK_SIZE,
+  FORMATS,
+  formatIssues,
   formatDeckList,
   needsManual,
   isColorCompatible,
@@ -124,6 +127,9 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
     [draft],
   );
   const report = useMemo(() => validateDeck(deckList, byId), [deckList, byId]);
+  /** Em quais formatos o deck pode ser usado, e por que não nos outros. */
+  const legality = useMemo(() => FORMATS.map((f) => ({ ...f, issues: formatIssues(deckList, f.id) })), [deckList]);
+  const formatProblems = useMemo(() => [...new Set(legality.flatMap((f) => f.issues.map((i) => i.message)))], [legality]);
 
   // ------------------------------------------------------------------ edição
 
@@ -315,8 +321,11 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                         ))}
                       </span>
                       <span className="deck-row-name">{d.name}</span>
-                      <span className={['deck-row-size', d.valid ? 'ok' : 'bad'].join(' ')}>
-                        {d.valid ? '✓' : `${d.size}/${DECK_SIZE}`}
+                      <span
+                        className={['deck-row-size', d.valid && !d.formats.standard.length ? 'ok' : 'bad'].join(' ')}
+                        title={d.valid ? deckRowTitle(d) : undefined}
+                      >
+                        {!d.valid ? `${d.size}/${DECK_SIZE}` : !d.formats.standard.length ? '✓' : !d.formats.egb.length ? 'EGB' : '🚫'}
                       </span>
                     </button>
                   ))}
@@ -420,6 +429,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                             ⚙
                           </span>
                         )}
+                        <LegalityBadge id={c.id} />
                       </>
                     }
                   />
@@ -496,7 +506,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                     <div className="entry-group">{CATEGORY_LABEL[e.card.category]}</div>
                   )}
                   <div
-                    className={['entry', errorIds.has(e.id) ? 'bad' : ''].join(' ')}
+                    className={['entry', errorIds.has(e.id) || cardLegality(e.id, 'egb') === 'banned' ? 'bad' : ''].join(' ')}
                     onMouseEnter={() => e.card && setHovered(e.card)}
                     onMouseLeave={() => setHovered(null)}
                   >
@@ -506,6 +516,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                       <small>
                         {e.id}
                         {e.card && needsManual(e.card) ? ' · ⚙ manual' : ''}
+                        {LEGALITY_NOTE[cardLegality(e.id, 'standard')]}
                       </small>
                     </span>
                     <button className="qty" onClick={() => remove(e.id)} aria-label="Remover uma">
@@ -525,6 +536,29 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
               );
             })}
           </div>
+
+          {(draft.leader || entries.length > 0) && (
+            <div className="format-legality">
+              {legality.map((f) => (
+                <span
+                  key={f.id}
+                  className={['format-chip', f.issues.length ? 'bad' : 'ok'].join(' ')}
+                  title={f.issues.map((i) => i.message).join('\n') || `Permitido no ${f.label}`}
+                >
+                  {f.issues.length ? '🚫' : '✓'} {f.label}
+                </span>
+              ))}
+            </div>
+          )}
+          {formatProblems.length > 0 && (
+            <ul className="issues">
+              {formatProblems.map((m) => (
+                <li key={m} className="warning">
+                  {m}
+                </li>
+              ))}
+            </ul>
+          )}
 
           {report.issues.length > 0 && (
             <ul className="issues">
@@ -582,6 +616,27 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         />
       )}
     </div>
+  );
+}
+
+const LEGALITY_NOTE = { legal: '', rotated: ' · ① rotacionada (só EGB)', banned: ' · 🚫 banida' } as const;
+
+function deckRowTitle(d: DeckSummary): string {
+  return FORMATS.map((f) => `${f.label}: ${d.formats[f.id].length ? 'não permitido' : 'permitido'}`).join(' · ');
+}
+
+/** Selo no catálogo para cartas banidas ou rotacionadas (bloco ①). */
+function LegalityBadge({ id }: { id: string }) {
+  const legality = cardLegality(id, 'standard');
+  if (legality === 'legal') return null;
+  return legality === 'banned' ? (
+    <span className="legality-badge banned" title="Banida: não vale em nenhum formato">
+      🚫
+    </span>
+  ) : (
+    <span className="legality-badge rotated" title="Bloco ①: rotacionada, vale só no Extra Grand Battle">
+      ①
+    </span>
   );
 }
 

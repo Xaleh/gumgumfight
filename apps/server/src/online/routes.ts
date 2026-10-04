@@ -5,7 +5,7 @@
 // buffer do proxy e um comentário a cada 20 s mantém a conexão abaixo do
 // proxy_read_timeout. O EventSource reconecta sozinho.
 
-import { buildCardDef, type CardData, type PlayerId, validateDeck } from '@gumgum/engine';
+import { buildCardDef, type CardData, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listLiveMatches, saveLiveMatch } from '../db';
@@ -73,7 +73,12 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   app.addHook('onClose', async () => lobby.dispose());
 
   /** Perfil e deck de quem pede uma partida, ou o motivo de não poder jogar. */
-  const seatFor = (req: FastifyRequest, body: { deckId?: unknown } | undefined, ranked: boolean): SeatRequest | LobbyError => {
+  const seatFor = (
+    req: FastifyRequest,
+    body: { deckId?: unknown } | undefined,
+    ranked: boolean,
+    format: FormatId,
+  ): SeatRequest | LobbyError => {
     const ownerHash = viewerHash(req);
     if (!ownerHash) return { code: 400, error: 'Navegador sem código de dono (header x-deck-owner).' };
     const account = user(req);
@@ -84,6 +89,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
     const report = validateDeck(deck, cards);
     if (!report.valid) return { code: 400, error: 'Esse deck não é válido para jogar.' };
+    const banned = formatIssues(deck, format);
+    if (banned.length) return { code: 400, error: `Esse deck não é permitido no formato ${formatLabel(format)}. ${banned[0].message}` };
     // Inclui cartas com script que ainda tenham alguma parte resolvida à mão.
     const manual = new Set([...report.unscripted, ...[...cards.values()].filter((c) => buildCardDef(c).manual).map((c) => c.id)]);
     if (ranked && manual.size) {
@@ -121,9 +128,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   type RoomBody = { deckId?: unknown; format?: unknown; code?: unknown };
   app.post<{ Body: RoomBody }>('/api/online/rooms', async (req, reply) => {
-    const seat = seatFor(req, req.body, false);
+    const format = formatOf(req.body?.format);
+    const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
-    const r = lobby.createPrivate(seat, formatOf(req.body?.format));
+    const r = lobby.createPrivate(seat, format);
     if (isError(r)) return reply.code(r.code).send(r);
     return reply.code(201).send({ roomId: r.room.id, code: r.room.data.code, token: r.token });
   });
@@ -131,7 +139,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   app.post<{ Body: RoomBody }>('/api/online/rooms/join', async (req, reply) => {
     const code = typeof req.body?.code === 'string' ? req.body.code : '';
     if (!/^[A-Za-z0-9]{6}$/.test(code.trim())) return reply.code(400).send({ error: 'Código de sala inválido.' });
-    const seat = seatFor(req, req.body, false);
+    const format = lobby.privateFormat(code);
+    if (!format) return reply.code(404).send({ error: 'Sala não encontrada ou já começou.' });
+    const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const r = lobby.joinPrivate(code, seat);
     if (isError(r)) return reply.code(r.code).send(r);
@@ -140,9 +150,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   app.post<{ Body: RoomBody & { queue?: unknown } }>('/api/online/queue', async (req, reply) => {
     const queue = req.body?.queue === 'ranked' ? 'ranked' : 'casual';
-    const seat = seatFor(req, req.body, queue === 'ranked');
+    const format = formatOf(req.body?.format);
+    const seat = seatFor(req, req.body, queue === 'ranked', format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
-    const r = lobby.enqueue(seat, formatOf(req.body?.format), queue);
+    const r = lobby.enqueue(seat, format, queue);
     if (isError(r)) return reply.code(r.code).send(r);
     return reply.code(201).send(r);
   });

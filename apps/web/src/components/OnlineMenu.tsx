@@ -21,11 +21,14 @@ const fmtWait = (ms: number) => {
 export function OnlineMenu({
   deck,
   format,
+  formatProblem,
   initialCode,
   onEnter,
 }: {
   deck?: DeckSummary;
   format: FormatId;
+  /** O deck não vale no formato escolhido: filas e criar sala ficam travados (entrar usa o formato da sala). */
+  formatProblem?: string | null;
   initialCode: string | null;
   onEnter: (seat: OnlineSeat) => void;
 }) {
@@ -123,7 +126,7 @@ export function OnlineMenu({
         <div className="btn-row">
           <button
             className="btn primary"
-            disabled={!deck || busy || Boolean(playing)}
+            disabled={!deck || busy || Boolean(formatProblem) || Boolean(playing)}
             onClick={() =>
               run(async () => {
                 const r = await api.online.enqueue(deck!.id, format, 'casual');
@@ -135,7 +138,7 @@ export function OnlineMenu({
           </button>
           <button
             className="btn primary"
-            disabled={!deck || busy || !canRanked || Boolean(playing)}
+            disabled={!deck || busy || !canRanked || Boolean(formatProblem) || Boolean(playing)}
             onClick={() =>
               run(async () => {
                 const r = await api.online.enqueue(deck!.id, format, 'ranked');
@@ -146,7 +149,9 @@ export function OnlineMenu({
             🏆 Ranqueada
           </button>
         </div>
-        {!user ? (
+        {formatProblem ? (
+          <p className="muted small">{formatProblem}</p>
+        ) : !user ? (
           <p className="muted small">A ranqueada é só para quem entrou com a conta Google.</p>
         ) : manualCards > 0 ? (
           <p className="muted small">
@@ -162,7 +167,7 @@ export function OnlineMenu({
         <div className="btn-row">
           <button
             className="btn"
-            disabled={!deck || busy || Boolean(playing)}
+            disabled={!deck || busy || Boolean(formatProblem) || Boolean(playing)}
             onClick={() =>
               run(async () => {
                 const r = await api.online.createRoom(deck!.id, format);

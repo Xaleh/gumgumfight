@@ -435,6 +435,9 @@ input[type='number'] {
   margin-top: 2px;
   text-align: center;
 }
+.deck-warning.bad {
+  color: var(--danger);
+}
 .picker-group {
   margin-bottom: 14px;
 }
@@ -2638,6 +2641,24 @@ button.hint-pill {
   font-size: 12px;
   filter: drop-shadow(0 0 2px #000);
 }
+.legality-badge {
+  position: absolute;
+  top: 22px;
+  right: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  z-index: 1;
+}
+.legality-badge.rotated {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 999px;
+  padding: 2px 4px;
+}
+.legality-badge.banned {
+  filter: drop-shadow(0 0 2px #000);
+}
 .btn.more {
   align-self: center;
 }
@@ -2789,6 +2810,25 @@ button.hint-pill {
 }
 .issues .warning {
   color: var(--gold);
+}
+.format-legality {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.format-chip {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.format-chip.ok {
+  color: var(--ok);
+}
+.format-chip.bad {
+  color: var(--danger);
 }
 .deck-actions {
   display: flex;
