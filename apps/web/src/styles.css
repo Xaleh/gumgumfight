@@ -1464,6 +1464,16 @@ button.hint-pill {
   transform: rotate(90deg) scale(0.72);
   filter: saturate(0.85) brightness(0.96);
 }
+/*
+ * Espectador: as cartas do jogador de cima ficam de cabeça para baixo, como numa mesa de verdade.
+ * O zoom e o painel de detalhes ficam fora da mesa e mostram a carta no sentido normal.
+ * `rotate` (e não `transform`) para somar com a carta virada (rested) e as animações.
+ */
+.game.flip-top .side.top .card,
+.game.flip-top .side.top .don-card,
+.game.flip-top .hand.top .card {
+  rotate: 180deg;
+}
 .c-red { --card-color: var(--red); }
 .c-green { --card-color: var(--green); }
 .c-blue { --card-color: var(--blue-card); }

@@ -687,7 +687,7 @@ function GameTable({
 
   return (
     <div
-      className={['game', wide ? 'wide' : '', drag ? 'dragging' : ''].join(' ')}
+      className={['game', wide ? 'wide' : '', watching ? 'flip-top' : '', drag ? 'dragging' : ''].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
