@@ -53,6 +53,8 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
+| `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar |
+| `ONLINE_BOT_ROOMS` | `on`                       | Treino online contra o bot do servidor (teste do modo espectador); `off` desliga |
 
 O backup é só copiar o arquivo `.db`.
 
@@ -205,6 +207,34 @@ No menu, a aba **Online** tem a fila **casual**, a **ranqueada** e as **salas pr
   novo refaz cada partida com o motor e os navegadores reconectam sozinhos; o tempo fora do ar não conta para ninguém.
 - Código: `apps/server/src/online/` (`room.ts`: uma partida e o relógio; `lobby.ts`: salas, filas e gravação;
   `routes.ts`: rotas e SSE) e `apps/web/src/game/useOnlineGame.ts` (canal e ações).
+
+### Modo espectador
+
+No menu, **Assistir partidas** lista as partidas online em andamento (ranqueadas primeiro), atualizada a cada 5 s.
+Qualquer pessoa assiste, com ou sem login. Salas privadas não aparecem na lista: para assisti-las é preciso o código
+da sala. Jogadores e espectadores veem quantas pessoas estão assistindo (👁); na revanche de uma sala privada, os
+espectadores seguem para a partida nova.
+
+- **O que o espectador vê:** a visão pública da mesa (`viewFor` com `viewer = null`): campo, descarte, Vida virada para
+  cima, cartas reveladas e o log público. Mãos, decks e Vida virada para baixo chegam escondidas.
+- **Ver mãos (Streamer e Admin):** a lista e a mesa têm o botão **Ver mãos**, que mostra as mãos dos dois jogadores
+  (decks e Vida continuam escondidos). O servidor confere o perfil da conta e recusa para quem está jogando a própria
+  partida.
+- **Treino contra o bot no servidor (fase de testes):** em **Contra o bot**, a opção **Jogar no servidor** cria uma
+  partida online em que o servidor joga pelo bot (decidindo só com a visão do bot). Ela aparece na lista para assistir,
+  então dá para testar o modo espectador sem um segundo jogador. Entra nas estatísticas como partida contra o bot.
+  Quando o modo espectador estiver aprovado, `ONLINE_BOT_ROOMS=off` tira a opção do menu e essas salas da lista,
+  deixando só as partidas multiplayer.
+
+### Perfis (Player, Streamer, Admin)
+
+Cada conta Google tem um perfil (coluna `users.role`): **Player** (padrão: joga e assiste sem ver as mãos),
+**Streamer** (assiste vendo as mãos) ou **Admin** (tudo do Streamer e muda os perfis em **Perfis das contas**, no
+menu). Sem login, a pessoa assiste como Player.
+
+O primeiro admin vem da variável `ADMIN_EMAILS`: quem entra com um desses e-mails (verificado pelo Google) vira Admin
+no login. Em produção, crie a *Variable* `ADMIN_EMAILS` no GitHub (como a `GOOGLE_CLIENT_ID`); o próximo deploy a grava
+em `shared/deploy.env`. Quem já estava logado precisa sair e entrar de novo. Um admin não muda o próprio perfil.
 
 ## Contas (login com Google)
 
@@ -404,7 +434,9 @@ npm run typecheck
 |--------|--------------------|---------------------------------------------|
 | GET    | `/api/health`      | Verificação de saúde                        |
 | GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google) |
-| GET    | `/api/auth/me`     | Usuário logado (`{ user }`, `null` sem sessão) |
+| GET    | `/api/auth/me`     | Usuário logado (`{ user }` com `role`; `null` sem sessão) |
+| GET    | `/api/admin/users?q=` | Contas e perfis (só Admin)               |
+| PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| admin }`; só Admin) |
 | POST   | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie |
 | POST   | `/api/auth/logout` | Sai (apaga a sessão)                        |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
@@ -431,7 +463,12 @@ npm run typecheck
 | GET    | `/api/online/rooms/:id/events?t=` | Canal SSE: visão do jogador, relógios, presença, emotes |
 | POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
 | POST   | `/api/online/rooms/:id/emote` · `/rematch` · `/leave` | Emote, revanche (salas privadas) e cancelar a sala |
-| GET    | `/api/online/rooms/:id/replay?t=` | Replay completo (só depois do fim) |
+| GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim) |
+| POST   | `/api/online/bot` | Treino contra o bot do servidor (`{ deckId, botDeckId \| random, format }`; desligado com `ONLINE_BOT_ROOMS=off`) |
+| GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |
+| GET    | `/api/online/watch/:code` | Sala privada pelo código, para assistir |
+| GET    | `/api/online/rooms/:id` | Resumo de uma sala (jogadores, turno, espectadores) |
+| GET    | `/api/online/rooms/:id/watch?hands=1` | Canal SSE do espectador (`hands=1`: só Streamer e Admin) |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked), `opponent` (bot,
 human), `by` (human = padrão, bot = simulações), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,

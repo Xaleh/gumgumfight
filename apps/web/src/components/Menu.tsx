@@ -192,12 +192,18 @@ export function Menu({
   onCoverage,
   onStats,
   onOnline,
+  onWatch,
+  onAdmin,
 }: {
   onStart: (s: GameSetup) => void;
   onOnline: (s: OnlineSeat) => void;
   onBuildDecks: () => void;
   onCoverage: () => void;
   onStats: () => void;
+  /** Lista de partidas online para assistir (modo espectador). */
+  onWatch: () => void;
+  /** Perfis das contas (só para admin). */
+  onAdmin?: () => void;
 }) {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +216,15 @@ export function Menu({
   const [loading, setLoading] = useState(false);
   const [picking, setPicking] = useState<null | 0 | 1>(null);
   const userId = useAuth().user?.id;
+  /** Treino contra o bot no servidor (fase de testes do modo espectador): a partida pode ser assistida. */
+  const [botRooms, setBotRooms] = useState(false);
+  const [onServer, setOnServer] = useState(false);
+  useEffect(() => {
+    api.online
+      .config()
+      .then((c) => setBotRooms(c.botRooms))
+      .catch(() => undefined);
+  }, []);
 
   // O servidor pode ainda estar subindo: tenta de novo por até ~30s antes de desistir.
   useEffect(() => {
@@ -266,6 +281,10 @@ export function Menu({
       if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
       if (mode === 'online') return;
+      if (mode === 'bot' && botRooms && onServer) {
+        onOnline(await api.online.botRoom(deck0, opp, format));
+        return;
+      }
       onStart(await buildSetup(mode, [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -394,6 +413,21 @@ export function Menu({
             )}
           </div>
 
+          {mode === 'bot' && botRooms && (
+            <div className="field">
+              <label className="check">
+                <input type="checkbox" checked={onServer} onChange={(e) => setOnServer(e.target.checked)} /> Jogar no servidor (outras
+                pessoas podem assistir)
+              </label>
+              {onServer && (
+                <p className="muted small">
+                  Modo de teste do espectador: o bot joga no servidor e a partida aparece em "Assistir partidas". Tem relógio como
+                  as partidas online; desfazer, pausa e "Auto" não ficam disponíveis.
+                </p>
+              )}
+            </div>
+          )}
+
           <button className="btn primary battle-btn" disabled={!ready || loading} onClick={start}>
             {loading ? 'Carregando…' : 'Batalhar!'}
           </button>
@@ -402,6 +436,16 @@ export function Menu({
         </section>
 
         <div className="menu-links">
+          <button className="btn" onClick={onWatch}>
+            <span className="ico">👁</span>
+            Assistir partidas
+          </button>
+          {onAdmin && (
+            <button className="btn" onClick={onAdmin}>
+              <span className="ico">🛡</span>
+              Perfis das contas
+            </button>
+          )}
           <button className="btn" onClick={onBuildDecks}>
             <span className="ico">🃏</span>
             Montar decks

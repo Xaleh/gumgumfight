@@ -3,6 +3,7 @@
 #   bash <release>/deploy/remote-deploy.sh <diretório do release>
 # Variável opcional: IMPORT_SETS="ST-01 ST-02" importa cartas da optcgapi depois do deploy.
 # Variável opcional: GOOGLE_CLIENT_ID (login com Google) é gravado em shared/deploy.env.
+# Variável opcional: ADMIN_EMAILS (contas Google que são sempre admin) é gravado em shared/deploy.env.
 set -euo pipefail
 
 RELEASE_DIR="$(cd "${1:?informe o diretório do release}" && pwd -P)"
@@ -21,6 +22,12 @@ NEW_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 if [ -n "$NEW_GOOGLE_CLIENT_ID" ]; then
   [[ "$NEW_GOOGLE_CLIENT_ID" =~ ^[A-Za-z0-9.-]+$ ]] || die "GOOGLE_CLIENT_ID inválido."
   { grep -v '^GOOGLE_CLIENT_ID=' "$ENV_FILE" || true; echo "GOOGLE_CLIENT_ID=$NEW_GOOGLE_CLIENT_ID"; } > "$ENV_FILE.tmp"
+  mv -f "$ENV_FILE.tmp" "$ENV_FILE"
+fi
+NEW_ADMIN_EMAILS="${ADMIN_EMAILS:-}"
+if [ -n "$NEW_ADMIN_EMAILS" ]; then
+  [[ "$NEW_ADMIN_EMAILS" =~ ^[A-Za-z0-9.@_+,-]+$ ]] || die "ADMIN_EMAILS inválido."
+  { grep -v '^ADMIN_EMAILS=' "$ENV_FILE" || true; echo "ADMIN_EMAILS=$NEW_ADMIN_EMAILS"; } > "$ENV_FILE.tmp"
   mv -f "$ENV_FILE.tmp" "$ENV_FILE"
 fi
 set -a

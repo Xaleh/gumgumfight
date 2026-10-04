@@ -4,17 +4,22 @@
 // Nginx Proxy Manager sem configuração extra: o header X-Accel-Buffering desliga o
 // buffer do proxy e um comentário a cada 20 s mantém a conexão abaixo do
 // proxy_read_timeout. O EventSource reconecta sozinho.
+//
+// Espectadores usam outro canal (/watch), sem token: qualquer um assiste às partidas
+// das filas (e às privadas, com o código). Ver as mãos exige perfil streamer ou admin
+// e é recusado para quem está jogando a própria partida.
 
-import { buildCardDef, type CardData, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
-import type { User } from '../auth/store';
-import { type DB, deleteLiveMatch, getCards, getDeck, listLiveMatches, saveLiveMatch } from '../db';
+import { randomInt } from 'node:crypto';
+import { buildCardDef, type CardData, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { accountOwnerKey, seesHands, type User } from '../auth/store';
+import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLiveMatches, saveLiveMatch } from '../db';
 import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
 import { Lobby, type LobbyError, type SeatRequest } from './lobby';
-import { type Connection, type Room, type RoomData, type RoomResult, TIME_BANK_MS } from './room';
+import { type Connection, MAX_SPECTATORS, type Room, type RoomData, type RoomResult, TIME_BANK_MS } from './room';
 
 interface Deps {
   db: DB;
@@ -25,6 +30,9 @@ interface Deps {
   now?: () => number;
   heartbeatMs?: number;
   rateLimit?: number;
+  /** Treino contra o bot do servidor (ONLINE_BOT_ROOMS). */
+  botRooms?: boolean;
+  botDelayMs?: number;
 }
 
 const isError = (v: unknown): v is LobbyError => typeof v === 'object' && v !== null && 'error' in v;
@@ -39,10 +47,17 @@ function finishMatch(db: DB, room: Room): RoomResult {
   };
   const ids = [...new Set(replay.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
   const facts = deriveMatch(replay, getCards(db, ids) as CardData[]);
-  const seat = (p: PlayerId) => ({ controller: 'human' as const, ownerHash: room.data.seats[p].ownerHash, deckId: room.data.seats[p].deckId });
+  const seat = (p: PlayerId) => {
+    const s = room.data.seats[p];
+    return s.bot
+      ? { controller: 'bot' as const, ownerHash: null, deckId: s.deckId }
+      : { controller: 'human' as const, ownerHash: s.ownerHash, deckId: s.deckId };
+  };
+  // Treino contra o bot entra nas estatísticas como as partidas contra o bot do navegador.
+  const mode = room.data.queue === 'bot' ? 'bot' : 'online';
   const matchId = recordMatch(
     db,
-    { mode: 'online', format: room.data.format, queue: room.ranked ? 'ranked' : 'casual', replay, seats: [seat(0), seat(1)] },
+    { mode, format: room.data.format, queue: room.ranked ? 'ranked' : 'casual', replay, seats: [seat(0), seat(1)] },
     facts,
   );
   return { matchId, bounty: matchBounties(db, matchId) };
@@ -57,8 +72,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     remove: (id) => deleteLiveMatch(db, id),
     now: deps.now,
     rateLimit: deps.rateLimit,
+    botDelayMs: deps.botDelayMs,
     log: (msg) => app.log.warn(msg),
   });
+  const botRooms = deps.botRooms ?? true;
   lobby.restore(
     listLiveMatches(db).flatMap((r) => {
       try {
@@ -83,8 +100,23 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (!ownerHash) return { code: 400, error: 'Navegador sem código de dono (header x-deck-owner).' };
     const account = user(req);
     if (ranked && !account) return { code: 401, error: 'A ranqueada é só para quem entrou com a conta Google.' };
-    const deckId = typeof body?.deckId === 'string' ? body.deckId : '';
-    const deck = deckId ? getDeck(db, deckId) : null;
+    const deck = deckFor(body?.deckId, format, ranked);
+    if (isError(deck)) return deck;
+    const profile = ensurePlayer(db, ownerHash);
+    return {
+      ownerHash,
+      userId: account?.id ?? null,
+      name: profile.name,
+      bounty: profile.bounty,
+      tier: tierFor(profile.bounty).id,
+      deckId: deck.id!,
+      deck,
+    };
+  };
+
+  /** Deck pronto para jogar no formato (e sem cartas manuais, na ranqueada). */
+  const deckFor = (deckId: unknown, format: FormatId, ranked: boolean): DeckList | LobbyError => {
+    const deck = typeof deckId === 'string' && deckId ? getDeck(db, deckId) : null;
     if (!deck) return { code: 400, error: 'Escolha um deck.' };
     const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
     const report = validateDeck(deck, cards);
@@ -99,16 +131,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
         error: `Na ranqueada o modo manual não é permitido: este deck tem ${manual.size} carta(s) com efeito ainda não automatizado (⚙).`,
       };
     }
-    const profile = ensurePlayer(db, ownerHash);
-    return {
-      ownerHash,
-      userId: account?.id ?? null,
-      name: profile.name,
-      bounty: profile.bounty,
-      tier: tierFor(profile.bounty).id,
-      deckId: deck.id,
-      deck: { id: deck.id, name: deck.name, leader: deck.leader, cards: deck.cards },
-    };
+    return { id: deck.id, name: deck.name, leader: deck.leader, cards: deck.cards };
   };
   const formatOf = (v: unknown): FormatId => (isFormat(v) ? v : 'standard');
 
@@ -119,7 +142,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return room && seat !== null ? { room, seat } : null;
   };
 
-  app.get('/api/online/config', async () => ({ timeBankMs: TIME_BANK_MS }));
+  app.get('/api/online/config', async () => ({ timeBankMs: TIME_BANK_MS, botRooms }));
 
   app.get('/api/online/active', async (req) => {
     const owner = viewerHash(req);
@@ -168,11 +191,31 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return reply.code(204).send();
   });
 
-  /** Canal da partida (SSE): estado, presença, emotes e avisos. */
-  app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/events', (req, reply) => {
-    const found = seatIn(req.params.id, req.query.t);
-    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
-    const { room, seat } = found;
+  /**
+   * Treino contra o bot jogado pelo servidor (fase de testes do modo espectador).
+   * `botDeckId` ausente ou "random": um deck pronto sorteado entre os permitidos no formato.
+   */
+  app.post<{ Body: RoomBody & { botDeckId?: unknown } }>('/api/online/bot', async (req, reply) => {
+    if (!botRooms) return reply.code(404).send({ error: 'O treino online contra o bot está desligado neste servidor.' });
+    const format = formatOf(req.body?.format);
+    const seat = seatFor(req, req.body, false, format);
+    if (isError(seat)) return reply.code(seat.code).send(seat);
+    let botDeckId = req.body?.botDeckId;
+    if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
+      const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false)));
+      if (!pool.length) return reply.code(400).send({ error: `Nenhum deck pronto é permitido no ${formatLabel(format)}.` });
+      botDeckId = pool[randomInt(pool.length)].id;
+    }
+    const botDeck = deckFor(botDeckId, format, false);
+    if (isError(botDeck)) return reply.code(botDeck.code).send({ error: `Deck do bot: ${botDeck.error}` });
+    const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: botDeck.id!, deck: botDeck };
+    const r = lobby.createBotRoom(seat, bot, format);
+    if (isError(r)) return reply.code(r.code).send(r);
+    return reply.code(201).send({ roomId: r.room.id, token: r.token });
+  });
+
+  /** Abre o canal SSE de uma conexão (jogador ou espectador) com a sala. */
+  const stream = (req: FastifyRequest, reply: FastifyReply, room: Room, init: Pick<Connection, 'seat' | 'hands'>) => {
     reply.hijack();
     const res = reply.raw;
     res.writeHead(200, {
@@ -183,7 +226,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     });
     res.write('retry: 2000\n\n');
     const conn: Connection = {
-      seat,
+      ...init,
       sentDefs: new Set(),
       sentLog: 0,
       send: (event, data) => {
@@ -200,6 +243,56 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     };
     req.raw.on('close', close);
     res.on('error', close);
+  };
+
+  /** Canal da partida (SSE): estado, presença, emotes e avisos. */
+  app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/events', (req, reply) => {
+    const found = seatIn(req.params.id, req.query.t);
+    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    stream(req, reply, found.room, { seat: found.seat });
+  });
+
+  // ---------------------------------------------------------------- espectadores
+
+  /** Sala que pode ser assistida (as de treino contra o bot somem quando o treino está desligado). */
+  const watchable = (id: string): Room | null => {
+    const room = lobby.get(id);
+    if (!room || (room.data.queue === 'bot' && !botRooms)) return null;
+    return room;
+  };
+
+  /** Partidas em andamento para assistir. `hands`: quem pede pode ligar "Ver mãos". */
+  app.get('/api/online/live', async (req) => ({
+    rooms: lobby.live({ bots: botRooms }),
+    hands: seesHands(user(req)?.role),
+  }));
+
+  /** Sala privada pelo código, para assistir. */
+  app.get<{ Params: { code: string } }>('/api/online/watch/:code', async (req, reply) => {
+    const room = /^[A-Za-z0-9]{6}$/.test(req.params.code) ? lobby.byCode(req.params.code) : null;
+    return room ? lobby.summary(room) : reply.code(404).send({ error: 'Nenhuma partida em andamento com esse código.' });
+  });
+
+  /** Resumo de uma sala (o espectador confere se ela ainda existe antes de reconectar). */
+  app.get<{ Params: { id: string } }>('/api/online/rooms/:id', async (req, reply) => {
+    const room = watchable(req.params.id);
+    return room ? lobby.summary(room) : reply.code(404).send({ error: 'Partida não encontrada.' });
+  });
+
+  /** Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin). */
+  app.get<{ Params: { id: string }; Querystring: { hands?: string } }>('/api/online/rooms/:id/watch', (req, reply) => {
+    const room = watchable(req.params.id);
+    if (!room || room.status === 'waiting') return reply.code(404).send({ error: 'Partida não encontrada.' });
+    const hands = req.query.hands === '1';
+    if (hands) {
+      const account = user(req);
+      if (!seesHands(account?.role)) return reply.code(403).send({ error: 'Ver as mãos é só para streamers e administradores.' });
+      if (room.isPlayer(accountOwnerKey(account!.id), account!.id)) {
+        return reply.code(403).send({ error: 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.' });
+      }
+    }
+    if (room.spectators >= MAX_SPECTATORS) return reply.code(429).send({ error: 'Esta partida já tem espectadores demais.' });
+    stream(req, reply, room, { seat: null, hands });
   });
 
   type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown };
@@ -233,10 +326,12 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return err ? reply.code(err.code).send(err) : reply.code(204).send();
   });
 
-  /** Replay completo, para baixar depois do fim (antes disso revelaria as cartas escondidas). */
-  app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/replay', async (req, reply) => {
-    const found = seatIn(req.params.id, req.query.t);
-    const replay = found?.room.replay();
+  /**
+   * Replay completo, para baixar depois do fim (antes disso revelaria as cartas
+   * escondidas). Jogadores e espectadores: depois do fim, tudo já é público.
+   */
+  app.get<{ Params: { id: string } }>('/api/online/rooms/:id/replay', async (req, reply) => {
+    const replay = lobby.get(req.params.id)?.replay();
     return replay ?? reply.code(404).send({ error: 'Replay disponível só depois do fim da partida.' });
   });
 

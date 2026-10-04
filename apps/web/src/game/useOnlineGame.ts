@@ -1,6 +1,6 @@
 import type { Action, CardDef, GameState, LogEntry, PlayerId } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, type OnlineRoomInfo, type OnlineSeat } from '../api';
+import { api, ApiError, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
 
 /** O que o servidor manda no evento "state" (online/room.ts: snapshot). */
 interface Snapshot {
@@ -20,11 +20,22 @@ export interface Emote {
   key: number;
 }
 
+/** Revanche: a sala nova (espectadores recebem só o id e seguem assistindo). */
+export interface RematchTarget {
+  roomId: string;
+  token?: string;
+}
+
 /**
  * Partida online: o estado vem do servidor (só a visão deste jogador) pelo canal
  * SSE; as ações vão por POST, uma de cada vez, na ordem em que foram feitas.
+ * Com um `WatchTarget` (sem token), a conexão é de espectador: só recebe a visão pública
+ * (ou com as mãos, para streamer e admin) e não age.
  */
-export function useOnlineGame(seat: OnlineSeat) {
+export function useOnlineGame(target: OnlineSeat | WatchTarget) {
+  const seat = { roomId: target.roomId, token: 'token' in target ? target.token : '' };
+  const watching = !('token' in target);
+  const hands = 'hands' in target && target.hands;
   const [state, setState] = useState<GameState | null>(null);
   const [room, setRoom] = useState<OnlineRoomInfo | null>(null);
   /** performance.now() de quando o relógio da sala chegou. */
@@ -32,7 +43,7 @@ export function useOnlineGame(seat: OnlineSeat) {
   const [conn, setConn] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [emotes, setEmotes] = useState<Emote[]>([]);
-  const [rematch, setRematch] = useState<OnlineSeat | null>(null);
+  const [rematch, setRematch] = useState<RematchTarget | null>(null);
   const [peek, setPeek] = useState(0);
   /** Ações vistas desde que a conexão abriu (para o resumo do fim de jogo). */
   const [actions, setActions] = useState<Action[]>([]);
@@ -53,7 +64,7 @@ export function useOnlineGame(seat: OnlineSeat) {
       if (stopped) return;
       es?.close();
       seen();
-      es = new EventSource(api.online.eventsUrl(seat.roomId, seat.token));
+      es = new EventSource(watching ? api.online.watchUrl(seat.roomId, hands) : api.online.eventsUrl(seat.roomId, seat.token));
       es.onopen = () => {
         seen();
         setConn('open');
@@ -76,8 +87,12 @@ export function useOnlineGame(seat: OnlineSeat) {
         }
       });
       es.addEventListener('presence', (e) => {
-        const { connected } = JSON.parse((e as MessageEvent).data) as { connected: boolean[] };
-        setRoom((r) => (r ? { ...r, players: r.players.map((p, i) => ({ ...p, connected: connected[i] ?? false })) } : r));
+        const { connected, spectators } = JSON.parse((e as MessageEvent).data) as { connected: boolean[]; spectators?: number };
+        setRoom((r) =>
+          r
+            ? { ...r, spectators: spectators ?? r.spectators, players: r.players.map((p, i) => ({ ...p, connected: connected[i] ?? false })) }
+            : r,
+        );
       });
       es.addEventListener('emote', (e) => {
         const m = JSON.parse((e as MessageEvent).data) as { seat: PlayerId; emote: string };
@@ -85,7 +100,7 @@ export function useOnlineGame(seat: OnlineSeat) {
         setEmotes((list) => [...list.slice(-3), { ...m, key }]);
         setTimeout(() => setEmotes((list) => list.filter((x) => x.key !== key)), 3500);
       });
-      es.addEventListener('rematch', (e) => setRematch(JSON.parse((e as MessageEvent).data) as OnlineSeat));
+      es.addEventListener('rematch', (e) => setRematch(JSON.parse((e as MessageEvent).data) as RematchTarget));
       es.addEventListener('closed', () => {
         stopped = true;
         es?.close();
@@ -102,11 +117,29 @@ export function useOnlineGame(seat: OnlineSeat) {
         if (finished.current) return;
         retry = setTimeout(async () => {
           try {
+            if (watching) {
+              await api.online.room(seat.roomId);
+              // A sala existe: o canal pode ter sido recusado (sem permissão para ver as mãos, lotado).
+              const ctrl = new AbortController();
+              const res = await fetch(api.online.watchUrl(seat.roomId, hands), { signal: ctrl.signal });
+              const refused = res.ok ? null : ((await res.json().catch(() => null)) as { error?: string } | null);
+              ctrl.abort();
+              if (refused && (res.status === 403 || res.status === 429)) {
+                stopped = true;
+                setError(refused.error ?? 'Não foi possível assistir a esta partida.');
+                setConn('gone');
+                return;
+              }
+              connect();
+              return;
+            }
             const active = await api.online.active();
             if (active.some((r) => r.roomId === seat.roomId)) connect();
             else setConn('gone');
-          } catch {
-            connect();
+          } catch (e) {
+            // Espectador: a sala sumiu (404) ou o canal foi recusado (ex.: sem permissão para ver as mãos).
+            if (watching && e instanceof ApiError && e.status === 404) setConn('gone');
+            else connect();
           }
         }, 3000);
       };
@@ -124,7 +157,7 @@ export function useOnlineGame(seat: OnlineSeat) {
       clearInterval(watchdog);
       es?.close();
     };
-  }, [seat.roomId, seat.token]);
+  }, [seat.roomId, seat.token, watching, hands]);
 
   // Ações em fila: cada POST leva a versão da mesa em que a ação foi feita.
   const queue = useRef<Action[]>([]);
@@ -165,7 +198,7 @@ export function useOnlineGame(seat: OnlineSeat) {
   const leave = useCallback(() => api.online.leave(seat.roomId, seat.token).catch(() => undefined), [seat.roomId, seat.token]);
   const downloadReplay = useCallback(async () => {
     try {
-      const replay = await api.online.replay(seat.roomId, seat.token);
+      const replay = await api.online.replay(seat.roomId);
       const blob = new Blob([JSON.stringify(replay)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -178,6 +211,8 @@ export function useOnlineGame(seat: OnlineSeat) {
   }, [seat.roomId, seat.token]);
 
   return {
+    watching,
+    hands,
     state,
     room,
     clockAt,

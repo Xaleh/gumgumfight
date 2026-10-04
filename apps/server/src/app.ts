@@ -35,7 +35,7 @@ import { registerStatsRoutes } from './stats/routes';
 
 export function buildApp(
   db: DB,
-  opts: { logger?: boolean; server?: ServerOptions; googleKeys?: GoogleKeys; /** Testes: relógio e limite de ações das partidas online. */ now?: () => number; onlineRateLimit?: number } = {},
+  opts: { logger?: boolean; server?: ServerOptions; googleKeys?: GoogleKeys; /** Testes: relógio, limite de ações e atraso do bot nas partidas online. */ now?: () => number; onlineRateLimit?: number; botDelayMs?: number } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
@@ -101,6 +101,7 @@ export function buildApp(
     clientId: server.googleClientId ?? null,
     keys: opts.googleKeys ?? googleKeyStore(),
     browserHash,
+    adminEmails: server.adminEmails,
   });
   /**
    * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o
@@ -220,7 +221,19 @@ export function buildApp(
 
   registerStatsRoutes(app, { db, viewerHash, present });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
-  app.decorate('onlineLobby', registerOnlineRoutes(app, { db, viewerHash, user: auth.viewer, present, now: opts.now, rateLimit: opts.onlineRateLimit }));
+  app.decorate(
+    'onlineLobby',
+    registerOnlineRoutes(app, {
+      db,
+      viewerHash,
+      user: auth.viewer,
+      present,
+      now: opts.now,
+      rateLimit: opts.onlineRateLimit,
+      botRooms: server.onlineBotRooms ?? true,
+      botDelayMs: opts.botDelayMs,
+    }),
+  );
 
   app.get('/api/matches', async () => recentMatches(db));
 
