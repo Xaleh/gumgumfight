@@ -147,6 +147,10 @@ CARD_IMAGES="on"
 [ -f "$ENV_FILE" ] && CARD_IMAGES="$(sed -n 's/^CARD_IMAGES=//p' "$ENV_FILE" | tail -1)" && CARD_IMAGES="${CARD_IMAGES:-on}"
 GOOGLE_CLIENT_ID=""
 [ -f "$ENV_FILE" ] && GOOGLE_CLIENT_ID="$(sed -n 's/^GOOGLE_CLIENT_ID=//p' "$ENV_FILE" | tail -1)"
+ADMIN_EMAILS=""
+[ -f "$ENV_FILE" ] && ADMIN_EMAILS="$(sed -n 's/^ADMIN_EMAILS=//p' "$ENV_FILE" | tail -1)"
+ONLINE_BOT_ROOMS="on"
+[ -f "$ENV_FILE" ] && ONLINE_BOT_ROOMS="$(sed -n 's/^ONLINE_BOT_ROOMS=//p' "$ENV_FILE" | tail -1)" && ONLINE_BOT_ROOMS="${ONLINE_BOT_ROOMS:-on}"
 cat > "$ENV_FILE" <<EOF
 # Gerado por deploy/setup-vm.sh — lido a cada deploy.
 PORT=$PORT
@@ -158,6 +162,10 @@ PM2_BIN=$PM2_BIN
 CARD_IMAGES=$CARD_IMAGES
 # Login com Google (preenchido pelo deploy a partir da Variable GOOGLE_CLIENT_ID do GitHub)
 GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+# Contas Google que viram Admin ao entrar (preenchido pelo deploy a partir da Variable ADMIN_EMAILS do GitHub)
+ADMIN_EMAILS=$ADMIN_EMAILS
+# on | off (off: desliga o treino online contra o bot do servidor)
+ONLINE_BOT_ROOMS=$ONLINE_BOT_ROOMS
 EOF
 info "Configuração salva em $ENV_FILE"
 
