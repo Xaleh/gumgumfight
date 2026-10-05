@@ -48,6 +48,10 @@ module.exports = {
         CARD_IMAGES: env.CARD_IMAGES || 'on',
         // Client ID do login com Google (vazio = login desligado).
         GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID || '',
+        // Contas Google que viram Admin ao entrar (e-mails separados por vírgula).
+        ADMIN_EMAILS: env.ADMIN_EMAILS || '',
+        // off: desliga o treino online contra o bot do servidor (teste do modo espectador).
+        ONLINE_BOT_ROOMS: env.ONLINE_BOT_ROOMS || 'on',
       },
     },
   ],
