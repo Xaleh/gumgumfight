@@ -880,19 +880,19 @@ input[type='number'] {
   place-items: center;
   width: var(--dw);
   height: calc(var(--dw) * 1.396);
-  border-radius: calc(var(--dw) * 0.12);
-  background:
-    radial-gradient(circle at 50% 38%, rgba(255, 215, 90, 0.35) 0 28%, transparent 60%),
-    linear-gradient(160deg, #3a2a10 0%, #1a1206 100%);
-  border: max(1.5px, calc(var(--dw) * 0.05)) solid #f2c14e;
-  box-shadow: 0 2px 5px rgba(60, 40, 0, 0.35);
+  border-radius: calc(var(--dw) * 0.07);
+  /* Arte original da carta DON!! (Starter Deck 01). */
+  background: #111 url('./assets/don-card.jpg') center / cover no-repeat;
+  border: max(1px, calc(var(--dw) * 0.025)) solid #111;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s, filter 0.2s;
 }
 .drag-ghost .don-card {
   --dw: calc(var(--cw) * 0.62);
 }
-.don-card::after {
+.don-card.back::after,
+.don-card.empty::after {
   content: 'DON!!';
   font-family: Bangers, Impact, sans-serif;
   color: #ffd75a;
@@ -1024,11 +1024,20 @@ input[type='number'] {
   bottom: calc(var(--k) * -3px + 9px);
   width: calc(var(--fw) * 1.396);
   height: var(--fw);
-  border-radius: calc(var(--fw) * 0.12);
+  border-radius: calc(var(--fw) * 0.07);
   --dw: var(--fw);
+  background: #111;
 }
+/* Deitado: a arte (em pé) é desenhada girada dentro da carta. */
 .don-card.flat::after {
-  transform: none;
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--fw);
+  height: calc(var(--fw) * 1.396);
+  background: url('./assets/don-card.jpg') center / cover no-repeat;
+  transform: translate(-50%, -50%) rotate(90deg);
 }
 /* No Líder, os DON!! aparecem pela direita (embaixo fica a fileira de DON!!). */
 .leader-zone .attached-don {
@@ -1046,7 +1055,7 @@ input[type='number'] {
   bottom: calc(var(--k) * 3px);
 }
 .leader-zone .don-card.flat::after {
-  transform: rotate(-90deg);
+  transform: translate(-50%, -50%);
 }
 .leader-zone .attached-don b {
   right: -8px;
