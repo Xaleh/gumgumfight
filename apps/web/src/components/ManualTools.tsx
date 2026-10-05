@@ -38,7 +38,9 @@ interface Props {
  * Ferramentas para aplicar à mão efeitos ainda não automatizados.
  * Cada botão vira uma ação 'manual' validada pelo motor (nenhuma carta some ou duplica).
  */
-export function ManualTools({ state, human, selected, onDispatch, onSelect, peek }: Props) {
+export function ManualTools({ state, human, selected: selectedUid, onDispatch, onSelect, peek }: Props) {
+  // Partida online: a carta escolhida pode ter sumido da visão (voltou ao deck, por exemplo).
+  const selected = selectedUid && state.cards[selectedUid] ? selectedUid : null;
   const [viewer, setViewer] = useState<null | 'deck' | 'trash' | 'oppTrash'>(null);
   const [deckCount, setDeckCount] = useState(5);
   const me = state.players[human];

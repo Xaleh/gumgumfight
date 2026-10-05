@@ -429,6 +429,9 @@ describe('modo espectador', () => {
     expect(live.hands).toBe(false);
     expect(live.rooms.map((r: { id: string }) => r.id)).toEqual([bot.json().roomId]);
     expect(live.rooms[0].players.map((p: { name: string; bot: boolean }) => p.bot)).toEqual([false, true]);
+    expect(live.rooms[0].mine).toBe(false);
+    const carol = { 'x-deck-owner': 'carol-0123456789abcdef' };
+    expect((await app.inject({ url: '/api/online/live', headers: carol })).json().rooms[0].mine).toBe(true);
     expect((await app.inject(`/api/online/watch/${code}`)).json().id).toBe(roomId);
     expect((await app.inject('/api/online/watch/ZZZZZZ')).statusCode).toBe(404);
     const streamer = login(db, 'nami', 'streamer');
@@ -493,6 +496,10 @@ describe('modo espectador', () => {
     expect(await open(nami.cookie, false)).toBe(200);
     expect(await open(admin.cookie)).toBe(200);
     expect(await open(undefined, false)).toBe(200);
+    // A lista avisa quem joga a partida, para assistir sem pedir as mãos.
+    const byCode = async (cookie: string) => (await app.inject({ url: `/api/online/watch/${code}`, headers: { cookie } })).json().mine;
+    expect(await byCode(nami.cookie)).toBe(true);
+    expect(await byCode(admin.cookie)).toBe(false);
     await app.close();
   });
 

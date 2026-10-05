@@ -261,16 +261,24 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return room;
   };
 
-  /** Partidas em andamento para assistir. `hands`: quem pede pode ligar "Ver mãos". */
-  app.get('/api/online/live', async (req) => ({
-    rooms: lobby.live({ bots: botRooms }),
-    hands: seesHands(user(req)?.role),
-  }));
+  /**
+   * Partidas em andamento para assistir. `hands`: quem pede pode ligar "Ver mãos".
+   * `mine`: quem pede joga a partida (nela, as mãos nunca aparecem).
+   */
+  app.get('/api/online/live', async (req) => {
+    const account = user(req);
+    const owner = viewerHash(req);
+    return {
+      rooms: lobby.live({ bots: botRooms }).map((r) => ({ ...r, mine: lobby.get(r.id)?.isPlayer(owner, account?.id ?? null) ?? false })),
+      hands: seesHands(account?.role),
+    };
+  });
 
   /** Sala privada pelo código, para assistir. */
   app.get<{ Params: { code: string } }>('/api/online/watch/:code', async (req, reply) => {
     const room = /^[A-Za-z0-9]{6}$/.test(req.params.code) ? lobby.byCode(req.params.code) : null;
-    return room ? lobby.summary(room) : reply.code(404).send({ error: 'Nenhuma partida em andamento com esse código.' });
+    if (!room) return reply.code(404).send({ error: 'Nenhuma partida em andamento com esse código.' });
+    return { ...lobby.summary(room), mine: room.isPlayer(viewerHash(req), user(req)?.id ?? null) };
   });
 
   /** Resumo de uma sala (o espectador confere se ela ainda existe antes de reconectar). */

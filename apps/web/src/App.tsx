@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { OnlineSeat, WatchTarget } from './api';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
@@ -21,8 +21,30 @@ type Screen =
   | { name: 'game'; setup: GameSetup; key: number }
   | { name: 'online'; seat: OnlineSeat };
 
+/** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
+const OPEN_MATCH = 'gumgum.openMatch';
+
+function savedScreen(): Screen {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(OPEN_MATCH) ?? 'null') as Screen | null;
+    if (s?.name === 'online' && typeof s.seat?.roomId === 'string' && typeof s.seat.token === 'string') return s;
+    if (s?.name === 'watch' && typeof s.target?.roomId === 'string') return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands) } };
+  } catch {
+    /* sem armazenamento */
+  }
+  return { name: 'menu' };
+}
+
 export function App() {
-  const [screen, setScreen] = useState<Screen>({ name: 'menu' });
+  const [screen, setScreen] = useState<Screen>(savedScreen);
+  useEffect(() => {
+    try {
+      if (screen.name === 'online' || screen.name === 'watch') sessionStorage.setItem(OPEN_MATCH, JSON.stringify(screen));
+      else sessionStorage.removeItem(OPEN_MATCH);
+    } catch {
+      /* sem armazenamento */
+    }
+  }, [screen]);
   const role = useAuth().user?.role;
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'coverage') return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
