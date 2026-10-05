@@ -21,6 +21,7 @@ import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
+import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
 import { ManualTools } from './ManualTools';
 import {
@@ -190,6 +191,10 @@ export function WatchGameScreen({
   useEffect(() => {
     if (online.rematch) onSwitch({ roomId: online.rematch.roomId, hands: target.hands });
   }, [online.rematch, onSwitch, target.hands]);
+  // "Ver mãos" recusado pelo servidor: continua assistindo sem as mãos (o motivo aparece no aviso).
+  useEffect(() => {
+    if (online.handsRefused && target.hands) onSwitch({ ...target, hands: false });
+  }, [online.handsRefused, onSwitch, target]);
   if (!state || !room) return <OnlineWaiting online={online} onCancel={onExit} />;
   const game: TableGame = {
     ...onlineTable,
@@ -212,7 +217,16 @@ export function WatchGameScreen({
   );
 }
 
-function GameTable({
+/** A mesa, protegida: um erro ao desenhar não apaga a página (o jogo continua por fora). */
+function GameTable(props: Parameters<typeof Table>[0]) {
+  return (
+    <ErrorBoundary title="A mesa travou" onExit={props.onExit}>
+      <Table {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function Table({
   game,
   kind,
   online,
@@ -234,11 +248,11 @@ function GameTable({
   const ranked = online?.room?.queue === 'ranked';
   const wide = useMediaQuery('(min-width: 1000px)');
   const { quickCounter } = useSettings();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
-  const [zoom, setZoom] = useState<string | null>(null);
+  const [selectedUid, setSelected] = useState<string | null>(null);
+  const [hoveredUid, setHovered] = useState<string | null>(null);
+  const [zoomUid, setZoom] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>(null);
-  const [picked, setPicked] = useState<string[]>([]);
+  const [pickedUids, setPicked] = useState<string[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
@@ -248,7 +262,16 @@ function GameTable({
   /** Ordem da mão escolhida pelo jogador (só exibição). */
   const [handOrder, setHandOrder] = useState<string[]>([]);
   /** Carta da mão erguida sob o dedo. */
-  const [lifted, setLifted] = useState<string | null>(null);
+  const [liftedUid, setLifted] = useState<string | null>(null);
+
+  // Online, uma carta pode sumir da visão (voltou ao deck, foi para a mão do oponente,
+  // virou Vida): a carta escolhida antes deixa de existir no estado e não pode ser lida.
+  const known = (uid: string | null) => (uid !== null && state.cards[uid] ? uid : null);
+  const selected = known(selectedUid);
+  const hovered = known(hoveredUid);
+  const zoom = known(zoomUid);
+  const lifted = known(liftedUid);
+  const picked = useMemo(() => pickedUids.filter((u) => state.cards[u]), [pickedUids, state]);
 
   const pending = state.pending;
   const myPending = pending && human !== null && pending.player === human ? pending : null;
@@ -763,11 +786,11 @@ function GameTable({
                 ))}
                 {(drag.count ?? 1) > 1 && <b>×{drag.count}</b>}
               </div>
-            ) : drag.uid && <CardView state={state} uid={drag.uid} />}
+            ) : known(drag.uid) && <CardView state={state} uid={drag.uid!} />}
           </div>
         )}
 
-        {zoom && state.cards[zoom] && (
+        {zoom && (
           <CardZoom
             state={state}
             uid={zoom}
@@ -960,7 +983,7 @@ function GameTable({
               </button>
             )}
           </div>
-          <CardDetail state={state} uid={detailUid && state.cards[detailUid] ? detailUid : null} />
+          <CardDetail state={state} uid={detailUid} />
           {manualOk && pending?.kind !== 'manual' && (
             <ManualTools state={state} human={human!} selected={selected} onDispatch={dispatch} onSelect={setSelected} peek={online?.peek} />
           )}

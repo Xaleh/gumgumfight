@@ -222,6 +222,8 @@ export interface ActiveRoom extends OnlineSeat {
 /** Partida na lista "Assistir". */
 export interface LiveRoom {
   id: string;
+  /** Quem pede joga esta partida (só na lista "Assistir"): não dá para vê-la com as mãos. */
+  mine?: boolean;
   queue: RoomQueue;
   format: FormatId;
   status: 'playing' | 'finished';

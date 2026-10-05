@@ -64,7 +64,11 @@ export function OnlineBanner({ online, player }: { online: OnlineGame; player: P
 export function OnlineStatus({ online }: { online: OnlineGame }) {
   const { room, conn } = online;
   if (conn === 'lost') return <div className="toast online-toast">Conexão perdida. Reconectando…</div>;
-  if (conn === 'gone' && room?.status !== 'finished') return <div className="toast error online-toast">A partida não existe mais.</div>;
+  if (conn === 'gone' && room?.status !== 'finished') {
+    // Espectador recusado (ex.: espectadores demais): o motivo já vem do servidor.
+    if (online.watching && online.error) return null;
+    return <div className="toast error online-toast">A partida não existe mais.</div>;
+  }
   if (!room || room.status !== 'playing') return null;
   if (room.you === null) {
     const away = room.players.find((p) => !p.connected && !p.bot);

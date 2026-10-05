@@ -45,6 +45,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const [emotes, setEmotes] = useState<Emote[]>([]);
   const [rematch, setRematch] = useState<RematchTarget | null>(null);
   const [peek, setPeek] = useState(0);
+  /** O servidor recusou mostrar as mãos (ex.: a conta joga esta partida): o espectador volta para a visão pública. */
+  const [handsRefused, setHandsRefused] = useState(false);
   /** Ações vistas desde que a conexão abriu (para o resumo do fim de jogo). */
   const [actions, setActions] = useState<Action[]>([]);
   const defs = useRef<Record<string, CardDef>>({});
@@ -57,6 +59,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     let retry: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
     let lastMessage = Date.now();
+    setHandsRefused(false);
     const seen = () => {
       lastMessage = Date.now();
     };
@@ -127,7 +130,9 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
               if (refused && (res.status === 403 || res.status === 429)) {
                 stopped = true;
                 setError(refused.error ?? 'Não foi possível assistir a esta partida.');
-                setConn('gone');
+                // Sem permissão só para as mãos: a partida continua visível sem elas.
+                if (hands && res.status === 403) setHandsRefused(true);
+                else setConn('gone');
                 return;
               }
               connect();
@@ -228,6 +233,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     downloadReplay,
     peek,
     actions,
+    handsRefused,
   };
 }
 

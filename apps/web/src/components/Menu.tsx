@@ -1,6 +1,6 @@
 import { type Action, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, canPlay, deckGroups, type DeckSummary, type FormatId, type OnlineSeat, whyNotPlayable } from '../api';
+import { type ActiveRoom, api, canPlay, deckGroups, type DeckSummary, type FormatId, type OnlineSeat, whyNotPlayable } from '../api';
 import { AccountBar, useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
 import { SettingsControls } from '../settings';
@@ -219,6 +219,14 @@ export function Menu({
   /** Treino contra o bot no servidor (fase de testes do modo espectador): a partida pode ser assistida. */
   const [botRooms, setBotRooms] = useState(false);
   const [onServer, setOnServer] = useState(false);
+  /** Partida online (ou treino contra o bot do servidor) ainda em andamento: atalho para voltar. */
+  const [resume, setResume] = useState<ActiveRoom | null>(null);
+  useEffect(() => {
+    api.online
+      .active()
+      .then((rooms) => setResume(rooms.find((r) => r.status === 'playing') ?? null))
+      .catch(() => undefined);
+  }, [userId]);
   useEffect(() => {
     api.online
       .config()
@@ -321,6 +329,15 @@ export function Menu({
         {error && <div className="error">{error}</div>}
 
         <AccountBar />
+
+        {resume && mode !== 'online' && (
+          <div className="online-active">
+            <span>{resume.queue === 'bot' ? 'Você tem um treino contra o bot em andamento.' : 'Você tem uma partida online em andamento.'}</span>
+            <button className="btn primary" onClick={() => onOnline(resume)}>
+              Voltar à partida
+            </button>
+          </div>
+        )}
 
         <section className="menu-card">
           <div className="seg">

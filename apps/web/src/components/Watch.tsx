@@ -59,13 +59,14 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
       /* sem armazenamento */
     }
   };
-  const watch = (roomId: string) => onWatch({ roomId, hands: canHands && hands });
+  // Na própria partida o servidor não mostra as mãos: assiste sem elas.
+  const watch = (roomId: string, mine = false) => onWatch({ roomId, hands: canHands && hands && !mine });
 
   const byCode = async () => {
     setError(null);
     try {
       const room = await api.online.byCode(code);
-      watch(room.id);
+      watch(room.id, room.mine);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -97,9 +98,14 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
           {rooms === null && !error && <p className="muted">Carregando…</p>}
           {rooms?.length === 0 && <p className="muted">Nenhuma partida em andamento agora. A lista se atualiza sozinha.</p>}
           {rooms?.map((r) => (
-            <button key={r.id} className="watch-room" onClick={() => watch(r.id)}>
+            <button key={r.id} className="watch-room" onClick={() => watch(r.id, r.mine)}>
               <div className="watch-meta">
                 <span className="watch-queue">{QUEUE_LABEL[r.queue]}</span>
+                {r.mine && (
+                  <span className="muted small" title="Você joga esta partida: ela aparece sem as mãos dos jogadores">
+                    Sua partida
+                  </span>
+                )}
                 <span className="muted small">
                   {formatLabel(r.format)} · {r.turn ? `Turno ${r.turn}` : 'Mão inicial'}
                   {r.spectators ? ` · 👁 ${r.spectators}` : ''}
