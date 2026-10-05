@@ -709,6 +709,9 @@ function GameTable({
               state={state}
               human={human}
               watching={watching}
+              hands={
+                spectator?.canHands && online ? { on: online.hands, onToggle: spectator.onToggleHands } : undefined
+              }
               acting={acting}
               mode={mode}
               paused={game.paused}
@@ -975,6 +978,8 @@ function CenterBand(props: {
   human: PlayerId | null;
   /** Espectador de partida online: sem botão de pausa e com "pensando" para os dois. */
   watching?: boolean;
+  /** Espectador Streamer/Admin: o olho mostra ou esconde as mãos dos jogadores. */
+  hands?: { on: boolean; onToggle: () => void };
   acting: PlayerId | null;
   mode: Mode;
   paused: boolean;
@@ -1035,6 +1040,15 @@ function CenterBand(props: {
           <br />
           turno
         </button>
+      ) : watching && props.hands ? (
+        <button
+          className={['end-turn', 'watching', 'hands-toggle', props.hands.on ? 'on' : ''].join(' ')}
+          onClick={props.hands.onToggle}
+          aria-pressed={props.hands.on}
+          title={props.hands.on ? 'Esconder as mãos dos jogadores' : 'Mostrar as mãos dos jogadores'}
+        >
+          <EyeIcon closed={!props.hands.on} />
+        </button>
       ) : watching ? (
         <span className="end-turn watching" title="Você está assistindo">
           👁
@@ -1045,6 +1059,16 @@ function CenterBand(props: {
         </button>
       )}
     </>
+  );
+}
+
+function EyeIcon({ closed }: { closed: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+      {closed && <path d="M4 4l16 16" />}
+    </svg>
   );
 }
 

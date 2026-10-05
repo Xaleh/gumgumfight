@@ -3894,6 +3894,19 @@ tr.clickable:hover td {
   background: #c6cee0;
   box-shadow: 0 3px 0 #aab4cc;
 }
+/* olho do Streamer/Admin: azul com as mãos à mostra, cinza com elas escondidas */
+.end-turn.hands-toggle {
+  cursor: pointer;
+  color: #5d6a88;
+}
+.end-turn.hands-toggle.on {
+  color: #fff;
+  background: linear-gradient(180deg, #4da3ff, var(--blue));
+  box-shadow: 0 4px 0 #1f5fc8, 0 6px 16px rgba(47, 125, 246, 0.4);
+}
+.end-turn.hands-toggle:active {
+  transform: translateY(3px);
+}
 
 .watch-hands {
   margin-bottom: 12px;
