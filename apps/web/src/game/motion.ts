@@ -15,8 +15,3 @@ export function holdMotion(ms: number) {
 export function motionWait(): number {
   return Math.max(0, busyUntil - performance.now());
 }
-
-/** O sistema pede menos movimento (acessibilidade). */
-export function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-}

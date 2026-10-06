@@ -16,7 +16,6 @@ import {
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
-import { prefersReducedMotion } from '../game/motion';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
@@ -254,7 +253,9 @@ function Table({
   const ranked = online?.room?.queue === 'ranked';
   const wide = useMediaQuery('(min-width: 1000px)');
   const { quickCounter, animations } = useSettings();
-  const animate = animations && !prefersReducedMotion();
+  // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
+  // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
+  const animate = animations;
   // Cartas voando entre as zonas (mais rápidas com o bot acelerado).
   const motionLayer = useBoardMotion(state, { enabled: animate, tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)) });
   // Sorteio com dados no começo da partida: só quando há sorteio (quem começa não foi
