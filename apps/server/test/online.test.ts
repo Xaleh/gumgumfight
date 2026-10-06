@@ -290,6 +290,38 @@ describe('partidas online: filas', () => {
   });
 });
 
+describe('partidas online: ferramentas manuais', () => {
+  it('só o perfil Dev usa as ferramentas manuais (função de desenvolvimento)', async () => {
+    const { app, db } = setup();
+    const login = (sub: string, role: Role) => {
+      const u = upsertGoogleUser(db, { sub, email: `${sub}@example.com`, emailVerified: true, name: sub, picture: null });
+      setUserRole(db, u.id, role);
+      return { cookie: `gg_session=${createSession(db, u.id)}` };
+    };
+    const zoro = { ...ALICE, ...login('zoro', 'admin') };
+    const sanji = { ...BOB, ...login('sanji', 'dev') };
+    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: zoro, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } })).json();
+    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: sanji, payload: { deckId: 'st02-kid', queue: 'casual', format: 'egb' } })).json();
+    const ma = (await app.inject(`/api/online/queue/${a.ticket}`)).json();
+    const mb = (await app.inject(`/api/online/queue/${b.ticket}`)).json();
+    expect(ma.status).toBe('matched');
+    const room = getRoom(app, ma.roomId);
+    const c = client(0);
+    room.attach(c.conn);
+    const p = actingPlayer(c.view!)!;
+    const tokens = p === 0 ? [ma.token, mb.token] : [mb.token, ma.token];
+    const draw = (headers: Record<string, string>, t: string) =>
+      app.inject({ method: 'POST', url: `/api/online/rooms/${ma.roomId}/action`, headers, payload: { t, seq: 0, action: { type: 'manual', player: p, op: { op: 'draw', count: 1 } } } });
+    // Sem login (só o token da cadeira) não pode, mesmo no casual.
+    const anon = await draw({}, tokens[0]);
+    expect(anon.statusCode).toBe(403);
+    expect(anon.json().error).toContain('Dev');
+    // Na cadeira da vez está o zoro (admin) ou o sanji (dev): só o Dev pode.
+    const mine = await draw(p === 0 ? zoro : sanji, tokens[0]);
+    expect(mine.statusCode).toBe(p === 0 ? 403 : 200);
+  });
+});
+
 describe('partidas online: relógio', () => {
   const seat = (name: string, deckId: string, db: DB): SeatRequest => {
     const d = getDeck(db, deckId)!;

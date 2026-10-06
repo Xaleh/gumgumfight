@@ -195,17 +195,21 @@ export function Menu({
   onWatch,
   onTournaments,
   onAdmin,
+  dev = false,
 }: {
   onStart: (s: GameSetup) => void;
   onOnline: (s: OnlineSeat) => void;
   onBuildDecks: () => void;
-  onCoverage: () => void;
+  /** Cobertura das cartas (só para Dev). */
+  onCoverage?: () => void;
   onStats: () => void;
   /** Lista de partidas online para assistir (modo espectador). */
   onWatch: () => void;
   onTournaments: () => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
+  /** Funções de desenvolvimento (só para Dev): opções de teste e treino no servidor contra o bot. */
+  dev?: boolean;
 }) {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -291,7 +295,7 @@ export function Menu({
       if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
       if (mode === 'online') return;
-      if (mode === 'bot' && botRooms && onServer) {
+      if (mode === 'bot' && dev && botRooms && onServer) {
         onOnline(await api.online.botRoom(deck0, opp, format));
         return;
       }
@@ -442,7 +446,7 @@ export function Menu({
             )}
           </div>
 
-          {mode === 'bot' && botRooms && (
+          {mode === 'bot' && dev && botRooms && (
             <div className="field">
               <label className="check">
                 <input type="checkbox" checked={onServer} onChange={(e) => setOnServer(e.target.checked)} /> Jogar no servidor (outras
@@ -487,10 +491,12 @@ export function Menu({
             <span className="ico">📈</span>
             Estatísticas
           </button>
-          <button className="btn" onClick={onCoverage}>
-            <span className="ico">📊</span>
-            Cobertura das cartas
-          </button>
+          {onCoverage && (
+            <button className="btn" onClick={onCoverage}>
+              <span className="ico">📊</span>
+              Cobertura das cartas
+            </button>
+          )}
         </div>
 
         <section className="menu-card">
@@ -498,26 +504,28 @@ export function Menu({
           <SettingsControls />
         </section>
 
-        <details className="menu-card advanced">
-          <summary>Opções de teste</summary>
-          <div className="field">
-            <label>Seed do embaralhamento</label>
-            <div className="seed">
-              <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value) || 0)} />
-              <button className="btn small" onClick={() => setSeed(randomSeed())} title="Sortear outra">
-                🎲
-              </button>
+        {dev && (
+          <details className="menu-card advanced">
+            <summary>Opções de teste</summary>
+            <div className="field">
+              <label>Seed do embaralhamento</label>
+              <div className="seed">
+                <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value) || 0)} />
+                <button className="btn small" onClick={() => setSeed(randomSeed())} title="Sortear outra">
+                  🎲
+                </button>
+              </div>
+              <p className="muted small">
+                Número que define a ordem dos decks e o sorteio de quem começa. A mesma seed com as mesmas jogadas repete a
+                partida exatamente, o que é útil para reproduzir um problema. Para jogar normalmente, ignore este campo.
+              </p>
             </div>
-            <p className="muted small">
-              Número que define a ordem dos decks e o sorteio de quem começa. A mesma seed com as mesmas jogadas repete a
-              partida exatamente, o que é útil para reproduzir um problema. Para jogar normalmente, ignore este campo.
-            </p>
-          </div>
-          <label className="replay-load">
-            Carregar um replay (.json baixado durante uma partida)
-            <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && loadReplay(e.target.files[0])} />
-          </label>
-        </details>
+            <label className="replay-load">
+              Carregar um replay (.json baixado durante uma partida)
+              <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && loadReplay(e.target.files[0])} />
+            </label>
+          </details>
+        )}
 
         <p className="disclaimer">
           Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para

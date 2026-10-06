@@ -4030,6 +4030,9 @@ tr.clickable:hover td {
 .role-tag.admin {
   background: var(--accent);
 }
+.role-tag.dev {
+  background: var(--accent);
+}
 .role-tag.organizer {
   background: var(--ok);
 }
