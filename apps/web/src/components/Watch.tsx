@@ -1,6 +1,6 @@
 import { formatLabel } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, type LiveRoom, type WatchTarget } from '../api';
+import { api, type LiveRoom, ROLE_LABEL, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
 import { LeaderArt } from './LeaderArt';
 import { TIER_LABEL } from './Online';
@@ -87,7 +87,7 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
         {canHands ? (
           <label className="check watch-hands">
             <input type="checkbox" checked={hands} onChange={(e) => toggleHands(e.target.checked)} /> Ver as mãos dos jogadores
-            <span className="muted small"> (perfil {user?.role === 'admin' ? 'Admin' : 'Streamer'})</span>
+            <span className="muted small"> (perfil {user ? ROLE_LABEL[user.role] : 'Streamer'})</span>
           </label>
         ) : (
           <p className="muted small">

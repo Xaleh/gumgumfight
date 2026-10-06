@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { OnlineSeat, WatchTarget } from './api';
+import { isAdmin, isDev, type OnlineSeat, type WatchTarget } from './api';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
 import { Coverage } from './components/Coverage';
@@ -54,10 +54,11 @@ export function App() {
     }
   }, [screen]);
   const role = useAuth().user?.role;
+  const dev = isDev(role);
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
-  if (screen.name === 'coverage') return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'coverage' && dev) return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} />;
-  if (screen.name === 'admin') return <Admin onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'admin' && isAdmin(role)) return <Admin onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'tournaments') {
     return (
       <Tournaments
@@ -76,7 +77,7 @@ export function App() {
       <WatchGameScreen
         key={screen.target.roomId}
         target={screen.target}
-        canHands={role === 'streamer' || role === 'admin'}
+        canHands={role === 'streamer' || isAdmin(role)}
         onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : { name: 'watch-list' })}
         onSwitch={(target) => setScreen({ name: 'watch', target, tournament: screen.tournament })}
       />
@@ -116,12 +117,13 @@ export function App() {
     <Menu
       onStart={(setup) => setScreen({ name: 'game', setup, key: Date.now() })}
       onBuildDecks={() => setScreen({ name: 'builder' })}
-      onCoverage={() => setScreen({ name: 'coverage' })}
+      onCoverage={dev ? () => setScreen({ name: 'coverage' }) : undefined}
       onStats={() => setScreen({ name: 'stats' })}
       onOnline={(seat) => setScreen({ name: 'online', seat })}
       onWatch={() => setScreen({ name: 'watch-list' })}
       onTournaments={() => setScreen({ name: 'tournaments' })}
-      onAdmin={role === 'admin' ? () => setScreen({ name: 'admin' }) : undefined}
+      onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
+      dev={dev}
     />
   );
 }

@@ -7,11 +7,12 @@ const ROLE_HELP: Record<Role, string> = {
   streamer: 'Assiste às partidas podendo ver as mãos dos dois jogadores.',
   organizer: 'Cria torneios e gerencia os que criou (inscrições, rodadas e resultados).',
   admin: 'Tudo do Streamer e do Organizador, gerencia qualquer torneio e muda os perfis das contas.',
+  dev: 'Tudo do Admin e as funções de desenvolvimento: ferramentas manuais na partida, cobertura das cartas e opções de teste.',
 };
 
-/** Perfis das contas (só admin): Player, Streamer, Organizador ou Admin. */
+/** Perfis das contas (só admin): Player, Streamer, Organizador, Admin ou Dev. */
 export function Admin({ onExit }: { onExit: () => void }) {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,8 @@ export function Admin({ onExit }: { onExit: () => void }) {
     try {
       const saved = await api.admin.setRole(u.id, role);
       setUsers((list) => list?.map((x) => (x.id === u.id ? { ...x, role: saved.role } : x)) ?? null);
+      // Promoveu a si mesmo a Dev: a barra de conta e o menu passam a mostrar as funções de desenvolvimento.
+      if (u.id === user?.id) await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -86,8 +89,8 @@ export function Admin({ onExit }: { onExit: () => void }) {
                   <button
                     key={r}
                     className={u.role === r ? 'on' : ''}
-                    disabled={u.id === user?.id || saving === u.id}
-                    title={u.id === user?.id ? 'Você não pode mudar o seu próprio perfil' : ROLE_HELP[r]}
+                    disabled={(u.id === user?.id && r !== 'dev') || saving === u.id}
+                    title={u.id === user?.id && r !== 'dev' ? 'Você só pode mudar o seu próprio perfil para Dev' : ROLE_HELP[r]}
                     onClick={() => u.role !== r && change(u, r)}
                   >
                     {ROLE_LABEL[r]}

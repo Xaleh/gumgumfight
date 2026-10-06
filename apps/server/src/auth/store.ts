@@ -9,15 +9,23 @@ export const SESSION_DAYS = 60;
 /**
  * Perfil da conta. player: joga e assiste às partidas sem ver as mãos; streamer:
  * pode assistir vendo as mãos dos dois jogadores; organizer: cria e gerencia
- * torneios; admin: tudo isso, gerencia qualquer torneio e muda os perfis.
+ * torneios; admin: tudo isso, gerencia qualquer torneio e muda os perfis; dev: tudo
+ * do admin e as funções de desenvolvimento (ferramentas manuais, cobertura, testes).
  */
-export const ROLES = ['player', 'streamer', 'organizer', 'admin'] as const;
+export const ROLES = ['player', 'streamer', 'organizer', 'admin', 'dev'] as const;
 export type Role = (typeof ROLES)[number];
 export const isRole = (v: unknown): v is Role => ROLES.includes(v as Role);
+/** Poderes de administrador (o Dev é um Admin com as ferramentas de desenvolvimento). */
+export const isAdmin = (role: Role | undefined) => role === 'admin' || role === 'dev';
+/**
+ * Funções de desenvolvimento: ferramentas manuais na partida, cobertura das cartas,
+ * opções de teste. Escondidas do público em geral.
+ */
+export const isDev = (role: Role | undefined) => role === 'dev';
 /** Pode assistir às partidas vendo as mãos. */
-export const seesHands = (role: Role | undefined) => role === 'streamer' || role === 'admin';
+export const seesHands = (role: Role | undefined) => role === 'streamer' || isAdmin(role);
 /** Pode criar torneios (e gerenciar os que criou; o admin gerencia todos). */
-export const createsTournaments = (role: Role | undefined) => role === 'organizer' || role === 'admin';
+export const createsTournaments = (role: Role | undefined) => role === 'organizer' || isAdmin(role);
 
 export interface User {
   id: string;
@@ -40,7 +48,8 @@ const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, 
 
 /**
  * Cria a conta no primeiro login; nos seguintes, atualiza nome, e-mail e foto.
- * `adminEmails`: e-mails (verificados pelo Google) que viram admin ao entrar.
+ * `adminEmails`: e-mails (verificados pelo Google) que viram admin ao entrar (um Dev
+ * continua Dev, que já é admin).
  */
 export function upsertGoogleUser(db: DB, g: GoogleIdentity, adminEmails: string[] = []): User {
   const found = db.prepare('SELECT id FROM users WHERE google_sub = ?').get(g.sub) as { id: string } | undefined;
@@ -50,8 +59,12 @@ export function upsertGoogleUser(db: DB, g: GoogleIdentity, adminEmails: string[
     ON CONFLICT(google_sub) DO UPDATE SET email = excluded.email, name = excluded.name,
       picture = excluded.picture, last_login_at = datetime('now')
   `).run(id, g.sub, g.email, g.name, g.picture);
-  if (g.emailVerified && g.email && adminEmails.includes(g.email.toLowerCase())) setUserRole(db, id, 'admin');
-  return getUser(db, id)!;
+  const user = getUser(db, id)!;
+  if (g.emailVerified && g.email && adminEmails.includes(g.email.toLowerCase()) && !isAdmin(user.role)) {
+    setUserRole(db, id, 'admin');
+    user.role = 'admin';
+  }
+  return user;
 }
 
 export function getUser(db: DB, id: string): User | null {
@@ -75,7 +88,7 @@ export function listUsers(db: DB, query = '', limit = 50): UserListItem[] {
     .prepare(
       `SELECT id, email, name, picture, role, created_at, last_login_at FROM users
        WHERE COALESCE(name, '') LIKE ? ESCAPE '\\' OR COALESCE(email, '') LIKE ? ESCAPE '\\'
-       ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'organizer' THEN 1 WHEN 'streamer' THEN 2 ELSE 3 END, last_login_at DESC
+       ORDER BY CASE role WHEN 'dev' THEN 0 WHEN 'admin' THEN 0 WHEN 'organizer' THEN 1 WHEN 'streamer' THEN 2 ELSE 3 END, last_login_at DESC
        LIMIT ?`,
     )
     .all(q, q, limit) as Array<UserRow & { created_at: string; last_login_at: string }>;

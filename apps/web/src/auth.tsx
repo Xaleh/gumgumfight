@@ -59,6 +59,8 @@ interface AuthCtx {
   error: string | null;
   signIn: (credential: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Relê a sessão no servidor (ex.: depois de mudar o próprio perfil). */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx | null>(null);
@@ -107,6 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refresh = async () => {
+    const me = await api.me();
+    setUser(me.user);
+  };
+
   const signOut = async () => {
     await api.logout().catch(() => undefined);
     window.google?.accounts.id.disableAutoSelect();
@@ -115,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ready, user, clientId, notice, error, signIn, signOut }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ ready, user, clientId, notice, error, signIn, signOut, refresh }}>{children}</AuthContext.Provider>
   );
 }
 
