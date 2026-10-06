@@ -32,6 +32,8 @@ import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
 import { registerOnlineRoutes } from './online/routes';
 import { registerStatsRoutes } from './stats/routes';
+import { registerTournamentRoutes } from './tournaments/routes';
+import { reportFromGame } from './tournaments/store';
 
 export function buildApp(
   db: DB,
@@ -220,20 +222,20 @@ export function buildApp(
   });
 
   registerStatsRoutes(app, { db, viewerHash, present });
+  const lobby = registerOnlineRoutes(app, {
+    db,
+    viewerHash,
+    user: auth.viewer,
+    present,
+    now: opts.now,
+    rateLimit: opts.onlineRateLimit,
+    botRooms: server.onlineBotRooms ?? true,
+    botDelayMs: opts.botDelayMs,
+    onTournamentGame: (game) => reportFromGame(db, game),
+  });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
-  app.decorate(
-    'onlineLobby',
-    registerOnlineRoutes(app, {
-      db,
-      viewerHash,
-      user: auth.viewer,
-      present,
-      now: opts.now,
-      rateLimit: opts.onlineRateLimit,
-      botRooms: server.onlineBotRooms ?? true,
-      botDelayMs: opts.botDelayMs,
-    }),
-  );
+  app.decorate('onlineLobby', lobby);
+  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages });
 
   app.get('/api/matches', async () => recentMatches(db));
 

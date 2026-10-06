@@ -53,8 +53,20 @@ const BOT_DELAY_MS = 700;
 export const EMOTES = ['hello', 'gg', 'nice', 'think', 'wow', 'oops', 'thanks', 'hurry'] as const;
 export type EmoteId = (typeof EMOTES)[number];
 
-/** private = sala com código; casual e ranked = filas; bot = treino contra o bot do servidor. */
-export type RoomQueue = 'private' | 'casual' | 'ranked' | 'bot';
+/**
+ * private = sala com código; casual e ranked = filas; bot = treino contra o bot do
+ * servidor; tournament = partida de uma rodada de torneio.
+ */
+export type RoomQueue = 'private' | 'casual' | 'ranked' | 'bot' | 'tournament';
+
+/** Partida de torneio jogada na sala. */
+export interface RoomTournament {
+  id: string;
+  name: string;
+  round: number;
+  /** Id da partida em tournament_matches. */
+  matchId: number;
+}
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 export interface SeatInfo {
@@ -95,6 +107,7 @@ export interface RoomData {
   /** Ids das salas de revanche pedidas (por assento). */
   rematch?: [boolean, boolean];
   rematchRoom?: string | null;
+  tournament?: RoomTournament;
 }
 
 export interface Connection {
@@ -128,8 +141,11 @@ export type ActResult = { ok: true; actionCount: number } | { ok: false; code: n
 
 export const randomToken = () => randomBytes(24).toString('base64url');
 
-export function newRoomData(init: Pick<RoomData, 'queue' | 'format' | 'code'> & { id?: string; seats: SeatInfo[] }): RoomData {
+export function newRoomData(
+  init: Pick<RoomData, 'queue' | 'format' | 'code' | 'tournament'> & { id?: string; seats: SeatInfo[] },
+): RoomData {
   return {
+    ...(init.tournament ? { tournament: init.tournament } : {}),
     id: init.id ?? randomBytes(9).toString('base64url'),
     code: init.code,
     queue: init.queue,
@@ -441,6 +457,7 @@ export class Room {
       code: this.data.code,
       queue: this.data.queue,
       format: this.data.format,
+      tournament: this.data.tournament ?? null,
       status: this.status,
       you: seat,
       players: this.data.seats.map((s, i) => ({

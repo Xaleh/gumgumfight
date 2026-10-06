@@ -191,6 +191,16 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
               <h2>{online.watching && online.error ? 'Não foi possível assistir' : 'Partida não encontrada'}</h2>
               <p className="muted">{online.error ?? 'A sala foi cancelada ou expirou.'}</p>
             </>
+          ) : room?.status === 'waiting' && room.tournament ? (
+            <>
+              <h2>🏆 {room.tournament.name}</h2>
+              <p className="muted">
+                Rodada {room.tournament.round}. A partida começa quando o seu oponente clicar em "Jogar" na página do torneio.
+              </p>
+              <p className="muted small waiting-dots">
+                Aguardando o oponente<span className="dots" />
+              </p>
+            </>
           ) : room?.status === 'waiting' ? (
             <>
               <h2>Sala privada</h2>

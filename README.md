@@ -2,8 +2,8 @@
 
 Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](https://duels.ink/) (Lorcana).
 
-> **Status:** partidas contra um bot, bot x bot, replays e **multiplayer online** (salas privadas, fila casual e
-> ranqueada). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
+> **Status:** partidas contra um bot, bot x bot, replays, **multiplayer online** (salas privadas, fila casual e
+> ranqueada) e **torneios** (suíço e eliminação simples). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
 > com textos em português (tradução automática) ou inglês e imagens opcionais.
 
 ## Requisitos
@@ -226,15 +226,43 @@ espectadores seguem para a partida nova.
   Quando o modo espectador estiver aprovado, `ONLINE_BOT_ROOMS=off` tira a opção do menu e essas salas da lista,
   deixando só as partidas multiplayer.
 
-### Perfis (Player, Streamer, Admin)
+### Perfis (Player, Streamer, Organizador, Admin)
 
 Cada conta Google tem um perfil (coluna `users.role`): **Player** (padrão: joga e assiste sem ver as mãos),
-**Streamer** (assiste vendo as mãos) ou **Admin** (tudo do Streamer e muda os perfis em **Perfis das contas**, no
-menu). Sem login, a pessoa assiste como Player.
+**Streamer** (assiste vendo as mãos), **Organizador** (cria torneios e gerencia os que criou) ou **Admin** (tudo
+isso, gerencia qualquer torneio e muda os perfis em **Perfis das contas**, no menu). Sem login, a pessoa assiste
+como Player.
 
 O primeiro admin vem da variável `ADMIN_EMAILS`: quem entra com um desses e-mails (verificado pelo Google) vira Admin
 no login. Em produção, crie a *Variable* `ADMIN_EMAILS` no GitHub (como a `GOOGLE_CLIENT_ID`); o próximo deploy a grava
 em `shared/deploy.env`. Quem já estava logado precisa sair e entrar de novo. Um admin não muda o próprio perfil.
+
+## Torneios
+
+Em **Torneios** (no menu), contas com perfil **Organizador** ou **Admin** criam torneios; qualquer conta Google se
+inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia qualquer um.
+
+- **Criação:** nome, descrição e regras, formato (Standard ou Extra Grand Battle), estrutura, limite de jogadores e
+  início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
+- **Estruturas:**
+  - **Suíço:** todos jogam todas as rodadas, contra quem tem a mesma pontuação e sem repetir confrontos. Vitória vale
+    3 pontos, empate 1, e o bye (número ímpar de jogadores) conta como vitória e vai para o último colocado que ainda
+    não teve um. Desempate por OMW (% de vitórias dos oponentes, mínimo de 33%) e OOMW. O número de rodadas é
+    escolhido pelo organizador ou, em branco, calculado no início (⌈log₂ jogadores⌉).
+  - **Eliminação simples:** chave sorteada no início, do tamanho da próxima potência de 2; as vagas que sobram viram
+    byes para os primeiros cabeças de chave. Não há empate.
+- **Inscrição:** com um deck válido no formato. A lista fica **congelada** na inscrição (mudar o deck depois não muda
+  o do torneio; inscreva-o de novo para trocar). Os outros jogadores veem só o Líder; as listas completas ficam
+  visíveis para o organizador e, quando o torneio termina, para todos.
+- **Partidas:** cada jogador clica em **Jogar partida** na página do torneio; quem entra primeiro espera o oponente
+  na sala online (fila `tournament`, com relógio e regras das partidas online). O resultado entra sozinho no
+  torneio quando a partida termina, e a partida aparece em **Assistir partidas** com o nome do torneio. Entra nas
+  estatísticas na fila **Torneio**.
+- **Organização:** o organizador lança ou corrige qualquer resultado da rodada atual (W.O., queda de conexão,
+  partida jogada fora do site), tira jogadores e gera a próxima rodada quando todas as partidas têm resultado.
+  Depois da última rodada (ou da final), o mesmo botão encerra o torneio; **Encerrar agora** termina antes.
+- **Desistência:** o jogador (ou o organizador) pode tirá-lo do torneio; a partida pendente dele na rodada atual vai
+  para o oponente e ele não é mais pareado.
 
 ## Contas (login com Google)
 
@@ -436,7 +464,7 @@ npm run typecheck
 | GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google) |
 | GET    | `/api/auth/me`     | Usuário logado (`{ user }` com `role`; `null` sem sessão) |
 | GET    | `/api/admin/users?q=` | Contas e perfis (só Admin)               |
-| PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| admin }`; só Admin) |
+| PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| organizer \| admin }`; só Admin) |
 | POST   | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie |
 | POST   | `/api/auth/logout` | Sai (apaga a sessão)                        |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
@@ -469,8 +497,17 @@ npm run typecheck
 | GET    | `/api/online/watch/:code` | Sala privada pelo código, para assistir |
 | GET    | `/api/online/rooms/:id` | Resumo de uma sala (jogadores, turno, espectadores) |
 | GET    | `/api/online/rooms/:id/watch?hands=1` | Canal SSE do espectador (`hands=1`: só Streamer e Admin) |
+| GET    | `/api/tournaments` | Torneios (`{ tournaments, canCreate }`) |
+| GET    | `/api/tournaments/:id` | Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer |
+| POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, maxPlayers, startsAt }`; Organizador e Admin) |
+| PUT / DELETE | `/api/tournaments/:id` | Edita (só com inscrições abertas) / apaga (organizador do torneio ou Admin) |
+| POST / DELETE | `/api/tournaments/:id/register` | Inscreve ou troca o deck (`{ deckId }`) / cancela a inscrição ou desiste |
+| POST   | `/api/tournaments/:id/start` · `/next` · `/finish` | Começa, gera a próxima rodada (ou encerra depois da última) e encerra antes |
+| PUT    | `/api/tournaments/:id/matches/:matchId/result` | Resultado da rodada atual (`{ result: p1 \| p2 \| draw \| null }`) |
+| POST   | `/api/tournaments/:id/players/:userId/drop` | Tira um jogador (organizador) |
+| POST   | `/api/tournaments/:id/matches/:matchId/play` | Abre ou entra na sala online da partida (`{ roomId, token }`) |
 
-Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked), `opponent` (bot,
+Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,
 human), `by` (human = padrão, bot = simulações), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,
 `first` (first, second), `days`, `mine=1` e `deck`.
 

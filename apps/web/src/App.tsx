@@ -7,6 +7,7 @@ import { DeckBuilder } from './components/DeckBuilder';
 import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/GameScreen';
 import { Menu } from './components/Menu';
 import { Stats } from './components/Stats';
+import { Tournaments } from './components/Tournaments';
 import { Watch } from './components/Watch';
 import type { GameSetup } from './game/useGame';
 
@@ -17,9 +18,11 @@ type Screen =
   | { name: 'stats' }
   | { name: 'admin' }
   | { name: 'watch-list' }
-  | { name: 'watch'; target: WatchTarget }
+  /** `tournament`: veio da página de um torneio (e volta para ela). */
+  | { name: 'watch'; target: WatchTarget; tournament?: string }
+  | { name: 'tournaments'; id?: string }
   | { name: 'game'; setup: GameSetup; key: number }
-  | { name: 'online'; seat: OnlineSeat };
+  | { name: 'online'; seat: OnlineSeat; tournament?: string };
 
 /** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
 const OPEN_MATCH = 'gumgum.openMatch';
@@ -27,8 +30,13 @@ const OPEN_MATCH = 'gumgum.openMatch';
 function savedScreen(): Screen {
   try {
     const s = JSON.parse(sessionStorage.getItem(OPEN_MATCH) ?? 'null') as Screen | null;
-    if (s?.name === 'online' && typeof s.seat?.roomId === 'string' && typeof s.seat.token === 'string') return s;
-    if (s?.name === 'watch' && typeof s.target?.roomId === 'string') return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands) } };
+    const tournament = s && 'tournament' in s && typeof s.tournament === 'string' ? s.tournament : undefined;
+    if (s?.name === 'online' && typeof s.seat?.roomId === 'string' && typeof s.seat.token === 'string') {
+      return { name: 'online', seat: { roomId: s.seat.roomId, token: s.seat.token }, tournament };
+    }
+    if (s?.name === 'watch' && typeof s.target?.roomId === 'string') {
+      return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands) }, tournament };
+    }
   } catch {
     /* sem armazenamento */
   }
@@ -50,6 +58,16 @@ export function App() {
   if (screen.name === 'coverage') return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'admin') return <Admin onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'tournaments') {
+    return (
+      <Tournaments
+        initialId={screen.id}
+        onExit={() => setScreen({ name: 'menu' })}
+        onPlay={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
+        onWatch={(target, tournament) => setScreen({ name: 'watch', target, tournament })}
+      />
+    );
+  }
   if (screen.name === 'watch-list') {
     return <Watch onExit={() => setScreen({ name: 'menu' })} onWatch={(target) => setScreen({ name: 'watch', target })} />;
   }
@@ -59,8 +77,8 @@ export function App() {
         key={screen.target.roomId}
         target={screen.target}
         canHands={role === 'streamer' || role === 'admin'}
-        onExit={() => setScreen({ name: 'watch-list' })}
-        onSwitch={(target) => setScreen({ name: 'watch', target })}
+        onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : { name: 'watch-list' })}
+        onSwitch={(target) => setScreen({ name: 'watch', target, tournament: screen.tournament })}
       />
     );
   }
@@ -69,7 +87,7 @@ export function App() {
       <OnlineGameScreen
         key={screen.seat.roomId}
         seat={screen.seat}
-        onExit={() => setScreen({ name: 'menu' })}
+        onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : { name: 'menu' })}
         onSwitch={(seat) => setScreen({ name: 'online', seat })}
       />
     );
@@ -102,6 +120,7 @@ export function App() {
       onStats={() => setScreen({ name: 'stats' })}
       onOnline={(seat) => setScreen({ name: 'online', seat })}
       onWatch={() => setScreen({ name: 'watch-list' })}
+      onTournaments={() => setScreen({ name: 'tournaments' })}
       onAdmin={role === 'admin' ? () => setScreen({ name: 'admin' }) : undefined}
     />
   );
