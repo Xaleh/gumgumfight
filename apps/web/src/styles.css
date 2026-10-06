@@ -4719,3 +4719,303 @@ tr.clickable:hover td {
   margin: 0 0 10px;
   font-size: 15px;
 }
+
+
+/* ==================================================================
+   Habilidade destacada sobre a carta (zoom) e destaques da mesa:
+   ataque bem-sucedido e habilidade ativada (components/Motion.tsx).
+   ================================================================== */
+
+.zoom-card {
+  position: relative;
+}
+.zoom-plates {
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  bottom: 5%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+}
+/* Painel brilhante com o texto da habilidade, por cima da carta (como no Pokémon TCG Pocket). */
+.ability-plate {
+  position: relative;
+  text-align: left;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 10px 9px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-color, #d99a0b) 78%, #fff 22%), color-mix(in srgb, var(--card-color, #d99a0b) 86%, #000 14%));
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 4px rgba(54, 220, 255, 0.95),
+    0 0 22px 6px rgba(54, 220, 255, 0.55),
+    0 10px 26px rgba(10, 20, 50, 0.45);
+  animation: plate-in 0.32s cubic-bezier(0.2, 1.3, 0.4, 1) backwards, plate-glow 1.6s ease-in-out 0.3s infinite;
+  transition: transform 0.12s;
+}
+.ability-plate:active {
+  transform: scale(0.97);
+}
+.ability-plate.counter {
+  --card-color: #2f7df6;
+}
+.zoom-card .c-red ~ .zoom-plates .ability-plate { --card-color: var(--red); }
+.zoom-card .c-green ~ .zoom-plates .ability-plate { --card-color: var(--green); }
+.zoom-card .c-blue ~ .zoom-plates .ability-plate { --card-color: var(--blue-card); }
+.zoom-card .c-purple ~ .zoom-plates .ability-plate { --card-color: var(--purple); }
+.zoom-card .c-black ~ .zoom-plates .ability-plate { --card-color: #3a3a48; }
+.zoom-card .c-yellow ~ .zoom-plates .ability-plate { --card-color: #c99a00; }
+.plate-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-weight: 900;
+  font-size: 14px;
+  line-height: 1.15;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.plate-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  flex: none;
+}
+.plate-chip {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d1d1d;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 900;
+  text-shadow: none;
+}
+.plate-chip + .plate-chip {
+  margin-left: 0;
+}
+.plate-chip.soft {
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+}
+.plate-text {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.plate-tap {
+  position: absolute;
+  right: 10px;
+  bottom: -9px;
+  background: #fff;
+  color: #1d5bb5;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+@keyframes plate-in {
+  from {
+    transform: translateY(14px) scale(0.92);
+    opacity: 0;
+  }
+}
+@keyframes plate-glow {
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 1),
+      0 0 0 4px rgba(120, 240, 255, 1),
+      0 0 34px 10px rgba(54, 220, 255, 0.8),
+      0 10px 26px rgba(10, 20, 50, 0.45);
+  }
+}
+
+/* fundo escuro com riscos de velocidade enquanto a carta está em destaque */
+.spot-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(-32deg, transparent 0 46px, rgba(255, 255, 255, 0.07) 46px 50px, transparent 50px 120px),
+    repeating-linear-gradient(-32deg, transparent 0 90px, rgba(255, 255, 255, 0.12) 90px 92px, transparent 92px 230px),
+    rgba(10, 16, 40, 0.62);
+  background-size: 300% 300%, 300% 300%, auto;
+  animation:
+    spot-fade var(--dur) ease-in-out forwards,
+    spot-lines 0.7s linear infinite;
+}
+.motion-layer.spot-ability .spot-backdrop {
+  background:
+    repeating-linear-gradient(-32deg, transparent 0 46px, rgba(255, 230, 150, 0.1) 46px 50px, transparent 50px 120px),
+    repeating-linear-gradient(-32deg, transparent 0 90px, rgba(255, 240, 200, 0.14) 90px 92px, transparent 92px 230px),
+    rgba(16, 14, 40, 0.6);
+  background-size: 300% 300%, 300% 300%, auto;
+}
+@keyframes spot-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  14%,
+  82% {
+    opacity: 1;
+  }
+}
+@keyframes spot-lines {
+  to {
+    background-position: -60% 0, 60% 0, 0 0;
+  }
+}
+.flight.spot > .card {
+  width: 100%;
+  height: 100%;
+  transition: none;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(255, 255, 255, 0.85), 0 0 40px rgba(255, 220, 120, 0.45);
+}
+.flight.spot > .card.rested {
+  transform: none;
+  filter: none;
+}
+/* Faixa do ataque atravessando a carta: entra por um lado, sai pelo outro. */
+.spot-sash {
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: 60%;
+  padding: 4% 10%;
+  transform: skewY(-6deg);
+  color: #fff;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--card-color, #ff5a2e) 85%, #000 15%), var(--card-color, #ff5a2e) 45%, color-mix(in srgb, var(--card-color, #ff5a2e) 70%, #fff 30%));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.25), inset 0 2px 0 rgba(255, 255, 255, 0.45);
+  animation: sash-in 0.32s cubic-bezier(0.2, 1, 0.3, 1) var(--in) both, sash-out 0.28s ease-in calc(var(--in) + var(--hold) - 0.28s) forwards;
+}
+.spot-sash.from-right {
+  animation-name: sash-in-r, sash-out-r;
+}
+.spot-sash b {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25em;
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  font-size: calc(var(--cw) * 0.26);
+  line-height: 1;
+  letter-spacing: 2px;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+.spot-sash .sash-icon {
+  font-size: 0.6em;
+  font-family: var(--font);
+}
+.spot-sash small {
+  display: block;
+  margin-top: 2px;
+  font-size: calc(var(--cw) * 0.07);
+  font-weight: 800;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes sash-in {
+  from {
+    transform: translateX(-120%) skewY(-6deg);
+    opacity: 0;
+  }
+}
+@keyframes sash-out {
+  to {
+    transform: translateX(120%) skewY(-6deg);
+    opacity: 0;
+  }
+}
+@keyframes sash-in-r {
+  from {
+    transform: translateX(120%) skewY(-6deg);
+    opacity: 0;
+  }
+}
+@keyframes sash-out-r {
+  to {
+    transform: translateX(-120%) skewY(-6deg);
+    opacity: 0;
+  }
+}
+/* Painel da habilidade ativada, sobre a carta em destaque. */
+.spot-plate {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 6%;
+  padding: 3% 4%;
+  border-radius: calc(var(--cw) * 0.05);
+  color: #fff;
+  text-align: left;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card-color, #d99a0b) 78%, #fff 22%), color-mix(in srgb, var(--card-color, #d99a0b) 86%, #000 14%));
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 4px rgba(255, 215, 90, 0.95),
+    0 0 30px 10px rgba(255, 205, 80, 0.6),
+    0 10px 26px rgba(10, 20, 50, 0.45);
+  animation: plate-in 0.3s cubic-bezier(0.2, 1.3, 0.4, 1) calc(var(--in) + 0.05s) both, spot-plate-out 0.22s ease-in calc(var(--in) + var(--hold) - 0.2s) forwards;
+}
+.spot-plate .plate-title {
+  font-size: calc(var(--cw) * 0.058);
+}
+.spot-plate .plate-icon {
+  width: 1.5em;
+  height: 1.5em;
+  font-size: 0.8em;
+}
+.spot-plate .plate-text {
+  font-size: calc(var(--cw) * 0.05);
+  -webkit-line-clamp: 6;
+}
+@keyframes spot-plate-out {
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+/* impacto */
+.burst.strike {
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 1) 0 14%, rgba(255, 220, 120, 0.9) 24%, rgba(255, 110, 50, 0.7) 40%, transparent 66%),
+    repeating-conic-gradient(from 10deg, rgba(255, 255, 255, 0.55) 0 6deg, transparent 6deg 30deg);
+  mix-blend-mode: screen;
+}
+.impact-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: Bangers, Impact, sans-serif;
+  font-size: clamp(26px, 5vw, 44px);
+  letter-spacing: 2px;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  -webkit-text-stroke: 1.5px #7a1d10;
+  text-shadow: 0 3px 0 #7a1d10, 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+.impact-label.life {
+  color: #ffd75a;
+}
+.impact-label.ko {
+  color: #ff6b5a;
+  -webkit-text-stroke: 1.5px #3a0a06;
+  text-shadow: 0 3px 0 #3a0a06, 0 6px 16px rgba(0, 0, 0, 0.5);
+}

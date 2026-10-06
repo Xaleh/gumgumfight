@@ -14,9 +14,11 @@
 // Também anima os DON!! (deck de DON!! → área de custo → cartas) e o impacto do
 // dano no Líder. O tempo total fica em `holdMotion` para o bot esperar.
 
-import { cardDef, type GameState, HIDDEN_CARD, type PlayerId } from '@gumgum/engine';
+import { type Action, cardDef, type GameState, getPower, hasKeyword, HIDDEN_CARD, type PlayerId } from '@gumgum/engine';
 import { type CSSProperties, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { abilityText, abilityTitle } from '../game/abilityText';
 import { holdMotion } from '../game/motion';
+import type { CardLang } from '../settings';
 import { CardBack, CardView } from './CardView';
 
 type Zone = 'deck' | 'hand' | 'life' | 'trash' | 'field';
@@ -68,11 +70,53 @@ interface Burst {
   id: number;
   kind: 'burst';
   at: Box;
-  tone: 'ko' | 'land' | 'hit';
+  tone: 'ko' | 'land' | 'hit' | 'strike';
   delay: number;
   duration: number;
 }
-type Item = CardFlight | DonFlight | Burst;
+/** Texto que sobe e some no lugar do impacto ("−1 Vida", "K.O.!"). */
+interface Label {
+  id: number;
+  kind: 'label';
+  at: Box;
+  text: string;
+  tone: 'life' | 'ko';
+  delay: number;
+  duration: number;
+}
+/**
+ * Destaque de uma carta no centro da mesa: ela sai do lugar, cresce com a tela
+ * escurecida e volta. 'attack': faixa com o poder (ataque bem-sucedido);
+ * 'ability': painel brilhante com o texto da habilidade ativada.
+ */
+interface Feature {
+  id: number;
+  kind: 'spot';
+  tone: 'attack' | 'ability';
+  state: GameState;
+  uid: string;
+  from: Box;
+  stage: Box;
+  hide: Element | null;
+  title: string;
+  subtitle: string;
+  text?: string;
+  /** Carta de baixo (do jogador) ou de cima: o movimento da faixa muda de lado. */
+  bottom: boolean;
+  delay: number;
+  /** Tempos (ms) da ida, da parada e da volta. */
+  flyIn: number;
+  hold: number;
+  back: number;
+  duration: number;
+}
+type Item = CardFlight | DonFlight | Burst | Label | Feature;
+
+interface PlanOptions {
+  /** A ação que levou a este estado (para a vitrine de habilidade ativada). */
+  lastAction?: Action;
+  lang: CardLang;
+}
 
 /** De onde para onde as cartas sem identidade costumam ir, em ordem de preferência. */
 const PAIRS: [Zone, Zone][] = [
@@ -208,9 +252,12 @@ interface Planned {
   step: number;
 }
 
-function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, root: Element, tempo: number): Item[] {
+function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, root: Element, tempo: number, opts: PlanOptions): Item[] {
   // Desfazer volta o estado: só troca a mesa.
   if (next.log.length < prev.log.length) return [];
+  const spot = spotPlan(prev, next, before, after, root, tempo, opts);
+  // Com uma carta em destaque, o resto da mesa espera ela voltar ao lugar.
+  const lead = spot ? spot.duration - 150 * tempo : 0;
   const a = spots(prev);
   const b = spots(next);
   interface Move {
@@ -300,7 +347,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
 
   // Cada grupo começa depois do anterior; as cartas de um grupo saem uma após a outra.
   out.sort((x, y) => x.group - y.group);
-  let t = 0;
+  let t = lead;
   let last = -1;
   let end = 0;
   for (const p of out) {
@@ -322,10 +369,94 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
     }
   }
   const items = out.map((p) => p.item);
-  for (const it of items) if (it.kind !== 'burst') hideEl(it.hide);
-  items.push(...hits(prev, next, after, root));
+  for (const it of items) if (it.kind === 'card' || it.kind === 'don') hideEl(it.hide);
+  // O impacto do ataque vem quando a carta atacante volta ao lugar.
+  const impactAt = spot?.tone === 'attack' ? spot.flyIn + spot.hold + spot.back * 0.7 : 0;
+  items.push(...hits(prev, next, after, root, impactAt, spot?.tone === 'attack' ? prev.battle?.target : undefined));
+  if (spot) {
+    items.push(spot);
+    hideEl(spot.hide);
+    end = Math.max(end, spot.duration + 200);
+  }
   if (end > 0) holdMotion(end + 60);
   return items;
+}
+
+/** Destaque no centro da mesa: ataque que acertou ou habilidade ativada. */
+function spotPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, root: Element, tempo: number, opts: PlanOptions): Feature | null {
+  const arena = after.get('anchor:arena');
+  if (!arena || next.actionCount <= prev.actionCount) return null;
+  const known = (st: GameState, uid: string) => Boolean(st.cards[uid]) && st.cards[uid].cardId !== HIDDEN_CARD;
+  const h = Math.min(arena.h * 0.62, 400);
+  const stage: Box = { x: arena.x, y: arena.y, w: h / 1.396, h };
+  const bottomSide = (box: Box) => box.y > arena.y;
+  const b = prev.battle;
+  if (b && b.step !== 'end' && known(prev, b.attacker) && prev.cards[b.target]) {
+    const defender = prev.cards[b.target].owner;
+    const wasLeader = prev.players[defender].leader.uid === b.target;
+    const lifeLost = next.players[defender].life.length < prev.players[defender].life.length;
+    const damage = (st: GameState) => st.stack.some((f) => f.kind === 'damage' && f.defender === defender);
+    const koed = !wasLeader && spots(next).get(b.target)?.zone !== 'field';
+    const over = !next.battle || next.battle.step === 'end';
+    const hit = over && (lifeLost || (damage(next) && !damage(prev)) || koed || next.winner !== null);
+    const from = before.get(`field:${b.attacker}`);
+    if (hit && from) {
+      const power = getPower(prev, b.attacker);
+      const extras = [hasKeyword(prev, b.attacker, 'doubleAttack') ? 'Double Attack!' : '', hasKeyword(prev, b.attacker, 'banish') ? 'Banish!' : ''].filter(Boolean);
+      const flyIn = 420 * tempo;
+      const hold = 820 * tempo;
+      const back = 380 * tempo;
+      return {
+        id: nextId++,
+        kind: 'spot',
+        tone: 'attack',
+        state: prev,
+        uid: b.attacker,
+        from,
+        stage,
+        hide: findEl(root, 'field', b.attacker),
+        title: String(power),
+        subtitle: [cardDef(prev, b.attacker).name, ...extras].join(' · '),
+        bottom: bottomSide(from),
+        delay: 0,
+        flyIn,
+        hold,
+        back,
+        duration: flyIn + hold + back,
+      };
+    }
+  }
+  const act = opts.lastAction;
+  if (act?.type === 'activate' && known(next, act.uid) && next.log.length > prev.log.length) {
+    const from = before.get(`field:${act.uid}`) ?? after.get(`field:${act.uid}`);
+    const def = cardDef(next, act.uid);
+    const ability = def.abilities[act.ability];
+    if (from && ability) {
+      const flyIn = 420 * tempo;
+      const hold = 1800 * tempo;
+      const back = 380 * tempo;
+      return {
+        id: nextId++,
+        kind: 'spot',
+        tone: 'ability',
+        state: next,
+        uid: act.uid,
+        from,
+        stage,
+        hide: findEl(root, 'field', act.uid),
+        title: abilityTitle(ability, opts.lang),
+        subtitle: def.name,
+        text: abilityText(def, act.ability, opts.lang),
+        bottom: bottomSide(from),
+        delay: 0,
+        flyIn,
+        hold,
+        back,
+        duration: flyIn + hold + back,
+      };
+    }
+  }
+  return null;
 }
 
 function findEl(root: Element, zone: Zone, uid: string): Element | null {
@@ -403,21 +534,51 @@ function donPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, 
   }
 }
 
-/** Dano: o Líder treme e brilha quando a Vida diminui. */
-function hits(prev: GameState, next: GameState, after: Boxes, root: Element): Item[] {
+/** Faz a carta tremer e piscar (CSS em [data-motion-hit]). */
+function shake(el: Element | null, delay: number) {
+  if (!el) return;
+  setTimeout(() => {
+    el.removeAttribute('data-motion-hit');
+    void (el as HTMLElement).offsetWidth; // recomeça a animação
+    el.setAttribute('data-motion-hit', '');
+    setTimeout(() => el.removeAttribute('data-motion-hit'), 700);
+  }, delay);
+}
+
+/**
+ * Dano: o Líder treme e brilha quando a Vida diminui. Num ataque bem-sucedido
+ * (`target`), o impacto vem depois da carta atacante (em `delay`), com o aviso
+ * "−1 Vida" ou "K.O.!" no alvo.
+ */
+function hits(prev: GameState, next: GameState, after: Boxes, root: Element, delay: number, target?: string): Item[] {
   const out: Item[] = [];
+  const strike = (box: Box, el: Element | null, label: string, tone: Label['tone']) => {
+    shake(el, delay);
+    out.push({ id: nextId++, kind: 'burst', at: box, tone: 'strike', delay, duration: 620 });
+    out.push({ id: nextId++, kind: 'label', at: box, text: label, tone, delay: delay + 40, duration: 1100 });
+  };
+  const lifeTargets = new Set<string>();
   for (const p of [0, 1] as PlayerId[]) {
-    if (next.players[p].life.length >= prev.players[p].life.length) continue;
+    const lost = prev.players[p].life.length - next.players[p].life.length;
+    if (lost <= 0) continue;
     const uid = next.players[p].leader.uid;
     const box = after.get(`field:${uid}`);
     const el = root.querySelector(`.field-card [data-uid="${CSS.escape(uid)}"]`);
-    if (el) {
-      el.removeAttribute('data-motion-hit');
-      void (el as HTMLElement).offsetWidth; // recomeça a animação
-      el.setAttribute('data-motion-hit', '');
-      setTimeout(() => el.removeAttribute('data-motion-hit'), 700);
+    if (!box) continue;
+    lifeTargets.add(uid);
+    if (target === uid) strike(box, el, `−${lost} Vida`, 'life');
+    else {
+      shake(el, delay);
+      out.push({ id: nextId++, kind: 'burst', at: box, tone: 'hit', delay, duration: 600 });
     }
-    if (box) out.push({ id: nextId++, kind: 'burst', at: box, tone: 'hit', delay: 0, duration: 600 });
+  }
+  if (target && !lifeTargets.has(target)) {
+    // Personagem nocauteado (já saiu da mesa: usa onde ele estava) ou Líder sem Vida perdida ainda ([Trigger]).
+    const owner = prev.cards[target]?.owner;
+    const isLeader = owner !== undefined && prev.players[owner].leader.uid === target;
+    const box = after.get(`field:${target}`) ?? (isLeader ? undefined : after.get(`anchor:trash-${owner}`));
+    const el = root.querySelector(`.field-card [data-uid="${CSS.escape(target)}"]`);
+    if (box) strike(box, el, isLeader ? '−1 Vida' : 'K.O.!', isLeader ? 'life' : 'ko');
   }
   return out;
 }
@@ -428,8 +589,13 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element): It
  * Anima a mesa entre um estado e o seguinte. Chame no componente que desenha a
  * mesa (antes dela) e coloque `layer` dentro dele.
  */
-export function useBoardMotion(state: GameState, { enabled, tempo }: { enabled: boolean; tempo: number }): ReactNode {
+export function useBoardMotion(
+  state: GameState,
+  { enabled, tempo, lastAction, lang }: { enabled: boolean; tempo: number; lastAction?: Action; lang: CardLang },
+): { layer: ReactNode; busy: boolean } {
   const [items, setItems] = useState<Item[]>([]);
+  const optsRef = useRef<PlanOptions>({ lastAction, lang });
+  optsRef.current = { lastAction, lang };
   const last = useRef<GameState | null>(null);
   const transition = useRef<{ prev: GameState; next: GameState; boxes: Boxes } | null>(null);
 
@@ -445,26 +611,37 @@ export function useBoardMotion(state: GameState, { enabled, tempo }: { enabled: 
     transition.current = null;
     const root = document.querySelector('.mat');
     if (!t || t.next !== state || !root) return;
-    const planned = plan(t.prev, t.next, t.boxes, capture(root), root, tempo);
+    const planned = plan(t.prev, t.next, t.boxes, capture(root), root, tempo, optsRef.current);
     if (planned.length) setItems((cur) => [...cur, ...planned]);
   }, [state, tempo]);
 
   const done = useCallback((id: number) => setItems((cur) => cur.filter((i) => i.id !== id)), []);
 
-  if (!items.length) return null;
-  return (
-    <div className="motion-layer" aria-hidden="true">
-      {items.map((it) =>
-        it.kind === 'card' ? (
-          <CardFlightView key={it.id} f={it} onDone={done} />
-        ) : it.kind === 'don' ? (
-          <DonFlightView key={it.id} f={it} onDone={done} />
-        ) : (
-          <BurstView key={it.id} b={it} onDone={done} />
-        ),
-      )}
-    </div>
-  );
+  // Vitrine ou destaque na tela: os avisos da partida esperam.
+  const busy = items.some((it) => it.kind === 'spot' || (it.kind === 'card' && Boolean(it.showcase)));
+  if (!items.length) return { layer: null, busy: false };
+  const spot = items.find((it): it is Feature => it.kind === 'spot');
+  return {
+    busy,
+    layer: (
+      <div className={['motion-layer', spot ? `spot-${spot.tone}` : ''].join(' ')} aria-hidden="true">
+        {spot && <div key={`bd${spot.id}`} className="spot-backdrop" style={vars({ '--dur': `${spot.duration}ms` })} />}
+        {items.map((it) =>
+          it.kind === 'card' ? (
+            <CardFlightView key={it.id} f={it} onDone={done} />
+          ) : it.kind === 'don' ? (
+            <DonFlightView key={it.id} f={it} onDone={done} />
+          ) : it.kind === 'burst' ? (
+            <BurstView key={it.id} b={it} onDone={done} />
+          ) : it.kind === 'label' ? (
+            <LabelView key={it.id} l={it} onDone={done} />
+          ) : (
+            <SpotView key={it.id} s={it} onDone={done} />
+          ),
+        )}
+      </div>
+    ),
+  };
 }
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
@@ -621,10 +798,12 @@ function BurstView({ b, onDone }: { b: Burst; onDone: (id: number) => void }) {
       onDone(b.id);
       return;
     }
+    // Começa invisível: com `fill: both`, o primeiro quadro aparece durante a espera.
     const anim = el.animate(
       [
-        { transform: 'translate(-50%, -50%) scale(0.35)', opacity: 0.95 },
-        { transform: 'translate(-50%, -50%) scale(1.25)', opacity: 0 },
+        { transform: 'translate(-50%, -50%) scale(0.35)', opacity: 0, offset: 0 },
+        { transform: 'translate(-50%, -50%) scale(0.5)', opacity: 0.95, offset: 0.1 },
+        { transform: 'translate(-50%, -50%) scale(1.25)', opacity: 0, offset: 1 },
       ],
       { duration: b.duration, delay: b.delay, fill: 'both', easing: 'cubic-bezier(.2,.7,.3,1)' },
     );
@@ -635,4 +814,101 @@ function BurstView({ b, onDone }: { b: Burst; onDone: (id: number) => void }) {
   }, []);
   const size = Math.max(b.at.w, b.at.h) * 1.5;
   return <div ref={ref} className={['burst', b.tone].join(' ')} style={{ left: b.at.x, top: b.at.y, width: size, height: size }} />;
+}
+
+function LabelView({ l, onDone }: { l: Label; onDone: (id: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof el.animate !== 'function') {
+      onDone(l.id);
+      return;
+    }
+    const anim = el.animate(
+      [
+        { transform: 'translate(-50%, -50%) scale(0.4)', opacity: 0, offset: 0 },
+        { transform: 'translate(-50%, -60%) scale(1.25)', opacity: 1, offset: 0.18 },
+        { transform: 'translate(-50%, -70%) scale(1)', opacity: 1, offset: 0.7 },
+        { transform: 'translate(-50%, -110%) scale(0.95)', opacity: 0, offset: 1 },
+      ],
+      { duration: l.duration, delay: l.delay, fill: 'both', easing: 'ease-out' },
+    );
+    anim.onfinish = () => onDone(l.id);
+    anim.oncancel = () => onDone(l.id);
+    return () => stop(anim);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div ref={ref} className={['impact-label', l.tone].join(' ')} style={{ left: l.at.x, top: l.at.y }}>
+      {l.text}
+    </div>
+  );
+}
+
+function SpotView({ s, onDone }: { s: Feature; onDone: (id: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const base = s.stage;
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const finish = () => {
+      showEl(s.hide);
+      onDone(s.id);
+    };
+    if (!el || typeof el.animate !== 'function') {
+      finish();
+      return;
+    }
+    const tIn = s.flyIn / s.duration;
+    const tOut = (s.flyIn + s.hold) / s.duration;
+    const tilt = s.bottom ? -7 : 7;
+    const anim = el.animate(
+      [
+        { transform: place(s.from, base), offset: 0, easing: 'cubic-bezier(.2,.9,.3,1)' },
+        { transform: place(s.stage, base, { tilt, grow: 1.06 }), offset: tIn * 0.85, easing: 'ease-out' },
+        { transform: place(s.stage, base), offset: tIn },
+        { transform: place(s.stage, base), offset: tOut, easing: 'cubic-bezier(.5,0,.4,1)' },
+        { transform: place(s.from, base), offset: 1 },
+      ],
+      { duration: s.duration, delay: s.delay, fill: 'both' },
+    );
+    anim.onfinish = finish;
+    anim.oncancel = finish;
+    return () => stop(anim);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const def = cardDef(s.state, s.uid);
+  const color = def.colors[0] ?? 'red';
+  return (
+    <div
+      ref={ref}
+      className={['flight', 'spot', `spot-${s.tone}`, `c-${color}`].join(' ')}
+      style={vars({
+        width: `${base.w}px`,
+        height: `${base.h}px`,
+        '--cw': `${base.w}px`,
+        '--in': `${s.flyIn}ms`,
+        '--hold': `${s.hold}ms`,
+        '--out': `${s.back}ms`,
+      })}
+    >
+      <CardView state={s.state} uid={s.uid} eager />
+      {s.tone === 'attack' ? (
+        <div className={['spot-sash', s.bottom ? 'from-left' : 'from-right'].join(' ')}>
+          <b>
+            <span className="sash-icon">⚔</span>
+            {s.title}
+          </b>
+          <small>{s.subtitle}</small>
+        </div>
+      ) : (
+        <div className="spot-plate">
+          <div className="plate-title">
+            <span className="plate-icon">✦</span>
+            {s.title}
+          </div>
+          {s.text && <p className="plate-text">{s.text}</p>}
+        </div>
+      )}
+    </div>
+  );
 }

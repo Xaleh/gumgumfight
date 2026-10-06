@@ -15,6 +15,7 @@ import {
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, type OnlineSeat, type WatchTarget } from '../api';
+import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
@@ -271,12 +272,18 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter, animations } = useSettings();
+  const { quickCounter, animations, lang } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
   // Cartas voando entre as zonas (mais rápidas com o bot acelerado).
-  const motionLayer = useBoardMotion(state, { enabled: animate, tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)) });
+  const allActions = game.actions();
+  const motion = useBoardMotion(state, {
+    enabled: animate,
+    tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
+    lastAction: allActions[allActions.length - 1],
+    lang,
+  });
   // Sorteio com dados no começo da partida: só quando há sorteio (quem começa não foi
   // escolhido no menu), e não no replay nem ao voltar para uma partida em andamento.
   const [intro, setIntro] = useState(
@@ -796,7 +803,7 @@ function Table({
           </div>
         )}
 
-        {motionLayer}
+        {motion.layer}
 
         {online && <EmoteBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
@@ -822,7 +829,7 @@ function Table({
         )}
 
         <Prompt
-          hidden={intro}
+          hidden={intro || motion.busy}
           state={state}
           human={human}
           picked={picked}
@@ -1624,6 +1631,7 @@ function CardZoom(props: {
   onTools: () => void;
 }) {
   const { state, uid, legal } = props;
+  const { lang } = useSettings();
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
   const play = legal.find((a) => a.type === 'playCard' && a.uid === uid);
@@ -1631,8 +1639,13 @@ function CardZoom(props: {
   const canAttack = legal.some((a) => a.type === 'attack' && a.attacker === uid);
   const attach = legal.find((a) => a.type === 'attachDon' && a.target === uid);
   const owner = state.cards[uid].owner;
-  const hasActions = Boolean(play || activates.length || canAttack || attach || props.canManual || props.onCounter);
+  const isEvent = def.category === 'event';
+  // Eventos: usar a carta (ou o Counter dela) é o texto dela, destacado sobre a carta.
+  const eventPlay = isEvent ? play : undefined;
+  const eventCounter = isEvent ? props.onCounter : undefined;
+  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || props.canManual || (props.onCounter && !eventCounter));
   const counter = counterValue(state, uid);
+  const eventText = isEvent ? cardText(def, lang).text : '';
 
   return (
     <div className="modal-backdrop zoom-backdrop" onClick={props.onClose}>
@@ -1642,18 +1655,64 @@ function CardZoom(props: {
         </button>
         <div className="zoom-card">
           <CardView state={state} uid={uid} fc={loc?.fc} />
+          {/* Habilidades ativáveis destacadas sobre a própria carta: toque no texto para usar. */}
+          {(activates.length > 0 || eventPlay || eventCounter) && (
+            <div className="zoom-plates">
+              {eventCounter && (
+                <button className="ability-plate counter" onClick={eventCounter}>
+                  <div className="plate-title">
+                    <span className="plate-icon">🛡</span>
+                    Usar evento [Counter]
+                    {counter > 0 && <span className="plate-chip">+{counter}</span>}
+                  </div>
+                  <p className="plate-text">{eventText}</p>
+                  <span className="plate-tap">Toque para usar</span>
+                </button>
+              )}
+              {eventPlay && (
+                <button className="ability-plate" onClick={() => props.onDispatch(eventPlay)}>
+                  <div className="plate-title">
+                    <span className="plate-icon">✦</span>
+                    Usar evento
+                    <span className="plate-chip">Custo {def.cost}</span>
+                  </div>
+                  <p className="plate-text">{eventText}</p>
+                  <span className="plate-tap">Toque para usar</span>
+                </button>
+              )}
+              {activates.map((a) => {
+                const ability = def.abilities[a.ability];
+                return (
+                  <button key={a.ability} className="ability-plate" onClick={() => props.onDispatch(a)}>
+                    <div className="plate-title">
+                      <span className="plate-icon">✦</span>
+                      {abilityTitle(ability, lang)}
+                      {abilityCostLabel(ability).map((c) => (
+                        <span key={c} className="plate-chip">
+                          {c}
+                        </span>
+                      ))}
+                      {ability.oncePerTurn && <span className="plate-chip soft">1× por turno</span>}
+                    </div>
+                    <p className="plate-text">{abilityText(def, a.ability, lang)}</p>
+                    <span className="plate-tap">Toque para ativar</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         {hasActions && (
           <div className="zoom-actions">
-            {props.onCounter && (
+            {props.onCounter && !eventCounter && (
               <button className="btn primary big" onClick={props.onCounter}>
-                🛡 {def.category === 'event' ? 'Usar evento [Counter]' : 'Usar como Counter'}
+                🛡 Usar como Counter
                 {counter > 0 && <span className="cost-chip">+{counter}</span>}
               </button>
             )}
-            {play && (
+            {play && !eventPlay && (
               <button className="btn primary big" onClick={() => props.onDispatch(play)}>
-                {def.category === 'event' ? 'Usar evento' : 'Jogar'} <span className="cost-chip">{def.cost}</span>
+                Jogar <span className="cost-chip">{def.cost}</span>
               </button>
             )}
             {canAttack && (
@@ -1661,11 +1720,6 @@ function CardZoom(props: {
                 ⚔ Atacar <span className="cost-chip">{getPower(state, uid)}</span>
               </button>
             )}
-            {activates.map((a) => (
-              <button key={a.ability} className="btn big" onClick={() => props.onDispatch(a)}>
-                ✦ {def.abilities[a.ability].label ?? 'Ativar efeito'}
-              </button>
-            ))}
             {attach && (
               <button className="btn don big" onClick={() => props.onDispatch(attach)}>
                 + 1 DON!! <small>({state.players[owner].donActive} ativos)</small>
