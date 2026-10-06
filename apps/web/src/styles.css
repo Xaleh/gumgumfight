@@ -1396,6 +1396,86 @@ button.hint-pill {
   color: var(--muted);
   font-weight: 700;
 }
+
+/* DON!! marcados: contador + o que fazer com eles (Líder / Personagem / cancelar), na faixa central */
+.don-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 6px;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 18px;
+  background: var(--overlay);
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.18);
+  animation: step-in 0.25s ease-out;
+}
+.don-bar-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe08a 0%, #f2b928 100%);
+  border: 2px solid #fff;
+  color: #4a3200;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(160, 110, 0, 0.35);
+}
+.don-bar-count b {
+  font-size: 15px;
+  font-weight: 900;
+}
+.don-bar .brief {
+  display: none;
+}
+.don-bar .don-card.mini {
+  --dw: 13px;
+  border-width: 1px;
+  box-shadow: none;
+}
+.don-bar-hint {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+}
+.don-bar-btn {
+  border: 2px solid #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #fff;
+  background: linear-gradient(180deg, #4da3ff, var(--blue));
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(var(--shadow-rgb), 0.25);
+  transition: transform 0.12s, filter 0.12s;
+}
+.don-bar-btn:hover {
+  filter: brightness(1.06);
+}
+.don-bar-btn:active {
+  transform: scale(0.96);
+}
+.don-bar-btn.back {
+  background: var(--slate);
+}
+.don-bar-btn.cancel {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  background: linear-gradient(180deg, #ff8a5c, #f0532a);
+}
 .dots::after {
   content: '…';
   animation: blink 1.2s infinite;
@@ -2372,6 +2452,7 @@ button.hint-pill {
   justify-content: center;
   display: flex;
   align-items: center;
+  gap: 6px;
 }
 .zoom-actions .btn.small {
   align-self: center;
@@ -3817,6 +3898,49 @@ tr.clickable:hover td {
 }
 
 /* Com pouca altura (celular deitado): faixas, mão e janelas mais compactas. */
+/* Barra de DON!! em tela estreita (celular em pé) ou baixa (celular deitado): textos curtos, tudo menor. */
+@media (max-width: 640px), ((orientation: landscape) and (max-height: 600px)) {
+  .don-bar {
+    gap: 3px 4px;
+    padding: 2px 4px;
+  }
+  .don-bar-count {
+    padding: 2px 8px 2px 5px;
+    font-size: 10.5px;
+  }
+  .don-bar-count b {
+    font-size: 13px;
+  }
+  .don-bar-hint {
+    font-size: 10.5px;
+  }
+  .don-bar-btn {
+    font-size: 10.5px;
+    padding: 5px 9px;
+  }
+  .don-bar-btn.cancel {
+    width: 26px;
+    height: 26px;
+  }
+  .don-bar .full {
+    display: none;
+  }
+  .don-bar .brief {
+    display: inline;
+  }
+  /* No contador só o ícone e o número: "2 DON!!" vira [DON!!] 2. */
+  .don-bar-count .brief {
+    display: none;
+  }
+  .don-bar-count {
+    gap: 4px;
+    padding-right: 7px;
+  }
+  .don-bar-btn {
+    padding: 5px 8px;
+  }
+}
+
 @media (orientation: landscape) and (max-height: 600px) {
   .board-col,
   .mat {
