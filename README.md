@@ -78,14 +78,22 @@ Node padrão for mais antigo) e um site separado no proxy.
    ```bash
    ssh-keygen -t ed25519 -f gumgum_deploy -N "" -C github-actions-gumgumfight
    ```
-2. **Domínio:** aponte o domínio do site para o servidor.
-3. **No servidor**, rode `deploy/setup-vm.sh` com a chave pública de deploy. O script cria as pastas, instala o
-   Node 22 se preciso, configura o proxy (ou mostra os campos para o Nginx Proxy Manager), gera o HTTPS com
-   certbot e autoriza a chave:
-   ```bash
-   bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
-   ```
-   Variáveis opcionais: `DOMAIN`, `PORT`, `CERTBOT_EMAIL` (veja o início do script).
+2. **Domínio:** aponte o domínio do site (registros A de `@` e `www`) para o IP do servidor.
+3. **No servidor**, rode um dos scripts com a chave pública de deploy:
+   - **VPS nova e só para este site** (ex.: a VPS KVM da Hostinger, Ubuntu limpo, como root): `deploy/bootstrap-hostinger.sh`
+     faz tudo — atualiza o sistema, instala Node 22, pm2, Nginx, HTTPS (Let's Encrypt), firewall, fail2ban, swap,
+     cria o usuário `gumgum` que recebe o deploy e um backup diário do banco. O passo a passo completo, com o DNS
+     da Hostinger e os valores dos secrets, está em [`deploy/HOSTINGER.md`](deploy/HOSTINGER.md).
+     ```bash
+     CERTBOT_EMAIL=voce@exemplo.com bash bootstrap-hostinger.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
+     ```
+   - **Servidor que já roda outros apps** (Nginx ou Nginx Proxy Manager, pm2 já instalado), como o usuário que roda
+     o pm2: `deploy/setup-vm.sh`. Ele cria as pastas, instala o Node 22 via nvm se preciso (sem trocar o padrão),
+     configura o site no proxy, gera o HTTPS com certbot e autoriza a chave:
+     ```bash
+     bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
+     ```
+   Variáveis opcionais: `DOMAIN`, `PORT`, `CERTBOT_EMAIL` (veja o início de cada script).
 4. **No GitHub** → Settings → Secrets and variables → Actions → *New repository secret*:
 
    | Secret               | Valor                                                  |
@@ -109,6 +117,9 @@ Enquanto os secrets não existirem, o job de deploy é pulado com um aviso (os t
 pm2 logs gumgumfight        # logs
 pm2 restart gumgumfight     # reiniciar
 ```
+
+(Na VPS preparada pelo `bootstrap-hostinger.sh`, o app roda no usuário `gumgum`: como root, use
+`sudo -u gumgum pm2 logs gumgumfight`, ou entre com `ssh gumgum@<IP>`.)
 
 Para importar mais coleções, use `import-cards.mjs` do release atual com o `DB_PATH` do banco compartilhado
 (para `--spoilers`, informe também `DATA_DIR=<release>/data`; o app no pm2 já recebe essa variável);
@@ -314,7 +325,7 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
 1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie (ou escolha) um projeto e
    configure a **tela de consentimento OAuth** (tipo *Externo*; só os escopos básicos: e-mail, perfil e openid).
 2. **Credenciais → Criar credenciais → ID do cliente OAuth**, tipo **Aplicativo da Web**. Em **Origens JavaScript
-   autorizadas**, inclua `https://gumgumfight.duckdns.org`, `http://localhost:5173` e `http://localhost` (o botão do
+   autorizadas**, inclua `https://gumgumfight.app`, `http://localhost:5173` e `http://localhost` (o botão do
    Google exige as duas formas do localhost). Não é preciso URI de redirecionamento nem a chave secreta.
 3. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`). Ele não é segredo: vai para todo navegador.
    - **Desenvolvimento:** crie um arquivo `.env` na raiz do projeto com `GOOGLE_CLIENT_ID=...` (o arquivo é ignorado

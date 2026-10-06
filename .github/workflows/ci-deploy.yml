@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 env:
-  SITE_URL: https://gumgumfight.duckdns.org
+  SITE_URL: https://gumgumfight.app
 
 jobs:
   test:
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://gumgumfight.duckdns.org
+      url: https://gumgumfight.app
     concurrency:
       group: deploy-production
       cancel-in-progress: false

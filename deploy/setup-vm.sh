@@ -7,11 +7,11 @@
 #
 # Funciona com Nginx instalado no host ou com o Nginx Proxy Manager (Docker): detecta sozinho.
 #
-# Variáveis opcionais: DOMAIN (gumgumfight.duckdns.org), PORT (3310),
+# Variáveis opcionais: DOMAIN (gumgumfight.app), PORT (3310),
 #   PROXY (auto | nginx | npm | none), CERTBOT_EMAIL (só no modo nginx), GUMGUM_APP_DIR.
 set -euo pipefail
 
-DOMAIN="${DOMAIN:-gumgumfight.duckdns.org}"
+DOMAIN="${DOMAIN:-gumgumfight.app}"
 PORT="${PORT:-3310}"
 APP_DIR="${GUMGUM_APP_DIR:-$HOME/apps/gumgumfight}"
 DEPLOY_PUBKEY="${1:-}"
@@ -223,7 +223,7 @@ EOF
   MY_IP="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
   DNS_IP="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}' || true)"
   if [ -n "$MY_IP" ] && [ "$DNS_IP" != "$MY_IP" ]; then
-    info "ATENÇÃO: $DOMAIN aponta para '${DNS_IP:-nada}', mas esta VM é $MY_IP. Corrija no DuckDNS e rode de novo."
+    info "ATENÇÃO: $DOMAIN aponta para '${DNS_IP:-nada}', mas esta VM é $MY_IP. Corrija o DNS e rode de novo."
   elif sudo certbot certificates 2>/dev/null | grep -q "Domains: .*$DOMAIN"; then
     info "Certificado já existe."
     sudo certbot install --nginx --cert-name "$DOMAIN" --redirect --non-interactive >/dev/null 2>&1 || true
