@@ -1743,62 +1743,66 @@ function CardZoom(props: {
   const hasActions = Boolean((play && !eventPlay) || canAttack || attach || props.canManual || (props.onCounter && !eventCounter));
   const counter = counterValue(state, uid);
   const eventText = isEvent ? cardText(def, lang).text : '';
+  // Habilidades ativáveis viram painéis brilhantes (modelo Pokémon TCG Pocket): em tela larga ficam ao lado da
+  // carta, ligados a ela pela borda ciano; em tela estreita, sobre a parte de baixo da carta. Com painel na tela, o
+  // fundo escurece mais e as ações secundárias (DON!!, ferramentas) viram botões discretos para não competir.
+  const hasPlates = activates.length > 0 || Boolean(eventPlay) || Boolean(eventCounter);
+  const color = def.colors[0] ?? 'red';
 
   return (
-    <div className="modal-backdrop zoom-backdrop" onClick={props.onClose}>
-      <div className="zoom" onClick={(e) => e.stopPropagation()}>
+    <div className={['modal-backdrop', 'zoom-backdrop', hasPlates ? 'dim' : ''].join(' ')} onClick={props.onClose}>
+      <div className={['zoom', hasPlates ? 'with-plates' : ''].join(' ')} onClick={(e) => e.stopPropagation()}>
         <button className="zoom-close" onClick={props.onClose} aria-label="Fechar">
           ✕
         </button>
         <div className="zoom-card">
           <CardView state={state} uid={uid} fc={loc?.fc} />
-          {/* Habilidades ativáveis destacadas sobre a própria carta: toque no texto para usar. */}
-          {(activates.length > 0 || eventPlay || eventCounter) && (
-            <div className="zoom-plates">
-              {eventCounter && (
-                <button className="ability-plate counter" onClick={eventCounter}>
-                  <div className="plate-title">
-                    <span className="plate-icon">🛡</span>
-                    Usar evento [Counter]
-                    {counter > 0 && <span className="plate-chip">+{counter}</span>}
-                  </div>
-                  <p className="plate-text">{eventText}</p>
-                  <span className="plate-tap">Toque para usar</span>
-                </button>
-              )}
-              {eventPlay && (
-                <button className="ability-plate" onClick={() => props.onDispatch(eventPlay)}>
+        </div>
+        {hasPlates && (
+          <div className={['zoom-plates', `c-${color}`].join(' ')}>
+            {eventCounter && (
+              <button className="ability-plate counter" onClick={eventCounter}>
+                <div className="plate-title">
+                  <span className="plate-icon">🛡</span>
+                  Usar evento [Counter]
+                  {counter > 0 && <span className="plate-chip">+{counter}</span>}
+                </div>
+                <p className="plate-text">{eventText}</p>
+                <span className="plate-tap">Toque para usar</span>
+              </button>
+            )}
+            {eventPlay && (
+              <button className="ability-plate" onClick={() => props.onDispatch(eventPlay)}>
+                <div className="plate-title">
+                  <span className="plate-icon">✦</span>
+                  Usar evento
+                  <span className="plate-chip">Custo {def.cost}</span>
+                </div>
+                <p className="plate-text">{eventText}</p>
+                <span className="plate-tap">Toque para usar</span>
+              </button>
+            )}
+            {activates.map((a) => {
+              const ability = def.abilities[a.ability];
+              return (
+                <button key={a.ability} className="ability-plate" onClick={() => props.onDispatch(a)}>
                   <div className="plate-title">
                     <span className="plate-icon">✦</span>
-                    Usar evento
-                    <span className="plate-chip">Custo {def.cost}</span>
+                    {abilityTitle(ability, lang)}
+                    {abilityCostLabel(ability).map((c) => (
+                      <span key={c} className="plate-chip">
+                        {c}
+                      </span>
+                    ))}
+                    {ability.oncePerTurn && <span className="plate-chip soft">1× por turno</span>}
                   </div>
-                  <p className="plate-text">{eventText}</p>
-                  <span className="plate-tap">Toque para usar</span>
+                  <p className="plate-text">{abilityText(def, a.ability, lang)}</p>
+                  <span className="plate-tap">Toque para ativar</span>
                 </button>
-              )}
-              {activates.map((a) => {
-                const ability = def.abilities[a.ability];
-                return (
-                  <button key={a.ability} className="ability-plate" onClick={() => props.onDispatch(a)}>
-                    <div className="plate-title">
-                      <span className="plate-icon">✦</span>
-                      {abilityTitle(ability, lang)}
-                      {abilityCostLabel(ability).map((c) => (
-                        <span key={c} className="plate-chip">
-                          {c}
-                        </span>
-                      ))}
-                      {ability.oncePerTurn && <span className="plate-chip soft">1× por turno</span>}
-                    </div>
-                    <p className="plate-text">{abilityText(def, a.ability, lang)}</p>
-                    <span className="plate-tap">Toque para ativar</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
         {hasActions && (
           <div className="zoom-actions">
             {props.onCounter && !eventCounter && (
@@ -1818,12 +1822,12 @@ function CardZoom(props: {
               </button>
             )}
             {attach && (
-              <button className="btn don big" onClick={() => props.onDispatch(attach)}>
+              <button className={hasPlates ? 'btn small quiet' : 'btn don big'} onClick={() => props.onDispatch(attach)}>
                 + 1 DON!! <small>({state.players[owner].donActive} ativos)</small>
               </button>
             )}
             {props.canManual && (
-              <button className="btn small" onClick={props.onTools}>
+              <button className={hasPlates ? 'btn small quiet' : 'btn small'} onClick={props.onTools}>
                 ⚙ Ferramentas manuais
               </button>
             )}
