@@ -19,6 +19,7 @@ import { accountOwnerKey, createsTournaments, type User } from '../auth/store';
 import { type DB, getCards } from '../db';
 import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
+import { TIME_BANK_MS } from '../online/room';
 import type { ApiCard } from '../present';
 import { FORMATS, isFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer } from '../stats/store';
@@ -286,6 +287,8 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
       /** Rodadas do suíço (só no suíço). */
       swissRounds: t.structure === 'swiss' ? (t.rounds ?? swissRounds(players.length)) : null,
       roundsAuto: t.rounds === null,
+      /** Relógio de cada jogador em cada jogo: quem zera o tempo perde. */
+      clockMs: TIME_BANK_MS,
       maxPlayers: t.maxPlayers,
       startsAt: t.startsAt,
       createdAt: t.createdAt,

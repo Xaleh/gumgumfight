@@ -411,6 +411,8 @@ export interface TournamentDetail {
   swissRounds: number | null;
   /** Suíço com rodadas calculadas pelo número de inscritos. */
   roundsAuto: boolean;
+  /** Relógio de cada jogador em cada jogo (ms): quem zera o tempo perde. */
+  clockMs: number;
   maxPlayers: number | null;
   startsAt: string | null;
   createdAt: string;

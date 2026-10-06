@@ -245,10 +245,14 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 - **Criação:** nome, descrição e regras, formato (Standard ou Extra Grand Battle), estrutura, limite de jogadores e
   início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
 - **Não há empate** (como no One Piece TCG): toda partida tem um vencedor.
+- **Tempo:** cada jogador tem 17min30s por jogo, que só corre na vez dele, e quem zera o tempo perde. Por isso as
+  regras oficiais de tempo esgotado (turnos extras e o desempate por Vida, cartas no deck, Personagens e última
+  Vida comprada) não se aplicam aqui.
 - **Estruturas:**
   - **Suíço:** todos jogam todas as rodadas, contra quem tem a mesma pontuação e sem repetir confrontos. Vitória vale
     3 pontos, e o bye (número ímpar de jogadores) conta como vitória e vai para o último colocado que ainda não teve
-    um. Desempate por OMW (% de vitórias dos oponentes, mínimo de 33%) e OOMW. O número de rodadas é escolhido pelo
+    um. Desempates na ordem das regras oficiais da Bandai: OMW (% de vitórias dos oponentes, mínimo de 33% por
+    oponente), OOMW (média do OMW dos oponentes) e sorteio (a ordem sorteada no início do torneio). O número de rodadas é escolhido pelo
     organizador ou, em branco, calculado no início (⌈log₂ jogadores⌉). As partidas do suíço são jogo único ou melhor
     de 3.
   - **Top cut (opcional, no suíço):** depois da última rodada, os melhores colocados (Top 2 a Top 64; quem desistiu

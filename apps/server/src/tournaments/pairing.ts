@@ -1,9 +1,12 @@
 // Regras dos torneios, sem banco: classificação, desempates, pareamentos e
 // melhor de N. No One Piece TCG não há empate: toda partida tem vencedor.
 //
-// Suíço: vitória vale 3 pontos e o bye conta como vitória. Desempates (como nos
-// torneios oficiais): % de vitórias dos oponentes (OMW) e % de vitórias dos
-// oponentes dos oponentes (OOMW); o % de cada jogador nunca fica abaixo de 33%.
+// Suíço: vitória vale 3 pontos e o bye conta como vitória. Desempates, na ordem das
+// regras oficiais da Bandai: % de vitórias dos oponentes (OMW, com piso de 33% por
+// oponente), média do OMW dos oponentes (OOMW) e, empatado em tudo, sorteio (aqui,
+// a ordem sorteada no início do torneio). As regras oficiais de tempo esgotado
+// (turnos extras, contagem de Vida…) não se aplicam: cada jogador tem um relógio e
+// quem zera o tempo perde o jogo.
 // Cada rodada pareia quem tem a mesma pontuação, sem repetir confrontos; com número
 // ímpar de jogadores, o último colocado que ainda não teve bye fica de fora.
 // Opcionalmente, depois do suíço os melhores colocados vão para o top cut

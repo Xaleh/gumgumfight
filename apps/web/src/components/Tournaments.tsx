@@ -33,6 +33,12 @@ function toLocalInput(iso: string | null): string {
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
+/** 1050000 → "17min30s". */
+const clock = (ms: number) => {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}min${s % 60 ? `${String(s % 60).padStart(2, '0')}s` : ''}`;
+};
+
 /** Fases da eliminatória que o organizador pode escolher (vagas → nome). */
 const PHASES: Array<[number, string]> = [
   [256, 'Toda a eliminatória'],
@@ -512,6 +518,10 @@ function TournamentPage({
                   {t.bo5From && ` melhor de 5 a partir ${phaseFrom(t.bo5From)}`}.
                 </p>
               )}
+              <p className="muted small">
+                ⏱ Cada jogador tem {clock(t.clockMs)} por jogo, que só corre na vez dele. Quem zera o tempo perde o jogo: não há
+                turnos extras nem empate por tempo.
+              </p>
               {t.description && <p className="tour-desc">{t.description}</p>}
               {t.status === 'finished' && t.standings[0] && (
                 <p className="tour-champion">
@@ -991,7 +1001,9 @@ function Standings({ t }: { t: TournamentDetail }) {
       </table>
       {t.structure === 'swiss' && (
         <p className="muted small">
-          Pontos, V-D e desempates são do suíço: vitória vale 3 pontos e bye conta como vitória; desempate por OMW e depois OOMW.
+          Classificação do suíço pelas regras oficiais: pontos (vitória 3, derrota 0; bye conta como vitória), depois OMW (% de
+          vitórias dos oponentes, mínimo de 33% por oponente), depois OOMW (média do OMW dos oponentes) e, empatado em tudo,
+          a ordem sorteada no início.
           {t.topCut ? ` Quem chegou mais longe no Top ${t.topCut} fica acima.` : ''}
         </p>
       )}

@@ -85,6 +85,18 @@ describe('torneios: pareamentos e classificação', () => {
     expect(withCut[0]).toMatchObject({ inElim: true, elimWins: 1, rank: 1 });
   });
 
+  it('empate em pontos, OMW e OOMW: decide a ordem sorteada no início', () => {
+    const ps: TPlayer[] = [
+      { userId: 'a', seed: 3, dropped: false },
+      { userId: 'b', seed: 1, dropped: false },
+      { userId: 'c', seed: 2, dropped: false },
+    ];
+    expect(standings(ps, []).map((r) => r.userId)).toEqual(['b', 'c', 'a']);
+    // Piso de 33%: quem perdeu tudo conta como 33% no OMW de quem o enfrentou.
+    const m: TMatch = { round: 1, stage: 'swiss', table: 1, p1: 'a', p2: 'b', result: 'p1' };
+    expect(standings(ps, [m]).find((r) => r.userId === 'a')!.omw).toBeCloseTo(1 / 3);
+  });
+
   it('melhor de N por fase da eliminatória', () => {
     const cfg = { bo3From: 8, bo5From: 2 };
     expect([16, 8, 4, 2].map((n) => elimBestOf(n, cfg))).toEqual([1, 3, 3, 5]);
