@@ -8,6 +8,7 @@ import {
   createSession,
   deleteSession,
   getUser,
+  isAdmin,
   isRole,
   listUsers,
   SESSION_DAYS,
@@ -106,7 +107,7 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
       void reply.code(401).send({ error: 'Entre com a conta Google.' });
       return null;
     }
-    if (u.role !== 'admin') {
+    if (!isAdmin(u.role)) {
       void reply.code(403).send({ error: 'Só administradores podem mudar perfis.' });
       return null;
     }
@@ -124,8 +125,10 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
     if (!me) return reply;
     const role = req.body?.role;
     if (!isRole(role)) return reply.code(400).send({ error: 'Perfil inválido.' });
-    // Evita que o último admin se tranque para fora.
-    if (req.params.id === me.id) return reply.code(409).send({ error: 'Você não pode mudar o seu próprio perfil.' });
+    // Evita que o último admin se tranque para fora: a si mesmo, só a promoção para Dev.
+    if (req.params.id === me.id && role !== 'dev') {
+      return reply.code(409).send({ error: 'Você só pode mudar o seu próprio perfil para Dev.' });
+    }
     if (!setUserRole(db, req.params.id, role)) return reply.code(404).send({ error: 'Conta não encontrada.' });
     return publicUser(getUser(db, req.params.id)!);
   });

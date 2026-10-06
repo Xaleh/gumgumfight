@@ -14,7 +14,8 @@ import {
   zoneOf,
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, type OnlineSeat, type WatchTarget } from '../api';
+import { api, isDev, type OnlineSeat, type WatchTarget } from '../api';
+import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
@@ -269,6 +270,8 @@ function Table({
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   const ranked = online?.room?.queue === 'ranked';
+  // Ferramentas manuais (mexer na mesa à mão) são função de desenvolvimento: só para o perfil Dev.
+  const dev = isDev(useAuth().user?.role);
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
@@ -400,7 +403,7 @@ function Table({
     const t = setTimeout(() => setShowResult(true), 1200);
     return () => clearTimeout(t);
   }, [over]);
-  const manualOk = human !== null && !ranked && manualAllowed(state, human);
+  const manualOk = dev && human !== null && !ranked && manualAllowed(state, human);
 
   const has = useCallback((pred: (a: Action) => boolean) => legal.some(pred), [legal]);
   const canPlay = (uid: string) => myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid);
@@ -836,7 +839,7 @@ function Table({
           onDispatch={dispatch}
           onCard={onCard}
           highlight={highlight}
-          onTools={() => setSheet('tools')}
+          onTools={dev ? () => setSheet('tools') : undefined}
         />
 
         <AttackArrow state={state} drag={drag} mode={mode} hovered={hovered} legal={legal} />
@@ -1328,7 +1331,8 @@ function Prompt(props: {
   onDispatch: (a: Action) => void;
   onCard: (uid: string) => void;
   highlight: (uid: string) => Highlight;
-  onTools: () => void;
+  /** Abre as ferramentas manuais (só o perfil Dev tem). */
+  onTools?: () => void;
 }) {
   const { state, human, picked, onDispatch } = props;
   const { lang, quickCounter } = useSettings();
@@ -1474,9 +1478,11 @@ function Prompt(props: {
           }
         >
           <div className="btn-row">
-            <button className="btn" onClick={props.onTools}>
-              ⚙
-            </button>
+            {props.onTools && (
+              <button className="btn" onClick={props.onTools}>
+                ⚙
+              </button>
+            )}
             <button className="btn primary" onClick={() => onDispatch({ type: 'pass', player: human })}>
               Concluir counters
             </button>
@@ -1485,8 +1491,21 @@ function Prompt(props: {
       );
     case 'manual': {
       const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
+      const name = cardDef(state, pending.source).name;
+      // Sem as ferramentas manuais (perfil que não é Dev), o efeito ainda não automático é só avisado e pulado.
+      if (!props.onTools) {
+        return (
+          <PromptPill title={`⚙ Efeito ainda não automático: ${name}`} subtitle={`${text} (Este efeito não é aplicado.)`} clamp>
+            <div className="btn-row">
+              <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
+                Continuar
+              </button>
+            </div>
+          </PromptPill>
+        );
+      }
       return (
-        <PromptPill title={`⚙ Efeito manual: ${cardDef(state, pending.source).name}`} subtitle={text} clamp>
+        <PromptPill title={`⚙ Efeito manual: ${name}`} subtitle={text} clamp>
           <div className="btn-row">
             <button className="btn" onClick={props.onTools}>
               Ferramentas

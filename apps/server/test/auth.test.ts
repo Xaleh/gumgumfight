@@ -213,6 +213,25 @@ describe('perfis (player, streamer, admin)', () => {
     expect(all.map((u: { role: string }) => u.role)).toEqual(['admin', 'streamer']);
   });
 
+  it('Dev: o admin só muda o próprio perfil para Dev; o Dev é admin e não volta a admin ao entrar', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const nami = await login(a, {});
+    const namiId = nami.res.json().user.id;
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    const put = (id: string, role: string, headers = nami.cookie) =>
+      a.inject({ method: 'PUT', url: `/api/admin/users/${id}/role`, headers, payload: { role } });
+    // A si mesmo, só a promoção para Dev (nunca uma demoção).
+    expect((await put(namiId, 'streamer')).statusCode).toBe(409);
+    expect((await put(namiId, 'dev')).json().role).toBe('dev');
+    expect((await put(namiId, 'admin')).statusCode).toBe(409);
+    // O Dev tem os poderes do admin e ADMIN_EMAILS não o rebaixa no próximo login.
+    expect((await put(zoro.res.json().user.id, 'organizer')).json().role).toBe('organizer');
+    const again = await login(a, {});
+    expect(again.res.json().user.role).toBe('dev');
+    const all = (await a.inject({ url: '/api/admin/users', headers: again.cookie })).json();
+    expect(all.map((u: { role: string }) => u.role)).toEqual(['dev', 'organizer']);
+  });
+
   it('e-mail não verificado pelo Google não vira admin', async () => {
     const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
     const r = await login(a, { email_verified: false });
