@@ -2251,7 +2251,10 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
   else if (/^trash this (?:Character|Stage|card)$/i.test(part)) cost.trashSelf = true;
   else if (/^K\.O\. this Character$/i.test(part)) cost.koSelf = true;
   else if (/^place this (?:Character|Stage|card) at the bottom of (?:the owner's|your) deck$/i.test(part)) cost.selfToBottom = true;
-  else if ((m = part.match(/^return (\d+)(?: or more)? (?:of your active )?DON!! cards?(?: from your field)? to your DON!! deck$/i))) cost.donMinus = Number(m[1]);
+  else if ((m = part.match(/^return (\d+)( or more)? (?:of your active )?DON!! cards?(?: from your field)? to your DON!! deck$/i))) {
+    cost.donMinus = Number(m[1]);
+    if (m[2]) cost.donMinusOpen = true; // "1 or more": o jogador escolhe quantos
+  }
   else if ((m = part.match(/^give your (?:1 )?active Leader [−-]?(\d+) power during this turn$/i))) cost.leaderPowerMinus = Number(m[1]);
   else if ((m = part.match(/^return (\d+) Characters? to your hand$/i))) {
     cost.returnOwn = { count: Number(m[1]), spec: { side: 'own', kinds: ['character'], upTo: Number(m[1]) } };

@@ -703,6 +703,8 @@ type EffectStepBody =
    * hand: …"). O jogador decide se paga; se não pagar (ou não puder), o resto do efeito não acontece.
    */
   | { do: 'payCost'; cost: AbilityCost; scope?: number }
+  /** Custo "DON!! −N ou mais": pergunta quantos DON!! devolver (no mínimo `min`) e devolve. */
+  | { do: 'returnDonChoice'; min: number }
   /** "Trash up to N of your opponent's Life cards." (do topo) */
   | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
   /** "This Character gains [Rush] during this turn." */
@@ -758,6 +760,8 @@ export interface AbilityCost {
   returnGivenDon?: number; // "return 2 total of your currently given DON!! cards to your cost area rested" // substituição: "give that Character −1000 power during this turn instead"
   restDon?: number; // ① ② ③ ... (virar DON!! ativos da área de custo)
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
+  /** "You may return 1 or more DON!! cards …": o jogador escolhe quantos devolver (no mínimo `donMinus`). */
+  donMinusOpen?: boolean;
   trashFromHand?: number; // "You may trash N card from your hand:"
   /** Filtro das cartas descartadas como custo ("trash 1 {FILM} type card from your hand"). */
   trashFilter?: CardFilter;

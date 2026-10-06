@@ -1792,11 +1792,16 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
   const ps = state.players[player];
   if (cost.restSelf && locate(state, source)) restCard(state, source);
   if (cost.restDon) payDon(ps, cost.restDon);
-  if (cost.donMinus) {
-    returnDonAndEmit(state, ps, cost.donMinus);
-    log(state, player, `${ps.name} devolve ${cost.donMinus} DON!! ao deck de DON!!.`);
-  }
   const steps: EffectStep[] = [];
+  if (cost.donMinus) {
+    if (cost.donMinusOpen) {
+      // "1 or more": a quantidade é escolhida no passo seguinte.
+      steps.push({ do: 'returnDonChoice', min: cost.donMinus });
+    } else {
+      returnDonAndEmit(state, ps, cost.donMinus);
+      log(state, player, `${ps.name} devolve ${cost.donMinus} DON!! ao deck de DON!!.`);
+    }
+  }
   if (cost.trashFromHand) steps.push({ do: 'trashFromHand', count: cost.trashFromHand, filter: cost.trashFilter });
   if (cost.handToBottom) steps.push({ do: 'handToDeckBottom', count: cost.handToBottom });
   if (cost.restCharacters) steps.push({ do: 'restOwnCharacters', count: cost.restCharacters });
@@ -1898,7 +1903,13 @@ function ownCostOptions(state: GameState, player: PlayerId, source: string, spec
 
 export function describeCost(cost: AbilityCost): string {
   const parts: string[] = [];
-  if (cost.donMinus) parts.push(`DON!! −${cost.donMinus} (devolver ${cost.donMinus} DON!! ao deck de DON!!)`);
+  if (cost.donMinus) {
+    parts.push(
+      cost.donMinusOpen
+        ? `DON!! −${cost.donMinus} ou mais (devolver ${cost.donMinus} ou mais DON!! ao deck de DON!!)`
+        : `DON!! −${cost.donMinus} (devolver ${cost.donMinus} DON!! ao deck de DON!!)`,
+    );
+  }
   if (cost.restDon) parts.push(`virar ${cost.restDon} DON!!`);
   if (cost.restSelf) parts.push('virar esta carta');
   if (cost.trashFromHand) parts.push(`descartar ${cost.trashFromHand} carta(s) da mão`);
@@ -2233,6 +2244,23 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return true;
       }
       frame.steps.splice(frame.i + 1, 0, ...payImmediateCost(state, frame.controller, frame.source, cost));
+      return true;
+    }
+    case 'returnDonChoice': {
+      const max = totalDonOnField(ps);
+      if (max > step.min && !frame.choice) {
+        askOption(
+          state,
+          frame,
+          frame.controller,
+          `${srcName}: quantos DON!! devolver ao deck de DON!!?`,
+          Array.from({ length: max - step.min + 1 }, (_, i) => `${step.min + i} DON!!`),
+        );
+        return false;
+      }
+      const n = Math.min(max, step.min + (frame.choice ? Number(frame.choice[0]) : 0));
+      returnDonAndEmit(state, ps, n);
+      log(state, frame.controller, `${ps.name} devolve ${n} DON!! ao deck de DON!!.`);
       return true;
     }
     case 'trashLife': {
