@@ -59,13 +59,22 @@ export type EmoteId = (typeof EMOTES)[number];
  */
 export type RoomQueue = 'private' | 'casual' | 'ranked' | 'bot' | 'tournament';
 
-/** Partida de torneio jogada na sala. */
+/** Jogo de uma partida de torneio jogado na sala. */
 export interface RoomTournament {
   id: string;
   name: string;
   round: number;
-  /** Id da partida em tournament_matches. */
+  /** Nome da rodada ("Rodada 3", "Semifinal"…). */
+  label: string;
+  /** Id da partida (série) em tournament_matches. */
   matchId: number;
+  /** Jogo da série (1, 2, 3…) e melhor de quantos. */
+  game: number;
+  bestOf: number;
+  /** Jogos já vencidos na série, por conta (userId). */
+  wins: Record<string, number>;
+  /** Conta que começa este jogo (quem perdeu o anterior); ausente = sorteio. */
+  firstUserId?: string | null;
 }
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
@@ -108,6 +117,8 @@ export interface RoomData {
   rematch?: [boolean, boolean];
   rematchRoom?: string | null;
   tournament?: RoomTournament;
+  /** Quem começa, quando não é sorteado (jogos 2+ de uma série de torneio). */
+  firstPlayer?: PlayerId;
 }
 
 export interface Connection {
@@ -218,6 +229,7 @@ export class Room {
     return {
       seed: 0,
       seed128: this.data.seed128!,
+      ...(this.data.firstPlayer !== undefined ? { firstPlayer: this.data.firstPlayer } : {}),
       cards: this.deps.cards(ids),
       players: [
         { name: a.name, deck: a.deck, isBot: Boolean(a.bot) },
@@ -457,7 +469,19 @@ export class Room {
       code: this.data.code,
       queue: this.data.queue,
       format: this.data.format,
-      tournament: this.data.tournament ?? null,
+      tournament: this.data.tournament
+        ? {
+            id: this.data.tournament.id,
+            name: this.data.tournament.name,
+            round: this.data.tournament.round,
+            label: this.data.tournament.label,
+            matchId: this.data.tournament.matchId,
+            game: this.data.tournament.game,
+            bestOf: this.data.tournament.bestOf,
+            /** Placar da série antes deste jogo, na ordem dos assentos. */
+            score: this.data.seats.map((s) => (s.userId ? (this.data.tournament!.wins[s.userId] ?? 0) : 0)),
+          }
+        : null,
       status: this.status,
       you: seat,
       players: this.data.seats.map((s, i) => ({

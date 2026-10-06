@@ -88,7 +88,7 @@ export function App() {
         key={screen.seat.roomId}
         seat={screen.seat}
         onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : { name: 'menu' })}
-        onSwitch={(seat) => setScreen({ name: 'online', seat })}
+        onSwitch={(seat) => setScreen({ name: 'online', seat, tournament: screen.tournament })}
       />
     );
   }

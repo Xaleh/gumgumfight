@@ -5,14 +5,15 @@ import {
   canPlay,
   type DeckSummary,
   type OnlineSeat,
+  phaseLabel,
   STRUCTURE_LABEL,
   type TournamentDetail,
   type TournamentInput,
   type TournamentMatchInfo,
-  type TournamentResult,
   type TournamentSummary,
   TOURNAMENT_STATUS_LABEL,
   type WatchTarget,
+  winsNeeded,
 } from '../api';
 import { useAuth } from '../auth';
 import { LeaderArt } from './LeaderArt';
@@ -31,6 +32,31 @@ function toLocalInput(iso: string | null): string {
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+
+/** Fases da eliminatória que o organizador pode escolher (vagas → nome). */
+const PHASES: Array<[number, string]> = [
+  [256, 'Toda a eliminatória'],
+  [32, 'Rodada de 32'],
+  [16, 'Oitavas de final'],
+  [8, 'Quartas de final'],
+  [4, 'Semifinal'],
+  [2, 'Final'],
+];
+const TOP_CUTS = [2, 4, 8, 16, 32, 64];
+
+/** "das quartas de final", "da final"… */
+const phaseFrom = (size: number) => {
+  if (size >= 256) return 'do início da eliminatória';
+  const name = phaseLabel(size).toLowerCase();
+  return `${name === 'final' || name === 'semifinal' ? 'da' : name.startsWith('rodada') ? 'da' : 'das'} ${name}`;
+};
+
+/** Nome curto da fase para os botões das rodadas. */
+const shortPhase = (label: string) =>
+  ({ Final: 'Final', Semifinal: 'Semi', 'Quartas de final': 'Quartas', 'Oitavas de final': 'Oitavas' })[label] ?? label.replace('Rodada de ', 'R');
+
+/** "Melhor de 3" (ou "Jogo único"). */
+const bestOfLabel = (n: number) => (n === 1 ? 'Jogo único' : `Melhor de ${n}`);
 
 /**
  * Torneios: a lista, a página de cada torneio (inscrição, rodadas, classificação e
@@ -66,7 +92,8 @@ export function Tournaments({
     return (
       <TournamentPage
         id={openId}
-        onBack={() => setOpenId(null)}
+        onExit={onExit}
+        onDeleted={() => setOpenId(null)}
         onPlay={(seat) => onPlay(seat, openId)}
         onWatch={(t) => onWatch(t, openId)}
       />
@@ -126,7 +153,8 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
                 <span className={['tour-status', t.status].join(' ')}>{TOURNAMENT_STATUS_LABEL[t.status]}</span>
               </div>
               <span className="muted small">
-                {formatLabel(t.format)} · {STRUCTURE_LABEL[t.structure]} · {t.players}
+                {formatLabel(t.format)} · {STRUCTURE_LABEL[t.structure]}
+                {t.topCut ? ` + Top ${t.topCut}` : ''} · {t.players}
                 {t.maxPlayers ? `/${t.maxPlayers}` : ''} jogador{t.players === 1 ? '' : 'es'}
                 {t.status === 'running' && ` · Rodada ${t.round}${t.totalRounds ? `/${t.totalRounds}` : ''}`}
               </span>
@@ -159,7 +187,11 @@ function TournamentForm({
     description: initial?.description ?? '',
     format: initial?.format ?? 'standard',
     structure: initial?.structure ?? 'swiss',
-    rounds: initial && !initial.roundsAuto ? initial.totalRounds : null,
+    rounds: initial && !initial.roundsAuto ? initial.swissRounds : null,
+    swissBestOf: initial?.swissBestOf ?? 1,
+    topCut: initial?.topCut ?? null,
+    bo3From: initial?.bo3From ?? null,
+    bo5From: initial?.bo5From ?? null,
     maxPlayers: initial?.maxPlayers ?? null,
     startsAt: initial?.startsAt ?? null,
   }));
@@ -227,12 +259,12 @@ function TournamentForm({
             </div>
             <p className="muted small">
               {form.structure === 'swiss'
-                ? 'Todos jogam todas as rodadas, sempre contra quem tem a mesma pontuação (vitória 3, empate 1). Desempate por % de vitórias dos oponentes.'
+                ? 'Todos jogam todas as rodadas, sempre contra quem tem a mesma pontuação (vitória vale 3 pontos). Desempate por % de vitórias dos oponentes. Opcionalmente, os melhores vão para um top cut no fim.'
                 : 'Quem perde sai. A chave é sorteada no início; com número de jogadores fora de potência de 2, os primeiros sorteados ganham bye.'}
             </p>
           </div>
-          <div className="tour-form-row">
-            {form.structure === 'swiss' && (
+          {form.structure === 'swiss' && (
+            <div className="tour-form-row">
               <div className="field">
                 <label htmlFor="tour-rounds">Rodadas</label>
                 <input
@@ -246,7 +278,68 @@ function TournamentForm({
                   onChange={(e) => set('rounds', num(e.target.value))}
                 />
               </div>
-            )}
+              <div className="field">
+                <label>Partidas do suíço</label>
+                <div className="seg small">
+                  {[1, 3].map((n) => (
+                    <button key={n} className={form.swissBestOf === n ? 'on' : ''} onClick={() => set('swissBestOf', n)}>
+                      {bestOfLabel(n)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="tour-cut">Top cut</label>
+                <select
+                  id="tour-cut"
+                  className="admin-search"
+                  value={form.topCut ?? ''}
+                  onChange={(e) => set('topCut', e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Sem top cut</option>
+                  {TOP_CUTS.map((n) => (
+                    <option key={n} value={n}>
+                      Top {n} ({phaseLabel(n).toLowerCase()})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+          {(form.structure === 'single' || form.topCut !== null) && (
+            <>
+              <div className="tour-form-row">
+                {(
+                  [
+                    ['bo3From', 'Melhor de 3 a partir de', 'tour-bo3'],
+                    ['bo5From', 'Melhor de 5 a partir de', 'tour-bo5'],
+                  ] as const
+                ).map(([key, label, id]) => (
+                  <div className="field" key={key}>
+                    <label htmlFor={id}>{label}</label>
+                    <select
+                      id={id}
+                      className="admin-search"
+                      value={form[key] ?? ''}
+                      onChange={(e) => set(key, e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">Nunca</option>
+                      {PHASES.map(([size, name]) => (
+                        <option key={size} value={size}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <p className="muted small">
+                Antes dessas fases, as partidas da eliminatória são jogo único. Ex.: melhor de 3 a partir das quartas e melhor de 5
+                na final.
+              </p>
+            </>
+          )}
+          <div className="tour-form-row">
             <div className="field">
               <label htmlFor="tour-max">Limite de jogadores</label>
               <input
@@ -293,14 +386,28 @@ function TournamentForm({
 
 type Tab = 'rounds' | 'standings' | 'players';
 
+/** Texto do botão de avançar, conforme o próximo passo. */
+function nextLabel(t: TournamentDetail): string {
+  if (t.next === 'finish') return 'Encerrar torneio';
+  if (t.next === 'cut') return `Começar o Top ${t.topCut}`;
+  if (t.next === 'elim') {
+    const current = t.rounds[t.round - 1]?.matches.length ?? 0;
+    return `Próxima fase: ${phaseLabel(current)}`;
+  }
+  return `Gerar rodada ${t.round + 1}`;
+}
+
 function TournamentPage({
   id,
-  onBack,
+  onExit,
+  onDeleted,
   onPlay,
   onWatch,
 }: {
   id: string;
-  onBack: () => void;
+  /** Volta para o menu principal. */
+  onExit: () => void;
+  onDeleted: () => void;
   onPlay: (seat: OnlineSeat) => void;
   onWatch: (t: WatchTarget) => void;
 }) {
@@ -361,13 +468,14 @@ function TournamentPage({
 
   const activeTab: Tab = tab ?? (t?.status === 'registration' ? 'players' : t?.status === 'finished' ? 'standings' : 'rounds');
   const shownRound = viewRound ?? t?.round ?? 0;
-  const lastRound = t ? (t.structure === 'swiss' ? t.round >= t.totalRounds : (t.rounds.at(-1)?.matches.length ?? 0) <= 1) : false;
+  const lastRound = t?.next === 'finish';
+  const current = t?.rounds[t.round - 1];
 
   return (
     <div className="coverage tournaments">
       <header className="builder-header">
-        <button className="btn small" onClick={onBack}>
-          ← Torneios
+        <button className="btn small" onClick={onExit}>
+          ← Menu
         </button>
         <h2>{t?.name ?? 'Torneio'}</h2>
       </header>
@@ -379,19 +487,31 @@ function TournamentPage({
             <section className="menu-card tour-info">
               <div className="tour-card-head">
                 <span className={['tour-status', t.status].join(' ')}>{TOURNAMENT_STATUS_LABEL[t.status]}</span>
-                {t.status === 'running' && (
+                {t.status === 'running' && current && (
                   <strong>
-                    Rodada {t.round} de {t.totalRounds}
+                    {current.stage === 'elim' ? current.label : `Rodada ${t.round} de ${t.swissRounds ?? t.totalRounds}`}
+                    {current.bestOf > 1 && ` · ${bestOfLabel(current.bestOf)}`}
                   </strong>
                 )}
               </div>
               <p className="muted small">
-                {formatLabel(t.format)} · {STRUCTURE_LABEL[t.structure]} · {t.players.length}
+                {formatLabel(t.format)} · {STRUCTURE_LABEL[t.structure]}
+                {t.structure === 'swiss' &&
+                  (t.roundsAuto && t.status === 'registration' ? ' (rodadas pelo nº de inscritos)' : ` (${t.swissRounds} rodadas)`)}
+                {t.structure === 'swiss' && t.swissBestOf > 1 && ` em ${bestOfLabel(t.swissBestOf).toLowerCase()}`}
+                {t.topCut && ` + Top ${t.topCut}`} · {t.players.length}
                 {t.maxPlayers ? `/${t.maxPlayers}` : ''} inscrito{t.players.length === 1 ? '' : 's'}
-                {t.structure === 'swiss' && t.status === 'registration' && (t.roundsAuto ? ' · rodadas pelo nº de inscritos' : ` · ${t.totalRounds} rodadas`)}
                 {t.organizerName && ` · Organizado por ${t.organizerName}`}
                 {t.startsAt && t.status === 'registration' && ` · Começa em ${dateTime(t.startsAt)}`}
               </p>
+              {(t.bo3From || t.bo5From) && (
+                <p className="muted small">
+                  Eliminatória:
+                  {t.bo3From && ` melhor de 3 a partir ${phaseFrom(t.bo3From)}`}
+                  {t.bo3From && t.bo5From && ';'}
+                  {t.bo5From && ` melhor de 5 a partir ${phaseFrom(t.bo5From)}`}.
+                </p>
+              )}
               {t.description && <p className="tour-desc">{t.description}</p>}
               {t.status === 'finished' && t.standings[0] && (
                 <p className="tour-champion">
@@ -442,7 +562,7 @@ function TournamentPage({
                           ).then(() => setViewRound(null))
                         }
                       >
-                        {lastRound ? 'Encerrar torneio' : `Gerar rodada ${t.round + 1}`}
+                        {nextLabel(t)}
                       </button>
                       {!lastRound && (
                         <button
@@ -463,17 +583,18 @@ function TournamentPage({
                     onClick={() =>
                       run(async () => {
                         await api.tournaments.remove(t.id);
-                        onBack();
+                        onDeleted();
                       }, `Apagar o torneio "${t.name}"? Isso não pode ser desfeito.`)
                     }
                   >
                     Apagar
                   </button>
                 </div>
-                {t.status === 'running' && !t.roundComplete && (
+                {t.status !== 'registration' && (
                   <p className="muted small">
-                    Os resultados das partidas jogadas no site entram sozinhos. Lance à mão os de W.O. ou de partidas jogadas fora
-                    do site; você também pode corrigir qualquer resultado da rodada atual.
+                    Os resultados dos jogos disputados no site entram sozinhos. Lance à mão os de W.O. ou de partidas jogadas fora do
+                    site. Para corrigir um resultado lançado errado, escolha o placar certo na partida, inclusive em rodadas
+                    passadas.
                   </p>
                 )}
               </section>
@@ -500,21 +621,32 @@ function TournamentPage({
                 {t.round > 1 && (
                   <div className="seg small tour-rounds">
                     {t.rounds.map((r) => (
-                      <button key={r.round} className={shownRound === r.round ? 'on' : ''} onClick={() => setViewRound(r.round)}>
-                        {r.round}
+                      <button
+                        key={r.round}
+                        className={shownRound === r.round ? 'on' : ''}
+                        title={r.label}
+                        onClick={() => setViewRound(r.round)}
+                      >
+                        {r.stage === 'elim' ? shortPhase(r.label) : r.round}
                       </button>
                     ))}
                   </div>
+                )}
+                {t.rounds[shownRound - 1] && (
+                  <h3 className="tour-round-title">
+                    {t.rounds[shownRound - 1].label}
+                    <span className="muted small"> · {bestOfLabel(t.rounds[shownRound - 1].bestOf)}</span>
+                  </h3>
                 )}
                 <div className="tour-matches">
                   {t.rounds[shownRound - 1]?.matches.map((m) => (
                     <MatchRow
                       key={m.id}
-                      t={t}
                       m={m}
-                      editable={t.canManage && t.status === 'running' && shownRound === t.round}
+                      editable={t.canManage && t.status !== 'registration'}
+                      current={t.status === 'running' && shownRound === t.round}
                       busy={busy}
-                      onResult={(r) => run(() => api.tournaments.setResult(t.id, m.id, r))}
+                      onScore={(wins) => run(() => api.tournaments.setScore(t.id, m.id, wins))}
                       onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false })}
                     />
                   ))}
@@ -654,7 +786,7 @@ function MyArea({
     return s ? (
       <section className="menu-card tour-me">
         <p>
-          Você terminou em <b>{s.rank}º</b> lugar ({s.wins}V {s.losses}D{s.draws ? ` ${s.draws}E` : ''}).
+          Você terminou em <b>{s.rank}º</b> lugar ({s.wins}V {s.losses}D{t.structure === 'swiss' ? ' no suíço' : ''}).
         </p>
       </section>
     ) : null;
@@ -666,24 +798,33 @@ function MyArea({
       </section>
     );
   }
-  const m = t.rounds[t.round - 1]?.matches.find((x) => x.id === t.me!.matchId);
+  const round = t.rounds[t.round - 1];
+  const m = round?.matches.find((x) => x.id === t.me!.matchId);
   const opp = m && (m.p1.userId === user.id ? m.p2 : m.p1);
+  const mine = m && (m.p1.userId === user.id ? 0 : 1);
   return (
     <section className="menu-card tour-me">
-      <h2>Sua partida · Rodada {t.round}</h2>
+      <h2>
+        Sua partida · {round?.label ?? `Rodada ${t.round}`}
+        {m && m.bestOf > 1 ? ` · ${bestOfLabel(m.bestOf)}` : ''}
+      </h2>
       {!m ? (
-        <p className="muted">Você não foi pareado nesta rodada.</p>
+        <p className="muted">Você não está nesta rodada.</p>
       ) : !opp ? (
         <p>Você está de <b>bye</b> nesta rodada: a vitória já é sua. Aguarde a próxima rodada.</p>
       ) : (
         <>
           <p>
             Mesa {m.table}: contra <b>{opp.name}</b>
+            {m.bestOf > 1 && (
+              <>
+                {' '}
+                · placar <b>{m.wins[mine!]}–{m.wins[1 - mine!]}</b>
+              </>
+            )}
           </p>
           {m.result ? (
-            <p className="tour-my-result">
-              {m.result === 'draw' ? 'Empate.' : m.winner === user.id ? '✔ Vitória!' : 'Derrota.'} Aguarde a próxima rodada.
-            </p>
+            <p className="tour-my-result">{m.winner === user.id ? '✔ Vitória!' : 'Derrota.'} Aguarde a próxima rodada.</p>
           ) : (
             <>
               <button
@@ -695,12 +836,14 @@ function MyArea({
                   })
                 }
               >
-                {m.room === 'playing' ? 'Voltar à partida' : 'Jogar partida'}
+                {m.room === 'playing' ? 'Voltar ao jogo' : m.bestOf > 1 ? `Jogar o jogo ${m.game}` : 'Jogar partida'}
               </button>
               <p className="muted small">
                 {m.room === 'waiting'
                   ? 'Uma das pessoas já está na sala esperando.'
-                  : 'Quem entrar primeiro espera o oponente na sala. O resultado entra sozinho no torneio.'}
+                  : `Quem entrar primeiro espera o oponente na sala. O resultado entra sozinho no torneio.${
+                      m.bestOf > 1 ? ` Vence quem ganhar ${winsNeeded(m.bestOf)} jogos; quem perde um jogo começa o seguinte.` : ''
+                    }`}
               </p>
             </>
           )}
@@ -731,23 +874,34 @@ const REPORTED: Record<NonNullable<TournamentMatchInfo['reportedBy']>, string> =
   organizer: 'lançado pelo organizador',
 };
 
+/** Placares finais possíveis de uma melhor de N, do ponto de vista de p1 e depois de p2. */
+function finalScores(bestOf: number): Array<[number, number]> {
+  const need = winsNeeded(bestOf);
+  const p1 = Array.from({ length: need }, (_, k): [number, number] => [need, k]);
+  const p2 = Array.from({ length: need }, (_, k): [number, number] => [need - 1 - k, need]);
+  return [...p1, ...p2];
+}
+
 function MatchRow({
-  t,
   m,
   editable,
+  current,
   busy,
-  onResult,
+  onScore,
   onWatch,
 }: {
-  t: TournamentDetail;
   m: TournamentMatchInfo;
+  /** O organizador pode lançar ou corrigir o placar. */
   editable: boolean;
+  /** Rodada atual (só nela o placar pode ser apagado). */
+  current: boolean;
   busy: boolean;
-  onResult: (r: TournamentResult | null) => void;
+  onScore: (wins: [number, number]) => void;
   onWatch: () => void;
 }) {
   const name = (p: TournamentMatchInfo['p1'] | null, won: boolean) =>
-    p ? <span className={['tour-player', won ? 'won' : m.result && m.result !== 'draw' ? 'lost' : ''].join(' ')}>{p.name}</span> : null;
+    p ? <span className={['tour-player', won ? 'won' : m.result ? 'lost' : ''].join(' ')}>{p.name}</span> : null;
+  const played = m.wins[0] + m.wins[1] > 0;
   return (
     <div className="tour-match">
       <span className="tour-table muted small">Mesa {m.table}</span>
@@ -755,7 +909,9 @@ function MatchRow({
         {name(m.p1, m.winner === m.p1.userId)}
         {m.p2 ? (
           <>
-            <span className="muted small">vs</span>
+            <span className={m.bestOf > 1 && (played || m.result) ? 'tour-score' : 'muted small'}>
+              {m.bestOf > 1 && (played || m.result) ? `${m.wins[0]}–${m.wins[1]}` : 'vs'}
+            </span>
             {name(m.p2, m.winner === m.p2.userId)}
           </>
         ) : (
@@ -763,30 +919,31 @@ function MatchRow({
         )}
       </div>
       <div className="tour-match-side">
-        {m.result === 'draw' && <span className="tour-badge">Empate</span>}
         {m.result && m.reportedBy && m.reportedBy !== 'bye' && <span className="muted small">{REPORTED[m.reportedBy]}</span>}
         {!m.result && m.room === 'playing' && (
           <button className="btn small" onClick={onWatch}>
-            👁 Assistir
+            👁 Assistir{m.bestOf > 1 ? ` o jogo ${m.game}` : ''}
           </button>
         )}
-        {!m.result && m.room !== 'playing' && <span className="muted small">{m.room === 'waiting' ? 'Na sala…' : 'Pendente'}</span>}
+        {!m.result && m.room !== 'playing' && (
+          <span className="muted small">
+            {m.room === 'waiting' ? 'Na sala…' : m.bestOf > 1 && played ? `Jogo ${m.game} pendente` : 'Pendente'}
+          </span>
+        )}
       </div>
       {editable && m.p2 && (
         <div className="seg small tour-result">
-          <button className={m.result === 'p1' ? 'on' : ''} disabled={busy} onClick={() => onResult('p1')}>
-            {m.p1.name} venceu
-          </button>
-          {t.structure === 'swiss' && (
-            <button className={m.result === 'draw' ? 'on' : ''} disabled={busy} onClick={() => onResult('draw')}>
-              Empate
-            </button>
-          )}
-          <button className={m.result === 'p2' ? 'on' : ''} disabled={busy} onClick={() => onResult('p2')}>
-            {m.p2.name} venceu
-          </button>
-          {m.result && (
-            <button disabled={busy} title="Apagar o resultado" onClick={() => onResult(null)}>
+          {finalScores(m.bestOf).map(([a, b]) => {
+            const winner = a > b ? m.p1.name : m.p2!.name;
+            const on = m.wins[0] === a && m.wins[1] === b;
+            return (
+              <button key={`${a}-${b}`} className={on ? 'on' : ''} disabled={busy || on} onClick={() => onScore([a, b])}>
+                {m.bestOf === 1 ? `${winner} venceu` : `${winner} ${Math.max(a, b)}–${Math.min(a, b)}`}
+              </button>
+            );
+          })}
+          {current && (played || m.result) && (
+            <button disabled={busy} title="Zerar o placar" onClick={() => onScore([0, 0])}>
               ✕
             </button>
           )}
@@ -797,6 +954,7 @@ function MatchRow({
 }
 
 function Standings({ t }: { t: TournamentDetail }) {
+  const champion = t.status === 'finished' ? t.standings[0]?.userId : null;
   return (
     <section className="menu-card tour-standings">
       <table className="cov-table">
@@ -805,7 +963,7 @@ function Standings({ t }: { t: TournamentDetail }) {
             <th>#</th>
             <th>Jogador</th>
             <th>Pts</th>
-            <th>V-D-E</th>
+            <th>V-D</th>
             <th title="% de vitórias dos oponentes">OMW</th>
             <th title="% de vitórias dos oponentes dos oponentes">OOMW</th>
           </tr>
@@ -816,14 +974,14 @@ function Standings({ t }: { t: TournamentDetail }) {
               <td>{s.rank}</td>
               <td>
                 {s.name}
+                {s.userId === champion && <span className="tour-badge gold">campeão</span>}
                 {s.dropped && <span className="tour-badge">saiu</span>}
-                {t.structure === 'single' && !s.alive && !s.dropped && t.status === 'running' && (
-                  <span className="tour-badge">eliminado</span>
-                )}
+                {t.topCut && s.inElim && s.userId !== champion && <span className="tour-badge">Top {t.topCut}</span>}
+                {s.inElim && !s.alive && !s.dropped && t.status === 'running' && <span className="tour-badge">eliminado</span>}
               </td>
               <td>{s.points}</td>
               <td>
-                {s.wins}-{s.losses}-{s.draws}
+                {s.wins}-{s.losses}
               </td>
               <td>{pct(s.omw)}</td>
               <td>{pct(s.oomw)}</td>
@@ -832,7 +990,10 @@ function Standings({ t }: { t: TournamentDetail }) {
         </tbody>
       </table>
       {t.structure === 'swiss' && (
-        <p className="muted small">Vitória vale 3 pontos, empate 1 e bye conta como vitória. Desempate: OMW e depois OOMW.</p>
+        <p className="muted small">
+          Pontos, V-D e desempates são do suíço: vitória vale 3 pontos e bye conta como vitória; desempate por OMW e depois OOMW.
+          {t.topCut ? ` Quem chegou mais longe no Top ${t.topCut} fica acima.` : ''}
+        </p>
       )}
     </section>
   );

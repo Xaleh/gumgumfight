@@ -1,20 +1,25 @@
-// Regras dos torneios, sem banco: classificação, desempates e pareamentos.
+// Regras dos torneios, sem banco: classificação, desempates, pareamentos e
+// melhor de N. No One Piece TCG não há empate: toda partida tem vencedor.
 //
-// Suíço: vitória vale 3 pontos, empate 1 e o bye conta como vitória. Desempates
-// (como nos torneios oficiais): % de vitórias dos oponentes (OMW) e % de vitórias
-// dos oponentes dos oponentes (OOMW); o % de cada jogador nunca fica abaixo de 33%.
+// Suíço: vitória vale 3 pontos e o bye conta como vitória. Desempates (como nos
+// torneios oficiais): % de vitórias dos oponentes (OMW) e % de vitórias dos
+// oponentes dos oponentes (OOMW); o % de cada jogador nunca fica abaixo de 33%.
 // Cada rodada pareia quem tem a mesma pontuação, sem repetir confrontos; com número
 // ímpar de jogadores, o último colocado que ainda não teve bye fica de fora.
+// Opcionalmente, depois do suíço os melhores colocados vão para o top cut
+// (eliminação simples semeada pela classificação).
 //
 // Eliminação simples: a chave tem o tamanho da próxima potência de 2; as vagas que
-// sobram viram byes para os primeiros cabeças de chave (sorteados no início). Os
-// cabeças 1 e 2 só podem se cruzar na final. Não há empate: o organizador decide.
+// sobram viram byes para os primeiros cabeças de chave. Os cabeças 1 e 2 só podem
+// se cruzar na final.
+//
+// Melhor de N: cada partida (série) termina quando alguém vence a maioria dos jogos.
 
 export type Structure = 'swiss' | 'single';
-export type MatchResult = 'p1' | 'p2' | 'draw' | 'bye';
+export type Stage = 'swiss' | 'elim';
+export type MatchResult = 'p1' | 'p2' | 'bye';
 
 export const WIN_POINTS = 3;
-export const DRAW_POINTS = 1;
 const MIN_WIN_RATE = 1 / 3;
 
 export interface TPlayer {
@@ -26,6 +31,7 @@ export interface TPlayer {
 
 export interface TMatch {
   round: number;
+  stage: Stage;
   table: number;
   p1: string;
   /** null = bye. */
@@ -41,18 +47,45 @@ export interface Pairing {
 export interface Standing {
   rank: number;
   userId: string;
+  /** Suíço (ou a chave inteira, na eliminação simples). */
   points: number;
   wins: number;
   losses: number;
-  draws: number;
   byes: number;
   /** % de vitórias dos oponentes (0..1). */
   omw: number;
   /** % de vitórias dos oponentes dos oponentes (0..1). */
   oomw: number;
   dropped: boolean;
-  /** Eliminação simples: ainda está na chave. */
+  /** Entrou na fase eliminatória (top cut ou eliminação simples). */
+  inElim: boolean;
+  /** Vitórias na fase eliminatória (inclui byes). */
+  elimWins: number;
+  /** Ainda vivo na fase eliminatória. */
   alive: boolean;
+}
+
+/** Vitórias necessárias numa melhor de N. */
+export const winsNeeded = (bestOf: number) => Math.floor(bestOf / 2) + 1;
+
+/**
+ * Melhor de quantos numa rodada eliminatória com `size` vagas (2 = final, 4 =
+ * semifinal…): melhor de 5 a partir de `bo5From`, senão melhor de 3 a partir de
+ * `bo3From` (o tamanho da fase), senão jogo único.
+ */
+export function elimBestOf(size: number, cfg: { bo3From: number | null; bo5From: number | null }): number {
+  if (cfg.bo5From && size <= cfg.bo5From) return 5;
+  if (cfg.bo3From && size <= cfg.bo3From) return 3;
+  return 1;
+}
+
+/** Nome da fase eliminatória pelo número de vagas. */
+export function elimLabel(size: number): string {
+  if (size <= 2) return 'Final';
+  if (size === 4) return 'Semifinal';
+  if (size === 8) return 'Quartas de final';
+  if (size === 16) return 'Oitavas de final';
+  return `Rodada de ${size}`;
 }
 
 /** Rodadas sugeridas para o suíço: o bastante para sobrar um só invicto. */
@@ -82,19 +115,14 @@ interface Record_ {
   points: number;
   wins: number;
   losses: number;
-  draws: number;
   byes: number;
   played: number;
   opponents: string[];
-  /** Eliminação simples: perdeu alguma partida. */
-  eliminated: boolean;
 }
 
 function records(players: TPlayer[], matches: TMatch[]) {
   const recs = new Map<string, Record_>();
-  for (const p of players) {
-    recs.set(p.userId, { points: 0, wins: 0, losses: 0, draws: 0, byes: 0, played: 0, opponents: [], eliminated: false });
-  }
+  for (const p of players) recs.set(p.userId, { points: 0, wins: 0, losses: 0, byes: 0, played: 0, opponents: [] });
   for (const m of matches) {
     if (!m.result) continue;
     const a = recs.get(m.p1);
@@ -113,18 +141,10 @@ function records(players: TPlayer[], matches: TMatch[]) {
     b.played++;
     a.opponents.push(m.p2!);
     b.opponents.push(m.p1);
-    if (m.result === 'draw') {
-      a.points += DRAW_POINTS;
-      b.points += DRAW_POINTS;
-      a.draws++;
-      b.draws++;
-    } else {
-      const [w, l] = m.result === 'p1' ? [a, b] : [b, a];
-      w.points += WIN_POINTS;
-      w.wins++;
-      l.losses++;
-      l.eliminated = true;
-    }
+    const [w, l] = m.result === 'p1' ? [a, b] : [b, a];
+    w.points += WIN_POINTS;
+    w.wins++;
+    l.losses++;
   }
   return recs;
 }
@@ -132,15 +152,27 @@ function records(players: TPlayer[], matches: TMatch[]) {
 const winRate = (r: Record_) => (r.played ? Math.max(MIN_WIN_RATE, r.points / (WIN_POINTS * r.played)) : MIN_WIN_RATE);
 
 /**
- * Classificação. Suíço: pontos, OMW, OOMW e a ordem sorteada. Eliminação simples:
- * quem chegou mais longe na chave (vitórias), quem ainda está vivo e os mesmos desempates.
+ * Classificação. A base é o suíço (pontos, OMW, OOMW e a ordem sorteada); na
+ * eliminação simples, a base usa todas as partidas. Quem entrou na fase
+ * eliminatória fica acima de quem não entrou, ordenado por quão longe chegou.
  */
-export function standings(players: TPlayer[], matches: TMatch[], structure: Structure): Standing[] {
-  const recs = records(players, matches);
+export function standings(players: TPlayer[], matches: TMatch[]): Standing[] {
+  const swiss = matches.filter((m) => m.stage === 'swiss');
+  const elim = matches.filter((m) => m.stage === 'elim');
+  const recs = records(players, swiss.length ? swiss : matches);
   const mw = new Map([...recs].map(([id, r]) => [id, winRate(r)]));
   const avg = (ids: string[], f: (id: string) => number) => (ids.length ? ids.reduce((s, id) => s + f(id), 0) / ids.length : 0);
   const omw = new Map([...recs].map(([id, r]) => [id, avg(r.opponents, (o) => mw.get(o) ?? MIN_WIN_RATE)]));
   const oomw = new Map([...recs].map(([id, r]) => [id, avg(r.opponents, (o) => omw.get(o) ?? 0)]));
+  const inElim = new Set(elim.flatMap((m) => [m.p1, m.p2]).filter((id): id is string => Boolean(id)));
+  const elimWins = new Map<string, number>();
+  const eliminated = new Set<string>();
+  for (const m of elim) {
+    const w = winnerOf(m);
+    if (w) elimWins.set(w, (elimWins.get(w) ?? 0) + 1);
+    const l = loserOf(m);
+    if (l) eliminated.add(l);
+  }
   const rows = players.map((p) => {
     const r = recs.get(p.userId)!;
     return {
@@ -149,18 +181,21 @@ export function standings(players: TPlayer[], matches: TMatch[], structure: Stru
       points: r.points,
       wins: r.wins,
       losses: r.losses,
-      draws: r.draws,
       byes: r.byes,
       omw: omw.get(p.userId)!,
       oomw: oomw.get(p.userId)!,
       dropped: p.dropped,
-      alive: structure === 'single' && !r.eliminated && !p.dropped,
+      inElim: inElim.has(p.userId),
+      elimWins: elimWins.get(p.userId) ?? 0,
+      alive: inElim.has(p.userId) && !eliminated.has(p.userId) && !p.dropped,
       seed: p.seed,
     };
   });
   rows.sort(
     (a, b) =>
-      (structure === 'single' ? b.wins - a.wins || Number(b.alive) - Number(a.alive) : 0) ||
+      Number(b.inElim) - Number(a.inElim) ||
+      b.elimWins - a.elimWins ||
+      Number(b.alive) - Number(a.alive) ||
       b.points - a.points ||
       b.omw - a.omw ||
       b.oomw - a.oomw ||
@@ -172,7 +207,7 @@ export function standings(players: TPlayer[], matches: TMatch[], structure: Stru
 /** Pareamentos da próxima rodada do suíço (quem desistiu fica de fora). */
 export function swissPairings(players: TPlayer[], matches: TMatch[]): Pairing[] {
   const active = new Set(players.filter((p) => !p.dropped).map((p) => p.userId));
-  const order = standings(players, matches, 'swiss')
+  const order = standings(players, matches)
     .filter((s) => active.has(s.userId))
     .map((s) => s.userId);
   const played = new Set<string>();
@@ -223,7 +258,7 @@ export function bracketOrder(size: number): number[] {
   return order;
 }
 
-/** Primeira rodada da eliminação simples, pela ordem dos cabeças de chave. */
+/** Primeira rodada da eliminação simples (ou do top cut), pela ordem dos cabeças de chave (`seed`). */
 export function singleFirstRound(players: TPlayer[]): Pairing[] {
   const seeded = players.filter((p) => !p.dropped).sort((a, b) => a.seed - b.seed);
   const size = 2 ** singleRounds(seeded.length);

@@ -67,6 +67,7 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
   const replay = {
     seed: 0,
     seed128: room.data.seed128!,
+    firstPlayer: room.data.firstPlayer,
     decks: [room.data.seats[0].deck, room.data.seats[1].deck] as [typeof room.data.seats[0]['deck'], typeof room.data.seats[0]['deck']],
     actions: room.data.actions,
   };

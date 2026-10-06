@@ -6,6 +6,8 @@ import type { Lobby } from '../src/online/lobby';
 import { seed } from '../src/seed';
 import {
   bracketOrder,
+  elimBestOf,
+  elimLabel,
   singleFirstRound,
   singleNextRound,
   standings,
@@ -36,7 +38,7 @@ describe('torneios: pareamentos e classificação', () => {
     expect(r1.find((p) => p.p2 === null)).toEqual({ p1: 'p5', p2: null });
     const matches: TMatch[] = [];
     const play = (round: number, pairs: typeof r1) =>
-      pairs.forEach((p, i) => matches.push({ round, table: i + 1, p1: p.p1, p2: p.p2, result: p.p2 ? 'p1' : 'bye' }));
+      pairs.forEach((p, i) => matches.push({ round, stage: 'swiss', table: i + 1, p1: p.p1, p2: p.p2, result: p.p2 ? 'p1' : 'bye' }));
     play(1, r1);
     for (let round = 2; round <= 4; round++) {
       const pairs = swissPairings(ps, matches);
@@ -58,25 +60,41 @@ describe('torneios: pareamentos e classificação', () => {
     expect(pairs.filter((p) => p.p2 === null)).toHaveLength(1);
   });
 
-  it('classificação: pontos, depois % de vitórias dos oponentes', () => {
+  it('classificação: pontos, depois % de vitórias dos oponentes; o top cut fica acima', () => {
     const ps = players(4);
-    const m = (round: number, p1: string, p2: string, result: TMatch['result']): TMatch => ({ round, table: 1, p1, p2, result });
-    const matches = [m(1, 'p1', 'p2', 'p1'), m(1, 'p3', 'p4', 'p1'), m(2, 'p1', 'p3', 'draw'), m(2, 'p2', 'p4', 'p1')];
-    const s = standings(ps, matches, 'swiss');
-    expect(s.map((r) => [r.userId, r.points])).toEqual([
-      ['p1', 4],
-      ['p3', 4],
-      ['p2', 3],
-      ['p4', 0],
+    const m = (round: number, p1: string, p2: string, result: TMatch['result'], stage: TMatch['stage'] = 'swiss'): TMatch => ({
+      round,
+      stage,
+      table: 1,
+      p1,
+      p2,
+      result,
+    });
+    const matches = [m(1, 'p1', 'p2', 'p1'), m(1, 'p3', 'p4', 'p1'), m(2, 'p1', 'p4', 'p2'), m(2, 'p2', 'p3', 'p1')];
+    const s = standings(ps, matches);
+    // Todos ficaram 1-1 (3 pontos): o desempate decide e é estável.
+    expect(new Set(s.map((r) => r.rank))).toEqual(new Set([1, 2, 3, 4]));
+    // Top cut: quem venceu a final é 1º, quem perdeu é 2º, mesmo com menos pontos no suíço.
+    const last = s[3].userId;
+    const other = s[2].userId;
+    const withCut = standings(ps, [...matches, m(3, last, other, 'p1', 'elim')]);
+    expect(withCut.slice(0, 2).map((r) => [r.userId, r.alive])).toEqual([
+      [last, true],
+      [other, false],
     ]);
-    // p1 enfrentou p2 (3 pts em 2) e p3 (4 em 2); p3 enfrentou p4 (33% mínimo) e p1.
-    expect(s[0].omw).toBeGreaterThan(s[1].omw);
-    expect(s[0]).toMatchObject({ wins: 1, draws: 1, losses: 0, rank: 1 });
+    expect(withCut[0]).toMatchObject({ inElim: true, elimWins: 1, rank: 1 });
+  });
+
+  it('melhor de N por fase da eliminatória', () => {
+    const cfg = { bo3From: 8, bo5From: 2 };
+    expect([16, 8, 4, 2].map((n) => elimBestOf(n, cfg))).toEqual([1, 3, 3, 5]);
+    expect(elimBestOf(2, { bo3From: null, bo5From: null })).toBe(1);
+    expect([2, 4, 8, 16, 32].map(elimLabel)).toEqual(['Final', 'Semifinal', 'Quartas de final', 'Oitavas de final', 'Rodada de 32']);
   });
 
   it('eliminação simples: vencedores avançam; quem desistiu dá bye', () => {
     const ps = players(4);
-    const r1: TMatch[] = singleFirstRound(ps).map((p, i) => ({ round: 1, table: i + 1, ...p, result: 'p1' }));
+    const r1: TMatch[] = singleFirstRound(ps).map((p, i) => ({ round: 1, stage: 'elim', table: i + 1, ...p, result: 'p1' }));
     expect(r1.map((m) => [m.p1, m.p2])).toEqual([
       ['p1', 'p4'],
       ['p2', 'p3'],
@@ -84,7 +102,7 @@ describe('torneios: pareamentos e classificação', () => {
     expect(singleNextRound(ps, r1)).toEqual([{ p1: 'p1', p2: 'p2' }]);
     ps[1].dropped = true;
     expect(singleNextRound(ps, r1)).toEqual([{ p1: 'p1', p2: null }]);
-    const s = standings(ps, r1, 'single');
+    const s = standings(ps, r1);
     expect(s[0]).toMatchObject({ userId: 'p1', alive: true });
     expect(s.find((r) => r.userId === 'p4')!.alive).toBe(false);
   });
@@ -215,13 +233,14 @@ describe('torneios: rotas', () => {
     expect(room.data.queue).toBe('tournament');
     // A partida aparece em "Assistir" com o nome do torneio.
     const live = (await req(app, 'GET', '/api/online/live')).json().rooms;
-    expect(live[0].tournament).toEqual({ id: t.id, name: 'Liga', round: 1 });
+    expect(live[0].tournament).toEqual({ id: t.id, name: 'Liga', round: 1, label: 'Rodada 1', game: 1, bestOf: 1 });
     // O jogador do segundo assento desiste: o primeiro vence.
     const loserSeat = room.seatOf(second.token)!;
     await app.inject({ method: 'POST', url: `/api/online/rooms/${room.id}/action`, payload: { t: second.token, seq: 0, action: { type: 'concede', player: loserSeat } } });
     let view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
     let m = view.rounds[0].matches.find((x: { id: number }) => x.id === m1.id);
-    expect(m).toMatchObject({ result: 'p1', winner: m1.p1.userId, reportedBy: 'game', room: 'finished' });
+    // O jogo contado libera a sala da partida.
+    expect(m).toMatchObject({ result: 'p1', wins: [1, 0], winner: m1.p1.userId, reportedBy: 'game', room: null });
     expect(db.prepare("SELECT COUNT(*) AS n FROM match_seats WHERE queue = 'tournament'").get()).toEqual({ n: 2 });
     expect((await play(who(m1.p1.userId), m1)).statusCode).toBe(409);
 
@@ -231,9 +250,11 @@ describe('torneios: rotas', () => {
     expect((await result(who(m2.p1.userId), m2, 'p1')).statusCode).toBe(403);
     expect((await result(org, m2, 'x')).statusCode).toBe(400);
     expect((await result(org, bye, 'p1')).statusCode).toBe(400);
-    await result(org, m2, 'p2');
-    view = (await result(org, m2, 'draw')).json();
-    expect(view.rounds[0].matches.find((x: { id: number }) => x.id === m2.id)).toMatchObject({ result: 'draw', reportedBy: 'organizer' });
+    // Não há empate no One Piece TCG.
+    expect((await result(org, m2, 'draw')).statusCode).toBe(400);
+    await result(org, m2, 'p1');
+    view = (await result(org, m2, 'p2')).json();
+    expect(view.rounds[0].matches.find((x: { id: number }) => x.id === m2.id)).toMatchObject({ result: 'p2', reportedBy: 'organizer' });
     expect(view.roundComplete).toBe(true);
 
     // Rodada 2: sem repetir confrontos.
@@ -241,8 +262,13 @@ describe('torneios: rotas', () => {
     expect(view.round).toBe(2);
     const pairsBefore = new Set(view.rounds[0].matches.filter((x: any) => x.p2).map((x: any) => [x.p1.userId, x.p2.userId].sort().join()));
     for (const x of view.rounds[1].matches.filter((x: any) => x.p2)) expect(pairsBefore.has([x.p1.userId, x.p2.userId].sort().join())).toBe(false);
-    // Resultados de rodadas passadas não mudam mais.
-    expect((await result(org, m2, 'p1')).statusCode).toBe(409);
+    // Resultado de rodada passada lançado errado: o organizador corrige (a classificação acompanha).
+    const before = view.standings.find((x: any) => x.userId === m2.p1.userId).points;
+    view = (await result(org, m2, 'p1')).json();
+    expect(view.rounds[0].matches.find((x: { id: number }) => x.id === m2.id)).toMatchObject({ result: 'p1' });
+    expect(view.standings.find((x: any) => x.userId === m2.p1.userId).points).toBe(before + 3);
+    // Mas rodada passada não fica sem vencedor.
+    expect((await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m2.id}/result`, org, { result: null })).statusCode).toBe(409);
 
     // Um jogador desiste no meio da rodada: o oponente vence a partida pendente.
     const pending = view.rounds[1].matches.find((x: any) => x.p2);
@@ -278,12 +304,97 @@ describe('torneios: rotas', () => {
     await set(match, 'p2');
     view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
     expect(view.rounds[1].matches).toHaveLength(1);
-    const final = view.rounds[1].matches[0];
+    let final = view.rounds[1].matches[0];
+    expect(view.rounds[1].label).toBe('Final');
     expect([final.p1.userId, final.p2.userId]).toContain(match.p2.userId);
+    // Resultado da semifinal lançado errado: corrigir troca quem está na final (que ainda não começou).
+    view = (await set(match, 'p1')).json();
+    final = view.rounds[1].matches[0];
+    expect([final.p1.userId, final.p2.userId]).toContain(match.p1.userId);
+    expect([final.p1.userId, final.p2.userId]).not.toContain(match.p2.userId);
     await set(final, 'p1');
+    // Com a final decidida, a semifinal não muda mais.
+    const blocked = await set(match, 'p2');
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().error).toMatch(/partida seguinte/);
     view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
     expect(view.status).toBe('finished');
     expect(view.standings[0]).toMatchObject({ userId: final.p1.userId, rank: 1, alive: true });
     expect(view.standings[1].userId).toBe(final.p2.userId);
+  });
+
+  it('suíço com top cut: melhor de 3 na semifinal, melhor de 5 na final, jogos nas salas online', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const ps = Array.from({ length: 6 }, () => login(db));
+    const body = { name: 'Regional', format: 'egb', structure: 'swiss', rounds: 2, topCut: 4, bo3From: 4, bo5From: 2 };
+    expect((await req(app, 'POST', '/api/tournaments', org, { ...body, topCut: 5 })).statusCode).toBe(400);
+    const t = (await req(app, 'POST', '/api/tournaments', org, body)).json();
+    expect(t).toMatchObject({ topCut: 4, bo3From: 4, bo5From: 2, swissBestOf: 1 });
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i % DECKS.length] });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
+    expect(view.totalRounds).toBe(4); // 2 do suíço + semifinal + final
+    const result = (m: { id: number }, payload: object) => req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, org, payload);
+    for (let r = 0; r < 2; r++) {
+      expect(view.rounds[r].bestOf).toBe(1);
+      for (const m of view.rounds[r].matches.filter((x: any) => x.p2)) await result(m, { result: 'p1' });
+      view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    }
+    // Top 4, semeado pela classificação do suíço: 1º x 4º e 2º x 3º.
+    const semis = view.rounds[2];
+    expect(semis).toMatchObject({ stage: 'elim', label: 'Semifinal', bestOf: 3 });
+    expect(view.stage).toBe('elim');
+    const swissTop = view.standings.slice(0, 4).map((s: any) => s.userId);
+    expect(semis.matches.map((m: any) => [m.p1.userId, m.p2.userId])).toEqual([
+      [swissTop[0], swissTop[3]],
+      [swissTop[1], swissTop[2]],
+    ]);
+    // Corrigir o suíço depois do top cut é recusado.
+    const swissMatch = view.rounds[0].matches.find((x: any) => x.p2);
+    expect((await result(swissMatch, { result: 'p2' })).statusCode).toBe(409);
+
+    // Semifinal 1 jogada no site: cada jogo é uma sala; quem perde começa o seguinte.
+    const lobby = (app as unknown as { onlineLobby: Lobby }).onlineLobby;
+    const who = (userId: string) => ps.find((p) => p.id === userId)!;
+    const s1 = semis.matches[0];
+    const playGame = async (loser: string) => {
+      const a = (await req(app, 'POST', `/api/tournaments/${t.id}/matches/${s1.id}/play`, who(s1.p1.userId))).json();
+      const b = (await req(app, 'POST', `/api/tournaments/${t.id}/matches/${s1.id}/play`, who(s1.p2.userId))).json();
+      expect(b.roomId).toBe(a.roomId);
+      const room = lobby.get(a.roomId)!;
+      const token = loser === s1.p1.userId ? a.token : b.token;
+      await app.inject({ method: 'POST', url: `/api/online/rooms/${room.id}/action`, payload: { t: token, seq: 0, action: { type: 'concede', player: room.seatOf(token)! } } });
+      return room;
+    };
+    const g1 = await playGame(s1.p2.userId);
+    expect(g1.data.tournament).toMatchObject({ game: 1, bestOf: 3, label: 'Semifinal' });
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    expect(view.rounds[2].matches[0]).toMatchObject({ wins: [1, 0], result: null, game: 2 });
+    const g2 = await playGame(s1.p1.userId);
+    expect(g2.id).not.toBe(g1.id);
+    expect(g2.data.tournament).toMatchObject({ game: 2 });
+    // Quem perdeu o jogo 1 (p2) começa o jogo 2.
+    expect(g2.data.seats[g2.state!.firstPlayer].userId).toBe(s1.p2.userId);
+    expect(g2.info(0).tournament!.score.reduce((x: number, y: number) => x + y, 0)).toBe(1);
+    await playGame(s1.p2.userId);
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    expect(view.rounds[2].matches[0]).toMatchObject({ wins: [2, 1], result: 'p1', winner: s1.p1.userId, reportedBy: 'game' });
+
+    // Semifinal 2 lançada pelo organizador: placar parcial, impossível e final.
+    const s2 = semis.matches[1];
+    expect((await result(s2, { wins: [3, 0] })).statusCode).toBe(400);
+    expect((await result(s2, { wins: [1, 1] })).json().roundComplete).toBe(false);
+    view = (await result(s2, { wins: [0, 2] })).json();
+    expect(view.roundComplete).toBe(true);
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    const final = view.rounds[3];
+    expect(final).toMatchObject({ label: 'Final', bestOf: 5 });
+    expect(final.matches[0].p1.userId).toBe(s1.p1.userId);
+    expect(final.matches[0].p2.userId).toBe(s2.p2.userId);
+    view = (await result(final.matches[0], { wins: [3, 2] })).json();
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    expect(view.status).toBe('finished');
+    expect(view.standings.slice(0, 2).map((s: any) => s.userId)).toEqual([s1.p1.userId, s2.p2.userId]);
+    expect(view.standings.slice(0, 4).every((s: any) => s.inElim)).toBe(true);
   });
 });

@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import type { DeckList } from '@gumgum/engine';
 import { type DB, transaction } from '../db';
 import type { FormatId } from '../stats/catalog';
-import type { MatchResult, Pairing, Structure, TMatch, TPlayer } from './pairing';
+import { type MatchResult, type Pairing, type Stage, type Structure, type TMatch, type TPlayer, winsNeeded } from './pairing';
 
 export type TournamentStatus = 'registration' | 'running' | 'finished';
 
@@ -14,8 +14,15 @@ export interface Tournament {
   description: string;
   format: FormatId;
   structure: Structure;
-  /** Suíço: número de rodadas (null = calculado no início). Eliminação simples: definido no início. */
+  /** Rodadas do suíço (null = calculado no início). Eliminação simples: definido no início. */
   rounds: number | null;
+  /** Partidas do suíço: melhor de 1 ou de 3. */
+  swissBestOf: number;
+  /** Suíço: quantos vão para a eliminatória no fim (null = sem top cut). */
+  topCut: number | null;
+  /** Eliminatória: melhor de 3 / de 5 a partir da fase com estas vagas (null = nunca). */
+  bo3From: number | null;
+  bo5From: number | null;
   maxPlayers: number | null;
   startsAt: string | null;
   status: TournamentStatus;
@@ -36,12 +43,20 @@ export interface TournamentPlayer extends TPlayer {
 
 export interface TournamentMatch extends TMatch {
   id: number;
+  bestOf: number;
+  /** Jogos vencidos por p1 e p2 na série. */
+  wins: [number, number];
+  /** Quem começa o próximo jogo da série (quem perdeu o anterior). */
+  nextFirst: string | null;
   roomId: string | null;
   matchId: number | null;
   reportedBy: string | null;
 }
 
-export type TournamentInput = Pick<Tournament, 'name' | 'description' | 'format' | 'structure' | 'rounds' | 'maxPlayers' | 'startsAt'>;
+export type TournamentInput = Pick<
+  Tournament,
+  'name' | 'description' | 'format' | 'structure' | 'rounds' | 'swissBestOf' | 'topCut' | 'bo3From' | 'bo5From' | 'maxPlayers' | 'startsAt'
+>;
 
 type TournamentRow = {
   id: string;
@@ -50,6 +65,10 @@ type TournamentRow = {
   format: FormatId;
   structure: Structure;
   rounds: number | null;
+  swiss_best_of: number;
+  top_cut: number | null;
+  bo3_from: number | null;
+  bo5_from: number | null;
   max_players: number | null;
   starts_at: string | null;
   status: TournamentStatus;
@@ -68,6 +87,10 @@ const toTournament = (r: TournamentRow): Tournament => ({
   format: r.format,
   structure: r.structure,
   rounds: r.rounds,
+  swissBestOf: r.swiss_best_of,
+  topCut: r.top_cut,
+  bo3From: r.bo3_from,
+  bo5From: r.bo5_from,
   maxPlayers: r.max_players,
   startsAt: r.starts_at,
   status: r.status,
@@ -86,18 +109,23 @@ const TOURNAMENT_FROM = `FROM tournaments t LEFT JOIN players p ON p.owner_hash 
 export function createTournament(db: DB, input: TournamentInput, organizerId: string): Tournament {
   const id = `t-${randomBytes(5).toString('hex')}`;
   db.prepare(
-    `INSERT INTO tournaments (id, name, description, format, structure, rounds, max_players, starts_at, organizer_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, input.name, input.description, input.format, input.structure, input.rounds, input.maxPlayers, input.startsAt, organizerId);
+    `INSERT INTO tournaments (id, name, description, format, structure, rounds, swiss_best_of, top_cut, bo3_from, bo5_from,
+       max_players, starts_at, organizer_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, ...inputValues(input), organizerId);
   return getTournament(db, id)!;
 }
 
 export function updateTournament(db: DB, id: string, input: TournamentInput) {
   db.prepare(
-    `UPDATE tournaments SET name = ?, description = ?, format = ?, structure = ?, rounds = ?, max_players = ?, starts_at = ?
+    `UPDATE tournaments SET name = ?, description = ?, format = ?, structure = ?, rounds = ?, swiss_best_of = ?, top_cut = ?,
+       bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?
      WHERE id = ?`,
-  ).run(input.name, input.description, input.format, input.structure, input.rounds, input.maxPlayers, input.startsAt, id);
+  ).run(...inputValues(input), id);
 }
+
+const inputValues = (i: TournamentInput) =>
+  [i.name, i.description, i.format, i.structure, i.rounds, i.swissBestOf, i.topCut, i.bo3From, i.bo5From, i.maxPlayers, i.startsAt] as const;
 
 export function deleteTournament(db: DB, id: string): boolean {
   return Number(db.prepare('DELETE FROM tournaments WHERE id = ?').run(id).changes) > 0;
@@ -195,22 +223,33 @@ export function dropPlayer(db: DB, t: Tournament, userId: string) {
 type MatchRow = {
   id: number;
   round: number;
+  stage: Stage;
   table_no: number;
   p1: string;
   p2: string | null;
+  best_of: number;
+  wins1: number;
+  wins2: number;
   result: MatchResult | null;
+  next_first: string | null;
   room_id: string | null;
   match_id: number | null;
   reported_by: string | null;
 };
 
+const MATCH_COLS = 'id, round, stage, table_no, p1, p2, best_of, wins1, wins2, result, next_first, room_id, match_id, reported_by';
+
 const toMatch = (r: MatchRow): TournamentMatch => ({
   id: r.id,
   round: r.round,
+  stage: r.stage,
   table: r.table_no,
   p1: r.p1,
   p2: r.p2,
+  bestOf: r.best_of,
+  wins: [r.wins1, r.wins2],
   result: r.result,
+  nextFirst: r.next_first,
   roomId: r.room_id,
   matchId: r.match_id,
   reportedBy: r.reported_by,
@@ -218,43 +257,46 @@ const toMatch = (r: MatchRow): TournamentMatch => ({
 
 export function listMatches(db: DB, tournamentId: string): TournamentMatch[] {
   return (
-    db
-      .prepare(
-        `SELECT id, round, table_no, p1, p2, result, room_id, match_id, reported_by FROM tournament_matches
-         WHERE tournament_id = ? ORDER BY round, table_no`,
-      )
-      .all(tournamentId) as MatchRow[]
+    db.prepare(`SELECT ${MATCH_COLS} FROM tournament_matches WHERE tournament_id = ? ORDER BY round, table_no`).all(tournamentId) as MatchRow[]
   ).map(toMatch);
 }
 
 export function getMatch(db: DB, tournamentId: string, id: number): TournamentMatch | null {
-  const r = db
-    .prepare('SELECT id, round, table_no, p1, p2, result, room_id, match_id, reported_by FROM tournament_matches WHERE tournament_id = ? AND id = ?')
-    .get(tournamentId, id) as MatchRow | undefined;
+  const r = db.prepare(`SELECT ${MATCH_COLS} FROM tournament_matches WHERE tournament_id = ? AND id = ?`).get(tournamentId, id) as
+    | MatchRow
+    | undefined;
   return r ? toMatch(r) : null;
 }
 
+/** Rodada nova: fase e melhor de quantos valem para todas as partidas dela. */
+export interface RoundSpec {
+  round: number;
+  stage: Stage;
+  bestOf: number;
+  pairings: Pairing[];
+}
+
 /** Começa o torneio: grava a ordem sorteada, o número de rodadas e a primeira rodada. */
-export function startTournament(db: DB, id: string, seeds: string[], rounds: number, pairings: Pairing[]) {
+export function startTournament(db: DB, id: string, seeds: string[], rounds: number, first: RoundSpec) {
   transaction(db, () => {
     const seed = db.prepare('UPDATE tournament_players SET seed = ? WHERE tournament_id = ? AND user_id = ?');
     seeds.forEach((userId, i) => seed.run(i + 1, id, userId));
     db.prepare("UPDATE tournaments SET status = 'running', rounds = ?, started_at = datetime('now') WHERE id = ?").run(rounds, id);
-    writeRound(db, id, 1, pairings);
+    writeRound(db, id, first);
   });
 }
 
 /** Grava a rodada (byes já saem com resultado) e a torna a rodada atual. */
-export function insertRound(db: DB, id: string, round: number, pairings: Pairing[]) {
-  transaction(db, () => writeRound(db, id, round, pairings));
+export function insertRound(db: DB, id: string, spec: RoundSpec) {
+  transaction(db, () => writeRound(db, id, spec));
 }
 
-function writeRound(db: DB, id: string, round: number, pairings: Pairing[]) {
+function writeRound(db: DB, id: string, { round, stage, bestOf, pairings }: RoundSpec) {
   const write = db.prepare(
-    `INSERT INTO tournament_matches (tournament_id, round, table_no, p1, p2, result, reported_by, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+    `INSERT INTO tournament_matches (tournament_id, round, stage, table_no, p1, p2, best_of, result, reported_by, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
   );
-  pairings.forEach((p, i) => write.run(id, round, i + 1, p.p1, p.p2, p.p2 ? null : 'bye', p.p2 ? null : 'bye'));
+  pairings.forEach((p, i) => write.run(id, round, stage, i + 1, p.p1, p.p2, bestOf, p.p2 ? null : 'bye', p.p2 ? null : 'bye'));
   db.prepare('UPDATE tournaments SET round = ? WHERE id = ?').run(round, id);
 }
 
@@ -262,11 +304,25 @@ export function finishTournament(db: DB, id: string) {
   db.prepare("UPDATE tournaments SET status = 'finished', finished_at = datetime('now') WHERE id = ?").run(id);
 }
 
-/** Resultado lançado pelo organizador (null apaga). */
-export function setMatchResult(db: DB, tournamentId: string, id: number, result: MatchResult | null, reportedBy: string) {
+/** Resultado da série a partir do placar (null = ainda em andamento). */
+export const seriesResult = (bestOf: number, wins: [number, number]): MatchResult | null =>
+  wins[0] >= winsNeeded(bestOf) ? 'p1' : wins[1] >= winsNeeded(bestOf) ? 'p2' : null;
+
+/** Placar lançado pelo organizador (0 x 0 apaga o resultado). */
+export function setMatchScore(db: DB, tournamentId: string, id: number, bestOf: number, wins: [number, number], reportedBy: string) {
+  const result = seriesResult(bestOf, wins);
   db.prepare(
-    `UPDATE tournament_matches SET result = ?, reported_by = ?, updated_at = datetime('now') WHERE tournament_id = ? AND id = ?`,
-  ).run(result, result ? reportedBy : null, tournamentId, id);
+    `UPDATE tournament_matches SET wins1 = ?, wins2 = ?, result = ?, reported_by = ?, updated_at = datetime('now')
+     WHERE tournament_id = ? AND id = ?`,
+  ).run(wins[0], wins[1], result, wins[0] || wins[1] ? reportedBy : null, tournamentId, id);
+}
+
+/** Troca um jogador de uma partida ainda não jogada (correção de um resultado da rodada anterior da chave). */
+export function replaceInMatch(db: DB, tournamentId: string, id: number, from: string, to: string) {
+  db.prepare(
+    `UPDATE tournament_matches SET p1 = CASE WHEN p1 = ? THEN ? ELSE p1 END, p2 = CASE WHEN p2 = ? THEN ? ELSE p2 END,
+       updated_at = datetime('now') WHERE tournament_id = ? AND id = ?`,
+  ).run(from, to, from, to, tournamentId, id);
 }
 
 export function setMatchRoom(db: DB, tournamentId: string, id: number, roomId: string) {
@@ -274,9 +330,10 @@ export function setMatchRoom(db: DB, tournamentId: string, id: number, roomId: s
 }
 
 /**
- * Fim de uma partida online do torneio: grava o resultado, a menos que o
- * organizador já tenha lançado outro ou que a partida não seja mais da rodada atual.
- * Empate: no suíço vale empate; na eliminação simples fica para o organizador.
+ * Fim de um jogo online da série: soma a vitória no placar e, se alguém chegou à
+ * maioria, fecha a série. Ignora jogos de uma sala que não é a atual da partida
+ * (o organizador já lançou outro placar, por exemplo). Quem perdeu começa o
+ * próximo jogo. Jogo sem vencedor não conta: a série segue com um jogo novo.
  */
 export function reportFromGame(
   db: DB,
@@ -284,15 +341,15 @@ export function reportFromGame(
 ) {
   const t = getTournament(db, game.tournamentId);
   const m = t && getMatch(db, t.id, game.matchId);
-  if (!t || !m || t.status !== 'running' || m.round !== t.round || m.roomId !== game.roomId) return;
-  db.prepare('UPDATE tournament_matches SET match_id = ? WHERE id = ?').run(game.statsMatchId, m.id);
-  if (m.result) return;
-  const result: MatchResult | null =
-    game.winner === m.p1 ? 'p1' : game.winner === m.p2 ? 'p2' : game.winner === null && t.structure === 'swiss' ? 'draw' : null;
-  if (result) {
-    db.prepare(`UPDATE tournament_matches SET result = ?, reported_by = 'game', updated_at = datetime('now') WHERE id = ? AND result IS NULL`).run(
-      result,
-      m.id,
-    );
-  }
+  if (!t || !m || t.status !== 'running' || m.roomId !== game.roomId) return;
+  const wins: [number, number] = [...m.wins];
+  if (!m.result && game.winner === m.p1) wins[0]++;
+  else if (!m.result && game.winner === m.p2) wins[1]++;
+  const loser = game.winner === m.p1 ? m.p2 : game.winner === m.p2 ? m.p1 : m.nextFirst;
+  const result = m.result ?? seriesResult(m.bestOf, wins);
+  db.prepare(
+    `UPDATE tournament_matches SET wins1 = ?, wins2 = ?, result = ?, next_first = ?, room_id = NULL, match_id = ?,
+       reported_by = CASE WHEN ? THEN reported_by ELSE 'game' END, updated_at = datetime('now')
+     WHERE id = ?`,
+  ).run(wins[0], wins[1], result, loser, game.statsMatchId, m.result ? 1 : 0, m.id);
 }

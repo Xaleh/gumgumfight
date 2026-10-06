@@ -3,7 +3,7 @@
 Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](https://duels.ink/) (Lorcana).
 
 > **Status:** partidas contra um bot, bot x bot, replays, **multiplayer online** (salas privadas, fila casual e
-> ranqueada) e **torneios** (suíço e eliminação simples). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
+> ranqueada) e **torneios** (suíço com top cut e eliminação simples, com melhor de 3 e de 5). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
 > com textos em português (tradução automática) ou inglês e imagens opcionais.
 
 ## Requisitos
@@ -244,23 +244,36 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 
 - **Criação:** nome, descrição e regras, formato (Standard ou Extra Grand Battle), estrutura, limite de jogadores e
   início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
+- **Não há empate** (como no One Piece TCG): toda partida tem um vencedor.
 - **Estruturas:**
   - **Suíço:** todos jogam todas as rodadas, contra quem tem a mesma pontuação e sem repetir confrontos. Vitória vale
-    3 pontos, empate 1, e o bye (número ímpar de jogadores) conta como vitória e vai para o último colocado que ainda
-    não teve um. Desempate por OMW (% de vitórias dos oponentes, mínimo de 33%) e OOMW. O número de rodadas é
-    escolhido pelo organizador ou, em branco, calculado no início (⌈log₂ jogadores⌉).
+    3 pontos, e o bye (número ímpar de jogadores) conta como vitória e vai para o último colocado que ainda não teve
+    um. Desempate por OMW (% de vitórias dos oponentes, mínimo de 33%) e OOMW. O número de rodadas é escolhido pelo
+    organizador ou, em branco, calculado no início (⌈log₂ jogadores⌉). As partidas do suíço são jogo único ou melhor
+    de 3.
+  - **Top cut (opcional, no suíço):** depois da última rodada, os melhores colocados (Top 2 a Top 64; quem desistiu
+    fica de fora) vão para uma eliminação simples semeada pela classificação (1º x último do corte, e o 1º e o 2º só
+    se cruzam na final).
   - **Eliminação simples:** chave sorteada no início, do tamanho da próxima potência de 2; as vagas que sobram viram
-    byes para os primeiros cabeças de chave. Não há empate.
+    byes para os primeiros cabeças de chave.
+- **Melhor de 3 / melhor de 5 na eliminatória:** o organizador escolhe a partir de qual fase (toda a eliminatória,
+  rodada de 32, oitavas, quartas, semifinal ou final) as partidas passam a ser melhor de 3 e melhor de 5. Ex.: melhor
+  de 3 a partir das quartas e melhor de 5 na final.
 - **Inscrição:** com um deck válido no formato. A lista fica **congelada** na inscrição (mudar o deck depois não muda
   o do torneio; inscreva-o de novo para trocar). Os outros jogadores veem só o Líder; as listas completas ficam
   visíveis para o organizador e, quando o torneio termina, para todos.
 - **Partidas:** cada jogador clica em **Jogar partida** na página do torneio; quem entra primeiro espera o oponente
-  na sala online (fila `tournament`, com relógio e regras das partidas online). O resultado entra sozinho no
-  torneio quando a partida termina, e a partida aparece em **Assistir partidas** com o nome do torneio. Entra nas
+  na sala online (fila `tournament`, com relógio e regras das partidas online). Numa melhor de N, cada jogo é uma
+  sala: o placar da série soma sozinho, quem perdeu um jogo começa o seguinte e a tela de fim de jogo tem o botão do
+  próximo jogo. A partida aparece em **Assistir partidas** com o nome do torneio e a fase. Cada jogo entra nas
   estatísticas na fila **Torneio**.
-- **Organização:** o organizador lança ou corrige qualquer resultado da rodada atual (W.O., queda de conexão,
-  partida jogada fora do site), tira jogadores e gera a próxima rodada quando todas as partidas têm resultado.
-  Depois da última rodada (ou da final), o mesmo botão encerra o torneio; **Encerrar agora** termina antes.
+- **Organização:** o organizador lança o placar de qualquer partida (W.O., queda de conexão, partida jogada fora do
+  site), tira jogadores e avança: próxima rodada do suíço, início do top cut, próxima fase da chave e, depois da
+  final, o encerramento. **Encerrar agora** termina antes.
+- **Correção de resultados:** um placar lançado errado pode ser corrigido em qualquer rodada, inclusive passadas (a
+  classificação é recalculada). Na chave, corrigir quem venceu troca o jogador da partida seguinte, desde que ela
+  ainda não tenha começado (senão, corrija ou zere antes a partida seguinte). Resultados do suíço não mudam depois
+  que o top cut começa, porque ele foi semeado por eles.
 - **Desistência:** o jogador (ou o organizador) pode tirá-lo do torneio; a partida pendente dele na rodada atual vai
   para o oponente e ele não é mais pareado.
 
@@ -499,13 +512,13 @@ npm run typecheck
 | GET    | `/api/online/rooms/:id/watch?hands=1` | Canal SSE do espectador (`hands=1`: só Streamer e Admin) |
 | GET    | `/api/tournaments` | Torneios (`{ tournaments, canCreate }`) |
 | GET    | `/api/tournaments/:id` | Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer |
-| POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, maxPlayers, startsAt }`; Organizador e Admin) |
+| POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, swissBestOf: 1 \| 3, topCut, bo3From, bo5From, maxPlayers, startsAt }`; Organizador e Admin) |
 | PUT / DELETE | `/api/tournaments/:id` | Edita (só com inscrições abertas) / apaga (organizador do torneio ou Admin) |
 | POST / DELETE | `/api/tournaments/:id/register` | Inscreve ou troca o deck (`{ deckId }`) / cancela a inscrição ou desiste |
-| POST   | `/api/tournaments/:id/start` · `/next` · `/finish` | Começa, gera a próxima rodada (ou encerra depois da última) e encerra antes |
-| PUT    | `/api/tournaments/:id/matches/:matchId/result` | Resultado da rodada atual (`{ result: p1 \| p2 \| draw \| null }`) |
+| POST   | `/api/tournaments/:id/start` · `/next` · `/finish` | Começa, avança (rodada do suíço, top cut, próxima fase ou encerramento) e encerra antes |
+| PUT    | `/api/tournaments/:id/matches/:matchId/result` | Placar da série (`{ wins: [p1, p2] }` ou `{ result: p1 \| p2 }`); rodadas passadas também |
 | POST   | `/api/tournaments/:id/players/:userId/drop` | Tira um jogador (organizador) |
-| POST   | `/api/tournaments/:id/matches/:matchId/play` | Abre ou entra na sala online da partida (`{ roomId, token }`) |
+| POST   | `/api/tournaments/:id/matches/:matchId/play` | Abre ou entra na sala online do jogo atual da série (`{ roomId, token }`) |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,
 human), `by` (human = padrão, bot = simulações), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,

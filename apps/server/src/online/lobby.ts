@@ -54,7 +54,7 @@ export interface LiveRoom {
   turn: number;
   spectators: number;
   createdAt: number;
-  tournament: { id: string; name: string; round: number } | null;
+  tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -70,7 +70,7 @@ const RANKED_WINDOW_PER_SECOND = 400;
 
 export type LobbyError = { error: string; code: number; roomId?: string };
 
-const tournamentKey = (t: Pick<RoomTournament, 'id' | 'matchId'>) => `${t.id}:${t.matchId}`;
+const tournamentKey = (t: Pick<RoomTournament, 'id' | 'matchId' | 'game'>) => `${t.id}:${t.matchId}:${t.game}`;
 
 export class Lobby {
   readonly rooms = new Map<string, Room>();
@@ -197,10 +197,10 @@ export class Lobby {
   }
 
   /**
-   * Partida de torneio: o primeiro dos dois jogadores a entrar abre a sala e o
-   * segundo a começa. Quem já está sentado recebe o próprio assento de volta. Uma
-   * sala terminada sem resultado no torneio (empate na eliminação simples, por
-   * exemplo) é trocada por outra se o organizador mandar jogar de novo.
+   * Jogo de uma partida de torneio: o primeiro dos dois jogadores a entrar abre a
+   * sala e o segundo a começa. Quem já está sentado recebe o próprio assento de
+   * volta. Cada jogo de uma melhor de N tem a sua sala; um jogo terminado sem
+   * vencedor é trocado por outra sala.
    */
   tournamentRoom(seat: SeatRequest, format: FormatId, tournament: RoomTournament): { room: Room; token: string } | LobbyError {
     const id = this.tournamentRooms.get(tournamentKey(tournament));
@@ -214,6 +214,9 @@ export class Lobby {
         this.leaveQueue(seat.ownerHash);
         const token = randomToken();
         existing.data.seats.push({ ...seat, token });
+        // Jogos 2+ da série: quem perdeu o anterior começa.
+        const first = existing.data.seats.findIndex((s) => s.userId && s.userId === tournament.firstUserId);
+        if (first === 0 || first === 1) existing.data.firstPlayer = first;
         existing.start();
         return { room: existing, token };
       }
@@ -270,7 +273,14 @@ export class Lobby {
       spectators: room.spectators,
       createdAt: room.data.createdAt,
       tournament: room.data.tournament
-        ? { id: room.data.tournament.id, name: room.data.tournament.name, round: room.data.tournament.round }
+        ? {
+            id: room.data.tournament.id,
+            name: room.data.tournament.name,
+            round: room.data.tournament.round,
+            label: room.data.tournament.label,
+            game: room.data.tournament.game,
+            bestOf: room.data.tournament.bestOf,
+          }
         : null,
     };
   }

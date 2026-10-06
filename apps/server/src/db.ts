@@ -103,7 +103,11 @@ function migrateTournaments(db: DB) {
       description  TEXT NOT NULL DEFAULT '',
       format       TEXT NOT NULL,
       structure    TEXT NOT NULL,             -- swiss | single (eliminação simples)
-      rounds       INTEGER,                   -- suíço: escolhido pelo organizador ou calculado no início
+      rounds       INTEGER,                   -- rodadas do suíço: escolhidas pelo organizador ou calculadas no início
+      swiss_best_of INTEGER NOT NULL DEFAULT 1, -- partidas do suíço: melhor de 1 ou de 3
+      top_cut      INTEGER,                   -- suíço: quantos vão para a eliminatória depois (null = sem top cut)
+      bo3_from     INTEGER,                   -- eliminatória: melhor de 3 a partir da fase com estas vagas (8 = quartas)
+      bo5_from     INTEGER,                   -- eliminatória: melhor de 5 a partir da fase com estas vagas (2 = final)
       max_players  INTEGER,
       starts_at    TEXT,                      -- data e hora previstas (ISO), só informativo
       status       TEXT NOT NULL DEFAULT 'registration',  -- registration | running | finished
@@ -130,11 +134,16 @@ function migrateTournaments(db: DB) {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
       round         INTEGER NOT NULL,
+      stage         TEXT NOT NULL DEFAULT 'swiss',  -- swiss | elim (top cut ou eliminação simples)
       table_no      INTEGER NOT NULL,
       p1            TEXT NOT NULL,
       p2            TEXT,                      -- null = bye
-      result        TEXT,                      -- p1 | p2 | draw | bye (null = pendente)
-      room_id       TEXT,                      -- sala online da partida
+      best_of       INTEGER NOT NULL DEFAULT 1,
+      wins1         INTEGER NOT NULL DEFAULT 0,  -- jogos vencidos na série
+      wins2         INTEGER NOT NULL DEFAULT 0,
+      result        TEXT,                      -- p1 | p2 | bye (null = série em andamento); não há empate
+      next_first    TEXT,                      -- quem começa o próximo jogo da série (quem perdeu o anterior)
+      room_id       TEXT,                      -- sala online do jogo atual da série
       match_id      INTEGER,                   -- partida gravada nas estatísticas
       reported_by   TEXT,                      -- game (sala online), bye, drop (desistência) ou id de quem lançou
       updated_at    TEXT

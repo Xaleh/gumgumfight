@@ -4260,3 +4260,15 @@ tr.clickable:hover td {
 .tour-tabs button {
   white-space: nowrap;
 }
+.tour-score {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.tour-badge.gold {
+  background: var(--gold);
+  color: #fff;
+}
+.tour-round-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+}

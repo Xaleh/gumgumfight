@@ -184,8 +184,9 @@ export const api = {
     start: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/start`),
     next: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/next`),
     finish: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/finish`),
-    setResult: (id: string, matchId: number, result: TournamentResult | null) =>
-      send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/result`, { result }),
+    /** Placar da série [p1, p2] ([0, 0] apaga). */
+    setScore: (id: string, matchId: number, wins: [number, number]) =>
+      send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/result`, { wins }),
     drop: (id: string, userId: string) =>
       send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/drop`),
     play: (id: string, matchId: number) => send<OnlineSeat>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/play`),
@@ -263,8 +264,8 @@ export interface LiveRoom {
   turn: number;
   spectators: number;
   createdAt: number;
-  /** Partida de torneio. */
-  tournament: { id: string; name: string; round: number } | null;
+  /** Jogo de uma partida de torneio. */
+  tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
 }
 
 export type QueuePoll =
@@ -276,7 +277,17 @@ export interface OnlineRoomInfo {
   code: string | null;
   queue: RoomQueue;
   format: FormatId;
-  tournament: { id: string; name: string; round: number; matchId: number } | null;
+  /** Jogo de uma partida de torneio; `score`: placar da série antes deste jogo, na ordem dos assentos. */
+  tournament: {
+    id: string;
+    name: string;
+    round: number;
+    label: string;
+    matchId: number;
+    game: number;
+    bestOf: number;
+    score: number[];
+  } | null;
   status: 'waiting' | 'playing' | 'finished';
   /** Seu assento; null = você está assistindo. */
   you: PlayerId | null;
@@ -291,7 +302,8 @@ export interface OnlineRoomInfo {
 
 export type TournamentStructure = 'swiss' | 'single';
 export type TournamentStatus = 'registration' | 'running' | 'finished';
-export type TournamentResult = 'p1' | 'p2' | 'draw';
+/** Não há empate no One Piece TCG. */
+export type TournamentResult = 'p1' | 'p2';
 
 export const STRUCTURE_LABEL: Record<TournamentStructure, string> = { swiss: 'Suíço', single: 'Eliminação simples' };
 export const TOURNAMENT_STATUS_LABEL: Record<TournamentStatus, string> = {
@@ -305,8 +317,15 @@ export interface TournamentInput {
   description: string;
   format: FormatId;
   structure: TournamentStructure;
-  /** Suíço: null = calculado pelo número de inscritos no início. */
+  /** Rodadas do suíço: null = calculado pelo número de inscritos no início. */
   rounds: number | null;
+  /** Partidas do suíço: melhor de 1 ou de 3. */
+  swissBestOf: number;
+  /** Suíço: quantos vão para a eliminatória no fim (null = sem top cut). */
+  topCut: number | null;
+  /** Eliminatória: melhor de 3 / de 5 a partir da fase com estas vagas (8 = quartas; null = nunca). */
+  bo3From: number | null;
+  bo5From: number | null;
   maxPlayers: number | null;
   /** ISO; só informativo. */
   startsAt: string | null;
@@ -317,6 +336,7 @@ export interface TournamentSummary {
   name: string;
   format: FormatId;
   structure: TournamentStructure;
+  topCut: number | null;
   status: TournamentStatus;
   round: number;
   totalRounds: number | null;
@@ -339,6 +359,11 @@ export interface TournamentMatchInfo {
   p1: TournamentPlayerRef;
   /** null = bye. */
   p2: TournamentPlayerRef | null;
+  bestOf: number;
+  /** Jogos vencidos por p1 e p2 na série. */
+  wins: [number, number];
+  /** Jogo da série em disputa (1, 2, 3…). */
+  game: number;
   result: TournamentResult | 'bye' | null;
   winner: string | null;
   /** game = sala online; drop = desistência. */
@@ -355,13 +380,17 @@ export interface TournamentStanding {
   points: number;
   wins: number;
   losses: number;
-  draws: number;
   byes: number;
   omw: number;
   oomw: number;
   dropped: boolean;
+  /** Entrou na fase eliminatória (top cut ou chave). */
+  inElim: boolean;
+  elimWins: number;
   alive: boolean;
 }
+
+export type TournamentStage = 'swiss' | 'elim';
 
 export interface TournamentDetail {
   id: string;
@@ -369,9 +398,17 @@ export interface TournamentDetail {
   description: string;
   format: FormatId;
   structure: TournamentStructure;
+  swissBestOf: number;
+  topCut: number | null;
+  bo3From: number | null;
+  bo5From: number | null;
   status: TournamentStatus;
   round: number;
+  /** Fase da rodada atual. */
+  stage: TournamentStage | null;
+  /** Rodadas previstas (suíço + top cut, ou a chave). */
   totalRounds: number;
+  swissRounds: number | null;
   /** Suíço com rodadas calculadas pelo número de inscritos. */
   roundsAuto: boolean;
   maxPlayers: number | null;
@@ -395,10 +432,24 @@ export interface TournamentDetail {
     /** Lista do deck: só para o organizador, o próprio jogador e, no fim, para todos. */
     deck: { name: string; leader: string; cards: Array<{ id: string; count: number; name: string | null }> } | null;
   }>;
-  rounds: Array<{ round: number; matches: TournamentMatchInfo[] }>;
+  rounds: Array<{ round: number; stage: TournamentStage; label: string; bestOf: number; matches: TournamentMatchInfo[] }>;
   standings: TournamentStanding[];
   /** Todas as partidas da rodada atual têm resultado. */
   roundComplete: boolean;
+  /** O que o botão de avançar faz: outra rodada do suíço, o top cut, a próxima fase da chave ou encerrar. */
+  next: 'swiss' | 'cut' | 'elim' | 'finish' | null;
+}
+
+/** Vitórias necessárias numa melhor de N. */
+export const winsNeeded = (bestOf: number) => Math.floor(bestOf / 2) + 1;
+
+/** Nome da fase da eliminatória pelo número de vagas. */
+export function phaseLabel(size: number): string {
+  if (size <= 2) return 'Final';
+  if (size === 4) return 'Semifinal';
+  if (size === 8) return 'Quartas de final';
+  if (size === 16) return 'Oitavas de final';
+  return `Rodada de ${size}`;
 }
 
 // ------------------------------------------------------------------ estatísticas
