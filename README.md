@@ -503,6 +503,12 @@ desenhada é usada automaticamente.
 
 Cada jogador escolhe "Português" ou "English" no menu ou durante a partida (a escolha fica salva no navegador).
 
+### Tema escuro
+
+Em "Configurações" (no menu ou durante a partida), "Tema" alterna entre **Automático** (segue o tema do aparelho,
+inclusive quando ele muda), **Claro** e **Escuro**. A escolha fica salva no navegador e é aplicada antes da página
+carregar, sem piscar o tema claro. As cores das cartas, dos DON!! e dos dados não mudam com o tema.
+
 - **Tradução automática:** feita por regras em `packages/engine/src/i18n/pt.ts`. Os textos do jogo seguem modelos
   fixos, então a maior parte é traduzida sem serviço externo. Trechos não reconhecidos ficam em inglês e a carta é
   marcada como "tradução parcial". O painel da carta sempre tem o link "ver original".
