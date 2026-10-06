@@ -293,32 +293,54 @@ describe('partidas online: filas', () => {
 describe('partidas online: ferramentas manuais', () => {
   it('só o perfil Dev usa as ferramentas manuais (função de desenvolvimento)', async () => {
     const { app, db } = setup();
-    const login = (sub: string, role: Role) => {
+    const login = (sub: string) => {
       const u = upsertGoogleUser(db, { sub, email: `${sub}@example.com`, emailVerified: true, name: sub, picture: null });
-      setUserRole(db, u.id, role);
-      return { cookie: `gg_session=${createSession(db, u.id)}` };
+      return { id: u.id, headers: { cookie: `gg_session=${createSession(db, u.id)}` } };
     };
-    const zoro = { ...ALICE, ...login('zoro', 'admin') };
-    const sanji = { ...BOB, ...login('sanji', 'dev') };
-    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: zoro, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } })).json();
-    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: sanji, payload: { deckId: 'st02-kid', queue: 'casual', format: 'egb' } })).json();
+    const zoro = login('zoro');
+    const sanji = login('sanji');
+    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: { ...ALICE, ...zoro.headers }, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } })).json();
+    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: { ...BOB, ...sanji.headers }, payload: { deckId: 'st02-kid', queue: 'casual', format: 'egb' } })).json();
     const ma = (await app.inject(`/api/online/queue/${a.ticket}`)).json();
     const mb = (await app.inject(`/api/online/queue/${b.ticket}`)).json();
     expect(ma.status).toBe('matched');
+    // Cadeira 0 = zoro, cadeira 1 = sanji.
+    const seats = [{ ...zoro, token: ma.token }, { ...sanji, token: mb.token }];
     const room = getRoom(app, ma.roomId);
     const c = client(0);
     room.attach(c.conn);
+    // Passa pelos mulligans: as ferramentas só valem na fase principal, no turno de quem age.
+    for (let i = 0; i < 2; i++) {
+      const v = c.view!;
+      const p = actingPlayer(v)!;
+      expect((await act(app, ma.roomId, seats[p].token, v.actionCount, { type: 'mulligan', player: p, redraw: false })).statusCode).toBe(200);
+    }
+    expect(c.view!.phase).toBe('main');
     const p = actingPlayer(c.view!)!;
-    const tokens = p === 0 ? [ma.token, mb.token] : [mb.token, ma.token];
-    const draw = (headers: Record<string, string>, t: string) =>
-      app.inject({ method: 'POST', url: `/api/online/rooms/${ma.roomId}/action`, headers, payload: { t, seq: 0, action: { type: 'manual', player: p, op: { op: 'draw', count: 1 } } } });
+    const other = (1 - p) as PlayerId;
+    // Quem está na vez é Dev; o outro é Admin (o perfil é lido a cada ação).
+    setUserRole(db, seats[p].id, 'dev');
+    setUserRole(db, seats[other].id, 'admin');
+    const draw = (seat: PlayerId, headers: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/online/rooms/${ma.roomId}/action`,
+        headers,
+        payload: { t: seats[seat].token, seq: c.view!.actionCount, action: { type: 'manual', player: seat, op: { op: 'draw', count: 1 } } },
+      });
     // Sem login (só o token da cadeira) não pode, mesmo no casual.
-    const anon = await draw({}, tokens[0]);
+    const anon = await draw(p, {});
     expect(anon.statusCode).toBe(403);
     expect(anon.json().error).toContain('Dev');
-    // Na cadeira da vez está o zoro (admin) ou o sanji (dev): só o Dev pode.
-    const mine = await draw(p === 0 ? zoro : sanji, tokens[0]);
-    expect(mine.statusCode).toBe(p === 0 ? 403 : 200);
+    // Admin não é Dev: recusado antes de chegar ao motor.
+    const admin = await draw(other, seats[other].headers);
+    expect(admin.statusCode).toBe(403);
+    expect(admin.json().error).toContain('Dev');
+    // O Dev na vez usa as ferramentas normalmente.
+    const hand = c.view!.players[p].hand.length;
+    const dev = await draw(p, seats[p].headers);
+    expect(dev.statusCode, dev.body).toBe(200);
+    expect(c.view!.players[p].hand.length).toBe(hand + 1);
   });
 });
 
