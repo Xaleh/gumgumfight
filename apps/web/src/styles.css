@@ -815,17 +815,26 @@ input[type='number'] {
   animation: life-hit 0.5s;
 }
 .life-card {
+  --lw: calc(var(--cw) * 0.62);
+  --lh: calc(var(--cw) * 0.44);
   position: absolute;
   left: 0;
   top: calc(var(--i) * var(--cw) * 0.13);
-  width: 100%;
-  height: calc(var(--cw) * 0.44);
-  border-radius: 5px;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.25) 0 22%, transparent 24%),
-    linear-gradient(135deg, #2a5d9a, #183a66);
-  border: 2px solid #e8eef8;
+  width: var(--lw);
+  height: var(--lh);
+  border-radius: calc(var(--cw) * 0.05);
   box-shadow: 0 2px 4px rgba(24, 58, 102, 0.35);
+}
+/* Deitada: o verso (em pé) é desenhado girado dentro da carta. */
+.life-card::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--lh);
+  height: var(--lw);
+  background: url('./assets/card-back.webp') center / 100% 100% no-repeat;
+  transform: translate(-50%, -50%) rotate(90deg);
 }
 .life-count {
   background: #fff;
@@ -1609,26 +1618,13 @@ button.hint-pill {
 }
 
 .card.back {
-  --back-bg: #1c3d63;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.18) 0 30%, transparent 62%),
-    repeating-conic-gradient(from 0deg at 50% 50%, #234b78 0 10deg, #1c3d63 10deg 20deg);
-  border: max(2px, calc(var(--cw) * 0.05)) solid #e9eef7;
+  /* Verso original das cartas de One Piece Card Game. */
+  background: url('./assets/card-back.webp') center / 100% 100% no-repeat;
+  border: 0;
   display: grid;
   place-items: center;
   color: #f4f1e6;
-  box-shadow: 0 2px 6px rgba(30, 40, 80, 0.35), inset 0 0 0 1px rgba(0, 0, 0, 0.15);
-}
-.back-emblem {
-  width: 62%;
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-}
-.back-emblem svg {
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+  box-shadow: 0 2px 6px rgba(30, 40, 80, 0.35);
 }
 .back-label {
   position: absolute;
@@ -3398,8 +3394,9 @@ tr.clickable:hover td {
     height: calc(var(--cw) * 0.4 + 4 * var(--cw) * 0.1);
   }
   .life-card {
+    --lw: calc(var(--cw) * 0.56);
+    --lh: calc(var(--cw) * 0.4);
     top: calc(var(--i) * var(--cw) * 0.1);
-    height: calc(var(--cw) * 0.4);
   }
   .life-count {
     font-size: max(10px, calc(var(--cw) * 0.15));
