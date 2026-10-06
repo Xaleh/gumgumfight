@@ -1,4 +1,6 @@
-// Sorteio inicial com dados 3D: o jogador segura o dado com o dedo (ou o mouse),
+// Sorteio inicial com dados 3D no estilo do dado oficial do One Piece Card Game
+// (cubo vermelho brilhante, números brancos e a caveira dos Chapéus de Palha na
+// face do 1): o jogador segura o dado com o dedo (ou o mouse),
 // chacoalha e solta para jogá-lo na mesa. Depois vem a vez do oponente: o bot
 // pega o dado, chacoalha e joga; no online, o dado dele rola quando ele joga (o
 // servidor repassa o gesto). O vencedor só aparece depois que os dois param.
@@ -13,14 +15,15 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, use
 import type { DiceThrow } from '../game/useOnlineGame';
 import { CardView } from './CardView';
 
-const SIZE = 52;
+/** Lado do dado em px (igual a `--die` em styles.css). */
+const SIZE = 58;
 const R = SIZE / 2;
 /** Graus de giro por pixel rolado (dado rolando sem deslizar). */
 const ROLL = 360 / (Math.PI * SIZE);
 /** Rotação (x, y) do cubo que deixa cada face virada para cima (para a tela). */
 const FACE: Record<number, [number, number]> = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 2: [-90, 0], 5: [90, 0] };
-/** Casas da grade 3×3 com pinta, por valor. */
-const PIPS: Record<number, number[]> = { 1: [5], 2: [3, 7], 3: [3, 5, 7], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+/** Ordem das faces no cubo (pares opostos somam 7, como no dado real). */
+const FACES = [1, 6, 3, 4, 2, 5];
 
 type DieStatus = 'idle' | 'held' | 'shaking' | 'rolling' | 'done';
 /** Quem joga cada dado: o próprio jogador, o navegador (bot) ou o oponente pela rede. */
@@ -537,11 +540,15 @@ export function DiceRoll({
             >
               <div className="die-shadow" />
               <div className="die-cube">
-                {[1, 6, 3, 4, 2, 5].map((v) => (
-                  <div key={v} className={`die-face f${v}`}>
-                    {PIPS[v].map((c) => (
-                      <span key={c} className="pip" style={{ gridArea: `${Math.ceil(c / 3)} / ${((c - 1) % 3) + 1}` }} />
-                    ))}
+                {/* Miolo: preenche as quinas arredondadas do cubo com a cor do dado. */}
+                <div className="die-core">
+                  {FACES.map((v) => (
+                    <div key={v} className={`die-side f${v}`} />
+                  ))}
+                </div>
+                {FACES.map((v) => (
+                  <div key={v} className={`die-side die-face f${v}`}>
+                    {v === 1 ? <span className="die-skull" role="img" aria-label="1" /> : <span className={`die-num${v === 6 ? ' six' : ''}`}>{v}</span>}
                   </div>
                 ))}
               </div>

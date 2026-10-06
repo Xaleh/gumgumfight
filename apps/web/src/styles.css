@@ -4519,13 +4519,28 @@ tr.clickable:hover td {
   cursor: default;
 }
 .die {
+  /* Lado do dado (igual a SIZE em DiceRoll.tsx). */
+  --die: 58px;
+  --half: calc(var(--die) / 2);
+  /* Cores do dado oficial: vermelho esmaltado e brilhante. */
+  --die-hi: #ef3a3f;
+  --die-mid: #d01d24;
+  --die-lo: #a60f16;
+  --die-core: #8f0c12;
   position: absolute;
   left: 0;
   top: 0;
-  width: 52px;
-  height: 52px;
+  width: var(--die);
+  height: var(--die);
   transform-style: preserve-3d;
   will-change: transform;
+}
+/* O dado do oponente sai na outra cor oficial (azul) para não confundir com o seu. */
+.die.theirs {
+  --die-hi: #3f7ff0;
+  --die-mid: #1f58cc;
+  --die-lo: #133f9c;
+  --die-core: #0f3382;
 }
 .die-cube {
   position: absolute;
@@ -4534,77 +4549,100 @@ tr.clickable:hover td {
 }
 .die-shadow {
   position: absolute;
-  left: 2px;
-  top: 8px;
-  width: 48px;
-  height: 46px;
+  left: 3px;
+  top: 9px;
+  width: calc(var(--die) - 6px);
+  height: calc(var(--die) - 8px);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(0, 0, 0, 0.6), transparent 70%);
   filter: blur(3px);
 }
-.die-face {
+/* As 6 faces do cubo (a mesma geometria serve para a casca e para o miolo). */
+.die-side {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
-  padding: 7px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #ffffff, #e8e2d4);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
-    inset -3px -4px 8px rgba(0, 0, 0, 0.14);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-.die-face.f1 {
-  transform: translateZ(26px);
+.die-side.f1 {
+  transform: translateZ(var(--half));
 }
-.die-face.f6 {
-  transform: rotateY(180deg) translateZ(26px);
+.die-side.f6 {
+  transform: rotateY(180deg) translateZ(var(--half));
 }
-.die-face.f3 {
-  transform: rotateY(90deg) translateZ(26px);
+.die-side.f3 {
+  transform: rotateY(90deg) translateZ(var(--half));
 }
-.die-face.f4 {
-  transform: rotateY(-90deg) translateZ(26px);
+.die-side.f4 {
+  transform: rotateY(-90deg) translateZ(var(--half));
 }
-.die-face.f2 {
-  transform: rotateX(90deg) translateZ(26px);
+.die-side.f2 {
+  transform: rotateX(90deg) translateZ(var(--half));
 }
-.die-face.f5 {
-  transform: rotateX(-90deg) translateZ(26px);
+.die-side.f5 {
+  transform: rotateX(-90deg) translateZ(var(--half));
 }
-.pip {
-  place-self: center;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #555, #111);
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+/* Miolo: um cubo um pouco menor e mais escuro, que aparece nas quinas arredondadas da casca. */
+.die-core {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
 }
-.die-face.f1 .pip {
-  width: 13px;
-  height: 13px;
+.die-core .die-side {
+  --half: calc(var(--die) / 2 - 5px);
+  inset: 4px;
+  border-radius: 20%;
+  background: var(--die-core);
 }
-.die.mine .die-face.f1 .pip {
-  background: radial-gradient(circle at 35% 35%, #ff6b5a, #b3150a);
+/* Casca: face esmaltada, com reflexo no canto de cima e cantos bem arredondados. */
+.die-face {
+  display: grid;
+  place-items: center;
+  border-radius: 24%;
+  color: #fff;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12) 28%, transparent 48%),
+    linear-gradient(150deg, var(--die-hi), var(--die-mid) 55%, var(--die-lo));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 2px 3px 6px rgba(255, 255, 255, 0.22),
+    inset -4px -5px 10px rgba(0, 0, 0, 0.35);
 }
-.die.theirs .die-face {
-  background: linear-gradient(145deg, #fff3ee, #f1cfc3);
+/* Números brancos, grandes e arredondados como no dado real. */
+.die-num {
+  font-family: var(--font);
+  font-weight: 900;
+  font-size: calc(var(--die) * 0.62);
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  user-select: none;
 }
-.die.theirs .pip {
-  background: radial-gradient(circle at 35% 35%, #e65a4b, #8f1d14);
+/* O 6 ganha um traço embaixo para não virar 9 quando o dado para de lado. */
+.die-num.six {
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+}
+/* Face do 1: a caveira dos Chapéus de Palha, em branco (SVG próprio). */
+.die-skull {
+  display: block;
+  width: 78%;
+  height: 78%;
+  background: url('./assets/jolly-roger.svg') center / contain no-repeat;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
 }
 .die.winner .die-face {
   box-shadow:
     inset 0 0 0 2px #ffd75a,
-    inset -3px -4px 8px rgba(0, 0, 0, 0.14),
+    inset 2px 3px 6px rgba(255, 255, 255, 0.22),
+    inset -4px -5px 10px rgba(0, 0, 0, 0.35),
     0 0 12px rgba(255, 200, 60, 0.6);
 }
 .dice-hand {
   position: absolute;
-  left: calc(40% + 18px);
-  top: calc(74% + 14px);
+  left: calc(40% + 20px);
+  top: calc(74% + 16px);
   font-size: 30px;
   pointer-events: none;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
