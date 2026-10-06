@@ -124,11 +124,19 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
 
 /**
  * player: joga e assiste sem ver as mãos; streamer: assiste vendo as mãos;
- * organizer: cria e gerencia torneios; admin: tudo isso e muda os perfis.
+ * organizer: cria e gerencia torneios; admin: tudo isso e muda os perfis;
+ * dev: tudo do admin e as funções de desenvolvimento (ferramentas manuais, cobertura, testes).
  */
-export type Role = 'player' | 'streamer' | 'organizer' | 'admin';
+export type Role = 'player' | 'streamer' | 'organizer' | 'admin' | 'dev';
 
-export const ROLE_LABEL: Record<Role, string> = { player: 'Player', streamer: 'Streamer', organizer: 'Organizador', admin: 'Admin' };
+export const ROLE_LABEL: Record<Role, string> = { player: 'Player', streamer: 'Streamer', organizer: 'Organizador', admin: 'Admin', dev: 'Dev' };
+/** Poderes de administrador (o Dev é um Admin com as ferramentas de desenvolvimento). */
+export const isAdmin = (role: Role | undefined) => role === 'admin' || role === 'dev';
+/**
+ * Funções de desenvolvimento, escondidas do público: ferramentas manuais na partida,
+ * cobertura das cartas, opções de teste e treino no servidor contra o bot.
+ */
+export const isDev = (role: Role | undefined) => role === 'dev';
 
 export interface User {
   id: string;
@@ -211,6 +219,8 @@ export const api = {
     act: (roomId: string, t: string, seq: number, action: Action) =>
       send<{ ok: true; actionCount: number }>('POST', `/api/online/rooms/${roomId}/action`, { t, seq, action }),
     emote: (roomId: string, t: string, emote: string) => send<void>('POST', `/api/online/rooms/${roomId}/emote`, { t, emote }),
+    /** Lançamento do dado do sorteio (velocidade em larguras/alturas da mesa por segundo). */
+    dice: (roomId: string, t: string, vx: number, vy: number) => send<void>('POST', `/api/online/rooms/${roomId}/dice`, { t, vx, vy }),
     rematch: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/rematch`, { t }),
     leave: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/leave`, { t }),
     replay: (roomId: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay`),
@@ -461,6 +471,8 @@ export interface MatchUpload {
   format: FormatId;
   seed: number;
   firstPlayer?: PlayerId;
+  /** O vencedor do sorteio escolheu quem começa (primeira ação). */
+  chooseFirst?: boolean;
   deckIds: [string, string];
   decks: [DeckList, DeckList];
   actions: Action[];

@@ -33,6 +33,7 @@ export interface MatchBody {
   format?: unknown;
   seed?: unknown;
   firstPlayer?: unknown;
+  chooseFirst?: unknown;
   deckIds?: unknown;
   decks?: unknown;
   actions?: unknown;
@@ -84,7 +85,13 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
     }
 
     const firstPlayer = b.firstPlayer === 0 || b.firstPlayer === 1 ? (b.firstPlayer as PlayerId) : undefined;
-    const replay = { seed: b.seed, firstPlayer, decks: pair, actions: b.actions as Action[] };
+    const replay = {
+      seed: b.seed,
+      firstPlayer,
+      ...(b.chooseFirst === true && firstPlayer === undefined ? { chooseFirst: true } : {}),
+      decks: pair,
+      actions: b.actions as Action[],
+    };
     let facts;
     try {
       facts = deriveMatch(replay, cards);

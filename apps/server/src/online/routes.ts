@@ -12,7 +12,7 @@
 import { randomInt } from 'node:crypto';
 import { buildCardDef, type CardData, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { accountOwnerKey, seesHands, type User } from '../auth/store';
+import { accountOwnerKey, isDev, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLiveMatches, saveLiveMatch } from '../db';
 import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
@@ -67,6 +67,7 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
   const replay = {
     seed: 0,
     seed128: room.data.seed128!,
+    chooseFirst: room.data.chooseFirst,
     firstPlayer: room.data.firstPlayer,
     decks: [room.data.seats[0].deck, room.data.seats[1].deck] as [typeof room.data.seats[0]['deck'], typeof room.data.seats[0]['deck']],
     actions: room.data.actions,
@@ -320,14 +321,26 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     stream(req, reply, room, { seat: null, hands });
   });
 
-  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown };
+  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; vx?: unknown; vy?: unknown };
   const withSeat = (req: FastifyRequest<{ Params: { id: string }; Body: SeatBody }>) => seatIn(req.params.id, req.body?.t);
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/action', async (req, reply) => {
     const found = withSeat(req);
     if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    // Ferramentas manuais (mexer na mesa à mão) são função de desenvolvimento: só para o perfil Dev.
+    const action = req.body?.action as { type?: unknown } | undefined;
+    if (action?.type === 'manual' && !isDev(user(req)?.role)) {
+      return reply.code(403).send({ error: 'As ferramentas manuais são só para o perfil Dev.' });
+    }
     const r = found.room.act(found.seat, req.body?.seq, req.body?.action);
     return r.ok ? r : reply.code(r.code).send({ error: r.error });
+  });
+
+  app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/dice', async (req, reply) => {
+    const found = withSeat(req);
+    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    const r = found.room.throwDice(found.seat, req.body?.vx, req.body?.vy);
+    return r.ok ? reply.code(204).send() : reply.code(r.code).send({ error: r.error });
   });
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/emote', async (req, reply) => {

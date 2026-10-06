@@ -992,6 +992,8 @@ export interface BattleState {
 
 /** Escolhas que o motor aguarda de um jogador. */
 export type Pending =
+  /** O vencedor do sorteio escolhe se joga primeiro (`answer` yes) ou segundo (no). */
+  | { kind: 'chooseFirst'; player: PlayerId }
   | { kind: 'mulligan'; player: PlayerId }
   | {
       kind: 'selectTargets';
@@ -1076,6 +1078,8 @@ export interface GameState {
   rng128?: [number, number, number, number];
   turn: number; // 1 = primeiro turno do primeiro jogador
   firstPlayer: PlayerId;
+  /** Quem venceu o sorteio e escolhe se joga primeiro ou segundo (só com `GameConfig.chooseFirst`). */
+  rollWinner?: PlayerId;
   activePlayer: PlayerId;
   phase: 'mulligan' | 'main' | 'gameover';
   players: [PlayerState, PlayerState];
@@ -1173,6 +1177,12 @@ export interface GameConfig {
   cards: CardData[];
   /** Se omitido, decidido pelo RNG (equivalente ao pedra-papel-tesoura). */
   firstPlayer?: PlayerId;
+  /**
+   * Sem `firstPlayer`: o RNG sorteia o vencedor e ele escolhe se joga primeiro ou
+   * segundo (regra oficial). Desligado, o vencedor do sorteio simplesmente começa
+   * (como nas partidas e replays gravados antes desta opção).
+   */
+  chooseFirst?: boolean;
   /**
    * Seed de 128 bits (4 inteiros de 32 bits) para o RNG sfc32. Usada nas partidas
    * online, em que a seed de 32 bits poderia ser descoberta por força bruta.

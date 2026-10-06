@@ -64,7 +64,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
 
   const life = (
     <div className="zone life-zone" title={`Vida: ${ps.life.length}`}>
-      <div className="life-stack" key={ps.life.length}>
+      <div className="life-stack" key={ps.life.length} data-anchor={`life-${player}`}>
         {ps.life.map((uid, i) => (
           <div key={uid} className="life-card" style={vars({ '--i': i })} />
         ))}
@@ -99,11 +99,11 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
       title={`DON!!: ${ps.donDeck} no deck, ${ps.donActive} ativos, ${ps.donRested} virados, ${attached} anexados`}
     >
       {/* Deck de DON!! fixo à esquerda; os DON!! entram à direita dele. */}
-      <div className="don-deck">
+      <div className="don-deck" data-anchor={`dondeck-${player}`}>
         {ps.donDeck > 0 ? <span className="don-card back" /> : <span className="don-card empty" />}
         <span className="pile-count">{ps.donDeck}</span>
       </div>
-      <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })}>
+      <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
         {Array.from({ length: ps.donActive }, (_, i) => (
           <span
             key={`a${i}`}
@@ -143,12 +143,13 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
 
   const piles = (
     <div className="zone piles">
-      <div className="pile" title={`Deck: ${ps.deck.length} cartas`}>
+      <div className="pile" title={`Deck: ${ps.deck.length} cartas`} data-anchor={`deck-${player}`}>
         <CardBack />
         <span className="pile-count">{ps.deck.length}</span>
       </div>
       <div
         className="pile clickable"
+        data-anchor={`trash-${player}`}
         onClick={() => h.onTrash(player)}
         title={`Descarte: ${ps.trash.length} cartas (toque para ver)`}
       >
@@ -239,13 +240,14 @@ export function Hand({
   const hand = order ?? state.players[player].hand;
   const n = hand.length;
   return (
-    <div className={['hand', position].join(' ')} style={vars({ '--n': n })}>
+    <div className={['hand', position].join(' ')} style={vars({ '--n': n })} data-anchor={`hand-${player}`}>
       {hand.map((uid, i) => {
         const offset = i - (n - 1) / 2;
         return (
           <div
             key={uid}
             className={['hand-card', uid === lifted ? 'lifted' : '', uid === ghost ? 'ghosted' : ''].join(' ')}
+            data-hand-uid={uid}
             style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}
           >
             {reveal ? (
@@ -341,7 +343,7 @@ export function Board({
         <PlayerBanner state={state} player={top} align="right" extra={bannerExtra?.(top)} />
       </div>
       {/* A arena inteira aceita cartas arrastadas da mão (jogar ou usar Counter). */}
-      <div className="arena" data-drop="field">
+      <div className="arena" data-drop="field" data-anchor="arena">
         <div className="arena-deco" aria-hidden="true">
           <div className="wheel">
             <JollyRoger />

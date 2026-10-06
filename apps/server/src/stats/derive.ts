@@ -12,6 +12,8 @@ export interface ReplayInput {
   seed128?: number[];
   /** Como veio na configuração da partida (omitido = sorteado pelo RNG). */
   firstPlayer?: PlayerId;
+  /** O vencedor do sorteio escolheu se jogava primeiro (primeira ação do replay). */
+  chooseFirst?: boolean;
   decks: [DeckList, DeckList];
   actions: Action[];
 }
@@ -51,6 +53,7 @@ export function deriveMatch(input: ReplayInput, cards: CardData[]): MatchFacts {
     seed: input.seed,
     seed128: input.seed128,
     firstPlayer: input.firstPlayer,
+    chooseFirst: input.chooseFirst,
     cards,
     players: [
       { name: 'A', deck: input.decks[0] },

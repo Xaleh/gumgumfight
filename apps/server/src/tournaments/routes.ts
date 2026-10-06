@@ -15,7 +15,7 @@
 
 import { randomInt } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { accountOwnerKey, createsTournaments, type User } from '../auth/store';
+import { accountOwnerKey, createsTournaments, isAdmin, type User } from '../auth/store';
 import { type DB, getCards } from '../db';
 import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
@@ -166,7 +166,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     if (!u) void reply.code(401).send({ error: 'Entre com a conta Google.' });
     return u;
   };
-  const canManage = (t: Tournament, u: User | null) => Boolean(u && (u.role === 'admin' || (u.id === t.organizerId && createsTournaments(u.role))));
+  const canManage = (t: Tournament, u: User | null) => Boolean(u && (isAdmin(u.role) || (u.id === t.organizerId && createsTournaments(u.role))));
 
   /** Torneio que a conta logada gerencia, ou responde 401/403/404. */
   const managed = (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply): { t: Tournament; me: User } | null => {

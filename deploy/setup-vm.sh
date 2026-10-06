@@ -223,7 +223,7 @@ EOF
   MY_IP="$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
   DNS_IP="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}' || true)"
   if [ -n "$MY_IP" ] && [ "$DNS_IP" != "$MY_IP" ]; then
-    info "ATENÇÃO: $DOMAIN aponta para '${DNS_IP:-nada}', mas esta VM é $MY_IP. Corrija no DuckDNS e rode de novo."
+    info "ATENÇÃO: $DOMAIN aponta para '${DNS_IP:-nada}', mas esta VM é $MY_IP. Corrija o DNS e rode de novo."
   elif sudo certbot certificates 2>/dev/null | grep -q "Domains: .*$DOMAIN"; then
     info "Certificado já existe."
     sudo certbot install --nginx --cert-name "$DOMAIN" --redirect --non-interactive >/dev/null 2>&1 || true

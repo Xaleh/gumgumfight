@@ -1,7 +1,10 @@
 name: CI e deploy
 
 # Todo push/PR roda os testes e monta o pacote.
-# Push na main (ou "Run workflow" na main) publica no servidor de produção.
+# Dois ambientes (Settings → Environments), cada um com os seus secrets DEPLOY_*:
+#   main → "production"  (https://gumgumfight.app)          — a VPS da Hostinger
+#   hmg  → "homologacao" (https://gumgumfight.duckdns.org)  — o servidor de testes
+# "Run workflow" em qualquer outro branch publica esse branch na homologação (até o próximo push na hmg).
 on:
   push:
     branches: ['**']
@@ -15,13 +18,16 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Nunca cancela um run que pode estar no meio de um deploy.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/hmg' && github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
 
 env:
-  SITE_URL: https://gumgumfight.duckdns.org
+  # main → produção; qualquer outro branch → homologação
+  DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'homologacao' }}
+  SITE_URL: ${{ github.ref == 'refs/heads/main' && 'https://gumgumfight.app' || 'https://gumgumfight.duckdns.org' }}
 
 jobs:
   test:
@@ -63,15 +69,19 @@ jobs:
           retention-days: 7
 
   deploy:
-    name: Deploy na VM
+    name: Deploy (${{ github.ref == 'refs/heads/main' && 'produção' || 'homologação' }})
     needs: test
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Push na main ou na hmg, ou "Run workflow" em qualquer branch (vai para a homologação, exceto na main).
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/hmg'))
+      || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # Os secrets/variables do Environment valem sobre os do repositório: cada servidor tem os seus.
     environment:
-      name: production
-      url: https://gumgumfight.duckdns.org
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'homologacao' }}
+      url: ${{ github.ref == 'refs/heads/main' && 'https://gumgumfight.app' || 'https://gumgumfight.duckdns.org' }}
     concurrency:
-      group: deploy-production
+      group: deploy-${{ github.ref == 'refs/heads/main' && 'production' || 'homologacao' }}
       cancel-in-progress: false
     env:
       REMOTE_DIR: apps/gumgumfight/releases/${{ github.sha }}
@@ -99,7 +109,7 @@ jobs:
             [ -n "${!var}" ] || missing="$missing ${pair#*:}"
           done
           if [ -n "$missing" ]; then
-            echo "::warning::Deploy pulado: o workflow não encontrou:$missing. Cadastre em Settings → Secrets and variables → Actions → aba Secrets → Repository secrets (não em Codespaces/Dependabot nem em outro Environment)."
+            echo "::warning::Deploy pulado: o workflow não encontrou:$missing. Cadastre em Settings → Environments → $DEPLOY_ENV → Environment secrets (ou em Repository secrets, que valem para os dois ambientes)."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
@@ -164,5 +174,5 @@ jobs:
             curl -fsS "$SITE_URL/api/health" && exit 0
             sleep 3
           done
-          echo "::error::$SITE_URL não respondeu. O app está no ar na VM, confira o Nginx/HTTPS (deploy/setup-vm.sh)."
+          echo "::error::$SITE_URL não respondeu. O app está no ar na VM, confira o Nginx/HTTPS (deploy/bootstrap-hostinger.sh ou deploy/setup-vm.sh)."
           exit 1

@@ -3,7 +3,7 @@
 //
 //   npm run simulate:all -w @gumgum/engine -- <cards.json | URL> [partidas=300] [aleatoriedade=0]
 //   aleatoriedade (0 a 1): chance de cada ação ser uma ação legal qualquer, para exercitar efeitos que o bot não usa.
-//   ex.: npm run simulate:all -w @gumgum/engine -- https://gumgumfight.duckdns.org/api/cards 500
+//   ex.: npm run simulate:all -w @gumgum/engine -- https://gumgumfight.app/api/cards 500
 
 import { readFileSync } from 'node:fs';
 import {

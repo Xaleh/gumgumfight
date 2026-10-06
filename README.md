@@ -53,15 +53,24 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
-| `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar |
+| `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
 | `ONLINE_BOT_ROOMS` | `on`                       | Treino online contra o bot do servidor (teste do modo espectador); `off` desliga |
 
 O backup é só copiar o arquivo `.db`.
 
 ## Deploy automático (GitHub Actions)
 
-O workflow `.github/workflows/ci-deploy.yml` roda os testes em todo push. Em push na **main** (ou em "Run workflow"),
-ele publica o site no servidor de produção:
+O workflow `.github/workflows/ci-deploy.yml` roda os testes em todo push e publica em dois ambientes:
+
+| Branch   | Environment (GitHub) | Site                               | Servidor                                   |
+|----------|----------------------|------------------------------------|--------------------------------------------|
+| `main`   | `production`         | https://gumgumfight.app            | VPS da Hostinger (`deploy/bootstrap-hostinger.sh`) |
+| `hmg`    | `homologacao`        | https://gumgumfight.duckdns.org    | servidor de testes (`deploy/setup-vm.sh`)  |
+
+**Fluxo:** cada branch de trabalho é mesclado na **`hmg`** (push → deploy na homologação); depois de testado em
+`gumgumfight.duckdns.org`, a `hmg` é mesclada na **`main`** (push → deploy na produção). "Run workflow" em
+qualquer outro branch publica aquele branch na homologação, para testar sem mesclar (o próximo push na `hmg`
+sobrescreve). Em cada deploy o workflow:
 
 1. Monta o pacote e o testa (sobe o servidor e consulta a API) antes de enviar.
 2. Copia o pacote por SSH para uma pasta de releases no servidor e troca o link `current`.
@@ -78,15 +87,24 @@ Node padrão for mais antigo) e um site separado no proxy.
    ```bash
    ssh-keygen -t ed25519 -f gumgum_deploy -N "" -C github-actions-gumgumfight
    ```
-2. **Domínio:** aponte o domínio do site para o servidor.
-3. **No servidor**, rode `deploy/setup-vm.sh` com a chave pública de deploy. O script cria as pastas, instala o
-   Node 22 se preciso, configura o proxy (ou mostra os campos para o Nginx Proxy Manager), gera o HTTPS com
-   certbot e autoriza a chave:
-   ```bash
-   bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
-   ```
-   Variáveis opcionais: `DOMAIN`, `PORT`, `CERTBOT_EMAIL` (veja o início do script).
-4. **No GitHub** → Settings → Secrets and variables → Actions → *New repository secret*:
+2. **Domínio:** aponte o domínio do site (registros A de `@` e `www`) para o IP do servidor.
+3. **No servidor**, rode um dos scripts com a chave pública de deploy:
+   - **VPS nova e só para este site** (ex.: a VPS KVM da Hostinger, Ubuntu limpo, como root): `deploy/bootstrap-hostinger.sh`
+     faz tudo — atualiza o sistema, instala Node 22, pm2, Nginx, HTTPS (Let's Encrypt), firewall, fail2ban, swap,
+     cria o usuário `gumgum` que recebe o deploy e um backup diário do banco. O passo a passo completo, com o DNS
+     da Hostinger e os valores dos secrets, está em [`deploy/HOSTINGER.md`](deploy/HOSTINGER.md).
+     ```bash
+     CERTBOT_EMAIL=voce@exemplo.com bash bootstrap-hostinger.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
+     ```
+   - **Servidor que já roda outros apps** (Nginx ou Nginx Proxy Manager, pm2 já instalado), como o usuário que roda
+     o pm2: `deploy/setup-vm.sh`. Ele cria as pastas, instala o Node 22 via nvm se preciso (sem trocar o padrão),
+     configura o site no proxy, gera o HTTPS com certbot e autoriza a chave:
+     ```bash
+     bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
+     ```
+   Variáveis opcionais: `DOMAIN`, `PORT`, `CERTBOT_EMAIL` (veja o início de cada script).
+4. **No GitHub** → Settings → **Environments** → *New environment*: crie `production` e `homologacao`. Em cada um,
+   *Environment secrets* com os dados **daquele** servidor (use uma chave de deploy por servidor):
 
    | Secret               | Valor                                                  |
    |----------------------|--------------------------------------------------------|
@@ -97,11 +115,18 @@ Node padrão for mais antigo) e um site separado no proxy.
 
    Use sempre **Secrets** (nunca *Variables*, que ficam visíveis para quem lê o repositório).
    A exceção é a Variable `GOOGLE_CLIENT_ID` do login com Google, que é pública (veja [Contas](#contas-login-com-google)).
-5. **No GitHub** → Settings → General → *Default branch*: `main`.
-6. **Primeiro deploy:** Actions → "CI e deploy" → *Run workflow* (branch `main`), com `import_sets` = `ST-01 ST-02`
-   para já importar as cartas reais. Depois disso, todo push na `main` publica sozinho.
+   Secrets e Variables cadastrados no **repositório** valem para os dois ambientes; os do Environment têm
+   prioridade. (Se o servidor de testes já estava nos *Repository secrets*, basta criar os secrets do
+   Environment `production` para a VPS nova: a homologação continua usando os do repositório.)
+5. **No GitHub** → Settings → General → *Default branch*: `main`. Crie o branch `hmg` a partir da `main`
+   (`git checkout -b hmg main && git push -u origin hmg`). Recomendado, em *Branches → Branch protection*:
+   proteger `main` para receber mudanças só por pull request.
+6. **Primeiro deploy:** Actions → "CI e deploy" → *Run workflow* (branch `main` para a produção, `hmg` para a
+   homologação), com `import_sets` = `ST-01 ST-02` para já importar as cartas reais num servidor novo. Depois
+   disso, todo push na `main` ou na `hmg` publica sozinho no ambiente correspondente.
 
-Enquanto os secrets não existirem, o job de deploy é pulado com um aviso (os testes continuam rodando).
+Enquanto os secrets de um ambiente não existirem, o deploy nele é pulado com um aviso (os testes continuam rodando).
+Cada ambiente tem o seu banco: decks, contas e partidas da homologação não vão para a produção.
 
 ### Operação (no servidor)
 
@@ -109,6 +134,9 @@ Enquanto os secrets não existirem, o job de deploy é pulado com um aviso (os t
 pm2 logs gumgumfight        # logs
 pm2 restart gumgumfight     # reiniciar
 ```
+
+(Na VPS preparada pelo `bootstrap-hostinger.sh`, o app roda no usuário `gumgum`: como root, use
+`sudo -u gumgum pm2 logs gumgumfight`, ou entre com `ssh gumgum@<IP>`.)
 
 Para importar mais coleções, use `import-cards.mjs` do release atual com o `DB_PATH` do banco compartilhado
 (para `--spoilers`, informe também `DATA_DIR=<release>/data`; o app no pm2 já recebe essa variável);
@@ -196,8 +224,8 @@ No menu, a aba **Online** tem a fila **casual**, a **ranqueada** e as **salas pr
   2 minutos desconectado, perde por abandono.
 - **Ranqueada:** só com login Google e sem modo manual: decks com cartas ⚙ (efeito ainda não automatizado) não entram na
   fila, e as ferramentas manuais ficam bloqueadas. O pareamento junta recompensas parecidas e a faixa abre com o tempo de
-  espera. No casual e nas salas privadas as ferramentas manuais funcionam, e o que é feito com elas aparece no log do
-  oponente (cartas movidas entre zonas escondidas aparecem como "uma carta").
+  espera. No casual e nas salas privadas as ferramentas manuais funcionam para o perfil **Dev**, e o que é feito com
+  elas aparece no log do oponente (cartas movidas entre zonas escondidas aparecem como "uma carta").
 - **Sem desfazer, Auto ou pausa** no online. Mensagens rápidas (emotes de uma lista fixa), revanche nas salas privadas e
   o replay completo para baixar no fim.
 - **Transporte:** SSE (`EventSource`) do servidor para o navegador e POST para as ações. Funciona atrás do Nginx / Nginx
@@ -226,16 +254,31 @@ espectadores seguem para a partida nova.
   Quando o modo espectador estiver aprovado, `ONLINE_BOT_ROOMS=off` tira a opção do menu e essas salas da lista,
   deixando só as partidas multiplayer.
 
-### Perfis (Player, Streamer, Organizador, Admin)
+### Perfis (Player, Streamer, Organizador, Admin, Dev)
 
 Cada conta Google tem um perfil (coluna `users.role`): **Player** (padrão: joga e assiste sem ver as mãos),
-**Streamer** (assiste vendo as mãos), **Organizador** (cria torneios e gerencia os que criou) ou **Admin** (tudo
-isso, gerencia qualquer torneio e muda os perfis em **Perfis das contas**, no menu). Sem login, a pessoa assiste
-como Player.
+**Streamer** (assiste vendo as mãos), **Organizador** (cria torneios e gerencia os que criou), **Admin** (tudo
+isso, gerencia qualquer torneio e muda os perfis em **Perfis das contas**, no menu) ou **Dev** (tudo do Admin e as
+funções de desenvolvimento). Sem login, a pessoa assiste como Player.
 
 O primeiro admin vem da variável `ADMIN_EMAILS`: quem entra com um desses e-mails (verificado pelo Google) vira Admin
-no login. Em produção, crie a *Variable* `ADMIN_EMAILS` no GitHub (como a `GOOGLE_CLIENT_ID`); o próximo deploy a grava
-em `shared/deploy.env`. Quem já estava logado precisa sair e entrar de novo. Um admin não muda o próprio perfil.
+no login (um Dev continua Dev). Em produção, crie a *Variable* `ADMIN_EMAILS` no GitHub (como a `GOOGLE_CLIENT_ID`);
+o próximo deploy a grava em `shared/deploy.env`. Quem já estava logado precisa sair e entrar de novo. Um admin não
+muda o próprio perfil, exceto para se promover a Dev.
+
+### Funções de desenvolvimento (só Dev)
+
+Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas funções aparecem apenas para o perfil
+**Dev**:
+
+- **Ferramentas manuais** na partida (executar efeitos de cartas à mão, mover cartas entre zonas, mexer em DON!!
+  e Vida, ver o topo do deck). O servidor recusa ações manuais nas partidas online de quem não é Dev (403), além
+  de já recusá-las na ranqueada. Para os outros perfis, uma carta com efeito ainda não automatizado (⚙) só mostra
+  um aviso e a partida segue sem aplicar o efeito.
+- A tela **Cobertura das cartas** (o endpoint `GET /api/coverage` continua público).
+- **Opções de teste** no menu (seed do embaralhamento e carregar um replay). Baixar o replay de uma partida
+  continua para todos, para mandar a um Dev ao relatar um problema.
+- **Jogar no servidor** contra o bot (teste do modo espectador; também depende de `ONLINE_BOT_ROOMS`).
 
 ## Torneios
 
@@ -299,13 +342,14 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
 1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie (ou escolha) um projeto e
    configure a **tela de consentimento OAuth** (tipo *Externo*; só os escopos básicos: e-mail, perfil e openid).
 2. **Credenciais → Criar credenciais → ID do cliente OAuth**, tipo **Aplicativo da Web**. Em **Origens JavaScript
-   autorizadas**, inclua `https://gumgumfight.duckdns.org`, `http://localhost:5173` e `http://localhost` (o botão do
+   autorizadas**, inclua `https://gumgumfight.app`, `https://gumgumfight.duckdns.org`, `http://localhost:5173` e `http://localhost` (o botão do
    Google exige as duas formas do localhost). Não é preciso URI de redirecionamento nem a chave secreta.
 3. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`). Ele não é segredo: vai para todo navegador.
    - **Desenvolvimento:** crie um arquivo `.env` na raiz do projeto com `GOOGLE_CLIENT_ID=...` (o arquivo é ignorado
      pelo git) e reinicie o `npm run dev`.
-   - **Produção:** no GitHub → Settings → Secrets and variables → Actions → aba **Variables** → *New repository
-     variable* `GOOGLE_CLIENT_ID`. O próximo deploy grava o valor em `shared/deploy.env` na VM.
+   - **Produção e homologação:** no GitHub → Settings → Secrets and variables → Actions → aba **Variables** → *New
+     repository variable* `GOOGLE_CLIENT_ID` (vale para os dois ambientes; para usar um Client ID diferente em um
+     deles, cadastre a Variable no Environment). O próximo deploy grava o valor em `shared/deploy.env` na VM.
 
 Sem `GOOGLE_CLIENT_ID`, o botão não aparece e `POST /api/auth/google` responde 503.
 
@@ -315,12 +359,13 @@ Toda carta da base é jogável:
 
 - **Efeito automatizado:** cartas com script (`packages/engine/src/cards/scripts.ts`) resolvem tudo sozinhas.
 - **Modo manual** (cartas com ⚙): o motor lê os momentos marcados no texto ([On Play], [When Attacking],
-  [Activate: Main], [Main], [Counter], [Trigger], [On K.O.], [End of Your Turn]…). Na hora certa, o jogo pausa,
-  mostra o efeito no painel lateral e libera as **ferramentas manuais**: comprar, nocautear, mover cartas entre
-  mão, campo, deck, descarte e Vida, virar/desvirar, ±poder, DON!!, ver o topo do deck e o descarte. O jogador
+  [Activate: Main], [Main], [Counter], [Trigger], [On K.O.], [End of Your Turn]…). Na hora certa, o jogo pausa e
+  mostra o efeito. Para o perfil **Dev**, libera as **ferramentas manuais**: comprar, nocautear, mover cartas entre
+  mão, campo, deck, descarte e Vida, virar/desvirar, ±poder, DON!!, ver o topo do deck e o descarte. O Dev
   aplica o efeito e clica em **Concluir**. As ferramentas também ficam disponíveis no próprio turno, para
-  efeitos contínuos. Toda operação passa pelo motor, então nenhuma carta some nem duplica.
-- **Cobertura:** a tela "📊 Cobertura das cartas" (no menu) e `GET /api/coverage` mostram, por coleção,
+  efeitos contínuos. Toda operação passa pelo motor, então nenhuma carta some nem duplica. Para os outros perfis
+  o jogo só avisa que o efeito ainda não é automático e segue sem aplicá-lo (botão **Continuar**).
+- **Cobertura:** a tela "📊 Cobertura das cartas" (no menu, só para o perfil Dev) e `GET /api/coverage` mostram, por coleção,
   quantas cartas são automáticas, quantas são manuais e como está a tradução.
 
 Para checar a robustez depois de importar coleções novas (decks aleatórios de toda a base, bot x bot):
@@ -337,7 +382,7 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
 - **Atacar:** selecione o líder ou um personagem ativo, clique em "⚔ Atacar" e escolha o alvo (líder ou personagem virado).
 - **Defesa:** quando for atacado, o jogo pede Blocker, Counter e [Trigger] quando aplicável.
 - **Desfazer** volta para antes da sua última ação. **Replay** baixa um `.json` com todas as ações.
-- Em **Opções de teste** (no menu), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
+- Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
   reproduz a mesma partida. Um replay carregado ali funciona como um "roteiro" que se joga sozinho.
 
 ## Estrutura
@@ -482,7 +527,7 @@ npm run typecheck
 | GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google) |
 | GET    | `/api/auth/me`     | Usuário logado (`{ user }` com `role`; `null` sem sessão) |
 | GET    | `/api/admin/users?q=` | Contas e perfis (só Admin)               |
-| PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| organizer \| admin }`; só Admin) |
+| PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| organizer \| admin \| dev }`; só Admin; a si mesmo, só para `dev`) |
 | POST   | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie |
 | POST   | `/api/auth/logout` | Sai (apaga a sessão)                        |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |

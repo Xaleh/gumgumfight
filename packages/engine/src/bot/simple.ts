@@ -31,6 +31,8 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       return { type: 'mulligan', player, redraw: cheap < 2 };
     }
 
+    // Vencendo o sorteio, o bot joga primeiro.
+    case 'chooseFirst':
     case 'trigger':
     case 'confirm':
       return { type: 'answer', player, yes: true };
