@@ -140,7 +140,9 @@ fi
 
 # ---------------------------------------------------------------- pastas + deploy.env
 step "Pastas em $APP_DIR"
-install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$APP_DIR/releases" "$SHARED" "$HOME_DIR/backups"
+# Todas as pastas do caminho precisam ser do usuário: o deploy cria o link "current" dentro de $APP_DIR.
+install -d "$HOME_DIR/apps" "$APP_DIR" "$APP_DIR/releases" "$SHARED" "$HOME_DIR/backups"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$HOME_DIR/apps" "$APP_DIR" "$APP_DIR/releases" "$SHARED" "$HOME_DIR/backups"
 # Preserva o que já estava em deploy.env (preenchido pelos deploys).
 get_env() { [ -f "$ENV_FILE" ] && sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 || true; }
 CARD_IMAGES="$(get_env CARD_IMAGES)"; CARD_IMAGES="${CARD_IMAGES:-on}"
