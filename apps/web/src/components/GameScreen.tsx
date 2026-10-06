@@ -419,14 +419,28 @@ function Table({
   };
   /** Decisão de defesa (Blocker ou Counter) que é deste jogador: vira o botão grande na faixa central. */
   const defense = myPending && (myPending.kind === 'block' || myPending.kind === 'counter') && state.battle ? myPending : null;
-  const defenseHint =
+  /**
+   * Escolha de alvos de um efeito que é deste jogador, com todos os alvos na mesa ou na mão: o pedido
+   * vai para a faixa central e o botão de confirmar toma o lugar de "Encerrar turno", como no Counter.
+   * (Alvos fora da mesa, como o topo do deck, o descarte ou a Vida, continuam num modal com as cartas.)
+   */
+  const targets = myPending?.kind === 'selectTargets' && targetsOnTable(state, myPending) ? myPending : null;
+  const decision = defense ?? targets;
+  const targetsInHand = targets ? targets.options.filter((u) => zoneOf(state, u) === 'hand').length : 0;
+  const handHint =
     defense?.kind === 'block'
       ? 'Toque num Personagem com [Blocker] para bloquear'
       : defense?.kind === 'counter'
         ? quickCounter
           ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
           : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
-        : null;
+        : targets
+          ? targets.max === 0
+            ? 'Toque numa carta destacada para ler e depois continue'
+            : `Toque nas cartas destacadas ${
+                targetsInHand === targets.options.length ? 'da mão' : targetsInHand > 0 ? 'da mesa ou da mão' : 'da mesa'
+              }${targets.ordered ? ', na ordem desejada,' : ''} e confirme`
+          : null;
 
   /** Destinos válidos para o que está sendo arrastado. */
   const dropValid = (d: Pick<Drag, 'kind' | 'uid'>, over: string | null): boolean => {
@@ -787,7 +801,7 @@ function Table({
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}
-          handHint={defenseHint}
+          handHint={handHint}
           lifted={lifted}
           ghost={drag?.kind === 'hand' ? drag.uid : null}
           center={
@@ -805,11 +819,13 @@ function Table({
               onEnd={() => dispatch({ type: 'endTurn', player: human! })}
               onCancelMode={() => setMode(null)}
               onTogglePause={() => game.setPaused((p) => !p)}
-              defense={
-                defense && (
-                  <DefenseButton
+              request={targets && <TargetRequest state={state} pending={targets} picked={picked} />}
+              decision={
+                decision && (
+                  <DecisionButton
                     state={state}
-                    pending={defense}
+                    pending={decision}
+                    picked={picked}
                     human={human!}
                     onDispatch={dispatch}
                     onTools={dev ? () => setSheet('tools') : undefined}
@@ -978,10 +994,12 @@ function Table({
         {sheet === 'hand' && human !== null && (
           <SheetFrame title={`Sua mão (${orderedHand.length})`} onClose={() => setSheet(null)}>
             {state.battle && <BattleInfo state={state} human={human} />}
-            {defense && (
-              <DefenseButton
+            {targets && <TargetRequest state={state} pending={targets} picked={picked} />}
+            {decision && (
+              <DecisionButton
                 state={state}
-                pending={defense}
+                pending={decision}
+                picked={picked}
                 human={human}
                 onDispatch={dispatch}
                 clock={online && !watching ? <OnlineClock online={online} player={human} /> : undefined}
@@ -993,9 +1011,11 @@ function Table({
                 ? quickCounter
                   ? 'Toque numa carta destacada para usar o Counter na hora.'
                   : 'Toque numa carta destacada e confirme para usar o Counter.'
-                : myPending?.kind === 'selectTargets'
-                  ? myPending.prompt
-                  : 'Toque numa carta para ver as ações. Segure para ler.'}
+                : targets
+                  ? `${handHint}.`
+                  : myPending?.kind === 'selectTargets'
+                    ? myPending.prompt
+                    : 'Toque numa carta para ver as ações. Segure para ler.'}
             </p>
             <div className="hand-grid">
               {orderedHand.map((uid) => (
@@ -1119,15 +1139,18 @@ function CenterBand(props: {
   onEnd: () => void;
   onCancelMode: () => void;
   onTogglePause: () => void;
-  /** Blocker/Counter do jogador: o botão de decisão toma o lugar de "Encerrar turno". */
-  defense?: ReactNode;
+  /** Pedido de um efeito que escolhe alvos: fica no meio da faixa, no lugar da dica (TargetRequest). */
+  request?: ReactNode;
+  /** Blocker/Counter ou escolha de alvos do jogador: o botão de decisão toma o lugar de "Encerrar turno". */
+  decision?: ReactNode;
 }) {
   const { state, human, mode, acting, watching } = props;
   const b = state.battle;
   const mineTurn = human === null ? state.activePlayer === 0 : state.activePlayer === human;
 
   let middle: ReactNode = null;
-  if (b) middle = <BattleInfo state={state} human={human} />;
+  if (props.request) middle = props.request;
+  else if (b) middle = <BattleInfo state={state} human={human} />;
   else if (mode?.kind === 'attack')
     middle = (
       <button className="hint-pill" onClick={props.onCancelMode}>
@@ -1174,8 +1197,8 @@ function CenterBand(props: {
         <b>{state.phase === 'mulligan' ? '—' : state.turn}</b>
       </div>
       <div className="band-middle">{middle}</div>
-      {props.defense ? (
-        props.defense
+      {props.decision ? (
+        props.decision
       ) : human !== null ? (
         <button className="end-turn" disabled={!props.canEnd} onClick={props.onEnd}>
           Encerrar
@@ -1214,14 +1237,67 @@ function EyeIcon({ closed }: { closed: boolean }) {
   );
 }
 
+/** Zonas cujas cartas não ficam à vista na mesa: a escolha entre elas abre um modal com as cartas. */
+const OFF_TABLE = ['deck', 'trash', 'life'];
+
 /**
- * Botão grande para concluir a etapa de Blocker ou de Counter ("Não bloquear", "Não usar Counter"),
- * sempre no mesmo lugar (o de "Encerrar turno"), com o resultado previsto do ataque. Pulsa quando
- * nenhuma carta da mão muda o resultado. Online, o relógio do jogador fica ao lado: o tempo corre aqui.
+ * Escolha de alvos que dá para fazer tocando na mesa ou na mão: nenhuma carta mostrada de uma busca,
+ * ao menos um alvo e todos fora do deck, do descarte e da Vida.
  */
-function DefenseButton({
+function targetsOnTable(state: GameState, pending: Extract<Pending, { kind: 'selectTargets' }>): boolean {
+  if (pending.shown?.length || pending.options.length === 0) return false;
+  return pending.options.every((u) => !OFF_TABLE.includes(zoneOf(state, u) ?? ''));
+}
+
+/**
+ * Pedido de um efeito que escolhe alvos na mesa, no meio da faixa central: a carta de origem em
+ * miniatura, o texto do pedido com o contador e, nos efeitos em que a ordem importa, a ordem marcada.
+ */
+function TargetRequest({
   state,
   pending,
+  picked,
+}: {
+  state: GameState;
+  pending: Extract<Pending, { kind: 'selectTargets' }>;
+  picked: string[];
+}) {
+  const source = state.cards[pending.source] ? cardDef(state, pending.source) : null;
+  // O motor costuma começar o pedido com "Nome da carta: "; o nome vai para a linha de cima.
+  const prefix = source ? `${source.name}: ` : '';
+  const text = prefix && pending.prompt.startsWith(prefix) ? pending.prompt.slice(prefix.length) : pending.prompt;
+  const order = pending.ordered && picked.length > 0 ? picked.map((u, i) => `${i + 1}. ${cardDef(state, u).name}`).join(' → ') : null;
+  return (
+    <div className="target-request" title={pending.prompt}>
+      {source && (
+        <div className="source-thumb">
+          <CardView state={state} uid={pending.source} />
+        </div>
+      )}
+      <div className="target-text">
+        {source && <small>{source.name}</small>}
+        <b>
+          {text}
+          {pending.max > 0 && ` (${picked.length}/${pending.max})`}
+        </b>
+        {order && <small className="target-order">Ordem: {order}</small>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Botão grande de decisão, sempre no mesmo lugar (o de "Encerrar turno"):
+ * - Blocker/Counter: "Não bloquear", "Não usar Counter", com o resultado previsto do ataque; pulsa
+ *   quando nenhuma carta da mão muda o resultado.
+ * - Escolha de alvos de efeito: "Confirmar (n/máx)" (desabilitado até atingir o mínimo), "Não escolher"
+ *   quando nada foi marcado e nada é obrigatório, ou "Continuar"; pulsa quando a escolha já está completa.
+ * Online, o relógio do jogador fica ao lado: o tempo corre aqui.
+ */
+function DecisionButton({
+  state,
+  pending,
+  picked,
   human,
   onDispatch,
   onTools,
@@ -1229,7 +1305,9 @@ function DefenseButton({
   sheet,
 }: {
   state: GameState;
-  pending: Extract<Pending, { kind: 'block' | 'counter' }>;
+  pending: Extract<Pending, { kind: 'block' | 'counter' | 'selectTargets' }>;
+  /** Alvos já marcados (escolha de alvos). */
+  picked: string[];
   human: PlayerId;
   onDispatch: (a: Action) => void;
   /** Ferramentas manuais (perfil Dev) durante a etapa de Counter. */
@@ -1238,6 +1316,42 @@ function DefenseButton({
   /** Dentro da folha da mão: botão largo. */
   sheet?: boolean;
 }) {
+  const d = pending.kind === 'selectTargets' ? targetsDecision(pending, picked) : defenseDecision(state, pending);
+  if (!d) return null;
+  const act = () => onDispatch(d.action(human));
+  return (
+    <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
+      {onTools && pending.kind === 'counter' && (
+        <button className="btn small defense-tools" onClick={onTools} title="Ferramentas manuais">
+          ⚙
+        </button>
+      )}
+      <button
+        className={['end-turn', 'defense', d.pulse && !d.disabled ? 'pulse' : ''].join(' ')}
+        onClick={act}
+        disabled={d.disabled}
+        title={d.title}
+      >
+        <b>{d.label}</b>
+        <small>{d.sub}</small>
+      </button>
+      {clock && <span className="defense-clock">{clock}</span>}
+    </div>
+  );
+}
+
+interface Decision {
+  label: string;
+  sub: string;
+  title: string;
+  /** Chama o olhar: não há mais o que fazer antes de concluir. */
+  pulse: boolean;
+  disabled?: boolean;
+  action: (player: PlayerId) => Action;
+}
+
+/** Blocker/Counter: rótulo com o resultado previsto do ataque. */
+function defenseDecision(state: GameState, pending: Extract<Pending, { kind: 'block' | 'counter' }>): Decision | null {
   const b = state.battle;
   if (!b) return null;
   const atk = getPower(state, b.attacker) ?? 0;
@@ -1257,27 +1371,50 @@ function DefenseButton({
   }
   const label = !counter ? 'Não bloquear' : !hits ? 'Concluir' : used ? 'Não usar mais Counter' : 'Não usar Counter';
   const result = hits ? 'o ataque passa' : 'defendido';
-  const title = !counter
-    ? `Seguir sem bloquear: ${result} (${atk} contra ${def})`
-    : `Encerrar a etapa de Counter: ${result} (${atk} contra ${def})`;
-  const act = () =>
-    onDispatch(counter ? { type: 'pass', player: human } : { type: 'choose', player: human, uids: [] });
-  return (
-    <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
-      {onTools && counter && (
-        <button className="btn small defense-tools" onClick={onTools} title="Ferramentas manuais">
-          ⚙
-        </button>
-      )}
-      <button className={['end-turn', 'defense', useless ? 'pulse' : ''].join(' ')} onClick={act} title={title}>
-        <b>{label}</b>
-        <small>
-          {result} · {atk} ⚔ {def}
-        </small>
-      </button>
-      {clock && <span className="defense-clock">{clock}</span>}
-    </div>
-  );
+  return {
+    label,
+    sub: `${result} · ${atk} ⚔ ${def}`,
+    title: !counter
+      ? `Seguir sem bloquear: ${result} (${atk} contra ${def})`
+      : `Encerrar a etapa de Counter: ${result} (${atk} contra ${def})`,
+    pulse: useless,
+    action: (player) => (counter ? { type: 'pass', player } : { type: 'choose', player, uids: [] }),
+  };
+}
+
+/** Escolha de alvos de efeito: "Confirmar (n/máx)", "Não escolher" ou "Continuar", com o contador. */
+function targetsDecision(pending: Extract<Pending, { kind: 'selectTargets' }>, picked: string[]): Decision {
+  const n = picked.length;
+  const { max } = pending;
+  // O mínimo nunca passa do que há para escolher.
+  const need = Math.min(pending.min, pending.options.length);
+  if (max === 0) {
+    return {
+      label: 'Continuar',
+      sub: 'nada a escolher',
+      title: pending.prompt,
+      pulse: true,
+      action: (player) => ({ type: 'choose', player, uids: [] }),
+    };
+  }
+  if (n === 0 && need === 0) {
+    return {
+      label: 'Não escolher',
+      sub: `nenhuma marcada · até ${max}`,
+      title: `${pending.prompt} — seguir sem escolher`,
+      pulse: false,
+      action: (player) => ({ type: 'choose', player, uids: [] }),
+    };
+  }
+  const missing = need - n;
+  return {
+    label: `Confirmar (${n}/${max})`,
+    sub: missing > 0 ? `marque mais ${missing}` : n < max ? 'pode marcar mais' : 'escolha completa',
+    title: pending.prompt,
+    pulse: n === max,
+    disabled: missing > 0,
+    action: (player) => ({ type: 'choose', player, uids: picked }),
+  };
 }
 
 /** Poder do atacante contra o alvo, com o que falta para defender (como o "Dano previsto" do Pocket). */
@@ -1497,7 +1634,7 @@ function Prompt(props: {
       // Opções fora da mesa (topo do deck, descarte, Vida) aparecem dentro do prompt.
       // Numa busca, todas as cartas olhadas aparecem; as que não podem ser escolhidas ficam apagadas.
       const shown = pending.shown?.length ? pending.shown : null;
-      const offBoard = shown ?? pending.options.filter((u) => ['deck', 'trash', 'life'].includes(zoneOf(state, u) ?? ''));
+      const offBoard = shown ?? pending.options.filter((u) => OFF_TABLE.includes(zoneOf(state, u) ?? ''));
       const blocked = shown ? shown.filter((u) => !pending.options.includes(u)).length : 0;
       const confirm = (
         <div className="btn-row">
@@ -1554,9 +1691,13 @@ function Prompt(props: {
           </div>
         );
       }
+      // Alvos todos na mesa ou na mão: o pedido fica na faixa central (TargetRequest) e o botão de
+      // confirmar no lugar de "Encerrar turno" (DecisionButton), como no Counter.
+      if (offBoard.length === 0) return null;
+      // Mistura de alvos na mesa e fora dela: o balão mostra as cartas de fora.
       return (
         <PromptPill title={pending.prompt} subtitle={`Toque nas cartas destacadas (${picked.length}/${pending.max}).`}>
-          {offBoard.length > 0 && options}
+          {options}
           {order}
           {confirm}
         </PromptPill>
@@ -1564,7 +1705,7 @@ function Prompt(props: {
     }
     case 'block':
     case 'counter':
-      // Blocker e Counter: o botão de concluir fica na faixa central (DefenseButton), junto do
+      // Blocker e Counter: o botão de concluir fica na faixa central (DecisionButton), junto do
       // confronto de poder e perto da mão; a dica de uso fica logo acima do leque.
       return null;
     case 'manual': {
