@@ -9,6 +9,7 @@ import {
   legalActions,
   locate,
   manualAllowed,
+  type Pending,
   type PlayerId,
   translateToPt,
   zoneOf,
@@ -32,6 +33,7 @@ import {
   EmoteBar,
   EmoteBubbles,
   OnlineBanner,
+  OnlineClock,
   OnlineResultInfo,
   OnlineStatus,
   OnlineWaiting,
@@ -415,6 +417,16 @@ function Table({
     setZoom(null);
     setSelected(null);
   };
+  /** Decisão de defesa (Blocker ou Counter) que é deste jogador: vira o botão grande na faixa central. */
+  const defense = myPending && (myPending.kind === 'block' || myPending.kind === 'counter') && state.battle ? myPending : null;
+  const defenseHint =
+    defense?.kind === 'block'
+      ? 'Toque num Personagem com [Blocker] para bloquear'
+      : defense?.kind === 'counter'
+        ? quickCounter
+          ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
+          : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
+        : null;
 
   /** Destinos válidos para o que está sendo arrastado. */
   const dropValid = (d: Pick<Drag, 'kind' | 'uid'>, over: string | null): boolean => {
@@ -775,6 +787,7 @@ function Table({
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}
+          handHint={defenseHint}
           lifted={lifted}
           ghost={drag?.kind === 'hand' ? drag.uid : null}
           center={
@@ -792,6 +805,18 @@ function Table({
               onEnd={() => dispatch({ type: 'endTurn', player: human! })}
               onCancelMode={() => setMode(null)}
               onTogglePause={() => game.setPaused((p) => !p)}
+              defense={
+                defense && (
+                  <DefenseButton
+                    state={state}
+                    pending={defense}
+                    human={human!}
+                    onDispatch={dispatch}
+                    onTools={dev ? () => setSheet('tools') : undefined}
+                    clock={online && !watching ? <OnlineClock online={online} player={human!} /> : undefined}
+                  />
+                )
+              }
             />
           }
           {...handlers}
@@ -953,6 +978,16 @@ function Table({
         {sheet === 'hand' && human !== null && (
           <SheetFrame title={`Sua mão (${orderedHand.length})`} onClose={() => setSheet(null)}>
             {state.battle && <BattleInfo state={state} human={human} />}
+            {defense && (
+              <DefenseButton
+                state={state}
+                pending={defense}
+                human={human}
+                onDispatch={dispatch}
+                clock={online && !watching ? <OnlineClock online={online} player={human} /> : undefined}
+                sheet
+              />
+            )}
             <p className="muted small hand-sheet-hint">
               {myPending?.kind === 'counter'
                 ? quickCounter
@@ -1084,6 +1119,8 @@ function CenterBand(props: {
   onEnd: () => void;
   onCancelMode: () => void;
   onTogglePause: () => void;
+  /** Blocker/Counter do jogador: o botão de decisão toma o lugar de "Encerrar turno". */
+  defense?: ReactNode;
 }) {
   const { state, human, mode, acting, watching } = props;
   const b = state.battle;
@@ -1137,7 +1174,9 @@ function CenterBand(props: {
         <b>{state.phase === 'mulligan' ? '—' : state.turn}</b>
       </div>
       <div className="band-middle">{middle}</div>
-      {human !== null ? (
+      {props.defense ? (
+        props.defense
+      ) : human !== null ? (
         <button className="end-turn" disabled={!props.canEnd} onClick={props.onEnd}>
           Encerrar
           <br />
@@ -1172,6 +1211,72 @@ function EyeIcon({ closed }: { closed: boolean }) {
       <circle cx="12" cy="12" r="3" />
       {closed && <path d="M4 4l16 16" />}
     </svg>
+  );
+}
+
+/**
+ * Botão grande para concluir a etapa de Blocker ou de Counter ("Não bloquear", "Não usar Counter"),
+ * sempre no mesmo lugar (o de "Encerrar turno"), com o resultado previsto do ataque. Pulsa quando
+ * nenhuma carta da mão muda o resultado. Online, o relógio do jogador fica ao lado: o tempo corre aqui.
+ */
+function DefenseButton({
+  state,
+  pending,
+  human,
+  onDispatch,
+  onTools,
+  clock,
+  sheet,
+}: {
+  state: GameState;
+  pending: Extract<Pending, { kind: 'block' | 'counter' }>;
+  human: PlayerId;
+  onDispatch: (a: Action) => void;
+  /** Ferramentas manuais (perfil Dev) durante a etapa de Counter. */
+  onTools?: () => void;
+  clock?: ReactNode;
+  /** Dentro da folha da mão: botão largo. */
+  sheet?: boolean;
+}) {
+  const b = state.battle;
+  if (!b) return null;
+  const atk = getPower(state, b.attacker) ?? 0;
+  const def = getPower(state, b.target) ?? 0;
+  const hits = atk >= def;
+  const need = atk - def + 1000;
+  const counter = pending.kind === 'counter';
+  // Já houve Counter nesta batalha: o alvo carrega um bônus de poder "até o fim da batalha".
+  const used = counter && state.modifiers.some((m) => m.uid === b.target && m.kind === 'power' && m.duration === 'battle');
+  // Nada na mão muda o resultado: o ataque já falha, ou os Counters somados não chegam ao que falta
+  // (eventos [Counter] podem ter efeitos além do valor, então contam como úteis).
+  let useless = !hits;
+  if (counter && hits) {
+    const events = pending.options.some((u) => cardDef(state, u).category === 'event');
+    const total = pending.options.reduce((sum, u) => sum + counterValue(state, u), 0);
+    useless = !events && total < need;
+  }
+  const label = !counter ? 'Não bloquear' : !hits ? 'Concluir' : used ? 'Não usar mais Counter' : 'Não usar Counter';
+  const result = hits ? 'o ataque passa' : 'defendido';
+  const title = !counter
+    ? `Seguir sem bloquear: ${result} (${atk} contra ${def})`
+    : `Encerrar a etapa de Counter: ${result} (${atk} contra ${def})`;
+  const act = () =>
+    onDispatch(counter ? { type: 'pass', player: human } : { type: 'choose', player: human, uids: [] });
+  return (
+    <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
+      {onTools && counter && (
+        <button className="btn small defense-tools" onClick={onTools} title="Ferramentas manuais">
+          ⚙
+        </button>
+      )}
+      <button className={['end-turn', 'defense', useless ? 'pulse' : ''].join(' ')} onClick={act} title={title}>
+        <b>{label}</b>
+        <small>
+          {result} · {atk} ⚔ {def}
+        </small>
+      </button>
+      {clock && <span className="defense-clock">{clock}</span>}
+    </div>
   );
 }
 
@@ -1335,7 +1440,7 @@ function Prompt(props: {
   onTools?: () => void;
 }) {
   const { state, human, picked, onDispatch } = props;
-  const { lang, quickCounter } = useSettings();
+  const { lang } = useSettings();
   const pending = state.pending;
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
 
@@ -1458,37 +1563,10 @@ function Prompt(props: {
       );
     }
     case 'block':
-      return (
-        <PromptPill title="Bloquear?" subtitle="Toque num Personagem com [Blocker] para receber o ataque.">
-          <div className="btn-row">
-            <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-              Não bloquear
-            </button>
-          </div>
-        </PromptPill>
-      );
     case 'counter':
-      return (
-        <PromptPill
-          title="Etapa de Counter"
-          subtitle={
-            quickCounter
-              ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter na hora.'
-              : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme para usar o Counter.'
-          }
-        >
-          <div className="btn-row">
-            {props.onTools && (
-              <button className="btn" onClick={props.onTools}>
-                ⚙
-              </button>
-            )}
-            <button className="btn primary" onClick={() => onDispatch({ type: 'pass', player: human })}>
-              Concluir counters
-            </button>
-          </div>
-        </PromptPill>
-      );
+      // Blocker e Counter: o botão de concluir fica na faixa central (DefenseButton), junto do
+      // confronto de poder e perto da mão; a dica de uso fica logo acima do leque.
+      return null;
     case 'manual': {
       const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
       const name = cardDef(state, pending.source).name;
@@ -1532,7 +1610,7 @@ function Prompt(props: {
                 Ativar [Trigger]
               </button>
               <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-                Adicionar à mão
+                Não ativar <small>(vai para a mão)</small>
               </button>
             </div>
           </div>
