@@ -5,7 +5,7 @@
 // card_image, card_image_id, set_id, rarity. O mapeamento também aceita nomes
 // alternativos comuns, para tolerar mudanças na API.
 
-import { type CardCategory, type CardData, type Color, normalizeTypeQuotes } from '@gumgum/engine';
+import { type CardCategory, type CardData, type Color, normalizeTypeQuotes, parseCard } from '@gumgum/engine';
 
 export const DEFAULT_API_BASE = 'https://optcgapi.com/api';
 
@@ -16,7 +16,7 @@ type Raw = Record<string, unknown>;
 const pick = (raw: Raw, ...keys: string[]): unknown => {
   for (const k of keys) {
     const v = raw[k];
-    if (v !== undefined && v !== null && v !== '' && v !== 'NULL' && v !== '-') return v;
+    if (v !== undefined && v !== null && v !== '' && v !== 'NULL' && v !== 'N/A' && v !== '-') return v;
   }
   return undefined;
 };
@@ -119,7 +119,8 @@ const VERSION_SUFFIX = new RegExp(
 export function cleanName(name: string): string {
   let out = name.trim();
   for (;;) {
-    const next = out.replace(VERSION_SUFFIX, '');
+    // "Boa Hancock - OP14-041", "Brook - ST01-011 (Reprint)": o código da carta também não é nome.
+    const next = out.replace(VERSION_SUFFIX, '').replace(/\s+-\s+[A-Z]+\d*-\d+$/, '');
     if (next === out) return out;
     out = next.trim();
   }
@@ -234,25 +235,91 @@ export function mapApiCard(raw: Raw, vocab: Set<string> = new Set()): CardData |
   };
 }
 
-/**
- * Converte uma resposta da API em cartas únicas. Versões alternativas (arte
- * paralela) têm o mesmo card_set_id: fica a versão cujo card_image_id é o próprio ID.
- */
 export function rowsOf(body: unknown): Raw[] {
   return (
     Array.isArray(body) ? body : ((body as { data?: unknown[] })?.data ?? (body as { cards?: unknown[] })?.cards ?? [])
   ) as Raw[];
 }
 
+type Entry = { card: CardData; raw: Raw; primary: boolean; ownSet: boolean };
+
+/** Quantas habilidades do texto o leitor de efeitos não entende (menor é melhor). */
+const unparsedCount = (c: CardData) => parseCard(c).unparsed.length;
+
+/**
+ * Junta as linhas da API que têm o mesmo card_set_id (arte paralela, reimpressão em
+ * starter deck, foil…) numa carta só. A linha primária é a impressão original
+ * (card_image_id igual ao id, de preferência na própria coleção): dela vêm nome, tipos e
+ * imagem. Os números e as listas são decididos por maioria entre as linhas, com empate
+ * para a primária: as linhas "(Reprint)" costumam vir com Counter 0 ou poder vazio, e a
+ * original também erra às vezes (OP08-001 Chopper com poder "4" e Vida "1"). O texto é o
+ * da versão que o leitor de efeitos entende melhor (a original de OP02-093 Smoker tem
+ * "1o of your opponent's Characters"), com empate pela mais repetida e depois pela primária.
+ */
+function mergeEntries(group: Entry[]): Entry {
+  const primary =
+    group.find((e) => e.primary && e.ownSet) ?? group.find((e) => e.primary) ?? group.find((e) => e.ownSet) ?? group[0];
+  if (group.length === 1) return primary;
+  const out: CardData = { ...primary.card };
+
+  const vote = <T>(get: (c: CardData) => T | undefined, key: (v: T) => string): T | undefined => {
+    const votes = new Map<string, { value: T; n: number }>();
+    for (const e of group) {
+      const v = get(e.card);
+      if (v === undefined) continue;
+      const k = key(v);
+      const cur = votes.get(k);
+      if (cur) cur.n++;
+      else votes.set(k, { value: v, n: 1 });
+    }
+    const own = get(primary.card);
+    let best = own === undefined ? undefined : votes.get(key(own));
+    for (const v of votes.values()) if (!best || v.n > best.n) best = v;
+    return best?.value;
+  };
+  const numKey = (v: number) => String(v);
+  const listKey = (v: string[]) => v.join('/');
+  const nonEmpty = <T extends string[]>(v: T | undefined): T | undefined => (v?.length ? v : undefined);
+  out.counter = vote((c) => c.counter, numKey);
+  out.power = vote((c) => c.power, numKey);
+  out.cost = vote((c) => c.cost, numKey);
+  out.life = vote((c) => c.life, numKey);
+  out.colors = vote((c) => nonEmpty(c.colors), listKey) ?? [];
+  out.attributes = vote((c) => nonEmpty(c.attributes), listKey) ?? [];
+  if (!out.types.length) out.types = group.find((e) => e.card.types.length)?.card.types ?? [];
+
+  const textKey = (c: CardData) => `${c.text}\n${c.trigger ?? ''}`;
+  // Uma versão sem o [Trigger] que outra tem está incompleta (OP03-110 Smoothie só o traz na reimpressão).
+  const anyTrigger = group.some((e) => e.card.trigger);
+  const texts = new Map<string, { card: CardData; n: number; bad: number }>();
+  for (const e of group) {
+    const k = textKey(e.card);
+    const cur = texts.get(k);
+    if (cur) cur.n++;
+    else texts.set(k, { card: e.card, n: 1, bad: unparsedCount(e.card) + (anyTrigger && !e.card.trigger ? 1 : 0) });
+  }
+  let bestText = texts.get(textKey(primary.card))!;
+  for (const t of texts.values()) if (t.bad < bestText.bad || (t.bad === bestText.bad && t.n > bestText.n)) bestText = t;
+  out.text = bestText.card.text;
+  out.trigger = bestText.card.trigger;
+  if (bestText.card.notes) out.notes = bestText.card.notes;
+  else delete out.notes;
+  if (bestText.card.aliases) out.aliases = bestText.card.aliases;
+  else delete out.aliases;
+  return { ...primary, card: out };
+}
+
+/**
+ * Converte uma resposta da API (ou várias juntas) em cartas únicas: as linhas da mesma
+ * carta são combinadas por `mergeEntries` antes de sair.
+ */
 export function mapApiResponse(
   body: unknown,
   vocab?: Set<string>,
 ): { cards: CardData[]; raw: Map<string, unknown>; ignored: number } {
-  const rows = (
-    Array.isArray(body) ? body : ((body as { data?: unknown[] })?.data ?? (body as { cards?: unknown[] })?.cards ?? [])
-  ) as Raw[];
-  const byId = new Map<string, { card: CardData; raw: Raw; primary: boolean }>();
+  const rows = rowsOf(body);
   const types = vocab ?? typeVocabulary(rows);
+  const groups = new Map<string, Entry[]>();
   let ignored = 0;
   for (const raw of rows) {
     const card = mapApiCard(raw, types);
@@ -260,11 +327,22 @@ export function mapApiResponse(
       ignored++;
       continue;
     }
-    const imageId = String(raw.card_image_id ?? card.id);
-    const primary = imageId === card.id;
-    const prev = byId.get(card.id);
-    if (!prev || (!prev.primary && primary)) byId.set(card.id, { card, raw, primary });
+    const entry: Entry = {
+      card,
+      raw,
+      primary: String(raw.card_image_id ?? card.id) === card.id,
+      ownSet: normalizeSetId(String(raw.set_id ?? '')).replace('-', '').startsWith(card.set ?? ''),
+    };
+    const g = groups.get(card.id);
+    if (g) g.push(entry);
+    else groups.set(card.id, [entry]);
   }
-  const list = [...byId.values()];
-  return { cards: list.map((x) => x.card), raw: new Map(list.map((x) => [x.card.id, x.raw])), ignored };
+  const cards: CardData[] = [];
+  const raw = new Map<string, unknown>();
+  for (const group of groups.values()) {
+    const e = mergeEntries(group);
+    cards.push(e.card);
+    raw.set(e.card.id, e.raw);
+  }
+  return { cards, raw, ignored };
 }

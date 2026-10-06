@@ -668,7 +668,7 @@ function event(e: GameEvent, ctx: Ctx): string {
 function cost(c: AbilityCost, ctx: Ctx): string {
   const symbols: string[] = [];
   if (c.restDon) symbols.push(CIRCLED[c.restDon - 1] ?? `(${c.restDon})`);
-  if (c.donMinus) symbols.push(`DON!! −${c.donMinus}`);
+  if (c.donMinus) symbols.push(`DON!! −${c.donMinus}${c.donMinusOpen ? ' ou mais' : ''}`);
   const parts: string[] = [];
   if (c.restSelf) parts.push(`virar ${ctx.self}`);
   if (c.trashFromHand) {

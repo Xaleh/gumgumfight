@@ -1,0 +1,120 @@
+{
+ "note": "Cartas reais da optcgapi usadas nos testes de regressão (bugs relatados no Trello).",
+ "cards": [
+  {
+   "id": "OP17-058",
+   "name": "Kaido",
+   "category": "leader",
+   "colors": [
+    "purple"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Animal Kingdom Pirates",
+    "The Four Emperors"
+   ],
+   "text": "[When Attacking]/ [On Your Opponent's Attack] [Once Per Turn] DON!! -1: Give up to 1 of your opponent's Characters -2000 power during this turn.",
+   "set": "OP17"
+  },
+  {
+   "id": "OP09-076",
+   "name": "Roronoa Zoro",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 3,
+   "power": 5000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Straw Hat Crew"
+   ],
+   "text": "[On Play] You may return 1 or more DON!! cards from your field to your DON!! deck: Add up to 1 DON!! card from your DON!! deck and set it as active.",
+   "set": "OP09"
+  },
+  {
+   "id": "OP09-073",
+   "name": "Brook",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 6,
+   "power": 7000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Straw Hat Crew"
+   ],
+   "text": "[When Attacking] You may return 1 or more DON!! cards from your field to your DON!! deck: Give up to 2 of your opponent's Characters 2000 power during this turn.",
+   "set": "OP09"
+  },
+  {
+   "id": "OP09-065",
+   "name": "Sanji",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 7,
+   "power": 7000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Straw Hat Crew"
+   ],
+   "text": "[On Play] You may return 1 or more DON!! cards from your field to your DON!! deck: This Character gains [Rush] during this turn. Then, rest up to 1 of your opponent's Characters with a cost of 6 or less.",
+   "set": "OP09"
+  },
+  {
+   "id": "OP09-068",
+   "name": "Tony Tony.Chopper",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Animal",
+    "Straw Hat Crew"
+   ],
+   "text": "[End of Your Turn] You may return 1 or more DON!! cards from your field to your DON!! deck: Set this Character as active. Then, this Character gains [Blocker] until the end of your opponent's next turn.",
+   "set": "OP09"
+  },
+  {
+   "id": "OP05-070",
+   "name": "Fra-Nosuke",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 5,
+   "power": 4000,
+   "counter": 0,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Straw Hat Crew"
+   ],
+   "text": "[DON!! x1] If you have 8 or more DON!! cards on your field, this Character gains [Rush]. (This card can attack on the turn in which it is played.)",
+   "set": "OP05"
+  }
+ ]
+}
