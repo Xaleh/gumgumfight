@@ -58,11 +58,11 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   // Carta que este jogador não vê (partida online): só o verso.
   if (def.id === HIDDEN_CARD) {
     return (
-      <div className={['card', 'back', highlight ? `hl-${highlight}` : '', onClick ? 'clickable' : ''].join(' ')} onClick={onClick} data-uid={uid}>
-        <div className="back-emblem">
-          <JollyRoger />
-        </div>
-      </div>
+      <div
+        className={['card', 'back', highlight ? `hl-${highlight}` : '', onClick ? 'clickable' : ''].join(' ')}
+        onClick={onClick}
+        data-uid={uid}
+      />
     );
   }
 
@@ -246,15 +246,12 @@ export function StaticCard({
 export function CardBack({ label, small }: { label?: string | number; small?: boolean }) {
   return (
     <div className={['card', 'back', small ? 'small' : ''].join(' ')}>
-      <div className="back-emblem">
-        <JollyRoger />
-      </div>
       {label !== undefined && <div className="back-label">{label}</div>}
     </div>
   );
 }
 
-/** Caveira com chapéu de palha (verso das cartas e mesa). */
+/** Caveira com chapéu de palha (mesa). */
 export function JollyRoger() {
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
