@@ -64,15 +64,18 @@ async function main() {
     knownTypes(),
   );
 
-  for (const { label, body } of bodies) {
-    const r = mapApiResponse(body, vocab);
-    const src = { label };
-    console.log(`${src.label}: ${r.cards.length} cartas${r.ignored ? ` (${r.ignored} entradas ignoradas)` : ''}`);
-    for (const c of r.cards) {
-      cards.set(c.id, c);
-      raw.set(c.id, r.raw.get(c.id));
-    }
+  for (const { label, body } of bodies) console.log(`${label}: ${rowsOf(body).length} entradas`);
+  // Todas as linhas juntas: a mesma carta aparece em várias fontes (coleção e starter deck
+  // que a reimprime) e a versão certa é escolhida vendo todas (mergeRows).
+  const mapped = mapApiResponse(
+    bodies.flatMap((b) => rowsOf(b.body)),
+    vocab,
+  );
+  for (const c of mapped.cards) {
+    cards.set(c.id, c);
+    raw.set(c.id, mapped.raw.get(c.id));
   }
+  if (mapped.ignored) console.log(`${mapped.ignored} entradas ignoradas (sem id, DON!! ou tipo desconhecido)`);
 
   const list = [...cards.values()];
   const count = (st: string) => list.filter((c) => automationStatus(c) === st).length;

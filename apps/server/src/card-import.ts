@@ -36,17 +36,11 @@ export const fetchJson: FetchJson = async (url) => {
 
 /** Mapeia respostas da API (o vocabulário de tipos vem de todas juntas) e grava como cartas oficiais. */
 export function importBodies(db: DB, bodies: unknown[], source: string): CardData[] {
-  const vocab = typeVocabulary(bodies.flatMap(rowsOf), knownTypes());
-  const cards = new Map<string, CardData>();
-  const raw = new Map<string, unknown>();
-  for (const body of bodies) {
-    const r = mapApiResponse(body, vocab);
-    for (const c of r.cards) {
-      cards.set(c.id, c);
-      raw.set(c.id, r.raw.get(c.id));
-    }
-  }
-  const list = [...cards.values()];
+  // Todas as linhas juntas: a mesma carta aparece em vários corpos (coleção e starter deck
+  // que a reimprime), e a escolha da versão certa precisa ver todas (mergeRows).
+  const rows = bodies.flatMap(rowsOf);
+  const vocab = typeVocabulary(rows, knownTypes());
+  const { cards: list, raw } = mapApiResponse(rows, vocab);
   if (list.length) upsertCards(db, list, { provisional: false, source, raw });
   return list;
 }
