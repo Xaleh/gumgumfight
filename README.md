@@ -60,8 +60,17 @@ O backup é só copiar o arquivo `.db`.
 
 ## Deploy automático (GitHub Actions)
 
-O workflow `.github/workflows/ci-deploy.yml` roda os testes em todo push. Em push na **main** (ou em "Run workflow"),
-ele publica o site no servidor de produção:
+O workflow `.github/workflows/ci-deploy.yml` roda os testes em todo push e publica em dois ambientes:
+
+| Branch   | Environment (GitHub) | Site                               | Servidor                                   |
+|----------|----------------------|------------------------------------|--------------------------------------------|
+| `main`   | `production`         | https://gumgumfight.app            | VPS da Hostinger (`deploy/bootstrap-hostinger.sh`) |
+| `hmg`    | `homologacao`        | https://gumgumfight.duckdns.org    | servidor de testes (`deploy/setup-vm.sh`)  |
+
+**Fluxo:** cada branch de trabalho é mesclado na **`hmg`** (push → deploy na homologação); depois de testado em
+`gumgumfight.duckdns.org`, a `hmg` é mesclada na **`main`** (push → deploy na produção). "Run workflow" em
+qualquer outro branch publica aquele branch na homologação, para testar sem mesclar (o próximo push na `hmg`
+sobrescreve). Em cada deploy o workflow:
 
 1. Monta o pacote e o testa (sobe o servidor e consulta a API) antes de enviar.
 2. Copia o pacote por SSH para uma pasta de releases no servidor e troca o link `current`.
@@ -94,7 +103,8 @@ Node padrão for mais antigo) e um site separado no proxy.
      bash setup-vm.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
      ```
    Variáveis opcionais: `DOMAIN`, `PORT`, `CERTBOT_EMAIL` (veja o início de cada script).
-4. **No GitHub** → Settings → Secrets and variables → Actions → *New repository secret*:
+4. **No GitHub** → Settings → **Environments** → *New environment*: crie `production` e `homologacao`. Em cada um,
+   *Environment secrets* com os dados **daquele** servidor (use uma chave de deploy por servidor):
 
    | Secret               | Valor                                                  |
    |----------------------|--------------------------------------------------------|
@@ -105,11 +115,18 @@ Node padrão for mais antigo) e um site separado no proxy.
 
    Use sempre **Secrets** (nunca *Variables*, que ficam visíveis para quem lê o repositório).
    A exceção é a Variable `GOOGLE_CLIENT_ID` do login com Google, que é pública (veja [Contas](#contas-login-com-google)).
-5. **No GitHub** → Settings → General → *Default branch*: `main`.
-6. **Primeiro deploy:** Actions → "CI e deploy" → *Run workflow* (branch `main`), com `import_sets` = `ST-01 ST-02`
-   para já importar as cartas reais. Depois disso, todo push na `main` publica sozinho.
+   Secrets e Variables cadastrados no **repositório** valem para os dois ambientes; os do Environment têm
+   prioridade. (Se o servidor de testes já estava nos *Repository secrets*, basta criar os secrets do
+   Environment `production` para a VPS nova: a homologação continua usando os do repositório.)
+5. **No GitHub** → Settings → General → *Default branch*: `main`. Crie o branch `hmg` a partir da `main`
+   (`git checkout -b hmg main && git push -u origin hmg`). Recomendado, em *Branches → Branch protection*:
+   proteger `main` para receber mudanças só por pull request.
+6. **Primeiro deploy:** Actions → "CI e deploy" → *Run workflow* (branch `main` para a produção, `hmg` para a
+   homologação), com `import_sets` = `ST-01 ST-02` para já importar as cartas reais num servidor novo. Depois
+   disso, todo push na `main` ou na `hmg` publica sozinho no ambiente correspondente.
 
-Enquanto os secrets não existirem, o job de deploy é pulado com um aviso (os testes continuam rodando).
+Enquanto os secrets de um ambiente não existirem, o deploy nele é pulado com um aviso (os testes continuam rodando).
+Cada ambiente tem o seu banco: decks, contas e partidas da homologação não vão para a produção.
 
 ### Operação (no servidor)
 
@@ -325,13 +342,14 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
 1. No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), crie (ou escolha) um projeto e
    configure a **tela de consentimento OAuth** (tipo *Externo*; só os escopos básicos: e-mail, perfil e openid).
 2. **Credenciais → Criar credenciais → ID do cliente OAuth**, tipo **Aplicativo da Web**. Em **Origens JavaScript
-   autorizadas**, inclua `https://gumgumfight.app`, `http://localhost:5173` e `http://localhost` (o botão do
+   autorizadas**, inclua `https://gumgumfight.app`, `https://gumgumfight.duckdns.org`, `http://localhost:5173` e `http://localhost` (o botão do
    Google exige as duas formas do localhost). Não é preciso URI de redirecionamento nem a chave secreta.
 3. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`). Ele não é segredo: vai para todo navegador.
    - **Desenvolvimento:** crie um arquivo `.env` na raiz do projeto com `GOOGLE_CLIENT_ID=...` (o arquivo é ignorado
      pelo git) e reinicie o `npm run dev`.
-   - **Produção:** no GitHub → Settings → Secrets and variables → Actions → aba **Variables** → *New repository
-     variable* `GOOGLE_CLIENT_ID`. O próximo deploy grava o valor em `shared/deploy.env` na VM.
+   - **Produção e homologação:** no GitHub → Settings → Secrets and variables → Actions → aba **Variables** → *New
+     repository variable* `GOOGLE_CLIENT_ID` (vale para os dois ambientes; para usar um Client ID diferente em um
+     deles, cadastre a Variable no Environment). O próximo deploy grava o valor em `shared/deploy.env` na VM.
 
 Sem `GOOGLE_CLIENT_ID`, o botão não aparece e `POST /api/auth/google` responde 503.
 

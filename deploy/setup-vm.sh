@@ -7,11 +7,11 @@
 #
 # Funciona com Nginx instalado no host ou com o Nginx Proxy Manager (Docker): detecta sozinho.
 #
-# Variáveis opcionais: DOMAIN (gumgumfight.app), PORT (3310),
+# Variáveis opcionais: DOMAIN (gumgumfight.duckdns.org), PORT (3310),
 #   PROXY (auto | nginx | npm | none), CERTBOT_EMAIL (só no modo nginx), GUMGUM_APP_DIR.
 set -euo pipefail
 
-DOMAIN="${DOMAIN:-gumgumfight.app}"
+DOMAIN="${DOMAIN:-gumgumfight.duckdns.org}"
 PORT="${PORT:-3310}"
 APP_DIR="${GUMGUM_APP_DIR:-$HOME/apps/gumgumfight}"
 DEPLOY_PUBKEY="${1:-}"
