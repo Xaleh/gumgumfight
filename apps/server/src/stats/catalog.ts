@@ -8,6 +8,7 @@ export { FORMATS, type FormatId, isFormat } from '@gumgum/engine';
 export const QUEUES = [
   { id: 'casual', label: 'Casual' },
   { id: 'ranked', label: 'Ranqueada' },
+  { id: 'tournament', label: 'Torneio' },
 ] as const;
 export type QueueId = (typeof QUEUES)[number]['id'];
 

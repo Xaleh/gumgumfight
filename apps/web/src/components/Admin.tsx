@@ -5,10 +5,11 @@ import { useAuth } from '../auth';
 const ROLE_HELP: Record<Role, string> = {
   player: 'Joga e assiste às partidas sem ver as mãos.',
   streamer: 'Assiste às partidas podendo ver as mãos dos dois jogadores.',
-  admin: 'Tudo do Streamer e muda os perfis das contas.',
+  organizer: 'Cria torneios e gerencia os que criou (inscrições, rodadas e resultados).',
+  admin: 'Tudo do Streamer e do Organizador, gerencia qualquer torneio e muda os perfis das contas.',
 };
 
-/** Perfis das contas (só admin): Player, Streamer ou Admin. */
+/** Perfis das contas (só admin): Player, Streamer, Organizador ou Admin. */
 export function Admin({ onExit }: { onExit: () => void }) {
   const { user } = useAuth();
   const [query, setQuery] = useState('');

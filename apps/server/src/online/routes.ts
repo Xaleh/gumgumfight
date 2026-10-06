@@ -33,15 +33,41 @@ interface Deps {
   /** Treino contra o bot do servidor (ONLINE_BOT_ROOMS). */
   botRooms?: boolean;
   botDelayMs?: number;
+  /** Fim de uma partida de torneio: lança o resultado no torneio. */
+  onTournamentGame?: (game: { tournamentId: string; matchId: number; roomId: string; winner: string | null; statsMatchId: number | null }) => void;
 }
 
 const isError = (v: unknown): v is LobbyError => typeof v === 'object' && v !== null && 'error' in v;
 
+/**
+ * Deck pronto para jogar no formato (e sem cartas manuais, se `noManual`): usado
+ * pelas salas online e pela inscrição nos torneios.
+ */
+export function playableDeck(db: DB, deckId: unknown, format: FormatId, noManual: boolean): DeckList | LobbyError {
+  const deck = typeof deckId === 'string' && deckId ? getDeck(db, deckId) : null;
+  if (!deck) return { code: 400, error: 'Escolha um deck.' };
+  const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
+  const report = validateDeck(deck, cards);
+  if (!report.valid) return { code: 400, error: 'Esse deck não é válido para jogar.' };
+  const banned = formatIssues(deck, format);
+  if (banned.length) return { code: 400, error: `Esse deck não é permitido no formato ${formatLabel(format)}. ${banned[0].message}` };
+  // Inclui cartas com script que ainda tenham alguma parte resolvida à mão.
+  const manual = new Set([...report.unscripted, ...[...cards.values()].filter((c) => buildCardDef(c).manual).map((c) => c.id)]);
+  if (noManual && manual.size) {
+    return {
+      code: 400,
+      error: `Na ranqueada o modo manual não é permitido: este deck tem ${manual.size} carta(s) com efeito ainda não automatizado (⚙).`,
+    };
+  }
+  return { id: deck.id, name: deck.name, leader: deck.leader, cards: deck.cards };
+}
+
 /** Grava a partida terminada nas estatísticas (refeita pelo motor, como as do navegador). */
-function finishMatch(db: DB, room: Room): RoomResult {
+function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGame']): RoomResult {
   const replay = {
     seed: 0,
     seed128: room.data.seed128!,
+    firstPlayer: room.data.firstPlayer,
     decks: [room.data.seats[0].deck, room.data.seats[1].deck] as [typeof room.data.seats[0]['deck'], typeof room.data.seats[0]['deck']],
     actions: room.data.actions,
   };
@@ -55,11 +81,19 @@ function finishMatch(db: DB, room: Room): RoomResult {
   };
   // Treino contra o bot entra nas estatísticas como as partidas contra o bot do navegador.
   const mode = room.data.queue === 'bot' ? 'bot' : 'online';
-  const matchId = recordMatch(
-    db,
-    { mode, format: room.data.format, queue: room.ranked ? 'ranked' : 'casual', replay, seats: [seat(0), seat(1)] },
-    facts,
-  );
+  const queue = room.ranked ? 'ranked' : room.data.queue === 'tournament' ? 'tournament' : 'casual';
+  const matchId = recordMatch(db, { mode, format: room.data.format, queue, replay, seats: [seat(0), seat(1)] }, facts);
+  const t = room.data.tournament;
+  if (t) {
+    const winner = room.state?.winner ?? null;
+    onTournamentGame?.({
+      tournamentId: t.id,
+      matchId: t.matchId,
+      roomId: room.id,
+      winner: winner === null ? null : room.data.seats[winner].userId,
+      statsMatchId: matchId,
+    });
+  }
   return { matchId, bounty: matchBounties(db, matchId) };
 }
 
@@ -67,7 +101,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   const { db, viewerHash, user, present } = deps;
   const lobby = new Lobby({
     cards: (ids) => present(getCards(db, ids)),
-    finish: (room) => finishMatch(db, room),
+    finish: (room) => finishMatch(db, room, deps.onTournamentGame),
     save: (data) => saveLiveMatch(db, data.id, data),
     remove: (id) => deleteLiveMatch(db, id),
     now: deps.now,
@@ -115,24 +149,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   };
 
   /** Deck pronto para jogar no formato (e sem cartas manuais, na ranqueada). */
-  const deckFor = (deckId: unknown, format: FormatId, ranked: boolean): DeckList | LobbyError => {
-    const deck = typeof deckId === 'string' && deckId ? getDeck(db, deckId) : null;
-    if (!deck) return { code: 400, error: 'Escolha um deck.' };
-    const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
-    const report = validateDeck(deck, cards);
-    if (!report.valid) return { code: 400, error: 'Esse deck não é válido para jogar.' };
-    const banned = formatIssues(deck, format);
-    if (banned.length) return { code: 400, error: `Esse deck não é permitido no formato ${formatLabel(format)}. ${banned[0].message}` };
-    // Inclui cartas com script que ainda tenham alguma parte resolvida à mão.
-    const manual = new Set([...report.unscripted, ...[...cards.values()].filter((c) => buildCardDef(c).manual).map((c) => c.id)]);
-    if (ranked && manual.size) {
-      return {
-        code: 400,
-        error: `Na ranqueada o modo manual não é permitido: este deck tem ${manual.size} carta(s) com efeito ainda não automatizado (⚙).`,
-      };
-    }
-    return { id: deck.id, name: deck.name, leader: deck.leader, cards: deck.cards };
-  };
+  const deckFor = (deckId: unknown, format: FormatId, ranked: boolean) => playableDeck(db, deckId, format, ranked);
   const formatOf = (v: unknown): FormatId => (isFormat(v) ? v : 'standard');
 
   /** Sala + assento a partir do token (query `t` ou corpo). */

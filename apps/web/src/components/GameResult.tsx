@@ -7,6 +7,8 @@ interface Props {
   human: PlayerId | null;
   actions: Action[];
   onExit: () => void;
+  /** Texto do botão de saída (padrão "Voltar ao menu"). */
+  exitLabel?: string;
   onRematch?: () => void;
   /** Texto do botão de revanche (online: "Pedir revanche"). */
   rematchLabel?: string;
@@ -17,7 +19,7 @@ interface Props {
 }
 
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
-export function GameResult({ state, human, actions, onExit, onRematch, rematchLabel, onReplay, onLog, extra }: Props) {
+export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, extra }: Props) {
   const me: PlayerId = human ?? state.winner ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
   const won = state.winner === me;
@@ -116,7 +118,7 @@ export function GameResult({ state, human, actions, onExit, onRematch, rematchLa
             </button>
           )}
           <button className="btn big" onClick={onExit}>
-            Voltar ao menu
+            {exitLabel ?? 'Voltar ao menu'}
           </button>
           <button className="btn small pill" onClick={onReplay}>
             ⤓ Baixar replay

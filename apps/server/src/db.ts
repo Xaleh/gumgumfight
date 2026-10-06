@@ -1,9 +1,9 @@
 // Banco local SQLite (arquivo único, sem custo de serviço externo).
 // Usa o SQLite embutido no Node (`node:sqlite`): nenhum módulo nativo para
 // compilar ou baixar, então funciona igual no Windows, Linux e macOS.
-// Toda a SQL fica aqui, em stats/store.ts (consultas das estatísticas) e em
-// auth/store.ts (contas e sessões); se um dia for preciso migrar para Postgres,
-// só esses arquivos mudam.
+// Toda a SQL fica aqui, em stats/store.ts (consultas das estatísticas), em
+// auth/store.ts (contas e sessões) e em tournaments/store.ts (torneios); se um dia
+// for preciso migrar para Postgres, só esses arquivos mudam.
 
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -88,6 +88,68 @@ function migrate(db: DB) {
   if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
   migrateStats(db);
   migrateAuth(db);
+  migrateTournaments(db);
+}
+
+/**
+ * Torneios criados pelos organizadores. A lista de cada inscrito fica congelada na
+ * inscrição (mudar o deck salvo depois não muda o deck do torneio).
+ */
+function migrateTournaments(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tournaments (
+      id           TEXT PRIMARY KEY,
+      name         TEXT NOT NULL,
+      description  TEXT NOT NULL DEFAULT '',
+      format       TEXT NOT NULL,
+      structure    TEXT NOT NULL,             -- swiss | single (eliminação simples)
+      rounds       INTEGER,                   -- rodadas do suíço: escolhidas pelo organizador ou calculadas no início
+      swiss_best_of INTEGER NOT NULL DEFAULT 1, -- partidas do suíço: melhor de 1 ou de 3
+      top_cut      INTEGER,                   -- suíço: quantos vão para a eliminatória depois (null = sem top cut)
+      bo3_from     INTEGER,                   -- eliminatória: melhor de 3 a partir da fase com estas vagas (8 = quartas)
+      bo5_from     INTEGER,                   -- eliminatória: melhor de 5 a partir da fase com estas vagas (2 = final)
+      max_players  INTEGER,
+      starts_at    TEXT,                      -- data e hora previstas (ISO), só informativo
+      status       TEXT NOT NULL DEFAULT 'registration',  -- registration | running | finished
+      round        INTEGER NOT NULL DEFAULT 0,  -- rodada atual (0 = não começou)
+      organizer_id TEXT NOT NULL REFERENCES users(id),
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      started_at   TEXT,
+      finished_at  TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS tournament_players (
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      user_id       TEXT NOT NULL REFERENCES users(id),
+      name          TEXT NOT NULL,             -- nome público (perfil de estatísticas) na inscrição
+      deck_id       TEXT,
+      deck          TEXT NOT NULL,             -- JSON DeckList congelado na inscrição
+      seed          INTEGER,                   -- ordem sorteada no início (desempate e chave)
+      dropped       INTEGER NOT NULL DEFAULT 0,
+      registered_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (tournament_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS tournament_matches (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      round         INTEGER NOT NULL,
+      stage         TEXT NOT NULL DEFAULT 'swiss',  -- swiss | elim (top cut ou eliminação simples)
+      table_no      INTEGER NOT NULL,
+      p1            TEXT NOT NULL,
+      p2            TEXT,                      -- null = bye
+      best_of       INTEGER NOT NULL DEFAULT 1,
+      wins1         INTEGER NOT NULL DEFAULT 0,  -- jogos vencidos na série
+      wins2         INTEGER NOT NULL DEFAULT 0,
+      result        TEXT,                      -- p1 | p2 | bye (null = série em andamento); não há empate
+      next_first    TEXT,                      -- quem começa o próximo jogo da série (quem perdeu o anterior)
+      room_id       TEXT,                      -- sala online do jogo atual da série
+      match_id      INTEGER,                   -- partida gravada nas estatísticas
+      reported_by   TEXT,                      -- game (sala online), bye, drop (desistência) ou id de quem lançou
+      updated_at    TEXT
+    );
+    CREATE INDEX IF NOT EXISTS tournament_matches_round ON tournament_matches(tournament_id, round);
+  `);
 }
 
 /** Contas (login com Google) e sessões abertas. Do token de sessão só o hash é guardado. */
@@ -111,7 +173,7 @@ function migrateAuth(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
   `);
-  // Perfil da conta: player (padrão), streamer (assiste vendo as mãos) ou admin.
+  // Perfil da conta: player (padrão), streamer (assiste vendo as mãos), organizer (torneios) ou admin.
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!userCols.includes('role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'player'");
 }

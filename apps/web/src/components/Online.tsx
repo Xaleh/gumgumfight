@@ -1,5 +1,6 @@
 import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
+import type { OnlineRoomInfo } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
 
 export const TIER_LABEL: Record<string, string> = {
@@ -22,6 +23,14 @@ const EMOTES: Array<[string, string]> = [
   ['hurry', 'Vamos lá? ⏳'],
 ];
 const EMOTE_TEXT = Object.fromEntries(EMOTES);
+
+/** Placar da série de torneio depois deste jogo (na ordem dos assentos) e se ela acabou. */
+export function seriesAfter(t: NonNullable<OnlineRoomInfo['tournament']>, winner: PlayerId | null) {
+  const score = [t.score[0] ?? 0, t.score[1] ?? 0];
+  if (winner !== null) score[winner]++;
+  const need = Math.floor(t.bestOf / 2) + 1;
+  return { score, decided: score.some((n) => n >= need) };
+}
 
 const bounty = (n: number) => `฿ ${n.toLocaleString('pt-BR')}`;
 
@@ -147,8 +156,22 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
   const me = room.you;
   const opp = me === 0 ? 1 : 0;
   const mine = room.result?.bounty?.[me];
+  const t = room.tournament;
+  const series = t && t.bestOf > 1 && online.state ? seriesAfter(t, online.state.winner) : null;
   return (
     <div className="online-result">
+      {t && (
+        <p className="small">
+          🏆 {t.name} · {t.label}
+          {series && (
+            <>
+              {' '}
+              · placar da série <b>{series.score[me]}–{series.score[opp]}</b>
+              {series.decided ? (series.score[me] > series.score[opp] ? ' — você venceu a série!' : ' — série encerrada.') : ''}
+            </>
+          )}
+        </p>
+      )}
       {room.queue === 'ranked' && mine && mine.before !== null && mine.after !== null && (
         <p className="bounty-change">
           Recompensa: {bounty(mine.before)} → <b>{bounty(mine.after)}</b>{' '}
@@ -190,6 +213,19 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
             <>
               <h2>{online.watching && online.error ? 'Não foi possível assistir' : 'Partida não encontrada'}</h2>
               <p className="muted">{online.error ?? 'A sala foi cancelada ou expirou.'}</p>
+            </>
+          ) : room?.status === 'waiting' && room.tournament ? (
+            <>
+              <h2>🏆 {room.tournament.name}</h2>
+              <p className="muted">
+                {room.tournament.label}
+                {room.tournament.bestOf > 1 &&
+                  ` · Jogo ${room.tournament.game} da melhor de ${room.tournament.bestOf} (placar ${room.tournament.score[0] ?? 0}–${room.tournament.score[1] ?? 0})`}
+                . O jogo começa quando o seu oponente clicar em "Jogar" na página do torneio.
+              </p>
+              <p className="muted small waiting-dots">
+                Aguardando o oponente<span className="dots" />
+              </p>
             </>
           ) : room?.status === 'waiting' ? (
             <>
