@@ -14,6 +14,12 @@ interface Snapshot {
 
 export type Connection = 'connecting' | 'open' | 'lost' | 'gone';
 
+export interface DiceThrow {
+  seat: PlayerId;
+  vx: number;
+  vy: number;
+}
+
 export interface Emote {
   seat: PlayerId;
   emote: string;
@@ -43,6 +49,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const [conn, setConn] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [emotes, setEmotes] = useState<Emote[]>([]);
+  /** Lançamentos do dado do sorteio de cada assento (para ver o dado do oponente rolar). */
+  const [diceThrows, setDiceThrows] = useState<[DiceThrow | null, DiceThrow | null]>([null, null]);
   const [rematch, setRematch] = useState<RematchTarget | null>(null);
   const [peek, setPeek] = useState(0);
   /** O servidor recusou mostrar as mãos (ex.: a conta joga esta partida): o espectador volta para a visão pública. */
@@ -102,6 +110,10 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
         const key = Date.now() + Math.random();
         setEmotes((list) => [...list.slice(-3), { ...m, key }]);
         setTimeout(() => setEmotes((list) => list.filter((x) => x.key !== key)), 3500);
+      });
+      es.addEventListener('dice', (e) => {
+        const t = JSON.parse((e as MessageEvent).data) as DiceThrow;
+        if (t.seat === 0 || t.seat === 1) setDiceThrows((cur) => (cur[t.seat] ? cur : (cur.map((x, i) => (i === t.seat ? t : x)) as typeof cur)));
       });
       es.addEventListener('rematch', (e) => setRematch(JSON.parse((e as MessageEvent).data) as RematchTarget));
       es.addEventListener('closed', () => {
@@ -196,6 +208,12 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     (emote: string) => api.online.emote(seat.roomId, seat.token, emote).catch((e) => setError(e instanceof Error ? e.message : String(e))),
     [seat.roomId, seat.token],
   );
+  const sendDice = useCallback(
+    (vx: number, vy: number) => {
+      if (!watching) void api.online.dice(seat.roomId, seat.token, vx, vy).catch(() => undefined);
+    },
+    [seat.roomId, seat.token, watching],
+  );
   const askRematch = useCallback(
     () => api.online.rematch(seat.roomId, seat.token).catch((e) => setError(e instanceof Error ? e.message : String(e))),
     [seat.roomId, seat.token],
@@ -227,6 +245,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     dispatch,
     emotes,
     sendEmote,
+    diceThrows,
+    sendDice,
     rematch,
     askRematch,
     leave,

@@ -11,6 +11,7 @@ import {
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
+import { motionWait } from './motion';
 
 export type GameMode = 'bot' | 'demo' | 'replay';
 
@@ -32,6 +33,8 @@ export interface ReplayFile {
   seed128?: number[];
   decks?: [DeckList, DeckList];
   firstPlayer: PlayerId;
+  /** O vencedor do sorteio escolheu quem começa: `firstPlayer` é só informativo. */
+  chooseFirst?: boolean;
   names: [string, string];
   deckIds: [string, string];
   actions: Action[];
@@ -55,6 +58,8 @@ export function useGame(setup: GameSetup) {
   const [speed, setSpeed] = useState(1);
   /** "Auto": o bot joga pelo humano até o modo ser desligado. */
   const [auto, setAuto] = useState(false);
+  /** A mesa segura o bot (sorteio inicial na tela). */
+  const [hold, setHold] = useState(false);
 
   const human: PlayerId | null = setup.mode === 'bot' ? 0 : null;
 
@@ -95,7 +100,7 @@ export function useGame(setup: GameSetup) {
 
   // Bots e replay agem sozinhos, com um pequeno atraso para a jogada ser visível.
   useEffect(() => {
-    if (state.phase === 'gameover' || paused) return;
+    if (state.phase === 'gameover' || paused || hold) return;
     const p = actingPlayer(state);
     if (p === null) return;
     let next: Action | undefined;
@@ -105,10 +110,13 @@ export function useGame(setup: GameSetup) {
       next = chooseBotAction(state, p);
     }
     if (!next) return;
-    const delay = (state.pending ? 500 : 800) / speed;
+    // Espera as cartas pousarem antes da próxima jogada.
+    // A escolha de quem começa demora um pouco mais (dá tempo de ver quem venceu o sorteio).
+    const base = state.pending?.kind === 'chooseFirst' ? 1300 : state.pending ? 500 : 800;
+    const delay = Math.max(base / speed, motionWait() + 120);
     const t = setTimeout(() => dispatch(next!), delay);
     return () => clearTimeout(t);
-  }, [state, paused, speed, setup, dispatch, auto, human]);
+  }, [state, paused, hold, speed, setup, dispatch, auto, human]);
 
   const exportReplay = useCallback((): ReplayFile => {
     const first = entries[0].state;
@@ -116,7 +124,8 @@ export function useGame(setup: GameSetup) {
       format: 'gumgumfight-replay',
       version: 1,
       seed: first.seed,
-      firstPlayer: first.firstPlayer,
+      firstPlayer: entries[entries.length - 1].state.firstPlayer,
+      ...(first.rollWinner !== undefined ? { chooseFirst: true } : {}),
       names: [first.players[0].name, first.players[1].name],
       deckIds: setup.deckIds,
       actions: actionsRef.current,
@@ -138,6 +147,7 @@ export function useGame(setup: GameSetup) {
     setSpeed,
     auto,
     setAuto,
+    setHold,
     undo,
     canUndo,
     exportReplay,

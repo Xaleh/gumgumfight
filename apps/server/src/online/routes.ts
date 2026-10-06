@@ -67,6 +67,7 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
   const replay = {
     seed: 0,
     seed128: room.data.seed128!,
+    chooseFirst: room.data.chooseFirst,
     firstPlayer: room.data.firstPlayer,
     decks: [room.data.seats[0].deck, room.data.seats[1].deck] as [typeof room.data.seats[0]['deck'], typeof room.data.seats[0]['deck']],
     actions: room.data.actions,
@@ -320,7 +321,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     stream(req, reply, room, { seat: null, hands });
   });
 
-  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown };
+  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; vx?: unknown; vy?: unknown };
   const withSeat = (req: FastifyRequest<{ Params: { id: string }; Body: SeatBody }>) => seatIn(req.params.id, req.body?.t);
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/action', async (req, reply) => {
@@ -333,6 +334,13 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     }
     const r = found.room.act(found.seat, req.body?.seq, req.body?.action);
     return r.ok ? r : reply.code(r.code).send({ error: r.error });
+  });
+
+  app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/dice', async (req, reply) => {
+    const found = withSeat(req);
+    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    const r = found.room.throwDice(found.seat, req.body?.vx, req.body?.vy);
+    return r.ok ? reply.code(204).send() : reply.code(r.code).send({ error: r.error });
   });
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/emote', async (req, reply) => {

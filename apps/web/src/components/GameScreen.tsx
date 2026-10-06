@@ -16,15 +16,18 @@ import {
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, isDev, type OnlineSeat, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
+import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
+import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
 import { ManualTools } from './ManualTools';
+import { useBoardMotion } from './Motion';
 import {
   EmoteBar,
   EmoteBubbles,
@@ -83,6 +86,8 @@ interface TableGame {
   setSpeed: (v: number) => void;
   auto: boolean;
   setAuto: (f: (a: boolean) => boolean) => void;
+  /** Segura o bot (partida no navegador) enquanto o sorteio inicial está na tela. */
+  setHold?: (hold: boolean) => void;
   undo: () => void;
   canUndo: boolean;
   actions: () => Action[];
@@ -104,6 +109,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       format: setup.format,
       seed: setup.config.seed,
       firstPlayer: setup.config.firstPlayer,
+      chooseFirst: setup.config.chooseFirst,
       deckIds: setup.deckIds,
       decks: [setup.config.players[0].deck, setup.config.players[1].deck],
       actions: game.actions(),
@@ -269,7 +275,34 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter } = useSettings();
+  const { quickCounter, animations, lang } = useSettings();
+  // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
+  // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
+  const animate = animations;
+  // Cartas voando entre as zonas (mais rápidas com o bot acelerado).
+  const allActions = game.actions();
+  const motion = useBoardMotion(state, {
+    enabled: animate,
+    tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
+    lastAction: allActions[allActions.length - 1],
+    lang,
+  });
+  // Sorteio com dados no começo da partida: só quando há sorteio (quem começa não foi
+  // escolhido no menu), e não no replay nem ao voltar para uma partida em andamento.
+  const [intro, setIntro] = useState(
+    () =>
+      animate &&
+      kind !== 'replay' &&
+      state.rollWinner !== undefined &&
+      state.phase === 'mulligan' &&
+      state.players.every((p) => !p.mulliganDone),
+  );
+  /** Os dados ainda rolam: o bot espera para fazer a escolha dele. */
+  const [rolling, setRolling] = useState(intro);
+  const { setHold } = game;
+  useEffect(() => {
+    setHold?.(intro && rolling);
+  }, [intro, rolling, setHold]);
   const [selectedUid, setSelected] = useState<string | null>(null);
   const [hoveredUid, setHovered] = useState<string | null>(null);
   const [zoomUid, setZoom] = useState<string | null>(null);
@@ -279,7 +312,7 @@ function Table({
   const [drag, setDrag] = useState<Drag | null>(null);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
   const [showBotHand, setShowBotHand] = useState(kind === 'demo' || kind === 'replay' || watching);
-  const [banner, setBanner] = useState<{ text: string; mine: boolean; key: number } | null>(null);
+  const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
   const [handOrder, setHandOrder] = useState<string[]>([]);
@@ -350,16 +383,11 @@ function Table({
     const p = state.activePlayer;
     const mine = human === null ? p === 0 : p === human;
     const name = state.players[p].name;
-    const text =
-      state.turn === 1
-        ? human !== null && p === human
-          ? 'Você jogará primeiro.'
-          : `${name} jogará primeiro.`
-        : human !== null && p === human
-          ? 'Seu turno!'
-          : `Turno de ${name}`;
-    setBanner({ text, mine, key: state.turn });
-    const t = setTimeout(() => setBanner(null), 1700);
+    const you = human !== null && p === human;
+    const text = you ? 'Seu turno!' : `Turno de ${name}`;
+    const kicker = state.turn === 1 ? (you ? 'Você joga primeiro' : `${name} joga primeiro`) : `Turno ${state.turn}`;
+    setBanner({ text, kicker, mine, key: state.turn });
+    const t = setTimeout(() => setBanner(null), 1900);
     return () => clearTimeout(t);
     // Só muda na troca de turno (não a cada ação).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -770,10 +798,15 @@ function Table({
         />
 
         {banner && state.phase === 'main' && (
-          <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs'].join(' ')}>
-            {banner.text}
+          <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs', animate ? 'sweep' : ''].join(' ')}>
+            <div className="tb-stripe">
+              <small>{banner.kicker}</small>
+              <b>{banner.text}</b>
+            </div>
           </div>
         )}
+
+        {motion.layer}
 
         {online && <EmoteBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
@@ -784,7 +817,22 @@ function Table({
           </div>
         )}
 
+        {intro && (
+          <DiceRoll
+            state={state}
+            human={human}
+            remote={online ? { throws: online.diceThrows, send: online.sendDice } : undefined}
+            onResult={() => setRolling(false)}
+            onChoose={(first) => {
+              dispatch({ type: 'answer', player: human!, yes: first });
+              setIntro(false);
+            }}
+            onDone={() => setIntro(false)}
+          />
+        )}
+
         <Prompt
+          hidden={intro || motion.busy}
           state={state}
           human={human}
           picked={picked}
@@ -1063,6 +1111,12 @@ function CenterBand(props: {
         {state.players[acting].name} está pensando<span className="dots" />
       </span>
     );
+  else if (state.pending?.kind === 'chooseFirst' && acting !== null && acting !== human)
+    middle = (
+      <span className="hint-pill thinking">
+        {state.players[acting].name} venceu o sorteio e está escolhendo quem começa<span className="dots" />
+      </span>
+    );
   else if (state.phase === 'mulligan' && (human !== null || watching) && acting !== null && acting !== human)
     middle = (
       <span className="hint-pill thinking">
@@ -1132,17 +1186,29 @@ function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null
   let status: string;
   if (human !== null && defender === human) status = hits ? `Faltam +${need} para defender` : 'Defendido!';
   else status = hits ? 'O ataque vai acertar' : `Faltam +${def - atk} para acertar`;
+  // Etapa da batalha (a visão do oponente também traz o tipo da escolha pendente).
+  const step =
+    state.pending?.kind === 'block'
+      ? 'Etapa de Bloqueio'
+      : state.pending?.kind === 'counter'
+        ? 'Etapa de Counter'
+        : state.stack.some((f) => f.kind === 'damage')
+          ? 'Etapa de Dano'
+          : 'Ataque';
   return (
     <div className="battle-info">
+      <div key={step} className="battle-step">
+        {step}
+      </div>
       <div className="battle-row">
         <span className="pow atk">
           <em>{cardDef(state, b.attacker).name}</em>
-          <b>{atk}</b>
+          <b key={atk}>{atk}</b>
         </span>
         <span className="vs">⚔</span>
         <span className="pow def">
           <em>{cardDef(state, b.target).name}</em>
-          <b>{def}</b>
+          <b key={def}>{def}</b>
         </span>
       </div>
       <div className={['battle-status', hits ? 'hit' : 'safe'].join(' ')}>
@@ -1257,6 +1323,8 @@ function AttackArrow({
 // ------------------------------------------------------------------ prompts
 
 function Prompt(props: {
+  /** Ainda não aparece (sorteio inicial na tela). */
+  hidden?: boolean;
   state: GameState;
   human: PlayerId | null;
   picked: string[];
@@ -1269,9 +1337,30 @@ function Prompt(props: {
   const { state, human, picked, onDispatch } = props;
   const { lang, quickCounter } = useSettings();
   const pending = state.pending;
-  if (state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
+  if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
 
   switch (pending.kind) {
+    case 'chooseFirst':
+      return (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-kicker">Sorteio inicial</div>
+            <h2>Você venceu o sorteio!</h2>
+            <p className="muted">Quer jogar primeiro ou segundo?</p>
+            <p className="muted small">
+              Quem joga primeiro não compra carta no primeiro turno e recebe 1 DON!!; quem joga segundo compra e recebe 2 DON!!.
+            </p>
+            <div className="btn-row center">
+              <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                Jogar primeiro
+              </button>
+              <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+                Jogar segundo
+              </button>
+            </div>
+          </div>
+        </div>
+      );
     case 'mulligan': {
       const first = state.firstPlayer === human;
       return (
@@ -1561,6 +1650,7 @@ function CardZoom(props: {
   onTools: () => void;
 }) {
   const { state, uid, legal } = props;
+  const { lang } = useSettings();
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
   const play = legal.find((a) => a.type === 'playCard' && a.uid === uid);
@@ -1568,8 +1658,13 @@ function CardZoom(props: {
   const canAttack = legal.some((a) => a.type === 'attack' && a.attacker === uid);
   const attach = legal.find((a) => a.type === 'attachDon' && a.target === uid);
   const owner = state.cards[uid].owner;
-  const hasActions = Boolean(play || activates.length || canAttack || attach || props.canManual || props.onCounter);
+  const isEvent = def.category === 'event';
+  // Eventos: usar a carta (ou o Counter dela) é o texto dela, destacado sobre a carta.
+  const eventPlay = isEvent ? play : undefined;
+  const eventCounter = isEvent ? props.onCounter : undefined;
+  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || props.canManual || (props.onCounter && !eventCounter));
   const counter = counterValue(state, uid);
+  const eventText = isEvent ? cardText(def, lang).text : '';
 
   return (
     <div className="modal-backdrop zoom-backdrop" onClick={props.onClose}>
@@ -1579,18 +1674,64 @@ function CardZoom(props: {
         </button>
         <div className="zoom-card">
           <CardView state={state} uid={uid} fc={loc?.fc} />
+          {/* Habilidades ativáveis destacadas sobre a própria carta: toque no texto para usar. */}
+          {(activates.length > 0 || eventPlay || eventCounter) && (
+            <div className="zoom-plates">
+              {eventCounter && (
+                <button className="ability-plate counter" onClick={eventCounter}>
+                  <div className="plate-title">
+                    <span className="plate-icon">🛡</span>
+                    Usar evento [Counter]
+                    {counter > 0 && <span className="plate-chip">+{counter}</span>}
+                  </div>
+                  <p className="plate-text">{eventText}</p>
+                  <span className="plate-tap">Toque para usar</span>
+                </button>
+              )}
+              {eventPlay && (
+                <button className="ability-plate" onClick={() => props.onDispatch(eventPlay)}>
+                  <div className="plate-title">
+                    <span className="plate-icon">✦</span>
+                    Usar evento
+                    <span className="plate-chip">Custo {def.cost}</span>
+                  </div>
+                  <p className="plate-text">{eventText}</p>
+                  <span className="plate-tap">Toque para usar</span>
+                </button>
+              )}
+              {activates.map((a) => {
+                const ability = def.abilities[a.ability];
+                return (
+                  <button key={a.ability} className="ability-plate" onClick={() => props.onDispatch(a)}>
+                    <div className="plate-title">
+                      <span className="plate-icon">✦</span>
+                      {abilityTitle(ability, lang)}
+                      {abilityCostLabel(ability).map((c) => (
+                        <span key={c} className="plate-chip">
+                          {c}
+                        </span>
+                      ))}
+                      {ability.oncePerTurn && <span className="plate-chip soft">1× por turno</span>}
+                    </div>
+                    <p className="plate-text">{abilityText(def, a.ability, lang)}</p>
+                    <span className="plate-tap">Toque para ativar</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         {hasActions && (
           <div className="zoom-actions">
-            {props.onCounter && (
+            {props.onCounter && !eventCounter && (
               <button className="btn primary big" onClick={props.onCounter}>
-                🛡 {def.category === 'event' ? 'Usar evento [Counter]' : 'Usar como Counter'}
+                🛡 Usar como Counter
                 {counter > 0 && <span className="cost-chip">+{counter}</span>}
               </button>
             )}
-            {play && (
+            {play && !eventPlay && (
               <button className="btn primary big" onClick={() => props.onDispatch(play)}>
-                {def.category === 'event' ? 'Usar evento' : 'Jogar'} <span className="cost-chip">{def.cost}</span>
+                Jogar <span className="cost-chip">{def.cost}</span>
               </button>
             )}
             {canAttack && (
@@ -1598,11 +1739,6 @@ function CardZoom(props: {
                 ⚔ Atacar <span className="cost-chip">{getPower(state, uid)}</span>
               </button>
             )}
-            {activates.map((a) => (
-              <button key={a.ability} className="btn big" onClick={() => props.onDispatch(a)}>
-                ✦ {def.abilities[a.ability].label ?? 'Ativar efeito'}
-              </button>
-            ))}
             {attach && (
               <button className="btn don big" onClick={() => props.onDispatch(attach)}>
                 + 1 DON!! <small>({state.players[owner].donActive} ativos)</small>

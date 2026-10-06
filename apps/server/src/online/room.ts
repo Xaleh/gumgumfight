@@ -50,6 +50,12 @@ export const MAX_SPECTATORS = 100;
 /** Pausa antes de cada jogada do bot, para a jogada ser visível. */
 const BOT_DELAY_MS = 700;
 
+export interface DiceThrow {
+  seat: PlayerId;
+  vx: number;
+  vy: number;
+}
+
 export const EMOTES = ['hello', 'gg', 'nice', 'think', 'wow', 'oops', 'thanks', 'hurry'] as const;
 export type EmoteId = (typeof EMOTES)[number];
 
@@ -109,6 +115,11 @@ export interface RoomData {
   createdAt: number;
   seats: SeatInfo[];
   seed128: number[] | null;
+  /**
+   * O vencedor do sorteio escolhe se joga primeiro. Salas gravadas antes desta
+   * opção não têm o campo e continuam sendo refeitas como foram jogadas.
+   */
+  chooseFirst?: boolean;
   aliasSalt: string;
   actions: Action[];
   remaining: [number, number];
@@ -164,6 +175,7 @@ export function newRoomData(
     createdAt: Date.now(),
     seats: init.seats,
     seed128: null,
+    chooseFirst: true,
     aliasSalt: randomBytes(16).toString('hex'),
     actions: [],
     remaining: [TIME_BANK_MS, TIME_BANK_MS],
@@ -186,6 +198,11 @@ export class Room {
   private peek: [number, number] = [0, 0];
   private recent: [number[], number[]] = [[], []];
   private lastEmote: [number, number] = [0, 0];
+  /**
+   * Lançamento do dado do sorteio de cada assento (velocidade em larguras/alturas da
+   * mesa por segundo). Só para a animação: o vencedor já saiu da seed. Fica em memória.
+   */
+  private diceThrows: [DiceThrow | null, DiceThrow | null] = [null, null];
   private lastAction: Action | null = null;
   private readonly deps: Required<Pick<RoomDeps, 'now' | 'log'>> & RoomDeps;
 
@@ -229,6 +246,7 @@ export class Room {
     return {
       seed: 0,
       seed128: this.data.seed128!,
+      chooseFirst: Boolean(this.data.chooseFirst),
       ...(this.data.firstPlayer !== undefined ? { firstPlayer: this.data.firstPlayer } : {}),
       cards: this.deps.cards(ids),
       players: [
@@ -391,6 +409,19 @@ export class Room {
     return n && this.state ? this.state.players[seat].deck.slice(0, n) : [];
   }
 
+  /** O jogador jogou o dado do sorteio: os outros veem o mesmo lançamento. */
+  throwDice(seat: PlayerId, vx: unknown, vy: unknown): ActResult {
+    const ok = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+    if (!ok(vx) || !ok(vy)) return { ok: false, code: 400, error: 'Lançamento inválido.' };
+    if (!this.state || this.state.phase !== 'mulligan') return { ok: false, code: 409, error: 'O sorteio já passou.' };
+    if (this.diceThrows[seat]) return { ok: true, actionCount: this.state.actionCount };
+    const clamp = (v: number) => Math.max(-12, Math.min(12, v));
+    const t = { seat, vx: clamp(vx), vy: clamp(vy) };
+    this.diceThrows[seat] = t;
+    for (const c of this.conns) c.send('dice', t);
+    return { ok: true, actionCount: this.state.actionCount };
+  }
+
   emote(seat: PlayerId, emote: unknown): ActResult {
     if (!EMOTES.includes(emote as EmoteId)) return { ok: false, code: 400, error: 'Emote inválido.' };
     const now = this.deps.now();
@@ -424,6 +455,8 @@ export class Room {
     this.conns.add(conn);
     this.updatePresence();
     conn.send('state', this.snapshot(conn));
+    // Quem chega durante o sorteio vê os dados já jogados.
+    if (this.state?.phase === 'mulligan') for (const t of this.diceThrows) if (t) conn.send('dice', t);
     this.broadcastPresence();
   }
 
@@ -544,6 +577,8 @@ export class Room {
       seed: 0,
       seed128: this.data.seed128,
       firstPlayer: this.state.firstPlayer,
+      // Houve a escolha do vencedor do sorteio (não quando a sala já definia quem começa).
+      ...(this.state.rollWinner !== undefined ? { chooseFirst: true } : {}),
       names: this.data.seats.map((s) => s.name),
       deckIds: this.data.seats.map((s) => s.deckId),
       decks: this.data.seats.map((s) => s.deck),

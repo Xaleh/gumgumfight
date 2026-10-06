@@ -100,6 +100,8 @@ export function createGame(config: GameConfig): GameState {
   }) as [PlayerState, PlayerState];
 
   const firstPlayer: PlayerId = config.firstPlayer ?? (holder.rng128 ? (nextRandom(holder) < 0.5 ? 0 : 1) : holder.rng & 1 ? 0 : 1);
+  // O vencedor do sorteio escolhe se joga primeiro ou segundo.
+  const choose = Boolean(config.chooseFirst) && config.firstPlayer === undefined;
 
   const state: GameState = {
     version: 1,
@@ -108,6 +110,7 @@ export function createGame(config: GameConfig): GameState {
     ...(holder.rng128 ? { rng128: holder.rng128 } : {}),
     turn: 0,
     firstPlayer,
+    ...(choose ? { rollWinner: firstPlayer } : {}),
     activePlayer: firstPlayer,
     phase: 'mulligan',
     players,
@@ -115,7 +118,7 @@ export function createGame(config: GameConfig): GameState {
     defs,
     battle: null,
     stack: [],
-    pending: { kind: 'mulligan', player: firstPlayer },
+    pending: { kind: choose ? 'chooseFirst' : 'mulligan', player: firstPlayer },
     modifiers: [],
     usedThisTurn: [],
     winner: null,
@@ -135,7 +138,8 @@ export function createGame(config: GameConfig): GameState {
     }
   }
   for (const p of players) drawCards(state, p.id, HAND_SIZE);
-  log(state, null, `${players[firstPlayer].name} joga primeiro.`);
+  if (choose) log(state, null, `${players[firstPlayer].name} venceu o sorteio e escolhe quem começa.`);
+  else log(state, null, `${players[firstPlayer].name} joga primeiro.`);
   return state;
 }
 
@@ -915,6 +919,16 @@ function handlePendingResponse(state: GameState, action: Action) {
   const p = action.player;
 
   switch (pending.kind) {
+    case 'chooseFirst': {
+      if (action.type !== 'answer') throw new IllegalActionError('Escolha se você joga primeiro ou segundo.');
+      const first = action.yes ? p : opponent(p);
+      state.firstPlayer = first;
+      state.activePlayer = first;
+      log(state, p, `${state.players[p].name} escolheu jogar ${action.yes ? 'primeiro' : 'segundo'}.`);
+      log(state, null, `${state.players[first].name} joga primeiro.`);
+      state.pending = { kind: 'mulligan', player: first };
+      return;
+    }
     case 'mulligan': {
       if (action.type !== 'mulligan') throw new IllegalActionError('Escolha manter ou trocar a mão.');
       const ps = state.players[p];
