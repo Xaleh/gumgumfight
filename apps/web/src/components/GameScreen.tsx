@@ -811,6 +811,7 @@ function Table({
           <DiceRoll
             state={state}
             human={human}
+            remote={online ? { throws: online.diceThrows, send: online.sendDice } : undefined}
             onResult={() => setRolling(false)}
             onChoose={(first) => {
               dispatch({ type: 'answer', player: human!, yes: first });

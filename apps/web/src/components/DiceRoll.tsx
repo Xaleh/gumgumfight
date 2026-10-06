@@ -1,5 +1,7 @@
 // Sorteio inicial com dados 3D: o jogador segura o dado com o dedo (ou o mouse),
-// chacoalha e solta para jogá-lo na mesa; o do oponente é jogado junto.
+// chacoalha e solta para jogá-lo na mesa. Depois vem a vez do oponente: o bot
+// pega o dado, chacoalha e joga; no online, o dado dele rola quando ele joga (o
+// servidor repassa o gesto). O vencedor só aparece depois que os dois param.
 //
 // O vencedor do sorteio já foi definido pelo motor (state.rollWinner, a partir da
 // seed); os dados só mostram esse resultado: o valor de cada um é escolhido para
@@ -8,6 +10,7 @@
 
 import type { GameState, PlayerId } from '@gumgum/engine';
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
+import type { DiceThrow } from '../game/useOnlineGame';
 import { CardView } from './CardView';
 
 const SIZE = 52;
@@ -18,6 +21,12 @@ const ROLL = 360 / (Math.PI * SIZE);
 const FACE: Record<number, [number, number]> = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 2: [-90, 0], 5: [90, 0] };
 /** Casas da grade 3×3 com pinta, por valor. */
 const PIPS: Record<number, number[]> = { 1: [5], 2: [3, 7], 3: [3, 5, 7], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+
+type DieStatus = 'idle' | 'held' | 'shaking' | 'rolling' | 'done';
+/** Quem joga cada dado: o próprio jogador, o navegador (bot) ou o oponente pela rede. */
+type Ctrl = 'user' | 'auto' | 'remote';
+/** Sem notícia do oponente pela rede, o dado dele é jogado sozinho depois deste tempo. */
+const REMOTE_WAIT_MS = 10_000;
 
 interface Die {
   x: number;
@@ -32,17 +41,21 @@ interface Die {
   /** Giro no ar (graus/s). */
   wz: number;
   value: number;
-  state: 'idle' | 'held' | 'rolling' | 'settling' | 'done';
+  state: 'idle' | 'held' | 'shaking' | 'rolling' | 'settling' | 'done';
+  /** Onde o dado fica parado (o bot chacoalha em volta daqui). */
+  home: { x: number; y: number };
+  thrownAt?: number;
+  shakeUntil?: number;
   settle?: { t: number; from: [number, number, number]; to: [number, number, number] };
 }
 
-type Phase = 'ready' | 'held' | 'rolling' | 'result';
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 export function DiceRoll({
   state,
   human,
+  remote,
   onResult,
   onChoose,
   onDone,
@@ -50,7 +63,9 @@ export function DiceRoll({
   state: GameState;
   /** null: ninguém joga (espectador, bot x bot): os dados são lançados sozinhos. */
   human: PlayerId | null;
-  /** Os dados pararam (o bot pode fazer a escolha dele). */
+  /** Partida online: lançamentos de cada assento e envio do seu. */
+  remote?: { throws: [DiceThrow | null, DiceThrow | null]; send: (vx: number, vy: number) => void };
+  /** Os dois dados pararam (o bot pode fazer a escolha dele). */
   onResult: () => void;
   /** O jogador venceu e escolheu: true = jogar primeiro. */
   onChoose: (first: boolean) => void;
@@ -58,25 +73,47 @@ export function DiceRoll({
 }) {
   const me: PlayerId = human ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
+  /** Assento de cada dado: o de baixo é o seu (ou o do jogador 0, para o espectador). */
+  const seats: [PlayerId, PlayerId] = [me, opp];
   const winner = state.rollWinner ?? state.firstPlayer;
   /** O vencedor ainda não escolheu se joga primeiro ou segundo. */
   const choosing = state.pending?.kind === 'chooseFirst';
   const iWon = human !== null && winner === human;
-  // O vencedor tira o maior número (sem empate).
+  const isBot = (p: PlayerId) => state.players[p].isBot;
+  const [ctrl] = useState<[Ctrl, Ctrl]>(() => [
+    human !== null ? 'user' : remote && !isBot(me) ? 'remote' : 'auto',
+    remote && !isBot(opp) ? 'remote' : 'auto',
+  ]);
+  // O vencedor tira o maior número (sem empate). Os números saem do que os dois
+  // jogadores têm igual (seed e apelidos das cartas da partida), para todo mundo ver os mesmos.
   const values = useMemo(() => {
-    const hi = 2 + Math.floor(Math.random() * 5);
-    const lo = 1 + Math.floor(Math.random() * (hi - 1));
+    let h = 2166136261;
+    for (const ch of `${state.seed}:${state.players[0].leader.uid}:${state.players[1].leader.uid}:${winner}`) {
+      h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+    }
+    const hi = 2 + (h % 5);
+    const lo = 1 + ((h >>> 8) % (hi - 1));
     return { [winner]: hi, [winner === 0 ? 1 : 0]: lo } as Record<PlayerId, number>;
+    // Fixos durante o sorteio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner]);
 
-  const [phase, setPhase] = useState<Phase>('ready');
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
+  const [status, setStatusState] = useState<[DieStatus, DieStatus]>(['idle', 'idle']);
+  const statusRef = useRef(status);
+  const setStatus = (i: number, s: DieStatus) => {
+    if (statusRef.current[i] === s) return;
+    const next = [...statusRef.current] as [DieStatus, DieStatus];
+    next[i] = s;
+    statusRef.current = next;
+    setStatusState(next);
+  };
+  const result = status[0] === 'done' && status[1] === 'done';
   const tray = useRef<HTMLDivElement>(null);
   const dieEls = useRef<(HTMLDivElement | null)[]>([null, null]);
   const dice = useRef<[Die, Die] | null>(null);
   const samples = useRef<{ x: number; y: number; t: number }[]>([]);
   const raf = useRef(0);
+  const running = useRef(false);
   const doneRef = useRef(onDone);
   doneRef.current = onDone;
 
@@ -101,32 +138,53 @@ export function DiceRoll({
       wz: 0,
       value: values[p],
       state: 'idle',
+      home: { x, y },
     });
     dice.current = [make(me, W * 0.4, H * 0.74), make(opp, W * 0.6, H * 0.26)];
     draw();
-    // Sem jogador: lança sozinho.
-    if (human === null) {
-      const t = setTimeout(() => throwDice(rand(-250, 250), -rand(700, 1000)), 700);
-      return () => clearTimeout(t);
-    }
-    return undefined;
+    // O dado de baixo sem jogador na tela: sozinho, ou esperando o jogador pela rede.
+    if (ctrl[0] === 'user') return undefined;
+    const t = setTimeout(() => shake(0), ctrl[0] === 'auto' ? 700 : REMOTE_WAIT_MS);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A vez do oponente: depois que o seu dado para (ou sozinho, se ele não jogar).
+  useEffect(() => {
+    if (status[0] !== 'done' || status[1] !== 'idle') return;
+    const t = setTimeout(() => shake(1), ctrl[1] === 'auto' ? 450 : REMOTE_WAIT_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  // Lançamentos vindos da rede. Na tela, o oponente fica em cima: o gesto dele é espelhado.
+  const throws = remote?.throws;
+  useEffect(() => {
+    if (!throws || !dice.current) return;
+    const { W, H } = size();
+    for (const i of [0, 1]) {
+      const t = throws[seats[i]];
+      if (ctrl[i] !== 'remote' || !t || !['idle', 'shaking'].includes(dice.current[i].state)) continue;
+      const k = i === 1 ? -1 : 1;
+      launch(i, k * t.vx * W, k * t.vy * H);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [throws]);
 
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
   const resultRef = useRef(onResult);
   resultRef.current = onResult;
   useEffect(() => {
-    if (phase === 'result') resultRef.current();
-  }, [phase]);
+    if (result) resultRef.current();
+  }, [result]);
 
   // Depois da escolha, segue sozinho em pouco tempo.
   useEffect(() => {
-    if (phase !== 'result' || choosing) return;
+    if (!result || choosing) return;
     const t = setTimeout(() => doneRef.current(), 2400);
     return () => clearTimeout(t);
-  }, [phase, choosing]);
+  }, [result, choosing]);
 
   function draw() {
     const ds = dice.current;
@@ -150,12 +208,29 @@ export function DiceRoll({
 
   const nearest = (cur: number, target: number) => target + Math.round((cur - target) / 360) * 360;
 
-  function step(dt: number) {
+  function step(dt: number, now: number) {
     const ds = dice.current!;
     const { W, H } = size();
     const lo = R + 9;
-    for (const d of ds) {
+    ds.forEach((d, i) => {
+      if (d.state === 'shaking') {
+        // O bot (ou quem demorou) pega o dado e chacoalha antes de jogar.
+        const t = now / 1000;
+        d.z = 24 + Math.sin(t * 17) * 5;
+        d.x = d.home.x + Math.sin(t * 22) * 10;
+        d.y = d.home.y + Math.cos(t * 27) * 6;
+        d.rx += 820 * dt;
+        d.ry -= 640 * dt;
+        d.rz += 260 * dt;
+        if (now >= (d.shakeUntil ?? 0)) launch(i, rand(-300, 300), (i === 0 ? -1 : 1) * rand(700, 950));
+        return;
+      }
       if (d.state === 'rolling') {
+        // Segurança: depois de alguns segundos, assenta à força.
+        if (now - (d.thrownAt ?? now) > 2800) {
+          d.vx = d.vy = d.vz = 0;
+          d.z = 0;
+        }
         d.vz -= 1700 * dt;
         d.z += d.vz * dt;
         if (d.z <= 0) {
@@ -220,86 +295,106 @@ export function DiceRoll({
         if (s.t >= 1) {
           [d.rx, d.ry, d.rz] = s.to;
           d.state = 'done';
+          d.home = { x: d.x, y: d.y };
+          setStatus(i, 'done');
         }
       }
-    }
+    });
     // Um dado bate no outro.
     const [a, b] = ds;
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const dist = Math.hypot(dx, dy) || 1;
-    if (dist < SIZE * 1.05 && a.z < SIZE && b.z < SIZE && a.state === 'rolling' && b.state === 'rolling') {
+    const loose = (d: Die) => d.state === 'rolling' || d.state === 'done';
+    if (dist < SIZE * 1.05 && a.z < SIZE && b.z < SIZE && loose(a) && loose(b) && (a.state === 'rolling' || b.state === 'rolling')) {
       const nx = dx / dist;
       const ny = dy / dist;
-      const push = (SIZE * 1.05 - dist) / 2;
-      a.x -= nx * push;
-      a.y -= ny * push;
-      b.x += nx * push;
-      b.y += ny * push;
+      // O dado parado não sai do lugar: o que está rolando é que bate e volta.
+      const wa = a.state === 'rolling' ? (b.state === 'rolling' ? 0.5 : 1) : 0;
+      const push = SIZE * 1.05 - dist;
+      a.x -= nx * push * wa;
+      a.y -= ny * push * wa;
+      b.x += nx * push * (1 - wa);
+      b.y += ny * push * (1 - wa);
       const va = a.vx * nx + a.vy * ny;
       const vb = b.vx * nx + b.vy * ny;
       if (va - vb > 0) {
         const j = (va - vb) * 0.85;
-        a.vx -= j * nx;
-        a.vy -= j * ny;
-        b.vx += j * nx;
-        b.vy += j * ny;
+        if (a.state === 'rolling') {
+          a.vx -= j * nx * (b.state === 'rolling' ? 1 : 2);
+          a.vy -= j * ny * (b.state === 'rolling' ? 1 : 2);
+        }
+        if (b.state === 'rolling') {
+          b.vx += j * nx * (a.state === 'rolling' ? 1 : 2);
+          b.vy += j * ny * (a.state === 'rolling' ? 1 : 2);
+        }
       }
     }
   }
 
-  function loop(started: number) {
+  /** Roda a física enquanto algum dado estiver sendo chacoalhado ou rolando. */
+  function ensureLoop() {
+    if (running.current) return;
+    running.current = true;
     let last = performance.now();
     const tick = (now: number) => {
       const dt = Math.min(0.033, (now - last) / 1000);
       last = now;
-      const ds = dice.current!;
-      // Segurança: depois de alguns segundos, assenta à força.
-      if (now - started > 2800) {
-        for (const d of ds) if (d.state === 'rolling') {
-          d.vx = d.vy = d.vz = 0;
-          d.z = 0;
-        }
-      }
-      step(dt);
+      step(dt, now);
       draw();
-      if (ds.every((d) => d.state === 'done')) {
-        setPhase('result');
-        return;
-      }
-      raf.current = requestAnimationFrame(tick);
+      if (dice.current!.some((d) => d.state === 'shaking' || d.state === 'rolling' || d.state === 'settling')) {
+        raf.current = requestAnimationFrame(tick);
+      } else running.current = false;
     };
     raf.current = requestAnimationFrame(tick);
   }
 
-  /** Lança os dois dados: o seu com a velocidade do gesto; o do oponente, de cima para baixo. */
-  function throwDice(vx: number, vy: number) {
-    const ds = dice.current;
-    if (!ds || phaseRef.current === 'rolling' || phaseRef.current === 'result') return;
-    const [mine, theirs] = ds;
+  /** Joga o dado `i` com a velocidade dada (px/s na mesa desta tela). */
+  function launch(i: number, vx: number, vy: number) {
+    const d = dice.current?.[i];
+    if (!d || !['idle', 'held', 'shaking'].includes(d.state)) return;
     let speed = Math.hypot(vx, vy);
     if (speed < 160) {
-      // Só um toque: joga para cima, para o meio da mesa.
+      // Só um toque: joga para o meio da mesa.
       vx = rand(-260, 260);
-      vy = -rand(750, 950);
+      vy = (i === 0 ? -1 : 1) * rand(750, 950);
       speed = Math.hypot(vx, vy);
     }
     const max = 1800;
     const min = 420;
     const k = speed > max ? max / speed : speed < min ? min / speed : 1;
-    Object.assign(mine, { vx: vx * k, vy: vy * k, vz: 300 + Math.min(speed, max) * 0.18, z: Math.max(mine.z, 10), wz: rand(-500, 500), state: 'rolling' });
-    Object.assign(theirs, {
-      vx: rand(-320, 320),
-      vy: rand(650, 950),
-      vz: rand(380, 520),
-      z: 12,
+    Object.assign(d, {
+      vx: vx * k,
+      vy: vy * k,
+      vz: 300 + Math.min(speed, max) * 0.18,
+      z: Math.max(d.z, 10),
       wz: rand(-500, 500),
       state: 'rolling',
+      thrownAt: performance.now(),
     });
-    setPhase('rolling');
-    cancelAnimationFrame(raf.current);
-    loop(performance.now());
+    setStatus(i, 'rolling');
+    // O seu lançamento vai para o oponente (em frações da mesa, que muda de tamanho entre telas).
+    if (i === 0 && ctrl[0] === 'user') {
+      const { W, H } = size();
+      remote?.send(d.vx / W, d.vy / H);
+    }
+    ensureLoop();
   }
+
+  function shake(i: number) {
+    const d = dice.current?.[i];
+    if (!d || d.state !== 'idle') return;
+    d.state = 'shaking';
+    d.shakeUntil = performance.now() + 850;
+    setStatus(i, 'shaking');
+    ensureLoop();
+  }
+
+  const skip = () => {
+    // Pulando sem jogar: o oponente ainda vê um dado rolar do seu lado.
+    if (ctrl[0] === 'user' && statusRef.current[0] === 'idle') remote?.send(rand(-0.6, 0.6), -rand(2.4, 3));
+    onDone();
+  };
 
   // ------------------------------------------------------------ gesto: segurar, chacoalhar e soltar
 
@@ -309,7 +404,7 @@ export function DiceRoll({
   };
 
   const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (human === null || phase !== 'ready' || !dice.current) return;
+    if (ctrl[0] !== 'user' || statusRef.current[0] !== 'idle' || !dice.current) return;
     e.preventDefault();
     tray.current?.setPointerCapture(e.pointerId);
     const p = local(e);
@@ -318,7 +413,7 @@ export function DiceRoll({
     d.state = 'held';
     d.z = 30;
     moveHeld(p.x, p.y);
-    setPhase('held');
+    setStatus(0, 'held');
   };
 
   const moveHeld = (x: number, y: number) => {
@@ -338,7 +433,7 @@ export function DiceRoll({
   };
 
   const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (phaseRef.current !== 'held') return;
+    if (statusRef.current[0] !== 'held') return;
     const p = local(e);
     const now = performance.now();
     samples.current.push({ ...p, t: now });
@@ -347,78 +442,98 @@ export function DiceRoll({
   };
 
   const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (phaseRef.current !== 'held') return;
+    if (statusRef.current[0] !== 'held') return;
     const p = local(e);
     const now = performance.now();
     const s = samples.current.find((x) => now - x.t < 90) ?? samples.current[0];
     const dt = Math.max(0.016, (now - (s?.t ?? now)) / 1000);
     const vx = s ? (p.x - s.x) / dt : 0;
     const vy = s ? (p.y - s.y) / dt : 0;
-    throwDice(vx, vy);
+    launch(0, vx, vy);
   };
 
   const name = (p: PlayerId) => (human !== null && p === human ? 'Você' : state.players[p].name);
   const first = state.firstPlayer;
-  const result =
-    phase !== 'result'
-      ? null
-      : choosing
-        ? iWon
-          ? 'Você venceu!'
-          : `${state.players[winner].name} venceu!`
-        : human !== null && first === human
-          ? 'Você começa!'
-          : `${state.players[first].name} começa!`;
+  const banner = !result
+    ? null
+    : choosing
+      ? iWon
+        ? 'Você venceu!'
+        : `${state.players[winner].name} venceu!`
+      : human !== null && first === human
+        ? 'Você começa!'
+        : `${state.players[first].name} começa!`;
 
-  const hint =
-    phase === 'result'
-      ? choosing
-        ? iWon
-          ? 'Você escolhe: quer jogar primeiro ou segundo?'
-          : `${state.players[winner].name} está escolhendo quem começa…`
-        : `${name(winner)} escolheu jogar ${first === winner ? 'primeiro' : 'segundo'}.`
-      : human === null
-      ? 'Sorteando quem começa…'
-      : phase === 'ready'
-        ? 'Segure o dado, chacoalhe e solte para jogar'
-        : phase === 'held'
-          ? 'Solte para jogar!'
-          : phase === 'rolling'
-            ? 'Rolando…'
-            : '';
+  /** Texto sobre a vez de cada dado. */
+  const turnHint = (i: number): string | null => {
+    const n = state.players[seats[i]].name;
+    switch (status[i]) {
+      case 'idle':
+        if (ctrl[i] === 'user') {
+          // O oponente jogou antes (online): agora é a sua vez.
+          const o = state.players[seats[1]].name;
+          if (status[1] === 'done') return `${o} tirou ${values[seats[1]]}. Sua vez: segure o dado e jogue!`;
+          if (status[1] === 'rolling') return `${o} jogou! Agora é a sua vez.`;
+          return 'Segure o dado, chacoalhe e solte para jogar';
+        }
+        if (ctrl[i] === 'remote') return `Aguardando ${n} jogar o dado…`;
+        return i === 1 && status[0] !== 'done' ? null : `Vez de ${n}…`;
+      case 'held':
+        return 'Solte para jogar!';
+      case 'shaking':
+        return `${n} está chacoalhando o dado…`;
+      case 'rolling':
+        return ctrl[i] === 'user' ? 'Rolando…' : `${n} jogou!`;
+      default:
+        return null;
+    }
+  };
+  const hint = result
+    ? choosing
+      ? iWon
+        ? 'Você escolhe: quer jogar primeiro ou segundo?'
+        : `${state.players[winner].name} está escolhendo quem começa…`
+      : `${name(winner)} escolheu jogar ${first === winner ? 'primeiro' : 'segundo'}.`
+    : status[0] === 'done' || (status[1] !== 'idle' && status[0] !== 'held' && ctrl[0] !== 'user')
+      ? turnHint(1)
+      : (turnHint(0) ?? turnHint(1));
 
-  const side = (p: PlayerId) => (
-    <div className={['dice-player', phase === 'result' && p === winner ? 'winner' : '', phase === 'result' && p !== winner ? 'loser' : ''].join(' ')}>
-      <div className="dice-leader">
-        <CardView state={state} uid={state.players[p].leader.uid} />
+  const side = (i: number) => {
+    const p = seats[i];
+    return (
+      <div className={['dice-player', result && p === winner ? 'winner' : '', result && p !== winner ? 'loser' : ''].join(' ')}>
+        <div className="dice-leader">
+          <CardView state={state} uid={state.players[p].leader.uid} />
+        </div>
+        <div className="dice-name">{name(p)}</div>
+        <div className={['dice-value', status[i] === 'done' ? 'shown' : ''].join(' ')}>{status[i] === 'done' ? values[p] : '–'}</div>
       </div>
-      <div className="dice-name">{name(p)}</div>
-      <div className="dice-value">{phase === 'result' ? values[p] : '–'}</div>
-    </div>
-  );
+    );
+  };
 
+  const busy = ctrl[0] !== 'user' || (status[0] !== 'idle' && status[0] !== 'held');
   return (
     <div className="modal-backdrop dice-backdrop">
       <div className="modal-card dice-card">
         <div className="modal-kicker">Sorteio inicial</div>
         <div className="dice-versus">
-          {side(me)}
+          {side(0)}
           <span className="dice-vs">VS</span>
-          {side(opp)}
+          {side(1)}
         </div>
         <div
           ref={tray}
-          className={['dice-tray', `is-${phase}`, human === null ? 'auto' : ''].join(' ')}
+          className={['dice-tray', status[0] === 'held' ? 'is-held' : '', busy ? 'is-busy' : ''].join(' ')}
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
         >
-          {[me, opp].map((p, i) => (
+          {seats.map((p, i) => (
             <div
               key={p}
               ref={(el) => (dieEls.current[i] = el)}
-              className={['die', i === 0 ? 'mine' : 'theirs', phase === 'result' && p === winner ? 'winner' : ''].join(' ')}
+              className={['die', i === 0 ? 'mine' : 'theirs', result && p === winner ? 'winner' : ''].join(' ')}
             >
               <div className="die-shadow" />
               <div className="die-cube">
@@ -432,12 +547,12 @@ export function DiceRoll({
               </div>
             </div>
           ))}
-          {phase === 'ready' && human !== null && <div className="dice-hand" aria-hidden="true">☝</div>}
-          {result && <div className="dice-result">{result}</div>}
+          {ctrl[0] === 'user' && status[0] === 'idle' && <div className="dice-hand" aria-hidden="true">☝</div>}
+          {banner && <div className="dice-result">{banner}</div>}
         </div>
         <p className="dice-hint muted small">{hint || ' '}</p>
         <div className="btn-row center">
-          {phase === 'result' && choosing && iWon ? (
+          {result && choosing && iWon ? (
             <>
               <button className="btn primary big" onClick={() => onChoose(true)}>
                 Jogar primeiro
@@ -446,18 +561,18 @@ export function DiceRoll({
                 Jogar segundo
               </button>
             </>
-          ) : phase === 'result' ? (
+          ) : result ? (
             <button className="btn primary big" onClick={onDone}>
               Continuar
             </button>
           ) : (
             <>
-              {human !== null && (
-                <button className="btn primary" disabled={phase !== 'ready'} onClick={() => throwDice(0, 0)}>
+              {ctrl[0] === 'user' && (
+                <button className="btn primary" disabled={status[0] !== 'idle'} onClick={() => launch(0, 0, 0)}>
                   🎲 Jogar dados
                 </button>
               )}
-              <button className="btn" onClick={onDone}>
+              <button className="btn" onClick={skip}>
                 Pular
               </button>
             </>

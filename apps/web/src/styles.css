@@ -4034,6 +4034,7 @@ tr.clickable:hover td {
   margin-left: auto;
 }
 
+/* ==================================================================
    Animações da mesa (components/Motion.tsx), faixa de turno e sorteio
    inicial com dados (components/DiceRoll.tsx).
    ================================================================== */
@@ -4311,9 +4312,12 @@ tr.clickable:hover td {
   line-height: 1;
   color: var(--muted);
 }
+.dice-value.shown {
+  color: var(--text);
+  animation: pow-pop 0.45s ease-out;
+}
 .dice-player.winner .dice-value {
   color: var(--gold);
-  animation: pow-pop 0.45s ease-out;
 }
 .dice-vs {
   font-family: Bangers, Impact, sans-serif;
@@ -4344,9 +4348,7 @@ tr.clickable:hover td {
 .dice-tray.is-held {
   cursor: grabbing;
 }
-.dice-tray.is-rolling,
-.dice-tray.is-result,
-.dice-tray.auto {
+.dice-tray.is-busy {
   cursor: default;
 }
 .die {
@@ -4481,7 +4483,7 @@ tr.clickable:hover td {
   margin: 10px 0 6px;
   font-weight: 800;
 }
-=======
+
 /* ------------------------------------------------------------------ torneios */
 
 .tournaments .builder-header .tour-create {
@@ -4717,5 +4719,3 @@ tr.clickable:hover td {
   margin: 0 0 10px;
   font-size: 15px;
 }
-
-/* ===========================================================

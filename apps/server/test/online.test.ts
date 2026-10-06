@@ -194,6 +194,28 @@ describe('partidas online: salas privadas', () => {
     expect(active).toEqual([{ roomId: created.roomId, token: created.token, status: 'waiting', queue: 'private', code: created.code }]);
   });
 
+  it('o lançamento do dado do sorteio chega ao oponente e a quem entra depois', async () => {
+    const { app } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    const c1 = client(1);
+    room.attach(c1.conn);
+    const dice = (t: string, payload: object) => app.inject({ method: 'POST', url: `/api/online/rooms/${roomId}/dice`, payload: { t, ...payload } });
+    expect((await dice(tokens[0], { vx: 'x', vy: 1 })).statusCode).toBe(400);
+    expect((await dice('nada', { vx: 1, vy: 1 })).statusCode).toBe(404);
+    expect((await dice(tokens[0], { vx: 0.5, vy: -99 })).statusCode).toBe(204);
+    // Só o primeiro lançamento vale (e a velocidade é limitada).
+    expect((await dice(tokens[0], { vx: 3, vy: 3 })).statusCode).toBe(204);
+    expect(c1.events.filter((e) => e.event === 'dice').map((e) => e.data)).toEqual([{ seat: 0, vx: 0.5, vy: -12 }]);
+    // Quem conecta durante o sorteio recebe os dados já jogados.
+    const late = client(null);
+    room.attach(late.conn);
+    expect(late.events.filter((e) => e.event === 'dice').map((e) => e.data)).toEqual([{ seat: 0, vx: 0.5, vy: -12 }]);
+    // Depois do sorteio (partida em andamento), não há mais dados.
+    room.state!.phase = 'main';
+    expect((await dice(tokens[1], { vx: 1, vy: 1 })).statusCode).toBe(409);
+  });
+
   it('a partida sobrevive a um reinício do servidor', async () => {
     const db = freshDb();
     const first = setup(db).app;
