@@ -87,7 +87,8 @@ describe('modo manual', () => {
     s.cards[lifeTop] = { ...s.cards[lifeTop], cardId: 'MAN-002' };
     s.players[1].hand = [];
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
-    expect(s.pending).toMatchObject({ kind: 'trigger', player: 1 });
+    s = applyAction(s, { type: 'pass', player: 1 });
+    expect(s.pending).toMatchObject({ kind: 'lifeCard', player: 1 });
     s = applyAction(s, { type: 'answer', player: 1, yes: true });
     expect(s.pending).toMatchObject({ kind: 'manual', player: 1 });
     // "Play this card": o defensor coloca a carta do descarte em campo... aqui é evento, então só confirma

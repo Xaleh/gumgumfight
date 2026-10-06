@@ -155,7 +155,8 @@ describe('ST04 — Animal Kingdom Pirates', () => {
     ps.hand = [];
     const deckBefore = ps.donDeck;
     s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: ps.leader.uid });
-    expect(s.pending).toMatchObject({ kind: 'trigger', card: bomber });
+    s = applyAction(s, { type: 'pass', player: 0 });
+    expect(s.pending).toMatchObject({ kind: 'lifeCard', card: bomber });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
     expect(s.players[0].donDeck).toBe(deckBefore - 1);
   });

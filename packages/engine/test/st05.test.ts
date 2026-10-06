@@ -74,6 +74,7 @@ describe('ST05 — ONE PIECE FILM edition', () => {
       s.players[0].hand = [];
       s.modifiers.push({ uid: s.players[1].leader.uid, kind: 'power', amount: 5000, duration: 'turn' });
       s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: shiki });
+      s = applyAction(s, { type: 'pass', player: 0 });
       expect(s.players[0].characters.some((c) => c.uid === shiki)).toBe(survives);
     }
   });

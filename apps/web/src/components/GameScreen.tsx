@@ -431,9 +431,11 @@ function Table({
     defense?.kind === 'block'
       ? 'Toque num Personagem com [Blocker] para bloquear'
       : defense?.kind === 'counter'
-        ? quickCounter
-          ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
-          : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
+        ? !defense.options.length
+          ? 'Nenhuma carta da mão serve como Counter agora: conclua a etapa (o oponente não sabe disso)'
+          : quickCounter
+            ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
+            : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
         : targets
           ? targets.max === 0
             ? 'Toque numa carta destacada para ler e depois continue'
@@ -1008,9 +1010,11 @@ function Table({
             )}
             <p className="muted small hand-sheet-hint">
               {myPending?.kind === 'counter'
-                ? quickCounter
-                  ? 'Toque numa carta destacada para usar o Counter na hora.'
-                  : 'Toque numa carta destacada e confirme para usar o Counter.'
+                ? !myPending.options.length
+                  ? 'Nenhuma carta serve como Counter agora: conclua a etapa.'
+                  : quickCounter
+                    ? 'Toque numa carta destacada para usar o Counter na hora.'
+                    : 'Toque numa carta destacada e confirme para usar o Counter.'
                 : targets
                   ? `${handHint}.`
                   : myPending?.kind === 'selectTargets'
@@ -1369,11 +1373,13 @@ function defenseDecision(state: GameState, pending: Extract<Pending, { kind: 'bl
     const total = pending.options.reduce((sum, u) => sum + counterValue(state, u), 0);
     useless = !events && total < need;
   }
-  const label = !counter ? 'Não bloquear' : !hits ? 'Concluir' : used ? 'Não usar mais Counter' : 'Não usar Counter';
+  // Sem carta de Counter na mão a etapa abre mesmo assim (senão o atacante saberia): só resta concluir.
+  const none = counter && !pending.options.length;
+  const label = !counter ? 'Não bloquear' : !hits || none ? 'Concluir' : used ? 'Não usar mais Counter' : 'Não usar Counter';
   const result = hits ? 'o ataque passa' : 'defendido';
   return {
     label,
-    sub: `${result} · ${atk} ⚔ ${def}`,
+    sub: none && hits && !used ? `sem Counter na mão · ${atk} ⚔ ${def}` : `${result} · ${atk} ⚔ ${def}`,
     title: !counter
       ? `Seguir sem bloquear: ${result} (${atk} contra ${def})`
       : `Encerrar a etapa de Counter: ${result} (${atk} contra ${def})`,
@@ -1736,27 +1742,44 @@ function Prompt(props: {
         </PromptPill>
       );
     }
-    case 'trigger':
+    case 'lifeCard': {
+      // Toda carta que sai da Vida passa por aqui, com ou sem [Trigger]: o oponente só vê que uma
+      // carta da Vida está sendo olhada, e não pode saber qual dos dois casos é.
+      const def = cardDef(state, pending.card);
+      const trigger = def.abilities.some((a) => a.timing === 'trigger') ? cardText(def, lang).trigger : null;
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
-            <div className="modal-kicker">[Trigger] revelado da Vida</div>
+            <div className="modal-kicker">{trigger ? '[Trigger] revelado da Vida' : 'Carta da Vida'}</div>
             <div className="modal-feature">
               <CardView state={state} uid={pending.card} />
             </div>
-            <h3>{cardDef(state, pending.card).name}</h3>
-            <p className="effect trigger">{cardText(cardDef(state, pending.card), lang).trigger}</p>
+            <h3>{def.name}</h3>
+            {trigger ? (
+              <p className="effect trigger">{trigger}</p>
+            ) : (
+              <p className="muted small">Esta carta não tem [Trigger]. O oponente não sabe qual carta saiu da sua Vida.</p>
+            )}
             <div className="btn-row center">
-              <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                Ativar [Trigger]
-              </button>
-              <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-                Não ativar <small>(vai para a mão)</small>
+              {trigger && (
+                <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                  Ativar [Trigger]
+                </button>
+              )}
+              <button className={`btn big${trigger ? '' : ' primary'}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+                {trigger ? (
+                  <>
+                    Não ativar <small>(vai para a mão)</small>
+                  </>
+                ) : (
+                  'Colocar na mão'
+                )}
               </button>
             </div>
           </div>
         </div>
       );
+    }
     case 'option':
       return (
         <div className="modal-backdrop">
