@@ -1301,6 +1301,99 @@ button.hint-pill {
   filter: saturate(0.4);
 }
 
+/* decisão de defesa (Blocker/Counter): botão grande no lugar de "Encerrar turno" */
+.defense-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.end-turn.defense {
+  min-width: 124px;
+  max-width: 190px;
+  padding: 3px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #3a2600;
+  background: linear-gradient(180deg, #ffe08a, #ffbd2e);
+  box-shadow: 0 4px 0 #c98a00, 0 6px 16px rgba(240, 160, 0, 0.45);
+}
+.end-turn.defense:active {
+  box-shadow: 0 1px 0 #c98a00, 0 3px 8px rgba(240, 160, 0, 0.45);
+}
+.end-turn.defense b {
+  font-size: 12px;
+  line-height: 1.1;
+}
+.end-turn.defense small {
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 1.1;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+/* nenhuma carta da mão muda o resultado: chama o olhar para concluir */
+.end-turn.defense.pulse {
+  animation: defense-pulse 1.1s ease-in-out infinite;
+}
+@keyframes defense-pulse {
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 4px 0 #c98a00, 0 0 0 4px rgba(255, 211, 77, 0.6), 0 0 26px 8px rgba(255, 190, 40, 0.8);
+  }
+}
+.defense-tools {
+  flex: none;
+}
+/* relógio online do jogador, colado no botão: o tempo corre nesta decisão */
+.defense-clock {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  z-index: 1;
+  pointer-events: none;
+}
+.defense-clock .clock,
+.defense-clock .clock.running {
+  opacity: 1;
+  background: var(--slate);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 1px 7px;
+  box-shadow: 0 0 0 1.5px #fff, 0 2px 6px rgba(43, 54, 86, 0.35);
+}
+.defense-clock .clock.low {
+  background: var(--danger);
+}
+.game.wide .end-turn.defense {
+  min-width: 156px;
+  max-width: 230px;
+}
+.game.wide .end-turn.defense b {
+  font-size: 13px;
+}
+/* dentro da folha da mão: botão largo, centralizado */
+.defense-slot.in-sheet {
+  justify-content: center;
+  align-self: center;
+  margin: 2px 0;
+}
+.defense-slot.in-sheet .end-turn.defense {
+  min-width: 230px;
+  max-width: none;
+  height: 56px;
+}
+.defense-slot.in-sheet .end-turn.defense b {
+  font-size: 14px;
+}
+.defense-slot.in-sheet .end-turn.defense small {
+  font-size: 11px;
+}
+
 /* batalha ("Dano previsto") */
 .battle-info {
   display: flex;
@@ -1405,6 +1498,32 @@ button.hint-pill {
   color: #fff;
   text-align: center;
   font-size: 11px;
+}
+/* dica de uso (Blocker/Counter) logo acima do leque, entre a faixa do jogador e "Ver mão" */
+.hand-hint {
+  position: absolute;
+  right: 108px;
+  top: 0;
+  z-index: 61;
+  max-width: calc(100% - 400px);
+  max-height: 31px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  padding: 3px 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.2), inset 0 0 0 1.5px var(--sky);
+  pointer-events: none;
+  animation: pop-in 0.2s;
+}
+@media (max-width: 640px) {
+  .hand-hint {
+    display: none;
+  }
 }
 .hand-grid {
   display: grid;
@@ -3548,6 +3667,19 @@ tr.clickable:hover td {
     min-width: 64px;
     font-size: 11px;
     border-width: 2px;
+  }
+  .end-turn.defense {
+    min-width: 108px;
+    padding: 2px 8px;
+  }
+  .end-turn.defense b {
+    font-size: 11px;
+  }
+  .end-turn.defense small {
+    font-size: 8.5px;
+  }
+  .hand-hint {
+    display: none;
   }
   .hint-pill {
     padding: 5px 12px;

@@ -44,23 +44,32 @@ function useTick(on: boolean, ms = 250) {
   }, [on, ms]);
 }
 
-/** Relógio e conexão de um jogador, na faixa com o nome. */
-export function OnlineBanner({ online, player }: { online: OnlineGame; player: PlayerId }) {
+/** Relógio de um jogador (tempo total da partida), atualizado a cada segundo enquanto corre. */
+export function OnlineClock({ online, player }: { online: OnlineGame; player: PlayerId }) {
   const { room, clockAt } = online;
   const running = room?.status === 'playing' && room.clock.running === player;
   useTick(running);
   if (!room) return null;
   const left = remainingNow(room, clockAt)[player];
-  const info = room.players[player];
   const low = left < 60_000;
   return (
+    <span
+      className={['clock', running ? 'running' : '', low ? 'low' : ''].join(' ')}
+      title="Tempo total do jogador: só corre quando a ação ou a decisão é dele"
+    >
+      ⏱ {formatClock(left)}
+    </span>
+  );
+}
+
+/** Relógio e conexão de um jogador, na faixa com o nome. */
+export function OnlineBanner({ online, player }: { online: OnlineGame; player: PlayerId }) {
+  const { room } = online;
+  if (!room) return null;
+  const info = room.players[player];
+  return (
     <div className="online-banner">
-      <span
-        className={['clock', running ? 'running' : '', low ? 'low' : ''].join(' ')}
-        title="Tempo total do jogador: só corre quando a ação ou a decisão é dele"
-      >
-        ⏱ {formatClock(left)}
-      </span>
+      <OnlineClock online={online} player={player} />
       {player !== room.you && (
         <span className={['presence', info?.connected ? 'on' : 'off'].join(' ')} title={info?.connected ? 'Conectado' : 'Desconectado'} />
       )}
