@@ -1,11 +1,11 @@
 // Salas online: salas privadas com código, filas casual e ranqueada, treino contra o
-// bot do servidor, a lista de partidas para assistir e a gravação das salas no banco
-// (para sobreviver a reinícios e deploys).
+// bot do servidor, partidas de torneio, a lista de partidas para assistir e a
+// gravação das salas no banco (para sobreviver a reinícios e deploys).
 
 import { randomBytes, randomInt } from 'node:crypto';
 import type { CardData, PlayerId } from '@gumgum/engine';
 import type { FormatId } from '../stats/catalog';
-import { newRoomData, randomToken, Room, type RoomData, type RoomResult, type SeatInfo } from './room';
+import { newRoomData, randomToken, Room, type RoomData, type RoomResult, type RoomTournament, type SeatInfo } from './room';
 
 /** Quem quer jogar (perfil do jogador e deck escolhido). */
 export type SeatRequest = Omit<SeatInfo, 'token'>;
@@ -54,6 +54,7 @@ export interface LiveRoom {
   turn: number;
   spectators: number;
   createdAt: number;
+  tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -69,9 +70,13 @@ const RANKED_WINDOW_PER_SECOND = 400;
 
 export type LobbyError = { error: string; code: number; roomId?: string };
 
+const tournamentKey = (t: Pick<RoomTournament, 'id' | 'matchId' | 'game'>) => `${t.id}:${t.matchId}:${t.game}`;
+
 export class Lobby {
   readonly rooms = new Map<string, Room>();
   private readonly codes = new Map<string, string>();
+  /** Partida de torneio ("torneio:partida") → sala. */
+  private readonly tournamentRooms = new Map<string, string>();
   private queue: Entry[] = [];
   private readonly finishedAt = new Map<string, number>();
   private readonly deps: LobbyDeps & { now: () => number; log: (msg: string) => void };
@@ -93,6 +98,7 @@ export class Lobby {
     });
     this.rooms.set(room.id, room);
     if (data.code) this.codes.set(data.code, room.id);
+    if (data.tournament) this.tournamentRooms.set(tournamentKey(data.tournament), room.id);
     return room;
   }
 
@@ -190,6 +196,42 @@ export class Lobby {
     return { room, token };
   }
 
+  /**
+   * Jogo de uma partida de torneio: o primeiro dos dois jogadores a entrar abre a
+   * sala e o segundo a começa. Quem já está sentado recebe o próprio assento de
+   * volta. Cada jogo de uma melhor de N tem a sua sala; um jogo terminado sem
+   * vencedor é trocado por outra sala.
+   */
+  tournamentRoom(seat: SeatRequest, format: FormatId, tournament: RoomTournament): { room: Room; token: string } | LobbyError {
+    const id = this.tournamentRooms.get(tournamentKey(tournament));
+    const existing = id ? this.rooms.get(id) : undefined;
+    if (existing && existing.status !== 'finished') {
+      const mine = existing.data.seats.find((s) => s.ownerHash === seat.ownerHash);
+      if (mine) return { room: existing, token: mine.token };
+      if (existing.status === 'waiting') {
+        const busy = this.busy(seat.ownerHash);
+        if (busy) return busy;
+        this.leaveQueue(seat.ownerHash);
+        const token = randomToken();
+        existing.data.seats.push({ ...seat, token });
+        // Jogos 2+ da série: quem perdeu o anterior começa.
+        const first = existing.data.seats.findIndex((s) => s.userId && s.userId === tournament.firstUserId);
+        if (first === 0 || first === 1) existing.data.firstPlayer = first;
+        existing.start();
+        return { room: existing, token };
+      }
+      return { code: 409, error: 'Esta partida já está em andamento.' };
+    }
+    const busy = this.busy(seat.ownerHash);
+    if (busy) return busy;
+    for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
+    this.leaveQueue(seat.ownerHash);
+    const token = randomToken();
+    const room = this.makeRoom(newRoomData({ queue: 'tournament', format, code: null, tournament, seats: [{ ...seat, token }] }));
+    this.deps.save?.(room.data);
+    return { room, token };
+  }
+
   // ------------------------------------------------------------------ espectadores
 
   /**
@@ -203,8 +245,8 @@ export class Lobby {
       if (room.data.queue === 'private' || (room.data.queue === 'bot' && !opts.bots)) continue;
       out.push(this.summary(room));
     }
-    // Ranqueadas primeiro; dentro de cada fila, as mais novas.
-    const rank = (q: string) => (q === 'ranked' ? 0 : q === 'casual' ? 1 : 2);
+    // Torneios e ranqueadas primeiro; dentro de cada fila, as mais novas.
+    const rank = (q: string) => (q === 'tournament' ? 0 : q === 'ranked' ? 1 : q === 'casual' ? 2 : 3);
     return out.sort((a, b) => rank(a.queue) - rank(b.queue) || b.createdAt - a.createdAt);
   }
 
@@ -230,6 +272,16 @@ export class Lobby {
       turn: st?.turn ?? 0,
       spectators: room.spectators,
       createdAt: room.data.createdAt,
+      tournament: room.data.tournament
+        ? {
+            id: room.data.tournament.id,
+            name: room.data.tournament.name,
+            round: room.data.tournament.round,
+            label: room.data.tournament.label,
+            game: room.data.tournament.game,
+            bestOf: room.data.tournament.bestOf,
+          }
+        : null,
     };
   }
 
@@ -357,6 +409,10 @@ export class Lobby {
     room.dispose();
     this.rooms.delete(id);
     if (room.data.code) this.codes.delete(room.data.code);
+    if (room.data.tournament) {
+      const key = tournamentKey(room.data.tournament);
+      if (this.tournamentRooms.get(key) === id) this.tournamentRooms.delete(key);
+    }
     this.finishedAt.delete(id);
     this.deps.remove?.(id);
   }

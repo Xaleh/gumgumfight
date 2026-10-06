@@ -10,6 +10,7 @@ const QUEUE_LABEL: Record<LiveRoom['queue'], string> = {
   casual: 'Casual',
   private: 'Sala privada',
   bot: '🤖 Treino contra o bot',
+  tournament: '🏆 Torneio',
 };
 
 const HANDS_PREF = 'gumgum.watchHands';
@@ -100,7 +101,11 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
           {rooms?.map((r) => (
             <button key={r.id} className="watch-room" onClick={() => watch(r.id, r.mine)}>
               <div className="watch-meta">
-                <span className="watch-queue">{QUEUE_LABEL[r.queue]}</span>
+                <span className="watch-queue">
+                  {r.tournament
+                    ? `🏆 ${r.tournament.name} · ${r.tournament.label}${r.tournament.bestOf > 1 ? ` · Jogo ${r.tournament.game}` : ''}`
+                    : QUEUE_LABEL[r.queue]}
+                </span>
                 {r.mine && (
                   <span className="muted small" title="Você joga esta partida: ela aparece sem as mãos dos jogadores">
                     Sua partida

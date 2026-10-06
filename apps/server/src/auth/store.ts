@@ -8,13 +8,16 @@ export const SESSION_DAYS = 60;
 
 /**
  * Perfil da conta. player: joga e assiste às partidas sem ver as mãos; streamer:
- * pode assistir vendo as mãos dos dois jogadores; admin: tudo isso e muda os perfis.
+ * pode assistir vendo as mãos dos dois jogadores; organizer: cria e gerencia
+ * torneios; admin: tudo isso, gerencia qualquer torneio e muda os perfis.
  */
-export const ROLES = ['player', 'streamer', 'admin'] as const;
+export const ROLES = ['player', 'streamer', 'organizer', 'admin'] as const;
 export type Role = (typeof ROLES)[number];
 export const isRole = (v: unknown): v is Role => ROLES.includes(v as Role);
 /** Pode assistir às partidas vendo as mãos. */
 export const seesHands = (role: Role | undefined) => role === 'streamer' || role === 'admin';
+/** Pode criar torneios (e gerenciar os que criou; o admin gerencia todos). */
+export const createsTournaments = (role: Role | undefined) => role === 'organizer' || role === 'admin';
 
 export interface User {
   id: string;
@@ -72,7 +75,7 @@ export function listUsers(db: DB, query = '', limit = 50): UserListItem[] {
     .prepare(
       `SELECT id, email, name, picture, role, created_at, last_login_at FROM users
        WHERE COALESCE(name, '') LIKE ? ESCAPE '\\' OR COALESCE(email, '') LIKE ? ESCAPE '\\'
-       ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'streamer' THEN 1 ELSE 2 END, last_login_at DESC
+       ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'organizer' THEN 1 WHEN 'streamer' THEN 2 ELSE 3 END, last_login_at DESC
        LIMIT ?`,
     )
     .all(q, q, limit) as Array<UserRow & { created_at: string; last_login_at: string }>;

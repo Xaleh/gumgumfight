@@ -35,6 +35,7 @@ import {
   OnlineWaiting,
   SpectatorBar,
   SpectatorCount,
+  seriesAfter,
 } from './Online';
 
 /** Modo 'don': `count` DON!! ativos escolhidos para anexar de uma vez. */
@@ -128,6 +129,7 @@ const noop = () => undefined;
 export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat; onExit: () => void; onSwitch: (s: OnlineSeat) => void }) {
   const online = useOnlineGame(seat);
   const { state, room } = online;
+  const [nextError, setNextError] = useState<string | null>(null);
   // Os dois pediram revanche: vai para a sala nova.
   useEffect(() => {
     if (online.rematch?.token) onSwitch({ roomId: online.rematch.roomId, token: online.rematch.token });
@@ -153,16 +155,28 @@ export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat;
     actions: () => online.actions,
     downloadReplay: () => void online.downloadReplay(),
   };
+  // Torneio em melhor de N: se a série não acabou, o próximo jogo começa daqui.
+  const series = room.tournament && room.you !== null && state.phase === 'gameover' ? seriesAfter(room.tournament, state.winner) : null;
+  const nextGame =
+    series && !series.decided
+      ? () =>
+          api.tournaments
+            .play(room.tournament!.id, room.tournament!.matchId)
+            .then(onSwitch)
+            .catch((e) => setNextError(e instanceof Error ? e.message : String(e)))
+      : undefined;
   return (
     <GameTable
-      game={game}
+      game={{ ...game, error: game.error ?? nextError, setError: (e) => (setNextError(null), game.setError(e)) }}
       kind="online"
       online={online}
       onExit={onExit}
-      onRematch={room.queue === 'private' ? () => void online.askRematch() : undefined}
+      onRematch={room.queue === 'private' ? () => void online.askRematch() : nextGame}
+      rematchLabel={nextGame ? `Jogar o jogo ${room.tournament!.game + 1}` : undefined}
     />
   );
 }
+
 
 /** O que a mesa online não usa (pausa, velocidade, desfazer e "Auto" são do jogo no navegador). */
 const onlineTable = {
@@ -237,6 +251,7 @@ function Table({
   online,
   onExit,
   onRematch,
+  rematchLabel,
   spectator,
 }: {
   game: TableGame;
@@ -244,6 +259,8 @@ function Table({
   online?: OnlineGame;
   onExit: () => void;
   onRematch?: () => void;
+  /** Texto do botão de revanche (ex.: próximo jogo da série do torneio). */
+  rematchLabel?: string;
   /** Modo espectador (partida online vista de fora). */
   spectator?: { canHands: boolean; onToggleHands: () => void };
 }) {
@@ -251,6 +268,8 @@ function Table({
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   const ranked = online?.room?.queue === 'ranked';
+  // Partida de torneio: "voltar" leva para a página do torneio.
+  const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
   const { quickCounter, animations } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
@@ -894,7 +913,7 @@ function Table({
                 </button>
               )}
               <button className="btn" onClick={onExit}>
-                ← Sair para o menu
+                ← Sair para o {backTo}
               </button>
             </div>
             {!isOnline && (
@@ -979,8 +998,12 @@ function Table({
             human={human}
             actions={game.actions()}
             onExit={onExit}
+            exitLabel={`Voltar ao ${backTo}`}
             onRematch={onRematch}
-            rematchLabel={online && human !== null ? (online.room?.rematch[human] ? 'Aguardando o oponente…' : 'Pedir revanche') : undefined}
+            rematchLabel={
+              rematchLabel ??
+              (online && human !== null ? (online.room?.rematch[human] ? 'Aguardando o oponente…' : 'Pedir revanche') : undefined)
+            }
             onReplay={game.downloadReplay}
             onLog={() => setSheet('log')}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
@@ -992,7 +1015,7 @@ function Table({
         <aside className="side-panel">
           <div className="panel-controls">
             <button className="btn small" onClick={onExit}>
-              ← Menu
+              ← {backTo === 'torneio' ? 'Torneio' : 'Menu'}
             </button>
             {human !== null && !isOnline && (
               <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>

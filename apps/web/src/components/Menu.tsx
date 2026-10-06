@@ -196,6 +196,7 @@ export function Menu({
   onStats,
   onOnline,
   onWatch,
+  onTournaments,
   onAdmin,
 }: {
   onStart: (s: GameSetup) => void;
@@ -205,6 +206,7 @@ export function Menu({
   onStats: () => void;
   /** Lista de partidas online para assistir (modo espectador). */
   onWatch: () => void;
+  onTournaments: () => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
 }) {
@@ -337,7 +339,13 @@ export function Menu({
 
         {resume && mode !== 'online' && (
           <div className="online-active">
-            <span>{resume.queue === 'bot' ? 'Você tem um treino contra o bot em andamento.' : 'Você tem uma partida online em andamento.'}</span>
+            <span>
+              {resume.queue === 'bot'
+                ? 'Você tem um treino contra o bot em andamento.'
+                : resume.queue === 'tournament'
+                  ? 'Você tem uma partida de torneio em andamento.'
+                  : 'Você tem uma partida online em andamento.'}
+            </span>
             <button className="btn primary" onClick={() => onOnline(resume)}>
               Voltar à partida
             </button>
@@ -461,6 +469,10 @@ export function Menu({
           <button className="btn" onClick={onWatch}>
             <span className="ico">👁</span>
             Assistir partidas
+          </button>
+          <button className="btn" onClick={onTournaments}>
+            <span className="ico">🏆</span>
+            Torneios
           </button>
           {onAdmin && (
             <button className="btn" onClick={onAdmin}>
