@@ -1,7 +1,12 @@
-// Sorteio inicial com dados 3D: o jogador segura o dado com o dedo (ou o mouse),
-// chacoalha e solta para jogá-lo na mesa. Depois vem a vez do oponente: o bot
-// pega o dado, chacoalha e joga; no online, o dado dele rola quando ele joga (o
-// servidor repassa o gesto). O vencedor só aparece depois que os dois param.
+// Sorteio inicial com dados 3D no estilo do dado oficial do One Piece Card Game
+// (cubo vermelho brilhante, números brancos e a caveira dos Chapéus de Palha na
+// face do 1): o jogador segura o dado com o dedo (ou o mouse),
+// chacoalha e solta para jogá-lo na mesa. No começo só o seu dado está na mesa:
+// o do oponente aparece quando ele joga, entrando na bandeja rolando pelo lado
+// dele (o bot "pega" o dado fora da tela e joga; no online, o servidor repassa o
+// gesto, e o oponente pode jogar antes de você). Para o espectador e em bot x bot,
+// os dois dados entram rolando, um depois do outro. O vencedor só aparece depois
+// que os dois param.
 //
 // O vencedor do sorteio já foi definido pelo motor (state.rollWinner, a partir da
 // seed); os dados só mostram esse resultado: o valor de cada um é escolhido para
@@ -13,14 +18,15 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, use
 import type { DiceThrow } from '../game/useOnlineGame';
 import { CardView } from './CardView';
 
-const SIZE = 52;
+/** Lado do dado em px (igual a `--die` em styles.css). */
+const SIZE = 58;
 const R = SIZE / 2;
 /** Graus de giro por pixel rolado (dado rolando sem deslizar). */
 const ROLL = 360 / (Math.PI * SIZE);
 /** Rotação (x, y) do cubo que deixa cada face virada para cima (para a tela). */
 const FACE: Record<number, [number, number]> = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 2: [-90, 0], 5: [90, 0] };
-/** Casas da grade 3×3 com pinta, por valor. */
-const PIPS: Record<number, number[]> = { 1: [5], 2: [3, 7], 3: [3, 5, 7], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+/** Ordem das faces no cubo (pares opostos somam 7, como no dado real). */
+const FACES = [1, 6, 3, 4, 2, 5];
 
 type DieStatus = 'idle' | 'held' | 'shaking' | 'rolling' | 'done';
 /** Quem joga cada dado: o próprio jogador, o navegador (bot) ou o oponente pela rede. */
@@ -44,6 +50,10 @@ interface Die {
   state: 'idle' | 'held' | 'shaking' | 'rolling' | 'settling' | 'done';
   /** Onde o dado fica parado (o bot chacoalha em volta daqui). */
   home: { x: number; y: number };
+  /** Ainda fora da mesa: o dado de quem não é você só aparece quando ele joga. */
+  hidden: boolean;
+  /** Entrando na bandeja por fora: a borda do lado de entrada não rebate até ele estar dentro. */
+  entering?: boolean;
   thrownAt?: number;
   shakeUntil?: number;
   settle?: { t: number; from: [number, number, number]; to: [number, number, number] };
@@ -122,10 +132,11 @@ export function DiceRoll({
     return { W: el?.clientWidth ?? 320, H: el?.clientHeight ?? 190 };
   };
 
-  // Posição inicial: o seu dado embaixo, o do oponente em cima.
+  // Posição inicial: o seu dado embaixo, o do oponente em cima. Só o dado que você
+  // joga começa na mesa; os outros ficam escondidos e entram rolando no lançamento.
   useEffect(() => {
     const { W, H } = size();
-    const make = (p: PlayerId, x: number, y: number): Die => ({
+    const make = (i: number, x: number, y: number): Die => ({
       x,
       y,
       z: 0,
@@ -136,11 +147,12 @@ export function DiceRoll({
       ry: rand(-25, 25),
       rz: rand(-30, 30),
       wz: 0,
-      value: values[p],
+      value: values[seats[i]],
       state: 'idle',
       home: { x, y },
+      hidden: ctrl[i] !== 'user',
     });
-    dice.current = [make(me, W * 0.4, H * 0.74), make(opp, W * 0.6, H * 0.26)];
+    dice.current = [make(0, W * 0.4, H * 0.74), make(1, W * 0.6, H * 0.26)];
     draw();
     // O dado de baixo sem jogador na tela: sozinho, ou esperando o jogador pela rede.
     if (ctrl[0] === 'user') return undefined;
@@ -171,7 +183,15 @@ export function DiceRoll({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [throws]);
 
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  // Ao desmontar, para a física e libera o loop para um novo mount (o StrictMode
+  // monta os efeitos duas vezes: sem isso, o segundo mount nunca recomeçaria o loop).
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(raf.current);
+      running.current = false;
+    },
+    [],
+  );
 
   const resultRef = useRef(onResult);
   resultRef.current = onResult;
@@ -192,6 +212,7 @@ export function DiceRoll({
     ds.forEach((d, i) => {
       const el = dieEls.current[i];
       if (!el) return;
+      el.style.visibility = d.hidden ? 'hidden' : 'visible';
       el.style.transform = `translate(${(d.x - R).toFixed(1)}px, ${(d.y - R).toFixed(1)}px)`;
       const cube = el.querySelector<HTMLElement>('.die-cube');
       const shadow = el.querySelector<HTMLElement>('.die-shadow');
@@ -214,7 +235,8 @@ export function DiceRoll({
     const lo = R + 9;
     ds.forEach((d, i) => {
       if (d.state === 'shaking') {
-        // O bot (ou quem demorou) pega o dado e chacoalha antes de jogar.
+        // O bot (ou quem demorou) pega o dado e chacoalha antes de jogar (fora da
+        // tela: o dado escondido só aparece no lançamento).
         const t = now / 1000;
         d.z = 24 + Math.sin(t * 17) * 5;
         d.x = d.home.x + Math.sin(t * 22) * 10;
@@ -261,7 +283,10 @@ export function DiceRoll({
           d.vx = -d.vx * 0.62;
           navigator.vibrate?.(8);
         }
-        if (d.y < lo || d.y > H - lo) {
+        if (d.entering) {
+          // Vindo de fora da bandeja: a borda só passa a rebater quando ele já está dentro.
+          if (d.y >= lo && d.y <= H - lo) d.entering = false;
+        } else if (d.y < lo || d.y > H - lo) {
           d.y = Math.max(lo, Math.min(H - lo, d.y));
           d.vy = -d.vy * 0.62;
           navigator.vibrate?.(8);
@@ -300,12 +325,12 @@ export function DiceRoll({
         }
       }
     });
-    // Um dado bate no outro.
+    // Um dado bate no outro (parado na mesa ou rolando; não no que está na mão nem fora da mesa).
     const [a, b] = ds;
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const loose = (d: Die) => d.state === 'rolling' || d.state === 'done';
+    const loose = (d: Die) => !d.hidden && (d.state === 'rolling' || d.state === 'done' || d.state === 'idle');
     if (dist < SIZE * 1.05 && a.z < SIZE && b.z < SIZE && loose(a) && loose(b) && (a.state === 'rolling' || b.state === 'rolling')) {
       const nx = dx / dist;
       const ny = dy / dist;
@@ -353,11 +378,26 @@ export function DiceRoll({
   function launch(i: number, vx: number, vy: number) {
     const d = dice.current?.[i];
     if (!d || !['idle', 'held', 'shaking'].includes(d.state)) return;
+    const { W, H } = size();
+    /** Para dentro da mesa: o de baixo joga para cima, o de cima joga para baixo. */
+    const inward = i === 0 ? -1 : 1;
     let speed = Math.hypot(vx, vy);
     if (speed < 160) {
       // Só um toque: joga para o meio da mesa.
       vx = rand(-260, 260);
-      vy = (i === 0 ? -1 : 1) * rand(750, 950);
+      vy = inward * rand(750, 950);
+      speed = Math.hypot(vx, vy);
+    }
+    if (d.hidden) {
+      // Dado que ainda não estava na mesa: entra rolando por fora da bandeja, pelo
+      // lado de quem joga, já com velocidade para dentro (nunca nasce em cima do outro).
+      const lo = R + 9;
+      d.x = Math.max(lo, Math.min(W - lo, d.home.x + rand(-W * 0.08, W * 0.08)));
+      d.y = i === 0 ? H + SIZE : -SIZE;
+      d.z = 16;
+      d.hidden = false;
+      d.entering = true;
+      vy = inward * Math.max(Math.abs(vy), 620);
       speed = Math.hypot(vx, vy);
     }
     const max = 1800;
@@ -374,10 +414,7 @@ export function DiceRoll({
     });
     setStatus(i, 'rolling');
     // O seu lançamento vai para o oponente (em frações da mesa, que muda de tamanho entre telas).
-    if (i === 0 && ctrl[0] === 'user') {
-      const { W, H } = size();
-      remote?.send(d.vx / W, d.vy / H);
-    }
+    if (i === 0 && ctrl[0] === 'user') remote?.send(d.vx / W, d.vy / H);
     ensureLoop();
   }
 
@@ -481,7 +518,7 @@ export function DiceRoll({
       case 'held':
         return 'Solte para jogar!';
       case 'shaking':
-        return `${n} está chacoalhando o dado…`;
+        return `${n} está pegando o dado…`;
       case 'rolling':
         return ctrl[i] === 'user' ? 'Rolando…' : `${n} jogou!`;
       default:
@@ -497,6 +534,16 @@ export function DiceRoll({
     : status[0] === 'done' || (status[1] !== 'idle' && status[0] !== 'held' && ctrl[0] !== 'user')
       ? turnHint(1)
       : (turnHint(0) ?? turnHint(1));
+
+  /** Texto no lugar do dado de quem ainda não jogou (o dado dele só aparece quando ele joga). */
+  const waitLabel = (i: number): string | null => {
+    if (ctrl[i] === 'user') return null;
+    const n = state.players[seats[i]].name;
+    if (status[i] === 'shaking') return `${n} está pegando o dado…`;
+    if (status[i] !== 'idle') return null;
+    if (ctrl[i] === 'remote') return `Aguardando ${n} jogar…`;
+    return i === 1 && status[0] !== 'done' ? null : `Vez de ${n}…`;
+  };
 
   const side = (i: number) => {
     const p = seats[i];
@@ -537,16 +584,28 @@ export function DiceRoll({
             >
               <div className="die-shadow" />
               <div className="die-cube">
-                {[1, 6, 3, 4, 2, 5].map((v) => (
-                  <div key={v} className={`die-face f${v}`}>
-                    {PIPS[v].map((c) => (
-                      <span key={c} className="pip" style={{ gridArea: `${Math.ceil(c / 3)} / ${((c - 1) % 3) + 1}` }} />
-                    ))}
+                {/* Miolo: preenche as quinas arredondadas do cubo com a cor do dado. */}
+                <div className="die-core">
+                  {FACES.map((v) => (
+                    <div key={v} className={`die-side f${v}`} />
+                  ))}
+                </div>
+                {FACES.map((v) => (
+                  <div key={v} className={`die-side die-face f${v}`}>
+                    {v === 1 ? <span className="die-skull" role="img" aria-label="1" /> : <span className={`die-num${v === 6 ? ' six' : ''}`}>{v}</span>}
                   </div>
                 ))}
               </div>
             </div>
           ))}
+          {seats.map((p, i) => {
+            const label = waitLabel(i);
+            return label ? (
+              <div key={p} className={['dice-wait', i === 0 ? 'mine' : 'theirs'].join(' ')}>
+                {label}
+              </div>
+            ) : null;
+          })}
           {ctrl[0] === 'user' && status[0] === 'idle' && <div className="dice-hand" aria-hidden="true">☝</div>}
           {banner && <div className="dice-result">{banner}</div>}
         </div>

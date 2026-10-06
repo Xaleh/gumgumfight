@@ -1,9 +1,12 @@
 /* ==================================================================
-   GumGum Fight — tema claro com as cores da marca (azul-marinho,
-   creme, amarelo, vermelho e contorno marrom). Mobile first.
+   GumGum Fight — cores da marca (azul-marinho, creme, amarelo, vermelho
+   e contorno marrom). Mobile first. Tema claro em :root e tema escuro em
+   :root[data-theme='dark'] (o atributo é posto por index.html/settings.tsx).
    ================================================================== */
 
 :root {
+  color-scheme: light;
+
   /* Marca */
   --navy: #12304b;
   --brown: #3d1308;
@@ -35,6 +38,123 @@
   --purple: #7d3c98;
   --black: #2c2c34;
   --yellow: #d3a80d;
+
+  /* Superfícies, sombras e textos que mudam com o tema */
+  --bg-top: #f8f3ea;
+  --bg-glow1: #fbe4cc;
+  --bg-glow2: #fdf1cf;
+  --surface: #ffffff; /* janelas, balões e contadores sólidos */
+  --glass: rgba(255, 255, 255, 0.86); /* cartões translúcidos do menu e painel lateral */
+  --glass-line: rgba(255, 255, 255, 0.9);
+  --overlay: rgba(255, 255, 255, 0.93); /* pílulas e avisos sobre a mesa */
+  --backdrop: rgba(36, 46, 80, 0.42);
+  --shadow-rgb: 43, 54, 86;
+  --shadow2-rgb: 30, 40, 80;
+  --heading: #3b4566;
+  --knob: #cfd6e8;
+  --btn-off: #c6cee0;
+  --btn-off-shadow: #aab4cc;
+  --btn-off-text: #5d6a88;
+  --chip-bg: var(--muted);
+  --danger-bg: #fff1f1;
+  --danger-line: #f3b5b7;
+  --danger-text: #c3282d;
+  --amber-text: #b77900;
+  --hot-text: #d9481f;
+  --trigger-text: #b5541c;
+  --log-p0: #1f5fc8;
+  --log-p1: #c2451d;
+  --note-bg: #fff8e6;
+  --note-line: #f1d58b;
+  --pip-bg: #dfe4ef;
+  --pip-text: #2f6db5;
+  --spoiler-text: #6a2bd1;
+
+  /* Mesa de jogo */
+  --mat-1: #e9e6f7;
+  --mat-2: #e3e7f8;
+  --mat-3: #dfe8fa;
+  --mat-top: rgba(255, 224, 212, 0.9);
+  --mat-bottom: rgba(214, 232, 255, 0.95);
+  --mat-line: rgba(255, 255, 255, 0.45);
+  --mat-line2: rgba(255, 255, 255, 0.7);
+  --wheel-ink: rgba(120, 136, 190, 0.18);
+  --slot-bg: rgba(255, 255, 255, 0.35);
+  --slot-line: rgba(255, 255, 255, 0.85);
+  --slot-text: rgba(116, 128, 158, 0.6);
+
+  /* Céu da tela de resultado */
+  --sky-won: linear-gradient(100deg, #ffd9ec 0%, #e5ddff 40%, #d6ecff 75%, #d7fbe8 100%);
+  --sky-lost: linear-gradient(100deg, #e3e6ef 0%, #d9deea 50%, #cfd6e6 100%);
+}
+
+/* Tema escuro: azul-marinho profundo da marca no fundo, painéis grafite-azulados,
+   texto creme; amarelo e vermelho da marca continuam como acentos. As cores "de objeto"
+   (cartas, DON!!, dados, as 6 cores de carta) não mudam. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0b1726;
+  --bg2: #122238;
+  --panel: #182c44;
+  --panel2: #1f3650;
+  --line: #2f4863;
+  --text: #f3e9d2;
+  --muted: #a9b6c6;
+  --gold: #f2b733;
+  --accent: #ff8a5c;
+  --blue: #5aa3ff;
+  --sky: #4fd3ff;
+  --ok: #3bc985;
+  --danger: #ff6b6f;
+  --slate: rgba(46, 62, 92, 0.92);
+  /* Carta preta: um pouco mais clara para a borda e as fichas não sumirem no fundo. */
+  --black: #50505e;
+
+  --bg-top: #0f1f33;
+  --bg-glow1: #1d2b48;
+  --bg-glow2: #1a2a3c;
+  --surface: #1b3049;
+  --glass: rgba(24, 44, 68, 0.86);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --overlay: rgba(22, 36, 56, 0.94);
+  --backdrop: rgba(2, 8, 18, 0.62);
+  --shadow-rgb: 0, 0, 0;
+  --shadow2-rgb: 0, 0, 0;
+  --heading: #f3e9d2;
+  --knob: #43536d;
+  --btn-off: #34435a;
+  --btn-off-shadow: #1f2a3a;
+  --btn-off-text: #93a2bb;
+  --chip-bg: #4b5f7a;
+  --danger-bg: rgba(255, 90, 90, 0.14);
+  --danger-line: rgba(255, 120, 120, 0.45);
+  --danger-text: #ff9a9a;
+  --amber-text: #f2b733;
+  --hot-text: #ff8a5c;
+  --trigger-text: #ffa676;
+  --log-p0: #7ab6ff;
+  --log-p1: #ff9873;
+  --note-bg: rgba(242, 193, 78, 0.12);
+  --note-line: rgba(242, 193, 78, 0.4);
+  --pip-bg: #2a3c55;
+  --pip-text: #8ec0ff;
+  --spoiler-text: #c2a3ff;
+
+  --mat-1: #131b2f;
+  --mat-2: #111a2d;
+  --mat-3: #0f192c;
+  --mat-top: rgba(78, 38, 44, 0.85);
+  --mat-bottom: rgba(20, 44, 84, 0.9);
+  --mat-line: rgba(255, 255, 255, 0.06);
+  --mat-line2: rgba(255, 255, 255, 0.14);
+  --wheel-ink: rgba(140, 160, 210, 0.12);
+  --slot-bg: rgba(255, 255, 255, 0.05);
+  --slot-line: rgba(255, 255, 255, 0.2);
+  --slot-text: rgba(170, 185, 215, 0.5);
+
+  --sky-won: linear-gradient(100deg, #4a2446 0%, #2d2a5e 40%, #1c3a5c 75%, #1d4a3c 100%);
+  --sky-lost: linear-gradient(100deg, #2a3040 0%, #242b3b 50%, #1e2535 100%);
 }
 
 * {
@@ -48,11 +168,15 @@ body,
   margin: 0;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   background:
-    radial-gradient(1200px 500px at 0% 0%, #fbe4cc 0%, transparent 60%),
-    radial-gradient(1000px 600px at 100% 0%, #fdf1cf 0%, transparent 60%),
-    linear-gradient(180deg, #f8f3ea 0%, var(--bg) 100%);
+    radial-gradient(1200px 500px at 0% 0%, var(--bg-glow1) 0%, transparent 60%),
+    radial-gradient(1000px 600px at 100% 0%, var(--bg-glow2) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 100%);
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
@@ -87,7 +211,7 @@ a {
   padding: 9px 16px;
   cursor: pointer;
   font-weight: 800;
-  box-shadow: 0 2px 0 rgba(43, 54, 86, 0.08), 0 4px 12px rgba(43, 54, 86, 0.08);
+  box-shadow: 0 2px 0 rgba(var(--shadow-rgb), 0.08), 0 4px 12px rgba(var(--shadow-rgb), 0.08);
   transition: background 0.15s, transform 0.08s, box-shadow 0.15s;
 }
 .btn:hover:not(:disabled) {
@@ -110,9 +234,9 @@ a {
   background: linear-gradient(180deg, #fde27f 0%, #f9d55c 100%);
 }
 .btn.danger {
-  background: #fff1f1;
-  border-color: #f3b5b7;
-  color: #c3282d;
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
 }
 .btn.attack {
   background: linear-gradient(180deg, #ff8a5c 0%, #f0532a 100%);
@@ -133,7 +257,7 @@ a {
   font-size: 16px;
 }
 .btn.pill {
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.12);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.12);
 }
 .btn-col {
   display: flex;
@@ -168,16 +292,16 @@ a {
 }
 
 .error {
-  background: #fff1f1;
-  border: 1px solid #f3b5b7;
-  color: #a5161b;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-line);
+  color: var(--danger-text);
   border-radius: 12px;
   padding: 8px 10px;
   margin: 8px 0;
   cursor: pointer;
 }
 .warn {
-  color: #b77900;
+  color: var(--amber-text);
 }
 
 select,
@@ -213,7 +337,7 @@ input[type='number'] {
 .seg button.on {
   background: var(--panel);
   color: var(--text);
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.14);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.14);
 }
 .check {
   font-size: 13px;
@@ -277,11 +401,11 @@ input[type='number'] {
   }
 }
 .menu-card {
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
   border-radius: 24px;
   padding: 16px;
-  box-shadow: 0 10px 30px rgba(43, 54, 86, 0.12);
+  box-shadow: 0 10px 30px rgba(var(--shadow-rgb), 0.12);
   backdrop-filter: blur(6px);
 }
 .menu-card h2 {
@@ -348,7 +472,7 @@ input[type='number'] {
   border-radius: 50%;
   overflow: hidden;
   border: 3px solid #fff;
-  box-shadow: 0 0 0 3px var(--card-color, var(--line)), 0 6px 14px rgba(43, 54, 86, 0.2);
+  box-shadow: 0 0 0 3px var(--card-color, var(--line)), 0 6px 14px rgba(var(--shadow-rgb), 0.2);
   background: var(--card-color, var(--panel2));
   display: grid;
   place-items: center;
@@ -543,14 +667,14 @@ input[type='number'] {
   background:
     radial-gradient(140% 55% at 50% -16%, transparent 0 68%, rgba(255, 112, 76, 0.55) 68.4% 70.6%, transparent 71%),
     radial-gradient(140% 55% at 50% 116%, transparent 0 68%, rgba(56, 132, 255, 0.55) 68.4% 70.6%, transparent 71%),
-    radial-gradient(140% 55% at 50% -16%, rgba(255, 224, 212, 0.9) 0 68%, transparent 68.4%),
-    radial-gradient(140% 55% at 50% 116%, rgba(214, 232, 255, 0.95) 0 68%, transparent 68.4%),
-    linear-gradient(180deg, #e9e6f7 0%, #e3e7f8 50%, #dfe8fa 100%);
+    radial-gradient(140% 55% at 50% -16%, var(--mat-top) 0 68%, transparent 68.4%),
+    radial-gradient(140% 55% at 50% 116%, var(--mat-bottom) 0 68%, transparent 68.4%),
+    linear-gradient(180deg, var(--mat-1) 0%, var(--mat-2) 50%, var(--mat-3) 100%);
 }
 .game.wide .mat {
-  border-left: 1px solid rgba(255, 255, 255, 0.8);
-  border-right: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 0 60px rgba(43, 54, 86, 0.12);
+  border-left: 1px solid var(--mat-line2);
+  border-right: 1px solid var(--mat-line2);
+  box-shadow: 0 0 60px rgba(var(--shadow-rgb), 0.12);
 }
 
 /* faixa de cima: menu, mão do oponente, faixa do oponente */
@@ -578,7 +702,7 @@ input[type='number'] {
   display: grid;
   place-items: center;
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(43, 54, 86, 0.3);
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.3);
 }
 .burger,
 .burger::before,
@@ -608,19 +732,19 @@ input[type='number'] {
   gap: 5px;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--overlay);
   color: var(--muted);
   font-weight: 800;
   font-size: 11px;
   padding: 4px 9px 4px 4px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.18);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.18);
 }
 .auto-toggle .knob {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #cfd6e8;
+  background: var(--knob);
   transition: background 0.2s;
 }
 .auto-toggle.on {
@@ -645,7 +769,7 @@ input[type='number'] {
   z-index: 4;
   pointer-events: none;
   max-width: 62%;
-  box-shadow: 0 3px 10px rgba(43, 54, 86, 0.25);
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.25);
 }
 .banner.right {
   right: 0;
@@ -720,7 +844,7 @@ input[type='number'] {
   top: 50%;
   height: calc(var(--cw) * 0.5);
   transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.45);
+  background: var(--mat-line);
 }
 .wheel {
   position: absolute;
@@ -730,10 +854,10 @@ input[type='number'] {
   height: calc(var(--cw) * 2);
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: calc(var(--cw) * 0.22) solid rgba(255, 255, 255, 0.6);
+  border: calc(var(--cw) * 0.22) solid var(--mat-line2);
   display: grid;
   place-items: center;
-  color: rgba(120, 136, 190, 0.18);
+  color: var(--wheel-ink);
 }
 .wheel svg {
   width: 72%;
@@ -768,11 +892,11 @@ input[type='number'] {
   width: var(--cw);
   height: var(--ch);
   border-radius: calc(var(--cw) * 0.09);
-  background: rgba(255, 255, 255, 0.35);
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: var(--slot-bg);
+  border: 2px solid var(--slot-line);
   display: grid;
   place-items: center;
-  color: rgba(116, 128, 158, 0.6);
+  color: var(--slot-text);
   font-size: max(9px, calc(var(--cw) * 0.13));
   font-weight: 800;
   text-transform: uppercase;
@@ -869,13 +993,13 @@ input[type='number'] {
   transform: translate(-50%, -50%) rotate(90deg);
 }
 .life-count {
-  background: #fff;
-  color: #c3282d;
+  background: var(--surface);
+  color: var(--danger-text);
   font-weight: 900;
   border-radius: 999px;
   padding: 1px 8px;
   font-size: max(11px, calc(var(--cw) * 0.17));
-  box-shadow: 0 2px 6px rgba(43, 54, 86, 0.2);
+  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.2);
   white-space: nowrap;
 }
 .life-count small {
@@ -985,12 +1109,12 @@ input[type='number'] {
   filter: grayscale(0.6) brightness(0.8);
 }
 .don-card.empty {
-  background: rgba(255, 255, 255, 0.35);
-  border: 2px dashed rgba(116, 128, 158, 0.45);
+  background: var(--slot-bg);
+  border: 2px dashed var(--slot-line);
   box-shadow: none;
 }
 .don-card.empty::after {
-  color: rgba(116, 128, 158, 0.55);
+  color: var(--slot-text);
   text-shadow: none;
 }
 .don-card.back {
@@ -1012,8 +1136,8 @@ input[type='number'] {
   gap: 1px;
   padding: 3px 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.75);
-  box-shadow: 0 2px 6px rgba(43, 54, 86, 0.12);
+  background: var(--overlay);
+  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.12);
   font-size: max(8.5px, calc(var(--cw) * 0.125));
   line-height: 1.15;
 }
@@ -1034,13 +1158,13 @@ input[type='number'] {
   font-weight: 700;
 }
 .don-stats .act dd {
-  color: #b77900;
+  color: var(--amber-text);
 }
 .don-stats .rest dd {
-  color: #7a849c;
+  color: var(--muted);
 }
 .don-stats .att dd {
-  color: #d9481f;
+  color: var(--hot-text);
 }
 /* DON!! anexados: deitados por baixo da carta, aparecendo na borda de baixo */
 .field-card {
@@ -1219,7 +1343,7 @@ input[type='number'] {
   line-height: 1;
   color: #fff;
   border: 3px solid #fff;
-  box-shadow: 0 3px 10px rgba(43, 54, 86, 0.25);
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.25);
 }
 .turn-chip small {
   font-size: 8px;
@@ -1254,7 +1378,7 @@ input[type='number'] {
   text-align: center;
   line-height: 1.25;
   max-width: 100%;
-  box-shadow: 0 3px 10px rgba(43, 54, 86, 0.25);
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.25);
 }
 button.hint-pill {
   cursor: pointer;
@@ -1268,7 +1392,7 @@ button.hint-pill {
   font-size: 10px;
 }
 .hint-pill.soft {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--overlay);
   color: var(--muted);
   font-weight: 700;
 }
@@ -1295,8 +1419,8 @@ button.hint-pill {
   box-shadow: 0 1px 0 #1f5fc8, 0 3px 8px rgba(47, 125, 246, 0.4);
 }
 .end-turn:disabled {
-  background: #c6cee0;
-  box-shadow: 0 3px 0 #aab4cc;
+  background: var(--btn-off);
+  box-shadow: 0 3px 0 var(--btn-off-shadow);
   cursor: default;
   filter: saturate(0.4);
 }
@@ -1364,7 +1488,7 @@ button.hint-pill {
   font-size: 11px;
   font-weight: 800;
   padding: 1px 7px;
-  box-shadow: 0 0 0 1.5px #fff, 0 2px 6px rgba(43, 54, 86, 0.35);
+  box-shadow: 0 0 0 1.5px #fff, 0 2px 6px rgba(var(--shadow-rgb), 0.35);
 }
 .defense-clock .clock.low {
   background: var(--danger);
@@ -1393,6 +1517,66 @@ button.hint-pill {
 .defense-slot.in-sheet .end-turn.defense small {
   font-size: 11px;
 }
+/* escolha de alvos: "Confirmar" apagado até marcar o mínimo */
+.end-turn.defense:disabled {
+  color: #fff;
+  background: var(--btn-off);
+  box-shadow: 0 3px 0 var(--btn-off-shadow);
+  filter: saturate(0.4);
+}
+
+/* pedido de um efeito que escolhe alvos na mesa: no meio da faixa central, com a carta de origem */
+.target-request {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 18px;
+  padding: 4px 12px 4px 5px;
+  background: var(--slate);
+  color: #fff;
+  text-align: left;
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.25);
+  animation: pop-in 0.2s;
+}
+.target-request .source-thumb {
+  flex: none;
+}
+.target-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.target-text small {
+  font-size: 9.5px;
+  font-weight: 700;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.target-text b {
+  font-size: 11.5px;
+  font-weight: 800;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.target-text .target-order {
+  white-space: normal;
+  opacity: 0.95;
+}
+.game.wide .target-text b {
+  font-size: 12.5px;
+}
+/* dentro da folha da mão: centralizado, acima do botão */
+.sheet-body > .target-request {
+  align-self: center;
+  max-width: 420px;
+}
 
 /* batalha ("Dano previsto") */
 .battle-info {
@@ -1418,7 +1602,7 @@ button.hint-pill {
   color: #fff;
   min-width: 0;
   line-height: 1.1;
-  box-shadow: 0 3px 8px rgba(43, 54, 86, 0.25);
+  box-shadow: 0 3px 8px rgba(var(--shadow-rgb), 0.25);
 }
 .pow em {
   font-style: normal;
@@ -1448,11 +1632,11 @@ button.hint-pill {
   font-weight: 900;
   padding: 2px 10px;
   border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(43, 54, 86, 0.18);
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.18);
 }
 .battle-status.hit {
-  color: #d9481f;
+  color: var(--hot-text);
 }
 .battle-status.safe {
   color: var(--ok);
@@ -1480,14 +1664,14 @@ button.hint-pill {
   z-index: 61;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--overlay);
   color: var(--text);
   font: inherit;
   font-size: 12px;
   font-weight: 800;
   padding: 4px 11px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.2);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.2);
 }
 .hand-expand b {
   display: inline-block;
@@ -1509,14 +1693,14 @@ button.hint-pill {
   max-height: 31px;
   overflow: hidden;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--overlay);
   color: var(--text);
   font-size: 11px;
   font-weight: 800;
   line-height: 1.15;
   padding: 3px 12px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.2), inset 0 0 0 1.5px var(--sky);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.2), inset 0 0 0 1.5px var(--sky);
   pointer-events: none;
   animation: pop-in 0.2s;
 }
@@ -1555,7 +1739,7 @@ button.hint-pill {
   transition: transform 0.12s ease-out, left 0.25s;
 }
 .hand.bottom .hand-card.lifted > .card {
-  box-shadow: 0 14px 26px rgba(30, 40, 80, 0.35);
+  box-shadow: 0 14px 26px rgba(var(--shadow2-rgb), 0.35);
 }
 .hand.bottom .hand-card.ghosted {
   opacity: 0.28;
@@ -1615,7 +1799,7 @@ button.hint-pill {
   background: linear-gradient(170deg, #fdfaf1 0%, #efe5cc 100%);
   color: #1d1d1d;
   border: max(2px, calc(var(--cw) * 0.035)) solid var(--card-color, #888);
-  box-shadow: 0 2px 6px rgba(30, 40, 80, 0.3);
+  box-shadow: 0 2px 6px rgba(var(--shadow2-rgb), 0.3);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1775,7 +1959,7 @@ button.hint-pill {
   display: grid;
   place-items: center;
   color: #f4f1e6;
-  box-shadow: 0 2px 6px rgba(30, 40, 80, 0.35);
+  box-shadow: 0 2px 6px rgba(var(--shadow2-rgb), 0.35);
 }
 .back-label {
   position: absolute;
@@ -1949,7 +2133,7 @@ button.hint-pill {
   white-space: nowrap;
   border: 3px solid rgba(255, 255, 255, 0.95);
   animation: banner 1.7s ease forwards;
-  box-shadow: 0 8px 26px rgba(43, 54, 86, 0.35);
+  box-shadow: 0 8px 26px rgba(var(--shadow-rgb), 0.35);
 }
 .turn-banner.mine {
   background: linear-gradient(180deg, #4da3ff, var(--blue));
@@ -1965,7 +2149,7 @@ button.hint-pill {
   transform: translateX(-50%);
   z-index: 60;
   width: min(92%, 480px);
-  box-shadow: 0 8px 24px rgba(43, 54, 86, 0.25);
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.25);
   animation: pop-in 0.2s;
 }
 
@@ -1975,7 +2159,7 @@ button.hint-pill {
   z-index: 200;
   pointer-events: none;
   transform: translate(-50%, -62%) rotate(-5deg) scale(1.08);
-  filter: drop-shadow(0 14px 18px rgba(30, 40, 80, 0.35));
+  filter: drop-shadow(0 14px 18px rgba(var(--shadow2-rgb), 0.35));
   transition: transform 0.12s;
 }
 .drag-ghost .card {
@@ -1993,6 +2177,7 @@ button.hint-pill {
 
 /* ------------------------------------------------------------------ prompts e janelas */
 
+/* balão de aviso (efeito manual; escolha com alvos de fora da mesa misturados com alvos na mesa) */
 .prompt-pill {
   position: absolute;
   top: calc(env(safe-area-inset-top) + 6px);
@@ -2000,10 +2185,10 @@ button.hint-pill {
   transform: translateX(-50%);
   width: min(calc(100% - 16px), 560px);
   z-index: 40;
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--overlay);
   border-radius: 20px;
   padding: 10px 12px;
-  box-shadow: 0 0 0 2px var(--sky), 0 10px 30px rgba(43, 54, 86, 0.28);
+  box-shadow: 0 0 0 2px var(--sky), 0 10px 30px rgba(var(--shadow-rgb), 0.28);
   animation: pop-in 0.2s;
   touch-action: pan-y;
 }
@@ -2048,7 +2233,7 @@ button.hint-pill {
   position: absolute;
   inset: 0;
   z-index: 50;
-  background: rgba(36, 46, 80, 0.42);
+  background: var(--backdrop);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   display: grid;
@@ -2060,11 +2245,11 @@ button.hint-pill {
 }
 .modal-card {
   width: min(460px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 24px;
   padding: 18px 16px 16px;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(30, 40, 80, 0.35);
+  box-shadow: 0 20px 60px rgba(var(--shadow2-rgb), 0.35);
   animation: pop-in 0.22s;
 }
 .modal-card h2 {
@@ -2187,10 +2372,10 @@ button.hint-pill {
 }
 .zoom-text {
   width: 100%;
-  background: #fff;
+  background: var(--surface);
   border-radius: 20px;
   padding: 14px;
-  box-shadow: 0 10px 30px rgba(30, 40, 80, 0.2);
+  box-shadow: 0 10px 30px rgba(var(--shadow2-rgb), 0.2);
 }
 .zoom-close {
   position: absolute;
@@ -2223,7 +2408,7 @@ button.hint-pill {
   flex-direction: column;
   background: var(--bg2);
   border-radius: 24px 24px 0 0;
-  box-shadow: 0 -10px 40px rgba(30, 40, 80, 0.3);
+  box-shadow: 0 -10px 40px rgba(var(--shadow2-rgb), 0.3);
   animation: sheet-up 0.25s cubic-bezier(0.2, 1, 0.3, 1);
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -2276,13 +2461,13 @@ button.hint-pill {
   --cw: min(92px, 27vw);
 }
 .manual-box {
-  background: #fff8e6;
-  border: 1px solid #f1d58b;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
   border-radius: 16px;
   padding: 12px;
 }
 .manual-box .effect {
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--glass);
   border-radius: 8px;
   padding: 6px 8px;
 }
@@ -2290,7 +2475,7 @@ button.hint-pill {
 /* ------------------------------------------------------------------ painel lateral (desktop) */
 
 .side-panel {
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--glass);
   border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -2350,7 +2535,7 @@ button.hint-pill {
   gap: 4px 10px;
   font-size: 12px;
   margin: 6px 0;
-  color: #b77900;
+  color: var(--amber-text);
   font-weight: 800;
 }
 .effect {
@@ -2360,7 +2545,7 @@ button.hint-pill {
   white-space: pre-line;
 }
 .effect.trigger {
-  color: #b5541c;
+  color: var(--trigger-text);
 }
 .actions {
   display: flex;
@@ -2390,10 +2575,10 @@ button.hint-pill {
   -webkit-user-select: text;
 }
 .log-line.p0 {
-  color: #1f5fc8;
+  color: var(--log-p0);
 }
 .log-line.p1 {
-  color: #c2451d;
+  color: var(--log-p1);
 }
 .log-line.turn {
   color: var(--text);
@@ -2408,7 +2593,7 @@ button.hint-pill {
   inset: 0;
   z-index: 80;
   overflow-y: auto;
-  background: linear-gradient(180deg, #f8f3ea 0%, var(--bg) 100%);
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 100%);
   animation: fade-in 0.4s;
   touch-action: pan-y;
   user-select: none;
@@ -2419,17 +2604,17 @@ button.hint-pill {
   right: 0;
   top: 0;
   height: 230px;
-  background: linear-gradient(100deg, #ffd9ec 0%, #e5ddff 40%, #d6ecff 75%, #d7fbe8 100%);
+  background: var(--sky-won);
   clip-path: polygon(0 0, 100% 0, 100% 60%, 0 100%);
 }
 .result.lost .result-sky {
-  background: linear-gradient(100deg, #e3e6ef 0%, #d9deea 50%, #cfd6e6 100%);
+  background: var(--sky-lost);
 }
 .result-head {
   position: relative;
   text-align: center;
   padding: calc(env(safe-area-inset-top) + 50px) 16px 14px;
-  background: linear-gradient(180deg, transparent 0 55%, rgba(255, 255, 255, 0.85) 55%);
+  background: linear-gradient(180deg, transparent 0 55%, var(--glass) 55%);
 }
 .result-avatar {
   width: 92px;
@@ -2438,7 +2623,7 @@ button.hint-pill {
   border-radius: 50%;
   overflow: hidden;
   border: 4px solid #fff;
-  box-shadow: 0 8px 20px rgba(43, 54, 86, 0.25);
+  box-shadow: 0 8px 20px rgba(var(--shadow-rgb), 0.25);
   background: var(--accent);
   display: grid;
   place-items: center;
@@ -2464,7 +2649,7 @@ button.hint-pill {
   font-size: 46px;
   font-weight: 900;
   letter-spacing: -0.5px;
-  color: #3b4566;
+  color: var(--heading);
 }
 .result.won h1 {
   animation: pop-in 0.5s 0.15s backwards;
@@ -2514,25 +2699,25 @@ button.hint-pill {
 }
 .mvp-card .card {
   border-radius: 10px;
-  box-shadow: 0 14px 34px rgba(30, 40, 80, 0.3);
+  box-shadow: 0 14px 34px rgba(var(--shadow2-rgb), 0.3);
 }
 .stats {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 8px 12px;
   margin: 0;
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.95);
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
   border-radius: 20px;
   padding: 14px;
   align-items: center;
 }
 .stats dt {
-  background: #fff;
+  background: var(--surface);
   border-radius: 999px;
   padding: 6px 14px;
   font-weight: 800;
-  box-shadow: 0 2px 6px rgba(43, 54, 86, 0.1);
+  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.1);
   text-align: center;
   font-size: 13px;
 }
@@ -2551,12 +2736,12 @@ button.hint-pill {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #dfe4ef;
+  background: var(--pip-bg);
   display: inline-grid;
   place-items: center;
   font-size: 12px;
   font-weight: 900;
-  color: #2f6db5;
+  color: var(--pip-text);
   font-style: italic;
 }
 .pips span.on {
@@ -2576,6 +2761,18 @@ button.hint-pill {
   align-self: center;
 }
 
+/* ------------------------------------------------------------------ tema escuro: retoques */
+
+/* Arte das cartas um pouco mais suave nas listas (construtor, visualizador); nunca na mesa. */
+:root[data-theme='dark'] .card-grid .card-img,
+:root[data-theme='dark'] .viewer-list .card-img,
+:root[data-theme='dark'] .picker-grid .leader-art img {
+  filter: brightness(0.88);
+}
+/* Faixa da marca: ganha um contorno para se destacar do fundo azul-marinho. */
+:root[data-theme='dark'] .brand-bar {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 30px rgba(0, 0, 0, 0.45);
+}
 /* ------------------------------------------------------------------ configurações */
 
 .settings {
@@ -2798,7 +2995,7 @@ button.hint-pill {
   pointer-events: none;
 }
 .spoiler-note {
-  color: #6a2bd1;
+  color: var(--spoiler-text);
 }
 .manual-badge {
   position: absolute;
@@ -3269,7 +3466,7 @@ button.hint-pill {
   padding: 4px 12px;
   border-radius: 999px;
   background: var(--text);
-  color: #fff;
+  color: var(--panel);
   font-weight: 800;
 }
 .stats-filters summary {
@@ -3297,6 +3494,9 @@ button.hint-pill {
 }
 .tier-chips .chip {
   padding: 5px 12px;
+}
+.tier-chips .chip.on {
+  color: var(--panel);
 }
 .tier-chips .chip:disabled {
   opacity: 0.4;
@@ -3497,9 +3697,9 @@ tr.clickable:hover td {
     background:
       radial-gradient(120% 70% at 50% -30%, transparent 0 66%, rgba(255, 112, 76, 0.5) 66.4% 68.4%, transparent 68.8%),
       radial-gradient(120% 70% at 50% 130%, transparent 0 66%, rgba(56, 132, 255, 0.5) 66.4% 68.4%, transparent 68.8%),
-      radial-gradient(120% 70% at 50% -30%, rgba(255, 224, 212, 0.9) 0 66%, transparent 66.4%),
-      radial-gradient(120% 70% at 50% 130%, rgba(214, 232, 255, 0.95) 0 66%, transparent 66.4%),
-      linear-gradient(180deg, #e9e6f7 0%, #e3e7f8 50%, #dfe8fa 100%);
+      radial-gradient(120% 70% at 50% -30%, var(--mat-top) 0 66%, transparent 66.4%),
+      radial-gradient(120% 70% at 50% 130%, var(--mat-bottom) 0 66%, transparent 66.4%),
+      linear-gradient(180deg, var(--mat-1) 0%, var(--mat-2) 50%, var(--mat-3) 100%);
   }
 
   /* cada lado numa linha só */
@@ -3677,6 +3877,13 @@ tr.clickable:hover td {
   }
   .end-turn.defense small {
     font-size: 8.5px;
+  }
+  .target-request {
+    padding: 2px 10px 2px 4px;
+  }
+  .target-text b {
+    font-size: 10.5px;
+    -webkit-line-clamp: 2;
   }
   .hand-hint {
     display: none;
@@ -3922,7 +4129,7 @@ tr.clickable:hover td {
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 8px;
-  box-shadow: 0 8px 24px rgba(43, 54, 86, 0.25);
+  box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.25);
   z-index: 80;
 }
 .emote-bubble {
@@ -3933,7 +4140,7 @@ tr.clickable:hover td {
   border-radius: 18px;
   padding: 8px 14px;
   font-weight: 800;
-  box-shadow: 0 6px 18px rgba(43, 54, 86, 0.3);
+  box-shadow: 0 6px 18px rgba(var(--shadow-rgb), 0.3);
   pointer-events: none;
   animation: pop-in 0.2s;
   max-width: 70%;
@@ -3998,8 +4205,8 @@ tr.clickable:hover td {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  background: #fff6dc;
-  border: 1px solid #f2d27a;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
   border-radius: 14px;
   padding: 10px 12px;
   margin-bottom: 8px;
@@ -4051,7 +4258,7 @@ tr.clickable:hover td {
   font-weight: 800;
   font-size: 11px;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.18);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.18);
 }
 .spectator-count {
   align-self: flex-start;
@@ -4061,13 +4268,13 @@ tr.clickable:hover td {
   place-items: center;
   font-size: 20px;
   cursor: default;
-  background: #c6cee0;
-  box-shadow: 0 3px 0 #aab4cc;
+  background: var(--btn-off);
+  box-shadow: 0 3px 0 var(--btn-off-shadow);
 }
 /* olho do Streamer/Admin: azul com as mãos à mostra, cinza com elas escondidas */
 .end-turn.hands-toggle {
   cursor: pointer;
-  color: #5d6a88;
+  color: var(--btn-off-text);
 }
 .end-turn.hands-toggle.on {
   color: #fff;
@@ -4096,7 +4303,7 @@ tr.clickable:hover td {
   border-radius: 18px;
   padding: 10px 12px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.08);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.08);
 }
 .watch-room:hover {
   border-color: var(--blue);
@@ -4519,13 +4726,28 @@ tr.clickable:hover td {
   cursor: default;
 }
 .die {
+  /* Lado do dado (igual a SIZE em DiceRoll.tsx). */
+  --die: 58px;
+  --half: calc(var(--die) / 2);
+  /* Cores do dado oficial: vermelho esmaltado e brilhante. */
+  --die-hi: #ef3a3f;
+  --die-mid: #d01d24;
+  --die-lo: #a60f16;
+  --die-core: #8f0c12;
   position: absolute;
   left: 0;
   top: 0;
-  width: 52px;
-  height: 52px;
+  width: var(--die);
+  height: var(--die);
   transform-style: preserve-3d;
   will-change: transform;
+}
+/* O dado do oponente sai na outra cor oficial (azul) para não confundir com o seu. */
+.die.theirs {
+  --die-hi: #3f7ff0;
+  --die-mid: #1f58cc;
+  --die-lo: #133f9c;
+  --die-core: #0f3382;
 }
 .die-cube {
   position: absolute;
@@ -4534,77 +4756,131 @@ tr.clickable:hover td {
 }
 .die-shadow {
   position: absolute;
-  left: 2px;
-  top: 8px;
-  width: 48px;
-  height: 46px;
+  left: 3px;
+  top: 9px;
+  width: calc(var(--die) - 6px);
+  height: calc(var(--die) - 8px);
   border-radius: 50%;
   background: radial-gradient(circle, rgba(0, 0, 0, 0.6), transparent 70%);
   filter: blur(3px);
 }
-.die-face {
+/* As 6 faces do cubo (a mesma geometria serve para a casca e para o miolo). */
+.die-side {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
-  padding: 7px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #ffffff, #e8e2d4);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
-    inset -3px -4px 8px rgba(0, 0, 0, 0.14);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-.die-face.f1 {
-  transform: translateZ(26px);
+.die-side.f1 {
+  transform: translateZ(var(--half));
 }
-.die-face.f6 {
-  transform: rotateY(180deg) translateZ(26px);
+.die-side.f6 {
+  transform: rotateY(180deg) translateZ(var(--half));
 }
-.die-face.f3 {
-  transform: rotateY(90deg) translateZ(26px);
+.die-side.f3 {
+  transform: rotateY(90deg) translateZ(var(--half));
 }
-.die-face.f4 {
-  transform: rotateY(-90deg) translateZ(26px);
+.die-side.f4 {
+  transform: rotateY(-90deg) translateZ(var(--half));
 }
-.die-face.f2 {
-  transform: rotateX(90deg) translateZ(26px);
+.die-side.f2 {
+  transform: rotateX(90deg) translateZ(var(--half));
 }
-.die-face.f5 {
-  transform: rotateX(-90deg) translateZ(26px);
+.die-side.f5 {
+  transform: rotateX(-90deg) translateZ(var(--half));
 }
-.pip {
-  place-self: center;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #555, #111);
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+/* Miolo: um cubo um pouco menor e mais escuro, que aparece nas quinas arredondadas da casca. */
+.die-core {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
 }
-.die-face.f1 .pip {
-  width: 13px;
-  height: 13px;
+.die-core .die-side {
+  --half: calc(var(--die) / 2 - 5px);
+  inset: 4px;
+  border-radius: 20%;
+  background: var(--die-core);
 }
-.die.mine .die-face.f1 .pip {
-  background: radial-gradient(circle at 35% 35%, #ff6b5a, #b3150a);
+/* Casca: face esmaltada, com reflexo no canto de cima e cantos bem arredondados. */
+.die-face {
+  display: grid;
+  place-items: center;
+  border-radius: 24%;
+  color: #fff;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12) 28%, transparent 48%),
+    linear-gradient(150deg, var(--die-hi), var(--die-mid) 55%, var(--die-lo));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 2px 3px 6px rgba(255, 255, 255, 0.22),
+    inset -4px -5px 10px rgba(0, 0, 0, 0.35);
 }
-.die.theirs .die-face {
-  background: linear-gradient(145deg, #fff3ee, #f1cfc3);
+/* Números brancos, grandes e arredondados como no dado real. */
+.die-num {
+  font-family: var(--font);
+  font-weight: 900;
+  font-size: calc(var(--die) * 0.62);
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  user-select: none;
 }
-.die.theirs .pip {
-  background: radial-gradient(circle at 35% 35%, #e65a4b, #8f1d14);
+/* O 6 ganha um traço embaixo para não virar 9 quando o dado para de lado. */
+.die-num.six {
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+}
+/* Face do 1: a caveira dos Chapéus de Palha, em branco (SVG próprio). */
+.die-skull {
+  display: block;
+  width: 78%;
+  height: 78%;
+  background: url('./assets/jolly-roger.svg') center / contain no-repeat;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
 }
 .die.winner .die-face {
   box-shadow:
     inset 0 0 0 2px #ffd75a,
-    inset -3px -4px 8px rgba(0, 0, 0, 0.14),
+    inset 2px 3px 6px rgba(255, 255, 255, 0.22),
+    inset -4px -5px 10px rgba(0, 0, 0, 0.35),
     0 0 12px rgba(255, 200, 60, 0.6);
+}
+/* No lugar do dado de quem ainda não jogou: o dado dele só entra na mesa quando ele joga. */
+.dice-wait {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 70%;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(10, 24, 50, 0.45);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: dice-wait 0.3s ease-out;
+}
+.dice-wait.theirs {
+  left: 60%;
+  top: 26%;
+}
+.dice-wait.mine {
+  left: 40%;
+  top: 74%;
+}
+@keyframes dice-wait {
+  from {
+    opacity: 0;
+  }
 }
 .dice-hand {
   position: absolute;
-  left: calc(40% + 18px);
-  top: calc(74% + 14px);
+  left: calc(40% + 20px);
+  top: calc(74% + 16px);
   font-size: 30px;
   pointer-events: none;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
@@ -4679,7 +4955,7 @@ tr.clickable:hover td {
   border-radius: 18px;
   padding: 12px 14px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(43, 54, 86, 0.08);
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.08);
 }
 .tour-card:hover {
   border-color: var(--blue);
@@ -4702,7 +4978,7 @@ tr.clickable:hover td {
   border-radius: 999px;
   padding: 2px 10px;
   color: #fff;
-  background: var(--muted);
+  background: var(--chip-bg);
 }
 .tour-status.registration {
   background: var(--blue);
