@@ -310,6 +310,8 @@ interface BoardProps extends BoardHandlers {
   ghost?: string | null;
   /** Abre a mão inteira em tamanho grande (mãos com muitas cartas). */
   onExpandHand?: () => void;
+  /** Dica curta sobre a mão (ex.: como usar um Counter), logo acima do leque. */
+  handHint?: ReactNode;
   bottom: PlayerId;
   revealTop: boolean;
   revealBottom: boolean;
@@ -331,6 +333,7 @@ export function Board({
   lifted,
   ghost,
   onExpandHand,
+  handHint,
   bannerExtra,
   ...handlers
 }: BoardProps) {
@@ -359,6 +362,7 @@ export function Board({
         <div className="my-bar">
           <PlayerBanner state={state} player={bottom} align="left" extra={bannerExtra?.(bottom)} />
         </div>
+        {handHint && <div className="hand-hint">{handHint}</div>}
         {onExpandHand && state.players[bottom].hand.length > 0 && (
           <button className="hand-expand" onClick={onExpandHand} title="Ver todas as cartas da mão em tamanho grande">
             ⤢ Ver mão <b>{state.players[bottom].hand.length}</b>
