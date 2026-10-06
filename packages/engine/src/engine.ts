@@ -650,6 +650,26 @@ function usedKey(uid: string, index: number) {
   return `${uid}:${index}`;
 }
 
+/**
+ * Passos de uma habilidade automática. Uma [Once Per Turn] que começa com custo opcional
+ * ("DON!! −1:", "You may trash 1 card from your hand:") é marcada como usada ao ser empilhada
+ * (para não disparar duas vezes seguidas), mas a recusa do custo devolve o uso: pelas regras,
+ * uma habilidade cujo custo não foi pago não foi ativada.
+ */
+function abilitySteps(a: Ability, index: number): EffectStep[] {
+  const first = a.steps[0];
+  if (a.oncePerTurn && first?.do === 'payCost' && first.ability === undefined) return [{ ...first, ability: index }, ...a.steps.slice(1)];
+  return a.steps;
+}
+
+/** Devolve o uso do turno de uma [Once Per Turn] cujo custo não foi pago. */
+function releaseOncePerTurn(state: GameState, uid: string, index: number | undefined) {
+  if (index === undefined) return;
+  const key = usedKey(uid, index);
+  const i = state.usedThisTurn.lastIndexOf(key);
+  if (i >= 0) state.usedThisTurn.splice(i, 1);
+}
+
 export function isIdle(state: GameState): boolean {
   return state.phase === 'main' && !state.pending && state.stack.length === 0;
 }
@@ -1320,7 +1340,7 @@ function emit(state: GameState, ev: EmittedEvent) {
         if (!conditionsMet(state, fc.uid, a)) return;
         if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) return;
         if (a.oncePerTurn) state.usedThisTurn.push(usedKey(fc.uid, i));
-        pushEffect(state, fc.uid, ps.id, a.steps);
+        pushEffect(state, fc.uid, ps.id, abilitySteps(a, i));
         // "that Character" no efeito se refere à carta do acontecimento.
         const top = state.stack[state.stack.length - 1];
         if (ev.card && a.steps.length && top?.kind === 'effect' && top.source === fc.uid) top.last = [ev.card];
@@ -1457,7 +1477,7 @@ function pushAbilities(state: GameState, uid: string, timing: AbilityTiming) {
   // Empilha de trás para frente para resolver na ordem do texto.
   for (const [i, a] of toPush.reverse()) {
     if (a.oncePerTurn) state.usedThisTurn.push(usedKey(uid, i));
-    pushEffect(state, uid, owner, a.steps);
+    pushEffect(state, uid, owner, abilitySteps(a, i));
   }
 }
 
@@ -2222,6 +2242,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const cost = step.cost;
       if (!frame.choice) {
         if (!canPayCost(state, frame.controller, frame.source, cost)) {
+          releaseOncePerTurn(state, frame.source, step.ability);
           if (step.scope === undefined) return abortEffect(frame);
           frame.i += step.scope;
           return true;
@@ -2238,6 +2259,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       if (!frame.choice.length) {
         log(state, frame.controller, `${ps.name} não usa o efeito de ${srcName}.`);
+        releaseOncePerTurn(state, frame.source, step.ability);
         if (step.scope === undefined) return abortEffect(frame);
         // "you may X" no meio do efeito: pula só X (e o "If you do, …"), o resto continua.
         frame.i += step.scope;

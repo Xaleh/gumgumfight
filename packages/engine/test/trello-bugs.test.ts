@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildCardDef } from '../src/cards';
-import { applyAction, createGame } from '../src/engine';
+import { applyAction, createGame, getPower } from '../src/engine';
+import { createAliases, viewFor } from '../src/view';
 import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
 import { cards as baseCards, toTurn } from './helpers';
 
@@ -91,5 +92,98 @@ describe('Trello: custo "devolver 1 ou mais DON!!" (Zoro OP09-076)', () => {
     expect(s.players[0].donDeck).toBe(5);
     expect(s.players[0].donActive).toBe(2);
     expect(s.players[0].donRested).toBe(3);
+  });
+});
+
+/** O defensor não usa [Blocker] nem Counter. */
+function noDefense(s: GameState): GameState {
+  for (let guard = 0; guard < 10; guard++) {
+    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: s.pending.player, uids: [] });
+    else if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: s.pending.player });
+    else break;
+  }
+  return s;
+}
+
+describe('Trello: Kaido OP17-058 [On Your Opponent\'s Attack] [Once Per Turn] DON!! −1', () => {
+  /** Turno 4 (do oponente, jogador 1) com dois Personagens prontos para atacar e Kaido com 3 DON!! em campo. */
+  function opponentTurn() {
+    const s = toTurn(game(), 4);
+    setDon(s, 0, 3);
+    setDon(s, 1, 4);
+    const a = field(s, 1, 'ST01-003'); // dois Personagens quaisquer do ST01, já prontos para atacar
+    const b = field(s, 1, 'ST01-004');
+    return { s, a, b };
+  }
+  const attack = (s: GameState, attacker: string) =>
+    applyAction(s, { type: 'attack', player: 1, attacker, target: s.players[0].leader.uid });
+
+  it('recusar o custo no primeiro ataque não gasta o [Once Per Turn]: o segundo ataque pergunta de novo', () => {
+    let { s, a, b } = opponentTurn();
+    s = attack(s, a);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = noDefense(applyAction(s, { type: 'answer', player: 0, yes: false }));
+    expect(s.battle).toBeNull();
+    expect(s.players[0].donDeck).toBe(7);
+
+    s = attack(s, b);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    // Pagou DON!! −1 e escolhe o alvo do −2000.
+    expect(s.players[0].donDeck).toBe(8);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+  });
+
+  it('depois de pagar uma vez, o ataque seguinte no mesmo turno não pergunta mais', () => {
+    let { s, a, b } = opponentTurn();
+    s = attack(s, a);
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [a] });
+    s = noDefense(s);
+    expect(s.battle).toBeNull();
+    s = attack(s, b);
+    expect(s.pending?.kind).not.toBe('confirm');
+    s = noDefense(s);
+    expect(s.players[0].donDeck).toBe(8);
+  });
+});
+
+describe('Trello: o −2000 do Kaido OP17-058 vale até o fim do turno, não só na batalha', () => {
+  it('[When Attacking] no próprio turno: o alvo fica com −2000 depois da batalha e volta no fim do turno', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 3);
+    const victim = field(s, 1, 'ST01-004');
+    const base = getPower(s, victim);
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [victim] });
+    expect(getPower(s, victim)).toBe(base - 2000);
+    s = noDefense(s);
+    expect(s.battle).toBeNull();
+    expect(getPower(s, victim)).toBe(base - 2000); // ainda no turno
+    // A visão do oponente (partida online) também mostra o poder reduzido.
+    let n = 0;
+    const aliases = createAliases(s, () => `k${n++}`);
+    const v = viewFor(s, 1, aliases);
+    expect(getPower(v, aliases.toAlias[victim])).toBe(base - 2000);
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(getPower(s, victim)).toBe(base); // fim do turno: acabou
+  });
+
+  it("[On Your Opponent's Attack] no turno do oponente: o atacante fica com −2000 até o fim do turno dele", () => {
+    let s = toTurn(game(), 4);
+    setDon(s, 0, 3);
+    setDon(s, 1, 4);
+    const attacker = field(s, 1, 'ST01-004');
+    const base = getPower(s, attacker);
+    s = applyAction(s, { type: 'attack', player: 1, attacker, target: s.players[0].leader.uid });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [attacker] });
+    s = noDefense(s);
+    expect(s.battle).toBeNull();
+    expect(getPower(s, attacker)).toBe(base - 2000);
+    s = applyAction(s, { type: 'endTurn', player: 1 });
+    expect(getPower(s, attacker)).toBe(base);
   });
 });

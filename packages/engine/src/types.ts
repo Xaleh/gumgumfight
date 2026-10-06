@@ -701,8 +701,9 @@ type EffectStepBody =
   /**
    * Custo opcional no meio de um efeito automático ("[On Play] DON!! −1: …", "You may trash 1 card from your
    * hand: …"). O jogador decide se paga; se não pagar (ou não puder), o resto do efeito não acontece.
+   * `ability`: índice da habilidade [Once Per Turn] dona do custo; recusar (ou não poder pagar) devolve o uso do turno.
    */
-  | { do: 'payCost'; cost: AbilityCost; scope?: number }
+  | { do: 'payCost'; cost: AbilityCost; scope?: number; ability?: number }
   /** Custo "DON!! −N ou mais": pergunta quantos DON!! devolver (no mínimo `min`) e devolve. */
   | { do: 'returnDonChoice'; min: number }
   /** "Trash up to N of your opponent's Life cards." (do topo) */
