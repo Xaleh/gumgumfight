@@ -128,7 +128,8 @@ describe('efeitos lidos automaticamente', () => {
     t.players[0].hand = [];
     const before = t.players[0].life.length;
     t = applyAction(t, { type: 'attack', player: 1, attacker: t.players[1].leader.uid, target: t.players[0].leader.uid });
-    expect(t.pending).toMatchObject({ kind: 'trigger', card: lifeTop });
+    t = applyAction(t, { type: 'pass', player: 0 });
+    expect(t.pending).toMatchObject({ kind: 'lifeCard', card: lifeTop });
     t = applyAction(t, { type: 'answer', player: 0, yes: true });
     expect(t.players[0].life.length).toBe(before); // perdeu 1, ganhou 1
   });
@@ -176,7 +177,7 @@ describe('efeitos lidos automaticamente', () => {
     expect(blockerOptions(s, 1)).not.toContain(capone);
     while (s.pending) {
       const p = s.pending;
-      s = applyAction(s, p.kind === 'block' ? { type: 'choose', player: p.player, uids: [] } : p.kind === 'trigger' ? { type: 'answer', player: p.player, yes: false } : { type: 'pass', player: p.player });
+      s = applyAction(s, p.kind === 'block' ? { type: 'choose', player: p.player, uids: [] } : p.kind === 'lifeCard' ? { type: 'answer', player: p.player, yes: false } : { type: 'pass', player: p.player });
     }
 
     // No turno do oponente: atacar vira a carta, então não pode atacar.
@@ -317,6 +318,7 @@ describe('efeitos lidos automaticamente', () => {
     const victim = field(s, 1, 'PX-001', true);
     s.players[1].hand = [];
     s = applyAction(s, { type: 'attack', player: 0, attacker: isuka, target: victim });
+    s = applyAction(s, { type: 'pass', player: 1 });
     expect(s.players[1].trash).toContain(victim);
     expect(s.players[0].characters.find((c) => c.uid === isuka)?.rested).toBe(false);
   });

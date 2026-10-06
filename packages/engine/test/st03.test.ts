@@ -135,7 +135,8 @@ describe('ST03 — The Seven Warlords of the Sea', () => {
     ps.life.push(sables);
     ps.hand = [];
     s = attack(s, 1, s.players[1].leader.uid, ps.leader.uid);
-    expect(s.pending).toMatchObject({ kind: 'trigger', player: 0, card: sables });
+    s = applyAction(s, { type: 'pass', player: 0 });
+    expect(s.pending).toMatchObject({ kind: 'lifeCard', player: 0, card: sables });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
     expect(s.pending?.kind === 'selectTargets' && s.pending.options).toContain(zoro);
     s = applyAction(s, { type: 'choose', player: 0, uids: [zoro] });

@@ -75,7 +75,7 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
   if (p && viewer !== null && p.player === viewer) {
     if (p.kind === 'selectTargets' || p.kind === 'block' || p.kind === 'counter') for (const u of p.options) out.add(u);
     if (p.kind === 'selectTargets') for (const u of p.shown ?? []) out.add(u);
-    if (p.kind === 'trigger') out.add(p.card);
+    if (p.kind === 'lifeCard') out.add(p.card);
   }
   return out;
 }
@@ -179,7 +179,8 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
     case 'block':
     case 'counter':
       return { ...p, options: mine ? p.options.map(ref) : [] };
-    case 'trigger':
+    case 'lifeCard':
+      // O oponente vê que há uma carta da Vida sendo olhada, nunca qual (nem se tem [Trigger]).
       return { ...p, card: ref(p.card) };
     case 'confirm':
       return { ...p, source: ref(p.source), prompt: mine ? p.prompt : '' };

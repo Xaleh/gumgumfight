@@ -86,7 +86,7 @@ describe('spoilers de EB05 e OP18', () => {
     const life = s.players[1].life.length;
     s = noDefense(applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid }));
     s = applyAction(s, { type: 'answer', player: 1, yes: false });
-    if (s.pending?.kind === 'trigger') s = applyAction(s, { type: 'answer', player: 1, yes: false });
+    if (s.pending?.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: 1, yes: false });
     expect(s.players[1].life).toHaveLength(life - 1);
     expect(s.players[1].characters.some((c) => c.uid === gloriosa)).toBe(true);
   });
@@ -132,7 +132,7 @@ describe('spoilers de EB05 e OP18', () => {
     expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
     s = noDefense(s);
-    if (s.pending?.kind === 'trigger') s = applyAction(s, { type: 'answer', player: 1, yes: false });
+    if (s.pending?.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: 1, yes: false });
     expect(s.players[0].leader.rested).toBe(false);
     // Usa o Líder de novo (fica virado) e passa a vez: na Renovação ele continua virado.
     s.players[0].leader.rested = true;

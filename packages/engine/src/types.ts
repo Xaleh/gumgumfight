@@ -1013,8 +1013,17 @@ export type Pending =
       shown?: string[];
     }
   | { kind: 'block'; player: PlayerId; options: string[] }
+  /**
+   * Etapa de Counter do defensor. Abre sempre, mesmo sem carta de Counter na mão
+   * (`options` vazio): pular a etapa contaria ao atacante que a mão não tem Counter.
+   */
   | { kind: 'counter'; player: PlayerId; options: string[] }
-  | { kind: 'trigger'; player: PlayerId; card: string }
+  /**
+   * Carta que saiu da Vida, mostrada só ao dono. `answer` yes ativa o [Trigger] (só
+   * vale quando a carta tem um); no coloca a carta na mão. Abre para toda carta de
+   * Vida, com ou sem [Trigger], para o oponente não descobrir qual era o caso.
+   */
+  | { kind: 'lifeCard'; player: PlayerId; card: string }
   /** Pergunta sim/não (ex.: pagar um custo opcional). Responder com `answer`. */
   | { kind: 'confirm'; player: PlayerId; source: string; prompt: string }
   /** Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`. */

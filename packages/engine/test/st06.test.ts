@@ -35,7 +35,8 @@ describe('ST06 — Absolute Justice (leitor automático)', () => {
     s.players[0].hand = [];
     const oppHand = s.players[1].hand.length;
     s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: s.players[0].leader.uid });
-    expect(s.pending).toMatchObject({ kind: 'trigger', card });
+    s = applyAction(s, { type: 'pass', player: 0 });
+    expect(s.pending).toMatchObject({ kind: 'lifeCard', card });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
     expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1, min: 1, max: 1, intent: 'discard' });
     const action = chooseBotAction(s, 1);
@@ -49,7 +50,8 @@ describe('ST06 — Absolute Justice (leitor automático)', () => {
     const card = lifeTrigger(s, 0, 'ST06-016');
     s.players[0].hand = [];
     s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: s.players[0].leader.uid });
-    expect(s.pending).toMatchObject({ kind: 'trigger', card });
+    s = applyAction(s, { type: 'pass', player: 0 });
+    expect(s.pending).toMatchObject({ kind: 'lifeCard', card });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
     expect(s.players[0].hand).toHaveLength(1); // a carta de Vida vai para o descarte; compra 1
     expect(koProtected(s, koby, false)).toBe(true);

@@ -35,7 +35,8 @@ describe('reações a acontecimentos ("When …")', () => {
     for (let i = 0; i < 6 && s.pending; i++) {
       const p = s.pending;
       if (p.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: p.player, uids: p.options.includes(target) ? [target] : p.options.slice(0, p.min || 1) });
-      else if (p.kind === 'trigger') s = applyAction(s, { type: 'answer', player: p.player, yes: false });
+      else if (p.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: p.player, yes: false });
+      else if (p.kind === 'counter') s = applyAction(s, { type: 'pass', player: p.player });
       else break;
     }
     expect(s.players[1].trash).toContain(target);
