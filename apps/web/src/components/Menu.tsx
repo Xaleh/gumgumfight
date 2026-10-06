@@ -22,6 +22,8 @@ async function buildSetup(
   script?: Action[],
   /** Replay online: listas exatas da partida e a seed de 128 bits. */
   online?: { decks: [DeckList, DeckList]; seed128: number[] },
+  /** Sem `firstPlayer`: o vencedor do sorteio escolhe se joga primeiro. */
+  chooseFirst = firstPlayer === undefined,
 ): Promise<GameSetup> {
   let a: { deck: DeckList; cards: CardData[] };
   let b: typeof a;
@@ -45,6 +47,7 @@ async function buildSetup(
       seed,
       ...(online ? { seed128: online.seed128 } : {}),
       firstPlayer,
+      ...(chooseFirst && firstPlayer === undefined ? { chooseFirst: true } : {}),
       cards: [...cards.values()],
       players: [
         { name: names[0], deck: a.deck, isBot: mode === 'demo' },
@@ -305,7 +308,9 @@ export function Menu({
       const r = JSON.parse(await file.text()) as ReplayFile;
       if (r.format !== 'gumgumfight-replay') throw new Error('Arquivo não é um replay do GumGum Fight.');
       const online = r.seed128 && r.decks ? { seed128: r.seed128, decks: r.decks } : undefined;
-      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', r.firstPlayer, r.actions, online));
+      // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
+      const first = r.chooseFirst ? undefined : r.firstPlayer;
+      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', first, r.actions, online, Boolean(r.chooseFirst)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }

@@ -88,6 +88,11 @@ export interface RoomData {
   createdAt: number;
   seats: SeatInfo[];
   seed128: number[] | null;
+  /**
+   * O vencedor do sorteio escolhe se joga primeiro. Salas gravadas antes desta
+   * opção não têm o campo e continuam sendo refeitas como foram jogadas.
+   */
+  chooseFirst?: boolean;
   aliasSalt: string;
   actions: Action[];
   remaining: [number, number];
@@ -137,6 +142,7 @@ export function newRoomData(init: Pick<RoomData, 'queue' | 'format' | 'code'> & 
     createdAt: Date.now(),
     seats: init.seats,
     seed128: null,
+    chooseFirst: true,
     aliasSalt: randomBytes(16).toString('hex'),
     actions: [],
     remaining: [TIME_BANK_MS, TIME_BANK_MS],
@@ -202,6 +208,7 @@ export class Room {
     return {
       seed: 0,
       seed128: this.data.seed128!,
+      chooseFirst: Boolean(this.data.chooseFirst),
       cards: this.deps.cards(ids),
       players: [
         { name: a.name, deck: a.deck, isBot: Boolean(a.bot) },
@@ -503,6 +510,7 @@ export class Room {
       seed: 0,
       seed128: this.data.seed128,
       firstPlayer: this.state.firstPlayer,
+      ...(this.data.chooseFirst ? { chooseFirst: true } : {}),
       names: this.data.seats.map((s) => s.name),
       deckIds: this.data.seats.map((s) => s.deckId),
       decks: this.data.seats.map((s) => s.deck),

@@ -104,19 +104,26 @@ describe('partidas online: salas privadas', () => {
     expect(v1.players[0].hand.every((u) => v1.cards[u].cardId === HIDDEN_CARD)).toBe(true);
     expect(v0.seed).toBe(0);
 
-    const first = actingPlayer(v0)!;
-    const other = (1 - first) as PlayerId;
+    // O vencedor do sorteio escolhe quem começa (os dois veem a escolha pendente).
+    const winner = actingPlayer(v0)!;
+    expect(v0.pending).toEqual({ kind: 'chooseFirst', player: winner });
+    expect(v1.pending).toEqual({ kind: 'chooseFirst', player: winner });
+    expect((await act(app, roomId, tokens[winner], 0, { type: 'answer', player: winner, yes: false })).statusCode).toBe(200);
+    const first = (1 - winner) as PlayerId;
+    const other = winner;
+    expect(c0.view!.firstPlayer).toBe(first);
+    const n = c0.view!.actionCount;
     // Ação do jogador errado, versão velha e token inválido.
-    expect((await act(app, roomId, tokens[other], v0.actionCount, { type: 'mulligan', player: other, redraw: false })).statusCode).toBe(422);
-    expect((await act(app, roomId, tokens[first], v0.actionCount, { type: 'mulligan', player: other, redraw: false })).statusCode).toBe(403);
+    expect((await act(app, roomId, tokens[other], n, { type: 'mulligan', player: other, redraw: false })).statusCode).toBe(422);
+    expect((await act(app, roomId, tokens[first], n, { type: 'mulligan', player: other, redraw: false })).statusCode).toBe(403);
     expect((await act(app, roomId, tokens[first], 99, { type: 'mulligan', player: first, redraw: false })).statusCode).toBe(409);
-    expect((await act(app, roomId, 'x', v0.actionCount, { type: 'mulligan', player: first, redraw: false })).statusCode).toBe(404);
-    expect((await act(app, roomId, tokens[first], v0.actionCount, { type: 'timeout', player: first })).statusCode).toBe(400);
+    expect((await act(app, roomId, 'x', n, { type: 'mulligan', player: first, redraw: false })).statusCode).toBe(404);
+    expect((await act(app, roomId, tokens[first], n, { type: 'timeout', player: first })).statusCode).toBe(400);
 
-    const ok = await act(app, roomId, tokens[first], v0.actionCount, { type: 'mulligan', player: first, redraw: false });
+    const ok = await act(app, roomId, tokens[first], n, { type: 'mulligan', player: first, redraw: false });
     expect(ok.statusCode).toBe(200);
-    expect(ok.json()).toEqual({ ok: true, actionCount: 1 });
-    expect(c1.view!.actionCount).toBe(1);
+    expect(ok.json()).toEqual({ ok: true, actionCount: 2 });
+    expect(c1.view!.actionCount).toBe(2);
     expect(c1.view!.pending).toEqual({ kind: 'mulligan', player: other });
   });
 
@@ -193,8 +200,10 @@ describe('partidas online: salas privadas', () => {
     const { roomId, tokens } = await privateMatch(first);
     const c = client(0);
     getRoom(first, roomId).attach(c.conn);
-    const p = actingPlayer(c.view!)!;
-    await act(first, roomId, tokens[p], 0, { type: 'mulligan', player: p, redraw: true });
+    const w = actingPlayer(c.view!)!;
+    await act(first, roomId, tokens[w], 0, { type: 'answer', player: w, yes: true });
+    const p = w;
+    await act(first, roomId, tokens[p], 1, { type: 'mulligan', player: p, redraw: true });
     const mine = client(p);
     getRoom(first, roomId).attach(mine.conn);
     const hand = mine.view!.players[p].hand;
@@ -204,7 +213,8 @@ describe('partidas online: salas privadas', () => {
     const second = setup(db).app;
     const again = client(p);
     getRoom(second, roomId).attach(again.conn);
-    expect(again.view!.actionCount).toBe(1);
+    expect(again.view!.actionCount).toBe(2);
+    expect(again.view!.firstPlayer).toBe(w);
     // Mesmos apelidos e mesma mão depois de refazer as ações.
     expect(again.view!.players[p].hand).toEqual(hand);
     await second.close();
@@ -323,8 +333,10 @@ describe('partidas online: relógio', () => {
     expect(clock.remaining[first]).toBe(TIME_BANK_MS - 60_000);
     expect(clock.remaining[other]).toBe(TIME_BANK_MS);
 
+    // O vencedor do sorteio escolhe jogar primeiro (na hora: o relógio continua com ele).
+    room.act(first, 0, { type: 'answer', player: first, yes: true });
     // Mulligan do primeiro: agora é a vez do outro, e o relógio do primeiro para.
-    room.act(first, 0, { type: 'mulligan', player: first, redraw: false });
+    room.act(first, 1, { type: 'mulligan', player: first, redraw: false });
     t += 30_000;
     vi.advanceTimersByTime(30_000);
     expect(room.clock().remaining).toEqual(
@@ -412,8 +424,9 @@ describe('modo espectador', () => {
     expect(s.players.every((p) => p.deck.every((u) => s.cards[u].cardId === HIDDEN_CARD))).toBe(true);
     // O espectador acompanha as jogadas.
     const first = actingPlayer(w)!;
-    await act(app, roomId, tokens[first], 0, { type: 'mulligan', player: first, redraw: true });
-    expect(watcher.view!.actionCount).toBe(1);
+    await act(app, roomId, tokens[first], 0, { type: 'answer', player: first, yes: true });
+    await act(app, roomId, tokens[first], 1, { type: 'mulligan', player: first, redraw: true });
+    expect(watcher.view!.actionCount).toBe(2);
     expect(hidden(watcher.view!, first)).toBe(true);
     room.detach(watcher.conn);
     expect(room.spectators).toBe(1);

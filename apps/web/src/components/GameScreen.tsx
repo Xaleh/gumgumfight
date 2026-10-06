@@ -107,6 +107,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       format: setup.format,
       seed: setup.config.seed,
       firstPlayer: setup.config.firstPlayer,
+      chooseFirst: setup.config.chooseFirst,
       deckIds: setup.deckIds,
       decks: [setup.config.players[0].deck, setup.config.players[1].deck],
       actions: game.actions(),
@@ -256,14 +257,22 @@ function Table({
   const animate = animations && !prefersReducedMotion();
   // Cartas voando entre as zonas (mais rápidas com o bot acelerado).
   const motionLayer = useBoardMotion(state, { enabled: animate, tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)) });
-  // Sorteio com dados no começo da partida (não no replay nem ao voltar para uma partida em andamento).
+  // Sorteio com dados no começo da partida: só quando há sorteio (quem começa não foi
+  // escolhido no menu), e não no replay nem ao voltar para uma partida em andamento.
   const [intro, setIntro] = useState(
-    () => animate && kind !== 'replay' && state.phase === 'mulligan' && state.players.every((p) => !p.mulliganDone),
+    () =>
+      animate &&
+      kind !== 'replay' &&
+      state.rollWinner !== undefined &&
+      state.phase === 'mulligan' &&
+      state.players.every((p) => !p.mulliganDone),
   );
+  /** Os dados ainda rolam: o bot espera para fazer a escolha dele. */
+  const [rolling, setRolling] = useState(intro);
   const { setHold } = game;
   useEffect(() => {
-    setHold?.(intro);
-  }, [intro, setHold]);
+    setHold?.(intro && rolling);
+  }, [intro, rolling, setHold]);
   const [selectedUid, setSelected] = useState<string | null>(null);
   const [hoveredUid, setHovered] = useState<string | null>(null);
   const [zoomUid, setZoom] = useState<string | null>(null);
@@ -778,7 +787,18 @@ function Table({
           </div>
         )}
 
-        {intro && <DiceRoll state={state} human={human} onDone={() => setIntro(false)} />}
+        {intro && (
+          <DiceRoll
+            state={state}
+            human={human}
+            onResult={() => setRolling(false)}
+            onChoose={(first) => {
+              dispatch({ type: 'answer', player: human!, yes: first });
+              setIntro(false);
+            }}
+            onDone={() => setIntro(false)}
+          />
+        )}
 
         <Prompt
           hidden={intro}
@@ -1056,6 +1076,12 @@ function CenterBand(props: {
         {state.players[acting].name} está pensando<span className="dots" />
       </span>
     );
+  else if (state.pending?.kind === 'chooseFirst' && acting !== null && acting !== human)
+    middle = (
+      <span className="hint-pill thinking">
+        {state.players[acting].name} venceu o sorteio e está escolhendo quem começa<span className="dots" />
+      </span>
+    );
   else if (state.phase === 'mulligan' && (human !== null || watching) && acting !== null && acting !== human)
     middle = (
       <span className="hint-pill thinking">
@@ -1278,6 +1304,27 @@ function Prompt(props: {
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
 
   switch (pending.kind) {
+    case 'chooseFirst':
+      return (
+        <div className="modal-backdrop">
+          <div className="modal-card">
+            <div className="modal-kicker">Sorteio inicial</div>
+            <h2>Você venceu o sorteio!</h2>
+            <p className="muted">Quer jogar primeiro ou segundo?</p>
+            <p className="muted small">
+              Quem joga primeiro não compra carta no primeiro turno e recebe 1 DON!!; quem joga segundo compra e recebe 2 DON!!.
+            </p>
+            <div className="btn-row center">
+              <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                Jogar primeiro
+              </button>
+              <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+                Jogar segundo
+              </button>
+            </div>
+          </div>
+        </div>
+      );
     case 'mulligan': {
       const first = state.firstPlayer === human;
       return (

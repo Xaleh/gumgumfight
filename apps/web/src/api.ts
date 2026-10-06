@@ -270,6 +270,8 @@ export interface MatchUpload {
   format: FormatId;
   seed: number;
   firstPlayer?: PlayerId;
+  /** O vencedor do sorteio escolheu quem começa (primeira ação). */
+  chooseFirst?: boolean;
   deckIds: [string, string];
   decks: [DeckList, DeckList];
   actions: Action[];

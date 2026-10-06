@@ -42,6 +42,7 @@ function finishMatch(db: DB, room: Room): RoomResult {
   const replay = {
     seed: 0,
     seed128: room.data.seed128!,
+    chooseFirst: room.data.chooseFirst,
     decks: [room.data.seats[0].deck, room.data.seats[1].deck] as [typeof room.data.seats[0]['deck'], typeof room.data.seats[0]['deck']],
     actions: room.data.actions,
   };

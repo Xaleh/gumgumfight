@@ -130,6 +130,29 @@ describe('API de estatísticas', () => {
     expect(meta.myDecks).toEqual([expect.objectContaining({ leader: 'ST01-001', deckId: 'st01-luffy', games: 1 })]);
   });
 
+  it('aceita a partida em que o vencedor do sorteio escolheu jogar segundo', async () => {
+    const { app } = setup();
+    const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
+    // O vencedor escolhe jogar segundo; o resto é jogado pelo bot.
+    let state = createGame({ seed: 5, chooseFirst: true, cards, players: [{ name: 'A', deck: decks[0] }, { name: 'B', deck: decks[1] }] });
+    const winner = state.rollWinner!;
+    const actions: Action[] = [{ type: 'answer', player: winner, yes: false }];
+    state = applyAction(state, actions[0]);
+    while (state.phase !== 'gameover' && actions.length < 3000) {
+      const a = chooseBotAction(state, actingPlayer(state)!);
+      actions.push(a);
+      state = applyAction(state, a);
+    }
+    expect(state.firstPlayer).toBe(1 - winner);
+    const post = (extra: object) =>
+      app.inject({ method: 'POST', url: '/api/matches', headers: ALICE, payload: { mode: 'demo', format: 'egb', seed: 5, decks, actions, ...extra } });
+    // Sem dizer que houve a escolha, o replay não confere.
+    expect((await post({})).statusCode).toBe(422);
+    const ok = await post({ chooseFirst: true });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ winner: state.winner, turns: state.turn });
+  });
+
   it('recusa replay adulterado ou deck inválido', async () => {
     const { app } = setup();
     const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);

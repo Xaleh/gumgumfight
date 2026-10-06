@@ -33,6 +33,8 @@ export interface ReplayFile {
   seed128?: number[];
   decks?: [DeckList, DeckList];
   firstPlayer: PlayerId;
+  /** O vencedor do sorteio escolheu quem começa: `firstPlayer` é só informativo. */
+  chooseFirst?: boolean;
   names: [string, string];
   deckIds: [string, string];
   actions: Action[];
@@ -109,7 +111,9 @@ export function useGame(setup: GameSetup) {
     }
     if (!next) return;
     // Espera as cartas pousarem antes da próxima jogada.
-    const delay = Math.max((state.pending ? 500 : 800) / speed, motionWait() + 120);
+    // A escolha de quem começa demora um pouco mais (dá tempo de ver quem venceu o sorteio).
+    const base = state.pending?.kind === 'chooseFirst' ? 1300 : state.pending ? 500 : 800;
+    const delay = Math.max(base / speed, motionWait() + 120);
     const t = setTimeout(() => dispatch(next!), delay);
     return () => clearTimeout(t);
   }, [state, paused, hold, speed, setup, dispatch, auto, human]);
@@ -120,7 +124,8 @@ export function useGame(setup: GameSetup) {
       format: 'gumgumfight-replay',
       version: 1,
       seed: first.seed,
-      firstPlayer: first.firstPlayer,
+      firstPlayer: entries[entries.length - 1].state.firstPlayer,
+      ...(first.rollWinner !== undefined ? { chooseFirst: true } : {}),
       names: [first.players[0].name, first.players[1].name],
       deckIds: setup.deckIds,
       actions: actionsRef.current,

@@ -1,9 +1,10 @@
 // Sorteio inicial com dados 3D: o jogador segura o dado com o dedo (ou o mouse),
 // chacoalha e solta para jogá-lo na mesa; o do oponente é jogado junto.
 //
-// Quem começa já foi sorteado pelo motor (state.firstPlayer, a partir da seed);
-// os dados só mostram esse resultado: o valor de cada um é escolhido para que o
-// primeiro jogador tire o número maior.
+// O vencedor do sorteio já foi definido pelo motor (state.rollWinner, a partir da
+// seed); os dados só mostram esse resultado: o valor de cada um é escolhido para
+// que o vencedor tire o número maior. Depois, o vencedor escolhe se joga primeiro
+// ou segundo (a escolha é uma ação do motor, gravada no replay).
 
 import type { GameState, PlayerId } from '@gumgum/engine';
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
@@ -42,22 +43,31 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 export function DiceRoll({
   state,
   human,
+  onResult,
+  onChoose,
   onDone,
 }: {
   state: GameState;
   /** null: ninguém joga (espectador, bot x bot): os dados são lançados sozinhos. */
   human: PlayerId | null;
+  /** Os dados pararam (o bot pode fazer a escolha dele). */
+  onResult: () => void;
+  /** O jogador venceu e escolheu: true = jogar primeiro. */
+  onChoose: (first: boolean) => void;
   onDone: () => void;
 }) {
   const me: PlayerId = human ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
-  const first = state.firstPlayer;
-  // O primeiro jogador tira o maior número (sem empate).
+  const winner = state.rollWinner ?? state.firstPlayer;
+  /** O vencedor ainda não escolheu se joga primeiro ou segundo. */
+  const choosing = state.pending?.kind === 'chooseFirst';
+  const iWon = human !== null && winner === human;
+  // O vencedor tira o maior número (sem empate).
   const values = useMemo(() => {
     const hi = 2 + Math.floor(Math.random() * 5);
     const lo = 1 + Math.floor(Math.random() * (hi - 1));
-    return { [first]: hi, [first === 0 ? 1 : 0]: lo } as Record<PlayerId, number>;
-  }, [first]);
+    return { [winner]: hi, [winner === 0 ? 1 : 0]: lo } as Record<PlayerId, number>;
+  }, [winner]);
 
   const [phase, setPhase] = useState<Phase>('ready');
   const phaseRef = useRef(phase);
@@ -105,12 +115,18 @@ export function DiceRoll({
 
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
-  // Resultado: segue sozinho depois de um tempo.
+  const resultRef = useRef(onResult);
+  resultRef.current = onResult;
   useEffect(() => {
-    if (phase !== 'result') return;
-    const t = setTimeout(() => doneRef.current(), 3000);
-    return () => clearTimeout(t);
+    if (phase === 'result') resultRef.current();
   }, [phase]);
+
+  // Depois da escolha, segue sozinho em pouco tempo.
+  useEffect(() => {
+    if (phase !== 'result' || choosing) return;
+    const t = setTimeout(() => doneRef.current(), 2400);
+    return () => clearTimeout(t);
+  }, [phase, choosing]);
 
   function draw() {
     const ds = dice.current;
@@ -341,18 +357,27 @@ export function DiceRoll({
     throwDice(vx, vy);
   };
 
-  const myTurn = first === me;
+  const name = (p: PlayerId) => (human !== null && p === human ? 'Você' : state.players[p].name);
+  const first = state.firstPlayer;
   const result =
-    phase === 'result'
-      ? human === null
-        ? `${state.players[first].name} começa!`
-        : myTurn
+    phase !== 'result'
+      ? null
+      : choosing
+        ? iWon
+          ? 'Você venceu!'
+          : `${state.players[winner].name} venceu!`
+        : human !== null && first === human
           ? 'Você começa!'
-          : `${state.players[first].name} começa!`
-      : null;
+          : `${state.players[first].name} começa!`;
 
   const hint =
-    human === null
+    phase === 'result'
+      ? choosing
+        ? iWon
+          ? 'Você escolhe: quer jogar primeiro ou segundo?'
+          : `${state.players[winner].name} está escolhendo quem começa…`
+        : `${name(winner)} escolheu jogar ${first === winner ? 'primeiro' : 'segundo'}.`
+      : human === null
       ? 'Sorteando quem começa…'
       : phase === 'ready'
         ? 'Segure o dado, chacoalhe e solte para jogar'
@@ -363,11 +388,11 @@ export function DiceRoll({
             : '';
 
   const side = (p: PlayerId) => (
-    <div className={['dice-player', phase === 'result' && p === first ? 'winner' : '', phase === 'result' && p !== first ? 'loser' : ''].join(' ')}>
+    <div className={['dice-player', phase === 'result' && p === winner ? 'winner' : '', phase === 'result' && p !== winner ? 'loser' : ''].join(' ')}>
       <div className="dice-leader">
         <CardView state={state} uid={state.players[p].leader.uid} />
       </div>
-      <div className="dice-name">{human !== null && p === me ? 'Você' : state.players[p].name}</div>
+      <div className="dice-name">{name(p)}</div>
       <div className="dice-value">{phase === 'result' ? values[p] : '–'}</div>
     </div>
   );
@@ -393,7 +418,7 @@ export function DiceRoll({
             <div
               key={p}
               ref={(el) => (dieEls.current[i] = el)}
-              className={['die', i === 0 ? 'mine' : 'theirs', phase === 'result' && p === first ? 'winner' : ''].join(' ')}
+              className={['die', i === 0 ? 'mine' : 'theirs', phase === 'result' && p === winner ? 'winner' : ''].join(' ')}
             >
               <div className="die-shadow" />
               <div className="die-cube">
@@ -412,7 +437,16 @@ export function DiceRoll({
         </div>
         <p className="dice-hint muted small">{hint || ' '}</p>
         <div className="btn-row center">
-          {phase === 'result' ? (
+          {phase === 'result' && choosing && iWon ? (
+            <>
+              <button className="btn primary big" onClick={() => onChoose(true)}>
+                Jogar primeiro
+              </button>
+              <button className="btn big" onClick={() => onChoose(false)}>
+                Jogar segundo
+              </button>
+            </>
+          ) : phase === 'result' ? (
             <button className="btn primary big" onClick={onDone}>
               Continuar
             </button>

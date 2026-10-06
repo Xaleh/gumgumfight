@@ -169,6 +169,7 @@ function sanitizeFrame(f: Frame, ref: (uid: string) => string): Frame {
 function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => string): Pending {
   const mine = viewer !== null && p.player === viewer;
   switch (p.kind) {
+    case 'chooseFirst':
     case 'mulligan':
       return p;
     case 'selectTargets':
