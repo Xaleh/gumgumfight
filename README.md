@@ -346,6 +346,7 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
 packages/engine   Motor de regras em TypeScript puro (sem dependências), bot e testes
 apps/server       API Fastify + SQLite (node:sqlite); serve a interface compilada em produção
 apps/web          Interface React + Vite
+apps/web/public   Marca: favicon, logos do header (brand/) e ícones do app (icons/, manifest.webmanifest)
 data/cards        Cartas provisórias (JSON)
 data/decks        Listas dos decks
 ```

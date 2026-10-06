@@ -1,18 +1,25 @@
 /* ==================================================================
-   GumGum Fight — tema claro inspirado no Pokémon TCG Pocket,
-   com cores do mar e do bando do Chapéu de Palha. Mobile first.
+   GumGum Fight — tema claro com as cores da marca (azul-marinho,
+   creme, amarelo, vermelho e contorno marrom). Mobile first.
    ================================================================== */
 
 :root {
-  --bg: #e4e9f6;
-  --bg2: #f3f6fc;
+  /* Marca */
+  --navy: #12304b;
+  --brown: #3d1308;
+  --cream: #fdf5e0;
+  --brand-yellow: #f7cd48;
+  --brand-red: #c9322b;
+
+  --bg: #f4eee2;
+  --bg2: #fbf7ee;
   --panel: #ffffff;
-  --panel2: #eef2fb;
-  --line: #d3dbee;
-  --text: #2b3656;
-  --muted: #74809e;
+  --panel2: #f8f1e2;
+  --line: #e8dcc0;
+  --text: #3d1a10;
+  --muted: #8a6a58;
   --gold: #d99a0b;
-  --accent: #ff6b3d;
+  --accent: #ee6f3c;
   --blue: #2f7df6;
   --sky: #36c8ff;
   --ok: #1f9d66;
@@ -43,9 +50,9 @@ body,
 
 body {
   background:
-    radial-gradient(1200px 500px at 0% 0%, #fde8f1 0%, transparent 60%),
-    radial-gradient(1000px 600px at 100% 0%, #dff3ff 0%, transparent 60%),
-    linear-gradient(180deg, #eef1fa 0%, var(--bg) 100%);
+    radial-gradient(1200px 500px at 0% 0%, #fbe4cc 0%, transparent 60%),
+    radial-gradient(1000px 600px at 100% 0%, #fdf1cf 0%, transparent 60%),
+    linear-gradient(180deg, #f8f3ea 0%, var(--bg) 100%);
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
@@ -93,14 +100,14 @@ a {
   opacity: 0.45;
   cursor: default;
 }
+/* Como o "Entrar" do header da marca: amarelo com contorno marrom. */
 .btn.primary {
-  background: linear-gradient(180deg, #4da3ff 0%, var(--blue) 100%);
-  border-color: #2a6fe0;
-  color: #fff;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+  background: linear-gradient(180deg, #fbda6a 0%, var(--brand-yellow) 100%);
+  border-color: var(--brown);
+  color: var(--brown);
 }
 .btn.primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #62afff 0%, #3f88f8 100%);
+  background: linear-gradient(180deg, #fde27f 0%, #f9d55c 100%);
 }
 .btn.danger {
   background: #fff1f1;
@@ -231,27 +238,43 @@ input[type='number'] {
   flex-direction: column;
   gap: 14px;
 }
-.menu-hero {
-  text-align: center;
-  padding: 18px 0 4px;
+/* Header da marca (header-logo-dark-bg.svg): logo completo com 44–56 px de altura no desktop,
+   só a carta (header-mark.svg) abaixo de ~480 px. */
+.brand-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--navy);
+  border-radius: 18px;
+  padding: 12px 20px;
+  box-shadow: 0 10px 30px rgba(18, 48, 75, 0.25);
 }
-.logo {
-  font-family: Bangers, Impact, sans-serif;
-  font-size: clamp(48px, 14vw, 72px);
-  letter-spacing: 2px;
+.brand {
   margin: 0;
-  line-height: 0.95;
-  color: #ffcf3f;
-  -webkit-text-stroke: 2px #7a2b12;
-  text-shadow: 0 4px 0 #7a2b12, 0 10px 24px rgba(122, 43, 18, 0.25);
+  line-height: 0;
+  flex: none;
 }
-.logo span {
-  color: var(--accent);
+.brand-logo {
+  display: block;
+  height: 52px;
+  width: auto;
 }
 .tagline {
-  color: var(--muted);
-  margin: 10px 0 0;
-  font-weight: 700;
+  margin: 0 0 0 auto;
+  max-width: 11.5em;
+  color: #f3e3bd;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: right;
+}
+@media (max-width: 480px) {
+  .brand-bar {
+    padding: 10px 14px;
+  }
+  .brand-logo {
+    height: 48px;
+  }
 }
 .menu-card {
   background: rgba(255, 255, 255, 0.86);
@@ -278,8 +301,8 @@ input[type='number'] {
 .vs-badge {
   font-family: Bangers, Impact, sans-serif;
   font-size: 28px;
-  color: var(--accent);
-  -webkit-text-stroke: 1px #7a2b12;
+  color: var(--brand-red);
+  -webkit-text-stroke: 1px var(--brown);
 }
 .deck-pick {
   display: flex;
@@ -357,6 +380,15 @@ input[type='number'] {
 }
 .leader-art.random {
   background: linear-gradient(135deg, #ffcf3f, #ff6b3d);
+}
+.btn.primary.battle-btn {
+  background: var(--brand-red);
+  border: 3px solid var(--brown);
+  color: var(--cream);
+  text-shadow: 0 2px 0 var(--brown);
+}
+.btn.primary.battle-btn:hover:not(:disabled) {
+  background: #d63c34;
 }
 .battle-btn {
   width: 100%;
@@ -2257,7 +2289,7 @@ button.hint-pill {
   inset: 0;
   z-index: 80;
   overflow-y: auto;
-  background: linear-gradient(180deg, #eef1fa 0%, #e4e9f6 100%);
+  background: linear-gradient(180deg, #f8f3ea 0%, var(--bg) 100%);
   animation: fade-in 0.4s;
   touch-action: pan-y;
   user-select: none;
