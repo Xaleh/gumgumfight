@@ -321,9 +321,13 @@ export function Menu({
   return (
     <div className="menu">
       <div className="menu-box">
-        <header className="menu-hero">
-          <h1 className="logo">
-            GumGum <span>Fight</span>
+        <header className="brand-bar">
+          <h1 className="brand">
+            {/* Abaixo de ~480 px de largura, só a carta (o logo completo não cabe com boa leitura). */}
+            <picture>
+              <source media="(max-width: 480px)" srcSet="/brand/header-mark.svg" />
+              <img className="brand-logo" src="/brand/header-logo-dark-bg.svg" alt="GumGum Fight" />
+            </picture>
           </h1>
           <p className="tagline">One Piece Card Game no navegador</p>
         </header>
