@@ -1067,24 +1067,26 @@ function handlePendingResponse(state: GameState, action: Action) {
       return;
     }
 
-    case 'trigger': {
-      if (action.type !== 'answer') throw new IllegalActionError('Responda se ativa o [Trigger].');
-      const frame = state.stack[state.stack.length - 1] as DamageFrame;
+    case 'lifeCard': {
+      if (action.type !== 'answer') throw new IllegalActionError('Responda se ativa o [Trigger] ou coloca a carta na mão.');
       const card = pending.card;
+      const def = cardDef(state, card);
+      const trig = def.abilities.find((a) => a.timing === 'trigger');
+      if (action.yes && !trig) throw new IllegalActionError('Esta carta não tem [Trigger].');
+      const frame = state.stack[state.stack.length - 1] as DamageFrame;
       const ps = state.players[p];
       frame.lifeCard = undefined;
       state.pending = null;
       if (action.yes) {
+        if (ps.lifeFaceUp?.includes(card)) removeFrom(ps.lifeFaceUp, card);
         ps.trash.push(card);
-        const def = cardDef(state, card);
         log(state, p, `[Trigger] ${def.name} ativado!`);
-        const trig = def.abilities.find((a) => a.timing === 'trigger')!;
-        pushEffect(state, card, p, trig.steps);
+        pushEffect(state, card, p, trig!.steps);
         emit(state, { kind: 'triggerActivated', player: p, card });
       } else {
-        ps.hand.push(card);
-        log(state, p, `${ps.name} adiciona a carta de Vida à mão.`);
-        emit(state, { kind: 'lifeToHand', player: p, card });
+        // Para o oponente a linha é a mesma com ou sem [Trigger]; só o dono lê qual carta foi.
+        logSecret(state, p, `${ps.name} coloca a carta de Vida na mão.`, `${ps.name} coloca ${def.name} (da Vida) na mão.`);
+        lifeToHandCard(state, ps.id, card);
       }
       return;
     }
@@ -1556,12 +1558,9 @@ function stepBattle(state: GameState) {
     }
 
     case 'counter': {
-      const options = counterOptions(state, defender);
-      if (!options.length) {
-        b.step = 'damage';
-        return;
-      }
-      state.pending = { kind: 'counter', player: defender, options };
+      // A etapa abre mesmo sem Counter na mão (e mesmo quando o ataque já falha): se fosse
+      // pulada, o atacante saberia que o defensor não tem Counter (ou veria a diferença de tempo).
+      state.pending = { kind: 'counter', player: defender, options: counterOptions(state, defender) };
       return;
     }
 
@@ -1644,7 +1643,7 @@ function stepDamage(state: GameState, frame: DamageFrame) {
   const card = ps.life.pop()!;
   frame.remaining--;
   frame.lost = (frame.lost ?? 0) + 1;
-  const def = cardDef(state, card);
+  log(state, frame.defender, `${ps.name} perde 1 Vida (${ps.life.length} restante(s)).`);
   if (frame.banish) {
     ps.trash.push(card);
     log(state, frame.defender, `[Banish] A carta de Vida vai para o descarte.`);
@@ -1654,13 +1653,10 @@ function stepDamage(state: GameState, frame: DamageFrame) {
     lifeToHandCard(state, ps.id, card);
     return;
   }
-  if (def.abilities.some((a) => a.timing === 'trigger')) {
-    frame.lifeCard = card;
-    state.pending = { kind: 'trigger', player: frame.defender, card };
-    return;
-  }
-  lifeToHandCard(state, ps.id, card);
-  log(state, frame.defender, `${ps.name} perde 1 Vida (${ps.life.length} restante(s)).`);
+  // O dono sempre olha a carta antes de ela ir para a mão, tenha ela [Trigger] ou não: se a
+  // pergunta só aparecesse com [Trigger], o oponente saberia (pela pausa) o que saiu da Vida.
+  frame.lifeCard = card;
+  state.pending = { kind: 'lifeCard', player: frame.defender, card };
 }
 
 function stepEffect(state: GameState, frame: EffectFrame) {

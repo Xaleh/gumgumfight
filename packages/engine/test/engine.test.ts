@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, getPower, IllegalActionError, locate } from '../src/engine';
 import { legalActions } from '../src/actions';
-import { fetchToHand, newGame, putOnField, started, toTurn } from './helpers';
+import { fetchToHand, newGame, noDefense, passCounter, putOnField, started, toTurn } from './helpers';
 
 describe('preparação', () => {
   it('distribui 5 cartas, aguarda mulligan e depois coloca a Vida', () => {
@@ -102,7 +102,12 @@ describe('batalha', () => {
     s.players[1].hand = s.players[1].hand.filter(() => false); // sem Counters
     const lifeBefore = s.players[1].life.length;
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
-    if (s.pending?.kind === 'trigger') s = applyAction(s, { type: 'answer', player: 1, yes: false });
+    // Sem Counter na mão a etapa abre mesmo assim (o atacante não pode saber que a mão está vazia).
+    expect(s.pending).toEqual({ kind: 'counter', player: 1, options: [] });
+    s = applyAction(s, { type: 'pass', player: 1 });
+    // A carta da Vida sempre passa pelo dono, tenha [Trigger] ou não.
+    expect(s.pending).toMatchObject({ kind: 'lifeCard', player: 1 });
+    s = applyAction(s, { type: 'answer', player: 1, yes: false });
     expect(s.players[1].life.length).toBe(lifeBefore - 1);
     expect(s.players[1].hand.length).toBe(1);
     expect(s.players[0].leader.rested).toBe(true);
@@ -162,6 +167,7 @@ describe('batalha', () => {
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
     expect(s.pending).toEqual({ kind: 'block', player: 1, options: [bege] });
     s = applyAction(s, { type: 'choose', player: 1, uids: [bege] });
+    s = passCounter(s);
     expect(s.players[1].characters).toHaveLength(0);
     expect(s.players[1].trash).toContain(bege);
     expect(s.players[1].life).toHaveLength(5);
@@ -185,8 +191,8 @@ describe('batalha', () => {
     s.players[1].life.push(scalpel); // topo da Vida
     s.players[1].donActive = 0;
     s.players[1].donRested = 2;
-    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
-    expect(s.pending).toEqual({ kind: 'trigger', player: 1, card: scalpel });
+    s = passCounter(applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid }));
+    expect(s.pending).toEqual({ kind: 'lifeCard', player: 1, card: scalpel });
     s = applyAction(s, { type: 'answer', player: 1, yes: true });
     expect(s.players[1].donActive).toBe(2);
     expect(s.players[1].trash).toContain(scalpel);
@@ -198,7 +204,7 @@ describe('batalha', () => {
     const killer = fetchToHand(s, 1, 'ST02-005');
     s.players[1].hand = [];
     s.players[1].life.push(killer);
-    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    s = passCounter(applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid }));
     s = applyAction(s, { type: 'answer', player: 1, yes: true });
     // [On Play] do Killer: sem alvos virados, nada a escolher.
     expect(s.players[1].characters.map((c) => c.uid)).toContain(killer);
@@ -209,6 +215,9 @@ describe('batalha', () => {
     s.players[1].hand = [];
     s.players[1].life = [];
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    // A etapa de Counter ainda abre (o defensor poderia se salvar com um Counter).
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 1 });
+    s = applyAction(s, { type: 'pass', player: 1 });
     expect(s.phase).toBe('gameover');
     expect(s.winner).toBe(0);
   });
@@ -221,8 +230,7 @@ describe('batalha', () => {
     s.modifiers.push({ uid: heat, kind: 'power', amount: 2000, duration: 'turn' }); // 4000 → 6000
     s.players[0].life = s.players[0].life.filter((u) => !s.defs[s.cards[u].cardId].abilities.some((a) => a.timing === 'trigger'));
     const before = s.players[0].life.length;
-    s = applyAction(s, { type: 'attack', player: 1, attacker: heat, target: s.players[0].leader.uid });
-    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    s = noDefense(applyAction(s, { type: 'attack', player: 1, attacker: heat, target: s.players[0].leader.uid }));
     expect(s.players[0].life.length).toBe(before - 2);
   });
   it('Killer [On Play] nocauteia personagem virado de custo 3 ou menos', () => {
@@ -263,8 +271,7 @@ describe('efeitos', () => {
     let s = toTurn(started(), 6);
     s.players[0].hand = [];
     const leader = s.players[1].leader.uid;
-    s = applyAction(s, { type: 'attack', player: 1, attacker: leader, target: s.players[0].leader.uid });
-    if (s.pending?.kind === 'trigger') s = applyAction(s, { type: 'answer', player: 0, yes: false });
+    s = noDefense(applyAction(s, { type: 'attack', player: 1, attacker: leader, target: s.players[0].leader.uid }));
     expect(s.players[1].leader.rested).toBe(true);
     const handBefore = s.players[1].hand.length;
     s = applyAction(s, { type: 'activate', player: 1, uid: leader, ability: 0 });
@@ -368,7 +375,7 @@ describe('efeitos', () => {
     s = applyAction(s, { type: 'attack', player: 1, attacker: kid, target: s.players[0].leader.uid });
     while (s.pending) {
       const p = s.pending;
-      if (p.kind === 'trigger') s = applyAction(s, { type: 'answer', player: p.player, yes: false });
+      if (p.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: p.player, yes: false });
       else if (p.kind === 'counter') s = applyAction(s, { type: 'pass', player: p.player });
       else if (p.kind === 'block') s = applyAction(s, { type: 'choose', player: p.player, uids: [] });
       else break;
