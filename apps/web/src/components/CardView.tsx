@@ -39,9 +39,11 @@ interface Props {
   drag?: 'hand' | 'attacker';
   /** Os DON!! anexados são desenhados pela mesa (cartas por baixo). */
   hideDon?: boolean;
+  /** Carrega a imagem na hora (cartas voando na animação da mesa). */
+  eager?: boolean;
 }
 
-export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover, drag, hideDon }: Props) {
+export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover, drag, hideDon, eager }: Props) {
   const def = cardDef(state, uid);
   const { showImages } = useSettings();
   const [imageFailed, setImageFailed] = useState(false);
@@ -89,7 +91,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
             className="card-img"
             src={def.imageUrl}
             alt={def.name}
-            loading="lazy"
+            loading={eager ? 'eager' : 'lazy'}
             referrerPolicy="no-referrer"
             draggable={false}
             onLoad={() => setImageLoaded(true)}

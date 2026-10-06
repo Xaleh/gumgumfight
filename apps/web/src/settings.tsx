@@ -12,15 +12,17 @@ export interface Settings {
   serverImages: boolean;
   /** Etapa de Counter: tocar/arrastar usa a carta na hora, sem confirmar. */
   quickCounter: boolean;
+  /** Cartas voando pela mesa, faixa de turno e sorteio com dados. */
+  animations: boolean;
 }
 
 interface Ctx extends Settings {
   showImages: boolean;
-  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter'>>) => void;
+  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter' | 'animations'>>) => void;
 }
 
 const KEY = 'gumgum.settings';
-const DEFAULTS: Settings = { lang: 'pt', images: true, serverImages: false, quickCounter: false };
+const DEFAULTS: Settings = { lang: 'pt', images: true, serverImages: false, quickCounter: false, animations: true };
 
 function load(): Settings {
   try {
@@ -58,7 +60,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((s) => {
       const next = { ...s, ...patch };
       try {
-        localStorage.setItem(KEY, JSON.stringify({ lang: next.lang, images: next.images, quickCounter: next.quickCounter }));
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({ lang: next.lang, images: next.images, quickCounter: next.quickCounter, animations: next.animations }),
+        );
       } catch {
         /* armazenamento indisponível: vale só nesta sessão */
       }
@@ -109,6 +114,10 @@ export function SettingsControls({ compact }: { compact?: boolean }) {
       <label className="check" title="Na etapa de Counter, tocar numa carta ou arrastá-la até a mesa usa o Counter na hora">
         <input type="checkbox" checked={s.quickCounter} onChange={(e) => s.update({ quickCounter: e.target.checked })} />
         Counter sem confirmação
+      </label>
+      <label className="check" title="Cartas voando pela mesa, faixa de troca de turno e sorteio inicial com dados">
+        <input type="checkbox" checked={s.animations} onChange={(e) => s.update({ animations: e.target.checked })} />
+        Animações
       </label>
     </div>
   );

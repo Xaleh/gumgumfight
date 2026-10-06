@@ -4033,3 +4033,452 @@ tr.clickable:hover td {
 .admin-user .seg {
   margin-left: auto;
 }
+
+/* ==================================================================
+   Animações da mesa (components/Motion.tsx), faixa de turno e sorteio
+   inicial com dados (components/DiceRoll.tsx).
+   ================================================================== */
+
+/* cartas voando entre as zonas */
+.motion-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  pointer-events: none;
+  overflow: hidden;
+}
+.flight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+.flight-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+.flight-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flight-face.back {
+  transform: rotateY(180deg);
+}
+.flight-face > .card {
+  width: 100%;
+  height: 100%;
+  transition: none;
+  box-shadow: 0 10px 24px rgba(20, 30, 60, 0.35);
+}
+.flight.showcase .flight-face > .card {
+  box-shadow: 0 22px 48px rgba(20, 30, 60, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.9), 0 0 34px rgba(255, 205, 80, 0.55);
+}
+.flight-don {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: none;
+  will-change: transform;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+/* O destino fica escondido até a carta voadora pousar. */
+[data-motion-hide] {
+  visibility: hidden !important;
+}
+.burst {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.burst.ko {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 16%, rgba(255, 130, 60, 0.6) 38%, transparent 68%);
+}
+.burst.land {
+  border: 3px solid rgba(255, 215, 90, 0.95);
+  box-shadow: 0 0 18px rgba(255, 190, 40, 0.7), inset 0 0 14px rgba(255, 215, 90, 0.5);
+}
+.burst.hit {
+  background: radial-gradient(circle, rgba(255, 80, 60, 0.8) 0 22%, rgba(255, 60, 40, 0.32) 48%, transparent 70%);
+}
+/* Dano no Líder: treme e pisca em vermelho. `translate` soma com o rotate da carta virada. */
+.card[data-motion-hit] {
+  animation: motion-hit 0.6s ease-out;
+}
+@keyframes motion-hit {
+  0% {
+    filter: brightness(2.2) saturate(0.2);
+  }
+  12% {
+    translate: -7px 2px;
+  }
+  26% {
+    translate: 6px -2px;
+    filter: brightness(1.2) sepia(0.6) saturate(3) hue-rotate(-25deg);
+  }
+  42% {
+    translate: -4px 1px;
+  }
+  60% {
+    translate: 2px 0;
+  }
+  100% {
+    translate: 0 0;
+    filter: none;
+  }
+}
+
+/* faixa de troca de turno atravessando a mesa */
+.turn-banner:not(.sweep) .tb-stripe small {
+  display: none;
+}
+.turn-banner.sweep {
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  animation: none;
+  overflow: hidden;
+  font-size: inherit;
+}
+.turn-banner.sweep .tb-stripe {
+  width: 100%;
+  text-align: center;
+  padding: 9px 0 11px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(18, 26, 50, 0.8) 16%,
+    rgba(18, 26, 50, 0.9) 50%,
+    rgba(18, 26, 50, 0.8) 84%,
+    transparent 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: tb-sweep 1.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.turn-banner.sweep small {
+  display: block;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+.turn-banner.sweep b {
+  display: block;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+}
+.turn-banner.sweep.mine b {
+  color: #ffd75a;
+  text-shadow: 0 0 16px rgba(255, 190, 40, 0.65);
+}
+.turn-banner.sweep.theirs b {
+  color: #ffb3a1;
+  text-shadow: 0 0 16px rgba(255, 90, 60, 0.6);
+}
+@keyframes tb-sweep {
+  0% {
+    transform: translateX(-70%) skewX(-14deg);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  14% {
+    transform: translateX(2%) skewX(0deg);
+    opacity: 1;
+    filter: blur(0);
+  }
+  20%,
+  78% {
+    transform: none;
+    opacity: 1;
+    filter: none;
+  }
+  100% {
+    transform: translateX(70%) skewX(14deg);
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
+
+/* etapa da batalha e poder mudando */
+.battle-step {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(18, 26, 50, 0.86);
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  animation: step-in 0.35s ease-out;
+}
+.band-middle .battle-info {
+  position: relative;
+}
+.band-middle .battle-step {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 3px 10px rgba(18, 26, 50, 0.3);
+}
+@keyframes step-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+    scale: 0.9;
+  }
+}
+.pow b {
+  display: inline-block;
+  animation: pow-pop 0.4s ease-out;
+}
+@keyframes pow-pop {
+  0% {
+    transform: scale(1.55);
+    color: #fff6c4;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ sorteio com dados */
+.dice-backdrop {
+  z-index: 52;
+}
+.dice-card {
+  width: min(460px, 100%);
+}
+.dice-versus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin: 10px 0 12px;
+}
+.dice-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  transition: opacity 0.3s, filter 0.3s, transform 0.3s;
+}
+.dice-leader {
+  --cw: clamp(54px, 15vw, 70px);
+}
+.dice-leader .card {
+  transition: box-shadow 0.3s;
+}
+.dice-player.winner {
+  transform: scale(1.06);
+}
+.dice-player.winner .dice-leader .card {
+  box-shadow: 0 0 0 3px #ffd75a, 0 0 24px rgba(255, 190, 40, 0.85);
+}
+.dice-player.loser {
+  opacity: 0.6;
+  filter: grayscale(0.5);
+}
+.dice-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 900;
+  font-size: 13px;
+}
+.dice-value {
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--muted);
+}
+.dice-player.winner .dice-value {
+  color: var(--gold);
+  animation: pow-pop 0.45s ease-out;
+}
+.dice-vs {
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 32px;
+  color: var(--gold);
+  text-shadow: 0 2px 0 #7a4c00;
+}
+/* A mesa: feltro azul-mar com borda de madeira. */
+.dice-tray {
+  position: relative;
+  height: clamp(170px, 30dvh, 220px);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(255, 255, 255, 0.16), transparent 62%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 5px),
+    linear-gradient(180deg, #2d77bd, #1a4b85);
+  box-shadow:
+    inset 0 0 0 5px #b07a3a,
+    inset 0 0 0 7px #7d5226,
+    inset 0 10px 28px rgba(0, 0, 0, 0.45);
+  perspective: 700px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+  cursor: grab;
+}
+.dice-tray.is-held {
+  cursor: grabbing;
+}
+.dice-tray.is-rolling,
+.dice-tray.is-result,
+.dice-tray.auto {
+  cursor: default;
+}
+.die {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 52px;
+  height: 52px;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.die-cube {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.die-shadow {
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 48px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.6), transparent 70%);
+  filter: blur(3px);
+}
+.die-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  padding: 7px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #ffffff, #e8e2d4);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
+    inset -3px -4px 8px rgba(0, 0, 0, 0.14);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.die-face.f1 {
+  transform: translateZ(26px);
+}
+.die-face.f6 {
+  transform: rotateY(180deg) translateZ(26px);
+}
+.die-face.f3 {
+  transform: rotateY(90deg) translateZ(26px);
+}
+.die-face.f4 {
+  transform: rotateY(-90deg) translateZ(26px);
+}
+.die-face.f2 {
+  transform: rotateX(90deg) translateZ(26px);
+}
+.die-face.f5 {
+  transform: rotateX(-90deg) translateZ(26px);
+}
+.pip {
+  place-self: center;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #555, #111);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.die-face.f1 .pip {
+  width: 13px;
+  height: 13px;
+}
+.die.mine .die-face.f1 .pip {
+  background: radial-gradient(circle at 35% 35%, #ff6b5a, #b3150a);
+}
+.die.theirs .die-face {
+  background: linear-gradient(145deg, #fff3ee, #f1cfc3);
+}
+.die.theirs .pip {
+  background: radial-gradient(circle at 35% 35%, #e65a4b, #8f1d14);
+}
+.die.winner .die-face {
+  box-shadow:
+    inset 0 0 0 2px #ffd75a,
+    inset -3px -4px 8px rgba(0, 0, 0, 0.14),
+    0 0 12px rgba(255, 200, 60, 0.6);
+}
+.dice-hand {
+  position: absolute;
+  left: calc(40% + 18px);
+  top: calc(74% + 14px);
+  font-size: 30px;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
+  animation: dice-hand 1.6s ease-in-out infinite;
+}
+@keyframes dice-hand {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-8deg);
+  }
+  35% {
+    transform: translate(-14px, -6px) rotate(-14deg);
+  }
+  65% {
+    transform: translate(10px, -40px) rotate(4deg);
+    opacity: 0.9;
+  }
+}
+.dice-result {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  padding: 8px 22px;
+  border-radius: 999px;
+  background: rgba(14, 22, 44, 0.82);
+  color: #ffd75a;
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 28px;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: dice-result 0.45s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+@keyframes dice-result {
+  from {
+    transform: translateX(-50%) scale(0.4);
+    opacity: 0;
+  }
+}
+.dice-hint {
+  margin: 10px 0 6px;
+  font-weight: 800;
+}

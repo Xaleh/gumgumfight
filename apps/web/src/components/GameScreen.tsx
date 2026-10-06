@@ -16,14 +16,17 @@ import {
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { type GameSetup, useGame } from '../game/useGame';
+import { prefersReducedMotion } from '../game/motion';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardTextInfo } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
+import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
 import { ManualTools } from './ManualTools';
+import { useBoardMotion } from './Motion';
 import {
   EmoteBar,
   EmoteBubbles,
@@ -81,6 +84,8 @@ interface TableGame {
   setSpeed: (v: number) => void;
   auto: boolean;
   setAuto: (f: (a: boolean) => boolean) => void;
+  /** Segura o bot (partida no navegador) enquanto o sorteio inicial está na tela. */
+  setHold?: (hold: boolean) => void;
   undo: () => void;
   canUndo: boolean;
   actions: () => Action[];
@@ -247,7 +252,18 @@ function Table({
   const watching = Boolean(spectator);
   const ranked = online?.room?.queue === 'ranked';
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter } = useSettings();
+  const { quickCounter, animations } = useSettings();
+  const animate = animations && !prefersReducedMotion();
+  // Cartas voando entre as zonas (mais rápidas com o bot acelerado).
+  const motionLayer = useBoardMotion(state, { enabled: animate, tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)) });
+  // Sorteio com dados no começo da partida (não no replay nem ao voltar para uma partida em andamento).
+  const [intro, setIntro] = useState(
+    () => animate && kind !== 'replay' && state.phase === 'mulligan' && state.players.every((p) => !p.mulliganDone),
+  );
+  const { setHold } = game;
+  useEffect(() => {
+    setHold?.(intro);
+  }, [intro, setHold]);
   const [selectedUid, setSelected] = useState<string | null>(null);
   const [hoveredUid, setHovered] = useState<string | null>(null);
   const [zoomUid, setZoom] = useState<string | null>(null);
@@ -257,7 +273,7 @@ function Table({
   const [drag, setDrag] = useState<Drag | null>(null);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
   const [showBotHand, setShowBotHand] = useState(kind === 'demo' || kind === 'replay' || watching);
-  const [banner, setBanner] = useState<{ text: string; mine: boolean; key: number } | null>(null);
+  const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
   const [handOrder, setHandOrder] = useState<string[]>([]);
@@ -328,16 +344,11 @@ function Table({
     const p = state.activePlayer;
     const mine = human === null ? p === 0 : p === human;
     const name = state.players[p].name;
-    const text =
-      state.turn === 1
-        ? human !== null && p === human
-          ? 'Você jogará primeiro.'
-          : `${name} jogará primeiro.`
-        : human !== null && p === human
-          ? 'Seu turno!'
-          : `Turno de ${name}`;
-    setBanner({ text, mine, key: state.turn });
-    const t = setTimeout(() => setBanner(null), 1700);
+    const you = human !== null && p === human;
+    const text = you ? 'Seu turno!' : `Turno de ${name}`;
+    const kicker = state.turn === 1 ? (you ? 'Você joga primeiro' : `${name} joga primeiro`) : `Turno ${state.turn}`;
+    setBanner({ text, kicker, mine, key: state.turn });
+    const t = setTimeout(() => setBanner(null), 1900);
     return () => clearTimeout(t);
     // Só muda na troca de turno (não a cada ação).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -748,10 +759,15 @@ function Table({
         />
 
         {banner && state.phase === 'main' && (
-          <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs'].join(' ')}>
-            {banner.text}
+          <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs', animate ? 'sweep' : ''].join(' ')}>
+            <div className="tb-stripe">
+              <small>{banner.kicker}</small>
+              <b>{banner.text}</b>
+            </div>
           </div>
         )}
+
+        {motionLayer}
 
         {online && <EmoteBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
@@ -762,7 +778,10 @@ function Table({
           </div>
         )}
 
+        {intro && <DiceRoll state={state} human={human} onDone={() => setIntro(false)} />}
+
         <Prompt
+          hidden={intro}
           state={state}
           human={human}
           picked={picked}
@@ -1106,17 +1125,29 @@ function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null
   let status: string;
   if (human !== null && defender === human) status = hits ? `Faltam +${need} para defender` : 'Defendido!';
   else status = hits ? 'O ataque vai acertar' : `Faltam +${def - atk} para acertar`;
+  // Etapa da batalha (a visão do oponente também traz o tipo da escolha pendente).
+  const step =
+    state.pending?.kind === 'block'
+      ? 'Etapa de Bloqueio'
+      : state.pending?.kind === 'counter'
+        ? 'Etapa de Counter'
+        : state.stack.some((f) => f.kind === 'damage')
+          ? 'Etapa de Dano'
+          : 'Ataque';
   return (
     <div className="battle-info">
+      <div key={step} className="battle-step">
+        {step}
+      </div>
       <div className="battle-row">
         <span className="pow atk">
           <em>{cardDef(state, b.attacker).name}</em>
-          <b>{atk}</b>
+          <b key={atk}>{atk}</b>
         </span>
         <span className="vs">⚔</span>
         <span className="pow def">
           <em>{cardDef(state, b.target).name}</em>
-          <b>{def}</b>
+          <b key={def}>{def}</b>
         </span>
       </div>
       <div className={['battle-status', hits ? 'hit' : 'safe'].join(' ')}>
@@ -1231,6 +1262,8 @@ function AttackArrow({
 // ------------------------------------------------------------------ prompts
 
 function Prompt(props: {
+  /** Ainda não aparece (sorteio inicial na tela). */
+  hidden?: boolean;
   state: GameState;
   human: PlayerId | null;
   picked: string[];
@@ -1242,7 +1275,7 @@ function Prompt(props: {
   const { state, human, picked, onDispatch } = props;
   const { lang, quickCounter } = useSettings();
   const pending = state.pending;
-  if (state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
+  if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
 
   switch (pending.kind) {
     case 'mulligan': {

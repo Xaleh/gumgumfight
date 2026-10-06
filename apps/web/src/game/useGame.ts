@@ -11,6 +11,7 @@ import {
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
+import { motionWait } from './motion';
 
 export type GameMode = 'bot' | 'demo' | 'replay';
 
@@ -55,6 +56,8 @@ export function useGame(setup: GameSetup) {
   const [speed, setSpeed] = useState(1);
   /** "Auto": o bot joga pelo humano até o modo ser desligado. */
   const [auto, setAuto] = useState(false);
+  /** A mesa segura o bot (sorteio inicial na tela). */
+  const [hold, setHold] = useState(false);
 
   const human: PlayerId | null = setup.mode === 'bot' ? 0 : null;
 
@@ -95,7 +98,7 @@ export function useGame(setup: GameSetup) {
 
   // Bots e replay agem sozinhos, com um pequeno atraso para a jogada ser visível.
   useEffect(() => {
-    if (state.phase === 'gameover' || paused) return;
+    if (state.phase === 'gameover' || paused || hold) return;
     const p = actingPlayer(state);
     if (p === null) return;
     let next: Action | undefined;
@@ -105,10 +108,11 @@ export function useGame(setup: GameSetup) {
       next = chooseBotAction(state, p);
     }
     if (!next) return;
-    const delay = (state.pending ? 500 : 800) / speed;
+    // Espera as cartas pousarem antes da próxima jogada.
+    const delay = Math.max((state.pending ? 500 : 800) / speed, motionWait() + 120);
     const t = setTimeout(() => dispatch(next!), delay);
     return () => clearTimeout(t);
-  }, [state, paused, speed, setup, dispatch, auto, human]);
+  }, [state, paused, hold, speed, setup, dispatch, auto, human]);
 
   const exportReplay = useCallback((): ReplayFile => {
     const first = entries[0].state;
@@ -138,6 +142,7 @@ export function useGame(setup: GameSetup) {
     setSpeed,
     auto,
     setAuto,
+    setHold,
     undo,
     canUndo,
     exportReplay,
