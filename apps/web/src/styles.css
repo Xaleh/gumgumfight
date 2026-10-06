@@ -4639,6 +4639,37 @@ tr.clickable:hover td {
     inset -4px -5px 10px rgba(0, 0, 0, 0.35),
     0 0 12px rgba(255, 200, 60, 0.6);
 }
+/* No lugar do dado de quem ainda não jogou: o dado dele só entra na mesa quando ele joga. */
+.dice-wait {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 70%;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(10, 24, 50, 0.45);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: dice-wait 0.3s ease-out;
+}
+.dice-wait.theirs {
+  left: 60%;
+  top: 26%;
+}
+.dice-wait.mine {
+  left: 40%;
+  top: 74%;
+}
+@keyframes dice-wait {
+  from {
+    opacity: 0;
+  }
+}
 .dice-hand {
   position: absolute;
   left: calc(40% + 20px);
