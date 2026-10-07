@@ -46,6 +46,29 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-34 | Erratas oficiais não aplicadas ao texto das cartas | Errata oficial | médio | C16 |
 | DV-35 | README "Regras implementadas" desatualizado (corrigido) | — | baixo | — |
 
+## Cards de correção no Trello
+
+Todos na lista "Planejamento" do quadro GumGum Fight, com etiqueta vermelha (bug).
+
+| Card | Trello | Assunto |
+|---|---|---|
+| C1 | <https://trello.com/c/0La1Qxs2> | [Double Attack] contra 1 de Vida (DV-01) |
+| C2 | <https://trello.com/c/hhReaY8H> | Fila de efeitos disparados (DV-02 a DV-06) |
+| C3 | <https://trello.com/c/zM6n04ML> | [On K.O.] no campo (DV-07) |
+| C4 | <https://trello.com/c/4MAOfZqn> | Escolha sem "up to" (DV-08) |
+| C5 | <https://trello.com/c/WZssyGGP> | DON!! −X com escolha (DV-09) |
+| C6 | <https://trello.com/c/T9waeyO3> | [Once Per Turn] ao voltar ao campo (DV-10) |
+| C7 | <https://trello.com/c/p5CPd7X6> | Substituições (DV-11, DV-12) |
+| C8 | <https://trello.com/c/sfJffgZI> | Proteções e proibições (DV-13 a DV-16) |
+| C9 | <https://trello.com/c/VknBMmyg> | Carta do [Trigger] sem área (DV-17) |
+| C10 | <https://trello.com/c/ZCOe5kVk> | Vida virada para cima a partir do campo (DV-18) |
+| C11 | <https://trello.com/c/HWy6Ks09> | «Set Power to 0» e poder base (DV-19, DV-20) |
+| C12 | <https://trello.com/c/x7dM5bMu> | Counter Step e fim de batalha (DV-21 a DV-23) |
+| C13 | <https://trello.com/c/RE2Z2216> | Preparação e fim de partida (DV-24 a DV-27) |
+| C14 | <https://trello.com/c/6egd4DaI> | Momentos do turno (DV-28 a DV-30) |
+| C15 | <https://trello.com/c/OfoyXyOm> | "Draw up to", restrições, revelar (DV-31 a DV-33) |
+| C16 | <https://trello.com/c/SG4w3tB2> | Erratas nos dados (DV-34) |
+
 Pontos **conformes** conferidos (não precisam de card): mulligan; Refresh, Draw e DON!! Phase; ninguém ataca no primeiro turno; +1000 por DON!! só no próprio turno; DON!! voltam rested quando a carta sai; alvos de ataque; checagem de saída de cena ao fim de cada etapa da batalha; [Blocker] (uma vez, não rested, não o próprio alvo) e [Unblockable]; [Banish]; dano um a um e [Trigger] antes do 2º dano; limite de 5 Personagens como regra (sem [On K.O.]); K.O. vs. trash; [Counter] e [Main] só nos momentos certos; custo negativo vale 0 (somando o negativo); poder negativo não trasha; informação oculta (`view.ts` e decisões que sempre abrem). A lista completa por regra está no fim deste arquivo.
 
 ---
