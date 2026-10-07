@@ -367,13 +367,18 @@ export type RestrictionKind =
   | 'noLifeToHand'
   | 'noAttackLeader'
   | 'noDrawByEffect'
-  | 'noSetDonActiveByCharacter';
+  | 'noSetDonActiveByCharacter'
+  /** "cannot activate [Blocker]": nenhum [Blocker] do jogador pode ser ativado. */
+  | 'noBlocker';
 
 export interface Restriction {
+  /** Quem fica restrito: o controlador do efeito ("you cannot …") ou o oponente dele ("your opponent cannot …"). */
   player: PlayerId;
   kind: RestrictionKind;
   /** noPlayCharacters: só os de custo base a partir deste. */
   minCost?: number;
+  /** Último turno em que vale (inclusive), como em `Modifier.untilTurn`; sem ele, só o turno em que foi criada. */
+  untilTurn?: number;
 }
 
 export type LeaderRule =
@@ -519,7 +524,8 @@ type EffectStepBody =
   | { do: 'rest'; target: TargetRef }
   | { do: 'setActive'; target: TargetRef }
   | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; anyState?: boolean }
-  | { do: 'draw'; count: number }
+  /** "Draw N cards"; com `upTo` ("draw up to N cards", 4-5-4), uma por vez, podendo parar antes de cada uma. */
+  | { do: 'draw'; count: number; upTo?: true }
   | { do: 'addDonFromDeck'; count: number; rested?: boolean }
   | { do: 'restOpponentDon'; count: number }
   | { do: 'returnToHand'; target: TargetRef }
@@ -626,7 +632,12 @@ type EffectStepBody =
   | { do: 'giveActiveDon'; count: number; target: TargetRef }
   | { do: 'ownToBottom'; count: number; spec: TargetSpec; toLife?: boolean }
   | { do: 'negate'; target: TargetRef; duration: Duration }
-  | { do: 'restrict'; kind: RestrictionKind; minCost?: number }
+  /**
+   * "You cannot … during this turn". `opponent`: quem fica restrito é o oponente ("your opponent
+   * cannot …"). `duration`: 'nextOpponentTurn' = "until the end of your opponent's next turn"; sem
+   * ela, até o fim deste turno.
+   */
+  | { do: 'restrict'; kind: RestrictionKind; minCost?: number; opponent?: true; duration?: 'nextOpponentTurn' }
   | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
   /** "base power becomes N" ou "the same as your opponent's Leader('s power)" */
   | { do: 'basePower'; target: TargetRef; amount?: number; copy?: 'opponentLeader' | 'chosen' | 'attacker'; duration: Duration }
@@ -1092,9 +1103,10 @@ export type Pending =
   /**
    * Pergunta sim/não (ex.: pagar um custo opcional). Responder com `answer`. Com `cannot`,
    * só o "não" é legal: o custo lê a mão e não pode ser pago, mas a pergunta abre mesmo
-   * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`.
+   * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`. Com `drawUpTo`,
+   * é o "comprar mais 1?" do "draw up to N cards" (4-5-4): sim compra 1, não para.
    */
-  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true }
+  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true; drawUpTo?: true }
   /**
    * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
    * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
@@ -1207,7 +1219,7 @@ export interface GameState {
   pending: Pending | null;
   modifiers: Modifier[];
   usedThisTurn: string[];
-  /** Restrições ao jogador até o fim do turno ("you cannot play Character cards during this turn"). */
+  /** Restrições a um jogador ("you cannot play Character cards during this turn", "your opponent cannot …"). */
   restrictions?: Restriction[];
   /** "The next time you play X from your hand during this turn, the cost will be reduced by N." */
   costReductions?: Array<{ player: PlayerId; filter: CardFilter; amount: number }>;

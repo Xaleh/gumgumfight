@@ -27,4 +27,4 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 [Once Per Turn] por carta (`uid:índice`), esquecido quando a carta sai do campo ou entra nele (carta nova, 3-1-6); custo tudo-ou-nada; custo negativo vale 0 somando o negativo; "up to" permite 0 e, sem "up to", a escolha exige o máximo possível (`TargetSpec.required`, 8-4-4-1); busca pode não achar (conforme).
 
-Divergências deste tema: DV-14, DV-31 (corrigidas: DV-08, DV-10) (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-14 (corrigidas: DV-08, DV-10, DV-31) (detalhes em [../divergencias.md](../divergencias.md)).

@@ -887,6 +887,8 @@ function totalDonOnField(ps: PlayerState): number {
 export function blockerOptions(state: GameState, defender: PlayerId): string[] {
   const b = state.battle;
   if (!b || b.noBlocker || hasKeyword(state, b.attacker, 'unblockable')) return [];
+  // "Your opponent cannot activate [Blocker] during this turn."
+  if (restricted(state, defender, 'noBlocker')) return [];
   return state.players[defender].characters
     .filter((c) => !c.rested && c.uid !== b.target && hasKeyword(state, c.uid, 'blocker'))
     .filter((c) => !state.modifiers.some((m) => m.uid === c.uid && m.kind === 'cannotBlock'))
@@ -1536,7 +1538,7 @@ function endTurn(state: GameState) {
   );
   state.usedThisTurn = [];
   state.eventsThisTurn = [];
-  state.restrictions = [];
+  state.restrictions = (state.restrictions ?? []).filter((r) => (r.untilTurn ?? 0) > state.turn);
   state.costReductions = [];
   state.battledCharacter = [];
   state.koThisTurn = [];
@@ -2563,12 +2565,41 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       return true;
     }
-    case 'draw':
+    case 'draw': {
       if (restricted(state, frame.controller, 'noDrawByEffect')) return true;
-      drawCards(state, frame.controller, step.count);
-      log(state, frame.controller, `${ps.name} compra ${step.count} carta(s).`);
-      emit(state, { kind: 'drawByEffect', player: frame.controller });
+      if (!step.upTo) {
+        drawCards(state, frame.controller, step.count);
+        log(state, frame.controller, `${ps.name} compra ${step.count} carta(s).`);
+        emit(state, { kind: 'drawByEffect', player: frame.controller });
+        return true;
+      }
+      // "Draw up to N cards" (4-5-4): uma por vez; antes de cada uma o jogador pode parar
+      // (memo[0] = quantas já comprou). O oponente vê só a pergunta, sem o texto.
+      let drawn = Number(frame.memo?.[0] ?? 0);
+      let stop = false;
+      if (frame.choice) {
+        if (frame.choice[0] === 'yes') {
+          drawCards(state, frame.controller, 1);
+          drawn++;
+        } else stop = true;
+        frame.choice = undefined;
+      }
+      if (!stop && drawn < step.count && ps.deck.length) {
+        frame.memo = [String(drawn)];
+        state.pending = {
+          kind: 'confirm',
+          player: frame.controller,
+          source: frame.source,
+          prompt: `${srcName}: comprar ${drawn ? 'mais ' : ''}1 carta? (${drawn} de até ${step.count})`,
+          drawUpTo: true,
+        };
+        return false;
+      }
+      frame.memo = undefined;
+      log(state, frame.controller, drawn ? `${ps.name} compra ${drawn} carta(s).` : `${ps.name} não compra cartas.`);
+      if (drawn) emit(state, { kind: 'drawByEffect', player: frame.controller });
       return true;
+    }
     case 'addDonFromDeck': {
       const n = Math.min(step.count, ps.donDeck);
       ps.donDeck -= n;
@@ -3746,9 +3777,15 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       return true;
     }
-    case 'restrict':
-      (state.restrictions ??= []).push({ player: frame.controller, kind: step.kind, ...(step.minCost !== undefined ? { minCost: step.minCost } : {}) });
+    case 'restrict': {
+      // Quem fica restrito e até quando: "your opponent cannot …", "until the end of your opponent's next turn".
+      const player = step.opponent ? opponent(frame.controller) : frame.controller;
+      const r: Restriction = { player, kind: step.kind, ...(step.minCost !== undefined ? { minCost: step.minCost } : {}) };
+      // Como em addModifier: no seu turno, acaba no fim do turno seguinte (do oponente); no do oponente, no fim do próximo dele.
+      if (step.duration === 'nextOpponentTurn') r.untilTurn = state.turn + (state.activePlayer === frame.controller ? 1 : 2);
+      (state.restrictions ??= []).push(r);
       return true;
+    }
     case 'nextPlayDiscount':
       (state.costReductions ??= []).push({ player: frame.controller, filter: step.filter, amount: step.amount });
       return true;
@@ -4085,6 +4122,12 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         }
       }
       const bottom = Boolean(step.choose) && frame.choice?.[0] === '1';
+      // Da mão para a Vida com uma exigência ("up to 1 {Supernovas} type Character card"): a carta é
+      // revelada (11-2-1), como na busca do deck para a mão; sai no log público com o nome. Sem
+      // exigência (qualquer carta) não há o que conferir e ela vai escondida, como a carta que vai
+      // do deck para a Vida (Q&A de regras). Do descarte ou virada para cima, ela já é pública.
+      const filtered = Object.keys(step.filter ?? {}).length > 0;
+      const shown = picked.filter((uid) => filtered || step.faceUp || ps.trash.includes(uid));
       for (const uid of picked) {
         removeFrom(ps.hand, uid);
         removeFrom(ps.trash, uid);
@@ -4092,7 +4135,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         else ps.life.push(uid);
         if (step.faceUp) (ps.lifeFaceUp ??= []).push(uid);
       }
-      if (picked.length) log(state, frame.controller, `${ps.name} coloca ${picked.length} carta(s) da mão no ${bottom ? 'fundo' : 'topo'} da Vida.`);
+      if (picked.length) {
+        const names = shown.length ? ` (${shown.map((u) => cardDef(state, u).name).join(', ')})` : '';
+        const from = step.trashOnly ? 'do descarte' : step.fromTrash ? 'da mão ou do descarte' : 'da mão';
+        log(state, frame.controller, `${ps.name} ${filtered && !step.trashOnly ? 'revela e ' : ''}coloca ${picked.length} carta(s) ${from}${names} no ${bottom ? 'fundo' : 'topo'} da Vida.`);
+      }
       return true;
     }
     case 'fieldToLife': {

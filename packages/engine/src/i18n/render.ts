@@ -753,7 +753,7 @@ function step(s: EffectStep, ctx: Ctx): string {
           ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a cada um ${target(s.target, ctx).replace(/^todos os /, 'dos ').replace(/^até /, 'de até ')}.`
           : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a ${target(s.target, ctx)}.`;
     case 'draw':
-      return `Compre ${cards(s.count)}.`;
+      return s.upTo ? `Compre até ${cards(s.count)}.` : `Compre ${cards(s.count)}.`;
     case 'drawUntil':
       return `Compre cartas até ficar com ${s.count} cartas na mão.`;
     case 'addDonFromDeck':
@@ -912,15 +912,19 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'negate':
       return `Anule o efeito de ${target(s.target, ctx)} ${dur(s.duration)}.`;
     case 'restrict': {
+      const opp = Boolean(s.opponent);
+      const own = opp ? 'dele' : 'seus';
       const txt: Record<string, string> = {
-        noPlayCharacters: s.minCost !== undefined ? `você não pode jogar Personagens com custo base ${s.minCost} ou mais neste turno` : 'você não pode jogar Personagens neste turno',
-        noPlayFromHand: 'você não pode jogar cartas da sua mão neste turno',
-        noLifeToHand: 'você não pode colocar cartas de Vida na mão com os seus próprios efeitos neste turno',
-        noAttackLeader: 'você não pode atacar um Líder neste turno',
-        noDrawByEffect: 'você não pode comprar cartas com os seus próprios efeitos neste turno',
-        noSetDonActiveByCharacter: 'você não pode deixar DON!! ativos com efeitos de Personagens neste turno',
+        noPlayCharacters: s.minCost !== undefined ? `jogar Personagens com custo base ${s.minCost} ou mais` : 'jogar Personagens',
+        noPlayFromHand: `jogar cartas da ${opp ? 'mão dele' : 'sua mão'}`,
+        noLifeToHand: `colocar cartas de Vida na mão com os ${opp ? 'próprios efeitos dele' : `${own} próprios efeitos`}`,
+        noAttackLeader: opp ? 'atacar o seu Líder' : 'atacar um Líder',
+        noDrawByEffect: `comprar cartas com os ${opp ? 'próprios efeitos dele' : `${own} próprios efeitos`}`,
+        noSetDonActiveByCharacter: 'deixar DON!! ativos com efeitos de Personagens',
+        noBlocker: 'ativar [Blocker]',
       };
-      return `${cap(txt[s.kind])}.`;
+      const when = s.duration === 'nextOpponentTurn' ? dur('nextOpponentTurn') : 'neste turno';
+      return `${opp ? 'O seu oponente' : 'Você'} não pode ${txt[s.kind]} ${when}.`;
     }
     case 'nextPlayDiscount':
       return `Na próxima vez que você jogar ${filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')} da sua mão neste turno, o custo será reduzido em ${s.amount}.`;

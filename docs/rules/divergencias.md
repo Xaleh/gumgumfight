@@ -40,9 +40,9 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-28 | "At the start of your turn" resolve depois do Draw e da DON!! Phase (**corrigido**) | 6-2-2 | baixo | C14 |
 | DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] (**corrigido**) | 6-6-1-2 | baixo | C14 |
 | DV-30 | Faltam momentos: "start of your opponent's turn", "start of the Main Phase", [End of Your Opponent's Turn] (**corrigido**) | 6-2-2, 6-5-1, 6-6-1-1 | baixo | C14 |
-| DV-31 | "Draw up to X" vira compra obrigatória | 4-5-4 | baixo | C15 |
-| DV-32 | Restrições ("you cannot ...") só valem para quem controla o efeito e só no turno | texto das cartas | baixo | C15 |
-| DV-33 | Mão → Vida com filtro não revela a carta | 11-2-1 | baixo | C15 |
+| DV-31 | "Draw up to X" vira compra obrigatória (**corrigido**) | 4-5-4 | baixo | C15 |
+| DV-32 | Restrições ("you cannot ...") só valem para quem controla o efeito e só no turno (**corrigido**) | texto das cartas | baixo | C15 |
+| DV-33 | Mão → Vida com filtro não revela a carta (**corrigido**) | 11-2-1 | baixo | C15 |
 | DV-34 | Erratas oficiais não aplicadas ao texto das cartas (**corrigido**) | Errata oficial | médio | C16 |
 | DV-35 | README "Regras implementadas" desatualizado (corrigido) | — | baixo | — |
 | DV-36 | Nomes e tipos da optcgapi diferentes da lista oficial (**corrigido**) | Lista oficial de cartas | médio | — |
@@ -301,14 +301,24 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C15 — Pequenas formas de efeito
 
-**DV-31. "Draw up to X" vira compra obrigatória** — baixo
-- Regra: 4-5-4. Atual: o passo `draw` não tem `upTo` (engine.ts:2246). Cenário: OP02-066 compra 2 à força.
+**DV-31. "Draw up to X" vira compra obrigatória** — baixo — **corrigido**
+- Regra: 4-5-4 ("draw up to X": antes de cada compra o jogador pode encerrar). O passo `draw` não tinha `upTo` (engine.ts:2246): OP02-066 comprava 2 à força.
+- Agora: o leitor marca "Draw up to N cards" com `upTo` ("Draw N cards" segue obrigatório). O motor compra uma por vez: antes de cada carta pergunta "comprar 1 carta?" (`confirm` com `drawUpTo`, botões "Comprar 1 carta" / "Parar"); o "não" encerra, inclusive antes da primeira. Com o deck vazio, para de perguntar. O oponente vê só que há uma pergunta (sem o texto nem `drawUpTo`); quantas foram compradas ele vê pelo tamanho da mão. O bot compra enquanto o deck tiver mais de 5 cartas.
+- Replays passam para a versão 10; nos antigos, cada pergunta é respondida com sim (as N compras, como antes).
+- Na base local, 1 carta usa (OP02-066).
 
-**DV-32. Restrições só valem para quem controla o efeito e só no turno** — baixo
-- Atual: `Restriction.player` é sempre o controlador e dura até o fim do turno (engine.ts:3412). Cartas "your opponent cannot …" ou "until the end of your opponent's next turn" precisariam de alvo e duração.
+**DV-32. Restrições só valem para quem controla o efeito e só no turno** — baixo — **corrigido**
+- `Restriction.player` era sempre o controlador e a restrição durava até o fim do turno (engine.ts:3412).
+- Agora: o passo `restrict` tem `opponent` (quem fica restrito é o oponente: "your opponent cannot …") e `duration: 'nextOpponentTurn'` ("until the end of your opponent's next turn"), que vira `Restriction.untilTurn` com a mesma conta dos modificadores (no seu turno, até o fim do turno seguinte; no do oponente, até o fim do próximo dele). O fim do turno remove só as vencidas. Tipo novo `noBlocker` ("cannot activate [Blocker]"): `blockerOptions` fica vazio para o jogador restrito.
+- Leitor: as frases de restrição aceitam "you" ou "your opponent", "your/their" ("their own effects", "their hand") e as duas durações, para jogar Personagens (com ou sem custo base mínimo), jogar cartas da mão, pôr Vida na mão com os próprios efeitos, comprar com os próprios efeitos, atacar Líder, deixar DON!! ativos com efeito de Personagem e ativar [Blocker]. Assim P-097 Shanks ("Your opponent cannot activate [Blocker] during this turn.") fica automático.
+- Varredura da base local: nenhuma outra carta tem restrição a um jogador com "your opponent cannot" ou "until the end of your opponent's next turn". As outras "your opponent cannot activate [Blocker]" já tinham primitivo próprio (`noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock`); as "until the end of your opponent's next turn" da base são sobre uma carta (poder, custo, não atacar, não virar: modificadores com `nextOpponentTurn`) ou negam [On Play] (`negateOnPlay`, OP09-081). As 2 cartas "cannot attack any card other than …" seguem com `staticTaunt` (efeito permanente, não restrição por turno).
 
-**DV-33. Mão → Vida com filtro não revela a carta** — baixo (a confirmar)
-- Regra: 11-2-1 (mover de área secreta para secreta revela). Atual: `handToLife` (engine.ts:3701) só registra a quantidade.
+**DV-33. Mão → Vida com filtro não revela a carta** — baixo — **corrigido**
+- Regra confirmada no CR v1.2.1, 11-2-1: "When a card is required to be moved from one secret area to another secret area, such as 'Add Monkey.D.Luffy from your deck to your hand', the card being moved must always be revealed". `handToLife` (engine.ts:3701) só registrava a quantidade.
+- Agora: com exigência (filtro: "Character card with a cost of 5", "{Supernovas} type Character card"), o log público traz o nome ("revela e coloca 1 carta(s) da mão (Bon Clay) no topo da Vida."), como na busca do deck para a mão (`search`/`tutor`), que é como o motor revela; na Vida a carta volta a ser oculta (11-2-2). Sem exigência ("add up to 1 card from your hand to the top of your Life cards", ST07-001, ST29-007), a carta vai escondida: não há exigência a conferir, e o Q&A de regras trata do mesmo jeito a carta que vai do deck para a Vida (ninguém pode olhar). Do descarte ou virada para cima, o nome também aparece (a carta já é pública).
+- Na base local: ST13-005 Ivankov e OP10-103 Kid (este também "face-up").
+
+Testes (DV-31 a DV-33): `packages/engine/test/draw-restrict-reveal.test.ts` (leitor de OP02-066; compra 1 e para; nenhuma compra e visão do oponente; bot; replay antigo; leitor de "your opponent cannot …"; P-097 sintético sem etapa de bloqueio e com o [Blocker] de volta no turno seguinte; "until the end of your opponent's next turn" com jogar Personagens; Ivankov ST13-005 revela; sem exigência não revela). 9 de 10 falham no código antigo (o último confere o que já era assim).
 
 ### C16 — Dados e documentação
 
@@ -367,6 +377,6 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano, carta do [Trigger] fora das áreas enquanto resolve | — |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O., «Set Power to 0» como −(poder atual), vários poderes base: vale o maior | DV-12 (custos) |
-| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública (também a que vem do campo), revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step, laço infinito empata | DV-33 |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O., «Set Power to 0» como −(poder atual), vários poderes base: vale o maior, "draw up to" uma por vez podendo parar | DV-12 (custos) |
+| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública (também a que vem do campo), revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step, laço infinito empata, mão → Vida com exigência revelada | — |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

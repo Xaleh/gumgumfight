@@ -214,9 +214,10 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
       // O oponente vê que há uma carta da Vida sendo olhada, nunca qual (nem se tem [Trigger]).
       return { ...p, card: ref(p.card) };
     case 'confirm': {
-      // O oponente não vê o prompt nem se o "sim" está disponível (isso contaria a mão).
-      const { cannot, ...rest } = p;
-      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}) };
+      // O oponente não vê o prompt nem se o "sim" está disponível (isso contaria a mão). No "draw up
+      // to N", só vê que há uma pergunta; quantas foram compradas ele vê pelo tamanho da mão.
+      const { cannot, drawUpTo, ...rest } = p;
+      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}), ...(mine && drawUpTo ? { drawUpTo } : {}) };
     }
     case 'option': {
       const { don, ...rest } = p;

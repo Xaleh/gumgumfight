@@ -321,6 +321,10 @@ const SENTENCES: Rule[] = [
     'Seu oponente não pode ativar [Blocker] durante esta batalha.',
   ],
   [
+    /^Your opponent cannot activate \[Blocker\] during this turn\.?$/i,
+    'Seu oponente não pode ativar [Blocker] durante este turno.',
+  ],
+  [
     /^Your opponent cannot activate \[Blocker\] if that Leader or Character attacks during this turn\.?$/i,
     'Seu oponente não pode ativar [Blocker] se esse Líder ou Personagem atacar durante este turno.',
   ],

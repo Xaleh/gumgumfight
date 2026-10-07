@@ -20,6 +20,7 @@ import type {
   EffectStep,
   GameEvent,
   Replacement,
+  RestrictionKind,
   Keyword,
   TargetRef,
   TargetSpec,
@@ -900,6 +901,25 @@ const durationOf = (d: string): Duration =>
 const DUR =
   "(during this turn|during this battle|until the end of your opponent's next turn|until the end of your opponent's next End Phase|until the start of your next turn|until the end of your next turn)";
 
+/**
+ * Restrição a um jogador: "you cannot <body>" ou "your opponent cannot <body>", "during this turn" ou
+ * "until the end of your opponent's next turn". Em `extra`, os grupos de `body` começam em m[2].
+ */
+function restriction(body: string, kind: RestrictionKind, extra?: (m: RegExpMatchArray) => { minCost?: number }): ClauseRule {
+  return [
+    new RegExp(`^(you|your opponent) cannot ${body} (during this turn|until the end of your opponent's next turn)$`, 'i'),
+    (m) => [
+      {
+        do: 'restrict',
+        kind,
+        ...extra?.(m),
+        ...(/opponent/i.test(m[1]) ? { opponent: true as const } : {}),
+        ...(/next turn/i.test(m[m.length - 1]) ? { duration: 'nextOpponentTurn' as const } : {}),
+      },
+    ],
+  ];
+}
+
 const CLAUSES: ClauseRule[] = [
   [/^Return up to (\d+) Stages? to the owner's hand$/i, (m) => [{ do: 'returnToHand', target: { side: 'any', kinds: ['stage'], upTo: Number(m[1]) } }]],
   [
@@ -1469,7 +1489,9 @@ const CLAUSES: ClauseRule[] = [
       { do: 'trashFromHand', count: Number(m[2]) },
     ],
   ],
-  [/^Draw (?:up to )?(\d+) cards?$/i, (m) => [{ do: 'draw', count: Number(m[1]) }]],
+  [/^Draw (\d+) cards?$/i, (m) => [{ do: 'draw', count: Number(m[1]) }]],
+  // 4-5-4: uma por vez, podendo parar a qualquer momento.
+  [/^Draw up to (\d+) cards?$/i, (m) => [{ do: 'draw', count: Number(m[1]), upTo: true }]],
   [/^Draw a card$/i, () => [{ do: 'draw', count: 1 }]],
   [/^Reveal 1 card from the top of your deck$/i, () => [{ do: 'revealTop' }]],
   [
@@ -1629,16 +1651,14 @@ const CLAUSES: ClauseRule[] = [
       ]) ?? null,
   ],
   [new RegExp(`^Negate the effects? of (.+?) ${DUR}$`, 'i'), (m) => withTarget(m[1], (target) => ({ do: 'negate', target, duration: durationOf(m[2]) }))],
-  [/^you cannot play (?:any )?Character cards(?: on your field)? during this turn$/i, () => [{ do: 'restrict', kind: 'noPlayCharacters' }]],
-  [
-    /^you cannot play Character cards with a base cost of (\d+) or more during this turn$/i,
-    (m) => [{ do: 'restrict', kind: 'noPlayCharacters', minCost: Number(m[1]) }],
-  ],
-  [/^you cannot add Life cards to your hand using your own effects during this turn$/i, () => [{ do: 'restrict', kind: 'noLifeToHand' }]],
-  [/^you cannot attack a Leader during this turn$/i, () => [{ do: 'restrict', kind: 'noAttackLeader' }]],
-  [/^you cannot draw cards using your own effects during this turn$/i, () => [{ do: 'restrict', kind: 'noDrawByEffect' }]],
-  [/^you cannot set DON!! cards as active using Character effects during this turn$/i, () => [{ do: 'restrict', kind: 'noSetDonActiveByCharacter' }]],
-  [/^you cannot play cards from your hand during this turn$/i, () => [{ do: 'restrict', kind: 'noPlayFromHand' }]],
+  restriction('play (?:any )?Character cards(?: on (?:your|their) field)?', 'noPlayCharacters'),
+  restriction('play Character cards with a base cost of (\\d+) or more', 'noPlayCharacters', (m) => ({ minCost: Number(m[2]) })),
+  restriction('add Life cards to (?:your|their) hand using (?:your|their) own effects', 'noLifeToHand'),
+  restriction('attack (?:a|your) Leader', 'noAttackLeader'),
+  restriction('draw cards using (?:your|their) own effects', 'noDrawByEffect'),
+  restriction('set DON!! cards as active using Character effects', 'noSetDonActiveByCharacter'),
+  restriction('play cards from (?:your|their) hand', 'noPlayFromHand'),
+  restriction('activate \\[Blocker\\]', 'noBlocker'),
   [
     /^the next time you play (.+?) from your hand during this turn, the cost will be reduced by (\d+)$/i,
     (m) => {

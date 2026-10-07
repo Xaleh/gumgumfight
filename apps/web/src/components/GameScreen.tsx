@@ -1965,11 +1965,11 @@ function Prompt(props: {
             <div className="btn-row center">
               {!pending.cannot && (
                 <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                  Pagar e usar
+                  {pending.drawUpTo ? 'Comprar 1 carta' : 'Pagar e usar'}
                 </button>
               )}
               <button className={`btn big${pending.cannot ? ' primary' : ''}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-                Não usar
+                {pending.drawUpTo ? 'Parar' : 'Não usar'}
               </button>
             </div>
             {cancel && <div className="btn-row center">{cancel}</div>}

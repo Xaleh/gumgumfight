@@ -41,8 +41,9 @@ export interface ReplayFile {
    * 8: "rest … DON!! cards or Characters" oferece a substituição de rest (`answer`), recusada nos antigos.
    * 9: a Vida inicial com a carta do topo do deck por baixo e o "at the start of the game" do Líder
    *    depois da escolha de quem começa, com escolha (`choose`); os antigos usam `legacySetup`.
+   * 10: "draw up to N cards" pergunta antes de cada carta se compra (`answer`); nos antigos, sim.
    */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];

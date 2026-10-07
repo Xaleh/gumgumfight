@@ -41,7 +41,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Jogar por efeito (mão, trash, deck, Vida) (11) | `playFrom`, `playThis`, `playRevealed`, `handPlayOrLife`, `opponentPlays` | Existe |
 | Negar efeitos / negar [On Play] (12) | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated` | Existe (ver [On K.O.] acima) |
 | Regras de Líder (deck, DON!!, início da partida) (12) | `leaderRule` (`donDeck`, `deckOutWin`, `startStage`, `deckMaxCost`…); `startStage` vira, em `startOfGame`, um efeito do Líder com `playFrom` (deck, até 1) + `shuffleDeck`, seguido do frame `startGame` (mãos e mulligan) | Existe |
-| Restrição imposta ao oponente ("your opponent cannot ...") (12) | `restrict` vale só para quem controla o efeito; `staticTaunt` | Falta como primitiva genérica (2 cartas resolvidas com `staticTaunt`) |
+| Restrição imposta ao oponente ("your opponent cannot ...") (12) | `restrict{opponent, duration}`; `staticTaunt` | Existe (DV-32): restrição ao controlador ou ao oponente, neste turno ou até o fim do próximo turno do oponente; as 2 cartas "cannot attack any card other than …" seguem com `staticTaunt` |
 | Copiar/ganhar efeitos de outra carta | — | Falta (0 cartas hoje) |
 | Gatilho de carta fora do campo ("when this card is removed from Life", na mão, no trash) | — | Falta (0 cartas hoje) |
 
@@ -132,7 +132,7 @@ Colunas: **types** = linha em types.ts; **engine** = `case` em `execStep`.
 ### 2.1 Comprar, olhar e buscar no deck
 | do | parâmetros | semântica | types | engine |
 |---|---|---|---|---|
-| `draw` | count | Compra N (bloqueado por restrição `noDrawByEffect`; emite `drawByEffect`) | 494 | 2246 |
+| `draw` | count, upTo? | Compra N (bloqueado por restrição `noDrawByEffect`; emite `drawByEffect`). Com `upTo` ("draw up to N", 4-5-4, DV-31): uma por vez, perguntando antes de cada uma (`confirm` com `drawUpTo`); "não" encerra | 494 | 2246 |
 | `drawUntil` | count | "Draw cards so that you have N cards in your hand" | 619 | 3852 |
 | `drawPerMatching` | spec | Compra 1 por carta sua que casa com `spec` | 518 | 2927 |
 | `drawEventCount` | returned? | Compra `eventCount` cartas (ex.: devolvidas ao deck) | 581 | 3255 |
@@ -214,7 +214,7 @@ emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 | `trashFaceUpLife` | — | Descarta todas as Vidas viradas para cima | 585 | 3319 |
 | `lifeToHand` | count, choose? | Vida → mão (topo ou topo/fundo); bloqueado por `noLifeToHand` | 629 | 3687 |
 | `opponentLifeToHand` | count | Vida do oponente → mão dele | 667 | 3587 |
-| `handToLife` | upTo, filter?, faceUp?, fromTrash?, trashOnly?, choose? | Mão (ou descarte) → topo/fundo da Vida, opcionalmente virada para cima | 632 | 3701 |
+| `handToLife` | upTo, filter?, faceUp?, fromTrash?, trashOnly?, choose? | Mão (ou descarte) → topo/fundo da Vida, opcionalmente virada para cima. Com filtro, a carta da mão é revelada (nome no log público, 11-2-1, DV-33); sem filtro vai escondida | 632 | 3701 |
 | `handPlayOrLife` | filter, from? | "Select … from your hand and play it or add it to the top of your Life cards face-up" | 516 | 2890 |
 | `fieldToLife` | target, choose?, faceUp? | Personagem do campo → topo/fundo da Vida do dono (`faceUp`: "face-up", vai para `lifeFaceUp`, pública; proteção + substituição + `characterRemoved` via `removeFromField`) | 634 | 3733 |
 | `addLifeFromDeck` | count | Topo do deck → topo da Vida | 729 | 3896 |
@@ -306,7 +306,7 @@ Infra: `playFree` :1912 (Personagem → frame `play` com `byEffect`; Stage subst
 ### 2.12 Restrições e proteções
 | Primitivo | Forma | Onde vale |
 |---|---|---|
-| `restrict` {kind, minCost?} (types 601, engine 3412) | `RestrictionKind` (types.ts:359): `noPlayCharacters`, `noPlayFromHand`, `noLifeToHand`, `noAttackLeader`, `noDrawByEffect`, `noSetDonActiveByCharacter`. **Sempre para quem controla o efeito e até o fim do turno** (`state.restrictions`, limpo em :1421) | `restricted` :754, `playBlocked` :759, `playError` :764, `attackError` :699, `draw` :2247, `lifeToHand` :3688, `setDonActive` :2344 |
+| `restrict` {kind, minCost?, opponent?, duration?} | `RestrictionKind`: `noPlayCharacters`, `noPlayFromHand`, `noLifeToHand`, `noAttackLeader`, `noDrawByEffect`, `noSetDonActiveByCharacter`, `noBlocker`. `Restriction.player` = quem fica restrito: o controlador ("you cannot") ou, com `opponent`, o oponente ("your opponent cannot"). Até o fim do turno ou, com `duration: 'nextOpponentTurn'`, até o fim do próximo turno do oponente (`Restriction.untilTurn`; `endTurn` remove as vencidas) (DV-32) | `restricted` :754, `playBlocked` :759, `playError` :764, `attackError` :699, `draw` :2247, `lifeToHand` :3688, `setDonActive` :2344 |
 | `cannotAttack` (691/3845) | modificador `cannotAttack` | `attackError` :694 |
 | `cannotAttackCharacters` (580/3250) | "this Leader cannot attack Characters with base cost ≤ N" | `attackError` :700-703 |
 | `attackTax` (564/3136) | "cannot attack unless your opponent trashes N" | `attackError` :722; ataque :1317-1318 |
@@ -490,7 +490,7 @@ Leitura do texto: `parseEvent` parser.ts:2407-2488.
 | Blocker ("cannot activate [Blocker]" com poder/custo, "when attacks") | 1020, 1023, 1579, 1583, 1752, 1877-1887 | `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock` |
 | Proteções ("cannot be K.O.'d … during this turn", "cannot be rested", "cannot attack") | 1217, 1221, 1229, 1690, 1771, 1775, 1801, 1891 | `cannotBeKO`, `cannotBeRested`, `cannotAttack` |
 | Negar | 1013, 1236, 1314, 1525, 1609, 1615 | `negate`, `negateOnPlay` |
-| Restrições ("you cannot …") e desconto | 1616-1627 | `restrict`, `nextPlayDiscount` |
+| Restrições ("you cannot …", "your opponent cannot …", função `restriction`) e desconto | 1616-1627 | `restrict`, `nextPlayDiscount` |
 | Comprar / descartar / mão | 935-936, 1140-1148, 1188, 1203, 1398, 1450-1465, 1463, 1698, 1734, 1744-1756, 1784, 1797, 1842 | `draw`, `trashFromHand`, `opponentDiscards`, `handToDeck`, `drawUntil`, … |
 | Buscar/olhar/revelar deck | 1211, 1321, 1325, 1458, 1484, 1491, 1497, 1605, 1686-1687, 1760, 1900 (+ `parseBody` :2096) | `search`, `tutor`, `arrangeTop`, `revealTop`, `playRevealed`, `chooseCost` |
 | Vida | 937, 996, 1059, 1061, 1170-1172, 1329, 1336, 1476, 1505, 1549, 1554-1560, 1586, 1592, 1694, 1746, 1805-1818, 1838, 1876 | `handToLife`, `fieldToLife`, `lifeToHand`, `trashLife`, `peekLife`, `arrangeLife`, … |
@@ -533,7 +533,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 2 | "cannot be removed from the field by effects" | **Existe** (só "by your opponent's effects") | 1 / 11 | `staticNoRemoval` / `aura.noRemoval` → `removalBlocked` (:4320). Não há versão temporária ("during this turn") — 0 cartas. |
 | 3 | "cannot be K.O.'d in battle" | **Existe** | 8 / 19 | `staticNoBattleKO`, `noBattleKOVsAttribute`, `noBattleKOByLeader`, `aura.noBattleKO`, `cannotBeKO{inBattle}`. |
 | 4 | "cannot be K.O.'d by your opponent's effects" | **Existe** (DV-13 corrigida) | 7 / 17 | `staticNoEffectKO: 'opponent'` (também `aura.noEffectKO` e `cannotBeKO{byEffect}`); `koProtected` recebe quem nocauteia (`byPlayer`) e só protege do oponente. "by effects" (`true`) continua protegendo também do próprio efeito e dos custos de K.O. |
-| 5 | "your opponent cannot activate [Blocker]" | **Existe** | 9 / 20 | `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock`. |
+| 5 | "your opponent cannot activate [Blocker]" | **Existe** | 9 / 20 | `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock`; "… during this turn" (P-097): `restrict` `noBlocker` com `opponent`. |
 | 6 | "gains the effect(s) of" / copiar efeitos | **Não existe** | 0 / 0 | Só há cópia de **poder base** (`basePower.copy`, `staticBasePower:'leader'`, `aura.basePowerCopyLeader`). |
 | 7 | Trocar poder | **Existe** | 0 / 3 | `swapBasePower` (troca poder base). |
 | 8 | "When this card is removed from Life" | **Não existe** | 0 / 0 | `emit` só olha cartas em campo; `lifeRemoved` não carrega qual carta saiu. "When a card is removed from your/opponent's Life" existe (0 / 3). |
@@ -545,7 +545,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 14 | Negar efeitos de Personagem/Líder | **Existe** | 1 / 15 | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated`. `isNegated` desliga habilidades e palavras impressas, inclusive o [On K.O.] (conferido em `koCharacter` antes de a carta sair do campo; DV-07 corrigida). |
 | 15 | Vida virada para cima | **Existe** (DV-18 corrigida) | 12 / 48 | Há `lifeFaceUp`, `lifeFace`, `handToLife{faceUp}`, `fieldToLife{faceUp}`, `search{toLife}`, custo `ownToLife`, `trashFaceUpLife`, `faceUpLifeMin`, regra `faceUpLifeToDeck`. `fieldToLife` com "face-up": ~16 cartas na base completa (OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103…), 4 na local (ST07-017, ST09-015, OP06-103, P-085). Quem tira carta da Vida (`trashLife`, `lifeToTrash`, `lifeTrashUntil`, `opponentLifeToBottom`, [Banish], `detach`…) a tira também de `lifeFaceUp`. |
 | 16 | [End of Your Opponent's Turn] / início do turno do oponente / início do Main Phase | **Existe** (DV-30) | 0 / 0 | Timings `endOfOpponentTurn`, `startOfOpponentTurn`, `startOfMainPhase`. |
-| 17 | Restrições ao oponente ("your opponent cannot play / attack …") | **Não existe** como primitivo | 1 / 2 | `Restriction.player` é sempre quem controla o efeito (:3412) e dura só o turno. As 2 cartas ("cannot attack any card other than …") usam `staticTaunt`. |
+| 17 | Restrições ao oponente ("your opponent cannot play / attack …") | **Existe** (DV-32) | 0 / 0 (+ P-097) | `restrict{opponent, duration}`: quem fica restrito e até quando (este turno ou o fim do próximo turno do oponente). As 2 cartas "cannot attack any card other than …" usam `staticTaunt`. |
 | 18 | Ordem de efeitos automáticos simultâneos | **Não existe** | — | `emit`/`pushAbilities` empilham em ordem fixa (jogador 0 → 1, ordem do campo; pilha LIFO); o jogador do turno não escolhe a ordem nem resolve os seus primeiro. |
 | 19 | "Your opponent rests N active DON!! at the start of their next Main Phase" | **Aproximado** | — | Lido como `skipRefreshDon` (parser.ts:1084). |
 | 20 | Virar Personagem do oponente em `restDonOrCharacter` | **Existe** (DV-15 corrigida) | — | `restCard(state, uid, controller, source)`: respeita `staticNoRest`, oferece a substituição `rest` e emite `restedByEffect`. |

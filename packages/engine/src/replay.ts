@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 9;
+export const REPLAY_VERSION = 10;
 
 /**
  * Configuração para refazer um replay da versão `version`: até a versão 8, a preparação antiga
@@ -48,7 +48,10 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * desvirar e comprar, e os "at the end of this turn" esperam também o que os [End of Your Turn]
  * dispararam e incluem os criados na própria End Phase (DV-28/29). Nenhuma carta da base tem efeito de
  * início de turno nem cria efeito adiado na End Phase; um replay antigo com essas combinações pode
- * tomar outro rumo.)
+ * tomar outro rumo.) Até a versão 9, "draw up to N cards" comprava as N sem perguntar; a pergunta
+ * "comprar mais 1?" (4-5-4) é respondida com sim. (Também desde a versão 10, sem decisão nova:
+ * "your opponent cannot …" e "until the end of your opponent's next turn" nas restrições a um
+ * jogador, e a carta da mão posta na Vida por um efeito com exigência é revelada no log.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -65,6 +68,9 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     }
     if (p.kind === 'confirm' && p.cannot) {
       return next?.type === 'answer' && !next.yes && next.player === p.player ? null : { type: 'answer', player: p.player, yes: false };
+    }
+    if (p.kind === 'confirm' && p.drawUpTo) {
+      return next?.type === 'answer' && next.player === p.player ? null : { type: 'answer', player: p.player, yes: true };
     }
     if (p.kind === 'confirm' && replacementAsked()) {
       return next?.type === 'answer' && next.player === p.player ? null : { type: 'answer', player: p.player, yes: false };

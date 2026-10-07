@@ -40,7 +40,7 @@ Princípio: **toda decisão cuja existência depende de uma área secreta abre s
 ## Casos para conferir
 
 - Log: as mensagens não podem diferir entre "tinha e recusou" e "não tinha" (campo `secret` do log em `engine.ts`).
-- Revelação obrigatória (CR 11-2-1): a carta buscada do deck para a mão precisa aparecer para o oponente (no log e/ou animação), e a mão comprada não.
+- Revelação obrigatória (CR 11-2-1): a carta buscada do deck para a mão precisa aparecer para o oponente (no log e/ou animação), e a mão comprada não. O mesmo vale para a carta da mão posta na Vida por um efeito com exigência ("Reveal up to 1 Character card with a cost of 5 from your hand and add it to the top of your Life cards"): o nome sai no log público (DV-33). Sem exigência ("add up to 1 card from your hand …") ela vai escondida, como a carta que vai do deck para a Vida.
 - Ordem das cartas devolvidas ao fundo do deck (CR 3-1-8): o oponente não deve ver a ordem.
 - Cartas "olhadas" (CR 11-3-1) só aparecem para quem usou o efeito; espectador comum segue a visão pública; o perfil Streamer vê tudo.
 
@@ -48,4 +48,4 @@ Princípio: **toda decisão cuja existência depende de uma área secreta abre s
 
 Ver a seção "Regra de simulador" acima.
 
-Divergências deste tema: DV-33 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: nenhuma aberta (corrigida: DV-33) (detalhes em [../divergencias.md](../divergencias.md)).

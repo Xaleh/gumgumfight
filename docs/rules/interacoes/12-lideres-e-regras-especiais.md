@@ -28,4 +28,4 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 Regras de Líder em `leaderRule` (DON!! deck, vitória por deck 0, Stage inicial, custo máximo do deck…). O Stage inicial (`startStage`, OP13-079 Imu) resolve depois da escolha de quem começa, a partir de quem joga primeiro, como uma busca no deck com "up to 1" seguida de embaralhar, antes de comprar a mão (`startOfGame`). Negação por `negate`/`negateOnPlay`. Vários efeitos que fixam o poder base: `basePowerOf` usa o maior (ST34-004, OP17-008).
 
-Divergências deste tema: DV-32, DV-34 (corrigidas: DV-20, DV-25) (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-34 (corrigidas: DV-20, DV-25, DV-32) (detalhes em [../divergencias.md](../divergencias.md)).

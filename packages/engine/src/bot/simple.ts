@@ -65,8 +65,10 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
     case 'chooseFirst':
       return { type: 'answer', player, yes: true };
 
-    // Paga custos opcionais quando dá; sem como pagar, só resta recusar.
+    // Paga custos opcionais quando dá; sem como pagar, só resta recusar. "Draw up to N": compra
+    // enquanto o deck tiver folga (o deck vazio perde a partida).
     case 'confirm':
+      if (pending.drawUpTo) return { type: 'answer', player, yes: me.deck.length > 5 };
       return { type: 'answer', player, yes: !pending.cannot && !ownRemoval(state, player) };
 
     // Carta da Vida: ativa o [Trigger] quando há um; senão só coloca na mão.
