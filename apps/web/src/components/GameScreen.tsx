@@ -45,11 +45,12 @@ import {
 } from './Online';
 
 /**
- * Modo 'don': `count` DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). Sem `step`, a faixa
- * central mostra a barra de ações (Anexar ao Líder / a um Personagem / Cancelar) e a mesa segue normal; com
- * `step: 'character'`, só os Personagens que podem receber DON!! ficam destacados e o toque num deles anexa.
+ * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
+ * cada DON!! tocado na fileira, para marcar exatamente ele. Sem `step`, a faixa central mostra a barra de ações
+ * (Anexar ao Líder / a um Personagem / Cancelar) e a mesa segue normal; com `step: 'character'`, só os
+ * Personagens que podem receber DON!! ficam destacados e o toque num deles anexa.
  */
-type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; count: number; step?: 'character' };
+type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; picked: number[]; step?: 'character' };
 /** attached = DON!! anexado numa carta, arrastado de volta para a área de custo (detachDon). */
 type DragKind = 'hand' | 'attacker' | 'don' | 'attached';
 interface Drag {
@@ -63,6 +64,8 @@ interface Drag {
   insert?: number;
   /** Quantos DON!! estão sendo arrastados juntos. */
   count?: number;
+  /** Posições na fileira dos DON!! arrastados (ficam apagados enquanto o arrasto dura). */
+  dons?: number[];
 }
 type Sheet = null | 'menu' | 'log' | 'tools' | 'hand' | { trash: PlayerId };
 
@@ -368,8 +371,10 @@ function Table({
     if (!myTurnIdle) setMode(null);
     if (mode?.kind === 'don' && human !== null) {
       const max = state.players[human].donActive;
-      if (max === 0) setMode(null);
-      else if (mode.count > max) setMode({ ...mode, count: max });
+      // DON!! que saíram da fileira (foram anexados ou virados) deixam de estar marcados.
+      const picked = mode.picked.filter((i) => i < max);
+      if (picked.length === 0) setMode(null);
+      else if (picked.length !== mode.picked.length) setMode({ ...mode, picked });
     }
   }, [myTurnIdle, state, human, mode]);
   useEffect(() => {
@@ -545,12 +550,12 @@ function Table({
     }
     if (mode?.kind === 'don' && mode.step === 'character') {
       if (canReceiveDon(uid, 'character')) {
-        attachDons(uid, mode.count);
+        attachDons(uid, mode.picked.length);
         setMode(null);
         return;
       }
       // Tocou fora dos alvos: volta para a barra de ações, com os DON!! ainda marcados.
-      setMode({ kind: 'don', count: mode.count });
+      setMode({ kind: 'don', picked: mode.picked });
       return;
     }
     // Carta escondida (mão do oponente) não abre.
@@ -584,14 +589,15 @@ function Table({
     return kind === 'leader' ? isLeader : !isLeader;
   };
 
-  /** Toque num DON!! ativo: marca mais um (ou desmarca, se já estava marcado). */
+  /** Toque num DON!! ativo: marca exatamente aquele (ou desmarca, se já estava marcado). */
   const onDon = (player: PlayerId, index: number) => {
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
+    if (index < 0 || index >= max) return;
     setMode((m) => {
-      const cur = m?.kind === 'don' ? m.count : 0;
-      const next = Math.min(index < cur ? cur - 1 : cur + 1, max);
-      return next > 0 ? { kind: 'don', count: next, step: m?.kind === 'don' ? m.step : undefined } : null;
+      const cur = m?.kind === 'don' ? m.picked : [];
+      const picked = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index].sort((a, b) => a - b);
+      return picked.length > 0 ? { kind: 'don', picked, step: m?.kind === 'don' ? m.step : undefined } : null;
     });
   };
 
@@ -600,7 +606,8 @@ function Table({
     mode?.kind === 'don' && human !== null
       ? (() => {
           const me = state.players[human];
-          const count = mode.count;
+          const { picked } = mode;
+          const count = picked.length;
           return (
             <DonBar
               count={count}
@@ -611,8 +618,8 @@ function Table({
                 attachDons(me.leader.uid, count);
                 setMode(null);
               }}
-              onCharacter={() => setMode({ kind: 'don', count, step: 'character' })}
-              onBack={() => setMode({ kind: 'don', count })}
+              onCharacter={() => setMode({ kind: 'don', picked, step: 'character' })}
+              onBack={() => setMode({ kind: 'don', picked })}
               onCancel={() => setMode(null)}
             />
           );
@@ -631,6 +638,8 @@ function Table({
     ay: number;
     uid: string | null;
     kind: DragKind | null;
+    /** Posição na fileira do DON!! ativo pressionado. */
+    don?: number;
     timer: ReturnType<typeof setTimeout>;
     moved: boolean;
     /** Começou na própria mão: deslizar ergue a carta sob o dedo. */
@@ -683,6 +692,7 @@ function Table({
     if (!dragEl && !cardEl) return;
     const uid = (dragEl ?? cardEl)!.dataset.uid ?? null;
     const kind = (dragEl?.dataset.drag as DragKind | undefined) ?? null;
+    const don = dragEl?.dataset.don !== undefined ? Number(dragEl.dataset.don) : undefined;
     const hand = Boolean(cardEl && el.closest('.hand.bottom'));
     if (press.current) clearTimeout(press.current.timer);
     if (hand && uid) setLifted(uid);
@@ -693,6 +703,7 @@ function Table({
       ay: e.clientY,
       uid,
       kind,
+      ...(don !== undefined ? { don } : {}),
       timer: armLongPress(cardEl?.dataset.uid ?? null),
       moved: false,
       hand,
@@ -730,8 +741,11 @@ function Table({
     const startDrag = (p: NonNullable<typeof press.current>, e: PointerEvent) => {
       clearTimeout(p.timer);
       const m = modeRef.current;
-      const count = p.kind === 'don' && m?.kind === 'don' ? m.count : 1;
-      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null, count };
+      // Arrastar um DON!! marcado leva todos os marcados; um DON!! sem marca vai sozinho.
+      const marked = m?.kind === 'don' ? m.picked : [];
+      const dons = p.kind !== 'don' ? [] : p.don !== undefined && marked.includes(p.don) ? marked : p.don !== undefined ? [p.don] : marked;
+      const count = p.kind === 'don' ? Math.max(1, dons.length) : 1;
+      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null, count, ...(dons.length ? { dons } : {}) };
       setLifted(null);
       setZoom(null);
       setMode(null);
@@ -817,7 +831,7 @@ function Table({
     onHover: setHovered,
     onDon,
     onTrash: (p: PlayerId) => setSheet({ trash: p }),
-    donPicked: (p: PlayerId) => (p === human && drag?.kind === 'don' ? (drag.count ?? 1) : p === human && mode?.kind === 'don' ? mode.count : 0),
+    donPicked: (p: PlayerId) => (p === human && drag?.kind === 'don' ? (drag.dons ?? []) : p === human && mode?.kind === 'don' ? mode.picked : []),
     donHighlight: (p: PlayerId) =>
       p === human && (mode?.kind === 'don' || drag?.kind === 'don' || (myTurnIdle && has((a) => a.type === 'attachDon'))),
     donDrop: (p: PlayerId) => p === human && drag?.kind === 'attached' && drag.over === 'don',
@@ -988,7 +1002,7 @@ function Table({
               setZoom(null);
               setSelected(null);
             }}
-            donCount={mode?.kind === 'don' ? mode.count : 0}
+            donCount={mode?.kind === 'don' ? mode.picked.length : 0}
             onAttachDons={(target, n) => {
               attachDons(target, n);
               setMode(null);
