@@ -288,7 +288,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
           ← Menu
         </button>
         <h2>Construtor de decks</h2>
-        <SettingsControls compact />
+        <SettingsControls />
       </header>
 
       {error && (

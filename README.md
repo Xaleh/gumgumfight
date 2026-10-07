@@ -2,7 +2,7 @@
 
 Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](https://duels.ink/) (Lorcana).
 
-> **Status:** partidas contra um bot, bot x bot, replays, **multiplayer online** (salas privadas, fila casual e
+> **Status:** partidas contra um bot, replays, **multiplayer online** (salas privadas, fila casual e
 > ranqueada) e **torneios** (suíço com top cut e eliminação simples, com melhor de 3 e de 5). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
 > com textos em português (tradução automática) ou inglês e imagens opcionais.
 
@@ -158,7 +158,7 @@ Decks prontos (`data/decks`) não são alterados: ao mexer em um, o construtor c
 
 ### Formatos
 
-A partida é sempre num formato, escolhido no menu, e os dois decks precisam valer nele (contra o bot, bot x bot,
+A partida é sempre num formato, escolhido no menu, e os dois decks precisam valer nele (contra o bot,
 filas e salas online; quem entra numa sala privada joga no formato dela). O servidor confere de novo antes de
 começar uma partida online e antes de gravar uma partida nas estatísticas.
 
@@ -181,8 +181,8 @@ comunidade": dá para jogar com eles e duplicá-los.
 
 No menu, **📈 Estatísticas** mostra vitórias por Líder, por matchup (Líder x Líder) e por carta, com filtros por
 formato (Standard ou Extra Grand Battle, escolhido no menu antes da partida), fila (casual ou ranqueada), oponente
-(bot ou jogador), ordem do turno, período, tier e "só as minhas partidas". A opção "Bots (simulações)" mostra as
-partidas bot x bot, que ficam fora das estatísticas de pessoas.
+(bot ou jogador), ordem do turno, período, tier e "só as minhas partidas". Partidas bot x bot gravadas por versões
+antigas ficam fora das estatísticas de pessoas (só pelo filtro `by=bot` da API).
 
 - **Coleta confiável:** no fim da partida o navegador envia o replay (seed, listas e ações). O servidor refaz a
   partida com o motor e só grava o que a simulação confirma; um replay que não confere é recusado (422). Assim, a
@@ -227,10 +227,8 @@ No menu, a aba **Online** tem a fila **casual**, a **ranqueada** e as **salas pr
 - **Relógio:** cada jogador tem **17:30** na partida inteira. O tempo só corre quando a ação ou a decisão (incluindo
   mulligan, Blocker, Counter e escolhas de efeitos) é daquele jogador. Sem tempo, ele perde. Se o jogador da vez ficar
   2 minutos desconectado, perde por abandono.
-- **Ranqueada:** só com login Google e sem modo manual: decks com cartas ⚙ (efeito ainda não automatizado) não entram na
-  fila, e as ferramentas manuais ficam bloqueadas. O pareamento junta recompensas parecidas e a faixa abre com o tempo de
-  espera. No casual e nas salas privadas as ferramentas manuais funcionam para o perfil **Dev**, e o que é feito com
-  elas aparece no log do oponente (cartas movidas entre zonas escondidas aparecem como "uma carta").
+- **Ranqueada:** só com login Google e só com decks sem cartas ⚙ (efeito ainda não automatizado). O pareamento junta
+  recompensas parecidas e a faixa abre com o tempo de espera.
 - **Sem desfazer, Auto ou pausa** no online. Mensagens rápidas (emotes de uma lista fixa), revanche nas salas privadas e
   o replay completo para baixar no fim.
 - **Transporte:** SSE (`EventSource`) do servidor para o navegador e POST para as ações. Funciona atrás do Nginx / Nginx
@@ -276,10 +274,6 @@ muda o próprio perfil, exceto para se promover a Dev.
 Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas funções aparecem apenas para o perfil
 **Dev**:
 
-- **Ferramentas manuais** na partida (executar efeitos de cartas à mão, mover cartas entre zonas, mexer em DON!!
-  e Vida, ver o topo do deck). O servidor recusa ações manuais nas partidas online de quem não é Dev (403), além
-  de já recusá-las na ranqueada. Para os outros perfis, uma carta com efeito ainda não automatizado (⚙) só mostra
-  um aviso e a partida segue sem aplicar o efeito.
 - A tela **Cobertura das cartas** (o endpoint `GET /api/coverage` continua público).
 - **Opções de teste** no menu (seed do embaralhamento e carregar um replay). Baixar o replay de uma partida
   continua para todos, para mandar a um Dev ao relatar um problema.
@@ -358,22 +352,22 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
 
 Sem `GOOGLE_CLIENT_ID`, o botão não aparece e `POST /api/auth/google` responde 503.
 
-## Efeitos automáticos e modo manual
+## Efeitos automáticos e cartas ainda não automatizadas
 
 Toda carta da base é jogável:
 
 - **Efeito automatizado:** cartas com script (`packages/engine/src/cards/scripts.ts`) resolvem tudo sozinhas.
-- **Modo manual** (cartas com ⚙): o motor lê os momentos marcados no texto ([On Play], [When Attacking],
-  [Activate: Main], [Main], [Counter], [Trigger], [On K.O.], [End of Your Turn]…). Na hora certa, o jogo pausa e
-  mostra o efeito. Para o perfil **Dev**, libera as **ferramentas manuais**: comprar, nocautear, mover cartas entre
-  mão, campo, deck, descarte e Vida, virar/desvirar, ±poder, DON!!, ver o topo do deck e o descarte. O Dev
-  aplica o efeito e clica em **Concluir**. As ferramentas também ficam disponíveis no próprio turno, para
-  efeitos contínuos. Toda operação passa pelo motor, então nenhuma carta some nem duplica. Para os outros perfis
-  o jogo só avisa que o efeito ainda não é automático e segue sem aplicá-lo (botão **Continuar**).
+- **Ainda não automatizado** (cartas com ⚙): o motor lê os momentos marcados no texto ([On Play], [When Attacking],
+  [Activate: Main], [Main], [Counter], [Trigger], [On K.O.], [End of Your Turn]…). Na hora certa, o jogo pausa,
+  mostra o efeito e avisa que ele ainda não é automático; a partida segue sem aplicá-lo (botão **Continuar**).
+  O construtor de decks marca essas cartas, e elas não entram na ranqueada. (As antigas ferramentas manuais para
+  aplicar o efeito à mão foram retiradas: a interface não as tem mais e o servidor recusa a ação `manual` nas
+  partidas online para qualquer perfil; o motor ainda a aceita só para os testes.)
 - **Cobertura:** a tela "📊 Cobertura das cartas" (no menu, só para o perfil Dev) e `GET /api/coverage` mostram, por coleção,
   quantas cartas são automáticas, quantas são manuais e como está a tradução.
 
-Para checar a robustez depois de importar coleções novas (decks aleatórios de toda a base, bot x bot):
+Para checar a robustez depois de importar coleções novas (decks aleatórios de toda a base, simulações bot x bot
+na linha de comando):
 
 ```bash
 npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a URL de /api/cards
@@ -506,11 +500,12 @@ desenhada é usada automaticamente.
 
 ### Textos em português
 
-Cada jogador escolhe "Português" ou "English" no menu ou durante a partida (a escolha fica salva no navegador).
+Cada jogador escolhe "Português" ou "English" em **⚙️ Configurações** (modal no menu) ou no menu da partida (a escolha
+fica salva no navegador).
 
 ### Tema escuro
 
-Em "Configurações" (no menu ou durante a partida), "Tema" alterna entre **Automático** (segue o tema do aparelho,
+Em **⚙️ Configurações** (modal aberto pelo botão no menu, ou no menu da partida), "Tema" alterna entre **Automático** (segue o tema do aparelho,
 inclusive quando ele muda), **Claro** e **Escuro**. A escolha fica salva no navegador e é aplicada antes da página
 carregar, sem piscar o tema claro. As cores das cartas, dos DON!! e dos dados não mudam com o tema.
 
@@ -582,7 +577,7 @@ npm run typecheck
 | POST   | `/api/tournaments/:id/matches/:matchId/play` | Abre ou entra na sala online do jogo atual da série (`{ roomId, token }`) |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,
-human), `by` (human = padrão, bot = simulações), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,
+human), `by` (human = padrão, bot = simulações bot x bot de versões antigas), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,
 `first` (first, second), `days`, `mine=1` e `deck`.
 
 ## Aviso

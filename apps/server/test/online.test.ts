@@ -276,7 +276,7 @@ describe('partidas online: filas', () => {
     expect(again.json().roomId).toBe(ma.roomId);
   });
 
-  it('ranqueada: só com login, sem cartas manuais e sem ferramentas manuais', async () => {
+  it('ranqueada: só com login e sem cartas com efeito ainda não automatizado', async () => {
     const { app, db } = setup();
     const anon = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'ranked', format: 'egb' } });
     expect(anon.statusCode).toBe(401);
@@ -313,8 +313,6 @@ describe('partidas online: filas', () => {
     room.attach(c.conn);
     const p = actingPlayer(c.view!)!;
     const t = p === 0 ? ma.token : mb.token;
-    const tools = await act(app, ma.roomId, t, 0, { type: 'manual', player: p, op: { op: 'draw', count: 1 } });
-    expect(tools.statusCode).toBe(403);
     // Desistência na ranqueada mexe na recompensa.
     await act(app, ma.roomId, t, 0, { type: 'concede', player: p });
     const diff = c.room.result.bounty.map((s: { before: number; after: number }) => s.after - s.before);
@@ -426,8 +424,8 @@ describe('partidas online: cancelar a ação e devolver DON!!', () => {
   }, 60_000);
 });
 
-describe('partidas online: ferramentas manuais', () => {
-  it('só o perfil Dev usa as ferramentas manuais (função de desenvolvimento)', async () => {
+describe('partidas online: ações manuais', () => {
+  it('a ação `manual` (mexer na mesa à mão) é recusada para todos, inclusive Dev', async () => {
     const { app, db } = setup();
     const login = (sub: string) => {
       const u = upsertGoogleUser(db, { sub, email: `${sub}@example.com`, emailVerified: true, name: sub, picture: null });
@@ -445,8 +443,6 @@ describe('partidas online: ferramentas manuais', () => {
     const room = getRoom(app, ma.roomId);
     const c = client(0);
     room.attach(c.conn);
-    // O vencedor do sorteio escolhe jogar primeiro; depois os mulligans: as ferramentas
-    // só valem na fase principal, no turno de quem age.
     {
       const v = c.view!;
       const w = actingPlayer(v)!;
@@ -459,30 +455,16 @@ describe('partidas online: ferramentas manuais', () => {
     }
     expect(c.view!.phase).toBe('main');
     const p = actingPlayer(c.view!)!;
-    const other = (1 - p) as PlayerId;
-    // Quem está na vez é Dev; o outro é Admin (o perfil é lido a cada ação).
     setUserRole(db, seats[p].id, 'dev');
-    setUserRole(db, seats[other].id, 'admin');
-    const draw = (seat: PlayerId, headers: Record<string, string>) =>
-      app.inject({
-        method: 'POST',
-        url: `/api/online/rooms/${ma.roomId}/action`,
-        headers,
-        payload: { t: seats[seat].token, seq: c.view!.actionCount, action: { type: 'manual', player: seat, op: { op: 'draw', count: 1 } } },
-      });
-    // Sem login (só o token da cadeira) não pode, mesmo no casual.
-    const anon = await draw(p, {});
-    expect(anon.statusCode).toBe(403);
-    expect(anon.json().error).toContain('Dev');
-    // Admin não é Dev: recusado antes de chegar ao motor.
-    const admin = await draw(other, seats[other].headers);
-    expect(admin.statusCode).toBe(403);
-    expect(admin.json().error).toContain('Dev');
-    // O Dev na vez usa as ferramentas normalmente.
     const hand = c.view!.players[p].hand.length;
-    const dev = await draw(p, seats[p].headers);
-    expect(dev.statusCode, dev.body).toBe(200);
-    expect(c.view!.players[p].hand.length).toBe(hand + 1);
+    const r = await app.inject({
+      method: 'POST',
+      url: `/api/online/rooms/${ma.roomId}/action`,
+      headers: seats[p].headers,
+      payload: { t: seats[p].token, seq: c.view!.actionCount, action: { type: 'manual', player: p, op: { op: 'draw', count: 1 } } },
+    });
+    expect(r.statusCode).toBe(400);
+    expect(c.view!.players[p].hand.length).toBe(hand);
   });
 });
 

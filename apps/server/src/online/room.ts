@@ -202,8 +202,6 @@ export class Room {
   private botTimer: ReturnType<typeof setTimeout> | null = null;
   /** Desde quando o jogador da vez está sem conexão. */
   private awaySince: number | null = null;
-  /** Ferramentas manuais: quantas cartas do topo do deck cada assento está olhando. */
-  private peek: [number, number] = [0, 0];
   private recent: [number[], number[]] = [[], []];
   private lastEmote: [number, number] = [0, 0];
   /**
@@ -326,9 +324,6 @@ export class Room {
     this.state = applyAction(this.state!, action);
     this.data.actions.push(action);
     this.lastAction = action;
-    // Olhar o topo do deck vale até a próxima ação que não seja das ferramentas manuais.
-    if (action.type !== 'manual') this.peek[action.player] = 0;
-    else if (action.op.op === 'peek') this.peek[action.player] = Math.max(0, Math.min(action.op.count, 50));
     this.running = this.state.phase === 'gameover' ? null : actingPlayer(this.state);
     if (this.running === null || this.connected(this.running)) this.awaySince = null;
     else this.awaySince ??= this.deps.now();
@@ -355,10 +350,8 @@ export class Room {
       return { ok: false, code: 400, error: 'Ação inválida.' };
     }
     if (action.player !== seat) return { ok: false, code: 403, error: 'Essa ação não é sua.' };
-    if (action.type === 'timeout') return { ok: false, code: 400, error: 'Ação inválida.' };
-    if (action.type === 'manual' && this.ranked) {
-      return { ok: false, code: 403, error: 'As ferramentas manuais não são permitidas na ranqueada.' };
-    }
+    // `timeout` é do relógio do servidor; `manual` (mexer na mesa à mão) não existe mais nas partidas online.
+    if (action.type === 'timeout' || action.type === 'manual') return { ok: false, code: 400, error: 'Ação inválida.' };
     if (this.data.actions.length >= MAX_ACTIONS) return { ok: false, code: 409, error: 'Partida longa demais.' };
     // Desistir vale a qualquer momento; o resto precisa da visão atual.
     if (action.type !== 'concede' && seq !== this.state.actionCount) {
@@ -369,7 +362,7 @@ export class Room {
     if (recent.length >= (this.deps.rateLimit ?? RATE_LIMIT)) return { ok: false, code: 429, error: 'Muitas ações em pouco tempo.' };
     recent.push(now);
 
-    const real = actionFromView(this.state, this.aliases, action, this.peekCards(seat));
+    const real = actionFromView(this.state, this.aliases, action);
     if (typeof real === 'string') return { ok: false, code: 422, error: real };
     try {
       // applyAction não muda o estado anterior: uma ação recusada não deixa rastro.
@@ -400,9 +393,8 @@ export class Room {
     if (!this.state || !this.aliases || this.state.phase === 'gameover' || this.running !== seat) return;
     try {
       // Decide pela visão do bot, como faria um jogador: sem espiar a mão do oponente.
-      const extra = this.peekCards(seat);
-      const view = viewFor(this.state, seat, this.aliases, extra);
-      const real = actionFromView(this.state, this.aliases, chooseBotAction(view, seat), extra);
+      const view = viewFor(this.state, seat, this.aliases);
+      const real = actionFromView(this.state, this.aliases, chooseBotAction(view, seat));
       if (typeof real === 'string') throw new Error(real);
       this.commit(real);
     } catch (e) {
@@ -414,11 +406,6 @@ export class Room {
         /* a partida já terminou */
       }
     }
-  }
-
-  private peekCards(seat: PlayerId): string[] {
-    const n = this.peek[seat];
-    return n && this.state ? this.state.players[seat].deck.slice(0, n) : [];
   }
 
   /** O jogador jogou o dado do sorteio: os outros veem o mesmo lançamento. */
@@ -569,13 +556,12 @@ export class Room {
       defs: newDefs,
       log: { from, entries },
       lastAction: this.lastAction ? aliasRefs(this.state, conn.seat, this.aliases, this.lastAction, extra) : null,
-      peek: conn.seat === null ? 0 : this.peek[conn.seat],
     };
   }
 
-  /** Cartas a mais na visão: o topo do deck espiado (jogador) ou as duas mãos (espectador com mãos). */
+  /** Cartas a mais na visão: as duas mãos (espectador com mãos). */
   private extraFor(conn: Connection): string[] {
-    if (conn.seat !== null) return this.peekCards(conn.seat);
+    if (conn.seat !== null) return [];
     if (conn.hands && this.state) {
       // Quem vê as mãos (streamer/admin) também vê a carta da Vida que o dono está olhando.
       const p = this.state.pending;

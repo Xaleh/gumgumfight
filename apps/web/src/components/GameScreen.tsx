@@ -10,15 +10,13 @@ import {
   HIDDEN_CARD,
   legalActions,
   locate,
-  manualAllowed,
   type Pending,
   type PlayerId,
   translateToPt,
   zoneOf,
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, isDev, type OnlineSeat, type WatchTarget } from '../api';
-import { useAuth } from '../auth';
+import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
@@ -29,7 +27,6 @@ import { CardView, type Highlight } from './CardView';
 import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
-import { ManualTools } from './ManualTools';
 import { useBoardMotion } from './Motion';
 import {
   EmoteBar,
@@ -67,7 +64,7 @@ interface Drag {
   /** Posições na fileira dos DON!! arrastados (ficam apagados enquanto o arrasto dura). */
   dons?: number[];
 }
-type Sheet = null | 'menu' | 'log' | 'tools' | 'hand' | { trash: PlayerId };
+type Sheet = null | 'menu' | 'log' | 'hand' | { trash: PlayerId };
 
 const LONG_PRESS_MS = 420;
 const DRAG_THRESHOLD = 9;
@@ -108,7 +105,7 @@ interface TableGame {
 
 type TableKind = GameSetup['mode'] | 'online';
 
-/** Partida no navegador: contra o bot, bot x bot ou replay. */
+/** Partida no navegador: contra o bot ou replay. */
 export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onExit: () => void; onRematch?: () => void }) {
   const game = useGame(setup);
   // Registra o resultado no servidor (que refaz a partida a partir das ações). Replays não contam de novo.
@@ -281,9 +278,6 @@ function Table({
   const { state, dispatch, human } = game;
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
-  const ranked = online?.room?.queue === 'ranked';
-  // Ferramentas manuais (mexer na mesa à mão) são função de desenvolvimento: só para o perfil Dev.
-  const dev = isDev(useAuth().user?.role);
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
@@ -323,7 +317,7 @@ function Table({
   const [sheet, setSheet] = useState<Sheet>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
-  const [showBotHand, setShowBotHand] = useState(kind === 'demo' || kind === 'replay' || watching);
+  const [showBotHand, setShowBotHand] = useState(kind === 'replay' || watching);
   const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
@@ -417,7 +411,6 @@ function Table({
     const t = setTimeout(() => setShowResult(true), 1200);
     return () => clearTimeout(t);
   }, [over]);
-  const manualOk = dev && human !== null && !ranked && manualAllowed(state, human);
 
   const has = useCallback((pred: (a: Action) => boolean) => legal.some(pred), [legal]);
   const canPlay = (uid: string) => myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid);
@@ -912,7 +905,6 @@ function Table({
                     human={human!}
                     onDispatch={dispatch}
                     onCancel={canCancel ? cancelAction : undefined}
-                    onTools={dev ? () => setSheet('tools') : undefined}
                     clock={online && !watching ? <OnlineClock online={online} player={human!} /> : undefined}
                   />
                 ) : mode && human !== null ? (
@@ -968,7 +960,6 @@ function Table({
           cancelHint={cancelHint}
           onCard={onCard}
           highlight={highlight}
-          onTools={dev ? () => setSheet('tools') : undefined}
         />
 
         <AttackArrow state={state} drag={drag} mode={mode} hovered={hovered} legal={legal} />
@@ -994,7 +985,6 @@ function Table({
             state={state}
             uid={zoom}
             legal={myTurnIdle ? legal : []}
-            canManual={manualOk}
             onCounter={canCounter(zoom) ? () => useCounter(zoom) : undefined}
             onClose={() => setZoom(null)}
             onDispatch={(a) => {
@@ -1012,10 +1002,6 @@ function Table({
             onAttackMode={(attacker) => {
               setMode({ kind: 'attack', attacker });
               setZoom(null);
-            }}
-            onTools={() => {
-              setZoom(null);
-              setSheet('tools');
             }}
           />
         )}
@@ -1036,11 +1022,6 @@ function Table({
               <button className="btn" onClick={() => setSheet('log')}>
                 📜 Histórico
               </button>
-              {manualOk && (
-                <button className="btn" onClick={() => setSheet('tools')}>
-                  ⚙ Ferramentas manuais
-                </button>
-              )}
               {(!isOnline || over) && (
                 <button className="btn" onClick={game.downloadReplay}>
                   ⤓ Baixar replay
@@ -1081,7 +1062,7 @@ function Table({
               </label>
             )}
             <div className="sheet-section">
-              <SettingsControls compact />
+              <SettingsControls />
             </div>
           </SheetFrame>
         )}
@@ -1131,19 +1112,6 @@ function Table({
         {sheet === 'log' && (
           <SheetFrame title="Histórico" onClose={() => setSheet(null)}>
             <LogPanel state={state} />
-          </SheetFrame>
-        )}
-
-        {sheet === 'tools' && human !== null && (
-          <SheetFrame title="Ferramentas manuais" onClose={() => setSheet(null)}>
-            <ManualPrompt state={state} onDone={() => dispatch({ type: 'manualDone', player: human })} />
-            {ranked ? (
-              <p className="muted">As ferramentas manuais não são permitidas na ranqueada.</p>
-            ) : manualOk ? (
-              <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} peek={online?.peek} />
-            ) : (
-              <p className="muted">As ferramentas ficam disponíveis no seu turno, num efeito manual ou na etapa de Counter.</p>
-            )}
           </SheetFrame>
         )}
 
@@ -1216,9 +1184,6 @@ function Table({
             )}
           </div>
           <CardDetail state={state} uid={detailUid} />
-          {manualOk && pending?.kind !== 'manual' && (
-            <ManualTools state={state} human={human!} selected={selected} onDispatch={dispatch} onSelect={setSelected} peek={online?.peek} />
-          )}
           <LogPanel state={state} />
         </aside>
       )}
@@ -1480,7 +1445,6 @@ function DecisionButton({
   human,
   onDispatch,
   onCancel,
-  onTools,
   clock,
   sheet,
 }: {
@@ -1492,8 +1456,6 @@ function DecisionButton({
   onDispatch: (a: Action) => void;
   /** A ação que pediu esta escolha ainda pode ser desfeita: botão Cancelar ao lado do de confirmar. */
   onCancel?: () => void;
-  /** Ferramentas manuais (perfil Dev) durante a etapa de Counter. */
-  onTools?: () => void;
   clock?: ReactNode;
   /** Dentro da folha da mão: botão largo. */
   sheet?: boolean;
@@ -1503,11 +1465,6 @@ function DecisionButton({
   const act = () => onDispatch(d.action(human));
   return (
     <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
-      {onTools && pending.kind === 'counter' && (
-        <button className="btn small defense-tools" onClick={onTools} title="Ferramentas manuais">
-          ⚙
-        </button>
-      )}
       {onCancel && pending.kind === 'selectTargets' && (
         <button className="end-turn defense cancel side" onClick={onCancel} title="Desfazer a ação e voltar ao estado anterior">
           <b>Cancelar</b>
@@ -1767,8 +1724,6 @@ function Prompt(props: {
   cancelHint?: string | null;
   onCard: (uid: string) => void;
   highlight: (uid: string) => Highlight;
-  /** Abre as ferramentas manuais (só o perfil Dev tem). */
-  onTools?: () => void;
 }) {
   const { state, human, picked, onDispatch, onCancel, cancelHint } = props;
   const { lang } = useSettings();
@@ -1915,29 +1870,15 @@ function Prompt(props: {
       // confronto de poder e perto da mão; a dica de uso fica logo acima do leque.
       return null;
     case 'manual': {
+      // Efeito ainda não automatizado (⚙): o jogo só avisa e segue sem aplicá-lo.
       const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
       const name = cardDef(state, pending.source).name;
-      // Sem as ferramentas manuais (perfil que não é Dev), o efeito ainda não automático é só avisado e pulado.
-      if (!props.onTools) {
-        return (
-          <PromptPill title={`⚙ Efeito ainda não automático: ${name}`} subtitle={`${text} (Este efeito não é aplicado.)`} clamp>
-            <div className="btn-row">
-              <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
-                Continuar
-              </button>
-            </div>
-          </PromptPill>
-        );
-      }
       return (
-        <PromptPill title={`⚙ Efeito manual: ${name}`} subtitle={text} clamp>
+        <PromptPill title={`⚙ Efeito ainda não automático: ${name}`} subtitle={`${text} (Este efeito não é aplicado.)`} clamp>
           <div className="btn-row">
             {cancel}
-            <button className="btn" onClick={props.onTools}>
-              Ferramentas
-            </button>
             <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
-              Concluir efeito
+              Continuar
             </button>
           </div>
         </PromptPill>
@@ -2067,33 +2008,12 @@ function PromptPill({
   );
 }
 
-function ManualPrompt({ state, onDone }: { state: GameState; onDone: () => void }) {
-  const { lang } = useSettings();
-  const pending = state.pending;
-  if (pending?.kind !== 'manual') return null;
-  const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
-  return (
-    <div className="manual-box">
-      <div className="prompt-title">⚙ Efeito manual: {cardDef(state, pending.source).name}</div>
-      <p className="effect">{text}</p>
-      <p className="muted small">
-        Ainda não é automático: aplique com as ferramentas abaixo (toque numa carta da mesa e depois em ⚙ para ver as opções
-        dela) e depois conclua. Se não se aplicar, só conclua.
-      </p>
-      <button className="btn primary" onClick={onDone}>
-        Concluir efeito
-      </button>
-    </div>
-  );
-}
-
 // ------------------------------------------------------------------ zoom da carta
 
 function CardZoom(props: {
   state: GameState;
   uid: string;
   legal: Action[];
-  canManual: boolean;
   /** Etapa de Counter: confirma o uso desta carta como Counter. */
   onCounter?: () => void;
   onClose: () => void;
@@ -2102,7 +2022,6 @@ function CardZoom(props: {
   donCount: number;
   onAttachDons: (target: string, count: number) => void;
   onAttackMode: (attacker: string) => void;
-  onTools: () => void;
 }) {
   const { state, uid, legal } = props;
   const { lang } = useSettings();
@@ -2120,12 +2039,12 @@ function CardZoom(props: {
   // Eventos: usar a carta (ou o Counter dela) é o texto dela, destacado sobre a carta.
   const eventPlay = isEvent ? play : undefined;
   const eventCounter = isEvent ? props.onCounter : undefined;
-  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || detach || props.canManual || (props.onCounter && !eventCounter));
+  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || detach || (props.onCounter && !eventCounter));
   const counter = counterValue(state, uid);
   const eventText = isEvent ? cardText(def, lang).text : '';
   // Habilidades ativáveis viram painéis brilhantes (modelo Pokémon TCG Pocket): em tela larga ficam ao lado da
   // carta, ligados a ela pela borda ciano; em tela estreita, sobre a parte de baixo da carta. Com painel na tela, o
-  // fundo escurece mais e as ações secundárias (DON!!, ferramentas) viram botões discretos para não competir.
+  // fundo escurece mais e as ações secundárias (DON!!) viram botões discretos para não competir.
   const hasPlates = activates.length > 0 || Boolean(eventPlay) || Boolean(eventCounter);
   const color = def.colors[0] ?? 'red';
 
@@ -2217,11 +2136,6 @@ function CardZoom(props: {
                 title="Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (até a carta atacar ou usar um efeito)"
               >
                 − 1 DON!! <small>({loose === 1 ? '1 pode voltar' : `${loose} podem voltar`})</small>
-              </button>
-            )}
-            {props.canManual && (
-              <button className={hasPlates ? 'btn small quiet' : 'btn small'} onClick={props.onTools}>
-                ⚙ Ferramentas manuais
               </button>
             )}
           </div>
