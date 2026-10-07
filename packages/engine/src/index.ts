@@ -22,3 +22,4 @@ export { normalizeTypeQuotes } from './text';
 export * from './view';
 export * from './status';
 export * from './replay';
+export { applyErrata, errataFor, ERRATA, type Errata } from './errata';

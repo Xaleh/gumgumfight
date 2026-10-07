@@ -41,7 +41,7 @@
       "types": [
         "Navy"
       ],
-      "text": "[Your Turn] When this Leader or 1 of your Characters is given a DON!! card, give up to 1 of your opponent's Characters with a cost of 7 or less -1 cost during this turn.",
+      "text": "[Your Turn] When this Leader or any of your Characters is given a DON!! card, give up to 1 of your opponent's Characters with a cost of 7 or less -1 cost during this turn.",
       "set": "OP02",
       "rarity": "L",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-002.jpg"
@@ -1495,7 +1495,7 @@
       "types": [
         "Impel Down"
       ],
-      "text": "[Your Turn] [Once Per Turn] When a DON!! card on your field is returned to your DON!! deck, this Leader gains +1000 power during this turn.",
+      "text": "[Your Turn] [Once Per Turn] When a DON!! card on the field is returned to your DON!! deck, this Leader gains +1000 power during this turn.",
       "set": "OP02",
       "rarity": "L",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-071.jpg"

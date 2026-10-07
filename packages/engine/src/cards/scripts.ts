@@ -209,7 +209,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
     ],
   },
   'ST02-013': {
-    // [Blocker] / [DON!! x1] [End of Your Turn] Set this card as active.
+    // [Blocker] / [DON!! x1] [End of Your Turn] Set this Character as active. (texto com errata)
     keywords: ['blocker'],
     abilities: [{ timing: 'endOfTurn', don: 1, steps: [{ do: 'setActive', target: 'self' }] }],
   },
@@ -383,7 +383,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
   // Sem efeito: ST04-007 Sheepshead, ST04-009 Ginrummy, ST04-012 Page One, ST04-013 X.Drake.
   // ST04-011 Black Maria: só [Blocker].
   'ST04-001': {
-    // [Activate: Main] [Once Per Turn] DON!! −7: Trash up to 1 of your opponent's Life cards.
+    // [Activate: Main] [Once Per Turn] DON!! −7: Trash up to 1 of your opponent's cards from the top of their Life cards. (texto com errata)
     abilities: [
       {
         timing: 'activateMain',

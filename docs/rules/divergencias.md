@@ -43,7 +43,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-31 | "Draw up to X" vira compra obrigatória | 4-5-4 | baixo | C15 |
 | DV-32 | Restrições ("you cannot ...") só valem para quem controla o efeito e só no turno | texto das cartas | baixo | C15 |
 | DV-33 | Mão → Vida com filtro não revela a carta | 11-2-1 | baixo | C15 |
-| DV-34 | Erratas oficiais não aplicadas ao texto das cartas | Errata oficial | médio | C16 |
+| DV-34 | Erratas oficiais não aplicadas ao texto das cartas (**corrigido**) | Errata oficial | médio | C16 |
 | DV-35 | README "Regras implementadas" desatualizado (corrigido) | — | baixo | — |
 
 ## Cards de correção no Trello
@@ -263,22 +263,17 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C16 — Dados e documentação
 
-**DV-34. Erratas oficiais não aplicadas ao texto das cartas** — médio
+**DV-34. Erratas oficiais não aplicadas ao texto das cartas** — médio — **corrigido**
 - Regra: a errata vale para todos os formatos e vence o texto impresso.
-- Atual: `data/cards` (e a importação da optcgapi) trazem o texto antigo. Conferido em `data/cards`:
-
-| Carta | Texto nos dados | Errata |
-|---|---|---|
-| OP01-002 Trafalgar Law | "return 1 of your Characters to your hand" | "to the owner's hand" |
-| OP01-003 Monkey.D.Luffy | "{Supernova} or {Straw Hat Crew} type" | "{Supernovas}" (o tipo certo; com "Supernova" o filtro de tipo pode falhar) |
-| OP02-002 Monkey.D.Garp | "When this Leader or 1 of your Characters is given a DON!! card" | "or **any** of your Characters" |
-| OP02-071 Magellan | "When a DON!! card on your field is returned" | "on **the** field" (vale também DON!! do oponente) |
-| ST02-013 Eustass"Captain"Kid | "Set this card as active" | "Set this **Character** as active" |
-| ST04-001 Kaido | "Trash up to 1 of your opponent's Life cards" | "Trash up to 1 of your opponent's cards **from the top** of their Life cards" |
-| ST14-014 Gum-Gum Giant Rifle | "If you have a Character with a cost of 8 or more" | "If **there is** a Character…" (inclui o lado do oponente) |
-
-  Erratas posteriores (fora de `data/cards`, entram pela importação): OP09-058 Special Muggy Ball (**o oponente escolhe**), OP13-119 Portgas.D.Ace (versão Wanted Poster: texto todo trocado), OP13-077 ("during this **battle**"), OP15-023 Arlong (sem "rested"), OP16-081 Otama ("If there is"), OP05-032 Pica (sem "up to"), OP03-054 e OP03-047 (posição do "you may"), OP14-009 e OP06-034 (tipos). Lista completa em [fontes.md](fontes.md).
-- Correto: tabela de erratas aplicada na importação (`apps/server/src/card-import.ts` / `optcgapi.ts`) e nos dados do repositório, com teste.
+- Agora: tabela `packages/engine/src/errata.ts` (`ERRATA`, `applyErrata`), com a troca exata de trecho (ou de tipo), a data e o link de cada aviso. É aplicada:
+  - no motor, em `buildCardDef` (o leitor lê o texto corrigido em qualquer origem);
+  - no servidor, em `upsertCards` (gravação) e na leitura das cartas do banco (`toCard` em `apps/server/src/db.ts`), o que corrige também as cartas já importadas em produção sem precisar reimportar;
+  - nos JSON de `data/cards`.
+- Cartas corrigidas (13): OP01-002, OP01-003, OP01-016, OP02-002, OP02-071, OP05-032, OP06-034 (tipo), OP13-077, OP14-009 (tipo), OP16-081, ST02-013, ST04-001, ST14-014. Mudam o jogo: Nami OP01-016 (busca qualquer carta {Straw Hat Crew}), Go All the Way to the Top!! OP13-077 ([Counter] dura a batalha), Otama OP16-081 e Gum-Gum Giant Rifle ST14-014 ("If there is…" olha os dois lados), Hyouzou OP06-034 ({Merfolk}), Law OP14-009 (deixa de ser {The Seven Warlords of the Sea}). Na Otama, a fonte também tinha perdido o sinal de "−2000".
+- Já vinham corrigidas da fonte (conferido em 07/10/2026): OP01-051, OP01-112, OP03-047, OP03-054, OP07-097, OP09-058, OP15-023 e o "up to" em massa de OP-01 e ST-01 a ST-04. OP13-119: a errata só vale para a impressão "Wanted Poster", e o texto da base já é o certo.
+- O leitor (`parser.ts`) e a tradução (`i18n/pt.ts`) ganharam as redações novas de Garp OP02-002 ("any of your Characters"), Magellan OP02-071 ("on the field") e Kaido ST04-001 ("from the top of their Life cards").
+- Testes: `packages/engine/test/errata.test.ts` e o teste "aplica a errata oficial…" em `apps/server/test/server.test.ts`.
+- Fora do escopo (dado da fonte, não errata): ST14-014 vem com o nome "Gum-Gum Giant Rifl" e o tipo "Straw Hat Cre" truncados.
 
 **DV-35. README "Regras implementadas" desatualizado** — baixo — **corrigido junto com esta base**
 - Diz que substituição, [End of Your Turn] e DON!! −X não existem; os três existem (timing `replace`, `endOfTurn`, `AbilityCost.donMinus`). Não menciona as limitações reais (C2). Atualizar e apontar para `docs/rules/`.
