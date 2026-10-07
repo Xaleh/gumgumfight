@@ -163,6 +163,16 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   app.get('/api/online/config', async () => ({ timeBankMs: TIME_BANK_MS, botRooms }));
 
+  /**
+   * Contadores do menu (conectados, partidas por modo, filas). Quem está com o menu
+   * aberto consulta a cada ~10 s, e essa consulta é o sinal que o conta em "conectados".
+   */
+  app.get('/api/online/stats', async (req) => {
+    const owner = viewerHash(req);
+    if (owner) lobby.touch(owner);
+    return lobby.stats();
+  });
+
   app.get('/api/online/active', async (req) => {
     const owner = viewerHash(req);
     return owner ? lobby.activeFor(owner) : [];

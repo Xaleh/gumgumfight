@@ -102,6 +102,20 @@ describe('modelos de frase', () => {
     expect(parseCard(card("This Character cannot be K.O.'d by effects.")).abilities[0]).toMatchObject({ staticNoEffectKO: true });
   });
 
+  it('"up to 1 of your [Shanks]" sem substantivo: Líder ou Personagem com esse nome (OP17-036, OP17-115, OP17-055)', () => {
+    const named = { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
+    expect(steps('[Counter] Up to 1 of your [Shanks] gains +4000 power during this battle.', { category: 'event', cost: 1 })).toEqual([
+      [{ do: 'power', target: { ...named, name: 'Shanks' }, amount: 4000, duration: 'battle' }],
+    ]);
+    expect(steps('[Main] Up to 1 of your [Rocks.D.Xebec] gains [Unblockable] during this turn.', { category: 'event', cost: 1 })).toEqual([
+      [{ do: 'gainKeyword', target: { ...named, name: 'Rocks.D.Xebec' }, keyword: 'unblockable', duration: 'turn' }],
+    ]);
+    // "[X] cards" continua valendo para o Líder; sem dono ("play up to 1 [Pacifista]"), o nome não inclui o Líder.
+    expect(steps('[On Play] Set up to 1 of your [Charlotte Linlin] cards as active.')).toEqual([
+      [{ do: 'setActive', target: { ...named, name: 'Charlotte Linlin' } }],
+    ]);
+  });
+
   it('texto desconhecido fica manual (linha a linha)', () => {
     const p = parseCard(card('[On Play] Draw 1 card.\n[When Attacking] Swap the universe.'));
     expect(p.unparsed).toEqual(['[When Attacking] Swap the universe.']);

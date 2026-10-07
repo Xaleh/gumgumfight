@@ -18,8 +18,8 @@ type Screen =
   | { name: 'stats' }
   | { name: 'admin' }
   | { name: 'watch-list' }
-  /** `tournament`: veio da página de um torneio (e volta para ela). */
-  | { name: 'watch'; target: WatchTarget; tournament?: string }
+  /** `tournament`: veio da página de um torneio (e volta para ela); `home`: veio do "Ao vivo agora" do menu. */
+  | { name: 'watch'; target: WatchTarget; tournament?: string; home?: boolean }
   | { name: 'tournaments'; id?: string }
   | { name: 'game'; setup: GameSetup; key: number }
   | { name: 'online'; seat: OnlineSeat; tournament?: string };
@@ -78,8 +78,10 @@ export function App() {
         key={screen.target.roomId}
         target={screen.target}
         canHands={role === 'streamer' || isAdmin(role)}
-        onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : { name: 'watch-list' })}
-        onSwitch={(target) => setScreen({ name: 'watch', target, tournament: screen.tournament })}
+        onExit={() =>
+          setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : screen.home ? { name: 'menu' } : { name: 'watch-list' })
+        }
+        onSwitch={(target) => setScreen({ name: 'watch', target, tournament: screen.tournament, home: screen.home })}
       />
     );
   }
@@ -121,7 +123,8 @@ export function App() {
       onStats={() => setScreen({ name: 'stats' })}
       onOnline={(seat) => setScreen({ name: 'online', seat })}
       onWatch={() => setScreen({ name: 'watch-list' })}
-      onTournaments={() => setScreen({ name: 'tournaments' })}
+      onWatchRoom={(target) => setScreen({ name: 'watch', target, home: true })}
+      onTournaments={(id) => setScreen({ name: 'tournaments', id })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
       dev={dev}
     />

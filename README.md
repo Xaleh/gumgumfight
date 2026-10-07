@@ -144,7 +144,7 @@ para desligar as imagens, defina `CARD_IMAGES=off` no ambiente do app e recarreg
 
 ## Montando decks
 
-No menu, **Montar / editar decks** abre o construtor:
+Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construtor:
 
 1. **Novo deck** → escolha o Líder (o catálogo mostra só Líderes até você escolher um).
 2. Clique nas cartas para adicionar e use o botão direito (ou os botões −/+ na lista) para remover. Por padrão
@@ -209,9 +209,16 @@ antigas ficam fora das estatísticas de pessoas (só pelo filtro `by=bot` da API
 
 ## Multiplayer online
 
-No menu, a aba **Online** tem a fila **casual**, a **ranqueada** e as **salas privadas** (criar uma sala gera um código de
-6 letras e um link `/?sala=CÓDIGO` para enviar a quem vai jogar). Quem recarrega a página ou troca de aparelho encontra
-"Voltar à partida" no mesmo menu.
+A tela inicial tem um card para cada modo: **Ranqueada**, **Partida rápida** (casual), **Sala privada** (criar uma
+sala gera um código de 6 letras e um link `/?sala=CÓDIGO` para enviar a quem vai jogar), **Contra o bot** e
+**Torneios**. Todos usam o **deck equipado** e o formato escolhidos na faixa acima dos cards. Quem recarrega a página ou
+troca de aparelho encontra "Voltar à partida" no topo da mesma tela.
+
+Os cards mostram ao vivo quantas partidas estão em andamento e quantas pessoas estão na fila de cada modo, e o
+cabeçalho mostra quantas pessoas estão conectadas. Esses números vêm de `GET /api/online/stats` (só contagens, sem
+nomes), que a tela inicial consulta a cada 10 s enquanto a aba está visível. Essa consulta também é o sinal de
+presença: quem fecha a tela inicial sai dos "conectados" depois de 30 s. Jogadores conectados a uma partida, quem
+está na fila e os espectadores também contam.
 
 - **O servidor é a autoridade.** Ele guarda o estado completo e aplica as ações com o motor; cada jogador recebe só a
   própria visão (`packages/engine/src/view.ts`): mão do oponente, decks e Vida virada para baixo chegam como cartas

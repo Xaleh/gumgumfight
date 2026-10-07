@@ -346,6 +346,64 @@ describe('partidas online: filas', () => {
   });
 });
 
+describe('partidas online: contadores do menu', () => {
+  it('conta quem está no menu, na fila, jogando e assistindo, sem dados de quem joga', async () => {
+    const { app } = setup();
+    const empty = (await app.inject('/api/online/stats')).json();
+    expect(empty).toEqual({
+      online: 0,
+      playing: { private: 0, casual: 0, ranked: 0, bot: 0, tournament: 0 },
+      waiting: 0,
+      queue: { casual: { standard: 0, egb: 0 }, ranked: { standard: 0, egb: 0 } },
+      spectators: 0,
+    });
+
+    // A consulta do menu é o sinal de presença (o mesmo navegador conta uma vez só).
+    await app.inject({ url: '/api/online/stats', headers: ALICE });
+    expect((await app.inject({ url: '/api/online/stats', headers: ALICE })).json().online).toBe(1);
+
+    const carol = { 'x-deck-owner': 'carol-0123456789abcdef' };
+    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: carol, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } })).json();
+    const s1 = (await app.inject('/api/online/stats')).json();
+    expect(s1.queue.casual.egb).toBe(1);
+    expect(s1.online).toBe(2);
+
+    // Sala privada esperando o segundo jogador.
+    await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: 'st02-kid', format: 'egb' } });
+    expect((await app.inject('/api/online/stats')).json().waiting).toBe(1);
+
+    const dave = { 'x-deck-owner': 'dave-0123456789abcdef00' };
+    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: dave, payload: { deckId: 'st02-kid', queue: 'casual', format: 'egb' } })).json();
+    const m = (await app.inject(`/api/online/queue/${a.ticket}`)).json();
+    await app.inject(`/api/online/queue/${b.ticket}`);
+    const room = getRoom(app, m.roomId);
+    room.attach(client(0).conn);
+    room.attach(client(null).conn);
+    const s2 = (await app.inject('/api/online/stats')).json();
+    expect(s2.playing.casual).toBe(1);
+    expect(s2.queue.casual.egb).toBe(0);
+    expect(s2.spectators).toBe(1);
+    // Alice (menu), Bob (sala esperando, sem canal aberto: não conta), Carol (conectada à partida) e o espectador.
+    expect(s2.online).toBe(3);
+    expect(JSON.stringify(s2)).not.toContain('carol');
+  });
+
+  it('quem fecha o menu some dos conectados depois de 30 s', () => {
+    let t = 1_000_000;
+    const db = freshDb();
+    const l = new Lobby({ cards: (ids) => getCards(db, ids) as CardData[], now: () => t });
+    l.touch('a');
+    l.touch('b');
+    expect(l.stats().online).toBe(2);
+    t += 20_000;
+    l.touch('b');
+    t += 15_000;
+    expect(l.stats().online).toBe(1);
+    t += 30_000;
+    expect(l.stats().online).toBe(0);
+  });
+});
+
 describe('partidas online: cancelar a ação e devolver DON!!', () => {
   it('o DON!! anexado volta pela visão e o cancelamento é refeito pelo servidor para os dois lados', async () => {
     const { app, db } = setup();

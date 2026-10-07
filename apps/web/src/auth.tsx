@@ -2,7 +2,7 @@
 // que o servidor confere e troca por uma sessão em cookie httpOnly.
 
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { api, ROLE_LABEL, type User } from './api';
+import { api, type User } from './api';
 
 interface GsiButtonOptions {
   theme?: 'outline' | 'filled_blue' | 'filled_black';
@@ -133,7 +133,7 @@ export function useAuth(): AuthCtx {
 }
 
 /** Botão oficial "Fazer login com o Google". */
-function GoogleButton({ clientId, onCredential }: { clientId: string; onCredential: (c: string) => void }) {
+export function GoogleButton({ clientId, onCredential }: { clientId: string; onCredential: (c: string) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const handler = useRef(onCredential);
   handler.current = onCredential;
@@ -161,40 +161,4 @@ function GoogleButton({ clientId, onCredential }: { clientId: string; onCredenti
   }, [clientId]);
 
   return failed ? <div className="muted small">{failed}</div> : <div ref={box} className="google-btn" />;
-}
-
-/** Faixa da conta no menu: botão de login ou foto, nome e "Sair". */
-export function AccountBar() {
-  const { ready, user, clientId, notice, error, signIn, signOut } = useAuth();
-  if (!ready || !clientId) return null;
-  return (
-    <section className="menu-card account">
-      {user ? (
-        <div className="account-row">
-          {user.picture ? (
-            <img className="account-avatar" src={user.picture} alt="" referrerPolicy="no-referrer" />
-          ) : (
-            <span className="account-avatar">{(user.name ?? user.email ?? '?').slice(0, 1).toUpperCase()}</span>
-          )}
-          <span className="account-who">
-            <strong>
-              {user.name ?? 'Conta Google'}
-              {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{ROLE_LABEL[user.role]}</span>}
-            </strong>
-            {user.email && <span className="muted small">{user.email}</span>}
-          </span>
-          <button className="btn small" onClick={signOut}>
-            Sair
-          </button>
-        </div>
-      ) : (
-        <div className="account-login">
-          <p className="muted small">Entre com o Google para guardar seus decks e estatísticas na sua conta e usá-los em qualquer aparelho.</p>
-          <GoogleButton clientId={clientId} onCredential={signIn} />
-        </div>
-      )}
-      {notice && <p className="small account-notice">{notice}</p>}
-      {error && <div className="error">{error}</div>}
-    </section>
-  );
 }
