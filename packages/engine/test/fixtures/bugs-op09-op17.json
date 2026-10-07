@@ -115,6 +115,61 @@
    ],
    "text": "[DON!! x1] If you have 8 or more DON!! cards on your field, this Character gains [Rush]. (This card can attack on the turn in which it is played.)",
    "set": "OP05"
+  },
+  {
+   "id": "OP17-020",
+   "name": "Shanks",
+   "category": "leader",
+   "colors": [
+    "green"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "The Four Emperors",
+    "Red-Haired Pirates"
+   ],
+   "text": "[Activate: Main] [Once Per Turn] You may trash 1 card from your hand or rest 1 of your DON!! cards: Up to 1 of your opponent's rested Characters will not become active in your opponent's next Refresh Phase.",
+   "set": "OP17"
+  },
+  {
+   "id": "OP17-022",
+   "name": "Shanks",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 10,
+   "power": 12000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "The Four Emperors",
+    "Red-Haired Pirates"
+   ],
+   "text": "[Rush] (This card can attack on the turn in which it is played.)\n[On Play] Set up to 2 of your DON!! cards as active. Then, rest all of your opponent's Characters.",
+   "set": "OP17"
+  },
+  {
+   "id": "OP17-036",
+   "name": "Withdraw Now and Allow Me to Save Face",
+   "category": "event",
+   "colors": [
+    "green"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "The Four Emperors",
+    "Red-Haired Pirates"
+   ],
+   "text": "[Main] You may rest 6 of your DON!! cards: Rest up to 1 of your opponent's Characters. Then, K.O. up to 2 of your opponent's rested Characters with a cost of 6 or less.\n\n[Counter] Up to 1 of your [Shanks] gains +4000 power during this battle.",
+   "set": "OP17"
   }
  ]
 }
