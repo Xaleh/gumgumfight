@@ -126,7 +126,7 @@ Para o simulador: as erratas **OP13-119** e **OP09-058** mudam o comportamento d
 ### Situação no repositório
 
 - A lista de banidas e de pares proibidos de `packages/engine/src/formats.ts` bate com a lista oficial vigente (6 banidas, 3 pares, OP14-020 a partir de 12/10/2026).
-- As **erratas não são aplicadas** ao texto das cartas: os dados de `data/cards` (e a importação da optcgapi) ainda trazem o texto antigo de várias cartas. Ver [divergencias.md](divergencias.md).
+- As erratas que a fonte de cartas (optcgapi) ainda não traz são aplicadas pela tabela `packages/engine/src/errata.ts`, no motor e no servidor (gravação e leitura do banco). Ver [divergencias.md](divergencias.md) (DV-34).
 
 ## Comunidade e outros simuladores
 

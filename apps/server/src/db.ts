@@ -7,7 +7,7 @@
 
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { CardData, DeckList } from '@gumgum/engine';
+import { applyErrata, type CardData, type DeckList } from '@gumgum/engine';
 import { DatabaseSync } from 'node:sqlite';
 import { DB_PATH } from './paths';
 
@@ -294,7 +294,8 @@ export function upsertCards(
   let written = 0;
   let skipped = 0;
   transaction(db, () => {
-    for (const c of cards) {
+    for (const card of cards) {
+      const c = applyErrata(card);
       const row = existing.get(c.id) as { provisional: number } | undefined;
       // Dados provisórios nunca sobrescrevem dados vindos da API.
       if (opts.provisional && row && !row.provisional) {
@@ -350,7 +351,8 @@ export function hasOfficialCards(db: DB, set: string): boolean {
 }
 
 type CardRow = { data: string; provisional: number };
-const toCard = (r: CardRow) => ({ ...(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
+// A errata oficial vale também para as cartas já gravadas (importadas antes de a errata entrar na tabela).
+const toCard = (r: CardRow) => ({ ...applyErrata(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
 
 export function listCards(db: DB, set?: string) {
   const rows = (

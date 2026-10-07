@@ -1874,6 +1874,8 @@ const CLAUSES: ClauseRule[] = [
     },
   ],
   [/^Trash up to (\d+) of your opponent's Life cards?$/i, (m) => [{ do: 'trashLife', side: 'opponent', count: Number(m[1]) }]],
+  // Kaido ST04-001 (texto com errata).
+  [/^Trash up to (\d+) of your opponent's cards from the top of their Life cards$/i, (m) => [{ do: 'trashLife', side: 'opponent', count: Number(m[1]) }]],
   [/^Your opponent cannot activate \[Blocker\] during this battle$/i, () => [{ do: 'noBlockerThisBattle' }]],
   [
     /^Your opponent cannot activate a \[Blocker\] Character that has (\d+) or more power during this battle$/i,
@@ -2406,7 +2408,8 @@ function parseCost(rest: string): { cost?: AbilityCost; body: string } | null {
 /** "When …" de habilidades que reagem a acontecimentos. */
 function parseEvent(text: string): GameEvent | null {
   const t = text.trim().replace(/’/g, "'");
-  if (/^a DON!! card on your field is returned to your DON!! deck(?: by your effect)?$/i.test(t)) return { kind: 'donReturned' };
+  // Errata de OP02-071: "on the field" (qualquer DON!! seu que volte ao seu deck de DON!!).
+  if (/^a DON!! card on (?:your|the) field is returned to your DON!! deck(?: by your effect)?$/i.test(t)) return { kind: 'donReturned' };
   if (/^this Character becomes rested$/i.test(t)) return { kind: 'selfRested' };
   if (/^a Character is K\.?O\.?'d$/i.test(t)) return { kind: 'characterKO', whose: 'any' };
   if (/^(?:your opponent's Character|one of your opponent's Characters) is K\.?O\.?'d$/i.test(t)) {
@@ -2433,7 +2436,7 @@ function parseEvent(text: string): GameEvent | null {
   if (/^this Character battles and K\.O\.'s your opponent's Character$/i.test(t)) return { kind: 'battleKO' };
   let m: RegExpMatchArray | null;
   if ((m = t.match(/^(\d+) or more DON!! cards on your field are returned to your DON!! deck$/i))) return { kind: 'donReturned', min: Number(m[1]) };
-  if (/^this Leader or 1 of your Characters is given a DON!! card$/i.test(t)) return { kind: 'donGiven' };
+  if (/^this Leader or (?:1|any) of your Characters is given a DON!! card$/i.test(t)) return { kind: 'donGiven' }; // "any": errata de OP02-002
   if (/^you take damage$/i.test(t)) return { kind: 'damageTaken' };
   if (/^a Character is rested by your effect$/i.test(t)) return { kind: 'restedByEffect' };
   if (/^your number of Life cards becomes 0$/i.test(t)) return { kind: 'lifeZero' };
