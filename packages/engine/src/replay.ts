@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 5;
+export const REPLAY_VERSION = 6;
 
 /**
  * Replays de versões anteriores foram gravados quando o motor pulava sem ação etapas que hoje
@@ -16,7 +16,9 @@ export const REPLAY_VERSION = 5;
  * versão 4 os efeitos disparados resolvem em outra ordem (CR 8-6): um replay antigo com efeitos
  * encadeados pode tomar outro rumo. Da mesma forma, um [On K.O.] que ativava sem cumprir as
  * condições no campo ([DON!! xX], negação, [Once Per Turn]) hoje não ativa; não há decisão nova
- * a inserir, então a versão não mudou.)
+ * a inserir, então a versão não mudou.) Até a versão 5, a escolha de alvos sem "up to" aceitava
+ * 0 alvos; a gravada com menos alvos do que hoje é obrigatório (8-4-4-1) é completada com as
+ * primeiras opções.
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -46,10 +48,22 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     state = applyAction(state, a);
     out.push(a);
   };
+  /**
+   * Escolha gravada com menos alvos do que o mínimo atual: antes de a escolha sem "up to" passar a
+   * ser obrigatória (8-4-4-1), dava para escolher 0. Completa com as primeiras opções para o
+   * replay continuar carregando (dali em diante a partida pode tomar outro rumo).
+   */
+  const completed = (a: Action): Action => {
+    const p = state.pending;
+    if (p?.kind !== 'selectTargets' || a.type !== 'choose' || a.player !== p.player || a.uids.length >= p.min) return a;
+    const uids = [...a.uids];
+    for (const u of p.options) if (uids.length < p.min && !uids.includes(u)) uids.push(u);
+    return { ...a, uids };
+  };
   for (const a of actions) {
     for (let i = implicit(a); i; i = implicit(a)) step(i);
     if (state.phase === 'gameover') break;
-    step(a);
+    step(completed(a));
   }
   for (let i = implicit(); i; i = implicit()) step(i);
   return out;

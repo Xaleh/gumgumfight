@@ -76,7 +76,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
 
     case 'selectTargets': {
       const uids = chooseTargets(state, player, pending);
-      // Completa escolhas obrigatórias de várias cartas (ex.: "trash 2 cards").
+      // Completa escolhas obrigatórias (ex.: "trash 2 cards", "return 1 of your Characters"): as de menor valor.
       for (const u of [...pending.options].sort((a, b) => value(state, a) - value(state, b))) {
         if (uids.length >= pending.min) break;
         if (!uids.includes(u)) uids.push(u);
@@ -133,10 +133,12 @@ function chooseTargets(state: GameState, player: PlayerId, pending: SelectPendin
   }
   if (pending.intent === 'harm') {
     // Efeitos que atingem "qualquer personagem": só mira os do oponente.
+    // Escolha obrigatória (sem "up to") de várias: as do oponente primeiro; o que faltar sai das
+    // próprias de menor valor (completado em chooseBotAction).
     const theirs = opts.filter((u) => state.cards[u].owner !== player);
     if (!theirs.length) return [];
     theirs.sort((a, b) => value(state, b) - value(state, a));
-    return [theirs[0]];
+    return theirs.slice(0, Math.max(1, pending.min));
   }
   // Cartas fora do campo (busca no deck, descarte): a mais valiosa.
   if (opts.every((u) => !locate(state, u))) {

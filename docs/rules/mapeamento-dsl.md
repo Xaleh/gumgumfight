@@ -36,7 +36,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | [Once Per Turn] (10) | `Ability.oncePerTurn`, `usedThisTurn` | Existe |
 | Custos de ativação (10) | `AbilityCost` (`payImmediateCost`, `canPayCost`) | Existe |
 | Redução de custo (10) | `cost`, `handCost`, `handCostAura`, `nextPlayDiscount` | Existe; custo com valor negativo oculto (CR 1-3-6-2-1) a conferir |
-| "Up to", busca no deck, revelar (10, 13) | `TargetSpec.upTo`, `search`, `tutor`, `revealTop`, `arrangeTop` | Existe |
+| "Up to", busca no deck, revelar (10, 13) | `TargetSpec.upTo`, `TargetSpec.required` (sem "up to": o máximo possível), `search`, `tutor`, `revealTop`, `arrangeTop` | Existe |
 | Limite de 5 Personagens (11) | `stepPlay` (escolha de qual trashar) | Existe |
 | Jogar por efeito (mão, trash, deck, Vida) (11) | `playFrom`, `playThis`, `playRevealed`, `handPlayOrLife`, `opponentPlays` | Existe |
 | Negar efeitos / negar [On Play] (12) | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated` | Existe (ver [On K.O.] acima) |
@@ -119,7 +119,7 @@ modo manual; 0 cartas hoje), "at the start of your opponent's turn" (0 cartas).
 Todo passo aceita `if?: Condition` (types.ts:734), avaliado em `stepConditionMet` (engine.ts:1866) **na hora de
 resolver**; falhou = passo pulado. Execução: `execStep` (engine.ts:2162). Alvos: `TargetRef` (types.ts:436:
 `'self' | 'ownLeader' | 'chosen' | 'battleTarget' | TargetSpec`), resolvidos em `resolveTargets` (:1820; `chosen` = `frame.last`
-do passo anterior; `TargetSpec.all` = sem escolha). Cada passo grava `frame.last`, que alimenta `chosen`, `lastDone`
+do passo anterior; `TargetSpec.all` = sem escolha; `TargetSpec.required` = sem "up to", o mínimo é o máximo possível). Cada passo grava `frame.last`, que alimenta `chosen`, `lastDone`
 ("If you do") e `chosenMatches`.
 
 Colunas: **types** = linha em types.ts; **engine** = `case` em `execStep`.

@@ -35,8 +35,9 @@ export interface ReplayFile {
    * 4: efeitos disparados resolvem em fila (CR 8-6) e a ordem entre efeitos simultâneos do mesmo
    *    jogador gera uma ação (`option`).
    * 5: DON!! −X pergunta quais DON!! devolver quando há mais de uma forma (`option`).
+   * 6: escolha de alvos sem "up to" exige o máximo possível (8-4-4-1); a gravada com menos é completada.
    */
-  version: 1 | 2 | 3 | 4 | 5;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];

@@ -17,7 +17,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-05 | Efeitos disparados durante o dano resolvem no meio do dano (**corrigido**) | 8-6-2 | médio | C2 |
 | DV-06 | Ordem dos efeitos simultâneos do mesmo jogador é fixa (sem escolha) (**corrigido**) | 6-6-1-1-3, 8-6-1 | baixo | C2 |
 | DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação (**corrigido**) | 10-2-17-1, 8-2-1-1 | médio | C3 |
-| DV-08 | Escolha sem "up to" aceita 0 alvos | 8-4-4-1 | médio | C4 |
+| DV-08 | Escolha sem "up to" aceita 0 alvos (**corrigido**) | 8-4-4-1 | médio | C4 |
 | DV-09 | DON!! −X sem escolha de quais DON!! devolver (**corrigido**) | 8-3-1-6, Q&A de regras | médio | C5 |
 | DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo | 10-2-13-4 | médio | C6 |
 | DV-11 | Só a primeira substituição aplicável é oferecida; recusar descarta as outras | 8-1-3-4-2 | médio | C7 |
@@ -129,11 +129,12 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C4 — Escolha obrigatória
 
-**DV-08. Escolha sem "up to" aceita 0 alvos** — médio
-- Regra: 8-4-4-1 (sem "up to", escolhe-se o máximo possível até o número pedido).
-- Atual: `resolveTargets` (engine.ts:1857) sempre abre `selectTargets` com `min: 0`; `TargetSpec` não diz se a escolha é obrigatória.
-- Cenários: Líder Trafalgar Law OP01-002 com 5 Personagens ("return 1 of your Characters to the owner's hand. Then, play up to 1…"): dá para devolver 0 e mesmo assim jogar. OP07-036: confirma "you may rest 1", escolhe 0 e o "If you do" ainda acontece.
-- Onde: `types.ts` (`TargetSpec`: campo de escolha obrigatória), `engine.ts` (`resolveTargets`), `cards/parser.ts` (marcar textos sem "up to").
+**DV-08. Escolha sem "up to" aceita 0 alvos** — médio — **corrigido**
+- Regra: 8-4-4-1 (sem "up to", escolhe-se o máximo possível até o número pedido; só com "up to" pode ser 0). "You may <ação> 1 …" deixa a ação inteira opcional (aceitar ou recusar), mas quem aceita escolhe o alvo.
+- Antes: `resolveTargets` sempre abria `selectTargets` com `min: 0`; `TargetSpec` não dizia se a escolha era obrigatória. Líder Trafalgar Law OP01-002 com 5 Personagens ("return 1 of your Characters to the owner's hand. Then, play up to 1…") devolvia 0 e mesmo assim jogava; OP07-036 confirmava "you may rest 1 of your Characters", escolhia 0 e o "If you do" ainda virava o Personagem do oponente.
+- Agora: `TargetSpec.required` marca a quantidade sem "up to". O parser (`parseTargetBase`) marca "N of your …"/"N of your opponent's …" e "your Leader or 1 of your Characters"; `resolveTargets` abre a escolha com `min` = o máximo possível (`requiredTargets`: `min(N, opções)`; com "with a total power/cost of N or less", quantas das menores cabem no total). Exceção: "Give up to N rested DON!! cards to your Leader or 1 of your Characters" — dar 0 DON!! é permitido, e o motor dá os DON!! a quem foi escolhido, então o alvo continua opcional (`donTarget`). Nos scripts à mão (`scripts.ts`), os únicos alvos sem "up to" são desse tipo (ST01-001, ST01-007, ST01-011) e ficaram como estavam. No "you may" sem custo seguido de alvo obrigatório sem nenhuma carta que possa ser escolhida (OP07-036 sem Personagem de custo 3 ou mais), a ação não pode ser feita: o motor não pergunta e pula o trecho com o "If you do". O bot completa o mínimo com as próprias cartas de menor valor (em escolhas "harm", as do oponente primeiro). Replays passam para a versão 6; nos antigos, a escolha gravada com menos alvos do que o mínimo é completada com as primeiras opções.
+- Varredura (data/cards + data/spoilers + as fixtures de teste, 826 cartas): 2 cartas com alvo obrigatório depois da correção, OP01-002 (`returnToHand`) e OP07-036 (`rest`); as outras 16 frases "… to your Leader or 1 of your Characters" / "to 1 of your …" são de dar "up to N" DON!! (ficam opcionais). Os demais textos sem "up to" da base ("You may rest 1 of your Characters: …", "K.O. 1 of your …:") são custos (`AbilityCost`), que já eram tudo-ou-nada.
+- Testes: `packages/engine/test/required-targets.test.ts` (Law: 0 alvos recusado, outra cor, "up to" ainda aceita 0, bot; OP07-036: aceitar exige o alvo, recusar, sem alvo possível; replay antigo; parser e varredura).
 
 ### C5 — DON!! −X
 
@@ -320,6 +321,6 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6) | DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível | DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
 | Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-16, DV-18, DV-27, DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

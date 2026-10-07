@@ -21,6 +21,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-Passos com `if` ("If"), `lastDone` ("If you do") e `payCost{scope}`; efeitos "during this turn" e atrasados continuam valendo depois que a fonte sai (conforme). A cadeia "If … Then" (4-10) depende do parser — ver itens a confirmar.
+Passos com `if` ("If"), `lastDone` ("If you do") e `payCost{scope}`; "you may <ação> 1 …" é opcional, mas quem aceita escolhe o alvo (sem "up to", 8-4-4-1), e sem carta que possa ser escolhida o "If you do" não acontece; efeitos "during this turn" e atrasados continuam valendo depois que a fonte sai (conforme). A cadeia "If … Then" (4-10) depende do parser — ver itens a confirmar.
 
-Divergências deste tema: DV-08 (corrigidas: DV-04) (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: nenhuma em aberto (corrigidas: DV-04, DV-08) (detalhes em [../divergencias.md](../divergencias.md)).

@@ -1989,13 +1989,36 @@ function resolveTargets(
     kind: 'selectTargets',
     player: frame.controller,
     options,
-    min: 0,
+    min: requiredTargets(state, ref, options),
     max: Math.min(ref.upTo, options.length),
     prompt,
     intent,
     source: frame.source,
   };
   return null;
+}
+
+/**
+ * Mínimo de alvos de uma escolha. Com "up to" é 0; sem "up to" (`required`) o jogador escolhe o
+ * máximo possível até o número pedido (8-4-4-1). Com soma máxima de poder/custo ("with a total
+ * power of N or less"), o máximo possível é quantas das menores cabem no total.
+ */
+function requiredTargets(state: GameState, ref: TargetSpec, options: string[]): number {
+  if (!ref.required) return 0;
+  const n = Math.min(ref.upTo, options.length);
+  if (ref.totalMaxPower === undefined && ref.totalMaxCost === undefined) return n;
+  const key = (u: string) => (ref.totalMaxPower !== undefined ? getPower(state, u) : getCost(state, u));
+  let pw = 0;
+  let co = 0;
+  let k = 0;
+  for (const u of [...options].sort((a, b) => key(a) - key(b))) {
+    if (k >= n) break;
+    pw += getPower(state, u);
+    co += getCost(state, u);
+    if ((ref.totalMaxPower !== undefined && pw > ref.totalMaxPower) || (ref.totalMaxCost !== undefined && co > ref.totalMaxCost)) break;
+    k++;
+  }
+  return k;
 }
 
 function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
@@ -2572,6 +2595,16 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (!costAsksOwner(state, frame.controller, frame.source, cost)) {
           releaseOncePerTurn(state, frame.source, step.ability);
           if (step.scope === undefined) return abortEffect(frame);
+          frame.i += step.scope;
+          return true;
+        }
+        // "you may rest 1 of your Characters. If you do, …": sem carta que possa ser escolhida, a
+        // ação não pode ser feita e o "If you do" não acontece; pula sem perguntar (o campo é público).
+        const next = frame.steps[frame.i + 1];
+        const target = next && 'target' in next ? next.target : undefined;
+        if (step.scope && !Object.keys(cost).length && typeof target === 'object' && target.required && !targetCandidates(state, frame.controller, frame.source, target).length) {
+          log(state, frame.controller, `${srcName}: nenhuma carta pode ser escolhida, o efeito opcional não é usado.`);
+          releaseOncePerTurn(state, frame.source, step.ability);
           frame.i += step.scope;
           return true;
         }

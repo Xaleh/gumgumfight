@@ -64,6 +64,11 @@ export interface TargetSpec {
   side: 'own' | 'opponent' | 'any';
   kinds: Array<'leader' | 'character' | 'stage'>;
   upTo: number;
+  /**
+   * Quantidade sem "up to" ("return 1 of your Characters", "your Leader or 1 of your Characters"):
+   * o jogador escolhe o máximo possível até `upTo`, não pode escolher menos (8-4-4-1).
+   */
+  required?: boolean;
   maxPower?: number;
   maxCost?: number;
   rested?: boolean; // true = somente virados; false = somente ativos

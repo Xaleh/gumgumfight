@@ -454,8 +454,9 @@ function parseTargetBase(phrase: string): TargetRef | null {
   if (/^this (character|card|leader|stage)$/i.test(p)) return 'self';
   if (/^your leader$/i.test(p)) return 'ownLeader';
   if (/^(?:that|the selected) (character|card|leader|leader or character)$/i.test(p) || /^it$/i.test(p)) return 'chosen';
-  if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
-  if (/^your Leader or \d+ of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
+  // Sem "up to": escolha obrigatória (8-4-4-1).
+  if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1, required: true };
+  if (/^your Leader or \d+ of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1, required: true };
   if (/^your Leader and all of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 99, all: true };
   // "Your opponent's rested Leader or up to 1 of your opponent's Characters other than [X]"
   const leadOr = p.match(/^your opponent's (rested )?Leader or up to (\d+) of your opponent's Characters(.*)$/i);
@@ -494,7 +495,9 @@ function parseTargetBase(phrase: string): TargetRef | null {
     spec.upTo = 99;
     quantified = true;
   } else if ((m = p.match(/^(\d+) of (?=your )/i))) {
+    // "return 1 of your Characters": sem "up to", escolhe o máximo possível até N (8-4-4-1).
     spec.upTo = Number(m[1]);
+    spec.required = true;
     quantified = true;
   }
   if (m) p = p.slice(m[0].length);
@@ -869,6 +872,17 @@ const withTarget = (phrase: string, make: (t: TargetRef) => EffectStep, characte
   const t = parseTarget(phrase);
   if (!t || (charactersOnly && !onlyCharacters(t))) return null;
   return [make(t)];
+};
+
+/**
+ * "Give up to N rested DON!! cards to your Leader or 1 of your Characters": o alvo não tem "up to",
+ * mas dar 0 DON!! é permitido; o motor dá o que houver a quem foi escolhido, então escolher
+ * ninguém é o jeito de dar 0.
+ */
+const donTarget = (t: TargetRef): TargetRef => {
+  if (typeof t !== 'object' || !t.required) return t;
+  const { required: _r, ...rest } = t;
+  return rest;
 };
 
 const durationOf = (d: string): Duration =>
@@ -1409,15 +1423,15 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^Give up to (\d+) of your opponent's rested DON!! cards? to (.+)$/i,
-    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target, count: Number(m[1]), fromOpponent: true })),
+    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target: donTarget(target), count: Number(m[1]), fromOpponent: true })),
   ],
   [
     /^Give up to (\d+) rested DON!! cards? to (.+)$/i,
-    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target, count: Number(m[1]) })),
+    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target: donTarget(target), count: Number(m[1]) })),
   ],
   [
     /^Give (.+?) up to (\d+) rested DON!! cards?$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'giveRestedDon', target, count: Number(m[2]) })),
+    (m) => withTarget(m[1], (target) => ({ do: 'giveRestedDon', target: donTarget(target), count: Number(m[2]) })),
   ],
   [
     new RegExp(`^Give (.+?) [−-](\\d+) power ${DUR}$`, 'i'),
