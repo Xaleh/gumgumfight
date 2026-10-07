@@ -455,12 +455,33 @@ export type Duration = 'turn' | 'battle' | 'nextOpponentTurn' | 'untilYourNextTu
 export interface Replacement {
   who: 'self' | TargetSpec;
   /**
-   * ko = só K.O.; removal = sair do campo por efeito do oponente (inclui K.O. por efeito do oponente);
+   * ko = só K.O.; removal = sair do campo (K.O. incluído; "by your opponent's effect" restringe a causa);
+   * koOrRemoval = os dois ("would be K.O.'d or removed from the field", "would leave the field");
    * damage = "If you would take damage": o dono da carta sofreria dano.
    */
   event: 'ko' | 'removal' | 'koOrRemoval' | 'rest' | 'damage';
-  /** any = qualquer K.O.; battle = em batalha; effect = por efeito; opponentEffect = por efeito do oponente. */
+  /**
+   * Causa: any = qualquer uma (inclusive efeito próprio e, na remoção, K.O. em batalha); battle = em batalha;
+   * effect = por efeito; opponentEffect = por efeito do oponente.
+   */
   by: 'any' | 'battle' | 'effect' | 'opponentEffect';
+  /** Em `koOrRemoval`, causa só da parte da remoção, quando difere de `by` ("removed … by your opponent's effect or K.O.'d"). */
+  removalBy?: 'any' | 'battle' | 'effect' | 'opponentEffect';
+}
+
+/** Remoção do campo em andamento (passos internos `replaceRemoval` e `removeFromField`). */
+export interface RemovalStep {
+  victims: string[];
+  action: 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
+  inBattle?: boolean;
+  /** Jogador cujo efeito remove (ausente em batalha). */
+  byPlayer?: PlayerId;
+  /** Carta cujo efeito remove (proteções "cannot be K.O.'d by …"). */
+  by?: string;
+  /** Vida: no fundo em vez do topo. */
+  bottom?: boolean;
+  /** Substituições já oferecidas (recusadas ou aplicadas) para estas remoções: `uid:índice` ou `temp:índice`. */
+  skip?: string[];
 }
 
 /** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
@@ -672,16 +693,21 @@ type EffectStepBody =
   | { do: 'opponentLifeToHand'; count: number }
   /** "your opponent places N card from their hand at the bottom of their deck" */
   | { do: 'opponentHandToBottom'; count: number }
-  /** Pergunta do efeito de substituição (o motor cria; não vem do texto). */
-  | {
+  /**
+   * Pergunta do efeito de substituição (o motor cria; não vem do texto). `victims` sairiam do campo
+   * juntos; `covered` são os que esta substituição salva com um só pagamento (8-1-3-4).
+   */
+  | ({
       do: 'replaceRemoval';
-      victim: string;
+      covered: string[];
       ability: number;
-      action: 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
-      inBattle?: boolean;
+      /** Identifica esta substituição em `skip` (`uid:índice` ou `temp:índice`). */
+      key: string;
       /** Substituição criada por efeito (sem habilidade na carta): o custo vem aqui. */
       inlineCost?: AbilityCost;
-    }
+    } & RemovalStep)
+  /** Continua a remoção depois de uma substituição: oferece as que faltam ou tira do campo (o motor cria). */
+  | ({ do: 'removeFromField' } & RemovalStep)
   /** Pergunta da substituição de dano ("If you would take damage, you may … instead"). */
   | { do: 'replaceDamage'; ability: number }
   /** "… at the end of this turn": passos adiados para o fim do turno. */

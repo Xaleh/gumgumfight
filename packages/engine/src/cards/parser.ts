@@ -2706,7 +2706,11 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   if (forced) {
     const steps = parseClause(forced[2]);
     if (!steps) return null;
-    return [{ ...base, timing: 'replace', replace: { who: 'self', event: /removed/i.test(forced[1]) ? 'koOrRemoval' : 'ko', by: 'any' }, cost: { trashSelf: true }, steps }];
+    // "removed … by your opponent's effect or K.O.'d": o K.O. vale por qualquer causa; a remoção, só por efeito do oponente.
+    const replace: Replacement = /removed/i.test(forced[1])
+      ? { who: 'self', event: 'koOrRemoval', by: 'any', removalBy: 'opponentEffect' }
+      : { who: 'self', event: 'ko', by: 'any' };
+    return [{ ...base, timing: 'replace', replace, cost: { trashSelf: true }, steps }];
   }
   // "If this Character would be K.O.'d (in battle / by an effect / by your opponent's effect), you may X instead."
   const repl = s.match(

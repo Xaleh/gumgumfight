@@ -32,6 +32,8 @@ import type {
   Modifier,
   PlayerId,
   PlayerState,
+  RemovalStep,
+  Replacement,
   StateSnapshot,
   TargetRef,
   TargetSpec,
@@ -2362,10 +2364,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'ko': {
       const t = resolveTargets(state, frame, step.target, 'harm', `${srcName}: escolha um personagem para K.O.`);
       if (!t) return false;
+      // Os Personagens saem juntos: cada substituição é oferecida uma vez para todos (8-1-3-4).
+      removeFromField(state, t.filter((u) => locate(state, u)?.zone === 'character'), 'ko', { byPlayer: frame.controller, by: frame.source });
       for (const uid of t) {
         const zone = locate(state, uid)?.zone;
-        if (zone === 'character') koCharacter(state, uid, { byPlayer: frame.controller, by: frame.source });
-        else if (zone === 'stage') {
+        if (zone === 'stage') {
           // Stages nocauteados vão para o descarte (sem [On K.O.]).
           detach(state, uid);
           state.players[ownerOf(state, uid)].trash.push(uid);
@@ -2448,22 +2451,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           detach(state, uid);
           state.players[loc.player].hand.push(uid);
           log(state, frame.controller, `${cardDef(state, uid).name} volta para a mão.`);
-          continue;
         }
-        if (loc?.zone !== 'character') continue;
-        if (removalBlocked(state, uid, frame.controller)) {
-          log(state, frame.controller, `${cardDef(state, uid).name} não pode ser removido do campo.`);
-          continue;
-        }
-        if (offerReplacement(state, uid, 'hand', { byPlayer: frame.controller })) continue;
-        const owner = state.players[loc.player];
-        owner.donRested += loc.fc.don;
-        removeCharacter(state, uid);
-        owner.hand.push(uid);
-        log(state, frame.controller, `${cardDef(state, uid).name} volta para a mão.`);
-        emit(state, { kind: 'characterRemoved', player: loc.player, card: uid, byPlayer: frame.controller });
-        emit(state, { kind: 'returnedToHand', player: loc.player, card: uid, byPlayer: frame.controller });
       }
+      removeFromField(state, t.filter((u) => locate(state, u)?.zone === 'character'), 'hand', { byPlayer: frame.controller, by: frame.source });
       return true;
     }
     case 'noBlockerThisBattle':
@@ -2828,18 +2818,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'trashTarget': {
       const t = resolveTargets(state, frame, step.target, 'harm', `${srcName}: escolha um Personagem para o descarte.`);
       if (!t) return false;
-      for (const uid of t.filter((u) => locate(state, u)?.zone === 'character')) {
-        if (removalBlocked(state, uid, frame.controller)) {
-          log(state, frame.controller, `${cardDef(state, uid).name} não pode ser removido do campo.`);
-          continue;
-        }
-        if (offerReplacement(state, uid, 'trash', { byPlayer: frame.controller })) continue;
-        const owner = state.players[ownerOf(state, uid)];
-        detach(state, uid);
-        owner.trash.push(uid);
-        log(state, frame.controller, `${cardDef(state, uid).name} vai para o descarte.`);
-        emit(state, { kind: 'characterRemoved', player: owner.id, card: uid, byPlayer: frame.controller });
-      }
+      removeFromField(state, t.filter((u) => locate(state, u)?.zone === 'character'), 'trash', { byPlayer: frame.controller, by: frame.source });
       return true;
     }
     case 'trashRandomFromOpponentHand': {
@@ -3400,16 +3379,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         };
         return false;
       }
-      for (const uid of frame.choice.filter((u) => options.includes(u)).slice(0, n)) {
-        const loc = locate(state, uid);
-        if (!loc) continue;
-        opp.donRested += loc.fc.don;
-        removeCharacter(state, uid);
-        if (step.action === 'hand') opp.hand.push(uid);
-        else opp.deck.push(uid);
-        log(state, opp.id, `${cardDef(state, uid).name} ${step.action === 'hand' ? 'volta para a mão' : 'vai para o fundo do deck'}.`);
-        emit(state, { kind: 'characterRemoved', player: opp.id, card: uid, byPlayer: frame.controller });
-      }
+      // Quem escolhe é o dono, mas a remoção é do efeito de quem controla: as substituições valem.
+      const chosen = frame.choice.filter((u) => options.includes(u)).slice(0, n);
+      removeFromField(state, chosen, step.action === 'hand' ? 'hand' : 'deckBottom', { byPlayer: frame.controller, by: frame.source });
       return true;
     }
     case 'takeDamage':
@@ -3836,41 +3808,56 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'replaceRemoval': {
       const ability: Ability | undefined = step.inlineCost ? { timing: 'replace', steps: [], cost: step.inlineCost } : cardDef(state, frame.source).abilities[step.ability];
       const owner = state.players[frame.controller];
-      if (!locate(state, step.victim) || !ability) return true;
+      const ctx = removalCtx(step);
+      const onField = (u: string) => locate(state, u)?.zone === 'character';
+      const victims = step.victims.filter(onField);
+      const covered = step.covered.filter(onField);
+      // Esta substituição não volta a ser oferecida para estas remoções (recusada ou aplicada).
+      const skip = [...(step.skip ?? []), step.key];
+      // Recusar (ou não poder pagar) não gasta o [Once Per Turn] e passa para a próxima substituição (8-1-3-4-2).
+      const decline = () => {
+        continueRemoval(state, victims, step.action, ctx, skip);
+        return true;
+      };
+      if (!covered.length || !ability) return decline();
+      const names = covered.map((u) => cardDef(state, u).name).join(', ');
       if (!frame.choice) {
-        if (ability.cost && !costAsksOwner(state, owner.id, frame.source, ability.cost)) {
-          performRemoval(state, step.victim, step.action, step.inBattle);
-          return true;
-        }
+        if (ability.cost && !costAsksOwner(state, owner.id, frame.source, ability.cost)) return decline();
         askPay(
           state,
           owner.id,
           frame.source,
           ability.cost,
-          `${srcName}: ${cardDef(state, step.victim).name} vai sair do campo. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
+          `${srcName}: ${names} ${covered.length > 1 ? 'vão' : 'vai'} sair do campo. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
         );
         return false;
       }
-      if (!frame.choice.length) {
-        performRemoval(state, step.victim, step.action, step.inBattle);
-        return true;
-      }
+      if (!frame.choice.length) return decline();
       if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(frame.source, step.ability));
+      // Os que esta substituição não cobre continuam saindo (ou recebem a próxima substituição).
+      const rest = victims.filter((u) => !covered.includes(u));
+      const next: EffectStep[] = rest.length ? [{ do: 'removeFromField', victims: rest, action: step.action, ...ctx, skip }] : [];
       // "you may add it to the top of your Life cards face-down instead"
       if (ability.cost?.victimToLife) {
-        detach(state, step.victim);
-        owner.life.push(step.victim);
-        log(state, owner.id, `${cardDef(state, step.victim).name} vai para o topo da Vida em vez de sair do campo.`);
+        for (const uid of covered) {
+          detach(state, uid);
+          owner.life.push(uid);
+          log(state, owner.id, `${cardDef(state, uid).name} vai para o topo da Vida em vez de sair do campo.`);
+        }
+        frame.steps.splice(frame.i + 1, 0, ...next);
         return true;
       }
-      log(state, owner.id, `${srcName}: ${cardDef(state, step.victim).name} fica em campo (efeito de substituição).`);
+      log(state, owner.id, `${srcName}: ${names} ${covered.length > 1 ? 'ficam' : 'fica'} em campo (efeito de substituição).`);
       const costSteps = ability.cost ? payImmediateCost(state, owner.id, frame.source, ability.cost) : [];
       if (ability.cost?.victimPowerMinus) {
-        addModifier(state, owner.id, { uid: step.victim, kind: 'power', amount: -ability.cost.victimPowerMinus, duration: 'turn' });
+        for (const uid of covered) addModifier(state, owner.id, { uid, kind: 'power', amount: -ability.cost.victimPowerMinus, duration: 'turn' });
       }
-      frame.steps.splice(frame.i + 1, 0, ...costSteps, ...ability.steps);
+      frame.steps.splice(frame.i + 1, 0, ...costSteps, ...next, ...ability.steps);
       return true;
     }
+    case 'removeFromField':
+      continueRemoval(state, step.victims.filter((u) => locate(state, u)?.zone === 'character'), step.action, removalCtx(step), step.skip ?? []);
+      return true;
     case 'replaceDamage': {
       const ability = cardDef(state, frame.source).abilities[step.ability];
       const owner = state.players[frame.controller];
@@ -3962,13 +3949,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         }
       }
       const bottom = Boolean(step.choose) && frame.choice?.[0] === '1';
-      for (const uid of targets.filter((u) => locate(state, u)?.zone === 'character')) {
-        const owner = state.players[ownerOf(state, uid)];
-        detach(state, uid);
-        if (bottom) owner.life.unshift(uid);
-        else owner.life.push(uid);
-        log(state, frame.controller, `${cardDef(state, uid).name} vai para o ${bottom ? 'fundo' : 'topo'} da Vida de ${owner.name}.`);
-      }
+      removeFromField(state, targets.filter((u) => locate(state, u)?.zone === 'character'), 'life', {
+        byPlayer: frame.controller,
+        by: frame.source,
+        ...(bottom ? { bottom: true } : {}),
+      });
       return true;
     }
     case 'peekLife': {
@@ -4121,19 +4106,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'toDeckBottom': {
       const t = resolveTargets(state, frame, step.target, 'harm', `${srcName}: escolha um personagem para o fundo do deck.`);
       if (!t) return false;
-      for (const uid of t) {
-        if (locate(state, uid)?.zone !== 'character') continue;
-        if (removalBlocked(state, uid, frame.controller)) {
-          log(state, frame.controller, `${cardDef(state, uid).name} não pode ser removido do campo.`);
-          continue;
-        }
-        if (offerReplacement(state, uid, 'deckBottom', { byPlayer: frame.controller })) continue;
-        const owner = state.players[ownerOf(state, uid)];
-        detach(state, uid);
-        owner.deck.push(uid);
-        log(state, frame.controller, `${cardDef(state, uid).name} vai para o fundo do deck de ${owner.name}.`);
-        emit(state, { kind: 'characterRemoved', player: owner.id, card: uid, byPlayer: frame.controller });
-      }
+      removeFromField(state, t.filter((u) => locate(state, u)?.zone === 'character'), 'deckBottom', { byPlayer: frame.controller, by: frame.source });
       return true;
     }
     case 'fromTrashToHand': {
@@ -4449,55 +4422,135 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
 // Utilitários de zonas
 // ---------------------------------------------------------------------------
 
-type RemovalAction = 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
+type RemovalAction = RemovalStep['action'];
+/** Contexto da remoção: causa (batalha / efeito de quem) e, na Vida, topo ou fundo. */
+type RemovalCtx = Omit<RemovalStep, 'victims' | 'action' | 'skip'>;
+
+const removalCtx = (step: RemovalStep): RemovalCtx => ({
+  ...(step.inBattle ? { inBattle: true } : {}),
+  ...(step.byPlayer !== undefined ? { byPlayer: step.byPlayer } : {}),
+  ...(step.by ? { by: step.by } : {}),
+  ...(step.bottom ? { bottom: true } : {}),
+});
+
+/** A substituição `r` vale para esta remoção (evento e causa)? */
+function replacementMatches(r: Replacement, action: RemovalAction, owner: PlayerId, ctx: RemovalCtx): boolean {
+  const inBattle = Boolean(ctx.inBattle);
+  const byOpponentEffect = !inBattle && ctx.byPlayer !== undefined && ctx.byPlayer !== owner;
+  const cause = (by: Replacement['by']) => by === 'any' || (by === 'battle' ? inBattle : by === 'effect' ? !inBattle : byOpponentEffect);
+  // "would be K.O.'d": só K.O.
+  if (r.event !== 'removal' && action === 'ko' && cause(r.by)) return true;
+  // "would be removed from the field" / "would leave the field": qualquer saída do campo (o K.O. também),
+  // inclusive por efeito próprio quando o texto não diz "by your opponent('s effect)".
+  return r.event !== 'ko' && cause(r.event === 'koOrRemoval' ? (r.removalBy ?? r.by) : r.by);
+}
+
+/** Uma substituição aplicável: quem a oferece e quais das vítimas ela salva. */
+interface ReplacementOffer {
+  source: string;
+  ability: number;
+  key: string;
+  covered: string[];
+  inlineCost?: AbilityCost;
+}
 
 /**
- * Efeito de substituição disponível para o Personagem que vai sair do campo? Se houver,
- * empilha a pergunta ("pagar … em vez disso?") e devolve true: a remoção fica para depois da resposta.
+ * Próxima substituição a oferecer para as remoções simultâneas `victims`, na ordem de 8-1-3-4-2:
+ * primeiro as do jogador do turno, depois as do outro (cada jogador só substitui a saída dos seus
+ * Personagens); de cada jogador, primeiro as das próprias cartas afetadas, depois Líder → Personagens
+ * → Stage → as criadas por efeito ("during this turn"). As de `skip` já foram oferecidas. Uma oferta
+ * cobre todas as vítimas a que se aplica (um pagamento salva todas, Q&A OP15-009, OP11-001, OP05-001).
  */
-function offerReplacement(
-  state: GameState,
-  victim: string,
-  action: RemovalAction,
-  ctx: { inBattle?: boolean; byPlayer?: PlayerId },
-): boolean {
-  const loc = locate(state, victim);
-  if (!loc || loc.zone !== 'character') return false;
-  const owner = state.players[loc.player];
-  const byOpponentEffect = !ctx.inBattle && ctx.byPlayer !== undefined && ctx.byPlayer !== loc.player;
-  for (const fc of [owner.leader, ...owner.characters, ...(owner.stage ? [owner.stage] : [])]) {
-    const abilities = cardDef(state, fc.uid).abilities;
-    for (let i = 0; i < abilities.length; i++) {
-      const a = abilities[i];
-      const r = a.replace;
-      if (a.timing !== 'replace' || !r || r.event === 'rest' || r.event === 'damage') continue;
-      if (r.who === 'self' ? fc.uid !== victim : !targetCandidates(state, owner.id, fc.uid, { ...r.who, side: 'own' }).includes(victim)) continue;
-      const isKO = action === 'ko';
-      const eventOk =
-        (r.event !== 'removal' && isKO) || (r.event !== 'ko' && byOpponentEffect);
-      if (!eventOk) continue;
-      if (isKO && r.event === 'ko') {
-        if (r.by === 'battle' && !ctx.inBattle) continue;
-        if (r.by === 'effect' && ctx.inBattle) continue;
-        if (r.by === 'opponentEffect' && !byOpponentEffect) continue;
+function nextReplacement(state: GameState, victims: string[], action: RemovalAction, ctx: RemovalCtx, skip: string[]): ReplacementOffer | null {
+  for (const pid of [state.activePlayer, opponent(state.activePlayer)]) {
+    const owner = state.players[pid];
+    const mine = victims.filter((u) => owner.characters.some((c) => c.uid === u));
+    if (!mine.length) continue;
+    const sources = [
+      ...mine,
+      owner.leader.uid,
+      ...owner.characters.map((c) => c.uid).filter((u) => !mine.includes(u)),
+      ...(owner.stage ? [owner.stage.uid] : []),
+    ];
+    for (const src of sources) {
+      const abilities = cardDef(state, src).abilities;
+      for (let i = 0; i < abilities.length; i++) {
+        const a = abilities[i];
+        const r = a.replace;
+        if (a.timing !== 'replace' || !r || r.event === 'rest' || r.event === 'damage') continue;
+        if (skip.includes(usedKey(src, i))) continue;
+        if (!replacementMatches(r, action, pid, ctx)) continue;
+        const covered = mine.filter((v) => (r.who === 'self' ? src === v : targetCandidates(state, pid, src, { ...r.who, side: 'own' }).includes(v)));
+        if (!covered.length) continue;
+        if (!conditionsMet(state, src, a)) continue;
+        if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(src, i))) continue;
+        if (a.cost && !costAsksOwner(state, pid, src, a.cost)) continue;
+        return { source: src, ability: i, key: usedKey(src, i), covered };
       }
-      if (!conditionsMet(state, fc.uid, a)) continue;
-      if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) continue;
-      if (a.cost && !costAsksOwner(state, owner.id, fc.uid, a.cost)) continue;
-      pushEffect(state, fc.uid, owner.id, [
-        { do: 'replaceRemoval', victim, ability: i, action, ...(ctx.inBattle ? { inBattle: true } : {}) },
-      ]);
-      return true;
+    }
+    // "If any of your Characters would be K.O.'d in battle during this turn, you may … instead."
+    const temps = state.tempReplacements ?? [];
+    for (let k = 0; k < temps.length; k++) {
+      const t = temps[k];
+      if (t.player !== pid || action !== 'ko' || (t.by === 'battle' && !ctx.inBattle) || skip.includes(`temp:${k}`)) continue;
+      if (!costAsksOwner(state, pid, t.source, t.cost)) continue;
+      return { source: t.source, ability: -1, key: `temp:${k}`, covered: mine, inlineCost: t.cost };
     }
   }
-  // "If any of your Characters would be K.O.'d in battle during this turn, you may … instead."
-  for (const t of state.tempReplacements ?? []) {
-    if (t.player !== owner.id || action !== 'ko' || (t.by === 'battle' && !ctx.inBattle)) continue;
-    if (!costAsksOwner(state, owner.id, t.source, t.cost)) continue;
-    pushEffect(state, t.source, owner.id, [{ do: 'replaceRemoval', victim, ability: -1, action, inlineCost: t.cost, ...(ctx.inBattle ? { inBattle: true } : {}) }]);
+  return null;
+}
+
+/**
+ * Efeito de substituição disponível para os Personagens que vão sair do campo juntos? Se houver,
+ * empilha a pergunta ("pagar … em vez disso?") e devolve true: a remoção fica para depois das
+ * respostas. Recusada uma, a próxima é oferecida (8-1-3-4-2).
+ */
+function offerReplacement(state: GameState, victims: string[], action: RemovalAction, ctx: RemovalCtx, skip: string[] = []): boolean {
+  const live = victims.filter((u) => locate(state, u)?.zone === 'character');
+  const offer = live.length ? nextReplacement(state, live, action, ctx, skip) : null;
+  if (!offer) return false;
+  const owner = ownerOf(state, offer.covered[0]);
+  pushEffect(state, offer.source, owner, [
+    {
+      do: 'replaceRemoval',
+      victims: live,
+      covered: offer.covered,
+      ability: offer.ability,
+      key: offer.key,
+      action,
+      ...ctx,
+      skip,
+      ...(offer.inlineCost ? { inlineCost: offer.inlineCost } : {}),
+    },
+  ]);
+  return true;
+}
+
+/** Oferece as substituições que faltam ou, sem nenhuma, tira os Personagens do campo. */
+function continueRemoval(state: GameState, victims: string[], action: RemovalAction, ctx: RemovalCtx, skip: string[]) {
+  if (offerReplacement(state, victims, action, ctx, skip)) return;
+  for (const uid of victims) performRemoval(state, uid, action, ctx);
+}
+
+/**
+ * Personagens que saem do campo juntos por efeito ("K.O. all …", "return up to 2 …"): tira os que
+ * estão protegidos, oferece as substituições (cada uma uma vez para todos) e remove o resto.
+ */
+function removeFromField(state: GameState, victims: string[], action: RemovalAction, ctx: RemovalCtx) {
+  const live = victims.filter((uid) => {
+    const loc = locate(state, uid);
+    if (loc?.zone !== 'character') return false;
+    if (action === 'ko' && koProtected(state, uid, Boolean(ctx.inBattle), ctx.by)) {
+      log(state, loc.player, `${cardDef(state, uid).name} não pode ser nocauteado.`);
+      return false;
+    }
+    if (!ctx.inBattle && removalBlocked(state, uid, ctx.byPlayer)) {
+      log(state, ctx.byPlayer ?? loc.player, `${cardDef(state, uid).name} não pode ser removido do campo.`);
+      return false;
+    }
     return true;
-  }
-  return false;
+  });
+  continueRemoval(state, live, action, ctx, []);
 }
 
 /** Procura "If you would take damage, you may … instead" no campo do defensor e pergunta. */
@@ -4518,20 +4571,33 @@ function offerDamageReplacement(state: GameState, defender: PlayerId): boolean {
   return false;
 }
 
-/** Executa a remoção (depois de recusada a substituição). */
-function performRemoval(state: GameState, victim: string, action: RemovalAction, inBattle?: boolean) {
-  if (locate(state, victim)?.zone !== 'character') return;
+/** Executa a remoção (sem substituição: nenhuma se aplicou ou todas foram recusadas). */
+function performRemoval(state: GameState, victim: string, action: RemovalAction, ctx: RemovalCtx) {
+  const loc = locate(state, victim);
+  if (loc?.zone !== 'character') return;
   if (action === 'ko') {
-    koCharacter(state, victim, { inBattle, noReplace: true });
+    koCharacter(state, victim, { ...ctx, noReplace: true });
     return;
   }
-  const owner = state.players[ownerOf(state, victim)];
+  const owner = state.players[loc.player];
   detach(state, victim);
-  if (action === 'hand') owner.hand.push(victim);
-  else if (action === 'deckBottom') owner.deck.push(victim);
-  else if (action === 'trash') owner.trash.push(victim);
-  else owner.life.push(victim);
-  log(state, null, `${cardDef(state, victim).name} sai do campo.`);
+  const name = cardDef(state, victim).name;
+  if (action === 'hand') {
+    owner.hand.push(victim);
+    log(state, ctx.byPlayer ?? null, `${name} volta para a mão.`);
+  } else if (action === 'deckBottom') {
+    owner.deck.push(victim);
+    log(state, ctx.byPlayer ?? null, `${name} vai para o fundo do deck de ${owner.name}.`);
+  } else if (action === 'trash') {
+    owner.trash.push(victim);
+    log(state, ctx.byPlayer ?? null, `${name} vai para o descarte.`);
+  } else {
+    if (ctx.bottom) owner.life.unshift(victim);
+    else owner.life.push(victim);
+    log(state, ctx.byPlayer ?? null, `${name} vai para o ${ctx.bottom ? 'fundo' : 'topo'} da Vida de ${owner.name}.`);
+  }
+  emit(state, { kind: 'characterRemoved', player: owner.id, card: victim, byPlayer: ctx.byPlayer });
+  if (action === 'hand') emit(state, { kind: 'returnedToHand', player: owner.id, card: victim, byPlayer: ctx.byPlayer });
 }
 
 /** "cannot be removed from the field by your opponent's effects": o efeito de `byPlayer` não tira a carta do campo? */
@@ -4589,7 +4655,14 @@ function koCharacter(
     log(state, loc.player, `${cardDef(state, uid).name} não pode ser removido do campo.`);
     return;
   }
-  if (!opts.force && !opts.noReplace && offerReplacement(state, uid, 'ko', { inBattle: opts.inBattle, byPlayer: opts.byPlayer })) return;
+  if (!opts.force && !opts.noReplace) {
+    const ctx: RemovalCtx = {
+      ...(opts.inBattle ? { inBattle: true } : {}),
+      ...(opts.byPlayer !== undefined ? { byPlayer: opts.byPlayer } : {}),
+      ...(opts.by ? { by: opts.by } : {}),
+    };
+    if (offerReplacement(state, [uid], 'ko', ctx)) return;
+  }
   // [On K.O.]: as condições são checadas no campo, antes de a carta sair (10-2-17-1): DON!! dados,
   // [Your Turn]/[Opponent's Turn], condição, negação (8-2-1-1) e [Once Per Turn]. O efeito resolve
   // depois, com a carta já no trash.

@@ -10,7 +10,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Interação (tema) | Primitiva(s) | Situação |
 |---|---|---|
 | K.O. por efeito / por batalha (1) | `do: 'ko'`, `koCharacter` (engine.ts:4359), `onKO` | Existe (as condições do [On K.O.] são vistas no campo, antes do K.O.) |
-| Trash / voltar à mão / fundo do deck sem ser K.O. (1) | `trashTarget`, `returnToHand`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife` | Existe; `fieldToLife` e `opponentChoosesOwn` não oferecem substituição nem emitem `characterRemoved` (Parcial) |
+| Trash / voltar à mão / fundo do deck sem ser K.O. (1) | `trashTarget`, `returnToHand`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife` | Existe; todos passam por `removeFromField` (proteções, substituições, `characterRemoved`) |
 | "Cannot be K.O.'d (in battle / by effects)" (1) | `cannotBeKO{inBattle,byEffect}`, `staticNoBattleKO`, `staticNoEffectKO`, `noBattleKOVsAttribute`, auras | Parcial: "by your opponent's effects" também bloqueia K.O. por efeito próprio |
 | "Cannot be removed from the field by your opponent's effects" (1) | `staticNoRemoval`, `aura.noRemoval` → `removalBlocked` | Existe |
 | [Banish] / [Double Attack] (2) | palavra-chave + frame `damage` (`stepDamage`) | Existe |
@@ -18,7 +18,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Vida: adicionar, trashar, virar para cima, olhar (2) | `handToLife{faceUp}`, `addLifeFromDeck`, `trashLife`, `lifeToTrash`, `lifeFace`, `peekLife`, `arrangeLife`, `fieldToLife` | Parcial: `fieldToLife` ignora "face-up" |
 | "When you take damage" / "when you deal damage" / "when a Life card is removed" (2) | eventos `damageTaken`, `damageDealt`, `attackDamage`, `lifeRemoved`, `lifeZero` | Existe; a ordem em relação ao [Trigger] precisa ser conferida (ver divergências) |
 | [Trigger] (3) | timing `trigger`, pendência `lifeCard`, `playThis`, `addThisToHand`, `useMainEffect`, `useCounterEffect` | Parcial: a carta vai ao trash **antes** de resolver (deveria estar em área nenhuma) |
-| Substituição de K.O./remoção/rest/dano (4) | timing `replace` + `Replacement`, `tempReplace`, `replaceRemoval`, `replaceRest`, `replaceDamage` | Parcial: só a primeira substituição aplicável é oferecida; remoção por efeito próprio não é substituível; sem substituição para Líder/Stage |
+| Substituição de K.O./remoção/rest/dano (4) | timing `replace` + `Replacement`, `tempReplace`, `replaceRemoval`, `replaceRest`, `replaceDamage` | Existe: todas as aplicáveis em sequência (8-1-3-4-2), em toda remoção por efeito, um pagamento para as simultâneas. Falta: custos que tiram Personagem próprio do campo; Líder/Stage |
 | Substituição de outros acontecimentos (comprar, mão, Vida) (4) | — | Falta (nenhuma carta precisa hoje) |
 | [Blocker], [Unblockable], "cannot activate [Blocker]" (5) | `blockerOptions`, `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock` | Existe |
 | [Rush], [Rush: Character], atacar Personagens ativos (5) | palavras-chave, `attackError`, `canAttackActive` | Existe |
@@ -96,7 +96,7 @@ DON!! anexados (217), [Your Turn] (218), [Opponent's Turn] (219), `condition` vi
 | `endOfTurn` | [End of Your Turn] | Ação `endTurn` :1330 (antes de passar o turno; depois os `delayed` :1333) | parser.ts:46 |
 | `battlesCharacter` | "If this Character battles your opponent's Character, …" / "At the end of a battle in which this Character battles …" | `stepBattle` passo `end` :1750 (`last` = o oponente da batalha) | parser.ts:2540, :2655 |
 | `event` | "When …" (reação a um `GameEvent`, `Ability.event`) | `emit` :1490 (varre Líder, Personagens e Stage dos dois jogadores) + `eventMatches` :1512 | parser.ts:2567, :2627, :2738 (`parseEvent` :2407) |
-| `replace` | "If … would be K.O.'d / removed from the field / rested / If you would take damage, you may … instead" (`Ability.replace` + `cost`) | K.O./remoção: `offerReplacement` :4240 (chamado em `koCharacter` :4374, `returnToHand` :2283, `trashTarget` :2616, `toDeckBottom` :3915); virar: `restCard` :1591-1603; dano: `offerDamageReplacement` :4286 (chamado em `stepDamage` :1779) | parser.ts:2665-2719 |
+| `replace` | "If … would be K.O.'d / removed from the field / rested / If you would take damage, you may … instead" (`Ability.replace` + `cost`) | K.O./remoção: `offerReplacement`/`nextReplacement` (chamado em `koCharacter` e em `removeFromField`, usado por `ko`, `returnToHand`, `trashTarget`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife`); virar: `restCard` :1591-1603; dano: `offerDamageReplacement` :4286 (chamado em `stepDamage` :1779) | parser.ts:2665-2719 |
 | `startOfTurn` | "This effect can be activated at the start of your turn." | `startTurn` :1358-1365 (antes da Renovação; a condição do 1º passo é vista nesse momento) | parser.ts:2524-2533 |
 | `static` | Efeito contínuo (sem marcação) | Lido sob demanda: `getPower` :584, `getCost` :448, `hasKeyword` :631, `aurasOn` :530, `koProtected` :4328, `removalBlocked` :4320, `attackError` :686, `playCost` :736, `counterValue` :165, `noRefreshByAura` :1400, `restCard` :1585, `leaderRule` :156 | `parseStatic` parser.ts:2521 |
 
@@ -156,7 +156,7 @@ Colunas: **types** = linha em types.ts; **engine** = `case` em `execStep`.
 | `koOwn` | count, spec | Custo "K.O. N of your …" (`force`) | 655 | 2582 |
 | `anyNumberForPower` | source field/trash, action ko/hand/bottom, spec/filter, power, every, target, duration | "You may K.O./return/place any number of … +N power for every …" | 529 | 2985 |
 
-`koCharacter` (:4359): `koProtected` (:4328) → `removalBlocked` (:4320, só por efeito) → `offerReplacement` (:4374) →
+`koCharacter` (:4359): `koProtected` (:4328) → `removalBlocked` (:4320, só por efeito) → `offerReplacement` (com `noReplace`, já oferecida) →
 avalia os [On K.O.] no campo (`conditionsMet`, [Once Per Turn], `koBy`) → move ao descarte, DON!! anexados voltam virados,
 emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 
@@ -166,7 +166,7 @@ emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 | `returnToHand` | target | Devolve Personagem/Stage à mão do dono (proteção `removalBlocked`, substituição, eventos `characterRemoved` + `returnedToHand`) | 497 | 2267 |
 | `returnOwn` | count, spec | Custo "return N of your Characters to hand" | 641 | 2563 |
 | `returnSelfToHand` | — | Custo "return this Character to the owner's hand" | 643 | 2636 |
-| `opponentChoosesOwn` | count, spec, action hand/bottom | "Your opponent returns/places 1 of their Characters …" (o oponente escolhe) | 571 | 3166 |
+| `opponentChoosesOwn` | count, spec, action hand/bottom | "Your opponent returns/places 1 of their Characters …" (o oponente escolhe; depois proteção + substituição + `characterRemoved` via `removeFromField`) | 571 | 3166 |
 | `fromTrashToHand` | upTo, filter | Do descarte para a mão | 697 | 3924 |
 | `addThisToHand` | — | [Trigger] "… and add this card to your hand" | 727 | 3887 |
 
@@ -213,7 +213,7 @@ emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 | `opponentLifeToHand` | count | Vida do oponente → mão dele | 667 | 3587 |
 | `handToLife` | upTo, filter?, faceUp?, fromTrash?, trashOnly?, choose? | Mão (ou descarte) → topo/fundo da Vida, opcionalmente virada para cima | 632 | 3701 |
 | `handPlayOrLife` | filter, from? | "Select … from your hand and play it or add it to the top of your Life cards face-up" | 516 | 2890 |
-| `fieldToLife` | target, choose? | Personagem do campo → topo/fundo da Vida do dono (**sempre virada para baixo**, ver 5) | 634 | 3733 |
+| `fieldToLife` | target, choose? | Personagem do campo → topo/fundo da Vida do dono (**sempre virada para baixo**, ver 5; proteção + substituição + `characterRemoved` via `removeFromField`) | 634 | 3733 |
 | `addLifeFromDeck` | count | Topo do deck → topo da Vida | 729 | 3896 |
 | `lifeFace` | count, up | Vira N Vidas para cima/baixo (custo ou efeito) | 647 | 2685 |
 | `revealLifeTop` | — | Revela o topo da Vida | 511 | 3439 |
@@ -321,14 +321,22 @@ Existe primitivo: **timing `replace`** + `Ability.replace: Replacement` (types.t
 `Ability.cost` (o que se paga "instead") + `steps` extras (ex.: "trash this Character and draw 1 card instead").
 
 Fluxo "If this Character would be K.O.'d, you may X instead":
-1. `koCharacter` (engine.ts:4374) chama `offerReplacement` (:4240), que procura no campo do dono da vítima (Líder →
-   Personagens → Stage) a **primeira** habilidade `replace` aplicável (vítima, evento, causa, condição, Once Per Turn,
-   custo pagável/`costAsksOwner`) e empilha o passo interno `replaceRemoval` (types 672, engine 3619).
-2. `replaceRemoval` abre `confirm` (`askPay` :2062). "Não" → `performRemoval` (:4304, com `noReplace`). "Sim" → marca
-   Once Per Turn, paga o custo (`payImmediateCost`), aplica `victimPowerMinus`/`victimToLife` e insere `steps`.
+1. `koCharacter` (um Personagem, ex.: batalha) ou `removeFromField` (os alvos de um efeito, juntos: `ko`, `returnToHand`,
+   `trashTarget`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife`; tira antes os protegidos) chamam `offerReplacement`.
+   `nextReplacement` acha a próxima aplicável (`replacementMatches`: evento e causa; vítimas cobertas; condição, Once Per
+   Turn, custo pagável/`costAsksOwner`) na ordem de 8-1-3-4-2: jogador do turno, depois o outro; de cada um, as das cartas
+   afetadas, Líder → Personagens → Stage → `tempReplacements`. Empilha o passo interno `replaceRemoval` com as vítimas, as
+   cobertas (`covered`) e as já oferecidas (`skip`).
+2. `replaceRemoval` abre `confirm` (`askPay`). "Não" (ou sem como pagar) → `continueRemoval`: oferece a próxima ou, sem
+   nenhuma, `performRemoval` em todas (K.O. via `koCharacter` com `noReplace`; o resto move a carta e emite
+   `characterRemoved`/`returnedToHand`). "Sim" → marca Once Per Turn, paga o custo uma vez (`payImmediateCost`), aplica
+   `victimPowerMinus`/`victimToLife` a cada coberta, insere `steps` e o passo `removeFromField` para as não cobertas.
+- Causa (`replacementMatches`): `ko` só K.O.; `removal` qualquer saída do campo (K.O. incluído); `koOrRemoval` os dois.
+  `by`: `opponentEffect` exige efeito do oponente; `any` vale até contra efeito próprio e, na remoção, K.O. em batalha.
+  `removalBy` dá a causa da remoção quando difere da do K.O. ("removed … by your opponent's effect or K.O.'d").
 - Virar: `restCard` :1591 → passo `replaceRest` (562/3025). Dano: `offerDamageReplacement` :4286 → `replaceDamage` (681/3657).
 - Temporária ("If any of your Characters would be K.O.'d in battle during this turn, you may … instead"):
-  passo `tempReplace` (560/3042) → `state.tempReplacements`, consultado no fim de `offerReplacement` :4272-4277.
+  passo `tempReplace` (560/3042) → `state.tempReplacements`, consultado por último em `nextReplacement` (cada uma cobre todas as vítimas do jogador).
 - Custos exclusivos de substituição em `AbilityCost` (types.ts:755-820): `koSelf`, `victimPowerMinus`, `victimToLife`,
   `restOpponentChars`, `selfPowerMinus`, `either`.
 - Outras "instead" sem ser remoção: "If X, choose Y instead of Z" (troca de alvo, `parseSpecialPair` parser.ts:1950);
@@ -426,7 +434,7 @@ Todos disparam habilidades `timing: 'event'` **de cartas em campo** (Líder, Per
 | `donGiven` | "When this Leader or 1 of your Characters is given a DON!! card" | `attachDon` :1265; `giveRestedDon` :2240; `giveActiveDon` :2824; `moveGivenDon` :2886 |
 | `damageTaken` / `damageDealt` | "When you take damage" / "When you deal damage to your opponent's Life" | `stepDamage` :1770-1771 (uma vez por frame de dano) |
 | `anyOf` {events} | "When X or Y" | (composição, `emit` :1496) |
-| `characterRemoved` {whose, by, filter?, orKO?} | "When … is removed from the field (by your/your opponent's effect) (or K.O.'d)" | `koCharacter` :4383; `returnToHand` :2289; `trashTarget` :2621; `opponentChoosesOwn` :3194; `toDeckBottom` :3920 |
+| `characterRemoved` {whose, by, filter?, orKO?} | "When … is removed from the field (by your/your opponent's effect) (or K.O.'d)" | `koCharacter`; `performRemoval` (`returnToHand`, `trashTarget`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife`) |
 | `characterKO` {whose, filter?} | "When a Character / your opponent's Character / your {X} Character is K.O.'d" | `koCharacter` :4381 |
 | `eventActivated` {who} | "When you/your opponent activate(s) an Event" | :1161, :1253, :3469 |
 | `blockerActivated` {who} | "When your opponent activates [Blocker]" | :1133 |
@@ -515,10 +523,10 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | # | Forma | Situação | Local / Completa | Detalhes |
 |---|---|---|---|---|
 | 1 | Substituição genérica ("instead") | **Parcial** | 12 / 76 | Primitivo só para K.O., remoção do campo, virar e dano (2.13); cobre ~69 cartas "would be K.O.'d/removed/rested". Sem primitivo para substituir outros acontecimentos (comprar, ir para a mão, descartar da mão, Vida…) — hoje nenhuma carta precisa. |
-| 1a | Várias substituições aplicáveis ao mesmo evento | **Não existe** | — | `offerReplacement` oferece só a primeira (ordem Líder → Personagens → Stage, engine.ts:4250-4271); recusada, `performRemoval` usa `noReplace` (:4307) e as outras nunca são oferecidas. Exemplo: OP13-047 + substituição própria da vítima. |
-| 1b | "would be removed from the field" sem "by your opponent" / "would leave the field" | **Parcial** | 0 / ~3 (OP17-043, EB04-044, OP05-100) | Remoção que não é K.O. só é substituída quando o efeito é do oponente (`eventOk`, :4258-4259); sair do campo por efeito próprio não oferece a substituição. "leave the field" vira `koOrRemoval` (clean :262). |
-| 1c | Remoções que não oferecem substituição nem emitem `characterRemoved` | **Parcial** | — | `fieldToLife` (:3733) e `opponentChoosesOwn` (:3166) respeitam `removalBlocked`, mas não chamam `offerReplacement`; `fieldToLife` também não emite `characterRemoved`. |
-| 1d | Substituição para Líder/Stage | **Não existe** | 0 / 0 | `offerReplacement` exige `zone === 'character'` (:4247). |
+| 1a | Várias substituições aplicáveis ao mesmo evento | **Existe** (DV-11 corrigida) | — | `nextReplacement` oferece em sequência (jogador do turno → outro; carta afetada → Líder → Personagens → Stage → temporárias); recusada, a próxima. Sem escolha de ordem à parte: a sequência já permite usar qualquer uma. |
+| 1b | "would be removed from the field" sem "by your opponent" / "would leave the field" | **Existe** em efeitos (DV-12) | 0 / ~3 (OP17-043, EB04-044, OP05-100) | `replacementMatches` usa `by` também na remoção: sem "by your opponent", vale contra efeito próprio. "leave the field" vira `koOrRemoval` (clean :262). Falta: custos que tiram Personagem próprio do campo (`returnOwn`, `koOwn`, `trashOwn`; Q&A OP05-100 + OP01-047). |
+| 1c | Remoções que não oferecem substituição nem emitem `characterRemoved` | **Existe** (DV-12) | — | Todas as remoções por efeito passam por `removeFromField` → `performRemoval`, inclusive `fieldToLife` e `opponentChoosesOwn`; os removidos juntos recebem cada substituição uma vez (um pagamento salva todos). |
+| 1d | Substituição para Líder/Stage | **Não existe** | 0 / 0 | `offerReplacement` só considera Personagens no campo. |
 | 2 | "cannot be removed from the field by effects" | **Existe** (só "by your opponent's effects") | 1 / 11 | `staticNoRemoval` / `aura.noRemoval` → `removalBlocked` (:4320). Não há versão temporária ("during this turn") — 0 cartas. |
 | 3 | "cannot be K.O.'d in battle" | **Existe** | 8 / 19 | `staticNoBattleKO`, `noBattleKOVsAttribute`, `noBattleKOByLeader`, `aura.noBattleKO`, `cannotBeKO{inBattle}`. |
 | 4 | "cannot be K.O.'d by your opponent's effects" | **Parcial** | 7 / 17 | Vira `staticNoEffectKO` (parser.ts:2898), que em `koProtected` (:4328) também bloqueia K.O. por efeito **próprio** (só custos usam `force`). |

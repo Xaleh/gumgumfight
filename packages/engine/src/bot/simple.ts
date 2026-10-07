@@ -38,6 +38,16 @@ function pickDonToReturn(state: GameState, player: PlayerId, sources: string[]):
   return best;
 }
 
+/**
+ * A pergunta é uma substituição contra uma remoção (sem K.O.) feita pelo próprio efeito do bot
+ * ("return 1 of your Characters", "add … to the top of your Life")? Ele escolheu remover: não paga.
+ */
+function ownRemoval(state: GameState, player: PlayerId): boolean {
+  const frame = state.stack[state.stack.length - 1];
+  const step = frame?.kind === 'effect' ? frame.steps[frame.i] : undefined;
+  return step?.do === 'replaceRemoval' && step.action !== 'ko' && step.byPlayer === player;
+}
+
 function choosePending(state: GameState, player: PlayerId, actions: Action[]): Action {
   const pending = state.pending!;
   const me = state.players[player];
@@ -57,7 +67,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
 
     // Paga custos opcionais quando dá; sem como pagar, só resta recusar.
     case 'confirm':
-      return { type: 'answer', player, yes: !pending.cannot };
+      return { type: 'answer', player, yes: !pending.cannot && !ownRemoval(state, player) };
 
     // Carta da Vida: ativa o [Trigger] quando há um; senão só coloca na mão.
     case 'lifeCard':

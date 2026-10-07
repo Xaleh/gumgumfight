@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 6;
+export const REPLAY_VERSION = 7;
 
 /**
  * Replays de versões anteriores foram gravados quando o motor pulava sem ação etapas que hoje
@@ -19,7 +19,11 @@ export const REPLAY_VERSION = 6;
  * uma carta que saiu do campo e voltou no mesmo turno hoje pode ser usado de novo; não há decisão
  * nova a inserir, então a versão não mudou.) Até a versão 5, a escolha de alvos sem "up to" aceitava
  * 0 alvos; a gravada com menos alvos do que hoje é obrigatório (8-4-4-1) é completada com as
- * primeiras opções.
+ * primeiras opções. Até a versão 6, só a primeira substituição aplicável ("… instead") era
+ * oferecida, só contra remoção por efeito do oponente (fora `fieldToLife` e "your opponent
+ * chooses") e uma vez por Personagem; a pergunta que o roteiro antigo não tem é recusada (o que
+ * acontecia antes). Pagar uma vez hoje salva todos os Personagens removidos juntos, então um replay
+ * antigo que pagou por cada um pode tomar outro rumo.
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -37,6 +41,9 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     if (p.kind === 'confirm' && p.cannot) {
       return next?.type === 'answer' && !next.yes && next.player === p.player ? null : { type: 'answer', player: p.player, yes: false };
     }
+    if (p.kind === 'confirm' && replacementAsked()) {
+      return next?.type === 'answer' && next.player === p.player ? null : { type: 'answer', player: p.player, yes: false };
+    }
     if (p.kind === 'option' && (p.order || p.don)) {
       return next?.type === 'option' && next.player === p.player ? null : { type: 'option', player: p.player, index: 0 };
     }
@@ -44,6 +51,11 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
       return next?.type === 'choose' && !next.uids.length && next.player === p.player ? null : { type: 'choose', player: p.player, uids: [] };
     }
     return null;
+  };
+  /** A pergunta aberta é a de uma substituição contra remoção (passo `replaceRemoval`)? */
+  const replacementAsked = () => {
+    const frame = state.stack[state.stack.length - 1];
+    return frame?.kind === 'effect' && frame.steps[frame.i]?.do === 'replaceRemoval';
   };
   const step = (a: Action) => {
     state = applyAction(state, a);
