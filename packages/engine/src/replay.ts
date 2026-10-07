@@ -4,12 +4,13 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 2;
+export const REPLAY_VERSION = 3;
 
 /**
- * Replays da versão 1 foram gravados quando a etapa de Counter sem opções e a carta de
- * Vida sem [Trigger] eram puladas sem ação. Hoje o motor sempre pede uma ação nesses
- * pontos; esta função insere as respostas implícitas para o roteiro antigo continuar válido.
+ * Replays de versões anteriores foram gravados quando o motor pulava sem ação etapas que hoje
+ * sempre pedem uma: a etapa de Counter sem opções e a carta de Vida sem [Trigger] (versão 1);
+ * a pergunta "pagar X?" sem como pagar e as escolhas na mão ou no deck sem opção (versão 2).
+ * Esta função insere as respostas implícitas para o roteiro antigo continuar válido.
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -23,6 +24,12 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     }
     if (p.kind === 'lifeCard' && !state.defs[state.cards[p.card].cardId].abilities.some((a) => a.timing === 'trigger')) {
       return next?.type === 'answer' && next.player === p.player ? null : { type: 'answer', player: p.player, yes: false };
+    }
+    if (p.kind === 'confirm' && p.cannot) {
+      return next?.type === 'answer' && !next.yes && next.player === p.player ? null : { type: 'answer', player: p.player, yes: false };
+    }
+    if (p.kind === 'selectTargets' && p.hidden && !p.options.length) {
+      return next?.type === 'choose' && !next.uids.length && next.player === p.player ? null : { type: 'choose', player: p.player, uids: [] };
     }
     return null;
   };
