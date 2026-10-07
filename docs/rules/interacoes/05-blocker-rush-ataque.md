@@ -27,4 +27,4 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 `blockerOptions` (engine.ts:817): um [Blocker] por batalha, não rested, não o próprio alvo, respeita [Unblockable] e "cannot be rested"; Rush e Rush: Character em `attackError`; saída de cena checada ao fim de cada etapa (conforme).
 
-Divergências deste tema: DV-04 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: nenhuma (corrigidas: DV-04) (detalhes em [../divergencias.md](../divergencias.md)).

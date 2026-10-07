@@ -27,4 +27,4 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 Pendência `lifeCard` sempre aberta para o dono (não vaza se havia Trigger); o Trigger resolve antes do 2º dano; [Trigger] de Evento não conta como "activate an Event" (conforme).
 
-Divergências deste tema: DV-17, DV-05 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-17 (corrigidas: DV-05) (detalhes em [../divergencias.md](../divergencias.md)).

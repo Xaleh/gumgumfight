@@ -429,10 +429,11 @@ autoridade; `viewFor(estado, jogador, apelidos)` gera a visão de cada jogador, 
 - Efeitos de substituição ("instead"), [End of Your Turn], custos DON!! −X, Vida virada para cima
 
 As regras oficiais resumidas, o catálogo de interações (com os rulings da Bandai), as divergências conhecidas do motor
-e o mapa das primitivas da DSL estão em [`docs/rules/`](docs/rules/README.md). As principais limitações hoje são a
-ordem de resolução de efeitos disparados juntos (pilha em vez de fila; ver
-[`docs/rules/divergencias.md`](docs/rules/divergencias.md)) e as poucas formas de efeito sem primitiva
-(listadas em [`docs/rules/mapeamento-dsl.md`](docs/rules/mapeamento-dsl.md)).
+e o mapa das primitivas da DSL estão em [`docs/rules/`](docs/rules/README.md). Os efeitos automáticos disparados
+resolvem em fila, como na regra 8-6 (primeiro os do jogador do turno, cada um depois do efeito que o disparou, e o
+dono escolhe a ordem entre os seus). As divergências que ainda faltam corrigir estão em
+[`docs/rules/divergencias.md`](docs/rules/divergencias.md), e as formas de efeito sem primitiva em
+[`docs/rules/mapeamento-dsl.md`](docs/rules/mapeamento-dsl.md).
 
 ## Dados das cartas
 

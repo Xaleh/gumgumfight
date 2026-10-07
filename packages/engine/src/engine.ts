@@ -34,6 +34,7 @@ import type {
   StateSnapshot,
   TargetRef,
   TargetSpec,
+  TriggeredEffect,
 } from './types';
 
 export const MAX_CHARACTERS = 5;
@@ -679,7 +680,7 @@ function releaseOncePerTurn(state: GameState, uid: string, index: number | undef
 }
 
 export function isIdle(state: GameState): boolean {
-  return state.phase === 'main' && !state.pending && state.stack.length === 0;
+  return state.phase === 'main' && !state.pending && state.stack.length === 0 && !state.triggered?.length;
 }
 
 /** Motivo pelo qual o ataque é ilegal, ou null se for legal. */
@@ -939,7 +940,7 @@ export function applyAction(prev: GameState, action: Action): GameState {
     handlePendingResponse(state, action);
   } else {
     if (state.phase !== 'main' || state.activePlayer !== p) throw new IllegalActionError('Não é o seu turno.');
-    if (state.stack.length) throw new IllegalActionError('Há efeitos em resolução.');
+    if (state.stack.length || state.triggered?.length) throw new IllegalActionError('Há efeitos em resolução.');
     // Guarda o estado de antes: se a ação parar numa escolha do próprio jogador, ele pode cancelar.
     const checkpoint = makeCheckpoint(prev);
     handleMainAction(state, action);
@@ -1012,6 +1013,9 @@ function restoreCheckpoint(state: GameState, p: PlayerId) {
   const info = state.cancel!;
   delete state.checkpoint;
   delete state.cancel;
+  // Campos criados depois do checkpoint (contadores, fila de efeitos…) também voltam ao que eram.
+  const kept = new Set(['defs', 'cards', 'log', 'actionCount', ...Object.keys(cp.snap)]);
+  for (const k of Object.keys(state)) if (!kept.has(k)) delete (state as unknown as Record<string, unknown>)[k];
   Object.assign(state, structuredClone(cp.snap));
   const name = (uid: string) => cardDef(state, uid).name;
   const a = info.action;
@@ -1169,6 +1173,12 @@ function handlePendingResponse(state: GameState, action: Action) {
       if (!Number.isInteger(action.index) || action.index < 0 || action.index >= pending.options.length) {
         throw new IllegalActionError('Opção inválida.');
       }
+      state.pending = null;
+      if (pending.order) {
+        const chosen = state.triggered?.find((e) => e.id === pending.order![action.index]);
+        if (chosen) activateTriggered(state, chosen);
+        return;
+      }
       const top = state.stack[state.stack.length - 1];
       if (top?.kind === 'effect') top.choice = [String(action.index)];
       state.pending = null;
@@ -1264,7 +1274,7 @@ function handleMainAction(state: GameState, action: Action) {
       loc.fc.don++;
       emit(state, { kind: 'donGiven', player: p, card: action.target });
       // Anexar disparou um efeito: o DON!! já foi "usado". Senão, ele pode voltar (detachDon).
-      if (state.stack.length) lockDon(ps);
+      if (state.stack.length || state.triggered?.length) lockDon(ps);
       else loc.fc.donLoose = (loc.fc.donLoose ?? 0) + 1;
       return;
     }
@@ -1329,12 +1339,8 @@ function handleMainAction(state: GameState, action: Action) {
       for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
         pushAbilities(state, fc.uid, 'endOfTurn');
       }
-      // "… at the end of this turn"
-      for (const d of state.delayed ?? []) {
-        pushEffect(state, d.source, d.controller, d.steps);
-        const top = state.stack[state.stack.length - 1];
-        if (top?.kind === 'effect' && d.last) top.last = d.last;
-      }
+      // "… at the end of this turn": depois de todos os [End of Your Turn] (6-6-1-2).
+      queueDelayed(state, state.delayed ?? []);
       state.delayed = [];
       return;
     }
@@ -1445,8 +1451,11 @@ function endTurn(state: GameState) {
 
 function run(state: GameState) {
   let guard = 0;
-  while (!state.pending && state.stack.length && state.phase !== 'gameover') {
+  while (!state.pending && (state.stack.length || state.triggered?.length) && state.phase !== 'gameover') {
     if (++guard > 5000) throw new Error('Loop infinito na resolução de efeitos.');
+    // Efeitos disparados entram na pilha um de cada vez, quando chega a vez deles (8-6).
+    if (nextTriggered(state)) continue;
+    if (!state.stack.length) break;
     const frame = state.stack[state.stack.length - 1];
     switch (frame.kind) {
       case 'effect':
@@ -1474,6 +1483,125 @@ function pushEffect(state: GameState, source: string, controller: PlayerId, step
   if (steps.length) state.stack.push({ kind: 'effect', source, controller, steps: [...steps], i: 0 }); // cópia: passos podem ser inseridos durante a resolução
 }
 
+// ---------------------------------------------------------------------------
+// Efeitos disparados (CR 8-6)
+//
+// Um efeito automático ("When …", [On Play], [On K.O.], [When Attacking]…) não entra na
+// pilha na hora em que dispara: ele vai para `state.triggered` e espera não haver nenhum
+// efeito nem dano em resolução.
+//  - Disparou enquanto um efeito resolvia: espera esse efeito terminar (8-6-3, 8-6-1-1).
+//  - Disparou durante o dano: espera todo o dano (8-6-2); só o [Trigger] interrompe o dano.
+//  - Depois, um de cada vez, na ordem em que dispararam; os disparados juntos (mesmo lote)
+//    resolvem primeiro os do jogador do turno, depois os do outro (8-6-1). Entre vários do
+//    mesmo jogador vindos de cartas diferentes, o dono escolhe a ordem (6-6-1-1-3, Q&A).
+//  - Na hora de ativar, a carta precisa continuar no campo (8-1-3-1-3) e as condições da
+//    habilidade precisam valer (8-4-1-1). O [On K.O.] e os efeitos adiados são exceção.
+// ---------------------------------------------------------------------------
+
+const TIMING_TAG: Partial<Record<AbilityTiming, string>> = {
+  onPlay: '[Ao Jogar]',
+  whenAttacking: '[Ao Atacar]',
+  onOpponentAttack: '[No Ataque do Oponente]',
+  onBlock: '[Ao Bloquear]',
+  onKO: '[Ao ser Nocauteado]',
+  endOfTurn: '[Fim do Seu Turno]',
+  battlesCharacter: '(fim da batalha)',
+};
+
+function queueTriggered(
+  state: GameState,
+  source: string,
+  controller: PlayerId,
+  steps: EffectStep[],
+  extra: { timing?: AbilityTiming; ability?: number; opt?: string; offField?: true; last?: string[]; eventCount?: number } = {},
+): TriggeredEffect | null {
+  if (!steps.length) return null;
+  const tag = extra.timing ? TIMING_TAG[extra.timing] : undefined;
+  const e: TriggeredEffect = {
+    id: (state.triggerSeq = (state.triggerSeq ?? 0) + 1),
+    source,
+    controller,
+    steps: [...steps],
+    label: `${cardDef(state, source).name}${tag ? ` ${tag}` : ''}`,
+    batch: state.triggerBatch ?? 0,
+    ...(extra.offField ? { offField: true as const } : {}),
+    ...(extra.ability !== undefined ? { ability: extra.ability } : {}),
+    ...(extra.opt ? { opt: extra.opt } : {}),
+    ...(extra.last ? { last: extra.last } : {}),
+    ...(extra.eventCount !== undefined ? { eventCount: extra.eventCount } : {}),
+  };
+  (state.triggered ??= []).push(e);
+  return e;
+}
+
+/** Efeitos adiados ("at the end of this turn/battle"): resolvem depois dos efeitos já disparados. */
+function queueDelayed(state: GameState, list: Array<{ source: string; controller: PlayerId; steps: EffectStep[]; last?: string[] }>) {
+  if (!list.length) return;
+  state.triggerBatch = (state.triggerBatch ?? 0) + 1;
+  for (const d of list) queueTriggered(state, d.source, d.controller, d.steps, { offField: true, ...(d.last ? { last: d.last } : {}) });
+}
+
+/**
+ * Leva para a pilha o próximo efeito disparado, ou pergunta ao dono a ordem. Só quando não há
+ * efeito nem dano em resolução. Devolve true se mexeu na pilha, na fila ou abriu uma escolha.
+ */
+function nextTriggered(state: GameState): boolean {
+  const queue = state.triggered;
+  if (!queue?.length) return false;
+  if (state.stack.some((f) => f.kind === 'effect' || f.kind === 'damage')) return false;
+  const batch = Math.min(...queue.map((e) => e.batch));
+  const together = queue.filter((e) => e.batch === batch);
+  const player = together.some((e) => e.controller === state.activePlayer) ? state.activePlayer : opponent(state.activePlayer);
+  const mine = together.filter((e) => e.controller === player);
+  // Na vez dele, a carta saiu do campo ou a condição deixou de valer: o efeito não ativa.
+  const lapsed = mine.find(
+    (e) => !e.offField && (!locate(state, e.source) || (e.ability !== undefined && !conditionsMet(state, e.source, cardDef(state, e.source).abilities[e.ability]))),
+  );
+  if (lapsed) {
+    dropTriggered(state, lapsed);
+    const why = locate(state, lapsed.source) ? 'a condição não vale mais' : 'a carta saiu do campo';
+    log(state, lapsed.controller, `${lapsed.label}: ${why}, o efeito não é ativado.`);
+    return true;
+  }
+  if (new Set(mine.map((e) => e.source)).size > 1) {
+    state.pending = {
+      kind: 'option',
+      player,
+      source: mine[0].source,
+      prompt: 'Efeitos que ativaram ao mesmo tempo: escolha qual resolve primeiro.',
+      options: mine.map((e) => e.label),
+      order: mine.map((e) => e.id),
+    };
+    return true;
+  }
+  activateTriggered(state, mine[0]);
+  return true;
+}
+
+function removeTriggered(state: GameState, e: TriggeredEffect) {
+  state.triggered = (state.triggered ?? []).filter((x) => x.id !== e.id);
+  if (!state.triggered.length) delete state.triggered;
+}
+
+function dropTriggered(state: GameState, e: TriggeredEffect) {
+  removeTriggered(state, e);
+  if (e.opt) {
+    const i = state.usedThisTurn.lastIndexOf(e.opt);
+    if (i >= 0) state.usedThisTurn.splice(i, 1);
+  }
+}
+
+/** O efeito disparado ativa: vai para a pilha. Os que ele disparar formam um lote novo. */
+function activateTriggered(state: GameState, e: TriggeredEffect) {
+  removeTriggered(state, e);
+  state.triggerBatch = (state.triggerBatch ?? 0) + 1;
+  pushEffect(state, e.source, e.controller, e.steps);
+  const top = state.stack[state.stack.length - 1];
+  if (top?.kind !== 'effect') return;
+  if (e.last) top.last = [...e.last];
+  if (e.eventCount !== undefined) top.eventCount = e.eventCount;
+}
+
 /** Dados de um acontecimento: quem causou/sofreu (player) e a carta envolvida. */
 type EmittedEvent = {
   kind: GameEvent['kind'];
@@ -1499,11 +1627,13 @@ function emit(state: GameState, ev: EmittedEvent) {
         if (!conditionsMet(state, fc.uid, a)) return;
         if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) return;
         if (a.oncePerTurn) state.usedThisTurn.push(usedKey(fc.uid, i));
-        pushEffect(state, fc.uid, ps.id, abilitySteps(a, i));
         // "that Character" no efeito se refere à carta do acontecimento.
-        const top = state.stack[state.stack.length - 1];
-        if (ev.card && a.steps.length && top?.kind === 'effect' && top.source === fc.uid) top.last = [ev.card];
-        if (ev.count !== undefined && top?.kind === 'effect' && top.source === fc.uid) top.eventCount = ev.count;
+        queueTriggered(state, fc.uid, ps.id, abilitySteps(a, i), {
+          ability: i,
+          ...(a.oncePerTurn ? { opt: usedKey(fc.uid, i) } : {}),
+          ...(ev.card ? { last: [ev.card] } : {}),
+          ...(ev.count !== undefined ? { eventCount: ev.count } : {}),
+        });
       });
     }
   }
@@ -1620,24 +1750,23 @@ function onPlayNegated(state: GameState, player: PlayerId): boolean {
   return (state.onPlayNegated ?? []).some((n) => n.player === player && n.untilTurn >= state.turn);
 }
 
-function pushAbilities(state: GameState, uid: string, timing: AbilityTiming) {
+/** Dispara as habilidades automáticas de uma carta (onPlay, whenAttacking, ...), na ordem do texto. */
+function pushAbilities(state: GameState, uid: string, timing: AbilityTiming): TriggeredEffect[] {
   const def = cardDef(state, uid);
   const owner = ownerOf(state, uid);
-  const toPush: Array<[number, Ability]> = [];
   if (timing === 'onPlay' && onPlayNegated(state, owner)) {
     log(state, owner, `O [Ao Jogar] de ${def.name} está anulado.`);
-    return;
+    return [];
   }
+  const queued: TriggeredEffect[] = [];
   def.abilities.forEach((a, i) => {
     if (a.timing !== timing || !conditionsMet(state, uid, a)) return;
     if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(uid, i))) return;
-    toPush.push([i, a]);
-  });
-  // Empilha de trás para frente para resolver na ordem do texto.
-  for (const [i, a] of toPush.reverse()) {
     if (a.oncePerTurn) state.usedThisTurn.push(usedKey(uid, i));
-    pushEffect(state, uid, owner, abilitySteps(a, i));
-  }
+    const e = queueTriggered(state, uid, owner, abilitySteps(a, i), { timing, ability: i, ...(a.oncePerTurn ? { opt: usedKey(uid, i) } : {}) });
+    if (e) queued.push(e);
+  });
+  return queued;
 }
 
 function stepPlay(state: GameState, frame: PlayFrame) {
@@ -1684,12 +1813,12 @@ function stepBattle(state: GameState) {
   switch (b.step) {
     case 'whenAttacking': {
       b.step = 'block';
-      // [On Your Opponent's Attack] do defensor resolve depois do [When Attacking] (pilha).
+      // [When Attacking] (jogador do turno) resolve antes do [On Your Opponent's Attack] (10-2-16).
+      pushAbilities(state, b.attacker, 'whenAttacking');
       const def = state.players[defender];
       for (const fc of [def.leader, ...def.characters, ...(def.stage ? [def.stage] : [])]) {
         pushAbilities(state, fc.uid, 'onOpponentAttack');
       }
-      pushAbilities(state, b.attacker, 'whenAttacking');
       return;
     }
 
@@ -1723,8 +1852,7 @@ function stepBattle(state: GameState) {
       if (target.zone === 'leader') {
         const n = hasKeyword(state, b.attacker, 'doubleAttack') ? 2 : 1;
         log(state, null, `O ataque acerta o líder (${ap} contra ${tp})${n > 1 ? ' — Double Attack!' : ''}.`);
-        // Empilhado antes do dano: resolve depois dele.
-        if (state.players[defender].life.length) emit(state, { kind: 'attackDamage', player: attackerOwner, card: b.attacker });
+        const hadLife = state.players[defender].life.length > 0;
         state.stack.push({
           kind: 'damage',
           defender,
@@ -1732,6 +1860,8 @@ function stepBattle(state: GameState) {
           banish: hasKeyword(state, b.attacker, 'banish'),
           attack: true,
         });
+        // Disparado com o dano em andamento: resolve depois dele (8-6-2).
+        if (hadLife) emit(state, { kind: 'attackDamage', player: attackerOwner, card: b.attacker });
       } else {
         koCharacter(state, b.target, { inBattle: true, by: b.attacker });
         if (!locate(state, b.target)) emit(state, { kind: 'battleKO', player: attackerOwner, card: b.attacker });
@@ -1747,17 +1877,11 @@ function stepBattle(state: GameState) {
       state.battle = null;
       state.stack.pop();
       for (const uid of fought) {
-        const before = state.stack.length;
-        pushAbilities(state, uid, 'battlesCharacter');
         // "the opponent's Character you battled with"
         const other = (b.fought ?? []).find((u) => u !== uid);
-        for (const f of state.stack.slice(before)) if (f.kind === 'effect' && other) f.last = [other];
+        for (const e of pushAbilities(state, uid, 'battlesCharacter')) if (other) e.last = [other];
       }
-      for (const d of after) {
-        pushEffect(state, d.source, d.controller, d.steps);
-        const top = state.stack[state.stack.length - 1];
-        if (top?.kind === 'effect' && d.last) top.last = d.last;
-      }
+      queueDelayed(state, after);
       return;
     }
   }
@@ -4398,7 +4522,7 @@ function koCharacter(
     const turnOk = (!a.yourTurn || state.activePlayer === loc.player) && (!a.opponentsTurn || state.activePlayer !== loc.player);
     const byEffect = !opts.inBattle && opts.byPlayer !== undefined;
     const causeOk = !a.koBy || (byEffect && (a.koBy === 'effect' || opts.byPlayer !== loc.player));
-    if (a.timing === 'onKO' && turnOk && causeOk) pushEffect(state, uid, loc.player, a.steps);
+    if (a.timing === 'onKO' && turnOk && causeOk) queueTriggered(state, uid, loc.player, a.steps, { timing: 'onKO', offField: true });
   });
 }
 

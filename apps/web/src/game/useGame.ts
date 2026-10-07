@@ -32,8 +32,10 @@ export interface ReplayFile {
   /**
    * 2: a etapa de Counter e a carta da Vida sempre geram uma ação (`pass` / `answer`).
    * 3: "pagar X?" sem como pagar e escolhas na mão ou no deck sem opção também (`answer` / `choose`).
+   * 4: efeitos disparados resolvem em fila (CR 8-6) e a ordem entre efeitos simultâneos do mesmo
+   *    jogador gera uma ação (`option`).
    */
-  version: 1 | 2 | 3;
+  version: 1 | 2 | 3 | 4;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];

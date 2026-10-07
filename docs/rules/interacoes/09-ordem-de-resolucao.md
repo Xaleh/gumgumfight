@@ -21,6 +21,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-Hoje a resolução é uma pilha LIFO que empilha os efeitos disparados na hora. É a principal fonte de divergência de ordem.
+Os efeitos disparados vão para uma fila (`state.triggered`) e entram na pilha um de cada vez, quando não há efeito nem dano em resolução: em ordem de disparo, primeiro os do jogador do turno, e o dono escolhe a ordem entre os seus de cartas diferentes (DV-02 a DV-06, corrigidos). Os casos do Q&A OP07-019 Bonney (o [On Play] disparado no [When Attacking] espera o [On Your Opponent's Attack] pendente) e OP03-094 Air Door (o [On Play] espera o Evento terminar) seguem essa ordem.
 
-Divergências deste tema: DV-02, DV-03, DV-06, DV-28, DV-29, DV-30 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências em aberto deste tema: DV-28, DV-29 (em parte), DV-30 (detalhes em [../divergencias.md](../divergencias.md)).

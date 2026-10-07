@@ -30,7 +30,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Stage único, K.O. de Stage (7) | `playFree` (substitui Stage), `ko` em Stage | Parcial: `ko` em Stage vai direto ao trash, sem proteções, substituição nem eventos |
 | Fonte sai de cena no meio do efeito (8) | o frame continua com o `uid`; `delayed` | Existe |
 | "If you do" / "If" / "Then" (8) | `lastDone`, `EffectStep.if`, `payCost{scope}` | Existe |
-| Ordem de resolução de efeitos simultâneos (9) | `emit` / `pushAbilities` (ordem fixa, pilha) | Falta: o jogador do turno não resolve os seus primeiro nem escolhe a ordem |
+| Ordem de resolução de efeitos simultâneos (9) | fila `state.triggered` (`queueTriggered`, `nextTriggered`, pendência `option` com `order`) | Existe |
 | [End of Your Turn] / [End of Your Opponent's Turn] (9) | timing `endOfTurn` / — | Existe / Falta (0 cartas hoje) |
 | "At the start of your turn" (9) | timing `startOfTurn` | Existe |
 | [Once Per Turn] (10) | `Ability.oncePerTurn`, `usedThisTurn` | Existe; não é conferido no [On K.O.] (Parcial) |

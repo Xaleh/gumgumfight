@@ -1045,8 +1045,12 @@ export type Pending =
    * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`.
    */
   | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true }
-  /** Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`. */
-  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[] }
+  /**
+   * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
+   * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
+   * `TriggeredEffect.id` correspondente.
+   */
+  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[]; order?: number[] }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
 
@@ -1117,6 +1121,16 @@ export interface GameState {
   defs: Record<string, CardDef>;
   battle: BattleState | null;
   stack: Frame[];
+  /**
+   * Efeitos automáticos já disparados que ainda não foram para a pilha (CR 8-6). Esperam
+   * não haver efeito nem dano em resolução; depois resolvem um de cada vez, em ordem de
+   * disparo, primeiro os do jogador do turno.
+   */
+  triggered?: TriggeredEffect[];
+  /** Lote atual de `triggered` (sobe a cada efeito disparado que ativa). */
+  triggerBatch?: number;
+  /** Último `TriggeredEffect.id` usado. */
+  triggerSeq?: number;
   pending: Pending | null;
   modifiers: Modifier[];
   usedThisTurn: string[];
@@ -1154,6 +1168,30 @@ export interface GameState {
   cancel?: CancelInfo;
   /** Estado de antes da ação em `cancel` (só no estado completo: não vai para as visões). */
   checkpoint?: Checkpoint;
+}
+
+/** Efeito automático disparado, esperando a vez de resolver (ver `GameState.triggered`). */
+export interface TriggeredEffect {
+  id: number;
+  source: string;
+  controller: PlayerId;
+  steps: EffectStep[];
+  /** Nome mostrado na escolha de ordem. */
+  label: string;
+  /** Disparados entre duas resoluções são simultâneos (mesmo lote). */
+  batch: number;
+  /**
+   * Resolve mesmo com a carta fora do campo: [On K.O.] (com a carta no descarte, 10-2-17) e os
+   * efeitos adiados ("at the end of this turn/battle"). Os outros não ativam se a carta saiu do
+   * campo antes da vez deles (8-1-3-1-3).
+   */
+  offField?: true;
+  /** Índice da habilidade: as condições dela são conferidas de novo na ativação (8-4-1-1). */
+  ability?: number;
+  /** Chave do [Once Per Turn] gasto ao disparar (devolvida se o efeito não chegar a ativar). */
+  opt?: string;
+  last?: string[];
+  eventCount?: number;
 }
 
 export interface CancelInfo {
