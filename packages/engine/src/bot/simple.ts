@@ -38,6 +38,16 @@ function pickDonToReturn(state: GameState, player: PlayerId, sources: string[]):
   return best;
 }
 
+/**
+ * A pergunta é uma substituição contra uma remoção (sem K.O.) feita pelo próprio efeito do bot
+ * ("return 1 of your Characters", "add … to the top of your Life")? Ele escolheu remover: não paga.
+ */
+function ownRemoval(state: GameState, player: PlayerId): boolean {
+  const frame = state.stack[state.stack.length - 1];
+  const step = frame?.kind === 'effect' ? frame.steps[frame.i] : undefined;
+  return step?.do === 'replaceRemoval' && step.action !== 'ko' && step.byPlayer === player;
+}
+
 function choosePending(state: GameState, player: PlayerId, actions: Action[]): Action {
   const pending = state.pending!;
   const me = state.players[player];
@@ -55,9 +65,11 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
     case 'chooseFirst':
       return { type: 'answer', player, yes: true };
 
-    // Paga custos opcionais quando dá; sem como pagar, só resta recusar.
+    // Paga custos opcionais quando dá; sem como pagar, só resta recusar. "Draw up to N": compra
+    // enquanto o deck tiver folga (o deck vazio perde a partida).
     case 'confirm':
-      return { type: 'answer', player, yes: !pending.cannot };
+      if (pending.drawUpTo) return { type: 'answer', player, yes: me.deck.length > 5 };
+      return { type: 'answer', player, yes: !pending.cannot && !ownRemoval(state, player) };
 
     // Carta da Vida: ativa o [Trigger] quando há um; senão só coloca na mão.
     case 'lifeCard':
@@ -76,7 +88,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
 
     case 'selectTargets': {
       const uids = chooseTargets(state, player, pending);
-      // Completa escolhas obrigatórias de várias cartas (ex.: "trash 2 cards").
+      // Completa escolhas obrigatórias (ex.: "trash 2 cards", "return 1 of your Characters"): as de menor valor.
       for (const u of [...pending.options].sort((a, b) => value(state, a) - value(state, b))) {
         if (uids.length >= pending.min) break;
         if (!uids.includes(u)) uids.push(u);
@@ -133,10 +145,12 @@ function chooseTargets(state: GameState, player: PlayerId, pending: SelectPendin
   }
   if (pending.intent === 'harm') {
     // Efeitos que atingem "qualquer personagem": só mira os do oponente.
+    // Escolha obrigatória (sem "up to") de várias: as do oponente primeiro; o que faltar sai das
+    // próprias de menor valor (completado em chooseBotAction).
     const theirs = opts.filter((u) => state.cards[u].owner !== player);
     if (!theirs.length) return [];
     theirs.sort((a, b) => value(state, b) - value(state, a));
-    return [theirs[0]];
+    return theirs.slice(0, Math.max(1, pending.min));
   }
   // Cartas fora do campo (busca no deck, descarte): a mais valiosa.
   if (opts.every((u) => !locate(state, u))) {
@@ -161,10 +175,19 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
   const find = <T extends Action['type']>(type: T, pred: (a: Extract<Action, { type: T }>) => boolean = () => true) =>
     actions.find((a): a is Extract<Action, { type: T }> => a.type === type && pred(a as Extract<Action, { type: T }>));
 
+  /**
+   * DON!! virado tem para onde ir? (P-136 Usopp, "[Activate: Main] Give up to 1 rested DON!! card to 1
+   * of your {Land of Wano} type Leader or Character cards", sem custo nem [Once Per Turn]: sem alvo, não
+   * faz nada e o bot o ativaria sem parar.)
+   */
+  const donTargets = (uid: string, step: EffectStep) =>
+    step.do === 'giveRestedDon' && (typeof step.target !== 'object' || targetCandidates(state, player, uid, step.target).length > 0);
+
   // 1) Habilidades que dão DON!! virados (só vale se houver DON!! virados e ataques possíveis).
   const giveDon = find('activate', (a) => {
     const ab = cardDef(state, a.uid).abilities[a.ability];
-    return ab.steps[0]?.do === 'giveRestedDon' && !ab.steps[0].fromOpponent && me.donRested > 0 && canBattle && !ab.cost?.restSelf;
+    const step = ab.steps[0];
+    return step?.do === 'giveRestedDon' && !step.fromOpponent && me.donRested > 0 && canBattle && !ab.cost?.restSelf && donTargets(a.uid, step);
   });
   if (giveDon) return giveDon;
 
@@ -192,7 +215,7 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
     const step = ab.steps[0];
     if (!step || !canBattle) return false;
     if (step.do === 'rest') return opp.characters.some((c) => !c.rested);
-    if (step.do === 'giveRestedDon') return !step.fromOpponent && me.donRested > 0;
+    if (step.do === 'giveRestedDon') return !step.fromOpponent && me.donRested > 0 && donTargets(a.uid, step);
     if (step.do === 'power') {
       // Custos de DON!! −X só valem se o bônus ajudar vários ataques.
       if (ab.cost?.donMinus) {

@@ -64,6 +64,11 @@ export interface TargetSpec {
   side: 'own' | 'opponent' | 'any';
   kinds: Array<'leader' | 'character' | 'stage'>;
   upTo: number;
+  /**
+   * Quantidade sem "up to" ("return 1 of your Characters", "your Leader or 1 of your Characters"):
+   * o jogador escolhe o máximo possível até `upTo`, não pode escolher menos (8-4-4-1).
+   */
+  required?: boolean;
   maxPower?: number;
   maxCost?: number;
   rested?: boolean; // true = somente virados; false = somente ativos
@@ -362,13 +367,18 @@ export type RestrictionKind =
   | 'noLifeToHand'
   | 'noAttackLeader'
   | 'noDrawByEffect'
-  | 'noSetDonActiveByCharacter';
+  | 'noSetDonActiveByCharacter'
+  /** "cannot activate [Blocker]": nenhum [Blocker] do jogador pode ser ativado. */
+  | 'noBlocker';
 
 export interface Restriction {
+  /** Quem fica restrito: o controlador do efeito ("you cannot …") ou o oponente dele ("your opponent cannot …"). */
   player: PlayerId;
   kind: RestrictionKind;
   /** noPlayCharacters: só os de custo base a partir deste. */
   minCost?: number;
+  /** Último turno em que vale (inclusive), como em `Modifier.untilTurn`; sem ele, só o turno em que foi criada. */
+  untilTurn?: number;
 }
 
 export type LeaderRule =
@@ -380,6 +390,8 @@ export type LeaderRule =
   | { kind: 'faceUpLifeToDeck' }
   | { kind: 'counterBonus'; type: string; amount: number }
   | { kind: 'deckMaxCost'; cost: number; category?: 'event' }
+  /** "you can only include {East Blue} type cards in your deck" */
+  | { kind: 'deckOnlyType'; type: string }
   | { kind: 'startStage'; type: string }
   | { kind: 'ownOnPlayNegated' };
 
@@ -401,8 +413,8 @@ export interface Aura {
   maxCost?: number;
   minPower?: number;
   maxPower?: number;
-  /** "cannot be K.O.'d by your opponent's effects" */
-  noEffectKO?: boolean;
+  /** "cannot be K.O.'d by effects" (`true`) ou "… by your opponent's effects" (`'opponent'`). */
+  noEffectKO?: true | 'opponent';
   excludeName?: string;
   /** Concede uma palavra-chave em vez de poder ("All of your Characters with a cost of 12 or more gain [Blocker]"). */
   keyword?: Keyword;
@@ -450,12 +462,35 @@ export type Duration = 'turn' | 'battle' | 'nextOpponentTurn' | 'untilYourNextTu
 export interface Replacement {
   who: 'self' | TargetSpec;
   /**
-   * ko = só K.O.; removal = sair do campo por efeito do oponente (inclui K.O. por efeito do oponente);
+   * ko = só K.O.; removal = sair do campo (K.O. incluído; "by your opponent's effect" restringe a causa);
+   * koOrRemoval = os dois ("would be K.O.'d or removed from the field", "would leave the field");
    * damage = "If you would take damage": o dono da carta sofreria dano.
    */
   event: 'ko' | 'removal' | 'koOrRemoval' | 'rest' | 'damage';
-  /** any = qualquer K.O.; battle = em batalha; effect = por efeito; opponentEffect = por efeito do oponente. */
+  /**
+   * Causa: any = qualquer uma (inclusive efeito próprio e, na remoção, K.O. em batalha); battle = em batalha;
+   * effect = por efeito; opponentEffect = por efeito do oponente.
+   */
   by: 'any' | 'battle' | 'effect' | 'opponentEffect';
+  /** Em `koOrRemoval`, causa só da parte da remoção, quando difere de `by` ("removed … by your opponent's effect or K.O.'d"). */
+  removalBy?: 'any' | 'battle' | 'effect' | 'opponentEffect';
+}
+
+/** Remoção do campo em andamento (passos internos `replaceRemoval` e `removeFromField`). */
+export interface RemovalStep {
+  victims: string[];
+  action: 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
+  inBattle?: boolean;
+  /** Jogador cujo efeito remove (ausente em batalha). */
+  byPlayer?: PlayerId;
+  /** Carta cujo efeito remove (proteções "cannot be K.O.'d by …"). */
+  by?: string;
+  /** Vida: no fundo em vez do topo. */
+  bottom?: boolean;
+  /** Vida: virada para cima (pública, 3-10-2-1). */
+  faceUp?: boolean;
+  /** Substituições já oferecidas (recusadas ou aplicadas) para estas remoções: `uid:índice` ou `temp:índice`. */
+  skip?: string[];
 }
 
 /** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
@@ -491,7 +526,8 @@ type EffectStepBody =
   | { do: 'rest'; target: TargetRef }
   | { do: 'setActive'; target: TargetRef }
   | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; anyState?: boolean }
-  | { do: 'draw'; count: number }
+  /** "Draw N cards"; com `upTo` ("draw up to N cards", 4-5-4), uma por vez, podendo parar antes de cada uma. */
+  | { do: 'draw'; count: number; upTo?: true }
   | { do: 'addDonFromDeck'; count: number; rested?: boolean }
   | { do: 'restOpponentDon'; count: number }
   | { do: 'returnToHand'; target: TargetRef }
@@ -516,6 +552,8 @@ type EffectStepBody =
   | { do: 'handPlayOrLife'; filter: CardFilter; from?: 'trash' }
   /** "Draw a card for each of your {X} type Characters" (eventCount = cartas compradas) */
   | { do: 'drawPerMatching'; spec: TargetSpec }
+  /** "Your Leader gains +1000 power for each of your Characters during this turn" (conta ao resolver). */
+  | { do: 'powerPerMatching'; target: TargetRef; amount: number; spec: TargetSpec; duration: Duration }
   /** "trash the same number of cards from your hand" / "from the top of your deck" (usa eventCount) */
   | { do: 'trashEventCount'; from: 'hand' | 'deck' }
   /** "Your opponent chooses 1 card from your hand; trash that card" */
@@ -562,8 +600,11 @@ type EffectStepBody =
   | { do: 'replaceRest'; victim: string; ability: number; byPlayer: PlayerId }
   /** "none of the selected Characters can attack unless your opponent trashes 2 cards from their hand whenever they attack" */
   | { do: 'attackTax'; target: TargetRef; count: number; duration: Duration }
-  /** "Return all cards in your hand to your deck and shuffle your deck" (eventCount = cartas devolvidas). */
-  | { do: 'handAllToDeck'; who: 'self' | 'opponent' }
+  /**
+   * "Return all cards in your hand to your deck and shuffle your deck" (eventCount = cartas devolvidas);
+   * `bottom`: "place all cards in your hand at the bottom of your deck in any order", sem embaralhar.
+   */
+  | { do: 'handAllToDeck'; who: 'self' | 'opponent'; bottom?: boolean }
   | { do: 'opponentDraws'; count: number }
   /** "trash all cards from your hand" */
   | { do: 'trashHand' }
@@ -598,10 +639,17 @@ type EffectStepBody =
   | { do: 'giveActiveDon'; count: number; target: TargetRef }
   | { do: 'ownToBottom'; count: number; spec: TargetSpec; toLife?: boolean }
   | { do: 'negate'; target: TargetRef; duration: Duration }
-  | { do: 'restrict'; kind: RestrictionKind; minCost?: number }
+  /**
+   * "You cannot … during this turn". `opponent`: quem fica restrito é o oponente ("your opponent
+   * cannot …"). `duration`: 'nextOpponentTurn' = "until the end of your opponent's next turn"; sem
+   * ela, até o fim deste turno.
+   */
+  | { do: 'restrict'; kind: RestrictionKind; minCost?: number; opponent?: true; duration?: 'nextOpponentTurn' }
   | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
   /** "base power becomes N" ou "the same as your opponent's Leader('s power)" */
   | { do: 'basePower'; target: TargetRef; amount?: number; copy?: 'opponentLeader' | 'chosen' | 'attacker'; duration: Duration }
+  /** «Set Power to 0» (4-12): −(poder atual na ativação), nada se já é 0 ou negativo. */
+  | { do: 'setPowerZero'; target: TargetRef; duration: Duration }
   | {
       do: 'trashAnyForPower';
       categories?: Array<'event' | 'stage' | 'character'>;
@@ -630,8 +678,8 @@ type EffectStepBody =
   /** "add up to 1 card from your hand to the top of your Life cards" */
   /** `choose`: "to the top or bottom of your Life cards" (o jogador escolhe a posição). */
   | { do: 'handToLife'; upTo: number; filter?: CardFilter; faceUp?: boolean; fromTrash?: boolean; trashOnly?: boolean; choose?: boolean }
-  /** "Add up to 1 of your Characters … to the top of the owner's Life cards" */
-  | { do: 'fieldToLife'; target: TargetRef; choose?: boolean }
+  /** "Add up to 1 of your Characters … to the top of the owner's Life cards [face-up]" (`faceUp`: virada para cima, pública) */
+  | { do: 'fieldToLife'; target: TargetRef; choose?: boolean; faceUp?: boolean }
   /** "Look at up to 1 card from the top of your or your opponent's Life cards, and place it at the top or bottom" */
   | { do: 'peekLife'; whose: 'either' | 'own' | 'opponent' }
   /** "Choose one: • … • …" / "Your opponent chooses one: …" */
@@ -667,16 +715,21 @@ type EffectStepBody =
   | { do: 'opponentLifeToHand'; count: number }
   /** "your opponent places N card from their hand at the bottom of their deck" */
   | { do: 'opponentHandToBottom'; count: number }
-  /** Pergunta do efeito de substituição (o motor cria; não vem do texto). */
-  | {
+  /**
+   * Pergunta do efeito de substituição (o motor cria; não vem do texto). `victims` sairiam do campo
+   * juntos; `covered` são os que esta substituição salva com um só pagamento (8-1-3-4).
+   */
+  | ({
       do: 'replaceRemoval';
-      victim: string;
+      covered: string[];
       ability: number;
-      action: 'ko' | 'hand' | 'deckBottom' | 'trash' | 'life';
-      inBattle?: boolean;
+      /** Identifica esta substituição em `skip` (`uid:índice` ou `temp:índice`). */
+      key: string;
       /** Substituição criada por efeito (sem habilidade na carta): o custo vem aqui. */
       inlineCost?: AbilityCost;
-    }
+    } & RemovalStep)
+  /** Continua a remoção depois de uma substituição: oferece as que faltam ou tira do campo (o motor cria). */
+  | ({ do: 'removeFromField' } & RemovalStep)
   /** Pergunta da substituição de dano ("If you would take damage, you may … instead"). */
   | { do: 'replaceDamage'; ability: number }
   /** "… at the end of this turn": passos adiados para o fim do turno. */
@@ -734,7 +787,7 @@ type EffectStepBody =
   /** "Add up to N card from the top of your deck to the top of your Life cards." */
   | { do: 'addLifeFromDeck'; count: number }
   /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
-  | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: boolean };
+  | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: true | 'opponent' };
 
 /** Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado). */
 export type EffectStep = EffectStepBody & { if?: StepCondition };
@@ -751,11 +804,14 @@ export type AbilityTiming =
   | 'onKO'
   | 'onBlock'
   | 'endOfTurn' // [End of Your Turn]
+  | 'endOfOpponentTurn' // [End of Your Opponent's Turn] (6-6-1-1-2)
   | 'battlesCharacter' // "If this Character battles your opponent's Character" (ao fim da batalha)
   | 'event' // "When …": reação a um acontecimento (Ability.event)
   | 'onOpponentAttack' // [On Your Opponent's Attack]
   | 'replace' // "If … would be K.O.'d / removed from the field, you may … instead" (Ability.replace + cost)
   | 'startOfTurn' // "This effect can be activated at the start of your turn"
+  | 'startOfOpponentTurn' // "… at the start of your opponent's turn" (6-2-2)
+  | 'startOfMainPhase' // "… at the start of your Main Phase" (6-5-1)
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
@@ -848,14 +904,16 @@ export interface Ability {
   staticCanAttackActive?: boolean;
   /** "This Character cannot be K.O.'d in battle." */
   staticNoBattleKO?: boolean;
-  /** "This Character cannot be K.O.'d by effects." */
-  staticNoEffectKO?: boolean;
+  /** "This Character cannot be K.O.'d by effects." (`true`) ou "… by your opponent's effects" (`'opponent'`). */
+  staticNoEffectKO?: true | 'opponent';
   /** "This Leader cannot attack." */
   staticCannotAttack?: boolean;
   /** "This Character cannot be K.O.'d in battle by "Strike" attribute Characters." */
   noBattleKOVsAttribute?: string;
   /** "This Character cannot be K.O.'d in battle by Leaders." */
   noBattleKOByLeader?: boolean;
+  /** "This Character cannot be K.O.'d in battle by Characters without the "Special" attribute." */
+  noBattleKOUnlessAttribute?: string;
   /** "This Character gains +N cost." */
   staticCost?: number;
   /** "this Character's base power becomes 9000" / "… the same as your Leader's base power" */
@@ -968,6 +1026,7 @@ export interface Modifier {
     | 'cannotBeKO'
     | 'cannotBeKOInBattle'
     | 'cannotBeKOByEffect'
+    | 'cannotBeKOByOpponentEffect'
     | 'canAttackActive'
     | 'cannotAttack'
     | 'skipRefresh'
@@ -1001,6 +1060,8 @@ export interface BattleState {
   noBlockerMaxCost?: number;
   /** Personagens que batalharam entre si (registrado no dano, vale mesmo se um sair de campo). */
   fought?: string[];
+  /** Os efeitos de fim de batalha já foram disparados (a batalha espera eles resolverem para terminar). */
+  endFired?: boolean;
   /** "at the end of this battle, …" */
   after?: Array<{ controller: PlayerId; source: string; steps: EffectStep[]; last?: string[] }>;
 }
@@ -1051,9 +1112,10 @@ export type Pending =
   /**
    * Pergunta sim/não (ex.: pagar um custo opcional). Responder com `answer`. Com `cannot`,
    * só o "não" é legal: o custo lê a mão e não pode ser pago, mas a pergunta abre mesmo
-   * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`.
+   * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`. Com `drawUpTo`,
+   * é o "comprar mais 1?" do "draw up to N cards" (4-5-4): sim compra 1, não para.
    */
-  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true }
+  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true; drawUpTo?: true }
   /**
    * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
    * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
@@ -1084,6 +1146,12 @@ export type Frame =
       revealed?: string[];
       /** Cartas descartadas da mão neste efeito ("the same card name as the trashed card"). */
       trashed?: string[];
+      /**
+       * Efeito de [Trigger]: a carta (`source`) fica fora de qualquer área enquanto ele resolve
+       * (`GameState.limbo`) e vai para o descarte quando o frame termina, se o efeito não a moveu
+       * (10-1-5-3).
+       */
+      trigger?: true;
     }
   | { kind: 'battle' }
   | {
@@ -1100,8 +1168,18 @@ export type Frame =
       replaceAsked?: boolean;
     }
   | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash'; byEffect?: boolean }
-  /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
-  | { kind: 'endTurn' };
+  /**
+   * Fecha o turno depois que os efeitos de [End of Your Turn]/[End of Your Opponent's Turn] e os
+   * "at the end of this turn" (inclusive os criados na própria End Phase) resolverem (6-6-1).
+   */
+  | { kind: 'endTurn' }
+  /**
+   * Continua o Refresh Phase (devolver DON!!, desvirar), o Draw e o DON!! Phase depois que os
+   * efeitos "at the start of your/your opponent's turn" resolverem (6-2-2).
+   */
+  | { kind: 'refresh' }
+  /** Fecha a preparação depois dos efeitos "at the start of the game" (5-2-1-5): mãos e mulligan. */
+  | { kind: 'startGame' };
 
 export interface LogEntry {
   turn: number;
@@ -1141,10 +1219,16 @@ export interface GameState {
   triggerBatch?: number;
   /** Último `TriggeredEffect.id` usado. */
   triggerSeq?: number;
+  /**
+   * Cartas fora de qualquer área: a carta do [Trigger] enquanto ele resolve (10-1-5-3). Não está
+   * na Vida nem no descarte (não conta para "cards in your trash", não sai "from your trash");
+   * é pública (foi revelada) e vai para o descarte no fim do efeito, se ele não a moveu.
+   */
+  limbo?: string[];
   pending: Pending | null;
   modifiers: Modifier[];
   usedThisTurn: string[];
-  /** Restrições ao jogador até o fim do turno ("you cannot play Character cards during this turn"). */
+  /** Restrições a um jogador ("you cannot play Character cards during this turn", "your opponent cannot …"). */
   restrictions?: Restriction[];
   /** "The next time you play X from your hand during this turn, the cost will be reduced by N." */
   costReductions?: Array<{ player: PlayerId; filter: CardFilter; amount: number }>;
@@ -1166,8 +1250,11 @@ export interface GameState {
   tempReplacements?: Array<{ player: PlayerId; source: string; by: 'battle' | 'any'; cost: AbilityCost }>;
   /** DON!! que não ficam ativos na próxima Renovação do jogador. */
   donSkipRefresh?: Array<{ player: PlayerId; count: number }>;
+  /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;
+  /** Partida criada com `GameConfig.legacySetup` (replays até a versão 8). */
+  legacySetup?: true;
   log: LogEntry[];
   actionCount: number;
   /**
@@ -1238,7 +1325,11 @@ export type Action =
   | { type: 'endTurn'; player: PlayerId }
   | { type: 'choose'; player: PlayerId; uids: string[] }
   | { type: 'answer'; player: PlayerId; yes: boolean }
-  | { type: 'counter'; player: PlayerId; uid: string }
+  /**
+   * Usa uma carta da mão no Counter Step. `target`: quem recebe o valor de Counter de um Personagem
+   * ou Stage (o Líder ou 1 Personagem do defensor, 7-1-3-1-1); sem ele, o atacado.
+   */
+  | { type: 'counter'; player: PlayerId; uid: string; target?: string }
   | { type: 'pass'; player: PlayerId }
   | { type: 'concede'; player: PlayerId }
   /** O jogador ficou sem tempo (só o servidor das partidas online envia). */
@@ -1295,4 +1386,10 @@ export interface GameConfig {
    * online, em que a seed de 32 bits poderia ser descoberta por força bruta.
    */
   seed128?: number[];
+  /**
+   * Preparação como nos replays até a versão 8 (antes das DV-24/25): a Vida na ordem inversa
+   * (a carta do topo do deck no topo da Vida) e o "at the start of the game" do Líder resolvido
+   * na criação da partida, antes da escolha de quem começa, com o primeiro Stage elegível do deck.
+   */
+  legacySetup?: boolean;
 }

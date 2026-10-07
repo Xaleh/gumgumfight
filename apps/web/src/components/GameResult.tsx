@@ -23,7 +23,9 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
   const me: PlayerId = human ?? state.winner ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
   const won = state.winner === me;
-  const title = human === null ? `${state.players[state.winner ?? 0].name} venceu!` : won ? 'Vitória!' : 'Derrota';
+  // Sem vencedor: os dois perderam juntos (9-2-1) ou houve um laço infinito (11-1).
+  const draw = state.winner === null;
+  const title = draw ? 'Empate' : human === null ? `${state.players[state.winner ?? 0].name} venceu!` : won ? 'Vitória!' : 'Derrota';
 
   const mine = actions.filter((a) => a.player === me);
   const attacks = mine.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack');
@@ -60,7 +62,7 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
   );
 
   return (
-    <div className={['result', won ? 'won' : 'lost'].join(' ')}>
+    <div className={['result', won ? 'won' : draw ? 'draw' : 'lost'].join(' ')}>
       <div className="result-sky" />
       <header className="result-head">
         <div className="result-avatar">

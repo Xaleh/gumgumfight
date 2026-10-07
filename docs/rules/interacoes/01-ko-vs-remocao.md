@@ -22,6 +22,8 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-O K.O. passa por `koCharacter` (engine.ts:4359): proteções, substituição, eventos `characterKO`/`characterRemoved` e [On K.O.]. Trash pelo limite de 5, por custo ou por efeito "trash" **não** é K.O. e não dispara [On K.O.] (conforme).
+O K.O. passa por `koCharacter` (engine.ts:4359): proteções, substituição, eventos `characterKO`/`characterRemoved` e [On K.O.]. As condições do [On K.O.] ([DON!! xX], [Your Turn]/[Opponent's Turn], condição, negação, [Once Per Turn]) são vistas com a carta ainda no campo; o efeito resolve depois, com ela no trash (10-2-17-1, Zephyr OP06-074: negado não ativa). Trash pelo limite de 5, por custo ou por efeito "trash" **não** é K.O. e não dispara [On K.O.] (conforme).
 
-Divergências deste tema: DV-07, DV-12, DV-13, DV-14, DV-16 (detalhes em [../divergencias.md](../divergencias.md)).
+As proteções olham quem nocauteia: "cannot be K.O.'d by your opponent's effects" só protege do efeito do oponente; o próprio efeito nocauteia (1-3-1). "Cannot be K.O.'d (by effects)" também protege do próprio efeito, como no Orlumbus OP04-079 (o Personagem escolhido não é nocauteado e o resto do efeito resolve). Num **custo** "K.O. N of your Characters" / "K.O. this Character", o protegido não pode ser escolhido e, sem outro, o custo não pode ser pago (1-3-3, 8-3-1-3). O K.O. de Stage ("K.O. … Stage") passa pelas mesmas proteções (`koStage`), sem [On K.O.] nem os eventos de Personagem (conforme).
+
+Divergências deste tema: DV-07 (corrigida), DV-12 (corrigida nos efeitos), DV-13, DV-14 e DV-16 (corrigidas) (detalhes em [../divergencias.md](../divergencias.md)).

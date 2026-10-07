@@ -84,9 +84,21 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
   const life = (
     <div className="zone life-zone" title={`Vida: ${ps.life.length}`}>
       <div className="life-stack" key={ps.life.length} data-anchor={`life-${player}`}>
-        {ps.life.map((uid, i) => (
-          <div key={uid} className="life-card" style={vars({ '--i': i })} />
-        ))}
+        {ps.life.map((uid, i) => {
+          // Vida virada para cima é pública (3-10-2-1): mostra a carta.
+          if (!ps.lifeFaceUp?.includes(uid)) return <div key={uid} className="life-card" style={vars({ '--i': i })} />;
+          const def = cardDef(state, uid);
+          return (
+            <div
+              key={uid}
+              className="life-card face-up"
+              title={`${def.name} (Vida virada para cima)`}
+              style={vars({ '--i': i, ...(def.imageUrl ? { '--face': `url("${def.imageUrl}")` } : {}) })}
+              onMouseEnter={() => h.onHover(uid)}
+              onMouseLeave={() => h.onHover(null)}
+            />
+          );
+        })}
       </div>
       <span className={['life-count', ps.life.length === 0 ? 'zero' : ''].join(' ')}>
         ♥ {ps.life.length}

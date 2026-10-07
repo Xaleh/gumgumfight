@@ -39,6 +39,7 @@ const TIMING: Record<string, string> = {
   onKO: '[Ao ser Nocauteado]',
   onBlock: '[Ao Bloquear]',
   endOfTurn: '[Fim do Seu Turno]',
+  endOfOpponentTurn: '[Fim do Turno do Oponente]',
   main: '[Principal]',
   counter: '[Counter]',
   onOpponentAttack: '[No Ataque do Oponente]',
@@ -752,7 +753,7 @@ function step(s: EffectStep, ctx: Ctx): string {
           ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a cada um ${target(s.target, ctx).replace(/^todos os /, 'dos ').replace(/^até /, 'de até ')}.`
           : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a ${target(s.target, ctx)}.`;
     case 'draw':
-      return `Compre ${cards(s.count)}.`;
+      return s.upTo ? `Compre até ${cards(s.count)}.` : `Compre ${cards(s.count)}.`;
     case 'drawUntil':
       return `Compre cartas até ficar com ${s.count} cartas na mão.`;
     case 'addDonFromDeck':
@@ -819,7 +820,7 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `${cap(target(s.target, ctx))} ganha ${KW[s.keyword]} ${dur(s.duration)}.`;
     case 'cannotBeKO': {
       const many = typeof s.target === 'object' && s.target.all;
-      return `${cap(target(s.target, ctx))} ${many ? 'não podem ser nocauteados' : 'não pode ser nocauteado'}${s.inBattle ? ' em batalha' : s.byEffect ? ' por efeitos' : ''} ${dur(s.duration)}.`;
+      return `${cap(target(s.target, ctx))} ${many ? 'não podem ser nocauteados' : 'não pode ser nocauteado'}${s.inBattle ? ' em batalha' : s.byEffect === 'opponent' ? ' por efeitos do oponente' : s.byEffect ? ' por efeitos' : ''} ${dur(s.duration)}.`;
     }
     case 'cannotAttack':
       return `${cap(target(s.target, ctx))} não pode atacar ${dur(s.duration)}.`;
@@ -848,7 +849,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'handToLife':
       return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} ${s.trashOnly ? 'do seu descarte' : `da sua mão${s.fromTrash ? ' ou do seu descarte' : ''}`} no ${s.choose ? 'topo ou no fundo' : 'topo'} da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'fieldToLife':
-      return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono.`;
+      return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'peekLife':
       return `Olhe até 1 carta do topo ${s.whose === 'either' ? 'da sua Vida ou da Vida do oponente' : s.whose === 'own' ? 'da sua Vida' : 'da Vida do oponente'} e coloque-a no topo ou no fundo dessa Vida.`;
     case 'chooseOne':
@@ -911,15 +912,19 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'negate':
       return `Anule o efeito de ${target(s.target, ctx)} ${dur(s.duration)}.`;
     case 'restrict': {
+      const opp = Boolean(s.opponent);
+      const own = opp ? 'dele' : 'seus';
       const txt: Record<string, string> = {
-        noPlayCharacters: s.minCost !== undefined ? `você não pode jogar Personagens com custo base ${s.minCost} ou mais neste turno` : 'você não pode jogar Personagens neste turno',
-        noPlayFromHand: 'você não pode jogar cartas da sua mão neste turno',
-        noLifeToHand: 'você não pode colocar cartas de Vida na mão com os seus próprios efeitos neste turno',
-        noAttackLeader: 'você não pode atacar um Líder neste turno',
-        noDrawByEffect: 'você não pode comprar cartas com os seus próprios efeitos neste turno',
-        noSetDonActiveByCharacter: 'você não pode deixar DON!! ativos com efeitos de Personagens neste turno',
+        noPlayCharacters: s.minCost !== undefined ? `jogar Personagens com custo base ${s.minCost} ou mais` : 'jogar Personagens',
+        noPlayFromHand: `jogar cartas da ${opp ? 'mão dele' : 'sua mão'}`,
+        noLifeToHand: `colocar cartas de Vida na mão com os ${opp ? 'próprios efeitos dele' : `${own} próprios efeitos`}`,
+        noAttackLeader: opp ? 'atacar o seu Líder' : 'atacar um Líder',
+        noDrawByEffect: `comprar cartas com os ${opp ? 'próprios efeitos dele' : `${own} próprios efeitos`}`,
+        noSetDonActiveByCharacter: 'deixar DON!! ativos com efeitos de Personagens',
+        noBlocker: 'ativar [Blocker]',
       };
-      return `${cap(txt[s.kind])}.`;
+      const when = s.duration === 'nextOpponentTurn' ? dur('nextOpponentTurn') : 'neste turno';
+      return `${opp ? 'O seu oponente' : 'Você'} não pode ${txt[s.kind]} ${when}.`;
     }
     case 'nextPlayDiscount':
       return `Na próxima vez que você jogar ${filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')} da sua mão neste turno, o custo será reduzido em ${s.amount}.`;
@@ -927,6 +932,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return s.copy
         ? `O poder base ${de(target(s.target, ctx))} passa a ser igual ao poder ${s.copy === 'chosen' ? 'da carta escolhida' : s.copy === 'attacker' ? 'do Líder ou Personagem atacante do oponente' : 'do Líder do oponente'} ${dur(s.duration)}.`
         : `O poder base ${de(target(s.target, ctx))} passa a ser ${s.amount} ${dur(s.duration)}.`;
+    case 'setPowerZero':
+      return `Deixe o poder ${de(target(s.target, ctx))} em 0 ${dur(s.duration)}.`;
     case 'revealLifeTop':
       return 'Revele a carta do topo da sua Vida.';
     case 'activateEventFromHand':
@@ -969,6 +976,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'takeDamage':
       return s.opponent ? `Cause ${s.count} de dano ao oponente.` : `Você recebe ${s.count} de dano.`;
     case 'handAllToDeck':
+      if (s.bottom) return 'Coloque todas as cartas da sua mão no fundo do seu deck, na ordem que quiser.';
       return s.who === 'self'
         ? 'Devolva todas as cartas da sua mão ao deck e embaralhe o seu deck.'
         : 'O oponente devolve todas as cartas da mão ao deck e embaralha o deck.';
@@ -1025,6 +1033,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return 'Devolva DON!! do seu campo ao deck de DON!! até ficar com o mesmo número de DON!! no campo que o oponente.';
     case 'powerPerDon':
       return `Dê −${-s.amount} de poder ${dur(s.duration)} a ${target(s.target, ctx)} para cada DON!! anexado a esse Personagem.`;
+    case 'powerPerMatching':
+      return `${cap(target(s.target, ctx))} recebe +${s.amount} de poder ${dur(s.duration)} para cada ${target({ ...s.spec, all: false, upTo: 1 }, ctx).replace(/^até 1 dos seus /, 'um dos seus ').replace(/^até 1 /, '')}.`;
     case 'powerPerRevealedCost':
       return `${cap(target(s.target, ctx))} recebe +${s.amount} de poder ${dur(s.duration)} para cada 1 de custo da carta revelada.`;
     case 'gainAttribute':
@@ -1145,9 +1155,10 @@ function staticText(a: Ability, ctx: Ctx): string {
   if (a.staticNoRemoval) parts.push('não pode ser removido do campo por efeitos do oponente');
   if (a.handCost) parts.push(`custa ${-a.handCost} a menos na sua mão`);
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
-  if (a.staticNoEffectKO) parts.push('não pode ser nocauteado por efeitos');
+  if (a.staticNoEffectKO) parts.push(a.staticNoEffectKO === 'opponent' ? 'não pode ser nocauteado por efeitos do oponente' : 'não pode ser nocauteado por efeitos');
   if (a.staticCannotAttack) parts.push('não pode atacar');
-  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Líderes ou Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOUnlessAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens sem o atributo ${a.noBattleKOUnlessAttribute}`);
   if (a.noBattleKOByLeader) parts.push('não pode ser nocauteado em batalha por Líderes');
   if (a.costPer) parts.push(`recebe ${a.costPer.cost > 0 ? '+' : '−'}${Math.abs(a.costPer.cost)} de custo para cada ${a.costPer.every} cartas no seu descarte`);
   if (a.staticBasePower !== undefined) {
@@ -1199,6 +1210,8 @@ function staticText(a: Ability, ctx: Ctx): string {
         return `Os seus Personagens do tipo {${r.type}} sem Counter têm Counter +${r.amount}, pelas regras.`;
       case 'deckMaxCost':
         return `Pelas regras desta partida, você não pode incluir ${r.category === 'event' ? 'Eventos' : 'cartas'} com custo ${r.cost + 1} ou mais no seu deck.`;
+      case 'deckOnlyType':
+        return `Pelas regras desta partida, você só pode incluir cartas do tipo {${r.type}} no seu deck.`;
       case 'ownOnPlayNegated':
         return 'Os seus efeitos [Ao Jogar] são anulados.';
       case 'startStage':
@@ -1243,7 +1256,7 @@ function staticText(a: Ability, ctx: Ctx): string {
           : au.noBattleKO
             ? 'não podem ser nocauteados em batalha'
             : au.noEffectKO
-      ? 'não podem ser nocauteados por efeitos do oponente'
+      ? `não podem ser nocauteados por efeitos${au.noEffectKO === 'opponent' ? ' do oponente' : ''}`
       : au.noRemoval
       ? `não podem ser removidos do campo por efeitos ${au.side === 'opponent' ? 'seus' : 'do oponente'}`
       : au.keyword === 'rushCharacter'
@@ -1291,6 +1304,8 @@ function ability(a: Ability, ctx: Ctx): string {
     const pre = a.condition && Object.keys(a.condition).length ? `${condition(a.condition, ctx)} e ` : '';
     body = `Se ${pre}${who} ${what}${by}, você pode ${c || 'evitar isso'}${extra} em vez disso.`;
   } else if (a.timing === 'startOfTurn') body = `Este efeito pode ser ativado no início do seu turno. ${steps(a.steps, ctx)}`;
+  else if (a.timing === 'startOfOpponentTurn') body = `Este efeito pode ser ativado no início do turno do oponente. ${steps(a.steps, ctx)}`;
+  else if (a.timing === 'startOfMainPhase') body = `Este efeito pode ser ativado no início da sua Fase Principal. ${steps(a.steps, ctx)}`;
   else if (a.timing === 'battlesCharacter') body = `Se ${ctx.self} batalhar com um Personagem do oponente, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
   else if (a.timing === 'onKO' && a.koBy) {
     body = `Quando ${ctx.self} for nocauteado por ${a.koBy === 'opponentEffect' ? 'um efeito do oponente' : 'um efeito'}, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;

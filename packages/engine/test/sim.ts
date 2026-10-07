@@ -40,6 +40,7 @@ export function describeMatchups(title: string, pairs: Array<[DeckList, DeckList
         for (let seed = 1; seed <= 100; seed++) {
           const s = playOut(seed, decks);
           expect(s.phase).toBe('gameover');
+          expect(s.winner).not.toBeNull();
           wins[s.winner!]++;
           totalTurns += s.turn;
         }

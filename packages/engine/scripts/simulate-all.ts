@@ -54,7 +54,7 @@ const countCards = (s: GameState, p: 0 | 1) => {
   const limbo = s.stack.filter(
     (f) =>
       (f.kind === 'damage' && f.lifeCard && s.cards[f.lifeCard].owner === p) || (f.kind === 'play' && s.cards[f.uid].owner === p),
-  ).length;
+  ).length + (s.limbo ?? []).filter((u) => s.cards[u].owner === p).length;
   return 1 + ps.characters.length + (ps.stage ? 1 : 0) + ps.hand.length + ps.deck.length + ps.trash.length + ps.life.length + limbo;
 };
 
@@ -110,7 +110,10 @@ async function main() {
         }
       }
       actions += i;
-      if (s.phase === 'gameover') {
+      // Laço infinito vira empate (11-1) em vez de travar: aqui continua sendo um problema a olhar.
+      if (s.phase === 'gameover' && s.winner === null && s.winReason?.startsWith('Laço infinito')) {
+        failures.push(`partida ${g + 1} (${l0.id} x ${l1.id}): ${s.winReason}`);
+      } else if (s.phase === 'gameover') {
         finished++;
         turnSum += s.turn;
       } else failures.push(`partida ${g + 1} (${l0.id} x ${l1.id}) não terminou em 4000 ações`);

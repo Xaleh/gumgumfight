@@ -20,6 +20,7 @@ import type {
   EffectStep,
   GameEvent,
   Replacement,
+  RestrictionKind,
   Keyword,
   TargetRef,
   TargetSpec,
@@ -50,6 +51,7 @@ const TIMINGS: Record<string, AbilityTiming> = {
   'on k.o.': 'onKO',
   'on block': 'onBlock',
   'end of your turn': 'endOfTurn',
+  "end of your opponent's turn": 'endOfOpponentTurn',
   main: 'main',
   counter: 'counter',
   "on your opponent's attack": 'onOpponentAttack',
@@ -454,8 +456,9 @@ function parseTargetBase(phrase: string): TargetRef | null {
   if (/^this (character|card|leader|stage)$/i.test(p)) return 'self';
   if (/^your leader$/i.test(p)) return 'ownLeader';
   if (/^(?:that|the selected) (character|card|leader|leader or character)$/i.test(p) || /^it$/i.test(p)) return 'chosen';
-  if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
-  if (/^your Leader or \d+ of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
+  // Sem "up to": escolha obrigatória (8-4-4-1).
+  if (/^(?:this|your) Leader or 1 of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1, required: true };
+  if (/^your Leader or \d+ of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 1, required: true };
   if (/^your Leader and all of your Characters$/i.test(p)) return { side: 'own', kinds: ['leader', 'character'], upTo: 99, all: true };
   // "Your opponent's rested Leader or up to 1 of your opponent's Characters other than [X]"
   const leadOr = p.match(/^your opponent's (rested )?Leader or up to (\d+) of your opponent's Characters(.*)$/i);
@@ -494,7 +497,9 @@ function parseTargetBase(phrase: string): TargetRef | null {
     spec.upTo = 99;
     quantified = true;
   } else if ((m = p.match(/^(\d+) of (?=your )/i))) {
+    // "return 1 of your Characters": sem "up to", escolhe o máximo possível até N (8-4-4-1).
     spec.upTo = Number(m[1]);
+    spec.required = true;
     quantified = true;
   }
   if (m) p = p.slice(m[0].length);
@@ -803,6 +808,7 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^you have a total of (\d+) or more given DON!! cards$/i))) return { minGivenDon: Number(m[1]) };
   if (/^your opponent has any DON!! cards given$/i.test(t)) return { opponentAnyDonGiven: true };
   if ((m = t.match(/^you have (\d+) or more active DON!! cards$/i))) return { minActiveDon: Number(m[1]) };
+  if (/^you have any active DON!! cards$/i.test(t)) return { minActiveDon: 1 };
   if ((m = t.match(/^you have (\d+) or more Events in your trash$/i))) return { trashEventsMin: Number(m[1]) };
   if ((m = t.match(/^you have a Character with (\d+) power or more$/i))) return { ownCharacterMinPower: Number(m[1]) };
   if (/^the number of your Life cards is equal to or less than the number of your opponent's Life cards$/i.test(t)) {
@@ -872,6 +878,17 @@ const withTarget = (phrase: string, make: (t: TargetRef) => EffectStep, characte
   return [make(t)];
 };
 
+/**
+ * "Give up to N rested DON!! cards to your Leader or 1 of your Characters": o alvo não tem "up to",
+ * mas dar 0 DON!! é permitido; o motor dá o que houver a quem foi escolhido, então escolher
+ * ninguém é o jeito de dar 0.
+ */
+const donTarget = (t: TargetRef): TargetRef => {
+  if (typeof t !== 'object' || !t.required) return t;
+  const { required: _r, ...rest } = t;
+  return rest;
+};
+
 const durationOf = (d: string): Duration =>
   /battle/i.test(d)
     ? 'battle'
@@ -885,6 +902,25 @@ const durationOf = (d: string): Duration =>
 /** Durações escritas no fim das frases. */
 const DUR =
   "(during this turn|during this battle|until the end of your opponent's next turn|until the end of your opponent's next End Phase|until the start of your next turn|until the end of your next turn)";
+
+/**
+ * Restrição a um jogador: "you cannot <body>" ou "your opponent cannot <body>", "during this turn" ou
+ * "until the end of your opponent's next turn". Em `extra`, os grupos de `body` começam em m[2].
+ */
+function restriction(body: string, kind: RestrictionKind, extra?: (m: RegExpMatchArray) => { minCost?: number }): ClauseRule {
+  return [
+    new RegExp(`^(you|your opponent) cannot ${body} (during this turn|until the end of your opponent's next turn)$`, 'i'),
+    (m) => [
+      {
+        do: 'restrict',
+        kind,
+        ...extra?.(m),
+        ...(/opponent/i.test(m[1]) ? { opponent: true as const } : {}),
+        ...(/next turn/i.test(m[m.length - 1]) ? { duration: 'nextOpponentTurn' as const } : {}),
+      },
+    ],
+  ];
+}
 
 const CLAUSES: ClauseRule[] = [
   [/^Return up to (\d+) Stages? to the owner's hand$/i, (m) => [{ do: 'returnToHand', target: { side: 'any', kinds: ['stage'], upTo: Number(m[1]) } }]],
@@ -1141,6 +1177,9 @@ const CLAUSES: ClauseRule[] = [
   [/^Return all cards in your hand to your deck and shuffle your deck$/i, () => [{ do: 'handAllToDeck', who: 'self' }]],
   [/^Your opponent returns all cards in their hand to their deck and shuffles their deck$/i, () => [{ do: 'handAllToDeck', who: 'opponent' }]],
   [/^draw cards equal to the number you returned to your deck$/i, () => [{ do: 'drawEventCount', returned: true }]],
+  // P-046 Yamato: "place all cards in your hand at the bottom of your deck in any order. If you do, draw cards equal to …"
+  [/^place all cards in your hand at the bottom of your deck(?: in any order)?$/i, () => [{ do: 'handAllToDeck', who: 'self', bottom: true }]],
+  [/^draw cards equal to the number you placed at the bottom of your deck$/i, () => [{ do: 'drawEventCount', returned: true }]],
   [/^your opponent draws (\d+) cards?$/i, (m) => [{ do: 'opponentDraws', count: Number(m[1]) }]],
   [/^trash all cards from your hand$/i, () => [{ do: 'trashHand' }]],
   [/^you take (\d+) damage$/i, (m) => [{ do: 'takeDamage', count: Number(m[1]) }]],
@@ -1223,7 +1262,8 @@ const CLAUSES: ClauseRule[] = [
     (m) => {
       if (!/^none of /i.test(m[0]) && !/cannot/i.test(m[0])) return null;
       const phrase = m[1].replace(/^your /i, 'all of your ');
-      return withTarget(phrase, (target) => ({ do: 'cannotBeKO', target, duration: durationOf(m[2]), byEffect: true }), true);
+      const byEffect = /by your opponent's effects/i.test(m[0]) ? 'opponent' : true;
+      return withTarget(phrase, (target) => ({ do: 'cannotBeKO', target, duration: durationOf(m[2]), byEffect }), true);
     },
   ],
   [
@@ -1335,7 +1375,7 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^(?:Place|Add) (.+?) (?:at|to) the top or bottom of (?:the owner's|their|your opponent's) Life cards face-(up|down)$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true }), true),
+    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true, ...(m[2].toLowerCase() === 'up' ? { faceUp: true } : {}) }), true),
   ],
   [
     /^(?:Place|Return) (.+?) at the bottom of (?:the owner's|its owner's|your|your opponent's) deck in any order$/i,
@@ -1385,6 +1425,26 @@ const CLAUSES: ClauseRule[] = [
     (m) => withTarget(m[1], (target) => ({ do: 'giveRestedDon', target, count: Number(m[2]) })),
   ],
   [
+    // "This Character and up to 1 of your Leader gain +1000 power during this turn" (P-036): esta carta
+    // sempre, a outra é escolha (Q&A P-036: dá para dar aos dois; pago o custo, esta carta ganha).
+    new RegExp(`^This (?:Character|Leader) and (up to \\d+ of your .+?) gains? \\+(\\d+) power ${DUR}$`, 'i'),
+    (m) => {
+      const duration = durationOf(m[3]);
+      const amount = Number(m[2]);
+      const other = withTarget(m[1], (target) => ({ do: 'power', target, amount, duration }));
+      return other && [{ do: 'power', target: 'self', amount, duration }, ...other];
+    },
+  ],
+  [
+    // "Your Leader gains +1000 power for each of your Characters during this turn" (P-024): conta ao resolver.
+    new RegExp(`^(.+?) gains? \\+(\\d+) power for each of (your .+?) ${DUR}$`, 'i'),
+    (m) => {
+      const spec = parseTarget(m[3].replace(/^your /i, 'all of your '));
+      if (!spec || typeof spec !== 'object') return null;
+      return withTarget(m[1], (target) => ({ do: 'powerPerMatching', target, amount: Number(m[2]), spec, duration: durationOf(m[4]) }));
+    },
+  ],
+  [
     // "Your Leader with 5000 power or less and up to 2 of your Characters gain +1000 power during this turn"
     new RegExp(`^Your Leader(?: with (\\d+) power or (less|more))? and (up to \\d+ of your .+?) gains? \\+(\\d+) power ${DUR}$`, 'i'),
     (m) => {
@@ -1410,15 +1470,15 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^Give up to (\d+) of your opponent's rested DON!! cards? to (.+)$/i,
-    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target, count: Number(m[1]), fromOpponent: true })),
+    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target: donTarget(target), count: Number(m[1]), fromOpponent: true })),
   ],
   [
     /^Give up to (\d+) rested DON!! cards? to (.+)$/i,
-    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target, count: Number(m[1]) })),
+    (m) => withTarget(m[2], (target) => ({ do: 'giveRestedDon', target: donTarget(target), count: Number(m[1]) })),
   ],
   [
     /^Give (.+?) up to (\d+) rested DON!! cards?$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'giveRestedDon', target, count: Number(m[2]) })),
+    (m) => withTarget(m[1], (target) => ({ do: 'giveRestedDon', target: donTarget(target), count: Number(m[2]) })),
   ],
   [
     new RegExp(`^Give (.+?) [−-](\\d+) power ${DUR}$`, 'i'),
@@ -1454,7 +1514,9 @@ const CLAUSES: ClauseRule[] = [
       { do: 'trashFromHand', count: Number(m[2]) },
     ],
   ],
-  [/^Draw (?:up to )?(\d+) cards?$/i, (m) => [{ do: 'draw', count: Number(m[1]) }]],
+  [/^Draw (\d+) cards?$/i, (m) => [{ do: 'draw', count: Number(m[1]) }]],
+  // 4-5-4: uma por vez, podendo parar a qualquer momento.
+  [/^Draw up to (\d+) cards?$/i, (m) => [{ do: 'draw', count: Number(m[1]), upTo: true }]],
   [/^Draw a card$/i, () => [{ do: 'draw', count: 1 }]],
   [/^Reveal 1 card from the top of your deck$/i, () => [{ do: 'revealTop' }]],
   [
@@ -1584,7 +1646,8 @@ const CLAUSES: ClauseRule[] = [
     new RegExp(`^Your opponent cannot activate up to (\\d+) \\[Blocker\\] Character that has (\\d+) (?:or less power|power or less) ${DUR}$`, 'i'),
     (m) => withTarget(`up to ${m[1]} of your opponent's [Blocker] Characters with ${m[2]} power or less`, (target) => ({ do: 'cannotBlock', target, duration: durationOf(m[3]) })),
   ],
-  [/^Your opponent adds (\d+) cards? from the top of their Life cards to their hand$/i, (m) => [{ do: 'opponentLifeToHand', count: Number(m[1]) }]],
+  // "from their Life area" (P-009) = do topo, como no dano (4-6-2-1).
+  [/^Your opponent adds (\d+) cards? from (?:the top of their Life cards|their Life area) to their hand$/i, (m) => [{ do: 'opponentLifeToHand', count: Number(m[1]) }]],
   [
     /^Your opponent places (\d+) cards? from their trash at the bottom of their deck(?: in any order)?$/i,
     (m) => [{ do: 'opponentTrashToBottom', count: Number(m[1]) }],
@@ -1614,16 +1677,14 @@ const CLAUSES: ClauseRule[] = [
       ]) ?? null,
   ],
   [new RegExp(`^Negate the effects? of (.+?) ${DUR}$`, 'i'), (m) => withTarget(m[1], (target) => ({ do: 'negate', target, duration: durationOf(m[2]) }))],
-  [/^you cannot play (?:any )?Character cards(?: on your field)? during this turn$/i, () => [{ do: 'restrict', kind: 'noPlayCharacters' }]],
-  [
-    /^you cannot play Character cards with a base cost of (\d+) or more during this turn$/i,
-    (m) => [{ do: 'restrict', kind: 'noPlayCharacters', minCost: Number(m[1]) }],
-  ],
-  [/^you cannot add Life cards to your hand using your own effects during this turn$/i, () => [{ do: 'restrict', kind: 'noLifeToHand' }]],
-  [/^you cannot attack a Leader during this turn$/i, () => [{ do: 'restrict', kind: 'noAttackLeader' }]],
-  [/^you cannot draw cards using your own effects during this turn$/i, () => [{ do: 'restrict', kind: 'noDrawByEffect' }]],
-  [/^you cannot set DON!! cards as active using Character effects during this turn$/i, () => [{ do: 'restrict', kind: 'noSetDonActiveByCharacter' }]],
-  [/^you cannot play cards from your hand during this turn$/i, () => [{ do: 'restrict', kind: 'noPlayFromHand' }]],
+  restriction('play (?:any )?Character cards(?: on (?:your|their) field)?', 'noPlayCharacters'),
+  restriction('play Character cards with a base cost of (\\d+) or more', 'noPlayCharacters', (m) => ({ minCost: Number(m[2]) })),
+  restriction('add Life cards to (?:your|their) hand using (?:your|their) own effects', 'noLifeToHand'),
+  restriction('attack (?:a|your) Leader', 'noAttackLeader'),
+  restriction('draw cards using (?:your|their) own effects', 'noDrawByEffect'),
+  restriction('set DON!! cards as active using Character effects', 'noSetDonActiveByCharacter'),
+  restriction('play cards from (?:your|their) hand', 'noPlayFromHand'),
+  restriction('activate \\[Blocker\\]', 'noBlocker'),
   [
     /^the next time you play (.+?) from your hand during this turn, the cost will be reduced by (\d+)$/i,
     (m) => {
@@ -1644,8 +1705,9 @@ const CLAUSES: ClauseRule[] = [
     (m) => [{ do: 'basePower', target: 'self', copy: 'opponentLeader', duration: durationOf(m[1]) }],
   ],
   [
-    new RegExp(`^Set the power of (.+?) to (\\d+) ${DUR}$`, 'i'),
-    (m) => withTarget(m[1], (target) => ({ do: 'basePower', target, amount: Number(m[2]), duration: durationOf(m[3]) })),
+    // «Set Power to 0» (4-12) é uma redução igual ao poder atual, não um poder base 0: DON!! e +poder posteriores somam.
+    new RegExp(`^Set the power of (.+?) to 0 ${DUR}$`, 'i'),
+    (m) => withTarget(m[1], (target) => ({ do: 'setPowerZero', target, duration: durationOf(m[2]) })),
   ],
   [
     new RegExp(`^(up to \\d+ of .+?)(?:'s|') base power becomes (\\d+) ${DUR}$`, 'i'),
@@ -1788,7 +1850,8 @@ const CLAUSES: ClauseRule[] = [
     (m) => [/rest/i.test(m[2]) ? { do: 'addDonFromDeck', count: Number(m[1]), rested: true } : { do: 'addDonFromDeck', count: Number(m[1]) }],
   ],
   [/^Play this card$/i, () => [{ do: 'playThis' }]],
-  [/^Add this card to your hand$/i, () => [{ do: 'addThisToHand' }]],
+  // "[On K.O.] You may add this Character card to your hand" (P-071): a carta já está no trash.
+  [/^Add this (?:Character )?card to your hand$/i, () => [{ do: 'addThisToHand' }]],
   [/^Activate this card's \[Main\] effect$/i, () => [{ do: 'useMainEffect' }]],
   [/^Activate this card's \[Counter\] effect$/i, () => [{ do: 'useCounterEffect' }]],
   [/^Activate this card's \[On Play\] effect$/i, () => [{ do: 'useOwnEffect', timing: 'onPlay' }]],
@@ -1812,12 +1875,12 @@ const CLAUSES: ClauseRule[] = [
   ],
   [/^Add up to (\d+) cards? from your hand to the top of your Life cards$/i, (m) => [{ do: 'handToLife', upTo: Number(m[1]) }]],
   [
-    /^Add (.+?) to the top of (?:the owner's|your|your opponent's) Life cards(?: face-up)?$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target }), true),
+    /^Add (.+?) to the top of (?:the owner's|your|your opponent's) Life cards( face-up)?$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, ...(m[2] ? { faceUp: true } : {}) }), true),
   ],
   [
-    /^Add (.+?) to the top or bottom of (?:the owner's|your|your opponent's) Life cards(?: face-up)?$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true }), true),
+    /^Add (.+?) to the top or bottom of (?:the owner's|your|your opponent's) Life cards( face-up)?$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true, ...(m[2] ? { faceUp: true } : {}) }), true),
   ],
   [
     // Efeito opcional sem custo: "you may draw 1 card" → pergunta antes.
@@ -2210,7 +2273,7 @@ function parseHeader(line: string): { h: Header; rest: string } | null {
     else if (t === "opponent's turn") h.opponentsTurn = true;
     else if (TIMINGS[t]) h.timings.push(TIMINGS[t]);
     else if (KEYWORDS[t]) h.keywords.push(KEYWORDS[t]);
-    else if (/^(trigger|end of your opponent's turn)$/.test(t)) return null; // ainda não suportados
+    else if (t === 'trigger') return null; // ainda não suportado
     else break; // nome de carta no início da frase
     rest = rest.slice(m[0].length);
   }
@@ -2497,7 +2560,12 @@ const POWER_SELF = /^this (?:Character|card|Leader) gains \+(\d+) power$/i;
 function parseRule(t: string): LeaderRule[] | null {
   let m: RegExpMatchArray | null;
   if ((m = t.match(/^Under the rules of this game, your DON!! deck consists of (\d+) cards$/i))) return [{ kind: 'donDeck', size: Number(m[1]) }];
-  if (/^When your deck is reduced to 0, you win the game instead of losing, according to the rules$/i.test(t)) return [{ kind: 'deckOutWin' }];
+  if (/^When your deck is reduced to 0, you win the game instead of losing(?:, according to the rules)?$/i.test(t)) return [{ kind: 'deckOutWin' }];
+  // P-117 Nami: "Under the rules of this game, you can only include {East Blue} type cards in your deck and when your deck is reduced to 0, …"
+  if ((m = t.match(/^Under the rules of this game, you can only include \{([^}]+)\} type cards in your deck(?: and (.+))?$/i))) {
+    const more = m[2] ? parseRule(m[2].charAt(0).toUpperCase() + m[2].slice(1)) : [];
+    return more && [{ kind: 'deckOnlyType', type: m[1] }, ...more];
+  }
   if (/^Under the rules of this game, you do not lose when your deck has 0 cards\. You lose at the end of the turn in which your deck becomes 0 cards$/i.test(t)) {
     return [{ kind: 'deckOutEndOfTurn' }];
   }
@@ -2526,11 +2594,17 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   const sentences = sentencesOf(body);
   const ruleOnly = parseRule(body.trim().replace(/\.$/, ''));
   if (ruleOnly && !h.don && !h.yourTurn && !h.opponentsTurn) return ruleOnly.map((r) => ({ timing: 'static', steps: [], rule: r }));
-  const start = body.match(/^This effect can be activated at the start of your turn\. (.+)$/i);
+  // "This effect can be activated at the start of your turn." / "At the start of your opponent's
+  // turn, …" / "… at the start of your Main Phase" (6-2-2, 6-5-1).
+  const start = body.match(
+    /^(?:This effect can be activated at the start of (your turn|your opponent's turn|(?:your|the) Main Phase)\. |At the start of (your turn|your opponent's turn|(?:your|the) Main Phase), )(.+)$/i,
+  );
   if (start) {
-    const steps = parseBody(start[1]);
+    const steps = parseBody(capitalizeFirst(start[3]));
     if (!steps) return null;
-    const ab: Ability = { timing: 'startOfTurn', steps };
+    const when = (start[1] ?? start[2]).toLowerCase();
+    const timing: AbilityTiming = when === 'your turn' ? 'startOfTurn' : when === "your opponent's turn" ? 'startOfOpponentTurn' : 'startOfMainPhase';
+    const ab: Ability = { timing, steps };
     if (h.don) ab.don = h.don;
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];
@@ -2693,7 +2767,11 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   if (forced) {
     const steps = parseClause(forced[2]);
     if (!steps) return null;
-    return [{ ...base, timing: 'replace', replace: { who: 'self', event: /removed/i.test(forced[1]) ? 'koOrRemoval' : 'ko', by: 'any' }, cost: { trashSelf: true }, steps }];
+    // "removed … by your opponent's effect or K.O.'d": o K.O. vale por qualquer causa; a remoção, só por efeito do oponente.
+    const replace: Replacement = /removed/i.test(forced[1])
+      ? { who: 'self', event: 'koOrRemoval', by: 'any', removalBy: 'opponentEffect' }
+      : { who: 'self', event: 'ko', by: 'any' };
+    return [{ ...base, timing: 'replace', replace, cost: { trashSelf: true }, steps }];
   }
   // "If this Character would be K.O.'d (in battle / by an effect / by your opponent's effect), you may X instead."
   const repl = s.match(
@@ -2778,11 +2856,11 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   }
   if ((m = s.match(/^this Character cannot be (K\.O\.'d or )?rested by your opponent's (?:Leader and Character )?effects(?: and gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\])?$/i))) {
     const out: Ability[] = [{ ...base, staticNoRest: true }];
-    if (m[1]) out.push({ ...base, staticNoEffectKO: true });
+    if (m[1]) out.push({ ...base, staticNoEffectKO: 'opponent' });
     if (m[2]) out.push({ ...base, staticKeyword: KEYWORDS[m[2].toLowerCase()] });
     return out;
   }
-  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards) and gains \+(\d+) power$/i))) {
+  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards|Leaders or Characters) and gains \+(\d+) power$/i))) {
     return [{ ...base, noBattleKOVsAttribute: m[1] }, { ...base, staticPower: Number(m[2]) }];
   }
   if ((m = s.match(/^Give (red|green|blue|purple|black|yellow) Events in your hand [−-]?(\d+) cost$/i))) {
@@ -2865,9 +2943,14 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [{ ...base, staticCanAttackActive: true }];
   }
   if (/^this Character cannot be K\.O\.'d in battle$/i.test(s)) return [{ ...base, staticNoBattleKO: true }];
-  if (/^this Character cannot be K\.O\.'d by effects$/i.test(s)) return [{ ...base, staticNoEffectKO: true }];
-  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards)$/i))) {
+  if (/^this (?:Character|Stage) cannot be K\.O\.'d by effects$/i.test(s)) return [{ ...base, staticNoEffectKO: true }];
+  // "by "Strike" attribute Leaders or Characters" (P-007) = "… attribute cards".
+  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards|Leaders or Characters)$/i))) {
     return [{ ...base, noBattleKOVsAttribute: m[1] }];
+  }
+  // "by Characters without the "Special" attribute" (P-025): Líder e Personagem com o atributo nocauteiam.
+  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by Characters without the "?(\w+)"? attribute$/i))) {
+    return [{ ...base, noBattleKOUnlessAttribute: m[1] }];
   }
   if (/^this (?:Leader|Character) cannot attack$/i.test(s)) return [{ ...base, staticCannotAttack: true }];
   if (/^this Character cannot be K\.O\.'d in battle by Leaders$/i.test(s)) return [{ ...base, noBattleKOByLeader: true }];
@@ -2899,8 +2982,9 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   }
   if ((m = s.match(/^give this card in your hand [−-]?(\d+) cost$/i))) return [{ ...base, handCost: -Number(m[1]) }];
   if (/^this Character can attack Characters on the turn in which it is played$/i.test(s)) return [{ ...base, staticKeyword: 'rushCharacter' }];
-  if ((m = s.match(/^this Character cannot be K\.O\.'d by your opponent's effects(?: and gains (?:\[(Rush|Blocker|Double Attack|Banish|Unblockable)\]|\+(\d+) power))?$/i))) {
-    const out: Ability[] = [{ ...base, staticNoEffectKO: true }];
+  if ((m = s.match(/^this (?:Character|Stage) cannot be K\.O\.'d by your opponent's effects(?: and gains (?:\[(Rush|Blocker|Double Attack|Banish|Unblockable)\]|\+(\d+) power))?$/i))) {
+    // Só contra efeitos do oponente: o K.O. por efeito próprio continua valendo (1-3-1).
+    const out: Ability[] = [{ ...base, staticNoEffectKO: 'opponent' }];
     if (m[1]) out.push({ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] });
     if (m[2]) out.push({ ...base, staticPower: Number(m[2]) });
     return out;
@@ -2926,7 +3010,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
       if (spec.names) aura.names = spec.names;
       if (spec.excludeName) aura.excludeName = spec.excludeName;
       if (spec.hasAllTypes) aura.hasAllTypes = spec.hasAllTypes;
-      if (m[3]) return [{ ...base, aura: { ...aura, noEffectKO: true } }];
+      if (m[3]) return [{ ...base, aura: { ...aura, noEffectKO: /opponent/i.test(m[3]) ? 'opponent' : true } }];
       return m[2].split(/ and /).map((gain) => {
         const one: NonNullable<Ability['aura']> = { ...aura };
         if (gain.startsWith('[')) one.keyword = KEYWORDS[gain.slice(1, -1).toLowerCase()];

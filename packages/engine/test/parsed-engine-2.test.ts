@@ -109,7 +109,9 @@ describe('lote seguinte: efeitos lidos automaticamente', () => {
     let s = toTurn(game(), 3);
     const mine = field(s, 0, 'ST01-006');
     s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PY-006') });
-    expect(koProtected(s, mine, false)).toBe(true);
+    expect(koProtected(s, mine, false, undefined, 1)).toBe(true);
+    // Só contra o oponente: o próprio efeito nocauteia (DV-13).
+    expect(koProtected(s, mine, false, undefined, 0)).toBe(false);
     expect(koProtected(s, mine, true)).toBe(false);
   });
 

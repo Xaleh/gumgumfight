@@ -49,6 +49,12 @@ describe('recompensa e tiers', () => {
     expect(bountyDelta(30_000, 10_000, true)).toBeLessThan(1_000);
     expect(bountyDelta(300, 0, false)).toBe(-300);
   });
+
+  it('empate vale meio ponto: nada entre iguais, ganha quem vale menos', () => {
+    expect(bountyDelta(10_000, 10_000, 'draw')).toBe(0);
+    expect(bountyDelta(10_000, 30_000, 'draw')).toBeGreaterThan(0);
+    expect(bountyDelta(30_000, 10_000, 'draw')).toBeLessThan(0);
+  });
 });
 
 describe('fatos da partida', () => {
@@ -153,6 +159,46 @@ describe('API de estatísticas', () => {
     expect(ok.json()).toMatchObject({ winner: state.winner, turns: state.turn });
   });
 
+  it('partida empatada (sem vencedor) é gravada sem vitória para ninguém', async () => {
+    const { db, app } = setup();
+    const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
+    const r = playOut(decks, cards, 9);
+    const facts = { ...deriveMatch(r, cards), winner: null };
+    for (const seat of facts.seats) seat.won = false;
+    const hashes = ['hash-alice', 'hash-bob'];
+    recordMatch(
+      db,
+      {
+        mode: 'online',
+        format: 'standard',
+        queue: 'ranked',
+        replay: r,
+        seats: [
+          { controller: 'human', ownerHash: hashes[0], deckId: null },
+          { controller: 'human', ownerHash: hashes[1], deckId: null },
+        ],
+      },
+      facts,
+    );
+    for (const h of hashes) expect(findPlayer(db, h)).toMatchObject({ bounty: 0, rankedGames: 1 });
+    const stats = (await app.inject('/api/stats?queue=ranked&opponent=human&tiers=east-blue')).json();
+    expect(stats.summary).toMatchObject({ games: 2, wins: 0 });
+  });
+
+  it('replay de partida online antiga (preparação antiga) confere com `legacySetup`', async () => {
+    const { app } = setup();
+    const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
+    let state = createGame({ seed: 4, legacySetup: true, cards, players: [{ name: 'A', deck: decks[0] }, { name: 'B', deck: decks[1] }] });
+    const actions: Action[] = [];
+    while (state.phase !== 'gameover' && actions.length < 3000) {
+      const a = chooseBotAction(state, actingPlayer(state)!);
+      actions.push(a);
+      state = applyAction(state, a);
+    }
+    const facts = deriveMatch({ seed: 4, legacySetup: true, decks, actions }, cards);
+    expect(facts).toMatchObject({ winner: state.winner, turns: state.turn });
+  });
+
   it('recusa replay adulterado ou deck inválido', async () => {
     const { app } = setup();
     const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
@@ -200,8 +246,9 @@ describe('API de estatísticas', () => {
       },
       facts,
     );
-    const winner = findPlayer(db, hashes[facts.winner])!;
-    const loser = findPlayer(db, hashes[1 - facts.winner])!;
+    const w = facts.winner!;
+    const winner = findPlayer(db, hashes[w])!;
+    const loser = findPlayer(db, hashes[1 - w])!;
     expect(winner).toMatchObject({ bounty: 1_000, rankedGames: 1 });
     expect(loser).toMatchObject({ bounty: 0, rankedGames: 1 });
     const stats = (await app.inject('/api/stats?queue=ranked&opponent=human&tiers=east-blue')).json();

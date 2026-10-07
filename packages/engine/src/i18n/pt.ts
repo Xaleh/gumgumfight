@@ -26,6 +26,7 @@ const TAGS: Array<[RegExp, string]> = [
   [/\[Your Turn\]/g, '[Seu Turno]'],
   [/\[Opponent's Turn\]/g, '[Turno do Oponente]'],
   [/\[End of Your Turn\]/g, '[Fim do Seu Turno]'],
+  [/\[End of Your Opponent's Turn\]/g, '[Fim do Turno do Oponente]'],
   [/\[On Your Opponent's Attack\]/g, '[No Ataque do Oponente]'],
 ];
 
@@ -318,6 +319,10 @@ const SENTENCES: Rule[] = [
   [
     /^Your opponent cannot activate \[Blocker\] during this battle\.?$/i,
     'Seu oponente não pode ativar [Blocker] durante esta batalha.',
+  ],
+  [
+    /^Your opponent cannot activate \[Blocker\] during this turn\.?$/i,
+    'Seu oponente não pode ativar [Blocker] durante este turno.',
   ],
   [
     /^Your opponent cannot activate \[Blocker\] if that Leader or Character attacks during this turn\.?$/i,

@@ -9,9 +9,9 @@
 //    cartas rotacionadas também invalidam o deck (veja formats.ts).
 
 import { buildCardDef, needsManual } from './cards';
-import { DECK_SIZE } from './engine';
+import { DECK_SIZE, hasType } from './engine';
 import { type FormatId, formatIssues } from './formats';
-import type { CardData, DeckList } from './types';
+import type { CardData, DeckList, LeaderRule } from './types';
 
 export const MAX_COPIES = 4;
 
@@ -42,17 +42,26 @@ export function isColorCompatible(leader: CardData, card: CardData): boolean {
   return card.colors.some((c) => leader.colors.includes(c));
 }
 
-/** Regras de construção do Líder ("you cannot include cards with a cost of 5 or more in your deck"). */
+/**
+ * Regras de construção do Líder ("you cannot include cards with a cost of 5 or more in your deck",
+ * "you can only include {East Blue} type cards in your deck").
+ */
 const leaderRuleCache = new WeakMap<CardData, ReturnType<typeof buildCardDef>['abilities']>();
 
-export function leaderAllows(leader: CardData, card: CardData): boolean {
+/** A regra de construção do Líder que a carta descumpre (nenhuma: `undefined`). */
+export function leaderRuleBroken(leader: CardData, card: CardData): LeaderRule | undefined {
   let abilities = leaderRuleCache.get(leader);
   if (!abilities) leaderRuleCache.set(leader, (abilities = buildCardDef(leader).abilities));
   for (const a of abilities) {
     const r = a.rule;
-    if (r?.kind === 'deckMaxCost' && (!r.category || card.category === r.category) && (card.cost ?? 0) > r.cost) return false;
+    if (r?.kind === 'deckMaxCost' && (!r.category || card.category === r.category) && (card.cost ?? 0) > r.cost) return r;
+    if (r?.kind === 'deckOnlyType' && !hasType(card, r.type)) return r;
   }
-  return true;
+  return undefined;
+}
+
+export function leaderAllows(leader: CardData, card: CardData): boolean {
+  return !leaderRuleBroken(leader, card);
 }
 
 export interface ValidateOptions {
@@ -89,7 +98,6 @@ export function validateDeck(
     });
   }
 
-  const leaderRules = leader?.category === 'leader' ? buildCardDef(leader).abilities.flatMap((a) => (a.rule ? [a.rule] : [])) : [];
   const counts = new Map<string, number>();
   for (const entry of deck.cards) counts.set(entry.id, (counts.get(entry.id) ?? 0) + entry.count);
 
@@ -106,13 +114,15 @@ export function validateDeck(
     if (count > MAX_COPIES && !anyNumberAllowed(card)) {
       issues.push({ level: 'error', message: `${card.name} (${id}): máximo de ${MAX_COPIES} cópias.`, cardId: id });
     }
-    const maxCost = leaderRules.find((r) => r.kind === 'deckMaxCost');
-    if (maxCost?.kind === 'deckMaxCost' && leader && !leaderAllows(leader, card)) {
+    const broken = leader?.category === 'leader' ? leaderRuleBroken(leader, card) : undefined;
+    if (broken?.kind === 'deckMaxCost') {
       issues.push({
         level: 'error',
-        message: `${card.name} (${id}): o Líder não permite ${maxCost.category === 'event' ? 'Eventos' : 'cartas'} com custo ${maxCost.cost + 1} ou mais.`,
+        message: `${card.name} (${id}): o Líder não permite ${broken.category === 'event' ? 'Eventos' : 'cartas'} com custo ${broken.cost + 1} ou mais.`,
         cardId: id,
       });
+    } else if (broken?.kind === 'deckOnlyType') {
+      issues.push({ level: 'error', message: `${card.name} (${id}): o Líder só permite cartas do tipo {${broken.type}}.`, cardId: id });
     }
     if (leader?.category === 'leader' && !isColorCompatible(leader, card)) {
       issues.push({ level: 'error', message: `${card.name} (${id}) não tem a cor do Líder.`, cardId: id });

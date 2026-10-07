@@ -1,4 +1,4 @@
-import { type Action, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId, REPLAY_VERSION, upgradeReplayActions } from '@gumgum/engine';
+import { type Action, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
@@ -40,8 +40,8 @@ async function buildSetup(
   online?: { decks: [DeckList, DeckList]; seed128: number[] },
   /** Sem `firstPlayer`: o vencedor do sorteio escolhe se joga primeiro. */
   chooseFirst = firstPlayer === undefined,
-  /** Replay da versão 1 (antes da etapa de Counter / carta da Vida sempre pedirem uma ação). */
-  legacyScript = false,
+  /** Versão do replay (as anteriores à atual ganham as respostas implícitas e, até a 8, a preparação antiga). */
+  replayVersion?: number,
 ): Promise<GameSetup> {
   let a: { deck: DeckList; cards: CardData[] };
   let b: typeof a;
@@ -73,7 +73,10 @@ async function buildSetup(
       ],
     },
   };
-  if (script && legacyScript) setup.script = upgradeReplayActions(setup.config, script);
+  if (script && replayVersion !== undefined && replayVersion < REPLAY_VERSION) {
+    setup.config = replayConfig(setup.config, replayVersion);
+    setup.script = upgradeReplayActions(setup.config, script);
+  }
   return setup;
 }
 
@@ -487,7 +490,7 @@ export function Menu({
       const online = r.seed128 && r.decks ? { seed128: r.seed128, decks: r.decks } : undefined;
       // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
       const first = r.chooseFirst ? undefined : r.firstPlayer;
-      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', first, r.actions, online, Boolean(r.chooseFirst), (r.version ?? 1) < REPLAY_VERSION));
+      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', first, r.actions, online, Boolean(r.chooseFirst), r.version ?? 1));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }

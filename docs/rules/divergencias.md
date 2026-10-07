@@ -16,33 +16,33 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-04 | Auto effect de carta que já saiu do campo ainda resolve (**corrigido**) | 8-1-3-1-3 | médio | C2 |
 | DV-05 | Efeitos disparados durante o dano resolvem no meio do dano (**corrigido**) | 8-6-2 | médio | C2 |
 | DV-06 | Ordem dos efeitos simultâneos do mesmo jogador é fixa (sem escolha) (**corrigido**) | 6-6-1-1-3, 8-6-1 | baixo | C2 |
-| DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação | 10-2-17-1, 8-2-1-1 | médio | C3 |
-| DV-08 | Escolha sem "up to" aceita 0 alvos | 8-4-4-1 | médio | C4 |
+| DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação (**corrigido**) | 10-2-17-1, 8-2-1-1 | médio | C3 |
+| DV-08 | Escolha sem "up to" aceita 0 alvos (**corrigido**) | 8-4-4-1 | médio | C4 |
 | DV-09 | DON!! −X sem escolha de quais DON!! devolver (**corrigido**) | 8-3-1-6, Q&A de regras | médio | C5 |
-| DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo | 10-2-13-4 | médio | C6 |
-| DV-11 | Só a primeira substituição aplicável é oferecida; recusar descarta as outras | 8-1-3-4-2 | médio | C7 |
-| DV-12 | Remoção por efeito próprio não oferece substituição; `fieldToLife`/`opponentChoosesOwn` nunca oferecem | 8-1-3-4 | médio | C7 |
-| DV-13 | "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio | 1-3-1 (texto) | médio | C8 |
-| DV-14 | "Cannot be K.O.'d" ignorado em custos "K.O. 1 of your Characters" | 1-3-3 | baixo | C8 |
-| DV-15 | `restDonOrCharacter` vira Personagem sem passar pelas proteções | 1-3-3 | baixo | C8 |
-| DV-16 | `ko` em Stage ignora proteções, substituição e eventos | 10-2-1 | baixo | C8 |
-| DV-17 | Carta do [Trigger] vai para o trash **antes** de resolver | 10-1-5-3 | médio | C9 |
-| DV-18 | `fieldToLife` ignora "face-up" | texto das cartas | médio | C10 |
-| DV-19 | «Set Power to 0» lido como poder base 0 | 4-12 | baixo | C11 |
-| DV-20 | Vários "base power becomes X": vale o último, não o maior | 4-9-2-1 | baixo | C11 |
-| DV-21 | Counter da mão só pode ir para o alvo do ataque | 7-1-3-1-1, Q&A de regras | baixo | C12 |
-| DV-22 | Evento [Counter] ignora redução de custo na mão | 2-7-6 | baixo | C12 |
-| DV-23 | "During this battle" expira antes dos efeitos de fim de batalha | 7-1-5-2..4 | baixo | C12 |
-| DV-24 | Ordem da Vida na preparação invertida | 5-2-1-7, 2-9-2-1 | baixo | C13 |
-| DV-25 | "At the start of the game" roda antes da escolha de quem começa, sem escolha nem recusa | 5-2-1-5-1/2 | baixo | C13 |
-| DV-26 | Derrota simultânea não empata | 9-2-1 | baixo | C13 |
-| DV-27 | Laço infinito trava a partida em vez de empatar | 11-1 | baixo | C13 |
-| DV-28 | "At the start of your turn" resolve depois do Draw e da DON!! Phase | 6-2-2 | baixo | C14 |
-| DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] (**corrigido em parte**) | 6-6-1-2 | baixo | C14 |
-| DV-30 | Faltam momentos: "start of your opponent's turn", "start of the Main Phase", [End of Your Opponent's Turn] | 6-2-2, 6-5-1, 6-6-1-1 | baixo | C14 |
-| DV-31 | "Draw up to X" vira compra obrigatória | 4-5-4 | baixo | C15 |
-| DV-32 | Restrições ("you cannot ...") só valem para quem controla o efeito e só no turno | texto das cartas | baixo | C15 |
-| DV-33 | Mão → Vida com filtro não revela a carta | 11-2-1 | baixo | C15 |
+| DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo (**corrigido**) | 10-2-13-4 | médio | C6 |
+| DV-11 | Só a primeira substituição aplicável é oferecida; recusar descarta as outras (**corrigido**) | 8-1-3-4-2 | médio | C7 |
+| DV-12 | Remoção por efeito próprio não oferece substituição; `fieldToLife`/`opponentChoosesOwn` nunca oferecem (**corrigido** em efeitos; custos ficam de fora) | 8-1-3-4 | médio | C7 |
+| DV-13 | "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio (**corrigido**) | 1-3-1 (texto) | médio | C8 |
+| DV-14 | "Cannot be K.O.'d" ignorado em custos "K.O. 1 of your Characters" (**corrigido**) | 1-3-3 | baixo | C8 |
+| DV-15 | `restDonOrCharacter` vira Personagem sem passar pelas proteções (**corrigido**) | 1-3-3 | baixo | C8 |
+| DV-16 | `ko` em Stage ignora proteções, substituição e eventos (**corrigido**) | 10-2-1 | baixo | C8 |
+| DV-17 | Carta do [Trigger] vai para o trash **antes** de resolver (**corrigido**) | 10-1-5-3 | médio | C9 |
+| DV-18 | `fieldToLife` ignora "face-up" (**corrigido**) | texto das cartas | médio | C10 |
+| DV-19 | «Set Power to 0» lido como poder base 0 (**corrigido**) | 4-12 | baixo | C11 |
+| DV-20 | Vários "base power becomes X": vale o último, não o maior (**corrigido**) | 4-9-2-1 | baixo | C11 |
+| DV-21 | Counter da mão só pode ir para o alvo do ataque (**corrigido**) | 7-1-3-1-1, Q&A de regras | baixo | C12 |
+| DV-22 | Evento [Counter] ignora redução de custo na mão (**corrigido**) | 2-7-6 | baixo | C12 |
+| DV-23 | "During this battle" expira antes dos efeitos de fim de batalha (**corrigido**) | 7-1-5-2..4 | baixo | C12 |
+| DV-24 | Ordem da Vida na preparação invertida (**corrigido**) | 5-2-1-7, 2-9-2-1 | baixo | C13 |
+| DV-25 | "At the start of the game" roda antes da escolha de quem começa, sem escolha nem recusa (**corrigido**) | 5-2-1-5-1/2 | baixo | C13 |
+| DV-26 | Derrota simultânea não empata (**corrigido**) | 9-2-1 | baixo | C13 |
+| DV-27 | Laço infinito trava a partida em vez de empatar (**corrigido**) | 11-1 | baixo | C13 |
+| DV-28 | "At the start of your turn" resolve depois do Draw e da DON!! Phase (**corrigido**) | 6-2-2 | baixo | C14 |
+| DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] (**corrigido**) | 6-6-1-2 | baixo | C14 |
+| DV-30 | Faltam momentos: "start of your opponent's turn", "start of the Main Phase", [End of Your Opponent's Turn] (**corrigido**) | 6-2-2, 6-5-1, 6-6-1-1 | baixo | C14 |
+| DV-31 | "Draw up to X" vira compra obrigatória (**corrigido**) | 4-5-4 | baixo | C15 |
+| DV-32 | Restrições ("you cannot ...") só valem para quem controla o efeito e só no turno (**corrigido**) | texto das cartas | baixo | C15 |
+| DV-33 | Mão → Vida com filtro não revela a carta (**corrigido**) | 11-2-1 | baixo | C15 |
 | DV-34 | Erratas oficiais não aplicadas ao texto das cartas (**corrigido**) | Errata oficial | médio | C16 |
 | DV-35 | README "Regras implementadas" desatualizado (corrigido) | — | baixo | — |
 | DV-36 | Nomes e tipos da optcgapi diferentes da lista oficial (**corrigido**) | Lista oficial de cartas | médio | — |
@@ -121,19 +121,20 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C3 — [On K.O.]
 
-**DV-07. [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação** — médio **[testado]**
+**DV-07. [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação** — médio — **corrigido**
 - Regra: 10-2-17-1 (as condições são checadas **no campo**, antes de a carta ir para o trash); 8-2-1-1 (efeito negado não ativa). Q&A OP01-061 Kaido, OP06-074 Zephyr, OP09-093 Teach.
-- Atual: `koCharacter` (engine.ts:4385) só confere [Your Turn]/[Opponent's Turn], depois de `removeCharacter` já ter apagado os modificadores (`negated` incluso).
-- Cenário: Jewelry Bonney ST21-004 "[DON!! x2] [On K.O.] Draw 1 card" nocauteada sem DON!! → compra 1 (não deveria). Personagem com efeitos negados também ativa o [On K.O.].
-- Correto: avaliar `conditionsMet` (DON!!, condição, negação, [Once Per Turn]) antes de mover a carta; depois mover e resolver.
+- Antes: `koCharacter` só conferia [Your Turn]/[Opponent's Turn], depois de `removeCharacter` já ter apagado os modificadores (`negated` incluso). Jewelry Bonney ST21-004 "[DON!! x2] [On K.O.] Draw 1 card" nocauteada sem DON!! comprava 1; Personagem com efeitos negados também ativava o [On K.O.].
+- Agora: `koCharacter` avalia cada [On K.O.] **antes** de mover a carta (com os DON!! ainda dados e os modificadores ainda valendo): `conditionsMet` (negação, [DON!! xX], [Your Turn]/[Opponent's Turn], condição da habilidade), [Once Per Turn] e a causa (`koBy`). Guarda o resultado, move a carta para o trash (DON!! voltam virados) e só então põe na fila os que valeram, marcando o [Once Per Turn] (o custo opcional recusado devolve o uso, como nos outros efeitos). O que não vale fica no log ("a condição não vale, o efeito não é ativado"). As condições escritas dentro do efeito ("If …") continuam sendo vistas na resolução.
+- Testes: `packages/engine/test/on-ko.test.ts` (Bonney com 0, 1 e 2 DON!!, Personagem negado, [Once Per Turn] marcado e já usado).
 
 ### C4 — Escolha obrigatória
 
-**DV-08. Escolha sem "up to" aceita 0 alvos** — médio
-- Regra: 8-4-4-1 (sem "up to", escolhe-se o máximo possível até o número pedido).
-- Atual: `resolveTargets` (engine.ts:1857) sempre abre `selectTargets` com `min: 0`; `TargetSpec` não diz se a escolha é obrigatória.
-- Cenários: Líder Trafalgar Law OP01-002 com 5 Personagens ("return 1 of your Characters to the owner's hand. Then, play up to 1…"): dá para devolver 0 e mesmo assim jogar. OP07-036: confirma "you may rest 1", escolhe 0 e o "If you do" ainda acontece.
-- Onde: `types.ts` (`TargetSpec`: campo de escolha obrigatória), `engine.ts` (`resolveTargets`), `cards/parser.ts` (marcar textos sem "up to").
+**DV-08. Escolha sem "up to" aceita 0 alvos** — médio — **corrigido**
+- Regra: 8-4-4-1 (sem "up to", escolhe-se o máximo possível até o número pedido; só com "up to" pode ser 0). "You may <ação> 1 …" deixa a ação inteira opcional (aceitar ou recusar), mas quem aceita escolhe o alvo.
+- Antes: `resolveTargets` sempre abria `selectTargets` com `min: 0`; `TargetSpec` não dizia se a escolha era obrigatória. Líder Trafalgar Law OP01-002 com 5 Personagens ("return 1 of your Characters to the owner's hand. Then, play up to 1…") devolvia 0 e mesmo assim jogava; OP07-036 confirmava "you may rest 1 of your Characters", escolhia 0 e o "If you do" ainda virava o Personagem do oponente.
+- Agora: `TargetSpec.required` marca a quantidade sem "up to". O parser (`parseTargetBase`) marca "N of your …"/"N of your opponent's …" e "your Leader or 1 of your Characters"; `resolveTargets` abre a escolha com `min` = o máximo possível (`requiredTargets`: `min(N, opções)`; com "with a total power/cost of N or less", quantas das menores cabem no total). Exceção: "Give up to N rested DON!! cards to your Leader or 1 of your Characters" — dar 0 DON!! é permitido, e o motor dá os DON!! a quem foi escolhido, então o alvo continua opcional (`donTarget`). Nos scripts à mão (`scripts.ts`), os únicos alvos sem "up to" são desse tipo (ST01-001, ST01-007, ST01-011) e ficaram como estavam. No "you may" sem custo seguido de alvo obrigatório sem nenhuma carta que possa ser escolhida (OP07-036 sem Personagem de custo 3 ou mais), a ação não pode ser feita: o motor não pergunta e pula o trecho com o "If you do". O bot completa o mínimo com as próprias cartas de menor valor (em escolhas "harm", as do oponente primeiro). Replays passam para a versão 6; nos antigos, a escolha gravada com menos alvos do que o mínimo é completada com as primeiras opções.
+- Varredura (data/cards + data/spoilers + as fixtures de teste, 826 cartas): 2 cartas com alvo obrigatório depois da correção, OP01-002 (`returnToHand`) e OP07-036 (`rest`); as outras 16 frases "… to your Leader or 1 of your Characters" / "to 1 of your …" são de dar "up to N" DON!! (ficam opcionais). Os demais textos sem "up to" da base ("You may rest 1 of your Characters: …", "K.O. 1 of your …:") são custos (`AbilityCost`), que já eram tudo-ou-nada.
+- Testes: `packages/engine/test/required-targets.test.ts` (Law: 0 alvos recusado, outra cor, "up to" ainda aceita 0, bot; OP07-036: aceitar exige o alvo, recusar, sem alvo possível; replay antigo; parser e varredura).
 
 ### C5 — DON!! −X
 
@@ -145,123 +146,179 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C6 — [Once Per Turn]
 
-**DV-10. [Once Per Turn] não reinicia quando a carta sai e volta ao campo** — médio **[testado]**
-- Regra: 10-2-13-4, 3-1-6 (é uma carta nova).
-- Atual: `usedThisTurn` guarda `uid:índice` e só é zerado no fim do turno (engine.ts:1419); `removeCharacter` não limpa.
-- Cenário: Jinbe ST14-004 usa o [Activate: Main], volta para a mão, é jogado de novo → "Já usada neste turno."
-- Onde: limpar as chaves do uid em `removeCharacter`/`detach`.
+**DV-10. [Once Per Turn] não reinicia quando a carta sai e volta ao campo** — médio — **corrigido**
+- Regra: 10-2-13-4, 3-1-6 (a carta que muda de área é uma carta nova).
+- Antes: `usedThisTurn` guardava `uid:índice` e só era zerado no fim do turno; `removeCharacter`/`detach` não limpavam. Jinbe ST14-004 usava o [Activate: Main], voltava para a mão, era jogado de novo → "Já usada neste turno."
+- Agora: `forgetCard` esquece as chaves `uid:*` de `usedThisTurn` quando a carta sai do campo (`removeCharacter`, que cobre K.O., devolver à mão/deck, Vida, descarte por campo cheio etc.; o Stage em `detach`; a troca de Stage ao jogar outro da mão passa a usar `detach`) e de novo quando entra (`resolvePlay`, Stage jogado da mão ou por efeito, modo manual). Saindo, também tira a marca (`opt`) dos efeitos da carta que ainda esperam na fila, para que, descartados depois (DV-04), não devolvam o uso de uma carta nova. O Líder não sai do campo. O [Once Per Turn] do [On K.O.] continua marcado depois do K.O. (é o uso da carta no trash, que resolve o efeito, DV-07); se ela voltar ao campo no mesmo turno, a entrada esquece a marca. Pelo mesmo motivo, a carta sai de `battledCharacter` ("if this Character battled … during this turn").
+- Fica de fora: os outros registros por carta (`delayed`, `tempReplacements`) são efeitos já criados, que seguem as próprias regras (8-2-3; OP03-005 Thatch, tema 08).
+- Testes: `packages/engine/test/once-per-turn.test.ts` (Jinbe devolvido à mão por efeito e jogado de novo; a mesma carta que não saiu continua bloqueada; [Once Per Turn] [On K.O.] de carta nocauteada, devolvida e jogada de novo ativa outra vez; Stage trocado, devolvido e jogado de novo; `battledCharacter`).
 
 ### C7 — Substituição ("instead")
 
-**DV-11. Só a primeira substituição aplicável é oferecida; recusar descarta as outras** — médio
+**DV-11. Só a primeira substituição aplicável é oferecida; recusar descarta as outras** — médio — **corrigido**
 - Regra: 8-1-3-4-2 (primeiro a da carta afetada, depois as do jogador do turno na ordem que ele escolher, depois as do outro). Q&A OP05-001 Sabo (recusar não gasta o [Once Per Turn]).
-- Atual: `offerReplacement` (engine.ts:4240) devolve a primeira habilidade elegível (Líder → Personagens → Stage → `tempReplacements`); se recusada, `performRemoval(..., noReplace)` (:4307) remove sem oferecer as outras. A substituição da própria carta não tem precedência.
-- Cenário: Líder com "If your Character would be K.O.'d, you may … instead" + Personagem com "If this Character would be K.O.'d, you may … instead": recusar a do Líder leva direto ao K.O.
+- Antes: `offerReplacement` devolvia a primeira habilidade elegível (Líder → Personagens → Stage → `tempReplacements`); se recusada, `performRemoval(..., noReplace)` removia sem oferecer as outras, e a da própria carta não tinha precedência. Líder com "If your Character would be K.O.'d, you may … instead" + Personagem com a própria substituição: recusar a do Líder levava direto ao K.O. A remoção depois da recusa também perdia quem removia (`byPlayer`): um K.O. por efeito do oponente com a substituição recusada não emitia `characterRemoved` nem ativava [On K.O.] "by your opponent's effect".
+- Agora: `nextReplacement` monta a ordem: primeiro as do jogador do turno, depois as do outro (cada um só substitui a saída dos próprios Personagens); de cada jogador, primeiro as das cartas afetadas, depois Líder → Personagens → Stage → as criadas por efeito (`tempReplacements`). O passo `replaceRemoval` guarda as já oferecidas (`skip`); recusada uma (ou sem como pagar), `continueRemoval` oferece a próxima e, sem nenhuma, remove. Recusar continua sem gastar o [Once Per Turn]; a aplicada não volta a ser oferecida para a mesma remoção. A remoção leva a causa (`byPlayer`, `by`, batalha) até o fim.
+- "Na ordem que ele escolher": oferecer em sequência já deixa o dono usar qualquer uma (recusa as anteriores), e só uma é aplicada por remoção (depois dela o Personagem não sai mais). Por isso não há uma escolha de ordem à parte; a ordem fixa só decide qual é perguntada primeiro.
+- Testes: `packages/engine/test/replacement.test.ts` (Líder + Personagem: a do Personagem vem primeiro, recusada a do Líder salva e o [Once Per Turn] recusado não é gasto; recusando todas, K.O.).
 - Outros simuladores tiveram o mesmo bug (OPTCGSim 1.43a; OPlayTCG oferece em cadeia — ver [interacoes/14](interacoes/14-comunidade-e-simuladores.md)).
 
-**DV-12. Remoções que não oferecem substituição** — médio
-- Atual: (a) remoção que não é K.O. só é substituída quando o efeito é do oponente (`eventOk`, engine.ts:4258), então "would be removed from the field" sem "by your opponent" não se aplica a efeito próprio; (b) `fieldToLife` (:3733) e `opponentChoosesOwn` (:3166) respeitam `removalBlocked`, mas não chamam `offerReplacement`; `fieldToLife` também não emite `characterRemoved`; (c) não há substituição para Líder/Stage (hoje nenhuma carta precisa).
-- Cartas afetadas: as com "would be removed from the field" / "would leave the field" (ex.: OP17-043, EB04-044, OP05-100) e qualquer substituição contra "place at the bottom of the Life" ou "your opponent chooses".
-- Remoções simultâneas: um pagamento salva todos (Q&A OP15-009, OP11-001, OP05-001) — conferir no conserto.
+**DV-12. Remoções que não oferecem substituição** — médio — **corrigido** (efeitos; custos ficam de fora)
+- Antes: (a) remoção que não é K.O. só era substituída quando o efeito era do oponente (`eventOk`), então "would be removed from the field" sem "by your opponent" não valia contra efeito próprio (OP17-043, EB04-044, OP05-100); (b) `fieldToLife` e `opponentChoosesOwn` respeitavam `removalBlocked`, mas não chamavam `offerReplacement`, e `fieldToLife` não emitia `characterRemoved`; (c) cada Personagem removido junto com outros recebia a própria pergunta, e cada um era removido logo depois da sua: o Líder OP11-001 Koby pagava 3 cartas por {Navy} do Kaido OP01-094 e, com 2 no descarte, o 1º nocauteado ia para o descarte e liberava a substituição do 2º.
+- Agora: `replacementMatches` usa a causa do texto também na remoção: "by your opponent('s effect)" exige efeito do oponente; sem isso, vale qualquer saída do campo (efeito próprio e K.O. em batalha incluídos, como "would leave the field"). "Removed … by your opponent's effect or K.O.'d" (forma obrigatória) ganhou `removalBy` para a remoção continuar só contra o oponente. `ko`, `returnToHand`, `trashTarget`, `toDeckBottom`, `opponentChoosesOwn` e `fieldToLife` passam todos por `removeFromField`: proteções (`koProtected`/`removalBlocked`), depois as substituições e por fim `performRemoval`, que move a carta e emite `characterRemoved` (e `returnedToHand`) — `fieldToLife` passou a emitir, inclusive no fundo da Vida. Os Personagens removidos juntos ("K.O. all", "return up to 2") recebem cada substituição uma vez, cobrindo todos a que ela se aplica: um pagamento salva todos ou nenhum (Q&A OP15-009, OP11-001, OP05-001; `victimPowerMinus` e `victimToLife` valem para cada um), e os não cobertos saem juntos depois das respostas. Quem a substituição não cobre (Tashigi OP10-032 não protege a si mesma) continua saindo.
+- Bot: paga como antes, exceto contra remoção sem K.O. feita pelo próprio efeito (ele escolheu remover).
+- Replays passam para a versão 7; nos antigos, a pergunta de substituição que o roteiro não tem é recusada (o que acontecia antes). Um replay antigo que pagou por cada Personagem removido junto pode tomar outro rumo.
+- Fica de fora: (1) custos que tiram Personagem próprio do campo ("You may return 1 of your Characters to your hand:", `returnOwn`/`koOwn`/`trashOwn`/`anyNumberForPower`) continuam sem substituição — com ela o custo não conta como pago (Q&A OP05-100 + OP01-047, CR 8-3-1-7) e isso pede outro tratamento; (2) substituição para Líder/Stage (nenhuma carta precisa); (3) K.O. de Stage (DV-16, corrigido sem substituição).
+- Testes: `packages/engine/test/replacement.test.ts` (Kaido OP01-094 + Líder tipo Koby OP11-001: um pagamento salva os dois {Navy} e o outro Personagem é nocauteado; com 2 cartas no descarte não dá nem em parte; recusando, todos saem; `fieldToLife` pagando e recusando, com `characterRemoved`; `opponentChoosesOwn`; "removed from the field" sem "by your opponent" contra efeito próprio e "by your opponent's effect" que continua não valendo; bot). 9 de 10 falham no código antigo.
 
 ### C8 — Proteções e proibições
 
-**DV-13. "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio** — médio
-- Atual: vira `staticNoEffectKO` (parser.ts:2898), que em `koProtected` (engine.ts:4328) bloqueia qualquer K.O. por efeito.
-- Correto: só efeitos do oponente. ~17 cartas usam o texto.
+**DV-13. "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio** — médio — **corrigido**
+- Regra: 1-3-1 (o texto vale como escrito). ~17 cartas usam o texto (ST14-009, OP07-033, OP09-086…).
+- Antes: virava `staticNoEffectKO` (parser.ts:2898), igual a "cannot be K.O.'d by effects", e `koProtected` (engine.ts:4328) bloqueava qualquer K.O. por efeito, inclusive o do próprio dono. O mesmo na aura ("your Characters … cannot be K.O.'d by your opponent's effects", `noEffectKO`) e no efeito temporário ("none of your Characters can be K.O.'d by your opponent's effects during this turn", modificador `cannotBeKOByEffect`).
+- Agora: as três formas guardam o lado: `staticNoEffectKO` e `aura.noEffectKO` valem `true` ("by effects") ou `'opponent'` ("by your opponent's effects", também "cannot be K.O.'d or rested by your opponent's effects"); o efeito temporário com "your opponent's" cria o modificador `cannotBeKOByOpponentEffect`. `koProtected` recebe quem nocauteia (`byPlayer`, vindo de `removeFromField`/`koCharacter`) e a versão `'opponent'` só protege quando é o oponente. Os textos em português (habilidade, aura, status) dizem "por efeitos do oponente".
+- Testes: `packages/engine/test/protections.test.ts` (o próprio efeito nocauteia e o do oponente não; "by effects" continua protegendo do próprio efeito; aura e efeito "during this turn"); `parsed-engine*.test.ts` passaram a informar quem nocauteia.
 
-**DV-14. "Cannot be K.O.'d" ignorado em custos de K.O.** — baixo
+**DV-14. "Cannot be K.O.'d" ignorado em custos de K.O.** — baixo — **corrigido**
 - Regra: 1-3-3 (proibição vence exigência); um custo que não pode ser pago não é pago (8-3-1-3).
-- Atual: `koOwn` (engine.ts:2592) e `koSelf` (:3400) usam `force: true`.
-- Correto: o Personagem protegido não serve para pagar o custo (ou, se a carta pedir, o custo não pode ser pago).
+- Antes: `koOwn` (engine.ts:2592) e `koSelf` (:3400) usavam `force: true` e as opções do custo eram todos os Personagens do filtro.
+- Agora: `koCostOptions` tira das opções de "K.O. N of your …" os Personagens que `koProtected` protege do K.O. pelo efeito do próprio dono ("cannot be K.O.'d", "by effects"; "by your opponent's effects" não protege, DV-13). `canPayCost` usa essas opções, então sem Personagens suficientes o custo não pode ser pago; "K.O. this Character" (`koSelf`) também não pode ser pago se a carta estiver protegida. O mesmo filtro vale para "You may K.O. any number of your Characters … for every Character K.O.'d" (`anyNumberForPower`): o protegido não seria nocauteado nem contaria. O K.O. em si continua com `force` (já escolhido entre os que podem), sem substituição: custos que tiram Personagem do campo seguem fora da substituição (DV-12).
+- Testes: `packages/engine/test/protections.test.ts` (com só o protegido, `canPayCost` falso; com outro Personagem, só ele aparece entre as opções).
 
-**DV-15. `restDonOrCharacter` vira Personagem sem passar pelas proteções** — baixo
-- Atual: chama `restCard(state, uid)` sem `byEffectOf` (engine.ts:2798): ignora "cannot be rested" (`staticNoRest`), a substituição de rest e não emite `restedByEffect`.
+**DV-15. `restDonOrCharacter` vira Personagem sem passar pelas proteções** — baixo — **corrigido**
+- Antes: chamava `restCard(state, uid)` sem `byEffectOf` (engine.ts:2798): ignorava "cannot be rested by your opponent's effects" (`staticNoRest`), a substituição de rest e não emitia `restedByEffect`.
+- Agora: `restCard(state, uid, controller, source)`, como o passo `rest`. Também a recusa da substituição de rest (`replaceRest`) passou a emitir `restedByEffect` (o Personagem é virado pelo efeito do mesmo jeito).
+- Replays passam para a versão 8: nos antigos, a pergunta da substituição de rest que o roteiro não tem é recusada (o que acontecia antes).
+- Testes: `packages/engine/test/protections.test.ts` (o protegido continua ativo; o outro é virado e ativa "If a Character is rested by your effect").
 
-**DV-16. `ko` em Stage ignora proteções, substituição e eventos** — baixo
-- Atual: K.O. em Stage vai direto ao trash (engine.ts:2193). Só cartas que dizem "K.O. … Stage" podem fazer isso (Q&A OP13-098: um efeito que mira Personagens não alcança Stage).
+**DV-16. `ko` em Stage ignora proteções, substituição e eventos** — baixo — **corrigido**
+- Regra: 10-2-1. Só cartas que dizem "K.O. … Stage" podem fazer isso (Q&A OP13-098: um efeito que mira Personagens não alcança Stage).
+- Antes: K.O. em Stage ia direto ao trash (engine.ts:2193).
+- Agora: `koStage` passa pelas mesmas proteções do Personagem: `koProtected` (com quem nocauteia) e `removalBlocked`; o parser lê "This Stage cannot be K.O.'d by (your opponent's) effects". Substituição e eventos: nenhuma carta tem "If your Stage would be K.O.'d … instead" nem "When your Stage is K.O.'d", e os eventos de Personagem (`characterKO`, `characterRemoved`, [On K.O.], "if your Character was K.O.'d this turn") não valem para Stage; por isso não há substituição nem evento novo (a substituição para Stage segue fora, DV-12).
+- Testes: `packages/engine/test/protections.test.ts` (Stage com "cannot be K.O.'d by your opponent's effects" fica no campo; o sem proteção vai para o descarte).
 
 ### C9 — [Trigger]
 
-**DV-17. A carta do [Trigger] vai para o trash antes de resolver** — médio
+**DV-17. A carta do [Trigger] vai para o trash antes de resolver** — médio — **corrigido**
 - Regra: 10-1-5-3 (enquanto o Trigger resolve, a carta não está em área nenhuma; vai para o trash depois). Q&A OP14-082 Oinkchuck, OP09-100 Karasu, OP15-097, OP15-079 Absalom.
-- Atual: `ps.trash.push(card)` antes de `pushEffect` (engine.ts:1208).
-- Consequências: contagens de trash incluem a carta (OP15-097 dá 10 em vez de 9); um [Trigger] "Play this card" sai como `from: 'trash'` (`playFree` :1915) e dispara "when a Character is played from your trash" (OP16-079); "add this card from your trash" pelo Trigger funcionaria quando não deveria.
-- Correto: "limbo" durante a resolução; trash ao fim do frame, salvo se o efeito moveu a carta.
+- Antes: `ps.trash.push(card)` antes de `pushEffect` (engine.ts:1208). Contagens de trash incluíam a carta (OP15-097 dava 10 em vez de 9); um [Trigger] "Play this card" saía como `from: 'trash'` (`playFree` :1915) e disparava "when a Character is played from your trash" (OP16-079); "play/add … from your trash" pelo [Trigger] alcançava a própria carta (OP14-082, OP15-079).
+- Agora: ao ativar o [Trigger], a carta vai para `state.limbo` (fora de qualquer área: nem Vida nem descarte) e o frame do efeito leva `trigger: true`. Quando esse frame termina (depois dos efeitos que ele empilhou por cima, como "Activate this card's [Main]"), a carta vai para o descarte, a menos que o efeito a tenha movido: `playThis` a joga (sem `from: 'trash'`), `addThisToHand` a leva para a mão (ST09-002), e `detach` a tira do limbo. Sem passos, vai direto ao descarte.
+- Efeitos disparados durante o [Trigger] (8-6) continuam esperando o dano terminar; quando resolvem, a carta já está no descarte (ou onde o efeito a pôs).
+- Visão (`view.ts`): a carta foi revelada, então é pública enquanto resolve (`limbo` com apelidos); a interface mostra "[Trigger] Nome" na etapa da batalha no lugar da carta no topo do descarte. OP09-100 Karasu e OP03-100 Kingbaum já estavam certos (a carta sai da Vida ao ser revelada).
+- Replays: sem decisão nova, a versão não muda; um replay antigo que contava a carta no descarte pode tomar outro rumo.
+- Testes: `packages/engine/test/trigger-limbo.test.ts` (OP15-097 pelo [Trigger] com 9 no descarte não compra e pelo [Main] compra; "Play this card" não dispara "played from your trash"; "play … from your trash" e "add … from your trash" não alcançam a própria carta; a carta é pública e fica fora do descarte enquanto resolve; ST09-002 vai para a mão; [On K.O.] disparado pelo [Trigger] resolve depois do dano, com a carta no descarte). 4 de 7 falham no código antigo.
 
 ### C10 — Vida virada para cima
 
-**DV-18. `fieldToLife` ignora "face-up"** — médio
-- Atual: o passo `fieldToLife` não tem o campo `faceUp` (parser.ts:1336, 1814, 1818).
-- Cartas: ~16, ex.: OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103 — põem a carta virada para baixo, escondendo do oponente uma carta que deveria ser pública (3-10-2-1).
+**DV-18. `fieldToLife` ignora "face-up"** — médio (**corrigido**)
+- Antes: o passo `fieldToLife` não tinha o campo `faceUp` (o parser aceitava o "face-up" e o descartava); a carta ia virada para baixo, escondendo do oponente uma carta que deveria ser pública (3-10-2-1), e não contava para "face-up Life card".
+- Cartas: ~16 na base completa (ex.: OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103). Na base deste repositório (`data/cards` + `data/spoilers`, 750 entradas) são 4 as que passam a ter `faceUp`: ST07-017 (topo), ST09-015, OP06-103 e P-085 (topo ou fundo). As outras citadas não estão na base local.
+- Agora: `fieldToLife{faceUp}` no tipo e nas três regras do parser ("to the top [or bottom] of … Life cards face-up", "Place/Add … face-up|down"). O motor passa `faceUp` pela remoção (`removeFromField` → substituições → `performRemoval`, como no DV-12) e põe a carta em `lifeFaceUp`, no topo ou no fundo. A visão (`view.ts`) já mostrava as cartas de `lifeFaceUp` a todos; a interface agora desenha a frente da carta na pilha de Vida (com o nome no título e a prévia ao passar o mouse).
+- Limpeza: `trashLife`, `lifeToTrash`, `lifeTrashUntil`, `opponentLifeToBottom`, o dano com [Banish] e `detach` tiram a carta de `lifeFaceUp` ao tirá-la da Vida (helper `takeLife`); `lifeToHandCard`, o [Trigger], `playRevealed`, `trashFaceUpLife` e "Life to top of deck" já tiravam.
+- Replays: sem decisão nova, a versão não muda; um replay antigo com essas cartas pode tomar outro rumo (condições "face-up Life card", custos de virar Vida).
+- Testes: `packages/engine/test/life-face-up.test.ts` (parser das 4 cartas e da frase sem "face-up"; ST07-017 põe o Personagem no topo em `lifeFaceUp` e o oponente e o espectador o veem, com o resto da Vida escondido; "top or bottom … face-up" no fundo; sem "face-up" fica escondida; substituição recusada mantém o "face-up"; `trashLife`/`lifeToTrash` limpam `lifeFaceUp`). 5 de 6 falham no código antigo.
 
 ### C11 — Poder base e «Set Power to 0»
 
-**DV-19. «Set Power to 0» lido como poder base 0** — baixo
-- Regra: 4-12 (reduz pelo valor do poder atual no momento da ativação; se já negativo, nada). Q&A OP07-002 Ain: com «Set Power to 0» e depois [Counter +1000], fica 1000.
-- Atual: "Set the power of X to 0" vira `basePower: 0` (parser.ts:1646); DON!!, auras e bônus continuam somando por cima do 0, e o efeito não reage a poder negativo.
-- Cartas: OP07-002, EB04-010.
+**DV-19. «Set Power to 0» lido como poder base 0** — baixo (**corrigido**)
+- Regra: 4-12 (reduz pelo valor do poder atual no momento da ativação; se já é 0 ou negativo, nada). Q&A OP07-002 Ain: com «Set Power to 0» e depois [Counter +1000], fica 1000; um Hack 5000 com +2000 "até o fim do próximo turno do oponente" fica 0 neste turno e volta a 7000 no seguinte.
+- Antes: "Set the power of X to 0" virava `basePower: 0` (parser.ts:1646); DON!!, auras e bônus (anteriores ou posteriores) somavam por cima do 0, e poder negativo subia para 0 + modificadores (−1000 virava −2000 com um −2000 já aplicado).
+- Agora: passo novo `setPowerZero` (parser: "Set the power of … to 0 …"). Na resolução lê o poder atual de cada alvo (`getPower`) e, se for positivo, aplica um modificador de poder −(poder atual) com a duração do texto; com 0 ou negativo não faz nada. Counters, DON!! e bônus posteriores somam normalmente, e o efeito some ao fim da duração. "Set the power … to N" com N ≠ 0 não existe nas cartas e deixa de ser lido.
+- Cartas: OP07-002, EB04-010 (nenhuma na base local; os testes usam o texto do OP07-002 numa carta sintética).
 
-**DV-20. Vários "base power becomes X": vale o último, não o maior** — baixo
-- Regra: 4-9-2-1. Q&A ST34-004 Linlin, OP17-008 Jozu.
-- Atual: `getPower` (engine.ts:589) aplica em sequência (aura → estático → modificador) e o último vence.
+**DV-20. Vários "base power becomes X": vale o último, não o maior** — baixo (**corrigido**)
+- Regra: 4-9-2-1. Q&A ST34-004 Linlin (0 e 6000 → 6000), OP17-008 Jozu (7000 e 8000 → 8000).
+- Antes: `getPower` (engine.ts:589) aplicava em sequência (aura → estático → modificador) e o último vencia; `swapBasePower` lia só o último modificador de poder base.
+- Agora: `basePowerOf` reúne todos os efeitos que fixam o poder base (auras `basePower`/`basePowerCopyLeader`, `staticBasePower`, modificadores `basePower`, inclusive os da troca de poder base) e usa o maior; sem nenhum, o impresso. `getPower` parte dele, e `swapBasePower` troca os valores de `basePowerOf`. Um único efeito ainda pode baixar o poder base abaixo do impresso (Linlin sozinha → 0).
+- Replays (DV-19 e DV-20): sem decisão nova, a versão não muda; um replay antigo com essas cartas pode tomar outro rumo.
+- Testes: `packages/engine/test/set-power.test.ts` (parser do OP07-002 e do ST34-004; OP07-002 + [Counter +1000] fica 1000; Hack 5000 +2000 fica 0 e volta a 7000 no turno seguinte; poder já negativo não muda; 0 e 6000 nas duas ordens dá 6000, com bônus por cima; um só "base power becomes 0" dá 0). 5 de 8 falham no código antigo.
 
 ### C12 — Counter Step e fim de batalha
 
-**DV-21. Counter da mão só pode ir para o alvo do ataque** — baixo
+**DV-21. Counter da mão só pode ir para o alvo do ataque** — baixo (**corrigido**)
 - Regra: 7-1-3-1-1 ("Leader or 1 Character card"). Q&A de regras: "Can I use a Counter to increase the power of a card not being attacked? Yes … the effect will end at the end of the current battle."
-- Atual: engine.ts:1151 aplica sempre no alvo.
+- Antes: engine.ts:1151 aplicava sempre no alvo do ataque.
+- Agora: a ação `counter` tem `target` opcional (o Líder ou 1 Personagem do defensor, `counterTargets`); sem ele, o valor vai para o atacado, como antes. O bônus continua com duração `battle`. Alvo do atacante, ou `target` num Evento [Counter] (que escolhe os alvos no próprio efeito), é recusado. A visão traduz o `target` como o `uid` (`aliasRefs`/`actionFromView`), então o servidor das partidas online aceita a ação nova.
+- Interface: o caso comum continua com um clique (tocar ou arrastar a carta até a mesa dá o Counter ao atacado). Ao abrir a carta (toque longo, ou o toque sem "Counter sem confirmação"), abaixo de "Usar como Counter" aparece "ou dar a" com o Líder e os Personagens do jogador. O bot continua dando o Counter ao atacado.
+- Replays: a ação antiga (sem `target`) vale o mesmo; a versão não muda.
 
-**DV-22. Evento [Counter] ignora redução de custo na mão** — baixo
-- Atual: `counterOptions` (engine.ts:837) e o pagamento (:1155) usam `def.cost`, não `playCost`.
+**DV-22. Evento [Counter] ignora redução de custo na mão** — baixo (**corrigido**)
+- Regra: 2-7-6 (as reduções valem para jogar ou ativar a carta da mão).
+- Antes: `counterOptions` (engine.ts:837) e o pagamento (:1155) usavam `def.cost`, não `playCost`.
+- Agora: os dois usam `playCost` (o mesmo do Main: `handCost`, `costReductions`, `handCostAura`), lido antes de a carta sair da mão; uma redução "da próxima jogada" (`costReductions`) é consumida como no Main. `eventsThisTurn` continua com o custo impresso.
+- Replays: sem decisão nova, a versão não muda; um replay antigo pode tomar outro rumo (um Evento [Counter] com redução passa a ser oferecido e custa menos).
 
-**DV-23. "During this battle" expira antes dos efeitos de fim de batalha** — baixo
+**DV-23. "During this battle" expira antes dos efeitos de fim de batalha** — baixo (**corrigido**)
 - Regra: 7-1-5-2 (ativam os "at the end of this battle"), depois 7-1-5-3/4 (expira "during this battle").
-- Atual: engine.ts:1744 remove os modificadores `battle` antes de empilhar os efeitos de fim de batalha; `state.battle` já é `null` para eles.
+- Antes: engine.ts:1744 removia os modificadores `battle` antes de empilhar os efeitos de fim de batalha; `state.battle` já era `null` para eles.
+- Agora: a etapa `end` de `stepBattle` primeiro dispara os `battlesCharacter` ("if this Character battles…", "at the end of a battle in which…") e os "at the end of this battle" (`battle.after`, inclusive os criados por esses mesmos efeitos), marca `battle.endFired` e volta. Os efeitos passam pela fila de disparados (8-6) e resolvem com a batalha ainda em curso (`state.battle`, Counters e outros "during this battle" valendo, pendências normais). Quando não há mais nada a disparar, expiram os modificadores `battle` e a batalha termina. Sem efeitos de fim de batalha, termina na hora, como antes.
+- Replays: sem decisão nova, a versão não muda; um replay antigo com efeitos de fim de batalha que leem o poder ou a batalha pode tomar outro rumo.
+- Testes (DV-21 a DV-23): `packages/engine/test/counter-step.test.ts` (Counter num Personagem que não é o atacado, que acaba no fim da batalha; sem alvo vai para o atacado e alvo inválido ou com Evento é recusado; tradução do alvo pela visão; Evento [Counter] de custo 3 com −2 na mão oferecido e pago com 1 DON!!; "at the end of a battle in which this Character battles…" e "[When Attacking] At the end of this battle" resolvem com o Counter ainda valendo e a batalha em curso, que termina depois). 6 de 6 falham no código antigo.
 
 ### C13 — Preparação e fim de partida
 
-**DV-24. Ordem da Vida na preparação invertida** — baixo **[testado]**
+**DV-24. Ordem da Vida na preparação invertida** — baixo — **corrigido**
 - Regra: 5-2-1-7, 2-9-2-1 (a carta do topo do deck fica **no fundo** da Vida). Q&A de regras.
-- Atual: `pl.life.unshift(pl.deck.shift())` (engine.ts:1098) deixa a carta do topo do deck no topo da Vida (a Vida tem o topo no fim do array). O comentário do código diz o contrário.
-- Correto: `pl.life.push(pl.deck.shift()!)`. Atenção: muda replays e testes que dependem da seed.
+- Antes: `pl.life.unshift(pl.deck.shift())` (engine.ts:1098) deixava a carta do topo do deck no topo da Vida (a Vida tem o topo no fim do array), ao contrário do que dizia o comentário.
+- Agora: `pl.life.push(pl.deck.shift()!)` no fim do mulligan: a 1ª carta do deck fica em `life[0]` (o fundo) e a 5ª é a primeira a sair.
+- Replays: a versão sobe para 9. Os até a 8 são refeitos com `GameConfig.legacySetup` (`replayConfig(config, versão)` em `replay.ts`), que mantém a ordem antiga; a interface aplica isso ao carregar o arquivo, e as salas online começadas antes (sem `RoomData.replayVersion`) também são refeitas assim depois de reiniciar o servidor (o replay delas sai como versão 8).
 
-**DV-25. "At the start of the game" fora de hora e sem escolha** — baixo
-- Regra: 5-2-1-5-1/2 (depois da escolha de quem começa; quem escolheu processa primeiro; "up to 1" permite recusar; o deck é reembaralhado). Q&A OP13-079 Imu.
-- Atual: a regra `startStage` roda em `createGame` (engine.ts:133), antes da escolha de primeiro/segundo, e pega o primeiro Stage elegível sem perguntar.
+**DV-25. "At the start of the game" fora de hora e sem escolha** — baixo — **corrigido**
+- Regra: 5-2-1-5-1/2 (depois da escolha de quem começa; "up to 1" permite recusar; o deck é reembaralhado). Q&A OP13-079 Imu: resolve depois de embaralhar, revelar o Líder e decidir quem começa, antes da mão inicial; busca, joga e reembaralha; com dois Imus, quem vai primeiro resolve primeiro.
+- Antes: a regra `startStage` rodava em `createGame` (engine.ts:133), antes da escolha de primeiro/segundo e depois de embaralhar, com o primeiro Stage elegível do deck, sem perguntar e sem reembaralhar.
+- Agora: `startOfGame` roda depois da escolha (ou na criação, quando quem começa já está definido). Para cada Líder com `startStage`, a partir de quem joga primeiro, um efeito do Líder com `playFrom` (deck, até 1 Stage do tipo) e `shuffleDeck`: a escolha é a busca de sempre (pendência `selectTargets` com `hidden`; o oponente não vê as opções; o bot joga o mais valioso). Esse jogador só compra a mão inicial depois (frame `startGame`, 5-2-1-6); o mulligan começa em seguida. Partidas sem esse Líder não mudam (as mãos continuam sendo compradas na criação).
+- Replays até a versão 8 (`legacySetup`): resolve na criação, como antes.
 
-**DV-26. Derrota simultânea não empata** — baixo
+**DV-26. Derrota simultânea não empata** — baixo — **corrigido**
 - Regra: 9-2-1 (todos que cumprem a condição perdem → empate). Em torneio de eliminação simples, perde o jogador do turno (TRM 5.2).
-- Atual: `checkDefeat` (engine.ts:4449) encerra no primeiro jogador; não há empate em `winner`.
+- Antes: `checkDefeat` (engine.ts:4449) encerrava no primeiro jogador; não havia empate em `winner`.
+- Agora: `checkDefeat` junta os jogadores com deck 0 (e a regra "perde no fim do turno com o deck vazio" junta os dois no fim do turno); os dois juntos → empate: `phase` 'gameover' com `winner` null (`gameOver` aceita null e registra "Fim de jogo: empate!"). Dois Líderes "vence com o deck 0" ao mesmo tempo também empatam. A derrota por dano sem Vida continua imediata (um dano é de um jogador só).
+- Servidor: as estatísticas aceitam partida sem vencedor (`MatchFacts.winner` null, ninguém com `won`); na ranqueada o empate vale meio ponto na recompensa (`bountyDelta(…, 'draw')`). Torneio: o jogo sem vencedor não conta e a série segue com um jogo novo (como já acontecia); a regra do TRM 5.2 (perde o jogador do turno na eliminação simples) **não** foi implementada — o jogo novo resolve o empate sem precisar dela. Interface: a tela de fim de jogo mostra "Empate".
 
-**DV-27. Laço infinito trava a partida** — baixo
+**DV-27. Laço infinito trava a partida** — baixo — **corrigido**
 - Regra: 11-1 (empate, ou o jogador que pode parar diz quantas vezes repete).
-- Atual: `run` (engine.ts:1449) lança `Error` depois de 5000 passos.
+- Antes: `run` (engine.ts:1449) lançava `Error` depois de 5000 passos e a partida travava.
+- Agora: no passo 5000 a pilha e os efeitos disparados são descartados e a partida termina empatada ("Laço infinito na resolução de efeitos."). O motor não sabe quem poderia parar o laço, então não oferece a escolha do número de repetições. O `simulate:all` continua apontando esse empate como problema.
+- Testes (DV-24 a DV-27): `packages/engine/test/game-setup.test.ts` (Vida com o topo do deck no fundo; ordem antiga com `legacySetup`/`replayConfig`; replay antigo refeito igual; Imu sintético (também numa partida bot x bot até o fim) depois da escolha, só Stages do tipo, opções escondidas do oponente, deck reembaralhado e mão comprada depois; recusar; dois Imus na ordem de quem começa; bot; deck 0 dos dois e "perde no fim do turno" dos dois → empate; laço → empate), `apps/server/test/stats.test.ts` (empate na recompensa e nas estatísticas, replay com `legacySetup`) e `apps/server/test/online.test.ts` (sala antiga refeita com a preparação antiga). 8 de 12 falham no código antigo (os outros conferem a compatibilidade e uma partida inteira).
 
 ### C14 — Momentos do turno
 
-**DV-28. "At the start of your turn" resolve depois do Draw e da DON!! Phase** — baixo
-- Regra: 6-2-2 (no Refresh, antes de devolver DON!! e desvirar). Q&A OP11-040 Luffy.
-- Atual: `startTurn` (engine.ts:1357) só empilha o efeito; ele resolve depois de devolver DON!!, desvirar, comprar e da DON!! Phase.
+**DV-28. "At the start of your turn" resolve depois do Draw e da DON!! Phase** — baixo — **corrigido**
+- Regra: 6-2-2 (no Refresh, antes de devolver DON!! e desvirar). Q&A OP11-040 Luffy ("efeitos de início de turno → os DON!! dados voltam → tudo fica ativo → Draw Phase").
+- Antes: `startTurn` (engine.ts:1357) só empilhava o efeito; ele resolvia depois de devolver DON!!, desvirar, comprar e da DON!! Phase (a condição do 1º passo era vista antes, para compensar).
+- Agora: `startTurn` põe os "at the start of your turn" na fila de efeitos disparados (`pushAbilities`: [DON!! xX], condição e [Once Per Turn] como nos outros momentos; o dono escolhe a ordem entre cartas diferentes) e empilha o frame `refresh`; só quando eles terminam (com as escolhas) `refreshDrawDon` devolve os DON!!, desvira, compra e faz a DON!! Phase. Sem efeito de início de turno, o turno segue direto, como antes. Nenhuma carta da base usa esse momento hoje (OP11-040 testado com o texto oficial).
 
-**DV-29. "At the end of this turn" resolve antes dos [End of Your Turn]** — baixo — **corrigido em parte**
+**DV-29. "At the end of this turn" resolve antes dos [End of Your Turn]** — baixo — **corrigido**
 - Regra: 6-6-1-2 (primeiro todos os [End of …]; depois os "at the end of this turn"). Q&A ST24-005 X.Drake.
-- Corrigido junto com a fila de efeitos disparados: os efeitos adiados entram num lote depois dos [End of Your Turn].
-- Falta: atrasados criados **durante** a End Phase (por um [End of Your Turn]) ainda ficam para o fim do turno seguinte.
+- A fila de efeitos disparados já punha os efeitos adiados num lote depois dos [End of Your Turn], mas na hora da ação `endTurn`: os criados **durante** a End Phase (por um [End of Your Turn]) ficavam para o fim do turno seguinte, e os efeitos disparados por um [End of Your Turn] resolviam depois dos adiados.
+- Agora: os `delayed` entram na fila quando o frame `endTurn` chega ao topo (fila vazia: todos os [End of …] e o que eles dispararam já resolveram); se novos forem criados (por um [End of Your Turn] ou por outro adiado), entram também, e o turno só passa sem nenhum pendente.
 
-**DV-30. Momentos que faltam** — baixo
-- "At the start of your opponent's turn" (6-2-2), "at the start of the Main Phase" (6-5-1), [End of Your Opponent's Turn] (6-6-1-1-2/4). Hoje nenhuma carta da base usa (0 cartas), mas o parser recusa [End of Your Opponent's Turn] (parser.ts:2210) e a carta cairia no modo manual.
+**DV-30. Momentos que faltam** — baixo — **corrigido**
+- "At the start of your opponent's turn" (6-2-2), "at the start of the Main Phase" (6-5-1), [End of Your Opponent's Turn] (6-6-1-1-2/4). Nenhuma carta da base usa (0 cartas); o parser recusava [End of Your Opponent's Turn] (parser.ts:2210) e a carta caía no modo manual.
+- Agora: timings `startOfOpponentTurn` ("This effect can be activated at the start of your opponent's turn." ou "At the start of your opponent's turn, …"), `startOfMainPhase` ("… at the start of your Main Phase" / "the Main Phase") e `endOfOpponentTurn` ([End of Your Opponent's Turn], também no modo manual e na tradução). Os do oponente ativam no mesmo lote dos do jogador do turno (que resolvem primeiro, 8-6-1): no início do turno, junto com os "at the start of your turn"; na End Phase, junto com os [End of Your Turn]. O "at the start of your Main Phase" ativa depois da DON!! Phase, antes de qualquer ação.
+- Replays: sem decisão nova, a versão não mudou (nota em `replay.ts`). Nenhuma carta da base tem efeito de início de turno, [End of Your Opponent's Turn] ou cria efeito adiado na End Phase; só um replay com um [End of Your Turn] que dispara outro efeito junto com um "at the end of this turn" pode tomar outro rumo.
+- Testes (DV-28 a DV-30): `packages/engine/test/turn-timing.test.ts` (OP11-040 sintético com 8 DON!!: olha as 5 do topo antes de comprar, com os DON!! ainda dados e o Personagem virado; com 7 DON!!, nada; bot x bot; X.Drake ST24-005 + Kid ST02-013; adiado criado por [End of Your Turn] resolve na mesma End Phase; parser dos três momentos; [End of Your Opponent's Turn], início do turno do oponente e início do Main Phase com cartas sintéticas). 6 de 9 falham no código antigo (os outros conferem o que já funcionava: 7 DON!!, o bot e a ordem X.Drake/Kid, que a fila de efeitos já tinha corrigido).
 
 ### C15 — Pequenas formas de efeito
 
-**DV-31. "Draw up to X" vira compra obrigatória** — baixo
-- Regra: 4-5-4. Atual: o passo `draw` não tem `upTo` (engine.ts:2246). Cenário: OP02-066 compra 2 à força.
+**DV-31. "Draw up to X" vira compra obrigatória** — baixo — **corrigido**
+- Regra: 4-5-4 ("draw up to X": antes de cada compra o jogador pode encerrar). O passo `draw` não tinha `upTo` (engine.ts:2246): OP02-066 comprava 2 à força.
+- Agora: o leitor marca "Draw up to N cards" com `upTo` ("Draw N cards" segue obrigatório). O motor compra uma por vez: antes de cada carta pergunta "comprar 1 carta?" (`confirm` com `drawUpTo`, botões "Comprar 1 carta" / "Parar"); o "não" encerra, inclusive antes da primeira. Com o deck vazio, para de perguntar. O oponente vê só que há uma pergunta (sem o texto nem `drawUpTo`); quantas foram compradas ele vê pelo tamanho da mão. O bot compra enquanto o deck tiver mais de 5 cartas.
+- Replays passam para a versão 10; nos antigos, cada pergunta é respondida com sim (as N compras, como antes).
+- Na base local, 1 carta usa (OP02-066).
 
-**DV-32. Restrições só valem para quem controla o efeito e só no turno** — baixo
-- Atual: `Restriction.player` é sempre o controlador e dura até o fim do turno (engine.ts:3412). Cartas "your opponent cannot …" ou "until the end of your opponent's next turn" precisariam de alvo e duração.
+**DV-32. Restrições só valem para quem controla o efeito e só no turno** — baixo — **corrigido**
+- `Restriction.player` era sempre o controlador e a restrição durava até o fim do turno (engine.ts:3412).
+- Agora: o passo `restrict` tem `opponent` (quem fica restrito é o oponente: "your opponent cannot …") e `duration: 'nextOpponentTurn'` ("until the end of your opponent's next turn"), que vira `Restriction.untilTurn` com a mesma conta dos modificadores (no seu turno, até o fim do turno seguinte; no do oponente, até o fim do próximo dele). O fim do turno remove só as vencidas. Tipo novo `noBlocker` ("cannot activate [Blocker]"): `blockerOptions` fica vazio para o jogador restrito.
+- Leitor: as frases de restrição aceitam "you" ou "your opponent", "your/their" ("their own effects", "their hand") e as duas durações, para jogar Personagens (com ou sem custo base mínimo), jogar cartas da mão, pôr Vida na mão com os próprios efeitos, comprar com os próprios efeitos, atacar Líder, deixar DON!! ativos com efeito de Personagem e ativar [Blocker]. Assim P-097 Shanks ("Your opponent cannot activate [Blocker] during this turn.") fica automático.
+- Varredura da base local: nenhuma outra carta tem restrição a um jogador com "your opponent cannot" ou "until the end of your opponent's next turn". As outras "your opponent cannot activate [Blocker]" já tinham primitivo próprio (`noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock`); as "until the end of your opponent's next turn" da base são sobre uma carta (poder, custo, não atacar, não virar: modificadores com `nextOpponentTurn`) ou negam [On Play] (`negateOnPlay`, OP09-081). As 2 cartas "cannot attack any card other than …" seguem com `staticTaunt` (efeito permanente, não restrição por turno).
 
-**DV-33. Mão → Vida com filtro não revela a carta** — baixo (a confirmar)
-- Regra: 11-2-1 (mover de área secreta para secreta revela). Atual: `handToLife` (engine.ts:3701) só registra a quantidade.
+**DV-33. Mão → Vida com filtro não revela a carta** — baixo — **corrigido**
+- Regra confirmada no CR v1.2.1, 11-2-1: "When a card is required to be moved from one secret area to another secret area, such as 'Add Monkey.D.Luffy from your deck to your hand', the card being moved must always be revealed". `handToLife` (engine.ts:3701) só registrava a quantidade.
+- Agora: com exigência (filtro: "Character card with a cost of 5", "{Supernovas} type Character card"), o log público traz o nome ("revela e coloca 1 carta(s) da mão (Bon Clay) no topo da Vida."), como na busca do deck para a mão (`search`/`tutor`), que é como o motor revela; na Vida a carta volta a ser oculta (11-2-2). Sem exigência ("add up to 1 card from your hand to the top of your Life cards", ST07-001, ST29-007), a carta vai escondida: não há exigência a conferir, e o Q&A de regras trata do mesmo jeito a carta que vai do deck para a Vida (ninguém pode olhar). Do descarte ou virada para cima, o nome também aparece (a carta já é pública).
+- Na base local: ST13-005 Ivankov e OP10-103 Kid (este também "face-up").
+
+Testes (DV-31 a DV-33): `packages/engine/test/draw-restrict-reveal.test.ts` (leitor de OP02-066; compra 1 e para; nenhuma compra e visão do oponente; bot; replay antigo; leitor de "your opponent cannot …"; P-097 sintético sem etapa de bloqueio e com o [Blocker] de volta no turno seguinte; "until the end of your opponent's next turn" com jogar Personagens; Ivankov ST13-005 revela; sem exigência não revela). 9 de 10 falham no código antigo (o último confere o que já era assim).
 
 ### C16 — Dados e documentação
 
@@ -298,8 +355,14 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 - Banco: na abertura, as cartas antigas com sufixo são apagadas (a importação e o seed gravam as certas) e os decks salvos e as inscrições de torneio passam a usar o número da carta, juntando as cópias (`migrateCardIds` em `apps/server/src/db.ts`). `data/cards` e `data/decks` (ST16, ST18) foram atualizados.
 - Resultado (07/10/2026): 117 promos importadas; das 106 oficiais, faltam na API P-110, P-135 e P-155. 14 promos da API ainda não estão na lista oficial em inglês (P-038, P-064, P-066, P-067, P-080, P-086, P-114, P-136, P-138 a P-140, P-142, P-147, P-148) e entram como vêm da API. `source-fixes.ts` ganhou 15 correções de promo (tipo {FILM} das cartas do filme Red, P-002 "I Smell Adventure!!!", P-072 {MONSTERS}, nomes de P-147/P-148 no formato "Mr.3(Galdino)") e perdeu as de P-029 e P-084, que a lista de promos já traz certas. `cards:check-official`: 0 diferenças.
 - Sem imagem na API: P-004, P-035, P-052, P-080, P-114, P-138 e P-142 (a carta aparece com o texto).
-- Leitor de efeitos: 87 das 117 promos automáticas, 5 parciais, 9 manuais. Algumas manuais e parciais têm texto corrompido na fonte (P-091 "Play-up to", P-115 "1-rested", P-147 "Character-gains", P-142 frase repetida).
+- Leitor de efeitos, na importação: 87 das 117 promos automáticas, 5 parciais, 9 manuais. Algumas manuais e parciais tinham texto corrompido na fonte (P-091 "Play-up to", P-115 "1-rested", P-147 "Character-gains", P-142 frase repetida).
 - Testes: bloco "promocionais (allPromos)" e nomes de promo em `apps/server/test/optcgapi-cleanup.test.ts`.
+- **Textos estragados e efeitos manuais/parciais (corrigido):**
+  - Texto: tabela `SOURCE_TEXT_FIXES` em `packages/engine/src/source-fixes.ts`, aplicada por `applySourceFixes` (e portanto por `fixCard`, no motor e no servidor): P-091 "Play up to 1", P-115 "Give up to 1 rested DON!! card", P-147 "this Character gains +2000 power" (mesmo texto da OP14-090) e P-142 sem a frase repetida ("If your {Straw Hat Crew} type Character with 8000 base power or less would be K.O.'d, you may trash this Stage instead."). Varredura nas 2796 cartas da optcgapi (coleções, starter decks e promos) e na base local: o hífen colado só aparece nessas três promos, por isso a correção é por carta e não uma regra genérica na limpeza do importador. P-142 e P-147 não estão na lista oficial em inglês nem no Q&A de promos; o texto segue o das outras versões.
+  - Leitor (construções novas): "cannot be K.O.'d in battle by "Strike" attribute Leaders or Characters" (P-007, `noBattleKOVsAttribute`); "… by Characters without the "Special" attribute" (P-025, `noBattleKOUnlessAttribute`: o Líder, de qualquer atributo, ainda nocauteia; Q&A P-007 confirma a leitura do filtro); "your opponent adds 1 card from their Life area to their hand" (P-009, `opponentLifeToHand`, do topo; obrigatório pelo Q&A); "This Character and up to 1 of your Leader gain +1000 power" (P-036: esta carta sempre, o Líder por escolha; Q&A P-036); "place all cards in your hand at the bottom of your deck in any order. If you do, draw cards equal to the number you placed …" (P-046, `handAllToDeck{bottom}` + `drawEventCount`; as cartas vão na ordem da mão, como o "place the rest at the bottom … in any order" das buscas); "add this Character card to your hand" no [On K.O.] (P-071, `addThisToHand` do trash); condição "If you have any active DON!! cards" (P-114, `minActiveDon: 1`); "Your Leader gains +1000 power for each of your Characters during this turn" (P-024, passo `powerPerMatching`, contado ao resolver); regra de Líder "you can only include {East Blue} type cards in your deck and when your deck is reduced to 0, you win the game instead of losing" (P-117, `deckOnlyType` + `deckOutWin`, como a OP03-040; `leaderAllows`/`validateDeck` recusam a carta sem o tipo, e o construtor de deck e o `simulate:all` deixam de oferecê-la). P-097 já era automática desde a DV-32; P-142 usa a substituição de K.O. pelo Stage (DV-11/12).
+  - Resultado (07/10/2026, promos da optcgapi mapeadas como na importação): antes 88 automáticas, 5 parciais, 8 manuais e 16 sem efeito; depois 101 automáticas, 0 parciais, 0 manuais e 16 sem efeito. Nas 2796 cartas da optcgapi não sobra nenhuma parcial ou manual.
+  - `simulate:all` com as promos incluídas: partidas não terminavam porque o bot ativava sem parar P-136 Usopp ("[Activate: Main] Give up to 1 rested DON!! card to 1 of your {Land of Wano} type Leader or Character cards", sem custo nem [Once Per Turn]) sem ter alvo {Land of Wano}. O bot (`bot/simple.ts`) só ativa "give rested DON!!" quando há alvo.
+  - Testes: `packages/engine/test/promos.test.ts`, com as promos de `test/fixtures/promos.json` (como a API as traz).
 
 ---
 
@@ -315,11 +378,11 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 | Área | Conforme | Divergente |
 |---|---|---|
-| Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, mulligan, derrota por dano sem Vida e por deck 0 (checada a cada passo), desistência, vitória por efeito | DV-24, DV-25, DV-26 |
-| Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-28, DV-29 (em parte), DV-30 |
+| Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, "at the start of the game" depois dela e com escolha, mulligan, Vida com o topo do deck no fundo, derrota por dano sem Vida e por deck 0 (checada a cada passo), derrota simultânea empata, desistência, vitória por efeito | — |
+| Fases (6) | Expiração "until the start of your next turn", "at the start of your/your opponent's turn" antes de devolver DON!! e desvirar, devolver DON!! e desvirar, Draw, DON!! Phase, "at the start of your Main Phase", sem ataque no 1º turno, [End of Your Turn]/[End of Your Opponent's Turn] uma vez, "at the end of this turn" depois deles (também os criados na End Phase), expiração de "this turn" | — |
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
-| Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O., "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6) | DV-07, DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
-| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-16, DV-18, DV-27, DV-33 |
+| Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano, carta do [Trigger] fora das áreas enquanto resolve | — |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O., «Set Power to 0» como −(poder atual), vários poderes base: vale o maior, "draw up to" uma por vez podendo parar | DV-12 (custos) |
+| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública (também a que vem do campo), revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step, laço infinito empata, mão → Vida com exigência revelada | — |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |
