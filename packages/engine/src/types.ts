@@ -922,6 +922,12 @@ export interface FieldCard {
   rested: boolean;
   don: number; // DON!! anexados
   playedOnTurn: number;
+  /**
+   * DON!! "soltos": anexados neste turno e ainda não usados (ver `detachDon`). Qualquer
+   * ação que possa ter contado com eles (ataque, habilidade, carta jogada, fim do turno…)
+   * zera o contador de todas as cartas do jogador.
+   */
+  donLoose?: number;
 }
 
 export interface PlayerState {
@@ -1135,6 +1141,31 @@ export interface GameState {
   winReason: string | null;
   log: LogEntry[];
   actionCount: number;
+  /**
+   * Ação principal em andamento que o jogador ainda pode cancelar (`cancel`): ele começou
+   * a ação, o motor espera uma escolha dele e o oponente ainda não decidiu nada. `blocked`
+   * explica por que não dá mais para cancelar (a interface mostra o motivo).
+   */
+  cancel?: CancelInfo;
+  /** Estado de antes da ação em `cancel` (só no estado completo: não vai para as visões). */
+  checkpoint?: Checkpoint;
+}
+
+export interface CancelInfo {
+  player: PlayerId;
+  /** A ação que seria desfeita. */
+  action: Action;
+  /** 'revealed': uma carta escondida ficou visível desde o começo da ação. */
+  blocked?: 'revealed';
+}
+
+/** O que o `cancel` restaura. As definições, as instâncias das cartas e o log ficam como estão. */
+export type StateSnapshot = Omit<GameState, 'defs' | 'cards' | 'log' | 'actionCount' | 'cancel' | 'checkpoint'>;
+
+export interface Checkpoint {
+  /** Cartas visíveis quando a ação começou, para cada jogador (0, 1) e para os espectadores (2). */
+  seen: [string[], string[], string[]];
+  snap: StateSnapshot;
 }
 
 // ---------------------------------------------------------------------------
@@ -1145,6 +1176,10 @@ export type Action =
   | { type: 'mulligan'; player: PlayerId; redraw: boolean }
   | { type: 'playCard'; player: PlayerId; uid: string }
   | { type: 'attachDon'; player: PlayerId; target: string }
+  /** Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (ver `FieldCard.donLoose`). */
+  | { type: 'detachDon'; player: PlayerId; target: string }
+  /** Desfaz a ação principal em andamento (ver `GameState.cancel` e `cancelError`). */
+  | { type: 'cancel'; player: PlayerId }
   | { type: 'activate'; player: PlayerId; uid: string; ability: number }
   | { type: 'attack'; player: PlayerId; attacker: string; target: string }
   | { type: 'endTurn'; player: PlayerId }

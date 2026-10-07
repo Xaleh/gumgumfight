@@ -81,7 +81,11 @@ describe('"você pode pagar X" com custo que lê a mão', () => {
   it('sem carta que sirva, a pergunta abre só com "não"; com carta, abre normal', () => {
     const a = jinbe(1, false);
     expect(a.s.pending).toMatchObject({ kind: 'confirm', player: 0, cannot: true });
-    expect(legalActions(a.s, 0)).toEqual([{ type: 'answer', player: 0, yes: false }]);
+    // A pergunta só leu a própria mão: além de "não", dá para cancelar a jogada.
+    expect(legalActions(a.s, 0)).toEqual([
+      { type: 'answer', player: 0, yes: false },
+      { type: 'cancel', player: 0 },
+    ]);
     expect(() => answer(a.s, 0, true)).toThrow(/pagar o custo/);
     const hand = a.s.players[0].hand.length;
     const t = answer(a.s, 0, false);
@@ -91,7 +95,7 @@ describe('"você pode pagar X" com custo que lê a mão', () => {
     const b = jinbe(1, true);
     expect(b.s.pending).toMatchObject({ kind: 'confirm', player: 0 });
     expect(b.s.pending).not.toHaveProperty('cannot');
-    expect(legalActions(b.s, 0)).toHaveLength(2);
+    expect(legalActions(b.s, 0)).toHaveLength(3);
   });
 
   it('para o oponente e o espectador, "não podia pagar" e "podia e recusou" são iguais', () => {
@@ -201,7 +205,11 @@ describe('escolhas que leem a mão abrem sempre', () => {
     const a = ulti(1, false);
     expect(a.s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [], min: 0, max: 0, hidden: true });
     expect((a.s.pending as { prompt: string }).prompt).toMatch(/nenhuma carta da mão/);
-    expect(legalActions(a.s, 0)).toEqual([{ type: 'choose', player: 0, uids: [] }]);
+    // Leu só a própria mão (e o DON!! −1 é público): a jogada ainda pode ser cancelada.
+    expect(legalActions(a.s, 0)).toEqual([
+      { type: 'choose', player: 0, uids: [] },
+      { type: 'cancel', player: 0 },
+    ]);
     const t = choose(a.s, 0, []);
     expect(t.pending).toBeNull();
     expect(t.players[0].characters).toHaveLength(1);
@@ -259,7 +267,9 @@ describe('busca no deck abre sempre', () => {
     const a = orochi(1, false);
     expect(a.s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [], hidden: true });
     expect((a.s.pending as { prompt: string }).prompt).toMatch(/nenhuma carta do deck/);
+    // Olhou o deck (soube que não há a carta): a jogada não pode mais ser cancelada.
     expect(legalActions(a.s, 0)).toEqual([{ type: 'choose', player: 0, uids: [] }]);
+    expect(a.s.cancel).toMatchObject({ player: 0, blocked: 'revealed' });
     const b = orochi(1, true);
     expect(b.s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [b.smile], hidden: true });
     sameForOthers(a.s, b.s, [a.log, b.log], 1);

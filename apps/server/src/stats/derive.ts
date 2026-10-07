@@ -88,6 +88,11 @@ export function deriveMatch(input: ReplayInput, cards: CardData[]): MatchFacts {
       const id = cardId(before, action.uid);
       played[p].set(id, (played[p].get(id) ?? 0) + 1);
     }
+    // Jogada cancelada (a carta voltou para a mão): não conta como jogada.
+    if (action.type === 'cancel' && before.cancel?.action.type === 'playCard') {
+      const id = cardId(before, before.cancel.action.uid);
+      played[p].set(id, Math.max(0, (played[p].get(id) ?? 0) - 1));
+    }
     markHands(state);
   }
   if (state.phase !== 'gameover' || state.winner === null) throw new Error('O replay não chega ao fim da partida.');

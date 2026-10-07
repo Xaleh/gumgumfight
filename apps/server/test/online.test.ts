@@ -6,6 +6,7 @@ import {
   chooseBotAction,
   type GameState,
   HIDDEN_CARD,
+  legalActions,
   type LogEntry,
   type PlayerId,
 } from '@gumgum/engine';
@@ -13,9 +14,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import type { ServerOptions } from '../src/config';
-import { type DB, getDeck, openDb, upsertCards } from '../src/db';
+import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
 import { Lobby, type SeatRequest } from '../src/online/lobby';
-import { ABANDON_MS, type Connection, TIME_BANK_MS } from '../src/online/room';
+import { ABANDON_MS, type Connection, Room, TIME_BANK_MS } from '../src/online/room';
 import { seed } from '../src/seed';
 
 const ALICE = { 'x-deck-owner': 'alice-0123456789abcdef' };
@@ -320,6 +321,109 @@ describe('partidas online: filas', () => {
     expect(diff[1 - p]).toBe(1000);
     expect(diff[p]).toBe(0);
   });
+});
+
+describe('partidas online: cancelar a ação e devolver DON!!', () => {
+  it('o DON!! anexado volta pela visão e o cancelamento é refeito pelo servidor para os dois lados', async () => {
+    const { app, db } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    const cs = [client(0), client(1)];
+    for (const c of cs) room.attach(c.conn);
+    const view = (p: PlayerId) => cs[p].view!;
+    const step = async (p: PlayerId, action: Action, code = 200) => {
+      const r = await act(app, roomId, tokens[p], view(p).actionCount, action);
+      expect(r.statusCode, r.body).toBe(code);
+      return r;
+    };
+    /** O bot joga (pelas visões) até a vez voltar para a cadeira 0 com a mesa parada. */
+    const untilMyTurn = async () => {
+      for (let i = 0; i < 500; i++) {
+        const v = view(0);
+        if (v.phase === 'gameover') throw new Error('a partida acabou cedo demais');
+        if (actingPlayer(v) === 0 && !v.pending) return;
+        const p = actingPlayer(v)!;
+        await step(p, chooseBotAction(view(p), p));
+      }
+    };
+    // O Luffy (cadeira 0) começa: a habilidade do Líder dele pede um alvo na mesa.
+    {
+      const v = view(0);
+      const w = actingPlayer(v)!;
+      await step(w, { type: 'answer', player: w, yes: w === 0 });
+    }
+    for (let i = 0; i < 2; i++) {
+      const p = actingPlayer(view(0))!;
+      await step(p, { type: 'mulligan', player: p, redraw: false });
+    }
+    expect(view(0).activePlayer).toBe(0);
+    const leader = () => view(0).players[0].leader;
+
+    // Anexa o único DON!! ao Líder: as duas visões mostram que ele ainda pode voltar.
+    await step(0, { type: 'attachDon', player: 0, target: leader().uid });
+    expect(leader()).toMatchObject({ don: 1, donLoose: 1 });
+    expect(view(1).players[0].leader.donLoose).toBe(1);
+    // Devolve pelo apelido da visão; o oponente não pode devolver o DON!! dos outros.
+    await step(1, { type: 'detachDon', player: 1, target: view(1).players[0].leader.uid }, 422);
+    await step(0, { type: 'detachDon', player: 0, target: leader().uid });
+    expect(leader().don).toBe(0);
+    expect(view(0).players[0].donActive).toBe(1);
+    expect(view(0).log[view(0).log.length - 1].text).toMatch(/devolve 1 DON!!/);
+    await step(0, { type: 'attachDon', player: 0, target: leader().uid });
+    await step(0, { type: 'endTurn', player: 0 });
+
+    // A habilidade do Luffy dá 1 DON!! virado: precisa de um DON!! virado (jogar um Personagem vira DON!!).
+    let ready = false;
+    for (let turn = 0; turn < 8 && !ready; turn++) {
+      await untilMyTurn();
+      const v = view(0);
+      const play = legalActions(v, 0).find((a) => a.type === 'playCard' && v.defs[v.cards[a.uid].cardId].category === 'character');
+      if (play) {
+        await step(0, play);
+        await untilMyTurn();
+        ready = view(0).players[0].donRested > 0;
+      }
+      if (!ready) await step(0, { type: 'endTurn', player: 0 });
+    }
+    expect(ready).toBe(true);
+
+    // Ativa a habilidade do Líder (pede um alvo): os dois veem que a ação pode ser cancelada,
+    // mas sem o estado guardado, e só o dono pode cancelar.
+    const before = view(0);
+    await step(0, { type: 'activate', player: 0, uid: leader().uid, ability: 0 });
+    expect(view(0).pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    expect(view(0).cancel).toEqual({ player: 0, action: { type: 'activate', player: 0, uid: leader().uid, ability: 0 } });
+    expect(view(1).cancel).toMatchObject({ player: 0, action: { type: 'activate', player: 0 } });
+    expect(view(0).checkpoint).toBeUndefined();
+    expect(view(1).checkpoint).toBeUndefined();
+    expect(JSON.stringify(view(1))).not.toContain('snap');
+    await step(1, { type: 'cancel', player: 1 }, 422);
+    await step(0, { type: 'cancel', player: 0 });
+    for (const p of [0, 1] as const) {
+      const v = view(p);
+      expect(v.actionCount).toBe(before.actionCount + 2);
+      expect(v.pending).toBeNull();
+      expect(v.cancel).toBeUndefined();
+      expect(v.usedThisTurn).toEqual([]);
+      expect(v.players[0].donRested).toBe(before.players[0].donRested);
+      expect(v.log[v.log.length - 1].text).toMatch(/cancela a ativação/);
+    }
+    // Depois do cancelamento a habilidade pode ser ativada de novo; cancelar fora de hora é recusado.
+    await step(0, { type: 'activate', player: 0, uid: leader().uid, ability: 0 });
+    expect(view(0).pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    await step(0, { type: 'choose', player: 0, uids: [] });
+    expect(view(0).pending).toBeNull();
+    await step(0, { type: 'cancel', player: 0 }, 422);
+
+    // O replay guarda as ações como foram feitas (cancel e detachDon inclusive): refazer a sala dá a mesma mesa.
+    const types = room.data.actions.map((a) => a.type);
+    expect(types).toContain('detachDon');
+    expect(types).toContain('cancel');
+    const again = new Room(structuredClone(room.data), { cards: (ids) => getCards(db, ids), botDelayMs: 0 });
+    const strip = (st: GameState) => ({ ...st, defs: undefined, checkpoint: undefined });
+    expect(strip(again.state!)).toEqual(strip(room.state!));
+    again.dispose();
+  }, 60_000);
 });
 
 describe('partidas online: ferramentas manuais', () => {

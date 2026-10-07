@@ -1,6 +1,7 @@
 import {
   type Action,
   actingPlayer,
+  cancelAllowed,
   cardDef,
   cardStatuses,
   counterValue,
@@ -44,12 +45,14 @@ import {
 } from './Online';
 
 /**
- * Modo 'don': `count` DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). Sem `step`, a faixa
- * central mostra a barra de ações (Anexar ao Líder / a um Personagem / Cancelar) e a mesa segue normal; com
- * `step: 'character'`, só os Personagens que podem receber DON!! ficam destacados e o toque num deles anexa.
+ * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
+ * cada DON!! tocado na fileira, para marcar exatamente ele. Sem `step`, a faixa central mostra a barra de ações
+ * (Anexar ao Líder / a um Personagem / Cancelar) e a mesa segue normal; com `step: 'character'`, só os
+ * Personagens que podem receber DON!! ficam destacados e o toque num deles anexa.
  */
-type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; count: number; step?: 'character' };
-type DragKind = 'hand' | 'attacker' | 'don';
+type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; picked: number[]; step?: 'character' };
+/** attached = DON!! anexado numa carta, arrastado de volta para a área de custo (detachDon). */
+type DragKind = 'hand' | 'attacker' | 'don' | 'attached';
 interface Drag {
   kind: DragKind;
   uid: string | null;
@@ -61,6 +64,8 @@ interface Drag {
   insert?: number;
   /** Quantos DON!! estão sendo arrastados juntos. */
   count?: number;
+  /** Posições na fileira dos DON!! arrastados (ficam apagados enquanto o arrasto dura). */
+  dons?: number[];
 }
 type Sheet = null | 'menu' | 'log' | 'tools' | 'hand' | { trash: PlayerId };
 
@@ -366,8 +371,10 @@ function Table({
     if (!myTurnIdle) setMode(null);
     if (mode?.kind === 'don' && human !== null) {
       const max = state.players[human].donActive;
-      if (max === 0) setMode(null);
-      else if (mode.count > max) setMode({ ...mode, count: max });
+      // DON!! que saíram da fileira (foram anexados ou virados) deixam de estar marcados.
+      const picked = mode.picked.filter((i) => i < max);
+      if (picked.length === 0) setMode(null);
+      else if (picked.length !== mode.picked.length) setMode({ ...mode, picked });
     }
   }, [myTurnIdle, state, human, mode]);
   useEffect(() => {
@@ -431,6 +438,21 @@ function Table({
    */
   const targets = myPending?.kind === 'selectTargets' && targetsOnTable(state, myPending) ? myPending : null;
   const decision = defense ?? targets;
+  /**
+   * A ação em andamento (habilidade, carta jogada, DON!! anexado, ataque) ainda pode ser desfeita no motor:
+   * o botão Cancelar aparece ao lado de "Confirmar" e nos balões de escolha. Quando o motor já não deixa
+   * (uma carta foi revelada), a interface explica em vez de só esconder o botão.
+   */
+  const canCancel = human !== null && cancelAllowed(state, human);
+  const cancelHint =
+    human !== null && myPending && state.cancel?.player === human && state.cancel.blocked === 'revealed'
+      ? 'Não dá mais para cancelar: carta revelada'
+      : null;
+  const cancelAction = () => {
+    dispatch({ type: 'cancel', player: human! });
+    setPicked([]);
+    setZoom(null);
+  };
   const targetsInHand = targets ? targets.options.filter((u) => zoneOf(state, u) === 'hand').length : 0;
   const handHint =
     defense?.kind === 'block'
@@ -456,6 +478,7 @@ function Table({
       return over === 'hand' || (over === 'field' && d.uid !== null && (canPlay(d.uid) || canCounter(d.uid)));
     }
     if (d.kind === 'attacker') return has((a) => a.type === 'attack' && a.attacker === d.uid && a.target === over);
+    if (d.kind === 'attached') return over === 'don' && has((a) => a.type === 'detachDon' && a.target === d.uid);
     return has((a) => a.type === 'attachDon' && a.target === over);
   };
 
@@ -527,12 +550,12 @@ function Table({
     }
     if (mode?.kind === 'don' && mode.step === 'character') {
       if (canReceiveDon(uid, 'character')) {
-        attachDons(uid, mode.count);
+        attachDons(uid, mode.picked.length);
         setMode(null);
         return;
       }
       // Tocou fora dos alvos: volta para a barra de ações, com os DON!! ainda marcados.
-      setMode({ kind: 'don', count: mode.count });
+      setMode({ kind: 'don', picked: mode.picked });
       return;
     }
     // Carta escondida (mão do oponente) não abre.
@@ -566,14 +589,15 @@ function Table({
     return kind === 'leader' ? isLeader : !isLeader;
   };
 
-  /** Toque num DON!! ativo: marca mais um (ou desmarca, se já estava marcado). */
+  /** Toque num DON!! ativo: marca exatamente aquele (ou desmarca, se já estava marcado). */
   const onDon = (player: PlayerId, index: number) => {
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
+    if (index < 0 || index >= max) return;
     setMode((m) => {
-      const cur = m?.kind === 'don' ? m.count : 0;
-      const next = Math.min(index < cur ? cur - 1 : cur + 1, max);
-      return next > 0 ? { kind: 'don', count: next, step: m?.kind === 'don' ? m.step : undefined } : null;
+      const cur = m?.kind === 'don' ? m.picked : [];
+      const picked = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index].sort((a, b) => a - b);
+      return picked.length > 0 ? { kind: 'don', picked, step: m?.kind === 'don' ? m.step : undefined } : null;
     });
   };
 
@@ -582,7 +606,8 @@ function Table({
     mode?.kind === 'don' && human !== null
       ? (() => {
           const me = state.players[human];
-          const count = mode.count;
+          const { picked } = mode;
+          const count = picked.length;
           return (
             <DonBar
               count={count}
@@ -593,8 +618,8 @@ function Table({
                 attachDons(me.leader.uid, count);
                 setMode(null);
               }}
-              onCharacter={() => setMode({ kind: 'don', count, step: 'character' })}
-              onBack={() => setMode({ kind: 'don', count })}
+              onCharacter={() => setMode({ kind: 'don', picked, step: 'character' })}
+              onBack={() => setMode({ kind: 'don', picked })}
               onCancel={() => setMode(null)}
             />
           );
@@ -613,6 +638,8 @@ function Table({
     ay: number;
     uid: string | null;
     kind: DragKind | null;
+    /** Posição na fileira do DON!! ativo pressionado. */
+    don?: number;
     timer: ReturnType<typeof setTimeout>;
     moved: boolean;
     /** Começou na própria mão: deslizar ergue a carta sob o dedo. */
@@ -640,6 +667,7 @@ function Table({
     }
     if (d.kind === 'hand') dispatch({ type: 'playCard', player: human, uid: d.uid! });
     else if (d.kind === 'attacker') dispatch({ type: 'attack', player: human, attacker: d.uid!, target: d.over });
+    else if (d.kind === 'attached') dispatch({ type: 'detachDon', player: human, target: d.uid! });
     else attachDons(d.over, d.count ?? 1);
     setMode(null);
     setSelected(null);
@@ -664,6 +692,7 @@ function Table({
     if (!dragEl && !cardEl) return;
     const uid = (dragEl ?? cardEl)!.dataset.uid ?? null;
     const kind = (dragEl?.dataset.drag as DragKind | undefined) ?? null;
+    const don = dragEl?.dataset.don !== undefined ? Number(dragEl.dataset.don) : undefined;
     const hand = Boolean(cardEl && el.closest('.hand.bottom'));
     if (press.current) clearTimeout(press.current.timer);
     if (hand && uid) setLifted(uid);
@@ -674,6 +703,7 @@ function Table({
       ay: e.clientY,
       uid,
       kind,
+      ...(don !== undefined ? { don } : {}),
       timer: armLongPress(cardEl?.dataset.uid ?? null),
       moved: false,
       hand,
@@ -701,14 +731,21 @@ function Table({
         if (el.closest('.bottom-strip')) return { over: 'hand', insert: handSlot(x) };
         return { over: el.closest('[data-drop="field"]') && dropValidRef.current(d, 'field') ? 'field' : null };
       }
+      if (d.kind === 'attached') {
+        // DON!! anexado volta para a própria fileira de DON!! (a de baixo).
+        return { over: el.closest('.don-row.bottom') && dropValidRef.current(d, 'don') ? 'don' : null };
+      }
       const uid = el.closest<HTMLElement>('[data-uid]')?.dataset.uid ?? null;
       return { over: uid && dropValidRef.current(d, uid) ? uid : null };
     };
     const startDrag = (p: NonNullable<typeof press.current>, e: PointerEvent) => {
       clearTimeout(p.timer);
       const m = modeRef.current;
-      const count = p.kind === 'don' && m?.kind === 'don' ? m.count : 1;
-      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null, count };
+      // Arrastar um DON!! marcado leva todos os marcados; um DON!! sem marca vai sozinho.
+      const marked = m?.kind === 'don' ? m.picked : [];
+      const dons = p.kind !== 'don' ? [] : p.don !== undefined && marked.includes(p.don) ? marked : p.don !== undefined ? [p.don] : marked;
+      const count = p.kind === 'don' ? Math.max(1, dons.length) : 1;
+      dragRef.current = { kind: p.kind!, uid: p.uid, x: e.clientX, y: e.clientY, over: null, count, ...(dons.length ? { dons } : {}) };
       setLifted(null);
       setZoom(null);
       setMode(null);
@@ -794,12 +831,14 @@ function Table({
     onHover: setHovered,
     onDon,
     onTrash: (p: PlayerId) => setSheet({ trash: p }),
-    donPicked: (p: PlayerId) => (p === human && drag?.kind === 'don' ? (drag.count ?? 1) : p === human && mode?.kind === 'don' ? mode.count : 0),
+    donPicked: (p: PlayerId) => (p === human && drag?.kind === 'don' ? (drag.dons ?? []) : p === human && mode?.kind === 'don' ? mode.picked : []),
     donHighlight: (p: PlayerId) =>
-      p === human && (mode?.kind === 'don' || (drag?.kind === 'don') || (myTurnIdle && has((a) => a.type === 'attachDon'))),
+      p === human && (mode?.kind === 'don' || drag?.kind === 'don' || (myTurnIdle && has((a) => a.type === 'attachDon'))),
+    donDrop: (p: PlayerId) => p === human && drag?.kind === 'attached' && drag.over === 'don',
     canDragHand: (uid: string) => human !== null && state.cards[uid]?.owner === human,
     canDragAttacker: (uid: string) => canAttackWith(uid),
     canDragDon: (p: PlayerId) => p === human && myTurnIdle && has((a) => a.type === 'attachDon'),
+    canDragAttached: (uid: string) => myTurnIdle && has((a) => a.type === 'detachDon' && a.target === uid),
     fieldDrop: (p: PlayerId) =>
       p === human && drag?.kind === 'hand' && drag.uid !== null && (canPlay(drag.uid) || canCounter(drag.uid)),
   };
@@ -863,19 +902,22 @@ function Table({
               onEnd={() => dispatch({ type: 'endTurn', player: human! })}
               onCancelMode={() => setMode(null)}
               onTogglePause={() => game.setPaused((p) => !p)}
-              request={targets && <TargetRequest state={state} pending={targets} picked={picked} />}
+              request={targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
               decision={
-                decision && (
+                decision ? (
                   <DecisionButton
                     state={state}
                     pending={decision}
                     picked={picked}
                     human={human!}
                     onDispatch={dispatch}
+                    onCancel={canCancel ? cancelAction : undefined}
                     onTools={dev ? () => setSheet('tools') : undefined}
                     clock={online && !watching ? <OnlineClock online={online} player={human!} /> : undefined}
                   />
-                )
+                ) : mode && human !== null ? (
+                  <CancelButton sub={mode.kind === 'attack' ? 'o ataque' : 'os DON!!'} onClick={() => setMode(null)} />
+                ) : null
               }
             />
           }
@@ -922,6 +964,8 @@ function Table({
           human={human}
           picked={picked}
           onDispatch={dispatch}
+          onCancel={canCancel ? cancelAction : undefined}
+          cancelHint={cancelHint}
           onCard={onCard}
           highlight={highlight}
           onTools={dev ? () => setSheet('tools') : undefined}
@@ -934,7 +978,7 @@ function Table({
             className={['drag-ghost', `ghost-${drag.kind}`, drag.over ? 'over' : ''].join(' ')}
             style={{ left: drag.x, top: drag.y }}
           >
-            {drag.kind === 'don' ? (
+            {drag.kind === 'don' || drag.kind === 'attached' ? (
               <div className="don-stack">
                 {Array.from({ length: Math.min(drag.count ?? 1, 4) }, (_, i) => (
                   <span key={i} className="don-card" style={{ ['--k' as string]: i }} />
@@ -958,7 +1002,7 @@ function Table({
               setZoom(null);
               setSelected(null);
             }}
-            donCount={mode?.kind === 'don' ? mode.count : 0}
+            donCount={mode?.kind === 'don' ? mode.picked.length : 0}
             onAttachDons={(target, n) => {
               attachDons(target, n);
               setMode(null);
@@ -1045,7 +1089,7 @@ function Table({
         {sheet === 'hand' && human !== null && (
           <SheetFrame title={`Sua mão (${orderedHand.length})`} onClose={() => setSheet(null)}>
             {state.battle && <BattleInfo state={state} human={human} />}
-            {targets && <TargetRequest state={state} pending={targets} picked={picked} />}
+            {targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
             {decision && (
               <DecisionButton
                 state={state}
@@ -1053,9 +1097,15 @@ function Table({
                 picked={picked}
                 human={human}
                 onDispatch={dispatch}
+                onCancel={canCancel ? cancelAction : undefined}
                 clock={online && !watching ? <OnlineClock online={online} player={human} /> : undefined}
                 sheet
               />
+            )}
+            {mode && !decision && (
+              <div className="defense-slot in-sheet">
+                <CancelButton sub={mode.kind === 'attack' ? 'o ataque' : 'os DON!!'} onClick={() => setMode(null)} />
+              </div>
             )}
             <p className="muted small hand-sheet-hint">
               {myPending?.kind === 'counter'
@@ -1369,10 +1419,13 @@ function TargetRequest({
   state,
   pending,
   picked,
+  hint,
 }: {
   state: GameState;
   pending: Extract<Pending, { kind: 'selectTargets' }>;
   picked: string[];
+  /** Aviso curto embaixo do pedido (ex.: por que não dá mais para cancelar). */
+  hint?: string | null;
 }) {
   const source = state.cards[pending.source] ? cardDef(state, pending.source) : null;
   // O motor costuma começar o pedido com "Nome da carta: "; o nome vai para a linha de cima.
@@ -1393,8 +1446,22 @@ function TargetRequest({
           {pending.max > 0 && ` (${picked.length}/${pending.max})`}
         </b>
         {order && <small className="target-order">Ordem: {order}</small>}
+        {hint && <small className="target-hint">{hint}</small>}
       </div>
     </div>
+  );
+}
+
+/**
+ * Botão grande de cancelar, no lugar de "Encerrar turno": sai do modo de ataque ou de DON!! marcados
+ * (nada foi para o motor ainda), ou desfaz no motor a ação em andamento (`cancel`).
+ */
+function CancelButton({ sub, onClick, title }: { sub: string; onClick: () => void; title?: string }) {
+  return (
+    <button className="end-turn defense cancel" onClick={onClick} title={title ?? 'Cancelar e voltar'}>
+      <b>Cancelar</b>
+      <small>{sub}</small>
+    </button>
   );
 }
 
@@ -1412,6 +1479,7 @@ function DecisionButton({
   picked,
   human,
   onDispatch,
+  onCancel,
   onTools,
   clock,
   sheet,
@@ -1422,6 +1490,8 @@ function DecisionButton({
   picked: string[];
   human: PlayerId;
   onDispatch: (a: Action) => void;
+  /** A ação que pediu esta escolha ainda pode ser desfeita: botão Cancelar ao lado do de confirmar. */
+  onCancel?: () => void;
   /** Ferramentas manuais (perfil Dev) durante a etapa de Counter. */
   onTools?: () => void;
   clock?: ReactNode;
@@ -1436,6 +1506,12 @@ function DecisionButton({
       {onTools && pending.kind === 'counter' && (
         <button className="btn small defense-tools" onClick={onTools} title="Ferramentas manuais">
           ⚙
+        </button>
+      )}
+      {onCancel && pending.kind === 'selectTargets' && (
+        <button className="end-turn defense cancel side" onClick={onCancel} title="Desfazer a ação e voltar ao estado anterior">
+          <b>Cancelar</b>
+          <small>desfaz a ação</small>
         </button>
       )}
       <button
@@ -1685,15 +1761,26 @@ function Prompt(props: {
   human: PlayerId | null;
   picked: string[];
   onDispatch: (a: Action) => void;
+  /** Desfaz no motor a ação que abriu esta escolha (só enquanto o motor permite). */
+  onCancel?: () => void;
+  /** Por que não dá mais para cancelar (ex.: carta revelada). */
+  cancelHint?: string | null;
   onCard: (uid: string) => void;
   highlight: (uid: string) => Highlight;
   /** Abre as ferramentas manuais (só o perfil Dev tem). */
   onTools?: () => void;
 }) {
-  const { state, human, picked, onDispatch } = props;
+  const { state, human, picked, onDispatch, onCancel, cancelHint } = props;
   const { lang } = useSettings();
   const pending = state.pending;
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
+  /** Botão de desfazer a ação (quando o motor permite) ou o motivo de não dar mais. */
+  const cancel = onCancel ? (
+    <button className="btn cancel" onClick={onCancel} title="Desfazer a ação e voltar ao estado anterior">
+      Cancelar
+    </button>
+  ) : null;
+  const hint = !onCancel && cancelHint ? <p className="muted small cancel-hint">{cancelHint}.</p> : null;
 
   switch (pending.kind) {
     case 'chooseFirst':
@@ -1752,6 +1839,7 @@ function Prompt(props: {
       const blocked = shown ? shown.filter((u) => !pending.options.includes(u)).length : 0;
       const confirm = (
         <div className="btn-row">
+          {cancel}
           {pending.max === 0 ? (
             <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
               Continuar
@@ -1803,6 +1891,7 @@ function Prompt(props: {
               {options}
               {order}
               {confirm}
+              {hint}
             </div>
           </div>
         );
@@ -1816,6 +1905,7 @@ function Prompt(props: {
           {options}
           {order}
           {confirm}
+          {hint}
         </PromptPill>
       );
     }
@@ -1842,6 +1932,7 @@ function Prompt(props: {
       return (
         <PromptPill title={`⚙ Efeito manual: ${name}`} subtitle={text} clamp>
           <div className="btn-row">
+            {cancel}
             <button className="btn" onClick={props.onTools}>
               Ferramentas
             </button>
@@ -1907,6 +1998,8 @@ function Prompt(props: {
                 </button>
               ))}
             </div>
+            {cancel && <div className="btn-row center">{cancel}</div>}
+            {hint}
           </div>
         </div>
       );
@@ -1929,6 +2022,8 @@ function Prompt(props: {
                 Não usar
               </button>
             </div>
+            {cancel && <div className="btn-row center">{cancel}</div>}
+            {hint}
           </div>
         </div>
       );
@@ -2017,12 +2112,15 @@ function CardZoom(props: {
   const activates = legal.filter((a): a is Extract<Action, { type: 'activate' }> => a.type === 'activate' && a.uid === uid);
   const canAttack = legal.some((a) => a.type === 'attack' && a.attacker === uid);
   const attach = legal.find((a) => a.type === 'attachDon' && a.target === uid);
+  // DON!! anexados neste turno e ainda não usados podem voltar para a área de custo.
+  const detach = legal.find((a) => a.type === 'detachDon' && a.target === uid);
+  const loose = loc?.fc.donLoose ?? 0;
   const owner = state.cards[uid].owner;
   const isEvent = def.category === 'event';
   // Eventos: usar a carta (ou o Counter dela) é o texto dela, destacado sobre a carta.
   const eventPlay = isEvent ? play : undefined;
   const eventCounter = isEvent ? props.onCounter : undefined;
-  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || props.canManual || (props.onCounter && !eventCounter));
+  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || detach || props.canManual || (props.onCounter && !eventCounter));
   const counter = counterValue(state, uid);
   const eventText = isEvent ? cardText(def, lang).text : '';
   // Habilidades ativáveis viram painéis brilhantes (modelo Pokémon TCG Pocket): em tela larga ficam ao lado da
@@ -2110,6 +2208,15 @@ function CardZoom(props: {
               >
                 {props.donCount > 1 ? `Anexar ${props.donCount} DON!!` : '+ 1 DON!!'}{' '}
                 <small>({state.players[owner].donActive} ativos)</small>
+              </button>
+            )}
+            {detach && (
+              <button
+                className={hasPlates ? 'btn small quiet' : 'btn don big'}
+                onClick={() => props.onDispatch(detach)}
+                title="Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (até a carta atacar ou usar um efeito)"
+              >
+                − 1 DON!! <small>({loose === 1 ? '1 pode voltar' : `${loose} podem voltar`})</small>
               </button>
             )}
             {props.canManual && (
