@@ -1880,7 +1880,9 @@ function Prompt(props: {
               <h3>{pending.prompt}</h3>
               <p className="muted small">
                 {pending.max === 0
-                  ? 'Toque numa carta para ler.'
+                  ? offBoard.length
+                    ? 'Toque numa carta para ler.'
+                    : 'O oponente vê a mesma escolha, havendo carta para escolher ou não.'
                   : pending.ordered
                     ? 'Toque nas cartas na ordem desejada. Segure para ler.'
                     : 'Toque nas cartas para escolher. Segure para ler.'}
@@ -2002,16 +2004,21 @@ function Prompt(props: {
         </div>
       );
     case 'confirm':
+      // Sem como pagar o custo a pergunta abre mesmo assim (para o oponente não deduzir a mão),
+      // só com "Não usar".
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
             <h3>{pending.prompt}</h3>
+            {pending.cannot && <p className="muted small">O oponente vê a mesma pergunta, dando para pagar ou não.</p>}
             <div className="btn-row center">
-              <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                Pagar e usar
-              </button>
-              <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+              {!pending.cannot && (
+                <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                  Pagar e usar
+                </button>
+              )}
+              <button className={`btn big${pending.cannot ? ' primary' : ''}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
                 Não usar
               </button>
             </div>

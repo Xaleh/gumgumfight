@@ -7,7 +7,9 @@ import {
   type DeckList,
   type GameConfig,
   type GameState,
+  hiddenDecision,
   type PlayerId,
+  REPLAY_VERSION,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
@@ -27,8 +29,11 @@ export interface GameSetup {
 
 export interface ReplayFile {
   format: 'gumgumfight-replay';
-  /** 2: a etapa de Counter e a carta da Vida sempre geram uma ação (`pass` / `answer`). */
-  version: 1 | 2;
+  /**
+   * 2: a etapa de Counter e a carta da Vida sempre geram uma ação (`pass` / `answer`).
+   * 3: "pagar X?" sem como pagar e escolhas na mão ou no deck sem opção também (`answer` / `choose`).
+   */
+  version: 1 | 2 | 3;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];
@@ -116,11 +121,11 @@ export function useGame(setup: GameSetup) {
     if (!next) return;
     // Espera as cartas pousarem antes da próxima jogada.
     // A escolha de quem começa demora um pouco mais (dá tempo de ver quem venceu o sorteio).
-    // Counter e carta da Vida: tempo aleatório, para a pressa (ou a demora) do bot não contar
-    // se ele tinha Counter na mão ou [Trigger] na Vida.
+    // Counter, carta da Vida, "pagar X?" e escolhas na mão ou no deck: tempo aleatório, para a
+    // pressa (ou a demora) do bot não contar se ele tinha o que usar.
     const kind = state.pending?.kind;
     const base =
-      setup.mode !== 'replay' && (kind === 'counter' || kind === 'lifeCard')
+      setup.mode !== 'replay' && hiddenDecision(state.pending)
         ? HIDDEN_DECISION_MS[0] + Math.random() * (HIDDEN_DECISION_MS[1] - HIDDEN_DECISION_MS[0])
         : kind === 'chooseFirst'
           ? 1300
@@ -136,7 +141,7 @@ export function useGame(setup: GameSetup) {
     const first = entries[0].state;
     return {
       format: 'gumgumfight-replay',
-      version: 2,
+      version: REPLAY_VERSION,
       seed: first.seed,
       firstPlayer: entries[entries.length - 1].state.firstPlayer,
       ...(first.rollWinner !== undefined ? { chooseFirst: true } : {}),

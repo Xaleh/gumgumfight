@@ -95,8 +95,14 @@ function pendingActions(state: GameState, player: PlayerId, pending: NonNullable
           ...(cardDef(state, pending.card).abilities.some((a) => a.timing === 'trigger') ? [{ type: 'answer', player, yes: true } as Action] : []),
           { type: 'answer', player, yes: false },
         ];
-      case 'chooseFirst':
       case 'confirm':
+        // Sem como pagar o custo, só o "não" (a pergunta abre para não revelar a mão).
+        if (pending.cannot) return [{ type: 'answer', player, yes: false }];
+        return [
+          { type: 'answer', player, yes: true },
+          { type: 'answer', player, yes: false },
+        ];
+      case 'chooseFirst':
         return [
           { type: 'answer', player, yes: true },
           { type: 'answer', player, yes: false },
