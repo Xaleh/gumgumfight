@@ -480,6 +480,8 @@ export interface RemovalStep {
   by?: string;
   /** Vida: no fundo em vez do topo. */
   bottom?: boolean;
+  /** Vida: virada para cima (pública, 3-10-2-1). */
+  faceUp?: boolean;
   /** Substituições já oferecidas (recusadas ou aplicadas) para estas remoções: `uid:índice` ou `temp:índice`. */
   skip?: string[];
 }
@@ -656,8 +658,8 @@ type EffectStepBody =
   /** "add up to 1 card from your hand to the top of your Life cards" */
   /** `choose`: "to the top or bottom of your Life cards" (o jogador escolhe a posição). */
   | { do: 'handToLife'; upTo: number; filter?: CardFilter; faceUp?: boolean; fromTrash?: boolean; trashOnly?: boolean; choose?: boolean }
-  /** "Add up to 1 of your Characters … to the top of the owner's Life cards" */
-  | { do: 'fieldToLife'; target: TargetRef; choose?: boolean }
+  /** "Add up to 1 of your Characters … to the top of the owner's Life cards [face-up]" (`faceUp`: virada para cima, pública) */
+  | { do: 'fieldToLife'; target: TargetRef; choose?: boolean; faceUp?: boolean }
   /** "Look at up to 1 card from the top of your or your opponent's Life cards, and place it at the top or bottom" */
   | { do: 'peekLife'; whose: 'either' | 'own' | 'opponent' }
   /** "Choose one: • … • …" / "Your opponent chooses one: …" */

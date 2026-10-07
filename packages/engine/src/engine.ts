@@ -1947,6 +1947,7 @@ function stepDamage(state: GameState, frame: DamageFrame) {
   frame.lost = (frame.lost ?? 0) + 1;
   log(state, frame.defender, `${ps.name} perde 1 Vida (${ps.life.length} restante(s)).`);
   if (frame.banish) {
+    if (ps.lifeFaceUp?.includes(card)) removeFrom(ps.lifeFaceUp, card);
     ps.trash.push(card);
     log(state, frame.defender, `[Banish] A carta de Vida vai para o descarte.`);
     return;
@@ -2701,7 +2702,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'trashLife': {
       const target = state.players[step.side === 'own' ? frame.controller : opponent(frame.controller)];
       const n = Math.min(step.count, target.life.length);
-      for (let i = 0; i < n; i++) target.trash.push(target.life.pop()!);
+      for (let i = 0; i < n; i++) target.trash.push(takeLife(target));
       if (n) lifeRemoved(state, target.id);
       if (n) log(state, frame.controller, `${n} carta(s) de Vida de ${target.name} vão para o descarte.`);
       return true;
@@ -2883,7 +2884,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       const fromBottom = frame.choice?.[0] === '1';
-      for (let i = 0; i < n; i++) ps.trash.push(fromBottom ? ps.life.shift()! : ps.life.pop()!);
+      for (let i = 0; i < n; i++) ps.trash.push(takeLife(ps, fromBottom));
       if (n) lifeRemoved(state, ps.id);
       log(state, frame.controller, `${ps.name} descarta ${n} carta(s) da Vida.`);
       return true;
@@ -3190,11 +3191,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'opponentLifeToBottom': {
       const opp = state.players[opponent(frame.controller)];
       const n = Math.min(step.count, opp.life.length);
-      for (let k = 0; k < n; k++) {
-        const uid = opp.life.pop()!;
-        if (opp.lifeFaceUp) removeFrom(opp.lifeFaceUp, uid);
-        opp.deck.push(uid);
-      }
+      for (let k = 0; k < n; k++) opp.deck.push(takeLife(opp));
       if (n) {
         lifeRemoved(state, opp.id);
         log(state, frame.controller, `${n} carta(s) da Vida de ${opp.name} vão para o fundo do deck.`);
@@ -3413,7 +3410,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     case 'lifeTrashUntil': {
       const n = Math.max(0, ps.life.length - step.count);
-      for (let k = 0; k < n; k++) ps.trash.push(ps.life.pop()!);
+      for (let k = 0; k < n; k++) ps.trash.push(takeLife(ps));
       if (n) {
         lifeRemoved(state, ps.id);
         log(state, frame.controller, `${n} carta(s) de Vida de ${ps.name} vão para o descarte.`);
@@ -3978,6 +3975,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         byPlayer: frame.controller,
         by: frame.source,
         ...(bottom ? { bottom: true } : {}),
+        ...(step.faceUp ? { faceUp: true } : {}),
       });
       return true;
     }
@@ -4302,6 +4300,7 @@ function detach(state: GameState, uid: string) {
     return;
   }
   for (const zone of [ps.hand, ps.deck, ps.trash, ps.life]) removeFrom(zone, uid);
+  if (ps.lifeFaceUp?.includes(uid)) removeFrom(ps.lifeFaceUp, uid);
   leaveLimbo(state, uid);
 }
 
@@ -4476,6 +4475,7 @@ const removalCtx = (step: RemovalStep): RemovalCtx => ({
   ...(step.byPlayer !== undefined ? { byPlayer: step.byPlayer } : {}),
   ...(step.by ? { by: step.by } : {}),
   ...(step.bottom ? { bottom: true } : {}),
+  ...(step.faceUp ? { faceUp: true } : {}),
 });
 
 /** A substituição `r` vale para esta remoção (evento e causa)? */
@@ -4639,7 +4639,9 @@ function performRemoval(state: GameState, victim: string, action: RemovalAction,
   } else {
     if (ctx.bottom) owner.life.unshift(victim);
     else owner.life.push(victim);
-    log(state, ctx.byPlayer ?? null, `${name} vai para o ${ctx.bottom ? 'fundo' : 'topo'} da Vida de ${owner.name}.`);
+    // "face-up": a carta fica pública na Vida (3-10-2-1).
+    if (ctx.faceUp) (owner.lifeFaceUp ??= []).push(victim);
+    log(state, ctx.byPlayer ?? null, `${name} vai para o ${ctx.bottom ? 'fundo' : 'topo'} da Vida de ${owner.name}${ctx.faceUp ? ', virada para cima' : ''}.`);
   }
   emit(state, { kind: 'characterRemoved', player: owner.id, card: victim, byPlayer: ctx.byPlayer });
   if (action === 'hand') emit(state, { kind: 'returnedToHand', player: owner.id, card: victim, byPlayer: ctx.byPlayer });
@@ -4843,6 +4845,13 @@ function summarizeDonSources(state: GameState, picked: DonSource[]): string {
   return [...counts]
     .map(([src, k]) => (src === 'rested' ? `${k} virado${k > 1 ? 's' : ''}` : src === 'active' ? `${k} ativo${k > 1 ? 's' : ''}` : `${k} de ${cardDef(state, src).name}`))
     .join(', ');
+}
+
+/** Tira a carta do topo (ou do fundo) da Vida; se estava virada para cima, deixa de estar. */
+function takeLife(ps: PlayerState, fromBottom = false): string {
+  const uid = fromBottom ? ps.life.shift()! : ps.life.pop()!;
+  if (ps.lifeFaceUp?.includes(uid)) removeFrom(ps.lifeFaceUp, uid);
+  return uid;
 }
 
 /** Carta de Vida indo para a mão (ou para o fundo do deck, se estiver virada para cima e o Líder mandar). */

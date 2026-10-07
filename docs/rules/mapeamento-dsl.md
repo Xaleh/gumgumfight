@@ -15,7 +15,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | "Cannot be removed from the field by your opponent's effects" (1) | `staticNoRemoval`, `aura.noRemoval` → `removalBlocked` | Existe |
 | [Banish] / [Double Attack] (2) | palavra-chave + frame `damage` (`stepDamage`) | Existe |
 | Dano por efeito (2) | `takeDamage` (frame `damage`, com [Trigger]) | Existe |
-| Vida: adicionar, trashar, virar para cima, olhar (2) | `handToLife{faceUp}`, `addLifeFromDeck`, `trashLife`, `lifeToTrash`, `lifeFace`, `peekLife`, `arrangeLife`, `fieldToLife` | Parcial: `fieldToLife` ignora "face-up" |
+| Vida: adicionar, trashar, virar para cima, olhar (2) | `handToLife{faceUp}`, `addLifeFromDeck`, `trashLife`, `lifeToTrash`, `lifeFace`, `peekLife`, `arrangeLife`, `fieldToLife{faceUp}` | Existe ("face-up" do campo: DV-18 corrigida) |
 | "When you take damage" / "when you deal damage" / "when a Life card is removed" (2) | eventos `damageTaken`, `damageDealt`, `attackDamage`, `lifeRemoved`, `lifeZero` | Existe; a ordem em relação ao [Trigger] precisa ser conferida (ver divergências) |
 | [Trigger] (3) | timing `trigger`, pendência `lifeCard`, `playThis`, `addThisToHand`, `useMainEffect`, `useCounterEffect` | Existe: a carta fica fora de qualquer área (`state.limbo`) enquanto resolve e vai ao trash no fim (DV-17) |
 | Substituição de K.O./remoção/rest/dano (4) | timing `replace` + `Replacement`, `tempReplace`, `replaceRemoval`, `replaceRest`, `replaceDamage` | Existe: todas as aplicáveis em sequência (8-1-3-4-2), em toda remoção por efeito, um pagamento para as simultâneas. Falta: custos que tiram Personagem próprio do campo; Líder/Stage |
@@ -213,7 +213,7 @@ emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 | `opponentLifeToHand` | count | Vida do oponente → mão dele | 667 | 3587 |
 | `handToLife` | upTo, filter?, faceUp?, fromTrash?, trashOnly?, choose? | Mão (ou descarte) → topo/fundo da Vida, opcionalmente virada para cima | 632 | 3701 |
 | `handPlayOrLife` | filter, from? | "Select … from your hand and play it or add it to the top of your Life cards face-up" | 516 | 2890 |
-| `fieldToLife` | target, choose? | Personagem do campo → topo/fundo da Vida do dono (**sempre virada para baixo**, ver 5; proteção + substituição + `characterRemoved` via `removeFromField`) | 634 | 3733 |
+| `fieldToLife` | target, choose?, faceUp? | Personagem do campo → topo/fundo da Vida do dono (`faceUp`: "face-up", vai para `lifeFaceUp`, pública; proteção + substituição + `characterRemoved` via `removeFromField`) | 634 | 3733 |
 | `addLifeFromDeck` | count | Topo do deck → topo da Vida | 729 | 3896 |
 | `lifeFace` | count, up | Vira N Vidas para cima/baixo (custo ou efeito) | 647 | 2685 |
 | `revealLifeTop` | — | Revela o topo da Vida | 511 | 3439 |
@@ -540,7 +540,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 12 | "base power becomes X" | **Existe** | 3 / 22 | `basePower`, `staticBasePower`, `aura.basePower`. |
 | 13 | "Set the power … to 0" | **Parcial** | 0 / 2 (OP07-002, EB04-010) | Lido como `basePower` 0 (parser.ts:1646): DON!!, auras e +poder posteriores continuam somando. "Set the cost … to 0" = `cost −99` (1 carta, OP03-091). |
 | 14 | Negar efeitos de Personagem/Líder | **Existe** | 1 / 15 | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated`. `isNegated` desliga habilidades e palavras impressas, inclusive o [On K.O.] (conferido em `koCharacter` antes de a carta sair do campo; DV-07 corrigida). |
-| 15 | Vida virada para cima | **Parcial** | 12 / 48 | Há `lifeFaceUp`, `lifeFace`, `handToLife{faceUp}`, `search{toLife}`, custo `ownToLife`, `trashFaceUpLife`, `faceUpLifeMin`, regra `faceUpLifeToDeck`. Mas **`fieldToLife` ignora "face-up"** (o passo nem tem o campo; parser.ts:1336, 1814, 1818): ~16 cartas (OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103…) põem a carta virada para baixo. `trashLife`/`lifeToTrash`/`opponentLifeToBottom` não limpam `lifeFaceUp` (ids velhos, inofensivos). |
+| 15 | Vida virada para cima | **Existe** (DV-18 corrigida) | 12 / 48 | Há `lifeFaceUp`, `lifeFace`, `handToLife{faceUp}`, `fieldToLife{faceUp}`, `search{toLife}`, custo `ownToLife`, `trashFaceUpLife`, `faceUpLifeMin`, regra `faceUpLifeToDeck`. `fieldToLife` com "face-up": ~16 cartas na base completa (OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103…), 4 na local (ST07-017, ST09-015, OP06-103, P-085). Quem tira carta da Vida (`trashLife`, `lifeToTrash`, `lifeTrashUntil`, `opponentLifeToBottom`, [Banish], `detach`…) a tira também de `lifeFaceUp`. |
 | 16 | [End of Your Opponent's Turn] / início do turno do oponente | **Não existe** | 0 / 0 | `parseHeader` recusa (:2210). |
 | 17 | Restrições ao oponente ("your opponent cannot play / attack …") | **Não existe** como primitivo | 1 / 2 | `Restriction.player` é sempre quem controla o efeito (:3412) e dura só o turno. As 2 cartas ("cannot attack any card other than …") usam `staticTaunt`. |
 | 18 | Ordem de efeitos automáticos simultâneos | **Não existe** | — | `emit`/`pushAbilities` empilham em ordem fixa (jogador 0 → 1, ordem do campo; pilha LIFO); o jogador do turno não escolhe a ordem nem resolve os seus primeiro. |

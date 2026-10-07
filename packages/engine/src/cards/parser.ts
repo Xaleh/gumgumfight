@@ -1349,7 +1349,7 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^(?:Place|Add) (.+?) (?:at|to) the top or bottom of (?:the owner's|their|your opponent's) Life cards face-(up|down)$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true }), true),
+    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true, ...(m[2].toLowerCase() === 'up' ? { faceUp: true } : {}) }), true),
   ],
   [
     /^(?:Place|Return) (.+?) at the bottom of (?:the owner's|its owner's|your|your opponent's) deck in any order$/i,
@@ -1826,12 +1826,12 @@ const CLAUSES: ClauseRule[] = [
   ],
   [/^Add up to (\d+) cards? from your hand to the top of your Life cards$/i, (m) => [{ do: 'handToLife', upTo: Number(m[1]) }]],
   [
-    /^Add (.+?) to the top of (?:the owner's|your|your opponent's) Life cards(?: face-up)?$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target }), true),
+    /^Add (.+?) to the top of (?:the owner's|your|your opponent's) Life cards( face-up)?$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, ...(m[2] ? { faceUp: true } : {}) }), true),
   ],
   [
-    /^Add (.+?) to the top or bottom of (?:the owner's|your|your opponent's) Life cards(?: face-up)?$/i,
-    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true }), true),
+    /^Add (.+?) to the top or bottom of (?:the owner's|your|your opponent's) Life cards( face-up)?$/i,
+    (m) => withTarget(m[1], (target) => ({ do: 'fieldToLife', target, choose: true, ...(m[2] ? { faceUp: true } : {}) }), true),
   ],
   [
     // Efeito opcional sem custo: "you may draw 1 card" → pergunta antes.

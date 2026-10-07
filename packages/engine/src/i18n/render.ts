@@ -848,7 +848,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'handToLife':
       return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} ${s.trashOnly ? 'do seu descarte' : `da sua mão${s.fromTrash ? ' ou do seu descarte' : ''}`} no ${s.choose ? 'topo ou no fundo' : 'topo'} da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'fieldToLife':
-      return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono.`;
+      return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'peekLife':
       return `Olhe até 1 carta do topo ${s.whose === 'either' ? 'da sua Vida ou da Vida do oponente' : s.whose === 'own' ? 'da sua Vida' : 'da Vida do oponente'} e coloque-a no topo ou no fundo dessa Vida.`;
     case 'chooseOne':
