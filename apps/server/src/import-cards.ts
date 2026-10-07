@@ -75,7 +75,7 @@ async function main() {
     cards.set(c.id, c);
     raw.set(c.id, mapped.raw.get(c.id));
   }
-  if (mapped.ignored) console.log(`${mapped.ignored} entradas ignoradas (sem id, DON!! ou tipo desconhecido)`);
+  if (mapped.ignored) console.log(`${mapped.ignored} entradas ignoradas (sem id, DON!!, tipo desconhecido ou reimpressão promocional de carta de coleção)`);
 
   const list = [...cards.values()];
   const count = (st: string) => list.filter((c) => automationStatus(c) === st).length;

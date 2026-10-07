@@ -45,8 +45,34 @@ export function setEndpoint(base: string, setId: string): string {
   return id.startsWith('ST-') ? `${base}/decks/${id}/` : `${base}/sets/${id}/`;
 }
 
+/** Coleções, starter decks e promocionais (P-xxx). */
 export function allEndpoints(base: string): string[] {
-  return [`${base}/allSetCards/`, `${base}/allSTCards/`];
+  return [`${base}/allSetCards/`, `${base}/allSTCards/`, `${base}/allPromos/`];
+}
+
+/**
+ * Número da carta sem o sufixo de versão: a API às vezes manda a reimpressão de uma promo
+ * num starter deck com o número da imagem ("P-030_r1", "P-057_p1") em vez do da carta.
+ */
+export function baseCardId(id: string): string {
+  return id.trim().replace(/_[a-z]+\d*$/i, '');
+}
+
+/**
+ * Linha da lista de promocionais que é só outra impressão de uma carta de coleção
+ * ("Gum-Gum Lightning (Premium Card Collection -Best Selection Vol. 4-)", OP09-077): a carta
+ * já vem da coleção, e essa linha repetiria a original (mesma imagem) na escolha por maioria.
+ */
+function isPromoReprint(raw: Raw, card: CardData): boolean {
+  return card.set !== 'P' && /promotion/i.test(String(raw.set_name ?? ''));
+}
+
+/**
+ * Líderes de evento (P-700, P-800, P-900: Luffy das seis cores, "This Leader can only be used in
+ * designated events"): não estão na lista oficial e não valem em partida normal.
+ */
+function isEventOnly(card: CardData): boolean {
+  return /can only be used in designated events/i.test(card.text);
 }
 
 /**
@@ -111,6 +137,8 @@ const VERSION_SUFFIX = new RegExp(
       '\\d+', // (025)
       '[A-Z]+\\d*(?:-\\d+)?', // (OP01-060), (P-041), (OP08), (SP), (SPR), (TR)
       '[^()]*\\b(?:Art|Reprint|Parallel|Foil|Manga|Pack|Topper|Poster|Promo|Version|Gold|Silver|Gem|Signature)\\b[^()]*',
+      // promocionais: o evento ou produto em que saíram ("(One Piece Film Red)", "(Sealed Battle Kit Vol. 1)")
+      '[^()]*\\b(?:Event|Release|Regional|Tournament|Battle|Party|Collection|Film|Expo|Fest|Con|Kit|Deck|Box|Set|Voyage|Cup|Champion|Championship|Regionals|Trophy|Judge|Store|Winner|Finalist|Participant|Participation)\\b[^()]*',
     ].join('|') +
     ')\\)\\s*$',
   // sem flag "i": "(SP)"/"(TR)" são siglas em maiúsculas; "(Zala)", "(Mikita)" fazem parte do nome
@@ -120,7 +148,11 @@ export function cleanName(name: string): string {
   let out = name.trim();
   for (;;) {
     // "Boa Hancock - OP14-041", "Brook - ST01-011 (Reprint)": o código da carta também não é nome.
-    const next = out.replace(VERSION_SUFFIX, '').replace(/\s+-\s+[A-Z]+\d*-\d+$/, '');
+    // "[Winner]", "[Participant]": a colocação no evento em que a promo foi dada.
+    const next = out
+      .replace(VERSION_SUFFIX, '')
+      .replace(/\s*\[(?:Winner|Finalist|Participant|Judge|\d+(?:st|nd|rd|th) Place)\]$/, '')
+      .replace(/\s+-\s+[A-Z]+\d*-\d+$/, '');
     if (next === out) return out;
     out = next.trim();
   }
@@ -212,7 +244,7 @@ export function mapApiCard(raw: Raw, vocab: Set<string> = new Set()): CardData |
   const { text: effectText, notes } = extractNotes(cleanText(pick(raw, 'card_text', 'text', 'effect')));
   const split = splitTrigger(normalizeTypeQuotes(effectText));
   const aliases = [...split.text.matchAll(/[Aa]lso treat this card's name as \[([^\]]+)\](?: and \[([^\]]+)\])?/g)].flatMap((m) => m.slice(1).filter(Boolean));
-  const cardId = String(id).trim();
+  const cardId = baseCardId(String(id));
 
   return {
     id: cardId,
@@ -287,6 +319,8 @@ function mergeEntries(group: Entry[]): Entry {
   out.colors = vote((c) => nonEmpty(c.colors), listKey) ?? [];
   out.attributes = vote((c) => nonEmpty(c.attributes), listKey) ?? [];
   if (!out.types.length) out.types = group.find((e) => e.card.types.length)?.card.types ?? [];
+  // Algumas linhas de promo vêm sem imagem (P-014): usa a de outra impressão da mesma carta.
+  out.imageUrl ??= group.find((e) => e.card.imageUrl)?.card.imageUrl;
 
   const textKey = (c: CardData) => `${c.text}\n${c.trigger ?? ''}`;
   // Uma versão sem o [Trigger] que outra tem está incompleta (OP03-110 Smoothie só o traz na reimpressão).
@@ -323,7 +357,7 @@ export function mapApiResponse(
   let ignored = 0;
   for (const raw of rows) {
     const card = mapApiCard(raw, types);
-    if (!card) {
+    if (!card || isPromoReprint(raw, card) || isEventOnly(card)) {
       ignored++;
       continue;
     }

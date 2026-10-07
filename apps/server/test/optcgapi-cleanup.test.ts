@@ -106,6 +106,17 @@ describe('nomes com parênteses oficiais', () => {
     expect(cleanName('Boa Hancock - OP14-041')).toBe('Boa Hancock');
     expect(cleanName('Brook - ST01-011 (Reprint)')).toBe('Brook');
   });
+
+  it('remove das promos o evento ou produto em que saíram', async () => {
+    const { cleanName } = await import('../src/optcgapi');
+    expect(cleanName('Koby (One Piece Film Red)')).toBe('Koby');
+    expect(cleanName('Monkey.D.Luffy (001) (Offline Regional 2024 Vol. 2) [Winner]')).toBe('Monkey.D.Luffy');
+    expect(cleanName('Uta - P-011 (Premium Card Collection -Uta-)')).toBe('Uta');
+    expect(cleanName('Fleeting Lullaby (Starter Deck 11: Uta Deck Battle)')).toBe('Fleeting Lullaby');
+    expect(cleanName('Jinbe (Seven Warlords of the Sea Binder Set)')).toBe('Jinbe');
+    expect(cleanName('Monkey.D.Luffy (Gen Con 2023)')).toBe('Monkey.D.Luffy');
+    expect(cleanName('Mr.3 (Galdino) - P-148 (Premium Card Collection -Live Action Edition Vol.2 Baroque Works-)')).toBe('Mr.3 (Galdino)');
+  });
 });
 
 describe('reimpressões e artes alternativas', () => {
@@ -185,5 +196,73 @@ describe('reimpressões e artes alternativas', () => {
     const reprint = row({ card_set_id: 'OP05-066', card_name: 'Jinbe (Reprint)', set_id: 'ST-26', card_image_id: 'OP05-066_r1', counter_amount: 0, card_power: '5000', card_cost: '4' });
     importBodies(db, [[original], [reprint]], 'teste');
     expect(listCards(db).map((c) => [c.id, c.counter])).toEqual([['OP05-066', 1000]]);
+  });
+});
+
+describe('promocionais (allPromos)', () => {
+  const promo = (o: Record<string, unknown>) => ({
+    card_type: 'Character',
+    card_color: 'Red',
+    card_cost: '3',
+    card_power: '4000',
+    counter_amount: 1000,
+    attribute: 'Strike',
+    sub_types: 'Navy',
+    card_text: '[On Play] Draw 1 card.',
+    set_id: 'P',
+    set_name: 'One Piece Promotion Cards',
+    rarity: 'P',
+    ...o,
+  });
+
+  it('a importação completa lê também a lista de promos', async () => {
+    const { allEndpoints } = await import('../src/optcgapi');
+    expect(allEndpoints('https://x/api')).toContain('https://x/api/allPromos/');
+  });
+
+  it('o número com sufixo da reimpressão em starter deck vira o número da carta', async () => {
+    const { baseCardId, mapApiResponse } = await import('../src/optcgapi');
+    expect(baseCardId('P-029_r1')).toBe('P-029');
+    expect(baseCardId('P-057_p1')).toBe('P-057');
+    expect(baseCardId('OP01-001')).toBe('OP01-001');
+    const rows = [
+      promo({ card_set_id: 'P-029_r1', card_name: 'Bartolomeo', set_id: 'ST-16', set_name: 'Uta', card_image_id: 'P-029_r1', card_image: 'r1.jpg' }),
+      promo({ card_set_id: 'P-029', card_name: 'Bartolomeo (CS 2023 Event Pack Finalist Ver.)', card_image_id: 'P-029', card_image: null }),
+    ];
+    const { cards } = mapApiResponse(rows);
+    expect(cards).toHaveLength(1);
+    // A linha principal (da lista de promos) não tem imagem: fica a da reimpressão.
+    expect(cards[0]).toMatchObject({ id: 'P-029', name: 'Bartolomeo', set: 'P', imageUrl: 'r1.jpg' });
+  });
+
+  it('ignora a reimpressão promocional de carta de coleção e os líderes só de evento', async () => {
+    const { mapApiResponse } = await import('../src/optcgapi');
+    const rows = [
+      promo({ card_set_id: 'OP09-077', card_name: 'Gum-Gum Lightning', set_id: 'OP09', card_image_id: 'OP09-077', card_type: 'Event', card_text: '[Main] Draw 2 cards.' }),
+      promo({ card_set_id: 'OP09-077', card_name: 'Gum-Gum Lightning (Premium Card Collection -Best Selection Vol. 4-)', set_id: 'OP09', card_image_id: 'OP09-077', card_type: 'Event', card_text: '[Main] Draw 1 card.' }),
+      promo({ card_set_id: 'P-700', card_name: 'Monkey.D.Luffy (Release Event Leader)', card_type: 'Leader', card_image_id: 'P-700', life: '5', card_text: 'This Leader can only be used in designated events according to the rules.' }),
+    ];
+    // A primeira linha não é da lista de promos (set_name da coleção).
+    rows[0].set_name = 'Emperors in the New World';
+    const { cards, ignored } = mapApiResponse(rows);
+    expect(cards.map((c) => [c.id, c.text])).toEqual([['OP09-077', '[Main] Draw 2 cards.']]);
+    expect(ignored).toBe(2);
+  });
+
+  it('o banco troca os números antigos com sufixo nos decks e apaga as cartas antigas', async () => {
+    const { mkdtempSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { tmpdir } = await import('node:os');
+    const { getDeck, listCards, openDb, upsertCards, upsertDeck } = await import('../src/db');
+    const file = join(mkdtempSync(join(tmpdir(), 'gg-')), 'db.sqlite');
+    const db = openDb(file);
+    const card = { id: 'P-029_r1', name: 'Bartolomeo', category: 'character' as const, colors: ['green' as const], types: [], text: '' };
+    upsertCards(db, [card, { ...card, id: 'P-029' }], { provisional: true, source: 'teste' });
+    upsertDeck(db, { id: 'd', name: 'D', leader: 'ST11-001', cards: [{ id: 'P-029_r1', count: 2 }, { id: 'P-029', count: 2 }, { id: 'ST16-001', count: 4 }] }, 'user');
+    db.close();
+    const again = openDb(file);
+    expect(listCards(again).map((c) => c.id)).toEqual(['P-029']);
+    expect(getDeck(again, 'd')?.cards).toEqual([{ id: 'P-029', count: 4 }, { id: 'ST16-001', count: 4 }]);
+    again.close();
   });
 });
