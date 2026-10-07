@@ -1077,6 +1077,8 @@ export type Frame =
       defender: PlayerId;
       remaining: number;
       banish: boolean;
+      /** Dano de ataque: a vitória por 0 de Vida só é decidida antes do 1º ponto (7-1-4-1-1-1). */
+      attack?: boolean;
       lifeCard?: string;
       answered?: boolean;
       lost?: number;
