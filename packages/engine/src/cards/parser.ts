@@ -3004,6 +3004,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
       if (spec.color) aura.color = spec.color;
       if (spec.minCost !== undefined) aura.minCost = spec.minCost;
       if (spec.maxCost !== undefined) aura.maxCost = spec.maxCost;
+      if (spec.base && (spec.minCost !== undefined || spec.maxCost !== undefined)) aura.baseCost = true;
       if (spec.minPower !== undefined) aura.minPower = spec.minPower;
       if (spec.maxPower !== undefined) aura.maxPower = spec.maxPower;
       if (spec.name) aura.names = [spec.name];

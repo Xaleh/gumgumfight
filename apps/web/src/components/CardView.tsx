@@ -7,6 +7,7 @@ import {
   cardStatuses,
   type FieldCard,
   type GameState,
+  getCost,
   getPower,
   HIDDEN_CARD,
   hasKeyword,
@@ -53,6 +54,9 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
   const power = fc ? getPower(state, uid) : def.power;
   const delta = fc && def.power !== undefined && power !== undefined ? power - def.power : 0;
+  // Custo atual em campo ("gains +12 cost", auras de custo): a carta mostra o valor que vale para os efeitos.
+  const cost = fc && def.cost !== undefined && def.category !== 'leader' ? getCost(state, uid) : def.cost;
+  const costDelta = fc && def.cost !== undefined && cost !== undefined ? cost - def.cost : 0;
   const keywords = (Object.keys(KEYWORD_LABEL) as Keyword[]).filter((k) =>
     fc ? hasKeyword(state, uid, k) : def.keywords.includes(k),
   );
@@ -104,12 +108,17 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
           {delta !== 0 && power !== undefined && (
             <span className={['img-power', delta > 0 ? 'up' : 'down'].join(' ')}>{power}</span>
           )}
+          {costDelta !== 0 && cost !== undefined && (
+            <span className={['img-cost', costDelta > 0 ? 'up' : 'down'].join(' ')} title={`Custo atual ${cost} (impresso ${def.cost})`}>
+              {cost}
+            </span>
+          )}
           {fc && fc.don > 0 && !hideDon && <div className="don-badge">DON!! ×{fc.don}</div>}
         </>
       )}
       {/* Enquanto a imagem carrega, a face desenhada fica por baixo. */}
       {(!withImage || !imageLoaded) && (
-        <CardFace def={def} power={power} delta={delta} keywords={keywords} fc={withImage || hideDon ? undefined : fc} />
+        <CardFace def={def} power={power} delta={delta} cost={cost} costDelta={costDelta} keywords={keywords} fc={withImage || hideDon ? undefined : fc} />
       )}
       {def.manual && (
         <span className="manual-badge" title="Efeito ainda não automatizado: não é aplicado na partida">
@@ -161,12 +170,17 @@ function CardFace({
   def,
   power,
   delta,
+  cost,
+  costDelta = 0,
   keywords,
   fc,
 }: {
   def: CardDef;
   power: number | undefined;
   delta: number;
+  /** Custo atual (em campo) ou impresso. */
+  cost?: number;
+  costDelta?: number;
   keywords: Keyword[];
   fc?: FieldCard;
 }) {
@@ -178,8 +192,11 @@ function CardFace({
             {def.life}
           </span>
         ) : (
-          <span className="badge cost-badge" title="Custo">
-            {def.cost}
+          <span
+            className={['badge', 'cost-badge', costDelta > 0 ? 'up' : costDelta < 0 ? 'down' : ''].join(' ')}
+            title={costDelta !== 0 ? `Custo atual ${cost} (impresso ${def.cost})` : 'Custo'}
+          >
+            {cost ?? def.cost}
           </span>
         )}
         <span className="card-cat">{CATEGORY_LABEL[def.category]}</span>

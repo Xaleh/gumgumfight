@@ -16,7 +16,7 @@ import {
 import jollyRoger from '../assets/jolly-roger.svg';
 import { useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
-import { SettingsModal } from '../settings';
+import { NICKNAME_EVENT, SettingsModal } from '../settings';
 import { type NavItem, TopBar } from './AppShell';
 import { LiveNow, MetaBlock, TournamentsBlock, usePoll } from './HomeBlocks';
 import { Icon, type IconName } from './Icons';
@@ -357,6 +357,21 @@ export function Menu({
   const [picking, setPicking] = useState<null | 0 | 1>(null);
   const [code, setCode] = useState(URL_ROOM_CODE ?? '');
   const userId = user?.id;
+  /** Apelido do jogador (perfil deste navegador): nome nas partidas contra o bot e online. */
+  const [nickname, setNickname] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .player()
+      .then((p) => !cancelled && setNickname(p?.name ?? null))
+      .catch(() => undefined);
+    const onRename = (e: Event) => setNickname((e as CustomEvent<string>).detail);
+    window.addEventListener(NICKNAME_EVENT, onRename);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NICKNAME_EVENT, onRename);
+    };
+  }, [userId]);
   /** Treino contra o bot no servidor (fase de testes do modo espectador): a partida pode ser assistida. */
   const [botRooms, setBotRooms] = useState(false);
   const [timeBank, setTimeBank] = useState<number | null>(null);
@@ -468,7 +483,7 @@ export function Menu({
     setLoading(true);
     setActionError(null);
     try {
-      const names: [string, string] = ['Você', 'Bot'];
+      const names: [string, string] = [nickname ?? 'Você', 'Bot'];
       const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
       if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
@@ -552,6 +567,11 @@ export function Menu({
               <button type="button" className="hero-link" onClick={onWatch}>
                 <Icon name="eye" size={18} />
                 Assistir partidas
+              </button>
+              <button type="button" className="hero-link nickname-link" onClick={() => setShowSettings(true)} title="Mudar o apelido (Configurações)">
+                <Icon name="user" size={18} />
+                {nickname ?? 'Apelido'}
+                <small>✎</small>
               </button>
             </div>
           </div>

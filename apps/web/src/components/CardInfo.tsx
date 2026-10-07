@@ -6,7 +6,7 @@ import { StaticCard, StatusTag } from './CardView';
 const CATEGORY = { leader: 'Líder', character: 'Personagem', event: 'Evento', stage: 'Stage' };
 
 /** Nome, atributos e texto da carta no idioma escolhido (com "ver original"); `statuses` = efeitos temporários em campo. */
-export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: number; statuses?: CardStatus[] }) {
+export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; power?: number; cost?: number; statuses?: CardStatus[] }) {
   const { lang } = useSettings();
   const [showOriginal, setShowOriginal] = useState(false);
   useEffect(() => setShowOriginal(false), [def.id]);
@@ -21,7 +21,12 @@ export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: n
         {def.attributes?.length ? ` · ${def.attributes.join('/')}` : ''}
       </div>
       <div className="detail-stats">
-        {def.cost !== undefined && <span>Custo {def.cost}</span>}
+        {def.cost !== undefined && (
+          <span>
+            Custo {cost ?? def.cost}
+            {cost !== undefined && cost !== def.cost ? ` (impresso ${def.cost})` : ''}
+          </span>
+        )}
         {def.life !== undefined && <span>Vida {def.life}</span>}
         {def.power !== undefined && (
           <span>
