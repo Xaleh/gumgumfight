@@ -175,10 +175,19 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
   const find = <T extends Action['type']>(type: T, pred: (a: Extract<Action, { type: T }>) => boolean = () => true) =>
     actions.find((a): a is Extract<Action, { type: T }> => a.type === type && pred(a as Extract<Action, { type: T }>));
 
+  /**
+   * DON!! virado tem para onde ir? (P-136 Usopp, "[Activate: Main] Give up to 1 rested DON!! card to 1
+   * of your {Land of Wano} type Leader or Character cards", sem custo nem [Once Per Turn]: sem alvo, não
+   * faz nada e o bot o ativaria sem parar.)
+   */
+  const donTargets = (uid: string, step: EffectStep) =>
+    step.do === 'giveRestedDon' && (typeof step.target !== 'object' || targetCandidates(state, player, uid, step.target).length > 0);
+
   // 1) Habilidades que dão DON!! virados (só vale se houver DON!! virados e ataques possíveis).
   const giveDon = find('activate', (a) => {
     const ab = cardDef(state, a.uid).abilities[a.ability];
-    return ab.steps[0]?.do === 'giveRestedDon' && !ab.steps[0].fromOpponent && me.donRested > 0 && canBattle && !ab.cost?.restSelf;
+    const step = ab.steps[0];
+    return step?.do === 'giveRestedDon' && !step.fromOpponent && me.donRested > 0 && canBattle && !ab.cost?.restSelf && donTargets(a.uid, step);
   });
   if (giveDon) return giveDon;
 
@@ -206,7 +215,7 @@ function chooseMain(state: GameState, player: PlayerId, actions: Action[]): Acti
     const step = ab.steps[0];
     if (!step || !canBattle) return false;
     if (step.do === 'rest') return opp.characters.some((c) => !c.rested);
-    if (step.do === 'giveRestedDon') return !step.fromOpponent && me.donRested > 0;
+    if (step.do === 'giveRestedDon') return !step.fromOpponent && me.donRested > 0 && donTargets(a.uid, step);
     if (step.do === 'power') {
       // Custos de DON!! −X só valem se o bônus ajudar vários ataques.
       if (ab.cost?.donMinus) {

@@ -40,7 +40,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Limite de 5 Personagens (11) | `stepPlay` (escolha de qual trashar) | Existe |
 | Jogar por efeito (mão, trash, deck, Vida) (11) | `playFrom`, `playThis`, `playRevealed`, `handPlayOrLife`, `opponentPlays` | Existe |
 | Negar efeitos / negar [On Play] (12) | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated` | Existe (ver [On K.O.] acima) |
-| Regras de Líder (deck, DON!!, início da partida) (12) | `leaderRule` (`donDeck`, `deckOutWin`, `startStage`, `deckMaxCost`…); `startStage` vira, em `startOfGame`, um efeito do Líder com `playFrom` (deck, até 1) + `shuffleDeck`, seguido do frame `startGame` (mãos e mulligan) | Existe |
+| Regras de Líder (deck, DON!!, início da partida) (12) | `leaderRule` (`donDeck`, `deckOutWin`, `startStage`, `deckMaxCost`, `deckOnlyType` ("you can only include {East Blue} type cards in your deck", P-117; conferida em `leaderAllows`/`validateDeck`)…); `startStage` vira, em `startOfGame`, um efeito do Líder com `playFrom` (deck, até 1) + `shuffleDeck`, seguido do frame `startGame` (mãos e mulligan) | Existe |
 | Restrição imposta ao oponente ("your opponent cannot ...") (12) | `restrict{opponent, duration}`; `staticTaunt` | Existe (DV-32): restrição ao controlador ou ao oponente, neste turno ou até o fim do próximo turno do oponente; as 2 cartas "cannot attack any card other than …" seguem com `staticTaunt` |
 | Copiar/ganhar efeitos de outra carta | — | Falta (0 cartas hoje) |
 | Gatilho de carta fora do campo ("when this card is removed from Life", na mão, no trash) | — | Falta (0 cartas hoje) |
@@ -146,6 +146,7 @@ Colunas: **types** = linha em types.ts; **engine** = `case` em `execStep`.
 | `revealedToTopOrBottom` | — | Jogador escolhe topo/fundo para a revelada | 587 | 3332 |
 | `playRevealed` | filter?, rested? | Joga a carta revelada (do deck ou da Vida) | 661 | 2712 |
 | `powerPerRevealedCost` | target, amount, duration | +N de poder por ponto de custo da revelada | 554 | 3121 |
+| `powerPerMatching` | target, amount, spec, duration | "Your Leader gains +1000 power for each of your Characters during this turn" (P-024): +N por carta que casa com `spec`, contada ao resolver | 556 | 3499 |
 | `millDeck` | count | Descarta N do topo do deck | 723 | 3876 |
 | `shuffleDeck` | — | Embaralha | 701 | 3976 |
 | `lookOpponentTop` / `revealOpponentTop` | — | Olha/revela o topo do deck do oponente | 509 / 597 | 3564 / 2809 |
@@ -171,7 +172,7 @@ emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 | `returnSelfToHand` | — | Custo "return this Character to the owner's hand" | 643 | 2636 |
 | `opponentChoosesOwn` | count, spec, action hand/bottom | "Your opponent returns/places 1 of their Characters …" (o oponente escolhe; depois proteção + substituição + `characterRemoved` via `removeFromField`) | 571 | 3166 |
 | `fromTrashToHand` | upTo, filter | Do descarte para a mão | 697 | 3924 |
-| `addThisToHand` | — | [Trigger] "… and add this card to your hand" | 727 | 3887 |
+| `addThisToHand` | — | [Trigger] "… and add this card to your hand"; [On K.O.] "add this Character card to your hand" (P-071, do trash) | 727 | 3887 |
 
 ### 2.4 Para o deck (topo/fundo)
 | do | parâmetros | semântica | types | engine |
@@ -181,7 +182,7 @@ emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 | `ownToBottom` | count, spec, toLife? | Custo "place N of your Characters at the bottom" (ou na Vida virada para cima) | 599 | 2829 |
 | `handToDeck` | count, where top/bottom/choose | Da mão para topo/fundo | 615 | 3536 |
 | `handToDeckBottom` | count | Custo "place N cards from your hand at the bottom" | 687 | 3827 |
-| `handAllToDeck` | who | "Return all cards in your hand to your deck and shuffle" (`eventCount`) | 566 | 3142 |
+| `handAllToDeck` | who, bottom? | "Return all cards in your hand to your deck and shuffle" (`eventCount`); `bottom`: "place all cards in your hand at the bottom of your deck in any order" (P-046), sem embaralhar | 607 | 3529 |
 | `trashToDeckBottom` | count, filter? | Do descarte para o fundo do deck | 644 | 2645 |
 | `opponentTrashToBottom` | count, upTo?, chooser?, filter? | Descarte do oponente → fundo do deck dele | 593 | 2730 |
 | `opponentHandToBottom` | count | O oponente põe N da mão no fundo | 669 | 3595 |
@@ -213,7 +214,7 @@ emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 | `lifeTrashUntil` | count | Descarta Vida até ficar com N | 575 | 3201 |
 | `trashFaceUpLife` | — | Descarta todas as Vidas viradas para cima | 585 | 3319 |
 | `lifeToHand` | count, choose? | Vida → mão (topo ou topo/fundo); bloqueado por `noLifeToHand` | 629 | 3687 |
-| `opponentLifeToHand` | count | Vida do oponente → mão dele | 667 | 3587 |
+| `opponentLifeToHand` | count | Vida do oponente → mão dele (do topo; "from their Life area", P-009, também) | 667 | 3587 |
 | `handToLife` | upTo, filter?, faceUp?, fromTrash?, trashOnly?, choose? | Mão (ou descarte) → topo/fundo da Vida, opcionalmente virada para cima. Com filtro, a carta da mão é revelada (nome no log público, 11-2-1, DV-33); sem filtro vai escondida | 632 | 3701 |
 | `handPlayOrLife` | filter, from? | "Select … from your hand and play it or add it to the top of your Life cards face-up" | 516 | 2890 |
 | `fieldToLife` | target, choose?, faceUp? | Personagem do campo → topo/fundo da Vida do dono (`faceUp`: "face-up", vai para `lifeFaceUp`, pública; proteção + substituição + `characterRemoved` via `removeFromField`) | 634 | 3733 |
@@ -315,7 +316,7 @@ Infra: `playFree` :1912 (Personagem → frame `play` com `byEffect`; Stage subst
 | `negate` (600/3403) | modificador `negated` | `isNegated` :207 → `conditionsMet` :216, `hasKeyword` :633 |
 | `negateOnPlay` (579/3242) | `state.onPlayNegated` | `pushAbilities` :1627 |
 | `redirectAttack` (614/3502) | muda o alvo do ataque | `state.battle.target` |
-| Estáticos (`Ability`) | `staticNoRemoval`, `staticNoBattleKO`, `staticNoEffectKO`, `noBattleKOVsAttribute`, `noBattleKOByLeader`, `noEffectKOUnlessAttribute`, `noEffectKOByMaxBasePower`, `staticNoRest`, `staticCannotAttack`, `staticTaunt`, `noLeaderAttackOnPlayTurn`, `noPlayByEffect`, `noRefreshMaxCost` | `koProtected`, `removalBlocked`, `restCard`, `attackError`, `playFrom`, `noRefreshByAura` |
+| Estáticos (`Ability`) | `staticNoRemoval`, `staticNoBattleKO`, `staticNoEffectKO`, `noBattleKOVsAttribute`, `noBattleKOByLeader`, `noBattleKOUnlessAttribute`, `noEffectKOUnlessAttribute`, `noEffectKOByMaxBasePower`, `staticNoRest`, `staticCannotAttack`, `staticTaunt`, `noLeaderAttackOnPlayTurn`, `noPlayByEffect`, `noRefreshMaxCost` | `koProtected`, `removalBlocked`, `restCard`, `attackError`, `playFrom`, `noRefreshByAura` |
 | Auras (`Aura`) | `noEffectKO`, `noBattleKO`, `noRemoval`, `negate`, `cannotAttack`, `keyword` (com `side`, `bothSides`, filtros) | `collectAuras` :542 |
 
 ### 2.13 Substituição ("instead")
@@ -484,7 +485,7 @@ Leitura do texto: `parseEvent` parser.ts:2407-2488.
 |---|---|---|
 | K.O. ("K.O. up to N …", "K.O. A and B", "K.O. or rest", "K.O. or return", "Choose … and K.O. it", Stages) | 1102, 1256, 1261, 1269, 1350, 1359 | `ko`, `chooseOne` |
 | Devolver à mão / fundo do deck | 889, 939, 1152, 1161, 1282, 1340, 1403, 1407, 1480 | `returnToHand`, `toDeckBottom`, `opponentChoosesOwn` |
-| Poder ("Give … ±N power", "gains +N", Líder e Personagens, "for every", "an additional") | 895, 1052, 1056, 1307, 1388, 1423-1441, 1781 | `power`, `powerPerDon`, `powerPerRevealedCost` |
+| Poder ("Give … ±N power", "gains +N", Líder e Personagens, "This Character and up to 1 of your Leader", "for every", "for each of your Characters", "an additional") | 895, 1052, 1056, 1307, 1388, 1423-1460, 1781 | `power`, `powerPerDon`, `powerPerRevealedCost`, `powerPerMatching` |
 | Poder base / custo ("base power becomes", "Set the power/cost", copiar Líder/atacante/selecionado, trocar) | 919, 923, 973-982, 1115, 1176, 1244, 1251, 1437, 1543, 1634-1650, 1706 | `basePower`, `swapBasePower`, `cost` |
 | Palavras-chave e atributos ("gains [X] (and +N)", "[Rush: Character] and attribute") | 997, 1025, 1240, 1445, 1553, 1849 | `gainKeyword`, `gainAttribute` |
 | Blocker ("cannot activate [Blocker]" com poder/custo, "when attacks") | 1020, 1023, 1579, 1583, 1752, 1877-1887 | `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock` |
@@ -531,7 +532,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 1c | Remoções que não oferecem substituição nem emitem `characterRemoved` | **Existe** (DV-12) | — | Todas as remoções por efeito passam por `removeFromField` → `performRemoval`, inclusive `fieldToLife` e `opponentChoosesOwn`; os removidos juntos recebem cada substituição uma vez (um pagamento salva todos). |
 | 1d | Substituição para Líder/Stage | **Não existe** | 0 / 0 | `offerReplacement` só considera Personagens no campo. |
 | 2 | "cannot be removed from the field by effects" | **Existe** (só "by your opponent's effects") | 1 / 11 | `staticNoRemoval` / `aura.noRemoval` → `removalBlocked` (:4320). Não há versão temporária ("during this turn") — 0 cartas. |
-| 3 | "cannot be K.O.'d in battle" | **Existe** | 8 / 19 | `staticNoBattleKO`, `noBattleKOVsAttribute`, `noBattleKOByLeader`, `aura.noBattleKO`, `cannotBeKO{inBattle}`. |
+| 3 | "cannot be K.O.'d in battle" | **Existe** | 8 / 21 | `staticNoBattleKO`, `noBattleKOVsAttribute` ("by "Strike" attribute cards / Leaders or Characters", P-007), `noBattleKOUnlessAttribute` ("by Characters without the "Special" attribute", P-025: o Líder ainda nocauteia), `noBattleKOByLeader`, `aura.noBattleKO`, `cannotBeKO{inBattle}`. |
 | 4 | "cannot be K.O.'d by your opponent's effects" | **Existe** (DV-13 corrigida) | 7 / 17 | `staticNoEffectKO: 'opponent'` (também `aura.noEffectKO` e `cannotBeKO{byEffect}`); `koProtected` recebe quem nocauteia (`byPlayer`) e só protege do oponente. "by effects" (`true`) continua protegendo também do próprio efeito e dos custos de K.O. |
 | 5 | "your opponent cannot activate [Blocker]" | **Existe** | 9 / 20 | `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock`; "… during this turn" (P-097): `restrict` `noBlocker` com `opponent`. |
 | 6 | "gains the effect(s) of" / copiar efeitos | **Não existe** | 0 / 0 | Só há cópia de **poder base** (`basePower.copy`, `staticBasePower:'leader'`, `aura.basePowerCopyLeader`). |

@@ -1,4 +1,4 @@
-// Correções de nome e de tipos das cartas que vêm da optcgapi.com.
+// Correções de nome, de tipos e de texto das cartas que vêm da optcgapi.com.
 //
 // A API corta nomes e tipos ("Gum-Gum Giant Rifl", "Straw Hat Cre"), formata nomes de outro jeito
 // ("Mr.3 (Galdino)" no lugar de "Mr.3(Galdino)", que é como os textos das cartas os citam), perde
@@ -9,6 +9,10 @@
 // o comentário de cada linha mostra o que a API trazia.
 // A lista oficial tem um erro conhecido, já tratado pelo comando: ST11-005 traz o tipo em
 // japonês ("音楽"); o certo é {Music}.
+//
+// SOURCE_TEXT_FIXES corrige o texto que a API traz estragado (hífen colado, frase repetida). O
+// comando acima não confere texto: estas entradas foram conferidas à mão (lista oficial ou, para as
+// promos que ainda não estão nela, o texto das outras versões da carta).
 
 import type { CardData } from './types';
 
@@ -138,13 +142,36 @@ export const SOURCE_FIXES: Readonly<Record<string, SourceFix>> = {
   'ST30-009': { types: ["Giant", "Whitebeard Pirates Allies"] }, // API: tipos ["Giant","Whitebeard Pirates"]
 };
 
-/** A carta com o nome e os tipos da lista oficial (o mesmo objeto, se não houver o que corrigir). */
+/**
+ * Texto estragado na fonte: trocas de trecho [como a API traz, como está na carta]. Como na errata,
+ * a troca só acontece se o trecho estragado estiver no texto (a API pode corrigir um dia) e aplicar
+ * de novo não muda nada. Conferido em 07/10/2026 em todas as cartas da optcgapi: o hífen colado no
+ * lugar do espaço ("Play-up", "1-rested", "Character-gains") só aparece nestas três promos.
+ */
+export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  'P-091': [['Play-up to 1', 'Play up to 1']], // Shirahoshi (lista oficial)
+  'P-115': [['Give up to 1-rested DON!! card', 'Give up to 1 rested DON!! card']], // Boa Hancock (lista oficial)
+  // P-142 e P-147 ainda não estão na lista oficial em inglês: o texto é o das outras cartas com o
+  // mesmo efeito (OP14-090 Miss.Valentine: "this Character gains +2000 power").
+  'P-142': [['with 8000 base If your Straw Hat Crew power or less', 'with 8000 base power or less']], // Merry Go: frase repetida
+  'P-147': [['this Character-gains +2000 power', 'this Character gains +2000 power']], // Miss.Valentine(Mikita)
+};
+
+function patchText(text: string, swaps: ReadonlyArray<readonly [string, string]>): string {
+  let out = text;
+  for (const [from, to] of swaps) if (out.includes(from)) out = out.split(from).join(to);
+  return out;
+}
+
+/** A carta com o nome, os tipos e o texto da lista oficial (o mesmo objeto, se não houver o que corrigir). */
 export function applySourceFixes<T extends CardData>(card: T): T {
   const fix = SOURCE_FIXES[card.id];
-  if (!fix) return card;
-  const name = fix.name ?? card.name;
-  const types = fix.types ?? card.types;
+  const textFix = SOURCE_TEXT_FIXES[card.id];
+  if (!fix && !textFix) return card;
+  const name = fix?.name ?? card.name;
+  const types = fix?.types ?? card.types;
+  const text = textFix && card.text ? patchText(card.text, textFix) : card.text;
   const sameTypes = types.length === card.types.length && types.every((t, i) => t === card.types[i]);
-  if (name === card.name && sameTypes) return card;
-  return { ...card, name, types: sameTypes ? card.types : [...types] };
+  if (name === card.name && sameTypes && text === card.text) return card;
+  return { ...card, name, types: sameTypes ? card.types : [...types], text };
 }

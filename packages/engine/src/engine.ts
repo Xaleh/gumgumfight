@@ -698,7 +698,7 @@ export function hasKeyword(state: GameState, uid: string, kw: Keyword): boolean 
  * Verifica o tipo ({Straw Hat Crew}). Tolera listas mal separadas vindas de APIs
  * (ex.: "Supernovas Straw Hat Crew" como um único item).
  */
-export function hasType(def: CardDef, type: string): boolean {
+export function hasType(def: Pick<CardDef, 'types'>, type: string): boolean {
   if (def.types.includes(type)) return true;
   // Sem diferenciar maiúsculas: a API traz "Film" nos tipos e "{FILM}" nos textos.
   return ` ${def.types.join(' ')} `.toLowerCase().includes(` ${type.toLowerCase()} `);
@@ -3496,6 +3496,15 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       return true;
     }
+    case 'powerPerMatching': {
+      // O número é contado ao resolver e não muda depois (Personagens que entram ou saem não contam).
+      const n = targetCandidates(state, frame.controller, frame.source, step.spec).length;
+      if (!n) return true;
+      const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha a carta.`);
+      if (!t) return false;
+      for (const uid of t) addModifier(state, frame.controller, { uid, kind: 'power', amount: step.amount * n, duration: step.duration });
+      return true;
+    }
     case 'powerPerRevealedCost': {
       const card = (frame.last ?? [])[0];
       const n = card ? (cardDef(state, card).cost ?? 0) : 0;
@@ -3521,8 +3530,14 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const who = step.who === 'self' ? ps : state.players[opponent(frame.controller)];
       const n = who.hand.length;
       who.deck.push(...who.hand.splice(0));
-      shuffleInPlace(state, who.deck);
       frame.eventCount = n;
+      // "at the bottom of your deck in any order": vão para o fundo na ordem da mão, sem embaralhar
+      // (como o "place the rest at the bottom of your deck in any order" das buscas).
+      if (step.bottom) {
+        log(state, frame.controller, `${who.name} coloca ${n} carta(s) da mão no fundo do deck.`);
+        return true;
+      }
+      shuffleInPlace(state, who.deck);
       log(state, frame.controller, `${who.name} devolve ${n} carta(s) da mão ao deck e embaralha.`);
       return true;
     }
@@ -4875,7 +4890,9 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
       a.timing === 'static' &&
       ((inBattle ? a.staticNoBattleKO : effectKO(a.staticNoEffectKO)) ||
         (inBattle && a.noBattleKOVsAttribute !== undefined && byAttrs.includes(a.noBattleKOVsAttribute)) ||
-        (inBattle && a.noBattleKOByLeader && by !== undefined && locate(state, by)?.zone === 'leader')) &&
+        (inBattle && a.noBattleKOByLeader && by !== undefined && locate(state, by)?.zone === 'leader') ||
+        // "by Characters without the "Special" attribute": o Líder (qualquer atributo) ainda nocauteia.
+        (inBattle && a.noBattleKOUnlessAttribute !== undefined && byChar && !hasAttributeOn(state, by!, a.noBattleKOUnlessAttribute))) &&
       conditionsMet(state, uid, a),
   );
 }

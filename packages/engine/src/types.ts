@@ -390,6 +390,8 @@ export type LeaderRule =
   | { kind: 'faceUpLifeToDeck' }
   | { kind: 'counterBonus'; type: string; amount: number }
   | { kind: 'deckMaxCost'; cost: number; category?: 'event' }
+  /** "you can only include {East Blue} type cards in your deck" */
+  | { kind: 'deckOnlyType'; type: string }
   | { kind: 'startStage'; type: string }
   | { kind: 'ownOnPlayNegated' };
 
@@ -550,6 +552,8 @@ type EffectStepBody =
   | { do: 'handPlayOrLife'; filter: CardFilter; from?: 'trash' }
   /** "Draw a card for each of your {X} type Characters" (eventCount = cartas compradas) */
   | { do: 'drawPerMatching'; spec: TargetSpec }
+  /** "Your Leader gains +1000 power for each of your Characters during this turn" (conta ao resolver). */
+  | { do: 'powerPerMatching'; target: TargetRef; amount: number; spec: TargetSpec; duration: Duration }
   /** "trash the same number of cards from your hand" / "from the top of your deck" (usa eventCount) */
   | { do: 'trashEventCount'; from: 'hand' | 'deck' }
   /** "Your opponent chooses 1 card from your hand; trash that card" */
@@ -596,8 +600,11 @@ type EffectStepBody =
   | { do: 'replaceRest'; victim: string; ability: number; byPlayer: PlayerId }
   /** "none of the selected Characters can attack unless your opponent trashes 2 cards from their hand whenever they attack" */
   | { do: 'attackTax'; target: TargetRef; count: number; duration: Duration }
-  /** "Return all cards in your hand to your deck and shuffle your deck" (eventCount = cartas devolvidas). */
-  | { do: 'handAllToDeck'; who: 'self' | 'opponent' }
+  /**
+   * "Return all cards in your hand to your deck and shuffle your deck" (eventCount = cartas devolvidas);
+   * `bottom`: "place all cards in your hand at the bottom of your deck in any order", sem embaralhar.
+   */
+  | { do: 'handAllToDeck'; who: 'self' | 'opponent'; bottom?: boolean }
   | { do: 'opponentDraws'; count: number }
   /** "trash all cards from your hand" */
   | { do: 'trashHand' }
@@ -905,6 +912,8 @@ export interface Ability {
   noBattleKOVsAttribute?: string;
   /** "This Character cannot be K.O.'d in battle by Leaders." */
   noBattleKOByLeader?: boolean;
+  /** "This Character cannot be K.O.'d in battle by Characters without the "Special" attribute." */
+  noBattleKOUnlessAttribute?: string;
   /** "This Character gains +N cost." */
   staticCost?: number;
   /** "this Character's base power becomes 9000" / "… the same as your Leader's base power" */

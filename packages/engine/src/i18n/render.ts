@@ -976,6 +976,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'takeDamage':
       return s.opponent ? `Cause ${s.count} de dano ao oponente.` : `Você recebe ${s.count} de dano.`;
     case 'handAllToDeck':
+      if (s.bottom) return 'Coloque todas as cartas da sua mão no fundo do seu deck, na ordem que quiser.';
       return s.who === 'self'
         ? 'Devolva todas as cartas da sua mão ao deck e embaralhe o seu deck.'
         : 'O oponente devolve todas as cartas da mão ao deck e embaralha o deck.';
@@ -1032,6 +1033,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return 'Devolva DON!! do seu campo ao deck de DON!! até ficar com o mesmo número de DON!! no campo que o oponente.';
     case 'powerPerDon':
       return `Dê −${-s.amount} de poder ${dur(s.duration)} a ${target(s.target, ctx)} para cada DON!! anexado a esse Personagem.`;
+    case 'powerPerMatching':
+      return `${cap(target(s.target, ctx))} recebe +${s.amount} de poder ${dur(s.duration)} para cada ${target({ ...s.spec, all: false, upTo: 1 }, ctx).replace(/^até 1 dos seus /, 'um dos seus ').replace(/^até 1 /, '')}.`;
     case 'powerPerRevealedCost':
       return `${cap(target(s.target, ctx))} recebe +${s.amount} de poder ${dur(s.duration)} para cada 1 de custo da carta revelada.`;
     case 'gainAttribute':
@@ -1154,7 +1157,8 @@ function staticText(a: Ability, ctx: Ctx): string {
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
   if (a.staticNoEffectKO) parts.push(a.staticNoEffectKO === 'opponent' ? 'não pode ser nocauteado por efeitos do oponente' : 'não pode ser nocauteado por efeitos');
   if (a.staticCannotAttack) parts.push('não pode atacar');
-  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Líderes ou Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOUnlessAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens sem o atributo ${a.noBattleKOUnlessAttribute}`);
   if (a.noBattleKOByLeader) parts.push('não pode ser nocauteado em batalha por Líderes');
   if (a.costPer) parts.push(`recebe ${a.costPer.cost > 0 ? '+' : '−'}${Math.abs(a.costPer.cost)} de custo para cada ${a.costPer.every} cartas no seu descarte`);
   if (a.staticBasePower !== undefined) {
@@ -1206,6 +1210,8 @@ function staticText(a: Ability, ctx: Ctx): string {
         return `Os seus Personagens do tipo {${r.type}} sem Counter têm Counter +${r.amount}, pelas regras.`;
       case 'deckMaxCost':
         return `Pelas regras desta partida, você não pode incluir ${r.category === 'event' ? 'Eventos' : 'cartas'} com custo ${r.cost + 1} ou mais no seu deck.`;
+      case 'deckOnlyType':
+        return `Pelas regras desta partida, você só pode incluir cartas do tipo {${r.type}} no seu deck.`;
       case 'ownOnPlayNegated':
         return 'Os seus efeitos [Ao Jogar] são anulados.';
       case 'startStage':

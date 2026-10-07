@@ -807,6 +807,7 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^you have a total of (\d+) or more given DON!! cards$/i))) return { minGivenDon: Number(m[1]) };
   if (/^your opponent has any DON!! cards given$/i.test(t)) return { opponentAnyDonGiven: true };
   if ((m = t.match(/^you have (\d+) or more active DON!! cards$/i))) return { minActiveDon: Number(m[1]) };
+  if (/^you have any active DON!! cards$/i.test(t)) return { minActiveDon: 1 };
   if ((m = t.match(/^you have (\d+) or more Events in your trash$/i))) return { trashEventsMin: Number(m[1]) };
   if ((m = t.match(/^you have a Character with (\d+) power or more$/i))) return { ownCharacterMinPower: Number(m[1]) };
   if (/^the number of your Life cards is equal to or less than the number of your opponent's Life cards$/i.test(t)) {
@@ -1175,6 +1176,9 @@ const CLAUSES: ClauseRule[] = [
   [/^Return all cards in your hand to your deck and shuffle your deck$/i, () => [{ do: 'handAllToDeck', who: 'self' }]],
   [/^Your opponent returns all cards in their hand to their deck and shuffles their deck$/i, () => [{ do: 'handAllToDeck', who: 'opponent' }]],
   [/^draw cards equal to the number you returned to your deck$/i, () => [{ do: 'drawEventCount', returned: true }]],
+  // P-046 Yamato: "place all cards in your hand at the bottom of your deck in any order. If you do, draw cards equal to …"
+  [/^place all cards in your hand at the bottom of your deck(?: in any order)?$/i, () => [{ do: 'handAllToDeck', who: 'self', bottom: true }]],
+  [/^draw cards equal to the number you placed at the bottom of your deck$/i, () => [{ do: 'drawEventCount', returned: true }]],
   [/^your opponent draws (\d+) cards?$/i, (m) => [{ do: 'opponentDraws', count: Number(m[1]) }]],
   [/^trash all cards from your hand$/i, () => [{ do: 'trashHand' }]],
   [/^you take (\d+) damage$/i, (m) => [{ do: 'takeDamage', count: Number(m[1]) }]],
@@ -1420,6 +1424,26 @@ const CLAUSES: ClauseRule[] = [
     (m) => withTarget(m[1], (target) => ({ do: 'giveRestedDon', target, count: Number(m[2]) })),
   ],
   [
+    // "This Character and up to 1 of your Leader gain +1000 power during this turn" (P-036): esta carta
+    // sempre, a outra é escolha (Q&A P-036: dá para dar aos dois; pago o custo, esta carta ganha).
+    new RegExp(`^This (?:Character|Leader) and (up to \\d+ of your .+?) gains? \\+(\\d+) power ${DUR}$`, 'i'),
+    (m) => {
+      const duration = durationOf(m[3]);
+      const amount = Number(m[2]);
+      const other = withTarget(m[1], (target) => ({ do: 'power', target, amount, duration }));
+      return other && [{ do: 'power', target: 'self', amount, duration }, ...other];
+    },
+  ],
+  [
+    // "Your Leader gains +1000 power for each of your Characters during this turn" (P-024): conta ao resolver.
+    new RegExp(`^(.+?) gains? \\+(\\d+) power for each of (your .+?) ${DUR}$`, 'i'),
+    (m) => {
+      const spec = parseTarget(m[3].replace(/^your /i, 'all of your '));
+      if (!spec || typeof spec !== 'object') return null;
+      return withTarget(m[1], (target) => ({ do: 'powerPerMatching', target, amount: Number(m[2]), spec, duration: durationOf(m[4]) }));
+    },
+  ],
+  [
     // "Your Leader with 5000 power or less and up to 2 of your Characters gain +1000 power during this turn"
     new RegExp(`^Your Leader(?: with (\\d+) power or (less|more))? and (up to \\d+ of your .+?) gains? \\+(\\d+) power ${DUR}$`, 'i'),
     (m) => {
@@ -1621,7 +1645,8 @@ const CLAUSES: ClauseRule[] = [
     new RegExp(`^Your opponent cannot activate up to (\\d+) \\[Blocker\\] Character that has (\\d+) (?:or less power|power or less) ${DUR}$`, 'i'),
     (m) => withTarget(`up to ${m[1]} of your opponent's [Blocker] Characters with ${m[2]} power or less`, (target) => ({ do: 'cannotBlock', target, duration: durationOf(m[3]) })),
   ],
-  [/^Your opponent adds (\d+) cards? from the top of their Life cards to their hand$/i, (m) => [{ do: 'opponentLifeToHand', count: Number(m[1]) }]],
+  // "from their Life area" (P-009) = do topo, como no dano (4-6-2-1).
+  [/^Your opponent adds (\d+) cards? from (?:the top of their Life cards|their Life area) to their hand$/i, (m) => [{ do: 'opponentLifeToHand', count: Number(m[1]) }]],
   [
     /^Your opponent places (\d+) cards? from their trash at the bottom of their deck(?: in any order)?$/i,
     (m) => [{ do: 'opponentTrashToBottom', count: Number(m[1]) }],
@@ -1824,7 +1849,8 @@ const CLAUSES: ClauseRule[] = [
     (m) => [/rest/i.test(m[2]) ? { do: 'addDonFromDeck', count: Number(m[1]), rested: true } : { do: 'addDonFromDeck', count: Number(m[1]) }],
   ],
   [/^Play this card$/i, () => [{ do: 'playThis' }]],
-  [/^Add this card to your hand$/i, () => [{ do: 'addThisToHand' }]],
+  // "[On K.O.] You may add this Character card to your hand" (P-071): a carta já está no trash.
+  [/^Add this (?:Character )?card to your hand$/i, () => [{ do: 'addThisToHand' }]],
   [/^Activate this card's \[Main\] effect$/i, () => [{ do: 'useMainEffect' }]],
   [/^Activate this card's \[Counter\] effect$/i, () => [{ do: 'useCounterEffect' }]],
   [/^Activate this card's \[On Play\] effect$/i, () => [{ do: 'useOwnEffect', timing: 'onPlay' }]],
@@ -2533,7 +2559,12 @@ const POWER_SELF = /^this (?:Character|card|Leader) gains \+(\d+) power$/i;
 function parseRule(t: string): LeaderRule[] | null {
   let m: RegExpMatchArray | null;
   if ((m = t.match(/^Under the rules of this game, your DON!! deck consists of (\d+) cards$/i))) return [{ kind: 'donDeck', size: Number(m[1]) }];
-  if (/^When your deck is reduced to 0, you win the game instead of losing, according to the rules$/i.test(t)) return [{ kind: 'deckOutWin' }];
+  if (/^When your deck is reduced to 0, you win the game instead of losing(?:, according to the rules)?$/i.test(t)) return [{ kind: 'deckOutWin' }];
+  // P-117 Nami: "Under the rules of this game, you can only include {East Blue} type cards in your deck and when your deck is reduced to 0, …"
+  if ((m = t.match(/^Under the rules of this game, you can only include \{([^}]+)\} type cards in your deck(?: and (.+))?$/i))) {
+    const more = m[2] ? parseRule(m[2].charAt(0).toUpperCase() + m[2].slice(1)) : [];
+    return more && [{ kind: 'deckOnlyType', type: m[1] }, ...more];
+  }
   if (/^Under the rules of this game, you do not lose when your deck has 0 cards\. You lose at the end of the turn in which your deck becomes 0 cards$/i.test(t)) {
     return [{ kind: 'deckOutEndOfTurn' }];
   }
@@ -2828,7 +2859,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     if (m[2]) out.push({ ...base, staticKeyword: KEYWORDS[m[2].toLowerCase()] });
     return out;
   }
-  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards) and gains \+(\d+) power$/i))) {
+  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards|Leaders or Characters) and gains \+(\d+) power$/i))) {
     return [{ ...base, noBattleKOVsAttribute: m[1] }, { ...base, staticPower: Number(m[2]) }];
   }
   if ((m = s.match(/^Give (red|green|blue|purple|black|yellow) Events in your hand [−-]?(\d+) cost$/i))) {
@@ -2912,8 +2943,13 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   }
   if (/^this Character cannot be K\.O\.'d in battle$/i.test(s)) return [{ ...base, staticNoBattleKO: true }];
   if (/^this (?:Character|Stage) cannot be K\.O\.'d by effects$/i.test(s)) return [{ ...base, staticNoEffectKO: true }];
-  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards)$/i))) {
+  // "by "Strike" attribute Leaders or Characters" (P-007) = "… attribute cards".
+  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards|Leaders or Characters)$/i))) {
     return [{ ...base, noBattleKOVsAttribute: m[1] }];
+  }
+  // "by Characters without the "Special" attribute" (P-025): Líder e Personagem com o atributo nocauteiam.
+  if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by Characters without the "?(\w+)"? attribute$/i))) {
+    return [{ ...base, noBattleKOUnlessAttribute: m[1] }];
   }
   if (/^this (?:Leader|Character) cannot attack$/i.test(s)) return [{ ...base, staticCannotAttack: true }];
   if (/^this Character cannot be K\.O\.'d in battle by Leaders$/i.test(s)) return [{ ...base, noBattleKOByLeader: true }];
