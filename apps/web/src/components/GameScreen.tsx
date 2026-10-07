@@ -1935,7 +1935,7 @@ function Prompt(props: {
                   className={`btn${index === 0 ? ' primary' : ''}`}
                   onClick={() => onDispatch({ type: 'option', player: human, index })}
                 >
-                  {!pending.order && lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
+                  {!pending.order && !pending.don && lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
                 </button>
               ))}
             </div>

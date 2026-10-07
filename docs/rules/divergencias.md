@@ -18,7 +18,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-06 | Ordem dos efeitos simultâneos do mesmo jogador é fixa (sem escolha) (**corrigido**) | 6-6-1-1-3, 8-6-1 | baixo | C2 |
 | DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação | 10-2-17-1, 8-2-1-1 | médio | C3 |
 | DV-08 | Escolha sem "up to" aceita 0 alvos | 8-4-4-1 | médio | C4 |
-| DV-09 | DON!! −X sem escolha de quais DON!! devolver | 8-3-1-6, Q&A de regras | médio | C5 |
+| DV-09 | DON!! −X sem escolha de quais DON!! devolver (**corrigido**) | 8-3-1-6, Q&A de regras | médio | C5 |
 | DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo | 10-2-13-4 | médio | C6 |
 | DV-11 | Só a primeira substituição aplicável é oferecida; recusar descarta as outras | 8-1-3-4-2 | médio | C7 |
 | DV-12 | Remoção por efeito próprio não oferece substituição; `fieldToLife`/`opponentChoosesOwn` nunca oferecem | 8-1-3-4 | médio | C7 |
@@ -137,11 +137,11 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C5 — DON!! −X
 
-**DV-09. DON!! −X sem escolha de quais DON!! devolver** — médio **[testado]**
+**DV-09. DON!! −X sem escolha de quais DON!! devolver** — médio — **corrigido**
 - Regra: 8-3-1-6, 10-2-10-1, 3-9-2. Q&A de regras: "You can choose to return any DON!! cards from your Leader area, Stage area, Character area, or cost area." Q&A OP02-085 Magellan: quem escolhe é o dono.
-- Atual: `returnDon` (engine.ts:4411) devolve primeiro os rested, depois os **active** e só então os dados, sem perguntar.
-- Cenário: Shanks ST05-001 com 3 DON!! active e 3 dados ao Líder paga "DON!! −3": o motor devolve os 3 active (sobra 0 para jogar cartas); o jogador queria devolver os 3 do Líder.
-- Onde: `returnDon`, `payImmediateCost`, `returnDonChoice`, `canPayCost`. O mesmo vale para `opponentReturnsDon` (o oponente escolhe os dele).
+- Antes: `returnDon` (engine.ts:4411) devolvia primeiro os rested, depois os **active** e só então os dados, sem perguntar. Shanks ST05-001 com 3 DON!! active e 3 dados ao Líder pagava "DON!! −3" com os 3 active (sobrava 0 para jogar cartas).
+- Agora: o passo `returnDon` pergunta ao dono, um DON!! por vez, de onde ele sai (pendência `option` com `don`: área de custo active ou rested, Líder, cada Personagem, Stage). Não pergunta quando só há uma origem ou quando todos os DON!! do campo vão. Vale para o custo DON!! −X (`payImmediateCost`), "DON!! −N ou mais" (`returnDonChoice`), `donMatchOpponent` e `opponentReturnsDon` (o oponente escolhe os dele, como no Magellan). O bot devolve os rested primeiro; no próprio turno, depois os dados (antes os de cartas que já atacaram) e por último os active.
+- Cenários testados em `don-return.test.ts`: o Shanks acima devolve os 3 do Líder e fica com os 3 active; Magellan OP02-085 com o oponente escolhendo; escolha do bot; replays antigos.
 
 ### C6 — [Once Per Turn]
 
@@ -317,7 +317,7 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 |---|---|---|
 | Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, mulligan, derrota por dano sem Vida e por deck 0 (checada a cada passo), desistência, vitória por efeito | DV-24, DV-25, DV-26 |
 | Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-28, DV-29 (em parte), DV-30 |
-| DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX] | DV-09 |
+| DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
 | Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O., "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6) | DV-07, DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |

@@ -5,7 +5,7 @@ import { buildCardDef } from '../src/cards';
 import { applyAction, createGame, getPower } from '../src/engine';
 import { createAliases, viewFor } from '../src/view';
 import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
-import { cards as baseCards, toTurn } from './helpers';
+import { cards as baseCards, returnDonInOrder, toTurn } from './helpers';
 
 // Bugs relatados no quadro do Trello, reproduzidos com as cartas reais da optcgapi.
 const bugCards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-op09-op17.json'), 'utf8')) as { cards: CardData[] }).cards;
@@ -64,6 +64,9 @@ describe('Trello: custo "devolver 1 ou mais DON!!" (Zoro OP09-076)', () => {
     expect(s.pending).toMatchObject({ kind: 'option', player: 0 });
     expect((s.pending as { options: string[] }).options).toEqual(['1 DON!!', '2 DON!!', '3 DON!!', '4 DON!!', '5 DON!!']);
     s = applyAction(s, { type: 'option', player: 0, index: 2 }); // 3 DON!!
+    // Há DON!! virados e ativos: o jogador escolhe quais devolver.
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, don: ['rested', 'active'] });
+    s = returnDonInOrder(s);
     // Devolveu 3 ao deck de DON!! (5 + 3 = 8) e o efeito pôs 1 ativo de volta (7 no deck).
     expect(s.pending).toBeNull();
     expect(s.players[0].donDeck).toBe(7);

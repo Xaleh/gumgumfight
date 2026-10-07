@@ -12,7 +12,7 @@ import { buildCardDef } from '../src/cards';
 import { applyAction } from '../src/engine';
 import type { Action, CardData, GameState, PlayerId } from '../src/types';
 import { createAliases, hiddenDecision, viewFor } from '../src/view';
-import { cards as baseCards, fetchToHand, kaido, luffy, started, toTurn } from './helpers';
+import { cards as baseCards, fetchToHand, kaido, luffy, returnDonInOrder, started, toTurn } from './helpers';
 
 const extra = ['st13', 'st22', 'st30', 'op01'].flatMap(
   (set) => (JSON.parse(readFileSync(join(__dirname, `../../../data/cards/${set}.json`), 'utf8')) as { cards: CardData[] }).cards,
@@ -197,7 +197,7 @@ describe('escolhas que leem a mão abrem sempre', () => {
     const log = s.log.length;
     let t = play(s, 0, uid);
     expect(t.pending).toMatchObject({ kind: 'confirm', player: 0 }); // DON!! −1 (custo público)
-    t = answer(t, 0, true);
+    t = returnDonInOrder(answer(t, 0, true)); // devolve um DON!! virado (há virados e ativos)
     return { s: t, pageOne, log };
   }
 

@@ -20,6 +20,7 @@ import type {
   CardDef,
   CardFilter,
   Condition,
+  DonSource,
   EffectStep,
   FieldCard,
   Frame,
@@ -2114,8 +2115,8 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
       // "1 or more": a quantidade é escolhida no passo seguinte.
       steps.push({ do: 'returnDonChoice', min: cost.donMinus });
     } else {
-      returnDonAndEmit(state, ps, cost.donMinus);
-      log(state, player, `${ps.name} devolve ${cost.donMinus} DON!! ao deck de DON!!.`);
+      // O dono escolhe quais DON!! devolver (CR 10-2-10-1).
+      steps.push({ do: 'returnDon', count: cost.donMinus });
     }
   }
   if (cost.trashFromHand) steps.push({ do: 'trashFromHand', count: cost.trashFromHand, filter: cost.trashFilter });
@@ -2607,8 +2608,43 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       const n = Math.min(max, step.min + (frame.choice ? Number(frame.choice[0]) : 0));
-      returnDonAndEmit(state, ps, n);
-      log(state, frame.controller, `${ps.name} devolve ${n} DON!! ao deck de DON!!.`);
+      frame.steps.splice(frame.i + 1, 0, { do: 'returnDon', count: n });
+      return true;
+    }
+    case 'returnDon': {
+      const owner = step.opponent ? state.players[opponent(frame.controller)] : ps;
+      const picked = (frame.memo ?? []) as DonSource[];
+      if (frame.choice) {
+        const src = donSources(owner)[Number(frame.choice[0])];
+        if (src) {
+          takeDon(owner, src);
+          picked.push(src);
+        }
+        frame.choice = undefined;
+      }
+      while (picked.length < step.count) {
+        const sources = donSources(owner);
+        if (!sources.length) break;
+        // Só pergunta quando a escolha muda alguma coisa: há mais de uma origem e sobra DON!! no campo.
+        if (sources.length > 1 && totalDonOnField(owner) > step.count - picked.length) {
+          frame.memo = picked;
+          state.pending = {
+            kind: 'option',
+            player: owner.id,
+            source: frame.source,
+            prompt: `${srcName}: escolha o ${picked.length + 1}º de ${step.count} DON!! a devolver ao deck de DON!!.`,
+            options: sources.map((src) => describeDonSource(state, owner, src)),
+            don: sources,
+          };
+          return false;
+        }
+        takeDon(owner, sources[0]);
+        picked.push(sources[0]);
+      }
+      if (picked.length) {
+        emit(state, { kind: 'donReturned', player: owner.id, count: picked.length });
+        log(state, frame.controller, `${owner.name} devolve ${picked.length} DON!! ao deck de DON!! (${summarizeDonSources(state, picked)}).`);
+      }
       return true;
     }
     case 'trashLife': {
@@ -3237,10 +3273,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'donMatchOpponent': {
       const extra = totalDonOnField(ps) - totalDonOnField(state.players[opponent(frame.controller)]);
-      if (extra > 0) {
-        returnDonAndEmit(state, ps, extra);
-        log(state, frame.controller, `${ps.name} devolve ${extra} DON!! ao deck de DON!!.`);
-      }
+      if (extra > 0) frame.steps.splice(frame.i + 1, 0, { do: 'returnDon', count: extra });
       return true;
     }
     case 'powerPerDon': {
@@ -4000,11 +4033,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (k) emit(state, { kind: 'donReturned', player: opp.id, count: k });
         return true;
       }
+      // O oponente escolhe quais dos seus DON!! devolver.
       const n = Math.min(step.count, totalDonOnField(opp));
-      if (n) {
-        returnDonAndEmit(state, opp, n);
-        log(state, frame.controller, `${opp.name} devolve ${n} DON!! ao deck de DON!!.`);
-      }
+      if (n) frame.steps.splice(frame.i + 1, 0, { do: 'returnDon', count: n, opponent: true });
       return true;
     }
     case 'millDeck': {
@@ -4542,17 +4573,59 @@ function payDon(ps: PlayerState, n: number) {
   ps.donRested += n;
 }
 
+/** Devolve `n` DON!! sem perguntar (virados, depois ativos, depois os dados às cartas). */
 function returnDon(ps: PlayerState, n: number) {
   for (let i = 0; i < n; i++) {
-    if (ps.donRested > 0) ps.donRested--;
-    else if (ps.donActive > 0) ps.donActive--;
-    else {
-      const fc = [ps.leader, ...ps.characters].find((c) => c.don > 0);
-      if (!fc) break;
-      fc.don--;
-    }
-    ps.donDeck++;
+    const src = donSources(ps)[0];
+    if (!src) break;
+    takeDon(ps, src);
   }
+}
+
+/** Origens dos DON!! no campo de `ps`: virados, ativos, Líder, Personagens e Stage (só as que têm DON!!). */
+function donSources(ps: PlayerState): DonSource[] {
+  const out: DonSource[] = [];
+  if (ps.donRested) out.push('rested');
+  if (ps.donActive) out.push('active');
+  for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) if (fc.don > 0) out.push(fc.uid);
+  return out;
+}
+
+/** Devolve ao deck de DON!! um DON!! da origem `src`. */
+function takeDon(ps: PlayerState, src: DonSource) {
+  if (src === 'rested') ps.donRested--;
+  else if (src === 'active') ps.donActive--;
+  else {
+    const fc = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])].find((c) => c.uid === src);
+    if (!fc || fc.don <= 0) return;
+    fc.don--;
+    if (fc.donLoose && fc.donLoose > fc.don) {
+      if (fc.don) fc.donLoose = fc.don;
+      else delete fc.donLoose;
+    }
+  }
+  ps.donDeck++;
+}
+
+/** Texto da opção de devolver 1 DON!! da origem `src`. */
+function describeDonSource(state: GameState, ps: PlayerState, src: DonSource): string {
+  if (src === 'rested') return `DON!! virado da área de custo (${ps.donRested})`;
+  if (src === 'active') return `DON!! ativo da área de custo (${ps.donActive})`;
+  const fc = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])].find((c) => c.uid === src)!;
+  const name = cardDef(state, src).name;
+  // Personagens com o mesmo nome ganham um número, na ordem do campo.
+  const same = ps.characters.filter((c) => cardDef(state, c.uid).name === name);
+  const tag = src === ps.leader.uid ? ' (Líder)' : same.length > 1 ? ` #${same.findIndex((c) => c.uid === src) + 1}` : '';
+  return `DON!! dado a ${name}${tag} (${fc.don})`;
+}
+
+/** Resumo das origens dos DON!! devolvidos, para o log ("2 ativos, 1 de Shanks"). */
+function summarizeDonSources(state: GameState, picked: DonSource[]): string {
+  const counts = new Map<DonSource, number>();
+  for (const src of picked) counts.set(src, (counts.get(src) ?? 0) + 1);
+  return [...counts]
+    .map(([src, k]) => (src === 'rested' ? `${k} virado${k > 1 ? 's' : ''}` : src === 'active' ? `${k} ativo${k > 1 ? 's' : ''}` : `${k} de ${cardDef(state, src).name}`))
+    .join(', ');
 }
 
 /** Carta de Vida indo para a mão (ou para o fundo do deck, se estiver virada para cima e o Líder mandar). */
