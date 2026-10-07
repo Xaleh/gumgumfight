@@ -148,9 +148,34 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     delayed: state.delayed?.filter((d) => vis.has(d.source)).map((d) => ({ ...d, source: alias(d.source), last: refs(d.last) })),
     tempReplacements: state.tempReplacements?.filter((t) => vis.has(t.source)).map((t) => ({ ...t, source: alias(t.source) })),
     log: state.log.map(({ secret, ...e }) => (secret !== undefined && viewer !== null && e.player === viewer ? { ...e, text: secret } : e)),
+    // A ação cancelável é pública (a interface mostra o botão); o estado guardado para restaurar, não.
+    cancel: state.cancel ? { ...state.cancel, action: aliasAction(state.cancel.action, ref) } : undefined,
   };
   delete view.rng128;
+  delete view.checkpoint;
+  if (!view.cancel) delete view.cancel;
   return view;
+}
+
+/** Troca as referências a cartas de uma ação (uid real → apelido, ou escondido). */
+function aliasAction(action: Action, ref: (uid: string) => string): Action {
+  switch (action.type) {
+    case 'playCard':
+    case 'activate':
+    case 'counter':
+      return { ...action, uid: ref(action.uid) };
+    case 'attachDon':
+    case 'detachDon':
+      return { ...action, target: ref(action.target) };
+    case 'attack':
+      return { ...action, attacker: ref(action.attacker), target: ref(action.target) };
+    case 'choose':
+      return { ...action, uids: action.uids.map(ref) };
+    case 'manual':
+      return 'uid' in action.op ? { ...action, op: { ...action.op, uid: ref(action.op.uid) } as ManualOp } : action;
+    default:
+      return action;
+  }
 }
 
 function sanitizeFrame(f: Frame, ref: (uid: string) => string): Frame {
@@ -217,7 +242,8 @@ export function actionFromView(state: GameState, aliases: Aliases, action: Actio
       const uid = real(action.uid);
       return uid ? { ...action, uid } : bad;
     }
-    case 'attachDon': {
+    case 'attachDon':
+    case 'detachDon': {
       const target = real(action.target);
       return target ? { ...action, target } : bad;
     }
@@ -247,21 +273,5 @@ export function actionFromView(state: GameState, aliases: Aliases, action: Actio
 /** Apelido de um uid real (para traduzir a última ação para os clientes). */
 export function aliasRefs(state: GameState, viewer: PlayerId | null, aliases: Aliases, action: Action, extra?: Iterable<string>): Action {
   const vis = visibleCards(state, viewer, extra);
-  const ref = (uid: string) => (vis.has(uid) ? aliases.toAlias[uid] ?? uid : HIDDEN_REF);
-  switch (action.type) {
-    case 'playCard':
-    case 'activate':
-    case 'counter':
-      return { ...action, uid: ref(action.uid) };
-    case 'attachDon':
-      return { ...action, target: ref(action.target) };
-    case 'attack':
-      return { ...action, attacker: ref(action.attacker), target: ref(action.target) };
-    case 'choose':
-      return { ...action, uids: action.uids.map(ref) };
-    case 'manual':
-      return 'uid' in action.op ? { ...action, op: { ...action.op, uid: ref(action.op.uid) } as ManualOp } : action;
-    default:
-      return action;
-  }
+  return aliasAction(action, (uid) => (vis.has(uid) ? aliases.toAlias[uid] ?? uid : HIDDEN_REF));
 }

@@ -61,7 +61,11 @@ describe('modo manual', () => {
     const uid = give(s, 0, 'MAN-001');
     s = applyAction(s, { type: 'playCard', player: 0, uid });
     expect(s.pending).toMatchObject({ kind: 'manual', player: 0, source: uid });
-    expect(legalActions(s, 0)).toEqual([{ type: 'manualDone', player: 0 }]);
+    // Nada foi revelado ainda: além de concluir, dá para cancelar a jogada.
+    expect(legalActions(s, 0)).toEqual([
+      { type: 'manualDone', player: 0 },
+      { type: 'cancel', player: 0 },
+    ]);
     expect(manualAllowed(s, 0)).toBe(true);
     expect(manualAllowed(s, 1)).toBe(false);
     const hand = s.players[0].hand.length;
