@@ -490,19 +490,25 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
 
 /** Custo atual de uma carta em campo (custo impresso + efeitos contínuos + modificadores). */
 export function getCost(state: GameState, uid: string): number {
+  const loc = locate(state, uid);
+  if (!loc) return cardDef(state, uid).cost ?? 0;
+  return Math.max(0, ownCost(state, uid) + auraPower(state, uid, loc.zone, 'cost'));
+}
+
+/** Custo da carta sem as auras de outras cartas: impresso + os próprios efeitos contínuos + modificadores. */
+function ownCost(state: GameState, uid: string): number {
   const def = cardDef(state, uid);
   let cost = def.cost ?? 0;
-  if (!locate(state, uid)) return cost;
+  const loc = locate(state, uid);
+  if (!loc) return cost;
   for (const a of def.abilities) {
     if (a.timing === 'static' && a.staticCost && conditionsMet(state, uid, a)) cost += a.staticCost;
     if (a.timing === 'static' && a.costPer && conditionsMet(state, uid, a)) {
-      cost += a.costPer.cost * Math.floor(state.players[locate(state, uid)!.player].trash.length / a.costPer.every);
+      cost += a.costPer.cost * Math.floor(state.players[loc.player].trash.length / a.costPer.every);
     }
   }
   for (const m of state.modifiers) if (m.uid === uid && m.kind === 'cost') cost += m.amount;
-  const loc = locate(state, uid)!;
-  cost += auraPower(state, uid, loc.zone, 'cost');
-  return Math.max(0, cost);
+  return cost;
 }
 
 /** Nome da carta (ou nome alternativo, "Also treat this card's name as …"). */
@@ -598,9 +604,14 @@ function collectAuras(state: GameState, uid: string, zone: 'leader' | 'character
         if (!matchesAnyType(target, a.aura.hasAnyType) || !conditionsMet(state, fc.uid, a)) continue;
         if (a.aura.typeIncludes && !typeIncludes(target, a.aura.typeIncludes)) continue;
         if (a.aura.names && !a.aura.names.some((n) => hasName(target, n))) continue;
-        // Custo impresso (o custo atual depende das próprias auras de custo).
-        if (a.aura.minCost !== undefined && (target.cost ?? 0) < a.aura.minCost) continue;
-        if (a.aura.maxCost !== undefined && (target.cost ?? 0) > a.aura.maxCost) continue;
+        // Custo atual ("Characters with a cost of 12 or more": o Rodo OP17-094, impresso 1, vale 13 com o
+        // +12 dele); "base cost" fica no impresso. Uma aura de custo que filtra por custo olha o custo sem as
+        // auras (senão ela dependeria de si mesma).
+        if (a.aura.minCost !== undefined || a.aura.maxCost !== undefined) {
+          const cost = a.aura.baseCost ? (target.cost ?? 0) : a.aura.cost !== undefined ? Math.max(0, ownCost(state, uid)) : getCost(state, uid);
+          if (a.aura.minCost !== undefined && cost < a.aura.minCost) continue;
+          if (a.aura.maxCost !== undefined && cost > a.aura.maxCost) continue;
+        }
         if (a.aura.color && !target.colors.includes(a.aura.color)) continue;
         if (a.aura.excludeName && hasName(target, a.aura.excludeName)) continue;
         if (a.aura.excludeSelf && fc.uid === uid) continue;

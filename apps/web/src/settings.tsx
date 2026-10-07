@@ -198,11 +198,81 @@ function OptionRow({ title, hint, disabled, children }: { title: string; hint?: 
   );
 }
 
+/**
+ * Apelido do jogador: o nome do perfil deste navegador (`/api/players/me`), que aparece para o oponente nas
+ * partidas online, contra o bot e no ranking. Salva no servidor; quem ouvir `gumgum:nickname` atualiza na hora.
+ */
+export const NICKNAME_EVENT = 'gumgum:nickname';
+
+export function NicknameField({ compact }: { compact?: boolean }) {
+  const [saved, setSaved] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .player()
+      .then((p) => {
+        if (!cancelled && p) {
+          setSaved(p.name);
+          setName(p.name);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const trimmed = name.trim().replace(/\s+/g, ' ');
+  const dirty = trimmed !== (saved ?? '');
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const p = await api.rename(trimmed);
+      setSaved(p.name);
+      setName(p.name);
+      window.dispatchEvent(new CustomEvent(NICKNAME_EVENT, { detail: p.name }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form
+      className={['nickname', compact ? 'compact' : ''].join(' ')}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (dirty && trimmed.length >= 2) void save();
+      }}
+    >
+      <input
+        value={name}
+        maxLength={24}
+        placeholder={saved ?? 'Apelido'}
+        aria-label="Apelido"
+        autoComplete="nickname"
+        onChange={(e) => setName(e.target.value)}
+      />
+      <button type="submit" className="btn small primary" disabled={!dirty || busy || trimmed.length < 2}>
+        {busy ? 'Salvando…' : 'Salvar'}
+      </button>
+      {error && <span className="warn small">{error}</span>}
+    </form>
+  );
+}
+
 /** Controles compactos de idioma, tema, imagens, Counter e animações (menu da partida). */
 export function SettingsControls() {
   const s = useSettings();
   return (
     <div className="settings">
+      <div className="setting nickname-setting">
+        <label className="sheet-label">Apelido</label>
+        <NicknameField compact />
+      </div>
       <div className="setting">
         <LangSeg />
       </div>
@@ -255,6 +325,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="sheet-body">
           <div className="option-list">
+            <OptionRow title="Apelido" hint="O nome que o oponente vê nas partidas online e contra o bot, e que aparece no ranking (2 a 24 letras).">
+              <NicknameField />
+            </OptionRow>
             <OptionRow title="Textos das cartas" hint="Tradução automática para português ou o texto original em inglês.">
               <LangSeg />
             </OptionRow>
@@ -279,7 +352,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <Switch on={s.animations} label="Animações" onChange={(on) => s.update({ animations: on })} />
             </OptionRow>
           </div>
-          <p className="muted small">As configurações ficam guardadas neste navegador e valem para todas as partidas.</p>
+          <p className="muted small">As configurações ficam guardadas neste navegador e valem para todas as partidas. O apelido fica no servidor, ligado a este navegador.</p>
         </div>
       </div>
     </div>

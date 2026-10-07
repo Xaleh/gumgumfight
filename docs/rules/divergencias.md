@@ -364,6 +364,13 @@ Testes (DV-31 a DV-33): `packages/engine/test/draw-restrict-reveal.test.ts` (lei
   - `simulate:all` com as promos incluídas: partidas não terminavam porque o bot ativava sem parar P-136 Usopp ("[Activate: Main] Give up to 1 rested DON!! card to 1 of your {Land of Wano} type Leader or Character cards", sem custo nem [Once Per Turn]) sem ter alvo {Land of Wano}. O bot (`bot/simple.ts`) só ativa "give rested DON!!" quando há alvo.
   - Testes: `packages/engine/test/promos.test.ts`, com as promos de `test/fixtures/promos.json` (como a API as traz).
 
+**DV-38. Auras filtradas por custo olhavam o custo impresso** — alto — **corrigido**
+- Relato do grupo de testes (07/10/2026): com o Líder OP17-079 Luffy ("All of your Characters with a cost of 12 or more gain [Blocker]"), nenhum Elbaph com "+12 cost" (Rodo OP17-094, Gerd OP17-081, Saul OP17-089, Dorry OP17-085, Loki OP17-119) bloqueava, mesmo com custo 13 a 18.
+- Causa: `collectAuras` comparava `aura.minCost`/`maxCost` com o custo impresso da carta (`target.cost`), não com o custo atual (`getCost`, que soma `staticCost`, modificadores e auras de custo). O custo da carta em campo é o atual (CR 1-3-6; o Q&A OP17-079 confirma que os "+12 cost" valem para o Líder).
+- Correção (engine.ts): a aura compara com `getCost`; "with a base cost of N" (`aura.baseCost`, vindo de `TargetSpec.base`) continua no impresso; uma aura de custo que filtra por custo ("your {X} type Characters with a cost of 2 or more gain +1 cost") olha o custo sem as auras (`ownCost`), para não depender de si mesma. `getCost` passou a ser `ownCost` + auras de custo.
+- Mesa: `CardView` passa a mostrar o custo atual da carta em campo (verde/vermelho quando difere do impresso), e o zoom/painel mostram "Custo 13 (impresso 1)".
+- Testes: `packages/engine/test/op17-elbaph.test.ts` (cartas reais em `test/fixtures/op17-elbaph.json`), que também cobre os outros dois relatos do grupo, não reproduzidos no motor: Thousand Sunny ST14-017 com o Líder OP17-079 compra 1 carta, e Pirates Docking Six OP15-088 oferece as cartas {Straw Hat Crew} de custo 1 e 2 do descarte e espera a escolha.
+
 ---
 
 ## Itens a confirmar (sem ruling oficial claro)

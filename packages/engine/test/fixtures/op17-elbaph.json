@@ -1,0 +1,194 @@
+{
+  "note": "Cartas reais da optcgapi (07/10/2026) para os bugs do grupo de testes: Líder OP17-079 Luffy (Blocker por custo), Elbaph com +12 cost, Thousand Sunny ST14-017 e Pirates Docking Six OP15-088.",
+  "cards": [
+    {
+      "id": "OP17-079",
+      "name": "Monkey.D.Luffy",
+      "category": "leader",
+      "colors": [
+        "black"
+      ],
+      "life": 5,
+      "power": 5000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew",
+        "The Four Emperors",
+        "Elbaph"
+      ],
+      "text": "All of your Characters with a cost of 12 or more gain [Blocker].(After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "set": "OP17",
+      "rarity": "L"
+    },
+    {
+      "id": "OP17-094",
+      "name": "Rodo",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Giant",
+        "Elbaph",
+        "New Giant Pirates"
+      ],
+      "text": "If your Leader has the {Elbaph} type, this Character gains +12 cost.",
+      "set": "OP17",
+      "rarity": "UC"
+    },
+    {
+      "id": "OP17-089",
+      "name": "Jaguar.D.Saul",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 4,
+      "power": 6000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Giant",
+        "Former Navy",
+        "Elbaph"
+      ],
+      "text": "This Character gains +12 cost.\n[On Play] Look at 3 cards from the top of your deck; reveal up to 1 {Elbaph} type card and add it to your hand. Then, trash the rest.",
+      "set": "OP17",
+      "rarity": "R"
+    },
+    {
+      "id": "OP17-081",
+      "name": "Gerd",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 3000,
+      "counter": 2000,
+      "attributes": [
+        "Slash"
+      ],
+      "types": [
+        "Giant",
+        "Elbaph",
+        "New Giant Pirates"
+      ],
+      "text": "If your Leader has the {Elbaph} type, this Character gains +12 cost.\n[On Play] You may trash 1 card from your hand: Add up to 1 Character card with a cost of 8 or less other than [Gerd] from your trash to your hand.",
+      "set": "OP17",
+      "rarity": "R"
+    },
+    {
+      "id": "ST14-017",
+      "name": "Thousand Sunny",
+      "category": "stage",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 0,
+      "attributes": [],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "All of your black {Straw Hat Crew} type Characters gain +1 cost.[On Play] If your Leader has the {Straw Hat Crew} type, draw 1 card.",
+      "set": "ST14",
+      "rarity": "C"
+    },
+    {
+      "id": "OP15-088",
+      "name": "Pirates Docking Six",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 5,
+      "power": 7000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew"
+      ],
+      "text": "This Character gains +6 cost.\n[On Play] You may trash 3 cards from the top of your deck: Play up to 1 {Straw Hat Crew} type Character card with a cost of 2 or less from your trash.",
+      "set": "OP15",
+      "rarity": "R"
+    },
+    {
+      "id": "OP17-084",
+      "name": "Tony Tony.Chopper",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 1,
+      "power": 2000,
+      "counter": 2000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Animal",
+        "Straw Hat Crew",
+        "Elbaph"
+      ],
+      "text": "[On Play] If there is a Character with a cost of 12 or more, up to 1 of your Characters gains [Unblockable] during this turn.\n(This card cannot be blocked.)",
+      "set": "OP17",
+      "rarity": "UC"
+    },
+    {
+      "id": "OP17-082",
+      "name": "Sanji",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 2,
+      "power": 2000,
+      "counter": 1000,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew",
+        "Elbaph"
+      ],
+      "text": "If there is a Character with a cost of 12 or more, this Character gains +3000 power.\n[On Play] Draw 2 cards and trash 2 cards from your hand.",
+      "set": "OP17",
+      "rarity": "C"
+    },
+    {
+      "id": "OP17-093",
+      "name": "Monkey.D.Luffy",
+      "category": "character",
+      "colors": [
+        "black"
+      ],
+      "cost": 8,
+      "power": 8000,
+      "counter": 0,
+      "attributes": [
+        "Strike"
+      ],
+      "types": [
+        "Straw Hat Crew",
+        "The Four Emperors",
+        "Elbaph"
+      ],
+      "text": "If there is a Character with a cost of 12 or more, this Character gains [Rush].\n[On Play] Draw 1 card and play up to 1 Character card with a cost of 2 or less from your trash.",
+      "set": "OP17",
+      "rarity": "SR"
+    }
+  ]
+}

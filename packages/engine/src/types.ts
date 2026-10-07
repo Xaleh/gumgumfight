@@ -406,11 +406,14 @@ export interface Aura {
   cost?: number;
   /** Só cartas com um destes nomes ("All of your [Portgas.D.Ace] and [Monkey.D.Luffy] cards"). */
   names?: string[];
-  /** Só cartas com custo impresso a partir deste. */
+  /** Só cartas com custo atual a partir deste ("with a cost of 12 or more"; com `baseCost`, o impresso). */
   minCost?: number;
-  /** Filtros pelos valores impressos (cor, custo máximo, poder base). */
+  /** Filtros pelos valores impressos (cor, poder base). */
   color?: Color;
+  /** Só cartas com custo atual até este (com `baseCost`, o impresso). */
   maxCost?: number;
+  /** "with a base cost of N or less": minCost/maxCost comparam o custo impresso. */
+  baseCost?: boolean;
   minPower?: number;
   maxPower?: number;
   /** "cannot be K.O.'d by effects" (`true`) ou "… by your opponent's effects" (`'opponent'`). */
