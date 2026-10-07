@@ -13,6 +13,7 @@ const decks: DeckList[] = [load('decks/st01-luffy.json'), load('decks/st02-kid.j
 const n = Number(process.argv[2] ?? 200);
 const wins = [0, 0];
 const firstWins = [0, 0];
+let draws = 0;
 let turns = 0;
 const t0 = Date.now();
 
@@ -26,12 +27,15 @@ for (let seed = 1; seed <= n; seed++) {
     ],
   });
   while (s.phase !== 'gameover') s = applyAction(s, chooseBotAction(s, actingPlayer(s)!));
-  wins[s.winner!]++;
-  firstWins[s.winner === s.firstPlayer ? 0 : 1]++;
+  if (s.winner === null) draws++;
+  else {
+    wins[s.winner]++;
+    firstWins[s.winner === s.firstPlayer ? 0 : 1]++;
+  }
   turns += s.turn;
 }
 
 console.log(`${n} partidas em ${Date.now() - t0}ms`);
-console.log(`${decks[0].name}: ${wins[0]} vitórias | ${decks[1].name}: ${wins[1]} vitórias`);
+console.log(`${decks[0].name}: ${wins[0]} vitórias | ${decks[1].name}: ${wins[1]} vitórias${draws ? ` | ${draws} empate(s)` : ''}`);
 console.log(`Quem começa vence: ${firstWins[0]} | quem joga em segundo vence: ${firstWins[1]}`);
 console.log(`Média de turnos: ${(turns / n).toFixed(1)}`);

@@ -95,7 +95,7 @@ export function recordMatch(db: DB, m: MatchInput, facts: MatchFacts): number {
       if (!me) return null;
       if (!rated) return me.bounty;
       const them = players[(1 - p) as PlayerId]!;
-      return me.bounty + bountyDelta(me.bounty, them.bounty, facts.winner === p);
+      return me.bounty + bountyDelta(me.bounty, them.bounty, facts.winner === null ? 'draw' : facts.winner === p);
     });
 
     const saveList = db.prepare('INSERT OR IGNORE INTO deck_lists (hash, leader, cards) VALUES (?, ?, ?)');

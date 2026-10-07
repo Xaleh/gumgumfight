@@ -110,7 +110,10 @@ async function main() {
         }
       }
       actions += i;
-      if (s.phase === 'gameover') {
+      // Laço infinito vira empate (11-1) em vez de travar: aqui continua sendo um problema a olhar.
+      if (s.phase === 'gameover' && s.winner === null && s.winReason?.startsWith('Laço infinito')) {
+        failures.push(`partida ${g + 1} (${l0.id} x ${l1.id}): ${s.winReason}`);
+      } else if (s.phase === 'gameover') {
         finished++;
         turnSum += s.turn;
       } else failures.push(`partida ${g + 1} (${l0.id} x ${l1.id}) não terminou em 4000 ações`);

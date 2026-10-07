@@ -39,8 +39,10 @@ export interface ReplayFile {
    * 7: todas as substituições ("… instead") são oferecidas, em toda remoção do campo (`answer`); a
    *    pergunta que o roteiro antigo não tem é recusada.
    * 8: "rest … DON!! cards or Characters" oferece a substituição de rest (`answer`), recusada nos antigos.
+   * 9: a Vida inicial com a carta do topo do deck por baixo e o "at the start of the game" do Líder
+   *    depois da escolha de quem começa, com escolha (`choose`); os antigos usam `legacySetup`.
    */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];
@@ -148,7 +150,8 @@ export function useGame(setup: GameSetup) {
     const first = entries[0].state;
     return {
       format: 'gumgumfight-replay',
-      version: REPLAY_VERSION,
+      // Um replay antigo (preparação antiga) continua com a versão 8 ao ser exportado de novo.
+      version: first.legacySetup ? 8 : REPLAY_VERSION,
       seed: first.seed,
       firstPlayer: entries[entries.length - 1].state.firstPlayer,
       ...(first.rollWinner !== undefined ? { chooseFirst: true } : {}),

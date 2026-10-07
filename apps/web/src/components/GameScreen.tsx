@@ -1248,7 +1248,8 @@ function CenterBand(props: {
   else if (state.phase === 'mulligan' && (human !== null || watching) && acting !== null && acting !== human)
     middle = (
       <span className="hint-pill thinking">
-        {state.players[acting].name} está escolhendo a mão inicial<span className="dots" />
+        {state.players[acting].name} {state.pending?.kind === 'mulligan' ? 'está escolhendo a mão inicial' : 'está preparando o início da partida'}
+        <span className="dots" />
       </span>
     );
   else if (props.canEnd)

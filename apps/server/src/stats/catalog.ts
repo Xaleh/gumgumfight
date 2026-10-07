@@ -50,10 +50,11 @@ export const BOUNTY_SCALE = 20_000;
 /**
  * Variação de recompensa ao fim de uma ranqueada, no estilo Elo: vencer quem tem
  * recompensa maior rende mais; perder para quem tem menor custa mais. A
- * recompensa nunca fica negativa.
+ * recompensa nunca fica negativa. Empate (`'draw'`) conta meio ponto, como no Elo.
  */
-export function bountyDelta(mine: number, theirs: number, won: boolean): number {
+export function bountyDelta(mine: number, theirs: number, won: boolean | 'draw'): number {
   const expected = 1 / (1 + 10 ** ((theirs - mine) / BOUNTY_SCALE));
-  const delta = Math.round(BOUNTY_STAKE * 2 * ((won ? 1 : 0) - expected));
+  const score = won === 'draw' ? 0.5 : won ? 1 : 0;
+  const delta = Math.round(BOUNTY_STAKE * 2 * (score - expected));
   return Math.max(delta, -mine);
 }

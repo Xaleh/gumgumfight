@@ -26,6 +26,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 Dano em `stepDamage` (engine.ts:1765): um ponto por vez, [Banish] trasha sem [Trigger], Double Attack fixo em 2; `damageTaken`/`damageDealt`/`lifeRemoved` só depois do dano (conforme).
 
-[Double Attack] contra 1 de Vida não vence (DV-01, corrigido). Personagem posto na Vida "face-up" (`fieldToLife{faceUp}`) fica em `lifeFaceUp`, público (3-10-2-1); quem tira a carta da Vida a tira também de `lifeFaceUp`.
+[Double Attack] contra 1 de Vida não vence (DV-01, corrigido). Na preparação, a carta do topo do deck fica no fundo da Vida (DV-24, corrigido). Personagem posto na Vida "face-up" (`fieldToLife{faceUp}`) fica em `lifeFaceUp`, público (3-10-2-1); quem tira a carta da Vida a tira também de `lifeFaceUp`.
 
 Divergências deste tema: nenhuma aberta (corrigidas: DV-05, DV-18) (detalhes em [../divergencias.md](../divergencias.md)).

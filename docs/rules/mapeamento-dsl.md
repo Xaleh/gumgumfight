@@ -40,7 +40,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Limite de 5 Personagens (11) | `stepPlay` (escolha de qual trashar) | Existe |
 | Jogar por efeito (mão, trash, deck, Vida) (11) | `playFrom`, `playThis`, `playRevealed`, `handPlayOrLife`, `opponentPlays` | Existe |
 | Negar efeitos / negar [On Play] (12) | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated` | Existe (ver [On K.O.] acima) |
-| Regras de Líder (deck, DON!!, início da partida) (12) | `leaderRule` (`donDeck`, `deckOutWin`, `startStage`, `deckMaxCost`…) | Existe |
+| Regras de Líder (deck, DON!!, início da partida) (12) | `leaderRule` (`donDeck`, `deckOutWin`, `startStage`, `deckMaxCost`…); `startStage` vira, em `startOfGame`, um efeito do Líder com `playFrom` (deck, até 1) + `shuffleDeck`, seguido do frame `startGame` (mãos e mulligan) | Existe |
 | Restrição imposta ao oponente ("your opponent cannot ...") (12) | `restrict` vale só para quem controla o efeito; `staticTaunt` | Falta como primitiva genérica (2 cartas resolvidas com `staticTaunt`) |
 | Copiar/ganhar efeitos de outra carta | — | Falta (0 cartas hoje) |
 | Gatilho de carta fora do campo ("when this card is removed from Life", na mão, no trash) | — | Falta (0 cartas hoje) |

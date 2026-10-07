@@ -14,6 +14,8 @@ export interface ReplayInput {
   firstPlayer?: PlayerId;
   /** O vencedor do sorteio escolheu se jogava primeiro (primeira ação do replay). */
   chooseFirst?: boolean;
+  /** Partida online começada antes da versão 9 dos replays (preparação antiga, `GameConfig.legacySetup`). */
+  legacySetup?: boolean;
   decks: [DeckList, DeckList];
   actions: Action[];
 }
@@ -30,7 +32,8 @@ export interface SeatFacts {
 }
 
 export interface MatchFacts {
-  winner: PlayerId;
+  /** null: empate (derrota simultânea ou laço infinito). */
+  winner: PlayerId | null;
   turns: number;
   reason: string | null;
   firstPlayer: PlayerId;
@@ -54,6 +57,7 @@ export function deriveMatch(input: ReplayInput, cards: CardData[]): MatchFacts {
     seed128: input.seed128,
     firstPlayer: input.firstPlayer,
     chooseFirst: input.chooseFirst,
+    legacySetup: input.legacySetup,
     cards,
     players: [
       { name: 'A', deck: input.decks[0] },
@@ -95,7 +99,7 @@ export function deriveMatch(input: ReplayInput, cards: CardData[]): MatchFacts {
     }
     markHands(state);
   }
-  if (state.phase !== 'gameover' || state.winner === null) throw new Error('O replay não chega ao fim da partida.');
+  if (state.phase !== 'gameover') throw new Error('O replay não chega ao fim da partida.');
 
   const seats = ([0, 1] as const).map((p): SeatFacts => {
     const deck = input.decks[p];

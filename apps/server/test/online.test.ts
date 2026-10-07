@@ -1,6 +1,7 @@
 import {
   type Action,
   actingPlayer,
+  applyAction,
   type CardData,
   type CardDef,
   chooseBotAction,
@@ -9,6 +10,7 @@ import {
   legalActions,
   type LogEntry,
   type PlayerId,
+  REPLAY_VERSION,
 } from '@gumgum/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
@@ -241,6 +243,29 @@ describe('partidas online: salas privadas', () => {
     // Mesmos apelidos e mesma mão depois de refazer as ações.
     expect(again.view!.players[p].hand).toEqual(hand);
     await second.close();
+  });
+
+  it('sala começada antes da versão 9 dos replays é refeita com a preparação antiga', async () => {
+    const { app, db } = setup();
+    const { roomId } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    expect(room.data.replayVersion).toBe(REPLAY_VERSION);
+    let s = room.state!;
+    s = applyAction(s, { type: 'answer', player: s.rollWinner!, yes: true });
+    s = applyAction(s, { type: 'mulligan', player: s.firstPlayer, redraw: false });
+    s = applyAction(s, { type: 'mulligan', player: (1 - s.firstPlayer) as PlayerId, redraw: false });
+    // Gravada sem o campo (antes desta versão): a Vida sai na ordem antiga, e o replay diz versão 8.
+    const data = structuredClone(room.data);
+    delete data.replayVersion;
+    data.actions = [
+      { type: 'answer', player: s.rollWinner!, yes: true },
+      { type: 'mulligan', player: s.firstPlayer, redraw: false },
+      { type: 'mulligan', player: (1 - s.firstPlayer) as PlayerId, redraw: false },
+    ];
+    const old = new Room(data, { cards: (ids) => getCards(db, ids), botDelayMs: 0 });
+    expect(old.state!.legacySetup).toBe(true);
+    expect(old.state!.players[0].life).toEqual([...s.players[0].life].reverse());
+    old.dispose();
   });
 
   it('revanche: quando os dois pedem, começa outra sala', async () => {

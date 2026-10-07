@@ -1145,7 +1145,9 @@ export type Frame =
     }
   | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash'; byEffect?: boolean }
   /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
-  | { kind: 'endTurn' };
+  | { kind: 'endTurn' }
+  /** Fecha a preparação depois dos efeitos "at the start of the game" (5-2-1-5): mãos e mulligan. */
+  | { kind: 'startGame' };
 
 export interface LogEntry {
   turn: number;
@@ -1216,8 +1218,11 @@ export interface GameState {
   tempReplacements?: Array<{ player: PlayerId; source: string; by: 'battle' | 'any'; cost: AbilityCost }>;
   /** DON!! que não ficam ativos na próxima Renovação do jogador. */
   donSkipRefresh?: Array<{ player: PlayerId; count: number }>;
+  /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;
+  /** Partida criada com `GameConfig.legacySetup` (replays até a versão 8). */
+  legacySetup?: true;
   log: LogEntry[];
   actionCount: number;
   /**
@@ -1349,4 +1354,10 @@ export interface GameConfig {
    * online, em que a seed de 32 bits poderia ser descoberta por força bruta.
    */
   seed128?: number[];
+  /**
+   * Preparação como nos replays até a versão 8 (antes das DV-24/25): a Vida na ordem inversa
+   * (a carta do topo do deck no topo da Vida) e o "at the start of the game" do Líder resolvido
+   * na criação da partida, antes da escolha de quem começa, com o primeiro Stage elegível do deck.
+   */
+  legacySetup?: boolean;
 }

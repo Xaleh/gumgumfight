@@ -138,6 +138,11 @@ export interface RoomData {
   tournament?: RoomTournament;
   /** Quem começa, quando não é sorteado (jogos 2+ de uma série de torneio). */
   firstPlayer?: PlayerId;
+  /**
+   * Versão do motor (`REPLAY_VERSION`) em que a partida começou. Salas começadas antes da
+   * versão 9 não têm o campo e são refeitas com a preparação antiga (`legacySetup`).
+   */
+  replayVersion?: number;
 }
 
 export interface Connection {
@@ -241,6 +246,7 @@ export class Room {
   start() {
     if (this.state || this.data.seats.length !== 2) return;
     this.data.seed128 = [0, 1, 2, 3].map(() => randomInt(0, 2 ** 32) | 0);
+    this.data.replayVersion = REPLAY_VERSION;
     this.rebuild();
     this.save();
     this.broadcast();
@@ -254,12 +260,18 @@ export class Room {
       seed128: this.data.seed128!,
       chooseFirst: Boolean(this.data.chooseFirst),
       ...(this.data.firstPlayer !== undefined ? { firstPlayer: this.data.firstPlayer } : {}),
+      ...(this.legacySetup ? { legacySetup: true } : {}),
       cards: this.deps.cards(ids),
       players: [
         { name: a.name, deck: a.deck, isBot: Boolean(a.bot) },
         { name: b.name, deck: b.deck, isBot: Boolean(b.bot) },
       ] as [{ name: string; deck: DeckList; isBot: boolean }, { name: string; deck: DeckList; isBot: boolean }],
     };
+  }
+
+  /** Partida começada antes da versão 9 dos replays: preparação antiga (ordem da Vida, "at the start of the game"). */
+  get legacySetup(): boolean {
+    return (this.data.replayVersion ?? 8) < 9;
   }
 
   /** Cria o jogo e refaz as ações gravadas (ao começar ou depois de reiniciar o servidor). */
@@ -575,7 +587,7 @@ export class Room {
     if (!this.state || this.state.phase !== 'gameover') return null;
     return {
       format: 'gumgumfight-replay' as const,
-      version: REPLAY_VERSION,
+      version: this.data.replayVersion ?? 8,
       seed: 0,
       seed128: this.data.seed128,
       firstPlayer: this.state.firstPlayer,

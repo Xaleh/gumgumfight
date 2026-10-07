@@ -134,20 +134,60 @@ export function createGame(config: GameConfig): GameState {
     actionCount: 0,
   };
 
-  // "At the start of the game, play up to 1 {X} type Stage card from your deck."
-  for (const p of players) {
-    const rule = leaderRule(state, p.id, 'startStage');
-    const stage = rule && p.deck.find((u) => cardDef(state, u).category === 'stage' && hasType(cardDef(state, u), rule.type));
-    if (stage) {
-      removeFrom(p.deck, stage);
-      p.stage = { uid: stage, rested: false, don: 0, playedOnTurn: 0 };
-      log(state, p.id, `${p.name} começa com ${cardDef(state, stage).name} em campo.`);
+  if (config.legacySetup) {
+    // Replays até a versão 8: o "at the start of the game" resolvia aqui, antes da escolha de quem
+    // começa, com o primeiro Stage elegível do deck e sem embaralhar; a Vida saía na ordem antiga.
+    state.legacySetup = true;
+    for (const p of players) {
+      const rule = leaderRule(state, p.id, 'startStage');
+      const stage = rule && p.deck.find((u) => cardDef(state, u).category === 'stage' && hasType(cardDef(state, u), rule.type));
+      if (stage) {
+        removeFrom(p.deck, stage);
+        p.stage = { uid: stage, rested: false, don: 0, playedOnTurn: 0 };
+        log(state, p.id, `${p.name} começa com ${cardDef(state, stage).name} em campo.`);
+      }
     }
   }
-  for (const p of players) drawCards(state, p.id, HAND_SIZE);
+  // Quem tem "at the start of the game" no Líder compra a mão só depois de resolvê-lo (5-2-1-5/6).
+  for (const p of players) if (state.legacySetup || !leaderRule(state, p.id, 'startStage')) drawCards(state, p.id, HAND_SIZE);
   if (choose) log(state, null, `${players[firstPlayer].name} venceu o sorteio e escolhe quem começa.`);
-  else log(state, null, `${players[firstPlayer].name} joga primeiro.`);
+  else {
+    log(state, null, `${players[firstPlayer].name} joga primeiro.`);
+    startOfGame(state);
+  }
   return state;
+}
+
+/**
+ * Efeitos "at the start of the game" do Líder (5-2-1-5), depois de decidido quem começa: primeiro
+ * os de quem joga primeiro (Q&A OP13-079 Imu), depois os do outro. "Play up to 1 {X} type Stage
+ * card from your deck" é uma busca: o dono escolhe qual Stage jogar (ou nenhum) e embaralha o deck
+ * (5-2-1-5-2). Quem tem o efeito compra a mão inicial depois dele (frame `startGame`, 5-2-1-6).
+ */
+function startOfGame(state: GameState) {
+  if (state.legacySetup) return;
+  const order = [state.firstPlayer, opponent(state.firstPlayer)];
+  const effects = order.flatMap((p) => {
+    const rule = leaderRule(state, p, 'startStage');
+    if (!rule) return [];
+    const steps: EffectStep[] = [
+      { do: 'playFrom', from: 'deck', upTo: 1, filter: { category: 'stage', hasAnyType: [rule.type] } },
+      { do: 'shuffleDeck' },
+    ];
+    return [{ player: p, steps }];
+  });
+  if (!effects.length) return;
+  state.pending = null;
+  state.stack.push({ kind: 'startGame' });
+  // Empilhados ao contrário: o de quem joga primeiro resolve primeiro.
+  for (const e of effects.reverse()) pushEffect(state, state.players[e.player].leader.uid, e.player, e.steps);
+  run(state);
+}
+
+/** Fim dos efeitos "at the start of the game": quem ainda não tem mão compra 5 e começa o mulligan. */
+function finishStartOfGame(state: GameState) {
+  for (const p of state.players) if (!p.hand.length && !p.mulliganDone) drawCards(state, p.id, HAND_SIZE);
+  state.pending = { kind: 'mulligan', player: state.firstPlayer };
 }
 
 // ---------------------------------------------------------------------------
@@ -1115,6 +1155,7 @@ function handlePendingResponse(state: GameState, action: Action) {
       log(state, p, `${state.players[p].name} escolheu jogar ${action.yes ? 'primeiro' : 'segundo'}.`);
       log(state, null, `${state.players[first].name} joga primeiro.`);
       state.pending = { kind: 'mulligan', player: first };
+      startOfGame(state);
       return;
     }
     case 'mulligan': {
@@ -1137,8 +1178,12 @@ function handlePendingResponse(state: GameState, action: Action) {
       } else {
         for (const pl of state.players) {
           const life = cardDef(state, pl.leader.uid).life ?? 5;
-          // A carta do topo do deck fica por baixo da pilha de Vida.
-          for (let i = 0; i < life; i++) pl.life.unshift(pl.deck.shift()!);
+          // A carta do topo do deck fica por baixo da pilha de Vida (5-2-1-7): o topo da Vida é o
+          // fim do array. (Replays até a versão 8 punham a Vida na ordem inversa.)
+          for (let i = 0; i < life; i++) {
+            if (state.legacySetup) pl.life.unshift(pl.deck.shift()!);
+            else pl.life.push(pl.deck.shift()!);
+          }
         }
         state.turn = 1;
         state.activePlayer = state.firstPlayer;
@@ -1491,11 +1536,10 @@ function endTurn(state: GameState) {
   state.handTrashedThisTurn = [];
   state.onPlayNegated = (state.onPlayNegated ?? []).filter((n) => n.untilTurn > state.turn);
   // "You lose at the end of the turn in which your deck becomes 0 cards."
-  for (const pl of state.players) {
-    if (pl.deck.length === 0 && leaderRule(state, pl.id, 'deckOutEndOfTurn')) {
-      gameOver(state, opponent(pl.id), `${pl.name} terminou o turno sem cartas no deck.`);
-      return;
-    }
+  const out = state.players.filter((pl) => pl.deck.length === 0 && leaderRule(state, pl.id, 'deckOutEndOfTurn')).map((pl) => pl.id);
+  if (out.length) {
+    defeat(state, out, (pl) => `${pl.name} terminou o turno sem cartas no deck.`, 'Os dois terminaram o turno sem cartas no deck.');
+    return;
   }
   // "take an extra turn after this one"
   if (state.extraTurn === state.activePlayer) state.extraTurn = undefined;
@@ -1511,7 +1555,13 @@ function endTurn(state: GameState) {
 function run(state: GameState) {
   let guard = 0;
   while (!state.pending && (state.stack.length || state.triggered?.length) && state.phase !== 'gameover') {
-    if (++guard > 5000) throw new Error('Loop infinito na resolução de efeitos.');
+    if (++guard > 5000) {
+      // Laço infinito (11-1): o motor não sabe pará-lo, então a partida termina empatada.
+      state.stack = [];
+      state.triggered = [];
+      gameOver(state, null, 'Laço infinito na resolução de efeitos.');
+      break;
+    }
     // Efeitos disparados entram na pilha um de cada vez, quando chega a vez deles (8-6).
     if (nextTriggered(state)) continue;
     if (!state.stack.length) break;
@@ -1532,6 +1582,10 @@ function run(state: GameState) {
       case 'endTurn':
         state.stack.pop();
         endTurn(state);
+        break;
+      case 'startGame':
+        state.stack.pop();
+        finishStartOfGame(state);
         break;
     }
     checkDefeat(state);
@@ -4940,27 +4994,41 @@ function removeFrom(arr: string[], uid: string) {
   if (i >= 0) arr.splice(i, 1);
 }
 
+/**
+ * Derrota por deck vazio (1-2-1-1-2), checada a cada passo (1-2-2). Se os dois cumprem a condição
+ * ao mesmo tempo, os dois perdem: empate (9-2-1).
+ */
 function checkDefeat(state: GameState) {
   if (state.phase === 'gameover' || state.phase === 'mulligan') return;
+  const losers: PlayerId[] = [];
+  const winners: PlayerId[] = [];
   for (const ps of state.players) {
-    if (ps.deck.length === 0) {
-      if (leaderRule(state, ps.id, 'deckOutEndOfTurn')) continue;
-      if (leaderRule(state, ps.id, 'deckOutWin')) {
-        gameOver(state, ps.id, `${ps.name} ficou sem cartas no deck e vence pela regra do Líder.`);
-        return;
-      }
-      gameOver(state, opponent(ps.id), `${ps.name} ficou sem cartas no deck.`);
-      return;
-    }
+    if (ps.deck.length !== 0 || leaderRule(state, ps.id, 'deckOutEndOfTurn')) continue;
+    // "… you win the game instead of losing": vitória pela regra do Líder.
+    (leaderRule(state, ps.id, 'deckOutWin') ? winners : losers).push(ps.id);
   }
+  if (winners.length === 1) {
+    const w = state.players[winners[0]];
+    gameOver(state, w.id, `${w.name} ficou sem cartas no deck e vence pela regra do Líder.`);
+  } else if (winners.length === 2) {
+    gameOver(state, null, 'Os dois ficaram sem cartas no deck e vencem pela regra do Líder.');
+  } else defeat(state, losers, (ps) => `${ps.name} ficou sem cartas no deck.`, 'Os dois ficaram sem cartas no deck.');
 }
 
-function gameOver(state: GameState, winner: PlayerId, reason: string) {
+/** Aplica a derrota de `losers`: um perde e o outro vence; os dois juntos, empate (9-2-1). */
+function defeat(state: GameState, losers: PlayerId[], reason: (ps: PlayerState) => string, both: string) {
+  if (losers.length === 2) gameOver(state, null, both);
+  else if (losers.length === 1) gameOver(state, opponent(losers[0]), reason(state.players[losers[0]]));
+}
+
+/** Fim da partida. `winner` null: empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
+function gameOver(state: GameState, winner: PlayerId | null, reason: string) {
   state.phase = 'gameover';
   state.winner = winner;
   state.winReason = reason;
   state.pending = null;
-  log(state, winner, `Fim de jogo: ${state.players[winner].name} venceu! ${reason}`);
+  if (winner === null) log(state, null, `Fim de jogo: empate! ${reason}`);
+  else log(state, winner, `Fim de jogo: ${state.players[winner].name} venceu! ${reason}`);
 }
 
 function log(state: GameState, player: PlayerId | null, text: string) {

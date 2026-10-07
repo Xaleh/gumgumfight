@@ -33,10 +33,10 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-21 | Counter da mão só pode ir para o alvo do ataque (**corrigido**) | 7-1-3-1-1, Q&A de regras | baixo | C12 |
 | DV-22 | Evento [Counter] ignora redução de custo na mão (**corrigido**) | 2-7-6 | baixo | C12 |
 | DV-23 | "During this battle" expira antes dos efeitos de fim de batalha (**corrigido**) | 7-1-5-2..4 | baixo | C12 |
-| DV-24 | Ordem da Vida na preparação invertida | 5-2-1-7, 2-9-2-1 | baixo | C13 |
-| DV-25 | "At the start of the game" roda antes da escolha de quem começa, sem escolha nem recusa | 5-2-1-5-1/2 | baixo | C13 |
-| DV-26 | Derrota simultânea não empata | 9-2-1 | baixo | C13 |
-| DV-27 | Laço infinito trava a partida em vez de empatar | 11-1 | baixo | C13 |
+| DV-24 | Ordem da Vida na preparação invertida (**corrigido**) | 5-2-1-7, 2-9-2-1 | baixo | C13 |
+| DV-25 | "At the start of the game" roda antes da escolha de quem começa, sem escolha nem recusa (**corrigido**) | 5-2-1-5-1/2 | baixo | C13 |
+| DV-26 | Derrota simultânea não empata (**corrigido**) | 9-2-1 | baixo | C13 |
+| DV-27 | Laço infinito trava a partida em vez de empatar (**corrigido**) | 11-1 | baixo | C13 |
 | DV-28 | "At the start of your turn" resolve depois do Draw e da DON!! Phase | 6-2-2 | baixo | C14 |
 | DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] (**corrigido em parte**) | 6-6-1-2 | baixo | C14 |
 | DV-30 | Faltam momentos: "start of your opponent's turn", "start of the Main Phase", [End of Your Opponent's Turn] | 6-2-2, 6-5-1, 6-6-1-1 | baixo | C14 |
@@ -257,22 +257,29 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C13 — Preparação e fim de partida
 
-**DV-24. Ordem da Vida na preparação invertida** — baixo **[testado]**
+**DV-24. Ordem da Vida na preparação invertida** — baixo — **corrigido**
 - Regra: 5-2-1-7, 2-9-2-1 (a carta do topo do deck fica **no fundo** da Vida). Q&A de regras.
-- Atual: `pl.life.unshift(pl.deck.shift())` (engine.ts:1098) deixa a carta do topo do deck no topo da Vida (a Vida tem o topo no fim do array). O comentário do código diz o contrário.
-- Correto: `pl.life.push(pl.deck.shift()!)`. Atenção: muda replays e testes que dependem da seed.
+- Antes: `pl.life.unshift(pl.deck.shift())` (engine.ts:1098) deixava a carta do topo do deck no topo da Vida (a Vida tem o topo no fim do array), ao contrário do que dizia o comentário.
+- Agora: `pl.life.push(pl.deck.shift()!)` no fim do mulligan: a 1ª carta do deck fica em `life[0]` (o fundo) e a 5ª é a primeira a sair.
+- Replays: a versão sobe para 9. Os até a 8 são refeitos com `GameConfig.legacySetup` (`replayConfig(config, versão)` em `replay.ts`), que mantém a ordem antiga; a interface aplica isso ao carregar o arquivo, e as salas online começadas antes (sem `RoomData.replayVersion`) também são refeitas assim depois de reiniciar o servidor (o replay delas sai como versão 8).
 
-**DV-25. "At the start of the game" fora de hora e sem escolha** — baixo
-- Regra: 5-2-1-5-1/2 (depois da escolha de quem começa; quem escolheu processa primeiro; "up to 1" permite recusar; o deck é reembaralhado). Q&A OP13-079 Imu.
-- Atual: a regra `startStage` roda em `createGame` (engine.ts:133), antes da escolha de primeiro/segundo, e pega o primeiro Stage elegível sem perguntar.
+**DV-25. "At the start of the game" fora de hora e sem escolha** — baixo — **corrigido**
+- Regra: 5-2-1-5-1/2 (depois da escolha de quem começa; "up to 1" permite recusar; o deck é reembaralhado). Q&A OP13-079 Imu: resolve depois de embaralhar, revelar o Líder e decidir quem começa, antes da mão inicial; busca, joga e reembaralha; com dois Imus, quem vai primeiro resolve primeiro.
+- Antes: a regra `startStage` rodava em `createGame` (engine.ts:133), antes da escolha de primeiro/segundo e depois de embaralhar, com o primeiro Stage elegível do deck, sem perguntar e sem reembaralhar.
+- Agora: `startOfGame` roda depois da escolha (ou na criação, quando quem começa já está definido). Para cada Líder com `startStage`, a partir de quem joga primeiro, um efeito do Líder com `playFrom` (deck, até 1 Stage do tipo) e `shuffleDeck`: a escolha é a busca de sempre (pendência `selectTargets` com `hidden`; o oponente não vê as opções; o bot joga o mais valioso). Esse jogador só compra a mão inicial depois (frame `startGame`, 5-2-1-6); o mulligan começa em seguida. Partidas sem esse Líder não mudam (as mãos continuam sendo compradas na criação).
+- Replays até a versão 8 (`legacySetup`): resolve na criação, como antes.
 
-**DV-26. Derrota simultânea não empata** — baixo
+**DV-26. Derrota simultânea não empata** — baixo — **corrigido**
 - Regra: 9-2-1 (todos que cumprem a condição perdem → empate). Em torneio de eliminação simples, perde o jogador do turno (TRM 5.2).
-- Atual: `checkDefeat` (engine.ts:4449) encerra no primeiro jogador; não há empate em `winner`.
+- Antes: `checkDefeat` (engine.ts:4449) encerrava no primeiro jogador; não havia empate em `winner`.
+- Agora: `checkDefeat` junta os jogadores com deck 0 (e a regra "perde no fim do turno com o deck vazio" junta os dois no fim do turno); os dois juntos → empate: `phase` 'gameover' com `winner` null (`gameOver` aceita null e registra "Fim de jogo: empate!"). Dois Líderes "vence com o deck 0" ao mesmo tempo também empatam. A derrota por dano sem Vida continua imediata (um dano é de um jogador só).
+- Servidor: as estatísticas aceitam partida sem vencedor (`MatchFacts.winner` null, ninguém com `won`); na ranqueada o empate vale meio ponto na recompensa (`bountyDelta(…, 'draw')`). Torneio: o jogo sem vencedor não conta e a série segue com um jogo novo (como já acontecia); a regra do TRM 5.2 (perde o jogador do turno na eliminação simples) **não** foi implementada — o jogo novo resolve o empate sem precisar dela. Interface: a tela de fim de jogo mostra "Empate".
 
-**DV-27. Laço infinito trava a partida** — baixo
+**DV-27. Laço infinito trava a partida** — baixo — **corrigido**
 - Regra: 11-1 (empate, ou o jogador que pode parar diz quantas vezes repete).
-- Atual: `run` (engine.ts:1449) lança `Error` depois de 5000 passos.
+- Antes: `run` (engine.ts:1449) lançava `Error` depois de 5000 passos e a partida travava.
+- Agora: no passo 5000 a pilha e os efeitos disparados são descartados e a partida termina empatada ("Laço infinito na resolução de efeitos."). O motor não sabe quem poderia parar o laço, então não oferece a escolha do número de repetições. O `simulate:all` continua apontando esse empate como problema.
+- Testes (DV-24 a DV-27): `packages/engine/test/game-setup.test.ts` (Vida com o topo do deck no fundo; ordem antiga com `legacySetup`/`replayConfig`; replay antigo refeito igual; Imu sintético (também numa partida bot x bot até o fim) depois da escolha, só Stages do tipo, opções escondidas do oponente, deck reembaralhado e mão comprada depois; recusar; dois Imus na ordem de quem começa; bot; deck 0 dos dois e "perde no fim do turno" dos dois → empate; laço → empate), `apps/server/test/stats.test.ts` (empate na recompensa e nas estatísticas, replay com `legacySetup`) e `apps/server/test/online.test.ts` (sala antiga refeita com a preparação antiga). 8 de 12 falham no código antigo (os outros conferem a compatibilidade e uma partida inteira).
 
 ### C14 — Momentos do turno
 
@@ -351,11 +358,11 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 | Área | Conforme | Divergente |
 |---|---|---|
-| Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, mulligan, derrota por dano sem Vida e por deck 0 (checada a cada passo), desistência, vitória por efeito | DV-24, DV-25, DV-26 |
+| Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, "at the start of the game" depois dela e com escolha, mulligan, Vida com o topo do deck no fundo, derrota por dano sem Vida e por deck 0 (checada a cada passo), derrota simultânea empata, desistência, vitória por efeito | — |
 | Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-28, DV-29 (em parte), DV-30 |
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano, carta do [Trigger] fora das áreas enquanto resolve | — |
 | Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O., «Set Power to 0» como −(poder atual), vários poderes base: vale o maior | DV-12 (custos) |
-| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública (também a que vem do campo), revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-27, DV-33 |
+| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública (também a que vem do campo), revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step, laço infinito empata | DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

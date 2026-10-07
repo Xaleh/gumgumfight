@@ -4,7 +4,15 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 8;
+export const REPLAY_VERSION = 9;
+
+/**
+ * Configuração para refazer um replay da versão `version`: até a versão 8, a preparação antiga
+ * (`GameConfig.legacySetup`: ordem da Vida e "at the start of the game", DV-24/25).
+ */
+export function replayConfig<T extends GameConfig>(config: T, version: number | undefined): T {
+  return (version ?? 1) < 9 ? { ...config, legacySetup: true } : config;
+}
 
 /**
  * Replays de versões anteriores foram gravados quando o motor pulava sem ação etapas que hoje
@@ -33,7 +41,9 @@ export const REPLAY_VERSION = 8;
  * o Personagem posto na Vida "face-up" (`fieldToLife`), que hoje fica virado para cima, para o
  * Evento [Counter] com redução de custo na mão e para os efeitos de fim de batalha, que hoje
  * resolvem antes de expirar o "during this battle". A ação `counter` ganhou `target` opcional;
- * sem ele, o Counter vai para o atacado, como sempre.)
+ * sem ele, o Counter vai para o atacado, como sempre.) Até a versão 8, a Vida inicial saía na ordem
+ * inversa (a carta do topo do deck no topo da Vida) e o "at the start of the game" do Líder resolvia
+ * na criação, sem escolha: esses replays precisam da configuração de `replayConfig`.
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
