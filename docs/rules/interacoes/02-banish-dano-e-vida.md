@@ -26,4 +26,4 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 Dano em `stepDamage` (engine.ts:1765): um ponto por vez, [Banish] trasha sem [Trigger], Double Attack fixo em 2; `damageTaken`/`damageDealt`/`lifeRemoved` só depois do dano (conforme).
 
-[Double Attack] contra 1 de Vida não vence (DV-01, corrigido). Divergências em aberto deste tema: DV-05, DV-18 (detalhes em [../divergencias.md](../divergencias.md)).
+[Double Attack] contra 1 de Vida não vence (DV-01, corrigido). Divergências em aberto deste tema: DV-18 (corrigidas: DV-05) (detalhes em [../divergencias.md](../divergencias.md)).

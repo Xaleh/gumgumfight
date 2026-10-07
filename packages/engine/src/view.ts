@@ -141,6 +141,8 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
         }
       : null,
     stack: state.stack.map((f) => sanitizeFrame(f, ref)),
+    // Efeitos disparados esperando a vez: só a carta de origem (os passos e alvos ficam no servidor).
+    triggered: state.triggered?.map((e) => ({ id: e.id, source: ref(e.source), controller: e.controller, steps: [], label: e.label, batch: e.batch })),
     pending: state.pending ? viewPending(state.pending, viewer, ref) : null,
     modifiers: state.modifiers.filter((m) => vis.has(m.uid)).map((m) => ({ ...m, uid: alias(m.uid) })),
     usedThisTurn: state.usedThisTurn.map(usedKey).filter((k): k is string => k !== null),

@@ -4,13 +4,16 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 3;
+export const REPLAY_VERSION = 4;
 
 /**
  * Replays de versões anteriores foram gravados quando o motor pulava sem ação etapas que hoje
  * sempre pedem uma: a etapa de Counter sem opções e a carta de Vida sem [Trigger] (versão 1);
- * a pergunta "pagar X?" sem como pagar e as escolhas na mão ou no deck sem opção (versão 2).
- * Esta função insere as respostas implícitas para o roteiro antigo continuar válido.
+ * a pergunta "pagar X?" sem como pagar e as escolhas na mão ou no deck sem opção (versão 2);
+ * a escolha da ordem entre efeitos disparados juntos (versão 3), respondida com a primeira opção.
+ * Esta função insere as respostas implícitas para o roteiro antigo continuar válido. (Desde a
+ * versão 4 os efeitos disparados resolvem em outra ordem (CR 8-6): um replay antigo com efeitos
+ * encadeados pode tomar outro rumo.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -27,6 +30,9 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     }
     if (p.kind === 'confirm' && p.cannot) {
       return next?.type === 'answer' && !next.yes && next.player === p.player ? null : { type: 'answer', player: p.player, yes: false };
+    }
+    if (p.kind === 'option' && p.order) {
+      return next?.type === 'option' && next.player === p.player ? null : { type: 'option', player: p.player, index: 0 };
     }
     if (p.kind === 'selectTargets' && p.hidden && !p.options.length) {
       return next?.type === 'choose' && !next.uids.length && next.player === p.player ? null : { type: 'choose', player: p.player, uids: [] };

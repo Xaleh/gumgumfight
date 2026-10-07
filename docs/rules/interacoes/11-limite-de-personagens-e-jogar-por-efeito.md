@@ -21,6 +21,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-Limite de 5 em `stepPlay` (o jogador escolhe quem trashar, sem [On K.O.]); jogar por efeito dispara [On Play]; entrar rested quando indicado (conforme). A ordem dos [On Play] disparados por um efeito segue a pilha (ver tema 9).
+Limite de 5 em `stepPlay` (o jogador escolhe quem trashar, sem [On K.O.]); jogar por efeito dispara [On Play]; entrar rested quando indicado (conforme). Os [On Play] disparados por um efeito esperam esse efeito terminar e, se forem de cartas diferentes, o dono escolhe a ordem (ver tema 9).
 
-Divergências deste tema: DV-02, DV-04 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: nenhuma (corrigidas: DV-02, DV-04) (detalhes em [../divergencias.md](../divergencias.md)).

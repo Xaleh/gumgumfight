@@ -11,11 +11,11 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | Código | Divergência | Regra | Impacto | Card |
 |---|---|---|---|---|
 | DV-01 | [Double Attack] com 1 de Vida vence a partida (**corrigido**) | 7-1-4-1-1-1, Q&A de regras | alto | C1 |
-| DV-02 | Efeitos disparados resolvem antes (ou no meio) do efeito que os disparou | 8-6-3, 8-6-1-1 | alto | C2 |
-| DV-03 | Jogador do turno não resolve os seus efeitos primeiro | 8-6-1 | alto | C2 |
-| DV-04 | Auto effect de carta que já saiu do campo ainda resolve | 8-1-3-1-3 | médio | C2 |
-| DV-05 | Efeitos disparados durante o dano resolvem no meio do dano | 8-6-2 | médio | C2 |
-| DV-06 | Ordem dos efeitos simultâneos do mesmo jogador é fixa (sem escolha) | 6-6-1-1-3, 8-6-1 | baixo | C2 |
+| DV-02 | Efeitos disparados resolvem antes (ou no meio) do efeito que os disparou (**corrigido**) | 8-6-3, 8-6-1-1 | alto | C2 |
+| DV-03 | Jogador do turno não resolve os seus efeitos primeiro (**corrigido**) | 8-6-1 | alto | C2 |
+| DV-04 | Auto effect de carta que já saiu do campo ainda resolve (**corrigido**) | 8-1-3-1-3 | médio | C2 |
+| DV-05 | Efeitos disparados durante o dano resolvem no meio do dano (**corrigido**) | 8-6-2 | médio | C2 |
+| DV-06 | Ordem dos efeitos simultâneos do mesmo jogador é fixa (sem escolha) (**corrigido**) | 6-6-1-1-3, 8-6-1 | baixo | C2 |
 | DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação | 10-2-17-1, 8-2-1-1 | médio | C3 |
 | DV-08 | Escolha sem "up to" aceita 0 alvos | 8-4-4-1 | médio | C4 |
 | DV-09 | DON!! −X sem escolha de quais DON!! devolver | 8-3-1-6, Q&A de regras | médio | C5 |
@@ -38,7 +38,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-26 | Derrota simultânea não empata | 9-2-1 | baixo | C13 |
 | DV-27 | Laço infinito trava a partida em vez de empatar | 11-1 | baixo | C13 |
 | DV-28 | "At the start of your turn" resolve depois do Draw e da DON!! Phase | 6-2-2 | baixo | C14 |
-| DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] | 6-6-1-2 | baixo | C14 |
+| DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] (**corrigido em parte**) | 6-6-1-2 | baixo | C14 |
 | DV-30 | Faltam momentos: "start of your opponent's turn", "start of the Main Phase", [End of Your Opponent's Turn] | 6-2-2, 6-5-1, 6-6-1-1 | baixo | C14 |
 | DV-31 | "Draw up to X" vira compra obrigatória | 4-5-4 | baixo | C15 |
 | DV-32 | Restrições ("you cannot ...") só valem para quem controla o efeito e só no turno | texto das cartas | baixo | C15 |
@@ -84,35 +84,38 @@ Pontos **conformes** conferidos (não precisam de card): mulligan; Refresh, Draw
 - Dano de **efeito** (passo `takeDamage`) continua ponto a ponto, pela leitura literal de 1-2-1-1-1 / 9-2-1-1 ("Leader takes damage when that player has 0 Life cards"): 2 de dano de efeito contra 1 de Vida vencem. Não há Q&A sobre esse caso; o Q&A EB03-055 Robin confirma só que dano de efeito com 0 de Vida vence.
 - Testes: `packages/engine/test/engine.test.ts`, bloco "Double Attack contra 1 de Vida".
 
-### C2 — Fila de efeitos disparados (ordem de resolução)
+### C2 — Fila de efeitos disparados (ordem de resolução) — **corrigido**
 
-Causa comum: `state.stack` é uma pilha LIFO, e os auto effects são empilhados (`pushEffect`) **no momento do acontecimento** (`emit` engine.ts:1490, `pushAbilities` :1623, `koCharacter` :4359), por cima do efeito que ainda está resolvendo. A correção é uma fila de "efeitos disparados e ainda não ativados", esvaziada quando o efeito atual termina, na ordem de 8-6-1.
+Antes: `state.stack` era uma pilha LIFO e os auto effects eram empilhados (`pushEffect`) **no momento do acontecimento**, por cima do efeito que ainda estava resolvendo.
 
-**DV-02. Efeitos disparados resolvem antes (ou no meio) do efeito que os disparou** — alto **[testado]**
+Agora (`engine.ts`, seção "Efeitos disparados (CR 8-6)"): os auto effects ([On Play], [When Attacking], [On Your Opponent's Attack], [On Block], [On K.O.], [End of Your Turn], "When …", fim de batalha) vão para a fila `state.triggered` e só entram na pilha quando **não há nenhum efeito nem dano em resolução**, um de cada vez:
+- em ordem de disparo; os disparados juntos (mesmo lote) resolvem primeiro os do **jogador do turno**, depois os do outro;
+- se o jogador da vez tem 2 ou mais efeitos de **cartas diferentes** no mesmo lote, ele escolhe a ordem (pendência `option` com `order`; o bot pega a primeira; o oponente vê só que há uma escolha);
+- na hora de ativar, a carta precisa continuar no campo e as condições da habilidade ([DON!! xX], [Your Turn], "if you have…") precisam valer (8-1-3-1-3, 8-4-1-1); senão o efeito não ativa (fica no log) e o [Once Per Turn] é devolvido. [On K.O.] e efeitos adiados ("at the end of this turn/battle") resolvem mesmo com a carta fora do campo.
+- Efeitos que fazem parte do processamento continuam imediatos: o [Trigger] (interrompe o dano), as perguntas de substituição, o custo de ataque, "Activate this card's [Main]".
+
+Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a escolha de ordem). Replays passam para a versão 4 (`replay.ts`): replays antigos ganham a resposta implícita da escolha de ordem, mas, com a nova ordem de resolução, um replay antigo com efeitos encadeados pode tomar outro rumo.
+
+**DV-02. Efeitos disparados resolvem antes (ou no meio) do efeito que os disparou** — alto — **corrigido**
 - Regra: 8-6-3 (o efeito disparado por usar uma carta espera ela resolver); 8-6-1-1 (C, disparado por A, resolve depois de B). Q&A OP03-094 Air Door, OP11-012 Franky, OP12-056 Garp.
-- Atual: em `playCard` (engine.ts:1252) o Evento é empilhado e logo em seguida `emit('eventActivated')` empilha as reações **por cima** — elas resolvem primeiro. O mesmo acontece no Counter (:1160) e no [Trigger] (:1210).
-- Cenários: (a) Líder Crocodile OP01-062 ("When you activate an Event, you may draw 1 card if you have 4 or less cards") com 5 cartas joga Great Eruption ST06-015: o motor compra pelo Crocodile antes do Evento (mão final 6); o certo é o Evento resolver primeiro e o Crocodile não comprar (mão 5). (b) Brachio Bomber ST04-015 ("K.O. …, then add up to 1 DON!!") nocauteia Caribou OP01-007: o [On K.O.] do Caribou resolve entre o K.O. e o "then".
+- Cenários testados: (a) Líder Crocodile OP01-062 com 5 cartas joga Great Eruption ST06-015 → o Evento resolve primeiro (mão volta a 5) e o Crocodile não compra (antes: mão 6). (b) Brachio Bomber ST04-015 nocauteia Caribou OP01-007 → o "then add 1 DON!!" acontece antes do [On K.O.] do Caribou.
 
-**DV-03. Jogador do turno não resolve os seus efeitos primeiro** — alto **[testado]**
+**DV-03. Jogador do turno não resolve os seus efeitos primeiro** — alto — **corrigido**
 - Regra: 8-6-1, 1-3-10.
-- Atual: `emit` percorre o jogador 0 e depois o 1, empilhando; com LIFO, o jogador 1 sempre resolve primeiro, seja ou não o jogador do turno — o resultado depende do assento. Em `koCharacter` o [On K.O.] é empilhado depois das reações ao K.O. e resolve antes delas.
-- Cenário: P0 (turno, Líder Kaido OP01-061, "when your opponent's Character is K.O.'d") nocauteia Caribou de P1 → pilha `Brachio(P0) > Kaido(P0) > Caribou(P1)`: o [On K.O.] de P1 resolve primeiro.
+- Cenário testado nos dois assentos: Líder Kaido OP01-061 do jogador do turno resolve antes do [On K.O.] de Caribou do oponente.
 
-**DV-04. Auto effect de carta que já saiu do campo ainda resolve** — médio **[testado]**
-- Regra: 8-1-3-1-3 (se a carta sai da área antes de o efeito ser ativado, ele não ativa), 10-2-16. Q&A OP11-049 Carrot, OP04-024 Sugar, OP05-075 Mr.1.
-- Atual: o efeito é "ativado" ao ser empilhado; `stepEffect` (engine.ts:1805) não confere se a fonte continua na área.
-- Cenário: Nico Robin OP01-017 ataca; o [When Attacking] dela nocauteia Gordon ST16-002; o [On Your Opponent's Attack] do Gordon (já no trash) ainda abre as escolhas.
-- Exceção a manter: [On K.O.] (resolve com a carta no trash, 10-2-17).
+**DV-04. Auto effect de carta que já saiu do campo ainda resolve** — médio — **corrigido**
+- Regra: 8-1-3-1-3, 10-2-16. Q&A OP11-049 Carrot, OP04-024 Sugar, OP05-075 Mr.1, OP06-086 Moria.
+- Cenário testado: Nico Robin OP01-017 nocauteia Gordon ST16-002 no [When Attacking]; o [On Your Opponent's Attack] do Gordon não ativa.
 
-**DV-05. Efeitos disparados durante o dano resolvem no meio do dano** — médio
-- Regra: 8-6-2 (só o próprio [Trigger] interrompe o dano, 8-6-2-1). Q&A OP05-098 Enel, OP13-002 Ace, OP08-105 Bonney.
-- Atual: `damageTaken`/`damageDealt`/`lifeRemoved` já esperam o fim do dano (correto), mas `lifeToHandCard` (engine.ts:4425) emite `lifeToHand` na hora, e efeitos disparados pela resolução do [Trigger] (ex.: o [On K.O.] de quem o Trigger nocauteou) resolvem antes do 2º dano.
-- Cenário: Double Attack; a 1ª Vida é ST01-015 (Trigger que dá K.O.), que nocauteia Caribou OP01-007 do atacante; o [On K.O.] do Caribou resolve antes do 2º dano, quando deveria vir depois.
+**DV-05. Efeitos disparados durante o dano resolvem no meio do dano** — médio — **corrigido**
+- Regra: 8-6-2. Q&A OP05-098 Enel, OP13-002 Ace, OP08-105 Bonney.
+- Cenário testado: Double Attack; o [Trigger] da 1ª Vida (ST01-015) nocauteia Caribou; o [On K.O.] do Caribou vem depois do 2º dano.
+- Observação: "When this Character's attack deals damage" (`attackDamage`) também resolve depois do dano. O Q&A OP03-043 Gaimon diz que ele vem antes da decisão do [Trigger]; caso raro, fica como está.
 
-**DV-06. Ordem fixa entre efeitos simultâneos do mesmo jogador** — baixo
-- Regra: 6-6-1-1-3 (o jogador do turno escolhe a ordem dos seus [End of Your Turn]); 8-6-1-1 e Q&A OP10-042 Usopp, OP04-058 Crocodile, OP06-086 Moria (o dono escolhe a ordem).
-- Atual: ordem fixa (Stage → Personagens do último para o primeiro → Líder).
-- Correto: quando houver 2 ou mais efeitos do mesmo jogador prontos, perguntar a ordem (pode ser um `pending` de "escolha qual resolver primeiro").
+**DV-06. Ordem fixa entre efeitos simultâneos do mesmo jogador** — baixo — **corrigido**
+- Regra: 6-6-1-1-3; 8-6-1-1 e Q&A OP10-042 Usopp, OP04-058 Crocodile, OP06-086 Moria (o dono escolhe a ordem).
+- Cenário testado: dois Eustass"Captain"Kid ST02-013 com [End of Your Turn] → o dono escolhe qual resolve primeiro. Habilidades da mesma carta seguem a ordem do texto (sem pergunta).
 
 ### C3 — [On K.O.]
 
@@ -239,9 +242,10 @@ Causa comum: `state.stack` é uma pilha LIFO, e os auto effects são empilhados 
 - Regra: 6-2-2 (no Refresh, antes de devolver DON!! e desvirar). Q&A OP11-040 Luffy.
 - Atual: `startTurn` (engine.ts:1357) só empilha o efeito; ele resolve depois de devolver DON!!, desvirar, comprar e da DON!! Phase.
 
-**DV-29. "At the end of this turn" resolve antes dos [End of Your Turn]** — baixo
+**DV-29. "At the end of this turn" resolve antes dos [End of Your Turn]** — baixo — **corrigido em parte**
 - Regra: 6-6-1-2 (primeiro todos os [End of …]; depois os "at the end of this turn"). Q&A ST24-005 X.Drake.
-- Atual: `state.delayed` é empilhado depois dos [End of Your Turn] (engine.ts:1333) e resolve antes deles; atrasados criados durante a End Phase ficam para o turno seguinte.
+- Corrigido junto com a fila de efeitos disparados: os efeitos adiados entram num lote depois dos [End of Your Turn].
+- Falta: atrasados criados **durante** a End Phase (por um [End of Your Turn]) ainda ficam para o fim do turno seguinte.
 
 **DV-30. Momentos que faltam** — baixo
 - "At the start of your opponent's turn" (6-2-2), "at the start of the Main Phase" (6-5-1), [End of Your Opponent's Turn] (6-6-1-1-2/4). Hoje nenhuma carta da base usa (0 cartas), mas o parser recusa [End of Your Opponent's Turn] (parser.ts:2210) e a carta cairia no modo manual.
@@ -294,10 +298,10 @@ Causa comum: `state.stack` é uma pilha LIFO, e os auto effects são empilhados 
 | Área | Conforme | Divergente |
 |---|---|---|
 | Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, mulligan, derrota por dano sem Vida e por deck 0 (checada a cada passo), desistência, vitória por efeito | DV-24, DV-25, DV-26 |
-| Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-06, DV-28, DV-29, DV-30 |
+| Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-28, DV-29 (em parte), DV-30 |
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX] | DV-09 |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
-| Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano | DV-05, DV-17 |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O., "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event" | DV-02, DV-03, DV-04, DV-07, DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
+| Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O., "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6) | DV-07, DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
 | Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-16, DV-18, DV-27, DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

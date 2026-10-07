@@ -23,4 +23,4 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 Passos com `if` ("If"), `lastDone` ("If you do") e `payCost{scope}`; efeitos "during this turn" e atrasados continuam valendo depois que a fonte sai (conforme). A cadeia "If … Then" (4-10) depende do parser — ver itens a confirmar.
 
-Divergências deste tema: DV-04, DV-08 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-08 (corrigidas: DV-04) (detalhes em [../divergencias.md](../divergencias.md)).
