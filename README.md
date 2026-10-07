@@ -361,8 +361,8 @@ Toda carta da base é jogável:
   [Activate: Main], [Main], [Counter], [Trigger], [On K.O.], [End of Your Turn]…). Na hora certa, o jogo pausa,
   mostra o efeito e avisa que ele ainda não é automático; a partida segue sem aplicá-lo (botão **Continuar**).
   O construtor de decks marca essas cartas, e elas não entram na ranqueada. (As antigas ferramentas manuais para
-  aplicar o efeito à mão foram retiradas da interface; o motor ainda aceita as ações `manual`, usadas nos testes,
-  e o servidor continua recusando-as de quem não é Dev e na ranqueada.)
+  aplicar o efeito à mão foram retiradas: a interface não as tem mais e o servidor recusa a ação `manual` nas
+  partidas online para qualquer perfil; o motor ainda a aceita só para os testes.)
 - **Cobertura:** a tela "📊 Cobertura das cartas" (no menu, só para o perfil Dev) e `GET /api/coverage` mostram, por coleção,
   quantas cartas são automáticas, quantas são manuais e como está a tradução.
 

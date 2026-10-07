@@ -12,7 +12,7 @@
 import { randomInt } from 'node:crypto';
 import { buildCardDef, type CardData, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { accountOwnerKey, isDev, seesHands, type User } from '../auth/store';
+import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLiveMatches, saveLiveMatch } from '../db';
 import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
@@ -327,11 +327,6 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/action', async (req, reply) => {
     const found = withSeat(req);
     if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
-    // Ferramentas manuais (mexer na mesa à mão) são função de desenvolvimento: só para o perfil Dev.
-    const action = req.body?.action as { type?: unknown } | undefined;
-    if (action?.type === 'manual' && !isDev(user(req)?.role)) {
-      return reply.code(403).send({ error: 'As ferramentas manuais são só para o perfil Dev.' });
-    }
     const r = found.room.act(found.seat, req.body?.seq, req.body?.action);
     return r.ok ? r : reply.code(r.code).send({ error: r.error });
   });
