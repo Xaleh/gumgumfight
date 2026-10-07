@@ -1438,14 +1438,13 @@ function handleMainAction(state: GameState, action: Action) {
     }
 
     case 'endTurn': {
-      // Efeitos de [End of Your Turn] resolvem antes de o turno passar.
+      // End Phase (6-6-1-1): os [End of Your Turn] do jogador do turno e os [End of Your Opponent's
+      // Turn] do outro ativam juntos (mesmo lote: os do jogador do turno resolvem primeiro, 8-6-1).
+      // Os "at the end of this turn" entram depois deles, no frame `endTurn` (6-6-1-2).
+      const other = state.players[opponent(p)];
       state.stack.push({ kind: 'endTurn' });
-      for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
-        pushAbilities(state, fc.uid, 'endOfTurn');
-      }
-      // "… at the end of this turn": depois de todos os [End of Your Turn] (6-6-1-2).
-      queueDelayed(state, state.delayed ?? []);
-      state.delayed = [];
+      for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) pushAbilities(state, fc.uid, 'endOfTurn');
+      for (const fc of [other.leader, ...other.characters, ...(other.stage ? [other.stage] : [])]) pushAbilities(state, fc.uid, 'endOfOpponentTurn');
       return;
     }
 
@@ -1460,21 +1459,26 @@ function handleMainAction(state: GameState, action: Action) {
 
 function startTurn(state: GameState) {
   const ps = state.players[state.activePlayer];
+  const other = state.players[opponent(state.activePlayer)];
   state.phase = 'main';
   state.modifiers = state.modifiers.filter((m) => !(m.duration === 'untilYourNextTurn' && (m.untilTurn ?? 0) <= state.turn));
   log(state, ps.id, `— Turno ${state.turn}: ${ps.name} —`);
 
-  // "This effect can be activated at the start of your turn": a condição é vista agora (antes de Renovar/DON!!).
-  for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
-    for (const a of cardDef(state, fc.uid).abilities) {
-      if (a.timing !== 'startOfTurn' || !conditionsMet(state, fc.uid, a) || !a.steps.length) continue;
-      const first = JSON.stringify(a.steps[0].if ?? null);
-      if (a.steps[0].if && !conditionHolds(state, ps.id, fc.uid, a.steps[0].if)) continue;
-      const steps = a.steps.map((st) => (JSON.stringify(st.if ?? null) === first ? { ...st, if: undefined } : st));
-      pushEffect(state, fc.uid, ps.id, steps);
-    }
-  }
+  // Refresh Phase (6-2-2, Q&A OP11-040): primeiro ativam os "at the start of your turn" do jogador
+  // do turno e os "at the start of your opponent's turn" do outro (mesmo lote: os do jogador do
+  // turno primeiro). Só depois que resolverem (com as escolhas) os DON!! voltam, tudo fica ativo,
+  // vem o Draw e o DON!! Phase (frame `refresh`).
+  const queued = [
+    ...[ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])].flatMap((fc) => pushAbilities(state, fc.uid, 'startOfTurn')),
+    ...[other.leader, ...other.characters, ...(other.stage ? [other.stage] : [])].flatMap((fc) => pushAbilities(state, fc.uid, 'startOfOpponentTurn')),
+  ];
+  if (queued.length) state.stack.push({ kind: 'refresh' });
+  else refreshDrawDon(state);
+}
 
+/** Resto do Refresh Phase, Draw e DON!! Phase; depois, os "at the start of your Main Phase" (6-5-1). */
+function refreshDrawDon(state: GameState) {
+  const ps = state.players[state.activePlayer];
   // Refresh: DON!! anexados voltam à área de custo e tudo fica ativo.
   const fieldCards = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])];
   for (const fc of fieldCards) {
@@ -1504,6 +1508,10 @@ function startTurn(state: GameState) {
     ps.leader.don++;
   }
   checkDefeat(state);
+  if (state.phase === 'gameover') return;
+
+  // Main Phase: antes de qualquer ação, ativam os "at the start of your Main Phase" (6-5-1).
+  for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) pushAbilities(state, fc.uid, 'startOfMainPhase');
 }
 
 /** "all Characters with a cost of 5 or less do not become active in your and your opponent's Refresh Phases" */
@@ -1580,8 +1588,20 @@ function run(state: GameState) {
         stepPlay(state, frame);
         break;
       case 'endTurn':
+        // "… at the end of this turn" (6-6-1-2): depois de todos os [End of …] e do que eles
+        // dispararam. Os criados agora (por um [End of Your Turn] ou por outro efeito adiado)
+        // também resolvem nesta End Phase, não no fim do turno seguinte.
+        if (state.delayed?.length) {
+          queueDelayed(state, state.delayed);
+          state.delayed = [];
+          break;
+        }
         state.stack.pop();
         endTurn(state);
+        break;
+      case 'refresh':
+        state.stack.pop();
+        refreshDrawDon(state);
         break;
       case 'startGame':
         state.stack.pop();
@@ -1618,6 +1638,10 @@ const TIMING_TAG: Partial<Record<AbilityTiming, string>> = {
   onBlock: '[Ao Bloquear]',
   onKO: '[Ao ser Nocauteado]',
   endOfTurn: '[Fim do Seu Turno]',
+  endOfOpponentTurn: '[Fim do Turno do Oponente]',
+  startOfTurn: '(início do turno)',
+  startOfOpponentTurn: '(início do turno do oponente)',
+  startOfMainPhase: '(início da Fase Principal)',
   battlesCharacter: '(fim da batalha)',
 };
 

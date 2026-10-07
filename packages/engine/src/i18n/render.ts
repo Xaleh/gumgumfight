@@ -39,6 +39,7 @@ const TIMING: Record<string, string> = {
   onKO: '[Ao ser Nocauteado]',
   onBlock: '[Ao Bloquear]',
   endOfTurn: '[Fim do Seu Turno]',
+  endOfOpponentTurn: '[Fim do Turno do Oponente]',
   main: '[Principal]',
   counter: '[Counter]',
   onOpponentAttack: '[No Ataque do Oponente]',
@@ -1293,6 +1294,8 @@ function ability(a: Ability, ctx: Ctx): string {
     const pre = a.condition && Object.keys(a.condition).length ? `${condition(a.condition, ctx)} e ` : '';
     body = `Se ${pre}${who} ${what}${by}, você pode ${c || 'evitar isso'}${extra} em vez disso.`;
   } else if (a.timing === 'startOfTurn') body = `Este efeito pode ser ativado no início do seu turno. ${steps(a.steps, ctx)}`;
+  else if (a.timing === 'startOfOpponentTurn') body = `Este efeito pode ser ativado no início do turno do oponente. ${steps(a.steps, ctx)}`;
+  else if (a.timing === 'startOfMainPhase') body = `Este efeito pode ser ativado no início da sua Fase Principal. ${steps(a.steps, ctx)}`;
   else if (a.timing === 'battlesCharacter') body = `Se ${ctx.self} batalhar com um Personagem do oponente, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
   else if (a.timing === 'onKO' && a.koBy) {
     body = `Quando ${ctx.self} for nocauteado por ${a.koBy === 'opponentEffect' ? 'um efeito do oponente' : 'um efeito'}, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;

@@ -786,11 +786,14 @@ export type AbilityTiming =
   | 'onKO'
   | 'onBlock'
   | 'endOfTurn' // [End of Your Turn]
+  | 'endOfOpponentTurn' // [End of Your Opponent's Turn] (6-6-1-1-2)
   | 'battlesCharacter' // "If this Character battles your opponent's Character" (ao fim da batalha)
   | 'event' // "When …": reação a um acontecimento (Ability.event)
   | 'onOpponentAttack' // [On Your Opponent's Attack]
   | 'replace' // "If … would be K.O.'d / removed from the field, you may … instead" (Ability.replace + cost)
   | 'startOfTurn' // "This effect can be activated at the start of your turn"
+  | 'startOfOpponentTurn' // "… at the start of your opponent's turn" (6-2-2)
+  | 'startOfMainPhase' // "… at the start of your Main Phase" (6-5-1)
   | 'static'; // efeito contínuo
 
 export interface AbilityCost {
@@ -1144,8 +1147,16 @@ export type Frame =
       replaceAsked?: boolean;
     }
   | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash'; byEffect?: boolean }
-  /** Fecha o turno depois que os efeitos de [End of Your Turn] resolverem. */
+  /**
+   * Fecha o turno depois que os efeitos de [End of Your Turn]/[End of Your Opponent's Turn] e os
+   * "at the end of this turn" (inclusive os criados na própria End Phase) resolverem (6-6-1).
+   */
   | { kind: 'endTurn' }
+  /**
+   * Continua o Refresh Phase (devolver DON!!, desvirar), o Draw e o DON!! Phase depois que os
+   * efeitos "at the start of your/your opponent's turn" resolverem (6-2-2).
+   */
+  | { kind: 'refresh' }
   /** Fecha a preparação depois dos efeitos "at the start of the game" (5-2-1-5): mãos e mulligan. */
   | { kind: 'startGame' };
 

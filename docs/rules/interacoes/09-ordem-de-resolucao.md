@@ -23,4 +23,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 Os efeitos disparados vão para uma fila (`state.triggered`) e entram na pilha um de cada vez, quando não há efeito nem dano em resolução: em ordem de disparo, primeiro os do jogador do turno, e o dono escolhe a ordem entre os seus de cartas diferentes (DV-02 a DV-06, corrigidos). Os casos do Q&A OP07-019 Bonney (o [On Play] disparado no [When Attacking] espera o [On Your Opponent's Attack] pendente) e OP03-094 Air Door (o [On Play] espera o Evento terminar) seguem essa ordem.
 
-Divergências em aberto deste tema: DV-28, DV-29 (em parte), DV-30 (detalhes em [../divergencias.md](../divergencias.md)).
+Os momentos do turno também passam pela fila (DV-28 a DV-30, corrigidos): no início do turno, os "at the start of your turn" do jogador do turno e os "at the start of your opponent's turn" do outro resolvem antes de os DON!! voltarem, de tudo desvirar e do Draw (Q&A OP11-040 Luffy; frame `refresh`); o "at the start of your Main Phase" vem depois da DON!! Phase. Na End Phase, os [End of Your Turn] do jogador do turno e depois os [End of Your Opponent's Turn] do outro; só quando eles (e o que dispararam) terminam, os "at the end of this turn" (Q&A ST24-005 X.Drake), inclusive os criados na própria End Phase.
+
+Nenhuma divergência em aberto deste tema (detalhes em [../divergencias.md](../divergencias.md)).

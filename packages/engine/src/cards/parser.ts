@@ -50,6 +50,7 @@ const TIMINGS: Record<string, AbilityTiming> = {
   'on k.o.': 'onKO',
   'on block': 'onBlock',
   'end of your turn': 'endOfTurn',
+  "end of your opponent's turn": 'endOfOpponentTurn',
   main: 'main',
   counter: 'counter',
   "on your opponent's attack": 'onOpponentAttack',
@@ -2225,7 +2226,7 @@ function parseHeader(line: string): { h: Header; rest: string } | null {
     else if (t === "opponent's turn") h.opponentsTurn = true;
     else if (TIMINGS[t]) h.timings.push(TIMINGS[t]);
     else if (KEYWORDS[t]) h.keywords.push(KEYWORDS[t]);
-    else if (/^(trigger|end of your opponent's turn)$/.test(t)) return null; // ainda não suportados
+    else if (t === 'trigger') return null; // ainda não suportado
     else break; // nome de carta no início da frase
     rest = rest.slice(m[0].length);
   }
@@ -2541,11 +2542,17 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   const sentences = sentencesOf(body);
   const ruleOnly = parseRule(body.trim().replace(/\.$/, ''));
   if (ruleOnly && !h.don && !h.yourTurn && !h.opponentsTurn) return ruleOnly.map((r) => ({ timing: 'static', steps: [], rule: r }));
-  const start = body.match(/^This effect can be activated at the start of your turn\. (.+)$/i);
+  // "This effect can be activated at the start of your turn." / "At the start of your opponent's
+  // turn, …" / "… at the start of your Main Phase" (6-2-2, 6-5-1).
+  const start = body.match(
+    /^(?:This effect can be activated at the start of (your turn|your opponent's turn|(?:your|the) Main Phase)\. |At the start of (your turn|your opponent's turn|(?:your|the) Main Phase), )(.+)$/i,
+  );
   if (start) {
-    const steps = parseBody(start[1]);
+    const steps = parseBody(capitalizeFirst(start[3]));
     if (!steps) return null;
-    const ab: Ability = { timing: 'startOfTurn', steps };
+    const when = (start[1] ?? start[2]).toLowerCase();
+    const timing: AbilityTiming = when === 'your turn' ? 'startOfTurn' : when === "your opponent's turn" ? 'startOfOpponentTurn' : 'startOfMainPhase';
+    const ab: Ability = { timing, steps };
     if (h.don) ab.don = h.don;
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];

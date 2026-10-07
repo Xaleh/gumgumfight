@@ -31,8 +31,8 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Fonte sai de cena no meio do efeito (8) | o frame continua com o `uid`; `delayed` | Existe |
 | "If you do" / "If" / "Then" (8) | `lastDone`, `EffectStep.if`, `payCost{scope}` | Existe |
 | Ordem de resolução de efeitos simultâneos (9) | fila `state.triggered` (`queueTriggered`, `nextTriggered`, pendência `option` com `order`) | Existe |
-| [End of Your Turn] / [End of Your Opponent's Turn] (9) | timing `endOfTurn` / — | Existe / Falta (0 cartas hoje) |
-| "At the start of your turn" (9) | timing `startOfTurn` | Existe |
+| [End of Your Turn] / [End of Your Opponent's Turn] (9) | timing `endOfTurn` / `endOfOpponentTurn` | Existe (DV-30; 0 cartas com [End of Your Opponent's Turn] hoje) |
+| "At the start of your turn" / "… of your opponent's turn" / "… of your Main Phase" (9) | timing `startOfTurn` / `startOfOpponentTurn` / `startOfMainPhase` | Existe (DV-28, DV-30; 0 cartas com os dois últimos hoje) |
 | [Once Per Turn] (10) | `Ability.oncePerTurn`, `usedThisTurn` | Existe |
 | Custos de ativação (10) | `AbilityCost` (`payImmediateCost`, `canPayCost`) | Existe |
 | Redução de custo (10) | `cost`, `handCost`, `handCostAura`, `nextPlayDiscount` | Existe; custo com valor negativo oculto (CR 1-3-6-2-1) a conferir |
@@ -93,15 +93,18 @@ DON!! anexados (217), [Your Turn] (218), [Opponent's Turn] (219), `condition` vi
 | `trigger` | [Trigger] (campo `CardData.trigger`) | Pendência `lifeCard` aberta em `stepDamage` :1802; resposta "sim" :1206-1211 (a carta vai para `state.limbo`, efeito empilhado com `trigger: true`, evento `triggerActivated`; descarte no fim do frame) | `parseTriggerText` parser.ts:3041 |
 | `onKO` | [On K.O.]; "When this Character is K.O.'d (by an effect / by your opponent's effect)" (`koBy`) | `koCharacter` (confere `conditionsMet`, [Once Per Turn] e `koBy` com a carta ainda no campo; o efeito vai para a fila depois do K.O.) | parser.ts:46; :2618, :2728 |
 | `onBlock` | [On Block] | Pendência `block` :1132 | parser.ts:46 |
-| `endOfTurn` | [End of Your Turn] | Ação `endTurn` :1330 (antes de passar o turno; depois os `delayed` :1333) | parser.ts:46 |
+| `endOfTurn` | [End of Your Turn] | Ação `endTurn` (fila de efeitos disparados, no mesmo lote dos `endOfOpponentTurn` do outro: os do jogador do turno primeiro). Os `delayed` ("at the end of this turn") entram no frame `endTurn` depois de tudo isso, inclusive os criados na própria End Phase (DV-29) | parser.ts:46 |
+| `endOfOpponentTurn` | [End of Your Opponent's Turn] | Ação `endTurn`, para as cartas do outro jogador (6-6-1-1-2) | parser.ts:46 |
 | `battlesCharacter` | "If this Character battles your opponent's Character, …" / "At the end of a battle in which this Character battles …" | `stepBattle` passo `end` :1750 (`last` = o oponente da batalha) | parser.ts:2540, :2655 |
 | `event` | "When …" (reação a um `GameEvent`, `Ability.event`) | `emit` :1490 (varre Líder, Personagens e Stage dos dois jogadores) + `eventMatches` :1512 | parser.ts:2567, :2627, :2738 (`parseEvent` :2407) |
 | `replace` | "If … would be K.O.'d / removed from the field / rested / If you would take damage, you may … instead" (`Ability.replace` + `cost`) | K.O./remoção: `offerReplacement`/`nextReplacement` (chamado em `koCharacter` e em `removeFromField`, usado por `ko`, `returnToHand`, `trashTarget`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife`); virar: `restCard` :1591-1603; dano: `offerDamageReplacement` :4286 (chamado em `stepDamage` :1779) | parser.ts:2665-2719 |
-| `startOfTurn` | "This effect can be activated at the start of your turn." | `startTurn` :1358-1365 (antes da Renovação; a condição do 1º passo é vista nesse momento) | parser.ts:2524-2533 |
+| `startOfTurn` | "This effect can be activated at the start of your turn." / "At the start of your turn, …" | `startTurn`: fila de efeitos disparados no começo do Refresh; o frame `refresh` (`refreshDrawDon`) devolve DON!!, desvira, compra e faz o DON!! Phase só depois que eles resolverem (6-2-2, DV-28) | `parseStatic` |
+| `startOfOpponentTurn` | "… at the start of your opponent's turn" | `startTurn`, para as cartas do outro jogador, no mesmo lote (os do jogador do turno primeiro) | `parseStatic` |
+| `startOfMainPhase` | "… at the start of your/the Main Phase" | `refreshDrawDon`, depois do DON!! Phase (6-5-1) | `parseStatic` |
 | `static` | Efeito contínuo (sem marcação) | Lido sob demanda: `getPower` :584, `getCost` :448, `hasKeyword` :631, `aurasOn` :530, `koProtected` :4328, `removalBlocked` :4320, `attackError` :686, `playCost` :736, `counterValue` :165, `noRefreshByAura` :1400, `restCard` :1585, `leaderRule` :156 | `parseStatic` parser.ts:2521 |
 
-Não existem: `[End of Your Opponent's Turn]` (parseHeader devolve null — parser.ts:2210 — e a linha iria para o
-modo manual; 0 cartas hoje), "at the start of your opponent's turn" (0 cartas).
+`[End of Your Opponent's Turn]`, "at the start of your opponent's turn" e "at the start of your Main Phase" existem
+desde a DV-30, mas nenhuma carta da base usa hoje (testados com cartas sintéticas em `test/turn-timing.test.ts`).
 
 ### [Once Per Turn], [DON!! xX], [Your Turn]/[Opponent's Turn]
 - **Once Per Turn:** chave `uid:índice` em `state.usedThisTurn` (`usedKey` :657), limpa em `endTurn` :1419. Marcado ao
@@ -461,7 +464,7 @@ Leitura do texto: `parseEvent` parser.ts:2407-2488.
    "Ad up to", reescreve frases fora do padrão para a forma canônica, como "If this Character would leave the field …
    If there is a [X] Character, this effect is negated" → condição + substituição :262-265).
 3. `parseHeader` (:2195): marcações `[DON!! xN]`, `[Once Per Turn]`, `[Your Turn]`, `[Opponent's Turn]`, momentos
-   (`TIMINGS` :46) e palavras-chave (`KEYWORDS` :36). `[Trigger]` e `[End of Your Opponent's Turn]` no texto
+   (`TIMINGS` :46) e palavras-chave (`KEYWORDS` :36). `[Trigger]` no texto
    principal → `null` (manual).
 4. `parseLine` (:2996): sem momento → `parseStatic` (:2521); com momento → condição de ativação "If X, you may COST: Y"
    (:3006-3013), `parseCost` (:2376) e `parseBody` (:2019).
@@ -507,7 +510,7 @@ Estáticos (`parseStatic` :2521-2985): regras de Líder (`parseRule` :2493), sub
 
 ### 4.3 O que cai no modo manual
 - Qualquer linha em que **um único trecho** não case (o parser é tudo-ou-nada por linha). Casos já conhecidos no código:
-  `[Trigger]` dentro do texto principal e `[End of Your Opponent's Turn]` (parser.ts:2210); palavra-chave seguida de
+  `[Trigger]` dentro do texto principal (`parseHeader`); palavra-chave seguida de
   texto na mesma linha (`keyword+texto`, :3001); momento de Evento em não-Evento (:3003).
 - Na base atual (2711 cartas): **0 linhas manuais**. O mecanismo existe para coleções novas (spoilers/importações).
 - Em jogo, a pendência `manual` (types.ts:1051) só mostra o texto e espera "Continuar"; as ferramentas `ManualOp`
@@ -541,7 +544,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 13 | "Set the power … to 0" | **Existe** (DV-19 corrigida) | 0 / 2 (OP07-002, EB04-010) | `setPowerZero`: modificador −(poder atual na ativação) com a duração do texto, nada se já ≤0 (4-12); Counters e DON!! posteriores somam. "Set the cost … to 0" = `cost −99` (1 carta, OP03-091). |
 | 14 | Negar efeitos de Personagem/Líder | **Existe** | 1 / 15 | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated`. `isNegated` desliga habilidades e palavras impressas, inclusive o [On K.O.] (conferido em `koCharacter` antes de a carta sair do campo; DV-07 corrigida). |
 | 15 | Vida virada para cima | **Existe** (DV-18 corrigida) | 12 / 48 | Há `lifeFaceUp`, `lifeFace`, `handToLife{faceUp}`, `fieldToLife{faceUp}`, `search{toLife}`, custo `ownToLife`, `trashFaceUpLife`, `faceUpLifeMin`, regra `faceUpLifeToDeck`. `fieldToLife` com "face-up": ~16 cartas na base completa (OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103…), 4 na local (ST07-017, ST09-015, OP06-103, P-085). Quem tira carta da Vida (`trashLife`, `lifeToTrash`, `lifeTrashUntil`, `opponentLifeToBottom`, [Banish], `detach`…) a tira também de `lifeFaceUp`. |
-| 16 | [End of Your Opponent's Turn] / início do turno do oponente | **Não existe** | 0 / 0 | `parseHeader` recusa (:2210). |
+| 16 | [End of Your Opponent's Turn] / início do turno do oponente / início do Main Phase | **Existe** (DV-30) | 0 / 0 | Timings `endOfOpponentTurn`, `startOfOpponentTurn`, `startOfMainPhase`. |
 | 17 | Restrições ao oponente ("your opponent cannot play / attack …") | **Não existe** como primitivo | 1 / 2 | `Restriction.player` é sempre quem controla o efeito (:3412) e dura só o turno. As 2 cartas ("cannot attack any card other than …") usam `staticTaunt`. |
 | 18 | Ordem de efeitos automáticos simultâneos | **Não existe** | — | `emit`/`pushAbilities` empilham em ordem fixa (jogador 0 → 1, ordem do campo; pilha LIFO); o jogador do turno não escolhe a ordem nem resolve os seus primeiro. |
 | 19 | "Your opponent rests N active DON!! at the start of their next Main Phase" | **Aproximado** | — | Lido como `skipRefreshDon` (parser.ts:1084). |
@@ -550,7 +553,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 22 | [On K.O.] e Once Per Turn | **Existe** | — | `koCharacter` confere `oncePerTurn`, `don`, `condition` e negação do [On K.O.] com a carta ainda no campo (DV-07 corrigida). |
 
 Formas listadas na pergunta que **não aparecem em nenhuma carta da base** (não há demanda hoje): copiar efeitos (#6),
-"when this card is removed from Life" (#8), [End of Your Opponent's Turn] (#16), "If you would take damage … instead"
+"when this card is removed from Life" (#8), [End of Your Opponent's Turn] (#16; primitivo existe, 0 cartas), "If you would take damage … instead"
 (primitivo existe, 0 cartas), "gains [Trigger]".
 
 ### Contagens auxiliares (base local / completa)

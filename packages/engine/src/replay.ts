@@ -43,7 +43,12 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * resolvem antes de expirar o "during this battle". A ação `counter` ganhou `target` opcional;
  * sem ele, o Counter vai para o atacado, como sempre.) Até a versão 8, a Vida inicial saía na ordem
  * inversa (a carta do topo do deck no topo da Vida) e o "at the start of the game" do Líder resolvia
- * na criação, sem escolha: esses replays precisam da configuração de `replayConfig`.
+ * na criação, sem escolha: esses replays precisam da configuração de `replayConfig`. (Desde a versão 9,
+ * sem decisão nova e sem mudar a versão: o "at the start of your turn" resolve antes de devolver DON!!,
+ * desvirar e comprar, e os "at the end of this turn" esperam também o que os [End of Your Turn]
+ * dispararam e incluem os criados na própria End Phase (DV-28/29). Nenhuma carta da base tem efeito de
+ * início de turno nem cria efeito adiado na End Phase; um replay antigo com essas combinações pode
+ * tomar outro rumo.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);

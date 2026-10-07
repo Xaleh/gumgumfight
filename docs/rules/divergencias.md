@@ -37,9 +37,9 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-25 | "At the start of the game" roda antes da escolha de quem começa, sem escolha nem recusa (**corrigido**) | 5-2-1-5-1/2 | baixo | C13 |
 | DV-26 | Derrota simultânea não empata (**corrigido**) | 9-2-1 | baixo | C13 |
 | DV-27 | Laço infinito trava a partida em vez de empatar (**corrigido**) | 11-1 | baixo | C13 |
-| DV-28 | "At the start of your turn" resolve depois do Draw e da DON!! Phase | 6-2-2 | baixo | C14 |
-| DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] (**corrigido em parte**) | 6-6-1-2 | baixo | C14 |
-| DV-30 | Faltam momentos: "start of your opponent's turn", "start of the Main Phase", [End of Your Opponent's Turn] | 6-2-2, 6-5-1, 6-6-1-1 | baixo | C14 |
+| DV-28 | "At the start of your turn" resolve depois do Draw e da DON!! Phase (**corrigido**) | 6-2-2 | baixo | C14 |
+| DV-29 | "At the end of this turn" resolve antes dos [End of Your Turn] (**corrigido**) | 6-6-1-2 | baixo | C14 |
+| DV-30 | Faltam momentos: "start of your opponent's turn", "start of the Main Phase", [End of Your Opponent's Turn] (**corrigido**) | 6-2-2, 6-5-1, 6-6-1-1 | baixo | C14 |
 | DV-31 | "Draw up to X" vira compra obrigatória | 4-5-4 | baixo | C15 |
 | DV-32 | Restrições ("you cannot ...") só valem para quem controla o efeito e só no turno | texto das cartas | baixo | C15 |
 | DV-33 | Mão → Vida com filtro não revela a carta | 11-2-1 | baixo | C15 |
@@ -283,17 +283,21 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C14 — Momentos do turno
 
-**DV-28. "At the start of your turn" resolve depois do Draw e da DON!! Phase** — baixo
-- Regra: 6-2-2 (no Refresh, antes de devolver DON!! e desvirar). Q&A OP11-040 Luffy.
-- Atual: `startTurn` (engine.ts:1357) só empilha o efeito; ele resolve depois de devolver DON!!, desvirar, comprar e da DON!! Phase.
+**DV-28. "At the start of your turn" resolve depois do Draw e da DON!! Phase** — baixo — **corrigido**
+- Regra: 6-2-2 (no Refresh, antes de devolver DON!! e desvirar). Q&A OP11-040 Luffy ("efeitos de início de turno → os DON!! dados voltam → tudo fica ativo → Draw Phase").
+- Antes: `startTurn` (engine.ts:1357) só empilhava o efeito; ele resolvia depois de devolver DON!!, desvirar, comprar e da DON!! Phase (a condição do 1º passo era vista antes, para compensar).
+- Agora: `startTurn` põe os "at the start of your turn" na fila de efeitos disparados (`pushAbilities`: [DON!! xX], condição e [Once Per Turn] como nos outros momentos; o dono escolhe a ordem entre cartas diferentes) e empilha o frame `refresh`; só quando eles terminam (com as escolhas) `refreshDrawDon` devolve os DON!!, desvira, compra e faz a DON!! Phase. Sem efeito de início de turno, o turno segue direto, como antes. Nenhuma carta da base usa esse momento hoje (OP11-040 testado com o texto oficial).
 
-**DV-29. "At the end of this turn" resolve antes dos [End of Your Turn]** — baixo — **corrigido em parte**
+**DV-29. "At the end of this turn" resolve antes dos [End of Your Turn]** — baixo — **corrigido**
 - Regra: 6-6-1-2 (primeiro todos os [End of …]; depois os "at the end of this turn"). Q&A ST24-005 X.Drake.
-- Corrigido junto com a fila de efeitos disparados: os efeitos adiados entram num lote depois dos [End of Your Turn].
-- Falta: atrasados criados **durante** a End Phase (por um [End of Your Turn]) ainda ficam para o fim do turno seguinte.
+- A fila de efeitos disparados já punha os efeitos adiados num lote depois dos [End of Your Turn], mas na hora da ação `endTurn`: os criados **durante** a End Phase (por um [End of Your Turn]) ficavam para o fim do turno seguinte, e os efeitos disparados por um [End of Your Turn] resolviam depois dos adiados.
+- Agora: os `delayed` entram na fila quando o frame `endTurn` chega ao topo (fila vazia: todos os [End of …] e o que eles dispararam já resolveram); se novos forem criados (por um [End of Your Turn] ou por outro adiado), entram também, e o turno só passa sem nenhum pendente.
 
-**DV-30. Momentos que faltam** — baixo
-- "At the start of your opponent's turn" (6-2-2), "at the start of the Main Phase" (6-5-1), [End of Your Opponent's Turn] (6-6-1-1-2/4). Hoje nenhuma carta da base usa (0 cartas), mas o parser recusa [End of Your Opponent's Turn] (parser.ts:2210) e a carta cairia no modo manual.
+**DV-30. Momentos que faltam** — baixo — **corrigido**
+- "At the start of your opponent's turn" (6-2-2), "at the start of the Main Phase" (6-5-1), [End of Your Opponent's Turn] (6-6-1-1-2/4). Nenhuma carta da base usa (0 cartas); o parser recusava [End of Your Opponent's Turn] (parser.ts:2210) e a carta caía no modo manual.
+- Agora: timings `startOfOpponentTurn` ("This effect can be activated at the start of your opponent's turn." ou "At the start of your opponent's turn, …"), `startOfMainPhase` ("… at the start of your Main Phase" / "the Main Phase") e `endOfOpponentTurn` ([End of Your Opponent's Turn], também no modo manual e na tradução). Os do oponente ativam no mesmo lote dos do jogador do turno (que resolvem primeiro, 8-6-1): no início do turno, junto com os "at the start of your turn"; na End Phase, junto com os [End of Your Turn]. O "at the start of your Main Phase" ativa depois da DON!! Phase, antes de qualquer ação.
+- Replays: sem decisão nova, a versão não mudou (nota em `replay.ts`). Nenhuma carta da base tem efeito de início de turno, [End of Your Opponent's Turn] ou cria efeito adiado na End Phase; só um replay com um [End of Your Turn] que dispara outro efeito junto com um "at the end of this turn" pode tomar outro rumo.
+- Testes (DV-28 a DV-30): `packages/engine/test/turn-timing.test.ts` (OP11-040 sintético com 8 DON!!: olha as 5 do topo antes de comprar, com os DON!! ainda dados e o Personagem virado; com 7 DON!!, nada; bot x bot; X.Drake ST24-005 + Kid ST02-013; adiado criado por [End of Your Turn] resolve na mesma End Phase; parser dos três momentos; [End of Your Opponent's Turn], início do turno do oponente e início do Main Phase com cartas sintéticas). 6 de 9 falham no código antigo (os outros conferem o que já funcionava: 7 DON!!, o bot e a ordem X.Drake/Kid, que a fila de efeitos já tinha corrigido).
 
 ### C15 — Pequenas formas de efeito
 
@@ -359,7 +363,7 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | Área | Conforme | Divergente |
 |---|---|---|
 | Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, "at the start of the game" depois dela e com escolha, mulligan, Vida com o topo do deck no fundo, derrota por dano sem Vida e por deck 0 (checada a cada passo), derrota simultânea empata, desistência, vitória por efeito | — |
-| Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-28, DV-29 (em parte), DV-30 |
+| Fases (6) | Expiração "until the start of your next turn", "at the start of your/your opponent's turn" antes de devolver DON!! e desvirar, devolver DON!! e desvirar, Draw, DON!! Phase, "at the start of your Main Phase", sem ataque no 1º turno, [End of Your Turn]/[End of Your Opponent's Turn] uma vez, "at the end of this turn" depois deles (também os criados na End Phase), expiração de "this turn" | — |
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano, carta do [Trigger] fora das áreas enquanto resolve | — |
