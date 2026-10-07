@@ -1,12 +1,12 @@
-import { applyErrata } from '../errata';
+import { fixCard } from '../errata';
 import type { CardData, CardDef } from '../types';
 import { parseCard } from './parser';
 import { CARD_SCRIPTS } from './scripts';
 import { detectKeywords, KEYWORD_ONLY, splitEffects } from './split';
 
 export function buildCardDef(card: CardData): CardDef {
-  // A errata oficial vale sobre o texto impresso (e sobre o que a base de cartas trouxer).
-  const data = applyErrata(card);
+  // Nome e tipos oficiais e a errata oficial valem sobre o que a base de cartas trouxer.
+  const data = fixCard(card);
   const script = CARD_SCRIPTS[data.id];
   if (script) {
     return {

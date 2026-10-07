@@ -45,6 +45,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-33 | Mão → Vida com filtro não revela a carta | 11-2-1 | baixo | C15 |
 | DV-34 | Erratas oficiais não aplicadas ao texto das cartas (**corrigido**) | Errata oficial | médio | C16 |
 | DV-35 | README "Regras implementadas" desatualizado (corrigido) | — | baixo | — |
+| DV-36 | Nomes e tipos da optcgapi diferentes da lista oficial (**corrigido**) | Lista oficial de cartas | médio | — |
 
 ## Cards de correção no Trello
 
@@ -273,10 +274,16 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 - Já vinham corrigidas da fonte (conferido em 07/10/2026): OP01-051, OP01-112, OP03-047, OP03-054, OP07-097, OP09-058, OP15-023 e o "up to" em massa de OP-01 e ST-01 a ST-04. OP13-119: a errata só vale para a impressão "Wanted Poster", e o texto da base já é o certo.
 - O leitor (`parser.ts`) e a tradução (`i18n/pt.ts`) ganharam as redações novas de Garp OP02-002 ("any of your Characters"), Magellan OP02-071 ("on the field") e Kaido ST04-001 ("from the top of their Life cards").
 - Testes: `packages/engine/test/errata.test.ts` e o teste "aplica a errata oficial…" em `apps/server/test/server.test.ts`.
-- Fora do escopo (dado da fonte, não errata): ST14-014 vem com o nome "Gum-Gum Giant Rifl" e o tipo "Straw Hat Cre" truncados.
+- Nomes e tipos que a fonte traz diferentes da lista oficial (ST14-014 "Gum-Gum Giant Rifl"/"Straw Hat Cre" e mais 103 cartas) são corrigidos à parte, pela tabela `packages/engine/src/source-fixes.ts` (DV-36).
 
 **DV-35. README "Regras implementadas" desatualizado** — baixo — **corrigido junto com esta base**
 - Diz que substituição, [End of Your Turn] e DON!! −X não existem; os três existem (timing `replace`, `endOfTurn`, `AbilityCost.donMinus`). Não menciona as limitações reais (C2). Atualizar e apontar para `docs/rules/`.
+
+**DV-36. Nomes e tipos da optcgapi diferentes da lista oficial** — médio — **corrigido**
+- Comparação de 07/10/2026 com a lista oficial (<https://en.onepiece-cardgame.com/cardlist/>), 2.703 cartas: 104 cartas com diferença (37 nomes e 68 listas de tipos; ST14-014 tem os dois). Há cortes ("Gum-Gum Giant Rifl", "Sakazuk", "Straw Hat Cre"), formatação ("Mr.3 (Galdino)"; os textos citam [Mr.3(Galdino)]), sufixos ("Jewelry Bonney -PRB02-004"), tipos ausentes, a mais ou trocados (Franky OP11-012 vinha como {Navy}/{SWORD}).
+- Impacto: o motor compara nomes exatamente; efeitos como OP16-040 ("If you have [Monkey.D.Luffy] and [Mr.3(Galdino)]"), EB04-056 ("If you have [Jewelry Bonney]") e as buscas "other than [Mr.3(Galdino)]"/"[Who's.Who]" não achavam as cartas; condições e buscas por tipo também falhavam.
+- Correção: tabela `packages/engine/src/source-fixes.ts` (104 cartas), aplicada junto com a errata por `fixCard` (motor, gravação e leitura do banco, `data/cards`). O comando `npm run cards:check-official -w @gumgum/server` refaz a comparação e gera as entradas (ver [manutencao.md](manutencao.md)). A própria lista oficial traz o tipo da ST11-005 em japonês ("音楽"); o comando o trata como {Music}.
+- Testes: `packages/engine/test/source-fixes.test.ts`, `apps/server/test/official-cards.test.ts` e o teste de carta já gravada em `apps/server/test/server.test.ts`.
 
 ---
 
