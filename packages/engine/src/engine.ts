@@ -672,6 +672,19 @@ function abilitySteps(a: Ability, index: number): EffectStep[] {
   return a.steps;
 }
 
+/**
+ * A carta que sai do campo ou entra nele é uma carta nova (3-1-6): o [Once Per Turn] dela pode
+ * ser usado de novo (10-2-13-4) e "this Character battled … during this turn" não vale mais.
+ * Esquece os usos do turno da carta e tira a marca dos efeitos dela que ainda esperam na fila
+ * (se forem descartados depois, não devolvem o uso da carta nova).
+ */
+function forgetCard(state: GameState, uid: string) {
+  const prefix = `${uid}:`;
+  if (state.usedThisTurn.some((k) => k.startsWith(prefix))) state.usedThisTurn = state.usedThisTurn.filter((k) => !k.startsWith(prefix));
+  if (state.battledCharacter?.includes(uid)) state.battledCharacter = state.battledCharacter.filter((u) => u !== uid);
+  for (const e of state.triggered ?? []) if (e.source === uid) delete e.opt;
+}
+
 /** Devolve o uso do turno de uma [Once Per Turn] cujo custo não foi pago. */
 function releaseOncePerTurn(state: GameState, uid: string, index: number | undefined) {
   if (index === undefined) return;
@@ -1250,9 +1263,11 @@ function handleMainAction(state: GameState, action: Action) {
         state.stack.push({ kind: 'play', uid: action.uid });
       } else if (def.category === 'stage') {
         if (ps.stage) {
-          ps.donRested += ps.stage.don;
-          ps.trash.push(ps.stage.uid);
+          const old = ps.stage.uid;
+          detach(state, old);
+          ps.trash.push(old);
         }
+        forgetCard(state, action.uid);
         ps.stage = { uid: action.uid, rested: false, don: 0, playedOnTurn: state.turn };
         log(state, p, `${ps.name} joga o Stage ${def.name}.`);
         pushAbilities(state, action.uid, 'onPlay');
@@ -1795,6 +1810,7 @@ function stepPlay(state: GameState, frame: PlayFrame) {
     log(state, owner, `${cardDef(state, out).name} é descartado para abrir espaço.`);
   }
   const rested = Boolean(frame.rested) || Boolean(leaderRule(state, owner, 'playRested'));
+  forgetCard(state, frame.uid);
   ps.characters.push({ uid: frame.uid, rested, don: 0, playedOnTurn: state.turn });
   state.stack.pop();
   pushAbilities(state, frame.uid, 'onPlay');
@@ -2082,6 +2098,7 @@ function playFree(state: GameState, uid: string, rested = false) {
       detach(state, old);
       ps.trash.push(old);
     }
+    forgetCard(state, uid);
     ps.stage = { uid, rested, don: 0, playedOnTurn: state.turn };
     log(state, ps.id, `${def.name} entra em campo.`);
     pushAbilities(state, uid, 'onPlay');
@@ -4264,6 +4281,7 @@ function detach(state: GameState, uid: string) {
     ps.donRested += loc.fc.don;
     ps.stage = null;
     state.modifiers = state.modifiers.filter((m) => m.uid !== uid);
+    forgetCard(state, uid);
     return;
   }
   for (const zone of [ps.hand, ps.deck, ps.trash, ps.life]) removeFrom(zone, uid);
@@ -4337,6 +4355,7 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
           os.life.push(op.uid);
           break;
         case 'character':
+          forgetCard(state, op.uid);
           os.characters.push({ uid: op.uid, rested: Boolean(op.rested), don: 0, playedOnTurn: state.turn });
           break;
         case 'stage':
@@ -4345,6 +4364,7 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
             detach(state, old);
             os.trash.push(old);
           }
+          forgetCard(state, op.uid);
           os.stage = { uid: op.uid, rested: Boolean(op.rested), don: 0, playedOnTurn: state.turn };
           break;
       }
@@ -4594,6 +4614,8 @@ function koCharacter(
   if (opts.inBattle || opts.byPlayer !== undefined) {
     emit(state, { kind: 'characterRemoved', player: loc.player, card: uid, byPlayer: opts.byPlayer, inBattle: opts.inBattle });
   }
+  // O uso marcado aqui é da carta no trash (removeCharacter já esqueceu os do campo); se ela voltar
+  // ao campo neste turno, entra como carta nova e o uso é esquecido de novo (forgetCard).
   for (const i of onKO) {
     const a = def.abilities[i];
     const opt = a.oncePerTurn ? usedKey(uid, i) : undefined;
@@ -4602,9 +4624,11 @@ function koCharacter(
   }
 }
 
+/** Tira o Personagem do campo: perde os modificadores e os usos do turno (é uma carta nova, 3-1-6). */
 function removeCharacter(state: GameState, uid: string) {
   for (const ps of state.players) ps.characters = ps.characters.filter((c) => c.uid !== uid);
   state.modifiers = state.modifiers.filter((m) => m.uid !== uid);
+  forgetCard(state, uid);
 }
 
 function drawCards(state: GameState, player: PlayerId, n: number) {

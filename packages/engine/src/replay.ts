@@ -15,8 +15,9 @@ export const REPLAY_VERSION = 6;
  * Esta função insere as respostas implícitas para o roteiro antigo continuar válido. (Desde a
  * versão 4 os efeitos disparados resolvem em outra ordem (CR 8-6): um replay antigo com efeitos
  * encadeados pode tomar outro rumo. Da mesma forma, um [On K.O.] que ativava sem cumprir as
- * condições no campo ([DON!! xX], negação, [Once Per Turn]) hoje não ativa; não há decisão nova
- * a inserir, então a versão não mudou.) Até a versão 5, a escolha de alvos sem "up to" aceitava
+ * condições no campo ([DON!! xX], negação, [Once Per Turn]) hoje não ativa, e o [Once Per Turn] de
+ * uma carta que saiu do campo e voltou no mesmo turno hoje pode ser usado de novo; não há decisão
+ * nova a inserir, então a versão não mudou.) Até a versão 5, a escolha de alvos sem "up to" aceitava
  * 0 alvos; a gravada com menos alvos do que hoje é obrigatório (8-4-4-1) é completada com as
  * primeiras opções.
  */

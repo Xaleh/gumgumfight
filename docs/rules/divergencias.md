@@ -19,7 +19,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação (**corrigido**) | 10-2-17-1, 8-2-1-1 | médio | C3 |
 | DV-08 | Escolha sem "up to" aceita 0 alvos (**corrigido**) | 8-4-4-1 | médio | C4 |
 | DV-09 | DON!! −X sem escolha de quais DON!! devolver (**corrigido**) | 8-3-1-6, Q&A de regras | médio | C5 |
-| DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo | 10-2-13-4 | médio | C6 |
+| DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo (**corrigido**) | 10-2-13-4 | médio | C6 |
 | DV-11 | Só a primeira substituição aplicável é oferecida; recusar descarta as outras | 8-1-3-4-2 | médio | C7 |
 | DV-12 | Remoção por efeito próprio não oferece substituição; `fieldToLife`/`opponentChoosesOwn` nunca oferecem | 8-1-3-4 | médio | C7 |
 | DV-13 | "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio | 1-3-1 (texto) | médio | C8 |
@@ -146,11 +146,12 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C6 — [Once Per Turn]
 
-**DV-10. [Once Per Turn] não reinicia quando a carta sai e volta ao campo** — médio **[testado]**
-- Regra: 10-2-13-4, 3-1-6 (é uma carta nova).
-- Atual: `usedThisTurn` guarda `uid:índice` e só é zerado no fim do turno (engine.ts:1419); `removeCharacter` não limpa.
-- Cenário: Jinbe ST14-004 usa o [Activate: Main], volta para a mão, é jogado de novo → "Já usada neste turno."
-- Onde: limpar as chaves do uid em `removeCharacter`/`detach`.
+**DV-10. [Once Per Turn] não reinicia quando a carta sai e volta ao campo** — médio — **corrigido**
+- Regra: 10-2-13-4, 3-1-6 (a carta que muda de área é uma carta nova).
+- Antes: `usedThisTurn` guardava `uid:índice` e só era zerado no fim do turno; `removeCharacter`/`detach` não limpavam. Jinbe ST14-004 usava o [Activate: Main], voltava para a mão, era jogado de novo → "Já usada neste turno."
+- Agora: `forgetCard` esquece as chaves `uid:*` de `usedThisTurn` quando a carta sai do campo (`removeCharacter`, que cobre K.O., devolver à mão/deck, Vida, descarte por campo cheio etc.; o Stage em `detach`; a troca de Stage ao jogar outro da mão passa a usar `detach`) e de novo quando entra (`resolvePlay`, Stage jogado da mão ou por efeito, modo manual). Saindo, também tira a marca (`opt`) dos efeitos da carta que ainda esperam na fila, para que, descartados depois (DV-04), não devolvam o uso de uma carta nova. O Líder não sai do campo. O [Once Per Turn] do [On K.O.] continua marcado depois do K.O. (é o uso da carta no trash, que resolve o efeito, DV-07); se ela voltar ao campo no mesmo turno, a entrada esquece a marca. Pelo mesmo motivo, a carta sai de `battledCharacter` ("if this Character battled … during this turn").
+- Fica de fora: os outros registros por carta (`delayed`, `tempReplacements`) são efeitos já criados, que seguem as próprias regras (8-2-3; OP03-005 Thatch, tema 08).
+- Testes: `packages/engine/test/once-per-turn.test.ts` (Jinbe devolvido à mão por efeito e jogado de novo; a mesma carta que não saiu continua bloqueada; [Once Per Turn] [On K.O.] de carta nocauteada, devolvida e jogada de novo ativa outra vez; Stage trocado, devolvido e jogado de novo; `battledCharacter`).
 
 ### C7 — Substituição ("instead")
 
@@ -321,6 +322,6 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível | DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo | DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
 | Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-16, DV-18, DV-27, DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

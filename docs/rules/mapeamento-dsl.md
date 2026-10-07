@@ -107,7 +107,9 @@ modo manual; 0 cartas hoje), "at the start of your opponent's turn" (0 cartas).
 - **Once Per Turn:** chave `uid:índice` em `state.usedThisTurn` (`usedKey` :657), limpa em `endTurn` :1419. Marcado ao
   empilhar (`pushAbilities` :1638, `emit` :1501, `activate` :1289) e na substituição (:3038, :3641, :3674). Se a
   habilidade começa com custo opcional e o jogador recusa, o uso é devolvido (`abilitySteps` :667, `releaseOncePerTurn`
-  :674). No `onKO` é conferido e marcado em `koCharacter`, antes de a carta sair do campo.
+  :674). No `onKO` é conferido em `koCharacter`, antes de a carta sair do campo, e marcado depois (uso da carta no
+  trash). A carta que sai do campo ou entra nele é nova (3-1-6): `forgetCard` apaga as chaves `uid:*` (e o
+  `battledCharacter`) em `removeCharacter`, `detach` do Stage, `resolvePlay` e na entrada do Stage (DV-10).
 - **[DON!! xX]:** `Ability.don`, conferido em `conditionsMet` :217 (qualquer turno).
 - **[Your Turn]/[Opponent's Turn]:** `Ability.yourTurn/opponentsTurn` (:218-219). Para `onKO`, `koCharacter` checa
   essas condições, o [DON!! xX] e a negação com a carta ainda no campo (10-2-17-1).

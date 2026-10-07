@@ -101,6 +101,8 @@ describe('[On K.O.] checa as condições no campo (DV-07)', () => {
   it('[Once Per Turn] [On K.O.] já usado neste turno não ativa', () => {
     const s0 = toTurn(started(), 3);
     const card = onField(s0, 1, 'KO-OPT');
+    // Estado montado à mão: numa partida a carta que volta ao campo é nova e não traz a marca
+    // (DV-10, once-per-turn.test.ts). Aqui só se confere que a marca é vista antes de sair do campo.
     s0.usedThisTurn.push(`${card}:0`);
     const hand = s0.players[1].hand.length;
     const s = koInBattle(s0, card);
