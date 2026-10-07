@@ -18,6 +18,26 @@ function value(state: GameState, uid: string): number {
   return (def.cost ?? 0) * 1000 + getPower(state, uid);
 }
 
+/**
+ * Qual DON!! devolver ao deck de DON!! (DON!! −X). Primeiro os virados, que já não servem para nada.
+ * No próprio turno, depois os dados a cartas (primeiro às que já atacaram), guardando os ativos para
+ * jogar cartas; no turno do oponente, os ativos (Counter) valem menos que o poder na defesa.
+ */
+function pickDonToReturn(state: GameState, player: PlayerId, sources: string[]): number {
+  const myTurn = state.activePlayer === player;
+  const rank = (src: string): number => {
+    if (src === 'rested') return 0;
+    if (src === 'active') return myTurn ? 3 : 1;
+    const rested = locate(state, src)?.fc.rested ?? false;
+    return myTurn ? (rested ? 1 : 2) : 2;
+  };
+  let best = 0;
+  sources.forEach((src, i) => {
+    if (rank(src) < rank(sources[best])) best = i;
+  });
+  return best;
+}
+
 function choosePending(state: GameState, player: PlayerId, actions: Action[]): Action {
   const pending = state.pending!;
   const me = state.players[player];
@@ -44,6 +64,7 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
       return actions.find((a) => a.type === 'answer' && a.yes) ?? { type: 'answer', player, yes: false };
 
     case 'option': {
+      if (pending.don) return { type: 'option', player, index: pickDonToReturn(state, player, pending.don) };
       // Opções do próprio efeito: a primeira; escolhendo pelo oponente ("Your opponent chooses one"): a última.
       const own = state.cards[pending.source]?.owner === player;
       return { type: 'option', player, index: own ? 0 : pending.options.length - 1 };

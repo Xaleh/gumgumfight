@@ -214,8 +214,10 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
       const { cannot, ...rest } = p;
       return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}) };
     }
-    case 'option':
-      return { ...p, source: ref(p.source), prompt: mine ? p.prompt : '', options: mine ? p.options : [] };
+    case 'option': {
+      const { don, ...rest } = p;
+      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', options: mine ? p.options : [], ...(mine && don ? { don: don.map((d) => (d === 'active' || d === 'rested' ? d : ref(d))) } : {}) };
+    }
     case 'manual':
       return { ...p, source: ref(p.source) };
   }

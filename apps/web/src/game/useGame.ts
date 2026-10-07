@@ -34,8 +34,9 @@ export interface ReplayFile {
    * 3: "pagar X?" sem como pagar e escolhas na mão ou no deck sem opção também (`answer` / `choose`).
    * 4: efeitos disparados resolvem em fila (CR 8-6) e a ordem entre efeitos simultâneos do mesmo
    *    jogador gera uma ação (`option`).
+   * 5: DON!! −X pergunta quais DON!! devolver quando há mais de uma forma (`option`).
    */
-  version: 1 | 2 | 3 | 4;
+  version: 1 | 2 | 3 | 4 | 5;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];

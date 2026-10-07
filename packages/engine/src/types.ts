@@ -709,6 +709,12 @@ type EffectStepBody =
   | { do: 'payCost'; cost: AbilityCost; scope?: number; ability?: number }
   /** Custo "DON!! −N ou mais": pergunta quantos DON!! devolver (no mínimo `min`) e devolve. */
   | { do: 'returnDonChoice'; min: number }
+  /**
+   * Devolve `count` DON!! ao deck de DON!! (DON!! −X, CR 10-2-10-1). O dono escolhe de onde, um por
+   * vez: área de custo (ativos ou virados), Líder, Personagens ou Stage. Sem escolha quando só há
+   * uma origem ou quando todos os DON!! do campo vão. `opponent`: os DON!! são do oponente, que escolhe.
+   */
+  | { do: 'returnDon'; count: number; opponent?: true }
   /** "Trash up to N of your opponent's Life cards." (do topo) */
   | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
   /** "This Character gains [Rush] during this turn." */
@@ -999,6 +1005,9 @@ export interface BattleState {
   after?: Array<{ controller: PlayerId; source: string; steps: EffectStep[]; last?: string[] }>;
 }
 
+/** De onde sai um DON!! do campo: área de custo (ativo ou virado) ou a carta (uid) a que está dado. */
+export type DonSource = 'active' | 'rested' | (string & {});
+
 /** Escolhas que o motor aguarda de um jogador. */
 export type Pending =
   /** O vencedor do sorteio escolhe se joga primeiro (`answer` yes) ou segundo (no). */
@@ -1048,9 +1057,10 @@ export type Pending =
   /**
    * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
    * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
-   * `TriggeredEffect.id` correspondente.
+   * `TriggeredEffect.id` correspondente. Com `don`, é a escolha de qual DON!! devolver ao deck
+   * de DON!!: cada opção é a origem correspondente.
    */
-  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[]; order?: number[] }
+  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[]; order?: number[]; don?: DonSource[] }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
 

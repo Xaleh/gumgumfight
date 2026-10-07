@@ -275,13 +275,14 @@ Estáticos de poder/custo (`Ability`): `staticPower`, `staticCost`, `staticBaseP
 | `setDonActive` | count | Desvira N DON!! (bloqueado por `noSetDonActiveByCharacter`) | 623 | 2343 |
 | `restOpponentDon` | count | Vira DON!! ativos do oponente | 496 | 2259 |
 | `skipRefreshDon` | count | DON!! virados do oponente não desviram (`state.donSkipRefresh`) | 540 | 3019 |
-| `returnDonChoice` | min | Custo "DON!! −N ou mais": pergunta quantos devolver | 711 | 2463 |
+| `returnDonChoice` | min | Custo "DON!! −N ou mais": pergunta quantos devolver (e passa a `returnDon`) | 711 | 2463 |
+| `returnDon` | count, opponent? | Devolve N DON!! ao deck; o dono escolhe de onde, um por vez (pendência `option` com `don`) | 717 | 2614 |
 | `returnGivenDon` | count | Custo: anexados voltam virados à área de custo | 590 | 3379 |
-| `opponentReturnsDon` | count, activeOnly? | O oponente devolve N DON!! ao deck | 621 | 3860 |
+| `opponentReturnsDon` | count, activeOnly? | O oponente devolve N DON!! ao deck (ele escolhe quais, via `returnDon`) | 621 | 3860 |
 | `donMatchOpponent` | — | Devolve até igualar o número de DON!! do oponente | 550 | 3104 |
 
-DON!! −X como custo: `AbilityCost.donMinus` (+`donMinusOpen`), pago em `payImmediateCost` :1976-1986 via
-`returnDonAndEmit` :1611 (emite `donReturned`). Virar DON!! (①②③): `AbilityCost.restDon` (`payDon` :4405).
+DON!! −X como custo: `AbilityCost.donMinus` (+`donMinusOpen`), pago em `payImmediateCost` com o passo
+`returnDon` (o dono escolhe quais DON!! devolver; emite `donReturned`). Virar DON!! (①②③): `AbilityCost.restDon` (`payDon` :4405).
 
 ### 2.11 Jogar cartas (mão, descarte, deck, Vida)
 | do | parâmetros | semântica | types | engine |
@@ -413,7 +414,7 @@ Todos disparam habilidades `timing: 'event'` **de cartas em campo** (Líder, Per
 
 | kind | Texto | Emitido em (engine.ts) |
 |---|---|---|
-| `donReturned` {min?} | "When a DON!! card on your field is returned to your DON!! deck" / "N or more" | `returnDonAndEmit` :1614; `opponentReturnsDon` :3866 |
+| `donReturned` {min?} | "When a DON!! card on your field is returned to your DON!! deck" / "N or more" | `returnDonAndEmit` :1614; passo `returnDon` |
 | `characterPlayed` {who, filter?, from?: trash, byEffect?} | "When you/your opponent play(s) a …", "is played from your trash", "using a Character's effect" | `stepPlay` :1671 |
 | `lifeRemoved` {whose} | "When a card is removed from your/your opponent's Life cards" | `lifeRemoved` :4440 (dano, `trashLife`, `lifeToHand`, `lifeToTrash`, `trashFaceUpLife`, `lifeOneToDeckTop`) |
 | `lifeZero` | "When your number of Life cards becomes 0" | `lifeRemoved` :4441 |

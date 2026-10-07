@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, attackError, hasKeyword, IllegalActionError } from '../src/engine';
 import type { GameState, PlayerId } from '../src/types';
-import { countDon, fetchToHand, kaido, luffy, putOnField, started, toTurn } from './helpers';
+import { countDon, fetchToHand, kaido, luffy, putOnField, returnDonInOrder, started, toTurn } from './helpers';
 
 // Jogador 0 = Kaido (ST04), jogador 1 = Luffy (ST01).
 const begin = (turn = 3, seed = 1) => toTurn(started(seed, [kaido, luffy]), turn);
@@ -40,6 +40,9 @@ describe('ST04 — Animal Kingdom Pirates', () => {
     s = play(s, 0, ulti);
     expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
     s = answer(s, 0, true);
+    // Pagou o Ulti com DON!! virados: escolhe entre devolver um virado ou um ativo.
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, don: ['rested', 'active'] });
+    s = returnDonInOrder(s);
     expect(s.players[0].donDeck).toBe(5); // devolveu 1
     expect(s.pending?.kind === 'selectTargets' && s.pending.options).toEqual([pageOne]);
     s = applyAction(s, { type: 'choose', player: 0, uids: [pageOne] });
@@ -76,7 +79,7 @@ describe('ST04 — Animal Kingdom Pirates', () => {
     const target = putOnField(s, 1, 'ST01-013');
     const kaidoChar = fetchToHand(s, 0, 'ST04-003');
     s = play(s, 0, kaidoChar);
-    s = answer(s, 0, true);
+    s = returnDonInOrder(answer(s, 0, true));
     s = applyAction(s, { type: 'choose', player: 0, uids: [target] });
     expect(s.players[1].trash).toContain(target);
     expect(hasKeyword(s, kaidoChar, 'rush')).toBe(true);
@@ -91,7 +94,7 @@ describe('ST04 — Animal Kingdom Pirates', () => {
     const queen = fetchToHand(s, 0, 'ST04-005');
     const hand = s.players[0].hand.length;
     s = play(s, 0, queen);
-    s = answer(s, 0, true);
+    s = returnDonInOrder(answer(s, 0, true));
     expect(s.pending).toMatchObject({ kind: 'selectTargets', min: 1, max: 1, intent: 'discard' });
     s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].hand[0]] });
     expect(s.players[0].hand.length).toBe(hand - 1 + 2 - 1);
@@ -122,7 +125,7 @@ describe('ST04 — Animal Kingdom Pirates', () => {
     s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: ps.leader.uid });
     s = applyAction(s, { type: 'counter', player: 0, uid: breath });
     expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
-    s = answer(s, 0, true);
+    s = returnDonInOrder(answer(s, 0, true));
     s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].leader.uid] });
     if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 0 });
     expect(s.players[0].life).toHaveLength(5);
