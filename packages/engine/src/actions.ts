@@ -1,7 +1,9 @@
 import {
   activateError,
   attackError,
+  cancelAllowed,
   cardDef,
+  detachDonError,
   isIdle,
   opponent,
   playError,
@@ -18,6 +20,48 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
   const pending = state.pending;
   if (pending) {
     if (pending.player !== player) return [];
+    const out = pendingActions(state, player, pending);
+    if (cancelAllowed(state, player)) out.push({ type: 'cancel', player });
+    return out;
+  }
+
+  if (!isIdle(state) || state.activePlayer !== player) return [];
+  const ps = state.players[player];
+  const out: Action[] = [];
+
+  for (const uid of ps.hand) if (!playError(state, player, uid)) out.push({ type: 'playCard', player, uid });
+
+  const field = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])];
+  for (const fc of field) {
+    cardDef(state, fc.uid).abilities.forEach((a, i) => {
+      if (a.timing === 'activateMain' && !activateError(state, player, fc.uid, i)) {
+        out.push({ type: 'activate', player, uid: fc.uid, ability: i });
+      }
+    });
+  }
+
+  if (ps.donActive > 0) {
+    for (const fc of [ps.leader, ...ps.characters]) out.push({ type: 'attachDon', player, target: fc.uid });
+  }
+  for (const fc of [ps.leader, ...ps.characters]) {
+    if (!detachDonError(state, player, fc.uid)) out.push({ type: 'detachDon', player, target: fc.uid });
+  }
+
+  const opp = state.players[opponent(player)];
+  const targets = [opp.leader.uid, ...opp.characters.map((c) => c.uid)];
+  for (const fc of [ps.leader, ...ps.characters]) {
+    for (const t of targets) {
+      if (!attackError(state, player, fc.uid, t)) out.push({ type: 'attack', player, attacker: fc.uid, target: t });
+    }
+  }
+
+  out.push({ type: 'endTurn', player });
+  return out;
+}
+
+/** Respostas possíveis à escolha pendente (sem o `cancel`, que depende do histórico da ação). */
+function pendingActions(state: GameState, player: PlayerId, pending: NonNullable<GameState['pending']>): Action[] {
+  {
     switch (pending.kind) {
       case 'mulligan':
         return [
@@ -64,36 +108,6 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
         return [{ type: 'manualDone', player }];
     }
   }
-
-  if (!isIdle(state) || state.activePlayer !== player) return [];
-  const ps = state.players[player];
-  const out: Action[] = [];
-
-  for (const uid of ps.hand) if (!playError(state, player, uid)) out.push({ type: 'playCard', player, uid });
-
-  const field = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])];
-  for (const fc of field) {
-    cardDef(state, fc.uid).abilities.forEach((a, i) => {
-      if (a.timing === 'activateMain' && !activateError(state, player, fc.uid, i)) {
-        out.push({ type: 'activate', player, uid: fc.uid, ability: i });
-      }
-    });
-  }
-
-  if (ps.donActive > 0) {
-    for (const fc of [ps.leader, ...ps.characters]) out.push({ type: 'attachDon', player, target: fc.uid });
-  }
-
-  const opp = state.players[opponent(player)];
-  const targets = [opp.leader.uid, ...opp.characters.map((c) => c.uid)];
-  for (const fc of [ps.leader, ...ps.characters]) {
-    for (const t of targets) {
-      if (!attackError(state, player, fc.uid, t)) out.push({ type: 'attack', player, attacker: fc.uid, target: t });
-    }
-  }
-
-  out.push({ type: 'endTurn', player });
-  return out;
 }
 
 /** Quem precisa agir agora (jogador com escolha pendente ou jogador ativo). */
