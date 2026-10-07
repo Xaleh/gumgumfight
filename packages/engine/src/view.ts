@@ -182,13 +182,26 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
     case 'lifeCard':
       // O oponente vê que há uma carta da Vida sendo olhada, nunca qual (nem se tem [Trigger]).
       return { ...p, card: ref(p.card) };
-    case 'confirm':
-      return { ...p, source: ref(p.source), prompt: mine ? p.prompt : '' };
+    case 'confirm': {
+      // O oponente não vê o prompt nem se o "sim" está disponível (isso contaria a mão).
+      const { cannot, ...rest } = p;
+      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}) };
+    }
     case 'option':
       return { ...p, source: ref(p.source), prompt: mine ? p.prompt : '', options: mine ? p.options : [] };
     case 'manual':
       return { ...p, source: ref(p.source) };
   }
+}
+
+/**
+ * Decisão que pode esconder informação do dono: Counter, carta da Vida, perguntas "pagar X?"
+ * e escolhas que leem a mão ou o deck. Elas abrem sempre, e o bot responde a elas com um
+ * tempo aleatório, para a pressa (ou a demora) não contar se havia algo a usar.
+ */
+export function hiddenDecision(p: Pending | null | undefined): boolean {
+  if (!p) return false;
+  return p.kind === 'counter' || p.kind === 'lifeCard' || p.kind === 'confirm' || (p.kind === 'selectTargets' && Boolean(p.hidden));
 }
 
 /**

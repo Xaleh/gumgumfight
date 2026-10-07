@@ -33,8 +33,11 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
 
     // Vencendo o sorteio, o bot joga primeiro.
     case 'chooseFirst':
-    case 'confirm':
       return { type: 'answer', player, yes: true };
+
+    // Paga custos opcionais quando dá; sem como pagar, só resta recusar.
+    case 'confirm':
+      return { type: 'answer', player, yes: !pending.cannot };
 
     // Carta da Vida: ativa o [Trigger] quando há um; senão só coloca na mão.
     case 'lifeCard':

@@ -217,6 +217,11 @@ No menu, a aba **Online** tem a fila **casual**, a **ranqueada** e as **salas pr
   própria visão (`packages/engine/src/view.ts`): mão do oponente, decks e Vida virada para baixo chegam como cartas
   escondidas, sem seed nem RNG. Os ids das cartas viram apelidos aleatórios por partida, porque os ids do motor seguem a
   ordem da lista do deck. Uma ação com uma carta fora de vista é recusada.
+- **Pular uma etapa também conta algo.** As decisões que dependem de informação escondida abrem sempre para o dono,
+  mesmo quando só há uma resposta: a etapa de Counter (sem Counter na mão), a carta que sai da Vida (sem [Trigger]),
+  as perguntas "pagar X?" cujo custo lê a mão (sem carta que sirva) e as escolhas na mão ou no deck (sem carta válida).
+  O oponente e o espectador veem a mesma decisão e o mesmo log nos dois casos, e o bot responde a elas depois de um
+  tempo aleatório, para a pressa não contar o que ele tinha.
 - **Embaralhamento:** as partidas online usam um RNG de 128 bits (sfc32) com seed do `crypto`. A seed de 32 bits das
   partidas locais poderia ser descoberta por força bruta a partir da mão inicial. Replays e estatísticas antigos não mudam.
 - **Relógio:** cada jogador tem **17:30** na partida inteira. O tempo só corre quando a ação ou a decisão (incluindo

@@ -1011,6 +1011,12 @@ export type Pending =
        * estão em `options` aparecem desabilitadas, para o jogador saber o que vai para o fundo.
        */
       shown?: string[];
+      /**
+       * As opções vêm de uma zona escondida do dono (mão, deck). A escolha abre mesmo sem
+       * opção (`options` vazio, só `choose []` é legal): pular contaria ao oponente o que
+       * há (ou não há) na mão ou no deck.
+       */
+      hidden?: true;
     }
   | { kind: 'block'; player: PlayerId; options: string[] }
   /**
@@ -1024,8 +1030,12 @@ export type Pending =
    * Vida, com ou sem [Trigger], para o oponente não descobrir qual era o caso.
    */
   | { kind: 'lifeCard'; player: PlayerId; card: string }
-  /** Pergunta sim/não (ex.: pagar um custo opcional). Responder com `answer`. */
-  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string }
+  /**
+   * Pergunta sim/não (ex.: pagar um custo opcional). Responder com `answer`. Com `cannot`,
+   * só o "não" é legal: o custo lê a mão e não pode ser pago, mas a pergunta abre mesmo
+   * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`.
+   */
+  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true }
   /** Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`. */
   | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[] }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
