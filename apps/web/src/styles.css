@@ -2601,6 +2601,17 @@ button.hint-pill {
 .zoom-actions .btn.quiet:hover:not(:disabled) {
   background: rgba(90, 98, 122, 0.95);
 }
+/* Counter em outra carta que não a atacada: opção discreta abaixo de "Usar como Counter". */
+.zoom-actions .counter-other {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+.zoom-actions .counter-other > small {
+  opacity: 0.75;
+}
 .zoom-text {
   width: 100%;
   background: var(--surface);

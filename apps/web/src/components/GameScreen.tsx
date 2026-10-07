@@ -4,6 +4,7 @@ import {
   cancelAllowed,
   cardDef,
   cardStatuses,
+  counterTargets,
   counterValue,
   type GameState,
   getPower,
@@ -417,8 +418,9 @@ function Table({
   const canAttackWith = (uid: string) => myTurnIdle && has((a) => a.type === 'attack' && a.attacker === uid);
   /** Etapa de Counter: esta carta da mão pode ser usada como Counter agora? */
   const canCounter = (uid: string) => myPending?.kind === 'counter' && myPending.options.includes(uid);
-  const useCounter = (uid: string) => {
-    dispatch({ type: 'counter', player: human!, uid });
+  /** Usa o Counter; sem `target`, o valor vai para o atacado (o caso comum, num clique só). */
+  const useCounter = (uid: string, target?: string) => {
+    dispatch({ type: 'counter', player: human!, uid, ...(target ? { target } : {}) });
     setZoom(null);
     setSelected(null);
   };
@@ -454,7 +456,7 @@ function Table({
         ? !defense.options.length
           ? 'Nenhuma carta da mão serve como Counter agora: conclua a etapa (o oponente não sabe disso)'
           : quickCounter
-            ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
+            ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter (toque longo: dar a outra carta)'
             : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
         : targets
           ? targets.max === 0
@@ -986,6 +988,8 @@ function Table({
             uid={zoom}
             legal={myTurnIdle ? legal : []}
             onCounter={canCounter(zoom) ? () => useCounter(zoom) : undefined}
+            counterTargets={canCounter(zoom) && state.battle && human !== null ? counterTargets(state, human).filter((u) => u !== state.battle!.target) : undefined}
+            onCounterTo={(target) => useCounter(zoom, target)}
             onClose={() => setZoom(null)}
             onDispatch={(a) => {
               dispatch(a);
@@ -2020,6 +2024,9 @@ function CardZoom(props: {
   legal: Action[];
   /** Etapa de Counter: confirma o uso desta carta como Counter. */
   onCounter?: () => void;
+  /** Etapa de Counter: outras cartas do jogador que podem receber o valor de Counter (o Líder ou 1 Personagem, 7-1-3-1-1). */
+  counterTargets?: string[];
+  onCounterTo: (target: string) => void;
   onClose: () => void;
   onDispatch: (a: Action) => void;
   /** DON!! marcados na fileira: o botão de anexar passa a anexar todos eles nesta carta. */
@@ -2113,6 +2120,22 @@ function CardZoom(props: {
                 🛡 Usar como Counter
                 {counter > 0 && <span className="cost-chip">+{counter}</span>}
               </button>
+            )}
+            {/* O Counter vai para o atacado; dá também para dar o bônus a outra carta (acaba no fim da batalha). */}
+            {props.onCounter && !eventCounter && Boolean(props.counterTargets?.length) && (
+              <div className="counter-other">
+                <small>ou dar a</small>
+                {props.counterTargets!.map((t) => (
+                  <button
+                    key={t}
+                    className="btn small quiet"
+                    onClick={() => props.onCounterTo(t)}
+                    title={`Dar o Counter a ${cardDef(state, t).name} (o bônus acaba no fim da batalha)`}
+                  >
+                    {cardDef(state, t).name} <small>({getPower(state, t)})</small>
+                  </button>
+                ))}
+              </div>
             )}
             {play && !eventPlay && (
               <button className="btn primary big" onClick={() => props.onDispatch(play)}>

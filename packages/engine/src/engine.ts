@@ -864,10 +864,20 @@ export function counterOptions(state: GameState, defender: PlayerId): string[] {
     const def = cardDef(state, uid);
     if (def.category === 'character' || def.category === 'stage') return counterValue(state, uid) > 0;
     if (def.category === 'event') {
-      return def.abilities.some((a) => a.timing === 'counter') && (def.cost ?? 0) <= ps.donActive;
+      // Reduções de custo da carta na mão valem também para o Evento [Counter] (2-7-6).
+      return def.abilities.some((a) => a.timing === 'counter') && playCost(state, uid) <= ps.donActive;
     }
     return false;
   });
+}
+
+/**
+ * Quem pode receber o valor de Counter de uma carta da mão (7-1-3-1-1): o Líder ou 1 Personagem do
+ * defensor, inclusive um que não é o alvo do ataque (o bônus acaba no fim da batalha, Q&A de regras).
+ */
+export function counterTargets(state: GameState, defender: PlayerId): string[] {
+  const ps = state.players[defender];
+  return [ps.leader.uid, ...ps.characters.map((c) => c.uid)];
 }
 
 export function targetCandidates(state: GameState, controller: PlayerId, source: string, spec: TargetSpec): string[] {
@@ -1178,16 +1188,28 @@ function handlePendingResponse(state: GameState, action: Action) {
       if (action.type !== 'counter') throw new IllegalActionError('Use um Counter ou passe.');
       if (!pending.options.includes(action.uid)) throw new IllegalActionError('Carta de Counter inválida.');
       const def = cardDef(state, action.uid);
+      const isEvent = def.category === 'event';
+      // Sem alvo, o valor de Counter vai para o atacado; com alvo, para o Líder ou 1 Personagem do defensor.
+      const target = action.target ?? state.battle!.target;
+      if (action.target !== undefined) {
+        if (isEvent) throw new IllegalActionError('O Evento [Counter] escolhe os alvos no próprio efeito.');
+        if (!counterTargets(state, p).includes(target)) throw new IllegalActionError('O Counter só pode ir para o seu Líder ou um Personagem seu.');
+      }
+      // Custo com as reduções da carta na mão (2-7-6), lido antes de ela sair da mão.
+      const cost = isEvent ? playCost(state, action.uid) : 0;
+      if (isEvent) {
+        const red = (state.costReductions ?? []).findIndex((r) => r.player === p && matchesFilter(def, r.filter));
+        if (red >= 0) state.costReductions!.splice(red, 1);
+      }
       removeFrom(ps.hand, action.uid);
       ps.trash.push(action.uid);
       state.pending = null;
-      if (def.category !== 'event') {
-        const target = state.battle!.target;
+      if (!isEvent) {
         const amount = counterValue(state, action.uid);
         state.modifiers.push({ uid: target, kind: 'power', amount, duration: 'battle' });
         log(state, p, `Counter: ${def.name} dá +${amount} a ${cardDef(state, target).name}.`);
       } else {
-        payDon(ps, def.cost ?? 0);
+        payDon(ps, cost);
         const ability = def.abilities.find((a) => a.timing === 'counter')!;
         log(state, p, `${ps.name} usa o evento ${def.name}.`);
         pushEffect(state, action.uid, p, ability.steps);
@@ -1908,18 +1930,35 @@ function stepBattle(state: GameState) {
     }
 
     case 'end': {
-      // "If this Character battles your opponent's Character": dispara ao fim da batalha.
-      const fought = (b.fought ?? []).filter((uid) => locate(state, uid));
+      // Fim da batalha (7-1-5): primeiro ativam os efeitos "at the end of this battle" e os de
+      // "if this Character battles your opponent's Character" (7-1-5-2); eles resolvem com a batalha
+      // ainda em curso (`state.battle`, Counters e outros "during this battle" valendo). Só depois
+      // expiram os efeitos "during this battle" e a batalha termina (7-1-5-3/4).
+      let queued = false;
+      if (!b.endFired) {
+        b.endFired = true;
+        const fought = (b.fought ?? []).filter((uid) => locate(state, uid));
+        for (const uid of fought) {
+          // "the opponent's Character you battled with"
+          const other = (b.fought ?? []).find((u) => u !== uid);
+          for (const e of pushAbilities(state, uid, 'battlesCharacter')) {
+            if (other) e.last = [other];
+            queued = true;
+          }
+        }
+      }
+      // Também os "at the end of this battle" criados por esses mesmos efeitos.
+      if (b.after?.length) {
+        const after = b.after;
+        delete b.after;
+        queueDelayed(state, after);
+        queued = true;
+      }
+      // Os efeitos disparados resolvem antes (fila 8-6); a batalha volta aqui depois deles.
+      if (queued) return;
       state.modifiers = state.modifiers.filter((m) => m.duration !== 'battle');
-      const after = b.after ?? [];
       state.battle = null;
       state.stack.pop();
-      for (const uid of fought) {
-        // "the opponent's Character you battled with"
-        const other = (b.fought ?? []).find((u) => u !== uid);
-        for (const e of pushAbilities(state, uid, 'battlesCharacter')) if (other) e.last = [other];
-      }
-      queueDelayed(state, after);
       return;
     }
   }

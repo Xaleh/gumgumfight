@@ -29,8 +29,11 @@ export const REPLAY_VERSION = 8;
  * pergunta também é recusada. (Também desde a versão 8, "cannot be K.O.'d by your opponent's
  * effects" não protege do K.O. pelo próprio efeito, o Personagem protegido não paga custo de K.O.
  * e o Stage protegido não é nocauteado: sem decisão nova, mas um replay antigo pode tomar outro rumo.
- * O mesmo vale para a carta do [Trigger], que hoje fica fora do descarte enquanto resolve, e para
- * o Personagem posto na Vida "face-up" (`fieldToLife`), que hoje fica virado para cima.)
+ * O mesmo vale para a carta do [Trigger], que hoje fica fora do descarte enquanto resolve, para
+ * o Personagem posto na Vida "face-up" (`fieldToLife`), que hoje fica virado para cima, para o
+ * Evento [Counter] com redução de custo na mão e para os efeitos de fim de batalha, que hoje
+ * resolvem antes de expirar o "during this battle". A ação `counter` ganhou `target` opcional;
+ * sem ele, o Counter vai para o atacado, como sempre.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);

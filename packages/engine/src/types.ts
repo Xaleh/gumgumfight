@@ -1037,6 +1037,8 @@ export interface BattleState {
   noBlockerMaxCost?: number;
   /** Personagens que batalharam entre si (registrado no dano, vale mesmo se um sair de campo). */
   fought?: string[];
+  /** Os efeitos de fim de batalha já foram disparados (a batalha espera eles resolverem para terminar). */
+  endFired?: boolean;
   /** "at the end of this battle, …" */
   after?: Array<{ controller: PlayerId; source: string; steps: EffectStep[]; last?: string[] }>;
 }
@@ -1286,7 +1288,11 @@ export type Action =
   | { type: 'endTurn'; player: PlayerId }
   | { type: 'choose'; player: PlayerId; uids: string[] }
   | { type: 'answer'; player: PlayerId; yes: boolean }
-  | { type: 'counter'; player: PlayerId; uid: string }
+  /**
+   * Usa uma carta da mão no Counter Step. `target`: quem recebe o valor de Counter de um Personagem
+   * ou Stage (o Líder ou 1 Personagem do defensor, 7-1-3-1-1); sem ele, o atacado.
+   */
+  | { type: 'counter'; player: PlayerId; uid: string; target?: string }
   | { type: 'pass'; player: PlayerId }
   | { type: 'concede'; player: PlayerId }
   /** O jogador ficou sem tempo (só o servidor das partidas online envia). */

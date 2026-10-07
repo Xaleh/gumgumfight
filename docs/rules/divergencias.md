@@ -30,9 +30,9 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-18 | `fieldToLife` ignora "face-up" (**corrigido**) | texto das cartas | médio | C10 |
 | DV-19 | «Set Power to 0» lido como poder base 0 (**corrigido**) | 4-12 | baixo | C11 |
 | DV-20 | Vários "base power becomes X": vale o último, não o maior (**corrigido**) | 4-9-2-1 | baixo | C11 |
-| DV-21 | Counter da mão só pode ir para o alvo do ataque | 7-1-3-1-1, Q&A de regras | baixo | C12 |
-| DV-22 | Evento [Counter] ignora redução de custo na mão | 2-7-6 | baixo | C12 |
-| DV-23 | "During this battle" expira antes dos efeitos de fim de batalha | 7-1-5-2..4 | baixo | C12 |
+| DV-21 | Counter da mão só pode ir para o alvo do ataque (**corrigido**) | 7-1-3-1-1, Q&A de regras | baixo | C12 |
+| DV-22 | Evento [Counter] ignora redução de custo na mão (**corrigido**) | 2-7-6 | baixo | C12 |
+| DV-23 | "During this battle" expira antes dos efeitos de fim de batalha (**corrigido**) | 7-1-5-2..4 | baixo | C12 |
 | DV-24 | Ordem da Vida na preparação invertida | 5-2-1-7, 2-9-2-1 | baixo | C13 |
 | DV-25 | "At the start of the game" roda antes da escolha de quem começa, sem escolha nem recusa | 5-2-1-5-1/2 | baixo | C13 |
 | DV-26 | Derrota simultânea não empata | 9-2-1 | baixo | C13 |
@@ -235,16 +235,25 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C12 — Counter Step e fim de batalha
 
-**DV-21. Counter da mão só pode ir para o alvo do ataque** — baixo
+**DV-21. Counter da mão só pode ir para o alvo do ataque** — baixo (**corrigido**)
 - Regra: 7-1-3-1-1 ("Leader or 1 Character card"). Q&A de regras: "Can I use a Counter to increase the power of a card not being attacked? Yes … the effect will end at the end of the current battle."
-- Atual: engine.ts:1151 aplica sempre no alvo.
+- Antes: engine.ts:1151 aplicava sempre no alvo do ataque.
+- Agora: a ação `counter` tem `target` opcional (o Líder ou 1 Personagem do defensor, `counterTargets`); sem ele, o valor vai para o atacado, como antes. O bônus continua com duração `battle`. Alvo do atacante, ou `target` num Evento [Counter] (que escolhe os alvos no próprio efeito), é recusado. A visão traduz o `target` como o `uid` (`aliasRefs`/`actionFromView`), então o servidor das partidas online aceita a ação nova.
+- Interface: o caso comum continua com um clique (tocar ou arrastar a carta até a mesa dá o Counter ao atacado). Ao abrir a carta (toque longo, ou o toque sem "Counter sem confirmação"), abaixo de "Usar como Counter" aparece "ou dar a" com o Líder e os Personagens do jogador. O bot continua dando o Counter ao atacado.
+- Replays: a ação antiga (sem `target`) vale o mesmo; a versão não muda.
 
-**DV-22. Evento [Counter] ignora redução de custo na mão** — baixo
-- Atual: `counterOptions` (engine.ts:837) e o pagamento (:1155) usam `def.cost`, não `playCost`.
+**DV-22. Evento [Counter] ignora redução de custo na mão** — baixo (**corrigido**)
+- Regra: 2-7-6 (as reduções valem para jogar ou ativar a carta da mão).
+- Antes: `counterOptions` (engine.ts:837) e o pagamento (:1155) usavam `def.cost`, não `playCost`.
+- Agora: os dois usam `playCost` (o mesmo do Main: `handCost`, `costReductions`, `handCostAura`), lido antes de a carta sair da mão; uma redução "da próxima jogada" (`costReductions`) é consumida como no Main. `eventsThisTurn` continua com o custo impresso.
+- Replays: sem decisão nova, a versão não muda; um replay antigo pode tomar outro rumo (um Evento [Counter] com redução passa a ser oferecido e custa menos).
 
-**DV-23. "During this battle" expira antes dos efeitos de fim de batalha** — baixo
+**DV-23. "During this battle" expira antes dos efeitos de fim de batalha** — baixo (**corrigido**)
 - Regra: 7-1-5-2 (ativam os "at the end of this battle"), depois 7-1-5-3/4 (expira "during this battle").
-- Atual: engine.ts:1744 remove os modificadores `battle` antes de empilhar os efeitos de fim de batalha; `state.battle` já é `null` para eles.
+- Antes: engine.ts:1744 removia os modificadores `battle` antes de empilhar os efeitos de fim de batalha; `state.battle` já era `null` para eles.
+- Agora: a etapa `end` de `stepBattle` primeiro dispara os `battlesCharacter` ("if this Character battles…", "at the end of a battle in which…") e os "at the end of this battle" (`battle.after`, inclusive os criados por esses mesmos efeitos), marca `battle.endFired` e volta. Os efeitos passam pela fila de disparados (8-6) e resolvem com a batalha ainda em curso (`state.battle`, Counters e outros "during this battle" valendo, pendências normais). Quando não há mais nada a disparar, expiram os modificadores `battle` e a batalha termina. Sem efeitos de fim de batalha, termina na hora, como antes.
+- Replays: sem decisão nova, a versão não muda; um replay antigo com efeitos de fim de batalha que leem o poder ou a batalha pode tomar outro rumo.
+- Testes (DV-21 a DV-23): `packages/engine/test/counter-step.test.ts` (Counter num Personagem que não é o atacado, que acaba no fim da batalha; sem alvo vai para o atacado e alvo inválido ou com Evento é recusado; tradução do alvo pela visão; Evento [Counter] de custo 3 com −2 na mão oferecido e pago com 1 DON!!; "at the end of a battle in which this Character battles…" e "[When Attacking] At the end of this battle" resolvem com o Counter ainda valendo e a batalha em curso, que termina depois). 6 de 6 falham no código antigo.
 
 ### C13 — Preparação e fim de partida
 

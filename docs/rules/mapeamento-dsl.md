@@ -23,7 +23,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | [Blocker], [Unblockable], "cannot activate [Blocker]" (5) | `blockerOptions`, `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock` | Existe |
 | [Rush], [Rush: Character], atacar Personagens ativos (5) | palavras-chave, `attackError`, `canAttackActive` | Existe |
 | Redirecionar ataque (5) | `redirectAttack` | Existe |
-| Counter da mão, Evento [Counter], "during this battle" (6) | pendência `counter`, `counterValue`, `handCounter`, duração `battle` | Existe; redução de custo na mão não vale para Eventos [Counter] (Parcial) |
+| Counter da mão, Evento [Counter], "during this battle" (6) | pendência `counter`, `counterValue`, `counterTargets`, `handCounter`, duração `battle` | Existe: Counter no Líder ou em qualquer Personagem do defensor (DV-21), Evento [Counter] com `playCost` (DV-22), "during this battle" expira depois dos efeitos de fim de batalha (DV-23) |
 | «Set Power to 0» (6) | `setPowerZero` | Existe: −(poder atual) na ativação, nada se já ≤0 (CR 4-12; DV-19 corrigida) |
 | Poder base / troca de poder base (6, 12) | `basePower`, `swapBasePower`, `staticBasePower`, `basePowerOf` | Existe: vários efeitos, vale o maior (CR 4-9-2-1; DV-20 corrigida) |
 | Dar DON!!, DON!! −X, [DON!! xX] (7) | `giveRestedDon`, `giveActiveDon`, `moveGivenDon`, `AbilityCost.donMinus`, `returnDonChoice`, `Ability.don` | Existe |
@@ -89,7 +89,7 @@ DON!! anexados (217), [Your Turn] (218), [Opponent's Turn] (219), `condition` vi
 | `onOpponentAttack` | [On Your Opponent's Attack]; "This effect can be activated when your opponent('s Character) attacks" | `stepBattle` :1690 (campo do defensor, empilhado antes do [When Attacking] → resolve depois) | parser.ts:46; :2582 (`attackerCharacter`/`attackerAttribute`), :2608 |
 | `activateMain` | [Activate: Main] (e "[Once Per Turn] You may X: Y" sem marcação, :2602) | Ação `activate` em `handleMainAction` :1284 (validação `activateError` :779; custo `payImmediateCost` :1973) | parser.ts:46, `parseLine` :3022 (custo vai para `Ability.cost`) |
 | `main` | [Main] (só Eventos) | Evento jogado da mão :1251; `activateEventFromHand/Trash` :3468; `useMainEffect` (Trigger) :3902 → `useOwnEffect` :1934 | parser.ts:46 |
-| `counter` | [Counter] (só Eventos) | Pendência `counter` :1158 (paga `def.cost` em DON!!); `useCounterEffect` :3904 | parser.ts:46 |
+| `counter` | [Counter] (só Eventos) | Pendência `counter` :1158 (paga `playCost` em DON!!, com as reduções na mão); `useCounterEffect` :3904 | parser.ts:46 |
 | `trigger` | [Trigger] (campo `CardData.trigger`) | Pendência `lifeCard` aberta em `stepDamage` :1802; resposta "sim" :1206-1211 (a carta vai para `state.limbo`, efeito empilhado com `trigger: true`, evento `triggerActivated`; descarte no fim do frame) | `parseTriggerText` parser.ts:3041 |
 | `onKO` | [On K.O.]; "When this Character is K.O.'d (by an effect / by your opponent's effect)" (`koBy`) | `koCharacter` (confere `conditionsMet`, [Once Per Turn] e `koBy` com a carta ainda no campo; o efeito vai para a fila depois do K.O.) | parser.ts:46; :2618, :2728 |
 | `onBlock` | [On Block] | Pendência `block` :1132 | parser.ts:46 |
@@ -238,7 +238,7 @@ Estado: `PlayerState.life` (último = topo) e `lifeFaceUp` (types.ts:946, :952).
 Durações (`Duration`, types.ts:447): `turn`, `battle`, `nextOpponentTurn` ("until the end of your opponent's next
 turn/End Phase"), `untilYourNextTurn` ("until the start of your next turn"), `endOfYourNextTurn`. `addModifier`
 (engine.ts:1944) calcula `untilTurn`; expiram em `endTurn` :1414-1418 (turn / nextOpponentTurn / endOfYourNextTurn),
-`startTurn` :1353 (untilYourNextTurn) e no fim da batalha :1742 (battle). `power` com `battle` fora de batalha vira
+`startTurn` :1353 (untilYourNextTurn) e no fim da batalha :1742 (battle), depois de resolverem os efeitos de fim de batalha. `power` com `battle` fora de batalha vira
 `turn` (:2177). Leitura: `getPower` :584 (base impresso → aura `basePower` → `staticBasePower` → modificador `basePower`
 → +1000 por DON!! no turno do dono → `staticPower`/`powerPer`/`battleVsAttribute` → auras de poder → modificadores
 `power`); `getCost` :448 (mínimo 0); custo de jogar `playCost` :736 (`handCost`, `costReductions`, `handCostAura`).
@@ -535,7 +535,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 7 | Trocar poder | **Existe** | 0 / 3 | `swapBasePower` (troca poder base). |
 | 8 | "When this card is removed from Life" | **Não existe** | 0 / 0 | `emit` só olha cartas em campo; `lifeRemoved` não carrega qual carta saiu. "When a card is removed from your/opponent's Life" existe (0 / 3). |
 | 9 | Gatilhos fora do campo (na mão, no descarte) | **Não existe** | 0 / 0 | `emit` (:1490) varre só Líder, Personagens e Stage. |
-| 10 | Redução estática de custo na mão | **Existe** | 5 / 17 | `handCost`, `handCostAura`, `nextPlayDiscount` → `playCost` (:736). Não vale para o custo de Eventos [Counter] (`counterOptions` :837 e pagamento :1155 usam `def.cost`). |
+| 10 | Redução estática de custo na mão | **Existe** | 5 / 17 | `handCost`, `handCostAura`, `nextPlayDiscount` → `playCost` (:736). Vale também para o custo de Eventos [Counter] (`counterOptions` e o pagamento, DV-22). |
 | 11 | Jogar esta carta do descarte / da Vida | **Existe** | 2 / 7 ("Play this (Character) card from your trash"); "play … from your trash" em geral 6 / 82; jogar da Vida fora de [Trigger]: 0 (o único acerto, OP01-008, é falso positivo) | `playThis`, `playFrom{trash}`, `playRevealed` (deck/Vida). No [Trigger] a carta fica fora das áreas enquanto resolve: `playThis` não a marca como `from: 'trash'` e "play … from your trash" não a alcança (DV-17). |
 | 12 | "base power becomes X" | **Existe** | 3 / 22 | `basePower`, `staticBasePower`, `aura.basePower`. Com vários ao mesmo tempo, `basePowerOf` usa o maior (4-9-2-1, DV-20). |
 | 13 | "Set the power … to 0" | **Existe** (DV-19 corrigida) | 0 / 2 (OP07-002, EB04-010) | `setPowerZero`: modificador −(poder atual na ativação) com a duração do texto, nada se já ≤0 (4-12); Counters e DON!! posteriores somam. "Set the cost … to 0" = `cost −99` (1 carta, OP03-091). |

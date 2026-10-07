@@ -167,8 +167,9 @@ function aliasAction(action: Action, ref: (uid: string) => string): Action {
   switch (action.type) {
     case 'playCard':
     case 'activate':
-    case 'counter':
       return { ...action, uid: ref(action.uid) };
+    case 'counter':
+      return { ...action, uid: ref(action.uid), ...(action.target !== undefined ? { target: ref(action.target) } : {}) };
     case 'attachDon':
     case 'detachDon':
       return { ...action, target: ref(action.target) };
@@ -257,10 +258,16 @@ export function actionFromView(state: GameState, aliases: Aliases, action: Actio
   const bad = 'Carta inválida ou fora de vista (a visão pode estar desatualizada).';
   switch (action.type) {
     case 'playCard':
-    case 'activate':
-    case 'counter': {
+    case 'activate': {
       const uid = real(action.uid);
       return uid ? { ...action, uid } : bad;
+    }
+    case 'counter': {
+      const uid = real(action.uid);
+      if (!uid) return bad;
+      if (action.target === undefined) return { ...action, uid };
+      const target = real(action.target);
+      return target ? { ...action, uid, target } : bad;
     }
     case 'attachDon':
     case 'detachDon': {

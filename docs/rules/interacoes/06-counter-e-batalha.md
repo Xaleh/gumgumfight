@@ -26,4 +26,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 Etapa de Counter sempre abre; vários Counters; atacante vence com ≥; poder negativo permitido (conforme). «Set Power to 0» (`setPowerZero`) é um −(poder atual) na ativação, com a duração do texto: Counters posteriores somam (OP07-002 dá 1000).
 
-Divergências deste tema: DV-21, DV-22, DV-23 (corrigida: DV-19) (detalhes em [../divergencias.md](../divergencias.md)).
+O valor de Counter de um Personagem ou Stage da mão vai para o atacado ou, com `target` na ação `counter`, para o Líder ou outro Personagem do defensor; dura até o fim da batalha (DV-21). O custo do Evento [Counter] é o `playCost` da carta na mão, com as reduções (DV-22). No fim da batalha, os "at the end of this battle" e "if this Character battles…" resolvem com a batalha ainda em curso; só depois expiram os "during this battle" (DV-23).
+
+Divergências deste tema: nenhuma em aberto (corrigidas: DV-19, DV-21, DV-22, DV-23) (detalhes em [../divergencias.md](../divergencias.md)).
