@@ -406,8 +406,8 @@ export interface Aura {
   maxCost?: number;
   minPower?: number;
   maxPower?: number;
-  /** "cannot be K.O.'d by your opponent's effects" */
-  noEffectKO?: boolean;
+  /** "cannot be K.O.'d by effects" (`true`) ou "… by your opponent's effects" (`'opponent'`). */
+  noEffectKO?: true | 'opponent';
   excludeName?: string;
   /** Concede uma palavra-chave em vez de poder ("All of your Characters with a cost of 12 or more gain [Blocker]"). */
   keyword?: Keyword;
@@ -765,7 +765,7 @@ type EffectStepBody =
   /** "Add up to N card from the top of your deck to the top of your Life cards." */
   | { do: 'addLifeFromDeck'; count: number }
   /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
-  | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: boolean };
+  | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: true | 'opponent' };
 
 /** Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado). */
 export type EffectStep = EffectStepBody & { if?: StepCondition };
@@ -879,8 +879,8 @@ export interface Ability {
   staticCanAttackActive?: boolean;
   /** "This Character cannot be K.O.'d in battle." */
   staticNoBattleKO?: boolean;
-  /** "This Character cannot be K.O.'d by effects." */
-  staticNoEffectKO?: boolean;
+  /** "This Character cannot be K.O.'d by effects." (`true`) ou "… by your opponent's effects" (`'opponent'`). */
+  staticNoEffectKO?: true | 'opponent';
   /** "This Leader cannot attack." */
   staticCannotAttack?: boolean;
   /** "This Character cannot be K.O.'d in battle by "Strike" attribute Characters." */
@@ -999,6 +999,7 @@ export interface Modifier {
     | 'cannotBeKO'
     | 'cannotBeKOInBattle'
     | 'cannotBeKOByEffect'
+    | 'cannotBeKOByOpponentEffect'
     | 'canAttackActive'
     | 'cannotAttack'
     | 'skipRefresh'

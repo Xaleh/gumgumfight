@@ -26,4 +26,4 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 DON!! dados dão +1000 só no turno do dono e voltam rested quando a carta sai; Stage novo substitui o antigo; [DON!! xX] checado na ativação; no DON!! −X o dono escolhe quais DON!! devolver (área de custo, Líder, Personagens ou Stage) (conforme).
 
-Divergências deste tema: DV-09 (corrigida), DV-16 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-09 (corrigida), DV-16 (corrigida) (detalhes em [../divergencias.md](../divergencias.md)).

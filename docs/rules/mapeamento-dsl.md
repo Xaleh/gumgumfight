@@ -11,7 +11,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 |---|---|---|
 | K.O. por efeito / por batalha (1) | `do: 'ko'`, `koCharacter` (engine.ts:4359), `onKO` | Existe (as condições do [On K.O.] são vistas no campo, antes do K.O.) |
 | Trash / voltar à mão / fundo do deck sem ser K.O. (1) | `trashTarget`, `returnToHand`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife` | Existe; todos passam por `removeFromField` (proteções, substituições, `characterRemoved`) |
-| "Cannot be K.O.'d (in battle / by effects)" (1) | `cannotBeKO{inBattle,byEffect}`, `staticNoBattleKO`, `staticNoEffectKO`, `noBattleKOVsAttribute`, auras | Parcial: "by your opponent's effects" também bloqueia K.O. por efeito próprio |
+| "Cannot be K.O.'d (in battle / by effects)" (1) | `cannotBeKO{inBattle,byEffect}`, `staticNoBattleKO`, `staticNoEffectKO`, `noBattleKOVsAttribute`, auras | Conforme: "by your opponent's effects" (`'opponent'`) só protege do oponente (DV-13); o protegido não paga custo de K.O. (DV-14) |
 | "Cannot be removed from the field by your opponent's effects" (1) | `staticNoRemoval`, `aura.noRemoval` → `removalBlocked` | Existe |
 | [Banish] / [Double Attack] (2) | palavra-chave + frame `damage` (`stepDamage`) | Existe |
 | Dano por efeito (2) | `takeDamage` (frame `damage`, com [Trigger]) | Existe |
@@ -27,7 +27,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | «Set Power to 0» (6) | lido como `basePower: 0` | Parcial: deveria ser −(poder atual) (CR 4-12) |
 | Poder base / troca de poder base (6, 12) | `basePower`, `swapBasePower`, `staticBasePower` | Existe |
 | Dar DON!!, DON!! −X, [DON!! xX] (7) | `giveRestedDon`, `giveActiveDon`, `moveGivenDon`, `AbilityCost.donMinus`, `returnDonChoice`, `Ability.don` | Existe |
-| Stage único, K.O. de Stage (7) | `playFree` (substitui Stage), `ko` em Stage | Parcial: `ko` em Stage vai direto ao trash, sem proteções, substituição nem eventos |
+| Stage único, K.O. de Stage (7) | `playFree` (substitui Stage), `ko` em Stage | Conforme: `koStage` passa por `koProtected`/`removalBlocked` (DV-16); sem substituição nem evento de Stage (nenhuma carta pede) |
 | Fonte sai de cena no meio do efeito (8) | o frame continua com o `uid`; `delayed` | Existe |
 | "If you do" / "If" / "Then" (8) | `lastDone`, `EffectStep.if`, `payCost{scope}` | Existe |
 | Ordem de resolução de efeitos simultâneos (9) | fila `state.triggered` (`queueTriggered`, `nextTriggered`, pendência `option` com `order`) | Existe |
@@ -151,9 +151,9 @@ Colunas: **types** = linha em types.ts; **engine** = `case` em `execStep`.
 ### 2.2 K.O.
 | do | parâmetros | semântica | types | engine |
 |---|---|---|---|---|
-| `ko` | target | K.O. (Personagem via `koCharacter` :4359 com proteções e substituição; Stage vai direto ao descarte, sem proteção) | 490 | 2187 |
-| `koSelf` | — | K.O. da própria carta (`force`: ignora proteção/substituição) | 512 | 3400 |
-| `koOwn` | count, spec | Custo "K.O. N of your …" (`force`) | 655 | 2582 |
+| `ko` | target | K.O. (Personagem via `removeFromField` → `koCharacter` com proteções e substituição; Stage via `koStage`, com as proteções e sem substituição) | 490 | 2187 |
+| `koSelf` | — | Custo "K.O. this Character": `canPayCost` recusa se ela não pode ser nocauteada; depois `force` (sem substituição) | 512 | 3400 |
+| `koOwn` | count, spec | Custo "K.O. N of your …": opções de `koCostOptions` (sem os protegidos, 1-3-3); depois `force` (sem substituição) | 655 | 2582 |
 | `anyNumberForPower` | source field/trash, action ko/hand/bottom, spec/filter, power, every, target, duration | "You may K.O./return/place any number of … +N power for every …" | 529 | 2985 |
 
 `koCharacter` (:4359): `koProtected` (:4328) → `removalBlocked` (:4320, só por efeito) → `offerReplacement` (com `noReplace`, já oferecida) →
@@ -263,7 +263,7 @@ Estáticos de poder/custo (`Ability`): `staticPower`, `staticCost`, `staticBaseP
 | `rest` | target | Vira (via `restCard` :1578: respeita `cannotBeRested`, `staticNoRest`, substituição `rest`; emite `selfRested`/`restedByEffect`) | 491 | 2202 |
 | `setActive` | target | Desvira | 492 | 2214 |
 | `restOwn` / `restOwnCharacters` | count, spec / count | Custos "rest N of your …" | 640 / 685 | 2562 / 3814 |
-| `restDonOrCharacter` | spec | "Rest up to 1 of your opponent's DON!! cards or Characters …" | 596 | 2772 |
+| `restDonOrCharacter` | spec | "Rest up to 1 of your opponent's DON!! cards or Characters …" (o Personagem por `restCard` com `byEffectOf`: proteções, substituição e `restedByEffect`) | 596 | 2772 |
 | `skipRefresh` | target | Não desvira na próxima Renovação | 649 | 2695 |
 | `cannotBeRested` | target, duration | Modificador `cannotBeRested` (não vira para atacar/bloquear/custos) | 665 | 3581 |
 
@@ -307,7 +307,7 @@ Infra: `playFree` :1912 (Personagem → frame `play` com `byEffect`; Stage subst
 | `cannotAttack` (691/3845) | modificador `cannotAttack` | `attackError` :694 |
 | `cannotAttackCharacters` (580/3250) | "this Leader cannot attack Characters with base cost ≤ N" | `attackError` :700-703 |
 | `attackTax` (564/3136) | "cannot attack unless your opponent trashes N" | `attackError` :722; ataque :1317-1318 |
-| `cannotBeKO` {inBattle?, byEffect?} (731/2498) | modificadores `cannotBeKO`, `cannotBeKOInBattle`, `cannotBeKOByEffect` | `koProtected` :4328 |
+| `cannotBeKO` {inBattle?, byEffect? (`true` / `'opponent'`)} (731/2498) | modificadores `cannotBeKO`, `cannotBeKOInBattle`, `cannotBeKOByEffect`, `cannotBeKOByOpponentEffect` | `koProtected` (com `byPlayer`) |
 | `cannotBeRested` (665/3581) | modificador | `cannotBeRested` :1573 |
 | `negate` (600/3403) | modificador `negated` | `isNegated` :207 → `conditionsMet` :216, `hasKeyword` :633 |
 | `negateOnPlay` (579/3242) | `state.onPlayNegated` | `pushAbilities` :1627 |
@@ -529,7 +529,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 1d | Substituição para Líder/Stage | **Não existe** | 0 / 0 | `offerReplacement` só considera Personagens no campo. |
 | 2 | "cannot be removed from the field by effects" | **Existe** (só "by your opponent's effects") | 1 / 11 | `staticNoRemoval` / `aura.noRemoval` → `removalBlocked` (:4320). Não há versão temporária ("during this turn") — 0 cartas. |
 | 3 | "cannot be K.O.'d in battle" | **Existe** | 8 / 19 | `staticNoBattleKO`, `noBattleKOVsAttribute`, `noBattleKOByLeader`, `aura.noBattleKO`, `cannotBeKO{inBattle}`. |
-| 4 | "cannot be K.O.'d by your opponent's effects" | **Parcial** | 7 / 17 | Vira `staticNoEffectKO` (parser.ts:2898), que em `koProtected` (:4328) também bloqueia K.O. por efeito **próprio** (só custos usam `force`). |
+| 4 | "cannot be K.O.'d by your opponent's effects" | **Existe** (DV-13 corrigida) | 7 / 17 | `staticNoEffectKO: 'opponent'` (também `aura.noEffectKO` e `cannotBeKO{byEffect}`); `koProtected` recebe quem nocauteia (`byPlayer`) e só protege do oponente. "by effects" (`true`) continua protegendo também do próprio efeito e dos custos de K.O. |
 | 5 | "your opponent cannot activate [Blocker]" | **Existe** | 9 / 20 | `noBlockerThisBattle`, `noBlockerWhenAttacking`, `cannotBlock`. |
 | 6 | "gains the effect(s) of" / copiar efeitos | **Não existe** | 0 / 0 | Só há cópia de **poder base** (`basePower.copy`, `staticBasePower:'leader'`, `aura.basePowerCopyLeader`). |
 | 7 | Trocar poder | **Existe** | 0 / 3 | `swapBasePower` (troca poder base). |
@@ -545,8 +545,8 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 17 | Restrições ao oponente ("your opponent cannot play / attack …") | **Não existe** como primitivo | 1 / 2 | `Restriction.player` é sempre quem controla o efeito (:3412) e dura só o turno. As 2 cartas ("cannot attack any card other than …") usam `staticTaunt`. |
 | 18 | Ordem de efeitos automáticos simultâneos | **Não existe** | — | `emit`/`pushAbilities` empilham em ordem fixa (jogador 0 → 1, ordem do campo; pilha LIFO); o jogador do turno não escolhe a ordem nem resolve os seus primeiro. |
 | 19 | "Your opponent rests N active DON!! at the start of their next Main Phase" | **Aproximado** | — | Lido como `skipRefreshDon` (parser.ts:1084). |
-| 20 | Virar Personagem do oponente em `restDonOrCharacter` | **Parcial** | — | Chama `restCard(state, uid)` sem `byEffectOf` (:2798): ignora `staticNoRest`, a substituição `rest` e não emite `restedByEffect`. |
-| 21 | K.O. de Stage | **Parcial** | — | `ko` em Stage vai direto ao descarte, sem proteções, substituição nem eventos (:2193-2198). |
+| 20 | Virar Personagem do oponente em `restDonOrCharacter` | **Existe** (DV-15 corrigida) | — | `restCard(state, uid, controller, source)`: respeita `staticNoRest`, oferece a substituição `rest` e emite `restedByEffect`. |
+| 21 | K.O. de Stage | **Existe** (DV-16 corrigida) | — | `koStage`: `koProtected` e `removalBlocked` como no Personagem ("This Stage cannot be K.O.'d by …" é lido); sem substituição nem evento próprio (nenhuma carta pede; os de Personagem não valem para Stage). |
 | 22 | [On K.O.] e Once Per Turn | **Existe** | — | `koCharacter` confere `oncePerTurn`, `don`, `condition` e negação do [On K.O.] com a carta ainda no campo (DV-07 corrigida). |
 
 Formas listadas na pergunta que **não aparecem em nenhuma carta da base** (não há demanda hoje): copiar efeitos (#6),

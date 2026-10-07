@@ -186,12 +186,19 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       onCard: true,
     });
   }
-  fromMods(['cannotBeKO', 'cannotBeKOInBattle', 'cannotBeKOByEffect'], 'cannotBeKO', (m) => ({
+  fromMods(['cannotBeKO', 'cannotBeKOInBattle', 'cannotBeKOByEffect', 'cannotBeKOByOpponentEffect'], 'cannotBeKO', (m) => ({
     kind: 'cannotBeKO',
     icon: '✨',
     label: 'Não é nocauteada',
     tag: 'SEM K.O.',
-    text: m.kind === 'cannotBeKOInBattle' ? 'Não pode ser nocauteada em batalha' : m.kind === 'cannotBeKOByEffect' ? 'Não pode ser nocauteada por efeitos' : 'Não pode ser nocauteada',
+    text:
+      m.kind === 'cannotBeKOInBattle'
+        ? 'Não pode ser nocauteada em batalha'
+        : m.kind === 'cannotBeKOByEffect'
+          ? 'Não pode ser nocauteada por efeitos'
+          : m.kind === 'cannotBeKOByOpponentEffect'
+            ? 'Não pode ser nocauteada por efeitos do oponente'
+            : 'Não pode ser nocauteada',
     tone: 'good',
     onCard: true,
   }));

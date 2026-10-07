@@ -819,7 +819,7 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `${cap(target(s.target, ctx))} ganha ${KW[s.keyword]} ${dur(s.duration)}.`;
     case 'cannotBeKO': {
       const many = typeof s.target === 'object' && s.target.all;
-      return `${cap(target(s.target, ctx))} ${many ? 'não podem ser nocauteados' : 'não pode ser nocauteado'}${s.inBattle ? ' em batalha' : s.byEffect ? ' por efeitos' : ''} ${dur(s.duration)}.`;
+      return `${cap(target(s.target, ctx))} ${many ? 'não podem ser nocauteados' : 'não pode ser nocauteado'}${s.inBattle ? ' em batalha' : s.byEffect === 'opponent' ? ' por efeitos do oponente' : s.byEffect ? ' por efeitos' : ''} ${dur(s.duration)}.`;
     }
     case 'cannotAttack':
       return `${cap(target(s.target, ctx))} não pode atacar ${dur(s.duration)}.`;
@@ -1145,7 +1145,7 @@ function staticText(a: Ability, ctx: Ctx): string {
   if (a.staticNoRemoval) parts.push('não pode ser removido do campo por efeitos do oponente');
   if (a.handCost) parts.push(`custa ${-a.handCost} a menos na sua mão`);
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
-  if (a.staticNoEffectKO) parts.push('não pode ser nocauteado por efeitos');
+  if (a.staticNoEffectKO) parts.push(a.staticNoEffectKO === 'opponent' ? 'não pode ser nocauteado por efeitos do oponente' : 'não pode ser nocauteado por efeitos');
   if (a.staticCannotAttack) parts.push('não pode atacar');
   if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens de atributo ${a.noBattleKOVsAttribute}`);
   if (a.noBattleKOByLeader) parts.push('não pode ser nocauteado em batalha por Líderes');
@@ -1243,7 +1243,7 @@ function staticText(a: Ability, ctx: Ctx): string {
           : au.noBattleKO
             ? 'não podem ser nocauteados em batalha'
             : au.noEffectKO
-      ? 'não podem ser nocauteados por efeitos do oponente'
+      ? `não podem ser nocauteados por efeitos${au.noEffectKO === 'opponent' ? ' do oponente' : ''}`
       : au.noRemoval
       ? `não podem ser removidos do campo por efeitos ${au.side === 'opponent' ? 'seus' : 'do oponente'}`
       : au.keyword === 'rushCharacter'

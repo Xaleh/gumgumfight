@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 7;
+export const REPLAY_VERSION = 8;
 
 /**
  * Replays de versões anteriores foram gravados quando o motor pulava sem ação etapas que hoje
@@ -23,7 +23,12 @@ export const REPLAY_VERSION = 7;
  * oferecida, só contra remoção por efeito do oponente (fora `fieldToLife` e "your opponent
  * chooses") e uma vez por Personagem; a pergunta que o roteiro antigo não tem é recusada (o que
  * acontecia antes). Pagar uma vez hoje salva todos os Personagens removidos juntos, então um replay
- * antigo que pagou por cada um pode tomar outro rumo.
+ * antigo que pagou por cada um pode tomar outro rumo. Até a versão 7, "rest up to 1 of your
+ * opponent's DON!! cards or Characters" virava o Personagem sem oferecer a substituição de rest
+ * ("If this Character would be rested by your opponent's Character's effect, … instead"); a
+ * pergunta também é recusada. (Também desde a versão 8, "cannot be K.O.'d by your opponent's
+ * effects" não protege do K.O. pelo próprio efeito, o Personagem protegido não paga custo de K.O.
+ * e o Stage protegido não é nocauteado: sem decisão nova, mas um replay antigo pode tomar outro rumo.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -52,10 +57,11 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     }
     return null;
   };
-  /** A pergunta aberta é a de uma substituição contra remoção (passo `replaceRemoval`)? */
+  /** A pergunta aberta é a de uma substituição contra remoção ou rest (passo `replaceRemoval`/`replaceRest`)? */
   const replacementAsked = () => {
     const frame = state.stack[state.stack.length - 1];
-    return frame?.kind === 'effect' && frame.steps[frame.i]?.do === 'replaceRemoval';
+    const step = frame?.kind === 'effect' ? frame.steps[frame.i]?.do : undefined;
+    return step === 'replaceRemoval' || step === 'replaceRest';
   };
   const step = (a: Action) => {
     state = applyAction(state, a);

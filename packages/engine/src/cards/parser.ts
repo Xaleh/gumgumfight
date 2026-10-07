@@ -1236,7 +1236,8 @@ const CLAUSES: ClauseRule[] = [
     (m) => {
       if (!/^none of /i.test(m[0]) && !/cannot/i.test(m[0])) return null;
       const phrase = m[1].replace(/^your /i, 'all of your ');
-      return withTarget(phrase, (target) => ({ do: 'cannotBeKO', target, duration: durationOf(m[2]), byEffect: true }), true);
+      const byEffect = /by your opponent's effects/i.test(m[0]) ? 'opponent' : true;
+      return withTarget(phrase, (target) => ({ do: 'cannotBeKO', target, duration: durationOf(m[2]), byEffect }), true);
     },
   ],
   [
@@ -2795,7 +2796,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   }
   if ((m = s.match(/^this Character cannot be (K\.O\.'d or )?rested by your opponent's (?:Leader and Character )?effects(?: and gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\])?$/i))) {
     const out: Ability[] = [{ ...base, staticNoRest: true }];
-    if (m[1]) out.push({ ...base, staticNoEffectKO: true });
+    if (m[1]) out.push({ ...base, staticNoEffectKO: 'opponent' });
     if (m[2]) out.push({ ...base, staticKeyword: KEYWORDS[m[2].toLowerCase()] });
     return out;
   }
@@ -2882,7 +2883,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [{ ...base, staticCanAttackActive: true }];
   }
   if (/^this Character cannot be K\.O\.'d in battle$/i.test(s)) return [{ ...base, staticNoBattleKO: true }];
-  if (/^this Character cannot be K\.O\.'d by effects$/i.test(s)) return [{ ...base, staticNoEffectKO: true }];
+  if (/^this (?:Character|Stage) cannot be K\.O\.'d by effects$/i.test(s)) return [{ ...base, staticNoEffectKO: true }];
   if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards)$/i))) {
     return [{ ...base, noBattleKOVsAttribute: m[1] }];
   }
@@ -2916,8 +2917,9 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   }
   if ((m = s.match(/^give this card in your hand [−-]?(\d+) cost$/i))) return [{ ...base, handCost: -Number(m[1]) }];
   if (/^this Character can attack Characters on the turn in which it is played$/i.test(s)) return [{ ...base, staticKeyword: 'rushCharacter' }];
-  if ((m = s.match(/^this Character cannot be K\.O\.'d by your opponent's effects(?: and gains (?:\[(Rush|Blocker|Double Attack|Banish|Unblockable)\]|\+(\d+) power))?$/i))) {
-    const out: Ability[] = [{ ...base, staticNoEffectKO: true }];
+  if ((m = s.match(/^this (?:Character|Stage) cannot be K\.O\.'d by your opponent's effects(?: and gains (?:\[(Rush|Blocker|Double Attack|Banish|Unblockable)\]|\+(\d+) power))?$/i))) {
+    // Só contra efeitos do oponente: o K.O. por efeito próprio continua valendo (1-3-1).
+    const out: Ability[] = [{ ...base, staticNoEffectKO: 'opponent' }];
     if (m[1]) out.push({ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] });
     if (m[2]) out.push({ ...base, staticPower: Number(m[2]) });
     return out;
@@ -2943,7 +2945,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
       if (spec.names) aura.names = spec.names;
       if (spec.excludeName) aura.excludeName = spec.excludeName;
       if (spec.hasAllTypes) aura.hasAllTypes = spec.hasAllTypes;
-      if (m[3]) return [{ ...base, aura: { ...aura, noEffectKO: true } }];
+      if (m[3]) return [{ ...base, aura: { ...aura, noEffectKO: /opponent/i.test(m[3]) ? 'opponent' : true } }];
       return m[2].split(/ and /).map((gain) => {
         const one: NonNullable<Ability['aura']> = { ...aura };
         if (gain.startsWith('[')) one.keyword = KEYWORDS[gain.slice(1, -1).toLowerCase()];

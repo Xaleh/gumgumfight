@@ -22,10 +22,10 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo (**corrigido**) | 10-2-13-4 | médio | C6 |
 | DV-11 | Só a primeira substituição aplicável é oferecida; recusar descarta as outras (**corrigido**) | 8-1-3-4-2 | médio | C7 |
 | DV-12 | Remoção por efeito próprio não oferece substituição; `fieldToLife`/`opponentChoosesOwn` nunca oferecem (**corrigido** em efeitos; custos ficam de fora) | 8-1-3-4 | médio | C7 |
-| DV-13 | "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio | 1-3-1 (texto) | médio | C8 |
-| DV-14 | "Cannot be K.O.'d" ignorado em custos "K.O. 1 of your Characters" | 1-3-3 | baixo | C8 |
-| DV-15 | `restDonOrCharacter` vira Personagem sem passar pelas proteções | 1-3-3 | baixo | C8 |
-| DV-16 | `ko` em Stage ignora proteções, substituição e eventos | 10-2-1 | baixo | C8 |
+| DV-13 | "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio (**corrigido**) | 1-3-1 (texto) | médio | C8 |
+| DV-14 | "Cannot be K.O.'d" ignorado em custos "K.O. 1 of your Characters" (**corrigido**) | 1-3-3 | baixo | C8 |
+| DV-15 | `restDonOrCharacter` vira Personagem sem passar pelas proteções (**corrigido**) | 1-3-3 | baixo | C8 |
+| DV-16 | `ko` em Stage ignora proteções, substituição e eventos (**corrigido**) | 10-2-1 | baixo | C8 |
 | DV-17 | Carta do [Trigger] vai para o trash **antes** de resolver | 10-1-5-3 | médio | C9 |
 | DV-18 | `fieldToLife` ignora "face-up" | texto das cartas | médio | C10 |
 | DV-19 | «Set Power to 0» lido como poder base 0 | 4-12 | baixo | C11 |
@@ -168,25 +168,34 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 - Agora: `replacementMatches` usa a causa do texto também na remoção: "by your opponent('s effect)" exige efeito do oponente; sem isso, vale qualquer saída do campo (efeito próprio e K.O. em batalha incluídos, como "would leave the field"). "Removed … by your opponent's effect or K.O.'d" (forma obrigatória) ganhou `removalBy` para a remoção continuar só contra o oponente. `ko`, `returnToHand`, `trashTarget`, `toDeckBottom`, `opponentChoosesOwn` e `fieldToLife` passam todos por `removeFromField`: proteções (`koProtected`/`removalBlocked`), depois as substituições e por fim `performRemoval`, que move a carta e emite `characterRemoved` (e `returnedToHand`) — `fieldToLife` passou a emitir, inclusive no fundo da Vida. Os Personagens removidos juntos ("K.O. all", "return up to 2") recebem cada substituição uma vez, cobrindo todos a que ela se aplica: um pagamento salva todos ou nenhum (Q&A OP15-009, OP11-001, OP05-001; `victimPowerMinus` e `victimToLife` valem para cada um), e os não cobertos saem juntos depois das respostas. Quem a substituição não cobre (Tashigi OP10-032 não protege a si mesma) continua saindo.
 - Bot: paga como antes, exceto contra remoção sem K.O. feita pelo próprio efeito (ele escolheu remover).
 - Replays passam para a versão 7; nos antigos, a pergunta de substituição que o roteiro não tem é recusada (o que acontecia antes). Um replay antigo que pagou por cada Personagem removido junto pode tomar outro rumo.
-- Fica de fora: (1) custos que tiram Personagem próprio do campo ("You may return 1 of your Characters to your hand:", `returnOwn`/`koOwn`/`trashOwn`/`anyNumberForPower`) continuam sem substituição — com ela o custo não conta como pago (Q&A OP05-100 + OP01-047, CR 8-3-1-7) e isso pede outro tratamento; (2) substituição para Líder/Stage (nenhuma carta precisa); (3) K.O. de Stage (DV-16).
+- Fica de fora: (1) custos que tiram Personagem próprio do campo ("You may return 1 of your Characters to your hand:", `returnOwn`/`koOwn`/`trashOwn`/`anyNumberForPower`) continuam sem substituição — com ela o custo não conta como pago (Q&A OP05-100 + OP01-047, CR 8-3-1-7) e isso pede outro tratamento; (2) substituição para Líder/Stage (nenhuma carta precisa); (3) K.O. de Stage (DV-16, corrigido sem substituição).
 - Testes: `packages/engine/test/replacement.test.ts` (Kaido OP01-094 + Líder tipo Koby OP11-001: um pagamento salva os dois {Navy} e o outro Personagem é nocauteado; com 2 cartas no descarte não dá nem em parte; recusando, todos saem; `fieldToLife` pagando e recusando, com `characterRemoved`; `opponentChoosesOwn`; "removed from the field" sem "by your opponent" contra efeito próprio e "by your opponent's effect" que continua não valendo; bot). 9 de 10 falham no código antigo.
 
 ### C8 — Proteções e proibições
 
-**DV-13. "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio** — médio
-- Atual: vira `staticNoEffectKO` (parser.ts:2898), que em `koProtected` (engine.ts:4328) bloqueia qualquer K.O. por efeito.
-- Correto: só efeitos do oponente. ~17 cartas usam o texto.
+**DV-13. "Cannot be K.O.'d by your opponent's effects" também bloqueia K.O. por efeito próprio** — médio — **corrigido**
+- Regra: 1-3-1 (o texto vale como escrito). ~17 cartas usam o texto (ST14-009, OP07-033, OP09-086…).
+- Antes: virava `staticNoEffectKO` (parser.ts:2898), igual a "cannot be K.O.'d by effects", e `koProtected` (engine.ts:4328) bloqueava qualquer K.O. por efeito, inclusive o do próprio dono. O mesmo na aura ("your Characters … cannot be K.O.'d by your opponent's effects", `noEffectKO`) e no efeito temporário ("none of your Characters can be K.O.'d by your opponent's effects during this turn", modificador `cannotBeKOByEffect`).
+- Agora: as três formas guardam o lado: `staticNoEffectKO` e `aura.noEffectKO` valem `true` ("by effects") ou `'opponent'` ("by your opponent's effects", também "cannot be K.O.'d or rested by your opponent's effects"); o efeito temporário com "your opponent's" cria o modificador `cannotBeKOByOpponentEffect`. `koProtected` recebe quem nocauteia (`byPlayer`, vindo de `removeFromField`/`koCharacter`) e a versão `'opponent'` só protege quando é o oponente. Os textos em português (habilidade, aura, status) dizem "por efeitos do oponente".
+- Testes: `packages/engine/test/protections.test.ts` (o próprio efeito nocauteia e o do oponente não; "by effects" continua protegendo do próprio efeito; aura e efeito "during this turn"); `parsed-engine*.test.ts` passaram a informar quem nocauteia.
 
-**DV-14. "Cannot be K.O.'d" ignorado em custos de K.O.** — baixo
+**DV-14. "Cannot be K.O.'d" ignorado em custos de K.O.** — baixo — **corrigido**
 - Regra: 1-3-3 (proibição vence exigência); um custo que não pode ser pago não é pago (8-3-1-3).
-- Atual: `koOwn` (engine.ts:2592) e `koSelf` (:3400) usam `force: true`.
-- Correto: o Personagem protegido não serve para pagar o custo (ou, se a carta pedir, o custo não pode ser pago).
+- Antes: `koOwn` (engine.ts:2592) e `koSelf` (:3400) usavam `force: true` e as opções do custo eram todos os Personagens do filtro.
+- Agora: `koCostOptions` tira das opções de "K.O. N of your …" os Personagens que `koProtected` protege do K.O. pelo efeito do próprio dono ("cannot be K.O.'d", "by effects"; "by your opponent's effects" não protege, DV-13). `canPayCost` usa essas opções, então sem Personagens suficientes o custo não pode ser pago; "K.O. this Character" (`koSelf`) também não pode ser pago se a carta estiver protegida. O mesmo filtro vale para "You may K.O. any number of your Characters … for every Character K.O.'d" (`anyNumberForPower`): o protegido não seria nocauteado nem contaria. O K.O. em si continua com `force` (já escolhido entre os que podem), sem substituição: custos que tiram Personagem do campo seguem fora da substituição (DV-12).
+- Testes: `packages/engine/test/protections.test.ts` (com só o protegido, `canPayCost` falso; com outro Personagem, só ele aparece entre as opções).
 
-**DV-15. `restDonOrCharacter` vira Personagem sem passar pelas proteções** — baixo
-- Atual: chama `restCard(state, uid)` sem `byEffectOf` (engine.ts:2798): ignora "cannot be rested" (`staticNoRest`), a substituição de rest e não emite `restedByEffect`.
+**DV-15. `restDonOrCharacter` vira Personagem sem passar pelas proteções** — baixo — **corrigido**
+- Antes: chamava `restCard(state, uid)` sem `byEffectOf` (engine.ts:2798): ignorava "cannot be rested by your opponent's effects" (`staticNoRest`), a substituição de rest e não emitia `restedByEffect`.
+- Agora: `restCard(state, uid, controller, source)`, como o passo `rest`. Também a recusa da substituição de rest (`replaceRest`) passou a emitir `restedByEffect` (o Personagem é virado pelo efeito do mesmo jeito).
+- Replays passam para a versão 8: nos antigos, a pergunta da substituição de rest que o roteiro não tem é recusada (o que acontecia antes).
+- Testes: `packages/engine/test/protections.test.ts` (o protegido continua ativo; o outro é virado e ativa "If a Character is rested by your effect").
 
-**DV-16. `ko` em Stage ignora proteções, substituição e eventos** — baixo
-- Atual: K.O. em Stage vai direto ao trash (engine.ts:2193). Só cartas que dizem "K.O. … Stage" podem fazer isso (Q&A OP13-098: um efeito que mira Personagens não alcança Stage).
+**DV-16. `ko` em Stage ignora proteções, substituição e eventos** — baixo — **corrigido**
+- Regra: 10-2-1. Só cartas que dizem "K.O. … Stage" podem fazer isso (Q&A OP13-098: um efeito que mira Personagens não alcança Stage).
+- Antes: K.O. em Stage ia direto ao trash (engine.ts:2193).
+- Agora: `koStage` passa pelas mesmas proteções do Personagem: `koProtected` (com quem nocauteia) e `removalBlocked`; o parser lê "This Stage cannot be K.O.'d by (your opponent's) effects". Substituição e eventos: nenhuma carta tem "If your Stage would be K.O.'d … instead" nem "When your Stage is K.O.'d", e os eventos de Personagem (`characterKO`, `characterRemoved`, [On K.O.], "if your Character was K.O.'d this turn") não valem para Stage; por isso não há substituição nem evento novo (a substituição para Stage segue fora, DV-12).
+- Testes: `packages/engine/test/protections.test.ts` (Stage com "cannot be K.O.'d by your opponent's effects" fica no campo; o sem proteção vai para o descarte).
 
 ### C9 — [Trigger]
 
@@ -327,6 +336,6 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas) | DV-12 (custos), DV-13, DV-14, DV-19, DV-20 |
-| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-16, DV-18, DV-27, DV-33 |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O. | DV-12 (custos), DV-19, DV-20 |
+| Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-18, DV-27, DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

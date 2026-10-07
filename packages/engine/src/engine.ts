@@ -2274,7 +2274,8 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(cardDef(state, u), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
   if (cost.giveOppDon && (state.players[opponent(player)].donRested < cost.giveOppDon || !state.players[opponent(player)].characters.length)) return false;
   if ((cost.handToTop ?? 0) > ps.hand.length) return false;
-  if (cost.koOwn && ownCostOptions(state, player, source, cost.koOwn.spec, false).length < cost.koOwn.count) return false;
+  if (cost.koSelf && (locate(state, source)?.zone !== 'character' || koProtected(state, source, false, source, player))) return false;
+  if (cost.koOwn && koCostOptions(state, player, source, cost.koOwn.spec).length < cost.koOwn.count) return false;
   if (cost.trashOwn && ownCostOptions(state, player, source, cost.trashOwn.spec, false).length < cost.trashOwn.count) return false;
   if ((cost.mill ?? 0) > ps.deck.length) return false;
   if ((cost.lifeToTrash?.count ?? 0) > ps.life.length) return false;
@@ -2287,6 +2288,15 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
     if (avail < cost.lifeFace.count) return false;
   }
   return true;
+}
+
+/**
+ * Personagens seus que podem pagar um custo "K.O. N of your …": o protegido ("cannot be K.O.'d [by
+ * effects]") não serve, a proibição vence a exigência (1-3-3). É o seu efeito que nocauteia, então
+ * "by your opponent's effects" não protege.
+ */
+function koCostOptions(state: GameState, player: PlayerId, source: string, spec: TargetSpec): string[] {
+  return ownCostOptions(state, player, source, spec, false).filter((u) => !koProtected(state, u, false, source, player));
 }
 
 /** Cartas suas que podem pagar um custo de "rest/return N of your …". */
@@ -2366,15 +2376,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       // Os Personagens saem juntos: cada substituição é oferecida uma vez para todos (8-1-3-4).
       removeFromField(state, t.filter((u) => locate(state, u)?.zone === 'character'), 'ko', { byPlayer: frame.controller, by: frame.source });
-      for (const uid of t) {
-        const zone = locate(state, uid)?.zone;
-        if (zone === 'stage') {
-          // Stages nocauteados vão para o descarte (sem [On K.O.]).
-          detach(state, uid);
-          state.players[ownerOf(state, uid)].trash.push(uid);
-          log(state, frame.controller, `${cardDef(state, uid).name} (Stage) foi nocauteado.`);
-        }
-      }
+      // "K.O. … Stage": só o efeito que diz Stage alcança um (Q&A OP13-098).
+      for (const uid of t) if (locate(state, uid)?.zone === 'stage') koStage(state, uid, { byPlayer: frame.controller, by: frame.source });
       return true;
     }
     case 'rest': {
@@ -2709,9 +2712,16 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const t = resolveTargets(state, frame, step.target, 'help', `${srcName}: escolha quem não pode ser nocauteado.`);
       if (!t) return false;
       for (const uid of t.filter((u) => locate(state, u)?.zone === 'character')) {
-        const kind = step.inBattle ? 'cannotBeKOInBattle' : step.byEffect ? 'cannotBeKOByEffect' : 'cannotBeKO';
+        const kind = step.inBattle
+          ? 'cannotBeKOInBattle'
+          : step.byEffect === 'opponent'
+            ? 'cannotBeKOByOpponentEffect'
+            : step.byEffect
+              ? 'cannotBeKOByEffect'
+              : 'cannotBeKO';
+        const how = step.inBattle ? ' em batalha' : step.byEffect === 'opponent' ? ' por efeitos do oponente' : step.byEffect ? ' por efeitos' : '';
         addModifier(state, frame.controller, { uid, kind, amount: 0, duration: step.duration });
-        log(state, frame.controller, `${cardDef(state, uid).name} não pode ser nocauteado${step.inBattle ? ' em batalha' : step.byEffect ? ' por efeitos' : ''}.`);
+        log(state, frame.controller, `${cardDef(state, uid).name} não pode ser nocauteado${how}.`);
       }
       return true;
     }
@@ -2791,7 +2801,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'koOwn':
     case 'trashOwn': {
-      const options = ownCostOptions(state, frame.controller, frame.source, step.spec, false);
+      const options =
+        step.do === 'koOwn' ? koCostOptions(state, frame.controller, frame.source, step.spec) : ownCostOptions(state, frame.controller, frame.source, step.spec, false);
       const n = Math.min(step.count, options.length);
       if (n === 0) return true;
       if (!frame.choice) {
@@ -2994,7 +3005,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       const t = resolveTargets(state, frame, { ...step.spec, side: 'opponent', upTo: 1 }, 'harm', `${srcName}: escolha o Personagem a virar.`);
       if (!t) return false;
-      for (const uid of t) restCard(state, uid);
+      // Virado por efeito: valem "cannot be rested by your opponent's effects", a substituição de rest e restedByEffect.
+      for (const uid of t) restCard(state, uid, frame.controller, frame.source);
       return true;
     }
     case 'chooseCost':
@@ -3186,7 +3198,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const options =
           step.source === 'trash'
             ? ps.trash.filter((u) => !step.filter || matchesFilter(cardDef(state, u), step.filter))
-            : targetCandidates(state, frame.controller, frame.source, { ...step.spec!, side: 'own' });
+            : targetCandidates(state, frame.controller, frame.source, { ...step.spec!, side: 'own' }).filter(
+                // "K.O. any number of your Characters": o protegido não seria nocauteado nem contaria.
+                (u) => step.action !== 'ko' || !koProtected(state, u, false, frame.source, frame.controller),
+              );
         if (!frame.choice) {
           if (!options.length) return true;
           askCards(state, frame, options, options.length, `${srcName}: escolha quantas cartas quiser.`, { ordered: step.action === 'bottom' });
@@ -3232,6 +3247,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const loc = locate(state, step.victim);
         if (loc) loc.fc.rested = true;
         emit(state, { kind: 'selfRested', player: frame.controller, card: step.victim, byPlayer: step.byPlayer });
+        if (loc?.zone === 'character') emit(state, { kind: 'restedByEffect', player: frame.controller, card: step.victim, byPlayer: step.byPlayer });
         return true;
       }
       if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(frame.source, step.ability));
@@ -3587,6 +3603,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'koSelf':
+      // canPayCost já recusou o custo se esta carta não pode ser nocauteada (1-3-3).
       if (locate(state, frame.source)?.zone === 'character') koCharacter(state, frame.source, { force: true });
       return true;
     case 'negate': {
@@ -4540,7 +4557,7 @@ function removeFromField(state: GameState, victims: string[], action: RemovalAct
   const live = victims.filter((uid) => {
     const loc = locate(state, uid);
     if (loc?.zone !== 'character') return false;
-    if (action === 'ko' && koProtected(state, uid, Boolean(ctx.inBattle), ctx.by)) {
+    if (action === 'ko' && koProtected(state, uid, Boolean(ctx.inBattle), ctx.by, ctx.byPlayer)) {
       log(state, loc.player, `${cardDef(state, uid).name} não pode ser nocauteado.`);
       return false;
     }
@@ -4608,13 +4625,20 @@ export function removalBlocked(state: GameState, uid: string, byPlayer: PlayerId
   return loc.zone !== 'stage' && aurasOn(state, uid, loc.zone, (au) => Boolean(au.noRemoval)).length > 0;
 }
 
-/** O personagem está protegido de K.O. ("cannot be K.O.'d [in battle]")? */
-export function koProtected(state: GameState, uid: string, inBattle: boolean, by?: string): boolean {
-  const kinds = inBattle ? ['cannotBeKO', 'cannotBeKOInBattle'] : ['cannotBeKO', 'cannotBeKOByEffect'];
+/**
+ * O personagem (ou Stage) está protegido de K.O. ("cannot be K.O.'d [in battle | by effects]")?
+ * `byPlayer` é o dono do efeito que nocauteia: "by your opponent's effects" só protege contra o
+ * oponente; o K.O. pelo próprio efeito (ou custo) continua valendo (1-3-1).
+ */
+export function koProtected(state: GameState, uid: string, inBattle: boolean, by?: string, byPlayer?: PlayerId): boolean {
+  const byOpponent = !inBattle && byPlayer !== undefined && byPlayer !== ownerOf(state, uid);
+  /** Proteção contra K.O. por efeito: `true` vale contra todos; `'opponent'`, só contra o oponente. */
+  const effectKO = (v: true | 'opponent' | undefined) => !inBattle && (v === true || (v === 'opponent' && byOpponent));
+  const kinds = inBattle ? ['cannotBeKO', 'cannotBeKOInBattle'] : ['cannotBeKO', 'cannotBeKOByEffect', ...(byOpponent ? ['cannotBeKOByOpponentEffect'] : [])];
   if (state.modifiers.some((m) => m.uid === uid && kinds.includes(m.kind))) return true;
   const byAttrs = by ? (cardDef(state, by).attributes ?? []) : [];
   const zone = locate(state, uid)?.zone;
-  if (!inBattle && zone && zone !== 'stage' && aurasOn(state, uid, zone, (au) => Boolean(au.noEffectKO)).length) return true;
+  if (!inBattle && zone && zone !== 'stage' && aurasOn(state, uid, zone, (au) => effectKO(au.noEffectKO)).length) return true;
   if (inBattle && zone && zone !== 'stage' && aurasOn(state, uid, zone, (au) => Boolean(au.noBattleKO)).length) return true;
   const byChar = by !== undefined && cardDef(state, by).category === 'character';
   const opposing = by !== undefined && ownerOf(state, by) !== ownerOf(state, uid);
@@ -4633,7 +4657,7 @@ export function koProtected(state: GameState, uid: string, inBattle: boolean, by
   return cardDef(state, uid).abilities.some(
     (a) =>
       a.timing === 'static' &&
-      ((inBattle ? a.staticNoBattleKO : a.staticNoEffectKO) ||
+      ((inBattle ? a.staticNoBattleKO : effectKO(a.staticNoEffectKO)) ||
         (inBattle && a.noBattleKOVsAttribute !== undefined && byAttrs.includes(a.noBattleKOVsAttribute)) ||
         (inBattle && a.noBattleKOByLeader && by !== undefined && locate(state, by)?.zone === 'leader')) &&
       conditionsMet(state, uid, a),
@@ -4647,7 +4671,7 @@ function koCharacter(
 ) {
   const loc = locate(state, uid);
   if (!loc || loc.zone !== 'character') return;
-  if (!opts.force && koProtected(state, uid, Boolean(opts.inBattle), opts.by)) {
+  if (!opts.force && koProtected(state, uid, Boolean(opts.inBattle), opts.by, opts.byPlayer)) {
     log(state, loc.player, `${cardDef(state, uid).name} não pode ser nocauteado.`);
     return;
   }
@@ -4695,6 +4719,29 @@ function koCharacter(
     if (opt) state.usedThisTurn.push(opt);
     queueTriggered(state, uid, loc.player, abilitySteps(a, i), { timing: 'onKO', ability: i, offField: true, ...(opt ? { opt } : {}) });
   }
+}
+
+/**
+ * K.O. de um Stage por efeito (10-2-1): passa pelas mesmas proteções do Personagem ("cannot be
+ * K.O.'d [by your opponent's effects]", "cannot be removed from the field by your opponent's
+ * effects") e vai para o descarte. Não há substituição nem evento de Stage nocauteado (nenhuma
+ * carta pede); os de Personagem ("When a Character is K.O.'d", [On K.O.]) não valem para ele.
+ */
+function koStage(state: GameState, uid: string, ctx: { byPlayer: PlayerId; by: string }) {
+  const loc = locate(state, uid);
+  if (loc?.zone !== 'stage') return;
+  const name = cardDef(state, uid).name;
+  if (koProtected(state, uid, false, ctx.by, ctx.byPlayer)) {
+    log(state, loc.player, `${name} (Stage) não pode ser nocauteado.`);
+    return;
+  }
+  if (removalBlocked(state, uid, ctx.byPlayer)) {
+    log(state, loc.player, `${name} (Stage) não pode ser removido do campo.`);
+    return;
+  }
+  detach(state, uid);
+  state.players[loc.player].trash.push(uid);
+  log(state, ctx.byPlayer, `${name} (Stage) foi nocauteado.`);
 }
 
 /** Tira o Personagem do campo: perde os modificadores e os usos do turno (é uma carta nova, 3-1-6). */

@@ -38,8 +38,9 @@ export interface ReplayFile {
    * 6: escolha de alvos sem "up to" exige o máximo possível (8-4-4-1); a gravada com menos é completada.
    * 7: todas as substituições ("… instead") são oferecidas, em toda remoção do campo (`answer`); a
    *    pergunta que o roteiro antigo não tem é recusada.
+   * 8: "rest … DON!! cards or Characters" oferece a substituição de rest (`answer`), recusada nos antigos.
    */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];
