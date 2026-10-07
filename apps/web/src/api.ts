@@ -202,6 +202,8 @@ export const api = {
   online: {
     config: () => get<{ timeBankMs: number; botRooms: boolean }>('/api/online/config'),
     active: () => get<ActiveRoom[]>('/api/online/active'),
+    /** Contadores do menu; a consulta também conta este navegador como conectado. */
+    stats: () => get<OnlineStats>('/api/online/stats'),
     /** Treino contra o bot jogado pelo servidor (pode ser assistido). */
     botRoom: (deckId: string, botDeckId: string, format: FormatId) =>
       send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, format }),
@@ -276,6 +278,18 @@ export interface LiveRoom {
   createdAt: number;
   /** Jogo de uma partida de torneio. */
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
+}
+
+/** Contadores públicos do menu (só números). */
+export interface OnlineStats {
+  /** Pessoas no menu, jogando, na fila ou assistindo. */
+  online: number;
+  /** Partidas em andamento, por tipo de sala. */
+  playing: Record<RoomQueue, number>;
+  /** Salas privadas esperando o segundo jogador. */
+  waiting: number;
+  queue: Record<QueueKind, Record<FormatId, number>>;
+  spectators: number;
 }
 
 export type QueuePoll =
