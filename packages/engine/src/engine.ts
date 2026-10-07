@@ -7,8 +7,10 @@
 
 import { buildCardDef } from './cards';
 import { nextRandom, type RngHolder, seedRng128, shuffleInPlace } from './rng';
+import { visibleCards } from './view';
 import type {
   Aura,
+  Checkpoint,
   LeaderRule,
   Restriction,
   Ability,
@@ -29,6 +31,7 @@ import type {
   Modifier,
   PlayerId,
   PlayerState,
+  StateSnapshot,
   TargetRef,
   TargetSpec,
 } from './types';
@@ -911,11 +914,21 @@ export function applyAction(prev: GameState, action: Action): GameState {
     return state;
   }
 
+  if (action.type === 'cancel') {
+    const err = cancelError(prev, p);
+    if (err) throw new IllegalActionError(err);
+    if (!state.checkpoint) throw new IllegalActionError('Não é possível cancelar a partir de uma visão da partida.');
+    restoreCheckpoint(state, p);
+    state.actionCount++;
+    return state;
+  }
+
   if (action.type === 'manual') {
     if (!manualAllowed(prev, p)) throw new IllegalActionError('Ferramentas manuais indisponíveis agora.');
     applyManualOp(state, p, action.op);
     checkDefeat(state);
     run(state);
+    settleCancel(state, p);
     state.actionCount++;
     return state;
   }
@@ -926,12 +939,123 @@ export function applyAction(prev: GameState, action: Action): GameState {
   } else {
     if (state.phase !== 'main' || state.activePlayer !== p) throw new IllegalActionError('Não é o seu turno.');
     if (state.stack.length) throw new IllegalActionError('Há efeitos em resolução.');
+    // Guarda o estado de antes: se a ação parar numa escolha do próprio jogador, ele pode cancelar.
+    const checkpoint = makeCheckpoint(prev);
     handleMainAction(state, action);
+    state.checkpoint = checkpoint;
+    state.cancel = { player: p, action };
   }
 
   run(state);
+  settleCancel(state, p);
   state.actionCount++;
   return state;
+}
+
+// ---------------------------------------------------------------------------
+// Cancelar a ação em andamento
+// ---------------------------------------------------------------------------
+
+/** Quem pode ver cartas: os dois jogadores e os espectadores. */
+const VIEWERS: Array<PlayerId | null> = [0, 1, null];
+
+/**
+ * `state` é o estado de antes da ação de `player`, que o motor nunca muda: o checkpoint só
+ * aponta para ele (a cópia fica para a hora de restaurar, que é rara).
+ */
+function makeCheckpoint(state: GameState): Checkpoint {
+  const { defs: _defs, cards: _cards, log: _log, actionCount: _n, cancel: _cancel, checkpoint: _cp, ...snap } = state;
+  return { seen: VIEWERS.map((v) => [...visibleCards(state, v)]) as Checkpoint['seen'], snap: snap as StateSnapshot };
+}
+
+/**
+ * Depois de cada ação de `actor`: a ação em andamento continua cancelável só enquanto o
+ * motor espera uma escolha de quem a começou (o oponente ainda não decidiu nada) e nenhuma
+ * carta escondida apareceu (busca no deck, carta comprada, Vida olhada, mão do oponente
+ * revelada…). Conta como revelada uma carta que ficou visível para alguém e que quem começou
+ * a ação ainda não via: uma carta da própria mão jogada ou descartada não é informação nova
+ * para ele, e cancelar só o prejudica. Revelou algo: o checkpoint some e fica só o motivo.
+ */
+function settleCancel(state: GameState, actor: PlayerId) {
+  const info = state.cancel;
+  if (!info) return;
+  const keep = state.phase !== 'gameover' && state.pending !== null && state.pending.player === info.player && actor === info.player;
+  if (!keep) {
+    delete state.cancel;
+    delete state.checkpoint;
+    return;
+  }
+  const cp = state.checkpoint;
+  if (!cp) return;
+  const actorSaw = new Set(cp.seen[info.player]);
+  const revealed = VIEWERS.some((v, i) => {
+    const before = new Set(cp.seen[i]);
+    for (const uid of visibleCards(state, v)) if (!before.has(uid) && !actorSaw.has(uid)) return true;
+    return false;
+  });
+  if (revealed) {
+    info.blocked = 'revealed';
+    delete state.checkpoint;
+  }
+}
+
+/** Algo escondido foi lido pelo jogador que começou a ação: ela não pode mais ser cancelada. */
+function markRevealed(state: GameState) {
+  if (!state.cancel) return;
+  state.cancel.blocked = 'revealed';
+  delete state.checkpoint;
+}
+
+function restoreCheckpoint(state: GameState, p: PlayerId) {
+  const cp = state.checkpoint!;
+  const info = state.cancel!;
+  delete state.checkpoint;
+  delete state.cancel;
+  Object.assign(state, structuredClone(cp.snap));
+  const name = (uid: string) => cardDef(state, uid).name;
+  const a = info.action;
+  const what =
+    a.type === 'playCard'
+      ? `a jogada de ${name(a.uid)} (a carta volta para a mão)`
+      : a.type === 'activate'
+        ? `a ativação de ${name(a.uid)}`
+        : a.type === 'attachDon'
+          ? `o DON!! anexado a ${name(a.target)}`
+          : a.type === 'attack'
+            ? `o ataque de ${name(a.attacker)}`
+            : a.type === 'endTurn'
+              ? 'o fim do turno'
+              : 'a ação';
+  log(state, p, `${state.players[p].name} cancela ${what}.`);
+}
+
+/** Motivo pelo qual `player` não pode cancelar a ação em andamento, ou null se puder. */
+export function cancelError(state: GameState, player: PlayerId): string | null {
+  if (state.phase === 'gameover') return 'A partida já terminou.';
+  const c = state.cancel;
+  if (!c || c.player !== player || !state.pending || state.pending.player !== player) return 'Não há ação para cancelar.';
+  if (c.blocked === 'revealed') return 'Não dá mais para cancelar: uma carta foi revelada.';
+  return null;
+}
+
+export function cancelAllowed(state: GameState, player: PlayerId): boolean {
+  return cancelError(state, player) === null;
+}
+
+/** Motivo pelo qual não dá para devolver 1 DON!! de `target` à área de custo, ou null se der. */
+export function detachDonError(state: GameState, player: PlayerId, target: string): string | null {
+  if (!isIdle(state) || state.activePlayer !== player) return 'Não é possível devolver DON!! agora.';
+  const loc = locate(state, target);
+  if (!loc || loc.player !== player || loc.zone === 'stage') return 'Alvo inválido.';
+  if (!(loc.fc.donLoose ?? 0)) {
+    return loc.fc.don > 0 ? 'Esse DON!! já foi usado neste turno: fica até a Renovação.' : 'Esta carta não tem DON!! anexado.';
+  }
+  return null;
+}
+
+/** Qualquer ação que possa ter contado com os DON!! anexados prende todos os DON!! soltos do jogador. */
+function lockDon(ps: PlayerState) {
+  for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) delete fc.donLoose;
 }
 
 function handlePendingResponse(state: GameState, action: Action) {
@@ -1097,6 +1221,7 @@ function handlePendingResponse(state: GameState, action: Action) {
 function handleMainAction(state: GameState, action: Action) {
   const p = action.player;
   const ps = state.players[p];
+  if (action.type !== 'attachDon' && action.type !== 'detachDon') lockDon(ps);
 
   switch (action.type) {
     case 'playCard': {
@@ -1137,6 +1262,21 @@ function handleMainAction(state: GameState, action: Action) {
       ps.donActive--;
       loc.fc.don++;
       emit(state, { kind: 'donGiven', player: p, card: action.target });
+      // Anexar disparou um efeito: o DON!! já foi "usado". Senão, ele pode voltar (detachDon).
+      if (state.stack.length) lockDon(ps);
+      else loc.fc.donLoose = (loc.fc.donLoose ?? 0) + 1;
+      return;
+    }
+
+    case 'detachDon': {
+      const err = detachDonError(state, p, action.target);
+      if (err) throw new IllegalActionError(err);
+      const loc = locate(state, action.target)!;
+      loc.fc.don--;
+      loc.fc.donLoose!--;
+      if (!loc.fc.donLoose) delete loc.fc.donLoose;
+      ps.donActive++;
+      log(state, p, `${ps.name} devolve 1 DON!! de ${cardDef(state, action.target).name} à área de custo.`);
       return;
     }
 
@@ -1229,6 +1369,7 @@ function startTurn(state: GameState) {
   for (const fc of fieldCards) {
     ps.donRested += fc.don;
     fc.don = 0;
+    delete fc.donLoose;
     // "will not become active in your opponent's next Refresh Phase"
     const skip = state.modifiers.some((m) => m.uid === fc.uid && m.kind === 'skipRefresh') || noRefreshByAura(state, fc.uid);
     if (!skip) fc.rested = false;
@@ -1749,6 +1890,9 @@ function askCards(
   extra: { min?: number; intent?: 'help' | 'harm' | 'discard'; ordered?: boolean; hidden?: string } = {},
 ) {
   const none = extra.hidden && !options.length;
+  // Olhar o deck (ou outra zona que o próprio jogador não vê) é informação ganha mesmo sem carta
+  // à mostra ("não tem X no deck"): a ação deixa de ser cancelável. A própria mão ele já via.
+  if (extra.hidden && extra.hidden !== 'da mão') markRevealed(state);
   state.pending = {
     kind: 'selectTargets',
     player: frame.controller,
@@ -3927,6 +4071,7 @@ const ZONE_FROM = { deck: 'do deck', hand: 'da mão', life: 'da Vida' } as const
 function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
   const ps = state.players[p];
   const tag = '(manual)';
+  lockDon(ps);
   const fieldCard = (uid: string) => {
     const loc = locate(state, uid);
     if (!loc) throw new IllegalActionError('A carta precisa estar em campo.');

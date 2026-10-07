@@ -1084,6 +1084,20 @@ input[type='number'] {
   cursor: grab;
   touch-action: none;
 }
+/* DON!! anexado que ainda pode voltar para a área de custo: arrastável, com o contador aceso */
+.attached-don.loose {
+  cursor: grab;
+  touch-action: none;
+}
+.attached-don.loose b {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 0 10px 3px rgba(255, 198, 52, 0.85);
+}
+/* fileira de DON!! recebendo um DON!! anexado de volta */
+.don-row.drop .don-cards {
+  outline: 3px dashed #ffc634;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
 .don-row.glow .don-card:not(.rested) {
   transform: translateY(-3px);
 }
@@ -1613,6 +1627,46 @@ button.hint-pill {
   background: var(--btn-off);
   box-shadow: 0 3px 0 var(--btn-off-shadow);
   filter: saturate(0.4);
+}
+/*
+ * Cancelar: sai do modo de ataque / DON!! marcados (botão grande no lugar de "Encerrar turno") ou
+ * desfaz no motor a ação em andamento (versão .side, ao lado de "Confirmar").
+ */
+.end-turn.defense.cancel {
+  color: #fff;
+  background: linear-gradient(180deg, #ff8a8a, #e03b3b);
+  box-shadow: 0 4px 0 #a52020, 0 6px 16px rgba(224, 59, 59, 0.4);
+}
+.end-turn.defense.cancel:active {
+  box-shadow: 0 1px 0 #a52020, 0 3px 8px rgba(224, 59, 59, 0.4);
+}
+.end-turn.defense.cancel small {
+  opacity: 0.9;
+}
+.end-turn.defense.cancel.side {
+  min-width: 0;
+  max-width: 120px;
+  padding: 3px 9px;
+}
+.defense-slot.in-sheet .end-turn.defense.cancel.side {
+  min-width: 0;
+  max-width: none;
+  flex: 1;
+}
+/* por que o Cancelar sumiu (embaixo do pedido de alvos e nos balões de escolha) */
+.target-text .target-hint {
+  white-space: normal;
+  opacity: 0.9;
+  color: #ffd27a;
+}
+.cancel-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+.btn.cancel {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
 }
 
 /* pedido de um efeito que escolhe alvos na mesa: no meio da faixa central, com a carta de origem */
@@ -2323,10 +2377,12 @@ button.hint-pill {
 .drag-ghost.over {
   transform: translate(-50%, -62%) rotate(0deg) scale(1.16);
 }
-.drag-ghost.ghost-don {
+.drag-ghost.ghost-don,
+.drag-ghost.ghost-attached {
   transform: translate(-50%, -50%);
 }
-.drag-ghost.ghost-don.over {
+.drag-ghost.ghost-don.over,
+.drag-ghost.ghost-attached.over {
   transform: translate(-50%, -50%) scale(1.2);
 }
 
@@ -2677,6 +2733,21 @@ button.hint-pill {
 .detail-card {
   --cw: 110px;
   flex: none;
+}
+/* Painel lateral da partida: carta maior em cima e o texto embaixo, aproveitando a largura toda. */
+.side-panel .detail {
+  flex-direction: column;
+  align-items: stretch;
+}
+.side-panel .detail.empty {
+  align-items: center;
+}
+.side-panel .detail-card {
+  --cw: 190px;
+  align-self: center;
+}
+.side-panel .detail-text {
+  width: 100%;
 }
 .detail-card .card.rested {
   transform: none;
@@ -4124,6 +4195,13 @@ tr.clickable:hover td {
   }
   .end-turn.defense small {
     font-size: 8.5px;
+  }
+  .end-turn.defense.cancel.side {
+    max-width: 84px;
+    padding: 2px 7px;
+  }
+  .end-turn.defense.cancel.side small {
+    display: none;
   }
   .target-request {
     padding: 2px 10px 2px 4px;
