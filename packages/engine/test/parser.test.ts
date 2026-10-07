@@ -78,6 +78,11 @@ describe('modelos de frase', () => {
     ).toEqual([[{ do: 'setDonActive', count: 2, if: { leaderHasType: 'Supernovas', lifeMax: 2 } }]]);
   });
 
+  it('"Leader\'s type includes "CP"" conta CP9 e CP0 (trecho do tipo, não o tipo inteiro)', () => {
+    expect(steps('[On Play] If your Leader\'s type includes "CP", draw 1 card.')).toEqual([[{ do: 'draw', count: 1, if: { leaderTypeIncludes: 'CP' } }]]);
+    expect(steps('[On Play] If your Leader has a type including "CP", draw 1 card.')).toEqual([[{ do: 'draw', count: 1, if: { leaderTypeIncludes: 'CP' } }]]);
+  });
+
   it('[Trigger] com custo, Vida a partir do deck e efeito [On Play] via [Trigger]', () => {
     expect(steps('', { trigger: 'You may trash 1 card from your hand: Play this card.' })).toEqual([
       [{ do: 'payCost', cost: { trashFromHand: 1 } }, { do: 'playThis' }],

@@ -271,6 +271,13 @@ function clean(raw: string): string {
     .replace(/\btrash (\d+) from your hand\b/g, 'trash $1 card from your hand')
     .replace(/\bDON!! Card each\b/g, 'DON!! card each')
     .replace(/ and add (them|it) to your hand, then place the rest\b/g, ' and add $1 to your hand. Then, place the rest')
+    // "{Land of Wano] type": colchete trocado no fim do tipo.
+    .replace(/\{([^}\]]+)\]/g, '{$1}')
+    .replace(/\} types cards\b/g, '} type cards')
+    // "reveal up to 1 card with the type {X}" → "reveal up to 1 {X} type card"
+    .replace(/\b(\d+) cards? with the type (\{[^}]+\})/g, '$1 $2 type card')
+    .replace(/\bThen, place the remaining cards into the trash\b/g, 'Then, trash the rest')
+    .replace(/\bup to (\d+) of your Leader or up to \1 of your Characters\b/g, 'up to $1 of your Leader or Character cards')
     .replace(/’/g, "'");
 }
 
@@ -391,8 +398,8 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       // "without an [On Play] effect and with a cost of 8 or less"
     } else if ((m = rest.match(/^\s*(?:and |with )?an? \[Trigger\]/i))) {
       spec.hasTrigger = true;
-    } else if ((m = rest.match(/^\s*with both the ((?:\{[^}]+\})(?:,?\s*and\s*\{[^}]+\})+) types/i))) {
-      // "with both the {Animal} and {Alabasta} types"
+    } else if ((m = rest.match(/^\s*with both the ((?:\{[^}]+\})(?:,?\s*and\s*\{[^}]+\})+) types?/i))) {
+      // "with both the {Animal} and {Alabasta} types" / "… type"
       spec.hasAllTypes = typesOf(m[1]);
     } else if ((m = rest.match(/^\s*with both the \{([^}]+)\} type and (?=an? |the |\d)/i))) {
       // "with both the {Revolutionary Army} type and a [Trigger]"
@@ -824,7 +831,8 @@ export function parseCondition(text: string): Condition | null {
   }
   if ((m = t.match(/^you have (\d+) or more rested Characters$/i))) return { minRestedCharacters: Number(m[1]) };
   if ((m = t.match(/^your opponent has (\d+) or more rested Characters$/i))) return { opponentMinRestedCharacters: Number(m[1]) };
-  if ((m = t.match(/^your Leader's type includes "([^"]+)"$/i))) return { leaderHasType: m[1] };
+  // "If your Leader's type includes "CP"" / "If your Leader has a type including "CP"": CP9, CP0… contam.
+  if ((m = t.match(/^your Leader(?:'s type includes| has a type including) "([^"]+)"$/i))) return { leaderTypeIncludes: m[1] };
   // "If that card is a Character, that Character …": o passo seguinte já só vale para Personagens.
   if (/^that card is a Character$/i.test(t)) return {};
   // Contagem genérica: "you have 2 or more Characters with 6000 base power", "your opponent has a Character with a [Trigger]"
@@ -964,6 +972,26 @@ const CLAUSES: ClauseRule[] = [
   [
     new RegExp(`^Set the cost of (.+?) to 0 ${DUR}$`, 'i'),
     (m) => withTarget(m[1], (target) => ({ do: 'cost', target, amount: -99, duration: durationOf(m[2]) }), true),
+  ],
+  [
+    // "Your Leader with a type including "Baroque Works" becomes 7000 base power during this turn"
+    new RegExp(`^Your Leader with a type including "([^"]+)" becomes (\\d+) base power ${DUR}$`, 'i'),
+    (m) => [{ do: 'basePower', target: 'ownLeader', amount: Number(m[2]), duration: durationOf(m[3]), if: { leaderTypeIncludes: m[1] } }],
+  ],
+  [
+    new RegExp(`^(.+?) becomes (\\d+) base power ${DUR}$`, 'i'),
+    (m) => withTarget(m[1], (target) => ({ do: 'basePower', target, amount: Number(m[2]), duration: durationOf(m[3]) })),
+  ],
+  [
+    // "add up to 1 card with a type including "CP" from your hand face-up to the top or bottom of your Life cards"
+    /^add (up to \d+ .+?) from your hand face-(up|down) to the top or bottom of your Life cards$/i,
+    (m) => {
+      const f = parseCardFilter(m[1]);
+      if (!f) return null;
+      const step: EffectStep = { do: 'handToLife', upTo: f.upTo, filter: f.filter, choose: true };
+      if (m[2].toLowerCase() === 'up') step.faceUp = true;
+      return [step];
+    },
   ],
   [
     new RegExp(`^(.+?) gains \\[(Double Attack|Banish|Blocker|Rush)\\], \\[(Double Attack|Banish|Blocker|Rush)\\] or \\[(Double Attack|Banish|Blocker|Rush)\\] ${DUR}$`, 'i'),

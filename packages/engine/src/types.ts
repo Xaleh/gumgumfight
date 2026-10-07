@@ -227,6 +227,8 @@ export interface Condition {
   handMax?: number;
   /** "If your Leader has the {X} type" */
   leaderHasType?: string;
+  /** "If your Leader's type includes "CP"" / "has a type including "CP"" (CP9, CP0… contam) */
+  leaderTypeIncludes?: string;
   /** "If your Leader is [X]" */
   leaderName?: string;
   /** "If your opponent has more DON!! cards on their field than you" */
@@ -626,7 +628,8 @@ type EffectStepBody =
   /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */
   | { do: 'lifeToHand'; count: number; choose?: boolean }
   /** "add up to 1 card from your hand to the top of your Life cards" */
-  | { do: 'handToLife'; upTo: number; filter?: CardFilter; faceUp?: boolean; fromTrash?: boolean; trashOnly?: boolean }
+  /** `choose`: "to the top or bottom of your Life cards" (o jogador escolhe a posição). */
+  | { do: 'handToLife'; upTo: number; filter?: CardFilter; faceUp?: boolean; fromTrash?: boolean; trashOnly?: boolean; choose?: boolean }
   /** "Add up to 1 of your Characters … to the top of the owner's Life cards" */
   | { do: 'fieldToLife'; target: TargetRef; choose?: boolean }
   /** "Look at up to 1 card from the top of your or your opponent's Life cards, and place it at the top or bottom" */

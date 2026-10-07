@@ -296,6 +296,9 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'leaderHasType':
         out.push(`o seu Líder tiver o tipo {${c.leaderHasType}}`);
         break;
+      case 'leaderTypeIncludes':
+        out.push(`o seu Líder tiver um tipo que inclua "${c.leaderTypeIncludes}"`);
+        break;
       case 'leaderHasAnyType':
         out.push(`o seu Líder tiver o tipo ${types(c.leaderHasAnyType!)}`);
         break;
@@ -843,7 +846,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'lifeToHand':
       return `Coloque ${cards(s.count)} do ${s.choose ? 'topo ou do fundo' : 'topo'} da sua Vida na mão.`;
     case 'handToLife':
-      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} ${s.trashOnly ? 'do seu descarte' : `da sua mão${s.fromTrash ? ' ou do seu descarte' : ''}`} no topo da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
+      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} ${s.trashOnly ? 'do seu descarte' : `da sua mão${s.fromTrash ? ' ou do seu descarte' : ''}`} no ${s.choose ? 'topo ou no fundo' : 'topo'} da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'fieldToLife':
       return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono.`;
     case 'peekLife':
