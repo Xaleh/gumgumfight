@@ -28,8 +28,8 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-16 | `ko` em Stage ignora proteções, substituição e eventos (**corrigido**) | 10-2-1 | baixo | C8 |
 | DV-17 | Carta do [Trigger] vai para o trash **antes** de resolver (**corrigido**) | 10-1-5-3 | médio | C9 |
 | DV-18 | `fieldToLife` ignora "face-up" (**corrigido**) | texto das cartas | médio | C10 |
-| DV-19 | «Set Power to 0» lido como poder base 0 | 4-12 | baixo | C11 |
-| DV-20 | Vários "base power becomes X": vale o último, não o maior | 4-9-2-1 | baixo | C11 |
+| DV-19 | «Set Power to 0» lido como poder base 0 (**corrigido**) | 4-12 | baixo | C11 |
+| DV-20 | Vários "base power becomes X": vale o último, não o maior (**corrigido**) | 4-9-2-1 | baixo | C11 |
 | DV-21 | Counter da mão só pode ir para o alvo do ataque | 7-1-3-1-1, Q&A de regras | baixo | C12 |
 | DV-22 | Evento [Counter] ignora redução de custo na mão | 2-7-6 | baixo | C12 |
 | DV-23 | "During this battle" expira antes dos efeitos de fim de batalha | 7-1-5-2..4 | baixo | C12 |
@@ -220,14 +220,18 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C11 — Poder base e «Set Power to 0»
 
-**DV-19. «Set Power to 0» lido como poder base 0** — baixo
-- Regra: 4-12 (reduz pelo valor do poder atual no momento da ativação; se já negativo, nada). Q&A OP07-002 Ain: com «Set Power to 0» e depois [Counter +1000], fica 1000.
-- Atual: "Set the power of X to 0" vira `basePower: 0` (parser.ts:1646); DON!!, auras e bônus continuam somando por cima do 0, e o efeito não reage a poder negativo.
-- Cartas: OP07-002, EB04-010.
+**DV-19. «Set Power to 0» lido como poder base 0** — baixo (**corrigido**)
+- Regra: 4-12 (reduz pelo valor do poder atual no momento da ativação; se já é 0 ou negativo, nada). Q&A OP07-002 Ain: com «Set Power to 0» e depois [Counter +1000], fica 1000; um Hack 5000 com +2000 "até o fim do próximo turno do oponente" fica 0 neste turno e volta a 7000 no seguinte.
+- Antes: "Set the power of X to 0" virava `basePower: 0` (parser.ts:1646); DON!!, auras e bônus (anteriores ou posteriores) somavam por cima do 0, e poder negativo subia para 0 + modificadores (−1000 virava −2000 com um −2000 já aplicado).
+- Agora: passo novo `setPowerZero` (parser: "Set the power of … to 0 …"). Na resolução lê o poder atual de cada alvo (`getPower`) e, se for positivo, aplica um modificador de poder −(poder atual) com a duração do texto; com 0 ou negativo não faz nada. Counters, DON!! e bônus posteriores somam normalmente, e o efeito some ao fim da duração. "Set the power … to N" com N ≠ 0 não existe nas cartas e deixa de ser lido.
+- Cartas: OP07-002, EB04-010 (nenhuma na base local; os testes usam o texto do OP07-002 numa carta sintética).
 
-**DV-20. Vários "base power becomes X": vale o último, não o maior** — baixo
-- Regra: 4-9-2-1. Q&A ST34-004 Linlin, OP17-008 Jozu.
-- Atual: `getPower` (engine.ts:589) aplica em sequência (aura → estático → modificador) e o último vence.
+**DV-20. Vários "base power becomes X": vale o último, não o maior** — baixo (**corrigido**)
+- Regra: 4-9-2-1. Q&A ST34-004 Linlin (0 e 6000 → 6000), OP17-008 Jozu (7000 e 8000 → 8000).
+- Antes: `getPower` (engine.ts:589) aplicava em sequência (aura → estático → modificador) e o último vencia; `swapBasePower` lia só o último modificador de poder base.
+- Agora: `basePowerOf` reúne todos os efeitos que fixam o poder base (auras `basePower`/`basePowerCopyLeader`, `staticBasePower`, modificadores `basePower`, inclusive os da troca de poder base) e usa o maior; sem nenhum, o impresso. `getPower` parte dele, e `swapBasePower` troca os valores de `basePowerOf`. Um único efeito ainda pode baixar o poder base abaixo do impresso (Linlin sozinha → 0).
+- Replays (DV-19 e DV-20): sem decisão nova, a versão não muda; um replay antigo com essas cartas pode tomar outro rumo.
+- Testes: `packages/engine/test/set-power.test.ts` (parser do OP07-002 e do ST34-004; OP07-002 + [Counter +1000] fica 1000; Hack 5000 +2000 fica 0 e volta a 7000 no turno seguinte; poder já negativo não muda; 0 e 6000 nas duas ordens dá 6000, com bônus por cima; um só "base power becomes 0" dá 0). 5 de 8 falham no código antigo.
 
 ### C12 — Counter Step e fim de batalha
 
@@ -343,6 +347,6 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano, carta do [Trigger] fora das áreas enquanto resolve | — |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O. | DV-12 (custos), DV-19, DV-20 |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O., «Set Power to 0» como −(poder atual), vários poderes base: vale o maior | DV-12 (custos) |
 | Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública (também a que vem do campo), revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-27, DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

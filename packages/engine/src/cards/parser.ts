@@ -1658,8 +1658,9 @@ const CLAUSES: ClauseRule[] = [
     (m) => [{ do: 'basePower', target: 'self', copy: 'opponentLeader', duration: durationOf(m[1]) }],
   ],
   [
-    new RegExp(`^Set the power of (.+?) to (\\d+) ${DUR}$`, 'i'),
-    (m) => withTarget(m[1], (target) => ({ do: 'basePower', target, amount: Number(m[2]), duration: durationOf(m[3]) })),
+    // «Set Power to 0» (4-12) é uma redução igual ao poder atual, não um poder base 0: DON!! e +poder posteriores somam.
+    new RegExp(`^Set the power of (.+?) to 0 ${DUR}$`, 'i'),
+    (m) => withTarget(m[1], (target) => ({ do: 'setPowerZero', target, duration: durationOf(m[2]) })),
   ],
   [
     new RegExp(`^(up to \\d+ of .+?)(?:'s|') base power becomes (\\d+) ${DUR}$`, 'i'),

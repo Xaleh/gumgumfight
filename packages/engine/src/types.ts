@@ -630,6 +630,8 @@ type EffectStepBody =
   | { do: 'nextPlayDiscount'; filter: CardFilter; amount: number }
   /** "base power becomes N" ou "the same as your opponent's Leader('s power)" */
   | { do: 'basePower'; target: TargetRef; amount?: number; copy?: 'opponentLeader' | 'chosen' | 'attacker'; duration: Duration }
+  /** «Set Power to 0» (4-12): −(poder atual na ativação), nada se já é 0 ou negativo. */
+  | { do: 'setPowerZero'; target: TargetRef; duration: Duration }
   | {
       do: 'trashAnyForPower';
       categories?: Array<'event' | 'stage' | 'character'>;

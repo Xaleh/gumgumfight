@@ -24,6 +24,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-Etapa de Counter sempre abre; vários Counters; atacante vence com ≥; poder negativo permitido (conforme).
+Etapa de Counter sempre abre; vários Counters; atacante vence com ≥; poder negativo permitido (conforme). «Set Power to 0» (`setPowerZero`) é um −(poder atual) na ativação, com a duração do texto: Counters posteriores somam (OP07-002 dá 1000).
 
-Divergências deste tema: DV-19, DV-21, DV-22, DV-23 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-21, DV-22, DV-23 (corrigida: DV-19) (detalhes em [../divergencias.md](../divergencias.md)).

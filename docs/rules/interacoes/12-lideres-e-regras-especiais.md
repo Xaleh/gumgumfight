@@ -26,6 +26,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-Regras de Líder em `leaderRule` (DON!! deck, vitória por deck 0, Stage inicial, custo máximo do deck…); negação por `negate`/`negateOnPlay`.
+Regras de Líder em `leaderRule` (DON!! deck, vitória por deck 0, Stage inicial, custo máximo do deck…); negação por `negate`/`negateOnPlay`. Vários efeitos que fixam o poder base: `basePowerOf` usa o maior (ST34-004, OP17-008).
 
-Divergências deste tema: DV-20, DV-25, DV-32, DV-34 (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-25, DV-32, DV-34 (corrigida: DV-20) (detalhes em [../divergencias.md](../divergencias.md)).

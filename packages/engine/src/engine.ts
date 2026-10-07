@@ -585,22 +585,35 @@ function auraPower(state: GameState, uid: string, zone: 'leader' | 'character' |
   return bonus;
 }
 
-export function getPower(state: GameState, uid: string): number {
+/**
+ * Poder base atual: o impresso, ou, se há efeitos que o fixam ("base power becomes X", auras, permanentes,
+ * troca de poder base), o MAIOR entre eles (4-9-2-1; Q&A ST34-004 Linlin, OP17-008 Jozu).
+ */
+export function basePowerOf(state: GameState, uid: string): number {
   const def = cardDef(state, uid);
-  let power = def.power ?? 0;
   const loc = locate(state, uid);
-  if (!loc) return power;
+  if (!loc) return def.power ?? 0;
+  const leaderPower = () => cardDef(state, state.players[loc.player].leader.uid).power ?? 0;
+  const set: number[] = [];
   if (loc.zone !== 'stage') {
     for (const au of aurasOn(state, uid, loc.zone, (x) => x.basePower !== undefined || Boolean(x.basePowerCopyLeader))) {
-      power = au.basePowerCopyLeader ? (cardDef(state, state.players[loc.player].leader.uid).power ?? 0) : au.basePower!;
+      set.push(au.basePowerCopyLeader ? leaderPower() : au.basePower!);
     }
   }
   for (const a of def.abilities) {
     if (a.timing === 'static' && a.staticBasePower !== undefined && conditionsMet(state, uid, a)) {
-      power = a.staticBasePower === 'leader' ? (cardDef(state, state.players[loc.player].leader.uid).power ?? 0) : a.staticBasePower;
+      set.push(a.staticBasePower === 'leader' ? leaderPower() : a.staticBasePower);
     }
   }
-  for (const m of state.modifiers) if (m.uid === uid && m.kind === 'basePower') power = m.amount;
+  for (const m of state.modifiers) if (m.uid === uid && m.kind === 'basePower') set.push(m.amount);
+  return set.length ? Math.max(...set) : def.power ?? 0;
+}
+
+export function getPower(state: GameState, uid: string): number {
+  const def = cardDef(state, uid);
+  const loc = locate(state, uid);
+  if (!loc) return def.power ?? 0;
+  let power = basePowerOf(state, uid);
   if (loc.player === state.activePlayer) power += loc.fc.don * 1000;
   for (const a of def.abilities) {
     if (a.timing === 'static' && a.staticPower && conditionsMet(state, uid, a)) power += a.staticPower;
@@ -3515,12 +3528,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const picked = frame.choice.filter((u) => options.includes(u));
       const [a, b] = step.withLeader ? [ps.leader.uid, picked[0]] : picked;
       if (!a || !b) return true;
-      const base = (uid: string) => {
-        const m = [...state.modifiers].reverse().find((x) => x.uid === uid && x.kind === 'basePower');
-        return m ? m.amount : cardDef(state, uid).power ?? 0;
-      };
-      const pa = base(a);
-      const pb = base(b);
+      const pa = basePowerOf(state, a);
+      const pb = basePowerOf(state, b);
       addModifier(state, frame.controller, { uid: a, kind: 'basePower', amount: pb, duration: step.duration });
       addModifier(state, frame.controller, { uid: b, kind: 'basePower', amount: pa, duration: step.duration });
       log(state, frame.controller, `${cardDef(state, a).name} e ${cardDef(state, b).name} trocam o poder base.`);
@@ -3644,6 +3653,19 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         addModifier(state, frame.controller, { uid, kind: 'basePower', amount, duration: step.duration });
         log(state, frame.controller, `O poder base de ${cardDef(state, uid).name} passa a ser ${amount}.`);
+      }
+      return true;
+    }
+    case 'setPowerZero': {
+      // «Set Power to 0» (4-12): reduz pelo poder atual no momento da ativação; já 0 ou negativo, nada muda.
+      // É um −X comum: Counters e DON!! posteriores somam por cima, e some ao fim da duração (Q&A OP07-002 Ain).
+      const t = resolveTargets(state, frame, step.target, 'harm', `${srcName}: escolha cujo poder fica em 0.`);
+      if (!t) return false;
+      const duration = step.duration === 'battle' && !state.battle ? 'turn' : step.duration;
+      for (const uid of t) {
+        const current = getPower(state, uid);
+        if (current > 0) addModifier(state, frame.controller, { uid, kind: 'power', amount: -current, duration });
+        log(state, frame.controller, `O poder de ${cardDef(state, uid).name} fica em ${Math.min(current, 0)}.`);
       }
       return true;
     }

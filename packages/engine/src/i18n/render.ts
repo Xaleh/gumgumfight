@@ -927,6 +927,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return s.copy
         ? `O poder base ${de(target(s.target, ctx))} passa a ser igual ao poder ${s.copy === 'chosen' ? 'da carta escolhida' : s.copy === 'attacker' ? 'do Líder ou Personagem atacante do oponente' : 'do Líder do oponente'} ${dur(s.duration)}.`
         : `O poder base ${de(target(s.target, ctx))} passa a ser ${s.amount} ${dur(s.duration)}.`;
+    case 'setPowerZero':
+      return `Deixe o poder ${de(target(s.target, ctx))} em 0 ${dur(s.duration)}.`;
     case 'revealLifeTop':
       return 'Revele a carta do topo da sua Vida.';
     case 'activateEventFromHand':

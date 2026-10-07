@@ -24,8 +24,8 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | [Rush], [Rush: Character], atacar Personagens ativos (5) | palavras-chave, `attackError`, `canAttackActive` | Existe |
 | Redirecionar ataque (5) | `redirectAttack` | Existe |
 | Counter da mão, Evento [Counter], "during this battle" (6) | pendência `counter`, `counterValue`, `handCounter`, duração `battle` | Existe; redução de custo na mão não vale para Eventos [Counter] (Parcial) |
-| «Set Power to 0» (6) | lido como `basePower: 0` | Parcial: deveria ser −(poder atual) (CR 4-12) |
-| Poder base / troca de poder base (6, 12) | `basePower`, `swapBasePower`, `staticBasePower` | Existe |
+| «Set Power to 0» (6) | `setPowerZero` | Existe: −(poder atual) na ativação, nada se já ≤0 (CR 4-12; DV-19 corrigida) |
+| Poder base / troca de poder base (6, 12) | `basePower`, `swapBasePower`, `staticBasePower`, `basePowerOf` | Existe: vários efeitos, vale o maior (CR 4-9-2-1; DV-20 corrigida) |
 | Dar DON!!, DON!! −X, [DON!! xX] (7) | `giveRestedDon`, `giveActiveDon`, `moveGivenDon`, `AbilityCost.donMinus`, `returnDonChoice`, `Ability.don` | Existe |
 | Stage único, K.O. de Stage (7) | `playFree` (substitui Stage), `ko` em Stage | Conforme: `koStage` passa por `koProtected`/`removalBlocked` (DV-16); sem substituição nem evento de Stage (nenhuma carta pede) |
 | Fonte sai de cena no meio do efeito (8) | o frame continua com o `uid`; `delayed` | Existe |
@@ -537,8 +537,8 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 9 | Gatilhos fora do campo (na mão, no descarte) | **Não existe** | 0 / 0 | `emit` (:1490) varre só Líder, Personagens e Stage. |
 | 10 | Redução estática de custo na mão | **Existe** | 5 / 17 | `handCost`, `handCostAura`, `nextPlayDiscount` → `playCost` (:736). Não vale para o custo de Eventos [Counter] (`counterOptions` :837 e pagamento :1155 usam `def.cost`). |
 | 11 | Jogar esta carta do descarte / da Vida | **Existe** | 2 / 7 ("Play this (Character) card from your trash"); "play … from your trash" em geral 6 / 82; jogar da Vida fora de [Trigger]: 0 (o único acerto, OP01-008, é falso positivo) | `playThis`, `playFrom{trash}`, `playRevealed` (deck/Vida). No [Trigger] a carta fica fora das áreas enquanto resolve: `playThis` não a marca como `from: 'trash'` e "play … from your trash" não a alcança (DV-17). |
-| 12 | "base power becomes X" | **Existe** | 3 / 22 | `basePower`, `staticBasePower`, `aura.basePower`. |
-| 13 | "Set the power … to 0" | **Parcial** | 0 / 2 (OP07-002, EB04-010) | Lido como `basePower` 0 (parser.ts:1646): DON!!, auras e +poder posteriores continuam somando. "Set the cost … to 0" = `cost −99` (1 carta, OP03-091). |
+| 12 | "base power becomes X" | **Existe** | 3 / 22 | `basePower`, `staticBasePower`, `aura.basePower`. Com vários ao mesmo tempo, `basePowerOf` usa o maior (4-9-2-1, DV-20). |
+| 13 | "Set the power … to 0" | **Existe** (DV-19 corrigida) | 0 / 2 (OP07-002, EB04-010) | `setPowerZero`: modificador −(poder atual na ativação) com a duração do texto, nada se já ≤0 (4-12); Counters e DON!! posteriores somam. "Set the cost … to 0" = `cost −99` (1 carta, OP03-091). |
 | 14 | Negar efeitos de Personagem/Líder | **Existe** | 1 / 15 | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated`. `isNegated` desliga habilidades e palavras impressas, inclusive o [On K.O.] (conferido em `koCharacter` antes de a carta sair do campo; DV-07 corrigida). |
 | 15 | Vida virada para cima | **Existe** (DV-18 corrigida) | 12 / 48 | Há `lifeFaceUp`, `lifeFace`, `handToLife{faceUp}`, `fieldToLife{faceUp}`, `search{toLife}`, custo `ownToLife`, `trashFaceUpLife`, `faceUpLifeMin`, regra `faceUpLifeToDeck`. `fieldToLife` com "face-up": ~16 cartas na base completa (OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103…), 4 na local (ST07-017, ST09-015, OP06-103, P-085). Quem tira carta da Vida (`trashLife`, `lifeToTrash`, `lifeTrashUntil`, `opponentLifeToBottom`, [Banish], `detach`…) a tira também de `lifeFaceUp`. |
 | 16 | [End of Your Opponent's Turn] / início do turno do oponente | **Não existe** | 0 / 0 | `parseHeader` recusa (:2210). |
