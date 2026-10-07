@@ -23,3 +23,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **OP12-020 (Roronoa Zoro, Líder)**: P: atacando o Líder, o oponente bloqueia com um Personagem. Ainda conta como "batalhou um Personagem"? E bloqueado pelo Líder OP05-022 Rosinante? E se o Personagem saiu antes do Damage Step? R: Sim; não; não. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op12.pdf. CR: 10-1-4-1, 7-1-5-2
 
 ---
+
+## No motor
+
+Regras de Líder em `leaderRule` (DON!! deck, vitória por deck 0, Stage inicial, custo máximo do deck…); negação por `negate`/`negateOnPlay`.
+
+Divergências deste tema: DV-20, DV-25, DV-32, DV-34 (detalhes em [../divergencias.md](../divergencias.md)).

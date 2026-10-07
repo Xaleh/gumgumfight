@@ -426,9 +426,13 @@ autoridade; `viewFor(estado, jogador, apelidos)` gera a visão de cada jogador, 
 - Palavras-chave: Rush, Blocker, Double Attack, Banish, [DON!! xN], [Once Per Turn], [Activate: Main], [On Play]
 - Limite de 5 personagens (substituição), Stage único
 - Derrota: dano sem Vida, ou deck vazio
+- Efeitos de substituição ("instead"), [End of Your Turn], custos DON!! −X, Vida virada para cima
 
-Ainda **não** implementado: [On K.O.] com escolhas complexas, efeitos de substituição, [End of Your Turn],
-custos DON!! −X em cartas reais, cartas com efeitos fora da DSL (aparecem com o aviso "efeito ainda não automatizado").
+As regras oficiais resumidas, o catálogo de interações (com os rulings da Bandai), as divergências conhecidas do motor
+e o mapa das primitivas da DSL estão em [`docs/rules/`](docs/rules/README.md). As principais limitações hoje são a
+ordem de resolução de efeitos disparados juntos (pilha em vez de fila; ver
+[`docs/rules/divergencias.md`](docs/rules/divergencias.md)) e as poucas formas de efeito sem primitiva
+(listadas em [`docs/rules/mapeamento-dsl.md`](docs/rules/mapeamento-dsl.md)).
 
 ## Dados das cartas
 

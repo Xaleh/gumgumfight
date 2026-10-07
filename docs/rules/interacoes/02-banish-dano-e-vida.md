@@ -21,3 +21,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **Q&A de regras (colocar na Vida)**: P: onde coloco uma carta "no topo/fundo da Vida"? E com 0 Vidas? R: No topo ou fundo exato. Com 0 Vidas, coloca na área de Vida. Fica virada para baixo, a menos que o efeito diga o contrário. Ninguém pode ver uma carta adicionada do deck à Vida. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 3-10-2, 3-10-2-1
 - **EB01-052 (Viola) / ST13-012 (Makino) / OP03-099 (Charlotte Katakuri)**: P: ao olhar e devolver Vidas, as viradas para cima voltam viradas para baixo? R: Não. Cada carta volta no estado em que estava. Fonte: https://en.onepiece-cardgame.com/pdf/qa_eb01.pdf. CR: 3-10-3
 - **OP11-102 (Camie)**: P: o oponente tem 2 Vidas, causo 1 dano e ele ativa [Trigger]. O efeito "se o oponente tem 2 Vidas…" ainda funciona? R: Pode ativar, mas a carta do [Trigger] já saiu da Vida, então ele tem 1 e nada acontece. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op11.pdf. CR: 10-1-5-3
+
+## No motor
+
+Dano em `stepDamage` (engine.ts:1765): um ponto por vez, [Banish] trasha sem [Trigger], Double Attack fixo em 2; `damageTaken`/`damageDealt`/`lifeRemoved` só depois do dano (conforme).
+
+Divergências deste tema: DV-01, DV-05, DV-18 (detalhes em [../divergencias.md](../divergencias.md)).

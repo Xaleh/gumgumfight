@@ -21,3 +21,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **OP04-016 (Bad Manners Kick Course) / OP02-068 / OP03-072**: P: posso ativar no Counter Step e não descartar? R: Sim, mas não ganho o +3000. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op04.pdf. CR: 4-10-1
 - **OP02-064 (Mr.2.Bon.Kurei(Bentham))**: P: se ele sair de campo durante a batalha por Counter/Trigger, ainda vai ao fundo do deck no fim da batalha? E se o alvo foi para o fundo do deck? R: Não vai (é carta nova). Se o alvo foi para o deck, ele vai ao fundo do deck no fim da batalha mesmo assim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op02.pdf. CR: 3-1-6, 7-1-5-2
 - **OP16-080 (Marshall.D.Teach, Líder)**: P: mudo o alvo do Líder OP12-020 Roronoa Zoro do oponente para o meu Líder. Ele ainda ativa o "após batalhar Personagem"? R: Não. Ele não batalhou um Personagem. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op16.pdf. CR: 7-1-5-2
+
+## No motor
+
+Etapa de Counter sempre abre; vários Counters; atacante vence com ≥; poder negativo permitido (conforme).
+
+Divergências deste tema: DV-19, DV-21, DV-22, DV-23 (detalhes em [../divergencias.md](../divergencias.md)).

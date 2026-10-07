@@ -19,3 +19,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **OP14-079 (Crocodile)**: P: se este [Activate: Main] dá K.O. em um Personagem meu com [On K.O.], ele ativa? R: Sim. Primeiro termina o resto do efeito do Crocodile ("−10 de custo… então trash 2"), depois ativa o [On K.O.]. (Igual: OP14-080 Gecko Moria.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_op14_eb04.pdf. CR: 8-6-3, 10-2-17
 - **OP03-090 (Blueno)**: P: se ele e outro Personagem "CP" de custo ≤4 são K.O.'d ao mesmo tempo, o [On K.O.] dele pode jogar o outro do trash? R: Sim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op03.pdf. CR: 10-2-17-1, 8-4-5
 - **ST08-013 (Mr.2.Bon.Kurei(Bentham))**: P: ele perde a batalha, é K.O.'d e está no trash no fim da batalha. O efeito [DON!! x1] "no fim da batalha" ainda ativa? R: Não. Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-08.pdf. CR: 8-1-3-1-3, 7-1-5-2
+
+## No motor
+
+O K.O. passa por `koCharacter` (engine.ts:4359): proteções, substituição, eventos `characterKO`/`characterRemoved` e [On K.O.]. Trash pelo limite de 5, por custo ou por efeito "trash" **não** é K.O. e não dispara [On K.O.] (conforme).
+
+Divergências deste tema: DV-07, DV-12, DV-13, DV-14, DV-16 (detalhes em [../divergencias.md](../divergencias.md)).

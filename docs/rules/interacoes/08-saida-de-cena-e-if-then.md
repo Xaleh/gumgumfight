@@ -18,3 +18,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **ST06-015 (Great Eruption) / OP09-089 (Stronger)**: P: posso escolher o alvo do −2 depois de comprar a carta? R: Sim. Os efeitos são processados em ordem e alvos são escolhidos ao resolver. Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-06.pdf. CR: 1-3-7, 8-4-4
 - **OP14-001 (Trafalgar Law, Líder)**: P: troquei os poderes base de 2 Personagens e um saiu de campo. O outro volta ao original? R: Não. Mantém o valor trocado até o fim do turno. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op14_eb04.pdf. CR: 8-2-3
 - **OP04-083 (Sabo) / OP08-038 / ST06-016 (White Out) / OP13-064 (Gol.D.Roger) / OP02-120 (Uta)**: P: um efeito "seus/todos os Personagens …" afeta Personagens jogados depois da resolução? R: Não. Só os que estavam em campo na resolução. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op04.pdf. CR: 8-1-4-2, 8-4-6
+
+## No motor
+
+Passos com `if` ("If"), `lastDone` ("If you do") e `payCost{scope}`; efeitos "during this turn" e atrasados continuam valendo depois que a fonte sai (conforme). A cadeia "If … Then" (4-10) depende do parser — ver itens a confirmar.
+
+Divergências deste tema: DV-04, DV-08 (detalhes em [../divergencias.md](../divergencias.md)).

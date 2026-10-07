@@ -18,3 +18,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **PRB01-001 (Sanji, Líder)**: P: dou [Rush] a Personagem sem [On Play]. Um com [On Play] cujo custo não paguei ou cuja condição não cumpro conta como "sem [On Play]"? E no 1º turno? R: Não conta. No 1º turno, não pode atacar mesmo com [Rush]. Fonte: https://en.onepiece-cardgame.com/pdf/qa_prb01.pdf. CR: 6-5-6-1, 2-8-5
 - **P-011 (Uta) / OP06-074 (Zephyr (Navy)) / OP09-081**: P: o que é "no base effect"? R: Carta sem texto: só [Counter +1000] conta como sem efeito base; só [Trigger], não; buffs externos não mudam; efeito negado não vira "sem efeito base"; [On Play] negado pelo Teach também não. Fonte: https://en.onepiece-cardgame.com/pdf/qa_promotion-cards.pdf. CR: 2-8-5, 8-2-2
 - **ST03-005 (Dracule Mihawk) / OP15-022 (Brook, Líder)**: P: o [When Attacking] obrigatório "compre 2" com ≤1 carta no deck? Com o Líder Brook, se o deck chega a 0 e depois recebe cartas? R: Mihawk: pode atacar, mas compra o que puder e com 0 no deck perde. Brook: ainda perde no fim do turno. Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-01-st-04.pdf. CR: 1-2-1-1-2, 9-2-1-2
+
+## No motor
+
+Limite de 5 em `stepPlay` (o jogador escolhe quem trashar, sem [On K.O.]); jogar por efeito dispara [On Play]; entrar rested quando indicado (conforme). A ordem dos [On Play] disparados por um efeito segue a pilha (ver tema 9).
+
+Divergências deste tema: DV-02, DV-04 (detalhes em [../divergencias.md](../divergencias.md)).

@@ -18,3 +18,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **OP12-053 (Borsalino) + OP12-040 (Kuzan)**: P: descartar 1 carta da mão em vez de ser removido conta como "carta descartada" para o Líder Kuzan comprar? R: Sim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op12.pdf. CR: 8-1-3-4-7
 - **PRB02-006 (Roronoa Zoro)**: P: posso escolher para "descanse outro Personagem seu em vez disso" um Personagem que não pode ser descansado? R: Não. Sem alvo válido, não pode usar. (Igual: OP07-029 Basil Hawkins sem Personagem ativo do oponente.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_prb02.pdf. CR: 8-1-3-4-5
 - **OP12-048 (Donquixote Rosinante) / OP12-102 (Shirahoshi) / OP15-009 / OP15-035 / OP15-106**: P: "se um Personagem seu seria removido… você pode X em vez disso" protege o próprio Personagem com o efeito? R: Sim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op12.pdf. CR: 8-1-3-4
+
+## No motor
+
+Timing `replace` + `offerReplacement` (engine.ts:4240) para K.O., remoção, rest e dano; recusar devolve o [Once Per Turn]; a mesma substituição não se reaplica (conforme).
+
+Divergências deste tema: DV-11, DV-12 (detalhes em [../divergencias.md](../divergencias.md)).

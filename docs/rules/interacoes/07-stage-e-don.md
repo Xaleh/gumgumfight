@@ -21,3 +21,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **OP15-058 (Enel, Líder)**: P: preciso de 10 DON? Se o efeito dele for negado, o que muda? E no 1º turno? R: Basta jogar com 6 DON. Negado depois do início, continua com 6. No 1º turno o [Activate: Main] não adiciona nem dá DON. Fonte: https://en.onepiece-cardgame.com/pdf/faq_op15-eb04.pdf. CR: 5-1-2-4, 8-1-3-3-3
 - **P-104 (Shanks)**: P: tenho 10 DON e o oponente 9. Posso pagar DON!! −1 do EB01-039 para ficar com 9 e cumprir a condição do K.O.? R: Sim. O custo é pago antes da resolução. Fonte: https://en.onepiece-cardgame.com/pdf/qa_promotion-cards.pdf. CR: 8-4-1-3
 - **OP15-003 (Alvida) / OP15-023 (Arlong)**: P: "give rested DON to its owner's Leader/Character" pode dar o meu DON ao oponente, ou o do oponente a mim? Quem escolhe o DON do oponente? R: Não pode cruzar donos. Quem ativa escolhe qual DON do oponente. "From its owner's cost area" aceita DON ativo. Fonte: https://en.onepiece-cardgame.com/pdf/faq_op15-eb04.pdf. CR: 6-5-5-1
+
+## No motor
+
+DON!! dados dão +1000 só no turno do dono e voltam rested quando a carta sai; Stage novo substitui o antigo; [DON!! xX] checado na ativação (conforme).
+
+Divergências deste tema: DV-09, DV-16 (detalhes em [../divergencias.md](../divergencias.md)).

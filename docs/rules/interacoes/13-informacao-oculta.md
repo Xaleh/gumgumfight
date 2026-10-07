@@ -43,3 +43,9 @@ Princípio: **toda decisão cuja existência depende de uma área secreta abre s
 - Revelação obrigatória (CR 11-2-1): a carta buscada do deck para a mão precisa aparecer para o oponente (no log e/ou animação), e a mão comprada não.
 - Ordem das cartas devolvidas ao fundo do deck (CR 3-1-8): o oponente não deve ver a ordem.
 - Cartas "olhadas" (CR 11-3-1) só aparecem para quem usou o efeito; espectador comum segue a visão pública; o perfil Streamer vê tudo.
+
+## No motor
+
+Ver a seção "Regra de simulador" acima.
+
+Divergências deste tema: DV-33 (detalhes em [../divergencias.md](../divergencias.md)).

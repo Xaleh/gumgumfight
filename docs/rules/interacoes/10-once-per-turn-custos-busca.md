@@ -22,3 +22,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **OP01-060 (Donquixote Doflamingo) / OP10-022 / ST17-001 / ST22-003**: P: o que faço com uma carta revelada que não foi jogada? R: Volta virada para baixo ao topo do deck (ou da Vida, no Law). Se a revelada é "comprada", conta como uma das cartas compradas. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op01.pdf. CR: 11-2-2
 - **OP08-040 (Atmos) / OP12-079 / OP07-111 (Lilith)**: P: o que significa "you may reveal 2 cards from your hand:"? Revelo cartas buscadas? R: Mostrar e devolver à mão. Busca do deck para a mão exige revelar (Lilith), mas OP12-079 tem ruling próprio: a carta adicionada pelo [Main] não é revelada. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op08.pdf. CR: 11-2-1
 - **OP12-099 (Kalgara)**: P: com 2 Kalgaras, compro 2 quando sai uma Vida? R: Não. Depois da 1ª compra, o próprio efeito impede comprar pelo resto do turno, e a 2ª não faz nada. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op12.pdf. CR: 1-3-3
+
+## No motor
+
+[Once Per Turn] por carta (`uid:índice`); custo tudo-ou-nada; custo negativo vale 0 somando o negativo; "up to" permite 0; busca pode não achar (conforme).
+
+Divergências deste tema: DV-08, DV-10, DV-14, DV-31 (detalhes em [../divergencias.md](../divergencias.md)).

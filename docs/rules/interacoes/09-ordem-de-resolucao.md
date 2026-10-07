@@ -18,3 +18,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **ST21-015 (Roronoa Zoro) / OP01-085 (Mr.3(Galdino))**: P: jogado no turno do oponente, até quando dura "até o fim do próximo turno do oponente"? R: Até o fim do turno atual do oponente. Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-21.pdf. CR: 6-6-1-2
 - **OP05-058 (It's a Waste of Human Life!!)**: P: os dois jogadores descartam ou põem no fundo do deck. Em que ordem? R: Primeiro o jogador do turno, depois o oponente, cada um escolhendo os seus. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op05.pdf. CR: 1-3-10, 1-3-4
 - **OP14-021 (Issho)**: P: "quando este Personagem fica descansado" ativa ao atacar? R: Sim, no mesmo timing que [When Attacking]. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op14_eb04.pdf. CR: 7-1-1-1, 7-1-1-3
+
+## No motor
+
+Hoje a resolução é uma pilha LIFO que empilha os efeitos disparados na hora. É a principal fonte de divergência de ordem.
+
+Divergências deste tema: DV-02, DV-03, DV-06, DV-28, DV-29, DV-30 (detalhes em [../divergencias.md](../divergencias.md)).

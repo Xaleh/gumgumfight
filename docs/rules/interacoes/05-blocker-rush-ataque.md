@@ -22,3 +22,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **ST10-006 (Monkey.D.Luffy)**: P: dei K.O. no bloqueador com o [Once Per Turn]. O que acontece com o ataque? R: A batalha termina sem ir ao Counter Step. Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-10.pdf. CR: 7-1-2-3
 - **OP05-022 (Donquixote Rosinante, Líder)**: P: usei o [Blocker] do Líder e ele perdeu a batalha. R: Eu tomo dano. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op05.pdf. CR: 7-1-4-1-1
 - **OP09-118 (Gol.D.Roger)**: P: com ele em campo e alguém com 0 Vida, o oponente ativa [Blocker] contra outro atacante. Eu ganho? E se o [On Block] de ST09-007 Shinobu reduz a Vida a 0 depois do bloqueio? R: Sim, ganha. Com a Shinobu, não: a Vida só chegou a 0 depois da ativação do [Blocker]. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op09.pdf. CR: 1-2-5
+
+## No motor
+
+`blockerOptions` (engine.ts:817): um [Blocker] por batalha, não rested, não o próprio alvo, respeita [Unblockable] e "cannot be rested"; Rush e Rush: Character em `attackError`; saída de cena checada ao fim de cada etapa (conforme).
+
+Divergências deste tema: DV-04 (detalhes em [../divergencias.md](../divergencias.md)).

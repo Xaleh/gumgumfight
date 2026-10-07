@@ -22,3 +22,9 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 - **ST09-002 (Uzuki Tempura)**: P: ativando o [Trigger] ("... e adicione esta carta à mão"), posso não adicioná-la? R: Não. (Igual: ST09-009.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-09.pdf. CR: 8-1-2
 - **OP15-079 (Absalom)**: P: posso adicionar esta própria carta à mão pelo [On K.O.]? E pelo [Trigger]? R: Pelo [On K.O.], sim (ela está no trash). Pelo [Trigger], não. Fonte: https://en.onepiece-cardgame.com/pdf/faq_op15-eb04.pdf. CR: 10-2-17-1, 10-1-5-3
 - **Q&A de regras**: P: ativei o [Trigger] de um Evento em vez de pôr na mão. Efeitos "quando você ativa um Evento" disparam? R: Não. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 8-5
+
+## No motor
+
+Pendência `lifeCard` sempre aberta para o dono (não vaza se havia Trigger); o Trigger resolve antes do 2º dano; [Trigger] de Evento não conta como "activate an Event" (conforme).
+
+Divergências deste tema: DV-17, DV-05 (detalhes em [../divergencias.md](../divergencias.md)).
