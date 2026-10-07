@@ -535,9 +535,10 @@ function parseTargetBase(phrase: string): TargetRef | null {
   } else if ((m = p.match(/^Stages?(?: cards?)?/i))) {
     spec.kinds = ['stage'];
   } else if (spec.name || spec.names) {
-    // "[Charlotte Linlin] cards" pode ser o Líder com esse nome; "[Pacifista]" sozinho, só Personagens.
+    // "[Charlotte Linlin] cards" e "up to 1 of your [Shanks]": com dono, o nome vale para qualquer carta
+    // em campo com esse nome, Líder incluído (regra 2-1). Sem dono ("play up to 1 [Pacifista]"), só Personagens.
     m = p.match(/^(?:cards?)?/i);
-    spec.kinds = m![0] && spec.side === 'own' ? ['leader', 'character'] : ['character'];
+    spec.kinds = spec.side === 'any' ? ['character'] : ['leader', 'character'];
   } else {
     return null;
   }
