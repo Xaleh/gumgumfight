@@ -1169,6 +1169,7 @@ function handlePendingResponse(state: GameState, action: Action) {
 
     case 'confirm': {
       if (action.type !== 'answer') throw new IllegalActionError('Responda sim ou não.');
+      if (action.yes && pending.cannot) throw new IllegalActionError('Não dá para pagar o custo.');
       const top = state.stack[state.stack.length - 1];
       if (top?.kind === 'effect') top.choice = action.yes ? ['yes'] : [];
       state.pending = null;
@@ -1586,7 +1587,7 @@ function restCard(state: GameState, uid: string, byEffectOf?: PlayerId, restSour
         a.replace?.event === 'rest' &&
         conditionsMet(state, uid, a) &&
         !(a.oncePerTurn && state.usedThisTurn.includes(usedKey(uid, k))) &&
-        (!a.cost || canPayCost(state, loc.player, uid, a.cost)),
+        (!a.cost || costAsksOwner(state, loc.player, uid, a.cost)),
     );
     if (i >= 0) {
       pushEffect(state, uid, loc.player, [{ do: 'replaceRest', victim: uid, ability: i, byPlayer: byEffectOf }]);
@@ -1868,25 +1869,31 @@ function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep
   return conditionHolds(state, frame.controller, frame.source, step.if);
 }
 
-/** Pede ao controlador do efeito que escolha cartas fora do campo (deck, descarte...). */
+/**
+ * Pede ao controlador do efeito que escolha cartas fora do campo (deck, descarte...).
+ * `hidden`: as opções vêm de uma zona que o oponente não vê (ex.: "da mão", "do deck"); a
+ * escolha abre mesmo sem opção, com o aviso de que nada pode ser escolhido.
+ */
 function askCards(
   state: GameState,
   frame: EffectFrame,
   options: string[],
   max: number,
   prompt: string,
-  extra: { min?: number; intent?: 'help' | 'harm' | 'discard'; ordered?: boolean } = {},
+  extra: { min?: number; intent?: 'help' | 'harm' | 'discard'; ordered?: boolean; hidden?: string } = {},
 ) {
+  const none = extra.hidden && !options.length;
   state.pending = {
     kind: 'selectTargets',
     player: frame.controller,
     options,
-    min: extra.min ?? 0,
+    min: Math.min(extra.min ?? 0, options.length),
     max: Math.min(max, options.length),
-    prompt,
+    prompt: none ? `${cardDef(state, frame.source).name}: nenhuma carta ${extra.hidden} pode ser escolhida.` : prompt,
     intent: extra.intent ?? 'help',
     source: frame.source,
     ...(extra.ordered ? { ordered: true } : {}),
+    ...(extra.hidden ? { hidden: true } : {}),
   };
 }
 
@@ -2008,6 +2015,42 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
 /** Cartas de Vida viradas para baixo, do topo para o fundo. */
 function faceDownLife(ps: PlayerState): string[] {
   return [...ps.life].reverse().filter((u) => !ps.lifeFaceUp?.includes(u));
+}
+
+/** O custo lê a mão do jogador (o oponente não sabe se dá para pagar)? */
+function costReadsHand(cost: AbilityCost): boolean {
+  return Boolean(cost.trashFromHand || cost.handToBottom || cost.handToTop || cost.playFromHand || cost.reveal || cost.either?.some(costReadsHand));
+}
+
+/**
+ * O custo sem o que o oponente não consegue conferir: ficam a quantidade de cartas da mão
+ * (o tamanho da mão é público) e o resto; saem os filtros sobre as cartas da mão.
+ */
+function publicCost(cost: AbilityCost): AbilityCost {
+  const { trashFilter: _f, playFromHand, reveal, either, ...rest } = cost;
+  const extra = (playFromHand ? 1 : 0) + (reveal?.count ?? 0);
+  return {
+    ...rest,
+    ...(extra ? { handToBottom: (rest.handToBottom ?? 0) + extra } : {}),
+    ...(either ? { either: either.map(publicCost) } : {}),
+  };
+}
+
+/**
+ * Uma pergunta "pagar X?" deve abrir? Sim quando dá para pagar; e também quando só a parte
+ * do custo que lê a mão impede o pagamento (ex.: "descarte 1 carta {FILM} da mão" sem
+ * {FILM} na mão): pular a pergunta contaria ao oponente o que há na mão. Nesse caso ela
+ * abre só com a resposta "não" (`confirm` com `cannot`). Quando a parte pública já impede
+ * (DON!!, campo, Vida, mão vazia), pular não conta nada.
+ */
+function costAsksOwner(state: GameState, player: PlayerId, source: string, cost: AbilityCost): boolean {
+  return canPayCost(state, player, source, cost) || (costReadsHand(cost) && canPayCost(state, player, source, publicCost(cost)));
+}
+
+/** `confirm` para pagar `cost` (ou só recusar, quando não dá para pagar). */
+function askPay(state: GameState, player: PlayerId, source: string, cost: AbilityCost | undefined, prompt: string) {
+  const cannot = Boolean(cost && !canPayCost(state, player, source, cost));
+  state.pending = { kind: 'confirm', player, source, prompt: cannot ? `${prompt} (Não dá para pagar o custo.)` : prompt, ...(cannot ? { cannot: true } : {}) };
 }
 
 export function canPayCost(state: GameState, player: PlayerId, source: string, cost: AbilityCost): boolean {
@@ -2266,18 +2309,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'trashFromHand': {
       const options = discardable(state, frame.controller, step.filter);
       const n = Math.min(step.count, options.length);
-      if (n === 0) return true;
+      // Mão vazia é público; "nenhuma carta da mão serve" (filtro) não é: a escolha abre mesmo assim.
+      if (n === 0 && (!ps.hand.length || frame.choice)) return true;
       if (!frame.choice) {
-        state.pending = {
-          kind: 'selectTargets',
-          player: frame.controller,
-          options,
-          min: step.upTo ? 0 : n,
-          max: n,
-          prompt: `${srcName}: escolha ${n} carta(s) da mão para descartar.`,
-          intent: 'discard',
-          source: frame.source,
-        };
+        askCards(state, frame, options, n, `${srcName}: escolha ${n} carta(s) da mão para descartar.`, { min: step.upTo ? 0 : n, intent: 'discard', hidden: 'da mão' });
         return false;
       }
       const trashed = frame.choice.filter((u) => options.includes(u));
@@ -2322,6 +2357,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             intent: 'help',
             source: frame.source,
             shown: top,
+            hidden: true,
           };
           return false;
         }
@@ -2385,20 +2421,21 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'payCost': {
       const cost = step.cost;
       if (!frame.choice) {
-        if (!canPayCost(state, frame.controller, frame.source, cost)) {
+        // Custo que o oponente vê que não dá para pagar (DON!!, campo, Vida): pula sem perguntar.
+        // Se só a mão impede, a pergunta abre mesmo assim (com "não" como única resposta).
+        if (!costAsksOwner(state, frame.controller, frame.source, cost)) {
           releaseOncePerTurn(state, frame.source, step.ability);
           if (step.scope === undefined) return abortEffect(frame);
           frame.i += step.scope;
           return true;
         }
-        state.pending = {
-          kind: 'confirm',
-          player: frame.controller,
-          source: frame.source,
-          prompt: Object.keys(cost).length
-            ? `${srcName}: usar o efeito? Custo: ${describeCost(cost)}.`
-            : `${srcName}: usar o efeito?`,
-        };
+        askPay(
+          state,
+          frame.controller,
+          frame.source,
+          cost,
+          Object.keys(cost).length ? `${srcName}: usar o efeito? Custo: ${describeCost(cost)}.` : `${srcName}: usar o efeito?`,
+        );
         return false;
       }
       if (!frame.choice.length) {
@@ -2499,8 +2536,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'tutor': {
       const options = ps.deck.filter((u) => matchesFilter(cardDef(state, u), step.filter));
       if (!frame.choice) {
-        if (!options.length) return true;
-        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) do deck para adicionar à mão.`);
+        // Abre mesmo sem carta válida: pular contaria ao oponente o que há no deck.
+        if (!ps.deck.length) return true;
+        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) do deck para adicionar à mão.`, { hidden: 'do deck' });
         return false;
       }
       for (const uid of frame.choice.filter((u) => options.includes(u))) {
@@ -2840,10 +2878,12 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'handPlayOrLife': {
       if (!frame.memo) {
-        const options = (step.from === 'trash' ? ps.trash : ps.hand).filter((u) => matchesFilter(cardDef(state, u), step.filter));
-        if (!options.length) return true;
+        const fromTrash = step.from === 'trash';
+        const options = (fromTrash ? ps.trash : ps.hand).filter((u) => matchesFilter(cardDef(state, u), step.filter));
+        // Do descarte (público) pula sem opção; da mão abre sempre.
+        if (!options.length && (fromTrash || !ps.hand.length || frame.choice)) return true;
         if (!frame.choice) {
-          askCards(state, frame, options, 1, `${srcName}: escolha uma carta ${step.from === 'trash' ? 'do descarte' : 'da mão'}.`);
+          askCards(state, frame, options, 1, `${srcName}: escolha uma carta ${fromTrash ? 'do descarte' : 'da mão'}.`, fromTrash ? {} : { hidden: 'da mão' });
           return false;
         }
         const uid = frame.choice.find((u) => options.includes(u));
@@ -2975,12 +3015,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const ability = cardDef(state, frame.source).abilities[step.ability];
       if (!locate(state, step.victim) || !ability) return true;
       if (!frame.choice) {
-        state.pending = {
-          kind: 'confirm',
-          player: frame.controller,
-          source: frame.source,
-          prompt: `${srcName} vai ser virado. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
-        };
+        askPay(state, frame.controller, frame.source, ability.cost, `${srcName} vai ser virado. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`);
         return false;
       }
       if (!frame.choice.length) {
@@ -3403,9 +3438,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const def = cardDef(state, u);
         return def.category === 'event' && matchesFilter(def, step.filter) && def.abilities.some((a) => a.timing === 'main');
       });
-      if (!options.length) return true;
+      if (!options.length && (fromTrash || !ps.hand.length || frame.choice)) return true;
       if (!frame.choice) {
-        askCards(state, frame, options, 1, `${srcName}: escolha um Evento da mão para ativar.`);
+        askCards(state, frame, options, 1, `${srcName}: escolha um Evento ${fromTrash ? 'do descarte' : 'da mão'} para ativar.`, fromTrash ? {} : { hidden: 'da mão' });
         return false;
       }
       const uid = frame.choice.find((u) => options.includes(u));
@@ -3436,9 +3471,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         frame.memo = t.length ? t : ['-'];
         frame.choice = undefined;
       }
-      if (!options.length) return true;
+      if (!options.length && (!ps.hand.length || frame.choice)) return true;
       if (!frame.choice) {
-        askCards(state, frame, options, options.length, `${srcName}: descarte quantas cartas quiser (+${step.power} de poder para cada).`, { intent: 'discard' });
+        askCards(state, frame, options, options.length, `${srcName}: descarte quantas cartas quiser (+${step.power} de poder para cada).`, { intent: 'discard', hidden: 'da mão' });
         return false;
       }
       const chosen = frame.choice.filter((u) => options.includes(u));
@@ -3575,16 +3610,17 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const owner = state.players[frame.controller];
       if (!locate(state, step.victim) || !ability) return true;
       if (!frame.choice) {
-        if (ability.cost && !canPayCost(state, owner.id, frame.source, ability.cost)) {
+        if (ability.cost && !costAsksOwner(state, owner.id, frame.source, ability.cost)) {
           performRemoval(state, step.victim, step.action, step.inBattle);
           return true;
         }
-        state.pending = {
-          kind: 'confirm',
-          player: owner.id,
-          source: frame.source,
-          prompt: `${srcName}: ${cardDef(state, step.victim).name} vai sair do campo. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
-        };
+        askPay(
+          state,
+          owner.id,
+          frame.source,
+          ability.cost,
+          `${srcName}: ${cardDef(state, step.victim).name} vai sair do campo. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
+        );
         return false;
       }
       if (!frame.choice.length) {
@@ -3612,14 +3648,15 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const owner = state.players[frame.controller];
       // O dano em resolução (logo abaixo deste efeito na pilha).
       const damage = [...state.stack].reverse().find((f): f is DamageFrame => f.kind === 'damage' && f.defender === owner.id);
-      if (!locate(state, frame.source) || !ability || !damage || (ability.cost && !canPayCost(state, owner.id, frame.source, ability.cost))) return true;
+      if (!locate(state, frame.source) || !ability || !damage || (ability.cost && !costAsksOwner(state, owner.id, frame.source, ability.cost))) return true;
       if (!frame.choice) {
-        state.pending = {
-          kind: 'confirm',
-          player: owner.id,
-          source: frame.source,
-          prompt: `${srcName}: você vai sofrer ${damage.remaining} de dano. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
-        };
+        askPay(
+          state,
+          owner.id,
+          frame.source,
+          ability.cost,
+          `${srcName}: você vai sofrer ${damage.remaining} de dano. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
+        );
         return false;
       }
       if (!frame.choice.length) return true;
@@ -3656,8 +3693,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         ...(step.fromTrash || step.trashOnly ? ps.trash.filter((u) => matchesFilter(cardDef(state, u), step.filter ?? {})) : []),
       ];
       if (!frame.choice) {
-        if (!options.length) return true;
-        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) da mão para o topo da Vida.`);
+        if (!options.length && (step.trashOnly || !ps.hand.length)) return true;
+        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) da mão para o topo da Vida.`, step.trashOnly ? {} : { hidden: 'da mão' });
         return false;
       }
       for (const uid of frame.choice.filter((u) => options.includes(u))) {
@@ -3893,10 +3930,12 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         );
       });
       if (!frame.choice) {
-        if (!options.length) return !!(frame.last = []);
         const where =
           step.from === 'deck' ? 'do deck' : step.from === 'hand' ? 'da mão' : step.from === 'trash' ? 'do descarte' : 'da mão ou do descarte';
-        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) ${where} para jogar.`);
+        // Do descarte (público) pula sem opção; da mão ou do deck abre sempre (a zona vazia é pública).
+        const hidden = step.from !== 'trash' && (step.from === 'deck' ? ps.deck : ps.hand).length > 0;
+        if (!options.length && !hidden) return !!(frame.last = []);
+        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) ${where} para jogar.`, hidden ? { hidden: where } : {});
         return false;
       }
       // Empilhadas ao contrário para entrarem na ordem escolhida.
@@ -4202,7 +4241,7 @@ function offerReplacement(
       }
       if (!conditionsMet(state, fc.uid, a)) continue;
       if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) continue;
-      if (a.cost && !canPayCost(state, owner.id, fc.uid, a.cost)) continue;
+      if (a.cost && !costAsksOwner(state, owner.id, fc.uid, a.cost)) continue;
       pushEffect(state, fc.uid, owner.id, [
         { do: 'replaceRemoval', victim, ability: i, action, ...(ctx.inBattle ? { inBattle: true } : {}) },
       ]);
@@ -4212,7 +4251,7 @@ function offerReplacement(
   // "If any of your Characters would be K.O.'d in battle during this turn, you may … instead."
   for (const t of state.tempReplacements ?? []) {
     if (t.player !== owner.id || action !== 'ko' || (t.by === 'battle' && !ctx.inBattle)) continue;
-    if (!canPayCost(state, owner.id, t.source, t.cost)) continue;
+    if (!costAsksOwner(state, owner.id, t.source, t.cost)) continue;
     pushEffect(state, t.source, owner.id, [{ do: 'replaceRemoval', victim, ability: -1, action, inlineCost: t.cost, ...(ctx.inBattle ? { inBattle: true } : {}) }]);
     return true;
   }
@@ -4229,7 +4268,7 @@ function offerDamageReplacement(state: GameState, defender: PlayerId): boolean {
       if (a.timing !== 'replace' || a.replace?.event !== 'damage') continue;
       if (!conditionsMet(state, fc.uid, a)) continue;
       if (a.oncePerTurn && state.usedThisTurn.includes(usedKey(fc.uid, i))) continue;
-      if (a.cost && !canPayCost(state, owner.id, fc.uid, a.cost)) continue;
+      if (a.cost && !costAsksOwner(state, owner.id, fc.uid, a.cost)) continue;
       pushEffect(state, fc.uid, owner.id, [{ do: 'replaceDamage', ability: i }]);
       return true;
     }

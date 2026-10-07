@@ -165,8 +165,8 @@ describe('a carta de Vida sempre passa pelo dono', () => {
   });
 });
 
-describe('replays da versão 1', () => {
-  it('ganham as respostas implícitas (pass no Counter vazio, carta de Vida sem [Trigger] para a mão)', () => {
+describe('replays de versões anteriores', () => {
+  it('ganham as respostas implícitas (Counter vazio, carta de Vida sem [Trigger], "pagar X?" sem como pagar, escolha vazia na mão/deck)', () => {
     const config = {
       seed: 7,
       firstPlayer: 0 as PlayerId,
@@ -188,7 +188,9 @@ describe('replays da versão 1', () => {
       modern.push(a);
       const implicit =
         (p?.kind === 'counter' && !p.options.length) ||
-        (p?.kind === 'lifeCard' && !s.defs[s.cards[p.card].cardId].abilities.some((ab) => ab.timing === 'trigger'));
+        (p?.kind === 'lifeCard' && !s.defs[s.cards[p.card].cardId].abilities.some((ab) => ab.timing === 'trigger')) ||
+        (p?.kind === 'confirm' && Boolean(p.cannot)) ||
+        (p?.kind === 'selectTargets' && Boolean(p.hidden) && !p.options.length);
       if (!implicit) old.push(a);
       s = applyAction(s, a);
     }

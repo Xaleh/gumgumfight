@@ -31,9 +31,11 @@ import {
   createGame,
   type DeckList,
   type GameState,
+  hiddenDecision,
   IllegalActionError,
   type LogEntry,
   type PlayerId,
+  REPLAY_VERSION,
   viewFor,
 } from '@gumgum/engine';
 import type { FormatId } from '../stats/catalog';
@@ -50,8 +52,9 @@ export const MAX_SPECTATORS = 100;
 /** Pausa antes de cada jogada do bot, para a jogada ser visível. */
 const BOT_DELAY_MS = 700;
 /**
- * Faixa de tempo do bot nas decisões que escondem informação (Counter, carta da Vida): um
- * tempo fixo (ou uma resposta imediata) contaria ao oponente que o bot não tinha o que usar.
+ * Faixa de tempo do bot nas decisões que escondem informação (Counter, carta da Vida, "pagar X?",
+ * escolhas na mão ou no deck): um tempo fixo (ou uma resposta imediata) contaria ao oponente
+ * que o bot não tinha o que usar.
  */
 const BOT_HIDDEN_DECISION_MS = [800, 2000] as const;
 
@@ -385,8 +388,7 @@ export class Room {
     this.botTimer = null;
     const seat = this.running;
     if (seat === null || !this.data.seats[seat]?.bot) return;
-    const kind = this.state?.pending?.kind;
-    const hidden = kind === 'counter' || kind === 'lifeCard';
+    const hidden = hiddenDecision(this.state?.pending);
     const delay =
       this.deps.botDelayMs ??
       (hidden ? BOT_HIDDEN_DECISION_MS[0] + Math.random() * (BOT_HIDDEN_DECISION_MS[1] - BOT_HIDDEN_DECISION_MS[0]) : BOT_DELAY_MS);
@@ -587,7 +589,7 @@ export class Room {
     if (!this.state || this.state.phase !== 'gameover') return null;
     return {
       format: 'gumgumfight-replay' as const,
-      version: 2 as const,
+      version: REPLAY_VERSION,
       seed: 0,
       seed128: this.data.seed128,
       firstPlayer: this.state.firstPlayer,
