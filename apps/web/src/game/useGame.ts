@@ -27,7 +27,8 @@ export interface GameSetup {
 
 export interface ReplayFile {
   format: 'gumgumfight-replay';
-  version: 1;
+  /** 2: a etapa de Counter e a carta da Vida sempre geram uma ação (`pass` / `answer`). */
+  version: 1 | 2;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];
@@ -46,6 +47,9 @@ interface Entry {
 }
 
 const MAX_HISTORY = 400;
+/** Faixa de tempo (ms) do bot nas decisões que escondem informação (Counter, carta da Vida). */
+const HIDDEN_DECISION_MS = [800, 2000] as const;
+
 
 export function useGame(setup: GameSetup) {
   const [entries, setEntries] = useState<Entry[]>(() => [{ state: createGame(setup.config), action: null }]);
@@ -112,7 +116,17 @@ export function useGame(setup: GameSetup) {
     if (!next) return;
     // Espera as cartas pousarem antes da próxima jogada.
     // A escolha de quem começa demora um pouco mais (dá tempo de ver quem venceu o sorteio).
-    const base = state.pending?.kind === 'chooseFirst' ? 1300 : state.pending ? 500 : 800;
+    // Counter e carta da Vida: tempo aleatório, para a pressa (ou a demora) do bot não contar
+    // se ele tinha Counter na mão ou [Trigger] na Vida.
+    const kind = state.pending?.kind;
+    const base =
+      setup.mode !== 'replay' && (kind === 'counter' || kind === 'lifeCard')
+        ? HIDDEN_DECISION_MS[0] + Math.random() * (HIDDEN_DECISION_MS[1] - HIDDEN_DECISION_MS[0])
+        : kind === 'chooseFirst'
+          ? 1300
+          : state.pending
+            ? 500
+            : 800;
     const delay = Math.max(base / speed, motionWait() + 120);
     const t = setTimeout(() => dispatch(next!), delay);
     return () => clearTimeout(t);
@@ -122,7 +136,7 @@ export function useGame(setup: GameSetup) {
     const first = entries[0].state;
     return {
       format: 'gumgumfight-replay',
-      version: 1,
+      version: 2,
       seed: first.seed,
       firstPlayer: entries[entries.length - 1].state.firstPlayer,
       ...(first.rollWinner !== undefined ? { chooseFirst: true } : {}),

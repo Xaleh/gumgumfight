@@ -45,8 +45,13 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
           { type: 'pass', player },
           ...pending.options.map((uid): Action => ({ type: 'counter', player, uid })),
         ];
+      case 'lifeCard':
+        // Ativar só quando a carta tem [Trigger]; colocar na mão sempre.
+        return [
+          ...(cardDef(state, pending.card).abilities.some((a) => a.timing === 'trigger') ? [{ type: 'answer', player, yes: true } as Action] : []),
+          { type: 'answer', player, yes: false },
+        ];
       case 'chooseFirst':
-      case 'trigger':
       case 'confirm':
         return [
           { type: 'answer', player, yes: true },

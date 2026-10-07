@@ -100,6 +100,7 @@ function noDefense(s: GameState): GameState {
   for (let guard = 0; guard < 10; guard++) {
     if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: s.pending.player, uids: [] });
     else if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: s.pending.player });
+    else if (s.pending?.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: s.pending.player, yes: false });
     else break;
   }
   return s;

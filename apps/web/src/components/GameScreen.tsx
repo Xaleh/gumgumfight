@@ -43,8 +43,12 @@ import {
   seriesAfter,
 } from './Online';
 
-/** Modo 'don': `count` DON!! ativos escolhidos para anexar de uma vez. */
-type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; count: number };
+/**
+ * Modo 'don': `count` DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). Sem `step`, a faixa
+ * central mostra a barra de ações (Anexar ao Líder / a um Personagem / Cancelar) e a mesa segue normal; com
+ * `step: 'character'`, só os Personagens que podem receber DON!! ficam destacados e o toque num deles anexa.
+ */
+type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; count: number; step?: 'character' };
 type DragKind = 'hand' | 'attacker' | 'don';
 interface Drag {
   kind: DragKind;
@@ -363,7 +367,7 @@ function Table({
     if (mode?.kind === 'don' && human !== null) {
       const max = state.players[human].donActive;
       if (max === 0) setMode(null);
-      else if (mode.count > max) setMode({ kind: 'don', count: max });
+      else if (mode.count > max) setMode({ ...mode, count: max });
     }
   }, [myTurnIdle, state, human, mode]);
   useEffect(() => {
@@ -432,9 +436,11 @@ function Table({
     defense?.kind === 'block'
       ? 'Toque num Personagem com [Blocker] para bloquear'
       : defense?.kind === 'counter'
-        ? quickCounter
-          ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
-          : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
+        ? !defense.options.length
+          ? 'Nenhuma carta da mão serve como Counter agora: conclua a etapa (o oponente não sabe disso)'
+          : quickCounter
+            ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
+            : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
         : targets
           ? targets.max === 0
             ? 'Toque numa carta destacada para ler e depois continue'
@@ -476,9 +482,10 @@ function Table({
       if (has((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === uid)) return 'option';
       return null;
     }
-    if (mode?.kind === 'don') {
-      return has((a) => a.type === 'attachDon' && a.target === uid) ? 'option' : null;
+    if (mode?.kind === 'don' && mode.step === 'character') {
+      return canReceiveDon(uid, 'character') ? 'option' : null;
     }
+    // DON!! marcados sem ação escolhida: a mesa continua com os destaques normais.
     if (uid === selected && !wide) return null;
     if (uid === selected) return 'selected';
     if (canPlay(uid)) return 'playable';
@@ -518,12 +525,15 @@ function Table({
       setMode(null);
       if (uid === mode.attacker) return;
     }
-    if (mode?.kind === 'don') {
-      setMode(null);
-      if (has((a) => a.type === 'attachDon' && a.target === uid)) {
+    if (mode?.kind === 'don' && mode.step === 'character') {
+      if (canReceiveDon(uid, 'character')) {
         attachDons(uid, mode.count);
+        setMode(null);
         return;
       }
+      // Tocou fora dos alvos: volta para a barra de ações, com os DON!! ainda marcados.
+      setMode({ kind: 'don', count: mode.count });
+      return;
     }
     // Carta escondida (mão do oponente) não abre.
     if (state.cards[uid]?.cardId === HIDDEN_CARD) return;
@@ -548,6 +558,14 @@ function Table({
     for (let i = 0; i < n; i++) dispatch({ type: 'attachDon', player: human, target });
   };
 
+  /** A carta pode receber DON!! agora? `kind` restringe a Líder ou a Personagem. */
+  const canReceiveDon = (uid: string, kind?: 'leader' | 'character') => {
+    if (!has((a) => a.type === 'attachDon' && a.target === uid)) return false;
+    if (!kind || human === null) return true;
+    const isLeader = state.players[human].leader.uid === uid;
+    return kind === 'leader' ? isLeader : !isLeader;
+  };
+
   /** Toque num DON!! ativo: marca mais um (ou desmarca, se já estava marcado). */
   const onDon = (player: PlayerId, index: number) => {
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
@@ -555,9 +573,33 @@ function Table({
     setMode((m) => {
       const cur = m?.kind === 'don' ? m.count : 0;
       const next = Math.min(index < cur ? cur - 1 : cur + 1, max);
-      return next > 0 ? { kind: 'don', count: next } : null;
+      return next > 0 ? { kind: 'don', count: next, step: m?.kind === 'don' ? m.step : undefined } : null;
     });
   };
+
+  /** Barra de ações dos DON!! marcados (na faixa central): o que fazer com eles. */
+  const donBar =
+    mode?.kind === 'don' && human !== null
+      ? (() => {
+          const me = state.players[human];
+          const count = mode.count;
+          return (
+            <DonBar
+              count={count}
+              step={mode.step}
+              canLeader={canReceiveDon(me.leader.uid, 'leader')}
+              characters={me.characters.filter((c) => canReceiveDon(c.uid, 'character')).length}
+              onLeader={() => {
+                attachDons(me.leader.uid, count);
+                setMode(null);
+              }}
+              onCharacter={() => setMode({ kind: 'don', count, step: 'character' })}
+              onBack={() => setMode({ kind: 'don', count })}
+              onCancel={() => setMode(null)}
+            />
+          );
+        })()
+      : null;
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
@@ -815,6 +857,7 @@ function Table({
               }
               acting={acting}
               mode={mode}
+              donBar={donBar}
               paused={game.paused}
               canEnd={myTurnIdle}
               onEnd={() => dispatch({ type: 'endTurn', player: human! })}
@@ -915,6 +958,13 @@ function Table({
               setZoom(null);
               setSelected(null);
             }}
+            donCount={mode?.kind === 'don' ? mode.count : 0}
+            onAttachDons={(target, n) => {
+              attachDons(target, n);
+              setMode(null);
+              setZoom(null);
+              setSelected(null);
+            }}
             onAttackMode={(attacker) => {
               setMode({ kind: 'attack', attacker });
               setZoom(null);
@@ -1009,9 +1059,11 @@ function Table({
             )}
             <p className="muted small hand-sheet-hint">
               {myPending?.kind === 'counter'
-                ? quickCounter
-                  ? 'Toque numa carta destacada para usar o Counter na hora.'
-                  : 'Toque numa carta destacada e confirme para usar o Counter.'
+                ? !myPending.options.length
+                  ? 'Nenhuma carta serve como Counter agora: conclua a etapa.'
+                  : quickCounter
+                    ? 'Toque numa carta destacada para usar o Counter na hora.'
+                    : 'Toque numa carta destacada e confirme para usar o Counter.'
                 : targets
                   ? `${handHint}.`
                   : myPending?.kind === 'selectTargets'
@@ -1135,6 +1187,8 @@ function CenterBand(props: {
   hands?: { on: boolean; onToggle: () => void };
   acting: PlayerId | null;
   mode: Mode;
+  /** DON!! marcados: contador e barra de ações (DonBar), no lugar da dica. */
+  donBar?: ReactNode;
   paused: boolean;
   canEnd: boolean;
   onEnd: () => void;
@@ -1158,13 +1212,7 @@ function CenterBand(props: {
         Escolha o alvo do ataque <small>(toque aqui para cancelar)</small>
       </button>
     );
-  else if (mode?.kind === 'don')
-    middle = (
-      <button className="hint-pill" onClick={props.onCancelMode}>
-        {mode.count} DON!! · toque no alvo ou arraste
-        <small>toque aqui para cancelar</small>
-      </button>
-    );
+  else if (mode?.kind === 'don' && props.donBar) middle = props.donBar;
   else if (props.paused) middle = <span className="hint-pill">Pausado</span>;
   else if (acting !== null && acting !== human && (state.players[acting].isBot || human !== null || watching) && state.phase === 'main')
     middle = (
@@ -1225,6 +1273,69 @@ function CenterBand(props: {
         </button>
       )}
     </>
+  );
+}
+
+/**
+ * DON!! marcados na fileira: quantos são e o que fazer com eles, como no OPTCG Sim. Primeiro a escolha da
+ * ação (Líder anexa na hora; Personagem passa a destacar os alvos), depois o alvo. Sem arrastar, no celular.
+ */
+function DonBar(props: {
+  count: number;
+  step?: 'character';
+  canLeader: boolean;
+  /** Quantos Personagens podem receber DON!! agora. */
+  characters: number;
+  onLeader: () => void;
+  onCharacter: () => void;
+  onBack: () => void;
+  onCancel: () => void;
+}) {
+  const { count, step } = props;
+  // Em tela estreita (.brief) os textos encurtam para a barra caber numa linha entre o turno e "Encerrar turno".
+  const counter = (
+    <span className="don-bar-count">
+      <span className="don-card mini" aria-hidden="true" />
+      <b>{count}</b>
+      <span className="full">{count === 1 ? 'selecionado' : 'selecionados'}</span>
+      <span className="brief">DON!!</span>
+    </span>
+  );
+  if (step === 'character')
+    return (
+      <div className="don-bar step" role="group" aria-label="Anexar DON!! a um Personagem">
+        {counter}
+        <span className="don-bar-hint">
+          <span className="full">Toque no Personagem que recebe</span>
+          <span className="brief">Toque no Personagem</span>
+        </span>
+        <button className="don-bar-btn back" onClick={props.onBack}>
+          Voltar
+        </button>
+        <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label="Cancelar">
+          ✕
+        </button>
+      </div>
+    );
+  return (
+    <div className="don-bar" role="group" aria-label="Anexar DON!!">
+      {counter}
+      {props.canLeader && (
+        <button className="don-bar-btn" onClick={props.onLeader} aria-label="Anexar ao Líder">
+          <span className="full">Anexar ao Líder</span>
+          <span className="brief">Líder</span>
+        </button>
+      )}
+      {props.characters > 0 && (
+        <button className="don-bar-btn" onClick={props.onCharacter} aria-label="Anexar a um Personagem">
+          <span className="full">Anexar a um Personagem</span>
+          <span className="brief">Personagem</span>
+        </button>
+      )}
+      <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label="Cancelar">
+        ✕
+      </button>
+    </div>
   );
 }
 
@@ -1370,11 +1481,13 @@ function defenseDecision(state: GameState, pending: Extract<Pending, { kind: 'bl
     const total = pending.options.reduce((sum, u) => sum + counterValue(state, u), 0);
     useless = !events && total < need;
   }
-  const label = !counter ? 'Não bloquear' : !hits ? 'Concluir' : used ? 'Não usar mais Counter' : 'Não usar Counter';
+  // Sem carta de Counter na mão a etapa abre mesmo assim (senão o atacante saberia): só resta concluir.
+  const none = counter && !pending.options.length;
+  const label = !counter ? 'Não bloquear' : !hits || none ? 'Concluir' : used ? 'Não usar mais Counter' : 'Não usar Counter';
   const result = hits ? 'o ataque passa' : 'defendido';
   return {
     label,
-    sub: `${result} · ${atk} ⚔ ${def}`,
+    sub: none && hits && !used ? `sem Counter na mão · ${atk} ⚔ ${def}` : `${result} · ${atk} ⚔ ${def}`,
     title: !counter
       ? `Seguir sem bloquear: ${result} (${atk} contra ${def})`
       : `Encerrar a etapa de Counter: ${result} (${atk} contra ${def})`,
@@ -1737,27 +1850,44 @@ function Prompt(props: {
         </PromptPill>
       );
     }
-    case 'trigger':
+    case 'lifeCard': {
+      // Toda carta que sai da Vida passa por aqui, com ou sem [Trigger]: o oponente só vê que uma
+      // carta da Vida está sendo olhada, e não pode saber qual dos dois casos é.
+      const def = cardDef(state, pending.card);
+      const trigger = def.abilities.some((a) => a.timing === 'trigger') ? cardText(def, lang).trigger : null;
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
-            <div className="modal-kicker">[Trigger] revelado da Vida</div>
+            <div className="modal-kicker">{trigger ? '[Trigger] revelado da Vida' : 'Carta da Vida'}</div>
             <div className="modal-feature">
               <CardView state={state} uid={pending.card} />
             </div>
-            <h3>{cardDef(state, pending.card).name}</h3>
-            <p className="effect trigger">{cardText(cardDef(state, pending.card), lang).trigger}</p>
+            <h3>{def.name}</h3>
+            {trigger ? (
+              <p className="effect trigger">{trigger}</p>
+            ) : (
+              <p className="muted small">Esta carta não tem [Trigger]. O oponente não sabe qual carta saiu da sua Vida.</p>
+            )}
             <div className="btn-row center">
-              <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                Ativar [Trigger]
-              </button>
-              <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-                Não ativar <small>(vai para a mão)</small>
+              {trigger && (
+                <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                  Ativar [Trigger]
+                </button>
+              )}
+              <button className={`btn big${trigger ? '' : ' primary'}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+                {trigger ? (
+                  <>
+                    Não ativar <small>(vai para a mão)</small>
+                  </>
+                ) : (
+                  'Colocar na mão'
+                )}
               </button>
             </div>
           </div>
         </div>
       );
+    }
     case 'option':
       return (
         <div className="modal-backdrop">
@@ -1866,6 +1996,9 @@ function CardZoom(props: {
   onCounter?: () => void;
   onClose: () => void;
   onDispatch: (a: Action) => void;
+  /** DON!! marcados na fileira: o botão de anexar passa a anexar todos eles nesta carta. */
+  donCount: number;
+  onAttachDons: (target: string, count: number) => void;
   onAttackMode: (attacker: string) => void;
   onTools: () => void;
 }) {
@@ -1964,8 +2097,12 @@ function CardZoom(props: {
               </button>
             )}
             {attach && (
-              <button className={hasPlates ? 'btn small quiet' : 'btn don big'} onClick={() => props.onDispatch(attach)}>
-                + 1 DON!! <small>({state.players[owner].donActive} ativos)</small>
+              <button
+                className={hasPlates ? 'btn small quiet' : 'btn don big'}
+                onClick={() => (props.donCount > 1 ? props.onAttachDons(uid, props.donCount) : props.onDispatch(attach))}
+              >
+                {props.donCount > 1 ? `Anexar ${props.donCount} DON!!` : '+ 1 DON!!'}{' '}
+                <small>({state.players[owner].donActive} ativos)</small>
               </button>
             )}
             {props.canManual && (
