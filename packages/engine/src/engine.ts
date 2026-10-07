@@ -1730,6 +1730,7 @@ function stepBattle(state: GameState) {
           defender,
           remaining: n,
           banish: hasKeyword(state, b.attacker, 'banish'),
+          attack: true,
         });
       } else {
         koCharacter(state, b.target, { inBattle: true, by: b.attacker });
@@ -1780,6 +1781,15 @@ function stepDamage(state: GameState, frame: DamageFrame) {
   }
   const ps = state.players[frame.defender];
   if (ps.life.length === 0) {
+    // Ataque: vence só quem encontra 0 de Vida no momento em que o dano é determinado (7-1-4-1-1-1).
+    // Com [Double Attack] contra 1 de Vida, o 1º ponto tira a última Vida e o 2º não faz nada
+    // (Q&A de regras: "can I win the game by using a [Double Attack]? No, you cannot.").
+    // Dano de efeito segue 1-2-1-1-1 ponto a ponto: o Líder que leva dano com 0 de Vida perde.
+    if (frame.attack && frame.lost) {
+      frame.remaining--;
+      log(state, frame.defender, `${ps.name} não tem mais Vida: o dano restante do ataque não tem efeito.`);
+      return;
+    }
     gameOver(state, opponent(frame.defender), `O líder de ${ps.name} recebeu dano sem cartas de Vida.`);
     return;
   }

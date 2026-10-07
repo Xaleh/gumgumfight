@@ -10,7 +10,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 
 | Código | Divergência | Regra | Impacto | Card |
 |---|---|---|---|---|
-| DV-01 | [Double Attack] com 1 de Vida vence a partida | 7-1-4-1-1-1, Q&A de regras | alto | C1 |
+| DV-01 | [Double Attack] com 1 de Vida vence a partida (**corrigido**) | 7-1-4-1-1-1, Q&A de regras | alto | C1 |
 | DV-02 | Efeitos disparados resolvem antes (ou no meio) do efeito que os disparou | 8-6-3, 8-6-1-1 | alto | C2 |
 | DV-03 | Jogador do turno não resolve os seus efeitos primeiro | 8-6-1 | alto | C2 |
 | DV-04 | Auto effect de carta que já saiu do campo ainda resolve | 8-1-3-1-3 | médio | C2 |
@@ -77,13 +77,12 @@ Pontos **conformes** conferidos (não precisam de card): mulligan; Refresh, Draw
 
 ### C1 — Vitória por dano
 
-**DV-01. [Double Attack] com 1 de Vida vence a partida** — alto **[testado]**
+**DV-01. [Double Attack] com 1 de Vida vence a partida** — alto — **corrigido**
 - Regra: 7-1-4-1-1-1 — o atacante vence se o oponente tem 0 de Vida **no momento em que se determina que haverá dano**. Q&A de regras: "If my opponent has 1 Life card, can I win the game by using a [Double Attack] to deal 2 damage? — No, you cannot."
-- Atual: `stepDamage` (engine.ts:1765) repete o ponto de dano; no 2º ponto, com 0 de Vida, chama `gameOver`.
-- Correto: checar a vitória só antes do 1º ponto do dano de ataque; pontos seguintes sem Vida não fazem nada.
-- Cenário: Kouzuki Oden ST09-005 (Double Attack) ataca um Líder com 1 de Vida → o motor declara vitória; o certo é o oponente ficar com 0 e a partida seguir.
-- A confirmar junto: dano de **efeito** de 2 ou mais com 1 de Vida (hoje perde no 2º ponto; o Q&A só fala de Double Attack) e a substituição de dano oferecida com 0 de Vida (`stepDamage` :1777).
-- Onde: `engine.ts` (`stepBattle` caso `damage`, `stepDamage`; marcar no frame se o dano é de ataque).
+- Antes: `stepDamage` repetia o ponto de dano e, no 2º ponto, com 0 de Vida, chamava `gameOver`.
+- Agora: o frame de dano de ataque tem `attack: true`; a vitória por 0 de Vida só é decidida antes do 1º ponto. Os pontos seguintes sem Vida não fazem nada e ficam no log. Se a Vida voltar entre os danos (ex.: [Trigger] que adiciona Vida, Q&A OP03-118), o 2º dano a tira normalmente. Vale também com [Banish].
+- Dano de **efeito** (passo `takeDamage`) continua ponto a ponto, pela leitura literal de 1-2-1-1-1 / 9-2-1-1 ("Leader takes damage when that player has 0 Life cards"): 2 de dano de efeito contra 1 de Vida vencem. Não há Q&A sobre esse caso; o Q&A EB03-055 Robin confirma só que dano de efeito com 0 de Vida vence.
+- Testes: `packages/engine/test/engine.test.ts`, bloco "Double Attack contra 1 de Vida".
 
 ### C2 — Fila de efeitos disparados (ordem de resolução)
 
@@ -284,7 +283,7 @@ Causa comum: `state.stack` é uma pilha LIFO, e os auto effects são empilhados 
 
 ## Itens a confirmar (sem ruling oficial claro)
 
-- Dano de efeito de 2 ou mais com 1 de Vida (hoje perde no 2º ponto). O Q&A EB03-055 Robin diz que dano de efeito com 0 de Vida vence; não há ruling para "2 de dano de efeito com 1 de Vida".
+- Dano de efeito de 2 ou mais com 1 de Vida: o motor segue a leitura literal de 1-2-1-1-1 (perde no 2º ponto). O Q&A EB03-055 Robin diz que dano de efeito com 0 de Vida vence; não há ruling para "2 de dano de efeito com 1 de Vida". Rever se a Bandai publicar um.
 - Substituição de dano ("If you would take damage, … instead") oferecida mesmo com 0 de Vida.
 - `handCounter.set` sobrescrevendo um Counter maior (CR 2-10-4: vale o maior).
 - Cadeia "If … Then …" (4-10): depende de o parser marcar o `if` em todos os passos seguintes; vale um teste por carta com "If … Then".
@@ -297,7 +296,7 @@ Causa comum: `state.stack` é uma pilha LIFO, e os auto effects são empilhados 
 | Preparação e derrota (1-2, 5-2, 9) | Escolha de primeiro/segundo, mulligan, derrota por dano sem Vida e por deck 0 (checada a cada passo), desistência, vitória por efeito | DV-24, DV-25, DV-26 |
 | Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-06, DV-28, DV-29, DV-30 |
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX] | DV-09 |
-| Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha | DV-01, DV-21, DV-22, DV-23 |
+| Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano | DV-05, DV-17 |
 | Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O., "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event" | DV-02, DV-03, DV-04, DV-07, DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
 | Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-16, DV-18, DV-27, DV-33 |
