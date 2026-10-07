@@ -1,7 +1,7 @@
 import { buildCardDef, type CardData, type CardDef, type CardStatus } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { cardText, useSettings } from '../settings';
-import { StaticCard } from './CardView';
+import { StaticCard, StatusTag } from './CardView';
 
 const CATEGORY = { leader: 'Líder', character: 'Personagem', event: 'Evento', stage: 'Stage' };
 
@@ -34,10 +34,10 @@ export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: n
       {statuses && statuses.length > 0 && (
         <ul className="detail-statuses" aria-label="Efeitos ativos">
           {statuses.map((s, i) => (
-            <li key={i} className={s.tone}>
-              <span className="status-chip">{s.icon}</span>
+            <li key={i}>
+              <StatusTag status={s} />
               <span>
-                <b>{s.text}</b> <span className="muted">{s.until}</span>
+                {s.text} <span className="muted">{s.until}</span>
               </span>
             </li>
           ))}

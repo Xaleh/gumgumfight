@@ -122,15 +122,26 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   );
 }
 
-/** Fileira de ícones no canto da carta, um por efeito temporário, com o texto e a duração no tooltip. */
+/**
+ * Tags no topo da carta, uma por efeito temporário, no estilo do aviso "−1 Vida" (Bangers), cada tipo com a
+ * sua cor (`tag-<kind>`, palavras-chave `tag-kw-<keyword>`). O texto completo e a duração ficam no tooltip.
+ */
+export function StatusTag({ status, title }: { status: CardStatus; title?: boolean }) {
+  const cls = ['status-tag', `tag-${status.kind}`, status.keyword ? `tag-kw-${status.keyword}` : '', status.tone].join(' ');
+  return (
+    <span className={cls} title={title ? `${status.text} (${status.until})` : undefined}>
+      <span className="tag-icon">{status.icon}</span>
+      {status.tag}
+    </span>
+  );
+}
+
 function StatusMarkers({ statuses }: { statuses: CardStatus[] }) {
   if (!statuses.length) return null;
   return (
     <div className="card-status" aria-label="Efeitos ativos">
       {statuses.map((s, i) => (
-        <span key={i} className={['status-chip', s.tone].join(' ')} title={`${s.text} (${s.until})`}>
-          {s.icon}
-        </span>
+        <StatusTag key={i} status={s} title />
       ))}
     </div>
   );

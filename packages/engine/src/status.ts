@@ -31,6 +31,8 @@ export interface CardStatus {
   icon: string;
   /** Rótulo de poucas palavras ("Não ataca"). */
   label: string;
+  /** Etiqueta curta, em caixa alta, para a tag na carta ("NÃO VIRA"). */
+  tag: string;
   /** Texto do efeito ("Não pode atacar"). */
   text: string;
   /** Até quando vale ("até o fim deste turno"). */
@@ -42,13 +44,13 @@ export interface CardStatus {
   keyword?: Keyword;
 }
 
-const KEYWORD: Record<Keyword, { icon: string; label: string }> = {
-  rush: { icon: '⚡', label: 'Rush' },
-  blocker: { icon: '🛡', label: 'Blocker' },
-  doubleAttack: { icon: '⚔', label: 'Double Attack' },
-  banish: { icon: '💥', label: 'Banish' },
-  rushCharacter: { icon: '⚡', label: 'Rush: Character' },
-  unblockable: { icon: '🎯', label: 'Unblockable' },
+const KEYWORD: Record<Keyword, { icon: string; label: string; tag: string }> = {
+  rush: { icon: '⚡', label: 'Rush', tag: 'RUSH' },
+  blocker: { icon: '🛡', label: 'Blocker', tag: 'BLOCKER' },
+  doubleAttack: { icon: '⚔', label: 'Double Attack', tag: 'DOUBLE ATTACK' },
+  banish: { icon: '💥', label: 'Banish', tag: 'BANISH' },
+  rushCharacter: { icon: '⚡', label: 'Rush: Character', tag: 'RUSH: CHAR.' },
+  unblockable: { icon: '🎯', label: 'Unblockable', tag: 'UNBLOCKABLE' },
 };
 
 const AURA_UNTIL = 'enquanto o efeito contínuo da outra carta valer';
@@ -100,15 +102,16 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
 
   // Restrições.
   if (attacker) {
-    fromMods(['cannotAttack'], 'cannotAttack', () => ({ kind: 'cannotAttack', icon: '🚫', label: 'Não ataca', text: 'Não pode atacar', tone: 'bad', onCard: true }));
+    fromMods(['cannotAttack'], 'cannotAttack', () => ({ kind: 'cannotAttack', icon: '🚫', label: 'Não ataca', tag: 'NÃO ATACA', text: 'Não pode atacar', tone: 'bad', onCard: true }));
     if (loc.zone === 'character' && aura((au) => Boolean(au.cannotAttack))) {
-      add('cannotAttack', 99, { kind: 'cannotAttack', icon: '🚫', label: 'Não ataca', text: 'Não pode atacar', until: AURA_UNTIL, tone: 'bad', onCard: true });
+      add('cannotAttack', 99, { kind: 'cannotAttack', icon: '🚫', label: 'Não ataca', tag: 'NÃO ATACA', text: 'Não pode atacar', until: AURA_UNTIL, tone: 'bad', onCard: true });
     }
     if (restricted(state, loc.player, 'noAttackLeader')) {
       add('cannotAttackLeader', 1, {
         kind: 'cannotAttackLeader',
         icon: '🚫',
         label: 'Não ataca o Líder',
+        tag: 'NÃO ATACA LÍDER',
         text: 'Não pode atacar o Líder',
         until: 'até o fim deste turno',
         tone: 'bad',
@@ -119,6 +122,7 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       kind: 'cannotAttackChars',
       icon: '🚫',
       label: `Não ataca custo ≤${m.amount}`,
+      tag: `NÃO ATACA CUSTO ≤${m.amount}`,
       text: `Não pode atacar Personagens com custo base de ${m.amount} ou menos`,
       tone: 'bad',
       onCard: true,
@@ -127,18 +131,20 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       kind: 'attackTax',
       icon: '💸',
       label: `Ataque custa ${m.amount} carta(s)`,
+      tag: `ATAQUE CUSTA ${m.amount}`,
       text: `Só pode atacar se o oponente descartar ${m.amount} carta(s) da mão`,
       tone: 'bad',
       onCard: true,
     }));
   }
   if (cannotBeRested(state, uid)) {
-    fromMods(['cannotBeRested'], 'cannotRest', () => ({ kind: 'cannotRest', icon: '🔒', label: 'Não vira', text: 'Não pode ser virada (não ataca nem paga custos de virar)', tone: 'bad', onCard: true }));
+    fromMods(['cannotBeRested'], 'cannotRest', () => ({ kind: 'cannotRest', icon: '🔒', label: 'Não vira', tag: 'NÃO VIRA', text: 'Não pode ser virada (não ataca nem paga custos de virar)', tone: 'bad', onCard: true }));
   }
   fromMods(['skipRefresh'], 'skipRefresh', () => ({
     kind: 'skipRefresh',
     icon: '💤',
     label: 'Não desvira',
+    tag: 'NÃO DESVIRA',
     text: 'Não fica ativa na próxima Fase de Renovação',
     tone: 'bad',
     onCard: true,
@@ -146,23 +152,23 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
   if (out.has('skipRefresh')) {
     out.get('skipRefresh')!.until = `até a próxima Fase de Renovação de ${state.players[ownerOf(state, uid)].name}`;
   } else if (noRefreshByAura(state, uid)) {
-    add('skipRefresh', 99, { kind: 'skipRefresh', icon: '💤', label: 'Não desvira', text: 'Não fica ativa nas Fases de Renovação', until: AURA_UNTIL, tone: 'bad', onCard: true });
+    add('skipRefresh', 99, { kind: 'skipRefresh', icon: '💤', label: 'Não desvira', tag: 'NÃO DESVIRA', text: 'Não fica ativa nas Fases de Renovação', until: AURA_UNTIL, tone: 'bad', onCard: true });
   }
   if (loc.zone === 'character') {
-    fromMods(['cannotBlock'], 'cannotBlock', () => ({ kind: 'cannotBlock', icon: '⛔', label: 'Sem Blocker', text: 'Não pode ativar [Blocker]', tone: 'bad', onCard: true }));
+    fromMods(['cannotBlock'], 'cannotBlock', () => ({ kind: 'cannotBlock', icon: '⛔', label: 'Sem Blocker', tag: 'SEM BLOCKER', text: 'Não pode ativar [Blocker]', tone: 'bad', onCard: true }));
   }
   if (isNegated(state, uid)) {
-    fromMods(['negated'], 'negated', () => ({ kind: 'negated', icon: '❌', label: 'Efeitos anulados', text: 'Os efeitos desta carta estão anulados', tone: 'bad', onCard: true }));
+    fromMods(['negated'], 'negated', () => ({ kind: 'negated', icon: '❌', label: 'Efeitos anulados', tag: 'ANULADA', text: 'Os efeitos desta carta estão anulados', tone: 'bad', onCard: true }));
     if (!out.has('negated')) {
-      add('negated', 99, { kind: 'negated', icon: '❌', label: 'Efeitos anulados', text: 'Os efeitos desta carta estão anulados', until: AURA_UNTIL, tone: 'bad', onCard: true });
+      add('negated', 99, { kind: 'negated', icon: '❌', label: 'Efeitos anulados', tag: 'ANULADA', text: 'Os efeitos desta carta estão anulados', until: AURA_UNTIL, tone: 'bad', onCard: true });
     }
   }
 
   // Ganhos.
   for (const kw of Object.keys(KEYWORD) as Keyword[]) {
     if (def.keywords.includes(kw) || !hasKeyword(state, uid, kw)) continue;
-    const { icon, label } = KEYWORD[kw];
-    const base = { kind: 'keyword' as const, icon, label: `Ganhou ${label}`, text: `Ganhou [${label}]`, tone: 'good' as const, onCard: true, keyword: kw };
+    const { icon, label, tag } = KEYWORD[kw];
+    const base = { kind: 'keyword' as const, icon, label: `Ganhou ${label}`, tag, text: `Ganhou [${label}]`, tone: 'good' as const, onCard: true, keyword: kw };
     const byMod = mods.filter((m) => m.kind === 'keyword' && m.keyword === kw);
     if (byMod.length) for (const m of byMod) add(`kw:${kw}`, expiry(state, m), { ...base, until: modifierUntil(state, m) });
     else add(`kw:${kw}`, 99, { ...base, until: AURA_UNTIL });
@@ -173,6 +179,7 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       kind: 'attribute',
       icon: '🔪',
       label: `Atributo ${m.attribute}`,
+      tag: m.attribute.toUpperCase(),
       text: `Ganhou o atributo "${m.attribute}"`,
       until: modifierUntil(state, m),
       tone: 'good',
@@ -183,6 +190,7 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
     kind: 'cannotBeKO',
     icon: '✨',
     label: 'Não é nocauteada',
+    tag: 'SEM K.O.',
     text: m.kind === 'cannotBeKOInBattle' ? 'Não pode ser nocauteada em batalha' : m.kind === 'cannotBeKOByEffect' ? 'Não pode ser nocauteada por efeitos' : 'Não pode ser nocauteada',
     tone: 'good',
     onCard: true,
@@ -192,6 +200,7 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       kind: 'canAttackActive',
       icon: '🏹',
       label: 'Ataca ativos',
+      tag: 'ATACA ATIVOS',
       text: 'Pode atacar Personagens ativos',
       tone: 'good',
       onCard: true,
@@ -200,6 +209,7 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       kind: 'noBlockerWhenAttacking',
       icon: '🚷',
       label: 'Sem Blocker contra',
+      tag: 'ANTI-BLOCKER',
       text: 'Quando esta carta ataca, o oponente não pode ativar [Blocker]',
       tone: 'good',
       onCard: true,
@@ -224,6 +234,7 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       kind: 'cost',
       icon: '🏷',
       label: `${signed(g.amount)} custo`,
+      tag: `${signed(g.amount)} CUSTO`,
       text: `${signed(g.amount)} de custo`,
       until,
       tone: g.amount > 0 ? 'bad' : 'good',
@@ -236,6 +247,7 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
       kind: 'power',
       icon: g.amount > 0 ? '▲' : '▼',
       label: `${signed(g.amount)} poder`,
+      tag: `${signed(g.amount)} PODER`,
       text: `${signed(g.amount)} de poder`,
       until,
       tone: g.amount > 0 ? 'good' : 'bad',
