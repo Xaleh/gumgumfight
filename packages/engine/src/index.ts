@@ -20,3 +20,4 @@ export * from './deck';
 export * from './formats';
 export { normalizeTypeQuotes } from './text';
 export * from './view';
+export * from './status';

@@ -3,6 +3,8 @@ import {
   type CardData,
   type CardDef,
   cardDef,
+  type CardStatus,
+  cardStatuses,
   type FieldCard,
   type GameState,
   getPower,
@@ -54,6 +56,8 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   const keywords = (Object.keys(KEYWORD_LABEL) as Keyword[]).filter((k) =>
     fc ? hasKeyword(state, uid, k) : def.keywords.includes(k),
   );
+  // Marcadores dos efeitos temporários (não ataca, não vira, ganhou [Blocker]…): só em campo.
+  const statuses = fc ? cardStatuses(state, uid).filter((s) => s.onCard) : [];
 
   // Carta que este jogador não vê (partida online): só o verso.
   if (def.id === HIDDEN_CARD) {
@@ -112,7 +116,33 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
           ⚙
         </span>
       )}
+      <StatusMarkers statuses={statuses} />
       <SpoilerTag card={def} />
+    </div>
+  );
+}
+
+/**
+ * Tags no topo da carta, uma por efeito temporário, no estilo do aviso "−1 Vida" (Bangers), cada tipo com a
+ * sua cor (`tag-<kind>`, palavras-chave `tag-kw-<keyword>`). O texto completo e a duração ficam no tooltip.
+ */
+export function StatusTag({ status, title }: { status: CardStatus; title?: boolean }) {
+  const cls = ['status-tag', `tag-${status.kind}`, status.keyword ? `tag-kw-${status.keyword}` : '', status.tone].join(' ');
+  return (
+    <span className={cls} title={title ? `${status.text} (${status.until})` : undefined}>
+      <span className="tag-icon">{status.icon}</span>
+      {status.tag}
+    </span>
+  );
+}
+
+function StatusMarkers({ statuses }: { statuses: CardStatus[] }) {
+  if (!statuses.length) return null;
+  return (
+    <div className="card-status" aria-label="Efeitos ativos">
+      {statuses.map((s, i) => (
+        <StatusTag key={i} status={s} title />
+      ))}
     </div>
   );
 }
