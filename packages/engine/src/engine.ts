@@ -322,6 +322,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.minDonOnField !== undefined && totalDonOnField(ps) < cond.minDonOnField) return false;
   if (cond.handMax !== undefined && ps.hand.length > cond.handMax) return false;
   if (cond.leaderHasType && !hasType(cardDef(state, ps.leader.uid), cond.leaderHasType)) return false;
+  if (cond.leaderTypeIncludes && !typeIncludes(cardDef(state, ps.leader.uid), cond.leaderTypeIncludes)) return false;
   if (cond.leaderName && !hasName(cardDef(state, ps.leader.uid), cond.leaderName)) return false;
   if (cond.opponentMoreDon && totalDonOnField(opp) <= totalDonOnField(ps)) return false;
   if (cond.lifeMax !== undefined && ps.life.length > cond.lifeMax) return false;
@@ -3702,18 +3703,31 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         ...(step.trashOnly ? [] : discardable(state, frame.controller, step.filter)),
         ...(step.fromTrash || step.trashOnly ? ps.trash.filter((u) => matchesFilter(cardDef(state, u), step.filter ?? {})) : []),
       ];
-      if (!frame.choice) {
-        if (!options.length && (step.trashOnly || !ps.hand.length)) return true;
-        askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) da mão para o topo da Vida.`, step.trashOnly ? {} : { hidden: 'da mão' });
-        return false;
+      // Com "top or bottom": primeiro as cartas (memo), depois a posição.
+      let picked = frame.memo;
+      if (!picked) {
+        if (!frame.choice) {
+          if (!options.length && (step.trashOnly || !ps.hand.length)) return true;
+          askCards(state, frame, options, step.upTo, `${srcName}: escolha até ${step.upTo} carta(s) da mão para ${step.choose ? 'a' : 'o topo da'} Vida.`, step.trashOnly ? {} : { hidden: 'da mão' });
+          return false;
+        }
+        picked = frame.choice.filter((u) => options.includes(u));
+        if (step.choose && picked.length) {
+          frame.memo = picked;
+          frame.choice = undefined;
+          askOption(state, frame, frame.controller, `${srcName}: colocar no topo ou no fundo da Vida?`, ['Topo da Vida', 'Fundo da Vida']);
+          return false;
+        }
       }
-      for (const uid of frame.choice.filter((u) => options.includes(u))) {
+      const bottom = Boolean(step.choose) && frame.choice?.[0] === '1';
+      for (const uid of picked) {
         removeFrom(ps.hand, uid);
         removeFrom(ps.trash, uid);
-        ps.life.push(uid);
+        if (bottom) ps.life.unshift(uid);
+        else ps.life.push(uid);
         if (step.faceUp) (ps.lifeFaceUp ??= []).push(uid);
       }
-      if (frame.choice.length) log(state, frame.controller, `${ps.name} coloca ${frame.choice.length} carta(s) da mão na Vida.`);
+      if (picked.length) log(state, frame.controller, `${ps.name} coloca ${picked.length} carta(s) da mão no ${bottom ? 'fundo' : 'topo'} da Vida.`);
       return true;
     }
     case 'fieldToLife': {
