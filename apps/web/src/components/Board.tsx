@@ -9,8 +9,8 @@ export interface BoardHandlers {
   onHover: (uid: string | null) => void;
   /** Toque no i-ésimo DON!! ativo (marca/desmarca para anexar vários). */
   onDon: (player: PlayerId, index: number) => void;
-  /** Quantos DON!! ativos estão marcados (os primeiros da fileira). */
-  donPicked: (player: PlayerId) => number;
+  /** Posições na fileira dos DON!! ativos marcados (ou arrastados). */
+  donPicked: (player: PlayerId) => number[];
   donHighlight: (player: PlayerId) => boolean;
   /** Um DON!! anexado está sendo arrastado de volta e já está sobre a fileira deste jogador. */
   donDrop: (player: PlayerId) => boolean;
@@ -129,10 +129,11 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
             key={`a${i}`}
             className={[
               'don-card',
-              i < picked ? 'picked' : donGlow ? 'hl-option' : '',
+              picked.includes(i) ? 'picked' : donGlow ? 'hl-option' : '',
               canDragDon ? 'clickable' : '',
             ].join(' ')}
             data-drag={canDragDon ? 'don' : undefined}
+            data-don={i}
             onClick={() => h.onDon(player, i)}
           />
         ))}
