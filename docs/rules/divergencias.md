@@ -26,7 +26,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-14 | "Cannot be K.O.'d" ignorado em custos "K.O. 1 of your Characters" (**corrigido**) | 1-3-3 | baixo | C8 |
 | DV-15 | `restDonOrCharacter` vira Personagem sem passar pelas proteções (**corrigido**) | 1-3-3 | baixo | C8 |
 | DV-16 | `ko` em Stage ignora proteções, substituição e eventos (**corrigido**) | 10-2-1 | baixo | C8 |
-| DV-17 | Carta do [Trigger] vai para o trash **antes** de resolver | 10-1-5-3 | médio | C9 |
+| DV-17 | Carta do [Trigger] vai para o trash **antes** de resolver (**corrigido**) | 10-1-5-3 | médio | C9 |
 | DV-18 | `fieldToLife` ignora "face-up" | texto das cartas | médio | C10 |
 | DV-19 | «Set Power to 0» lido como poder base 0 | 4-12 | baixo | C11 |
 | DV-20 | Vários "base power becomes X": vale o último, não o maior | 4-9-2-1 | baixo | C11 |
@@ -199,11 +199,14 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C9 — [Trigger]
 
-**DV-17. A carta do [Trigger] vai para o trash antes de resolver** — médio
+**DV-17. A carta do [Trigger] vai para o trash antes de resolver** — médio — **corrigido**
 - Regra: 10-1-5-3 (enquanto o Trigger resolve, a carta não está em área nenhuma; vai para o trash depois). Q&A OP14-082 Oinkchuck, OP09-100 Karasu, OP15-097, OP15-079 Absalom.
-- Atual: `ps.trash.push(card)` antes de `pushEffect` (engine.ts:1208).
-- Consequências: contagens de trash incluem a carta (OP15-097 dá 10 em vez de 9); um [Trigger] "Play this card" sai como `from: 'trash'` (`playFree` :1915) e dispara "when a Character is played from your trash" (OP16-079); "add this card from your trash" pelo Trigger funcionaria quando não deveria.
-- Correto: "limbo" durante a resolução; trash ao fim do frame, salvo se o efeito moveu a carta.
+- Antes: `ps.trash.push(card)` antes de `pushEffect` (engine.ts:1208). Contagens de trash incluíam a carta (OP15-097 dava 10 em vez de 9); um [Trigger] "Play this card" saía como `from: 'trash'` (`playFree` :1915) e disparava "when a Character is played from your trash" (OP16-079); "play/add … from your trash" pelo [Trigger] alcançava a própria carta (OP14-082, OP15-079).
+- Agora: ao ativar o [Trigger], a carta vai para `state.limbo` (fora de qualquer área: nem Vida nem descarte) e o frame do efeito leva `trigger: true`. Quando esse frame termina (depois dos efeitos que ele empilhou por cima, como "Activate this card's [Main]"), a carta vai para o descarte, a menos que o efeito a tenha movido: `playThis` a joga (sem `from: 'trash'`), `addThisToHand` a leva para a mão (ST09-002), e `detach` a tira do limbo. Sem passos, vai direto ao descarte.
+- Efeitos disparados durante o [Trigger] (8-6) continuam esperando o dano terminar; quando resolvem, a carta já está no descarte (ou onde o efeito a pôs).
+- Visão (`view.ts`): a carta foi revelada, então é pública enquanto resolve (`limbo` com apelidos); a interface mostra "[Trigger] Nome" na etapa da batalha no lugar da carta no topo do descarte. OP09-100 Karasu e OP03-100 Kingbaum já estavam certos (a carta sai da Vida ao ser revelada).
+- Replays: sem decisão nova, a versão não muda; um replay antigo que contava a carta no descarte pode tomar outro rumo.
+- Testes: `packages/engine/test/trigger-limbo.test.ts` (OP15-097 pelo [Trigger] com 9 no descarte não compra e pelo [Main] compra; "Play this card" não dispara "played from your trash"; "play … from your trash" e "add … from your trash" não alcançam a própria carta; a carta é pública e fica fora do descarte enquanto resolve; ST09-002 vai para a mão; [On K.O.] disparado pelo [Trigger] resolve depois do dano, com a carta no descarte). 4 de 7 falham no código antigo.
 
 ### C10 — Vida virada para cima
 
@@ -335,7 +338,7 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | Fases (6) | Expiração "until the start of your next turn", devolver DON!! e desvirar, Draw, DON!! Phase, sem ataque no 1º turno, [End of Your Turn] uma vez, expiração de "this turn" | DV-28, DV-29 (em parte), DV-30 |
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
-| Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
+| Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano, carta do [Trigger] fora das áreas enquanto resolve | — |
 | Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6), sem "up to" escolhe o máximo possível, [Once Per Turn] reinicia na carta que volta ao campo, todas as substituições oferecidas em ordem e em toda remoção por efeito (um pagamento para as simultâneas), "cannot be K.O.'d by your opponent's effects" só contra o oponente, protegido não paga custo de K.O. | DV-12 (custos), DV-19, DV-20 |
 | Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, K.O. de Stage com as proteções, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-18, DV-27, DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

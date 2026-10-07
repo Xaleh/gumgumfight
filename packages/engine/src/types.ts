@@ -1116,6 +1116,12 @@ export type Frame =
       revealed?: string[];
       /** Cartas descartadas da mão neste efeito ("the same card name as the trashed card"). */
       trashed?: string[];
+      /**
+       * Efeito de [Trigger]: a carta (`source`) fica fora de qualquer área enquanto ele resolve
+       * (`GameState.limbo`) e vai para o descarte quando o frame termina, se o efeito não a moveu
+       * (10-1-5-3).
+       */
+      trigger?: true;
     }
   | { kind: 'battle' }
   | {
@@ -1173,6 +1179,12 @@ export interface GameState {
   triggerBatch?: number;
   /** Último `TriggeredEffect.id` usado. */
   triggerSeq?: number;
+  /**
+   * Cartas fora de qualquer área: a carta do [Trigger] enquanto ele resolve (10-1-5-3). Não está
+   * na Vida nem no descarte (não conta para "cards in your trash", não sai "from your trash");
+   * é pública (foi revelada) e vai para o descarte no fim do efeito, se ele não a moveu.
+   */
+  limbo?: string[];
   pending: Pending | null;
   modifiers: Modifier[];
   usedThisTurn: string[];

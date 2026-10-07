@@ -25,6 +25,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-Pendência `lifeCard` sempre aberta para o dono (não vaza se havia Trigger); o Trigger resolve antes do 2º dano; [Trigger] de Evento não conta como "activate an Event" (conforme).
+Pendência `lifeCard` sempre aberta para o dono (não vaza se havia Trigger); o Trigger resolve antes do 2º dano; [Trigger] de Evento não conta como "activate an Event"; a carta do [Trigger] fica fora de qualquer área enquanto ele resolve (`state.limbo`: não conta no descarte, não é jogada "from your trash", pública por ter sido revelada) e vai para o descarte no fim do efeito, se ele não a moveu (conforme).
 
-Divergências deste tema: DV-17 (corrigidas: DV-05) (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: nenhuma aberta (corrigidas: DV-05, DV-17) (detalhes em [../divergencias.md](../divergencias.md)).

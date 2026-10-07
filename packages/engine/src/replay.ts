@@ -28,7 +28,8 @@ export const REPLAY_VERSION = 8;
  * ("If this Character would be rested by your opponent's Character's effect, … instead"); a
  * pergunta também é recusada. (Também desde a versão 8, "cannot be K.O.'d by your opponent's
  * effects" não protege do K.O. pelo próprio efeito, o Personagem protegido não paga custo de K.O.
- * e o Stage protegido não é nocauteado: sem decisão nova, mas um replay antigo pode tomar outro rumo.)
+ * e o Stage protegido não é nocauteado: sem decisão nova, mas um replay antigo pode tomar outro rumo.
+ * O mesmo vale para a carta do [Trigger], que hoje fica fora do descarte enquanto resolve.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);

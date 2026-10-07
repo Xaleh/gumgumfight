@@ -71,6 +71,8 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
   }
   // Cartas reveladas por efeitos em resolução ("reveal …").
   for (const f of state.stack) if (f.kind === 'effect') for (const u of f.revealed ?? []) out.add(u);
+  // A carta do [Trigger] em resolução, fora de qualquer área (10-1-5-3): foi revelada.
+  for (const u of state.limbo ?? []) out.add(u);
   const p = state.pending;
   if (p && viewer !== null && p.player === viewer) {
     if (p.kind === 'selectTargets' || p.kind === 'block' || p.kind === 'counter') for (const u of p.options) out.add(u);
@@ -141,6 +143,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
         }
       : null,
     stack: state.stack.map((f) => sanitizeFrame(f, ref)),
+    ...(state.limbo ? { limbo: state.limbo.map(alias) } : {}),
     // Efeitos disparados esperando a vez: só a carta de origem (os passos e alvos ficam no servidor).
     triggered: state.triggered?.map((e) => ({ id: e.id, source: ref(e.source), controller: e.controller, steps: [], label: e.label, batch: e.batch })),
     pending: state.pending ? viewPending(state.pending, viewer, ref) : null,
@@ -183,7 +186,7 @@ function aliasAction(action: Action, ref: (uid: string) => string): Action {
 function sanitizeFrame(f: Frame, ref: (uid: string) => string): Frame {
   switch (f.kind) {
     case 'effect':
-      return { kind: 'effect', source: ref(f.source), controller: f.controller, steps: [], i: 0 };
+      return { kind: 'effect', source: ref(f.source), controller: f.controller, steps: [], i: 0, ...(f.trigger ? { trigger: true as const } : {}) };
     case 'damage':
       return { kind: 'damage', defender: f.defender, remaining: f.remaining, banish: f.banish };
     case 'play':

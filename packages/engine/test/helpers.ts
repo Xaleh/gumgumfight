@@ -108,7 +108,8 @@ export function countCards(s: GameState, player: PlayerId): number {
       (f) =>
         (f.kind === 'damage' && f.lifeCard && s.cards[f.lifeCard].owner === player) ||
         (f.kind === 'play' && s.cards[f.uid].owner === player),
-    ).length
+    ).length +
+    (s.limbo ?? []).filter((u) => s.cards[u].owner === player).length
   );
 }
 

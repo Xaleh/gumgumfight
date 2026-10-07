@@ -1576,14 +1576,18 @@ function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null
   if (human !== null && defender === human) status = hits ? `Faltam +${need} para defender` : 'Defendido!';
   else status = hits ? 'O ataque vai acertar' : `Faltam +${def - atk} para acertar`;
   // Etapa da batalha (a visão do oponente também traz o tipo da escolha pendente).
+  // A carta do [Trigger] em resolução está fora das áreas (nem Vida nem descarte): aparece aqui.
+  const trigger = state.limbo?.find((u) => state.cards[u]);
   const step =
     state.pending?.kind === 'block'
       ? 'Etapa de Bloqueio'
       : state.pending?.kind === 'counter'
         ? 'Etapa de Counter'
-        : state.stack.some((f) => f.kind === 'damage')
-          ? 'Etapa de Dano'
-          : 'Ataque';
+        : trigger
+          ? `[Trigger] ${cardDef(state, trigger).name}`
+          : state.stack.some((f) => f.kind === 'damage')
+            ? 'Etapa de Dano'
+            : 'Ataque';
   return (
     <div className="battle-info">
       <div key={step} className="battle-step">

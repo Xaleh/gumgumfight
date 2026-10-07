@@ -54,7 +54,7 @@ const countCards = (s: GameState, p: 0 | 1) => {
   const limbo = s.stack.filter(
     (f) =>
       (f.kind === 'damage' && f.lifeCard && s.cards[f.lifeCard].owner === p) || (f.kind === 'play' && s.cards[f.uid].owner === p),
-  ).length;
+  ).length + (s.limbo ?? []).filter((u) => s.cards[u].owner === p).length;
   return 1 + ps.characters.length + (ps.stage ? 1 : 0) + ps.hand.length + ps.deck.length + ps.trash.length + ps.life.length + limbo;
 };
 

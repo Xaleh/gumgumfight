@@ -1231,9 +1231,15 @@ function handlePendingResponse(state: GameState, action: Action) {
       state.pending = null;
       if (action.yes) {
         if (ps.lifeFaceUp?.includes(card)) removeFrom(ps.lifeFaceUp, card);
-        ps.trash.push(card);
+        // Enquanto o [Trigger] resolve, a carta não está em área nenhuma (10-1-5-3): não conta
+        // no descarte nem na Vida e não sai "from your trash" (Q&A OP14-082, OP15-097, OP15-079).
+        // Vai para o descarte quando o efeito termina, se ele não a moveu (jogada, mão...).
+        (state.limbo ??= []).push(card);
         log(state, p, `[Trigger] ${def.name} ativado!`);
         pushEffect(state, card, p, trig!.steps);
+        const top = state.stack[state.stack.length - 1];
+        if (top.kind === 'effect' && top.source === card) top.trigger = true;
+        else limboToTrash(state, card);
         emit(state, { kind: 'triggerActivated', player: p, card });
       } else {
         // Para o oponente a linha é a mesma com ou sem [Trigger]; só o dono lê qual carta foi.
@@ -1958,6 +1964,7 @@ function stepDamage(state: GameState, frame: DamageFrame) {
 function stepEffect(state: GameState, frame: EffectFrame) {
   if (frame.i >= frame.steps.length) {
     state.stack.pop();
+    if (frame.trigger) limboToTrash(state, frame.source);
     return;
   }
   const step = frame.steps[frame.i];
@@ -2088,6 +2095,7 @@ function askCards(
 function playFree(state: GameState, uid: string, rested = false) {
   const def = cardDef(state, uid);
   const ps = state.players[ownerOf(state, uid)];
+  // A carta do [Trigger] ("Play this card") vem de fora das áreas, não do descarte (10-1-5-3).
   const from = ps.trash.includes(uid) ? 'trash' : undefined;
   if (def.category === 'character') {
     detach(state, uid);
@@ -4103,8 +4111,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return useOwnEffect(state, frame, step.timing);
     case 'addThisToHand': {
       const owner = state.players[ownerOf(state, frame.source)];
-      if (owner.trash.includes(frame.source)) {
-        removeFrom(owner.trash, frame.source);
+      // Do descarte ([On K.O.]) ou, no [Trigger], de fora das áreas ("… and add this card to your hand").
+      if (owner.trash.includes(frame.source) || inLimbo(state, frame.source)) {
+        detach(state, frame.source);
         owner.hand.push(frame.source);
         log(state, frame.controller, `${srcName} vai para a mão.`);
       }
@@ -4258,6 +4267,24 @@ export function zoneOf(state: GameState, uid: string): CardZone | null {
   return null;
 }
 
+/** A carta está fora de qualquer área (a do [Trigger] enquanto ele resolve, 10-1-5-3)? */
+export function inLimbo(state: GameState, uid: string): boolean {
+  return Boolean(state.limbo?.includes(uid));
+}
+
+function leaveLimbo(state: GameState, uid: string) {
+  if (!state.limbo) return;
+  removeFrom(state.limbo, uid);
+  if (!state.limbo.length) delete state.limbo;
+}
+
+/** Fim do [Trigger]: a carta que o efeito não moveu vai para o descarte (10-1-5-3). */
+function limboToTrash(state: GameState, uid: string) {
+  if (!inLimbo(state, uid)) return;
+  leaveLimbo(state, uid);
+  state.players[ownerOf(state, uid)].trash.push(uid);
+}
+
 /** Tira a carta de onde estiver (DON!! anexados voltam virados à área de custo). */
 function detach(state: GameState, uid: string) {
   const ps = state.players[ownerOf(state, uid)];
@@ -4275,6 +4302,7 @@ function detach(state: GameState, uid: string) {
     return;
   }
   for (const zone of [ps.hand, ps.deck, ps.trash, ps.life]) removeFrom(zone, uid);
+  leaveLimbo(state, uid);
 }
 
 const ZONE_LABEL: Record<string, string> = {
