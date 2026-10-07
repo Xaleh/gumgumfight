@@ -73,7 +73,7 @@ export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: n
       {def.manual && (
         <p className="warn small">
           {def.abilities.some((a) => !a.manual && a.steps.length)
-            ? '⚠ Parte do efeito ainda não é automática (⚙ aplicada à mão).'
+            ? '⚠ Parte do efeito ainda não é automática (⚙ não é aplicada).'
             : '⚠ Efeito ainda não automatizado.'}
         </p>
       )}

@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
 import { motionWait } from './motion';
 
-export type GameMode = 'bot' | 'demo' | 'replay';
+export type GameMode = 'bot' | 'replay';
 
 export interface GameSetup {
   mode: GameMode;

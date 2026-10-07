@@ -467,7 +467,7 @@ export function phaseLabel(size: number): string {
 // ------------------------------------------------------------------ estatísticas
 
 export interface MatchUpload {
-  mode: 'bot' | 'demo';
+  mode: 'bot';
   format: FormatId;
   seed: number;
   firstPlayer?: PlayerId;
@@ -519,6 +519,7 @@ export interface StatsMeta {
 export interface StatsQuery {
   format?: string;
   queue?: string;
+  /** `bot`: partidas bot x bot de versões antigas (ficam fora das estatísticas de pessoas). */
   by?: 'human' | 'bot';
   opponent?: string;
   tiers?: string[];

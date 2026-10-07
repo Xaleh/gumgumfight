@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { type ActiveRoom, api, canPlay, deckGroups, type DeckSummary, type FormatId, type OnlineSeat, whyNotPlayable } from '../api';
 import { AccountBar, useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
-import { SettingsControls } from '../settings';
+import { SettingsModal } from '../settings';
 import { LeaderArt } from './LeaderArt';
 import { OnlineMenu, roomCodeFromUrl } from './OnlineMenu';
 
@@ -52,7 +52,7 @@ async function buildSetup(
       ...(chooseFirst && firstPlayer === undefined ? { chooseFirst: true } : {}),
       cards: [...cards.values()],
       players: [
-        { name: names[0], deck: a.deck, isBot: mode === 'demo' },
+        { name: names[0], deck: a.deck, isBot: false },
         { name: names[1], deck: b.deck, isBot: mode !== 'replay' },
       ],
     },
@@ -221,6 +221,8 @@ export function Menu({
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Exclude<GameMode, 'replay'> | 'online'>(URL_ROOM_CODE ? 'online' : 'bot');
+  /** Configurações do jogador (modal). */
+  const [showSettings, setShowSettings] = useState(false);
   const [deck0, setDeck0] = useState('');
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
@@ -297,7 +299,7 @@ export function Menu({
       /* sem armazenamento */
     }
     try {
-      const names: [string, string] = mode === 'demo' ? ['Bot A', 'Bot B'] : ['Você', 'Bot'];
+      const names: [string, string] = ['Você', 'Bot'];
       const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
       if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
@@ -369,9 +371,6 @@ export function Menu({
             <button className={mode === 'bot' ? 'on' : ''} onClick={() => setMode('bot')}>
               Contra o bot
             </button>
-            <button className={mode === 'demo' ? 'on' : ''} onClick={() => setMode('demo')}>
-              Bot x Bot
-            </button>
             <button className={mode === 'online' ? 'on' : ''} onClick={() => setMode('online')}>
               Online
             </button>
@@ -411,10 +410,10 @@ export function Menu({
           ) : (
           <>
           <div className="matchup">
-            <DeckPick who={mode === 'demo' ? 'Bot A' : 'Seu deck'} deck={d0} format={format} onClick={() => setPicking(0)} />
+            <DeckPick who="Seu deck" deck={d0} format={format} onClick={() => setPicking(0)} />
             <span className="vs-badge">VS</span>
             <DeckPick
-              who={mode === 'demo' ? 'Bot B' : 'Oponente'}
+              who="Oponente"
               deck={d1}
               random={deck1 === RANDOM}
               format={format}
@@ -428,8 +427,8 @@ export function Menu({
               {(
                 [
                   ['random', 'Sorteio'],
-                  ['0', mode === 'demo' ? 'Bot A' : 'Você'],
-                  ['1', mode === 'demo' ? 'Bot B' : 'Bot'],
+                  ['0', 'Você'],
+                  ['1', 'Bot'],
                 ] as const
               ).map(([v, label]) => (
                 <button key={v} className={first === v ? 'on' : ''} onClick={() => setFirst(v)}>
@@ -506,12 +505,11 @@ export function Menu({
               Cobertura das cartas
             </button>
           )}
+          <button className="btn" onClick={() => setShowSettings(true)}>
+            <span className="ico">⚙️</span>
+            Configurações
+          </button>
         </div>
-
-        <section className="menu-card">
-          <h2>Configurações</h2>
-          <SettingsControls />
-        </section>
 
         {dev && (
           <details className="menu-card advanced">
@@ -542,9 +540,11 @@ export function Menu({
         </p>
       </div>
 
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
       {picking !== null && (
         <DeckPicker
-          title={picking === 0 ? (mode === 'demo' ? 'Deck do Bot A' : 'Seu deck') : mode === 'demo' ? 'Deck do Bot B' : 'Deck do oponente'}
+          title={picking === 0 ? 'Seu deck' : 'Deck do oponente'}
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
           format={format}

@@ -621,6 +621,19 @@ input[type='number'] {
   width: min(640px, 100%);
   justify-self: center;
 }
+/* em telas largas, a folha vira uma janela centralizada */
+@media (min-width: 700px) {
+  .page-sheet.centered {
+    align-items: center;
+    padding: 24px;
+  }
+  .page-sheet.centered .sheet {
+    border-radius: 24px;
+    max-height: 90%;
+    padding-bottom: 0;
+    animation: pop-in 0.22s;
+  }
+}
 
 /* ------------------------------------------------------------------ partida: estrutura */
 
@@ -1548,9 +1561,6 @@ button.hint-pill {
     transform: scale(1.06);
     box-shadow: 0 4px 0 #c98a00, 0 0 0 4px rgba(255, 211, 77, 0.6), 0 0 26px 8px rgba(255, 190, 40, 0.8);
   }
-}
-.defense-tools {
-  flex: none;
 }
 /* relógio online do jogador, colado no botão: o tempo corre nesta decisão */
 .defense-clock {
@@ -2557,7 +2567,7 @@ button.hint-pill {
   flex: none;
 }
 
-/* folha inferior (menu, histórico, ferramentas, descarte) */
+/* folha inferior (menu, histórico, mão, descarte) */
 .sheet-backdrop {
   align-items: end;
   padding: 0;
@@ -2620,17 +2630,6 @@ button.hint-pill {
   gap: 8px;
   justify-content: center;
   --cw: min(92px, 27vw);
-}
-.manual-box {
-  background: var(--note-bg);
-  border: 1px solid var(--note-line);
-  border-radius: 16px;
-  padding: 12px;
-}
-.manual-box .effect {
-  background: var(--glass);
-  border-radius: 8px;
-  padding: 6px 8px;
 }
 
 /* ------------------------------------------------------------------ painel lateral (desktop) */
@@ -2950,9 +2949,8 @@ button.hint-pill {
 
 /* ------------------------------------------------------------------ tema escuro: retoques */
 
-/* Arte das cartas um pouco mais suave nas listas (construtor, visualizador); nunca na mesa. */
+/* Arte das cartas um pouco mais suave nas listas (construtor, seletor de decks); nunca na mesa. */
 :root[data-theme='dark'] .card-grid .card-img,
-:root[data-theme='dark'] .viewer-list .card-img,
 :root[data-theme='dark'] .picker-grid .leader-art img {
   filter: brightness(0.88);
 }
@@ -2962,13 +2960,9 @@ button.hint-pill {
 }
 /* ------------------------------------------------------------------ configurações */
 
+/* controles compactos no menu da partida (o modal do menu inicial usa .option-row) */
 .settings {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.settings.compact {
-  flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
@@ -2979,6 +2973,89 @@ button.hint-pill {
 }
 .check.disabled {
   opacity: 0.55;
+}
+
+/* modal de configurações (menu): uma linha por opção, com explicação e interruptor */
+.settings-sheet .sheet-body {
+  gap: 10px;
+}
+.option-list {
+  display: flex;
+  flex-direction: column;
+}
+.option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.option-row:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+.option-row.disabled {
+  opacity: 0.55;
+}
+.option-text {
+  flex: 1;
+  min-width: 0;
+}
+.option-title {
+  font-weight: 800;
+  font-size: 14px;
+}
+.option-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.option-row .seg.small {
+  flex: none;
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--knob);
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+.switch.on {
+  background: var(--blue);
+  box-shadow: 0 0 8px rgba(54, 200, 255, 0.35);
+}
+.switch.on::after {
+  transform: translateX(20px);
+}
+.switch:disabled {
+  cursor: default;
+}
+@media (max-width: 480px) {
+  .option-row {
+    flex-wrap: wrap;
+  }
+  .option-row .seg.small {
+    width: 100%;
+  }
 }
 .translation-note a {
   font-size: 12px;
@@ -3443,74 +3520,14 @@ button.hint-pill {
   line-height: 1.4;
 }
 
-/* ------------------------------------------------------------------ modo manual */
+/* ------------------------------------------------------------------ cartas com efeito ainda não automatizado (⚙) */
 
-.manual-tools {
-  border-color: rgba(242, 193, 78, 0.45);
-}
-.tool-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.tool-label {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.tool-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.tool-buttons .btn.small {
-  padding: 4px 7px;
-  font-size: 11px;
-}
 .card .manual-badge {
   position: absolute;
   top: 2px;
   right: 3px;
   font-size: 0.9em;
   z-index: 1;
-}
-.viewer {
-  width: min(760px, 100%);
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-}
-.viewer-count {
-  justify-content: flex-start;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.viewer-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  overflow-y: auto;
-  padding: 4px;
-  margin-bottom: 10px;
-}
-.viewer-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  --cw: 84px;
-  width: 120px;
-}
-.viewer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  justify-content: center;
-}
-.viewer-actions .btn.small {
-  padding: 2px 6px;
-  font-size: 10px;
 }
 
 /* ------------------------------------------------------------------ cobertura */

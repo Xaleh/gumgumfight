@@ -9,7 +9,6 @@ interface Snapshot {
   defs: Record<string, CardDef>;
   log: { from: number; entries: LogEntry[] };
   lastAction: Action | null;
-  peek?: number;
 }
 
 export type Connection = 'connecting' | 'open' | 'lost' | 'gone';
@@ -52,7 +51,6 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   /** Lançamentos do dado do sorteio de cada assento (para ver o dado do oponente rolar). */
   const [diceThrows, setDiceThrows] = useState<[DiceThrow | null, DiceThrow | null]>([null, null]);
   const [rematch, setRematch] = useState<RematchTarget | null>(null);
-  const [peek, setPeek] = useState(0);
   /** O servidor recusou mostrar as mãos (ex.: a conta joga esta partida): o espectador volta para a visão pública. */
   const [handsRefused, setHandsRefused] = useState(false);
   /** Ações vistas desde que a conexão abriu (para o resumo do fim de jogo). */
@@ -89,7 +87,6 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
         log.current = [...log.current.slice(0, s.log.from), ...s.log.entries];
         setRoom(s.room);
         setClockAt(performance.now());
-        setPeek(s.peek ?? 0);
         if (s.view) {
           if (s.lastAction && s.view.actionCount > seq.current) setActions((a) => [...a, s.lastAction!]);
           seq.current = s.view.actionCount;
@@ -251,7 +248,6 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     askRematch,
     leave,
     downloadReplay,
-    peek,
     actions,
     handsRefused,
   };
