@@ -77,6 +77,7 @@ describe('ST07 — Big Mom Pirates (Vida e escolhas)', () => {
     s = applyAction(s, { type: 'attack', player: 0, attacker: snack, target: s.players[1].leader.uid });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
     s = option(s, 0, 0);
+    s = applyAction(s, { type: 'pass', player: 1 });
     // [Banish]: a carta de Vida do oponente vai para o descarte (não para a mão).
     expect(s.players[1].life).toHaveLength(4);
     expect(s.players[1].trash).toHaveLength(1);

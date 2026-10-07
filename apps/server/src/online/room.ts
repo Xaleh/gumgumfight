@@ -49,6 +49,11 @@ const MAX_ACTIONS = 5000;
 export const MAX_SPECTATORS = 100;
 /** Pausa antes de cada jogada do bot, para a jogada ser visível. */
 const BOT_DELAY_MS = 700;
+/**
+ * Faixa de tempo do bot nas decisões que escondem informação (Counter, carta da Vida): um
+ * tempo fixo (ou uma resposta imediata) contaria ao oponente que o bot não tinha o que usar.
+ */
+const BOT_HIDDEN_DECISION_MS = [800, 2000] as const;
 
 export interface DiceThrow {
   seat: PlayerId;
@@ -380,7 +385,12 @@ export class Room {
     this.botTimer = null;
     const seat = this.running;
     if (seat === null || !this.data.seats[seat]?.bot) return;
-    this.botTimer = setTimeout(() => this.botMove(seat), this.deps.botDelayMs ?? BOT_DELAY_MS);
+    const kind = this.state?.pending?.kind;
+    const hidden = kind === 'counter' || kind === 'lifeCard';
+    const delay =
+      this.deps.botDelayMs ??
+      (hidden ? BOT_HIDDEN_DECISION_MS[0] + Math.random() * (BOT_HIDDEN_DECISION_MS[1] - BOT_HIDDEN_DECISION_MS[0]) : BOT_DELAY_MS);
+    this.botTimer = setTimeout(() => this.botMove(seat), delay);
   }
 
   private botMove(seat: PlayerId) {
@@ -564,7 +574,11 @@ export class Room {
   /** Cartas a mais na visão: o topo do deck espiado (jogador) ou as duas mãos (espectador com mãos). */
   private extraFor(conn: Connection): string[] {
     if (conn.seat !== null) return this.peekCards(conn.seat);
-    if (conn.hands && this.state) return this.state.players.flatMap((p) => p.hand);
+    if (conn.hands && this.state) {
+      // Quem vê as mãos (streamer/admin) também vê a carta da Vida que o dono está olhando.
+      const p = this.state.pending;
+      return [...this.state.players.flatMap((ps) => ps.hand), ...(p?.kind === 'lifeCard' ? [p.card] : [])];
+    }
     return [];
   }
 
@@ -573,7 +587,7 @@ export class Room {
     if (!this.state || this.state.phase !== 'gameover') return null;
     return {
       format: 'gumgumfight-replay' as const,
-      version: 1 as const,
+      version: 2 as const,
       seed: 0,
       seed128: this.data.seed128,
       firstPlayer: this.state.firstPlayer,

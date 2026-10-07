@@ -78,6 +78,28 @@ export function putOnField(s: GameState, player: PlayerId, cardId: string, opts:
   return uid;
 }
 
+/**
+ * O defensor não bloqueia, não usa Counter e coloca na mão toda carta de Vida sem ativar
+ * [Trigger]. (A etapa de Counter e a carta da Vida abrem sempre, mesmo sem opção.)
+ */
+export function noDefense(s: GameState): GameState {
+  for (let guard = 0; guard < 20; guard++) {
+    const p = s.pending;
+    if (p?.kind === 'block') s = applyAction(s, { type: 'choose', player: p.player, uids: [] });
+    else if (p?.kind === 'counter') s = applyAction(s, { type: 'pass', player: p.player });
+    else if (p?.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: p.player, yes: false });
+    else break;
+  }
+  return s;
+}
+
+/** Encerra a etapa de Counter sem usar nada (a carta da Vida, se houver, fica pendente). */
+export function passCounter(s: GameState): GameState {
+  if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: s.pending.player, uids: [] });
+  if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: s.pending.player });
+  return s;
+}
+
 export function countCards(s: GameState, player: PlayerId): number {
   const ps = s.players[player];
   return (
