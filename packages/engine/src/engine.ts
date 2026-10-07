@@ -523,7 +523,7 @@ export function typeIncludes(def: CardDef, part: string): boolean {
 /** Auras ativas (de qualquer jogador) que afetam a carta. */
 let auraDepth = 0;
 
-function aurasOn(state: GameState, uid: string, zone: 'leader' | 'character' | 'stage', want: (au: Aura) => boolean): Aura[] {
+export function aurasOn(state: GameState, uid: string, zone: 'leader' | 'character' | 'stage', want: (au: Aura) => boolean): Aura[] {
   if (zone === 'stage') return [];
   // Condições de auras podem depender de custo/poder, que dependem de auras: corta ciclos.
   if (auraDepth > 8) return [];
@@ -747,7 +747,7 @@ export function playCost(state: GameState, uid: string): number {
   return Math.max(0, cost);
 }
 
-function restricted(state: GameState, player: PlayerId, kind: Restriction['kind']): Restriction | undefined {
+export function restricted(state: GameState, player: PlayerId, kind: Restriction['kind']): Restriction | undefined {
   return state.restrictions?.find((r) => r.player === player && r.kind === kind);
 }
 
@@ -1254,7 +1254,7 @@ function startTurn(state: GameState) {
 }
 
 /** "all Characters with a cost of 5 or less do not become active in your and your opponent's Refresh Phases" */
-function noRefreshByAura(state: GameState, uid: string): boolean {
+export function noRefreshByAura(state: GameState, uid: string): boolean {
   if (locate(state, uid)?.zone !== 'character') return false;
   return state.players.some((pl) =>
     [pl.leader, ...pl.characters, ...(pl.stage ? [pl.stage] : [])].some((fc) =>

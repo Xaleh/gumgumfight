@@ -1,12 +1,12 @@
-import { buildCardDef, type CardData, type CardDef } from '@gumgum/engine';
+import { buildCardDef, type CardData, type CardDef, type CardStatus } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { cardText, useSettings } from '../settings';
-import { StaticCard } from './CardView';
+import { StaticCard, StatusTag } from './CardView';
 
 const CATEGORY = { leader: 'Líder', character: 'Personagem', event: 'Evento', stage: 'Stage' };
 
-/** Nome, atributos e texto da carta no idioma escolhido (com "ver original"). */
-export function CardTextInfo({ def, power }: { def: CardDef; power?: number }) {
+/** Nome, atributos e texto da carta no idioma escolhido (com "ver original"); `statuses` = efeitos temporários em campo. */
+export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: number; statuses?: CardStatus[] }) {
   const { lang } = useSettings();
   const [showOriginal, setShowOriginal] = useState(false);
   useEffect(() => setShowOriginal(false), [def.id]);
@@ -31,6 +31,18 @@ export function CardTextInfo({ def, power }: { def: CardDef; power?: number }) {
         )}
         {def.counter ? <span>Counter +{def.counter}</span> : null}
       </div>
+      {statuses && statuses.length > 0 && (
+        <ul className="detail-statuses" aria-label="Efeitos ativos">
+          {statuses.map((s, i) => (
+            <li key={i}>
+              <StatusTag status={s} />
+              <span>
+                {s.text} <span className="muted">{s.until}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       {shown.text && <p className="effect">{shown.text}</p>}
       {shown.trigger && (
         <p className="effect trigger">

@@ -2032,6 +2032,71 @@ button.hint-pill {
   z-index: 2;
 }
 
+/* Marcadores de estado (não ataca, não vira, ganhou [Blocker]…): tags empilhadas no topo direito da carta,
+   no estilo do aviso "−1 Vida" (Bangers), uma cor por tipo. Tooltip no title. */
+.card-status {
+  position: absolute;
+  top: 17%;
+  right: 3%;
+  max-width: 94%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: max(1px, calc(var(--cw) * 0.02));
+  z-index: 2;
+}
+.status-tag {
+  --tag: #4a5568;
+  --tag-ink: #1a1a1a;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  max-width: 100%;
+  padding: 0 0.45em 0 0.3em;
+  border-radius: max(2px, calc(var(--cw) * 0.035));
+  background: var(--tag);
+  border: max(1px, calc(var(--cw) * 0.018)) solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), inset 0 -2px 0 rgba(0, 0, 0, 0.22);
+  font-family: Bangers, Impact, sans-serif;
+  font-size: max(8px, calc(var(--cw) * 0.105));
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  color: #fff;
+  -webkit-text-stroke: 0.4px var(--tag-ink);
+  text-shadow: 0 1px 0 var(--tag-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-tag .tag-icon {
+  font-family: var(--font);
+  font-size: 0.8em;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.35));
+}
+/* uma cor por tipo */
+.tag-cannotAttack { --tag: #d1402f; --tag-ink: #6b1a10; }
+.tag-cannotAttackLeader { --tag: #e0552b; --tag-ink: #6f2410; }
+.tag-cannotAttackChars { --tag: #e07b2b; --tag-ink: #6e3a0e; }
+.tag-attackTax { --tag: #a2642a; --tag-ink: #4d2e10; }
+.tag-cannotRest { --tag: #c2185b; --tag-ink: #5c0a2a; }
+.tag-skipRefresh { --tag: #7b3fb8; --tag-ink: #3a1a5c; }
+.tag-cannotBlock { --tag: #c75a00; --tag-ink: #5e2a00; }
+.tag-negated { --tag: #5a5a6a; --tag-ink: #26262e; }
+.tag-attribute { --tag: #6b7a1e; --tag-ink: #33390c; }
+.tag-cannotBeKO { --tag: #1f8a4c; --tag-ink: #0d4224; }
+.tag-canAttackActive { --tag: #1d6fd1; --tag-ink: #0d3566; }
+.tag-noBlockerWhenAttacking { --tag: #0f8bb0; --tag-ink: #064356; }
+.tag-cost { --tag: #4a6fa5; --tag-ink: #22354f; }
+.tag-power.good { --tag: #0a8a3c; --tag-ink: #04421c; }
+.tag-power.bad { --tag: #c0392b; --tag-ink: #5c1a13; }
+.tag-kw-blocker { --tag: #0e8a8a; --tag-ink: #064242; }
+.tag-kw-rush, .tag-kw-rushCharacter { --tag: #e0a000; --tag-ink: #6b4c00; }
+.tag-kw-doubleAttack { --tag: #8a1c1c; --tag-ink: #420a0a; }
+.tag-kw-banish { --tag: #2b2b33; --tag-ink: #000; }
+.tag-kw-unblockable { --tag: #3f51b5; --tag-ink: #1e2659; }
+
 .card.back {
   /* Verso original das cartas de One Piece Card Game. */
   background: url('./assets/card-back.webp') center / 100% 100% no-repeat;
@@ -2634,6 +2699,32 @@ button.hint-pill {
   color: var(--amber-text);
   font-weight: 800;
 }
+/* Efeitos temporários da carta no painel de detalhes / zoom: a mesma tag da carta, com o texto e a duração. */
+.detail-statuses {
+  --cw: 110px;
+  list-style: none;
+  margin: 4px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+.detail-statuses li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  line-height: 1.3;
+  text-align: left;
+}
+.detail-statuses .status-tag {
+  flex: none;
+  font-size: 12px;
+}
+.detail-statuses li > span:last-child {
+  min-width: 0;
+}
+
 .effect {
   font-size: 13px;
   line-height: 1.5;

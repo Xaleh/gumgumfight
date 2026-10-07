@@ -2,6 +2,7 @@ import {
   type Action,
   actingPlayer,
   cardDef,
+  cardStatuses,
   counterValue,
   type GameState,
   getPower,
@@ -2112,7 +2113,7 @@ function CardZoom(props: {
           </div>
         )}
         <div className="zoom-text">
-          <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} />
+          <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} statuses={loc ? cardStatuses(state, uid) : undefined} />
         </div>
       </div>
     </div>
@@ -2130,7 +2131,7 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
       <div className="detail-card">
         <CardView state={state} uid={uid} fc={loc?.fc} />
       </div>
-      <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} />
+      <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} statuses={loc ? cardStatuses(state, uid) : undefined} />
     </div>
   );
 }
