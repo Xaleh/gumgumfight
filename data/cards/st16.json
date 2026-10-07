@@ -5,7 +5,7 @@
   "note": "Copiado da optcgapi.com para os testes e para o primeiro início do servidor. A importação (npm run cards:import) tem prioridade sobre estes dados.",
   "cards": [
     {
-      "id": "P-029_r1",
+      "id": "P-029",
       "name": "Bartolomeo",
       "category": "character",
       "colors": [
@@ -28,7 +28,7 @@
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-029_r1.jpg"
     },
     {
-      "id": "P-057_p1",
+      "id": "P-057",
       "name": "Fleeting Lullaby",
       "category": "event",
       "colors": [
@@ -47,7 +47,7 @@
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-057_p1.jpg"
     },
     {
-      "id": "P-058_p1",
+      "id": "P-058",
       "name": "Where the Wind Blows",
       "category": "event",
       "colors": [
@@ -66,7 +66,7 @@
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-058_p1.jpg"
     },
     {
-      "id": "P-059_p1",
+      "id": "P-059",
       "name": "The World's Continuation",
       "category": "event",
       "colors": [
@@ -84,7 +84,7 @@
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-059_p1.jpg"
     },
     {
-      "id": "P-060_p1",
+      "id": "P-060",
       "name": "Tot Musica",
       "category": "event",
       "colors": [
@@ -102,7 +102,7 @@
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/P-060_p1.jpg"
     },
     {
-      "id": "P-061_r1",
+      "id": "P-061",
       "name": "Monkey.D.Luffy",
       "category": "character",
       "colors": [

@@ -443,13 +443,16 @@ consulta a API durante as partidas.
 ```bash
 npm run cards:import                      # ST-01 e ST-02 (os decks de teste)
 npm run cards:import -- ST-03 OP-01       # coleções específicas (ST-xx = starter deck, OP/EB/PRB = boosters)
-npm run cards:import -- --all             # tudo
+npm run cards:import -- --all             # tudo (coleções, starter decks e promocionais P-xxx)
 npm run cards:import -- --dry-run ST-01   # mostra o resultado sem gravar
 npm run cards:import -- --file resp.json  # importa uma resposta da API salva em arquivo (sem rede)
 ```
 
-- Versões com arte alternativa (mesmo ID) são unificadas; cartas DON!! são ignoradas.
-- **Limpeza:** o importador remove do nome a versão de impressão ("(Parallel)", "(025)", "(OP01-060)"…),
+- Versões com arte alternativa (mesmo ID) são unificadas; cartas DON!! são ignoradas. Promo reimpressa em starter deck
+  que a API manda com o número da imagem ("P-029_r1") entra com o número da carta ("P-029"); reimpressões promocionais de
+  cartas de coleção e líderes só de evento (P-700, P-800, P-900) ficam de fora.
+- **Limpeza:** o importador remove do nome a versão de impressão ("(Parallel)", "(025)", "(OP01-060)"…) e o evento das
+  promos ("(One Piece Film Red)", "[Winner]"),
   separa do texto as notas de errata/reimpressão (campo `notes`), converte `"X" type` para `{X} type` e
   reconhece "Also treat this card's name as [X]" (campo `aliases`).
 - **Tipos:** a API junta vários tipos com espaço ("Heart Pirates Supernovas"). O importador separa pelo maior

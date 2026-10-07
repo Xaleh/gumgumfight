@@ -93,9 +93,23 @@ export const SOURCE_FIXES: Readonly<Record<string, SourceFix>> = {
   'OP17-021': { name: "Crone Oli" }, // API: nome "Crone Oil"
   'OP17-037': { name: "Are You That Afraid of the New Era?!!" }, // API: nome "Are You That Afraid of the New Era?!"
   'OP17-099': { types: ["The Four Emperors", "Big Mom Pirates"] }, // API: tipos ["Special"]
-  'P-014': { types: ["FILM", "Navy"] }, // API: tipos ["Navy"]
-  'P-029': { types: ["FILM", "Supernovas", "Barto Club"] }, // API: tipos ["Barto Club Pirates","Supernovas"]
-  'P-084': { types: ["The Four Emperors", "Cross Guild"] }, // API: tipos []
+  'P-002': { name: "I Smell Adventure!!!" }, // API: nome "I Smell Adventure Ahead!"
+  'P-011': { types: ["FILM"] }, // API: tipos ["Special"]
+  'P-012': { types: ["FILM", "Jellyfish Pirates"] }, // API: tipos ["Film","Jellyfish Pirates"]
+  'P-013': { types: ["FILM"] }, // API: tipos ["Film"]
+  'P-014': { types: ["FILM", "Navy"] }, // API: tipos ["Film","Navy"]
+  'P-015': { types: ["FILM", "Straw Hat Crew"] }, // API: tipos ["Film","Straw Hat Crew"]
+  'P-016': { types: ["FILM", "The Four Emperors", "Red-Haired Pirates"] }, // API: tipos ["Film","The Four Emperors","Red-Haired Pirates"]
+  'P-017': { types: ["FILM", "Supernovas", "Heart Pirates"] }, // API: tipos ["Film","Heart Pirates","Supernovas"]
+  'P-018': { types: ["FILM", "Supernovas", "Barto Club"] }, // API: tipos ["Barto Club Pirates","Film","Supernovas"]
+  'P-019': { types: ["FILM", "Minks", "Heart Pirates"] }, // API: tipos ["Film","Heart Pirates","Minks"]
+  'P-020': { types: ["FILM", "Navy"] }, // API: tipos ["Film","Navy"]
+  'P-021': { types: ["FILM", "Red-Haired Pirates"] }, // API: tipos ["Film","Red-Haired Pirates"]
+  'P-023': { types: ["FILM", "Red-Haired Pirates"] }, // API: tipos ["Film","Red-Haired Pirates"]
+  'P-072': { types: ["MONSTERS"] }, // API: tipos ["Monsters"]
+  // P-147 e P-148 ainda não estão na lista oficial em inglês: nome no formato das outras versões (OP04-066, OP01-085)
+  'P-147': { name: "Miss.Valentine(Mikita)" }, // API: nome "Miss.Valentine (Mikita)"
+  'P-148': { name: "Mr.3(Galdino)" }, // API: nome "Mr.3 (Galdino)"
   'PRB02-004': { name: "Jewelry Bonney" }, // API: nome "Jewelry Bonney -PRB02-004"
   'ST04-007': { types: ["Animal Kingdom Pirates", "Smile"] }, // API: tipos ["Animal Kingdom Pirates","SMILE"]
   'ST04-009': { types: ["Animal Kingdom Pirates", "Smile"] }, // API: tipos ["Animal Kingdom Pirates","SMILE"]

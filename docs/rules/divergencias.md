@@ -46,6 +46,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-34 | Erratas oficiais não aplicadas ao texto das cartas (**corrigido**) | Errata oficial | médio | C16 |
 | DV-35 | README "Regras implementadas" desatualizado (corrigido) | — | baixo | — |
 | DV-36 | Nomes e tipos da optcgapi diferentes da lista oficial (**corrigido**) | Lista oficial de cartas | médio | — |
+| DV-37 | Cartas promocionais (P-xxx) fora da importação e com número errado (**corrigido**) | Lista oficial de cartas | médio | — |
 
 ## Cards de correção no Trello
 
@@ -284,6 +285,21 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 - Impacto: o motor compara nomes exatamente; efeitos como OP16-040 ("If you have [Monkey.D.Luffy] and [Mr.3(Galdino)]"), EB04-056 ("If you have [Jewelry Bonney]") e as buscas "other than [Mr.3(Galdino)]"/"[Who's.Who]" não achavam as cartas; condições e buscas por tipo também falhavam.
 - Correção: tabela `packages/engine/src/source-fixes.ts` (104 cartas), aplicada junto com a errata por `fixCard` (motor, gravação e leitura do banco, `data/cards`). O comando `npm run cards:check-official -w @gumgum/server` refaz a comparação e gera as entradas (ver [manutencao.md](manutencao.md)). A própria lista oficial traz o tipo da ST11-005 em japonês ("音楽"); o comando o trata como {Music}.
 - Testes: `packages/engine/test/source-fixes.test.ts`, `apps/server/test/official-cards.test.ts` e o teste de carta já gravada em `apps/server/test/server.test.ts`.
+
+**DV-37. Cartas promocionais (P-xxx) fora da importação e com número errado** — médio — **corrigido**
+- A importação completa só lia `/api/allSetCards/` e `/api/allSTCards/`. Das 106 promos da lista oficial, só chegavam as reimpressas em starter deck, e 8 delas com o número da imagem no lugar do número da carta (P-029_r1, P-030_r1, P-041_r1, P-057_p1, P-058_p1, P-059_p1, P-060_p1, P-061_r1): o deck montado com o número oficial não achava a carta. 82 promos oficiais não existiam no jogo.
+- Correção (`apps/server/src/optcgapi.ts`):
+  - a importação lê também `/api/allPromos/` (`allEndpoints`);
+  - o sufixo de versão sai do número (`baseCardId`: "P-029_r1" → "P-029"), e as linhas se juntam à promo;
+  - a lista de promos também traz reimpressões de cartas de coleção ("Gum-Gum Lightning (Premium Card Collection -Best Selection Vol. 4-)", mesmo número e imagem da original): são ignoradas, para não pesar na escolha por maioria (`mergeEntries`);
+  - os líderes só de evento P-700, P-800 e P-900 (Luffy das seis cores, "This Leader can only be used in designated events") são ignorados: não estão na lista oficial e não valem em partida normal;
+  - o nome perde o evento ou produto da promo ("(One Piece Film Red)", "(Offline Regional 2024 Vol. 2) [Winner]");
+  - se a linha principal vem sem imagem (P-014), fica a imagem de outra impressão.
+- Banco: na abertura, as cartas antigas com sufixo são apagadas (a importação e o seed gravam as certas) e os decks salvos e as inscrições de torneio passam a usar o número da carta, juntando as cópias (`migrateCardIds` em `apps/server/src/db.ts`). `data/cards` e `data/decks` (ST16, ST18) foram atualizados.
+- Resultado (07/10/2026): 117 promos importadas; das 106 oficiais, faltam na API P-110, P-135 e P-155. 14 promos da API ainda não estão na lista oficial em inglês (P-038, P-064, P-066, P-067, P-080, P-086, P-114, P-136, P-138 a P-140, P-142, P-147, P-148) e entram como vêm da API. `source-fixes.ts` ganhou 15 correções de promo (tipo {FILM} das cartas do filme Red, P-002 "I Smell Adventure!!!", P-072 {MONSTERS}, nomes de P-147/P-148 no formato "Mr.3(Galdino)") e perdeu as de P-029 e P-084, que a lista de promos já traz certas. `cards:check-official`: 0 diferenças.
+- Sem imagem na API: P-004, P-035, P-052, P-080, P-114, P-138 e P-142 (a carta aparece com o texto).
+- Leitor de efeitos: 87 das 117 promos automáticas, 5 parciais, 9 manuais. Algumas manuais e parciais têm texto corrompido na fonte (P-091 "Play-up to", P-115 "1-rested", P-147 "Character-gains", P-142 frase repetida).
+- Testes: bloco "promocionais (allPromos)" e nomes de promo em `apps/server/test/optcgapi-cleanup.test.ts`.
 
 ---
 
