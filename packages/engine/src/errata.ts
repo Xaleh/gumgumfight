@@ -13,6 +13,7 @@
 // OP01-051, OP01-112, OP03-047, OP03-054, OP07-097, OP09-058, OP15-023, o "up to" em massa de
 // OP-01 e ST-01 a ST-04, e OP13-119 (a errata só vale para a impressão "Wanted Poster").
 
+import { applySourceFixes } from './source-fixes';
 import type { CardData } from './types';
 
 export interface Errata {
@@ -141,4 +142,12 @@ export function applyErrata<T extends CardData>(card: T): T {
   const sameTypes = types.length === card.types.length && types.every((t, i) => t === card.types[i]);
   if (text === (card.text ?? '') && trigger === card.trigger && sameTypes) return card;
   return { ...card, text, ...(trigger !== undefined ? { trigger } : {}), types: sameTypes ? card.types : types };
+}
+
+/**
+ * A carta como deve ser usada no jogo: nome e tipos da lista oficial (`source-fixes.ts`) e texto
+ * com a errata oficial. É o que o motor e o servidor aplicam a toda carta que chega da fonte.
+ */
+export function fixCard<T extends CardData>(card: T): T {
+  return applyErrata(applySourceFixes(card));
 }

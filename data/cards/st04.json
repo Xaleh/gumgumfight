@@ -146,7 +146,7 @@
       ],
       "types": [
         "Animal Kingdom Pirates",
-        "SMILE"
+        "Smile"
       ],
       "text": "",
       "set": "ST04",
@@ -189,7 +189,7 @@
       ],
       "types": [
         "Animal Kingdom Pirates",
-        "SMILE"
+        "Smile"
       ],
       "text": "",
       "set": "ST04",
@@ -210,8 +210,7 @@
         "Slash"
       ],
       "types": [
-        "Animal Kingdom Pirates",
-        "Smile"
+        "Animal Kingdom Pirates"
       ],
       "text": "[On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): K.O. up to 1 of your opponent's Characters with a cost of 3 or less.",
       "trigger": "Play this card.",

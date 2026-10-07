@@ -22,4 +22,5 @@ export { normalizeTypeQuotes } from './text';
 export * from './view';
 export * from './status';
 export * from './replay';
-export { applyErrata, errataFor, ERRATA, type Errata } from './errata';
+export { applyErrata, errataFor, ERRATA, type Errata, fixCard } from './errata';
+export { applySourceFixes, SOURCE_FIXES, type SourceFix } from './source-fixes';

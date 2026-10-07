@@ -117,6 +117,18 @@ describe('API', () => {
     expect(JSON.parse(row.data).text).toBe('[DON!! x1] [End of Your Turn] Set this Character as active.');
   });
 
+  it('corrige nome e tipos que a API traz diferentes da lista oficial, inclusive em cartas já gravadas', async () => {
+    const db = openDb(':memory:');
+    const old = { id: 'ST14-014', name: 'Gum-Gum Giant Rifl', category: 'event', colors: ['red'], types: ['Straw Hat Cre'], text: '' };
+    db.prepare("INSERT INTO cards (id, set_code, name, category, data, provisional, source, updated_at) VALUES (?, 'ST14', ?, 'event', ?, 0, 't', datetime('now'))").run(
+      old.id,
+      old.name,
+      JSON.stringify(old),
+    );
+    const card = (await buildApp(db, { server: { cardImages: true } }).inject('/api/cards/ST14-014')).json();
+    expect(card).toMatchObject({ name: 'Gum-Gum Giant Rifle', types: ['Straw Hat Crew'] });
+  });
+
   it('lista traduções pendentes', async () => {
     const db = openDb(':memory:');
     upsertCards(db, [{ id: 'T-1', name: 'X', category: 'event', colors: ['red'], types: [], text: '[Main] Swap the hands of both players.' }], {
