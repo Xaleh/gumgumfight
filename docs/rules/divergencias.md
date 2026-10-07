@@ -16,7 +16,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-04 | Auto effect de carta que já saiu do campo ainda resolve (**corrigido**) | 8-1-3-1-3 | médio | C2 |
 | DV-05 | Efeitos disparados durante o dano resolvem no meio do dano (**corrigido**) | 8-6-2 | médio | C2 |
 | DV-06 | Ordem dos efeitos simultâneos do mesmo jogador é fixa (sem escolha) (**corrigido**) | 6-6-1-1-3, 8-6-1 | baixo | C2 |
-| DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação | 10-2-17-1, 8-2-1-1 | médio | C3 |
+| DV-07 | [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação (**corrigido**) | 10-2-17-1, 8-2-1-1 | médio | C3 |
 | DV-08 | Escolha sem "up to" aceita 0 alvos | 8-4-4-1 | médio | C4 |
 | DV-09 | DON!! −X sem escolha de quais DON!! devolver (**corrigido**) | 8-3-1-6, Q&A de regras | médio | C5 |
 | DV-10 | [Once Per Turn] não reinicia quando a carta sai e volta ao campo | 10-2-13-4 | médio | C6 |
@@ -121,11 +121,11 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 
 ### C3 — [On K.O.]
 
-**DV-07. [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação** — médio **[testado]**
+**DV-07. [On K.O.] ignora [DON!! xX], condição, [Once Per Turn] e negação** — médio — **corrigido**
 - Regra: 10-2-17-1 (as condições são checadas **no campo**, antes de a carta ir para o trash); 8-2-1-1 (efeito negado não ativa). Q&A OP01-061 Kaido, OP06-074 Zephyr, OP09-093 Teach.
-- Atual: `koCharacter` (engine.ts:4385) só confere [Your Turn]/[Opponent's Turn], depois de `removeCharacter` já ter apagado os modificadores (`negated` incluso).
-- Cenário: Jewelry Bonney ST21-004 "[DON!! x2] [On K.O.] Draw 1 card" nocauteada sem DON!! → compra 1 (não deveria). Personagem com efeitos negados também ativa o [On K.O.].
-- Correto: avaliar `conditionsMet` (DON!!, condição, negação, [Once Per Turn]) antes de mover a carta; depois mover e resolver.
+- Antes: `koCharacter` só conferia [Your Turn]/[Opponent's Turn], depois de `removeCharacter` já ter apagado os modificadores (`negated` incluso). Jewelry Bonney ST21-004 "[DON!! x2] [On K.O.] Draw 1 card" nocauteada sem DON!! comprava 1; Personagem com efeitos negados também ativava o [On K.O.].
+- Agora: `koCharacter` avalia cada [On K.O.] **antes** de mover a carta (com os DON!! ainda dados e os modificadores ainda valendo): `conditionsMet` (negação, [DON!! xX], [Your Turn]/[Opponent's Turn], condição da habilidade), [Once Per Turn] e a causa (`koBy`). Guarda o resultado, move a carta para o trash (DON!! voltam virados) e só então põe na fila os que valeram, marcando o [Once Per Turn] (o custo opcional recusado devolve o uso, como nos outros efeitos). O que não vale fica no log ("a condição não vale, o efeito não é ativado"). As condições escritas dentro do efeito ("If …") continuam sendo vistas na resolução.
+- Testes: `packages/engine/test/on-ko.test.ts` (Bonney com 0, 1 e 2 DON!!, Personagem negado, [Once Per Turn] marcado e já usado).
 
 ### C4 — Escolha obrigatória
 
@@ -320,6 +320,6 @@ Testes: `packages/engine/test/trigger-order.test.ts` (os 5 cenários abaixo e a 
 | DON!! (6-5-5, 8-3) | Dar DON!!, +1000 só no próprio turno, DON!! voltam rested, [DON!! xX], DON!! −X com escolha | — |
 | Batalha (7) | Alvos, [When Attacking] antes de [On Your Opponent's Attack], saída de cena ao fim de cada etapa, [Blocker], [On Block], vários Counters, ≥ vence, Double Attack fixo em 2, [Banish], K.O. do perdedor, efeitos de fim de batalha, [Double Attack] contra 1 de Vida | DV-21, DV-22, DV-23 |
 | Dano e [Trigger] (4-6, 10-1-5) | Dano um a um, [Trigger] no lugar de ir para a mão, recusar sem revelar, Trigger antes do 2º dano, `damageTaken`/`lifeRemoved` depois do dano, efeitos disparados esperam o dano | DV-17 |
-| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O., "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6) | DV-07, DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
+| Efeitos (8) | "may" e custos opcionais, auto effect por ocorrência, custo tudo-ou-nada, [Once Per Turn] por carta, substituição opcional e não reaplicada, "up to" 0, busca pode não achar, [On K.O.] só por K.O. e com as condições vistas no campo, "cannot be K.O.'d" só contra K.O., auto effects não ativam em área secreta, [Trigger] de Evento não é "activate an Event", fila de efeitos disparados (8-6) | DV-08, DV-10, DV-11, DV-12, DV-13, DV-14, DV-19, DV-20 |
 | Áreas e outros (3, 10, 11) | Limite de 5 como regra, Stage único, carta nova ao sair do campo, Líder não se move, Rush/Rush: Character, entrar rested, poder negativo, custo negativo = 0, Vida do topo, Vida virada para cima pública, revelar na busca, olhar e devolver, [Main]/[Activate: Main] fora de batalha, [Counter] só no Counter Step | DV-16, DV-18, DV-27, DV-33 |
 | Informação oculta (`view.ts`) | Mão/deck/Vida escondidos, contagens abertas, trash aberto, "look at" só para quem olha, revelada volta a ficar oculta, decisões que leem a mão sempre abrem, log secreto | — |

@@ -14,7 +14,9 @@ export const REPLAY_VERSION = 5;
  * DON!! −X (versão 4), respondidas com a primeira opção (a ordem antiga: virados, ativos, dados).
  * Esta função insere as respostas implícitas para o roteiro antigo continuar válido. (Desde a
  * versão 4 os efeitos disparados resolvem em outra ordem (CR 8-6): um replay antigo com efeitos
- * encadeados pode tomar outro rumo.)
+ * encadeados pode tomar outro rumo. Da mesma forma, um [On K.O.] que ativava sem cumprir as
+ * condições no campo ([DON!! xX], negação, [Once Per Turn]) hoje não ativa; não há decisão nova
+ * a inserir, então a versão não mudou.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);

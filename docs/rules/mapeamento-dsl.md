@@ -9,7 +9,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 
 | Interação (tema) | Primitiva(s) | Situação |
 |---|---|---|
-| K.O. por efeito / por batalha (1) | `do: 'ko'`, `koCharacter` (engine.ts:4359), `onKO` | Existe; o [On K.O.] de Personagem negado ainda dispara (Parcial) |
+| K.O. por efeito / por batalha (1) | `do: 'ko'`, `koCharacter` (engine.ts:4359), `onKO` | Existe (as condições do [On K.O.] são vistas no campo, antes do K.O.) |
 | Trash / voltar à mão / fundo do deck sem ser K.O. (1) | `trashTarget`, `returnToHand`, `toDeckBottom`, `opponentChoosesOwn`, `fieldToLife` | Existe; `fieldToLife` e `opponentChoosesOwn` não oferecem substituição nem emitem `characterRemoved` (Parcial) |
 | "Cannot be K.O.'d (in battle / by effects)" (1) | `cannotBeKO{inBattle,byEffect}`, `staticNoBattleKO`, `staticNoEffectKO`, `noBattleKOVsAttribute`, auras | Parcial: "by your opponent's effects" também bloqueia K.O. por efeito próprio |
 | "Cannot be removed from the field by your opponent's effects" (1) | `staticNoRemoval`, `aura.noRemoval` → `removalBlocked` | Existe |
@@ -33,7 +33,7 @@ Legenda: **Existe** = há primitiva e ela segue a regra · **Parcial** = existe,
 | Ordem de resolução de efeitos simultâneos (9) | fila `state.triggered` (`queueTriggered`, `nextTriggered`, pendência `option` com `order`) | Existe |
 | [End of Your Turn] / [End of Your Opponent's Turn] (9) | timing `endOfTurn` / — | Existe / Falta (0 cartas hoje) |
 | "At the start of your turn" (9) | timing `startOfTurn` | Existe |
-| [Once Per Turn] (10) | `Ability.oncePerTurn`, `usedThisTurn` | Existe; não é conferido no [On K.O.] (Parcial) |
+| [Once Per Turn] (10) | `Ability.oncePerTurn`, `usedThisTurn` | Existe |
 | Custos de ativação (10) | `AbilityCost` (`payImmediateCost`, `canPayCost`) | Existe |
 | Redução de custo (10) | `cost`, `handCost`, `handCostAura`, `nextPlayDiscount` | Existe; custo com valor negativo oculto (CR 1-3-6-2-1) a conferir |
 | "Up to", busca no deck, revelar (10, 13) | `TargetSpec.upTo`, `search`, `tutor`, `revealTop`, `arrangeTop` | Existe |
@@ -91,7 +91,7 @@ DON!! anexados (217), [Your Turn] (218), [Opponent's Turn] (219), `condition` vi
 | `main` | [Main] (só Eventos) | Evento jogado da mão :1251; `activateEventFromHand/Trash` :3468; `useMainEffect` (Trigger) :3902 → `useOwnEffect` :1934 | parser.ts:46 |
 | `counter` | [Counter] (só Eventos) | Pendência `counter` :1158 (paga `def.cost` em DON!!); `useCounterEffect` :3904 | parser.ts:46 |
 | `trigger` | [Trigger] (campo `CardData.trigger`) | Pendência `lifeCard` aberta em `stepDamage` :1802; resposta "sim" :1206-1211 (a carta vai ao descarte, efeito empilhado, evento `triggerActivated`) | `parseTriggerText` parser.ts:3041 |
-| `onKO` | [On K.O.]; "When this Character is K.O.'d (by an effect / by your opponent's effect)" (`koBy`) | `koCharacter` :4385-4392 (confere só o turno e `koBy`, não `conditionsMet`) | parser.ts:46; :2618, :2728 |
+| `onKO` | [On K.O.]; "When this Character is K.O.'d (by an effect / by your opponent's effect)" (`koBy`) | `koCharacter` (confere `conditionsMet`, [Once Per Turn] e `koBy` com a carta ainda no campo; o efeito vai para a fila depois do K.O.) | parser.ts:46; :2618, :2728 |
 | `onBlock` | [On Block] | Pendência `block` :1132 | parser.ts:46 |
 | `endOfTurn` | [End of Your Turn] | Ação `endTurn` :1330 (antes de passar o turno; depois os `delayed` :1333) | parser.ts:46 |
 | `battlesCharacter` | "If this Character battles your opponent's Character, …" / "At the end of a battle in which this Character battles …" | `stepBattle` passo `end` :1750 (`last` = o oponente da batalha) | parser.ts:2540, :2655 |
@@ -107,10 +107,10 @@ modo manual; 0 cartas hoje), "at the start of your opponent's turn" (0 cartas).
 - **Once Per Turn:** chave `uid:índice` em `state.usedThisTurn` (`usedKey` :657), limpa em `endTurn` :1419. Marcado ao
   empilhar (`pushAbilities` :1638, `emit` :1501, `activate` :1289) e na substituição (:3038, :3641, :3674). Se a
   habilidade começa com custo opcional e o jogador recusa, o uso é devolvido (`abilitySteps` :667, `releaseOncePerTurn`
-  :674). `onKO` não confere Once Per Turn.
+  :674). No `onKO` é conferido e marcado em `koCharacter`, antes de a carta sair do campo.
 - **[DON!! xX]:** `Ability.don`, conferido em `conditionsMet` :217 (qualquer turno).
-- **[Your Turn]/[Opponent's Turn]:** `Ability.yourTurn/opponentsTurn` (:218-219); para `onKO` só o turno é checado
-  (:4388), pois a carta já saiu do campo.
+- **[Your Turn]/[Opponent's Turn]:** `Ability.yourTurn/opponentsTurn` (:218-219). Para `onKO`, `koCharacter` checa
+  essas condições, o [DON!! xX] e a negação com a carta ainda no campo (10-2-17-1).
 
 ---
 
@@ -155,7 +155,8 @@ Colunas: **types** = linha em types.ts; **engine** = `case` em `execStep`.
 | `anyNumberForPower` | source field/trash, action ko/hand/bottom, spec/filter, power, every, target, duration | "You may K.O./return/place any number of … +N power for every …" | 529 | 2985 |
 
 `koCharacter` (:4359): `koProtected` (:4328) → `removalBlocked` (:4320, só por efeito) → `offerReplacement` (:4374) →
-move ao descarte, DON!! anexados voltam virados, emite `characterKO` e `characterRemoved` (:4381-4383), empilha [On K.O.].
+avalia os [On K.O.] no campo (`conditionsMet`, [Once Per Turn], `koBy`) → move ao descarte, DON!! anexados voltam virados,
+emite `characterKO` e `characterRemoved`, põe na fila os [On K.O.] que valeram.
 
 ### 2.3 Devolver à mão
 | do | parâmetros | semântica | types | engine |
@@ -528,7 +529,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 11 | Jogar esta carta do descarte / da Vida | **Existe** | 2 / 7 ("Play this (Character) card from your trash"); "play … from your trash" em geral 6 / 82; jogar da Vida fora de [Trigger]: 0 (o único acerto, OP01-008, é falso positivo) | `playThis`, `playFrom{trash}`, `playRevealed` (deck/Vida). Detalhe: no [Trigger] a carta vai ao descarte antes de resolver (:1208) e `playFree` (:1915) a marca como `from: 'trash'` → dispararia "When … is played from your trash" (OP16-079) indevidamente. |
 | 12 | "base power becomes X" | **Existe** | 3 / 22 | `basePower`, `staticBasePower`, `aura.basePower`. |
 | 13 | "Set the power … to 0" | **Parcial** | 0 / 2 (OP07-002, EB04-010) | Lido como `basePower` 0 (parser.ts:1646): DON!!, auras e +poder posteriores continuam somando. "Set the cost … to 0" = `cost −99` (1 carta, OP03-091). |
-| 14 | Negar efeitos de Personagem/Líder | **Existe** (com ressalva) | 1 / 15 | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated`. `isNegated` desliga habilidades e palavras impressas, mas o [On K.O.] de um Personagem negado ainda dispara (`koCharacter` :4385-4392 não verifica, e `removeCharacter` :4397 apaga o modificador antes). |
+| 14 | Negar efeitos de Personagem/Líder | **Existe** | 1 / 15 | `negate`, `aura.negate`, `negateOnPlay`, regra `ownOnPlayNegated`. `isNegated` desliga habilidades e palavras impressas, inclusive o [On K.O.] (conferido em `koCharacter` antes de a carta sair do campo; DV-07 corrigida). |
 | 15 | Vida virada para cima | **Parcial** | 12 / 48 | Há `lifeFaceUp`, `lifeFace`, `handToLife{faceUp}`, `search{toLife}`, custo `ownToLife`, `trashFaceUpLife`, `faceUpLifeMin`, regra `faceUpLifeToDeck`. Mas **`fieldToLife` ignora "face-up"** (o passo nem tem o campo; parser.ts:1336, 1814, 1818): ~16 cartas (OP04-117, OP04-097, OP05-096, OP03-123, OP11-116, EB01-053, ST09-015, OP06-103…) põem a carta virada para baixo. `trashLife`/`lifeToTrash`/`opponentLifeToBottom` não limpam `lifeFaceUp` (ids velhos, inofensivos). |
 | 16 | [End of Your Opponent's Turn] / início do turno do oponente | **Não existe** | 0 / 0 | `parseHeader` recusa (:2210). |
 | 17 | Restrições ao oponente ("your opponent cannot play / attack …") | **Não existe** como primitivo | 1 / 2 | `Restriction.player` é sempre quem controla o efeito (:3412) e dura só o turno. As 2 cartas ("cannot attack any card other than …") usam `staticTaunt`. |
@@ -536,7 +537,7 @@ completa da optcgapi (2711 cartas). Exemplos da base completa.
 | 19 | "Your opponent rests N active DON!! at the start of their next Main Phase" | **Aproximado** | — | Lido como `skipRefreshDon` (parser.ts:1084). |
 | 20 | Virar Personagem do oponente em `restDonOrCharacter` | **Parcial** | — | Chama `restCard(state, uid)` sem `byEffectOf` (:2798): ignora `staticNoRest`, a substituição `rest` e não emite `restedByEffect`. |
 | 21 | K.O. de Stage | **Parcial** | — | `ko` em Stage vai direto ao descarte, sem proteções, substituição nem eventos (:2193-2198). |
-| 22 | [On K.O.] e Once Per Turn | **Parcial** | — | `koCharacter` não confere `oncePerTurn` nem `condition` do [On K.O.]. |
+| 22 | [On K.O.] e Once Per Turn | **Existe** | — | `koCharacter` confere `oncePerTurn`, `don`, `condition` e negação do [On K.O.] com a carta ainda no campo (DV-07 corrigida). |
 
 Formas listadas na pergunta que **não aparecem em nenhuma carta da base** (não há demanda hoje): copiar efeitos (#6),
 "when this card is removed from Life" (#8), [End of Your Opponent's Turn] (#16), "If you would take damage … instead"

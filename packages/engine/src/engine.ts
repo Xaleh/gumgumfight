@@ -4537,24 +4537,36 @@ function koCharacter(
     return;
   }
   if (!opts.force && !opts.noReplace && offerReplacement(state, uid, 'ko', { inBattle: opts.inBattle, byPlayer: opts.byPlayer })) return;
+  // [On K.O.]: as condições são checadas no campo, antes de a carta sair (10-2-17-1): DON!! dados,
+  // [Your Turn]/[Opponent's Turn], condição, negação (8-2-1-1) e [Once Per Turn]. O efeito resolve
+  // depois, com a carta já no trash.
+  const def = cardDef(state, uid);
+  const byEffect = !opts.inBattle && opts.byPlayer !== undefined;
+  const onKO: number[] = [];
+  let lapsed = false;
+  def.abilities.forEach((a, i) => {
+    if (a.timing !== 'onKO') return;
+    if (a.koBy && !(byEffect && (a.koBy === 'effect' || opts.byPlayer !== loc.player))) return;
+    if (conditionsMet(state, uid, a) && !(a.oncePerTurn && state.usedThisTurn.includes(usedKey(uid, i)))) onKO.push(i);
+    else lapsed = true;
+  });
   const ps = state.players[loc.player];
   ps.donRested += loc.fc.don;
   removeCharacter(state, uid);
   ps.trash.push(uid);
-  log(state, loc.player, `${cardDef(state, uid).name} foi nocauteado (K.O.).`);
+  log(state, loc.player, `${def.name} foi nocauteado (K.O.).`);
+  if (lapsed) log(state, loc.player, `${def.name} ${TIMING_TAG.onKO}: a condição não vale, o efeito não é ativado.`);
   (state.koThisTurn ??= []).push(loc.player);
   emit(state, { kind: 'characterKO', player: loc.player, card: uid });
   if (opts.inBattle || opts.byPlayer !== undefined) {
     emit(state, { kind: 'characterRemoved', player: loc.player, card: uid, byPlayer: opts.byPlayer, inBattle: opts.inBattle });
   }
-  const def = cardDef(state, uid);
-  def.abilities.forEach((a) => {
-    // [On K.O.] com [Your Turn]/[Opponent's Turn]: a carta já saiu do campo, só o turno é checado.
-    const turnOk = (!a.yourTurn || state.activePlayer === loc.player) && (!a.opponentsTurn || state.activePlayer !== loc.player);
-    const byEffect = !opts.inBattle && opts.byPlayer !== undefined;
-    const causeOk = !a.koBy || (byEffect && (a.koBy === 'effect' || opts.byPlayer !== loc.player));
-    if (a.timing === 'onKO' && turnOk && causeOk) queueTriggered(state, uid, loc.player, a.steps, { timing: 'onKO', offField: true });
-  });
+  for (const i of onKO) {
+    const a = def.abilities[i];
+    const opt = a.oncePerTurn ? usedKey(uid, i) : undefined;
+    if (opt) state.usedThisTurn.push(opt);
+    queueTriggered(state, uid, loc.player, abilitySteps(a, i), { timing: 'onKO', ability: i, offField: true, ...(opt ? { opt } : {}) });
+  }
 }
 
 function removeCharacter(state: GameState, uid: string) {

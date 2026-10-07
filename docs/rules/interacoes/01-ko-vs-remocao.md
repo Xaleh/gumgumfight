@@ -22,6 +22,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-O K.O. passa por `koCharacter` (engine.ts:4359): proteções, substituição, eventos `characterKO`/`characterRemoved` e [On K.O.]. Trash pelo limite de 5, por custo ou por efeito "trash" **não** é K.O. e não dispara [On K.O.] (conforme).
+O K.O. passa por `koCharacter` (engine.ts:4359): proteções, substituição, eventos `characterKO`/`characterRemoved` e [On K.O.]. As condições do [On K.O.] ([DON!! xX], [Your Turn]/[Opponent's Turn], condição, negação, [Once Per Turn]) são vistas com a carta ainda no campo; o efeito resolve depois, com ela no trash (10-2-17-1, Zephyr OP06-074: negado não ativa). Trash pelo limite de 5, por custo ou por efeito "trash" **não** é K.O. e não dispara [On K.O.] (conforme).
 
 Divergências deste tema: DV-07, DV-12, DV-13, DV-14, DV-16 (detalhes em [../divergencias.md](../divergencias.md)).
