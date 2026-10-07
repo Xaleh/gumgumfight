@@ -999,6 +999,13 @@ function settleCancel(state: GameState, actor: PlayerId) {
   }
 }
 
+/** Algo escondido foi lido pelo jogador que começou a ação: ela não pode mais ser cancelada. */
+function markRevealed(state: GameState) {
+  if (!state.cancel) return;
+  state.cancel.blocked = 'revealed';
+  delete state.checkpoint;
+}
+
 function restoreCheckpoint(state: GameState, p: PlayerId) {
   const cp = state.checkpoint!;
   const info = state.cancel!;
@@ -1883,6 +1890,9 @@ function askCards(
   extra: { min?: number; intent?: 'help' | 'harm' | 'discard'; ordered?: boolean; hidden?: string } = {},
 ) {
   const none = extra.hidden && !options.length;
+  // Olhar o deck (ou outra zona que o próprio jogador não vê) é informação ganha mesmo sem carta
+  // à mostra ("não tem X no deck"): a ação deixa de ser cancelável. A própria mão ele já via.
+  if (extra.hidden && extra.hidden !== 'da mão') markRevealed(state);
   state.pending = {
     kind: 'selectTargets',
     player: frame.controller,
