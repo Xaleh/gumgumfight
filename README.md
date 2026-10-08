@@ -397,6 +397,9 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
 
 ## Estrutura
 
+A documentação técnica completa do produto (stacks, banco, cartas, partidas, torneios, transmissão ao vivo,
+infraestrutura e capacidade da VPS, com medições) está em [`docs/documentacao-tecnica.md`](docs/documentacao-tecnica.md).
+
 ```
 packages/engine   Motor de regras em TypeScript puro (sem dependências), bot e testes
 apps/server       API Fastify + SQLite (node:sqlite); serve a interface compilada em produção
