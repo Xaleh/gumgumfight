@@ -14,6 +14,7 @@ import {
   type Keyword,
 } from '@gumgum/engine';
 import { type ReactNode, useMemo, useState } from 'react';
+import { useLongPress } from '../hooks/useLongPress';
 import { useSettings } from '../settings';
 
 /** 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. */
@@ -234,6 +235,7 @@ export function StaticCard({
   onClick,
   onContextMenu,
   onHover,
+  onLongPress,
 }: {
   card: CardData;
   highlight?: Highlight;
@@ -241,13 +243,17 @@ export function StaticCard({
   badge?: ReactNode;
   onClick?: () => void;
   onContextMenu?: () => void;
-  onHover?: (card: CardData | null) => void;
+  /** `anchor` = o elemento da carta, para posicionar um popover ao lado dela. */
+  onHover?: (card: CardData | null, anchor?: HTMLElement) => void;
+  /** Toque longo (dedo/caneta): abre a carta ampliada; o clique seguinte é ignorado. */
+  onLongPress?: (card: CardData) => void;
 }) {
   const def = useMemo(() => buildCardDef(card), [card]);
   const { showImages } = useSettings();
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
+  const press = useLongPress<HTMLDivElement>(onLongPress ? () => onLongPress(card) : undefined);
   return (
     <div
       className={[
@@ -258,16 +264,26 @@ export function StaticCard({
         withImage ? 'with-image' : '',
         dimmed ? 'dimmed' : '',
       ].join(' ')}
-      onClick={onClick}
-      onContextMenu={
-        onContextMenu
-          ? (e) => {
-              e.preventDefault();
-              onContextMenu();
+      {...press.handlers}
+      onClick={
+        onClick
+          ? () => {
+              if (press.consume()) return;
+              onClick();
             }
           : undefined
       }
-      onMouseEnter={() => onHover?.(card)}
+      onContextMenu={
+        onContextMenu || onLongPress
+          ? (e) => {
+              e.preventDefault();
+              // No toque não existe botão direito: o menu de contexto é só o navegador reagindo ao dedo parado.
+              if (press.isTouch()) return;
+              onContextMenu?.();
+            }
+          : undefined
+      }
+      onMouseEnter={(e) => onHover?.(card, e.currentTarget)}
       onMouseLeave={() => onHover?.(null)}
       title={def.name}
     >

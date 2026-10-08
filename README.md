@@ -146,9 +146,13 @@ para desligar as imagens, defina `CARD_IMAGES=off` no ambiente do app e recarreg
 
 Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construtor:
 
-1. **Novo deck** → escolha o Líder (o catálogo mostra só Líderes até você escolher um).
+1. **Novo deck** → escolha o Líder (o catálogo mostra só Líderes até você escolher um). Os decks salvos (seus,
+   da comunidade e prontos) ficam no menu suspenso do cabeçalho, com busca por nome ou Líder.
 2. Clique nas cartas para adicionar e use o botão direito (ou os botões −/+ na lista) para remover. Por padrão
-   aparecem só cartas com a cor do Líder. Dá para filtrar por nome/texto, cor, tipo, custo e coleção.
+   aparecem só cartas com a cor do Líder. Dá para filtrar por nome/texto, cor, tipo, custo e coleção (no
+   celular, atrás do botão **Filtros**; a busca e os filtros ficam presos no topo enquanto o catálogo rola).
+   Com o mouse sobre uma carta (no catálogo, no Líder ou na lista do deck), ela aparece ampliada ao lado, com
+   o texto do efeito; no toque, segure o dedo na carta para abri-la ampliada.
 3. O painel à direita mostra o total, a curva de custo, os Counters e os problemas do deck. **Salvar** grava
    no banco. Decks incompletos ficam salvos como rascunho e aparecem desabilitados no menu.
 

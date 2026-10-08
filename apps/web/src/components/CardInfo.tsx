@@ -1,5 +1,5 @@
 import { buildCardDef, type CardData, type CardDef, type CardStatus } from '@gumgum/engine';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cardText, useSettings } from '../settings';
 import { StaticCard, StatusTag } from './CardView';
 
@@ -87,13 +87,74 @@ export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; pow
 }
 
 /** Painel de detalhes para uma carta fora de partida (construtor de deck). */
-export function CardInfo({ card }: { card: CardData | null }) {
+export function CardInfo({ card, emptyHint }: { card: CardData | null; emptyHint?: string }) {
   const def = useMemo(() => (card ? buildCardDef(card) : null), [card]);
-  if (!def) return <div className="detail empty">Passe o mouse sobre uma carta para ver os detalhes.</div>;
+  if (!def) return <div className="detail empty">{emptyHint ?? 'Passe o mouse sobre uma carta para ver os detalhes.'}</div>;
   return (
     <div className="detail">
       <div className="detail-card">
         <StaticCard card={card!} />
+      </div>
+      <CardTextInfo def={def} />
+    </div>
+  );
+}
+
+/** Carta ampliada em modal, com o texto do efeito (toque longo no construtor de deck). Fecha no fundo, no ✕ ou com Esc. */
+export function StaticCardZoom({ card, onClose }: { card: CardData; onClose: () => void }) {
+  const def = useMemo(() => buildCardDef(card), [card]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop zoom-backdrop" onClick={onClose}>
+      <div className="zoom" role="dialog" aria-label={def.name} onClick={(e) => e.stopPropagation()}>
+        <button className="zoom-close" onClick={onClose} aria-label="Fechar">
+          ✕
+        </button>
+        <div className="zoom-card">
+          <StaticCard card={card} />
+        </div>
+        <div className="zoom-text">
+          <CardTextInfo def={def} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Popover com a carta ampliada e o texto do efeito, ao lado do elemento sob o mouse (construtor de deck).
+ * Fica à direita da carta quando cabe, senão à esquerda, sempre dentro da tela; não captura o mouse.
+ */
+export function CardHoverPreview({ card, anchor }: { card: CardData; anchor: HTMLElement }) {
+  const def = useMemo(() => buildCardDef(card), [card]);
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const a = anchor.getBoundingClientRect();
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const gap = 14;
+    const pad = 8;
+    let left = a.right + gap;
+    if (left + w > vw - pad) left = a.left - gap - w;
+    // Não cabe de nenhum lado (tela estreita): centraliza sobre a carta.
+    if (left < pad) left = Math.max(pad, Math.min(vw - w - pad, a.left + a.width / 2 - w / 2));
+    const top = Math.max(pad, Math.min(vh - h - pad, a.top + a.height / 2 - h / 2));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [card, anchor]);
+  if (!anchor.isConnected) return null;
+  return (
+    <div className="card-hover" ref={ref} role="tooltip" aria-live="polite">
+      <div className="detail-card">
+        <StaticCard card={card} />
       </div>
       <CardTextInfo def={def} />
     </div>

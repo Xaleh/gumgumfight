@@ -3101,6 +3101,8 @@ button.hint-pill {
   flex-direction: column;
   transition: transform 0.22s, box-shadow 0.18s;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   font-size: calc(var(--cw) * 0.105);
 }
 .card.clickable {
@@ -4418,11 +4420,10 @@ button.hint-pill {
 }
 .builder-body {
   display: grid;
-  grid-template-columns: 250px 1fr 340px;
+  grid-template-columns: 1fr 340px;
   flex: 1;
   min-height: 0;
 }
-.builder-left,
 .builder-deck {
   display: flex;
   flex-direction: column;
@@ -4431,16 +4432,102 @@ button.hint-pill {
   overflow-y: auto;
   min-height: 0;
   background: var(--bg2);
-}
-.builder-left {
-  border-right: 1px solid var(--line);
-}
-.builder-deck {
   border-left: 1px solid var(--line);
 }
-.builder-left .detail {
+/* Painel de detalhes no toque (sem hover): carta em cima, texto embaixo. */
+.builder-deck .detail {
   flex-direction: column;
   align-items: center;
+}
+
+/* Decks salvos no cabeçalho: "+ Novo deck" e o menu suspenso com o deck aberto. */
+.builder-decks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.deck-dd {
+  position: relative;
+  min-width: 0;
+}
+.deck-dd-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: clamp(240px, 32vw, 380px);
+  max-width: 100%;
+  min-height: 38px;
+  text-align: left;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 10px 5px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.deck-dd-btn:hover,
+.deck-dd-btn.open {
+  border-color: var(--gold);
+}
+.deck-dd-btn svg {
+  flex: none;
+  transition: transform 0.15s;
+}
+.deck-dd-btn.open svg {
+  transform: rotate(180deg);
+}
+.deck-dd-count {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.deck-dd-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  max-height: min(70vh, 600px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(var(--shadow-rgb), 0.28);
+  z-index: 50;
+  animation: pop-in 0.16s;
+}
+.deck-dd-search {
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.deck-dd-search:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(242, 183, 51, 0.35);
+}
+.deck-dd-pop .deck-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.deck-dd-pop .owner-hint {
+  flex: none;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
 }
 .deck-list {
   display: flex;
@@ -4501,16 +4588,57 @@ button.hint-pill {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 0 12px 10px;
   overflow-y: auto;
   min-height: 0;
   min-width: 0;
+}
+/* Busca, filtros e dica ficam presos no topo enquanto o catálogo rola. */
+.catalog-top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 -12px;
+  padding: 10px 12px 8px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 8px 16px -12px rgba(var(--shadow-rgb), 0.5);
 }
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+/* No desktop a busca e os filtros fluem na mesma linha; no celular viram busca + botão "Filtros" (abaixo). */
+.search-row,
+.filters-more {
+  display: contents;
+}
+.filters-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.filters-toggle.on {
+  border-color: var(--gold);
+}
+.filters-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-grid;
+  place-items: center;
 }
 .filters select {
   width: auto;
@@ -4817,7 +4945,8 @@ button.hint-pill {
   font-size: 13px;
   margin: 8px 0;
 }
-.builder .overlay {
+.builder .overlay,
+.builder .modal-backdrop {
   position: fixed;
 }
 
@@ -4829,28 +4958,121 @@ button.hint-pill {
   .builder {
     height: auto;
   }
-  .builder-left,
   .builder-deck {
     border: 0;
     border-top: 1px solid var(--line);
   }
-  .builder-left {
-    order: 2;
-  }
   .builder-catalog {
     order: 1;
-    max-height: 70vh;
+    max-height: 75vh;
+    max-height: 75dvh;
   }
   .builder-deck {
-    order: 3;
+    order: 2;
   }
   .builder .card-grid {
     --cw: 70px;
+  }
+  /* Cabeçalho de uma linha, preso no topo: Menu, "+ Novo" e o menu de decks. */
+  .builder-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .builder-header h2 {
+    display: none;
+  }
+  .builder-header .btn {
+    flex: none;
+    white-space: nowrap;
+  }
+  /* Filtros atrás do botão: a faixa presa no topo fica só com a busca e a dica. */
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .search-row .search {
+    flex: 1;
+    min-width: 0;
+  }
+  .filters-more {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .filters-more.hidden {
+    display: none;
+  }
+  .builder-decks {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .builder-decks .wide {
+    display: none;
+  }
+  .deck-dd {
+    flex: 1;
+    min-width: 0;
+  }
+  .deck-dd-btn {
+    width: 100%;
   }
 }
 .owner-hint {
   margin: 0;
   line-height: 1.4;
+}
+
+/* Carta ampliada ao lado da carta sob o mouse (construtor): só leitura, não captura o mouse. */
+.card-hover {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  width: max-content;
+  max-width: min(560px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(var(--shadow-rgb), 0.32);
+  animation: pop-in 0.12s;
+}
+.card-hover .detail-card {
+  --cw: 230px;
+}
+.card-hover .detail-card .card {
+  box-shadow: 0 10px 30px rgba(var(--shadow2-rgb), 0.35);
+}
+.card-hover .detail-text {
+  flex: 1 1 auto;
+  min-width: 170px;
+  overflow: hidden;
+}
+.card-hover .detail-name {
+  font-size: 17px;
+}
+.card-hover .effect {
+  font-size: 13.5px;
+}
+.card-hover .translation-note a {
+  pointer-events: none;
+  text-decoration: none;
+  cursor: default;
 }
 
 /* ------------------------------------------------------------------ cartas com efeito ainda não automatizado (⚙) */
