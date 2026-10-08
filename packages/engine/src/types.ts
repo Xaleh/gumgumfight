@@ -474,11 +474,12 @@ export interface Replacement {
   event: 'ko' | 'removal' | 'koOrRemoval' | 'rest' | 'damage';
   /**
    * Causa: any = qualquer uma (inclusive efeito próprio e, na remoção, K.O. em batalha); battle = em batalha;
-   * effect = por efeito; opponentEffect = por efeito do oponente.
+   * effect = por efeito; opponentEffect = por efeito do oponente; opponent = "by your opponent" (sem "'s effect"):
+   * qualquer causa do oponente, K.O. em batalha e efeitos dele (K.O., descarte, mão, deck…), menos efeito próprio.
    */
-  by: 'any' | 'battle' | 'effect' | 'opponentEffect';
+  by: 'any' | 'battle' | 'effect' | 'opponentEffect' | 'opponent';
   /** Em `koOrRemoval`, causa só da parte da remoção, quando difere de `by` ("removed … by your opponent's effect or K.O.'d"). */
-  removalBy?: 'any' | 'battle' | 'effect' | 'opponentEffect';
+  removalBy?: 'any' | 'battle' | 'effect' | 'opponentEffect' | 'opponent';
 }
 
 /** Remoção do campo em andamento (passos internos `replaceRemoval` e `removeFromField`). */

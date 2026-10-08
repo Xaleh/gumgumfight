@@ -29,9 +29,17 @@ const extra: CardData[] = [
   char('RP-003', "If this Character would be removed from the field by your opponent's effect, you may trash 1 card from your hand instead."),
   char('RP-004', '[Your Turn] [Once Per Turn] This effect can be activated when a Character is removed from the field by your effect. Draw 1 card.'),
   char('RP-005', 'If this Character would be removed from the field, you may trash 1 card from your hand instead.'),
+  // EB05-061 Nami: "by your opponent" (sem "'s effect") vale para K.O. em batalha e para qualquer efeito do oponente.
+  char(
+    'RP-006',
+    '[Once Per Turn] If your Character with 6000 base power or less would be removed from the field by your opponent, you may add 1 card from the top of your Life cards to your hand instead.',
+  ),
+  { ...char('RP-007', 'Big grunt.'), power: 7000 },
   event('RP-E01', "[Main] Add up to 1 of your opponent's Characters with a cost of 3 or less to the top of the owner's Life cards."),
   event('RP-E02', "[Main] Return up to 1 of your Characters to the owner's hand."),
   event('RP-E03', "[Main] Your opponent returns 1 of their Characters to the owner's hand."),
+  event('RP-E04', "[Main] K.O. up to 1 of your opponent's Characters with a cost of 3 or less."),
+  event('RP-E05', "[Main] Trash up to 1 of your opponent's Characters with a cost of 3 or less."),
 ];
 const cards = [...baseCards, ...extra];
 const inDeck = extra.filter((c) => c.category !== 'leader');
@@ -211,5 +219,83 @@ describe('toda remoção do campo oferece a substituição (DV-12)', () => {
     s = choose(s, 0, [mine]);
     expect(s.pending?.kind).not.toBe('confirm');
     expect(s.players[0].hand).toContain(mine);
+  });
+});
+
+describe('EB05-061 Nami: "removed from the field by your opponent" vale para qualquer remoção causada pelo oponente', () => {
+  /** Nami (RP-006) e um Personagem de 2000 virados no campo do jogador 0; jogador 1 no turno 4. */
+  function setup(grunt = 'RP-002') {
+    const s = toTurn(game(['ST01-001', 'ST01-001']), 4);
+    const nami = field(s, 0, 'RP-006', true);
+    const target = field(s, 0, grunt, true);
+    return { s, nami, target };
+  }
+  const attackPast = (s: GameState, target: string) => {
+    s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target });
+    if (s.pending?.kind === 'block') s = choose(s, 0, []);
+    if (s.pending?.kind === 'counter') s = applyAction(s, { type: 'pass', player: 0 });
+    return s;
+  };
+
+  it('K.O. em batalha: a substituição é oferecida e, paga, a carta de Vida vai para a mão e o Personagem fica', () => {
+    let { s, nami, target } = setup();
+    const life = s.players[0].life.length;
+    const hand = s.players[0].hand.length;
+    s = attackPast(s, target);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0, source: nami });
+    s = answer(s, 0, true);
+    expect(onField(s, target)).toBe(true);
+    expect(s.players[0].life).toHaveLength(life - 1);
+    expect(s.players[0].hand).toHaveLength(hand + 1);
+    expect(s.usedThisTurn).toContain(`${nami}:0`);
+  });
+
+  it('K.O. em batalha recusado: o Personagem é nocauteado normalmente', () => {
+    let { s, target } = setup();
+    s = attackPast(s, target);
+    s = answer(s, 0, false);
+    expect(s.players[0].trash).toContain(target);
+  });
+
+  it('K.O. por efeito do oponente também é oferecido', () => {
+    let { s, nami, target } = setup();
+    s = applyAction(s, { type: 'playCard', player: 1, uid: give(s, 1, 'RP-E04') });
+    s = choose(s, 1, [target]);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0, source: nami });
+    s = answer(s, 0, true);
+    expect(onField(s, target)).toBe(true);
+  });
+
+  it('descarte (Trash) por efeito do oponente também é oferecido', () => {
+    let { s, nami, target } = setup();
+    s = applyAction(s, { type: 'playCard', player: 1, uid: give(s, 1, 'RP-E05') });
+    s = choose(s, 1, [target]);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0, source: nami });
+    s = answer(s, 0, true);
+    expect(onField(s, target)).toBe(true);
+  });
+
+  it('a própria Nami é protegida (4000 de poder base)', () => {
+    let { s, nami } = setup();
+    s = attackPast(s, nami);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0, source: nami });
+  });
+
+  it('não vale contra efeito próprio ("by your opponent")', () => {
+    let s = toTurn(game(['ST01-001', 'ST01-001']), 3);
+    field(s, 0, 'RP-006');
+    const target = field(s, 0, 'RP-002');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'RP-E02') });
+    s = choose(s, 0, [target]);
+    expect(s.pending?.kind).not.toBe('confirm');
+    expect(s.players[0].hand).toContain(target);
+  });
+
+  it('não vale para Personagem com mais de 6000 de poder base', () => {
+    let { s, target } = setup('RP-007');
+    s = applyAction(s, { type: 'playCard', player: 1, uid: give(s, 1, 'RP-E04') });
+    s = choose(s, 1, [target]);
+    expect(s.pending?.kind).not.toBe('confirm');
+    expect(s.players[0].trash).toContain(target);
   });
 });
