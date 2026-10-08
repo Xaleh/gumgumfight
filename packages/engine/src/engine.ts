@@ -1867,12 +1867,17 @@ export function cannotBeRested(state: GameState, uid: string): boolean {
 function restCard(state: GameState, uid: string, byEffectOf?: PlayerId, restSource?: string) {
   const loc = locate(state, uid);
   if (!loc || loc.fc.rested) return;
-  if (cannotBeRested(state, uid)) return;
+  if (cannotBeRested(state, uid)) {
+    // "… cannot be rested": o efeito tenta virar e nada acontece; o histórico explica (Q&A EB02-011).
+    if (byEffectOf !== undefined) log(state, byEffectOf, `${cardDef(state, uid).name} não pode ser virada (efeito "não vira" ativo).`);
+    return;
+  }
   if (
     byEffectOf !== undefined &&
     byEffectOf !== loc.player &&
     cardDef(state, uid).abilities.some((a) => a.timing === 'static' && a.staticNoRest && conditionsMet(state, uid, a))
   ) {
+    log(state, byEffectOf, `${cardDef(state, uid).name} não pode ser virada por efeitos do oponente.`);
     return;
   }
   // "If this Character would be rested by your opponent's Character's effect, you may rest 1 of your other Characters instead."
@@ -1985,6 +1990,16 @@ function stepBattle(state: GameState) {
     case 'block': {
       b.step = 'counter';
       const options = blockerOptions(state, defender);
+      // Um [Blocker] ativo que ficou de fora por um efeito na própria carta ("cannot be rested",
+      // "cannot activate [Blocker]"): o histórico diz o motivo, senão parece que o jogo o ignorou.
+      // (Restrições gerais, como "o oponente não pode usar [Blocker]", já têm a própria linha.)
+      if (!b.noBlocker && !restricted(state, defender, 'noBlocker')) {
+        for (const c of state.players[defender].characters) {
+          if (c.rested || c.uid === b.target || options.includes(c.uid) || !hasKeyword(state, c.uid, 'blocker')) continue;
+          if (cannotBeRested(state, c.uid)) log(state, defender, `${cardDef(state, c.uid).name} não pode bloquear: não pode ser virada.`);
+          else if (state.modifiers.some((m) => m.uid === c.uid && m.kind === 'cannotBlock')) log(state, defender, `${cardDef(state, c.uid).name} não pode ativar [Blocker] agora.`);
+        }
+      }
       if (options.length) state.pending = { kind: 'block', player: defender, options };
       return;
     }
@@ -2507,10 +2522,59 @@ export function describeCost(cost: AbilityCost): string {
   return parts.join(' e ');
 }
 
+/**
+ * Explica, para o histórico, por que a condição de um efeito não vale ("If you have 2 or less
+ * Characters…"): o jogador vê o motivo em vez de um efeito que "não abriu". Cobre as contagens
+ * mais comuns; as outras condições recebem o texto genérico.
+ */
+function conditionFailure(state: GameState, controller: PlayerId, source: string, cond: Condition): string {
+  const ps = state.players[controller];
+  const opp = state.players[opponent(controller)];
+  const chars = ps.characters.length;
+  const self = ps.characters.some((c) => c.uid === source) ? ', contando esta carta' : '';
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  if (cond.maxCharacters !== undefined && chars > cond.maxCharacters) {
+    return `${ps.name} tem ${n(chars, 'Personagem', 'Personagens')}${self}; precisa de ${cond.maxCharacters} ou menos`;
+  }
+  if (cond.minCharacters !== undefined && chars < cond.minCharacters) {
+    return `${ps.name} tem ${n(chars, 'Personagem', 'Personagens')}${self}; precisa de ${cond.minCharacters} ou mais`;
+  }
+  if (cond.handMax !== undefined && ps.hand.length > cond.handMax) return `${ps.name} tem ${n(ps.hand.length, 'carta', 'cartas')} na mão; precisa de ${cond.handMax} ou menos`;
+  if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return `${ps.name} tem ${n(ps.hand.length, 'carta', 'cartas')} na mão; precisa de ${cond.handMin} ou mais`;
+  if (cond.lifeMax !== undefined && ps.life.length > cond.lifeMax) return `${ps.name} tem ${n(ps.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.lifeMax} ou menos`;
+  if (cond.lifeMin !== undefined && ps.life.length < cond.lifeMin) return `${ps.name} tem ${n(ps.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.lifeMin} ou mais`;
+  if (cond.opponentLifeMax !== undefined && opp.life.length > cond.opponentLifeMax) {
+    return `${opp.name} tem ${n(opp.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.opponentLifeMax} ou menos`;
+  }
+  if (cond.opponentLifeMin !== undefined && opp.life.length < cond.opponentLifeMin) {
+    return `${opp.name} tem ${n(opp.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.opponentLifeMin} ou mais`;
+  }
+  if (cond.minDonOnField !== undefined && totalDonOnField(ps) < cond.minDonOnField) return `${ps.name} tem ${totalDonOnField(ps)} DON!! no campo; precisa de ${cond.minDonOnField} ou mais`;
+  if (cond.maxDonOnField !== undefined && totalDonOnField(ps) > cond.maxDonOnField) return `${ps.name} tem ${totalDonOnField(ps)} DON!! no campo; precisa de ${cond.maxDonOnField} ou menos`;
+  if (cond.leaderHasType && !hasType(cardDef(state, ps.leader.uid), cond.leaderHasType)) return `o Líder de ${ps.name} não tem o tipo {${cond.leaderHasType}}`;
+  if (cond.leaderHasAnyType && !cond.leaderHasAnyType.some((t) => hasType(cardDef(state, ps.leader.uid), t))) {
+    return `o Líder de ${ps.name} não tem o tipo ${cond.leaderHasAnyType.map((t) => `{${t}}`).join(' nem ')}`;
+  }
+  return 'a condição do efeito não vale agora';
+}
+
+/** Condições internas do leitor (dependem da escolha anterior), que não são "a condição da carta". */
+const INTERNAL_CONDITIONS: Array<keyof Condition> = ['lastDone', 'chosenMatches', 'revealedHasChosenCost'];
+
 function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   const ps = state.players[frame.controller];
   const srcName = cardDef(state, frame.source).name;
-  if (!frame.choice && !frame.memo && !stepConditionMet(state, frame, step)) return true;
+  if (!frame.choice && !frame.memo && !stepConditionMet(state, frame, step)) {
+    // "If you have 2 or less Characters, play…": a condição da carta não vale. O histórico diz
+    // o motivo (o jogador costuma achar que o efeito falhou, ou que a carta que queria escolher
+    // não servia). Condições internas (depende da escolha anterior) continuam silenciosas.
+    const cond = step.if;
+    if (cond && Object.keys(cond).some((k) => !INTERNAL_CONDITIONS.includes(k as keyof Condition))) {
+      const text = `${srcName}: a condição não vale (${conditionFailure(state, frame.controller, frame.source, cond)}), o efeito não acontece.`;
+      if (state.log[state.log.length - 1]?.text !== text) log(state, frame.controller, text);
+    }
+    return true;
+  }
 
   switch (step.do) {
     case 'power': {
@@ -2547,8 +2611,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         const loc = locate(state, uid);
         if (loc) {
+          const before = loc.fc.rested;
           restCard(state, uid, frame.controller, frame.source);
-          log(state, frame.controller, `${cardDef(state, uid).name} é virado.`);
+          // "cannot be rested" (ou a substituição de rest) deixa a carta como estava: o histórico já explicou.
+          if (loc.fc.rested && !before) log(state, frame.controller, `${cardDef(state, uid).name} é virado.`);
         }
       }
       return true;

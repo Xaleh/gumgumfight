@@ -1,0 +1,26 @@
+{
+ "note": "Cartas reais da optcgapi usadas nos testes de regressão (bugs relatados no Trello): Arlong EB02-011 (\"cannot be rested\").",
+ "cards": [
+  {
+   "id": "EB02-011",
+   "name": "Arlong",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Fish-Man",
+    "Arlong Pirates",
+    "East Blue"
+   ],
+   "text": "[On Play] If your Leader has the {Fish-Man} or {East Blue} type, give up to 1 rested DON!! card to 1 of your Leader. Then, up to 1 of your opponent's Characters with a cost of 5 or less cannot be rested until the end of your opponent's next turn.",
+   "set": "EB02"
+  }
+ ]
+}

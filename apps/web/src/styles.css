@@ -3575,6 +3575,17 @@ button.hint-pill {
   box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.25);
   animation: pop-in 0.2s;
 }
+/* Aviso do histórico ("a condição não vale…", "não pode bloquear…"): some sozinho. */
+.toast.notice {
+  background: var(--slate);
+  color: #fff;
+  border-radius: 14px;
+  padding: 8px 14px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
 
 /* arrastar */
 .drag-ghost {
