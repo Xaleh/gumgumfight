@@ -35,7 +35,9 @@ module.exports = {
       node_args: '--disable-warning=ExperimentalWarning',
       exec_mode: 'fork',
       autorestart: true,
-      max_memory_restart: '400M',
+      // Reinicia se passar disto (derruba os canais SSE por alguns segundos: as salas voltam do banco).
+      // A VPS de produção tem 4 GB; num servidor menor, defina PM2_MAX_MEMORY em shared/deploy.env.
+      max_memory_restart: env.PM2_MAX_MEMORY || '1500M',
       time: true,
       env: {
         NODE_ENV: 'production',
@@ -52,6 +54,9 @@ module.exports = {
         ADMIN_EMAILS: env.ADMIN_EMAILS || '',
         // off: desliga o treino online contra o bot do servidor (teste do modo espectador).
         ONLINE_BOT_ROOMS: env.ONLINE_BOT_ROOMS || 'on',
+        // Tetos de salas ativas (todas / só treino contra o bot); vazio = padrões do app.
+        ONLINE_MAX_ROOMS: env.ONLINE_MAX_ROOMS || '',
+        ONLINE_MAX_BOT_ROOMS: env.ONLINE_MAX_BOT_ROOMS || '',
       },
     },
   ],

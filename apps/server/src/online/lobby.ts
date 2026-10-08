@@ -15,6 +15,8 @@ export type QueueKind = 'casual' | 'ranked';
 interface Entry {
   ticket: string;
   seat: SeatRequest;
+  /** IP de quem entrou na fila (só em memória, para os limites por IP). */
+  ip: string | null;
   format: FormatId;
   queue: QueueKind;
   since: number;
@@ -22,8 +24,33 @@ interface Entry {
   matched: { roomId: string; token: string } | null;
 }
 
+/**
+ * Tetos contra abuso: criar salas não exige login (só o código do navegador, que
+ * qualquer um gera à vontade), e cada sala custa memória e CPU do servidor.
+ */
+export interface LobbyLimits {
+  /** Salas ativas (esperando ou jogando) no servidor inteiro; acima disso, 503. */
+  maxRooms: number;
+  /** Salas de treino contra o bot do servidor ativas ao mesmo tempo (o servidor joga por ele). */
+  maxBotRooms: number;
+  /** Salas ativas (ou lugares na fila) de um mesmo IP ao mesmo tempo. */
+  perIpRooms: number;
+  /** Salas criadas, entradas e filas por IP numa janela de `perIpWindowMs`. */
+  perIpCreates: number;
+  perIpWindowMs: number;
+}
+
+export const DEFAULT_LIMITS: LobbyLimits = {
+  maxRooms: 400,
+  maxBotRooms: 10,
+  perIpRooms: 16,
+  perIpCreates: 60,
+  perIpWindowMs: 10 * 60_000,
+};
+
 export interface LobbyDeps {
   cards: (ids: string[]) => CardData[];
+  limits?: Partial<LobbyLimits>;
   finish?: (room: Room) => RoomResult;
   save?: (data: RoomData) => void;
   remove?: (id: string) => void;
@@ -98,11 +125,73 @@ export class Lobby {
   private readonly finishedAt = new Map<string, number>();
   /** Navegadores com o menu aberto → último sinal. */
   private readonly presence = new Map<string, number>();
+  /** IPs que ocupam cada sala (só em memória: não vai para o banco). */
+  private readonly roomIps = new Map<string, Set<string>>();
+  /** Criações recentes por IP (salas, entradas e filas), para o limite por janela. */
+  private readonly creates = new Map<string, number[]>();
+  readonly limits: LobbyLimits;
   private readonly deps: LobbyDeps & { now: () => number; log: (msg: string) => void };
   private sweeper: ReturnType<typeof setInterval> | null = null;
 
   constructor(deps: LobbyDeps) {
     this.deps = { ...deps, now: deps.now ?? (() => Date.now()), log: deps.log ?? (() => {}) };
+    this.limits = { ...DEFAULT_LIMITS, ...deps.limits };
+  }
+
+  // ------------------------------------------------------------------ limites por IP
+
+  /** Salas ativas (esperando ou jogando). */
+  get activeRooms() {
+    let n = 0;
+    for (const room of this.rooms.values()) if (room.status !== 'finished') n++;
+    return n;
+  }
+
+  private activeBotRooms() {
+    let n = 0;
+    for (const room of this.rooms.values()) if (room.status !== 'finished' && room.data.queue === 'bot') n++;
+    return n;
+  }
+
+  /** Salas ativas e lugares na fila ocupados por um IP. */
+  roomsOfIp(ip: string) {
+    let n = 0;
+    for (const [id, ips] of this.roomIps) {
+      const room = this.rooms.get(id);
+      if (room && room.status !== 'finished' && ips.has(ip)) n++;
+    }
+    for (const e of this.queue) if (!e.matched && e.ip === ip) n++;
+    return n;
+  }
+
+  /** Marca que este IP ocupa a sala (para `roomsOfIp`). */
+  tagIp(roomId: string, ip: string | null) {
+    if (!ip) return;
+    let ips = this.roomIps.get(roomId);
+    if (!ips) this.roomIps.set(roomId, (ips = new Set()));
+    ips.add(ip);
+  }
+
+  /**
+   * Pode abrir mais uma sala (ou entrar numa, ou na fila)? Confere os tetos do
+   * servidor e, com `ip`, os do IP; quando pode, conta a criação na janela do IP.
+   * `kind`: bot = treino contra o bot do servidor; tournament = só o teto global
+   * (quem joga torneio está logado e inscrito).
+   */
+  admit(ip: string | null, kind: 'room' | 'bot' | 'tournament' = 'room'): LobbyError | null {
+    const L = this.limits;
+    if (this.activeRooms >= L.maxRooms) return { code: 503, error: 'O servidor está cheio agora; tente de novo em alguns minutos.' };
+    if (kind === 'bot' && this.activeBotRooms() >= L.maxBotRooms) {
+      return { code: 503, error: 'O treino contra o bot do servidor está lotado agora; jogue contra o bot no navegador ou tente mais tarde.' };
+    }
+    if (!ip || kind === 'tournament') return null;
+    if (this.roomsOfIp(ip) >= L.perIpRooms) return { code: 429, error: 'Há partidas demais abertas a partir da sua rede.' };
+    const now = this.deps.now();
+    const recent = (this.creates.get(ip) ?? []).filter((t) => now - t < L.perIpWindowMs);
+    if (recent.length >= L.perIpCreates) return { code: 429, error: 'Você abriu partidas demais em pouco tempo; espere alguns minutos.' };
+    recent.push(now);
+    this.creates.set(ip, recent);
+    return null;
   }
 
   private makeRoom(data: RoomData) {
@@ -354,12 +443,12 @@ export class Lobby {
 
   // ------------------------------------------------------------------ filas
 
-  enqueue(seat: SeatRequest, format: FormatId, queue: QueueKind): { ticket: string } | LobbyError {
+  enqueue(seat: SeatRequest, format: FormatId, queue: QueueKind, ip: string | null = null): { ticket: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     this.leaveQueue(seat.ownerHash);
     const now = this.deps.now();
-    const entry: Entry = { ticket: randomBytes(12).toString('base64url'), seat, format, queue, since: now, lastSeen: now, matched: null };
+    const entry: Entry = { ticket: randomBytes(12).toString('base64url'), seat, ip, format, queue, since: now, lastSeen: now, matched: null };
     this.queue.push(entry);
     this.match();
     return { ticket: entry.ticket };
@@ -422,6 +511,8 @@ export class Lobby {
           newRoomData({ queue: a.queue, format: a.format, code: null, seats: [{ ...a.seat, token: ta }, { ...b.seat, token: tb }] }),
         );
         room.start();
+        this.tagIp(room.id, a.ip);
+        this.tagIp(room.id, b.ip);
         a.matched = { roomId: room.id, token: ta };
         b.matched = { roomId: room.id, token: tb };
         break;
@@ -454,6 +545,7 @@ export class Lobby {
       const seats = [room.data.seats[1], room.data.seats[0]].map((s) => ({ ...s, token: randomToken() }));
       const next = this.makeRoom(newRoomData({ queue: 'private', format: room.data.format, code: null, seats }));
       next.start();
+      for (const ip of this.roomIps.get(room.id) ?? []) this.tagIp(next.id, ip);
       room.data.rematchRoom = next.id;
       // Espectadores seguem para a sala nova (sem token: continuam só assistindo).
       room.notify('rematch', (p) => (p === null ? { roomId: next.id } : { roomId: next.id, token: next.data.seats[p === 0 ? 1 : 0].token }));
@@ -474,6 +566,7 @@ export class Lobby {
       if (this.tournamentRooms.get(key) === id) this.tournamentRooms.delete(key);
     }
     this.finishedAt.delete(id);
+    this.roomIps.delete(id);
     this.deps.remove?.(id);
   }
 
@@ -487,6 +580,11 @@ export class Lobby {
         if (at === undefined) this.finishedAt.set(room.id, now);
         else if (now - at > FINISHED_TTL_MS) this.close(room.id);
       }
+    }
+    for (const [ip, times] of this.creates) {
+      const recent = times.filter((t) => now - t < this.limits.perIpWindowMs);
+      if (recent.length) this.creates.set(ip, recent);
+      else this.creates.delete(ip);
     }
     this.match();
   }

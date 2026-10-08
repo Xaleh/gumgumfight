@@ -55,6 +55,9 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
 | `ONLINE_BOT_ROOMS` | `on`                       | Treino online contra o bot do servidor (teste do modo espectador); `off` desliga |
+| `ONLINE_MAX_ROOMS` | `400`                      | Salas online ativas ao mesmo tempo no servidor (acima disso, 503); cada sala custa memória e CPU |
+| `ONLINE_MAX_BOT_ROOMS` | `10`                   | Salas de treino contra o bot do servidor ativas ao mesmo tempo (o servidor joga por ele) |
+| `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
 
 O backup é só copiar o arquivo `.db`.
 
@@ -242,6 +245,12 @@ está na fila e os espectadores também contam.
   recompensas parecidas e a faixa abre com o tempo de espera.
 - **Sem desfazer, Auto ou pausa** no online. Mensagens rápidas (emotes de uma lista fixa), revanche nas salas privadas e
   o replay completo para baixar no fim.
+- **Proteção contra abuso:** abrir salas não exige login, então há tetos: salas ativas no servidor
+  (`ONLINE_MAX_ROOMS`), salas de treino contra o bot (`ONLINE_MAX_BOT_ROOMS`), e por IP (16 salas ou lugares na fila
+  ao mesmo tempo e 60 criações a cada 10 min; `apps/server/src/online/lobby.ts`, `DEFAULT_LIMITS`). O Nginx dos scripts
+  de deploy ainda limita `/api/` a 30 requisições/s por IP (rajada de 100) e 64 conexões simultâneas por IP.
+- **Cache:** o torneio completo (`GET /api/tournaments/:id`, consultado a cada 5 s por jogador) e as estatísticas
+  ficam em cache no servidor, invalidado a cada gravação, e saem com `ETag` (o navegador recebe 304 quando nada mudou).
 - **Transporte:** SSE (`EventSource`) do servidor para o navegador e POST para as ações. Funciona atrás do Nginx / Nginx
   Proxy Manager sem configuração extra (header `X-Accel-Buffering: no` e um `ping` a cada 20 s, abaixo do
   `proxy_read_timeout` de 60 s).

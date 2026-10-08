@@ -5,13 +5,14 @@ Guia para colocar o site no ar numa VPS nova da Hostinger (KVM 1, Ubuntu, acesso
 é feito pelo script [`bootstrap-hostinger.sh`](bootstrap-hostinger.sh); o deploy do código continua sendo o do
 GitHub Actions (push na `main`).
 
-Dados usados neste guia (troque se os seus forem outros):
+Dados usados neste guia (`<IP-DA-VPS>` e `<nome>.hstgr.cloud` são os valores que o hPanel mostra para a sua VPS;
+não os deixe escritos neste repositório, que é público):
 
 | Item            | Valor                              |
 |-----------------|------------------------------------|
-| IP da VPS       | `179.236.249.105`                  |
-| Host            | `srv2039127.hstgr.cloud`           |
-| Acesso inicial  | `ssh root@179.236.249.105`         |
+| IP da VPS       | `<IP-DA-VPS>`                  |
+| Host            | `<nome>.hstgr.cloud`           |
+| Acesso inicial  | `ssh root@<IP-DA-VPS>`         |
 | Domínio do site | `gumgumfight.app`                  |
 | Redireciona     | `www.gumgumfight.app`, `gumgumfight.cloud`, `www.gumgumfight.cloud` |
 | Usuário do app  | `gumgum` (criado pelo script)      |
@@ -32,8 +33,8 @@ então os registros são editados no hPanel, sem trocar nameserver:
 
    | Tipo | Nome  | Aponta para       | TTL   |
    |------|-------|-------------------|-------|
-   | A    | `@`   | `179.236.249.105` | 3600  |
-   | A    | `www` | `179.236.249.105` | 3600  |
+   | A    | `@`   | `<IP-DA-VPS>` | 3600  |
+   | A    | `www` | `<IP-DA-VPS>` | 3600  |
 
 4. Repita para `gumgumfight.cloud` (mesmos dois registros).
 5. Espere a propagação (normalmente minutos, pode levar até 1 h). Confira na sua máquina:
@@ -41,9 +42,9 @@ então os registros são editados no hPanel, sem trocar nameserver:
    nslookup gumgumfight.app
    nslookup www.gumgumfight.cloud
    ```
-   Os dois devem responder `179.236.249.105`.
+   Os dois devem responder `<IP-DA-VPS>`.
 
-Não precisa criar registro para `srv2039127.hstgr.cloud` (já existe) nem registros AAAA.
+Não precisa criar registro para `<nome>.hstgr.cloud` (já existe) nem registros AAAA.
 
 ## 2. Chave de deploy (na sua máquina)
 
@@ -61,8 +62,8 @@ Copie o script para a VPS e rode-o com a chave pública do passo 2 e o seu e-mai
 
 ```bash
 # na sua máquina, a partir da raiz do repositório
-scp deploy/bootstrap-hostinger.sh root@179.236.249.105:/root/
-ssh root@179.236.249.105
+scp deploy/bootstrap-hostinger.sh root@<IP-DA-VPS>:/root/
+ssh root@<IP-DA-VPS>
 ```
 
 ```bash
@@ -90,7 +91,7 @@ inclui o nome no certificado (`SKIP_UPGRADE=1` pula o `apt upgrade` e fica rápi
 Teste o acesso do deploy, da sua máquina:
 
 ```bash
-ssh -i gumgum_deploy gumgum@179.236.249.105 'echo ok'
+ssh -i gumgum_deploy gumgum@<IP-DA-VPS> 'echo ok'
 ```
 
 ## 4. Secrets no GitHub
@@ -102,10 +103,10 @@ GitHub → repositório → **Settings → Environments → New environment** �
 
 | Secret               | Valor                                                                 |
 |----------------------|-----------------------------------------------------------------------|
-| `DEPLOY_HOST`        | `179.236.249.105`                                                     |
+| `DEPLOY_HOST`        | `<IP-DA-VPS>`                                                     |
 | `DEPLOY_USER`        | `gumgum`                                                              |
 | `DEPLOY_SSH_KEY`     | conteúdo inteiro do arquivo `gumgum_deploy` (chave **privada**)       |
-| `DEPLOY_KNOWN_HOSTS` | a linha impressa pelo script, ou a saída de `ssh-keyscan -t ed25519 179.236.249.105` |
+| `DEPLOY_KNOWN_HOSTS` | a linha impressa pelo script, ou a saída de `ssh-keyscan -t ed25519 <IP-DA-VPS>` |
 
 Sempre em **Secrets** (nunca em Variables). Crie também o Environment `homologacao`: se os secrets do servidor
 antigo já estão em *Repository secrets*, não precisa cadastrar nada nele (os do repositório valem como padrão e
@@ -133,7 +134,7 @@ Cadastre o Client ID na Variable `GOOGLE_CLIENT_ID` do GitHub e rode um deploy.
 ## Operação
 
 ```bash
-ssh gumgum@179.236.249.105            # as chaves que abrem o root também abrem o gumgum
+ssh gumgum@<IP-DA-VPS>            # as chaves que abrem o root também abrem o gumgum
 pm2 logs gumgumfight                  # logs
 pm2 restart gumgumfight               # reiniciar
 ls ~/apps/gumgumfight/releases        # últimos 5 releases; "current" aponta para o ativo
@@ -149,7 +150,7 @@ Mudar opções do app (`CARD_IMAGES`, `ONLINE_BOT_ROOMS`): edite `shared/deploy.
 ## Segurança (recomendado depois que tudo funcionar)
 
 1. **Chave SSH para o root.** No hPanel → VPS → *Configurações → Chaves SSH*, adicione a chave pública da sua
-   máquina (ou `ssh-copy-id root@179.236.249.105`). Teste `ssh root@179.236.249.105` sem senha.
+   máquina (ou `ssh-copy-id root@<IP-DA-VPS>`). Teste `ssh root@<IP-DA-VPS>` sem senha.
 2. **Desligar login por senha:** `HARDEN_SSH=1 SKIP_UPGRADE=1 bash /root/bootstrap-hostinger.sh`. O script só
    faz isso se o root já tiver uma chave autorizada (para você não ficar trancado para fora).
 3. **Firewall da Hostinger** (hPanel → VPS → Firewall): é opcional, o `ufw` já está ativo na VPS. Se ativar o da

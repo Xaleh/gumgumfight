@@ -13,7 +13,7 @@
 #   4. Cria o usuário "gumgum" (sem sudo), que roda o app e recebe o deploy do GitHub Actions.
 #   5. Cria ~gumgum/apps/gumgumfight/{releases,shared} e shared/deploy.env (lido a cada deploy).
 #   6. Firewall: só SSH, HTTP e HTTPS. fail2ban protege o SSH.
-#   7. Nginx: site para o domínio principal; os outros nomes redirecionam para ele.
+#   7. Nginx: site para o domínio principal (com limite de requisições por IP na API); os outros nomes redirecionam para ele.
 #   8. HTTPS (Let's Encrypt, webroot) para todos os nomes que já apontam para esta VPS.
 #      (.app é um TLD com HTTPS obrigatório nos navegadores: sem certificado o site não abre.)
 #   9. pm2 sobe sozinho no boot. Backup diário do banco (7 dias) em ~gumgum/backups.
@@ -204,14 +204,19 @@ else
   LISTEN_SSL=$'    listen 443 ssl http2;\n    listen [::]:443 ssl http2;'
 fi
 
-PROXY_BLOCK="$(cat <<EOF
-    client_max_body_size 2m;
-    gzip on;
-    gzip_types text/css application/javascript application/json image/svg+xml;
+# Limites por IP (zonas no contexto http, em conf.d): a API não exige login para abrir salas,
+# então o Nginx segura rajadas antes de chegarem ao app. 30 req/s por IP com rajada de 100
+# comporta uma rede inteira (NAT) jogando; um atacante sozinho fica nisso. As conexões
+# simultâneas incluem os canais SSE (um por jogador/espectador): 64 por IP.
+cat > /etc/nginx/conf.d/gumgumfight-limits.conf <<EOF
+# GumGum Fight — gerado por deploy/bootstrap-hostinger.sh
+limit_req_zone \$binary_remote_addr zone=gumgum_api:10m rate=30r/s;
+limit_conn_zone \$binary_remote_addr zone=gumgum_conn:10m;
+limit_req_status 429;
+limit_conn_status 429;
+EOF
 
-    location ^~ /.well-known/acme-challenge/ { root $WEBROOT; }
-
-    location / {
+PROXY_SETTINGS="$(cat <<EOF
         proxy_pass http://127.0.0.1:$PORT;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -221,6 +226,24 @@ PROXY_BLOCK="$(cat <<EOF
         # SSE (partidas online): o app manda um ping a cada 20 s e pede para não bufferizar.
         proxy_buffering off;
         proxy_read_timeout 90s;
+EOF
+)"
+
+PROXY_BLOCK="$(cat <<EOF
+    client_max_body_size 2m;
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    location ^~ /.well-known/acme-challenge/ { root $WEBROOT; }
+
+    location /api/ {
+        limit_req zone=gumgum_api burst=100 nodelay;
+        limit_conn gumgum_conn 64;
+$PROXY_SETTINGS
+    }
+
+    location / {
+$PROXY_SETTINGS
     }
 EOF
 )"

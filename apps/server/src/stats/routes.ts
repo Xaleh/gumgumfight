@@ -2,6 +2,7 @@
 
 import { type Action, type CardData, type DeckList, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
 import type { ApiCard } from '../present';
 import { FORMATS, type FormatId, isFormat, isQueue, isTier, QUEUES, TIERS, tierFor } from './catalog';
@@ -51,7 +52,13 @@ function parseDeck(v: unknown): DeckList | null {
   return { id: String(d.id ?? ''), name: String(d.name ?? '').slice(0, 60), leader: d.leader, cards };
 }
 
+/** Validade das estatísticas em cache (cada partida gravada já as invalida). */
+const STATS_TTL_MS = 30_000;
+
 export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, present }: Deps) {
+  const cache = new ResponseCache();
+  /** Chave do cache: a rota com a query e, quando a resposta depende de quem pede, o dono. */
+  const cacheKey = (req: FastifyRequest, personal: boolean) => `${req.url}|${personal ? (viewerHash(req) ?? '-') : ''}`;
   /** Nome, cores e imagem das cartas citadas numa resposta. */
   const cardInfo = (ids: Iterable<string>) => {
     const out: Record<string, { name: string; category: string; colors: string[]; imageUrl?: string }> = {};
@@ -124,21 +131,23 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
   });
 
   /** Opções dos filtros: formatos, filas, tiers, Líderes com partidas e o perfil do jogador. */
-  app.get('/api/stats/meta', async (req) => {
-    const owner = viewerHash(req);
-    const me = owner ? findPlayer(db, owner) : null;
-    const { leaders } = statsDimensions(db);
-    const decks = me ? myDecks(db, me.id) : [];
-    return {
-      formats: FORMATS,
-      queues: QUEUES,
-      tiers: TIERS,
-      leaders,
-      me: me ? profile(me) : null,
-      myDecks: decks,
-      cards: cardInfo([...leaders.map((l) => l.leader), ...decks.map((d) => d.leader)]),
-    };
-  });
+  app.get('/api/stats/meta', async (req, reply) =>
+    cache.send(req, reply, cacheKey(req, true), STATS_TTL_MS, () => {
+      const owner = viewerHash(req);
+      const me = owner ? findPlayer(db, owner) : null;
+      const { leaders } = statsDimensions(db);
+      const decks = me ? myDecks(db, me.id) : [];
+      return {
+        formats: FORMATS,
+        queues: QUEUES,
+        tiers: TIERS,
+        leaders,
+        me: me ? profile(me) : null,
+        myDecks: decks,
+        cards: cardInfo([...leaders.map((l) => l.leader), ...decks.map((d) => d.leader)]),
+      };
+    }),
+  );
 
   const parseFilter = (req: FastifyRequest<{ Querystring: Query }>): StatsFilter => {
     const q = req.query;
@@ -164,30 +173,36 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
   };
 
   /** Visão geral: totais, Líderes e matchups. */
-  app.get<{ Querystring: Query }>('/api/stats', async (req) => {
-    const f = parseFilter(req);
-    const leaders = leaderStats(db, f);
-    const matchups = matchupStats(db, f);
-    return {
-      summary: summary(db, f),
-      leaders,
-      matchups,
-      cards: cardInfo([...leaders.map((l) => l.leader), ...matchups.map((m) => m.oppLeader)]),
-    };
-  });
+  app.get<{ Querystring: Query }>('/api/stats', async (req, reply) =>
+    cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
+      const f = parseFilter(req);
+      const leaders = leaderStats(db, f);
+      const matchups = matchupStats(db, f);
+      return {
+        summary: summary(db, f),
+        leaders,
+        matchups,
+        cards: cardInfo([...leaders.map((l) => l.leader), ...matchups.map((m) => m.oppLeader)]),
+      };
+    }),
+  );
 
   /** Tendência semanal: uso e vitórias por Líder nas últimas semanas (padrão 6, máximo 26). */
-  app.get<{ Querystring: Query }>('/api/stats/trend', async (req) => {
-    const weeks = Math.min(26, Math.max(2, Math.floor(Number(req.query.weeks) || 6)));
-    const t = trendStats(db, parseFilter(req), weeks);
-    return { ...t, cards: cardInfo(t.rows.map((r) => r.leader)) };
-  });
+  app.get<{ Querystring: Query }>('/api/stats/trend', async (req, reply) =>
+    cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
+      const weeks = Math.min(26, Math.max(2, Math.floor(Number(req.query.weeks) || 6)));
+      const t = trendStats(db, parseFilter(req), weeks);
+      return { ...t, cards: cardInfo(t.rows.map((r) => r.leader)) };
+    }),
+  );
 
   /** Cartas de um Líder (ou de uma lista): efetividade no deck, na mão inicial, compradas e jogadas. */
   app.get<{ Querystring: Query }>('/api/stats/cards', async (req, reply) => {
-    const f = parseFilter(req);
-    if (!f.leader && !f.deckHash) return reply.code(400).send({ error: 'Escolha um Líder ou uma lista.' });
-    const rows = cardStats(db, f);
-    return { summary: summary(db, f), rows, cards: cardInfo(rows.map((r) => r.cardId).concat(f.leader ?? [])) };
+    if (!req.query.leader && !req.query.deck) return reply.code(400).send({ error: 'Escolha um Líder ou uma lista.' });
+    return cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
+      const f = parseFilter(req);
+      const rows = cardStats(db, f);
+      return { summary: summary(db, f), rows, cards: cardInfo(rows.map((r) => r.cardId).concat(f.leader ?? [])) };
+    });
   });
 }

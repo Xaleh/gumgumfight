@@ -18,7 +18,7 @@ import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
-import { Lobby, type LobbyError, type SeatRequest } from './lobby';
+import { Lobby, type LobbyError, type LobbyLimits, type SeatRequest } from './lobby';
 import { type Connection, MAX_SPECTATORS, type Room, type RoomData, type RoomResult, TIME_BANK_MS } from './room';
 
 interface Deps {
@@ -32,6 +32,8 @@ interface Deps {
   rateLimit?: number;
   /** Treino contra o bot do servidor (ONLINE_BOT_ROOMS). */
   botRooms?: boolean;
+  /** Tetos de salas (servidor e por IP); ver `DEFAULT_LIMITS` em lobby.ts. */
+  limits?: Partial<LobbyLimits>;
   botDelayMs?: number;
   /** Fim de uma partida de torneio: lança o resultado no torneio. */
   onTournamentGame?: (game: { tournamentId: string; matchId: number; roomId: string; winner: string | null; statsMatchId: number | null }) => void;
@@ -109,6 +111,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     now: deps.now,
     rateLimit: deps.rateLimit,
     botDelayMs: deps.botDelayMs,
+    limits: deps.limits,
     log: (msg) => app.log.warn(msg),
   });
   const botRooms = deps.botRooms ?? true;
@@ -183,8 +186,11 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const format = formatOf(req.body?.format);
     const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
+    const limit = lobby.admit(req.ip);
+    if (limit) return reply.code(limit.code).send(limit);
     const r = lobby.createPrivate(seat, format);
     if (isError(r)) return reply.code(r.code).send(r);
+    lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, code: r.room.data.code, token: r.token });
   });
 
@@ -195,8 +201,11 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (!format) return reply.code(404).send({ error: 'Sala não encontrada ou já começou.' });
     const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
+    const limit = lobby.admit(req.ip);
+    if (limit) return reply.code(limit.code).send(limit);
     const r = lobby.joinPrivate(code, seat);
     if (isError(r)) return reply.code(r.code).send(r);
+    lobby.tagIp(r.room.id, req.ip);
     return { roomId: r.room.id, token: r.token };
   });
 
@@ -205,7 +214,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const format = formatOf(req.body?.format);
     const seat = seatFor(req, req.body, queue === 'ranked', format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
-    const r = lobby.enqueue(seat, format, queue);
+    const limit = lobby.admit(req.ip);
+    if (limit) return reply.code(limit.code).send(limit);
+    const r = lobby.enqueue(seat, format, queue, req.ip);
     if (isError(r)) return reply.code(r.code).send(r);
     return reply.code(201).send(r);
   });
@@ -229,6 +240,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const format = formatOf(req.body?.format);
     const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
+    const limit = lobby.admit(req.ip, 'bot');
+    if (limit) return reply.code(limit.code).send(limit);
     let botDeckId = req.body?.botDeckId;
     if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
       const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false)));
@@ -240,6 +253,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: botDeck.id!, deck: botDeck };
     const r = lobby.createBotRoom(seat, bot, format);
     if (isError(r)) return reply.code(r.code).send(r);
+    lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, token: r.token });
   });
 

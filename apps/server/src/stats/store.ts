@@ -2,6 +2,7 @@
 
 import { randomBytes } from 'node:crypto';
 import type { DeckList, PlayerId } from '@gumgum/engine';
+import { dataVersion } from '../cache';
 import { type DB, transaction } from '../db';
 import { bountyDelta, type Controller, type FormatId, type QueueId, START_BOUNTY, tierFor } from './catalog';
 import type { MatchFacts, ReplayInput } from './derive';
@@ -38,6 +39,7 @@ export function ensurePlayer(db: DB, ownerHash: string): Player {
 export function renamePlayer(db: DB, ownerHash: string, name: string): Player {
   const p = ensurePlayer(db, ownerHash);
   db.prepare("UPDATE players SET name = ?, updated_at = datetime('now') WHERE id = ?").run(name, p.id);
+  dataVersion.bump();
   return { ...p, name };
 }
 
@@ -64,6 +66,7 @@ export interface MatchInput {
  * partida, para os filtros refletirem o nível em que ela foi jogada.
  */
 export function recordMatch(db: DB, m: MatchInput, facts: MatchFacts): number {
+  dataVersion.bump();
   return transaction(db, () => {
     const { replay } = m;
     const matchId = Number(

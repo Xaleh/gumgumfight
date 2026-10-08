@@ -5,7 +5,7 @@
 > CPU e banda foram **medidos** no pacote de produção (`npm run build:release`) na data abaixo; o modelo de
 > capacidade usa esses números como base.
 >
-> Última revisão: 2026-10-08 (commit `bcf02e2`). Fonte da verdade é sempre o código; os caminhos citados são
+> Última revisão: 2026-10-08. Fonte da verdade é sempre o código; os caminhos citados são
 > relativos à raiz do repositório.
 
 ## Sumário
@@ -250,7 +250,13 @@ não jogar bem. É o mesmo bot usado no navegador (contra o bot) e no servidor (
 - **Sem login**: o navegador gera `gumgum.owner` (24 bytes aleatórios em hex) e manda em **todo** fetch no header
   `x-deck-owner`. O servidor guarda só `sha256(token)` (`owner_hash`).
 - **Com login**: o cookie `gg_session` identifica a conta; o dono passa a ser `user:<id>`.
-- Rate limit só nas ações das salas (60 ações / 10 s por assento) e nos emotes (1 / 3 s). Não há rate limit global.
+- Rate limit nas ações das salas (60 ações / 10 s por assento) e nos emotes (1 / 3 s).
+- **Tetos de salas** (`online/lobby.ts`, `DEFAULT_LIMITS`, conferidos em `lobby.admit` antes de criar sala, entrar numa,
+  entrar na fila ou abrir treino contra o bot): 400 salas ativas no servidor (`ONLINE_MAX_ROOMS`, 503 acima), 10 salas de
+  bot (`ONLINE_MAX_BOT_ROOMS`, 503), 16 salas ou lugares na fila por IP ao mesmo tempo (429) e 60 criações por IP a cada
+  10 min (429). Os IPs ficam só em memória (nunca no banco). Partidas de torneio só passam pelo teto global.
+- **Rate limit por IP no Nginx** (scripts de deploy): `/api/` com 30 req/s por IP, rajada de 100, e 64 conexões
+  simultâneas por IP (os canais SSE contam). Acima disso, 429 antes de chegar ao app.
 
 ### Limites de corpo
 
@@ -260,8 +266,11 @@ partida local (`POST /api/matches`, ~7–10 KB).
 ### Concorrência
 
 Tudo roda num único event loop. **`node:sqlite` é síncrono**: cada consulta bloqueia o loop enquanto dura. As
-consultas de estatísticas (`GROUP BY` sobre `match_seats`/`match_cards`) são as únicas potencialmente longas; ver
-seção 15.
+consultas de estatísticas (`GROUP BY` sobre `match_seats`/`match_cards`) e o torneio completo são as potencialmente
+longas; por isso as respostas de `GET /api/stats*` e `GET /api/tournaments/:id` ficam em cache (`cache.ts`,
+`ResponseCache`): a entrada vale enquanto a versão global dos dados (`dataVersion`, incrementada por toda gravação de
+partida, torneio ou nome de jogador) não muda, com TTL de segurança (30 s e 5 s), e sai com `ETag` +
+`Cache-Control: private, no-cache`, então o navegador manda `If-None-Match` e recebe 304 sem corpo quando nada mudou.
 
 ---
 
@@ -310,7 +319,7 @@ reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do prot
 | Menu (bloco meta) | `GET /api/stats?days=7` | 5 min | aba visível |
 | Assistir partidas | `GET /api/online/live` | 5 s | sempre, enquanto a lista está aberta |
 | Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila |
-| Página do torneio | `GET /api/tournaments/:id` | 5 s | torneio `running` |
+| Página do torneio | `GET /api/tournaments/:id` | 5 s | torneio `running` (304 sem corpo quando nada mudou) |
 | Partida online | `ping` SSE (servidor → cliente) | 20 s | canal aberto |
 
 ### Imagens
@@ -734,8 +743,8 @@ importa `IMPORT_SETS` se pedido; o workflow então confere `https://<site>/api/h
 | Plano | **KVM 1** (segundo o catálogo da Hostinger: 1 vCPU, 4 GB RAM, 50 GB NVMe, 4 TB de tráfego/mês — conferir no hPanel). O script de bootstrap assume 4 GB de RAM e cria 2 GB de swap (`vm.swappiness=10`) |
 | SO | Ubuntu, `apt upgrade` no bootstrap |
 | Domínios | `gumgumfight.app` (principal, HSTS obrigatório no TLD `.app`); `www`, `gumgumfight.cloud`, `www.gumgumfight.cloud` → 301 |
-| Processo | pm2, app `gumgumfight`, usuário `gumgum` (sem sudo), `fork`, 1 instância, `autorestart`, **`max_memory_restart: 400M`**, `--disable-warning=ExperimentalWarning`, `HOST=127.0.0.1`, `PORT=3310` |
-| Nginx | `proxy_pass http://127.0.0.1:3310`, HTTP/1.1, `proxy_buffering off`, `proxy_read_timeout 90s`, `client_max_body_size 2m`, `gzip_types text/css application/javascript application/json image/svg+xml` (**SSE não é comprimido**), HTTP/2 quando disponível, ACME webroot |
+| Processo | pm2, app `gumgumfight`, usuário `gumgum` (sem sudo), `fork`, 1 instância, `autorestart`, **`max_memory_restart: 1500M`** (`PM2_MAX_MEMORY` em `deploy.env`), `--disable-warning=ExperimentalWarning`, `HOST=127.0.0.1`, `PORT=3310` |
+| Nginx | `proxy_pass http://127.0.0.1:3310`, HTTP/1.1, `proxy_buffering off`, `proxy_read_timeout 90s`, `client_max_body_size 2m`, `gzip_types text/css application/javascript application/json image/svg+xml` (**SSE não é comprimido**), HTTP/2 quando disponível, ACME webroot. Em `location /api/`: `limit_req` 30 r/s por IP (rajada 100) e `limit_conn` 64 por IP (`/etc/nginx/conf.d/gumgumfight-limits.conf`) |
 | TLS | Let's Encrypt via certbot (`certbot.timer` renova; hook recarrega o Nginx) |
 | Firewall | ufw: 22, 80, 443. fail2ban no SSH. Opção `HARDEN_SSH=1` desliga senha do root |
 | Banco | `~gumgum/apps/gumgumfight/shared/gumgum.db`; backup diário 04:15 (7 cópias) |
@@ -834,7 +843,7 @@ até 20.000 navegadores lembrados (~2 MB).
 | Tela "Assistir partidas" aberta | (0,5 KB + 1 KB × salas listadas) / 5 s | idem |
 | Jogador numa partida | ~1 KB/s médio | 1,6 ms + 0,35 ms × conexões, por ação |
 | Espectador | ~1 KB/s médio | 0,35 ms por ação da partida |
-| Página de torneio em andamento | ~(0,3 KB × jogadores + 0,1 KB × partidas) gzip / 5 s → 32 jogadores ≈ 1 KB/s, 128 ≈ 3 KB/s | consulta com joins a cada 5 s por jogador |
+| Página de torneio em andamento | ~0,1 KB/s (304 sem corpo); ~(0,3 KB × jogadores + 0,1 KB × partidas) gzip só quando algo muda | consulta servida do cache; o SQL roda uma vez por mudança |
 | Partida contra o bot no navegador | 0 durante o jogo; ~9 KB no fim (`POST /api/matches`) | 55 ms no fim |
 
 ### Cenários de carga simultânea
@@ -845,16 +854,17 @@ Premissas: partida de 20 min com 130 ações; espectadores distribuídos; todos 
 |---|---|---|---|---|---|---|---|---|
 | **A — hoje/pequeno** | 10 | 20 | 50 | — | ~50 KB/s (0,4 Mbit/s) | 0,2 GB | < 1 % | ~110 MB |
 | **B — médio** | 50 | 100 | 300 | 32 jogadores | ~290 KB/s (2,3 Mbit/s) | 1,0 GB | ~3 % | ~200 MB |
-| **C — grande** | 200 | 500 | 1.000 | 128 jogadores | ~1,4 MB/s (11 Mbit/s) | 5 GB | ~20 % (metade é o polling do torneio) | **~570 MB** |
-| **D — muito grande** | 500 | 1.500 | 3.000 | 256 jogadores | ~3,6 MB/s (29 Mbit/s) | 13 GB | ~50–60 % (dominado pelo polling do torneio e por GC; estimativa) | **~1,3 GB** |
+| **C — grande** | 200 | 500 | 1.000 | 128 jogadores | ~1,1 MB/s (9 Mbit/s) | 4 GB | ~10 % | **~570 MB** |
+| **D — muito grande** | 500 | 1.500 | 3.000 | 256 jogadores | ~2,9 MB/s (23 Mbit/s) | 10 GB | ~25–30 % (partidas + GC; estimativa) | **~1,3 GB** |
 
 Leitura: a **banda não é o gargalo** da VPS (link de centenas de Mbit/s; 4 TB/mês comportam o cenário C durante
-8 h/dia o mês inteiro, ~1,2 TB). A **CPU** de um core só começa a pesar no cenário D, e principalmente por causa do
-polling da página do torneio (uma consulta com joins a cada 5 s por jogador inscrito), de consultas SQL síncronas
-e de pausas de GC, não das partidas em si (as 500 partidas de D custam ~18 % do core). O primeiro limite real é a **memória do processo**: o
-pm2 reinicia o app ao passar de **400 MB** (`max_memory_restart`), o que derruba todos os canais SSE por alguns
-segundos (as salas voltam do banco e os navegadores reconectam, mas é uma interrupção visível). Com o número de
-planejamento de 2 MB/sala, isso acontece por volta de **150 partidas simultâneas**.
+8 h/dia o mês inteiro, ~1 TB). A **CPU** de um core só começa a pesar no cenário D, por causa das partidas e das
+pausas de GC (o polling da página do torneio era o maior custo, e passou a ser servido do cache). O primeiro limite
+real é a **memória do processo**: o pm2 reinicia o app ao passar de `max_memory_restart` (hoje **1500 MB**; era 400 MB),
+o que derruba todos os canais SSE por alguns segundos (as salas voltam do banco e os navegadores reconectam, mas é
+uma interrupção visível). Com o número de planejamento de 2 MB/sala, isso aconteceria perto de 600 partidas
+simultâneas; antes disso o teto de **400 salas ativas** (`ONLINE_MAX_ROOMS`) responde 503 a salas novas, protegendo
+as partidas em andamento.
 
 ---
 
@@ -874,9 +884,9 @@ planejamento de 2 MB/sala, isso acontece por volta de **150 partidas simultânea
 
 ### Passos, do mais barato ao mais caro
 
-1. **Configuração, sem código (1 h).** Na VPS de 4 GB, subir `max_memory_restart` para `1500M` em
-   `deploy/ecosystem.config.cjs` (e, se preciso, `node_args: '--max-old-space-size=1536'`). Isso leva o teto de ~150
-   para ~600 partidas simultâneas sem mexer em mais nada. Manter a swap de 2 GB como rede de segurança.
+1. **Configuração, sem código (1 h).** Já feito: `max_memory_restart` em `1500M` (`PM2_MAX_MEMORY` em `deploy.env`)
+   e teto de 400 salas (`ONLINE_MAX_ROOMS`). Para ir além, subir os dois juntos (2 MB por sala como regra) e, se preciso,
+   `node_args: '--max-old-space-size=…'`. Manter a swap de 2 GB como rede de segurança.
 2. **Otimizações no código (dias), na ordem de retorno:**
    - **Fan-out compartilhado no espectador**: calcular `viewFor(state, null)` e o JSON uma vez por ação e enviar o
      mesmo buffer a todos os espectadores sem mãos (hoje é uma vez por conexão). Corta o custo por espectador de
@@ -884,8 +894,8 @@ planejamento de 2 MB/sala, isso acontece por volta de **150 partidas simultânea
    - **Deltas no `state`**: mandar só o que mudou (ou o estado comprimido) em vez de ~9,5 KB por ação. Reduz a banda
      do SSE em ~80 %. Alternativa mais simples: ligar compressão no canal (`Content-Encoding: gzip` com flush por
      evento no próprio Node, já que o Nginx não comprime `text/event-stream` com `proxy_buffering off`).
-   - **Cache curto (30–60 s) com ETag** em `GET /api/stats*`, `GET /api/tournaments/:id` (consultada a cada 5 s por
-     jogador) e `GET /api/online/live`. Remove quase todo o custo do polling.
+   - **Cache com ETag em `GET /api/online/live`** (a lista "Assistir" consulta a cada 5 s). Estatísticas e torneio
+     completo já ficam em cache com ETag (`cache.ts`).
    - **`GET /api/cards` com `ETag`/`Last-Modified`** (máximo de `cards.updated_at`) e `Cache-Control`. Evita ~280 KB
      por abertura do construtor.
    - **Consultas pesadas de estatísticas num `worker_thread`** com a própria conexão `DatabaseSync` (SQLite em WAL
@@ -913,11 +923,11 @@ planejamento de 2 MB/sala, isso acontece por volta de **150 partidas simultânea
 |---|---|---|---|
 | **Ponto único de falha**: um processo, uma máquina, um arquivo | tudo | pm2 `autorestart`, salas persistidas em `live_matches`, backup diário | monitoramento externo de `/api/health`; passo 4 da seção 15 a longo prazo |
 | **SQLite síncrono bloqueia o event loop** | `node:sqlite` | consultas hoje levam ms; índices em `match_seats`/`match_cards` | cache de stats; worker thread |
-| **Reinício por memória em 400 MB** | `ecosystem.config.cjs` | salas voltam do banco | subir o limite (seção 15, passo 1) |
+| **Reinício por memória** (1500 MB) | `ecosystem.config.cjs` | salas voltam do banco; o teto de 400 salas segura antes | subir os dois juntos ao escalar (seção 15) |
 | **SSE sem compressão e sem deltas** | `online/room.ts` `snapshot` | — | deltas / gzip no Node |
-| **Polling de 5 s na página do torneio** por jogador | `Tournaments.tsx` | — | ETag + cache ou SSE do torneio |
+| **Polling de 5 s na página do torneio** por jogador | `Tournaments.tsx` | cache no servidor + ETag/304 (`cache.ts`) | SSE do torneio, se o volume crescer |
 | **Hotlink das imagens** em `optcgapi.com` / `optcgleaks.com` (podem bloquear, mudar URL ou sair do ar) | `imageUrl` | fallback para a carta desenhada; `CARD_IMAGES=off` | cache/proxy próprio de imagens (custaria ~50–100 KB × cartas de banda e disco) |
-| **Sem rate limit global** nas rotas HTTP (só ações e emotes nas salas) | `app.ts` | ufw/fail2ban só no SSH | `limit_req` no Nginx para `/api/` |
+| **Abrir salas não exige login** (o código do navegador é gerado à vontade) | `online/routes.ts` | tetos de salas por servidor e por IP (`lobby.admit`), `limit_req`/`limit_conn` no Nginx | acompanhar os 429/503 nos logs e ajustar `DEFAULT_LIMITS` |
 | **Token do assento no `live_matches`** em texto | `RoomData.seats[].token` | arquivo só legível pelo usuário `gumgum` | guardar hash |
 | **Importador sem retry/backoff** | `card-import.ts` | roda poucas vezes | retry com espera |
 | **Cartas ⚙ (efeito não automatizado)** | `parser.ts` coverage | `/api/coverage`, proibidas na ranqueada | continuar ampliando parser/scripts |
@@ -940,6 +950,8 @@ planejamento de 2 MB/sala, isso acontece por volta de **150 partidas simultânea
 | `GOOGLE_CLIENT_ID` | vazio (login desligado) | OAuth Web client |
 | `ADMIN_EMAILS` | vazio | contas que viram Admin ao entrar |
 | `ONLINE_BOT_ROOMS` | `on` | treino online contra o bot do servidor |
+| `ONLINE_MAX_ROOMS` / `ONLINE_MAX_BOT_ROOMS` | `400` / `10` | tetos de salas ativas (todas / treino contra o bot) |
+| `PM2_MAX_MEMORY` | `1500M` | só em `shared/deploy.env` da VM: memória em que o pm2 reinicia o app |
 | `NODE_ENV` | — | `production` desliga a leitura do `.env`; `test` desliga o sync |
 
 ### B. Rotas da API

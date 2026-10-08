@@ -19,7 +19,18 @@ export interface ServerOptions {
    * essas salas deixam de aparecer na lista de partidas para assistir.
    */
   onlineBotRooms?: boolean;
+  /**
+   * ONLINE_MAX_ROOMS / ONLINE_MAX_BOT_ROOMS: tetos de salas ativas no servidor (todas e
+   * só as de treino contra o bot). Cada sala custa memória e CPU, e criar uma não exige
+   * login; os padrões estão em online/lobby.ts (DEFAULT_LIMITS).
+   */
+  onlineLimits?: { maxRooms?: number; maxBotRooms?: number };
 }
+
+const positiveInt = (v: string | undefined) => {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+};
 
 export const parseEmails = (v: string | undefined) =>
   (v ?? '')
@@ -32,6 +43,7 @@ export const serverOptions: ServerOptions = {
   googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
   adminEmails: parseEmails(process.env.ADMIN_EMAILS),
   onlineBotRooms: !off(process.env.ONLINE_BOT_ROOMS),
+  onlineLimits: { maxRooms: positiveInt(process.env.ONLINE_MAX_ROOMS), maxBotRooms: positiveInt(process.env.ONLINE_MAX_BOT_ROOMS) },
 };
 
 /**

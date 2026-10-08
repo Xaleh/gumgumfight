@@ -16,6 +16,7 @@
 import { randomInt } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, type User } from '../auth/store';
+import { dataVersion, ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
 import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
@@ -159,7 +160,11 @@ function parseScore(body: { wins?: unknown; result?: unknown } | undefined, best
   return [w[0], w[1]];
 }
 
+/** Validade do torneio completo em cache (só por garantia: cada gravação já o invalida). */
+const DETAIL_TTL_MS = 5_000;
+
 export function registerTournamentRoutes(app: FastifyInstance, { db, user, present, lobby, cardImages }: Deps) {
+  const cache = new ResponseCache();
   /** Conta logada, ou responde 401. */
   const account = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = user(req);
@@ -322,9 +327,16 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     };
   };
 
+  /**
+   * A página do torneio consulta esta rota a cada 5 s por jogador: a resposta fica em
+   * cache (por torneio e conta, invalidado a cada gravação) e sai como 304 quando o
+   * navegador já a tem.
+   */
   app.get<{ Params: { id: string } }>('/api/tournaments/:id', async (req, reply) => {
     const t = getTournament(db, req.params.id);
-    return t ? detail(t, user(req)) : reply.code(404).send({ error: 'Torneio não encontrado.' });
+    if (!t) return reply.code(404).send({ error: 'Torneio não encontrado.' });
+    const u = user(req);
+    return cache.send(req, reply, `tournament:${t.id}:${u?.id ?? '-'}`, DETAIL_TTL_MS, () => detail(t, u));
   });
 
   // ---------------------------------------------------------------- organizador
@@ -541,6 +553,8 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     if (m.result) return reply.code(409).send({ error: 'Esta partida já tem resultado.' });
     const player = listPlayers(db, t.id).find((p) => p.userId === me.id)!;
     if (player.dropped) return reply.code(409).send({ error: 'Você saiu do torneio.' });
+    const limit = lobby.admit(req.ip, 'tournament');
+    if (limit) return reply.code(limit.code).send(limit);
     const ownerHash = accountOwnerKey(me.id);
     const profile = ensurePlayer(db, ownerHash);
     const r = lobby.tournamentRoom(
@@ -567,7 +581,10 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
       },
     );
     if ('error' in r) return reply.code(r.code).send(r);
+    lobby.tagIp(r.room.id, req.ip);
     if (m.roomId !== r.room.id) setMatchRoom(db, t.id, m.id, r.room.id);
+    // A sala mudou de estado (criada ou começou): a página do torneio mostra isso.
+    dataVersion.bump();
     return { roomId: r.room.id, token: r.token };
   });
 }

@@ -2,6 +2,7 @@
 
 import { randomBytes } from 'node:crypto';
 import type { DeckList } from '@gumgum/engine';
+import { dataVersion } from '../cache';
 import { type DB, transaction } from '../db';
 import type { FormatId } from '../stats/catalog';
 import { type MatchResult, type Pairing, type Stage, type Structure, type TMatch, type TPlayer, winsNeeded } from './pairing';
@@ -107,6 +108,7 @@ const TOURNAMENT_COLS = 't.*, p.name AS organizer_name';
 const TOURNAMENT_FROM = `FROM tournaments t LEFT JOIN players p ON p.owner_hash = 'user:' || t.organizer_id`;
 
 export function createTournament(db: DB, input: TournamentInput, organizerId: string): Tournament {
+  dataVersion.bump();
   const id = `t-${randomBytes(5).toString('hex')}`;
   db.prepare(
     `INSERT INTO tournaments (id, name, description, format, structure, rounds, swiss_best_of, top_cut, bo3_from, bo5_from,
@@ -117,6 +119,7 @@ export function createTournament(db: DB, input: TournamentInput, organizerId: st
 }
 
 export function updateTournament(db: DB, id: string, input: TournamentInput) {
+  dataVersion.bump();
   db.prepare(
     `UPDATE tournaments SET name = ?, description = ?, format = ?, structure = ?, rounds = ?, swiss_best_of = ?, top_cut = ?,
        bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?
@@ -128,6 +131,7 @@ const inputValues = (i: TournamentInput) =>
   [i.name, i.description, i.format, i.structure, i.rounds, i.swissBestOf, i.topCut, i.bo3From, i.bo5From, i.maxPlayers, i.startsAt] as const;
 
 export function deleteTournament(db: DB, id: string): boolean {
+  dataVersion.bump();
   return Number(db.prepare('DELETE FROM tournaments WHERE id = ?').run(id).changes) > 0;
 }
 
@@ -190,6 +194,7 @@ export function listPlayers(db: DB, tournamentId: string): TournamentPlayer[] {
 
 /** Inscreve (ou troca o deck de quem já está inscrito). */
 export function registerPlayer(db: DB, tournamentId: string, userId: string, name: string, deckId: string | null, deck: DeckList) {
+  dataVersion.bump();
   db.prepare(
     `INSERT INTO tournament_players (tournament_id, user_id, name, deck_id, deck) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(tournament_id, user_id) DO UPDATE SET name = excluded.name, deck_id = excluded.deck_id, deck = excluded.deck`,
@@ -197,6 +202,7 @@ export function registerPlayer(db: DB, tournamentId: string, userId: string, nam
 }
 
 export function unregisterPlayer(db: DB, tournamentId: string, userId: string): boolean {
+  dataVersion.bump();
   return Number(db.prepare('DELETE FROM tournament_players WHERE tournament_id = ? AND user_id = ?').run(tournamentId, userId).changes) > 0;
 }
 
@@ -209,6 +215,7 @@ export function countPlayers(db: DB, tournamentId: string): number {
  * dele na rodada atual ainda não tem resultado, o oponente vence.
  */
 export function dropPlayer(db: DB, t: Tournament, userId: string) {
+  dataVersion.bump();
   transaction(db, () => {
     db.prepare('UPDATE tournament_players SET dropped = 1 WHERE tournament_id = ? AND user_id = ?').run(t.id, userId);
     db.prepare(
@@ -278,6 +285,7 @@ export interface RoundSpec {
 
 /** Começa o torneio: grava a ordem sorteada, o número de rodadas e a primeira rodada. */
 export function startTournament(db: DB, id: string, seeds: string[], rounds: number, first: RoundSpec) {
+  dataVersion.bump();
   transaction(db, () => {
     const seed = db.prepare('UPDATE tournament_players SET seed = ? WHERE tournament_id = ? AND user_id = ?');
     seeds.forEach((userId, i) => seed.run(i + 1, id, userId));
@@ -288,6 +296,7 @@ export function startTournament(db: DB, id: string, seeds: string[], rounds: num
 
 /** Grava a rodada (byes já saem com resultado) e a torna a rodada atual. */
 export function insertRound(db: DB, id: string, spec: RoundSpec) {
+  dataVersion.bump();
   transaction(db, () => writeRound(db, id, spec));
 }
 
@@ -301,6 +310,7 @@ function writeRound(db: DB, id: string, { round, stage, bestOf, pairings }: Roun
 }
 
 export function finishTournament(db: DB, id: string) {
+  dataVersion.bump();
   db.prepare("UPDATE tournaments SET status = 'finished', finished_at = datetime('now') WHERE id = ?").run(id);
 }
 
@@ -310,6 +320,7 @@ export const seriesResult = (bestOf: number, wins: [number, number]): MatchResul
 
 /** Placar lançado pelo organizador (0 x 0 apaga o resultado). */
 export function setMatchScore(db: DB, tournamentId: string, id: number, bestOf: number, wins: [number, number], reportedBy: string) {
+  dataVersion.bump();
   const result = seriesResult(bestOf, wins);
   db.prepare(
     `UPDATE tournament_matches SET wins1 = ?, wins2 = ?, result = ?, reported_by = ?, updated_at = datetime('now')
@@ -319,6 +330,7 @@ export function setMatchScore(db: DB, tournamentId: string, id: number, bestOf: 
 
 /** Troca um jogador de uma partida ainda não jogada (correção de um resultado da rodada anterior da chave). */
 export function replaceInMatch(db: DB, tournamentId: string, id: number, from: string, to: string) {
+  dataVersion.bump();
   db.prepare(
     `UPDATE tournament_matches SET p1 = CASE WHEN p1 = ? THEN ? ELSE p1 END, p2 = CASE WHEN p2 = ? THEN ? ELSE p2 END,
        updated_at = datetime('now') WHERE tournament_id = ? AND id = ?`,
@@ -326,6 +338,7 @@ export function replaceInMatch(db: DB, tournamentId: string, id: number, from: s
 }
 
 export function setMatchRoom(db: DB, tournamentId: string, id: number, roomId: string) {
+  dataVersion.bump();
   db.prepare('UPDATE tournament_matches SET room_id = ? WHERE tournament_id = ? AND id = ?').run(roomId, tournamentId, id);
 }
 
@@ -339,6 +352,7 @@ export function reportFromGame(
   db: DB,
   game: { tournamentId: string; matchId: number; roomId: string; winner: string | null; statsMatchId: number | null },
 ) {
+  dataVersion.bump();
   const t = getTournament(db, game.tournamentId);
   const m = t && getMatch(db, t.id, game.matchId);
   if (!t || !m || t.status !== 'running' || m.roomId !== game.roomId) return;

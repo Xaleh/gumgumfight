@@ -30,14 +30,27 @@ import {
 } from './db';
 import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
+import type { LobbyLimits } from './online/lobby';
 import { registerOnlineRoutes } from './online/routes';
 import { registerStatsRoutes } from './stats/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
 import { reportFromGame } from './tournaments/store';
 
+/** Objeto sem as chaves `undefined` (para não sobrescrever os padrões num spread). */
+const stripUndefined = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+
 export function buildApp(
   db: DB,
-  opts: { logger?: boolean; server?: ServerOptions; googleKeys?: GoogleKeys; /** Testes: relógio, limite de ações e atraso do bot nas partidas online. */ now?: () => number; onlineRateLimit?: number; botDelayMs?: number } = {},
+  opts: {
+    logger?: boolean;
+    server?: ServerOptions;
+    googleKeys?: GoogleKeys;
+    /** Testes: relógio, limite de ações, atraso do bot e tetos de salas nas partidas online. */
+    now?: () => number;
+    onlineRateLimit?: number;
+    botDelayMs?: number;
+    onlineLimits?: Partial<LobbyLimits>;
+  } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
@@ -231,6 +244,7 @@ export function buildApp(
     rateLimit: opts.onlineRateLimit,
     botRooms: server.onlineBotRooms ?? true,
     botDelayMs: opts.botDelayMs,
+    limits: { ...stripUndefined(server.onlineLimits ?? {}), ...opts.onlineLimits },
     onTournamentGame: (game) => reportFromGame(db, game),
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
