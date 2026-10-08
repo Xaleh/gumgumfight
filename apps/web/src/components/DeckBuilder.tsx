@@ -17,8 +17,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ApiCard, deckGroups, type DeckSummary } from '../api';
 import { useAuth } from '../auth';
-import { SettingsControls } from '../settings';
-import { CardHoverPreview, CardInfo } from './CardInfo';
+import { useLongPress } from '../hooks/useLongPress';
+import { CardHoverPreview, StaticCardZoom } from './CardInfo';
 import { StaticCard } from './CardView';
 import { Icon } from './Icons';
 
@@ -75,8 +75,20 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHoveredState] = useState<Hovered | null>(null);
   const [textModal, setTextModal] = useState<null | 'import' | 'export'>(null);
-  /** Com mouse, a carta sob o cursor aparece ampliada num popover; no toque, no painel de detalhes. */
+  /** Carta aberta em modal (toque longo). */
+  const [zoom, setZoom] = useState<CardData | null>(null);
+  const closeZoom = useCallback(() => setZoom(null), []);
+  /** Com mouse, a carta sob o cursor aparece ampliada num popover; no toque, segurar o dedo abre o modal. */
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
+  /** Tela estreita: os filtros ficam escondidos atrás do botão "Filtros" para sobrar espaço para as cartas. */
+  const narrow = useMediaQuery('(max-width: 1100px)');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Toque longo numa linha do deck atual: abre a carta dela (um só handler para a lista toda).
+  const entryPress = useLongPress<HTMLDivElement>((e) => {
+    const id = (e.target as HTMLElement).closest<HTMLElement>('.entry')?.dataset.card;
+    const card = id ? byId.get(id) : undefined;
+    if (card) setZoom(card);
+  });
   const setHovered = useCallback((card: CardData | null, anchor?: HTMLElement) => {
     setHoveredState(card && anchor ? { card, anchor } : null);
   }, []);
@@ -129,6 +141,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const confirmDiscard = () => !dirty || window.confirm('Descartar as alterações não salvas deste deck?');
 
   const sets = useMemo(() => [...new Set(allCards.map((c) => c.set ?? c.id.split('-')[0]))].sort(), [allCards]);
+  /** Quantos filtros estão fora do padrão (selo do botão "Filtros" no celular). */
+  const activeFilters = [colors.length > 0, category !== '', cost !== '', set !== '', !onlyCompatible, onlyAutomated].filter(Boolean).length;
   /** Coleções que ainda têm cartas de spoiler (não lançadas na API oficial). */
   const spoilerSets = useMemo(() => new Set(allCards.filter((c) => c.spoiler).map((c) => c.set ?? c.id.split('-')[0])), [allCards]);
 
@@ -324,7 +338,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         <h2>Construtor de decks</h2>
         <div className="builder-decks">
           <button className="btn small primary" onClick={newDeck}>
-            + Novo deck
+            + Novo<span className="wide"> deck</span>
           </button>
           <DeckDropdown
             decks={decks}
@@ -337,7 +351,6 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
             }
           />
         </div>
-        <SettingsControls />
       </header>
 
       {error && (
@@ -349,13 +362,28 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
       <div className="builder-body">
         {/* ------------------------------------------------ catálogo */}
         <section className="builder-catalog">
+          <div className="catalog-top">
           <div className="filters">
-            <input
-              className="search"
-              placeholder="Buscar por nome, número, tipo ou texto…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <div className="search-row">
+              <input
+                className="search"
+                placeholder="Buscar por nome, número, tipo ou texto…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              {narrow && (
+                <button
+                  type="button"
+                  className={['btn small filters-toggle', filtersOpen ? 'on' : ''].join(' ')}
+                  aria-expanded={filtersOpen}
+                  onClick={() => setFiltersOpen((v) => !v)}
+                >
+                  Filtros
+                  {activeFilters > 0 && <span className="filters-count">{activeFilters}</span>}
+                </button>
+              )}
+            </div>
+            <div className={['filters-more', narrow && !filtersOpen ? 'hidden' : ''].join(' ')}>
             <div className="color-chips">
               {COLORS.map((c) => (
                 <button
@@ -405,13 +433,19 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
               <input type="checkbox" checked={onlyAutomated} onChange={(e) => setOnlyAutomated(e.target.checked)} />
               Só efeitos automatizados
             </label>
+            </div>
           </div>
 
           <div className="catalog-hint muted small">
             {choosingLeader
-              ? 'Escolha o Líder do deck: clique em um Líder.'
-              : 'Clique para adicionar · botão direito para remover · passe o mouse para ler o efeito.'}{' '}
+              ? canHover
+                ? 'Escolha o Líder do deck: clique em um Líder.'
+                : 'Toque em um Líder para escolhê-lo · segure: lê o efeito.'
+              : canHover
+                ? 'Clique para adicionar · botão direito para remover · passe o mouse para ler o efeito.'
+                : 'Toque: adiciona · segure: lê o efeito.'}{' '}
             {filtered.length} carta(s).
+          </div>
           </div>
 
           <div className="card-grid">
@@ -427,6 +461,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                     onClick={() => add(c)}
                     onContextMenu={() => remove(c.id)}
                     onHover={setHovered}
+                    onLongPress={setZoom}
                     badge={
                       <>
                         {n > 0 && <span className="copies">{n}/{MAX_COPIES}</span>}
@@ -456,7 +491,6 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
 
         {/* ------------------------------------------------ deck atual */}
         <aside className="builder-deck">
-          {!canHover && <CardInfo card={hovered?.card ?? null} emptyHint="Toque em uma carta para ver os detalhes dela aqui." />}
           <input
             className="deck-name"
             value={draft.name}
@@ -469,7 +503,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
           <div className="leader-slot">
             {leader ? (
               <>
-                <StaticCard card={leader} onHover={setHovered} />
+                <StaticCard card={leader} onHover={setHovered} onLongPress={setZoom} />
                 <div>
                   <div className="muted small">Líder</div>
                   <b>{leader.name}</b>
@@ -503,8 +537,20 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
             </div>
           </div>
 
-          <div className="deck-entries">
-            {entries.length === 0 && <div className="muted small">Clique nas cartas do catálogo para adicioná-las.</div>}
+          <div
+            className="deck-entries"
+            {...entryPress.handlers}
+            onClickCapture={(e) => {
+              // O clique que o navegador manda depois do toque longo não mexe nas quantidades.
+              if (entryPress.consume()) {
+                e.stopPropagation();
+                e.preventDefault();
+              }
+            }}
+          >
+            {entries.length === 0 && (
+              <div className="muted small">{canHover ? 'Clique nas cartas do catálogo para adicioná-las.' : 'Toque nas cartas do catálogo para adicioná-las.'}</div>
+            )}
             {entries.map((e, i) => {
               const prev = entries[i - 1]?.card?.category;
               return (
@@ -514,6 +560,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                   )}
                   <div
                     className={['entry', errorIds.has(e.id) || cardLegality(e.id, 'egb') === 'banned' ? 'bad' : ''].join(' ')}
+                    data-card={e.id}
                     onMouseEnter={(ev) => e.card && setHovered(e.card, ev.currentTarget)}
                     onMouseLeave={() => setHovered(null)}
                   >
@@ -601,7 +648,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         </aside>
       </div>
 
-      {canHover && hovered && !textModal && <CardHoverPreview card={hovered.card} anchor={hovered.anchor} />}
+      {canHover && hovered && !textModal && !zoom && <CardHoverPreview card={hovered.card} anchor={hovered.anchor} />}
+      {zoom && <StaticCardZoom card={zoom} onClose={closeZoom} />}
 
       {textModal && (
         <TextModal

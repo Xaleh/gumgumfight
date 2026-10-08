@@ -100,6 +100,31 @@ export function CardInfo({ card, emptyHint }: { card: CardData | null; emptyHint
   );
 }
 
+/** Carta ampliada em modal, com o texto do efeito (toque longo no construtor de deck). Fecha no fundo, no ✕ ou com Esc. */
+export function StaticCardZoom({ card, onClose }: { card: CardData; onClose: () => void }) {
+  const def = useMemo(() => buildCardDef(card), [card]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop zoom-backdrop" onClick={onClose}>
+      <div className="zoom" role="dialog" aria-label={def.name} onClick={(e) => e.stopPropagation()}>
+        <button className="zoom-close" onClick={onClose} aria-label="Fechar">
+          ✕
+        </button>
+        <div className="zoom-card">
+          <StaticCard card={card} />
+        </div>
+        <div className="zoom-text">
+          <CardTextInfo def={def} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Popover com a carta ampliada e o texto do efeito, ao lado do elemento sob o mouse (construtor de deck).
  * Fica à direita da carta quando cabe, senão à esquerda, sempre dentro da tela; não captura o mouse.
