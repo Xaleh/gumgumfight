@@ -241,7 +241,8 @@ export function StaticCard({
   badge?: ReactNode;
   onClick?: () => void;
   onContextMenu?: () => void;
-  onHover?: (card: CardData | null) => void;
+  /** `anchor` = o elemento da carta, para posicionar um popover ao lado dela. */
+  onHover?: (card: CardData | null, anchor?: HTMLElement) => void;
 }) {
   const def = useMemo(() => buildCardDef(card), [card]);
   const { showImages } = useSettings();
@@ -267,7 +268,7 @@ export function StaticCard({
             }
           : undefined
       }
-      onMouseEnter={() => onHover?.(card)}
+      onMouseEnter={(e) => onHover?.(card, e.currentTarget)}
       onMouseLeave={() => onHover?.(null)}
       title={def.name}
     >

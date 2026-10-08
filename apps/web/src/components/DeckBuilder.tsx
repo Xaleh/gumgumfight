@@ -14,12 +14,13 @@ import {
   parseDeckList,
   validateDeck,
 } from '@gumgum/engine';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ApiCard, deckGroups, type DeckSummary } from '../api';
 import { useAuth } from '../auth';
 import { SettingsControls } from '../settings';
-import { CardInfo } from './CardInfo';
+import { CardHoverPreview, CardInfo } from './CardInfo';
 import { StaticCard } from './CardView';
+import { Icon } from './Icons';
 
 interface Draft {
   id: string | null; // null = ainda não salvo
@@ -47,6 +48,23 @@ const PAGE = 60;
 /** Valor do filtro de coleção que mostra só as cartas de spoiler. */
 const SPOILERS = '__spoilers';
 
+/** Carta sob o mouse e o elemento dela (âncora do popover ampliado). */
+interface Hovered {
+  card: CardData;
+  anchor: HTMLElement;
+}
+
+function useMediaQuery(query: string) {
+  const [match, setMatch] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatch(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}
+
 export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const [allCards, setAllCards] = useState<ApiCard[]>([]);
   const [decks, setDecks] = useState<DeckSummary[]>([]);
@@ -55,8 +73,24 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<CardData | null>(null);
+  const [hovered, setHoveredState] = useState<Hovered | null>(null);
   const [textModal, setTextModal] = useState<null | 'import' | 'export'>(null);
+  /** Com mouse, a carta sob o cursor aparece ampliada num popover; no toque, no painel de detalhes. */
+  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
+  const setHovered = useCallback((card: CardData | null, anchor?: HTMLElement) => {
+    setHoveredState(card && anchor ? { card, anchor } : null);
+  }, []);
+  // Rolar a tela move a âncora: o popover fecha até a próxima carta sob o mouse.
+  useEffect(() => {
+    if (!hovered) return;
+    const off = () => setHoveredState(null);
+    window.addEventListener('scroll', off, { capture: true, passive: true });
+    return () => window.removeEventListener('scroll', off, { capture: true });
+  }, [hovered]);
+  // A carta saiu da tela (por exemplo, a última cópia foi removida do deck) sem disparar mouseleave.
+  useEffect(() => {
+    if (hovered && !hovered.anchor.isConnected) setHoveredState(null);
+  });
 
   // filtros
   const [query, setQuery] = useState('');
@@ -288,6 +322,21 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
           ← Menu
         </button>
         <h2>Construtor de decks</h2>
+        <div className="builder-decks">
+          <button className="btn small primary" onClick={newDeck}>
+            + Novo deck
+          </button>
+          <DeckDropdown
+            decks={decks}
+            currentId={draft.id}
+            onPick={load}
+            hint={
+              auth.user
+                ? 'Seus decks ficam na sua conta Google: entre com ela em qualquer aparelho para editá-los.'
+                : `Sem login, seus decks ficam ligados a este navegador: limpar os dados do site faz perder a edição deles (continuam visíveis e podem ser duplicados).${auth.clientId ? ' Entre com o Google no menu para guardá-los na sua conta.' : ''}`
+            }
+          />
+        </div>
         <SettingsControls />
       </header>
 
@@ -298,49 +347,6 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
       )}
 
       <div className="builder-body">
-        {/* ------------------------------------------------ decks salvos + detalhe */}
-        <aside className="builder-left">
-          <button className="btn primary" onClick={newDeck}>
-            + Novo deck
-          </button>
-          <div className="deck-list">
-            {deckGroups(decks).map(([title, group]) =>
-              title === 'Decks da comunidade' && !group.length ? null : (
-                <div key={title}>
-                  <div className="deck-list-title">{title}</div>
-                  {group.length === 0 && <div className="muted small">Nenhum deck ainda.</div>}
-                  {group.map((d) => (
-                    <button
-                      key={d.id}
-                      className={['deck-row', d.id === draft.id ? 'on' : ''].join(' ')}
-                      onClick={() => load(d.id)}
-                    >
-                      <span className="deck-colors">
-                        {d.colors.map((c) => (
-                          <i key={c} className={`dot c-${c}`} />
-                        ))}
-                      </span>
-                      <span className="deck-row-name">{d.name}</span>
-                      <span
-                        className={['deck-row-size', d.valid && !d.formats.standard.length ? 'ok' : 'bad'].join(' ')}
-                        title={d.valid ? deckRowTitle(d) : undefined}
-                      >
-                        {!d.valid ? `${d.size}/${DECK_SIZE}` : !d.formats.standard.length ? '✓' : !d.formats.egb.length ? 'EGB' : '🚫'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ),
-            )}
-          </div>
-          <p className="muted small owner-hint">
-            {auth.user
-              ? 'Seus decks ficam na sua conta Google: entre com ela em qualquer aparelho para editá-los.'
-              : `Sem login, seus decks ficam ligados a este navegador: limpar os dados do site faz perder a edição deles (continuam visíveis e podem ser duplicados).${auth.clientId ? ' Entre com o Google no menu para guardá-los na sua conta.' : ''}`}
-          </p>
-          <CardInfo card={hovered} />
-        </aside>
-
         {/* ------------------------------------------------ catálogo */}
         <section className="builder-catalog">
           <div className="filters">
@@ -450,6 +456,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
 
         {/* ------------------------------------------------ deck atual */}
         <aside className="builder-deck">
+          {!canHover && <CardInfo card={hovered?.card ?? null} emptyHint="Toque em uma carta para ver os detalhes dela aqui." />}
           <input
             className="deck-name"
             value={draft.name}
@@ -507,7 +514,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                   )}
                   <div
                     className={['entry', errorIds.has(e.id) || cardLegality(e.id, 'egb') === 'banned' ? 'bad' : ''].join(' ')}
-                    onMouseEnter={() => e.card && setHovered(e.card)}
+                    onMouseEnter={(ev) => e.card && setHovered(e.card, ev.currentTarget)}
                     onMouseLeave={() => setHovered(null)}
                   >
                     <span className={`entry-cost c-${e.card?.colors[0] ?? 'red'}`}>{e.card?.cost ?? '?'}</span>
@@ -594,6 +601,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         </aside>
       </div>
 
+      {canHover && hovered && !textModal && <CardHoverPreview card={hovered.card} anchor={hovered.anchor} />}
+
       {textModal && (
         <TextModal
           mode={textModal}
@@ -623,6 +632,128 @@ const LEGALITY_NOTE = { legal: '', rotated: ' · ① rotacionada (só EGB)', ban
 
 function deckRowTitle(d: DeckSummary): string {
   return FORMATS.map((f) => `${f.label}: ${d.formats[f.id].length ? 'não permitido' : 'permitido'}`).join(' · ');
+}
+
+/** Cores do deck e o selo de estado: ✓ (Standard), EGB (só Extra Grand Battle), 🚫 ou o tamanho de um rascunho. */
+function DeckRowInfo({ d }: { d: DeckSummary }) {
+  return (
+    <>
+      <span className="deck-colors">
+        {d.colors.map((c) => (
+          <i key={c} className={`dot c-${c}`} />
+        ))}
+      </span>
+      <span className="deck-row-name">{d.name}</span>
+      <span
+        className={['deck-row-size', d.valid && !d.formats.standard.length ? 'ok' : 'bad'].join(' ')}
+        title={d.valid ? deckRowTitle(d) : undefined}
+      >
+        {!d.valid ? `${d.size}/${DECK_SIZE}` : !d.formats.standard.length ? '✓' : !d.formats.egb.length ? 'EGB' : '🚫'}
+      </span>
+    </>
+  );
+}
+
+/**
+ * Decks salvos num menu suspenso (meus, da comunidade e prontos), com busca por nome ou Líder.
+ * Fecha ao escolher, ao clicar fora ou com Esc.
+ */
+function DeckDropdown({
+  decks,
+  currentId,
+  onPick,
+  hint,
+}: {
+  decks: DeckSummary[];
+  currentId: string | null;
+  onPick: (id: string) => void;
+  /** Onde os decks ficam guardados (conta Google ou este navegador). */
+  hint: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuery('');
+    inputRef.current?.focus();
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const current = decks.find((d) => d.id === currentId);
+  const needle = query.trim().toLowerCase();
+  const groups = deckGroups(decks).map(
+    ([title, group]) =>
+      [title, needle ? group.filter((d) => `${d.name} ${d.leaderName ?? ''} ${d.leader}`.toLowerCase().includes(needle)) : group] as const,
+  );
+
+  return (
+    <div className="deck-dd" ref={ref}>
+      <button
+        type="button"
+        className={['deck-dd-btn', open ? 'open' : ''].join(' ')}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        title={current ? `Deck aberto: ${current.name}` : 'Abrir um deck salvo'}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {current ? <DeckRowInfo d={current} /> : <span className="deck-row-name muted">Abrir um deck salvo…</span>}
+        <span className="deck-dd-count" title={`${decks.length} deck(s)`}>
+          {decks.length}
+        </span>
+        <Icon name="chevron" size={16} />
+      </button>
+      {open && (
+        <div className="deck-dd-pop">
+          <input
+            ref={inputRef}
+            className="search deck-dd-search"
+            placeholder="Buscar deck por nome ou Líder…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar deck"
+          />
+          <div className="deck-list" role="listbox" aria-label="Decks salvos">
+            {groups.map(([title, group]) =>
+              title === 'Decks da comunidade' && !group.length ? null : (
+                <div key={title}>
+                  <div className="deck-list-title">{title}</div>
+                  {group.length === 0 && <div className="muted small">{needle ? 'Nenhum deck encontrado.' : 'Nenhum deck ainda.'}</div>}
+                  {group.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      role="option"
+                      aria-selected={d.id === currentId}
+                      className={['deck-row', d.id === currentId ? 'on' : ''].join(' ')}
+                      onClick={() => {
+                        setOpen(false);
+                        onPick(d.id);
+                      }}
+                    >
+                      <DeckRowInfo d={d} />
+                    </button>
+                  ))}
+                </div>
+              ),
+            )}
+          </div>
+          <p className="muted small owner-hint">{hint}</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** Selo no catálogo para cartas banidas ou rotacionadas (bloco ①). */
