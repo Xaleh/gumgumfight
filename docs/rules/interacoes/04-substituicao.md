@@ -24,7 +24,7 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 Timing `replace` + `offerReplacement`/`nextReplacement` para K.O. e remoção do campo, `restCard` para rest e `offerDamageReplacement` para dano. Conforme:
 - Várias aplicáveis: oferecidas em sequência (jogador do turno, depois o outro; de cada um, primeiro a da carta afetada, depois Líder → Personagens → Stage → as criadas por efeito); recusar uma oferece a próxima e não gasta o [Once Per Turn] (OP05-001); a mesma não se reaplica.
 - Remoções simultâneas ("K.O. all", "return up to 2"): cada substituição é oferecida uma vez e um pagamento salva todos os Personagens a que ela se aplica (OP15-009, OP11-001, OP05-001); os outros saem juntos (OP10-032).
-- Toda remoção por efeito passa pelo mesmo caminho (`removeFromField`): K.O., mão, fundo do deck, descarte, Vida (`fieldToLife`) e "your opponent chooses" (`opponentChoosesOwn`). "Would be removed from the field" sem "by your opponent" vale também contra efeito próprio (ST10-001).
+- Toda remoção por efeito passa pelo mesmo caminho (`removeFromField`): K.O., mão, fundo do deck, descarte, Vida (`fieldToLife`) e "your opponent chooses" (`opponentChoosesOwn`). "Would be removed from the field" sem "by your opponent" vale também contra efeito próprio (ST10-001). "By your opponent" sem "'s effect" (EB05-061 Nami) cobre o K.O. em batalha e todo efeito do oponente (K.O., descarte, mão, deck), e a tradução diz "pelo oponente", não "por um efeito do oponente".
 - Não coberto: custos que tiram Personagem próprio do campo (OP05-100 + OP01-047) e substituição para Líder/Stage.
 
 Divergências deste tema: DV-11 (corrigida), DV-12 (corrigida nos efeitos; custos ficam de fora) (detalhes em [../divergencias.md](../divergencias.md)).

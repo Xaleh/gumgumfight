@@ -321,7 +321,7 @@ Infra: `playFree` :1912 (Personagem → frame `play` com `byEffect`; Stage subst
 
 ### 2.13 Substituição ("instead")
 Existe primitivo: **timing `replace`** + `Ability.replace: Replacement` (types.ts:450: `who: 'self' | TargetSpec`,
-`event: 'ko' | 'removal' | 'koOrRemoval' | 'rest' | 'damage'`, `by: 'any' | 'battle' | 'effect' | 'opponentEffect'`) +
+`event: 'ko' | 'removal' | 'koOrRemoval' | 'rest' | 'damage'`, `by: 'any' | 'battle' | 'effect' | 'opponentEffect' | 'opponent'`) +
 `Ability.cost` (o que se paga "instead") + `steps` extras (ex.: "trash this Character and draw 1 card instead").
 
 Fluxo "If this Character would be K.O.'d, you may X instead":
@@ -336,7 +336,9 @@ Fluxo "If this Character would be K.O.'d, you may X instead":
    `characterRemoved`/`returnedToHand`). "Sim" → marca Once Per Turn, paga o custo uma vez (`payImmediateCost`), aplica
    `victimPowerMinus`/`victimToLife` a cada coberta, insere `steps` e o passo `removeFromField` para as não cobertas.
 - Causa (`replacementMatches`): `ko` só K.O.; `removal` qualquer saída do campo (K.O. incluído); `koOrRemoval` os dois.
-  `by`: `opponentEffect` exige efeito do oponente; `any` vale até contra efeito próprio e, na remoção, K.O. em batalha.
+  `by`: `opponentEffect` exige efeito do oponente; `opponent` ("by your opponent", sem "'s effect", EB05-061 Nami) vale
+  para o K.O. em batalha e para qualquer efeito do oponente, mas não contra efeito próprio; `any` vale até contra efeito
+  próprio e, na remoção, K.O. em batalha.
   `removalBy` dá a causa da remoção quando difere da do K.O. ("removed … by your opponent's effect or K.O.'d").
 - Virar: `restCard` :1591 → passo `replaceRest` (562/3025). Dano: `offerDamageReplacement` :4286 → `replaceDamage` (681/3657).
 - Temporária ("If any of your Characters would be K.O.'d in battle during this turn, you may … instead"):

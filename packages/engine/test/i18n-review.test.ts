@@ -106,6 +106,17 @@ describe('tradução: frases estáticas e custos', () => {
     );
   });
 
+  it('EB05-061 Nami: "by your opponent" é "pelo oponente", não "por um efeito do oponente" (vale para K.O. em batalha)', () => {
+    expect(
+      pt(
+        'EB05-061',
+        '[Once Per Turn] If your Character with 6000 base power or less would be removed from the field by your opponent, you may add 1 card from the top of your Life cards to your hand instead.',
+      ),
+    ).toBe(
+      '[Uma Vez por Turno] Se um Personagem seu com 6000 de poder base ou menos for removido do campo pelo oponente, você pode colocar 1 carta do topo da sua Vida na mão em vez disso.',
+    );
+  });
+
   it('OP14-070 Buffalo: "DON!!" não fica minúsculo no meio da frase', () => {
     expect(pt('OP14-070', "When this Character becomes rested by your opponent's Character's effect, you may return 1 DON!! card from your field to your DON!! deck. If you do, set this Character as active.")).toBe(
       'Quando este Personagem for virado pelo efeito de um Personagem do oponente, DON!! −1: Deixe este Personagem ativo.',

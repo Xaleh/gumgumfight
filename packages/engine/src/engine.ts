@@ -4703,7 +4703,10 @@ const removalCtx = (step: RemovalStep): RemovalCtx => ({
 function replacementMatches(r: Replacement, action: RemovalAction, owner: PlayerId, ctx: RemovalCtx): boolean {
   const inBattle = Boolean(ctx.inBattle);
   const byOpponentEffect = !inBattle && ctx.byPlayer !== undefined && ctx.byPlayer !== owner;
-  const cause = (by: Replacement['by']) => by === 'any' || (by === 'battle' ? inBattle : by === 'effect' ? !inBattle : byOpponentEffect);
+  // "by your opponent" (sem "'s effect"): o K.O. em batalha (só o defensor sai, pelo ataque do oponente) e os efeitos dele.
+  const byOpponent = inBattle || byOpponentEffect;
+  const cause = (by: Replacement['by']) =>
+    by === 'any' || (by === 'battle' ? inBattle : by === 'effect' ? !inBattle : by === 'opponent' ? byOpponent : byOpponentEffect);
   // "would be K.O.'d": só K.O.
   if (r.event !== 'removal' && action === 'ko' && cause(r.by)) return true;
   // "would be removed from the field" / "would leave the field": qualquer saída do campo (o K.O. também),

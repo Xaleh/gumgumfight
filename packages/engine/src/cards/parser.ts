@@ -2804,7 +2804,16 @@ function parseStatic(h: Header, body: string): Ability[] | null {
       extra = st;
     }
     const event: Replacement['event'] = /or/i.test(repl[2]) ? 'koOrRemoval' : /removed/i.test(repl[2]) ? 'removal' : 'ko';
-    const by: Replacement['by'] = !repl[3] ? 'any' : /battle/i.test(repl[3]) ? 'battle' : /opponent/i.test(repl[3]) ? 'opponentEffect' : 'effect';
+    // "by your opponent" (EB05-061 Nami) não é "by your opponent's effect": vale também para o K.O. em batalha.
+    const by: Replacement['by'] = !repl[3]
+      ? 'any'
+      : /battle/i.test(repl[3])
+        ? 'battle'
+        : /opponent's effect/i.test(repl[3])
+          ? 'opponentEffect'
+          : /opponent/i.test(repl[3])
+            ? 'opponent'
+            : 'effect';
     const ab: Ability = { ...base, timing: 'replace', replace: { who, event, by }, cost, steps: extra };
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];
