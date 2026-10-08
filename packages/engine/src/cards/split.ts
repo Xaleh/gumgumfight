@@ -13,7 +13,7 @@ const KEYWORD_PATTERNS: Array<[Keyword, RegExp]> = [
 
 /** Marcações que podem iniciar um efeito novo. */
 const EFFECT_START =
-  /(?<=^|[.)]\s*|\n)\s*(?=\[(?:DON!! ?[x×]\d+|On Play|When Attacking|Activate: ?Main|Main|Counter|On K\.O\.|On Block|End of Your Turn|Your Turn|Opponent's Turn|Once Per Turn|Rush|Rush:? ?Character|Blocker|Double Attack|Banish|Unblockable|On Your Opponent's Attack)\])/;
+  /(?<=^|[.)]\s*|\n)\s*(?=\[(?:DON!! ?[x×]\d+|On Play|When Attacking|Activate: ?Main|Main|Counter|On K\.O\.|On Block|End of Your Turn|End of Your Opponent's Turn|Your Turn|Opponent's Turn|Once Per Turn|Rush|Rush:? ?Character|Blocker|Double Attack|Banish|Unblockable|On Your Opponent's Attack)\])/;
 
 /**
  * Separa o texto em efeitos. A API não usa quebras de linha
@@ -53,6 +53,7 @@ const TIMING_TAGS: Array<[RegExp, AbilityTiming]> = [
   [/\[On K\.O\.\]/i, 'onKO'],
   [/\[On Block\]/i, 'onBlock'],
   [/\[End of Your Turn\]/i, 'endOfTurn'],
+  [/\[End of Your Opponent's Turn\]/i, 'endOfOpponentTurn'],
   [/\[Counter\]/i, 'counter'],
   [/\[Main\]/i, 'main'],
 ];

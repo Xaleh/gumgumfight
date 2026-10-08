@@ -5,7 +5,7 @@ import { buildCardDef } from '../src/cards';
 import { applyAction, createGame, getPower } from '../src/engine';
 import { createAliases, viewFor } from '../src/view';
 import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
-import { cards as baseCards, toTurn } from './helpers';
+import { cards as baseCards, returnDonInOrder, toTurn } from './helpers';
 
 // Bugs relatados no quadro do Trello, reproduzidos com as cartas reais da optcgapi.
 const bugCards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-op09-op17.json'), 'utf8')) as { cards: CardData[] }).cards;
@@ -64,6 +64,9 @@ describe('Trello: custo "devolver 1 ou mais DON!!" (Zoro OP09-076)', () => {
     expect(s.pending).toMatchObject({ kind: 'option', player: 0 });
     expect((s.pending as { options: string[] }).options).toEqual(['1 DON!!', '2 DON!!', '3 DON!!', '4 DON!!', '5 DON!!']);
     s = applyAction(s, { type: 'option', player: 0, index: 2 }); // 3 DON!!
+    // Há DON!! virados e ativos: o jogador escolhe quais devolver.
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, don: ['rested', 'active'] });
+    s = returnDonInOrder(s);
     // Devolveu 3 ao deck de DON!! (5 + 3 = 8) e o efeito pôs 1 ativo de volta (7 no deck).
     expect(s.pending).toBeNull();
     expect(s.players[0].donDeck).toBe(7);
@@ -186,5 +189,46 @@ describe('Trello: o −2000 do Kaido OP17-058 vale até o fim do turno, não só
     expect(getPower(s, attacker)).toBe(base - 2000);
     s = applyAction(s, { type: 'endTurn', player: 1 });
     expect(getPower(s, attacker)).toBe(base);
+  });
+});
+
+describe('Trello: "Up to 1 of your [Shanks]" (OP17-036) também vale para o Líder Shanks', () => {
+  /** Turno 4 (do oponente): o Líder Shanks OP17-020 é atacado, com o evento na mão e DON!! para pagá-lo. */
+  function attacked(withShanksCharacter: boolean) {
+    let s = toTurn(game(['OP17-020', 'ST02-001']), 4);
+    setDon(s, 0, 3);
+    setDon(s, 1, 4);
+    const event = hand(s, 0, 'OP17-036');
+    const shanks = withShanksCharacter ? field(s, 0, 'OP17-022') : null;
+    const other = field(s, 0, 'ST01-004'); // Personagem com outro nome: não pode receber o bônus
+    const leader = s.players[0].leader.uid;
+    s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: leader });
+    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 0 });
+    expect((s.pending as { options: string[] }).options).toContain(event);
+    s = applyAction(s, { type: 'counter', player: 0, uid: event });
+    return { s, leader, shanks, other };
+  }
+
+  it('o [Counter] oferece o Líder e o Personagem [Shanks] (e não os outros Personagens)', () => {
+    let { s, leader, shanks, other } = attacked(true);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    const options = (s.pending as { options: string[] }).options;
+    expect(options).toContain(leader);
+    expect(options).toContain(shanks);
+    expect(options).not.toContain(other);
+    s = applyAction(s, { type: 'choose', player: 0, uids: [leader] });
+    expect(getPower(s, leader)).toBe(9000);
+    expect(getPower(s, shanks!)).toBe(12000);
+  });
+
+  it('sem Personagem [Shanks], o Líder recebe os +4000 e o ataque de 5000 não tira Vida', () => {
+    let { s, leader } = attacked(false);
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [leader] });
+    expect(getPower(s, leader)).toBe(9000);
+    s = noDefense(s);
+    expect(s.battle).toBeNull();
+    expect(s.players[0].life).toHaveLength(5);
+    expect(getPower(s, leader)).toBe(5000); // o bônus era só durante a batalha
   });
 });

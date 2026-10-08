@@ -7,8 +7,9 @@
 
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { CardData, DeckList } from '@gumgum/engine';
+import { type CardData, type DeckList, fixCard } from '@gumgum/engine';
 import { DatabaseSync } from 'node:sqlite';
+import { baseCardId } from './optcgapi';
 import { DB_PATH } from './paths';
 
 export type DB = DatabaseSync;
@@ -89,6 +90,49 @@ function migrate(db: DB) {
   migrateStats(db);
   migrateAuth(db);
   migrateTournaments(db);
+  migrateCardIds(db);
+}
+
+/** Deck com os números de carta sem sufixo de versão ("P-029_r1" -> "P-029"), juntando as cópias. */
+export function normalizeDeckIds<T extends Pick<DeckList, 'leader' | 'cards'>>(deck: T): T {
+  const counts = new Map<string, number>();
+  for (const c of deck.cards) counts.set(baseCardId(c.id), (counts.get(baseCardId(c.id)) ?? 0) + c.count);
+  return { ...deck, leader: baseCardId(deck.leader), cards: [...counts].map(([id, count]) => ({ id, count })) };
+}
+
+/**
+ * As promos reimpressas em starter deck vinham da API com o número da imagem ("P-029_r1"), e
+ * assim foram gravadas nas cartas, nos decks e nas inscrições de torneio. Agora a importação usa
+ * o número da carta: apaga as cartas antigas (a importação e o seed gravam as certas) e troca os
+ * números nos decks.
+ */
+function migrateCardIds(db: DB) {
+  const suffixed = (id: string) => baseCardId(id) !== id;
+  const like = `LIKE '%\\_%' ESCAPE '\\'`;
+  const del = db.prepare('DELETE FROM cards WHERE id = ?');
+  for (const { id } of db.prepare(`SELECT id FROM cards WHERE id ${like}`).all() as Array<{ id: string }>) if (suffixed(id)) del.run(id);
+  const fix = (deck: Pick<DeckList, 'leader' | 'cards'>) =>
+    suffixed(deck.leader) || deck.cards.some((c) => suffixed(c.id)) ? normalizeDeckIds(deck) : null;
+  const decks = db.prepare(`SELECT id, leader, cards FROM decks WHERE leader ${like} OR cards ${like}`).all() as Array<{
+    id: string;
+    leader: string;
+    cards: string;
+  }>;
+  const writeDeck = db.prepare('UPDATE decks SET leader = ?, cards = ? WHERE id = ?');
+  for (const r of decks) {
+    const d = fix({ leader: r.leader, cards: JSON.parse(r.cards) });
+    if (d) writeDeck.run(d.leader, JSON.stringify(d.cards), r.id);
+  }
+  const entries = db.prepare(`SELECT tournament_id, user_id, deck FROM tournament_players WHERE deck ${like}`).all() as Array<{
+    tournament_id: string;
+    user_id: string;
+    deck: string;
+  }>;
+  const writeEntry = db.prepare('UPDATE tournament_players SET deck = ? WHERE tournament_id = ? AND user_id = ?');
+  for (const r of entries) {
+    const d = fix(JSON.parse(r.deck) as DeckList);
+    if (d) writeEntry.run(JSON.stringify(d), r.tournament_id, r.user_id);
+  }
 }
 
 /**
@@ -294,7 +338,8 @@ export function upsertCards(
   let written = 0;
   let skipped = 0;
   transaction(db, () => {
-    for (const c of cards) {
+    for (const card of cards) {
+      const c = fixCard(card);
       const row = existing.get(c.id) as { provisional: number } | undefined;
       // Dados provisórios nunca sobrescrevem dados vindos da API.
       if (opts.provisional && row && !row.provisional) {
@@ -350,7 +395,8 @@ export function hasOfficialCards(db: DB, set: string): boolean {
 }
 
 type CardRow = { data: string; provisional: number };
-const toCard = (r: CardRow) => ({ ...(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
+// Correções de nome/tipos e errata valem também para as cartas já gravadas (importadas antes de a correção entrar na tabela).
+const toCard = (r: CardRow) => ({ ...fixCard(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
 
 export function listCards(db: DB, set?: string) {
   const rows = (

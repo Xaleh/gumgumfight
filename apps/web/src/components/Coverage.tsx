@@ -67,7 +67,7 @@ export function Coverage({ onExit }: { onExit: () => void }) {
         <p className="muted">
           <span className="legend cov-scripted" /> efeito automatizado <span className="legend cov-vanilla" /> sem efeito
           (nada a automatizar) <span className="legend cov-partial" /> parcial (parte dos efeitos é automática){' '}
-          <span className="legend cov-manual" /> manual (o jogador aplica o efeito com as ferramentas manuais).
+          <span className="legend cov-manual" /> manual (o efeito ainda não é aplicado na partida).
           "Automático" = automatizadas + sem efeito.
         </p>
         {error && <div className="error">{error}</div>}

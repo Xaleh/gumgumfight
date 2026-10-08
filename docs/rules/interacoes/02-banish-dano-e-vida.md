@@ -1,0 +1,31 @@
+# [Banish], [Double Attack], dano extra / dano por efeito, Vida
+
+## Rulings oficiais
+
+Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e seção das Comprehensive Rules (CR). Os rulings servem de caso de teste.
+
+- **Q&A de regras ([Banish])**: P: ao causar dano com [Banish], posso escolher não mandar a carta de Vida ao trash? R: Não. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 10-1-3-1
+- **OP06-083 (Oars)**: P: ganhei [Banish] (via OP06-101 O-Nami) e causei dano ao Líder. O que acontece? R: Nenhum [Trigger] ativa e o oponente manda a carta de Vida ao trash. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op06.pdf. CR: 10-1-3-1
+- **OP06-002 (Inazuma)**: P: ataco com 7000 (o que dá [Banish]) e um [Counter] baixa o poder para ≤6000. E o [Banish]? R: A batalha é processada sem [Banish]. A condição é checada continuamente. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op06.pdf. CR: 8-1-3-3-2
+- **EB03-055 (Nico Robin)**: P: dano causado pelo [On K.O.] dela permite Blocker ou Counter? Permite [Trigger]? [Banish]/[Double Attack] contam? Ganha com 0 Vida? R: Não há Blocker nem Counter. O [Trigger] pode ser ativado. [Banish] só vale para dano de ataque, então a carta vai para a mão. [Double Attack] só vale ao atacar, então é 1 dano. Com o oponente em 0 Vida, causar o dano ganha o jogo. Fonte: https://en.onepiece-cardgame.com/pdf/qa_eb03.pdf. CR: 4-6-2, 10-1-2-1, 10-1-3-1, 1-2-1-1-1
+- **P-009 (Trafalgar Law)**: P: posso ganhar o jogo com este [On Play] se o oponente tem 0 Vida? R: Não. O efeito não é dano. (Igual: ST04-001 Kaido, cujo efeito "trash Life" com 0 Vida não faz nada.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_promotion-cards.pdf. CR: 1-2-1-1-1
+- **Q&A de regras ([Double Attack])**: P: posso escolher causar só 1 dano? Com o oponente em 1 Vida, ganho com [Double Attack]? R: Não e não. O 1º dano tira a última Vida, e o 2º dano não é "dano com 0 Vida" para vitória. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 7-1-4-1-1-1, 7-1-4-1-1-3
+- **Q&A de regras ([Double Attack])**: P: se, durante os 2 danos, o atacante perde [Double Attack] ou sai de campo por um [Trigger] do 1º dano, o 2º dano é cancelado? R: Não. O dano fica fixado em 2. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 7-1-4-1-1-3
+- **OP03-108 (Charlotte Cracker)**: P: ele tem [Double Attack] porque tenho menos Vidas. Após o 1º dano as Vidas empatam. E o 2º dano? R: Ele perde [Double Attack] e o +1000, mas o 2º dano ainda é processado. (Igual: ST09-001 Yamato, cujo Líder ganha poder após o 1º dano e mesmo assim toma o 2º.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_op03.pdf. CR: 7-1-4-1-1-3
+- **ST06-004 (Smoker)**: P: ele tem [Double Attack] por haver um Personagem de custo 0. Um [Counter] remove esse Personagem. Quanto dano causa? R: Se antes do Damage Step não houver custo 0, ele perde [Double Attack] e causa só 1 dano. Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-06.pdf. CR: 7-1-4, 8-1-3-3-2
+- **OP03-043 (Gaimon)**: P: "When you deal damage to your opponent's Life" ativa 2x com [Double Attack]? Ativa quando a Vida sai por efeito? Resolve antes do [Trigger]? R: Ativa só 1 vez. Não ativa quando a Vida sai por efeito. O oponente checa a Vida, este efeito ativa, e só depois o oponente decide o [Trigger]. (Igual: OP03-040 Nami, OP03-041 Usopp, OP03-047 Zeff, OP03-051 Bell-mère.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_op03.pdf. CR: 8-6-2, 8-6-2-1
+- **OP13-002 (Portgas.D.Ace)**: P: tomando dano com [Trigger], posso escolher a ordem entre o "when taking damage" do Líder e o [Trigger]? R: Não. O [Trigger] é sempre processado primeiro, e o efeito do Líder ativa depois. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op13.pdf. CR: 8-6-2, 8-6-2-1
+- **OP08-105 (Jewelry Bonney)**: P: "When a card is removed from your opponent's Life cards" ativa quando olho, revelo ou reordeno a Vida? E a ordem contra o [Trigger]? R: Só quando a carta sai da área de Vida para outra área. O [Trigger] (se ativado) resolve primeiro, depois este efeito, desde que a Bonney ainda esteja em campo. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op08.pdf. CR: 8-6-2, 8-1-3-1-3
+- **OP05-098 (Enel)**: P: com 1 Vida tomo 2 danos de [Double Attack]. O [Opponent's Turn] "quando a Vida chega a 0" age entre os danos? R: Não. Só depois dos 2 danos e do fim do Damage Step. Com 1 Vida e [Trigger], eu escolho o [Trigger] primeiro e o efeito do Enel vem depois. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op05.pdf. CR: 8-6-2
+- **OP02-001 (Edward.Newgate)**: P: o [End of Your Turn] (pôr Vida na mão) com 0 Vidas me faz perder? R: Não. Nada acontece. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op02.pdf. CR: 1-2-1-1-1, 1-3-2
+- **Q&A de regras (colocar na Vida)**: P: onde coloco uma carta "no topo/fundo da Vida"? E com 0 Vidas? R: No topo ou fundo exato. Com 0 Vidas, coloca na área de Vida. Fica virada para baixo, a menos que o efeito diga o contrário. Ninguém pode ver uma carta adicionada do deck à Vida. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 3-10-2, 3-10-2-1
+- **EB01-052 (Viola) / ST13-012 (Makino) / OP03-099 (Charlotte Katakuri)**: P: ao olhar e devolver Vidas, as viradas para cima voltam viradas para baixo? R: Não. Cada carta volta no estado em que estava. Fonte: https://en.onepiece-cardgame.com/pdf/qa_eb01.pdf. CR: 3-10-3
+- **OP11-102 (Camie)**: P: o oponente tem 2 Vidas, causo 1 dano e ele ativa [Trigger]. O efeito "se o oponente tem 2 Vidas…" ainda funciona? R: Pode ativar, mas a carta do [Trigger] já saiu da Vida, então ele tem 1 e nada acontece. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op11.pdf. CR: 10-1-5-3
+
+## No motor
+
+Dano em `stepDamage` (engine.ts:1765): um ponto por vez, [Banish] trasha sem [Trigger], Double Attack fixo em 2; `damageTaken`/`damageDealt`/`lifeRemoved` só depois do dano (conforme).
+
+[Double Attack] contra 1 de Vida não vence (DV-01, corrigido). Na preparação, a carta do topo do deck fica no fundo da Vida (DV-24, corrigido). Personagem posto na Vida "face-up" (`fieldToLife{faceUp}`) fica em `lifeFaceUp`, público (3-10-2-1); quem tira a carta da Vida a tira também de `lifeFaceUp`.
+
+Divergências deste tema: nenhuma aberta (corrigidas: DV-05, DV-18) (detalhes em [../divergencias.md](../divergencias.md)).

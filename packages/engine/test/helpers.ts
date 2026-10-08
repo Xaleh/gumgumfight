@@ -108,7 +108,8 @@ export function countCards(s: GameState, player: PlayerId): number {
       (f) =>
         (f.kind === 'damage' && f.lifeCard && s.cards[f.lifeCard].owner === player) ||
         (f.kind === 'play' && s.cards[f.uid].owner === player),
-    ).length
+    ).length +
+    (s.limbo ?? []).filter((u) => s.cards[u].owner === player).length
   );
 }
 
@@ -116,4 +117,10 @@ export function countDon(s: GameState, player: PlayerId): number {
   const ps = s.players[player];
   const attached = ps.leader.don + ps.characters.reduce((a, c) => a + c.don, 0) + (ps.stage?.don ?? 0);
   return ps.donDeck + ps.donActive + ps.donRested + attached;
+}
+
+/** Responde as escolhas de quais DON!! devolver (DON!! −X) com a 1ª opção: virados, depois ativos, depois dados. */
+export function returnDonInOrder(s: GameState): GameState {
+  while (s.pending?.kind === 'option' && s.pending.don) s = applyAction(s, { type: 'option', player: s.pending.player, index: 0 });
+  return s;
 }

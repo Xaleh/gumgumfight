@@ -39,6 +39,7 @@ const TIMING: Record<string, string> = {
   onKO: '[Ao ser Nocauteado]',
   onBlock: '[Ao Bloquear]',
   endOfTurn: '[Fim do Seu Turno]',
+  endOfOpponentTurn: '[Fim do Turno do Oponente]',
   main: '[Principal]',
   counter: '[Counter]',
   onOpponentAttack: '[No Ataque do Oponente]',
@@ -73,6 +74,8 @@ const unknown = (what: string): never => {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+/** Primeira letra minúscula, sem mexer em "DON!!" e nos nomes entre colchetes. */
+const lowerFirst = (t: string) => (/^(DON!!|\[)/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1));
 const types = (list: string[]) => list.map((t) => `{${t}}`).join(' ou ');
 const cards = (n: number) => `${n} ${plural(n, 'carta', 'cartas')}`;
 
@@ -92,6 +95,11 @@ function selfName(category: CardCategory): string {
 /** "de" + artigo/demonstrativo contraídos ("do seu Líder", "deste Personagem"). */
 function de(t: string): string {
   return `de ${t}`.replace(/^de o /, 'do ').replace(/^de a /, 'da ').replace(/^de este /, 'deste ').replace(/^de esta /, 'desta ').replace(/^de essa /, 'dessa ').replace(/^de esse /, 'desse ');
+}
+
+/** Preposição "a" + alvo, com a contração ("a o seu Líder" → "ao seu Líder"). */
+function a(t: string): string {
+  return `a ${t}`.replace(/^a o /, 'ao ').replace(/^a os /, 'aos ');
 }
 
 function dur(d: Duration): string {
@@ -196,6 +204,9 @@ function target(ref: TargetRef, ctx: Ctx): string {
   if (ref === 'battleTarget') return 'a carta atacada';
   const spec = ref;
   const many = spec.all || spec.upTo > 1;
+  // "your opponent's Characters with a total cost of 4 or less": sem quantidade (o leitor usa 99
+  // como "quantas quiser"); o número não pode aparecer no texto.
+  const anyNumber = !spec.all && spec.upTo >= 99;
   const adj: string[] = [];
   if (spec.rested === true) adj.push(many ? 'virados' : 'virado');
   if (spec.rested === false) adj.push(many ? 'ativos' : 'ativo');
@@ -207,19 +218,23 @@ function target(ref: TargetRef, ctx: Ctx): string {
     const n = spec.names ? spec.names.map((x) => `[${x}]`).join(' ou ') : `[${spec.name}]`;
     head = spec.all
       ? `todas as suas cartas ${n}`
-      : spec.side === 'own'
-        ? `até ${spec.upTo} ${plural(spec.upTo, 'carta sua', 'cartas suas')} ${n}`
-        : `até ${spec.upTo} ${n}`;
+      : anyNumber
+        ? spec.side === 'own'
+          ? `cartas suas ${n}`
+          : `cartas ${n}${spec.side === 'opponent' ? ' do oponente' : ''}`
+        : spec.side === 'own'
+          ? `até ${spec.upTo} ${plural(spec.upTo, 'carta sua', 'cartas suas')} ${n}`
+          : `até ${spec.upTo} ${n}`;
     return [head, ...adj, ...limits(spec, many)].join(' ');
   }
   const nn = noun(spec.kinds, many || spec.side === 'own');
   if (spec.side === 'own') {
-    head = spec.all ? `todos os seus ${nn}` : `até ${spec.upTo} dos seus ${noun(spec.kinds, true)}`;
+    head = spec.all ? `todos os seus ${nn}` : anyNumber ? `${noun(spec.kinds, true)} seus` : `até ${spec.upTo} dos seus ${noun(spec.kinds, true)}`;
     const adjOwn = adj.map((a) => (a === 'virado' ? 'virados' : a === 'ativo' ? 'ativos' : a));
     return [head, ...adjOwn, ...limits(spec, true)].join(' ');
   }
   const who = spec.side === 'opponent' ? 'do oponente' : '';
-  head = spec.all ? `todos os ${noun(spec.kinds, true)}` : `até ${spec.upTo} ${noun(spec.kinds, many)}`;
+  head = spec.all ? `todos os ${noun(spec.kinds, true)}` : anyNumber ? noun(spec.kinds, true) : `até ${spec.upTo} ${noun(spec.kinds, many)}`;
   return [head, ...adj, who, ...limits(spec, many)].filter(Boolean).join(' ');
 }
 
@@ -247,6 +262,12 @@ function filter(f: CardFilter, n: number, upTo = true): string {
             ? ''
             : cards(n).replace(/^\d+ /, '');
   const fem = !f.category && !f.name && !f.names;
+  // "Play up to 1 each of [Sabo], [Portgas.D.Ace], and [Monkey.D.Luffy]": um de cada nome.
+  if (f.names && f.names.length > 1 && f.distinctNames && n === f.names.length) {
+    const each = f.names.map((x) => `até 1 [${x}]`).join(', ').replace(/, (até 1 \[[^\]]+\])$/, ' e $1');
+    const { distinctNames: _d, names: _n, ...rest } = f;
+    return [each, ...limits(rest, false)].join(' ');
+  }
   const parts: string[] = [upTo ? `até ${n}` : String(n)];
   if (f.name) parts.push(`[${f.name}]`);
   if (f.names) parts.push(f.names.map((x) => `[${x}]`).join(', ').replace(/, (\[[^\]]+\])$/, ' ou $1'));
@@ -295,6 +316,9 @@ function condition(c: Condition, ctx: Ctx): string {
         break;
       case 'leaderHasType':
         out.push(`o seu Líder tiver o tipo {${c.leaderHasType}}`);
+        break;
+      case 'leaderTypeIncludes':
+        out.push(`o seu Líder tiver um tipo que inclua "${c.leaderTypeIncludes}"`);
         break;
       case 'leaderHasAnyType':
         out.push(`o seu Líder tiver o tipo ${types(c.leaderHasAnyType!)}`);
@@ -347,7 +371,9 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você tiver [${c.haveCharacterNamed}]`);
         break;
       case 'noOtherNamed':
-        out.push(`você não tiver outro Personagem [${c.noOtherNamed}]`);
+        out.push(`você não tiver outro Personagem [${c.noOtherNamed}]${c.noOtherNamedBaseCost !== undefined ? ` com custo base ${c.noOtherNamedBaseCost}` : ''}`);
+        break;
+      case 'noOtherNamedBaseCost':
         break;
       case 'opponentCharacterMinPower':
         out.push(`o oponente tiver um Personagem com ${c.opponentCharacterMinPower} ou mais de poder`);
@@ -388,9 +414,20 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'anyCharacterMinPower':
         out.push(`houver um Personagem com ${c.anyCharacterMinPower} de poder ou mais`);
         break;
-      case 'not':
-        out.push(`não ${condition(c.not!, ctx)}`.replace(/^não você tiver/, 'você não tiver'));
+      case 'not': {
+        const inner = c.not!;
+        const mm = inner.opponentMatching ?? inner.ownMatching;
+        // "If your opponent has 2 or less Characters" vira not(3 ou mais): escreve "2 ou menos".
+        if (mm && Object.keys(inner).length === 1 && mm.count > 1) {
+          out.push(condition(inner, ctx).replace(`${mm.count} ou mais`, `${mm.count - 1} ou menos`));
+          break;
+        }
+        const text = condition(inner, ctx);
+        // A negação vai depois do sujeito: "o oponente não tiver …", "este Personagem não estiver …".
+        const m = text.match(/^(você|o oponente|o seu Líder|este (?:Personagem|Líder|Stage|Evento)|esta carta|houver) /i);
+        out.push(m ? (m[1] === 'houver' ? `não ${text}` : `${m[1]} não ${text.slice(m[0].length)}`) : `não ${text}`);
         break;
+      }
       case 'selfBattledCharacter':
         out.push(`${ctx.self} tiver batalhado com um Personagem do oponente neste turno`);
         break;
@@ -557,9 +594,11 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'selfPlayedThisTurn':
         out.push(`${ctx.self} tiver sido jogado neste turno`);
         break;
-      case 'minTypedCharacters':
-        out.push(`você tiver ${c.minTypedCharacters!.count} ou mais Personagens do tipo {${c.minTypedCharacters!.type}}`);
+      case 'minTypedCharacters': {
+        const mt = c.minTypedCharacters!;
+        out.push(`você tiver ${mt.count} ou mais Personagens do tipo ${types(mt.types ?? [mt.type])}`);
         break;
+      }
       case 'minRestedTyped': {
         const r = c.minRestedTyped!;
         out.push(`você tiver ${r.count} ou mais Personagens virados${r.types ? ` do tipo ${types(r.types)}` : ''}`);
@@ -665,11 +704,17 @@ function event(e: GameEvent, ctx: Ctx): string {
 // Custos
 // ---------------------------------------------------------------------------
 
-function cost(c: AbilityCost, ctx: Ctx): string {
+function cost(c: AbilityCost, ctx: Ctx, verbal = false): string {
   const symbols: string[] = [];
-  if (c.restDon) symbols.push(CIRCLED[c.restDon - 1] ?? `(${c.restDon})`);
-  if (c.donMinus) symbols.push(`DON!! −${c.donMinus}${c.donMinusOpen ? ' ou mais' : ''}`);
   const parts: string[] = [];
+  if (verbal) {
+    // No meio de uma frase ("você pode … em vez disso") os símbolos viram verbos.
+    if (c.restDon) parts.push(`virar ${c.restDon} dos seus DON!!`);
+    if (c.donMinus) parts.push(`devolver ${c.donMinus}${c.donMinusOpen ? ' ou mais' : ''} DON!! do seu campo ao seu deck de DON!!`);
+  } else {
+    if (c.restDon) symbols.push(CIRCLED[c.restDon - 1] ?? `(${c.restDon})`);
+    if (c.donMinus) symbols.push(`DON!! −${c.donMinus}${c.donMinusOpen ? ' ou mais' : ''}`);
+  }
   if (c.restSelf) parts.push(`virar ${ctx.self}`);
   if (c.trashFromHand) {
     const what = c.trashFilter ? filter(c.trashFilter, c.trashFromHand, false) : cards(c.trashFromHand);
@@ -734,6 +779,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       if (s.amount < 0) return `Dê −${-s.amount} de poder a ${target(s.target, ctx)} ${dur(s.duration)}.`;
       return `${cap(target(s.target, ctx))} recebe +${s.amount} de poder ${dur(s.duration)}.`;
     case 'cost':
+      // "Set the cost of … to 0": o leitor representa como −99.
+      if (s.amount <= -99) return `O custo de ${target(s.target, ctx)} passa a ser 0 ${dur(s.duration)}.`;
       if (s.amount < 0) return `Dê −${-s.amount} de custo a ${target(s.target, ctx)} ${dur(s.duration)}.`;
       return `${cap(target(s.target, ctx))} recebe +${s.amount} de custo ${dur(s.duration)}.`;
     case 'ko':
@@ -747,9 +794,9 @@ function step(s: EffectStep, ctx: Ctx): string {
         ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} do seu oponente a ${target(s.target, ctx)}.`
         : typeof s.target === 'object' && (s.target.all || s.target.upTo > 1)
           ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a cada um ${target(s.target, ctx).replace(/^todos os /, 'dos ').replace(/^até /, 'de até ')}.`
-          : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a ${target(s.target, ctx)}.`;
+          : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} ${a(target(s.target, ctx))}.`;
     case 'draw':
-      return `Compre ${cards(s.count)}.`;
+      return s.upTo ? `Compre até ${cards(s.count)}.` : `Compre ${cards(s.count)}.`;
     case 'drawUntil':
       return `Compre cartas até ficar com ${s.count} cartas na mão.`;
     case 'addDonFromDeck':
@@ -784,6 +831,7 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Descarte ${s.upTo ? `até ${what}` : what} da sua mão.`;
     }
     case 'setDonActive':
+      if (s.count >= 99) return 'Deixe todos os seus DON!! ativos.';
       return `Deixe ${qty(s.count)} dos seus DON!! ${plural(s.count, 'ativo', 'ativos')}.`;
     case 'search': {
       const verb = s.play ? 'jogue' : 'revele';
@@ -816,7 +864,7 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `${cap(target(s.target, ctx))} ganha ${KW[s.keyword]} ${dur(s.duration)}.`;
     case 'cannotBeKO': {
       const many = typeof s.target === 'object' && s.target.all;
-      return `${cap(target(s.target, ctx))} ${many ? 'não podem ser nocauteados' : 'não pode ser nocauteado'}${s.inBattle ? ' em batalha' : s.byEffect ? ' por efeitos' : ''} ${dur(s.duration)}.`;
+      return `${cap(target(s.target, ctx))} ${many ? 'não podem ser nocauteados' : 'não pode ser nocauteado'}${s.inBattle ? ' em batalha' : s.byEffect === 'opponent' ? ' por efeitos do oponente' : s.byEffect ? ' por efeitos' : ''} ${dur(s.duration)}.`;
     }
     case 'cannotAttack':
       return `${cap(target(s.target, ctx))} não pode atacar ${dur(s.duration)}.`;
@@ -843,9 +891,9 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'lifeToHand':
       return `Coloque ${cards(s.count)} do ${s.choose ? 'topo ou do fundo' : 'topo'} da sua Vida na mão.`;
     case 'handToLife':
-      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} ${s.trashOnly ? 'do seu descarte' : `da sua mão${s.fromTrash ? ' ou do seu descarte' : ''}`} no topo da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
+      return `Coloque ${s.filter ? filter(s.filter, s.upTo) : `${qty(s.upTo)} ${plural(s.upTo, 'carta', 'cartas')}`} ${s.trashOnly ? 'do seu descarte' : `da sua mão${s.fromTrash ? ' ou do seu descarte' : ''}`} no ${s.choose ? 'topo ou no fundo' : 'topo'} da sua Vida${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'fieldToLife':
-      return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono.`;
+      return `Coloque ${target(s.target, ctx)} no ${s.choose ? 'topo ou no fundo' : 'topo'} da Vida do dono${s.faceUp ? ', com a face para cima' : ''}.`;
     case 'peekLife':
       return `Olhe até 1 carta do topo ${s.whose === 'either' ? 'da sua Vida ou da Vida do oponente' : s.whose === 'own' ? 'da sua Vida' : 'da Vida do oponente'} e coloque-a no topo ou no fundo dessa Vida.`;
     case 'chooseOne':
@@ -908,15 +956,19 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'negate':
       return `Anule o efeito de ${target(s.target, ctx)} ${dur(s.duration)}.`;
     case 'restrict': {
+      const opp = Boolean(s.opponent);
+      const own = opp ? 'dele' : 'seus';
       const txt: Record<string, string> = {
-        noPlayCharacters: s.minCost !== undefined ? `você não pode jogar Personagens com custo base ${s.minCost} ou mais neste turno` : 'você não pode jogar Personagens neste turno',
-        noPlayFromHand: 'você não pode jogar cartas da sua mão neste turno',
-        noLifeToHand: 'você não pode colocar cartas de Vida na mão com os seus próprios efeitos neste turno',
-        noAttackLeader: 'você não pode atacar um Líder neste turno',
-        noDrawByEffect: 'você não pode comprar cartas com os seus próprios efeitos neste turno',
-        noSetDonActiveByCharacter: 'você não pode deixar DON!! ativos com efeitos de Personagens neste turno',
+        noPlayCharacters: s.minCost !== undefined ? `jogar Personagens com custo base ${s.minCost} ou mais` : 'jogar Personagens',
+        noPlayFromHand: `jogar cartas da ${opp ? 'mão dele' : 'sua mão'}`,
+        noLifeToHand: `colocar cartas de Vida na mão com os ${opp ? 'próprios efeitos dele' : `${own} próprios efeitos`}`,
+        noAttackLeader: opp ? 'atacar o seu Líder' : 'atacar um Líder',
+        noDrawByEffect: `comprar cartas com os ${opp ? 'próprios efeitos dele' : `${own} próprios efeitos`}`,
+        noSetDonActiveByCharacter: 'deixar DON!! ativos com efeitos de Personagens',
+        noBlocker: 'ativar [Blocker]',
       };
-      return `${cap(txt[s.kind])}.`;
+      const when = s.duration === 'nextOpponentTurn' ? dur('nextOpponentTurn') : 'neste turno';
+      return `${opp ? 'O seu oponente' : 'Você'} não pode ${txt[s.kind]} ${when}.`;
     }
     case 'nextPlayDiscount':
       return `Na próxima vez que você jogar ${filter(s.filter, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')} da sua mão neste turno, o custo será reduzido em ${s.amount}.`;
@@ -924,6 +976,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return s.copy
         ? `O poder base ${de(target(s.target, ctx))} passa a ser igual ao poder ${s.copy === 'chosen' ? 'da carta escolhida' : s.copy === 'attacker' ? 'do Líder ou Personagem atacante do oponente' : 'do Líder do oponente'} ${dur(s.duration)}.`
         : `O poder base ${de(target(s.target, ctx))} passa a ser ${s.amount} ${dur(s.duration)}.`;
+    case 'setPowerZero':
+      return `Deixe o poder ${de(target(s.target, ctx))} em 0 ${dur(s.duration)}.`;
     case 'revealLifeTop':
       return 'Revele a carta do topo da sua Vida.';
     case 'activateEventFromHand':
@@ -966,6 +1020,7 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'takeDamage':
       return s.opponent ? `Cause ${s.count} de dano ao oponente.` : `Você recebe ${s.count} de dano.`;
     case 'handAllToDeck':
+      if (s.bottom) return 'Coloque todas as cartas da sua mão no fundo do seu deck, na ordem que quiser.';
       return s.who === 'self'
         ? 'Devolva todas as cartas da sua mão ao deck e embaralhe o seu deck.'
         : 'O oponente devolve todas as cartas da mão ao deck e embaralha o deck.';
@@ -1022,6 +1077,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return 'Devolva DON!! do seu campo ao deck de DON!! até ficar com o mesmo número de DON!! no campo que o oponente.';
     case 'powerPerDon':
       return `Dê −${-s.amount} de poder ${dur(s.duration)} a ${target(s.target, ctx)} para cada DON!! anexado a esse Personagem.`;
+    case 'powerPerMatching':
+      return `${cap(target(s.target, ctx))} recebe +${s.amount} de poder ${dur(s.duration)} para cada ${target({ ...s.spec, all: false, upTo: 1 }, ctx).replace(/^até 1 dos seus /, 'um dos seus ').replace(/^até 1 /, '')}.`;
     case 'powerPerRevealedCost':
       return `${cap(target(s.target, ctx))} recebe +${s.amount} de poder ${dur(s.duration)} para cada 1 de custo da carta revelada.`;
     case 'gainAttribute':
@@ -1043,7 +1100,7 @@ function step(s: EffectStep, ctx: Ctx): string {
 /** Passos em sequência; condições ("if") viram "Se …,"; "you may" vira "Você pode …". */
 function steps(list: EffectStep[], ctx: Ctx): string {
   const out: string[] = [];
-  const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+  const lower = lowerFirst;
   const noDot = (t: string) => t.replace(/\.$/, '');
   let sentences = 0; // frases de efeito já escritas (para o "Depois,")
   let ifDone = 0; // passos cobertos por um custo opcional no meio do efeito ("Se fizer isso, …")
@@ -1078,7 +1135,15 @@ function steps(list: EffectStep[], ctx: Ctx): string {
     while (key && i + 1 < list.length && list[i + 1].do !== 'payCost' && JSON.stringify(list[i + 1].if ?? null) === key) {
       group.push(list[++i]);
     }
-    const body = group.map((g, k) => (k ? lower(noDot(step(g, ctx))) : noDot(step(g, ctx)))).join(' e ');
+    let body: string;
+    // "Rest up to a total of 2 of your opponent's Characters or DON!! cards": o leitor repete o passo.
+    let run = 1;
+    while (s.do === 'restDonOrCharacter' && group.length === 1 && i + run < list.length && JSON.stringify(list[i + run]) === JSON.stringify(s)) run++;
+    if (run > 1) {
+      i += run - 1;
+      const spec = (s as Extract<EffectStep, { do: 'restDonOrCharacter' }>).spec;
+      body = `Vire até ${run} ${target({ ...spec, side: 'opponent', upTo: run }, ctx).replace(/^até \d+ /, '').replace(/ do oponente$/, '')} ou DON!! do oponente, no total`;
+    } else body = group.map((g, k) => (k ? lower(noDot(step(g, ctx))) : noDot(step(g, ctx)))).join(' e ');
     let text = key ? `Se ${condition(s.if!, ctx)}, ${lower(body)}.` : `${body}.`;
     if (ifDone > 0) {
       text = `Se fizer isso, ${lower(text)}`;
@@ -1123,7 +1188,13 @@ function header(a: Ability): string[] {
   return tags;
 }
 
-function staticText(a: Ability, ctx: Ctx): string {
+/** Frase estática "simples" (só `parts`): sem aura, regra especial nem texto próprio. */
+function isSimpleStatic(a: Ability): boolean {
+  return !a.rule && !a.aura && !a.battleVsAttribute && !a.noPlayByEffect && !a.selfHandCounter && !a.handCounter && !a.handCostAura && a.noRefreshMaxCost === undefined;
+}
+
+/** Trechos "recebe +N de poder", "ganha [Blocker]" … de uma frase estática simples. */
+function staticParts(a: Ability, ctx: Ctx): string[] {
   const parts: string[] = [];
   if (a.staticPower) parts.push(a.staticPower > 0 ? `recebe +${a.staticPower} de poder` : `recebe −${-a.staticPower} de poder`);
   if (a.staticCost) parts.push(`recebe +${a.staticCost} de custo`);
@@ -1135,16 +1206,24 @@ function staticText(a: Ability, ctx: Ctx): string {
       trashEvents: 'Evento no seu descarte',
       distinctCharacters: 'Personagem seu com nome diferente',
     }[a.powerPer.what];
-    parts.push(`recebe +${a.powerPer.power} de poder para cada ${a.powerPer.every > 1 ? `${a.powerPer.every} × ` : ''}${what}`);
+    const whatMany = {
+      hand: 'cartas na sua mão',
+      restedDon: 'DON!! virados seus',
+      trash: 'cartas no seu descarte',
+      trashEvents: 'Eventos no seu descarte',
+      distinctCharacters: 'Personagens seus com nomes diferentes',
+    }[a.powerPer.what];
+    parts.push(`recebe +${a.powerPer.power} de poder para cada ${a.powerPer.every > 1 ? `${a.powerPer.every} ${whatMany}` : what}`);
   }
   if (a.staticKeyword) parts.push(`ganha ${KW[a.staticKeyword]}`);
   if (a.staticCanAttackActive) parts.push('também pode atacar Personagens ativos do oponente');
   if (a.staticNoRemoval) parts.push('não pode ser removido do campo por efeitos do oponente');
   if (a.handCost) parts.push(`custa ${-a.handCost} a menos na sua mão`);
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
-  if (a.staticNoEffectKO) parts.push('não pode ser nocauteado por efeitos');
+  if (a.staticNoEffectKO) parts.push(a.staticNoEffectKO === 'opponent' ? 'não pode ser nocauteado por efeitos do oponente' : 'não pode ser nocauteado por efeitos');
   if (a.staticCannotAttack) parts.push('não pode atacar');
-  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Líderes ou Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOUnlessAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens sem o atributo ${a.noBattleKOUnlessAttribute}`);
   if (a.noBattleKOByLeader) parts.push('não pode ser nocauteado em batalha por Líderes');
   if (a.costPer) parts.push(`recebe ${a.costPer.cost > 0 ? '+' : '−'}${Math.abs(a.costPer.cost)} de custo para cada ${a.costPer.every} cartas no seu descarte`);
   if (a.staticBasePower !== undefined) {
@@ -1157,6 +1236,24 @@ function staticText(a: Ability, ctx: Ctx): string {
     parts.push(`não pode ser nocauteado por efeitos de Personagens do oponente com ${a.noEffectKOByMaxBasePower} de poder base ou menos`);
   }
   if (a.staticNoRest) parts.push('não pode ser virado por efeitos do oponente');
+  return parts;
+}
+
+/** Várias frases estáticas seguidas com a mesma condição: "Se X, este Personagem ganha [Blocker] e recebe +3000 de poder." */
+function staticGroup(group: Ability[], ctx: Ctx): string {
+  if (group.length > 1 && group.every((a) => isSimpleStatic(a))) {
+    const parts = group.flatMap((a) => staticParts(a, ctx));
+    if (parts.length) {
+      const text = `${cap(ctx.self)} ${parts.join(' e ')}.`;
+      const cond = group[0].condition;
+      return cond && Object.keys(cond).length ? `Se ${condition(cond, ctx)}, ${lowerFirst(text)}` : text;
+    }
+  }
+  return group.map((a) => staticText(a, ctx)).join(' ');
+}
+
+function staticText(a: Ability, ctx: Ctx): string {
+  const parts = staticParts(a, ctx);
   let special: string | null = null;
   if (a.noPlayByEffect) special = 'Esta carta não pode ser jogada da mão por efeitos.';
   if (a.selfHandCounter) special = `Esta carta na sua mão tem Counter +${a.selfHandCounter}.`;
@@ -1196,6 +1293,8 @@ function staticText(a: Ability, ctx: Ctx): string {
         return `Os seus Personagens do tipo {${r.type}} sem Counter têm Counter +${r.amount}, pelas regras.`;
       case 'deckMaxCost':
         return `Pelas regras desta partida, você não pode incluir ${r.category === 'event' ? 'Eventos' : 'cartas'} com custo ${r.cost + 1} ou mais no seu deck.`;
+      case 'deckOnlyType':
+        return `Pelas regras desta partida, você só pode incluir cartas do tipo {${r.type}} no seu deck.`;
       case 'ownOnPlayNegated':
         return 'Os seus efeitos [Ao Jogar] são anulados.';
       case 'startStage':
@@ -1211,7 +1310,8 @@ function staticText(a: Ability, ctx: Ctx): string {
     const whose = au.bothSides ? `todos os ${many}` : au.side === 'opponent' ? `todos os ${many} do oponente` : leaderOnly ? 'o seu Líder' : `os seus ${many}`;
     const extra = [
       au.color ? COLOR_M[au.color][1] : '',
-      au.maxCost !== undefined ? `com custo ${au.maxCost} ou menos` : '',
+      au.minCost !== undefined && au.minCost === au.maxCost ? `com custo${au.baseCost ? ' base' : ''} ${au.minCost}` : '',
+      au.maxCost !== undefined && au.minCost !== au.maxCost ? `com custo${au.baseCost ? ' base' : ''} ${au.maxCost} ou menos` : '',
       au.minPower !== undefined && au.minPower === au.maxPower ? `com ${au.minPower} de poder base` : '',
       au.minPower !== undefined && au.minPower !== au.maxPower ? `com ${au.minPower} de poder base ou mais` : '',
       au.maxPower !== undefined && au.minPower !== au.maxPower ? `com ${au.maxPower} de poder base ou menos` : '',
@@ -1223,7 +1323,7 @@ function staticText(a: Ability, ctx: Ctx): string {
       au.names?.length ? `chamados ${au.names.map((n) => `[${n}]`).join(' ou ')}` : '',
       au.hasAnyType?.length ? `do tipo ${types(au.hasAnyType)}` : '',
       au.typeIncludes ? `com um tipo que inclua "${au.typeIncludes}"` : '',
-      au.minCost !== undefined ? `com custo ${au.minCost} ou mais` : '',
+      au.minCost !== undefined && au.minCost !== au.maxCost ? `com custo${au.baseCost ? ' base' : ''} ${au.minCost} ou mais` : '',
       au.exactCosts ? `com custo ${au.exactCosts.join(' ou ')}` : '',
       au.hasTrigger ? 'com [Trigger]' : '',
       au.hasAllTypes?.length ? `com os tipos ${au.hasAllTypes.map((t) => `{${t}}`).join(' e ')}` : '',
@@ -1240,7 +1340,7 @@ function staticText(a: Ability, ctx: Ctx): string {
           : au.noBattleKO
             ? 'não podem ser nocauteados em batalha'
             : au.noEffectKO
-      ? 'não podem ser nocauteados por efeitos do oponente'
+      ? `não podem ser nocauteados por efeitos${au.noEffectKO === 'opponent' ? ' do oponente' : ''}`
       : au.noRemoval
       ? `não podem ser removidos do campo por efeitos ${au.side === 'opponent' ? 'seus' : 'do oponente'}`
       : au.keyword === 'rushCharacter'
@@ -1267,10 +1367,10 @@ function ability(a: Ability, ctx: Ctx): string {
   if (a.timing === 'static') body = staticText(a, ctx);
   else if (a.timing === 'event') {
     const cond = a.condition && Object.keys(a.condition).length ? `se ${condition(a.condition, ctx)}, ` : '';
-    body = `Quando ${event(a.event!, ctx)}, ${cond}${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
+    body = `Quando ${event(a.event!, ctx)}, ${cond}${lowerFirst(steps(a.steps, ctx))}`;
   }
   else if (a.timing === 'replace' && a.replace?.event === 'damage') {
-    const c = a.cost ? cost(a.cost, ctx).replace(/^Você pode /, '') : 'evitar isso';
+    const c = a.cost ? cost(a.cost, ctx, true).replace(/^Você pode /, '') : 'evitar isso';
     body = `Se você fosse sofrer dano, você pode ${c} em vez disso.`;
   } else if (a.timing === 'replace' && a.replace) {
     const r = a.replace;
@@ -1283,11 +1383,13 @@ function ability(a: Ability, ctx: Ctx): string {
     const what =
       r.event === 'ko' ? 'for nocauteado' : r.event === 'removal' ? 'for removido do campo' : r.event === 'rest' ? 'for virado' : 'for nocauteado ou removido do campo';
     const by = r.by === 'battle' ? ' em batalha' : r.by === 'effect' ? ' por um efeito' : r.by === 'opponentEffect' ? ' por um efeito do oponente' : '';
-    const c = a.cost ? cost(a.cost, ctx).replace(/^Você pode /, '') : '';
-    const extra = a.steps.length ? ` e ${steps(a.steps, ctx).replace(/^./, (x) => x.toLowerCase()).replace(/\.$/, '')}` : '';
+    const c = a.cost ? cost(a.cost, ctx, true).replace(/^Você pode /, '') : '';
+    const extra = a.steps.length ? ` e ${lowerFirst(steps(a.steps, ctx)).replace(/\.$/, '')}` : '';
     const pre = a.condition && Object.keys(a.condition).length ? `${condition(a.condition, ctx)} e ` : '';
     body = `Se ${pre}${who} ${what}${by}, você pode ${c || 'evitar isso'}${extra} em vez disso.`;
   } else if (a.timing === 'startOfTurn') body = `Este efeito pode ser ativado no início do seu turno. ${steps(a.steps, ctx)}`;
+  else if (a.timing === 'startOfOpponentTurn') body = `Este efeito pode ser ativado no início do turno do oponente. ${steps(a.steps, ctx)}`;
+  else if (a.timing === 'startOfMainPhase') body = `Este efeito pode ser ativado no início da sua Fase Principal. ${steps(a.steps, ctx)}`;
   else if (a.timing === 'battlesCharacter') body = `Se ${ctx.self} batalhar com um Personagem do oponente, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
   else if (a.timing === 'onKO' && a.koBy) {
     body = `Quando ${ctx.self} for nocauteado por ${a.koBy === 'opponentEffect' ? 'um efeito do oponente' : 'um efeito'}, ${steps(a.steps, ctx).replace(/^./, (c) => c.toLowerCase())}`;
@@ -1303,9 +1405,22 @@ function ability(a: Ability, ctx: Ctx): string {
 
 /** Várias habilidades da mesma linha (ex.: "[On Play]/[When Attacking]"): mesmo corpo, marcações juntas. */
 function line(abilities: Ability[], ctx: Ctx): string {
-  // Várias frases estáticas da mesma linha: as marcações aparecem uma vez só.
+  // Várias frases estáticas da mesma linha: as marcações aparecem uma vez só; frases com a
+  // mesma condição viram uma só; uma frase com marcação diferente ("and if it is your
+  // opponent's turn, …") leva a própria marcação.
   if (abilities.length > 1 && abilities.every((a) => a.timing === 'static')) {
-    return [...header(abilities[0]), ...abilities.map((a) => staticText(a, ctx))].join(' ');
+    const groups: Ability[][] = [];
+    const keyOf = (a: Ability) => JSON.stringify([header(a), a.condition ?? null]);
+    for (const a of abilities) {
+      const last = groups[groups.length - 1];
+      if (last && keyOf(last[0]) === keyOf(a)) last.push(a);
+      else groups.push([a]);
+    }
+    const first = JSON.stringify(header(abilities[0]));
+    if (groups.every((g) => JSON.stringify(header(g[0])) === first)) {
+      return [...header(abilities[0]), ...groups.map((g) => staticGroup(g, ctx))].join(' ');
+    }
+    return groups.map((g) => [...header(g[0]), staticGroup(g, ctx)].join(' ')).join(' ');
   }
   if (abilities.length > 1 && abilities.every((a) => JSON.stringify(a.steps) === JSON.stringify(abilities[0].steps))) {
     const timings = abilities.map((a) => TIMING[a.timing]).join('/');

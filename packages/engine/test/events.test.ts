@@ -31,10 +31,11 @@ describe('reações a acontecimentos ("When …")', () => {
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
     expect(s.pending).toMatchObject({ kind: 'confirm' });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
-    // Resolve as escolhas que aparecerem (alvo do Killer, descarte do Wire).
-    for (let i = 0; i < 6 && s.pending; i++) {
+    // Resolve as escolhas que aparecerem (ordem das três reações, alvo do Killer, descarte do Wire).
+    for (let i = 0; i < 10 && s.pending; i++) {
       const p = s.pending;
-      if (p.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: p.player, uids: p.options.includes(target) ? [target] : p.options.slice(0, p.min || 1) });
+      if (p.kind === 'option' && p.order) s = applyAction(s, { type: 'option', player: p.player, index: 0 });
+      else if (p.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: p.player, uids: p.options.includes(target) ? [target] : p.options.slice(0, p.min || 1) });
       else if (p.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: p.player, yes: false });
       else if (p.kind === 'counter') s = applyAction(s, { type: 'pass', player: p.player });
       else break;

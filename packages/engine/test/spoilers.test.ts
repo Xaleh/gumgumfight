@@ -16,6 +16,9 @@ const extra: CardData[] = [
   { id: 'SPX-002', name: 'Guard', category: 'character', colors: ['red'], cost: 1, power: 2000, types: ['Alabasta'], text: '' },
   { id: 'SPX-003', name: 'Scholar', category: 'character', colors: ['green'], cost: 1, power: 1000, attributes: ['Wisdom'], types: [], text: '' },
   { id: 'SPX-004', name: 'Wall', category: 'character', colors: ['green'], cost: 1, power: 1000, attributes: ['Wisdom'], types: [], text: '[Blocker]' },
+  { id: 'SPX-005', name: 'Lucci', category: 'leader', colors: ['yellow'], life: 4, power: 5000, types: ['CP9'], text: '' },
+  { id: 'SPX-006', name: 'Agent', category: 'character', colors: ['yellow'], cost: 1, power: 2000, types: ['CP0'], text: '' },
+  { id: 'SPX-007', name: 'Spy', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] If your Leader has a type including "CP", draw 1 card.' },
 ];
 const cards = [...baseCards, ...spoilers, ...extra];
 
@@ -63,7 +66,7 @@ function noDefense(s: GameState): GameState {
 
 describe('spoilers de EB05 e OP18', () => {
   it('todas as cartas têm efeito automatizado e tradução completa', () => {
-    expect(spoilers).toHaveLength(71);
+    expect(spoilers).toHaveLength(87);
     const pending = spoilers.filter((c) => ['partial', 'manual'].includes(automationStatus(c)) || !translateCardPt(c).complete);
     expect(pending.map((c) => c.id)).toEqual([]);
   });
@@ -180,5 +183,95 @@ describe('spoilers de EB05 e OP18', () => {
     expect(s.players[0].characters.find((c) => c.uid === a)?.don).toBe(1);
     expect(s.players[0].characters.find((c) => c.uid === b)?.don).toBe(1);
     expect(s.players[0].donRested).toBe(1);
+  });
+
+  it('Vivi (OP18-011): "with both the {Animal} and {Alabasta} type" (singular) vale só para quem tem os dois tipos', () => {
+    const s = toTurn(game(), 3);
+    field(s, 0, 'OP18-011');
+    const both = field(s, 0, 'SPX-001');
+    const one = field(s, 0, 'SPX-002');
+    expect(getPower(s, both)).toBe(3000);
+    expect(getPower(s, one)).toBe(2000);
+  });
+
+  it('"a type including "CP"" vale para o Líder CP9 e não para o Chapéu de Palha', () => {
+    for (const [leader, draws] of [
+      ['SPX-005', 1],
+      ['ST01-001', 0],
+    ] as const) {
+      let s = toTurn(game([leader, 'ST02-001']), 3);
+      const spy = hand(s, 0, 'SPX-007');
+      s.players[0].donActive = 10;
+      const before = s.players[0].hand.length;
+      s = applyAction(s, { type: 'playCard', player: 0, uid: spy });
+      expect(s.players[0].hand, leader).toHaveLength(before - 1 + draws);
+    }
+  });
+
+  it('Kalifa (OP18-100): compra 1 e põe uma carta "CP" da mão no fundo da Vida, com a face para cima', () => {
+    let s = toTurn(game(['SPX-005', 'ST02-001']), 3);
+    const kalifa = hand(s, 0, 'OP18-100');
+    const agent = hand(s, 0, 'SPX-006');
+    s.players[0].donActive = 10;
+    const before = s.players[0].hand.length;
+    const life = s.players[0].life.length;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: kalifa });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [agent] });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [agent] });
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0 });
+    s = applyAction(s, { type: 'option', player: 0, index: 1 });
+    expect(s.pending).toBeNull();
+    expect(s.players[0].life).toHaveLength(life + 1);
+    expect(s.players[0].life[0]).toBe(agent);
+    expect(s.players[0].lifeFaceUp).toContain(agent);
+    expect(s.players[0].hand).toHaveLength(before - 2 + 1);
+  });
+
+  it('Mr.0 & Ms. All Sunday (OP18-046): o Líder {Baroque Works} passa a 7000 de poder base no ataque do oponente', () => {
+    let s = toTurn(game(['ST03-001', 'ST02-001']), 4);
+    field(s, 0, 'OP18-046');
+    const leader = s.players[0].leader.uid;
+    expect(getPower(s, leader)).toBe(5000);
+    s = applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: leader });
+    // "You may trash 1 card from your hand": o custo pergunta e pede a carta.
+    expect(s.pending).toMatchObject({ player: 0 });
+    if (s.pending?.kind === 'confirm') s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].hand[0]] });
+    expect(getPower(s, leader)).toBe(7000);
+  });
+
+  it('Saint Gunko (OP18-084): olha 4 cartas, pega 1 {Holy Knights of God} e descarta o resto', () => {
+    let s = toTurn(game(), 3);
+    const gunko = hand(s, 0, 'OP18-084');
+    const knight = take(s, 0, 'OP18-060');
+    s.players[0].deck.unshift(knight); // topo do deck
+    const deckSize = s.players[0].deck.length;
+    const trash = s.players[0].trash.length;
+    s.players[0].donActive = 10;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: gunko });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [knight] });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [knight] });
+    expect(s.players[0].hand).toContain(knight);
+    expect(s.players[0].trash).toHaveLength(trash + 3);
+    expect(s.players[0].deck).toHaveLength(deckSize - 4);
+  });
+
+  it('Iceburg (OP18-061): Stages ou cartas {Water Seven} entre as 5 do topo', () => {
+    let s = toTurn(game(), 3);
+    const iceburg = hand(s, 0, 'OP18-061');
+    const sunny = take(s, 0, 'ST01-017');
+    const water = take(s, 0, 'OP18-061');
+    s.players[0].deck.unshift(sunny, water);
+    s.players[0].donActive = 10;
+    s = applyAction(s, { type: 'playCard', player: 0, uid: iceburg });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    expect([...(s.pending as { options: string[] }).options].sort()).toEqual([sunny, water].sort());
+    s = applyAction(s, { type: 'choose', player: 0, uids: [sunny, water] });
+    // As 3 restantes vão para o fundo na ordem escolhida.
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: (s.pending as { options: string[] }).options });
+    expect(s.pending).toBeNull();
+    expect(s.players[0].hand).toEqual(expect.arrayContaining([sunny, water]));
   });
 });

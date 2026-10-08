@@ -1,6 +1,7 @@
 import {
   type Action,
   actingPlayer,
+  applyAction,
   type CardData,
   type CardDef,
   chooseBotAction,
@@ -9,6 +10,7 @@ import {
   legalActions,
   type LogEntry,
   type PlayerId,
+  REPLAY_VERSION,
 } from '@gumgum/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
@@ -243,6 +245,29 @@ describe('partidas online: salas privadas', () => {
     await second.close();
   });
 
+  it('sala começada antes da versão 9 dos replays é refeita com a preparação antiga', async () => {
+    const { app, db } = setup();
+    const { roomId } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    expect(room.data.replayVersion).toBe(REPLAY_VERSION);
+    let s = room.state!;
+    s = applyAction(s, { type: 'answer', player: s.rollWinner!, yes: true });
+    s = applyAction(s, { type: 'mulligan', player: s.firstPlayer, redraw: false });
+    s = applyAction(s, { type: 'mulligan', player: (1 - s.firstPlayer) as PlayerId, redraw: false });
+    // Gravada sem o campo (antes desta versão): a Vida sai na ordem antiga, e o replay diz versão 8.
+    const data = structuredClone(room.data);
+    delete data.replayVersion;
+    data.actions = [
+      { type: 'answer', player: s.rollWinner!, yes: true },
+      { type: 'mulligan', player: s.firstPlayer, redraw: false },
+      { type: 'mulligan', player: (1 - s.firstPlayer) as PlayerId, redraw: false },
+    ];
+    const old = new Room(data, { cards: (ids) => getCards(db, ids), botDelayMs: 0 });
+    expect(old.state!.legacySetup).toBe(true);
+    expect(old.state!.players[0].life).toEqual([...s.players[0].life].reverse());
+    old.dispose();
+  });
+
   it('revanche: quando os dois pedem, começa outra sala', async () => {
     const { app } = setup();
     const { roomId, tokens } = await privateMatch(app);
@@ -276,7 +301,7 @@ describe('partidas online: filas', () => {
     expect(again.json().roomId).toBe(ma.roomId);
   });
 
-  it('ranqueada: só com login, sem cartas manuais e sem ferramentas manuais', async () => {
+  it('ranqueada: só com login e sem cartas com efeito ainda não automatizado', async () => {
     const { app, db } = setup();
     const anon = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'ranked', format: 'egb' } });
     expect(anon.statusCode).toBe(401);
@@ -313,13 +338,69 @@ describe('partidas online: filas', () => {
     room.attach(c.conn);
     const p = actingPlayer(c.view!)!;
     const t = p === 0 ? ma.token : mb.token;
-    const tools = await act(app, ma.roomId, t, 0, { type: 'manual', player: p, op: { op: 'draw', count: 1 } });
-    expect(tools.statusCode).toBe(403);
     // Desistência na ranqueada mexe na recompensa.
     await act(app, ma.roomId, t, 0, { type: 'concede', player: p });
     const diff = c.room.result.bounty.map((s: { before: number; after: number }) => s.after - s.before);
     expect(diff[1 - p]).toBe(1000);
     expect(diff[p]).toBe(0);
+  });
+});
+
+describe('partidas online: contadores do menu', () => {
+  it('conta quem está no menu, na fila, jogando e assistindo, sem dados de quem joga', async () => {
+    const { app } = setup();
+    const empty = (await app.inject('/api/online/stats')).json();
+    expect(empty).toEqual({
+      online: 0,
+      playing: { private: 0, casual: 0, ranked: 0, bot: 0, tournament: 0 },
+      waiting: 0,
+      queue: { casual: { standard: 0, egb: 0 }, ranked: { standard: 0, egb: 0 } },
+      spectators: 0,
+    });
+
+    // A consulta do menu é o sinal de presença (o mesmo navegador conta uma vez só).
+    await app.inject({ url: '/api/online/stats', headers: ALICE });
+    expect((await app.inject({ url: '/api/online/stats', headers: ALICE })).json().online).toBe(1);
+
+    const carol = { 'x-deck-owner': 'carol-0123456789abcdef' };
+    const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: carol, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } })).json();
+    const s1 = (await app.inject('/api/online/stats')).json();
+    expect(s1.queue.casual.egb).toBe(1);
+    expect(s1.online).toBe(2);
+
+    // Sala privada esperando o segundo jogador.
+    await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: 'st02-kid', format: 'egb' } });
+    expect((await app.inject('/api/online/stats')).json().waiting).toBe(1);
+
+    const dave = { 'x-deck-owner': 'dave-0123456789abcdef00' };
+    const b = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: dave, payload: { deckId: 'st02-kid', queue: 'casual', format: 'egb' } })).json();
+    const m = (await app.inject(`/api/online/queue/${a.ticket}`)).json();
+    await app.inject(`/api/online/queue/${b.ticket}`);
+    const room = getRoom(app, m.roomId);
+    room.attach(client(0).conn);
+    room.attach(client(null).conn);
+    const s2 = (await app.inject('/api/online/stats')).json();
+    expect(s2.playing.casual).toBe(1);
+    expect(s2.queue.casual.egb).toBe(0);
+    expect(s2.spectators).toBe(1);
+    // Alice (menu), Bob (sala esperando, sem canal aberto: não conta), Carol (conectada à partida) e o espectador.
+    expect(s2.online).toBe(3);
+    expect(JSON.stringify(s2)).not.toContain('carol');
+  });
+
+  it('quem fecha o menu some dos conectados depois de 30 s', () => {
+    let t = 1_000_000;
+    const db = freshDb();
+    const l = new Lobby({ cards: (ids) => getCards(db, ids) as CardData[], now: () => t });
+    l.touch('a');
+    l.touch('b');
+    expect(l.stats().online).toBe(2);
+    t += 20_000;
+    l.touch('b');
+    t += 15_000;
+    expect(l.stats().online).toBe(1);
+    t += 30_000;
+    expect(l.stats().online).toBe(0);
   });
 });
 
@@ -426,8 +507,8 @@ describe('partidas online: cancelar a ação e devolver DON!!', () => {
   }, 60_000);
 });
 
-describe('partidas online: ferramentas manuais', () => {
-  it('só o perfil Dev usa as ferramentas manuais (função de desenvolvimento)', async () => {
+describe('partidas online: ações manuais', () => {
+  it('a ação `manual` (mexer na mesa à mão) é recusada para todos, inclusive Dev', async () => {
     const { app, db } = setup();
     const login = (sub: string) => {
       const u = upsertGoogleUser(db, { sub, email: `${sub}@example.com`, emailVerified: true, name: sub, picture: null });
@@ -445,8 +526,6 @@ describe('partidas online: ferramentas manuais', () => {
     const room = getRoom(app, ma.roomId);
     const c = client(0);
     room.attach(c.conn);
-    // O vencedor do sorteio escolhe jogar primeiro; depois os mulligans: as ferramentas
-    // só valem na fase principal, no turno de quem age.
     {
       const v = c.view!;
       const w = actingPlayer(v)!;
@@ -459,30 +538,16 @@ describe('partidas online: ferramentas manuais', () => {
     }
     expect(c.view!.phase).toBe('main');
     const p = actingPlayer(c.view!)!;
-    const other = (1 - p) as PlayerId;
-    // Quem está na vez é Dev; o outro é Admin (o perfil é lido a cada ação).
     setUserRole(db, seats[p].id, 'dev');
-    setUserRole(db, seats[other].id, 'admin');
-    const draw = (seat: PlayerId, headers: Record<string, string>) =>
-      app.inject({
-        method: 'POST',
-        url: `/api/online/rooms/${ma.roomId}/action`,
-        headers,
-        payload: { t: seats[seat].token, seq: c.view!.actionCount, action: { type: 'manual', player: seat, op: { op: 'draw', count: 1 } } },
-      });
-    // Sem login (só o token da cadeira) não pode, mesmo no casual.
-    const anon = await draw(p, {});
-    expect(anon.statusCode).toBe(403);
-    expect(anon.json().error).toContain('Dev');
-    // Admin não é Dev: recusado antes de chegar ao motor.
-    const admin = await draw(other, seats[other].headers);
-    expect(admin.statusCode).toBe(403);
-    expect(admin.json().error).toContain('Dev');
-    // O Dev na vez usa as ferramentas normalmente.
     const hand = c.view!.players[p].hand.length;
-    const dev = await draw(p, seats[p].headers);
-    expect(dev.statusCode, dev.body).toBe(200);
-    expect(c.view!.players[p].hand.length).toBe(hand + 1);
+    const r = await app.inject({
+      method: 'POST',
+      url: `/api/online/rooms/${ma.roomId}/action`,
+      headers: seats[p].headers,
+      payload: { t: seats[p].token, seq: c.view!.actionCount, action: { type: 'manual', player: p, op: { op: 'draw', count: 1 } } },
+    });
+    expect(r.statusCode).toBe(400);
+    expect(c.view!.players[p].hand.length).toBe(hand);
   });
 });
 

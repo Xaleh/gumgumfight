@@ -1,12 +1,12 @@
 import { buildCardDef, type CardData, type CardDef, type CardStatus } from '@gumgum/engine';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cardText, useSettings } from '../settings';
 import { StaticCard, StatusTag } from './CardView';
 
 const CATEGORY = { leader: 'Líder', character: 'Personagem', event: 'Evento', stage: 'Stage' };
 
 /** Nome, atributos e texto da carta no idioma escolhido (com "ver original"); `statuses` = efeitos temporários em campo. */
-export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: number; statuses?: CardStatus[] }) {
+export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; power?: number; cost?: number; statuses?: CardStatus[] }) {
   const { lang } = useSettings();
   const [showOriginal, setShowOriginal] = useState(false);
   useEffect(() => setShowOriginal(false), [def.id]);
@@ -21,7 +21,12 @@ export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: n
         {def.attributes?.length ? ` · ${def.attributes.join('/')}` : ''}
       </div>
       <div className="detail-stats">
-        {def.cost !== undefined && <span>Custo {def.cost}</span>}
+        {def.cost !== undefined && (
+          <span>
+            Custo {cost ?? def.cost}
+            {cost !== undefined && cost !== def.cost ? ` (impresso ${def.cost})` : ''}
+          </span>
+        )}
         {def.life !== undefined && <span>Vida {def.life}</span>}
         {def.power !== undefined && (
           <span>
@@ -73,7 +78,7 @@ export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: n
       {def.manual && (
         <p className="warn small">
           {def.abilities.some((a) => !a.manual && a.steps.length)
-            ? '⚠ Parte do efeito ainda não é automática (⚙ aplicada à mão).'
+            ? '⚠ Parte do efeito ainda não é automática (⚙ não é aplicada).'
             : '⚠ Efeito ainda não automatizado.'}
         </p>
       )}
@@ -82,13 +87,49 @@ export function CardTextInfo({ def, power, statuses }: { def: CardDef; power?: n
 }
 
 /** Painel de detalhes para uma carta fora de partida (construtor de deck). */
-export function CardInfo({ card }: { card: CardData | null }) {
+export function CardInfo({ card, emptyHint }: { card: CardData | null; emptyHint?: string }) {
   const def = useMemo(() => (card ? buildCardDef(card) : null), [card]);
-  if (!def) return <div className="detail empty">Passe o mouse sobre uma carta para ver os detalhes.</div>;
+  if (!def) return <div className="detail empty">{emptyHint ?? 'Passe o mouse sobre uma carta para ver os detalhes.'}</div>;
   return (
     <div className="detail">
       <div className="detail-card">
         <StaticCard card={card!} />
+      </div>
+      <CardTextInfo def={def} />
+    </div>
+  );
+}
+
+/**
+ * Popover com a carta ampliada e o texto do efeito, ao lado do elemento sob o mouse (construtor de deck).
+ * Fica à direita da carta quando cabe, senão à esquerda, sempre dentro da tela; não captura o mouse.
+ */
+export function CardHoverPreview({ card, anchor }: { card: CardData; anchor: HTMLElement }) {
+  const def = useMemo(() => buildCardDef(card), [card]);
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const a = anchor.getBoundingClientRect();
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const gap = 14;
+    const pad = 8;
+    let left = a.right + gap;
+    if (left + w > vw - pad) left = a.left - gap - w;
+    // Não cabe de nenhum lado (tela estreita): centraliza sobre a carta.
+    if (left < pad) left = Math.max(pad, Math.min(vw - w - pad, a.left + a.width / 2 - w / 2));
+    const top = Math.max(pad, Math.min(vh - h - pad, a.top + a.height / 2 - h / 2));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [card, anchor]);
+  if (!anchor.isConnected) return null;
+  return (
+    <div className="card-hover" ref={ref} role="tooltip" aria-live="polite">
+      <div className="detail-card">
+        <StaticCard card={card} />
       </div>
       <CardTextInfo def={def} />
     </div>

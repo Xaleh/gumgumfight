@@ -233,6 +233,62 @@ describe('batalha', () => {
     s = noDefense(applyAction(s, { type: 'attack', player: 1, attacker: heat, target: s.players[0].leader.uid }));
     expect(s.players[0].life.length).toBe(before - 2);
   });
+
+  // CR 7-1-4-1-1-1 + Q&A de regras: "If my opponent has 1 Life card, can I win the game by using a
+  // [Double Attack] to deal 2 damage? — No, you cannot."
+  describe('Double Attack contra 1 de Vida', () => {
+    function doubleAttacker(keywords: Array<'doubleAttack' | 'banish'> = ['doubleAttack']) {
+      const s = toTurn(started(), 4); // turno do Kid
+      s.players[0].hand = [];
+      const heat = putOnField(s, 1, 'ST02-011');
+      s.defs['ST02-011'] = { ...s.defs['ST02-011'], keywords };
+      s.modifiers.push({ uid: heat, kind: 'power', amount: 2000, duration: 'turn' }); // 4000 → 6000
+      const noTrigger = s.players[0].life.filter((u) => !s.defs[s.cards[u].cardId].abilities.some((a) => a.timing === 'trigger'));
+      s.players[0].deck.push(...s.players[0].life.filter((u) => u !== noTrigger[0]));
+      s.players[0].life = [noTrigger[0]];
+      return { s, heat };
+    }
+
+    it('não vence: o 1º dano tira a última Vida e o 2º não faz nada', () => {
+      const { s: g, heat } = doubleAttacker();
+      const last = g.players[0].life[0];
+      const s = noDefense(applyAction(g, { type: 'attack', player: 1, attacker: heat, target: g.players[0].leader.uid }));
+      expect(s.phase).not.toBe('gameover');
+      expect(s.winner).toBeNull();
+      expect(s.players[0].life).toEqual([]);
+      expect(s.players[0].hand).toContain(last);
+      expect(s.stack).toEqual([]);
+    });
+
+    it('com [Banish] também não vence', () => {
+      const { s: g, heat } = doubleAttacker(['doubleAttack', 'banish']);
+      const last = g.players[0].life[0];
+      const s = noDefense(applyAction(g, { type: 'attack', player: 1, attacker: heat, target: g.players[0].leader.uid }));
+      expect(s.phase).not.toBe('gameover');
+      expect(s.players[0].life).toEqual([]);
+      expect(s.players[0].trash).toContain(last);
+    });
+
+    it('o ataque seguinte, com 0 de Vida, vence', () => {
+      const { s: g, heat } = doubleAttacker();
+      let s = noDefense(applyAction(g, { type: 'attack', player: 1, attacker: heat, target: g.players[0].leader.uid }));
+      s = noDefense(applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: s.players[0].leader.uid }));
+      expect(s.phase).toBe('gameover');
+      expect(s.winner).toBe(1);
+    });
+
+    it('se a Vida volta entre os danos (ex.: [Trigger] que adiciona Vida), o 2º dano a tira', () => {
+      const { s: g, heat } = doubleAttacker();
+      let s = passCounter(applyAction(g, { type: 'attack', player: 1, attacker: heat, target: g.players[0].leader.uid }));
+      expect(s.pending).toMatchObject({ kind: 'lifeCard', player: 0 });
+      const added = s.players[0].deck.shift()!; // simula o efeito do [Trigger] (Q&A OP03-118)
+      s.players[0].life.push(added);
+      s = noDefense(applyAction(s, { type: 'answer', player: 0, yes: false }));
+      expect(s.phase).not.toBe('gameover');
+      expect(s.players[0].life).toEqual([]);
+      expect(s.players[0].hand).toContain(added);
+    });
+  });
   it('Killer [On Play] nocauteia personagem virado de custo 3 ou menos', () => {
     let s = toTurn(started(), 4);
     const chopper = putOnField(s, 0, 'ST01-006', { rested: true });

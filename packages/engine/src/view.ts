@@ -71,6 +71,8 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
   }
   // Cartas reveladas por efeitos em resolução ("reveal …").
   for (const f of state.stack) if (f.kind === 'effect') for (const u of f.revealed ?? []) out.add(u);
+  // A carta do [Trigger] em resolução, fora de qualquer área (10-1-5-3): foi revelada.
+  for (const u of state.limbo ?? []) out.add(u);
   const p = state.pending;
   if (p && viewer !== null && p.player === viewer) {
     if (p.kind === 'selectTargets' || p.kind === 'block' || p.kind === 'counter') for (const u of p.options) out.add(u);
@@ -141,6 +143,9 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
         }
       : null,
     stack: state.stack.map((f) => sanitizeFrame(f, ref)),
+    ...(state.limbo ? { limbo: state.limbo.map(alias) } : {}),
+    // Efeitos disparados esperando a vez: só a carta de origem (os passos e alvos ficam no servidor).
+    triggered: state.triggered?.map((e) => ({ id: e.id, source: ref(e.source), controller: e.controller, steps: [], label: e.label, batch: e.batch })),
     pending: state.pending ? viewPending(state.pending, viewer, ref) : null,
     modifiers: state.modifiers.filter((m) => vis.has(m.uid)).map((m) => ({ ...m, uid: alias(m.uid) })),
     usedThisTurn: state.usedThisTurn.map(usedKey).filter((k): k is string => k !== null),
@@ -162,8 +167,9 @@ function aliasAction(action: Action, ref: (uid: string) => string): Action {
   switch (action.type) {
     case 'playCard':
     case 'activate':
-    case 'counter':
       return { ...action, uid: ref(action.uid) };
+    case 'counter':
+      return { ...action, uid: ref(action.uid), ...(action.target !== undefined ? { target: ref(action.target) } : {}) };
     case 'attachDon':
     case 'detachDon':
       return { ...action, target: ref(action.target) };
@@ -181,7 +187,7 @@ function aliasAction(action: Action, ref: (uid: string) => string): Action {
 function sanitizeFrame(f: Frame, ref: (uid: string) => string): Frame {
   switch (f.kind) {
     case 'effect':
-      return { kind: 'effect', source: ref(f.source), controller: f.controller, steps: [], i: 0 };
+      return { kind: 'effect', source: ref(f.source), controller: f.controller, steps: [], i: 0, ...(f.trigger ? { trigger: true as const } : {}) };
     case 'damage':
       return { kind: 'damage', defender: f.defender, remaining: f.remaining, banish: f.banish };
     case 'play':
@@ -208,12 +214,15 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
       // O oponente vê que há uma carta da Vida sendo olhada, nunca qual (nem se tem [Trigger]).
       return { ...p, card: ref(p.card) };
     case 'confirm': {
-      // O oponente não vê o prompt nem se o "sim" está disponível (isso contaria a mão).
-      const { cannot, ...rest } = p;
-      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}) };
+      // O oponente não vê o prompt nem se o "sim" está disponível (isso contaria a mão). No "draw up
+      // to N", só vê que há uma pergunta; quantas foram compradas ele vê pelo tamanho da mão.
+      const { cannot, drawUpTo, ...rest } = p;
+      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}), ...(mine && drawUpTo ? { drawUpTo } : {}) };
     }
-    case 'option':
-      return { ...p, source: ref(p.source), prompt: mine ? p.prompt : '', options: mine ? p.options : [] };
+    case 'option': {
+      const { don, ...rest } = p;
+      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', options: mine ? p.options : [], ...(mine && don ? { don: don.map((d) => (d === 'active' || d === 'rested' ? d : ref(d))) } : {}) };
+    }
     case 'manual':
       return { ...p, source: ref(p.source) };
   }
@@ -250,10 +259,16 @@ export function actionFromView(state: GameState, aliases: Aliases, action: Actio
   const bad = 'Carta inválida ou fora de vista (a visão pode estar desatualizada).';
   switch (action.type) {
     case 'playCard':
-    case 'activate':
-    case 'counter': {
+    case 'activate': {
       const uid = real(action.uid);
       return uid ? { ...action, uid } : bad;
+    }
+    case 'counter': {
+      const uid = real(action.uid);
+      if (!uid) return bad;
+      if (action.target === undefined) return { ...action, uid };
+      const target = real(action.target);
+      return target ? { ...action, uid, target } : bad;
     }
     case 'attachDon':
     case 'detachDon': {

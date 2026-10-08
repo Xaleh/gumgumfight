@@ -26,6 +26,7 @@ const TAGS: Array<[RegExp, string]> = [
   [/\[Your Turn\]/g, '[Seu Turno]'],
   [/\[Opponent's Turn\]/g, '[Turno do Oponente]'],
   [/\[End of Your Turn\]/g, '[Fim do Seu Turno]'],
+  [/\[End of Your Opponent's Turn\]/g, '[Fim do Turno do Oponente]'],
   [/\[On Your Opponent's Attack\]/g, '[No Ataque do Oponente]'],
 ];
 
@@ -304,6 +305,10 @@ const SENTENCES: Rule[] = [
     (_, n) => `Descarte até ${n} ${plural(n, 'carta', 'cartas')} de Vida do oponente.`,
   ],
   [
+    /^Trash up to (\d+) of your opponent's cards from the top of their Life cards\.?$/i,
+    (_, n) => `Descarte até ${n} ${plural(n, 'carta', 'cartas')} do topo da Vida do oponente.`,
+  ],
+  [
     /^Your opponent cannot activate a \[Blocker\] Character that has (\d+) or more power during this battle\.?$/i,
     (_, n) => `Seu oponente não pode ativar um Personagem com [Blocker] que tenha ${n} ou mais de poder durante esta batalha.`,
   ],
@@ -314,6 +319,10 @@ const SENTENCES: Rule[] = [
   [
     /^Your opponent cannot activate \[Blocker\] during this battle\.?$/i,
     'Seu oponente não pode ativar [Blocker] durante esta batalha.',
+  ],
+  [
+    /^Your opponent cannot activate \[Blocker\] during this turn\.?$/i,
+    'Seu oponente não pode ativar [Blocker] durante este turno.',
   ],
   [
     /^Your opponent cannot activate \[Blocker\] if that Leader or Character attacks during this turn\.?$/i,
@@ -403,6 +412,8 @@ const PHRASES: Rule[] = [
   [/If your opponent has (\d+) or more cards in their hand,\s*/gi, (_, n) => `Se o oponente tiver ${n} ou mais cartas na mão, `],
   // Reações ("When …,"): antes das regras de trechos genéricos.
   [/When a DON!! card on your field is returned to your DON!! deck(?: by your effect)?,\s*/gi, 'Quando um DON!! do seu campo voltar ao seu deck de DON!!, '],
+  // Errata de OP02-071 ("on the field").
+  [/When a DON!! card on the field is returned to your DON!! deck(?: by your effect)?,\s*/gi, 'Quando um DON!! do campo voltar ao seu deck de DON!!, '],
   [/When a Character is K\.?O\.?'d,\s*/gi, 'Quando um Personagem for nocauteado, '],
   [/When (?:your opponent's Character|one of your opponent's Characters) is K\.?O\.?'d,\s*/gi, 'Quando um Personagem do oponente for nocauteado, '],
   [/When your opponent activates a \[Blocker\],\s*/gi, 'Quando o oponente ativar um [Blocker], '],

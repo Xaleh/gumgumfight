@@ -569,7 +569,9 @@ describe('efeitos lidos automaticamente', () => {
     const s = toTurn(game(), 3);
     field(s, 0, 'PX-042');
     const small = field(s, 0, 'PX-001');
-    expect(koProtected(s, small, false)).toBe(true);
+    expect(koProtected(s, small, false, undefined, 1)).toBe(true);
+    // Só contra o oponente: o próprio efeito nocauteia (DV-13).
+    expect(koProtected(s, small, false, undefined, 0)).toBe(false);
     expect(koProtected(s, small, true)).toBe(false);
   });
 });

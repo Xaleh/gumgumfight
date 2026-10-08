@@ -42,7 +42,7 @@
         "Heart Pirates",
         "Supernovas"
       ],
-      "text": "[Activate:Main] [Once Per Turn] ② (You may rest the specified number of DON!! cards in your cost area.): If you have 5 Characters, return 1 of your Characters to your hand. Then, play up to 1 Character with a cost of 5 or less from your hand that is a different color than the returned Character.",
+      "text": "[Activate:Main] [Once Per Turn] ② (You may rest the specified number of DON!! cards in your cost area.): If you have 5 Characters, return 1 of your Characters to the owner's hand. Then, play up to 1 Character with a cost of 5 or less from your hand that is a different color than the returned Character.",
       "notes": [
         "This card has been officially errata'd."
       ],
@@ -67,7 +67,7 @@
         "Straw Hat Crew",
         "Supernovas"
       ],
-      "text": "[Activate:Main] [Once Per Turn] ④ (You may rest the specified number of DON!! cards in your cost area): Set up to 1 of your {Supernova} or {Straw Hat Crew} type Character cards with a cost of 5 or less as active. It gains +1000 power during this turn.",
+      "text": "[Activate:Main] [Once Per Turn] ④ (You may rest the specified number of DON!! cards in your cost area): Set up to 1 of your {Supernovas} or {Straw Hat Crew} type Character cards with a cost of 5 or less as active. It gains +1000 power during this turn.",
       "notes": [
         "This card has been officially errata'd."
       ],
@@ -110,7 +110,7 @@
         "Special"
       ],
       "types": [
-        "Film"
+        "FILM"
       ],
       "text": "[On Play] Add up to 1 red Character card other than [Uta] with a cost of 3 or less from your trash to your hand.",
       "notes": [
@@ -249,7 +249,7 @@
         "Wisdom"
       ],
       "types": [
-        "Film"
+        "FILM"
       ],
       "text": "[On Play] You may place 1 card from your hand at the bottom of your deck: Draw 1 card.",
       "set": "OP01",
@@ -364,7 +364,7 @@
       "types": [
         "Straw Hat Crew"
       ],
-      "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Straw Hat Crew} type Character card other than [Nami] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+      "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Straw Hat Crew} type card other than [Nami] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
       "notes": [
         "This card has been officially errata'd."
       ],
@@ -411,7 +411,7 @@
       ],
       "types": [
         "Giant",
-        "New Giant Pirate Crew"
+        "New Giant Pirates"
       ],
       "text": "",
       "set": "OP01",
@@ -432,8 +432,8 @@
         "Special"
       ],
       "types": [
-        "Barto Club Pirates",
-        "Supernovas"
+        "Supernovas",
+        "Barto Club"
       ],
       "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [DON!! x2] [Opponent's Turn] This Character gains +3000 power.",
       "set": "OP01",
@@ -758,9 +758,8 @@
         "Slash"
       ],
       "types": [
-        "Former Whitebeard Pirates",
-        "Land of Wano",
         "Minks",
+        "Land of Wano",
         "The Akazaya Nine"
       ],
       "text": "[DON!! x2] [When Attacking] Set up to 1 of your DON!! cards as active.",
@@ -1871,7 +1870,7 @@
     },
     {
       "id": "OP01-083",
-      "name": "Mr.1 (Daz.Bonez)",
+      "name": "Mr.1(Daz.Bonez)",
       "category": "character",
       "colors": [
         "blue"
@@ -1892,7 +1891,7 @@
     },
     {
       "id": "OP01-084",
-      "name": "Mr.2.Bon.Kurei (Bentham)",
+      "name": "Mr.2.Bon.Kurei(Bentham)",
       "category": "character",
       "colors": [
         "blue"
@@ -1916,7 +1915,7 @@
     },
     {
       "id": "OP01-085",
-      "name": "Mr.3 (Galdino)",
+      "name": "Mr.3(Galdino)",
       "category": "character",
       "colors": [
         "blue"

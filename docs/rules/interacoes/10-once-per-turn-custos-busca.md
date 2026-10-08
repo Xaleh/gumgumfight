@@ -1,0 +1,30 @@
+# [Once Per Turn], custos de ativação, redução de custo, "up to", busca/revelar
+
+## Rulings oficiais
+
+Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e seção das Comprehensive Rules (CR). Os rulings servem de caso de teste.
+
+- **Q&A de regras**: P: cartas com o mesmo nome e [Once Per Turn] podem usar cada uma no turno? R: Sim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 10-2-13-2
+- **OP03-076 (Rob Lucci) / OP07-038 / OP09-001 (Shanks) / OP17-058 (Kaido)**: P: posso recusar o [Once Per Turn] opcional no 1º evento e usar no seguinte? R: Sim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op03.pdf. CR: 8-1-2, 10-2-13-1
+- **PRB02-004 (Jewelry Bonney)**: P: posso não usar o [On Your Opponent's Attack] [Once Per Turn] no 1º ataque para usar depois? R: Não. Ele sempre ativa no ataque. Mesmo sem efeito, não pode ser usado de novo no turno. (Igual: OP02-026 Sanji, obrigatório quando possível.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_prb02.pdf. CR: 8-1-2, 10-2-13-3
+- **ST06-012 (Monkey.D.Garp)**: P: posso pagar só parte do custo (descansar sem descartar)? R: Não. Custos não se pagam parcialmente, e sem pagar tudo o efeito não ativa. Fonte: https://en.onepiece-cardgame.com/pdf/qa_st-06.pdf. CR: 8-3-1-3
+- **Q&A de regras / OP01-042 (Komurasaki) / OP02-065 (Mr.3(Galdino))**: P: posso jogar um Personagem sem ativar o [On Play]? Posso pagar o custo quando a condição não é cumprida? R: O [On Play] é obrigatório, mas se tem custo posso não pagar. Posso pagar mesmo sem condição, e o resto não acontece. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 8-3-1-4, 8-1-2
+- **OP02-004 (Edward.Newgate)**: P: depois do [On Play] "não pode adicionar Vida à mão neste turno", posso pagar um custo "add 1 Life to your hand:"? R: Não. O custo não pode ser pago. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op02.pdf. CR: 1-3-3, 8-2-1-1
+- **P-036 (Monkey.D.Luffy)**: P: posso pagar o custo do [When Attacking] e escolher não dar +1000? R: Não. Fonte: https://en.onepiece-cardgame.com/pdf/qa_promotion-cards.pdf. CR: 8-1-2
+- **Q&A de regras / OP01-067 (Crocodile)**: P: o custo pode ficar abaixo de 0? Um Personagem com custo negativo devolvido à mão é jogado assim? R: Não, é tratado como 0. Não, ele perde os efeitos ao mudar de área. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 1-3-6-2, 3-1-6
+- **OP02-121 (Kuzan) / P-032 (Sengoku)**: P: custo 6 → 1 (−5 do Kuzan) → 0 (−2 do Tsuru). Se o Kuzan sai, quanto fica? R: 4. O valor negativo oculto (−1) entra no cálculo. (Sengoku: 3 → 1 → 0, e removido fica 1.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_op02.pdf. CR: 1-3-6-2-1
+- **OP10-042 (Usopp, Líder)**: P: OP04-089 Bartolomeo (base 3, +1 do Usopp = 4) recebe −2 do Tsuru, −3 do Kaku ou −3 do Issho (permanente do oponente). Qual o custo? R: Tsuru: 2 (permanente primeiro, depois o auto). Kaku: 4 → 1, perde a condição do Usopp, fica 0. Issho: os permanentes do jogador do turno vêm primeiro (3 → 0), e o Usopp não se aplica, então fica 0. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op10.pdf. CR: 8-1-3-3-5, 8-4-6
+- **OP02-025 (Kin'emon) / OP12-061 (Donquixote Rosinante)**: P: a redução "no próximo Personagem X que você jogar" é consumida por outro Personagem, ou por um jogado por efeito sem pagar custo? R: Não é consumida, continua valendo para o próximo que cumprir. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op02.pdf. CR: 8-1-4-2
+- **OP11-023 (Arlong) / ST23-001 (Uta) / ST26-001 (Soba Mask)**: P: com −3 (ou −4) de custo na mão, posso jogá-lo por efeitos de "jogue custo ≤X" (ex.: OP01-047 Law)? R: Sim. O custo reduzido na mão vale para esses efeitos. (Mas OP08-084 Jack: "+4 cost" só vale em campo, ST14-001 idem.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_op11.pdf. CR: 2-7-6, 2-8-2
+- **Q&A de regras / OP02-062 (Monkey.D.Luffy) / ST04-003 (Kaido)**: P: "up to" permite 0? A parte seguinte acontece? R: Sim. O Luffy ganha [Double Attack] mesmo devolvendo 0, e o Kaido ganha [Rush] mesmo sem K.O. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 1-3-5-1, 4-8-1
+- **OP01-016 (Nami) / OP01-030 / OP01-041**: P: na busca "olhe 5 e adicione X", se não houver nada válido, ou se o deck tiver ≤4 cartas? R: Todas vão ao fundo do deck em qualquer ordem. Olho as que houver, e o deck não conta como 0 enquanto olho. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op01.pdf. CR: 11-3-2, 11-3-3
+- **OP01-073 (Donquixote Doflamingo) / OP17-050 / OP15-066**: P: ao olhar 5 e devolver ao topo ou fundo, posso dividir? R: Não. Todas vão ao topo ou todas ao fundo, na ordem escolhida. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op01.pdf. CR: 1-3-7
+- **OP01-060 (Donquixote Doflamingo) / OP10-022 / ST17-001 / ST22-003**: P: o que faço com uma carta revelada que não foi jogada? R: Volta virada para baixo ao topo do deck (ou da Vida, no Law). Se a revelada é "comprada", conta como uma das cartas compradas. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op01.pdf. CR: 11-2-2
+- **OP08-040 (Atmos) / OP12-079 / OP07-111 (Lilith)**: P: o que significa "you may reveal 2 cards from your hand:"? Revelo cartas buscadas? R: Mostrar e devolver à mão. Busca do deck para a mão exige revelar (Lilith), mas OP12-079 tem ruling próprio: a carta adicionada pelo [Main] não é revelada. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op08.pdf. CR: 11-2-1
+- **OP12-099 (Kalgara)**: P: com 2 Kalgaras, compro 2 quando sai uma Vida? R: Não. Depois da 1ª compra, o próprio efeito impede comprar pelo resto do turno, e a 2ª não faz nada. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op12.pdf. CR: 1-3-3
+
+## No motor
+
+[Once Per Turn] por carta (`uid:índice`), esquecido quando a carta sai do campo ou entra nele (carta nova, 3-1-6); custo tudo-ou-nada; custo negativo vale 0 somando o negativo; "up to" permite 0 e, sem "up to", a escolha exige o máximo possível (`TargetSpec.required`, 8-4-4-1); busca pode não achar (conforme).
+
+Divergências deste tema: DV-14 (corrigidas: DV-08, DV-10, DV-31) (detalhes em [../divergencias.md](../divergencias.md)).

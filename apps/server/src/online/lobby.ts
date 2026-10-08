@@ -4,8 +4,8 @@
 
 import { randomBytes, randomInt } from 'node:crypto';
 import type { CardData, PlayerId } from '@gumgum/engine';
-import type { FormatId } from '../stats/catalog';
-import { newRoomData, randomToken, Room, type RoomData, type RoomResult, type RoomTournament, type SeatInfo } from './room';
+import { FORMATS, type FormatId } from '../stats/catalog';
+import { newRoomData, randomToken, Room, type RoomData, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
 
 /** Quem quer jogar (perfil do jogador e deck escolhido). */
 export type SeatRequest = Omit<SeatInfo, 'token'>;
@@ -57,7 +57,24 @@ export interface LiveRoom {
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
 }
 
+/** Contadores públicos do menu (sem nomes: só números). */
+export interface OnlineStats {
+  /** Pessoas no menu, jogando, na fila ou assistindo. */
+  online: number;
+  /** Partidas em andamento, por tipo de sala. */
+  playing: Record<RoomQueue, number>;
+  /** Salas privadas esperando o segundo jogador. */
+  waiting: number;
+  /** Quem está na fila agora, por fila e formato. */
+  queue: Record<QueueKind, Record<FormatId, number>>;
+  spectators: number;
+}
+
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+/** Quem está no menu manda um sinal a cada ~10 s; some depois deste tempo sem sinal. */
+const PRESENCE_TTL_MS = 30_000;
+/** Teto de navegadores lembrados (o código vem do navegador: não deixa a lista crescer sem fim). */
+const PRESENCE_MAX = 20_000;
 /** Sala privada esperando o segundo jogador. */
 const WAITING_TTL_MS = 30 * 60_000;
 /** Sala terminada (tela de resultado e revanche). */
@@ -79,6 +96,8 @@ export class Lobby {
   private readonly tournamentRooms = new Map<string, string>();
   private queue: Entry[] = [];
   private readonly finishedAt = new Map<string, number>();
+  /** Navegadores com o menu aberto → último sinal. */
+  private readonly presence = new Map<string, number>();
   private readonly deps: LobbyDeps & { now: () => number; log: (msg: string) => void };
   private sweeper: ReturnType<typeof setInterval> | null = null;
 
@@ -290,6 +309,47 @@ export class Lobby {
     const id = this.codes.get(code.trim().toUpperCase());
     const room = id ? this.rooms.get(id) : undefined;
     return room && room.status !== 'waiting' ? room : null;
+  }
+
+  // ------------------------------------------------------------------ contadores do menu
+
+  /** Sinal de quem está com o menu aberto (conta em "conectados" por PRESENCE_TTL_MS). */
+  touch(ownerHash: string) {
+    const now = this.deps.now();
+    this.presence.delete(ownerHash);
+    this.presence.set(ownerHash, now);
+    // Ordem de inserção = ordem do último sinal: os mais antigos ficam no começo.
+    for (const [key, at] of this.presence) {
+      if (now - at < PRESENCE_TTL_MS && this.presence.size <= PRESENCE_MAX) break;
+      this.presence.delete(key);
+    }
+  }
+
+  stats(): OnlineStats {
+    const now = this.deps.now();
+    const people = new Set<string>();
+    for (const [key, at] of this.presence) if (now - at < PRESENCE_TTL_MS) people.add(key);
+    const playing: Record<RoomQueue, number> = { private: 0, casual: 0, ranked: 0, bot: 0, tournament: 0 };
+    let waiting = 0;
+    let spectators = 0;
+    for (const room of this.rooms.values()) {
+      if (room.status === 'finished') continue;
+      if (room.status === 'waiting') waiting++;
+      else playing[room.data.queue]++;
+      spectators += room.spectators;
+      room.data.seats.forEach((s, i) => {
+        if (!s.bot && room.connected(i as PlayerId)) people.add(s.ownerHash);
+      });
+    }
+    const byFormat = () => Object.fromEntries(FORMATS.map((f) => [f.id, 0])) as Record<FormatId, number>;
+    const queue: OnlineStats['queue'] = { casual: byFormat(), ranked: byFormat() };
+    for (const e of this.queue) {
+      if (e.matched || now - e.lastSeen >= QUEUE_STALE_MS) continue;
+      queue[e.queue][e.format]++;
+      people.add(e.seat.ownerHash);
+    }
+    // Espectadores não se identificam: entram só como número.
+    return { online: people.size + spectators, playing, waiting, queue, spectators };
   }
 
   // ------------------------------------------------------------------ filas

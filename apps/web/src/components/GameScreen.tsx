@@ -4,21 +4,21 @@ import {
   cancelAllowed,
   cardDef,
   cardStatuses,
+  counterTargets,
   counterValue,
   type GameState,
+  getCost,
   getPower,
   HIDDEN_CARD,
   legalActions,
   locate,
-  manualAllowed,
   type Pending,
   type PlayerId,
   translateToPt,
   zoneOf,
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, isDev, type OnlineSeat, type WatchTarget } from '../api';
-import { useAuth } from '../auth';
+import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
@@ -29,7 +29,6 @@ import { CardView, type Highlight } from './CardView';
 import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
-import { ManualTools } from './ManualTools';
 import { useBoardMotion } from './Motion';
 import {
   EmoteBar,
@@ -67,12 +66,14 @@ interface Drag {
   /** Posições na fileira dos DON!! arrastados (ficam apagados enquanto o arrasto dura). */
   dons?: number[];
 }
-type Sheet = null | 'menu' | 'log' | 'tools' | 'hand' | { trash: PlayerId };
+type Sheet = null | 'menu' | 'log' | 'hand' | { trash: PlayerId };
 
 const LONG_PRESS_MS = 420;
 const DRAG_THRESHOLD = 9;
 /** Quanto puxar a carta da mão para cima até ela "sair" (arrastar). */
 const HAND_PULL = 22;
+/** Com o mouse, deslizar a carta da mão para os lados já começa a arrastá-la (reordenar ou jogar). */
+const HAND_SLIDE = 14;
 
 function useMediaQuery(query: string) {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches);
@@ -108,7 +109,7 @@ interface TableGame {
 
 type TableKind = GameSetup['mode'] | 'online';
 
-/** Partida no navegador: contra o bot, bot x bot ou replay. */
+/** Partida no navegador: contra o bot ou replay. */
 export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onExit: () => void; onRematch?: () => void }) {
   const game = useGame(setup);
   // Registra o resultado no servidor (que refaz a partida a partir das ações). Replays não contam de novo.
@@ -281,9 +282,6 @@ function Table({
   const { state, dispatch, human } = game;
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
-  const ranked = online?.room?.queue === 'ranked';
-  // Ferramentas manuais (mexer na mesa à mão) são função de desenvolvimento: só para o perfil Dev.
-  const dev = isDev(useAuth().user?.role);
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
@@ -323,7 +321,7 @@ function Table({
   const [sheet, setSheet] = useState<Sheet>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
-  const [showBotHand, setShowBotHand] = useState(kind === 'demo' || kind === 'replay' || watching);
+  const [showBotHand, setShowBotHand] = useState(kind === 'replay' || watching);
   const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
@@ -360,6 +358,20 @@ function Table({
     const rest = orderedHand.filter((u) => u !== uid);
     rest.splice(Math.max(0, Math.min(index, rest.length)), 0, uid);
     return rest;
+  };
+  /** Ordena a mão por custo (Eventos e Stages depois dos Personagens de mesmo custo) e nome; só exibição. */
+  const sortHand = () => {
+    const rank = (uid: string) => {
+      const d = cardDef(state, uid);
+      return [d.cost ?? 0, d.category === 'character' ? 0 : d.category === 'event' ? 1 : 2, d.name] as const;
+    };
+    setHandOrder(
+      [...myHand].sort((a, b) => {
+        const [ca, ka, na] = rank(a);
+        const [cb, kb, nb] = rank(b);
+        return ca - cb || ka - kb || na.localeCompare(nb);
+      }),
+    );
   };
   const handView = drag?.kind === 'hand' && drag.over === 'hand' && drag.uid && drag.insert !== undefined
     ? reorder(drag.uid, drag.insert)
@@ -417,15 +429,15 @@ function Table({
     const t = setTimeout(() => setShowResult(true), 1200);
     return () => clearTimeout(t);
   }, [over]);
-  const manualOk = dev && human !== null && !ranked && manualAllowed(state, human);
 
   const has = useCallback((pred: (a: Action) => boolean) => legal.some(pred), [legal]);
   const canPlay = (uid: string) => myTurnIdle && has((a) => a.type === 'playCard' && a.uid === uid);
   const canAttackWith = (uid: string) => myTurnIdle && has((a) => a.type === 'attack' && a.attacker === uid);
   /** Etapa de Counter: esta carta da mão pode ser usada como Counter agora? */
   const canCounter = (uid: string) => myPending?.kind === 'counter' && myPending.options.includes(uid);
-  const useCounter = (uid: string) => {
-    dispatch({ type: 'counter', player: human!, uid });
+  /** Usa o Counter; sem `target`, o valor vai para o atacado (o caso comum, num clique só). */
+  const useCounter = (uid: string, target?: string) => {
+    dispatch({ type: 'counter', player: human!, uid, ...(target ? { target } : {}) });
     setZoom(null);
     setSelected(null);
   };
@@ -461,7 +473,7 @@ function Table({
         ? !defense.options.length
           ? 'Nenhuma carta da mão serve como Counter agora: conclua a etapa (o oponente não sabe disso)'
           : quickCounter
-            ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter'
+            ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter (toque longo: dar a outra carta)'
             : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
         : targets
           ? targets.max === 0
@@ -645,6 +657,8 @@ function Table({
     /** Começou na própria mão: deslizar ergue a carta sob o dedo. */
     hand: boolean;
     browsed: boolean;
+    /** Mouse: deslizar para os lados na mão arrasta a carta (no toque, folheia). */
+    mouse: boolean;
   } | null>(null);
   const dragRef = useRef<Drag | null>(null);
   const suppressClick = useRef(false);
@@ -708,6 +722,7 @@ function Table({
       moved: false,
       hand,
       browsed: false,
+      mouse: e.pointerType === 'mouse',
     };
   };
 
@@ -754,8 +769,9 @@ function Table({
       const p = press.current;
       if (!p) return;
       if (p.hand && !dragRef.current) {
-        // Na mão: puxar para cima tira a carta; para os lados, ergue a carta sob o dedo.
-        if (p.kind && p.y - e.clientY > HAND_PULL) startDrag(p, e);
+        // Na mão: puxar para cima tira a carta; para os lados, ergue a carta sob o dedo (toque) ou, com o
+        // mouse, já arrasta (soltar na própria mão reordena).
+        if (p.kind && (p.y - e.clientY > HAND_PULL || (p.mouse && Math.abs(e.clientX - p.x) > HAND_SLIDE))) startDrag(p, e);
         else {
           if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) p.moved = true;
           if (Math.hypot(e.clientX - p.ax, e.clientY - p.ay) > 8) {
@@ -883,6 +899,8 @@ function Table({
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}
+          onSortHand={human !== null && myHand.length > 1 ? sortHand : undefined}
+          turnPulse={animate && myTurnIdle}
           handHint={handHint}
           lifted={lifted}
           ghost={drag?.kind === 'hand' ? drag.uid : null}
@@ -891,6 +909,8 @@ function Table({
               state={state}
               human={human}
               watching={watching}
+              wide={wide}
+              pulse={animate && myTurnIdle}
               hands={
                 spectator?.canHands && online ? { on: online.hands, onToggle: spectator.onToggleHands } : undefined
               }
@@ -912,7 +932,6 @@ function Table({
                     human={human!}
                     onDispatch={dispatch}
                     onCancel={canCancel ? cancelAction : undefined}
-                    onTools={dev ? () => setSheet('tools') : undefined}
                     clock={online && !watching ? <OnlineClock online={online} player={human!} /> : undefined}
                   />
                 ) : mode && human !== null ? (
@@ -968,7 +987,6 @@ function Table({
           cancelHint={cancelHint}
           onCard={onCard}
           highlight={highlight}
-          onTools={dev ? () => setSheet('tools') : undefined}
         />
 
         <AttackArrow state={state} drag={drag} mode={mode} hovered={hovered} legal={legal} />
@@ -994,8 +1012,9 @@ function Table({
             state={state}
             uid={zoom}
             legal={myTurnIdle ? legal : []}
-            canManual={manualOk}
             onCounter={canCounter(zoom) ? () => useCounter(zoom) : undefined}
+            counterTargets={canCounter(zoom) && state.battle && human !== null ? counterTargets(state, human).filter((u) => u !== state.battle!.target) : undefined}
+            onCounterTo={(target) => useCounter(zoom, target)}
             onClose={() => setZoom(null)}
             onDispatch={(a) => {
               dispatch(a);
@@ -1012,10 +1031,6 @@ function Table({
             onAttackMode={(attacker) => {
               setMode({ kind: 'attack', attacker });
               setZoom(null);
-            }}
-            onTools={() => {
-              setZoom(null);
-              setSheet('tools');
             }}
           />
         )}
@@ -1036,11 +1051,6 @@ function Table({
               <button className="btn" onClick={() => setSheet('log')}>
                 📜 Histórico
               </button>
-              {manualOk && (
-                <button className="btn" onClick={() => setSheet('tools')}>
-                  ⚙ Ferramentas manuais
-                </button>
-              )}
               {(!isOnline || over) && (
                 <button className="btn" onClick={game.downloadReplay}>
                   ⤓ Baixar replay
@@ -1081,7 +1091,7 @@ function Table({
               </label>
             )}
             <div className="sheet-section">
-              <SettingsControls compact />
+              <SettingsControls />
             </div>
           </SheetFrame>
         )}
@@ -1118,8 +1128,15 @@ function Table({
                   ? `${handHint}.`
                   : myPending?.kind === 'selectTargets'
                     ? myPending.prompt
-                    : 'Toque numa carta para ver as ações. Segure para ler.'}
+                    : 'Toque numa carta para ver as ações. Segure para ler. Na mesa, arraste uma carta para cima e solte-a entre as outras para mudar a ordem.'}
             </p>
+            {orderedHand.length > 1 && (
+              <div className="btn-row center hand-sheet-tools">
+                <button className="btn small" onClick={sortHand} title="Ordena a mão por custo e nome (só a exibição)">
+                  ⇅ Ordenar por custo
+                </button>
+              </div>
+            )}
             <div className="hand-grid">
               {orderedHand.map((uid) => (
                 <CardView key={uid} state={state} uid={uid} highlight={highlight(uid)} onClick={() => onCard(uid)} />
@@ -1131,19 +1148,6 @@ function Table({
         {sheet === 'log' && (
           <SheetFrame title="Histórico" onClose={() => setSheet(null)}>
             <LogPanel state={state} />
-          </SheetFrame>
-        )}
-
-        {sheet === 'tools' && human !== null && (
-          <SheetFrame title="Ferramentas manuais" onClose={() => setSheet(null)}>
-            <ManualPrompt state={state} onDone={() => dispatch({ type: 'manualDone', player: human })} />
-            {ranked ? (
-              <p className="muted">As ferramentas manuais não são permitidas na ranqueada.</p>
-            ) : manualOk ? (
-              <ManualTools state={state} human={human} selected={selected} onDispatch={dispatch} onSelect={setSelected} peek={online?.peek} />
-            ) : (
-              <p className="muted">As ferramentas ficam disponíveis no seu turno, num efeito manual ou na etapa de Counter.</p>
-            )}
           </SheetFrame>
         )}
 
@@ -1216,9 +1220,6 @@ function Table({
             )}
           </div>
           <CardDetail state={state} uid={detailUid} />
-          {manualOk && pending?.kind !== 'manual' && (
-            <ManualTools state={state} human={human!} selected={selected} onDispatch={dispatch} onSelect={setSelected} peek={online?.peek} />
-          )}
           <LogPanel state={state} />
         </aside>
       )}
@@ -1248,10 +1249,15 @@ function CenterBand(props: {
   request?: ReactNode;
   /** Blocker/Counter ou escolha de alvos do jogador: o botão de decisão toma o lugar de "Encerrar turno". */
   decision?: ReactNode;
+  /** Tela larga: o botão de decisão vai para o meio da faixa, maior, ao lado do confronto/pedido. */
+  wide?: boolean;
+  /** É o seu turno e a jogada está com você: o círculo do turno e "Encerrar turno" pulsam. */
+  pulse?: boolean;
 }) {
   const { state, human, mode, acting, watching } = props;
   const b = state.battle;
   const mineTurn = human === null ? state.activePlayer === 0 : state.activePlayer === human;
+  const centerDecision = Boolean(props.wide && props.decision);
 
   let middle: ReactNode = null;
   if (props.request) middle = props.request;
@@ -1279,7 +1285,8 @@ function CenterBand(props: {
   else if (state.phase === 'mulligan' && (human !== null || watching) && acting !== null && acting !== human)
     middle = (
       <span className="hint-pill thinking">
-        {state.players[acting].name} está escolhendo a mão inicial<span className="dots" />
+        {state.players[acting].name} {state.pending?.kind === 'mulligan' ? 'está escolhendo a mão inicial' : 'está preparando o início da partida'}
+        <span className="dots" />
       </span>
     );
   else if (props.canEnd)
@@ -1291,15 +1298,20 @@ function CenterBand(props: {
 
   return (
     <>
-      <div className={['turn-chip', mineTurn ? 'mine' : 'theirs'].join(' ')}>
+      <div className={['turn-chip', mineTurn ? 'mine' : 'theirs', props.pulse ? 'pulse' : ''].join(' ')} title={mineTurn ? 'Seu turno' : 'Turno do oponente'}>
         <small>Turno</small>
         <b>{state.phase === 'mulligan' ? '—' : state.turn}</b>
       </div>
-      <div className="band-middle">{middle}</div>
-      {props.decision ? (
+      <div className={['band-middle', centerDecision ? 'with-decision' : ''].join(' ')}>
+        {middle}
+        {centerDecision && props.decision}
+      </div>
+      {centerDecision ? (
+        <span className="end-turn placeholder" aria-hidden="true" />
+      ) : props.decision ? (
         props.decision
       ) : human !== null ? (
-        <button className="end-turn" disabled={!props.canEnd} onClick={props.onEnd}>
+        <button className={['end-turn', props.pulse && props.canEnd ? 'pulse' : ''].join(' ')} disabled={!props.canEnd} onClick={props.onEnd}>
           Encerrar
           <br />
           turno
@@ -1480,7 +1492,6 @@ function DecisionButton({
   human,
   onDispatch,
   onCancel,
-  onTools,
   clock,
   sheet,
 }: {
@@ -1492,8 +1503,6 @@ function DecisionButton({
   onDispatch: (a: Action) => void;
   /** A ação que pediu esta escolha ainda pode ser desfeita: botão Cancelar ao lado do de confirmar. */
   onCancel?: () => void;
-  /** Ferramentas manuais (perfil Dev) durante a etapa de Counter. */
-  onTools?: () => void;
   clock?: ReactNode;
   /** Dentro da folha da mão: botão largo. */
   sheet?: boolean;
@@ -1503,11 +1512,6 @@ function DecisionButton({
   const act = () => onDispatch(d.action(human));
   return (
     <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
-      {onTools && pending.kind === 'counter' && (
-        <button className="btn small defense-tools" onClick={onTools} title="Ferramentas manuais">
-          ⚙
-        </button>
-      )}
       {onCancel && pending.kind === 'selectTargets' && (
         <button className="end-turn defense cancel side" onClick={onCancel} title="Desfazer a ação e voltar ao estado anterior">
           <b>Cancelar</b>
@@ -1619,14 +1623,18 @@ function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null
   if (human !== null && defender === human) status = hits ? `Faltam +${need} para defender` : 'Defendido!';
   else status = hits ? 'O ataque vai acertar' : `Faltam +${def - atk} para acertar`;
   // Etapa da batalha (a visão do oponente também traz o tipo da escolha pendente).
+  // A carta do [Trigger] em resolução está fora das áreas (nem Vida nem descarte): aparece aqui.
+  const trigger = state.limbo?.find((u) => state.cards[u]);
   const step =
     state.pending?.kind === 'block'
       ? 'Etapa de Bloqueio'
       : state.pending?.kind === 'counter'
         ? 'Etapa de Counter'
-        : state.stack.some((f) => f.kind === 'damage')
-          ? 'Etapa de Dano'
-          : 'Ataque';
+        : trigger
+          ? `[Trigger] ${cardDef(state, trigger).name}`
+          : state.stack.some((f) => f.kind === 'damage')
+            ? 'Etapa de Dano'
+            : 'Ataque';
   return (
     <div className="battle-info">
       <div key={step} className="battle-step">
@@ -1767,13 +1775,32 @@ function Prompt(props: {
   cancelHint?: string | null;
   onCard: (uid: string) => void;
   highlight: (uid: string) => Highlight;
-  /** Abre as ferramentas manuais (só o perfil Dev tem). */
-  onTools?: () => void;
 }) {
   const { state, human, picked, onDispatch, onCancel, cancelHint } = props;
   const { lang } = useSettings();
   const pending = state.pending;
+  // "Ver a mesa": a janela da pergunta recolhe para um balão no topo, para olhar o campo e a mão antes de
+  // responder (ex.: usar ou não um efeito quando o oponente ataca). Volta sozinha quando a situação muda.
+  const [peek, setPeek] = useState(false);
+  useEffect(() => setPeek(false), [pending]);
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
+  const peekButton = (
+    <button className="btn peek" onClick={() => setPeek(true)} title="Recolhe a pergunta para você olhar a mesa e a mão; depois volte e responda">
+      👁 Ver a mesa
+    </button>
+  );
+  if (peek && (pending.kind === 'confirm' || pending.kind === 'option' || pending.kind === 'selectTargets' || pending.kind === 'lifeCard')) {
+    const title = pending.kind === 'lifeCard' ? `Carta da Vida: ${cardDef(state, pending.card).name}` : pending.prompt;
+    return (
+      <PromptPill title={title} subtitle="A mesa e a mão estão à vista. Toque numa carta para ler; depois volte à pergunta.">
+        <div className="btn-row center">
+          <button className="btn primary" onClick={() => setPeek(false)}>
+            Voltar à pergunta
+          </button>
+        </div>
+      </PromptPill>
+    );
+  }
   /** Botão de desfazer a ação (quando o motor permite) ou o motivo de não dar mais. */
   const cancel = onCancel ? (
     <button className="btn cancel" onClick={onCancel} title="Desfazer a ação e voltar ao estado anterior">
@@ -1839,6 +1866,7 @@ function Prompt(props: {
       const blocked = shown ? shown.filter((u) => !pending.options.includes(u)).length : 0;
       const confirm = (
         <div className="btn-row">
+          {peekButton}
           {cancel}
           {pending.max === 0 ? (
             <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
@@ -1885,7 +1913,9 @@ function Prompt(props: {
                     : 'O oponente vê a mesma escolha, havendo carta para escolher ou não.'
                   : pending.ordered
                     ? 'Toque nas cartas na ordem desejada. Segure para ler.'
-                    : 'Toque nas cartas para escolher. Segure para ler.'}
+                    : pending.max === 1
+                      ? 'Toque numa carta para marcá-la (tocar em outra troca a escolha) e confirme. Segure para ler.'
+                      : 'Toque nas cartas para escolher. Segure para ler.'}
                 {blocked > 0 && ' As cartas apagadas não podem ser escolhidas.'}
               </p>
               {options}
@@ -1915,29 +1945,15 @@ function Prompt(props: {
       // confronto de poder e perto da mão; a dica de uso fica logo acima do leque.
       return null;
     case 'manual': {
+      // Efeito ainda não automatizado (⚙): o jogo só avisa e segue sem aplicá-lo.
       const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
       const name = cardDef(state, pending.source).name;
-      // Sem as ferramentas manuais (perfil que não é Dev), o efeito ainda não automático é só avisado e pulado.
-      if (!props.onTools) {
-        return (
-          <PromptPill title={`⚙ Efeito ainda não automático: ${name}`} subtitle={`${text} (Este efeito não é aplicado.)`} clamp>
-            <div className="btn-row">
-              <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
-                Continuar
-              </button>
-            </div>
-          </PromptPill>
-        );
-      }
       return (
-        <PromptPill title={`⚙ Efeito manual: ${name}`} subtitle={text} clamp>
+        <PromptPill title={`⚙ Efeito ainda não automático: ${name}`} subtitle={`${text} (Este efeito não é aplicado.)`} clamp>
           <div className="btn-row">
             {cancel}
-            <button className="btn" onClick={props.onTools}>
-              Ferramentas
-            </button>
             <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
-              Concluir efeito
+              Continuar
             </button>
           </div>
         </PromptPill>
@@ -1977,6 +1993,7 @@ function Prompt(props: {
                 )}
               </button>
             </div>
+            {trigger && <div className="btn-row center">{peekButton}</div>}
           </div>
         </div>
       );
@@ -1994,11 +2011,14 @@ function Prompt(props: {
                   className={`btn${index === 0 ? ' primary' : ''}`}
                   onClick={() => onDispatch({ type: 'option', player: human, index })}
                 >
-                  {lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
+                  {!pending.order && !pending.don && lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
                 </button>
               ))}
             </div>
-            {cancel && <div className="btn-row center">{cancel}</div>}
+            <div className="btn-row center">
+              {peekButton}
+              {cancel}
+            </div>
             {hint}
           </div>
         </div>
@@ -2015,14 +2035,17 @@ function Prompt(props: {
             <div className="btn-row center">
               {!pending.cannot && (
                 <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                  Pagar e usar
+                  {pending.drawUpTo ? 'Comprar 1 carta' : 'Pagar e usar'}
                 </button>
               )}
               <button className={`btn big${pending.cannot ? ' primary' : ''}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-                Não usar
+                {pending.drawUpTo ? 'Parar' : 'Não usar'}
               </button>
             </div>
-            {cancel && <div className="btn-row center">{cancel}</div>}
+            <div className="btn-row center">
+              {peekButton}
+              {cancel}
+            </div>
             {hint}
           </div>
         </div>
@@ -2067,42 +2090,23 @@ function PromptPill({
   );
 }
 
-function ManualPrompt({ state, onDone }: { state: GameState; onDone: () => void }) {
-  const { lang } = useSettings();
-  const pending = state.pending;
-  if (pending?.kind !== 'manual') return null;
-  const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
-  return (
-    <div className="manual-box">
-      <div className="prompt-title">⚙ Efeito manual: {cardDef(state, pending.source).name}</div>
-      <p className="effect">{text}</p>
-      <p className="muted small">
-        Ainda não é automático: aplique com as ferramentas abaixo (toque numa carta da mesa e depois em ⚙ para ver as opções
-        dela) e depois conclua. Se não se aplicar, só conclua.
-      </p>
-      <button className="btn primary" onClick={onDone}>
-        Concluir efeito
-      </button>
-    </div>
-  );
-}
-
 // ------------------------------------------------------------------ zoom da carta
 
 function CardZoom(props: {
   state: GameState;
   uid: string;
   legal: Action[];
-  canManual: boolean;
   /** Etapa de Counter: confirma o uso desta carta como Counter. */
   onCounter?: () => void;
+  /** Etapa de Counter: outras cartas do jogador que podem receber o valor de Counter (o Líder ou 1 Personagem, 7-1-3-1-1). */
+  counterTargets?: string[];
+  onCounterTo: (target: string) => void;
   onClose: () => void;
   onDispatch: (a: Action) => void;
   /** DON!! marcados na fileira: o botão de anexar passa a anexar todos eles nesta carta. */
   donCount: number;
   onAttachDons: (target: string, count: number) => void;
   onAttackMode: (attacker: string) => void;
-  onTools: () => void;
 }) {
   const { state, uid, legal } = props;
   const { lang } = useSettings();
@@ -2120,12 +2124,12 @@ function CardZoom(props: {
   // Eventos: usar a carta (ou o Counter dela) é o texto dela, destacado sobre a carta.
   const eventPlay = isEvent ? play : undefined;
   const eventCounter = isEvent ? props.onCounter : undefined;
-  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || detach || props.canManual || (props.onCounter && !eventCounter));
+  const hasActions = Boolean((play && !eventPlay) || canAttack || attach || detach || (props.onCounter && !eventCounter));
   const counter = counterValue(state, uid);
   const eventText = isEvent ? cardText(def, lang).text : '';
   // Habilidades ativáveis viram painéis brilhantes (modelo Pokémon TCG Pocket): em tela larga ficam ao lado da
   // carta, ligados a ela pela borda ciano; em tela estreita, sobre a parte de baixo da carta. Com painel na tela, o
-  // fundo escurece mais e as ações secundárias (DON!!, ferramentas) viram botões discretos para não competir.
+  // fundo escurece mais e as ações secundárias (DON!!) viram botões discretos para não competir.
   const hasPlates = activates.length > 0 || Boolean(eventPlay) || Boolean(eventCounter);
   const color = def.colors[0] ?? 'red';
 
@@ -2191,6 +2195,22 @@ function CardZoom(props: {
                 {counter > 0 && <span className="cost-chip">+{counter}</span>}
               </button>
             )}
+            {/* O Counter vai para o atacado; dá também para dar o bônus a outra carta (acaba no fim da batalha). */}
+            {props.onCounter && !eventCounter && Boolean(props.counterTargets?.length) && (
+              <div className="counter-other">
+                <small>ou dar a</small>
+                {props.counterTargets!.map((t) => (
+                  <button
+                    key={t}
+                    className="btn small quiet"
+                    onClick={() => props.onCounterTo(t)}
+                    title={`Dar o Counter a ${cardDef(state, t).name} (o bônus acaba no fim da batalha)`}
+                  >
+                    {cardDef(state, t).name} <small>({getPower(state, t)})</small>
+                  </button>
+                ))}
+              </div>
+            )}
             {play && !eventPlay && (
               <button className="btn primary big" onClick={() => props.onDispatch(play)}>
                 Jogar <span className="cost-chip">{def.cost}</span>
@@ -2219,15 +2239,15 @@ function CardZoom(props: {
                 − 1 DON!! <small>({loose === 1 ? '1 pode voltar' : `${loose} podem voltar`})</small>
               </button>
             )}
-            {props.canManual && (
-              <button className={hasPlates ? 'btn small quiet' : 'btn small'} onClick={props.onTools}>
-                ⚙ Ferramentas manuais
-              </button>
-            )}
           </div>
         )}
         <div className="zoom-text">
-          <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} statuses={loc ? cardStatuses(state, uid) : undefined} />
+          <CardTextInfo
+            def={def}
+            power={loc ? getPower(state, uid) : undefined}
+            cost={loc && def.category !== 'leader' ? getCost(state, uid) : undefined}
+            statuses={loc ? cardStatuses(state, uid) : undefined}
+          />
         </div>
       </div>
     </div>
@@ -2245,7 +2265,12 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
       <div className="detail-card">
         <CardView state={state} uid={uid} fc={loc?.fc} />
       </div>
-      <CardTextInfo def={def} power={loc ? getPower(state, uid) : undefined} statuses={loc ? cardStatuses(state, uid) : undefined} />
+      <CardTextInfo
+        def={def}
+        power={loc ? getPower(state, uid) : undefined}
+        cost={loc && def.category !== 'leader' ? getCost(state, uid) : undefined}
+        statuses={loc ? cardStatuses(state, uid) : undefined}
+      />
     </div>
   );
 }

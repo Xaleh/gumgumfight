@@ -1,11 +1,27 @@
-import { type Action, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId, REPLAY_VERSION, upgradeReplayActions } from '@gumgum/engine';
-import { useEffect, useState } from 'react';
-import { type ActiveRoom, api, canPlay, deckGroups, type DeckSummary, type FormatId, type OnlineSeat, whyNotPlayable } from '../api';
-import { AccountBar, useAuth } from '../auth';
+import { type Action, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
+import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type ActiveRoom,
+  api,
+  ApiError,
+  canPlay,
+  deckGroups,
+  type DeckSummary,
+  type FormatId,
+  type OnlineSeat,
+  type QueueKind,
+  type WatchTarget,
+  whyNotPlayable,
+} from '../api';
+import jollyRoger from '../assets/jolly-roger.svg';
+import { useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
-import { SettingsControls } from '../settings';
+import { NICKNAME_EVENT, SettingsModal } from '../settings';
+import { type NavItem, TopBar } from './AppShell';
+import { LiveNow, MetaBlock, TournamentsBlock, usePoll } from './HomeBlocks';
+import { Icon, type IconName } from './Icons';
 import { LeaderArt } from './LeaderArt';
-import { OnlineMenu, roomCodeFromUrl } from './OnlineMenu';
+import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 
 /** Código de sala do link de convite (lido uma vez, ao carregar a página). */
 const URL_ROOM_CODE = roomCodeFromUrl();
@@ -24,8 +40,8 @@ async function buildSetup(
   online?: { decks: [DeckList, DeckList]; seed128: number[] },
   /** Sem `firstPlayer`: o vencedor do sorteio escolhe se joga primeiro. */
   chooseFirst = firstPlayer === undefined,
-  /** Replay da versão 1 (antes da etapa de Counter / carta da Vida sempre pedirem uma ação). */
-  legacyScript = false,
+  /** Versão do replay (as anteriores à atual ganham as respostas implícitas e, até a 8, a preparação antiga). */
+  replayVersion?: number,
 ): Promise<GameSetup> {
   let a: { deck: DeckList; cards: CardData[] };
   let b: typeof a;
@@ -52,12 +68,15 @@ async function buildSetup(
       ...(chooseFirst && firstPlayer === undefined ? { chooseFirst: true } : {}),
       cards: [...cards.values()],
       players: [
-        { name: names[0], deck: a.deck, isBot: mode === 'demo' },
+        { name: names[0], deck: a.deck, isBot: false },
         { name: names[1], deck: b.deck, isBot: mode !== 'replay' },
       ],
     },
   };
-  if (script && legacyScript) setup.script = upgradeReplayActions(setup.config, script);
+  if (script && replayVersion !== undefined && replayVersion < REPLAY_VERSION) {
+    setup.config = replayConfig(setup.config, replayVersion);
+    setup.script = upgradeReplayActions(setup.config, script);
+  }
   return setup;
 }
 
@@ -83,40 +102,6 @@ function DeckArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
       colors={deck?.colors}
       size={small ? 'small' : undefined}
     />
-  );
-}
-
-function DeckPick({
-  who,
-  deck,
-  random,
-  format,
-  onClick,
-}: {
-  who: string;
-  deck?: DeckSummary;
-  random?: boolean;
-  format: FormatId;
-  onClick: () => void;
-}) {
-  return (
-    <button className="deck-pick" onClick={onClick}>
-      <span className="who">{who}</span>
-      <DeckArt deck={random ? undefined : deck} />
-      <span className="name">{random ? 'Aleatório' : (deck?.name ?? 'Escolher deck')}</span>
-      {!random && <FormatWarning deck={deck} format={format} />}
-      {!random && <DeckWarning deck={deck} />}
-    </button>
-  );
-}
-
-/** Aviso de deck que não vale no formato escolhido (cartas banidas ou rotacionadas). */
-function FormatWarning({ deck, format }: { deck?: DeckSummary; format: FormatId }) {
-  if (!deck?.valid || canPlay(deck, format)) return null;
-  return (
-    <div className="small deck-warning bad" title={whyNotPlayable(deck, format) ?? undefined}>
-      🚫 Não permitido no {formatLabel(format)}
-    </div>
   );
 }
 
@@ -184,12 +169,145 @@ function DeckPicker({
   );
 }
 
-function DeckWarning({ deck }: { deck?: DeckSummary }) {
-  if (!deck || !deck.unscripted) return null;
+/** Opções de teste (só Dev): seed do embaralhamento e replay salvo. */
+function TestOptions({
+  seed,
+  onSeed,
+  onReplay,
+  onClose,
+}: {
+  seed: number;
+  onSeed: (n: number) => void;
+  onReplay: (f: File) => void;
+  onClose: () => void;
+}) {
   return (
-    <div className="muted small deck-warning" title="Essas cartas entram no jogo, mas sem o efeito">
-      ⚙ {deck.unscripted} sem efeito automático
+    <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h3>Opções de teste</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">
+          <div className="field">
+            <label htmlFor="test-seed">Seed do embaralhamento</label>
+            <div className="seed">
+              <input id="test-seed" type="number" value={seed} onChange={(e) => onSeed(Number(e.target.value) || 0)} />
+              <button className="btn small" onClick={() => onSeed(randomSeed())} title="Sortear outra">
+                🎲
+              </button>
+            </div>
+            <p className="muted small">
+              Número que define a ordem dos decks e o sorteio de quem começa, nas partidas contra o bot. A mesma seed com as mesmas
+              jogadas repete a partida exatamente, o que é útil para reproduzir um problema.
+            </p>
+          </div>
+          <label className="replay-load">
+            Carregar um replay (.json baixado durante uma partida)
+            <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && onReplay(e.target.files[0])} />
+          </label>
+        </div>
+      </div>
     </div>
+  );
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+const fmtClock = (ms: number) => {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** Card de um modo de jogo: cor própria, contador ao vivo e botão de ação. */
+function ModeCard({
+  color,
+  icon,
+  kicker,
+  title,
+  badge,
+  desc,
+  chips,
+  live,
+  note,
+  action,
+  onAction,
+  disabled,
+  highlight,
+  gold,
+  children,
+  cardRef,
+}: {
+  /** Cor da carta (variável CSS). */
+  color: string;
+  icon: IconName;
+  kicker: string;
+  title: string;
+  badge: string;
+  desc: string;
+  chips?: string[];
+  /** Contador ao vivo (null = sem contador neste modo). */
+  live: ReactNode | null;
+  /** Por que o botão está travado (ou um aviso). */
+  note?: string | null;
+  action: string;
+  onAction: () => void;
+  disabled?: boolean;
+  highlight?: boolean;
+  gold?: boolean;
+  children?: ReactNode;
+  cardRef?: Ref<HTMLElement>;
+}) {
+  const id = `mode-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+  return (
+    <article
+      ref={cardRef}
+      className={['mode-card', highlight ? 'highlight' : '', gold ? 'gold' : ''].join(' ')}
+      style={{ ['--mode' as string]: `var(--${color})` }}
+      aria-labelledby={id}
+    >
+      <div className="mode-top">
+        <span className="mode-icon">
+          <Icon name={icon} size={24} />
+        </span>
+        <span className="mode-badge">{badge}</span>
+      </div>
+      <div>
+        <div className="mode-kicker">{kicker}</div>
+        <h3 className="mode-title" id={id}>
+          {title}
+        </h3>
+      </div>
+      <p className="mode-desc">{desc}</p>
+      {chips && chips.length > 0 && (
+        <ul className="home-chips">
+          {chips.map((c) => (
+            <li key={c} className="home-chip">
+              {c}
+            </li>
+          ))}
+        </ul>
+      )}
+      {children}
+      <div className="mode-foot">
+        {live !== null && <div className="mode-live">{live}</div>}
+        {note && <p className="mode-note">{note}</p>}
+        <button type="button" className="mode-btn" disabled={disabled} onClick={onAction}>
+          {action}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function Live({ children, off }: { children: ReactNode; off?: boolean }) {
+  return (
+    <>
+      <span className={['live-dot', off ? 'off' : ''].join(' ')} />
+      <span>{children}</span>
+    </>
   );
 }
 
@@ -200,6 +318,7 @@ export function Menu({
   onStats,
   onOnline,
   onWatch,
+  onWatchRoom,
   onTournaments,
   onAdmin,
   dev = false,
@@ -212,39 +331,78 @@ export function Menu({
   onStats: () => void;
   /** Lista de partidas online para assistir (modo espectador). */
   onWatch: () => void;
-  onTournaments: () => void;
+  /** Assistir direto a uma partida da lista "Ao vivo agora". */
+  onWatchRoom: (target: WatchTarget) => void;
+  /** Torneios (com `id`: a página daquele torneio). */
+  onTournaments: (id?: string) => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste e treino no servidor contra o bot. */
   dev?: boolean;
 }) {
+  const { user, notice: authNotice, error: authError } = useAuth();
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<Exclude<GameMode, 'replay'> | 'online'>(URL_ROOM_CODE ? 'online' : 'bot');
+  /** Erro de uma ação dos modos (fila, sala, bot). */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showTests, setShowTests] = useState(false);
   const [deck0, setDeck0] = useState('');
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
   const [format, setFormat] = useState<FormatId>(savedFormat);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState<null | 0 | 1>(null);
-  const userId = useAuth().user?.id;
+  const [code, setCode] = useState(URL_ROOM_CODE ?? '');
+  const userId = user?.id;
+  /** Apelido do jogador (perfil deste navegador): nome nas partidas contra o bot e online. */
+  const [nickname, setNickname] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .player()
+      .then((p) => !cancelled && setNickname(p?.name ?? null))
+      .catch(() => undefined);
+    const onRename = (e: Event) => setNickname((e as CustomEvent<string>).detail);
+    window.addEventListener(NICKNAME_EVENT, onRename);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(NICKNAME_EVENT, onRename);
+    };
+  }, [userId]);
   /** Treino contra o bot no servidor (fase de testes do modo espectador): a partida pode ser assistida. */
   const [botRooms, setBotRooms] = useState(false);
+  const [timeBank, setTimeBank] = useState<number | null>(null);
   const [onServer, setOnServer] = useState(false);
-  /** Partida online (ou treino contra o bot do servidor) ainda em andamento: atalho para voltar. */
-  const [resume, setResume] = useState<ActiveRoom | null>(null);
-  useEffect(() => {
+  /** Partidas online (ou treino contra o bot do servidor) ainda abertas: atalho para voltar. */
+  const [active, setActive] = useState<ActiveRoom[]>([]);
+  const privateCard = useRef<HTMLElement>(null);
+
+  const stats = usePoll(() => api.online.stats(), 10_000);
+  const tournaments = usePoll(() => api.tournaments.list(), 60_000);
+
+  const refreshActive = useCallback(() => {
     api.online
       .active()
-      .then((rooms) => setResume(rooms.find((r) => r.status === 'playing') ?? null))
+      .then(setActive)
       .catch(() => undefined);
-  }, [userId]);
+  }, []);
+  useEffect(refreshActive, [userId, refreshActive]);
   useEffect(() => {
     api.online
       .config()
-      .then((c) => setBotRooms(c.botRooms))
+      .then((c) => {
+        setBotRooms(c.botRooms);
+        setTimeBank(c.timeBankMs);
+      })
       .catch(() => undefined);
+  }, []);
+
+  // Link de convite: leva até a sala privada, com o código já preenchido.
+  useEffect(() => {
+    if (URL_ROOM_CODE) privateCard.current?.scrollIntoView({ block: 'center' });
   }, []);
 
   // O servidor pode ainda estar subindo: tenta de novo por até ~30s antes de desistir.
@@ -288,27 +446,54 @@ export function Menu({
     // Entrar ou sair da conta muda quais decks são "meus".
   }, [userId]);
 
-  const start = async () => {
-    setLoading(true);
+  // O deck equipado e o formato ficam salvos e valem para todos os modos.
+  useEffect(() => {
+    if (!deck0) return;
     try {
       localStorage.setItem(LAST_DECKS, JSON.stringify([deck0, deck1]));
       localStorage.setItem(LAST_FORMAT, format);
     } catch {
       /* sem armazenamento */
     }
+  }, [deck0, deck1, format]);
+
+  const fail = useCallback(
+    (e: unknown) => {
+      setActionError(e instanceof Error ? e.message : String(e));
+      // Já está numa partida: mostra o atalho para voltar.
+      if (e instanceof ApiError && e.data.roomId) refreshActive();
+    },
+    [refreshActive],
+  );
+  const { queue, enqueue, cancel } = useQueue(onOnline, fail);
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setActionError(null);
     try {
-      const names: [string, string] = mode === 'demo' ? ['Bot A', 'Bot B'] : ['Você', 'Bot'];
+      await fn();
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startBot = async () => {
+    setLoading(true);
+    setActionError(null);
+    try {
+      const names: [string, string] = [nickname ?? 'Você', 'Bot'];
       const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
       if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
-      if (mode === 'online') return;
-      if (mode === 'bot' && dev && botRooms && onServer) {
+      if (dev && botRooms && onServer) {
         onOnline(await api.online.botRoom(deck0, opp, format));
         return;
       }
-      onStart(await buildSetup(mode, [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId)));
+      onStart(await buildSetup('bot', [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      fail(e);
       setLoading(false);
     }
   };
@@ -320,7 +505,7 @@ export function Menu({
       const online = r.seed128 && r.decks ? { seed128: r.seed128, decks: r.decks } : undefined;
       // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
       const first = r.chooseFirst ? undefined : r.firstPlayer;
-      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', first, r.actions, online, Boolean(r.chooseFirst), (r.version ?? 1) < REPLAY_VERSION));
+      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', first, r.actions, online, Boolean(r.chooseFirst), r.version ?? 1));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -328,223 +513,353 @@ export function Menu({
 
   const d0 = decks.find((d) => d.id === deck0);
   const d1 = decks.find((d) => d.id === deck1);
+  const fmt = formatLabel(format);
   /** Os dois decks precisam valer no formato escolhido. */
-  const ready = Boolean(d0 && canPlay(d0, format) && (deck1 === RANDOM || (d1 && canPlay(d1, format))));
+  const botReady = Boolean(d0 && canPlay(d0, format) && (deck1 === RANDOM || (d1 && canPlay(d1, format))));
+  /** Deck para as partidas online (completo e permitido no formato). */
+  const onlineDeck = d0 && canPlay(d0, format) ? d0 : undefined;
+  const playing = active.find((r) => r.status === 'playing');
+  const waiting = active.find((r) => r.status === 'waiting');
+  const manualCards = d0?.unscripted ?? 0;
+  const onlineBlocked = !onlineDeck || busy || Boolean(playing) || Boolean(queue);
+  const onlineNote = !d0 ? 'Escolha um deck.' : !onlineDeck ? `O deck equipado não vale no ${fmt}.` : playing ? 'Termine a partida em andamento primeiro.' : null;
+  const rankedNote = onlineNote ?? (!user ? 'Entre com o Google para jogar a ranqueada.' : manualCards > 0 ? `O deck tem ${plural(manualCards, 'carta', 'cartas')} com efeito manual (⚙), que a ranqueada não permite.` : null);
+
+  const enterQueue = (kind: QueueKind) => run(() => enqueue(onlineDeck!.id, format, kind));
+
+  const queueLive = (kind: QueueKind) =>
+    stats ? <Live>{`${plural(stats.playing[kind], 'partida', 'partidas')} · ${stats.queue[kind][format]} na fila`}</Live> : <Live off>Contando…</Live>;
+  const openTournaments = (tournaments?.tournaments ?? []).filter((t) => t.status === 'registration').length;
+  const runningTournaments = (tournaments?.tournaments ?? []).filter((t) => t.status === 'running').length;
+  const totalPlaying = stats ? Object.values(stats.playing).reduce((a, b) => a + b, 0) : null;
+  const totalQueue = stats ? Object.values(stats.queue).reduce((a, q) => a + Object.values(q).reduce((x, y) => x + y, 0), 0) : null;
+
+  const nav: NavItem[] = [
+    { key: 'play', label: 'Jogar', icon: 'swords', current: true, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+    { key: 'builder', label: 'Montar decks', icon: 'deck', onClick: onBuildDecks },
+    { key: 'tournaments', label: 'Torneios', icon: 'crown', onClick: () => onTournaments() },
+    { key: 'watch', label: 'Assistir', icon: 'eye', onClick: onWatch },
+    { key: 'stats', label: 'Estatísticas', icon: 'chart', onClick: onStats },
+  ];
+  const extra: NavItem[] = [
+    { key: 'settings', label: 'Configurações', icon: 'sliders', onClick: () => setShowSettings(true) },
+    ...(onAdmin ? [{ key: 'admin', label: 'Perfis das contas', icon: 'shield' as const, onClick: onAdmin }] : []),
+    ...(onCoverage ? [{ key: 'coverage', label: 'Cobertura das cartas', icon: 'check' as const, onClick: onCoverage }] : []),
+    ...(dev ? [{ key: 'tests', label: 'Opções de teste', icon: 'flask' as const, onClick: () => setShowTests(true) }] : []),
+  ];
 
   return (
-    <div className="menu">
-      <div className="menu-box">
-        <header className="brand-bar">
-          <h1 className="brand">
-            {/* Abaixo de ~480 px de largura, só a carta (o logo completo não cabe com boa leitura). */}
-            <picture>
-              <source media="(max-width: 480px)" srcSet="/brand/header-mark.svg" />
-              <img className="brand-logo" src="/brand/header-logo-dark-bg.svg" alt="GumGum Fight" />
-            </picture>
-          </h1>
-          <p className="tagline">One Piece Card Game no navegador</p>
-        </header>
+    <div className="home">
+      <TopBar nav={nav} extra={extra} online={stats?.online ?? null} onHome={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
 
+      <section className="home-hero">
+        <img className="home-watermark" src={jollyRoger} alt="" />
+        <div className="home-wrap home-hero-inner">
+          <div className="home-hero-text">
+            <div className="hero-kicker">One Piece Card Game no navegador</div>
+            <h1 className="hero-title">Escolha seu modo</h1>
+            <p className="hero-sub">Toda partida usa o deck equipado. Escolha uma fila e entre num duelo 1 contra 1, ou treine contra o bot.</p>
+            <div className="hero-links">
+              <button type="button" className="hero-link" onClick={onStats}>
+                <Icon name="trophy" size={18} />
+                Minhas estatísticas
+              </button>
+              <button type="button" className="hero-link" onClick={onWatch}>
+                <Icon name="eye" size={18} />
+                Assistir partidas
+              </button>
+              <button type="button" className="hero-link nickname-link" onClick={() => setShowSettings(true)} title="Mudar o apelido (Configurações)">
+                <Icon name="user" size={18} />
+                {nickname ?? 'Apelido'}
+                <small>✎</small>
+              </button>
+            </div>
+          </div>
+          <div className="hero-stats" role="status" aria-live="off">
+            <div className="hero-stat">
+              <b>{stats?.online ?? '–'}</b>
+              <span>{stats?.online === 1 ? 'conectado' : 'conectados'}</span>
+            </div>
+            <div className="hero-stat">
+              <b>{totalPlaying ?? '–'}</b>
+              <span>{totalPlaying === 1 ? 'partida ao vivo' : 'partidas ao vivo'}</span>
+            </div>
+            <div className="hero-stat">
+              <b>{totalQueue ?? '–'}</b>
+              <span>na fila agora</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="home-wrap home-main">
         {error && <div className="error">{error}</div>}
+        {authNotice && <div className="home-notice">{authNotice}</div>}
+        {authError && <div className="error">{authError}</div>}
 
-        <AccountBar />
-
-        {resume && mode !== 'online' && (
-          <div className="online-active">
-            <span>
-              {resume.queue === 'bot'
-                ? 'Você tem um treino contra o bot em andamento.'
-                : resume.queue === 'tournament'
-                  ? 'Você tem uma partida de torneio em andamento.'
-                  : 'Você tem uma partida online em andamento.'}
+        {playing ? (
+          <div className="home-banner" role="status">
+            <span className="play-ico">
+              <Icon name="play" size={16} />
             </span>
-            <button className="btn primary" onClick={() => onOnline(resume)}>
+            <div className="home-banner-text">
+              <strong>
+                {playing.queue === 'bot'
+                  ? 'Você tem um treino contra o bot em andamento.'
+                  : playing.queue === 'tournament'
+                    ? 'Você tem uma partida de torneio em andamento.'
+                    : 'Você tem uma partida online em andamento.'}
+              </strong>
+              <span>Seu relógio pode estar correndo.</span>
+            </div>
+            <button type="button" className="btn primary" onClick={() => onOnline(playing)}>
               Voltar à partida
             </button>
           </div>
+        ) : (
+          waiting && (
+            <div className="home-banner" role="status">
+              <span className="play-ico">
+                <Icon name="key" size={16} />
+              </span>
+              <div className="home-banner-text">
+                <strong>
+                  Sua sala <b>{waiting.code}</b> está esperando um oponente.
+                </strong>
+                <span>Envie o código ou o link para quem vai jogar com você.</span>
+              </div>
+              <button type="button" className="btn primary" onClick={() => onOnline(waiting)}>
+                Abrir sala
+              </button>
+            </div>
+          )
         )}
 
-        <section className="menu-card">
-          <div className="seg">
-            <button className={mode === 'bot' ? 'on' : ''} onClick={() => setMode('bot')}>
-              Contra o bot
-            </button>
-            <button className={mode === 'demo' ? 'on' : ''} onClick={() => setMode('demo')}>
-              Bot x Bot
-            </button>
-            <button className={mode === 'online' ? 'on' : ''} onClick={() => setMode('online')}>
-              Online
-            </button>
+        <section className="deck-strip" aria-label="Deck equipado">
+          <DeckArt deck={d0} />
+          <div className="deck-strip-info">
+            <div className="kicker">Deck equipado</div>
+            <div className="deck-strip-name">{d0?.name ?? (decks.length ? 'Escolha um deck' : 'Carregando decks…')}</div>
+            {d0 && (
+              <ul className="home-chips">
+                {d0.leaderName && <li className="home-chip">Líder: {d0.leaderName}</li>}
+                {!d0.valid ? (
+                  <li className="home-chip bad">{d0.size}/50 cartas: incompleto</li>
+                ) : canPlay(d0, format) ? (
+                  <li className="home-chip ok">
+                    <Icon name="check" size={12} stroke={3} />
+                    Válido no {fmt}
+                  </li>
+                ) : (
+                  <li className="home-chip bad" title={whyNotPlayable(d0, format) ?? undefined}>
+                    Não permitido no {fmt}
+                  </li>
+                )}
+                {d0.unscripted > 0 && (
+                  <li className="home-chip" title="Essas cartas entram no jogo, mas sem o efeito automático">
+                    ⚙ {d0.unscripted} sem efeito automático
+                  </li>
+                )}
+              </ul>
+            )}
           </div>
-
-          {mode === 'online' ? (
-            <>
-              <div className="matchup single">
-                <DeckPick who="Seu deck" deck={d0} format={format} onClick={() => setPicking(0)} />
-              </div>
-              <div className="field">
-                <label>Formato</label>
-                <div className="seg small">
-                  {FORMATS.map((f) => (
-                    <button key={f.id} className={format === f.id ? 'on' : ''} onClick={() => setFormat(f.id)}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <OnlineMenu
-                deck={d0?.valid ? d0 : undefined}
-                formatProblem={d0?.valid && !canPlay(d0, format) ? `Este deck não é permitido no ${formatLabel(format)}.` : null}
-                format={format}
-                initialCode={URL_ROOM_CODE}
-                onEnter={(s) => {
-                  try {
-                    localStorage.setItem(LAST_DECKS, JSON.stringify([deck0, deck1]));
-                    localStorage.setItem(LAST_FORMAT, format);
-                  } catch {
-                    /* sem armazenamento */
-                  }
-                  onOnline(s);
-                }}
-              />
-            </>
-          ) : (
-          <>
-          <div className="matchup">
-            <DeckPick who={mode === 'demo' ? 'Bot A' : 'Seu deck'} deck={d0} format={format} onClick={() => setPicking(0)} />
-            <span className="vs-badge">VS</span>
-            <DeckPick
-              who={mode === 'demo' ? 'Bot B' : 'Oponente'}
-              deck={d1}
-              random={deck1 === RANDOM}
-              format={format}
-              onClick={() => setPicking(1)}
-            />
-          </div>
-
-          <div className="field">
-            <label>Quem começa</label>
-            <div className="seg small">
-              {(
-                [
-                  ['random', 'Sorteio'],
-                  ['0', mode === 'demo' ? 'Bot A' : 'Você'],
-                  ['1', mode === 'demo' ? 'Bot B' : 'Bot'],
-                ] as const
-              ).map(([v, label]) => (
-                <button key={v} className={first === v ? 'on' : ''} onClick={() => setFirst(v)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Formato</label>
-            <div className="seg small">
+          <div className="deck-strip-actions">
+            <button type="button" className="deck-change" onClick={() => setPicking(0)} disabled={!decks.length}>
+              Trocar deck
+              <Icon name="chevron" size={16} />
+            </button>
+            <div className="seg format-seg" role="group" aria-label="Formato">
               {FORMATS.map((f) => (
-                <button key={f.id} className={format === f.id ? 'on' : ''} onClick={() => setFormat(f.id)}>
+                <button key={f.id} type="button" className={format === f.id ? 'on' : ''} aria-pressed={format === f.id} onClick={() => setFormat(f.id)}>
                   {f.label}
                 </button>
               ))}
             </div>
-            {format === 'standard' ? (
-              <p className="muted small">Sem cartas banidas nem cartas com o bloco ① (rotacionadas), salvo as exceções oficiais.</p>
-            ) : (
-              <p className="muted small">Todas as cartas lançadas, menos as banidas.</p>
-            )}
+            <button type="button" className="text-link" onClick={onBuildDecks}>
+              Montar decks
+            </button>
           </div>
-
-          {mode === 'bot' && dev && botRooms && (
-            <div className="field">
-              <label className="check">
-                <input type="checkbox" checked={onServer} onChange={(e) => setOnServer(e.target.checked)} /> Jogar no servidor (outras
-                pessoas podem assistir)
-              </label>
-              {onServer && (
-                <p className="muted small">
-                  Modo de teste do espectador: o bot joga no servidor e a partida aparece em "Assistir partidas". Tem relógio como
-                  as partidas online; desfazer, pausa e "Auto" não ficam disponíveis.
-                </p>
-              )}
-            </div>
-          )}
-
-          <button className="btn primary battle-btn" disabled={!ready || loading} onClick={start}>
-            {loading ? 'Carregando…' : 'Batalhar!'}
-          </button>
-          </>
-          )}
         </section>
 
-        <div className="menu-links">
-          <button className="btn" onClick={onWatch}>
-            <span className="ico">👁</span>
-            Assistir partidas
-          </button>
-          <button className="btn" onClick={onTournaments}>
-            <span className="ico">🏆</span>
-            Torneios
-          </button>
-          {onAdmin && (
-            <button className="btn" onClick={onAdmin}>
-              <span className="ico">🛡</span>
-              Perfis das contas
-            </button>
-          )}
-          <button className="btn" onClick={onBuildDecks}>
-            <span className="ico">🃏</span>
-            Montar decks
-          </button>
-          <button className="btn" onClick={onStats}>
-            <span className="ico">📈</span>
-            Estatísticas
-          </button>
-          {onCoverage && (
-            <button className="btn" onClick={onCoverage}>
-              <span className="ico">📊</span>
-              Cobertura das cartas
-            </button>
-          )}
-        </div>
-
-        <section className="menu-card">
-          <h2>Configurações</h2>
-          <SettingsControls />
-        </section>
-
-        {dev && (
-          <details className="menu-card advanced">
-            <summary>Opções de teste</summary>
-            <div className="field">
-              <label>Seed do embaralhamento</label>
-              <div className="seed">
-                <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value) || 0)} />
-                <button className="btn small" onClick={() => setSeed(randomSeed())} title="Sortear outra">
-                  🎲
-                </button>
+        <section className="home-section" aria-labelledby="home-modes">
+          <div className="section-head">
+            <h2 className="home-h2" id="home-modes">
+              Modos de jogo
+            </h2>
+            <span className="muted">Contadores ao vivo, atualizados a cada 10 s</span>
+          </div>
+          {actionError && <div className="error">{actionError}</div>}
+          <div className="mode-grid">
+            <ModeCard
+              color="red"
+              icon="trophy"
+              kicker="Competitivo"
+              title="Ranqueada"
+              badge={fmt}
+              desc="Vale bounty. Você enfrenta quem está perto do seu nível."
+              chips={['Login com Google', 'Sem efeitos manuais']}
+              live={queueLive('ranked')}
+              note={rankedNote}
+              action="Buscar partida"
+              disabled={onlineBlocked || Boolean(rankedNote)}
+              onAction={() => enterQueue('ranked')}
+            />
+            <ModeCard
+              color="green"
+              icon="swords"
+              kicker="Casual"
+              title="Partida rápida"
+              badge={fmt}
+              desc="Sem bounty em jogo. Ideal para testar um deck novo."
+              chips={['Qualquer deck válido', ...(timeBank ? [`Relógio de ${fmtClock(timeBank)}`] : [])]}
+              live={queueLive('casual')}
+              note={onlineNote}
+              action="Buscar partida"
+              disabled={onlineBlocked}
+              onAction={() => enterQueue('casual')}
+            />
+            <ModeCard
+              cardRef={privateCard}
+              color="blue-card"
+              icon="key"
+              kicker="Com amigos"
+              title="Sala privada"
+              badge={fmt}
+              desc="Crie uma sala e mande o código, ou entre na sala de um amigo."
+              live={stats ? <Live>{`${plural(stats.playing.private, 'partida', 'partidas')} · ${plural(stats.waiting, 'sala esperando', 'salas esperando')}`}</Live> : <Live off>Contando…</Live>}
+              note={onlineNote}
+              action="Criar sala"
+              disabled={onlineBlocked}
+              highlight={Boolean(URL_ROOM_CODE)}
+              onAction={() =>
+                run(async () => {
+                  const r = await api.online.createRoom(onlineDeck!.id, format);
+                  onOnline({ roomId: r.roomId, token: r.token });
+                })
+              }
+            >
+              <div className="mode-field">
+                <label htmlFor="room-code">Código da sala</label>
+                <div className="code-row">
+                  <input
+                    id="room-code"
+                    value={code}
+                    maxLength={6}
+                    placeholder="ABC123"
+                    autoComplete="off"
+                    onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                  />
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    disabled={!d0?.valid || busy || code.length !== 6 || Boolean(playing)}
+                    onClick={() =>
+                      run(async () => {
+                        // Quem entra joga no formato de quem criou a sala.
+                        onOnline(await api.online.joinRoom(code, d0!.id));
+                      })
+                    }
+                  >
+                    Entrar
+                  </button>
+                </div>
               </div>
-              <p className="muted small">
-                Número que define a ordem dos decks e o sorteio de quem começa. A mesma seed com as mesmas jogadas repete a
-                partida exatamente, o que é útil para reproduzir um problema. Para jogar normalmente, ignore este campo.
-              </p>
-            </div>
-            <label className="replay-load">
-              Carregar um replay (.json baixado durante uma partida)
-              <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && loadReplay(e.target.files[0])} />
-            </label>
-          </details>
-        )}
+            </ModeCard>
+            <ModeCard
+              color="purple"
+              icon="bot"
+              kicker="Treino"
+              title="Contra o bot"
+              badge={fmt}
+              desc="Treine com qualquer deck, sem fila e sem pressa."
+              live={dev && botRooms && onServer && stats ? <Live>{`${plural(stats.playing.bot, 'treino', 'treinos')} no servidor`}</Live> : <Live off>Roda no seu navegador</Live>}
+              note={!d0 || botReady ? null : `Os dois decks precisam valer no ${fmt}.`}
+              action={loading ? 'Carregando…' : 'Batalhar!'}
+              disabled={!botReady || loading}
+              onAction={startBot}
+            >
+              <div className="mode-fields">
+                <button type="button" className="pick-btn" onClick={() => setPicking(1)} disabled={!decks.length}>
+                  <span>
+                    Oponente: <strong>{deck1 === RANDOM ? 'Aleatório' : (d1?.name ?? 'Escolher')}</strong>
+                  </span>
+                  <Icon name="chevron" size={14} />
+                </button>
+                <div className="mode-field">
+                  <span className="mode-field-label" id="first-label">
+                    Quem começa
+                  </span>
+                  <div className="seg small" role="group" aria-labelledby="first-label">
+                    {(
+                      [
+                        ['random', 'Sorteio'],
+                        ['0', 'Você'],
+                        ['1', 'Bot'],
+                      ] as const
+                    ).map(([v, label]) => (
+                      <button key={v} type="button" className={first === v ? 'on' : ''} aria-pressed={first === v} onClick={() => setFirst(v)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {dev && botRooms && (
+                  <label className="check">
+                    <input type="checkbox" checked={onServer} onChange={(e) => setOnServer(e.target.checked)} /> Jogar no servidor (dá para assistir)
+                  </label>
+                )}
+              </div>
+            </ModeCard>
+            <ModeCard
+              color="yellow"
+              gold
+              icon="crown"
+              kicker="Eventos"
+              title="Torneios"
+              badge="Suíço e mata-mata"
+              desc="Torneios da comunidade, com chave, rodadas e relógio."
+              chips={['Inscrição com login', 'Melhor de 1 ou de 3']}
+              live={tournaments ? <Live off={!openTournaments && !runningTournaments}>{`${plural(openTournaments, 'aberto', 'abertos')} · ${runningTournaments} em andamento`}</Live> : <Live off>Contando…</Live>}
+              action="Ver torneios"
+              onAction={() => onTournaments()}
+            />
+          </div>
+        </section>
 
-        <p className="disclaimer">
-          Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para
-          português são automáticas e não oficiais.
-        </p>
-      </div>
+        <div className="home-blocks">
+          <LiveNow onWatch={onWatchRoom} onAll={onWatch} />
+          <TournamentsBlock list={tournaments} onOpen={onTournaments} />
+          <MetaBlock onStats={onStats} />
+        </div>
+      </main>
+
+      <footer className="home-footer">
+        <div className="home-wrap home-footer-inner">
+          <div className="footer-brand">
+            <img src="/brand/header-mark.svg" alt="" />
+            <span>GumGum Fight</span>
+          </div>
+          <nav className="footer-links" aria-label="Rodapé">
+            {[...nav.slice(1), extra[0]].map((item) => (
+              <button key={item.key} type="button" className="text-link" onClick={item.onClick}>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <p className="disclaimer">
+            Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para português são
+            automáticas e não oficiais.
+          </p>
+        </div>
+      </footer>
+
+      {queue && <QueueWait queue={queue} onCancel={cancel} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showTests && <TestOptions seed={seed} onSeed={setSeed} onReplay={loadReplay} onClose={() => setShowTests(false)} />}
 
       {picking !== null && (
         <DeckPicker
-          title={picking === 0 ? (mode === 'demo' ? 'Deck do Bot A' : 'Seu deck') : mode === 'demo' ? 'Deck do Bot B' : 'Deck do oponente'}
+          title={picking === 0 ? 'Deck equipado' : 'Deck do oponente'}
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
           format={format}

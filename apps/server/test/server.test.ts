@@ -89,6 +89,46 @@ describe('API', () => {
     expect(card.i18n.pt).toEqual({ text: 'Texto revisado.', source: 'manual' });
   });
 
+  it('aplica a errata oficial às cartas, inclusive às já gravadas com o texto antigo', async () => {
+    const db = openDb(':memory:');
+    const old = {
+      id: 'OP02-002',
+      name: 'Monkey.D.Garp',
+      category: 'leader',
+      colors: ['blue'],
+      types: ['Navy'],
+      text: '[Your Turn] When this Leader or 1 of your Characters is given a DON!! card, give up to 1 of your opponent\'s Characters with a cost of 7 or less -1 cost during this turn.',
+    };
+    // Gravada antes de a errata existir (sem passar por upsertCards).
+    db.prepare("INSERT INTO cards (id, set_code, name, category, data, provisional, source, updated_at) VALUES (?, 'OP02', ?, 'leader', ?, 0, 't', datetime('now'))").run(
+      old.id,
+      old.name,
+      JSON.stringify(old),
+    );
+    const app = buildApp(db, { server: { cardImages: true } });
+    const card = (await app.inject('/api/cards/OP02-002')).json();
+    expect(card.text).toContain('When this Leader or any of your Characters is given a DON!! card');
+    // E na gravação: o texto salvo já sai corrigido.
+    upsertCards(db, [{ ...old, id: 'ST02-013', name: 'Kid', category: 'character', text: '[DON!! x1] [End of Your Turn] Set this card as active.' }] as never, {
+      provisional: false,
+      source: 't',
+    });
+    const row = db.prepare("SELECT data FROM cards WHERE id = 'ST02-013'").get() as { data: string };
+    expect(JSON.parse(row.data).text).toBe('[DON!! x1] [End of Your Turn] Set this Character as active.');
+  });
+
+  it('corrige nome e tipos que a API traz diferentes da lista oficial, inclusive em cartas já gravadas', async () => {
+    const db = openDb(':memory:');
+    const old = { id: 'ST14-014', name: 'Gum-Gum Giant Rifl', category: 'event', colors: ['red'], types: ['Straw Hat Cre'], text: '' };
+    db.prepare("INSERT INTO cards (id, set_code, name, category, data, provisional, source, updated_at) VALUES (?, 'ST14', ?, 'event', ?, 0, 't', datetime('now'))").run(
+      old.id,
+      old.name,
+      JSON.stringify(old),
+    );
+    const card = (await buildApp(db, { server: { cardImages: true } }).inject('/api/cards/ST14-014')).json();
+    expect(card).toMatchObject({ name: 'Gum-Gum Giant Rifle', types: ['Straw Hat Crew'] });
+  });
+
   it('lista traduções pendentes', async () => {
     const db = openDb(':memory:');
     upsertCards(db, [{ id: 'T-1', name: 'X', category: 'event', colors: ['red'], types: [], text: '[Main] Swap the hands of both players.' }], {

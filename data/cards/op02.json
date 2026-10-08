@@ -41,7 +41,7 @@
       "types": [
         "Navy"
       ],
-      "text": "[Your Turn] When this Leader or 1 of your Characters is given a DON!! card, give up to 1 of your opponent's Characters with a cost of 7 or less -1 cost during this turn.",
+      "text": "[Your Turn] When this Leader or any of your Characters is given a DON!! card, give up to 1 of your opponent's Characters with a cost of 7 or less -1 cost during this turn.",
       "set": "OP02",
       "rarity": "L",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-002.jpg"
@@ -579,7 +579,7 @@
         "Ranged"
       ],
       "types": [
-        "Film",
+        "FILM",
         "Straw Hat Crew"
       ],
       "text": "",
@@ -687,7 +687,7 @@
         "Strike"
       ],
       "types": [
-        "Film",
+        "FILM",
         "Fish-Man",
         "Straw Hat Crew"
       ],
@@ -710,8 +710,8 @@
         "Wisdom"
       ],
       "types": [
+        "FILM",
         "Animal",
-        "Film",
         "Straw Hat Crew"
       ],
       "text": "[DON!! x1] [When Attacking] Rest up to 1 of your opponent's Characters with a cost of 2 or less.",
@@ -733,9 +733,9 @@
         "Slash"
       ],
       "types": [
-        "Film",
-        "Heart Pirates",
-        "Supernovas"
+        "FILM",
+        "Supernovas",
+        "Heart Pirates"
       ],
       "text": "[Activate:Main] ① (You may rest the specified number of DON!! cards in your cost area.) You may return this Character to the owner's hand: Play up to 1 Character with a cost of 3 from your hand.",
       "set": "OP02",
@@ -756,7 +756,7 @@
         "Special"
       ],
       "types": [
-        "Film",
+        "FILM",
         "Straw Hat Crew"
       ],
       "text": "[On Play]/[When Attacking] ① (You may rest the specified number of DON!! cards in your cost area.): Look at 3 cards from the top of your deck; reveal up to 1 {FILM} type card other than [Nami] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
@@ -778,7 +778,7 @@
         "Strike"
       ],
       "types": [
-        "Film",
+        "FILM",
         "Straw Hat Crew"
       ],
       "text": "[On Play] Play up to 1 {FILM} or {Straw Hat Crew} type Character card with a cost of 2 or less from your hand.",
@@ -823,7 +823,7 @@
         "Special"
       ],
       "types": [
-        "Film",
+        "FILM",
         "Straw Hat Crew"
       ],
       "text": "",
@@ -845,6 +845,7 @@
         "Slash"
       ],
       "types": [
+        "FILM",
         "Straw Hat Crew"
       ],
       "text": "[On Play] Play up to 1 {FILM} or {Straw Hat Crew} type Character card with a cost of 3 or less from your hand.",
@@ -866,8 +867,9 @@
         "Strike"
       ],
       "types": [
-        "Straw Hat Crew",
-        "Supernovas"
+        "FILM",
+        "Supernovas",
+        "Straw Hat Crew"
       ],
       "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] Play up to 1 {FILM} or {Straw Hat Crew} type Character card with a cost of 4 or less from your hand.",
       "set": "OP02",
@@ -912,9 +914,9 @@
         "Slash"
       ],
       "types": [
-        "Film",
-        "Straw Hat Crew",
-        "Supernovas"
+        "FILM",
+        "Supernovas",
+        "Straw Hat Crew"
       ],
       "text": "",
       "set": "OP02",
@@ -952,9 +954,9 @@
       "cost": 3,
       "attributes": [],
       "types": [
-        "Film",
-        "Straw Hat Crew",
-        "Supernovas"
+        "FILM",
+        "Supernovas",
+        "Straw Hat Crew"
       ],
       "text": "[Counter] Up to 1 of your Leader or Character cards gains +6000 power during this battle. Then, play up to 1 Character card with a cost of 3 or less and no base effect from your hand.",
       "trigger": "Rest up to 1 of your opponent's Leader or Character cards with a cost of 5 or less.",
@@ -972,7 +974,7 @@
       "cost": 2,
       "attributes": [],
       "types": [
-        "Film",
+        "FILM",
         "Straw Hat Crew"
       ],
       "text": "[Main] K.O. up to 1 of your opponent's rested Characters with a cost of 4 or less.",
@@ -1324,7 +1326,7 @@
     },
     {
       "id": "OP02-063",
-      "name": "Mr.1 (Daz.Bonez)",
+      "name": "Mr.1(Daz.Bonez)",
       "category": "character",
       "colors": [
         "blue"
@@ -1346,7 +1348,7 @@
     },
     {
       "id": "OP02-064",
-      "name": "Mr.2.Bon.Kurei (Bentham)",
+      "name": "Mr.2.Bon.Kurei(Bentham)",
       "category": "character",
       "colors": [
         "blue"
@@ -1368,7 +1370,7 @@
     },
     {
       "id": "OP02-065",
-      "name": "Mr.3 (Galdino)",
+      "name": "Mr.3(Galdino)",
       "category": "character",
       "colors": [
         "blue"
@@ -1495,7 +1497,7 @@
       "types": [
         "Impel Down"
       ],
-      "text": "[Your Turn] [Once Per Turn] When a DON!! card on your field is returned to your DON!! deck, this Leader gains +1000 power during this turn.",
+      "text": "[Your Turn] [Once Per Turn] When a DON!! card on the field is returned to your DON!! deck, this Leader gains +1000 power during this turn.",
       "set": "OP02",
       "rarity": "L",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP02-071.jpg"
@@ -1514,7 +1516,7 @@
         "Strike"
       ],
       "types": [
-        "Film",
+        "FILM",
         "Neo Navy"
       ],
       "text": "[When Attacking] DON!! -4 (You may return the specified number of DON!! cards from your field to your DON!! deck.): K.O. up to 1 of your opponent's Characters with a cost of 3 or less. Then, this Leader gains +1000 power during this turn.",
@@ -2342,7 +2344,7 @@
     },
     {
       "id": "OP02-112",
-      "name": "Bell-mere",
+      "name": "Bell-mère",
       "category": "character",
       "colors": [
         "black"

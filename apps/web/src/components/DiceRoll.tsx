@@ -4,7 +4,7 @@
 // chacoalha e solta para jogá-lo na mesa. No começo só o seu dado está na mesa:
 // o do oponente aparece quando ele joga, entrando na bandeja rolando pelo lado
 // dele (o bot "pega" o dado fora da tela e joga; no online, o servidor repassa o
-// gesto, e o oponente pode jogar antes de você). Para o espectador e em bot x bot,
+// gesto, e o oponente pode jogar antes de você). Para o espectador e no replay,
 // os dois dados entram rolando, um depois do outro. O vencedor só aparece depois
 // que os dois param.
 //
@@ -71,7 +71,7 @@ export function DiceRoll({
   onDone,
 }: {
   state: GameState;
-  /** null: ninguém joga (espectador, bot x bot): os dados são lançados sozinhos. */
+  /** null: ninguém joga (espectador, replay): os dados são lançados sozinhos. */
   human: PlayerId | null;
   /** Partida online: lançamentos de cada assento e envio do seu. */
   remote?: { throws: [DiceThrow | null, DiceThrow | null]; send: (vx: number, vy: number) => void };

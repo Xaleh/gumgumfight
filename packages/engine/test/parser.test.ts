@@ -78,6 +78,11 @@ describe('modelos de frase', () => {
     ).toEqual([[{ do: 'setDonActive', count: 2, if: { leaderHasType: 'Supernovas', lifeMax: 2 } }]]);
   });
 
+  it('"Leader\'s type includes "CP"" conta CP9 e CP0 (trecho do tipo, não o tipo inteiro)', () => {
+    expect(steps('[On Play] If your Leader\'s type includes "CP", draw 1 card.')).toEqual([[{ do: 'draw', count: 1, if: { leaderTypeIncludes: 'CP' } }]]);
+    expect(steps('[On Play] If your Leader has a type including "CP", draw 1 card.')).toEqual([[{ do: 'draw', count: 1, if: { leaderTypeIncludes: 'CP' } }]]);
+  });
+
   it('[Trigger] com custo, Vida a partir do deck e efeito [On Play] via [Trigger]', () => {
     expect(steps('', { trigger: 'You may trash 1 card from your hand: Play this card.' })).toEqual([
       [{ do: 'payCost', cost: { trashFromHand: 1 } }, { do: 'playThis' }],
@@ -95,6 +100,20 @@ describe('modelos de frase', () => {
     expect(p.abilities).toEqual([{ timing: 'static', steps: [], condition: { leaderHasType: 'Elbaph' }, staticCost: 12 }]);
     expect(parseCard(card('This Leader cannot attack.', { category: 'leader' })).abilities[0]).toMatchObject({ staticCannotAttack: true });
     expect(parseCard(card("This Character cannot be K.O.'d by effects.")).abilities[0]).toMatchObject({ staticNoEffectKO: true });
+  });
+
+  it('"up to 1 of your [Shanks]" sem substantivo: Líder ou Personagem com esse nome (OP17-036, OP17-115, OP17-055)', () => {
+    const named = { side: 'own', kinds: ['leader', 'character'], upTo: 1 };
+    expect(steps('[Counter] Up to 1 of your [Shanks] gains +4000 power during this battle.', { category: 'event', cost: 1 })).toEqual([
+      [{ do: 'power', target: { ...named, name: 'Shanks' }, amount: 4000, duration: 'battle' }],
+    ]);
+    expect(steps('[Main] Up to 1 of your [Rocks.D.Xebec] gains [Unblockable] during this turn.', { category: 'event', cost: 1 })).toEqual([
+      [{ do: 'gainKeyword', target: { ...named, name: 'Rocks.D.Xebec' }, keyword: 'unblockable', duration: 'turn' }],
+    ]);
+    // "[X] cards" continua valendo para o Líder; sem dono ("play up to 1 [Pacifista]"), o nome não inclui o Líder.
+    expect(steps('[On Play] Set up to 1 of your [Charlotte Linlin] cards as active.')).toEqual([
+      [{ do: 'setActive', target: { ...named, name: 'Charlotte Linlin' } }],
+    ]);
   });
 
   it('texto desconhecido fica manual (linha a linha)', () => {

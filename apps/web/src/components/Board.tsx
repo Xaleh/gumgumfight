@@ -84,9 +84,21 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
   const life = (
     <div className="zone life-zone" title={`Vida: ${ps.life.length}`}>
       <div className="life-stack" key={ps.life.length} data-anchor={`life-${player}`}>
-        {ps.life.map((uid, i) => (
-          <div key={uid} className="life-card" style={vars({ '--i': i })} />
-        ))}
+        {ps.life.map((uid, i) => {
+          // Vida virada para cima é pública (3-10-2-1): mostra a carta.
+          if (!ps.lifeFaceUp?.includes(uid)) return <div key={uid} className="life-card" style={vars({ '--i': i })} />;
+          const def = cardDef(state, uid);
+          return (
+            <div
+              key={uid}
+              className="life-card face-up"
+              title={`${def.name} (Vida virada para cima)`}
+              style={vars({ '--i': i, ...(def.imageUrl ? { '--face': `url("${def.imageUrl}")` } : {}) })}
+              onMouseEnter={() => h.onHover(uid)}
+              onMouseLeave={() => h.onHover(null)}
+            />
+          );
+        })}
       </div>
       <span className={['life-count', ps.life.length === 0 ? 'zero' : ''].join(' ')}>
         ♥ {ps.life.length}
@@ -296,11 +308,14 @@ export function PlayerBanner({
   state,
   player,
   align,
+  pulse,
   extra,
 }: {
   state: GameState;
   player: PlayerId;
   align: 'left' | 'right';
+  /** Seu turno, jogada com você: a faixa pulsa para lembrar de quem é o turno. */
+  pulse?: boolean;
   /** Online: relógio e conexão do jogador. */
   extra?: ReactNode;
 }) {
@@ -308,7 +323,7 @@ export function PlayerBanner({
   const max = Math.max(cardDef(state, ps.leader.uid).life ?? 0, ps.life.length);
   const isActive = state.activePlayer === player && state.phase === 'main';
   return (
-    <div className={['banner', align, isActive ? 'active' : ''].join(' ')}>
+    <div className={['banner', align, isActive ? 'active' : '', isActive && pulse ? 'pulse' : ''].join(' ')}>
       <div className="banner-life" title={`Vida: ${ps.life.length}`}>
         {Array.from({ length: max }, (_, i) => (
           <span key={i} className={i < ps.life.length ? 'on' : ''} />
@@ -331,6 +346,10 @@ interface BoardProps extends BoardHandlers {
   ghost?: string | null;
   /** Abre a mão inteira em tamanho grande (mãos com muitas cartas). */
   onExpandHand?: () => void;
+  /** Ordena a mão por custo (só a exibição). */
+  onSortHand?: () => void;
+  /** É o seu turno e a jogada está com você: a sua faixa pulsa. */
+  turnPulse?: boolean;
   /** Dica curta sobre a mão (ex.: como usar um Counter), logo acima do leque. */
   handHint?: ReactNode;
   bottom: PlayerId;
@@ -354,6 +373,8 @@ export function Board({
   lifted,
   ghost,
   onExpandHand,
+  onSortHand,
+  turnPulse,
   handHint,
   bannerExtra,
   ...handlers
@@ -381,13 +402,22 @@ export function Board({
       </div>
       <div className="bottom-strip">
         <div className="my-bar">
-          <PlayerBanner state={state} player={bottom} align="left" extra={bannerExtra?.(bottom)} />
+          <PlayerBanner state={state} player={bottom} align="left" pulse={turnPulse} extra={bannerExtra?.(bottom)} />
         </div>
         {handHint && <div className="hand-hint">{handHint}</div>}
-        {onExpandHand && state.players[bottom].hand.length > 0 && (
-          <button className="hand-expand" onClick={onExpandHand} title="Ver todas as cartas da mão em tamanho grande">
-            ⤢ Ver mão <b>{state.players[bottom].hand.length}</b>
-          </button>
+        {state.players[bottom].hand.length > 0 && (onExpandHand || onSortHand) && (
+          <div className="hand-tools">
+            {onSortHand && (
+              <button className="hand-expand sort" onClick={onSortHand} title="Ordenar a mão por custo e nome (só a exibição)">
+                ⇅ Ordenar
+              </button>
+            )}
+            {onExpandHand && (
+              <button className="hand-expand" onClick={onExpandHand} title="Ver todas as cartas da mão em tamanho grande">
+                ⤢ Ver mão <b>{state.players[bottom].hand.length}</b>
+              </button>
+            )}
+          </div>
         )}
         <Hand
           state={state}

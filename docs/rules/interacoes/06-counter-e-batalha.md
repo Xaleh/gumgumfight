@@ -1,0 +1,31 @@
+# Counter Step: valores de Counter, Eventos [Counter], poder na batalha, "during this battle"
+
+## Rulings oficiais
+
+Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e seção das Comprehensive Rules (CR). Os rulings servem de caso de teste.
+
+- **Q&A de regras (Counter)**: P: posso usar o [Counter +1000] de um Personagem em campo? Preciso pagar custo? Posso dar Counter em quem não é atacado? R: Não (só da mão); não há custo; sim, mas acaba no fim da batalha. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 7-1-3-1-1, 7-1-5-3
+- **Q&A de regras (Evento [Counter])**: P: posso ativar [Counter] de Evento na minha Main Phase? R: Não. Só no Counter Step de um ataque do oponente. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 10-2-4-1
+- **Q&A de regras (poder negativo / empate)**: P: −2000 ataca −2000, ou 0 ataca 0. Quem vence? R: O atacante (empate favorece o atacante). Poder ≤0 não sai de campo. 6000 com −10000 fica −4000, e +1 DON dá −3000. Fonte: https://en.onepiece-cardgame.com/pdf/qa_rules.pdf. CR: 7-1-4-1, 1-3-6-1
+- **OP01-072 (Smiley) / ST02-003 (Urouge)**: P: Counter que altera o tamanho da mão (ou o número de Personagens) muda o poder dele? R: Sim. O resultado usa o poder ao entrar no Damage Step. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op01.pdf. CR: 7-1-4-1
+- **OP01-026 (Gum-Gum Fire-Fist Pistol Red Hawk)**: P: o [Counter] dá K.O. no atacante. E a batalha? Posso ativar outro Counter depois? R: No fim do Counter Step sem atacante, a batalha termina sem Damage Step. Sim, pode ativar mais Counters. (Igual: OP01-086 Overheat, ST03-016, OP05-039.) Fonte: https://en.onepiece-cardgame.com/pdf/qa_op01.pdf. CR: 7-1-3-1-3
+- **OP16-118 (Portgas.D.Ace) / OP17-063 (Kaido)**: P: com ele em campo, um Personagem de 8000 com [Counter +1000] na mão pode usar +1000? Com 2 Aces vira +4000? R: Não, passa a ser [Counter +2000]. Com 2 Aces continua +2000 (aplica-se o maior valor, sem somar). Fonte: https://en.onepiece-cardgame.com/pdf/qa_op16.pdf. CR: 2-10-3, 2-10-4
+- **OP11-059 (Gum-Gum King Cobra) / ST03-017 (Love-Love Mellow)**: P: com 5 cartas na mão incluindo este Evento, quanto conta a mão? R: O Evento ativado não conta, então são 4. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op11.pdf. CR: 2-7-3, 8-4-2
+- **OP01-064 (Alvida) / ST03-016 (Thrust Pad Cannon)**: P: um Personagem devolvido à mão durante a batalha pode ser usado como Counter na mesma batalha? R: Sim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op01.pdf. CR: 3-1-6, 7-1-3-1-1
+- **OP11-097 (After All These Years I'm Losing My Edge!!!)**: P: posso devolver à mão o Personagem que acabei de usar como Counter nesta batalha? R: Sim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op11.pdf. CR: 7-1-3-1
+- **OP07-002 (Ain)**: P: o poder virou 0 por este efeito e o oponente usa [Counter +1000]. Fica 0? E um Hack 5000 com +2000 "até o fim do próximo turno do oponente"? R: Fica 1000. O Hack fica 0 neste turno e volta a 7000 no turno seguinte. «Set Power to 0» é −(poder atual). Fonte: https://en.onepiece-cardgame.com/pdf/qa_op07.pdf. CR: 4-12-1, 4-12-2
+- **OP06-009 (Shuraiya)**: P: o [When Attacking] iguala o poder base ao do Líder oponente (5000), e depois o oponente dá Counter (6000). Muda? R: Não. Vale o valor no momento da ativação. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op06.pdf. CR: 8-4-6
+- **OP03-001 (Portgas.D.Ace, Líder)**: P: quando ativam "When this Leader attacks" e "When this Leader is attacked"? R: "Attacks" ativa antes de Blocker/Counter do oponente. "Is attacked" ativa depois dos [When Attacking] do oponente e depois do meu [Blocker] (se eu bloquear, não ativa mais), mas antes do Counter. Não pode ser usado depois de um Counter. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op03.pdf. CR: 7-1-1-3, 10-2-16-1
+- **OP13-001 (Monkey.D.Luffy) / OP17-040 (Edward.Newgate)**: P: posso gastar DON num Counter e depois ativar o [On Your Opponent's Attack]? R: Não. [On Your Opponent's Attack] e "when attacked" ativam no Attack Step, antes de [Blocker] e Counter. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op13.pdf. CR: 7-1-1-3, 10-2-16-1
+- **OP11-012 (Franky)**: P: o oponente ativa OP01-026 Red Hawk no meu turno. Posso usar o efeito do Franky ("quando o oponente ativa Evento") para subir o poder antes do K.O.? R: Não. O Evento resolve antes, e se o Franky for K.O.'d não ativa. (Igual: OP11-102 Camie; regra: OP01-004 "após resolver".) Fonte: https://en.onepiece-cardgame.com/pdf/qa_op11.pdf. CR: 8-6-3
+- **OP04-016 (Bad Manners Kick Course) / OP02-068 / OP03-072**: P: posso ativar no Counter Step e não descartar? R: Sim, mas não ganho o +3000. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op04.pdf. CR: 4-10-1
+- **OP02-064 (Mr.2.Bon.Kurei(Bentham))**: P: se ele sair de campo durante a batalha por Counter/Trigger, ainda vai ao fundo do deck no fim da batalha? E se o alvo foi para o fundo do deck? R: Não vai (é carta nova). Se o alvo foi para o deck, ele vai ao fundo do deck no fim da batalha mesmo assim. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op02.pdf. CR: 3-1-6, 7-1-5-2
+- **OP16-080 (Marshall.D.Teach, Líder)**: P: mudo o alvo do Líder OP12-020 Roronoa Zoro do oponente para o meu Líder. Ele ainda ativa o "após batalhar Personagem"? R: Não. Ele não batalhou um Personagem. Fonte: https://en.onepiece-cardgame.com/pdf/qa_op16.pdf. CR: 7-1-5-2
+
+## No motor
+
+Etapa de Counter sempre abre; vários Counters; atacante vence com ≥; poder negativo permitido (conforme). «Set Power to 0» (`setPowerZero`) é um −(poder atual) na ativação, com a duração do texto: Counters posteriores somam (OP07-002 dá 1000).
+
+O valor de Counter de um Personagem ou Stage da mão vai para o atacado ou, com `target` na ação `counter`, para o Líder ou outro Personagem do defensor; dura até o fim da batalha (DV-21). O custo do Evento [Counter] é o `playCost` da carta na mão, com as reduções (DV-22). No fim da batalha, os "at the end of this battle" e "if this Character battles…" resolvem com a batalha ainda em curso; só depois expiram os "during this battle" (DV-23).
+
+Divergências deste tema: nenhuma em aberto (corrigidas: DV-19, DV-21, DV-22, DV-23) (detalhes em [../divergencias.md](../divergencias.md)).

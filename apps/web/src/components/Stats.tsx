@@ -53,7 +53,8 @@ function loadMin(): number {
 
 function loadFilters(): StatsQuery {
   try {
-    return { by: 'human', ...(JSON.parse(localStorage.getItem(FILTERS_KEY) ?? '{}') as StatsQuery) };
+    // `by` fica sempre em `human`: o filtro de simulações bot x bot não existe mais na tela.
+    return { ...(JSON.parse(localStorage.getItem(FILTERS_KEY) ?? '{}') as StatsQuery), by: 'human' };
   } catch {
     return { by: 'human' };
   }
@@ -927,13 +928,12 @@ export function Stats({ onExit }: { onExit: () => void }) {
             <div className="field">
               <label>De quem</label>
               <Seg
-                value={filters.mine ? 'mine' : filters.by === 'bot' ? 'bot' : 'all'}
+                value={filters.mine ? 'mine' : 'all'}
                 options={[
                   ['all', 'Todos os jogadores'],
                   ['mine', 'Só eu'],
-                  ['bot', 'Bots (simulações)'],
                 ]}
-                onChange={(v) => set({ mine: v === 'mine', by: v === 'bot' ? 'bot' : 'human' })}
+                onChange={(v) => set({ mine: v === 'mine', by: 'human' })}
               />
             </div>
             <div className="field">
@@ -956,7 +956,6 @@ export function Stats({ onExit }: { onExit: () => void }) {
                   <button
                     key={t.id}
                     className={['chip', filters.tiers?.includes(t.id) ? 'on' : ''].join(' ')}
-                    disabled={filters.by === 'bot'}
                     onClick={() => toggleTier(t.id)}
                     title={`${beries(t.min)}${t.max === null ? ' ou mais' : ` a ${beries(t.max)}`}`}
                   >
