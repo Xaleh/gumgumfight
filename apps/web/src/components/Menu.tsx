@@ -122,16 +122,26 @@ function DeckPicker({
   onPick: (id: string) => void;
   onClose: () => void;
 }) {
+  const body = useRef<HTMLDivElement>(null);
+  // Ao abrir, a folha mostra o deck já escolhido (a lista pode ser longa).
+  useEffect(() => {
+    const b = body.current;
+    const on = b?.querySelector<HTMLElement>('.deck-pick.on');
+    if (!b || !on) return;
+    // Rola só a folha (não a página atrás dela), e só se o deck está fora da parte visível.
+    const top = on.getBoundingClientRect().top - b.getBoundingClientRect().top;
+    if (top + on.offsetHeight > b.clientHeight) b.scrollTop = top - (b.clientHeight - on.offsetHeight) / 2;
+  }, []);
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h3>{title}</h3>
           <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
             ✕
           </button>
         </div>
-        <div className="sheet-body">
+        <div className="sheet-body" ref={body}>
           {allowRandom && (
             <div className="picker-grid">
               <button className={['deck-pick', value === RANDOM ? 'on' : ''].join(' ')} onClick={() => onPick(RANDOM)}>
