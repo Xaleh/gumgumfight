@@ -43,6 +43,9 @@ import {
   seriesAfter,
 } from './Online';
 
+/** Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen). */
+const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]/;
+
 /**
  * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
  * cada DON!! tocado na fileira, para marcar exatamente ele. Sem `step`, a faixa central mostra a barra de ações
@@ -280,6 +283,23 @@ function Table({
   spectator?: { canHands: boolean; onToggleHands: () => void };
 }) {
   const { state, dispatch, human } = game;
+  /**
+   * Aviso curto na mesa para as linhas do histórico que explicam por que algo não aconteceu
+   * (condição de efeito que não vale, [Blocker] que não pode bloquear, carta que não pode ser
+   * virada). No celular o histórico fica atrás de um botão, e sem o aviso parece que o jogo ignorou a jogada.
+   */
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeSeen = useRef(state.log.length);
+  useEffect(() => {
+    if (noticeSeen.current > state.log.length) noticeSeen.current = 0; // desfazer / replay
+    const fresh = state.log.slice(noticeSeen.current);
+    noticeSeen.current = state.log.length;
+    const hit = [...fresh].reverse().find((e) => NOTICE_RE.test(e.text));
+    if (!hit) return;
+    setNotice(hit.text);
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
@@ -960,6 +980,11 @@ function Table({
         {game.error && (
           <div className="toast error" onClick={() => game.setError(null)}>
             {game.error}
+          </div>
+        )}
+        {notice && !game.error && (
+          <div className="toast notice" role="status" onClick={() => setNotice(null)}>
+            {notice}
           </div>
         )}
 
