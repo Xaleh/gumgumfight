@@ -320,8 +320,8 @@ export interface Condition {
   anyDonGiven?: boolean;
   /** "If this Character was played on this turn" */
   selfPlayedThisTurn?: boolean;
-  /** "If you have N or more {X} type Characters" */
-  minTypedCharacters?: { count: number; type: string };
+  /** "If you have N or more {X} type Characters" ("{X} or {Y}": `types` traz todos; `type` é o primeiro). */
+  minTypedCharacters?: { count: number; type: string; types?: string[] };
   /** "If your opponent has N or more Life cards" */
   opponentLifeMin?: number;
   /** "If the revealed card / that card is …": testa a carta escolhida/revelada no passo anterior. */
@@ -336,6 +336,8 @@ export interface Condition {
   leaderTypeOrName?: { type: string; name: string };
   /** "If you have no other [X] Characters" */
   noOtherNamed?: string;
+  /** "If you have no other [X] with a base cost of N": só conta os [X] com esse custo impresso. */
+  noOtherNamedBaseCost?: number;
   /** "If you have N or less Characters" */
   maxCharacters?: number;
   /** "If you have N or more active DON!! cards" */
