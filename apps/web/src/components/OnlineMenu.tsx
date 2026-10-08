@@ -75,7 +75,7 @@ export function useQueue(onEnter: (seat: OnlineSeat) => void, onError: (e: unkno
 /** Janela "Procurando oponente…" enquanto espera na fila. */
 export function QueueWait({ queue, onCancel }: { queue: QueueState; onCancel: () => void }) {
   return (
-    <div className="modal-backdrop">
+    <div className="modal-backdrop page-sheet">
       <div className="modal-card queue-wait" role="dialog" aria-modal="true" aria-labelledby="queue-wait-title">
         <div className="modal-kicker">{queue.kind === 'ranked' ? 'Ranqueada' : 'Casual'}</div>
         <h2 id="queue-wait-title">

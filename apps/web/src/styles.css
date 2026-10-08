@@ -527,12 +527,24 @@ input[type='number'] {
   cursor: default;
 }
 
-.page-sheet {
+/* Janelas abertas numa página que rola inteira (Home, etc.): presas à tela, e não ao
+   topo do documento. `.modal-backdrop.page-sheet` para vencer o `position: absolute`
+   de `.modal-backdrop`, declarado mais abaixo (mesma especificidade, o último ganha). */
+.modal-backdrop.page-sheet {
   position: fixed;
+  /* a página atrás não rola junto com a folha; ver `.sheet-body` */
+  overscroll-behavior: contain;
 }
 .page-sheet .sheet {
   width: min(640px, 100%);
   justify-self: center;
+  /* Em unidades da tela (e não em %): dentro da grade do backdrop a porcentagem não
+     limita a folha, que cresce com a lista de decks e some para baixo da tela. */
+  max-height: 86vh;
+  max-height: 86dvh;
+}
+.page-sheet .sheet-body {
+  overscroll-behavior: contain;
 }
 /* em telas largas, a folha vira uma janela centralizada */
 @media (min-width: 700px) {
@@ -542,7 +554,8 @@ input[type='number'] {
   }
   .page-sheet.centered .sheet {
     border-radius: 24px;
-    max-height: 90%;
+    max-height: calc(90vh - 48px);
+    max-height: calc(90dvh - 48px);
     padding-bottom: 0;
     animation: pop-in 0.22s;
   }
