@@ -529,6 +529,8 @@ carregar, sem piscar o tema claro. As cores das cartas, dos DON!! e dos dados n�
   marcada como "tradução parcial". O painel da carta sempre tem o link "ver original".
 - **Traduções revisadas:** `data/translations/pt.json` (`{ "cards": { "OP01-001": { "text": "...", "trigger": "..." } } }`)
   tem prioridade sobre a automática. `GET /api/translations/pending` lista as cartas com tradução parcial, para revisão.
+  `npm run translations:check -w @gumgum/server` traduz a base inteira e lista as traduções parciais e as suspeitas
+  (número, nome, tipo ou palavra-chave que só aparece de um lado), para conferir depois de cada coleção nova.
 - Nomes de cartas, tipos ({Straw Hat Crew}) e palavras-chave (Rush, Blocker, Counter, Trigger...) ficam no original,
   como nas cartas físicas.
 

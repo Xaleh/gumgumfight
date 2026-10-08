@@ -677,7 +677,10 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^you have \[([^\]]+)\] with (\d+) power or more(?: on your field)?$/i))) {
     return { ownMatching: { count: 1, spec: { side: 'own', kinds: ['character'], upTo: 99, name: m[1], minPower: Number(m[2]) } } };
   }
-  if ((m = t.match(/^there are no other \[([^\]]+)\] cards$/i)) || (m = t.match(/^you have no other \[([^\]]+)\] with a base cost of \d+$/i))) {
+  if ((m = t.match(/^you have no other \[([^\]]+)\] with a base cost of (\d+)$/i))) {
+    return { noOtherNamed: m[1], noOtherNamedBaseCost: Number(m[2]) };
+  }
+  if ((m = t.match(/^there are no other \[([^\]]+)\] cards$/i))) {
     return { noOtherNamed: m[1] };
   }
   if ((m = t.match(/^you have no (Characters? .+)$/i))) {
@@ -819,7 +822,8 @@ export function parseCondition(text: string): Condition | null {
     return { minRestedTyped: { count: Number(m[1]), types: typesOf(m[2]) } };
   }
   if ((m = t.match(/^you have (\d+) or more ((?:\{[^}]+\})(?:\s*(?:,|or)\s*\{[^}]+\})+) type Characters(?: on your field)?$/i))) {
-    return { minTypedCharacters: { count: Number(m[1]), type: typesOf(m[2])[0] } };
+    const list = typesOf(m[2]);
+    return { minTypedCharacters: { count: Number(m[1]), type: list[0], ...(list.length > 1 ? { types: list } : {}) } };
   }
   if ((m = t.match(/^your Leader is \[([^\]]+)\] or has the \{([^}]+)\} type$/i))) {
     return { leaderTypeOrName: { type: m[2], name: m[1] } };
@@ -873,7 +877,10 @@ const onlyCharacters = (t: TargetRef | null): t is TargetRef =>
   t !== null && (typeof t !== 'object' || t.kinds.every((k) => k === 'character'));
 
 const withTarget = (phrase: string, make: (t: TargetRef) => EffectStep, charactersOnly = false): EffectStep[] | null => {
-  const t = parseTarget(phrase);
+  let t = parseTarget(phrase);
+  // "up to 1 of your [Kouzuki Momonosuke] gains +20 cost": o nome sozinho vale para Líder ou
+  // Personagem, mas custo só existe em Personagem (OP16-087 Shinobu).
+  if (t && typeof t === 'object' && charactersOnly && (t.name || t.names) && t.kinds.includes('character')) t = { ...t, kinds: ['character'] };
   if (!t || (charactersOnly && !onlyCharacters(t))) return null;
   return [make(t)];
 };

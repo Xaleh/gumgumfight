@@ -429,7 +429,8 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.selfPlayedThisTurn && locate(state, source)?.fc.playedOnTurn !== state.turn) return false;
   if (
     cond.minTypedCharacters &&
-    ps.characters.filter((c) => hasType(cardDef(state, c.uid), cond.minTypedCharacters!.type)).length < cond.minTypedCharacters.count
+    ps.characters.filter((c) => (cond.minTypedCharacters!.types ?? [cond.minTypedCharacters!.type]).some((t) => hasType(cardDef(state, c.uid), t))).length <
+      cond.minTypedCharacters.count
   ) {
     return false;
   }
@@ -466,7 +467,15 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   ) {
     return false;
   }
-  if (cond.noOtherNamed && ps.characters.some((c) => c.uid !== source && hasName(cardDef(state, c.uid), cond.noOtherNamed!))) {
+  if (
+    cond.noOtherNamed &&
+    ps.characters.some(
+      (c) =>
+        c.uid !== source &&
+        hasName(cardDef(state, c.uid), cond.noOtherNamed!) &&
+        (cond.noOtherNamedBaseCost === undefined || cardDef(state, c.uid).cost === cond.noOtherNamedBaseCost),
+    )
+  ) {
     return false;
   }
   if (cond.lifeMin !== undefined && ps.life.length < cond.lifeMin) return false;
