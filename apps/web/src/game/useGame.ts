@@ -43,7 +43,7 @@ export interface ReplayFile {
    *    depois da escolha de quem começa, com escolha (`choose`); os antigos usam `legacySetup`.
    * 10: "draw up to N cards" pergunta antes de cada carta se compra (`answer`); nos antigos, sim.
    * 11: auditoria das cartas: "up to N" nos passos de Vida e em "give up to N rested DON!!", "rest N of your
-   *    cards" com DON!!, "your opponent's cards" com DON!!, "reveal … play up to 1" e "you may deal 1 damage"
+   *    cards" com DON!!, "your opponent's cards" com DON!!, "reveal … play up to 1", "you may deal 1 damage" e topo ou fundo da Vida
    *    perguntam (`option`/`answer`); nos antigos, a resposta que o motor dava sozinho (`upgradeReplayActions`).
    */
   version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;

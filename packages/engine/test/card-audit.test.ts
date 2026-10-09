@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildCardDef } from '../src/cards';
-import { applyAction, canPayCost, createGame, getPower, hasKeyword, hasName, koProtected, matchesFilter } from '../src/engine';
+import { applyAction, attackError, canPayCost, costInHand, createGame, getPower, hasKeyword, hasName, koProtected, matchesFilter } from '../src/engine';
+import { fixCard } from '../src/errata';
 import { upgradeReplayActions } from '../src/replay';
 import { applySourceFixes } from '../src/source-fixes';
 import type { Ability, Action, CardData, DeckList, EffectStep, GameState, PlayerId } from '../src/types';
@@ -11,7 +12,11 @@ import { cards as baseCards, noDefense, toTurn } from './helpers';
 // Auditoria das cartas automatizadas (card 21 do Trello, "Testar as funcionalidades das cartas em
 // busca de bugs"): texto oficial x o que o motor entendia. Cartas reais da optcgapi.
 const auditCards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-auditoria-cartas.json'), 'utf8')) as { cards: CardData[] }).cards;
-const cards = [...baseCards, ...auditCards];
+// Cartas de teste: um Evento que faz o oponente descartar (ST33-004).
+const synthetic: CardData[] = [
+  { id: 'AU-001', name: 'Descarte', category: 'event', colors: ['blue'], cost: 0, types: [], text: '[Main] Your opponent trashes 1 card from their hand.' },
+];
+const cards = [...baseCards, ...auditCards, ...synthetic];
 const byId = (id: string) => cards.find((c) => c.id === id)!;
 const def = (id: string) => buildCardDef(byId(id));
 const abilities = (id: string): Ability[] => def(id).abilities;
@@ -494,5 +499,149 @@ describe('Replays da versão 10 continuam carregando', () => {
     for (const a of upgraded) t = applyAction(t, a);
     expect(t.players[0].leader.don).toBe(2);
     expect(t.pending).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rodada 3: starter decks, promos e spoilers de EB05/OP18
+// ---------------------------------------------------------------------------
+
+describe('Rodada 3: leitura e execução', () => {
+  it('Sabo ST13-007: sem [Sabo] de custo 5 no topo da Vida, o Líder não ganha +2000 ("If you do")', () => {
+    let s = toTurn(game(), 3);
+    const sabo = field(s, 0, 'ST13-007');
+    const top = s.players[0].life[s.players[0].life.length - 1];
+    s.cards[top] = { ...s.cards[top], cardId: 'ST01-006' };
+    const leaderPower = getPower(s, s.players[0].leader.uid);
+    s = applyAction(s, { type: 'activate', player: 0, uid: sabo, ability: 0 });
+    if (s.pending?.kind === 'confirm') s = answer(s, true);
+    expect(s.pending).toBeNull();
+    expect(getPower(s, s.players[0].leader.uid)).toBe(leaderPower);
+  });
+
+  it('Avalo Pizarro ST27-001: "rest 1 of your [Fullalead] cards" aceita o Stage [Fullalead]', () => {
+    const s = toTurn(game(), 3);
+    const avalo = field(s, 0, 'ST27-001');
+    s.players[0].stage = { uid: take(s, 0, 'OP09-099'), rested: false, don: 0, playedOnTurn: 0 };
+    const ability = def('ST27-001').abilities.find((a) => a.timing === 'activateMain')!;
+    expect(canPayCost(s, 0, avalo, ability.cost!)).toBe(true);
+  });
+
+  it('Borsalino ST33-004: o descarte forçado pelo oponente também vale ("trashed by an effect")', () => {
+    let s = toTurn(game(), 3);
+    const borsalino = hand(s, 1, 'ST33-004');
+    const cost = costInHand(s, borsalino);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'AU-001') });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1 });
+    s = choose(s, [s.players[1].hand.find((u) => u !== borsalino)!]);
+    expect(costInHand(s, borsalino)).toBe(cost - 3);
+  });
+
+  it('Zoro OP18-017: "give your Leader −2000 power … instead" vale com o Líder virado', () => {
+    const s = toTurn(game(), 4);
+    const zoro = field(s, 0, 'OP18-017');
+    s.players[0].leader.rested = true;
+    const ab = def('OP18-017').abilities.find((a) => a.timing === 'replace')!;
+    expect(ab.cost).toEqual({ leaderPowerMinus: 2000 });
+    expect(canPayCost(s, 0, zoro, ab.cost!)).toBe(true);
+    // "your 1 active Leader" (EB01-004) continua exigindo o Líder ativo.
+    expect(stepsOf('EB01-004', 'whenAttacking')[0]).toMatchObject({ cost: { leaderPowerMinusActive: true } });
+  });
+
+  it('Zambai OP18-066: "K.O. 1 of your Stages" manda o Stage para o descarte', () => {
+    let s = toTurn(game(), 3);
+    const zambai = field(s, 0, 'OP18-066');
+    const stage = take(s, 0, 'OP09-099');
+    s.players[0].stage = { uid: stage, rested: false, don: 0, playedOnTurn: 0 };
+    s = applyAction(s, { type: 'activate', player: 0, uid: zambai, ability: def('OP18-066').abilities.findIndex((a) => a.timing === 'activateMain') });
+    if (s.pending?.kind === 'confirm') s = answer(s, true);
+    if (s.pending?.kind === 'selectTargets') s = choose(s, [stage]);
+    expect(s.players[0].stage).toBeFalsy();
+    expect(s.players[0].trash).toContain(stage);
+    expect(hasKeyword(s, zambai, 'rush')).toBe(true);
+  });
+
+  it('spoilers OP18-069, EB05-033 e EB05-059 deixam o modo manual', () => {
+    for (const id of ['OP18-069', 'EB05-033', 'EB05-059']) expect([id, def(id).manual]).toEqual([id, false]);
+    expect(abilities('OP18-069')[0]).toMatchObject({ timing: 'replace', cost: { donMinus: 1, restSelf: true } });
+    expect(stepsOf('EB05-059', 'main')[1]).toMatchObject({ do: 'cannotBeKO', inBattle: true, duration: 'nextOpponentTurn' });
+  });
+
+  it('Hody & Hyouzou P-062: "Slash Strike" vira dois atributos', () => {
+    expect(fixCard(byId('P-062')).attributes).toEqual(['Slash', 'Strike']);
+    expect(matchesFilter(def('P-062'), { attribute: 'Strike' })).toBe(true);
+  });
+
+  it('Kid P-067: com duas cópias viradas, as duas podem ser atacadas', () => {
+    const s = toTurn(game(), 4);
+    const a = field(s, 0, 'P-067', true);
+    const b = field(s, 0, 'P-067', true);
+    const other = field(s, 0, 'ST01-003', true);
+    const atk = s.players[1].leader.uid;
+    expect(attackError(s, 1, atk, a)).toBeNull();
+    expect(attackError(s, 1, atk, b)).toBeNull();
+    expect(attackError(s, 1, atk, other)).toMatch(/Só é possível atacar/);
+  });
+
+  it('Buggy P-084: "Characters with a cost of 3 or 4 cannot attack" olha o custo atual', () => {
+    const s = toTurn(game(['OP09-042', 'ST02-001']), 3);
+    field(s, 0, 'P-084');
+    const garp = field(s, 0, 'ST08-010'); // custo 5 impresso
+    expect(attackError(s, 0, garp, s.players[1].leader.uid)).toBeNull();
+    s.modifiers.push({ uid: garp, kind: 'cost', amount: -2, duration: 'turn' });
+    expect(attackError(s, 0, garp, s.players[1].leader.uid)).not.toBeNull();
+  });
+
+  it('Luffy PRB02-005: o oponente vira 1 DON!! ativo no início da próxima Fase Principal dele', () => {
+    expect(stepsOf('PRB02-005', 'onPlay').find((st) => st.do === 'skipRefreshDon')).toMatchObject({ count: 1, atMainPhase: true });
+    let s = toTurn(game(), 3);
+    s.donRestAtMain = [{ player: 1, count: 1 }];
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    // O jogador 1 desvirou tudo e recebeu os DON!! da fase; 1 deles foi virado no começo da Fase Principal.
+    expect(s.players[1].donRested).toBe(1);
+  });
+
+  it('Zephyr ST05-010: o +3000 contra Personagem "Strike" dura o turno, não só a batalha', () => {
+    let s = toTurn(game(), 4);
+    setDon(s, 1, 4);
+    const zephyr = field(s, 0, 'ST05-010', true);
+    const base = getPower(s, zephyr);
+    const strike = field(s, 1, 'ST01-010'); // Franky, "Strike"
+    s = noDefense(applyAction(s, { type: 'attack', player: 1, attacker: strike, target: zephyr }));
+    expect(s.battle).toBeNull();
+    expect(getPower(s, zephyr)).toBe(base + 3000);
+  });
+
+  it('Thatch OP03-005: jogado de novo no mesmo turno, o Thatch novo não é descartado no fim do turno', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 5);
+    const thatch = field(s, 0, 'OP03-005');
+    s = applyAction(s, { type: 'activate', player: 0, uid: thatch, ability: 0 });
+    // Volta para a mão (mutação de teste) e é jogado de novo.
+    s.players[0].characters = s.players[0].characters.filter((c) => c.uid !== thatch);
+    s.players[0].hand.push(thatch);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: thatch });
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(s.players[0].characters.some((c) => c.uid === thatch)).toBe(true);
+  });
+
+  it('Usopp OP15-024: só efeitos de Líder e de Personagem do oponente não o viram', () => {
+    expect(abilities('OP15-024').find((a) => a.staticNoRest)).toMatchObject({ staticNoRest: 'leaderOrCharacter' });
+  });
+
+  it('Gecko Moria OP06-086: o jogador escolhe qual das duas cartas entra virada', () => {
+    const [step] = stepsOf('OP06-086', 'onPlay');
+    expect(step.do).toBe('chooseOne');
+    const options = (step as Extract<EffectStep, { do: 'chooseOne' }>).options;
+    expect(options.map((o) => o.map((st) => Boolean((st as { rested?: boolean }).rested)))).toEqual([
+      [false, true],
+      [true, false],
+    ]);
+  });
+
+  it('Kid ST36-005: "turn 1 card from the top or bottom of your Life cards" deixa escolher topo ou fundo', () => {
+    const ab = abilities('ST36-005').find((a) => a.timing === 'onOpponentAttack')!;
+    const pay = ab.steps.find((st) => st.do === 'payCost') as Extract<EffectStep, { do: 'payCost' }> | undefined;
+    expect(pay?.cost.lifeFace ?? ab.cost?.lifeFace).toMatchObject({ count: 1, topOrBottom: true });
   });
 });

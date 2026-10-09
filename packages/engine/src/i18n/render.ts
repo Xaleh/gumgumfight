@@ -749,7 +749,7 @@ function cost(c: AbilityCost, ctx: Ctx, verbal = false): string {
   if (c.reveal) parts.push(`revelar ${c.reveal.filter ? filter(c.reveal.filter, c.reveal.count, false) : cards(c.reveal.count)} da sua mão`);
   if (c.returnSelf) parts.push(`devolver ${ctx.self} à mão do dono`);
   if (c.koSelf) parts.push(`nocautear ${ctx.self}`);
-  if (c.leaderPowerMinus) parts.push(`dar −${c.leaderPowerMinus} de poder ao seu Líder ativo durante este turno`);
+  if (c.leaderPowerMinus) parts.push(`dar −${c.leaderPowerMinus} de poder ao seu Líder${c.leaderPowerMinusActive ? ' ativo' : ''} durante este turno`);
   if (c.giveDon) parts.push(`dar ${c.giveDon.count} DON!! ativo a ${target(c.giveDon.spec, ctx)}`);
   if (c.returnGivenDon) parts.push(`devolver ${c.returnGivenDon} DON!! anexados às suas cartas para a área de custo, virados`);
   if (c.victimPowerMinus) parts.push(`dar −${c.victimPowerMinus} de poder a esse Personagem durante este turno`);
@@ -1074,6 +1074,7 @@ function step(s: EffectStep, ctx: Ctx): string {
         : `Você pode devolver à mão qualquer número ${what.startsWith('dos ') ? what : `de ${what}`}. ${who} recebe +${s.power} de poder ${dur(s.duration)} para cada Personagem devolvido.`;
     }
     case 'skipRefreshDon':
+      if (s.atMainPhase) return `O oponente vira ${s.count} dos DON!! ativos dele no início da próxima Fase Principal dele.`;
       return `Até ${s.count} DON!! ${plural(s.count, 'virado', 'virados')} do oponente não ${plural(s.count, 'fica ativo', 'ficam ativos')} na próxima Fase de Renovação dele.`;
     case 'winGame':
       return 'Você vence a partida.';
@@ -1255,7 +1256,7 @@ function staticParts(a: Ability, ctx: Ctx): string[] {
   if (a.noEffectKOByMaxBasePower !== undefined) {
     parts.push(`não pode ser nocauteado por efeitos de Personagens do oponente com ${a.noEffectKOByMaxBasePower} de poder base ou menos`);
   }
-  if (a.staticNoRest) parts.push('não pode ser virado por efeitos do oponente');
+  if (a.staticNoRest) parts.push(`não pode ser virado por efeitos ${a.staticNoRest === 'leaderOrCharacter' ? 'de Líder e de Personagem do oponente' : 'do oponente'}`);
   return parts;
 }
 

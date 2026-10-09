@@ -597,7 +597,8 @@ type EffectStepBody =
       duration: Duration;
     }
   /** "up to 1 of your opponent's rested DON!! cards will not become active in your opponent's next Refresh Phase" */
-  | { do: 'skipRefreshDon'; count: number }
+  /** `atMainPhase`: "your opponent rests N of their active DON!! cards at the start of their next Main Phase" (PRB02-005). */
+  | { do: 'skipRefreshDon'; count: number; atMainPhase?: true }
   | { do: 'winGame' }
   | { do: 'extraTurn' }
   /** "Your opponent may trash N … . If they do not, …" */
@@ -715,7 +716,8 @@ type EffectStepBody =
   | { do: 'trashToDeckBottom'; count: number; filter?: CardFilter }
   | { do: 'lifeToTrash'; count: number; choose?: boolean }
   | { do: 'revealFromHand'; count: number; filter?: CardFilter }
-  | { do: 'lifeFace'; count: number; up: boolean }
+  /** `topOrBottom`: "turn 1 card from the top or bottom of your Life cards …" (ST29-008, ST36-005): o jogador escolhe qual. */
+  | { do: 'lifeFace'; count: number; up: boolean; topOrBottom?: true }
   /** "… will not become active in your opponent's next Refresh Phase" */
   | { do: 'skipRefresh'; target: TargetRef }
   /** "Trash up to 1 of your opponent's Characters" (vai para o descarte sem ser K.O.) */
@@ -849,7 +851,9 @@ export type AbilityTiming =
 export interface AbilityCost {
   restSelf?: boolean; // "You may rest this Character/Stage"
   koSelf?: boolean; // "K.O. this Character" (custo de substituição)
-  leaderPowerMinus?: number; // "give your 1 active Leader −5000 power during this turn"
+  leaderPowerMinus?: number; // "give your 1 active Leader −5000 power during this turn" / "give your Leader −2000 power"
+  /** "give your 1 active Leader …": o Líder tem de estar ativo (sem "active", OP18-017, vale virado). */
+  leaderPowerMinusActive?: boolean;
   giveDon?: { count: number; spec: TargetSpec }; // "give 1 active DON!! card to 1 of your [X]"
   ownToBottom?: { count: number; spec: TargetSpec }; // "place 1 of your Characters at the bottom of the owner's deck"
   ownToLife?: { count: number; spec: TargetSpec }; // "add 1 of your Characters … to the top of your Life cards face-up"
@@ -897,7 +901,7 @@ export interface AbilityCost {
   /** "You may reveal N … from your hand:" */
   reveal?: { count: number; filter?: CardFilter };
   /** "You may turn N card from the top of your Life cards face-up / face-down:" */
-  lifeFace?: { count: number; up: boolean };
+  lifeFace?: { count: number; up: boolean; topOrBottom?: true };
   /** "you may rest 1 of your opponent's Characters instead" */
   restOpponentChars?: number;
   /** "give this Character −2000 power during this turn" */
@@ -970,7 +974,8 @@ export interface Ability {
   /** "cannot be K.O.'d by effects of your opponent's Characters with 5000 base power or less" */
   noEffectKOByMaxBasePower?: number;
   /** "This Character cannot be rested by your opponent's effects." */
-  staticNoRest?: boolean;
+  /** "cannot be rested by your opponent's effects" (`true`) ou "… by your opponent's Leader and Character effects" (OP15-024). */
+  staticNoRest?: true | 'leaderOrCharacter';
   /** Counter das suas cartas na mão: "+1000 Counter" para as sem Counter, ou "becomes +2000" (set). */
   handCounter?: { filter: CardFilter; amount: number; set?: boolean; withoutCounter?: boolean };
   /** "this card in your hand has a +2000 Counter" (com a condição da habilidade) */
@@ -1298,6 +1303,8 @@ export interface GameState {
   tempReplacements?: Array<{ player: PlayerId; source: string; by: 'battle' | 'any'; cost: AbilityCost }>;
   /** DON!! que não ficam ativos na próxima Renovação do jogador. */
   donSkipRefresh?: Array<{ player: PlayerId; count: number }>;
+  /** DON!! ativos que o jogador vira no início da próxima Fase Principal dele (PRB02-005). */
+  donRestAtMain?: Array<{ player: PlayerId; count: number }>;
   /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;

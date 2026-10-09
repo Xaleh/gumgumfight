@@ -54,7 +54,8 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * jogador, e a carta da mão posta na Vida por um efeito com exigência é revelada no log.) Até a versão 10
  * (auditoria das cartas, DV-40/42), estas escolhas não existiam e são respondidas como o motor fazia: "up to
  * N" nos passos de Vida e em "give up to N rested DON!!" (a quantidade máxima); "rest N of your cards"
- * (nenhum DON!!, só as cartas); "rest up to N of your opponent's cards" (a carta do campo, se a próxima ação
+ * (nenhum DON!!, só as cartas); "turn 1 card from the top or bottom of your Life cards" (o topo); "rest up to N
+ * of your opponent's cards" (a carta do campo, se a próxima ação
  * gravada é uma escolha de alvo; senão "Nenhum"); "reveal 1 card … play up to 1" e "you may deal 1 damage"
  * (sim). Uma escolha gravada com mais alvos do que hoje cabe fica com os primeiros, e uma resposta gravada
  * para uma pergunta que hoje não aparece (o efeito deixou de ser oferecido) é descartada; dali em diante
@@ -91,7 +92,7 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     // Versão 10: escolhas novas da auditoria das cartas.
     const current = currentStep();
     if (p.kind === 'option' && !(next?.type === 'option' && next.player === p.player)) {
-      if (current && ['trashLife', 'opponentLifeToHand', 'addLifeFromDeck', 'giveRestedDon'].includes(current.do)) return { type: 'option', player: p.player, index: 0 };
+      if (current && ['trashLife', 'opponentLifeToHand', 'addLifeFromDeck', 'giveRestedDon', 'lifeFace'].includes(current.do)) return { type: 'option', player: p.player, index: 0 };
       if (current?.do === 'restOwn') return { type: 'option', player: p.player, index: p.options.length - 1 };
       if (current?.do === 'restDonOrCharacter') {
         const card = p.options.findIndex((o) => !/DON!!|Nenhum/.test(o));

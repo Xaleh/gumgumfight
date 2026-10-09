@@ -52,6 +52,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-40 | Auditoria das cartas: 24 cartas com efeito lido ou executado errado (**corrigido**) | texto das cartas | alto | C17 |
 | DV-41 | Auditoria das cartas: leituras que dependem de ruling ou de interface nova (parte **corrigida** na rodada 2) | texto das cartas | baixo | C17 |
 | DV-42 | Auditoria das cartas, rodada 2 (OP01 a OP09): 24 cartas com efeito lido ou executado errado, mais as regras de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
+| DV-43 | Auditoria das cartas, rodada 3 (starter decks, promos e spoilers EB05/OP18): 19 cartas, as 20 com atributos juntos e 3 pendências de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
 
 ## Cards de correção no Trello
 
@@ -75,7 +76,7 @@ Todos na lista "Planejamento" do quadro GumGum Fight, com etiqueta vermelha (bug
 | C14 | <https://trello.com/c/6egd4DaI> | Momentos do turno (DV-28 a DV-30) |
 | C15 | <https://trello.com/c/OfoyXyOm> | "Draw up to", restrições, revelar (DV-31 a DV-33) |
 | C16 | <https://trello.com/c/SG4w3tB2> | Erratas nos dados (DV-34) |
-| C17 | <https://trello.com/c/RR3kkVwy> | Auditoria das cartas automatizadas (DV-40 a DV-42); pendências: <https://trello.com/c/V3eu7Opx> |
+| C17 | <https://trello.com/c/RR3kkVwy> | Auditoria das cartas automatizadas (DV-40 a DV-43); pendências: <https://trello.com/c/V3eu7Opx> |
 
 Pontos **conformes** conferidos (não precisam de card): mulligan; Refresh, Draw e DON!! Phase; ninguém ataca no primeiro turno; +1000 por DON!! só no próprio turno; DON!! voltam rested quando a carta sai; alvos de ataque; checagem de saída de cena ao fim de cada etapa da batalha; [Blocker] (uma vez, não rested, não o próprio alvo) e [Unblockable]; [Banish]; dano um a um e [Trigger] antes do 2º dano; limite de 5 Personagens como regra (sem [On K.O.]); K.O. vs. trash; [Counter] e [Main] só nos momentos certos; custo negativo vale 0 (somando o negativo); poder negativo não trasha; informação oculta (`view.ts` e decisões que sempre abrem). A lista completa por regra está no fim deste arquivo.
 
@@ -414,12 +415,14 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
   - "up to" nos passos de Vida (OP10-109, OP14-072, OP14-112, OP14-115, Kaido ST04-001 e toda carta com "add up to N card(s) from the top of your deck to the top of your Life cards"): pergunta a quantidade, do máximo para 0 (`upTo` em `trashLife`, `addLifeFromDeck` e `opponentLifeToHand`).
 - Pendente:
 - Ms. All Sunday OP12-075: "your opponent may add 1 DON!! card" adiciona sem perguntar ao oponente (falta a escolha do oponente nesse passo).
-- Usopp OP15-024: "cannot be rested by your opponent's Leader and Character effects" também bloqueia Eventos e Stages do oponente.
+- ~~Usopp OP15-024: "cannot be rested by your opponent's Leader and Character effects" também bloqueia Eventos e Stages do oponente.~~ Corrigido na rodada 3 (DV-43).
 - "If X, A. Then, B.": o motor aplica a condição só a A (EB02-006, EB02-011, EB02-013, EB02-028, EB02-032, EB03-003, EB03-013, EB04-038, OP10-024, OP12-062, OP12-073, OP12-078). Coerente com 4-10, mas Leo OP10-057 ("Then, place the rest at the bottom … and trash 1 card from your hand") descarta mesmo quando a busca não aconteceu (Líder que não é [Usopp]).
 - `haveCharacterNamed` não conta o Líder ("If you have [Jewelry Bonney]", EB04-056; "[Gecko Moria] with 10000 power or more on your field", OP15-080).
 - `onlyTypeIncludes` falha quando você não tem nenhum Personagem (EB03-038).
-- Gecko Moria OP06-086: "Play 1 card and play the other card rested" fixa qual das duas entra virada (a de custo 2 ou menos); o texto deixa o jogador escolher.
-- Thatch OP03-005: "trash this Character at the end of this turn" descarta também o Thatch que saiu do campo e foi jogado de novo no mesmo turno (o efeito adiado guarda só o uid; o Q&A diz que a carta que foi para a mão ou o deck não é descartada).
+- ~~Gecko Moria OP06-086 ("Play 1 card and play the other card rested") e Thatch OP03-005 ("trash this Character at the end of this turn" para a carta que voltou ao campo).~~ Corrigidos na rodada 3 (DV-43).
+- Mr.2.Bon.Kurei(Bentham) ST08-013: "you may K.O. the opponent's Character you battled with. If you do, K.O. this Character" nocauteia o Mr.2 mesmo quando o Personagem do oponente não sai (já foi nocauteado na batalha, está protegido ou foi salvo por substituição). Corrigir exige que o passo de K.O. registre o que de fato saiu do campo.
+- Texto dos spoilers (fonte não oficial; some quando a carta sair na API): EB05-039 Pink Hornet com os tipos "Vinsmoke Family"/"Germa 66" em vez de {The Vinsmoke Family}/{GERMA 66}; OP18-065 Saint Gunko com o atributo "?"; erros de digitação já tolerados pelo leitor (EB05-048 "cost of O", EB05-019 "{Land of Wano]").
+- Texto da fonte sem o sinal de menos (ST31-004, ST33-004, ST34-004, ST34-005, ST35-002: "1000 power", "3 cost", "DON!! 4"): o leitor já lê os valores negativos; só a exibição em inglês fica errada.
 
 **DV-42. Rodada 2 (OP01 a OP09): efeitos lidos ou executados errado** — alto — **corrigido**
 - Revisadas 920 cartas (OP01 a OP09, fora os Líderes, já vistos na rodada 1), com as correções da rodada 1 já aplicadas. Diff das habilidades e da tradução de toda a base antes e depois: só as cartas listadas (e as das regras de DV-41) mudaram.
@@ -443,6 +446,28 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
   - **"Give up to 2 rested DON!! cards to …"** (Chaka OP05-008, Brook ST01-011 e as outras com "up to N"): dava sempre o máximo; com um alvo só, pergunta quantos.
 - Replays: a versão sobe para 11 (`REPLAY_VERSION`). `upgradeReplayActions` responde às perguntas novas como o motor fazia (a quantidade máxima, nenhum DON!!, sim) e descarta a resposta gravada para uma pergunta que deixou de existir. As salas online começadas antes do deploy passam pelo mesmo upgrade ao serem refeitas (`rebuild` em `apps/server/src/online/room.ts`).
 - Testes: `packages/engine/test/card-audit.test.ts` (rodada 2 e regras de DV-41; 19 testes novos, que falham sem a correção), com as cartas reais em `test/fixtures/bugs-auditoria-cartas.json`. Testes antigos que fixavam o comportamento errado foram atualizados: `parsed-engine.test.ts` (Strike por Personagem), `protections.test.ts` (a própria carta paga o custo de K.O.), `i18n-review.test.ts` (Rosinante "ativos") e os que passam pelas perguntas novas.
+
+**DV-43. Rodada 3 (starter decks, promos e spoilers de EB05/OP18): efeitos lidos ou executados errado** — alto — **corrigido**
+- Revisadas 522 cartas: 304 dos starter decks (fora os Líderes, vistos na rodada 1), 118 promos (P-xxx e PRB) e as 90 cartas com efeito dos spoilers de EB05 e OP18 (Líderes incluídos; baixados do feed com `cards:import --spoilers`). Diff das habilidades e da tradução de toda a base antes e depois: só as cartas listadas mudaram.
+- Alto:
+  - **Sabo ST13-007, Ace ST13-010, Luffy ST13-014:** "If that card is a [Sabo] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000": com a condição falsa, o "you may" era pulado mas o "If you do" não, e o Líder ganhava +2000 sem jogar nada. No motor: um "you may" (`payCost` com `scope`) pulado pela condição pula também o trecho dele.
+  - **Avalo Pizarro ST27-001:** "rest 1 of your [Fullalead] cards" não aceitava o Stage [Fullalead]; o custo nunca podia ser pago.
+  - **Zoro OP18-017** (e OP14-016, OP15-009): "you may give your Leader −2000 power during this turn instead" exigia o Líder ativo, o que só vale para "your 1 active Leader" (`AbilityCost.leaderPowerMinusActive`); com o Líder virado (já atacou), a substituição nunca era oferecida.
+  - **Zambai OP18-066:** "You may K.O. 1 of your Stages" não tirava o Stage do campo (o passo só sabia nocautear Personagem) e o [Rush] saía de graça.
+- Médio:
+  - **Hody & Hyouzou P-062** e mais 19 cartas: a API junta os dois atributos ("Slash Strike"); a carta não contava como nenhum dos dois. `applySourceFixes` separa os atributos conhecidos; `data/cards` (ST12, ST24, ST25, ST30) atualizado.
+  - **Buggy P-084:** "all Characters with a cost of 3 or 4 cannot attack" olhava o custo impresso (`Aura.exactCosts` agora usa o atual, como `minCost`/`maxCost`).
+  - **Borsalino ST33-004:** "During the turn in which a card in your hand is trashed by an effect" só contava o descarte pelo próprio efeito; agora conta também o descarte forçado pelo oponente, ao acaso, de toda a mão e o de "até ficar com N".
+  - **OP18-069, EB05-033 e EB05-059** (spoilers) caíam no modo manual; o leitor ganhou as redações ("you may DON!! −1 and rest this Character instead", "If your Leader has the {X} type, and the number of DON!! …", "all of your Characters with 4000 base power and the {X} type cannot be K.O.'d in battle until the end of your opponent's next End Phase").
+- Baixo:
+  - **Kid P-067:** "cannot attack any card other than the Character [Eustass"Captain"Kid]" só deixava atacar a primeira cópia.
+  - **Luffy PRB02-005:** "your opponent rests 1 of their active DON!! cards at the start of their next Main Phase" era lido como "não desvira 1 DON!!" e sumia quando o oponente não tinha DON!! virado; agora vira 1 DON!! ativo no início da Fase Principal dele (`skipRefreshDon.atMainPhase`).
+  - **Zephyr ST05-010:** o +3000 contra Personagem "Strike" sumia no fim da batalha; dura o turno.
+  - **Kid ST36-005, Nami ST29-008:** "turn 1 card from the top or bottom of your Life cards" sempre virava a de cima; o jogador escolhe topo ou fundo.
+  - Pendências de DV-41 resolvidas: **Usopp OP15-024** ("… by your opponent's Leader and Character effects": Eventos e Stages do oponente viram), **Gecko Moria OP06-086** (o jogador escolhe qual das duas entra virada) e **Thatch OP03-005** (o efeito adiado sobre "this Character" não vale para a carta que saiu e voltou ao campo).
+- Custos com a própria carta (DV-42): a carta que já paga outra parte do custo ("rest this card and 1 of your [Enel] cards") não conta duas vezes.
+- Replays: as perguntas novas (topo ou fundo da Vida) entram nas respostas implícitas da versão 11.
+- Testes: `packages/engine/test/card-audit.test.ts` (rodada 3; 15 testes novos, que falham sem a correção).
 
 ---
 

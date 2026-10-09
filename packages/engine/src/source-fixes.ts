@@ -185,13 +185,28 @@ function patchText(text: string, swaps: ReadonlyArray<readonly [string, string]>
 }
 
 /** A carta com o nome, os tipos e o texto da lista oficial (o mesmo objeto, se não houver o que corrigir). */
+const ATTRIBUTES = /^(?:Slash|Strike|Ranged|Special|Wisdom)$/i;
+
+/**
+ * A API junta os dois atributos de uma carta num item só ("Slash Strike", P-062 e mais 19 cartas): sem
+ * separar, a carta não conta como nenhum dos dois.
+ */
+function splitAttributes(list: string[] | undefined): string[] | undefined {
+  if (!list?.some((a) => /\s/.test(a.trim()))) return list;
+  return list.flatMap((a) => {
+    const parts = a.trim().split(/\s+/);
+    return parts.every((x) => ATTRIBUTES.test(x)) ? parts : [a];
+  });
+}
+
 export function applySourceFixes<T extends CardData>(card: T): T {
   const fix = SOURCE_FIXES[card.id];
   const textFix = SOURCE_TEXT_FIXES[card.id];
-  if (!fix && !textFix) return card;
+  const split = splitAttributes(card.attributes);
+  if (!fix && !textFix && split === card.attributes) return card;
   const name = fix?.name ?? card.name;
   const types = fix?.types ?? card.types;
-  const attributes = fix?.attributes ?? card.attributes;
+  const attributes = fix?.attributes ?? split;
   const text = textFix && card.text ? patchText(card.text, textFix) : card.text;
   const sameList = (a: string[] | undefined, b: string[] | undefined) => a === b || (a !== undefined && b !== undefined && a.length === b.length && a.every((t, i) => t === b[i]));
   const sameTypes = sameList(types, card.types);

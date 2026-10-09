@@ -271,7 +271,8 @@
       "power": 7000,
       "counter": 0,
       "attributes": [
-        "Slash Special"
+        "Slash",
+        "Special"
       ],
       "types": [
         "Former Baroque Works",

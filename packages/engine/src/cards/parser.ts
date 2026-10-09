@@ -255,13 +255,19 @@ function clean(raw: string): string {
     .replace(/Select your Leader and 1 Character\. Swap the base power of the selected cards with each other/g, 'Swap the base power of your Leader and 1 Character with each other')
     .replace(
       /Choose (up to \d+ .+?) and (up to \d+ .+?) from your trash\. Play 1 card and play the other card rested/g,
-      'Play $1 from your trash. Then, play $2 from your trash rested',
+      'Play $1 from your trash and $2 from your trash, one of them rested',
     )
     .replace(
       /reveal up to \d+ (.+?) from your hand\. Play 1 of the revealed cards and play the other card rested if it has a cost of (\d+) or less/g,
       'play up to 1 $1 from your hand. Then, play up to 1 $1 with a cost of $2 or less from your hand rested',
     )
     .replace(/the opponent's Character you battled with/g, 'that Character')
+    // EB05-033: "If your Leader has the {X} type, and the number of DON!! …" (a vírgula separaria a condição).
+    .replace(/(If your Leader has the \{[^}]+\} type), and (the number of DON!! cards)/g, '$1 and $2')
+    // EB05-059: "all of your Characters with 4000 base power and the {X} type" = "all of your {X} type Characters with 4000 base power".
+    .replace(/all of your Characters with (\d+) base power and the (\{[^}]+\}) type/gi, 'all of your $2 type Characters with $1 base power')
+    // OP18-069: "you may DON!! -1 and rest this Character instead".
+    .replace(/you may DON!! [−-](\d+) and /g, 'you may return $1 DON!! card from your field to your DON!! deck and ')
     // Spoilers (traduções de fãs): erros de digitação e frases fora do padrão oficial.
     .replace(/\bCharacetr\b/g, 'Character')
     .replace(/\brest your Leader (\[[^\]]+\])/g, 'rest your $1 Leader')
@@ -1145,7 +1151,10 @@ const CLAUSES: ClauseRule[] = [
     ],
   ],
   [/^up to (\d+) of your opponent's rested DON!! cards will not become active in your opponent's next Refresh Phase$/i, (m) => [{ do: 'skipRefreshDon', count: Number(m[1]) }]],
-  [/^your opponent rests (\d+) of their active DON!! cards at the start of their next Main Phase$/i, (m) => [{ do: 'skipRefreshDon', count: Number(m[1]) }]],
+  [
+    /^your opponent rests (\d+) of their active DON!! cards at the start of their next Main Phase$/i,
+    (m) => [{ do: 'skipRefreshDon', count: Number(m[1]), atMainPhase: true }],
+  ],
   // "your opponent's cards" inclui DON!!: cada uma é uma carta do campo ou um DON!!.
   [
     /^Up to (\d+) of your opponent's rested cards will not become active in your opponent's next Refresh Phase$/i,
@@ -1581,6 +1590,28 @@ const CLAUSES: ClauseRule[] = [
     (m) => withTarget(m[1], (target) => ({ do: 'toDeckBottom', target }), true),
   ],
   [
+    // "Choose A and B from your trash. Play 1 card and play the other card rested" (OP06-086): o jogador escolhe
+    // qual das duas entra virada.
+    /^Play (up to \d+ .+?) from your trash and (up to \d+ .+?) from your trash, one of them rested$/i,
+    (m) => {
+      const a = parseCardFilter(m[1]);
+      const b = parseCardFilter(m[2]);
+      if (!a || !b) return null;
+      const play = (f: typeof a, rested: boolean): EffectStep => ({ do: 'playFrom', from: 'trash', upTo: f.upTo, filter: f.filter, ...(rested ? { rested: true } : {}) });
+      return [
+        {
+          do: 'chooseOne',
+          chooser: 'self',
+          options: [
+            [play(a, false), play(b, true)],
+            [play(a, true), play(b, false)],
+          ],
+          labels: ['A 1ª carta entra ativa e a 2ª virada', 'A 1ª carta entra virada e a 2ª ativa'],
+        },
+      ];
+    },
+  ],
+  [
     /^Reveal 1 card from the top of your deck and play (up to 1 .+?)( rested)?$/i,
     (m) => {
       const f = parseCardFilter(m[1]);
@@ -1992,7 +2023,7 @@ const CLAUSES: ClauseRule[] = [
     () => [{ do: 'noBlockerWhenAttacking', target: 'chosen' }],
   ],
   [
-    /^(.+?) cannot be K\.O\.'d (in battle )?during this (turn|battle)$/i,
+    new RegExp(`^(.+?) cannot be K\\.O\\.'d (in battle )?${DUR}$`, 'i'),
     (m) =>
       withTarget(m[1], (target) =>
         m[2]
@@ -2399,14 +2430,17 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
     if (m[2]) cost.donMinusOpen = true; // "1 or more": o jogador escolhe quantos
     if (m[3]) cost.donMinusActive = true;
   }
-  else if ((m = part.match(/^give your (?:1 )?active Leader [−-]?(\d+) power during this turn$/i))) cost.leaderPowerMinus = Number(m[1]);
+  else if ((m = part.match(/^give your (?:1 )?active Leader [−-]?(\d+) power during this turn$/i))) {
+    cost.leaderPowerMinus = Number(m[1]);
+    cost.leaderPowerMinusActive = true;
+  }
   else if ((m = part.match(/^return (\d+) Characters? to your hand$/i))) {
     cost.returnOwn = { count: Number(m[1]), spec: { side: 'own', kinds: ['character'], upTo: Number(m[1]) } };
   }
   else if ((m = part.match(/^give that Character [−-]?(\d+) power during this turn$/i))) cost.victimPowerMinus = Number(m[1]);
   else if ((m = part.match(/^turn (\d+) of your face-up Life cards face-down$/i))) cost.lifeFace = { count: Number(m[1]), up: false };
   else if ((m = part.match(/^turn (\d+) cards? from the top or bottom of your Life cards face-(up|down)$/i))) {
-    cost.lifeFace = { count: Number(m[1]), up: m[2].toLowerCase() === 'up' };
+    cost.lifeFace = { count: Number(m[1]), up: m[2].toLowerCase() === 'up', ...(m[1] === '1' ? { topOrBottom: true as const } : {}) };
   } else if ((m = part.match(/^return (\d+) total of your currently given DON!! cards to your cost area rested$/i))) cost.returnGivenDon = Number(m[1]);
   else if ((m = part.match(/^add (\d+) of your (.+) to the top of your Life cards face-up$/i))) {
     const spec = parseTarget(`up to ${m[1]} of your ${m[2]}`);
@@ -2459,6 +2493,8 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
     if (!spec || typeof spec !== 'object' || spec.side !== 'own') return false;
     const rest = m[1].toLowerCase() === 'rest';
     if (!rest && (!/hand/i.test(part) || spec.kinds.some((k) => k !== 'character'))) return false;
+    // "rest 1 of your [Fullalead] cards" (ST27-001): o nome pode ser de um Stage.
+    if (rest && /\bcards?$/i.test(m[3]) && (spec.name || spec.names) && !spec.kinds.includes('stage')) spec.kinds = [...spec.kinds, 'stage'];
     if (rest) cost.restOwn = { count: Number(m[2]), spec };
     else cost.returnOwn = { count: Number(m[2]), spec };
   } else if ((m = part.match(/^trash (\d+) cards? from the top of your deck$/i))) cost.mill = Number(m[1]);
@@ -2933,10 +2969,11 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   if ((m = s.match(/^This Character cannot be K\.O\.'d by effects of your opponent's Characters with (\d+) base power or less$/i))) {
     return [{ ...base, noEffectKOByMaxBasePower: Number(m[1]) }];
   }
-  if ((m = s.match(/^this Character cannot be (K\.O\.'d or )?rested by your opponent's (?:Leader and Character )?effects(?: and gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\])?$/i))) {
-    const out: Ability[] = [{ ...base, staticNoRest: true }];
+  if ((m = s.match(/^this Character cannot be (K\.O\.'d or )?rested by your opponent's (Leader and Character )?effects(?: and gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\])?$/i))) {
+    // "… by your opponent's Leader and Character effects" (OP15-024): Eventos e Stages do oponente viram.
+    const out: Ability[] = [{ ...base, staticNoRest: m[2] ? 'leaderOrCharacter' : true }];
     if (m[1]) out.push({ ...base, staticNoEffectKO: 'opponent' });
-    if (m[2]) out.push({ ...base, staticKeyword: KEYWORDS[m[2].toLowerCase()] });
+    if (m[3]) out.push({ ...base, staticKeyword: KEYWORDS[m[3].toLowerCase()] });
     return out;
   }
   if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (Characters|cards|Leaders or Characters) and gains \+(\d+) power$/i))) {
