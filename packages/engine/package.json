@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "simulate": "tsx scripts/simulate.ts",
-    "simulate:all": "tsx scripts/simulate-all.ts"
+    "simulate:all": "tsx scripts/simulate-all.ts",
+    "compare-bots": "tsx scripts/compare-bots.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

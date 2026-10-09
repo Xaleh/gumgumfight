@@ -1,4 +1,4 @@
-import { type Action, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
+import { type Action, type BotLevel, type CardData, type DeckList, FORMATS, formatLabel, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
@@ -90,6 +90,16 @@ async function buildSetup(
 
 const LAST_DECKS = 'gumgum.lastDecks';
 const LAST_FORMAT = 'gumgum.format';
+const LAST_BOT_LEVEL = 'gumgum.botLevel';
+
+function savedBotLevel(): BotLevel {
+  try {
+    const v = localStorage.getItem(LAST_BOT_LEVEL);
+    return v === 'easy' || v === 'normal' ? v : 'hard';
+  } catch {
+    return 'hard';
+  }
+}
 
 function savedFormat(): FormatId {
   try {
@@ -356,6 +366,7 @@ export function Menu({
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
+  const [botLevel, setBotLevel] = useState<BotLevel>(savedBotLevel);
   const [format, setFormat] = useState<FormatId>(savedFormat);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -506,8 +517,13 @@ export function Menu({
           notice = 'A transmissão está lotada agora: este treino roda no seu navegador, sem espectadores.';
         }
       }
+      try {
+        localStorage.setItem(LAST_BOT_LEVEL, botLevel);
+      } catch {
+        /* sem armazenamento local */
+      }
       const setup = await buildSetup('bot', [deck0, opp], names, seed, format, firstPlayer);
-      onStart(notice ? { ...setup, notice } : setup);
+      onStart({ ...setup, botLevel, ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);
       setLoading(false);
@@ -826,6 +842,24 @@ export function Menu({
                       ] as const
                     ).map(([v, label]) => (
                       <button key={v} type="button" className={first === v ? 'on' : ''} aria-pressed={first === v} onClick={() => setFirst(v)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="mode-field">
+                  <span className="mode-field-label" id="bot-level-label">
+                    Nível do bot
+                  </span>
+                  <div className="seg small" role="group" aria-labelledby="bot-level-label">
+                    {(
+                      [
+                        ['easy', 'Fácil'],
+                        ['normal', 'Normal'],
+                        ['hard', 'Difícil'],
+                      ] as const
+                    ).map(([v, label]) => (
+                      <button key={v} type="button" className={botLevel === v ? 'on' : ''} aria-pressed={botLevel === v} onClick={() => setBotLevel(v)}>
                         {label}
                       </button>
                     ))}
