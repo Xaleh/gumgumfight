@@ -25,6 +25,8 @@ export interface GameSetup {
   format: FormatId;
   /** Ações gravadas (modo replay / roteiro). */
   script?: Action[];
+  /** Aviso mostrado na mesa ao começar (ex.: a transmissão não abriu e o treino roda no navegador). */
+  notice?: string;
 }
 
 export interface ReplayFile {

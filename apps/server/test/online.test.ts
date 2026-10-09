@@ -687,15 +687,15 @@ describe('modo espectador', () => {
     const { app, db } = setup();
     const { roomId } = await privateMatch(app);
     const code = getRoom(app, roomId).data.code!;
-    const bot = await app.inject({ method: 'POST', url: '/api/online/bot', headers: { ...ALICE, ...{ 'x-deck-owner': 'carol-0123456789abcdef' } }, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' } });
+    const carolLogin = { 'x-deck-owner': 'carol-0123456789abcdef', cookie: login(db, 'carol').cookie };
+    const bot = await app.inject({ method: 'POST', url: '/api/online/bot', headers: carolLogin, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' } });
     expect(bot.statusCode, bot.body).toBe(201);
     const live = (await app.inject('/api/online/live')).json();
     expect(live.hands).toBe(false);
     expect(live.rooms.map((r: { id: string }) => r.id)).toEqual([bot.json().roomId]);
     expect(live.rooms[0].players.map((p: { name: string; bot: boolean }) => p.bot)).toEqual([false, true]);
     expect(live.rooms[0].mine).toBe(false);
-    const carol = { 'x-deck-owner': 'carol-0123456789abcdef' };
-    expect((await app.inject({ url: '/api/online/live', headers: carol })).json().rooms[0].mine).toBe(true);
+    expect((await app.inject({ url: '/api/online/live', headers: carolLogin })).json().rooms[0].mine).toBe(true);
     expect((await app.inject(`/api/online/watch/${code}`)).json().id).toBe(roomId);
     expect((await app.inject('/api/online/watch/ZZZZZZ')).statusCode).toBe(404);
     const streamer = login(db, 'nami', 'streamer');
@@ -708,9 +708,40 @@ describe('modo espectador', () => {
     expect(refused.statusCode).toBe(404);
   });
 
+  it('transmitir o treino contra o bot: só com login; "Quem começa" vale na sala do servidor', async () => {
+    const { app, db } = setup();
+    const anon = await app.inject({ method: 'POST', url: '/api/online/bot', headers: ALICE, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' } });
+    expect(anon.statusCode).toBe(401);
+    expect(anon.json().error).toMatch(/conta Google/);
+    expect((await app.inject('/api/online/live')).json().rooms).toEqual([]);
+
+    const open = async (headers: Record<string, string>, first?: unknown) => {
+      const r = await app.inject({ method: 'POST', url: '/api/online/bot', headers, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb', first } });
+      expect(r.statusCode, r.body).toBe(201);
+      const room = getRoom(app, r.json().roomId);
+      return { room, state: room.state! };
+    };
+    // O jogador começa: sem sorteio, direto no mulligan dele.
+    const mine = await open({ ...ALICE, cookie: login(db, 'zoro').cookie }, 0);
+    expect(mine.room.data.firstPlayer).toBe(0);
+    expect(mine.state.firstPlayer).toBe(0);
+    expect(mine.state.rollWinner).toBeUndefined();
+    expect(mine.state.pending).toMatchObject({ kind: 'mulligan', player: 0 });
+    // O bot começa.
+    const theirs = await open({ ...BOB, cookie: login(db, 'sanji').cookie }, 1);
+    expect(theirs.state.firstPlayer).toBe(1);
+    expect(theirs.state.rollWinner).toBeUndefined();
+    // Sorteio (ou valor inválido): o vencedor escolhe, como antes.
+    const roll = await open({ 'x-deck-owner': 'carol-0123456789abcdef', cookie: login(db, 'carol').cookie }, 'random');
+    expect(roll.room.data.firstPlayer).toBeUndefined();
+    expect(roll.state.rollWinner).toBeDefined();
+    expect(roll.state.pending?.kind).toBe('chooseFirst');
+    expect((await app.inject('/api/online/live')).json().rooms).toHaveLength(3);
+  });
+
   it('o bot do servidor joga a partida inteira e ela entra nas estatísticas como partida contra o bot', async () => {
     const { app, db } = setup();
-    const r = await app.inject({ method: 'POST', url: '/api/online/bot', headers: ALICE, payload: { deckId: 'st03-crocodile', botDeckId: 'random', format: 'egb' } });
+    const r = await app.inject({ method: 'POST', url: '/api/online/bot', headers: { ...ALICE, cookie: login(db, 'zoro').cookie }, payload: { deckId: 'st03-crocodile', botDeckId: 'random', format: 'egb', first: 0 } });
     expect(r.statusCode, r.body).toBe(201);
     const { roomId, token } = r.json();
     const room = getRoom(app, roomId);

@@ -137,6 +137,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       kind={setup.mode}
       onExit={onExit}
       onRematch={onRematch}
+      startNotice={setup.notice}
     />
   );
 }
@@ -271,6 +272,7 @@ function Table({
   onRematch,
   rematchLabel,
   spectator,
+  startNotice,
 }: {
   game: TableGame;
   kind: TableKind;
@@ -281,6 +283,8 @@ function Table({
   rematchLabel?: string;
   /** Modo espectador (partida online vista de fora). */
   spectator?: { canHands: boolean; onToggleHands: () => void };
+  /** Aviso na mesa ao começar (some sozinho em 10 s). */
+  startNotice?: string;
 }) {
   const { state, dispatch, human } = game;
   /**
@@ -288,7 +292,12 @@ function Table({
    * (condição de efeito que não vale, [Blocker] que não pode bloquear, carta que não pode ser
    * virada). No celular o histórico fica atrás de um botão, e sem o aviso parece que o jogo ignorou a jogada.
    */
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(startNotice ?? null);
+  useEffect(() => {
+    if (!startNotice) return;
+    const t = setTimeout(() => setNotice((n) => (n === startNotice ? null : n)), 10_000);
+    return () => clearTimeout(t);
+  }, [startNotice]);
   const noticeSeen = useRef(state.log.length);
   useEffect(() => {
     if (noticeSeen.current > state.log.length) noticeSeen.current = 0; // desfazer / replay

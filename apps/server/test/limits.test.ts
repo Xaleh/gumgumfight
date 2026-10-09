@@ -44,9 +44,14 @@ describe('tetos de salas', () => {
   });
 
   it('o servidor recusa salas novas acima de maxRooms, e o treino contra o bot acima de maxBotRooms', async () => {
-    const { app } = setup({ maxRooms: 2, maxBotRooms: 1, perIpRooms: 100 });
+    const { app, db } = setup({ maxRooms: 2, maxBotRooms: 1, perIpRooms: 100 });
+    // Transmitir o treino exige login.
+    const login = (n: number) => {
+      const u = upsertGoogleUser(db, { sub: `bot-${n}`, email: `bot-${n}@example.com`, emailVerified: true, name: `bot-${n}`, picture: null });
+      return { cookie: `gg_session=${createSession(db, u.id)}` };
+    };
     const bot = (n: number) =>
-      app.inject({ method: 'POST', url: '/api/online/bot', headers: owner(n), payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' }, remoteAddress: `10.0.0.${n}` });
+      app.inject({ method: 'POST', url: '/api/online/bot', headers: { ...owner(n), ...login(n) }, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' }, remoteAddress: `10.0.0.${n}` });
     expect((await bot(1)).statusCode).toBe(201);
     const second = await bot(2);
     expect(second.statusCode).toBe(503);

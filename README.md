@@ -54,9 +54,9 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
-| `ONLINE_BOT_ROOMS` | `on`                       | Treino online contra o bot do servidor (teste do modo espectador); `off` desliga |
+| `ONLINE_BOT_ROOMS` | `on`                       | Transmitir o treino contra o bot (o servidor joga pelo bot; exige login); `off` desliga |
 | `ONLINE_MAX_ROOMS` | `400`                      | Salas online ativas ao mesmo tempo no servidor (acima disso, 503); cada sala custa memória e CPU |
-| `ONLINE_MAX_BOT_ROOMS` | `10`                   | Salas de treino contra o bot do servidor ativas ao mesmo tempo (o servidor joga por ele) |
+| `ONLINE_MAX_BOT_ROOMS` | `100`                  | Treinos contra o bot transmitidos ao mesmo tempo (o servidor joga pelo bot); acima disso o treino roda no navegador |
 | `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
 
 O backup é só copiar o arquivo `.db`.
@@ -271,11 +271,11 @@ espectadores seguem para a partida nova.
 - **Ver mãos (Streamer e Admin):** a lista e a mesa têm o botão **Ver mãos**, que mostra as mãos dos dois jogadores
   (decks e Vida continuam escondidos). O servidor confere o perfil da conta e recusa para quem está jogando a própria
   partida.
-- **Treino contra o bot no servidor (fase de testes):** em **Contra o bot**, a opção **Jogar no servidor** cria uma
-  partida online em que o servidor joga pelo bot (decidindo só com a visão do bot). Ela aparece na lista para assistir,
-  então dá para testar o modo espectador sem um segundo jogador. Entra nas estatísticas como partida contra o bot.
-  Quando o modo espectador estiver aprovado, `ONLINE_BOT_ROOMS=off` tira a opção do menu e essas salas da lista,
-  deixando só as partidas multiplayer.
+- **Transmitir o treino contra o bot:** em **Contra o bot**, quem entrou com o Google pode marcar **Transmitir esta
+  partida**. A partida roda no servidor, que joga pelo bot (decidindo só com a visão do bot), e aparece na lista para
+  assistir. "Quem começa" vale como no treino local; a seed e o desfazer ficam só no treino no navegador. Entra nas
+  estatísticas como partida contra o bot. Com a transmissão lotada (`ONLINE_MAX_BOT_ROOMS`), o treino roda no
+  navegador, com um aviso na mesa. `ONLINE_BOT_ROOMS=off` tira a opção do menu e essas salas da lista.
 
 ### Perfis (Player, Streamer, Organizador, Admin, Dev)
 
@@ -297,7 +297,6 @@ Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas
 - A tela **Cobertura das cartas** (o endpoint `GET /api/coverage` continua público).
 - **Opções de teste** no menu (seed do embaralhamento e carregar um replay). Baixar o replay de uma partida
   continua para todos, para mandar a um Dev ao relatar um problema.
-- **Jogar no servidor** contra o bot (teste do modo espectador; também depende de `ONLINE_BOT_ROOMS`).
 
 ## Torneios
 
@@ -594,7 +593,7 @@ npm run typecheck
 | POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
 | POST   | `/api/online/rooms/:id/emote` · `/rematch` · `/leave` | Emote, revanche (salas privadas) e cancelar a sala |
 | GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim) |
-| POST   | `/api/online/bot` | Treino contra o bot do servidor (`{ deckId, botDeckId \| random, format }`; desligado com `ONLINE_BOT_ROOMS=off`) |
+| POST   | `/api/online/bot` | Treino contra o bot transmitido, só com login (`{ deckId, botDeckId \| random, format, first? }`, `first`: 0 = jogador, 1 = bot, ausente = sorteio; 401 sem login; desligado com `ONLINE_BOT_ROOMS=off`) |
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |
 | GET    | `/api/online/watch/:code` | Sala privada pelo código, para assistir |
 | GET    | `/api/online/rooms/:id` | Resumo de uma sala (jogadores, turno, espectadores) |
