@@ -475,6 +475,572 @@
    "text": "[On Play] You may trash 1 card from the top of your Life cards: If your Leader has the {Straw Hat Crew} type, add up to 2 cards from the top of your deck to the top of your Life cards.\n[Opponent's Turn] [On K.O.] You may deal 1 damage to your opponent.",
    "set": "EB03",
    "rarity": "SR"
+  },
+  {
+   "id": "OP01-024",
+   "name": "Monkey.D.Luffy",
+   "category": "character",
+   "colors": [
+    "red"
+   ],
+   "cost": 2,
+   "power": 3000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "text": "[DON!! x2] This Character cannot be K.O.'d in battle by \"Strike\" attribute Characters. [Activate:Main] [Once Per Turn] Give this Character up to 2 rested DON!! cards.",
+   "set": "OP01",
+   "rarity": "SR"
+  },
+  {
+   "id": "OP01-047",
+   "name": "Trafalgar Law",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Heart Pirates",
+    "Supernovas"
+   ],
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] You may return 1 Character to your hand: Play up to 1 Character card with a cost of 3 or less from your hand.",
+   "notes": [
+    "This card has been officially errata'd."
+   ],
+   "set": "OP01",
+   "rarity": "SR"
+  },
+  {
+   "id": "OP03-013",
+   "name": "Marco",
+   "category": "character",
+   "colors": [
+    "red"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Whitebeard Pirates"
+   ],
+   "text": "[Your Turn] [On Play] K.O. up to 1 of your opponent's Characters with 3000 power or less. [On K.O.] You may trash 1 Event from your hand",
+   "set": "OP03",
+   "rarity": "SR"
+  },
+  {
+   "id": "OP03-091",
+   "name": "Helmeppo",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "power": 0,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Navy"
+   ],
+   "text": "[On Play] Set the cost of up to 1 of your opponent's Characters with no base effect to 0 during this turn.",
+   "set": "OP03",
+   "rarity": "C"
+  },
+  {
+   "id": "OP03-112",
+   "name": "Charlotte Pudding",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 2000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Big Mom Pirates"
+   ],
+   "text": "[On Play] Look at 4 cards from the top of your deck; reveal up to 1 {Sanji} or {Big Mom Pirates} type card other than [Charlotte Pudding] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "set": "OP03",
+   "rarity": "R"
+  },
+  {
+   "id": "OP04-055",
+   "name": "Plague Rounds",
+   "category": "event",
+   "colors": [
+    "blue"
+   ],
+   "cost": 2,
+   "attributes": [],
+   "types": [
+    "Animal Kingdom Pirates"
+   ],
+   "text": "[Main] You may trash 1 [Ice Oni] from your hand and place 1 Character with a cost of 4 or less at the bottom of the owner's deck: Play 1 [Ice Oni] from your trash.",
+   "trigger": "Activate this card's [Main] effect.",
+   "set": "OP04",
+   "rarity": "C"
+  },
+  {
+   "id": "OP04-119",
+   "name": "Donquixote Rosinante",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 8,
+   "power": 8000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Donquixote Pirates",
+    "Navy"
+   ],
+   "text": "[Opponent's Turn] If this Character is rested, your active Characters with a base cost of 5 cannot be K.O.'d by effects. [On Play] You may rest this Character: Play up to 1 green Character card with a cost of 5 from your hand.",
+   "set": "OP04",
+   "rarity": "SEC"
+  },
+  {
+   "id": "OP05-008",
+   "name": "Chaka",
+   "category": "character",
+   "colors": [
+    "red"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Alabasta"
+   ],
+   "text": "[DON!! x1][Activate:Main][Once Per Turn] Give up to 2 rested DON!! cards to your Leader or 1 of your Characters.",
+   "set": "OP05",
+   "rarity": "UC"
+  },
+  {
+   "id": "OP05-096",
+   "name": "I Bid 500 Million!!",
+   "category": "event",
+   "colors": [
+    "black"
+   ],
+   "cost": 3,
+   "attributes": [],
+   "types": [
+    "Celestial Dragons"
+   ],
+   "text": "[Main] Choose one: • K.O. up to 1 of your opponent's Characters with a cost of 1 or less. • Return up to 1 of your opponent's Characters with a cost of 1 or less to the owner's hand. • Place up to 1 of your opponent's Characters with a cost of 1 or less at the top or bottom of their Life cards face-up. Then, if you have a {Celestial Dragons} type Character, draw 1 card.",
+   "trigger": "K.O. up to 1 of your opponent's Characters with a cost of 6 or less, or return it to the owner's hand.",
+   "set": "OP05",
+   "rarity": "UC"
+  },
+  {
+   "id": "OP05-111",
+   "name": "Hotori",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 3000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Sky Island"
+   ],
+   "text": "[On Play] You may play 1 [Kotori] from your hand: Add up to 1 of your opponent's Characters with a cost of 3 or less to the top or bottom of your opponent's Life cards face-up.",
+   "set": "OP05",
+   "rarity": "UC"
+  },
+  {
+   "id": "OP06-043",
+   "name": "Aramaki",
+   "category": "character",
+   "colors": [
+    "blue"
+   ],
+   "cost": 8,
+   "power": 8000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Navy"
+   ],
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[Activate:Main] [Once Per Turn] You may trash 1 card from your hand and place 1 Character with a cost of 2 or less at the bottom of the owner's deck: This Character gains +3000 power during this turn.",
+   "set": "OP06",
+   "rarity": "SR"
+  },
+  {
+   "id": "OP06-057",
+   "name": "But I Will Never Doubt a Woman's Tears!!!!",
+   "category": "event",
+   "colors": [
+    "blue"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "Straw Hat Crew",
+    "Dressrosa"
+   ],
+   "text": "[Main] Up to 1 of your Leader or Character cards gains +1000 power during this turn. Then, reveal 1 card from the top of your deck, play up to 1 Character card with a cost of 2, and place the rest at the top or bottom of your deck.",
+   "trigger": "Play up to 1 Character card with a cost of 2 from your hand.",
+   "set": "OP06",
+   "rarity": "C"
+  },
+  {
+   "id": "OP06-074",
+   "name": "Zephyr (Navy)",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 7,
+   "power": 7000,
+   "counter": 0,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "FILM",
+    "Navy"
+   ],
+   "text": "[On Play] DON!! -1 (You may return the specified number of DON!! cards from your field to your DON!! deck.): Negate the effect of up to 1 of your opponent's Characters during this turn. Then, if that Character has 5000 power or less, K.O. it.",
+   "set": "OP06",
+   "rarity": "R"
+  },
+  {
+   "id": "OP06-102",
+   "name": "Kamakiri",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Sky Island",
+    "Shandian Warrior"
+   ],
+   "text": "[Activate:Main][Once Per Turn] You may place 1 Stage with a cost of 1 at the bottom of the owner's deck: K.O. up to 1 of your opponent's Characters with a cost of 2 or less.",
+   "set": "OP06",
+   "rarity": "C"
+  },
+  {
+   "id": "OP07-029",
+   "name": "Basil Hawkins",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 6,
+   "power": 7000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Hawkins Pirates",
+    "Supernovas"
+   ],
+   "text": "If your Leader has the {Supernovas} type, this Character gains [Blocker]. (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [Once Per Turn] If this Character would be removed from the field by your opponent's effect, you may rest 1 of your opponent's Characters instead.",
+   "set": "OP07",
+   "rarity": "SR"
+  },
+  {
+   "id": "OP08-052",
+   "name": "Portgas.D.Ace",
+   "category": "character",
+   "colors": [
+    "blue"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Whitebeard Pirates"
+   ],
+   "text": "[On Play] Reveal 1 card from the top of your deck and play up to 1 Character card with a type including \"Whitebeard Pirates\" and a cost of 4 or less. Then, place the rest at the top or bottom of your deck.",
+   "set": "OP08",
+   "rarity": "R"
+  },
+  {
+   "id": "OP08-118",
+   "name": "Silvers Rayleigh",
+   "category": "character",
+   "colors": [
+    "red"
+   ],
+   "cost": 8,
+   "power": 8000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Former Roger Pirates"
+   ],
+   "text": "[On Play] Select up to 2 of your opponent's Characters, and give 1 Character 3000 power and the other 2000 power until the end of your opponent's next turn. Then, K.O. up to 1 of your opponent's Characters with 3000 power or less.",
+   "set": "OP08",
+   "rarity": "SEC"
+  },
+  {
+   "id": "OP09-046",
+   "name": "Crocodile",
+   "category": "character",
+   "colors": [
+    "blue"
+   ],
+   "cost": 7,
+   "power": 7000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Former Baroque Works",
+    "Cross Guild"
+   ],
+   "text": "[On Play] Play up to 1 {Cross Guild} type Character card or Character card with a type including \"Baroque Works\" with a cost of 5 or less from your hand.",
+   "set": "OP09",
+   "rarity": "SR"
+  },
+  {
+   "id": "OP09-056",
+   "name": "Mr.3(Galdino)",
+   "category": "character",
+   "colors": [
+    "blue"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Former Baroque Works",
+    "Cross Guild"
+   ],
+   "text": "[On Play] Look at 4 cards from the top of your deck; reveal up to 1 {Cross Guild} type card or card with a type including \"Baroque Works\" other than [Mr.3(Galdino)] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "set": "OP09",
+   "rarity": "R"
+  },
+  {
+   "id": "OP09-098",
+   "name": "Black Hole",
+   "category": "event",
+   "colors": [
+    "black"
+   ],
+   "cost": 4,
+   "attributes": [],
+   "types": [
+    "Blackbeard Pirates"
+   ],
+   "text": "[Main] If your Leader has the {Blackbeard Pirates} type, negate the effect of up to 1 of your opponent's Characters during this turn. Then, if that Character has a cost of 4 or less, K.O. it.",
+   "trigger": "Negate the effect of up to 1 of your opponent's Leader or Character cards during this turn.",
+   "set": "OP09",
+   "rarity": "UC"
+  },
+  {
+   "id": "OP10-109",
+   "name": "Basil Hawkins",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Hawkins Pirates",
+    "Supernovas"
+   ],
+   "text": "[On K.O.] Trash up to 1 card from the top of your opponent's Life cards.",
+   "trigger": "Draw 2 cards and trash 1 card from your hand.",
+   "set": "OP10",
+   "rarity": "R"
+  },
+  {
+   "id": "OP13-033",
+   "name": "Franky",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 3,
+   "power": 5000,
+   "counter": 0,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "FILM",
+    "Straw Hat Crew"
+   ],
+   "text": "[On K.O.] Rest up to 2 of your opponent's cards.",
+   "set": "OP13",
+   "rarity": "C"
+  },
+  {
+   "id": "OP14-020",
+   "name": "Dracule Mihawk",
+   "category": "leader",
+   "colors": [
+    "green"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "The Seven Warlords of the Sea"
+   ],
+   "text": "If your opponent's Leader has the \"Slash\" attribute, this leader gains +1000 power.\n[Activate:Main] [Once Per Turn] You may rest 1 of your cards: If there is a Character with a cost of 5 or more, set up to 3 of your DON!! cards as active. Then, you cannot play character cards during this turn.",
+   "set": "OP14",
+   "rarity": "L"
+  },
+  {
+   "id": "OP14-112",
+   "name": "Boa Hancock",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 9,
+   "power": 10000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Kuja Pirates",
+    "The Seven Warlords of the Sea"
+   ],
+   "text": "[On Play] If your Leader has the {The Seven Warlords of the Sea} type, add up to 1 card from the top of your deck to the top of your Life cards. Then, add up to 1 card from the top of your opponent's Life cards to the owner's hand.",
+   "trigger": "Play up to 1 Character card with 6000 power or less and a [Trigger] from your hand.",
+   "set": "OP14",
+   "rarity": "SR"
+  },
+  {
+   "id": "OP15-023",
+   "name": "Arlong",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Fish-Man",
+    "Arlong Pirates",
+    "East Blue"
+   ],
+   "text": "[On K.O.] Up to 2 of your opponent's rested cards will not become active in your opponent's next Refresh Phase.\n[Activate: Main] [Once Per Turn] You may give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters: Give up to 1 DON!! card from its owner's cost area to its owner's Leader or 1 of their Characters.",
+   "set": "OP15",
+   "rarity": "R"
+  },
+  {
+   "id": "OP15-032",
+   "name": "Brook",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 6,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Straw Hat Crew"
+   ],
+   "text": "[On Play] Rest up to 1 of your opponent's cards.\n[Activate: Main] You may trash this Character: If your Leader has the {Straw Hat Crew} type, set up to 1 of your Characters with a base cost of 8 or less as active.",
+   "set": "OP15",
+   "rarity": "SR"
+  },
+  {
+   "id": "P-086",
+   "name": "Trafalgar Law",
+   "category": "leader",
+   "colors": [
+    "purple",
+    "red"
+   ],
+   "life": 4,
+   "power": 5000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Heart Pirates"
+   ],
+   "text": "[Activate:Main] [Once Per Turn] DON!!-3, You may place 1 Character with 3000 power or more at the bottom of your deck: Play up to 1 {Heart Pirates} type Character card with a cost of 4 or less from your hand.",
+   "set": "P",
+   "rarity": "PR"
+  },
+  {
+   "id": "OP05-103",
+   "name": "Kotori",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 3000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Sky Island"
+   ],
+   "text": "[On Play] If you have [Hotori], K.O. up to 1 of your opponent's Characters with a cost equal to or less than the number of your opponent's Life cards.",
+   "set": "OP05",
+   "rarity": "UC"
   }
  ]
 }

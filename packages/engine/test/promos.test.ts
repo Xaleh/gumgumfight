@@ -64,7 +64,8 @@ describe('textos estragados na fonte (SOURCE_TEXT_FIXES)', () => {
   });
 
   it('a troca só vale para o trecho estragado e aplicar de novo não muda nada', () => {
-    for (const id of Object.keys(SOURCE_TEXT_FIXES)) {
+    // As cartas de coleção da tabela (OP03-013, OP03-112) estão em card-audit.test.ts.
+    for (const id of Object.keys(SOURCE_TEXT_FIXES).filter((k) => k.startsWith('P-'))) {
       const fixed = applySourceFixes(promo(id));
       expect(fixed.text).not.toBe(promo(id).text);
       expect(applySourceFixes(fixed)).toBe(fixed);

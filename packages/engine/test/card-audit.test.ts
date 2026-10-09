@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildCardDef } from '../src/cards';
-import { applyAction, createGame, getPower, hasKeyword, hasName } from '../src/engine';
-import type { Ability, CardData, DeckList, EffectStep, GameState, PlayerId } from '../src/types';
+import { applyAction, canPayCost, createGame, getPower, hasKeyword, hasName, koProtected, matchesFilter } from '../src/engine';
+import { upgradeReplayActions } from '../src/replay';
+import { applySourceFixes } from '../src/source-fixes';
+import type { Ability, Action, CardData, DeckList, EffectStep, GameState, PlayerId } from '../src/types';
 import { cards as baseCards, noDefense, toTurn } from './helpers';
 
 // Auditoria das cartas automatizadas (card 21 do Trello, "Testar as funcionalidades das cartas em
@@ -58,6 +60,11 @@ const setDon = (s: GameState, player: PlayerId, active: number, rested = 0) => {
 };
 const answer = (s: GameState, yes: boolean) => applyAction(s, { type: 'answer', player: s.pending!.player, yes });
 const stepsOf = (id: string, timing: Ability['timing']) => abilities(id).find((a) => a.timing === timing)!.steps;
+/** Responde "Nenhum" na escolha entre carta e DON!! do oponente. */
+const nothing = (s: GameState) => {
+  const p = s.pending;
+  return p?.kind === 'option' ? applyAction(s, { type: 'option', player: p.player, index: p.options.length - 1 }) : s;
+};
 
 describe('Law OP01-002: "Then, play … different color than the returned Character" depende da devolução', () => {
   it('com 4 Personagens não devolve nada e também não joga o Personagem da mão', () => {
@@ -167,8 +174,8 @@ describe('"you may trash 1 card from your hand. If you do, …" com a mão vazia
     setDon(s, 0, 7, 3);
     const zoro = hand(s, 0, 'OP16-035');
     s = applyAction(s, { type: 'playCard', player: 0, uid: zoro });
-    // "Rest up to 1 of your opponent's cards": não escolhe nada.
-    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    // "Rest up to 1 of your opponent's cards" (carta ou DON!!): não escolhe nada.
+    s = nothing(s);
     expect(s.pending).toBeNull();
     expect(s.players[0].leader.don).toBe(0);
   });
@@ -180,12 +187,15 @@ describe('"you may trash 1 card from your hand. If you do, …" com a mão vazia
     const zoro = hand(s, 0, 'OP16-035');
     const other = hand(s, 0, 'ST01-006');
     s = applyAction(s, { type: 'playCard', player: 0, uid: zoro });
-    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    s = nothing(s);
     expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
     s = answer(s, true);
     expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
     s = applyAction(s, { type: 'choose', player: 0, uids: [other] });
     expect(s.players[0].trash).toContain(other);
+    // "give up to 3 rested DON!! cards to your Leader": escolhe quantos (3, 2 ou 1).
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['3', '2', '1'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.players[0].leader.don).toBe(3);
   });
 });
@@ -261,5 +271,228 @@ describe('Leitura de outras cartas da auditoria', () => {
     const koala = abilities('OP12-081').find((a) => a.timing === 'event')!.event!;
     expect(koala.kind === 'anyOf' && koala.events[1]).toMatchObject({ kind: 'characterPlayed', byCharacterEffect: true });
     expect(abilities('OP02-026')[0].event).toMatchObject({ kind: 'characterPlayed', who: 'self', fromHand: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rodada 2: OP01 a OP09, e as regras confirmadas pelo dono do projeto
+// ("your cards" inclui DON!!, Stage e Líder; "up to" sempre aceita 0).
+// ---------------------------------------------------------------------------
+
+const option = (s: GameState, index: number) => applyAction(s, { type: 'option', player: s.pending!.player, index });
+const choose = (s: GameState, uids: string[]) => applyAction(s, { type: 'choose', player: s.pending!.player, uids });
+
+describe('"rest N of your cards" inclui DON!!, Stage e o próprio Líder', () => {
+  it('Mihawk OP14-020 (Líder): paga virando 1 DON!! ativo em vez de uma carta', () => {
+    let s = toTurn(game(['OP14-020', 'ST02-001']), 3);
+    setDon(s, 0, 1);
+    s = applyAction(s, { type: 'activate', player: 0, uid: s.players[0].leader.uid, ability: 1 });
+    if (s.pending?.kind === 'confirm') s = answer(s, true);
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['1 DON!!', '0 DON!!'] });
+    s = option(s, 0);
+    expect(s.players[0].donRested).toBe(1);
+    expect(s.players[0].leader.rested).toBe(false);
+  });
+
+  it('sem DON!! ativo, o próprio Líder paga (a carta pode se virar: o texto não diz "other")', () => {
+    let s = toTurn(game(['OP14-020', 'ST02-001']), 3);
+    setDon(s, 0, 0);
+    s = applyAction(s, { type: 'activate', player: 0, uid: s.players[0].leader.uid, ability: 1 });
+    if (s.pending?.kind === 'confirm') s = answer(s, true);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [s.players[0].leader.uid] });
+    s = choose(s, [s.players[0].leader.uid]);
+    expect(s.players[0].leader.rested).toBe(true);
+  });
+});
+
+describe('"your opponent\'s cards" inclui DON!!', () => {
+  it('Brook OP15-032: "Rest up to 1 of your opponent\'s cards" pode virar 1 DON!! ativo do oponente', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 6);
+    setDon(s, 1, 3);
+    field(s, 1, 'ST01-003');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'OP15-032') });
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0 });
+    const opts = (s.pending as { options: string[] }).options;
+    expect(opts).toEqual(['Virar 1 DON!! ativo do oponente', 'Virar uma carta do oponente (Líder, Personagem ou Stage)', 'Nenhum']);
+    s = option(s, 0);
+    expect(s.players[1].donActive).toBe(2);
+    expect(s.players[1].donRested).toBe(1);
+  });
+
+  it('Franky OP13-033 ("up to 2") e Arlong OP15-023 ("rested cards will not become active") escolhem uma a uma', () => {
+    expect(stepsOf('OP13-033', 'onKO')).toHaveLength(2);
+    expect(stepsOf('OP13-033', 'onKO').every((st) => st.do === 'restDonOrCharacter')).toBe(true);
+    expect(stepsOf('OP15-023', 'onKO').every((st) => st.do === 'restDonOrCharacter' && st.skipRefresh)).toBe(true);
+  });
+});
+
+describe('"up to N" aceita 0 nos passos de Vida e nos DON!! virados', () => {
+  it('passos de Vida com "up to" (OP10-109, OP14-112) perguntam a quantidade', () => {
+    expect(stepsOf('OP10-109', 'onKO')).toEqual([{ do: 'trashLife', side: 'opponent', count: 1, upTo: true }]);
+    const hancock = stepsOf('OP14-112', 'onPlay');
+    expect(hancock[0]).toMatchObject({ do: 'addLifeFromDeck', count: 1, upTo: true });
+    expect(hancock[1]).toEqual({ do: 'opponentLifeToHand', count: 1, upTo: true });
+  });
+
+  it('escolher 0 não mexe na Vida', () => {
+    let s = toTurn(game(['ST04-001', 'ST02-001']), 3);
+    setDon(s, 0, 7);
+    const life = s.players[1].life.length;
+    s = applyAction(s, { type: 'activate', player: 0, uid: s.players[0].leader.uid, ability: 0 });
+    expect(s.pending).toMatchObject({ kind: 'option', options: ['1', '0'] });
+    s = option(s, 1);
+    expect(s.players[1].life).toHaveLength(life);
+  });
+});
+
+describe('Rodada 2: leitura e execução', () => {
+  it('Crocodile OP09-046: o "cost of 5 or less" vale também para o {Cross Guild}', () => {
+    const step = stepsOf('OP09-046', 'onPlay')[0] as Extract<EffectStep, { do: 'playFrom' }>;
+    const buggy = { ...def('OP09-046'), hasAnyType: undefined, types: ['Cross Guild'], cost: 10, category: 'character' as const };
+    expect(matchesFilter(buggy, step.filter)).toBe(false);
+    expect(matchesFilter({ ...buggy, cost: 5 }, step.filter)).toBe(true);
+    // Mr.3 OP09-056: o "other than [Mr.3(Galdino)]" vale para as duas opções.
+    const search = stepsOf('OP09-056', 'onPlay')[0] as Extract<EffectStep, { do: 'search' }>;
+    expect(search.filter.either!.every((f) => f.excludeName === 'Mr.3(Galdino)')).toBe(true);
+  });
+
+  it('Aramaki OP06-043: "place 1 Character … at the bottom of the owner\'s deck" aceita Personagem do oponente', () => {
+    let s = toTurn(game(), 3);
+    const aramaki = field(s, 0, 'OP06-043');
+    const discard = hand(s, 0, 'ST01-006');
+    const theirs = field(s, 1, 'ST01-009'); // custo 2
+    const ability = def('OP06-043').abilities.findIndex((a) => a.timing === 'activateMain');
+    expect(canPayCost(s, 0, aramaki, def('OP06-043').abilities[ability].cost!)).toBe(true);
+    s = applyAction(s, { type: 'activate', player: 0, uid: aramaki, ability });
+    if (s.pending?.kind === 'confirm') s = answer(s, true);
+    for (let guard = 0; guard < 4 && s.pending?.kind === 'selectTargets'; guard++) {
+      const opts = (s.pending as { options: string[] }).options;
+      s = choose(s, [opts.includes(theirs) ? theirs : discard]);
+    }
+    expect(s.players[1].deck[s.players[1].deck.length - 1]).toBe(theirs);
+    expect(getPower(s, aramaki)).toBe(def('OP06-043').power! + 3000);
+    // "… at the bottom of your deck" (P-086 Law) continua só com os seus.
+    expect(abilities('P-086')[0].cost!.ownToBottom!.spec.side).toBe('own');
+  });
+
+  it('Marco OP03-013 e Pudding OP03-112: texto cortado e "{Sanji}" corrigidos pela lista oficial', () => {
+    const marco = applySourceFixes(byId('OP03-013'));
+    expect(marco.text).toMatch(/You may trash 1 Event from your hand: You may play this Character card from your trash rested\.$/);
+    expect(applySourceFixes(marco)).toBe(marco);
+    expect(stepsOf('OP03-013', 'onKO').some((st) => st.do === 'playThis')).toBe(true);
+    expect(applySourceFixes(byId('OP03-112')).text).toContain('reveal up to 1 [Sanji] or {Big Mom Pirates}');
+  });
+
+  it('Zephyr OP06-074: "if that Character has 5000 power or less" olha o poder atual', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 8);
+    const boosted = field(s, 1, 'ST01-009'); // 4000 impresso
+    s.modifiers.push({ uid: boosted, kind: 'power', amount: 2000, duration: 'turn' });
+    s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'OP06-074') });
+    if (s.pending?.kind === 'confirm') s = answer(s, true);
+    if (s.pending?.kind === 'option') s = option(s, 0);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    s = choose(s, [boosted]);
+    // 6000 agora: não é nocauteado (antes: o impresso, 4000, nocauteava).
+    expect(s.players[1].characters.some((c) => c.uid === boosted)).toBe(true);
+  });
+
+  it('I Bid 500 Million!! OP05-096: o "Then, draw 1" vale para qualquer opção', () => {
+    const steps = stepsOf('OP05-096', 'main');
+    expect(steps.map((st) => st.do)).toEqual(['chooseOne', 'draw']);
+  });
+
+  it('Rosinante OP04-119: só os Personagens ativos de custo base 5 ficam protegidos', () => {
+    const s = toTurn(game(), 4);
+    field(s, 0, 'OP04-119', true);
+    s.defs['ST01-010'] = { ...s.defs['ST01-010'] ?? def('ST01-010'), cost: 5 };
+    const active = field(s, 0, 'ST01-010');
+    const rested = field(s, 0, 'ST01-010', true);
+    expect(koProtected(s, active, false, s.players[1].leader.uid, 1)).toBe(true);
+    expect(koProtected(s, rested, false, s.players[1].leader.uid, 1)).toBe(false);
+  });
+
+  it('Rayleigh OP08-118: o −2000 vai para "the other" Personagem', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 8);
+    const a = field(s, 1, 'ST01-010');
+    const b = field(s, 1, 'ST01-008');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'OP08-118') });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    s = choose(s, [a]);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    expect((s.pending as { options: string[] }).options).toEqual([b]);
+  });
+
+  it('Luffy OP01-024: "by "Strike" attribute Characters" não protege contra o Líder', () => {
+    expect(abilities('OP01-024').find((a) => a.noBattleKOVsAttribute)).toMatchObject({ noBattleKOVsAttribute: 'Strike', noBattleKOVsAttributeCharacters: true });
+  });
+
+  it('Helmeppo OP03-091: Personagem só com [Blocker] tem efeito base', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 1);
+    const vanilla = field(s, 1, 'ST01-003');
+    field(s, 1, 'ST01-006'); // [Blocker]
+    s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'OP03-091') });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', options: [vanilla] });
+  });
+
+  it('"reveal 1 card … play up to 1" pergunta antes de jogar (OP06-057, OP08-052)', () => {
+    for (const [id, timing] of [['OP06-057', 'main'], ['OP08-052', 'onPlay']] as const) {
+      expect(stepsOf(id, timing).find((st) => st.do === 'playRevealed')).toMatchObject({ upTo: true });
+    }
+  });
+
+  it('Hotori OP05-111: aceitar o custo obriga a jogar o [Kotori]', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 3);
+    const kotori = hand(s, 0, 'OP05-103');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'OP05-111') });
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = answer(s, true);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, min: 1 });
+    expect((s.pending as { options: string[] }).options).toContain(kotori);
+  });
+
+  it('Law OP01-047: "return 1 Character to your hand" pode devolver o próprio Law', () => {
+    const s = toTurn(game(), 3);
+    const law = field(s, 0, 'OP01-047');
+    const cost = stepsOf('OP01-047', 'onPlay').find((st) => st.do === 'payCost') as Extract<EffectStep, { do: 'payCost' }>;
+    expect(canPayCost(s, 0, law, cost.cost)).toBe(true);
+  });
+});
+
+describe('Replays da versão 10 continuam carregando', () => {
+  it('"give up to 2 rested DON!!" (Brook ST01-011): a pergunta nova recebe a quantidade máxima, como antes', () => {
+    const brooks: DeckList = { id: 'b', name: 'b', leader: 'ST01-001', cards: [{ id: 'ST01-011', count: 50 }] };
+    const config = {
+      seed: 3,
+      firstPlayer: 0 as PlayerId,
+      cards,
+      players: [
+        { name: 'A', deck: brooks },
+        { name: 'B', deck: deck('ST02-001') },
+      ] as [{ name: string; deck: DeckList }, { name: string; deck: DeckList }],
+    };
+    const opening: Action[] = [
+      { type: 'mulligan', player: 0, redraw: false },
+      { type: 'mulligan', player: 1, redraw: false },
+      { type: 'endTurn', player: 0 },
+      { type: 'endTurn', player: 1 },
+    ];
+    let s = createGame(config);
+    for (const a of opening) s = applyAction(s, a);
+    // Turno 3: 3 DON!!; o Brook custa 2 e deixa 2 DON!! virados para o [On Play].
+    const brook = s.players[0].hand[0];
+    const leader = s.players[0].leader.uid;
+    // Roteiro gravado na versão 10: jogar o Brook e escolher o Líder, sem a pergunta "quantos DON!!".
+    const old: Action[] = [...opening, { type: 'playCard', player: 0, uid: brook }, { type: 'choose', player: 0, uids: [leader] }];
+    const upgraded = upgradeReplayActions(config, old);
+    expect(upgraded).toEqual([...old, { type: 'option', player: 0, index: 0 }]);
+    let t = createGame(config);
+    for (const a of upgraded) t = applyAction(t, a);
+    expect(t.players[0].leader.don).toBe(2);
+    expect(t.pending).toBeNull();
   });
 });

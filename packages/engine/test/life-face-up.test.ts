@@ -161,6 +161,7 @@ describe('fieldToLife "face-up" (DV-18)', () => {
     const a = field(s, 1, 'ST01-006');
     s = faceUpOnTop(s, a);
     s = play(s, give(s, 0, 'FU-E04'));
+    s = applyAction(s, { type: 'option', player: 0, index: 0 }); // "up to 1": descarta 1
     expect(s.players[1].trash).toContain(a);
     expect(s.players[1].lifeFaceUp).toEqual([]);
 

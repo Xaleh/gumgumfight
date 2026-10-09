@@ -308,6 +308,9 @@ describe('efeitos', () => {
     s = applyAction(s, { type: 'playCard', player: 0, uid: brook });
     expect(s.pending?.kind).toBe('selectTargets');
     s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].leader.uid] });
+    // "up to 2": quantos DON!! (2 ou 1).
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['2', '1'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.players[0].leader.don).toBe(2);
     expect(s.players[0].donRested).toBe(0);
   });

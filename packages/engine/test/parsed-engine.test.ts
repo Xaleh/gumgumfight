@@ -120,6 +120,9 @@ describe('efeitos lidos automaticamente', () => {
     let s = toTurn(game(), 3);
     const life = s.players[0].life.length;
     s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-003') });
+    // "up to 1": pergunta quantas (0 ou 1).
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['1', '0'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.players[0].life.length).toBe(life + 1);
 
     let t = toTurn(game(), 4);
@@ -131,6 +134,7 @@ describe('efeitos lidos automaticamente', () => {
     t = applyAction(t, { type: 'pass', player: 0 });
     expect(t.pending).toMatchObject({ kind: 'lifeCard', card: lifeTop });
     t = applyAction(t, { type: 'answer', player: 0, yes: true });
+    t = applyAction(t, { type: 'option', player: 0, index: 0 });
     expect(t.players[0].life.length).toBe(before); // perdeu 1, ganhou 1
   });
 
@@ -232,12 +236,15 @@ describe('efeitos lidos automaticamente', () => {
     expect(attackError(s, 1, enemy, s.players[0].leader.uid)).toBeNull();
   });
 
-  it('não é nocauteado em batalha por atacante Strike', () => {
+  it('não é nocauteado em batalha por Personagem Strike (o Líder Strike nocauteia: "attribute Characters")', () => {
     const s = toTurn(game(), 3);
     const luffy = field(s, 0, 'PX-010');
-    const strike = s.players[1].leader.uid; // Kid: Special... troca o atributo para o teste
-    s.defs[s.cards[strike].cardId] = { ...s.defs[s.cards[strike].cardId], attributes: ['Strike'] };
-    expect(koProtected(s, luffy, true, strike)).toBe(true);
+    const leader = s.players[1].leader.uid; // Kid: Special... troca o atributo para o teste
+    s.defs[s.cards[leader].cardId] = { ...s.defs[s.cards[leader].cardId], attributes: ['Strike'] };
+    const strikeChar = field(s, 1, 'PX-001');
+    s.defs['PX-001'] = { ...s.defs['PX-001'], attributes: ['Strike'] };
+    expect(koProtected(s, luffy, true, strikeChar)).toBe(true);
+    expect(koProtected(s, luffy, true, leader)).toBe(false);
     expect(koProtected(s, luffy, true)).toBe(false);
   });
 

@@ -167,11 +167,20 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   // mesmo efeito (OP14-090 Miss.Valentine: "this Character gains +2000 power").
   'P-142': [['with 8000 base If your Straw Hat Crew power or less', 'with 8000 base power or less']], // Merry Go: frase repetida
   'P-147': [['this Character-gains +2000 power', 'this Character gains +2000 power']], // Miss.Valentine(Mikita)
+  // Auditoria das cartas (09/10/2026), conferidas na lista oficial:
+  // Marco: a API corta o efeito do [On K.O.] (só fica o custo; "$" = só se o texto terminar assim).
+  'OP03-013': [['[On K.O.] You may trash 1 Event from your hand$', '[On K.O.] You may trash 1 Event from your hand: You may play this Character card from your trash rested.']],
+  'OP03-112': [['reveal up to 1 {Sanji} or', 'reveal up to 1 [Sanji] or']], // Charlotte Pudding: [Sanji] é nome de carta, não tipo
 };
 
 function patchText(text: string, swaps: ReadonlyArray<readonly [string, string]>): string {
   let out = text;
-  for (const [from, to] of swaps) if (out.includes(from)) out = out.split(from).join(to);
+  for (const [from, to] of swaps) {
+    if (from.endsWith('$')) {
+      const tail = from.slice(0, -1);
+      if (out.trimEnd().endsWith(tail)) out = out.trimEnd().slice(0, -tail.length) + to;
+    } else if (out.includes(from)) out = out.split(from).join(to);
+  }
   return out;
 }
 

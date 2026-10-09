@@ -60,6 +60,8 @@ export interface CardTextTranslation {
 
 /** Filtro para escolha de alvos. */
 export interface TargetSpec {
+  /** "… and the other": não pode ser a carta escolhida no passo anterior (OP08-118). */
+  notLast?: true;
   /** 'any' = personagens de qualquer jogador ("Return up to 1 Character…"). */
   side: 'own' | 'opponent' | 'any';
   kinds: Array<'leader' | 'character' | 'stage'>;
@@ -422,6 +424,8 @@ export interface Aura {
   maxPower?: number;
   /** "cannot be K.O.'d by effects" (`true`) ou "… by your opponent's effects" (`'opponent'`). */
   noEffectKO?: true | 'opponent';
+  /** Só cartas viradas (`true`) ou só ativas (`false`): "your active Characters with a base cost of 5" (OP04-119). */
+  rested?: boolean;
   excludeName?: string;
   /** Concede uma palavra-chave em vez de poder ("All of your Characters with a cost of 12 or more gain [Blocker]"). */
   keyword?: Keyword;
@@ -652,7 +656,8 @@ type EffectStepBody =
   | { do: 'opponentTrashToBottom'; count: number; upTo?: boolean; chooser?: 'self'; filter?: CardFilter }
   | { do: 'arrangeLife'; whose: 'own' | 'opponent' }
   /** "Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 3 or less" */
-  | { do: 'restDonOrCharacter'; spec: TargetSpec }
+  /** 1 carta do oponente ou 1 DON!! dele ("your opponent's cards" inclui DON!!): vira, ou (`skipRefresh`) uma já virada não desvira. */
+  | { do: 'restDonOrCharacter'; spec: TargetSpec; skipRefresh?: true }
   | { do: 'revealOpponentTop' }
   | { do: 'giveActiveDon'; count: number; target: TargetRef }
   | { do: 'ownToBottom'; count: number; spec: TargetSpec; toLife?: boolean }
@@ -703,7 +708,7 @@ type EffectStepBody =
   /** "Choose one: • … • …" / "Your opponent chooses one: …" */
   | { do: 'chooseOne'; chooser: 'self' | 'opponent'; options: EffectStep[][]; labels: string[] }
   /** Custos com escolha (ver AbilityCost): */
-  | { do: 'restOwn'; count: number; spec: TargetSpec }
+  | { do: 'restOwn'; count: number; spec: TargetSpec; withDon?: true }
   | { do: 'returnOwn'; count: number; spec: TargetSpec }
   | { do: 'trashSelf' }
   | { do: 'returnSelfToHand' }
@@ -724,13 +729,13 @@ type EffectStepBody =
   /** "Reveal 1 card from the top of your deck." (a carta vira 'chosen') */
   | { do: 'revealTop' }
   /** "you may play that card (rested)" / "play up to 1 … (dentre as reveladas)" */
-  | { do: 'playRevealed'; filter?: CardFilter; rested?: boolean }
+  | { do: 'playRevealed'; filter?: CardFilter; rested?: boolean; /** "play up to 1 …": pergunta antes. */ upTo?: true }
   /** "place the revealed card at the bottom of your deck" */
   | { do: 'revealedToBottom' }
   /** "… cannot be rested until the end of your opponent's next turn" */
   | { do: 'cannotBeRested'; target: TargetRef; duration: Duration }
   /** "add up to N card from the top of your opponent's Life cards to the owner's hand" */
-  | { do: 'opponentLifeToHand'; count: number }
+  | { do: 'opponentLifeToHand'; count: number; upTo?: true }
   /** "your opponent places N card from their hand at the bottom of their deck" */
   | { do: 'opponentHandToBottom'; count: number }
   /**
@@ -767,7 +772,16 @@ type EffectStepBody =
   /** "Add up to N … from your trash to your hand." */
   | { do: 'fromTrashToHand'; upTo: number; filter: CardFilter }
   /** "Play up to N … from your deck/hand/trash" (sem pagar custo). */
-  | { do: 'playFrom'; from: 'deck' | 'hand' | 'trash' | 'handOrTrash'; upTo: number; filter: CardFilter; rested?: boolean; notColorOfLast?: boolean }
+  | {
+      do: 'playFrom';
+      from: 'deck' | 'hand' | 'trash' | 'handOrTrash';
+      upTo: number;
+      filter: CardFilter;
+      rested?: boolean;
+      notColorOfLast?: boolean;
+      /** Custo ("You may play 1 [Kotori] from your hand:"): tem de jogar 1 carta que sirva. */
+      required?: boolean;
+    }
   /** "… then shuffle your deck." */
   | { do: 'shuffleDeck' }
   /** "Look at N cards from the top of your deck and return them to the top or bottom of the deck in any order." */
@@ -787,7 +801,7 @@ type EffectStepBody =
    */
   | { do: 'returnDon'; count: number; opponent?: true; activeOnly?: true }
   /** "Trash up to N of your opponent's Life cards." (do topo) */
-  | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
+  | { do: 'trashLife'; side: 'own' | 'opponent'; count: number; upTo?: true }
   /** "This Character gains [Rush] during this turn." */
   | { do: 'gainKeyword'; target: TargetRef; keyword: Keyword; duration: Duration }
   /** "Select up to 1 …": só escolhe (o passo seguinte usa 'chosen'). */
@@ -803,7 +817,7 @@ type EffectStepBody =
   /** "… and add this card to your hand." ([Trigger]) */
   | { do: 'addThisToHand' }
   /** "Add up to N card from the top of your deck to the top of your Life cards." */
-  | { do: 'addLifeFromDeck'; count: number }
+  | { do: 'addLifeFromDeck'; count: number; upTo?: true }
   /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
   | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: true | 'opponent' };
 
@@ -860,7 +874,8 @@ export interface AbilityCost {
   /** "You may rest N of your Characters:" (o jogador escolhe quais) */
   restCharacters?: number;
   /** "You may rest N of your {X} type Leader or Stage cards:" (filtro de alvo) */
-  restOwn?: { count: number; spec: TargetSpec };
+  /** `withDon`: "rest N of your cards" (qualquer carta sua no campo, DON!! ativos incluídos). */
+  restOwn?: { count: number; spec: TargetSpec; withDon?: true };
   /** "You may return N of your Characters … to the owner's hand:" */
   returnOwn?: { count: number; spec: TargetSpec };
   /** "You may trash this Character:" */
@@ -930,6 +945,8 @@ export interface Ability {
   staticCannotAttack?: boolean;
   /** "This Character cannot be K.O.'d in battle by "Strike" attribute Characters." */
   noBattleKOVsAttribute?: string;
+  /** "… by "Strike" attribute Characters" (OP01-024): só Personagens; o Líder com o atributo ainda nocauteia. */
+  noBattleKOVsAttributeCharacters?: true;
   /** "This Character cannot be K.O.'d in battle by Leaders." */
   noBattleKOByLeader?: boolean;
   /** "This Character cannot be K.O.'d in battle by Characters without the "Special" attribute." */

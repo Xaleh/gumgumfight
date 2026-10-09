@@ -42,8 +42,11 @@ export interface ReplayFile {
    * 9: a Vida inicial com a carta do topo do deck por baixo e o "at the start of the game" do Líder
    *    depois da escolha de quem começa, com escolha (`choose`); os antigos usam `legacySetup`.
    * 10: "draw up to N cards" pergunta antes de cada carta se compra (`answer`); nos antigos, sim.
+   * 11: auditoria das cartas: "up to N" nos passos de Vida e em "give up to N rested DON!!", "rest N of your
+   *    cards" com DON!!, "your opponent's cards" com DON!!, "reveal … play up to 1" e "you may deal 1 damage"
+   *    perguntam (`option`/`answer`); nos antigos, a resposta que o motor dava sozinho (`upgradeReplayActions`).
    */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
   seed: number;
   /** Partidas online: seed de 128 bits e as listas exatas usadas. */
   seed128?: number[];

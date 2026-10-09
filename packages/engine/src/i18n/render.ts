@@ -956,6 +956,9 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'arrangeLife':
       return `Olhe todas as cartas de Vida ${s.whose === 'own' ? 'suas' : 'do oponente'} e devolva-as na ordem que quiser.`;
     case 'restDonOrCharacter':
+      if (s.skipRefresh) return 'Até 1 carta virada do oponente (DON!! incluídos) não fica ativa na próxima Fase de Renovação do oponente.';
+      // "Rest up to 1 of your opponent's cards": qualquer carta, DON!! incluídos.
+      if (s.spec.kinds.length === 3) return 'Vire até 1 carta do oponente (DON!! incluídos).';
       return `Vire até 1 DON!! do oponente ou ${target({ ...s.spec, side: 'opponent', upTo: 1 }, ctx)}.`;
     case 'chooseCost':
       return 'Escolha um custo.';
@@ -1153,8 +1156,12 @@ function steps(list: EffectStep[], ctx: Ctx): string {
     while (s.do === 'restDonOrCharacter' && group.length === 1 && i + run < list.length && JSON.stringify(list[i + run]) === JSON.stringify(s)) run++;
     if (run > 1) {
       i += run - 1;
-      const spec = (s as Extract<EffectStep, { do: 'restDonOrCharacter' }>).spec;
-      body = `Vire até ${run} ${target({ ...spec, side: 'opponent', upTo: run }, ctx).replace(/^até \d+ /, '').replace(/ do oponente$/, '')} ou DON!! do oponente, no total`;
+      const { spec, skipRefresh } = s as Extract<EffectStep, { do: 'restDonOrCharacter' }>;
+      body = skipRefresh
+        ? `Até ${run} cartas viradas do oponente (DON!! incluídos) não ficam ativas na próxima Fase de Renovação do oponente`
+        : spec.kinds.length === 3
+          ? `Vire até ${run} cartas do oponente (DON!! incluídos)`
+          : `Vire até ${run} ${target({ ...spec, side: 'opponent', upTo: run }, ctx).replace(/^até \d+ /, '').replace(/ do oponente$/, '')} ou DON!! do oponente, no total`;
     } else body = group.map((g, k) => (k ? lower(noDot(step(g, ctx))) : noDot(step(g, ctx)))).join(' e ');
     let text = key ? `Se ${condition(s.if!, ctx)}, ${lower(body)}.` : `${body}.`;
     if (ifDone > 0) {
@@ -1235,7 +1242,7 @@ function staticParts(a: Ability, ctx: Ctx): string[] {
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
   if (a.staticNoEffectKO) parts.push(a.staticNoEffectKO === 'opponent' ? 'não pode ser nocauteado por efeitos do oponente' : 'não pode ser nocauteado por efeitos');
   if (a.staticCannotAttack) parts.push('não pode atacar');
-  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Líderes ou Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por ${a.noBattleKOVsAttributeCharacters ? 'Personagens' : 'Líderes ou Personagens'} de atributo ${a.noBattleKOVsAttribute}`);
   if (a.noBattleKOUnlessAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens sem o atributo ${a.noBattleKOUnlessAttribute}`);
   if (a.noBattleKOByLeader) parts.push('não pode ser nocauteado em batalha por Líderes');
   if (a.costPer) parts.push(`recebe ${a.costPer.cost > 0 ? '+' : '−'}${Math.abs(a.costPer.cost)} de custo para cada ${a.costPer.every} cartas no seu descarte`);
@@ -1322,6 +1329,7 @@ function staticText(a: Ability, ctx: Ctx): string {
     const leaderOnly = au.kinds.length === 1 && au.kinds[0] === 'leader';
     const whose = au.bothSides ? `todos os ${many}` : au.side === 'opponent' ? `todos os ${many} do oponente` : leaderOnly ? 'o seu Líder' : `os seus ${many}`;
     const extra = [
+      au.rested === false ? 'ativos' : au.rested ? 'virados' : '',
       au.color ? COLOR_M[au.color][1] : '',
       au.minCost !== undefined && au.minCost === au.maxCost ? `com custo${au.baseCost ? ' base' : ''} ${au.minCost}` : '',
       au.maxCost !== undefined && au.minCost !== au.maxCost ? `com custo${au.baseCost ? ' base' : ''} ${au.maxCost} ou menos` : '',
