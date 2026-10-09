@@ -281,7 +281,7 @@ espectadores seguem para a partida nova.
 
 Cada conta Google tem um perfil (coluna `users.role`): **Player** (padrão: joga e assiste sem ver as mãos),
 **Streamer** (assiste vendo as mãos), **Organizador** (cria torneios e gerencia os que criou), **Admin** (tudo
-isso, gerencia qualquer torneio e muda os perfis em **Perfis das contas**, no menu) ou **Dev** (tudo do Admin e as
+isso, gerencia qualquer torneio, muda os perfis e vê os relatos de partidas em **Administração**, no menu) ou **Dev** (tudo do Admin e as
 funções de desenvolvimento). Sem login, a pessoa assiste como Player.
 
 O primeiro admin vem da variável `ADMIN_EMAILS`: quem entra com um desses e-mails (verificado pelo Google) vira Admin
@@ -305,6 +305,18 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 
 - **Criação:** nome, descrição e regras, formato (Standard ou Extra Grand Battle), estrutura, limite de jogadores e
   início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
+- **Check-in, início automático e W.O. por ausência** (torneios com data de início; ligado por padrão ao criar):
+  - O **check-in** abre 30 minutos antes do início, na página do torneio e num atalho no alto da tela inicial, para
+    quem está inscrito.
+  - Na hora marcada o torneio **começa sozinho**: a rodada 1 é sorteada entre todos os inscritos e a sala de cada mesa
+    fica pronta para os dois jogadores (o atalho da tela inicial vira **Entrar na sala**). O organizador ainda pode
+    começar antes à mão.
+  - Em cada rodada, cada jogador tem a **tolerância escolhida pelo organizador** (1 a 60 minutos; padrão 5) para
+    entrar na sala. Quem não entra **perde por W.O.** e sai do torneio; se nenhum dos dois entra, **os dois perdem**
+    (W.O. duplo: na chave, a mesa seguinte fica com bye). Na rodada 1, o check-in feito antes já vale como presença.
+    Depois do primeiro jogo de uma série a tolerância não corre mais (o organizador lança o placar, se precisar).
+  - Durante o torneio, a tela inicial mostra a sua partida da rodada (mesa, oponente e prazo) com o atalho para a
+    sala, ou avisa que você espera a próxima rodada.
 - **Não há empate** (como no One Piece TCG): toda partida tem um vencedor.
 - **Tempo:** cada jogador tem 17min30s por jogo, que só corre na vez dele, e quem zera o tempo perde. Por isso as
   regras oficiais de tempo esgotado (turnos extras e o desempate por Vida, cartas no deck, Personagens e última
@@ -335,6 +347,11 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 - **Organização:** o organizador lança o placar de qualquer partida (W.O., queda de conexão, partida jogada fora do
   site), tira jogadores e avança: próxima rodada do suíço, início do top cut, próxima fase da chave e, depois da
   final, o encerramento. **Encerrar agora** termina antes.
+- **Auditoria:** todo jogo disputado nas salas fica gravado com o replay. Em cada partida da aba Rodadas, **Jogos
+  gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os dois jogadores podem
+  **assistir ao replay**. Ao fim de uma partida de torneio ou ranqueada, o jogador pode **relatar um problema**
+  (botão ⚑ na tela de resultado); o relato, com o replay, aparece na aba **Relatos** do torneio para o organizador e
+  em **Administração → Relatos de partidas** para Admin e Dev, que o resolvem com uma nota.
 - **Correção de resultados:** um placar lançado errado pode ser corrigido em qualquer rodada, inclusive passadas (a
   classificação é recalculada). Na chave, corrigir quem venceu troca o jogador da partida seguinte, desde que ela
   ainda não tenha começado (senão, corrija ou zere antes a partida seguinte). Resultados do suíço não mudam depois

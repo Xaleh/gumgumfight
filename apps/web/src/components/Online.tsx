@@ -2,6 +2,7 @@ import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import type { OnlineRoomInfo } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
+import { ReportModal } from './ReportModal';
 
 export const TIER_LABEL: Record<string, string> = {
   'east-blue': 'East Blue',
@@ -143,9 +144,10 @@ export function EmoteBubbles({ online, bottom }: { online: OnlineGame; bottom: P
   );
 }
 
-/** Fim da partida online: recompensa (ranqueada) e revanche. */
+/** Fim da partida online: recompensa (ranqueada), revanche e o relato de problema (ranqueada e torneio). */
 export function OnlineResultInfo({ online }: { online: OnlineGame }) {
   const { room } = online;
+  const [reporting, setReporting] = useState(false);
   if (!room) return null;
   if (room.you === null) {
     // Espectador: a recompensa dos dois.
@@ -193,6 +195,16 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
       {room.result?.error && <p className="muted small">{room.result.error}</p>}
       {room.queue === 'private' && room.rematch[opp] && !room.rematch[me] && (
         <p className="muted small">{room.players[opp]?.name} quer revanche!</p>
+      )}
+      {(room.queue === 'ranked' || room.queue === 'tournament') && room.result?.matchId != null && (
+        <p className="small">
+          <button className="btn small pill" onClick={() => setReporting(true)}>
+            ⚑ Relatar um problema
+          </button>
+        </p>
+      )}
+      {reporting && room.result?.matchId != null && (
+        <ReportModal matchId={room.result.matchId} tournament={t?.name ?? null} onClose={() => setReporting(false)} />
       )}
     </div>
   );

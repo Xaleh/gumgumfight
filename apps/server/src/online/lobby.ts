@@ -533,6 +533,12 @@ export class Lobby {
     return null;
   }
 
+  /** Fecha uma sala que ainda espera o segundo jogador (partida de torneio decidida por W.O.). */
+  closeIfWaiting(id: string) {
+    const room = this.rooms.get(id);
+    if (room?.status === 'waiting') this.close(id);
+  }
+
   /** Revanche (só salas privadas): quando os dois pedem, começa uma sala nova com os mesmos decks. */
   rematch(room: Room, seat: PlayerId): LobbyError | null {
     if (room.data.queue !== 'private') return { code: 400, error: 'Revanche só nas salas privadas.' };

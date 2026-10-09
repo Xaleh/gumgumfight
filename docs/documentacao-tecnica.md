@@ -693,13 +693,52 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
 
 - **`tournaments`**: `format` (`standard`/`egb`), `structure` (`swiss` | `single`), `rounds` (1–15 ou null =
   ⌈log₂ n⌉ no início), `swiss_best_of` (1 | 3), `top_cut` (2…64 | null), `bo3_from`/`bo5_from` (tamanho da fase a
-  partir da qual a série é melhor de 3/5: 8 = quartas, 2 = final), `max_players` (2–256), `starts_at` (só
-  informativo), `status` (`registration → running → finished`), `round`, `organizer_id`.
+  partir da qual a série é melhor de 3/5: 8 = quartas, 2 = final), `max_players` (2–256), `starts_at` (com
+  `check_in`, hora do início automático), `check_in` (check-in, início automático e W.O. por ausência), `tolerance_min` (minutos para entrar na sala, 1–60), `status`
+  (`registration → running → finished`), `round`, `round_at` (quando a rodada atual foi gerada), `round_wo` (a
+  varredura de ausentes da rodada já foi feita), `organizer_id`.
 - **`tournament_players`**: `deck` é o `DeckList` **congelado** na inscrição (validado com `playableDeck` no formato),
-  `seed` = ordem sorteada no início, `dropped`.
-- **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye`, nunca empate),
-  `next_first` (quem perdeu começa o próximo jogo), `room_id` (sala do jogo atual), `match_id` (última partida em
-  `matches`), `reported_by` (`game`, `bye`, `drop` ou id do organizador).
+  `seed` = ordem sorteada no início, `dropped`, `checked_in_at`.
+- **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none`
+  (`none` = W.O. duplo: os dois perdem), nunca empate), `next_first` (quem perdeu começa o próximo jogo), `room_id`
+  (sala do jogo atual), `match_id` (última partida em `matches`), `reported_by` (`game`, `bye`, `drop`, `noshow` ou
+  id do organizador), `p1_in`/`p2_in` (quando cada jogador entrou na sala da série).
+
+### Check-in e relógio (`tournaments/clock.ts`)
+
+Torneio com `check_in = 1` (exige `starts_at`): `tournamentTick` roda a cada 5 s no servidor (`registerTournamentRoutes`;
+com relógio injetado nos testes não roda sozinho e é chamado por `app.tournamentTick()`).
+
+- **Check-in** (`POST /api/tournaments/:id/checkin`): aberto de `starts_at − 30 min` até o início, só para inscritos.
+- **Início automático**: em `starts_at` (até 1 h depois, se o servidor estava fora do ar; passado isso, o organizador
+  começa à mão), com ≥ 2 inscritos, `beginTournament` sorteia e grava a rodada 1 entre **todos** os inscritos.
+- **W.O. por ausência**: `round_at + tolerance_min` depois de cada rodada gerada, cada partida pendente com placar 0 x 0 é
+  conferida: presença = entrou na sala (`p1_in`/`p2_in`, gravado em `play`) ou, na rodada 1, fez check-in. O ausente
+  perde (`reported_by = noshow`) e sai (`dropped`); os dois ausentes = `result = none` e os dois saem. A sala em espera
+  é fechada (`lobby.closeIfWaiting`). A varredura roda uma vez por rodada (`round_wo`), então o organizador pode
+  zerar/corrigir depois sem que o W.O. volte. Na chave, `singleNextRound` dá bye a quem avançaria contra uma mesa sem
+  vencedor; sem ninguém para avançar, `next` encerra.
+- **Atalho da tela inicial**: `GET /api/tournaments/me` (a cada 10 s, só logado) devolve os torneios em que a conta está
+  em jogo agora (check-in aberto ou `running`), com a partida da rodada, o oponente, a situação da sala e o prazo.
+
+### Auditoria: jogos gravados e relatos (`reports/`)
+
+- **`tournament_games`**: uma linha por jogo disputado numa sala de torneio (`match_id` = série, `game`,
+  `stats_match_id` = partida em `matches` com o replay, `winner`, `counted` = entrou no placar; um jogo de uma sala
+  que já não era a atual fica gravado com `counted = 0`). Gravada em `reportFromGame`. O replay em `matches.replay`
+  passou a guardar `version`, `names` e `deckIds` (os antigos usam a versão 8 se `legacySetup`, senão a atual).
+- **`match_reports`**: relato de um jogador sobre uma partida (`match_id`, `tournament_id` quando é de torneio,
+  `reporter_id`, `text`, `resolved_at`/`resolved_by`/`note`; um por jogador e partida — relatar de novo troca o texto e
+  reabre).
+- **Rotas**: `GET /api/matches/:id/replay` (arquivo de replay para a mesa: quem jogou, o organizador do torneio ou
+  admin/dev), `GET /api/matches/:id` (resumo), `POST /api/matches/:id/report` (um dos jogadores, fila `ranked` ou
+  `tournament`), `GET /api/reports?tournament=&status=open|resolved|all` (admin/dev: todos; organizador: dos torneios
+  dele), `PUT /api/reports/:id` (`{resolved, note}`; admin/dev ou o organizador do torneio).
+- **Interface**: a tela de resultado das partidas online ranqueadas e de torneio tem **Relatar um problema**
+  (`ReportModal`); cada partida do torneio lista os **Jogos gravados** com "Assistir replay"
+  (`setupFromReplay`, em `game/setup.ts`, monta a mesa em modo replay a partir do JSON); o organizador tem a aba
+  **Relatos** no torneio e Admin/Dev a aba **Relatos de partidas** em Administração (`ReportsPanel`, em
+  `components/Reports.tsx`).
 
 ### Algoritmos (`tournaments/pairing.ts`)
 
@@ -1000,7 +1039,8 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | Partidas/estatísticas | `POST /api/matches`, `GET /api/matches`, `GET/PUT /api/players/me`, `GET /api/stats/meta`, `GET /api/stats`, `GET /api/stats/trend?weeks=`, `GET /api/stats/cards?leader=|deck=` |
 | Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
 | Espectador | `GET /api/online/live`, `GET /api/online/watch/:code`, `GET /api/online/rooms/:id`, `GET /api/online/rooms/:id/watch?hands=1` (SSE) |
-| Torneios | `GET /api/tournaments`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/drop`, `POST /api/tournaments/:id/matches/:m/play` |
+| Auditoria | `GET /api/matches/:id`, `GET /api/matches/:id/replay`, `POST /api/matches/:id/report`, `GET /api/reports`, `PUT /api/reports/:id` |
+| Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/drop`, `POST /api/tournaments/:id/matches/:m/play` |
 
 Corpos, filtros e códigos de erro estão descritos no `README.md` (seção "API").
 

@@ -16,7 +16,10 @@ import {
   winsNeeded,
 } from '../api';
 import { useAuth } from '../auth';
+import type { GameSetup } from '../game/useGame';
+import { useNow } from './HomeBlocks';
 import { LeaderArt } from './LeaderArt';
+import { openReplay, ReportsPanel } from './Reports';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -32,6 +35,18 @@ function toLocalInput(iso: string | null): string {
 }
 
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+
+const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null);
+
+/** "restam 4min30s" (ou "o prazo acabou"). */
+const remaining = (deadline: string, now: number) => {
+  const left = Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000));
+  if (!left) return 'o prazo acabou';
+  return `restam ${Math.floor(left / 60)}min${String(left % 60).padStart(2, '0')}s`;
+};
+
+/** Minutos de um intervalo em ms ("30 min"). */
+const minutes = (ms: number) => `${Math.round(ms / 60_000)} min`;
 
 /** 1050000 → "17min30s". */
 const clock = (ms: number) => {
@@ -73,12 +88,15 @@ export function Tournaments({
   onExit,
   onPlay,
   onWatch,
+  onReplay,
 }: {
   initialId?: string;
   onExit: () => void;
   /** Entra na sala online da partida do torneio. */
   onPlay: (seat: OnlineSeat, tournamentId: string) => void;
   onWatch: (target: WatchTarget, tournamentId: string) => void;
+  /** Abre o replay gravado de um jogo (auditoria). */
+  onReplay: (setup: GameSetup, tournamentId: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(initialId ?? null);
   const [creating, setCreating] = useState(false);
@@ -102,6 +120,7 @@ export function Tournaments({
         onDeleted={() => setOpenId(null)}
         onPlay={(seat) => onPlay(seat, openId)}
         onWatch={(t) => onWatch(t, openId)}
+        onReplay={(setup) => onReplay(setup, openId)}
       />
     );
   }
@@ -200,6 +219,8 @@ function TournamentForm({
     bo5From: initial?.bo5From ?? null,
     maxPlayers: initial?.maxPlayers ?? null,
     startsAt: initial?.startsAt ?? null,
+    checkIn: initial?.checkIn ?? true,
+    toleranceMin: initial?.toleranceMin ?? 5,
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -210,7 +231,9 @@ function TournamentForm({
     setSaving(true);
     setError(null);
     try {
-      onSaved(initial ? await api.tournaments.update(initial.id, form) : await api.tournaments.create(form));
+      // Sem data de início não há check-in nem início automático.
+      const input = { ...form, checkIn: form.checkIn && Boolean(form.startsAt) };
+      onSaved(initial ? await api.tournaments.update(initial.id, input) : await api.tournaments.create(input));
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -370,6 +393,38 @@ function TournamentForm({
               />
             </div>
           </div>
+          {form.startsAt ? (
+            <div className="field">
+              <label className="check">
+                <input type="checkbox" checked={form.checkIn} onChange={(e) => set('checkIn', e.target.checked)} />
+                Check-in, início automático e W.O. por ausência
+              </label>
+              <p className="muted small">
+                O check-in abre 30 minutos antes do início para os inscritos. Na hora marcada o torneio começa sozinho: a rodada 1 é
+                sorteada entre todos os inscritos e a sala de cada mesa fica pronta para os dois jogadores. Em cada rodada, cada
+                jogador tem a tolerância abaixo para entrar na sala: quem não entra perde por W.O. e sai do torneio; se nenhum dos
+                dois entra, os dois perdem. Na rodada 1, o check-in já vale como presença.
+              </p>
+              {form.checkIn && (
+                <div className="tour-form-row">
+                  <div className="field">
+                    <label htmlFor="tour-tolerance">Tolerância para entrar na sala (minutos)</label>
+                    <input
+                      id="tour-tolerance"
+                      className="admin-search"
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={form.toleranceMin}
+                      onChange={(e) => set('toleranceMin', Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="muted small">Com uma data de início, o torneio pode ter check-in e começar sozinho na hora marcada.</p>
+          )}
           {form.structure === 'swiss' && (
             <p className="muted small">Rodadas em branco: o número é calculado no início pelo total de inscritos.</p>
           )}
@@ -390,7 +445,7 @@ function TournamentForm({
 
 // ------------------------------------------------------------------ página do torneio
 
-type Tab = 'rounds' | 'standings' | 'players';
+type Tab = 'rounds' | 'standings' | 'players' | 'reports';
 
 /** Texto do botão de avançar, conforme o próximo passo. */
 function nextLabel(t: TournamentDetail): string {
@@ -409,6 +464,7 @@ function TournamentPage({
   onDeleted,
   onPlay,
   onWatch,
+  onReplay,
 }: {
   id: string;
   /** Volta para o menu principal. */
@@ -416,6 +472,7 @@ function TournamentPage({
   onDeleted: () => void;
   onPlay: (seat: OnlineSeat) => void;
   onWatch: (t: WatchTarget) => void;
+  onReplay: (setup: GameSetup) => void;
 }) {
   const { user } = useAuth();
   const [t, setT] = useState<TournamentDetail | null>(null);
@@ -510,6 +567,18 @@ function TournamentPage({
                 {t.organizerName && ` · Organizado por ${t.organizerName}`}
                 {t.startsAt && t.status === 'registration' && ` · Começa em ${dateTime(t.startsAt)}`}
               </p>
+              {t.checkIn && t.status === 'registration' && (
+                <p className="small tour-checkin-info">
+                  ✅ Check-in {t.checkInOpen ? 'aberto' : `abre às ${time(t.checkInOpensAt)}`} ({minutes(t.checkInMs)} antes do início) ·
+                  o torneio começa sozinho em {dateTime(t.startsAt)} · {t.checkedIn}/{t.players.length} com check-in
+                </p>
+              )}
+              {t.checkIn && t.status === 'running' && (
+                <p className="muted small">
+                  ⏳ Em cada rodada, cada jogador tem {minutes(t.toleranceMs)} para entrar na sala: quem não entra perde por W.O. e sai do
+                  torneio; se nenhum dos dois entra, os dois perdem.
+                </p>
+              )}
               {(t.bo3From || t.bo5From) && (
                 <p className="muted small">
                   Eliminatória:
@@ -600,11 +669,18 @@ function TournamentPage({
                     Apagar
                   </button>
                 </div>
+                {t.status === 'registration' && t.checkIn && (
+                  <p className="muted small">
+                    O torneio começa sozinho em {dateTime(t.startsAt)} com todos os inscritos (quem não fez check-in nem entra na sala em{' '}
+                    {minutes(t.toleranceMs)} perde por W.O.). Começar agora não espera a hora.
+                  </p>
+                )}
                 {t.status !== 'registration' && (
                   <p className="muted small">
                     Os resultados dos jogos disputados no site entram sozinhos. Lance à mão os de W.O. ou de partidas jogadas fora do
                     site. Para corrigir um resultado lançado errado, escolha o placar certo na partida, inclusive em rodadas
-                    passadas.
+                    passadas. Todos os jogos ficam gravados: em cada partida, abra "Jogos gravados" para rever o replay; os
+                    problemas relatados pelos jogadores ficam na aba Relatos.
                   </p>
                 )}
               </section>
@@ -624,6 +700,11 @@ function TournamentPage({
               <button className={activeTab === 'players' ? 'on' : ''} onClick={() => setTab('players')}>
                 Inscritos ({t.players.length})
               </button>
+              {t.canManage && t.status !== 'registration' && (
+                <button className={activeTab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>
+                  Relatos{t.openReports ? ` (${t.openReports})` : ''}
+                </button>
+              )}
             </div>
 
             {activeTab === 'rounds' && t.round > 0 && (
@@ -655,9 +736,11 @@ function TournamentPage({
                       m={m}
                       editable={t.canManage && t.status !== 'registration'}
                       current={t.status === 'running' && shownRound === t.round}
+                      deadline={shownRound === t.round ? t.deadline : null}
                       busy={busy}
                       onScore={(wins) => run(() => api.tournaments.setScore(t.id, m.id, wins))}
                       onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false })}
+                      onReplay={(statsMatchId) => run(() => openReplay(statsMatchId, onReplay))}
                     />
                   ))}
                 </div>
@@ -665,6 +748,8 @@ function TournamentPage({
             )}
 
             {activeTab === 'standings' && <Standings t={t} />}
+
+            {activeTab === 'reports' && t.canManage && <ReportsPanel tournament={t.id} onReplay={onReplay} />}
 
             {activeTab === 'players' && (
               <Players
@@ -738,6 +823,30 @@ function MyArea({
             Inscrito com <b>{t.me.deckName}</b>. A lista fica congelada como estava na inscrição: se mudar o deck depois, inscreva-o
             de novo.
           </p>
+        )}
+        {t.me && t.checkIn && (
+          <div className="tour-checkin">
+            {t.me.checkedInAt ? (
+              <p className="tour-my-result">
+                ✔ Check-in feito às {time(t.me.checkedInAt)}. O torneio começa em {dateTime(t.startsAt)}: a sua sala aparece aqui e na
+                tela inicial.
+              </p>
+            ) : t.checkInOpen ? (
+              <>
+                <button className="btn primary" disabled={busy} onClick={() => run(() => api.tournaments.checkIn(t.id))}>
+                  Fazer check-in
+                </button>
+                <p className="muted small">
+                  O torneio começa em {dateTime(t.startsAt)}. Sem check-in, você ainda tem {minutes(t.toleranceMs)} depois do início
+                  para entrar na sala; depois disso perde por W.O.
+                </p>
+              </>
+            ) : (
+              <p className="muted small">
+                O check-in abre às {time(t.checkInOpensAt)} ({minutes(t.checkInMs)} antes do início, em {dateTime(t.startsAt)}).
+              </p>
+            )}
+          </div>
         )}
         {full ? (
           <p className="muted">O torneio está lotado.</p>
@@ -834,9 +943,13 @@ function MyArea({
             )}
           </p>
           {m.result ? (
-            <p className="tour-my-result">{m.winner === user.id ? '✔ Vitória!' : 'Derrota.'} Aguarde a próxima rodada.</p>
+            <p className="tour-my-result">
+              {m.result === 'none' ? 'W.O. duplo: ninguém entrou na sala.' : m.winner === user.id ? '✔ Vitória!' : 'Derrota.'}
+              {m.reportedBy === 'noshow' && m.winner === user.id && ' O oponente não entrou na sala.'} Aguarde a próxima rodada.
+            </p>
           ) : (
             <>
+              {t.deadline && (!m.present[mine!] || !m.present[1 - mine!]) && <Deadline deadline={t.deadline} mine={m.present[mine!]} />}
               <button
                 className="btn primary"
                 disabled={busy}
@@ -881,8 +994,20 @@ const REPORTED: Record<NonNullable<TournamentMatchInfo['reportedBy']>, string> =
   game: 'partida no site',
   bye: 'bye',
   drop: 'desistência',
+  noshow: 'W.O. por ausência',
   organizer: 'lançado pelo organizador',
 };
+
+/** Prazo para entrar na sala (contagem regressiva). */
+function Deadline({ deadline, mine }: { deadline: string; mine: boolean }) {
+  const now = useNow(1000);
+  return (
+    <p className="tour-deadline">
+      ⏳ {mine ? 'O oponente tem' : 'Entre na sala'} até <b>{time(deadline)}</b> ({remaining(deadline, now)}).
+      {mine ? ' Se não entrar, a vitória é sua por W.O.' : ' Quem não entra perde por W.O.'}
+    </p>
+  );
+}
 
 /** Placares finais possíveis de uma melhor de N, do ponto de vista de p1 e depois de p2. */
 function finalScores(bestOf: number): Array<[number, number]> {
@@ -896,22 +1021,29 @@ function MatchRow({
   m,
   editable,
   current,
+  deadline,
   busy,
   onScore,
   onWatch,
+  onReplay,
 }: {
   m: TournamentMatchInfo;
   /** O organizador pode lançar ou corrigir o placar. */
   editable: boolean;
   /** Rodada atual (só nela o placar pode ser apagado). */
   current: boolean;
+  /** Prazo para entrar na sala (tolerância correndo): mostra quem ainda falta. */
+  deadline: string | null;
   busy: boolean;
   onScore: (wins: [number, number]) => void;
   onWatch: () => void;
+  /** Abre o replay gravado de um jogo da série. */
+  onReplay: (statsMatchId: number) => void;
 }) {
   const name = (p: TournamentMatchInfo['p1'] | null, won: boolean) =>
     p ? <span className={['tour-player', won ? 'won' : m.result ? 'lost' : ''].join(' ')}>{p.name}</span> : null;
   const played = m.wins[0] + m.wins[1] > 0;
+  const missing = deadline && !m.result && m.p2 ? [m.p1, m.p2].filter((_, i) => !m.present[i]).map((p) => p.name) : [];
   return (
     <div className="tour-match">
       <span className="tour-table muted small">Mesa {m.table}</span>
@@ -929,7 +1061,8 @@ function MatchRow({
         )}
       </div>
       <div className="tour-match-side">
-        {m.result && m.reportedBy && m.reportedBy !== 'bye' && <span className="muted small">{REPORTED[m.reportedBy]}</span>}
+        {m.result === 'none' && <span className="muted small">W.O. duplo</span>}
+        {m.result && m.result !== 'none' && m.reportedBy && m.reportedBy !== 'bye' && <span className="muted small">{REPORTED[m.reportedBy]}</span>}
         {!m.result && m.room === 'playing' && (
           <button className="btn small" onClick={onWatch}>
             👁 Assistir{m.bestOf > 1 ? ` o jogo ${m.game}` : ''}
@@ -937,7 +1070,13 @@ function MatchRow({
         )}
         {!m.result && m.room !== 'playing' && (
           <span className="muted small">
-            {m.room === 'waiting' ? 'Na sala…' : m.bestOf > 1 && played ? `Jogo ${m.game} pendente` : 'Pendente'}
+            {missing.length
+              ? `Falta entrar: ${missing.join(' e ')}`
+              : m.room === 'waiting'
+                ? 'Na sala…'
+                : m.bestOf > 1 && played
+                  ? `Jogo ${m.game} pendente`
+                  : 'Pendente'}
           </span>
         )}
       </div>
@@ -958,6 +1097,24 @@ function MatchRow({
             </button>
           )}
         </div>
+      )}
+      {m.games.length > 0 && (
+        <details className="tour-games">
+          <summary className="small">Jogos gravados ({m.games.length})</summary>
+          <ul className="small">
+            {m.games.map((g, i) => (
+              <li key={i}>
+                Jogo {g.game} · {g.winner ? <>venceu <b>{g.winner.name}</b></> : 'sem vencedor'} · {time(g.playedAt)}
+                {!g.counted && <span className="muted"> · não contou no placar</span>}
+                {g.statsMatchId !== null && (
+                  <button className="btn small" disabled={busy} onClick={() => onReplay(g.statsMatchId!)}>
+                    ▶ Assistir replay
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );
@@ -1031,6 +1188,7 @@ function Players({ t, busy, onDrop }: { t: TournamentDetail; busy: boolean; onDr
                 <span className="muted small">
                   {p.leaderName ?? p.leader}
                   {p.dropped ? ' · saiu do torneio' : ''}
+                  {t.checkIn && t.status === 'registration' && p.checkedIn ? ' · ✔ check-in' : ''}
                 </span>
               </span>
               {t.canManage && t.status !== 'finished' && !p.dropped && (
