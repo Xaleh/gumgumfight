@@ -249,7 +249,8 @@ export function buildApp(
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
-  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages });
+  // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
+  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined });
 
   app.get('/api/matches', async () => recentMatches(db));
 

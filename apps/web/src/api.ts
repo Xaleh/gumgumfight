@@ -187,6 +187,10 @@ export const api = {
     update: (id: string, t: TournamentInput) => send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}`, t),
     remove: (id: string) => send<void>('DELETE', `/api/tournaments/${encodeURIComponent(id)}`),
     register: (id: string, deckId: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/register`, { deckId }),
+    /** Check-in (torneios com hora marcada; abre 30 min antes do início). */
+    checkIn: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/checkin`),
+    /** Torneios em que a conta está em jogo agora (atalho da tela inicial). */
+    me: () => get<{ entries: TournamentMine[] }>('/api/tournaments/me'),
     /** Cancela a inscrição ou, com o torneio em andamento, desiste. */
     leave: (id: string) => send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/register`),
     start: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/start`),
@@ -351,8 +355,10 @@ export interface TournamentInput {
   bo3From: number | null;
   bo5From: number | null;
   maxPlayers: number | null;
-  /** ISO; só informativo. */
+  /** ISO. Com `checkIn`, o torneio começa sozinho nesta hora. */
   startsAt: string | null;
+  /** Check-in 30 min antes, início automático na hora e 5 min de tolerância por rodada (W.O. automático). */
+  checkIn: boolean;
 }
 
 export interface TournamentSummary {
@@ -367,9 +373,36 @@ export interface TournamentSummary {
   players: number;
   maxPlayers: number | null;
   startsAt: string | null;
+  checkIn: boolean;
+  checkInOpensAt: string | null;
   organizerName: string | null;
   /** Você está inscrito. */
   registered: boolean;
+}
+
+/** Torneio em que a conta está em jogo agora (check-in aberto ou em andamento), para o atalho da tela inicial. */
+export interface TournamentMine {
+  id: string;
+  name: string;
+  status: TournamentStatus;
+  startsAt: string | null;
+  checkInOpensAt: string | null;
+  checkedIn: boolean;
+  round: number;
+  label: string | null;
+  /** Prazo para entrar na sala na rodada atual. */
+  deadline: string | null;
+  match: {
+    id: number;
+    table: number;
+    /** null = bye. */
+    opponent: string | null;
+    bestOf: number;
+    game: number;
+    result: TournamentResult | 'bye' | 'none' | null;
+    winner: string | null;
+    room: 'waiting' | 'playing' | 'finished' | null;
+  } | null;
 }
 
 export interface TournamentPlayerRef {
@@ -388,13 +421,16 @@ export interface TournamentMatchInfo {
   wins: [number, number];
   /** Jogo da série em disputa (1, 2, 3…). */
   game: number;
-  result: TournamentResult | 'bye' | null;
+  /** none = W.O. duplo (ninguém apareceu). */
+  result: TournamentResult | 'bye' | 'none' | null;
   winner: string | null;
-  /** game = sala online; drop = desistência. */
-  reportedBy: 'game' | 'bye' | 'drop' | 'organizer' | null;
+  /** game = sala online; drop = desistência; noshow = W.O. automático. */
+  reportedBy: 'game' | 'bye' | 'drop' | 'noshow' | 'organizer' | null;
   roomId: string | null;
   /** Situação da sala online (null = nenhuma sala aberta agora). */
   room: 'waiting' | 'playing' | 'finished' | null;
+  /** Cada jogador já entrou na sala da série (ou, na rodada 1, fez check-in). */
+  present: [boolean, boolean];
 }
 
 export interface TournamentStanding {
@@ -439,18 +475,37 @@ export interface TournamentDetail {
   clockMs: number;
   maxPlayers: number | null;
   startsAt: string | null;
+  /** Torneio com hora marcada: check-in, início automático e W.O. por ausência. */
+  checkIn: boolean;
+  checkInMs: number;
+  toleranceMs: number;
+  checkInOpensAt: string | null;
+  checkInOpen: boolean;
+  /** Inscritos que já fizeram check-in. */
+  checkedIn: number;
+  roundAt: string | null;
+  /** Prazo para entrar na sala na rodada atual (null = sem tolerância correndo). */
+  deadline: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
   organizerName: string | null;
   canManage: boolean;
   canRegister: boolean;
-  me: { deckId: string | null; deckName: string; leader: string; dropped: boolean; matchId: number | null } | null;
+  me: {
+    deckId: string | null;
+    deckName: string;
+    leader: string;
+    dropped: boolean;
+    matchId: number | null;
+    checkedInAt: string | null;
+  } | null;
   players: Array<{
     userId: string;
     name: string;
     seed: number | null;
     dropped: boolean;
+    checkedIn: boolean;
     leader: string;
     leaderName: string | null;
     leaderImage: string | null;

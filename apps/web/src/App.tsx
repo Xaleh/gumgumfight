@@ -125,6 +125,7 @@ export function App() {
       onWatch={() => setScreen({ name: 'watch-list' })}
       onWatchRoom={(target) => setScreen({ name: 'watch', target, home: true })}
       onTournaments={(id) => setScreen({ name: 'tournaments', id })}
+      onTournamentMatch={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
       dev={dev}
     />

@@ -6958,6 +6958,27 @@ tr.clickable:hover td {
 .tour-champion {
   font-size: 16px;
 }
+.tour-checkin-info {
+  color: var(--ok);
+  font-weight: 700;
+}
+.tour-checkin {
+  margin-top: 8px;
+}
+.tour-checkin .btn {
+  margin-top: 4px;
+}
+.tour-deadline {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
+  font-weight: 700;
+}
+.home-banner.tournament .play-ico {
+  background: var(--gold);
+}
 .tour-me p {
   margin: 0 0 10px;
 }

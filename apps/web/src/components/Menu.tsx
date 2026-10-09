@@ -10,6 +10,7 @@ import {
   type FormatId,
   type OnlineSeat,
   type QueueKind,
+  type TournamentMine,
   type WatchTarget,
   whyNotPlayable,
 } from '../api';
@@ -18,7 +19,7 @@ import { useAuth } from '../auth';
 import type { GameMode, GameSetup, ReplayFile } from '../game/useGame';
 import { NICKNAME_EVENT, SettingsModal } from '../settings';
 import { type NavItem, TopBar } from './AppShell';
-import { LiveNow, MetaBlock, TournamentsBlock, usePoll } from './HomeBlocks';
+import { LiveNow, MetaBlock, TournamentBanner, TournamentsBlock, usePoll } from './HomeBlocks';
 import { Icon, type IconName } from './Icons';
 import { LeaderArt } from './LeaderArt';
 import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
@@ -334,6 +335,7 @@ export function Menu({
   onWatch,
   onWatchRoom,
   onTournaments,
+  onTournamentMatch,
   onAdmin,
   dev = false,
 }: {
@@ -349,6 +351,8 @@ export function Menu({
   onWatchRoom: (target: WatchTarget) => void;
   /** Torneios (com `id`: a página daquele torneio). */
   onTournaments: (id?: string) => void;
+  /** Entra na sala da partida de torneio (atalho da tela inicial); ao sair, volta para o torneio. */
+  onTournamentMatch: (seat: OnlineSeat, tournamentId: string) => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
@@ -400,6 +404,10 @@ export function Menu({
 
   const stats = usePoll(() => api.online.stats(), 10_000);
   const tournaments = usePoll(() => api.tournaments.list(), 60_000);
+  /** Torneio em jogo agora (check-in aberto ou partida da rodada): atalho no alto da tela. */
+  const mine = usePoll(() => (user ? api.tournaments.me() : Promise.resolve({ entries: [] })), 10_000);
+  const [myEntry, setMyEntry] = useState<TournamentMine | null>(null);
+  useEffect(() => setMyEntry(mine?.entries[0] ?? null), [mine]);
 
   const refreshActive = useCallback(() => {
     api.online
@@ -641,6 +649,14 @@ export function Menu({
         {authNotice && <div className="home-notice">{authNotice}</div>}
         {authError && <div className="error">{authError}</div>}
 
+        {!playing && myEntry && (
+          <TournamentBanner
+            entry={myEntry}
+            onOpen={() => onTournaments(myEntry.id)}
+            onPlay={() => api.tournaments.play(myEntry.id, myEntry.match!.id).then((seat) => (onTournamentMatch(seat, myEntry.id), seat))}
+            onCheckIn={() => api.tournaments.checkIn(myEntry.id).then(() => setMyEntry({ ...myEntry, checkedIn: true }))}
+          />
+        )}
         {playing ? (
           <div className="home-banner" role="status">
             <span className="play-ico">
@@ -661,7 +677,9 @@ export function Menu({
             </button>
           </div>
         ) : (
-          waiting && (
+          // A sala de torneio em espera já aparece no atalho do torneio.
+          waiting &&
+          !(waiting.queue === 'tournament' && myEntry) && (
             <div className="home-banner" role="status">
               <span className="play-ico">
                 <Icon name="key" size={16} />

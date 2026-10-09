@@ -153,7 +153,7 @@ function migrateTournaments(db: DB) {
       bo3_from     INTEGER,                   -- eliminatória: melhor de 3 a partir da fase com estas vagas (8 = quartas)
       bo5_from     INTEGER,                   -- eliminatória: melhor de 5 a partir da fase com estas vagas (2 = final)
       max_players  INTEGER,
-      starts_at    TEXT,                      -- data e hora previstas (ISO), só informativo
+      starts_at    TEXT,                      -- data e hora previstas (ISO); com check_in, o torneio começa sozinho nessa hora
       status       TEXT NOT NULL DEFAULT 'registration',  -- registration | running | finished
       round        INTEGER NOT NULL DEFAULT 0,  -- rodada atual (0 = não começou)
       organizer_id TEXT NOT NULL REFERENCES users(id),
@@ -185,15 +185,29 @@ function migrateTournaments(db: DB) {
       best_of       INTEGER NOT NULL DEFAULT 1,
       wins1         INTEGER NOT NULL DEFAULT 0,  -- jogos vencidos na série
       wins2         INTEGER NOT NULL DEFAULT 0,
-      result        TEXT,                      -- p1 | p2 | bye (null = série em andamento); não há empate
+      result        TEXT,                      -- p1 | p2 | bye | none (W.O. duplo; null = série em andamento); não há empate
       next_first    TEXT,                      -- quem começa o próximo jogo da série (quem perdeu o anterior)
       room_id       TEXT,                      -- sala online do jogo atual da série
       match_id      INTEGER,                   -- partida gravada nas estatísticas
-      reported_by   TEXT,                      -- game (sala online), bye, drop (desistência) ou id de quem lançou
+      reported_by   TEXT,                      -- game (sala online), bye, drop (desistência), noshow (W.O. automático) ou id de quem lançou
       updated_at    TEXT
     );
     CREATE INDEX IF NOT EXISTS tournament_matches_round ON tournament_matches(tournament_id, round);
   `);
+  // Check-in e W.O. automático (ver tournaments/clock.ts).
+  const tCols = (db.prepare('PRAGMA table_info(tournaments)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  // check_in: o torneio começa sozinho na hora marcada, com check-in 30 min antes e tolerância de 5 min por rodada.
+  if (!tCols.includes('check_in')) db.exec('ALTER TABLE tournaments ADD COLUMN check_in INTEGER NOT NULL DEFAULT 0');
+  // round_at: quando a rodada atual foi gerada (a tolerância conta a partir daqui).
+  if (!tCols.includes('round_at')) db.exec('ALTER TABLE tournaments ADD COLUMN round_at TEXT');
+  // round_wo: a varredura de ausentes da rodada atual já foi feita.
+  if (!tCols.includes('round_wo')) db.exec('ALTER TABLE tournaments ADD COLUMN round_wo INTEGER NOT NULL DEFAULT 0');
+  const pCols = (db.prepare('PRAGMA table_info(tournament_players)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!pCols.includes('checked_in_at')) db.exec('ALTER TABLE tournament_players ADD COLUMN checked_in_at TEXT');
+  const mCols = (db.prepare('PRAGMA table_info(tournament_matches)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  // p1_in / p2_in: quando cada jogador entrou na sala da série (presença para o W.O. automático).
+  if (!mCols.includes('p1_in')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p1_in TEXT');
+  if (!mCols.includes('p2_in')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p2_in TEXT');
 }
 
 /** Contas (login com Google) e sessões abertas. Do token de sessão só o hash é guardado. */
