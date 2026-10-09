@@ -33,6 +33,7 @@ import { type ApiCard, presentCards } from './present';
 import type { LobbyLimits } from './online/lobby';
 import { registerOnlineRoutes } from './online/routes';
 import { registerStatsRoutes } from './stats/routes';
+import { registerReportRoutes } from './reports/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
 import { reportFromGame } from './tournaments/store';
 
@@ -251,6 +252,8 @@ export function buildApp(
   app.decorate('onlineLobby', lobby);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
   registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined });
+
+  registerReportRoutes(app, { db, user: auth.viewer });
 
   app.get('/api/matches', async () => recentMatches(db));
 

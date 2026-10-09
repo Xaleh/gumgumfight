@@ -4,7 +4,7 @@ import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/
 import { type DB, openDb } from '../src/db';
 import type { Lobby } from '../src/online/lobby';
 import { seed } from '../src/seed';
-import { AUTO_START_GRACE_MS, CHECK_IN_MS, type TickResult, TOLERANCE_MS } from '../src/tournaments/clock';
+import { AUTO_START_GRACE_MS, CHECK_IN_MS, DEFAULT_TOLERANCE_MIN, type TickResult } from '../src/tournaments/clock';
 import {
   bracketOrder,
   elimBestOf,
@@ -133,6 +133,7 @@ function setup(now?: () => number) {
 }
 type App = ReturnType<typeof buildApp>;
 /** Relógio dos torneios (início automático e W.O.), exposto pelo app. */
+const TOLERANCE_MS_T = DEFAULT_TOLERANCE_MIN * 60_000;
 const tick = (app: App) => (app as unknown as { tournamentTick: () => TickResult | null }).tournamentTick();
 
 let n = 0;
@@ -424,7 +425,7 @@ describe('torneios: rotas', () => {
     const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Noturno', format: 'egb', structure: 'swiss', rounds: 2, startsAt, checkIn: true })).json();
     expect(t).toMatchObject({ checkIn: true, checkInOpensAt: '2026-10-10T19:30:00.000Z', checkInOpen: false, checkedIn: 0, deadline: null });
     expect(t.checkInMs).toBe(CHECK_IN_MS);
-    expect(t.toleranceMs).toBe(TOLERANCE_MS);
+    expect(t.toleranceMs).toBe(TOLERANCE_MS_T);
     for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
 
     // Antes da janela: nem o check-in nem o atalho da tela inicial.
@@ -521,7 +522,7 @@ describe('torneios: rotas', () => {
     const who = (userId: string) => ps.find((p) => p.id === userId)!;
     // Semifinal 2: só p1 entra na sala. Semifinal 1: ninguém.
     await req(app, 'POST', `/api/tournaments/${t.id}/matches/${s2.id}/play`, who(s2.p1.userId));
-    now += TOLERANCE_MS;
+    now += TOLERANCE_MS_T;
     expect(tick(app)!.noShows).toHaveLength(2);
     view = (await req(app, 'GET', `/api/tournaments/${t.id}`, admin)).json();
     expect(view.rounds[0].matches[0]).toMatchObject({ result: 'none', winner: null, reportedBy: 'noshow' });

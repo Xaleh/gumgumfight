@@ -16,8 +16,10 @@ import {
   winsNeeded,
 } from '../api';
 import { useAuth } from '../auth';
+import type { GameSetup } from '../game/useGame';
 import { useNow } from './HomeBlocks';
 import { LeaderArt } from './LeaderArt';
+import { openReplay, ReportsPanel } from './Reports';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -86,12 +88,15 @@ export function Tournaments({
   onExit,
   onPlay,
   onWatch,
+  onReplay,
 }: {
   initialId?: string;
   onExit: () => void;
   /** Entra na sala online da partida do torneio. */
   onPlay: (seat: OnlineSeat, tournamentId: string) => void;
   onWatch: (target: WatchTarget, tournamentId: string) => void;
+  /** Abre o replay gravado de um jogo (auditoria). */
+  onReplay: (setup: GameSetup, tournamentId: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(initialId ?? null);
   const [creating, setCreating] = useState(false);
@@ -115,6 +120,7 @@ export function Tournaments({
         onDeleted={() => setOpenId(null)}
         onPlay={(seat) => onPlay(seat, openId)}
         onWatch={(t) => onWatch(t, openId)}
+        onReplay={(setup) => onReplay(setup, openId)}
       />
     );
   }
@@ -214,6 +220,7 @@ function TournamentForm({
     maxPlayers: initial?.maxPlayers ?? null,
     startsAt: initial?.startsAt ?? null,
     checkIn: initial?.checkIn ?? true,
+    toleranceMin: initial?.toleranceMin ?? 5,
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -395,9 +402,25 @@ function TournamentForm({
               <p className="muted small">
                 O check-in abre 30 minutos antes do início para os inscritos. Na hora marcada o torneio começa sozinho: a rodada 1 é
                 sorteada entre todos os inscritos e a sala de cada mesa fica pronta para os dois jogadores. Em cada rodada, cada
-                jogador tem 5 minutos para entrar na sala: quem não entra perde por W.O. e sai do torneio; se nenhum dos dois entra,
-                os dois perdem. Na rodada 1, o check-in já vale como presença.
+                jogador tem a tolerância abaixo para entrar na sala: quem não entra perde por W.O. e sai do torneio; se nenhum dos
+                dois entra, os dois perdem. Na rodada 1, o check-in já vale como presença.
               </p>
+              {form.checkIn && (
+                <div className="tour-form-row">
+                  <div className="field">
+                    <label htmlFor="tour-tolerance">Tolerância para entrar na sala (minutos)</label>
+                    <input
+                      id="tour-tolerance"
+                      className="admin-search"
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={form.toleranceMin}
+                      onChange={(e) => set('toleranceMin', Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <p className="muted small">Com uma data de início, o torneio pode ter check-in e começar sozinho na hora marcada.</p>
@@ -422,7 +445,7 @@ function TournamentForm({
 
 // ------------------------------------------------------------------ página do torneio
 
-type Tab = 'rounds' | 'standings' | 'players';
+type Tab = 'rounds' | 'standings' | 'players' | 'reports';
 
 /** Texto do botão de avançar, conforme o próximo passo. */
 function nextLabel(t: TournamentDetail): string {
@@ -441,6 +464,7 @@ function TournamentPage({
   onDeleted,
   onPlay,
   onWatch,
+  onReplay,
 }: {
   id: string;
   /** Volta para o menu principal. */
@@ -448,6 +472,7 @@ function TournamentPage({
   onDeleted: () => void;
   onPlay: (seat: OnlineSeat) => void;
   onWatch: (t: WatchTarget) => void;
+  onReplay: (setup: GameSetup) => void;
 }) {
   const { user } = useAuth();
   const [t, setT] = useState<TournamentDetail | null>(null);
@@ -654,7 +679,8 @@ function TournamentPage({
                   <p className="muted small">
                     Os resultados dos jogos disputados no site entram sozinhos. Lance à mão os de W.O. ou de partidas jogadas fora do
                     site. Para corrigir um resultado lançado errado, escolha o placar certo na partida, inclusive em rodadas
-                    passadas.
+                    passadas. Todos os jogos ficam gravados: em cada partida, abra "Jogos gravados" para rever o replay; os
+                    problemas relatados pelos jogadores ficam na aba Relatos.
                   </p>
                 )}
               </section>
@@ -674,6 +700,11 @@ function TournamentPage({
               <button className={activeTab === 'players' ? 'on' : ''} onClick={() => setTab('players')}>
                 Inscritos ({t.players.length})
               </button>
+              {t.canManage && t.status !== 'registration' && (
+                <button className={activeTab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>
+                  Relatos{t.openReports ? ` (${t.openReports})` : ''}
+                </button>
+              )}
             </div>
 
             {activeTab === 'rounds' && t.round > 0 && (
@@ -709,6 +740,7 @@ function TournamentPage({
                       busy={busy}
                       onScore={(wins) => run(() => api.tournaments.setScore(t.id, m.id, wins))}
                       onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false })}
+                      onReplay={(statsMatchId) => run(() => openReplay(statsMatchId, onReplay))}
                     />
                   ))}
                 </div>
@@ -716,6 +748,8 @@ function TournamentPage({
             )}
 
             {activeTab === 'standings' && <Standings t={t} />}
+
+            {activeTab === 'reports' && t.canManage && <ReportsPanel tournament={t.id} onReplay={onReplay} />}
 
             {activeTab === 'players' && (
               <Players
@@ -991,6 +1025,7 @@ function MatchRow({
   busy,
   onScore,
   onWatch,
+  onReplay,
 }: {
   m: TournamentMatchInfo;
   /** O organizador pode lançar ou corrigir o placar. */
@@ -1002,6 +1037,8 @@ function MatchRow({
   busy: boolean;
   onScore: (wins: [number, number]) => void;
   onWatch: () => void;
+  /** Abre o replay gravado de um jogo da série. */
+  onReplay: (statsMatchId: number) => void;
 }) {
   const name = (p: TournamentMatchInfo['p1'] | null, won: boolean) =>
     p ? <span className={['tour-player', won ? 'won' : m.result ? 'lost' : ''].join(' ')}>{p.name}</span> : null;
@@ -1060,6 +1097,24 @@ function MatchRow({
             </button>
           )}
         </div>
+      )}
+      {m.games.length > 0 && (
+        <details className="tour-games">
+          <summary className="small">Jogos gravados ({m.games.length})</summary>
+          <ul className="small">
+            {m.games.map((g, i) => (
+              <li key={i}>
+                Jogo {g.game} · {g.winner ? <>venceu <b>{g.winner.name}</b></> : 'sem vencedor'} · {time(g.playedAt)}
+                {!g.counted && <span className="muted"> · não contou no placar</span>}
+                {g.statsMatchId !== null && (
+                  <button className="btn small" disabled={busy} onClick={() => onReplay(g.statsMatchId!)}>
+                    ▶ Assistir replay
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

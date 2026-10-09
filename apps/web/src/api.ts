@@ -203,6 +203,18 @@ export const api = {
       send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/drop`),
     play: (id: string, matchId: number) => send<OnlineSeat>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/play`),
   },
+  /** Auditoria: replay e relatos de problemas das partidas gravadas (ranqueadas e de torneio). */
+  matches: {
+    replay: (id: number) => get<Record<string, unknown>>(`/api/matches/${id}/replay`),
+    report: (id: number, text: string) => send<MatchReport>('POST', `/api/matches/${id}/report`, { text }),
+  },
+  reports: {
+    list: (opts: { tournament?: string; status?: 'open' | 'resolved' | 'all' } = {}) =>
+      get<{ reports: MatchReport[] }>(
+        `/api/reports?${new URLSearchParams({ ...(opts.tournament ? { tournament: opts.tournament } : {}), status: opts.status ?? 'open' })}`,
+      ),
+    resolve: (id: number, resolved: boolean, note?: string) => send<MatchReport>('PUT', `/api/reports/${id}`, { resolved, note }),
+  },
   online: {
     config: () => get<{ timeBankMs: number; botRooms: boolean }>('/api/online/config'),
     active: () => get<ActiveRoom[]>('/api/online/active'),
@@ -357,8 +369,10 @@ export interface TournamentInput {
   maxPlayers: number | null;
   /** ISO. Com `checkIn`, o torneio começa sozinho nesta hora. */
   startsAt: string | null;
-  /** Check-in 30 min antes, início automático na hora e 5 min de tolerância por rodada (W.O. automático). */
+  /** Check-in 30 min antes, início automático na hora e tolerância por rodada (W.O. automático). */
   checkIn: boolean;
+  /** Minutos para entrar na sala em cada rodada (1 a 60). */
+  toleranceMin: number;
 }
 
 export interface TournamentSummary {
@@ -431,6 +445,45 @@ export interface TournamentMatchInfo {
   room: 'waiting' | 'playing' | 'finished' | null;
   /** Cada jogador já entrou na sala da série (ou, na rodada 1, fez check-in). */
   present: [boolean, boolean];
+  /** Jogos disputados nas salas desta série (todos ficam gravados). `statsMatchId`: replay, para quem pode vê-lo. */
+  games: TournamentGame[];
+}
+
+export interface TournamentGame {
+  game: number;
+  winner: TournamentPlayerRef | null;
+  /** Entrou no placar da série. */
+  counted: boolean;
+  playedAt: string;
+  statsMatchId: number | null;
+}
+
+/** Problema relatado por um jogador ao fim de uma partida ranqueada ou de torneio. */
+export interface MatchReport {
+  id: number;
+  matchId: number;
+  tournamentId: string | null;
+  reporterId: string;
+  reporterName: string;
+  text: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  note: string | null;
+  /** A partida gravada (quando a lista vem com o resumo). */
+  match?: MatchSummary | null;
+}
+
+export interface MatchSummary {
+  id: number;
+  queue: RoomQueue | string;
+  format: FormatId | string;
+  winner: number | null;
+  turns: number | null;
+  reason: string | null;
+  playedAt: string;
+  players: Array<{ seat: number; name: string; userId: string | null; leader: string; deckId: string | null; won: boolean }>;
+  tournament: { id: string; name: string; matchId: number; game: number; round: number; table: number } | null;
 }
 
 export interface TournamentStanding {
@@ -478,6 +531,7 @@ export interface TournamentDetail {
   /** Torneio com hora marcada: check-in, início automático e W.O. por ausência. */
   checkIn: boolean;
   checkInMs: number;
+  toleranceMin: number;
   toleranceMs: number;
   checkInOpensAt: string | null;
   checkInOpen: boolean;
@@ -519,6 +573,8 @@ export interface TournamentDetail {
   roundComplete: boolean;
   /** O que o botão de avançar faz: outra rodada do suíço, o top cut, a próxima fase da chave ou encerrar. */
   next: 'swiss' | 'cut' | 'elim' | 'finish' | null;
+  /** Relatos abertos dos jogadores (só para quem gerencia). */
+  openReports: number;
 }
 
 /** Vitórias necessárias numa melhor de N. */

@@ -27,15 +27,19 @@ import { TIME_BANK_MS } from '../online/room';
 import type { ApiCard } from '../present';
 import { FORMATS, isFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer } from '../stats/store';
+import { listReports } from '../reports/store';
 import {
   absentSides,
   beginTournament,
   CHECK_IN_MS,
   checkInOpen,
   checkInOpensAt,
+  DEFAULT_TOLERANCE_MIN,
   elimRound,
+  MAX_TOLERANCE_MIN,
+  MIN_TOLERANCE_MIN,
   roundDeadline,
-  TOLERANCE_MS,
+  toleranceMs,
   tournamentTick,
 } from './clock';
 import { elimLabel, singleFirstRound, singleNextRound, singleRounds, standings, swissPairings, swissRounds, winnerOf, winsNeeded } from './pairing';
@@ -49,6 +53,7 @@ import {
   getMatch,
   getTournament,
   insertRound,
+  listGames,
   listMatches,
   listPlayers,
   listTournaments,
@@ -100,6 +105,7 @@ type Body = {
   maxPlayers?: unknown;
   startsAt?: unknown;
   checkIn?: unknown;
+  toleranceMin?: unknown;
 };
 
 /** Valida o formulário de criação/edição. */
@@ -137,6 +143,10 @@ function parseInput(b: Body | undefined): TournamentInput | string {
   }
   const checkIn = Boolean(b.checkIn);
   if (checkIn && !startsAt) return 'O check-in e o início automático precisam de uma data e hora de início.';
+  const toleranceMin = int(b.toleranceMin) ?? DEFAULT_TOLERANCE_MIN;
+  if (!Number.isInteger(toleranceMin) || toleranceMin < MIN_TOLERANCE_MIN || toleranceMin > MAX_TOLERANCE_MIN) {
+    return `Tolerância inválida (${MIN_TOLERANCE_MIN} a ${MAX_TOLERANCE_MIN} minutos).`;
+  }
   return {
     name,
     description,
@@ -150,6 +160,7 @@ function parseInput(b: Body | undefined): TournamentInput | string {
     maxPlayers,
     startsAt,
     checkIn,
+    toleranceMin,
   };
 }
 
@@ -278,6 +289,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
   const detail = (t: Tournament, u: User | null) => {
     const players = listPlayers(db, t.id);
     const matches = listMatches(db, t.id);
+    const games = listGames(db, t.id);
     const manage = canManage(t, u);
     // As listas ficam escondidas até o fim (só o organizador e o próprio jogador as veem).
     const showDeck = (userId: string) => manage || t.status === 'finished' || userId === u?.id;
@@ -294,6 +306,8 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
         bestOf: ms[0]?.bestOf ?? 1,
         matches: ms.map((m) => {
           const absent = absentSides(t, m, players);
+          /** O replay de cada jogo: para quem audita e para os dois jogadores. */
+          const seesReplays = manage || m.p1 === u?.id || m.p2 === u?.id;
           return {
             id: m.id,
             table: m.table,
@@ -311,6 +325,16 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
             game: m.wins[0] + m.wins[1] + 1,
             /** Cada jogador já entrou na sala desta série (ou, na rodada 1, fez check-in). */
             present: m.p2 ? [!absent.includes('p1'), !absent.includes('p2')] : [true, false],
+            /** Jogos disputados nas salas desta série (auditoria): todos ficam gravados, com o replay. */
+            games: games
+              .filter((g) => g.matchId === m.id)
+              .map((g) => ({
+                game: g.game,
+                winner: ref(g.winner),
+                counted: g.counted,
+                playedAt: g.playedAt,
+                statsMatchId: seesReplays ? g.statsMatchId : null,
+              })),
           };
         }),
       };
@@ -343,7 +367,8 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
       /** Torneio com hora marcada: check-in, início automático e W.O. por ausência. */
       checkIn: t.checkIn,
       checkInMs: CHECK_IN_MS,
-      toleranceMs: TOLERANCE_MS,
+      toleranceMin: t.toleranceMin,
+      toleranceMs: toleranceMs(t),
       checkInOpensAt: checkInOpensAt(t),
       checkInOpen: checkInOpen(t, now()),
       checkedIn: players.filter((p) => p.checkedInAt).length,
@@ -388,6 +413,8 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
       roundComplete: t.status === 'running' && roundComplete(t, matches),
       /** O que o botão de avançar faz agora. */
       next: t.status === 'running' ? nextStep(t, players, matches) : null,
+      /** Relatos abertos dos jogadores (só para quem gerencia; a lista vem de GET /api/reports?tournament=). */
+      openReports: manage ? listReports(db, { tournamentId: t.id, status: 'open' }).length : 0,
     };
   };
 

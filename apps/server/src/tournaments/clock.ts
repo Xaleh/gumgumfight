@@ -1,9 +1,10 @@
 // Relógio dos torneios com hora marcada (`check_in`): o check-in abre 30 minutos antes
 // do início; na hora marcada o torneio começa sozinho (rodada 1 sorteada entre todos os
 // inscritos, com a sala de cada mesa pronta para os dois jogadores); e em cada rodada
-// cada jogador tem 5 minutos para entrar na sala. Quem não entra perde por W.O. e sai
+// cada jogador tem alguns minutos para entrar na sala. Quem não entra perde por W.O. e sai
 // do torneio; se nenhum dos dois entra, os dois perdem (W.O. duplo). Na rodada 1, o
-// check-in feito antes também vale como presença.
+// check-in feito antes também vale como presença. Os 5 minutos são o padrão: o
+// organizador escolhe a tolerância (`tolerance_min`).
 //
 // `tournamentTick` roda a cada poucos segundos no servidor (ver routes.ts) e é
 // idempotente: cada rodada é varrida uma vez (`round_wo`).
@@ -26,8 +27,11 @@ import {
 
 /** O check-in abre este tempo antes do início. */
 export const CHECK_IN_MS = 30 * 60_000;
-/** Tolerância para entrar na sala em cada rodada. */
-export const TOLERANCE_MS = 5 * 60_000;
+/** Tolerância para entrar na sala em cada rodada: minutos escolhidos pelo organizador (padrão e limites). */
+export const DEFAULT_TOLERANCE_MIN = 5;
+export const MIN_TOLERANCE_MIN = 1;
+export const MAX_TOLERANCE_MIN = 60;
+export const toleranceMs = (t: Pick<Tournament, 'toleranceMin'>) => t.toleranceMin * 60_000;
 /** Passado isto da hora marcada sem começar (servidor fora do ar, por exemplo), o organizador começa à mão. */
 export const AUTO_START_GRACE_MS = 60 * 60_000;
 
@@ -42,8 +46,8 @@ export const checkInOpen = (t: Pick<Tournament, 'checkIn' | 'startsAt' | 'status
   t.checkIn && t.status === 'registration' && Boolean(t.startsAt) && now >= ms(t.startsAt) - CHECK_IN_MS;
 
 /** Prazo para entrar na sala na rodada atual (ISO), ou null quando não há tolerância correndo. */
-export const roundDeadline = (t: Pick<Tournament, 'checkIn' | 'status' | 'roundAt' | 'roundSwept'>): string | null =>
-  t.checkIn && t.status === 'running' && t.roundAt && !t.roundSwept ? new Date(ms(t.roundAt) + TOLERANCE_MS).toISOString() : null;
+export const roundDeadline = (t: Pick<Tournament, 'checkIn' | 'status' | 'roundAt' | 'roundSwept' | 'toleranceMin'>): string | null =>
+  t.checkIn && t.status === 'running' && t.roundAt && !t.roundSwept ? new Date(ms(t.roundAt) + toleranceMs(t)).toISOString() : null;
 
 /** Rodada da eliminatória: melhor de N pelo tamanho da fase. */
 export const elimRound = (t: Tournament, round: number, pairings: Pairing[]): RoundSpec => ({
@@ -102,7 +106,7 @@ export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string)
       result.started.push(t.id);
       continue;
     }
-    if (t.status !== 'running' || t.roundSwept || !t.roundAt || now < ms(t.roundAt) + TOLERANCE_MS) continue;
+    if (t.status !== 'running' || t.roundSwept || !t.roundAt || now < ms(t.roundAt) + toleranceMs(t)) continue;
     const players = listPlayers(db, t.id);
     for (const m of listMatches(db, t.id).filter((x) => x.round === t.round)) {
       const absent = absentSides(t, m, players);

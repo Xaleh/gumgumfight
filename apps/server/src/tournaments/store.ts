@@ -31,6 +31,8 @@ export interface Tournament {
    * em cada rodada, quem não entra na sala em 5 min perde por W.O. (ver clock.ts).
    */
   checkIn: boolean;
+  /** Minutos para entrar na sala em cada rodada (W.O. depois disso). */
+  toleranceMin: number;
   status: TournamentStatus;
   round: number;
   /** Quando a rodada atual foi gerada (a tolerância do W.O. conta daqui). */
@@ -81,6 +83,7 @@ export type TournamentInput = Pick<
   | 'maxPlayers'
   | 'startsAt'
   | 'checkIn'
+  | 'toleranceMin'
 >;
 
 type TournamentRow = {
@@ -97,6 +100,7 @@ type TournamentRow = {
   max_players: number | null;
   starts_at: string | null;
   check_in: number;
+  tolerance_min: number;
   status: TournamentStatus;
   round: number;
   round_at: string | null;
@@ -122,6 +126,7 @@ const toTournament = (r: TournamentRow): Tournament => ({
   maxPlayers: r.max_players,
   startsAt: r.starts_at,
   checkIn: Boolean(r.check_in),
+  toleranceMin: r.tolerance_min,
   status: r.status,
   round: r.round,
   roundAt: r.round_at,
@@ -142,8 +147,8 @@ export function createTournament(db: DB, input: TournamentInput, organizerId: st
   const id = `t-${randomBytes(5).toString('hex')}`;
   db.prepare(
     `INSERT INTO tournaments (id, name, description, format, structure, rounds, swiss_best_of, top_cut, bo3_from, bo5_from,
-       max_players, starts_at, check_in, organizer_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       max_players, starts_at, check_in, tolerance_min, organizer_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, ...inputValues(input), organizerId);
   return getTournament(db, id)!;
 }
@@ -152,7 +157,7 @@ export function updateTournament(db: DB, id: string, input: TournamentInput) {
   dataVersion.bump();
   db.prepare(
     `UPDATE tournaments SET name = ?, description = ?, format = ?, structure = ?, rounds = ?, swiss_best_of = ?, top_cut = ?,
-       bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?, check_in = ?
+       bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?, check_in = ?, tolerance_min = ?
      WHERE id = ?`,
   ).run(...inputValues(input), id);
 }
@@ -171,6 +176,7 @@ const inputValues = (i: TournamentInput) =>
     i.maxPlayers,
     i.startsAt,
     i.checkIn ? 1 : 0,
+    i.toleranceMin,
   ] as const;
 
 export function deleteTournament(db: DB, id: string): boolean {
@@ -453,11 +459,65 @@ export function setMatchRoom(db: DB, tournamentId: string, id: number, roomId: s
   db.prepare('UPDATE tournament_matches SET room_id = ? WHERE tournament_id = ? AND id = ?').run(roomId, tournamentId, id);
 }
 
+// ------------------------------------------------------------------ jogos (auditoria)
+
+export interface TournamentGame {
+  id: number;
+  matchId: number;
+  game: number;
+  statsMatchId: number | null;
+  roomId: string | null;
+  winner: string | null;
+  counted: boolean;
+  playedAt: string;
+}
+
+type GameRow = {
+  id: number;
+  match_id: number;
+  game: number;
+  stats_match_id: number | null;
+  room_id: string | null;
+  winner: string | null;
+  counted: number;
+  played_at: string;
+};
+
+/** Todos os jogos disputados nas salas do torneio (inclusive os que não contaram no placar). */
+export function listGames(db: DB, tournamentId: string): TournamentGame[] {
+  return (
+    db
+      .prepare(
+        `SELECT id, match_id, game, stats_match_id, room_id, winner, counted, played_at FROM tournament_games
+         WHERE tournament_id = ? ORDER BY match_id, played_at, id`,
+      )
+      .all(tournamentId) as GameRow[]
+  ).map((r) => ({
+    id: r.id,
+    matchId: r.match_id,
+    game: r.game,
+    statsMatchId: r.stats_match_id,
+    roomId: r.room_id,
+    winner: r.winner,
+    counted: Boolean(r.counted),
+    playedAt: r.played_at,
+  }));
+}
+
+/** Torneio (e partida) de uma partida gravada nas estatísticas, se foi um jogo de torneio. */
+export function tournamentOfStatsMatch(db: DB, statsMatchId: number): { tournamentId: string; matchId: number; game: number } | null {
+  const r = db.prepare('SELECT tournament_id, match_id, game FROM tournament_games WHERE stats_match_id = ?').get(statsMatchId) as
+    | { tournament_id: string; match_id: number; game: number }
+    | undefined;
+  return r ? { tournamentId: r.tournament_id, matchId: r.match_id, game: r.game } : null;
+}
+
 /**
- * Fim de um jogo online da série: soma a vitória no placar e, se alguém chegou à
- * maioria, fecha a série. Ignora jogos de uma sala que não é a atual da partida
- * (o organizador já lançou outro placar, por exemplo). Quem perdeu começa o
- * próximo jogo. Jogo sem vencedor não conta: a série segue com um jogo novo.
+ * Fim de um jogo online da série: grava o jogo (para a auditoria) e soma a vitória no
+ * placar; se alguém chegou à maioria, fecha a série. Um jogo de uma sala que não é a
+ * atual da partida (o organizador já lançou outro placar, por exemplo) fica gravado
+ * mas não conta. Quem perdeu começa o próximo jogo. Jogo sem vencedor não conta: a
+ * série segue com um jogo novo.
  */
 export function reportFromGame(
   db: DB,
@@ -466,7 +526,13 @@ export function reportFromGame(
   dataVersion.bump();
   const t = getTournament(db, game.tournamentId);
   const m = t && getMatch(db, t.id, game.matchId);
-  if (!t || !m || t.status !== 'running' || m.roomId !== game.roomId) return;
+  if (!t || !m) return;
+  const counted = t.status === 'running' && m.roomId === game.roomId && !m.result;
+  db.prepare(
+    `INSERT INTO tournament_games (tournament_id, match_id, game, stats_match_id, room_id, winner, counted, played_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+  ).run(t.id, m.id, m.wins[0] + m.wins[1] + 1, game.statsMatchId, game.roomId, game.winner, counted ? 1 : 0);
+  if (t.status !== 'running' || m.roomId !== game.roomId) return;
   const wins: [number, number] = [...m.wins];
   if (!m.result && game.winner === m.p1) wins[0]++;
   else if (!m.result && game.winner === m.p2) wins[1]++;
