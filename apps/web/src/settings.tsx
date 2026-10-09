@@ -16,6 +16,8 @@ export interface Settings {
   quickCounter: boolean;
   /** Cartas voando pela mesa, faixa de turno e sorteio com dados. */
   animations: boolean;
+  /** Replay: mostra o clique/seleção do jogador (contorno, toque e legenda) antes de cada ação. */
+  replayCues: boolean;
   /** Tema claro, escuro ou o do sistema. */
   theme: Theme;
 }
@@ -24,11 +26,11 @@ interface Ctx extends Settings {
   showImages: boolean;
   /** Tema em uso depois de resolver `system`. */
   resolvedTheme: 'light' | 'dark';
-  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter' | 'animations' | 'theme'>>) => void;
+  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter' | 'animations' | 'replayCues' | 'theme'>>) => void;
 }
 
 const KEY = 'gumgum.settings';
-const DEFAULTS: Settings = { lang: 'pt', images: true, serverImages: false, quickCounter: false, animations: true, theme: 'system' };
+const DEFAULTS: Settings = { lang: 'pt', images: true, serverImages: false, quickCounter: false, animations: true, replayCues: true, theme: 'system' };
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 /** Cor da barra do navegador/PWA em cada tema (igual ao `--bg` escuro e ao azul-marinho da marca). */
@@ -113,6 +115,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             images: next.images,
             quickCounter: next.quickCounter,
             animations: next.animations,
+            replayCues: next.replayCues,
             theme: next.theme,
           }),
         );
@@ -299,6 +302,10 @@ export function SettingsControls() {
         <input type="checkbox" checked={s.animations} onChange={(e) => s.update({ animations: e.target.checked })} />
         Animações
       </label>
+      <label className="check" title="No replay, mostra o que o jogador clicou ou escolheu (contorno nas cartas, toque e legenda) antes de cada ação">
+        <input type="checkbox" checked={s.replayCues} onChange={(e) => s.update({ replayCues: e.target.checked })} />
+        Cliques no replay
+      </label>
     </div>
   );
 }
@@ -350,6 +357,12 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </OptionRow>
             <OptionRow title="Animações" hint="Cartas voando pela mesa, faixa de troca de turno e sorteio inicial com dados.">
               <Switch on={s.animations} label="Animações" onChange={(on) => s.update({ animations: on })} />
+            </OptionRow>
+            <OptionRow
+              title="Cliques no replay"
+              hint="Ao assistir a um replay, mostra o que o jogador clicou ou escolheu (contorno nas cartas, toque e legenda) antes de cada ação. Desligue para ver só a mesa."
+            >
+              <Switch on={s.replayCues} label="Cliques no replay" onChange={(on) => s.update({ replayCues: on })} />
             </OptionRow>
           </div>
           <p className="muted small">As configurações ficam guardadas neste navegador e valem para todas as partidas. O apelido fica no servidor, ligado a este navegador.</p>

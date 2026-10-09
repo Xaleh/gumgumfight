@@ -4252,14 +4252,38 @@ button.hint-pill {
   color: #fff;
   box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.3);
 }
-.replay-speed {
+.replay-right {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.replay-speed {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
+}
+/* Mostrar ou esconder o clique/seleção do jogador (👆): aceso quando está ligado. */
+.replay-cues {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+.replay-cues.on {
+  border-color: transparent;
+  background: var(--sky);
+  color: #062a3a;
+  box-shadow: 0 0 0 2px rgba(54, 200, 255, 0.3);
 }
 .replay-hint {
   margin: 0;

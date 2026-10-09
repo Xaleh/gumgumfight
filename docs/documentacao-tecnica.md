@@ -338,7 +338,9 @@ palavras dos botões e das cartas que o jogador viu ("Atacar Zoro com Nami", "N�
 cartas e os DON!! envolvidos ganham um contorno (numerado na ordem dos cliques: DON!! → carta, atacante → alvo), um toque
 animado no instante em que a ação cai (`useGame` expõe `replay.dueAt`) e uma legenda junto do elemento (ou do lado da mão de
 quem agiu, nas respostas sem carta na mesa: opções, sim/não, encerrar turno). A `ReplayBar` repete a mesma frase por
-escrito. Pausado (passo a passo), contorno e legenda ficam parados em "Próxima ação"; em 8× só a barra mostra.
+escrito. Pausado (passo a passo), contorno e legenda ficam parados em "Próxima ação"; em 8× só a barra mostra. A
+configuração `replayCues` ("Cliques no replay", em `settings.tsx`; também na folha de abrir o replay e no botão 👆 da
+`ReplayBar`) desliga tudo.
 
 ### Partida online e espectador
 

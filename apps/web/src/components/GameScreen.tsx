@@ -326,7 +326,7 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter, animations, lang } = useSettings();
+  const { quickCounter, animations, replayCues, lang } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -342,7 +342,8 @@ function Table({
   });
   // Replay: o clique/seleção do jogador na próxima ação do roteiro (na mesa e na barra), para quem assiste
   // ou audita ver a decisão antes do resultado. Em 8× a mesa já muda sem animação: só a barra mostra.
-  const nextAction = replay?.next;
+  // A opção "Cliques no replay" (configurações ou o botão na barra) desliga tudo.
+  const nextAction = replayCues ? replay?.next : undefined;
   const cue = useMemo(() => (nextAction ? describeReplayAction(state, nextAction, lang) : null), [state, nextAction, lang]);
   // Sorteio com dados no começo da partida: só quando há sorteio (quem começa não foi
   // escolhido no menu), e não no replay nem ao voltar para uma partida em andamento.
