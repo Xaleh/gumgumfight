@@ -204,9 +204,9 @@ export const api = {
     active: () => get<ActiveRoom[]>('/api/online/active'),
     /** Contadores do menu; a consulta também conta este navegador como conectado. */
     stats: () => get<OnlineStats>('/api/online/stats'),
-    /** Treino contra o bot jogado pelo servidor (pode ser assistido). */
-    botRoom: (deckId: string, botDeckId: string, format: FormatId) =>
-      send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, format }),
+    /** Treino contra o bot transmitido: o servidor joga pelo bot e a partida aparece em "Assistir" (exige login). */
+    botRoom: (deckId: string, botDeckId: string, format: FormatId, first?: PlayerId) =>
+      send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, format, ...(first !== undefined ? { first } : {}) }),
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),

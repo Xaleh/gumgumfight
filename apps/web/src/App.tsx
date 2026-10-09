@@ -109,7 +109,7 @@ export function App() {
                 setScreen({
                   name: 'game',
                   key: Date.now(),
-                  setup: { ...setup, config: { ...setup.config, seed: Math.floor(Math.random() * 1_000_000) } },
+                  setup: { ...setup, notice: undefined, config: { ...setup.config, seed: Math.floor(Math.random() * 1_000_000) } },
                 })
         }
       />

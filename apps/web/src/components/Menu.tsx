@@ -347,7 +347,7 @@ export function Menu({
   onTournaments: (id?: string) => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
-  /** Funções de desenvolvimento (só para Dev): opções de teste e treino no servidor contra o bot. */
+  /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
   const { user, notice: authNotice, error: authError } = useAuth();
@@ -382,10 +382,12 @@ export function Menu({
       window.removeEventListener(NICKNAME_EVENT, onRename);
     };
   }, [userId]);
-  /** Treino contra o bot no servidor (fase de testes do modo espectador): a partida pode ser assistida. */
+  /** O servidor aceita transmitir o treino contra o bot (ele joga pelo bot e a partida aparece em "Assistir"). */
   const [botRooms, setBotRooms] = useState(false);
   const [timeBank, setTimeBank] = useState<number | null>(null);
-  const [onServer, setOnServer] = useState(false);
+  /** "Transmitir esta partida": só com login. */
+  const [broadcast, setBroadcast] = useState(false);
+  const broadcasting = botRooms && broadcast && Boolean(user);
   /** Partidas online (ou treino contra o bot do servidor) ainda abertas: atalho para voltar. */
   const [active, setActive] = useState<ActiveRoom[]>([]);
   const privateCard = useRef<HTMLElement>(null);
@@ -497,11 +499,20 @@ export function Menu({
       const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
       if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
-      if (dev && botRooms && onServer) {
-        onOnline(await api.online.botRoom(deck0, opp, format));
-        return;
+      const firstPlayer = first === 'random' ? undefined : (Number(first) as PlayerId);
+      let notice: string | undefined;
+      if (broadcasting) {
+        try {
+          onOnline(await api.online.botRoom(deck0, opp, format, firstPlayer));
+          return;
+        } catch (e) {
+          // Servidor lotado: o treino roda no navegador, sem transmissão.
+          if (!(e instanceof ApiError && e.status === 503)) throw e;
+          notice = 'A transmissão está lotada agora: este treino roda no seu navegador, sem espectadores.';
+        }
       }
-      onStart(await buildSetup('bot', [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId)));
+      const setup = await buildSetup('bot', [deck0, opp], names, seed, format, firstPlayer);
+      onStart(notice ? { ...setup, notice } : setup);
     } catch (e) {
       fail(e);
       setLoading(false);
@@ -782,7 +793,7 @@ export function Menu({
               title="Contra o bot"
               badge={fmt}
               desc="Treine com qualquer deck, sem fila e sem pressa."
-              live={dev && botRooms && onServer && stats ? <Live>{`${plural(stats.playing.bot, 'treino', 'treinos')} no servidor`}</Live> : <Live off>Roda no seu navegador</Live>}
+              live={broadcasting && stats ? <Live>{plural(stats.playing.bot, 'treino transmitido', 'treinos transmitidos')}</Live> : <Live off>Roda no seu navegador</Live>}
               note={!d0 || botReady ? null : `Os dois decks precisam valer no ${fmt}.`}
               action={loading ? 'Carregando…' : 'Batalhar!'}
               disabled={!botReady || loading}
@@ -813,9 +824,10 @@ export function Menu({
                     ))}
                   </div>
                 </div>
-                {dev && botRooms && (
-                  <label className="check">
-                    <input type="checkbox" checked={onServer} onChange={(e) => setOnServer(e.target.checked)} /> Jogar no servidor (dá para assistir)
+                {botRooms && (
+                  <label className={['check', user ? '' : 'disabled'].join(' ')} title={user ? 'A partida aparece em "Assistir".' : undefined}>
+                    <input type="checkbox" checked={broadcasting} disabled={!user} onChange={(e) => setBroadcast(e.target.checked)} />
+                    {user ? 'Transmitir esta partida' : 'Transmitir: entre com o Google'}
                   </label>
                 )}
               </div>
