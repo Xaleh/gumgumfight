@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { CardData } from '@gumgum/engine';
 import { diffWithOfficial, mergeOfficial, officialSeries, parseOfficialCardList } from '../src/official-cards';
 
-const entry = (id: string, name: string, types: string) => `
+const entry = (id: string, name: string, types: string, attribute?: string) => `
   <dl class="modalCol" id="${id}">
     <dt><div class="infoCol"><span>${id}</span></div><div class="cardName">${name}</div></dt>
-    <dd><div class="backCol"><div class="feature"><h3>Type</h3>${types}</div></div></dd>
+    <dd><div class="backCol">${attribute ? `<div class="attribute"><h3>Attribute</h3><img src="/images/cardlist/attribute/ico_type02.png?v" alt="${attribute}"><i>${attribute}</i></div>` : ''}<div class="feature"><h3>Type</h3>${types}</div></div></dd>
   </dl>`;
 
 describe('lista oficial de cartas', () => {
@@ -36,5 +36,14 @@ describe('lista oficial de cartas', () => {
     expect(diffWithOfficial([api('ST14-014', 'Gum-Gum Giant Rifl', ['Straw Hat Cre']), api('OP02-035', 'Trafalgar Law', ['Heart Pirates', 'Supernovas', 'FILM'])], official)).toEqual([
       { id: 'ST14-014', name: { api: 'Gum-Gum Giant Rifl', official: 'Gum-Gum Giant Rifle' }, types: { api: ['Straw Hat Cre'], official: ['Straw Hat Crew'] } },
     ]);
+  });
+
+  it('lê o atributo e aponta a carta que a API traz sem atributo (OP15-023 Arlong, card 70 do Trello)', () => {
+    const official = parseOfficialCardList(entry('OP15-023', 'Arlong', 'Fish-Man/East Blue/Arlong Pirates', 'Slash') + entry('OP15-001', 'Um Evento', 'Navy'));
+    expect(official.get('OP15-023')).toEqual({ name: 'Arlong', types: ['Fish-Man', 'East Blue', 'Arlong Pirates'], attribute: 'Slash' });
+    expect(official.get('OP15-001')?.attribute).toBeUndefined();
+    const api = (id: string, attributes: string[]): CardData => ({ id, name: 'Arlong', category: 'character', colors: ['green'], types: ['Fish-Man', 'East Blue', 'Arlong Pirates'], attributes, text: '' });
+    expect(diffWithOfficial([api('OP15-023', [])], official)).toEqual([{ id: 'OP15-023', attributes: { api: [], official: ['Slash'] } }]);
+    expect(diffWithOfficial([api('OP15-023', ['Slash'])], official)).toEqual([]);
   });
 });

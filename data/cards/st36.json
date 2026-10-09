@@ -194,7 +194,9 @@
       "cost": 5,
       "power": 6000,
       "counter": 1000,
-      "attributes": [],
+      "attributes": [
+        "Special"
+      ],
       "types": [
         "Bonney Pirates",
         "Supernovas"

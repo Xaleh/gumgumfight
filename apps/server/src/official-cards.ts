@@ -11,6 +11,8 @@ const OFFICIAL_TYPE_ERRORS: Record<string, string> = { 音楽: 'Music' };
 export interface OfficialCard {
   name: string;
   types: string[];
+  /** Atributo (Personagens e Líderes); a API perde em algumas cartas. */
+  attribute?: string;
   /** Veio de uma versão alternativa ou reimpressão ("_p1", "_r1"): a versão normal tem prioridade. */
   variant?: true;
 }
@@ -50,7 +52,8 @@ export function parseOfficialCardList(html: string): Map<string, OfficialCard> {
           .filter(Boolean)
           .map((t) => OFFICIAL_TYPE_ERRORS[t] ?? t)
       : [];
-    const card = { name: decode(name[1]), types };
+    const attribute = body.match(/<div class="attribute">[\s\S]*?<i>([^<]*)<\/i>/);
+    const card: OfficialCard = { name: decode(name[1]), types, ...(attribute && decode(attribute[1]) ? { attribute: decode(attribute[1]) } : {}) };
     const base = id.split('_')[0];
     if (base === id) exact.set(id, card);
     else if (!variants.has(base)) variants.set(base, { ...card, variant: true });
@@ -65,6 +68,7 @@ export interface OfficialDiff {
   id: string;
   name?: { api: string; official: string };
   types?: { api: string[]; official: string[] };
+  attributes?: { api: string[]; official: string[] };
 }
 
 /** Junta as páginas: a versão normal de uma carta vence as alternativas/reimpressões de outra página. */
@@ -79,7 +83,7 @@ export function mergeOfficial(pages: Array<Map<string, OfficialCard>>): Map<stri
   return out;
 }
 
-/** Diferenças de nome e de tipos entre as cartas (da API) e a lista oficial. */
+/** Diferenças de nome, de tipos e de atributo entre as cartas (da API) e a lista oficial. */
 export function diffWithOfficial(cards: CardData[], official: Map<string, OfficialCard>): OfficialDiff[] {
   const out: OfficialDiff[] = [];
   for (const c of cards) {
@@ -90,7 +94,12 @@ export function diffWithOfficial(cards: CardData[], official: Map<string, Offici
     const sameTypes =
       c.types.length === o.types.length && [...c.types].map(norm).sort().join('|') === [...o.types].map(norm).sort().join('|');
     if (!sameTypes) d.types = { api: c.types, official: o.types };
-    if (d.name || d.types) out.push(d);
+    // Atributo: só Personagens e Líderes têm; a lista oficial traz um por carta.
+    if (o.attribute && (c.category === 'character' || c.category === 'leader')) {
+      const api = c.attributes ?? [];
+      if (api.length !== 1 || norm(api[0]) !== norm(o.attribute)) d.attributes = { api, official: [o.attribute] };
+    }
+    if (d.name || d.types || d.attributes) out.push(d);
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
 }
