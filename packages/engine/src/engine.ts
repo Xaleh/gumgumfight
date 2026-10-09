@@ -400,10 +400,16 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.leaderAttribute && !(cardDef(state, ps.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.leaderAttribute!.toLowerCase())) {
     return false;
   }
+  // "If you have [Jewelry Bonney]" / "… [Merry Go] on your field": qualquer carta sua com o nome (Líder, Personagem
+  // ou Stage); "If you have a [X] Character": só Personagens.
+  const named = (n: string, onlyCharacters?: boolean) =>
+    (onlyCharacters ? ps.characters : [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]).some((c) => hasName(cardDef(state, c.uid), n));
   if (
     cond.haveNamed &&
     !cond.haveNamed.every((n) =>
-      ps.characters.some((c) => hasName(cardDef(state, c.uid), n) && (cond.haveNamedBasePower === undefined || cardDef(state, c.uid).power === cond.haveNamedBasePower)),
+      cond.haveNamedBasePower === undefined
+        ? named(n)
+        : ps.characters.some((c) => hasName(cardDef(state, c.uid), n) && cardDef(state, c.uid).power === cond.haveNamedBasePower),
     )
   ) {
     return false;
@@ -417,8 +423,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return false;
   if (cond.lifeLessThanOpponent && ps.life.length >= opp.life.length) return false;
   if (cond.maxDonOnField !== undefined && totalDonOnField(ps) > cond.maxDonOnField) return false;
-  // "If you have [Merry Go] on your field": o nome pode ser de um Stage.
-  if (cond.haveCharacterNamed && ![...ps.characters, ...(ps.stage ? [ps.stage] : [])].some((c) => hasName(cardDef(state, c.uid), cond.haveCharacterNamed!))) {
+  if (cond.haveCharacterNamed && !named(cond.haveCharacterNamed, cond.haveCharacterOnly)) {
     return false;
   }
   if (cond.opponentMinDonOnField !== undefined && totalDonOnField(opp) < cond.opponentMinDonOnField) return false;

@@ -1466,6 +1466,131 @@
    "text": "[When Attacking] You may give your 1 active Leader -5000 power during this turn: Give up to 1 of your opponent's Characters -3000 power during this turn.",
    "set": "EB01",
    "rarity": "C"
+  },
+  {
+   "id": "EB04-056",
+   "name": "Pacifista",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 1,
+   "power": 1000,
+   "counter": 2000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Biological Weapon",
+    "Navy",
+    "Egghead"
+   ],
+   "text": "If you have [Jewelry Bonney] and you have 0 Life cards, this Character gains [Blocker].\n(After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "set": "EB04",
+   "rarity": "C"
+  },
+  {
+   "id": "OP02-031",
+   "name": "Kouzuki Toki",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 1,
+   "power": 0,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Land of Wano",
+    "Kouzuki Clan"
+   ],
+   "text": "If you have a [Kouzuki Oden] Character, this Character gains [Blocker]. (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "set": "OP02",
+   "rarity": "UC"
+  },
+  {
+   "id": "OP07-019",
+   "name": "Jewelry Bonney",
+   "category": "leader",
+   "colors": [
+    "green"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Bonney Pirates",
+    "Supernovas"
+   ],
+   "text": "[On Your Opponent's Attack] [Once Per Turn] ① (You may rest the specified number of DON!! cards in your cost area.): Rest up to 1 of your opponent's Leader or Character cards.",
+   "set": "OP07",
+   "rarity": "L"
+  },
+  {
+   "id": "EB01-001",
+   "name": "Kouzuki Oden",
+   "category": "leader",
+   "colors": [
+    "green",
+    "red"
+   ],
+   "life": 4,
+   "power": 5000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Land of Wano",
+    "Kouzuki Clan"
+   ],
+   "text": "All of your {Land of Wano} type Character cards without a Counter have a +1000 Counter, according to the rules.[DON!! x1] [When Attacking] If you have a {Land of Wano} type Character with a cost of 5 or more, this Leader gains +1000 power until the start of your next turn.",
+   "set": "EB01",
+   "rarity": "L"
+  },
+  {
+   "id": "OP15-080",
+   "name": "Oars",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 4,
+   "power": 0,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Giant",
+    "Thriller Bark Pirates"
+   ],
+   "text": "If you have [Gecko Moria] with 10000 power or more on your field and there are no other [Oars] cards, this Character gains +7000 power.\n[On K.O.] You may place 3 cards from your trash at the bottom of your deck in any order: Play this Character card from your trash.",
+   "set": "OP15",
+   "rarity": "R"
+  },
+  {
+   "id": "OP06-080",
+   "name": "Gecko Moria",
+   "category": "leader",
+   "colors": [
+    "black"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "The Seven Warlords of the Sea",
+    "Thriller Bark Pirates"
+   ],
+   "text": "[DON!!×1] [When Attacking] 2 (You may rest the specified number of DON!! cards in your cost area.) You may trash 1 card from your hand: Trash 2 cards from the top of your deck and play up to 1 {Thriller Bark Pirates} type Character card with a cost of 4 or less from your trash.",
+   "set": "OP06",
+   "rarity": "L"
   }
  ]
 }

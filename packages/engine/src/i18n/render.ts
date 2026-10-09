@@ -368,7 +368,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você não tiver [${c.noCharacterNamed}]`);
         break;
       case 'haveCharacterNamed':
-        out.push(`você tiver [${c.haveCharacterNamed}]`);
+        out.push(c.haveCharacterOnly ? `você tiver um Personagem [${c.haveCharacterNamed}]` : `você tiver [${c.haveCharacterNamed}]`);
         break;
       case 'noOtherNamed':
         out.push(`você não tiver outro Personagem [${c.noOtherNamed}]${c.noOtherNamedBaseCost !== undefined ? ` com custo base ${c.noOtherNamedBaseCost}` : ''}`);
@@ -474,6 +474,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você tiver ${c.distinctTyped!.count} Personagens do tipo {${c.distinctTyped!.type}} com nomes diferentes`);
         break;
       case 'haveNamedBasePower':
+      case 'haveCharacterOnly':
         break;
       case 'chosenCostEqualsDon':
         out.push('o custo do Personagem escolhido for igual ao número de DON!! anexados a ele');

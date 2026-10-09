@@ -645,3 +645,27 @@ describe('Rodada 3: leitura e execução', () => {
     expect(pay?.cost.lifeFace ?? ab.cost?.lifeFace).toMatchObject({ count: 1, topOrBottom: true });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Regras confirmadas depois da rodada 3
+// ---------------------------------------------------------------------------
+
+describe('"If you have [X]" conta qualquer carta sua com o nome, Líder incluído', () => {
+  it('Pacifista EB04-056: o Líder [Jewelry Bonney] conta (com 0 de Vida, ganha [Blocker])', () => {
+    const s = toTurn(game(['OP07-019', 'ST02-001']), 3);
+    const pacifista = field(s, 0, 'EB04-056');
+    s.players[0].trash.push(...s.players[0].life.splice(0));
+    expect(hasKeyword(s, pacifista, 'blocker')).toBe(true);
+  });
+
+  it('Kouzuki Toki OP02-031: "a [Kouzuki Oden] Character" continua só com Personagem', () => {
+    const s = toTurn(game(['EB01-001', 'ST02-001']), 3);
+    const toki = field(s, 0, 'OP02-031');
+    expect(hasKeyword(s, toki, 'blocker')).toBe(false);
+  });
+
+  it('Oars OP15-080: "[Gecko Moria] with 10000 power or more on your field" conta o Líder', () => {
+    const cond = abilities('OP15-080').find((a) => a.staticPower)!.condition!;
+    expect(cond.ownMatching!.spec.kinds).toEqual(['leader', 'character']);
+  });
+});

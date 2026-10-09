@@ -284,6 +284,8 @@ export interface Condition {
   opponentCharacterMinPower?: number;
   /** "If you have [X]" / "If you have a [X] Character" / "If you have [X] on your field" (Personagem ou Stage) */
   haveCharacterNamed?: string;
+  /** "If you have a [X] Character": só Personagens (sem "Character", vale o Líder e o Stage com o nome). */
+  haveCharacterOnly?: boolean;
   /** "If your opponent has N or more DON!! cards on their field" */
   opponentMinDonOnField?: number;
   /** "If you have N or more cards in your trash" */

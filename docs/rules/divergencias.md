@@ -416,8 +416,8 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Pendente:
 - Ms. All Sunday OP12-075: "your opponent may add 1 DON!! card" adiciona sem perguntar ao oponente (falta a escolha do oponente nesse passo).
 - ~~Usopp OP15-024: "cannot be rested by your opponent's Leader and Character effects" também bloqueia Eventos e Stages do oponente.~~ Corrigido na rodada 3 (DV-43).
-- "If X, A. Then, B.": o motor aplica a condição só a A (EB02-006, EB02-011, EB02-013, EB02-028, EB02-032, EB03-003, EB03-013, EB04-038, OP10-024, OP12-062, OP12-073, OP12-078). Coerente com 4-10, mas Leo OP10-057 ("Then, place the rest at the bottom … and trash 1 card from your hand") descarta mesmo quando a busca não aconteceu (Líder que não é [Usopp]).
-- `haveCharacterNamed` não conta o Líder ("If you have [Jewelry Bonney]", EB04-056; "[Gecko Moria] with 10000 power or more on your field", OP15-080).
+- ~~"If X, A. Then, B." aplica a condição só a A.~~ **Conforme** (regra confirmada pelo dono do projeto em 09/10/2026): o B só depende do A quando o A é custo do efeito ("You may X: …", "you may X. If you do, …"); fora isso, o B acontece mesmo que o A não aconteça. Ex.: Hody Jones OP06-035 ("Rest up to a total of 2 … Then, add 1 card from the top of your Life cards to your hand") vira as cartas com 0 de Vida; Leo OP10-057 descarta 1 carta mesmo com outro Líder (o "If your Leader is [Usopp]" é condição, não custo). O motor já fazia assim.
+- ~~`haveCharacterNamed` não conta o Líder.~~ Corrigido (regra confirmada em 09/10/2026: "If you have [X]" é qualquer carta sua com o nome, Líder incluído, como o +4000 do evento do OP17 para [Shanks]): "If you have [Jewelry Bonney]" (EB04-056), "[A] and [B]" (OP16-040, OP15-064, OP15-072, ST30-016) e "[Gecko Moria] with 10000 power or more on your field" (OP15-080) contam o Líder e o Stage; "If you have a [X] Character" (OP02-031, OP07-030, OP08-109) continua só com Personagens (`Condition.haveCharacterOnly`). Testes em `card-audit.test.ts`.
 - `onlyTypeIncludes` falha quando você não tem nenhum Personagem (EB03-038).
 - ~~Gecko Moria OP06-086 ("Play 1 card and play the other card rested") e Thatch OP03-005 ("trash this Character at the end of this turn" para a carta que voltou ao campo).~~ Corrigidos na rodada 3 (DV-43).
 - Mr.2.Bon.Kurei(Bentham) ST08-013: "you may K.O. the opponent's Character you battled with. If you do, K.O. this Character" nocauteia o Mr.2 mesmo quando o Personagem do oponente não sai (já foi nocauteado na batalha, está protegido ou foi salvo por substituição). Corrigir exige que o passo de K.O. registre o que de fato saiu do campo.
@@ -476,7 +476,7 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Dano de efeito de 2 ou mais com 1 de Vida: o motor segue a leitura literal de 1-2-1-1-1 (perde no 2º ponto). O Q&A EB03-055 Robin diz que dano de efeito com 0 de Vida vence; não há ruling para "2 de dano de efeito com 1 de Vida". Rever se a Bandai publicar um.
 - Substituição de dano ("If you would take damage, … instead") oferecida mesmo com 0 de Vida.
 - `handCounter.set` sobrescrevendo um Counter maior (CR 2-10-4: vale o maior).
-- Cadeia "If … Then …" (4-10): depende de o parser marcar o `if` em todos os passos seguintes; vale um teste por carta com "If … Then".
+- Cadeia "If … Then …" (4-10): a condição vale só para o trecho dela; o "Then" depende só de custo ("You may X:", "If you do") — regra confirmada pelo dono do projeto (DV-41).
 - `cancel` e `detachDon` (desfazer) estão fora das regras oficiais — o Q&A proíbe mover DON!! já dado. São conveniências de interface protegidas contra vazamento; manter documentado.
 
 ## Conferência completa por regra

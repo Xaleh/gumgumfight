@@ -701,7 +701,8 @@ export function parseCondition(text: string): Condition | null {
     return /\bno\b/i.test(t) ? { not: { anyCharacterNamed: m[1] } } : { anyCharacterNamed: m[1] };
   }
   if ((m = t.match(/^you have \[([^\]]+)\] with (\d+) power or more(?: on your field)?$/i))) {
-    return { ownMatching: { count: 1, spec: { side: 'own', kinds: ['character'], upTo: 99, name: m[1], minPower: Number(m[2]) } } };
+    // "[Gecko Moria] with 10000 power or more on your field" (OP15-080): o Líder com o nome também vale.
+    return { ownMatching: { count: 1, spec: { side: 'own', kinds: ['leader', 'character'], upTo: 99, name: m[1], minPower: Number(m[2]) } } };
   }
   if ((m = t.match(/^you have no other \[([^\]]+)\] with a base cost of (\d+)$/i))) {
     return { noOtherNamed: m[1], noOtherNamedBaseCost: Number(m[2]) };
@@ -803,7 +804,8 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^you have (\d+) or more cards in your hand$/i))) return { handMin: Number(m[1]) };
   if (/^you have less Life cards than your opponent$/i.test(t)) return { lifeLessThanOpponent: true };
   if ((m = t.match(/^you have (\d+) or less DON!! cards on your field$/i))) return { maxDonOnField: Number(m[1]) };
-  if ((m = t.match(/^you have (?:a )?\[([^\]]+)\](?: Character)?$/i))) return { haveCharacterNamed: m[1] };
+  // "If you have [Jewelry Bonney]": qualquer carta sua com o nome, Líder incluído; "a [Kouzuki Oden] Character": só Personagem.
+  if ((m = t.match(/^you have (?:a )?\[([^\]]+)\]( Character)?$/i))) return m[2] ? { haveCharacterNamed: m[1], haveCharacterOnly: true } : { haveCharacterNamed: m[1] };
   if ((m = t.match(/^you have (\d+) or more cards in your trash$/i))) return { trashMin: Number(m[1]) };
   if (/^the number of DON!! cards on your field is equal to or less than the number on your opponent's field$/i.test(t)) {
     return { donLeqOpponent: true };
