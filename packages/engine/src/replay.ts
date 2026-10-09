@@ -1,7 +1,7 @@
 // Compatibilidade de replays gravados por versões anteriores do motor.
 
 import { applyAction, createGame } from './engine';
-import type { Action, GameConfig } from './types';
+import type { Action, GameConfig, GameState } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
 export const REPLAY_VERSION = 11;
@@ -151,4 +151,69 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
   }
   for (let i = implicit(); i; i = implicit()) step(i);
   return out;
+}
+
+/**
+ * Navega por um replay (o roteiro já convertido por `upgradeReplayActions`): vai para qualquer posição,
+ * para frente ou para trás. Guarda o estado a cada `ReplayCursor.EVERY` ações e, para voltar, refaz a
+ * partida a partir do estado guardado mais próximo (o motor é puro e determinístico).
+ */
+export class ReplayCursor {
+  /** De quantas em quantas ações o estado fica guardado. */
+  static readonly EVERY = 20;
+  private readonly saved = new Map<number, GameState>();
+  /** Quantas ações do roteiro já foram aplicadas. */
+  pos = 0;
+  state: GameState;
+  /** Estado antes da última ação aplicada (posição `pos - 1`); null no início. */
+  previous: GameState | null = null;
+  /** Primeira ação que o motor recusou: o replay para antes dela. */
+  failed: { index: number; message: string } | null = null;
+
+  constructor(
+    initial: GameState,
+    readonly actions: readonly Action[],
+  ) {
+    this.state = initial;
+    this.saved.set(0, initial);
+  }
+
+  /** Última posição que dá para alcançar (o fim do roteiro ou a ação recusada). */
+  get end(): number {
+    return this.failed ? this.failed.index : this.actions.length;
+  }
+
+  /** Vai para a posição `target` (limitada a 0…`end`) e devolve o estado ali. */
+  seek(target: number): GameState {
+    let n = Math.max(0, Math.min(Math.floor(target), this.end));
+    if (n === this.pos) return this.state;
+    let from = this.pos;
+    let s = this.state;
+    // Para trás, ou para frente além de um estado já guardado: começa do guardado mais próximo antes
+    // de `n` (estritamente antes, para refazer ao menos a última ação e saber o estado anterior).
+    let base = n === 0 ? 0 : n - 1 - ((n - 1) % ReplayCursor.EVERY);
+    while (base > 0 && !this.saved.has(base)) base -= ReplayCursor.EVERY;
+    if (n < from || base > from) {
+      from = base;
+      s = this.saved.get(base)!;
+    }
+    let prev: GameState | null = null;
+    for (let i = from; i < n; i++) {
+      const before = s;
+      try {
+        s = applyAction(s, this.actions[i]);
+      } catch (e) {
+        this.failed = { index: i, message: e instanceof Error ? e.message : String(e) };
+        n = i;
+        break;
+      }
+      prev = before;
+      if ((i + 1) % ReplayCursor.EVERY === 0) this.saved.set(i + 1, s);
+    }
+    if (n === this.pos) return this.state;
+    this.pos = n;
+    this.state = s;
+    this.previous = prev;
+    return s;
+  }
 }

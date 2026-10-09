@@ -10,6 +10,7 @@ import {
   hiddenDecision,
   type PlayerId,
   REPLAY_VERSION,
+  ReplayCursor,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
@@ -25,6 +26,8 @@ export interface GameSetup {
   format: FormatId;
   /** Ações gravadas (modo replay / roteiro). */
   script?: Action[];
+  /** Replay: começa pausado (passo a passo) ou rodando, e em que velocidade. */
+  replayStart?: { paused: boolean; speed: number };
   /** Aviso mostrado na mesa ao começar (ex.: a transmissão não abriu e o treino roda no navegador). */
   notice?: string;
 }
@@ -50,8 +53,9 @@ export interface ReplayFile {
    */
   version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
   seed: number;
-  /** Partidas online: seed de 128 bits e as listas exatas usadas. */
+  /** Partidas online: seed de 128 bits. */
   seed128?: number[];
+  /** As listas exatas usadas (online sempre; no navegador, nos replays baixados desde o card 73). */
   decks?: [DeckList, DeckList];
   firstPlayer: PlayerId;
   /** O vencedor do sorteio escolheu quem começa: `firstPlayer` é só informativo. */
@@ -64,6 +68,8 @@ export interface ReplayFile {
 interface Entry {
   state: GameState;
   action: Action | null;
+  /** Replay: a mesa pulou para esta posição (voltou ou avançou mais de uma ação), sem animação. */
+  jump?: boolean;
 }
 
 const MAX_HISTORY = 400;
@@ -71,15 +77,27 @@ const MAX_HISTORY = 400;
 const HIDDEN_DECISION_MS = [800, 2000] as const;
 
 
+/** Velocidades oferecidas no replay (a partida contra o bot usa as do meio). */
+export const REPLAY_SPEEDS = [0.25, 0.5, 1, 2, 4, 8] as const;
+
 export function useGame(setup: GameSetup) {
-  const [entries, setEntries] = useState<Entry[]>(() => [{ state: createGame(setup.config), action: null }]);
+  /** Estado inicial da partida (para exportar o replay). */
+  const startRef = useRef<GameState | null>(null);
+  /** Replay: posição no roteiro, com avançar, voltar e pular para qualquer ação. */
+  const cursorRef = useRef<ReplayCursor | null>(null);
+  const [entries, setEntries] = useState<Entry[]>(() => {
+    const initial = createGame(setup.config);
+    startRef.current = initial;
+    if (setup.mode === 'replay') cursorRef.current = new ReplayCursor(initial, setup.script ?? []);
+    return [{ state: initial, action: null }];
+  });
   const state = entries[entries.length - 1].state;
   const stateRef = useRef(state);
   stateRef.current = state;
   const actionsRef = useRef<Action[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [paused, setPaused] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  const [paused, setPaused] = useState(setup.replayStart?.paused ?? false);
+  const [speed, setSpeed] = useState(setup.replayStart?.speed ?? 1);
   /** "Auto": o bot joga pelo humano até o modo ser desligado. */
   const [auto, setAuto] = useState(false);
   /** A mesa segura o bot (sorteio inicial na tela). */
@@ -122,15 +140,33 @@ export function useGame(setup: GameSetup) {
 
   const canUndo = human !== null && entries.some((e) => e.action?.player === human);
 
+  /** Replay: vai para a posição `n` do roteiro (0 = início da partida). */
+  const seek = useCallback((n: number) => {
+    const c = cursorRef.current;
+    if (!c) return;
+    const before = c.pos;
+    const next = c.seek(n);
+    // O motivo aparece só onde o replay para (o motor recusou a ação seguinte).
+    const failure = c.failed && c.pos === c.failed.index ? `O replay para na ação ${c.failed.index + 1}: ${c.failed.message}` : null;
+    if (c.pos === before) {
+      if (failure) setError(failure);
+      return;
+    }
+    stateRef.current = next;
+    actionsRef.current = c.actions.slice(0, c.pos);
+    setEntries([{ state: next, action: c.actions[c.pos - 1] ?? null, jump: c.pos !== before + 1 }]);
+    setError(failure || null);
+  }, []);
+
   // Bots e replay agem sozinhos, com um pequeno atraso para a jogada ser visível.
   useEffect(() => {
     if (state.phase === 'gameover' || paused || hold) return;
+    const cursor = cursorRef.current;
     const p = actingPlayer(state);
-    if (p === null) return;
     let next: Action | undefined;
-    if (setup.mode === 'replay') {
-      next = setup.script?.[actionsRef.current.length];
-    } else if (state.players[p].isBot || (auto && p === human)) {
+    if (cursor) {
+      if (cursor.pos < cursor.end) next = cursor.actions[cursor.pos];
+    } else if (p !== null && (state.players[p].isBot || (auto && p === human))) {
       next = chooseBotAction(state, p);
     }
     if (!next) return;
@@ -148,27 +184,44 @@ export function useGame(setup: GameSetup) {
             ? 500
             : 800;
     const delay = Math.max(base / speed, motionWait() + 120);
-    const t = setTimeout(() => dispatch(next!), delay);
+    const t = setTimeout(() => (cursor ? seek(cursor.pos + 1) : dispatch(next!)), delay);
     return () => clearTimeout(t);
-  }, [state, paused, hold, speed, setup, dispatch, auto, human]);
+  }, [state, paused, hold, speed, setup, dispatch, seek, auto, human]);
 
   const exportReplay = useCallback((): ReplayFile => {
-    const first = entries[0].state;
+    const first = startRef.current!;
+    const { config } = setup;
     return {
       format: 'gumgumfight-replay',
       // Um replay antigo (preparação antiga) continua com a versão 8 ao ser exportado de novo.
       version: first.legacySetup ? 8 : REPLAY_VERSION,
       seed: first.seed,
-      firstPlayer: entries[entries.length - 1].state.firstPlayer,
+      ...(config.seed128 ? { seed128: config.seed128 } : {}),
+      // As listas vão junto: o replay abre mesmo se o deck for apagado ou for de outra conta.
+      decks: [config.players[0].deck, config.players[1].deck],
+      firstPlayer: config.firstPlayer ?? stateRef.current.firstPlayer,
       ...(first.rollWinner !== undefined ? { chooseFirst: true } : {}),
       names: [first.players[0].name, first.players[1].name],
       deckIds: setup.deckIds,
-      actions: actionsRef.current,
+      // No replay, o roteiro inteiro (não só até a posição atual).
+      actions: cursorRef.current ? [...cursorRef.current.actions] : actionsRef.current,
     };
-  }, [entries, setup.deckIds]);
+  }, [setup]);
 
   /** Todas as ações da partida até agora (para as estatísticas do fim de jogo). */
   const actions = useCallback(() => actionsRef.current, []);
+
+  const cursor = cursorRef.current;
+  const replay = cursor
+    ? {
+        pos: cursor.pos,
+        total: cursor.actions.length,
+        end: cursor.end,
+        seek,
+        // Linhas do histórico que a ação atual escreveu (a partir desta).
+        logFrom: cursor.previous ? cursor.previous.log.length : null,
+      }
+    : undefined;
 
   return {
     state,
@@ -187,5 +240,7 @@ export function useGame(setup: GameSetup) {
     canUndo,
     exportReplay,
     actions,
+    replay,
+    jumped: entries[entries.length - 1].jump ?? false,
   };
 }

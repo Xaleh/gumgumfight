@@ -295,8 +295,8 @@ Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas
 **Dev**:
 
 - A tela **Cobertura das cartas** (o endpoint `GET /api/coverage` continua público).
-- **Opções de teste** no menu (seed do embaralhamento e carregar um replay). Baixar o replay de uma partida
-  continua para todos, para mandar a um Dev ao relatar um problema.
+- **Opções de teste** no menu (seed do embaralhamento). Baixar e assistir a um replay é para todos (um jogador pode
+  mandar o replay a um Dev ao relatar um problema).
 
 ## Torneios
 
@@ -399,9 +399,15 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
 - **DON!!:** clique na área de DON!! e depois no líder/personagem para anexar (+1000 de poder no seu turno).
 - **Atacar:** selecione o líder ou um personagem ativo, clique em "⚔ Atacar" e escolha o alvo (líder ou personagem virado).
 - **Defesa:** quando for atacado, o jogo pede Blocker, Counter e [Trigger] quando aplicável.
-- **Desfazer** volta para antes da sua última ação. **Replay** baixa um `.json` com todas as ações.
+- **Desfazer** volta para antes da sua última ação. **Replay** baixa um `.json` com a seed, as listas dos decks e todas as ações.
+- **Assistir replay** (no topo da página inicial e no menu): carregue o `.json` (escolher ou arrastar), veja o resumo
+  (jogadores, Líderes, ações, turnos e, se quiser, o resultado) e assista no modo **automático** ou **passo a passo**.
+  A barra de baixo tem ⏮ início, ◀ ação anterior, ▶/❚❚, ▶| próxima ação, ⏭ fim, a barra de progresso (pula para
+  qualquer ação) e a velocidade (0.25× a 8×; em 8× sem animações). Atalhos: espaço, ← →, Home, End, + e −.
+  Replays antigos continuam abrindo (são convertidos para a versão atual); os que não trazem as listas precisam
+  que os decks ainda existam.
 - Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
-  reproduz a mesma partida. Um replay carregado ali funciona como um "roteiro" que se joga sozinho.
+  reproduz a mesma partida.
 
 ## Estrutura
 

@@ -186,8 +186,10 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
   (só testes; recusadas online).
 - **Determinismo**: o RNG vive dentro do estado. `mulberry32` (32 bits) nas partidas locais; `sfc32` (128 bits,
   seed do `crypto`) nas online, porque 32 bits poderiam ser descobertos por força bruta a partir da mão inicial.
-- **Replays**: `REPLAY_VERSION = 10`; `upgradeReplayActions` insere respostas implícitas de versões antigas. Não há
-  "verificador" no motor: verificar um replay é refazer a partida com `createGame` + `applyAction`.
+- **Replays**: `REPLAY_VERSION = 11`; `upgradeReplayActions` insere respostas implícitas de versões antigas. Não há
+  "verificador" no motor: verificar um replay é refazer a partida com `createGame` + `applyAction`. `ReplayCursor`
+  navega por um replay (avançar, voltar, pular para a ação N): guarda o estado a cada 20 ações e refaz a partir do
+  mais próximo; uma ação que o motor recusa encurta o replay (`failed`).
 
 ### Efeitos das cartas
 
@@ -304,6 +306,11 @@ seed, firstPlayer, chooseFirst, deckIds, decks, actions}`; o servidor refaz e gr
 Com login, a opção **Transmitir esta partida** troca o navegador pelo servidor: `POST /api/online/bot {deckId,
 botDeckId, format, first}` abre uma sala `bot` (seção 11) e a mesa vira a de uma partida online. Se o servidor
 responde 503 (transmissão lotada), o menu começa o treino no navegador e a mesa mostra o aviso (`GameSetup.notice`).
+
+**Assistir replay** (`ReplayLoader.tsx` + modo `replay` do `useGame`): o `.json` vira um `GameSetup` com o roteiro já
+convertido; com `decks` no arquivo (online e, desde o card 73, também os baixados no navegador) os decks não precisam
+existir. O `useGame` usa um `ReplayCursor`; a `ReplayBar` (abaixo da mesa) avança, volta e pula. Pulos e a velocidade 8×
+mudam a mesa sem animação. Nada é gravado em `matches`.
 
 ### Partida online e espectador
 
