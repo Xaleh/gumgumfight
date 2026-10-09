@@ -822,22 +822,42 @@ export function attackError(state: GameState, player: PlayerId, attacker: string
   return null;
 }
 
-/** Custo para jogar uma carta da mão (com "give this card in your hand −N cost" e reduções da próxima jogada). */
-export function playCost(state: GameState, uid: string): number {
+/**
+ * Custo de uma carta enquanto está na mão: o impresso mais "give this card in your hand −N cost"
+ * (da própria carta, com a condição dela) e "Give … in your hand −N cost" (auras do campo).
+ * É o custo que vale para efeitos que jogam da mão "with a cost of N or less" (Q&A OP11-023 Arlong:
+ * com −3 na mão, pode ser jogado por Aladine OP11-024 e Fisher Tiger OP11-035).
+ */
+export function costInHand(state: GameState, uid: string): number {
   const def = cardDef(state, uid);
   const owner = ownerOf(state, uid);
   let cost = def.cost ?? 0;
   for (const a of def.abilities) {
     if (a.handCost && (!a.yourTurn || state.activePlayer === owner) && conditionHolds(state, owner, uid, a.condition)) cost += a.handCost;
   }
-  const red = (state.costReductions ?? []).find((r) => r.player === owner && matchesFilter(def, r.filter));
-  if (red) cost -= red.amount;
   const ps = state.players[owner];
   for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
     for (const a of cardDef(state, fc.uid).abilities) {
       if (a.timing === 'static' && a.handCostAura && matchesFilter(def, a.handCostAura.filter) && conditionsMet(state, fc.uid, a)) cost += a.handCostAura.amount;
     }
   }
+  return Math.max(0, cost);
+}
+
+/** A definição da carta com o custo que ela tem na mão (para filtros "with a cost of N or less" de efeitos que jogam da mão). */
+function handDef(state: GameState, uid: string): CardDef {
+  const def = cardDef(state, uid);
+  const cost = costInHand(state, uid);
+  return cost === (def.cost ?? 0) ? def : { ...def, cost };
+}
+
+/** Custo para jogar uma carta da mão (o custo na mão mais as reduções da próxima jogada). */
+export function playCost(state: GameState, uid: string): number {
+  const def = cardDef(state, uid);
+  const owner = ownerOf(state, uid);
+  let cost = costInHand(state, uid);
+  const red = (state.costReductions ?? []).find((r) => r.player === owner && matchesFilter(def, r.filter));
+  if (red) cost -= red.amount;
   return Math.max(0, cost);
 }
 
@@ -2447,7 +2467,7 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
     return false;
   }
   if ((cost.trashToDeck ?? 0) > ps.trash.length) return false;
-  if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(cardDef(state, u), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
+  if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(handDef(state, u), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
   if (cost.giveOppDon && (state.players[opponent(player)].donRested < cost.giveOppDon || !state.players[opponent(player)].characters.length)) return false;
   if ((cost.handToTop ?? 0) > ps.hand.length) return false;
   if (cost.koSelf && (locate(state, source)?.zone !== 'character' || koProtected(state, source, false, source, player))) return false;
@@ -3357,7 +3377,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'handPlayOrLife': {
       if (!frame.memo) {
         const fromTrash = step.from === 'trash';
-        const options = (fromTrash ? ps.trash : ps.hand).filter((u) => matchesFilter(cardDef(state, u), step.filter));
+        const options = (fromTrash ? ps.trash : ps.hand).filter((u) => matchesFilter(fromTrash ? cardDef(state, u) : handDef(state, u), step.filter));
         // Do descarte (público) pula sem opção; da mão abre sempre.
         if (!options.length && (fromTrash || !ps.hand.length || frame.choice)) return true;
         if (!frame.choice) {
@@ -3993,7 +4013,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const to = (frame.last ?? []).find((u) => locate(state, u)?.player === frame.controller);
         if (to && to !== state.battle.target) {
           state.battle.target = to;
-          log(state, frame.controller, `O ataque agora mira ${cardDef(state, to).name}.`);
+          log(state, frame.controller, `${srcName}: o ataque passa a mirar ${cardDef(state, to).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`);
         }
         return true;
       }
@@ -4017,7 +4037,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const target = frame.choice.find((u) => options.includes(u));
       if (target && locate(state, target)) {
         state.battle.target = target;
-        log(state, frame.controller, `O ataque agora mira ${cardDef(state, target).name}.`);
+        log(state, frame.controller, `${srcName}: o ataque passa a mirar ${cardDef(state, target).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`);
       }
       return true;
     }
@@ -4447,7 +4467,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           (!sameName || sameName.includes(def.name)) &&
           (def.category === 'character' || def.category === 'stage') &&
           !def.abilities.some((a) => a.noPlayByEffect) &&
-          matchesFilter(def, filter) &&
+          // Da mão, vale o custo que a carta tem na mão ("give this card in your hand −3 cost", Q&A OP11-023).
+          matchesFilter(ps.hand.includes(u) ? handDef(state, u) : def, filter) &&
           !playBlocked(state, frame.controller, def) &&
           !def.colors.some((c) => lastColors.includes(c))
         );

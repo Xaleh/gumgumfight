@@ -44,7 +44,7 @@ import {
 } from './Online';
 
 /** Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen). */
-const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]/;
+const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]|o ataque passa a mirar/;
 
 /**
  * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de

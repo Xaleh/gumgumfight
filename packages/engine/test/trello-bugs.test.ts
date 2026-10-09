@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildCardDef } from '../src/cards';
 import { legalActions } from '../src/actions';
-import { applyAction, cannotBeRested, createGame, getPower } from '../src/engine';
+import { applyAction, cannotBeRested, costInHand, createGame, getPower } from '../src/engine';
 import { createAliases, viewFor } from '../src/view';
 import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
 import { cards as baseCards, returnDonInOrder, toTurn } from './helpers';
@@ -13,8 +13,9 @@ const bugCards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-op09-op
 const eb02Cards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-eb02.json'), 'utf8')) as { cards: CardData[] }).cards;
 const dataCards = (set: string) => (JSON.parse(readFileSync(join(__dirname, '../../../data/cards', `${set}.json`), 'utf8')) as { cards: CardData[] }).cards;
 const st12Cards = dataCards('st12');
+const st36Cards = dataCards('st36');
 const op01Arlong = dataCards('op01').filter((c) => c.id === 'OP01-063');
-const cards = [...baseCards, ...bugCards, ...st12Cards, ...op01Arlong, ...eb02Cards];
+const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards];
 
 const deck = (leader: string): DeckList => ({ id: leader, name: leader, leader, cards: [{ id: 'ST01-006', count: 50 }] });
 
@@ -341,5 +342,66 @@ describe('Trello: [Blocker] vira ao bloquear; "cannot be rested" (Arlong EB02-01
     const log = s.log.map((l) => l.text);
     expect(log).toContain('Duval não pode ser virada (efeito "não vira" ativo).');
     expect(log).not.toContain('Duval é virado.');
+  });
+});
+
+describe('Trello (replay): Mihawk ST12-003 + Arlong OP11-023 com "give this card in your hand −3 cost" (Q&A OP11-023)', () => {
+  /** Turno 3 do jogador 0 com Líder Jinbe OP11-021 ({Fish-Man}); `holds` deixa a condição do Arlong valendo (≤ 3 Vidas, oponente com 5+ cartas viradas). */
+  function playMihawk(holds: boolean) {
+    let s = toTurn(game(['OP11-021', 'ST02-001']), 3);
+    setDon(s, 0, 3);
+    if (holds) {
+      const ps = s.players[0];
+      while (ps.life.length > 3) ps.deck.push(ps.life.pop()!);
+      setDon(s, 1, 0, 5); // 5 DON!! virados do oponente
+    }
+    const mihawk = hand(s, 0, 'ST12-003');
+    const arlong = hand(s, 0, 'OP11-023'); // custo impresso 7; na mão vale 4 quando a condição vale
+    const before = costInHand(s, arlong);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: mihawk });
+    return { s, arlong, before };
+  }
+
+  it('com a condição valendo, o Arlong custa 4 na mão e pode ser jogado pelo Mihawk', () => {
+    let { s, arlong, before } = playMihawk(true);
+    expect(before).toBe(4);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, hidden: true });
+    expect((s.pending as { options: string[] }).options).toContain(arlong);
+    s = applyAction(s, { type: 'choose', player: 0, uids: [arlong] });
+    expect(s.players[0].characters.find((c) => c.uid === arlong)).toMatchObject({ rested: true });
+  });
+
+  it('sem a condição, o Arlong custa 7 e fica de fora', () => {
+    const { s, arlong, before } = playMihawk(false);
+    expect(before).toBe(7);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, hidden: true });
+    expect((s.pending as { options: string[] }).options).not.toContain(arlong);
+  });
+});
+
+describe('Trello (replay): Eustass Kid ST36-005 troca o alvo do ataque sem virar (não é [Blocker])', () => {
+  it('o Kid vira o alvo, continua ativo, e o histórico diz que foi troca de alvo por efeito', () => {
+    let s = game(['ST12-001', 'OP10-099']);
+    // O Líder OP10-099 pergunta no fim do turno ("virar 1 Vida para cima?"): recusa até o turno 3.
+    while (s.turn < 3) s = s.pending?.kind === 'confirm' ? applyAction(s, { type: 'answer', player: s.pending.player, yes: false }) : applyAction(s, { type: 'endTurn', player: s.activePlayer });
+    setDon(s, 0, 3);
+    const kid = field(s, 1, 'ST36-005');
+    // O custo do Kid é virar 1 Vida para baixo: precisa de uma Vida virada para cima (no replay, o Líder OP10-099 vira no fim do turno).
+    const life1 = s.players[1].life;
+    s.players[1].lifeFaceUp = [life1[life1.length - 1]];
+    const leader1 = s.players[1].leader.uid;
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: leader1 });
+    // [On Your Opponent's Attack]: "You may turn 1 Life face-down": pergunta, depois escolhe o novo alvo.
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 1 });
+    s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1, options: [kid] });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [kid] });
+    expect(s.battle).toMatchObject({ target: kid, blocked: false });
+    expect(s.players[1].characters.find((c) => c.uid === kid)).toMatchObject({ rested: false });
+    expect(s.log.map((l) => l.text)).toContain(
+      'Eustass"Captain"Kid: o ataque passa a mirar Eustass"Captain"Kid (troca de alvo por efeito, não é [Blocker]: a carta não vira).',
+    );
+    // Sem outro [Blocker], segue direto para o Counter.
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 1 });
   });
 });

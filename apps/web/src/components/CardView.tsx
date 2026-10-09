@@ -7,6 +7,7 @@ import {
   cardStatuses,
   type FieldCard,
   type GameState,
+  costInHand,
   getCost,
   getPower,
   HIDDEN_CARD,
@@ -56,8 +57,12 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   const power = fc ? getPower(state, uid) : def.power;
   const delta = fc && def.power !== undefined && power !== undefined ? power - def.power : 0;
   // Custo atual em campo ("gains +12 cost", auras de custo): a carta mostra o valor que vale para os efeitos.
-  const cost = fc && def.cost !== undefined && def.category !== 'leader' ? getCost(state, uid) : def.cost;
-  const costDelta = fc && def.cost !== undefined && cost !== undefined ? cost - def.cost : 0;
+  // Na mão, o custo que a carta tem agora ("give this card in your hand −3 cost"): é o que vale para jogá-la e para
+  // efeitos "play … with a cost of N or less".
+  const inHand = !fc && state.cards[uid] !== undefined && state.players[state.cards[uid].owner]?.hand.includes(uid);
+  const cost =
+    def.cost !== undefined && def.category !== 'leader' ? (fc ? getCost(state, uid) : inHand ? costInHand(state, uid) : def.cost) : def.cost;
+  const costDelta = (fc || inHand) && def.cost !== undefined && cost !== undefined ? cost - def.cost : 0;
   const keywords = (Object.keys(KEYWORD_LABEL) as Keyword[]).filter((k) =>
     fc ? hasKeyword(state, uid, k) : def.keywords.includes(k),
   );
