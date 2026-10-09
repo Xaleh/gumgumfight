@@ -42,7 +42,7 @@ export interface LobbyLimits {
 
 export const DEFAULT_LIMITS: LobbyLimits = {
   maxRooms: 400,
-  maxBotRooms: 10,
+  maxBotRooms: 100,
   perIpRooms: 16,
   perIpCreates: 60,
   perIpWindowMs: 10 * 60_000,
@@ -290,8 +290,11 @@ export class Lobby {
     return { room, token };
   }
 
-  /** Treino contra o bot do servidor: começa na hora; a partida pode ser assistida. */
-  createBotRoom(seat: SeatRequest, bot: SeatRequest, format: FormatId): { room: Room; token: string } | LobbyError {
+  /**
+   * Treino contra o bot do servidor: começa na hora; a partida pode ser assistida.
+   * `first`: quem começa (0 = o jogador, 1 = o bot); sem ele, o sorteio decide.
+   */
+  createBotRoom(seat: SeatRequest, bot: SeatRequest, format: FormatId, first?: PlayerId): { room: Room; token: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
@@ -300,6 +303,7 @@ export class Lobby {
     const room = this.makeRoom(
       newRoomData({ queue: 'bot', format, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
     );
+    if (first !== undefined) room.data.firstPlayer = first;
     room.start();
     return { room, token };
   }

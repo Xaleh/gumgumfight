@@ -14,9 +14,9 @@ export interface ServerOptions {
    */
   adminEmails?: string[];
   /**
-   * ONLINE_BOT_ROOMS: partidas online contra o bot jogado pelo servidor (para testar o
-   * modo espectador sem precisar de dois jogadores). "off" desliga: some o botão e
-   * essas salas deixam de aparecer na lista de partidas para assistir.
+   * ONLINE_BOT_ROOMS: treino contra o bot transmitido (o servidor joga pelo bot e a
+   * partida aparece em "Assistir"; exige login). "off" desliga: some a opção
+   * "Transmitir esta partida" e essas salas deixam de aparecer na lista para assistir.
    */
   onlineBotRooms?: boolean;
   /**
