@@ -82,7 +82,7 @@ describe('tradução: condições', () => {
 
   it('OP04-119 Rosinante: aura "with a base cost of 5" (custo exato)', () => {
     expect(pt('OP04-119', "[Opponent's Turn] If this Character is rested, your active Characters with a base cost of 5 cannot be K.O.'d by effects.")).toBe(
-      '[Turno do Oponente] Se este Personagem estiver virado, os seus Personagens com custo base 5 não podem ser nocauteados por efeitos.',
+      '[Turno do Oponente] Se este Personagem estiver virado, os seus Personagens ativos com custo base 5 não podem ser nocauteados por efeitos.',
     );
   });
 });

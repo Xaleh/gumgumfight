@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buildCardDef } from '../src/cards';
 import { legalActions } from '../src/actions';
 import { applyAction, cannotBeRested, costInHand, createGame, getPower } from '../src/engine';
+import { upgradeReplayActions } from '../src/replay';
 import { createAliases, viewFor } from '../src/view';
 import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
 import { cards as baseCards, returnDonInOrder, toTurn } from './helpers';
@@ -415,7 +416,7 @@ describe('Trello (replay do card 70): Zoro OP12-020 x bot Kid ST36, partida inte
 
   it('o Arlong OP15-023 (atributo vazio na API) é "Slash" e entra nas opções do Mihawk; o Kid ST36-005 troca o alvo sem virar; o replay roda até o fim', () => {
     const { replay } = fx;
-    let s = createGame({
+    const config = {
       seed: replay.seed,
       firstPlayer: replay.chooseFirst ? undefined : replay.firstPlayer,
       chooseFirst: replay.chooseFirst,
@@ -423,12 +424,15 @@ describe('Trello (replay do card 70): Zoro OP12-020 x bot Kid ST36, partida inte
       players: [
         { name: 'Xaleh', deck: fx.decks[0], isBot: false },
         { name: 'Bot', deck: fx.decks[1], isBot: true },
-      ],
-    });
+      ] as [{ name: string; deck: DeckList; isBot: boolean }, { name: string; deck: DeckList; isBot: boolean }],
+    };
+    let s = createGame(config);
+    // Gravado na versão 10 dos replays: carrega como a interface faz (respostas das perguntas novas).
+    const actions = upgradeReplayActions(config, replay.actions);
     const byId = (id: string, player: PlayerId) => s.players[player].hand.find((u) => s.cards[u].cardId === id);
     let mihawkChecked = false;
     let redirects = 0;
-    replay.actions.forEach((a, i) => {
+    actions.forEach((a, i) => {
       const before = s;
       s = applyAction(s, a);
       if (a.type === 'playCard' && s.cards[a.uid].cardId === 'ST12-003') {
@@ -451,7 +455,7 @@ describe('Trello (replay do card 70): Zoro OP12-020 x bot Kid ST36, partida inte
         expect(fc.rested).toBe(before.players[1].characters.find((c) => c.uid === kid)!.rested);
         redirects++;
       }
-      if (i === replay.actions.length - 1) expect(s.phase).not.toBe('mulligan');
+      if (i === actions.length - 1) expect(s.phase).not.toBe('mulligan');
     });
     expect(mihawkChecked).toBe(true);
     expect(redirects).toBe(3);

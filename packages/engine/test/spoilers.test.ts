@@ -166,6 +166,9 @@ describe('spoilers de EB05 e OP18', () => {
     s.players[1].leader.rested = false;
     s = noDefense(applyAction(s, { type: 'attack', player: 1, attacker: s.players[1].leader.uid, target: scholar }));
     expect(s.players[0].characters.some((c) => c.uid === scholar)).toBe(false);
+    // "add up to 1 card from the top of your deck to the top of your Life cards": 0 ou 1.
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['1', '0'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.players[0].life).toHaveLength(life + 1);
   });
 

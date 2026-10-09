@@ -47,6 +47,12 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-35 | README "Regras implementadas" desatualizado (corrigido) | — | baixo | — |
 | DV-36 | Nomes e tipos da optcgapi diferentes da lista oficial (**corrigido**) | Lista oficial de cartas | médio | — |
 | DV-37 | Cartas promocionais (P-xxx) fora da importação e com número errado (**corrigido**) | Lista oficial de cartas | médio | — |
+| DV-38 | Auras filtradas por custo olhavam o custo impresso (**corrigido**) | 1-3-6 | alto | — |
+| DV-39 | Condições com dois tipos e "no other [X] with a base cost of N" lidas pela metade (**corrigido**) | texto das cartas | médio | — |
+| DV-40 | Auditoria das cartas: 24 cartas com efeito lido ou executado errado (**corrigido**) | texto das cartas | alto | C17 |
+| DV-41 | Auditoria das cartas: leituras que dependiam de ruling ou de interface nova (**corrigido**; as regras confirmadas estão no item) | texto das cartas | baixo | C17 |
+| DV-42 | Auditoria das cartas, rodada 2 (OP01 a OP09): 24 cartas com efeito lido ou executado errado, mais as regras de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
+| DV-43 | Auditoria das cartas, rodada 3 (starter decks, promos e spoilers EB05/OP18): 19 cartas, as 20 com atributos juntos e 3 pendências de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
 
 ## Cards de correção no Trello
 
@@ -70,6 +76,7 @@ Todos na lista "Planejamento" do quadro GumGum Fight, com etiqueta vermelha (bug
 | C14 | <https://trello.com/c/6egd4DaI> | Momentos do turno (DV-28 a DV-30) |
 | C15 | <https://trello.com/c/OfoyXyOm> | "Draw up to", restrições, revelar (DV-31 a DV-33) |
 | C16 | <https://trello.com/c/SG4w3tB2> | Erratas nos dados (DV-34) |
+| C17 | <https://trello.com/c/RR3kkVwy> | Auditoria das cartas automatizadas (DV-40 a DV-43); pendências: <https://trello.com/c/V3eu7Opx> |
 
 Pontos **conformes** conferidos (não precisam de card): mulligan; Refresh, Draw e DON!! Phase; ninguém ataca no primeiro turno; +1000 por DON!! só no próprio turno; DON!! voltam rested quando a carta sai; alvos de ataque; checagem de saída de cena ao fim de cada etapa da batalha; [Blocker] (uma vez, não rested, não o próprio alvo) e [Unblockable]; [Banish]; dano um a um e [Trigger] antes do 2º dano; limite de 5 Personagens como regra (sem [On K.O.]); K.O. vs. trash; [Counter] e [Main] só nos momentos certos; custo negativo vale 0 (somando o negativo); poder negativo não trasha; informação oculta (`view.ts` e decisões que sempre abrem). A lista completa por regra está no fim deste arquivo.
 
@@ -377,6 +384,91 @@ Testes (DV-31 a DV-33): `packages/engine/test/draw-restrict-reveal.test.ts` (lei
 - Tradução (render.ts), achados da mesma revisão: `upTo: 99` sem `all` ("your opponent's Characters with a total cost of 4 or less", OP17-119 Loki) saía "até 99 Personagens"; "Set all of your DON!! cards as active" (OP13-028) saía "até 99 dos seus DON!!"; "Set the cost of … to 0" (OP03-091) saía "Dê −99 de custo"; a segunda frase estática de "…, and if it is your opponent's turn, this Character gains +3000 power" perdia o [Turno do Oponente]; frases estáticas com a mesma condição eram repetidas ("Se X, ganha [Blocker]. Se X, recebe +1000") e agora viram uma; "with a base cost of 5" em aura saía "com custo 5 ou menos com custo 5 ou mais"; "if your opponent has 2 or less Characters" saía "se não o oponente tiver 3 ou mais"; "you may return 1 DON!! … instead" saía "você pode DON!! −1 em vez disso"; "for every 5 cards" saía "5 × carta"; "to your Leader" saía "a o seu Líder"; "Rest up to a total of 2 of your opponent's Characters or DON!! cards" repetia a frase; "up to 1 each of [A], [B], and [C]" saía "até 3 [A], [B] ou [C] Personagens com nomes diferentes".
 - Testes: `packages/engine/test/i18n-review.test.ts` (cartas reais). Conferência de toda a base: `npm run translations:check -w @gumgum/server` (ver [manutencao.md](manutencao.md)).
 
+### C17 — Auditoria das cartas automatizadas
+
+Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/2026). Base importada da optcgapi (2796 cartas) e, para cada carta, o texto oficial comparado com as habilidades que `buildCardDef` gera, conferindo no `engine.ts` como cada campo é executado. Revisadas 1171 cartas, na ordem de prioridade do card: os 143 Líderes de todas as coleções, OP10 a OP17 e EB01 a EB04. Cada correção foi conferida com um diff das habilidades de toda a base antes e depois (só as cartas listadas mudaram).
+
+**DV-40. Efeitos lidos ou executados errado** — alto — **corrigido**
+- Alto:
+  - **Law OP01-002 (Líder):** "If you have 5 Characters, return 1 …. Then, play … different color than the returned Character": a jogada não dependia da devolução, e com 0 a 4 Personagens o Líder jogava de graça qualquer Personagem de custo 5 ou menos. Agora o "Then" que cita "the returned Character" só acontece se algo foi devolvido (`lastDone`).
+  - **Mr.2.Bon.Kurei(Bentham) OP14-091:** o texto escreve "other than [Mr.2.Bon.Kurei.(Bentham)]" (um ponto a mais), e o nome não batia: o [On K.O.] jogava a si mesma de volta do descarte. `hasName` ignora pontos e espaços (também junta "Mr. 9"/"Mr.9" e "Zephyr (Navy)"/"Zephyr(Navy)", que são as mesmas cartas na fonte).
+  - **Octoballoon OP15-106:** "play up to 1 yellow Character or Stage card with a cost of 2 or less": cor e custo só valiam para um dos lados (jogava qualquer Personagem amarelo, de qualquer custo). `parseCardFilter` aplica cor e custo às duas categorias.
+  - **Klabautermann EB02-033:** "If you have [Merry Go] on your field": [Merry Go] é um Stage e `haveCharacterNamed` só olhava os Personagens; a carta nunca ganhava [Blocker]. A condição olha também o Stage.
+- Médio:
+  - **"you may trash 1 card from your hand. If you do, …"** (Newgate OP17-040, Zoro OP16-035, OP05-038, OP15-020): com menos cartas na mão do que o descarte pede, o jogador aceitava, não descartava nada e recebia o efeito. Agora o efeito opcional nem é oferecido (o tamanho da mão é público).
+  - **"If you have N or more rested cards"** (Bonney OP12-118, Trichiliocosm OP06-038, Katakuri ST16-003, Bege ST24-001): não contava os DON!! virados, como já fazia a versão do oponente. Nova condição `ownRestedCardsMin`.
+  - **"return N of your active DON!! cards"** (Luffy EB02-061, Sengoku OP16-060): o custo aceitava DON!! virados e dados. Novo `AbilityCost.donMinusActive` (só os ativos da área de custo, sem escolha).
+  - **"This effect can be activated when …" no começo do efeito** (Shu OP11-088, Vinsmoke Ichiji OP11-043): a condição de ativação ficava nos passos, então o efeito disparava, não fazia nada e gastava o [Once Per Turn]. O Shu gastava o uso do turno num ataque do Líder e não ganhava +5000 no ataque seguinte de um Personagem (Slash). A condição vai para a habilidade; o "If that Character has the (Slash) attribute" do Shu continua no efeito.
+  - **Foxy OP07-059 (Líder):** a condição "3 or more {Foxy Pirates}" só valia para o Líder do oponente, não para o Personagem escolhido.
+  - **"returned to your DON!! deck by your effect"** (Crocodile OP04-058, Charlotte Brulee EB03-033): disparava também quando um efeito do oponente fazia você devolver DON!!. O evento `donReturned` guarda quem causou a devolução (`byYourEffect`).
+- Baixo:
+  - **Portgas.D.Ace OP13-119:** "you may return up to 1 …. If you do, your opponent plays …": aceitar e não devolver nada ainda deixava o oponente jogar. O "If you do" depois de um "up to" exige que algo tenha sido feito (`lastDone`).
+  - **Nico Robin EB03-055:** "You may deal 1 damage" era obrigatório; agora pergunta.
+  - **Portgas.D.Ace OP03-001 (Líder):** "When this Leader attacks or is attacked" disparava em qualquer ataque do oponente, também contra Personagens. Agora é o evento `leaderBattle`.
+  - **Koala OP12-081 (Líder):** "plays a Character using a Character's effect" valia para qualquer efeito (Evento, Stage, Líder). **Sanji OP02-026 (Líder):** "When you play a Character … from your hand" valia também para Personagens jogados do deck ou do descarte. O evento `characterPlayed` guarda `fromHand` e `byCharacterEffect`.
+- Testes: `packages/engine/test/card-audit.test.ts`, com as cartas reais em `test/fixtures/bugs-auditoria-cartas.json` (20 dos 22 testes falham sem a correção; os outros 2 são os casos negativos).
+
+**DV-41. Leituras que dependiam de ruling ou de interface nova** — baixo — **corrigido**
+- Regras confirmadas pelo dono do projeto (09/10/2026): **"your cards" é qualquer carta no campo** (Líder, Personagens, Stage e DON!!) e **"up to N" sempre aceita 0**. Com isso, na rodada 2 (DV-42):
+  - "rest N of your cards" (custo; OP14-020, OP14-029, OP14-033, OP14-036 a OP14-038, OP15-035, OP16-033, OP17-021, OP17-037, OP17-038, EB04-015, EB04-019): o jogador escolhe quantos DON!! ativos virar e depois as cartas (`AbilityCost.restOwn.withDon`; só pergunta quando há escolha). A própria carta pode pagar (o Líder OP14-020 se vira).
+  - "rest up to N of your opponent's cards" (OP13-033, OP14-024, OP15-032, OP16-035) e "up to N of your opponent's rested cards will not become active" (OP15-023): a cada carta, um DON!! do oponente, uma carta do campo dele ou nada (passo `restDonOrCharacter`, com `skipRefresh` para o segundo).
+  - "up to" nos passos de Vida (OP10-109, OP14-072, OP14-112, OP14-115, Kaido ST04-001 e toda carta com "add up to N card(s) from the top of your deck to the top of your Life cards"): pergunta a quantidade, do máximo para 0 (`upTo` em `trashLife`, `addLifeFromDeck` e `opponentLifeToHand`).
+- Itens levantados nas rodadas (todos resolvidos):
+- ~~Ms. All Sunday OP12-075: "your opponent may add 1 DON!! card" adiciona sem perguntar ao oponente.~~ Corrigido: o oponente responde se adiciona (`opponentAddDon.may`).
+- ~~Usopp OP15-024: "cannot be rested by your opponent's Leader and Character effects" também bloqueia Eventos e Stages do oponente.~~ Corrigido na rodada 3 (DV-43).
+- ~~"If X, A. Then, B." aplica a condição só a A.~~ **Conforme** (regra confirmada pelo dono do projeto em 09/10/2026): o B só depende do A quando o A é custo do efeito ("You may X: …", "you may X. If you do, …"); fora isso, o B acontece mesmo que o A não aconteça. Ex.: Hody Jones OP06-035 ("Rest up to a total of 2 … Then, add 1 card from the top of your Life cards to your hand") vira as cartas com 0 de Vida; Leo OP10-057 descarta 1 carta mesmo com outro Líder (o "If your Leader is [Usopp]" é condição, não custo). O motor já fazia assim.
+- ~~`haveCharacterNamed` não conta o Líder.~~ Corrigido (regra confirmada em 09/10/2026: "If you have [X]" é qualquer carta sua com o nome, Líder incluído, como o +4000 do evento do OP17 para [Shanks]): "If you have [Jewelry Bonney]" (EB04-056), "[A] and [B]" (OP16-040, OP15-064, OP15-072, ST30-016) e "[Gecko Moria] with 10000 power or more on your field" (OP15-080) contam o Líder e o Stage; "If you have a [X] Character" (OP02-031, OP07-030, OP08-109) continua só com Personagens (`Condition.haveCharacterOnly`). Testes em `card-audit.test.ts`.
+- `onlyTypeIncludes` falha quando você não tem nenhum Personagem (EB03-038): **conforme** (confirmado pelo dono do projeto: sem Personagens em campo, o efeito de adicionar 2 DON!! não acontece).
+- ~~Gecko Moria OP06-086 ("Play 1 card and play the other card rested") e Thatch OP03-005 ("trash this Character at the end of this turn" para a carta que voltou ao campo).~~ Corrigidos na rodada 3 (DV-43).
+- ~~Mr.2.Bon.Kurei(Bentham) ST08-013 nocauteava a si mesmo mesmo quando o Personagem do oponente não saía.~~ Corrigido (confirmado: ele se nocauteia só se o Personagem do oponente foi nocauteado): o passo de K.O. guarda os alvos (`koTargets`) e o "If you do" depois de um K.O. confere se algum foi para o descarte (`Condition.lastKOd`); vale também quando o Personagem já saiu na batalha, está protegido ou foi salvo por substituição.
+- ~~Texto dos spoilers.~~ Corrigido por dedução até a carta oficial sair (regra do dono do projeto), em `source-fixes.ts`: EB05-039 Pink Hornet com os tipos {The Vinsmoke Family}/{GERMA 66} (como o resto da família; a condição do texto também), OP18-065 Saint Gunko "Special" (como os outros Saint Gunko do OP18) e EB05-048 "cost of 0". O "{Land of Wano]" do [Trigger] de EB05-019 o leitor já tolera.
+- ~~Texto da fonte sem o sinal de menos.~~ Corrigido para toda a base: a API perde o "−" (U+2212) em "DON!! −1", "give … −2000 power" e "give … −3 cost"; `restoreMinusSigns` (em `applySourceFixes`) o devolve nessas formas (um número sem sinal ali é sempre negativo; filtros como "with 5000 power or less" e "0 cost Characters" ficam como estão). 151 cartas da base com o texto corrigido, nenhuma com a leitura alterada (conferido carta a carta); `data/cards` atualizado.
+
+**DV-42. Rodada 2 (OP01 a OP09): efeitos lidos ou executados errado** — alto — **corrigido**
+- Revisadas 920 cartas (OP01 a OP09, fora os Líderes, já vistos na rodada 1), com as correções da rodada 1 já aplicadas. Diff das habilidades e da tradução de toda a base antes e depois: só as cartas listadas (e as das regras de DV-41) mudaram.
+- Alto:
+  - **Crocodile OP09-046:** "{Cross Guild} type Character card or Character card with a type including "Baroque Works" with a cost of 5 or less": o custo só valia para o lado "Baroque Works", e qualquer {Cross Guild} da mão (Buggy de custo 10) entrava de graça. Em "A or B …", o custo, o poder e o "other than" do fim valem para os dois lados (também Mr.3 OP09-056: "other than [Mr.3(Galdino)]").
+  - **Plague Rounds OP04-055, Aramaki OP06-043 e os Shandian OP06-102/111/114:** o custo "place 1 Character/Stage … at the bottom of the owner's deck" só aceitava carta própria; sem "of your", vale qualquer uma, e é assim que o Evento remove um Personagem do oponente (a remoção passa pelas proteções). "… at the bottom of your deck" (P-086) continua só com as suas.
+  - **Marco OP03-013:** a API corta o [On K.O.] depois do custo ("You may trash 1 Event from your hand"): descartar o Evento não fazia nada. Texto da lista oficial em `SOURCE_TEXT_FIXES` (com `$`: só troca se o texto terminar cortado).
+- Médio:
+  - **Charlotte Pudding OP03-112:** a API traz "{Sanji}" (tipo) no lugar de "[Sanji]" (nome); a busca nunca achava os [Sanji]. Corrigido pela lista oficial.
+  - **"Then, if that Character has 5000 power or less, K.O. it"** (Zephyr OP06-074, Black Hole OP09-098, Ice Oni OP04-047): comparava o poder ou o custo impresso. Em campo vale o atual; revelada do deck ou da Vida, o impresso.
+  - **I Bid 500 Million!! OP05-096:** o "Then, if you have a {Celestial Dragons} type Character, draw 1 card" depois da última opção do "Choose one" ficava só dentro da 3ª opção.
+  - **Rosinante OP04-119:** "your active Characters with a base cost of 5" protegia também os virados (`Aura.rested`).
+  - **Rayleigh OP08-118:** "give 1 Character −3000 power and the other −2000": dava para escolher o mesmo Personagem duas vezes (`TargetSpec.notLast`).
+  - **Basil Hawkins OP07-029:** a substituição com o custo "rest 1 of your opponent's Characters" podia ser paga escolhendo 0 alvos.
+  - **Luffy OP01-024:** "cannot be K.O.'d in battle by "Strike" attribute Characters" protegia também contra Líderes Strike.
+  - **Helmeppo OP03-091** (e todo "with no base effect" em campo): um Personagem só com [Blocker] contava como sem efeito. Agora vale a regra do Q&A (P-011/OP06-074): sem efeito base é a carta sem texto; [Trigger] também é efeito.
+- Baixo:
+  - **"reveal 1 card from the top of your deck and play up to 1 …"** (OP06-057, OP08-052, OP08-054): jogava a carta revelada sem perguntar.
+  - **Hotori OP05-111:** depois de aceitar o custo "You may play 1 [Kotori] from your hand", dava para escolher nenhuma carta e o efeito acontecia.
+  - **Law OP01-047:** "You may return 1 Character to your hand" não deixava devolver o próprio Law. Os custos com cartas suas ("return/rest/K.O./trash 1 of your Characters") aceitam a própria carta, a menos que o texto diga "other than this Character" (`excludeSelf`).
+  - **"Give up to 2 rested DON!! cards to …"** (Chaka OP05-008, Brook ST01-011 e as outras com "up to N"): dava sempre o máximo; com um alvo só, pergunta quantos.
+- Replays: a versão sobe para 11 (`REPLAY_VERSION`). `upgradeReplayActions` responde às perguntas novas como o motor fazia (a quantidade máxima, nenhum DON!!, sim) e descarta a resposta gravada para uma pergunta que deixou de existir. As salas online começadas antes do deploy passam pelo mesmo upgrade ao serem refeitas (`rebuild` em `apps/server/src/online/room.ts`).
+- Testes: `packages/engine/test/card-audit.test.ts` (rodada 2 e regras de DV-41; 19 testes novos, que falham sem a correção), com as cartas reais em `test/fixtures/bugs-auditoria-cartas.json`. Testes antigos que fixavam o comportamento errado foram atualizados: `parsed-engine.test.ts` (Strike por Personagem), `protections.test.ts` (a própria carta paga o custo de K.O.), `i18n-review.test.ts` (Rosinante "ativos") e os que passam pelas perguntas novas.
+
+**DV-43. Rodada 3 (starter decks, promos e spoilers de EB05/OP18): efeitos lidos ou executados errado** — alto — **corrigido**
+- Revisadas 522 cartas: 304 dos starter decks (fora os Líderes, vistos na rodada 1), 118 promos (P-xxx e PRB) e as 90 cartas com efeito dos spoilers de EB05 e OP18 (Líderes incluídos; baixados do feed com `cards:import --spoilers`). Diff das habilidades e da tradução de toda a base antes e depois: só as cartas listadas mudaram.
+- Alto:
+  - **Sabo ST13-007, Ace ST13-010, Luffy ST13-014:** "If that card is a [Sabo] with a cost of 5, you may play that card. If you do, up to 1 of your Leader gains +2000": com a condição falsa, o "you may" era pulado mas o "If you do" não, e o Líder ganhava +2000 sem jogar nada. No motor: um "you may" (`payCost` com `scope`) pulado pela condição pula também o trecho dele.
+  - **Avalo Pizarro ST27-001:** "rest 1 of your [Fullalead] cards" não aceitava o Stage [Fullalead]; o custo nunca podia ser pago.
+  - **Zoro OP18-017** (e OP14-016, OP15-009): "you may give your Leader −2000 power during this turn instead" exigia o Líder ativo, o que só vale para "your 1 active Leader" (`AbilityCost.leaderPowerMinusActive`); com o Líder virado (já atacou), a substituição nunca era oferecida.
+  - **Zambai OP18-066:** "You may K.O. 1 of your Stages" não tirava o Stage do campo (o passo só sabia nocautear Personagem) e o [Rush] saía de graça.
+- Médio:
+  - **Hody & Hyouzou P-062** e mais 19 cartas: a API junta os dois atributos ("Slash Strike"); a carta não contava como nenhum dos dois. `applySourceFixes` separa os atributos conhecidos; `data/cards` (ST12, ST24, ST25, ST30) atualizado.
+  - **Buggy P-084:** "all Characters with a cost of 3 or 4 cannot attack" olhava o custo impresso (`Aura.exactCosts` agora usa o atual, como `minCost`/`maxCost`).
+  - **Borsalino ST33-004:** "During the turn in which a card in your hand is trashed by an effect" só contava o descarte pelo próprio efeito; agora conta também o descarte forçado pelo oponente, ao acaso, de toda a mão e o de "até ficar com N".
+  - **OP18-069, EB05-033 e EB05-059** (spoilers) caíam no modo manual; o leitor ganhou as redações ("you may DON!! −1 and rest this Character instead", "If your Leader has the {X} type, and the number of DON!! …", "all of your Characters with 4000 base power and the {X} type cannot be K.O.'d in battle until the end of your opponent's next End Phase").
+- Baixo:
+  - **Kid P-067:** "cannot attack any card other than the Character [Eustass"Captain"Kid]" só deixava atacar a primeira cópia.
+  - **Luffy PRB02-005:** "your opponent rests 1 of their active DON!! cards at the start of their next Main Phase" era lido como "não desvira 1 DON!!" e sumia quando o oponente não tinha DON!! virado; agora vira 1 DON!! ativo no início da Fase Principal dele (`skipRefreshDon.atMainPhase`).
+  - **Zephyr ST05-010:** o +3000 contra Personagem "Strike" sumia no fim da batalha; dura o turno.
+  - **Kid ST36-005, Nami ST29-008:** "turn 1 card from the top or bottom of your Life cards" sempre virava a de cima; o jogador escolhe topo ou fundo.
+  - Pendências de DV-41 resolvidas: **Usopp OP15-024** ("… by your opponent's Leader and Character effects": Eventos e Stages do oponente viram), **Gecko Moria OP06-086** (o jogador escolhe qual das duas entra virada) e **Thatch OP03-005** (o efeito adiado sobre "this Character" não vale para a carta que saiu e voltou ao campo).
+- Custos com a própria carta (DV-42): a carta que já paga outra parte do custo ("rest this card and 1 of your [Enel] cards") não conta duas vezes.
+- Replays: as perguntas novas (topo ou fundo da Vida) entram nas respostas implícitas da versão 11.
+- Testes: `packages/engine/test/card-audit.test.ts` (rodada 3; 15 testes novos, que falham sem a correção).
+
 ---
 
 ## Itens a confirmar (sem ruling oficial claro)
@@ -384,7 +476,7 @@ Testes (DV-31 a DV-33): `packages/engine/test/draw-restrict-reveal.test.ts` (lei
 - Dano de efeito de 2 ou mais com 1 de Vida: o motor segue a leitura literal de 1-2-1-1-1 (perde no 2º ponto). O Q&A EB03-055 Robin diz que dano de efeito com 0 de Vida vence; não há ruling para "2 de dano de efeito com 1 de Vida". Rever se a Bandai publicar um.
 - Substituição de dano ("If you would take damage, … instead") oferecida mesmo com 0 de Vida.
 - `handCounter.set` sobrescrevendo um Counter maior (CR 2-10-4: vale o maior).
-- Cadeia "If … Then …" (4-10): depende de o parser marcar o `if` em todos os passos seguintes; vale um teste por carta com "If … Then".
+- Cadeia "If … Then …" (4-10): a condição vale só para o trecho dela; o "Then" depende só de custo ("You may X:", "If you do") — regra confirmada pelo dono do projeto (DV-41).
 - `cancel` e `detachDon` (desfazer) estão fora das regras oficiais — o Q&A proíbe mover DON!! já dado. São conveniências de interface protegidas contra vazamento; manter documentado.
 
 ## Conferência completa por regra

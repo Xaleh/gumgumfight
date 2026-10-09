@@ -19,6 +19,9 @@ describe('ST04 — Animal Kingdom Pirates', () => {
     giveDon(s, 0, 7);
     const leader = s.players[0].leader.uid;
     s = applyAction(s, { type: 'activate', player: 0, uid: leader, ability: 0 });
+    // "Trash up to 1": escolhe 0 ou 1.
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['1', '0'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.players[1].life).toHaveLength(4);
     expect(s.players[1].trash).toHaveLength(1);
     expect(s.players[0].donActive + s.players[0].donRested).toBe(0);

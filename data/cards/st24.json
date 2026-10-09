@@ -274,7 +274,8 @@
       "power": 2000,
       "counter": 1000,
       "attributes": [
-        "Slash Special"
+        "Slash",
+        "Special"
       ],
       "types": [
         "Kid Pirates",
@@ -318,7 +319,8 @@
       "power": 11000,
       "counter": 0,
       "attributes": [
-        "Slash Strike"
+        "Slash",
+        "Strike"
       ],
       "types": [
         "Heart Pirates",

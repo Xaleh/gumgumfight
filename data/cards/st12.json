@@ -15,7 +15,8 @@
       "life": 4,
       "power": 5000,
       "attributes": [
-        "Slash Strike"
+        "Slash",
+        "Strike"
       ],
       "types": [
         "Straw Hat Crew"
