@@ -1,6 +1,7 @@
 import { cardDef, createGame, type PlayerId, ReplayCursor } from '@gumgum/engine';
 import { useRef, useState } from 'react';
 import { type GameSetup, REPLAY_SPEEDS } from '../game/useGame';
+import { useSettings } from '../settings';
 
 interface Summary {
   players: { name: string; leader: string }[];
@@ -53,6 +54,8 @@ export function ReplayLoader({
   const [speed, setSpeed] = useState(1);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // "Cliques do jogador" é a mesma configuração do menu (fica guardada neste navegador).
+  const { replayCues, update } = useSettings();
 
   const open = async (file: File) => {
     setBusy(true);
@@ -192,6 +195,29 @@ export function ReplayLoader({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="mode-field">
+                <span className="mode-field-label" id="replay-cues-label">
+                  Cliques do jogador
+                </span>
+                <div className="seg small" role="group" aria-labelledby="replay-cues-label">
+                  {(
+                    [
+                      [true, 'Mostrar'],
+                      [false, 'Esconder'],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button key={label} type="button" className={replayCues === v ? 'on' : ''} aria-pressed={replayCues === v} onClick={() => update({ replayCues: v })}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="muted small">
+                  {replayCues
+                    ? 'Antes de cada ação, a mesa mostra o que o jogador clicou ou escolheu (contorno nas cartas, toque e legenda).'
+                    : 'Só a mesa: as ações acontecem sem mostrar o clique. Dá para mudar na barra do replay.'}
+                </p>
               </div>
 
               <button

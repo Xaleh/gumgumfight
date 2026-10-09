@@ -20,6 +20,7 @@ import {
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
+import { describeReplayAction } from '../game/replayCue';
 import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
@@ -31,6 +32,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
 import { useBoardMotion } from './Motion';
 import { ReplayBar, type ReplayControls } from './ReplayBar';
+import { ReplayCue } from './ReplayCue';
 import {
   EmoteBar,
   EmoteBubbles,
@@ -324,7 +326,7 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter, animations, lang } = useSettings();
+  const { quickCounter, animations, replayCues, lang } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -338,6 +340,11 @@ function Table({
     lastAction: allActions[allActions.length - 1],
     lang,
   });
+  // Replay: o clique/seleção do jogador na próxima ação do roteiro (na mesa e na barra), para quem assiste
+  // ou audita ver a decisão antes do resultado. Em 8× a mesa já muda sem animação: só a barra mostra.
+  // A opção "Cliques no replay" (configurações ou o botão na barra) desliga tudo.
+  const nextAction = replayCues ? replay?.next : undefined;
+  const cue = useMemo(() => (nextAction ? describeReplayAction(state, nextAction, lang) : null), [state, nextAction, lang]);
   // Sorteio com dados no começo da partida: só quando há sorteio (quem começa não foi
   // escolhido no menu), e não no replay nem ao voltar para uma partida em andamento.
   const [intro, setIntro] = useState(
@@ -1000,6 +1007,18 @@ function Table({
 
         {motion.layer}
 
+        {replay && cue && game.speed < 8 && !showResult && (
+          <ReplayCue
+            cue={cue}
+            pos={replay.pos}
+            bottom={bottom}
+            dueAt={replay.dueAt}
+            playing={!game.paused}
+            speed={game.speed}
+            animate={animate}
+          />
+        )}
+
         {online && <EmoteBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
 
@@ -1291,6 +1310,7 @@ function Table({
           setPaused={game.setPaused}
           speed={game.speed}
           setSpeed={game.setSpeed}
+          cue={cue}
         />
       )}
     </div>

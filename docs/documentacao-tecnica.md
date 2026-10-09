@@ -330,6 +330,18 @@ convertido; com `decks` no arquivo (online e, desde o card 73, também os baixad
 existir. O `useGame` usa um `ReplayCursor`; a `ReplayBar` (abaixo da mesa) avança, volta e pula. Pulos e a velocidade 8×
 mudam a mesa sem animação. Nada é gravado em `matches`.
 
+**Clique/seleção no replay** (`game/replayCue.ts` + `ReplayCue.tsx`): antes de cada ação do roteiro ser aplicada, a mesa
+mostra o que o jogador tocou, para quem assiste ou audita ver a decisão e não só o resultado. O replay não grava cliques à
+parte: cada `Action` já diz o que foi selecionado (`playCard.uid`, `attack.attacker/target`, `choose.uids`, `option.index`,
+`answer.yes`, `counter.uid/target`…), e `describeReplayAction(estado, ação)` traduz a ação de volta para o gesto, com as
+palavras dos botões e das cartas que o jogador viu ("Atacar Zoro com Nami", "Não usar Counter", "Trocar mão"). Na mesa, as
+cartas e os DON!! envolvidos ganham um contorno (numerado na ordem dos cliques: DON!! → carta, atacante → alvo), um toque
+animado no instante em que a ação cai (`useGame` expõe `replay.dueAt`) e uma legenda junto do elemento (ou do lado da mão de
+quem agiu, nas respostas sem carta na mesa: opções, sim/não, encerrar turno). A `ReplayBar` repete a mesma frase por
+escrito. Pausado (passo a passo), contorno e legenda ficam parados em "Próxima ação"; em 8× só a barra mostra. A
+configuração `replayCues` ("Cliques no replay", em `settings.tsx`; também na folha de abrir o replay e no botão 👆 da
+`ReplayBar`) desliga tudo.
+
 ### Partida online e espectador
 
 `useOnlineGame.ts` abre um `EventSource` (`/events?t=<token>` para jogador, `/watch[?hands=1]` para espectador),
