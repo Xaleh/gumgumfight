@@ -1,5 +1,6 @@
-import type { GameState } from '@gumgum/engine';
+import type { Action, GameState } from '@gumgum/engine';
 import { type ReactNode, useEffect, useRef } from 'react';
+import type { ReplayCue } from '../game/replayCue';
 import { REPLAY_SPEEDS } from '../game/useGame';
 
 /** Posição no replay e como mudá-la (de `useGame`). */
@@ -13,6 +14,10 @@ export interface ReplayControls {
   seek: (n: number) => void;
   /** Primeira linha do histórico escrita pela ação atual (null no início). */
   logFrom: number | null;
+  /** Próxima ação do roteiro (undefined no fim): o clique/seleção que a mesa mostra antes de aplicá-la. */
+  next?: Action;
+  /** Modo automático: quando (`performance.now()`) `next` será aplicada; null se nada está agendado. */
+  dueAt: () => number | null;
 }
 
 const svg = (children: ReactNode) => (
@@ -57,6 +62,7 @@ export function ReplayBar({
   setPaused,
   speed,
   setSpeed,
+  cue,
 }: {
   replay: ReplayControls;
   state: GameState;
@@ -64,6 +70,8 @@ export function ReplayBar({
   setPaused: (f: (p: boolean) => boolean) => void;
   speed: number;
   setSpeed: (v: number) => void;
+  /** O clique/seleção da próxima ação, por escrito (o mesmo que a mesa mostra). */
+  cue?: ReplayCue | null;
 }) {
   const { pos, total, end, seek } = replay;
   const atEnd = pos >= end || state.phase === 'gameover';
@@ -184,6 +192,13 @@ export function ReplayBar({
           </select>
         </label>
       </div>
+      {cue && !atEnd && (
+        <p className="replay-cue-line" title="O que o jogador clicou ou escolheu nesta ação">
+          <span className="replay-cue-k">{playing ? `Ação ${pos + 1}` : 'Próxima ação'}</span>
+          <b>{cue.who}</b>: {cue.title}
+          {cue.sub && <em> — {cue.sub}</em>}
+        </p>
+      )}
       {!playing && !atEnd && <p className="replay-hint">Passo a passo: use ▶| (ou →) para ver a próxima ação, ou ▶ para rodar sozinho.</p>}
     </div>
   );

@@ -404,6 +404,9 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
   (jogadores, Líderes, ações, turnos e, se quiser, o resultado) e assista no modo **automático** ou **passo a passo**.
   A barra de baixo tem ⏮ início, ◀ ação anterior, ▶/❚❚, ▶| próxima ação, ⏭ fim, a barra de progresso (pula para
   qualquer ação) e a velocidade (0.25× a 8×; em 8× sem animações). Atalhos: espaço, ← →, Home, End, + e −.
+  Antes de cada ação, a mesa mostra o **clique/seleção do jogador** (contorno nas cartas e nos DON!! tocados, o toque e
+  uma legenda como "Luffy: Atacar Zoro com Nami" ou "Nami: Não usar Counter"); a barra repete a frase por escrito. No
+  passo a passo, o contorno fica parado na "Próxima ação" até você avançar.
   Replays antigos continuam abrindo (são convertidos para a versão atual); os que não trazem as listas precisam
   que os decks ainda existam.
 - Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
