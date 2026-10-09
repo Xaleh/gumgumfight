@@ -154,7 +154,7 @@ function clean(raw: string): string {
     .replace(/ instead of that Character being K\.O\.'d/g, ' instead')
     .replace(
       /select your opponent's rested Leader and up to (\d+) Character card\. The selected cards will not become active in your opponent's next Refresh Phase/gi,
-      "your opponent's rested Leader will not become active in your opponent's next Refresh Phase. Then, up to $1 of your opponent's rested Characters will not become active in your opponent's next Refresh Phase",
+      "your opponent's rested Leader will not become active in your opponent's next Refresh Phase, then up to $1 of your opponent's rested Characters will not become active in your opponent's next Refresh Phase",
     )
     .replace(
       /Select (\d+) of (your .+?)\. Swap the base power of the selected (?:Characters|cards) with each other (during this (?:turn|battle))/gi,
@@ -572,6 +572,13 @@ export function parseCardFilter(phrase: string): { upTo: number; filter: CardFil
   const t = phrase.trim();
   const q = t.match(/^((?:up to )?\d+ |)/)![1];
   const body = t.slice(q.length);
+  // "yellow Character or Stage card with a cost of 2 or less": cor e custo valem para as duas categorias.
+  const cats = body.match(/^(.*?)\b(Character|Event|Stage) or (Character|Event|Stage) cards?\b(.*)$/i);
+  if (cats) {
+    const a = parseCardFilterBase(`${q}${cats[1]}${cats[2]} card${cats[4]}`);
+    const b = a && parseCardFilterBase(`${q}${cats[1]}${cats[3]} card${cats[4]}`);
+    if (a && b) return { upTo: a.upTo, filter: { either: [a.filter, b.filter] } };
+  }
   for (const at of [...body.matchAll(/ or /g)].map((x) => x.index!)) {
     const a = parseCardFilterBase(`${q}${body.slice(0, at)}`);
     const second = body.slice(at + 4).replace(/^up to \d+ /i, '');
@@ -664,6 +671,7 @@ export function parseCondition(text: string): Condition | null {
   }
   if (/^the chosen Character has a cost equal to the number of DON!! cards given to it$/i.test(t)) return { chosenCostEqualsDon: true };
   if ((m = t.match(/^your opponent has (\d+) or more rested cards$/i))) return { opponentRestedCardsMin: Number(m[1]) };
+  if ((m = t.match(/^you have (\d+) or more rested cards$/i))) return { ownRestedCardsMin: Number(m[1]) };
   if ((m = t.match(/^your Leader is ((?:\[[^\]]+\] or )+\[[^\]]+\])$/i))) return { leaderNames: [...m[1].matchAll(/\[([^\]]+)\]/g)].map((x) => x[1]) };
   if ((m = t.match(/^either you or your opponent has (\d+) Life cards?$/i))) {
     return { anyOf: [{ lifeMin: Number(m[1]), lifeMax: Number(m[1]) }, { opponentLifeMin: Number(m[1]), opponentLifeMax: Number(m[1]) }] };
@@ -1215,7 +1223,7 @@ const CLAUSES: ClauseRule[] = [
   ],
   [/^Set all of your DON!! cards as active$/i, () => [{ do: 'setDonActive', count: 99 }]],
   [/^turn all of your Life cards face-down$/i, () => [{ do: 'lifeFace', count: 99, up: false }]],
-  [/^(?:you may )?deal (\d+) damage to your opponent$/i, (m) => [{ do: 'takeDamage', count: Number(m[1]), opponent: true }]],
+  [/^deal (\d+) damage to your opponent$/i, (m) => [{ do: 'takeDamage', count: Number(m[1]), opponent: true }]],
   [/^trash cards from the top of your Life cards until you have (\d+) Life cards?$/i, (m) => [{ do: 'lifeTrashUntil', count: Number(m[1]) }]],
   [/^trash this (?:Character|Stage|card)$/i, () => [{ do: 'trashSelf' }]],
   [/^the selected Character will not become active in your next Refresh Phase$/i, () => [{ do: 'skipRefresh', target: 'chosen' }]],
@@ -2241,10 +2249,19 @@ export function parseBody(body: string): EffectStep[] | null {
       steps.push(...(cond && Object.keys(cond).length ? parsed.map((st) => ({ ...st, if: { ...cond, ...st.if } })) : parsed));
     }
     if (gate) for (let k = before; k < steps.length; k++) steps[k] = { ...steps[k], if: { ...gate, ...steps[k].if } };
+    // "If X, return 1 …. Then, play … than the returned Character": sem carta devolvida (X falso),
+    // a segunda parte não acontece.
+    if (!cond && /\bthe returned (?:Character|card)\b/i.test(s) && steps[before]) steps[before] = { ...steps[before], if: { ...steps[before].if, lastDone: true } };
     if (ifYouDo) {
       // Estende o trecho do último "you may" para incluir o "If you do, …".
       const opt = [...steps.slice(0, before)].reverse().find((st) => st.do === 'payCost' && st.scope !== undefined);
-      if (opt && opt.do === 'payCost') opt.scope! += steps.length - before;
+      if (opt && opt.do === 'payCost') {
+        opt.scope! += steps.length - before;
+        // "you may return up to 1 of …. If you do, …": aceitar e não escolher nada não é "do".
+        const x = steps[before - 1];
+        const xTarget = x && x !== opt && 'target' in x ? x.target : undefined;
+        if (typeof xTarget === 'object' && !xTarget.required && steps[before]) steps[before] = { ...steps[before], if: { ...steps[before].if, lastDone: true } };
+      }
       // Sem "you may" antes: "Y" só acontece se o passo anterior afetou alguma carta.
       else for (let k = before; k < steps.length; k++) steps[k] = { ...steps[k], if: { ...steps[k].if, lastDone: true } };
     }
@@ -2352,9 +2369,10 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
   else if (/^trash this (?:Character|Stage|card)$/i.test(part)) cost.trashSelf = true;
   else if (/^K\.O\. this Character$/i.test(part)) cost.koSelf = true;
   else if (/^place this (?:Character|Stage|card) at the bottom of (?:the owner's|your) deck$/i.test(part)) cost.selfToBottom = true;
-  else if ((m = part.match(/^return (\d+)( or more)? (?:of your active )?DON!! cards?(?: from your field)? to your DON!! deck$/i))) {
+  else if ((m = part.match(/^return (\d+)( or more)? (of your active )?DON!! cards?(?: from your field)? to your DON!! deck$/i))) {
     cost.donMinus = Number(m[1]);
     if (m[2]) cost.donMinusOpen = true; // "1 or more": o jogador escolhe quantos
+    if (m[3]) cost.donMinusActive = true;
   }
   else if ((m = part.match(/^give your (?:1 )?active Leader [−-]?(\d+) power during this turn$/i))) cost.leaderPowerMinus = Number(m[1]);
   else if ((m = part.match(/^return (\d+) Characters? to your hand$/i))) {
@@ -2480,7 +2498,10 @@ function parseCost(rest: string): { cost?: AbilityCost; body: string } | null {
 function parseEvent(text: string): GameEvent | null {
   const t = text.trim().replace(/’/g, "'");
   // Errata de OP02-071: "on the field" (qualquer DON!! seu que volte ao seu deck de DON!!).
-  if (/^a DON!! card on (?:your|the) field is returned to your DON!! deck(?: by your effect)?$/i.test(t)) return { kind: 'donReturned' };
+  const donBack = t.match(/^a DON!! card on (?:your|the) field is returned to your DON!! deck( by your effect)?$/i);
+  if (donBack) {
+    return donBack[1] ? { kind: 'donReturned', byYourEffect: true } : { kind: 'donReturned' };
+  }
   if (/^this Character becomes rested$/i.test(t)) return { kind: 'selfRested' };
   if (/^a Character is K\.?O\.?'d$/i.test(t)) return { kind: 'characterKO', whose: 'any' };
   if (/^(?:your opponent's Character|one of your opponent's Characters) is K\.?O\.?'d$/i.test(t)) {
@@ -2517,7 +2538,9 @@ function parseEvent(text: string): GameEvent | null {
   if ((m = t.match(/^a card is trashed from your hand by (?:your \{([^}]+)\} type card's|an) effect$/i))) {
     return m[1] ? { kind: 'handTrashedByEffect', sourceType: m[1] } : { kind: 'handTrashedByEffect' };
   }
-  if (/^your opponent plays a Character using a Character's effect$/i.test(t)) return { kind: 'characterPlayed', who: 'opponent', byEffect: true };
+  if (/^your opponent plays a Character using a Character's effect$/i.test(t)) {
+    return { kind: 'characterPlayed', who: 'opponent', byEffect: true, byCharacterEffect: true };
+  }
   // "your Character with 6000 base power or more is K.O.'d", "one of your {X} type Characters with … is K.O.'d"
   if ((m = t.match(/^(?:one of )?your (.+?) (?:is|are) K\.O\.'d$/i))) {
     const f = parseCardFilter(`1 ${m[1].replace(/Characters\b/, 'Character')}`);
@@ -2534,11 +2557,12 @@ function parseEvent(text: string): GameEvent | null {
     const f = parseCardFilter(`1 ${m[1]}`);
     return f && f.filter.category === 'character' ? { kind: 'characterPlayed', who: 'self', filter: f.filter, from: 'trash' } : null;
   }
-  if ((m = t.match(/^(you play|your opponent plays) (an? .+?|a Character)(?: from your hand)?$/i))) {
+  if ((m = t.match(/^(you play|your opponent plays) (an? .+?|a Character)( from your hand)?$/i))) {
     const who = /opponent/i.test(m[1]) ? 'opponent' : 'self';
-    if (/^a Character$/i.test(m[2])) return { kind: 'characterPlayed', who };
+    const fromHand = m[3] ? { fromHand: true as const } : {};
+    if (/^a Character$/i.test(m[2])) return { kind: 'characterPlayed', who, ...fromHand };
     const f = parseCardFilter(`1 ${m[2].replace(/^an? /i, '')}`);
-    return f && f.filter.category === 'character' ? { kind: 'characterPlayed', who, filter: f.filter } : null;
+    return f && f.filter.category === 'character' ? { kind: 'characterPlayed', who, filter: f.filter, ...fromHand } : null;
   }
   if ((m = t.match(/^your Leader (with .+) attacks or is attacked$/i))) {
     const f = parseCardFilter(`1 card ${m[1]}`);
@@ -2627,10 +2651,13 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [ab];
   }
   // "When this Leader attacks or is attacked, …" = [When Attacking] + [On Your Opponent's Attack]
-  const both = body.match(/^When this (?:Leader|Character) attacks or is attacked, (.+)$/i);
+  const both = body.match(/^When this (Leader|Character) attacks or is attacked, (.+)$/i);
   if (both) {
-    const steps = parseBody(capitalizeFirst(both[1]));
+    const steps = parseBody(capitalizeFirst(both[2]));
     if (!steps) return null;
+    // Líder: só quando ele mesmo ataca ou é o alvo ([On Your Opponent's Attack] valeria também para
+    // ataques aos Personagens).
+    if (/^Leader$/i.test(both[1])) return [{ timing: 'event', event: { kind: 'leaderBattle' }, steps, ...(h.don ? { don: h.don } : {}) }];
     return (['whenAttacking', 'onOpponentAttack'] as const).map((timing) => ({ timing, steps, ...(h.don ? { don: h.don } : {}) }));
   }
   // "When this Leader attacks your opponent's Leader, if X, Y."
@@ -2663,8 +2690,14 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   if (oppChar) {
     const steps = parseBody(capitalizeFirst(oppChar[2]));
     if (!steps) return null;
-    const cond: Condition = { attackerCharacter: true, ...(oppChar[1] ? { attackerAttribute: oppChar[1] } : {}) };
-    const ab: Ability = { timing: 'onOpponentAttack', steps: steps.map((st) => ({ ...st, if: { ...cond, ...st.if } })) };
+    // "when your opponent's Character attacks" é a condição para disparar (um ataque do Líder não gasta o
+    // [Once Per Turn]); "If that Character has …" é condição do efeito.
+    const attr = oppChar[1];
+    const ab: Ability = {
+      timing: 'onOpponentAttack',
+      condition: { attackerCharacter: true },
+      steps: attr ? steps.map((st) => ({ ...st, if: { attackerAttribute: attr, ...st.if } })) : steps,
+    };
     if (h.don) ab.don = h.don;
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];
@@ -3119,11 +3152,21 @@ function parseLine(raw: string, category: CardCategory): Ability[] | null {
   }
   const pc = parseCost(rest);
   if (!pc) return fail(`cost: ${rest.slice(0, rest.indexOf(':'))}`);
+  // "[On Your Opponent's Attack] [Once Per Turn] This effect can be activated when X. Y": X é condição
+  // para ativar (sem ela o efeito nem dispara e o [Once Per Turn] não é gasto), não um "If" de Y.
+  let gate: Condition | undefined;
+  const gateM = pc.body.match(/^This effect can be activated when (.+?)\. (?=[A-Z])(.+)$/);
+  const gateCond = gateM && parseCondition(gateM[1]);
+  if (gateM && gateCond) {
+    gate = gateCond;
+    pc.body = gateM[2];
+  }
   const steps = parseBody(pc.body);
   if (!steps) return null;
   return h.timings.map((timing) => {
     const ab: Ability = { timing, steps };
-    if (preCond && timing === 'activateMain') ab.condition = preCond;
+    if (gate) ab.condition = gate;
+    if (preCond && timing === 'activateMain') ab.condition = { ...ab.condition, ...preCond };
     else if (preCond) ab.steps = ab.steps.map((st) => ({ ...st, if: { ...preCond, ...st.if } }));
     if (h.don) ab.don = h.don;
     if (h.oncePerTurn) ab.oncePerTurn = true;

@@ -351,6 +351,10 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
     const rested = [opp.leader, ...opp.characters, ...(opp.stage ? [opp.stage] : [])].filter((c) => c.rested).length + opp.donRested;
     if (rested < cond.opponentRestedCardsMin) return false;
   }
+  if (cond.ownRestedCardsMin !== undefined) {
+    const rested = [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])].filter((c) => c.rested).length + ps.donRested;
+    if (rested < cond.ownRestedCardsMin) return false;
+  }
   if (cond.leaderNames && !cond.leaderNames.some((nm) => hasName(cardDef(state, ps.leader.uid), nm))) return false;
   if (cond.onlyCharactersWithoutCounter && ps.characters.some((c) => cardDef(state, c.uid).counter)) return false;
   if (cond.leaderMinPower !== undefined && getPower(state, ps.leader.uid) < cond.leaderMinPower) return false;
@@ -413,7 +417,8 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return false;
   if (cond.lifeLessThanOpponent && ps.life.length >= opp.life.length) return false;
   if (cond.maxDonOnField !== undefined && totalDonOnField(ps) > cond.maxDonOnField) return false;
-  if (cond.haveCharacterNamed && !ps.characters.some((c) => hasName(cardDef(state, c.uid), cond.haveCharacterNamed!))) {
+  // "If you have [Merry Go] on your field": o nome pode ser de um Stage.
+  if (cond.haveCharacterNamed && ![...ps.characters, ...(ps.stage ? [ps.stage] : [])].some((c) => hasName(cardDef(state, c.uid), cond.haveCharacterNamed!))) {
     return false;
   }
   if (cond.opponentMinDonOnField !== undefined && totalDonOnField(opp) < cond.opponentMinDonOnField) return false;
@@ -522,8 +527,14 @@ function ownCost(state: GameState, uid: string): number {
 
 /** Nome da carta (ou nome alternativo, "Also treat this card's name as …"). */
 export function hasName(def: CardDef, name: string): boolean {
-  return def.name === name || Boolean(def.aliases?.includes(name));
+  if (def.name === name || def.aliases?.includes(name)) return true;
+  // O texto às vezes grafa o nome com outra pontuação ("other than [Mr.2.Bon.Kurei.(Bentham)]" na
+  // carta "Mr.2.Bon.Kurei(Bentham)"): pontos e espaços não distinguem nomes.
+  const key = nameKey(name);
+  return nameKey(def.name) === key || Boolean(def.aliases?.some((a) => nameKey(a) === key));
 }
+
+const nameKey = (name: string) => name.replace(/[\s.]/g, '').toLowerCase();
 
 /** Bate com um filtro de tipos ("{A} or {B} type")? Tolerante a tipos mal separados. */
 export function matchesAnyType(def: CardDef, types: string[] | undefined): boolean {
@@ -898,6 +909,7 @@ export function activateError(state: GameState, player: PlayerId, uid: string, i
   if (ability.cost?.restSelf && loc.fc.rested) return 'A carta já está virada.';
   if (ability.cost?.restSelf && cannotBeRested(state, uid)) return 'Esta carta não pode ser virada.';
   if ((ability.cost?.restDon ?? 0) > ps.donActive) return 'DON!! ativos insuficientes.';
+  if (ability.cost?.donMinusActive && (ability.cost.donMinus ?? 0) + (ability.cost.restDon ?? 0) > ps.donActive) return 'DON!! ativos insuficientes.';
   if ((ability.cost?.donMinus ?? 0) > totalDonOnField(ps)) return 'DON!! insuficientes em campo.';
   if (
     (ability.cost?.trashFromHand ?? 0) + (ability.cost?.handToBottom ?? 0) >
@@ -1390,7 +1402,7 @@ function handleMainAction(state: GameState, action: Action) {
       payDon(ps, cost);
       if (def.category === 'character') {
         log(state, p, `${ps.name} joga ${def.name}.`);
-        state.stack.push({ kind: 'play', uid: action.uid });
+        state.stack.push({ kind: 'play', uid: action.uid, fromHand: true });
       } else if (def.category === 'stage') {
         if (ps.stage) {
           const old = ps.stage.uid;
@@ -1791,6 +1803,8 @@ type EmittedEvent = {
   inBattle?: boolean;
   from?: string;
   byEffect?: boolean;
+  fromHand?: boolean;
+  byCharacterEffect?: boolean;
 };
 
 /** Dispara as habilidades "When …" de todas as cartas em campo que reagem ao acontecimento. */
@@ -1821,6 +1835,8 @@ function emit(state: GameState, ev: EmittedEvent) {
 function eventMatches(state: GameState, e: GameEvent, ev: EmittedEvent, owner: PlayerId, uid: string): boolean {
   switch (e.kind) {
     case 'donReturned':
+      // "… returned to your DON!! deck by your effect": não vale quando o efeito do oponente devolve.
+      if (e.byYourEffect && ev.byPlayer !== undefined && ev.byPlayer !== owner) return false;
       return ev.player === owner && (ev.count ?? 1) >= (e.min ?? 1);
     case 'donGiven':
     case 'damageTaken':
@@ -1839,7 +1855,9 @@ function eventMatches(state: GameState, e: GameEvent, ev: EmittedEvent, owner: P
         (e.who === 'self') === (ev.player === owner) &&
         (!e.filter || matchesFilter(cardDef(state, ev.card!), e.filter)) &&
         (!e.from || e.from === ev.from) &&
-        (!e.byEffect || Boolean(ev.byEffect))
+        (!e.byEffect || Boolean(ev.byEffect)) &&
+        (!e.byCharacterEffect || Boolean(ev.byCharacterEffect)) &&
+        (!e.fromHand || Boolean(ev.fromHand))
       );
     case 'characterRemoved': {
       if (e.whose !== 'any' && (e.whose === 'own') !== (ev.player === owner)) return false;
@@ -1925,7 +1943,7 @@ function restCard(state: GameState, uid: string, byEffectOf?: PlayerId, restSour
 function returnDonAndEmit(state: GameState, ps: PlayerState, n: number) {
   if (n <= 0) return;
   returnDon(ps, n);
-  emit(state, { kind: 'donReturned', player: ps.id, count: n });
+  emit(state, { kind: 'donReturned', player: ps.id, count: n, byPlayer: ps.id });
 }
 
 /** Empilha as habilidades automáticas de uma carta (onPlay, whenAttacking, ...). */
@@ -1982,7 +2000,15 @@ function stepPlay(state: GameState, frame: PlayFrame) {
   ps.characters.push({ uid: frame.uid, rested, don: 0, playedOnTurn: state.turn });
   state.stack.pop();
   pushAbilities(state, frame.uid, 'onPlay');
-  emit(state, { kind: 'characterPlayed', player: owner, card: frame.uid, from: frame.from, byEffect: frame.byEffect });
+  emit(state, {
+    kind: 'characterPlayed',
+    player: owner,
+    card: frame.uid,
+    from: frame.from,
+    byEffect: frame.byEffect,
+    fromHand: frame.fromHand,
+    byCharacterEffect: frame.byCharacterEffect,
+  });
 }
 
 function stepBattle(state: GameState) {
@@ -2280,15 +2306,26 @@ function askCards(
 }
 
 /** Coloca em campo uma carta (de qualquer zona), sem pagar o custo. */
-function playFree(state: GameState, uid: string, rested = false) {
+function playFree(state: GameState, uid: string, rested = false, source?: string, notFromHand = false) {
   const def = cardDef(state, uid);
   const ps = state.players[ownerOf(state, uid)];
   // A carta do [Trigger] ("Play this card") vem de fora das áreas, não do descarte (10-1-5-3).
   const from = ps.trash.includes(uid) ? 'trash' : undefined;
   if (def.category === 'character') {
+    // "When you play a Character … from your hand" / "… using a Character's effect"
+    const fromHand = !notFromHand && ps.hand.includes(uid);
+    const byCharacterEffect = source !== undefined && cardDef(state, source).category === 'character';
     detach(state, uid);
     log(state, ps.id, `${def.name} entra em campo.`);
-    state.stack.push({ kind: 'play', uid, byEffect: true, ...(rested ? { rested: true } : {}), ...(from ? { from } : {}) });
+    state.stack.push({
+      kind: 'play',
+      uid,
+      byEffect: true,
+      ...(rested ? { rested: true } : {}),
+      ...(from ? { from } : {}),
+      ...(fromHand ? { fromHand: true } : {}),
+      ...(byCharacterEffect ? { byCharacterEffect: true } : {}),
+    });
   } else if (def.category === 'stage') {
     detach(state, uid);
     if (ps.stage) {
@@ -2354,7 +2391,7 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
       steps.push({ do: 'returnDonChoice', min: cost.donMinus });
     } else {
       // O dono escolhe quais DON!! devolver (CR 10-2-10-1).
-      steps.push({ do: 'returnDon', count: cost.donMinus });
+      steps.push({ do: 'returnDon', count: cost.donMinus, ...(cost.donMinusActive ? { activeOnly: true as const } : {}) });
     }
   }
   if (cost.trashFromHand) steps.push({ do: 'trashFromHand', count: cost.trashFromHand, filter: cost.trashFilter });
@@ -2442,6 +2479,7 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if (cost.restSelf && (!locate(state, source) || locate(state, source)!.fc.rested || cannotBeRested(state, source))) return false;
   if ((cost.restDon ?? 0) > ps.donActive) return false;
   if ((cost.donMinus ?? 0) > totalDonOnField(ps)) return false;
+  if (cost.donMinusActive && (cost.donMinus ?? 0) + (cost.restDon ?? 0) > ps.donActive) return false;
   if ((cost.trashFromHand ?? 0) > discardable(state, player, cost.trashFilter).length) return false;
   if ((cost.handToBottom ?? 0) > ps.hand.length) return false;
   if ((cost.lifeToHand ?? 0) > ps.life.length) return false;
@@ -2506,9 +2544,11 @@ export function describeCost(cost: AbilityCost): string {
   const parts: string[] = [];
   if (cost.donMinus) {
     parts.push(
-      cost.donMinusOpen
-        ? `DON!! −${cost.donMinus} ou mais (devolver ${cost.donMinus} ou mais DON!! ao deck de DON!!)`
-        : `DON!! −${cost.donMinus} (devolver ${cost.donMinus} DON!! ao deck de DON!!)`,
+      cost.donMinusActive
+        ? `devolver ${cost.donMinus} DON!! ativo(s) ao deck de DON!!`
+        : cost.donMinusOpen
+          ? `DON!! −${cost.donMinus} ou mais (devolver ${cost.donMinus} ou mais DON!! ao deck de DON!!)`
+          : `DON!! −${cost.donMinus} (devolver ${cost.donMinus} DON!! ao deck de DON!!)`,
     );
   }
   if (cost.restDon) parts.push(`virar ${cost.restDon} DON!!`);
@@ -2758,7 +2798,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'playThis': {
       if (zoneOf(state, frame.source) === 'character' || zoneOf(state, frame.source) === 'stage') return true;
-      playFree(state, frame.source, step.rested);
+      playFree(state, frame.source, step.rested, frame.source);
       return true;
     }
     case 'trashFromHand': {
@@ -2852,7 +2892,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         } else if (step.play) {
           // "play up to 1 … Then, place the rest at the bottom": joga a carta (o resto vai para o fundo antes).
           ps.hand.push(uid);
-          playFree(state, uid, step.rested);
+          playFree(state, uid, step.rested, frame.source, true); // vem do deck (só passa pela mão)
         } else {
           ps.hand.push(uid);
           log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`);
@@ -2890,6 +2930,14 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const target = next && 'target' in next ? next.target : undefined;
         if (step.scope && !Object.keys(cost).length && typeof target === 'object' && target.required && !targetCandidates(state, frame.controller, frame.source, target).length) {
           log(state, frame.controller, `${srcName}: nenhuma carta pode ser escolhida, o efeito opcional não é usado.`);
+          releaseOncePerTurn(state, frame.source, step.ability);
+          frame.i += step.scope;
+          return true;
+        }
+        // "you may trash 1 card from your hand. If you do, …": com menos cartas na mão do que o
+        // descarte pede, o descarte não pode ser feito e o "If you do" não acontece (o tamanho da mão é público).
+        if (step.scope && !Object.keys(cost).length && next?.do === 'trashFromHand' && !next.upTo && ps.hand.length < next.count) {
+          log(state, frame.controller, `${srcName}: cartas insuficientes na mão para descartar, o efeito opcional não é usado.`);
           releaseOncePerTurn(state, frame.source, step.ability);
           frame.i += step.scope;
           return true;
@@ -2942,7 +2990,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         frame.choice = undefined;
       }
       while (picked.length < step.count) {
-        const sources = donSources(owner);
+        // "return N of your active DON!! cards": só os ativos da área de custo (sem escolha).
+        const sources = step.activeOnly ? (owner.donActive ? (['active'] as DonSource[]) : []) : donSources(owner);
         if (!sources.length) break;
         // Só pergunta quando a escolha muda alguma coisa: há mais de uma origem e sobra DON!! no campo.
         if (sources.length > 1 && totalDonOnField(owner) > step.count - picked.length) {
@@ -2961,7 +3010,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         picked.push(sources[0]);
       }
       if (picked.length) {
-        emit(state, { kind: 'donReturned', player: owner.id, count: picked.length });
+        emit(state, { kind: 'donReturned', player: owner.id, count: picked.length, byPlayer: frame.controller });
         log(state, frame.controller, `${owner.name} devolve ${picked.length} DON!! ao deck de DON!! (${summarizeDonSources(state, picked)}).`);
       }
       return true;
@@ -3200,7 +3249,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (card && (ps.deck.includes(card) || ps.life.includes(card)) && (!step.filter || matchesFilter(cardDef(state, card), step.filter))) {
         const def = cardDef(state, card);
         if (ps.lifeFaceUp?.includes(card)) removeFrom(ps.lifeFaceUp, card);
-        if (def.category === 'character' || def.category === 'stage') playFree(state, card, step.rested);
+        if (def.category === 'character' || def.category === 'stage') playFree(state, card, step.rested, frame.source);
       }
       return true;
     }
@@ -3401,7 +3450,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       const pickPlay = frame.memo[1] === 'play' && frame.choice[0] === '0';
-      if (pickPlay) playFree(state, uid);
+      if (pickPlay) playFree(state, uid, false, frame.source);
       else {
         removeFrom(ps.hand, uid);
         removeFrom(ps.trash, uid);
@@ -3577,7 +3626,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         };
         return false;
       }
-      for (const uid of frame.choice.filter((u) => options.includes(u)).reverse()) playFree(state, uid);
+      for (const uid of frame.choice.filter((u) => options.includes(u)).reverse()) playFree(state, uid, false, frame.source);
       return true;
     }
     case 'opponentAddDon': {
@@ -4395,7 +4444,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const k = Math.min(step.count, opp.donActive);
         opp.donActive -= k;
         opp.donDeck += k;
-        if (k) emit(state, { kind: 'donReturned', player: opp.id, count: k });
+        if (k) emit(state, { kind: 'donReturned', player: opp.id, count: k, byPlayer: frame.controller });
         return true;
       }
       // O oponente escolhe quais dos seus DON!! devolver.
@@ -4490,7 +4539,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         chosen = chosen.filter((u) => (total + (cardDef(state, u).cost ?? 0) <= step.filter.totalMaxCost! ? ((total += cardDef(state, u).cost ?? 0), true) : false));
       }
       frame.last = [...chosen];
-      for (const uid of chosen.reverse()) playFree(state, uid, step.rested);
+      for (const uid of chosen.reverse()) playFree(state, uid, step.rested, frame.source);
       return true;
     }
     case 'shuffleDeck':

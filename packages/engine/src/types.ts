@@ -198,6 +198,8 @@ export interface Condition {
   handTrashedThisTurn?: boolean;
   /** "your opponent has 5 or more rested cards" (cartas + DON!!) */
   opponentRestedCardsMin?: number;
+  /** "If you have 8 or more rested cards" (cartas + DON!!) */
+  ownRestedCardsMin?: number;
   /** "If your Leader is [A] or [B]" */
   leaderNames?: string[];
   /** "If you only have Characters without a Counter" */
@@ -278,7 +280,7 @@ export interface Condition {
   lifeMin?: number;
   /** "If your opponent has a Character with N or more power" */
   opponentCharacterMinPower?: number;
-  /** "If you have [X]" / "If you have a [X] Character" */
+  /** "If you have [X]" / "If you have a [X] Character" / "If you have [X] on your field" (Personagem ou Stage) */
   haveCharacterNamed?: string;
   /** "If your opponent has N or more DON!! cards on their field" */
   opponentMinDonOnField?: number;
@@ -501,8 +503,18 @@ export interface RemovalStep {
 
 /** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
 export type GameEvent =
-  | { kind: 'donReturned'; min?: number } // DON!! do seu campo voltou ao deck de DON!! ("2 or more")
-  | { kind: 'characterPlayed'; who: 'self' | 'opponent'; filter?: CardFilter; from?: 'trash'; byEffect?: boolean }
+  | { kind: 'donReturned'; min?: number; byYourEffect?: true } // DON!! do seu campo voltou ao deck de DON!! ("2 or more", "by your effect")
+  | {
+      kind: 'characterPlayed';
+      who: 'self' | 'opponent';
+      filter?: CardFilter;
+      from?: 'trash';
+      byEffect?: boolean;
+      /** "… using a Character's effect" */
+      byCharacterEffect?: true;
+      /** "When you play a Character … from your hand" */
+      fromHand?: true;
+    }
   | { kind: 'lifeRemoved'; whose: 'any' | 'own' | 'opponent' } // "a card is removed from your (or your opponent's) Life cards"
   | { kind: 'lifeZero' } // "When your number of Life cards becomes 0"
   | { kind: 'restedByEffect' } // "If a Character is rested by your effect"
@@ -773,7 +785,7 @@ type EffectStepBody =
    * vez: área de custo (ativos ou virados), Líder, Personagens ou Stage. Sem escolha quando só há
    * uma origem ou quando todos os DON!! do campo vão. `opponent`: os DON!! são do oponente, que escolhe.
    */
-  | { do: 'returnDon'; count: number; opponent?: true }
+  | { do: 'returnDon'; count: number; opponent?: true; activeOnly?: true }
   /** "Trash up to N of your opponent's Life cards." (do topo) */
   | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
   /** "This Character gains [Rush] during this turn." */
@@ -834,6 +846,8 @@ export interface AbilityCost {
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
   /** "You may return 1 or more DON!! cards …": o jogador escolhe quantos devolver (no mínimo `donMinus`). */
   donMinusOpen?: boolean;
+  /** "You may return N of your active DON!! cards to your DON!! deck": só DON!! ativos da área de custo. */
+  donMinusActive?: boolean;
   trashFromHand?: number; // "You may trash N card from your hand:"
   /** Filtro das cartas descartadas como custo ("trash 1 {FILM} type card from your hand"). */
   trashFilter?: CardFilter;
@@ -1173,7 +1187,18 @@ export type Frame =
       /** A substituição de dano já foi oferecida para este dano. */
       replaceAsked?: boolean;
     }
-  | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash'; byEffect?: boolean }
+  | {
+      kind: 'play';
+      uid: string;
+      replaceChoice?: string[];
+      rested?: boolean;
+      from?: 'trash';
+      byEffect?: boolean;
+      /** Jogado da mão (pela regra ou por efeito). */
+      fromHand?: boolean;
+      /** Jogado pelo efeito de um Personagem. */
+      byCharacterEffect?: boolean;
+    }
   /**
    * Fecha o turno depois que os efeitos de [End of Your Turn]/[End of Your Opponent's Turn] e os
    * "at the end of this turn" (inclusive os criados na própria End Phase) resolverem (6-6-1).

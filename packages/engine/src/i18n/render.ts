@@ -490,6 +490,9 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'opponentRestedCardsMin':
         out.push(`o oponente tiver ${c.opponentRestedCardsMin} ou mais cartas viradas`);
         break;
+      case 'ownRestedCardsMin':
+        out.push(`você tiver ${c.ownRestedCardsMin} ou mais cartas viradas`);
+        break;
       case 'leaderNames':
         out.push(`o seu Líder for ${c.leaderNames!.map((n) => `[${n}]`).join(' ou ')}`);
         break;
@@ -635,7 +638,9 @@ function condition(c: Condition, ctx: Ctx): string {
 function event(e: GameEvent, ctx: Ctx): string {
   switch (e.kind) {
     case 'donReturned':
-      return e.min && e.min > 1 ? `${e.min} ou mais DON!! do seu campo voltarem ao seu deck de DON!!` : 'um DON!! do seu campo voltar ao seu deck de DON!!';
+      return e.min && e.min > 1
+        ? `${e.min} ou mais DON!! do seu campo voltarem ao seu deck de DON!!`
+        : `um DON!! do seu campo voltar ao seu deck de DON!!${e.byYourEffect ? ' por um efeito seu' : ''}`;
     case 'donGiven':
       return 'este Líder ou 1 dos seus Personagens receber um DON!!';
     case 'damageTaken':
@@ -658,7 +663,8 @@ function event(e: GameEvent, ctx: Ctx): string {
       const what = e.filter ? filter(e.filter, 1, false).replace(/^1 /, 'um ') : 'um Personagem';
       if (e.from === 'trash') return `${what} for jogado do seu descarte`;
       if (e.byEffect) return e.who === 'self' ? `você jogar ${what} usando o efeito de um Personagem` : `o oponente jogar ${what} usando o efeito de um Personagem`;
-      return e.who === 'self' ? `você jogar ${what}` : `o oponente jogar ${what}`;
+      const hand = e.fromHand ? (e.who === 'self' ? ' da sua mão' : ' da mão dele') : '';
+      return e.who === 'self' ? `você jogar ${what}${hand}` : `o oponente jogar ${what}${hand}`;
     }
     case 'characterRemoved': {
       const who =
@@ -692,7 +698,9 @@ function event(e: GameEvent, ctx: Ctx): string {
     case 'damageDealt':
       return 'você causar dano à Vida do oponente';
     case 'leaderBattle':
-      return `o seu Líder${e.filter ? ` ${filter(e.filter, 1, false).replace(/^1 carta ?/, '')}` : ''} atacar ou for atacado`.replace(/  +/g, ' ');
+      // Sem filtro é o próprio Líder ("When this Leader attacks or is attacked", OP03-001).
+      if (!e.filter) return 'este Líder atacar ou for atacado';
+      return `o seu Líder ${filter(e.filter, 1, false).replace(/^1 carta ?/, '')} atacar ou for atacado`.replace(/  +/g, ' ');
     case 'lifeToHand':
       return 'uma carta da sua Vida for para a sua mão';
     case 'returnedToHand':
@@ -707,7 +715,11 @@ function event(e: GameEvent, ctx: Ctx): string {
 function cost(c: AbilityCost, ctx: Ctx, verbal = false): string {
   const symbols: string[] = [];
   const parts: string[] = [];
-  if (verbal) {
+  if (c.donMinusActive) {
+    // "return 2 of your active DON!! cards to your DON!! deck": sem símbolo DON!! −X no texto oficial.
+    if (c.restDon) (verbal ? parts : symbols).push(verbal ? `virar ${c.restDon} dos seus DON!!` : (CIRCLED[c.restDon - 1] ?? `(${c.restDon})`));
+    parts.push(`devolver ${c.donMinus} dos seus DON!! ativos ao seu deck de DON!!`);
+  } else if (verbal) {
     // No meio de uma frase ("você pode … em vez disso") os símbolos viram verbos.
     if (c.restDon) parts.push(`virar ${c.restDon} dos seus DON!!`);
     if (c.donMinus) parts.push(`devolver ${c.donMinus}${c.donMinusOpen ? ' ou mais' : ''} DON!! do seu campo ao seu deck de DON!!`);
@@ -1171,6 +1183,7 @@ const INF: Record<string, string> = {
   embaralhe: 'embaralhar',
   escolha: 'escolher',
   ative: 'ativar',
+  cause: 'causar',
 };
 const toInfinitive = (t: string) => t.replace(/^(\S+)/, (w) => INF[w.toLowerCase()] ?? w.charAt(0).toLowerCase() + w.slice(1));
 
@@ -1405,6 +1418,12 @@ function ability(a: Ability, ctx: Ctx): string {
     return [...tags.filter((t) => t !== TIMING.onKO), body].join(' ');
   }
   else {
+    // Condição de ativação de efeito disparado ("This effect can be activated when …", OP11-043): no
+    // texto, o "Se …" do efeito (junto com o "If …" dos passos).
+    if (a.condition && Object.keys(a.condition).length && !a.cost && a.timing !== 'activateMain') {
+      const cond = a.condition;
+      return ability({ ...a, condition: undefined, steps: a.steps.map((st) => ({ ...st, if: { ...cond, ...st.if } })) }, ctx);
+    }
     const c = a.cost ? cost(a.cost, ctx) : '';
     const pre = a.condition && Object.keys(a.condition).length ? `Se ${condition(a.condition, ctx)}, ` : '';
     body = pre + (c ? `${pre ? c.charAt(0).toLowerCase() + c.slice(1) : c}: ` : '') + steps(a.steps, ctx);
