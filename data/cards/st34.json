@@ -35,7 +35,9 @@
       "cost": 4,
       "power": 4000,
       "counter": 2000,
-      "attributes": [],
+      "attributes": [
+        "Wisdom"
+      ],
       "types": [
         "Big Mom Pirates"
       ],
@@ -202,7 +204,9 @@
       "cost": 7,
       "power": 7000,
       "counter": 1000,
-      "attributes": [],
+      "attributes": [
+        "Special"
+      ],
       "types": [
         "Big Mom Pirates"
       ],

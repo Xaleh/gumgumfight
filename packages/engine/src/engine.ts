@@ -822,22 +822,42 @@ export function attackError(state: GameState, player: PlayerId, attacker: string
   return null;
 }
 
-/** Custo para jogar uma carta da mão (com "give this card in your hand −N cost" e reduções da próxima jogada). */
-export function playCost(state: GameState, uid: string): number {
+/**
+ * Custo de uma carta enquanto está na mão: o impresso mais "give this card in your hand −N cost"
+ * (da própria carta, com a condição dela) e "Give … in your hand −N cost" (auras do campo).
+ * É o custo que vale para efeitos que jogam da mão "with a cost of N or less" (Q&A OP11-023 Arlong:
+ * com −3 na mão, pode ser jogado por Aladine OP11-024 e Fisher Tiger OP11-035).
+ */
+export function costInHand(state: GameState, uid: string): number {
   const def = cardDef(state, uid);
   const owner = ownerOf(state, uid);
   let cost = def.cost ?? 0;
   for (const a of def.abilities) {
     if (a.handCost && (!a.yourTurn || state.activePlayer === owner) && conditionHolds(state, owner, uid, a.condition)) cost += a.handCost;
   }
-  const red = (state.costReductions ?? []).find((r) => r.player === owner && matchesFilter(def, r.filter));
-  if (red) cost -= red.amount;
   const ps = state.players[owner];
   for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) {
     for (const a of cardDef(state, fc.uid).abilities) {
       if (a.timing === 'static' && a.handCostAura && matchesFilter(def, a.handCostAura.filter) && conditionsMet(state, fc.uid, a)) cost += a.handCostAura.amount;
     }
   }
+  return Math.max(0, cost);
+}
+
+/** A definição da carta com o custo que ela tem na mão (para filtros "with a cost of N or less" de efeitos que jogam da mão). */
+function handDef(state: GameState, uid: string): CardDef {
+  const def = cardDef(state, uid);
+  const cost = costInHand(state, uid);
+  return cost === (def.cost ?? 0) ? def : { ...def, cost };
+}
+
+/** Custo para jogar uma carta da mão (o custo na mão mais as reduções da próxima jogada). */
+export function playCost(state: GameState, uid: string): number {
+  const def = cardDef(state, uid);
+  const owner = ownerOf(state, uid);
+  let cost = costInHand(state, uid);
+  const red = (state.costReductions ?? []).find((r) => r.player === owner && matchesFilter(def, r.filter));
+  if (red) cost -= red.amount;
   return Math.max(0, cost);
 }
 
@@ -1867,12 +1887,17 @@ export function cannotBeRested(state: GameState, uid: string): boolean {
 function restCard(state: GameState, uid: string, byEffectOf?: PlayerId, restSource?: string) {
   const loc = locate(state, uid);
   if (!loc || loc.fc.rested) return;
-  if (cannotBeRested(state, uid)) return;
+  if (cannotBeRested(state, uid)) {
+    // "… cannot be rested": o efeito tenta virar e nada acontece; o histórico explica (Q&A EB02-011).
+    if (byEffectOf !== undefined) log(state, byEffectOf, `${cardDef(state, uid).name} não pode ser virada (efeito "não vira" ativo).`);
+    return;
+  }
   if (
     byEffectOf !== undefined &&
     byEffectOf !== loc.player &&
     cardDef(state, uid).abilities.some((a) => a.timing === 'static' && a.staticNoRest && conditionsMet(state, uid, a))
   ) {
+    log(state, byEffectOf, `${cardDef(state, uid).name} não pode ser virada por efeitos do oponente.`);
     return;
   }
   // "If this Character would be rested by your opponent's Character's effect, you may rest 1 of your other Characters instead."
@@ -1985,6 +2010,16 @@ function stepBattle(state: GameState) {
     case 'block': {
       b.step = 'counter';
       const options = blockerOptions(state, defender);
+      // Um [Blocker] ativo que ficou de fora por um efeito na própria carta ("cannot be rested",
+      // "cannot activate [Blocker]"): o histórico diz o motivo, senão parece que o jogo o ignorou.
+      // (Restrições gerais, como "o oponente não pode usar [Blocker]", já têm a própria linha.)
+      if (!b.noBlocker && !restricted(state, defender, 'noBlocker')) {
+        for (const c of state.players[defender].characters) {
+          if (c.rested || c.uid === b.target || options.includes(c.uid) || !hasKeyword(state, c.uid, 'blocker')) continue;
+          if (cannotBeRested(state, c.uid)) log(state, defender, `${cardDef(state, c.uid).name} não pode bloquear: não pode ser virada.`);
+          else if (state.modifiers.some((m) => m.uid === c.uid && m.kind === 'cannotBlock')) log(state, defender, `${cardDef(state, c.uid).name} não pode ativar [Blocker] agora.`);
+        }
+      }
       if (options.length) state.pending = { kind: 'block', player: defender, options };
       return;
     }
@@ -2432,7 +2467,7 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
     return false;
   }
   if ((cost.trashToDeck ?? 0) > ps.trash.length) return false;
-  if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(cardDef(state, u), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
+  if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(handDef(state, u), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
   if (cost.giveOppDon && (state.players[opponent(player)].donRested < cost.giveOppDon || !state.players[opponent(player)].characters.length)) return false;
   if ((cost.handToTop ?? 0) > ps.hand.length) return false;
   if (cost.koSelf && (locate(state, source)?.zone !== 'character' || koProtected(state, source, false, source, player))) return false;
@@ -2507,10 +2542,59 @@ export function describeCost(cost: AbilityCost): string {
   return parts.join(' e ');
 }
 
+/**
+ * Explica, para o histórico, por que a condição de um efeito não vale ("If you have 2 or less
+ * Characters…"): o jogador vê o motivo em vez de um efeito que "não abriu". Cobre as contagens
+ * mais comuns; as outras condições recebem o texto genérico.
+ */
+function conditionFailure(state: GameState, controller: PlayerId, source: string, cond: Condition): string {
+  const ps = state.players[controller];
+  const opp = state.players[opponent(controller)];
+  const chars = ps.characters.length;
+  const self = ps.characters.some((c) => c.uid === source) ? ', contando esta carta' : '';
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  if (cond.maxCharacters !== undefined && chars > cond.maxCharacters) {
+    return `${ps.name} tem ${n(chars, 'Personagem', 'Personagens')}${self}; precisa de ${cond.maxCharacters} ou menos`;
+  }
+  if (cond.minCharacters !== undefined && chars < cond.minCharacters) {
+    return `${ps.name} tem ${n(chars, 'Personagem', 'Personagens')}${self}; precisa de ${cond.minCharacters} ou mais`;
+  }
+  if (cond.handMax !== undefined && ps.hand.length > cond.handMax) return `${ps.name} tem ${n(ps.hand.length, 'carta', 'cartas')} na mão; precisa de ${cond.handMax} ou menos`;
+  if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return `${ps.name} tem ${n(ps.hand.length, 'carta', 'cartas')} na mão; precisa de ${cond.handMin} ou mais`;
+  if (cond.lifeMax !== undefined && ps.life.length > cond.lifeMax) return `${ps.name} tem ${n(ps.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.lifeMax} ou menos`;
+  if (cond.lifeMin !== undefined && ps.life.length < cond.lifeMin) return `${ps.name} tem ${n(ps.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.lifeMin} ou mais`;
+  if (cond.opponentLifeMax !== undefined && opp.life.length > cond.opponentLifeMax) {
+    return `${opp.name} tem ${n(opp.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.opponentLifeMax} ou menos`;
+  }
+  if (cond.opponentLifeMin !== undefined && opp.life.length < cond.opponentLifeMin) {
+    return `${opp.name} tem ${n(opp.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.opponentLifeMin} ou mais`;
+  }
+  if (cond.minDonOnField !== undefined && totalDonOnField(ps) < cond.minDonOnField) return `${ps.name} tem ${totalDonOnField(ps)} DON!! no campo; precisa de ${cond.minDonOnField} ou mais`;
+  if (cond.maxDonOnField !== undefined && totalDonOnField(ps) > cond.maxDonOnField) return `${ps.name} tem ${totalDonOnField(ps)} DON!! no campo; precisa de ${cond.maxDonOnField} ou menos`;
+  if (cond.leaderHasType && !hasType(cardDef(state, ps.leader.uid), cond.leaderHasType)) return `o Líder de ${ps.name} não tem o tipo {${cond.leaderHasType}}`;
+  if (cond.leaderHasAnyType && !cond.leaderHasAnyType.some((t) => hasType(cardDef(state, ps.leader.uid), t))) {
+    return `o Líder de ${ps.name} não tem o tipo ${cond.leaderHasAnyType.map((t) => `{${t}}`).join(' nem ')}`;
+  }
+  return 'a condição do efeito não vale agora';
+}
+
+/** Condições internas do leitor (dependem da escolha anterior), que não são "a condição da carta". */
+const INTERNAL_CONDITIONS: Array<keyof Condition> = ['lastDone', 'chosenMatches', 'revealedHasChosenCost'];
+
 function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   const ps = state.players[frame.controller];
   const srcName = cardDef(state, frame.source).name;
-  if (!frame.choice && !frame.memo && !stepConditionMet(state, frame, step)) return true;
+  if (!frame.choice && !frame.memo && !stepConditionMet(state, frame, step)) {
+    // "If you have 2 or less Characters, play…": a condição da carta não vale. O histórico diz
+    // o motivo (o jogador costuma achar que o efeito falhou, ou que a carta que queria escolher
+    // não servia). Condições internas (depende da escolha anterior) continuam silenciosas.
+    const cond = step.if;
+    if (cond && Object.keys(cond).some((k) => !INTERNAL_CONDITIONS.includes(k as keyof Condition))) {
+      const text = `${srcName}: a condição não vale (${conditionFailure(state, frame.controller, frame.source, cond)}), o efeito não acontece.`;
+      if (state.log[state.log.length - 1]?.text !== text) log(state, frame.controller, text);
+    }
+    return true;
+  }
 
   switch (step.do) {
     case 'power': {
@@ -2547,8 +2631,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         const loc = locate(state, uid);
         if (loc) {
+          const before = loc.fc.rested;
           restCard(state, uid, frame.controller, frame.source);
-          log(state, frame.controller, `${cardDef(state, uid).name} é virado.`);
+          // "cannot be rested" (ou a substituição de rest) deixa a carta como estava: o histórico já explicou.
+          if (loc.fc.rested && !before) log(state, frame.controller, `${cardDef(state, uid).name} é virado.`);
         }
       }
       return true;
@@ -3291,7 +3377,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'handPlayOrLife': {
       if (!frame.memo) {
         const fromTrash = step.from === 'trash';
-        const options = (fromTrash ? ps.trash : ps.hand).filter((u) => matchesFilter(cardDef(state, u), step.filter));
+        const options = (fromTrash ? ps.trash : ps.hand).filter((u) => matchesFilter(fromTrash ? cardDef(state, u) : handDef(state, u), step.filter));
         // Do descarte (público) pula sem opção; da mão abre sempre.
         if (!options.length && (fromTrash || !ps.hand.length || frame.choice)) return true;
         if (!frame.choice) {
@@ -3927,7 +4013,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const to = (frame.last ?? []).find((u) => locate(state, u)?.player === frame.controller);
         if (to && to !== state.battle.target) {
           state.battle.target = to;
-          log(state, frame.controller, `O ataque agora mira ${cardDef(state, to).name}.`);
+          log(state, frame.controller, `${srcName}: o ataque passa a mirar ${cardDef(state, to).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`);
         }
         return true;
       }
@@ -3951,7 +4037,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const target = frame.choice.find((u) => options.includes(u));
       if (target && locate(state, target)) {
         state.battle.target = target;
-        log(state, frame.controller, `O ataque agora mira ${cardDef(state, target).name}.`);
+        log(state, frame.controller, `${srcName}: o ataque passa a mirar ${cardDef(state, target).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`);
       }
       return true;
     }
@@ -4381,7 +4467,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           (!sameName || sameName.includes(def.name)) &&
           (def.category === 'character' || def.category === 'stage') &&
           !def.abilities.some((a) => a.noPlayByEffect) &&
-          matchesFilter(def, filter) &&
+          // Da mão, vale o custo que a carta tem na mão ("give this card in your hand −3 cost", Q&A OP11-023).
+          matchesFilter(ps.hand.includes(u) ? handDef(state, u) : def, filter) &&
           !playBlocked(state, frame.controller, def) &&
           !def.colors.some((c) => lastColors.includes(c))
         );
@@ -4703,7 +4790,10 @@ const removalCtx = (step: RemovalStep): RemovalCtx => ({
 function replacementMatches(r: Replacement, action: RemovalAction, owner: PlayerId, ctx: RemovalCtx): boolean {
   const inBattle = Boolean(ctx.inBattle);
   const byOpponentEffect = !inBattle && ctx.byPlayer !== undefined && ctx.byPlayer !== owner;
-  const cause = (by: Replacement['by']) => by === 'any' || (by === 'battle' ? inBattle : by === 'effect' ? !inBattle : byOpponentEffect);
+  // "by your opponent" (sem "'s effect"): o K.O. em batalha (só o defensor sai, pelo ataque do oponente) e os efeitos dele.
+  const byOpponent = inBattle || byOpponentEffect;
+  const cause = (by: Replacement['by']) =>
+    by === 'any' || (by === 'battle' ? inBattle : by === 'effect' ? !inBattle : by === 'opponent' ? byOpponent : byOpponentEffect);
   // "would be K.O.'d": só K.O.
   if (r.event !== 'removal' && action === 'ko' && cause(r.by)) return true;
   // "would be removed from the field" / "would leave the field": qualquer saída do campo (o K.O. também),

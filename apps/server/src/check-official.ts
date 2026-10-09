@@ -36,8 +36,18 @@ async function main() {
   if (!remaining.length) return;
   console.log('\nEntradas para SOURCE_FIXES (conferir antes de colar):');
   for (const d of remaining) {
-    const fix = { ...(d.name ? { name: d.name.official } : {}), ...(d.types ? { types: d.types.official } : {}) };
-    const was = [d.name ? `nome "${d.name.api}"` : '', d.types ? `tipos ${JSON.stringify(d.types.api)}` : ''].filter(Boolean).join(', ');
+    const fix = {
+      ...(d.name ? { name: d.name.official } : {}),
+      ...(d.types ? { types: d.types.official } : {}),
+      ...(d.attributes ? { attributes: d.attributes.official } : {}),
+    };
+    const was = [
+      d.name ? `nome "${d.name.api}"` : '',
+      d.types ? `tipos ${JSON.stringify(d.types.api)}` : '',
+      d.attributes ? `atributo ${JSON.stringify(d.attributes.api)}` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
     console.log(`  '${d.id}': ${JSON.stringify(fix)}, // API: ${was}`);
   }
 }

@@ -30,6 +30,7 @@ import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
 import { useBoardMotion } from './Motion';
+import { ReplayBar, type ReplayControls } from './ReplayBar';
 import {
   EmoteBar,
   EmoteBubbles,
@@ -42,6 +43,9 @@ import {
   SpectatorCount,
   seriesAfter,
 } from './Online';
+
+/** Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen). */
+const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]|o ataque passa a mirar/;
 
 /**
  * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
@@ -105,6 +109,10 @@ interface TableGame {
   canUndo: boolean;
   actions: () => Action[];
   downloadReplay: () => void;
+  /** Replay: posição no roteiro, para avançar, voltar e pular. */
+  replay?: ReplayControls;
+  /** Replay: a última mudança foi um pulo (sem animação). */
+  jumped?: boolean;
 }
 
 type TableKind = GameSetup['mode'] | 'online';
@@ -280,6 +288,28 @@ function Table({
   spectator?: { canHands: boolean; onToggleHands: () => void };
 }) {
   const { state, dispatch, human } = game;
+  /**
+   * Aviso curto na mesa para as linhas do histórico que explicam por que algo não aconteceu
+   * (condição de efeito que não vale, [Blocker] que não pode bloquear, carta que não pode ser
+   * virada). No celular o histórico fica atrás de um botão, e sem o aviso parece que o jogo ignorou a jogada.
+   */
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeSeen = useRef(state.log.length);
+  useEffect(() => {
+    // Replay: num pulo, as linhas puladas não viram aviso.
+    if (game.jumped) {
+      noticeSeen.current = state.log.length;
+      return;
+    }
+    if (noticeSeen.current > state.log.length) noticeSeen.current = 0; // desfazer / replay
+    const fresh = state.log.slice(noticeSeen.current);
+    noticeSeen.current = state.log.length;
+    const hit = [...fresh].reverse().find((e) => NOTICE_RE.test(e.text));
+    if (!hit) return;
+    setNotice(hit.text);
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
@@ -291,8 +321,10 @@ function Table({
   const animate = animations;
   // Cartas voando entre as zonas (mais rápidas com o bot acelerado).
   const allActions = game.actions();
+  // Replay: os pulos (voltar, ir para uma ação) e a velocidade máxima mudam a mesa sem animação.
+  const replay = game.replay;
   const motion = useBoardMotion(state, {
-    enabled: animate,
+    enabled: animate && !game.jumped && !(replay && game.speed >= 8),
     tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
     lastAction: allActions[allActions.length - 1],
     lang,
@@ -406,6 +438,11 @@ function Table({
   const turnKey = state.phase === 'main' ? `${state.turn}:${state.activePlayer}` : null;
   useEffect(() => {
     if (turnKey === null) return;
+    // Replay: num pulo, a faixa do turno anterior some e a do novo não aparece.
+    if (game.jumped) {
+      setBanner(null);
+      return;
+    }
     const p = state.activePlayer;
     const mine = human === null ? p === 0 : p === human;
     const name = state.players[p].name;
@@ -884,7 +921,7 @@ function Table({
 
   return (
     <div
-      className={['game', wide ? 'wide' : '', watching ? 'flip-top' : '', drag ? 'dragging' : ''].join(' ')}
+      className={['game', wide ? 'wide' : '', watching ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : ''].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
@@ -960,6 +997,11 @@ function Table({
         {game.error && (
           <div className="toast error" onClick={() => game.setError(null)}>
             {game.error}
+          </div>
+        )}
+        {notice && !game.error && (
+          <div className="toast notice" role="status" onClick={() => setNotice(null)}>
+            {notice}
           </div>
         )}
 
@@ -1043,7 +1085,7 @@ function Table({
                   ↶ Desfazer
                 </button>
               )}
-              {!isOnline && (
+              {!isOnline && !replay && (
                 <button className="btn" onClick={() => game.setPaused((p) => !p)}>
                   {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
                 </button>
@@ -1073,7 +1115,7 @@ function Table({
                 ← Sair para o {backTo}
               </button>
             </div>
-            {!isOnline && (
+            {!isOnline && !replay && (
               <div className="sheet-section">
                 <label className="sheet-label">Velocidade do bot</label>
                 <div className="seg small">
@@ -1147,7 +1189,7 @@ function Table({
 
         {sheet === 'log' && (
           <SheetFrame title="Histórico" onClose={() => setSheet(null)}>
-            <LogPanel state={state} />
+            <LogPanel state={state} fresh={replay?.logFrom} />
           </SheetFrame>
         )}
 
@@ -1172,13 +1214,21 @@ function Table({
             actions={game.actions()}
             onExit={onExit}
             exitLabel={`Voltar ao ${backTo}`}
-            onRematch={onRematch}
+            onRematch={
+              replay
+                ? () => {
+                    replay.seek(0);
+                    game.setPaused(() => false);
+                  }
+                : onRematch
+            }
             rematchLabel={
-              rematchLabel ??
+              (replay ? 'Assistir de novo' : rematchLabel) ??
               (online && human !== null ? (online.room?.rematch[human] ? 'Aguardando o oponente…' : 'Pedir revanche') : undefined)
             }
             onReplay={game.downloadReplay}
             onLog={() => setSheet('log')}
+            onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
           />
         )}
@@ -1195,7 +1245,7 @@ function Table({
                 ↶ Desfazer
               </button>
             )}
-            {!isOnline && (
+            {!isOnline && !replay && (
               <>
                 <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
                   {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
@@ -1220,8 +1270,19 @@ function Table({
             )}
           </div>
           <CardDetail state={state} uid={detailUid} />
-          <LogPanel state={state} />
+          <LogPanel state={state} fresh={replay?.logFrom} />
         </aside>
+      )}
+
+      {replay && (
+        <ReplayBar
+          replay={replay}
+          state={state}
+          paused={game.paused}
+          setPaused={game.setPaused}
+          speed={game.speed}
+          setSpeed={game.setSpeed}
+        />
       )}
     </div>
   );
@@ -2293,7 +2354,8 @@ function SheetFrame({ title, onClose, children }: { title: string; onClose: () =
   );
 }
 
-function LogPanel({ state }: { state: GameState }) {
+/** Histórico da partida. `fresh`: no replay, as linhas da ação atual (desta em diante) ficam destacadas. */
+function LogPanel({ state, fresh }: { state: GameState; fresh?: number | null }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
@@ -2301,7 +2363,15 @@ function LogPanel({ state }: { state: GameState }) {
   return (
     <div className="log" ref={ref}>
       {state.log.map((e, i) => (
-        <div key={i} className={['log-line', e.player === null ? '' : `p${e.player}`, e.text.startsWith('—') ? 'turn' : ''].join(' ')}>
+        <div
+          key={i}
+          className={[
+            'log-line',
+            e.player === null ? '' : `p${e.player}`,
+            e.text.startsWith('—') ? 'turn' : '',
+            fresh != null && i >= fresh ? 'fresh' : '',
+          ].join(' ')}
+        >
           {e.secret ?? e.text}
         </div>
       ))}

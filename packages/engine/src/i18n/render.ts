@@ -1382,7 +1382,16 @@ function ability(a: Ability, ctx: Ctx): string {
             .replace(/^até 1 carta sua (\[[^\]]+\])/, 'o seu $1');
     const what =
       r.event === 'ko' ? 'for nocauteado' : r.event === 'removal' ? 'for removido do campo' : r.event === 'rest' ? 'for virado' : 'for nocauteado ou removido do campo';
-    const by = r.by === 'battle' ? ' em batalha' : r.by === 'effect' ? ' por um efeito' : r.by === 'opponentEffect' ? ' por um efeito do oponente' : '';
+    const by =
+      r.by === 'battle'
+        ? ' em batalha'
+        : r.by === 'effect'
+          ? ' por um efeito'
+          : r.by === 'opponentEffect'
+            ? ' por um efeito do oponente'
+            : r.by === 'opponent'
+              ? ' pelo oponente'
+              : '';
     const c = a.cost ? cost(a.cost, ctx, true).replace(/^Você pode /, '') : '';
     const extra = a.steps.length ? ` e ${lowerFirst(steps(a.steps, ctx)).replace(/\.$/, '')}` : '';
     const pre = a.condition && Object.keys(a.condition).length ? `${condition(a.condition, ctx)} e ` : '';

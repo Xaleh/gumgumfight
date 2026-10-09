@@ -1,0 +1,67 @@
+{
+ "note": "Cartas reais da optcgapi usadas nos testes de regressão (bugs relatados no Trello): Arlong EB02-011 (\"cannot be rested\"), Arlong OP11-023 (\"give this card in your hand −3 cost\") e um Líder {Fish-Man}.",
+ "cards": [
+  {
+   "id": "EB02-011",
+   "name": "Arlong",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Fish-Man",
+    "Arlong Pirates",
+    "East Blue"
+   ],
+   "text": "[On Play] If your Leader has the {Fish-Man} or {East Blue} type, give up to 1 rested DON!! card to 1 of your Leader. Then, up to 1 of your opponent's Characters with a cost of 5 or less cannot be rested until the end of your opponent's next turn.",
+   "set": "EB02"
+  },
+  {
+   "id": "OP11-023",
+   "name": "Arlong",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 7,
+   "power": 7000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Fish-Man",
+    "The Sun Pirates",
+    "Fish-Man Island"
+   ],
+   "text": "If your Leader has the {Fish-Man} type, you have 3 or less Life cards and your opponent has 5 or more rested cards, give this card in your hand 3 cost.",
+   "trigger": "Rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+   "set": "OP11"
+  },
+  {
+   "id": "OP11-021",
+   "name": "Jinbe",
+   "category": "leader",
+   "colors": [
+    "green"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Fish-Man",
+    "Straw Hat Crew"
+   ],
+   "text": "[End of Your Turn] If you have 6 or less cards in your hand, set up to 1 of your {Fish-Man} or {Merfolk} type Characters and up to 1 of your DON!! cards as active.",
+   "set": "OP11"
+  }
+ ]
+}

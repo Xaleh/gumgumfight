@@ -187,7 +187,9 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
 - **Determinismo**: o RNG vive dentro do estado. `mulberry32` (32 bits) nas partidas locais; `sfc32` (128 bits,
   seed do `crypto`) nas online, porque 32 bits poderiam ser descobertos por força bruta a partir da mão inicial.
 - **Replays**: `REPLAY_VERSION = 10`; `upgradeReplayActions` insere respostas implícitas de versões antigas. Não há
-  "verificador" no motor: verificar um replay é refazer a partida com `createGame` + `applyAction`.
+  "verificador" no motor: verificar um replay é refazer a partida com `createGame` + `applyAction`. `ReplayCursor`
+  navega por um replay (avançar, voltar, pular para a ação N): guarda o estado a cada 20 ações e refaz a partir do
+  mais próximo; uma ação que o motor recusa encurta o replay (`failed`).
 
 ### Efeitos das cartas
 
@@ -300,6 +302,11 @@ Nada de cache de cartas: o construtor baixa `GET /api/cards` inteiro toda vez qu
 Roda **inteira no navegador** (`useGame.ts`): `createGame`, `applyAction`, `chooseBotAction` com atrasos de 500–2000 ms
 para parecer humano, undo com até 400 estados, replay `.json`. No fim, `POST /api/matches` envia `{mode, format,
 seed, firstPlayer, chooseFirst, deckIds, decks, actions}`; o servidor refaz e grava (seção 9).
+
+**Assistir replay** (`ReplayLoader.tsx` + modo `replay` do `useGame`): o `.json` vira um `GameSetup` com o roteiro já
+convertido; com `decks` no arquivo (online e, desde o card 73, também os baixados no navegador) os decks não precisam
+existir. O `useGame` usa um `ReplayCursor`; a `ReplayBar` (abaixo da mesa) avança, volta e pula. Pulos e a velocidade 8×
+mudam a mesa sem animação. Nada é gravado em `matches`.
 
 ### Partida online e espectador
 

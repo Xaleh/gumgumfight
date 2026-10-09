@@ -14,12 +14,14 @@ interface Props {
   rematchLabel?: string;
   onReplay: () => void;
   onLog: () => void;
+  /** Replay: fecha o resumo para rever a partida (voltar ações). */
+  onClose?: () => void;
   /** Informações a mais (online: recompensa da ranqueada). */
   extra?: ReactNode;
 }
 
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
-export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, extra }: Props) {
+export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra }: Props) {
   const me: PlayerId = human ?? state.winner ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
   const won = state.winner === me;
@@ -122,6 +124,11 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
           <button className="btn big" onClick={onExit}>
             {exitLabel ?? 'Voltar ao menu'}
           </button>
+          {onClose && (
+            <button className="btn big" onClick={onClose}>
+              Rever a partida
+            </button>
+          )}
           <button className="btn small pill" onClick={onReplay}>
             ⤓ Baixar replay
           </button>

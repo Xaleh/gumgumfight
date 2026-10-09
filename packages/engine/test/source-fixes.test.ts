@@ -31,8 +31,17 @@ describe('tabela de correções da fonte', () => {
       const fixed = applySourceFixes(fromApi(id, 'Nome da API', ['Tipo da API']));
       expect(fixed.name).toBe(fix.name ?? 'Nome da API');
       expect(fixed.types).toEqual(fix.types ?? ['Tipo da API']);
+      expect(fixed.attributes).toEqual(fix.attributes);
       expect(applySourceFixes(fixed)).toBe(fixed);
     }
+  });
+
+  it('Arlong OP15-023 chega da API sem atributo e vira "Slash": o filtro "Slash" attribute (Mihawk ST12-003) o acha', () => {
+    const api: CardData = { ...fromApi('OP15-023', 'Arlong', ['Fish-Man', 'East Blue', 'Arlong Pirates']), colors: ['green'], cost: 4, attributes: [] };
+    const def = buildCardDef(api);
+    expect(def.attributes).toEqual(['Slash']);
+    expect(matchesFilter(def, { hasAnyType: ['Muggy Kingdom'], orAttribute: 'Slash', category: 'character', maxCost: 4 })).toBe(true);
+    expect(matchesFilter(buildCardDef({ ...api, id: 'OP99-023' }), { hasAnyType: ['Muggy Kingdom'], orAttribute: 'Slash', category: 'character', maxCost: 4 })).toBe(false);
   });
 
   it('carta sem correção volta igual', () => {

@@ -2,14 +2,20 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildCardDef } from '../src/cards';
-import { applyAction, createGame, getPower } from '../src/engine';
+import { legalActions } from '../src/actions';
+import { applyAction, cannotBeRested, costInHand, createGame, getPower } from '../src/engine';
 import { createAliases, viewFor } from '../src/view';
 import type { CardData, DeckList, GameState, PlayerId } from '../src/types';
 import { cards as baseCards, returnDonInOrder, toTurn } from './helpers';
 
 // Bugs relatados no quadro do Trello, reproduzidos com as cartas reais da optcgapi.
 const bugCards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-op09-op17.json'), 'utf8')) as { cards: CardData[] }).cards;
-const cards = [...baseCards, ...bugCards];
+const eb02Cards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-eb02.json'), 'utf8')) as { cards: CardData[] }).cards;
+const dataCards = (set: string) => (JSON.parse(readFileSync(join(__dirname, '../../../data/cards', `${set}.json`), 'utf8')) as { cards: CardData[] }).cards;
+const st12Cards = dataCards('st12');
+const st36Cards = dataCards('st36');
+const op01Arlong = dataCards('op01').filter((c) => c.id === 'OP01-063');
+const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards];
 
 const deck = (leader: string): DeckList => ({ id: leader, name: leader, leader, cards: [{ id: 'ST01-006', count: 50 }] });
 
@@ -230,5 +236,224 @@ describe('Trello: "Up to 1 of your [Shanks]" (OP17-036) também vale para o Líd
     expect(s.battle).toBeNull();
     expect(s.players[0].life).toHaveLength(5);
     expect(getPower(s, leader)).toBe(5000); // o bônus era só durante a batalha
+  });
+});
+
+describe('Trello: Mihawk ST12-003 joga um Personagem "Slash" (Arlong) da mão, virado', () => {
+  /** Turno 3 do jogador 0 (Líder ST12-001), com `others` Personagens já em campo e Mihawk + 2 Arlong + Duval na mão. */
+  function playMihawk(others: number) {
+    let s = toTurn(game(['ST12-001', 'ST02-001']), 3);
+    setDon(s, 0, 3);
+    for (let i = 0; i < others; i++) field(s, 0, 'ST01-006');
+    const mihawk = hand(s, 0, 'ST12-003');
+    const arlongEb02 = hand(s, 0, 'EB02-011'); // verde, "Slash", custo 3
+    const arlongOp01 = hand(s, 0, 'OP01-063'); // azul, "Slash", custo 4
+    const duval = hand(s, 0, 'ST12-014'); // "Strike": não serve
+    s = applyAction(s, { type: 'playCard', player: 0, uid: mihawk });
+    return { s, mihawk, arlongEb02, arlongOp01, duval };
+  }
+
+  it('com 1 outro Personagem (2 contando o Mihawk), os dois Arlong são opções e o escolhido entra virado', () => {
+    let { s, arlongEb02, arlongOp01, duval } = playMihawk(1);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, hidden: true, max: 1 });
+    const options = (s.pending as { options: string[] }).options;
+    expect(options).toContain(arlongEb02);
+    expect(options).toContain(arlongOp01);
+    expect(options).not.toContain(duval);
+    s = applyAction(s, { type: 'choose', player: 0, uids: [arlongEb02] });
+    expect(s.players[0].characters.find((c) => c.uid === arlongEb02)).toMatchObject({ rested: true });
+    expect(s.players[0].hand).not.toContain(arlongEb02);
+  });
+
+  it('com 2 outros Personagens (3 contando o Mihawk, Q&A OP01-038 e EB02-022), o efeito não abre e o histórico diz o motivo', () => {
+    const { s, arlongEb02 } = playMihawk(2);
+    expect(s.pending).toBeNull();
+    expect(s.players[0].characters).toHaveLength(3);
+    expect(s.players[0].hand).toContain(arlongEb02);
+    expect(s.log.map((l) => l.text)).toContain(
+      'Dracule Mihawk: a condição não vale (A tem 3 Personagens, contando esta carta; precisa de 2 ou menos), o efeito não acontece.',
+    );
+  });
+});
+
+describe('Trello: [Blocker] vira ao bloquear; "cannot be rested" (Arlong EB02-011) impede bloquear e ser virado', () => {
+  /** Turno 4 (do jogador 1), com Duval ativo no campo do jogador 0. */
+  function defending() {
+    const s = toTurn(game(['ST12-001', 'ST12-001']), 4);
+    setDon(s, 1, 4);
+    const duval = field(s, 0, 'ST12-014');
+    return { s, duval };
+  }
+  const attackLeader = (s: GameState, attacker: PlayerId) =>
+    applyAction(s, { type: 'attack', player: attacker, attacker: s.players[attacker].leader.uid, target: s.players[opponentOf(attacker)].leader.uid });
+  const opponentOf = (p: PlayerId): PlayerId => (p === 0 ? 1 : 0);
+
+  it('Duval bloqueia o ataque, fica virado e passa a ser o alvo', () => {
+    let { s, duval } = defending();
+    s = attackLeader(s, 1);
+    expect(s.pending).toMatchObject({ kind: 'block', player: 0, options: [duval] });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [duval] });
+    expect(s.players[0].characters.find((c) => c.uid === duval)).toMatchObject({ rested: true });
+    expect(s.battle).toMatchObject({ target: duval, blocked: true });
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 0 });
+  });
+
+  it('sob "cannot be rested", Duval não entra nas opções de Blocker (Q&A EB02-011), não ataca, e volta a bloquear quando o efeito acaba', () => {
+    let { s, duval } = defending();
+    const arlong = hand(s, 1, 'EB02-011');
+    s = applyAction(s, { type: 'playCard', player: 1, uid: arlong });
+    // O 1º passo (DON!! ao Líder) pede Líder {Fish-Man} ou {East Blue}: não vale, e o histórico explica; o 2º escolhe o alvo.
+    expect(s.log.map((l) => l.text)).toContain('Arlong: a condição não vale (o Líder de B não tem o tipo {Fish-Man} nem {East Blue}), o efeito não acontece.');
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1, options: [duval] });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [duval] });
+    expect(cannotBeRested(s, duval)).toBe(true);
+
+    s = attackLeader(s, 1);
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 0 }); // sem etapa de Blocker: Duval era o único
+    expect(s.log.map((l) => l.text)).toContain('Duval não pode bloquear: não pode ser virada.');
+    expect(s.players[0].characters.find((c) => c.uid === duval)).toMatchObject({ rested: false });
+    s = noDefense(s);
+
+    // Turno 5 (do jogador 0): o efeito dura até o fim deste turno; Duval não pode atacar.
+    s = applyAction(s, { type: 'endTurn', player: 1 });
+    expect(s.turn).toBe(5);
+    expect(legalActions(s, 0).some((a) => a.type === 'attack' && a.attacker === duval)).toBe(false);
+
+    // Turno 6 (do jogador 1): o efeito acabou; Duval bloqueia de novo.
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(cannotBeRested(s, duval)).toBe(false);
+    s = attackLeader(s, 1);
+    expect(s.pending).toMatchObject({ kind: 'block', player: 0, options: [duval] });
+  });
+
+  it('um efeito que vira ("Rest up to 1…", Kuina ST12-002) não vira Duval sob "cannot be rested", e o histórico explica', () => {
+    let { s, duval } = defending();
+    const kuina = field(s, 1, 'ST12-002');
+    const arlong = hand(s, 1, 'EB02-011');
+    s = applyAction(s, { type: 'playCard', player: 1, uid: arlong });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [duval] });
+    s = applyAction(s, { type: 'activate', player: 1, uid: kuina, ability: 0 });
+    if (s.pending?.kind === 'selectTargets') {
+      expect(s.pending.options).toContain(duval);
+      s = applyAction(s, { type: 'choose', player: 1, uids: [duval] });
+    }
+    expect(s.players[0].characters.find((c) => c.uid === duval)).toMatchObject({ rested: false });
+    expect(s.players[1].characters.find((c) => c.uid === kuina)).toMatchObject({ rested: true }); // o custo foi pago
+    const log = s.log.map((l) => l.text);
+    expect(log).toContain('Duval não pode ser virada (efeito "não vira" ativo).');
+    expect(log).not.toContain('Duval é virado.');
+  });
+});
+
+describe('Trello (replay): Mihawk ST12-003 + Arlong OP11-023 com "give this card in your hand −3 cost" (Q&A OP11-023)', () => {
+  /** Turno 3 do jogador 0 com Líder Jinbe OP11-021 ({Fish-Man}); `holds` deixa a condição do Arlong valendo (≤ 3 Vidas, oponente com 5+ cartas viradas). */
+  function playMihawk(holds: boolean) {
+    let s = toTurn(game(['OP11-021', 'ST02-001']), 3);
+    setDon(s, 0, 3);
+    if (holds) {
+      const ps = s.players[0];
+      while (ps.life.length > 3) ps.deck.push(ps.life.pop()!);
+      setDon(s, 1, 0, 5); // 5 DON!! virados do oponente
+    }
+    const mihawk = hand(s, 0, 'ST12-003');
+    const arlong = hand(s, 0, 'OP11-023'); // custo impresso 7; na mão vale 4 quando a condição vale
+    const before = costInHand(s, arlong);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: mihawk });
+    return { s, arlong, before };
+  }
+
+  it('com a condição valendo, o Arlong custa 4 na mão e pode ser jogado pelo Mihawk', () => {
+    let { s, arlong, before } = playMihawk(true);
+    expect(before).toBe(4);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, hidden: true });
+    expect((s.pending as { options: string[] }).options).toContain(arlong);
+    s = applyAction(s, { type: 'choose', player: 0, uids: [arlong] });
+    expect(s.players[0].characters.find((c) => c.uid === arlong)).toMatchObject({ rested: true });
+  });
+
+  it('sem a condição, o Arlong custa 7 e fica de fora', () => {
+    const { s, arlong, before } = playMihawk(false);
+    expect(before).toBe(7);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, hidden: true });
+    expect((s.pending as { options: string[] }).options).not.toContain(arlong);
+  });
+});
+
+describe('Trello (replay): Eustass Kid ST36-005 troca o alvo do ataque sem virar (não é [Blocker])', () => {
+  it('o Kid vira o alvo, continua ativo, e o histórico diz que foi troca de alvo por efeito', () => {
+    let s = game(['ST12-001', 'OP10-099']);
+    // O Líder OP10-099 pergunta no fim do turno ("virar 1 Vida para cima?"): recusa até o turno 3.
+    while (s.turn < 3) s = s.pending?.kind === 'confirm' ? applyAction(s, { type: 'answer', player: s.pending.player, yes: false }) : applyAction(s, { type: 'endTurn', player: s.activePlayer });
+    setDon(s, 0, 3);
+    const kid = field(s, 1, 'ST36-005');
+    // O custo do Kid é virar 1 Vida para baixo: precisa de uma Vida virada para cima (no replay, o Líder OP10-099 vira no fim do turno).
+    const life1 = s.players[1].life;
+    s.players[1].lifeFaceUp = [life1[life1.length - 1]];
+    const leader1 = s.players[1].leader.uid;
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: leader1 });
+    // [On Your Opponent's Attack]: "You may turn 1 Life face-down": pergunta, depois escolhe o novo alvo.
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 1 });
+    s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1, options: [kid] });
+    s = applyAction(s, { type: 'choose', player: 1, uids: [kid] });
+    expect(s.battle).toMatchObject({ target: kid, blocked: false });
+    expect(s.players[1].characters.find((c) => c.uid === kid)).toMatchObject({ rested: false });
+    expect(s.log.map((l) => l.text)).toContain(
+      'Eustass"Captain"Kid: o ataque passa a mirar Eustass"Captain"Kid (troca de alvo por efeito, não é [Blocker]: a carta não vira).',
+    );
+    // Sem outro [Blocker], segue direto para o Counter.
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 1 });
+  });
+});
+
+describe('Trello (replay do card 70): Zoro OP12-020 x bot Kid ST36, partida inteira', () => {
+  const fx = JSON.parse(readFileSync(join(__dirname, 'fixtures/replay-trello-70.json'), 'utf8')) as {
+    decks: [DeckList, DeckList];
+    cards: CardData[];
+    replay: { seed: number; firstPlayer: PlayerId; chooseFirst?: boolean; actions: Parameters<typeof applyAction>[1][] };
+  };
+
+  it('o Arlong OP15-023 (atributo vazio na API) é "Slash" e entra nas opções do Mihawk; o Kid ST36-005 troca o alvo sem virar; o replay roda até o fim', () => {
+    const { replay } = fx;
+    let s = createGame({
+      seed: replay.seed,
+      firstPlayer: replay.chooseFirst ? undefined : replay.firstPlayer,
+      chooseFirst: replay.chooseFirst,
+      cards: fx.cards,
+      players: [
+        { name: 'Xaleh', deck: fx.decks[0], isBot: false },
+        { name: 'Bot', deck: fx.decks[1], isBot: true },
+      ],
+    });
+    const byId = (id: string, player: PlayerId) => s.players[player].hand.find((u) => s.cards[u].cardId === id);
+    let mihawkChecked = false;
+    let redirects = 0;
+    replay.actions.forEach((a, i) => {
+      const before = s;
+      s = applyAction(s, a);
+      if (a.type === 'playCard' && s.cards[a.uid].cardId === 'ST12-003') {
+        // Mão na hora: Arlong OP15-023 ("Slash" pela lista oficial; a API traz o atributo vazio), Oden OP14-026 ("Slash"), Perona OP14-033 (custo 5).
+        expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, hidden: true });
+        const options = (s.pending as { options: string[] }).options;
+        expect(options).toContain(byId('OP15-023', 0));
+        expect(options).toContain(byId('OP14-026', 0));
+        expect(options).not.toContain(byId('OP14-033', 0));
+        mihawkChecked = true;
+      }
+      if (before.pending?.kind === 'selectTargets' && before.pending.prompt.endsWith('escolha o novo alvo do ataque.') && a.type === 'choose') {
+        const kid = a.uids[0];
+        expect(s.cards[kid].cardId).toBe('ST36-005');
+        expect(s.battle?.target).toBe(kid);
+        expect(s.battle?.blocked).toBe(false);
+        expect(s.log[s.log.length - 1].text).toContain('troca de alvo por efeito, não é [Blocker]');
+        // Continua como estava (ativo no turno 7, virado nos seguintes): a troca de alvo não vira a carta.
+        const fc = s.players[1].characters.find((c) => c.uid === kid)!;
+        expect(fc.rested).toBe(before.players[1].characters.find((c) => c.uid === kid)!.rested);
+        redirects++;
+      }
+      if (i === replay.actions.length - 1) expect(s.phase).not.toBe('mulligan');
+    });
+    expect(mihawkChecked).toBe(true);
+    expect(redirects).toBe(3);
   });
 });
