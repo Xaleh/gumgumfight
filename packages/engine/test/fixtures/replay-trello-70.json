@@ -1,0 +1,1471 @@
+{
+ "note": "Replay anexado ao card 70 do Trello (Zoro OP12-020 x bot Kid ST36), com as listas dos decks e as cartas reais da optcgapi (mescladas como no importador).",
+ "decks": [
+  {
+   "id": "u-d509ebc4",
+   "name": "Zoro Verde (OP12-020)",
+   "leader": "OP12-020",
+   "cards": [
+    {
+     "id": "OP12-039",
+     "count": 4
+    },
+    {
+     "id": "OP13-037",
+     "count": 2
+    },
+    {
+     "id": "OP12-031",
+     "count": 4
+    },
+    {
+     "id": "OP12-028",
+     "count": 4
+    },
+    {
+     "id": "OP12-026",
+     "count": 2
+    },
+    {
+     "id": "ST32-005",
+     "count": 4
+    },
+    {
+     "id": "OP12-034",
+     "count": 4
+    },
+    {
+     "id": "OP14-033",
+     "count": 4
+    },
+    {
+     "id": "ST32-003",
+     "count": 3
+    },
+    {
+     "id": "ST32-002",
+     "count": 4
+    },
+    {
+     "id": "EB01-012",
+     "count": 2
+    },
+    {
+     "id": "OP12-037",
+     "count": 2
+    },
+    {
+     "id": "OP13-031",
+     "count": 3
+    },
+    {
+     "id": "ST12-003",
+     "count": 4
+    },
+    {
+     "id": "OP15-023",
+     "count": 2
+    },
+    {
+     "id": "OP14-026",
+     "count": 2
+    }
+   ]
+  },
+  {
+   "id": "st36-kid",
+   "name": "Kid Amarelo (ST36)",
+   "leader": "OP10-099",
+   "cards": [
+    {
+     "id": "OP10-101",
+     "count": 2
+    },
+    {
+     "id": "OP10-103",
+     "count": 4
+    },
+    {
+     "id": "OP10-109",
+     "count": 4
+    },
+    {
+     "id": "OP10-111",
+     "count": 4
+    },
+    {
+     "id": "OP10-114",
+     "count": 4
+    },
+    {
+     "id": "OP12-113",
+     "count": 4
+    },
+    {
+     "id": "OP13-116",
+     "count": 4
+    },
+    {
+     "id": "P-085",
+     "count": 2
+    },
+    {
+     "id": "P-088",
+     "count": 4
+    },
+    {
+     "id": "ST36-001",
+     "count": 4
+    },
+    {
+     "id": "ST36-002",
+     "count": 4
+    },
+    {
+     "id": "ST36-003",
+     "count": 4
+    },
+    {
+     "id": "ST36-004",
+     "count": 4
+    },
+    {
+     "id": "ST36-005",
+     "count": 2
+    }
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "id": "EB01-012",
+   "name": "Cavendish",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Beautiful Pirates",
+    "Supernovas"
+   ],
+   "text": "[On Play]/[When Attacking] If your Leader has the {Supernovas} type and you have no other [Cavendish] Characters, set up to 2 of your DON!! cards as active.",
+   "set": "EB01"
+  },
+  {
+   "id": "OP10-109",
+   "name": "Basil Hawkins",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Hawkins Pirates",
+    "Supernovas"
+   ],
+   "text": "[On K.O.] Trash up to 1 card from the top of your opponent's Life cards.",
+   "trigger": "Draw 2 cards and trash 1 card from your hand.",
+   "set": "OP10"
+  },
+  {
+   "id": "OP10-111",
+   "name": "Monkey.D.Luffy",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "text": "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Supernovas} type card other than [Monkey.D.Luffy] and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "set": "OP10"
+  },
+  {
+   "id": "OP10-114",
+   "name": "X.Drake",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 3000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Drake Pirates",
+    "Navy",
+    "Supernovas"
+   ],
+   "text": "[Activate: Main] You may rest this Character: If the number of your Life cards is equal to or less than the number of your opponent's Life cards, rest up to 1 of your opponent's Characters with a cost of 4 or less.",
+   "set": "OP10"
+  },
+  {
+   "id": "OP10-103",
+   "name": "Capone\"Gang\"Bege",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 1,
+   "power": 0,
+   "counter": 2000,
+   "attributes": [
+    "Ranged"
+   ],
+   "types": [
+    "Firetank Pirates",
+    "Supernovas"
+   ],
+   "text": "[On Play] You may add 1 card from the top or bottom of your Life cards to your hand: Add up to 1 {Supernovas} type Character card from your hand to the top of your Life cards face-up.",
+   "set": "OP10"
+  },
+  {
+   "id": "OP10-101",
+   "name": "Urouge",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 5,
+   "power": 7000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Fallen Monk Pirates",
+    "Supernovas"
+   ],
+   "text": "",
+   "set": "OP10"
+  },
+  {
+   "id": "OP10-099",
+   "name": "Eustass\"Captain\"Kid",
+   "category": "leader",
+   "colors": [
+    "yellow"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Kid Pirates",
+    "Supernovas"
+   ],
+   "text": "[End of Your Turn] You may turn 1 card from the top of your Life cards face-up: Set up to 1 of your {Supernovas} type Characters with a cost of 3 to 8 as active. That Character gains [Blocker] until the end of your opponent's next turn.",
+   "set": "OP10"
+  },
+  {
+   "id": "OP12-034",
+   "name": "Perona",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Thriller Bark Pirates",
+    "Muggy Kingdom"
+   ],
+   "text": "[On Play] If your Leader has the (Slash) attribute, look at 5 cards from the top of your deck; reveal up to 1 (Slash) attribute card or green Event and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP12-037",
+   "name": "Demon Aura Nine Sword Style Asura Blades Drawn Dead Man's Game",
+   "category": "event",
+   "colors": [
+    "green"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "Straw Hat Crew"
+   ],
+   "text": "[Main] You may rest 3 of your DON!! cards: Rest up to a total of 2 of your opponent's Characters or DON!! cards.\n[Counter] Your Leader gains +3000 power during this battle.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP12-039",
+   "name": "Luffy Is the Man Who Will Become the King of Pirates!!!",
+   "category": "event",
+   "colors": [
+    "green"
+   ],
+   "cost": 3,
+   "attributes": [],
+   "types": [
+    "Straw Hat Crew"
+   ],
+   "text": "[Main] Set your [Roronoa Zoro] Leader as active.",
+   "trigger": "Up to 1 of your Leader or Character cards gains +1000 power during this turn.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP12-028",
+   "name": "Kouzuki Hiyori",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 1,
+   "power": 0,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Land of Wano",
+    "Kouzuki Clan"
+   ],
+   "text": "[Activate: Main] You may rest 1 of your DON!! cards and this Character: If your Leader is [Roronoa Zoro], look at 5 cards from the top of your deck; reveal up to 1 (Slash) attribute card or green Event and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP12-031",
+   "name": "Tashigi",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 5,
+   "power": 7000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Navy",
+    "East Blue"
+   ],
+   "text": "[On Play] Rest up to 1 of your opponent's Characters with a base cost of 6 or less. Then, give up to 3 rested DON!! cards to your [Roronoa Zoro] Leader.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP12-026",
+   "name": "Kuina",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 4,
+   "power": 1000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "East Blue",
+    "Frost Moon Village"
+   ],
+   "text": "[Activate: Main] You may rest this Character: Rest up to 1 of your opponent's Characters with a base cost of 4 or less. Then, give up to 3 rested DON!! cards to your [Roronoa Zoro] Leader.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP12-020",
+   "name": "Roronoa Zoro",
+   "category": "leader",
+   "colors": [
+    "green"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "text": "[DON!! x3] [Activate: Main] [Once Per Turn] If this Leader battles your opponent's Character during this turn, set this Leader as active. Then, this Leader cannot attack your opponent's Characters with a base cost of 7 or less during this turn.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP12-113",
+   "name": "Roronoa Zoro",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "text": "[On K.O.] If your Leader has the {Supernovas} type, play up to 1 {Supernovas} type Character card with a cost of 4 or less from your hand rested.",
+   "trigger": "K.O. up to 1 of your opponent's Characters with a cost of 1 or less and add this card to your hand.",
+   "set": "OP12"
+  },
+  {
+   "id": "OP13-031",
+   "name": "Trafalgar Law",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 6,
+   "power": 6000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "FILM",
+    "Heart Pirates",
+    "Supernovas"
+   ],
+   "text": "If you have 1 or less Life cards, this Character gains [Blocker].\n[On Play] You may return 1 of your Characters to the owner's hand: Play up to 1 Character card with a cost of 5 or less from your hand rested.",
+   "set": "OP13"
+  },
+  {
+   "id": "OP13-037",
+   "name": "Roronoa Zoro",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "FILM",
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "text": "[On Play] If your Leader has the {FILM} or {Straw Hat Crew} type, set up to 2 of your DON!! cards as active.\n[End of Your Turn] Set this Character as active.",
+   "set": "OP13"
+  },
+  {
+   "id": "OP13-116",
+   "name": "The One Who Is the Most Free Is the Pirate King!!!",
+   "category": "event",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "text": "[Main] Look at 5 cards from the top of your deck; reveal up to 1 {Supernovas} type Character card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "trigger": "Activate this card's [Main] effect.",
+   "set": "OP13"
+  },
+  {
+   "id": "ST32-002",
+   "name": "Kouzuki Oden",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Land of Wano",
+    "Kouzuki Clan"
+   ],
+   "text": "[On Play] Draw 1 card and up to 1 of your opponent's Characters with a base cost of 6 or less cannot be rested until the end of your opponent's next End Phase.",
+   "set": "ST32"
+  },
+  {
+   "id": "OP14-033",
+   "name": "Perona",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Thriller Bark Pirates",
+    "Muggy Kingdom"
+   ],
+   "text": "[On Play] Up to 2 of your opponent's Characters with a cost of 5 or less cannot be rested until the end of your opponent's next End Phase.\n[On K.O.] You may rest 1 of your cards: Play up to 1 green Character card with a cost of 5 or less from your hand.",
+   "set": "OP14"
+  },
+  {
+   "id": "OP14-026",
+   "name": "Kouzuki Oden",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Land of Wano",
+    "Kouzuki Clan"
+   ],
+   "text": "[Opponent's Turn] If this Character is rested, this Character gains +2000 power.",
+   "set": "OP14"
+  },
+  {
+   "id": "OP15-023",
+   "name": "Arlong",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [],
+   "types": [
+    "Fish-Man",
+    "Arlong Pirates",
+    "East Blue"
+   ],
+   "text": "[On K.O.] Up to 2 of your opponent's rested cards will not become active in your opponent's next Refresh Phase.\n[Activate: Main] [Once Per Turn] You may give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters: Give up to 1 DON!! card from its owner's cost area to its owner's Leader or 1 of their Characters.",
+   "set": "OP15"
+  },
+  {
+   "id": "P-088",
+   "name": "Trafalgar Law",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Heart Pirates",
+    "Supernovas"
+   ],
+   "text": "",
+   "trigger": "If your Leader has the {Supernovas} type and you and your opponent have a total of 5 or less Life cards, play this card.",
+   "notes": [
+    "Disclaimer: This card was reprinted from the original set with a different border (Note: the original print had a full art border)."
+   ],
+   "set": "P"
+  },
+  {
+   "id": "P-085",
+   "name": "Jewelry Bonney",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Bonney Pirates",
+    "Supernovas"
+   ],
+   "text": "[On Play] If your Leader has the {Supernovas} type and the number of your Life cards is equal to or less than the number of your opponent's Life cards, add up to 1 of your opponent's Characters with a cost of 4 or less to the top or bottom of the owner's Life cards face-up.",
+   "set": "P"
+  },
+  {
+   "id": "ST12-003",
+   "name": "Dracule Mihawk",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 3,
+   "power": 4000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "The Seven Warlords of the Sea",
+    "Muggy Kingdom"
+   ],
+   "text": "[On Play] If you have 2 or less Characters, play up to 1 {Muggy Kingdom} type or \"Slash\" attribute Character card with a cost of 4 or less other than [Dracule Mihawk] from your hand rested.",
+   "set": "ST12"
+  },
+  {
+   "id": "ST32-003",
+   "name": "Dracule Mihawk",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 6,
+   "power": 7000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "The Seven Warlords of the Sea",
+    "Muggy Kingdom"
+   ],
+   "text": "[Your Turn] When this Character becomes rested, draw 1 card and trash 1 card from your hand.[On Play] If your Leader has the \"Slash\" attribute, play up to 1 Character card with a cost of 5 or less that is either [Perona] or has the \"Slash\" attribute from your hand.",
+   "set": "ST32"
+  },
+  {
+   "id": "ST32-005",
+   "name": "Roronoa Zoro",
+   "category": "character",
+   "colors": [
+    "green"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Straw Hat Crew",
+    "Supernovas"
+   ],
+   "text": "[Rush: Character] (This card can attack Characters on the turn in which it is played.)[On Play] If your Leader has the \"Slash\" attribute, rest up to 1 of your opponent's Characters with a cost of 2 or less.",
+   "set": "ST32"
+  },
+  {
+   "id": "ST36-005",
+   "name": "Eustass\"Captain\"Kid",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 6,
+   "power": 7000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Kid Pirates",
+    "Supernovas"
+   ],
+   "text": "[On Your Opponent's Attack] [Once Per Turn] You may turn 1 card from the top or bottom of your Life cards face-down: Change the target of the attack to your [Eustass\"Captain\"Kid] with 5000 base power or more.[Activate: Main] [Once Per Turn] You may turn 1 card from the top or bottom of your Life cards face-up: Give up to 1 rested DON!! card to your Leader.",
+   "set": "ST36"
+  },
+  {
+   "id": "ST36-002",
+   "name": "Killer",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 6000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Kid Pirates",
+    "Supernovas"
+   ],
+   "text": "[Your Turn] [On Play] If your Leader has the {Kid Pirates} type, add up to 1 card from the top of your deck to the top of your Life cards.",
+   "trigger": "If your opponent has 3 or less Life cards, play this card.",
+   "set": "ST36"
+  },
+  {
+   "id": "ST36-003",
+   "name": "Scratchmen Apoo",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 4000,
+   "counter": 2000,
+   "attributes": [
+    "Ranged"
+   ],
+   "types": [
+    "On-Air Pirates",
+    "Supernovas"
+   ],
+   "text": "",
+   "trigger": "Draw 1 card and your {Supernovas} type Leader's base power becomes 7000 during this turn.",
+   "set": "ST36"
+  },
+  {
+   "id": "ST36-004",
+   "name": "Bartolomeo",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Supernovas",
+    "Dressrosa",
+    "Barto Club"
+   ],
+   "text": "[On Play] You may trash 1 {Supernovas} type card from your hand: Draw 2 cards.",
+   "set": "ST36"
+  },
+  {
+   "id": "ST36-001",
+   "name": "Cavendish",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 3000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Beautiful Pirates",
+    "Supernovas",
+    "Dressrosa"
+   ],
+   "text": "[On K.O.] You may trash 1 card from your hand: Add up to 1 card from the top of your deck to the top of your Life cards.",
+   "set": "ST36"
+  }
+ ],
+ "replay": {
+  "format": "gumgumfight-replay",
+  "version": 10,
+  "seed": 717807,
+  "firstPlayer": 0,
+  "chooseFirst": true,
+  "names": [
+   "Xaleh",
+   "Bot"
+  ],
+  "deckIds": [
+   "u-d509ebc4",
+   "st36-kid"
+  ],
+  "actions": [
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": true
+   },
+   {
+    "type": "mulligan",
+    "player": 0,
+    "redraw": false
+   },
+   {
+    "type": "mulligan",
+    "player": 1,
+    "redraw": true
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c13"
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c97"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c93"
+    ]
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "activate",
+    "player": 0,
+    "uid": "c13",
+    "ability": 0
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c44"
+    ]
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c48",
+     "c15",
+     "c12",
+     "c23"
+    ]
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c60"
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c35"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c97",
+    "target": "c13"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c60"
+    ]
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c8"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c60"
+    ]
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c1"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c97"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "activate",
+    "player": 0,
+    "uid": "c1",
+    "ability": 0
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c102"
+   },
+   {
+    "type": "activate",
+    "player": 1,
+    "uid": "c102",
+    "ability": 1
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c44"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c60",
+    "target": "c1"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": false
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c102"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c8",
+    "target": "c52"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c102"
+    ]
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c72"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": []
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c47"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c50"
+    ]
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c80"
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c47"
+    ]
+   },
+   {
+    "type": "option",
+    "player": 1,
+    "index": 0
+   },
+   {
+    "type": "activate",
+    "player": 1,
+    "uid": "c102",
+    "ability": 1
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c85"
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": false
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c60",
+    "target": "c1"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": false
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c102",
+    "target": "c8"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c36"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c50",
+    "target": "c52"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c102"
+    ]
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c8",
+    "target": "c52"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c87"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c71"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c102"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c86"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c96"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "activate",
+    "player": 0,
+    "uid": "c1",
+    "ability": 0
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c28"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c80",
+     "c89"
+    ]
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "attachDon",
+    "player": 1,
+    "target": "c52"
+   },
+   {
+    "type": "attachDon",
+    "player": 1,
+    "target": "c60"
+   },
+   {
+    "type": "attachDon",
+    "player": 1,
+    "target": "c85"
+   },
+   {
+    "type": "attachDon",
+    "player": 1,
+    "target": "c85"
+   },
+   {
+    "type": "attachDon",
+    "player": 1,
+    "target": "c85"
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c47"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c60",
+    "target": "c1"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": false
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c102",
+    "target": "c8"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c22"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c85",
+    "target": "c1"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c46"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c8",
+    "target": "c52"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c102"
+    ]
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c57"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c50",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c28",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   }
+  ]
+ }
+}

@@ -405,3 +405,55 @@ describe('Trello (replay): Eustass Kid ST36-005 troca o alvo do ataque sem virar
     expect(s.pending).toMatchObject({ kind: 'counter', player: 1 });
   });
 });
+
+describe('Trello (replay do card 70): Zoro OP12-020 x bot Kid ST36, partida inteira', () => {
+  const fx = JSON.parse(readFileSync(join(__dirname, 'fixtures/replay-trello-70.json'), 'utf8')) as {
+    decks: [DeckList, DeckList];
+    cards: CardData[];
+    replay: { seed: number; firstPlayer: PlayerId; chooseFirst?: boolean; actions: Parameters<typeof applyAction>[1][] };
+  };
+
+  it('o Arlong OP15-023 (atributo vazio na API) é "Slash" e entra nas opções do Mihawk; o Kid ST36-005 troca o alvo sem virar; o replay roda até o fim', () => {
+    const { replay } = fx;
+    let s = createGame({
+      seed: replay.seed,
+      firstPlayer: replay.chooseFirst ? undefined : replay.firstPlayer,
+      chooseFirst: replay.chooseFirst,
+      cards: fx.cards,
+      players: [
+        { name: 'Xaleh', deck: fx.decks[0], isBot: false },
+        { name: 'Bot', deck: fx.decks[1], isBot: true },
+      ],
+    });
+    const byId = (id: string, player: PlayerId) => s.players[player].hand.find((u) => s.cards[u].cardId === id);
+    let mihawkChecked = false;
+    let redirects = 0;
+    replay.actions.forEach((a, i) => {
+      const before = s;
+      s = applyAction(s, a);
+      if (a.type === 'playCard' && s.cards[a.uid].cardId === 'ST12-003') {
+        // Mão na hora: Arlong OP15-023 ("Slash" pela lista oficial; a API traz o atributo vazio), Oden OP14-026 ("Slash"), Perona OP14-033 (custo 5).
+        expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, hidden: true });
+        const options = (s.pending as { options: string[] }).options;
+        expect(options).toContain(byId('OP15-023', 0));
+        expect(options).toContain(byId('OP14-026', 0));
+        expect(options).not.toContain(byId('OP14-033', 0));
+        mihawkChecked = true;
+      }
+      if (before.pending?.kind === 'selectTargets' && before.pending.prompt.endsWith('escolha o novo alvo do ataque.') && a.type === 'choose') {
+        const kid = a.uids[0];
+        expect(s.cards[kid].cardId).toBe('ST36-005');
+        expect(s.battle?.target).toBe(kid);
+        expect(s.battle?.blocked).toBe(false);
+        expect(s.log[s.log.length - 1].text).toContain('troca de alvo por efeito, não é [Blocker]');
+        // Continua como estava (ativo no turno 7, virado nos seguintes): a troca de alvo não vira a carta.
+        const fc = s.players[1].characters.find((c) => c.uid === kid)!;
+        expect(fc.rested).toBe(before.players[1].characters.find((c) => c.uid === kid)!.rested);
+        redirects++;
+      }
+      if (i === replay.actions.length - 1) expect(s.phase).not.toBe('mulligan');
+    });
+    expect(mihawkChecked).toBe(true);
+    expect(redirects).toBe(3);
+  });
+});

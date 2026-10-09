@@ -19,9 +19,21 @@ import type { CardData } from './types';
 export interface SourceFix {
   name?: string;
   types?: string[];
+  /** A API traz o atributo vazio em algumas cartas (ex.: OP15-023 Arlong): sem ele, "Slash" attribute não acha a carta. */
+  attributes?: string[];
 }
 
 export const SOURCE_FIXES: Readonly<Record<string, SourceFix>> = {
+  // Atributo vazio na API (conferido na lista oficial em 09/10/2026). Sem ele, efeitos como o do
+  // Mihawk ST12-003 ("Slash" attribute Character) não acham a carta (card 70 do Trello).
+  'EB03-035': { attributes: ["Wisdom"] }, // API: atributo ""
+  'OP12-047': { attributes: ["Wisdom"] }, // API: atributo ""
+  'OP15-023': { attributes: ["Slash"] }, // API: atributo ""
+  'OP15-092': { attributes: ["Special"] }, // API: atributo ""
+  'OP16-034': { attributes: ["Strike"] }, // API: atributo ""
+  'P-084': { attributes: ["Slash"] }, // API: atributo ""
+  'P-085': { attributes: ["Special"] }, // API: atributo ""
+  'P-090': { attributes: ["Special"] }, // API: atributo ""
   'EB01-027': { name: "Mr.1(Daz.Bonez)" }, // API: nome "Mr. 1 (Daz.Bonez)"
   'EB01-036': { types: ["Impel Down", "Jailer Beast"] }, // API: tipos ["Baroque Works","Impel Down","Jailer Beast"]
   'EB01-061': { name: "Mr.2.Bon.Kurei(Bentham)" }, // API: nome "Mr.2.Bon.Kurei (Bentham)"
@@ -96,7 +108,7 @@ export const SOURCE_FIXES: Readonly<Record<string, SourceFix>> = {
   'OP16-065': { name: "Sakazuki" }, // API: nome "Sakazuk"
   'OP17-021': { name: "Crone Oli" }, // API: nome "Crone Oil"
   'OP17-037': { name: "Are You That Afraid of the New Era?!!" }, // API: nome "Are You That Afraid of the New Era?!"
-  'OP17-099': { types: ["The Four Emperors", "Big Mom Pirates"] }, // API: tipos ["Special"]
+  'OP17-099': { types: ["The Four Emperors", "Big Mom Pirates"], attributes: ["Special"] }, // API: tipos ["Special"], atributo "" (o atributo veio no campo dos tipos)
   'P-002': { name: "I Smell Adventure!!!" }, // API: nome "I Smell Adventure Ahead!"
   'P-011': { types: ["FILM"] }, // API: tipos ["Special"]
   'P-012': { types: ["FILM", "Jellyfish Pirates"] }, // API: tipos ["Film","Jellyfish Pirates"]
@@ -170,8 +182,11 @@ export function applySourceFixes<T extends CardData>(card: T): T {
   if (!fix && !textFix) return card;
   const name = fix?.name ?? card.name;
   const types = fix?.types ?? card.types;
+  const attributes = fix?.attributes ?? card.attributes;
   const text = textFix && card.text ? patchText(card.text, textFix) : card.text;
-  const sameTypes = types.length === card.types.length && types.every((t, i) => t === card.types[i]);
-  if (name === card.name && sameTypes && text === card.text) return card;
-  return { ...card, name, types: sameTypes ? card.types : [...types], text };
+  const sameList = (a: string[] | undefined, b: string[] | undefined) => a === b || (a !== undefined && b !== undefined && a.length === b.length && a.every((t, i) => t === b[i]));
+  const sameTypes = sameList(types, card.types);
+  const sameAttributes = sameList(attributes, card.attributes);
+  if (name === card.name && sameTypes && sameAttributes && text === card.text) return card;
+  return { ...card, name, types: sameTypes ? card.types : [...types], ...(sameAttributes ? {} : { attributes: [...attributes!] }), text };
 }
