@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig, GameState } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 10;
+export const REPLAY_VERSION = 11;
 
 /**
  * Configuração para refazer um replay da versão `version`: até a versão 8, a preparação antiga
@@ -51,7 +51,15 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * tomar outro rumo.) Até a versão 9, "draw up to N cards" comprava as N sem perguntar; a pergunta
  * "comprar mais 1?" (4-5-4) é respondida com sim. (Também desde a versão 10, sem decisão nova:
  * "your opponent cannot …" e "until the end of your opponent's next turn" nas restrições a um
- * jogador, e a carta da mão posta na Vida por um efeito com exigência é revelada no log.)
+ * jogador, e a carta da mão posta na Vida por um efeito com exigência é revelada no log.) Até a versão 10
+ * (auditoria das cartas, DV-40/42), estas escolhas não existiam e são respondidas como o motor fazia: "up to
+ * N" nos passos de Vida e em "give up to N rested DON!!" (a quantidade máxima); "rest N of your cards"
+ * (nenhum DON!!, só as cartas); "turn 1 card from the top or bottom of your Life cards" (o topo); "rest up to N
+ * of your opponent's cards" (a carta do campo, se a próxima ação
+ * gravada é uma escolha de alvo; senão "Nenhum"); "reveal 1 card … play up to 1", "you may deal 1 damage" e
+ * "your opponent may add 1 DON!!" (sim). Uma escolha gravada com mais alvos do que hoje cabe fica com os primeiros, e uma resposta gravada
+ * para uma pergunta que hoje não aparece (o efeito deixou de ser oferecido) é descartada; dali em diante
+ * a partida pode tomar outro rumo.
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -81,7 +89,36 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     if (p.kind === 'selectTargets' && p.hidden && !p.options.length) {
       return next?.type === 'choose' && !next.uids.length && next.player === p.player ? null : { type: 'choose', player: p.player, uids: [] };
     }
+    // Versão 10: escolhas novas da auditoria das cartas.
+    const current = currentStep();
+    if (p.kind === 'option' && !(next?.type === 'option' && next.player === p.player)) {
+      if (current && ['trashLife', 'opponentLifeToHand', 'addLifeFromDeck', 'giveRestedDon', 'lifeFace'].includes(current.do)) return { type: 'option', player: p.player, index: 0 };
+      if (current?.do === 'restOwn') return { type: 'option', player: p.player, index: p.options.length - 1 };
+      if (current?.do === 'restDonOrCharacter') {
+        const card = p.options.findIndex((o) => !/DON!!|Nenhum/.test(o));
+        return { type: 'option', player: p.player, index: next?.type === 'choose' && card >= 0 ? card : p.options.length - 1 };
+      }
+    }
+    if (p.kind === 'confirm' && !(next?.type === 'answer' && next.player === p.player)) {
+      const frame = state.stack[state.stack.length - 1];
+      const after = frame?.kind === 'effect' ? frame.steps[frame.i + 1] : undefined;
+      if (current?.do === 'playRevealed' || current?.do === 'opponentAddDon' || (current?.do === 'payCost' && after?.do === 'takeDamage')) {
+        return { type: 'answer', player: p.player, yes: true };
+      }
+    }
     return null;
+  };
+  const currentStep = () => {
+    const frame = state.stack[state.stack.length - 1];
+    return frame?.kind === 'effect' ? frame.steps[frame.i] : undefined;
+  };
+  /** A ação gravada responde à decisão aberta agora? (senão é de uma pergunta que deixou de existir) */
+  const fits = (a: Action): boolean => {
+    const p = state.pending;
+    if (a.type === 'answer') return p?.kind === 'confirm' || p?.kind === 'lifeCard' || p?.kind === 'chooseFirst';
+    if (a.type === 'option') return p?.kind === 'option';
+    if (a.type === 'choose') return p?.kind === 'selectTargets' || p?.kind === 'block';
+    return true;
   };
   /** A pergunta aberta é a de uma substituição contra remoção ou rest (passo `replaceRemoval`/`replaceRest`)? */
   const replacementAsked = () => {
@@ -100,6 +137,7 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
    */
   const completed = (a: Action): Action => {
     const p = state.pending;
+    if (p?.kind === 'selectTargets' && a.type === 'choose' && a.player === p.player && a.uids.length > p.max) return { ...a, uids: a.uids.slice(0, p.max) };
     if (p?.kind !== 'selectTargets' || a.type !== 'choose' || a.player !== p.player || a.uids.length >= p.min) return a;
     const uids = [...a.uids];
     for (const u of p.options) if (uids.length < p.min && !uids.includes(u)) uids.push(u);
@@ -108,6 +146,7 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
   for (const a of actions) {
     for (let i = implicit(a); i; i = implicit(a)) step(i);
     if (state.phase === 'gameover') break;
+    if (!fits(a)) continue;
     step(completed(a));
   }
   for (let i = implicit(); i; i = implicit()) step(i);

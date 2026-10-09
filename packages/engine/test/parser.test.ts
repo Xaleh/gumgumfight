@@ -88,7 +88,7 @@ describe('modelos de frase', () => {
       [{ do: 'payCost', cost: { trashFromHand: 1 } }, { do: 'playThis' }],
     ]);
     expect(steps('[On Play] Add up to 1 card from the top of your deck to the top of your Life cards.')).toEqual([
-      [{ do: 'addLifeFromDeck', count: 1 }],
+      [{ do: 'addLifeFromDeck', count: 1, upTo: true }],
     ]);
     expect(steps('[On Play] Draw 1 card.', { trigger: "Activate this card's [On Play] effect." })[1]).toEqual([
       { do: 'useOwnEffect', timing: 'onPlay' },

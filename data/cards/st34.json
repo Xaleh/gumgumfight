@@ -64,7 +64,7 @@
       "types": [
         "Big Mom Pirates"
       ],
-      "text": "[When Attacking]/[On Your Opponent's Attack] [Once Per Turn] DON!! 1: Look at 1 card from the top of your opponent's deck. Then, this Leader gains +1000 power during this battle.",
+      "text": "[When Attacking]/[On Your Opponent's Attack] [Once Per Turn] DON!! -1: Look at 1 card from the top of your opponent's deck. Then, this Leader gains +1000 power during this battle.",
       "set": "OP11",
       "rarity": "L",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP11-062_p2.jpg"
@@ -210,7 +210,7 @@
       "types": [
         "Big Mom Pirates"
       ],
-      "text": "[Opponent's Turn] [On K.O.] DON!! 1: Play up to 1 {Big Mom Pirates} type Character card with a cost equal to or less than the number of DON!! cards on your opponent's field other than [Charlotte Smoothie] from your hand.",
+      "text": "[Opponent's Turn] [On K.O.] DON!! -1: Play up to 1 {Big Mom Pirates} type Character card with a cost equal to or less than the number of DON!! cards on your opponent's field other than [Charlotte Smoothie] from your hand.",
       "notes": [
         "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
       ],
@@ -298,7 +298,7 @@
         "The Four Emperors",
         "Big Mom Pirates"
       ],
-      "text": "[On Play] DON!! 4, you may trash 1 card from your hand: Add up to 1 card from the top of your deck to the top of your Life cards. Then, up to 1 of your opponent's Characters' base power becomes 0 during this turn.",
+      "text": "[On Play] DON!! -4, you may trash 1 card from your hand: Add up to 1 card from the top of your deck to the top of your Life cards. Then, up to 1 of your opponent's Characters' base power becomes 0 during this turn.",
       "set": "ST34",
       "rarity": "SR",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST34-004.jpg"
@@ -320,7 +320,7 @@
         "Minks",
         "Big Mom Pirates"
       ],
-      "text": "[When Attacking] DON!! 1: K.O. up to 1 of your opponent's Characters with 2000 base power or less.",
+      "text": "[When Attacking] DON!! -1: K.O. up to 1 of your opponent's Characters with 2000 base power or less.",
       "set": "ST34",
       "rarity": "C",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST34-005.jpg"

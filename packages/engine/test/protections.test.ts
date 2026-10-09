@@ -109,19 +109,19 @@ describe('"cannot be K.O.\'d by your opponent\'s effects" só contra o oponente 
 });
 
 describe('Personagem protegido não paga custo de K.O. (DV-14)', () => {
-  it('não aparece entre as opções; sem outro Personagem, o custo não pode ser pago', () => {
+  it('não aparece entre as opções (a própria carta pode pagar: o texto não diz "other")', () => {
     let s = game();
     const src = field(s, 0, 'PT-003');
     const guarded = field(s, 0, 'PT-002');
     const ability = s.defs['PT-003'].abilities.findIndex((a) => a.cost?.koOwn);
     expect(ability).toBeGreaterThanOrEqual(0);
-    expect(canPayCost(s, 0, src, s.defs['PT-003'].abilities[ability].cost!)).toBe(false);
+    expect(canPayCost(s, 0, src, s.defs['PT-003'].abilities[ability].cost!)).toBe(true);
 
     const plain = field(s, 0, 'PT-006');
     s = applyAction(s, { type: 'activate', player: 0, uid: src, ability });
     if (s.pending?.kind === 'confirm') s = applyAction(s, { type: 'answer', player: 0, yes: true });
     expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
-    expect(s.pending?.kind === 'selectTargets' && s.pending.options).toEqual([plain]);
+    expect(s.pending?.kind === 'selectTargets' && [...s.pending.options].sort()).toEqual([src, plain].sort());
     s = choose(s, 0, [plain]);
     expect(s.players[0].trash).toContain(plain);
     expect(onField(s, guarded)).toBe(true);

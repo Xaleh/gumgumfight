@@ -390,7 +390,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         oncePerTurn: true,
         cost: { donMinus: 7 },
         label: 'DON!! −7: descartar 1 Vida do oponente',
-        steps: [{ do: 'trashLife', side: 'opponent', count: 1 }],
+        steps: [{ do: 'trashLife', side: 'opponent', count: 1, upTo: true }],
       },
     ],
   },
