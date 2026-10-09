@@ -17,10 +17,13 @@
 // se cruzar na final.
 //
 // Melhor de N: cada partida (série) termina quando alguém vence a maioria dos jogos.
+//
+// W.O. duplo (`none`): nenhum dos dois apareceu; os dois perdem (e, na chave, os dois
+// saem: a mesa seguinte fica com bye).
 
 export type Structure = 'swiss' | 'single';
 export type Stage = 'swiss' | 'elim';
-export type MatchResult = 'p1' | 'p2' | 'bye';
+export type MatchResult = 'p1' | 'p2' | 'bye' | 'none';
 
 export const WIN_POINTS = 3;
 const MIN_WIN_RATE = 1 / 3;
@@ -101,7 +104,7 @@ export function singleRounds(players: number): number {
   return Math.max(1, Math.ceil(Math.log2(Math.max(2, players))));
 }
 
-/** Vencedor de uma partida com resultado (null = empate ou pendente). */
+/** Vencedor de uma partida com resultado (null = pendente ou W.O. duplo). */
 export function winnerOf(m: Pick<TMatch, 'p1' | 'p2' | 'result'>): string | null {
   if (m.result === 'p1' || m.result === 'bye') return m.p1;
   if (m.result === 'p2') return m.p2;
@@ -112,6 +115,13 @@ export function loserOf(m: Pick<TMatch, 'p1' | 'p2' | 'result'>): string | null 
   if (m.result === 'p1') return m.p2;
   if (m.result === 'p2') return m.p1;
   return null;
+}
+
+/** Quem perdeu a partida: um lado, ou os dois no W.O. duplo. */
+export function losersOf(m: Pick<TMatch, 'p1' | 'p2' | 'result'>): string[] {
+  if (m.result === 'none') return [m.p1, m.p2].filter((id): id is string => Boolean(id));
+  const l = loserOf(m);
+  return l ? [l] : [];
 }
 
 interface Record_ {
@@ -144,6 +154,12 @@ function records(players: TPlayer[], matches: TMatch[]) {
     b.played++;
     a.opponents.push(m.p2!);
     b.opponents.push(m.p1);
+    if (m.result === 'none') {
+      // W.O. duplo: derrota para os dois.
+      a.losses++;
+      b.losses++;
+      continue;
+    }
     const [w, l] = m.result === 'p1' ? [a, b] : [b, a];
     w.points += WIN_POINTS;
     w.wins++;
@@ -173,8 +189,7 @@ export function standings(players: TPlayer[], matches: TMatch[]): Standing[] {
   for (const m of elim) {
     const w = winnerOf(m);
     if (w) elimWins.set(w, (elimWins.get(w) ?? 0) + 1);
-    const l = loserOf(m);
-    if (l) eliminated.add(l);
+    for (const l of losersOf(m)) eliminated.add(l);
   }
   const rows = players.map((p) => {
     const r = recs.get(p.userId)!;
@@ -278,7 +293,8 @@ export function singleFirstRound(players: TPlayer[]): Pairing[] {
 
 /**
  * Rodada seguinte da eliminação simples: os vencedores de mesas vizinhas se
- * enfrentam. Quem desistiu depois de vencer dá bye ao oponente.
+ * enfrentam. Quem desistiu depois de vencer dá bye ao oponente; uma mesa sem
+ * vencedor (W.O. duplo) também. Duas mesas vizinhas sem vencedor não geram partida.
  */
 export function singleNextRound(players: TPlayer[], previous: TMatch[]): Pairing[] {
   const dropped = new Set(players.filter((p) => p.dropped).map((p) => p.userId));

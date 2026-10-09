@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from 'react';
 import {
   api,
   type LiveRoom,
+  type OnlineSeat,
   type RoomQueue,
   STRUCTURE_LABEL,
   TOURNAMENT_STATUS_LABEL,
+  type TournamentMine,
   type TournamentSummary,
   type WatchTarget,
 } from '../api';
@@ -41,6 +43,16 @@ export function usePoll<T>(load: () => Promise<T>, ms: number): T | null {
     };
   }, [ms]);
   return value;
+}
+
+/** Hora atual, atualizada a cada `ms` (contagens regressivas). */
+export function useNow(ms: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), ms);
+    return () => clearInterval(timer);
+  }, [ms]);
+  return now;
 }
 
 export const QUEUE_LABEL: Record<RoomQueue, string> = {
@@ -108,6 +120,88 @@ export function LiveNow({ onWatch, onAll }: { onWatch: (t: WatchTarget) => void;
   );
 }
 
+const clockTime = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+
+/** "restam 4min30s". */
+function countdown(deadline: string, now: number) {
+  const left = Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000));
+  return left ? `restam ${Math.floor(left / 60)}min${String(left % 60).padStart(2, '0')}s` : 'o prazo acabou';
+}
+
+/**
+ * Atalho da tela inicial para o torneio em jogo: check-in aberto, a partida da rodada
+ * (entrar na sala) ou a espera pela próxima rodada.
+ */
+export function TournamentBanner({
+  entry,
+  onOpen,
+  onPlay,
+  onCheckIn,
+}: {
+  entry: TournamentMine;
+  onOpen: () => void;
+  /** Entra na sala da partida (devolve o assento). */
+  onPlay: () => Promise<OnlineSeat>;
+  onCheckIn: () => Promise<unknown>;
+}) {
+  const now = useNow(1000);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const act = (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    fn()
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
+  const m = entry.match;
+  const pending = entry.status === 'running' && m && m.opponent && !m.result;
+  let title: string;
+  let sub: string;
+  let action: { label: string; run: () => void };
+  if (entry.status === 'registration') {
+    title = `Check-in aberto: ${entry.name}`;
+    sub = entry.checkedIn
+      ? `✔ Check-in feito. O torneio começa às ${clockTime(entry.startsAt)}: a sua sala aparece aqui.`
+      : `O torneio começa às ${clockTime(entry.startsAt)}. Confirme a sua presença.`;
+    action = entry.checkedIn ? { label: 'Abrir torneio', run: onOpen } : { label: 'Fazer check-in', run: () => act(onCheckIn) };
+  } else if (pending) {
+    title = `${entry.name} · ${entry.label}: mesa ${m.table} contra ${m.opponent}${m.bestOf > 1 ? ` (jogo ${m.game})` : ''}`;
+    sub =
+      m.room === 'playing'
+        ? 'A partida está em andamento.'
+        : entry.deadline
+          ? `Entre na sala até ${clockTime(entry.deadline)} (${countdown(entry.deadline, now)}). Quem não entra perde por W.O.`
+          : m.room === 'waiting'
+            ? 'Uma das pessoas já está na sala esperando.'
+            : 'Quem entra primeiro espera o oponente na sala.';
+    action = { label: m.room === 'playing' ? 'Voltar ao jogo' : 'Entrar na sala', run: () => act(onPlay) };
+  } else {
+    title = `${entry.name} em andamento`;
+    sub = m && !m.opponent ? 'Você está de bye nesta rodada. Aguarde a próxima.' : 'Sua partida desta rodada terminou. Aguarde a próxima rodada.';
+    action = { label: 'Abrir torneio', run: onOpen };
+  }
+  return (
+    <div className="home-banner tournament" role="status">
+      <span className="play-ico">
+        <Icon name="crown" size={16} />
+      </span>
+      <div className="home-banner-text">
+        <strong>{title}</strong>
+        <span>{error ?? sub}</span>
+      </div>
+      <button type="button" className="btn primary" disabled={busy} onClick={action.run}>
+        {action.label}
+      </button>
+      {action.run !== onOpen && (
+        <button type="button" className="btn" onClick={onOpen}>
+          Abrir torneio
+        </button>
+      )}
+    </div>
+  );
+}
+
 function when(iso: string | null) {
   if (!iso) return null;
   const d = new Date(iso);
@@ -118,10 +212,11 @@ function when(iso: string | null) {
 function TournamentRow({ t, onOpen }: { t: TournamentSummary; onOpen: () => void }) {
   const side =
     t.status === 'running' ? `Rodada ${t.round}${t.totalRounds ? ` de ${t.totalRounds}` : ''}` : when(t.startsAt);
+  const checkInOpen = t.status === 'registration' && t.checkInOpensAt && new Date(t.checkInOpensAt).getTime() <= Date.now();
   return (
     <button type="button" className={['tour-item', t.status].join(' ')} onClick={onOpen}>
       <span className="tour-item-top">
-        <span>{TOURNAMENT_STATUS_LABEL[t.status]}</span>
+        <span>{checkInOpen ? 'Check-in aberto' : TOURNAMENT_STATUS_LABEL[t.status]}</span>
         {side && <span className="muted">{side}</span>}
       </span>
       <strong>{t.name}</strong>

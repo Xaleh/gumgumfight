@@ -74,6 +74,10 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
     ...(room.legacySetup ? { legacySetup: true } : {}),
     decks: [room.data.seats[0].deck, room.data.seats[1].deck] as [typeof room.data.seats[0]['deck'], typeof room.data.seats[0]['deck']],
     actions: room.data.actions,
+    // Para rever a partida depois (auditoria): a versão do motor e quem jogou.
+    version: room.data.replayVersion ?? 8,
+    names: room.data.seats.map((s) => s.name),
+    deckIds: room.data.seats.map((s) => s.deckId),
   };
   const ids = [...new Set(replay.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
   const facts = deriveMatch(replay, getCards(db, ids) as CardData[]);

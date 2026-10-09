@@ -4,6 +4,7 @@ import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/
 import { type DB, openDb } from '../src/db';
 import type { Lobby } from '../src/online/lobby';
 import { seed } from '../src/seed';
+import { AUTO_START_GRACE_MS, CHECK_IN_MS, DEFAULT_TOLERANCE_MIN, type TickResult } from '../src/tournaments/clock';
 import {
   bracketOrder,
   elimBestOf,
@@ -124,13 +125,16 @@ describe('torneios: pareamentos e classificação', () => {
 
 const DECKS = ['st01-luffy', 'st02-kid', 'st03-crocodile', 'st04-kaido'];
 
-function setup() {
+function setup(now?: () => number) {
   const db = openDb(':memory:');
   seed(db);
-  const app = buildApp(db, { server: { cardImages: true }, onlineRateLimit: 1e9, botDelayMs: 0 });
+  const app = buildApp(db, { server: { cardImages: true }, onlineRateLimit: 1e9, botDelayMs: 0, now });
   return { db, app };
 }
 type App = ReturnType<typeof buildApp>;
+/** Relógio dos torneios (início automático e W.O.), exposto pelo app. */
+const TOLERANCE_MS_T = DEFAULT_TOLERANCE_MIN * 60_000;
+const tick = (app: App) => (app as unknown as { tournamentTick: () => TickResult | null }).tournamentTick();
 
 let n = 0;
 function login(db: DB, role: Role = 'player') {
@@ -408,5 +412,131 @@ describe('torneios: rotas', () => {
     expect(view.status).toBe('finished');
     expect(view.standings.slice(0, 2).map((s: any) => s.userId)).toEqual([s1.p1.userId, s2.p2.userId]);
     expect(view.standings.slice(0, 4).every((s: any) => s.inElim)).toBe(true);
+  });
+
+  it('check-in: abre 30 min antes, o torneio começa sozinho na hora e quem não aparece em 5 min perde por W.O.', async () => {
+    let now = Date.parse('2026-10-10T19:00:00Z');
+    const { db, app } = setup(() => now);
+    const org = login(db, 'organizer');
+    const ps = [login(db), login(db), login(db), login(db)];
+    const startsAt = '2026-10-10T20:00:00.000Z';
+    // Check-in exige data de início.
+    expect((await req(app, 'POST', '/api/tournaments', org, { name: 'Noturno', format: 'egb', structure: 'swiss', checkIn: true })).statusCode).toBe(400);
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Noturno', format: 'egb', structure: 'swiss', rounds: 2, startsAt, checkIn: true })).json();
+    expect(t).toMatchObject({ checkIn: true, checkInOpensAt: '2026-10-10T19:30:00.000Z', checkInOpen: false, checkedIn: 0, deadline: null });
+    expect(t.checkInMs).toBe(CHECK_IN_MS);
+    expect(t.toleranceMs).toBe(TOLERANCE_MS_T);
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
+
+    // Antes da janela: nem o check-in nem o atalho da tela inicial.
+    const checkin = (p: ReturnType<typeof login>) => req(app, 'POST', `/api/tournaments/${t.id}/checkin`, p);
+    expect((await checkin(ps[0])).statusCode).toBe(409);
+    expect((await req(app, 'GET', '/api/tournaments/me', ps[0])).json().entries).toEqual([]);
+    expect(tick(app)).toEqual({ started: [], noShows: [] });
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`)).json().status).toBe('registration');
+
+    // 19:30: check-in aberto para os inscritos (e só para eles).
+    now = Date.parse('2026-10-10T19:30:00Z');
+    expect((await req(app, 'GET', '/api/tournaments', ps[0])).json().tournaments[0]).toMatchObject({ checkIn: true, checkInOpensAt: '2026-10-10T19:30:00.000Z' });
+    let mine = (await req(app, 'GET', '/api/tournaments/me', ps[0])).json().entries;
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({ id: t.id, status: 'registration', checkedIn: false, match: null });
+    expect((await checkin(login(db))).statusCode).toBe(404);
+    expect((await checkin(undefined as never)).statusCode).toBe(401);
+    let view = (await checkin(ps[0])).json();
+    expect(view).toMatchObject({ checkInOpen: true, checkedIn: 1 });
+    expect(view.me.checkedInAt).toBe('2026-10-10T19:30:00.000Z');
+    expect(view.players.find((p: any) => p.userId === ps[0].id).checkedIn).toBe(true);
+    await checkin(ps[1]);
+    expect((await req(app, 'GET', '/api/tournaments/me', ps[0])).json().entries[0].checkedIn).toBe(true);
+    // Ainda não é a hora.
+    expect(tick(app)!.started).toEqual([]);
+
+    // 20:00: começa sozinho com todos os inscritos (quem não fez check-in também é pareado).
+    now = Date.parse('2026-10-10T20:00:00Z');
+    expect(tick(app)!.started).toEqual([t.id]);
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    expect(view).toMatchObject({ status: 'running', round: 1, roundAt: '2026-10-10T20:00:00.000Z', deadline: '2026-10-10T20:05:00.000Z' });
+    expect(view.rounds[0].matches).toHaveLength(2);
+    expect((await checkin(ps[2])).statusCode).toBe(409);
+    // A rodada 1 conta o check-in como presença.
+    const of = (userId: string) => view.rounds[0].matches.find((m: any) => m.p1.userId === userId || m.p2.userId === userId);
+    const side = (m: any, userId: string) => (m.p1.userId === userId ? 0 : 1);
+    expect(of(ps[0].id).present[side(of(ps[0].id), ps[0].id)]).toBe(true);
+    expect(of(ps[2].id).present[side(of(ps[2].id), ps[2].id)]).toBe(false);
+    // Atalho da tela inicial: a partida da rodada, com o prazo.
+    mine = (await req(app, 'GET', '/api/tournaments/me', ps[2])).json().entries;
+    expect(mine[0]).toMatchObject({ status: 'running', round: 1, label: 'Rodada 1', deadline: '2026-10-10T20:05:00.000Z' });
+    expect(mine[0].match).toMatchObject({ id: of(ps[2].id).id, result: null, room: null });
+    expect(typeof mine[0].match.opponent).toBe('string');
+
+    // Quem entra na sala fica presente, mesmo sem check-in antes.
+    const who = (userId: string) => ps.find((p) => p.id === userId)!;
+    const mA = of(ps[2].id); // mesa de ps[2], que não fez check-in e não vai entrar na sala
+    const oppA = mA.p1.userId === ps[2].id ? mA.p2.userId : mA.p1.userId;
+    const play = (p: ReturnType<typeof login>, m: { id: number }) => req(app, 'POST', `/api/tournaments/${t.id}/matches/${m.id}/play`, p);
+    now = Date.parse('2026-10-10T20:03:00Z');
+    const seat = (await play(who(oppA), mA)).json();
+    expect(seat.roomId).toBeTruthy();
+    const lobby = (app as unknown as { onlineLobby: Lobby }).onlineLobby;
+    expect(lobby.get(seat.roomId)!.status).toBe('waiting');
+    // Dentro da tolerância, nada acontece.
+    expect(tick(app)!.noShows).toEqual([]);
+
+    // 20:05: ps[2] não apareceu: o oponente vence por W.O., ps[2] sai do torneio e a sala em espera fecha.
+    now = Date.parse('2026-10-10T20:05:00Z');
+    const r = tick(app)!;
+    expect(r.noShows.map((w) => w.matchId)).toContain(mA.id);
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    const decided = view.rounds[0].matches.find((m: any) => m.id === mA.id);
+    expect(decided).toMatchObject({ result: mA.p1.userId === oppA ? 'p1' : 'p2', winner: oppA, reportedBy: 'noshow', room: null });
+    expect(view.players.find((p: any) => p.userId === ps[2].id).dropped).toBe(true);
+    expect(lobby.get(seat.roomId)).toBeNull();
+    expect(view.deadline).toBeNull();
+    // A outra mesa: quem fez check-in está presente; quem não fez (e não entrou na sala) perdeu por W.O.
+    const mB = view.rounds[0].matches.find((m: any) => m.id !== mA.id);
+    const absent = [mB.p1.userId, mB.p2.userId].filter((id: string) => ![ps[0].id, ps[1].id].includes(id));
+    if (absent.length) expect(mB).toMatchObject({ reportedBy: 'noshow', result: absent.length === 2 ? 'none' : mB.p1.userId === absent[0] ? 'p2' : 'p1' });
+    else expect(mB.result).toBeNull();
+    // A varredura não se repete: zerar o placar depois não dá W.O. de novo.
+    await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${mA.id}/result`, org, { wins: [0, 0] });
+    expect(tick(app)!.noShows).toEqual([]);
+    // Um torneio que ficou parado muito depois da hora não começa mais sozinho.
+    const stale = (await req(app, 'POST', '/api/tournaments', org, { name: 'Velho', format: 'egb', structure: 'swiss', startsAt, checkIn: true })).json();
+    for (const [i, p] of ps.slice(0, 2).entries()) await req(app, 'POST', `/api/tournaments/${stale.id}/register`, p, { deckId: DECKS[i] });
+    now = Date.parse(startsAt) + AUTO_START_GRACE_MS + 1;
+    expect(tick(app)!.started).toEqual([]);
+  });
+
+  it('W.O. duplo: os dois perdem; na chave, a mesa seguinte fica com bye', async () => {
+    let now = Date.parse('2026-10-10T20:00:00Z');
+    const { db, app } = setup(() => now);
+    const admin = login(db, 'admin');
+    const ps = [login(db), login(db), login(db), login(db)];
+    const startsAt = '2026-10-10T20:00:00.000Z';
+    const t = (await req(app, 'POST', '/api/tournaments', admin, { name: 'Mata-mata', format: 'egb', structure: 'single', startsAt, checkIn: true })).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
+    expect(tick(app)!.started).toEqual([t.id]);
+    let view = (await req(app, 'GET', `/api/tournaments/${t.id}`, admin)).json();
+    const [s1, s2] = view.rounds[0].matches;
+    const who = (userId: string) => ps.find((p) => p.id === userId)!;
+    // Semifinal 2: só p1 entra na sala. Semifinal 1: ninguém.
+    await req(app, 'POST', `/api/tournaments/${t.id}/matches/${s2.id}/play`, who(s2.p1.userId));
+    now += TOLERANCE_MS_T;
+    expect(tick(app)!.noShows).toHaveLength(2);
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, admin)).json();
+    expect(view.rounds[0].matches[0]).toMatchObject({ result: 'none', winner: null, reportedBy: 'noshow' });
+    expect(view.rounds[0].matches[1]).toMatchObject({ result: 'p1', winner: s2.p1.userId, reportedBy: 'noshow' });
+    expect(view.roundComplete).toBe(true);
+    // Os dois da semifinal 1 perderam e saíram; o vencedor da 2 vai para a final de bye e é o campeão.
+    for (const id of [s1.p1.userId, s1.p2.userId]) {
+      expect(view.players.find((p: any) => p.userId === id).dropped).toBe(true);
+      expect(view.standings.find((s: any) => s.userId === id)).toMatchObject({ losses: 1, wins: 0, alive: false });
+    }
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
+    expect(view.rounds[1].matches).toEqual([expect.objectContaining({ p1: expect.objectContaining({ userId: s2.p1.userId }), p2: null, result: 'bye' })]);
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
+    expect(view.status).toBe('finished');
+    expect(view.standings[0].userId).toBe(s2.p1.userId);
   });
 });
