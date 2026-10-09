@@ -1591,6 +1591,121 @@
    "text": "[DON!!×1] [When Attacking] 2 (You may rest the specified number of DON!! cards in your cost area.) You may trash 1 card from your hand: Trash 2 cards from the top of your deck and play up to 1 {Thriller Bark Pirates} type Character card with a cost of 4 or less from your trash.",
    "set": "OP06",
    "rarity": "L"
+  },
+  {
+   "id": "OP12-075",
+   "name": "Ms. All Sunday",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Baroque Works"
+   ],
+   "text": "[On Play] K.O. up to 1 of your opponent's Characters with a cost of 3 or less. Then, your opponent may add 1 DON!! card from their DON!! deck and set it as active.",
+   "trigger": "DON!! 1: Play this card.",
+   "set": "OP12",
+   "rarity": "C"
+  },
+  {
+   "id": "OP14-083",
+   "name": "Ms. Wednesday",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "power": 1000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Baroque Works"
+   ],
+   "text": "[Activate: Main] You may trash this Character: Give up to 1 of your opponent's 0 cost Characters 3000 power during this turn.",
+   "set": "OP14",
+   "rarity": "UC"
+  },
+  {
+   "id": "EB05-039",
+   "name": "Pink Hornet",
+   "category": "event",
+   "colors": [
+    "purple"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "Vinsmoke Family",
+    "Germa 66"
+   ],
+   "text": "[Main] DON!! -1: If your Leader has the {Vinsmoke Family} type, give up to 1 of your opponent's Characters -4000 power during this turn.\n[Counter] DON!! -1: Your Leader gains +4000 power during this battle.",
+   "set": "EB05",
+   "rarity": "C"
+  },
+  {
+   "id": "EB05-048",
+   "name": "Hedgehog Stinger",
+   "category": "event",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "Baroque Works"
+   ],
+   "text": "[Main] You may rest 1 of your DON!! cards and K.O. 1 of your Characters with a type including \"Baroque Works\": All of your opponent's Characters with a cost of O cannot activate [Blocker] during this turn.\n[Counter] Your Leader gains +3000 power during this battle.",
+   "set": "EB05",
+   "rarity": "R"
+  },
+  {
+   "id": "OP18-065",
+   "name": "Saint Gunko",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 10,
+   "power": 11000,
+   "attributes": [
+    "?"
+   ],
+   "types": [
+    "Celestial Dragons",
+    "Holy Knights of God"
+   ],
+   "text": "[Blocker]\n[On Play] DON!!-1: Play up to 1 {Celestial Dragons} type Character card with 6000 power or less from your trash.",
+   "set": "OP18",
+   "rarity": "SR"
+  },
+  {
+   "id": "ST34-004",
+   "name": "Charlotte Linlin",
+   "category": "character",
+   "colors": [
+    "purple"
+   ],
+   "cost": 10,
+   "power": 12000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "The Four Emperors",
+    "Big Mom Pirates"
+   ],
+   "text": "[On Play] DON!! 4, you may trash 1 card from your hand: Add up to 1 card from the top of your deck to the top of your Life cards. Then, up to 1 of your opponent's Characters' base power becomes 0 during this turn.",
+   "set": "ST34",
+   "rarity": "SR"
   }
  ]
 }

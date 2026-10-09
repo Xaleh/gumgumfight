@@ -29,6 +29,9 @@ export const SOURCE_FIXES: Readonly<Record<string, SourceFix>> = {
   'EB03-035': { attributes: ["Wisdom"] }, // API: atributo ""
   'OP12-047': { attributes: ["Wisdom"] }, // API: atributo ""
   'OP15-023': { attributes: ["Slash"] }, // API: atributo ""
+  // Spoilers (fonte não oficial), deduzidos das outras cartas até a carta oficial sair; conferir na lista oficial depois.
+  'EB05-039': { types: ['The Vinsmoke Family', 'GERMA 66'] }, // spoiler: "Vinsmoke Family"/"Germa 66" (EB05-031 e a família toda: {The Vinsmoke Family}/{GERMA 66})
+  'OP18-065': { attributes: ['Special'] }, // spoiler: atributo "?" (os outros Saint Gunko do OP18, OP18-060 e OP18-084, são "Special")
   'OP15-092': { attributes: ["Special"] }, // API: atributo ""
   'OP16-034': { attributes: ["Strike"] }, // API: atributo ""
   'P-084': { attributes: ["Slash"] }, // API: atributo ""
@@ -171,6 +174,9 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   // Marco: a API corta o efeito do [On K.O.] (só fica o custo; "$" = só se o texto terminar assim).
   'OP03-013': [['[On K.O.] You may trash 1 Event from your hand$', '[On K.O.] You may trash 1 Event from your hand: You may play this Character card from your trash rested.']],
   'OP03-112': [['reveal up to 1 {Sanji} or', 'reveal up to 1 [Sanji] or']], // Charlotte Pudding: [Sanji] é nome de carta, não tipo
+  // Spoilers com erro de digitação (deduzidos; o leitor já tolerava).
+  'EB05-039': [['{Vinsmoke Family}', '{The Vinsmoke Family}']], // Pink Hornet
+  'EB05-048': [['with a cost of O cannot', 'with a cost of 0 cannot']], // Hedgehog Stinger
 };
 
 function patchText(text: string, swaps: ReadonlyArray<readonly [string, string]>): string {
@@ -199,18 +205,41 @@ function splitAttributes(list: string[] | undefined): string[] | undefined {
   });
 }
 
+/**
+ * A API perde o sinal "−" (U+2212) em "DON!! −1", "give … −2000 power" e "give … −3 cost" (ST31-004, ST33-004,
+ * ST34-004/005, ST35-002, OP13-019 e dezenas de outras). Nessas formas um número sem sinal é sempre negativo
+ * (os bônus vêm com "+"). O leitor já entendia o valor; isto corrige o texto mostrado.
+ */
+export function restoreMinusSigns(text: string): string {
+  return text
+    .replace(/\bDON!! (\d+)(?=[\s:,(]|$)/g, 'DON!! -$1')
+    // "with 5000 power or less" e "0 cost Characters" são filtros, não o valor dado.
+    .replace(/(\b[Gg]ive\b[^.:\n]*?) (\d{3,5}) power\b(?! or (?:less|more))(?! (?:Characters?|cards?|Leaders?)\b)/g, '$1 -$2 power')
+    .replace(/(\b[Gg]ive\b[^.:\n]*?) (\d{1,2}) cost\b(?! or (?:less|more))(?! (?:Characters?|cards?|Leaders?)\b)/g, '$1 -$2 cost');
+}
+
 export function applySourceFixes<T extends CardData>(card: T): T {
   const fix = SOURCE_FIXES[card.id];
   const textFix = SOURCE_TEXT_FIXES[card.id];
   const split = splitAttributes(card.attributes);
-  if (!fix && !textFix && split === card.attributes) return card;
+  const signed = card.text ? restoreMinusSigns(card.text) : card.text;
+  const signedTrigger = card.trigger ? restoreMinusSigns(card.trigger) : card.trigger;
+  if (!fix && !textFix && split === card.attributes && signed === card.text && signedTrigger === card.trigger) return card;
   const name = fix?.name ?? card.name;
   const types = fix?.types ?? card.types;
   const attributes = fix?.attributes ?? split;
-  const text = textFix && card.text ? patchText(card.text, textFix) : card.text;
+  const text = textFix && signed ? patchText(signed, textFix) : signed;
+  const trigger = signedTrigger;
   const sameList = (a: string[] | undefined, b: string[] | undefined) => a === b || (a !== undefined && b !== undefined && a.length === b.length && a.every((t, i) => t === b[i]));
   const sameTypes = sameList(types, card.types);
   const sameAttributes = sameList(attributes, card.attributes);
-  if (name === card.name && sameTypes && sameAttributes && text === card.text) return card;
-  return { ...card, name, types: sameTypes ? card.types : [...types], ...(sameAttributes ? {} : { attributes: [...attributes!] }), text };
+  if (name === card.name && sameTypes && sameAttributes && text === card.text && trigger === card.trigger) return card;
+  return {
+    ...card,
+    name,
+    types: sameTypes ? card.types : [...types],
+    ...(sameAttributes ? {} : { attributes: [...attributes!] }),
+    text,
+    ...(trigger !== card.trigger ? { trigger } : {}),
+  };
 }

@@ -2327,6 +2327,7 @@ function chosenMatches(state: GameState, card: string, filter: CardFilter): bool
 
 function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   if (step.if?.lastDone && !frame.last?.length) return false;
+  if (step.if?.lastKOd && !(frame.koTargets ?? []).some((u) => state.players[ownerOf(state, u)].trash.includes(u))) return false;
   if (step.if?.revealedHasChosenCost) {
     const card = frame.last?.[0];
     if (!card || frame.chosenCost === undefined || (cardDef(state, card).cost ?? 0) !== frame.chosenCost) return false;
@@ -2736,7 +2737,7 @@ function conditionFailure(state: GameState, controller: PlayerId, source: string
 }
 
 /** Condições internas do leitor (dependem da escolha anterior), que não são "a condição da carta". */
-const INTERNAL_CONDITIONS: Array<keyof Condition> = ['lastDone', 'chosenMatches', 'revealedHasChosenCost'];
+const INTERNAL_CONDITIONS: Array<keyof Condition> = ['lastDone', 'lastKOd', 'chosenMatches', 'revealedHasChosenCost'];
 
 function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   const ps = state.players[frame.controller];
@@ -2779,6 +2780,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'ko': {
       const t = resolveTargets(state, frame, step.target, 'harm', `${srcName}: escolha um personagem para K.O.`);
       if (!t) return false;
+      frame.koTargets = t.filter((u) => locate(state, u));
       // Os Personagens saem juntos: cada substituição é oferecida uma vez para todos (8-1-3-4).
       removeFromField(state, t.filter((u) => locate(state, u)?.zone === 'character'), 'ko', { byPlayer: frame.controller, by: frame.source });
       // "K.O. … Stage": só o efeito que diz Stage alcança um (Q&A OP13-098).
@@ -3855,6 +3857,17 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'opponentAddDon': {
       const opp = state.players[opponent(frame.controller)];
       const n = Math.min(step.count, opp.donDeck);
+      // "your opponent may add …": quem decide é o oponente.
+      if (step.may && n > 0) {
+        if (!frame.choice) {
+          state.pending = { kind: 'confirm', player: opp.id, source: frame.source, prompt: `${srcName}: adicionar ${n} DON!! ativo(s) do seu deck de DON!!?` };
+          return false;
+        }
+        if (!frame.choice.length) {
+          log(state, opp.id, `${opp.name} não adiciona DON!!.`);
+          return true;
+        }
+      }
       opp.donDeck -= n;
       opp.donActive += n;
       if (n) log(state, frame.controller, `${opp.name} adiciona ${n} DON!! ativo(s).`);

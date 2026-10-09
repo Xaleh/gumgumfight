@@ -334,6 +334,8 @@ export interface Condition {
   chosenMatches?: CardFilter;
   /** "If you do": o passo anterior afetou ao menos uma carta. */
   lastDone?: boolean;
+  /** "you may K.O. … If you do, …" (ST08-013): algum alvo do último K.O. foi mesmo nocauteado (está no descarte). */
+  lastKOd?: boolean;
   /** "If you have a {X} type Character with a cost of N or more" */
   ownTypedCharacterMinCost?: { type: string; cost: number };
   /** "If your opponent has a Character with a cost of N or more" */
@@ -608,7 +610,8 @@ type EffectStepBody =
   /** "your opponent plays up to 1 Character card … from their hand" */
   | { do: 'opponentPlays'; upTo: number; filter: CardFilter }
   /** "your opponent may add 1 DON!! card from their DON!! deck and set it as active" */
-  | { do: 'opponentAddDon'; count: number }
+  /** `may`: "your opponent may add 1 DON!! card …" (OP12-075): o oponente escolhe. */
+  | { do: 'opponentAddDon'; count: number; may?: true }
   /** "return DON!! cards … until you have the same number of DON!! cards on your field as your opponent" */
   | { do: 'donMatchOpponent' }
   /** "give all of your opponent's Characters -1000 power … for every DON!! card given to that Character" */
@@ -1190,6 +1193,8 @@ export type Frame =
       revealed?: string[];
       /** Cartas descartadas da mão neste efeito ("the same card name as the trashed card"). */
       trashed?: string[];
+      /** Personagens que o último passo de K.O. tentou nocautear (para "If you do" depois do K.O.). */
+      koTargets?: string[];
       /**
        * Efeito de [Trigger]: a carta (`source`) fica fora de qualquer área enquanto ele resolve
        * (`GameState.limbo`) e vai para o descarte quando o frame termina, se o efeito não a moveu

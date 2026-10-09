@@ -273,7 +273,7 @@
       "types": [
         "Navy"
       ],
-      "text": "During the turn in which a card in your hand is trashed by an effect, give this card in your hand 3 cost.[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+      "text": "During the turn in which a card in your hand is trashed by an effect, give this card in your hand -3 cost.[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
       "set": "ST33",
       "rarity": "SR",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST33-004.jpg"

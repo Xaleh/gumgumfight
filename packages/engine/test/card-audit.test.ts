@@ -5,7 +5,7 @@ import { buildCardDef } from '../src/cards';
 import { applyAction, attackError, canPayCost, costInHand, createGame, getPower, hasKeyword, hasName, koProtected, matchesFilter } from '../src/engine';
 import { fixCard } from '../src/errata';
 import { upgradeReplayActions } from '../src/replay';
-import { applySourceFixes } from '../src/source-fixes';
+import { applySourceFixes, restoreMinusSigns } from '../src/source-fixes';
 import type { Ability, Action, CardData, DeckList, EffectStep, GameState, PlayerId } from '../src/types';
 import { cards as baseCards, noDefense, toTurn } from './helpers';
 
@@ -667,5 +667,62 @@ describe('"If you have [X]" conta qualquer carta sua com o nome, Líder incluíd
   it('Oars OP15-080: "[Gecko Moria] with 10000 power or more on your field" conta o Líder', () => {
     const cond = abilities('OP15-080').find((a) => a.staticPower)!.condition!;
     expect(cond.ownMatching!.spec.kinds).toEqual(['leader', 'character']);
+  });
+});
+
+describe('Pendências fechadas com as regras confirmadas', () => {
+  it('Ms. All Sunday OP12-075: "your opponent may add 1 DON!!" pergunta ao oponente', () => {
+    let s = toTurn(game(), 3);
+    setDon(s, 0, 5);
+    setDon(s, 1, 4);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'OP12-075') });
+    if (s.pending?.kind === 'selectTargets') s = choose(s, []);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 1 });
+    const deck = s.players[1].donDeck;
+    s = answer(s, false);
+    expect(s.players[1].donDeck).toBe(deck);
+  });
+
+  describe('Mr.2 ST08-013: "If you do, K.O. this Character" só se o Personagem do oponente foi nocauteado', () => {
+    function battle(boost: number) {
+      let s = toTurn(game(), 3);
+      setDon(s, 0, 0, 1);
+      const mr2 = field(s, 0, 'ST08-013');
+      s.players[0].characters.find((c) => c.uid === mr2)!.don = 1;
+      const franky = field(s, 1, 'ST01-010', true); // 6000
+      if (boost) s.modifiers.push({ uid: franky, kind: 'power', amount: boost, duration: 'turn' });
+      s = noDefense(applyAction(s, { type: 'attack', player: 0, attacker: mr2, target: franky }));
+      if (s.pending?.kind === 'confirm') s = answer(s, true);
+      return { s, mr2, franky };
+    }
+    it('o Personagem do oponente já saiu na batalha: o Mr.2 fica', () => {
+      const { s, mr2, franky } = battle(0);
+      expect(s.players[1].trash).toContain(franky);
+      expect(s.players[0].characters.some((c) => c.uid === mr2)).toBe(true);
+    });
+    it('o efeito nocauteia o Personagem do oponente: o Mr.2 também sai', () => {
+      const { s, mr2, franky } = battle(5000);
+      expect(s.players[1].trash).toContain(franky);
+      expect(s.players[0].trash).toContain(mr2);
+    });
+  });
+
+  it('o sinal de menos que a API perde volta ao texto ("DON!! −4", "give … −1000 power")', () => {
+    expect(applySourceFixes(byId('ST34-004')).text).toContain('[On Play] DON!! -4,');
+    expect(restoreMinusSigns("Give up to 1 of your opponent's Characters 3000 power during this turn.")).toBe(
+      "Give up to 1 of your opponent's Characters -3000 power during this turn.",
+    );
+    // Filtros ficam como estão.
+    expect(restoreMinusSigns("give up to 1 of your opponent's Characters with 5000 power or less -2000 power")).toBe(
+      "give up to 1 of your opponent's Characters with 5000 power or less -2000 power",
+    );
+    expect(applySourceFixes(byId('OP14-083')).text).toContain("your opponent's 0 cost Characters -3000 power");
+  });
+
+  it('spoilers deduzidos até a carta oficial: tipos de EB05-039, atributo de OP18-065, "cost of O" de EB05-048', () => {
+    expect(fixCard(byId('EB05-039'))).toMatchObject({ types: ['The Vinsmoke Family', 'GERMA 66'] });
+    expect(stepsOf('EB05-039', 'main')[1].if).toEqual({ leaderHasType: 'The Vinsmoke Family' });
+    expect(fixCard(byId('OP18-065')).attributes).toEqual(['Special']);
+    expect(fixCard(byId('EB05-048')).text).toContain('with a cost of 0 cannot');
   });
 });

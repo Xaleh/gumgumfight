@@ -357,7 +357,7 @@
         "Straw Hat Crew",
         "The Four Emperors"
       ],
-      "text": "[Main] Give up to 1 of your opponent's Characters 5000 power during this turn. Then, if you have a Character with 6000 power or more, K.O. up to 1 of your opponent's Characters with 2000 power or less.",
+      "text": "[Main] Give up to 1 of your opponent's Characters -5000 power during this turn. Then, if you have a Character with 6000 power or more, K.O. up to 1 of your opponent's Characters with 2000 power or less.",
       "trigger": "Activate this card's [Main] effect.",
       "set": "ST21",
       "rarity": "C",

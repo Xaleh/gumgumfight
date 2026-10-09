@@ -20,7 +20,7 @@
         "The Four Emperors",
         "Red-Haired Pirates"
       ],
-      "text": "[Once Per Turn] This effect can be activated when your opponent attacks. Give up to 1 of your opponent's Leader or Character cards 1000 power during this turn.",
+      "text": "[Once Per Turn] This effect can be activated when your opponent attacks. Give up to 1 of your opponent's Leader or Character cards -1000 power during this turn.",
       "set": "OP09",
       "rarity": "L",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP09-001_p2.jpg"
@@ -89,7 +89,7 @@
       "types": [
         "Red-Haired Pirates"
       ],
-      "text": "[Activate: Main] You may rest this Character: If your Leader has the {Red-Haired Pirates} type, give up to 1 of your opponent's Characters 2000 power during this turn.",
+      "text": "[Activate: Main] You may rest this Character: If your Leader has the {Red-Haired Pirates} type, give up to 1 of your opponent's Characters -2000 power during this turn.",
       "notes": [
         "DISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
       ],
@@ -138,7 +138,7 @@
       "types": [
         "Red-Haired Pirates"
       ],
-      "text": "[On Play] Up to 1 of your Leader gains +1000 power until the end of your opponent's next turn.[DON!! x1] [When Attacking] Give up to 1 of your opponent's Characters 1000 power during this turn.",
+      "text": "[On Play] Up to 1 of your Leader gains +1000 power until the end of your opponent's next turn.[DON!! x1] [When Attacking] Give up to 1 of your opponent's Characters -1000 power during this turn.",
       "notes": [
         "DISCLAIMER: This card is a reprint of the pre-existing card in the OP09 set. The main difference between this card and the original print is the inclusion of \"EN\" on the right side, by the copyright information."
       ],

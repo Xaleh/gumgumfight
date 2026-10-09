@@ -56,8 +56,8 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * N" nos passos de Vida e em "give up to N rested DON!!" (a quantidade máxima); "rest N of your cards"
  * (nenhum DON!!, só as cartas); "turn 1 card from the top or bottom of your Life cards" (o topo); "rest up to N
  * of your opponent's cards" (a carta do campo, se a próxima ação
- * gravada é uma escolha de alvo; senão "Nenhum"); "reveal 1 card … play up to 1" e "you may deal 1 damage"
- * (sim). Uma escolha gravada com mais alvos do que hoje cabe fica com os primeiros, e uma resposta gravada
+ * gravada é uma escolha de alvo; senão "Nenhum"); "reveal 1 card … play up to 1", "you may deal 1 damage" e
+ * "your opponent may add 1 DON!!" (sim). Uma escolha gravada com mais alvos do que hoje cabe fica com os primeiros, e uma resposta gravada
  * para uma pergunta que hoje não aparece (o efeito deixou de ser oferecido) é descartada; dali em diante
  * a partida pode tomar outro rumo.
  */
@@ -102,7 +102,9 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     if (p.kind === 'confirm' && !(next?.type === 'answer' && next.player === p.player)) {
       const frame = state.stack[state.stack.length - 1];
       const after = frame?.kind === 'effect' ? frame.steps[frame.i + 1] : undefined;
-      if (current?.do === 'playRevealed' || (current?.do === 'payCost' && after?.do === 'takeDamage')) return { type: 'answer', player: p.player, yes: true };
+      if (current?.do === 'playRevealed' || current?.do === 'opponentAddDon' || (current?.do === 'payCost' && after?.do === 'takeDamage')) {
+        return { type: 'answer', player: p.player, yes: true };
+      }
     }
     return null;
   };

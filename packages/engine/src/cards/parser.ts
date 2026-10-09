@@ -1107,7 +1107,7 @@ const CLAUSES: ClauseRule[] = [
       return f ? [{ do: 'opponentPlays', upTo: f.upTo, filter: f.filter }] : null;
     },
   ],
-  [/^your opponent may add (\d+) DON!! cards? from their DON!! deck and set (?:it|them) as active$/i, (m) => [{ do: 'opponentAddDon', count: Number(m[1]) }]],
+  [/^your opponent may add (\d+) DON!! cards? from their DON!! deck and set (?:it|them) as active$/i, (m) => [{ do: 'opponentAddDon', count: Number(m[1]), may: true }]],
   [/^return DON!! cards from your field to your DON!! deck until you have the same number of DON!! cards on your field as your opponent$/i, () => [{ do: 'donMatchOpponent' }]],
   [
     /^at the end of this (turn|battle), (.+)$/i,
@@ -2318,7 +2318,10 @@ export function parseBody(body: string): EffectStep[] | null {
         // "you may return up to 1 of …. If you do, …": aceitar e não escolher nada não é "do".
         const x = steps[before - 1];
         const xTarget = x && x !== opt && 'target' in x ? x.target : undefined;
-        if (typeof xTarget === 'object' && !xTarget.required && steps[before]) steps[before] = { ...steps[before], if: { ...steps[before].if, lastDone: true } };
+        // "you may K.O. the opponent's Character you battled with. If you do, K.O. this Character" (ST08-013):
+        // só se o K.O. aconteceu de fato (proteção, substituição ou carta que já saiu impedem).
+        if (x?.do === 'ko' && steps[before]) steps[before] = { ...steps[before], if: { ...steps[before].if, lastKOd: true } };
+        else if (typeof xTarget === 'object' && !xTarget.required && steps[before]) steps[before] = { ...steps[before], if: { ...steps[before].if, lastDone: true } };
       }
       // Sem "you may" antes: "Y" só acontece se o passo anterior afetou alguma carta.
       else for (let k = before; k < steps.length; k++) steps[k] = { ...steps[k], if: { ...steps[k].if, lastDone: true } };

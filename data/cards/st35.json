@@ -83,7 +83,7 @@
         "Revolutionary Army",
         "Dressrosa"
       ],
-      "text": "If you have 4 or more Life cards, give this Leader 1000 power.[DON!! x1] If you have a Character with a cost of 8 or more, your Leader and all of your Characters gain +1000 power.",
+      "text": "If you have 4 or more Life cards, give this Leader -1000 power.[DON!! x1] If you have a Character with a cost of 8 or more, your Leader and all of your Characters gain +1000 power.",
       "set": "OP13",
       "rarity": "L",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP13-004_p2.jpg"
@@ -146,7 +146,7 @@
       "types": [
         "Revolutionary Army"
       ],
-      "text": "[Once Per Turn] If your {Revolutionary Army} type Character would be removed from the field by your opponent's effect, you may give this Character 2000 power during this turn instead.",
+      "text": "[Once Per Turn] If your {Revolutionary Army} type Character would be removed from the field by your opponent's effect, you may give this Character -2000 power during this turn instead.",
       "notes": [
         "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
       ],
@@ -167,7 +167,7 @@
         "Revolutionary Army",
         "Dressrosa"
       ],
-      "text": "[Main] You may rest 4 of your DON!! cards: Give up to 1 of your opponent's Characters 3000 power during this turn. Then, K.O. up to 1 of your opponent's Characters with 3000 power or less.[Counter] Your Leader gains +3000 power during this battle.",
+      "text": "[Main] You may rest 4 of your DON!! cards: Give up to 1 of your opponent's Characters -3000 power during this turn. Then, K.O. up to 1 of your opponent's Characters with 3000 power or less.[Counter] Your Leader gains +3000 power during this battle.",
       "notes": [
         "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
       ],
@@ -261,7 +261,7 @@
         "Minks",
         "Revolutionary Army"
       ],
-      "text": "[On Play] Give up to 1 of your opponent's Characters 3000 power during this turn.",
+      "text": "[On Play] Give up to 1 of your opponent's Characters -3000 power during this turn.",
       "set": "ST35",
       "rarity": "C",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST35-002.jpg"

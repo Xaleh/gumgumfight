@@ -624,6 +624,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você tiver ${c.minActiveDon} ou mais DON!! ativos`);
         break;
       case 'lastDone':
+      case 'lastKOd':
         out.push('fizer isso');
         break;
       case 'chosenMatches':
