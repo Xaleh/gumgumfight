@@ -24,6 +24,6 @@ Cada item: carta (ou regra geral), pergunta (P), resposta oficial (R), fonte e s
 
 ## No motor
 
-DON!! dados dão +1000 só no turno do dono e voltam rested quando a carta sai; Stage novo substitui o antigo; [DON!! xX] checado na ativação; no DON!! −X o dono escolhe quais DON!! devolver (área de custo, Líder, Personagens ou Stage) (conforme).
+DON!! dados dão +1000 só no turno do dono e voltam rested quando a carta sai; Stage novo substitui o antigo; [DON!! xX] checado na ativação; no DON!! −X o dono escolhe quais DON!! devolver (área de custo, Líder, Personagens ou Stage) (conforme). "Give … DON!! card from its owner's cost area to its owner's Leader or 1 of their Characters" (OP15-023): o alvo pode ser seu ou do oponente, o DON!! sai da área de custo do dono do alvo, virado ou ativo à escolha de quem ativa (conforme, DV-44).
 
-Divergências deste tema: DV-09 (corrigida), DV-16 (corrigida) (detalhes em [../divergencias.md](../divergencias.md)).
+Divergências deste tema: DV-09 (corrigida), DV-16 (corrigida), DV-44 (corrigida) (detalhes em [../divergencias.md](../divergencias.md)).

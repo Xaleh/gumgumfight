@@ -726,3 +726,91 @@ describe('Pendências fechadas com as regras confirmadas', () => {
     expect(fixCard(byId('EB05-048')).text).toContain('with a cost of 0 cannot');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Arlong OP15-023 (errata de 13/03/2026): "Give up to 1 DON!! card from its owner's cost area to
+// its owner's Leader or 1 of their Characters". O DON!! pode ser seu ou do oponente, virado ou
+// ativo, e vai a uma carta do mesmo dono (Q&A OP15: não cruza donos; quem ativa escolhe o DON!!).
+// ---------------------------------------------------------------------------
+
+describe('Arlong OP15-023: DON!! da área de custo do dono ao Líder ou Personagem dele', () => {
+  const arlongReady = (ownActive: number, ownRested: number, oppActive: number, oppRested: number) => {
+    let s = toTurn(game(['ST01-001', 'ST02-001']), 3);
+    const arlong = field(s, 0, 'OP15-023');
+    const oppChar = field(s, 1, 'ST02-004');
+    setDon(s, 0, ownActive, ownRested);
+    setDon(s, 1, oppActive, oppRested);
+    s = applyAction(s, { type: 'activate', player: 0, uid: arlong, ability: 1 });
+    if (s.pending?.kind === 'confirm') s = answer(s, true);
+    // Custo: 1 DON!! virado do oponente a 1 Personagem dele (obrigatório depois de aceitar).
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, options: [oppChar], min: 1, max: 1 });
+    s = choose(s, [oppChar]);
+    expect(s.players[1].donRested).toBe(oppRested - 1);
+    expect(s.players[1].characters.find((c) => c.uid === oppChar)!.don).toBe(1);
+    return { s, arlong, oppChar };
+  };
+
+  it('a leitura: alvo de qualquer lado, DON!! do dono, virado ou ativo', () => {
+    expect(stepsOf('OP15-023', 'activateMain')).toEqual([
+      { do: 'giveRestedDon', target: { side: 'any', kinds: ['leader', 'character'], upTo: 1 }, count: 1, fromOwner: true, anyState: true },
+    ]);
+    expect(abilities('OP15-023')[1].cost).toEqual({ giveOppDon: 1 });
+  });
+
+  it('dá um DON!! ativo meu ao meu Líder (depois de dar o DON!! virado do oponente ao Personagem dele)', () => {
+    let { s, arlong, oppChar } = arlongReady(3, 1, 2, 2);
+    const p = s.pending as Extract<NonNullable<GameState['pending']>, { kind: 'selectTargets' }>;
+    expect(p).toMatchObject({ kind: 'selectTargets', player: 0, min: 0, max: 1 });
+    expect([...p.options].sort()).toEqual([s.players[0].leader.uid, arlong, s.players[1].leader.uid, oppChar].sort());
+    s = choose(s, [s.players[0].leader.uid]);
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['DON!! virado', 'DON!! ativo'] });
+    s = option(s, 1);
+    expect(s.players[0]).toMatchObject({ donActive: 2, donRested: 1 });
+    expect(s.players[0].leader.don).toBe(1);
+    expect(s.players[1]).toMatchObject({ donActive: 2, donRested: 1 });
+    expect(s.pending).toBeFalsy();
+  });
+
+  it('dá um DON!! virado do oponente a um Personagem dele; o meu DON!! não se move', () => {
+    let { s, oppChar } = arlongReady(3, 1, 2, 2);
+    s = choose(s, [oppChar]);
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['DON!! virado', 'DON!! ativo'] });
+    s = option(s, 0);
+    expect(s.players[1]).toMatchObject({ donActive: 2, donRested: 0 });
+    expect(s.players[1].characters.find((c) => c.uid === oppChar)!.don).toBe(2);
+    expect(s.players[0]).toMatchObject({ donActive: 3, donRested: 1 });
+  });
+
+  it('"up to 1": pode não dar nenhum', () => {
+    let { s } = arlongReady(3, 1, 2, 2);
+    s = choose(s, []);
+    expect(s.pending).toBeFalsy();
+    expect(s.players[0]).toMatchObject({ donActive: 3, donRested: 1 });
+    expect(s.players[1]).toMatchObject({ donActive: 2, donRested: 1 });
+    expect(s.players[0].leader.don).toBe(0);
+  });
+
+  it('só um estado disponível: não pergunta; só quem tem DON!! na área de custo pode receber', () => {
+    // O oponente fica sem DON!! na área de custo depois do custo: só as minhas cartas são opções.
+    let { s, arlong } = arlongReady(2, 0, 0, 1);
+    const p = s.pending as Extract<NonNullable<GameState['pending']>, { kind: 'selectTargets' }>;
+    expect([...p.options].sort()).toEqual([s.players[0].leader.uid, arlong].sort());
+    s = choose(s, [arlong]);
+    expect(s.pending).toBeFalsy();
+    expect(s.players[0]).toMatchObject({ donActive: 1, donRested: 0 });
+    expect(s.players[0].characters.find((c) => c.uid === arlong)!.don).toBe(1);
+  });
+
+  it('sem DON!! virado do oponente ou sem Personagem dele, o custo não pode ser pago', () => {
+    let s = toTurn(game(['ST01-001', 'ST02-001']), 3);
+    const arlong = field(s, 0, 'OP15-023');
+    const cost = abilities('OP15-023')[1].cost!;
+    setDon(s, 0, 3);
+    setDon(s, 1, 2, 1);
+    expect(canPayCost(s, 0, arlong, cost)).toBe(false); // sem Personagem do oponente
+    field(s, 1, 'ST02-004');
+    expect(canPayCost(s, 0, arlong, cost)).toBe(true);
+    setDon(s, 1, 3, 0);
+    expect(canPayCost(s, 0, arlong, cost)).toBe(false); // sem DON!! virado do oponente
+  });
+});
