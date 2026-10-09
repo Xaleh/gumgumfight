@@ -60,6 +60,8 @@ export interface CardTextTranslation {
 
 /** Filtro para escolha de alvos. */
 export interface TargetSpec {
+  /** "… and the other": não pode ser a carta escolhida no passo anterior (OP08-118). */
+  notLast?: true;
   /** 'any' = personagens de qualquer jogador ("Return up to 1 Character…"). */
   side: 'own' | 'opponent' | 'any';
   kinds: Array<'leader' | 'character' | 'stage'>;
@@ -198,6 +200,8 @@ export interface Condition {
   handTrashedThisTurn?: boolean;
   /** "your opponent has 5 or more rested cards" (cartas + DON!!) */
   opponentRestedCardsMin?: number;
+  /** "If you have 8 or more rested cards" (cartas + DON!!) */
+  ownRestedCardsMin?: number;
   /** "If your Leader is [A] or [B]" */
   leaderNames?: string[];
   /** "If you only have Characters without a Counter" */
@@ -278,8 +282,10 @@ export interface Condition {
   lifeMin?: number;
   /** "If your opponent has a Character with N or more power" */
   opponentCharacterMinPower?: number;
-  /** "If you have [X]" / "If you have a [X] Character" */
+  /** "If you have [X]" / "If you have a [X] Character" / "If you have [X] on your field" (Personagem ou Stage) */
   haveCharacterNamed?: string;
+  /** "If you have a [X] Character": só Personagens (sem "Character", vale o Líder e o Stage com o nome). */
+  haveCharacterOnly?: boolean;
   /** "If your opponent has N or more DON!! cards on their field" */
   opponentMinDonOnField?: number;
   /** "If you have N or more cards in your trash" */
@@ -328,6 +334,8 @@ export interface Condition {
   chosenMatches?: CardFilter;
   /** "If you do": o passo anterior afetou ao menos uma carta. */
   lastDone?: boolean;
+  /** "you may K.O. … If you do, …" (ST08-013): algum alvo do último K.O. foi mesmo nocauteado (está no descarte). */
+  lastKOd?: boolean;
   /** "If you have a {X} type Character with a cost of N or more" */
   ownTypedCharacterMinCost?: { type: string; cost: number };
   /** "If your opponent has a Character with a cost of N or more" */
@@ -420,6 +428,8 @@ export interface Aura {
   maxPower?: number;
   /** "cannot be K.O.'d by effects" (`true`) ou "… by your opponent's effects" (`'opponent'`). */
   noEffectKO?: true | 'opponent';
+  /** Só cartas viradas (`true`) ou só ativas (`false`): "your active Characters with a base cost of 5" (OP04-119). */
+  rested?: boolean;
   excludeName?: string;
   /** Concede uma palavra-chave em vez de poder ("All of your Characters with a cost of 12 or more gain [Blocker]"). */
   keyword?: Keyword;
@@ -501,8 +511,18 @@ export interface RemovalStep {
 
 /** Acontecimentos a que uma carta pode reagir ("When a DON!! card on your field is returned…"). */
 export type GameEvent =
-  | { kind: 'donReturned'; min?: number } // DON!! do seu campo voltou ao deck de DON!! ("2 or more")
-  | { kind: 'characterPlayed'; who: 'self' | 'opponent'; filter?: CardFilter; from?: 'trash'; byEffect?: boolean }
+  | { kind: 'donReturned'; min?: number; byYourEffect?: true } // DON!! do seu campo voltou ao deck de DON!! ("2 or more", "by your effect")
+  | {
+      kind: 'characterPlayed';
+      who: 'self' | 'opponent';
+      filter?: CardFilter;
+      from?: 'trash';
+      byEffect?: boolean;
+      /** "… using a Character's effect" */
+      byCharacterEffect?: true;
+      /** "When you play a Character … from your hand" */
+      fromHand?: true;
+    }
   | { kind: 'lifeRemoved'; whose: 'any' | 'own' | 'opponent' } // "a card is removed from your (or your opponent's) Life cards"
   | { kind: 'lifeZero' } // "When your number of Life cards becomes 0"
   | { kind: 'restedByEffect' } // "If a Character is rested by your effect"
@@ -531,7 +551,12 @@ type EffectStepBody =
   | { do: 'ko'; target: TargetRef }
   | { do: 'rest'; target: TargetRef }
   | { do: 'setActive'; target: TargetRef }
-  | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; anyState?: boolean }
+  /**
+   * "Give up to N rested DON!! cards to …". `fromOpponent`: DON!! da área de custo do oponente;
+   * `fromOwner`: da área de custo do dono da carta escolhida ("from its owner's cost area", OP15-023:
+   * sua ou do oponente, sem cruzar donos); `anyState`: virado ou ativo, à escolha de quem ativa.
+   */
+  | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; fromOwner?: boolean; anyState?: boolean }
   /** "Draw N cards"; com `upTo` ("draw up to N cards", 4-5-4), uma por vez, podendo parar antes de cada uma. */
   | { do: 'draw'; count: number; upTo?: true }
   | { do: 'addDonFromDeck'; count: number; rested?: boolean }
@@ -581,7 +606,8 @@ type EffectStepBody =
       duration: Duration;
     }
   /** "up to 1 of your opponent's rested DON!! cards will not become active in your opponent's next Refresh Phase" */
-  | { do: 'skipRefreshDon'; count: number }
+  /** `atMainPhase`: "your opponent rests N of their active DON!! cards at the start of their next Main Phase" (PRB02-005). */
+  | { do: 'skipRefreshDon'; count: number; atMainPhase?: true }
   | { do: 'winGame' }
   | { do: 'extraTurn' }
   /** "Your opponent may trash N … . If they do not, …" */
@@ -589,7 +615,8 @@ type EffectStepBody =
   /** "your opponent plays up to 1 Character card … from their hand" */
   | { do: 'opponentPlays'; upTo: number; filter: CardFilter }
   /** "your opponent may add 1 DON!! card from their DON!! deck and set it as active" */
-  | { do: 'opponentAddDon'; count: number }
+  /** `may`: "your opponent may add 1 DON!! card …" (OP12-075): o oponente escolhe. */
+  | { do: 'opponentAddDon'; count: number; may?: true }
   /** "return DON!! cards … until you have the same number of DON!! cards on your field as your opponent" */
   | { do: 'donMatchOpponent' }
   /** "give all of your opponent's Characters -1000 power … for every DON!! card given to that Character" */
@@ -640,7 +667,8 @@ type EffectStepBody =
   | { do: 'opponentTrashToBottom'; count: number; upTo?: boolean; chooser?: 'self'; filter?: CardFilter }
   | { do: 'arrangeLife'; whose: 'own' | 'opponent' }
   /** "Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 3 or less" */
-  | { do: 'restDonOrCharacter'; spec: TargetSpec }
+  /** 1 carta do oponente ou 1 DON!! dele ("your opponent's cards" inclui DON!!): vira, ou (`skipRefresh`) uma já virada não desvira. */
+  | { do: 'restDonOrCharacter'; spec: TargetSpec; skipRefresh?: true }
   | { do: 'revealOpponentTop' }
   | { do: 'giveActiveDon'; count: number; target: TargetRef }
   | { do: 'ownToBottom'; count: number; spec: TargetSpec; toLife?: boolean }
@@ -691,14 +719,15 @@ type EffectStepBody =
   /** "Choose one: • … • …" / "Your opponent chooses one: …" */
   | { do: 'chooseOne'; chooser: 'self' | 'opponent'; options: EffectStep[][]; labels: string[] }
   /** Custos com escolha (ver AbilityCost): */
-  | { do: 'restOwn'; count: number; spec: TargetSpec }
+  | { do: 'restOwn'; count: number; spec: TargetSpec; withDon?: true }
   | { do: 'returnOwn'; count: number; spec: TargetSpec }
   | { do: 'trashSelf' }
   | { do: 'returnSelfToHand' }
   | { do: 'trashToDeckBottom'; count: number; filter?: CardFilter }
   | { do: 'lifeToTrash'; count: number; choose?: boolean }
   | { do: 'revealFromHand'; count: number; filter?: CardFilter }
-  | { do: 'lifeFace'; count: number; up: boolean }
+  /** `topOrBottom`: "turn 1 card from the top or bottom of your Life cards …" (ST29-008, ST36-005): o jogador escolhe qual. */
+  | { do: 'lifeFace'; count: number; up: boolean; topOrBottom?: true }
   /** "… will not become active in your opponent's next Refresh Phase" */
   | { do: 'skipRefresh'; target: TargetRef }
   /** "Trash up to 1 of your opponent's Characters" (vai para o descarte sem ser K.O.) */
@@ -712,13 +741,13 @@ type EffectStepBody =
   /** "Reveal 1 card from the top of your deck." (a carta vira 'chosen') */
   | { do: 'revealTop' }
   /** "you may play that card (rested)" / "play up to 1 … (dentre as reveladas)" */
-  | { do: 'playRevealed'; filter?: CardFilter; rested?: boolean }
+  | { do: 'playRevealed'; filter?: CardFilter; rested?: boolean; /** "play up to 1 …": pergunta antes. */ upTo?: true }
   /** "place the revealed card at the bottom of your deck" */
   | { do: 'revealedToBottom' }
   /** "… cannot be rested until the end of your opponent's next turn" */
   | { do: 'cannotBeRested'; target: TargetRef; duration: Duration }
   /** "add up to N card from the top of your opponent's Life cards to the owner's hand" */
-  | { do: 'opponentLifeToHand'; count: number }
+  | { do: 'opponentLifeToHand'; count: number; upTo?: true }
   /** "your opponent places N card from their hand at the bottom of their deck" */
   | { do: 'opponentHandToBottom'; count: number }
   /**
@@ -755,7 +784,16 @@ type EffectStepBody =
   /** "Add up to N … from your trash to your hand." */
   | { do: 'fromTrashToHand'; upTo: number; filter: CardFilter }
   /** "Play up to N … from your deck/hand/trash" (sem pagar custo). */
-  | { do: 'playFrom'; from: 'deck' | 'hand' | 'trash' | 'handOrTrash'; upTo: number; filter: CardFilter; rested?: boolean; notColorOfLast?: boolean }
+  | {
+      do: 'playFrom';
+      from: 'deck' | 'hand' | 'trash' | 'handOrTrash';
+      upTo: number;
+      filter: CardFilter;
+      rested?: boolean;
+      notColorOfLast?: boolean;
+      /** Custo ("You may play 1 [Kotori] from your hand:"): tem de jogar 1 carta que sirva. */
+      required?: boolean;
+    }
   /** "… then shuffle your deck." */
   | { do: 'shuffleDeck' }
   /** "Look at N cards from the top of your deck and return them to the top or bottom of the deck in any order." */
@@ -773,9 +811,9 @@ type EffectStepBody =
    * vez: área de custo (ativos ou virados), Líder, Personagens ou Stage. Sem escolha quando só há
    * uma origem ou quando todos os DON!! do campo vão. `opponent`: os DON!! são do oponente, que escolhe.
    */
-  | { do: 'returnDon'; count: number; opponent?: true }
+  | { do: 'returnDon'; count: number; opponent?: true; activeOnly?: true }
   /** "Trash up to N of your opponent's Life cards." (do topo) */
-  | { do: 'trashLife'; side: 'own' | 'opponent'; count: number }
+  | { do: 'trashLife'; side: 'own' | 'opponent'; count: number; upTo?: true }
   /** "This Character gains [Rush] during this turn." */
   | { do: 'gainKeyword'; target: TargetRef; keyword: Keyword; duration: Duration }
   /** "Select up to 1 …": só escolhe (o passo seguinte usa 'chosen'). */
@@ -791,7 +829,7 @@ type EffectStepBody =
   /** "… and add this card to your hand." ([Trigger]) */
   | { do: 'addThisToHand' }
   /** "Add up to N card from the top of your deck to the top of your Life cards." */
-  | { do: 'addLifeFromDeck'; count: number }
+  | { do: 'addLifeFromDeck'; count: number; upTo?: true }
   /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
   | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: true | 'opponent' };
 
@@ -823,7 +861,9 @@ export type AbilityTiming =
 export interface AbilityCost {
   restSelf?: boolean; // "You may rest this Character/Stage"
   koSelf?: boolean; // "K.O. this Character" (custo de substituição)
-  leaderPowerMinus?: number; // "give your 1 active Leader −5000 power during this turn"
+  leaderPowerMinus?: number; // "give your 1 active Leader −5000 power during this turn" / "give your Leader −2000 power"
+  /** "give your 1 active Leader …": o Líder tem de estar ativo (sem "active", OP18-017, vale virado). */
+  leaderPowerMinusActive?: boolean;
   giveDon?: { count: number; spec: TargetSpec }; // "give 1 active DON!! card to 1 of your [X]"
   ownToBottom?: { count: number; spec: TargetSpec }; // "place 1 of your Characters at the bottom of the owner's deck"
   ownToLife?: { count: number; spec: TargetSpec }; // "add 1 of your Characters … to the top of your Life cards face-up"
@@ -834,6 +874,8 @@ export interface AbilityCost {
   donMinus?: number; // DON!! −X (devolver DON!! ao deck de DON!!)
   /** "You may return 1 or more DON!! cards …": o jogador escolhe quantos devolver (no mínimo `donMinus`). */
   donMinusOpen?: boolean;
+  /** "You may return N of your active DON!! cards to your DON!! deck": só DON!! ativos da área de custo. */
+  donMinusActive?: boolean;
   trashFromHand?: number; // "You may trash N card from your hand:"
   /** Filtro das cartas descartadas como custo ("trash 1 {FILM} type card from your hand"). */
   trashFilter?: CardFilter;
@@ -846,7 +888,8 @@ export interface AbilityCost {
   /** "You may rest N of your Characters:" (o jogador escolhe quais) */
   restCharacters?: number;
   /** "You may rest N of your {X} type Leader or Stage cards:" (filtro de alvo) */
-  restOwn?: { count: number; spec: TargetSpec };
+  /** `withDon`: "rest N of your cards" (qualquer carta sua no campo, DON!! ativos incluídos). */
+  restOwn?: { count: number; spec: TargetSpec; withDon?: true };
   /** "You may return N of your Characters … to the owner's hand:" */
   returnOwn?: { count: number; spec: TargetSpec };
   /** "You may trash this Character:" */
@@ -868,7 +911,7 @@ export interface AbilityCost {
   /** "You may reveal N … from your hand:" */
   reveal?: { count: number; filter?: CardFilter };
   /** "You may turn N card from the top of your Life cards face-up / face-down:" */
-  lifeFace?: { count: number; up: boolean };
+  lifeFace?: { count: number; up: boolean; topOrBottom?: true };
   /** "you may rest 1 of your opponent's Characters instead" */
   restOpponentChars?: number;
   /** "give this Character −2000 power during this turn" */
@@ -916,6 +959,8 @@ export interface Ability {
   staticCannotAttack?: boolean;
   /** "This Character cannot be K.O.'d in battle by "Strike" attribute Characters." */
   noBattleKOVsAttribute?: string;
+  /** "… by "Strike" attribute Characters" (OP01-024): só Personagens; o Líder com o atributo ainda nocauteia. */
+  noBattleKOVsAttributeCharacters?: true;
   /** "This Character cannot be K.O.'d in battle by Leaders." */
   noBattleKOByLeader?: boolean;
   /** "This Character cannot be K.O.'d in battle by Characters without the "Special" attribute." */
@@ -939,7 +984,8 @@ export interface Ability {
   /** "cannot be K.O.'d by effects of your opponent's Characters with 5000 base power or less" */
   noEffectKOByMaxBasePower?: number;
   /** "This Character cannot be rested by your opponent's effects." */
-  staticNoRest?: boolean;
+  /** "cannot be rested by your opponent's effects" (`true`) ou "… by your opponent's Leader and Character effects" (OP15-024). */
+  staticNoRest?: true | 'leaderOrCharacter';
   /** Counter das suas cartas na mão: "+1000 Counter" para as sem Counter, ou "becomes +2000" (set). */
   handCounter?: { filter: CardFilter; amount: number; set?: boolean; withoutCounter?: boolean };
   /** "this card in your hand has a +2000 Counter" (com a condição da habilidade) */
@@ -1152,6 +1198,8 @@ export type Frame =
       revealed?: string[];
       /** Cartas descartadas da mão neste efeito ("the same card name as the trashed card"). */
       trashed?: string[];
+      /** Personagens que o último passo de K.O. tentou nocautear (para "If you do" depois do K.O.). */
+      koTargets?: string[];
       /**
        * Efeito de [Trigger]: a carta (`source`) fica fora de qualquer área enquanto ele resolve
        * (`GameState.limbo`) e vai para o descarte quando o frame termina, se o efeito não a moveu
@@ -1173,7 +1221,18 @@ export type Frame =
       /** A substituição de dano já foi oferecida para este dano. */
       replaceAsked?: boolean;
     }
-  | { kind: 'play'; uid: string; replaceChoice?: string[]; rested?: boolean; from?: 'trash'; byEffect?: boolean }
+  | {
+      kind: 'play';
+      uid: string;
+      replaceChoice?: string[];
+      rested?: boolean;
+      from?: 'trash';
+      byEffect?: boolean;
+      /** Jogado da mão (pela regra ou por efeito). */
+      fromHand?: boolean;
+      /** Jogado pelo efeito de um Personagem. */
+      byCharacterEffect?: boolean;
+    }
   /**
    * Fecha o turno depois que os efeitos de [End of Your Turn]/[End of Your Opponent's Turn] e os
    * "at the end of this turn" (inclusive os criados na própria End Phase) resolverem (6-6-1).
@@ -1256,6 +1315,8 @@ export interface GameState {
   tempReplacements?: Array<{ player: PlayerId; source: string; by: 'battle' | 'any'; cost: AbilityCost }>;
   /** DON!! que não ficam ativos na próxima Renovação do jogador. */
   donSkipRefresh?: Array<{ player: PlayerId; count: number }>;
+  /** DON!! ativos que o jogador vira no início da próxima Fase Principal dele (PRB02-005). */
+  donRestAtMain?: Array<{ player: PlayerId; count: number }>;
   /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;

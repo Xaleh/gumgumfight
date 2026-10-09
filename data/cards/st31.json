@@ -42,7 +42,7 @@
         "Straw Hat Crew"
       ],
       "text": "[Counter] You may trash 1 card from your hand: Up to 1 of your Leader or Character cards gains +3000 power during this battle.",
-      "trigger": "Give up to 1 of your opponent's Leader or Character cards 3000 power during this turn.",
+      "trigger": "Give up to 1 of your opponent's Leader or Character cards -3000 power during this turn.",
       "notes": [
         "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
       ],
@@ -130,7 +130,7 @@
         "Straw Hat Crew",
         "Supernovas"
       ],
-      "text": "[Rush] (This card can attack on the turn in which it is played.)[When Attacking] Give up to 1 of your opponent's Characters 1000 power during this turn.",
+      "text": "[Rush] (This card can attack on the turn in which it is played.)[When Attacking] Give up to 1 of your opponent's Characters -1000 power during this turn.",
       "notes": [
         "Disclaimer: This card is a reprint of a previous card. While the original print is exclusively available in foil, this version is exclusively available as non-foil."
       ],
@@ -284,7 +284,7 @@
         "Straw Hat Crew",
         "The Four Emperors"
       ],
-      "text": "If you have a total of 3 or more given DON!! cards, this Character gains [Rush]. (This card can attack on the turn in which it is played.)[On Play] For every {Straw Hat Crew} type card on your field, give up to 1 of your opponent's Characters 1000 power during this turn.",
+      "text": "If you have a total of 3 or more given DON!! cards, this Character gains [Rush]. (This card can attack on the turn in which it is played.)[On Play] For every {Straw Hat Crew} type card on your field, give up to 1 of your opponent's Characters -1000 power during this turn.",
       "set": "ST31",
       "rarity": "SR",
       "imageUrl": "https://optcgapi.com/media/static/Card_Images/ST31-004.jpg"

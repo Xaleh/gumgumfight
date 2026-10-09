@@ -232,11 +232,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   });
 
   /**
-   * Treino contra o bot jogado pelo servidor (fase de testes do modo espectador).
+   * Treino contra o bot transmitido: o servidor joga pelo bot e a partida aparece em
+   * "Assistir". Só com login (sem conta, o treino roda no navegador).
    * `botDeckId` ausente ou "random": um deck pronto sorteado entre os permitidos no formato.
+   * `first`: 0 = o jogador começa, 1 = o bot começa; ausente ou "random" = sorteio.
    */
-  app.post<{ Body: RoomBody & { botDeckId?: unknown } }>('/api/online/bot', async (req, reply) => {
+  app.post<{ Body: RoomBody & { botDeckId?: unknown; first?: unknown } }>('/api/online/bot', async (req, reply) => {
     if (!botRooms) return reply.code(404).send({ error: 'O treino online contra o bot está desligado neste servidor.' });
+    if (!user(req)) return reply.code(401).send({ error: 'Para transmitir o treino contra o bot, entre com a conta Google.' });
     const format = formatOf(req.body?.format);
     const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
@@ -251,7 +254,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const botDeck = deckFor(botDeckId, format, false);
     if (isError(botDeck)) return reply.code(botDeck.code).send({ error: `Deck do bot: ${botDeck.error}` });
     const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: botDeck.id!, deck: botDeck };
-    const r = lobby.createBotRoom(seat, bot, format);
+    const first = req.body?.first;
+    const r = lobby.createBotRoom(seat, bot, format, first === 0 || first === 1 ? first : undefined);
     if (isError(r)) return reply.code(r.code).send(r);
     lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, token: r.token });

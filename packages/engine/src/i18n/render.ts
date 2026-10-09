@@ -368,7 +368,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você não tiver [${c.noCharacterNamed}]`);
         break;
       case 'haveCharacterNamed':
-        out.push(`você tiver [${c.haveCharacterNamed}]`);
+        out.push(c.haveCharacterOnly ? `você tiver um Personagem [${c.haveCharacterNamed}]` : `você tiver [${c.haveCharacterNamed}]`);
         break;
       case 'noOtherNamed':
         out.push(`você não tiver outro Personagem [${c.noOtherNamed}]${c.noOtherNamedBaseCost !== undefined ? ` com custo base ${c.noOtherNamedBaseCost}` : ''}`);
@@ -474,6 +474,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você tiver ${c.distinctTyped!.count} Personagens do tipo {${c.distinctTyped!.type}} com nomes diferentes`);
         break;
       case 'haveNamedBasePower':
+      case 'haveCharacterOnly':
         break;
       case 'chosenCostEqualsDon':
         out.push('o custo do Personagem escolhido for igual ao número de DON!! anexados a ele');
@@ -489,6 +490,9 @@ function condition(c: Condition, ctx: Ctx): string {
         break;
       case 'opponentRestedCardsMin':
         out.push(`o oponente tiver ${c.opponentRestedCardsMin} ou mais cartas viradas`);
+        break;
+      case 'ownRestedCardsMin':
+        out.push(`você tiver ${c.ownRestedCardsMin} ou mais cartas viradas`);
         break;
       case 'leaderNames':
         out.push(`o seu Líder for ${c.leaderNames!.map((n) => `[${n}]`).join(' ou ')}`);
@@ -620,6 +624,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você tiver ${c.minActiveDon} ou mais DON!! ativos`);
         break;
       case 'lastDone':
+      case 'lastKOd':
         out.push('fizer isso');
         break;
       case 'chosenMatches':
@@ -635,7 +640,9 @@ function condition(c: Condition, ctx: Ctx): string {
 function event(e: GameEvent, ctx: Ctx): string {
   switch (e.kind) {
     case 'donReturned':
-      return e.min && e.min > 1 ? `${e.min} ou mais DON!! do seu campo voltarem ao seu deck de DON!!` : 'um DON!! do seu campo voltar ao seu deck de DON!!';
+      return e.min && e.min > 1
+        ? `${e.min} ou mais DON!! do seu campo voltarem ao seu deck de DON!!`
+        : `um DON!! do seu campo voltar ao seu deck de DON!!${e.byYourEffect ? ' por um efeito seu' : ''}`;
     case 'donGiven':
       return 'este Líder ou 1 dos seus Personagens receber um DON!!';
     case 'damageTaken':
@@ -658,7 +665,8 @@ function event(e: GameEvent, ctx: Ctx): string {
       const what = e.filter ? filter(e.filter, 1, false).replace(/^1 /, 'um ') : 'um Personagem';
       if (e.from === 'trash') return `${what} for jogado do seu descarte`;
       if (e.byEffect) return e.who === 'self' ? `você jogar ${what} usando o efeito de um Personagem` : `o oponente jogar ${what} usando o efeito de um Personagem`;
-      return e.who === 'self' ? `você jogar ${what}` : `o oponente jogar ${what}`;
+      const hand = e.fromHand ? (e.who === 'self' ? ' da sua mão' : ' da mão dele') : '';
+      return e.who === 'self' ? `você jogar ${what}${hand}` : `o oponente jogar ${what}${hand}`;
     }
     case 'characterRemoved': {
       const who =
@@ -692,7 +700,9 @@ function event(e: GameEvent, ctx: Ctx): string {
     case 'damageDealt':
       return 'você causar dano à Vida do oponente';
     case 'leaderBattle':
-      return `o seu Líder${e.filter ? ` ${filter(e.filter, 1, false).replace(/^1 carta ?/, '')}` : ''} atacar ou for atacado`.replace(/  +/g, ' ');
+      // Sem filtro é o próprio Líder ("When this Leader attacks or is attacked", OP03-001).
+      if (!e.filter) return 'este Líder atacar ou for atacado';
+      return `o seu Líder ${filter(e.filter, 1, false).replace(/^1 carta ?/, '')} atacar ou for atacado`.replace(/  +/g, ' ');
     case 'lifeToHand':
       return 'uma carta da sua Vida for para a sua mão';
     case 'returnedToHand':
@@ -707,7 +717,11 @@ function event(e: GameEvent, ctx: Ctx): string {
 function cost(c: AbilityCost, ctx: Ctx, verbal = false): string {
   const symbols: string[] = [];
   const parts: string[] = [];
-  if (verbal) {
+  if (c.donMinusActive) {
+    // "return 2 of your active DON!! cards to your DON!! deck": sem símbolo DON!! −X no texto oficial.
+    if (c.restDon) (verbal ? parts : symbols).push(verbal ? `virar ${c.restDon} dos seus DON!!` : (CIRCLED[c.restDon - 1] ?? `(${c.restDon})`));
+    parts.push(`devolver ${c.donMinus} dos seus DON!! ativos ao seu deck de DON!!`);
+  } else if (verbal) {
     // No meio de uma frase ("você pode … em vez disso") os símbolos viram verbos.
     if (c.restDon) parts.push(`virar ${c.restDon} dos seus DON!!`);
     if (c.donMinus) parts.push(`devolver ${c.donMinus}${c.donMinusOpen ? ' ou mais' : ''} DON!! do seu campo ao seu deck de DON!!`);
@@ -737,7 +751,7 @@ function cost(c: AbilityCost, ctx: Ctx, verbal = false): string {
   if (c.reveal) parts.push(`revelar ${c.reveal.filter ? filter(c.reveal.filter, c.reveal.count, false) : cards(c.reveal.count)} da sua mão`);
   if (c.returnSelf) parts.push(`devolver ${ctx.self} à mão do dono`);
   if (c.koSelf) parts.push(`nocautear ${ctx.self}`);
-  if (c.leaderPowerMinus) parts.push(`dar −${c.leaderPowerMinus} de poder ao seu Líder ativo durante este turno`);
+  if (c.leaderPowerMinus) parts.push(`dar −${c.leaderPowerMinus} de poder ao seu Líder${c.leaderPowerMinusActive ? ' ativo' : ''} durante este turno`);
   if (c.giveDon) parts.push(`dar ${c.giveDon.count} DON!! ativo a ${target(c.giveDon.spec, ctx)}`);
   if (c.returnGivenDon) parts.push(`devolver ${c.returnGivenDon} DON!! anexados às suas cartas para a área de custo, virados`);
   if (c.victimPowerMinus) parts.push(`dar −${c.victimPowerMinus} de poder a esse Personagem durante este turno`);
@@ -789,12 +803,15 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Vire ${target(s.target, ctx)}.`;
     case 'setActive':
       return `Deixe ${target(s.target, ctx)} ativo.`;
-    case 'giveRestedDon':
+    case 'giveRestedDon': {
+      const state = s.anyState ? `DON!! (${plural(s.count, 'virado ou ativo', 'virados ou ativos')})` : `DON!! ${plural(s.count, 'virado', 'virados')}`;
+      if (s.fromOwner) return `Dê ${qty(s.count)} ${state} da área de custo do dono a ${target(s.target, ctx)} (seu ou do oponente).`;
       return s.fromOpponent
-        ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} do seu oponente a ${target(s.target, ctx)}.`
+        ? `Dê ${qty(s.count)} ${state} do seu oponente a ${target(s.target, ctx)}.`
         : typeof s.target === 'object' && (s.target.all || s.target.upTo > 1)
           ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a cada um ${target(s.target, ctx).replace(/^todos os /, 'dos ').replace(/^até /, 'de até ')}.`
           : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} ${a(target(s.target, ctx))}.`;
+    }
     case 'draw':
       return s.upTo ? `Compre até ${cards(s.count)}.` : `Compre ${cards(s.count)}.`;
     case 'drawUntil':
@@ -944,6 +961,9 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'arrangeLife':
       return `Olhe todas as cartas de Vida ${s.whose === 'own' ? 'suas' : 'do oponente'} e devolva-as na ordem que quiser.`;
     case 'restDonOrCharacter':
+      if (s.skipRefresh) return 'Até 1 carta virada do oponente (DON!! incluídos) não fica ativa na próxima Fase de Renovação do oponente.';
+      // "Rest up to 1 of your opponent's cards": qualquer carta, DON!! incluídos.
+      if (s.spec.kinds.length === 3) return 'Vire até 1 carta do oponente (DON!! incluídos).';
       return `Vire até 1 DON!! do oponente ou ${target({ ...s.spec, side: 'opponent', upTo: 1 }, ctx)}.`;
     case 'chooseCost':
       return 'Escolha um custo.';
@@ -1059,6 +1079,7 @@ function step(s: EffectStep, ctx: Ctx): string {
         : `Você pode devolver à mão qualquer número ${what.startsWith('dos ') ? what : `de ${what}`}. ${who} recebe +${s.power} de poder ${dur(s.duration)} para cada Personagem devolvido.`;
     }
     case 'skipRefreshDon':
+      if (s.atMainPhase) return `O oponente vira ${s.count} dos DON!! ativos dele no início da próxima Fase Principal dele.`;
       return `Até ${s.count} DON!! ${plural(s.count, 'virado', 'virados')} do oponente não ${plural(s.count, 'fica ativo', 'ficam ativos')} na próxima Fase de Renovação dele.`;
     case 'winGame':
       return 'Você vence a partida.';
@@ -1141,8 +1162,12 @@ function steps(list: EffectStep[], ctx: Ctx): string {
     while (s.do === 'restDonOrCharacter' && group.length === 1 && i + run < list.length && JSON.stringify(list[i + run]) === JSON.stringify(s)) run++;
     if (run > 1) {
       i += run - 1;
-      const spec = (s as Extract<EffectStep, { do: 'restDonOrCharacter' }>).spec;
-      body = `Vire até ${run} ${target({ ...spec, side: 'opponent', upTo: run }, ctx).replace(/^até \d+ /, '').replace(/ do oponente$/, '')} ou DON!! do oponente, no total`;
+      const { spec, skipRefresh } = s as Extract<EffectStep, { do: 'restDonOrCharacter' }>;
+      body = skipRefresh
+        ? `Até ${run} cartas viradas do oponente (DON!! incluídos) não ficam ativas na próxima Fase de Renovação do oponente`
+        : spec.kinds.length === 3
+          ? `Vire até ${run} cartas do oponente (DON!! incluídos)`
+          : `Vire até ${run} ${target({ ...spec, side: 'opponent', upTo: run }, ctx).replace(/^até \d+ /, '').replace(/ do oponente$/, '')} ou DON!! do oponente, no total`;
     } else body = group.map((g, k) => (k ? lower(noDot(step(g, ctx))) : noDot(step(g, ctx)))).join(' e ');
     let text = key ? `Se ${condition(s.if!, ctx)}, ${lower(body)}.` : `${body}.`;
     if (ifDone > 0) {
@@ -1171,6 +1196,7 @@ const INF: Record<string, string> = {
   embaralhe: 'embaralhar',
   escolha: 'escolher',
   ative: 'ativar',
+  cause: 'causar',
 };
 const toInfinitive = (t: string) => t.replace(/^(\S+)/, (w) => INF[w.toLowerCase()] ?? w.charAt(0).toLowerCase() + w.slice(1));
 
@@ -1222,7 +1248,7 @@ function staticParts(a: Ability, ctx: Ctx): string[] {
   if (a.staticNoBattleKO) parts.push('não pode ser nocauteado em batalha');
   if (a.staticNoEffectKO) parts.push(a.staticNoEffectKO === 'opponent' ? 'não pode ser nocauteado por efeitos do oponente' : 'não pode ser nocauteado por efeitos');
   if (a.staticCannotAttack) parts.push('não pode atacar');
-  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por Líderes ou Personagens de atributo ${a.noBattleKOVsAttribute}`);
+  if (a.noBattleKOVsAttribute) parts.push(`não pode ser nocauteado em batalha por ${a.noBattleKOVsAttributeCharacters ? 'Personagens' : 'Líderes ou Personagens'} de atributo ${a.noBattleKOVsAttribute}`);
   if (a.noBattleKOUnlessAttribute) parts.push(`não pode ser nocauteado em batalha por Personagens sem o atributo ${a.noBattleKOUnlessAttribute}`);
   if (a.noBattleKOByLeader) parts.push('não pode ser nocauteado em batalha por Líderes');
   if (a.costPer) parts.push(`recebe ${a.costPer.cost > 0 ? '+' : '−'}${Math.abs(a.costPer.cost)} de custo para cada ${a.costPer.every} cartas no seu descarte`);
@@ -1235,7 +1261,7 @@ function staticParts(a: Ability, ctx: Ctx): string[] {
   if (a.noEffectKOByMaxBasePower !== undefined) {
     parts.push(`não pode ser nocauteado por efeitos de Personagens do oponente com ${a.noEffectKOByMaxBasePower} de poder base ou menos`);
   }
-  if (a.staticNoRest) parts.push('não pode ser virado por efeitos do oponente');
+  if (a.staticNoRest) parts.push(`não pode ser virado por efeitos ${a.staticNoRest === 'leaderOrCharacter' ? 'de Líder e de Personagem do oponente' : 'do oponente'}`);
   return parts;
 }
 
@@ -1309,6 +1335,7 @@ function staticText(a: Ability, ctx: Ctx): string {
     const leaderOnly = au.kinds.length === 1 && au.kinds[0] === 'leader';
     const whose = au.bothSides ? `todos os ${many}` : au.side === 'opponent' ? `todos os ${many} do oponente` : leaderOnly ? 'o seu Líder' : `os seus ${many}`;
     const extra = [
+      au.rested === false ? 'ativos' : au.rested ? 'virados' : '',
       au.color ? COLOR_M[au.color][1] : '',
       au.minCost !== undefined && au.minCost === au.maxCost ? `com custo${au.baseCost ? ' base' : ''} ${au.minCost}` : '',
       au.maxCost !== undefined && au.minCost !== au.maxCost ? `com custo${au.baseCost ? ' base' : ''} ${au.maxCost} ou menos` : '',
@@ -1405,6 +1432,12 @@ function ability(a: Ability, ctx: Ctx): string {
     return [...tags.filter((t) => t !== TIMING.onKO), body].join(' ');
   }
   else {
+    // Condição de ativação de efeito disparado ("This effect can be activated when …", OP11-043): no
+    // texto, o "Se …" do efeito (junto com o "If …" dos passos).
+    if (a.condition && Object.keys(a.condition).length && !a.cost && a.timing !== 'activateMain') {
+      const cond = a.condition;
+      return ability({ ...a, condition: undefined, steps: a.steps.map((st) => ({ ...st, if: { ...cond, ...st.if } })) }, ctx);
+    }
     const c = a.cost ? cost(a.cost, ctx) : '';
     const pre = a.condition && Object.keys(a.condition).length ? `Se ${condition(a.condition, ctx)}, ` : '';
     body = pre + (c ? `${pre ? c.charAt(0).toLowerCase() + c.slice(1) : c}: ` : '') + steps(a.steps, ctx);

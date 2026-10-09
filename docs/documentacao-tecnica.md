@@ -188,8 +188,10 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
   (só testes; recusadas online).
 - **Determinismo**: o RNG vive dentro do estado. `mulberry32` (32 bits) nas partidas locais; `sfc32` (128 bits,
   seed do `crypto`) nas online, porque 32 bits poderiam ser descobertos por força bruta a partir da mão inicial.
-- **Replays**: `REPLAY_VERSION = 10`; `upgradeReplayActions` insere respostas implícitas de versões antigas. Não há
-  "verificador" no motor: verificar um replay é refazer a partida com `createGame` + `applyAction`.
+- **Replays**: `REPLAY_VERSION = 11`; `upgradeReplayActions` insere respostas implícitas de versões antigas. Não há
+  "verificador" no motor: verificar um replay é refazer a partida com `createGame` + `applyAction`. `ReplayCursor`
+  navega por um replay (avançar, voltar, pular para a ação N): guarda o estado a cada 20 ações e refaz a partir do
+  mais próximo; uma ação que o motor recusa encurta o replay (`failed`).
 
 ### Efeitos das cartas
 
@@ -222,7 +224,7 @@ frase). Resultado `complete: boolean` → o servidor marca `i18n.pt.source = man
 
 ### Bot (`bot/`)
 
-Três níveis (`BotLevel`), escolhidos no menu "Contra o bot"; o servidor (treino online, `queue: 'bot'`) usa o `hard`.
+Três níveis (`BotLevel`), escolhidos no menu "Contra o bot"; o servidor (treino transmitido, `queue: 'bot'`) usa o `hard`.
 Todos decidem pela **visão** do jogador (`viewFor`): no navegador, `useGame.ts` monta a visão com `identityAliases`
 e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
 
@@ -270,8 +272,8 @@ Os conceitos de tempo que a avaliação representa e os testes de posição que 
 - **Com login**: o cookie `gg_session` identifica a conta; o dono passa a ser `user:<id>`.
 - Rate limit nas ações das salas (60 ações / 10 s por assento) e nos emotes (1 / 3 s).
 - **Tetos de salas** (`online/lobby.ts`, `DEFAULT_LIMITS`, conferidos em `lobby.admit` antes de criar sala, entrar numa,
-  entrar na fila ou abrir treino contra o bot): 400 salas ativas no servidor (`ONLINE_MAX_ROOMS`, 503 acima), 10 salas de
-  bot (`ONLINE_MAX_BOT_ROOMS`, 503), 16 salas ou lugares na fila por IP ao mesmo tempo (429) e 60 criações por IP a cada
+  entrar na fila ou abrir treino contra o bot): 400 salas ativas no servidor (`ONLINE_MAX_ROOMS`, 503 acima), 100 salas de
+  bot (`ONLINE_MAX_BOT_ROOMS`, 503; o menu cai para o treino no navegador), 16 salas ou lugares na fila por IP ao mesmo tempo (429) e 60 criações por IP a cada
   10 min (429). Os IPs ficam só em memória (nunca no banco). Partidas de torneio só passam pelo teto global.
 - **Rate limit por IP no Nginx** (scripts de deploy): `/api/` com 30 req/s por IP, rajada de 100, e 64 conexões
   simultâneas por IP (os canais SSE contam). Acima disso, 429 antes de chegar ao app.
@@ -318,6 +320,15 @@ Nada de cache de cartas: o construtor baixa `GET /api/cards` inteiro toda vez qu
 Roda **inteira no navegador** (`useGame.ts`): `createGame`, `applyAction`, `chooseBotAction` com atrasos de 500–2000 ms
 para parecer humano, undo com até 400 estados, replay `.json`. No fim, `POST /api/matches` envia `{mode, format,
 seed, firstPlayer, chooseFirst, deckIds, decks, actions}`; o servidor refaz e grava (seção 9).
+
+Com login, a opção **Transmitir esta partida** troca o navegador pelo servidor: `POST /api/online/bot {deckId,
+botDeckId, format, first}` abre uma sala `bot` (seção 11) e a mesa vira a de uma partida online. Se o servidor
+responde 503 (transmissão lotada), o menu começa o treino no navegador e a mesa mostra o aviso (`GameSetup.notice`).
+
+**Assistir replay** (`ReplayLoader.tsx` + modo `replay` do `useGame`): o `.json` vira um `GameSetup` com o roteiro já
+convertido; com `decks` no arquivo (online e, desde o card 73, também os baixados no navegador) os decks não precisam
+existir. O `useGame` usa um `ReplayCursor`; a `ReplayBar` (abaixo da mesa) avança, volta e pula. Pulos e a velocidade 8×
+mudam a mesa sem animação. Nada é gravado em `matches`.
 
 ### Partida online e espectador
 
@@ -502,7 +513,7 @@ traduz a base inteira e lista traduções parciais/suspeitas. Nenhum dos dois gr
 | Tipo | Motor roda em | Gravação | `matches.mode` | `queue` |
 |---|---|---|---|---|
 | Contra o bot (navegador) | navegador | o navegador envia o replay em `POST /api/matches`; o servidor **refaz** com o motor e só grava o que confere (422 se não confere) | `bot` (ou `demo`) | sempre `casual` |
-| Treino contra o bot do servidor | servidor | o próprio servidor grava ao terminar | `bot` | `casual` |
+| Treino contra o bot transmitido | servidor | o próprio servidor grava ao terminar | `bot` | `casual` |
 | Online (privada, casual, ranqueada, torneio) | servidor | o próprio servidor grava ao terminar (`finishMatch`, `online/routes.ts`) — **única origem da ranqueada e do torneio** | `online` | `casual`, `ranked`, `tournament` |
 
 Nunca se grava `timeout` vindo do navegador (400), nem partidas que não chegaram a `gameover`, nem com mais de 5.000 ações.
@@ -616,7 +627,7 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
 |---|---|---|
 | `private` | `POST /api/online/rooms` gera código de 6 letras (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`) e link `/?sala=CÓDIGO`; o segundo entra com `/rooms/join` | Revanche (os dois pedem → sala nova, assentos trocados); espera no máximo 30 min |
 | `casual` / `ranked` | `POST /api/online/queue` devolve um `ticket`; o navegador consulta `GET /queue/:ticket` a cada 1,5 s; quem para de consultar por 30 s sai da fila | Pareamento por ordem de chegada, mesmo formato. Ranqueada: só conta Google, deck sem ⚙, diferença de bounty ≤ 2.000 + 400/s de espera |
-| `bot` | `POST /api/online/bot` | O servidor joga o assento do bot a partir da **visão do bot** (sem espiar), com 700 ms de pausa e 800–2.000 ms aleatórios nas decisões escondidas. `ONLINE_BOT_ROOMS=off` desliga |
+| `bot` | `POST /api/online/bot` (**só com login**, 401 sem conta) | Treino transmitido. O servidor joga o assento do bot a partir da **visão do bot** (sem espiar), com 700 ms de pausa e 800–2.000 ms aleatórios nas decisões escondidas. `first` (0 = jogador, 1 = bot) vira `firstPlayer`; sem ele, sorteio com escolha. `ONLINE_BOT_ROOMS=off` desliga |
 | `tournament` | `POST /api/tournaments/:id/matches/:m/play` | Uma sala por jogo da série; `firstPlayer` definido (quem perdeu o anterior) |
 
 ### Ciclo de uma partida
@@ -884,6 +895,12 @@ uma interrupção visível). Com o número de planejamento de 2 MB/sala, isso ac
 simultâneas; antes disso o teto de **400 salas ativas** (`ONLINE_MAX_ROOMS`) responde 503 a salas novas, protegendo
 as partidas em andamento.
 
+**Treino contra o bot transmitido (teto de 100 salas, `ONLINE_MAX_BOT_ROOMS`).** Cada sala custa o mesmo que uma
+partida online (o bot do servidor já entra no 1,9 ms por ação medido acima). Com as 100 salas cheias em ritmo de gente
+(~20–30 ações/s no total) e alguns espectadores: ~200–250 MB a mais de RSS, ~5–10 % de 1 vCPU e ~0,3–0,5 MB/s. Essas
+salas contam dentro das 400 do teto geral. As medições não foram feitas na KVM 1: depois de subir o teto, acompanhar
+`playing.bot` em `/api/online/stats` com os sinais da seção 15.
+
 ---
 
 ## 15. Quando e como escalar a VPS
@@ -945,7 +962,7 @@ as partidas em andamento.
 | **SSE sem compressão e sem deltas** | `online/room.ts` `snapshot` | — | deltas / gzip no Node |
 | **Polling de 5 s na página do torneio** por jogador | `Tournaments.tsx` | cache no servidor + ETag/304 (`cache.ts`) | SSE do torneio, se o volume crescer |
 | **Hotlink das imagens** em `optcgapi.com` / `optcgleaks.com` (podem bloquear, mudar URL ou sair do ar) | `imageUrl` | fallback para a carta desenhada; `CARD_IMAGES=off` | cache/proxy próprio de imagens (custaria ~50–100 KB × cartas de banda e disco) |
-| **Abrir salas não exige login** (o código do navegador é gerado à vontade) | `online/routes.ts` | tetos de salas por servidor e por IP (`lobby.admit`), `limit_req`/`limit_conn` no Nginx | acompanhar os 429/503 nos logs e ajustar `DEFAULT_LIMITS` |
+| **Abrir salas não exige login** (o código do navegador é gerado à vontade; o treino transmitido exige) | `online/routes.ts` | tetos de salas por servidor e por IP (`lobby.admit`), `limit_req`/`limit_conn` no Nginx | acompanhar os 429/503 nos logs e ajustar `DEFAULT_LIMITS` |
 | **Token do assento no `live_matches`** em texto | `RoomData.seats[].token` | arquivo só legível pelo usuário `gumgum` | guardar hash |
 | **Importador sem retry/backoff** | `card-import.ts` | roda poucas vezes | retry com espera |
 | **Cartas ⚙ (efeito não automatizado)** | `parser.ts` coverage | `/api/coverage`, proibidas na ranqueada | continuar ampliando parser/scripts |
@@ -967,8 +984,8 @@ as partidas em andamento.
 | `SPOILER_SYNC` | `6` (horas) | `off` desliga; nunca roda em testes |
 | `GOOGLE_CLIENT_ID` | vazio (login desligado) | OAuth Web client |
 | `ADMIN_EMAILS` | vazio | contas que viram Admin ao entrar |
-| `ONLINE_BOT_ROOMS` | `on` | treino online contra o bot do servidor |
-| `ONLINE_MAX_ROOMS` / `ONLINE_MAX_BOT_ROOMS` | `400` / `10` | tetos de salas ativas (todas / treino contra o bot) |
+| `ONLINE_BOT_ROOMS` | `on` | transmitir o treino contra o bot (servidor joga pelo bot; exige login) |
+| `ONLINE_MAX_ROOMS` / `ONLINE_MAX_BOT_ROOMS` | `400` / `100` | tetos de salas ativas (todas / treino contra o bot transmitido) |
 | `PM2_MAX_MEMORY` | `1500M` | só em `shared/deploy.env` da VM: memória em que o pm2 reinicia o app |
 | `NODE_ENV` | — | `production` desliga a leitura do `.env`; `test` desliga o sync |
 
@@ -1012,7 +1029,7 @@ sqlite3 ~/apps/gumgumfight/shared/gumgum.db "select count(*) from matches"
 1. `npm ci && npm run build:release`.
 2. Subir o pacote: `DB_PATH=/tmp/bench.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data PORT=3998 HOST=127.0.0.1 NODE_ENV=production SPOILER_SYNC=off node release/server/index.mjs`.
 3. Um cliente Node que cria N salas com `POST /api/online/bot` (`{deckId:'st01-luffy', botDeckId:'st02-kid', format:'egb'}`,
-   header `x-deck-owner` único por sala), lê o SSE `/rooms/:id/events?t=<token>` com `fetch`, joga o assento humano
+   header `x-deck-owner` único por sala e um cookie `gg_session` de uma conta, já que a rota exige login), lê o SSE `/rooms/:id/events?t=<token>` com `fetch`, joga o assento humano
    com `chooseBotAction` do `@gumgum/engine` sobre a visão recebida (`POST /action {t, seq: view.actionCount, action}`)
    e abre K leitores de `/rooms/:id/watch` por sala; soma `byteLength` dos chunks e lê `VmRSS` de `/proc/<pid>/status`
    e `utime+stime` de `/proc/<pid>/stat` antes e depois.

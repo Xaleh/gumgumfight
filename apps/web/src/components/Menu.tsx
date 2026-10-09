@@ -22,6 +22,7 @@ import { LiveNow, MetaBlock, TournamentsBlock, usePoll } from './HomeBlocks';
 import { Icon, type IconName } from './Icons';
 import { LeaderArt } from './LeaderArt';
 import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
+import { ReplayLoader } from './ReplayLoader';
 
 /** Código de sala do link de convite (lido uma vez, ao carregar a página). */
 const URL_ROOM_CODE = roomCodeFromUrl();
@@ -36,8 +37,8 @@ async function buildSetup(
   format: FormatId,
   firstPlayer?: PlayerId,
   script?: Action[],
-  /** Replay online: listas exatas da partida e a seed de 128 bits. */
-  online?: { decks: [DeckList, DeckList]; seed128: number[] },
+  /** Replay com as listas exatas da partida (e, online, a seed de 128 bits). */
+  online?: { decks: [DeckList, DeckList]; seed128?: number[] },
   /** Sem `firstPlayer`: o vencedor do sorteio escolhe se joga primeiro. */
   chooseFirst = firstPlayer === undefined,
   /** Versão do replay (as anteriores à atual ganham as respostas implícitas e, até a 8, a preparação antiga). */
@@ -52,7 +53,14 @@ async function buildSetup(
     a = { deck: online.decks[0], cards: pool };
     b = { deck: online.decks[1], cards: [] };
   } else {
-    [a, b] = await Promise.all(deckIds.map((id) => api.deck(id)));
+    const decks = Promise.all(deckIds.map((id) => api.deck(id)));
+    [a, b] =
+      mode === 'replay'
+        ? await decks.catch((e: unknown) => {
+            const why = e instanceof Error ? e.message : String(e);
+            throw new Error(`Não foi possível abrir os decks deste replay (${why}). O deck pode ter sido apagado ou ser de outra conta.`);
+          })
+        : await decks;
   }
   const cards = new Map<string, CardData>();
   for (const c of [...a.cards, ...b.cards]) cards.set(c.id, c);
@@ -63,7 +71,7 @@ async function buildSetup(
     script,
     config: {
       seed,
-      ...(online ? { seed128: online.seed128 } : {}),
+      ...(online?.seed128 ? { seed128: online.seed128 } : {}),
       firstPlayer,
       ...(chooseFirst && firstPlayer === undefined ? { chooseFirst: true } : {}),
       cards: [...cards.values()],
@@ -189,18 +197,8 @@ function DeckPicker({
   );
 }
 
-/** Opções de teste (só Dev): seed do embaralhamento e replay salvo. */
-function TestOptions({
-  seed,
-  onSeed,
-  onReplay,
-  onClose,
-}: {
-  seed: number;
-  onSeed: (n: number) => void;
-  onReplay: (f: File) => void;
-  onClose: () => void;
-}) {
+/** Opções de teste (só Dev): seed do embaralhamento. */
+function TestOptions({ seed, onSeed, onClose }: { seed: number; onSeed: (n: number) => void; onClose: () => void }) {
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -224,10 +222,6 @@ function TestOptions({
               jogadas repete a partida exatamente, o que é útil para reproduzir um problema.
             </p>
           </div>
-          <label className="replay-load">
-            Carregar um replay (.json baixado durante uma partida)
-            <input type="file" accept="application/json" onChange={(e) => e.target.files?.[0] && onReplay(e.target.files[0])} />
-          </label>
         </div>
       </div>
     </div>
@@ -357,7 +351,7 @@ export function Menu({
   onTournaments: (id?: string) => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
-  /** Funções de desenvolvimento (só para Dev): opções de teste e treino no servidor contra o bot. */
+  /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
   const { user, notice: authNotice, error: authError } = useAuth();
@@ -367,6 +361,7 @@ export function Menu({
   const [actionError, setActionError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showTests, setShowTests] = useState(false);
+  const [showReplay, setShowReplay] = useState(false);
   const [deck0, setDeck0] = useState('');
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
@@ -393,10 +388,12 @@ export function Menu({
       window.removeEventListener(NICKNAME_EVENT, onRename);
     };
   }, [userId]);
-  /** Treino contra o bot no servidor (fase de testes do modo espectador): a partida pode ser assistida. */
+  /** O servidor aceita transmitir o treino contra o bot (ele joga pelo bot e a partida aparece em "Assistir"). */
   const [botRooms, setBotRooms] = useState(false);
   const [timeBank, setTimeBank] = useState<number | null>(null);
-  const [onServer, setOnServer] = useState(false);
+  /** "Transmitir esta partida": só com login. */
+  const [broadcast, setBroadcast] = useState(false);
+  const broadcasting = botRooms && broadcast && Boolean(user);
   /** Partidas online (ou treino contra o bot do servidor) ainda abertas: atalho para voltar. */
   const [active, setActive] = useState<ActiveRoom[]>([]);
   const privateCard = useRef<HTMLElement>(null);
@@ -508,34 +505,49 @@ export function Menu({
       const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
       if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
-      if (dev && botRooms && onServer) {
-        onOnline(await api.online.botRoom(deck0, opp, format));
-        return;
+      const firstPlayer = first === 'random' ? undefined : (Number(first) as PlayerId);
+      let notice: string | undefined;
+      if (broadcasting) {
+        try {
+          onOnline(await api.online.botRoom(deck0, opp, format, firstPlayer));
+          return;
+        } catch (e) {
+          // Servidor lotado: o treino roda no navegador, sem transmissão.
+          if (!(e instanceof ApiError && e.status === 503)) throw e;
+          notice = 'A transmissão está lotada agora: este treino roda no seu navegador, sem espectadores.';
+        }
       }
       try {
         localStorage.setItem(LAST_BOT_LEVEL, botLevel);
       } catch {
         /* sem armazenamento local */
       }
-      const setup = await buildSetup('bot', [deck0, opp], names, seed, format, first === 'random' ? undefined : (Number(first) as PlayerId));
-      onStart({ ...setup, botLevel });
+      const setup = await buildSetup('bot', [deck0, opp], names, seed, format, firstPlayer);
+      onStart({ ...setup, botLevel, ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);
       setLoading(false);
     }
   };
 
-  const loadReplay = async (file: File) => {
+  /** Lê um replay baixado (.json) e monta a partida para assistir. */
+  const loadReplay = async (file: File): Promise<GameSetup> => {
+    let r: ReplayFile;
     try {
-      const r = JSON.parse(await file.text()) as ReplayFile;
-      if (r.format !== 'gumgumfight-replay') throw new Error('Arquivo não é um replay do GumGum Fight.');
-      const online = r.seed128 && r.decks ? { seed128: r.seed128, decks: r.decks } : undefined;
-      // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
-      const first = r.chooseFirst ? undefined : r.firstPlayer;
-      onStart(await buildSetup('replay', r.deckIds, r.names, r.seed, 'standard', first, r.actions, online, Boolean(r.chooseFirst), r.version ?? 1));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      r = JSON.parse(await file.text()) as ReplayFile;
+    } catch {
+      throw new Error('O arquivo não é um replay do GumGum Fight (não é um JSON válido).');
     }
+    if (r?.format !== 'gumgumfight-replay' || !Array.isArray(r.actions)) throw new Error('O arquivo não é um replay do GumGum Fight.');
+    if ((r.version ?? 1) > REPLAY_VERSION) {
+      throw new Error('Este replay foi gravado por uma versão mais nova do jogo. Recarregue a página e tente de novo.');
+    }
+    // Com as listas no arquivo (partidas online e replays baixados desde o card 73), os decks não precisam existir.
+    const lists = r.decks ? { decks: r.decks, seed128: r.seed128 } : undefined;
+    // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
+    const first = r.chooseFirst ? undefined : r.firstPlayer;
+    const names = r.names ?? ['Jogador 1', 'Jogador 2'];
+    return buildSetup('replay', r.deckIds, names, r.seed, 'standard', first, r.actions, lists, Boolean(r.chooseFirst), r.version ?? 1);
   };
 
   const d0 = decks.find((d) => d.id === deck0);
@@ -570,6 +582,7 @@ export function Menu({
   ];
   const extra: NavItem[] = [
     { key: 'settings', label: 'Configurações', icon: 'sliders', onClick: () => setShowSettings(true) },
+    { key: 'replay', label: 'Assistir replay', icon: 'play', onClick: () => setShowReplay(true) },
     ...(onAdmin ? [{ key: 'admin', label: 'Perfis das contas', icon: 'shield' as const, onClick: onAdmin }] : []),
     ...(onCoverage ? [{ key: 'coverage', label: 'Cobertura das cartas', icon: 'check' as const, onClick: onCoverage }] : []),
     ...(dev ? [{ key: 'tests', label: 'Opções de teste', icon: 'flask' as const, onClick: () => setShowTests(true) }] : []),
@@ -594,6 +607,10 @@ export function Menu({
               <button type="button" className="hero-link" onClick={onWatch}>
                 <Icon name="eye" size={18} />
                 Assistir partidas
+              </button>
+              <button type="button" className="hero-link" onClick={() => setShowReplay(true)} title="Assistir a um replay baixado (.json)">
+                <Icon name="play" size={18} />
+                Assistir replay
               </button>
               <button type="button" className="hero-link nickname-link" onClick={() => setShowSettings(true)} title="Mudar o apelido (Configurações)">
                 <Icon name="user" size={18} />
@@ -799,7 +816,7 @@ export function Menu({
               title="Contra o bot"
               badge={fmt}
               desc="Treine com qualquer deck, sem fila e sem pressa."
-              live={dev && botRooms && onServer && stats ? <Live>{`${plural(stats.playing.bot, 'treino', 'treinos')} no servidor`}</Live> : <Live off>Roda no seu navegador</Live>}
+              live={broadcasting && stats ? <Live>{plural(stats.playing.bot, 'treino transmitido', 'treinos transmitidos')}</Live> : <Live off>Roda no seu navegador</Live>}
               note={!d0 || botReady ? null : `Os dois decks precisam valer no ${fmt}.`}
               action={loading ? 'Carregando…' : 'Batalhar!'}
               disabled={!botReady || loading}
@@ -848,9 +865,10 @@ export function Menu({
                     ))}
                   </div>
                 </div>
-                {dev && botRooms && (
-                  <label className="check">
-                    <input type="checkbox" checked={onServer} onChange={(e) => setOnServer(e.target.checked)} /> Jogar no servidor (dá para assistir)
+                {botRooms && (
+                  <label className={['check', user ? '' : 'disabled'].join(' ')} title={user ? 'A partida aparece em "Assistir".' : undefined}>
+                    <input type="checkbox" checked={broadcasting} disabled={!user} onChange={(e) => setBroadcast(e.target.checked)} />
+                    {user ? 'Transmitir esta partida' : 'Transmitir: entre com o Google'}
                   </label>
                 )}
               </div>
@@ -900,7 +918,8 @@ export function Menu({
 
       {queue && <QueueWait queue={queue} onCancel={cancel} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      {showTests && <TestOptions seed={seed} onSeed={setSeed} onReplay={loadReplay} onClose={() => setShowTests(false)} />}
+      {showTests && <TestOptions seed={seed} onSeed={setSeed} onClose={() => setShowTests(false)} />}
+      {showReplay && <ReplayLoader load={loadReplay} onStart={onStart} onClose={() => setShowReplay(false)} />}
 
       {picking !== null && (
         <DeckPicker

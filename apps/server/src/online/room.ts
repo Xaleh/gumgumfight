@@ -36,6 +36,7 @@ import {
   type LogEntry,
   type PlayerId,
   REPLAY_VERSION,
+  upgradeReplayActions,
   viewFor,
 } from '@gumgum/engine';
 import type { FormatId } from '../stats/catalog';
@@ -276,10 +277,14 @@ export class Room {
 
   /** Cria o jogo e refaz as ações gravadas (ao começar ou depois de reiniciar o servidor). */
   private rebuild() {
-    let state = createGame(this.config());
+    const config = this.config();
+    let state = createGame(config);
     let i = 0;
     const salt = this.data.aliasSalt;
     this.aliases = createAliases(state, () => `k${createHmac('sha256', salt).update(String(i++)).digest('base64url').slice(0, 10)}`);
+    // Partida começada numa versão anterior do motor (deploy no meio do jogo): as perguntas que o motor
+    // passou a fazer recebem a resposta que ele dava sozinho (`upgradeReplayActions`).
+    if ((this.data.replayVersion ?? 8) < REPLAY_VERSION && this.data.actions.length) this.data.actions = upgradeReplayActions(config, this.data.actions);
     for (const a of this.data.actions) state = applyAction(state, a);
     this.state = state;
     this.lastAction = this.data.actions[this.data.actions.length - 1] ?? null;
