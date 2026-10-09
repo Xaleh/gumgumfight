@@ -236,9 +236,10 @@ function clean(raw: string): string {
     )
     .replace(/\bgive (\d+) of your active DON!! cards to/g, 'give $1 active DON!! cards to')
     .replace(/to your Leader with a type including "([^"]+)" or 1 Character with a type including "\1"/g, 'to up to 1 of your Leader or Character cards with a type including "$1"')
+    // Texto anterior à errata de 13/03/2026 do Arlong OP15-023 (e cartas com a mesma redação): mesma leitura, só DON!! virados.
     .replace(
       /Give up to (\d+) rested DON!! cards? to its owner's Leader or 1 of their Characters/g,
-      "Give up to $1 of your opponent's rested DON!! cards to up to 1 of your opponent's Leader or Character cards",
+      "Give up to $1 rested DON!! cards from its owner's cost area to its owner's Leader or 1 of their Characters",
     )
     .replace(/set your Leader (\[[^\]]+\]) as active/g, 'set your $1 Leader as active')
     .replace(/play up to 1 (\[[^\]]+\]), up to 1 (\[[^\]]+\]),? and up to 1 (\[[^\]]+\]),? with a cost of (\d+) or less from your trash/g, 'play up to 1 each of $1, $2 and $3 with a cost of $4 or less from your trash')
@@ -1200,16 +1201,15 @@ const CLAUSES: ClauseRule[] = [
     new RegExp(`^Swap the base power of your Leader and 1 Character with each other ${DUR}$`, 'i'),
     (m) => [{ do: 'swapBasePower', spec: { side: 'any', kinds: ['character'], upTo: 1 }, duration: durationOf(m[1]), withLeader: true }],
   ],
+  // "Give up to 1 DON!! card from its owner's cost area to its owner's Leader or 1 of their Characters"
+  // (Arlong OP15-023, errata de 13/03/2026): o DON!! pode ser seu ou do oponente, virado ou ativo, e vai
+  // ao Líder ou a um Personagem do mesmo dono (Q&A OP15: não cruza donos; quem ativa escolhe o DON!!).
   [
-    /^Give up to (\d+) DON!! cards? from (?:its owner's|your opponent's) cost area to (?:its owner's Leader or 1 of their Characters|(\d+) of your opponent's Characters)$/i,
+    /^Give up to (\d+) (rested )?DON!! cards? from (?:its owner's|your opponent's) cost area to (?:(its owner's Leader or 1 of their Characters)|(\d+) of your opponent's Characters)$/i,
     (m) => [
-      {
-        do: 'giveRestedDon',
-        target: { side: 'opponent', kinds: m[2] ? ['character'] : ['leader', 'character'], upTo: 1 },
-        count: Number(m[1]),
-        fromOpponent: true,
-        anyState: true,
-      },
+      m[3]
+        ? { do: 'giveRestedDon', target: { side: 'any', kinds: ['leader', 'character'], upTo: 1 }, count: Number(m[1]), fromOwner: true, ...(m[2] ? {} : { anyState: true }) }
+        : { do: 'giveRestedDon', target: { side: 'opponent', kinds: ['character'], upTo: 1 }, count: Number(m[1]), fromOpponent: true, ...(m[2] ? {} : { anyState: true }) },
     ],
   ],
   [/^return (\d+) DON!! cards? from your field to your DON!! deck$/i, (m) => [{ do: 'payCost', cost: { donMinus: Number(m[1]) } }]],

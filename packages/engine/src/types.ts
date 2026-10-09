@@ -551,7 +551,12 @@ type EffectStepBody =
   | { do: 'ko'; target: TargetRef }
   | { do: 'rest'; target: TargetRef }
   | { do: 'setActive'; target: TargetRef }
-  | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; anyState?: boolean }
+  /**
+   * "Give up to N rested DON!! cards to …". `fromOpponent`: DON!! da área de custo do oponente;
+   * `fromOwner`: da área de custo do dono da carta escolhida ("from its owner's cost area", OP15-023:
+   * sua ou do oponente, sem cruzar donos); `anyState`: virado ou ativo, à escolha de quem ativa.
+   */
+  | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; fromOwner?: boolean; anyState?: boolean }
   /** "Draw N cards"; com `upTo` ("draw up to N cards", 4-5-4), uma por vez, podendo parar antes de cada uma. */
   | { do: 'draw'; count: number; upTo?: true }
   | { do: 'addDonFromDeck'; count: number; rested?: boolean }

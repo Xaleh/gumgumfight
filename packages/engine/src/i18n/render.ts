@@ -803,12 +803,15 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `Vire ${target(s.target, ctx)}.`;
     case 'setActive':
       return `Deixe ${target(s.target, ctx)} ativo.`;
-    case 'giveRestedDon':
+    case 'giveRestedDon': {
+      const state = s.anyState ? `DON!! (${plural(s.count, 'virado ou ativo', 'virados ou ativos')})` : `DON!! ${plural(s.count, 'virado', 'virados')}`;
+      if (s.fromOwner) return `Dê ${qty(s.count)} ${state} da área de custo do dono a ${target(s.target, ctx)} (seu ou do oponente).`;
       return s.fromOpponent
-        ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} do seu oponente a ${target(s.target, ctx)}.`
+        ? `Dê ${qty(s.count)} ${state} do seu oponente a ${target(s.target, ctx)}.`
         : typeof s.target === 'object' && (s.target.all || s.target.upTo > 1)
           ? `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} a cada um ${target(s.target, ctx).replace(/^todos os /, 'dos ').replace(/^até /, 'de até ')}.`
           : `Dê ${qty(s.count)} DON!! ${plural(s.count, 'virado', 'virados')} ${a(target(s.target, ctx))}.`;
+    }
     case 'draw':
       return s.upTo ? `Compre até ${cards(s.count)}.` : `Compre ${cards(s.count)}.`;
     case 'drawUntil':

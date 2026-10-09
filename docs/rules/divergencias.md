@@ -469,6 +469,13 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Replays: as perguntas novas (topo ou fundo da Vida) entram nas respostas implícitas da versão 11.
 - Testes: `packages/engine/test/card-audit.test.ts` (rodada 3; 15 testes novos, que falham sem a correção).
 
+**DV-44. Arlong OP15-023: "Give up to 1 DON!! card from its owner's cost area to its owner's Leader or 1 of their Characters"** — médio — **corrigido**
+- Relato do dono do projeto (09/10/2026). O efeito só oferecia o Líder e os Personagens do oponente e tirava o DON!! sempre da área de custo dele; a tradução dizia "DON!! virado do seu oponente".
+- Regra (errata de 13/03/2026, que tirou o "rested", e Q&A OP15, em [interacoes/07-stage-e-don.md](interacoes/07-stage-e-don.md)): depois do custo (1 DON!! virado do oponente a 1 Personagem dele), quem ativa escolhe até 1 Líder ou Personagem **de qualquer jogador**; o DON!! sai da área de custo **do dono dessa carta** (não cruza donos) e pode ser **virado ou ativo**, à escolha de quem ativa. "Up to 1" aceita 0.
+- Correção: `giveRestedDon.fromOwner` (o DON!! sai da área de custo do dono do alvo; só cartas de quem tem DON!! na área de custo são opções) e, com `anyState`, a pergunta "virado ou ativo" quando os dois existem (para mais de um DON!!, quantos saem virados). O custo "give 1 of your opponent's rested DON!! cards to 1 of your opponent's Characters" passou a exigir o Personagem (`required`): aceito o custo, não dá para escolher 0. A redação anterior à errata ("Give up to N rested DON!! cards to its owner's Leader or 1 of their Characters") segue a mesma leitura, só com DON!! virados.
+- Replays: a pergunta nova é uma `option` do passo `giveRestedDon`; a resposta implícita (índice 0, o máximo de virados) reproduz o comportamento antigo.
+- Testes: `packages/engine/test/card-audit.test.ts` ("Arlong OP15-023: DON!! da área de custo do dono…", 6 testes).
+
 ---
 
 ## Itens a confirmar (sem ruling oficial claro)

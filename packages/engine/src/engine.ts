@@ -2517,7 +2517,7 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
   // Custo "You may play 1 [Kotori] from your hand" (OP05-111): jogar é obrigatório depois de aceitar.
   if (cost.playFromHand) steps.push({ do: 'playFrom', from: 'hand', upTo: 1, filter: cost.playFromHand, required: true });
   if (cost.giveOppDon) {
-    steps.push({ do: 'giveRestedDon', target: { side: 'opponent', kinds: ['character'], upTo: 1 }, count: cost.giveOppDon, fromOpponent: true });
+    steps.push({ do: 'giveRestedDon', target: { side: 'opponent', kinds: ['character'], upTo: 1, required: true }, count: cost.giveOppDon, fromOpponent: true });
   }
   if (cost.handToTop) steps.push({ do: 'handToDeck', count: cost.handToTop, where: 'top' });
   return steps;
@@ -2814,36 +2814,80 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'giveRestedDon': {
-      const giver = step.fromOpponent ? state.players[1 - frame.controller] : ps;
-      const pool = () => giver.donRested + (step.anyState ? giver.donActive : 0);
-      if (pool() === 0) return true;
-      // "Give up to 2 rested DON!! cards to …" (OP05-008): com um alvo só, o jogador escolhe quantos (do máximo para 1).
-      let t: string[] | null;
+      const opp = state.players[opponent(frame.controller)];
+      // "from its owner's cost area" (OP15-023): o DON!! sai da área de custo do dono da carta escolhida.
+      const giverOf = (uid: string): PlayerState => (step.fromOwner ? state.players[ownerOf(state, uid)] : step.fromOpponent ? opp : ps);
+      const poolOf = (g: PlayerState) => g.donRested + (step.anyState ? g.donActive : 0);
+      const prompt = step.anyState ? 'DON!!' : 'DON!! virado(s)';
+      const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
+      let t: string[];
       let qty = step.count;
-      if (frame.memo) {
-        t = frame.memo;
-        qty = Math.min(step.count, pool()) - Number(frame.choice?.[0] ?? 0);
+      /** Quantos dos DON!! dados saem virados (o resto, ativos); só com `anyState` e os dois estados disponíveis. */
+      let fromRested: number | undefined;
+      const stage = frame.memo?.[0];
+      if (frame.memo && (stage === 'qty' || stage?.startsWith('state:'))) {
+        t = frame.memo.slice(1);
+        if (stage === 'qty') {
+          qty = Math.min(step.count, poolOf(giverOf(t[0]))) - Number(frame.choice?.[0] ?? 0);
+        } else {
+          qty = Number(stage.slice('state:'.length));
+          const g = giverOf(t[0]);
+          fromRested = Math.min(qty, g.donRested) - Number(frame.choice?.[0] ?? 0);
+        }
+        frame.choice = undefined;
+        frame.memo = undefined;
       } else {
-        t = resolveTargets(state, frame, step.target, step.fromOpponent ? 'harm' : 'help', `${srcName}: escolha quem recebe DON!! virado(s).`);
-        if (!t) return false;
-        const max = Math.min(step.count, pool());
+        let spec = step.target;
+        if (step.fromOwner && typeof spec === 'object') {
+          // Só quem tem DON!! na área de custo pode receber; sem DON!! de nenhum lado, nada acontece.
+          const sides = (['own', 'opponent'] as const).filter((side) => poolOf(side === 'own' ? ps : opp) > 0);
+          if (!sides.length) return true;
+          if (sides.length === 1) spec = { ...spec, side: sides[0] };
+        } else if (poolOf(step.fromOpponent ? opp : ps) === 0) return true;
+        const chosen = resolveTargets(state, frame, spec, step.fromOpponent ? 'harm' : 'help', `${srcName}: escolha quem recebe ${prompt}.`);
+        if (!chosen) return false;
+        t = chosen;
+        // "Give up to 2 rested DON!! cards to …" (OP05-008): com um alvo só, o jogador escolhe quantos (do máximo para 1).
+        const max = t.length ? Math.min(step.count, poolOf(giverOf(t[0]))) : 0;
         if (t.length === 1 && max > 1) {
-          frame.memo = t;
-          frame.choice = undefined;
+          frame.memo = ['qty', ...t];
           askOption(state, frame, frame.controller, `${srcName}: quantos DON!! dar a ${cardDef(state, t[0]).name}?`, Array.from({ length: max }, (_, i) => String(max - i)));
+          return false;
+        }
+      }
+      // Virado ou ativo ("from its owner's cost area" aceita DON!! ativo, Q&A OP15): quem ativa escolhe
+      // quantos saem virados, do máximo de virados para o mínimo.
+      if (step.anyState && fromRested === undefined && t.length === 1) {
+        const g = giverOf(t[0]);
+        const n = Math.min(qty, poolOf(g));
+        const kMax = Math.min(n, g.donRested);
+        const kMin = Math.max(0, n - g.donActive);
+        if (kMax > kMin) {
+          const label = (k: number) =>
+            n === 1 ? (k ? 'DON!! virado' : 'DON!! ativo') : `${k} ${pl(k, 'virado', 'virados')} e ${n - k} ${pl(n - k, 'ativo', 'ativos')}`;
+          frame.memo = [`state:${qty}`, ...t];
+          askOption(
+            state,
+            frame,
+            frame.controller,
+            `${srcName}: dar ${n === 1 ? 'um DON!! virado ou ativo' : 'quantos DON!! virados (o resto ativos)'} de ${g.name} a ${cardDef(state, t[0]).name}?`,
+            Array.from({ length: kMax - kMin + 1 }, (_, i) => label(kMax - i)),
+          );
           return false;
         }
       }
       for (const uid of t) {
         const loc = locate(state, uid);
-        const n = Math.min(qty, pool());
+        const giver = giverOf(uid);
+        const n = Math.min(qty, poolOf(giver));
         if (loc && n > 0) {
-          const fromRested = Math.min(n, giver.donRested);
-          giver.donRested -= fromRested;
-          giver.donActive -= n - fromRested;
+          const rested = fromRested === undefined ? Math.min(n, giver.donRested) : Math.min(fromRested, giver.donRested, n);
+          giver.donRested -= rested;
+          giver.donActive -= n - rested;
           loc.fc.don += n;
           emit(state, { kind: 'donGiven', player: loc.player, card: uid });
-          log(state, frame.controller, `${cardDef(state, uid).name} recebe ${n} DON!!.`);
+          const state_ = step.anyState ? ` (${rested} ${pl(rested, 'virado', 'virados')}, ${n - rested} ${pl(n - rested, 'ativo', 'ativos')})` : '';
+          log(state, frame.controller, `${cardDef(state, uid).name} recebe ${n} DON!!${state_} da área de custo de ${giver.name}.`);
         }
       }
       return true;
