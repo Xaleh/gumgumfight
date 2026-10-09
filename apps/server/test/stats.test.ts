@@ -1,4 +1,4 @@
-import { type Action, actingPlayer, applyAction, type CardData, chooseBotAction, createGame, type DeckList } from '@gumgum/engine';
+import { type Action, actingPlayer, applyAction, type CardData, chooseSimpleBotAction as chooseBotAction, createGame, type DeckList } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { getCards, openDb } from '../src/db';

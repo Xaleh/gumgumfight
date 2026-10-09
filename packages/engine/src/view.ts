@@ -12,7 +12,7 @@
 // - Definições só das cartas que o jogador já pode ver; seed e RNG zerados.
 // - Escolhas pendentes e a pilha do oponente sem os detalhes; log sem as linhas secretas.
 
-import type { Action, CardDef, Frame, GameState, ManualOp, Pending, PlayerId, PlayerState } from './types';
+import type { Action, CardDef, EffectStep, Frame, GameState, ManualOp, Pending, PlayerId, PlayerState } from './types';
 
 export const HIDDEN_CARD = '?';
 /** Referência para uma carta que o jogador não vê (fora das zonas). */
@@ -50,6 +50,13 @@ export function createAliases(state: GameState, randomId: () => string): Aliases
     toUid[a] = uid;
   }
   return { toAlias, toUid };
+}
+
+/** Apelidos iguais aos uids: para montar a visão de um jogador numa partida local (o bot no navegador). */
+export function identityAliases(state: GameState): Aliases {
+  const map: Record<string, string> = {};
+  for (const uid of Object.keys(state.cards)) map[uid] = uid;
+  return { toAlias: map, toUid: map };
 }
 
 const handle = (owner: PlayerId, zone: Zone, index: number) => `${HIDDEN_REF}${owner}:${zone}:${index}`;
@@ -142,10 +149,15 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
           after: undefined,
         }
       : null,
-    stack: state.stack.map((f) => sanitizeFrame(f, ref)),
+    stack: state.stack.map((f) => sanitizeFrame(state, f, viewer, ref, vis)),
     ...(state.limbo ? { limbo: state.limbo.map(alias) } : {}),
-    // Efeitos disparados esperando a vez: só a carta de origem (os passos e alvos ficam no servidor).
-    triggered: state.triggered?.map((e) => ({ id: e.id, source: ref(e.source), controller: e.controller, steps: [], label: e.label, batch: e.batch })),
+    // Efeitos disparados esperando a vez: os do próprio jogador inteiros (ele precisa simulá-los para
+    // decidir; os passos são o texto da carta dele); os do oponente só com a carta de origem.
+    triggered: state.triggered?.map((e) =>
+      viewer !== null && e.controller === viewer
+        ? { ...e, source: ref(e.source), last: refs(e.last) }
+        : { id: e.id, source: ref(e.source), controller: e.controller, steps: [], label: e.label, batch: e.batch },
+    ),
     pending: state.pending ? viewPending(state.pending, viewer, ref) : null,
     modifiers: state.modifiers.filter((m) => vis.has(m.uid)).map((m) => ({ ...m, uid: alias(m.uid) })),
     usedThisTurn: state.usedThisTurn.map(usedKey).filter((k): k is string => k !== null),
@@ -184,14 +196,44 @@ function aliasAction(action: Action, ref: (uid: string) => string): Action {
   }
 }
 
-function sanitizeFrame(f: Frame, ref: (uid: string) => string): Frame {
+/**
+ * Frames da pilha. Os efeitos do próprio jogador vão inteiros (passos, escolhas, alvos): são o texto
+ * das cartas dele e as respostas que ele mesmo deu, e o bot precisa deles para simular as escolhas
+ * pendentes. Os do oponente ficam só com a carta de origem. Nos frames de dano, a carta da Vida só
+ * aparece se o jogador a vê.
+ */
+function sanitizeFrame(state: GameState, f: Frame, viewer: PlayerId | null, ref: (uid: string) => string, vis: Set<string>): Frame {
+  const refs = (uids: string[] | undefined) => uids?.map(ref);
   switch (f.kind) {
     case 'effect':
+      if (viewer !== null && f.controller === viewer) {
+        // Passos inseridos durante a resolução carregam uids (vítimas de uma substituição, DON!! dados…);
+        // escolhas e memória podem ser uids ou marcadores ("yes", índices): só o que é uid muda.
+        const isUid = (x: string) => x in state.cards;
+        const deep = (x: unknown): unknown => {
+          if (typeof x === 'string') return isUid(x) ? ref(x) : x;
+          if (Array.isArray(x)) return x.map(deep);
+          if (x && typeof x === 'object') return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, deep(v)]));
+          return x;
+        };
+        return {
+          ...f,
+          source: ref(f.source),
+          steps: deep(f.steps) as EffectStep[],
+          choice: f.choice?.map((c) => (isUid(c) ? ref(c) : c)),
+          memo: f.memo?.map((m) => (isUid(m) ? ref(m) : m)),
+          last: refs(f.last),
+          revealed: refs(f.revealed),
+          trashed: refs(f.trashed),
+        };
+      }
       return { kind: 'effect', source: ref(f.source), controller: f.controller, steps: [], i: 0, ...(f.trigger ? { trigger: true as const } : {}) };
-    case 'damage':
-      return { kind: 'damage', defender: f.defender, remaining: f.remaining, banish: f.banish };
+    case 'damage': {
+      const { lifeCard, ...rest } = f;
+      return lifeCard && vis.has(lifeCard) ? { ...rest, lifeCard: ref(lifeCard) } : rest;
+    }
     case 'play':
-      return { kind: 'play', uid: ref(f.uid) };
+      return { ...f, uid: ref(f.uid), replaceChoice: refs(f.replaceChoice) };
     default:
       return f;
   }

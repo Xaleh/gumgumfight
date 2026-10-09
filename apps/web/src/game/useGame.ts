@@ -1,15 +1,20 @@
 import {
   type Action,
   actingPlayer,
+  actionFromView,
   applyAction,
+  type BotLevel,
   chooseBotAction,
+  chooseSimpleBotAction,
   createGame,
   type DeckList,
   type GameConfig,
   type GameState,
   hiddenDecision,
+  identityAliases,
   type PlayerId,
   REPLAY_VERSION,
+  viewFor,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
@@ -25,6 +30,8 @@ export interface GameSetup {
   format: FormatId;
   /** Ações gravadas (modo replay / roteiro). */
   script?: Action[];
+  /** Nível do bot (padrão `hard`). */
+  botLevel?: BotLevel;
 }
 
 export interface ReplayFile {
@@ -62,6 +69,17 @@ interface Entry {
 }
 
 const MAX_HISTORY = 400;
+
+/**
+ * Jogada do bot a partir da visão dele (como no servidor): ele não enxerga a mão nem o deck do humano.
+ * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
+ * partida não travar.
+ */
+function botAction(state: GameState, p: PlayerId, level: BotLevel): Action {
+  const aliases = identityAliases(state);
+  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, p, aliases), p, level));
+  return typeof real === 'string' ? chooseSimpleBotAction(state, p) : real;
+}
 /** Faixa de tempo (ms) do bot nas decisões que escondem informação (Counter, carta da Vida). */
 const HIDDEN_DECISION_MS = [800, 2000] as const;
 
@@ -126,7 +144,7 @@ export function useGame(setup: GameSetup) {
     if (setup.mode === 'replay') {
       next = setup.script?.[actionsRef.current.length];
     } else if (state.players[p].isBot || (auto && p === human)) {
-      next = chooseBotAction(state, p);
+      next = botAction(state, p, setup.botLevel ?? 'hard');
     }
     if (!next) return;
     // Espera as cartas pousarem antes da próxima jogada.

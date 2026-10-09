@@ -123,7 +123,9 @@ gumgumfight/
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
 │   ├── src/cards/scripts.ts     scripts escritos à mão (62 cartas, prioridade sobre o parser)
 │   ├── src/i18n/pt.ts, render.ts   tradução automática para português
-│   ├── src/bot/simple.ts        bot heurístico
+│   ├── src/bot/simple.ts        bot heurístico (nível fácil)
+│   ├── src/bot/evaluate.ts      função de avaliação do bot com busca
+│   ├── src/bot/planner.ts       bot com busca (níveis normal e difícil)
 │   ├── scripts/simulate*.ts     simulações bot x bot na linha de comando
 │   └── test/                    46 arquivos de teste + fixtures
 ├── apps/server/                 API Fastify
@@ -218,11 +220,27 @@ regras especiais do Líder.
 `translateCardPt` monta o português a partir da DSL; o que o parser não entendeu passa por `translateToPt` (regras de
 frase). Resultado `complete: boolean` → o servidor marca `i18n.pt.source = manual | auto | partial`.
 
-### Bot (`bot/simple.ts`)
+### Bot (`bot/`)
 
-Heurístico (valor = custo × 1000 + poder): joga a carta mais cara, anexa DON!! até superar o Líder inimigo, ataca
-para K.O. de custo ≥ 3 ou o Líder, bloqueia/conta só quando vale a pena. Objetivo: partidas plausíveis para testes,
-não jogar bem. É o mesmo bot usado no navegador (contra o bot) e no servidor (treino online, `queue: 'bot'`).
+Três níveis (`BotLevel`), escolhidos no menu "Contra o bot"; o servidor (treino online, `queue: 'bot'`) usa o `hard`.
+Todos decidem pela **visão** do jogador (`viewFor`): no navegador, `useGame.ts` monta a visão com `identityAliases`
+e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
+
+- **`easy`** (`simple.ts`): heurístico (valor = custo × 1000 + poder): joga a carta mais cara, anexa DON!! até superar
+  o Líder inimigo, ataca para K.O. de custo ≥ 3 ou o Líder, bloqueia/conta só quando vale a pena. Rápido (< 1 ms);
+  é o bot dos testes de simulação (`sim.ts`) e do `simulate:all`.
+- **`normal`** e **`hard`** (`planner.ts` + `evaluate.ts`): simulam as jogadas com `applyAction` e comparam pela
+  função de avaliação (`evaluate`, pesos em `DEFAULT_WEIGHTS`). `normal` olha uma jogada à frente; `hard` faz busca
+  em feixe sobre o turno inteiro (jogadas compostas "anexar k DON!! e atacar", teto de 250 ms por busca) e guarda a
+  linha escolhida para as decisões seguintes enquanto a partida seguir o previsto. As escolhas pendentes (bloqueio,
+  Counter, carta da Vida, alvos, opções, "pagar X?") simulam cada resposta possível. O oponente, na simulação,
+  bloqueia do jeito que mais prejudica o bot e nunca usa Counter (a mão dele é escondida): o Counter entra como um
+  ajuste de probabilidade pelo tamanho da mão e pela margem do ataque (`counterAdjust`).
+- Para a simulação funcionar na visão, os frames de efeito **do próprio jogador** vão inteiros na visão (passos,
+  escolhas, alvos, com uids apelidados); os do oponente seguem só com a carta de origem.
+
+Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
+[`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`.
 
 ---
 
@@ -980,7 +998,8 @@ npm run cards:import -- --spoilers         # buscar spoilers e trocar por oficia
 npm run db:seed                            # reaplicar decks prontos / cartas provisórias / traduções
 npm run translations:check -w @gumgum/server
 npm run cards:check-official -w @gumgum/server
-npm run simulate -w @gumgum/engine -- 500  # N partidas bot x bot
+npm run simulate -w @gumgum/engine -- 500  # N partidas bot x bot (bot heurístico)
+npm run compare-bots -w @gumgum/engine -- 100 hard easy  # dois níveis do bot frente a frente: vitórias e tempo por decisão
 npm run build:release                      # pacote em release/
 DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data PORT=3310 node release/server/index.mjs
 # na VPS

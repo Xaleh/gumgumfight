@@ -4,7 +4,7 @@ import {
   applyAction,
   type CardData,
   type CardDef,
-  chooseBotAction,
+  chooseSimpleBotAction as chooseBotAction,
   type GameState,
   HIDDEN_CARD,
   legalActions,
