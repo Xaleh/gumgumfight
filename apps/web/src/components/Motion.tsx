@@ -615,6 +615,11 @@ export function useBoardMotion(
     if (planned.length) setItems((cur) => [...cur, ...planned]);
   }, [state, tempo]);
 
+  // Mesa mudada sem animação (pulo no replay, animações desligadas): o que ainda voava some junto.
+  useLayoutEffect(() => {
+    if (!enabled) setItems((cur) => (cur.length ? [] : cur));
+  }, [state, enabled]);
+
   const done = useCallback((id: number) => setItems((cur) => cur.filter((i) => i.id !== id)), []);
 
   // Vitrine ou destaque na tela: os avisos da partida esperam.
