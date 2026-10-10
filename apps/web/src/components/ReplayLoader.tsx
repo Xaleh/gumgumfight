@@ -1,7 +1,8 @@
-import { cardDef, createGame, type PlayerId, ReplayCursor } from '@gumgum/engine';
+import { cardDef, createGame, type PlayerId, type PromptParams, ReplayCursor } from '@gumgum/engine';
 import { useRef, useState } from 'react';
+import { winReasonText } from '../game/engineText';
 import { type GameSetup, REPLAY_SPEEDS } from '../game/useGame';
-import { useLocale, useT } from '../i18n';
+import { useLocale, useT, useTryT } from '../i18n';
 import { fmtDateTime } from '../i18n/format';
 import { useSettings } from '../settings';
 
@@ -13,6 +14,9 @@ interface Summary {
   over: boolean;
   winner: PlayerId | null;
   reason?: string;
+  /** `reason` como chave do motor (`log.win*`), para traduzir. */
+  reasonKey?: string;
+  reasonParams?: PromptParams;
   failed: { index: number; message: string } | null;
 }
 
@@ -28,6 +32,8 @@ function summarize(setup: GameSetup): Summary {
     over: s.phase === 'gameover',
     winner: s.winner,
     reason: s.winReason ?? undefined,
+    reasonKey: s.winReasonKey,
+    reasonParams: s.winReasonParams,
     failed: cursor.failed,
   };
 }
@@ -47,6 +53,7 @@ export function ReplayLoader({
   onClose: () => void;
 }) {
   const t = useT();
+  const tryT = useTryT();
   const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +87,7 @@ export function ReplayLoader({
       ? t('replay.notFinished')
       : sum.winner === null
         ? t('replay.drawResult')
-        : `${t('replay.wonResult', { name: name(sum.winner) })}${sum.reason ? ` ${sum.reason}` : ''}`;
+        : `${t('replay.wonResult', { name: name(sum.winner) })}${sum.reason ? ` ${winReasonText(tryT, { winReason: sum.reason, winReasonKey: sum.reasonKey, winReasonParams: sum.reasonParams })}` : ''}`;
 
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>

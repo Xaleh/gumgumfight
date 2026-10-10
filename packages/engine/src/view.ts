@@ -12,7 +12,7 @@
 // - Definições só das cartas que o jogador já pode ver; seed e RNG zerados.
 // - Escolhas pendentes e a pilha do oponente sem os detalhes; log sem as linhas secretas.
 
-import type { Action, CardDef, EffectStep, Frame, GameState, ManualOp, Pending, PlayerId, PlayerState } from './types';
+import type { Action, CardDef, EffectStep, Frame, GameState, LogEntry, ManualOp, Pending, PlayerId, PlayerState } from './types';
 
 export const HIDDEN_CARD = '?';
 /** Referência para uma carta que o jogador não vê (fora das zonas). */
@@ -164,7 +164,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     battledCharacter: refs(state.battledCharacter),
     delayed: state.delayed?.filter((d) => vis.has(d.source)).map((d) => ({ ...d, source: alias(d.source), last: refs(d.last) })),
     tempReplacements: state.tempReplacements?.filter((t) => vis.has(t.source)).map((t) => ({ ...t, source: alias(t.source) })),
-    log: state.log.map(({ secret, ...e }) => (secret !== undefined && viewer !== null && e.player === viewer ? { ...e, text: secret } : e)),
+    log: state.log.map(viewLogEntry(viewer)),
     // A ação cancelável é pública (a interface mostra o botão); o estado guardado para restaurar, não.
     cancel: state.cancel ? { ...state.cancel, action: aliasAction(state.cancel.action, ref) } : undefined,
   };
@@ -239,6 +239,26 @@ function sanitizeFrame(state: GameState, f: Frame, viewer: PlayerId | null, ref:
   }
 }
 
+/**
+ * Linha do log como `viewer` a vê. Com `secret`, o dono recebe o texto secreto e a chave/parâmetros
+ * dele (`secretKey`…) no lugar dos públicos; os outros recebem só os públicos. Os campos `secret*`
+ * nunca saem daqui (os parâmetros secretos têm os nomes das cartas escondidas).
+ */
+function viewLogEntry(viewer: PlayerId | null) {
+  return (entry: LogEntry): LogEntry => {
+    const { secret, secretKey, secretParams, secretParts, ...e } = entry;
+    if (secret === undefined || viewer === null || e.player !== viewer) return e;
+    const { key: _k, params: _p, parts: _parts, ...rest } = e;
+    return {
+      ...rest,
+      text: secret,
+      ...(secretKey ? { key: secretKey } : {}),
+      ...(secretParams ? { params: secretParams } : {}),
+      ...(secretParts ? { parts: secretParts } : {}),
+    };
+  };
+}
+
 function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => string): Pending {
   const mine = viewer !== null && p.player === viewer;
   switch (p.kind) {
@@ -248,7 +268,7 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
     case 'selectTargets': {
       if (mine) return { ...p, options: p.options.map(ref), source: ref(p.source), ...(p.shown ? { shown: p.shown.map(ref) } : {}) };
       // O prompt (e sua chave/parâmetros, que o reconstroem) é só do dono.
-      const { promptKey: _k, promptParams: _pp, ...rest } = p;
+      const { promptKey: _k, promptParams: _pp, promptParts: _ppp, ...rest } = p;
       return { ...rest, options: [], min: 0, max: 0, prompt: '', source: ref(p.source), shown: undefined };
     }
     case 'block':
@@ -260,25 +280,28 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
     case 'confirm': {
       // O oponente não vê o prompt nem se o "sim" está disponível (isso contaria a mão). No "draw up
       // to N", só vê que há uma pergunta; quantas foram compradas ele vê pelo tamanho da mão.
-      const { cannot, drawUpTo, promptKey, promptParams, ...rest } = p;
+      const { cannot, drawUpTo, promptKey, promptParams, promptParts, ...rest } = p;
       return {
         ...rest,
         source: ref(p.source),
         prompt: mine ? p.prompt : '',
         ...(mine && promptKey ? { promptKey } : {}),
         ...(mine && promptParams ? { promptParams } : {}),
+        ...(mine && promptParts ? { promptParts } : {}),
         ...(mine && cannot ? { cannot } : {}),
         ...(mine && drawUpTo ? { drawUpTo } : {}),
       };
     }
     case 'option': {
-      const { don, promptKey, promptParams, optionKeys, ...rest } = p;
+      const { don, promptKey, promptParams, promptParts, optionKeys, optionParts, ...rest } = p;
       return {
         ...rest,
         source: ref(p.source),
         prompt: mine ? p.prompt : '',
         ...(mine && promptKey ? { promptKey } : {}),
         ...(mine && promptParams ? { promptParams } : {}),
+        ...(mine && promptParts ? { promptParts } : {}),
+        ...(mine && optionParts ? { optionParts } : {}),
         options: mine ? p.options : [],
         ...(mine && optionKeys ? { optionKeys } : {}),
         ...(mine && don ? { don: don.map((d) => (d === 'active' || d === 'rested' ? d : ref(d))) } : {}),

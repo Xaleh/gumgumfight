@@ -1128,6 +1128,24 @@ export type DonSource = 'active' | 'rested' | (string & {});
 export type PromptParams = Record<string, string | number>;
 
 /**
+ * Texto traduzível: chave do dicionário (`engine.*`, `log.*`) e parâmetros. `parts` traz os
+ * parâmetros que são, eles mesmos, texto a traduzir (uma lista de custos, o motivo da vitória…):
+ * a interface traduz cada item e junta com a chave `join` (padrão `log.listAnd`); em `params`
+ * o mesmo parâmetro vem pronto em português, para quem não traduz.
+ */
+export interface Msg {
+  key: string;
+  params?: PromptParams;
+  parts?: MsgParts;
+}
+export interface MsgList {
+  items: Msg[];
+  /** Chave do separador entre os itens (ex.: `engine.cost.join` = " e "). */
+  join?: string;
+}
+export type MsgParts = Record<string, MsgList>;
+
+/**
  * Escolhas que o motor aguarda de um jogador.
  *
  * `prompt` é o texto em português (sempre preenchido: replays e salas antigas dependem dele).
@@ -1148,6 +1166,7 @@ export type Pending =
       prompt: string;
       promptKey?: string;
       promptParams?: PromptParams;
+      promptParts?: MsgParts;
       intent: 'harm' | 'help' | 'discard';
       source: string;
       /** A ordem dos cliques importa (ex.: ordem das cartas no topo do deck). */
@@ -1182,7 +1201,7 @@ export type Pending =
    * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`. Com `drawUpTo`,
    * é o "comprar mais 1?" do "draw up to N cards" (4-5-4): sim compra 1, não para.
    */
-  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; promptKey?: string; promptParams?: PromptParams; cannot?: true; drawUpTo?: true }
+  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; promptKey?: string; promptParams?: PromptParams; promptParts?: MsgParts; cannot?: true; drawUpTo?: true }
   /**
    * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
    * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
@@ -1198,8 +1217,11 @@ export type Pending =
       prompt: string;
       promptKey?: string;
       promptParams?: PromptParams;
+      promptParts?: MsgParts;
       options: string[];
       optionKeys?: (string | null)[];
+      /** Opção que é texto composto (ex.: um custo em `payEither`): os itens a traduzir e juntar. */
+      optionParts?: (MsgList | null)[];
       order?: number[];
       don?: DonSource[];
     }
@@ -1283,6 +1305,14 @@ export interface LogEntry {
    * recebem `text`, sem os nomes das cartas.
    */
   secret?: string;
+  /** `text` como chave (`log.*`), parâmetros e partes traduzíveis (ver `Msg`). */
+  key?: string;
+  params?: PromptParams;
+  parts?: MsgParts;
+  /** O mesmo para `secret`: só o dono da linha vê (a visão do oponente os remove). */
+  secretKey?: string;
+  secretParams?: PromptParams;
+  secretParts?: MsgParts;
 }
 
 export interface GameState {
@@ -1348,6 +1378,9 @@ export interface GameState {
   /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;
+  /** `winReason` como chave (`log.win*`) e parâmetros, para a interface traduzir. */
+  winReasonKey?: string;
+  winReasonParams?: PromptParams;
   /** Partida criada com `GameConfig.legacySetup` (replays até a versão 8). */
   legacySetup?: true;
   log: LogEntry[];

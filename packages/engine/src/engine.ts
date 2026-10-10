@@ -32,6 +32,9 @@ import type {
   Modifier,
   PlayerId,
   PlayerState,
+  Msg,
+  MsgList,
+  MsgParts,
   PromptParams,
   RemovalStep,
   Replacement,
@@ -50,16 +53,33 @@ interface Prompt {
   text: string;
   key: string;
   params?: PromptParams;
+  /** Parâmetros que são texto traduzível (ver `Msg` em types.ts); em `params` eles vão em português. */
+  parts?: MsgParts;
 }
 
 /** Monta um `Prompt`; `key` é o sufixo depois de `engine.`. */
-function pr(key: string, text: string, params?: PromptParams): Prompt {
-  return { text, key: `engine.${key}`, ...(params ? { params } : {}) };
+function pr(key: string, text: string, params?: PromptParams, parts?: MsgParts): Prompt {
+  return { text, key: `engine.${key}`, ...(params ? { params } : {}), ...(parts ? { parts } : {}) };
 }
 
-/** Campos `prompt`, `promptKey` e `promptParams` de um `pending`. */
-function promptOf(p: Prompt): { prompt: string; promptKey: string; promptParams?: PromptParams } {
-  return { prompt: p.text, promptKey: p.key, ...(p.params ? { promptParams: p.params } : {}) };
+/** Linha do histórico: o português de sempre (`text`) e a chave `log.<key>` com os parâmetros. */
+function lg(key: string, text: string, params?: PromptParams, parts?: MsgParts): Prompt {
+  return { text, key: `log.${key}`, ...(params ? { params } : {}), ...(parts ? { parts } : {}) };
+}
+
+/** O `Msg` (chave, parâmetros e partes) de um `Prompt`, sem o texto. */
+function msgOf(p: Prompt): Msg {
+  return { key: p.key, ...(p.params ? { params: p.params } : {}), ...(p.parts ? { parts: p.parts } : {}) };
+}
+
+/** Campos `prompt`, `promptKey`, `promptParams` e `promptParts` de um `pending`. */
+function promptOf(p: Prompt): { prompt: string; promptKey: string; promptParams?: PromptParams; promptParts?: MsgParts } {
+  return { prompt: p.text, promptKey: p.key, ...(p.params ? { promptParams: p.params } : {}), ...(p.parts ? { promptParts: p.parts } : {}) };
+}
+
+/** Parte `cost` de uma pergunta: as peças do custo, juntas por `engine.cost.join`. */
+function costPartsOf(cost: AbilityCost): MsgParts {
+  return { cost: { items: costPieces(cost).map(msgOf), join: 'engine.cost.join' } };
 }
 
 /** `optionKeys` das opções ['Topo da Vida', 'Fundo da Vida'] e ['Topo do deck', 'Fundo do deck']. */
@@ -170,15 +190,15 @@ export function createGame(config: GameConfig): GameState {
       if (stage) {
         removeFrom(p.deck, stage);
         p.stage = { uid: stage, rested: false, don: 0, playedOnTurn: 0 };
-        log(state, p.id, `${p.name} começa com ${cardDef(state, stage).name} em campo.`);
+        log(state, p.id, lg('startsWithStage', `${p.name} começa com ${cardDef(state, stage).name} em campo.`, { player: p.name, card: cardDef(state, stage).name }));
       }
     }
   }
   // Quem tem "at the start of the game" no Líder compra a mão só depois de resolvê-lo (5-2-1-5/6).
   for (const p of players) if (state.legacySetup || !leaderRule(state, p.id, 'startStage')) drawCards(state, p.id, HAND_SIZE);
-  if (choose) log(state, null, `${players[firstPlayer].name} venceu o sorteio e escolhe quem começa.`);
+  if (choose) log(state, null, lg('wonRoll', `${players[firstPlayer].name} venceu o sorteio e escolhe quem começa.`, { player: players[firstPlayer].name }));
   else {
-    log(state, null, `${players[firstPlayer].name} joga primeiro.`);
+    log(state, null, lg('goesFirst', `${players[firstPlayer].name} joga primeiro.`, { player: players[firstPlayer].name }));
     startOfGame(state);
   }
   return state;
@@ -1086,14 +1106,18 @@ export function applyAction(prev: GameState, action: Action): GameState {
   const pending = state.pending;
 
   if (action.type === 'concede') {
-    gameOver(state, opponent(p), `${state.players[p].name} desistiu.`);
+    gameOver(state, opponent(p), lg('winConcede', `${state.players[p].name} desistiu.`, { player: state.players[p].name }));
     state.actionCount++;
     return state;
   }
 
   if (action.type === 'timeout') {
     const name = state.players[p].name;
-    gameOver(state, opponent(p), action.abandoned ? `${name} abandonou a partida.` : `${name} ficou sem tempo.`);
+    gameOver(
+      state,
+      opponent(p),
+      action.abandoned ? lg('winAbandoned', `${name} abandonou a partida.`, { player: name }) : lg('winTimeout', `${name} ficou sem tempo.`, { player: name }),
+    );
     state.actionCount++;
     return state;
   }
@@ -1201,19 +1225,20 @@ function restoreCheckpoint(state: GameState, p: PlayerId) {
   Object.assign(state, structuredClone(cp.snap));
   const name = (uid: string) => cardDef(state, uid).name;
   const a = info.action;
-  const what =
+  const player = state.players[p].name;
+  const [key, what, card] =
     a.type === 'playCard'
-      ? `a jogada de ${name(a.uid)} (a carta volta para a mão)`
+      ? ['cancelPlay', `a jogada de ${name(a.uid)} (a carta volta para a mão)`, name(a.uid)]
       : a.type === 'activate'
-        ? `a ativação de ${name(a.uid)}`
+        ? ['cancelActivate', `a ativação de ${name(a.uid)}`, name(a.uid)]
         : a.type === 'attachDon'
-          ? `o DON!! anexado a ${name(a.target)}`
+          ? ['cancelAttachDon', `o DON!! anexado a ${name(a.target)}`, name(a.target)]
           : a.type === 'attack'
-            ? `o ataque de ${name(a.attacker)}`
+            ? ['cancelAttack', `o ataque de ${name(a.attacker)}`, name(a.attacker)]
             : a.type === 'endTurn'
-              ? 'o fim do turno'
-              : 'a ação';
-  log(state, p, `${state.players[p].name} cancela ${what}.`);
+              ? ['cancelEndTurn', 'o fim do turno']
+              : ['cancelAction', 'a ação'];
+  log(state, p, lg(key, `${player} cancela ${what}.`, { player, ...(card !== undefined ? { card } : {}) }));
 }
 
 /** Motivo pelo qual `player` não pode cancelar a ação em andamento, ou null se puder. */
@@ -1255,8 +1280,14 @@ function handlePendingResponse(state: GameState, action: Action) {
       const first = action.yes ? p : opponent(p);
       state.firstPlayer = first;
       state.activePlayer = first;
-      log(state, p, `${state.players[p].name} escolheu jogar ${action.yes ? 'primeiro' : 'segundo'}.`);
-      log(state, null, `${state.players[first].name} joga primeiro.`);
+      log(
+        state,
+        p,
+        lg(action.yes ? 'choseFirst' : 'choseSecond', `${state.players[p].name} escolheu jogar ${action.yes ? 'primeiro' : 'segundo'}.`, {
+          player: state.players[p].name,
+        }),
+      );
+      log(state, null, lg('goesFirst', `${state.players[first].name} joga primeiro.`, { player: state.players[first].name }));
       state.pending = { kind: 'mulligan', player: first };
       startOfGame(state);
       return;
@@ -1269,9 +1300,9 @@ function handlePendingResponse(state: GameState, action: Action) {
         ps.hand = [];
         shuffleInPlace(state, ps.deck);
         drawCards(state, p, HAND_SIZE);
-        log(state, p, `${ps.name} trocou a mão inicial.`);
+        log(state, p, lg('mulliganRedraw', `${ps.name} trocou a mão inicial.`, { player: ps.name }));
       } else {
-        log(state, p, `${ps.name} manteve a mão inicial.`);
+        log(state, p, lg('mulliganKeep', `${ps.name} manteve a mão inicial.`, { player: ps.name }));
       }
       ps.mulliganDone = true;
       state.pending = null;
@@ -1319,7 +1350,7 @@ function handlePendingResponse(state: GameState, action: Action) {
         restCard(state, blocker);
         state.battle!.target = blocker;
         state.battle!.blocked = true;
-        log(state, p, `${cardDef(state, blocker).name} bloqueia o ataque!`);
+        log(state, p, lg('blocks', `${cardDef(state, blocker).name} bloqueia o ataque!`, { card: cardDef(state, blocker).name }));
         pushAbilities(state, blocker, 'onBlock');
         emit(state, { kind: 'blockerActivated', player: p, card: blocker });
       }
@@ -1355,11 +1386,11 @@ function handlePendingResponse(state: GameState, action: Action) {
       if (!isEvent) {
         const amount = counterValue(state, action.uid);
         state.modifiers.push({ uid: target, kind: 'power', amount, duration: 'battle' });
-        log(state, p, `Counter: ${def.name} dá +${amount} a ${cardDef(state, target).name}.`);
+        log(state, p, lg('counter', `Counter: ${def.name} dá +${amount} a ${cardDef(state, target).name}.`, { card: def.name, amount, target: cardDef(state, target).name }));
       } else {
         payDon(ps, cost);
         const ability = def.abilities.find((a) => a.timing === 'counter')!;
-        log(state, p, `${ps.name} usa o evento ${def.name}.`);
+        log(state, p, lg('usesEvent', `${ps.name} usa o evento ${def.name}.`, { player: ps.name, card: def.name }));
         pushEffect(state, action.uid, p, ability.steps);
         emit(state, { kind: 'eventActivated', player: p, card: action.uid });
         (state.eventsThisTurn ??= []).push({ player: p, cost: def.cost ?? 0 });
@@ -1398,7 +1429,7 @@ function handlePendingResponse(state: GameState, action: Action) {
       const top = state.stack[state.stack.length - 1];
       if (top?.kind === 'effect') top.choice = [];
       state.pending = null;
-      log(state, p, `Efeito de ${cardDef(state, pending.source).name} resolvido manualmente.`);
+      log(state, p, lg('manualResolved', `Efeito de ${cardDef(state, pending.source).name} resolvido manualmente.`, { card: cardDef(state, pending.source).name }));
       return;
     }
 
@@ -1418,7 +1449,7 @@ function handlePendingResponse(state: GameState, action: Action) {
         // no descarte nem na Vida e não sai "from your trash" (Q&A OP14-082, OP15-097, OP15-079).
         // Vai para o descarte quando o efeito termina, se ele não a moveu (jogada, mão...).
         (state.limbo ??= []).push(card);
-        log(state, p, `[Trigger] ${def.name} ativado!`);
+        log(state, p, lg('triggerActivated', `[Trigger] ${def.name} ativado!`, { card: def.name }));
         pushEffect(state, card, p, trig!.steps);
         const top = state.stack[state.stack.length - 1];
         if (top.kind === 'effect' && top.source === card) top.trigger = true;
@@ -1426,7 +1457,12 @@ function handlePendingResponse(state: GameState, action: Action) {
         emit(state, { kind: 'triggerActivated', player: p, card });
       } else {
         // Para o oponente a linha é a mesma com ou sem [Trigger]; só o dono lê qual carta foi.
-        logSecret(state, p, `${ps.name} coloca a carta de Vida na mão.`, `${ps.name} coloca ${def.name} (da Vida) na mão.`);
+        logSecret(
+          state,
+          p,
+          lg('lifeCardToHand', `${ps.name} coloca a carta de Vida na mão.`, { player: ps.name }),
+          lg('lifeCardToHandSecret', `${ps.name} coloca ${def.name} (da Vida) na mão.`, { player: ps.name, card: def.name }),
+        );
         lifeToHandCard(state, ps.id, card);
       }
       return;
@@ -1450,7 +1486,7 @@ function handleMainAction(state: GameState, action: Action) {
       removeFrom(ps.hand, action.uid);
       payDon(ps, cost);
       if (def.category === 'character') {
-        log(state, p, `${ps.name} joga ${def.name}.`);
+        log(state, p, lg('plays', `${ps.name} joga ${def.name}.`, { player: ps.name, card: def.name }));
         state.stack.push({ kind: 'play', uid: action.uid, fromHand: true });
       } else if (def.category === 'stage') {
         if (ps.stage) {
@@ -1460,11 +1496,11 @@ function handleMainAction(state: GameState, action: Action) {
         }
         forgetCard(state, action.uid);
         ps.stage = { uid: action.uid, rested: false, don: 0, playedOnTurn: state.turn };
-        log(state, p, `${ps.name} joga o Stage ${def.name}.`);
+        log(state, p, lg('playsStage', `${ps.name} joga o Stage ${def.name}.`, { player: ps.name, card: def.name }));
         pushAbilities(state, action.uid, 'onPlay');
       } else {
         ps.trash.push(action.uid);
-        log(state, p, `${ps.name} usa o evento ${def.name}.`);
+        log(state, p, lg('usesEvent', `${ps.name} usa o evento ${def.name}.`, { player: ps.name, card: def.name }));
         const main = def.abilities.find((a) => a.timing === 'main')!;
         pushEffect(state, action.uid, p, main.steps);
         emit(state, { kind: 'eventActivated', player: p, card: action.uid });
@@ -1494,7 +1530,7 @@ function handleMainAction(state: GameState, action: Action) {
       loc.fc.donLoose!--;
       if (!loc.fc.donLoose) delete loc.fc.donLoose;
       ps.donActive++;
-      log(state, p, `${ps.name} devolve 1 DON!! de ${cardDef(state, action.target).name} à área de custo.`);
+      log(state, p, lg('detachDon', `${ps.name} devolve 1 DON!! de ${cardDef(state, action.target).name} à área de custo.`, { player: ps.name, card: cardDef(state, action.target).name }));
       return;
     }
 
@@ -1504,7 +1540,22 @@ function handleMainAction(state: GameState, action: Action) {
       const loc = locate(state, action.uid)!;
       const ability = cardDef(state, action.uid).abilities[action.ability];
       if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(action.uid, action.ability));
-      log(state, p, `${cardDef(state, action.uid).name}: ${ability.label ?? 'efeito ativado'}.`);
+      {
+        const card = cardDef(state, action.uid).name;
+        // O rótulo da habilidade vai como parte traduzível quando tem chave (`labelKey`).
+        log(
+          state,
+          p,
+          ability.label === undefined
+            ? lg('activatedEffect', `${card}: efeito ativado.`, { card })
+            : lg(
+                'activated',
+                `${card}: ${ability.label}.`,
+                { card, label: ability.label },
+                ability.labelKey ? { label: { items: [{ key: ability.labelKey, ...(ability.labelParams ? { params: ability.labelParams } : {}) }] } } : undefined,
+              ),
+        );
+      }
       // Custos com escolha (descartar, virar cartas…) resolvem antes do efeito.
       const steps = ability.cost ? payImmediateCost(state, p, action.uid, ability.cost) : [];
       pushEffect(state, action.uid, p, [...steps, ...ability.steps]);
@@ -1526,7 +1577,16 @@ function handleMainAction(state: GameState, action: Action) {
       log(
         state,
         p,
-        `${cardDef(state, action.attacker).name} (${getPower(state, action.attacker)}) ataca ${cardDef(state, action.target).name} (${getPower(state, action.target)}).`,
+        lg(
+          'attacks',
+          `${cardDef(state, action.attacker).name} (${getPower(state, action.attacker)}) ataca ${cardDef(state, action.target).name} (${getPower(state, action.target)}).`,
+          {
+            card: cardDef(state, action.attacker).name,
+            power: getPower(state, action.attacker),
+            target: cardDef(state, action.target).name,
+            targetPower: getPower(state, action.target),
+          },
+        ),
       );
       state.stack.push({ kind: 'battle' });
       // Virar o atacante pode disparar "When this Character becomes rested" (resolve antes da batalha seguir).
@@ -1565,7 +1625,7 @@ function startTurn(state: GameState) {
   const other = state.players[opponent(state.activePlayer)];
   state.phase = 'main';
   state.modifiers = state.modifiers.filter((m) => !(m.duration === 'untilYourNextTurn' && (m.untilTurn ?? 0) <= state.turn));
-  log(state, ps.id, `— Turno ${state.turn}: ${ps.name} —`);
+  log(state, ps.id, lg('turnStart', `— Turno ${state.turn}: ${ps.name} —`, { n: state.turn, player: ps.name }));
 
   // Refresh Phase (6-2-2, Q&A OP11-040): primeiro ativam os "at the start of your turn" do jogador
   // do turno e os "at the start of your opponent's turn" do outro (mesmo lote: os do jogador do
@@ -1620,7 +1680,7 @@ function refreshDrawDon(state: GameState) {
     const k = Math.min(toRest, ps.donActive);
     ps.donActive -= k;
     ps.donRested += k;
-    if (k) log(state, ps.id, `${ps.name} vira ${k} DON!! ativo(s) no início da Fase Principal.`);
+    if (k) log(state, ps.id, lg('restDonAtMain', `${ps.name} vira ${k} DON!! ativo(s) no início da Fase Principal.`, { player: ps.name, n: k }));
   }
   // Main Phase: antes de qualquer ação, ativam os "at the start of your Main Phase" (6-5-1).
   for (const fc of [ps.leader, ...ps.characters, ...(ps.stage ? [ps.stage] : [])]) pushAbilities(state, fc.uid, 'startOfMainPhase');
@@ -1640,7 +1700,7 @@ export function noRefreshByAura(state: GameState, uid: string): boolean {
 
 function endTurn(state: GameState) {
   const ps = state.players[state.activePlayer];
-  log(state, ps.id, `${ps.name} encerra o turno.`);
+  log(state, ps.id, lg('endTurn', `${ps.name} encerra o turno.`, { player: ps.name }));
   state.modifiers = state.modifiers.filter(
     (m) =>
       m.duration !== 'turn' &&
@@ -1658,7 +1718,12 @@ function endTurn(state: GameState) {
   // "You lose at the end of the turn in which your deck becomes 0 cards."
   const out = state.players.filter((pl) => pl.deck.length === 0 && leaderRule(state, pl.id, 'deckOutEndOfTurn')).map((pl) => pl.id);
   if (out.length) {
-    defeat(state, out, (pl) => `${pl.name} terminou o turno sem cartas no deck.`, 'Os dois terminaram o turno sem cartas no deck.');
+    defeat(
+      state,
+      out,
+      (pl) => lg('winDeckOutEndOfTurn', `${pl.name} terminou o turno sem cartas no deck.`, { player: pl.name }),
+      lg('winBothDeckOutEndOfTurn', 'Os dois terminaram o turno sem cartas no deck.'),
+    );
     return;
   }
   // "take an extra turn after this one"
@@ -1679,7 +1744,7 @@ function run(state: GameState) {
       // Laço infinito (11-1): o motor não sabe pará-lo, então a partida termina empatada.
       state.stack = [];
       state.triggered = [];
-      gameOver(state, null, 'Laço infinito na resolução de efeitos.');
+      gameOver(state, null, lg('winInfiniteLoop', 'Laço infinito na resolução de efeitos.'));
       break;
     }
     // Efeitos disparados entram na pilha um de cada vez, quando chega a vez deles (8-6).
@@ -1808,8 +1873,19 @@ function nextTriggered(state: GameState): boolean {
   );
   if (lapsed) {
     dropTriggered(state, lapsed);
-    const why = locate(state, lapsed.source) ? 'a condição não vale mais' : 'a carta saiu do campo';
-    log(state, lapsed.controller, `${lapsed.label}: ${why}, o efeito não é ativado.`);
+    const left = !locate(state, lapsed.source);
+    const why = left ? 'a carta saiu do campo' : 'a condição não vale mais';
+    // O rótulo é "Nome [Marca]": a marca de momento vai como parte traduzível (`log.tag.*`).
+    const card = cardDef(state, lapsed.source).name;
+    const timing = (Object.keys(TIMING_TAG) as AbilityTiming[]).find((k) => lapsed.label === `${card} ${TIMING_TAG[k]}`);
+    const text = `${lapsed.label}: ${why}, o efeito não é ativado.`;
+    log(
+      state,
+      lapsed.controller,
+      timing
+        ? lg(left ? 'lapsedLeftTagged' : 'lapsedConditionTagged', text, { card, tag: TIMING_TAG[timing]! }, { tag: { items: [{ key: `log.tag.${timing}` }] } })
+        : lg(left ? 'lapsedLeft' : 'lapsedCondition', text, { card: lapsed.label }),
+    );
     return true;
   }
   if (new Set(mine.map((e) => e.source)).size > 1) {
@@ -1965,7 +2041,7 @@ function restCard(state: GameState, uid: string, byEffectOf?: PlayerId, restSour
   if (!loc || loc.fc.rested) return;
   if (cannotBeRested(state, uid)) {
     // "… cannot be rested": o efeito tenta virar e nada acontece; o histórico explica (Q&A EB02-011).
-    if (byEffectOf !== undefined) log(state, byEffectOf, `${cardDef(state, uid).name} não pode ser virada (efeito "não vira" ativo).`);
+    if (byEffectOf !== undefined) log(state, byEffectOf, lg('cannotBeRestedActive', `${cardDef(state, uid).name} não pode ser virada (efeito "não vira" ativo).`, { card: cardDef(state, uid).name }));
     return;
   }
   if (
@@ -1979,7 +2055,7 @@ function restCard(state: GameState, uid: string, byEffectOf?: PlayerId, restSour
         conditionsMet(state, uid, a),
     )
   ) {
-    log(state, byEffectOf, `${cardDef(state, uid).name} não pode ser virada por efeitos do oponente.`);
+    log(state, byEffectOf, lg('cannotBeRestedByOpponent', `${cardDef(state, uid).name} não pode ser virada por efeitos do oponente.`, { card: cardDef(state, uid).name }));
     return;
   }
   // "If this Character would be rested by your opponent's Character's effect, you may rest 1 of your other Characters instead."
@@ -2021,7 +2097,7 @@ function pushAbilities(state: GameState, uid: string, timing: AbilityTiming): Tr
   const def = cardDef(state, uid);
   const owner = ownerOf(state, uid);
   if (timing === 'onPlay' && onPlayNegated(state, owner)) {
-    log(state, owner, `O [Ao Jogar] de ${def.name} está anulado.`);
+    log(state, owner, lg('onPlayNegated', `O [Ao Jogar] de ${def.name} está anulado.`, { card: def.name }));
     return [];
   }
   const queued: TriggeredEffect[] = [];
@@ -2057,7 +2133,7 @@ function stepPlay(state: GameState, frame: PlayFrame) {
     ps.donRested += fc.don;
     removeCharacter(state, out);
     ps.trash.push(out);
-    log(state, owner, `${cardDef(state, out).name} é descartado para abrir espaço.`);
+    log(state, owner, lg('trashedForRoom', `${cardDef(state, out).name} é descartado para abrir espaço.`, { card: cardDef(state, out).name }));
   }
   const rested = Boolean(frame.rested) || Boolean(leaderRule(state, owner, 'playRested'));
   forgetCard(state, frame.uid);
@@ -2081,7 +2157,7 @@ function stepBattle(state: GameState) {
   const defender = opponent(attackerOwner);
 
   if (b.step !== 'end' && (!locate(state, b.attacker) || !locate(state, b.target))) {
-    log(state, null, 'A batalha termina (uma das cartas saiu do campo).');
+    log(state, null, lg('battleEndsCardLeft', 'A batalha termina (uma das cartas saiu do campo).'));
     b.step = 'end';
   }
 
@@ -2106,8 +2182,8 @@ function stepBattle(state: GameState) {
       if (!b.noBlocker && !restricted(state, defender, 'noBlocker')) {
         for (const c of state.players[defender].characters) {
           if (c.rested || c.uid === b.target || options.includes(c.uid) || !hasKeyword(state, c.uid, 'blocker')) continue;
-          if (cannotBeRested(state, c.uid)) log(state, defender, `${cardDef(state, c.uid).name} não pode bloquear: não pode ser virada.`);
-          else if (state.modifiers.some((m) => m.uid === c.uid && m.kind === 'cannotBlock')) log(state, defender, `${cardDef(state, c.uid).name} não pode ativar [Blocker] agora.`);
+          if (cannotBeRested(state, c.uid)) log(state, defender, lg('cannotBlockCannotRest', `${cardDef(state, c.uid).name} não pode bloquear: não pode ser virada.`, { card: cardDef(state, c.uid).name }));
+          else if (state.modifiers.some((m) => m.uid === c.uid && m.kind === 'cannotBlock')) log(state, defender, lg('cannotBlock', `${cardDef(state, c.uid).name} não pode ativar [Blocker] agora.`, { card: cardDef(state, c.uid).name }));
         }
       }
       if (options.length) state.pending = { kind: 'block', player: defender, options };
@@ -2131,12 +2207,16 @@ function stepBattle(state: GameState) {
       const tp = getPower(state, b.target);
       const target = locate(state, b.target)!;
       if (ap < tp) {
-        log(state, null, `O ataque falha (${ap} contra ${tp}).`);
+        log(state, null, lg('attackFails', `O ataque falha (${ap} contra ${tp}).`, { attack: ap, defense: tp }));
         return;
       }
       if (target.zone === 'leader') {
         const n = hasKeyword(state, b.attacker, 'doubleAttack') ? 2 : 1;
-        log(state, null, `O ataque acerta o líder (${ap} contra ${tp})${n > 1 ? ' — Double Attack!' : ''}.`);
+        log(
+          state,
+          null,
+          lg(n > 1 ? 'attackHitsLeaderDouble' : 'attackHitsLeader', `O ataque acerta o líder (${ap} contra ${tp})${n > 1 ? ' — Double Attack!' : ''}.`, { attack: ap, defense: tp }),
+        );
         const hadLife = state.players[defender].life.length > 0;
         state.stack.push({
           kind: 'damage',
@@ -2222,20 +2302,20 @@ function stepDamage(state: GameState, frame: DamageFrame) {
     // Dano de efeito segue 1-2-1-1-1 ponto a ponto: o Líder que leva dano com 0 de Vida perde.
     if (frame.attack && frame.lost) {
       frame.remaining--;
-      log(state, frame.defender, `${ps.name} não tem mais Vida: o dano restante do ataque não tem efeito.`);
+      log(state, frame.defender, lg('noLifeLeft', `${ps.name} não tem mais Vida: o dano restante do ataque não tem efeito.`, { player: ps.name }));
       return;
     }
-    gameOver(state, opponent(frame.defender), `O líder de ${ps.name} recebeu dano sem cartas de Vida.`);
+    gameOver(state, opponent(frame.defender), lg('winLeaderDamage', `O líder de ${ps.name} recebeu dano sem cartas de Vida.`, { player: ps.name }));
     return;
   }
   const card = ps.life.pop()!;
   frame.remaining--;
   frame.lost = (frame.lost ?? 0) + 1;
-  log(state, frame.defender, `${ps.name} perde 1 Vida (${ps.life.length} restante(s)).`);
+  log(state, frame.defender, lg('losesLife', `${ps.name} perde 1 Vida (${ps.life.length} restante(s)).`, { player: ps.name, n: ps.life.length }));
   if (frame.banish) {
     if (ps.lifeFaceUp?.includes(card)) removeFrom(ps.lifeFaceUp, card);
     ps.trash.push(card);
-    log(state, frame.defender, `[Banish] A carta de Vida vai para o descarte.`);
+    log(state, frame.defender, lg('banish', `[Banish] A carta de Vida vai para o descarte.`));
     return;
   }
   if (ps.lifeFaceUp?.includes(card) && leaderRule(state, ps.id, 'faceUpLifeToDeck')) {
@@ -2436,7 +2516,7 @@ function playFree(state: GameState, uid: string, rested = false, source?: string
     const fromHand = !notFromHand && ps.hand.includes(uid);
     const byCharacterEffect = source !== undefined && cardDef(state, source).category === 'character';
     detach(state, uid);
-    log(state, ps.id, `${def.name} entra em campo.`);
+    log(state, ps.id, lg('entersField', `${def.name} entra em campo.`, { card: def.name }));
     state.stack.push({
       kind: 'play',
       uid,
@@ -2455,7 +2535,7 @@ function playFree(state: GameState, uid: string, rested = false, source?: string
     }
     forgetCard(state, uid);
     ps.stage = { uid, rested, don: 0, playedOnTurn: state.turn };
-    log(state, ps.id, `${def.name} entra em campo.`);
+    log(state, ps.id, lg('entersField', `${def.name} entra em campo.`, { card: def.name }));
     pushAbilities(state, uid, 'onPlay');
   }
 }
@@ -2487,8 +2567,24 @@ function addModifier(state: GameState, controller: PlayerId, m: Modifier) {
  * Pergunta com opções de texto; a resposta chega em frame.choice = [índice]. `optionKeys` são as
  * chaves de tradução das opções fixas (null = texto de carta, nome, número: fica como está).
  */
-function askOption(state: GameState, frame: EffectFrame, player: PlayerId, prompt: Prompt, options: string[], optionKeys?: (string | null)[]) {
-  state.pending = { kind: 'option', player, source: frame.source, ...promptOf(prompt), options, ...(optionKeys ? { optionKeys } : {}) };
+function askOption(
+  state: GameState,
+  frame: EffectFrame,
+  player: PlayerId,
+  prompt: Prompt,
+  options: string[],
+  optionKeys?: (string | null)[],
+  optionParts?: (MsgList | null)[],
+) {
+  state.pending = {
+    kind: 'option',
+    player,
+    source: frame.source,
+    ...promptOf(prompt),
+    options,
+    ...(optionKeys ? { optionKeys } : {}),
+    ...(optionParts ? { optionParts } : {}),
+  };
 }
 
 /** Interrompe o efeito: os passos restantes não acontecem. */
@@ -2532,7 +2628,7 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
   if (cost.koSelf) steps.push({ do: 'koSelf' });
   if (cost.leaderPowerMinus) {
     addModifier(state, player, { uid: ps.leader.uid, kind: 'power', amount: -cost.leaderPowerMinus, duration: 'turn' });
-    log(state, player, `${cardDef(state, ps.leader.uid).name} recebe −${cost.leaderPowerMinus} de poder (custo).`);
+    log(state, player, lg('leaderPowerCost', `${cardDef(state, ps.leader.uid).name} recebe −${cost.leaderPowerMinus} de poder (custo).`, { card: cardDef(state, ps.leader.uid).name, n: cost.leaderPowerMinus }));
   }
   if (cost.giveDon) steps.push({ do: 'giveActiveDon', count: cost.giveDon.count, target: cost.giveDon.spec });
   if (cost.ownToBottom) steps.push({ do: 'ownToBottom', ...cost.ownToBottom });
@@ -2701,45 +2797,62 @@ function ownCostOptions(state: GameState, player: PlayerId, source: string, spec
 }
 
 export function describeCost(cost: AbilityCost): string {
-  const parts: string[] = [];
+  return costPieces(cost)
+    .map((p) => p.text)
+    .join(' e ');
+}
+
+/** As peças de um custo, cada uma com o português e a chave `engine.cost.*` (juntas por " e "). */
+function costPieces(cost: AbilityCost): Prompt[] {
+  const parts: Prompt[] = [];
+  const c = (key: string, text: string, params?: PromptParams) => parts.push(pr(`cost.${key}`, text, params));
   if (cost.donMinus) {
-    parts.push(
-      cost.donMinusActive
-        ? `devolver ${cost.donMinus} DON!! ativo(s) ao deck de DON!!`
-        : cost.donMinusOpen
-          ? `DON!! −${cost.donMinus} ou mais (devolver ${cost.donMinus} ou mais DON!! ao deck de DON!!)`
-          : `DON!! −${cost.donMinus} (devolver ${cost.donMinus} DON!! ao deck de DON!!)`,
-    );
+    const n = cost.donMinus;
+    if (cost.donMinusActive) c('donMinusActive', `devolver ${n} DON!! ativo(s) ao deck de DON!!`, { n });
+    else if (cost.donMinusOpen) c('donMinusOpen', `DON!! −${n} ou mais (devolver ${n} ou mais DON!! ao deck de DON!!)`, { n });
+    else c('donMinus', `DON!! −${n} (devolver ${n} DON!! ao deck de DON!!)`, { n });
   }
-  if (cost.restDon) parts.push(`virar ${cost.restDon} DON!!`);
-  if (cost.restSelf) parts.push('virar esta carta');
-  if (cost.trashFromHand) parts.push(`descartar ${cost.trashFromHand} carta(s) da mão`);
-  if (cost.handToBottom) parts.push(`colocar ${cost.handToBottom} carta(s) da mão no fundo do deck`);
-  if (cost.lifeToHand) parts.push(`colocar ${cost.lifeToHand} carta(s) da Vida na mão`);
-  if (cost.restOwn) parts.push(`virar ${cost.restOwn.count} carta(s) sua(s)${cost.restOwn.withDon ? ' (DON!! incluídos)' : ''}`);
-  if (cost.returnOwn) parts.push(`devolver ${cost.returnOwn.count} Personagem(ns) seu(s) à mão`);
-  if (cost.trashSelf) parts.push('descartar esta carta');
-  if (cost.koSelf) parts.push('nocautear esta carta');
-  if (cost.leaderPowerMinus) parts.push(`dar −${cost.leaderPowerMinus} de poder ao seu Líder`);
-  if (cost.giveDon) parts.push(`dar ${cost.giveDon.count} DON!! ativo(s)`);
-  if (cost.ownToBottom) parts.push(`colocar ${cost.ownToBottom.count} carta(s)${cost.ownToBottom.spec.side === 'any' ? '' : ' sua(s)'} no fundo do deck do dono`);
-  if (cost.selfToBottom) parts.push('colocar esta carta no fundo do deck');
-  if (cost.koOwn) parts.push(`nocautear ${cost.koOwn.count} Personagem(ns) seu(s)`);
-  if (cost.trashOwn) parts.push(`descartar ${cost.trashOwn.count} Personagem(ns) seu(s)`);
-  if (cost.returnSelf) parts.push('devolver esta carta à mão');
-  if (cost.mill) parts.push(`descartar ${cost.mill} carta(s) do topo do deck`);
-  if (cost.trashToBottom) parts.push(`colocar ${cost.trashToBottom.count} carta(s) do descarte no fundo do deck`);
-  if (cost.lifeToTrash) parts.push(`descartar ${cost.lifeToTrash.count} carta(s) da Vida`);
-  if (cost.reveal) parts.push(`revelar ${cost.reveal.count} carta(s) da mão`);
-  if (cost.lifeFace) parts.push(`virar ${cost.lifeFace.count} carta(s) de Vida para ${cost.lifeFace.up ? 'cima' : 'baixo'}`);
-  if (cost.restCharacters) parts.push(`virar ${cost.restCharacters} Personagem(ns) seu(s)`);
-  if (cost.restOpponentChars) parts.push(`virar ${cost.restOpponentChars} Personagem(ns) do oponente`);
-  if (cost.selfPowerMinus) parts.push(`dar −${cost.selfPowerMinus} de poder a esta carta`);
-  if (cost.trashToDeck) parts.push(`devolver ${cost.trashToDeck} carta(s) do descarte ao deck e embaralhar`);
-  if (cost.playFromHand) parts.push('jogar 1 carta da mão');
-  if (cost.giveOppDon) parts.push(`dar ${cost.giveOppDon} DON!! virado(s) do oponente a um Personagem dele`);
-  if (cost.handToTop) parts.push(`colocar ${cost.handToTop} carta(s) da mão no topo do deck`);
-  return parts.join(' e ');
+  if (cost.restDon) c('restDon', `virar ${cost.restDon} DON!!`, { n: cost.restDon });
+  if (cost.restSelf) c('restSelf', 'virar esta carta');
+  if (cost.trashFromHand) c('trashFromHand', `descartar ${cost.trashFromHand} carta(s) da mão`, { n: cost.trashFromHand });
+  if (cost.handToBottom) c('handToBottom', `colocar ${cost.handToBottom} carta(s) da mão no fundo do deck`, { n: cost.handToBottom });
+  if (cost.lifeToHand) c('lifeToHand', `colocar ${cost.lifeToHand} carta(s) da Vida na mão`, { n: cost.lifeToHand });
+  if (cost.restOwn) {
+    const n = cost.restOwn.count;
+    if (cost.restOwn.withDon) c('restOwnWithDon', `virar ${n} carta(s) sua(s) (DON!! incluídos)`, { n });
+    else c('restOwn', `virar ${n} carta(s) sua(s)`, { n });
+  }
+  if (cost.returnOwn) c('returnOwn', `devolver ${cost.returnOwn.count} Personagem(ns) seu(s) à mão`, { n: cost.returnOwn.count });
+  if (cost.trashSelf) c('trashSelf', 'descartar esta carta');
+  if (cost.koSelf) c('koSelf', 'nocautear esta carta');
+  if (cost.leaderPowerMinus) c('leaderPowerMinus', `dar −${cost.leaderPowerMinus} de poder ao seu Líder`, { n: cost.leaderPowerMinus });
+  if (cost.giveDon) c('giveDon', `dar ${cost.giveDon.count} DON!! ativo(s)`, { n: cost.giveDon.count });
+  if (cost.ownToBottom) {
+    const n = cost.ownToBottom.count;
+    if (cost.ownToBottom.spec.side === 'any') c('anyToBottom', `colocar ${n} carta(s) no fundo do deck do dono`, { n });
+    else c('ownToBottom', `colocar ${n} carta(s) sua(s) no fundo do deck do dono`, { n });
+  }
+  if (cost.selfToBottom) c('selfToBottom', 'colocar esta carta no fundo do deck');
+  if (cost.koOwn) c('koOwn', `nocautear ${cost.koOwn.count} Personagem(ns) seu(s)`, { n: cost.koOwn.count });
+  if (cost.trashOwn) c('trashOwn', `descartar ${cost.trashOwn.count} Personagem(ns) seu(s)`, { n: cost.trashOwn.count });
+  if (cost.returnSelf) c('returnSelf', 'devolver esta carta à mão');
+  if (cost.mill) c('mill', `descartar ${cost.mill} carta(s) do topo do deck`, { n: cost.mill });
+  if (cost.trashToBottom) c('trashToBottom', `colocar ${cost.trashToBottom.count} carta(s) do descarte no fundo do deck`, { n: cost.trashToBottom.count });
+  if (cost.lifeToTrash) c('lifeToTrash', `descartar ${cost.lifeToTrash.count} carta(s) da Vida`, { n: cost.lifeToTrash.count });
+  if (cost.reveal) c('reveal', `revelar ${cost.reveal.count} carta(s) da mão`, { n: cost.reveal.count });
+  if (cost.lifeFace) {
+    const n = cost.lifeFace.count;
+    if (cost.lifeFace.up) c('lifeFaceUp', `virar ${n} carta(s) de Vida para cima`, { n });
+    else c('lifeFaceDown', `virar ${n} carta(s) de Vida para baixo`, { n });
+  }
+  if (cost.restCharacters) c('restCharacters', `virar ${cost.restCharacters} Personagem(ns) seu(s)`, { n: cost.restCharacters });
+  if (cost.restOpponentChars) c('restOpponentChars', `virar ${cost.restOpponentChars} Personagem(ns) do oponente`, { n: cost.restOpponentChars });
+  if (cost.selfPowerMinus) c('selfPowerMinus', `dar −${cost.selfPowerMinus} de poder a esta carta`, { n: cost.selfPowerMinus });
+  if (cost.trashToDeck) c('trashToDeck', `devolver ${cost.trashToDeck} carta(s) do descarte ao deck e embaralhar`, { n: cost.trashToDeck });
+  if (cost.playFromHand) c('playFromHand', 'jogar 1 carta da mão');
+  if (cost.giveOppDon) c('giveOppDon', `dar ${cost.giveOppDon} DON!! virado(s) do oponente a um Personagem dele`, { n: cost.giveOppDon });
+  if (cost.handToTop) c('handToTop', `colocar ${cost.handToTop} carta(s) da mão no topo do deck`, { n: cost.handToTop });
+  return parts;
 }
 
 /**
@@ -2747,35 +2860,50 @@ export function describeCost(cost: AbilityCost): string {
  * Characters…"): o jogador vê o motivo em vez de um efeito que "não abriu". Cobre as contagens
  * mais comuns; as outras condições recebem o texto genérico.
  */
-function conditionFailure(state: GameState, controller: PlayerId, source: string, cond: Condition): string {
+function conditionFailure(state: GameState, controller: PlayerId, source: string, cond: Condition): Prompt {
   const ps = state.players[controller];
   const opp = state.players[opponent(controller)];
   const chars = ps.characters.length;
   const self = ps.characters.some((c) => c.uid === source) ? ', contando esta carta' : '';
   const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  // "{player} tem N …; precisa de L ou menos/mais" (chave `log.cond.<key>`).
+  const has = (key: string, player: string, k: number, what: string, limit: number, more: boolean) =>
+    lg(`cond.${key}`, `${player} tem ${what}; precisa de ${limit} ou ${more ? 'mais' : 'menos'}`, { player, n: k, limit });
   if (cond.maxCharacters !== undefined && chars > cond.maxCharacters) {
-    return `${ps.name} tem ${n(chars, 'Personagem', 'Personagens')}${self}; precisa de ${cond.maxCharacters} ou menos`;
+    return has(self ? 'maxCharactersSelf' : 'maxCharacters', ps.name, chars, `${n(chars, 'Personagem', 'Personagens')}${self}`, cond.maxCharacters, false);
   }
   if (cond.minCharacters !== undefined && chars < cond.minCharacters) {
-    return `${ps.name} tem ${n(chars, 'Personagem', 'Personagens')}${self}; precisa de ${cond.minCharacters} ou mais`;
+    return has(self ? 'minCharactersSelf' : 'minCharacters', ps.name, chars, `${n(chars, 'Personagem', 'Personagens')}${self}`, cond.minCharacters, true);
   }
-  if (cond.handMax !== undefined && ps.hand.length > cond.handMax) return `${ps.name} tem ${n(ps.hand.length, 'carta', 'cartas')} na mão; precisa de ${cond.handMax} ou menos`;
-  if (cond.handMin !== undefined && ps.hand.length < cond.handMin) return `${ps.name} tem ${n(ps.hand.length, 'carta', 'cartas')} na mão; precisa de ${cond.handMin} ou mais`;
-  if (cond.lifeMax !== undefined && ps.life.length > cond.lifeMax) return `${ps.name} tem ${n(ps.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.lifeMax} ou menos`;
-  if (cond.lifeMin !== undefined && ps.life.length < cond.lifeMin) return `${ps.name} tem ${n(ps.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.lifeMin} ou mais`;
-  if (cond.opponentLifeMax !== undefined && opp.life.length > cond.opponentLifeMax) {
-    return `${opp.name} tem ${n(opp.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.opponentLifeMax} ou menos`;
+  const hand = ps.hand.length;
+  if (cond.handMax !== undefined && hand > cond.handMax) return has('handMax', ps.name, hand, `${n(hand, 'carta', 'cartas')} na mão`, cond.handMax, false);
+  if (cond.handMin !== undefined && hand < cond.handMin) return has('handMin', ps.name, hand, `${n(hand, 'carta', 'cartas')} na mão`, cond.handMin, true);
+  const life = ps.life.length;
+  if (cond.lifeMax !== undefined && life > cond.lifeMax) return has('lifeMax', ps.name, life, `${n(life, 'carta', 'cartas')} de Vida`, cond.lifeMax, false);
+  if (cond.lifeMin !== undefined && life < cond.lifeMin) return has('lifeMin', ps.name, life, `${n(life, 'carta', 'cartas')} de Vida`, cond.lifeMin, true);
+  const oppLife = opp.life.length;
+  if (cond.opponentLifeMax !== undefined && oppLife > cond.opponentLifeMax) {
+    return has('lifeMax', opp.name, oppLife, `${n(oppLife, 'carta', 'cartas')} de Vida`, cond.opponentLifeMax, false);
   }
-  if (cond.opponentLifeMin !== undefined && opp.life.length < cond.opponentLifeMin) {
-    return `${opp.name} tem ${n(opp.life.length, 'carta', 'cartas')} de Vida; precisa de ${cond.opponentLifeMin} ou mais`;
+  if (cond.opponentLifeMin !== undefined && oppLife < cond.opponentLifeMin) {
+    return has('lifeMin', opp.name, oppLife, `${n(oppLife, 'carta', 'cartas')} de Vida`, cond.opponentLifeMin, true);
   }
-  if (cond.minDonOnField !== undefined && totalDonOnField(ps) < cond.minDonOnField) return `${ps.name} tem ${totalDonOnField(ps)} DON!! no campo; precisa de ${cond.minDonOnField} ou mais`;
-  if (cond.maxDonOnField !== undefined && totalDonOnField(ps) > cond.maxDonOnField) return `${ps.name} tem ${totalDonOnField(ps)} DON!! no campo; precisa de ${cond.maxDonOnField} ou menos`;
-  if (cond.leaderHasType && !hasType(cardDef(state, ps.leader.uid), cond.leaderHasType)) return `o Líder de ${ps.name} não tem o tipo {${cond.leaderHasType}}`;
+  const don = totalDonOnField(ps);
+  if (cond.minDonOnField !== undefined && don < cond.minDonOnField) return has('donMin', ps.name, don, `${don} DON!! no campo`, cond.minDonOnField, true);
+  if (cond.maxDonOnField !== undefined && don > cond.maxDonOnField) return has('donMax', ps.name, don, `${don} DON!! no campo`, cond.maxDonOnField, false);
+  if (cond.leaderHasType && !hasType(cardDef(state, ps.leader.uid), cond.leaderHasType)) {
+    return lg('cond.leaderNoType', `o Líder de ${ps.name} não tem o tipo {${cond.leaderHasType}}`, { player: ps.name, type: cond.leaderHasType });
+  }
   if (cond.leaderHasAnyType && !cond.leaderHasAnyType.some((t) => hasType(cardDef(state, ps.leader.uid), t))) {
-    return `o Líder de ${ps.name} não tem o tipo ${cond.leaderHasAnyType.map((t) => `{${t}}`).join(' nem ')}`;
+    const types = cond.leaderHasAnyType.map((t) => `{${t}}`).join(' nem ');
+    return lg(
+      'cond.leaderNoAnyType',
+      `o Líder de ${ps.name} não tem o tipo ${types}`,
+      { player: ps.name, types },
+      { types: { items: cond.leaderHasAnyType.map((type) => ({ key: 'log.cond.typeName', params: { type } })), join: 'log.cond.nor' } },
+    );
   }
-  return 'a condição do efeito não vale agora';
+  return lg('cond.generic', 'a condição do efeito não vale agora');
 }
 
 /** Condições internas do leitor (dependem da escolha anterior), que não são "a condição da carta". */
@@ -2790,8 +2918,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     // não servia). Condições internas (depende da escolha anterior) continuam silenciosas.
     const cond = step.if;
     if (cond && Object.keys(cond).some((k) => !INTERNAL_CONDITIONS.includes(k as keyof Condition))) {
-      const text = `${srcName}: a condição não vale (${conditionFailure(state, frame.controller, frame.source, cond)}), o efeito não acontece.`;
-      if (state.log[state.log.length - 1]?.text !== text) log(state, frame.controller, text);
+      const why = conditionFailure(state, frame.controller, frame.source, cond);
+      const text = `${srcName}: a condição não vale (${why.text}), o efeito não acontece.`;
+      if (state.log[state.log.length - 1]?.text !== text) {
+        log(state, frame.controller, lg('conditionFails', text, { source: srcName, reason: why.text }, { reason: { items: [msgOf(why)] } }));
+      }
     }
     // "If that card is a [Sabo] …, you may play that card. If you do, …" (ST13-007): sem a condição, o
     // "you may" não acontece, e o "If you do" (o trecho do `scope`) também não.
@@ -2818,7 +2949,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         if (!mult) break;
         addModifier(state, frame.controller, { uid, kind: 'power', amount: step.amount * mult, duration });
-        log(state, frame.controller, `${cardDef(state, uid).name} recebe ${step.amount > 0 ? '+' : ''}${step.amount} de poder.`);
+        const amount = `${step.amount > 0 ? '+' : ''}${step.amount}`;
+        log(state, frame.controller, lg('getsPower', `${cardDef(state, uid).name} recebe ${amount} de poder.`, { card: cardDef(state, uid).name, amount }));
       }
       return true;
     }
@@ -2841,7 +2973,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           const before = loc.fc.rested;
           restCard(state, uid, frame.controller, frame.source);
           // "cannot be rested" (ou a substituição de rest) deixa a carta como estava: o histórico já explicou.
-          if (loc.fc.rested && !before) log(state, frame.controller, `${cardDef(state, uid).name} é virado.`);
+          if (loc.fc.rested && !before) log(state, frame.controller, lg('isRested', `${cardDef(state, uid).name} é virado.`, { card: cardDef(state, uid).name }));
         }
       }
       return true;
@@ -2853,7 +2985,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const loc = locate(state, uid);
         if (loc) {
           loc.fc.rested = false;
-          log(state, frame.controller, `${cardDef(state, uid).name} fica ativo.`);
+          log(state, frame.controller, lg('becomesActive', `${cardDef(state, uid).name} fica ativo.`, { card: cardDef(state, uid).name }));
         }
       }
       return true;
@@ -2950,7 +3082,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           loc.fc.don += n;
           emit(state, { kind: 'donGiven', player: loc.player, card: uid });
           const state_ = step.anyState ? ` (${rested} ${pl(rested, 'virado', 'virados')}, ${n - rested} ${pl(n - rested, 'ativo', 'ativos')})` : '';
-          log(state, frame.controller, `${cardDef(state, uid).name} recebe ${n} DON!!${state_} da área de custo de ${giver.name}.`);
+          const text = `${cardDef(state, uid).name} recebe ${n} DON!!${state_} da área de custo de ${giver.name}.`;
+          const params = { card: cardDef(state, uid).name, n, player: giver.name };
+          log(state, frame.controller, step.anyState ? lg('receivesDonMixed', text, { ...params, rested, active: n - rested }) : lg('receivesDon', text, params));
         }
       }
       return true;
@@ -2959,7 +3093,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (restricted(state, frame.controller, 'noDrawByEffect')) return true;
       if (!step.upTo) {
         drawCards(state, frame.controller, step.count);
-        log(state, frame.controller, `${ps.name} compra ${step.count} carta(s).`);
+        log(state, frame.controller, lg('draws', `${ps.name} compra ${step.count} carta(s).`, { player: ps.name, n: step.count }));
         emit(state, { kind: 'drawByEffect', player: frame.controller });
         return true;
       }
@@ -2986,7 +3120,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       frame.memo = undefined;
-      log(state, frame.controller, drawn ? `${ps.name} compra ${drawn} carta(s).` : `${ps.name} não compra cartas.`);
+      log(
+        state,
+        frame.controller,
+        drawn ? lg('draws', `${ps.name} compra ${drawn} carta(s).`, { player: ps.name, n: drawn }) : lg('drawsNone', `${ps.name} não compra cartas.`, { player: ps.name }),
+      );
       if (drawn) emit(state, { kind: 'drawByEffect', player: frame.controller });
       return true;
     }
@@ -3002,7 +3140,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const n = Math.min(step.count, o.donActive);
       o.donActive -= n;
       o.donRested += n;
-      if (n) log(state, frame.controller, `${n} DON!! de ${o.name} é virado.`);
+      if (n) log(state, frame.controller, lg('donRested', `${n} DON!! de ${o.name} é virado.`, { n, player: o.name }));
       return true;
     }
     case 'returnToHand': {
@@ -3013,7 +3151,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (loc?.zone === 'stage') {
           detach(state, uid);
           state.players[loc.player].hand.push(uid);
-          log(state, frame.controller, `${cardDef(state, uid).name} volta para a mão.`);
+          log(state, frame.controller, lg('returnsToHand', `${cardDef(state, uid).name} volta para a mão.`, { card: cardDef(state, uid).name }));
         }
       }
       removeFromField(state, t.filter((u) => locate(state, u)?.zone === 'character'), 'hand', { byPlayer: frame.controller, by: frame.source });
@@ -3029,8 +3167,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           state,
           frame.controller,
           step.minPower !== undefined
-            ? `O oponente não pode usar [Blocker] com ${step.minPower}+ de poder nesta batalha.`
-            : 'O oponente não pode usar [Blocker] nesta batalha.',
+            ? lg('noBlockerMinPower', `O oponente não pode usar [Blocker] com ${step.minPower}+ de poder nesta batalha.`, { power: step.minPower })
+            : lg('noBlocker', 'O oponente não pode usar [Blocker] nesta batalha.'),
         );
       }
       return true;
@@ -3062,7 +3200,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of trashed) {
         removeFrom(ps.hand, uid);
         ps.trash.push(uid);
-        log(state, frame.controller, `${ps.name} descarta ${cardDef(state, uid).name}.`);
+        log(state, frame.controller, lg('trashesCard', `${ps.name} descarta ${cardDef(state, uid).name}.`, { player: ps.name, card: cardDef(state, uid).name }));
       }
       frame.eventCount = trashed.length;
       frame.trashed = trashed;
@@ -3077,7 +3215,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const n = Math.min(step.count, ps.donRested);
       ps.donRested -= n;
       ps.donActive += n;
-      if (n) log(state, frame.controller, `${n} DON!! de ${ps.name} fica(m) ativo(s).`);
+      if (n) log(state, frame.controller, lg('donSetActive', `${n} DON!! de ${ps.name} fica(m) ativo(s).`, { n, player: ps.name }));
       return true;
     }
     case 'search': {
@@ -3135,13 +3273,13 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of chosen) {
         if (step.toTrash) {
           ps.trash.push(uid);
-          log(state, frame.controller, `${ps.name} descarta ${cardDef(state, uid).name}.`);
+          log(state, frame.controller, lg('trashesCard', `${ps.name} descarta ${cardDef(state, uid).name}.`, { player: ps.name, card: cardDef(state, uid).name }));
         } else if (step.toLife) {
           ps.life.push(uid);
-          if (step.lifeFaceDown) log(state, frame.controller, `${ps.name} coloca 1 carta no topo da Vida.`);
+          if (step.lifeFaceDown) log(state, frame.controller, lg('addsOneToLife', `${ps.name} coloca 1 carta no topo da Vida.`, { player: ps.name }));
           else {
             (ps.lifeFaceUp ??= []).push(uid);
-            log(state, frame.controller, `${ps.name} coloca ${cardDef(state, uid).name} no topo da Vida, virada para cima.`);
+            log(state, frame.controller, lg('addsToLifeFaceUp', `${ps.name} coloca ${cardDef(state, uid).name} no topo da Vida, virada para cima.`, { player: ps.name, card: cardDef(state, uid).name }));
           }
         } else if (step.play) {
           // "play up to 1 … Then, place the rest at the bottom": joga a carta (o resto vai para o fundo antes).
@@ -3149,12 +3287,12 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           playFree(state, uid, step.rested, frame.source, true); // vem do deck (só passa pela mão)
         } else {
           ps.hand.push(uid);
-          log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`);
+          log(state, frame.controller, lg('revealsAddsToHand', `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }));
         }
       }
       if (step.rest === 'bottom') {
         ps.deck.push(...rest);
-        if (rest.length) log(state, frame.controller, `${ps.name} coloca ${rest.length} carta(s) no fundo do deck.`);
+        if (rest.length) log(state, frame.controller, lg('placesAtBottom', `${ps.name} coloca ${rest.length} carta(s) no fundo do deck.`, { player: ps.name, n: rest.length }));
       } else if (step.rest === 'trash') ps.trash.push(...rest);
       else if (rest.length) {
         // "place the rest at the top or bottom of the deck in any order": o jogador ordena em seguida.
@@ -3183,7 +3321,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const next = frame.steps[frame.i + 1];
         const target = next && 'target' in next ? next.target : undefined;
         if (step.scope && !Object.keys(cost).length && typeof target === 'object' && target.required && !targetCandidates(state, frame.controller, frame.source, target).length) {
-          log(state, frame.controller, `${srcName}: nenhuma carta pode ser escolhida, o efeito opcional não é usado.`);
+          log(state, frame.controller, lg('optionalNoCards', `${srcName}: nenhuma carta pode ser escolhida, o efeito opcional não é usado.`, { source: srcName }));
           releaseOncePerTurn(state, frame.source, step.ability);
           frame.i += step.scope;
           return true;
@@ -3191,7 +3329,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         // "you may trash 1 card from your hand. If you do, …": com menos cartas na mão do que o
         // descarte pede, o descarte não pode ser feito e o "If you do" não acontece (o tamanho da mão é público).
         if (step.scope && !Object.keys(cost).length && next?.do === 'trashFromHand' && !next.upTo && ps.hand.length < next.count) {
-          log(state, frame.controller, `${srcName}: cartas insuficientes na mão para descartar, o efeito opcional não é usado.`);
+          log(state, frame.controller, lg('optionalNotEnoughHand', `${srcName}: cartas insuficientes na mão para descartar, o efeito opcional não é usado.`, { source: srcName }));
           releaseOncePerTurn(state, frame.source, step.ability);
           frame.i += step.scope;
           return true;
@@ -3202,13 +3340,13 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           frame.source,
           cost,
           Object.keys(cost).length
-            ? pr('useEffectWithCost', `${srcName}: usar o efeito? Custo: ${describeCost(cost)}.`, { source: srcName, cost: describeCost(cost) })
+            ? pr('useEffectWithCost', `${srcName}: usar o efeito? Custo: ${describeCost(cost)}.`, { source: srcName, cost: describeCost(cost) }, costPartsOf(cost))
             : pr('useEffect', `${srcName}: usar o efeito?`, { source: srcName }),
         );
         return false;
       }
       if (!frame.choice.length) {
-        log(state, frame.controller, `${ps.name} não usa o efeito de ${srcName}.`);
+        log(state, frame.controller, lg('declinesEffect', `${ps.name} não usa o efeito de ${srcName}.`, { player: ps.name, source: srcName }));
         releaseOncePerTurn(state, frame.source, step.ability);
         if (step.scope === undefined) return abortEffect(frame);
         // "you may X" no meio do efeito: pula só X (e o "If you do, …"), o resto continua.
@@ -3274,7 +3412,17 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       if (picked.length) {
         emit(state, { kind: 'donReturned', player: owner.id, count: picked.length, byPlayer: frame.controller });
-        log(state, frame.controller, `${owner.name} devolve ${picked.length} DON!! ao deck de DON!! (${summarizeDonSources(state, picked)}).`);
+        const from = summarizeDonSources(state, picked);
+        log(
+          state,
+          frame.controller,
+          lg(
+            'returnsDon',
+            `${owner.name} devolve ${picked.length} DON!! ao deck de DON!! (${from.map((p) => p.text).join(', ')}).`,
+            { player: owner.name, n: picked.length, from: from.map((p) => p.text).join(', ') },
+            { from: { items: from.map(msgOf), join: 'log.listComma' } },
+          ),
+        );
       }
       return true;
     }
@@ -3284,7 +3432,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (n === null) return false;
       for (let i = 0; i < n; i++) target.trash.push(takeLife(target));
       if (n) lifeRemoved(state, target.id);
-      if (n) log(state, frame.controller, `${n} carta(s) de Vida de ${target.name} vão para o descarte.`);
+      if (n) log(state, frame.controller, lg('lifeToTrash', `${n} carta(s) de Vida de ${target.name} vão para o descarte.`, { n, player: target.name }));
       return true;
     }
     case 'gainKeyword': {
@@ -3309,8 +3457,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
               ? 'cannotBeKOByEffect'
               : 'cannotBeKO';
         const how = step.inBattle ? ' em batalha' : step.byEffect === 'opponent' ? ' por efeitos do oponente' : step.byEffect ? ' por efeitos' : '';
+        const key = step.inBattle ? 'cannotBeKodInBattle' : step.byEffect === 'opponent' ? 'cannotBeKodByOpponent' : step.byEffect ? 'cannotBeKodByEffects' : 'cannotBeKod';
         addModifier(state, frame.controller, { uid, kind, amount: 0, duration: step.duration });
-        log(state, frame.controller, `${cardDef(state, uid).name} não pode ser nocauteado${how}.`);
+        log(state, frame.controller, lg(key, `${cardDef(state, uid).name} não pode ser nocauteado${how}.`, { card: cardDef(state, uid).name }));
       }
       return true;
     }
@@ -3328,7 +3477,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       for (const uid of t) {
         addModifier(state, frame.controller, { uid, kind: 'cost', amount: step.amount, duration: step.duration });
-        log(state, frame.controller, `${cardDef(state, uid).name}: ${step.amount > 0 ? '+' : ''}${step.amount} de custo.`);
+        const amount = `${step.amount > 0 ? '+' : ''}${step.amount}`;
+        log(state, frame.controller, lg('getsCost', `${cardDef(state, uid).name}: ${amount} de custo.`, { card: cardDef(state, uid).name, amount }));
       }
       return true;
     }
@@ -3353,7 +3503,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(opp.hand, uid);
         opp.trash.push(uid);
         markHandTrashed(state, opp.id);
-        log(state, opp.id, `${opp.name} descarta ${cardDef(state, uid).name}.`);
+        log(state, opp.id, lg('trashesCard', `${opp.name} descarta ${cardDef(state, uid).name}.`, { player: opp.name, card: cardDef(state, uid).name }));
       }
       return true;
     }
@@ -3370,7 +3520,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of frame.choice.filter((u) => options.includes(u))) {
         removeFrom(ps.deck, uid);
         ps.hand.push(uid);
-        log(state, frame.controller, `${ps.name} revela ${cardDef(state, uid).name} do deck e adiciona à mão.`);
+        log(state, frame.controller, lg('revealsFromDeckToHand', `${ps.name} revela ${cardDef(state, uid).name} do deck e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }));
       }
       return true;
     }
@@ -3401,7 +3551,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (k > 0) {
           ps.donActive -= k;
           ps.donRested += k;
-          log(state, frame.controller, `${ps.name} vira ${k} DON!!.`);
+          log(state, frame.controller, lg('restsDon', `${ps.name} vira ${k} DON!!.`, { player: ps.name, n: k }));
         }
         frame.memo = [String(count - k)];
       }
@@ -3419,7 +3569,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         else {
           detach(state, uid);
           state.players[ownerOf(state, uid)].hand.push(uid);
-          log(state, frame.controller, `${cardDef(state, uid).name} volta para a mão.`);
+          log(state, frame.controller, lg('returnsToHand', `${cardDef(state, uid).name} volta para a mão.`, { card: cardDef(state, uid).name }));
         }
       }
       return true;
@@ -3460,7 +3610,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const owner = state.players[ownerOf(state, frame.source)];
       detach(state, frame.source);
       owner.deck.push(frame.source);
-      log(state, frame.controller, `${srcName} vai para o fundo do deck.`);
+      log(state, frame.controller, lg('toDeckBottom', `${srcName} vai para o fundo do deck.`, { card: srcName }));
       return true;
     }
     case 'trashTarget': {
@@ -3476,7 +3626,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(opp.hand, uid);
         opp.trash.push(uid);
         markHandTrashed(state, opp.id);
-        log(state, frame.controller, `${opp.name} descarta ${cardDef(state, uid).name} (escolhida ao acaso).`);
+        log(state, frame.controller, lg('trashesRandom', `${opp.name} descarta ${cardDef(state, uid).name} (escolhida ao acaso).`, { player: opp.name, card: cardDef(state, uid).name }));
       }
       return true;
     }
@@ -3487,7 +3637,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       detach(state, frame.source);
       if (step.do === 'trashSelf') owner.trash.push(frame.source);
       else owner.hand.push(frame.source);
-      log(state, frame.controller, `${srcName} vai para ${step.do === 'trashSelf' ? 'o descarte' : 'a mão'}.`);
+      log(
+        state,
+        frame.controller,
+        step.do === 'trashSelf' ? lg('goesToTrash', `${srcName} vai para o descarte.`, { card: srcName }) : lg('goesToHand', `${srcName} vai para a mão.`, { card: srcName }),
+      );
       return true;
     }
     case 'trashToDeckBottom': {
@@ -3502,7 +3656,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(ps.trash, uid);
         ps.deck.push(uid);
       }
-      log(state, frame.controller, `${ps.name} coloca ${n} carta(s) do descarte no fundo do deck.`);
+      log(state, frame.controller, lg('trashToBottom', `${ps.name} coloca ${n} carta(s) do descarte no fundo do deck.`, { player: ps.name, n }));
       return true;
     }
     case 'lifeToTrash': {
@@ -3515,7 +3669,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const fromBottom = frame.choice?.[0] === '1';
       for (let i = 0; i < n; i++) ps.trash.push(takeLife(ps, fromBottom));
       if (n) lifeRemoved(state, ps.id);
-      log(state, frame.controller, `${ps.name} descarta ${n} carta(s) da Vida.`);
+      log(state, frame.controller, lg('trashesLife', `${ps.name} descarta ${n} carta(s) da Vida.`, { player: ps.name, n }));
       return true;
     }
     case 'revealFromHand': {
@@ -3526,7 +3680,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         askCards(state, frame, options, n, pr('chooseHandCardsToReveal', `${srcName}: escolha ${n} carta(s) da mão para revelar.`, { source: srcName, n }), { min: n });
         return false;
       }
-      log(state, frame.controller, `${ps.name} revela ${frame.choice.map((u) => cardDef(state, u).name).join(', ')}.`);
+      log(state, frame.controller, lg('reveals', `${ps.name} revela ${frame.choice.map((u) => cardDef(state, u).name).join(', ')}.`, { player: ps.name, cards: frame.choice.map((u) => cardDef(state, u).name).join(', ') }));
       frame.last = frame.choice.filter((u) => options.includes(u));
       return true;
     }
@@ -3546,7 +3700,16 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         }
         if (step.up) ps.lifeFaceUp.push(uid);
         else removeFrom(ps.lifeFaceUp, uid);
-        log(state, frame.controller, `${ps.name} vira a carta do ${uid === ps.life[ps.life.length - 1] ? 'topo' : 'fundo'} da Vida para ${step.up ? 'cima' : 'baixo'}.`);
+        const top = uid === ps.life[ps.life.length - 1];
+        log(
+          state,
+          frame.controller,
+          lg(
+            `flipsLife${top ? 'Top' : 'Bottom'}${step.up ? 'Up' : 'Down'}`,
+            `${ps.name} vira a carta do ${top ? 'topo' : 'fundo'} da Vida para ${step.up ? 'cima' : 'baixo'}.`,
+            { player: ps.name },
+          ),
+        );
         return true;
       }
       const pool = step.up ? faceDownLife(ps) : [...ps.life].reverse().filter((u) => ps.lifeFaceUp!.includes(u));
@@ -3554,7 +3717,12 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (step.up) ps.lifeFaceUp.push(uid);
         else removeFrom(ps.lifeFaceUp, uid);
       }
-      log(state, frame.controller, `${ps.name} vira ${Math.min(step.count, pool.length)} carta(s) de Vida para ${step.up ? 'cima' : 'baixo'}.`);
+      const n = Math.min(step.count, pool.length);
+      log(
+        state,
+        frame.controller,
+        lg(step.up ? 'flipsLifeUp' : 'flipsLifeDown', `${ps.name} vira ${n} carta(s) de Vida para ${step.up ? 'cima' : 'baixo'}.`, { player: ps.name, n }),
+      );
       return true;
     }
     case 'skipRefresh': {
@@ -3571,7 +3739,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const card = ps.deck[0];
       frame.last = card ? [card] : [];
       frame.revealed = frame.last;
-      if (card) log(state, frame.controller, `${ps.name} revela ${cardDef(state, card).name} do topo do deck.`);
+      if (card) log(state, frame.controller, lg('revealsDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck.`, { player: ps.name, card: cardDef(state, card).name }));
       return true;
     }
     case 'playRevealed': {
@@ -3595,7 +3763,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (card && ps.deck.includes(card) && (!step.filter || matchesFilter(cardDef(state, card), step.filter))) {
         removeFrom(ps.deck, card);
         ps.hand.push(card);
-        log(state, frame.controller, `${ps.name} adiciona ${cardDef(state, card).name} à mão.`);
+        log(state, frame.controller, lg('addsToHand', `${ps.name} adiciona ${cardDef(state, card).name} à mão.`, { player: ps.name, card: cardDef(state, card).name }));
       }
       return true;
     }
@@ -3628,7 +3796,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(opp.trash, uid);
         opp.deck.push(uid);
       }
-      log(state, opp.id, `${frame.choice.length} carta(s) do descarte de ${opp.name} vão para o fundo do deck.`);
+      log(state, opp.id, lg('oppTrashToBottom', `${frame.choice.length} carta(s) do descarte de ${opp.name} vão para o fundo do deck.`, { n: frame.choice.length, player: opp.name }));
       return true;
     }
     case 'arrangeLife': {
@@ -3644,7 +3812,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       }
       const order = frame.choice.filter((u) => owner.life.includes(u));
       if (order.length === owner.life.length) owner.life = [...order].reverse();
-      log(state, frame.controller, `${ps.name} reorganiza as cartas de Vida de ${owner.name}.`);
+      log(state, frame.controller, lg('arrangesLife', `${ps.name} reorganiza as cartas de Vida de ${owner.name}.`, { player: ps.name, owner: owner.name }));
       return true;
     }
     case 'restDonOrCharacter': {
@@ -3696,11 +3864,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (pick === 'don') {
           if (skip) {
             (state.donSkipRefresh ??= []).push({ player: opp.id, count: 1 });
-            log(state, frame.controller, `1 DON!! de ${opp.name} não fica ativo na próxima Renovação.`);
+            log(state, frame.controller, lg('donSkipsRefresh', `1 DON!! de ${opp.name} não fica ativo na próxima Renovação.`, { n: 1, player: opp.name }));
           } else {
             opp.donActive--;
             opp.donRested++;
-            log(state, frame.controller, `1 DON!! de ${opp.name} é virado.`);
+            log(state, frame.controller, lg('donRested', `1 DON!! de ${opp.name} é virado.`, { n: 1, player: opp.name }));
           }
           return true;
         }
@@ -3725,12 +3893,12 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       frame.chosenCost = Number(frame.choice[0]);
-      log(state, frame.controller, `${ps.name} escolhe o custo ${frame.chosenCost}.`);
+      log(state, frame.controller, lg('choosesCost', `${ps.name} escolhe o custo ${frame.chosenCost}.`, { player: ps.name, n: frame.chosenCost }));
       return true;
     case 'revealOpponentTop': {
       const card = state.players[opponent(frame.controller)].deck[0];
       frame.last = card ? [card] : [];
-      if (card) log(state, frame.controller, `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`);
+      if (card) log(state, frame.controller, lg('revealsOppDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`, { player: ps.name, card: cardDef(state, card).name }));
       return true;
     }
     case 'giveActiveDon': {
@@ -3774,10 +3942,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (step.toLife) {
           owner.life.push(uid);
           (owner.lifeFaceUp ??= []).push(uid);
-          log(state, frame.controller, `${cardDef(state, uid).name} vai para o topo da Vida, virada para cima.`);
+          log(state, frame.controller, lg('toLifeTopFaceUp', `${cardDef(state, uid).name} vai para o topo da Vida, virada para cima.`, { card: cardDef(state, uid).name }));
         } else {
           owner.deck.push(uid);
-          log(state, frame.controller, `${cardDef(state, uid).name} vai para o fundo do deck.`);
+          log(state, frame.controller, lg('toDeckBottom', `${cardDef(state, uid).name} vai para o fundo do deck.`, { card: cardDef(state, uid).name }));
         }
       }
       return true;
@@ -3808,7 +3976,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         left -= n;
       }
       if (left < step.count) {
-        log(state, frame.controller, `${cardDef(state, dest).name} recebe ${step.count - left} DON!! anexado(s).`);
+        log(state, frame.controller, lg('receivesAttachedDon', `${cardDef(state, dest).name} recebe ${step.count - left} DON!! anexado(s).`, { card: cardDef(state, dest).name, n: step.count - left }));
         emit(state, { kind: 'donGiven', player: frame.controller, card: dest });
       }
       return true;
@@ -3850,7 +4018,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(ps.trash, uid);
         ps.life.push(uid);
         (ps.lifeFaceUp ??= []).push(uid);
-        log(state, frame.controller, `${def.name} vai para o topo da Vida, virada para cima.`);
+        log(state, frame.controller, lg('toLifeTopFaceUp', `${def.name} vai para o topo da Vida, virada para cima.`, { card: def.name }));
       }
       return true;
     }
@@ -3861,7 +4029,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const before = ps.hand.length;
       drawCards(state, frame.controller, n);
       frame.eventCount = ps.hand.length - before;
-      log(state, frame.controller, `${ps.name} compra ${frame.eventCount} carta(s).`);
+      log(state, frame.controller, lg('draws', `${ps.name} compra ${frame.eventCount} carta(s).`, { player: ps.name, n: frame.eventCount }));
       emit(state, { kind: 'drawByEffect', player: frame.controller });
       return true;
     }
@@ -3871,7 +4039,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (step.from === 'deck') {
         const k = Math.min(n, ps.deck.length);
         ps.trash.push(...ps.deck.splice(0, k));
-        if (k) log(state, frame.controller, `${ps.name} descarta ${k} carta(s) do topo do deck.`);
+        if (k) log(state, frame.controller, lg('millsDeck', `${ps.name} descarta ${k} carta(s) do topo do deck.`, { player: ps.name, n: k }));
         return true;
       }
       frame.steps.splice(frame.i + 1, 0, { do: 'trashFromHand', count: n });
@@ -3885,7 +4053,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(ps.hand, uid);
         ps.trash.push(uid);
         markHandTrashed(state, ps.id);
-        log(state, frame.controller, `${ps.name} descarta ${cardDef(state, uid).name} (escolhida pelo oponente).`);
+        log(state, frame.controller, lg('trashesChosenByOpponent', `${ps.name} descarta ${cardDef(state, uid).name} (escolhida pelo oponente).`, { player: ps.name, card: cardDef(state, uid).name }));
       }
       return true;
     }
@@ -3896,7 +4064,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (let k = 0; k < step.count && pool.length; k++) picked.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
       frame.last = picked;
       frame.revealed = picked;
-      if (picked.length) log(state, frame.controller, `${opp.name} revela ${picked.map((u) => cardDef(state, u).name).join(', ')}.`);
+      if (picked.length) log(state, frame.controller, lg('reveals', `${opp.name} revela ${picked.map((u) => cardDef(state, u).name).join(', ')}.`, { player: opp.name, cards: picked.map((u) => cardDef(state, u).name).join(', ') }));
       return true;
     }
     case 'opponentLifeToBottom': {
@@ -3905,7 +4073,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (let k = 0; k < n; k++) opp.deck.push(takeLife(opp));
       if (n) {
         lifeRemoved(state, opp.id);
-        log(state, frame.controller, `${n} carta(s) da Vida de ${opp.name} vão para o fundo do deck.`);
+        log(state, frame.controller, lg('oppLifeToBottom', `${n} carta(s) da Vida de ${opp.name} vão para o fundo do deck.`, { n, player: opp.name }));
       }
       return true;
     }
@@ -3950,11 +4118,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const opp = state.players[opponent(frame.controller)];
       if (step.atMainPhase) {
         (state.donRestAtMain ??= []).push({ player: opp.id, count: step.count });
-        log(state, frame.controller, `${opp.name} vai virar ${step.count} DON!! ativo(s) no início da próxima Fase Principal.`);
+        log(state, frame.controller, lg('oppWillRestDon', `${opp.name} vai virar ${step.count} DON!! ativo(s) no início da próxima Fase Principal.`, { player: opp.name, n: step.count }));
         return true;
       }
       (state.donSkipRefresh ??= []).push({ player: opp.id, count: step.count });
-      log(state, frame.controller, `${step.count} DON!! de ${opp.name} não fica(m) ativo(s) na próxima Renovação.`);
+      log(state, frame.controller, lg('donSkipsRefresh', `${step.count} DON!! de ${opp.name} não fica(m) ativo(s) na próxima Renovação.`, { n: step.count, player: opp.name }));
       return true;
     }
     case 'replaceRest': {
@@ -3962,7 +4130,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!locate(state, step.victim) || !ability) return true;
       if (!frame.choice) {
         askPay(state, frame.controller, frame.source, ability.cost, ability.cost
-            ? pr('replaceRestPay', `${srcName} vai ser virado. Pagar ${describeCost(ability.cost)} para evitar?`, { source: srcName, cost: describeCost(ability.cost) })
+            ? pr('replaceRestPay', `${srcName} vai ser virado. Pagar ${describeCost(ability.cost)} para evitar?`, { source: srcName, cost: describeCost(ability.cost) }, costPartsOf(ability.cost))
             : pr('replaceRestEffect', `${srcName} vai ser virado. Pagar o efeito para evitar?`, { source: srcName }));
         return false;
       }
@@ -3981,11 +4149,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       (state.tempReplacements ??= []).push({ player: frame.controller, source: frame.source, by: step.by, cost: step.cost });
       return true;
     case 'winGame':
-      gameOver(state, frame.controller, `${ps.name} vence pelo efeito de ${srcName}.`);
+      gameOver(state, frame.controller, lg('winByEffect', `${ps.name} vence pelo efeito de ${srcName}.`, { player: ps.name, source: srcName }));
       return true;
     case 'extraTurn':
       state.extraTurn = frame.controller;
-      log(state, frame.controller, `${ps.name} jogará um turno extra.`);
+      log(state, frame.controller, lg('extraTurn', `${ps.name} jogará um turno extra.`, { player: ps.name }));
       return true;
     case 'opponentMay': {
       const opp = state.players[opponent(frame.controller)];
@@ -4050,13 +4218,13 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           return false;
         }
         if (!frame.choice.length) {
-          log(state, opp.id, `${opp.name} não adiciona DON!!.`);
+          log(state, opp.id, lg('declinesAddDon', `${opp.name} não adiciona DON!!.`, { player: opp.name }));
           return true;
         }
       }
       opp.donDeck -= n;
       opp.donActive += n;
-      if (n) log(state, frame.controller, `${opp.name} adiciona ${n} DON!! ativo(s).`);
+      if (n) log(state, frame.controller, lg('addsActiveDon', `${opp.name} adiciona ${n} DON!! ativo(s).`, { player: opp.name, n }));
       return true;
     }
     case 'donMatchOpponent': {
@@ -4111,17 +4279,17 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       // "at the bottom of your deck in any order": vão para o fundo na ordem da mão, sem embaralhar
       // (como o "place the rest at the bottom of your deck in any order" das buscas).
       if (step.bottom) {
-        log(state, frame.controller, `${who.name} coloca ${n} carta(s) da mão no fundo do deck.`);
+        log(state, frame.controller, lg('handToBottom', `${who.name} coloca ${n} carta(s) da mão no fundo do deck.`, { player: who.name, n }));
         return true;
       }
       shuffleInPlace(state, who.deck);
-      log(state, frame.controller, `${who.name} devolve ${n} carta(s) da mão ao deck e embaralha.`);
+      log(state, frame.controller, lg('handToDeckShuffle', `${who.name} devolve ${n} carta(s) da mão ao deck e embaralha.`, { player: who.name, n }));
       return true;
     }
     case 'opponentDraws': {
       const o = state.players[opponent(frame.controller)];
       drawCards(state, o.id, step.count);
-      log(state, frame.controller, `${o.name} compra ${step.count} carta(s).`);
+      log(state, frame.controller, lg('draws', `${o.name} compra ${step.count} carta(s).`, { player: o.name, n: step.count }));
       return true;
     }
     case 'trashHand': {
@@ -4129,7 +4297,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       ps.trash.push(...ps.hand.splice(0));
       if (n) {
         markHandTrashed(state, ps.id);
-        log(state, frame.controller, `${ps.name} descarta toda a mão (${n} carta(s)).`);
+        log(state, frame.controller, lg('trashesWholeHand', `${ps.name} descarta toda a mão (${n} carta(s)).`, { player: ps.name, n }));
         emit(state, { kind: 'handTrashedByEffect', player: frame.controller, card: frame.source, count: n });
       }
       return true;
@@ -4173,7 +4341,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (let k = 0; k < n; k++) ps.trash.push(takeLife(ps));
       if (n) {
         lifeRemoved(state, ps.id);
-        log(state, frame.controller, `${n} carta(s) de Vida de ${ps.name} vão para o descarte.`);
+        log(state, frame.controller, lg('lifeToTrash', `${n} carta(s) de Vida de ${ps.name} vão para o descarte.`, { n, player: ps.name }));
       }
       return true;
     }
@@ -4203,7 +4371,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(pl.hand, uid);
         pl.trash.push(uid);
       }
-      log(state, next, `${pl.name} descarta ${trashed.length} carta(s).`);
+      log(state, next, lg('trashesCards', `${pl.name} descarta ${trashed.length} carta(s).`, { player: pl.name, n: trashed.length }));
       if (trashed.length) markHandTrashed(state, next);
       if (trashed.length && next === frame.controller) emit(state, { kind: 'handTrashedByEffect', player: next, card: frame.source, count: trashed.length });
       frame.memo = [...memo, String(next)];
@@ -4215,7 +4383,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const mine = state.activePlayer === frame.controller;
       const untilTurn = step.duration === 'nextOpponentTurn' ? state.turn + (mine ? 1 : 2) : state.turn;
       (state.onPlayNegated ??= []).push({ player: who, untilTurn });
-      log(state, frame.controller, `Os efeitos [Ao Jogar] de ${state.players[who].name} estão anulados.`);
+      log(state, frame.controller, lg('playerOnPlayNegated', `Os efeitos [Ao Jogar] de ${state.players[who].name} estão anulados.`, { player: state.players[who].name }));
       return true;
     }
     case 'cannotAttackCharacters':
@@ -4227,7 +4395,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const n = frame.eventCount ?? 0;
       if (n && !restricted(state, frame.controller, 'noDrawByEffect')) {
         drawCards(state, frame.controller, n);
-        log(state, frame.controller, `${ps.name} compra ${n} carta(s).`);
+        log(state, frame.controller, lg('draws', `${ps.name} compra ${n} carta(s).`, { player: ps.name, n }));
       }
       return true;
     }
@@ -4249,14 +4417,18 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       const n = Number(frame.memo[0]);
       for (const uid of t) addModifier(state, frame.controller, { uid, kind: 'power', amount: step.power * n, duration: 'battle' });
-      log(state, frame.controller, `${ps.name} vira ${n} DON!! (+${step.power * n} de poder).`);
+      log(state, frame.controller, lg('restsDonForPower', `${ps.name} vira ${n} DON!! (+${step.power * n} de poder).`, { player: ps.name, n, power: step.power * n }));
       return true;
     }
     case 'payEither': {
       const payable = step.options.map((c, i) => [c, i] as const).filter(([c]) => canPayCost(state, frame.controller, frame.source, c));
       if (!payable.length) return abortEffect(frame);
       if (!frame.choice) {
-        askOption(state, frame, frame.controller, pr('howToPayCost', `${srcName}: como pagar o custo?`, { source: srcName }), payable.map(([c]) => describeCost(c)));
+        askOption(state, frame, frame.controller, pr('howToPayCost', `${srcName}: como pagar o custo?`, { source: srcName }),
+          payable.map(([c]) => describeCost(c)),
+          undefined,
+          payable.map(([c]) => costPartsOf(c).cost),
+        );
         frame.memo = payable.map(([, i]) => String(i));
         return false;
       }
@@ -4280,7 +4452,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const pb = basePowerOf(state, b);
       addModifier(state, frame.controller, { uid: a, kind: 'basePower', amount: pb, duration: step.duration });
       addModifier(state, frame.controller, { uid: b, kind: 'basePower', amount: pa, duration: step.duration });
-      log(state, frame.controller, `${cardDef(state, a).name} e ${cardDef(state, b).name} trocam o poder base.`);
+      log(state, frame.controller, lg('swapBasePower', `${cardDef(state, a).name} e ${cardDef(state, b).name} trocam o poder base.`, { card: cardDef(state, a).name, other: cardDef(state, b).name }));
       return true;
     }
     case 'trashFaceUpLife': {
@@ -4291,7 +4463,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         ps.trash.push(uid);
       }
       if (up.length) {
-        log(state, frame.controller, `${ps.name} descarta ${up.length} carta(s) de Vida virada(s) para cima.`);
+        log(state, frame.controller, lg('trashesFaceUpLife', `${ps.name} descarta ${up.length} carta(s) de Vida virada(s) para cima.`, { player: ps.name, n: up.length }));
         lifeRemoved(state, ps.id);
       }
       return true;
@@ -4322,7 +4494,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           removeFrom(ps.life, uid);
           if (ps.lifeFaceUp?.includes(uid)) removeFrom(ps.lifeFaceUp, uid);
           ps.deck.unshift(uid);
-          log(state, frame.controller, `${ps.name} coloca 1 carta da Vida no topo do deck.`);
+          log(state, frame.controller, lg('lifeToDeckTop', `${ps.name} coloca 1 carta da Vida no topo do deck.`, { player: ps.name }));
           lifeRemoved(state, ps.id);
         }
         frame.memo = ['order'];
@@ -4353,14 +4525,19 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         left -= n;
         if (!left) break;
       }
-      log(state, frame.controller, `${ps.name} devolve ${step.count - left} DON!! anexado(s) à área de custo.`);
+      log(state, frame.controller, lg('returnsAttachedDon', `${ps.name} devolve ${step.count - left} DON!! anexado(s) à área de custo.`, { player: ps.name, n: step.count - left }));
       return true;
     }
     case 'lastToDeckTop': {
       for (const uid of (frame.last ?? []).filter((u) => ps.hand.includes(u))) {
         removeFrom(ps.hand, uid);
         ps.deck.unshift(uid);
-        logSecret(state, frame.controller, `${ps.name} coloca 1 carta da mão no topo do deck.`, `${cardDef(state, uid).name} volta ao topo do deck.`);
+        logSecret(
+          state,
+          frame.controller,
+          lg('handCardToDeckTop', `${ps.name} coloca 1 carta da mão no topo do deck.`, { player: ps.name }),
+          lg('cardBackToDeckTop', `${cardDef(state, uid).name} volta ao topo do deck.`, { card: cardDef(state, uid).name }),
+        );
       }
       return true;
     }
@@ -4373,7 +4550,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (!t) return false;
       for (const uid of t) {
         addModifier(state, frame.controller, { uid, kind: 'negated', amount: 0, duration: step.duration });
-        log(state, frame.controller, `O efeito de ${cardDef(state, uid).name} é anulado.`);
+        log(state, frame.controller, lg('effectNegated', `O efeito de ${cardDef(state, uid).name} é anulado.`, { card: cardDef(state, uid).name }));
       }
       return true;
     }
@@ -4406,7 +4583,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const amount = copied ? getPower(state, copied) : step.amount ?? 0;
       for (const uid of t) {
         addModifier(state, frame.controller, { uid, kind: 'basePower', amount, duration: step.duration });
-        log(state, frame.controller, `O poder base de ${cardDef(state, uid).name} passa a ser ${amount}.`);
+        log(state, frame.controller, lg('basePowerSet', `O poder base de ${cardDef(state, uid).name} passa a ser ${amount}.`, { card: cardDef(state, uid).name, n: amount }));
       }
       return true;
     }
@@ -4419,14 +4596,14 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of t) {
         const current = getPower(state, uid);
         if (current > 0) addModifier(state, frame.controller, { uid, kind: 'power', amount: -current, duration });
-        log(state, frame.controller, `O poder de ${cardDef(state, uid).name} fica em ${Math.min(current, 0)}.`);
+        log(state, frame.controller, lg('powerSet', `O poder de ${cardDef(state, uid).name} fica em ${Math.min(current, 0)}.`, { card: cardDef(state, uid).name, n: Math.min(current, 0) }));
       }
       return true;
     }
     case 'revealLifeTop': {
       const card = ps.life[ps.life.length - 1];
       frame.last = card ? [card] : [];
-      if (card) log(state, frame.controller, `${ps.name} revela ${cardDef(state, card).name} do topo da Vida.`);
+      if (card) log(state, frame.controller, lg('revealsLifeTop', `${ps.name} revela ${cardDef(state, card).name} do topo da Vida.`, { player: ps.name, card: cardDef(state, card).name }));
       return true;
     }
     case 'activateEventFromTrash':
@@ -4451,7 +4628,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(ps.hand, uid);
         ps.trash.push(uid);
       }
-      log(state, frame.controller, `${ps.name} ativa ${def.name} ${fromTrash ? 'do descarte' : 'da mão'}.`);
+      log(
+        state,
+        frame.controller,
+        lg(fromTrash ? 'activatesFromTrash' : 'activatesFromHand', `${ps.name} ativa ${def.name} ${fromTrash ? 'do descarte' : 'da mão'}.`, { player: ps.name, card: def.name }),
+      );
       pushEffect(state, uid, frame.controller, def.abilities.find((a) => a.timing === 'main')!.steps);
       emit(state, { kind: 'eventActivated', player: frame.controller, card: uid });
       (state.eventsThisTurn ??= []).push({ player: frame.controller, cost: def.cost ?? 0 });
@@ -4482,7 +4663,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const receiver = step.target && step.target !== 'self' ? frame.memo?.[0] : frame.source;
       if (chosen.length && receiver && locate(state, receiver)) {
         addModifier(state, frame.controller, { uid: receiver, kind: 'power', amount: step.power * chosen.length, duration: step.duration });
-        log(state, frame.controller, `${cardDef(state, receiver).name} recebe +${step.power * chosen.length} de poder (${chosen.length} carta(s) descartada(s)).`);
+        log(state, frame.controller, lg('powerPerTrashed', `${cardDef(state, receiver).name} recebe +${step.power * chosen.length} de poder (${chosen.length} carta(s) descartada(s)).`, { card: cardDef(state, receiver).name, power: step.power * chosen.length, n: chosen.length }));
       }
       return true;
     }
@@ -4492,7 +4673,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         const to = (frame.last ?? []).find((u) => locate(state, u)?.player === frame.controller);
         if (to && to !== state.battle.target) {
           state.battle.target = to;
-          log(state, frame.controller, `${srcName}: o ataque passa a mirar ${cardDef(state, to).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`);
+          log(state, frame.controller, lg('retarget', `${srcName}: o ataque passa a mirar ${cardDef(state, to).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`, { source: srcName, card: cardDef(state, to).name }));
         }
         return true;
       }
@@ -4516,7 +4697,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const target = frame.choice.find((u) => options.includes(u));
       if (target && locate(state, target)) {
         state.battle.target = target;
-        log(state, frame.controller, `${srcName}: o ataque passa a mirar ${cardDef(state, target).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`);
+        log(state, frame.controller, lg('retarget', `${srcName}: o ataque passa a mirar ${cardDef(state, target).name} (troca de alvo por efeito, não é [Blocker]: a carta não vira).`, { source: srcName, card: cardDef(state, target).name }));
       }
       return true;
     }
@@ -4544,7 +4725,14 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (where === 'top') ps.deck.unshift(uid);
         else ps.deck.push(uid);
       }
-      log(state, frame.controller, `${ps.name} coloca ${frame.memo.length} carta(s) da mão no ${where === 'top' ? 'topo' : 'fundo'} do deck.`);
+      log(
+        state,
+        frame.controller,
+        lg(where === 'top' ? 'handToDeckTop' : 'handToBottom', `${ps.name} coloca ${frame.memo.length} carta(s) da mão no ${where === 'top' ? 'topo' : 'fundo'} do deck.`, {
+          player: ps.name,
+          n: frame.memo.length,
+        }),
+      );
       frame.memo = undefined;
       return true;
     }
@@ -4577,7 +4765,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (n === null) return false;
       for (let i = 0; i < n; i++) lifeToHandCard(state, opp.id, opp.life.pop()!);
       if (n) lifeRemoved(state, opp.id);
-      if (n) log(state, frame.controller, `${opp.name} coloca ${n} carta(s) da Vida na mão.`);
+      if (n) log(state, frame.controller, lg('lifeToHand', `${opp.name} coloca ${n} carta(s) da Vida na mão.`, { player: opp.name, n }));
       return true;
     }
     case 'opponentHandToBottom': {
@@ -4601,7 +4789,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(opp.hand, uid);
         opp.deck.push(uid);
       }
-      log(state, opp.id, `${opp.name} coloca ${n} carta(s) da mão no fundo do deck.`);
+      log(state, opp.id, lg('handToBottom', `${opp.name} coloca ${n} carta(s) da mão no fundo do deck.`, { player: opp.name, n }));
       return true;
     }
     case 'replaceRemoval': {
@@ -4631,6 +4819,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             ability.cost ? 'replaceRemovalPay' : 'replaceRemovalEffect',
             `${srcName}: ${names} ${covered.length > 1 ? 'vão' : 'vai'} sair do campo. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
             { source: srcName, cards: names, n: covered.length, ...(ability.cost ? { cost: describeCost(ability.cost) } : {}) },
+            ability.cost ? costPartsOf(ability.cost) : undefined,
           ),
         );
         return false;
@@ -4645,12 +4834,20 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         for (const uid of covered) {
           detach(state, uid);
           owner.life.push(uid);
-          log(state, owner.id, `${cardDef(state, uid).name} vai para o topo da Vida em vez de sair do campo.`);
+          log(state, owner.id, lg('toLifeInstead', `${cardDef(state, uid).name} vai para o topo da Vida em vez de sair do campo.`, { card: cardDef(state, uid).name }));
         }
         frame.steps.splice(frame.i + 1, 0, ...next);
         return true;
       }
-      log(state, owner.id, `${srcName}: ${names} ${covered.length > 1 ? 'ficam' : 'fica'} em campo (efeito de substituição).`);
+      log(
+        state,
+        owner.id,
+        lg('staysOnField', `${srcName}: ${names} ${covered.length > 1 ? 'ficam' : 'fica'} em campo (efeito de substituição).`, {
+          source: srcName,
+          cards: names,
+          n: covered.length,
+        }),
+      );
       const costSteps = ability.cost ? payImmediateCost(state, owner.id, frame.source, ability.cost) : [];
       if (ability.cost?.victimPowerMinus) {
         for (const uid of covered) addModifier(state, owner.id, { uid, kind: 'power', amount: -ability.cost.victimPowerMinus, duration: 'turn' });
@@ -4677,13 +4874,14 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             ability.cost ? 'replaceDamagePay' : 'replaceDamageEffect',
             `${srcName}: você vai sofrer ${damage.remaining} de dano. Pagar ${ability.cost ? describeCost(ability.cost) : 'o efeito'} para evitar?`,
             { source: srcName, n: damage.remaining, ...(ability.cost ? { cost: describeCost(ability.cost) } : {}) },
+            ability.cost ? costPartsOf(ability.cost) : undefined,
           ),
         );
         return false;
       }
       if (!frame.choice.length) return true;
       if (ability.oncePerTurn) state.usedThisTurn.push(usedKey(frame.source, step.ability));
-      log(state, owner.id, `${srcName}: ${owner.name} não sofre o dano (efeito de substituição).`);
+      log(state, owner.id, lg('damagePrevented', `${srcName}: ${owner.name} não sofre o dano (efeito de substituição).`, { source: srcName, player: owner.name }));
       damage.remaining = 0;
       const costSteps = ability.cost ? payImmediateCost(state, owner.id, frame.source, ability.cost) : [];
       frame.steps.splice(frame.i + 1, 0, ...costSteps, ...ability.steps);
@@ -4706,7 +4904,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const fromBottom = frame.choice?.[0] === '1';
       for (let i = 0; i < n; i++) lifeToHandCard(state, ps.id, fromBottom ? ps.life.shift()! : ps.life.pop()!);
       lifeRemoved(state, ps.id);
-      log(state, frame.controller, `${ps.name} coloca ${n} carta(s) da Vida (${fromBottom ? 'fundo' : 'topo'}) na mão.`);
+      log(
+        state,
+        frame.controller,
+        lg(fromBottom ? 'lifeBottomToHand' : 'lifeTopToHand', `${ps.name} coloca ${n} carta(s) da Vida (${fromBottom ? 'fundo' : 'topo'}) na mão.`, { player: ps.name, n }),
+      );
       return true;
     }
     case 'handToLife': {
@@ -4747,7 +4949,19 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (picked.length) {
         const names = shown.length ? ` (${shown.map((u) => cardDef(state, u).name).join(', ')})` : '';
         const from = step.trashOnly ? 'do descarte' : step.fromTrash ? 'da mão ou do descarte' : 'da mão';
-        log(state, frame.controller, `${ps.name} ${filtered && !step.trashOnly ? 'revela e ' : ''}coloca ${picked.length} carta(s) ${from}${names} no ${bottom ? 'fundo' : 'topo'} da Vida.`);
+        const reveal = filtered && !step.trashOnly;
+        // Chave: revela (com nomes) | com nomes | sem nomes, e topo/fundo; a origem é uma parte traduzível.
+        const key = `${reveal ? 'revealsToLife' : names ? 'toLifeNamed' : 'toLife'}${bottom ? 'Bottom' : 'Top'}`;
+        log(
+          state,
+          frame.controller,
+          lg(
+            key,
+            `${ps.name} ${reveal ? 'revela e ' : ''}coloca ${picked.length} carta(s) ${from}${names} no ${bottom ? 'fundo' : 'topo'} da Vida.`,
+            { player: ps.name, n: picked.length, from, ...(names ? { cards: shown.map((u) => cardDef(state, u).name).join(', ') } : {}) },
+            { from: { items: [{ key: step.trashOnly ? 'log.fromTrash' : step.fromTrash ? 'log.fromHandOrTrash' : 'log.fromHand' }] } },
+          ),
+        );
       }
       return true;
     }
@@ -4818,7 +5032,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       log(
         state,
         frame.controller,
-        `${ps.name} olha a carta do topo da Vida ${side === 'own' ? 'própria' : 'do oponente'} e a deixa no ${frame.choice[0] === '1' ? 'fundo' : 'topo'}.`,
+        lg(
+          `peeksLife${side === 'own' ? 'Own' : 'Opponent'}${frame.choice[0] === '1' ? 'Bottom' : 'Top'}`,
+          `${ps.name} olha a carta do topo da Vida ${side === 'own' ? 'própria' : 'do oponente'} e a deixa no ${frame.choice[0] === '1' ? 'fundo' : 'topo'}.`,
+          { player: ps.name },
+        ),
       );
       return true;
     }
@@ -4829,7 +5047,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         return false;
       }
       const picked = step.options[Number(frame.choice[0])] ?? [];
-      log(state, chooser, `Escolhido: ${step.labels[Number(frame.choice[0])] ?? '-'}`);
+      log(state, chooser, lg('chosen', `Escolhido: ${step.labels[Number(frame.choice[0])] ?? '-'}`, { label: step.labels[Number(frame.choice[0])] ?? '-' }));
       frame.i++;
       frame.choice = undefined;
       frame.memo = undefined;
@@ -4866,7 +5084,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         removeFrom(ps.hand, uid);
         ps.deck.push(uid);
       }
-      log(state, frame.controller, `${ps.name} coloca ${n} carta(s) da mão no fundo do deck.`);
+      log(state, frame.controller, lg('handToBottom', `${ps.name} coloca ${n} carta(s) da mão no fundo do deck.`, { player: ps.name, n }));
       return true;
     }
     case 'canAttackActive':
@@ -4881,7 +5099,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const n = Math.max(0, step.count - ps.hand.length);
       if (n) {
         drawCards(state, frame.controller, n);
-        log(state, frame.controller, `${ps.name} compra ${n} carta(s).`);
+        log(state, frame.controller, lg('draws', `${ps.name} compra ${n} carta(s).`, { player: ps.name, n }));
       }
       return true;
     }
@@ -4905,7 +5123,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       ps.trash.push(...milled);
       // "If the trashed card has a cost of 6 or more"
       frame.last = milled;
-      if (n) log(state, frame.controller, `${ps.name} descarta ${n} carta(s) do topo do deck.`);
+      if (n) log(state, frame.controller, lg('millsDeck', `${ps.name} descarta ${n} carta(s) do topo do deck.`, { player: ps.name, n }));
       return true;
     }
     case 'useOwnEffect':
@@ -4916,7 +5134,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       if (owner.trash.includes(frame.source) || inLimbo(state, frame.source)) {
         detach(state, frame.source);
         owner.hand.push(frame.source);
-        log(state, frame.controller, `${srcName} vai para a mão.`);
+        log(state, frame.controller, lg('goesToHand', `${srcName} vai para a mão.`, { card: srcName }));
       }
       return true;
     }
@@ -4924,7 +5142,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const n = upToCount(state, frame, step, ps.deck.length, pr('howManyDeckToLife', `${srcName}: quantas cartas do topo do deck adicionar à Vida?`, { source: srcName }));
       if (n === null) return false;
       for (let i = 0; i < n; i++) ps.life.push(ps.deck.shift()!);
-      if (n) log(state, frame.controller, `${ps.name} adiciona ${n} carta(s) do deck à Vida.`);
+      if (n) log(state, frame.controller, lg('deckToLife', `${ps.name} adiciona ${n} carta(s) do deck à Vida.`, { player: ps.name, n }));
       return true;
     }
     case 'useMainEffect':
@@ -4947,7 +5165,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of frame.choice.filter((u) => options.includes(u))) {
         removeFrom(ps.trash, uid);
         ps.hand.push(uid);
-        log(state, frame.controller, `${ps.name} adiciona ${cardDef(state, uid).name} do descarte à mão.`);
+        log(state, frame.controller, lg('trashToHand', `${ps.name} adiciona ${cardDef(state, uid).name} do descarte à mão.`, { player: ps.name, card: cardDef(state, uid).name }));
       }
       return true;
     }
@@ -4999,7 +5217,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'shuffleDeck':
       shuffleInPlace(state, ps.deck);
-      log(state, frame.controller, `${ps.name} embaralha o deck.`);
+      log(state, frame.controller, lg('shuffles', `${ps.name} embaralha o deck.`, { player: ps.name }));
       return true;
     case 'arrangeTop': {
       // 1ª escolha: cartas que vão para o fundo. 2ª (se sobrar 2+ no topo): ordem do topo.
@@ -5027,7 +5245,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         // As que ficam continuam no topo (visíveis) até a escolha da ordem.
         for (const uid of bottom) removeFrom(ps.deck, uid);
         ps.deck.push(...bottom);
-        if (bottom.length) log(state, frame.controller, `${ps.name} coloca ${bottom.length} carta(s) no fundo do deck.`);
+        if (bottom.length) log(state, frame.controller, lg('placesAtBottom', `${ps.name} coloca ${bottom.length} carta(s) no fundo do deck.`, { player: ps.name, n: bottom.length }));
         if (keep.length <= 1) return true;
         frame.memo = keep;
         frame.choice = undefined;
@@ -5046,7 +5264,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const order = [...chosen, ...keep.filter((u) => !chosen.includes(u))];
       for (const uid of order) removeFrom(ps.deck, uid);
       ps.deck.unshift(...order);
-      log(state, frame.controller, `${ps.name} devolve ${order.length} carta(s) ao topo do deck.`);
+      log(state, frame.controller, lg('returnsToDeckTop', `${ps.name} devolve ${order.length} carta(s) ao topo do deck.`, { player: ps.name, n: order.length }));
       return true;
     }
   }
@@ -5144,7 +5362,7 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
     case 'draw': {
       const n = Math.max(1, Math.min(10, Math.floor(op.count)));
       drawCards(state, p, n);
-      log(state, p, `${tag} ${ps.name} compra ${n} carta(s).`);
+      log(state, p, lg('manualDraw', `${tag} ${ps.name} compra ${n} carta(s).`, { player: ps.name, n }));
       return;
     }
     case 'move': {
@@ -5202,31 +5420,41 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
       }
       // De uma zona escondida para outra: o oponente só fica sabendo que "uma carta" se moveu.
       const hiddenMove = ['deck', 'hand', 'life'].includes(from) && ['hand', 'deckTop', 'deckBottom', 'life'].includes(op.to);
-      const where = `vai para ${ZONE_LABEL[op.to]}${owner !== p ? ` de ${os.name}` : ''}.`;
-      if (!hiddenMove) log(state, p, `${tag} ${def.name} ${where}`);
-      else if (owner !== p) log(state, p, `${tag} Uma carta ${where}`);
-      else logSecret(state, p, `${tag} Uma carta (${ZONE_FROM[from as 'deck' | 'hand' | 'life']}) ${where}`, `${tag} ${def.name} ${where}`);
+      const of = owner !== p;
+      const where = `vai para ${ZONE_LABEL[op.to]}${of ? ` de ${os.name}` : ''}.`;
+      // A zona de destino é uma parte traduzível (`log.zone.*`); "de X" quando a carta é do oponente.
+      const zone = { zone: { items: [{ key: `log.zone.${op.to}` }] } };
+      const base = { zone: ZONE_LABEL[op.to], ...(of ? { player: os.name } : {}) };
+      const shown = lg(of ? 'manualMoveOf' : 'manualMove', `${tag} ${def.name} ${where}`, { card: def.name, ...base }, zone);
+      if (!hiddenMove) log(state, p, shown);
+      else if (of) log(state, p, lg('manualMoveHiddenOf', `${tag} Uma carta ${where}`, base, zone));
+      else {
+        const src = from as 'deck' | 'hand' | 'life';
+        const fromKey = src === 'deck' ? 'manualMoveFromDeck' : src === 'hand' ? 'manualMoveFromHand' : 'manualMoveFromLife';
+        logSecret(state, p, lg(fromKey, `${tag} Uma carta (${ZONE_FROM[src]}) ${where}`, base, zone), shown);
+      }
       if (op.to === 'character' || op.to === 'stage') pushAbilities(state, op.uid, 'onPlay');
       return;
     }
     case 'ko': {
       const loc = fieldCard(op.uid);
       if (loc.zone !== 'character') throw new IllegalActionError('Só Personagens podem ser nocauteados.');
-      log(state, p, `${tag} K.O. em ${cardDef(state, op.uid).name}.`);
+      log(state, p, lg('manualKo', `${tag} K.O. em ${cardDef(state, op.uid).name}.`, { card: cardDef(state, op.uid).name }));
       koCharacter(state, op.uid, { force: true });
       return;
     }
     case 'setRested': {
       const loc = fieldCard(op.uid);
       loc.fc.rested = op.rested;
-      log(state, p, `${tag} ${cardDef(state, op.uid).name} fica ${op.rested ? 'virado' : 'ativo'}.`);
+      log(state, p, lg(op.rested ? 'manualRest' : 'manualSetActive', `${tag} ${cardDef(state, op.uid).name} fica ${op.rested ? 'virado' : 'ativo'}.`, { card: cardDef(state, op.uid).name }));
       return;
     }
     case 'power': {
       fieldCard(op.uid);
       const duration = op.duration === 'battle' && !state.battle ? 'turn' : op.duration;
       state.modifiers.push({ uid: op.uid, kind: 'power', amount: op.amount, duration });
-      log(state, p, `${tag} ${cardDef(state, op.uid).name}: ${op.amount > 0 ? '+' : ''}${op.amount} de poder.`);
+      const amount = `${op.amount > 0 ? '+' : ''}${op.amount}`;
+      log(state, p, lg('manualPower', `${tag} ${cardDef(state, op.uid).name}: ${amount} de poder.`, { card: cardDef(state, op.uid).name, amount }));
       return;
     }
     case 'donFromDeck': {
@@ -5234,12 +5462,12 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
       ps.donDeck -= n;
       if (op.rested) ps.donRested += n;
       else ps.donActive += n;
-      log(state, p, `${tag} +${n} DON!! ${op.rested ? 'virado' : 'ativo'}.`);
+      log(state, p, lg(op.rested ? 'manualDonFromDeckRested' : 'manualDonFromDeck', `${tag} +${n} DON!! ${op.rested ? 'virado' : 'ativo'}.`, { n }));
       return;
     }
     case 'donToDeck': {
       returnDonAndEmit(state, ps, Math.max(1, op.count));
-      log(state, p, `${tag} DON!! −${op.count}.`);
+      log(state, p, lg('manualDonToDeck', `${tag} DON!! −${op.count}.`, { n: op.count }));
       return;
     }
     case 'donGive': {
@@ -5249,7 +5477,13 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
       if (op.from === 'active') ps.donActive--;
       else ps.donRested--;
       loc.fc.don++;
-      log(state, p, `${tag} ${cardDef(state, op.uid).name} recebe 1 DON!! ${op.from === 'active' ? 'ativo' : 'virado'}.`);
+      log(
+        state,
+        p,
+        lg(op.from === 'active' ? 'manualGiveActiveDon' : 'manualGiveRestedDon', `${tag} ${cardDef(state, op.uid).name} recebe 1 DON!! ${op.from === 'active' ? 'ativo' : 'virado'}.`, {
+          card: cardDef(state, op.uid).name,
+        }),
+      );
       return;
     }
     case 'donSetState': {
@@ -5262,16 +5496,16 @@ function applyManualOp(state: GameState, p: PlayerId, op: ManualOp) {
         target.donRested -= n;
         target.donActive += n;
       }
-      log(state, p, `${tag} ${n} DON!! de ${target.name} fica ${op.rested ? 'virado' : 'ativo'}.`);
+      log(state, p, lg(op.rested ? 'manualDonRest' : 'manualDonSetActive', `${tag} ${n} DON!! de ${target.name} fica ${op.rested ? 'virado' : 'ativo'}.`, { n, player: target.name }));
       return;
     }
     case 'shuffle':
       shuffleInPlace(state, ps.deck);
-      log(state, p, `${tag} ${ps.name} embaralha o deck.`);
+      log(state, p, lg('manualShuffle', `${tag} ${ps.name} embaralha o deck.`, { player: ps.name }));
       return;
     case 'peek': {
       const n = Math.min(Math.max(1, Math.floor(op.count) || 1), ps.deck.length);
-      log(state, p, `${tag} ${ps.name} olha ${n} carta(s) do topo do deck.`);
+      log(state, p, lg('manualPeek', `${tag} ${ps.name} olha ${n} carta(s) do topo do deck.`, { player: ps.name, n }));
       return;
     }
   }
@@ -5404,11 +5638,11 @@ function removeFromField(state: GameState, victims: string[], action: RemovalAct
     const loc = locate(state, uid);
     if (loc?.zone !== 'character') return false;
     if (action === 'ko' && koProtected(state, uid, Boolean(ctx.inBattle), ctx.by, ctx.byPlayer)) {
-      log(state, loc.player, `${cardDef(state, uid).name} não pode ser nocauteado.`);
+      log(state, loc.player, lg('cannotBeKod', `${cardDef(state, uid).name} não pode ser nocauteado.`, { card: cardDef(state, uid).name }));
       return false;
     }
     if (!ctx.inBattle && removalBlocked(state, uid, ctx.byPlayer)) {
-      log(state, ctx.byPlayer ?? loc.player, `${cardDef(state, uid).name} não pode ser removido do campo.`);
+      log(state, ctx.byPlayer ?? loc.player, lg('cannotBeRemoved', `${cardDef(state, uid).name} não pode ser removido do campo.`, { card: cardDef(state, uid).name }));
       return false;
     }
     return true;
@@ -5447,19 +5681,27 @@ function performRemoval(state: GameState, victim: string, action: RemovalAction,
   const name = cardDef(state, victim).name;
   if (action === 'hand') {
     owner.hand.push(victim);
-    log(state, ctx.byPlayer ?? null, `${name} volta para a mão.`);
+    log(state, ctx.byPlayer ?? null, lg('returnsToHand', `${name} volta para a mão.`, { card: name }));
   } else if (action === 'deckBottom') {
     owner.deck.push(victim);
-    log(state, ctx.byPlayer ?? null, `${name} vai para o fundo do deck de ${owner.name}.`);
+    log(state, ctx.byPlayer ?? null, lg('toOwnerDeckBottom', `${name} vai para o fundo do deck de ${owner.name}.`, { card: name, player: owner.name }));
   } else if (action === 'trash') {
     owner.trash.push(victim);
-    log(state, ctx.byPlayer ?? null, `${name} vai para o descarte.`);
+    log(state, ctx.byPlayer ?? null, lg('goesToTrash', `${name} vai para o descarte.`, { card: name }));
   } else {
     if (ctx.bottom) owner.life.unshift(victim);
     else owner.life.push(victim);
     // "face-up": a carta fica pública na Vida (3-10-2-1).
     if (ctx.faceUp) (owner.lifeFaceUp ??= []).push(victim);
-    log(state, ctx.byPlayer ?? null, `${name} vai para o ${ctx.bottom ? 'fundo' : 'topo'} da Vida de ${owner.name}${ctx.faceUp ? ', virada para cima' : ''}.`);
+    log(
+      state,
+      ctx.byPlayer ?? null,
+      lg(
+        `toOwnerLife${ctx.bottom ? 'Bottom' : 'Top'}${ctx.faceUp ? 'FaceUp' : ''}`,
+        `${name} vai para o ${ctx.bottom ? 'fundo' : 'topo'} da Vida de ${owner.name}${ctx.faceUp ? ', virada para cima' : ''}.`,
+        { card: name, player: owner.name },
+      ),
+    );
   }
   emit(state, { kind: 'characterRemoved', player: owner.id, card: victim, byPlayer: ctx.byPlayer });
   if (action === 'hand') emit(state, { kind: 'returnedToHand', player: owner.id, card: victim, byPlayer: ctx.byPlayer });
@@ -5522,11 +5764,11 @@ function koCharacter(
   const loc = locate(state, uid);
   if (!loc || loc.zone !== 'character') return;
   if (!opts.force && koProtected(state, uid, Boolean(opts.inBattle), opts.by, opts.byPlayer)) {
-    log(state, loc.player, `${cardDef(state, uid).name} não pode ser nocauteado.`);
+    log(state, loc.player, lg('cannotBeKod', `${cardDef(state, uid).name} não pode ser nocauteado.`, { card: cardDef(state, uid).name }));
     return;
   }
   if (!opts.force && !opts.inBattle && removalBlocked(state, uid, opts.byPlayer)) {
-    log(state, loc.player, `${cardDef(state, uid).name} não pode ser removido do campo.`);
+    log(state, loc.player, lg('cannotBeRemoved', `${cardDef(state, uid).name} não pode ser removido do campo.`, { card: cardDef(state, uid).name }));
     return;
   }
   if (!opts.force && !opts.noReplace) {
@@ -5554,8 +5796,16 @@ function koCharacter(
   ps.donRested += loc.fc.don;
   removeCharacter(state, uid);
   ps.trash.push(uid);
-  log(state, loc.player, `${def.name} foi nocauteado (K.O.).`);
-  if (lapsed) log(state, loc.player, `${def.name} ${TIMING_TAG.onKO}: a condição não vale, o efeito não é ativado.`);
+  log(state, loc.player, lg('kod', `${def.name} foi nocauteado (K.O.).`, { card: def.name }));
+  if (lapsed) {
+    log(
+      state,
+      loc.player,
+      lg('onKoConditionFails', `${def.name} ${TIMING_TAG.onKO}: a condição não vale, o efeito não é ativado.`, { card: def.name, tag: TIMING_TAG.onKO! }, {
+        tag: { items: [{ key: 'log.tag.onKO' }] },
+      }),
+    );
+  }
   (state.koThisTurn ??= []).push(loc.player);
   emit(state, { kind: 'characterKO', player: loc.player, card: uid });
   if (opts.inBattle || opts.byPlayer !== undefined) {
@@ -5582,16 +5832,16 @@ function koStage(state: GameState, uid: string, ctx: { byPlayer: PlayerId; by: s
   if (loc?.zone !== 'stage') return;
   const name = cardDef(state, uid).name;
   if (koProtected(state, uid, false, ctx.by, ctx.byPlayer)) {
-    log(state, loc.player, `${name} (Stage) não pode ser nocauteado.`);
+    log(state, loc.player, lg('stageCannotBeKod', `${name} (Stage) não pode ser nocauteado.`, { card: name }));
     return;
   }
   if (removalBlocked(state, uid, ctx.byPlayer)) {
-    log(state, loc.player, `${name} (Stage) não pode ser removido do campo.`);
+    log(state, loc.player, lg('stageCannotBeRemoved', `${name} (Stage) não pode ser removido do campo.`, { card: name }));
     return;
   }
   detach(state, uid);
   state.players[loc.player].trash.push(uid);
-  log(state, ctx.byPlayer, `${name} (Stage) foi nocauteado.`);
+  log(state, ctx.byPlayer, lg('stageKod', `${name} (Stage) foi nocauteado.`, { card: name }));
 }
 
 /** Tira o Personagem do campo: perde os modificadores e os usos do turno (é uma carta nova, 3-1-6). */
@@ -5659,12 +5909,17 @@ function describeDonSource(state: GameState, ps: PlayerState, src: DonSource): s
 }
 
 /** Resumo das origens dos DON!! devolvidos, para o log ("2 ativos, 1 de Shanks"). */
-function summarizeDonSources(state: GameState, picked: DonSource[]): string {
+/** De onde saíram os DON!! devolvidos ("2 virados, 1 de Nami"), uma peça por origem. */
+function summarizeDonSources(state: GameState, picked: DonSource[]): Prompt[] {
   const counts = new Map<DonSource, number>();
   for (const src of picked) counts.set(src, (counts.get(src) ?? 0) + 1);
-  return [...counts]
-    .map(([src, k]) => (src === 'rested' ? `${k} virado${k > 1 ? 's' : ''}` : src === 'active' ? `${k} ativo${k > 1 ? 's' : ''}` : `${k} de ${cardDef(state, src).name}`))
-    .join(', ');
+  return [...counts].map(([src, n]) =>
+    src === 'rested'
+      ? lg('donFromRested', `${n} virado${n > 1 ? 's' : ''}`, { n })
+      : src === 'active'
+        ? lg('donFromActive', `${n} ativo${n > 1 ? 's' : ''}`, { n })
+        : lg('donFromCard', `${n} de ${cardDef(state, src).name}`, { n, card: cardDef(state, src).name }),
+  );
 }
 
 /** Tira a carta do topo (ou do fundo) da Vida; se estava virada para cima, deixa de estar. */
@@ -5681,7 +5936,7 @@ function lifeToHandCard(state: GameState, player: PlayerId, uid: string) {
   if (faceUp) removeFrom(ps.lifeFaceUp!, uid);
   if (faceUp && leaderRule(state, player, 'faceUpLifeToDeck')) {
     ps.deck.push(uid);
-    log(state, player, `${cardDef(state, uid).name} (Vida virada para cima) vai para o fundo do deck.`);
+    log(state, player, lg('faceUpLifeToBottom', `${cardDef(state, uid).name} (Vida virada para cima) vai para o fundo do deck.`, { card: cardDef(state, uid).name }));
   } else {
     ps.hand.push(uid);
     emit(state, { kind: 'lifeToHand', player, card: uid });
@@ -5714,33 +5969,58 @@ function checkDefeat(state: GameState) {
   }
   if (winners.length === 1) {
     const w = state.players[winners[0]];
-    gameOver(state, w.id, `${w.name} ficou sem cartas no deck e vence pela regra do Líder.`);
+    gameOver(state, w.id, lg('winDeckOutLeaderRule', `${w.name} ficou sem cartas no deck e vence pela regra do Líder.`, { player: w.name }));
   } else if (winners.length === 2) {
-    gameOver(state, null, 'Os dois ficaram sem cartas no deck e vencem pela regra do Líder.');
-  } else defeat(state, losers, (ps) => `${ps.name} ficou sem cartas no deck.`, 'Os dois ficaram sem cartas no deck.');
+    gameOver(state, null, lg('winBothDeckOutLeaderRule', 'Os dois ficaram sem cartas no deck e vencem pela regra do Líder.'));
+  } else defeat(
+      state,
+      losers,
+      (ps) => lg('winDeckOut', `${ps.name} ficou sem cartas no deck.`, { player: ps.name }),
+      lg('winBothDeckOut', 'Os dois ficaram sem cartas no deck.'),
+    );
 }
 
 /** Aplica a derrota de `losers`: um perde e o outro vence; os dois juntos, empate (9-2-1). */
-function defeat(state: GameState, losers: PlayerId[], reason: (ps: PlayerState) => string, both: string) {
+function defeat(state: GameState, losers: PlayerId[], reason: (ps: PlayerState) => Prompt, both: Prompt) {
   if (losers.length === 2) gameOver(state, null, both);
   else if (losers.length === 1) gameOver(state, opponent(losers[0]), reason(state.players[losers[0]]));
 }
 
 /** Fim da partida. `winner` null: empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
-function gameOver(state: GameState, winner: PlayerId | null, reason: string) {
+function gameOver(state: GameState, winner: PlayerId | null, reason: Prompt) {
   state.phase = 'gameover';
   state.winner = winner;
-  state.winReason = reason;
+  state.winReason = reason.text;
+  state.winReasonKey = reason.key;
+  if (reason.params) state.winReasonParams = reason.params;
   state.pending = null;
-  if (winner === null) log(state, null, `Fim de jogo: empate! ${reason}`);
-  else log(state, winner, `Fim de jogo: ${state.players[winner].name} venceu! ${reason}`);
+  // O motivo entra na linha do log como parte traduzível.
+  const parts = { reason: { items: [msgOf(reason)] } };
+  if (winner === null) log(state, null, lg('gameOverDraw', `Fim de jogo: empate! ${reason.text}`, { reason: reason.text }, parts));
+  else {
+    const player = state.players[winner].name;
+    log(state, winner, lg('gameOverWin', `Fim de jogo: ${player} venceu! ${reason.text}`, { player, reason: reason.text }, parts));
+  }
 }
 
-function log(state: GameState, player: PlayerId | null, text: string) {
-  state.log.push({ turn: state.turn, player, text });
+function log(state: GameState, player: PlayerId | null, m: Prompt) {
+  state.log.push({ turn: state.turn, player, text: m.text, ...msgOf(m) });
 }
 
-/** Linha do log com cartas que só `player` vê; o oponente recebe `text` (no online). */
-function logSecret(state: GameState, player: PlayerId, text: string, secret: string) {
-  state.log.push({ turn: state.turn, player, text, secret });
+/**
+ * Linha do log com cartas que só `player` vê; o oponente recebe `text` (no online). A chave e os
+ * parâmetros seguem a mesma regra: os de `secret` (`secretKey`…) só chegam ao dono (view.ts).
+ */
+function logSecret(state: GameState, player: PlayerId, m: Prompt, secret: Prompt) {
+  const s = msgOf(secret);
+  state.log.push({
+    turn: state.turn,
+    player,
+    text: m.text,
+    ...msgOf(m),
+    secret: secret.text,
+    secretKey: s.key,
+    ...(s.params ? { secretParams: s.params } : {}),
+    ...(s.parts ? { secretParts: s.parts } : {}),
+  });
 }

@@ -1,6 +1,7 @@
 import { type Action, cardDef, type GameState, type PlayerId } from '@gumgum/engine';
 import { Fragment, type ReactNode } from 'react';
-import { useT } from '../i18n';
+import { winReasonText } from '../game/engineText';
+import { useT, useTryT } from '../i18n';
 import { CardView } from './CardView';
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
 export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra }: Props) {
   const t = useT();
+  const tryT = useTryT();
   const me: PlayerId = human ?? state.winner ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
   const won = state.winner === me;
@@ -126,7 +128,7 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
           <dt>{t('result.cardsPlayed')}</dt>
           <dd>{played}</dd>
         </dl>
-        {state.winReason && <p className="muted small result-reason">{state.winReason}</p>}
+        {state.winReason && <p className="muted small result-reason">{winReasonText(tryT, state)}</p>}
         {extra}
 
         <div className="result-actions">

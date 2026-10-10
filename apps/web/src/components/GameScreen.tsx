@@ -13,6 +13,8 @@ import {
   HIDDEN_CARD,
   legalActions,
   locate,
+  type MsgList,
+  type MsgParts,
   type Pending,
   type PlayerId,
   translateToPt,
@@ -26,6 +28,7 @@ import { describeReplayAction } from '../game/replayCue';
 import { type GameSetup, useGame } from '../game/useGame';
 import { audio } from '../audio';
 import { type Translate, useT, useTryT } from '../i18n';
+import { listText, logText, msgText } from '../game/engineText';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
@@ -52,8 +55,23 @@ import {
   seriesAfter,
 } from './Online';
 
-/** Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen). */
+/**
+ * Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen): pela chave do motor
+ * (`LogEntry.key`); linhas sem chave (estados salvos antes das chaves) pelo texto em português.
+ */
+const NOTICE_KEYS = new Set([
+  'log.conditionFails',
+  'log.lapsedCondition',
+  'log.lapsedConditionTagged',
+  'log.onKoConditionFails',
+  'log.cannotBlockCannotRest',
+  'log.cannotBlock',
+  'log.cannotBeRestedActive',
+  'log.cannotBeRestedByOpponent',
+  'log.retarget',
+]);
 const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]|o ataque passa a mirar/;
+const isNotice = (e: { key?: string; text: string }) => (e.key ? NOTICE_KEYS.has(e.key) : NOTICE_RE.test(e.text));
 
 /**
  * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
@@ -85,9 +103,11 @@ type TryT = ReturnType<typeof useTryT>;
 interface Keyed {
   promptKey?: string;
   promptParams?: Record<string, string | number>;
+  promptParts?: MsgParts;
 }
 interface KeyedOptions {
   optionKeys?: (string | null)[];
+  optionParts?: (MsgList | null)[];
 }
 interface KeyedLabel {
   labelKey?: string;
@@ -100,7 +120,7 @@ interface KeyedLabel {
  */
 function promptText(tryT: TryT, pending: { prompt: string }): string {
   const p = pending as typeof pending & Keyed & { cannot?: true };
-  const text = tryT(p.promptKey, p.promptParams);
+  const text = msgText(tryT, p.promptKey, p.promptParams, p.promptParts);
   if (text === undefined) return p.prompt;
   // `confirm` com `cannot`: o motor junta "(Não dá para pagar o custo.)" ao texto, mas não à chave.
   return p.cannot ? `${text} ${tryT('engine.cannotPayCost') ?? ''}`.trim() : text;
@@ -356,9 +376,9 @@ function Table({
     if (noticeSeen.current > state.log.length) noticeSeen.current = 0; // desfazer / replay
     const fresh = state.log.slice(noticeSeen.current);
     noticeSeen.current = state.log.length;
-    const hit = [...fresh].reverse().find((e) => NOTICE_RE.test(e.text));
+    const hit = [...fresh].reverse().find(isNotice);
     if (!hit) return;
-    setNotice(hit.text);
+    setNotice(logText(tryT, hit));
     const t = setTimeout(() => setNotice(null), 6000);
     return () => clearTimeout(t);
   }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2190,7 +2210,7 @@ function Prompt(props: {
     }
     case 'option': {
       // Rótulos das opções: a chave do motor (`optionKeys`), quando há; senão o texto da carta (traduzido em pt-BR).
-      const optionKeys = (pending as typeof pending & KeyedOptions).optionKeys;
+      const { optionKeys, optionParts } = pending as typeof pending & KeyedOptions;
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
@@ -2203,7 +2223,8 @@ function Prompt(props: {
                   className={`btn${index === 0 ? ' primary' : ''}`}
                   onClick={() => onDispatch({ type: 'option', player: human, index })}
                 >
-                  {tryT(optionKeys?.[index]) ??
+                  {(optionParts?.[index] ? listText(tryT, optionParts[index]!) : undefined) ??
+                    tryT(optionKeys?.[index]) ??
                     (!pending.order && !pending.don && locale === 'pt-BR' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label)
                       ? translateToPt(label).text
                       : label)}
@@ -2505,6 +2526,7 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
   const [hover, setHover] = useState<{ def: CardDef; anchor: HTMLElement } | null>(null);
   const names = useMemo(() => logCardNames(state.defs), [state.defs]);
+  const tryT = useTryT();
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
   }, [state.log.length]);
@@ -2522,7 +2544,7 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
             ].join(' ')}
           >
             <LogText
-              text={e.secret ?? e.text}
+              text={logText(tryT, e)}
               names={names}
               onCard={(name) => {
                 const def = resolveLogCard(state, names, name, e.player);
