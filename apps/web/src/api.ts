@@ -237,6 +237,8 @@ export const api = {
     act: (roomId: string, t: string, seq: number, action: Action) =>
       send<{ ok: true; actionCount: number }>('POST', `/api/online/rooms/${roomId}/action`, { t, seq, action }),
     emote: (roomId: string, t: string, emote: string) => send<void>('POST', `/api/online/rooms/${roomId}/emote`, { t, emote }),
+    /** Mensagem do chat da partida (o servidor censura palavrões antes de repassar). */
+    chat: (roomId: string, t: string, text: string) => send<void>('POST', `/api/online/rooms/${roomId}/chat`, { t, text }),
     /** Lançamento do dado do sorteio (velocidade em larguras/alturas da mesa por segundo). */
     dice: (roomId: string, t: string, vx: number, vy: number) => send<void>('POST', `/api/online/rooms/${roomId}/dice`, { t, vx, vy }),
     rematch: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/rematch`, { t }),

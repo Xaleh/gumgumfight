@@ -6354,19 +6354,105 @@ tr.clickable:hover td {
 .emote-bar {
   position: relative;
 }
-.emote-list {
+.chat-btn {
+  position: relative;
+}
+.chat-unread {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.3);
+}
+/* Painel do chat: ao lado do botão, cabe numa tela de celular. */
+.chat-panel {
   position: absolute;
   left: 46px;
   top: 0;
-  display: grid;
-  grid-template-columns: repeat(2, max-content);
-  gap: 6px;
+  width: min(320px, calc(100vw - 70px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   background: var(--panel);
+  color: var(--text);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 8px;
   box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.25);
   z-index: 80;
+  animation: pop-in 0.15s;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-head strong {
+  flex: 1;
+}
+.chat-head .btn.on {
+  background: var(--panel2);
+  border-color: var(--accent);
+}
+.emote-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.emote-list .btn {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-log {
+  max-height: min(180px, 30vh);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.chat-msg.mine .chat-who {
+  color: var(--accent);
+}
+.chat-who {
+  font-weight: 800;
+}
+.chat-who::after {
+  content: ':';
+}
+.chat-form {
+  display: flex;
+  gap: 6px;
+}
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+}
+.chat-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .emote-bubble {
   position: absolute;
@@ -6392,6 +6478,17 @@ tr.clickable:hover td {
   bottom: calc(var(--ch) * 1.1 + 48px);
   transform: translateX(-50%);
   border-bottom-left-radius: 4px;
+}
+.emote-bubble.text {
+  font-weight: 600;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.emote-bubble.text.theirs {
+  top: 100px;
+}
+.emote-bubble.text.mine {
+  bottom: calc(var(--ch) * 1.1 + 96px);
 }
 
 .online-result {
