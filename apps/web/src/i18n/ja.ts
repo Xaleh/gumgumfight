@@ -1153,6 +1153,7 @@ export default {
   'game.detachOneDon': '− ドン!!1枚',
   'game.detachDonTitle': 'このターンに付与してまだ使っていない（カードがアタックするか効果を使うまで）ドン!!を1枚、コストエリアに戻します',
   'game.donCanReturn': '{n|#枚戻せる}',
+  'game.tapCardToRead': 'カードをタップすると詳細を読めます。',
   // ==== /game ====
 
 
@@ -1869,6 +1870,8 @@ export default {
   'log.manualDonSetActive': '（手動）{player}のドン!!{n}枚をアクティブに。',
   'log.manualShuffle': '（手動）{player}はデッキをシャッフルします。',
   'log.manualPeek': '（手動）{player}はデッキの上から{n|#枚}を見ます。',
+  'log.looksOpponentDeckTop': '{player}が{opponent}のデッキの一番上のカードを見ました。',
+  'log.looksOpponentDeckTopCard': '{player}が{opponent}のデッキの一番上の{card}を見ました。',
   // ==== /log ====
 
 

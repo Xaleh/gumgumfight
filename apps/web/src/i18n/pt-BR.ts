@@ -1153,6 +1153,7 @@ const ptBR = {
   'game.detachOneDon': '− 1 DON!!',
   'game.detachDonTitle': 'Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (até a carta atacar ou usar um efeito)',
   'game.donCanReturn': '{n|# pode voltar|# podem voltar}',
+  'game.tapCardToRead': 'Toque na carta para ler.',
   // ==== /game ====
 
 
@@ -1871,6 +1872,8 @@ const ptBR = {
   'log.manualDonSetActive': '(manual) {n} DON!! de {player} fica ativo.',
   'log.manualShuffle': '(manual) {player} embaralha o deck.',
   'log.manualPeek': '(manual) {player} olha {n|# carta|# cartas} do topo do deck.',
+  'log.looksOpponentDeckTop': '{player} olha a carta do topo do deck de {opponent}.',
+  'log.looksOpponentDeckTopCard': '{player} olha {card} no topo do deck de {opponent}.',
   // ==== /log ====
 
 

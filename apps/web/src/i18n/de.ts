@@ -1153,6 +1153,7 @@ export default {
   'game.detachOneDon': '− 1 DON!!',
   'game.detachDonTitle': 'Legt 1 DON!!, das in diesem Zug angelegt und noch nicht genutzt wurde (bis die Karte angreift oder einen Effekt nutzt), zurück in den Kostenbereich',
   'game.donCanReturn': '{n|# kann zurück|# können zurück}',
+  'game.tapCardToRead': 'Tippe auf die Karte, um sie zu lesen.',
   // ==== /game ====
 
 
@@ -1869,6 +1870,8 @@ export default {
   'log.manualDonSetActive': '(manuell) {n} DON!! von {player} aktiv gesetzt.',
   'log.manualShuffle': '(manuell) {player} mischt sein Deck.',
   'log.manualPeek': '(manuell) {player} sieht sich {n|die oberste Karte|die obersten # Karten} seines Decks an.',
+  'log.looksOpponentDeckTop': '{player} sieht sich die oberste Karte von {opponent}s Deck an.',
+  'log.looksOpponentDeckTopCard': '{player} sieht {card} oben auf {opponent}s Deck.',
   // ==== /log ====
 
 

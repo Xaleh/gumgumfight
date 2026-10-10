@@ -1153,6 +1153,7 @@ export default {
   'game.detachOneDon': '− 1 DON!!',
   'game.detachDonTitle': 'Renvoie dans la zone de coût 1 DON!! attachée ce tour et pas encore utilisée (jusqu’à ce que la carte attaque ou utilise un effet)',
   'game.donCanReturn': '{n|# peut revenir|# peuvent revenir}',
+  'game.tapCardToRead': 'Touchez la carte pour la lire.',
   // ==== /game ====
 
 
@@ -1869,6 +1870,8 @@ export default {
   'log.manualDonSetActive': '(manuel) {n} DON!! de {player} redressée(s).',
   'log.manualShuffle': '(manuel) {player} mélange son deck.',
   'log.manualPeek': '(manuel) {player} regarde {n|la carte du dessus|les # cartes du dessus} de son deck.',
+  'log.looksOpponentDeckTop': '{player} regarde la carte du dessus du deck de {opponent}.',
+  'log.looksOpponentDeckTopCard': '{player} regarde {card} sur le dessus du deck de {opponent}.',
   // ==== /log ====
 
 

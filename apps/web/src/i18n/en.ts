@@ -1153,6 +1153,7 @@ export default {
   'game.detachOneDon': '− 1 DON!!',
   'game.detachDonTitle': 'Returns to the cost area 1 DON!! attached this turn and not yet used (until the card attacks or uses an effect)',
   'game.donCanReturn': '{n|# can return|# can return}',
+  'game.tapCardToRead': 'Tap the card to read it.',
   // ==== /game ====
 
 
@@ -1869,6 +1870,8 @@ export default {
   'log.manualDonSetActive': "(manual) {n} of {player}'s DON!! set as active.",
   'log.manualShuffle': '(manual) {player} shuffles their deck.',
   'log.manualPeek': '(manual) {player} looks at the top {n|card|# cards} of their deck.',
+  'log.looksOpponentDeckTop': '{player} looks at the top card of {opponent}\'s deck.',
+  'log.looksOpponentDeckTopCard': '{player} looks at {card} on top of {opponent}\'s deck.',
   // ==== /log ====
 
 

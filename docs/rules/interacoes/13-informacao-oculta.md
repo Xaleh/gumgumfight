@@ -43,6 +43,7 @@ Princípio: **toda decisão cuja existência depende de uma área secreta abre s
 - Revelação obrigatória (CR 11-2-1): a carta buscada do deck para a mão precisa aparecer para o oponente (no log e/ou animação), e a mão comprada não. O mesmo vale para a carta da mão posta na Vida por um efeito com exigência ("Reveal up to 1 Character card with a cost of 5 from your hand and add it to the top of your Life cards"): o nome sai no log público (DV-33). Sem exigência ("add up to 1 card from your hand …") ela vai escondida, como a carta que vai do deck para a Vida.
 - Ordem das cartas devolvidas ao fundo do deck (CR 3-1-8): o oponente não deve ver a ordem.
 - Cartas "olhadas" (CR 11-3-1) só aparecem para quem usou o efeito; espectador comum segue a visão pública; o perfil Streamer vê tudo.
+  - Feito para "Look at 1 card from the top of your opponent's deck" (Katakuri OP11-062): a pergunta de OK (`pending: option`) leva a carta em `shown`, visível só para quem olha (`visibleCards`); o histórico registra o nome só para ele (`secret`) e, para os demais, só que uma carta do topo foi olhada. Teste em `packages/engine/test/look-opponent-top.test.ts`.
 
 ## No motor
 

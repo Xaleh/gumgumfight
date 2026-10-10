@@ -146,7 +146,7 @@ export function describeReplayAction(state: GameState, a: Action, locale: Locale
     case 'option': {
       if (p?.kind !== 'option') return cue(tr('replay.optionN', { n: a.index + 1 }));
       const label = p.options[a.index];
-      return cue(label !== undefined ? optionLabel(label, locale, !p.order && !p.don) : tr('replay.optionN', { n: a.index + 1 }), [], p.prompt);
+      return cue(label !== undefined ? optionLabel(label, locale, !p.order && !p.don) : tr('replay.optionN', { n: a.index + 1 }), cards(p.shown ?? []), p.prompt);
     }
   }
 }

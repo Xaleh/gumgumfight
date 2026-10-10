@@ -1209,6 +1209,7 @@ export type Pending =
    * de DON!!: cada opção é a origem correspondente. `optionKeys` (paralelo a `options`) traz a
    * chave de tradução de cada opção fixa (topo/fundo, sim/não…), resolvida com `promptParams`;
    * `null` quando a opção é texto da carta (ou nome de carta, número…) e se mostra como está.
+   * `shown`: cartas que só quem responde vê junto da pergunta (ex.: o topo do deck do oponente, olhado por efeito).
    */
   | {
       kind: 'option';
@@ -1224,6 +1225,7 @@ export type Pending =
       optionParts?: (MsgList | null)[];
       order?: number[];
       don?: DonSource[];
+      shown?: string[];
     }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };

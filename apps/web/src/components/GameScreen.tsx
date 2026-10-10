@@ -2209,13 +2209,22 @@ function Prompt(props: {
       );
     }
     case 'option': {
+      // Cartas que a pergunta mostra (ex.: o topo do deck do oponente): a carta inteira, e toque para ler.
       // Rótulos das opções: a chave do motor (`optionKeys`), quando há; senão o texto da carta (traduzido em pt-BR).
       const { optionKeys, optionParts } = pending as typeof pending & KeyedOptions;
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
+            {pending.shown?.length ? (
+              <div className="modal-feature">
+                {pending.shown.map((uid) => (
+                  <CardView key={uid} state={state} uid={uid} onClick={() => props.onCard(uid)} />
+                ))}
+              </div>
+            ) : null}
             <h3>{prompt}</h3>
+            {pending.shown?.length ? <p className="muted small">{t('game.tapCardToRead')}</p> : null}
             <div className="btn-col">
               {pending.options.map((label, index) => (
                 <button
