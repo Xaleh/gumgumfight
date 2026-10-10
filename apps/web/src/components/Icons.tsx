@@ -96,6 +96,15 @@ const PATHS = {
       <line x1="4" x2="20" y1="18" y2="18" />
     </>
   ),
+  /** Histórico da partida: folha com linhas de texto. */
+  history: (
+    <>
+      <path d="M6 3h9l4 4v14H6z" />
+      <polyline points="15 3 15 7 19 7" />
+      <line x1="9" x2="15" y1="12" y2="12" />
+      <line x1="9" x2="15" y1="16" y2="16" />
+    </>
+  ),
   close: (
     <>
       <path d="M18 6 6 18" />

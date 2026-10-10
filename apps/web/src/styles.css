@@ -1902,6 +1902,11 @@ input[type='number'] {
   gap: 6px;
   z-index: 5;
 }
+.corner-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .round-btn {
   width: 40px;
   height: 40px;
@@ -1912,6 +1917,28 @@ input[type='number'] {
   place-items: center;
   cursor: pointer;
   box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.3);
+}
+/* Atalho do histórico no celular: ao lado do menu, com a conta de linhas novas desde a última leitura. */
+.round-btn.log-btn {
+  position: relative;
+  color: #fff;
+}
+.corner-badge {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--mat-1);
+  pointer-events: none;
 }
 .burger,
 .burger::before,
@@ -4177,6 +4204,32 @@ button.hint-pill {
   border-radius: 6px;
   margin-inline: -4px;
   padding-inline: 4px;
+}
+/* Nome de carta no histórico: toque/clique amplia a carta; com mouse, passar por cima mostra a carta ao lado. */
+.log-card {
+  display: inline;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.log-card:hover,
+.log-card:focus-visible {
+  text-decoration-style: solid;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  outline: none;
+}
+/* Carta ampliada a partir do histórico: acima do painel do histórico e do resumo de fim de jogo. */
+.zoom-backdrop.log-zoom {
+  z-index: 90;
 }
 
 /* ------------------------------------------------------------------ replay: controles */
