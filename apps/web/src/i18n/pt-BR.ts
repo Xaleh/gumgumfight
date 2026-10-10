@@ -422,11 +422,6 @@ const ptBR = {
 
   // ==== reports ====
   // ---- lista de relatos ----
-  'reports.queue.private': 'Sala privada',
-  'reports.queue.casual': 'Casual',
-  'reports.queue.ranked': 'Ranqueada',
-  'reports.queue.bot': 'Treino',
-  'reports.queue.tournament': 'Torneio',
   'reports.none': 'Nenhum relato.',
   'reports.resolved': 'Resolvido',
   'reports.open': 'Aberto',

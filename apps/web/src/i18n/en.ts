@@ -423,11 +423,6 @@ export default {
 
   // ==== reports ====
   // ---- report list ----
-  'reports.queue.private': 'Private room',
-  'reports.queue.casual': 'Casual',
-  'reports.queue.ranked': 'Ranked',
-  'reports.queue.bot': 'Practice',
-  'reports.queue.tournament': 'Tournament',
   'reports.none': 'No reports.',
   'reports.resolved': 'Resolved',
   'reports.open': 'Open',

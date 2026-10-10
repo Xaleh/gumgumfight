@@ -3,19 +3,11 @@ import { useEffect, useState } from 'react';
 import { api, type FormatId, type MatchReport, type MatchSummary, type RoomQueue } from '../api';
 import { setupFromReplay } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
-import { type MessageKey, useLocale, useT } from '../i18n';
+import { useLocale, useT } from '../i18n';
 import { fmtDateTime } from '../i18n/format';
+import { QUEUE_KEY } from './HomeBlocks';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Nome de cada fila na lista de relatos: chave do dicionário. */
-const QUEUE_LABEL: Record<RoomQueue, MessageKey> = {
-  private: 'reports.queue.private',
-  casual: 'reports.queue.casual',
-  ranked: 'reports.queue.ranked',
-  bot: 'reports.queue.bot',
-  tournament: 'reports.queue.tournament',
-};
 
 /** Abre o replay gravado de uma partida na mesa. */
 export const openReplay = (statsMatchId: number, onReplay: (setup: GameSetup) => void) =>
@@ -86,7 +78,7 @@ export function ReportList({
     <div className="report-list">
       {reports.map((r) => {
         const m = r.match;
-        const queueKey = m ? QUEUE_LABEL[m.queue as RoomQueue] : undefined;
+        const queueKey = m ? QUEUE_KEY[m.queue as RoomQueue] : undefined;
         return (
           <article key={r.id} className={['report-card', r.resolvedAt ? 'resolved' : ''].join(' ')}>
             <header className="report-head">

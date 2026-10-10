@@ -57,18 +57,6 @@ export function useNow(ms: number): number {
   return now;
 }
 
-/**
- * Nome de cada tipo de sala, em português (ainda usado por Reports.tsx).
- * Para mostrar no idioma em vigor, use `t(QUEUE_KEY[queue])`.
- */
-export const QUEUE_LABEL: Record<RoomQueue, string> = {
-  private: 'Sala privada',
-  casual: 'Casual',
-  ranked: 'Ranqueada',
-  bot: 'Treino',
-  tournament: 'Torneio',
-};
-
 /** Chave do dicionário de cada tipo de sala (mostrar com `t(QUEUE_KEY[queue])`). */
 export const QUEUE_KEY: Record<RoomQueue, MessageKey> = {
   private: 'home.queue.private',
