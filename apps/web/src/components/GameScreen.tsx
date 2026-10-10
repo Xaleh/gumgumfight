@@ -2,6 +2,7 @@ import {
   type Action,
   actingPlayer,
   cancelAllowed,
+  type CardDef,
   cardDef,
   cardStatuses,
   counterTargets,
@@ -18,6 +19,7 @@ import {
   zoneOf,
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
@@ -25,11 +27,12 @@ import { type GameSetup, useGame } from '../game/useGame';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
-import { CardTextInfo } from './CardInfo';
+import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
 import { CardView, type Highlight } from './CardView';
 import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
+import { Icon } from './Icons';
 import { useBoardMotion } from './Motion';
 import { ReplayBar, type ReplayControls } from './ReplayBar';
 import { ReplayCue } from './ReplayCue';
@@ -372,6 +375,17 @@ function Table({
   const [showBotHand, setShowBotHand] = useState(kind === 'replay' || watching);
   const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
+  /** Carta citada no histórico, ampliada (toque/clique no nome). */
+  const [logCard, setLogCard] = useState<CardDef | null>(null);
+  /**
+   * Linhas do histórico já vistas: o botão de histórico do celular mostra quantas chegaram desde a última
+   * vez que o painel foi aberto (no desktop o histórico fica sempre à vista no painel lateral).
+   */
+  const [logSeen, setLogSeen] = useState(state.log.length);
+  useEffect(() => {
+    if (sheet === 'log' || logSeen > state.log.length) setLogSeen(state.log.length); // desfazer / replay encolhem o log
+  }, [sheet, state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const logNew = sheet === 'log' ? 0 : Math.max(0, state.log.length - logSeen);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
   const [handOrder, setHandOrder] = useState<string[]>([]);
   /** Carta da mão erguida sob o dedo. */
@@ -914,9 +928,17 @@ function Table({
 
   const corner = (
     <>
-      <button className="round-btn" onClick={() => setSheet('menu')} aria-label="Menu da partida">
-        <span className="burger" />
-      </button>
+      <div className="corner-row">
+        <button className="round-btn" onClick={() => setSheet('menu')} aria-label="Menu da partida">
+          <span className="burger" />
+        </button>
+        {!wide && (
+          <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label="Histórico da partida" title="Histórico">
+            <Icon name="history" size={20} />
+            {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
+          </button>
+        )}
+      </div>
       {online && !watching && <ChatBar online={online} />}
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
       {online && !watching && <SpectatorCount online={online} />}
@@ -1217,7 +1239,7 @@ function Table({
 
         {sheet === 'log' && (
           <SheetFrame title="Histórico" onClose={() => setSheet(null)}>
-            <LogPanel state={state} fresh={replay?.logFrom} />
+            <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
           </SheetFrame>
         )}
 
@@ -1234,6 +1256,8 @@ function Table({
             </div>
           </SheetFrame>
         )}
+
+        {logCard && <StaticCardZoom card={logCard} className="log-zoom" onClose={() => setLogCard(null)} />}
 
         {state.phase === 'gameover' && showResult && (
           <GameResult
@@ -1298,7 +1322,7 @@ function Table({
             )}
           </div>
           <CardDetail state={state} uid={detailUid} />
-          <LogPanel state={state} fresh={replay?.logFrom} />
+          <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
         </aside>
       )}
 
@@ -2385,29 +2409,142 @@ function SheetFrame({ title, onClose, children }: { title: string; onClose: () =
   );
 }
 
-/** Histórico da partida. `fresh`: no replay, as linhas da ação atual (desta em diante) ficam destacadas. */
-function LogPanel({ state, fresh }: { state: GameState; fresh?: number | null }) {
+/**
+ * Histórico da partida. `fresh`: no replay, as linhas da ação atual (desta em diante) ficam destacadas.
+ * Os nomes de cartas viram links: toque/clique abre a carta ampliada (`onCardZoom`); com mouse, passar por cima mostra a carta ao lado.
+ */
+function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: number | null; onCardZoom?: (def: CardDef) => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
+  const [hover, setHover] = useState<{ def: CardDef; anchor: HTMLElement } | null>(null);
+  const names = useMemo(() => logCardNames(state.defs), [state.defs]);
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
   }, [state.log.length]);
   return (
-    <div className="log" ref={ref}>
-      {state.log.map((e, i) => (
-        <div
-          key={i}
-          className={[
-            'log-line',
-            e.player === null ? '' : `p${e.player}`,
-            e.text.startsWith('—') ? 'turn' : '',
-            fresh != null && i >= fresh ? 'fresh' : '',
-          ].join(' ')}
-        >
-          {e.secret ?? e.text}
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="log" ref={ref} onScroll={() => setHover(null)}>
+        {state.log.map((e, i) => (
+          <div
+            key={i}
+            className={[
+              'log-line',
+              e.player === null ? '' : `p${e.player}`,
+              e.text.startsWith('—') ? 'turn' : '',
+              fresh != null && i >= fresh ? 'fresh' : '',
+            ].join(' ')}
+          >
+            <LogText
+              text={e.secret ?? e.text}
+              names={names}
+              onCard={(name) => {
+                const def = resolveLogCard(state, names, name, e.player);
+                if (!def) return;
+                setHover(null);
+                onCardZoom?.(def);
+              }}
+              onHover={
+                canHover
+                  ? (name, el) => {
+                      const def = el && resolveLogCard(state, names, name, e.player);
+                      setHover(def && el ? { def, anchor: el } : null);
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        ))}
+      </div>
+      {/* No body: o painel lateral tem backdrop-filter, que prenderia um elemento fixo dentro dele. */}
+      {canHover && hover && createPortal(<CardHoverPreview card={hover.def} anchor={hover.anchor} />, document.body)}
+    </>
   );
+}
+
+interface LogNames {
+  /** Todos os nomes de carta da partida, do maior para o menor, como alternativas de uma regex. */
+  regex: RegExp | null;
+  /** Nome → ids das cartas com esse nome (reimpressões com o mesmo nome). */
+  byName: Map<string, string[]>;
+}
+
+/** Nomes das cartas conhecidas da partida, para achá-los nas linhas do histórico. */
+function logCardNames(defs: GameState['defs']): LogNames {
+  const byName = new Map<string, string[]>();
+  for (const def of Object.values(defs)) {
+    if (def.id === HIDDEN_CARD || !def.name) continue;
+    const ids = byName.get(def.name);
+    if (ids) ids.push(def.id);
+    else byName.set(def.name, [def.id]);
+  }
+  // Os nomes maiores primeiro: "Monkey.D.Luffy" antes de "Luffy".
+  const names = [...byName.keys()].sort((a, b) => b.length - a.length);
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  // Só nomes inteiros: nada de letra ou número colado antes ou depois.
+  const regex = names.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(${escaped.join('|')})(?![\\p{L}\\p{N}])`, 'gu') : null;
+  return { regex, byName };
+}
+
+/** Onde a carta está vale mais que de quem é: líder antes de personagem/stage, depois descarte, depois o resto. */
+const LOG_ZONE_RANK: Record<string, number> = { leader: 0, character: 1, stage: 1, trash: 2 };
+
+/**
+ * A carta por trás de um nome do histórico. Com homônimas (líder e personagem de mesmo nome, reimpressões),
+ * a que está à vista na mesa; em empate, a de `player` (quem fez a jogada).
+ */
+function resolveLogCard(state: GameState, names: LogNames, name: string, player: PlayerId | null): CardDef | null {
+  const ids = names.byName.get(name);
+  if (!ids?.length) return null;
+  let best = ids[0];
+  if (ids.length > 1) {
+    let bestScore = Infinity;
+    for (const c of Object.values(state.cards)) {
+      if (!ids.includes(c.cardId)) continue;
+      const score = (LOG_ZONE_RANK[zoneOf(state, c.uid) ?? ''] ?? 3) * 2 + (c.owner === player ? 0 : 1);
+      if (score < bestScore) {
+        bestScore = score;
+        best = c.cardId;
+      }
+    }
+  }
+  return state.defs[best] ?? null;
+}
+
+/** Linha do histórico com os nomes de carta como botões. */
+function LogText({
+  text,
+  names,
+  onCard,
+  onHover,
+}: {
+  text: string;
+  names: LogNames;
+  onCard: (name: string) => void;
+  onHover?: (name: string, el: HTMLElement | null) => void;
+}) {
+  if (!names.regex) return <>{text}</>;
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(names.regex)) {
+    const start = (m.index ?? 0) + m[1].length;
+    const name = m[2];
+    if (start > last) out.push(text.slice(last, start));
+    out.push(
+      <button
+        key={start}
+        type="button"
+        className="log-card"
+        onClick={() => onCard(name)}
+        onMouseEnter={onHover ? (e) => onHover(name, e.currentTarget) : undefined}
+        onMouseLeave={onHover ? () => onHover(name, null) : undefined}
+      >
+        {name}
+      </button>,
+    );
+    last = start + name.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return <>{out}</>;
 }
 
 export function downloadReplay(data: unknown) {

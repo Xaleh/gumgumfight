@@ -101,7 +101,7 @@ export function CardInfo({ card, emptyHint }: { card: CardData | null; emptyHint
 }
 
 /** Carta ampliada em modal, com o texto do efeito (toque longo no construtor de deck). Fecha no fundo, no ✕ ou com Esc. */
-export function StaticCardZoom({ card, onClose }: { card: CardData; onClose: () => void }) {
+export function StaticCardZoom({ card, onClose, className }: { card: CardData; onClose: () => void; className?: string }) {
   const def = useMemo(() => buildCardDef(card), [card]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -109,7 +109,7 @@ export function StaticCardZoom({ card, onClose }: { card: CardData; onClose: () 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="modal-backdrop zoom-backdrop" onClick={onClose}>
+    <div className={['modal-backdrop zoom-backdrop', className ?? ''].join(' ')} onClick={onClose}>
       <div className="zoom" role="dialog" aria-label={def.name} onClick={(e) => e.stopPropagation()}>
         <button className="zoom-close" onClick={onClose} aria-label="Fechar">
           ✕
