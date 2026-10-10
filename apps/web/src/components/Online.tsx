@@ -1,5 +1,6 @@
 import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
+import { audio } from '../audio';
 import type { OnlineRoomInfo } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
 import { useSettings } from '../settings';
@@ -124,6 +125,13 @@ export function ChatBar({ online }: { online: OnlineGame }) {
   const logRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const seen = useRef(0);
+
+  // Mensagem ou emote do oponente: um toque curto (com o painel aberto ou fechado).
+  const heard = useRef(messages.length);
+  useEffect(() => {
+    if (messages.length > heard.current && messages.slice(heard.current).some((m) => m.seat !== mine)) audio.play('chat', { detune: 0 });
+    heard.current = messages.length;
+  }, [messages, mine]);
 
   // Mensagens que chegaram com o painel fechado contam como não lidas.
   useEffect(() => {

@@ -24,6 +24,8 @@ import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
 import { type GameSetup, useGame } from '../game/useGame';
+import { audio } from '../audio';
+import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
@@ -342,6 +344,14 @@ function Table({
     tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
     lastAction: allActions[allActions.length - 1],
     lang,
+  });
+  // Sons da mesa e música da partida (os mesmos pontos que as animações; valem sem elas também).
+  useMatchAudio(state, {
+    enabled: !game.jumped && !(replay && game.speed >= 8),
+    animate: animate && !game.jumped,
+    tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
+    human,
+    lastAction: allActions[allActions.length - 1],
   });
   // Replay: o clique/seleção do jogador na próxima ação do roteiro (na mesa e na barra), para quem assiste
   // ou audita ver a decisão antes do resultado. Em 8× a mesa já muda sem animação: só a barra mostra.
@@ -673,6 +683,9 @@ function Table({
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
     if (index < 0 || index >= max) return;
+    const cur = mode?.kind === 'don' ? mode.picked : [];
+    // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
+    audio.play('don-pick', { pitch: cur.includes(index) ? -3 : Math.min(6, cur.length) });
     setMode((m) => {
       const cur = m?.kind === 'don' ? m.picked : [];
       const picked = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index].sort((a, b) => a - b);

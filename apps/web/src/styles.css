@@ -8035,3 +8035,45 @@ tr.clickable:hover td {
   -webkit-text-stroke: 1.5px #3a0a06;
   text-shadow: 0 3px 0 #3a0a06, 0 6px 16px rgba(0, 0, 0, 0.5);
 }
+
+/* ---------- Volume (efeitos e música, em Configurações) ---------- */
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  width: 190px;
+  max-width: 100%;
+}
+.volume-mute {
+  flex: none;
+  width: 34px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--knob);
+  color: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.volume input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+.settings .volume-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings .volume-setting .volume {
+  width: 100%;
+}
+@media (max-width: 480px) {
+  .option-row .volume {
+    width: 100%;
+  }
+}

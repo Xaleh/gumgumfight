@@ -1,5 +1,6 @@
-import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { audio } from './audio';
 
 export type CardLang = 'pt' | 'en';
 /** `system` segue o tema do aparelho (prefers-color-scheme). */
@@ -22,13 +23,19 @@ export interface Settings {
   theme: Theme;
   /** Online: mostrar as mensagens e os emotes que o oponente manda. */
   opponentChat: boolean;
+  /** Volume dos efeitos sonoros (0 = mudo … 1). */
+  sfxVolume: number;
+  /** Volume da música de fundo (0 = mudo … 1). */
+  musicVolume: number;
 }
 
 interface Ctx extends Settings {
   showImages: boolean;
   /** Tema em uso depois de resolver `system`. */
   resolvedTheme: 'light' | 'dark';
-  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter' | 'animations' | 'replayCues' | 'theme' | 'opponentChat'>>) => void;
+  update: (
+    patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter' | 'animations' | 'replayCues' | 'theme' | 'opponentChat' | 'sfxVolume' | 'musicVolume'>>,
+  ) => void;
 }
 
 const KEY = 'gumgum.settings';
@@ -41,7 +48,14 @@ const DEFAULTS: Settings = {
   replayCues: true,
   theme: 'system',
   opponentChat: true,
+  sfxVolume: 0.8,
+  musicVolume: 0.5,
 };
+
+/** Volume salvo: número entre 0 e 1 (qualquer outra coisa volta ao padrão). */
+function volume(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback;
+}
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 /** Cor da barra do navegador/PWA em cada tema (igual ao `--bg` escuro e ao azul-marinho da marca). */
@@ -53,7 +67,14 @@ function load(): Settings {
     if (!raw) return DEFAULTS;
     const saved = JSON.parse(raw) as Partial<Settings>;
     const theme: Theme = saved.theme === 'light' || saved.theme === 'dark' ? saved.theme : 'system';
-    return { ...DEFAULTS, ...saved, theme, serverImages: false };
+    return {
+      ...DEFAULTS,
+      ...saved,
+      theme,
+      serverImages: false,
+      sfxVolume: volume(saved.sfxVolume, DEFAULTS.sfxVolume),
+      musicVolume: volume(saved.musicVolume, DEFAULTS.musicVolume),
+    };
   } catch {
     return DEFAULTS;
   }
@@ -100,6 +121,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Áudio: destrava no primeiro gesto do usuário e segue os volumes escolhidos.
+  useEffect(() => audio.install(), []);
+  useEffect(() => audio.setVolumes({ sfx: settings.sfxVolume, music: settings.musicVolume }), [settings.sfxVolume, settings.musicVolume]);
+
   // Tema: aplica na hora e, em "Automático", acompanha a troca do sistema.
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolveTheme(settings.theme));
   useEffect(() => {
@@ -129,6 +154,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             replayCues: next.replayCues,
             theme: next.theme,
             opponentChat: next.opponentChat,
+            sfxVolume: next.sfxVolume,
+            musicVolume: next.musicVolume,
           }),
         );
       } catch {
@@ -197,6 +224,41 @@ function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boo
       disabled={disabled}
       onClick={() => onChange(!on)}
     />
+  );
+}
+
+/**
+ * Volume de um canal: botão de mudo (🔊/🔇) e barra de 0 a 100. O botão guarda o último volume
+ * para o som voltar como estava; com tudo em zero, volta ao padrão.
+ */
+function VolumeControl({ kind, label }: { kind: 'sfxVolume' | 'musicVolume'; label: string }) {
+  const s = useSettings();
+  const value = s[kind];
+  const before = useRef(value);
+  if (value > 0) before.current = value;
+  const toggle = () => s.update({ [kind]: value > 0 ? 0 : before.current > 0 ? before.current : DEFAULTS[kind] });
+  return (
+    <div className="volume">
+      <button
+        type="button"
+        className="volume-mute"
+        onClick={toggle}
+        aria-label={value > 0 ? `Silenciar ${label}` : `Ligar ${label}`}
+        title={value > 0 ? 'Silenciar' : 'Ligar'}
+      >
+        {value === 0 ? '🔇' : value < 0.5 ? '🔉' : '🔊'}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={Math.round(value * 100)}
+        aria-label={label}
+        onChange={(e) => s.update({ [kind]: Number(e.target.value) / 100 })}
+        onPointerUp={() => kind === 'sfxVolume' && audio.play('play')}
+      />
+    </div>
   );
 }
 
@@ -322,6 +384,14 @@ export function SettingsControls() {
         <input type="checkbox" checked={s.opponentChat} onChange={(e) => s.update({ opponentChat: e.target.checked })} />
         Chat do oponente
       </label>
+      <div className="setting volume-setting">
+        <label className="sheet-label">Efeitos sonoros</label>
+        <VolumeControl kind="sfxVolume" label="efeitos sonoros" />
+      </div>
+      <div className="setting volume-setting">
+        <label className="sheet-label">Música</label>
+        <VolumeControl kind="musicVolume" label="música" />
+      </div>
     </div>
   );
 }
@@ -385,6 +455,12 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               hint="Nas partidas online, mostra as mensagens e os emotes que o oponente manda. Desligue para não ver nada que ele escreve; as suas mensagens continuam saindo."
             >
               <Switch on={s.opponentChat} label="Chat do oponente" onChange={(on) => s.update({ opponentChat: on })} />
+            </OptionRow>
+            <OptionRow title="Efeitos sonoros" hint="Cartas, DON!!, ataques, dano, dados e o resultado da partida. No iPhone, a chave de silencioso também vale.">
+              <VolumeControl kind="sfxVolume" label="efeitos sonoros" />
+            </OptionRow>
+            <OptionRow title="Música" hint="Trilha original do GumGum Fight no menu e na partida.">
+              <VolumeControl kind="musicVolume" label="música" />
             </OptionRow>
           </div>
           <p className="muted small">As configurações ficam guardadas neste navegador e valem para todas as partidas. O apelido fica no servidor, ligado a este navegador.</p>

@@ -148,6 +148,8 @@ gumgumfight/
 │   ├── src/App.tsx              seleção de tela (useState<Screen>, sem roteador)
 │   ├── src/api.ts               todos os fetches, header x-deck-owner, URLs de SSE
 │   ├── src/auth.tsx, settings.tsx   contexts
+│   ├── src/audio.ts             efeitos e música (Web Audio); src/assets/audio/ com os MP3 e CREDITS.md
+│   ├── src/game/useMatchAudio.ts   sons derivados das mudanças de estado da partida
 │   ├── src/game/useGame.ts      partida local (motor + bot no navegador, undo, replay)
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
 │   ├── src/components/          Menu, DeckBuilder, GameScreen (2.319 linhas), Board, Watch, Tournaments, Stats, Admin…
@@ -311,7 +313,7 @@ privada), lido uma vez e removido com `history.replaceState`.
 | Chave | Conteúdo |
 |---|---|
 | `localStorage.gumgum.owner` | token do dono dos decks/perfil (sem login) |
-| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, replayCues, theme, opponentChat}` |
+| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, replayCues, theme, opponentChat, sfxVolume, musicVolume}` |
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
 | `localStorage.gumgum.watchHands`, `gumgum.statsFilters`, `gumgum.statsMin` | preferências de espectador e estatísticas |
 | `sessionStorage.gumgum.openMatch` | partida/transmissão aberta |
@@ -372,10 +374,25 @@ reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do prot
 As URLs apontam para `https://optcgapi.com/media/static/Card_Images/<ID>.jpg` (oficiais) e
 `https://images.optcgleaks.com/<set>/images/<id>.webp` (spoilers). **Esse tráfego não passa pela VPS.**
 
+### Áudio
+
+`audio.ts` (Web Audio API) tem dois canais com volume próprio, efeitos e música, ligados às configurações
+`sfxVolume` e `musicVolume`. O primeiro toque ou tecla destrava o áudio (os navegadores exigem um gesto) e
+pré-carrega os efeitos; a música só é baixada quando pedida e toca num `AudioBufferSourceNode` em loop (emenda
+sem corte), com crossfade na troca. `game/useMatchAudio.ts` deriva os sons da diferença entre o estado anterior e o
+novo da partida (como `Motion.tsx` faz com as animações), então valem para a partida contra o bot, online,
+espectador e replay (mudos nos pulos e no replay em 8×); `App.tsx` toca a música do menu fora da mesa e a mesa troca
+para a da partida. Os arquivos (MP3) ficam em `assets/audio`, com a origem e a licença de cada um em
+`assets/audio/CREDITS.md`: efeitos CC0 do Kenney e do OpenGameArt e duas músicas originais ("Brisa do Leste" no menu,
+"Valsa do Mar" na partida) geradas em MIDI por `scripts/audio/compose.py` e renderizadas com FluidSynth;
+`scripts/audio/sfx.py` refaz a conversão dos efeitos.
+
 ### Build
 
-`vite build` → `apps/web/dist`: `index.html` + `assets/index-<hash>.js` (715 KB, **203 KB gzip**) +
-`assets/index-<hash>.css` (116 KB, 26 KB gzip) + imagens locais (verso da carta 26 KB, DON!! 38 KB) + `public/`.
+`vite build` → `apps/web/dist`: `index.html` + `assets/index-<hash>.js` (845 KB, **260 KB gzip**) +
+`assets/index-<hash>.css` (127 KB, 28 KB gzip) + imagens locais (verso da carta 26 KB, DON!! 38 KB) + áudio
+(46 efeitos, 340 KB ao todo, baixados no primeiro toque; músicas de 800 KB e 585 KB e três vinhetas de 33 a 46 KB,
+baixadas quando tocam) + `public/`.
 
 ---
 
