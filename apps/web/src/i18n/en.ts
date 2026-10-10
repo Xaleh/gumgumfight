@@ -1582,4 +1582,9 @@ export default {
   'labels.phase.roundOf': 'Round of {n}',
   // ==== /errors ====
 
+  // ==== rules ====
+  // ==== /rules ====
+
+  // ==== status ====
+  // ==== /status ====
 } satisfies Messages;

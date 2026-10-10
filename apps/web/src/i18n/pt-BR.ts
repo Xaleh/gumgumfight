@@ -1582,6 +1582,11 @@ const ptBR = {
   'labels.phase.roundOf': 'Rodada de {n}',
   // ==== /errors ====
 
+  // ==== rules ====
+  // ==== /rules ====
+
+  // ==== status ====
+  // ==== /status ====
 } as const;
 
 export type MessageKey = keyof typeof ptBR;
