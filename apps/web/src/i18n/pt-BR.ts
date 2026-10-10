@@ -1754,9 +1754,73 @@ const ptBR = {
   // ==== /errors ====
 
   // ==== rules ====
+  // ---- construção do deck (validateDeck no motor: `code` + `params` de cada aviso) ----
+  'rules.pickLeader': 'Escolha um Líder.',
+  'rules.unknownLeader': 'Líder desconhecido: {id}.',
+  'rules.notLeader': '{name} não é um Líder.',
+  'rules.tooFewCards': 'O deck tem {total|# carta|# cartas}; {missing|falta #|faltam #}.',
+  'rules.tooManyCards': 'O deck tem {total|# carta|# cartas}; {extra|sobra #|sobram #}.',
+  'rules.unknownCard': 'Carta desconhecida: {id}.',
+  'rules.badCount': 'Quantidade inválida de {name}.',
+  'rules.leaderInDeck': '{name} é um Líder e não pode ir no deck.',
+  'rules.maxCopies': '{name} ({id}): máximo de {n|# cópia|# cópias}.',
+  'rules.leaderMaxCost': '{name} ({id}): o Líder não permite cartas com custo {cost} ou mais.',
+  'rules.leaderMaxCostEvents': '{name} ({id}): o Líder não permite Eventos com custo {cost} ou mais.',
+  'rules.leaderOnlyType': '{name} ({id}): o Líder só permite cartas do tipo {{type}}.',
+  'rules.leaderColor': '{name} ({id}) não tem a cor do Líder.',
+  'rules.unscripted': '{n|# carta|# cartas} com efeito ainda não automatizado (aplicado à mão, com as ferramentas manuais).',
+  // ---- formatos (formatIssues) ----
+  'rules.banned': '{id} está banida (não vale em nenhum formato).',
+  'rules.rotated': '{id} tem o bloco ① e rotacionou: não vale no {format}.',
+  'rules.bannedPair': '{a} e {b} não podem ser usadas juntas no mesmo deck.',
+  // ---- lista em texto (parseDeckList) ----
+  'rules.listBadLine': 'Linha não reconhecida: "{line}"',
+  'rules.listUnknownCard': 'Carta não encontrada no banco: {id}',
+  'rules.listTwoLeaders': 'Mais de um Líder na lista: {a} e {b}',
   // ==== /rules ====
 
   // ==== status ====
+  // ---- etiquetas na carta (tagKey) ----
+  'status.cannotAttackTag': 'NÃO ATACA',
+  'status.cannotAttackLeaderTag': 'NÃO ATACA LÍDER',
+  'status.cannotAttackCharsTag': 'NÃO ATACA CUSTO ≤{n}',
+  'status.attackTaxTag': 'ATAQUE CUSTA {n}',
+  'status.cannotRestTag': 'NÃO VIRA',
+  'status.skipRefreshTag': 'NÃO DESVIRA',
+  'status.cannotBlockTag': 'SEM BLOCKER',
+  'status.negatedTag': 'ANULADA',
+  'status.cannotBeKOTag': 'SEM K.O.',
+  'status.canAttackActiveTag': 'ATACA ATIVOS',
+  'status.noBlockerWhenAttackingTag': 'ANTI-BLOCKER',
+  'status.costTag': '{amount} CUSTO',
+  'status.powerTag': '{amount} PODER',
+  // ---- texto do efeito (textKey) ----
+  'status.cannotAttack': 'Não pode atacar',
+  'status.cannotAttackLeader': 'Não pode atacar o Líder',
+  'status.cannotAttackChars': 'Não pode atacar Personagens com custo base de {n} ou menos',
+  'status.attackTax': 'Só pode atacar se o oponente descartar {n} carta(s) da mão',
+  'status.cannotRest': 'Não pode ser virada (não ataca nem paga custos de virar)',
+  'status.skipRefresh': 'Não fica ativa na próxima Fase de Renovação',
+  'status.skipRefreshAura': 'Não fica ativa nas Fases de Renovação',
+  'status.cannotBlock': 'Não pode ativar [Blocker]',
+  'status.negated': 'Os efeitos desta carta estão anulados',
+  'status.gainedKeyword': 'Ganhou [{keyword}]',
+  'status.gainedAttribute': 'Ganhou o atributo "{attribute}"',
+  'status.cannotBeKO': 'Não pode ser nocauteada',
+  'status.cannotBeKOInBattle': 'Não pode ser nocauteada em batalha',
+  'status.cannotBeKOByEffect': 'Não pode ser nocauteada por efeitos',
+  'status.cannotBeKOByOpponentEffect': 'Não pode ser nocauteada por efeitos do oponente',
+  'status.canAttackActive': 'Pode atacar Personagens ativos',
+  'status.noBlockerWhenAttacking': 'Quando esta carta ataca, o oponente não pode ativar [Blocker]',
+  'status.cost': '{amount} de custo',
+  'status.power': '{amount} de poder',
+  // ---- até quando vale (untilKey) ----
+  'status.untilEndOfTurn': 'até o fim deste turno',
+  'status.untilEndOfBattle': 'até o fim desta batalha',
+  'status.untilEndOfNextTurn': 'até o fim do próximo turno de {name}',
+  'status.untilStartOfNextTurn': 'até o início do próximo turno de {name}',
+  'status.untilNextRefresh': 'até a próxima Fase de Renovação de {name}',
+  'status.untilAura': 'enquanto o efeito contínuo da outra carta valer',
   // ==== /status ====
 } as const;
 

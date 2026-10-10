@@ -170,6 +170,8 @@ describe('partidas online: salas privadas', () => {
     expect(std.statusCode).toBe(400);
     expect(std.json().error).toMatch(/não é permitido no formato Standard/);
     expect(std.json()).toMatchObject({ errorCode: 'deckNotAllowedInFormat', errorParams: { format: 'Standard' } });
+    // O motivo também vai com a chave do motor, para o cliente traduzir o {issue}.
+    expect(std.json().errorParams).toMatchObject({ issueCode: 'rules.rotated', issueParams: { format: 'Standard' } });
     expect((await post('/api/online/rooms', ALICE, { deckId: 'st01-luffy', format: 'standard' })).statusCode).toBe(400);
     // Carta banida: nem no Extra Grand Battle.
     const banned = await post('/api/online/rooms', ALICE, { deckId: 'st10-law', format: 'egb' });

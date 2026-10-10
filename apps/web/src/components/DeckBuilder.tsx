@@ -1,22 +1,15 @@
 import {
   type CardData,
-  BANNED_PAIRS,
   cardLegality,
   type Color,
   DECK_SIZE,
-  type DeckIssue,
   type DeckList,
-  deckSize,
   FORMATS,
-  type FormatId,
-  type FormatIssue,
   formatIssues,
   formatDeckList,
-  formatLabel,
   needsManual,
   isColorCompatible,
   leaderAllows,
-  leaderRuleBroken,
   MAX_COPIES,
   anyNumberAllowed,
   parseDeckList,
@@ -26,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ApiCard, deckGroups, type DeckSummary } from '../api';
 import { useAuth } from '../auth';
 import { useLongPress } from '../hooks/useLongPress';
-import { type MessageKey, type Translate, useT } from '../i18n';
+import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, fillSlots, StaticCardZoom } from './CardInfo';
 import { StaticCard } from './CardView';
 import { Icon } from './Icons';
@@ -59,65 +52,6 @@ const CATEGORY_LABEL: Record<CardData['category'], MessageKey> = {
   stage: 'deck.cat.stage',
 };
 
-/**
- * Avisos de `validateDeck` no idioma da interface. O motor só devolve o texto em português (sem código),
- * então as mesmas regras, na mesma ordem, viram frases do dicionário. Se a contagem não bater com a do
- * motor (regra nova lá), fica o texto do motor.
- */
-function deckIssueTexts(deck: DeckList, byId: Map<string, CardData>, engine: DeckIssue[], t: Translate): string[] {
-  const out: string[] = [];
-  const unscripted = new Set<string>();
-  const leader = deck.leader ? byId.get(deck.leader) : undefined;
-  if (!deck.leader) out.push(t('deck.issuePickLeader'));
-  else if (!leader) out.push(t('deck.issueUnknownLeader', { id: deck.leader }));
-  else if (leader.category !== 'leader') out.push(t('deck.issueNotLeader', { name: leader.name }));
-  else if (needsManual(leader)) unscripted.add(leader.id);
-
-  const total = deckSize(deck);
-  if (total < DECK_SIZE) out.push(t('deck.issueTooFew', { total, missing: DECK_SIZE - total }));
-  else if (total > DECK_SIZE) out.push(t('deck.issueTooMany', { total, extra: total - DECK_SIZE }));
-
-  const counts = new Map<string, number>();
-  for (const entry of deck.cards) counts.set(entry.id, (counts.get(entry.id) ?? 0) + entry.count);
-  for (const [id, count] of counts) {
-    const card = byId.get(id);
-    if (!card) {
-      out.push(t('deck.issueUnknownCard', { id }));
-      continue;
-    }
-    const name = card.name;
-    if (count < 1) out.push(t('deck.issueBadCount', { name }));
-    if (card.category === 'leader') out.push(t('deck.issueLeaderInDeck', { name }));
-    if (count > MAX_COPIES && !anyNumberAllowed(card)) out.push(t('deck.issueMaxCopies', { name, id, n: MAX_COPIES }));
-    const broken = leader?.category === 'leader' ? leaderRuleBroken(leader, card) : undefined;
-    if (broken?.kind === 'deckMaxCost') {
-      out.push(t(broken.category === 'event' ? 'deck.issueMaxCostEvents' : 'deck.issueMaxCost', { name, id, cost: broken.cost + 1 }));
-    } else if (broken?.kind === 'deckOnlyType') {
-      out.push(t('deck.issueOnlyType', { name, id, type: broken.type }));
-    }
-    if (leader?.category === 'leader' && !isColorCompatible(leader, card)) out.push(t('deck.issueColor', { name, id }));
-    if (needsManual(card)) unscripted.add(id);
-  }
-  if (unscripted.size) out.push(t('deck.issueUnscripted', { n: unscripted.size }));
-  return out.length === engine.length ? out : engine.map((i) => i.message);
-}
-
-/** Avisos de `formatIssues` no idioma da interface (mesmo esquema de `deckIssueTexts`). */
-function formatIssueTexts(deck: Pick<DeckList, 'leader' | 'cards'>, format: FormatId, engine: FormatIssue[], t: Translate): string[] {
-  const out: string[] = [];
-  const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean))];
-  for (const id of ids) {
-    const legality = cardLegality(id, format);
-    if (legality === 'banned') out.push(t('deck.issueBanned', { id }));
-    else if (legality === 'rotated') out.push(t('deck.issueRotated', { id, format: formatLabel(format) }));
-  }
-  const has = new Set(ids);
-  const today = new Date().toISOString().slice(0, 10);
-  for (const { cards: [a, b], since } of BANNED_PAIRS) {
-    if (has.has(a) && has.has(b) && (!since || since <= today)) out.push(t('deck.issuePair', { a, b }));
-  }
-  return out.length === engine.length ? out : engine.map((i) => i.message);
-}
 const PAGE = 60;
 /** Valor do filtro de coleção que mostra só as cartas de spoiler. */
 const SPOILERS = '__spoilers';
@@ -144,6 +78,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const auth = useAuth();
   const t = useT();
+  /** Avisos do motor (`validateDeck`, `formatIssues`, `parseDeckList`): chave `rules.…` ou o texto em português. */
+  const tryT = useTryT();
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(t('deck.newDeckName')));
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -250,16 +186,14 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
     [draft],
   );
   const report = useMemo(() => validateDeck(deckList, byId), [deckList, byId]);
-  /** Avisos do relatório no idioma da interface (mesma ordem de `report.issues`). */
-  const issueTexts = useMemo(() => deckIssueTexts(deckList, byId, report.issues, t), [deckList, byId, report, t]);
   /** Em quais formatos o deck pode ser usado, e por que não nos outros. */
   const legality = useMemo(
     () =>
       FORMATS.map((f) => {
         const issues = formatIssues(deckList, f.id);
-        return { ...f, issues, texts: formatIssueTexts(deckList, f.id, issues, t) };
+        return { ...f, issues, texts: issues.map((i) => tryT(i.code, i.params) ?? i.message) };
       }),
-    [deckList, t],
+    [deckList, tryT],
   );
   const formatProblems = useMemo(() => [...new Set(legality.flatMap((f) => f.texts))], [legality]);
 
@@ -702,7 +636,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
             <ul className="issues">
               {report.issues.map((i, k) => (
                 <li key={k} className={i.level}>
-                  {issueTexts[k] ?? i.message}
+                  {tryT(i.code, i.params) ?? i.message}
                 </li>
               ))}
             </ul>
@@ -743,18 +677,19 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
           onImport={(text) => {
             const parsed = parseDeckList(text, byId);
             const total = parsed.cards.reduce((s, c) => s + c.count, 0);
-            if (!parsed.leader && !total) return parsed.errors.length ? parsed.errors : [t('deck.noneRecognized')];
+            const errors = parsed.errorDetails.map((e) => tryT(e.code, e.params) ?? e.message);
+            if (!parsed.leader && !total) return errors.length ? errors : [t('deck.noneRecognized')];
             edit((d) => ({
               ...d,
               leader: parsed.leader ?? d.leader,
               cards: new Map(parsed.cards.map((c) => [c.id, c.count])),
             }));
             setNotice(
-              parsed.errors.length
-                ? t('deck.importedSkipped', { n: total, skipped: parsed.errors.length })
+              errors.length
+                ? t('deck.importedSkipped', { n: total, skipped: errors.length })
                 : t('deck.imported', { n: total }),
             );
-            return parsed.errors.length ? parsed.errors : null;
+            return errors.length ? errors : null;
           }}
         />
       )}

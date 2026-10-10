@@ -6,7 +6,11 @@
 // chaves ficam em apps/web/src/i18n/{pt-BR,en}.ts, seção `errors`. `code` continua
 // sendo o status HTTP (ou o código da sala), por isso o campo novo chama `errorCode`.
 
-export type ErrorParams = Record<string, string | number>;
+/**
+ * Parâmetros da mensagem. Um valor objeto não entra direto na mensagem: serve a parâmetros
+ * traduzidos à parte (ex.: `issueParams`, da chave `issueCode` de um aviso do motor, que vira `{issue}`).
+ */
+export type ErrorParams = Record<string, string | number | Record<string, string | number>>;
 
 export interface PlayerError {
   error: string;

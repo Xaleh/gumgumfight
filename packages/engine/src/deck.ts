@@ -10,7 +10,7 @@
 
 import { buildCardDef, needsManual } from './cards';
 import { DECK_SIZE, hasType } from './engine';
-import { type FormatId, formatIssues } from './formats';
+import { type FormatId, formatIssues, type RuleParams } from './formats';
 import type { CardData, DeckList, LeaderRule } from './types';
 
 export const MAX_COPIES = 4;
@@ -22,8 +22,19 @@ export function anyNumberAllowed(card: Pick<CardData, 'text'>): boolean {
 
 export interface DeckIssue {
   level: 'error' | 'warning';
+  /** Texto em português (logs, servidor e clientes antigos). */
   message: string;
+  /** Chave de tradução (`rules.…`) e os parâmetros dela; em português a mensagem equivale a `message`. */
+  code: string;
+  params: RuleParams;
   cardId?: string;
+}
+
+/** Problema numa linha da lista em texto (`parseDeckList`), com a chave de tradução. */
+export interface DeckListError {
+  message: string;
+  code: string;
+  params: RuleParams;
 }
 
 export interface DeckReport {
@@ -82,20 +93,20 @@ export function validateDeck(
   const total = deckSize(deck);
 
   const leader = deck.leader ? get(deck.leader) : undefined;
-  if (!deck.leader) issues.push({ level: 'error', message: 'Escolha um Líder.' });
-  else if (!leader) issues.push({ level: 'error', message: `Líder desconhecido: ${deck.leader}.`, cardId: deck.leader });
+  /** Erro de construção: texto em português, chave `rules.<code>` e parâmetros. */
+  const error = (message: string, code: string, params: RuleParams = {}, cardId?: string) =>
+    issues.push({ level: 'error', message, code: `rules.${code}`, params, ...(cardId ? { cardId } : {}) });
+
+  if (!deck.leader) error('Escolha um Líder.', 'pickLeader');
+  else if (!leader) error(`Líder desconhecido: ${deck.leader}.`, 'unknownLeader', { id: deck.leader }, deck.leader);
   else if (leader.category !== 'leader') {
-    issues.push({ level: 'error', message: `${leader.name} não é um Líder.`, cardId: leader.id });
+    error(`${leader.name} não é um Líder.`, 'notLeader', { name: leader.name }, leader.id);
   } else if (needsManual(leader)) unscripted.add(leader.id);
 
-  if (total !== DECK_SIZE) {
-    issues.push({
-      level: 'error',
-      message:
-        total < DECK_SIZE
-          ? `O deck tem ${total} cartas; faltam ${DECK_SIZE - total}.`
-          : `O deck tem ${total} cartas; sobram ${total - DECK_SIZE}.`,
-    });
+  if (total < DECK_SIZE) {
+    error(`O deck tem ${total} cartas; faltam ${DECK_SIZE - total}.`, 'tooFewCards', { total, missing: DECK_SIZE - total });
+  } else if (total > DECK_SIZE) {
+    error(`O deck tem ${total} cartas; sobram ${total - DECK_SIZE}.`, 'tooManyCards', { total, extra: total - DECK_SIZE });
   }
 
   const counts = new Map<string, number>();
@@ -104,28 +115,29 @@ export function validateDeck(
   for (const [id, count] of counts) {
     const card = get(id);
     if (!card) {
-      issues.push({ level: 'error', message: `Carta desconhecida: ${id}.`, cardId: id });
+      error(`Carta desconhecida: ${id}.`, 'unknownCard', { id }, id);
       continue;
     }
-    if (count < 1) issues.push({ level: 'error', message: `Quantidade inválida de ${card.name}.`, cardId: id });
-    if (card.category === 'leader') {
-      issues.push({ level: 'error', message: `${card.name} é um Líder e não pode ir no deck.`, cardId: id });
-    }
+    const name = card.name;
+    if (count < 1) error(`Quantidade inválida de ${name}.`, 'badCount', { name }, id);
+    if (card.category === 'leader') error(`${name} é um Líder e não pode ir no deck.`, 'leaderInDeck', { name }, id);
     if (count > MAX_COPIES && !anyNumberAllowed(card)) {
-      issues.push({ level: 'error', message: `${card.name} (${id}): máximo de ${MAX_COPIES} cópias.`, cardId: id });
+      error(`${name} (${id}): máximo de ${MAX_COPIES} cópias.`, 'maxCopies', { name, id, n: MAX_COPIES }, id);
     }
     const broken = leader?.category === 'leader' ? leaderRuleBroken(leader, card) : undefined;
     if (broken?.kind === 'deckMaxCost') {
-      issues.push({
-        level: 'error',
-        message: `${card.name} (${id}): o Líder não permite ${broken.category === 'event' ? 'Eventos' : 'cartas'} com custo ${broken.cost + 1} ou mais.`,
-        cardId: id,
-      });
+      const events = broken.category === 'event';
+      error(
+        `${name} (${id}): o Líder não permite ${events ? 'Eventos' : 'cartas'} com custo ${broken.cost + 1} ou mais.`,
+        events ? 'leaderMaxCostEvents' : 'leaderMaxCost',
+        { name, id, cost: broken.cost + 1 },
+        id,
+      );
     } else if (broken?.kind === 'deckOnlyType') {
-      issues.push({ level: 'error', message: `${card.name} (${id}): o Líder só permite cartas do tipo {${broken.type}}.`, cardId: id });
+      error(`${name} (${id}): o Líder só permite cartas do tipo {${broken.type}}.`, 'leaderOnlyType', { name, id, type: broken.type }, id);
     }
     if (leader?.category === 'leader' && !isColorCompatible(leader, card)) {
-      issues.push({ level: 'error', message: `${card.name} (${id}) não tem a cor do Líder.`, cardId: id });
+      error(`${name} (${id}) não tem a cor do Líder.`, 'leaderColor', { name, id }, id);
     }
     if (needsManual(card)) unscripted.add(id);
   }
@@ -138,6 +150,8 @@ export function validateDeck(
     issues.push({
       level: 'warning',
       message: `${unscripted.size} carta(s) com efeito ainda não automatizado (aplicado à mão, com as ferramentas manuais).`,
+      code: 'rules.unscripted',
+      params: { n: unscripted.size },
     });
   }
 
@@ -151,12 +165,14 @@ export function validateDeck(
  *   4xST01-002
  *   4 ST01-013
  * Linhas vazias e comentários (#, //) são ignorados.
+ * `errors` traz os problemas em português; `errorDetails`, na mesma ordem, as chaves de tradução.
  */
 export function parseDeckList(
   text: string,
   cards?: Map<string, CardData>,
-): { leader?: string; cards: Array<{ id: string; count: number }>; errors: string[] } {
-  const errors: string[] = [];
+): { leader?: string; cards: Array<{ id: string; count: number }>; errors: string[]; errorDetails: DeckListError[] } {
+  const errorDetails: DeckListError[] = [];
+  const fail = (message: string, code: string, params: RuleParams) => errorDetails.push({ message, code: `rules.${code}`, params });
   const out = new Map<string, number>();
   let leader: string | undefined;
   for (const rawLine of text.split(/\r?\n/)) {
@@ -164,24 +180,24 @@ export function parseDeckList(
     if (!line) continue;
     const m = line.match(/^(\d+)\s*[xX×]?\s*([A-Za-z]+\d*-\d+)\b/) ?? line.match(/^([A-Za-z]+\d*-\d+)\s*[xX×]?\s*(\d+)?$/);
     if (!m) {
-      errors.push(`Linha não reconhecida: "${rawLine.trim()}"`);
+      fail(`Linha não reconhecida: "${rawLine.trim()}"`, 'listBadLine', { line: rawLine.trim() });
       continue;
     }
     const [count, id] = /^\d+$/.test(m[1]) ? [Number(m[1]), m[2]] : [Number(m[2] ?? 1), m[1]];
     const cardId = id.toUpperCase();
     const card = cards?.get(cardId);
     if (cards && !card) {
-      errors.push(`Carta não encontrada no banco: ${cardId}`);
+      fail(`Carta não encontrada no banco: ${cardId}`, 'listUnknownCard', { id: cardId });
       continue;
     }
     if (card?.category === 'leader') {
-      if (leader && leader !== cardId) errors.push(`Mais de um Líder na lista: ${leader} e ${cardId}`);
+      if (leader && leader !== cardId) fail(`Mais de um Líder na lista: ${leader} e ${cardId}`, 'listTwoLeaders', { a: leader, b: cardId });
       leader = cardId;
       continue;
     }
     out.set(cardId, (out.get(cardId) ?? 0) + count);
   }
-  return { leader, cards: [...out].map(([id, count]) => ({ id, count })), errors };
+  return { leader, cards: [...out].map(([id, count]) => ({ id, count })), errors: errorDetails.map((e) => e.message), errorDetails };
 }
 
 export function formatDeckList(deck: Pick<DeckList, 'leader' | 'cards'>): string {

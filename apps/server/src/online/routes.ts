@@ -61,8 +61,17 @@ export function playableDeck(db: DB, deckId: unknown, format: FormatId, noManual
   if (!report.valid) return { code: 400, ...fail('deckInvalid', 'Esse deck não é válido para jogar.') };
   const banned = formatIssues(deck, format);
   if (banned.length) {
-    const issue = banned[0].message;
-    return { code: 400, ...fail('deckNotAllowedInFormat', `Esse deck não é permitido no formato ${formatLabel(format)}. ${issue}`, { format: formatLabel(format), issue }) };
+    // `issue` em português; `issueCode` + `issueParams` para o cliente traduzir o motivo (chave `rules.…`).
+    const { message: issue, code: issueCode, params: issueParams } = banned[0];
+    return {
+      code: 400,
+      ...fail('deckNotAllowedInFormat', `Esse deck não é permitido no formato ${formatLabel(format)}. ${issue}`, {
+        format: formatLabel(format),
+        issue,
+        issueCode,
+        issueParams,
+      }),
+    };
   }
   // Inclui cartas com script que ainda tenham alguma parte resolvida à mão.
   const manual = new Set([...report.unscripted, ...[...cards.values()].filter((c) => buildCardDef(c).manual).map((c) => c.id)]);

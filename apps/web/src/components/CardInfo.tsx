@@ -1,8 +1,8 @@
 import { buildCardDef, type CardData, type CardDef, type CardStatus } from '@gumgum/engine';
 import { Fragment, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { type MessageKey, useT } from '../i18n';
+import { type MessageKey, useT, useTryT } from '../i18n';
 import { cardText, useSettings } from '../settings';
-import { StaticCard, StatusTag } from './CardView';
+import { StaticCard, StatusTag, statusText, statusUntil } from './CardView';
 
 const CATEGORY: Record<CardDef['category'], MessageKey> = {
   leader: 'card.cat.leader',
@@ -23,6 +23,7 @@ export function fillSlots(message: string, slots: Record<string, ReactNode>): Re
 export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; power?: number; cost?: number; statuses?: CardStatus[] }) {
   const { locale } = useSettings();
   const t = useT();
+  const tryT = useTryT();
   const [showOriginal, setShowOriginal] = useState(false);
   useEffect(() => setShowOriginal(false), [def.id]);
   const shown = cardText(def, showOriginal ? 'en' : locale);
@@ -59,7 +60,7 @@ export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; pow
             <li key={i}>
               <StatusTag status={s} />
               <span>
-                {s.text} <span className="muted">{s.until}</span>
+                {statusText(s, tryT)} <span className="muted">{statusUntil(s, tryT)}</span>
               </span>
             </li>
           ))}

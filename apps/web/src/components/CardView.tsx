@@ -16,7 +16,7 @@ import {
 } from '@gumgum/engine';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
-import { type MessageKey, useT } from '../i18n';
+import { type MessageKey, useT, useTryT } from '../i18n';
 import { useSettings } from '../settings';
 
 /** 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. */
@@ -150,14 +150,21 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
  * sua cor (`tag-<kind>`, palavras-chave `tag-kw-<keyword>`). O texto completo e a duração ficam no tooltip.
  */
 export function StatusTag({ status, title }: { status: CardStatus; title?: boolean }) {
+  const tryT = useTryT();
   const cls = ['status-tag', `tag-${status.kind}`, status.keyword ? `tag-kw-${status.keyword}` : '', status.tone].join(' ');
   return (
-    <span className={cls} title={title ? `${status.text} (${status.until})` : undefined}>
+    <span className={cls} title={title ? `${statusText(status, tryT)} (${statusUntil(status, tryT)})` : undefined}>
       <span className="tag-icon">{status.icon}</span>
-      {status.tag}
+      {tryT(status.tagKey, status.tagParams) ?? status.tag}
     </span>
   );
 }
+
+type TryTranslate = ReturnType<typeof useTryT>;
+/** Texto do estado no idioma da interface (o motor manda o português e a chave `status.…`). */
+export const statusText = (s: CardStatus, tryT: TryTranslate) => tryT(s.textKey, s.textParams) ?? s.text;
+/** Até quando o estado vale, no idioma da interface. */
+export const statusUntil = (s: CardStatus, tryT: TryTranslate) => tryT(s.untilKey, s.untilParams) ?? s.until;
 
 function StatusMarkers({ statuses }: { statuses: CardStatus[] }) {
   const t = useT();

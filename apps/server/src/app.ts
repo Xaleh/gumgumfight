@@ -136,6 +136,7 @@ export function buildApp(
   const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null) => {
     const report = validateDeck(deck, cards);
     const leader = cards.get(deck.leader);
+    const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id)] as const);
     return {
       id: deck.id,
       name: deck.name,
@@ -148,9 +149,11 @@ export function buildApp(
       valid: report.valid,
       errors: report.issues.filter((i) => i.level === 'error').map((i) => i.message),
       /** Por formato: o que impede o deck de ser usado nele (vazio = permitido). */
-      formats: Object.fromEntries(FORMATS.map((f) => [f.id, formatIssues(deck, f.id).map((i) => i.message)])) as Record<
+      formats: Object.fromEntries(byFormat.map(([id, issues]) => [id, issues.map((i) => i.message)])) as Record<FormatId, string[]>,
+      /** Os mesmos motivos, na mesma ordem, com a chave de tradução (`rules.…`) e os parâmetros. */
+      formatCodes: Object.fromEntries(byFormat.map(([id, issues]) => [id, issues.map(({ code, params }) => ({ code, params }))])) as Record<
         FormatId,
-        string[]
+        Array<{ code: string; params: Record<string, string | number> }>
       >,
       unscripted: report.unscripted.length,
       updatedAt: deck.updatedAt,

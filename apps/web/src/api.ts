@@ -15,8 +15,10 @@ export interface DeckSummary {
   size: number;
   valid: boolean;
   errors: string[];
-  /** Por formato: o que impede o deck de ser usado nele (vazio = permitido). */
+  /** Por formato: o que impede o deck de ser usado nele (vazio = permitido), em português. */
   formats: Record<FormatId, string[]>;
+  /** Os mesmos motivos, na mesma ordem, com a chave `rules.…` para traduzir (servidores antigos não mandam). */
+  formatCodes?: Record<FormatId, Array<{ code: string; params: Params }>>;
   unscripted: number;
   updatedAt: string;
   /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
@@ -32,7 +34,8 @@ export function canPlay(deck: DeckSummary, format: FormatId): boolean {
 export function whyNotPlayable(deck: DeckSummary, format: FormatId): string | null {
   if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
   const issues = deck.formats?.[format] ?? [];
-  return issues.length ? issues.join('\n') : null;
+  const codes = deck.formatCodes?.[format];
+  return issues.length ? issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n') : null;
 }
 
 /** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. O título é chave (`t(title)`). */
@@ -91,7 +94,22 @@ export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards'>;
 export type ApiCard = CardData & { provisional?: boolean };
 
 /** Corpo de uma resposta de erro do servidor: `error` em português e `errorCode` (+ `errorParams`) para traduzir. */
-type ErrorBody = { error?: string; errorCode?: string; errorParams?: Params } & Record<string, unknown>;
+type ErrorBody = { error?: string; errorCode?: string; errorParams?: Record<string, unknown> } & Record<string, unknown>;
+
+const isParams = (v: unknown): v is Params => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Parâmetros de um erro prontos para a mensagem: só os valores simples; o motivo vindo do motor
+ * (`issueCode` + `issueParams`, ex.: carta banida no formato) vira `{issue}` no idioma em vigor.
+ */
+function errorParams(raw: Record<string, unknown> | undefined): Params | undefined {
+  if (!isParams(raw)) return undefined;
+  const out: Params = {};
+  for (const [k, v] of Object.entries(raw)) if (typeof v === 'string' || typeof v === 'number') out[k] = v;
+  const issue = typeof raw.issueCode === 'string' ? tryT(raw.issueCode, isParams(raw.issueParams) ? raw.issueParams : undefined) : undefined;
+  if (issue) out.issue = issue;
+  return out;
+}
 
 /**
  * Texto de um erro do servidor no idioma em vigor: a chave `errors.<errorCode>` se o
@@ -99,7 +117,7 @@ type ErrorBody = { error?: string; errorCode?: string; errorParams?: Params } & 
  */
 export function errorMessage(body: ErrorBody | null | undefined, fallback: string): string {
   const code = typeof body?.errorCode === 'string' ? body.errorCode : null;
-  return (code ? tryT(`errors.${code}`, body?.errorParams) : undefined) ?? (typeof body?.error === 'string' ? body.error : null) ?? fallback;
+  return (code ? tryT(`errors.${code}`, errorParams(body?.errorParams)) : undefined) ?? (typeof body?.error === 'string' ? body.error : null) ?? fallback;
 }
 
 /** Erro da API com o status e o corpo da resposta (ex.: a sala da partida em andamento). */

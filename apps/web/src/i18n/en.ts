@@ -1753,8 +1753,72 @@ export default {
   // ==== /errors ====
 
   // ==== rules ====
+  // ---- deck building (engine's validateDeck: each issue's `code` + `params`) ----
+  'rules.pickLeader': 'Choose a Leader.',
+  'rules.unknownLeader': 'Unknown Leader: {id}.',
+  'rules.notLeader': '{name} is not a Leader.',
+  'rules.tooFewCards': 'The deck has {total|# card|# cards}; {missing|# missing}.',
+  'rules.tooManyCards': 'The deck has {total|# card|# cards}; {extra|# too many}.',
+  'rules.unknownCard': 'Unknown card: {id}.',
+  'rules.badCount': 'Invalid count for {name}.',
+  'rules.leaderInDeck': '{name} is a Leader and cannot go in the deck.',
+  'rules.maxCopies': '{name} ({id}): maximum of {n|# copy|# copies}.',
+  'rules.leaderMaxCost': '{name} ({id}): the Leader does not allow cards with a cost of {cost} or more.',
+  'rules.leaderMaxCostEvents': '{name} ({id}): the Leader does not allow Events with a cost of {cost} or more.',
+  'rules.leaderOnlyType': '{name} ({id}): the Leader only allows {{type}} type cards.',
+  'rules.leaderColor': '{name} ({id}) does not share a color with the Leader.',
+  'rules.unscripted': '{n|# card|# cards} with an effect not automated yet (applied by hand, with the manual tools).',
+  // ---- formats (formatIssues) ----
+  'rules.banned': '{id} is banned (not legal in any format).',
+  'rules.rotated': '{id} has block ① and rotated out: not legal in {format}.',
+  'rules.bannedPair': '{a} and {b} cannot be used together in the same deck.',
+  // ---- text list (parseDeckList) ----
+  'rules.listBadLine': 'Line not recognized: "{line}"',
+  'rules.listUnknownCard': 'Card not found in the database: {id}',
+  'rules.listTwoLeaders': 'More than one Leader in the list: {a} and {b}',
   // ==== /rules ====
 
   // ==== status ====
+  // ---- tags on the card (tagKey) ----
+  'status.cannotAttackTag': "CAN'T ATTACK",
+  'status.cannotAttackLeaderTag': "CAN'T ATTACK LEADER",
+  'status.cannotAttackCharsTag': "CAN'T ATTACK COST ≤{n}",
+  'status.attackTaxTag': 'ATTACK COSTS {n}',
+  'status.cannotRestTag': "CAN'T REST",
+  'status.skipRefreshTag': 'STAYS RESTED',
+  'status.cannotBlockTag': 'NO BLOCKER',
+  'status.negatedTag': 'NEGATED',
+  'status.cannotBeKOTag': 'NO K.O.',
+  'status.canAttackActiveTag': 'HITS ACTIVE',
+  'status.noBlockerWhenAttackingTag': 'ANTI-BLOCKER',
+  'status.costTag': '{amount} COST',
+  'status.powerTag': '{amount} POWER',
+  // ---- effect text (textKey) ----
+  'status.cannotAttack': 'Cannot attack',
+  'status.cannotAttackLeader': 'Cannot attack the Leader',
+  'status.cannotAttackChars': 'Cannot attack Characters with a base cost of {n} or less',
+  'status.attackTax': 'Can only attack if the opponent trashes {n|# card|# cards} from their hand',
+  'status.cannotRest': 'Cannot be rested (cannot attack or pay rest costs)',
+  'status.skipRefresh': 'Does not become active in the next Refresh Phase',
+  'status.skipRefreshAura': 'Does not become active in Refresh Phases',
+  'status.cannotBlock': 'Cannot activate [Blocker]',
+  'status.negated': "This card's effects are negated",
+  'status.gainedKeyword': 'Gained [{keyword}]',
+  'status.gainedAttribute': 'Gained the "{attribute}" attribute',
+  'status.cannotBeKO': "Cannot be K.O.'d",
+  'status.cannotBeKOInBattle': "Cannot be K.O.'d in battle",
+  'status.cannotBeKOByEffect': "Cannot be K.O.'d by effects",
+  'status.cannotBeKOByOpponentEffect': "Cannot be K.O.'d by your opponent's effects",
+  'status.canAttackActive': 'Can attack active Characters',
+  'status.noBlockerWhenAttacking': 'When this card attacks, the opponent cannot activate [Blocker]',
+  'status.cost': '{amount} cost',
+  'status.power': '{amount} power',
+  // ---- until when (untilKey) ----
+  'status.untilEndOfTurn': 'until the end of this turn',
+  'status.untilEndOfBattle': 'until the end of this battle',
+  'status.untilEndOfNextTurn': "until the end of {name}'s next turn",
+  'status.untilStartOfNextTurn': "until the start of {name}'s next turn",
+  'status.untilNextRefresh': "until {name}'s next Refresh Phase",
+  'status.untilAura': "while the other card's continuous effect lasts",
   // ==== /status ====
 } satisfies Messages;
