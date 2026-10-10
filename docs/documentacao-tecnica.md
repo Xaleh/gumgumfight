@@ -328,7 +328,8 @@ Seis idiomas, sem biblioteca externa: `pt-BR` (padrão e referência), `en`, `es
 `src/i18n/<locale>.ts` exportando um objeto com **as mesmas chaves** de `pt-BR.ts` (`satisfies Messages`): faltar ou sobrar uma
 chave em qualquer idioma é erro de `npm run typecheck`, que o CI roda. As chaves são `<tela>.camelCase`, agrupadas em seções
 marcadas (`// ==== menu ====`): `menu`, `home`, `deck`, `card`, `online`, `watch`, `admin`, `reports`, `tour`, `stats`, `game`,
-`board`, `dice`, `result`, `replay`, `ability`, `engine` (perguntas do motor), `errors` (erros do servidor), `labels`, `settings`.
+`board`, `dice`, `result`, `replay`, `ability`, `engine` (perguntas do motor), `log` (histórico da partida), `rules` (validação de
+deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `settings`.
 
 - **Sintaxe das mensagens:** `{nome}` interpola um parâmetro; `{n|# carta|# cartas}` escolhe a forma pelo `Intl.PluralRules`
   do idioma (`one` | `other`; `#` vira o número formatado). Frases sempre inteiras, com parâmetros: nada de concatenar pedaços
@@ -338,6 +339,19 @@ marcadas (`// ==== menu ====`): `menu`, `home`, `deck`, `card`, `online`, `watch
   `promptParams`/`optionKeys` ao lado de `prompt`/`options` em `Pending`, `labelKey` em `Ability`) e **do servidor** (`errorCode`
   ao lado de `error` nas respostas 4xx/5xx; `api.ts` traduz `errors.<errorCode>` e cai no texto do servidor se não conhecer).
   Os textos em português do motor e do servidor continuam sendo gerados (replays, logs e clientes antigos).
+- **Motor → interface:** cada texto que o motor gera em português ganha ao lado uma mensagem estruturada
+  `Msg = { key, params?, parts? }` (`parts` = parâmetros que também são texto a traduzir, ex. a lista de custos, juntada por
+  `log.listAnd`/`engine.cost.join`). Onde aparece:
+  - `LogEntry.key/params/parts` (histórico, seção `log`; a linha secreta tem `secretKey…`, que `view.ts` só entrega ao dono);
+  - `GameState.winReasonKey/winReasonParams` (motivo do fim de jogo, `log.win*`);
+  - `Pending.promptKey/promptParams/promptParts` e `optionKeys/optionParts` (perguntas de efeito, seção `engine`);
+  - `Ability.labelKey/labelParams` (rótulos de habilidades roteirizadas);
+  - `StatusInfo.textKey/untilKey/tagKey` (marcadores de estado nas cartas, seção `status`);
+  - `DeckIssue`/`FormatIssue.code/params` e `parseDeckList().errorDetails` (validação de deck e formato, seção `rules`).
+  `apps/web/src/game/engineText.ts` (`msgText`, `logText`, `winReasonText`) traduz isso na interface; sem chave, mostra o texto.
+  Os avisos da mesa (`NOTICE_KEYS` em `GameScreen.tsx`) são decididos pela chave do log, com um regex de reserva para estados
+  antigos. Ainda só em português: as recusas `IllegalActionError` do motor (a interface só oferece ações legais, então só
+  aparecem em corridas) e os rótulos de "Escolha um" que vêm da DSL do leitor.
 - **Carga:** `pt-BR` vai no bundle principal; os outros são chunks separados (`import()` em `loadLocale`), baixados ao escolher.
   `main.tsx` carrega o idioma salvo antes do primeiro render. `I18nProvider` (dentro do `SettingsProvider`) troca o dicionário,
   ajusta `<html lang>` e o `locale` do botão do Google.
