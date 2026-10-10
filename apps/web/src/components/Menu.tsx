@@ -468,7 +468,8 @@ export function Menu({
     setLoading(true);
     setActionError(null);
     try {
-      const names: [string, string] = [nickname ?? t('menu.you'), t('menu.botName')];
+      // Sem apelido: um nome que funcione nas frases do log, que são em terceira pessoa ("You kept their hand" não).
+      const names: [string, string] = [nickname ?? t('menu.youName'), t('menu.botName')];
       const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
       if (deck1 === RANDOM && !pool.length) throw new Error(t('menu.noBuiltinDeck', { format: formatLabel(format) }));
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;

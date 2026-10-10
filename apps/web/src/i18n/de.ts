@@ -188,6 +188,7 @@ export default {
   'menu.whoStarts': 'Wer beginnt',
   'menu.firstRandom': 'Münzwurf',
   'menu.you': 'Du',
+  'menu.youName': 'Spieler',
   'menu.botName': 'Bot',
   'menu.botLevel': 'Bot-Stufe',
   'menu.botEasy': 'Leicht',

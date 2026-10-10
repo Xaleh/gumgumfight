@@ -188,6 +188,7 @@ export default {
   'menu.whoStarts': 'Qui commence',
   'menu.firstRandom': 'Pile ou face',
   'menu.you': 'Vous',
+  'menu.youName': 'Joueur',
   'menu.botName': 'Bot',
   'menu.botLevel': 'Niveau du bot',
   'menu.botEasy': 'Facile',

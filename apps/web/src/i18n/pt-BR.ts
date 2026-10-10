@@ -187,6 +187,8 @@ const ptBR = {
   'menu.whoStarts': 'Quem começa',
   'menu.firstRandom': 'Sorteio',
   'menu.you': 'Você',
+  /** Nome do jogador sem apelido nas partidas contra o bot (entra nas frases do log, em terceira pessoa). */
+  'menu.youName': 'Você',
   'menu.botName': 'Bot',
   'menu.botLevel': 'Nível do bot',
   'menu.botEasy': 'Fácil',

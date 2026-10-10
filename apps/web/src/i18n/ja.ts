@@ -188,6 +188,7 @@ export default {
   'menu.whoStarts': '先攻',
   'menu.firstRandom': 'ランダム',
   'menu.you': 'あなた',
+  'menu.youName': 'プレイヤー',
   'menu.botName': 'Bot',
   'menu.botLevel': 'Botの強さ',
   'menu.botEasy': 'かんたん',

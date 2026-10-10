@@ -188,6 +188,7 @@ export default {
   'menu.whoStarts': 'Quién empieza',
   'menu.firstRandom': 'A suertes',
   'menu.you': 'Tú',
+  'menu.youName': 'Jugador',
   'menu.botName': 'Bot',
   'menu.botLevel': 'Nivel del bot',
   'menu.botEasy': 'Fácil',

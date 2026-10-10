@@ -188,6 +188,7 @@ export default {
   'menu.whoStarts': 'Who goes first',
   'menu.firstRandom': 'Coin flip',
   'menu.you': 'You',
+  'menu.youName': 'Player',
   'menu.botName': 'Bot',
   'menu.botLevel': 'Bot level',
   'menu.botEasy': 'Easy',
