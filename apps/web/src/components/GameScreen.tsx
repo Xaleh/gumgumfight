@@ -24,6 +24,7 @@ import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
 import { type GameSetup, useGame } from '../game/useGame';
+import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
@@ -342,6 +343,14 @@ function Table({
     tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
     lastAction: allActions[allActions.length - 1],
     lang,
+  });
+  // Sons da mesa e música da partida (os mesmos pontos que as animações; valem sem elas também).
+  useMatchAudio(state, {
+    enabled: !game.jumped && !(replay && game.speed >= 8),
+    animate: animate && !game.jumped,
+    tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
+    human,
+    lastAction: allActions[allActions.length - 1],
   });
   // Replay: o clique/seleção do jogador na próxima ação do roteiro (na mesa e na barra), para quem assiste
   // ou audita ver a decisão antes do resultado. Em 8× a mesa já muda sem animação: só a barra mostra.

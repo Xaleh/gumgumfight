@@ -577,6 +577,14 @@ carregar, sem piscar o tema claro. As cores das cartas, dos DON!! e dos dados n�
 - Nomes de cartas, tipos ({Straw Hat Crew}) e palavras-chave (Rush, Blocker, Counter, Trigger...) ficam no original,
   como nas cartas físicas.
 
+### Som
+
+O jogo tem efeitos sonoros (cartas, DON!!, ataques, dano, dados, chat e o resultado) e uma trilha original, a
+"Valsa do Mar", no menu e na partida. Em **⚙️ Configurações** há um volume para os efeitos e outro para a música,
+com botão de mudo, guardados no navegador. O som só começa depois do primeiro toque na página (regra dos
+navegadores) e, no iPhone, respeita a chave de silencioso. Os efeitos são CC0 (Kenney e OpenGameArt) e a música foi
+composta para o projeto: veja `apps/web/src/assets/audio/CREDITS.md`.
+
 ## Testes
 
 ```bash

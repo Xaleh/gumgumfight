@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { isAdmin, isDev, type OnlineSeat, type WatchTarget } from './api';
+import { audio } from './audio';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
 import { Coverage } from './components/Coverage';
@@ -54,6 +55,11 @@ export function App() {
       /* sem armazenamento */
     }
   }, [screen]);
+  // Música do menu em toda tela fora da mesa (a mesa troca para a música da partida ao abrir).
+  const inMatch = screen.name === 'game' || screen.name === 'online' || screen.name === 'watch';
+  useEffect(() => {
+    if (!inMatch) audio.music('menu');
+  }, [inMatch]);
   const role = useAuth().user?.role;
   const dev = isDev(role);
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;

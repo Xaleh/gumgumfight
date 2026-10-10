@@ -15,6 +15,7 @@
 
 import type { GameState, PlayerId } from '@gumgum/engine';
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { audio } from '../audio';
 import type { DiceThrow } from '../game/useOnlineGame';
 import { CardView } from './CardView';
 
@@ -413,6 +414,7 @@ export function DiceRoll({
       thrownAt: performance.now(),
     });
     setStatus(i, 'rolling');
+    audio.play('dice-throw');
     // O seu lançamento vai para o oponente (em frações da mesa, que muda de tamanho entre telas).
     if (i === 0 && ctrl[0] === 'user') remote?.send(d.vx / W, d.vy / H);
     ensureLoop();
@@ -424,6 +426,7 @@ export function DiceRoll({
     d.state = 'shaking';
     d.shakeUntil = performance.now() + 850;
     setStatus(i, 'shaking');
+    audio.play('dice-shake');
     ensureLoop();
   }
 
