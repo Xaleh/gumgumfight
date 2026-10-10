@@ -3,10 +3,19 @@ import { useEffect, useState } from 'react';
 import { api, type FormatId, type MatchReport, type MatchSummary, type RoomQueue } from '../api';
 import { setupFromReplay } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
-import { QUEUE_LABEL } from './HomeBlocks';
+import { type MessageKey, useLocale, useT } from '../i18n';
+import { fmtDateTime } from '../i18n/format';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const dateTime = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+/** Nome de cada fila na lista de relatos: chave do dicionário. */
+const QUEUE_LABEL: Record<RoomQueue, MessageKey> = {
+  private: 'reports.queue.private',
+  casual: 'reports.queue.casual',
+  ranked: 'reports.queue.ranked',
+  bot: 'reports.queue.bot',
+  tournament: 'reports.queue.tournament',
+};
 
 /** Abre o replay gravado de uma partida na mesa. */
 export const openReplay = (statsMatchId: number, onReplay: (setup: GameSetup) => void) =>
@@ -47,6 +56,9 @@ export function ReportList({
   onReplay: (setup: GameSetup) => void;
   setError: (e: string | null) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
+  const dateTime = (iso: string) => fmtDateTime(iso, locale);
   const [busy, setBusy] = useState<number | null>(null);
   const [noteFor, setNoteFor] = useState<number | null>(null);
   const [note, setNote] = useState('');
@@ -69,67 +81,64 @@ export function ReportList({
       setNote('');
     });
 
-  if (!reports.length) return <p className="muted">Nenhum relato.</p>;
+  if (!reports.length) return <p className="muted">{t('reports.none')}</p>;
   return (
     <div className="report-list">
       {reports.map((r) => {
         const m = r.match;
+        const queueKey = m ? QUEUE_LABEL[m.queue as RoomQueue] : undefined;
         return (
           <article key={r.id} className={['report-card', r.resolvedAt ? 'resolved' : ''].join(' ')}>
             <header className="report-head">
-              <span className={['tour-status', r.resolvedAt ? 'finished' : 'running'].join(' ')}>{r.resolvedAt ? 'Resolvido' : 'Aberto'}</span>
+              <span className={['tour-status', r.resolvedAt ? 'finished' : 'running'].join(' ')}>{r.resolvedAt ? t('reports.resolved') : t('reports.open')}</span>
               {m && (
                 <span className="muted small">
-                  {QUEUE_LABEL[m.queue as RoomQueue] ?? m.queue} · {formatLabel(m.format as FormatId)} · {dateTime(m.playedAt)}
-                  {m.tournament && ` · ${m.tournament.name} · Rodada ${m.tournament.round} · Mesa ${m.tournament.table} · Jogo ${m.tournament.game}`}
+                  {queueKey ? t(queueKey) : m.queue} · {formatLabel(m.format as FormatId)} · {dateTime(m.playedAt)}
+                  {m.tournament &&
+                    t('reports.tourInfo', { name: m.tournament.name, round: m.tournament.round, table: m.tournament.table, game: m.tournament.game })}
                 </span>
               )}
             </header>
             {m ? (
               <p className="report-players">
                 <MatchLine m={m} />
-                {m.winner === null && <span className="muted small"> · sem vencedor</span>}
+                {m.winner === null && <span className="muted small"> · {t('reports.noWinner')}</span>}
                 {m.reason && <span className="muted small"> · {m.reason}</span>}
               </p>
             ) : (
-              <p className="muted small">Partida #{r.matchId} (não encontrada).</p>
+              <p className="muted small">{t('reports.matchMissing', { id: r.matchId })}</p>
             )}
             <p className="report-text">
               <b>{r.reporterName}</b> <span className="muted small">({dateTime(r.createdAt)})</span>: {r.text}
             </p>
             {r.resolvedAt && (
               <p className="muted small">
-                Resolvido em {dateTime(r.resolvedAt)}
-                {r.note ? `: ${r.note}` : '.'}
+                {r.note ? t('reports.resolvedAtNote', { date: dateTime(r.resolvedAt), note: r.note }) : t('reports.resolvedAt', { date: dateTime(r.resolvedAt) })}
               </p>
             )}
             <div className="btn-row">
-              <button
-                className="btn small"
-                disabled={busy === r.id}
-                onClick={() => run(r.id, () => openReplay(r.matchId, onReplay))}
-              >
-                ▶ Assistir replay
+              <button className="btn small" disabled={busy === r.id} onClick={() => run(r.id, () => openReplay(r.matchId, onReplay))}>
+                {t('reports.watchReplay')}
               </button>
               {r.resolvedAt ? (
                 <button className="btn small" disabled={busy === r.id} onClick={() => resolve(r, false)}>
-                  Reabrir
+                  {t('reports.reopen')}
                 </button>
               ) : noteFor === r.id ? (
                 <>
                   <input
                     className="admin-search report-note"
-                    placeholder="Nota (opcional): o que foi feito"
+                    placeholder={t('reports.notePlaceholder')}
                     maxLength={2000}
                     value={note}
                     autoFocus
                     onChange={(e) => setNote(e.target.value)}
                   />
                   <button className="btn small primary" disabled={busy === r.id} onClick={() => resolve(r, true)}>
-                    Confirmar
+                    {t('reports.confirm')}
                   </button>
                   <button className="btn small" onClick={() => setNoteFor(null)}>
-                    Cancelar
+                    {t('common.cancel')}
                   </button>
                 </>
               ) : (
@@ -141,7 +150,7 @@ export function ReportList({
                     setNoteFor(r.id);
                   }}
                 >
-                  ✔ Resolver
+                  {t('reports.resolve')}
                 </button>
               )}
             </div>
@@ -154,6 +163,7 @@ export function ReportList({
 
 /** Relatos carregados do servidor (todos, para admin; de um torneio, para o organizador), com filtro por situação. */
 export function ReportsPanel({ tournament, onReplay }: { tournament?: string; onReplay: (setup: GameSetup) => void }) {
+  const t = useT();
   const [status, setStatus] = useState<'open' | 'resolved' | 'all'>('open');
   const [reports, setReports] = useState<MatchReport[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -173,19 +183,19 @@ export function ReportsPanel({ tournament, onReplay }: { tournament?: string; on
       <div className="seg small">
         {(
           [
-            ['open', 'Abertos'],
-            ['resolved', 'Resolvidos'],
-            ['all', 'Todos'],
+            ['open', 'reports.filterOpen'],
+            ['resolved', 'reports.filterResolved'],
+            ['all', 'reports.filterAll'],
           ] as const
         ).map(([k, label]) => (
           <button key={k} className={status === k ? 'on' : ''} onClick={() => setStatus(k)}>
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>
       {error && <div className="error">{error}</div>}
       {reports === null && !error ? (
-        <p className="muted">Carregando…</p>
+        <p className="muted">{t('common.loading')}</p>
       ) : reports ? (
         <ReportList
           reports={reports}
@@ -194,10 +204,7 @@ export function ReportsPanel({ tournament, onReplay }: { tournament?: string; on
           onChanged={(r) => setReports((list) => list?.map((x) => (x.id === r.id ? r : x)) ?? null)}
         />
       ) : null}
-      <p className="muted small">
-        Os jogadores relatam problemas ao fim das partidas ranqueadas e de torneio. Toda partida fica gravada: o replay mostra
-        exatamente o que aconteceu.
-      </p>
+      <p className="muted small">{t('reports.panelHint')}</p>
     </section>
   );
 }
