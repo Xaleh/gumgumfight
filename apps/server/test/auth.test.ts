@@ -1,4 +1,4 @@
-import { actingPlayer, type Action, applyAction, type CardData, chooseBotAction, createGame, type DeckList } from '@gumgum/engine';
+import { actingPlayer, type Action, applyAction, type CardData, chooseSimpleBotAction as chooseBotAction, createGame, type DeckList } from '@gumgum/engine';
 import { generateKeyPairSync, type KeyObject, sign } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

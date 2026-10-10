@@ -243,7 +243,8 @@ está na fila e os espectadores também contam.
   2 minutos desconectado, perde por abandono.
 - **Ranqueada:** só com login Google e só com decks sem cartas ⚙ (efeito ainda não automatizado). O pareamento junta
   recompensas parecidas e a faixa abre com o tempo de espera.
-- **Sem desfazer, Auto ou pausa** no online. Mensagens rápidas (emotes de uma lista fixa), revanche nas salas privadas e
+- **Sem desfazer, Auto ou pausa** no online. Chat da partida (mensagens curtas, com palavrões censurados no servidor, e
+  emotes de uma lista fixa; em Configurações dá para esconder o que o oponente manda), revanche nas salas privadas e
   o replay completo para baixar no fim.
 - **Proteção contra abuso:** abrir salas não exige login, então há tetos: salas ativas no servidor
   (`ONLINE_MAX_ROOMS`), salas de treino contra o bot (`ONLINE_MAX_BOT_ROOMS`), e por IP (16 salas ou lugares na fila
@@ -281,7 +282,7 @@ espectadores seguem para a partida nova.
 
 Cada conta Google tem um perfil (coluna `users.role`): **Player** (padrão: joga e assiste sem ver as mãos),
 **Streamer** (assiste vendo as mãos), **Organizador** (cria torneios e gerencia os que criou), **Admin** (tudo
-isso, gerencia qualquer torneio e muda os perfis em **Perfis das contas**, no menu) ou **Dev** (tudo do Admin e as
+isso, gerencia qualquer torneio, muda os perfis e vê os relatos de partidas em **Administração**, no menu) ou **Dev** (tudo do Admin e as
 funções de desenvolvimento). Sem login, a pessoa assiste como Player.
 
 O primeiro admin vem da variável `ADMIN_EMAILS`: quem entra com um desses e-mails (verificado pelo Google) vira Admin
@@ -305,6 +306,18 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 
 - **Criação:** nome, descrição e regras, formato (Standard ou Extra Grand Battle), estrutura, limite de jogadores e
   início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
+- **Check-in, início automático e W.O. por ausência** (torneios com data de início; ligado por padrão ao criar):
+  - O **check-in** abre 30 minutos antes do início, na página do torneio e num atalho no alto da tela inicial, para
+    quem está inscrito.
+  - Na hora marcada o torneio **começa sozinho**: a rodada 1 é sorteada entre todos os inscritos e a sala de cada mesa
+    fica pronta para os dois jogadores (o atalho da tela inicial vira **Entrar na sala**). O organizador ainda pode
+    começar antes à mão.
+  - Em cada rodada, cada jogador tem a **tolerância escolhida pelo organizador** (1 a 60 minutos; padrão 5) para
+    entrar na sala. Quem não entra **perde por W.O.** e sai do torneio; se nenhum dos dois entra, **os dois perdem**
+    (W.O. duplo: na chave, a mesa seguinte fica com bye). Na rodada 1, o check-in feito antes já vale como presença.
+    Depois do primeiro jogo de uma série a tolerância não corre mais (o organizador lança o placar, se precisar).
+  - Durante o torneio, a tela inicial mostra a sua partida da rodada (mesa, oponente e prazo) com o atalho para a
+    sala, ou avisa que você espera a próxima rodada.
 - **Não há empate** (como no One Piece TCG): toda partida tem um vencedor.
 - **Tempo:** cada jogador tem 17min30s por jogo, que só corre na vez dele, e quem zera o tempo perde. Por isso as
   regras oficiais de tempo esgotado (turnos extras e o desempate por Vida, cartas no deck, Personagens e última
@@ -335,6 +348,11 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 - **Organização:** o organizador lança o placar de qualquer partida (W.O., queda de conexão, partida jogada fora do
   site), tira jogadores e avança: próxima rodada do suíço, início do top cut, próxima fase da chave e, depois da
   final, o encerramento. **Encerrar agora** termina antes.
+- **Auditoria:** todo jogo disputado nas salas fica gravado com o replay. Em cada partida da aba Rodadas, **Jogos
+  gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os dois jogadores podem
+  **assistir ao replay**. Ao fim de uma partida de torneio ou ranqueada, o jogador pode **relatar um problema**
+  (botão ⚑ na tela de resultado); o relato, com o replay, aparece na aba **Relatos** do torneio para o organizador e
+  em **Administração → Relatos de partidas** para Admin e Dev, que o resolvem com uma nota.
 - **Correção de resultados:** um placar lançado errado pode ser corrigido em qualquer rodada, inclusive passadas (a
   classificação é recalculada). Na chave, corrigir quem venceu troca o jogador da partida seguinte, desde que ela
   ainda não tenha começado (senão, corrija ou zere antes a partida seguinte). Resultados do suíço não mudam depois
@@ -404,6 +422,10 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
   (jogadores, Líderes, ações, turnos e, se quiser, o resultado) e assista no modo **automático** ou **passo a passo**.
   A barra de baixo tem ⏮ início, ◀ ação anterior, ▶/❚❚, ▶| próxima ação, ⏭ fim, a barra de progresso (pula para
   qualquer ação) e a velocidade (0.25× a 8×; em 8× sem animações). Atalhos: espaço, ← →, Home, End, + e −.
+  Antes de cada ação, a mesa mostra o **clique/seleção do jogador** (contorno nas cartas e nos DON!! tocados, o toque e
+  uma legenda como "Luffy: Atacar Zoro com Nami" ou "Nami: Não usar Counter"); a barra repete a frase por escrito. No
+  passo a passo, o contorno fica parado na "Próxima ação" até você avançar. Para ver só a mesa, desligue "Cliques no
+  replay" (nas configurações, ao abrir o replay ou no botão 👆 da barra).
   Replays antigos continuam abrindo (são convertidos para a versão atual); os que não trazem as listas precisam
   que os decks ainda existam.
 - Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
@@ -555,6 +577,14 @@ carregar, sem piscar o tema claro. As cores das cartas, dos DON!! e dos dados n�
 - Nomes de cartas, tipos ({Straw Hat Crew}) e palavras-chave (Rush, Blocker, Counter, Trigger...) ficam no original,
   como nas cartas físicas.
 
+### Som
+
+O jogo tem efeitos sonoros (cartas, DON!!, ataques, dano, dados, chat e o resultado) e uma trilha original, a
+"Valsa do Mar", no menu e na partida. Em **⚙️ Configurações** há um volume para os efeitos e outro para a música,
+com botão de mudo, guardados no navegador. O som só começa depois do primeiro toque na página (regra dos
+navegadores) e, no iPhone, respeita a chave de silencioso. Os efeitos são CC0 (Kenney e OpenGameArt) e a música foi
+composta para o projeto: veja `apps/web/src/assets/audio/CREDITS.md`.
+
 ## Testes
 
 ```bash
@@ -595,9 +625,9 @@ npm run typecheck
 | POST   | `/api/online/rooms/join` | Entra numa sala (`{ code, deckId }`) |
 | POST   | `/api/online/queue` | Entra na fila (`{ deckId, format, queue: casual \| ranked }`) |
 | GET / DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela |
-| GET    | `/api/online/rooms/:id/events?t=` | Canal SSE: visão do jogador, relógios, presença, emotes |
+| GET    | `/api/online/rooms/:id/events?t=` | Canal SSE: visão do jogador, relógios, presença, emotes e chat |
 | POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
-| POST   | `/api/online/rooms/:id/emote` · `/rematch` · `/leave` | Emote, revanche (salas privadas) e cancelar a sala |
+| POST   | `/api/online/rooms/:id/emote` · `/chat` · `/rematch` · `/leave` | Emote, mensagem do chat (`{ t, text }`, até 120 caracteres, censurada), revanche (salas privadas) e cancelar a sala |
 | GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim) |
 | POST   | `/api/online/bot` | Treino contra o bot transmitido, só com login (`{ deckId, botDeckId \| random, format, first? }`, `first`: 0 = jogador, 1 = bot, ausente = sorteio; 401 sem login; desligado com `ONLINE_BOT_ROOMS=off`) |
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |

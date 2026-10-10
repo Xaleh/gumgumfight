@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { isAdmin, isDev, type OnlineSeat, type WatchTarget } from './api';
+import { audio } from './audio';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
 import { Coverage } from './components/Coverage';
@@ -21,7 +22,8 @@ type Screen =
   /** `tournament`: veio da página de um torneio (e volta para ela); `home`: veio do "Ao vivo agora" do menu. */
   | { name: 'watch'; target: WatchTarget; tournament?: string; home?: boolean }
   | { name: 'tournaments'; id?: string }
-  | { name: 'game'; setup: GameSetup; key: number }
+  /** `back`: tela para onde "Voltar" leva (replay aberto da página de um torneio ou da administração). */
+  | { name: 'game'; setup: GameSetup; key: number; back?: Screen }
   | { name: 'online'; seat: OnlineSeat; tournament?: string };
 
 /** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
@@ -53,12 +55,24 @@ export function App() {
       /* sem armazenamento */
     }
   }, [screen]);
+  // Música do menu em toda tela fora da mesa (a mesa troca para a música da partida ao abrir).
+  const inMatch = screen.name === 'game' || screen.name === 'online' || screen.name === 'watch';
+  useEffect(() => {
+    if (!inMatch) audio.music('menu');
+  }, [inMatch]);
   const role = useAuth().user?.role;
   const dev = isDev(role);
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'coverage' && dev) return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} />;
-  if (screen.name === 'admin' && isAdmin(role)) return <Admin onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'admin' && isAdmin(role)) {
+    return (
+      <Admin
+        onExit={() => setScreen({ name: 'menu' })}
+        onReplay={(setup) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'admin' } })}
+      />
+    );
+  }
   if (screen.name === 'tournaments') {
     return (
       <Tournaments
@@ -66,6 +80,7 @@ export function App() {
         onExit={() => setScreen({ name: 'menu' })}
         onPlay={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
         onWatch={(target, tournament) => setScreen({ name: 'watch', target, tournament })}
+        onReplay={(setup, tournament) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'tournaments', id: tournament } })}
       />
     );
   }
@@ -101,7 +116,7 @@ export function App() {
       <GameScreen
         key={screen.key}
         setup={setup}
-        onExit={() => setScreen({ name: 'menu' })}
+        onExit={() => setScreen(screen.back ?? { name: 'menu' })}
         onRematch={
           setup.mode === 'replay'
             ? undefined
@@ -125,6 +140,7 @@ export function App() {
       onWatch={() => setScreen({ name: 'watch-list' })}
       onWatchRoom={(target) => setScreen({ name: 'watch', target, home: true })}
       onTournaments={(id) => setScreen({ name: 'tournaments', id })}
+      onTournamentMatch={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
       dev={dev}
     />

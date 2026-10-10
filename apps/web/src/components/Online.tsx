@@ -1,7 +1,10 @@
 import type { PlayerId } from '@gumgum/engine';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { audio } from '../audio';
 import type { OnlineRoomInfo } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
+import { useSettings } from '../settings';
+import { ReportModal } from './ReportModal';
 
 export const TIER_LABEL: Record<string, string> = {
   'east-blue': 'East Blue',
@@ -23,6 +26,8 @@ const EMOTES: Array<[string, string]> = [
   ['hurry', 'Vamos lá? ⏳'],
 ];
 const EMOTE_TEXT = Object.fromEntries(EMOTES);
+/** Igual ao limite do servidor (CHAT_MAX_LENGTH em room.ts). */
+const CHAT_MAX_LENGTH = 120;
 
 /** Placar da série de torneio depois deste jogo (na ordem dos assentos) e se ela acabou. */
 export function seriesAfter(t: NonNullable<OnlineRoomInfo['tournament']>, winner: PlayerId | null) {
@@ -103,49 +108,148 @@ export function OnlineStatus({ online }: { online: OnlineGame }) {
   return null;
 }
 
-/** Botão de emotes (lista fixa, sem chat livre). */
-export function EmoteBar({ online }: { online: OnlineGame }) {
+/** Mensagens do oponente aparecem? (configuração geral e o silêncio só desta partida). */
+function useShowOpponent(online: OnlineGame) {
+  const { opponentChat } = useSettings();
+  return online.watching || (opponentChat && !online.muted);
+}
+
+/** Painel de chat da partida: emotes (atalhos) e mensagens de texto curtas. */
+export function ChatBar({ online }: { online: OnlineGame }) {
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [unread, setUnread] = useState(0);
+  const showOpponent = useShowOpponent(online);
+  const mine = online.room?.you ?? null;
+  const messages = showOpponent ? online.chat : online.chat.filter((m) => m.seat === mine);
+  const logRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const seen = useRef(0);
+
+  // Mensagem ou emote do oponente: um toque curto (com o painel aberto ou fechado).
+  const heard = useRef(messages.length);
+  useEffect(() => {
+    if (messages.length > heard.current && messages.slice(heard.current).some((m) => m.seat !== mine)) audio.play('chat', { detune: 0 });
+    heard.current = messages.length;
+  }, [messages, mine]);
+
+  // Mensagens que chegaram com o painel fechado contam como não lidas.
+  useEffect(() => {
+    if (open) {
+      seen.current = messages.length;
+      setUnread(0);
+      return;
+    }
+    const fresh = messages.slice(seen.current).filter((m) => m.seat !== mine).length;
+    setUnread(fresh);
+  }, [open, messages, mine]);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    inputRef.current?.focus();
+  }, [open, messages.length]);
+
+  const send = () => {
+    const text = draft.trim();
+    if (!text) return;
+    void online.sendChat(text);
+    setDraft('');
+    inputRef.current?.focus();
+  };
+  const name = (seat: PlayerId) => (seat === mine ? 'Você' : (online.room?.players[seat]?.name ?? 'Oponente'));
+
   return (
     <div className="emote-bar">
-      <button className="round-btn" onClick={() => setOpen((o) => !o)} aria-label="Emotes" title="Mensagens rápidas">
+      <button className="round-btn chat-btn" onClick={() => setOpen((o) => !o)} aria-label="Chat da partida" title="Chat e mensagens rápidas">
         💬
+        {unread > 0 && !open && <span className="chat-unread">{unread > 9 ? '9+' : unread}</span>}
       </button>
       {open && (
-        <div className="emote-list">
-          {EMOTES.map(([id, text]) => (
+        <div className="chat-panel">
+          <div className="chat-head">
+            <strong>Chat</strong>
             <button
-              key={id}
-              className="btn small"
-              onClick={() => {
-                void online.sendEmote(id);
-                setOpen(false);
-              }}
+              type="button"
+              className={['btn small', online.muted ? 'on' : ''].join(' ')}
+              aria-pressed={online.muted}
+              onClick={() => online.setMuted(!online.muted)}
+              title={online.muted ? 'Voltar a ver as mensagens e emotes do oponente nesta partida' : 'Esconder as mensagens e emotes do oponente só nesta partida'}
             >
-              {text}
+              {online.muted ? '🔇 Silenciado' : '🔊 Silenciar'}
             </button>
-          ))}
+            <button type="button" className="btn small" onClick={() => setOpen(false)} aria-label="Fechar o chat">
+              ✕
+            </button>
+          </div>
+          <div className="emote-list">
+            {EMOTES.map(([id, text]) => (
+              <button key={id} className="btn small" onClick={() => void online.sendEmote(id)}>
+                {text}
+              </button>
+            ))}
+          </div>
+          <div className="chat-log" ref={logRef} aria-live="polite">
+            {messages.length === 0 && <div className="muted small">{showOpponent ? 'Nenhuma mensagem ainda.' : 'Mensagens do oponente escondidas.'}</div>}
+            {messages.map((m) => (
+              <div key={m.key} className={['chat-msg', m.seat === mine ? 'mine' : 'theirs'].join(' ')}>
+                <span className="chat-who">{name(m.seat)}</span> {m.text}
+              </div>
+            ))}
+          </div>
+          <form
+            className="chat-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
+          >
+            <input
+              ref={inputRef}
+              className="chat-input"
+              value={draft}
+              maxLength={CHAT_MAX_LENGTH}
+              placeholder="Mensagem para o oponente…"
+              aria-label="Mensagem"
+              autoComplete="off"
+              enterKeyHint="send"
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button type="submit" className="btn small primary" disabled={!draft.trim()}>
+              Enviar
+            </button>
+          </form>
         </div>
       )}
     </div>
   );
 }
 
-export function EmoteBubbles({ online, bottom }: { online: OnlineGame; bottom: PlayerId }) {
+/** Balões flutuantes com os emotes e as últimas mensagens de texto de cada lado. */
+export function ChatBubbles({ online, bottom }: { online: OnlineGame; bottom: PlayerId }) {
+  const showOpponent = useShowOpponent(online);
+  const visible = <T extends { seat: PlayerId }>(list: T[]) => (showOpponent ? list : list.filter((x) => x.seat === bottom));
   return (
     <>
-      {online.emotes.map((e) => (
+      {visible(online.emotes).map((e) => (
         <div key={e.key} className={['emote-bubble', e.seat === bottom ? 'mine' : 'theirs'].join(' ')}>
           {EMOTE_TEXT[e.emote] ?? e.emote}
+        </div>
+      ))}
+      {visible(online.chatBubbles).map((m) => (
+        <div key={m.key} className={['emote-bubble text', m.seat === bottom ? 'mine' : 'theirs'].join(' ')}>
+          {m.text}
         </div>
       ))}
     </>
   );
 }
 
-/** Fim da partida online: recompensa (ranqueada) e revanche. */
+/** Fim da partida online: recompensa (ranqueada), revanche e o relato de problema (ranqueada e torneio). */
 export function OnlineResultInfo({ online }: { online: OnlineGame }) {
   const { room } = online;
+  const [reporting, setReporting] = useState(false);
   if (!room) return null;
   if (room.you === null) {
     // Espectador: a recompensa dos dois.
@@ -193,6 +297,16 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
       {room.result?.error && <p className="muted small">{room.result.error}</p>}
       {room.queue === 'private' && room.rematch[opp] && !room.rematch[me] && (
         <p className="muted small">{room.players[opp]?.name} quer revanche!</p>
+      )}
+      {(room.queue === 'ranked' || room.queue === 'tournament') && room.result?.matchId != null && (
+        <p className="small">
+          <button className="btn small pill" onClick={() => setReporting(true)}>
+            ⚑ Relatar um problema
+          </button>
+        </p>
+      )}
+      {reporting && room.result?.matchId != null && (
+        <ReportModal matchId={room.result.matchId} tournament={t?.name ?? null} onClose={() => setReporting(false)} />
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import {
   applyAction,
   type CardData,
   type CardDef,
-  chooseBotAction,
+  chooseSimpleBotAction as chooseBotAction,
   type GameState,
   HIDDEN_CARD,
   legalActions,
@@ -217,6 +217,32 @@ describe('partidas online: salas privadas', () => {
     // Depois do sorteio (partida em andamento), não há mais dados.
     room.state!.phase = 'main';
     expect((await dice(tokens[1], { vx: 1, vy: 1 })).statusCode).toBe(409);
+  });
+
+  it('o chat chega censurado ao oponente e aos espectadores, com limites de tamanho e frequência', async () => {
+    const { app } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    const c1 = client(1);
+    const watcher = client(null);
+    room.attach(c1.conn);
+    room.attach(watcher.conn);
+    const chat = (t: string, text: unknown) => app.inject({ method: 'POST', url: `/api/online/rooms/${roomId}/chat`, payload: { t, text } });
+    expect((await chat('nada', 'oi')).statusCode).toBe(404);
+    expect((await chat(tokens[0], 42)).statusCode).toBe(400);
+    expect((await chat(tokens[0], '   \n ')).statusCode).toBe(400);
+    expect((await chat(tokens[0], 'x'.repeat(121))).statusCode).toBe(400);
+    expect((await chat(tokens[0], '  Boa   sorte,\nque porra é essa? ')).statusCode).toBe(204);
+    const seen = (c: ReturnType<typeof client>) => c.events.filter((e) => e.event === 'chat').map((e) => e.data);
+    expect(seen(c1)).toEqual([{ seat: 0, text: 'Boa sorte, que ***** é essa?' }]);
+    expect(seen(watcher)).toEqual([{ seat: 0, text: 'Boa sorte, que ***** é essa?' }]);
+    // Duas mensagens seguidas rápido demais: a segunda espera.
+    const fast = await chat(tokens[0], 'de novo');
+    expect(fast.statusCode).toBe(429);
+    expect(fast.json().error).toMatch(/Espere/);
+    // O outro assento tem o próprio limite.
+    expect((await chat(tokens[1], 'gg')).statusCode).toBe(204);
+    expect(seen(c1)).toHaveLength(2);
   });
 
   it('a partida sobrevive a um reinício do servidor', async () => {

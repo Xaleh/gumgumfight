@@ -1,16 +1,21 @@
 import {
   type Action,
   actingPlayer,
+  actionFromView,
   applyAction,
+  type BotLevel,
   chooseBotAction,
+  chooseSimpleBotAction,
   createGame,
   type DeckList,
   type GameConfig,
   type GameState,
   hiddenDecision,
+  identityAliases,
   type PlayerId,
   REPLAY_VERSION,
   ReplayCursor,
+  viewFor,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
@@ -26,6 +31,8 @@ export interface GameSetup {
   format: FormatId;
   /** Ações gravadas (modo replay / roteiro). */
   script?: Action[];
+  /** Nível do bot (padrão `hard`). */
+  botLevel?: BotLevel;
   /** Replay: começa pausado (passo a passo) ou rodando, e em que velocidade. */
   replayStart?: { paused: boolean; speed: number };
   /** Aviso mostrado na mesa ao começar (ex.: a transmissão não abriu e o treino roda no navegador). */
@@ -73,6 +80,17 @@ interface Entry {
 }
 
 const MAX_HISTORY = 400;
+
+/**
+ * Jogada do bot a partir da visão dele (como no servidor): ele não enxerga a mão nem o deck do humano.
+ * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
+ * partida não travar.
+ */
+function botAction(state: GameState, p: PlayerId, level: BotLevel): Action {
+  const aliases = identityAliases(state);
+  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, p, aliases), p, level));
+  return typeof real === 'string' ? chooseSimpleBotAction(state, p) : real;
+}
 /** Faixa de tempo (ms) do bot nas decisões que escondem informação (Counter, carta da Vida). */
 const HIDDEN_DECISION_MS = [800, 2000] as const;
 
@@ -85,6 +103,8 @@ export function useGame(setup: GameSetup) {
   const startRef = useRef<GameState | null>(null);
   /** Replay: posição no roteiro, com avançar, voltar e pular para qualquer ação. */
   const cursorRef = useRef<ReplayCursor | null>(null);
+  /** Replay (automático): quando (`performance.now()`) a próxima ação do roteiro será aplicada; null se nada está agendado. */
+  const dueRef = useRef<number | null>(null);
   const [entries, setEntries] = useState<Entry[]>(() => {
     const initial = createGame(setup.config);
     startRef.current = initial;
@@ -160,6 +180,7 @@ export function useGame(setup: GameSetup) {
 
   // Bots e replay agem sozinhos, com um pequeno atraso para a jogada ser visível.
   useEffect(() => {
+    dueRef.current = null;
     if (state.phase === 'gameover' || paused || hold) return;
     const cursor = cursorRef.current;
     const p = actingPlayer(state);
@@ -167,7 +188,7 @@ export function useGame(setup: GameSetup) {
     if (cursor) {
       if (cursor.pos < cursor.end) next = cursor.actions[cursor.pos];
     } else if (p !== null && (state.players[p].isBot || (auto && p === human))) {
-      next = chooseBotAction(state, p);
+      next = botAction(state, p, setup.botLevel ?? 'hard');
     }
     if (!next) return;
     // Espera as cartas pousarem antes da próxima jogada.
@@ -183,10 +204,17 @@ export function useGame(setup: GameSetup) {
           : state.pending
             ? 500
             : 800;
-    const delay = Math.max(base / speed, motionWait() + 120);
+    // No replay, depois de as cartas pousarem ainda há tempo de ver o clique do jogador (ReplayCue).
+    const delay = Math.max(base / speed, motionWait() + 120 + (cursor ? 420 / speed : 0));
+    // A mesa mostra o clique do jogador (ReplayCue) sincronizado com este momento.
+    if (cursor) dueRef.current = performance.now() + delay;
     const t = setTimeout(() => (cursor ? seek(cursor.pos + 1) : dispatch(next!)), delay);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      dueRef.current = null;
+    };
   }, [state, paused, hold, speed, setup, dispatch, seek, auto, human]);
+  const dueAt = useCallback(() => dueRef.current, []);
 
   const exportReplay = useCallback((): ReplayFile => {
     const first = startRef.current!;
@@ -220,6 +248,9 @@ export function useGame(setup: GameSetup) {
         seek,
         // Linhas do histórico que a ação atual escreveu (a partir desta).
         logFrom: cursor.previous ? cursor.previous.log.length : null,
+        // A próxima ação do roteiro: a mesa mostra o clique/seleção do jogador antes de aplicá-la.
+        next: cursor.pos < cursor.end ? cursor.actions[cursor.pos] : undefined,
+        dueAt,
       }
     : undefined;
 

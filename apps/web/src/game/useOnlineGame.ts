@@ -25,6 +25,18 @@ export interface Emote {
   key: number;
 }
 
+/** Mensagem do chat da partida (já censurada pelo servidor). */
+export interface ChatMessage {
+  seat: PlayerId;
+  text: string;
+  key: number;
+  /** Date.now() de quando chegou. */
+  at: number;
+}
+
+/** Quantas mensagens do chat ficam no histórico do painel. */
+const CHAT_HISTORY = 50;
+
 /** Revanche: a sala nova (espectadores recebem só o id e seguem assistindo). */
 export interface RematchTarget {
   roomId: string;
@@ -48,6 +60,12 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const [conn, setConn] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [emotes, setEmotes] = useState<Emote[]>([]);
+  /** Histórico do chat desta conexão (o servidor não guarda nada). */
+  const [chat, setChat] = useState<ChatMessage[]>([]);
+  /** Última mensagem de texto de cada assento ainda em balão (some sozinha). */
+  const [chatBubbles, setChatBubbles] = useState<ChatMessage[]>([]);
+  /** Silenciar o oponente só nesta partida (a configuração geral fica em Configurações). */
+  const [muted, setMuted] = useState(false);
   /** Lançamentos do dado do sorteio de cada assento (para ver o dado do oponente rolar). */
   const [diceThrows, setDiceThrows] = useState<[DiceThrow | null, DiceThrow | null]>([null, null]);
   const [rematch, setRematch] = useState<RematchTarget | null>(null);
@@ -107,6 +125,14 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
         const key = Date.now() + Math.random();
         setEmotes((list) => [...list.slice(-3), { ...m, key }]);
         setTimeout(() => setEmotes((list) => list.filter((x) => x.key !== key)), 3500);
+      });
+      es.addEventListener('chat', (e) => {
+        const m = JSON.parse((e as MessageEvent).data) as { seat: PlayerId; text: string };
+        const key = Date.now() + Math.random();
+        const msg: ChatMessage = { ...m, key, at: Date.now() };
+        setChat((list) => [...list.slice(-(CHAT_HISTORY - 1)), msg]);
+        setChatBubbles((list) => [...list.filter((x) => x.seat !== m.seat), msg]);
+        setTimeout(() => setChatBubbles((list) => list.filter((x) => x.key !== key)), 5000);
       });
       es.addEventListener('dice', (e) => {
         const t = JSON.parse((e as MessageEvent).data) as DiceThrow;
@@ -205,6 +231,10 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     (emote: string) => api.online.emote(seat.roomId, seat.token, emote).catch((e) => setError(e instanceof Error ? e.message : String(e))),
     [seat.roomId, seat.token],
   );
+  const sendChat = useCallback(
+    (text: string) => api.online.chat(seat.roomId, seat.token, text).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+    [seat.roomId, seat.token],
+  );
   const sendDice = useCallback(
     (vx: number, vy: number) => {
       if (!watching) void api.online.dice(seat.roomId, seat.token, vx, vy).catch(() => undefined);
@@ -242,6 +272,11 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     dispatch,
     emotes,
     sendEmote,
+    chat,
+    chatBubbles,
+    sendChat,
+    muted,
+    setMuted,
     diceThrows,
     sendDice,
     rematch,

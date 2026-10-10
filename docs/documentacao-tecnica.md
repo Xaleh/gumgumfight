@@ -123,7 +123,9 @@ gumgumfight/
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
 │   ├── src/cards/scripts.ts     scripts escritos à mão (62 cartas, prioridade sobre o parser)
 │   ├── src/i18n/pt.ts, render.ts   tradução automática para português
-│   ├── src/bot/simple.ts        bot heurístico
+│   ├── src/bot/simple.ts        bot heurístico (nível fácil)
+│   ├── src/bot/evaluate.ts      função de avaliação do bot com busca
+│   ├── src/bot/planner.ts       bot com busca (níveis normal e difícil)
 │   ├── scripts/simulate*.ts     simulações bot x bot na linha de comando
 │   └── test/                    46 arquivos de teste + fixtures
 ├── apps/server/                 API Fastify
@@ -146,6 +148,8 @@ gumgumfight/
 │   ├── src/App.tsx              seleção de tela (useState<Screen>, sem roteador)
 │   ├── src/api.ts               todos os fetches, header x-deck-owner, URLs de SSE
 │   ├── src/auth.tsx, settings.tsx   contexts
+│   ├── src/audio.ts             efeitos e música (Web Audio); src/assets/audio/ com os MP3 e CREDITS.md
+│   ├── src/game/useMatchAudio.ts   sons derivados das mudanças de estado da partida
 │   ├── src/game/useGame.ts      partida local (motor + bot no navegador, undo, replay)
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
 │   ├── src/components/          Menu, DeckBuilder, GameScreen (2.319 linhas), Board, Watch, Tournaments, Stats, Admin…
@@ -220,11 +224,27 @@ regras especiais do Líder.
 `translateCardPt` monta o português a partir da DSL; o que o parser não entendeu passa por `translateToPt` (regras de
 frase). Resultado `complete: boolean` → o servidor marca `i18n.pt.source = manual | auto | partial`.
 
-### Bot (`bot/simple.ts`)
+### Bot (`bot/`)
 
-Heurístico (valor = custo × 1000 + poder): joga a carta mais cara, anexa DON!! até superar o Líder inimigo, ataca
-para K.O. de custo ≥ 3 ou o Líder, bloqueia/conta só quando vale a pena. Objetivo: partidas plausíveis para testes,
-não jogar bem. É o mesmo bot usado no navegador (contra o bot) e no servidor (treino transmitido, `queue: 'bot'`).
+Três níveis (`BotLevel`), escolhidos no menu "Contra o bot"; o servidor (treino transmitido, `queue: 'bot'`) usa o `hard`.
+Todos decidem pela **visão** do jogador (`viewFor`): no navegador, `useGame.ts` monta a visão com `identityAliases`
+e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
+
+- **`easy`** (`simple.ts`): heurístico (valor = custo × 1000 + poder): joga a carta mais cara, anexa DON!! até superar
+  o Líder inimigo, ataca para K.O. de custo ≥ 3 ou o Líder, bloqueia/conta só quando vale a pena. Rápido (< 1 ms);
+  é o bot dos testes de simulação (`sim.ts`) e do `simulate:all`.
+- **`normal`** e **`hard`** (`planner.ts` + `evaluate.ts`): simulam as jogadas com `applyAction` e comparam pela
+  função de avaliação (`evaluate`, pesos em `DEFAULT_WEIGHTS`). `normal` olha uma jogada à frente; `hard` faz busca
+  em feixe sobre o turno inteiro (jogadas compostas "anexar k DON!! e atacar", teto de 250 ms por busca) e guarda a
+  linha escolhida para as decisões seguintes enquanto a partida seguir o previsto. As escolhas pendentes (bloqueio,
+  Counter, carta da Vida, alvos, opções, "pagar X?") simulam cada resposta possível. O oponente, na simulação,
+  bloqueia do jeito que mais prejudica o bot e nunca usa Counter (a mão dele é escondida): o Counter entra como um
+  ajuste de probabilidade pelo tamanho da mão e pela margem do ataque (`counterAdjust`).
+- Para a simulação funcionar na visão, os frames de efeito **do próprio jogador** vão inteiros na visão (passos,
+  escolhas, alvos, com uids apelidados); os do oponente seguem só com a carta de origem.
+
+Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
+[`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`.
 
 ---
 
@@ -252,7 +272,10 @@ não jogar bem. É o mesmo bot usado no navegador (contra o bot) e no servidor (
 - **Sem login**: o navegador gera `gumgum.owner` (24 bytes aleatórios em hex) e manda em **todo** fetch no header
   `x-deck-owner`. O servidor guarda só `sha256(token)` (`owner_hash`).
 - **Com login**: o cookie `gg_session` identifica a conta; o dono passa a ser `user:<id>`.
-- Rate limit nas ações das salas (60 ações / 10 s por assento) e nos emotes (1 / 3 s).
+- Rate limit nas ações das salas (60 ações / 10 s por assento), nos emotes (1 / 3 s) e no chat (1 / 1,5 s e 10 / min por
+  assento). O chat (`Room.chat`) limpa o texto (sem controle/quebras, até 120 caracteres) e censura palavrões em PT/EN
+  (`online/profanity.ts`: palavra inteira, sem acentos, com trocas de letra por número/símbolo, repetição e soletrado) antes
+  de repassar; nada fica gravado.
 - **Tetos de salas** (`online/lobby.ts`, `DEFAULT_LIMITS`, conferidos em `lobby.admit` antes de criar sala, entrar numa,
   entrar na fila ou abrir treino contra o bot): 400 salas ativas no servidor (`ONLINE_MAX_ROOMS`, 503 acima), 100 salas de
   bot (`ONLINE_MAX_BOT_ROOMS`, 503; o menu cai para o treino no navegador), 16 salas ou lugares na fila por IP ao mesmo tempo (429) e 60 criações por IP a cada
@@ -290,7 +313,7 @@ privada), lido uma vez e removido com `history.replaceState`.
 | Chave | Conteúdo |
 |---|---|
 | `localStorage.gumgum.owner` | token do dono dos decks/perfil (sem login) |
-| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, theme}` |
+| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, replayCues, theme, opponentChat, sfxVolume, musicVolume}` |
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
 | `localStorage.gumgum.watchHands`, `gumgum.statsFilters`, `gumgum.statsMin` | preferências de espectador e estatísticas |
 | `sessionStorage.gumgum.openMatch` | partida/transmissão aberta |
@@ -311,6 +334,18 @@ responde 503 (transmissão lotada), o menu começa o treino no navegador e a mes
 convertido; com `decks` no arquivo (online e, desde o card 73, também os baixados no navegador) os decks não precisam
 existir. O `useGame` usa um `ReplayCursor`; a `ReplayBar` (abaixo da mesa) avança, volta e pula. Pulos e a velocidade 8×
 mudam a mesa sem animação. Nada é gravado em `matches`.
+
+**Clique/seleção no replay** (`game/replayCue.ts` + `ReplayCue.tsx`): antes de cada ação do roteiro ser aplicada, a mesa
+mostra o que o jogador tocou, para quem assiste ou audita ver a decisão e não só o resultado. O replay não grava cliques à
+parte: cada `Action` já diz o que foi selecionado (`playCard.uid`, `attack.attacker/target`, `choose.uids`, `option.index`,
+`answer.yes`, `counter.uid/target`…), e `describeReplayAction(estado, ação)` traduz a ação de volta para o gesto, com as
+palavras dos botões e das cartas que o jogador viu ("Atacar Zoro com Nami", "Não usar Counter", "Trocar mão"). Na mesa, as
+cartas e os DON!! envolvidos ganham um contorno (numerado na ordem dos cliques: DON!! → carta, atacante → alvo), um toque
+animado no instante em que a ação cai (`useGame` expõe `replay.dueAt`) e uma legenda junto do elemento (ou do lado da mão de
+quem agiu, nas respostas sem carta na mesa: opções, sim/não, encerrar turno). A `ReplayBar` repete a mesma frase por
+escrito. Pausado (passo a passo), contorno e legenda ficam parados em "Próxima ação"; em 8× só a barra mostra. A
+configuração `replayCues` ("Cliques no replay", em `settings.tsx`; também na folha de abrir o replay e no botão 👆 da
+`ReplayBar`) desliga tudo.
 
 ### Partida online e espectador
 
@@ -339,10 +374,24 @@ reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do prot
 As URLs apontam para `https://optcgapi.com/media/static/Card_Images/<ID>.jpg` (oficiais) e
 `https://images.optcgleaks.com/<set>/images/<id>.webp` (spoilers). **Esse tráfego não passa pela VPS.**
 
+### Áudio
+
+`audio.ts` (Web Audio API) tem dois canais com volume próprio, efeitos e música, ligados às configurações
+`sfxVolume` e `musicVolume`. O primeiro toque ou tecla destrava o áudio (os navegadores exigem um gesto) e
+pré-carrega os efeitos; a música só é baixada quando pedida e toca num `AudioBufferSourceNode` em loop (emenda
+sem corte), com crossfade na troca. `game/useMatchAudio.ts` deriva os sons da diferença entre o estado anterior e o
+novo da partida (como `Motion.tsx` faz com as animações), então valem para a partida contra o bot, online,
+espectador e replay (mudos nos pulos e no replay em 8×); `App.tsx` toca a música do menu fora da mesa e a mesa troca
+para a da partida. Os arquivos (MP3) ficam em `assets/audio`, com a origem e a licença de cada um em
+`assets/audio/CREDITS.md`: efeitos CC0 do Kenney e do OpenGameArt, música original ("Valsa do Mar") gerada por
+`scripts/audio/compose.py` e renderizada com FluidSynth; `scripts/audio/sfx.py` refaz a conversão dos efeitos.
+
 ### Build
 
-`vite build` → `apps/web/dist`: `index.html` + `assets/index-<hash>.js` (715 KB, **203 KB gzip**) +
-`assets/index-<hash>.css` (116 KB, 26 KB gzip) + imagens locais (verso da carta 26 KB, DON!! 38 KB) + `public/`.
+`vite build` → `apps/web/dist`: `index.html` + `assets/index-<hash>.js` (845 KB, **260 KB gzip**) +
+`assets/index-<hash>.css` (127 KB, 28 KB gzip) + imagens locais (verso da carta 26 KB, DON!! 38 KB) + áudio
+(42 efeitos, 330 KB ao todo, baixados no primeiro toque; músicas de 807 KB e 585 KB e três vinhetas de 33 a 46 KB,
+baixadas quando tocam) + `public/`.
 
 ---
 
@@ -636,6 +685,7 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
 | `state` | `{room, view, defs, log: {from, entries}, lastAction}` | ao conectar e a cada ação (**todas** as conexões da sala) |
 | `presence` | `{connected: [bool, bool], spectators}` | alguém conecta/desconecta |
 | `emote` | `{seat, emote}` | emote de um jogador (lista fixa de 8) |
+| `chat` | `{seat, text}` | mensagem do chat já censurada (todas as conexões, espectadores também) |
 | `dice` | `{seat, vx, vy}` | lançamento do dado do sorteio (só animação) |
 | `rematch` | `{roomId, token?}` | revanche aceita (espectador recebe só o `roomId`) |
 | `closed` | `{}` | sala cancelada/expirada (não reconectar) |
@@ -675,13 +725,52 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
 
 - **`tournaments`**: `format` (`standard`/`egb`), `structure` (`swiss` | `single`), `rounds` (1–15 ou null =
   ⌈log₂ n⌉ no início), `swiss_best_of` (1 | 3), `top_cut` (2…64 | null), `bo3_from`/`bo5_from` (tamanho da fase a
-  partir da qual a série é melhor de 3/5: 8 = quartas, 2 = final), `max_players` (2–256), `starts_at` (só
-  informativo), `status` (`registration → running → finished`), `round`, `organizer_id`.
+  partir da qual a série é melhor de 3/5: 8 = quartas, 2 = final), `max_players` (2–256), `starts_at` (com
+  `check_in`, hora do início automático), `check_in` (check-in, início automático e W.O. por ausência), `tolerance_min` (minutos para entrar na sala, 1–60), `status`
+  (`registration → running → finished`), `round`, `round_at` (quando a rodada atual foi gerada), `round_wo` (a
+  varredura de ausentes da rodada já foi feita), `organizer_id`.
 - **`tournament_players`**: `deck` é o `DeckList` **congelado** na inscrição (validado com `playableDeck` no formato),
-  `seed` = ordem sorteada no início, `dropped`.
-- **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye`, nunca empate),
-  `next_first` (quem perdeu começa o próximo jogo), `room_id` (sala do jogo atual), `match_id` (última partida em
-  `matches`), `reported_by` (`game`, `bye`, `drop` ou id do organizador).
+  `seed` = ordem sorteada no início, `dropped`, `checked_in_at`.
+- **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none`
+  (`none` = W.O. duplo: os dois perdem), nunca empate), `next_first` (quem perdeu começa o próximo jogo), `room_id`
+  (sala do jogo atual), `match_id` (última partida em `matches`), `reported_by` (`game`, `bye`, `drop`, `noshow` ou
+  id do organizador), `p1_in`/`p2_in` (quando cada jogador entrou na sala da série).
+
+### Check-in e relógio (`tournaments/clock.ts`)
+
+Torneio com `check_in = 1` (exige `starts_at`): `tournamentTick` roda a cada 5 s no servidor (`registerTournamentRoutes`;
+com relógio injetado nos testes não roda sozinho e é chamado por `app.tournamentTick()`).
+
+- **Check-in** (`POST /api/tournaments/:id/checkin`): aberto de `starts_at − 30 min` até o início, só para inscritos.
+- **Início automático**: em `starts_at` (até 1 h depois, se o servidor estava fora do ar; passado isso, o organizador
+  começa à mão), com ≥ 2 inscritos, `beginTournament` sorteia e grava a rodada 1 entre **todos** os inscritos.
+- **W.O. por ausência**: `round_at + tolerance_min` depois de cada rodada gerada, cada partida pendente com placar 0 x 0 é
+  conferida: presença = entrou na sala (`p1_in`/`p2_in`, gravado em `play`) ou, na rodada 1, fez check-in. O ausente
+  perde (`reported_by = noshow`) e sai (`dropped`); os dois ausentes = `result = none` e os dois saem. A sala em espera
+  é fechada (`lobby.closeIfWaiting`). A varredura roda uma vez por rodada (`round_wo`), então o organizador pode
+  zerar/corrigir depois sem que o W.O. volte. Na chave, `singleNextRound` dá bye a quem avançaria contra uma mesa sem
+  vencedor; sem ninguém para avançar, `next` encerra.
+- **Atalho da tela inicial**: `GET /api/tournaments/me` (a cada 10 s, só logado) devolve os torneios em que a conta está
+  em jogo agora (check-in aberto ou `running`), com a partida da rodada, o oponente, a situação da sala e o prazo.
+
+### Auditoria: jogos gravados e relatos (`reports/`)
+
+- **`tournament_games`**: uma linha por jogo disputado numa sala de torneio (`match_id` = série, `game`,
+  `stats_match_id` = partida em `matches` com o replay, `winner`, `counted` = entrou no placar; um jogo de uma sala
+  que já não era a atual fica gravado com `counted = 0`). Gravada em `reportFromGame`. O replay em `matches.replay`
+  passou a guardar `version`, `names` e `deckIds` (os antigos usam a versão 8 se `legacySetup`, senão a atual).
+- **`match_reports`**: relato de um jogador sobre uma partida (`match_id`, `tournament_id` quando é de torneio,
+  `reporter_id`, `text`, `resolved_at`/`resolved_by`/`note`; um por jogador e partida — relatar de novo troca o texto e
+  reabre).
+- **Rotas**: `GET /api/matches/:id/replay` (arquivo de replay para a mesa: quem jogou, o organizador do torneio ou
+  admin/dev), `GET /api/matches/:id` (resumo), `POST /api/matches/:id/report` (um dos jogadores, fila `ranked` ou
+  `tournament`), `GET /api/reports?tournament=&status=open|resolved|all` (admin/dev: todos; organizador: dos torneios
+  dele), `PUT /api/reports/:id` (`{resolved, note}`; admin/dev ou o organizador do torneio).
+- **Interface**: a tela de resultado das partidas online ranqueadas e de torneio tem **Relatar um problema**
+  (`ReportModal`); cada partida do torneio lista os **Jogos gravados** com "Assistir replay"
+  (`setupFromReplay`, em `game/setup.ts`, monta a mesa em modo replay a partir do JSON); o organizador tem a aba
+  **Relatos** no torneio e Admin/Dev a aba **Relatos de partidas** em Administração (`ReportsPanel`, em
+  `components/Reports.tsx`).
 
 ### Algoritmos (`tournaments/pairing.ts`)
 
@@ -980,9 +1069,10 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | Cartas | `GET /api/cards?set=`, `GET /api/cards/:id`, `GET /api/coverage`, `GET /api/translations/pending` |
 | Decks | `GET /api/decks`, `GET/PUT/DELETE /api/decks/:id`, `POST /api/decks` |
 | Partidas/estatísticas | `POST /api/matches`, `GET /api/matches`, `GET/PUT /api/players/me`, `GET /api/stats/meta`, `GET /api/stats`, `GET /api/stats/trend?weeks=`, `GET /api/stats/cards?leader=|deck=` |
-| Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
+| Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,chat,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
 | Espectador | `GET /api/online/live`, `GET /api/online/watch/:code`, `GET /api/online/rooms/:id`, `GET /api/online/rooms/:id/watch?hands=1` (SSE) |
-| Torneios | `GET /api/tournaments`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/drop`, `POST /api/tournaments/:id/matches/:m/play` |
+| Auditoria | `GET /api/matches/:id`, `GET /api/matches/:id/replay`, `POST /api/matches/:id/report`, `GET /api/reports`, `PUT /api/reports/:id` |
+| Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/drop`, `POST /api/tournaments/:id/matches/:m/play` |
 
 Corpos, filtros e códigos de erro estão descritos no `README.md` (seção "API").
 
@@ -997,7 +1087,8 @@ npm run cards:import -- --spoilers         # buscar spoilers e trocar por oficia
 npm run db:seed                            # reaplicar decks prontos / cartas provisórias / traduções
 npm run translations:check -w @gumgum/server
 npm run cards:check-official -w @gumgum/server
-npm run simulate -w @gumgum/engine -- 500  # N partidas bot x bot
+npm run simulate -w @gumgum/engine -- 500  # N partidas bot x bot (bot heurístico)
+npm run compare-bots -w @gumgum/engine -- 100 hard easy  # dois níveis do bot frente a frente: vitórias e tempo por decisão
 npm run build:release                      # pacote em release/
 DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data PORT=3310 node release/server/index.mjs
 # na VPS

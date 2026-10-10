@@ -74,6 +74,10 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
     ...(room.legacySetup ? { legacySetup: true } : {}),
     decks: [room.data.seats[0].deck, room.data.seats[1].deck] as [typeof room.data.seats[0]['deck'], typeof room.data.seats[0]['deck']],
     actions: room.data.actions,
+    // Para rever a partida depois (auditoria): a versão do motor e quem jogou.
+    version: room.data.replayVersion ?? 8,
+    names: room.data.seats.map((s) => s.name),
+    deckIds: room.data.seats.map((s) => s.deckId),
   };
   const ids = [...new Set(replay.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
   const facts = deriveMatch(replay, getCards(db, ids) as CardData[]);
@@ -292,7 +296,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     res.on('error', close);
   };
 
-  /** Canal da partida (SSE): estado, presença, emotes e avisos. */
+  /** Canal da partida (SSE): estado, presença, emotes, chat e avisos. */
   app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/events', (req, reply) => {
     const found = seatIn(req.params.id, req.query.t);
     if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
@@ -350,7 +354,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     stream(req, reply, room, { seat: null, hands });
   });
 
-  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; vx?: unknown; vy?: unknown };
+  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; text?: unknown; vx?: unknown; vy?: unknown };
   const withSeat = (req: FastifyRequest<{ Params: { id: string }; Body: SeatBody }>) => seatIn(req.params.id, req.body?.t);
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/action', async (req, reply) => {
@@ -371,6 +375,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const found = withSeat(req);
     if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
     const r = found.room.emote(found.seat, req.body?.emote);
+    return r.ok ? reply.code(204).send() : reply.code(r.code).send({ error: r.error });
+  });
+
+  /** Chat da partida (texto livre, censurado no servidor; só quem tem assento manda). */
+  app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/chat', async (req, reply) => {
+    const found = withSeat(req);
+    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    const r = found.room.chat(found.seat, req.body?.text);
     return r.ok ? reply.code(204).send() : reply.code(r.code).send({ error: r.error });
   });
 
