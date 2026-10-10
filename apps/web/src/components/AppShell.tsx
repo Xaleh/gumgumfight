@@ -5,7 +5,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ROLE_LABEL } from '../api';
 import { GoogleButton, useAuth } from '../auth';
-import { useSettings } from '../settings';
+import { LOCALES, useT } from '../i18n';
+import { LocaleSeg, useSettings } from '../settings';
+import { Flag } from './Flags';
 import { Icon, type IconName } from './Icons';
 
 export interface NavItem {
@@ -42,6 +44,7 @@ function Avatar() {
 /** Nome, perfil e login/saída da conta (no menu da conta e na gaveta). */
 function AccountBlock() {
   const { ready, user, clientId, signIn } = useAuth();
+  const t = useT();
   if (!ready) return null;
   return (
     <div className="account-block">
@@ -49,20 +52,20 @@ function AccountBlock() {
       {user ? (
         <div className="account-who">
           <strong>
-            {user.name ?? 'Conta Google'}
-            {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{ROLE_LABEL[user.role]}</span>}
+            {user.name ?? t('account.google')}
+            {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{t(ROLE_LABEL[user.role])}</span>}
           </strong>
           {user.email && <span className="muted small">{user.email}</span>}
         </div>
       ) : clientId ? (
         <div className="account-who">
-          <span className="muted small">Entre para guardar decks e estatísticas na sua conta e jogar a ranqueada.</span>
+          <span className="muted small">{t('account.signInHint')}</span>
           <GoogleButton clientId={clientId} onCredential={signIn} />
         </div>
       ) : (
         <div className="account-who">
-          <strong>Visitante</strong>
-          <span className="muted small">O login está desligado neste servidor.</span>
+          <strong>{t('account.guest')}</strong>
+          <span className="muted small">{t('account.loginOff')}</span>
         </div>
       )}
     </div>
@@ -88,8 +91,9 @@ function NavButton({ item, onDone, className }: { item: NavItem; onDone?: () => 
 
 function ThemeButton({ className, withLabel }: { className: string; withLabel?: boolean }) {
   const { resolvedTheme, update } = useSettings();
+  const t = useT();
   const next = resolvedTheme === 'dark' ? 'light' : 'dark';
-  const label = next === 'dark' ? 'Tema escuro' : 'Tema claro';
+  const label = t(next === 'dark' ? 'topbar.themeDark' : 'topbar.themeLight');
   return (
     <button type="button" className={className} aria-label={withLabel ? undefined : label} title={label} onClick={() => update({ theme: next })}>
       <Icon name={next === 'dark' ? 'moon' : 'sun'} size={18} />
@@ -98,8 +102,43 @@ function ThemeButton({ className, withLabel }: { className: string; withLabel?: 
   );
 }
 
+/**
+ * Idioma na barra superior: botão com a bandeira atual que abre as seis bandeiras (mesmo padrão do
+ * menu da conta). Na gaveta ☰ as bandeiras aparecem direto (`LocaleSeg`).
+ */
+function LocaleButton({ className }: { className: string }) {
+  const { locale } = useSettings();
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEscape(open, () => setOpen(false));
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [open]);
+  const name = LOCALES.find((l) => l.code === locale)?.name ?? locale;
+  const label = `${t('topbar.language')}: ${name}`;
+  return (
+    <div className={['locale-wrap', className].join(' ')} ref={ref}>
+      <button type="button" className="icon-btn locale-btn" aria-label={label} title={label} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <Flag locale={locale} width={24} />
+      </button>
+      {open && (
+        <div className="locale-pop">
+          <LocaleSeg onChange={() => setOpen(false)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SignOutButton({ className, onDone }: { className: string; onDone?: () => void }) {
   const { user, signOut } = useAuth();
+  const t = useT();
   if (!user) return null;
   return (
     <button
@@ -111,7 +150,7 @@ function SignOutButton({ className, onDone }: { className: string; onDone?: () =
       }}
     >
       <Icon name="logout" size={18} />
-      Sair
+      {t('topbar.signOut')}
     </button>
   );
 }
@@ -131,6 +170,7 @@ export function TopBar({
   onHome: () => void;
 }) {
   const { user, clientId } = useAuth();
+  const t = useT();
   const [drawer, setDrawer] = useState(false);
   const [account, setAccount] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -157,19 +197,19 @@ export function TopBar({
     };
   }, [drawer]);
 
-  const onlineLabel = online === null ? 'Contando quem está online' : `${online} ${online === 1 ? 'conectado' : 'conectados'}`;
+  const onlineLabel = online === null ? t('topbar.counting') : t('topbar.online', { n: online });
 
   return (
     <header className="topbar">
       <div className="home-wrap topbar-inner">
-        <button type="button" className="topbar-logo" onClick={onHome} aria-label="GumGum Fight: início">
+        <button type="button" className="topbar-logo" onClick={onHome} aria-label={t('topbar.home')}>
           <picture>
             <source media="(max-width: 480px)" srcSet="/brand/header-mark.svg" />
             <img src="/brand/header-logo-dark-bg.svg" alt="" />
           </picture>
         </button>
 
-        <nav className="topbar-nav" aria-label="Principal">
+        <nav className="topbar-nav" aria-label={t('topbar.nav')}>
           {nav.map((item) => (
             <NavButton key={item.key} item={item} className="topbar-link" />
           ))}
@@ -179,8 +219,9 @@ export function TopBar({
           <div className="live-pill" role="status" aria-label={onlineLabel} title={onlineLabel}>
             <span className={['live-dot', online === null ? 'off' : ''].join(' ')} />
             <span>{online ?? '–'}</span>
-            <span className="live-pill-label">{online === 1 ? 'conectado' : 'conectados'}</span>
+            <span className="live-pill-label">{t('topbar.onlineWord', { n: online ?? 0 })}</span>
           </div>
+          <LocaleButton className="desktop-only" />
           <ThemeButton className="icon-btn desktop-only" />
           <div className="account-wrap desktop-only" ref={accountRef}>
             <button
@@ -191,7 +232,7 @@ export function TopBar({
               onClick={() => setAccount((v) => !v)}
             >
               <Avatar />
-              <span className="account-btn-name">{user ? (user.name?.split(' ')[0] ?? 'Conta') : clientId ? 'Entrar' : 'Conta'}</span>
+              <span className="account-btn-name">{user ? (user.name?.split(' ')[0] ?? t('topbar.account')) : clientId ? t('topbar.signIn') : t('topbar.account')}</span>
               <Icon name="chevron" size={16} />
             </button>
             {account && (
@@ -206,7 +247,7 @@ export function TopBar({
               </div>
             )}
           </div>
-          <button type="button" className="icon-btn menu-toggle" aria-label="Abrir menu" aria-expanded={drawer} onClick={() => setDrawer(true)}>
+          <button type="button" className="icon-btn menu-toggle" aria-label={t('topbar.openMenu')} aria-expanded={drawer} onClick={() => setDrawer(true)}>
             <Icon name="menu" size={22} stroke={2.2} />
           </button>
         </div>
@@ -215,11 +256,11 @@ export function TopBar({
       {drawer && (
         <>
           <div className="drawer-backdrop" onClick={() => setDrawer(false)} />
-          <nav className="drawer" aria-label="Menu">
+          <nav className="drawer" aria-label={t('topbar.menu')}>
             <div className="drawer-head">
               <img src="/brand/header-mark.svg" alt="" />
-              <span>Menu</span>
-              <button type="button" className="icon-btn" aria-label="Fechar menu" autoFocus onClick={() => setDrawer(false)}>
+              <span>{t('topbar.menu')}</span>
+              <button type="button" className="icon-btn" aria-label={t('topbar.closeMenu')} autoFocus onClick={() => setDrawer(false)}>
                 <Icon name="close" />
               </button>
             </div>
@@ -236,6 +277,9 @@ export function TopBar({
                 ))}
               </div>
             )}
+            <div className="drawer-locale">
+              <LocaleSeg flagWidth={28} />
+            </div>
             <div className="drawer-foot">
               <ThemeButton className="pill-btn" withLabel />
               <SignOutButton className="pill-btn" onDone={() => setDrawer(false)} />

@@ -16,11 +16,13 @@ import {
 } from '@gumgum/engine';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
+import { type MessageKey, useT, useTryT } from '../i18n';
 import { useSettings } from '../settings';
 
 /** 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. */
 export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | 'ready' | 'disabled' | null;
 
+// Nomes oficiais das palavras-chave, em inglês como no jogo (não se traduzem).
 const KEYWORD_LABEL: Record<Keyword, string> = {
   rush: 'Rush',
   blocker: 'Blocker',
@@ -30,7 +32,12 @@ const KEYWORD_LABEL: Record<Keyword, string> = {
   unblockable: 'Unblockable',
 };
 
-const CATEGORY_LABEL = { leader: 'LÍDER', character: 'PERSONAGEM', event: 'EVENTO', stage: 'STAGE' };
+const CATEGORY_LABEL: Record<CardDef['category'], MessageKey> = {
+  leader: 'card.catUpper.leader',
+  character: 'card.catUpper.character',
+  event: 'card.catUpper.event',
+  stage: 'card.catUpper.stage',
+};
 
 interface Props {
   state: GameState;
@@ -51,6 +58,7 @@ interface Props {
 export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, onHover, drag, hideDon, eager }: Props) {
   const def = cardDef(state, uid);
   const { showImages } = useSettings();
+  const t = useT();
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
@@ -115,7 +123,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
             <span className={['img-power', delta > 0 ? 'up' : 'down'].join(' ')}>{power}</span>
           )}
           {costDelta !== 0 && cost !== undefined && (
-            <span className={['img-cost', costDelta > 0 ? 'up' : 'down'].join(' ')} title={`Custo atual ${cost} (impresso ${def.cost})`}>
+            <span className={['img-cost', costDelta > 0 ? 'up' : 'down'].join(' ')} title={t('card.costNowTitle', { n: cost, printed: def.cost })}>
               {cost}
             </span>
           )}
@@ -127,7 +135,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         <CardFace def={def} power={power} delta={delta} cost={cost} costDelta={costDelta} keywords={keywords} fc={withImage || hideDon ? undefined : fc} />
       )}
       {def.manual && (
-        <span className="manual-badge" title="Efeito ainda não automatizado: não é aplicado na partida">
+        <span className="manual-badge" title={t('card.manualTitle')}>
           ⚙
         </span>
       )}
@@ -142,19 +150,27 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
  * sua cor (`tag-<kind>`, palavras-chave `tag-kw-<keyword>`). O texto completo e a duração ficam no tooltip.
  */
 export function StatusTag({ status, title }: { status: CardStatus; title?: boolean }) {
+  const tryT = useTryT();
   const cls = ['status-tag', `tag-${status.kind}`, status.keyword ? `tag-kw-${status.keyword}` : '', status.tone].join(' ');
   return (
-    <span className={cls} title={title ? `${status.text} (${status.until})` : undefined}>
+    <span className={cls} title={title ? `${statusText(status, tryT)} (${statusUntil(status, tryT)})` : undefined}>
       <span className="tag-icon">{status.icon}</span>
-      {status.tag}
+      {tryT(status.tagKey, status.tagParams) ?? status.tag}
     </span>
   );
 }
 
+type TryTranslate = ReturnType<typeof useTryT>;
+/** Texto do estado no idioma da interface (o motor manda o português e a chave `status.…`). */
+export const statusText = (s: CardStatus, tryT: TryTranslate) => tryT(s.textKey, s.textParams) ?? s.text;
+/** Até quando o estado vale, no idioma da interface. */
+export const statusUntil = (s: CardStatus, tryT: TryTranslate) => tryT(s.untilKey, s.untilParams) ?? s.until;
+
 function StatusMarkers({ statuses }: { statuses: CardStatus[] }) {
+  const t = useT();
   if (!statuses.length) return null;
   return (
-    <div className="card-status" aria-label="Efeitos ativos">
+    <div className="card-status" aria-label={t('card.activeEffects')}>
       {statuses.map((s, i) => (
         <StatusTag key={i} status={s} title />
       ))}
@@ -164,10 +180,11 @@ function StatusMarkers({ statuses }: { statuses: CardStatus[] }) {
 
 /** Etiqueta das cartas anunciadas que ainda não saíram na API oficial. */
 export function SpoilerTag({ card }: { card: CardData }) {
+  const t = useT();
   if (!card.spoiler) return null;
   return (
-    <span className="spoiler-tag" title={`Spoiler (${card.spoiler.source}): a carta ainda não foi lançada oficialmente`}>
-      SPOILER
+    <span className="spoiler-tag" title={t('card.spoilerTitle', { source: card.spoiler.source })}>
+      {t('card.spoilerBadge')}
     </span>
   );
 }
@@ -190,22 +207,23 @@ function CardFace({
   keywords: Keyword[];
   fc?: FieldCard;
 }) {
+  const t = useT();
   return (
     <>
       <div className="card-top">
         {def.category === 'leader' ? (
-          <span className="badge life-badge" title="Vida">
+          <span className="badge life-badge" title={t('card.life')}>
             {def.life}
           </span>
         ) : (
           <span
             className={['badge', 'cost-badge', costDelta > 0 ? 'up' : costDelta < 0 ? 'down' : ''].join(' ')}
-            title={costDelta !== 0 ? `Custo atual ${cost} (impresso ${def.cost})` : 'Custo'}
+            title={costDelta !== 0 ? t('card.costNowTitle', { n: cost, printed: def.cost }) : t('card.cost')}
           >
             {cost ?? def.cost}
           </span>
         )}
-        <span className="card-cat">{CATEGORY_LABEL[def.category]}</span>
+        <span className="card-cat">{t(CATEGORY_LABEL[def.category])}</span>
       </div>
       <div className="card-body">
         <div className="card-name">{def.name}</div>

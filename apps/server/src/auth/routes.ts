@@ -2,7 +2,8 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { DB } from '../db';
-import { type GoogleKeys, verifyGoogleIdToken } from './google';
+import { fail } from '../errors';
+import { type GoogleKeys, LoginError, verifyGoogleIdToken } from './google';
 import {
   claimBrowserData,
   createSession,
@@ -70,17 +71,19 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
    * Os decks e o perfil criados neste navegador antes do login passam para a conta.
    */
   app.post<{ Body: { credential?: unknown } }>('/api/auth/google', async (req, reply) => {
-    if (!clientId) return reply.code(503).send({ error: 'Login com Google não configurado neste servidor.' });
+    if (!clientId) return reply.code(503).send(fail('googleLoginOff', 'Login com Google não configurado neste servidor.'));
     const credential = req.body?.credential;
     if (typeof credential !== 'string' || credential.length > 4096) {
-      return reply.code(400).send({ error: 'Credencial do Google ausente.' });
+      return reply.code(400).send(fail('googleCredentialMissing', 'Credencial do Google ausente.'));
     }
     let identity;
     try {
       identity = await verifyGoogleIdToken(credential, clientId, keys);
     } catch (e) {
       req.log.warn({ err: e }, 'login com Google recusado');
-      return reply.code(401).send({ error: e instanceof Error ? e.message : 'Login inválido.' });
+      // Erro inesperado (ex.: rede): vai o texto dele, sem chave de tradução.
+      if (e instanceof LoginError) return reply.code(401).send(fail(e.errorCode, e.message, e.errorParams));
+      return reply.code(401).send(e instanceof Error ? { error: e.message } : fail('loginInvalid', 'Login inválido.'));
     }
     const user = upsertGoogleUser(db, identity, adminEmails);
     const browser = browserHash(req);
@@ -104,11 +107,11 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
   const admin = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = viewer(req);
     if (!u) {
-      void reply.code(401).send({ error: 'Entre com a conta Google.' });
+      void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
       return null;
     }
     if (!isAdmin(u.role)) {
-      void reply.code(403).send({ error: 'Só administradores podem mudar perfis.' });
+      void reply.code(403).send(fail('adminOnlyRoles', 'Só administradores podem mudar perfis.'));
       return null;
     }
     return u;
@@ -124,12 +127,12 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
     const me = admin(req, reply);
     if (!me) return reply;
     const role = req.body?.role;
-    if (!isRole(role)) return reply.code(400).send({ error: 'Perfil inválido.' });
+    if (!isRole(role)) return reply.code(400).send(fail('invalidRole', 'Perfil inválido.'));
     // Evita que o último admin se tranque para fora: a si mesmo, só a promoção para Dev.
     if (req.params.id === me.id && role !== 'dev') {
-      return reply.code(409).send({ error: 'Você só pode mudar o seu próprio perfil para Dev.' });
+      return reply.code(409).send(fail('selfRoleOnlyDev', 'Você só pode mudar o seu próprio perfil para Dev.'));
     }
-    if (!setUserRole(db, req.params.id, role)) return reply.code(404).send({ error: 'Conta não encontrada.' });
+    if (!setUserRole(db, req.params.id, role)) return reply.code(404).send(fail('accountNotFound', 'Conta não encontrada.'));
     return publicUser(getUser(db, req.params.id)!);
   });
 

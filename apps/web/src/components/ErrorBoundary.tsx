@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { t } from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -50,19 +51,19 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="menu-box">
           <section className="menu-card online-wait">
             <h2>{this.props.title}</h2>
-            <p className="muted">Algo deu errado ao desenhar a tela. A partida continua: tente de novo.</p>
+            <p className="muted">{t('menu.errorHint')}</p>
             <p className="muted small">{error.message}</p>
             <div className="btn-row center">
               <button className="btn primary" onClick={this.retry}>
-                Tentar de novo
+                {t('menu.errorRetry')}
               </button>
               {this.props.onExit ? (
                 <button className="btn" onClick={this.props.onExit}>
-                  {this.props.exitLabel ?? 'Voltar ao menu'}
+                  {this.props.exitLabel ?? t('menu.errorBackToMenu')}
                 </button>
               ) : (
                 <button className="btn" onClick={() => location.reload()}>
-                  Recarregar a página
+                  {t('menu.errorReload')}
                 </button>
               )}
             </div>

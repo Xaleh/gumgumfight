@@ -2,18 +2,21 @@ import { useEffect, useState } from 'react';
 import { type AdminUser, api, type Role, ROLE_LABEL } from '../api';
 import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
+import { type MessageKey, useT } from '../i18n';
 import { ReportsPanel } from './Reports';
 
-const ROLE_HELP: Record<Role, string> = {
-  player: 'Joga e assiste às partidas sem ver as mãos.',
-  streamer: 'Assiste às partidas podendo ver as mãos dos dois jogadores.',
-  organizer: 'Cria torneios e gerencia os que criou (inscrições, rodadas e resultados).',
-  admin: 'Tudo do Streamer e do Organizador, gerencia qualquer torneio e muda os perfis das contas.',
-  dev: 'Tudo do Admin e as funções de desenvolvimento: ferramentas manuais na partida, cobertura das cartas e opções de teste.',
+/** O que cada perfil pode fazer: chave do dicionário. */
+const ROLE_HELP: Record<Role, MessageKey> = {
+  player: 'admin.roleHelp.player',
+  streamer: 'admin.roleHelp.streamer',
+  organizer: 'admin.roleHelp.organizer',
+  admin: 'admin.roleHelp.admin',
+  dev: 'admin.roleHelp.dev',
 };
 
 /** Administração (só admin e dev): perfis das contas e os relatos de problemas das partidas. */
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
+  const t = useT();
   const { user, refresh } = useAuth();
   const [tab, setTab] = useState<'users' | 'reports'>('users');
   const [query, setQuery] = useState('');
@@ -23,7 +26,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
 
   useEffect(() => {
     let stop = false;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       api.admin
         .users(query)
         .then((u) => !stop && (setUsers(u), setError(null)))
@@ -31,7 +34,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
     }, 250);
     return () => {
       stop = true;
-      clearTimeout(t);
+      clearTimeout(timer);
     };
   }, [query]);
 
@@ -54,17 +57,17 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
     <div className="coverage admin">
       <header className="builder-header">
         <button className="btn small" onClick={onExit}>
-          ← Menu
+          {t('admin.menu')}
         </button>
-        <h2>Administração</h2>
+        <h2>{t('admin.title')}</h2>
       </header>
       <div className="coverage-body">
         <div className="seg tour-tabs">
           <button className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>
-            Perfis das contas
+            {t('admin.tabUsers')}
           </button>
           <button className={tab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>
-            Relatos de partidas
+            {t('admin.tabReports')}
           </button>
         </div>
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
@@ -73,19 +76,14 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
             <ul className="role-help muted small">
               {(Object.keys(ROLE_HELP) as Role[]).map((r) => (
                 <li key={r}>
-                  <b>{ROLE_LABEL[r]}</b>: {ROLE_HELP[r]}
+                  <b>{t(ROLE_LABEL[r])}</b>: {t(ROLE_HELP[r])}
                 </li>
               ))}
             </ul>
-            <input
-              className="admin-search"
-              value={query}
-              placeholder="Buscar por nome ou e-mail"
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <input className="admin-search" value={query} placeholder={t('admin.searchPlaceholder')} onChange={(e) => setQuery(e.target.value)} />
             {error && <div className="error">{error}</div>}
-            {users === null && !error && <p className="muted">Carregando…</p>}
-            {users?.length === 0 && <p className="muted">Nenhuma conta encontrada.</p>}
+            {users === null && !error && <p className="muted">{t('common.loading')}</p>}
+            {users?.length === 0 && <p className="muted">{t('admin.noAccounts')}</p>}
             <div className="admin-users">
               {users?.map((u) => (
                 <div key={u.id} className="admin-user">
@@ -95,7 +93,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
                     <span className="account-avatar">{(u.name ?? u.email ?? '?').slice(0, 1).toUpperCase()}</span>
                   )}
                   <span className="account-who">
-                    <strong>{u.name ?? 'Conta Google'}</strong>
+                    <strong>{u.name ?? t('admin.googleAccount')}</strong>
                     {u.email && <span className="muted small">{u.email}</span>}
                   </span>
                   <div className="seg small">
@@ -104,10 +102,10 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
                         key={r}
                         className={u.role === r ? 'on' : ''}
                         disabled={(u.id === user?.id && r !== 'dev') || saving === u.id}
-                        title={u.id === user?.id && r !== 'dev' ? 'Você só pode mudar o seu próprio perfil para Dev' : ROLE_HELP[r]}
+                        title={u.id === user?.id && r !== 'dev' ? t('admin.selfRoleTitle') : t(ROLE_HELP[r])}
                         onClick={() => u.role !== r && change(u, r)}
                       >
-                        {ROLE_LABEL[r]}
+                        {t(ROLE_LABEL[r])}
                       </button>
                     ))}
                   </div>

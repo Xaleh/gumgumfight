@@ -3,6 +3,7 @@
 
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, type User } from './api';
+import { useLocale } from './i18n';
 
 interface GsiButtonOptions {
   theme?: 'outline' | 'filled_blue' | 'filled_black';
@@ -134,6 +135,7 @@ export function useAuth(): AuthCtx {
 
 /** Botão oficial "Fazer login com o Google". */
 export function GoogleButton({ clientId, onCredential }: { clientId: string; onCredential: (c: string) => void }) {
+  const locale = useLocale();
   const box = useRef<HTMLDivElement>(null);
   const handler = useRef(onCredential);
   handler.current = onCredential;
@@ -150,7 +152,7 @@ export function GoogleButton({ clientId, onCredential }: { clientId: string; onC
           size: 'large',
           text: 'signin_with',
           shape: 'pill',
-          locale: 'pt-BR',
+          locale,
           width: Math.min(320, box.current.clientWidth || 320),
         });
       })
@@ -158,7 +160,7 @@ export function GoogleButton({ clientId, onCredential }: { clientId: string; onC
     return () => {
       cancelled = true;
     };
-  }, [clientId]);
+  }, [clientId, locale]);
 
   return failed ? <div className="muted small">{failed}</div> : <div ref={box} className="google-btn" />;
 }

@@ -4,6 +4,7 @@ import { type Action, type CardData, type DeckList, formatLabel, type PlayerId, 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
+import { fail } from '../errors';
 import type { ApiCard } from '../present';
 import { FORMATS, type FormatId, isFormat, isQueue, isTier, QUEUES, TIERS, tierFor } from './catalog';
 import { deriveMatch } from './derive';
@@ -124,9 +125,9 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
 
   app.put<{ Body: { name?: unknown } }>('/api/players/me', async (req, reply) => {
     const owner = viewerHash(req);
-    if (!owner) return reply.code(400).send({ error: 'Navegador sem código de dono (header x-deck-owner).' });
+    if (!owner) return reply.code(400).send(fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).'));
     const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ').slice(0, 24) : '';
-    if (name.length < 2) return reply.code(400).send({ error: 'O nome precisa de pelo menos 2 letras.' });
+    if (name.length < 2) return reply.code(400).send(fail('nameTooShort', 'O nome precisa de pelo menos 2 letras.'));
     return profile(renamePlayer(db, owner, name));
   });
 
@@ -198,7 +199,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
 
   /** Cartas de um Líder (ou de uma lista): efetividade no deck, na mão inicial, compradas e jogadas. */
   app.get<{ Querystring: Query }>('/api/stats/cards', async (req, reply) => {
-    if (!req.query.leader && !req.query.deck) return reply.code(400).send({ error: 'Escolha um Líder ou uma lista.' });
+    if (!req.query.leader && !req.query.deck) return reply.code(400).send(fail('chooseLeaderOrList', 'Escolha um Líder ou uma lista.'));
     return cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
       const f = parseFilter(req);
       const rows = cardStats(db, f);

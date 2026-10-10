@@ -1004,6 +1004,9 @@ export interface Ability {
   replace?: Replacement;
   /** Texto curto exibido na interface. */
   label?: string;
+  /** Chave de tradução de `label` (`engine.*`) e seus parâmetros; a interface traduz, com `label` de reserva. */
+  labelKey?: string;
+  labelParams?: PromptParams;
   /** Habilidade derivada do texto, resolvida manualmente pelo jogador. */
   manual?: boolean;
   /** Trecho do texto da carta a que a habilidade corresponde. */
@@ -1121,7 +1124,35 @@ export interface BattleState {
 /** De onde sai um DON!! do campo: área de custo (ativo ou virado) ou a carta (uid) a que está dado. */
 export type DonSource = 'active' | 'rested' | (string & {});
 
-/** Escolhas que o motor aguarda de um jogador. */
+/** Parâmetros de uma chave de tradução (`promptParams`, `labelParams`). */
+export type PromptParams = Record<string, string | number>;
+
+/**
+ * Texto traduzível: chave do dicionário (`engine.*`, `log.*`) e parâmetros. `parts` traz os
+ * parâmetros que são, eles mesmos, texto a traduzir (uma lista de custos, o motivo da vitória…):
+ * a interface traduz cada item e junta com a chave `join` (padrão `log.listAnd`); em `params`
+ * o mesmo parâmetro vem pronto em português, para quem não traduz.
+ */
+export interface Msg {
+  key: string;
+  params?: PromptParams;
+  parts?: MsgParts;
+}
+export interface MsgList {
+  items: Msg[];
+  /** Chave do separador entre os itens (ex.: `engine.cost.join` = " e "). */
+  join?: string;
+}
+export type MsgParts = Record<string, MsgList>;
+
+/**
+ * Escolhas que o motor aguarda de um jogador.
+ *
+ * `prompt` é o texto em português (sempre preenchido: replays e salas antigas dependem dele).
+ * `promptKey` (`engine.*`) e `promptParams` são a mesma frase para a interface traduzir; se a
+ * chave não existir no dicionário, mostra-se `prompt`. Em `confirm` com `cannot`, o texto do
+ * `prompt` já traz " (Não dá para pagar o custo.)" no fim; a interface junta `engine.cannotPayCost`.
+ */
 export type Pending =
   /** O vencedor do sorteio escolhe se joga primeiro (`answer` yes) ou segundo (no). */
   | { kind: 'chooseFirst'; player: PlayerId }
@@ -1133,6 +1164,9 @@ export type Pending =
       min: number;
       max: number;
       prompt: string;
+      promptKey?: string;
+      promptParams?: PromptParams;
+      promptParts?: MsgParts;
       intent: 'harm' | 'help' | 'discard';
       source: string;
       /** A ordem dos cliques importa (ex.: ordem das cartas no topo do deck). */
@@ -1167,15 +1201,32 @@ export type Pending =
    * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`. Com `drawUpTo`,
    * é o "comprar mais 1?" do "draw up to N cards" (4-5-4): sim compra 1, não para.
    */
-  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true; drawUpTo?: true }
+  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; promptKey?: string; promptParams?: PromptParams; promptParts?: MsgParts; cannot?: true; drawUpTo?: true }
   /**
    * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
    * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
    * `TriggeredEffect.id` correspondente. Com `don`, é a escolha de qual DON!! devolver ao deck
-   * de DON!!: cada opção é a origem correspondente. `shown`: cartas que só quem responde vê
-   * junto da pergunta (ex.: o topo do deck do oponente, olhado por efeito).
+   * de DON!!: cada opção é a origem correspondente. `optionKeys` (paralelo a `options`) traz a
+   * chave de tradução de cada opção fixa (topo/fundo, sim/não…), resolvida com `promptParams`;
+   * `null` quando a opção é texto da carta (ou nome de carta, número…) e se mostra como está.
+   * `shown`: cartas que só quem responde vê junto da pergunta (ex.: o topo do deck do oponente, olhado por efeito).
    */
-  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[]; order?: number[]; don?: DonSource[]; shown?: string[] }
+  | {
+      kind: 'option';
+      player: PlayerId;
+      source: string;
+      prompt: string;
+      promptKey?: string;
+      promptParams?: PromptParams;
+      promptParts?: MsgParts;
+      options: string[];
+      optionKeys?: (string | null)[];
+      /** Opção que é texto composto (ex.: um custo em `payEither`): os itens a traduzir e juntar. */
+      optionParts?: (MsgList | null)[];
+      order?: number[];
+      don?: DonSource[];
+      shown?: string[];
+    }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
 
@@ -1256,6 +1307,14 @@ export interface LogEntry {
    * recebem `text`, sem os nomes das cartas.
    */
   secret?: string;
+  /** `text` como chave (`log.*`), parâmetros e partes traduzíveis (ver `Msg`). */
+  key?: string;
+  params?: PromptParams;
+  parts?: MsgParts;
+  /** O mesmo para `secret`: só o dono da linha vê (a visão do oponente os remove). */
+  secretKey?: string;
+  secretParams?: PromptParams;
+  secretParts?: MsgParts;
 }
 
 export interface GameState {
@@ -1321,6 +1380,9 @@ export interface GameState {
   /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;
+  /** `winReason` como chave (`log.win*`) e parâmetros, para a interface traduzir. */
+  winReasonKey?: string;
+  winReasonParams?: PromptParams;
   /** Partida criada com `GameConfig.legacySetup` (replays até a versão 8). */
   legacySetup?: true;
   log: LogEntry[];

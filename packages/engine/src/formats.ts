@@ -79,8 +79,15 @@ export function cardLegality(id: string, format: FormatId, now = new Date()): Ca
   return 'legal';
 }
 
+/** Parâmetros das chaves de tradução dos avisos (`{nome}` na mensagem). */
+export type RuleParams = Record<string, string | number>;
+
 export interface FormatIssue {
+  /** Texto em português (logs, servidor e clientes antigos). */
   message: string;
+  /** Chave de tradução (`rules.…`); em português a mensagem equivale a `message`. */
+  code: string;
+  params: RuleParams;
   cardId?: string;
 }
 
@@ -91,13 +98,16 @@ export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: F
   const label = formatLabel(format);
   for (const id of ids) {
     const legality = cardLegality(id, format, now);
-    if (legality === 'banned') issues.push({ message: `${id} está banida (não vale em nenhum formato).`, cardId: id });
-    else if (legality === 'rotated') issues.push({ message: `${id} tem o bloco ① e rotacionou: não vale no ${label}.`, cardId: id });
+    if (legality === 'banned') {
+      issues.push({ message: `${id} está banida (não vale em nenhum formato).`, code: 'rules.banned', params: { id }, cardId: id });
+    } else if (legality === 'rotated') {
+      issues.push({ message: `${id} tem o bloco ① e rotacionou: não vale no ${label}.`, code: 'rules.rotated', params: { id, format: label }, cardId: id });
+    }
   }
   const has = new Set(ids);
   for (const { cards: [a, b], since } of BANNED_PAIRS) {
     if (has.has(a) && has.has(b) && inEffect(since, now)) {
-      issues.push({ message: `${a} e ${b} não podem ser usadas juntas no mesmo deck.`, cardId: b });
+      issues.push({ message: `${a} e ${b} não podem ser usadas juntas no mesmo deck.`, code: 'rules.bannedPair', params: { a, b }, cardId: b });
     }
   }
   return issues;

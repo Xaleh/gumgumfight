@@ -14,12 +14,13 @@ import { buildCardDef, type CardData, type DeckList, formatIssues, formatLabel, 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLiveMatches, saveLiveMatch } from '../db';
+import { fail } from '../errors';
 import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
 import { Lobby, type LobbyError, type LobbyLimits, type SeatRequest } from './lobby';
-import { type Connection, MAX_SPECTATORS, type Room, type RoomData, type RoomResult, TIME_BANK_MS } from './room';
+import { type ActResult, type Connection, MAX_SPECTATORS, type Room, type RoomData, type RoomResult, TIME_BANK_MS } from './room';
 
 interface Deps {
   db: DB;
@@ -41,24 +42,47 @@ interface Deps {
 
 const isError = (v: unknown): v is LobbyError => typeof v === 'object' && v !== null && 'error' in v;
 
+/** Corpo da resposta de uma ação recusada pela sala (sem o status, que vai no código HTTP). */
+const refused = (r: Extract<ActResult, { ok: false }>) => ({
+  error: r.error,
+  ...(r.errorCode ? { errorCode: r.errorCode } : {}),
+  ...(r.errorParams ? { errorParams: r.errorParams } : {}),
+});
+
 /**
  * Deck pronto para jogar no formato (e sem cartas manuais, se `noManual`): usado
  * pelas salas online e pela inscrição nos torneios.
  */
 export function playableDeck(db: DB, deckId: unknown, format: FormatId, noManual: boolean): DeckList | LobbyError {
   const deck = typeof deckId === 'string' && deckId ? getDeck(db, deckId) : null;
-  if (!deck) return { code: 400, error: 'Escolha um deck.' };
+  if (!deck) return { code: 400, ...fail('chooseDeck', 'Escolha um deck.') };
   const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
   const report = validateDeck(deck, cards);
-  if (!report.valid) return { code: 400, error: 'Esse deck não é válido para jogar.' };
+  if (!report.valid) return { code: 400, ...fail('deckInvalid', 'Esse deck não é válido para jogar.') };
   const banned = formatIssues(deck, format);
-  if (banned.length) return { code: 400, error: `Esse deck não é permitido no formato ${formatLabel(format)}. ${banned[0].message}` };
+  if (banned.length) {
+    // `issue` em português; `issueCode` + `issueParams` para o cliente traduzir o motivo (chave `rules.…`).
+    const { message: issue, code: issueCode, params: issueParams } = banned[0];
+    return {
+      code: 400,
+      ...fail('deckNotAllowedInFormat', `Esse deck não é permitido no formato ${formatLabel(format)}. ${issue}`, {
+        format: formatLabel(format),
+        issue,
+        issueCode,
+        issueParams,
+      }),
+    };
+  }
   // Inclui cartas com script que ainda tenham alguma parte resolvida à mão.
   const manual = new Set([...report.unscripted, ...[...cards.values()].filter((c) => buildCardDef(c).manual).map((c) => c.id)]);
   if (noManual && manual.size) {
     return {
       code: 400,
-      error: `Na ranqueada o modo manual não é permitido: este deck tem ${manual.size} carta(s) com efeito ainda não automatizado (⚙).`,
+      ...fail(
+        'rankedNoManualCards',
+        `Na ranqueada o modo manual não é permitido: este deck tem ${manual.size} carta(s) com efeito ainda não automatizado (⚙).`,
+        { n: manual.size },
+      ),
     };
   }
   return { id: deck.id, name: deck.name, leader: deck.leader, cards: deck.cards };
@@ -140,9 +164,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     format: FormatId,
   ): SeatRequest | LobbyError => {
     const ownerHash = viewerHash(req);
-    if (!ownerHash) return { code: 400, error: 'Navegador sem código de dono (header x-deck-owner).' };
+    if (!ownerHash) return { code: 400, ...fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).') };
     const account = user(req);
-    if (ranked && !account) return { code: 401, error: 'A ranqueada é só para quem entrou com a conta Google.' };
+    if (ranked && !account) return { code: 401, ...fail('rankedLoginRequired', 'A ranqueada é só para quem entrou com a conta Google.') };
     const deck = deckFor(body?.deckId, format, ranked);
     if (isError(deck)) return deck;
     const profile = ensurePlayer(db, ownerHash);
@@ -200,9 +224,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   app.post<{ Body: RoomBody }>('/api/online/rooms/join', async (req, reply) => {
     const code = typeof req.body?.code === 'string' ? req.body.code : '';
-    if (!/^[A-Za-z0-9]{6}$/.test(code.trim())) return reply.code(400).send({ error: 'Código de sala inválido.' });
+    if (!/^[A-Za-z0-9]{6}$/.test(code.trim())) return reply.code(400).send(fail('invalidRoomCode', 'Código de sala inválido.'));
     const format = lobby.privateFormat(code);
-    if (!format) return reply.code(404).send({ error: 'Sala não encontrada ou já começou.' });
+    if (!format) return reply.code(404).send(fail('roomNotFound', 'Sala não encontrada ou já começou.'));
     const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip);
@@ -227,7 +251,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   app.get<{ Params: { ticket: string } }>('/api/online/queue/:ticket', async (req, reply) => {
     const r = lobby.poll(req.params.ticket);
-    return r ?? reply.code(404).send({ error: 'Você não está mais na fila.' });
+    return r ?? reply.code(404).send(fail('notInQueue', 'Você não está mais na fila.'));
   });
 
   app.delete<{ Params: { ticket: string } }>('/api/online/queue/:ticket', async (req, reply) => {
@@ -242,8 +266,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    * `first`: 0 = o jogador começa, 1 = o bot começa; ausente ou "random" = sorteio.
    */
   app.post<{ Body: RoomBody & { botDeckId?: unknown; first?: unknown } }>('/api/online/bot', async (req, reply) => {
-    if (!botRooms) return reply.code(404).send({ error: 'O treino online contra o bot está desligado neste servidor.' });
-    if (!user(req)) return reply.code(401).send({ error: 'Para transmitir o treino contra o bot, entre com a conta Google.' });
+    if (!botRooms) return reply.code(404).send(fail('botRoomsOff', 'O treino online contra o bot está desligado neste servidor.'));
+    if (!user(req)) return reply.code(401).send(fail('botRoomLoginRequired', 'Para transmitir o treino contra o bot, entre com a conta Google.'));
     const format = formatOf(req.body?.format);
     const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
@@ -252,11 +276,15 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     let botDeckId = req.body?.botDeckId;
     if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
       const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false)));
-      if (!pool.length) return reply.code(400).send({ error: `Nenhum deck pronto é permitido no ${formatLabel(format)}.` });
+      if (!pool.length) return reply.code(400).send(fail('noBuiltinDeckInFormat', `Nenhum deck pronto é permitido no ${formatLabel(format)}.`, { format: formatLabel(format) }));
       botDeckId = pool[randomInt(pool.length)].id;
     }
     const botDeck = deckFor(botDeckId, format, false);
-    if (isError(botDeck)) return reply.code(botDeck.code).send({ error: `Deck do bot: ${botDeck.error}` });
+    if (isError(botDeck)) {
+      // Mesmo motivo do deck do jogador, com o prefixo "Deck do bot" (chave própria: botChooseDeck, botDeckInvalid…).
+      const errorCode = `bot${botDeck.errorCode[0].toUpperCase()}${botDeck.errorCode.slice(1)}`;
+      return reply.code(botDeck.code).send(fail(errorCode, `Deck do bot: ${botDeck.error}`, botDeck.errorParams));
+    }
     const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: botDeck.id!, deck: botDeck };
     const first = req.body?.first;
     const r = lobby.createBotRoom(seat, bot, format, first === 0 || first === 1 ? first : undefined);
@@ -299,7 +327,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   /** Canal da partida (SSE): estado, presença, emotes, chat e avisos. */
   app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/events', (req, reply) => {
     const found = seatIn(req.params.id, req.query.t);
-    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     stream(req, reply, found.room, { seat: found.seat });
   });
 
@@ -328,29 +356,29 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   /** Sala privada pelo código, para assistir. */
   app.get<{ Params: { code: string } }>('/api/online/watch/:code', async (req, reply) => {
     const room = /^[A-Za-z0-9]{6}$/.test(req.params.code) ? lobby.byCode(req.params.code) : null;
-    if (!room) return reply.code(404).send({ error: 'Nenhuma partida em andamento com esse código.' });
+    if (!room) return reply.code(404).send(fail('noMatchWithCode', 'Nenhuma partida em andamento com esse código.'));
     return { ...lobby.summary(room), mine: room.isPlayer(viewerHash(req), user(req)?.id ?? null) };
   });
 
   /** Resumo de uma sala (o espectador confere se ela ainda existe antes de reconectar). */
   app.get<{ Params: { id: string } }>('/api/online/rooms/:id', async (req, reply) => {
     const room = watchable(req.params.id);
-    return room ? lobby.summary(room) : reply.code(404).send({ error: 'Partida não encontrada.' });
+    return room ? lobby.summary(room) : reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
   });
 
   /** Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin). */
   app.get<{ Params: { id: string }; Querystring: { hands?: string } }>('/api/online/rooms/:id/watch', (req, reply) => {
     const room = watchable(req.params.id);
-    if (!room || room.status === 'waiting') return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!room || room.status === 'waiting') return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const hands = req.query.hands === '1';
     if (hands) {
       const account = user(req);
-      if (!seesHands(account?.role)) return reply.code(403).send({ error: 'Ver as mãos é só para streamers e administradores.' });
+      if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers e administradores.'));
       if (room.isPlayer(accountOwnerKey(account!.id), account!.id)) {
-        return reply.code(403).send({ error: 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.' });
+        return reply.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));
       }
     }
-    if (room.spectators >= MAX_SPECTATORS) return reply.code(429).send({ error: 'Esta partida já tem espectadores demais.' });
+    if (room.spectators >= MAX_SPECTATORS) return reply.code(429).send(fail('tooManySpectators', 'Esta partida já tem espectadores demais.'));
     stream(req, reply, room, { seat: null, hands });
   });
 
@@ -359,36 +387,36 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/action', async (req, reply) => {
     const found = withSeat(req);
-    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const r = found.room.act(found.seat, req.body?.seq, req.body?.action);
-    return r.ok ? r : reply.code(r.code).send({ error: r.error });
+    return r.ok ? r : reply.code(r.code).send(refused(r));
   });
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/dice', async (req, reply) => {
     const found = withSeat(req);
-    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const r = found.room.throwDice(found.seat, req.body?.vx, req.body?.vy);
-    return r.ok ? reply.code(204).send() : reply.code(r.code).send({ error: r.error });
+    return r.ok ? reply.code(204).send() : reply.code(r.code).send(refused(r));
   });
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/emote', async (req, reply) => {
     const found = withSeat(req);
-    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const r = found.room.emote(found.seat, req.body?.emote);
-    return r.ok ? reply.code(204).send() : reply.code(r.code).send({ error: r.error });
+    return r.ok ? reply.code(204).send() : reply.code(r.code).send(refused(r));
   });
 
   /** Chat da partida (texto livre, censurado no servidor; só quem tem assento manda). */
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/chat', async (req, reply) => {
     const found = withSeat(req);
-    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const r = found.room.chat(found.seat, req.body?.text);
-    return r.ok ? reply.code(204).send() : reply.code(r.code).send({ error: r.error });
+    return r.ok ? reply.code(204).send() : reply.code(r.code).send(refused(r));
   });
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/rematch', async (req, reply) => {
     const found = withSeat(req);
-    if (!found) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const err = lobby.rematch(found.room, found.seat);
     return err ? reply.code(err.code).send(err) : reply.code(204).send();
   });
@@ -406,7 +434,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    */
   app.get<{ Params: { id: string } }>('/api/online/rooms/:id/replay', async (req, reply) => {
     const replay = lobby.get(req.params.id)?.replay();
-    return replay ?? reply.code(404).send({ error: 'Replay disponível só depois do fim da partida.' });
+    return replay ?? reply.code(404).send(fail('replayAfterEnd', 'Replay disponível só depois do fim da partida.'));
   });
 
   return lobby;

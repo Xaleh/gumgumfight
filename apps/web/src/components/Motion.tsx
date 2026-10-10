@@ -18,7 +18,7 @@ import { type Action, cardDef, type GameState, getPower, hasKeyword, HIDDEN_CARD
 import { type CSSProperties, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { abilityText, abilityTitle } from '../game/abilityText';
 import { holdMotion } from '../game/motion';
-import type { CardLang } from '../settings';
+import { type Locale, t as tr } from '../i18n';
 import { CardBack, CardView } from './CardView';
 
 type Zone = 'deck' | 'hand' | 'life' | 'trash' | 'field';
@@ -115,7 +115,7 @@ type Item = CardFlight | DonFlight | Burst | Label | Feature;
 interface PlanOptions {
   /** A ação que levou a este estado (para a vitrine de habilidade ativada). */
   lastAction?: Action;
-  lang: CardLang;
+  lang: Locale;
 }
 
 /** De onde para onde as cartas sem identidade costumam ir, em ordem de preferência. */
@@ -402,7 +402,10 @@ function spotPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes,
     const from = before.get(`field:${b.attacker}`);
     if (hit && from) {
       const power = getPower(prev, b.attacker);
-      const extras = [hasKeyword(prev, b.attacker, 'doubleAttack') ? 'Double Attack!' : '', hasKeyword(prev, b.attacker, 'banish') ? 'Banish!' : ''].filter(Boolean);
+      const extras = [
+        hasKeyword(prev, b.attacker, 'doubleAttack') ? tr('board.motionDoubleAttack') : '',
+        hasKeyword(prev, b.attacker, 'banish') ? tr('board.motionBanish') : '',
+      ].filter(Boolean);
       const flyIn = 420 * tempo;
       const hold = 820 * tempo;
       const back = 380 * tempo;
@@ -566,7 +569,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
     const el = root.querySelector(`.field-card [data-uid="${CSS.escape(uid)}"]`);
     if (!box) continue;
     lifeTargets.add(uid);
-    if (target === uid) strike(box, el, `−${lost} Vida`, 'life');
+    if (target === uid) strike(box, el, tr('board.motionLifeLost', { n: lost }), 'life');
     else {
       shake(el, delay);
       out.push({ id: nextId++, kind: 'burst', at: box, tone: 'hit', delay, duration: 600 });
@@ -578,7 +581,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
     const isLeader = owner !== undefined && prev.players[owner].leader.uid === target;
     const box = after.get(`field:${target}`) ?? (isLeader ? undefined : after.get(`anchor:trash-${owner}`));
     const el = root.querySelector(`.field-card [data-uid="${CSS.escape(target)}"]`);
-    if (box) strike(box, el, isLeader ? '−1 Vida' : 'K.O.!', isLeader ? 'life' : 'ko');
+    if (box) strike(box, el, isLeader ? tr('board.motionLifeLost', { n: 1 }) : tr('board.motionKO'), isLeader ? 'life' : 'ko');
   }
   return out;
 }
@@ -591,7 +594,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
  */
 export function useBoardMotion(
   state: GameState,
-  { enabled, tempo, lastAction, lang }: { enabled: boolean; tempo: number; lastAction?: Action; lang: CardLang },
+  { enabled, tempo, lastAction, lang }: { enabled: boolean; tempo: number; lastAction?: Action; lang: Locale },
 ): { layer: ReactNode; busy: boolean } {
   const [items, setItems] = useState<Item[]>([]);
   const optsRef = useRef<PlanOptions>({ lastAction, lang });
