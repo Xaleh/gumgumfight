@@ -7,11 +7,11 @@ const CATEGORY = { leader: 'Líder', character: 'Personagem', event: 'Evento', s
 
 /** Nome, atributos e texto da carta no idioma escolhido (com "ver original"); `statuses` = efeitos temporários em campo. */
 export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; power?: number; cost?: number; statuses?: CardStatus[] }) {
-  const { lang } = useSettings();
+  const { locale } = useSettings();
   const [showOriginal, setShowOriginal] = useState(false);
   useEffect(() => setShowOriginal(false), [def.id]);
-  const shown = cardText(def, showOriginal ? 'en' : lang);
-  const translated = lang === 'pt' && shown.source !== 'original';
+  const shown = cardText(def, showOriginal ? 'en' : locale);
+  const translated = locale === 'pt-BR' && shown.source !== 'original';
 
   return (
     <div className="detail-text">
@@ -54,7 +54,7 @@ export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; pow
           <b>[Trigger]</b> {shown.trigger}
         </p>
       )}
-      {lang === 'pt' && (def.text || def.trigger) && (
+      {locale === 'pt-BR' && (def.text || def.trigger) && (
         <p className="small muted translation-note">
           {translated && shown.source === 'partial' && '⚠ Tradução automática parcial. '}
           {translated && shown.source === 'auto' && 'Tradução automática. '}

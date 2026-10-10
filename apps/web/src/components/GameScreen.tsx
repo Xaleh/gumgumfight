@@ -331,7 +331,7 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const backTo = online?.room?.tournament ? 'torneio' : 'menu';
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter, animations, replayCues, lang } = useSettings();
+  const { quickCounter, animations, replayCues, locale: lang } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -1906,7 +1906,7 @@ function Prompt(props: {
   highlight: (uid: string) => Highlight;
 }) {
   const { state, human, picked, onDispatch, onCancel, cancelHint } = props;
-  const { lang } = useSettings();
+  const { locale: lang } = useSettings();
   const pending = state.pending;
   // "Ver a mesa": a janela da pergunta recolhe para um balão no topo, para olhar o campo e a mão antes de
   // responder (ex.: usar ou não um efeito quando o oponente ataca). Volta sozinha quando a situação muda.
@@ -2075,7 +2075,7 @@ function Prompt(props: {
       return null;
     case 'manual': {
       // Efeito ainda não automatizado (⚙): o jogo só avisa e segue sem aplicá-lo.
-      const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
+      const text = lang === 'pt-BR' ? translateToPt(pending.text).text : pending.text;
       const name = cardDef(state, pending.source).name;
       return (
         <PromptPill title={`⚙ Efeito ainda não automático: ${name}`} subtitle={`${text} (Este efeito não é aplicado.)`} clamp>
@@ -2140,7 +2140,7 @@ function Prompt(props: {
                   className={`btn${index === 0 ? ' primary' : ''}`}
                   onClick={() => onDispatch({ type: 'option', player: human, index })}
                 >
-                  {!pending.order && !pending.don && lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
+                  {!pending.order && !pending.don && lang === 'pt-BR' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
                 </button>
               ))}
             </div>
@@ -2238,7 +2238,7 @@ function CardZoom(props: {
   onAttackMode: (attacker: string) => void;
 }) {
   const { state, uid, legal } = props;
-  const { lang } = useSettings();
+  const { locale: lang } = useSettings();
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
   const play = legal.find((a) => a.type === 'playCard' && a.uid === uid);

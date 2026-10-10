@@ -8086,3 +8086,54 @@ tr.clickable:hover td {
     width: 100%;
   }
 }
+
+/* Idioma: seletor por bandeiras (Configurações, menu da partida, barra superior e gaveta ☰) */
+.flag {
+  display: block;
+  flex: none;
+}
+.locale-seg button {
+  display: grid;
+  place-items: center;
+  padding: 5px 7px;
+  opacity: 0.6;
+  filter: saturate(0.7);
+}
+.locale-seg button:hover {
+  opacity: 0.9;
+}
+.locale-seg button.on {
+  opacity: 1;
+  filter: none;
+}
+.locale-wrap {
+  position: relative;
+}
+.locale-btn .flag {
+  border-radius: 3px;
+}
+.locale-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 18px 40px rgba(var(--shadow-rgb), 0.28);
+  padding: 4px;
+  z-index: 50;
+  animation: pop-in 0.16s;
+}
+.locale-pop .seg {
+  border: 0;
+  background: transparent;
+}
+.drawer-locale {
+  display: flex;
+  justify-content: center;
+  padding: 10px 6px 0;
+}
+.drawer-locale .seg {
+  width: 100%;
+}

@@ -5,7 +5,7 @@
 // carta pelo marcador de momento ("[Activate: Main]" etc.), na ordem em que aparece.
 
 import { type Ability, type CardDef, translateToPt } from '@gumgum/engine';
-import type { CardLang } from '../settings';
+import type { Locale } from '../i18n';
 
 const MARKERS: Partial<Record<Ability['timing'], RegExp>> = {
   activateMain: /^\[Activate: ?Main\]/i,
@@ -66,10 +66,10 @@ export function abilitySource(def: CardDef, index: number): string {
 }
 
 /** Texto da habilidade no idioma escolhido, sem os marcadores do início (ficam no título e nos chips). */
-export function abilityText(def: CardDef, index: number, lang: CardLang): string {
+export function abilityText(def: CardDef, index: number, locale: Locale): string {
   const src = abilitySource(def, index);
   let out = src;
-  if (lang === 'pt') {
+  if (locale === 'pt-BR') {
     const pt = def.i18n?.pt?.text;
     const a = def.abilities[index];
     const marker = a && MARKERS_PT[a.timing];
@@ -85,11 +85,11 @@ export function abilityText(def: CardDef, index: number, lang: CardLang): string
 }
 
 /** Título da habilidade: o rótulo curto ou o momento ("[Ativar: Principal]"). */
-export function abilityTitle(a: Ability, lang: CardLang): string {
+export function abilityTitle(a: Ability, locale: Locale): string {
   if (a.label) return a.label;
   const en: Partial<Record<Ability['timing'], string>> = { activateMain: '[Activate: Main]', onPlay: '[On Play]', whenAttacking: '[When Attacking]', onKO: '[On K.O.]', trigger: '[Trigger]' };
   const pt: Partial<Record<Ability['timing'], string>> = { activateMain: '[Ativar: Principal]', onPlay: '[Ao Jogar]', whenAttacking: '[Ao Atacar]', onKO: '[Ao ser Nocauteado]', trigger: '[Trigger]' };
-  return (lang === 'pt' ? pt : en)[a.timing] ?? 'Ativar efeito';
+  return (locale === 'pt-BR' ? pt : en)[a.timing] ?? 'Ativar efeito';
 }
 
 /** Custo da habilidade em poucas palavras ("②", "DON!! −1", "Virar", "Descartar 1"). */

@@ -18,7 +18,7 @@ import { type Action, cardDef, type GameState, getPower, hasKeyword, HIDDEN_CARD
 import { type CSSProperties, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { abilityText, abilityTitle } from '../game/abilityText';
 import { holdMotion } from '../game/motion';
-import type { CardLang } from '../settings';
+import type { Locale } from '../i18n';
 import { CardBack, CardView } from './CardView';
 
 type Zone = 'deck' | 'hand' | 'life' | 'trash' | 'field';
@@ -115,7 +115,7 @@ type Item = CardFlight | DonFlight | Burst | Label | Feature;
 interface PlanOptions {
   /** A ação que levou a este estado (para a vitrine de habilidade ativada). */
   lastAction?: Action;
-  lang: CardLang;
+  lang: Locale;
 }
 
 /** De onde para onde as cartas sem identidade costumam ir, em ordem de preferência. */
@@ -591,7 +591,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
  */
 export function useBoardMotion(
   state: GameState,
-  { enabled, tempo, lastAction, lang }: { enabled: boolean; tempo: number; lastAction?: Action; lang: CardLang },
+  { enabled, tempo, lastAction, lang }: { enabled: boolean; tempo: number; lastAction?: Action; lang: Locale },
 ): { layer: ReactNode; busy: boolean } {
   const [items, setItems] = useState<Item[]>([]);
   const optsRef = useRef<PlanOptions>({ lastAction, lang });

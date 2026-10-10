@@ -6,7 +6,7 @@
 // das cartas que o jogador viu, para a mesa mostrar o clique/seleção antes de aplicar a ação.
 
 import { type Action, cardDef, type GameState, type ManualOp, type ManualZone, type PlayerId, translateToPt } from '@gumgum/engine';
-import type { CardLang } from '../settings';
+import type { Locale } from '../i18n';
 import { abilityText, abilityTitle } from './abilityText';
 
 /** Um elemento da mesa que o jogador tocou: uma carta (mão, campo, descarte), um DON!! da fileira ou um DON!! anexado. */
@@ -35,8 +35,8 @@ const ZONE_LABEL: Record<ManualZone, string> = {
 };
 
 /** Texto de uma opção como o jogador a viu (o prompt traduz as opções em inglês quando a interface está em português). */
-function optionLabel(label: string, lang: CardLang, translate: boolean): string {
-  return translate && lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label;
+function optionLabel(label: string, locale: Locale, translate: boolean): string {
+  return translate && locale === 'pt-BR' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label;
 }
 
 function manualLabel(op: ManualOp, name: (uid: string) => string): { title: string; target?: string } {
@@ -70,7 +70,7 @@ function manualLabel(op: ManualOp, name: (uid: string) => string): { title: stri
  * Descreve a ação `a` (a próxima do roteiro) como o clique/seleção do jogador sobre o estado `state`
  * (o estado em que ele agiu: é dele que vêm a pergunta pendente e os nomes das cartas).
  */
-export function describeReplayAction(state: GameState, a: Action, lang: CardLang): ReplayCue {
+export function describeReplayAction(state: GameState, a: Action, locale: Locale): ReplayCue {
   const who = state.players[a.player].name;
   const name = (uid: string) => (state.cards[uid] ? cardDef(state, uid).name : 'carta desconhecida');
   const names = (uids: string[]) => uids.map(name).join(', ');
@@ -95,7 +95,7 @@ export function describeReplayAction(state: GameState, a: Action, lang: CardLang
       if (!state.cards[a.uid]) return cue('Ativar efeito');
       const def = cardDef(state, a.uid);
       const ability = def.abilities[a.ability];
-      return cue(`${name(a.uid)}: ${ability ? abilityTitle(ability, lang) : 'ativar efeito'}`, cards([a.uid]), ability ? abilityText(def, a.ability, lang) : undefined);
+      return cue(`${name(a.uid)}: ${ability ? abilityTitle(ability, locale) : 'ativar efeito'}`, cards([a.uid]), ability ? abilityText(def, a.ability, locale) : undefined);
     }
     case 'attack':
       return cue(`Atacar ${name(a.target)} com ${name(a.attacker)}`, cards([a.attacker, a.target]));
@@ -137,7 +137,7 @@ export function describeReplayAction(state: GameState, a: Action, lang: CardLang
     case 'option': {
       if (p?.kind !== 'option') return cue(`Opção ${a.index + 1}`);
       const label = p.options[a.index];
-      return cue(label !== undefined ? optionLabel(label, lang, !p.order && !p.don) : `Opção ${a.index + 1}`, [], p.prompt);
+      return cue(label !== undefined ? optionLabel(label, locale, !p.order && !p.don) : `Opção ${a.index + 1}`, [], p.prompt);
     }
   }
 }
