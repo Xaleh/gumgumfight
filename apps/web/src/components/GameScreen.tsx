@@ -972,7 +972,7 @@ function Table({
 
   return (
     <div
-      className={['game', wide ? 'wide' : '', watching ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : ''].join(' ')}
+      className={['game', wide ? 'wide' : '', watching || replay ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : ''].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
