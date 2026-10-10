@@ -3185,16 +3185,19 @@ button.hint-pill {
 .hand.bottom .hand-card:has(.hl-selected) {
   transform: translateY(-18%) rotate(0deg);
 }
+/*
+ * Mão de cima: cartas do mesmo tamanho da mão de baixo, mas só a ponta de baixo aparece
+ * (`--peek`), o resto fica acima da borda da mesa. Contexto de empilhamento próprio para o
+ * leque ficar abaixo do menu e da faixa do oponente, por mais cartas que tenha.
+ */
 .hand.top {
-  --hcw: calc(var(--cw) * 0.58);
+  z-index: 1;
+  --peek: calc(var(--cw) * 0.5);
 }
 .hand.top .hand-card {
-  top: calc(var(--hcw) * -0.62);
-  transform: translateY(calc(var(--a) * var(--a) * -0.8px)) rotate(calc(var(--o) * -3deg));
+  top: calc(var(--peek) - var(--hcw) * 1.396);
+  transform: translateY(calc(var(--a) * var(--a) * -0.8px)) rotate(calc(var(--o) * -2deg));
   transform-origin: 50% -30%;
-}
-.hand.top .hand-card > .card {
-  font-size: calc(var(--hcw) * 0.1);
 }
 
 /* ------------------------------------------------------------------ carta */
@@ -3228,12 +3231,11 @@ button.hint-pill {
   filter: saturate(0.85) brightness(0.96);
 }
 /*
- * Espectador: as cartas do jogador de cima ficam de cabeça para baixo, como numa mesa de verdade.
- * O zoom e o painel de detalhes ficam fora da mesa e mostram a carta no sentido normal.
- * `rotate` (e não `transform`) para somar com a carta virada (rested) e as animações.
+ * Espectador e replay: a mão do jogador de cima fica de cabeça para baixo, como numa mesa de
+ * verdade; as cartas na mesa (Líder, Personagens, Stage, DON!!) seguem no sentido normal para
+ * dar para ler. O zoom e o painel de detalhes ficam fora da mesa e mostram a carta no sentido normal.
+ * `rotate` (e não `transform`) para somar com as animações.
  */
-.game.flip-top .side.top .card,
-.game.flip-top .side.top .don-card,
 .game.flip-top .hand.top .card {
   rotate: 180deg;
 }
@@ -5977,6 +5979,10 @@ tr.clickable:hover td {
     --hcw: calc(var(--cw) * 1.2);
     width: 100%;
     padding: 0 max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
+  }
+  /* Sobra altura acima da linha do oponente: a mão de cima aparece um pouco mais. */
+  .hand.top {
+    --peek: calc(var(--cw) * 0.7);
     background:
       radial-gradient(120% 70% at 50% -30%, transparent 0 66%, rgba(255, 112, 76, 0.5) 66.4% 68.4%, transparent 68.8%),
       radial-gradient(120% 70% at 50% 130%, transparent 0 66%, rgba(56, 132, 255, 0.5) 66.4% 68.4%, transparent 68.8%),
@@ -6154,6 +6160,9 @@ tr.clickable:hover td {
   /* faixa de cima mais baixa; menu e Auto lado a lado */
   .top-strip {
     height: 34px;
+  }
+  .hand.top {
+    --peek: calc(var(--cw) * 0.5);
   }
   .corner {
     flex-direction: row;
