@@ -81,6 +81,18 @@ export default {
   'settings.unmuteLabel': 'Unmute {what}',
   'settings.footer': 'Settings are stored in this browser and apply to every match. The nickname is stored on the server, tied to this browser.',
 
+  // ---- labels shared across screens (api.ts) ----
+  'labels.role.player': 'Player',
+  'labels.role.streamer': 'Streamer',
+  'labels.role.organizer': 'Organizer',
+  'labels.role.admin': 'Admin',
+  'labels.role.dev': 'Dev',
+  'labels.structure.swiss': 'Swiss',
+  'labels.structure.single': 'Single elimination',
+  'labels.tourStatus.registration': 'Registration open',
+  'labels.tourStatus.running': 'In progress',
+  'labels.tourStatus.finished': 'Finished',
+
   // ==== menu ====
   // ==== /menu ====
 

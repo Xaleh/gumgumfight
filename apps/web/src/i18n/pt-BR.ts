@@ -80,6 +80,18 @@ const ptBR = {
   'settings.unmuteLabel': 'Ligar {what}',
   'settings.footer': 'As configurações ficam guardadas neste navegador e valem para todas as partidas. O apelido fica no servidor, ligado a este navegador.',
 
+  // ---- rótulos usados em várias telas (api.ts) ----
+  'labels.role.player': 'Player',
+  'labels.role.streamer': 'Streamer',
+  'labels.role.organizer': 'Organizador',
+  'labels.role.admin': 'Admin',
+  'labels.role.dev': 'Dev',
+  'labels.structure.swiss': 'Suíço',
+  'labels.structure.single': 'Eliminação simples',
+  'labels.tourStatus.registration': 'Inscrições abertas',
+  'labels.tourStatus.running': 'Em andamento',
+  'labels.tourStatus.finished': 'Encerrado',
+
   // ==== menu ====
   // ==== /menu ====
 

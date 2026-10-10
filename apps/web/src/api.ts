@@ -1,3 +1,4 @@
+import type { MessageKey } from './i18n';
 import type { Action, CardData, DeckList, FormatId, PlayerId } from '@gumgum/engine';
 
 export type { FormatId };
@@ -129,7 +130,14 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
  */
 export type Role = 'player' | 'streamer' | 'organizer' | 'admin' | 'dev';
 
-export const ROLE_LABEL: Record<Role, string> = { player: 'Player', streamer: 'Streamer', organizer: 'Organizador', admin: 'Admin', dev: 'Dev' };
+/** Nome de cada perfil: chave do dicionário (mostrar com `t(ROLE_LABEL[role])`). */
+export const ROLE_LABEL: Record<Role, MessageKey> = {
+  player: 'labels.role.player',
+  streamer: 'labels.role.streamer',
+  organizer: 'labels.role.organizer',
+  admin: 'labels.role.admin',
+  dev: 'labels.role.dev',
+};
 /** Poderes de administrador (o Dev é um Admin com as ferramentas de desenvolvimento). */
 export const isAdmin = (role: Role | undefined) => role === 'admin' || role === 'dev';
 /**
@@ -347,11 +355,12 @@ export type TournamentStatus = 'registration' | 'running' | 'finished';
 /** Não há empate no One Piece TCG. */
 export type TournamentResult = 'p1' | 'p2';
 
-export const STRUCTURE_LABEL: Record<TournamentStructure, string> = { swiss: 'Suíço', single: 'Eliminação simples' };
-export const TOURNAMENT_STATUS_LABEL: Record<TournamentStatus, string> = {
-  registration: 'Inscrições abertas',
-  running: 'Em andamento',
-  finished: 'Encerrado',
+/** Chaves do dicionário (mostrar com `t(STRUCTURE_LABEL[s])`). */
+export const STRUCTURE_LABEL: Record<TournamentStructure, MessageKey> = { swiss: 'labels.structure.swiss', single: 'labels.structure.single' };
+export const TOURNAMENT_STATUS_LABEL: Record<TournamentStatus, MessageKey> = {
+  registration: 'labels.tourStatus.registration',
+  running: 'labels.tourStatus.running',
+  finished: 'labels.tourStatus.finished',
 };
 
 export interface TournamentInput {

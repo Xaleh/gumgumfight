@@ -53,7 +53,7 @@ function AccountBlock() {
         <div className="account-who">
           <strong>
             {user.name ?? t('account.google')}
-            {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{ROLE_LABEL[user.role]}</span>}
+            {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{t(ROLE_LABEL[user.role])}</span>}
           </strong>
           {user.email && <span className="muted small">{user.email}</span>}
         </div>
