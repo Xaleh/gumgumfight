@@ -199,13 +199,18 @@ describe('torneios: rotas', () => {
     expect((await req(app, 'POST', url, b, { deckId: 'st03-crocodile' })).statusCode).toBe(200);
     expect((await req(app, 'POST', url, c, { deckId: 'st04-kaido' })).statusCode).toBe(409);
 
-    // A lista de cada um fica escondida dos outros jogadores até o fim (o Líder aparece).
+    // Nas inscrições, os outros jogadores não veem nem o Líder nem a lista de cada um
+    // (para ninguém escolher o deck olhando os dos outros); cada um vê o seu, e o
+    // organizador vê tudo.
     const seen = (await req(app, 'GET', `/api/tournaments/${t.id}`, b)).json();
     const ofA = seen.players.find((p: { userId: string }) => p.userId === a.id);
-    expect(ofA.deck).toBeNull();
-    expect(ofA.leader).toBe('ST02-001');
-    expect(seen.players.find((p: { userId: string }) => p.userId === b.id).deck.cards.length).toBeGreaterThan(0);
-    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json().players.every((p: { deck: unknown }) => p.deck)).toBe(true);
+    expect(ofA).toMatchObject({ deck: null, leader: null, leaderName: null, leaderImage: null, colors: [] });
+    const ofB = seen.players.find((p: { userId: string }) => p.userId === b.id);
+    expect(ofB.leader).toBe('ST03-001');
+    expect(ofB.deck.cards.length).toBeGreaterThan(0);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`)).json().players.every((p: { leader: unknown }) => p.leader === null)).toBe(true);
+    const byOrg = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    expect(byOrg.players.every((p: { deck: unknown; leader: unknown }) => p.deck && p.leader)).toBe(true);
 
     // Mudar o formato para um em que os decks não valem é recusado.
     expect((await req(app, 'PUT', `/api/tournaments/${t.id}`, org, { name: 'Copa', format: 'standard', structure: 'swiss' })).statusCode).toBe(400);
@@ -224,7 +229,12 @@ describe('torneios: rotas', () => {
     expect((await req(app, 'POST', `/api/tournaments/${t.id}/start`, ps[0])).statusCode).toBe(403);
     const started = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
     expect(started).toMatchObject({ status: 'running', round: 1, totalRounds: 3 });
+    // Com o torneio em andamento ninguém troca de deck (nem de lista)...
     expect((await req(app, 'POST', `/api/tournaments/${t.id}/register`, ps[0], { deckId: DECKS[0] })).statusCode).toBe(409);
+    // ...e é aí que o Líder de cada um aparece para todos (a lista continua escondida até o fim).
+    const running = (await req(app, 'GET', `/api/tournaments/${t.id}`, ps[1])).json();
+    expect(running.players.every((p: { leader: unknown }) => typeof p.leader === 'string')).toBe(true);
+    expect(running.players.filter((p: { deck: unknown }) => p.deck)).toHaveLength(1);
     const r1 = started.rounds[0].matches;
     expect(r1).toHaveLength(3);
     const bye = r1.find((m: { p2: unknown }) => m.p2 === null);

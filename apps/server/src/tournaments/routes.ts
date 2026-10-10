@@ -291,9 +291,16 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const matches = listMatches(db, t.id);
     const games = listGames(db, t.id);
     const manage = canManage(t, u);
-    // As listas ficam escondidas até o fim (só o organizador e o próprio jogador as veem).
+    // Nas inscrições, só o organizador e o próprio jogador veem qual deck (Líder) cada
+    // um inscreveu: o deck e a lista ficam congelados quando o torneio começa, e é aí
+    // que o Líder aparece para todos (ninguém escolhe o deck olhando os dos outros).
+    // As listas completas ficam escondidas até o fim (só o organizador e o próprio jogador as veem).
+    const showLeader = (userId: string) => manage || t.status !== 'registration' || userId === u?.id;
     const showDeck = (userId: string) => manage || t.status === 'finished' || userId === u?.id;
-    const ids = players.flatMap((p) => [p.deck.leader, ...(showDeck(p.userId) ? p.deck.cards.map((c) => c.id) : [])]);
+    const ids = players.flatMap((p) => [
+      ...(showLeader(p.userId) ? [p.deck.leader] : []),
+      ...(showDeck(p.userId) ? p.deck.cards.map((c) => c.id) : []),
+    ]);
     const cards = new Map(present(getCards(db, [...new Set(ids)])).map((c) => [c.id, c] as const));
     const name = new Map(players.map((p) => [p.userId, p.name]));
     const ref = (id: string | null) => (id ? { userId: id, name: name.get(id) ?? '?' } : null);
@@ -392,14 +399,15 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
           }
         : null,
       players: players.map((p) => {
-        const leader = cards.get(p.deck.leader);
+        const leader = showLeader(p.userId) ? cards.get(p.deck.leader) : undefined;
         return {
           userId: p.userId,
           name: p.name,
           seed: t.status === 'registration' ? null : p.seed,
           dropped: p.dropped,
           checkedIn: Boolean(p.checkedInAt),
-          leader: p.deck.leader,
+          /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
+          leader: showLeader(p.userId) ? p.deck.leader : null,
           leaderName: leader?.name ?? null,
           leaderImage: (cardImages && leader?.imageUrl) || null,
           colors: leader?.colors ?? [],
