@@ -562,7 +562,8 @@ export interface TournamentDetail {
     seed: number | null;
     dropped: boolean;
     checkedIn: boolean;
-    leader: string;
+    /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
+    leader: string | null;
     leaderName: string | null;
     leaderImage: string | null;
     colors: string[];

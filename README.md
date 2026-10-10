@@ -338,8 +338,10 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   rodada de 32, oitavas, quartas, semifinal ou final) as partidas passam a ser melhor de 3 e melhor de 5. Ex.: melhor
   de 3 a partir das quartas e melhor de 5 na final.
 - **Inscrição:** com um deck válido no formato. A lista fica **congelada** na inscrição (mudar o deck depois não muda
-  o do torneio; inscreva-o de novo para trocar). Os outros jogadores veem só o Líder; as listas completas ficam
-  visíveis para o organizador e, quando o torneio termina, para todos.
+  o do torneio; inscreva-o de novo para trocar, só enquanto as inscrições estão abertas: depois que o torneio começa,
+  ninguém troca nem o deck nem a lista). Enquanto as inscrições estão abertas, os outros jogadores **não veem** qual
+  deck cada um inscreveu (só o organizador, um Admin e o próprio jogador); quando o torneio começa, o Líder de cada um
+  aparece para todos. As listas completas ficam visíveis para o organizador e, quando o torneio termina, para todos.
 - **Partidas:** cada jogador clica em **Jogar partida** na página do torneio; quem entra primeiro espera o oponente
   na sala online (fila `tournament`, com relógio e regras das partidas online). Numa melhor de N, cada jogo é uma
   sala: o placar da série soma sozinho, quem perdeu um jogo começa o seguinte e a tela de fim de jogo tem o botão do
