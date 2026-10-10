@@ -1,7 +1,7 @@
 import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '../audio';
-import type { OnlineRoomInfo } from '../api';
+import { errorMessage, type OnlineRoomInfo } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
 import { type MessageKey, type Translate, useLocale, useT, useTryT } from '../i18n';
 import { fmtBerries, fmtNumber } from '../i18n/format';
@@ -294,7 +294,7 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
           </span>
         </p>
       )}
-      {room.result?.error && <p className="muted small">{room.result.error}</p>}
+      {room.result?.error && <p className="muted small">{errorMessage(room.result, room.result.error)}</p>}
       {room.queue === 'private' && room.rematch[opp] && !room.rematch[me] && (
         <p className="muted small">{t('online.rematchWanted', { name: room.players[opp]?.name })}</p>
       )}

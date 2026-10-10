@@ -384,9 +384,6 @@ const ptBR = {
   'deck.searchDecksPlaceholder': 'Buscar deck por nome ou Líder…',
   'deck.searchDecksLabel': 'Buscar deck',
   'deck.savedDecks': 'Decks salvos',
-  'deck.groupMine': 'Meus decks',
-  'deck.groupCommunity': 'Decks da comunidade',
-  'deck.groupBuiltin': 'Decks prontos',
   'deck.noDeckFound': 'Nenhum deck encontrado.',
   'deck.noDeckYet': 'Nenhum deck ainda.',
   // ---- importar / exportar lista ----

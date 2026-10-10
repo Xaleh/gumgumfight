@@ -59,13 +59,6 @@ const CATEGORY_LABEL: Record<CardData['category'], MessageKey> = {
   stage: 'deck.cat.stage',
 };
 
-/** Títulos dos grupos de `deckGroups` (api.ts devolve o título em português; aqui vira chave). */
-const GROUP_TITLE: Record<string, MessageKey> = {
-  'Meus decks': 'deck.groupMine',
-  'Decks da comunidade': 'deck.groupCommunity',
-  'Decks prontos': 'deck.groupBuiltin',
-};
-
 /**
  * Avisos de `validateDeck` no idioma da interface. O motor só devolve o texto em português (sem código),
  * então as mesmas regras, na mesma ordem, viram frases do dicionário. Se a contagem não bater com a do
@@ -872,9 +865,9 @@ function DeckDropdown({
           />
           <div className="deck-list" role="listbox" aria-label={t('deck.savedDecks')}>
             {groups.map(([title, group]) =>
-              title === 'Decks da comunidade' && !group.length ? null : (
+              title === 'labels.deckGroup.community' && !group.length ? null : (
                 <div key={title}>
-                  <div className="deck-list-title">{GROUP_TITLE[title] ? t(GROUP_TITLE[title]) : title}</div>
+                  <div className="deck-list-title">{t(title)}</div>
                   {group.length === 0 && <div className="muted small">{needle ? t('deck.noDeckFound') : t('deck.noDeckYet')}</div>}
                   {group.map((d) => (
                     <button

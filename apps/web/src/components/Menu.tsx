@@ -117,7 +117,7 @@ function DeckPicker({
             .filter(([, list]) => list.length)
             .map(([label, list]) => (
               <div key={label} className="picker-group">
-                <label className="sheet-label">{label}</label>
+                <label className="sheet-label">{t(label)}</label>
                 <div className="picker-grid">
                   {list.map((d) => (
                     <button

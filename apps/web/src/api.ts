@@ -35,12 +35,12 @@ export function whyNotPlayable(deck: DeckSummary, format: FormatId): string | nu
   return issues.length ? issues.join('\n') : null;
 }
 
-/** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. */
-export function deckGroups(decks: DeckSummary[]): Array<[string, DeckSummary[]]> {
+/** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. O título é chave (`t(title)`). */
+export function deckGroups(decks: DeckSummary[]): Array<[MessageKey, DeckSummary[]]> {
   return [
-    [t('labels.deckGroup.mine'), decks.filter((d) => d.kind === 'user' && d.mine)],
-    [t('labels.deckGroup.community'), decks.filter((d) => d.kind === 'user' && !d.mine)],
-    [t('labels.deckGroup.builtin'), decks.filter((d) => d.kind === 'builtin')],
+    ['labels.deckGroup.mine', decks.filter((d) => d.kind === 'user' && d.mine)],
+    ['labels.deckGroup.community', decks.filter((d) => d.kind === 'user' && !d.mine)],
+    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin')],
   ];
 }
 

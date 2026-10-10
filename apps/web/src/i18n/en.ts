@@ -385,9 +385,6 @@ export default {
   'deck.searchDecksPlaceholder': 'Search decks by name or Leader…',
   'deck.searchDecksLabel': 'Search decks',
   'deck.savedDecks': 'Saved decks',
-  'deck.groupMine': 'My decks',
-  'deck.groupCommunity': 'Community decks',
-  'deck.groupBuiltin': 'Preset decks',
   'deck.noDeckFound': 'No deck found.',
   'deck.noDeckYet': 'No decks yet.',
   // ---- import / export list ----
