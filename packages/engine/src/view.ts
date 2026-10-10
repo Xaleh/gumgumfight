@@ -245,10 +245,12 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
     case 'chooseFirst':
     case 'mulligan':
       return p;
-    case 'selectTargets':
-      return mine
-        ? { ...p, options: p.options.map(ref), source: ref(p.source), ...(p.shown ? { shown: p.shown.map(ref) } : {}) }
-        : { ...p, options: [], min: 0, max: 0, prompt: '', source: ref(p.source), shown: undefined };
+    case 'selectTargets': {
+      if (mine) return { ...p, options: p.options.map(ref), source: ref(p.source), ...(p.shown ? { shown: p.shown.map(ref) } : {}) };
+      // O prompt (e sua chave/parâmetros, que o reconstroem) é só do dono.
+      const { promptKey: _k, promptParams: _pp, ...rest } = p;
+      return { ...rest, options: [], min: 0, max: 0, prompt: '', source: ref(p.source), shown: undefined };
+    }
     case 'block':
     case 'counter':
       return { ...p, options: mine ? p.options.map(ref) : [] };
@@ -258,12 +260,29 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
     case 'confirm': {
       // O oponente não vê o prompt nem se o "sim" está disponível (isso contaria a mão). No "draw up
       // to N", só vê que há uma pergunta; quantas foram compradas ele vê pelo tamanho da mão.
-      const { cannot, drawUpTo, ...rest } = p;
-      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}), ...(mine && drawUpTo ? { drawUpTo } : {}) };
+      const { cannot, drawUpTo, promptKey, promptParams, ...rest } = p;
+      return {
+        ...rest,
+        source: ref(p.source),
+        prompt: mine ? p.prompt : '',
+        ...(mine && promptKey ? { promptKey } : {}),
+        ...(mine && promptParams ? { promptParams } : {}),
+        ...(mine && cannot ? { cannot } : {}),
+        ...(mine && drawUpTo ? { drawUpTo } : {}),
+      };
     }
     case 'option': {
-      const { don, ...rest } = p;
-      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', options: mine ? p.options : [], ...(mine && don ? { don: don.map((d) => (d === 'active' || d === 'rested' ? d : ref(d))) } : {}) };
+      const { don, promptKey, promptParams, optionKeys, ...rest } = p;
+      return {
+        ...rest,
+        source: ref(p.source),
+        prompt: mine ? p.prompt : '',
+        ...(mine && promptKey ? { promptKey } : {}),
+        ...(mine && promptParams ? { promptParams } : {}),
+        options: mine ? p.options : [],
+        ...(mine && optionKeys ? { optionKeys } : {}),
+        ...(mine && don ? { don: don.map((d) => (d === 'active' || d === 'rested' ? d : ref(d))) } : {}),
+      };
     }
     case 'manual':
       return { ...p, source: ref(p.source) };

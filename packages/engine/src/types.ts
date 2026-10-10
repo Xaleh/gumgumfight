@@ -1004,6 +1004,9 @@ export interface Ability {
   replace?: Replacement;
   /** Texto curto exibido na interface. */
   label?: string;
+  /** Chave de tradução de `label` (`engine.*`) e seus parâmetros; a interface traduz, com `label` de reserva. */
+  labelKey?: string;
+  labelParams?: PromptParams;
   /** Habilidade derivada do texto, resolvida manualmente pelo jogador. */
   manual?: boolean;
   /** Trecho do texto da carta a que a habilidade corresponde. */
@@ -1121,7 +1124,17 @@ export interface BattleState {
 /** De onde sai um DON!! do campo: área de custo (ativo ou virado) ou a carta (uid) a que está dado. */
 export type DonSource = 'active' | 'rested' | (string & {});
 
-/** Escolhas que o motor aguarda de um jogador. */
+/** Parâmetros de uma chave de tradução (`promptParams`, `labelParams`). */
+export type PromptParams = Record<string, string | number>;
+
+/**
+ * Escolhas que o motor aguarda de um jogador.
+ *
+ * `prompt` é o texto em português (sempre preenchido: replays e salas antigas dependem dele).
+ * `promptKey` (`engine.*`) e `promptParams` são a mesma frase para a interface traduzir; se a
+ * chave não existir no dicionário, mostra-se `prompt`. Em `confirm` com `cannot`, o texto do
+ * `prompt` já traz " (Não dá para pagar o custo.)" no fim; a interface junta `engine.cannotPayCost`.
+ */
 export type Pending =
   /** O vencedor do sorteio escolhe se joga primeiro (`answer` yes) ou segundo (no). */
   | { kind: 'chooseFirst'; player: PlayerId }
@@ -1133,6 +1146,8 @@ export type Pending =
       min: number;
       max: number;
       prompt: string;
+      promptKey?: string;
+      promptParams?: PromptParams;
       intent: 'harm' | 'help' | 'discard';
       source: string;
       /** A ordem dos cliques importa (ex.: ordem das cartas no topo do deck). */
@@ -1167,14 +1182,27 @@ export type Pending =
    * assim, para o oponente não deduzir a mão pelo pulo. Só o dono vê `cannot`. Com `drawUpTo`,
    * é o "comprar mais 1?" do "draw up to N cards" (4-5-4): sim compra 1, não para.
    */
-  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; cannot?: true; drawUpTo?: true }
+  | { kind: 'confirm'; player: PlayerId; source: string; prompt: string; promptKey?: string; promptParams?: PromptParams; cannot?: true; drawUpTo?: true }
   /**
    * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
    * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
    * `TriggeredEffect.id` correspondente. Com `don`, é a escolha de qual DON!! devolver ao deck
-   * de DON!!: cada opção é a origem correspondente.
+   * de DON!!: cada opção é a origem correspondente. `optionKeys` (paralelo a `options`) traz a
+   * chave de tradução de cada opção fixa (topo/fundo, sim/não…), resolvida com `promptParams`;
+   * `null` quando a opção é texto da carta (ou nome de carta, número…) e se mostra como está.
    */
-  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[]; order?: number[]; don?: DonSource[] }
+  | {
+      kind: 'option';
+      player: PlayerId;
+      source: string;
+      prompt: string;
+      promptKey?: string;
+      promptParams?: PromptParams;
+      options: string[];
+      optionKeys?: (string | null)[];
+      order?: number[];
+      don?: DonSource[];
+    }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
 

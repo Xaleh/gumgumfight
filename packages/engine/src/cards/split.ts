@@ -81,6 +81,7 @@ export function manualAbility(line: string, category: CardData['category']): Abi
     yourTurn: /\[Your Turn\]/i.test(line) || undefined,
     opponentsTurn: /\[Opponent's Turn\]/i.test(line) || undefined,
     label: timing === 'activateMain' ? 'Ativar efeito (manual)' : undefined,
+    labelKey: timing === 'activateMain' ? 'engine.labelManualActivate' : undefined,
     steps: timing === 'static' ? [] : [{ do: 'manual', text: line }],
   };
 }
