@@ -5,7 +5,7 @@
 // carta pelo marcador de momento ("[Activate: Main]" etc.), na ordem em que aparece.
 
 import { type Ability, type CardDef, translateToPt } from '@gumgum/engine';
-import type { Locale } from '../i18n';
+import { type Locale, type MessageKey, t, translate, tryT } from '../i18n';
 
 const MARKERS: Partial<Record<Ability['timing'], RegExp>> = {
   activateMain: /^\[Activate: ?Main\]/i,
@@ -84,29 +84,57 @@ export function abilityText(def: CardDef, index: number, locale: Locale): string
   return out.replace(/^(\s*\[[^\]]+\])+\s*/, '').trim() || out;
 }
 
+/** Marcadores em inglês: os mesmos do texto original das cartas (os idiomas sem tradução das cartas usam estes). */
+const TITLE_EN: Partial<Record<Ability['timing'], string>> = {
+  activateMain: '[Activate: Main]',
+  onPlay: '[On Play]',
+  whenAttacking: '[When Attacking]',
+  onKO: '[On K.O.]',
+  trigger: '[Trigger]',
+};
+/** Marcadores em português (o texto das cartas sai traduzido em pt-BR). */
+const TITLE_PT: Partial<Record<Ability['timing'], MessageKey>> = {
+  activateMain: 'ability.timingActivateMain',
+  onPlay: 'ability.timingOnPlay',
+  whenAttacking: 'ability.timingWhenAttacking',
+  onKO: 'ability.timingOnKO',
+  trigger: 'ability.timingTrigger',
+};
+
+/** Rótulo traduzível que o motor pode mandar junto do `label` (campos novos, lidos sem depender do tipo). */
+type LabelledAbility = Ability & { labelKey?: string; labelParams?: Record<string, string | number> };
+
 /** Título da habilidade: o rótulo curto ou o momento ("[Ativar: Principal]"). */
 export function abilityTitle(a: Ability, locale: Locale): string {
-  if (a.label) return a.label;
-  const en: Partial<Record<Ability['timing'], string>> = { activateMain: '[Activate: Main]', onPlay: '[On Play]', whenAttacking: '[When Attacking]', onKO: '[On K.O.]', trigger: '[Trigger]' };
-  const pt: Partial<Record<Ability['timing'], string>> = { activateMain: '[Ativar: Principal]', onPlay: '[Ao Jogar]', whenAttacking: '[Ao Atacar]', onKO: '[Ao ser Nocauteado]', trigger: '[Trigger]' };
-  return (locale === 'pt-BR' ? pt : en)[a.timing] ?? 'Ativar efeito';
+  if (a.label) {
+    const { labelKey, labelParams } = a as LabelledAbility;
+    return tryT(labelKey, labelParams, locale) ?? a.label;
+  }
+  if (locale === 'pt-BR') {
+    const key = TITLE_PT[a.timing];
+    if (key) return translate(locale, key);
+  } else {
+    const en = TITLE_EN[a.timing];
+    if (en) return en;
+  }
+  return translate(locale, 'ability.activate');
 }
 
 /** Custo da habilidade em poucas palavras ("②", "DON!! −1", "Virar", "Descartar 1"). */
 export function abilityCostLabel(a: Ability): string[] {
   const c = a.cost;
   const out: string[] = [];
-  if (a.don) out.push(`DON!! ×${a.don}`);
+  if (a.don) out.push(t('ability.costDon', { n: a.don }));
   if (!c) return out;
-  if (c.restDon) out.push('①②③④⑤⑥⑦⑧⑨⑩'[c.restDon - 1] ?? `${c.restDon} DON!!`);
-  if (c.donMinus) out.push(`DON!! −${c.donMinus}`);
-  if (c.restSelf) out.push('Virar');
-  if (c.koSelf) out.push('K.O. esta carta');
-  if (c.trashFromHand) out.push(`Descartar ${c.trashFromHand}`);
-  if (c.handToBottom) out.push(`${c.handToBottom} ao fundo do deck`);
-  if (c.lifeToHand) out.push(`${c.lifeToHand} Vida → mão`);
-  if (c.leaderPowerMinus) out.push(`Líder −${c.leaderPowerMinus}`);
-  if (c.returnGivenDon) out.push(`Devolver ${c.returnGivenDon} DON!!`);
-  if (c.restCharacters) out.push(`Virar ${c.restCharacters} Personagem(ns)`);
+  if (c.restDon) out.push('①②③④⑤⑥⑦⑧⑨⑩'[c.restDon - 1] ?? t('ability.costRestDon', { n: c.restDon }));
+  if (c.donMinus) out.push(t('ability.costDonMinus', { n: c.donMinus }));
+  if (c.restSelf) out.push(t('ability.costRest'));
+  if (c.koSelf) out.push(t('ability.costKOSelf'));
+  if (c.trashFromHand) out.push(t('ability.costTrash', { n: c.trashFromHand }));
+  if (c.handToBottom) out.push(t('ability.costHandToBottom', { n: c.handToBottom }));
+  if (c.lifeToHand) out.push(t('ability.costLifeToHand', { n: c.lifeToHand }));
+  if (c.leaderPowerMinus) out.push(t('ability.costLeaderMinus', { n: c.leaderPowerMinus }));
+  if (c.returnGivenDon) out.push(t('ability.costReturnDon', { n: c.returnGivenDon }));
+  if (c.restCharacters) out.push(t('ability.costRestCharacters', { n: c.restCharacters }));
   return out;
 }

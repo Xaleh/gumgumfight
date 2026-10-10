@@ -1,5 +1,6 @@
 import { cardDef, type GameState, MAX_CHARACTERS, type PlayerId } from '@gumgum/engine';
 import type { CSSProperties, ReactNode } from 'react';
+import { useT } from '../i18n';
 import { CardBack, CardView, type Highlight, JollyRoger } from './CardView';
 
 export interface BoardHandlers {
@@ -37,6 +38,7 @@ interface SideProps extends BoardHandlers {
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
 
 function PlayerSide({ state, player, position, ...h }: SideProps) {
+  const t = useT();
   const ps = state.players[player];
   const isActive = state.activePlayer === player && state.phase === 'main';
   const trashTop = ps.trash[ps.trash.length - 1];
@@ -52,11 +54,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
         {fc.don > 0 && (
           <div
             className={['attached-don', draggable ? 'loose' : ''].join(' ')}
-            title={
-              draggable
-                ? `${fc.don} DON!! anexado(s); ${loose} ainda pode(m) voltar: arraste até a fileira de DON!! ou use "−1 DON!!" na carta`
-                : `${fc.don} DON!! anexado(s)`
-            }
+            title={draggable ? t('board.attachedDonLoose', { n: fc.don, loose }) : t('board.attachedDon', { n: fc.don })}
             data-uid={uid}
             data-drag={draggable ? 'attached' : undefined}
             onClick={() => h.onCard(uid)}
@@ -82,7 +80,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
   };
 
   const life = (
-    <div className="zone life-zone" title={`Vida: ${ps.life.length}`}>
+    <div className="zone life-zone" title={t('board.lifeTitle', { n: ps.life.length })}>
       <div className="life-stack" key={ps.life.length} data-anchor={`life-${player}`}>
         {ps.life.map((uid, i) => {
           // Vida virada para cima é pública (3-10-2-1): mostra a carta.
@@ -92,7 +90,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
             <div
               key={uid}
               className="life-card face-up"
-              title={`${def.name} (Vida virada para cima)`}
+              title={t('board.lifeFaceUpTitle', { name: def.name })}
               style={vars({ '--i': i, ...(def.imageUrl ? { '--face': `url("${def.imageUrl}")` } : {}) })}
               onMouseEnter={() => h.onHover(uid)}
               onMouseLeave={() => h.onHover(null)}
@@ -109,7 +107,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
 
   const stage = (
     <div className="zone stage-zone">
-      {ps.stage ? fieldCard(ps.stage.uid, ps.stage) : <div className="slot-empty">Stage</div>}
+      {ps.stage ? fieldCard(ps.stage.uid, ps.stage) : <div className="slot-empty">{t('board.stageSlot')}</div>}
     </div>
   );
 
@@ -128,7 +126,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
   const don = (
     <div
       className={['don-row', position, donGlow ? 'glow' : '', donDrop ? 'drop' : ''].join(' ')}
-      title={`DON!!: ${ps.donDeck} no deck, ${ps.donActive} ativos, ${ps.donRested} virados, ${attached} anexados`}
+      title={t('board.donTitle', { deck: ps.donDeck, active: ps.donActive, rested: ps.donRested, attached })}
     >
       {/* Deck de DON!! fixo à esquerda; os DON!! entram à direita dele. */}
       <div className="don-deck" data-anchor={`dondeck-${player}`}>
@@ -155,19 +153,19 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
       </div>
       <dl className="don-stats" aria-label="DON!!">
         <div>
-          <dt>Deck</dt>
+          <dt>{t('board.donDeck')}</dt>
           <dd>{ps.donDeck}</dd>
         </div>
         <div className="act">
-          <dt>Ativos</dt>
+          <dt>{t('board.donActive')}</dt>
           <dd>{ps.donActive}</dd>
         </div>
         <div className="rest">
-          <dt>Virados</dt>
+          <dt>{t('board.donRested')}</dt>
           <dd>{ps.donRested}</dd>
         </div>
         <div className="att">
-          <dt>Anexados</dt>
+          <dt>{t('board.donAttached')}</dt>
           <dd>{attached}</dd>
         </div>
       </dl>
@@ -176,7 +174,7 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
 
   const piles = (
     <div className="zone piles">
-      <div className="pile" title={`Deck: ${ps.deck.length} cartas`} data-anchor={`deck-${player}`}>
+      <div className="pile" title={t('board.deckTitle', { n: ps.deck.length })} data-anchor={`deck-${player}`}>
         <CardBack />
         <span className="pile-count">{ps.deck.length}</span>
       </div>
@@ -184,9 +182,9 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
         className="pile clickable"
         data-anchor={`trash-${player}`}
         onClick={() => h.onTrash(player)}
-        title={`Descarte: ${ps.trash.length} cartas (toque para ver)`}
+        title={t('board.trashTitle', { n: ps.trash.length })}
       >
-        {trashTop ? <CardView state={state} uid={trashTop} /> : <div className="slot-empty">Lixo</div>}
+        {trashTop ? <CardView state={state} uid={trashTop} /> : <div className="slot-empty">{t('board.trashSlot')}</div>}
         <span className="pile-count">{ps.trash.length}</span>
       </div>
     </div>
@@ -319,20 +317,21 @@ export function PlayerBanner({
   /** Online: relógio e conexão do jogador. */
   extra?: ReactNode;
 }) {
+  const t = useT();
   const ps = state.players[player];
   const max = Math.max(cardDef(state, ps.leader.uid).life ?? 0, ps.life.length);
   const isActive = state.activePlayer === player && state.phase === 'main';
   return (
     <div className={['banner', align, isActive ? 'active' : '', isActive && pulse ? 'pulse' : ''].join(' ')}>
-      <div className="banner-life" title={`Vida: ${ps.life.length}`}>
+      <div className="banner-life" title={t('board.lifeTitle', { n: ps.life.length })}>
         {Array.from({ length: max }, (_, i) => (
           <span key={i} className={i < ps.life.length ? 'on' : ''} />
         ))}
       </div>
       <div className="banner-name">
         {ps.name}
-        {ps.isBot && <span className="tag">BOT</span>}
-        <small>✋ {ps.hand.length}</small>
+        {ps.isBot && <span className="tag">{t('board.bot')}</span>}
+        <small>{t('board.handCount', { n: ps.hand.length })}</small>
       </div>
       {extra}
     </div>
@@ -379,6 +378,7 @@ export function Board({
   bannerExtra,
   ...handlers
 }: BoardProps) {
+  const t = useT();
   const top = (bottom === 0 ? 1 : 0) as PlayerId;
   return (
     <div className="mat">
@@ -408,13 +408,13 @@ export function Board({
         {state.players[bottom].hand.length > 0 && (onExpandHand || onSortHand) && (
           <div className="hand-tools">
             {onSortHand && (
-              <button className="hand-expand sort" onClick={onSortHand} title="Ordenar a mão por custo e nome (só a exibição)">
-                ⇅ Ordenar
+              <button className="hand-expand sort" onClick={onSortHand} title={t('board.sortTitle')}>
+                {t('board.sort')}
               </button>
             )}
             {onExpandHand && (
-              <button className="hand-expand" onClick={onExpandHand} title="Ver todas as cartas da mão em tamanho grande">
-                ⤢ Ver mão <b>{state.players[bottom].hand.length}</b>
+              <button className="hand-expand" onClick={onExpandHand} title={t('board.expandTitle')}>
+                {t('board.expand')} <b>{state.players[bottom].hand.length}</b>
               </button>
             )}
           </div>

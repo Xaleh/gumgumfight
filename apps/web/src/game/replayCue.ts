@@ -6,7 +6,7 @@
 // das cartas que o jogador viu, para a mesa mostrar o clique/seleção antes de aplicar a ação.
 
 import { type Action, cardDef, type GameState, type ManualOp, type ManualZone, type PlayerId, translateToPt } from '@gumgum/engine';
-import type { Locale } from '../i18n';
+import { type Locale, type MessageKey, type Params, translate } from '../i18n';
 import { abilityText, abilityTitle } from './abilityText';
 
 /** Um elemento da mesa que o jogador tocou: uma carta (mão, campo, descarte), um DON!! da fileira ou um DON!! anexado. */
@@ -24,14 +24,14 @@ export interface ReplayCue {
   targets: CueTarget[];
 }
 
-const ZONE_LABEL: Record<ManualZone, string> = {
-  hand: 'a mão',
-  trash: 'o descarte',
-  deckTop: 'o topo do deck',
-  deckBottom: 'o fundo do deck',
-  life: 'a Vida',
-  character: 'o campo',
-  stage: 'a área de Stage',
+const ZONE_LABEL: Record<ManualZone, MessageKey> = {
+  hand: 'replay.zoneHand',
+  trash: 'replay.zoneTrash',
+  deckTop: 'replay.zoneDeckTop',
+  deckBottom: 'replay.zoneDeckBottom',
+  life: 'replay.zoneLife',
+  character: 'replay.zoneCharacter',
+  stage: 'replay.zoneStage',
 };
 
 /** Texto de uma opção como o jogador a viu (o prompt traduz as opções em inglês quando a interface está em português). */
@@ -39,30 +39,30 @@ function optionLabel(label: string, locale: Locale, translate: boolean): string 
   return translate && locale === 'pt-BR' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label;
 }
 
-function manualLabel(op: ManualOp, name: (uid: string) => string): { title: string; target?: string } {
+function manualLabel(op: ManualOp, name: (uid: string) => string, tr: (key: MessageKey, params?: Params) => string): { title: string; target?: string } {
   switch (op.op) {
     case 'draw':
-      return { title: `Comprar ${op.count} carta${op.count === 1 ? '' : 's'}` };
+      return { title: tr('replay.manualDraw', { n: op.count }) };
     case 'move':
-      return { title: `Mover ${name(op.uid)} para ${ZONE_LABEL[op.to]}${op.rested ? ' (virada)' : ''}`, target: op.uid };
+      return { title: tr(op.rested ? 'replay.manualMoveRested' : 'replay.manualMove', { name: name(op.uid), zone: tr(ZONE_LABEL[op.to]) }), target: op.uid };
     case 'ko':
-      return { title: `Nocautear ${name(op.uid)}`, target: op.uid };
+      return { title: tr('replay.manualKO', { name: name(op.uid) }), target: op.uid };
     case 'setRested':
-      return { title: `${op.rested ? 'Virar' : 'Desvirar'} ${name(op.uid)}`, target: op.uid };
+      return { title: tr(op.rested ? 'replay.manualRest' : 'replay.manualUnrest', { name: name(op.uid) }), target: op.uid };
     case 'power':
-      return { title: `${op.amount >= 0 ? '+' : ''}${op.amount} de poder em ${name(op.uid)}`, target: op.uid };
+      return { title: tr('replay.manualPower', { amount: `${op.amount >= 0 ? '+' : ''}${op.amount}`, name: name(op.uid) }), target: op.uid };
     case 'donFromDeck':
-      return { title: `${op.count} DON!! do deck de DON!!${op.rested ? ' (virados)' : ''}` };
+      return { title: tr(op.rested ? 'replay.manualDonFromDeckRested' : 'replay.manualDonFromDeck', { n: op.count }) };
     case 'donToDeck':
-      return { title: `${op.count} DON!! de volta ao deck de DON!!` };
+      return { title: tr('replay.manualDonToDeck', { n: op.count }) };
     case 'donGive':
-      return { title: `Dar 1 DON!! ${op.from === 'rested' ? 'virado ' : ''}a ${name(op.uid)}`, target: op.uid };
+      return { title: tr(op.from === 'rested' ? 'replay.manualDonGiveRested' : 'replay.manualDonGive', { name: name(op.uid) }), target: op.uid };
     case 'donSetState':
-      return { title: `${op.count} DON!! ${op.rested ? 'virados' : 'ativos'}` };
+      return { title: tr(op.rested ? 'replay.manualDonRested' : 'replay.manualDonActive', { n: op.count }) };
     case 'shuffle':
-      return { title: 'Embaralhar o deck' };
+      return { title: tr('replay.manualShuffle') };
     case 'peek':
-      return { title: `Olhar ${op.count} carta${op.count === 1 ? '' : 's'} do topo do deck` };
+      return { title: tr('replay.manualPeek', { n: op.count }) };
   }
 }
 
@@ -71,8 +71,9 @@ function manualLabel(op: ManualOp, name: (uid: string) => string): { title: stri
  * (o estado em que ele agiu: é dele que vêm a pergunta pendente e os nomes das cartas).
  */
 export function describeReplayAction(state: GameState, a: Action, locale: Locale): ReplayCue {
+  const tr = (key: MessageKey, params?: Params) => translate(locale, key, params);
   const who = state.players[a.player].name;
-  const name = (uid: string) => (state.cards[uid] ? cardDef(state, uid).name : 'carta desconhecida');
+  const name = (uid: string) => (state.cards[uid] ? cardDef(state, uid).name : tr('replay.unknownCard'));
   const names = (uids: string[]) => uids.map(name).join(', ');
   const cards = (uids: string[]): CueTarget[] => uids.filter((u) => state.cards[u]).map((u) => ({ card: u }));
   const p = state.pending;
@@ -80,64 +81,72 @@ export function describeReplayAction(state: GameState, a: Action, locale: Locale
 
   switch (a.type) {
     case 'mulligan':
-      return cue(a.redraw ? 'Trocar mão' : 'Manter mão', [], 'Mão inicial');
+      return cue(tr(a.redraw ? 'replay.mulliganRedraw' : 'replay.mulliganKeep'), [], tr('replay.openingHand'));
     case 'playCard': {
       const event = state.cards[a.uid] && cardDef(state, a.uid).category === 'event';
-      return cue(`${event ? 'Usar' : 'Jogar'} ${name(a.uid)}`, cards([a.uid]));
+      return cue(tr(event ? 'replay.useCard' : 'replay.playCard', { name: name(a.uid) }), cards([a.uid]));
     }
     case 'attachDon':
-      return cue(`Anexar 1 DON!! em ${name(a.target)}`, [{ don: a.player }, ...cards([a.target])]);
+      return cue(tr('replay.attachDon', { name: name(a.target) }), [{ don: a.player }, ...cards([a.target])]);
     case 'detachDon':
-      return cue(`Devolver 1 DON!! de ${name(a.target)} à área de custo`, state.cards[a.target] ? [{ attached: a.target }] : []);
+      return cue(tr('replay.detachDon', { name: name(a.target) }), state.cards[a.target] ? [{ attached: a.target }] : []);
     case 'cancel':
-      return cue('Cancelar', [], 'desfaz a ação em andamento');
+      return cue(tr('common.cancel'), [], tr('replay.cancelSub'));
     case 'activate': {
-      if (!state.cards[a.uid]) return cue('Ativar efeito');
+      if (!state.cards[a.uid]) return cue(tr('replay.activate'));
       const def = cardDef(state, a.uid);
       const ability = def.abilities[a.ability];
-      return cue(`${name(a.uid)}: ${ability ? abilityTitle(ability, locale) : 'ativar efeito'}`, cards([a.uid]), ability ? abilityText(def, a.ability, locale) : undefined);
+      return cue(tr('replay.activateCard', { name: name(a.uid), title: ability ? abilityTitle(ability, locale) : tr('replay.activateLower') }), cards([a.uid]), ability ? abilityText(def, a.ability, locale) : undefined);
     }
     case 'attack':
-      return cue(`Atacar ${name(a.target)} com ${name(a.attacker)}`, cards([a.attacker, a.target]));
+      return cue(tr('replay.attack', { target: name(a.target), attacker: name(a.attacker) }), cards([a.attacker, a.target]));
     case 'endTurn':
-      return cue('Encerrar turno');
+      return cue(tr('replay.endTurn'));
     case 'choose':
-      if (p?.kind === 'block') return a.uids.length ? cue(`Bloquear com ${names(a.uids)}`, cards(a.uids), 'Etapa de Bloqueio') : cue('Não bloquear', [], 'Etapa de Bloqueio');
+      if (p?.kind === 'block')
+        return a.uids.length
+          ? cue(tr('replay.blockWith', { names: names(a.uids) }), cards(a.uids), tr('replay.blockStep'))
+          : cue(tr('replay.noBlock'), [], tr('replay.blockStep'));
       if (p?.kind === 'selectTargets') {
-        if (p.max === 0) return cue('Continuar', [], p.prompt);
-        if (!a.uids.length) return cue('Não escolher', [], p.prompt);
+        if (p.max === 0) return cue(tr('replay.continue'), [], p.prompt);
+        if (!a.uids.length) return cue(tr('replay.noChoice'), [], p.prompt);
         const list = p.ordered ? a.uids.map((u, i) => `${i + 1}. ${name(u)}`).join(' → ') : names(a.uids);
-        return cue(`Escolher ${list}`, cards(a.uids), p.prompt);
+        return cue(tr('replay.choose', { list }), cards(a.uids), p.prompt);
       }
-      return cue(a.uids.length ? `Escolher ${names(a.uids)}` : 'Não escolher', cards(a.uids));
+      return cue(a.uids.length ? tr('replay.choose', { list: names(a.uids) }) : tr('replay.noChoice'), cards(a.uids));
     case 'answer':
-      if (p?.kind === 'chooseFirst') return cue(a.yes ? 'Jogar primeiro' : 'Jogar segundo', [], 'Venceu o sorteio');
+      if (p?.kind === 'chooseFirst') return cue(tr(a.yes ? 'replay.playFirst' : 'replay.playSecond'), [], tr('replay.wonRoll'));
       if (p?.kind === 'lifeCard') {
         const def = state.cards[p.card] ? cardDef(state, p.card) : null;
         const trigger = def?.abilities.some((x) => x.timing === 'trigger') ?? false;
-        return cue(a.yes ? 'Ativar [Trigger]' : trigger ? 'Não ativar (vai para a mão)' : 'Colocar na mão', [], `Carta da Vida: ${def?.name ?? '?'}`);
+        return cue(tr(a.yes ? 'replay.activateTrigger' : trigger ? 'replay.noTrigger' : 'replay.toHand'), [], tr('replay.lifeCard', { name: def?.name ?? '?' }));
       }
-      if (p?.kind === 'confirm') return cue(a.yes ? (p.drawUpTo ? 'Comprar 1 carta' : 'Pagar e usar') : p.drawUpTo ? 'Parar' : 'Não usar', [], p.prompt);
-      return cue(a.yes ? 'Sim' : 'Não');
+      if (p?.kind === 'confirm')
+        return cue(tr(a.yes ? (p.drawUpTo ? 'replay.drawOne' : 'replay.payAndUse') : p.drawUpTo ? 'replay.stop' : 'replay.dontUse'), [], p.prompt);
+      return cue(tr(a.yes ? 'common.yes' : 'common.no'));
     case 'counter':
-      return cue(`Counter com ${name(a.uid)}${a.target ? ` em ${name(a.target)}` : ''}`, cards([a.uid, ...(a.target ? [a.target] : [])]), 'Etapa de Counter');
+      return cue(
+        a.target ? tr('replay.counterWithOn', { name: name(a.uid), target: name(a.target) }) : tr('replay.counterWith', { name: name(a.uid) }),
+        cards([a.uid, ...(a.target ? [a.target] : [])]),
+        tr('replay.counterStep'),
+      );
     case 'pass':
-      if (p?.kind === 'counter') return cue(p.options.length ? 'Não usar Counter' : 'Concluir', [], 'Etapa de Counter');
-      return cue('Passar');
+      if (p?.kind === 'counter') return cue(tr(p.options.length ? 'replay.noCounter' : 'replay.finish'), [], tr('replay.counterStep'));
+      return cue(tr('replay.pass'));
     case 'concede':
-      return cue('Desistir da partida');
+      return cue(tr('replay.concede'));
     case 'timeout':
-      return cue(a.abandoned ? 'Abandonou a partida' : 'Ficou sem tempo', [], 'registrado pelo servidor');
+      return cue(tr(a.abandoned ? 'replay.abandoned' : 'replay.timeout'), [], tr('replay.byServer'));
     case 'manual': {
-      const m = manualLabel(a.op, name);
-      return cue(`⚙ ${m.title}`, m.target ? cards([m.target]) : [], 'ferramenta manual');
+      const m = manualLabel(a.op, name, tr);
+      return cue(tr('replay.manual', { title: m.title }), m.target ? cards([m.target]) : [], tr('replay.manualTool'));
     }
     case 'manualDone':
-      return cue('Continuar', [], p?.kind === 'manual' ? `⚙ ${name(p.source)}: efeito aplicado à mão` : undefined);
+      return cue(tr('replay.continue'), [], p?.kind === 'manual' ? tr('replay.manualApplied', { name: name(p.source) }) : undefined);
     case 'option': {
-      if (p?.kind !== 'option') return cue(`Opção ${a.index + 1}`);
+      if (p?.kind !== 'option') return cue(tr('replay.optionN', { n: a.index + 1 }));
       const label = p.options[a.index];
-      return cue(label !== undefined ? optionLabel(label, locale, !p.order && !p.don) : `Opção ${a.index + 1}`, [], p.prompt);
+      return cue(label !== undefined ? optionLabel(label, locale, !p.order && !p.don) : tr('replay.optionN', { n: a.index + 1 }), [], p.prompt);
     }
   }
 }

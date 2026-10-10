@@ -16,6 +16,7 @@
 import type { GameState, PlayerId } from '@gumgum/engine';
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { audio } from '../audio';
+import { useT } from '../i18n';
 import type { DiceThrow } from '../game/useOnlineGame';
 import { CardView } from './CardView';
 
@@ -82,6 +83,7 @@ export function DiceRoll({
   onChoose: (first: boolean) => void;
   onDone: () => void;
 }) {
+  const t = useT();
   const me: PlayerId = human ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
   /** Assento de cada dado: o de baixo é o seu (ou o do jogador 0, para o espectador). */
@@ -492,17 +494,17 @@ export function DiceRoll({
     launch(0, vx, vy);
   };
 
-  const name = (p: PlayerId) => (human !== null && p === human ? 'Você' : state.players[p].name);
+  const name = (p: PlayerId) => (human !== null && p === human ? t('dice.you') : state.players[p].name);
   const first = state.firstPlayer;
   const banner = !result
     ? null
     : choosing
       ? iWon
-        ? 'Você venceu!'
-        : `${state.players[winner].name} venceu!`
+        ? t('dice.youWon')
+        : t('dice.playerWon', { name: state.players[winner].name })
       : human !== null && first === human
-        ? 'Você começa!'
-        : `${state.players[first].name} começa!`;
+        ? t('dice.youStart')
+        : t('dice.playerStarts', { name: state.players[first].name });
 
   /** Texto sobre a vez de cada dado. */
   const turnHint = (i: number): string | null => {
@@ -512,18 +514,18 @@ export function DiceRoll({
         if (ctrl[i] === 'user') {
           // O oponente jogou antes (online): agora é a sua vez.
           const o = state.players[seats[1]].name;
-          if (status[1] === 'done') return `${o} tirou ${values[seats[1]]}. Sua vez: segure o dado e jogue!`;
-          if (status[1] === 'rolling') return `${o} jogou! Agora é a sua vez.`;
-          return 'Segure o dado, chacoalhe e solte para jogar';
+          if (status[1] === 'done') return t('dice.oppRolledYourTurn', { name: o, value: values[seats[1]] });
+          if (status[1] === 'rolling') return t('dice.oppThrewYourTurn', { name: o });
+          return t('dice.holdHint');
         }
-        if (ctrl[i] === 'remote') return `Aguardando ${n} jogar o dado…`;
-        return i === 1 && status[0] !== 'done' ? null : `Vez de ${n}…`;
+        if (ctrl[i] === 'remote') return t('dice.waitingThrow', { name: n });
+        return i === 1 && status[0] !== 'done' ? null : t('dice.turnOf', { name: n });
       case 'held':
-        return 'Solte para jogar!';
+        return t('dice.release');
       case 'shaking':
-        return `${n} está pegando o dado…`;
+        return t('dice.grabbing', { name: n });
       case 'rolling':
-        return ctrl[i] === 'user' ? 'Rolando…' : `${n} jogou!`;
+        return ctrl[i] === 'user' ? t('dice.rolling') : t('dice.threw', { name: n });
       default:
         return null;
     }
@@ -531,9 +533,9 @@ export function DiceRoll({
   const hint = result
     ? choosing
       ? iWon
-        ? 'Você escolhe: quer jogar primeiro ou segundo?'
-        : `${state.players[winner].name} está escolhendo quem começa…`
-      : `${name(winner)} escolheu jogar ${first === winner ? 'primeiro' : 'segundo'}.`
+        ? t('dice.youChoose')
+        : t('dice.choosing', { name: state.players[winner].name })
+      : t(first === winner ? 'dice.choseFirst' : 'dice.choseSecond', { name: name(winner) })
     : status[0] === 'done' || (status[1] !== 'idle' && status[0] !== 'held' && ctrl[0] !== 'user')
       ? turnHint(1)
       : (turnHint(0) ?? turnHint(1));
@@ -542,10 +544,10 @@ export function DiceRoll({
   const waitLabel = (i: number): string | null => {
     if (ctrl[i] === 'user') return null;
     const n = state.players[seats[i]].name;
-    if (status[i] === 'shaking') return `${n} está pegando o dado…`;
+    if (status[i] === 'shaking') return t('dice.grabbing', { name: n });
     if (status[i] !== 'idle') return null;
-    if (ctrl[i] === 'remote') return `Aguardando ${n} jogar…`;
-    return i === 1 && status[0] !== 'done' ? null : `Vez de ${n}…`;
+    if (ctrl[i] === 'remote') return t('dice.waiting', { name: n });
+    return i === 1 && status[0] !== 'done' ? null : t('dice.turnOf', { name: n });
   };
 
   const side = (i: number) => {
@@ -565,10 +567,10 @@ export function DiceRoll({
   return (
     <div className="modal-backdrop dice-backdrop">
       <div className="modal-card dice-card">
-        <div className="modal-kicker">Sorteio inicial</div>
+        <div className="modal-kicker">{t('dice.kicker')}</div>
         <div className="dice-versus">
           {side(0)}
-          <span className="dice-vs">VS</span>
+          <span className="dice-vs">{t('dice.vs')}</span>
           {side(1)}
         </div>
         <div
@@ -617,25 +619,25 @@ export function DiceRoll({
           {result && choosing && iWon ? (
             <>
               <button className="btn primary big" onClick={() => onChoose(true)}>
-                Jogar primeiro
+                {t('dice.playFirst')}
               </button>
               <button className="btn big" onClick={() => onChoose(false)}>
-                Jogar segundo
+                {t('dice.playSecond')}
               </button>
             </>
           ) : result ? (
             <button className="btn primary big" onClick={onDone}>
-              Continuar
+              {t('dice.continue')}
             </button>
           ) : (
             <>
               {ctrl[0] === 'user' && (
                 <button className="btn primary" disabled={status[0] !== 'idle'} onClick={() => launch(0, 0, 0)}>
-                  🎲 Jogar dados
+                  {t('dice.roll')}
                 </button>
               )}
               <button className="btn" onClick={skip}>
-                Pular
+                {t('dice.skip')}
               </button>
             </>
           )}

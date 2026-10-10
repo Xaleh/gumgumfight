@@ -18,7 +18,7 @@ import { type Action, cardDef, type GameState, getPower, hasKeyword, HIDDEN_CARD
 import { type CSSProperties, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { abilityText, abilityTitle } from '../game/abilityText';
 import { holdMotion } from '../game/motion';
-import type { Locale } from '../i18n';
+import { type Locale, t as tr } from '../i18n';
 import { CardBack, CardView } from './CardView';
 
 type Zone = 'deck' | 'hand' | 'life' | 'trash' | 'field';
@@ -402,7 +402,10 @@ function spotPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes,
     const from = before.get(`field:${b.attacker}`);
     if (hit && from) {
       const power = getPower(prev, b.attacker);
-      const extras = [hasKeyword(prev, b.attacker, 'doubleAttack') ? 'Double Attack!' : '', hasKeyword(prev, b.attacker, 'banish') ? 'Banish!' : ''].filter(Boolean);
+      const extras = [
+        hasKeyword(prev, b.attacker, 'doubleAttack') ? tr('board.motionDoubleAttack') : '',
+        hasKeyword(prev, b.attacker, 'banish') ? tr('board.motionBanish') : '',
+      ].filter(Boolean);
       const flyIn = 420 * tempo;
       const hold = 820 * tempo;
       const back = 380 * tempo;
@@ -566,7 +569,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
     const el = root.querySelector(`.field-card [data-uid="${CSS.escape(uid)}"]`);
     if (!box) continue;
     lifeTargets.add(uid);
-    if (target === uid) strike(box, el, `−${lost} Vida`, 'life');
+    if (target === uid) strike(box, el, tr('board.motionLifeLost', { n: lost }), 'life');
     else {
       shake(el, delay);
       out.push({ id: nextId++, kind: 'burst', at: box, tone: 'hit', delay, duration: 600 });
@@ -578,7 +581,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
     const isLeader = owner !== undefined && prev.players[owner].leader.uid === target;
     const box = after.get(`field:${target}`) ?? (isLeader ? undefined : after.get(`anchor:trash-${owner}`));
     const el = root.querySelector(`.field-card [data-uid="${CSS.escape(target)}"]`);
-    if (box) strike(box, el, isLeader ? '−1 Vida' : 'K.O.!', isLeader ? 'life' : 'ko');
+    if (box) strike(box, el, isLeader ? tr('board.motionLifeLost', { n: 1 }) : tr('board.motionKO'), isLeader ? 'life' : 'ko');
   }
   return out;
 }

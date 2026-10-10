@@ -1,5 +1,6 @@
 import { type Action, cardDef, type GameState, type PlayerId } from '@gumgum/engine';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
+import { useT } from '../i18n';
 import { CardView } from './CardView';
 
 interface Props {
@@ -22,12 +23,19 @@ interface Props {
 
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
 export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra }: Props) {
+  const t = useT();
   const me: PlayerId = human ?? state.winner ?? 0;
   const opp = (me === 0 ? 1 : 0) as PlayerId;
   const won = state.winner === me;
   // Sem vencedor: os dois perderam juntos (9-2-1) ou houve um laço infinito (11-1).
   const draw = state.winner === null;
-  const title = draw ? 'Empate' : human === null ? `${state.players[state.winner ?? 0].name} venceu!` : won ? 'Vitória!' : 'Derrota';
+  const title = draw
+    ? t('result.draw')
+    : human === null
+      ? t('result.playerWon', { name: state.players[state.winner ?? 0].name })
+      : won
+        ? t('result.victory')
+        : t('result.defeat');
 
   const mine = actions.filter((a) => a.player === me);
   const attacks = mine.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack');
@@ -75,22 +83,28 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
           )}
         </div>
         <div className="result-vs">
-          vs. {state.players[opp].name} ({oppLeader.name})
+          {t('result.vs', { name: state.players[opp].name, leader: oppLeader.name })}
         </div>
         <h1>{title}</h1>
       </header>
 
       <div className="result-body">
         <button className="btn small pill" onClick={onLog}>
-          Histórico
+          {t('result.history')}
         </button>
         <div className="mvp">
           <div className="laurel">
             <span className="crown">♛</span>
             <span>
-              Carta
-              <br />
-              do jogo
+              {/* Duas linhas, como no troféu. */}
+              {t('result.mvp')
+                .split('\n')
+                .map((line, i) => (
+                  <Fragment key={i}>
+                    {i > 0 && <br />}
+                    {line}
+                  </Fragment>
+                ))}
             </span>
           </div>
           <div className="mvp-card">
@@ -99,17 +113,17 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
         </div>
 
         <dl className="stats">
-          <dt>Ordem do turno</dt>
-          <dd>{state.firstPlayer === me ? 'Primeiro a jogar' : 'Segundo a jogar'}</dd>
-          <dt>Turnos jogados</dt>
+          <dt>{t('result.turnOrder')}</dt>
+          <dd>{state.firstPlayer === me ? t('result.first') : t('result.second')}</dd>
+          <dt>{t('result.turns')}</dt>
           <dd>{state.turn}</dd>
-          <dt>{human === null ? `Vida de ${state.players[me].name}` : 'Sua Vida'}</dt>
+          <dt>{human === null ? t('result.lifeOf', { name: state.players[me].name }) : t('result.yourLife')}</dt>
           <dd>{pips(myLife)}</dd>
-          <dt>Vida do oponente</dt>
+          <dt>{t('result.oppLife')}</dt>
           <dd>{pips(oppLife)}</dd>
-          <dt>Ataques</dt>
+          <dt>{t('result.attacks')}</dt>
           <dd>{attacks.length}</dd>
-          <dt>Cartas jogadas</dt>
+          <dt>{t('result.cardsPlayed')}</dt>
           <dd>{played}</dd>
         </dl>
         {state.winReason && <p className="muted small result-reason">{state.winReason}</p>}
@@ -118,19 +132,19 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
         <div className="result-actions">
           {onRematch && (
             <button className="btn primary big" onClick={onRematch}>
-              {rematchLabel ?? 'Jogar de novo'}
+              {rematchLabel ?? t('result.rematch')}
             </button>
           )}
           <button className="btn big" onClick={onExit}>
-            {exitLabel ?? 'Voltar ao menu'}
+            {exitLabel ?? t('result.exit')}
           </button>
           {onClose && (
             <button className="btn big" onClick={onClose}>
-              Rever a partida
+              {t('result.review')}
             </button>
           )}
           <button className="btn small pill" onClick={onReplay}>
-            ⤓ Baixar replay
+            {t('result.download')}
           </button>
         </div>
       </div>

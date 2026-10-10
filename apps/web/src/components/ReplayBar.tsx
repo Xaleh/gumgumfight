@@ -2,6 +2,7 @@ import type { Action, GameState } from '@gumgum/engine';
 import { type ReactNode, useEffect, useRef } from 'react';
 import type { ReplayCue } from '../game/replayCue';
 import { REPLAY_SPEEDS } from '../game/useGame';
+import { useT } from '../i18n';
 import { useSettings } from '../settings';
 
 /** Posição no replay e como mudá-la (de `useGame`). */
@@ -83,6 +84,7 @@ export function ReplayBar({
   /** O clique/seleção da próxima ação, por escrito (o mesmo que a mesa mostra). */
   cue?: ReplayCue | null;
 }) {
+  const t = useT();
   const { pos, total, end, seek } = replay;
   const atEnd = pos >= end || state.phase === 'gameover';
   // Mostrar ou não o clique/seleção do jogador: a mesma configuração do menu, guardada neste navegador.
@@ -151,7 +153,7 @@ export function ReplayBar({
   }, []);
 
   return (
-    <div className="replay-bar" role="toolbar" aria-label="Controles do replay">
+    <div className="replay-bar" role="toolbar" aria-label={t('replay.toolbarLabel')}>
       <input
         className="replay-seek"
         type="range"
@@ -159,43 +161,43 @@ export function ReplayBar({
         max={total}
         value={pos}
         onChange={(e) => seek(Number(e.target.value))}
-        aria-label="Posição no replay"
-        aria-valuetext={`Ação ${pos} de ${total}`}
+        aria-label={t('replay.seekLabel')}
+        aria-valuetext={t('replay.actionOf', { pos, total })}
         style={{ ['--fill' as string]: `${total ? (pos / total) * 100 : 0}%` }}
       />
       <div className="replay-row">
         <div className="replay-info">
           <span>
-            Ação <b>{pos}</b>/{total}
+            {t('replay.actionWord')} <b>{pos}</b>/{total}
           </span>
-          <span className="replay-turn">{state.phase === 'gameover' ? 'Fim de jogo' : state.phase === 'mulligan' ? 'Mulligan' : `Turno ${state.turn}`}</span>
+          <span className="replay-turn">{state.phase === 'gameover' ? t('replay.gameOver') : state.phase === 'mulligan' ? t('replay.mulligan') : t('replay.turnN', { n: state.turn })}</span>
         </div>
         <div className="replay-btns">
-          <button type="button" onClick={() => seek(0)} disabled={pos === 0} title="Início (Home)" aria-label="Voltar ao início">
+          <button type="button" onClick={() => seek(0)} disabled={pos === 0} title={t('replay.startTitle')} aria-label={t('replay.startLabel')}>
             {ICONS.start}
           </button>
-          <button type="button" onClick={() => step(-1)} disabled={pos === 0} title="Ação anterior (←)" aria-label="Ação anterior">
+          <button type="button" onClick={() => step(-1)} disabled={pos === 0} title={t('replay.prevTitle')} aria-label={t('replay.prevLabel')}>
             {ICONS.back}
           </button>
           <button
             type="button"
             className="replay-play"
             onClick={toggle}
-            title={playing ? 'Pausar (espaço)' : atEnd ? 'Assistir de novo (espaço)' : 'Automático (espaço)'}
-            aria-label={playing ? 'Pausar' : atEnd ? 'Assistir de novo' : 'Reproduzir automaticamente'}
+            title={playing ? t('replay.pauseTitle') : atEnd ? t('replay.againTitle') : t('replay.autoTitle')}
+            aria-label={playing ? t('replay.pauseLabel') : atEnd ? t('replay.againLabel') : t('replay.autoLabel')}
           >
             {playing ? ICONS.pause : ICONS.play}
           </button>
-          <button type="button" onClick={() => step(1)} disabled={atEnd} title="Próxima ação (→)" aria-label="Próxima ação">
+          <button type="button" onClick={() => step(1)} disabled={atEnd} title={t('replay.nextTitle')} aria-label={t('replay.nextAction')}>
             {ICONS.next}
           </button>
-          <button type="button" onClick={() => seek(end)} disabled={atEnd} title="Fim (End)" aria-label="Ir para o fim">
+          <button type="button" onClick={() => seek(end)} disabled={atEnd} title={t('replay.endTitle')} aria-label={t('replay.endLabel')}>
             {ICONS.end}
           </button>
         </div>
         <div className="replay-right">
-          <label className="replay-speed" title="Velocidade (+ e −)">
-            <span>Velocidade</span>
+          <label className="replay-speed" title={t('replay.speedTitle')}>
+            <span>{t('replay.speed')}</span>
             <select className="speed" value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
               {REPLAY_SPEEDS.map((v) => (
                 <option key={v} value={v}>
@@ -209,21 +211,21 @@ export function ReplayBar({
             className={['replay-cues', replayCues ? 'on' : ''].join(' ')}
             aria-pressed={replayCues}
             onClick={() => update({ replayCues: !replayCues })}
-            title={replayCues ? 'Mostrando o clique/seleção do jogador antes de cada ação (clique para esconder)' : 'Clique/seleção do jogador escondido (clique para mostrar)'}
-            aria-label={replayCues ? 'Esconder os cliques do jogador' : 'Mostrar os cliques do jogador'}
+            title={replayCues ? t('replay.cuesOnTitle') : t('replay.cuesOffTitle')}
+            aria-label={replayCues ? t('replay.cuesHideLabel') : t('replay.cuesShowLabel')}
           >
             {ICONS.cues}
           </button>
         </div>
       </div>
       {cue && !atEnd && (
-        <p className="replay-cue-line" title="O que o jogador clicou ou escolheu nesta ação">
-          <span className="replay-cue-k">{playing ? `Ação ${pos + 1}` : 'Próxima ação'}</span>
+        <p className="replay-cue-line" title={t('replay.cueLineTitle')}>
+          <span className="replay-cue-k">{playing ? t('replay.actionN', { n: pos + 1 }) : t('replay.nextAction')}</span>
           <b>{cue.who}</b>: {cue.title}
           {cue.sub && <em> — {cue.sub}</em>}
         </p>
       )}
-      {!playing && !atEnd && <p className="replay-hint">Passo a passo: use ▶| (ou →) para ver a próxima ação, ou ▶ para rodar sozinho.</p>}
+      {!playing && !atEnd && <p className="replay-hint">{t('replay.stepHint')}</p>}
     </div>
   );
 }

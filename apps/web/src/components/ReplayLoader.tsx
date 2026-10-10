@@ -1,6 +1,8 @@
 import { cardDef, createGame, type PlayerId, ReplayCursor } from '@gumgum/engine';
 import { useRef, useState } from 'react';
 import { type GameSetup, REPLAY_SPEEDS } from '../game/useGame';
+import { useLocale, useT } from '../i18n';
+import { fmtDateTime } from '../i18n/format';
 import { useSettings } from '../settings';
 
 interface Summary {
@@ -30,9 +32,6 @@ function summarize(setup: GameSetup): Summary {
   };
 }
 
-const fmtDate = (ms: number) =>
-  new Date(ms).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
 /**
  * Assistir a um replay: carrega o .json (escolher ou arrastar), mostra o resumo da partida e
  * começa no modo automático ou passo a passo, na velocidade escolhida.
@@ -47,6 +46,8 @@ export function ReplayLoader({
   onStart: (setup: GameSetup) => void;
   onClose: () => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<{ setup: GameSetup; summary: Summary; file: string; date: number } | null>(null);
@@ -76,17 +77,17 @@ export function ReplayLoader({
   const result = !sum
     ? ''
     : !sum.over
-      ? 'A partida não terminou: o replay acaba antes do fim.'
+      ? t('replay.notFinished')
       : sum.winner === null
-        ? 'Empate.'
-        : `${name(sum.winner)} venceu.${sum.reason ? ` ${sum.reason}` : ''}`;
+        ? t('replay.drawResult')
+        : `${t('replay.wonResult', { name: name(sum.winner) })}${sum.reason ? ` ${sum.reason}` : ''}`;
 
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
-      <div className="sheet replay-sheet" role="dialog" aria-modal="true" aria-label="Assistir replay" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet replay-sheet" role="dialog" aria-modal="true" aria-label={t('replay.title')} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <h3>Assistir replay</h3>
-          <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
+          <h3>{t('replay.title')}</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>
@@ -117,14 +118,11 @@ export function ReplayLoader({
                 if (f) void open(f);
               }}
             />
-            <b>{busy ? 'Carregando…' : loaded ? 'Trocar o arquivo' : 'Escolher o arquivo .json do replay'}</b>
-            <span>ou arraste o arquivo para cá</span>
+            <b>{busy ? t('common.loading') : loaded ? t('replay.changeFile') : t('replay.chooseFile')}</b>
+            <span>{t('replay.dropHint')}</span>
           </label>
           {!loaded && !error && (
-            <p className="muted small">
-              O replay é baixado no fim de cada partida (⤓ Baixar replay) ou pelo menu da partida. Ele traz a seed e todas as ações: a
-              partida é refeita aqui, do começo ao fim.
-            </p>
+            <p className="muted small">{t('replay.intro')}</p>
           )}
           {error && <div className="error">{error}</div>}
 
@@ -140,36 +138,33 @@ export function ReplayLoader({
                   ))}
                 </div>
                 <dl className="replay-facts">
-                  <dt>Ações</dt>
+                  <dt>{t('replay.actions')}</dt>
                   <dd>{sum.actions}</dd>
-                  <dt>Turnos</dt>
+                  <dt>{t('replay.turns')}</dt>
                   <dd>{sum.turns}</dd>
-                  <dt>Quem começou</dt>
+                  <dt>{t('replay.firstPlayer')}</dt>
                   <dd>{name(sum.first)}</dd>
-                  <dt>Arquivo</dt>
-                  <dd title={loaded.file}>{fmtDate(loaded.date)}</dd>
+                  <dt>{t('replay.file')}</dt>
+                  <dd title={loaded.file}>{fmtDateTime(loaded.date, locale)}</dd>
                 </dl>
                 {sum.failed && (
-                  <p className="error small">
-                    O jogo atual recusa a ação {sum.failed.index + 1} ({sum.failed.message}). O replay para ali: as regras ou as cartas
-                    mudaram desde a gravação.
-                  </p>
+                  <p className="error small">{t('replay.failed', { n: sum.failed.index + 1, message: sum.failed.message })}</p>
                 )}
                 <details className="replay-spoiler">
-                  <summary>Ver o resultado</summary>
+                  <summary>{t('replay.showResult')}</summary>
                   <p>{result}</p>
                 </details>
               </div>
 
               <div className="mode-field">
                 <span className="mode-field-label" id="replay-mode-label">
-                  Como assistir
+                  {t('replay.howToWatch')}
                 </span>
                 <div className="seg small" role="group" aria-labelledby="replay-mode-label">
                   {(
                     [
-                      ['auto', '▶ Automático'],
-                      ['step', '▶| Passo a passo'],
+                      ['auto', t('replay.modeAuto')],
+                      ['step', t('replay.modeStep')],
                     ] as const
                   ).map(([v, label]) => (
                     <button key={v} type="button" className={mode === v ? 'on' : ''} aria-pressed={mode === v} onClick={() => setMode(v)}>
@@ -179,14 +174,14 @@ export function ReplayLoader({
                 </div>
                 <p className="muted small">
                   {mode === 'auto'
-                    ? 'A partida roda sozinha. Dá para pausar, voltar e avançar a qualquer momento.'
-                    : 'Você avança uma ação por vez com ▶| (ou a seta →) e volta com ◀ (ou ←).'}
+                    ? t('replay.modeAutoHint')
+                    : t('replay.modeStepHint')}
                 </p>
               </div>
 
               <div className="mode-field">
                 <span className="mode-field-label" id="replay-speed-label">
-                  Velocidade
+                  {t('replay.speed')}
                 </span>
                 <div className="seg small" role="group" aria-labelledby="replay-speed-label">
                   {REPLAY_SPEEDS.map((v) => (
@@ -199,24 +194,24 @@ export function ReplayLoader({
 
               <div className="mode-field">
                 <span className="mode-field-label" id="replay-cues-label">
-                  Cliques do jogador
+                  {t('replay.cues')}
                 </span>
                 <div className="seg small" role="group" aria-labelledby="replay-cues-label">
                   {(
                     [
-                      [true, 'Mostrar'],
-                      [false, 'Esconder'],
+                      [true, t('replay.show')],
+                      [false, t('replay.hide')],
                     ] as const
                   ).map(([v, label]) => (
-                    <button key={label} type="button" className={replayCues === v ? 'on' : ''} aria-pressed={replayCues === v} onClick={() => update({ replayCues: v })}>
+                    <button key={String(v)} type="button" className={replayCues === v ? 'on' : ''} aria-pressed={replayCues === v} onClick={() => update({ replayCues: v })}>
                       {label}
                     </button>
                   ))}
                 </div>
                 <p className="muted small">
                   {replayCues
-                    ? 'Antes de cada ação, a mesa mostra o que o jogador clicou ou escolheu (contorno nas cartas, toque e legenda).'
-                    : 'Só a mesa: as ações acontecem sem mostrar o clique. Dá para mudar na barra do replay.'}
+                    ? t('replay.cuesOnHint')
+                    : t('replay.cuesOffHint')}
                 </p>
               </div>
 
@@ -225,7 +220,7 @@ export function ReplayLoader({
                 className="btn primary big replay-start"
                 onClick={() => onStart({ ...loaded.setup, replayStart: { paused: mode === 'step', speed } })}
               >
-                Assistir ao replay
+                {t('replay.start')}
               </button>
             </>
           )}
