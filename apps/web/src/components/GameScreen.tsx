@@ -99,8 +99,11 @@ interface KeyedLabel {
  * a manda e o dicionário a conhece; senão o texto que veio junto (`prompt`).
  */
 function promptText(tryT: TryT, pending: { prompt: string }): string {
-  const p = pending as typeof pending & Keyed;
-  return tryT(p.promptKey, p.promptParams) ?? p.prompt;
+  const p = pending as typeof pending & Keyed & { cannot?: true };
+  const text = tryT(p.promptKey, p.promptParams);
+  if (text === undefined) return p.prompt;
+  // `confirm` com `cannot`: o motor junta "(Não dá para pagar o custo.)" ao texto, mas não à chave.
+  return p.cannot ? `${text} ${tryT('engine.cannotPayCost') ?? ''}`.trim() : text;
 }
 
 /** Ordem marcada numa escolha ordenada: "1. Carta → 2. Carta". */
