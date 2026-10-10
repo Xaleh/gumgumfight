@@ -11,6 +11,7 @@ import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import { motionWait } from '../game/motion';
 import type { CueTarget, ReplayCue as Cue } from '../game/replayCue';
+import { useT } from '../i18n';
 
 interface Tap {
   id: number;
@@ -91,6 +92,7 @@ export function ReplayCue({
   /** Animações ligadas: toque e pulso do contorno. Desligadas, só o contorno e a legenda. */
   animate: boolean;
 }) {
+  const tr = useT();
   // Os toques sobrevivem à troca de ação (a onda termina já com a mesa nova); a legenda não.
   const [taps, setTaps] = useState<Tap[]>([]);
   const [pill, setPill] = useState<Pill | null>(null);
@@ -161,7 +163,7 @@ export function ReplayCue({
       ))}
       {pill && (
         <div className={['replay-cue-pill', pill.above ? 'above' : 'below', pill.loose ? 'loose' : ''].join(' ')} style={{ left: pill.x, top: pill.y }}>
-          <small>{playing ? `Ação ${pos + 1}` : 'Próxima ação'}</small>
+          <small>{playing ? tr('replay.actionN', { n: pos + 1 }) : tr('replay.nextAction')}</small>
           <div>
             <b>{cue.who}</b>: {cue.title}
           </div>

@@ -39,6 +39,7 @@ import {
   upgradeReplayActions,
   viewFor,
 } from '@gumgum/engine';
+import { type ErrorParams, fail } from '../errors';
 import type { FormatId } from '../stats/catalog';
 import { censor } from './profanity';
 
@@ -120,6 +121,8 @@ export interface RoomResult {
   /** Recompensa antes e depois (ranqueada). */
   bounty: Array<{ before: number | null; after: number | null }> | null;
   error?: string;
+  /** Chave de `error` para o cliente traduzir. */
+  errorCode?: string;
 }
 
 /** O que é gravado no banco para refazer a sala depois de reiniciar o servidor. */
@@ -180,7 +183,11 @@ export interface RoomDeps {
   botDelayMs?: number;
 }
 
-export type ActResult = { ok: true; actionCount: number } | { ok: false; code: number; error: string };
+/**
+ * Resultado de uma ação. Recusa: `code` é o status HTTP; `errorCode` (+ `errorParams`) é a chave
+ * que o cliente traduz. Sem `errorCode` quando o texto vem do motor (`IllegalActionError`).
+ */
+export type ActResult = { ok: true; actionCount: number } | { ok: false; code: number; error: string; errorCode?: string; errorParams?: ErrorParams };
 
 export const randomToken = () => randomBytes(24).toString('base64url');
 
@@ -360,7 +367,7 @@ export class Room {
         this.data.result = this.deps.finish?.(this) ?? { matchId: null, bounty: null };
       } catch (e) {
         this.deps.log(`Partida online ${this.id}: falha ao gravar o resultado: ${e instanceof Error ? e.message : e}`);
-        this.data.result = { matchId: null, bounty: null, error: 'Não foi possível gravar o resultado.' };
+        this.data.result = { matchId: null, bounty: null, ...fail('resultNotSaved', 'Não foi possível gravar o resultado.') };
       }
     }
     this.save();
@@ -369,23 +376,23 @@ export class Room {
 
   /** Ação de um jogador, feita sobre a visão de versão `seq`. */
   act(seat: PlayerId, seq: unknown, raw: unknown): ActResult {
-    if (!this.state || !this.aliases) return { ok: false, code: 409, error: 'A partida ainda não começou.' };
-    if (this.state.phase === 'gameover') return { ok: false, code: 409, error: 'A partida já terminou.' };
+    if (!this.state || !this.aliases) return { ok: false, code: 409, ...fail('matchNotStarted', 'A partida ainda não começou.') };
+    if (this.state.phase === 'gameover') return { ok: false, code: 409, ...fail('matchOver', 'A partida já terminou.') };
     const action = raw as Action;
     if (!action || typeof action !== 'object' || typeof action.type !== 'string') {
-      return { ok: false, code: 400, error: 'Ação inválida.' };
+      return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
     }
-    if (action.player !== seat) return { ok: false, code: 403, error: 'Essa ação não é sua.' };
+    if (action.player !== seat) return { ok: false, code: 403, ...fail('notYourAction', 'Essa ação não é sua.') };
     // `timeout` é do relógio do servidor; `manual` (mexer na mesa à mão) não existe mais nas partidas online.
-    if (action.type === 'timeout' || action.type === 'manual') return { ok: false, code: 400, error: 'Ação inválida.' };
-    if (this.data.actions.length >= MAX_ACTIONS) return { ok: false, code: 409, error: 'Partida longa demais.' };
+    if (action.type === 'timeout' || action.type === 'manual') return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
+    if (this.data.actions.length >= MAX_ACTIONS) return { ok: false, code: 409, ...fail('matchTooLong', 'Partida longa demais.') };
     // Desistir vale a qualquer momento; o resto precisa da visão atual.
     if (action.type !== 'concede' && seq !== this.state.actionCount) {
-      return { ok: false, code: 409, error: 'A mesa mudou; tente de novo.' };
+      return { ok: false, code: 409, ...fail('boardChanged', 'A mesa mudou; tente de novo.') };
     }
     const now = this.deps.now();
     const recent = (this.recent[seat] = this.recent[seat].filter((t) => now - t < RATE_WINDOW_MS));
-    if (recent.length >= (this.deps.rateLimit ?? RATE_LIMIT)) return { ok: false, code: 429, error: 'Muitas ações em pouco tempo.' };
+    if (recent.length >= (this.deps.rateLimit ?? RATE_LIMIT)) return { ok: false, code: 429, ...fail('tooManyActions', 'Muitas ações em pouco tempo.') };
     recent.push(now);
 
     const real = actionFromView(this.state, this.aliases, action);
@@ -396,7 +403,7 @@ export class Room {
     } catch (e) {
       if (e instanceof IllegalActionError) return { ok: false, code: 422, error: e.message };
       this.deps.log(`Partida online ${this.id}: erro do motor: ${e instanceof Error ? e.stack : e}`);
-      return { ok: false, code: 422, error: e instanceof Error ? e.message : 'Ação inválida.' };
+      return e instanceof Error ? { ok: false, code: 422, error: e.message } : { ok: false, code: 422, ...fail('invalidAction', 'Ação inválida.') };
     }
     return { ok: true, actionCount: this.state.actionCount };
   }
@@ -437,8 +444,8 @@ export class Room {
   /** O jogador jogou o dado do sorteio: os outros veem o mesmo lançamento. */
   throwDice(seat: PlayerId, vx: unknown, vy: unknown): ActResult {
     const ok = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-    if (!ok(vx) || !ok(vy)) return { ok: false, code: 400, error: 'Lançamento inválido.' };
-    if (!this.state || this.state.phase !== 'mulligan') return { ok: false, code: 409, error: 'O sorteio já passou.' };
+    if (!ok(vx) || !ok(vy)) return { ok: false, code: 400, ...fail('invalidDiceThrow', 'Lançamento inválido.') };
+    if (!this.state || this.state.phase !== 'mulligan') return { ok: false, code: 409, ...fail('diceAlreadyRolled', 'O sorteio já passou.') };
     if (this.diceThrows[seat]) return { ok: true, actionCount: this.state.actionCount };
     const clamp = (v: number) => Math.max(-12, Math.min(12, v));
     const t = { seat, vx: clamp(vx), vy: clamp(vy) };
@@ -448,9 +455,9 @@ export class Room {
   }
 
   emote(seat: PlayerId, emote: unknown): ActResult {
-    if (!EMOTES.includes(emote as EmoteId)) return { ok: false, code: 400, error: 'Emote inválido.' };
+    if (!EMOTES.includes(emote as EmoteId)) return { ok: false, code: 400, ...fail('invalidEmote', 'Emote inválido.') };
     const now = this.deps.now();
-    if (now - this.lastEmote[seat] < 3000) return { ok: false, code: 429, error: 'Espere um pouco.' };
+    if (now - this.lastEmote[seat] < 3000) return { ok: false, code: 429, ...fail('emoteTooFast', 'Espere um pouco.') };
     this.lastEmote[seat] = now;
     for (const c of this.conns) c.send('emote', { seat, emote });
     return { ok: true, actionCount: this.state?.actionCount ?? 0 };
@@ -462,15 +469,15 @@ export class Room {
    * gravado: o chat vive só na memória da sala.
    */
   chat(seat: PlayerId, text: unknown): ActResult {
-    if (typeof text !== 'string') return { ok: false, code: 400, error: 'Mensagem inválida.' };
+    if (typeof text !== 'string') return { ok: false, code: 400, ...fail('invalidChatMessage', 'Mensagem inválida.') };
     // Sem quebras de linha nem caracteres de controle; espaços repetidos viram um só.
     const clean = text.replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim();
-    if (!clean) return { ok: false, code: 400, error: 'Mensagem vazia.' };
-    if (clean.length > CHAT_MAX_LENGTH) return { ok: false, code: 400, error: `A mensagem pode ter no máximo ${CHAT_MAX_LENGTH} caracteres.` };
+    if (!clean) return { ok: false, code: 400, ...fail('emptyChatMessage', 'Mensagem vazia.') };
+    if (clean.length > CHAT_MAX_LENGTH) return { ok: false, code: 400, ...fail('chatMessageTooLong', `A mensagem pode ter no máximo ${CHAT_MAX_LENGTH} caracteres.`, { max: CHAT_MAX_LENGTH }) };
     const now = this.deps.now();
     const times = (this.chatTimes[seat] = this.chatTimes[seat].filter((t) => now - t < 60_000));
     const last = times[times.length - 1] ?? 0;
-    if (now - last < CHAT_MIN_INTERVAL_MS || times.length >= CHAT_PER_MINUTE) return { ok: false, code: 429, error: 'Espere um pouco antes de mandar outra mensagem.' };
+    if (now - last < CHAT_MIN_INTERVAL_MS || times.length >= CHAT_PER_MINUTE) return { ok: false, code: 429, ...fail('chatTooFast', 'Espere um pouco antes de mandar outra mensagem.') };
     times.push(now);
     const message = censor(clean);
     for (const c of this.conns) c.send('chat', { seat, text: message });

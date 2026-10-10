@@ -16,6 +16,12 @@
           theme = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         }
         document.documentElement.setAttribute('data-theme', theme);
+        // Idioma salvo (src/i18n detecta o do navegador quando não há nada salvo).
+        try {
+          var saved = JSON.parse(localStorage.getItem('gumgum.settings') || '{}');
+          var locale = saved.locale || (saved.lang === 'en' ? 'en' : saved.lang === 'pt' ? 'pt-BR' : '');
+          if (locale) document.documentElement.setAttribute('lang', locale);
+        } catch (e) {}
         if (theme === 'dark') {
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', '#0b1726');

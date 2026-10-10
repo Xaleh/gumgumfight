@@ -4,7 +4,8 @@ Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](http
 
 > **Status:** partidas contra um bot, replays, **multiplayer online** (salas privadas, fila casual e
 > ranqueada) e **torneios** (suíço com top cut e eliminação simples, com melhor de 3 e de 5). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
-> com textos em português (tradução automática) ou inglês e imagens opcionais.
+> com textos em português (tradução automática) ou inglês e imagens opcionais. Interface em **seis idiomas**
+> (🇧🇷 português do Brasil, 🇬🇧 inglês, 🇪🇸 espanhol, 🇯🇵 japonês, 🇫🇷 francês e 🇩🇪 alemão), escolhidos pela bandeira.
 
 ## Requisitos
 
@@ -432,6 +433,16 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
   que os decks ainda existam.
 - Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
   reproduz a mesma partida.
+
+### Idiomas
+
+A interface inteira (menu, mesa, construtor de decks, online, torneios, estatísticas, configurações e mensagens de erro)
+está em **português do Brasil, inglês, espanhol, japonês, francês e alemão**. A troca é pela **bandeira** 🇧🇷 🇬🇧 🇪🇸 🇯🇵 🇫🇷 🇩🇪,
+na barra superior (ou na gaveta ☰ no celular), em **⚙️ Configurações** e no menu da partida. Na primeira visita o app segue
+o idioma do navegador (desconhecido → inglês); a escolha fica guardada neste navegador.
+
+O **texto das cartas** sai traduzido só em português (tradução automática revisável, ver abaixo); nos demais idiomas aparece o
+original em inglês, como nas cartas oficiais. Nomes de cartas, DON!!, Blocker, Rush, Counter, Trigger e K.O. não se traduzem.
 
 ## Estrutura
 

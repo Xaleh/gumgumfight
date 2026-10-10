@@ -343,6 +343,7 @@ describe('torneios: rotas', () => {
     const blocked = await set(match, 'p2');
     expect(blocked.statusCode).toBe(409);
     expect(blocked.json().error).toMatch(/partida seguinte/);
+    expect(blocked.json()).toMatchObject({ errorCode: 'fixNextMatchFirst', errorParams: { table: expect.any(Number) } });
     view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
     expect(view.status).toBe('finished');
     expect(view.standings[0]).toMatchObject({ userId: final.p1.userId, rank: 1, alive: true });

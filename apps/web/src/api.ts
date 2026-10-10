@@ -1,3 +1,4 @@
+import { type MessageKey, type Params, t, tryT } from './i18n';
 import type { Action, CardData, DeckList, FormatId, PlayerId } from '@gumgum/engine';
 
 export type { FormatId };
@@ -14,8 +15,10 @@ export interface DeckSummary {
   size: number;
   valid: boolean;
   errors: string[];
-  /** Por formato: o que impede o deck de ser usado nele (vazio = permitido). */
+  /** Por formato: o que impede o deck de ser usado nele (vazio = permitido), em português. */
   formats: Record<FormatId, string[]>;
+  /** Os mesmos motivos, na mesma ordem, com a chave `rules.…` para traduzir (servidores antigos não mandam). */
+  formatCodes?: Record<FormatId, Array<{ code: string; params: Params }>>;
   unscripted: number;
   updatedAt: string;
   /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
@@ -29,17 +32,18 @@ export function canPlay(deck: DeckSummary, format: FormatId): boolean {
 
 /** Por que o deck não pode ser usado no formato (null = pode). */
 export function whyNotPlayable(deck: DeckSummary, format: FormatId): string | null {
-  if (!deck.valid) return `Incompleto: ${deck.size}/50`;
+  if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
   const issues = deck.formats?.[format] ?? [];
-  return issues.length ? issues.join('\n') : null;
+  const codes = deck.formatCodes?.[format];
+  return issues.length ? issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n') : null;
 }
 
-/** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. */
-export function deckGroups(decks: DeckSummary[]): Array<[string, DeckSummary[]]> {
+/** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. O título é chave (`t(title)`). */
+export function deckGroups(decks: DeckSummary[]): Array<[MessageKey, DeckSummary[]]> {
   return [
-    ['Meus decks', decks.filter((d) => d.kind === 'user' && d.mine)],
-    ['Decks da comunidade', decks.filter((d) => d.kind === 'user' && !d.mine)],
-    ['Decks prontos', decks.filter((d) => d.kind === 'builtin')],
+    ['labels.deckGroup.mine', decks.filter((d) => d.kind === 'user' && d.mine)],
+    ['labels.deckGroup.community', decks.filter((d) => d.kind === 'user' && !d.mine)],
+    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin')],
   ];
 }
 
@@ -89,21 +93,56 @@ export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards'>;
 
 export type ApiCard = CardData & { provisional?: boolean };
 
-async function get<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { 'x-deck-owner': ownerToken() } });
-  if (!res.ok) throw new Error(`${url}: ${res.status}`);
-  return res.json() as Promise<T>;
+/** Corpo de uma resposta de erro do servidor: `error` em português e `errorCode` (+ `errorParams`) para traduzir. */
+type ErrorBody = { error?: string; errorCode?: string; errorParams?: Record<string, unknown> } & Record<string, unknown>;
+
+const isParams = (v: unknown): v is Params => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * Parâmetros de um erro prontos para a mensagem: só os valores simples; o motivo vindo do motor
+ * (`issueCode` + `issueParams`, ex.: carta banida no formato) vira `{issue}` no idioma em vigor.
+ */
+function errorParams(raw: Record<string, unknown> | undefined): Params | undefined {
+  if (!isParams(raw)) return undefined;
+  const out: Params = {};
+  for (const [k, v] of Object.entries(raw)) if (typeof v === 'string' || typeof v === 'number') out[k] = v;
+  const issue = typeof raw.issueCode === 'string' ? tryT(raw.issueCode, isParams(raw.issueParams) ? raw.issueParams : undefined) : undefined;
+  if (issue) out.issue = issue;
+  return out;
+}
+
+/**
+ * Texto de um erro do servidor no idioma em vigor: a chave `errors.<errorCode>` se o
+ * dicionário a conhece, senão o texto em português que veio em `error`, senão `fallback`.
+ */
+export function errorMessage(body: ErrorBody | null | undefined, fallback: string): string {
+  const code = typeof body?.errorCode === 'string' ? body.errorCode : null;
+  return (code ? tryT(`errors.${code}`, errorParams(body?.errorParams)) : undefined) ?? (typeof body?.error === 'string' ? body.error : null) ?? fallback;
 }
 
 /** Erro da API com o status e o corpo da resposta (ex.: a sala da partida em andamento). */
 export class ApiError extends Error {
+  readonly errorCode?: string;
   constructor(
     message: string,
     readonly status: number,
     readonly data: Record<string, unknown>,
   ) {
     super(message);
+    if (typeof data.errorCode === 'string') this.errorCode = data.errorCode;
   }
+}
+
+/** ApiError a partir de uma resposta com erro (o corpo pode não ser JSON). */
+async function apiError(res: Response, url: string): Promise<ApiError> {
+  const body = (await res.json().catch(() => null)) as ErrorBody | null;
+  return new ApiError(errorMessage(body, t('errors.http', { url, status: res.status })), res.status, body ?? {});
+}
+
+async function get<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: { 'x-deck-owner': ownerToken() } });
+  if (!res.ok) throw await apiError(res, url);
+  return res.json() as Promise<T>;
 }
 
 async function send<T>(method: string, url: string, body?: unknown): Promise<T> {
@@ -115,10 +154,7 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) {
-    const err = (await res.json().catch(() => null)) as ({ error?: string } & Record<string, unknown>) | null;
-    throw new ApiError(err?.error ?? `${method} ${url}: ${res.status}`, res.status, err ?? {});
-  }
+  if (!res.ok) throw await apiError(res, `${method} ${url}`);
   return (res.status === 204 ? undefined : res.json()) as Promise<T>;
 }
 
@@ -129,7 +165,14 @@ async function send<T>(method: string, url: string, body?: unknown): Promise<T> 
  */
 export type Role = 'player' | 'streamer' | 'organizer' | 'admin' | 'dev';
 
-export const ROLE_LABEL: Record<Role, string> = { player: 'Player', streamer: 'Streamer', organizer: 'Organizador', admin: 'Admin', dev: 'Dev' };
+/** Nome de cada perfil: chave do dicionário (mostrar com `t(ROLE_LABEL[role])`). */
+export const ROLE_LABEL: Record<Role, MessageKey> = {
+  player: 'labels.role.player',
+  streamer: 'labels.role.streamer',
+  organizer: 'labels.role.organizer',
+  admin: 'labels.role.admin',
+  dev: 'labels.role.dev',
+};
 /** Poderes de administrador (o Dev é um Admin com as ferramentas de desenvolvimento). */
 export const isAdmin = (role: Role | undefined) => role === 'admin' || role === 'dev';
 /**
@@ -336,7 +379,13 @@ export interface OnlineRoomInfo {
   players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean }>;
   spectators: number;
   clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null };
-  result: { matchId: number | null; bounty: Array<{ before: number | null; after: number | null }> | null; error?: string } | null;
+  /** `error`: texto em português; mostrar com `errorMessage(result, …)`, que traduz `errorCode`. */
+  result: {
+    matchId: number | null;
+    bounty: Array<{ before: number | null; after: number | null }> | null;
+    error?: string;
+    errorCode?: string;
+  } | null;
   rematch: [boolean, boolean];
 }
 
@@ -347,11 +396,12 @@ export type TournamentStatus = 'registration' | 'running' | 'finished';
 /** Não há empate no One Piece TCG. */
 export type TournamentResult = 'p1' | 'p2';
 
-export const STRUCTURE_LABEL: Record<TournamentStructure, string> = { swiss: 'Suíço', single: 'Eliminação simples' };
-export const TOURNAMENT_STATUS_LABEL: Record<TournamentStatus, string> = {
-  registration: 'Inscrições abertas',
-  running: 'Em andamento',
-  finished: 'Encerrado',
+/** Chaves do dicionário (mostrar com `t(STRUCTURE_LABEL[s])`). */
+export const STRUCTURE_LABEL: Record<TournamentStructure, MessageKey> = { swiss: 'labels.structure.swiss', single: 'labels.structure.single' };
+export const TOURNAMENT_STATUS_LABEL: Record<TournamentStatus, MessageKey> = {
+  registration: 'labels.tourStatus.registration',
+  running: 'labels.tourStatus.running',
+  finished: 'labels.tourStatus.finished',
 };
 
 export interface TournamentInput {
@@ -585,11 +635,11 @@ export const winsNeeded = (bestOf: number) => Math.floor(bestOf / 2) + 1;
 
 /** Nome da fase da eliminatória pelo número de vagas. */
 export function phaseLabel(size: number): string {
-  if (size <= 2) return 'Final';
-  if (size === 4) return 'Semifinal';
-  if (size === 8) return 'Quartas de final';
-  if (size === 16) return 'Oitavas de final';
-  return `Rodada de ${size}`;
+  if (size <= 2) return t('labels.phase.final');
+  if (size === 4) return t('labels.phase.semifinal');
+  if (size === 8) return t('labels.phase.quarterfinal');
+  if (size === 16) return t('labels.phase.roundOf16');
+  return t('labels.phase.roundOf', { n: size });
 }
 
 // ------------------------------------------------------------------ estatísticas

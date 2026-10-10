@@ -8,6 +8,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createsTournaments, isAdmin, type User } from '../auth/store';
 import type { DB } from '../db';
+import { fail } from '../errors';
 import { getTournament } from '../tournaments/store';
 import { createReport, getReport, listReports, type MatchReport, matchReplay, matchSummary, matchUsers, resolveReport } from './store';
 
@@ -21,7 +22,7 @@ const MAX_TEXT = 2000;
 export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
   const account = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = user(req);
-    if (!u) void reply.code(401).send({ error: 'Entre com a conta Google.' });
+    if (!u) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
     return u;
   };
   /** Pode auditar (ver relatos e replays) as partidas do torneio: admin/dev ou o organizador dele. */
@@ -38,12 +39,12 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     if (!me) return reply;
     const id = Number(req.params.id);
     const m = matchSummary(db, id);
-    if (!m) return reply.code(404).send({ error: 'Partida não encontrada.' });
+    if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     if (!matchUsers(db, id).includes(me.id) && !audits(me, m.tournament?.id ?? null)) {
-      return reply.code(403).send({ error: 'Só quem jogou a partida, o organizador do torneio ou um admin pode ver este replay.' });
+      return reply.code(403).send(fail('replayForbidden', 'Só quem jogou a partida, o organizador do torneio ou um admin pode ver este replay.'));
     }
     const replay = matchReplay(db, id);
-    return replay ?? reply.code(404).send({ error: 'Esta partida não tem replay gravado.' });
+    return replay ?? reply.code(404).send(fail('noReplay', 'Esta partida não tem replay gravado.'));
   });
 
   /** Resumo de uma partida gravada (mesmas regras de acesso do replay). */
@@ -52,8 +53,8 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     if (!me) return reply;
     const id = Number(req.params.id);
     const m = matchSummary(db, id);
-    if (!m) return reply.code(404).send({ error: 'Partida não encontrada.' });
-    if (!matchUsers(db, id).includes(me.id) && !audits(me, m.tournament?.id ?? null)) return reply.code(403).send({ error: 'Partida de outros jogadores.' });
+    if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    if (!matchUsers(db, id).includes(me.id) && !audits(me, m.tournament?.id ?? null)) return reply.code(403).send(fail('matchOfOthers', 'Partida de outros jogadores.'));
     return { ...m, reports: audits(me, m.tournament?.id ?? null) ? listReports(db, { status: 'all' }).filter((r) => r.matchId === id) : [] };
   });
 
@@ -63,13 +64,13 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     if (!me) return reply;
     const id = Number(req.params.id);
     const m = matchSummary(db, id);
-    if (!m) return reply.code(404).send({ error: 'Partida não encontrada.' });
-    if (!matchUsers(db, id).includes(me.id)) return reply.code(403).send({ error: 'Só quem jogou a partida pode relatar um problema.' });
+    if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    if (!matchUsers(db, id).includes(me.id)) return reply.code(403).send(fail('reportOnlyPlayers', 'Só quem jogou a partida pode relatar um problema.'));
     if (m.queue !== 'ranked' && m.queue !== 'tournament') {
-      return reply.code(400).send({ error: 'Relatos valem para partidas ranqueadas e de torneio.' });
+      return reply.code(400).send(fail('reportOnlyRankedOrTournament', 'Relatos valem para partidas ranqueadas e de torneio.'));
     }
     const text = typeof req.body?.text === 'string' ? req.body.text.trim().slice(0, MAX_TEXT) : '';
-    if (text.length < 5) return reply.code(400).send({ error: 'Descreva o problema (pelo menos 5 letras).' });
+    if (text.length < 5) return reply.code(400).send(fail('reportTooShort', 'Descreva o problema (pelo menos 5 letras).'));
     return reply.code(201).send(withMatch(createReport(db, id, m.tournament?.id ?? null, me.id, text)));
   });
 
@@ -83,11 +84,11 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     const tournamentId = typeof req.query.tournament === 'string' && req.query.tournament ? req.query.tournament : undefined;
     const status = req.query.status === 'resolved' || req.query.status === 'all' ? req.query.status : 'open';
     if (tournamentId) {
-      if (!audits(me, tournamentId)) return reply.code(403).send({ error: 'Só o organizador do torneio (ou um admin) vê os relatos.' });
+      if (!audits(me, tournamentId)) return reply.code(403).send(fail('reportsViewForbidden', 'Só o organizador do torneio (ou um admin) vê os relatos.'));
       return { reports: listReports(db, { tournamentId, status }).map(withMatch) };
     }
     if (isAdmin(me.role)) return { reports: listReports(db, { status }).map(withMatch) };
-    if (!createsTournaments(me.role)) return reply.code(403).send({ error: 'Só organizadores e admins veem os relatos.' });
+    if (!createsTournaments(me.role)) return reply.code(403).send(fail('reportsOrganizersOnly', 'Só organizadores e admins veem os relatos.'));
     return { reports: listReports(db, { organizerId: me.id, status }).map(withMatch) };
   });
 
@@ -96,8 +97,8 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     const me = account(req, reply);
     if (!me) return reply;
     const r = getReport(db, Number(req.params.id));
-    if (!r) return reply.code(404).send({ error: 'Relato não encontrado.' });
-    if (!audits(me, r.tournamentId)) return reply.code(403).send({ error: 'Só o organizador do torneio (ou um admin) resolve relatos.' });
+    if (!r) return reply.code(404).send(fail('reportNotFound', 'Relato não encontrado.'));
+    if (!audits(me, r.tournamentId)) return reply.code(403).send(fail('reportResolveForbidden', 'Só o organizador do torneio (ou um admin) resolve relatos.'));
     const resolved = req.body?.resolved !== false;
     const note = typeof req.body?.note === 'string' && req.body.note.trim() ? req.body.note.trim().slice(0, MAX_TEXT) : null;
     return withMatch(resolveReport(db, r.id, me.id, resolved, note)!);

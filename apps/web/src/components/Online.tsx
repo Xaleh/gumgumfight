@@ -1,31 +1,32 @@
 import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '../audio';
-import type { OnlineRoomInfo } from '../api';
+import { errorMessage, type OnlineRoomInfo } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
+import { type MessageKey, type Translate, useLocale, useT, useTryT } from '../i18n';
+import { fmtBerries, fmtNumber } from '../i18n/format';
 import { useSettings } from '../settings';
 import { ReportModal } from './ReportModal';
 
-export const TIER_LABEL: Record<string, string> = {
-  'east-blue': 'East Blue',
-  paradise: 'Paradise',
-  'new-world': 'Novo Mundo',
-  supernova: 'Supernova',
-  warlord: 'Shichibukai',
-  emperor: 'Yonkou',
+/** Nome de cada liga da ranqueada: chave do dicionário (mostrar com `tierName`). */
+export const TIER_LABEL: Record<string, MessageKey> = {
+  'east-blue': 'online.tier.eastBlue',
+  paradise: 'online.tier.paradise',
+  'new-world': 'online.tier.newWorld',
+  supernova: 'online.tier.supernova',
+  warlord: 'online.tier.warlord',
+  emperor: 'online.tier.emperor',
 };
 
-const EMOTES: Array<[string, string]> = [
-  ['hello', 'Olá! 👋'],
-  ['gg', 'Boa partida! 🤝'],
-  ['nice', 'Boa jogada! 👏'],
-  ['think', 'Hmm… 🤔'],
-  ['wow', 'Uau! 😮'],
-  ['oops', 'Ops! 😅'],
-  ['thanks', 'Valeu! 🙏'],
-  ['hurry', 'Vamos lá? ⏳'],
-];
-const EMOTE_TEXT = Object.fromEntries(EMOTES);
+/** Nome da liga no idioma em vigor (liga desconhecida: o próprio id). */
+export function tierName(t: Translate, tier: string): string {
+  const key = TIER_LABEL[tier];
+  return key ? t(key) : tier;
+}
+
+/** Ids dos emotes (o que vai para o servidor); o texto fica em `online.emote.<id>`. */
+const EMOTES = ['hello', 'gg', 'nice', 'think', 'wow', 'oops', 'thanks', 'hurry'] as const;
+const emoteKey = (id: (typeof EMOTES)[number]) => `online.emote.${id}` as const;
 /** Igual ao limite do servidor (CHAT_MAX_LENGTH em room.ts). */
 const CHAT_MAX_LENGTH = 120;
 
@@ -36,8 +37,6 @@ export function seriesAfter(t: NonNullable<OnlineRoomInfo['tournament']>, winner
   const need = Math.floor(t.bestOf / 2) + 1;
   return { score, decided: score.some((n) => n >= need) };
 }
-
-const bounty = (n: number) => `฿ ${n.toLocaleString('pt-BR')}`;
 
 /** Re-renderiza a cada `ms` enquanto `on` (relógios correndo). */
 function useTick(on: boolean, ms = 250) {
@@ -51,6 +50,7 @@ function useTick(on: boolean, ms = 250) {
 
 /** Relógio de um jogador (tempo total da partida), atualizado a cada segundo enquanto corre. */
 export function OnlineClock({ online, player }: { online: OnlineGame; player: PlayerId }) {
+  const t = useT();
   const { room, clockAt } = online;
   const running = room?.status === 'playing' && room.clock.running === player;
   useTick(running);
@@ -58,10 +58,7 @@ export function OnlineClock({ online, player }: { online: OnlineGame; player: Pl
   const left = remainingNow(room, clockAt)[player];
   const low = left < 60_000;
   return (
-    <span
-      className={['clock', running ? 'running' : '', low ? 'low' : ''].join(' ')}
-      title="Tempo total do jogador: só corre quando a ação ou a decisão é dele"
-    >
+    <span className={['clock', running ? 'running' : '', low ? 'low' : ''].join(' ')} title={t('online.clockTitle')}>
       ⏱ {formatClock(left)}
     </span>
   );
@@ -69,6 +66,7 @@ export function OnlineClock({ online, player }: { online: OnlineGame; player: Pl
 
 /** Relógio e conexão de um jogador, na faixa com o nome. */
 export function OnlineBanner({ online, player }: { online: OnlineGame; player: PlayerId }) {
+  const t = useT();
   const { room } = online;
   if (!room) return null;
   const info = room.players[player];
@@ -76,34 +74,31 @@ export function OnlineBanner({ online, player }: { online: OnlineGame; player: P
     <div className="online-banner">
       <OnlineClock online={online} player={player} />
       {player !== room.you && (
-        <span className={['presence', info?.connected ? 'on' : 'off'].join(' ')} title={info?.connected ? 'Conectado' : 'Desconectado'} />
+        <span className={['presence', info?.connected ? 'on' : 'off'].join(' ')} title={info?.connected ? t('online.connected') : t('online.disconnected')} />
       )}
-      {room.queue === 'ranked' && info && <span className="tier-tag">{TIER_LABEL[info.tier] ?? info.tier}</span>}
+      {room.queue === 'ranked' && info && <span className="tier-tag">{tierName(t, info.tier)}</span>}
     </div>
   );
 }
 
 /** Avisos de conexão (a sua e a do oponente). */
 export function OnlineStatus({ online }: { online: OnlineGame }) {
+  const t = useT();
   const { room, conn } = online;
-  if (conn === 'lost') return <div className="toast online-toast">Conexão perdida. Reconectando…</div>;
+  if (conn === 'lost') return <div className="toast online-toast">{t('online.connLost')}</div>;
   if (conn === 'gone' && room?.status !== 'finished') {
     // Espectador recusado (ex.: espectadores demais): o motivo já vem do servidor.
     if (online.watching && online.error) return null;
-    return <div className="toast error online-toast">A partida não existe mais.</div>;
+    return <div className="toast error online-toast">{t('online.roomGone')}</div>;
   }
   if (!room || room.status !== 'playing') return null;
   if (room.you === null) {
     const away = room.players.find((p) => !p.connected && !p.bot);
-    return away ? <div className="toast online-toast">{away.name} desconectou.</div> : null;
+    return away ? <div className="toast online-toast">{t('online.playerLeft', { name: away.name })}</div> : null;
   }
   const opp = room.players[room.you === 0 ? 1 : 0];
   if (opp && !opp.connected) {
-    return (
-      <div className="toast online-toast">
-        {opp.name} desconectou. Se ficar 2 minutos fora na vez dele, perde por abandono.
-      </div>
-    );
+    return <div className="toast online-toast">{t('online.opponentLeft', { name: opp.name })}</div>;
   }
   return null;
 }
@@ -116,6 +111,7 @@ function useShowOpponent(online: OnlineGame) {
 
 /** Painel de chat da partida: emotes (atalhos) e mensagens de texto curtas. */
 export function ChatBar({ online }: { online: OnlineGame }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [unread, setUnread] = useState(0);
@@ -158,40 +154,40 @@ export function ChatBar({ online }: { online: OnlineGame }) {
     setDraft('');
     inputRef.current?.focus();
   };
-  const name = (seat: PlayerId) => (seat === mine ? 'Você' : (online.room?.players[seat]?.name ?? 'Oponente'));
+  const name = (seat: PlayerId) => (seat === mine ? t('online.you') : (online.room?.players[seat]?.name ?? t('online.opponent')));
 
   return (
     <div className="emote-bar">
-      <button className="round-btn chat-btn" onClick={() => setOpen((o) => !o)} aria-label="Chat da partida" title="Chat e mensagens rápidas">
+      <button className="round-btn chat-btn" onClick={() => setOpen((o) => !o)} aria-label={t('online.chatLabel')} title={t('online.chatTitle')}>
         💬
         {unread > 0 && !open && <span className="chat-unread">{unread > 9 ? '9+' : unread}</span>}
       </button>
       {open && (
         <div className="chat-panel">
           <div className="chat-head">
-            <strong>Chat</strong>
+            <strong>{t('online.chat')}</strong>
             <button
               type="button"
               className={['btn small', online.muted ? 'on' : ''].join(' ')}
               aria-pressed={online.muted}
               onClick={() => online.setMuted(!online.muted)}
-              title={online.muted ? 'Voltar a ver as mensagens e emotes do oponente nesta partida' : 'Esconder as mensagens e emotes do oponente só nesta partida'}
+              title={online.muted ? t('online.unmuteTitle') : t('online.muteTitle')}
             >
-              {online.muted ? '🔇 Silenciado' : '🔊 Silenciar'}
+              {online.muted ? t('online.muted') : t('online.mute')}
             </button>
-            <button type="button" className="btn small" onClick={() => setOpen(false)} aria-label="Fechar o chat">
+            <button type="button" className="btn small" onClick={() => setOpen(false)} aria-label={t('online.closeChatLabel')}>
               ✕
             </button>
           </div>
           <div className="emote-list">
-            {EMOTES.map(([id, text]) => (
+            {EMOTES.map((id) => (
               <button key={id} className="btn small" onClick={() => void online.sendEmote(id)}>
-                {text}
+                {t(emoteKey(id))}
               </button>
             ))}
           </div>
           <div className="chat-log" ref={logRef} aria-live="polite">
-            {messages.length === 0 && <div className="muted small">{showOpponent ? 'Nenhuma mensagem ainda.' : 'Mensagens do oponente escondidas.'}</div>}
+            {messages.length === 0 && <div className="muted small">{showOpponent ? t('online.noMessages') : t('online.opponentHidden')}</div>}
             {messages.map((m) => (
               <div key={m.key} className={['chat-msg', m.seat === mine ? 'mine' : 'theirs'].join(' ')}>
                 <span className="chat-who">{name(m.seat)}</span> {m.text}
@@ -210,14 +206,14 @@ export function ChatBar({ online }: { online: OnlineGame }) {
               className="chat-input"
               value={draft}
               maxLength={CHAT_MAX_LENGTH}
-              placeholder="Mensagem para o oponente…"
-              aria-label="Mensagem"
+              placeholder={t('online.messagePlaceholder')}
+              aria-label={t('online.messageLabel')}
               autoComplete="off"
               enterKeyHint="send"
               onChange={(e) => setDraft(e.target.value)}
             />
             <button type="submit" className="btn small primary" disabled={!draft.trim()}>
-              Enviar
+              {t('online.send')}
             </button>
           </form>
         </div>
@@ -228,13 +224,14 @@ export function ChatBar({ online }: { online: OnlineGame }) {
 
 /** Balões flutuantes com os emotes e as últimas mensagens de texto de cada lado. */
 export function ChatBubbles({ online, bottom }: { online: OnlineGame; bottom: PlayerId }) {
+  const tryT = useTryT();
   const showOpponent = useShowOpponent(online);
   const visible = <T extends { seat: PlayerId }>(list: T[]) => (showOpponent ? list : list.filter((x) => x.seat === bottom));
   return (
     <>
       {visible(online.emotes).map((e) => (
         <div key={e.key} className={['emote-bubble', e.seat === bottom ? 'mine' : 'theirs'].join(' ')}>
-          {EMOTE_TEXT[e.emote] ?? e.emote}
+          {tryT(`online.emote.${e.emote}`) ?? e.emote}
         </div>
       ))}
       {visible(online.chatBubbles).map((m) => (
@@ -248,6 +245,9 @@ export function ChatBubbles({ online, bottom }: { online: OnlineGame; bottom: Pl
 
 /** Fim da partida online: recompensa (ranqueada), revanche e o relato de problema (ranqueada e torneio). */
 export function OnlineResultInfo({ online }: { online: OnlineGame }) {
+  const t = useT();
+  const locale = useLocale();
+  const bounty = (n: number) => fmtBerries(n, locale);
   const { room } = online;
   const [reporting, setReporting] = useState(false);
   if (!room) return null;
@@ -269,44 +269,44 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
   const me = room.you;
   const opp = me === 0 ? 1 : 0;
   const mine = room.result?.bounty?.[me];
-  const t = room.tournament;
-  const series = t && t.bestOf > 1 && online.state ? seriesAfter(t, online.state.winner) : null;
+  const tour = room.tournament;
+  const series = tour && tour.bestOf > 1 && online.state ? seriesAfter(tour, online.state.winner) : null;
   return (
     <div className="online-result">
-      {t && (
+      {tour && (
         <p className="small">
-          🏆 {t.name} · {t.label}
+          🏆 {tour.name} · {tour.label}
           {series && (
             <>
               {' '}
-              · placar da série <b>{series.score[me]}–{series.score[opp]}</b>
-              {series.decided ? (series.score[me] > series.score[opp] ? ' — você venceu a série!' : ' — série encerrada.') : ''}
+              · {t('online.seriesScore')} <b>{series.score[me]}–{series.score[opp]}</b>
+              {series.decided ? (series.score[me] > series.score[opp] ? t('online.seriesWon') : t('online.seriesOver')) : ''}
             </>
           )}
         </p>
       )}
       {room.queue === 'ranked' && mine && mine.before !== null && mine.after !== null && (
         <p className="bounty-change">
-          Recompensa: {bounty(mine.before)} → <b>{bounty(mine.after)}</b>{' '}
+          {t('online.bounty')} {bounty(mine.before)} → <b>{bounty(mine.after)}</b>{' '}
           <span className={mine.after >= mine.before ? 'up' : 'down'}>
             ({mine.after >= mine.before ? '+' : '−'}
-            {bounty(Math.abs(mine.after - mine.before)).replace('฿ ', '')})
+            {fmtNumber(Math.abs(mine.after - mine.before), locale)})
           </span>
         </p>
       )}
-      {room.result?.error && <p className="muted small">{room.result.error}</p>}
+      {room.result?.error && <p className="muted small">{errorMessage(room.result, room.result.error)}</p>}
       {room.queue === 'private' && room.rematch[opp] && !room.rematch[me] && (
-        <p className="muted small">{room.players[opp]?.name} quer revanche!</p>
+        <p className="muted small">{t('online.rematchWanted', { name: room.players[opp]?.name })}</p>
       )}
       {(room.queue === 'ranked' || room.queue === 'tournament') && room.result?.matchId != null && (
         <p className="small">
           <button className="btn small pill" onClick={() => setReporting(true)}>
-            ⚑ Relatar um problema
+            {t('online.report')}
           </button>
         </p>
       )}
       {reporting && room.result?.matchId != null && (
-        <ReportModal matchId={room.result.matchId} tournament={t?.name ?? null} onClose={() => setReporting(false)} />
+        <ReportModal matchId={room.result.matchId} tournament={tour?.name ?? null} onClose={() => setReporting(false)} />
       )}
     </div>
   );
@@ -314,12 +314,13 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
 
 /** Antes da partida: conectando ou esperando o segundo jogador na sala privada. */
 export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCancel: () => void }) {
+  const t = useT();
   const { room, conn } = online;
   const [copied, setCopied] = useState(false);
   const link = room?.code ? `${location.origin}/?sala=${room.code}` : '';
   const copy = async () => {
     try {
-      if (navigator.share) await navigator.share({ title: 'GumGum Fight', text: `Vamos jogar? Código da sala: ${room?.code}`, url: link });
+      if (navigator.share) await navigator.share({ title: 'GumGum Fight', text: t('online.shareText', { code: room?.code }), url: link });
       else {
         await navigator.clipboard.writeText(link);
         setCopied(true);
@@ -334,8 +335,8 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
         <section className="menu-card online-wait">
           {conn === 'gone' ? (
             <>
-              <h2>{online.watching && online.error ? 'Não foi possível assistir' : 'Partida não encontrada'}</h2>
-              <p className="muted">{online.error ?? 'A sala foi cancelada ou expirou.'}</p>
+              <h2>{online.watching && online.error ? t('online.cannotWatch') : t('online.notFound')}</h2>
+              <p className="muted">{online.error ?? t('online.roomExpired')}</p>
             </>
           ) : room?.status === 'waiting' && room.tournament ? (
             <>
@@ -343,36 +344,43 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
               <p className="muted">
                 {room.tournament.label}
                 {room.tournament.bestOf > 1 &&
-                  ` · Jogo ${room.tournament.game} da melhor de ${room.tournament.bestOf} (placar ${room.tournament.score[0] ?? 0}–${room.tournament.score[1] ?? 0})`}
-                . O jogo começa quando o seu oponente clicar em "Jogar" na página do torneio.
+                  t('online.tourGame', {
+                    game: room.tournament.game,
+                    bestOf: room.tournament.bestOf,
+                    a: room.tournament.score[0] ?? 0,
+                    b: room.tournament.score[1] ?? 0,
+                  })}
+                . {t('online.tourStartHint')}
               </p>
               <p className="muted small waiting-dots">
-                Aguardando o oponente<span className="dots" />
+                {t('online.waitingOpponent')}
+                <span className="dots" />
               </p>
             </>
           ) : room?.status === 'waiting' ? (
             <>
-              <h2>Sala privada</h2>
-              <p className="muted">Envie o código ou o link para quem vai jogar com você. A partida começa quando a pessoa entrar.</p>
+              <h2>{t('online.privateRoom')}</h2>
+              <p className="muted">{t('online.privateHint')}</p>
               <div className="room-code">{room.code}</div>
               <div className="btn-row center">
                 <button className="btn primary" onClick={copy}>
-                  {copied ? 'Link copiado!' : 'Compartilhar link'}
+                  {copied ? t('online.linkCopied') : t('online.shareLink')}
                 </button>
               </div>
               <p className="muted small waiting-dots">
-                Aguardando o oponente<span className="dots" />
+                {t('online.waitingOpponent')}
+                <span className="dots" />
               </p>
             </>
           ) : (
             <p className="muted waiting-dots">
-              {conn === 'lost' ? 'Reconectando' : 'Conectando'}
+              {conn === 'lost' ? t('online.reconnecting') : t('online.connecting')}
               <span className="dots" />
             </p>
           )}
           <div className="btn-row center">
             <button className="btn" onClick={onCancel}>
-              {room?.status === 'waiting' ? 'Cancelar sala' : 'Voltar ao menu'}
+              {room?.status === 'waiting' ? t('online.cancelRoom') : t('online.backToMenu')}
             </button>
           </div>
         </section>
@@ -383,10 +391,11 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
 
 /** Quantos estão assistindo (aparece para jogadores e espectadores). */
 export function SpectatorCount({ online }: { online: OnlineGame }) {
+  const t = useT();
   const n = online.room?.spectators ?? 0;
   if (!n) return null;
   return (
-    <span className="spectator-count" title={n === 1 ? '1 pessoa assistindo' : `${n} pessoas assistindo`}>
+    <span className="spectator-count" title={t('online.spectatorsTitle', { n })}>
       👁 {n}
     </span>
   );
@@ -402,19 +411,17 @@ export function SpectatorBar({
   canHands: boolean;
   onToggleHands: () => void;
 }) {
+  const t = useT();
+  const n = online.room?.spectators ?? 1;
   return (
     <div className="spectator-bar">
-      <span className="spectator-tag" title={`${online.room?.spectators ?? 1} assistindo`}>
-        👁 Assistindo · {online.room?.spectators ?? 1}
+      <span className="spectator-tag" title={t('online.watchingTitle', { n })}>
+        {t('online.watching', { n })}
       </span>
       {canHands && (
-        <button
-          className={['auto-toggle', online.hands ? 'on' : ''].join(' ')}
-          onClick={onToggleHands}
-          title="Mostra as mãos dos dois jogadores (perfil Streamer ou Admin)"
-        >
+        <button className={['auto-toggle', online.hands ? 'on' : ''].join(' ')} onClick={onToggleHands} title={t('online.handsTitle')}>
           <span className="knob" />
-          Ver mãos
+          {t('online.hands')}
         </button>
       )}
     </div>
