@@ -1,7 +1,7 @@
 import type { Action, CardDef, GameState, LogEntry, PlayerId } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, errorMessage, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
-import { t, tryT } from '../i18n';
+import { t } from '../i18n';
 
 /** Mensagem de erro de uma resposta do servidor: o `errorCode` traduzido, se o dicionário o conhece; senão o `error` que veio. */
 function serverError(body: Record<string, unknown> | null | undefined): string | undefined {
