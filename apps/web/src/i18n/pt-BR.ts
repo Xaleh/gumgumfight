@@ -129,6 +129,141 @@ const ptBR = {
 
 
   // ==== stats ====
+  // ---- taxas e intervalos ----
+  'stats.noGames': 'Sem partidas',
+  'stats.winRateTitle': '{wins|# vitória|# vitórias} em {games|# partida|# partidas} (95%: {lo} a {hi})',
+  'stats.ciTitle': '95%: {lo} a {hi}',
+  'stats.pp': '{sign}{value} pp',
+  'stats.nameValue': '{name} ({value})',
+  'stats.nameId': '{name} ({id})',
+  'stats.listSep': ', ',
+  'stats.gamesCount': '{n|# partida|# partidas}',
+
+  // ---- perfil / recompensa ----
+  'stats.wanted': 'WANTED',
+  'stats.renameTitle': 'Trocar o nome',
+  'stats.unnamedPirate': 'Pirata sem nome',
+  'stats.tierOpen': '{min} ou mais',
+  'stats.tierSpan': '{min} a {max}',
+  'stats.tierRange': 'Faixa {range}.',
+  'stats.nextTier': 'Próximo tier: {label} ({min}).',
+  'stats.bountyHint': 'A recompensa sobe e desce nas partidas ranqueadas contra outros jogadores. Partidas contra o bot contam nas estatísticas como casuais.',
+  'stats.bountyHintPlayed':
+    'A recompensa sobe e desce nas partidas ranqueadas contra outros jogadores ({n|# jogada|# jogadas}). Partidas contra o bot contam nas estatísticas como casuais.',
+
+  // ---- resumo (tiles) ----
+  'stats.tileGames': 'Partidas',
+  'stats.tilePlayers': '{n|# jogador|# jogadores}',
+  'stats.tileWins': 'Vitórias',
+  'stats.tileWinsOf': '{wins} de {games}',
+  'stats.tileSecond': 'Como segundo',
+  'stats.tileKeep': 'Mantendo a mão',
+  'stats.tileMulligan': 'Com mulligan',
+  'stats.first': 'Começando',
+  'stats.second': 'Em segundo',
+
+  // ---- resumo do meta ----
+  'stats.metaTop': '{leader} é o Líder mais jogado ({share} das partidas), com {rate} de vitórias.',
+  'stats.metaBest': 'Melhor taxa de vitórias entre os Líderes com pelo menos {min|# partida|# partidas}: {leader}, {rate} (em {share} das partidas).',
+  'stats.metaBestSame': 'Além de ser o mais jogado, ele também lidera em vitórias entre os Líderes com pelo menos {min|# partida|# partidas}.',
+  'stats.metaLosing': 'Muito jogados, mas perdendo: {list}.',
+  'stats.metaFirstSecond': 'Quem começa vence {first} das partidas; quem joga em segundo, {second}.',
+  'stats.metaMulligan': 'Depois de um mulligan a taxa é {mulligan}, contra {keep} mantendo a mão.',
+
+  // ---- tabela de Líderes ----
+  'stats.noGamesFilters': 'Nenhuma partida com esses filtros.',
+  'stats.leader': 'Líder',
+  'stats.colGames': 'Partidas',
+  'stats.colWins': 'Vitórias',
+  'stats.colInterval': 'Intervalo (95%)',
+  'stats.colFirstShort': '1º',
+  'stats.colFirstTitle': 'Vitórias começando a partida',
+  'stats.colSecondShort': '2º',
+  'stats.colSecondTitle': 'Vitórias jogando em segundo',
+  'stats.colLists': 'Listas',
+  'stats.colListsTitle': 'Listas diferentes usadas',
+  'stats.rowCardsTitle': 'Ver as cartas deste Líder',
+  'stats.hiddenLeaders': '{n|# Líder|# Líderes} com menos de {min|# partida|# partidas} {n|escondido|escondidos}. Mude o mínimo nos filtros para ver.',
+
+  // ---- matchups ----
+  'stats.backToMatrix': '← Tabela de todos os Líderes',
+  'stats.vsEachLeader': '{leader} contra cada Líder',
+  'stats.noMatchups': 'Nenhum matchup deste Líder com {min|# partida|# partidas} ou mais.',
+  'stats.colOpponent': 'Adversário',
+  'stats.colFirstMatchupTitle': 'Vitórias do Líder analisado quando ele começa',
+  'stats.colSecondMatchupTitle': 'Vitórias do Líder analisado jogando em segundo',
+  'stats.hiddenOpponents': '{n|# adversário|# adversários} com menos de {min|# partida|# partidas} {n|escondido|escondidos}.',
+  'stats.matrixHint':
+    'Linha = Líder analisado, coluna = Líder adversário. A cor vai do laranja (perde mais) ao azul (vence mais), passando pelo cinza em 50%. Na diagonal (espelho), a taxa é de quem começou. Células com menos de {min|# partida|# partidas} mostram só a quantidade. Clique numa linha para ver todos os adversários daquele Líder.',
+  'stats.cellTitle': '{a} x {b}: {wins|# vitória|# vitórias} em {games}; começando: {rate} em {firstGames}',
+  'stats.mirrorGames': '1º · {n}',
+
+  // ---- tendência ----
+  'stats.sparkPoint': '{label}: {value}',
+  'stats.weeks': 'Semanas',
+  'stats.weeksCount': '{n|# semana|# semanas}',
+  'stats.risers': 'Subindo nesta semana: {list}.',
+  'stats.fallers': 'Caindo: {list}.',
+  'stats.noTrend': 'Nenhum Líder com {min|# partida|# partidas} ou mais nessas semanas.',
+  'stats.colUsage': 'Uso ({from} → {to})',
+  'stats.colUsageTitle': 'Participação nas partidas de cada semana',
+  'stats.colThisWeek': 'Nesta semana',
+  'stats.colUsageDelta': 'Δ uso',
+  'stats.colUsageDeltaTitle': 'Variação da participação em relação à semana anterior',
+  'stats.colWinsWeek': 'Vitórias na semana',
+  'stats.colWinsPeriod': 'Vitórias no período',
+  'stats.rowMatchupsTitle': 'Ver os matchups deste Líder',
+  'stats.trendFooter': 'Semanas começam na segunda-feira. O período dos filtros não vale aqui: a janela é a escolhida acima.',
+
+  // ---- cartas ----
+  'stats.noCards': 'Nenhuma carta com {min|# partida|# partidas} ou mais com esses filtros.',
+  'stats.cardsHint':
+    '{lift}: vitórias com a carta no deck menos as vitórias do Líder em geral ({base}); só aparece quando nem todas as listas usam a carta. {opening}: a carta estava na mão mantida após o mulligan. {drawn}: passou pela mão em algum momento. {iwd}: vitórias quando comprada menos vitórias quando não comprada; positivo indica que a carta ajuda quando aparece. Toque no cabeçalho para ordenar.',
+  'stats.colCard': 'Carta',
+  'stats.colInDeck': 'No deck',
+  'stats.colInDeckTitle': 'Partidas com a carta no deck (média de cópias)',
+  'stats.colLift': 'Lift',
+  'stats.colLiftTitle': 'Vitórias com a carta no deck menos as vitórias do Líder em geral',
+  'stats.colOpening': 'Mão inicial',
+  'stats.colDrawn': 'Comprada',
+  'stats.colNotDrawn': 'Não comprada',
+  'stats.colIwd': 'Δ comprada',
+  'stats.colIwdTitle': 'Diferença de vitórias entre comprar e não comprar a carta',
+  'stats.colPlayed': 'Jogada',
+  'stats.colPerGame': 'Usos/partida',
+  'stats.colPerGameTitle': 'Vezes jogada (ou usada como Counter) por partida',
+  'stats.copies': '×{n}',
+
+  // ---- página / filtros ----
+  'stats.backMenu': '← Menu',
+  'stats.title': 'Estatísticas',
+  'stats.updating': 'Atualizando…',
+  'stats.filters': 'Filtros',
+  'stats.all': 'Todos',
+  'stats.allFem': 'Todas',
+  'stats.filterFormat': 'Formato',
+  'stats.filterQueue': 'Partida',
+  'stats.filterOpponent': 'Oponente',
+  'stats.opponentBot': 'Bot',
+  'stats.opponentHuman': 'Jogador',
+  'stats.filterTurnOrder': 'Ordem do turno',
+  'stats.filterPeriod': 'Período',
+  'stats.allTime': 'Tudo',
+  'stats.days': '{n|# dia|# dias}',
+  'stats.filterWhose': 'De quem',
+  'stats.allPlayers': 'Todos os jogadores',
+  'stats.onlyMe': 'Só eu',
+  'stats.filterMin': 'Mínimo de partidas por linha',
+  'stats.filterTiers': 'Tiers (recompensa na hora da partida)',
+  'stats.tabLeaders': 'Líderes',
+  'stats.tabMatchups': 'Matchups',
+  'stats.tabTrend': 'Tendência',
+  'stats.tabCards': 'Cartas',
+  'stats.list': 'Lista',
+  'stats.allLists': 'Todas as listas',
+  'stats.listOption': '{name} · {n|# partida|# partidas}',
+  'stats.footer':
+    'Cada partida é refeita pelo servidor a partir do replay antes de entrar nas estatísticas. Taxas com menos de {n|# partida|# partidas} aparecem esmaecidas: passe o mouse para ver o intervalo de confiança.',
   // ==== /stats ====
 
 

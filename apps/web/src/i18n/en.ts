@@ -130,6 +130,141 @@ export default {
 
 
   // ==== stats ====
+  // ---- rates and intervals ----
+  'stats.noGames': 'No games',
+  'stats.winRateTitle': '{wins|# win|# wins} in {games|# game|# games} (95%: {lo} to {hi})',
+  'stats.ciTitle': '95%: {lo} to {hi}',
+  'stats.pp': '{sign}{value} pp',
+  'stats.nameValue': '{name} ({value})',
+  'stats.nameId': '{name} ({id})',
+  'stats.listSep': ', ',
+  'stats.gamesCount': '{n|# game|# games}',
+
+  // ---- profile / bounty ----
+  'stats.wanted': 'WANTED',
+  'stats.renameTitle': 'Change name',
+  'stats.unnamedPirate': 'Nameless pirate',
+  'stats.tierOpen': '{min} or more',
+  'stats.tierSpan': '{min} to {max}',
+  'stats.tierRange': 'Range: {range}.',
+  'stats.nextTier': 'Next tier: {label} ({min}).',
+  'stats.bountyHint': 'Your bounty goes up and down in ranked games against other players. Games against the bot count in the stats as casual.',
+  'stats.bountyHintPlayed':
+    'Your bounty goes up and down in ranked games against other players ({n|# played|# played}). Games against the bot count in the stats as casual.',
+
+  // ---- summary tiles ----
+  'stats.tileGames': 'Games',
+  'stats.tilePlayers': '{n|# player|# players}',
+  'stats.tileWins': 'Wins',
+  'stats.tileWinsOf': '{wins} of {games}',
+  'stats.tileSecond': 'Going second',
+  'stats.tileKeep': 'Keeping the hand',
+  'stats.tileMulligan': 'After mulligan',
+  'stats.first': 'Going first',
+  'stats.second': 'Going second',
+
+  // ---- meta summary ----
+  'stats.metaTop': '{leader} is the most played Leader ({share} of games), with a {rate} win rate.',
+  'stats.metaBest': 'Best win rate among Leaders with at least {min|# game|# games}: {leader}, {rate} (in {share} of games).',
+  'stats.metaBestSame': 'Besides being the most played, it also has the best win rate among Leaders with at least {min|# game|# games}.',
+  'stats.metaLosing': 'Heavily played but losing: {list}.',
+  'stats.metaFirstSecond': 'Going first wins {first} of games; going second, {second}.',
+  'stats.metaMulligan': 'After a mulligan the win rate is {mulligan}, versus {keep} when keeping the hand.',
+
+  // ---- Leaders table ----
+  'stats.noGamesFilters': 'No games match these filters.',
+  'stats.leader': 'Leader',
+  'stats.colGames': 'Games',
+  'stats.colWins': 'Wins',
+  'stats.colInterval': 'Interval (95%)',
+  'stats.colFirstShort': '1st',
+  'stats.colFirstTitle': 'Wins when going first',
+  'stats.colSecondShort': '2nd',
+  'stats.colSecondTitle': 'Wins when going second',
+  'stats.colLists': 'Lists',
+  'stats.colListsTitle': 'Different lists used',
+  'stats.rowCardsTitle': "See this Leader's cards",
+  'stats.hiddenLeaders': '{n|# Leader|# Leaders} with fewer than {min|# game|# games} hidden. Change the minimum in the filters to see them.',
+
+  // ---- matchups ----
+  'stats.backToMatrix': '← All Leaders table',
+  'stats.vsEachLeader': '{leader} against each Leader',
+  'stats.noMatchups': 'No matchups for this Leader with {min|# game|# games} or more.',
+  'stats.colOpponent': 'Opponent',
+  'stats.colFirstMatchupTitle': 'Wins of the analyzed Leader when going first',
+  'stats.colSecondMatchupTitle': 'Wins of the analyzed Leader when going second',
+  'stats.hiddenOpponents': '{n|# opponent|# opponents} with fewer than {min|# game|# games} hidden.',
+  'stats.matrixHint':
+    "Row = analyzed Leader, column = opposing Leader. Color goes from orange (loses more) to blue (wins more), through gray at 50%. On the diagonal (mirror), the rate is for whoever went first. Cells with fewer than {min|# game|# games} show only the count. Click a row to see all of that Leader's opponents.",
+  'stats.cellTitle': '{a} vs {b}: {wins|# win|# wins} in {games}; going first: {rate} in {firstGames}',
+  'stats.mirrorGames': '1st · {n}',
+
+  // ---- trend ----
+  'stats.sparkPoint': '{label}: {value}',
+  'stats.weeks': 'Weeks',
+  'stats.weeksCount': '{n|# week|# weeks}',
+  'stats.risers': 'Rising this week: {list}.',
+  'stats.fallers': 'Falling: {list}.',
+  'stats.noTrend': 'No Leader with {min|# game|# games} or more in these weeks.',
+  'stats.colUsage': 'Usage ({from} → {to})',
+  'stats.colUsageTitle': 'Share of games in each week',
+  'stats.colThisWeek': 'This week',
+  'stats.colUsageDelta': 'Δ usage',
+  'stats.colUsageDeltaTitle': 'Change in share compared to the previous week',
+  'stats.colWinsWeek': 'Wins this week',
+  'stats.colWinsPeriod': 'Wins in the period',
+  'stats.rowMatchupsTitle': "See this Leader's matchups",
+  'stats.trendFooter': "Weeks start on Monday. The filters' period does not apply here: the window is the one chosen above.",
+
+  // ---- cards ----
+  'stats.noCards': 'No cards with {min|# game|# games} or more match these filters.',
+  'stats.cardsHint':
+    "{lift}: wins with the card in the deck minus the Leader's overall wins ({base}); shown only when not every list runs the card. {opening}: the card was in the hand kept after the mulligan. {drawn}: it passed through the hand at some point. {iwd}: wins when drawn minus wins when not drawn; positive means the card helps when it shows up. Tap a header to sort.",
+  'stats.colCard': 'Card',
+  'stats.colInDeck': 'In deck',
+  'stats.colInDeckTitle': 'Games with the card in the deck (average copies)',
+  'stats.colLift': 'Lift',
+  'stats.colLiftTitle': "Wins with the card in the deck minus the Leader's overall wins",
+  'stats.colOpening': 'Opening hand',
+  'stats.colDrawn': 'Drawn',
+  'stats.colNotDrawn': 'Not drawn',
+  'stats.colIwd': 'Δ drawn',
+  'stats.colIwdTitle': 'Difference in wins between drawing and not drawing the card',
+  'stats.colPlayed': 'Played',
+  'stats.colPerGame': 'Uses/game',
+  'stats.colPerGameTitle': 'Times played (or used as Counter) per game',
+  'stats.copies': '×{n}',
+
+  // ---- page / filters ----
+  'stats.backMenu': '← Menu',
+  'stats.title': 'Stats',
+  'stats.updating': 'Updating…',
+  'stats.filters': 'Filters',
+  'stats.all': 'All',
+  'stats.allFem': 'All',
+  'stats.filterFormat': 'Format',
+  'stats.filterQueue': 'Game',
+  'stats.filterOpponent': 'Opponent',
+  'stats.opponentBot': 'Bot',
+  'stats.opponentHuman': 'Player',
+  'stats.filterTurnOrder': 'Turn order',
+  'stats.filterPeriod': 'Period',
+  'stats.allTime': 'All time',
+  'stats.days': '{n|# day|# days}',
+  'stats.filterWhose': 'Whose',
+  'stats.allPlayers': 'All players',
+  'stats.onlyMe': 'Only me',
+  'stats.filterMin': 'Minimum games per row',
+  'stats.filterTiers': 'Tiers (bounty at game time)',
+  'stats.tabLeaders': 'Leaders',
+  'stats.tabMatchups': 'Matchups',
+  'stats.tabTrend': 'Trend',
+  'stats.tabCards': 'Cards',
+  'stats.list': 'List',
+  'stats.allLists': 'All lists',
+  'stats.listOption': '{name} · {n|# game|# games}',
+  'stats.footer':
+    'The server replays every game from its replay before it enters the stats. Rates with fewer than {n|# game|# games} are dimmed: hover to see the confidence interval.',
   // ==== /stats ====
 
 
