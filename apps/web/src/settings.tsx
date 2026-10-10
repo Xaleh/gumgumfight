@@ -20,17 +20,28 @@ export interface Settings {
   replayCues: boolean;
   /** Tema claro, escuro ou o do sistema. */
   theme: Theme;
+  /** Online: mostrar as mensagens e os emotes que o oponente manda. */
+  opponentChat: boolean;
 }
 
 interface Ctx extends Settings {
   showImages: boolean;
   /** Tema em uso depois de resolver `system`. */
   resolvedTheme: 'light' | 'dark';
-  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter' | 'animations' | 'replayCues' | 'theme'>>) => void;
+  update: (patch: Partial<Pick<Settings, 'lang' | 'images' | 'quickCounter' | 'animations' | 'replayCues' | 'theme' | 'opponentChat'>>) => void;
 }
 
 const KEY = 'gumgum.settings';
-const DEFAULTS: Settings = { lang: 'pt', images: true, serverImages: false, quickCounter: false, animations: true, replayCues: true, theme: 'system' };
+const DEFAULTS: Settings = {
+  lang: 'pt',
+  images: true,
+  serverImages: false,
+  quickCounter: false,
+  animations: true,
+  replayCues: true,
+  theme: 'system',
+  opponentChat: true,
+};
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 /** Cor da barra do navegador/PWA em cada tema (igual ao `--bg` escuro e ao azul-marinho da marca). */
@@ -117,6 +128,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             animations: next.animations,
             replayCues: next.replayCues,
             theme: next.theme,
+            opponentChat: next.opponentChat,
           }),
         );
       } catch {
@@ -306,6 +318,10 @@ export function SettingsControls() {
         <input type="checkbox" checked={s.replayCues} onChange={(e) => s.update({ replayCues: e.target.checked })} />
         Cliques no replay
       </label>
+      <label className="check" title="Nas partidas online, mostra as mensagens e os emotes que o oponente manda">
+        <input type="checkbox" checked={s.opponentChat} onChange={(e) => s.update({ opponentChat: e.target.checked })} />
+        Chat do oponente
+      </label>
     </div>
   );
 }
@@ -363,6 +379,12 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               hint="Ao assistir a um replay, mostra o que o jogador clicou ou escolheu (contorno nas cartas, toque e legenda) antes de cada ação. Desligue para ver só a mesa."
             >
               <Switch on={s.replayCues} label="Cliques no replay" onChange={(on) => s.update({ replayCues: on })} />
+            </OptionRow>
+            <OptionRow
+              title="Chat do oponente"
+              hint="Nas partidas online, mostra as mensagens e os emotes que o oponente manda. Desligue para não ver nada que ele escreve; as suas mensagens continuam saindo."
+            >
+              <Switch on={s.opponentChat} label="Chat do oponente" onChange={(on) => s.update({ opponentChat: on })} />
             </OptionRow>
           </div>
           <p className="muted small">As configurações ficam guardadas neste navegador e valem para todas as partidas. O apelido fica no servidor, ligado a este navegador.</p>

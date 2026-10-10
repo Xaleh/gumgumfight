@@ -270,7 +270,10 @@ Os conceitos de tempo que a avaliação representa e os testes de posição que 
 - **Sem login**: o navegador gera `gumgum.owner` (24 bytes aleatórios em hex) e manda em **todo** fetch no header
   `x-deck-owner`. O servidor guarda só `sha256(token)` (`owner_hash`).
 - **Com login**: o cookie `gg_session` identifica a conta; o dono passa a ser `user:<id>`.
-- Rate limit nas ações das salas (60 ações / 10 s por assento) e nos emotes (1 / 3 s).
+- Rate limit nas ações das salas (60 ações / 10 s por assento), nos emotes (1 / 3 s) e no chat (1 / 1,5 s e 10 / min por
+  assento). O chat (`Room.chat`) limpa o texto (sem controle/quebras, até 120 caracteres) e censura palavrões em PT/EN
+  (`online/profanity.ts`: palavra inteira, sem acentos, com trocas de letra por número/símbolo, repetição e soletrado) antes
+  de repassar; nada fica gravado.
 - **Tetos de salas** (`online/lobby.ts`, `DEFAULT_LIMITS`, conferidos em `lobby.admit` antes de criar sala, entrar numa,
   entrar na fila ou abrir treino contra o bot): 400 salas ativas no servidor (`ONLINE_MAX_ROOMS`, 503 acima), 100 salas de
   bot (`ONLINE_MAX_BOT_ROOMS`, 503; o menu cai para o treino no navegador), 16 salas ou lugares na fila por IP ao mesmo tempo (429) e 60 criações por IP a cada
@@ -308,7 +311,7 @@ privada), lido uma vez e removido com `history.replaceState`.
 | Chave | Conteúdo |
 |---|---|
 | `localStorage.gumgum.owner` | token do dono dos decks/perfil (sem login) |
-| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, theme}` |
+| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, replayCues, theme, opponentChat}` |
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
 | `localStorage.gumgum.watchHands`, `gumgum.statsFilters`, `gumgum.statsMin` | preferências de espectador e estatísticas |
 | `sessionStorage.gumgum.openMatch` | partida/transmissão aberta |
@@ -666,6 +669,7 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
 | `state` | `{room, view, defs, log: {from, entries}, lastAction}` | ao conectar e a cada ação (**todas** as conexões da sala) |
 | `presence` | `{connected: [bool, bool], spectators}` | alguém conecta/desconecta |
 | `emote` | `{seat, emote}` | emote de um jogador (lista fixa de 8) |
+| `chat` | `{seat, text}` | mensagem do chat já censurada (todas as conexões, espectadores também) |
 | `dice` | `{seat, vx, vy}` | lançamento do dado do sorteio (só animação) |
 | `rematch` | `{roomId, token?}` | revanche aceita (espectador recebe só o `roomId`) |
 | `closed` | `{}` | sala cancelada/expirada (não reconectar) |
@@ -1049,7 +1053,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | Cartas | `GET /api/cards?set=`, `GET /api/cards/:id`, `GET /api/coverage`, `GET /api/translations/pending` |
 | Decks | `GET /api/decks`, `GET/PUT/DELETE /api/decks/:id`, `POST /api/decks` |
 | Partidas/estatísticas | `POST /api/matches`, `GET /api/matches`, `GET/PUT /api/players/me`, `GET /api/stats/meta`, `GET /api/stats`, `GET /api/stats/trend?weeks=`, `GET /api/stats/cards?leader=|deck=` |
-| Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
+| Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,chat,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
 | Espectador | `GET /api/online/live`, `GET /api/online/watch/:code`, `GET /api/online/rooms/:id`, `GET /api/online/rooms/:id/watch?hands=1` (SSE) |
 | Auditoria | `GET /api/matches/:id`, `GET /api/matches/:id/replay`, `POST /api/matches/:id/report`, `GET /api/reports`, `PUT /api/reports/:id` |
 | Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/drop`, `POST /api/tournaments/:id/matches/:m/play` |

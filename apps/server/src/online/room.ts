@@ -40,6 +40,7 @@ import {
   viewFor,
 } from '@gumgum/engine';
 import type { FormatId } from '../stats/catalog';
+import { censor } from './profanity';
 
 export const TIME_BANK_MS = 17 * 60_000 + 30_000;
 /** Jogador da vez desconectado por este tempo perde por abandono. */
@@ -67,6 +68,12 @@ export interface DiceThrow {
 
 export const EMOTES = ['hello', 'gg', 'nice', 'think', 'wow', 'oops', 'thanks', 'hurry'] as const;
 export type EmoteId = (typeof EMOTES)[number];
+
+/** Tamanho máximo de uma mensagem do chat da partida. */
+export const CHAT_MAX_LENGTH = 120;
+/** Chat: intervalo mínimo entre mensagens e teto por minuto, por assento. */
+const CHAT_MIN_INTERVAL_MS = 1500;
+const CHAT_PER_MINUTE = 10;
 
 /**
  * private = sala com código; casual e ranked = filas; bot = treino contra o bot do
@@ -210,6 +217,8 @@ export class Room {
   private awaySince: number | null = null;
   private recent: [number[], number[]] = [[], []];
   private lastEmote: [number, number] = [0, 0];
+  /** Instantes das mensagens de chat recentes de cada assento (rate limit). */
+  private chatTimes: [number[], number[]] = [[], []];
   /**
    * Lançamento do dado do sorteio de cada assento (velocidade em larguras/alturas da
    * mesa por segundo). Só para a animação: o vencedor já saiu da seed. Fica em memória.
@@ -444,6 +453,27 @@ export class Room {
     if (now - this.lastEmote[seat] < 3000) return { ok: false, code: 429, error: 'Espere um pouco.' };
     this.lastEmote[seat] = now;
     for (const c of this.conns) c.send('emote', { seat, emote });
+    return { ok: true, actionCount: this.state?.actionCount ?? 0 };
+  }
+
+  /**
+   * Mensagem de texto do chat da partida: limpa, limita o tamanho e a frequência, censura
+   * palavrões e manda para todas as conexões (os espectadores também veem). Nada fica
+   * gravado: o chat vive só na memória da sala.
+   */
+  chat(seat: PlayerId, text: unknown): ActResult {
+    if (typeof text !== 'string') return { ok: false, code: 400, error: 'Mensagem inválida.' };
+    // Sem quebras de linha nem caracteres de controle; espaços repetidos viram um só.
+    const clean = text.replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim();
+    if (!clean) return { ok: false, code: 400, error: 'Mensagem vazia.' };
+    if (clean.length > CHAT_MAX_LENGTH) return { ok: false, code: 400, error: `A mensagem pode ter no máximo ${CHAT_MAX_LENGTH} caracteres.` };
+    const now = this.deps.now();
+    const times = (this.chatTimes[seat] = this.chatTimes[seat].filter((t) => now - t < 60_000));
+    const last = times[times.length - 1] ?? 0;
+    if (now - last < CHAT_MIN_INTERVAL_MS || times.length >= CHAT_PER_MINUTE) return { ok: false, code: 429, error: 'Espere um pouco antes de mandar outra mensagem.' };
+    times.push(now);
+    const message = censor(clean);
+    for (const c of this.conns) c.send('chat', { seat, text: message });
     return { ok: true, actionCount: this.state?.actionCount ?? 0 };
   }
 

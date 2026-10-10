@@ -34,8 +34,8 @@ import { useBoardMotion } from './Motion';
 import { ReplayBar, type ReplayControls } from './ReplayBar';
 import { ReplayCue } from './ReplayCue';
 import {
-  EmoteBar,
-  EmoteBubbles,
+  ChatBar,
+  ChatBubbles,
   OnlineBanner,
   OnlineClock,
   OnlineResultInfo,
@@ -917,7 +917,7 @@ function Table({
       <button className="round-btn" onClick={() => setSheet('menu')} aria-label="Menu da partida">
         <span className="burger" />
       </button>
-      {online && !watching && <EmoteBar online={online} />}
+      {online && !watching && <ChatBar online={online} />}
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
       {online && !watching && <SpectatorCount online={online} />}
       {human !== null && !isOnline && (
@@ -1019,7 +1019,7 @@ function Table({
           />
         )}
 
-        {online && <EmoteBubbles online={online} bottom={bottom} />}
+        {online && <ChatBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
 
         {game.error && (
