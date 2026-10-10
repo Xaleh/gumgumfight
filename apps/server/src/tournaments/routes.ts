@@ -21,6 +21,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, type User } from '../auth/store';
 import { dataVersion, ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
+import { fail, isPlayerError, type PlayerError } from '../errors';
 import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
 import { TIME_BANK_MS } from '../online/room';
@@ -109,43 +110,43 @@ type Body = {
 };
 
 /** Valida o formulário de criação/edição. */
-function parseInput(b: Body | undefined): TournamentInput | string {
-  if (!b || typeof b !== 'object') return 'Corpo inválido.';
+function parseInput(b: Body | undefined): TournamentInput | PlayerError {
+  if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
   const name = typeof b.name === 'string' ? b.name.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
-  if (name.length < 3) return 'Dê um nome ao torneio (pelo menos 3 letras).';
+  if (name.length < 3) return fail('tourNameTooShort', 'Dê um nome ao torneio (pelo menos 3 letras).');
   const description = typeof b.description === 'string' ? b.description.trim().slice(0, 2000) : '';
-  if (!isFormat(b.format)) return 'Formato inválido.';
-  if (b.structure !== 'swiss' && b.structure !== 'single') return 'Estrutura inválida.';
+  if (!isFormat(b.format)) return fail('invalidFormat', 'Formato inválido.');
+  if (b.structure !== 'swiss' && b.structure !== 'single') return fail('invalidStructure', 'Estrutura inválida.');
   const swiss = b.structure === 'swiss';
   const int = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
   const rounds = swiss ? int(b.rounds) : null;
   if (rounds !== null && (!Number.isInteger(rounds) || rounds < 1 || rounds > MAX_SWISS_ROUNDS)) {
-    return `Número de rodadas inválido (1 a ${MAX_SWISS_ROUNDS}, ou vazio para calcular pelo número de inscritos).`;
+    return fail('invalidRounds', `Número de rodadas inválido (1 a ${MAX_SWISS_ROUNDS}, ou vazio para calcular pelo número de inscritos).`, { max: MAX_SWISS_ROUNDS });
   }
   const swissBestOf = swiss ? (int(b.swissBestOf) ?? 1) : 1;
-  if (swissBestOf !== 1 && swissBestOf !== 3) return 'As partidas do suíço são melhor de 1 ou de 3.';
+  if (swissBestOf !== 1 && swissBestOf !== 3) return fail('invalidSwissBestOf', 'As partidas do suíço são melhor de 1 ou de 3.');
   const topCut = swiss ? int(b.topCut) : null;
-  if (topCut !== null && !CUT_SIZES.includes(topCut)) return `Top cut inválido (${CUT_SIZES.join(', ')} ou nenhum).`;
+  if (topCut !== null && !CUT_SIZES.includes(topCut)) return fail('invalidTopCut', `Top cut inválido (${CUT_SIZES.join(', ')} ou nenhum).`, { sizes: CUT_SIZES.join(', ') });
   // Fases da eliminatória só existem na eliminação simples ou no top cut.
   const elim = !swiss || topCut !== null;
   const bo3From = elim ? int(b.bo3From) : null;
   const bo5From = elim ? int(b.bo5From) : null;
-  for (const v of [bo3From, bo5From]) if (v !== null && !PHASE_SIZES.includes(v)) return 'Fase da eliminatória inválida.';
+  for (const v of [bo3From, bo5From]) if (v !== null && !PHASE_SIZES.includes(v)) return fail('invalidElimPhase', 'Fase da eliminatória inválida.');
   const maxPlayers = int(b.maxPlayers);
   if (maxPlayers !== null && (!Number.isInteger(maxPlayers) || maxPlayers < 2 || maxPlayers > MAX_PLAYERS)) {
-    return `Limite de jogadores inválido (2 a ${MAX_PLAYERS}).`;
+    return fail('invalidMaxPlayers', `Limite de jogadores inválido (2 a ${MAX_PLAYERS}).`, { max: MAX_PLAYERS });
   }
   let startsAt: string | null = null;
   if (typeof b.startsAt === 'string' && b.startsAt.trim()) {
     const d = new Date(b.startsAt);
-    if (Number.isNaN(d.getTime())) return 'Data de início inválida.';
+    if (Number.isNaN(d.getTime())) return fail('invalidStartDate', 'Data de início inválida.');
     startsAt = d.toISOString();
   }
   const checkIn = Boolean(b.checkIn);
-  if (checkIn && !startsAt) return 'O check-in e o início automático precisam de uma data e hora de início.';
+  if (checkIn && !startsAt) return fail('checkInNeedsStart', 'O check-in e o início automático precisam de uma data e hora de início.');
   const toleranceMin = int(b.toleranceMin) ?? DEFAULT_TOLERANCE_MIN;
   if (!Number.isInteger(toleranceMin) || toleranceMin < MIN_TOLERANCE_MIN || toleranceMin > MAX_TOLERANCE_MIN) {
-    return `Tolerância inválida (${MIN_TOLERANCE_MIN} a ${MAX_TOLERANCE_MIN} minutos).`;
+    return fail('invalidTolerance', `Tolerância inválida (${MIN_TOLERANCE_MIN} a ${MAX_TOLERANCE_MIN} minutos).`, { min: MIN_TOLERANCE_MIN, max: MAX_TOLERANCE_MIN });
   }
   return {
     name,
@@ -174,15 +175,15 @@ const roundLabel = (matches: TournamentMatch[], round: number) => {
  * Placar pedido pelo organizador: `wins` = [p1, p2], ou `result` (p1/p2) como atalho
  * para a vitória mais curta. null/[0, 0] apaga. Recusa placares impossíveis.
  */
-function parseScore(body: { wins?: unknown; result?: unknown } | undefined, bestOf: number): [number, number] | string {
+function parseScore(body: { wins?: unknown; result?: unknown } | undefined, bestOf: number): [number, number] | PlayerError {
   const need = winsNeeded(bestOf);
   if (body?.result === 'p1') return [need, 0];
   if (body?.result === 'p2') return [0, need];
-  if (body?.result === 'draw') return 'No One Piece TCG não há empate.';
+  if (body?.result === 'draw') return fail('noDraws', 'No One Piece TCG não há empate.');
   if (body?.result === null || body?.wins === null) return [0, 0];
   const w = body?.wins;
-  if (!Array.isArray(w) || w.length !== 2 || !w.every((n) => Number.isInteger(n) && n >= 0 && n <= need)) return 'Placar inválido.';
-  if (w[0] === need && w[1] === need) return 'Placar inválido.';
+  if (!Array.isArray(w) || w.length !== 2 || !w.every((n) => Number.isInteger(n) && n >= 0 && n <= need)) return fail('invalidScore', 'Placar inválido.');
+  if (w[0] === need && w[1] === need) return fail('invalidScore', 'Placar inválido.');
   return [w[0], w[1]];
 }
 
@@ -216,7 +217,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
   /** Conta logada, ou responde 401. */
   const account = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = user(req);
-    if (!u) void reply.code(401).send({ error: 'Entre com a conta Google.' });
+    if (!u) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
     return u;
   };
   const canManage = (t: Tournament, u: User | null) => Boolean(u && (isAdmin(u.role) || (u.id === t.organizerId && createsTournaments(u.role))));
@@ -227,11 +228,11 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     if (!me) return null;
     const t = getTournament(db, req.params.id);
     if (!t) {
-      void reply.code(404).send({ error: 'Torneio não encontrado.' });
+      void reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
       return null;
     }
     if (!canManage(t, me)) {
-      void reply.code(403).send({ error: 'Só o organizador do torneio (ou um admin) pode fazer isso.' });
+      void reply.code(403).send(fail('tourManageForbidden', 'Só o organizador do torneio (ou um admin) pode fazer isso.'));
       return null;
     }
     return { t, me };
@@ -433,7 +434,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
    */
   app.get<{ Params: { id: string } }>('/api/tournaments/:id', async (req, reply) => {
     const t = getTournament(db, req.params.id);
-    if (!t) return reply.code(404).send({ error: 'Torneio não encontrado.' });
+    if (!t) return reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
     const u = user(req);
     // A abertura do check-in muda a resposta sem gravação: entra na chave do cache.
     const open = checkInOpen(t, now()) ? 'open' : '';
@@ -489,9 +490,9 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
   app.post<{ Body: Body }>('/api/tournaments', async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
-    if (!createsTournaments(me.role)) return reply.code(403).send({ error: 'Só organizadores e administradores podem criar torneios.' });
+    if (!createsTournaments(me.role)) return reply.code(403).send(fail('tourCreateForbidden', 'Só organizadores e administradores podem criar torneios.'));
     const input = parseInput(req.body);
-    if (typeof input === 'string') return reply.code(400).send({ error: input });
+    if (isPlayerError(input)) return reply.code(400).send(input);
     // O nome público do organizador vem do perfil de estatísticas.
     ensurePlayer(db, accountOwnerKey(me.id));
     const t = createTournament(db, input, me.id);
@@ -501,17 +502,20 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
   app.put<{ Params: { id: string }; Body: Body }>('/api/tournaments/:id', async (req, reply) => {
     const found = managed(req, reply);
     if (!found) return reply;
-    if (found.t.status !== 'registration') return reply.code(409).send({ error: 'O torneio já começou: não dá para mudar as regras.' });
+    if (found.t.status !== 'registration') return reply.code(409).send(fail('tourStartedNoEdit', 'O torneio já começou: não dá para mudar as regras.'));
     const input = parseInput(req.body);
-    if (typeof input === 'string') return reply.code(400).send({ error: input });
+    if (isPlayerError(input)) return reply.code(400).send(input);
     if (input.maxPlayers !== null && input.maxPlayers < countPlayers(db, found.t.id)) {
-      return reply.code(400).send({ error: 'O limite é menor que o número de inscritos.' });
+      return reply.code(400).send(fail('maxBelowRegistered', 'O limite é menor que o número de inscritos.'));
     }
     // Mudar o formato pode invalidar decks já inscritos: confere de novo.
     if (input.format !== found.t.format) {
       const bad = listPlayers(db, found.t.id).filter((p) => p.deckId && 'error' in playableDeck(db, p.deckId, input.format, false));
       if (bad.length) {
-        return reply.code(400).send({ error: `${bad.length} inscrito(s) usam decks que não valem no formato ${FORMATS.find((f) => f.id === input.format)?.label}.` });
+        const format = FORMATS.find((f) => f.id === input.format)?.label;
+        return reply
+          .code(400)
+          .send(fail('tourDecksNotAllowed', `${bad.length} inscrito(s) usam decks que não valem no formato ${format}.`, { n: bad.length, format: format ?? input.format }));
       }
     }
     updateTournament(db, found.t.id, input);
@@ -530,9 +534,9 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const found = managed(req, reply);
     if (!found) return reply;
     const { t, me } = found;
-    if (t.status !== 'registration') return reply.code(409).send({ error: 'O torneio já começou.' });
+    if (t.status !== 'registration') return reply.code(409).send(fail('tourStarted', 'O torneio já começou.'));
     const players = listPlayers(db, t.id);
-    if (players.length < 2) return reply.code(400).send({ error: 'São precisos pelo menos 2 inscritos.' });
+    if (players.length < 2) return reply.code(400).send(fail('tourNeedsTwoPlayers', 'São precisos pelo menos 2 inscritos.'));
     beginTournament(db, t, players, nowIso());
     return detail(getTournament(db, t.id)!, me);
   });
@@ -542,9 +546,9 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const found = managed(req, reply);
     if (!found) return reply;
     const { t, me } = found;
-    if (t.status !== 'running') return reply.code(409).send({ error: 'O torneio não está em andamento.' });
+    if (t.status !== 'running') return reply.code(409).send(fail('tourNotRunning', 'O torneio não está em andamento.'));
     const matches = listMatches(db, t.id);
-    if (!roundComplete(t, matches)) return reply.code(409).send({ error: 'Ainda há partidas da rodada sem resultado.' });
+    if (!roundComplete(t, matches)) return reply.code(409).send(fail('roundIncomplete', 'Ainda há partidas da rodada sem resultado.'));
     const players = listPlayers(db, t.id);
     const step = nextStep(t, players, matches);
     const round = t.round + 1;
@@ -569,7 +573,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
   app.post<{ Params: { id: string } }>('/api/tournaments/:id/finish', async (req, reply) => {
     const found = managed(req, reply);
     if (!found) return reply;
-    if (found.t.status !== 'running') return reply.code(409).send({ error: 'O torneio não está em andamento.' });
+    if (found.t.status !== 'running') return reply.code(409).send(fail('tourNotRunning', 'O torneio não está em andamento.'));
     finishTournament(db, found.t.id);
     return detail(getTournament(db, found.t.id)!, found.me);
   });
@@ -586,33 +590,34 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
       if (!found) return reply;
       const { t, me } = found;
       const m = getMatch(db, t.id, Number(req.params.matchId));
-      if (!m) return reply.code(404).send({ error: 'Partida não encontrada.' });
-      if (t.status === 'registration') return reply.code(409).send({ error: 'O torneio ainda não começou.' });
-      if (!m.p2) return reply.code(400).send({ error: 'Esta partida é um bye.' });
+      if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+      if (t.status === 'registration') return reply.code(409).send(fail('tourNotStarted', 'O torneio ainda não começou.'));
+      if (!m.p2) return reply.code(400).send(fail('matchIsBye', 'Esta partida é um bye.'));
       const wins = parseScore(req.body, m.bestOf);
-      if (typeof wins === 'string') return reply.code(400).send({ error: wins });
+      if (isPlayerError(wins)) return reply.code(400).send(wins);
       const result = seriesResult(m.bestOf, wins);
       const live = t.status === 'running' && m.round === t.round;
       if (!live) {
-        if (!result) return reply.code(409).send({ error: 'Partidas de rodadas passadas precisam de um vencedor.' });
+        if (!result) return reply.code(409).send(fail('pastRoundNeedsWinner', 'Partidas de rodadas passadas precisam de um vencedor.'));
         const matches = listMatches(db, t.id);
         const oldWinner = winnerOf(m);
         const newWinner = result === 'p1' ? m.p1 : m.p2;
         if (oldWinner && oldWinner !== newWinner) {
           if (m.stage === 'swiss' && matches.some((x) => x.stage === 'elim')) {
-            return reply.code(409).send({ error: 'O top cut já começou: os resultados do suíço não mudam mais.' });
+            return reply.code(409).send(fail('topCutStartedSwissLocked', 'O top cut já começou: os resultados do suíço não mudam mais.'));
           }
           if (m.stage === 'elim') {
             // Na chave, o vencedor já foi para a partida seguinte: troca-o lá, se ela ainda não começou.
             const next = matches.find((x) => x.round === m.round + 1 && (x.p1 === oldWinner || x.p2 === oldWinner));
             if (next) {
               if (next.result && next.result !== 'bye') {
+                const round = roundLabel(matches, next.round);
                 return reply
                   .code(409)
-                  .send({ error: `Corrija antes o resultado da partida seguinte (${roundLabel(matches, next.round)}, mesa ${next.table}).` });
+                  .send(fail('fixNextMatchFirst', `Corrija antes o resultado da partida seguinte (${round}, mesa ${next.table}).`, { round, table: next.table }));
               }
               if (next.wins[0] + next.wins[1] > 0 || (next.roomId && lobby.get(next.roomId)?.status === 'playing')) {
-                return reply.code(409).send({ error: 'A partida seguinte da chave já começou: zere o placar dela antes de corrigir esta.' });
+                return reply.code(409).send(fail('nextMatchStarted', 'A partida seguinte da chave já começou: zere o placar dela antes de corrigir esta.'));
               }
               replaceInMatch(db, t.id, next.id, oldWinner, newWinner!);
             }
@@ -630,17 +635,17 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     if (!found) return reply;
     const { t, me } = found;
     const r = removePlayer(t, req.params.userId);
-    return r ? reply.code(r.code).send({ error: r.error }) : detail(getTournament(db, t.id)!, me);
+    return r ? reply.code(r.code).send(fail(r.errorCode, r.error)) : detail(getTournament(db, t.id)!, me);
   });
 
-  const removePlayer = (t: Tournament, userId: string): { code: number; error: string } | null => {
+  const removePlayer = (t: Tournament, userId: string): ({ code: number } & PlayerError) | null => {
     const p = listPlayers(db, t.id).find((x) => x.userId === userId);
-    if (!p) return { code: 404, error: 'Jogador não inscrito.' };
+    if (!p) return { code: 404, ...fail('playerNotRegistered', 'Jogador não inscrito.') };
     if (t.status === 'registration') unregisterPlayer(db, t.id, userId);
     else if (t.status === 'running') {
-      if (p.dropped) return { code: 409, error: 'Este jogador já saiu do torneio.' };
+      if (p.dropped) return { code: 409, ...fail('playerAlreadyDropped', 'Este jogador já saiu do torneio.') };
       dropPlayer(db, t, userId);
-    } else return { code: 409, error: 'O torneio já terminou.' };
+    } else return { code: 409, ...fail('tourFinished', 'O torneio já terminou.') };
     return null;
   };
 
@@ -651,14 +656,14 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const me = account(req, reply);
     if (!me) return reply;
     const t = getTournament(db, req.params.id);
-    if (!t) return reply.code(404).send({ error: 'Torneio não encontrado.' });
-    if (t.status !== 'registration') return reply.code(409).send({ error: 'As inscrições deste torneio já fecharam.' });
+    if (!t) return reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
+    if (t.status !== 'registration') return reply.code(409).send(fail('registrationClosed', 'As inscrições deste torneio já fecharam.'));
     const already = listPlayers(db, t.id).some((p) => p.userId === me.id);
     if (!already && t.maxPlayers !== null && countPlayers(db, t.id) >= t.maxPlayers) {
-      return reply.code(409).send({ error: 'O torneio está lotado.' });
+      return reply.code(409).send(fail('tourFull', 'O torneio está lotado.'));
     }
     const deck = playableDeck(db, req.body?.deckId, t.format, false);
-    if ('error' in deck) return reply.code(deck.code).send({ error: deck.error });
+    if ('error' in deck) return reply.code(deck.code).send(fail(deck.errorCode, deck.error, deck.errorParams));
     const profile = ensurePlayer(db, accountOwnerKey(me.id));
     registerPlayer(db, t.id, me.id, profile.name, deck.id ?? null, deck);
     return detail(t, me);
@@ -669,11 +674,11 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const me = account(req, reply);
     if (!me) return reply;
     const t = getTournament(db, req.params.id);
-    if (!t) return reply.code(404).send({ error: 'Torneio não encontrado.' });
-    if (!t.checkIn) return reply.code(400).send({ error: 'Este torneio não tem check-in.' });
-    if (t.status !== 'registration') return reply.code(409).send({ error: 'O torneio já começou: entre na sala da sua partida.' });
-    if (!checkInOpen(t, now())) return reply.code(409).send({ error: 'O check-in abre 30 minutos antes do início.' });
-    if (!listPlayers(db, t.id).some((p) => p.userId === me.id)) return reply.code(404).send({ error: 'Você não está inscrito.' });
+    if (!t) return reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
+    if (!t.checkIn) return reply.code(400).send(fail('noCheckIn', 'Este torneio não tem check-in.'));
+    if (t.status !== 'registration') return reply.code(409).send(fail('tourStartedJoinRoom', 'O torneio já começou: entre na sala da sua partida.'));
+    if (!checkInOpen(t, now())) return reply.code(409).send(fail('checkInNotOpen', 'O check-in abre 30 minutos antes do início.'));
+    if (!listPlayers(db, t.id).some((p) => p.userId === me.id)) return reply.code(404).send(fail('notRegistered', 'Você não está inscrito.'));
     checkInPlayer(db, t.id, me.id, nowIso());
     return detail(getTournament(db, t.id)!, me);
   });
@@ -683,9 +688,9 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const me = account(req, reply);
     if (!me) return reply;
     const t = getTournament(db, req.params.id);
-    if (!t) return reply.code(404).send({ error: 'Torneio não encontrado.' });
+    if (!t) return reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
     const r = removePlayer(t, me.id);
-    return r ? reply.code(r.code).send({ error: r.error }) : detail(getTournament(db, t.id)!, me);
+    return r ? reply.code(r.code).send(fail(r.errorCode, r.error)) : detail(getTournament(db, t.id)!, me);
   });
 
   /**
@@ -697,13 +702,13 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     if (!me) return reply;
     const t = getTournament(db, req.params.id);
     const m = t && getMatch(db, t.id, Number(req.params.matchId));
-    if (!t || !m) return reply.code(404).send({ error: 'Partida não encontrada.' });
-    if (m.p1 !== me.id && m.p2 !== me.id) return reply.code(403).send({ error: 'Esta partida não é sua.' });
-    if (t.status !== 'running' || m.round !== t.round) return reply.code(409).send({ error: 'Esta partida não é da rodada atual.' });
-    if (!m.p2) return reply.code(400).send({ error: 'Você está de bye nesta rodada: a vitória já é sua.' });
-    if (m.result) return reply.code(409).send({ error: 'Esta partida já tem resultado.' });
+    if (!t || !m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    if (m.p1 !== me.id && m.p2 !== me.id) return reply.code(403).send(fail('notYourMatch', 'Esta partida não é sua.'));
+    if (t.status !== 'running' || m.round !== t.round) return reply.code(409).send(fail('matchNotCurrentRound', 'Esta partida não é da rodada atual.'));
+    if (!m.p2) return reply.code(400).send(fail('youHaveBye', 'Você está de bye nesta rodada: a vitória já é sua.'));
+    if (m.result) return reply.code(409).send(fail('matchHasResult', 'Esta partida já tem resultado.'));
     const player = listPlayers(db, t.id).find((p) => p.userId === me.id)!;
-    if (player.dropped) return reply.code(409).send({ error: 'Você saiu do torneio.' });
+    if (player.dropped) return reply.code(409).send(fail('youDropped', 'Você saiu do torneio.'));
     const limit = lobby.admit(req.ip, 'tournament');
     if (limit) return reply.code(limit.code).send(limit);
     const ownerHash = accountOwnerKey(me.id);
