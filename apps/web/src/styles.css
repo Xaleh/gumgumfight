@@ -6633,6 +6633,96 @@ tr.clickable:hover td {
 .spectator-count {
   align-self: flex-start;
 }
+
+/*
+ * Mesa em pé (celular e tablet): a mão do oponente ocupa a largura toda, então o menu, o
+ * histórico, o chat e a faixa do oponente descem para uma faixa própria logo abaixo da ponta
+ * das cartas, sem cobri-las. Fica depois das regras do chat e do espectador para valer sobre elas.
+ */
+@container not (min-aspect-ratio: 1/1) {
+  .mat {
+    /* A faixa de cima ficou ~40px mais alta (0,5 carta + 48px): as cartas encolhem um pouco para caber. */
+    --cw: max(38px, min(calc((100cqw - 20px) / 5.45), calc((100cqh - 178px) / 9.79), 112px));
+    --ch: calc(var(--cw) * 1.396);
+    --hcw: calc(var(--cw) * 1.2);
+  }
+  /*
+   * Linha 1: ponta da mão de cima (`--peek`). Linha 2: botões à esquerda e faixa do oponente à
+   * direita; numa tela estreita a faixa encolhe em vez de passar por cima dos botões.
+   */
+  .top-strip {
+    height: calc(var(--cw) * 0.5 + 48px);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: calc(var(--cw) * 0.5) 1fr;
+    align-items: center;
+  }
+  .hand.top {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    height: var(--peek);
+  }
+  .corner {
+    grid-column: 1;
+    grid-row: 2;
+    position: relative;
+    top: 0;
+    left: 0;
+    margin-left: 4px;
+    flex-direction: row;
+    align-items: center;
+  }
+  .spectator-bar {
+    flex-direction: row;
+    align-items: center;
+  }
+  /* painel do chat abaixo da faixa, a partir da borda esquerda */
+  .emote-bar {
+    position: static;
+  }
+  .chat-panel {
+    left: 0;
+    top: 46px;
+  }
+  .top-strip .banner.right {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    position: relative;
+    top: 0;
+    right: 0;
+    max-width: calc(100% - 8px);
+    /* sem espaço, o relógio da partida online desce para uma segunda linha */
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 2px;
+  }
+  /* celular em pé: botões e faixa um pouco menores para caberem lado a lado (partida online) */
+  @container (max-width: 420px) {
+    .corner,
+    .corner-row {
+      gap: 4px;
+    }
+    .corner .round-btn {
+      width: 36px;
+      height: 36px;
+    }
+    .top-strip .banner.right {
+      gap: 6px;
+      padding: 4px 8px 4px 6px;
+    }
+    .top-strip .banner-life {
+      gap: 2px;
+    }
+    .top-strip .banner-life span {
+      width: 11px;
+      height: 11px;
+    }
+    .chat-panel {
+      top: 42px;
+    }
+  }
+}
 .end-turn.watching {
   display: grid;
   place-items: center;
