@@ -18,6 +18,7 @@ import jollyRoger from '../assets/jolly-roger.svg';
 import { useAuth } from '../auth';
 import { buildSetup, setupFromReplayText } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
+import { type MessageKey, useT } from '../i18n';
 import { NICKNAME_EVENT, SettingsModal } from '../settings';
 import { type NavItem, TopBar } from './AppShell';
 import { LiveNow, MetaBlock, TournamentBanner, TournamentsBlock, usePoll } from './HomeBlocks';
@@ -83,6 +84,7 @@ function DeckPicker({
   onPick: (id: string) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const body = useRef<HTMLDivElement>(null);
   // Ao abrir, a folha mostra o deck já escolhido (a lista pode ser longa).
   useEffect(() => {
@@ -98,7 +100,7 @@ function DeckPicker({
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h3>{title}</h3>
-          <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
+          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>
@@ -107,7 +109,7 @@ function DeckPicker({
             <div className="picker-grid">
               <button className={['deck-pick', value === RANDOM ? 'on' : ''].join(' ')} onClick={() => onPick(RANDOM)}>
                 <DeckArt small />
-                <span className="name">Aleatório</span>
+                <span className="name">{t('menu.randomDeck')}</span>
               </button>
             </div>
           )}
@@ -128,7 +130,7 @@ function DeckPicker({
                       <DeckArt deck={d} small />
                       <span className="name">{d.name}</span>
                       {!d.valid && <span className="muted small">{d.size}/50</span>}
-                      {d.valid && !canPlay(d, format) && <span className="muted small">🚫 {formatLabel(format)}</span>}
+                      {d.valid && !canPlay(d, format) && <span className="muted small">{t('menu.notAllowedShort', { format: formatLabel(format) })}</span>}
                     </button>
                   ))}
                 </div>
@@ -142,28 +144,26 @@ function DeckPicker({
 
 /** Opções de teste (só Dev): seed do embaralhamento. */
 function TestOptions({ seed, onSeed, onClose }: { seed: number; onSeed: (n: number) => void; onClose: () => void }) {
+  const t = useT();
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <h3>Opções de teste</h3>
-          <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
+          <h3>{t('menu.testOptions')}</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>
         <div className="sheet-body">
           <div className="field">
-            <label htmlFor="test-seed">Seed do embaralhamento</label>
+            <label htmlFor="test-seed">{t('menu.testSeed')}</label>
             <div className="seed">
               <input id="test-seed" type="number" value={seed} onChange={(e) => onSeed(Number(e.target.value) || 0)} />
-              <button className="btn small" onClick={() => onSeed(randomSeed())} title="Sortear outra">
+              <button className="btn small" onClick={() => onSeed(randomSeed())} title={t('menu.testSeedRerollTitle')}>
                 🎲
               </button>
             </div>
-            <p className="muted small">
-              Número que define a ordem dos decks e o sorteio de quem começa, nas partidas contra o bot. A mesma seed com as mesmas
-              jogadas repete a partida exatamente, o que é útil para reproduzir um problema.
-            </p>
+            <p className="muted small">{t('menu.testSeedHint')}</p>
           </div>
         </div>
       </div>
@@ -171,7 +171,20 @@ function TestOptions({ seed, onSeed, onClose }: { seed: number; onSeed: (n: numb
   );
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+/**
+ * Frase traduzida com um pedaço em JSX: `msg` ainda com o `{param}` por preencher, cortado
+ * no lugar do parâmetro e com `node` no meio (ex.: o código da sala em negrito).
+ */
+function interp(msg: string, param: string, node: ReactNode): ReactNode {
+  const [before, after] = msg.split(`{${param}}`);
+  return (
+    <>
+      {before}
+      {node}
+      {after}
+    </>
+  );
+}
 
 const fmtClock = (ms: number) => {
   const s = Math.round(ms / 1000);
@@ -180,6 +193,7 @@ const fmtClock = (ms: number) => {
 
 /** Card de um modo de jogo: cor própria, contador ao vivo e botão de ação. */
 function ModeCard({
+  mode,
   color,
   icon,
   kicker,
@@ -197,6 +211,8 @@ function ModeCard({
   children,
   cardRef,
 }: {
+  /** Nome fixo do modo (id do título, independente do idioma). */
+  mode: string;
   /** Cor da carta (variável CSS). */
   color: string;
   icon: IconName;
@@ -217,7 +233,7 @@ function ModeCard({
   children?: ReactNode;
   cardRef?: Ref<HTMLElement>;
 }) {
-  const id = `mode-${title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+  const id = `mode-${mode}`;
   return (
     <article
       ref={cardRef}
@@ -301,8 +317,9 @@ export function Menu({
   dev?: boolean;
 }) {
   const { user, notice: authNotice, error: authError } = useAuth();
+  const t = useT();
   const [decks, setDecks] = useState<DeckSummary[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MessageKey | null>(null);
   /** Erro de uma ação dos modos (fila, sala, bot). */
   const [actionError, setActionError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -399,10 +416,10 @@ export function Menu({
         .catch(() => {
           if (cancelled) return;
           if (attempt < 15) {
-            setError('Conectando ao servidor…');
+            setError('menu.connecting');
             timer = setTimeout(() => load(attempt + 1), 2000);
           } else {
-            setError('Não foi possível conectar ao servidor. Veja as mensagens [server] no terminal do npm run dev.');
+            setError('menu.connectFailed');
           }
         });
     };
@@ -451,9 +468,9 @@ export function Menu({
     setLoading(true);
     setActionError(null);
     try {
-      const names: [string, string] = [nickname ?? 'Você', 'Bot'];
+      const names: [string, string] = [nickname ?? t('menu.you'), t('menu.botName')];
       const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
-      if (deck1 === RANDOM && !pool.length) throw new Error(`Nenhum deck pronto é permitido no ${formatLabel(format)}.`);
+      if (deck1 === RANDOM && !pool.length) throw new Error(t('menu.noBuiltinDeck', { format: formatLabel(format) }));
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
       const firstPlayer = first === 'random' ? undefined : (Number(first) as PlayerId);
       let notice: string | undefined;
@@ -464,7 +481,7 @@ export function Menu({
         } catch (e) {
           // Servidor lotado: o treino roda no navegador, sem transmissão.
           if (!(e instanceof ApiError && e.status === 503)) throw e;
-          notice = 'A transmissão está lotada agora: este treino roda no seu navegador, sem espectadores.';
+          notice = t('menu.broadcastFull');
         }
       }
       try {
@@ -494,31 +511,31 @@ export function Menu({
   const waiting = active.find((r) => r.status === 'waiting');
   const manualCards = d0?.unscripted ?? 0;
   const onlineBlocked = !onlineDeck || busy || Boolean(playing) || Boolean(queue);
-  const onlineNote = !d0 ? 'Escolha um deck.' : !onlineDeck ? `O deck equipado não vale no ${fmt}.` : playing ? 'Termine a partida em andamento primeiro.' : null;
-  const rankedNote = onlineNote ?? (!user ? 'Entre com o Google para jogar a ranqueada.' : manualCards > 0 ? `O deck tem ${plural(manualCards, 'carta', 'cartas')} com efeito manual (⚙), que a ranqueada não permite.` : null);
+  const onlineNote = !d0 ? t('menu.pickDeck') : !onlineDeck ? t('menu.deckNotValidIn', { format: fmt }) : playing ? t('menu.finishCurrent') : null;
+  const rankedNote = onlineNote ?? (!user ? t('menu.rankedNeedsLogin') : manualCards > 0 ? t('menu.rankedManualCards', { n: manualCards }) : null);
 
   const enterQueue = (kind: QueueKind) => run(() => enqueue(onlineDeck!.id, format, kind));
 
   const queueLive = (kind: QueueKind) =>
-    stats ? <Live>{`${plural(stats.playing[kind], 'partida', 'partidas')} · ${stats.queue[kind][format]} na fila`}</Live> : <Live off>Contando…</Live>;
+    stats ? <Live>{t('menu.queueLive', { n: stats.playing[kind], q: stats.queue[kind][format] })}</Live> : <Live off>{t('menu.counting')}</Live>;
   const openTournaments = (tournaments?.tournaments ?? []).filter((t) => t.status === 'registration').length;
   const runningTournaments = (tournaments?.tournaments ?? []).filter((t) => t.status === 'running').length;
   const totalPlaying = stats ? Object.values(stats.playing).reduce((a, b) => a + b, 0) : null;
   const totalQueue = stats ? Object.values(stats.queue).reduce((a, q) => a + Object.values(q).reduce((x, y) => x + y, 0), 0) : null;
 
   const nav: NavItem[] = [
-    { key: 'play', label: 'Jogar', icon: 'swords', current: true, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-    { key: 'builder', label: 'Montar decks', icon: 'deck', onClick: onBuildDecks },
-    { key: 'tournaments', label: 'Torneios', icon: 'crown', onClick: () => onTournaments() },
-    { key: 'watch', label: 'Assistir', icon: 'eye', onClick: onWatch },
-    { key: 'stats', label: 'Estatísticas', icon: 'chart', onClick: onStats },
+    { key: 'play', label: t('menu.navPlay'), icon: 'swords', current: true, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+    { key: 'builder', label: t('menu.navDecks'), icon: 'deck', onClick: onBuildDecks },
+    { key: 'tournaments', label: t('menu.navTournaments'), icon: 'crown', onClick: () => onTournaments() },
+    { key: 'watch', label: t('menu.navWatch'), icon: 'eye', onClick: onWatch },
+    { key: 'stats', label: t('menu.navStats'), icon: 'chart', onClick: onStats },
   ];
   const extra: NavItem[] = [
-    { key: 'settings', label: 'Configurações', icon: 'sliders', onClick: () => setShowSettings(true) },
-    { key: 'replay', label: 'Assistir replay', icon: 'play', onClick: () => setShowReplay(true) },
-    ...(onAdmin ? [{ key: 'admin', label: 'Administração', icon: 'shield' as const, onClick: onAdmin }] : []),
-    ...(onCoverage ? [{ key: 'coverage', label: 'Cobertura das cartas', icon: 'check' as const, onClick: onCoverage }] : []),
-    ...(dev ? [{ key: 'tests', label: 'Opções de teste', icon: 'flask' as const, onClick: () => setShowTests(true) }] : []),
+    { key: 'settings', label: t('menu.navSettings'), icon: 'sliders', onClick: () => setShowSettings(true) },
+    { key: 'replay', label: t('menu.navReplay'), icon: 'play', onClick: () => setShowReplay(true) },
+    ...(onAdmin ? [{ key: 'admin', label: t('menu.navAdmin'), icon: 'shield' as const, onClick: onAdmin }] : []),
+    ...(onCoverage ? [{ key: 'coverage', label: t('menu.navCoverage'), icon: 'check' as const, onClick: onCoverage }] : []),
+    ...(dev ? [{ key: 'tests', label: t('menu.testOptions'), icon: 'flask' as const, onClick: () => setShowTests(true) }] : []),
   ];
 
   return (
@@ -529,25 +546,25 @@ export function Menu({
         <img className="home-watermark" src={jollyRoger} alt="" />
         <div className="home-wrap home-hero-inner">
           <div className="home-hero-text">
-            <div className="hero-kicker">One Piece Card Game no navegador</div>
-            <h1 className="hero-title">Escolha seu modo</h1>
-            <p className="hero-sub">Toda partida usa o deck equipado. Escolha uma fila e entre num duelo 1 contra 1, ou treine contra o bot.</p>
+            <div className="hero-kicker">{t('menu.heroKicker')}</div>
+            <h1 className="hero-title">{t('menu.heroTitle')}</h1>
+            <p className="hero-sub">{t('menu.heroSub')}</p>
             <div className="hero-links">
               <button type="button" className="hero-link" onClick={onStats}>
                 <Icon name="trophy" size={18} />
-                Minhas estatísticas
+                {t('menu.myStats')}
               </button>
               <button type="button" className="hero-link" onClick={onWatch}>
                 <Icon name="eye" size={18} />
-                Assistir partidas
+                {t('menu.watchMatches')}
               </button>
-              <button type="button" className="hero-link" onClick={() => setShowReplay(true)} title="Assistir a um replay baixado (.json)">
+              <button type="button" className="hero-link" onClick={() => setShowReplay(true)} title={t('menu.watchReplayTitle')}>
                 <Icon name="play" size={18} />
-                Assistir replay
+                {t('menu.navReplay')}
               </button>
-              <button type="button" className="hero-link nickname-link" onClick={() => setShowSettings(true)} title="Mudar o apelido (Configurações)">
+              <button type="button" className="hero-link nickname-link" onClick={() => setShowSettings(true)} title={t('menu.nicknameTitle')}>
                 <Icon name="user" size={18} />
-                {nickname ?? 'Apelido'}
+                {nickname ?? t('menu.nickname')}
                 <small>✎</small>
               </button>
             </div>
@@ -555,22 +572,22 @@ export function Menu({
           <div className="hero-stats" role="status" aria-live="off">
             <div className="hero-stat">
               <b>{stats?.online ?? '–'}</b>
-              <span>{stats?.online === 1 ? 'conectado' : 'conectados'}</span>
+              <span>{t('menu.onlineWord', { n: stats?.online ?? 0 })}</span>
             </div>
             <div className="hero-stat">
               <b>{totalPlaying ?? '–'}</b>
-              <span>{totalPlaying === 1 ? 'partida ao vivo' : 'partidas ao vivo'}</span>
+              <span>{t('menu.liveMatchesWord', { n: totalPlaying ?? 0 })}</span>
             </div>
             <div className="hero-stat">
               <b>{totalQueue ?? '–'}</b>
-              <span>na fila agora</span>
+              <span>{t('menu.inQueueNow')}</span>
             </div>
           </div>
         </div>
       </section>
 
       <main className="home-wrap home-main">
-        {error && <div className="error">{error}</div>}
+        {error && <div className="error">{t(error)}</div>}
         {authNotice && <div className="home-notice">{authNotice}</div>}
         {authError && <div className="error">{authError}</div>}
 
@@ -589,16 +606,12 @@ export function Menu({
             </span>
             <div className="home-banner-text">
               <strong>
-                {playing.queue === 'bot'
-                  ? 'Você tem um treino contra o bot em andamento.'
-                  : playing.queue === 'tournament'
-                    ? 'Você tem uma partida de torneio em andamento.'
-                    : 'Você tem uma partida online em andamento.'}
+                {playing.queue === 'bot' ? t('menu.playingBot') : playing.queue === 'tournament' ? t('menu.playingTournament') : t('menu.playingOnline')}
               </strong>
-              <span>Seu relógio pode estar correndo.</span>
+              <span>{t('menu.clockRunning')}</span>
             </div>
             <button type="button" className="btn primary" onClick={() => onOnline(playing)}>
-              Voltar à partida
+              {t('menu.backToMatch')}
             </button>
           </div>
         ) : (
@@ -610,41 +623,39 @@ export function Menu({
                 <Icon name="key" size={16} />
               </span>
               <div className="home-banner-text">
-                <strong>
-                  Sua sala <b>{waiting.code}</b> está esperando um oponente.
-                </strong>
-                <span>Envie o código ou o link para quem vai jogar com você.</span>
+                <strong>{interp(t('menu.roomWaiting'), 'code', <b>{waiting.code}</b>)}</strong>
+                <span>{t('menu.roomWaitingHint')}</span>
               </div>
               <button type="button" className="btn primary" onClick={() => onOnline(waiting)}>
-                Abrir sala
+                {t('menu.openRoom')}
               </button>
             </div>
           )
         )}
 
-        <section className="deck-strip" aria-label="Deck equipado">
+        <section className="deck-strip" aria-label={t('menu.equippedDeck')}>
           <DeckArt deck={d0} />
           <div className="deck-strip-info">
-            <div className="kicker">Deck equipado</div>
-            <div className="deck-strip-name">{d0?.name ?? (decks.length ? 'Escolha um deck' : 'Carregando decks…')}</div>
+            <div className="kicker">{t('menu.equippedDeck')}</div>
+            <div className="deck-strip-name">{d0?.name ?? (decks.length ? t('menu.chooseDeck') : t('menu.loadingDecks'))}</div>
             {d0 && (
               <ul className="home-chips">
-                {d0.leaderName && <li className="home-chip">Líder: {d0.leaderName}</li>}
+                {d0.leaderName && <li className="home-chip">{t('menu.leaderChip', { name: d0.leaderName })}</li>}
                 {!d0.valid ? (
-                  <li className="home-chip bad">{d0.size}/50 cartas: incompleto</li>
+                  <li className="home-chip bad">{t('menu.incompleteChip', { size: d0.size })}</li>
                 ) : canPlay(d0, format) ? (
                   <li className="home-chip ok">
                     <Icon name="check" size={12} stroke={3} />
-                    Válido no {fmt}
+                    {t('menu.validIn', { format: fmt })}
                   </li>
                 ) : (
                   <li className="home-chip bad" title={whyNotPlayable(d0, format) ?? undefined}>
-                    Não permitido no {fmt}
+                    {t('menu.notAllowedIn', { format: fmt })}
                   </li>
                 )}
                 {d0.unscripted > 0 && (
-                  <li className="home-chip" title="Essas cartas entram no jogo, mas sem o efeito automático">
-                    ⚙ {d0.unscripted} sem efeito automático
+                  <li className="home-chip" title={t('menu.unscriptedTitle')}>
+                    {t('menu.unscriptedChip', { n: d0.unscripted })}
                   </li>
                 )}
               </ul>
@@ -652,10 +663,10 @@ export function Menu({
           </div>
           <div className="deck-strip-actions">
             <button type="button" className="deck-change" onClick={() => setPicking(0)} disabled={!decks.length}>
-              Trocar deck
+              {t('menu.changeDeck')}
               <Icon name="chevron" size={16} />
             </button>
-            <div className="seg format-seg" role="group" aria-label="Formato">
+            <div className="seg format-seg" role="group" aria-label={t('menu.format')}>
               {FORMATS.map((f) => (
                 <button key={f.id} type="button" className={format === f.id ? 'on' : ''} aria-pressed={format === f.id} onClick={() => setFormat(f.id)}>
                   {f.label}
@@ -663,7 +674,7 @@ export function Menu({
               ))}
             </div>
             <button type="button" className="text-link" onClick={onBuildDecks}>
-              Montar decks
+              {t('menu.navDecks')}
             </button>
           </div>
         </section>
@@ -671,51 +682,54 @@ export function Menu({
         <section className="home-section" aria-labelledby="home-modes">
           <div className="section-head">
             <h2 className="home-h2" id="home-modes">
-              Modos de jogo
+              {t('menu.modes')}
             </h2>
-            <span className="muted">Contadores ao vivo, atualizados a cada 10 s</span>
+            <span className="muted">{t('menu.modesHint')}</span>
           </div>
           {actionError && <div className="error">{actionError}</div>}
           <div className="mode-grid">
             <ModeCard
+              mode="ranked"
               color="red"
               icon="trophy"
-              kicker="Competitivo"
-              title="Ranqueada"
+              kicker={t('menu.rankedKicker')}
+              title={t('menu.ranked')}
               badge={fmt}
-              desc="Vale bounty. Você enfrenta quem está perto do seu nível."
-              chips={['Login com Google', 'Sem efeitos manuais']}
+              desc={t('menu.rankedDesc')}
+              chips={[t('menu.chipGoogleLogin'), t('menu.chipNoManual')]}
               live={queueLive('ranked')}
               note={rankedNote}
-              action="Buscar partida"
+              action={t('menu.findMatch')}
               disabled={onlineBlocked || Boolean(rankedNote)}
               onAction={() => enterQueue('ranked')}
             />
             <ModeCard
+              mode="casual"
               color="green"
               icon="swords"
-              kicker="Casual"
-              title="Partida rápida"
+              kicker={t('menu.casualKicker')}
+              title={t('menu.casual')}
               badge={fmt}
-              desc="Sem bounty em jogo. Ideal para testar um deck novo."
-              chips={['Qualquer deck válido', ...(timeBank ? [`Relógio de ${fmtClock(timeBank)}`] : [])]}
+              desc={t('menu.casualDesc')}
+              chips={[t('menu.chipAnyDeck'), ...(timeBank ? [t('menu.chipClock', { time: fmtClock(timeBank) })] : [])]}
               live={queueLive('casual')}
               note={onlineNote}
-              action="Buscar partida"
+              action={t('menu.findMatch')}
               disabled={onlineBlocked}
               onAction={() => enterQueue('casual')}
             />
             <ModeCard
+              mode="private"
               cardRef={privateCard}
               color="blue-card"
               icon="key"
-              kicker="Com amigos"
-              title="Sala privada"
+              kicker={t('menu.privateKicker')}
+              title={t('menu.private')}
               badge={fmt}
-              desc="Crie uma sala e mande o código, ou entre na sala de um amigo."
-              live={stats ? <Live>{`${plural(stats.playing.private, 'partida', 'partidas')} · ${plural(stats.waiting, 'sala esperando', 'salas esperando')}`}</Live> : <Live off>Contando…</Live>}
+              desc={t('menu.privateDesc')}
+              live={stats ? <Live>{t('menu.privateLive', { n: stats.playing.private, w: stats.waiting })}</Live> : <Live off>{t('menu.counting')}</Live>}
               note={onlineNote}
-              action="Criar sala"
+              action={t('menu.createRoom')}
               disabled={onlineBlocked}
               highlight={Boolean(URL_ROOM_CODE)}
               onAction={() =>
@@ -726,13 +740,13 @@ export function Menu({
               }
             >
               <div className="mode-field">
-                <label htmlFor="room-code">Código da sala</label>
+                <label htmlFor="room-code">{t('menu.roomCode')}</label>
                 <div className="code-row">
                   <input
                     id="room-code"
                     value={code}
                     maxLength={6}
-                    placeholder="ABC123"
+                    placeholder={t('menu.roomCodePlaceholder')}
                     autoComplete="off"
                     onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                   />
@@ -747,86 +761,86 @@ export function Menu({
                       })
                     }
                   >
-                    Entrar
+                    {t('menu.joinRoom')}
                   </button>
                 </div>
               </div>
             </ModeCard>
             <ModeCard
+              mode="bot"
               color="purple"
               icon="bot"
-              kicker="Treino"
-              title="Contra o bot"
+              kicker={t('menu.botKicker')}
+              title={t('menu.vsBot')}
               badge={fmt}
-              desc="Treine com qualquer deck, sem fila e sem pressa."
-              live={broadcasting && stats ? <Live>{plural(stats.playing.bot, 'treino transmitido', 'treinos transmitidos')}</Live> : <Live off>Roda no seu navegador</Live>}
-              note={!d0 || botReady ? null : `Os dois decks precisam valer no ${fmt}.`}
-              action={loading ? 'Carregando…' : 'Batalhar!'}
+              desc={t('menu.botDesc')}
+              live={broadcasting && stats ? <Live>{t('menu.botLive', { n: stats.playing.bot })}</Live> : <Live off>{t('menu.botLocal')}</Live>}
+              note={!d0 || botReady ? null : t('menu.bothDecksValid', { format: fmt })}
+              action={loading ? t('common.loading') : t('menu.battle')}
               disabled={!botReady || loading}
               onAction={startBot}
             >
               <div className="mode-fields">
                 <button type="button" className="pick-btn" onClick={() => setPicking(1)} disabled={!decks.length}>
-                  <span>
-                    Oponente: <strong>{deck1 === RANDOM ? 'Aleatório' : (d1?.name ?? 'Escolher')}</strong>
-                  </span>
+                  <span>{interp(t('menu.opponent'), 'name', <strong>{deck1 === RANDOM ? t('menu.randomDeck') : (d1?.name ?? t('menu.choose'))}</strong>)}</span>
                   <Icon name="chevron" size={14} />
                 </button>
                 <div className="mode-field">
                   <span className="mode-field-label" id="first-label">
-                    Quem começa
+                    {t('menu.whoStarts')}
                   </span>
                   <div className="seg small" role="group" aria-labelledby="first-label">
                     {(
                       [
-                        ['random', 'Sorteio'],
-                        ['0', 'Você'],
-                        ['1', 'Bot'],
+                        ['random', 'menu.firstRandom'],
+                        ['0', 'menu.you'],
+                        ['1', 'menu.botName'],
                       ] as const
                     ).map(([v, label]) => (
                       <button key={v} type="button" className={first === v ? 'on' : ''} aria-pressed={first === v} onClick={() => setFirst(v)}>
-                        {label}
+                        {t(label)}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="mode-field">
                   <span className="mode-field-label" id="bot-level-label">
-                    Nível do bot
+                    {t('menu.botLevel')}
                   </span>
                   <div className="seg small" role="group" aria-labelledby="bot-level-label">
                     {(
                       [
-                        ['easy', 'Fácil'],
-                        ['normal', 'Normal'],
-                        ['hard', 'Difícil'],
+                        ['easy', 'menu.botEasy'],
+                        ['normal', 'menu.botNormal'],
+                        ['hard', 'menu.botHard'],
                       ] as const
                     ).map(([v, label]) => (
                       <button key={v} type="button" className={botLevel === v ? 'on' : ''} aria-pressed={botLevel === v} onClick={() => setBotLevel(v)}>
-                        {label}
+                        {t(label)}
                       </button>
                     ))}
                   </div>
                 </div>
                 {botRooms && (
-                  <label className={['check', user ? '' : 'disabled'].join(' ')} title={user ? 'A partida aparece em "Assistir".' : undefined}>
+                  <label className={['check', user ? '' : 'disabled'].join(' ')} title={user ? t('menu.broadcastTitle') : undefined}>
                     <input type="checkbox" checked={broadcasting} disabled={!user} onChange={(e) => setBroadcast(e.target.checked)} />
-                    {user ? 'Transmitir esta partida' : 'Transmitir: entre com o Google'}
+                    {user ? t('menu.broadcast') : t('menu.broadcastNeedsLogin')}
                   </label>
                 )}
               </div>
             </ModeCard>
             <ModeCard
+              mode="tournaments"
               color="yellow"
               gold
               icon="crown"
-              kicker="Eventos"
-              title="Torneios"
-              badge="Suíço e mata-mata"
-              desc="Torneios da comunidade, com chave, rodadas e relógio."
-              chips={['Inscrição com login', 'Melhor de 1 ou de 3']}
-              live={tournaments ? <Live off={!openTournaments && !runningTournaments}>{`${plural(openTournaments, 'aberto', 'abertos')} · ${runningTournaments} em andamento`}</Live> : <Live off>Contando…</Live>}
-              action="Ver torneios"
+              kicker={t('menu.tourKicker')}
+              title={t('menu.navTournaments')}
+              badge={t('menu.tourBadge')}
+              desc={t('menu.tourDesc')}
+              chips={[t('menu.chipTourLogin'), t('menu.chipBestOf')]}
+              live={tournaments ? <Live off={!openTournaments && !runningTournaments}>{t('menu.tourLive', { n: openTournaments, running: runningTournaments })}</Live> : <Live off>{t('menu.counting')}</Live>}
+              action={t('menu.seeTournaments')}
               onAction={() => onTournaments()}
             />
           </div>
@@ -845,17 +859,14 @@ export function Menu({
             <img src="/brand/header-mark.svg" alt="" />
             <span>GumGum Fight</span>
           </div>
-          <nav className="footer-links" aria-label="Rodapé">
+          <nav className="footer-links" aria-label={t('menu.footerNav')}>
             {[...nav.slice(1), extra[0]].map((item) => (
               <button key={item.key} type="button" className="text-link" onClick={item.onClick}>
                 {item.label}
               </button>
             ))}
           </nav>
-          <p className="disclaimer">
-            Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para português são
-            automáticas e não oficiais.
-          </p>
+          <p className="disclaimer">{t('menu.disclaimer')}</p>
         </div>
       </footer>
 
@@ -866,7 +877,7 @@ export function Menu({
 
       {picking !== null && (
         <DeckPicker
-          title={picking === 0 ? 'Deck equipado' : 'Deck do oponente'}
+          title={picking === 0 ? t('menu.equippedDeck') : t('menu.opponentDeck')}
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
           format={format}

@@ -13,6 +13,8 @@ import {
   type TournamentSummary,
   type WatchTarget,
 } from '../api';
+import { type Locale, type MessageKey, type Translate, useLocale, useT } from '../i18n';
+import { fmtTime, fmtWeekdayTime } from '../i18n/format';
 import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
 
@@ -55,6 +57,10 @@ export function useNow(ms: number): number {
   return now;
 }
 
+/**
+ * Nome de cada tipo de sala, em português (ainda usado por Reports.tsx).
+ * Para mostrar no idioma em vigor, use `t(QUEUE_KEY[queue])`.
+ */
 export const QUEUE_LABEL: Record<RoomQueue, string> = {
   private: 'Sala privada',
   casual: 'Casual',
@@ -63,10 +69,20 @@ export const QUEUE_LABEL: Record<RoomQueue, string> = {
   tournament: 'Torneio',
 };
 
+/** Chave do dicionário de cada tipo de sala (mostrar com `t(QUEUE_KEY[queue])`). */
+export const QUEUE_KEY: Record<RoomQueue, MessageKey> = {
+  private: 'home.queue.private',
+  casual: 'home.queue.casual',
+  ranked: 'home.queue.ranked',
+  bot: 'home.queue.bot',
+  tournament: 'home.queue.tournament',
+};
+
 function LiveRow({ room, onWatch }: { room: LiveRoom; onWatch: (t: WatchTarget) => void }) {
+  const t = useT();
   const [a, b] = room.players;
   const name = (p: LiveRoom['players'][number]) => p.leaderName ?? p.name;
-  const where = room.tournament ? `${room.tournament.name} · ${room.tournament.label}` : QUEUE_LABEL[room.queue];
+  const where = room.tournament ? `${room.tournament.name} · ${room.tournament.label}` : t(QUEUE_KEY[room.queue]);
   return (
     <div className="live-row">
       <div className="live-leaders">
@@ -75,27 +91,24 @@ function LiveRow({ room, onWatch }: { room: LiveRoom; onWatch: (t: WatchTarget) 
         ))}
       </div>
       <div className="live-info">
-        <strong>
-          {name(a)} vs {name(b)}
-        </strong>
-        <span>
-          {where} · Turno {room.turn}
-        </span>
+        <strong>{t('home.versus', { a: name(a), b: name(b) })}</strong>
+        <span>{t('home.whereTurn', { where, turn: room.turn })}</span>
       </div>
       {room.spectators > 0 && (
-        <span className="eyes" title={`${room.spectators} assistindo`}>
+        <span className="eyes" title={t('home.watching', { n: room.spectators })}>
           <Icon name="eye" size={14} />
           {room.spectators}
         </span>
       )}
       <button type="button" className="small-btn" onClick={() => onWatch({ roomId: room.id, hands: false })}>
-        Assistir
+        {t('home.watch')}
       </button>
     </div>
   );
 }
 
 export function LiveNow({ onWatch, onAll }: { onWatch: (t: WatchTarget) => void; onAll: () => void }) {
+  const t = useT();
   const live = usePoll(() => api.online.live(), 15_000);
   const rooms = (live?.rooms ?? []).filter((r) => !r.mine && r.players.length === 2).slice(0, 3);
   return (
@@ -103,29 +116,29 @@ export function LiveNow({ onWatch, onAll }: { onWatch: (t: WatchTarget) => void;
       <div className="block-head">
         <h2 id="home-live">
           <span className="rec-dot" />
-          Ao vivo agora
+          {t('home.liveNow')}
         </h2>
         <button type="button" className="text-link" onClick={onAll}>
-          Ver todas
+          {t('home.seeAllMatches')}
         </button>
       </div>
       {live === null ? (
-        <p className="block-empty">Carregando…</p>
+        <p className="block-empty">{t('common.loading')}</p>
       ) : rooms.length ? (
         rooms.map((r) => <LiveRow key={r.id} room={r} onWatch={onWatch} />)
       ) : (
-        <p className="block-empty">Nenhuma partida pública agora. Que tal começar uma?</p>
+        <p className="block-empty">{t('home.noLive')}</p>
       )}
     </section>
   );
 }
 
-const clockTime = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+const clockTime = (iso: string | null, locale: Locale) => (iso ? fmtTime(iso, locale) : '');
 
 /** "restam 4min30s". */
-function countdown(deadline: string, now: number) {
+function countdown(deadline: string, now: number, t: Translate) {
   const left = Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000));
-  return left ? `restam ${Math.floor(left / 60)}min${String(left % 60).padStart(2, '0')}s` : 'o prazo acabou';
+  return left ? t('home.timeLeft', { m: Math.floor(left / 60), s: String(left % 60).padStart(2, '0') }) : t('home.deadlinePassed');
 }
 
 /**
@@ -144,6 +157,8 @@ export function TournamentBanner({
   onPlay: () => Promise<OnlineSeat>;
   onCheckIn: () => Promise<unknown>;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const now = useNow(1000);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,26 +175,27 @@ export function TournamentBanner({
   let sub: string;
   let action: { label: string; run: () => void };
   if (entry.status === 'registration') {
-    title = `Check-in aberto: ${entry.name}`;
+    title = t('home.checkInOpenFor', { name: entry.name });
     sub = entry.checkedIn
-      ? `✔ Check-in feito. O torneio começa às ${clockTime(entry.startsAt)}: a sua sala aparece aqui.`
-      : `O torneio começa às ${clockTime(entry.startsAt)}. Confirme a sua presença.`;
-    action = entry.checkedIn ? { label: 'Abrir torneio', run: onOpen } : { label: 'Fazer check-in', run: () => act(onCheckIn) };
+      ? t('home.checkedInStarts', { time: clockTime(entry.startsAt, locale) })
+      : t('home.confirmPresence', { time: clockTime(entry.startsAt, locale) });
+    action = entry.checkedIn ? { label: t('home.openTournament'), run: onOpen } : { label: t('home.doCheckIn'), run: () => act(onCheckIn) };
   } else if (pending) {
-    title = `${entry.name} · ${entry.label}: mesa ${m.table} contra ${m.opponent}${m.bestOf > 1 ? ` (jogo ${m.game})` : ''}`;
+    const params = { name: entry.name, label: entry.label, table: m.table, opponent: m.opponent, game: m.game };
+    title = m.bestOf > 1 ? t('home.matchTitleGame', params) : t('home.matchTitle', params);
     sub =
       m.room === 'playing'
-        ? 'A partida está em andamento.'
+        ? t('home.matchRunning')
         : entry.deadline
-          ? `Entre na sala até ${clockTime(entry.deadline)} (${countdown(entry.deadline, now)}). Quem não entra perde por W.O.`
+          ? t('home.enterUntil', { time: clockTime(entry.deadline, locale), left: countdown(entry.deadline, now, t) })
           : m.room === 'waiting'
-            ? 'Uma das pessoas já está na sala esperando.'
-            : 'Quem entra primeiro espera o oponente na sala.';
-    action = { label: m.room === 'playing' ? 'Voltar ao jogo' : 'Entrar na sala', run: () => act(onPlay) };
+            ? t('home.oneWaiting')
+            : t('home.firstWaits');
+    action = { label: m.room === 'playing' ? t('home.backToGame') : t('home.enterRoom'), run: () => act(onPlay) };
   } else {
-    title = `${entry.name} em andamento`;
-    sub = m && !m.opponent ? 'Você está de bye nesta rodada. Aguarde a próxima.' : 'Sua partida desta rodada terminou. Aguarde a próxima rodada.';
-    action = { label: 'Abrir torneio', run: onOpen };
+    title = t('home.tournamentRunning', { name: entry.name });
+    sub = m && !m.opponent ? t('home.bye') : t('home.roundDone');
+    action = { label: t('home.openTournament'), run: onOpen };
   }
   return (
     <div className="home-banner tournament" role="status">
@@ -195,34 +211,41 @@ export function TournamentBanner({
       </button>
       {action.run !== onOpen && (
         <button type="button" className="btn" onClick={onOpen}>
-          Abrir torneio
+          {t('home.openTournament')}
         </button>
       )}
     </div>
   );
 }
 
-function when(iso: string | null) {
+function when(iso: string | null, locale: Locale) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return fmtWeekdayTime(d, locale);
 }
 
-function TournamentRow({ t, onOpen }: { t: TournamentSummary; onOpen: () => void }) {
+function TournamentRow({ t: tour, onOpen }: { t: TournamentSummary; onOpen: () => void }) {
+  const t = useT();
+  const locale = useLocale();
   const side =
-    t.status === 'running' ? `Rodada ${t.round}${t.totalRounds ? ` de ${t.totalRounds}` : ''}` : when(t.startsAt);
-  const checkInOpen = t.status === 'registration' && t.checkInOpensAt && new Date(t.checkInOpensAt).getTime() <= Date.now();
+    tour.status === 'running'
+      ? tour.totalRounds
+        ? t('home.roundOf', { n: tour.round, total: tour.totalRounds })
+        : t('home.round', { n: tour.round })
+      : when(tour.startsAt, locale);
+  const checkInOpen = tour.status === 'registration' && tour.checkInOpensAt && new Date(tour.checkInOpensAt).getTime() <= Date.now();
+  const count = `${tour.players}${tour.maxPlayers ? `/${tour.maxPlayers}` : ''}`;
   return (
-    <button type="button" className={['tour-item', t.status].join(' ')} onClick={onOpen}>
+    <button type="button" className={['tour-item', tour.status].join(' ')} onClick={onOpen}>
       <span className="tour-item-top">
-        <span>{checkInOpen ? 'Check-in aberto' : TOURNAMENT_STATUS_LABEL[t.status]}</span>
+        <span>{checkInOpen ? t('home.checkInOpen') : t(TOURNAMENT_STATUS_LABEL[tour.status])}</span>
         {side && <span className="muted">{side}</span>}
       </span>
-      <strong>{t.name}</strong>
+      <strong>{tour.name}</strong>
       <span className="sub">
-        {STRUCTURE_LABEL[t.structure]} · {formatLabel(t.format)} · {t.players}
-        {t.maxPlayers ? `/${t.maxPlayers}` : ''} {t.status === 'registration' ? 'inscritos' : 'jogadores'}
+        {t(STRUCTURE_LABEL[tour.structure])} · {formatLabel(tour.format)} ·{' '}
+        {tour.status === 'registration' ? t('home.registered', { count }) : t('home.playersCount', { count })}
       </span>
     </button>
   );
@@ -235,6 +258,7 @@ export function TournamentsBlock({
   list: { tournaments: TournamentSummary[]; canCreate: boolean } | null;
   onOpen: (id?: string) => void;
 }) {
+  const t = useT();
   const open = (list?.tournaments ?? [])
     .filter((t) => t.status !== 'finished')
     .sort((a, b) => (a.status === b.status ? 0 : a.status === 'running' ? -1 : 1))
@@ -242,23 +266,24 @@ export function TournamentsBlock({
   return (
     <section className="home-block" aria-labelledby="home-tournaments">
       <div className="block-head">
-        <h2 id="home-tournaments">Torneios</h2>
+        <h2 id="home-tournaments">{t('home.tournaments')}</h2>
         <button type="button" className="text-link" onClick={() => onOpen()}>
-          Ver todos
+          {t('home.seeAllTournaments')}
         </button>
       </div>
       {list === null ? (
-        <p className="block-empty">Carregando…</p>
+        <p className="block-empty">{t('common.loading')}</p>
       ) : open.length ? (
-        open.map((t) => <TournamentRow key={t.id} t={t} onOpen={() => onOpen(t.id)} />)
+        open.map((tour) => <TournamentRow key={tour.id} t={tour} onOpen={() => onOpen(tour.id)} />)
       ) : (
-        <p className="block-empty">Nenhum torneio aberto agora.{list.canCreate ? ' Que tal organizar um?' : ''}</p>
+        <p className="block-empty">{list.canCreate ? t('home.noTournamentsCreate') : t('home.noTournaments')}</p>
       )}
     </section>
   );
 }
 
 export function MetaBlock({ onStats }: { onStats: () => void }) {
+  const t = useT();
   const stats = usePoll(() => api.stats({ days: '7' }), 5 * 60_000);
   const total = stats?.leaders.reduce((n, l) => n + l.games, 0) ?? 0;
   const top = [...(stats?.leaders ?? [])].sort((a, b) => b.games - a.games).slice(0, 5);
@@ -266,14 +291,14 @@ export function MetaBlock({ onStats }: { onStats: () => void }) {
   return (
     <section className="home-block" aria-labelledby="home-meta">
       <div className="block-head">
-        <h2 id="home-meta">Meta da semana</h2>
+        <h2 id="home-meta">{t('home.meta')}</h2>
         <button type="button" className="text-link" onClick={onStats}>
-          Estatísticas
+          {t('home.stats')}
         </button>
       </div>
-      <p className="block-sub">Líderes mais jogados nos últimos 7 dias</p>
+      <p className="block-sub">{t('home.metaSub')}</p>
       {stats === null ? (
-        <p className="block-empty">Carregando…</p>
+        <p className="block-empty">{t('common.loading')}</p>
       ) : top.length ? (
         top.map((l, i) => {
           const info = stats.cards[l.leader];
@@ -292,7 +317,7 @@ export function MetaBlock({ onStats }: { onStats: () => void }) {
           );
         })
       ) : (
-        <p className="block-empty">Ainda não há partidas nos últimos 7 dias.</p>
+        <p className="block-empty">{t('home.noMeta')}</p>
       )}
     </section>
   );
