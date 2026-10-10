@@ -1,12 +1,12 @@
 import type { Action, CardDef, GameState, LogEntry, PlayerId } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
+import { api, ApiError, errorMessage, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
 import { t, tryT } from '../i18n';
 
 /** Mensagem de erro de uma resposta do servidor: o `errorCode` traduzido, se o dicionário o conhece; senão o `error` que veio. */
-function serverError(body: { error?: unknown; errorCode?: unknown } | null | undefined): string | undefined {
-  const code = typeof body?.errorCode === 'string' ? body.errorCode : undefined;
-  return tryT(code ? `errors.${code}` : undefined) ?? (typeof body?.error === 'string' ? body.error : undefined);
+function serverError(body: Record<string, unknown> | null | undefined): string | undefined {
+  // errorMessage traduz `errors.<errorCode>` com os `errorParams` (e o `{issue}` do formato).
+  return errorMessage(body as Parameters<typeof errorMessage>[0], '') || undefined;
 }
 
 /** Texto de um erro de chamada à API (com `errorCode` nos dados da resposta, quando houver). */
