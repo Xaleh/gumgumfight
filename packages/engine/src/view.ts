@@ -83,7 +83,7 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
   const p = state.pending;
   if (p && viewer !== null && p.player === viewer) {
     if (p.kind === 'selectTargets' || p.kind === 'block' || p.kind === 'counter') for (const u of p.options) out.add(u);
-    if (p.kind === 'selectTargets') for (const u of p.shown ?? []) out.add(u);
+    if (p.kind === 'selectTargets' || p.kind === 'option') for (const u of p.shown ?? []) out.add(u);
     if (p.kind === 'lifeCard') out.add(p.card);
   }
   return out;
@@ -262,8 +262,15 @@ function viewPending(p: Pending, viewer: PlayerId | null, ref: (uid: string) => 
       return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', ...(mine && cannot ? { cannot } : {}), ...(mine && drawUpTo ? { drawUpTo } : {}) };
     }
     case 'option': {
-      const { don, ...rest } = p;
-      return { ...rest, source: ref(p.source), prompt: mine ? p.prompt : '', options: mine ? p.options : [], ...(mine && don ? { don: don.map((d) => (d === 'active' || d === 'rested' ? d : ref(d))) } : {}) };
+      const { don, shown, ...rest } = p;
+      return {
+        ...rest,
+        source: ref(p.source),
+        prompt: mine ? p.prompt : '',
+        options: mine ? p.options : [],
+        ...(mine && don ? { don: don.map((d) => (d === 'active' || d === 'rested' ? d : ref(d))) } : {}),
+        ...(mine && shown ? { shown: shown.map(ref) } : {}),
+      };
     }
     case 'manual':
       return { ...p, source: ref(p.source) };

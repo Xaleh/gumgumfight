@@ -2453,8 +2453,8 @@ function addModifier(state: GameState, controller: PlayerId, m: Modifier) {
 }
 
 /** Pergunta com opções de texto; a resposta chega em frame.choice = [índice]. */
-function askOption(state: GameState, frame: EffectFrame, player: PlayerId, prompt: string, options: string[]) {
-  state.pending = { kind: 'option', player, source: frame.source, prompt, options };
+function askOption(state: GameState, frame: EffectFrame, player: PlayerId, prompt: string, options: string[], shown?: string[]) {
+  state.pending = { kind: 'option', player, source: frame.source, prompt, options, ...(shown?.length ? { shown } : {}) };
 }
 
 /** Interrompe o efeito: os passos restantes não acontecem. */
@@ -4401,12 +4401,21 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'lookOpponentTop': {
-      const deck = state.players[opponent(frame.controller)].deck;
-      if (!deck.length) return true;
+      // A carta aparece inteira só para quem olha (`shown`); o oponente e os espectadores veem
+      // apenas que uma carta do topo foi olhada. O histórico guarda o nome só para quem olhou.
+      const opp = state.players[opponent(frame.controller)];
+      const card = opp.deck[0];
+      if (!card) return true;
       if (!frame.choice) {
-        askOption(state, frame, frame.controller, `${srcName}: a carta do topo do deck do oponente é ${cardDef(state, deck[0]).name}.`, ['OK']);
+        askOption(state, frame, frame.controller, `${srcName}: a carta do topo do deck do oponente é ${cardDef(state, card).name}.`, ['OK'], [card]);
         return false;
       }
+      logSecret(
+        state,
+        frame.controller,
+        `${ps.name} olha a carta do topo do deck de ${opp.name}.`,
+        `${ps.name} olha ${cardDef(state, card).name} no topo do deck de ${opp.name}.`,
+      );
       return true;
     }
     case 'revealedToBottom': {

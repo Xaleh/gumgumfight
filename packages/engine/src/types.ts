@@ -1172,9 +1172,10 @@ export type Pending =
    * Escolha entre opções com texto (modo "Choose one", topo/fundo...). Responder com `option`.
    * Com `order`, é a escolha de qual efeito disparado resolve primeiro: cada opção é o
    * `TriggeredEffect.id` correspondente. Com `don`, é a escolha de qual DON!! devolver ao deck
-   * de DON!!: cada opção é a origem correspondente.
+   * de DON!!: cada opção é a origem correspondente. `shown`: cartas que só quem responde vê
+   * junto da pergunta (ex.: o topo do deck do oponente, olhado por efeito).
    */
-  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[]; order?: number[]; don?: DonSource[] }
+  | { kind: 'option'; player: PlayerId; source: string; prompt: string; options: string[]; order?: number[]; don?: DonSource[]; shown?: string[] }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
 

@@ -2128,11 +2128,20 @@ function Prompt(props: {
       );
     }
     case 'option':
+      // Cartas que a pergunta mostra (ex.: o topo do deck do oponente): a carta inteira, e toque para ler.
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
+            {pending.shown?.length ? (
+              <div className="modal-feature">
+                {pending.shown.map((uid) => (
+                  <CardView key={uid} state={state} uid={uid} onClick={() => props.onCard(uid)} />
+                ))}
+              </div>
+            ) : null}
             <h3>{pending.prompt}</h3>
+            {pending.shown?.length ? <p className="muted small">Toque na carta para ler.</p> : null}
             <div className="btn-col">
               {pending.options.map((label, index) => (
                 <button
