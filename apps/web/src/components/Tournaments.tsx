@@ -1182,11 +1182,11 @@ function Players({ t, busy, onDrop }: { t: TournamentDetail; busy: boolean; onDr
         {t.players.map((p) => (
           <div key={p.userId} className={['tour-entry', p.dropped ? 'dropped' : ''].join(' ')}>
             <div className="tour-entry-head">
-              <LeaderArt name={p.leaderName ?? p.leader} image={p.leaderImage} colors={p.colors} size="small" />
+              <LeaderArt name={p.leader ? (p.leaderName ?? p.leader) : undefined} image={p.leaderImage} colors={p.colors} size="small" />
               <span className="watch-name">
                 <b>{p.name}</b>
                 <span className="muted small">
-                  {p.leaderName ?? p.leader}
+                  {p.leader ? (p.leaderName ?? p.leader) : 'deck escondido até o início'}
                   {p.dropped ? ' · saiu do torneio' : ''}
                   {t.checkIn && t.status === 'registration' && p.checkedIn ? ' · ✔ check-in' : ''}
                 </span>
@@ -1212,7 +1212,13 @@ function Players({ t, busy, onDrop }: { t: TournamentDetail; busy: boolean; onDr
           </div>
         ))}
       </div>
-      {t.status !== 'finished' && !t.canManage && (
+      {t.status === 'registration' && !t.canManage && (
+        <p className="muted small">
+          O deck de cada jogador aparece quando o torneio começa (e não pode mais ser trocado); as listas completas ficam
+          públicas quando o torneio termina.
+        </p>
+      )}
+      {t.status === 'running' && !t.canManage && (
         <p className="muted small">As listas dos decks ficam públicas quando o torneio termina.</p>
       )}
     </section>
