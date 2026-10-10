@@ -1805,8 +1805,10 @@ function AttackArrow({
       return;
     }
     const base = svg.getBoundingClientRect();
+    // Sempre a carta em si (`.card`): o emblema de DON!! anexado também leva o `data-uid` da carta
+    // e vem antes dela no DOM, o que puxava a seta para fora do centro.
     const center = (uid: string) => {
-      const el = document.querySelector<HTMLElement>(`.mat [data-uid="${CSS.escape(uid)}"]`);
+      const el = document.querySelector<HTMLElement>(`.mat .card[data-uid="${CSS.escape(uid)}"]`);
       if (!el) return null;
       const r = el.getBoundingClientRect();
       return { x: r.left + r.width / 2 - base.left, y: r.top + r.height / 2 - base.top };
@@ -1836,7 +1838,7 @@ function AttackArrow({
   return (
     <svg ref={svgRef} className={['attack-arrow', kind].join(' ')} aria-hidden="true">
       <defs>
-        <marker id="arrow-head" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+        <marker id="arrow-head" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
           <path d="M0 0 L10 5 L0 10 L2.5 5 Z" fill="#ff4d2e" stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
         </marker>
       </defs>
