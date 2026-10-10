@@ -147,7 +147,9 @@ gumgumfight/
 ├── apps/web/                    React + Vite
 │   ├── src/App.tsx              seleção de tela (useState<Screen>, sem roteador)
 │   ├── src/api.ts               todos os fetches, header x-deck-owner, URLs de SSE
-│   ├── src/auth.tsx, settings.tsx   contexts
+│   ├── src/auth.tsx, settings.tsx   contexts (login; configurações, inclusive o idioma `locale`)
+│   ├── src/i18n/                idiomas da interface: index.ts (t/useT, plural), pt-BR.ts (chaves), en.ts, es.ts, ja.ts, fr.ts, de.ts, format.ts
+│   ├── src/components/Flags.tsx bandeiras SVG do seletor de idioma
 │   ├── src/audio.ts             efeitos e música (Web Audio); src/assets/audio/ com os MP3 e CREDITS.md
 │   ├── src/game/useMatchAudio.ts   sons derivados das mudanças de estado da partida
 │   ├── src/game/useGame.ts      partida local (motor + bot no navegador, undo, replay)
@@ -313,12 +315,41 @@ privada), lido uma vez e removido com `history.replaceState`.
 | Chave | Conteúdo |
 |---|---|
 | `localStorage.gumgum.owner` | token do dono dos decks/perfil (sem login) |
-| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, replayCues, theme, opponentChat, sfxVolume, musicVolume}` |
+| `localStorage.gumgum.settings` | `{locale, images, quickCounter, animations, replayCues, theme, opponentChat, sfxVolume, musicVolume}` (`lang: 'pt'\|'en'` antigo é migrado para `locale`) |
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
 | `localStorage.gumgum.watchHands`, `gumgum.statsFilters`, `gumgum.statsMin` | preferências de espectador e estatísticas |
 | `sessionStorage.gumgum.openMatch` | partida/transmissão aberta |
 
 Nada de cache de cartas: o construtor baixa `GET /api/cards` inteiro toda vez que abre.
+
+### Idiomas da interface (`src/i18n/`)
+
+Seis idiomas, sem biblioteca externa: `pt-BR` (padrão e referência), `en`, `es`, `ja`, `fr`, `de`. Cada um é um arquivo
+`src/i18n/<locale>.ts` exportando um objeto com **as mesmas chaves** de `pt-BR.ts` (`satisfies Messages`): faltar ou sobrar uma
+chave em qualquer idioma é erro de `npm run typecheck`, que o CI roda. As chaves são `<tela>.camelCase`, agrupadas em seções
+marcadas (`// ==== menu ====`): `menu`, `home`, `deck`, `card`, `online`, `watch`, `admin`, `reports`, `tour`, `stats`, `game`,
+`board`, `dice`, `result`, `replay`, `ability`, `engine` (perguntas do motor), `errors` (erros do servidor), `labels`, `settings`.
+
+- **Sintaxe das mensagens:** `{nome}` interpola um parâmetro; `{n|# carta|# cartas}` escolhe a forma pelo `Intl.PluralRules`
+  do idioma (`one` | `other`; `#` vira o número formatado). Frases sempre inteiras, com parâmetros: nada de concatenar pedaços
+  (a ordem das palavras muda em japonês e alemão).
+- **Uso:** em componentes, `const t = useT()` (re-renderiza ao trocar o idioma); fora deles, `t()` do módulo (idioma em vigor).
+  `tryT(chave)` devolve `undefined` quando a chave não existe: é como a interface trata o que vem **do motor** (`promptKey`/
+  `promptParams`/`optionKeys` ao lado de `prompt`/`options` em `Pending`, `labelKey` em `Ability`) e **do servidor** (`errorCode`
+  ao lado de `error` nas respostas 4xx/5xx; `api.ts` traduz `errors.<errorCode>` e cai no texto do servidor se não conhecer).
+  Os textos em português do motor e do servidor continuam sendo gerados (replays, logs e clientes antigos).
+- **Carga:** `pt-BR` vai no bundle principal; os outros são chunks separados (`import()` em `loadLocale`), baixados ao escolher.
+  `main.tsx` carrega o idioma salvo antes do primeiro render. `I18nProvider` (dentro do `SettingsProvider`) troca o dicionário,
+  ajusta `<html lang>` e o `locale` do botão do Google.
+- **Escolha e detecção:** `Settings.locale`, salvo em `gumgum.settings`; na primeira visita, `detectLocale()` lê
+  `navigator.languages` (pt→pt-BR, en, es, ja, fr, de; outro → en). Seletor `LocaleSeg` só com bandeiras (SVG em `Flags.tsx`,
+  porque emoji de bandeira vira letras no Windows), com o nome do idioma em `title`/`aria-label`; está em Configurações, no menu
+  da partida, na barra superior (`LocaleButton`) e na gaveta ☰.
+- **Datas e números:** `format.ts` (`fmtDateTime`, `fmtTime`, `fmtNumber`, `fmtBerries`…) usa o idioma em vigor.
+- **Texto das cartas:** `cardText(def, locale)` dá a tradução automática/manual só em `pt-BR`; nos demais, o original em inglês.
+  A tabela `card_translations` e `data/translations/<lang>.json` já aceitam outros idiomas, mas só `pt` é montado hoje.
+- **CSS:** `html[lang=ja]` usa `word-break: keep-all` + `overflow-wrap: anywhere`; textos de alemão e francês são mais longos,
+  por isso botões e segmentos usam `min-width: 0` e quebra onde cabe, e algumas chaves têm a forma curta `.Short`.
 
 ### Partida contra o bot
 

@@ -8137,3 +8137,20 @@ tr.clickable:hover td {
 .drawer-locale .seg {
   width: 100%;
 }
+
+/* Idiomas: japonês não tem espaços para quebrar; alemão e francês são mais longos que o português. */
+html[lang='ja'] body {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-break: strict;
+}
+.seg button,
+.btn,
+.pill-btn,
+.nav-item,
+.check {
+  min-width: 0;
+}
+.seg button {
+  overflow-wrap: anywhere;
+}
