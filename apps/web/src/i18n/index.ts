@@ -89,7 +89,9 @@ export function format(message: string, locale: Locale, params?: Params): string
       const raw = params[name];
       const n = typeof raw === 'number' ? raw : Number(raw ?? 0);
       const forms = body.split('|');
-      const form = forms.length > 1 && pluralRules(locale).select(n) !== 'one' ? forms[1] : forms[0];
+      // No português do Brasil o zero vai no plural ("0 cartas"), embora o CLDR o trate como "one".
+      const one = locale === 'pt-BR' ? n === 1 : pluralRules(locale).select(n) === 'one';
+      const form = forms.length > 1 && !one ? forms[1] : forms[0];
       return form.replace(/#/g, Number.isFinite(n) ? n.toLocaleString(locale) : String(raw ?? ''));
     })
     .replace(PARAM, (m, name: string) => {
