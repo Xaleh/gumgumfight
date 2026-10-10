@@ -23,6 +23,7 @@ PICKS = {
     "dice-shake": ([K("casino-audio", f"dice-shake-{i}") for i in (1, 2, 3)], 1.5),
     "dice-throw": ([K("casino-audio", f"dice-throw-{i}") for i in (1, 2, 3)], 0.7),
     "chat": ([K("interface-sounds", f"pluck_00{i}") for i in (1, 2)], 0.3),
+    "don-pick": ([K("casino-audio", f"chips-stack-{i}") for i in (1, 2, 3, 4)], 0.35),
 }
 
 def peak_db(path):
