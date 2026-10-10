@@ -1,10 +1,11 @@
 """
-Música original do GumGum Fight: "Valsa do Mar", uma valsa de taverna em 3/4
-(acordeão, rabeca, violão, baixo), composta para o projeto. Gera os MIDIs:
+Músicas originais do GumGum Fight, compostas para o projeto. Gera os MIDIs:
 
-  menu.mid     versão calma (100 bpm), 32 compassos em loop
-  battle.mid   versão animada (138 bpm) com percussão, 32 compassos em loop
-  win.mid / lose.mid / draw.mid   vinhetas do fim da partida
+  menu.mid     "Brisa do Leste": 6/8 tranquilo em Sol maior (violão dedilhado, flauta,
+               cordas, glockenspiel), 40 compassos em loop, para o menu
+  battle.mid   "Valsa do Mar": valsa de taverna em 3/4 (acordeão, rabeca, violão, baixo,
+               percussão), 138 bpm, 32 compassos em loop, para a partida
+  win.mid / lose.mid / draw.mid   vinhetas do fim da partida (na mesma paleta da valsa)
 
 Os loops são escritos duas vezes seguidas: o render corta a segunda passada,
 que já começa com a cauda (reverb) da primeira, e por isso emenda sem corte.
@@ -89,8 +90,9 @@ FORM = [("A1", A1), ("A2", A2), ("B", B), ("A2", A2)]
 
 
 class Score:
-    def __init__(self, bpm):
+    def __init__(self, bpm, meter=(3, 4)):
         self.bpm = bpm
+        self.meter = meter
         self.events = []  # (tick, ordem, Message)
         self.rng = random.Random(7)
 
@@ -115,7 +117,7 @@ class Score:
         track = MidiTrack()
         mid.tracks.append(track)
         track.append(MetaMessage("set_tempo", tempo=int(60_000_000 / self.bpm), time=0))
-        track.append(MetaMessage("time_signature", numerator=3, denominator=4, time=0))
+        track.append(MetaMessage("time_signature", numerator=self.meter[0], denominator=self.meter[1], time=0))
         last = 0
         for tick, _, msg in sorted(self.events, key=lambda e: (e[0], e[1])):
             msg.time = tick - last
@@ -195,6 +197,107 @@ def loop(style, path):
     return 60.0 / s.bpm * 3 * 32  # duração de uma passada, em segundos
 
 
+# ------------------------------------------------------------------ "Brisa do Leste" (menu)
+
+E8 = TPQ // 2  # colcheia
+BAR68 = 6 * E8
+GUITAR, STRINGS, GLOCK, OCARINA = 24, 48, 9, 79
+# Acordes em Sol maior: (baixo, dedilhado de 6 colcheias, tríade das cordas)
+BREEZE_CHORDS = {
+    "G": (43, [55, 62, 67, 71, 67, 62], [62, 67, 71]),
+    "Em": (40, [52, 59, 64, 67, 64, 59], [59, 64, 67]),
+    "C": (36, [48, 55, 60, 64, 60, 55], [60, 64, 67]),
+    "D": (38, [50, 57, 62, 66, 62, 57], [62, 66, 69]),
+    "Am": (45, [57, 64, 69, 72, 69, 64], [60, 64, 69]),
+}
+# Melodia por compasso: (altura, colcheias)
+BA = [
+    ([(74, 3), (71, 2), (69, 1)], "G"),
+    ([(71, 3), (67, 3)], "Em"),
+    ([(76, 3), (74, 2), (72, 1)], "C"),
+    ([(74, 6)], "D"),
+    ([(71, 2), (74, 2), (79, 2)], "G"),
+    ([(78, 3), (76, 3)], "Em"),
+    ([(74, 2), (72, 2), (71, 2)], "C"),
+    ([(69, 6)], "D"),
+]
+BA2 = BA[:6] + [
+    ([(76, 2), (74, 2), (72, 2)], "C"),
+    ([(71, 3), (67, 3)], "G"),
+]
+BB = [
+    ([(76, 3), (72, 3)], "Am"),
+    ([(78, 3), (74, 3)], "D"),
+    ([(79, 2), (78, 2), (76, 2)], "G"),
+    ([(74, 6)], "Em"),
+    ([(72, 3), (76, 3)], "Am"),
+    ([(81, 3), (78, 3)], "D"),
+    ([(79, 2), (76, 2), (72, 2)], "C"),
+    ([(74, 4), (None, 2)], "D"),
+]
+# Interlúdio: só violão e cordas, com um motivo lento no glockenspiel
+BI = [
+    ([(67, 6)], "G"),
+    ([(69, 6)], "D"),
+    ([(71, 6)], "Em"),
+    ([(72, 6)], "C"),
+    ([(71, 6)], "G"),
+    ([(69, 6)], "D"),
+    ([(67, 6)], "C"),
+    ([(74, 4), (None, 2)], "D"),
+]
+BREEZE_FORM = [("A", BA), ("A2", BA2), ("B", BB), ("A2", BA2), ("I", BI)]
+
+
+def breeze_loop(path):
+    s = Score(126, meter=(6, 8))  # semínima = 126 → semínima pontuada = 84
+    s.program(CH_MEL, FLUTE)
+    s.program(CH_HARM, GLOCK)
+    s.program(CH_CHORD, GUITAR)
+    s.program(CH_BASS, ABASS)
+    s.program(CH_EXTRA, STRINGS)
+    for ch, vol in ((CH_MEL, 92), (CH_HARM, 60), (CH_CHORD, 96), (CH_BASS, 84), (CH_EXTRA, 48), (CH_DRUM, 60)):
+        s.control(ch, 7, vol)
+    s.control(CH_MEL, 10, 70)
+    s.control(CH_HARM, 10, 52)
+    s.control(CH_CHORD, 10, 50)
+    s.control(CH_EXTRA, 10, 64)
+    s.control(CH_MEL, 91, 90)  # reverb
+    s.control(CH_EXTRA, 91, 100)
+    total = sum(len(b) for _, b in BREEZE_FORM) * BAR68
+    at = 0
+    for rep in range(2):
+        for name, bars in BREEZE_FORM:
+            for i, (notes, chord) in enumerate(bars):
+                t = at + i * BAR68
+                root, arp, triad = BREEZE_CHORDS[chord]
+                # violão dedilhado, uma colcheia por nota, o baixo do acorde um pouco mais forte
+                for k, p in enumerate(arp):
+                    s.note(CH_CHORD, p, t + k * E8, int(E8 * 1.8), 70 if k == 0 else 56 + (4 if k == 3 else 0))
+                s.note(CH_BASS, root, t, int(E8 * 2.8), 72)
+                s.note(CH_BASS, root, t + 3 * E8, int(E8 * 2.6), 58)
+                if name != "A":
+                    for p in triad:
+                        s.note(CH_EXTRA, p, t, int(BAR68 * 0.98), 44)
+                if name == "B":
+                    for k in range(6):
+                        s.note(CH_DRUM, 70, t + k * E8, E8 // 2, 30 if k % 3 else 44)  # maracas
+                # melodia: flauta (A, A2, B) ou glockenspiel (interlúdio); no 2º A2, glock dobra a flauta
+                tt = t
+                for p, n in notes:
+                    dur = int(E8 * n * 0.9)
+                    if name == "I":
+                        s.note(CH_HARM, None if p is None else p + 12, tt, dur, 54)
+                    else:
+                        s.note(CH_MEL, p, tt, dur, 78 if name != "B" else 84)
+                        if name == "A2" and at >= total // 2 - BAR68 * 8 and (at % total) >= 20 * BAR68:
+                            s.note(CH_HARM, None if p is None else p + 12, tt, dur, 40)
+                    tt += E8 * n
+            at += len(bars) * BAR68
+    s.save(path, at + 2 * BAR68)
+    return 60.0 / s.bpm * 3 * 40  # 40 compassos de 3 semínimas
+
+
 def jingle(kind, path):
     s = Score(112)
     s.program(CH_MEL, ACCORDION)
@@ -241,7 +344,7 @@ def jingle(kind, path):
 
 if __name__ == "__main__":
     out = sys.argv[1]
-    print("menu", loop("menu", f"{out}/menu.mid"))
+    print("menu", breeze_loop(f"{out}/menu.mid"))
     print("battle", loop("battle", f"{out}/battle.mid"))
     for k in ("win", "lose", "draw"):
         jingle(k, f"{out}/{k}.mid")

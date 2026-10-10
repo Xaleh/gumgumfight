@@ -24,6 +24,7 @@ import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
 import { type GameSetup, useGame } from '../game/useGame';
+import { audio } from '../audio';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
@@ -682,6 +683,9 @@ function Table({
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
     if (index < 0 || index >= max) return;
+    const cur = mode?.kind === 'don' ? mode.picked : [];
+    // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
+    audio.play('don-pick', { pitch: cur.includes(index) ? -3 : Math.min(6, cur.length) });
     setMode((m) => {
       const cur = m?.kind === 'don' ? m.picked : [];
       const picked = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index].sort((a, b) => a - b);

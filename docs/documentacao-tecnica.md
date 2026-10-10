@@ -383,14 +383,15 @@ sem corte), com crossfade na troca. `game/useMatchAudio.ts` deriva os sons da di
 novo da partida (como `Motion.tsx` faz com as animações), então valem para a partida contra o bot, online,
 espectador e replay (mudos nos pulos e no replay em 8×); `App.tsx` toca a música do menu fora da mesa e a mesa troca
 para a da partida. Os arquivos (MP3) ficam em `assets/audio`, com a origem e a licença de cada um em
-`assets/audio/CREDITS.md`: efeitos CC0 do Kenney e do OpenGameArt, música original ("Valsa do Mar") gerada por
-`scripts/audio/compose.py` e renderizada com FluidSynth; `scripts/audio/sfx.py` refaz a conversão dos efeitos.
+`assets/audio/CREDITS.md`: efeitos CC0 do Kenney e do OpenGameArt e duas músicas originais ("Brisa do Leste" no menu,
+"Valsa do Mar" na partida) geradas em MIDI por `scripts/audio/compose.py` e renderizadas com FluidSynth;
+`scripts/audio/sfx.py` refaz a conversão dos efeitos.
 
 ### Build
 
 `vite build` → `apps/web/dist`: `index.html` + `assets/index-<hash>.js` (845 KB, **260 KB gzip**) +
 `assets/index-<hash>.css` (127 KB, 28 KB gzip) + imagens locais (verso da carta 26 KB, DON!! 38 KB) + áudio
-(42 efeitos, 330 KB ao todo, baixados no primeiro toque; músicas de 807 KB e 585 KB e três vinhetas de 33 a 46 KB,
+(46 efeitos, 340 KB ao todo, baixados no primeiro toque; músicas de 800 KB e 585 KB e três vinhetas de 33 a 46 KB,
 baixadas quando tocam) + `public/`.
 
 ---

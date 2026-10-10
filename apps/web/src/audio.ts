@@ -33,6 +33,7 @@ export type SfxName =
   | 'dice-shake'
   | 'dice-throw'
   | 'chat'
+  | 'don-pick'
   | 'win'
   | 'lose'
   | 'tie';
@@ -71,6 +72,8 @@ interface PlayOptions {
   gain?: number;
   /** Variação de tom em semitons para cada lado (0 = sem variação). */
   detune?: number;
+  /** Deslocamento fixo de tom, em semitons (negativo = mais grave). */
+  pitch?: number;
   /** Atraso em ms. */
   delay?: number;
 }
@@ -180,7 +183,7 @@ class GameAudio {
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       const detune = opts.detune ?? 1;
-      if (detune > 0) src.detune.value = (Math.random() * 2 - 1) * detune * 100;
+      src.detune.value = ((opts.pitch ?? 0) + (Math.random() * 2 - 1) * detune) * 100;
       const gain = ctx.createGain();
       gain.gain.value = opts.gain ?? 1;
       src.connect(gain).connect(bus);
