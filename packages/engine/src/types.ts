@@ -935,6 +935,11 @@ export interface Ability {
   /** [DON!! xN]: requer N DON!! anexados (e só vale no seu turno). */
   don?: number;
   oncePerTurn?: boolean;
+  /**
+   * "This effect can be activated when …": o dono escolhe se ativa (pergunta antes). Com [Once Per Turn],
+   * recusar não gasta o uso, e ele pode ser guardado para o próximo evento (Q&A OP03, OP09-001).
+   */
+  optional?: true;
   yourTurn?: boolean;
   opponentsTurn?: boolean;
   cost?: AbilityCost;

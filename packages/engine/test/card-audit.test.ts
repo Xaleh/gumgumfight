@@ -98,6 +98,9 @@ describe('Shu OP11-088: "can be activated when your opponent\'s Character attack
     s = noDefense(s);
     expect(s.battle).toBeNull();
     s = applyAction(s, { type: 'attack', player: 1, attacker: zoro, target: s.players[0].leader.uid });
+    // "can be activated": o dono escolhe se usa.
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
     expect(getPower(s, shu)).toBe(base + 5000);
   });
 
