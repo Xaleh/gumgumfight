@@ -443,7 +443,7 @@ describe('torneios: rotas', () => {
     const checkin = (p: ReturnType<typeof login>) => req(app, 'POST', `/api/tournaments/${t.id}/checkin`, p);
     expect((await checkin(ps[0])).statusCode).toBe(409);
     expect((await req(app, 'GET', '/api/tournaments/me', ps[0])).json().entries).toEqual([]);
-    expect(tick(app)).toEqual({ started: [], noShows: [] });
+    expect(tick(app)).toEqual({ started: [], checkIns: [], noShows: [] });
     expect((await req(app, 'GET', `/api/tournaments/${t.id}`)).json().status).toBe('registration');
 
     // 19:30: check-in aberto para os inscritos (e só para eles).

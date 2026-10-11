@@ -23,6 +23,7 @@ import { NICKNAME_EVENT, SettingsModal } from '../settings';
 import { type NavItem, TopBar } from './AppShell';
 import { LiveNow, MetaBlock, TournamentBanner, TournamentsBlock, usePoll } from './HomeBlocks';
 import { Icon, type IconName } from './Icons';
+import { InstallBanner } from './Install';
 import { LeaderArt } from './LeaderArt';
 import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 import { ReplayLoader } from './ReplayLoader';
@@ -633,6 +634,8 @@ export function Menu({
             </div>
           )
         )}
+
+        <InstallBanner />
 
         <section className="deck-strip" aria-label={t('menu.equippedDeck')}>
           <DeckArt deck={d0} />

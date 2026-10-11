@@ -58,6 +58,9 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `ONLINE_BOT_ROOMS` | `on`                       | Transmitir o treino contra o bot (o servidor joga pelo bot; exige login); `off` desliga |
 | `ONLINE_MAX_ROOMS` | `400`                      | Salas online ativas ao mesmo tempo no servidor (acima disso, 503); cada sala custa memória e CPU |
 | `ONLINE_MAX_BOT_ROOMS` | `100`                  | Treinos contra o bot transmitidos ao mesmo tempo (o servidor joga pelo bot); acima disso o treino roda no navegador |
+| `PUSH`          | `on`                          | Notificações no celular (Web Push); `off` desliga e some a opção nas configurações |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | (gerado) | Par de chaves das notificações (base64url). Sem elas, o servidor gera um na primeira vez e guarda no banco |
+| `VAPID_SUBJECT` | `https://gumgumfight.app`     | Contato do servidor para os serviços de push (`mailto:` ou `https:`) |
 | `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
 
 O backup é só copiar o arquivo `.db`.
@@ -598,6 +601,32 @@ com botão de mudo, guardados no navegador. O som só começa depois do primeiro
 navegadores) e, no iPhone, respeita a chave de silencioso. Os efeitos são CC0 (Kenney e OpenGameArt) e a música foi
 composta para o projeto: veja `apps/web/src/assets/audio/CREDITS.md`.
 
+### No celular (app instalado, tela acesa e notificações)
+
+O site é um PWA: dá para instalar na tela de início e ele abre em tela cheia, como um aplicativo, sem passar por loja.
+
+- **Instalar:** no celular, o menu inicial mostra um convite. No Chrome/Android, o botão **Instalar** abre o pedido do
+  navegador; no iPhone/iPad, o convite ensina o caminho (Compartilhar → "Adicionar à Tela de Início"). "Agora não"
+  esconde o convite por 30 dias. A opção **Instalar o app** em **⚙️ Configurações** fica sempre disponível.
+- **Tela sempre acesa** (ligada por padrão, em **⚙️ Configurações** e no menu da partida): enquanto você joga, assiste
+  ou vê um replay, a tela do celular não apaga (Wake Lock). No menu, a tela apaga normalmente.
+- **Notificações** (desligadas por padrão; só ligam quando a pessoa ativa em **⚙️ Configurações** e aceita o pedido
+  do navegador): avisos no celular com o app em segundo plano ou fechado. Dá para escolher os tipos:
+  - **Partidas online:** o oponente entrou na sala que você criou (ou a fila encontrou uma partida) e chegou a sua vez
+    (no máximo um aviso a cada 30 s). O app conta ao servidor quando sai da tela; com ele na tela, nada é enviado.
+  - **Torneios:** check-in aberto (para quem ainda não confirmou), rodada nova (com o oponente e o prazo de
+    tolerância, ou o aviso de bye) e oponente esperando você na sala.
+
+  Tocar no aviso abre o app direto na partida ou na página do torneio. Desligar cancela a inscrição deste navegador no
+  servidor. No iPhone/iPad, as notificações só funcionam com o app instalado na tela de início (iOS 16.4 ou mais novo).
+  Os textos saem no idioma escolhido no app.
+
+O service worker (`/sw.js`, gerado a partir de `apps/web/src/service-worker.js` pelo plugin em `vite.config.ts`)
+guarda a casca do app para abrir rápido e sem internet (a página sempre é buscada primeiro na rede, então um deploy
+aparece na hora) e mostra as notificações. As notificações não dependem de serviço pago: o servidor assina e cifra
+cada mensagem (VAPID e RFC 8291, em `apps/server/src/push/`) e a entrega ao serviço de push do navegador (Google,
+Mozilla, Microsoft ou Apple). As chaves nascem sozinhas no banco; não há nada para configurar no deploy.
+
 ## Testes
 
 ```bash
@@ -611,7 +640,9 @@ npm run typecheck
 | Método | Rota               | Descrição                                   |
 |--------|--------------------|---------------------------------------------|
 | GET    | `/api/health`      | Verificação de saúde                        |
-| GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google) |
+| GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google, chave pública das notificações) |
+| PUT    | `/api/push/subscription` | Liga as notificações deste navegador (`{ subscription, locale, matches, tournaments }`; repetir atualiza) |
+| DELETE | `/api/push/subscription` | Desliga (`{ endpoint }`) |
 | GET    | `/api/auth/me`     | Usuário logado (`{ user }` com `role`; `null` sem sessão) |
 | GET    | `/api/admin/users?q=` | Contas e perfis (só Admin)               |
 | PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| organizer \| admin \| dev }`; só Admin; a si mesmo, só para `dev`) |
@@ -641,6 +672,7 @@ npm run typecheck
 | GET    | `/api/online/rooms/:id/events?t=` | Canal SSE: visão do jogador, relógios, presença, emotes e chat |
 | POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
 | POST   | `/api/online/rooms/:id/emote` · `/chat` · `/rematch` · `/leave` | Emote, mensagem do chat (`{ t, text }`, até 120 caracteres, censurada), revanche (salas privadas) e cancelar a sala |
+| POST   | `/api/online/rooms/:id/focus` | O app do jogador saiu da tela ou voltou (`{ t, visible }`): fora da tela, a vez vira notificação |
 | GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim) |
 | POST   | `/api/online/bot` | Treino contra o bot transmitido, só com login (`{ deckId, botDeckId \| random, format, first? }`, `first`: 0 = jogador, 1 = bot, ausente = sorteio; 401 sem login; desligado com `ONLINE_BOT_ROOMS=off`) |
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |

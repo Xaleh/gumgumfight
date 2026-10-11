@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { isAdmin, isDev, type OnlineSeat, type WatchTarget } from './api';
+import { api, isAdmin, isDev, type OnlineSeat, type WatchTarget } from './api';
 import { audio } from './audio';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
@@ -11,6 +11,8 @@ import { Stats } from './components/Stats';
 import { Tournaments } from './components/Tournaments';
 import { Watch } from './components/Watch';
 import type { GameSetup } from './game/useGame';
+import { usePushSync, useWakeLock } from './pwa';
+import { useSettings } from './settings';
 
 type Screen =
   | { name: 'menu' }
@@ -45,6 +47,10 @@ function savedScreen(): Screen {
   return { name: 'menu' };
 }
 
+/** Parâmetros dos endereços abertos pelas notificações: a partida online e a página do torneio. */
+const ROOM_PARAM = 'partida';
+const TOURNAMENT_PARAM = 'torneio';
+
 export function App() {
   const [screen, setScreen] = useState<Screen>(savedScreen);
   useEffect(() => {
@@ -60,7 +66,49 @@ export function App() {
   useEffect(() => {
     if (!inMatch) audio.music('menu');
   }, [inMatch]);
-  const role = useAuth().user?.role;
+  const settings = useSettings();
+  const user = useAuth().user;
+  const role = user?.role;
+  // Na mesa (jogando, assistindo ou vendo um replay), a tela do celular não apaga.
+  useWakeLock(inMatch && settings.keepAwake);
+  usePushSync({
+    serverKey: settings.pushKey,
+    enabled: settings.notify,
+    prefs: { locale: settings.locale, matches: settings.notifyMatches, tournaments: settings.notifyTournaments },
+    userId: user?.id ?? null,
+    onRevoked: () => settings.update({ notify: false }),
+  });
+
+  // Toque numa notificação: abre a partida online (se ainda estiver aberta) ou a página do
+  // torneio. Com o app fechado, o endereço chega na URL; com ele aberto, numa mensagem do service worker.
+  useEffect(() => {
+    const open = (href: string) => {
+      const url = new URL(href, location.origin);
+      const room = url.searchParams.get(ROOM_PARAM);
+      const tournament = url.searchParams.get(TOURNAMENT_PARAM);
+      if (room) {
+        api.online
+          .active()
+          .then((rooms) => {
+            const r = rooms.find((x) => x.roomId === room);
+            if (r) setScreen((s) => (s.name === 'online' && s.seat.roomId === r.roomId ? s : { name: 'online', seat: { roomId: r.roomId, token: r.token } }));
+          })
+          .catch(() => undefined);
+      } else if (tournament) setScreen({ name: 'tournaments', id: tournament });
+    };
+    const here = new URL(location.href);
+    if (here.searchParams.has(ROOM_PARAM) || here.searchParams.has(TOURNAMENT_PARAM)) {
+      open(here.href);
+      here.searchParams.delete(ROOM_PARAM);
+      here.searchParams.delete(TOURNAMENT_PARAM);
+      history.replaceState(null, '', here.toString());
+    }
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'gumgum:open' && typeof e.data.url === 'string') open(e.data.url);
+    };
+    navigator.serviceWorker?.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
+  }, []);
   const dev = isDev(role);
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'coverage' && dev) return <Coverage onExit={() => setScreen({ name: 'menu' })} />;

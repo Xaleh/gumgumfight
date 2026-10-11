@@ -39,6 +39,8 @@ export interface Tournament {
   roundAt: string | null;
   /** A varredura de ausentes da rodada atual já foi feita. */
   roundSwept: boolean;
+  /** Hora de início (`startsAt`) cujo aviso de check-in já saiu por notificação. */
+  checkInNotice: string | null;
   organizerId: string;
   organizerName: string | null;
   createdAt: string;
@@ -105,6 +107,7 @@ type TournamentRow = {
   round: number;
   round_at: string | null;
   round_wo: number;
+  checkin_notice: string | null;
   organizer_id: string;
   organizer_name: string | null;
   created_at: string;
@@ -131,6 +134,7 @@ const toTournament = (r: TournamentRow): Tournament => ({
   round: r.round,
   roundAt: r.round_at,
   roundSwept: Boolean(r.round_wo),
+  checkInNotice: r.checkin_notice ?? null,
   organizerId: r.organizer_id,
   organizerName: r.organizer_name,
   createdAt: r.created_at,
@@ -392,6 +396,11 @@ function writeRound(db: DB, id: string, { round, stage, bestOf, pairings }: Roun
   );
   pairings.forEach((p, i) => write.run(id, round, stage, i + 1, p.p1, p.p2, bestOf, p.p2 ? null : 'bye', p.p2 ? null : 'bye', at));
   db.prepare('UPDATE tournaments SET round = ?, round_at = ?, round_wo = 0 WHERE id = ?').run(round, at, id);
+}
+
+/** Marca que o aviso de check-in para a hora de início `startsAt` já foi enviado. */
+export function markCheckInNotice(db: DB, id: string, startsAt: string) {
+  db.prepare('UPDATE tournaments SET checkin_notice = ? WHERE id = ?').run(startsAt, id);
 }
 
 /** Marca que a varredura de ausentes da rodada atual foi feita. */

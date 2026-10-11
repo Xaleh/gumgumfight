@@ -33,6 +33,8 @@ import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
 import type { LobbyLimits } from './online/lobby';
 import { registerOnlineRoutes } from './online/routes';
+import { type PushSender, registerPushRoutes } from './push/routes';
+import { vapidKeys } from './push/store';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
@@ -52,11 +54,15 @@ export function buildApp(
     onlineRateLimit?: number;
     botDelayMs?: number;
     onlineLimits?: Partial<LobbyLimits>;
+    /** Testes: envio das notificações (sem ele, vai para o serviço de push de verdade). */
+    pushSend?: PushSender;
   } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
   const server = opts.server ?? serverOptions;
+  // Notificações: as chaves VAPID nascem no banco na primeira vez (ou vêm do ambiente).
+  const pushKeys = server.push === false ? null : vapidKeys(db, server.vapidKeys);
   const present = (cards: ApiCard[]) =>
     presentCards(cards, getTranslations(db, 'pt', cards.length > 200 ? undefined : cards.map((c) => c.id)), server);
 
@@ -66,6 +72,8 @@ export function buildApp(
     cardImages: server.cardImages,
     languages: ['pt', 'en'],
     googleClientId: server.googleClientId ?? null,
+    /** Chave pública VAPID para o navegador se inscrever nas notificações (null = desligadas). */
+    pushKey: pushKeys?.publicKey ?? null,
   }));
 
   app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => present(listCards(db, req.query.set)));
@@ -128,6 +136,15 @@ export function buildApp(
     const user = auth.viewer(req);
     return user ? accountOwnerKey(user.id) : browserHash(req);
   };
+  const notifier = registerPushRoutes(app, {
+    db,
+    browserHash,
+    user: auth.viewer,
+    keys: pushKeys,
+    subject: server.vapidSubject ?? 'https://gumgumfight.app',
+    send: opts.pushSend,
+    log: (msg) => app.log.warn(msg),
+  });
   const isMine = (deck: StoredDeck, viewer: string | null) =>
     deck.kind === 'user' && deck.ownerHash !== null && deck.ownerHash === viewer;
   const publicDeck = ({ ownerHash: _hidden, ...deck }: StoredDeck) => deck;
@@ -251,11 +268,12 @@ export function buildApp(
     botDelayMs: opts.botDelayMs,
     limits: { ...stripUndefined(server.onlineLimits ?? {}), ...opts.onlineLimits },
     onTournamentGame: (game) => reportFromGame(db, game),
+    notifier,
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
-  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined });
+  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined, notifier });
 
   registerReportRoutes(app, { db, user: auth.viewer });
 

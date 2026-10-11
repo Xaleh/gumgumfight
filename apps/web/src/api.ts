@@ -196,7 +196,14 @@ export interface AdminUser extends User {
 }
 
 export const api = {
-  config: () => get<{ cardImages: boolean; languages: string[]; googleClientId: string | null }>('/api/config'),
+  /** `pushKey`: chave pública para as notificações (null = desligadas no servidor). */
+  config: () => get<{ cardImages: boolean; languages: string[]; googleClientId: string | null; pushKey?: string | null }>('/api/config'),
+  push: {
+    /** Grava a inscrição deste navegador nas notificações, com o idioma e os avisos escolhidos. */
+    save: (subscription: PushSubscriptionJSON, prefs: { locale: string; matches: boolean; tournaments: boolean }) =>
+      send<void>('PUT', '/api/push/subscription', { subscription, ...prefs }),
+    remove: (endpoint: string) => send<void>('DELETE', '/api/push/subscription', { endpoint }),
+  },
   me: () => get<{ user: User | null }>('/api/auth/me'),
   /** Troca o ID token do botão do Google por uma sessão (cookie). */
   googleLogin: (credential: string) => send<{ user: User; claimedDecks: number }>('POST', '/api/auth/google', { credential }),
@@ -282,6 +289,14 @@ export const api = {
     emote: (roomId: string, t: string, emote: string) => send<void>('POST', `/api/online/rooms/${roomId}/emote`, { t, emote }),
     /** Mensagem do chat da partida (o servidor censura palavrões antes de repassar). */
     chat: (roomId: string, t: string, text: string) => send<void>('POST', `/api/online/rooms/${roomId}/chat`, { t, text }),
+    /** O app saiu da tela ou voltou (decide se a vez que chega vira notificação). Vai mesmo com a página fechando. */
+    focus: (roomId: string, t: string, visible: boolean) =>
+      fetch(`/api/online/rooms/${roomId}/focus`, {
+        method: 'POST',
+        keepalive: true,
+        headers: { 'content-type': 'application/json', 'x-deck-owner': ownerToken() },
+        body: JSON.stringify({ t, visible }),
+      }).catch(() => undefined),
     /** Lançamento do dado do sorteio (velocidade em larguras/alturas da mesa por segundo). */
     dice: (roomId: string, t: string, vx: number, vy: number) => send<void>('POST', `/api/online/rooms/${roomId}/dice`, { t, vx, vy }),
     rematch: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/rematch`, { t }),
