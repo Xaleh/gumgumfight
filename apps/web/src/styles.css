@@ -1931,7 +1931,7 @@ input[type='number'] {
   cursor: pointer;
   box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.3);
 }
-/* Atalho do histórico no celular: ao lado do menu, com a conta de linhas novas desde a última leitura. */
+/* Atalho do histórico no celular: ao lado do seu deck, com a conta de linhas novas desde a última leitura. */
 .round-btn.log-btn {
   position: relative;
   color: #fff;
@@ -2560,6 +2560,19 @@ input[type='number'] {
   from {
     opacity: 0;
   }
+}
+
+/* Histórico e chat: coluna de botões à direita do seu deck e lixo. */
+.side-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-left: calc(var(--cw) * 0.12);
+}
+.side-tools .round-btn {
+  width: clamp(32px, calc(var(--cw) * 0.56), 40px);
+  height: clamp(32px, calc(var(--cw) * 0.56), 40px);
 }
 
 /* deck e descarte */
@@ -6660,8 +6673,8 @@ tr.clickable:hover td {
 }
 
 /*
- * Mesa em pé (celular e tablet): a mão do oponente ocupa a largura toda, então o menu, o
- * histórico, o chat e a faixa do oponente descem para uma faixa própria logo abaixo da ponta
+ * Mesa em pé (celular e tablet): a mão do oponente ocupa a largura toda, então o menu, o Auto
+ * e a faixa do oponente descem para uma faixa própria logo abaixo da ponta
  * das cartas, sem cobri-las. Fica depois das regras do chat e do espectador para valer sobre elas.
  */
 @container not (min-aspect-ratio: 1/1) {
@@ -6746,6 +6759,34 @@ tr.clickable:hover td {
     .chat-panel {
       top: 42px;
     }
+  }
+}
+/*
+ * Chat ao lado do deck: o painel abre para cima, por cima do seu campo, centralizado na fileira
+ * do Líder (o botão fica na borda da mesa e o painel não caberia preso a ele).
+ */
+.side.bottom .base-row {
+  position: relative;
+}
+.side-tools .emote-bar {
+  position: static;
+}
+.side-tools .chat-panel {
+  left: 50%;
+  top: auto;
+  bottom: calc(100% + 8px);
+  width: min(320px, calc(100vw - 24px));
+  /* `translate` (e não `transform`) para não brigar com a animação de entrada */
+  translate: -50% 0;
+}
+/* Mesa deitada: não há altura acima do seu campo, então o painel abre no canto de cima da mesa. */
+@container (min-aspect-ratio: 1/1) {
+  .side-tools .chat-panel {
+    position: fixed;
+    left: 8px;
+    top: 8px;
+    bottom: auto;
+    translate: none;
   }
 }
 .end-turn.watching {

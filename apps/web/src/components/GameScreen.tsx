@@ -1005,14 +1005,7 @@ function Table({
         <button className="round-btn" onClick={() => setSheet('menu')} aria-label={t('game.menuLabel')}>
           <span className="burger" />
         </button>
-        {!wide && (
-          <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label={t('game.logLabel')} title={t('game.log')}>
-            <Icon name="history" size={20} />
-            {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
-          </button>
-        )}
       </div>
-      {online && !watching && <ChatBar online={online} />}
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
       {online && !watching && <SpectatorCount online={online} />}
       {human !== null && !isOnline && (
@@ -1027,6 +1020,20 @@ function Table({
       )}
     </>
   );
+
+  // Histórico e chat ficam ao lado do seu deck e lixo, perto de onde o olho repousa.
+  const sideTools =
+    !wide || (online && !watching) ? (
+      <>
+        {!wide && (
+          <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label={t('game.logLabel')} title={t('game.log')}>
+            <Icon name="history" size={20} />
+            {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
+          </button>
+        )}
+        {online && !watching && <ChatBar online={online} />}
+      </>
+    ) : null;
 
   const detailUid = hovered ?? selected;
 
@@ -1044,6 +1051,7 @@ function Table({
           revealBottom
           revealTop={showBotHand}
           corner={corner}
+          sideTools={sideTools}
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}

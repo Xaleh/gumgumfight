@@ -33,11 +33,13 @@ interface SideProps extends BoardHandlers {
   state: GameState;
   player: PlayerId;
   position: 'top' | 'bottom';
+  /** Botões ao lado do deck e do lixo (histórico, chat). */
+  tools?: ReactNode;
 }
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
 
-function PlayerSide({ state, player, position, ...h }: SideProps) {
+function PlayerSide({ state, player, position, tools, ...h }: SideProps) {
   const t = useT();
   const ps = state.players[player];
   const isActive = state.activePlayer === player && state.phase === 'main';
@@ -199,7 +201,10 @@ function PlayerSide({ state, player, position, ...h }: SideProps) {
             {stage}
           </div>
           {leader}
-          <div className="base-side right">{piles}</div>
+          <div className="base-side right">
+            {piles}
+            {tools && <div className="side-tools">{tools}</div>}
+          </div>
         </>
       ) : (
         <>
@@ -356,6 +361,8 @@ interface BoardProps extends BoardHandlers {
   revealBottom: boolean;
   /** Botões do canto superior esquerdo (menu, Auto). */
   corner: ReactNode;
+  /** Botões ao lado do seu deck e lixo, perto de onde o olho fica (histórico, chat). */
+  sideTools?: ReactNode;
   center: ReactNode;
   /** Conteúdo a mais na faixa de cada jogador (partidas online). */
   bannerExtra?: (player: PlayerId) => ReactNode;
@@ -367,6 +374,7 @@ export function Board({
   revealTop,
   revealBottom,
   corner,
+  sideTools,
   center,
   handOrder,
   lifted,
@@ -398,7 +406,7 @@ export function Board({
         <div className="center-band" data-drop="field">
           {center}
         </div>
-        <PlayerSide state={state} player={bottom} position="bottom" {...handlers} />
+        <PlayerSide state={state} player={bottom} position="bottom" tools={sideTools} {...handlers} />
       </div>
       <div className="bottom-strip">
         <div className="my-bar">
