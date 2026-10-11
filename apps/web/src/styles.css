@@ -2524,9 +2524,16 @@ input[type='number'] {
   stroke-dasharray: 15 9;
   animation: arrow-flow 0.45s linear infinite;
 }
-.attack-arrow.battle .arrow-shadow,
+/*
+ * A seta da batalha fica na tela enquanto o jogador decide a defesa (às vezes por muito tempo):
+ * o tracejado corre algumas vezes e para. Animar o traço (e a sombra) repinta a cada quadro e
+ * esquenta o celular. A sombra não tem tracejado, então só aparece.
+ */
+.attack-arrow.battle .arrow-shadow {
+  animation: arrow-draw 0.35s ease-out backwards;
+}
 .attack-arrow.battle .arrow-line {
-  animation: arrow-draw 0.35s ease-out backwards, arrow-flow 0.45s linear infinite;
+  animation: arrow-draw 0.35s ease-out backwards, arrow-flow 0.45s linear 4;
 }
 .attack-arrow.aim:not(.locked) .arrow-line {
   stroke: #8f9bbd;
@@ -2635,9 +2642,11 @@ input[type='number'] {
   box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.25);
 }
 button.hint-pill {
+  position: relative;
   cursor: pointer;
   background: linear-gradient(180deg, #4da3ff, var(--blue));
-  animation: glow 1.4s ease-in-out infinite;
+  --halo: 0 0 0 3px var(--sky), 0 0 26px 7px rgba(54, 200, 255, 0.85);
+  --halo-time: 1.4s;
 }
 .hint-pill small {
   display: block;
@@ -2796,11 +2805,12 @@ button.hint-pill {
 /* nenhuma carta da mão muda o resultado: chama o olhar para concluir */
 .end-turn.defense.pulse {
   animation: defense-pulse 1.1s ease-in-out infinite;
+  --halo: 0 0 0 4px rgba(255, 211, 77, 0.6), 0 0 26px 8px rgba(255, 190, 40, 0.8);
+  --halo-time: 1.1s;
 }
 @keyframes defense-pulse {
   50% {
     transform: scale(1.06);
-    box-shadow: 0 4px 0 #c98a00, 0 0 0 4px rgba(255, 211, 77, 0.6), 0 0 26px 8px rgba(255, 190, 40, 0.8);
   }
 }
 /* relógio online do jogador, colado no botão: o tempo corre nesta decisão */
@@ -3509,9 +3519,9 @@ button.hint-pill {
 }
 
 /* destaques (brilho azul do Pocket) */
+/* Brilho fixo: animar box-shadow/filter repinta a carta a cada quadro e esquenta o celular. */
 .hl-option {
-  box-shadow: 0 0 0 3px var(--sky), 0 0 18px 4px rgba(54, 200, 255, 0.75) !important;
-  animation: glow 1.3s ease-in-out infinite;
+  box-shadow: 0 0 0 3px var(--sky), 0 0 22px 5px rgba(54, 200, 255, 0.8) !important;
   cursor: pointer;
 }
 .hl-disabled {
@@ -3554,12 +3564,6 @@ button.hint-pill {
   to {
     transform: none;
     opacity: 1;
-  }
-}
-@keyframes glow {
-  50% {
-    filter: brightness(1.08);
-    box-shadow: 0 0 0 3px var(--sky), 0 0 26px 7px rgba(54, 200, 255, 0.85);
   }
 }
 @keyframes shake {
@@ -3628,29 +3632,46 @@ button.hint-pill {
 
 /* seu turno, jogada com você: o círculo do turno, a sua faixa e "Encerrar turno" pulsam o tempo todo */
 .turn-chip.pulse {
+  position: relative;
   animation: turn-chip-pulse 1.6s ease-in-out infinite;
+  --halo: 0 0 0 4px rgba(77, 163, 255, 0.45), 0 0 22px 8px rgba(77, 163, 255, 0.75);
 }
 @keyframes turn-chip-pulse {
   50% {
     transform: scale(1.08);
-    box-shadow: 0 0 0 4px rgba(77, 163, 255, 0.45), 0 0 22px 8px rgba(77, 163, 255, 0.75);
   }
 }
 .banner.active.pulse {
-  animation: banner-pulse 1.6s ease-in-out infinite;
-}
-@keyframes banner-pulse {
-  50% {
-    box-shadow: 0 0 0 3px #ffd34d, 0 0 18px 6px rgba(255, 190, 40, 0.75);
-  }
+  --halo: 0 0 0 3px #ffd34d, 0 0 18px 6px rgba(255, 190, 40, 0.75);
 }
 .end-turn.pulse:not(:disabled) {
-  animation: end-turn-pulse 1.6s ease-in-out infinite;
+  position: relative;
+  --halo: 0 0 0 4px rgba(77, 163, 255, 0.45), 0 0 24px 8px rgba(77, 163, 255, 0.7);
 }
-@keyframes end-turn-pulse {
+
+/*
+ * Halo pulsante: o brilho fica pintado uma vez numa camada (::after) e só a opacidade anima.
+ * Animar box-shadow ou filter direto no elemento obriga o navegador a repintar a cada quadro
+ * (60 a 120 vezes por segundo, o turno inteiro) e esquenta o celular.
+ */
+button.hint-pill::after,
+.end-turn.defense.pulse::after,
+.turn-chip.pulse::after,
+.banner.active.pulse::after,
+.end-turn.pulse:not(:disabled)::after,
+.ability-plate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--halo);
+  opacity: 0;
+  pointer-events: none;
+  animation: halo-pulse var(--halo-time, 1.6s) ease-in-out infinite;
+}
+@keyframes halo-pulse {
   50% {
-    filter: brightness(1.1);
-    box-shadow: 0 4px 0 #1f5fc8, 0 0 0 4px rgba(77, 163, 255, 0.45), 0 0 24px 8px rgba(77, 163, 255, 0.7);
+    opacity: 1;
   }
 }
 
@@ -4422,18 +4443,9 @@ button.hint-pill {
   box-shadow: 0 0 0 6px var(--sky), 0 0 26px 4px rgba(54, 200, 255, 0.7);
   z-index: 6;
 }
-.mat [data-replay-pick='pulse'] {
-  animation: replay-pick 1.1s ease-in-out infinite;
-}
 /* Na mão, a carta tocada sobe por cima das vizinhas para o contorno aparecer inteiro. */
 .mat .hand-card:has([data-replay-pick]) {
   z-index: 99;
-}
-@keyframes replay-pick {
-  50% {
-    outline-offset: 4px;
-    box-shadow: 0 0 0 7px var(--sky), 0 0 36px 10px rgba(54, 200, 255, 0.9);
-  }
 }
 /* Mais de um toque (DON!! e depois a carta, atacante e depois o alvo): a ordem dos cliques. */
 .mat [data-replay-order]::after {
@@ -7767,7 +7779,8 @@ tr.clickable:hover td {
     0 0 0 5px rgba(54, 220, 255, 0.95),
     0 0 32px 10px rgba(54, 220, 255, 0.6),
     0 14px 34px rgba(5, 12, 40, 0.6);
-  animation: plate-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards, plate-glow 1.6s ease-in-out 0.45s infinite;
+  animation: plate-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
+  --halo: 0 0 0 2px rgba(255, 255, 255, 1), 0 0 0 5px rgba(120, 240, 255, 1), 0 0 46px 16px rgba(54, 220, 255, 0.85);
   transition: transform 0.12s;
 }
 .ability-plate:active {
@@ -7855,15 +7868,6 @@ tr.clickable:hover td {
   100% {
     transform: none;
     opacity: 1;
-  }
-}
-@keyframes plate-glow {
-  50% {
-    box-shadow:
-      0 0 0 2px rgba(255, 255, 255, 1),
-      0 0 0 5px rgba(120, 240, 255, 1),
-      0 0 46px 16px rgba(54, 220, 255, 0.85),
-      0 14px 34px rgba(5, 12, 40, 0.6);
   }
 }
 
