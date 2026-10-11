@@ -4,8 +4,11 @@ import { App } from './App';
 import { AuthProvider } from './auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { loadLocale, t } from './i18n';
+import { registerServiceWorker } from './pwa';
 import { initialLocale, SettingsProvider } from './settings';
 import './styles.css';
+
+registerServiceWorker();
 
 // Dicionário do idioma salvo antes do primeiro render, para a tela não piscar em português.
 // (Se o download falhar, começa em português e o I18nProvider tenta de novo.)

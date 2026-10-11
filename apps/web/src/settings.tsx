@@ -2,7 +2,9 @@ import { createContext, type ReactNode, useContext, useEffect, useRef, useState 
 import { api } from './api';
 import { audio } from './audio';
 import { Flag } from './components/Flags';
+import { InstallButton } from './components/Install';
 import { DEFAULT_LOCALE, detectLocale, I18nProvider, isLocale, type Locale, LOCALES, type MessageKey, useT } from './i18n';
+import { notificationPermission, pushSupport, syncPush, useInstallMode, wakeLockSupported } from './pwa';
 
 export type { Locale };
 /** `system` segue o tema do aparelho (prefers-color-scheme). */
@@ -29,15 +31,39 @@ export interface Settings {
   sfxVolume: number;
   /** Volume da música de fundo (0 = mudo … 1). */
   musicVolume: number;
+  /** Tela do celular sempre acesa durante a partida (Wake Lock). */
+  keepAwake: boolean;
+  /** Notificações no celular. Desligadas até a pessoa ligar (e o navegador pedir a permissão). */
+  notify: boolean;
+  /** Avisos de partidas online (oponente entrou, sua vez) e de torneios (check-in, rodada, oponente na sala). */
+  notifyMatches: boolean;
+  notifyTournaments: boolean;
+  /** Chave pública das notificações no servidor (null = desligadas lá). */
+  pushKey: string | null;
 }
+
+type Editable = Exclude<keyof Settings, 'serverImages' | 'pushKey'>;
+const EDITABLE: Editable[] = [
+  'locale',
+  'images',
+  'quickCounter',
+  'animations',
+  'replayCues',
+  'theme',
+  'opponentChat',
+  'sfxVolume',
+  'musicVolume',
+  'keepAwake',
+  'notify',
+  'notifyMatches',
+  'notifyTournaments',
+];
 
 interface Ctx extends Settings {
   showImages: boolean;
   /** Tema em uso depois de resolver `system`. */
   resolvedTheme: 'light' | 'dark';
-  update: (
-    patch: Partial<Pick<Settings, 'locale' | 'images' | 'quickCounter' | 'animations' | 'replayCues' | 'theme' | 'opponentChat' | 'sfxVolume' | 'musicVolume'>>,
-  ) => void;
+  update: (patch: Partial<Pick<Settings, Editable>>) => void;
 }
 
 const KEY = 'gumgum.settings';
@@ -52,6 +78,11 @@ const DEFAULTS: Settings = {
   opponentChat: true,
   sfxVolume: 0.8,
   musicVolume: 0.5,
+  keepAwake: true,
+  notify: false,
+  notifyMatches: true,
+  notifyTournaments: true,
+  pushKey: null,
 };
 
 /** Volume salvo: número entre 0 e 1 (qualquer outra coisa volta ao padrão). */
@@ -86,6 +117,7 @@ function load(): Settings {
       locale: savedLocale(saved),
       theme,
       serverImages: false,
+      pushKey: null,
       sfxVolume: volume(saved.sfxVolume, DEFAULTS.sfxVolume),
       musicVolume: volume(saved.musicVolume, DEFAULTS.musicVolume),
     };
@@ -129,7 +161,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const load = (attempt: number) =>
       api
         .config()
-        .then((c) => !cancelled && setSettings((s) => ({ ...s, serverImages: c.cardImages })))
+        .then((c) => !cancelled && setSettings((s) => ({ ...s, serverImages: c.cardImages, pushKey: c.pushKey ?? null })))
         .catch(() => {
           if (!cancelled && attempt < 15) timer = setTimeout(() => load(attempt + 1), 2000);
         });
@@ -163,20 +195,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((s) => {
       const next = { ...s, ...patch };
       try {
-        localStorage.setItem(
-          KEY,
-          JSON.stringify({
-            locale: next.locale,
-            images: next.images,
-            quickCounter: next.quickCounter,
-            animations: next.animations,
-            replayCues: next.replayCues,
-            theme: next.theme,
-            opponentChat: next.opponentChat,
-            sfxVolume: next.sfxVolume,
-            musicVolume: next.musicVolume,
-          }),
-        );
+        localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(EDITABLE.map((k) => [k, next[k]]))));
       } catch {
         /* armazenamento indisponível: vale só nesta sessão */
       }
@@ -418,6 +437,12 @@ export function SettingsControls() {
         <input type="checkbox" checked={s.opponentChat} onChange={(e) => s.update({ opponentChat: e.target.checked })} />
         {t('settings.opponentChat')}
       </label>
+      {wakeLockSupported() && (
+        <label className="check" title={t('settings.keepAwakeHint')}>
+          <input type="checkbox" checked={s.keepAwake} onChange={(e) => s.update({ keepAwake: e.target.checked })} />
+          {t('settings.keepAwake')}
+        </label>
+      )}
       <div className="setting volume-setting">
         <label className="sheet-label">{t('settings.sfx')}</label>
         <VolumeControl kind="sfxVolume" />
@@ -427,6 +452,82 @@ export function SettingsControls() {
         <VolumeControl kind="musicVolume" />
       </div>
     </div>
+  );
+}
+
+/**
+ * Notificações: desligadas até a pessoa ligar. Ligar pede a permissão do navegador (precisa
+ * ser num toque) e inscreve este navegador; desligar cancela a inscrição (ver `usePushSync`).
+ */
+function NotificationRows() {
+  const s = useSettings();
+  const t = useT();
+  const [problem, setProblem] = useState<MessageKey | null>(null);
+  const [busy, setBusy] = useState(false);
+  const support = pushSupport();
+  const blocked = support === 'ok' && notificationPermission() === 'denied';
+  const unavailable = !s.pushKey || support !== 'ok' || blocked;
+  const hint: MessageKey = !s.pushKey
+    ? 'settings.notificationsOff'
+    : support === 'ios-install'
+      ? 'settings.notificationsIos'
+      : support === 'unsupported'
+        ? 'settings.notificationsUnsupported'
+        : blocked
+          ? 'settings.notificationsDenied'
+          : (problem ?? 'settings.notificationsHint');
+  const turnOn = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      if ((await Notification.requestPermission()) !== 'granted') return setProblem('settings.notificationsDenied');
+      await syncPush(s.pushKey!, { locale: s.locale, matches: s.notifyMatches, tournaments: s.notifyTournaments });
+      s.update({ notify: true });
+    } catch {
+      setProblem('settings.notificationsError');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const on = s.notify && !unavailable;
+  return (
+    <>
+      <OptionRow title={t('settings.notifications')} hint={t(hint)} disabled={unavailable}>
+        <Switch
+          on={on}
+          disabled={unavailable || busy}
+          label={t('settings.notifications')}
+          onChange={(next) => (next ? void turnOn() : s.update({ notify: false }))}
+        />
+      </OptionRow>
+      {on && (
+        <>
+          <OptionRow title={t('settings.notifyMatches')} hint={t('settings.notifyMatchesHint')}>
+            <Switch on={s.notifyMatches} label={t('settings.notifyMatches')} onChange={(v) => s.update({ notifyMatches: v })} />
+          </OptionRow>
+          <OptionRow title={t('settings.notifyTournaments')} hint={t('settings.notifyTournamentsHint')}>
+            <Switch on={s.notifyTournaments} label={t('settings.notifyTournaments')} onChange={(v) => s.update({ notifyTournaments: v })} />
+          </OptionRow>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Instalar na tela de início: botão (Chrome/Android), instruções (iPhone ou menu do navegador) ou "já instalado". */
+function InstallRow() {
+  const t = useT();
+  const mode = useInstallMode();
+  const hint: Record<typeof mode, MessageKey> = {
+    prompt: 'settings.installHint',
+    ios: 'settings.installIos',
+    menu: 'settings.installMenu',
+    installed: 'settings.installed',
+  };
+  return (
+    <OptionRow title={t('settings.install')} hint={t(hint[mode])}>
+      {mode === 'prompt' && <InstallButton />}
+    </OptionRow>
   );
 }
 
@@ -483,6 +584,20 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             <OptionRow title={t('settings.music')} hint={t('settings.musicHint')}>
               <VolumeControl kind="musicVolume" />
             </OptionRow>
+            <OptionRow
+              title={t('settings.keepAwake')}
+              hint={t(wakeLockSupported() ? 'settings.keepAwakeHint' : 'settings.keepAwakeUnsupported')}
+              disabled={!wakeLockSupported()}
+            >
+              <Switch
+                on={s.keepAwake && wakeLockSupported()}
+                disabled={!wakeLockSupported()}
+                label={t('settings.keepAwake')}
+                onChange={(on) => s.update({ keepAwake: on })}
+              />
+            </OptionRow>
+            <NotificationRows />
+            <InstallRow />
           </div>
           <p className="muted small">{t('settings.footer')}</p>
         </div>

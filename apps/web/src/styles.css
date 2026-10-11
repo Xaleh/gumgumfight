@@ -1187,6 +1187,19 @@ input[type='number'] {
 .home-banner .btn {
   min-height: 44px;
 }
+.install-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+/* ícone do botão Compartilhar do Safari, no meio da frase */
+.install-share {
+  display: inline-grid;
+  place-items: center;
+  vertical-align: -3px;
+  margin: 0 3px;
+  color: var(--text);
+}
 
 .kicker {
   font-size: 11px;

@@ -108,6 +108,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       es.onopen = () => {
         seen();
         setConn('open');
+        // A sala não guarda isto no banco: repete a cada conexão (servidor reiniciado, reconexão).
+        if (!watching) void api.online.focus(seat.roomId, seat.token, document.visibilityState === 'visible');
       };
       es.addEventListener('ping', seen);
       es.addEventListener('state', (e) => {
@@ -211,6 +213,14 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       es?.close();
     };
   }, [seat.roomId, seat.token, watching, hands]);
+
+  // App fora da tela (outro app, tela bloqueada): a sala passa a avisar a vez por notificação.
+  useEffect(() => {
+    if (watching) return;
+    const report = () => void api.online.focus(seat.roomId, seat.token, document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', report);
+    return () => document.removeEventListener('visibilitychange', report);
+  }, [seat.roomId, seat.token, watching]);
 
   // Ações em fila: cada POST leva a versão da mesa em que a ação foi feita.
   const queue = useRef<Action[]>([]);
