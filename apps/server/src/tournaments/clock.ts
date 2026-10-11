@@ -7,7 +7,8 @@
 // organizador escolhe a tolerância (`tolerance_min`).
 //
 // `tournamentTick` roda a cada poucos segundos no servidor (ver routes.ts) e é
-// idempotente: cada rodada é varrida uma vez (`round_wo`).
+// idempotente: cada rodada é varrida uma vez (`round_wo`) e o aviso de check-in sai uma
+// vez por hora de início (`checkin_notice`).
 
 import { randomInt } from 'node:crypto';
 import type { DB } from '../db';
@@ -16,6 +17,7 @@ import {
   listAutomatic,
   listMatches,
   listPlayers,
+  markCheckInNotice,
   markRoundSwept,
   noShow,
   type RoundSpec,
@@ -86,6 +88,8 @@ export function absentSides(t: Tournament, m: TournamentMatch, players: Tourname
 
 export interface TickResult {
   started: string[];
+  /** Torneios cujo check-in acabou de abrir (o aviso por notificação sai uma vez por hora de início). */
+  checkIns: string[];
   /** Partidas decididas por W.O., por torneio. */
   noShows: Array<{ tournamentId: string; matchId: number; absent: Array<'p1' | 'p2'> }>;
 }
@@ -95,9 +99,13 @@ export interface TickResult {
  * na sala dentro da tolerância. `closeRoom`: fecha a sala em espera de uma partida decidida.
  */
 export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string) => void): TickResult {
-  const result: TickResult = { started: [], noShows: [] };
+  const result: TickResult = { started: [], checkIns: [], noShows: [] };
   for (const t of listAutomatic(db)) {
     if (t.status === 'registration') {
+      if (t.startsAt && checkInOpen(t, now) && t.checkInNotice !== t.startsAt && now < ms(t.startsAt)) {
+        markCheckInNotice(db, t.id, t.startsAt);
+        result.checkIns.push(t.id);
+      }
       const start = ms(t.startsAt);
       if (Number.isNaN(start) || now < start || now - start > AUTO_START_GRACE_MS) continue;
       const players = listPlayers(db, t.id);

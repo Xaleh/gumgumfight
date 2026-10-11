@@ -19,8 +19,10 @@ import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
+import { pushText } from '../push/messages';
+import { noNotifier, type Notifier } from '../push/routes';
 import { Lobby, type LobbyError, type LobbyLimits, type SeatRequest } from './lobby';
-import { type ActResult, type Connection, MAX_SPECTATORS, type Room, type RoomData, type RoomResult, TIME_BANK_MS } from './room';
+import { type ActResult, type Connection, MAX_SPECTATORS, type Room, type RoomData, type RoomEvent, type RoomResult, TIME_BANK_MS } from './room';
 
 interface Deps {
   db: DB;
@@ -38,6 +40,32 @@ interface Deps {
   botDelayMs?: number;
   /** Fim de uma partida de torneio: lança o resultado no torneio. */
   onTournamentGame?: (game: { tournamentId: string; matchId: number; roomId: string; winner: string | null; statsMatchId: number | null }) => void;
+  /** Notificações no celular (partida começou, sua vez). */
+  notifier?: Notifier;
+}
+
+/**
+ * Notificação de uma sala: a partida começou ou a vez passou para o jogador (a sala já
+ * escolheu quem avisar: quem está longe do app). Tocar no aviso abre a partida (`?partida=`).
+ */
+export function roomNotice(notifier: Notifier, room: Room, event: RoomEvent) {
+  for (const i of event.seats) {
+    const seat = room.data.seats[i];
+    const opponent = room.data.seats[i === 0 ? 1 : 0]?.name ?? '?';
+    if (!seat) continue;
+    const [title, body] = event.type === 'start' ? (['matchStartTitle', 'matchStartBody'] as const) : (['turnTitle', 'turnBody'] as const);
+    void notifier.notify(
+      { ownerHash: seat.ownerHash, userIds: [seat.userId] },
+      {
+        category: 'matches',
+        text: (locale) => ({ title: pushText(locale, title), body: pushText(locale, body, { opponent }) }),
+        tag: `room-${room.id}`,
+        url: `/?partida=${encodeURIComponent(room.id)}`,
+        ttl: event.type === 'start' ? 300 : 120,
+        urgency: 'high',
+      },
+    );
+  }
 }
 
 const isError = (v: unknown): v is LobbyError => typeof v === 'object' && v !== null && 'error' in v;
@@ -141,6 +169,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     botDelayMs: deps.botDelayMs,
     limits: deps.limits,
     log: (msg) => app.log.warn(msg),
+    onRoomEvent: (room, event) => roomNotice(deps.notifier ?? noNotifier, room, event),
   });
   const botRooms = deps.botRooms ?? true;
   lobby.restore(
@@ -382,7 +411,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     stream(req, reply, room, { seat: null, hands });
   });
 
-  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; text?: unknown; vx?: unknown; vy?: unknown };
+  type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; text?: unknown; vx?: unknown; vy?: unknown; visible?: unknown };
   const withSeat = (req: FastifyRequest<{ Params: { id: string }; Body: SeatBody }>) => seatIn(req.params.id, req.body?.t);
 
   app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/action', async (req, reply) => {
@@ -404,6 +433,17 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const r = found.room.emote(found.seat, req.body?.emote);
     return r.ok ? reply.code(204).send() : reply.code(r.code).send(refused(r));
+  });
+
+  /**
+   * O app do jogador saiu da tela ou voltou (`visible`): com ele fora da tela, a vez que
+   * chega vira notificação no celular (ver `Room.turnNotice`).
+   */
+  app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/focus', async (req, reply) => {
+    const found = withSeat(req);
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    found.room.setVisible(found.seat, req.body?.visible !== false);
+    return reply.code(204).send();
   });
 
   /** Chat da partida (texto livre, censurado no servidor; só quem tem assento manda). */

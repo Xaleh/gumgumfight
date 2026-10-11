@@ -29,6 +29,8 @@ import type { ApiCard } from '../present';
 import { FORMATS, isFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer } from '../stats/store';
 import { listReports } from '../reports/store';
+import { pushText, roundName } from '../push/messages';
+import { noNotifier, type Notifier } from '../push/routes';
 import {
   absentSides,
   beginTournament,
@@ -85,6 +87,8 @@ interface Deps {
   now?: () => number;
   /** Intervalo do relógio dos torneios (0 = não liga; os testes chamam `tournamentTick` à mão). */
   tickMs?: number;
+  /** Notificações no celular (check-in aberto, rodada nova, oponente esperando na sala). */
+  notifier?: Notifier;
 }
 
 export const MAX_PLAYERS = 256;
@@ -190,15 +194,71 @@ function parseScore(body: { wins?: unknown; result?: unknown } | undefined, best
 /** Validade do torneio completo em cache (só por garantia: cada gravação já o invalida). */
 const DETAIL_TTL_MS = 5_000;
 
-export function registerTournamentRoutes(app: FastifyInstance, { db, user, present, lobby, cardImages, now = Date.now, tickMs = 5_000 }: Deps) {
+export function registerTournamentRoutes(
+  app: FastifyInstance,
+  { db, user, present, lobby, cardImages, now = Date.now, tickMs = 5_000, notifier = noNotifier }: Deps,
+) {
   const cache = new ResponseCache();
   const nowIso = () => new Date(now()).toISOString();
+
+  /** Aviso de torneio para uma conta (tocar abre a página do torneio). Avisos novos do mesmo torneio substituem os antigos. */
+  const tournamentNotice = (t: Tournament, userId: string, body: (locale: string) => string, ttl: number) =>
+    void notifier.notify(
+      { userIds: [userId] },
+      {
+        category: 'tournaments',
+        text: (locale) => ({ title: t.name, body: body(locale) }),
+        tag: `tour-${t.id}`,
+        url: `/?torneio=${encodeURIComponent(t.id)}`,
+        ttl,
+        urgency: 'high',
+      },
+    );
+
+  /** Rodada nova: cada jogador recebe o nome do oponente (ou o aviso de bye) e, com W.O. automático, o prazo para entrar. */
+  const notifyRound = (id: string) => {
+    const t = getTournament(db, id);
+    if (!t || t.status !== 'running') return;
+    const players = listPlayers(db, t.id);
+    const name = (userId: string) => players.find((p) => p.userId === userId)?.name ?? '?';
+    const round = listMatches(db, t.id).filter((m) => m.round === t.round);
+    for (const m of round) {
+      for (const [me, opp] of [
+        [m.p1, m.p2],
+        [m.p2, m.p1],
+      ] as const) {
+        if (!me) continue;
+        tournamentNotice(
+          t,
+          me,
+          (locale) => {
+            const label = roundName(locale, m.stage, m.round, round.length);
+            if (!opp) return pushText(locale, 'byeBody', { round: label });
+            return pushText(locale, t.checkIn ? 'roundDeadlineBody' : 'roundBody', { round: label, opponent: name(opp), minutes: t.toleranceMin });
+          },
+          t.checkIn ? toleranceMs(t) / 1000 : 3600,
+        );
+      }
+    }
+  };
+
+  /** Check-in aberto: avisa quem está inscrito e ainda não confirmou presença. */
+  const notifyCheckIn = (id: string) => {
+    const t = getTournament(db, id);
+    if (!t || t.status !== 'registration' || !t.startsAt) return;
+    const ttl = Math.max(60, Math.round((new Date(t.startsAt).getTime() - now()) / 1000));
+    for (const p of listPlayers(db, t.id)) if (!p.checkedInAt && !p.dropped) tournamentNotice(t, p.userId, (locale) => pushText(locale, 'checkInBody'), ttl);
+  };
 
   // Relógio dos torneios com hora marcada: início automático e W.O. por ausência.
   const tick = () => {
     try {
       const r = tournamentTick(db, now(), (roomId) => lobby.closeIfWaiting(roomId));
-      for (const id of r.started) app.log.info(`torneio ${id}: começou sozinho na hora marcada`);
+      for (const id of r.checkIns) notifyCheckIn(id);
+      for (const id of r.started) {
+        app.log.info(`torneio ${id}: começou sozinho na hora marcada`);
+        notifyRound(id);
+      }
       for (const w of r.noShows) app.log.info(`torneio ${w.tournamentId}: W.O. na partida ${w.matchId} (${w.absent.join(', ')} ausente)`);
       return r;
     } catch (err) {
@@ -538,6 +598,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const players = listPlayers(db, t.id);
     if (players.length < 2) return reply.code(400).send(fail('tourNeedsTwoPlayers', 'São precisos pelo menos 2 inscritos.'));
     beginTournament(db, t, players, nowIso());
+    notifyRound(t.id);
     return detail(getTournament(db, t.id)!, me);
   });
 
@@ -566,6 +627,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
       if (pairings.length) insertRound(db, t.id, elimRound(t, round, pairings), at);
       else finishTournament(db, t.id);
     } else finishTournament(db, t.id);
+    notifyRound(t.id);
     return detail(getTournament(db, t.id)!, me);
   });
 
@@ -738,7 +800,12 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     );
     if ('error' in r) return reply.code(r.code).send(r);
     lobby.tagIp(r.room.id, req.ip);
-    if (m.roomId !== r.room.id) setMatchRoom(db, t.id, m.id, r.room.id);
+    if (m.roomId !== r.room.id) {
+      setMatchRoom(db, t.id, m.id, r.room.id);
+      // Sala nova deste jogo, ainda sem o oponente: ele é avisado de que alguém o espera.
+      const opp = m.p1 === me.id ? m.p2 : m.p1;
+      if (r.room.status === 'waiting') tournamentNotice(t, opp, (locale) => pushText(locale, 'waitingBody', { opponent: profile.name }), toleranceMs(t) / 1000);
+    }
     // Entrar na sala é a presença que o W.O. automático confere.
     markEntered(db, t.id, m.id, m.p1 === me.id ? 'p1' : 'p2', nowIso());
     // A sala mudou de estado (criada ou começou): a página do torneio mostra isso.

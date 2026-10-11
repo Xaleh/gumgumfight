@@ -6,7 +6,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import type { CardData, PlayerId } from '@gumgum/engine';
 import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId } from '../stats/catalog';
-import { newRoomData, randomToken, Room, type RoomData, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
+import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
 
 /** Quem quer jogar (perfil do jogador e deck escolhido). */
 export type SeatRequest = Omit<SeatInfo, 'token'>;
@@ -59,6 +59,8 @@ export interface LobbyDeps {
   log?: (msg: string) => void;
   rateLimit?: number;
   botDelayMs?: number;
+  /** Partida começou / vez de um jogador (notificações). */
+  onRoomEvent?: (room: Room, event: RoomEvent) => void;
 }
 
 /** Partida em andamento na lista "Assistir". */
@@ -205,6 +207,7 @@ export class Lobby {
       finish: this.deps.finish,
       rateLimit: this.deps.rateLimit,
       botDelayMs: this.deps.botDelayMs,
+      onEvent: this.deps.onRoomEvent,
     });
     this.rooms.set(room.id, room);
     if (data.code) this.codes.set(data.code, room.id);
@@ -288,7 +291,7 @@ export class Lobby {
     this.leaveQueue(seat.ownerHash);
     const token = randomToken();
     room.data.seats.push({ ...seat, token });
-    room.start();
+    room.start(1);
     return { room, token };
   }
 
@@ -306,7 +309,7 @@ export class Lobby {
       newRoomData({ queue: 'bot', format, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
     );
     if (first !== undefined) room.data.firstPlayer = first;
-    room.start();
+    room.start(0);
     return { room, token };
   }
 
@@ -331,7 +334,7 @@ export class Lobby {
         // Jogos 2+ da série: quem perdeu o anterior começa.
         const first = existing.data.seats.findIndex((s) => s.userId && s.userId === tournament.firstUserId);
         if (first === 0 || first === 1) existing.data.firstPlayer = first;
-        existing.start();
+        existing.start(1);
         return { room: existing, token };
       }
       return { code: 409, ...fail('matchInProgress', 'Esta partida já está em andamento.') };
@@ -556,7 +559,8 @@ export class Lobby {
       // Quem foi o segundo assento passa a ser o primeiro (quem começa é sorteado).
       const seats = [room.data.seats[1], room.data.seats[0]].map((s) => ({ ...s, token: randomToken() }));
       const next = this.makeRoom(newRoomData({ queue: 'private', format: room.data.format, code: null, seats }));
-      next.start();
+      // Quem aceitou agora (o assento dele troca de lado na sala nova) não precisa de aviso.
+      next.start(seat === 0 ? 1 : 0);
       for (const ip of this.roomIps.get(room.id) ?? []) this.tagIp(next.id, ip);
       room.data.rematchRoom = next.id;
       // Espectadores seguem para a sala nova (sem token: continuam só assistindo).

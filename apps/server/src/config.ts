@@ -25,6 +25,15 @@ export interface ServerOptions {
    * login; os padrões estão em online/lobby.ts (DEFAULT_LIMITS).
    */
   onlineLimits?: { maxRooms?: number; maxBotRooms?: number };
+  /**
+   * PUSH: notificações no celular (Web Push). "off" desliga: some a opção nas
+   * configurações do app. As chaves VAPID são geradas na primeira vez e guardadas no
+   * banco; VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY (base64url) fixam outras.
+   */
+  push?: boolean;
+  vapidKeys?: { publicKey?: string | null; privateKey?: string | null };
+  /** VAPID_SUBJECT: contato do servidor para os serviços de push (mailto: ou https:). */
+  vapidSubject?: string;
 }
 
 const positiveInt = (v: string | undefined) => {
@@ -44,6 +53,9 @@ export const serverOptions: ServerOptions = {
   adminEmails: parseEmails(process.env.ADMIN_EMAILS),
   onlineBotRooms: !off(process.env.ONLINE_BOT_ROOMS),
   onlineLimits: { maxRooms: positiveInt(process.env.ONLINE_MAX_ROOMS), maxBotRooms: positiveInt(process.env.ONLINE_MAX_BOT_ROOMS) },
+  push: !off(process.env.PUSH),
+  vapidKeys: { publicKey: process.env.VAPID_PUBLIC_KEY?.trim() || null, privateKey: process.env.VAPID_PRIVATE_KEY?.trim() || null },
+  vapidSubject: process.env.VAPID_SUBJECT?.trim() || undefined,
 };
 
 /**

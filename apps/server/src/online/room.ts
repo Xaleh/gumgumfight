@@ -181,7 +181,20 @@ export interface RoomDeps {
   rateLimit?: number;
   /** Pausa antes de cada jogada do bot (padrão BOT_DELAY_MS; os testes usam 0). */
   botDelayMs?: number;
+  /** Momentos que viram notificação no celular (ver push/routes.ts). */
+  onEvent?: (room: Room, event: RoomEvent) => void;
 }
+
+/**
+ * `start`: os dois jogadores estão na sala e a partida começou. `turn`: a vez passou para
+ * um assento humano (começo do turno ou uma decisão no turno do oponente, como o Counter).
+ * `seats`: quem avisar — só jogadores humanos longe do app (sem conexão ou com o app fora
+ * da tela), nunca quem acabou de entrar na sala.
+ */
+export type RoomEvent = { type: 'start' | 'turn'; seats: PlayerId[] };
+
+/** Intervalo mínimo entre dois avisos de "sua vez" para o mesmo assento (ataques com Blocker e Counter em sequência). */
+export const TURN_NOTICE_MS = 30_000;
 
 /**
  * Resultado de uma ação. Recusa: `code` é o status HTTP; `errorCode` (+ `errorParams`) é a chave
@@ -232,6 +245,10 @@ export class Room {
    */
   private diceThrows: [DiceThrow | null, DiceThrow | null] = [null, null];
   private lastAction: Action | null = null;
+  /** Último aviso de "sua vez" de cada assento. */
+  private turnNoticeAt: [number, number] = [-Infinity, -Infinity];
+  /** O jogador está com o app fora da tela (o navegador avisa em /focus). Só em memória. */
+  private hidden: [boolean, boolean] = [false, false];
   private readonly deps: Required<Pick<RoomDeps, 'now' | 'log'>> & RoomDeps;
 
   constructor(data: RoomData, deps: RoomDeps) {
@@ -259,14 +276,16 @@ export class Room {
     return i === 0 || i === 1 ? i : null;
   }
 
-  /** Segundo jogador entrou: embaralha e começa. */
-  start() {
+  /** Segundo jogador entrou: embaralha e começa. `by`: quem entrou agora (não precisa de aviso). */
+  start(by?: PlayerId) {
     if (this.state || this.data.seats.length !== 2) return;
     this.data.seed128 = [0, 1, 2, 3].map(() => randomInt(0, 2 ** 32) | 0);
     this.data.replayVersion = REPLAY_VERSION;
     this.rebuild();
     this.save();
     this.broadcast();
+    const seats = ([0, 1] as const).filter((p) => p !== by && this.away(p));
+    if (seats.length) this.deps.onEvent?.(this, { type: 'start', seats });
   }
 
   private config() {
@@ -357,6 +376,7 @@ export class Room {
     this.state = applyAction(this.state!, action);
     this.data.actions.push(action);
     this.lastAction = action;
+    const before = this.running;
     this.running = this.state.phase === 'gameover' ? null : actingPlayer(this.state);
     if (this.running === null || this.connected(this.running)) this.awaySince = null;
     else this.awaySince ??= this.deps.now();
@@ -372,6 +392,27 @@ export class Room {
     }
     this.save();
     this.broadcast();
+    if (this.running !== null && this.running !== before) this.turnNotice(this.running);
+  }
+
+  /** Avisa que a vez passou para `seat`, se ele estiver longe do app (no máximo um aviso a cada TURN_NOTICE_MS). */
+  private turnNotice(seat: PlayerId) {
+    if (!this.away(seat)) return;
+    const now = this.deps.now();
+    if (now - this.turnNoticeAt[seat] < TURN_NOTICE_MS) return;
+    this.turnNoticeAt[seat] = now;
+    this.deps.onEvent?.(this, { type: 'turn', seats: [seat] });
+  }
+
+  /** Jogador humano sem conexão com a sala ou com o app fora da tela (quem recebe notificação). */
+  private away(seat: PlayerId) {
+    const s = this.data.seats[seat];
+    return Boolean(s && !s.bot && (this.hidden[seat] || !this.connected(seat)));
+  }
+
+  /** O navegador do jogador avisa quando o app sai da tela ou volta para ela. */
+  setVisible(seat: PlayerId, visible: boolean) {
+    this.hidden[seat] = !visible;
   }
 
   /** Ação de um jogador, feita sobre a visão de versão `seq`. */

@@ -1,0 +1,135 @@
+// Textos das notificações, nos idiomas da interface. Ficam no servidor porque a
+// notificação chega com o app fechado: o service worker só mostra o que recebe. Cada
+// inscrição guarda o idioma escolhido no app (ver push/store.ts).
+
+export const PUSH_LOCALES = ['pt-BR', 'en', 'es', 'ja', 'fr', 'de'] as const;
+export type PushLocale = (typeof PUSH_LOCALES)[number];
+
+export const pushLocale = (v: unknown): PushLocale => (PUSH_LOCALES.includes(v as PushLocale) ? (v as PushLocale) : 'pt-BR');
+
+const pt = {
+  matchStartTitle: 'Partida encontrada!',
+  matchStartBody: '{opponent} entrou. Toque para jogar.',
+  turnTitle: 'Sua vez!',
+  turnBody: '{opponent} está esperando a sua jogada.',
+  roundBody: '{round}: sua partida contra {opponent} está pronta.',
+  roundDeadlineBody: '{round}: entre na sala contra {opponent} em até {minutes} min.',
+  byeBody: '{round}: você está de bye (vitória automática).',
+  waitingBody: '{opponent} está esperando você na sala.',
+  checkInBody: 'O check-in está aberto: confirme sua presença antes do início.',
+  roundN: 'Rodada {n}',
+  final: 'Final',
+  semi: 'Semifinal',
+  quarter: 'Quartas de final',
+  r16: 'Oitavas de final',
+  roundOf: 'Rodada de {n}',
+};
+
+export type PushKey = keyof typeof pt;
+
+const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
+  'pt-BR': pt,
+  en: {
+    matchStartTitle: 'Match found!',
+    matchStartBody: '{opponent} joined. Tap to play.',
+    turnTitle: 'Your turn!',
+    turnBody: '{opponent} is waiting for your move.',
+    roundBody: '{round}: your match against {opponent} is ready.',
+    roundDeadlineBody: '{round}: join the room against {opponent} within {minutes} min.',
+    byeBody: '{round}: you have a bye (automatic win).',
+    waitingBody: '{opponent} is waiting for you in the room.',
+    checkInBody: 'Check-in is open: confirm your attendance before the start.',
+    roundN: 'Round {n}',
+    final: 'Final',
+    semi: 'Semifinal',
+    quarter: 'Quarterfinals',
+    r16: 'Round of 16',
+    roundOf: 'Round of {n}',
+  },
+  es: {
+    matchStartTitle: '¡Partida encontrada!',
+    matchStartBody: '{opponent} se unió. Toca para jugar.',
+    turnTitle: '¡Tu turno!',
+    turnBody: '{opponent} está esperando tu jugada.',
+    roundBody: '{round}: tu partida contra {opponent} está lista.',
+    roundDeadlineBody: '{round}: entra en la sala contra {opponent} en un máximo de {minutes} min.',
+    byeBody: '{round}: tienes bye (victoria automática).',
+    waitingBody: '{opponent} te está esperando en la sala.',
+    checkInBody: 'El check-in está abierto: confirma tu asistencia antes del inicio.',
+    roundN: 'Ronda {n}',
+    final: 'Final',
+    semi: 'Semifinal',
+    quarter: 'Cuartos de final',
+    r16: 'Octavos de final',
+    roundOf: 'Ronda de {n}',
+  },
+  ja: {
+    matchStartTitle: '対戦相手が見つかりました！',
+    matchStartBody: '{opponent}さんが入室しました。タップして対戦しましょう。',
+    turnTitle: 'あなたの番です！',
+    turnBody: '{opponent}さんがあなたの操作を待っています。',
+    roundBody: '{round}：{opponent}さんとの対戦の準備ができました。',
+    roundDeadlineBody: '{round}：{minutes}分以内に{opponent}さんとのルームに入ってください。',
+    byeBody: '{round}：不戦勝（BYE）です。',
+    waitingBody: '{opponent}さんがルームであなたを待っています。',
+    checkInBody: 'チェックインが始まりました。開始前に参加を確定してください。',
+    roundN: 'ラウンド{n}',
+    final: '決勝',
+    semi: '準決勝',
+    quarter: '準々決勝',
+    r16: 'ベスト16',
+    roundOf: 'ベスト{n}',
+  },
+  fr: {
+    matchStartTitle: 'Partie trouvée !',
+    matchStartBody: '{opponent} vous a rejoint. Touchez pour jouer.',
+    turnTitle: 'À vous de jouer !',
+    turnBody: '{opponent} attend votre action.',
+    roundBody: '{round} : votre match contre {opponent} est prêt.',
+    roundDeadlineBody: '{round} : rejoignez la salle contre {opponent} dans les {minutes} min.',
+    byeBody: '{round} : vous êtes exempt (victoire automatique).',
+    waitingBody: '{opponent} vous attend dans la salle.',
+    checkInBody: 'Le check-in est ouvert : confirmez votre présence avant le début.',
+    roundN: 'Ronde {n}',
+    final: 'Finale',
+    semi: 'Demi-finale',
+    quarter: 'Quarts de finale',
+    r16: 'Huitièmes de finale',
+    roundOf: 'Tour des {n}',
+  },
+  de: {
+    matchStartTitle: 'Match gefunden!',
+    matchStartBody: '{opponent} ist beigetreten. Tippe, um zu spielen.',
+    turnTitle: 'Du bist dran!',
+    turnBody: '{opponent} wartet auf deinen Zug.',
+    roundBody: '{round}: Dein Match gegen {opponent} ist bereit.',
+    roundDeadlineBody: '{round}: Betritt den Raum gegen {opponent} innerhalb von {minutes} Min.',
+    byeBody: '{round}: Du hast ein Freilos (automatischer Sieg).',
+    waitingBody: '{opponent} wartet im Raum auf dich.',
+    checkInBody: 'Der Check-in ist geöffnet: Bestätige deine Teilnahme vor dem Start.',
+    roundN: 'Runde {n}',
+    final: 'Finale',
+    semi: 'Halbfinale',
+    quarter: 'Viertelfinale',
+    r16: 'Achtelfinale',
+    roundOf: 'Runde der letzten {n}',
+  },
+};
+
+export type PushParams = Record<string, string | number>;
+
+/** Texto no idioma, com os `{parâmetros}` trocados. */
+export function pushText(locale: string, key: PushKey, params: PushParams = {}): string {
+  return MESSAGES[pushLocale(locale)][key].replace(/\{(\w+)\}/g, (m, k: string) => (k in params ? String(params[k]) : m));
+}
+
+/** Nome da rodada: "Rodada 3" no suíço; a fase pelo tamanho na eliminatória ("Semifinal"). */
+export function roundName(locale: string, stage: 'swiss' | 'elim', round: number, matches: number): string {
+  if (stage === 'swiss') return pushText(locale, 'roundN', { n: round });
+  const size = matches * 2;
+  if (size <= 2) return pushText(locale, 'final');
+  if (size === 4) return pushText(locale, 'semi');
+  if (size === 8) return pushText(locale, 'quarter');
+  if (size === 16) return pushText(locale, 'r16');
+  return pushText(locale, 'roundOf', { n: size });
+}
