@@ -103,7 +103,10 @@ export function OnlineStatus({ online }: { online: OnlineGame }) {
   return null;
 }
 
-/** Mensagens do oponente aparecem? (configuração geral e o silêncio só desta partida). */
+/**
+ * O chat com o oponente está aberto? (configuração geral e o silêncio só desta partida).
+ * Silenciado vale para os dois lados: não vê o que o oponente manda nem manda nada.
+ */
 function useShowOpponent(online: OnlineGame) {
   const { opponentChat } = useSettings();
   return online.watching || (opponentChat && !online.muted);
@@ -149,7 +152,7 @@ export function ChatBar({ online }: { online: OnlineGame }) {
 
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || !showOpponent) return;
     void online.sendChat(text);
     setDraft('');
     inputRef.current?.focus();
@@ -179,43 +182,48 @@ export function ChatBar({ online }: { online: OnlineGame }) {
               ✕
             </button>
           </div>
-          <div className="emote-list">
-            {EMOTES.map((id) => (
-              <button key={id} className="btn small" onClick={() => void online.sendEmote(id)}>
-                {t(emoteKey(id))}
-              </button>
-            ))}
-          </div>
+          {showOpponent && (
+            <div className="emote-list">
+              {EMOTES.map((id) => (
+                <button key={id} className="btn small" onClick={() => void online.sendEmote(id)}>
+                  {t(emoteKey(id))}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="chat-log" ref={logRef} aria-live="polite">
-            {messages.length === 0 && <div className="muted small">{showOpponent ? t('online.noMessages') : t('online.opponentHidden')}</div>}
+            {!showOpponent && <div className="muted small">{t('online.opponentHidden')}</div>}
+            {showOpponent && messages.length === 0 && <div className="muted small">{t('online.noMessages')}</div>}
             {messages.map((m) => (
               <div key={m.key} className={['chat-msg', m.seat === mine ? 'mine' : 'theirs'].join(' ')}>
                 <span className="chat-who">{name(m.seat)}</span> {m.text}
               </div>
             ))}
           </div>
-          <form
-            className="chat-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              send();
-            }}
-          >
-            <input
-              ref={inputRef}
-              className="chat-input"
-              value={draft}
-              maxLength={CHAT_MAX_LENGTH}
-              placeholder={t('online.messagePlaceholder')}
-              aria-label={t('online.messageLabel')}
-              autoComplete="off"
-              enterKeyHint="send"
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <button type="submit" className="btn small primary" disabled={!draft.trim()}>
-              {t('online.send')}
-            </button>
-          </form>
+          {showOpponent && (
+            <form
+              className="chat-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                send();
+              }}
+            >
+              <input
+                ref={inputRef}
+                className="chat-input"
+                value={draft}
+                maxLength={CHAT_MAX_LENGTH}
+                placeholder={t('online.messagePlaceholder')}
+                aria-label={t('online.messageLabel')}
+                autoComplete="off"
+                enterKeyHint="send"
+                onChange={(e) => setDraft(e.target.value)}
+              />
+              <button type="submit" className="btn small primary" disabled={!draft.trim()}>
+                {t('online.send')}
+              </button>
+            </form>
+          )}
         </div>
       )}
     </div>
