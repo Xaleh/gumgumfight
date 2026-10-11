@@ -814,6 +814,8 @@ function usedKey(uid: string, index: number) {
 function abilitySteps(a: Ability, index: number): EffectStep[] {
   const first = a.steps[0];
   if (a.oncePerTurn && first?.do === 'payCost' && first.ability === undefined) return [{ ...first, ability: index }, ...a.steps.slice(1)];
+  // Opcional sem custo: "usar o efeito?" antes; recusar devolve o [Once Per Turn].
+  if (a.optional && a.oncePerTurn) return [{ do: 'payCost', cost: {}, ability: index }, ...a.steps];
   return a.steps;
 }
 
