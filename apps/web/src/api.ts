@@ -217,6 +217,8 @@ export const api = {
   coverage: () => get<{ total: CoverageRow; sets: CoverageRow[] }>('/api/coverage'),
   createDeck: (d: DeckInput) => send<DeckSummary>('POST', '/api/decks', d),
   updateDeck: (id: string, d: DeckInput) => send<DeckSummary>('PUT', `/api/decks/${encodeURIComponent(id)}`, d),
+  /** Só o nome: o dono ou um admin/dev (em decks de outros jogadores). */
+  renameDeck: (id: string, name: string) => send<DeckSummary>('PUT', `/api/decks/${encodeURIComponent(id)}/name`, { name }),
   deleteDeck: (id: string) => send<void>('DELETE', `/api/decks/${encodeURIComponent(id)}`),
   /** Envia o replay de uma partida terminada; o servidor refaz a partida antes de gravar as estatísticas. */
   saveMatch: (m: MatchUpload) => send<{ id: number }>('POST', '/api/matches', m).catch(() => undefined),

@@ -232,6 +232,37 @@ describe('perfis (player, streamer, admin)', () => {
     expect(all.map((u: { role: string }) => u.role)).toEqual(['dev', 'organizer']);
   });
 
+  it('admin e dev renomeiam decks de outros jogadores; o player não', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const nami = await login(a, {});
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    const usopp = await login(a, { sub: '3003', email: 'usopp@example.com', name: 'Usopp' });
+    const deck = (await a.inject({ method: 'POST', url: '/api/decks', headers: zoro.cookie, payload: { name: 'Santoryu', leader: 'ST01-001', cards: luffy.cards } })).json();
+    const rename = (name: unknown, headers: Record<string, string>, id = deck.id) =>
+      a.inject({ method: 'PUT', url: `/api/decks/${id}/name`, headers, payload: { name } });
+
+    // Outro jogador (ou um navegador sem login) não renomeia; deck pronto ninguém renomeia.
+    expect((await rename('Roubado', usopp.cookie)).statusCode).toBe(403);
+    expect((await rename('Roubado', BROWSER)).statusCode).toBe(403);
+    expect((await rename('Luffy', nami.cookie, 'st01-luffy')).statusCode).toBe(403);
+    expect((await rename('   ', nami.cookie)).statusCode).toBe(400);
+
+    // O admin renomeia: o deck continua do Zoro, com as mesmas cartas.
+    const renamed = await rename('  Zoro Santoryu  ', nami.cookie);
+    expect(renamed.json()).toMatchObject({ name: 'Zoro Santoryu', mine: false, size: 50 });
+    const full = (await a.inject({ url: `/api/decks/${deck.id}`, headers: zoro.cookie })).json();
+    expect(full.deck).toMatchObject({ name: 'Zoro Santoryu', mine: true });
+    expect(full.summary.size).toBe(50);
+    // O admin continua sem poder mudar as cartas nem apagar.
+    expect((await a.inject({ method: 'PUT', url: `/api/decks/${deck.id}`, headers: nami.cookie, payload: { name: 'x', leader: 'ST01-001', cards: [] } })).statusCode).toBe(403);
+    expect((await a.inject({ method: 'DELETE', url: `/api/decks/${deck.id}`, headers: nami.cookie })).statusCode).toBe(403);
+
+    // O dono também usa a rota; o Dev tem o mesmo poder do admin.
+    expect((await rename('Meu Zoro', zoro.cookie)).json().name).toBe('Meu Zoro');
+    await a.inject({ method: 'PUT', url: `/api/admin/users/${nami.res.json().user.id}/role`, headers: nami.cookie, payload: { role: 'dev' } });
+    expect((await rename('Zoro (Dev)', nami.cookie)).json().name).toBe('Zoro (Dev)');
+  });
+
   it('e-mail não verificado pelo Google não vira admin', async () => {
     const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
     const r = await login(a, { email_verified: false });
