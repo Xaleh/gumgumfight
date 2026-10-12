@@ -12,6 +12,7 @@ import { Menu } from './components/Menu';
 import { Stats } from './components/Stats';
 import { Tournaments } from './components/Tournaments';
 import { Watch } from './components/Watch';
+import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
 import { usePushSync, useWakeLock } from './pwa';
 import { useSettings } from './settings';
@@ -74,6 +75,10 @@ export function App() {
   const settings = useSettings();
   const user = useAuth().user;
   const role = user?.role;
+  // Progresso do tutorial: junta navegador e servidor ao abrir e quando a conta muda.
+  useEffect(() => {
+    void syncTutorialProgress();
+  }, [user?.id]);
   // Na mesa (jogando, assistindo ou vendo um replay), a tela do celular não apaga.
   useWakeLock(inMatch && settings.keepAwake);
   usePushSync({

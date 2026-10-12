@@ -25,6 +25,7 @@ import { createPortal } from 'react-dom';
 import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
+import { coachTip } from '../game/tutorial/coachTips';
 import { type GameSetup, useGame } from '../game/useGame';
 import { audio } from '../audio';
 import { type Translate, useT, useTryT } from '../i18n';
@@ -407,7 +408,7 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const toTournament = Boolean(online?.room?.tournament);
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter, animations, replayCues, locale } = useSettings();
+  const { quickCounter, animations, replayCues, coachTips, locale } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -1361,6 +1362,7 @@ function Table({
         {logCard && <StaticCardZoom card={logCard} className="log-zoom" onClose={() => setLogCard(null)} />}
 
         {tutorial?.overlay}
+        {kind === 'bot' && !replay && !tutorial && coachTips && human !== null && !intro && !zoom && !logCard && !sheet && <CoachTipPill state={state} human={human} />}
         {tutorial && !wide && <div className={['coach-float', tutorial.floatAt ?? 'top'].join(' ')}>{tutorial.coach}</div>}
 
         {state.phase === 'gameover' && showResult && !tutorial && (
@@ -1453,6 +1455,29 @@ function Table({
           cue={cue}
         />
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ dicas do treinador
+
+/** Treino contra o bot com "Dicas do treinador": uma dica curta para o momento (some ao fechar até mudar). */
+function CoachTipPill({ state, human }: { state: GameState; human: PlayerId }) {
+  const t = useT();
+  const tryT = useTryT();
+  const tip = useMemo(() => coachTip(state, human), [state, human]);
+  const id = tip ? `${tip.key}|${state.turn}|${state.pending?.kind ?? ''}` : '';
+  const [closed, setClosed] = useState<string | null>(null);
+  if (!tip || closed === id) return null;
+  return (
+    <div className="coach-tip" role="status">
+      <span className="coach-tip-ico" aria-hidden="true">
+        <Icon name="learn" size={16} />
+      </span>
+      <span>{tryT(`coach.tip.${tip.key}`, tip.params) ?? tip.key}</span>
+      <button type="button" className="coach-tip-close" onClick={() => setClosed(id)} aria-label={t('common.close')}>
+        <Icon name="close" size={14} />
+      </button>
     </div>
   );
 }

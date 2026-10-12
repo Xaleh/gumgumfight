@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, useT } from '../i18n';
 import { ReportsPanel } from './Reports';
+import { TutorialFunnelPanel } from './TutorialFunnel';
 
 /** O que cada perfil pode fazer: chave do dicionário. */
 const ROLE_HELP: Record<Role, MessageKey> = {
@@ -14,11 +15,11 @@ const ROLE_HELP: Record<Role, MessageKey> = {
   dev: 'admin.roleHelp.dev',
 };
 
-/** Administração (só admin e dev): perfis das contas e os relatos de problemas das partidas. */
+/** Administração (só admin e dev): perfis das contas, relatos de problemas das partidas e o funil do tutorial. */
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
   const t = useT();
   const { user, refresh } = useAuth();
-  const [tab, setTab] = useState<'users' | 'reports'>('users');
+  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial'>('users');
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +70,12 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
           <button className={tab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>
             {t('admin.tabReports')}
           </button>
+          <button className={tab === 'tutorial' ? 'on' : ''} onClick={() => setTab('tutorial')}>
+            {t('tutorial.admin.tab')}
+          </button>
         </div>
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
+        {tab === 'tutorial' && <TutorialFunnelPanel />}
         {tab === 'users' && (
           <>
             <ul className="role-help muted small">

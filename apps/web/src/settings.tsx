@@ -23,6 +23,8 @@ export interface Settings {
   animations: boolean;
   /** Replay: mostra o clique/seleção do jogador (contorno, toque e legenda) antes de cada ação. */
   replayCues: boolean;
+  /** Treino contra o bot: dicas do treinador do tutorial na mesa (DON!! sobrando, Counter que salva...). */
+  coachTips: boolean;
   /** Tema claro, escuro ou o do sistema. */
   theme: Theme;
   /** Online: mostrar as mensagens e os emotes que o oponente manda. */
@@ -49,6 +51,7 @@ const EDITABLE: Editable[] = [
   'quickCounter',
   'animations',
   'replayCues',
+  'coachTips',
   'theme',
   'opponentChat',
   'sfxVolume',
@@ -74,6 +77,7 @@ const DEFAULTS: Settings = {
   quickCounter: false,
   animations: true,
   replayCues: true,
+  coachTips: false,
   theme: 'system',
   opponentChat: true,
   sfxVolume: 0.8,
@@ -265,7 +269,7 @@ function ThemeSeg({ compact }: { compact?: boolean }) {
 }
 
 /** Interruptor liga/desliga de uma opção. */
-function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boolean; label: string; onChange: (on: boolean) => void }) {
+export function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boolean; label: string; onChange: (on: boolean) => void }) {
   return (
     <button
       type="button"
@@ -433,6 +437,10 @@ export function SettingsControls() {
         <input type="checkbox" checked={s.replayCues} onChange={(e) => s.update({ replayCues: e.target.checked })} />
         {t('settings.replayCues')}
       </label>
+      <label className="check" title={t('settings.coachTipsHint')}>
+        <input type="checkbox" checked={s.coachTips} onChange={(e) => s.update({ coachTips: e.target.checked })} />
+        {t('settings.coachTips')}
+      </label>
       <label className="check" title={t('settings.opponentChatTitle')}>
         <input type="checkbox" checked={s.opponentChat} onChange={(e) => s.update({ opponentChat: e.target.checked })} />
         {t('settings.opponentChat')}
@@ -574,6 +582,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </OptionRow>
             <OptionRow title={t('settings.replayCues')} hint={t('settings.replayCuesHint')}>
               <Switch on={s.replayCues} label={t('settings.replayCues')} onChange={(on) => s.update({ replayCues: on })} />
+            </OptionRow>
+            <OptionRow title={t('settings.coachTips')} hint={t('settings.coachTipsHint')}>
+              <Switch on={s.coachTips} label={t('settings.coachTips')} onChange={(on) => s.update({ coachTips: on })} />
             </OptionRow>
             <OptionRow title={t('settings.opponentChat')} hint={t('settings.opponentChatHint')}>
               <Switch on={s.opponentChat} label={t('settings.opponentChat')} onChange={(on) => s.update({ opponentChat: on })} />

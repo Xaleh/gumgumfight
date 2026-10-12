@@ -228,7 +228,14 @@ export const api = {
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
   cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
+  tutorial: {
+    progress: () => get<TutorialProgressDto>('/api/tutorial/progress'),
+    saveProgress: (p: { done: string[]; dismissed: boolean; completed: boolean; reset?: boolean }) => send<TutorialProgressDto>('PUT', '/api/tutorial/progress', p),
+    /** Evento anônimo de lição (sem esperar resposta; falhas são ignoradas). */
+    event: (lesson: string, event: TutorialEventKind, step = '') => send<void>('POST', '/api/tutorial/events', { lesson, event, step }).catch(() => undefined),
+  },
   admin: {
+    tutorial: (days = 30) => get<{ days: number; since: string; lessons: TutorialFunnel[] }>(`/api/admin/tutorial?days=${days}`),
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
     setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
   },
@@ -393,7 +400,7 @@ export interface OnlineRoomInfo {
   status: 'waiting' | 'playing' | 'finished';
   /** Seu assento; null = você está assistindo. */
   you: PlayerId | null;
-  players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean }>;
+  players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean; apprentice?: boolean }>;
   spectators: number;
   clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null };
   /** `error`: texto em português; mostrar com `errorMessage(result, …)`, que traduz `errorCode`. */
@@ -680,6 +687,27 @@ export interface PlayerProfile {
   bounty: number;
   rankedGames: number;
   tier: string;
+  /** Concluiu o tutorial: título "Aprendiz da Grand Line" (só em /api/players/me). */
+  apprentice?: boolean;
+}
+
+/** Progresso do tutorial gravado no servidor (conta ou navegador). */
+export interface TutorialProgressDto {
+  done: string[];
+  dismissed: boolean;
+  apprentice: boolean;
+}
+
+export type TutorialEventKind = 'start' | 'step' | 'fail' | 'exit' | 'complete';
+
+/** Funil de uma lição na Administração. */
+export interface TutorialFunnel {
+  lesson: string;
+  starts: number;
+  completes: number;
+  exits: number;
+  fails: number;
+  steps: Array<{ step: string; reached: number; exits: number; fails: number }>;
 }
 
 export interface Tier {

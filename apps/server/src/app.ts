@@ -39,6 +39,7 @@ import { vapidKeys } from './push/store';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
+import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
 
 /** Objeto sem as chaves `undefined` (para não sobrescrever os padrões num spread). */
@@ -293,6 +294,7 @@ export function buildApp(
   registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined, notifier });
 
   registerReportRoutes(app, { db, user: auth.viewer });
+  registerTutorialRoutes(app, { db, viewerHash, user: auth.viewer, now: opts.now });
 
   app.get('/api/matches', async () => recentMatches(db));
 

@@ -114,6 +114,8 @@ export interface SeatInfo {
   token: string;
   /** Assento jogado pelo bot do servidor. */
   bot?: boolean;
+  /** Concluiu o tutorial: título "Aprendiz da Grand Line" ao lado do nome. */
+  apprentice?: boolean;
 }
 
 export interface RoomResult {
@@ -615,6 +617,7 @@ export class Room {
         name: s.name,
         bounty: s.bounty,
         tier: s.tier,
+        apprentice: Boolean(s.apprentice),
         leader: s.deck.leader,
         connected: this.connected(i as PlayerId),
         bot: Boolean(s.bot),
