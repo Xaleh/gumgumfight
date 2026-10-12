@@ -973,10 +973,16 @@ input[type='number'] {
     transform: translateX(100%);
   }
 }
-@media (max-width: 1279px) {
-  .live-pill-label {
-    display: none;
-  }
+/* Barra apertada (medido em `useSqueeze`, no AppShell): cada etapa esconde mais um pouco. */
+.topbar-inner[data-squeeze] .live-pill-label,
+.topbar-inner:is([data-squeeze='2'], [data-squeeze='3'], [data-squeeze='4']) .account-btn-name,
+.topbar-inner:is([data-squeeze='3'], [data-squeeze='4']) .topbar-link svg,
+.topbar-inner[data-squeeze='4'] .topbar-nav,
+.topbar-inner[data-squeeze='4'] .desktop-only {
+  display: none;
+}
+.topbar-inner[data-squeeze='4'] .menu-toggle {
+  display: grid;
 }
 @media (max-width: 1023px) {
   .topbar-nav,
