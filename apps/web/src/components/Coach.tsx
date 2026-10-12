@@ -47,7 +47,9 @@ export function Coach({
   // título e o que fazer), para não cobrir as cartas; os de leitura começam abertos.
   const floating = !useWideScreen() && Boolean(lesson.board);
   const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => setCollapsed(floating && Boolean(step?.do)), [index, floating, step]);
+  useEffect(() => {
+    setCollapsed(floating && Boolean(step?.do));
+  }, [index, floating, step]);
   useEffect(() => {
     if (run.failed) setCollapsed(false);
   }, [run.failed]);
