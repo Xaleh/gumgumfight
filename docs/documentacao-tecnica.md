@@ -956,6 +956,9 @@ instala Node 22 via nvm sem trocar o padrão, cria site separado, `proxy_read_ti
 
 ## 14. Capacidade: memória, CPU e banda (medições)
 
+> Atualizado em 2026-10-12: o [plano de escala](plano-de-escala.md) tem medições mais precisas de memória por sala,
+> o efeito da compressão do canal das partidas (−95% de banda) e o plano por fases. Onde divergir, vale ele.
+
 ### Como foi medido
 
 Pacote de produção (`release/server/index.mjs`, `NODE_ENV=production`, banco novo com as 735 cartas provisórias e os
@@ -1062,6 +1065,9 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 ---
 
 ## 15. Quando e como escalar a VPS
+
+> Atualizado em 2026-10-12: o [plano de escala](plano-de-escala.md) tem medições mais precisas de memória por sala,
+> o efeito da compressão do canal das partidas (−95% de banda) e o plano por fases. Onde divergir, vale ele.
 
 ### Sinais para agir (monitorar com `pm2 monit`, `pm2 logs`, `htop`, `GET /api/online/stats`)
 
