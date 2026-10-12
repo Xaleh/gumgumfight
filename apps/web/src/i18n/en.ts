@@ -1,6 +1,7 @@
 // English.
 
 import type { Messages } from './pt-BR';
+import tutorial from './tutorial/en';
 
 export default {
   // ---- general ----
@@ -2127,4 +2128,6 @@ export default {
   'status.untilNextRefresh': "until {name}'s next Refresh Phase",
   'status.untilAura': "while the other card's continuous effect lasts",
   // ==== /status ====
+  // ==== tutorial (i18n/tutorial) ====
+  ...tutorial,
 } satisfies Messages;

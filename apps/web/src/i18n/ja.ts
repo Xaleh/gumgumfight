@@ -1,6 +1,7 @@
 // 日本語.
 
 import type { Messages } from './pt-BR';
+import tutorial from './tutorial/ja';
 
 export default {
   // ---- 全般 ----
@@ -2127,4 +2128,6 @@ export default {
   'status.untilNextRefresh': '{name}の次のリフレッシュフェイズまで',
   'status.untilAura': 'もう一方のカードの永続効果が続く間',
   // ==== /status ====
+  // ==== tutorial (i18n/tutorial) ====
+  ...tutorial,
 } satisfies Messages;

@@ -154,6 +154,26 @@ const PATHS = {
       <path d="M4 21a8 8 0 0 1 16 0" />
     </>
   ),
+  learn: (
+    <>
+      <path d="M2 9l10-5 10 5-10 5z" />
+      <path d="M6 11.2V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.8" />
+      <path d="M22 9v6" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z" />
+      <path d="M4 21.5A2.5 2.5 0 0 1 6.5 19H20v3H6.5" />
+    </>
+  ),
+  bulb: (
+    <>
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

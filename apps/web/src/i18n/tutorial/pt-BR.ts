@@ -1,0 +1,501 @@
+// Textos do tutorial "Aprender a jogar" (português do Brasil, referência das chaves).
+// Chaves das lições: tutorial.<lição>.<passo>.title/body (+ .o1… .why no quiz, .fail no passo que pode dar errado).
+// Os termos das cartas ficam em inglês, como impressos ([On Play], [Blocker], DON!!...).
+
+const tutorialPtBR = {
+  // ---- home ----
+  'menu.navLearn': 'Aprender',
+  'menu.learnLink': 'Novo no jogo? Faça o tutorial',
+  'menu.learnKicker': 'Primeira vez aqui?',
+  'menu.learnTitle': 'Aprenda One Piece Card Game do zero',
+  'menu.learnSub': '{n} lições curtas na mesa de verdade, com um deck pronto. Não precisa de login.',
+  'menu.learnStart': 'Começar o tutorial',
+  'menu.learnContinue': 'Continuar o tutorial',
+  'menu.learnDismiss': 'Já sei jogar',
+
+  // ---- hub ----
+  'tutorial.title': 'Aprender a jogar',
+  'tutorial.heroKicker': 'Novo no One Piece Card Game?',
+  'tutorial.heroTitle': 'Aprenda a jogar',
+  'tutorial.heroSub':
+    '{n} lições curtas, jogadas na mesa de verdade. Cada mecânica tem explicação, demonstração e uma jogada sua para fixar. São cerca de {min} minutos no total, e dá para parar e voltar quando quiser.',
+  'tutorial.start': 'Começar pela lição 1',
+  'tutorial.continue': 'Continuar: lição {n}',
+  'tutorial.allDone': 'Rota completa! Agora é jogar contra o bot ou online.',
+  'tutorial.skipToBattle': 'Já sei jogar: ir para a batalha final',
+  'tutorial.progress': 'Seu progresso',
+  'tutorial.lessonsDone': '{n} de {total} lições',
+  'tutorial.chapters': 'capítulos',
+  'tutorial.minLeft': 'min restantes',
+  'tutorial.badges': '{n|insígnia|insígnias}',
+  'tutorial.route': 'Rota do Aprendiz',
+  'tutorial.routeHint': 'Ordem sugerida, mas todas as lições ficam abertas',
+  'tutorial.minutes': '{n} min',
+  'tutorial.doneShort': 'concluída',
+  'tutorial.badgeEarned': 'Insígnia conquistada: {name}',
+  'tutorial.glossary': 'Glossário',
+  'tutorial.glossaryHint': 'Os termos ficam em inglês, como impressos nas cartas. Toque num termo.',
+  'tutorial.seeLesson': 'Ver lição {n}: {name}',
+  'tutorial.reset': 'Recomeçar o tutorial do zero',
+  'tutorial.resetConfirm': 'Apagar o progresso do tutorial neste navegador?',
+  'tutorial.format.explain': 'Explicação',
+  'tutorial.format.discover': 'Toque e descubra',
+  'tutorial.format.guided': 'Ação guiada',
+  'tutorial.format.challenge': 'Desafio',
+  'tutorial.format.quiz': 'Quiz',
+  'tutorial.format.build': 'Montagem de deck',
+  'tutorial.format.match': 'Partida com dicas',
+  'tutorial.ch1.name': 'Fundamentos',
+  'tutorial.ch1.kicker': 'Capítulo 1 · East Blue',
+  'tutorial.ch1.desc': 'Para que serve cada carta, onde ela fica na mesa e como a partida começa.',
+  'tutorial.ch2.name': 'O turno',
+  'tutorial.ch2.kicker': 'Capítulo 2 · Grand Line',
+  'tutorial.ch2.desc': 'As fases do turno, como os DON!! pagam as cartas e o que cada tipo de carta faz.',
+  'tutorial.ch3.name': 'Combate',
+  'tutorial.ch3.kicker': 'Capítulo 3 · Novo Mundo',
+  'tutorial.ch3.desc': 'Atacar, turbinar com DON!!, defender com Blocker e Counter, e o que acontece com a Vida.',
+  'tutorial.ch4.name': 'Domínio',
+  'tutorial.ch4.kicker': 'Capítulo 4 · Rumo ao Yonkou',
+  'tutorial.ch4.desc': 'Palavras-chave dos efeitos, como montar um deck e uma partida inteira com dicas.',
+
+  // ---- treinador ----
+  'tutorial.lessonN': 'Lição {n} · {name}',
+  'tutorial.stepOf': 'Passo {n} de {total}',
+  'tutorial.coach': 'Treinador',
+  'tutorial.collapse': 'Recolher ou abrir o treinador',
+  'tutorial.next': 'Próximo',
+  'tutorial.finish': 'Concluir lição',
+  'tutorial.retry': 'Tentar de novo',
+  'tutorial.quiz': 'Alternativas',
+  'tutorial.coach.yourMove': 'Sua vez: faça a jogada na mesa.',
+  'tutorial.coach.wait': 'O oponente está jogando…',
+  'tutorial.coach.notThis': 'Essa jogada fica para depois. Nesta etapa, faça o que o treinador pede.',
+  'tutorial.coach.readFirst': 'Leia a explicação e toque em Próximo para continuar.',
+  'tutorial.coach.right': 'Certo!',
+  'tutorial.coach.wrong': 'Não foi dessa vez.',
+  'tutorial.coach.tryAgain': 'Tente outra alternativa.',
+  'tutorial.doneTitle': 'Lição concluída!',
+  'tutorial.doneBody': 'Bom trabalho. Siga para a próxima lição ou volte para a Rota do Aprendiz.',
+  'tutorial.doneAll': 'Você completou a Rota do Aprendiz! Agora é praticar: jogue contra o bot ou encare alguém online.',
+  'tutorial.backToHub': 'Voltar ao tutorial',
+  'tutorial.nextLesson': 'Próxima: {name}',
+  'tutorial.exitLesson': 'Sair da lição',
+  'tutorial.notFound': 'Lição não encontrada.',
+  'tutorial.loadFailed': 'Não deu para carregar as cartas do tutorial: {why}',
+  'tutorial.you': 'Você',
+  'tutorial.botName': 'Bot de treino',
+  'tutorial.openBuilder': 'Abrir Montar decks',
+  'tutorial.deckRules.cards': 'cartas no deck',
+  'tutorial.deckRules.leader': 'Líder, fora das 50',
+  'tutorial.deckRules.don': 'DON!! no deck de DON!!',
+  'tutorial.deckRules.copies': 'cópias no máximo de cada carta',
+  'tutorial.curveCaption': 'Deck inicial do Luffy (ST01): quantas cartas de cada custo',
+  'tutorial.curveCost': 'Custo {n}',
+
+  // ---- anatomia da carta ----
+  'tutorial.card.found': 'Partes descobertas: {n} de {total}',
+  'tutorial.card.kinds': 'Tipos de carta',
+  'tutorial.card.kind.character': 'Personagem',
+  'tutorial.card.kind.event': 'Evento',
+  'tutorial.card.kind.stage': 'Stage',
+  'tutorial.card.kind.leader': 'Líder',
+  'tutorial.card.lifeN': 'Vida {n}',
+  'tutorial.card.noEffect': '(sem efeito)',
+  'tutorial.card.noTrigger': '(sem [Trigger])',
+  'tutorial.card.tapHint': 'Toque numa parte da carta para saber para que ela serve.',
+  'tutorial.card.part.cost.title': 'Custo',
+  'tutorial.card.part.cost.body': 'Quantos DON!! você vira para jogar a carta da mão. O Líder não tem custo: ele já começa na mesa.',
+  'tutorial.card.part.power.title': 'Poder',
+  'tutorial.card.part.power.body': 'A força na batalha. O atacante com poder igual ou maior que o do alvo vence. Só Líder e Personagens têm poder.',
+  'tutorial.card.part.counter.title': 'Counter',
+  'tutorial.card.part.counter.body': 'O bônus que a carta dá quando você a descarta da mão para se defender (+1000 ou +2000). Só Personagens têm.',
+  'tutorial.card.part.attribute.title': 'Atributo',
+  'tutorial.card.part.attribute.body': 'O estilo de luta: Slash, Strike, Ranged, Special ou Wisdom. Sozinho não faz nada, mas alguns efeitos olham o atributo.',
+  'tutorial.card.part.effect.title': 'Efeito',
+  'tutorial.card.part.effect.body': 'O que a carta faz. As palavras entre colchetes dizem quando o efeito acontece. Regra de ouro: o texto da carta vence a regra geral.',
+  'tutorial.card.part.trigger.title': '[Trigger]',
+  'tutorial.card.part.trigger.body': 'Um efeito que você pode ativar quando a carta sai da sua Vida por dano, em vez de colocá-la na mão.',
+  'tutorial.card.part.name.title': 'Nome',
+  'tutorial.card.part.name.body': 'Efeitos citam nomes entre colchetes, como [Monkey.D.Luffy]. O limite de 4 cópias vale por número de carta.',
+  'tutorial.card.part.type.title': 'Tipo',
+  'tutorial.card.part.type.body': 'Grupos como Straw Hat Crew ou Supernovas. Muitos efeitos só funcionam com cartas de um tipo, o que guia a montagem do deck.',
+
+  // ---- lição 1 ----
+  'tutorial.goal.name': 'O objetivo do jogo',
+  'tutorial.goal.welcome.title': 'Bem-vindo à mesa!',
+  'tutorial.goal.welcome.body':
+    'One Piece Card Game é um duelo entre dois piratas. Cada jogador comanda um Líder e uma tripulação de Personagens. Esta partida já está no fim: você está a um ataque da vitória.',
+  'tutorial.goal.leader.title': 'O Líder',
+  'tutorial.goal.leader.body':
+    'O Líder é a carta no centro de cada lado. Ele nunca sai da mesa e define as cores do deck. Embaixo fica o seu (Luffy); em cima, o do oponente (Crocodile).',
+  'tutorial.goal.life.title': 'A Vida',
+  'tutorial.goal.life.body':
+    'Ao lado de cada Líder fica a Vida: cartas viradas para baixo que funcionam como escudo. Cada dano no Líder tira 1 carta da Vida. O oponente está com 0 de Vida: o próximo dano encerra a partida.',
+  'tutorial.goal.attack.title': 'Ataque o Líder!',
+  'tutorial.goal.attack.body':
+    'Toque no Zoro, escolha Atacar e toque no Líder do oponente (ou arraste o Zoro até ele). Sem Vida para proteger, o ataque que acertar o Líder vence a partida.',
+  'tutorial.goal.won.title': 'Vitória!',
+  'tutorial.goal.won.body':
+    'O Líder do oponente levou dano sem Vida para protegê-lo. Esse é o objetivo. Também perde quem fica com 0 cartas no deck. Nas próximas lições você aprende, passo a passo, como chegar até aqui.',
+
+  // ---- lição 2 ----
+  'tutorial.card.name': 'Anatomia da carta',
+  'tutorial.card.intro.title': 'A carta por dentro',
+  'tutorial.card.intro.body': 'Toda carta traz as mesmas informações nos mesmos lugares. Conhecendo cada parte, você lê qualquer carta num piscar de olhos.',
+  'tutorial.card.discover.title': 'Toque e descubra',
+  'tutorial.card.discover.body':
+    'Toque em cada parte da carta para ver para que ela serve. Troque o tipo de carta nas abas: algumas partes só aparecem em certos tipos (o [Trigger] está no Evento). Descubra as 8 partes para continuar.',
+  'tutorial.card.types.title': 'Os 5 tipos de carta',
+  'tutorial.card.types.body':
+    'Líder: define as cores e a Vida, nunca sai da mesa. Personagem: fica em campo, ataca e defende. Evento: efeito na hora, depois vai para o trash. Stage: cenário com efeito contínuo, 1 por vez. DON!!: a energia que paga tudo.',
+
+  // ---- lição 3 ----
+  'tutorial.table.name': 'A mesa e suas áreas',
+  'tutorial.table.intro.title': 'Cada coisa no seu lugar',
+  'tutorial.table.intro.body': 'A mesa tem áreas fixas, iguais para os dois jogadores. Vamos passar por cada uma do seu lado (embaixo). O oponente tem as mesmas, espelhadas em cima.',
+  'tutorial.table.leader.title': 'Líder',
+  'tutorial.table.leader.body':
+    'O coração do deck. Tem poder e Vida, ataca e pode ser atacado, mas nunca é nocauteado: quando perde uma batalha, você leva dano na Vida.',
+  'tutorial.table.characters.title': 'Personagens',
+  'tutorial.table.characters.body': 'Aqui ficam os Personagens que você joga, até 5 ao mesmo tempo. Eles atacam, bloqueiam e têm efeitos.',
+  'tutorial.table.stage.title': 'Stage',
+  'tutorial.table.stage.body': 'O espaço do cenário (Stage): cartas com efeito contínuo, como navios e ilhas. Só cabe 1 por vez.',
+  'tutorial.table.don.title': 'DON!!',
+  'tutorial.table.don.body':
+    'À esquerda, o deck de DON!! (10 cartas, separadas do deck principal). Ao lado, a área de custo com os DON!! que você já recebeu: em pé estão ativos, de lado já foram usados.',
+  'tutorial.table.deck.title': 'Deck e trash',
+  'tutorial.table.deck.body':
+    'O deck, virado para baixo, e o trash (descarte), virado para cima. Eventos usados e cartas nocauteadas ou descartadas vão para o trash. Toque no trash para ver o que tem lá.',
+  'tutorial.table.life.title': 'Vida',
+  'tutorial.table.life.body': 'Sua Vida: começa com tantas cartas quanto a Vida do Líder (5 no Luffy). Ela é secreta: nem você sabe quais cartas estão ali.',
+  'tutorial.table.hand.title': 'Mão',
+  'tutorial.table.hand.body': 'Sua mão fica embaixo e só você a vê. Não há limite de cartas na mão. Toque numa carta para ampliar e ler o efeito.',
+  'tutorial.table.opponent.title': 'O lado do oponente',
+  'tutorial.table.opponent.body':
+    'Em cima, o mesmo para o oponente. Você vê o campo dele e quantas cartas ele tem na mão, no deck e na Vida, mas não quais são as cartas da mão e da Vida.',
+  'tutorial.table.quiz.title': 'Teste rápido',
+  'tutorial.table.quiz.body': 'Quantos Personagens você pode ter em campo ao mesmo tempo?',
+  'tutorial.table.quiz.o1': '3',
+  'tutorial.table.quiz.o2': '5',
+  'tutorial.table.quiz.o3': '7',
+  'tutorial.table.quiz.why': 'No máximo 5. Para jogar o sexto, você escolhe um deles para ir ao trash (você vai ver isso na lição 7).',
+
+  // ---- lição 4 ----
+  'tutorial.setup.name': 'Preparação e mulligan',
+  'tutorial.setup.deck.title': 'Antes da partida',
+  'tutorial.setup.deck.body':
+    'Cada jogador traz um deck de 50 cartas, 1 Líder e 10 DON!!. O deck só pode ter cartas das cores do Líder e no máximo 4 cópias de cada carta.',
+  'tutorial.setup.leader.title': 'Líderes revelados',
+  'tutorial.setup.leader.body': 'Os Líderes começam virados para cima. A Vida de cada um é o número impresso no Líder: o Luffy tem 5, o Crocodile também.',
+  'tutorial.setup.first.title': 'Quem começa?',
+  'tutorial.setup.first.body':
+    'Um sorteio (pedra, papel e tesoura, na mesa de verdade) decide quem escolhe ir primeiro ou segundo. Nesta lição, você começa.',
+  'tutorial.setup.hand.title': 'Sua mão inicial',
+  'tutorial.setup.hand.body': 'Os dois embaralham e compram 5 cartas. Olhe as suas: cartas baratas (custo 1 a 3) ajudam a começar bem.',
+  'tutorial.setup.mulligan.title': 'Mulligan',
+  'tutorial.setup.mulligan.body':
+    'Uma vez, logo no começo, você pode devolver a mão inteira, embaralhar e comprar 5 cartas novas. Escolha: Manter mão ou Trocar mão.',
+  'tutorial.setup.life.title': 'A Vida vai para a mesa',
+  'tutorial.setup.life.body': 'Depois do mulligan, cada um coloca na Vida, viradas para baixo, cartas do topo do deck: 5 para o Luffy e 5 para o Crocodile.',
+  'tutorial.setup.firstTurn.title': 'O primeiro turno',
+  'tutorial.setup.firstTurn.body':
+    'Quem começa não compra carta no primeiro turno e recebe só 1 DON!!. E ninguém ataca no próprio primeiro turno. A partida está pronta!',
+
+  // ---- lição 5 ----
+  'tutorial.turn.name': 'As fases do turno',
+  'tutorial.turn.phases.title': 'Cinco fases',
+  'tutorial.turn.phases.body':
+    'Todo turno passa por 5 fases: Refresh, Draw, DON!!, Main e End. As três primeiras acontecem sozinhas; você só decide na Main Phase.',
+  'tutorial.turn.main.title': 'Main Phase',
+  'tutorial.turn.main.body':
+    'É a fase das decisões: jogar cartas, ativar efeitos, dar DON!! e atacar, na ordem que quiser. Neste turno você já jogou: a Nico Robin e o Líder estão virados e os DON!! foram usados.',
+  'tutorial.turn.end.title': 'Encerre o turno',
+  'tutorial.turn.end.body': 'Não há mais nada a fazer. Toque em Encerrar turno. O oponente joga o turno dele e depois volta a ser a sua vez.',
+  'tutorial.turn.refresh.title': 'Refresh Phase',
+  'tutorial.turn.refresh.body':
+    'Seu turno começou pela Refresh: o DON!! que estava dado ao Líder voltou para a área de custo, e tudo o que estava virado (Líder, Personagens, DON!!) ficou ativo de novo.',
+  'tutorial.turn.draw.title': 'Draw Phase',
+  'tutorial.turn.draw.body': 'Depois, você comprou 1 carta do topo do deck. Repare na mão: tem uma carta a mais.',
+  'tutorial.turn.don.title': 'DON!! Phase',
+  'tutorial.turn.don.body':
+    'Por fim, 2 DON!! saíram do deck de DON!! para a área de custo. Você tem mais energia do que no turno passado. Agora começa a Main Phase.',
+  'tutorial.turn.endPhase.title': 'End Phase',
+  'tutorial.turn.endPhase.body': 'Quando você encerra o turno, acontece a End Phase: os efeitos de "fim do turno" resolvem e a vez passa para o oponente.',
+  'tutorial.turn.quiz.title': 'Teste rápido',
+  'tutorial.turn.quiz.body': 'Em qual fase você joga cartas e ataca?',
+  'tutorial.turn.quiz.o1': 'Refresh',
+  'tutorial.turn.quiz.o2': 'Draw',
+  'tutorial.turn.quiz.o3': 'Main',
+  'tutorial.turn.quiz.o4': 'End',
+  'tutorial.turn.quiz.why': 'Na Main Phase. As outras fases são automáticas.',
+
+  // ---- lição 6 ----
+  'tutorial.don.name': 'DON!! e custo',
+  'tutorial.don.what.title': 'O que é DON!!',
+  'tutorial.don.what.body': 'Este é o seu deck de DON!!: 10 cartas que não fazem parte do deck de 50. Elas são a sua energia para jogar cartas e turbinar ataques.',
+  'tutorial.don.phase.title': 'Chegam 2 por turno',
+  'tutorial.don.phase.body': 'Na DON!! Phase de cada turno, 2 DON!! vão para a área de custo, ativos (em pé). Você está no seu terceiro turno e tem 4 DON!! ativos.',
+  'tutorial.don.cost.title': 'O número no canto',
+  'tutorial.don.cost.body':
+    'O número no canto da carta é o custo. Para jogar o Zoro, você vira (dá rest em) 3 DON!! ativos. DON!! virado já foi usado neste turno.',
+  'tutorial.don.play.title': 'Jogue o Zoro',
+  'tutorial.don.play.body': 'Toque no Zoro na sua mão e confirme, ou arraste-o para a mesa.',
+  'tutorial.don.rested.title': 'Zoro em campo',
+  'tutorial.don.rested.body':
+    'Três DON!! ficaram virados e só voltam a ficar ativos na sua próxima Refresh Phase. E o Zoro acabou de entrar: Personagem não ataca no turno em que é jogado, a não ser que tenha [Rush].',
+  'tutorial.don.quiz.title': 'E agora?',
+  'tutorial.don.quiz.body': 'Sobrou 1 DON!! ativo. Qual destas cartas da sua mão você ainda consegue jogar?',
+  'tutorial.don.quiz.o1': 'Nami (custo 1)',
+  'tutorial.don.quiz.o2': 'Sanji (custo 2)',
+  'tutorial.don.quiz.o3': 'Gum-Gum Jet Pistol (custo 4)',
+  'tutorial.don.quiz.why': 'Com 1 DON!! ativo dá para pagar só cartas de custo 1 (ou 0).',
+  'tutorial.don.playNami.title': 'Jogue a Nami',
+  'tutorial.don.playNami.body': 'Então jogue a Nami com o último DON!! ativo.',
+  'tutorial.don.recap.title': 'Resumo',
+  'tutorial.don.recap.body':
+    'DON!! ativos pagam o custo; os usados ficam virados até o próximo turno. Planejar quais cartas cabem nos DON!! do turno é metade do jogo.',
+
+  // ---- lição 7 ----
+  'tutorial.cards.name': 'Personagens, Eventos e Stage',
+  'tutorial.cards.types.title': 'Três tipos na mão',
+  'tutorial.cards.types.body':
+    'Na mão você tem três tipos de carta: Personagem (fica em campo), Evento (efeito na hora, depois vai para o trash) e Stage (cenário com efeito contínuo). Você tem 9 DON!! ativos para gastar.',
+  'tutorial.cards.stage.title': 'Jogue o Stage',
+  'tutorial.cards.stage.body': 'Jogue o Thousand Sunny (custo 2). Ele vai para o espaço do Stage.',
+  'tutorial.cards.stageOne.title': 'Só um Stage',
+  'tutorial.cards.stageOne.body':
+    'Você só pode ter 1 Stage. Se jogar outro, o antigo vai para o trash. O Thousand Sunny tem um efeito [Activate: Main] que você pode usar nos próximos turnos.',
+  'tutorial.cards.event.title': 'Jogue o Evento',
+  'tutorial.cards.event.body':
+    'O Gum-Gum Jet Pistol (custo 4) é um Evento [Main]: nocauteia (K.O.) 1 Personagem do oponente com 6000 de poder ou menos. Jogue-o e escolha o Pacifista.',
+  'tutorial.cards.event.fail': 'O Pacifista continua em campo: o Evento foi usado sem alvo. Tente de novo e escolha o Pacifista.',
+  'tutorial.cards.eventTrash.title': 'Evento no trash',
+  'tutorial.cards.eventTrash.body': 'O Evento resolveu e foi para o seu trash. O Pacifista, nocauteado, foi para o trash do oponente.',
+  'tutorial.cards.limit.title': 'Campo cheio',
+  'tutorial.cards.limit.body': 'Você já tem 5 Personagens, o máximo. Mesmo assim dá para jogar mais um: veja o que acontece.',
+  'tutorial.cards.sixth.title': 'O sexto Personagem',
+  'tutorial.cards.sixth.body':
+    'Jogue o Brook (custo 2). Com o campo cheio, você escolhe um dos seus Personagens para ir ao trash e abrir espaço. Depois, o efeito [On Play] do Brook pergunta a quem dar DON!!.',
+  'tutorial.cards.notKo.title': 'Trocado, não nocauteado',
+  'tutorial.cards.notKo.body':
+    'O Personagem que saiu foi para o trash pela regra do limite, sem ser nocauteado: efeitos de [On K.O.] não ativam. E o Brook entrou com o efeito [On Play] dele.',
+
+  // ---- lição 8 ----
+  'tutorial.attack.name': 'Atacar',
+  'tutorial.attack.declare.title': 'Quem pode atacar',
+  'tutorial.attack.declare.body':
+    'Na Main Phase, seu Líder e seus Personagens ativos (em pé) podem atacar. Ao atacar, a carta vira (rest) e não ataca de novo neste turno.',
+  'tutorial.attack.targets.title': 'Quem pode ser atacado',
+  'tutorial.attack.targets.body':
+    'O alvo é o Líder do oponente ou um Personagem dele que esteja virado (rested). Personagens em pé não podem ser atacados: o Edward Weevil está protegido.',
+  'tutorial.attack.power.title': 'Quem vence',
+  'tutorial.attack.power.body': 'Compara-se o poder: se o atacante tiver poder igual ou maior que o do alvo, ele vence. Empate é do atacante!',
+  'tutorial.attack.hitLeader.title': 'Ataque o Líder',
+  'tutorial.attack.hitLeader.body': 'Ataque o Líder do oponente com o Zoro: 5000 contra 5000. Toque no Zoro, escolha Atacar e toque no Líder do oponente.',
+  'tutorial.attack.damage.title': 'Dano!',
+  'tutorial.attack.damage.body': 'Empate, vitória do atacante: o Líder do oponente levou 1 dano e a carta do topo da Vida dele foi para a mão dele.',
+  'tutorial.attack.hitCharacter.title': 'Ataque um Personagem',
+  'tutorial.attack.hitCharacter.body': 'Agora ataque o Buggy (3000, virado) com o seu Líder (5000).',
+  'tutorial.attack.ko.title': 'K.O.',
+  'tutorial.attack.ko.body':
+    'O Personagem que perde a batalha é nocauteado (K.O.) e vai para o trash. O Líder nunca é nocauteado: no lugar, perde Vida. O Edward Weevil, em pé, não podia ser atacado.',
+
+  // ---- lição 9 ----
+  'tutorial.giveDon.name': 'Dar DON!! (+1000)',
+  'tutorial.giveDon.why.title': 'Falta força',
+  'tutorial.giveDon.why.body': 'A Nico Robin tem 5000 e o Pacifista do oponente, virado, tem 6000. Atacando assim, a Robin perde a batalha.',
+  'tutorial.giveDon.how.title': 'Dar DON!!',
+  'tutorial.giveDon.how.body':
+    'Na Main Phase, você pode dar DON!! ativos ao seu Líder ou a um Personagem. Cada DON!! dado vale +1000 de poder durante o seu turno.',
+  'tutorial.giveDon.give.title': 'Dê 1 DON!! à Robin',
+  'tutorial.giveDon.give.body': 'Toque na Robin e escolha +1 DON!! (ou arraste um DON!! ativo até ela).',
+  'tutorial.giveDon.attack.title': 'Agora sim, ataque',
+  'tutorial.giveDon.attack.body': 'Com 6000, a Robin empata com o Pacifista, e empate é do atacante. Ataque o Pacifista com a Robin.',
+  'tutorial.giveDon.leader.title': 'De novo, com o Líder',
+  'tutorial.giveDon.leader.body': 'Sobraram 2 DON!!. Dê ao seu Líder e ataque o Líder do oponente.',
+  'tutorial.giveDon.donX.title': '[DON!! x1]',
+  'tutorial.giveDon.donX.body':
+    'Algumas cartas pedem DON!! dados para ligar um efeito. O Zoro tem [DON!! x1]: com pelo menos 1 DON!! dado a ele, ganha +1000 a mais.',
+  'tutorial.giveDon.back.title': 'E depois?',
+  'tutorial.giveDon.back.body':
+    'DON!! dado não paga mais custos neste turno. Na sua próxima Refresh Phase, os DON!! dados voltam para a área de custo e ficam ativos de novo.',
+
+  // ---- lição 10 ----
+  'tutorial.defense.name': 'Defender: Blocker e Counter',
+  'tutorial.defense.theirTurn.title': 'Turno do oponente',
+  'tutorial.defense.theirTurn.body':
+    'Agora é o oponente quem ataca. No turno dele você não joga cartas, mas pode se defender de dois jeitos: [Blocker] e Counter.',
+  'tutorial.defense.steps.title': 'As etapas do ataque',
+  'tutorial.defense.steps.body':
+    'Cada ataque tem etapas: o atacante declara o alvo; no Block Step você pode bloquear; no Counter Step você pode usar Counters; por fim compara-se o poder.',
+  'tutorial.defense.incoming.title': 'Lá vem o ataque',
+  'tutorial.defense.incoming.body': 'O oponente vai declarar o ataque. Espere um instante.',
+  'tutorial.defense.block.title': 'Bloqueie com o Chopper',
+  'tutorial.defense.block.body': 'O Crocodile (5000) ataca seu Líder. O Chopper tem [Blocker]: toque nele para virá-lo e torná-lo o novo alvo do ataque.',
+  'tutorial.defense.blocked.title': 'Bloqueado',
+  'tutorial.defense.blocked.body':
+    'O Chopper agora é o alvo: com 1000 contra 5000 ele vai ser nocauteado, mas a sua Vida fica intacta. No Counter Step, não use nada: toque em Não usar Counter.',
+  'tutorial.defense.next.title': 'Mais um ataque',
+  'tutorial.defense.next.body': 'Agora o Pacifista (6000) vai atacar seu Líder (5000). Sem Blocker em campo, vem direto o Counter Step.',
+  'tutorial.defense.counter.title': 'Use Counter',
+  'tutorial.defense.counter.body':
+    'Cartas da mão com Counter podem ser descartadas para dar poder ao seu Líder nesta batalha. Ele precisa ficar com MAIS de 6000, porque empate é do atacante. Toque nos Counters e depois em Não usar mais Counter.',
+  'tutorial.defense.counter.fail':
+    'Seu Líder levou dano. O defensor precisa ficar com mais poder que o atacante: 6000 contra 6000 perde. Tente de novo (a Nami dá +1000; o Brook, +2000).',
+  'tutorial.defense.recap.title': 'Defesa feita',
+  'tutorial.defense.recap.body':
+    'Os Counters usados foram para o trash, e o bônus vale só naquela batalha. Também existem Eventos de [Counter], que custam DON!!. Cartas na mão são a sua defesa: gastar todas no seu turno deixa você sem proteção.',
+
+  // ---- lição 11 ----
+  'tutorial.damage.name': 'Dano, Vida e Trigger',
+  'tutorial.damage.life.title': 'Vida é escudo',
+  'tutorial.damage.life.body': 'Quando seu Líder perde uma batalha, você leva 1 de dano: a carta do topo da sua Vida vai para a sua mão. Perde Vida, mas ganha carta.',
+  'tutorial.damage.incoming.title': 'Ataque a caminho',
+  'tutorial.damage.incoming.body': 'O Pacifista (6000) vai atacar seu Líder.',
+  'tutorial.damage.noCounter.title': 'Sem Counter desta vez',
+  'tutorial.damage.noCounter.body': 'As cartas da sua mão não têm Counter. Toque em Concluir e receba o dano.',
+  'tutorial.damage.trigger.title': '[Trigger]!',
+  'tutorial.damage.trigger.body':
+    'A carta da Vida tem [Trigger]: em vez de ir para a mão, ela pode ser ativada de graça. O Trigger do Gum-Gum Jet Pistol nocauteia 1 Personagem de até 6000. Ative-o e escolha o Pacifista.',
+  'tutorial.damage.trigger.fail': 'O Pacifista continua em campo. Desta vez, ative o [Trigger] e escolha o Pacifista como alvo.',
+  'tutorial.damage.recap.title': 'Virada!',
+  'tutorial.damage.recap.body':
+    'Você levou o dano, mas o Trigger nocauteou o atacante. Cada dano recebido pode virar uma surpresa: por isso a Vida é secreta.',
+  'tutorial.damage.more.title': 'Outros tipos de dano',
+  'tutorial.damage.more.body':
+    '[Double Attack]: o ataque que acerta o Líder causa 2 de dano. [Banish]: a carta da Vida vai direto para o trash, sem ir para a mão e sem Trigger.',
+  'tutorial.damage.lose.title': 'Quando se perde',
+  'tutorial.damage.lose.body': 'Com 0 de Vida, o próximo dano no Líder perde a partida. E quem fica com 0 cartas no deck também perde.',
+
+  // ---- lição 12 ----
+  'tutorial.keywords.name': 'Palavras-chave e efeitos',
+  'tutorial.keywords.intro.title': 'Palavras entre colchetes',
+  'tutorial.keywords.intro.body':
+    'O texto das cartas usa palavras-chave em inglês, entre colchetes, que dizem quando e como um efeito acontece. Vamos ver as mais comuns em cartas de verdade.',
+  'tutorial.keywords.onPlay.title': '[On Play]',
+  'tutorial.keywords.onPlay.body': 'Ativa quando a carta é jogada da mão. O Brook, ao entrar, dá até 2 DON!! virados ao Líder ou a um Personagem.',
+  'tutorial.keywords.whenAttacking.title': '[When Attacking]',
+  'tutorial.keywords.whenAttacking.body': 'Ativa quando a carta declara um ataque. O Jinbe, com 1 DON!! dado, dá +1000 a outra carta sua quando ataca.',
+  'tutorial.keywords.activateMain.title': '[Activate: Main]',
+  'tutorial.keywords.activateMain.body': 'Um efeito que você ativa quando quiser na sua Main Phase, fora de batalha. A Nami dá 1 DON!! virado a uma carta sua.',
+  'tutorial.keywords.oncePerTurn.title': '[Once Per Turn]',
+  'tutorial.keywords.oncePerTurn.body': 'O efeito só pode ser usado uma vez por turno. O Líder Luffy dá 1 DON!! virado por turno.',
+  'tutorial.keywords.donX.title': '[DON!! x1]',
+  'tutorial.keywords.donX.body': 'O efeito só vale enquanto a carta tem pelo menos esse número de DON!! dados. O Zoro com 1 DON!! dado ganha +1000.',
+  'tutorial.keywords.donMinus.title': 'DON!! −X',
+  'tutorial.keywords.donMinus.body':
+    'Um custo: devolver X DON!! do seu campo para o deck de DON!!. O Líder Crocodile devolve 4 DON!! para usar o efeito dele. Poderoso, mas tira energia.',
+  'tutorial.keywords.rush.title': '[Rush]',
+  'tutorial.keywords.rush.body': 'O Personagem pode atacar no mesmo turno em que foi jogado. Este Luffy (custo 5) entra e já ataca.',
+  'tutorial.keywords.blocker.title': '[Blocker]',
+  'tutorial.keywords.blocker.body': 'No ataque do oponente, você vira este Personagem e ele passa a ser o alvo. O Chopper protege o seu Líder.',
+  'tutorial.keywords.counter.title': '[Counter]',
+  'tutorial.keywords.counter.body': 'Evento usado no Counter Step, no turno do oponente, pagando o custo. O Guard Point dá +3000 a uma carta sua durante a batalha.',
+  'tutorial.keywords.trigger.title': '[Trigger]',
+  'tutorial.keywords.trigger.body':
+    'Ativa quando a carta sai da Vida por dano, no lugar de ir para a mão. O Trigger do Gum-Gum Jet Pistol ativa o efeito [Main] dele.',
+  'tutorial.keywords.q1.title': 'Pergunta 1',
+  'tutorial.keywords.q1.body': 'Este Luffy tem [Rush]. O que isso permite?',
+  'tutorial.keywords.q1.o1': 'Atacar duas vezes por turno',
+  'tutorial.keywords.q1.o2': 'Atacar no turno em que é jogado',
+  'tutorial.keywords.q1.o3': 'Não poder ser bloqueado',
+  'tutorial.keywords.q1.why': '[Rush] tira a espera: o Personagem ataca no mesmo turno em que entra. Dano dobrado é [Double Attack].',
+  'tutorial.keywords.q2.title': 'Pergunta 2',
+  'tutorial.keywords.q2.body': 'Quando o efeito [On Play] do Brook ativa?',
+  'tutorial.keywords.q2.o1': 'Quando ele é jogado da mão',
+  'tutorial.keywords.q2.o2': 'Quando ele ataca',
+  'tutorial.keywords.q2.o3': 'No começo de cada turno',
+  'tutorial.keywords.q2.why': '[On Play] ativa uma vez, quando a carta entra em campo vinda da mão.',
+  'tutorial.keywords.q3.title': 'Pergunta 3',
+  'tutorial.keywords.q3.body': 'O efeito do Líder Crocodile tem DON!! −4. O que isso significa?',
+  'tutorial.keywords.q3.o1': 'Ele dá 4 DON!! ao oponente',
+  'tutorial.keywords.q3.o2': 'Ele perde 4000 de poder',
+  'tutorial.keywords.q3.o3': 'Você devolve 4 DON!! do campo ao deck de DON!!',
+  'tutorial.keywords.q3.why': 'DON!! −X é um custo: os DON!! voltam para o deck de DON!! e você fica com menos energia.',
+
+  // ---- lição 13 ----
+  'tutorial.deck.name': 'Montar seu primeiro deck',
+  'tutorial.deck.rules.title': 'As regras do deck',
+  'tutorial.deck.rules.body': 'Um deck tem exatamente 50 cartas, mais o Líder (fora das 50) e 10 DON!!. No máximo 4 cópias de cada carta (mesmo número).',
+  'tutorial.deck.colors.title': 'As cores do Líder',
+  'tutorial.deck.colors.body':
+    'O Líder define as cores: o deck só pode ter cartas das cores dele. O Luffy (ST01) é vermelho, então o deck é todo vermelho. Líderes de duas cores aceitam as duas.',
+  'tutorial.deck.curve.title': 'A curva de custo',
+  'tutorial.deck.curve.body':
+    'Um bom deck tem muitas cartas baratas para os primeiros turnos e poucas caras para o fim da partida. Veja como o deck inicial do Luffy se distribui.',
+  'tutorial.deck.counters.title': 'Counters',
+  'tutorial.deck.counters.body':
+    'Conte quantas cartas com Counter o deck tem: elas são a sua defesa no turno do oponente. Com pouco Counter, a sua Vida acaba rápido.',
+  'tutorial.deck.triggers.title': 'Triggers',
+  'tutorial.deck.triggers.body': 'Cartas com [Trigger] podem salvar você quando saem da Vida. Não são obrigatórias, mas dão chances de virada.',
+  'tutorial.deck.q1.title': 'Pergunta 1',
+  'tutorial.deck.q1.body': 'Quantas cópias de uma mesma carta um deck pode ter?',
+  'tutorial.deck.q1.o1': '2',
+  'tutorial.deck.q1.o2': '4',
+  'tutorial.deck.q1.o3': 'Quantas quiser',
+  'tutorial.deck.q1.why': 'No máximo 4 cópias de cada número de carta (a não ser que uma carta diga outra coisa).',
+  'tutorial.deck.q2.title': 'Pergunta 2',
+  'tutorial.deck.q2.body': 'Seu Líder é vermelho. Qual carta pode entrar no deck?',
+  'tutorial.deck.q2.o1': 'Um Personagem azul',
+  'tutorial.deck.q2.o2': 'Um Evento verde',
+  'tutorial.deck.q2.o3': 'Um Personagem vermelho',
+  'tutorial.deck.q2.why': 'Só entram cartas das cores do Líder. Um Líder vermelho aceita só cartas vermelhas.',
+  'tutorial.deck.builder.title': 'Hora de montar',
+  'tutorial.deck.builder.body':
+    'Os decks iniciais já vêm prontos para jogar. Quando quiser criar o seu, abra Montar decks: o app confere as regras para você.',
+
+  // ---- lição 14 ----
+  'tutorial.battle.name': 'Batalha final contra o bot',
+  'tutorial.battle.intro.title': 'A grande final',
+  'tutorial.battle.intro.body':
+    'Agora é uma partida inteira contra o bot no nível fácil: seu Luffy contra o Crocodile. Use tudo o que aprendeu. O treinador vai dando dicas durante a partida.',
+  'tutorial.battle.play.title': 'Sua partida',
+  'tutorial.battle.play.body': 'Jogue a partida até o fim.',
+  'tutorial.battle.over.title': 'Fim de jogo',
+  'tutorial.battle.over.body': 'Ganhando ou perdendo, você já conhece as regras básicas. Continue treinando contra o bot ou jogue online.',
+  'tutorial.battle.won': 'Você venceu!',
+  'tutorial.battle.lost': 'Desta vez o bot venceu.',
+  'tutorial.battle.tipLead': 'Dica:',
+  'tutorial.battle.tip.mulligan': 'Mão com cartas de custo 1 a 3 é boa para começar. Se só tiver cartas caras, troque.',
+  'tutorial.battle.tip.block': 'Bloquear protege a Vida, mas o Blocker pode ser nocauteado. Vale quando o ataque é forte.',
+  'tutorial.battle.tip.counter':
+    'Para defender, seu alvo precisa ficar com MAIS poder que o atacante. Nem sempre vale gastar cartas: às vezes é melhor levar o dano e ganhar a carta da Vida.',
+  'tutorial.battle.tip.trigger': 'Carta de Vida com [Trigger]: ative se o efeito ajudar agora; senão, ela vai para a sua mão.',
+  'tutorial.battle.tip.choice': 'O jogo está pedindo uma escolha: leia a pergunta na mesa.',
+  'tutorial.battle.tip.theirTurn': 'Turno do oponente. Fique de olho nos ataques: você poderá bloquear e usar Counter.',
+  'tutorial.battle.tip.firstTurn': 'Primeiro turno: ninguém ataca. Jogue uma carta barata e encerre o turno.',
+  'tutorial.battle.tip.spend': 'Você ainda tem DON!! ativos: jogue cartas, dê DON!! a quem vai atacar e só então ataque.',
+  'tutorial.battle.tip.attack': 'DON!! gastos. Ataque com quem estiver em pé e depois encerre o turno.',
+  'tutorial.battle.tip.over': 'Partida encerrada!',
+
+  // ---- glossário ----
+  'tutorial.term.leader': 'A carta principal do deck. Define as cores e a Vida, ataca e pode ser atacada, e nunca sai da mesa.',
+  'tutorial.term.life': 'Cartas viradas para baixo ao lado do Líder. Cada dano tira 1, que vai para a mão. Com 0 de Vida, o próximo dano perde a partida.',
+  'tutorial.term.don': 'A energia do jogo: 10 cartas no deck de DON!!. Pagam custos e dão +1000 quando dadas a uma carta, no seu turno.',
+  'tutorial.term.rest': 'Active: carta em pé, pronta para usar. Rested: carta virada de lado, já usada. Tudo volta a ficar active na sua Refresh Phase.',
+  'tutorial.term.cost': 'Quantos DON!! ativos você vira para jogar a carta.',
+  'tutorial.term.power': 'A força numa batalha. O atacante vence com poder igual ou maior que o do alvo.',
+  'tutorial.term.counter':
+    'Bônus de poder que um Personagem dá quando é descartado da mão no Counter Step. Também é o nome dos Eventos [Counter], usados na defesa.',
+  'tutorial.term.blocker': 'No ataque do oponente, você vira este Personagem e ele passa a ser o alvo.',
+  'tutorial.term.trigger': 'Efeito que pode ser ativado quando a carta sai da Vida por dano, no lugar de ir para a mão.',
+  'tutorial.term.rush': 'O Personagem pode atacar no turno em que é jogado.',
+  'tutorial.term.onPlay': 'Efeito que ativa quando a carta é jogada da mão.',
+  'tutorial.term.whenAttacking': 'Efeito que ativa quando a carta declara um ataque.',
+  'tutorial.term.activateMain': 'Efeito que você ativa na sua Main Phase, fora de batalha.',
+  'tutorial.term.oncePerTurn': 'O efeito só pode ser usado uma vez por turno.',
+  'tutorial.term.donX': 'O efeito vale enquanto a carta tem pelo menos X DON!! dados.',
+  'tutorial.term.donMinus': 'Custo: devolver X DON!! do seu campo ao deck de DON!!.',
+  'tutorial.term.doubleAttack': 'O ataque que acerta o Líder causa 2 de dano.',
+  'tutorial.term.banish': 'O dano manda a carta da Vida para o trash, sem Trigger.',
+  'tutorial.term.ko': 'Nocaute: o Personagem vai para o trash. Acontece quando ele perde uma batalha ou por efeito.',
+  'tutorial.term.trash': 'O descarte, virado para cima. Recebe Eventos usados e cartas nocauteadas ou descartadas.',
+  'tutorial.term.mulligan': 'No começo da partida, trocar a mão inicial inteira por 5 cartas novas, uma única vez.',
+  'tutorial.term.stage': 'Carta de cenário com efeito contínuo. Cada jogador tem no máximo 1.',
+  'tutorial.term.event': 'Carta de efeito único: resolve e vai para o trash.',
+} as const;
+
+export type TutorialKey = keyof typeof tutorialPtBR;
+export type TutorialMessages = Record<TutorialKey, string>;
+
+export default tutorialPtBR;

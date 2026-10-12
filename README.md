@@ -416,6 +416,15 @@ na linha de comando):
 npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a URL de /api/cards
 ```
 
+## Aprender a jogar (tutorial)
+
+Para quem nunca jogou One Piece Card Game: **Aprender** no menu (ou o convite "Primeira vez aqui?" na home) abre a
+**Rota do Aprendiz**, com 14 lições curtas em 4 capítulos (Fundamentos, O turno, Combate e Domínio). As lições rodam
+na mesa de verdade, com cenários prontos montados pelo motor: um treinador explica cada passo, destaca as áreas da mesa
+e pede uma jogada, travando as outras até a hora certa. Há também a anatomia da carta (toque e descubra), quizzes, um
+glossário de termos e uma partida final contra o bot fácil com dicas. Não precisa de login; o progresso fica no
+navegador. Como escrever uma lição nova: [`docs/tutorial.md`](docs/tutorial.md).
+
 ## Como jogar
 
 - **Mulligan:** no início, mantenha ou troque a mão (uma vez).
@@ -630,7 +639,7 @@ Mozilla, Microsoft ou Apple). As chaves nascem sozinhas no banco; não há nada 
 ## Testes
 
 ```bash
-npm test                                   # regras, tradução, importador, API e 200 partidas bot x bot
+npm test                                   # regras, tradução, importador, API, 200 partidas bot x bot e as lições do tutorial
 npm run simulate -w @gumgum/engine -- 500  # estatísticas de N partidas bot x bot
 npm run typecheck
 ```

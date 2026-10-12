@@ -6,6 +6,8 @@ import { Admin } from './components/Admin';
 import { Coverage } from './components/Coverage';
 import { DeckBuilder } from './components/DeckBuilder';
 import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/GameScreen';
+import { Learn } from './components/Learn';
+import { Lesson } from './components/Lesson';
 import { Menu } from './components/Menu';
 import { Stats } from './components/Stats';
 import { Tournaments } from './components/Tournaments';
@@ -21,6 +23,9 @@ type Screen =
   | { name: 'stats' }
   | { name: 'admin' }
   | { name: 'watch-list' }
+  /** Tutorial "Aprender a jogar": a lista de lições e uma lição aberta. */
+  | { name: 'learn' }
+  | { name: 'lesson'; id: string }
   /** `tournament`: veio da página de um torneio (e volta para ela); `home`: veio do "Ao vivo agora" do menu. */
   | { name: 'watch'; target: WatchTarget; tournament?: string; home?: boolean }
   | { name: 'tournaments'; id?: string }
@@ -62,7 +67,7 @@ export function App() {
     }
   }, [screen]);
   // Música do menu em toda tela fora da mesa (a mesa troca para a música da partida ao abrir).
-  const inMatch = screen.name === 'game' || screen.name === 'online' || screen.name === 'watch';
+  const inMatch = screen.name === 'game' || screen.name === 'online' || screen.name === 'watch' || screen.name === 'lesson';
   useEffect(() => {
     if (!inMatch) audio.music('menu');
   }, [inMatch]);
@@ -111,6 +116,18 @@ export function App() {
   }, []);
   const dev = isDev(role);
   if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'learn') return <Learn onExit={() => setScreen({ name: 'menu' })} onLesson={(id) => setScreen({ name: 'lesson', id })} />;
+  if (screen.name === 'lesson') {
+    return (
+      <Lesson
+        key={screen.id}
+        id={screen.id}
+        onHub={() => setScreen({ name: 'learn' })}
+        onLesson={(id) => setScreen({ name: 'lesson', id })}
+        onBuildDecks={() => setScreen({ name: 'builder' })}
+      />
+    );
+  }
   if (screen.name === 'coverage' && dev) return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} />;
   if (screen.name === 'admin' && isAdmin(role)) {
@@ -182,6 +199,7 @@ export function App() {
     <Menu
       onStart={(setup) => setScreen({ name: 'game', setup, key: Date.now() })}
       onBuildDecks={() => setScreen({ name: 'builder' })}
+      onLearn={() => setScreen({ name: 'learn' })}
       onCoverage={dev ? () => setScreen({ name: 'coverage' }) : undefined}
       onStats={() => setScreen({ name: 'stats' })}
       onOnline={(seat) => setScreen({ name: 'online', seat })}
