@@ -2,7 +2,7 @@
 // No desktop as seções ficam na barra; abaixo de 1024 px elas vão para o menu ☰
 // (gaveta lateral), junto com a conta e os atalhos de admin/dev.
 
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ROLE_LABEL } from '../api';
 import { GoogleButton, useAuth } from '../auth';
 import { LOCALES, useT } from '../i18n';
@@ -27,6 +27,47 @@ function useEscape(open: boolean, close: () => void) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, close]);
+}
+
+/** Etapas de aperto da barra, da mais leve à mais forte (ver `useSqueeze`). */
+const SQUEEZE_STEPS = ['1', '2', '3', '4'] as const;
+
+/**
+ * Aperta a barra quando as seções não cabem ao lado do bloco da direita: esconde a palavra
+ * "conectados" (1), o nome da conta (2), os ícones das seções (3) e, por fim, manda as seções
+ * para o menu ☰ (4). A largura dos textos muda com o idioma e o nome da conta, então mede em vez
+ * de usar um ponto de quebra fixo. Mede a cada render (o contador e o nome mudam), ao mudar a
+ * largura da barra e quando as fontes terminam de carregar.
+ */
+function useSqueeze(innerRef: RefObject<HTMLDivElement>, navRef: RefObject<HTMLElement>) {
+  useLayoutEffect(() => {
+    fit();
+  });
+  useEffect(() => {
+    const inner = innerRef.current;
+    if (!inner) return;
+    let lastWidth = inner.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (inner.clientWidth === lastWidth) return;
+      lastWidth = inner.clientWidth;
+      fit();
+    });
+    ro.observe(inner);
+    void document.fonts?.ready.then(fit);
+    return () => ro.disconnect();
+  }, []);
+
+  function fit() {
+    const inner = innerRef.current;
+    const nav = navRef.current;
+    if (!inner || !nav) return;
+    const fits = () => nav.scrollWidth <= nav.clientWidth;
+    delete inner.dataset.squeeze;
+    for (const step of SQUEEZE_STEPS) {
+      if (fits()) return;
+      inner.dataset.squeeze = step;
+    }
+  }
 }
 
 function Avatar() {
@@ -174,6 +215,9 @@ export function TopBar({
   const [drawer, setDrawer] = useState(false);
   const [account, setAccount] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  useSqueeze(innerRef, navRef);
   useEscape(drawer, () => setDrawer(false));
   useEscape(account, () => setAccount(false));
 
@@ -201,7 +245,7 @@ export function TopBar({
 
   return (
     <header className="topbar">
-      <div className="home-wrap topbar-inner">
+      <div className="home-wrap topbar-inner" ref={innerRef}>
         <button type="button" className="topbar-logo" onClick={onHome} aria-label={t('topbar.home')}>
           <picture>
             <source media="(max-width: 480px)" srcSet="/brand/header-mark.svg" />
@@ -209,7 +253,7 @@ export function TopBar({
           </picture>
         </button>
 
-        <nav className="topbar-nav" aria-label={t('topbar.nav')}>
+        <nav className="topbar-nav" ref={navRef} aria-label={t('topbar.nav')}>
           {nav.map((item) => (
             <NavButton key={item.key} item={item} className="topbar-link" />
           ))}
