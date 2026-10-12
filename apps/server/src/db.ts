@@ -578,6 +578,11 @@ export function getDeck(db: DB, id: string): StoredDeck | null {
   return row ? toDeck(row) : null;
 }
 
+/** Só o nome (o dono e as cartas continuam). */
+export function renameDeck(db: DB, id: string, name: string): boolean {
+  return Number(db.prepare(`UPDATE decks SET name = ?, updated_at = datetime('now') WHERE id = ? AND kind = 'user'`).run(name, id).changes) > 0;
+}
+
 export function deleteDeck(db: DB, id: string): boolean {
   return Number(db.prepare(`DELETE FROM decks WHERE id = ? AND kind = 'user'`).run(id).changes) > 0;
 }

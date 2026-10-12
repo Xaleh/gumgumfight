@@ -14,7 +14,7 @@ import type { FastifyRequest } from 'fastify';
 import { existsSync } from 'node:fs';
 import { type GoogleKeys, googleKeyStore } from './auth/google';
 import { registerAuth } from './auth/routes';
-import { accountOwnerKey } from './auth/store';
+import { accountOwnerKey, isAdmin } from './auth/store';
 import { type ServerOptions, serverOptions } from './config';
 import { fail, isPlayerError, type PlayerError } from './errors';
 import {
@@ -26,6 +26,7 @@ import {
   listCards,
   listDecks,
   recentMatches,
+  renameDeck,
   type StoredDeck,
   upsertDeck,
 } from './db';
@@ -241,6 +242,22 @@ export function buildApp(
     const parsed = parseDeckBody(req.body);
     if (isPlayerError(parsed)) return reply.code(400).send(parsed);
     upsertDeck(db, { id: existing.id, ...parsed }, 'user');
+    const stored = getDeck(db, existing.id)!;
+    return summarize(stored, cardsFor([stored]), viewer);
+  });
+
+  /** Só o nome: o dono ou um admin/dev (que corrige o nome de decks de outros jogadores). */
+  app.put<{ Params: { id: string }; Body: { name?: unknown } }>('/api/decks/:id/name', async (req, reply) => {
+    const existing = getDeck(db, req.params.id);
+    if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
+    if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckReadOnly', 'Decks prontos não podem ser alterados; duplique-o.'));
+    const viewer = viewerHash(req);
+    if (!isMine(existing, viewer) && !isAdmin(auth.viewer(req)?.role)) {
+      return reply.code(403).send(fail('deckNotMineEdit', 'Este deck pertence a outro jogador; duplique-o para editar.'));
+    }
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 60) : '';
+    if (!name) return reply.code(400).send(fail('deckNameRequired', 'Dê um nome ao deck.'));
+    renameDeck(db, existing.id, name);
     const stored = getDeck(db, existing.id)!;
     return summarize(stored, cardsFor([stored]), viewer);
   });

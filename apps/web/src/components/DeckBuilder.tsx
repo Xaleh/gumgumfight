@@ -16,7 +16,7 @@ import {
   validateDeck,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type ApiCard, deckGroups, type DeckSummary } from '../api';
+import { api, type ApiCard, deckGroups, type DeckSummary, isAdmin } from '../api';
 import { useAuth } from '../auth';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
@@ -150,6 +150,9 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   }, [dirty]);
 
   const confirmDiscard = () => !dirty || window.confirm(t('deck.confirmDiscard'));
+  /** Admin/dev corrige o nome de um deck de outro jogador sem criar cópia (as cartas continuam somente leitura). */
+  const staff = isAdmin(auth.user?.role);
+  const renaming = staff && draft.kind === 'community' && draft.id !== null;
 
   const sets = useMemo(() => [...new Set(allCards.map((c) => c.set ?? c.id.split('-')[0]))].sort(), [allCards]);
   /** Quantos filtros estão fora do padrão (selo do botão "Filtros" no celular). */
@@ -252,7 +255,13 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
       });
       setDirty(false);
       setNotice(
-        deck.kind === 'builtin' ? t('deck.noticeBuiltinOpened') : deck.mine ? null : t('deck.noticeCommunityOpened'),
+        deck.kind === 'builtin'
+          ? t('deck.noticeBuiltinOpened')
+          : deck.mine
+            ? null
+            : staff
+              ? t('deck.noticeCommunityOpenedAdmin')
+              : t('deck.noticeCommunityOpened'),
       );
       setError(null);
     } catch (e) {
@@ -261,6 +270,19 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   };
 
   const save = async () => {
+    if (renaming) {
+      try {
+        const saved = await api.renameDeck(draft.id!, draft.name.trim() || t('deck.unnamed'));
+        setDraft((d) => ({ ...d, name: saved.name }));
+        setDirty(false);
+        setNotice(t('deck.renamed'));
+        setError(null);
+        await refreshDecks();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
     const input = { name: draft.name.trim() || t('deck.unnamed'), leader: draft.leader, cards: deckList.cards };
     try {
       const saved = draft.id && draft.kind === 'user' ? await api.updateDeck(draft.id, input) : await api.createDeck(input);
@@ -507,7 +529,12 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
             className="deck-name"
             value={draft.name}
             maxLength={60}
-            onChange={(e) => edit((d) => ({ ...d, name: e.target.value }))}
+            onChange={(e) => {
+              const name = e.target.value;
+              if (!renaming) return edit((d) => ({ ...d, name }));
+              setDraft((d) => ({ ...d, name }));
+              setDirty(true);
+            }}
             aria-label={t('deck.nameLabel')}
           />
           {notice && <div className="notice">{notice}</div>}
@@ -644,7 +671,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
 
           <div className="deck-actions">
             <button className="btn primary" onClick={save} disabled={!dirty && draft.id !== null}>
-              {draft.id && draft.kind === 'user' ? t('common.save') : t('deck.saveDeck')}
+              {renaming ? t('deck.saveName') : draft.id && draft.kind === 'user' ? t('common.save') : t('deck.saveDeck')}
             </button>
             {draft.id && (
               <button className="btn" onClick={duplicate}>
