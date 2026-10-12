@@ -150,7 +150,7 @@ function useMediaQuery(query: string) {
 }
 
 /** O que a mesa precisa de uma partida, local (useGame) ou online (useOnlineGame). */
-interface TableGame {
+export interface TableGame {
   state: GameState;
   dispatch: (a: Action) => void;
   error: string | null;
@@ -330,6 +330,23 @@ function GameTable(props: Parameters<typeof Table>[0]) {
   );
 }
 
+/** Lição do tutorial: a mesa com o treinador (painel ao lado no desktop, balão no celular). */
+export function LessonTable({ game, onExit, tutorial }: { game: TableGame; onExit: () => void; tutorial: TableTutorial }) {
+  return <GameTable game={game} kind="bot" onExit={onExit} tutorial={tutorial} />;
+}
+
+/** O que a lição do tutorial pede da mesa. */
+export interface TableTutorial {
+  /** O treinador (texto do passo e botões). */
+  coach: ReactNode;
+  /** Destaques na mesa (desenhados por cima, ver `Spotlight`). */
+  overlay?: ReactNode;
+  /** Esconde as perguntas do motor (mulligan, alvos...) enquanto o passo é só de leitura. */
+  hidePrompt?: boolean;
+  /** Celular: o treinador flutua em cima ou embaixo (longe das áreas destacadas). */
+  floatAt?: 'top' | 'bottom';
+}
+
 function Table({
   game,
   kind,
@@ -339,6 +356,7 @@ function Table({
   rematchLabel,
   spectator,
   startNotice,
+  tutorial,
 }: {
   game: TableGame;
   kind: TableKind;
@@ -351,6 +369,8 @@ function Table({
   spectator?: { canHands: boolean; onToggleHands: () => void };
   /** Aviso na mesa ao começar (some sozinho em 10 s). */
   startNotice?: string;
+  /** Lição do tutorial: treinador, destaques e menos controles (sem Auto, desfazer, replay). */
+  tutorial?: TableTutorial;
 }) {
   const { state, dispatch, human } = game;
   const t = useT();
@@ -1008,7 +1028,7 @@ function Table({
       </div>
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
       {online && !watching && <SpectatorCount online={online} />}
-      {human !== null && !isOnline && (
+      {human !== null && !isOnline && !tutorial && (
         <button
           className={['auto-toggle', game.auto ? 'on' : ''].join(' ')}
           onClick={() => game.setAuto((a) => !a)}
@@ -1039,7 +1059,7 @@ function Table({
 
   return (
     <div
-      className={['game', wide ? 'wide' : '', watching || replay ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : ''].join(' ')}
+      className={['game', wide ? 'wide' : '', watching || replay ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : '', tutorial ? 'lesson' : ''].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
@@ -1151,7 +1171,7 @@ function Table({
         )}
 
         <Prompt
-          hidden={intro || motion.busy}
+          hidden={intro || motion.busy || Boolean(tutorial?.hidePrompt)}
           state={state}
           human={human}
           picked={picked}
@@ -1211,12 +1231,12 @@ function Table({
         {sheet === 'menu' && (
           <SheetFrame title={t('game.matchSheet')} onClose={() => setSheet(null)}>
             <div className="menu-grid">
-              {human !== null && !isOnline && (
+              {human !== null && !isOnline && !tutorial && (
                 <button className="btn" onClick={game.undo} disabled={!game.canUndo}>
                   {t('game.undo')}
                 </button>
               )}
-              {!isOnline && !replay && (
+              {!isOnline && !replay && !tutorial && (
                 <button className="btn" onClick={() => game.setPaused((p) => !p)}>
                   {game.paused ? t('game.resume') : t('game.pause')}
                 </button>
@@ -1224,12 +1244,12 @@ function Table({
               <button className="btn" onClick={() => setSheet('log')}>
                 {t('game.logBtn')}
               </button>
-              {(!isOnline || over) && (
+              {(!isOnline || over) && !tutorial && (
                 <button className="btn" onClick={game.downloadReplay}>
                   {t('game.downloadReplay')}
                 </button>
               )}
-              {human !== null && state.phase === 'main' && (
+              {human !== null && state.phase === 'main' && !tutorial && (
                 <button
                   className="btn danger"
                   onClick={() => {
@@ -1243,10 +1263,10 @@ function Table({
                 </button>
               )}
               <button className="btn" onClick={onExit}>
-                {toTournament ? t('game.exitToTournament') : t('game.exitToMenu')}
+                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : t('game.exitToMenu')}
               </button>
             </div>
-            {!isOnline && !replay && (
+            {!isOnline && !replay && !tutorial && (
               <div className="sheet-section">
                 <label className="sheet-label">{t('game.botSpeed')}</label>
                 <div className="seg small">
@@ -1258,7 +1278,7 @@ function Table({
                 </div>
               </div>
             )}
-            {kind === 'bot' && (
+            {kind === 'bot' && !tutorial && (
               <label className="check">
                 <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> {t('game.showBotHand')}
               </label>
@@ -1340,7 +1360,10 @@ function Table({
 
         {logCard && <StaticCardZoom card={logCard} className="log-zoom" onClose={() => setLogCard(null)} />}
 
-        {state.phase === 'gameover' && showResult && (
+        {tutorial?.overlay}
+        {tutorial && !wide && <div className={['coach-float', tutorial.floatAt ?? 'top'].join(' ')}>{tutorial.coach}</div>}
+
+        {state.phase === 'gameover' && showResult && !tutorial && (
           <GameResult
             state={state}
             human={human}
@@ -1367,7 +1390,18 @@ function Table({
         )}
       </div>
 
-      {wide && (
+      {wide && tutorial && (
+        <aside className="side-panel lesson-panel">
+          <div className="panel-controls">
+            <button className="btn small" onClick={onExit}>
+              {t('tutorial.exitLesson')}
+            </button>
+          </div>
+          {tutorial.coach}
+          <CardDetail state={state} uid={detailUid} />
+        </aside>
+      )}
+      {wide && !tutorial && (
         <aside className="side-panel">
           <div className="panel-controls">
             <button className="btn small" onClick={onExit}>

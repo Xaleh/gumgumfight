@@ -1,6 +1,8 @@
 // Português (Brasil): idioma padrão e referência das chaves. Todo idioma novo precisa ter
 // exatamente estas chaves (ver `Messages`). Sintaxe de {param} e {n|# um|# vários}: index.ts.
 
+import tutorialPtBR from './tutorial/pt-BR';
+
 const ptBR = {
   // ---- geral ----
   'app.name': 'GumGum Fight',
@@ -2130,6 +2132,8 @@ const ptBR = {
   'status.untilNextRefresh': 'até a próxima Fase de Renovação de {name}',
   'status.untilAura': 'enquanto o efeito contínuo da outra carta valer',
   // ==== /status ====
+  // ==== tutorial (i18n/tutorial) ====
+  ...tutorialPtBR,
 } as const;
 
 export type MessageKey = keyof typeof ptBR;

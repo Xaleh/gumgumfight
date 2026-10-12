@@ -1,6 +1,7 @@
 // Deutsch.
 
 import type { Messages } from './pt-BR';
+import tutorial from './tutorial/de';
 
 export default {
   // ---- Allgemein ----
@@ -2127,4 +2128,6 @@ export default {
   'status.untilNextRefresh': 'bis zur nächsten Erholungsphase von {name}',
   'status.untilAura': 'solange der Dauereffekt der anderen Karte anhält',
   // ==== /status ====
+  // ==== tutorial (i18n/tutorial) ====
+  ...tutorial,
 } satisfies Messages;

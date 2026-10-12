@@ -24,6 +24,7 @@ import { type NavItem, TopBar } from './AppShell';
 import { LiveNow, MetaBlock, TournamentBanner, TournamentsBlock, usePoll } from './HomeBlocks';
 import { Icon, type IconName } from './Icons';
 import { InstallBanner } from './Install';
+import { LearnBanner } from './LearnBanner';
 import { LeaderArt } from './LeaderArt';
 import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 import { ReplayLoader } from './ReplayLoader';
@@ -288,6 +289,7 @@ function Live({ children, off }: { children: ReactNode; off?: boolean }) {
 export function Menu({
   onStart,
   onBuildDecks,
+  onLearn,
   onCoverage,
   onStats,
   onOnline,
@@ -301,6 +303,8 @@ export function Menu({
   onStart: (s: GameSetup) => void;
   onOnline: (s: OnlineSeat) => void;
   onBuildDecks: () => void;
+  /** Tutorial "Aprender a jogar". */
+  onLearn: () => void;
   /** Cobertura das cartas (só para Dev). */
   onCoverage?: () => void;
   onStats: () => void;
@@ -527,6 +531,7 @@ export function Menu({
 
   const nav: NavItem[] = [
     { key: 'play', label: t('menu.navPlay'), icon: 'swords', current: true, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+    { key: 'learn', label: t('menu.navLearn'), icon: 'learn', onClick: onLearn },
     { key: 'builder', label: t('menu.navDecks'), icon: 'deck', onClick: onBuildDecks },
     { key: 'tournaments', label: t('menu.navTournaments'), icon: 'crown', onClick: () => onTournaments() },
     { key: 'watch', label: t('menu.navWatch'), icon: 'eye', onClick: onWatch },
@@ -635,6 +640,7 @@ export function Menu({
           )
         )}
 
+        <LearnBanner onLearn={onLearn} />
         <InstallBanner />
 
         <section className="deck-strip" aria-label={t('menu.equippedDeck')}>
@@ -784,6 +790,10 @@ export function Menu({
               disabled={!botReady || loading}
               onAction={startBot}
             >
+              <button type="button" className="mode-learn" onClick={onLearn}>
+                <Icon name="learn" size={16} />
+                {t('menu.learnLink')}
+              </button>
               <div className="mode-fields">
                 <button type="button" className="pick-btn" onClick={() => setPicking(1)} disabled={!decks.length}>
                   <span>{interp(t('menu.opponent'), 'name', <strong>{deck1 === RANDOM ? t('menu.randomDeck') : (d1?.name ?? t('menu.choose'))}</strong>)}</span>
