@@ -14,7 +14,10 @@ export function Learn({ onExit, onLesson }: { onExit: () => void; onLesson: (id:
   const lt = useLessonText();
   const { done, next, reset } = useTutorialProgress();
   const [term, setTerm] = useState<string | null>(null);
-  useEffect(() => window.scrollTo(0, 0), []);
+  // Chaves: em navegadores novos scrollTo devolve uma Promise, que o React tentaria chamar como limpeza.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const totalMin = LESSONS.reduce((n, l) => n + l.minutes, 0);
   const leftMin = LESSONS.filter((l) => !done.includes(l.id)).reduce((n, l) => n + l.minutes, 0);
   const chaptersDone = CHAPTERS.filter((c) => LESSONS.filter((l) => l.chapter === c).every((l) => done.includes(l.id))).length;

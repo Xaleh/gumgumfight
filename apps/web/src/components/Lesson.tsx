@@ -77,7 +77,10 @@ function LessonRunner({
   onBuildDecks: () => void;
 }) {
   const run = useLesson(lesson, data);
-  useEffect(() => window.scrollTo(0, 0), []);
+  // Chaves: em navegadores novos scrollTo devolve uma Promise, que o React tentaria chamar como limpeza.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const { complete } = useTutorialProgress();
   useEffect(() => {
     if (run.finished) complete(lesson.id);
