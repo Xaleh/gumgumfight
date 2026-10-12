@@ -4,7 +4,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type Action, actingPlayer, applyAction, type CardData, type DeckList, type GameState } from '@gumgum/engine';
+import { type Action, actingPlayer, applyAction, type CardData, type DeckList, type GameState, legalActions, passiveAction } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import ptBR from '../src/i18n/pt-BR';
 import { BATTLE_TIPS, cardIdOf, GLOSSARY, LESSONS, type Lesson, ME, OPP, type TutorialData, uidsOf } from '../src/game/tutorial/lessons';
@@ -124,6 +124,18 @@ describe('lições do tutorial', () => {
     const s = LESSONS.find((l) => l.id === 'battle')!.board!.build(data);
     expect(s.pending?.kind).toBe('mulligan');
     expect(s.firstPlayer).toBe(ME);
+  });
+
+  it('na batalha final, qualquer jogada vale na Main Phase', () => {
+    const lesson = LESSONS.find((l) => l.id === 'battle')!;
+    const play = lesson.steps.find((x) => x.id === 'play')!;
+    let s = lesson.board!.build(data);
+    s = applyAction(s, { type: 'mulligan', player: ME, redraw: false });
+    while (s.pending) s = applyAction(s, passiveAction(s, s.pending.player));
+    expect(s.activePlayer).toBe(ME);
+    const legal = legalActions(s, ME);
+    expect(legal.some((a) => a.type === 'endTurn')).toBe(true);
+    for (const a of legal) expect(humanAllowed(play, a, s), JSON.stringify(a)).toBe(true);
   });
 
   it('a jogada errada fica travada no passo de ação', () => {

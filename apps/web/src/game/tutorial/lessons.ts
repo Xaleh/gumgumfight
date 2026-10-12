@@ -599,7 +599,8 @@ export const LESSONS: Lesson[] = [
     },
     steps: [
       { id: 'intro' },
-      { id: 'play', do: { done: (s) => s.phase === 'gameover' } },
+      // Partida livre: qualquer jogada vale (sem `allow`, nada passaria na Main Phase).
+      { id: 'play', do: { allow: () => true, done: (s) => s.phase === 'gameover' } },
       { id: 'over' },
     ],
   },
