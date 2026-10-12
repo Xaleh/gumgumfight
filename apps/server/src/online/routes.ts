@@ -19,6 +19,7 @@ import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
+import { isApprentice } from '../tutorial/store';
 import { pushText } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
 import { Lobby, type LobbyError, type LobbyLimits, type SeatRequest } from './lobby';
@@ -205,6 +206,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       name: profile.name,
       bounty: profile.bounty,
       tier: tierFor(profile.bounty).id,
+      apprentice: isApprentice(db, ownerHash),
       deckId: deck.id!,
       deck,
     };

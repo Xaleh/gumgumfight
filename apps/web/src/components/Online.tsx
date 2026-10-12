@@ -77,6 +77,11 @@ export function OnlineBanner({ online, player }: { online: OnlineGame; player: P
         <span className={['presence', info?.connected ? 'on' : 'off'].join(' ')} title={info?.connected ? t('online.connected') : t('online.disconnected')} />
       )}
       {room.queue === 'ranked' && info && <span className="tier-tag">{tierName(t, info.tier)}</span>}
+      {info?.apprentice && (
+        <span className="apprentice-tag" title={t('tutorial.titleHint')}>
+          {t('tutorial.titleShort')}
+        </span>
+      )}
     </div>
   );
 }

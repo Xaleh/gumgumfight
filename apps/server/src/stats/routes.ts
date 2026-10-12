@@ -8,6 +8,7 @@ import { fail } from '../errors';
 import type { ApiCard } from '../present';
 import { FORMATS, type FormatId, isFormat, isQueue, isTier, QUEUES, TIERS, tierFor } from './catalog';
 import { deriveMatch } from './derive';
+import { isApprentice } from '../tutorial/store';
 import {
   cardStats,
   findPlayer,
@@ -43,7 +44,7 @@ export interface MatchBody {
 
 type Query = Record<string, string | undefined>;
 
-const profile = (p: Player) => ({ ...p, tier: tierFor(p.bounty).id });
+const profileOf = (p: Player) => ({ ...p, tier: tierFor(p.bounty).id });
 
 function parseDeck(v: unknown): DeckList | null {
   const d = v as Partial<DeckList> | null;
@@ -120,7 +121,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
   app.get('/api/players/me', async (req) => {
     const owner = viewerHash(req);
     const p = owner ? findPlayer(db, owner) : null;
-    return p ? profile(p) : null;
+    return p ? { ...profileOf(p), apprentice: isApprentice(db, owner!) } : null;
   });
 
   app.put<{ Body: { name?: unknown } }>('/api/players/me', async (req, reply) => {
@@ -128,7 +129,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
     if (!owner) return reply.code(400).send(fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).'));
     const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ').slice(0, 24) : '';
     if (name.length < 2) return reply.code(400).send(fail('nameTooShort', 'O nome precisa de pelo menos 2 letras.'));
-    return profile(renamePlayer(db, owner, name));
+    return { ...profileOf(renamePlayer(db, owner, name)), apprentice: isApprentice(db, owner) };
   });
 
   /** Opções dos filtros: formatos, filas, tiers, Líderes com partidas e o perfil do jogador. */
@@ -143,7 +144,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
         queues: QUEUES,
         tiers: TIERS,
         leaders,
-        me: me ? profile(me) : null,
+        me: me ? profileOf(me) : null,
         myDecks: decks,
         cards: cardInfo([...leaders.map((l) => l.leader), ...decks.map((d) => d.leader)]),
       };

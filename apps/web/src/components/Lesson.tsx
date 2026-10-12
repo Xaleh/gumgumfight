@@ -2,10 +2,11 @@
 // (carta de exemplo, anatomia da carta, curva do deck) ao lado do treinador.
 
 import { type CardData, type GameState } from '@gumgum/engine';
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { lessonById, lessonNumber, ME, type Lesson as LessonDef, type LessonStep, type TutorialData } from '../game/tutorial/lessons';
 import { useTutorialProgress } from '../game/tutorial/progress';
 import { type LessonRun, useLesson, useTutorialData } from '../game/tutorial/useLesson';
+import { api } from '../api';
 import { useT } from '../i18n';
 import { cardText, useSettings } from '../settings';
 import { StaticCard } from './CardView';
@@ -14,6 +15,31 @@ import { LessonTable, type TableGame } from './GameScreen';
 import { Icon } from './Icons';
 
 const noop = () => undefined;
+
+/**
+ * Eventos anônimos da lição (só lição, passo e evento, sem identificar ninguém), para a
+ * Administração ver em que passo as pessoas desistem.
+ */
+function useLessonEvents(lessonId: string, run: LessonRun) {
+  const stepId = run.step?.id ?? '';
+  const state = useRef({ stepId, finished: run.finished });
+  state.current = { stepId, finished: run.finished };
+  useEffect(() => {
+    void api.tutorial.event(lessonId, 'start');
+    return () => {
+      if (!state.current.finished) void api.tutorial.event(lessonId, 'exit', state.current.stepId);
+    };
+  }, [lessonId]);
+  useEffect(() => {
+    if (stepId && !run.finished) void api.tutorial.event(lessonId, 'step', stepId);
+  }, [lessonId, stepId, run.finished]);
+  useEffect(() => {
+    if (run.failed) void api.tutorial.event(lessonId, 'fail', stepId);
+  }, [run.failed]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (run.finished) void api.tutorial.event(lessonId, 'complete');
+  }, [run.finished, lessonId]);
+}
 
 export function Lesson({
   id,
@@ -85,6 +111,7 @@ function LessonRunner({
   useEffect(() => {
     if (run.finished) complete(lesson.id);
   }, [run.finished, complete, lesson.id]);
+  useLessonEvents(lesson.id, run);
   const t = useT();
   // A lição de montar deck termina com o atalho para o construtor.
   const builderButton =

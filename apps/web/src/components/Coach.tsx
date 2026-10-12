@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { battleTip, type Lesson, lessonNumber, LESSONS, ME, OPP, type Spot, uidsOf } from '../game/tutorial/lessons';
 import type { LessonRun } from '../game/tutorial/useLesson';
 import { hasKey, type Params, useT } from '../i18n';
+import { useSettings } from '../settings';
 import { Icon } from './Icons';
 
 /** Tradução de uma chave montada em tempo de execução (as lições citam passos pelo id). */
@@ -33,6 +34,7 @@ export function Coach({
 }) {
   const t = useT();
   const lt = useLessonText();
+  const settings = useSettings();
   const { step, index, state, finished } = run;
   const base = `tutorial.${lesson.id}.${step?.id}`;
   const n = lessonNumber(lesson.id);
@@ -84,6 +86,13 @@ export function Coach({
         </div>
         <h3 className="coach-title">{t('tutorial.doneTitle')}</h3>
         <p className="coach-body">{next ? t('tutorial.doneBody') : t('tutorial.doneAll')}</p>
+        {lesson.id === 'battle' && !settings.coachTips && (
+          <button type="button" className="btn coach-extra" onClick={() => settings.update({ coachTips: true })}>
+            <Icon name="bulb" size={18} />
+            {t('tutorial.enableCoachTips')}
+          </button>
+        )}
+        {lesson.id === 'battle' && settings.coachTips && <p className="coach-do">{t('tutorial.coachTipsOn')}</p>}
         <div className="coach-actions">
           <button type="button" className="btn" onClick={onHub}>
             {t('tutorial.backToHub')}

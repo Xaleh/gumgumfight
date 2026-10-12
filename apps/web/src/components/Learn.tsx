@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { CHAPTERS, GLOSSARY, LESSONS, lessonNumber } from '../game/tutorial/lessons';
 import { useTutorialProgress } from '../game/tutorial/progress';
 import { useT } from '../i18n';
+import { Switch, useSettings } from '../settings';
 import { useLessonText } from './Coach';
 import { Icon } from './Icons';
 
@@ -12,7 +13,8 @@ const CHAPTER_COLOR: Record<number, string> = { 1: 'red', 2: 'green', 3: 'blue-c
 export function Learn({ onExit, onLesson }: { onExit: () => void; onLesson: (id: string) => void }) {
   const t = useT();
   const lt = useLessonText();
-  const { done, next, reset } = useTutorialProgress();
+  const { done, next, reset, completedAll } = useTutorialProgress();
+  const settings = useSettings();
   const [term, setTerm] = useState<string | null>(null);
   // Chaves: em navegadores novos scrollTo devolve uma Promise, que o React tentaria chamar como limpeza.
   useEffect(() => {
@@ -47,7 +49,10 @@ export function Learn({ onExit, onLesson }: { onExit: () => void; onLesson: (id:
                   {done.length === 0 ? t('tutorial.start') : t('tutorial.continue', { n: lessonNumber(next.id) })}
                 </button>
               ) : (
-                <span className="learn-all-done">{t('tutorial.allDone')}</span>
+                <span className="learn-all-done">
+                  {t('tutorial.allDone')}{' '}
+                  {completedAll && <span className="apprentice-tag">{t('tutorial.titleShort')}</span>}
+                </span>
               )}
               {done.length === 0 && (
                 <button type="button" className="hero-link" onClick={() => onLesson(battle.id)}>
@@ -139,6 +144,14 @@ export function Learn({ onExit, onLesson }: { onExit: () => void; onLesson: (id:
             );
           })}
         </div>
+
+        <section className="menu-card learn-coach-option" aria-labelledby="coach-option-title">
+          <div>
+            <strong id="coach-option-title">{t('settings.coachTips')}</strong>
+            <p className="muted">{t('settings.coachTipsHint')}</p>
+          </div>
+          <Switch on={settings.coachTips} label={t('settings.coachTips')} onChange={(on) => settings.update({ coachTips: on })} />
+        </section>
 
         <section className="menu-card glossary" aria-labelledby="glossary-title">
           <div className="section-head">

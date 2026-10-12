@@ -93,6 +93,7 @@ function migrate(db: DB) {
   migratePush(db);
   migrateTournaments(db);
   migrateCardIds(db);
+  migrateTutorial(db);
 }
 
 /** Deck com os números de carta sem sufixo de versão ("P-029_r1" -> "P-029"), juntando as cópias. */
@@ -243,6 +244,32 @@ function migrateTournaments(db: DB) {
       UNIQUE (match_id, reporter_id)
     );
     CREATE INDEX IF NOT EXISTS match_reports_open ON match_reports(resolved_at, created_at);
+  `);
+}
+
+/**
+ * Tutorial "Aprender a jogar": o progresso de cada dono (conta `user:<id>` ou navegador, a mesma
+ * chave das estatísticas) e as contagens anônimas de eventos das lições (sem dono, sem IP: só
+ * lição, passo, evento e dia), para ver onde as pessoas desistem.
+ */
+function migrateTutorial(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tutorial_progress (
+      owner_hash   TEXT PRIMARY KEY,
+      done         TEXT NOT NULL DEFAULT '[]',  -- JSON: ids das lições concluídas
+      dismissed    INTEGER NOT NULL DEFAULT 0,  -- "Já sei jogar": sem convite na home
+      completed_at TEXT,                        -- concluiu a Rota inteira (título)
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tutorial_events (
+      day    TEXT NOT NULL,                     -- AAAA-MM-DD (UTC)
+      lesson TEXT NOT NULL,
+      step   TEXT NOT NULL,                     -- '' para eventos da lição inteira
+      event  TEXT NOT NULL,                     -- start | step | fail | exit | complete
+      count  INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, lesson, step, event)
+    );
   `);
 }
 

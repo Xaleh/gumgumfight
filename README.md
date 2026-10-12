@@ -423,7 +423,11 @@ Para quem nunca jogou One Piece Card Game: **Aprender** no menu (ou o convite "P
 na mesa de verdade, com cenários prontos montados pelo motor: um treinador explica cada passo, destaca as áreas da mesa
 e pede uma jogada, travando as outras até a hora certa. Há também a anatomia da carta (toque e descubra), quizzes, um
 glossário de termos e uma partida final contra o bot fácil com dicas. Não precisa de login; o progresso fica no
-navegador. Como escrever uma lição nova: [`docs/tutorial.md`](docs/tutorial.md).
+navegador e é guardado também no servidor (por conta ou por navegador). Quem termina as 14 lições ganha o título
+**Aprendiz da Grand Line** (no perfil e na partida online). Fora das lições: **Dicas do treinador** nas partidas contra
+o bot (opção nas Configurações, desligada por padrão), palavras-chave clicáveis no texto das cartas e, para a
+administração, o funil anônimo das lições (onde as pessoas desistem). Detalhes e como escrever uma lição nova:
+[`docs/tutorial.md`](docs/tutorial.md).
 
 ## Como jogar
 
@@ -655,6 +659,7 @@ npm run typecheck
 | GET    | `/api/auth/me`     | Usuário logado (`{ user }` com `role`; `null` sem sessão) |
 | GET    | `/api/admin/users?q=` | Contas e perfis (só Admin)               |
 | PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| organizer \| admin \| dev }`; só Admin; a si mesmo, só para `dev`) |
+| GET    | `/api/admin/tutorial?days=` | Funil anônimo das lições do tutorial (só Admin; padrão 30 dias) |
 | POST   | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie |
 | POST   | `/api/auth/logout` | Sai (apaga a sessão)                        |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
@@ -666,7 +671,10 @@ npm run typecheck
 | DELETE | `/api/decks/:id`   | Apaga um deck do jogador                    |
 | POST   | `/api/matches`     | Envia o replay de uma partida (verificado pelo servidor) |
 | GET    | `/api/matches`     | Últimas partidas                            |
-| GET    | `/api/players/me`  | Perfil do jogador: conta ou navegador (nome, recompensa, tier) |
+| GET    | `/api/players/me`  | Perfil do jogador: conta ou navegador (nome, recompensa, tier, `apprentice`) |
+| GET    | `/api/tutorial/progress` | Progresso do tutorial da conta ou do navegador (`{ done, dismissed, apprentice }`) |
+| PUT    | `/api/tutorial/progress` | Soma lições feitas (`{ done, dismissed, completed, reset? }`) |
+| POST   | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event: start \| step \| fail \| exit \| complete }`) |
 | PUT    | `/api/players/me`  | Troca o nome (`{ name }`)                   |
 | GET    | `/api/stats/meta`  | Opções dos filtros: formatos, filas, tiers, Líderes |
 | GET    | `/api/stats`       | Totais, Líderes e matchups (filtros na query) |

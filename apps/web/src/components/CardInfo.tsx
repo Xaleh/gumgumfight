@@ -1,6 +1,8 @@
 import { buildCardDef, type CardData, type CardDef, type CardStatus } from '@gumgum/engine';
 import { Fragment, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { type MessageKey, useT, useTryT } from '../i18n';
+import { GLOSSARY, lessonNumber } from '../game/tutorial/lessons';
+import { splitTerms } from '../game/tutorial/terms';
+import { hasKey, type MessageKey, useT, useTryT } from '../i18n';
 import { cardText, useSettings } from '../settings';
 import { StaticCard, StatusTag, statusText, statusUntil } from './CardView';
 
@@ -26,6 +28,9 @@ export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; pow
   const tryT = useTryT();
   const [showOriginal, setShowOriginal] = useState(false);
   useEffect(() => setShowOriginal(false), [def.id]);
+  /** Termo do glossário aberto (toque num termo entre colchetes do texto). */
+  const [term, setTerm] = useState<string | null>(null);
+  useEffect(() => setTerm(null), [def.id]);
   const shown = cardText(def, showOriginal ? 'en' : locale);
   const translated = locale === 'pt-BR' && shown.source !== 'original';
 
@@ -66,12 +71,17 @@ export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; pow
           ))}
         </ul>
       )}
-      {shown.text && <p className="effect">{shown.text}</p>}
-      {shown.trigger && (
-        <p className="effect trigger">
-          <b>{t('card.trigger')}</b> {shown.trigger}
+      {shown.text && (
+        <p className="effect">
+          <TermText text={shown.text} active={term} onTerm={setTerm} />
         </p>
       )}
+      {shown.trigger && (
+        <p className="effect trigger">
+          <b>{t('card.trigger')}</b> <TermText text={shown.trigger} active={term} onTerm={setTerm} />
+        </p>
+      )}
+      {term && <TermDefinition id={term} />}
       {locale === 'pt-BR' && (def.text || def.trigger) && (
         <p className="small muted translation-note">
           {translated && shown.source === 'partial' && <>{t('card.translationPartial')} </>}
@@ -99,6 +109,47 @@ export function CardTextInfo({ def, power, cost, statuses }: { def: CardDef; pow
           {def.abilities.some((a) => !a.manual && a.steps.length) ? t('card.manualPartial') : t('card.manualAll')}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Texto da carta com os termos do glossário ([Blocker], [Ao Jogar], DON!! −1...) como botões. */
+function TermText({ text, active, onTerm }: { text: string; active: string | null; onTerm: (id: string | null) => void }) {
+  return (
+    <>
+      {splitTerms(text).map((p, i) =>
+        p.term ? (
+          <button
+            key={i}
+            type="button"
+            className={['term-link', active === p.term ? 'on' : ''].join(' ')}
+            aria-expanded={active === p.term}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTerm(active === p.term ? null : p.term!);
+            }}
+          >
+            {p.text}
+          </button>
+        ) : (
+          <Fragment key={i}>{p.text}</Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+/** Definição do glossário do tutorial e a lição que ensina o termo. */
+function TermDefinition({ id }: { id: string }) {
+  const t = useT();
+  const g = GLOSSARY.find((x) => x.id === id);
+  const def = `tutorial.term.${id}`;
+  const lessonName = g ? `tutorial.${g.lesson}.name` : '';
+  if (!g || !hasKey(def)) return null;
+  return (
+    <div className="term-def" role="note">
+      <strong>{g.label}</strong> {t(def)}
+      {hasKey(lessonName) && <span className="muted small"> {t('tutorial.termLesson', { n: lessonNumber(g.lesson), name: t(lessonName) })}</span>}
     </div>
   );
 }

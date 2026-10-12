@@ -75,6 +75,7 @@ import {
   unregisterPlayer,
   updateTournament,
 } from './store';
+import { isApprentice } from '../tutorial/store';
 
 interface Deps {
   db: DB;
@@ -782,6 +783,7 @@ export function registerTournamentRoutes(
         name: profile.name,
         bounty: profile.bounty,
         tier: tierFor(profile.bounty).id,
+        apprentice: isApprentice(db, ownerHash),
         deckId: player.deckId,
         deck: player.deck,
       },
