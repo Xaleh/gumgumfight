@@ -31,7 +31,10 @@ export interface User {
   id: string;
   email: string | null;
   name: string | null;
+  /** Foto mostrada: a enviada pelo usuário (URL do servidor) ou, sem ela, a do Google. */
   picture: string | null;
+  /** O usuário enviou a própria foto (pode voltar para a do Google). */
+  customPicture: boolean;
   role: Role;
 }
 
@@ -43,11 +46,22 @@ export const accountOwnerKey = (userId: string) => `user:${userId}`;
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
-type UserRow = { id: string; email: string | null; name: string | null; picture: string | null; role: string };
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, picture: r.picture, role: isRole(r.role) ? r.role : 'player' });
+type UserRow = { id: string; email: string | null; name: string | null; picture: string | null; custom_picture_at: number | null; role: string };
+const USER_COLS = 'id, email, name, picture, custom_picture_at, role';
+/** Endereço da foto enviada; a versão no endereço deixa o navegador guardar a imagem para sempre. */
+const customPictureUrl = (id: string, version: number) => `/api/users/${encodeURIComponent(id)}/picture?v=${version}`;
+const toUser = (r: UserRow): User => ({
+  id: r.id,
+  email: r.email,
+  name: r.name,
+  picture: r.custom_picture_at ? customPictureUrl(r.id, r.custom_picture_at) : r.picture,
+  customPicture: r.custom_picture_at != null,
+  role: isRole(r.role) ? r.role : 'player',
+});
 
 /**
- * Cria a conta no primeiro login; nos seguintes, atualiza nome, e-mail e foto.
+ * Cria a conta no primeiro login; nos seguintes, atualiza nome, e-mail e foto do Google
+ * (a foto enviada pelo usuário, se houver, continua valendo).
  * `adminEmails`: e-mails (verificados pelo Google) que viram admin ao entrar (um Dev
  * continua Dev, que já é admin).
  */
@@ -68,8 +82,40 @@ export function upsertGoogleUser(db: DB, g: GoogleIdentity, adminEmails: string[
 }
 
 export function getUser(db: DB, id: string): User | null {
-  const r = db.prepare('SELECT id, email, name, picture, role FROM users WHERE id = ?').get(id) as UserRow | undefined;
+  const r = db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?`).get(id) as UserRow | undefined;
   return r ? toUser(r) : null;
+}
+
+/** Tipos aceitos na foto enviada (o tipo vem dos primeiros bytes, não do que o navegador diz). */
+export type PictureType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+export function pictureType(data: Uint8Array): PictureType | null {
+  const at = (i: number, bytes: number[]) => bytes.every((b, k) => data[i + k] === b);
+  if (at(0, [0xff, 0xd8, 0xff])) return 'image/jpeg';
+  if (at(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
+  if (at(0, [0x52, 0x49, 0x46, 0x46]) && at(8, [0x57, 0x45, 0x42, 0x50])) return 'image/webp';
+  return null;
+}
+
+/** Grava a foto enviada pelo usuário (`data` = null volta para a foto do Google). */
+export function setCustomPicture(db: DB, id: string, picture: { data: Uint8Array; type: PictureType } | null): boolean {
+  const res = picture
+    ? db
+        .prepare('UPDATE users SET custom_picture = ?, custom_picture_type = ?, custom_picture_at = ? WHERE id = ?')
+        // A versão sempre cresce, mesmo com duas trocas no mesmo milissegundo.
+        .run(picture.data, picture.type, Math.max(Date.now(), lastPictureVersion(db, id) + 1), id)
+    : db.prepare('UPDATE users SET custom_picture = NULL, custom_picture_type = NULL, custom_picture_at = NULL WHERE id = ?').run(id);
+  return Number(res.changes) > 0;
+}
+
+const lastPictureVersion = (db: DB, id: string) =>
+  (db.prepare('SELECT custom_picture_at AS v FROM users WHERE id = ?').get(id) as { v: number | null } | undefined)?.v ?? 0;
+
+export function getCustomPicture(db: DB, id: string): { data: Uint8Array; type: string } | null {
+  const r = db.prepare('SELECT custom_picture AS data, custom_picture_type AS type FROM users WHERE id = ? AND custom_picture IS NOT NULL').get(id) as
+    | { data: Uint8Array; type: string }
+    | undefined;
+  return r ?? null;
 }
 
 export function setUserRole(db: DB, id: string, role: Role): boolean {
@@ -86,7 +132,7 @@ export function listUsers(db: DB, query = '', limit = 50): UserListItem[] {
   const q = `%${query.trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const rows = db
     .prepare(
-      `SELECT id, email, name, picture, role, created_at, last_login_at FROM users
+      `SELECT ${USER_COLS}, created_at, last_login_at FROM users
        WHERE COALESCE(name, '') LIKE ? ESCAPE '\\' OR COALESCE(email, '') LIKE ? ESCAPE '\\'
        ORDER BY CASE role WHEN 'dev' THEN 0 WHEN 'admin' THEN 0 WHEN 'organizer' THEN 1 WHEN 'streamer' THEN 2 ELSE 3 END, last_login_at DESC
        LIMIT ?`,
@@ -110,7 +156,7 @@ export function createSession(db: DB, userId: string): string {
 export function sessionUser(db: DB, token: string): User | null {
   const r = db
     .prepare(
-      `SELECT u.id, u.email, u.name, u.picture, u.role FROM sessions s JOIN users u ON u.id = s.user_id
+      `SELECT u.id, u.email, u.name, u.picture, u.custom_picture_at, u.role FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ? AND s.expires_at > datetime('now')`,
     )
     .get(hashToken(token)) as UserRow | undefined;

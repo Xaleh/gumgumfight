@@ -8,12 +8,15 @@ import {
   claimBrowserData,
   createSession,
   deleteSession,
+  getCustomPicture,
   getUser,
   isAdmin,
   isRole,
   listUsers,
+  pictureType,
   SESSION_DAYS,
   sessionUser,
+  setCustomPicture,
   setUserRole,
   upsertGoogleUser,
   type User,
@@ -48,7 +51,10 @@ function setSessionCookie(req: FastifyRequest, reply: FastifyReply, token: strin
   reply.header('set-cookie', attrs.join('; '));
 }
 
-const publicUser = (u: User) => ({ id: u.id, name: u.name, email: u.email, picture: u.picture, role: u.role });
+const publicUser = (u: User) => ({ id: u.id, name: u.name, email: u.email, picture: u.picture, customPicture: u.customPicture, role: u.role });
+
+/** Maior foto aceita (o navegador já manda a imagem reduzida, com poucas dezenas de KB). */
+export const MAX_PICTURE_BYTES = 256 * 1024;
 
 export function registerAuth(app: FastifyInstance, { db, clientId, keys, browserHash, adminEmails = [] }: Deps) {
   const cache = new WeakMap<FastifyRequest, User | null>();
@@ -99,6 +105,49 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
     if (token) deleteSession(db, token);
     setSessionCookie(req, reply, '', 0);
     return reply.code(204).send();
+  });
+
+  // ---------------------------------------------------------------- foto da conta
+
+  /**
+   * Troca a foto da conta. `image`: data URL (JPEG, PNG ou WebP) que o navegador já
+   * recortou e reduziu; a foto do Google deixa de aparecer até o usuário removê-la.
+   */
+  app.put<{ Body: { image?: unknown } }>('/api/auth/me/picture', async (req, reply) => {
+    const u = viewer(req);
+    if (!u) return reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+    const image = req.body?.image;
+    const m = typeof image === 'string' ? /^data:image\/[a-z+.-]+;base64,([A-Za-z0-9+/]+={0,2})$/.exec(image) : null;
+    if (!m) return reply.code(400).send(fail('pictureInvalid', 'Imagem inválida. Use JPG, PNG ou WebP.'));
+    if (m[1].length > Math.ceil(MAX_PICTURE_BYTES / 3) * 4) {
+      return reply.code(413).send(fail('pictureTooBig', 'Imagem grande demais.'));
+    }
+    const data = Buffer.from(m[1], 'base64');
+    const type = pictureType(data);
+    if (!type) return reply.code(400).send(fail('pictureInvalid', 'Imagem inválida. Use JPG, PNG ou WebP.'));
+    setCustomPicture(db, u.id, { data, type });
+    return { user: publicUser(getUser(db, u.id)!) };
+  });
+
+  /** Remove a foto enviada: volta a valer a foto do Google. */
+  app.delete('/api/auth/me/picture', async (req, reply) => {
+    const u = viewer(req);
+    if (!u) return reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+    setCustomPicture(db, u.id, null);
+    return { user: publicUser(getUser(db, u.id)!) };
+  });
+
+  /** A foto enviada; só o próprio usuário e os admins (tela de perfis) a veem. */
+  app.get<{ Params: { id: string } }>('/api/users/:id/picture', async (req, reply) => {
+    const u = viewer(req);
+    const pic = u && (u.id === req.params.id || isAdmin(u.role)) ? getCustomPicture(db, req.params.id) : null;
+    if (!pic) return reply.code(404).send(fail('notFound', 'Não encontrado'));
+    // O endereço muda a cada troca (?v=), então a imagem pode ficar no cache do navegador.
+    return reply
+      .header('content-type', pic.type)
+      .header('cache-control', 'private, max-age=31536000, immutable')
+      .header('x-content-type-options', 'nosniff')
+      .send(Buffer.from(pic.data));
   });
 
   // ---------------------------------------------------------------- perfis (só admin)

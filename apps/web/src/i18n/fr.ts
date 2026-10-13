@@ -36,6 +36,10 @@ export default {
   'account.signInHint': 'Connectez-vous pour garder vos decks et vos statistiques sur votre compte et jouer en classée.',
   'account.guest': 'Invité',
   'account.loginOff': 'La connexion est désactivée sur ce serveur.',
+  'account.changePhoto': 'Changer de photo',
+  'account.googlePhoto': 'Utiliser la photo Google',
+  'account.photoSaving': 'Envoi…',
+  'account.photoUnreadable': 'Impossible d\'ouvrir cette image.',
 
   // ---- settings ----
   'settings.title': '⚙️ Paramètres',
@@ -1929,6 +1933,8 @@ export default {
   'errors.invalidRole': 'Rôle invalide.',
   'errors.selfRoleOnlyDev': 'Vous ne pouvez changer votre propre rôle qu’en Dev.',
   'errors.accountNotFound': 'Compte introuvable.',
+  'errors.pictureInvalid': 'Image invalide. Utilisez JPG, PNG ou WebP.',
+  'errors.pictureTooBig': 'Image trop volumineuse.',
   'errors.nameTooShort': 'Le nom doit contenir au moins 2 lettres.',
   // ---- cartas e decks ----
   'errors.cardNotFound': 'Carte introuvable',

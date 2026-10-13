@@ -36,6 +36,10 @@ export default {
   'account.signInHint': 'Sign in to keep your decks and stats in your account and play ranked.',
   'account.guest': 'Guest',
   'account.loginOff': 'Sign-in is turned off on this server.',
+  'account.changePhoto': 'Change photo',
+  'account.googlePhoto': 'Use Google photo',
+  'account.photoSaving': 'Uploading…',
+  'account.photoUnreadable': 'Couldn\'t open that image.',
 
   // ---- settings ----
   'settings.title': '⚙️ Settings',
@@ -1929,6 +1933,8 @@ export default {
   'errors.invalidRole': 'Invalid role.',
   'errors.selfRoleOnlyDev': 'You can only change your own role to Dev.',
   'errors.accountNotFound': 'Account not found.',
+  'errors.pictureInvalid': 'Invalid image. Use JPG, PNG or WebP.',
+  'errors.pictureTooBig': 'Image too large.',
   'errors.nameTooShort': 'The name needs at least 2 letters.',
   // ---- cartas e decks ----
   'errors.cardNotFound': 'Card not found',

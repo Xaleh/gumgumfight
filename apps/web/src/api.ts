@@ -186,7 +186,10 @@ export interface User {
   /** Nome da conta Google (só você vê; o nome público é o do perfil de estatísticas). */
   name: string | null;
   email: string | null;
+  /** Foto mostrada: a enviada pelo usuário ou, sem ela, a do Google. */
   picture: string | null;
+  /** O usuário enviou a própria foto (pode voltar para a do Google). */
+  customPicture: boolean;
   role: Role;
 }
 
@@ -208,6 +211,10 @@ export const api = {
   /** Troca o ID token do botão do Google por uma sessão (cookie). */
   googleLogin: (credential: string) => send<{ user: User; claimedDecks: number }>('POST', '/api/auth/google', { credential }),
   logout: () => send<void>('POST', '/api/auth/logout'),
+  /** Troca a foto da conta (data URL já reduzida; ver `picture.ts`). */
+  setPicture: (image: string) => send<{ user: User }>('PUT', '/api/auth/me/picture', { image }),
+  /** Remove a foto enviada: volta a valer a do Google. */
+  removePicture: () => send<{ user: User }>('DELETE', '/api/auth/me/picture'),
   decks: () => get<DeckSummary[]>('/api/decks'),
   deck: (id: string) =>
     get<{ deck: DeckList & { kind: DeckSummary['kind']; mine: boolean }; cards: ApiCard[]; summary: DeckSummary }>(

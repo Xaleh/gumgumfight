@@ -839,6 +839,57 @@ input[type='number'] {
   height: 44px;
   font-size: 22px;
 }
+.avatar-edit {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.avatar-edit:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+.avatar-edit-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.avatar-edit:hover .avatar-edit-badge,
+.avatar-edit:focus-visible .avatar-edit-badge {
+  background: var(--brand-yellow);
+  color: var(--brown);
+}
+.account-photo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.account-photo-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.account-photo-error {
+  color: var(--danger-text);
+}
 .account-who {
   flex: 1;
   min-width: 0;

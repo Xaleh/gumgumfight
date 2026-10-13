@@ -6,6 +6,7 @@ import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 're
 import { ROLE_LABEL } from '../api';
 import { GoogleButton, useAuth } from '../auth';
 import { LOCALES, useT } from '../i18n';
+import { squarePicture } from '../picture';
 import { LocaleSeg, useSettings } from '../settings';
 import { Flag } from './Flags';
 import { Icon, type IconName } from './Icons';
@@ -82,14 +83,72 @@ function Avatar() {
   return <span className="avatar">{user ? (user.name ?? user.email ?? '?').slice(0, 1).toUpperCase() : <Icon name="user" size={18} />}</span>;
 }
 
+/** Trocar a foto da conta: escolher uma imagem (recortada e reduzida aqui) ou voltar para a do Google. */
+function usePictureChange() {
+  const { changePicture } = useAuth();
+  const t = useT();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (work: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await work();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const onFile = (file: File) =>
+    run(async () => {
+      const image = await squarePicture(file).catch(() => {
+        throw new Error(t('account.photoUnreadable'));
+      });
+      await changePicture(image);
+    });
+  const fileInput = (
+    <input
+      ref={input}
+      type="file"
+      accept="image/*"
+      hidden
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (file) void onFile(file);
+      }}
+    />
+  );
+  return { busy, error, fileInput, pick: () => input.current?.click(), reset: () => run(() => changePicture(null)) };
+}
+
 /** Nome, perfil e login/saída da conta (no menu da conta e na gaveta). */
 function AccountBlock() {
   const { ready, user, clientId, signIn } = useAuth();
   const t = useT();
+  const picture = usePictureChange();
   if (!ready) return null;
   return (
     <div className="account-block">
-      <Avatar />
+      {user ? (
+        <button
+          type="button"
+          className="avatar-edit"
+          aria-label={t('account.changePhoto')}
+          title={t('account.changePhoto')}
+          disabled={picture.busy}
+          onClick={picture.pick}
+        >
+          <Avatar />
+          <span className="avatar-edit-badge">
+            <Icon name="camera" size={12} stroke={2.4} />
+          </span>
+        </button>
+      ) : (
+        <Avatar />
+      )}
       {user ? (
         <div className="account-who">
           <strong>
@@ -97,6 +156,28 @@ function AccountBlock() {
             {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{t(ROLE_LABEL[user.role])}</span>}
           </strong>
           {user.email && <span className="muted small">{user.email}</span>}
+          {picture.fileInput}
+          <div className="account-photo">
+            {picture.busy ? (
+              <span className="muted small">{t('account.photoSaving')}</span>
+            ) : (
+              <>
+                <button type="button" className="account-photo-btn" onClick={picture.pick}>
+                  {t('account.changePhoto')}
+                </button>
+                {user.customPicture && (
+                  <button type="button" className="account-photo-btn" onClick={() => void picture.reset()}>
+                    {t('account.googlePhoto')}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          {picture.error && (
+            <span className="account-photo-error small" role="alert">
+              {picture.error}
+            </span>
+          )}
         </div>
       ) : clientId ? (
         <div className="account-who">

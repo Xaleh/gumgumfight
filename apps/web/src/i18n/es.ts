@@ -36,6 +36,10 @@ export default {
   'account.signInHint': 'Inicia sesión para guardar tus mazos y estadísticas en tu cuenta y jugar clasificatoria.',
   'account.guest': 'Invitado',
   'account.loginOff': 'El inicio de sesión está desactivado en este servidor.',
+  'account.changePhoto': 'Cambiar foto',
+  'account.googlePhoto': 'Usar la foto de Google',
+  'account.photoSaving': 'Subiendo…',
+  'account.photoUnreadable': 'No se pudo abrir esa imagen.',
 
   // ---- ajustes ----
   'settings.title': '⚙️ Ajustes',
@@ -1929,6 +1933,8 @@ export default {
   'errors.invalidRole': 'Rol no válido.',
   'errors.selfRoleOnlyDev': 'Solo puedes cambiar tu propio rol a Dev.',
   'errors.accountNotFound': 'Cuenta no encontrada.',
+  'errors.pictureInvalid': 'Imagen no válida. Usa JPG, PNG o WebP.',
+  'errors.pictureTooBig': 'Imagen demasiado grande.',
   'errors.nameTooShort': 'El nombre necesita al menos 2 letras.',
   // ---- cartas y mazos ----
   'errors.cardNotFound': 'Carta no encontrada',
