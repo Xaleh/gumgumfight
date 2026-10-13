@@ -17,7 +17,7 @@ import { buildApp } from '../src/app';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import type { ServerOptions } from '../src/config';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
-import { Lobby, type SeatRequest } from '../src/online/lobby';
+import { LEADER_PICK_MS, Lobby, type SeatRequest } from '../src/online/lobby';
 import { ABANDON_MS, type Connection, Room, TIME_BANK_MS } from '../src/online/room';
 import { seed } from '../src/seed';
 
@@ -329,6 +329,112 @@ describe('partidas online: filas', () => {
     const again = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb' } });
     expect(again.statusCode).toBe(409);
     expect(again.json().roomId).toBe(ma.roomId);
+  });
+
+  describe('casual: escolher o Líder do oponente', () => {
+    const seat = (name: string, deckId: string, db: DB): SeatRequest => {
+      const d = getDeck(db, deckId)!;
+      return { ownerHash: name, userId: null, name, bounty: 0, tier: 'east-blue', deckId, deck: d };
+    };
+    function queueLobby() {
+      const clock = { t: 1_000_000 };
+      const db = freshDb();
+      const l = new Lobby({ cards: (ids) => getCards(db, ids) as CardData[], now: () => clock.t });
+      const join = (name: string, deckId: string, leader: string | null = null) => {
+        const r = l.enqueue(seat(name, deckId, db), 'egb', 'casual', null, leader);
+        if ('error' in r) throw new Error(r.error);
+        return r.ticket;
+      };
+      /** Passa o tempo com todos consultando a fila a cada 5 s, como o navegador faz. */
+      const wait = (ms: number, tickets: string[]) => {
+        for (let left = ms; left > 0; left -= 5_000) {
+          clock.t += Math.min(5_000, left);
+          for (const t of tickets) l.poll(t);
+        }
+      };
+      return { l, clock, join, wait };
+    }
+
+    it('no primeiro minuto só forma par com o Líder escolhido', () => {
+      const { l, join } = queueLobby();
+      const a = join('a', 'st01-luffy', 'ST02-001');
+      const c = join('c', 'st03-crocodile');
+      expect(l.poll(a)).toMatchObject({ status: 'waiting', wantLeader: 'ST02-001', leaderWait: LEADER_PICK_MS });
+      expect(l.poll(c)?.status).toBe('waiting');
+      const b = join('b', 'st02-kid');
+      const ma = l.poll(a);
+      const mb = l.poll(b);
+      expect(ma?.status).toBe('matched');
+      expect(mb?.status === 'matched' && ma?.status === 'matched' && mb.roomId === ma.roomId).toBe(true);
+      expect(l.poll(c)?.status).toBe('waiting');
+      l.dispose();
+    });
+
+    it('quem escolheu tem prioridade sobre quem chegou antes sem escolher', () => {
+      const { l, join } = queueLobby();
+      // A Carol (sem escolha) chegou primeiro, mas o Kid fica com quem pediu por ele.
+      const c = join('c', 'st03-crocodile');
+      const a = join('a', 'st01-luffy', 'ST02-001');
+      const b = join('b', 'st02-kid');
+      const ma = l.poll(a);
+      const mb = l.poll(b);
+      expect(ma?.status === 'matched' && mb?.status === 'matched' && ma.roomId === mb.roomId).toBe(true);
+      expect(l.poll(c)?.status).toBe('waiting');
+      l.dispose();
+    });
+
+    it('depois de 1 minuto sem o Líder escolhido, joga contra quem estiver na fila', () => {
+      const { l, join, wait } = queueLobby();
+      const a = join('a', 'st01-luffy', 'ST02-001');
+      const c = join('c', 'st03-crocodile');
+      wait(45_000, [a, c]);
+      expect(l.poll(a)).toMatchObject({ status: 'waiting', leaderWait: LEADER_PICK_MS - 45_000 });
+      wait(10_000, [a, c]);
+      expect(l.poll(a)?.status).toBe('waiting');
+      wait(5_000, []);
+      const ma = l.poll(a);
+      const mc = l.poll(c);
+      expect(ma?.status === 'matched' && mc?.status === 'matched' && ma.roomId === mc.roomId).toBe(true);
+      l.dispose();
+    });
+
+    it('a escolha vale para os dois lados', () => {
+      const { l, join, wait } = queueLobby();
+      // A Alice quer o Kid, mas o Bob (Kid) quer o Crocodile: só formam par quando a escolha do Bob expira.
+      const a = join('a', 'st01-luffy', 'ST02-001');
+      wait(30_000, [a]);
+      const b = join('b', 'st02-kid', 'ST03-001');
+      expect(l.poll(a)?.status).toBe('waiting');
+      expect(l.poll(b)?.status).toBe('waiting');
+      // A escolha da Alice expira, mas o Bob ainda espera o Crocodile.
+      wait(55_000, [a, b]);
+      expect(l.poll(a)?.status).toBe('waiting');
+      wait(5_000, []);
+      expect(l.poll(a)?.status).toBe('matched');
+      expect(l.poll(b)?.status).toBe('matched');
+      l.dispose();
+    });
+
+    it('rotas: lista de Líderes por formato e recusa de Líder inválido', async () => {
+      const { app } = setup();
+      const egb = (await app.inject('/api/online/leaders?format=egb')).json() as Array<{ id: string; queue: number }>;
+      expect(egb.map((c) => c.id)).toContain('ST01-001');
+      expect(egb.every((c) => c.queue === 0)).toBe(true);
+      // Bloco ①: o ST01-001 rotacionou no Standard.
+      const std = (await app.inject('/api/online/leaders?format=standard')).json() as Array<{ id: string }>;
+      expect(std.map((c) => c.id)).not.toContain('ST01-001');
+
+      const notLeader = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb', leader: 'ST01-002' } });
+      expect(notLeader.statusCode).toBe(400);
+      expect(notLeader.json().errorCode).toBe('invalidLeaderPick');
+      const rotated = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st08-luffy', queue: 'casual', format: 'standard', leader: 'ST01-001' } });
+      expect(rotated.statusCode).toBe(400);
+
+      const a = (await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'casual', format: 'egb', leader: 'ST02-001' } })).json();
+      expect((await app.inject(`/api/online/queue/${a.ticket}`)).json()).toMatchObject({ status: 'waiting', wantLeader: 'ST02-001' });
+      const after = (await app.inject('/api/online/leaders?format=egb')).json() as Array<{ id: string; queue: number }>;
+      expect(after.find((c) => c.id === 'ST01-001')?.queue).toBe(1);
+    });
   });
 
   it('ranqueada: só com login e sem cartas com efeito ainda não automatizado', async () => {

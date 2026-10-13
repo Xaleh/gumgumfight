@@ -20,6 +20,8 @@ interface Entry {
   ip: string | null;
   format: FormatId;
   queue: QueueKind;
+  /** Casual: Líder contra o qual quer jogar (vale por LEADER_PICK_MS; depois, qualquer um). */
+  wantLeader: string | null;
   since: number;
   lastSeen: number;
   matched: { roomId: string; token: string } | null;
@@ -114,6 +116,8 @@ const QUEUE_STALE_MS = 30_000;
 /** Faixa de recompensa aceita na ranqueada: começa em BASE e abre PER_SECOND a cada segundo de espera. */
 const RANKED_WINDOW_BASE = 2_000;
 const RANKED_WINDOW_PER_SECOND = 400;
+/** Casual: por quanto tempo quem escolheu um Líder só é pareado com ele. */
+export const LEADER_PICK_MS = 60_000;
 
 /** Recusa para o jogador: `code` é o status HTTP; `errorCode` (+ `errorParams`) é a chave que o cliente traduz. */
 export type LobbyError = { error: string; errorCode: string; errorParams?: ErrorParams; code: number; roomId?: string };
@@ -452,12 +456,23 @@ export class Lobby {
 
   // ------------------------------------------------------------------ filas
 
-  enqueue(seat: SeatRequest, format: FormatId, queue: QueueKind, ip: string | null = null): { ticket: string } | LobbyError {
+  /** `wantLeader` (só casual): Líder do oponente preferido no primeiro minuto. */
+  enqueue(seat: SeatRequest, format: FormatId, queue: QueueKind, ip: string | null = null, wantLeader: string | null = null): { ticket: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     this.leaveQueue(seat.ownerHash);
     const now = this.deps.now();
-    const entry: Entry = { ticket: randomBytes(12).toString('base64url'), seat, ip, format, queue, since: now, lastSeen: now, matched: null };
+    const entry: Entry = {
+      ticket: randomBytes(12).toString('base64url'),
+      seat,
+      ip,
+      format,
+      queue,
+      wantLeader: queue === 'casual' ? wantLeader : null,
+      since: now,
+      lastSeen: now,
+      matched: null,
+    };
     this.queue.push(entry);
     this.match();
     return { ticket: entry.ticket };
@@ -478,7 +493,21 @@ export class Lobby {
       status: 'waiting' as const,
       waited: now - entry.since,
       players: this.queue.filter((e) => !e.matched && e.queue === entry.queue && e.format === entry.format).length,
+      wantLeader: entry.wantLeader,
+      /** Quanto falta para a escolha do Líder expirar (0 = já procura qualquer oponente). */
+      leaderWait: entry.wantLeader ? Math.max(0, LEADER_PICK_MS - (now - entry.since)) : 0,
     };
+  }
+
+  /** Quantos estão na fila casual do formato com cada Líder (para a lista de escolha). */
+  casualLeaders(format: FormatId): Record<string, number> {
+    const now = this.deps.now();
+    const out: Record<string, number> = {};
+    for (const e of this.queue) {
+      if (e.matched || e.queue !== 'casual' || e.format !== format || now - e.lastSeen >= QUEUE_STALE_MS) continue;
+      out[e.seat.deck.leader] = (out[e.seat.deck.leader] ?? 0) + 1;
+    }
+    return out;
   }
 
   cancel(ticket: string) {
@@ -497,33 +526,59 @@ export class Lobby {
     return RANKED_WINDOW_BASE + (RANKED_WINDOW_PER_SECOND * (now - e.since)) / 1000;
   }
 
-  /** Forma pares na ordem de chegada. */
+  /** A escolha de Líder de `e` ainda vale (casual, dentro do primeiro minuto)? */
+  private picking(e: Entry, now: number) {
+    return e.wantLeader !== null && now - e.since < LEADER_PICK_MS;
+  }
+
+  /** `a` aceita jogar contra `b`: sem escolha de Líder em vigor, ou `b` usa o Líder escolhido. */
+  private accepts(a: Entry, b: Entry, now: number) {
+    return !this.picking(a, now) || b.seat.deck.leader === a.wantLeader;
+  }
+
+  private compatible(a: Entry, b: Entry, now: number) {
+    if (a.queue !== b.queue || a.format !== b.format) return false;
+    if (a.seat.ownerHash === b.seat.ownerHash) return false;
+    if (a.queue === 'ranked') {
+      if (a.seat.userId && a.seat.userId === b.seat.userId) return false;
+      const gap = Math.abs(a.seat.bounty - b.seat.bounty);
+      if (gap > Math.max(this.window(a, now), this.window(b, now))) return false;
+    }
+    return this.accepts(a, b, now) && this.accepts(b, a, now);
+  }
+
+  private pair(a: Entry, b: Entry) {
+    const ta = randomToken();
+    const tb = randomToken();
+    const room = this.makeRoom(newRoomData({ queue: a.queue, format: a.format, code: null, seats: [{ ...a.seat, token: ta }, { ...b.seat, token: tb }] }));
+    room.start();
+    this.tagIp(room.id, a.ip);
+    this.tagIp(room.id, b.ip);
+    a.matched = { roomId: room.id, token: ta };
+    b.matched = { roomId: room.id, token: tb };
+  }
+
+  /**
+   * Forma pares na ordem de chegada. Antes, quem escolheu um Líder (casual) pega o
+   * primeiro oponente com aquele Líder, para ele não ser pareado com outra pessoa
+   * da fila enquanto a escolha ainda vale.
+   */
   private match() {
     const now = this.deps.now();
     this.queue = this.queue.filter((e) => e.matched || now - e.lastSeen < QUEUE_STALE_MS);
     const open = this.queue.filter((e) => !e.matched);
+    for (const a of open) {
+      if (a.matched || !this.picking(a, now)) continue;
+      const b = open.find((b) => b !== a && !b.matched && this.compatible(a, b, now));
+      if (b) this.pair(a, b);
+    }
     for (let i = 0; i < open.length; i++) {
       const a = open[i];
       if (a.matched) continue;
       for (let j = i + 1; j < open.length; j++) {
         const b = open[j];
-        if (b.matched || a.queue !== b.queue || a.format !== b.format) continue;
-        if (a.seat.ownerHash === b.seat.ownerHash) continue;
-        if (a.queue === 'ranked') {
-          if (a.seat.userId && a.seat.userId === b.seat.userId) continue;
-          const gap = Math.abs(a.seat.bounty - b.seat.bounty);
-          if (gap > Math.max(this.window(a, now), this.window(b, now))) continue;
-        }
-        const ta = randomToken();
-        const tb = randomToken();
-        const room = this.makeRoom(
-          newRoomData({ queue: a.queue, format: a.format, code: null, seats: [{ ...a.seat, token: ta }, { ...b.seat, token: tb }] }),
-        );
-        room.start();
-        this.tagIp(room.id, a.ip);
-        this.tagIp(room.id, b.ip);
-        a.matched = { roomId: room.id, token: ta };
-        b.matched = { roomId: room.id, token: tb };
+        if (b.matched || !this.compatible(a, b, now)) continue;
+        this.pair(a, b);
         break;
       }
     }
