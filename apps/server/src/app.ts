@@ -34,6 +34,7 @@ import type { LobbyLimits } from './online/lobby';
 import { registerOnlineRoutes } from './online/routes';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
+import { registerAccessGate } from './support/access';
 import { registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
 import { reportFromGame } from './tournaments/store';
@@ -52,6 +53,8 @@ export function buildApp(
     onlineRateLimit?: number;
     botDelayMs?: number;
     onlineLimits?: Partial<LobbyLimits>;
+    /** Testes: fetch usado na consulta do plano à produção (ACCESS=supporters). */
+    fetchImpl?: typeof fetch;
   } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
@@ -124,6 +127,9 @@ export function buildApp(
     browserHash,
     adminEmails: server.adminEmails,
   });
+  // Homologação só para apoiadores (ACCESS=supporters): antes de todas as outras rotas.
+  registerAccessGate(app, { db, user: auth.viewer, access: server.access ?? { mode: 'open' }, fetchImpl: opts.fetchImpl, now: opts.now });
+
   /**
    * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o
    * navegador. Só o dono edita/apaga os decks que criou.

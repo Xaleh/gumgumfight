@@ -268,6 +268,11 @@ export const api = {
   },
   sponsors: (placement?: 'tournaments' | 'home') =>
     get<{ sponsors: PublicSponsor[]; contactUrl: string | null }>(`/api/sponsors${placement ? `?placement=${placement}` : ''}`),
+  /** Acesso ao site (homologação só para apoiadores). */
+  access: () =>
+    get<{ mode: 'open' | 'supporters'; allowed: boolean; reason: 'open' | 'login' | 'admin' | 'supporter' | 'remote' | 'denied' | 'unverified'; homeUrl: string | null }>(
+      '/api/access',
+    ),
   support: {
     info: () => get<SupportInfo>('/api/support'),
     supporters: () => get<Array<{ name: string; tier: SupporterTier }>>('/api/support/supporters'),
