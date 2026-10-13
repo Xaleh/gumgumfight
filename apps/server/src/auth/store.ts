@@ -159,6 +159,20 @@ export function userByVerifiedEmail(db: DB, email: string): User | null {
   return r ? toUser(r) : null;
 }
 
+/** Plano de apoio ativo de cada conta (para o selo ao lado do nome); quem não tem plano fica de fora. */
+export function supporterTiers(db: DB, ids: string[]): Map<string, SupporterTier> {
+  const out = new Map<string, SupporterTier>();
+  if (!ids.length) return out;
+  const rows = db
+    .prepare(`SELECT id, supporter_tier, supporter_until FROM users WHERE supporter_tier IS NOT NULL AND id IN (${ids.map(() => '?').join(',')})`)
+    .all(...ids) as Array<{ id: string; supporter_tier: string | null; supporter_until: string | null }>;
+  for (const r of rows) {
+    const t = activeTier(r);
+    if (t) out.set(r.id, t);
+  }
+  return out;
+}
+
 /** O Google confirmou o e-mail desta conta. */
 export const emailVerified = (db: DB, id: string) =>
   Boolean((db.prepare('SELECT email_verified FROM users WHERE id = ?').get(id) as { email_verified: number } | undefined)?.email_verified);

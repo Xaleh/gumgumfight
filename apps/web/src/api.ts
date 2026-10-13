@@ -259,14 +259,22 @@ export const api = {
         until,
       }),
     payments: () => get<SupporterPayment[]>('/api/admin/support/payments'),
+    sponsors: () => get<AdminSponsor[]>('/api/admin/sponsors'),
+    createSponsor: (s: SponsorInput) => send<AdminSponsor>('POST', '/api/admin/sponsors', s),
+    updateSponsor: (id: string, s: SponsorInput) => send<AdminSponsor>('PUT', `/api/admin/sponsors/${encodeURIComponent(id)}`, s),
+    deleteSponsor: (id: string) => send<void>('DELETE', `/api/admin/sponsors/${encodeURIComponent(id)}`),
+    /** Logo em data URL (PNG, JPEG ou WebP); null apaga. */
+    setSponsorLogo: (id: string, image: string | null) => send<AdminSponsor>('PUT', `/api/admin/sponsors/${encodeURIComponent(id)}/logo`, { image }),
   },
+  sponsors: (placement?: 'tournaments' | 'home') =>
+    get<{ sponsors: PublicSponsor[]; contactUrl: string | null }>(`/api/sponsors${placement ? `?placement=${placement}` : ''}`),
   support: {
     info: () => get<SupportInfo>('/api/support'),
     supporters: () => get<Array<{ name: string; tier: SupporterTier }>>('/api/support/supporters'),
     setPublic: (visible: boolean) => send<{ public: boolean }>('PUT', '/api/support/me', { public: visible }),
   },
   tournaments: {
-    list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean }>('/api/tournaments'),
+    list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null }>('/api/tournaments'),
     get: (id: string) => get<TournamentDetail>(`/api/tournaments/${encodeURIComponent(id)}`),
     create: (t: TournamentInput) => send<TournamentDetail>('POST', '/api/tournaments', t),
     update: (id: string, t: TournamentInput) => send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}`, t),
@@ -460,6 +468,11 @@ export interface TournamentInput {
   checkIn: boolean;
   /** Minutos para entrar na sala em cada rodada (1 a 60). */
   toleranceMin: number;
+  /** Só admin: torneio do time (Torneio da Tripulação), prêmio, loja patrocinadora e inscrição antecipada de 48 h para Almirantes. */
+  official?: boolean;
+  prize?: string | null;
+  sponsorId?: string | null;
+  priority?: boolean;
 }
 
 export interface TournamentSummary {
@@ -479,6 +492,47 @@ export interface TournamentSummary {
   organizerName: string | null;
   /** Você está inscrito. */
   registered: boolean;
+  /** Torneio do time (Torneio da Tripulação). */
+  official: boolean;
+  prize: string | null;
+  sponsor: PublicSponsor | null;
+  /** Até quando só Almirantes se inscrevem. */
+  priorityUntil: string | null;
+}
+
+/** Limites de quem organiza: Organizador/Admin sem cota; apoiador Capitão ou Almirante com cota mensal. */
+export interface OrganizeLimits {
+  kind: 'role' | 'supporter';
+  perMonth: number | null;
+  used: number;
+  maxPlayers: number;
+}
+
+/** Loja patrocinadora (o que o site mostra). */
+export interface PublicSponsor {
+  id: string;
+  name: string;
+  url: string | null;
+  offer: string | null;
+  placements: Array<'tournaments' | 'home'>;
+  logoUrl: string | null;
+}
+
+export interface AdminSponsor extends PublicSponsor {
+  startsAt: string | null;
+  endsAt: string | null;
+  sort: number;
+  active: boolean;
+}
+
+export interface SponsorInput {
+  name: string;
+  url: string | null;
+  offer: string | null;
+  placements: Array<'tournaments' | 'home'>;
+  startsAt: string | null;
+  endsAt: string | null;
+  sort: number;
 }
 
 /** Torneio em que a conta está em jogo agora (check-in aberto ou em andamento), para o atalho da tela inicial. */
@@ -631,6 +685,14 @@ export interface TournamentDetail {
   startedAt: string | null;
   finishedAt: string | null;
   organizerName: string | null;
+  official: boolean;
+  prize: string | null;
+  sponsor: PublicSponsor | null;
+  /** Inscrição antecipada: até esta hora só Almirantes se inscrevem. */
+  priorityUntil: string | null;
+  priorityOpen: boolean;
+  /** Limite de jogadores que quem pede pode escolher ao editar. */
+  maxPlayersCap: number;
   canManage: boolean;
   canRegister: boolean;
   me: {
@@ -651,6 +713,8 @@ export interface TournamentDetail {
     leaderName: string | null;
     leaderImage: string | null;
     colors: string[];
+    /** Plano de apoio ativo (selo ao lado do nome). */
+    supporter: SupporterTier | null;
     /** Lista do deck: só para o organizador, o próprio jogador e, no fim, para todos. */
     deck: { name: string; leader: string; cards: Array<{ id: string; count: number; name: string | null }> } | null;
   }>;

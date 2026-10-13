@@ -8362,3 +8362,162 @@ tr.clickable:hover td {
   background: linear-gradient(90deg, var(--line), var(--panel2));
   filter: blur(1px);
 }
+
+/* Torneios: torneio do time, cota de apoiador e lojas parceiras. */
+.tour-card.official {
+  border-color: color-mix(in srgb, var(--gold) 65%, var(--line));
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+.tour-official-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.tour-official-line .tour-badge {
+  margin-left: 0;
+}
+.tour-badge.official {
+  background: color-mix(in srgb, var(--gold) 25%, var(--panel));
+  color: var(--text);
+}
+.tour-prize {
+  font-weight: 700;
+  font-size: 13px;
+}
+.tour-quota {
+  margin: 0;
+}
+.tour-quota .text-link {
+  padding: 0;
+}
+.tour-sponsor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.tour-official-form {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--gold) 60%, var(--line));
+}
+.sponsors-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sponsors-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sponsors-head h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+}
+.sponsors-head .text-link {
+  text-decoration: none;
+  padding: 0;
+}
+.sponsors-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.sponsor-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+a.sponsor-card:hover {
+  border-color: var(--blue);
+}
+.sponsor-card img,
+.sponsor-initial {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+}
+.sponsor-initial {
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 20px;
+  background: var(--panel2);
+}
+.sponsor-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sponsor-text b,
+.sponsor-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tour-item.official {
+  border-color: color-mix(in srgb, var(--gold) 65%, var(--line));
+}
+.tour-item-prize {
+  font-weight: 700;
+}
+.admin-sponsors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-sponsors h3 {
+  margin: 8px 0 0;
+}
+.admin-sponsor .btn-row {
+  margin-left: auto;
+}
+.admin-sponsor img.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+}
+.sponsor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+}
+.sponsor-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 140px;
+  margin: 0;
+}
+.sponsor-form .tour-form-row {
+  gap: 8px;
+}
+.sponsor-placements {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}

@@ -16,6 +16,21 @@ import {
 import type { SupportOptions } from '../config';
 import type { DB } from '../db';
 import { pixPayload } from './pix';
+import {
+  createSponsor,
+  deleteSponsor,
+  getSponsor,
+  imageType,
+  listSponsors,
+  MAX_LOGO_BYTES,
+  type Placement,
+  PLACEMENTS,
+  publicSponsor,
+  setSponsorLogo,
+  type SponsorInput,
+  sponsorLogo,
+  updateSponsor,
+} from './sponsors';
 import { isSupporterTier, SUPPORTER_TIERS, type SupporterTier, TIER_INFO, tierFromPayment, tierRank } from './tiers';
 
 interface Deps {
@@ -52,12 +67,31 @@ function activeCounts(db: DB): Record<SupporterTier, number> {
   return out;
 }
 
-/** Data "AAAA-MM-DD" (fim do dia, horário de Brasília) ou ISO completo. */
-function parseUntil(v: unknown): string | null | 'invalid' {
+/** Data "AAAA-MM-DD" (fim do dia, horário de Brasília; `startOfDay` = início) ou ISO completo. */
+function parseUntil(v: unknown, startOfDay = false): string | null | 'invalid' {
   if (v === null || v === undefined || v === '') return null;
   if (typeof v !== 'string') return 'invalid';
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T23:59:59-03:00`) : new Date(v);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T${startOfDay ? '00:00:00' : '23:59:59'}-03:00`) : new Date(v);
   return Number.isNaN(d.getTime()) ? 'invalid' : d.toISOString();
+}
+
+type SponsorBody = { name?: unknown; url?: unknown; offer?: unknown; placements?: unknown; startsAt?: unknown; endsAt?: unknown; sort?: unknown };
+
+function parseSponsor(b: SponsorBody | undefined): SponsorInput | string {
+  if (!b || typeof b !== 'object') return 'Corpo inválido.';
+  const name = typeof b.name === 'string' ? b.name.trim().replace(/\s+/g, ' ').slice(0, 60) : '';
+  if (name.length < 2) return 'Dê o nome da loja.';
+  const url = typeof b.url === 'string' && b.url.trim() ? b.url.trim().slice(0, 300) : null;
+  if (url && !/^https?:\/\/[^\s]+$/i.test(url)) return 'O link precisa começar com http:// ou https://.';
+  const offer = typeof b.offer === 'string' && b.offer.trim() ? b.offer.trim().replace(/\s+/g, ' ').slice(0, 160) : null;
+  const placements = Array.isArray(b.placements) ? PLACEMENTS.filter((p) => (b.placements as unknown[]).includes(p)) : (['tournaments'] as Placement[]);
+  if (!placements.length) return 'Escolha onde a loja aparece.';
+  const startsAt = parseUntil(b.startsAt, true);
+  const endsAt = parseUntil(b.endsAt);
+  if (startsAt === 'invalid' || endsAt === 'invalid') return 'Data inválida.';
+  if (startsAt && endsAt && endsAt <= startsAt) return 'O fim precisa ser depois do início.';
+  const sort = Number.isInteger(Number(b.sort)) ? Math.max(-999, Math.min(999, Number(b.sort))) : 0;
+  return { name, url, offer, placements, startsAt, endsAt, sort };
 }
 
 export function registerSupportRoutes(app: FastifyInstance, { db, user, options }: Deps) {
@@ -178,6 +212,31 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
     return { tier: u?.supporterTier ?? null, admin: Boolean(u && isAdmin(u.role)) };
   });
 
+  // ---------------------------------------------------------------- lojas patrocinadoras
+
+  /** Lojas ativas (de um lugar do site, se pedido) e o contato para quem quer patrocinar. */
+  app.get<{ Querystring: { placement?: string } }>('/api/sponsors', async (req) => {
+    const placement = PLACEMENTS.find((p) => p === req.query.placement);
+    return {
+      sponsors: listSponsors(db)
+        .filter((sp) => sp.active && (!placement || sp.placements.includes(placement)))
+        .map(publicSponsor),
+      contactUrl: options.contactUrl ?? null,
+    };
+  });
+
+  app.get<{ Params: { id: string } }>('/api/sponsors/:id/logo', async (req, reply) => {
+    const logo = sponsorLogo(db, req.params.id);
+    if (!logo) return reply.code(404).send({ error: 'Sem logo.' });
+    // A URL muda a cada novo logo (?v=), então pode ficar em cache por bastante tempo.
+    return reply
+      .header('content-type', logo.type)
+      .header('cache-control', 'public, max-age=86400')
+      .header('x-content-type-options', 'nosniff')
+      .header('content-security-policy', "default-src 'none'")
+      .send(logo.data);
+  });
+
   // ---------------------------------------------------------------- admin
 
   const admin = (req: FastifyRequest, reply: FastifyReply): User | null => {
@@ -198,6 +257,51 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
     if (!setSupporter(db, req.params.id, tier, until)) return reply.code(404).send({ error: 'Conta não encontrada.' });
     const u = getUser(db, req.params.id)!;
     return { id: u.id, supporterTier: u.supporterTier, supporterUntil: u.supporterUntil, supporterSource: u.supporterSource };
+  });
+
+  app.get('/api/admin/sponsors', async (req, reply) => {
+    if (!admin(req, reply)) return reply;
+    return listSponsors(db).map((sp) => ({ ...sp, ...publicSponsor(sp) }));
+  });
+
+  app.post<{ Body: SponsorBody }>('/api/admin/sponsors', async (req, reply) => {
+    if (!admin(req, reply)) return reply;
+    const input = parseSponsor(req.body);
+    if (typeof input === 'string') return reply.code(400).send({ error: input });
+    const sp = createSponsor(db, input);
+    return reply.code(201).send({ ...sp, ...publicSponsor(sp) });
+  });
+
+  app.put<{ Params: { id: string }; Body: SponsorBody }>('/api/admin/sponsors/:id', async (req, reply) => {
+    if (!admin(req, reply)) return reply;
+    const input = parseSponsor(req.body);
+    if (typeof input === 'string') return reply.code(400).send({ error: input });
+    const sp = updateSponsor(db, req.params.id, input);
+    return sp ? { ...sp, ...publicSponsor(sp) } : reply.code(404).send({ error: 'Loja não encontrada.' });
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/admin/sponsors/:id', async (req, reply) => {
+    if (!admin(req, reply)) return reply;
+    return deleteSponsor(db, req.params.id) ? reply.code(204).send() : reply.code(404).send({ error: 'Loja não encontrada.' });
+  });
+
+  /** Logo da loja: imagem PNG, JPEG ou WebP em base64 (ou data URL); null apaga. */
+  app.put<{ Params: { id: string }; Body: { image?: unknown } }>('/api/admin/sponsors/:id/logo', { bodyLimit: 600 * 1024 }, async (req, reply) => {
+    if (!admin(req, reply)) return reply;
+    if (!getSponsor(db, req.params.id)) return reply.code(404).send({ error: 'Loja não encontrada.' });
+    const raw = req.body?.image;
+    if (raw === null) {
+      setSponsorLogo(db, req.params.id, null, null);
+    } else {
+      if (typeof raw !== 'string') return reply.code(400).send({ error: 'Imagem inválida.' });
+      const data = Buffer.from(raw.replace(/^data:[^,]*,/, ''), 'base64');
+      if (data.length > MAX_LOGO_BYTES) return reply.code(400).send({ error: `O logo pode ter até ${Math.round(MAX_LOGO_BYTES / 1024)} KB.` });
+      const type = imageType(data);
+      if (!type) return reply.code(400).send({ error: 'Use uma imagem PNG, JPEG ou WebP.' });
+      setSponsorLogo(db, req.params.id, data, type);
+    }
+    const sp = getSponsor(db, req.params.id)!;
+    return { ...sp, ...publicSponsor(sp) };
   });
 
   /** Últimos pagamentos recebidos (conferência do admin). */

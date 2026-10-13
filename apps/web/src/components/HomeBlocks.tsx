@@ -214,12 +214,16 @@ function TournamentRow({ t, onOpen }: { t: TournamentSummary; onOpen: () => void
     t.status === 'running' ? `Rodada ${t.round}${t.totalRounds ? ` de ${t.totalRounds}` : ''}` : when(t.startsAt);
   const checkInOpen = t.status === 'registration' && t.checkInOpensAt && new Date(t.checkInOpensAt).getTime() <= Date.now();
   return (
-    <button type="button" className={['tour-item', t.status].join(' ')} onClick={onOpen}>
+    <button type="button" className={['tour-item', t.status, t.official ? 'official' : ''].join(' ')} onClick={onOpen}>
       <span className="tour-item-top">
         <span>{checkInOpen ? 'Check-in aberto' : TOURNAMENT_STATUS_LABEL[t.status]}</span>
         {side && <span className="muted">{side}</span>}
       </span>
-      <strong>{t.name}</strong>
+      <strong>
+        {t.official && <span title="Torneio da Tripulação">⚓ </span>}
+        {t.name}
+      </strong>
+      {t.prize && <span className="sub tour-item-prize">🏆 {t.prize}</span>}
       <span className="sub">
         {STRUCTURE_LABEL[t.structure]} · {formatLabel(t.format)} · {t.players}
         {t.maxPlayers ? `/${t.maxPlayers}` : ''} {t.status === 'registration' ? 'inscritos' : 'jogadores'}
@@ -237,7 +241,8 @@ export function TournamentsBlock({
 }) {
   const open = (list?.tournaments ?? [])
     .filter((t) => t.status !== 'finished')
-    .sort((a, b) => (a.status === b.status ? 0 : a.status === 'running' ? -1 : 1))
+    // Torneios do time primeiro; depois os em andamento.
+    .sort((a, b) => Number(b.official) - Number(a.official) || (a.status === b.status ? 0 : a.status === 'running' ? -1 : 1))
     .slice(0, 3);
   return (
     <section className="home-block" aria-labelledby="home-tournaments">

@@ -1,9 +1,13 @@
 import { FORMATS, formatLabel } from '@gumgum/engine';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  type AdminSponsor,
   api,
   canPlay,
   type DeckSummary,
+  isAdmin,
+  type OrganizeLimits,
+  type PublicSponsor,
   type OnlineSeat,
   phaseLabel,
   STRUCTURE_LABEL,
@@ -12,14 +16,17 @@ import {
   type TournamentMatchInfo,
   type TournamentSummary,
   TOURNAMENT_STATUS_LABEL,
+  TIER_LABEL,
   type WatchTarget,
   winsNeeded,
 } from '../api';
 import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { useNow } from './HomeBlocks';
+import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
 import { openReplay, ReportsPanel } from './Reports';
+import { SupportModal } from './Support';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -99,14 +106,16 @@ export function Tournaments({
   onReplay: (setup: GameSetup, tournamentId: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(initialId ?? null);
-  const [creating, setCreating] = useState(false);
+  /** Criando um torneio: o limite de jogadores de quem cria (null = não está criando). */
+  const [creating, setCreating] = useState<number | null>(null);
 
-  if (creating) {
+  if (creating !== null) {
     return (
       <TournamentForm
-        onCancel={() => setCreating(false)}
+        cap={creating}
+        onCancel={() => setCreating(null)}
         onSaved={(t) => {
-          setCreating(false);
+          setCreating(null);
           setOpenId(t.id);
         }}
       />
@@ -124,15 +133,94 @@ export function Tournaments({
       />
     );
   }
-  return <TournamentList onExit={onExit} onOpen={setOpenId} onCreate={() => setCreating(true)} />;
+  return <TournamentList onExit={onExit} onOpen={setOpenId} onCreate={setCreating} />;
+}
+
+// ------------------------------------------------------------------ lojas parceiras e torneio do time
+
+/** Selos do torneio: do time, prêmio, loja e inscrição antecipada. */
+function OfficialBadges({
+  t,
+  hideSponsor,
+}: {
+  t: Pick<TournamentSummary, 'official' | 'prize' | 'sponsor' | 'priorityUntil' | 'status'>;
+  /** Na página do torneio a loja aparece com o logo logo abaixo. */
+  hideSponsor?: boolean;
+}) {
+  if (!t.official && !t.prize && !t.sponsor) return null;
+  const early = t.priorityUntil && Date.parse(t.priorityUntil) > Date.now() && t.status === 'registration';
+  return (
+    <span className="tour-official-line">
+      {t.official && <span className="tour-badge official">⚓ Torneio da Tripulação</span>}
+      {t.prize && <span className="tour-prize">🏆 {t.prize}</span>}
+      {t.sponsor && !hideSponsor && <span className="muted small">Patrocínio: {t.sponsor.name}</span>}
+      {early && <span className="muted small">Inscrição antecipada para Almirantes até {dateTime(t.priorityUntil)}</span>}
+    </span>
+  );
+}
+
+function SponsorCard({ sp }: { sp: PublicSponsor }) {
+  const inner = (
+    <>
+      {sp.logoUrl ? <img src={sp.logoUrl} alt="" loading="lazy" /> : <span className="sponsor-initial">{sp.name.slice(0, 1)}</span>}
+      <span className="sponsor-text">
+        <b>{sp.name}</b>
+        {sp.offer && <span className="small">{sp.offer}</span>}
+      </span>
+    </>
+  );
+  return sp.url ? (
+    <a className="sponsor-card" href={sp.url} target="_blank" rel="noopener noreferrer sponsored">
+      {inner}
+    </a>
+  ) : (
+    <div className="sponsor-card">{inner}</div>
+  );
+}
+
+/** Faixa "Lojas parceiras" com o convite para novas lojas. */
+export function SponsorsStrip({ placement, hideEmpty }: { placement: 'tournaments' | 'home'; /** Sem lojas, nem mostra o convite. */ hideEmpty?: boolean }) {
+  const [data, setData] = useState<{ sponsors: PublicSponsor[]; contactUrl: string | null } | null>(null);
+  useEffect(() => {
+    api
+      .sponsors(placement)
+      .then(setData)
+      .catch(() => setData(null));
+  }, [placement]);
+  if (!data || (!data.sponsors.length && (!data.contactUrl || hideEmpty))) return null;
+  return (
+    <section className="menu-card sponsors-strip" aria-label="Lojas parceiras">
+      <div className="sponsors-head">
+        <h3>
+          <Icon name="store" size={18} /> Lojas parceiras
+        </h3>
+        {data.contactUrl && (
+          <a className="text-link small" href={data.contactUrl} target="_blank" rel="noopener noreferrer">
+            Seja um patrocinador
+          </a>
+        )}
+      </div>
+      {data.sponsors.length > 0 ? (
+        <div className="sponsors-list">
+          {data.sponsors.map((sp) => (
+            <SponsorCard key={sp.id} sp={sp} />
+          ))}
+        </div>
+      ) : (
+        <p className="muted small">Sua loja pode patrocinar os torneios do GumGum Fight e aparecer aqui.</p>
+      )}
+    </section>
+  );
 }
 
 // ------------------------------------------------------------------ lista
 
-function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOpen: (id: string) => void; onCreate: () => void }) {
-  const { user } = useAuth();
-  const [data, setData] = useState<{ tournaments: TournamentSummary[]; canCreate: boolean } | null>(null);
+function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOpen: (id: string) => void; onCreate: (cap: number) => void }) {
+  const { user, config } = useAuth();
+  const [data, setData] = useState<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSupport, setShowSupport] = useState(false);
+  const quota = data?.organize?.kind === 'supporter' ? data.organize : null;
 
   useEffect(() => {
     let stop = false;
@@ -153,7 +241,7 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
         </button>
         <h2>Torneios</h2>
         {data?.canCreate && (
-          <button className="btn small primary tour-create" onClick={onCreate}>
+          <button className="btn small primary tour-create" onClick={() => onCreate(data.organize?.maxPlayers ?? 256)}>
             + Criar torneio
           </button>
         )}
@@ -163,20 +251,36 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
         {!user && (
           <p className="muted small">Para se inscrever num torneio, entre com a conta Google no menu.</p>
         )}
+        {quota && (
+          <p className="muted small tour-quota">
+            Seu plano: {quota.used} de {quota.perMonth} torneios criados este mês, de até {quota.maxPlayers} jogadores. A cota renova no dia 1º.
+          </p>
+        )}
+        {data && !data.organize && config?.support && (
+          <p className="small tour-quota">
+            Quer organizar os seus torneios? Os planos Capitão e Almirante criam até 5 por mês.{' '}
+            <button className="text-link" onClick={() => setShowSupport(true)}>
+              Apoie para organizar
+            </button>
+          </p>
+        )}
+        {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+        <SponsorsStrip placement="tournaments" />
         {data === null && !error && <p className="muted">Carregando…</p>}
         {data?.tournaments.length === 0 && (
           <p className="muted">
             Nenhum torneio ainda.
-            {data.canCreate ? ' Crie o primeiro!' : ' Torneios são criados por contas com o perfil Organizador.'}
+            {data.canCreate ? ' Crie o primeiro!' : ' Torneios são criados por Organizadores e apoiadores Capitão ou Almirante.'}
           </p>
         )}
         <div className="tour-list">
           {data?.tournaments.map((t) => (
-            <button key={t.id} className="tour-card" onClick={() => onOpen(t.id)}>
+            <button key={t.id} className={['tour-card', t.official ? 'official' : ''].join(' ')} onClick={() => onOpen(t.id)}>
               <div className="tour-card-head">
                 <strong>{t.name}</strong>
                 <span className={['tour-status', t.status].join(' ')}>{TOURNAMENT_STATUS_LABEL[t.status]}</span>
               </div>
+              <OfficialBadges t={t} />
               <span className="muted small">
                 {formatLabel(t.format)} · {STRUCTURE_LABEL[t.structure]}
                 {t.topCut ? ` + Top ${t.topCut}` : ''} · {t.players}
@@ -200,13 +304,22 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
 
 function TournamentForm({
   initial,
+  cap,
   onCancel,
   onSaved,
 }: {
   initial?: TournamentDetail;
+  /** Limite de jogadores de quem cria (plano de apoiador: 64). */
+  cap: number;
   onCancel: () => void;
   onSaved: (t: TournamentDetail) => void;
 }) {
+  const { user } = useAuth();
+  const admin = isAdmin(user?.role);
+  const [sponsors, setSponsors] = useState<AdminSponsor[]>([]);
+  useEffect(() => {
+    if (admin) api.admin.sponsors().then(setSponsors, () => setSponsors([]));
+  }, [admin]);
   const [form, setForm] = useState<TournamentInput>(() => ({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
@@ -221,6 +334,10 @@ function TournamentForm({
     startsAt: initial?.startsAt ?? null,
     checkIn: initial?.checkIn ?? true,
     toleranceMin: initial?.toleranceMin ?? 5,
+    official: initial?.official ?? false,
+    prize: initial?.prize ?? null,
+    sponsorId: initial?.sponsor?.id ?? null,
+    priority: Boolean(initial?.priorityUntil),
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -376,11 +493,12 @@ function TournamentForm({
                 className="admin-search"
                 type="number"
                 min={2}
-                max={256}
-                placeholder="Sem limite"
+                max={cap}
+                placeholder={cap < 256 ? `Até ${cap}` : 'Sem limite'}
                 value={form.maxPlayers ?? ''}
                 onChange={(e) => set('maxPlayers', num(e.target.value))}
               />
+              {cap < 256 && <p className="muted small">Torneios do seu plano têm até {cap} jogadores.</p>}
             </div>
             <div className="field">
               <label htmlFor="tour-start">Início previsto</label>
@@ -427,6 +545,56 @@ function TournamentForm({
           )}
           {form.structure === 'swiss' && (
             <p className="muted small">Rodadas em branco: o número é calculado no início pelo total de inscritos.</p>
+          )}
+          {admin && (
+            <div className="field tour-official-form">
+              <label className="check">
+                <input type="checkbox" checked={Boolean(form.official)} onChange={(e) => set('official', e.target.checked)} />
+                Torneio do time (Torneio da Tripulação)
+              </label>
+              {form.official && (
+                <>
+                  <div className="tour-form-row">
+                    <div className="field">
+                      <label htmlFor="tour-prize">Prêmio</label>
+                      <input
+                        id="tour-prize"
+                        className="admin-search"
+                        maxLength={200}
+                        placeholder="Ex.: 1 booster box, cortesia da Loja X"
+                        value={form.prize ?? ''}
+                        onChange={(e) => set('prize', e.target.value || null)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="tour-sponsor">Loja patrocinadora</label>
+                      <select
+                        id="tour-sponsor"
+                        className="admin-search"
+                        value={form.sponsorId ?? ''}
+                        onChange={(e) => set('sponsorId', e.target.value || null)}
+                      >
+                        <option value="">Nenhuma</option>
+                        {sponsors.map((sp) => (
+                          <option key={sp.id} value={sp.id}>
+                            {sp.name}
+                            {sp.active ? '' : ' (fora do período)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <label className="check">
+                    <input type="checkbox" checked={Boolean(form.priority)} onChange={(e) => set('priority', e.target.checked)} />
+                    Inscrição antecipada: nas primeiras 48 h, só apoiadores Almirante se inscrevem
+                  </label>
+                  <p className="muted small">
+                    O torneio continua aberto e gratuito para todos depois da janela. Anuncie o prêmio como produto da loja, sem logo nem arte
+                    da Bandai, e só prometa prêmio com o patrocínio fechado.
+                  </p>
+                </>
+              )}
+            </div>
           )}
           {error && <div className="error">{error}</div>}
           <div className="btn-row">
@@ -520,6 +688,7 @@ function TournamentPage({
     return (
       <TournamentForm
         initial={t}
+        cap={t.maxPlayersCap}
         onCancel={() => setEditing(false)}
         onSaved={(saved) => {
           setT(saved);
@@ -591,6 +760,13 @@ function TournamentPage({
                 ⏱ Cada jogador tem {clock(t.clockMs)} por jogo, que só corre na vez dele. Quem zera o tempo perde o jogo: não há
                 turnos extras nem empate por tempo.
               </p>
+              <OfficialBadges t={t} hideSponsor />
+              {t.sponsor && (
+                <div className="tour-sponsor">
+                  <span className="muted small">Patrocínio</span>
+                  <SponsorCard sp={t.sponsor} />
+                </div>
+              )}
               {t.description && <p className="tour-desc">{t.description}</p>}
               {t.status === 'finished' && t.standings[0] && (
                 <p className="tour-champion">
@@ -848,7 +1024,11 @@ function MyArea({
             )}
           </div>
         )}
-        {full ? (
+        {!t.me && t.priorityOpen && !t.canRegister ? (
+          <p className="muted">
+            Inscrição antecipada para apoiadores Almirante até {dateTime(t.priorityUntil)}. Depois disso, as inscrições abrem para todos.
+          </p>
+        ) : full ? (
           <p className="muted">O torneio está lotado.</p>
         ) : (
           <>
@@ -1184,7 +1364,14 @@ function Players({ t, busy, onDrop }: { t: TournamentDetail; busy: boolean; onDr
             <div className="tour-entry-head">
               <LeaderArt name={p.leaderName ?? p.leader} image={p.leaderImage} colors={p.colors} size="small" />
               <span className="watch-name">
-                <b>{p.name}</b>
+                <b>
+                  {p.name}
+                  {p.supporter && (
+                    <span className="supporter-tag" title={`Apoiador ${TIER_LABEL[p.supporter]}`}>
+                      ❤ {TIER_LABEL[p.supporter]}
+                    </span>
+                  )}
+                </b>
                 <span className="muted small">
                   {p.leaderName ?? p.leader}
                   {p.dropped ? ' · saiu do torneio' : ''}

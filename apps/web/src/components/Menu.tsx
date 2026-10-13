@@ -26,6 +26,7 @@ import { LeaderArt } from './LeaderArt';
 import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 import { ReplayLoader } from './ReplayLoader';
 import { SupportersList, SupportModal } from './Support';
+import { SponsorsStrip } from './Tournaments';
 
 /** Código de sala do link de convite (lido uma vez, ao carregar a página). */
 const URL_ROOM_CODE = roomCodeFromUrl();
@@ -846,6 +847,7 @@ export function Menu({
           <TournamentsBlock list={tournaments} onOpen={onTournaments} />
           <MetaBlock onStats={onStats} />
         </div>
+        {supportOn && <SponsorsStrip placement="home" hideEmpty />}
       </main>
 
       <footer className="home-footer">
