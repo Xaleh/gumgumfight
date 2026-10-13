@@ -6,8 +6,9 @@
 // proxy_read_timeout. O EventSource reconecta sozinho.
 //
 // Espectadores usam outro canal (/watch), sem token: qualquer um assiste às partidas
-// das filas (e às privadas, com o código). Ver as mãos exige perfil streamer ou admin
-// e é recusado para quem está jogando a própria partida.
+// das filas (e às privadas, com o código). Ver as mãos exige perfil streamer ou admin,
+// é recusado para quem está jogando a própria partida e mostra a mesa atrasada
+// (HANDS_DELAY_MS). Modo transmissão (/api/broadcast): ver online/broadcast.ts.
 
 import { randomInt } from 'node:crypto';
 import { buildCardDef, type CardData, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
@@ -22,8 +23,19 @@ import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
 import { isApprentice } from '../tutorial/store';
 import { pushText } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
+import { broadcastByKey, getBroadcast, newBroadcastKey, setBroadcastRoom } from './broadcast';
 import { Lobby, type LobbyError, type LobbyLimits, type SeatRequest } from './lobby';
-import { type ActResult, type Connection, MAX_SPECTATORS, type Room, type RoomData, type RoomEvent, type RoomResult, TIME_BANK_MS } from './room';
+import {
+  type ActResult,
+  type Connection,
+  HANDS_DELAY_MS,
+  MAX_SPECTATORS,
+  type Room,
+  type RoomData,
+  type RoomEvent,
+  type RoomResult,
+  TIME_BANK_MS,
+} from './room';
 
 interface Deps {
   db: DB;
@@ -39,6 +51,7 @@ interface Deps {
   /** Tetos de salas (servidor e por IP); ver `DEFAULT_LIMITS` em lobby.ts. */
   limits?: Partial<LobbyLimits>;
   botDelayMs?: number;
+  handsDelayMs?: number;
   /** Fim de uma partida de torneio: lança o resultado no torneio. */
   onTournamentGame?: (game: { tournamentId: string; matchId: number; roomId: string; winner: string | null; statsMatchId: number | null }) => void;
   /** Notificações no celular (partida começou, sua vez). */
@@ -168,6 +181,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     now: deps.now,
     rateLimit: deps.rateLimit,
     botDelayMs: deps.botDelayMs,
+    handsDelayMs: deps.handsDelayMs,
     limits: deps.limits,
     log: (msg) => app.log.warn(msg),
     onRoomEvent: (room, event) => roomNotice(deps.notifier ?? noNotifier, room, event),
@@ -397,13 +411,16 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return room ? lobby.summary(room) : reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
   });
 
-  /** Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin). */
-  app.get<{ Params: { id: string }; Querystring: { hands?: string } }>('/api/online/rooms/:id/watch', (req, reply) => {
+  /**
+   * Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin), na
+   * mesa atrasada. `k`: chave da transmissão no lugar do login (a fonte do OBS não tem a sessão).
+   */
+  app.get<{ Params: { id: string }; Querystring: { hands?: string; k?: string } }>('/api/online/rooms/:id/watch', (req, reply) => {
     const room = watchable(req.params.id);
     if (!room || room.status === 'waiting') return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const hands = req.query.hands === '1';
     if (hands) {
-      const account = user(req);
+      const account = user(req) ?? (req.query.k ? (broadcastByKey(db, req.query.k)?.user ?? null) : null);
       if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers e administradores.'));
       if (room.isPlayer(accountOwnerKey(account!.id), account!.id)) {
         return reply.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));
@@ -411,6 +428,66 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     }
     if (room.spectators >= MAX_SPECTATORS) return reply.code(429).send(fail('tooManySpectators', 'Esta partida já tem espectadores demais.'));
     stream(req, reply, room, { seat: null, hands });
+  });
+
+  // ---------------------------------------------------------------- modo transmissão
+
+  const handsDelayMs = deps.handsDelayMs ?? HANDS_DELAY_MS;
+
+  /** Conta que pode transmitir (a que vê as mãos: streamer, admin ou dev), ou responde 401/403. */
+  const broadcaster = (req: FastifyRequest, reply: FastifyReply): User | null => {
+    const account = user(req);
+    if (!account) {
+      void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+      return null;
+    }
+    if (!seesHands(account.role)) {
+      void reply.code(403).send(fail('broadcastForbidden', 'O modo transmissão é só para os perfis Streamer e Admin.'));
+      return null;
+    }
+    return account;
+  };
+
+  /** Transmissão da conta: a chave do link do OBS (null antes de gerar) e a partida escolhida. */
+  app.get('/api/broadcast', async (req, reply) => {
+    const account = broadcaster(req, reply);
+    if (!account) return reply;
+    const b = getBroadcast(db, account.id);
+    return { key: b?.key ?? null, roomId: b?.roomId ?? null, hands: b?.hands ?? false, delayMs: handsDelayMs };
+  });
+
+  /** Gera o link da transmissão (ou um novo: o antigo para de funcionar no OBS). */
+  app.post('/api/broadcast/key', async (req, reply) => {
+    const account = broadcaster(req, reply);
+    if (!account) return reply;
+    return { ...newBroadcastKey(db, account.id), delayMs: handsDelayMs };
+  });
+
+  /** Escolhe a partida que vai para a transmissão (`roomId` null tira a partida da tela). */
+  app.put<{ Body: { roomId?: unknown; hands?: unknown } }>('/api/broadcast/room', async (req, reply) => {
+    const account = broadcaster(req, reply);
+    if (!account) return reply;
+    if (!getBroadcast(db, account.id)) return reply.code(409).send(fail('broadcastNoKey', 'Crie o link da transmissão antes.'));
+    const roomId = req.body?.roomId;
+    const hands = req.body?.hands === true;
+    if (roomId === null) return { ...setBroadcastRoom(db, account.id, null, false)!, delayMs: handsDelayMs };
+    const room = typeof roomId === 'string' ? watchable(roomId) : null;
+    if (!room || room.status === 'waiting') return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    if (hands && room.isPlayer(accountOwnerKey(account.id), account.id)) {
+      return reply.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));
+    }
+    return { ...setBroadcastRoom(db, account.id, room.id, hands)!, delayMs: handsDelayMs };
+  });
+
+  /**
+   * O que a tela de transmissão (fonte do OBS) mostra agora: a partida escolhida no app. Sem login:
+   * a chave é o segredo. Some (404) se o link foi trocado ou a conta perdeu o perfil.
+   */
+  app.get<{ Params: { key: string } }>('/api/broadcast/:key', async (req, reply) => {
+    const found = broadcastByKey(db, req.params.key);
+    if (!found || !seesHands(found.user.role)) return reply.code(404).send(fail('broadcastNotFound', 'Link de transmissão inválido. Copie o link de novo no app.'));
+    const { roomId, hands } = found.broadcast;
+    return { roomId, hands, delayMs: handsDelayMs };
   });
 
   type SeatBody = { t?: unknown; seq?: unknown; action?: unknown; emote?: unknown; text?: unknown; vx?: unknown; vy?: unknown; visible?: unknown };

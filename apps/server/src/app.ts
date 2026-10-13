@@ -55,6 +55,8 @@ export function buildApp(
     now?: () => number;
     onlineRateLimit?: number;
     botDelayMs?: number;
+    /** Testes: atraso da mesa de quem vê as mãos (padrão HANDS_DELAY_MS, em online/room.ts). */
+    handsDelayMs?: number;
     onlineLimits?: Partial<LobbyLimits>;
     /** Testes: envio das notificações (sem ele, vai para o serviço de push de verdade). */
     pushSend?: PushSender;
@@ -284,6 +286,7 @@ export function buildApp(
     rateLimit: opts.onlineRateLimit,
     botRooms: server.onlineBotRooms ?? true,
     botDelayMs: opts.botDelayMs,
+    handsDelayMs: opts.handsDelayMs,
     limits: { ...stripUndefined(server.onlineLimits ?? {}), ...opts.onlineLimits },
     onTournamentGame: (game) => reportFromGame(db, game),
     notifier,

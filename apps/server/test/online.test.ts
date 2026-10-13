@@ -18,7 +18,7 @@ import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/
 import type { ServerOptions } from '../src/config';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
 import { Lobby, type SeatRequest } from '../src/online/lobby';
-import { ABANDON_MS, type Connection, Room, TIME_BANK_MS } from '../src/online/room';
+import { ABANDON_MS, type Connection, HANDS_DELAY_MS, Room, TIME_BANK_MS } from '../src/online/room';
 import { seed } from '../src/seed';
 
 const ALICE = { 'x-deck-owner': 'alice-0123456789abcdef' };
@@ -651,6 +651,97 @@ describe('partidas online: relógio', () => {
     expect(room.state!.winReason).toContain('abandonou');
     l.dispose();
   });
+
+  it('quem vê as mãos assiste à mesa atrasada: ações, chat e resultado chegam depois do atraso', () => {
+    vi.useFakeTimers();
+    let t = 1_000_000;
+    const step = (ms: number) => {
+      t += ms;
+      vi.advanceTimersByTime(ms);
+    };
+    const db = freshDb();
+    const l = lobby(db, () => t);
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    if ('error' in r) throw new Error(r.error);
+    l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
+    const room = r.room;
+    const players = [client(0), client(1)];
+    const watcher = client(null);
+    const streamer = client(null, true);
+    for (const c of [...players, watcher, streamer]) room.attach(c.conn);
+    expect(streamer.room.delay).toBe(HANDS_DELAY_MS);
+    expect(watcher.room.delay).toBe(0);
+    const s0 = streamer.view!;
+    expect(s0.players.every((p) => p.hand.every((u) => s0.cards[u].cardId !== HIDDEN_CARD))).toBe(true);
+    const first = actingPlayer(room.state!)!;
+    const other = (1 - first) as PlayerId;
+
+    step(10_000);
+    const actedAt = t;
+    room.act(first, 0, { type: 'answer', player: first, yes: true });
+    room.act(first, 1, { type: 'mulligan', player: first, redraw: false });
+    room.chat(first, 'boa sorte');
+    // Ao vivo: na hora. Com as mãos: nada ainda.
+    expect(watcher.view!.actionCount).toBe(2);
+    expect(watcher.events.some((e) => e.event === 'chat')).toBe(true);
+    expect(streamer.view!.actionCount).toBe(0);
+    expect(streamer.events.some((e) => e.event === 'chat')).toBe(false);
+    expect(streamer.room.clock.remaining).toEqual([TIME_BANK_MS, TIME_BANK_MS]);
+    // Quem chega agora para ver as mãos também começa atrás.
+    const late = client(null, true);
+    room.attach(late.conn);
+    expect(late.view!.actionCount).toBe(0);
+
+    step(HANDS_DELAY_MS - 1_000);
+    expect(streamer.view!.actionCount).toBe(0);
+    step(2_000);
+    expect(t - HANDS_DELAY_MS).toBeGreaterThanOrEqual(actedAt);
+    for (const c of [streamer, late]) {
+      expect(c.view!.actionCount).toBe(2);
+      // Um estado por ação (as animações acompanham), e o chat depois das ações que vieram antes dele.
+      const kinds = c.events.filter((e) => e.event === 'state' || e.event === 'chat').map((e) => (e.event === 'chat' ? 'chat' : e.data.view.actionCount));
+      expect(kinds.slice(-3)).toEqual([1, 2, 'chat']);
+    }
+    // O relógio é o daquele momento: o primeiro gastou 10 s antes de jogar.
+    expect(streamer.room.clock.remaining[first]).toBe(TIME_BANK_MS - 10_000);
+    expect(streamer.room.clock.running).toBe(other);
+
+    room.act(other, 2, { type: 'concede', player: other });
+    expect(watcher.room.status).toBe('finished');
+    expect(streamer.room.status).toBe('playing');
+    expect(streamer.room.result).toBeNull();
+    step(HANDS_DELAY_MS + 1_000);
+    expect(streamer.room.status).toBe('finished');
+    expect(streamer.room.result).not.toBeNull();
+    expect(streamer.view!.winner).toBe(first);
+    l.dispose();
+  });
+
+  it('sala refeita sem o instante das ações: a mesa atrasada não mostra o presente antes da hora', () => {
+    vi.useFakeTimers();
+    let t = 5_000_000;
+    const db = freshDb();
+    const l = lobby(db, () => t);
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    if ('error' in r) throw new Error(r.error);
+    l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
+    const first = actingPlayer(r.room.state!)!;
+    r.room.act(first, 0, { type: 'answer', player: first, yes: true });
+    r.room.act(first, 1, { type: 'mulligan', player: first, redraw: false });
+    t += 10 * 60_000;
+    // Gravada antes do campo `timeline` (ou refeita por uma versão nova do motor).
+    const { timeline: _, ...old } = JSON.parse(JSON.stringify(r.room.data));
+    const restored = new Room(old, { cards: (ids) => getCards(db, ids) as CardData[], now: () => t });
+    const streamer = client(null, true);
+    restored.attach(streamer.conn);
+    expect(restored.state!.actionCount).toBe(2);
+    expect(streamer.view!.actionCount).toBe(0);
+    t += HANDS_DELAY_MS + 1;
+    vi.advanceTimersByTime(HANDS_DELAY_MS + 1);
+    expect(streamer.view!.actionCount).toBe(2);
+    restored.dispose();
+    l.dispose();
+  });
 });
 
 describe('partidas online: canal SSE', () => {
@@ -826,6 +917,69 @@ describe('modo espectador', () => {
     expect(await byCode(nami.cookie)).toBe(true);
     expect(await byCode(admin.cookie)).toBe(false);
     await app.close();
+  });
+
+  it('modo transmissão: link do OBS, partida escolhida no app e as mãos pela chave', async () => {
+    const { app, db } = setup();
+    const nami = login(db, 'nami', 'streamer');
+    const usopp = login(db, 'usopp');
+    const get = (url: string, cookie?: string) => app.inject({ url, headers: cookie ? { cookie } : {} });
+    const send = (method: 'POST' | 'PUT', url: string, cookie: string, payload?: object) => app.inject({ method, url, headers: { cookie }, payload });
+    expect((await get('/api/broadcast')).statusCode).toBe(401);
+    expect((await get('/api/broadcast', usopp.cookie)).statusCode).toBe(403);
+    expect((await get('/api/broadcast', nami.cookie)).json()).toEqual({ key: null, roomId: null, hands: false, delayMs: HANDS_DELAY_MS });
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: null })).statusCode).toBe(409);
+
+    const key = (await send('POST', '/api/broadcast/key', nami.cookie)).json().key as string;
+    expect(key).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    expect((await get(`/api/broadcast/${key}`)).json()).toEqual({ roomId: null, hands: false, delayMs: HANDS_DELAY_MS });
+    expect((await get('/api/broadcast/nao-existe')).statusCode).toBe(404);
+
+    const { roomId } = await privateMatch(app);
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: 'nope' })).statusCode).toBe(404);
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId, hands: true })).statusCode).toBe(200);
+    expect((await get(`/api/broadcast/${key}`)).json()).toEqual({ roomId, hands: true, delayMs: HANDS_DELAY_MS });
+    expect((await get('/api/broadcast', nami.cookie)).json()).toMatchObject({ key, roomId, hands: true });
+
+    // A fonte do OBS não tem o login: a chave libera as mãos (na mesa atrasada).
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = app.server.address() as { port: number };
+    const open = async (query: string) => {
+      const ctrl = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${port}/api/online/rooms/${roomId}/watch?${query}`, { signal: ctrl.signal });
+      ctrl.abort();
+      return res.status;
+    };
+    expect(await open('hands=1')).toBe(403);
+    expect(await open(`hands=1&k=${key}`)).toBe(200);
+    expect(await open('hands=1&k=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).toBe(403);
+
+    // Link novo: o antigo para de funcionar; a partida escolhida continua.
+    const fresh = (await send('POST', '/api/broadcast/key', nami.cookie)).json();
+    expect(fresh).toMatchObject({ roomId, hands: true });
+    expect((await get(`/api/broadcast/${key}`)).statusCode).toBe(404);
+    expect(await open(`hands=1&k=${key}`)).toBe(403);
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: null })).json()).toMatchObject({ roomId: null, hands: false });
+
+    // Sem o perfil, o link some.
+    setUserRole(db, nami.id, 'player');
+    expect((await get(`/api/broadcast/${fresh.key}`)).statusCode).toBe(404);
+    expect(await open(`hands=1&k=${fresh.key}`)).toBe(403);
+    await app.close();
+  });
+
+  it('modo transmissão: na própria partida, só sem as mãos', async () => {
+    const { app, db } = setup();
+    const nami = login(db, 'nami', 'streamer');
+    await app.inject({ method: 'POST', url: '/api/broadcast/key', headers: { cookie: nami.cookie } });
+    const created = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: { ...ALICE, cookie: nami.cookie }, payload: { deckId: 'st01-luffy', format: 'egb' } });
+    const { roomId, code } = created.json();
+    const choose = (hands: boolean) => app.inject({ method: 'PUT', url: '/api/broadcast/room', headers: { cookie: nami.cookie }, payload: { roomId, hands } });
+    // Ainda esperando o oponente: não dá para assistir.
+    expect((await choose(false)).statusCode).toBe(404);
+    await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: BOB, payload: { code, deckId: 'st02-kid' } });
+    expect((await choose(true)).statusCode).toBe(403);
+    expect((await choose(false)).statusCode).toBe(200);
   });
 
   it('revanche: os espectadores seguem para a sala nova', async () => {

@@ -141,7 +141,7 @@ gumgumfight/
 │   ├── src/seed.ts, seed-cli.ts  decks prontos, cartas provisórias, traduções
 │   ├── src/present.ts           ApiCard: i18n e remoção de imagens
 │   ├── src/auth/                google.ts (JWKS/RS256), store.ts (users, sessions, roles), routes.ts
-│   ├── src/online/              room.ts (uma partida + relógio), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE)
+│   ├── src/online/              room.ts (uma partida + relógio + mesa atrasada), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE), broadcast.ts (modo transmissão)
 │   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
@@ -487,7 +487,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (17)
+### Tabelas (18)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -496,6 +496,7 @@ baixadas quando tocam) + `public/`.
 | `decks` | `id` (`st01-luffy`, `u-xxxxxxxx`) | `name`, `leader`, **`cards` (JSON `[{id,count}]`)**, `kind` (`builtin`/`user`), `owner_hash`, `updated_at` | seed (builtin), `POST/PUT /api/decks` |
 | `users` | `id` (`u-` + 12 hex) | `google_sub` (único), `email`, `name`, `picture`, `role` (`player/streamer/organizer/admin/dev`), `created_at`, `last_login_at` | login Google, admin |
 | `sessions` | `token_hash` | `user_id`, `created_at`, `expires_at` (60 dias) | login/logout |
+| `broadcasts` | `user_id` | `key` (único: segredo do link do OBS, guardado como está para o streamer copiar de novo), `room_id` (partida na transmissão), `hands` (0/1), `updated_at` | `/api/broadcast/*` |
 | `players` | `id` (`p-` + 12 hex) | `owner_hash` (único: `sha256(navegador)` ou `user:<id>`), `name` (público, "Pirata XXXX"), `bounty` (Beries), `ranked_games` | primeira partida/consulta, ranqueada, `PUT /api/players/me` |
 | `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida | gravação de partida |
 | `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON)**, `created_at` | gravação de partida |
@@ -692,7 +693,7 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
   desconhecido) e confere assinatura, `iss`, `aud = GOOGLE_CLIENT_ID`, `exp`/`iat` (tolerância 60 s), `sub`.
 - **Sessão**: cookie `gg_session` (`HttpOnly; SameSite=Lax; Path=/; Secure` em HTTPS), 60 dias; no banco só
   `sha256(token)`. Login apaga a sessão anterior e as expiradas.
-- **Perfis** (`users.role`): `player`, `streamer` (vê mãos ao assistir), `organizer` (cria/gerencia torneios), `admin`
+- **Perfis** (`users.role`): `player`, `streamer` (vê mãos ao assistir, com atraso, e usa o modo transmissão), `organizer` (cria/gerencia torneios), `admin`
   (gerencia tudo, muda perfis), `dev` (admin + telas de desenvolvimento). `ADMIN_EMAILS` promove a admin no login com
   e-mail verificado.
 - **Migração do navegador para a conta** (`claimBrowserData`): no primeiro login, decks `user` do `owner_hash` do
@@ -785,7 +786,25 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
 - `GET /api/online/rooms/:id/watch` abre o SSE do espectador com `viewFor(state, null)`: campo, lixo, Vida virada para
   cima, cartas reveladas e log público. Mãos, decks e Vida virada chegam como `?`.
 - `?hands=1` (**Streamer**, **Admin** e **Dev**, via `seesHands`): `extra` = as duas mãos + a carta da Vida sendo olhada. Recusado (403) para quem
-  joga a própria partida. Decks e Vida virada continuam escondidos.
+  joga a própria partida. Decks e Vida virada continuam escondidos. `&k=<chave>` (modo transmissão) vale como o login
+  da conta dona da chave.
+- **Mesa atrasada** (toda conexão com `hands=1`, `HANDS_DELAY_MS` = 3 min): a partida pode estar numa live, e o
+  oponente não pode ver a mão do outro pela transmissão. `RoomData.timeline` guarda, para cada ação, o instante e o
+  tempo dos dois jogadores logo depois dela (e `startedAt`, o começo). A sala mantém **uma** mesa atrasada (`late`:
+  estado + quantas ações aplicadas), criada quando chega o primeiro espectador com as mãos (`createGame` + as ações com
+  instante ≤ agora − 3 min) e descartada quando sai o último. Um `setTimeout` aplica cada ação quando ela completa
+  3 min, e cada uma vira um `state` (as animações acompanham). Emotes, chat, dados do sorteio e o aviso de revanche
+  entram numa fila (`lateEvents`, só em memória) e saem com o mesmo atraso, depois das ações que vieram antes deles.
+  No `room` dessa conexão, `status`, `result`, `rematch` e o relógio (`lateClock`, refeito da `timeline`) são os
+  daquele momento, e `delay` = 180000 (0 nas outras). Sala gravada sem `timeline` (de antes do campo, ou com as ações
+  refeitas por uma versão nova do motor): as ações contam como feitas na hora em que a sala foi refeita, então a mesa
+  atrasada nunca mostra o presente antes da hora.
+- **Modo transmissão** (`online/broadcast.ts`, tabela `broadcasts`): `POST /api/broadcast/key` gera a chave
+  (24 bytes, base64url); `PUT /api/broadcast/room` escolhe a partida; a tela `/?transmissao=<chave>` (componente
+  `Broadcast`) consulta `GET /api/broadcast/:key` a cada 3 s e abre o canal do espectador com `k=<chave>`. Ela só
+  troca de sala quando a escolha muda, então segue a revanche no ritmo da mesa atrasada sem voltar para a sala velha.
+  O perfil do dono é conferido a cada pedido. A mesa em modo transmissão (`Table` com `broadcast`) esconde menus,
+  botões e avisos de erro e mostra `PlayHighlight`: a carta de `playCard`, `counter` ou `activate`, grande, por 2,8 s.
 - Limite **100 espectadores por sala** (429 acima). Espectadores não se identificam: entram só como número.
 - Na revanche de sala privada, os espectadores seguem para a sala nova automaticamente.
 - Cada espectador recebe o **mesmo volume** de dados que um jogador (um `state` completo por ação, ~9,5 KB). Não há

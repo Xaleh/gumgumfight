@@ -305,6 +305,16 @@ function migrateAuth(db: DB) {
       ALTER TABLE users ADD COLUMN custom_picture_at INTEGER;
     `);
   }
+  // Modo transmissão (streamer): o link secreto da fonte do OBS e a partida escolhida para a live.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS broadcasts (
+      user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      key        TEXT NOT NULL UNIQUE,        -- segredo do link (o streamer copia de novo quando quiser)
+      room_id    TEXT,                        -- partida na transmissão (null = nenhuma)
+      hands      INTEGER NOT NULL DEFAULT 0,  -- com as mãos dos jogadores (mesa atrasada)
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 }
 
 /**

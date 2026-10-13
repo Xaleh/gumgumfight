@@ -42,8 +42,11 @@ import { GameResult } from './GameResult';
 import { Icon } from './Icons';
 import { useBoardMotion } from './Motion';
 import { ReplayBar, type ReplayControls } from './ReplayBar';
+import { PlayHighlight } from './PlayHighlight';
 import { ReplayCue } from './ReplayCue';
 import {
+  BroadcastIdle,
+  BroadcastTag,
   ChatBar,
   ChatBubbles,
   OnlineBanner,
@@ -277,28 +280,35 @@ const onlineTable = {
 
 /**
  * Modo espectador: a mesa de uma partida online vista de fora (sem as mãos, ou com
- * as duas mãos para streamer e admin). Ninguém age; na revanche, segue para a sala nova.
+ * as duas mãos para streamer e admin, na mesa atrasada). Ninguém age; na revanche, segue
+ * para a sala nova. `broadcast`: tela de transmissão (fonte do OBS), sem menus nem botões.
  */
 export function WatchGameScreen({
   target,
   canHands,
+  broadcast,
   onExit,
   onSwitch,
 }: {
   target: WatchTarget;
   canHands: boolean;
+  broadcast?: boolean;
   onExit: () => void;
   onSwitch: (t: WatchTarget) => void;
 }) {
+  const t = useT();
   const online = useOnlineGame(target);
   const { state, room } = online;
   useEffect(() => {
-    if (online.rematch) onSwitch({ roomId: online.rematch.roomId, hands: target.hands });
-  }, [online.rematch, onSwitch, target.hands]);
+    if (online.rematch) onSwitch({ ...target, roomId: online.rematch.roomId });
+  }, [online.rematch, onSwitch, target]);
   // "Ver mãos" recusado pelo servidor: continua assistindo sem as mãos (o motivo aparece no aviso).
   useEffect(() => {
     if (online.handsRefused && target.hands) onSwitch({ ...target, hands: false });
   }, [online.handsRefused, onSwitch, target]);
+  if ((!state || !room) && broadcast) {
+    return online.conn === 'gone' ? <BroadcastIdle title={t('broadcast.matchOver')} text={t('broadcast.waitingHint')} /> : <BroadcastIdle title={t('common.loading')} />;
+  }
   if (!state || !room) return <OnlineWaiting online={online} onCancel={onExit} />;
   const game: TableGame = {
     ...onlineTable,
@@ -317,6 +327,7 @@ export function WatchGameScreen({
       online={online}
       onExit={onExit}
       spectator={{ canHands, onToggleHands: () => onSwitch({ ...target, hands: !target.hands }) }}
+      broadcast={broadcast}
     />
   );
 }
@@ -356,6 +367,7 @@ function Table({
   onRematch,
   rematchLabel,
   spectator,
+  broadcast,
   startNotice,
   tutorial,
 }: {
@@ -368,6 +380,8 @@ function Table({
   rematchLabel?: string;
   /** Modo espectador (partida online vista de fora). */
   spectator?: { canHands: boolean; onToggleHands: () => void };
+  /** Tela de transmissão (fonte do OBS): sem menus nem botões, com o destaque da carta jogada. */
+  broadcast?: boolean;
   /** Aviso na mesa ao começar (some sozinho em 10 s). */
   startNotice?: string;
   /** Lição do tutorial: treinador, destaques e menos controles (sem Auto, desfazer, replay). */
@@ -1020,7 +1034,9 @@ function Table({
       p === human && drag?.kind === 'hand' && drag.uid !== null && (canPlay(drag.uid) || canCounter(drag.uid)),
   };
 
-  const corner = (
+  const corner = broadcast && online ? (
+    <BroadcastTag online={online} />
+  ) : (
     <>
       <div className="corner-row">
         <button className="round-btn" onClick={() => setSheet('menu')} aria-label={t('game.menuLabel')}>
@@ -1044,7 +1060,7 @@ function Table({
 
   // Histórico e chat ficam ao lado do seu deck e lixo, perto de onde o olho repousa.
   const sideTools =
-    !wide || (online && !watching) ? (
+    !broadcast && (!wide || (online && !watching)) ? (
       <>
         {!wide && (
           <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label={t('game.logLabel')} title={t('game.log')}>
@@ -1060,7 +1076,15 @@ function Table({
 
   return (
     <div
-      className={['game', wide ? 'wide' : '', watching || replay ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : '', tutorial ? 'lesson' : ''].join(' ')}
+      className={[
+        'game',
+        wide ? 'wide' : '',
+        watching || replay ? 'flip-top' : '',
+        drag ? 'dragging' : '',
+        replay ? 'replaying' : '',
+        tutorial ? 'lesson' : '',
+        broadcast ? 'broadcast' : '',
+      ].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
@@ -1131,6 +1155,8 @@ function Table({
 
         {motion.layer}
 
+        {broadcast && <PlayHighlight state={state} lastAction={allActions[allActions.length - 1]} bottom={bottom} />}
+
         {replay && cue && game.speed < 8 && !showResult && (
           <ReplayCue
             cue={cue}
@@ -1146,12 +1172,13 @@ function Table({
         {online && <ChatBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
 
-        {game.error && (
+        {/* Na transmissão ninguém clica para fechar o aviso: os erros ficam fora da tela. */}
+        {game.error && !broadcast && (
           <div className="toast error" onClick={() => game.setError(null)}>
             {game.error}
           </div>
         )}
-        {notice && !game.error && (
+        {notice && (!game.error || broadcast) && (
           <div className="toast notice" role="status" onClick={() => setNotice(null)}>
             {notice}
           </div>
@@ -1403,7 +1430,12 @@ function Table({
           <CardDetail state={state} uid={detailUid} />
         </aside>
       )}
-      {wide && !tutorial && (
+      {wide && broadcast && (
+        <aside className="side-panel">
+          <LogPanel state={state} />
+        </aside>
+      )}
+      {wide && !tutorial && !broadcast && (
         <aside className="side-panel">
           <div className="panel-controls">
             <button className="btn small" onClick={onExit}>

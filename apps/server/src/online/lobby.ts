@@ -59,6 +59,7 @@ export interface LobbyDeps {
   log?: (msg: string) => void;
   rateLimit?: number;
   botDelayMs?: number;
+  handsDelayMs?: number;
   /** Partida começou / vez de um jogador (notificações). */
   onRoomEvent?: (room: Room, event: RoomEvent) => void;
 }
@@ -207,6 +208,7 @@ export class Lobby {
       finish: this.deps.finish,
       rateLimit: this.deps.rateLimit,
       botDelayMs: this.deps.botDelayMs,
+      handsDelayMs: this.deps.handsDelayMs,
       onEvent: this.deps.onRoomEvent,
     });
     this.rooms.set(room.id, room);

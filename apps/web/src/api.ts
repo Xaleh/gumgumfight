@@ -292,7 +292,9 @@ export const api = {
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
-    watchUrl: (roomId: string, hands: boolean) => `/api/online/rooms/${roomId}/watch${hands ? '?hands=1' : ''}`,
+    /** `key`: chave da transmissão no lugar do login (fonte do OBS). */
+    watchUrl: (roomId: string, hands: boolean, key?: string) =>
+      `/api/online/rooms/${roomId}/watch${hands ? `?hands=1${key ? `&k=${encodeURIComponent(key)}` : ''}` : ''}`,
     createRoom: (deckId: string, format: FormatId) =>
       send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format }),
     joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
@@ -320,7 +322,25 @@ export const api = {
     replay: (roomId: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay`),
     eventsUrl: (roomId: string, t: string) => `/api/online/rooms/${roomId}/events?t=${encodeURIComponent(t)}`,
   },
+  /** Modo transmissão (perfil Streamer ou Admin): o link da fonte do OBS e a partida da live. */
+  broadcast: {
+    mine: () => get<BroadcastInfo & { key: string | null }>('/api/broadcast'),
+    newKey: () => send<BroadcastInfo & { key: string }>('POST', '/api/broadcast/key'),
+    choose: (roomId: string | null, hands = false) => send<BroadcastInfo & { key: string }>('PUT', '/api/broadcast/room', { roomId, hands }),
+    /** O que a fonte do OBS mostra agora (sem login: a chave é o segredo). */
+    byKey: (key: string) => get<BroadcastInfo>(`/api/broadcast/${encodeURIComponent(key)}`),
+  },
 };
+
+/** Partida escolhida para a transmissão; `delayMs`: atraso da mesa com as mãos. */
+export interface BroadcastInfo {
+  roomId: string | null;
+  hands: boolean;
+  delayMs: number;
+}
+
+/** Endereço da tela de transmissão (fonte do OBS) de uma chave. */
+export const broadcastUrl = (key: string) => `${location.origin}/?transmissao=${encodeURIComponent(key)}`;
 
 // ------------------------------------------------------------------ online
 
@@ -335,6 +355,8 @@ export interface OnlineSeat {
 export interface WatchTarget {
   roomId: string;
   hands: boolean;
+  /** Tela de transmissão: a chave do link faz as vezes do login para ver as mãos. */
+  key?: string;
 }
 
 export type RoomQueue = 'private' | QueueKind | 'bot' | 'tournament';
@@ -418,6 +440,8 @@ export interface OnlineRoomInfo {
     errorCode?: string;
   } | null;
   rematch: [boolean, boolean];
+  /** Atraso da mesa desta conexão em ms (quem vê as mãos); 0 ou ausente = ao vivo. */
+  delay?: number;
 }
 
 // ------------------------------------------------------------------ torneios

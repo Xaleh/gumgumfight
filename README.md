@@ -275,7 +275,17 @@ espectadores seguem para a partida nova.
   cima, cartas reveladas e o log público. Mãos, decks e Vida virada para baixo chegam escondidas.
 - **Ver mãos (Streamer e Admin):** a lista e a mesa têm o botão **Ver mãos**, que mostra as mãos dos dois jogadores
   (decks e Vida continuam escondidos). O servidor confere o perfil da conta e recusa para quem está jogando a própria
-  partida.
+  partida. Com as mãos, a mesa chega **com 3 minutos de atraso** (ações, relógio, chat, emotes e resultado), para a
+  partida poder ir para uma live sem o oponente ver a mão do outro pela transmissão; a mesa mostra o aviso
+  "⏱ 3 min de atraso". Sem as mãos, continua ao vivo.
+- **Modo transmissão (OBS, Streamer e Admin):** em **Assistir partidas**, o painel **Modo transmissão** cria um link
+  secreto (`/?transmissao=<chave>`) para colocar no OBS como **Fonte de navegador** (1920 × 1080). A fonte do OBS não
+  tem o login do Google: a chave faz esse papel, só para assistir. Cada partida da lista ganha o botão **📡 Transmitir**:
+  a tela de transmissão troca para ela sozinha (consulta a escolha a cada 3 s), com as mãos se **Ver as mãos dos
+  jogadores** estiver marcado (na mesa atrasada; na própria partida, só sem as mãos). A tela não tem menus nem botões,
+  mostra o tipo de partida (ou o torneio), o atraso e quantos assistem, e põe em destaque, grande e por alguns
+  segundos, a carta que acabou de ser jogada, usada no Counter ou que ativou um efeito. Na revanche de uma sala
+  privada, segue para a partida nova. **Gerar novo link** invalida o anterior; a conta que perde o perfil perde o link.
 - **Transmitir o treino contra o bot:** em **Contra o bot**, quem entrou com o Google pode marcar **Transmitir esta
   partida**. A partida roda no servidor, que joga pelo bot (decidindo só com a visão do bot), e aparece na lista para
   assistir. "Quem começa" vale como no treino local; a seed e o desfazer ficam só no treino no navegador. Entra nas
@@ -285,7 +295,7 @@ espectadores seguem para a partida nova.
 ### Perfis (Player, Streamer, Organizador, Admin, Dev)
 
 Cada conta Google tem um perfil (coluna `users.role`): **Player** (padrão: joga e assiste sem ver as mãos),
-**Streamer** (assiste vendo as mãos), **Organizador** (cria torneios e gerencia os que criou), **Admin** (tudo
+**Streamer** (assiste vendo as mãos, com atraso, e usa o modo transmissão), **Organizador** (cria torneios e gerencia os que criou), **Admin** (tudo
 isso, gerencia qualquer torneio, muda os perfis e vê os relatos de partidas em **Administração**, no menu) ou **Dev** (tudo do Admin e as
 funções de desenvolvimento). Sem login, a pessoa assiste como Player.
 
@@ -699,7 +709,11 @@ npm run typecheck
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |
 | GET    | `/api/online/watch/:code` | Sala privada pelo código, para assistir |
 | GET    | `/api/online/rooms/:id` | Resumo de uma sala (jogadores, turno, espectadores) |
-| GET    | `/api/online/rooms/:id/watch?hands=1` | Canal SSE do espectador (`hands=1`: só Streamer e Admin) |
+| GET    | `/api/online/rooms/:id/watch?hands=1&k=` | Canal SSE do espectador (`hands=1`: só Streamer e Admin, mesa com 3 min de atraso; `k`: chave da transmissão no lugar do login) |
+| GET    | `/api/broadcast` | Modo transmissão da conta (`{ key, roomId, hands, delayMs }`; Streamer e Admin) |
+| POST   | `/api/broadcast/key` | Gera o link da transmissão (ou um novo, que invalida o anterior) |
+| PUT    | `/api/broadcast/room` | Partida na transmissão (`{ roomId \| null, hands }`; 409 sem link, 403 com as mãos na própria partida) |
+| GET    | `/api/broadcast/:key` | O que a tela de transmissão mostra (`{ roomId, hands, delayMs }`; sem login, 404 com chave inválida) |
 | GET    | `/api/tournaments` | Torneios (`{ tournaments, canCreate }`) |
 | GET    | `/api/tournaments/:id` | Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer |
 | POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, swissBestOf: 1 \| 3, topCut, bo3From, bo5From, maxPlayers, startsAt }`; Organizador e Admin) |

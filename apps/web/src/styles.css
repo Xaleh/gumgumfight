@@ -6728,6 +6728,193 @@ tr.clickable:hover td {
 .spectator-count {
   align-self: flex-start;
 }
+/* mesa atrasada (quem vê as mãos): o aviso do atraso */
+.delay-tag {
+  background: var(--gold);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: 11px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.18);
+}
+
+/* ------------------------------------------------------------------ modo transmissão (OBS) */
+
+.broadcast-page,
+.broadcast-page body {
+  overflow: hidden;
+  cursor: none;
+}
+.broadcast-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.broadcast-match {
+  background: var(--slate);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 900;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(var(--shadow-rgb), 0.18);
+}
+/* ninguém clica na fonte do OBS: o resultado aparece sem os botões */
+.game.broadcast .result-actions,
+.game.broadcast .result-body > .pill {
+  display: none;
+}
+.broadcast-idle {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  background: radial-gradient(120% 90% at 50% 0%, var(--bg2), var(--bg));
+}
+.broadcast-idle-box h1 {
+  margin: 0 0 6px;
+  font-size: clamp(28px, 6vw, 64px);
+  font-weight: 900;
+  color: var(--brand-red);
+}
+.broadcast-idle-box h2 {
+  margin: 0 0 8px;
+  font-size: clamp(18px, 3vw, 32px);
+}
+
+/* destaque da carta jogada: grande, do lado de quem jogou */
+.play-highlight {
+  position: absolute;
+  left: max(12px, calc(50% - var(--cw) * 3.6 - var(--cw) * 2.6));
+  z-index: 44;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  animation: play-highlight 2.8s ease forwards;
+}
+.play-highlight.top {
+  top: 8%;
+}
+.play-highlight.bottom {
+  bottom: 8%;
+}
+.play-highlight-card {
+  width: calc(var(--cw) * 2.3);
+}
+.play-highlight-card .card {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1.396;
+  border-radius: calc(var(--cw) * 0.12);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.95),
+    0 14px 40px rgba(var(--shadow-rgb), 0.45);
+}
+.play-highlight.counter .play-highlight-card .card {
+  box-shadow:
+    0 0 0 3px var(--sky),
+    0 14px 40px rgba(var(--shadow-rgb), 0.45);
+}
+.play-highlight-label {
+  background: var(--slate);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-weight: 900;
+  font-size: 14px;
+  white-space: nowrap;
+  max-width: calc(var(--cw) * 3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.play-highlight.counter .play-highlight-label {
+  background: var(--blue);
+}
+.play-highlight.activate .play-highlight-label {
+  background: var(--accent);
+}
+@keyframes play-highlight {
+  0% {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.85);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(0) scale(1.03);
+  }
+  16%,
+  86% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-12px) scale(0.97);
+  }
+}
+
+/* painel do modo transmissão em "Assistir partidas" */
+.broadcast-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 12px 14px;
+  margin: 0 0 14px;
+}
+.broadcast-panel h3 {
+  margin: 0 0 6px;
+}
+.broadcast-panel p {
+  margin: 6px 0;
+}
+.broadcast-panel .btn-row {
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+.broadcast-url {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--panel2);
+  color: var(--text);
+}
+.watch-room-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.watch-room-row .watch-room {
+  flex: 1;
+  min-width: 0;
+}
+.watch-room-row.on-air .watch-room {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(229, 72, 77, 0.25);
+}
+.broadcast-btn {
+  align-self: center;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .watch-room-row {
+    flex-direction: column;
+  }
+  .broadcast-btn {
+    align-self: stretch;
+  }
+}
 
 /*
  * Mesa em pé (celular e tablet): a mão do oponente ocupa a largura toda, então o menu, o Auto
