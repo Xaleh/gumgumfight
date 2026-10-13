@@ -1187,6 +1187,8 @@ export default {
   'game.detachDonTitle': 'Legt 1 DON!!, das in diesem Zug angelegt und noch nicht genutzt wurde (bis die Karte angreift oder einen Effekt nutzt), zurück in den Kostenbereich',
   'game.donCanReturn': '{n|# kann zurück|# können zurück}',
   'game.tapCardToRead': 'Tippe auf die Karte, um sie zu lesen.',
+  'game.revealedTitle': '{n|Aufgedeckte Karte|Aufgedeckte Karten}',
+  'game.revealedOk': 'Verstanden',
   // ==== /game ====
 
 

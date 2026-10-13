@@ -1320,6 +1320,13 @@ export interface LogEntry {
   secretKey?: string;
   secretParams?: PromptParams;
   secretParts?: MsgParts;
+  /**
+   * Cartas reveladas a todos nesta linha (ids de carta, não uids): a interface as mostra na mesa,
+   * para não ser preciso procurá-las no histórico.
+   */
+  revealed?: string[];
+  /** Quem escolheu as cartas reveladas da própria mão ou deck: já as viu, não precisa do aviso. */
+  revealedBy?: PlayerId;
 }
 
 export interface GameState {

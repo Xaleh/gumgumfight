@@ -1187,6 +1187,8 @@ export default {
   'game.detachDonTitle': 'Returns to the cost area 1 DON!! attached this turn and not yet used (until the card attacks or uses an effect)',
   'game.donCanReturn': '{n|# can return|# can return}',
   'game.tapCardToRead': 'Tap the card to read it.',
+  'game.revealedTitle': '{n|Revealed card|Revealed cards}',
+  'game.revealedOk': 'Got it',
   // ==== /game ====
 
 

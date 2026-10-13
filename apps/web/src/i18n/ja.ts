@@ -1187,6 +1187,8 @@ export default {
   'game.detachDonTitle': 'このターンに付与してまだ使っていない（カードがアタックするか効果を使うまで）ドン!!を1枚、コストエリアに戻します',
   'game.donCanReturn': '{n|#枚戻せる}',
   'game.tapCardToRead': 'カードをタップすると詳細を読めます。',
+  'game.revealedTitle': '{n|公開されたカード}',
+  'game.revealedOk': 'OK',
   // ==== /game ====
 
 

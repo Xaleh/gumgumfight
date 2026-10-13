@@ -1188,6 +1188,8 @@ const ptBR = {
   'game.detachDonTitle': 'Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (até a carta atacar ou usar um efeito)',
   'game.donCanReturn': '{n|# pode voltar|# podem voltar}',
   'game.tapCardToRead': 'Toque na carta para ler.',
+  'game.revealedTitle': '{n|Carta revelada|Cartas reveladas}',
+  'game.revealedOk': 'Entendi',
   // ==== /game ====
 
 

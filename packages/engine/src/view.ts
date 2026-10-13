@@ -103,6 +103,8 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     cards[alias(uid)] = { uid: alias(uid), cardId: c.cardId, owner: c.owner };
     defs[c.cardId] = state.defs[c.cardId];
   }
+  // Cartas reveladas no log: públicas, mesmo que já tenham voltado para a mão ou o deck.
+  for (const e of state.log) for (const id of e.revealed ?? []) defs[id] ??= state.defs[id];
   const zone = (ps: PlayerState, name: Zone) =>
     ps[name].map((uid, i) => {
       if (vis.has(uid)) return alias(uid);

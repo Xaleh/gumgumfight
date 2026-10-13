@@ -4337,6 +4337,20 @@ button.hint-pill::after,
 .zoom-backdrop.log-zoom {
   z-index: 90;
 }
+/* Cartas reveladas pelo oponente: por cima das escolhas pendentes, abaixo da carta ampliada. */
+.reveal-backdrop {
+  z-index: 60;
+}
+.modal-feature.reveal-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.reveal-line + .reveal-line {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
 
 /* ------------------------------------------------------------------ replay: controles */
 
