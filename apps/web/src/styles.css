@@ -9561,3 +9561,534 @@ button.funnel-row[aria-expanded='true'] {
     padding-left: 26px;
   }
 }
+
+/* ==================================================================
+   Apoio ao projeto: plano das contas na Administração.
+   ================================================================== */
+.admin-supporter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.admin-supporter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-supporter select,
+.admin-supporter input {
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-table th {
+  font-weight: 600;
+  color: var(--muted, inherit);
+}
+.admin-payments {
+  overflow-x: auto;
+}
+
+/* ==================================================================
+   Apoio ao projeto: modal (components/Support.tsx), lista de apoiadores
+   e selo de apoiador.
+   ================================================================== */
+.support-sheet .sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.page-sheet.centered .support-sheet {
+  width: min(640px, 100%);
+}
+.support-intro {
+  margin: 0;
+}
+.support-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.support-block h4 {
+  margin: 0;
+  font-size: 16px;
+}
+.support-block p {
+  margin: 0;
+}
+.support-goal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.support-goal-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.support-goal-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.support-goal-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+}
+.pix-amounts {
+  flex-wrap: wrap;
+}
+.pix-box {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.pix-qr {
+  width: 180px;
+  height: 180px;
+  flex: none;
+  padding: 6px;
+  border-radius: 12px;
+  /* O QR precisa de fundo branco e módulos pretos em qualquer tema. */
+  background: #fff;
+}
+.pix-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pix-qr.loading {
+  background: var(--panel2);
+}
+.pix-side {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.pix-code {
+  width: 100%;
+  font: 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  resize: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: inherit;
+}
+.support-cta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.support-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+.support-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+}
+.support-plan header {
+  display: flex;
+  flex-direction: column;
+}
+.support-plan header span {
+  font-weight: 800;
+  font-size: 18px;
+}
+.support-plan header small {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+}
+.support-plan ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.support-plan.current {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent);
+}
+.support-plan-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #2a1a00;
+}
+.support-plan.tier-almirante {
+  border-color: color-mix(in srgb, var(--gold) 60%, var(--line));
+}
+.support-fair {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+}
+.support-mine {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--gold) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line));
+}
+.support-mine p {
+  margin: 0 0 6px;
+}
+.support-mine-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.supporters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.supporters-list ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.supporters-list li {
+  font-size: 13px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.supporters-list li.tier-almirante {
+  border-color: var(--gold);
+  font-weight: 700;
+}
+.supporters-list.compact {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.supporter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+}
+.home-support-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Estatísticas: abas Geral e Pro, e a amostra com cadeado. */
+.stats-scope {
+  width: 100%;
+}
+.stats-scope button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.2;
+}
+.stats-scope-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stats-scope small {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.pro-teaser h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+}
+.pro-teaser p {
+  margin: 0 0 10px;
+}
+.pro-teaser .btn-row {
+  margin: 12px 0 8px;
+  justify-content: flex-start;
+}
+.pro-teaser .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.locked-row td {
+  opacity: 0.55;
+}
+.locked-bar {
+  display: inline-block;
+  width: min(220px, 60vw);
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line), var(--panel2));
+  filter: blur(1px);
+}
+
+/* Torneios: torneio do time, cota de apoiador e lojas parceiras. */
+.tour-card.official {
+  border-color: color-mix(in srgb, var(--gold) 65%, var(--line));
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+.tour-official-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.tour-official-line .tour-badge {
+  margin-left: 0;
+}
+.tour-badge.official {
+  background: color-mix(in srgb, var(--gold) 25%, var(--panel));
+  color: var(--text);
+}
+.tour-prize {
+  font-weight: 700;
+  font-size: 13px;
+}
+.tour-quota {
+  margin: 0;
+}
+.tour-quota .text-link {
+  padding: 0;
+}
+.tour-sponsor {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.tour-official-form {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--gold) 60%, var(--line));
+}
+.sponsors-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sponsors-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sponsors-head h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+}
+.sponsors-head .text-link {
+  text-decoration: none;
+  padding: 0;
+}
+.sponsors-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.sponsor-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+a.sponsor-card:hover {
+  border-color: var(--blue);
+}
+.sponsor-card img,
+.sponsor-initial {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+}
+.sponsor-initial {
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 20px;
+  background: var(--panel2);
+}
+.sponsor-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sponsor-text b,
+.sponsor-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tour-item.official {
+  border-color: color-mix(in srgb, var(--gold) 65%, var(--line));
+}
+.tour-item-prize {
+  font-weight: 700;
+}
+.admin-sponsors {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.admin-sponsors h3 {
+  margin: 8px 0 0;
+}
+.admin-sponsor .btn-row {
+  margin-left: auto;
+}
+.admin-sponsor img.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+}
+.sponsor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+}
+.sponsor-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 140px;
+  margin: 0;
+}
+.sponsor-form .tour-form-row {
+  gap: 8px;
+}
+.sponsor-placements {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Homologação só para apoiadores (components/AccessGate.tsx). */
+.access-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--bg);
+}
+.access-card {
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 28px 22px;
+  border-radius: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 40px rgba(var(--shadow-rgb), 0.15);
+}
+.access-card h1 {
+  margin: 0;
+  font-size: 24px;
+}
+.access-card p {
+  margin: 0;
+}
+.access-card .btn {
+  text-decoration: none;
+}
+.support-verify {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.support-verify p {
+  margin: 0;
+}
+.support-ok {
+  color: var(--ok);
+  font-weight: 700;
+}

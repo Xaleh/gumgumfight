@@ -33,6 +33,11 @@ interface Deps {
   browserHash: (req: FastifyRequest) => string | null;
   /** E-mails que viram admin ao entrar (ADMIN_EMAILS). */
   adminEmails?: string[];
+  /**
+   * Tarefas rodadas depois de cada login, antes da resposta (ex.: consultar o apoio na
+   * Apoia.se). Um erro numa delas não impede o login.
+   */
+  afterLogin?: Array<(user: User) => Promise<void>>;
 }
 
 function readCookie(req: FastifyRequest, name: string): string | null {
@@ -51,12 +56,20 @@ function setSessionCookie(req: FastifyRequest, reply: FastifyReply, token: strin
   reply.header('set-cookie', attrs.join('; '));
 }
 
-const publicUser = (u: User) => ({ id: u.id, name: u.name, email: u.email, picture: u.picture, customPicture: u.customPicture, role: u.role });
+const publicUser = (u: User) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  picture: u.picture,
+  customPicture: u.customPicture,
+  role: u.role,
+  supporter: u.supporterTier ? { tier: u.supporterTier, until: u.supporterUntil, source: u.supporterSource, public: u.supporterPublic } : null,
+});
 
 /** Maior foto aceita (o navegador já manda a imagem reduzida, com poucas dezenas de KB). */
 export const MAX_PICTURE_BYTES = 256 * 1024;
 
-export function registerAuth(app: FastifyInstance, { db, clientId, keys, browserHash, adminEmails = [] }: Deps) {
+export function registerAuth(app: FastifyInstance, { db, clientId, keys, browserHash, adminEmails = [], afterLogin = [] }: Deps) {
   const cache = new WeakMap<FastifyRequest, User | null>();
   /** Usuário logado nesta requisição (cookie de sessão válido), ou null. */
   const viewer = (req: FastifyRequest): User | null => {
@@ -97,7 +110,14 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
     const old = readCookie(req, COOKIE);
     if (old) deleteSession(db, old);
     setSessionCookie(req, reply, createSession(db, user.id), SESSION_DAYS * 86_400);
-    return { user: publicUser(user), claimedDecks: claimed.decks };
+    for (const task of afterLogin) {
+      try {
+        await task(user);
+      } catch (e) {
+        req.log.warn({ err: e }, 'tarefa depois do login falhou');
+      }
+    }
+    return { user: publicUser(getUser(db, user.id) ?? user), claimedDecks: claimed.decks };
   });
 
   app.post('/api/auth/logout', async (req, reply) => {

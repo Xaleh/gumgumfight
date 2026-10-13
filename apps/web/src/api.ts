@@ -191,16 +191,87 @@ export interface User {
   /** O usuário enviou a própria foto (pode voltar para a do Google). */
   customPicture: boolean;
   role: Role;
+  /** Plano de apoio ativo (null = sem plano). */
+  supporter: SupporterState | null;
+}
+
+// ------------------------------------------------------------------ apoio ao projeto
+
+/** Planos de apoio mensal, do menor para o maior. */
+export type SupporterTier = 'grumete' | 'tripulante' | 'capitao' | 'almirante';
+export const SUPPORTER_TIERS: SupporterTier[] = ['grumete', 'tripulante', 'capitao', 'almirante'];
+export const TIER_LABEL: Record<SupporterTier, string> = { grumete: 'Grumete', tripulante: 'Tripulante', capitao: 'Capitão', almirante: 'Almirante' };
+export const tierRank = (t: SupporterTier | null | undefined) => (t ? SUPPORTER_TIERS.indexOf(t) + 1 : 0);
+/** A conta tem o benefício do plano `min` (admins têm todos, para testar e moderar). */
+export const hasPerk = (u: User | null | undefined, min: SupporterTier) => Boolean(u && (isAdmin(u.role) || tierRank(u.supporter?.tier) >= tierRank(min)));
+
+export interface SupporterState {
+  tier: SupporterTier;
+  /** Até quando vale (null = sem prazo). */
+  until: string | null;
+  source: 'manual' | 'apoiase' | 'kofi' | null;
+  /** Aparece na lista pública de Apoiadores. */
+  public: boolean;
+}
+
+export interface TierInfo {
+  id: SupporterTier;
+  label: string;
+  price: number;
+  perks: string[];
+}
+
+export interface SupportInfo {
+  enabled: boolean;
+  pix: { key: string; name: string; city: string; codes: Array<{ amount: number | null; code: string }> } | null;
+  coffeeUrl: string | null;
+  monthlyUrl: string | null;
+  contactUrl: string | null;
+  /** O plano mensal vem da Apoia.se pelo e-mail da conta (mostra "Já apoio: verificar"). */
+  apoiase: boolean;
+  /** Custo mensal do site (meta). */
+  goal: number | null;
+  /** Soma mensal dos planos ativos. */
+  covered: number;
+  supporters: number;
+  tiers: TierInfo[];
+  me: (Omit<SupporterState, 'tier'> & { tier: SupporterTier | null }) | null;
+}
+
+export interface SupporterPayment {
+  id: string;
+  email: string | null;
+  kind: string;
+  tier: SupporterTier | null;
+  amount: number;
+  currency: string;
+  paidAt: string;
+  userId: string | null;
+  userName: string | null;
 }
 
 export interface AdminUser extends User {
   createdAt: string;
   lastLoginAt: string;
+  supporterTier: SupporterTier | null;
+  supporterUntil: string | null;
+  supporterSource: 'manual' | 'apoiase' | 'kofi' | null;
+}
+
+export interface AppConfig {
+  cardImages: boolean;
+  languages: string[];
+  googleClientId: string | null;
+  /** O apoio está configurado: o item "Apoiar o projeto" aparece. */
+  support: boolean;
+  /** supporters: o site só abre para apoiadores (homologação). */
+  access: 'open' | 'supporters';
+  /** Chave pública para as notificações (null = desligadas no servidor). */
+  pushKey?: string | null;
 }
 
 export const api = {
-  /** `pushKey`: chave pública para as notificações (null = desligadas no servidor). */
-  config: () => get<{ cardImages: boolean; languages: string[]; googleClientId: string | null; pushKey?: string | null }>('/api/config'),
+  config: () => get<AppConfig>('/api/config'),
   push: {
     /** Grava a inscrição deste navegador nas notificações, com o idioma e os avisos escolhidos. */
     save: (subscription: PushSubscriptionJSON, prefs: { locale: string; matches: boolean; tournaments: boolean }) =>
@@ -234,6 +305,11 @@ export const api = {
   statsMeta: () => get<StatsMeta>('/api/stats/meta'),
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
   cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
+  /** Amostra das Estatísticas Pro (top 3 da ranqueada e dos torneios nos últimos 30 dias). */
+  statsTeaser: (format?: string) =>
+    get<{ total: number; leaders: number; top: Array<WinCount & { leader: string }>; cards: Record<string, CardInfo> }>(
+      `/api/stats/teaser${format ? `?format=${encodeURIComponent(format)}` : ''}`,
+    ),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
   tutorial: {
     progress: () => get<TutorialProgressDto>('/api/tutorial/progress'),
@@ -245,9 +321,37 @@ export const api = {
     tutorial: (days = 30) => get<{ days: number; since: string; lessons: TutorialFunnel[] }>(`/api/admin/tutorial?days=${days}`),
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
     setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
+    /** Plano dado à mão; `until` "AAAA-MM-DD" ou null (sem prazo). */
+    setSupporter: (id: string, tier: SupporterTier | null, until: string | null) =>
+      send<Pick<AdminUser, 'id' | 'supporterTier' | 'supporterUntil' | 'supporterSource'>>('PUT', `/api/admin/users/${encodeURIComponent(id)}/supporter`, {
+        tier,
+        until,
+      }),
+    payments: () => get<SupporterPayment[]>('/api/admin/support/payments'),
+    sponsors: () => get<AdminSponsor[]>('/api/admin/sponsors'),
+    createSponsor: (s: SponsorInput) => send<AdminSponsor>('POST', '/api/admin/sponsors', s),
+    updateSponsor: (id: string, s: SponsorInput) => send<AdminSponsor>('PUT', `/api/admin/sponsors/${encodeURIComponent(id)}`, s),
+    deleteSponsor: (id: string) => send<void>('DELETE', `/api/admin/sponsors/${encodeURIComponent(id)}`),
+    /** Logo em data URL (PNG, JPEG ou WebP); null apaga. */
+    setSponsorLogo: (id: string, image: string | null) => send<AdminSponsor>('PUT', `/api/admin/sponsors/${encodeURIComponent(id)}/logo`, { image }),
+  },
+  sponsors: (placement?: 'tournaments' | 'home') =>
+    get<{ sponsors: PublicSponsor[]; contactUrl: string | null }>(`/api/sponsors${placement ? `?placement=${placement}` : ''}`),
+  /** Acesso ao site (homologação só para apoiadores). */
+  access: () =>
+    get<{ mode: 'open' | 'supporters'; allowed: boolean; reason: 'open' | 'login' | 'admin' | 'supporter' | 'remote' | 'denied' | 'unverified'; homeUrl: string | null }>(
+      '/api/access',
+    ),
+  support: {
+    info: () => get<SupportInfo>('/api/support'),
+    supporters: () => get<Array<{ name: string; tier: SupporterTier }>>('/api/support/supporters'),
+    setPublic: (visible: boolean) => send<{ public: boolean }>('PUT', '/api/support/me', { public: visible }),
+    /** Consulta agora, na Apoia.se, o apoio do e-mail da conta. */
+    verifyApoiase: () =>
+      send<{ isBacker: boolean; isPaidThisMonth: boolean; tier: SupporterTier | null; until: string | null }>('POST', '/api/support/apoiase/sync'),
   },
   tournaments: {
-    list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean }>('/api/tournaments'),
+    list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null }>('/api/tournaments'),
     get: (id: string) => get<TournamentDetail>(`/api/tournaments/${encodeURIComponent(id)}`),
     create: (t: TournamentInput) => send<TournamentDetail>('POST', '/api/tournaments', t),
     update: (id: string, t: TournamentInput) => send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}`, t),
@@ -470,6 +574,11 @@ export interface TournamentInput {
   checkIn: boolean;
   /** Minutos para entrar na sala em cada rodada (1 a 60). */
   toleranceMin: number;
+  /** Só admin: torneio do time (Torneio da Tripulação), prêmio, loja patrocinadora e inscrição antecipada de 48 h para Almirantes. */
+  official?: boolean;
+  prize?: string | null;
+  sponsorId?: string | null;
+  priority?: boolean;
 }
 
 export interface TournamentSummary {
@@ -489,6 +598,47 @@ export interface TournamentSummary {
   organizerName: string | null;
   /** Você está inscrito. */
   registered: boolean;
+  /** Torneio do time (Torneio da Tripulação). */
+  official: boolean;
+  prize: string | null;
+  sponsor: PublicSponsor | null;
+  /** Até quando só Almirantes se inscrevem. */
+  priorityUntil: string | null;
+}
+
+/** Limites de quem organiza: Organizador/Admin sem cota; apoiador Capitão ou Almirante com cota mensal. */
+export interface OrganizeLimits {
+  kind: 'role' | 'supporter';
+  perMonth: number | null;
+  used: number;
+  maxPlayers: number;
+}
+
+/** Loja patrocinadora (o que o site mostra). */
+export interface PublicSponsor {
+  id: string;
+  name: string;
+  url: string | null;
+  offer: string | null;
+  placements: Array<'tournaments' | 'home'>;
+  logoUrl: string | null;
+}
+
+export interface AdminSponsor extends PublicSponsor {
+  startsAt: string | null;
+  endsAt: string | null;
+  sort: number;
+  active: boolean;
+}
+
+export interface SponsorInput {
+  name: string;
+  url: string | null;
+  offer: string | null;
+  placements: Array<'tournaments' | 'home'>;
+  startsAt: string | null;
+  endsAt: string | null;
+  sort: number;
 }
 
 /** Torneio em que a conta está em jogo agora (check-in aberto ou em andamento), para o atalho da tela inicial. */
@@ -641,6 +791,14 @@ export interface TournamentDetail {
   startedAt: string | null;
   finishedAt: string | null;
   organizerName: string | null;
+  official: boolean;
+  prize: string | null;
+  sponsor: PublicSponsor | null;
+  /** Inscrição antecipada: até esta hora só Almirantes se inscrevem. */
+  priorityUntil: string | null;
+  priorityOpen: boolean;
+  /** Limite de jogadores que quem pede pode escolher ao editar. */
+  maxPlayersCap: number;
   canManage: boolean;
   canRegister: boolean;
   me: {
@@ -662,6 +820,8 @@ export interface TournamentDetail {
     leaderName: string | null;
     leaderImage: string | null;
     colors: string[];
+    /** Plano de apoio ativo (selo ao lado do nome). */
+    supporter: SupporterTier | null;
     /** Lista do deck: só para o organizador, o próprio jogador e, no fim, para todos. */
     deck: { name: string; leader: string; cards: Array<{ id: string; count: number; name: string | null }> } | null;
   }>;
@@ -751,6 +911,10 @@ export interface WinCount {
 }
 
 export interface StatsMeta {
+  /** Estatísticas Pro liberadas para quem pede (plano Tripulante ou acima, ou servidor sem apoio configurado). */
+  pro: boolean;
+  /** O servidor separa as estatísticas gerais (casual) das Pro (ranqueada e torneios). */
+  proGate: boolean;
   formats: Array<{ id: FormatId; label: string }>;
   queues: Array<{ id: string; label: string }>;
   tiers: Tier[];

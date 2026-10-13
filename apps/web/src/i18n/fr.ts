@@ -1,6 +1,7 @@
 // Français.
 
 import type { Messages } from './pt-BR';
+import support from './support/fr';
 import tutorial from './tutorial/fr';
 
 export default {
@@ -136,7 +137,7 @@ export default {
   'menu.navCoverage': 'Couverture des cartes',
   'menu.footerNav': 'Pied de page',
   'menu.disclaimer':
-    'Projet de fans, à but non lucratif et sans lien avec Bandai, Toei Animation ou Shueisha. Les traductions en portugais sont automatiques et non officielles.',
+    'Projet de fans, soutenu par la communauté et des boutiques partenaires, sans lien avec Bandai, Toei Animation ou Shueisha. Les traductions en portugais sont automatiques et non officielles.',
   // ---- connection ----
   'menu.connecting': 'Connexion au serveur…',
   'menu.connectFailed': 'Impossible de se connecter au serveur. Vérifiez les messages [server] dans le terminal de npm run dev.',
@@ -684,7 +685,7 @@ export default {
   'tour.create': '+ Créer un tournoi',
   'tour.signInToRegister': 'Pour vous inscrire à un tournoi, connectez-vous avec votre compte Google depuis le menu.',
   'tour.emptyCreate': 'Aucun tournoi pour l’instant. Créez le premier !',
-  'tour.emptyOrganizer': 'Aucun tournoi pour l’instant. Les tournois sont créés par les comptes ayant le rôle Organisateur.',
+  'tour.emptyOrganizer': 'Aucun tournoi pour l’instant. Les tournois sont créés par les Organisateurs et par les soutiens Capitão ou Almirante.',
   'tour.playersCount': '{n|# joueur|# joueurs}',
   'tour.playersOfMax': '{n}/{max} {n|joueur|joueurs}',
   'tour.youRegistered': '✔ Vous êtes inscrit',
@@ -2146,4 +2147,6 @@ export default {
   // ==== /status ====
   // ==== tutorial (i18n/tutorial) ====
   ...tutorial,
+  // ==== apoio ao projeto (i18n/support) ====
+  ...support,
 } satisfies Messages;

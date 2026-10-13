@@ -1,7 +1,9 @@
 import { type Action, actingPlayer, applyAction, type CardData, chooseSimpleBotAction as chooseBotAction, createGame, type DeckList } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
-import { getCards, openDb } from '../src/db';
+import { createSession, setSupporter, upsertGoogleUser } from '../src/auth/store';
+import { type DB, getCards, openDb } from '../src/db';
+import { dataVersion } from '../src/cache';
 import { seed } from '../src/seed';
 import { bountyDelta, tierFor } from '../src/stats/catalog';
 import { deckHash, deriveMatch } from '../src/stats/derive';
@@ -13,7 +15,16 @@ const BOB = { 'x-deck-owner': 'bob-0123456789abcdef00' };
 function setup() {
   const db = openDb(':memory:');
   seed(db);
-  return { db, app: buildApp(db, { server: { cardImages: true } }) };
+  // Apoio configurado: as Estatísticas Pro (ranqueada, torneios, faixas) exigem o plano.
+  return { db, app: buildApp(db, { server: { cardImages: true, support: { coffeeUrl: 'https://ko-fi.com/x' } } }) };
+}
+
+/** Sessão de um apoiador Tripulante (Estatísticas Pro: ranqueada, torneios e faixas). */
+let supporters = 0;
+function proViewer(db: DB) {
+  const u = upsertGoogleUser(db, { sub: `pro-${++supporters}`, email: `pro${supporters}@example.com`, emailVerified: true, name: 'Pro', picture: null });
+  setSupporter(db, u.id, 'tripulante', null);
+  return { cookie: `gg_session=${createSession(db, u.id)}` };
 }
 
 async function decksAndCards(app: ReturnType<typeof buildApp>, ids: [string, string]) {
@@ -88,7 +99,7 @@ describe('fatos da partida', () => {
 
 describe('API de estatísticas', () => {
   it('grava a partida verificada e responde aos filtros', async () => {
-    const { app } = setup();
+    const { db, app } = setup();
     const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
     const r = playOut(decks, cards, 11);
     const res = await app.inject({
@@ -114,7 +125,9 @@ describe('API de estatísticas', () => {
     expect((await get('queue=ranked')).summary.games).toBe(0);
     expect((await get('opponent=human')).summary.games).toBe(0);
     expect((await get('opponent=bot&tiers=east-blue,paradise')).summary.games).toBe(1);
-    expect((await get('tiers=paradise')).summary.games).toBe(0);
+    // O filtro por faixa é das Estatísticas Pro: sem o plano, é ignorado.
+    expect((await get('tiers=paradise')).summary.games).toBe(1);
+    expect((await get('tiers=paradise', { ...ALICE, ...proViewer(db) })).summary.games).toBe(0);
     expect((await get('mine=1')).summary.games).toBe(1);
     expect((await get('mine=1', BOB)).summary.games).toBe(0);
     expect((await get('days=7')).summary.games).toBe(1);
@@ -181,7 +194,8 @@ describe('API de estatísticas', () => {
       facts,
     );
     for (const h of hashes) expect(findPlayer(db, h)).toMatchObject({ bounty: 0, rankedGames: 1 });
-    const stats = (await app.inject('/api/stats?queue=ranked&opponent=human&tiers=east-blue')).json();
+    const url = '/api/stats?queue=ranked&opponent=human&tiers=east-blue';
+    const stats = (await app.inject({ url, headers: proViewer(db) })).json();
     expect(stats.summary).toMatchObject({ games: 2, wins: 0 });
   });
 
@@ -226,6 +240,40 @@ describe('API de estatísticas', () => {
     expect((await app.inject('/api/stats?by=bot')).json().summary.games).toBe(2);
   });
 
+  it('Estatísticas Pro: partida de torneio só entra no meta depois que o torneio termina', async () => {
+    const { db, app } = setup();
+    const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
+    const r = playOut(decks, cards, 13);
+    const matchId = recordMatch(
+      db,
+      {
+        mode: 'online',
+        format: 'egb',
+        queue: 'tournament',
+        replay: r,
+        seats: [
+          { controller: 'human', ownerHash: 'hash-t1', deckId: null },
+          { controller: 'human', ownerHash: 'hash-t2', deckId: null },
+        ],
+      },
+      deriveMatch(r, cards),
+    );
+    const org = upsertGoogleUser(db, { sub: 'org-t', email: 'org@example.com', emailVerified: true, name: 'Org', picture: null });
+    db.prepare("INSERT INTO tournaments (id, name, format, structure, organizer_id, status) VALUES ('t-x', 'Copa', 'egb', 'swiss', ?, 'running')").run(org.id);
+    db.prepare("INSERT INTO tournament_games (tournament_id, match_id, game, stats_match_id, played_at) VALUES ('t-x', 1, 1, ?, datetime('now'))").run(matchId);
+    const pro = proViewer(db);
+    const games = async (qs: string, headers: Record<string, string> = pro) =>
+      (await app.inject({ url: `/api/stats?${qs}`, headers })).json().summary.games;
+    expect(await games('queue=tournament')).toBe(0);
+    expect(await games('')).toBe(0);
+    db.prepare('UPDATE tournaments SET status = ? WHERE id = ?').run('finished', 't-x');
+    // Encerrar o torneio pela rota já invalida o cache das respostas; aqui o UPDATE é direto.
+    dataVersion.bump();
+    expect(await games('queue=tournament')).toBe(2);
+    // Sem o plano, torneio não entra nas estatísticas gerais.
+    expect(await games('queue=tournament', {})).toBe(0);
+  });
+
   it('ranqueada atualiza a recompensa e grava o tier de antes da partida', async () => {
     const { db, app } = setup();
     const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
@@ -251,7 +299,21 @@ describe('API de estatísticas', () => {
     const loser = findPlayer(db, hashes[1 - w])!;
     expect(winner).toMatchObject({ bounty: 1_000, rankedGames: 1 });
     expect(loser).toMatchObject({ bounty: 0, rankedGames: 1 });
-    const stats = (await app.inject('/api/stats?queue=ranked&opponent=human&tiers=east-blue')).json();
+    const url = '/api/stats?queue=ranked&opponent=human&tiers=east-blue';
+    const stats = (await app.inject({ url, headers: proViewer(db) })).json();
     expect(stats.summary).toMatchObject({ games: 2, wins: 1, matches: 1, players: 2 });
+    // Sem o plano: as estatísticas gerais não mostram a ranqueada (nem com o filtro de faixa).
+    expect((await app.inject(url)).json().summary.games).toBe(0);
+    expect((await app.inject('/api/stats?opponent=human')).json().summary.games).toBe(0);
+    // Amostra para quem não tem o plano: os Líderes mais jogados na ranqueada.
+    const teaser = (await app.inject('/api/stats/teaser')).json();
+    expect(teaser.total).toBe(2);
+    expect(teaser.top.length).toBeGreaterThan(0);
+    expect((await app.inject('/api/stats/meta')).json().pro).toBe(false);
+    expect((await app.inject({ url: '/api/stats/meta', headers: proViewer(db) })).json().pro).toBe(true);
+    // Servidor sem apoio configurado: tudo aberto, como antes.
+    const open = buildApp(db, { server: { cardImages: true } });
+    expect((await open.inject(url)).json().summary.games).toBe(2);
+    expect((await open.inject('/api/stats/meta')).json()).toMatchObject({ pro: true, proGate: false });
   });
 });

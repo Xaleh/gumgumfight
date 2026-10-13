@@ -18,7 +18,8 @@
 // sala (W.O. automático; ver clock.ts).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { accountOwnerKey, createsTournaments, isAdmin, type User } from '../auth/store';
+import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
+import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
 import { dataVersion, ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
 import { fail, isPlayerError, type PlayerError } from '../errors';
@@ -29,6 +30,7 @@ import type { ApiCard } from '../present';
 import { FORMATS, isFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer } from '../stats/store';
 import { listReports } from '../reports/store';
+import { getSponsor, publicSponsor } from '../support/sponsors';
 import { pushText, roundName } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
 import {
@@ -62,7 +64,9 @@ import {
   listTournaments,
   markEntered,
   myTournaments,
+  quotaUsed,
   registerPlayer,
+  releaseQuota,
   replaceInMatch,
   seriesResult,
   setMatchRoom,
@@ -112,10 +116,18 @@ type Body = {
   startsAt?: unknown;
   checkIn?: unknown;
   toleranceMin?: unknown;
+  /** Só admin: torneio do time, prêmio, loja patrocinadora e inscrição antecipada para Almirantes. */
+  official?: unknown;
+  prize?: unknown;
+  sponsorId?: unknown;
+  priority?: unknown;
 };
 
+/** Formulário validado; `priority` vira `priorityUntil` na rota (depende do relógio). */
+type ParsedInput = TournamentInput & { priority: boolean };
+
 /** Valida o formulário de criação/edição. */
-function parseInput(b: Body | undefined): TournamentInput | PlayerError {
+function parseInput(b: Body | undefined): ParsedInput | PlayerError {
   if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
   const name = typeof b.name === 'string' ? b.name.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
   if (name.length < 3) return fail('tourNameTooShort', 'Dê um nome ao torneio (pelo menos 3 letras).');
@@ -167,7 +179,31 @@ function parseInput(b: Body | undefined): TournamentInput | PlayerError {
     startsAt,
     checkIn,
     toleranceMin,
+    official: Boolean(b.official),
+    prize: typeof b.prize === 'string' && b.prize.trim() ? b.prize.trim().replace(/\s+/g, ' ').slice(0, 200) : null,
+    sponsorId: typeof b.sponsorId === 'string' && b.sponsorId.trim() ? b.sponsorId.trim().slice(0, 40) : null,
+    priorityUntil: null,
+    priority: Boolean(b.official) && Boolean(b.priority),
   };
+}
+
+/** Início do mês civil em Brasília (UTC−3, sem horário de verão desde 2019), em ISO. */
+export function monthStart(ms: number): string {
+  const local = new Date(ms - 3 * 3_600_000);
+  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), 1) + 3 * 3_600_000).toISOString();
+}
+
+/**
+ * Quem pode criar torneios e com que limites: Organizador e Admin sem limite; apoiador
+ * Capitão ou Almirante pela cota mensal; os demais não criam.
+ */
+export interface OrganizeLimits {
+  kind: 'role' | 'supporter';
+  /** Torneios por mês (null = sem limite). */
+  perMonth: number | null;
+  /** Criados neste mês pela cota. */
+  used: number;
+  maxPlayers: number;
 }
 
 /** Nome de uma rodada: "Rodada 3" no suíço, "Semifinal" na eliminatória. */
@@ -281,7 +317,64 @@ export function registerTournamentRoutes(
     if (!u) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
     return u;
   };
-  const canManage = (t: Tournament, u: User | null) => Boolean(u && (isAdmin(u.role) || (u.id === t.organizerId && createsTournaments(u.role))));
+  // O criador gerencia o próprio torneio se é Organizador ou se o criou pela cota de apoiador
+  // (mesmo que o plano vença depois, para não deixar o torneio sem dono).
+  const canManage = (t: Tournament, u: User | null) =>
+    Boolean(u && (isAdmin(u.role) || (u.id === t.organizerId && (createsTournaments(u.role) || t.quota))));
+
+  const organizeLimits = (u: User | null): OrganizeLimits | null => {
+    if (!u) return null;
+    if (createsTournaments(u.role)) return { kind: 'role', perMonth: null, used: 0, maxPlayers: MAX_PLAYERS };
+    if (atLeast(u.supporterTier, 'capitao')) {
+      return {
+        kind: 'supporter',
+        perMonth: SUPPORTER_TOURNAMENTS_PER_MONTH,
+        used: quotaUsed(db, u.id, monthStart(now())),
+        maxPlayers: SUPPORTER_MAX_PLAYERS,
+      };
+    }
+    return null;
+  };
+
+  /**
+   * Campos do torneio do time (oficial, prêmio, loja, inscrição antecipada): só o admin
+   * muda; para os outros, ficam como estavam.
+   */
+  const officialFields = ({ priority, ...input }: ParsedInput, me: User, existing: Tournament | null): TournamentInput | PlayerError => {
+    if (!isAdmin(me.role)) {
+      return {
+        ...input,
+        official: existing?.official ?? false,
+        prize: existing?.prize ?? null,
+        sponsorId: existing?.sponsorId ?? null,
+        priorityUntil: existing?.priorityUntil ?? null,
+      };
+    }
+    if (input.sponsorId && !getSponsor(db, input.sponsorId)) return fail('sponsorNotFound', 'Loja patrocinadora não encontrada.');
+    const keep = existing?.priorityUntil && existing.official ? existing.priorityUntil : null;
+    return {
+      ...input,
+      priorityUntil: priority ? (keep ?? new Date(now() + DEFAULT_PRIORITY_HOURS * 3_600_000).toISOString()) : null,
+    };
+  };
+
+  /** Torneios da cota de apoiador: no máximo `max` jogadores (sem limite informado = o máximo). */
+  const capPlayers = (input: TournamentInput, max: number): PlayerError | null => {
+    if (max >= MAX_PLAYERS) return null;
+    if (input.maxPlayers === null) input.maxPlayers = max;
+    return input.maxPlayers > max ? fail('tourPlanMaxPlayers', `Torneios do seu plano têm até ${max} jogadores.`, { max }) : null;
+  };
+
+  /** Loja patrocinadora para mostrar no torneio (só as ativas). */
+  const sponsorOf = (id: string | null) => {
+    const sp = id ? getSponsor(db, id) : null;
+    return sp && sp.active ? publicSponsor(sp) : null;
+  };
+
+  /** Inscrição antecipada aberta agora (só Almirantes e admins se inscrevem). */
+  const priorityOpen = (t: Tournament) => Boolean(t.priorityUntil && Date.parse(t.priorityUntil) > now());
+  const canRegisterNow = (t: Tournament, u: User | null) =>
+    Boolean(u) && t.status === 'registration' && (!priorityOpen(t) || atLeast(u!.supporterTier, 'almirante') || isAdmin(u!.role));
 
   /** Torneio que a conta logada gerencia, ou responde 401/403/404. */
   const managed = (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply): { t: Tournament; me: User } | null => {
@@ -324,15 +417,22 @@ export function registerTournamentRoutes(
       checkInOpensAt: checkInOpensAt(t),
       organizerName: t.organizerName,
       registered: mine.has(t.id),
+      official: t.official,
+      prize: t.prize,
+      sponsor: sponsorOf(t.sponsorId),
+      priorityUntil: t.priorityUntil,
     };
   };
 
   app.get('/api/tournaments', async (req) => {
     const u = user(req);
     const mine = u ? tournamentsOf(db, u.id) : new Set<string>();
+    const limits = organizeLimits(u);
     return {
       tournaments: listTournaments(db).map((t) => summary(t, mine)),
-      canCreate: createsTournaments(u?.role),
+      canCreate: Boolean(limits && (limits.perMonth === null || limits.used < limits.perMonth)),
+      /** Limites de quem pede (null = não organiza): a tela mostra "3 de 5 este mês". */
+      organize: limits,
     };
   });
 
@@ -353,6 +453,7 @@ export function registerTournamentRoutes(
     const matches = listMatches(db, t.id);
     const games = listGames(db, t.id);
     const manage = canManage(t, u);
+    const tiers = supporterTiers(db, players.map((p) => p.userId));
     // Nas inscrições, só o organizador e o próprio jogador veem qual deck (Líder) cada
     // um inscreveu: o deck e a lista ficam congelados quando o torneio começa, e é aí
     // que o Líder aparece para todos (ninguém escolhe o deck olhando os dos outros).
@@ -448,8 +549,16 @@ export function registerTournamentRoutes(
       startedAt: t.startedAt,
       finishedAt: t.finishedAt,
       organizerName: t.organizerName,
+      official: t.official,
+      prize: t.prize,
+      sponsor: sponsorOf(t.sponsorId),
+      /** Inscrição antecipada: até esta hora só Almirantes se inscrevem. */
+      priorityUntil: t.priorityUntil,
+      priorityOpen: priorityOpen(t),
+      /** Limite de jogadores dos torneios da cota de apoiador (para o formulário de edição). */
+      maxPlayersCap: t.quota && !isAdmin(u?.role) && !createsTournaments(u?.role) ? SUPPORTER_MAX_PLAYERS : MAX_PLAYERS,
       canManage: manage,
-      canRegister: Boolean(u) && t.status === 'registration',
+      canRegister: canRegisterNow(t, u) || Boolean(u && t.status === 'registration' && players.some((p) => p.userId === u.id)),
       me: me
         ? {
             deckId: me.deckId,
@@ -465,6 +574,8 @@ export function registerTournamentRoutes(
         return {
           userId: p.userId,
           name: p.name,
+          /** Plano de apoio ativo (selo ao lado do nome). */
+          supporter: tiers.get(p.userId) ?? null,
           seed: t.status === 'registration' ? null : p.seed,
           dropped: p.dropped,
           checkedIn: Boolean(p.checkedInAt),
@@ -551,12 +662,26 @@ export function registerTournamentRoutes(
   app.post<{ Body: Body }>('/api/tournaments', async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
-    if (!createsTournaments(me.role)) return reply.code(403).send(fail('tourCreateForbidden', 'Só organizadores e administradores podem criar torneios.'));
-    const input = parseInput(req.body);
+    const limits = organizeLimits(me);
+    if (!limits) {
+      return reply
+        .code(403)
+        .send(fail('tourCreateNeedsPlan', 'Organizar torneios é um benefício dos planos Capitão e Almirante (ou do perfil Organizador).'));
+    }
+    if (limits.perMonth !== null && limits.used >= limits.perMonth) {
+      return reply
+        .code(403)
+        .send(fail('tourQuotaReached', `Você já criou ${limits.perMonth} torneios este mês. A cota renova no dia 1º.`, { n: limits.perMonth }));
+    }
+    const parsed = parseInput(req.body);
+    if (isPlayerError(parsed)) return reply.code(400).send(parsed);
+    const input = officialFields(parsed, me, null);
     if (isPlayerError(input)) return reply.code(400).send(input);
+    const cap = capPlayers(input, limits.maxPlayers);
+    if (cap) return reply.code(400).send(cap);
     // O nome público do organizador vem do perfil de estatísticas.
     ensurePlayer(db, accountOwnerKey(me.id));
-    const t = createTournament(db, input, me.id);
+    const t = createTournament(db, input, me.id, limits.kind === 'supporter' ? { at: nowIso() } : null);
     return reply.code(201).send(detail(t, me));
   });
 
@@ -564,8 +689,14 @@ export function registerTournamentRoutes(
     const found = managed(req, reply);
     if (!found) return reply;
     if (found.t.status !== 'registration') return reply.code(409).send(fail('tourStartedNoEdit', 'O torneio já começou: não dá para mudar as regras.'));
-    const input = parseInput(req.body);
+    const parsed = parseInput(req.body);
+    if (isPlayerError(parsed)) return reply.code(400).send(parsed);
+    const input = officialFields(parsed, found.me, found.t);
     if (isPlayerError(input)) return reply.code(400).send(input);
+    if (found.t.quota && !isAdmin(found.me.role) && !createsTournaments(found.me.role)) {
+      const cap = capPlayers(input, SUPPORTER_MAX_PLAYERS);
+      if (cap) return reply.code(400).send(cap);
+    }
     if (input.maxPlayers !== null && input.maxPlayers < countPlayers(db, found.t.id)) {
       return reply.code(400).send(fail('maxBelowRegistered', 'O limite é menor que o número de inscritos.'));
     }
@@ -586,6 +717,8 @@ export function registerTournamentRoutes(
   app.delete<{ Params: { id: string } }>('/api/tournaments/:id', async (req, reply) => {
     const found = managed(req, reply);
     if (!found) return reply;
+    // Apagar antes de começar devolve a vaga da cota de apoiador.
+    if (found.t.status === 'registration') releaseQuota(db, found.t.id);
     deleteTournament(db, found.t.id);
     return reply.code(204).send();
   });
@@ -722,6 +855,13 @@ export function registerTournamentRoutes(
     if (!t) return reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
     if (t.status !== 'registration') return reply.code(409).send(fail('registrationClosed', 'As inscrições deste torneio já fecharam.'));
     const already = listPlayers(db, t.id).some((p) => p.userId === me.id);
+    // Inscrição antecipada: só barra inscrições novas (quem já está inscrito pode trocar de deck).
+    if (!already && !canRegisterNow(t, me)) {
+      const opens = new Date(t.priorityUntil!).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
+      return reply
+        .code(403)
+        .send(fail('tourPriorityWindow', `Inscrição antecipada para apoiadores Almirante: abre para todos em ${opens}.`, { date: opens }));
+    }
     if (!already && t.maxPlayers !== null && countPlayers(db, t.id) >= t.maxPlayers) {
       return reply.code(409).send(fail('tourFull', 'O torneio está lotado.'));
     }

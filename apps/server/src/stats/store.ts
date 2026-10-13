@@ -169,6 +169,10 @@ export interface StatsFilter {
   playerId?: string;
   /** Uma lista exata. */
   deckHash?: string;
+  /** Só estas filas (estatísticas gerais: só casual). */
+  queues?: QueueId[];
+  /** Esconde as partidas de torneios que ainda não terminaram (ninguém espia a lista do próximo adversário). */
+  hideLiveTournaments?: boolean;
 }
 
 type Param = string | number;
@@ -193,6 +197,15 @@ function where(f: StatsFilter): { sql: string; params: Param[] } {
   if (f.tiers?.length) {
     parts.push(`s.tier IN (${f.tiers.map(() => '?').join(',')})`);
     params.push(...f.tiers);
+  }
+  if (f.queues) {
+    parts.push(f.queues.length ? `s.queue IN (${f.queues.map(() => '?').join(',')})` : '0');
+    params.push(...f.queues);
+  }
+  if (f.hideLiveTournaments) {
+    parts.push(`(s.queue <> 'tournament' OR s.match_id IN (
+      SELECT g.stats_match_id FROM tournament_games g JOIN tournaments t ON t.id = g.tournament_id
+      WHERE t.status = 'finished' AND g.stats_match_id IS NOT NULL))`);
   }
   if (f.days) {
     parts.push("s.played_at >= datetime('now', ?)");
