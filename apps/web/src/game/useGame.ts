@@ -19,6 +19,7 @@ import {
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormatId } from '../api';
+import { t } from '../i18n';
 import { motionWait } from './motion';
 
 export type GameMode = 'bot' | 'replay';
@@ -167,7 +168,7 @@ export function useGame(setup: GameSetup) {
     const before = c.pos;
     const next = c.seek(n);
     // O motivo aparece só onde o replay para (o motor recusou a ação seguinte).
-    const failure = c.failed && c.pos === c.failed.index ? `O replay para na ação ${c.failed.index + 1}: ${c.failed.message}` : null;
+    const failure = c.failed && c.pos === c.failed.index ? t('replay.stopsAt', { n: c.failed.index + 1, message: c.failed.message }) : null;
     if (c.pos === before) {
       if (failure) setError(failure);
       return;

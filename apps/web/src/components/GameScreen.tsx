@@ -13,6 +13,8 @@ import {
   HIDDEN_CARD,
   legalActions,
   locate,
+  type MsgList,
+  type MsgParts,
   type Pending,
   type PlayerId,
   translateToPt,
@@ -23,7 +25,12 @@ import { createPortal } from 'react-dom';
 import { api, type OnlineSeat, type WatchTarget } from '../api';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
+import { coachTip } from '../game/tutorial/coachTips';
 import { type GameSetup, useGame } from '../game/useGame';
+import { audio } from '../audio';
+import { type Translate, useT, useTryT } from '../i18n';
+import { listText, logText, msgText } from '../game/engineText';
+import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
@@ -49,8 +56,23 @@ import {
   seriesAfter,
 } from './Online';
 
-/** Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen). */
+/**
+ * Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen): pela chave do motor
+ * (`LogEntry.key`); linhas sem chave (estados salvos antes das chaves) pelo texto em português.
+ */
+const NOTICE_KEYS = new Set([
+  'log.conditionFails',
+  'log.lapsedCondition',
+  'log.lapsedConditionTagged',
+  'log.onKoConditionFails',
+  'log.cannotBlockCannotRest',
+  'log.cannotBlock',
+  'log.cannotBeRestedActive',
+  'log.cannotBeRestedByOpponent',
+  'log.retarget',
+]);
 const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virada|não pode ativar \[Blocker\]|o ataque passa a mirar/;
+const isNotice = (e: { key?: string; text: string }) => (e.key ? NOTICE_KEYS.has(e.key) : NOTICE_RE.test(e.text));
 
 /**
  * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
@@ -77,6 +99,39 @@ interface Drag {
 }
 type Sheet = null | 'menu' | 'log' | 'hand' | { trash: PlayerId };
 
+type TryT = ReturnType<typeof useTryT>;
+/** Campos que o motor passa a mandar junto das perguntas e das habilidades: a chave do texto no dicionário e os parâmetros. */
+interface Keyed {
+  promptKey?: string;
+  promptParams?: Record<string, string | number>;
+  promptParts?: MsgParts;
+}
+interface KeyedOptions {
+  optionKeys?: (string | null)[];
+  optionParts?: (MsgList | null)[];
+}
+interface KeyedLabel {
+  labelKey?: string;
+  labelParams?: Record<string, string | number>;
+}
+
+/**
+ * Texto de uma pergunta do motor no idioma da interface: a tradução da chave (`promptKey`), quando o motor
+ * a manda e o dicionário a conhece; senão o texto que veio junto (`prompt`).
+ */
+function promptText(tryT: TryT, pending: { prompt: string }): string {
+  const p = pending as typeof pending & Keyed & { cannot?: true };
+  const text = msgText(tryT, p.promptKey, p.promptParams, p.promptParts);
+  if (text === undefined) return p.prompt;
+  // `confirm` com `cannot`: o motor junta "(Não dá para pagar o custo.)" ao texto, mas não à chave.
+  return p.cannot ? `${text} ${tryT('engine.cannotPayCost') ?? ''}`.trim() : text;
+}
+
+/** Ordem marcada numa escolha ordenada: "1. Carta → 2. Carta". */
+function orderText(t: Translate, state: GameState, picked: string[]): string {
+  return picked.map((u, i) => t('game.orderItem', { n: i + 1, name: cardDef(state, u).name })).join(' → ');
+}
+
 const LONG_PRESS_MS = 420;
 const DRAG_THRESHOLD = 9;
 /** Quanto puxar a carta da mão para cima até ela "sair" (arrastar). */
@@ -96,7 +151,7 @@ function useMediaQuery(query: string) {
 }
 
 /** O que a mesa precisa de uma partida, local (useGame) ou online (useOnlineGame). */
-interface TableGame {
+export interface TableGame {
   state: GameState;
   dispatch: (a: Action) => void;
   error: string | null;
@@ -156,6 +211,7 @@ const noop = () => undefined;
 
 /** Partida online: a mesa recebe só a visão deste jogador, vinda do servidor. */
 export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat; onExit: () => void; onSwitch: (s: OnlineSeat) => void }) {
+  const t = useT();
   const online = useOnlineGame(seat);
   const { state, room } = online;
   const [nextError, setNextError] = useState<string | null>(null);
@@ -201,7 +257,7 @@ export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat;
       online={online}
       onExit={onExit}
       onRematch={room.queue === 'private' ? () => void online.askRematch() : nextGame}
-      rematchLabel={nextGame ? `Jogar o jogo ${room.tournament!.game + 1}` : undefined}
+      rematchLabel={nextGame ? t('game.playGameN', { n: room.tournament!.game + 1 }) : undefined}
     />
   );
 }
@@ -267,11 +323,29 @@ export function WatchGameScreen({
 
 /** A mesa, protegida: um erro ao desenhar não apaga a página (o jogo continua por fora). */
 function GameTable(props: Parameters<typeof Table>[0]) {
+  const t = useT();
   return (
-    <ErrorBoundary title="A mesa travou" onExit={props.onExit}>
+    <ErrorBoundary title={t('game.crashed')} onExit={props.onExit}>
       <Table {...props} />
     </ErrorBoundary>
   );
+}
+
+/** Lição do tutorial: a mesa com o treinador (painel ao lado no desktop, balão no celular). */
+export function LessonTable({ game, onExit, tutorial }: { game: TableGame; onExit: () => void; tutorial: TableTutorial }) {
+  return <GameTable game={game} kind="bot" onExit={onExit} tutorial={tutorial} />;
+}
+
+/** O que a lição do tutorial pede da mesa. */
+export interface TableTutorial {
+  /** O treinador (texto do passo e botões). */
+  coach: ReactNode;
+  /** Destaques na mesa (desenhados por cima, ver `Spotlight`). */
+  overlay?: ReactNode;
+  /** Esconde as perguntas do motor (mulligan, alvos...) enquanto o passo é só de leitura. */
+  hidePrompt?: boolean;
+  /** Celular: o treinador flutua em cima ou embaixo (longe das áreas destacadas). */
+  floatAt?: 'top' | 'bottom';
 }
 
 function Table({
@@ -283,6 +357,7 @@ function Table({
   rematchLabel,
   spectator,
   startNotice,
+  tutorial,
 }: {
   game: TableGame;
   kind: TableKind;
@@ -295,8 +370,12 @@ function Table({
   spectator?: { canHands: boolean; onToggleHands: () => void };
   /** Aviso na mesa ao começar (some sozinho em 10 s). */
   startNotice?: string;
+  /** Lição do tutorial: treinador, destaques e menos controles (sem Auto, desfazer, replay). */
+  tutorial?: TableTutorial;
 }) {
   const { state, dispatch, human } = game;
+  const t = useT();
+  const tryT = useTryT();
   /**
    * Aviso curto na mesa para as linhas do histórico que explicam por que algo não aconteceu
    * (condição de efeito que não vale, [Blocker] que não pode bloquear, carta que não pode ser
@@ -318,18 +397,18 @@ function Table({
     if (noticeSeen.current > state.log.length) noticeSeen.current = 0; // desfazer / replay
     const fresh = state.log.slice(noticeSeen.current);
     noticeSeen.current = state.log.length;
-    const hit = [...fresh].reverse().find((e) => NOTICE_RE.test(e.text));
+    const hit = [...fresh].reverse().find(isNotice);
     if (!hit) return;
-    setNotice(hit.text);
+    setNotice(logText(tryT, hit));
     const t = setTimeout(() => setNotice(null), 6000);
     return () => clearTimeout(t);
   }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
-  const backTo = online?.room?.tournament ? 'torneio' : 'menu';
+  const toTournament = Boolean(online?.room?.tournament);
   const wide = useMediaQuery('(min-width: 1000px)');
-  const { quickCounter, animations, replayCues, lang } = useSettings();
+  const { quickCounter, animations, replayCues, coachTips, locale } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -341,13 +420,21 @@ function Table({
     enabled: animate && !game.jumped && !(replay && game.speed >= 8),
     tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
     lastAction: allActions[allActions.length - 1],
-    lang,
+    lang: locale,
+  });
+  // Sons da mesa e música da partida (os mesmos pontos que as animações; valem sem elas também).
+  useMatchAudio(state, {
+    enabled: !game.jumped && !(replay && game.speed >= 8),
+    animate: animate && !game.jumped,
+    tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
+    human,
+    lastAction: allActions[allActions.length - 1],
   });
   // Replay: o clique/seleção do jogador na próxima ação do roteiro (na mesa e na barra), para quem assiste
   // ou audita ver a decisão antes do resultado. Em 8× a mesa já muda sem animação: só a barra mostra.
   // A opção "Cliques no replay" (configurações ou o botão na barra) desliga tudo.
   const nextAction = replayCues ? replay?.next : undefined;
-  const cue = useMemo(() => (nextAction ? describeReplayAction(state, nextAction, lang) : null), [state, nextAction, lang]);
+  const cue = useMemo(() => (nextAction ? describeReplayAction(state, nextAction, locale) : null), [state, nextAction, locale]);
   // Sorteio com dados no começo da partida: só quando há sorteio (quem começa não foi
   // escolhido no menu), e não no replay nem ao voltar para uma partida em andamento.
   const [intro, setIntro] = useState(
@@ -477,11 +564,11 @@ function Table({
     const mine = human === null ? p === 0 : p === human;
     const name = state.players[p].name;
     const you = human !== null && p === human;
-    const text = you ? 'Seu turno!' : `Turno de ${name}`;
-    const kicker = state.turn === 1 ? (you ? 'Você joga primeiro' : `${name} joga primeiro`) : `Turno ${state.turn}`;
+    const text = you ? t('game.yourTurn') : t('game.turnOf', { name });
+    const kicker = state.turn === 1 ? (you ? t('game.youPlayFirst') : t('game.playsFirst', { name })) : t('game.turnN', { n: state.turn });
     setBanner({ text, kicker, mine, key: state.turn });
-    const t = setTimeout(() => setBanner(null), 1900);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setBanner(null), 1900);
+    return () => clearTimeout(timer);
     // Só muda na troca de turno (não a cada ação).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnKey, human]);
@@ -525,7 +612,7 @@ function Table({
   const canCancel = human !== null && cancelAllowed(state, human);
   const cancelHint =
     human !== null && myPending && state.cancel?.player === human && state.cancel.blocked === 'revealed'
-      ? 'Não dá mais para cancelar: carta revelada'
+      ? t('game.cancelRevealed')
       : null;
   const cancelAction = () => {
     dispatch({ type: 'cancel', player: human! });
@@ -533,21 +620,25 @@ function Table({
     setZoom(null);
   };
   const targetsInHand = targets ? targets.options.filter((u) => zoneOf(state, u) === 'hand').length : 0;
+  /** Onde estão os alvos destacados (mão, mesa ou os dois), com ou sem ordem: uma frase inteira para cada caso. */
+  const targetsHint = () => {
+    const where = targetsInHand === targets!.options.length ? 'Hand' : targetsInHand > 0 ? 'BoardOrHand' : 'Board';
+    const ordered = targets!.ordered ? 'Ordered' : '';
+    return t(`game.hintTargets${where}${ordered}` as const);
+  };
   const handHint =
     defense?.kind === 'block'
-      ? 'Toque num Personagem com [Blocker] para bloquear'
+      ? t('game.hintBlock')
       : defense?.kind === 'counter'
         ? !defense.options.length
-          ? 'Nenhuma carta da mão serve como Counter agora: conclua a etapa (o oponente não sabe disso)'
+          ? t('game.hintCounterNone')
           : quickCounter
-            ? 'Toque numa carta destacada da mão (ou arraste-a até a mesa) para usar o Counter (toque longo: dar a outra carta)'
-            : 'Toque numa carta destacada da mão (ou arraste-a até a mesa) e confirme o Counter'
+            ? t('game.hintCounterQuick')
+            : t('game.hintCounterConfirm')
         : targets
           ? targets.max === 0
-            ? 'Toque numa carta destacada para ler e depois continue'
-            : `Toque nas cartas destacadas ${
-                targetsInHand === targets.options.length ? 'da mão' : targetsInHand > 0 ? 'da mesa ou da mão' : 'da mesa'
-              }${targets.ordered ? ', na ordem desejada,' : ''} e confirme`
+            ? t('game.hintTargetsRead')
+            : targetsHint()
           : null;
 
   /** Destinos válidos para o que está sendo arrastado. */
@@ -673,6 +764,9 @@ function Table({
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
     if (index < 0 || index >= max) return;
+    const cur = mode?.kind === 'don' ? mode.picked : [];
+    // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
+    audio.play('don-pick', { pitch: cur.includes(index) ? -3 : Math.min(6, cur.length) });
     setMode((m) => {
       const cur = m?.kind === 'don' ? m.picked : [];
       const picked = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index].sort((a, b) => a - b);
@@ -929,37 +1023,44 @@ function Table({
   const corner = (
     <>
       <div className="corner-row">
-        <button className="round-btn" onClick={() => setSheet('menu')} aria-label="Menu da partida">
+        <button className="round-btn" onClick={() => setSheet('menu')} aria-label={t('game.menuLabel')}>
           <span className="burger" />
         </button>
-        {!wide && (
-          <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label="Histórico da partida" title="Histórico">
-            <Icon name="history" size={20} />
-            {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
-          </button>
-        )}
       </div>
-      {online && !watching && <ChatBar online={online} />}
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
       {online && !watching && <SpectatorCount online={online} />}
-      {human !== null && !isOnline && (
+      {human !== null && !isOnline && !tutorial && (
         <button
           className={['auto-toggle', game.auto ? 'on' : ''].join(' ')}
           onClick={() => game.setAuto((a) => !a)}
-          title="O bot joga por você enquanto estiver ligado"
+          title={t('game.autoTitle')}
         >
           <span className="knob" />
-          Auto
+          {t('game.auto')}
         </button>
       )}
     </>
   );
 
+  // Histórico e chat ficam ao lado do seu deck e lixo, perto de onde o olho repousa.
+  const sideTools =
+    !wide || (online && !watching) ? (
+      <>
+        {!wide && (
+          <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label={t('game.logLabel')} title={t('game.log')}>
+            <Icon name="history" size={20} />
+            {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
+          </button>
+        )}
+        {online && !watching && <ChatBar online={online} />}
+      </>
+    ) : null;
+
   const detailUid = hovered ?? selected;
 
   return (
     <div
-      className={['game', wide ? 'wide' : '', watching ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : ''].join(' ')}
+      className={['game', wide ? 'wide' : '', watching || replay ? 'flip-top' : '', drag ? 'dragging' : '', replay ? 'replaying' : '', tutorial ? 'lesson' : ''].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
@@ -971,6 +1072,7 @@ function Table({
           revealBottom
           revealTop={showBotHand}
           corner={corner}
+          sideTools={sideTools}
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}
@@ -1010,7 +1112,7 @@ function Table({
                     clock={online && !watching ? <OnlineClock online={online} player={human!} /> : undefined}
                   />
                 ) : mode && human !== null ? (
-                  <CancelButton sub={mode.kind === 'attack' ? 'o ataque' : 'os DON!!'} onClick={() => setMode(null)} />
+                  <CancelButton sub={mode.kind === 'attack' ? t('game.cancelAttackSub') : t('game.cancelDonSub')} onClick={() => setMode(null)} />
                 ) : null
               }
             />
@@ -1070,7 +1172,7 @@ function Table({
         )}
 
         <Prompt
-          hidden={intro || motion.busy}
+          hidden={intro || motion.busy || Boolean(tutorial?.hidePrompt)}
           state={state}
           human={human}
           picked={picked}
@@ -1128,58 +1230,58 @@ function Table({
         )}
 
         {sheet === 'menu' && (
-          <SheetFrame title="Partida" onClose={() => setSheet(null)}>
+          <SheetFrame title={t('game.matchSheet')} onClose={() => setSheet(null)}>
             <div className="menu-grid">
-              {human !== null && !isOnline && (
+              {human !== null && !isOnline && !tutorial && (
                 <button className="btn" onClick={game.undo} disabled={!game.canUndo}>
-                  ↶ Desfazer
+                  {t('game.undo')}
                 </button>
               )}
-              {!isOnline && !replay && (
+              {!isOnline && !replay && !tutorial && (
                 <button className="btn" onClick={() => game.setPaused((p) => !p)}>
-                  {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
+                  {game.paused ? t('game.resume') : t('game.pause')}
                 </button>
               )}
               <button className="btn" onClick={() => setSheet('log')}>
-                📜 Histórico
+                {t('game.logBtn')}
               </button>
-              {(!isOnline || over) && (
+              {(!isOnline || over) && !tutorial && (
                 <button className="btn" onClick={game.downloadReplay}>
-                  ⤓ Baixar replay
+                  {t('game.downloadReplay')}
                 </button>
               )}
-              {human !== null && state.phase === 'main' && (
+              {human !== null && state.phase === 'main' && !tutorial && (
                 <button
                   className="btn danger"
                   onClick={() => {
-                    if (window.confirm('Desistir desta partida?')) {
+                    if (window.confirm(t('game.concedeConfirm'))) {
                       dispatch({ type: 'concede', player: human });
                       setSheet(null);
                     }
                   }}
                 >
-                  🏳 Desistir
+                  {t('game.concede')}
                 </button>
               )}
               <button className="btn" onClick={onExit}>
-                ← Sair para o {backTo}
+                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : t('game.exitToMenu')}
               </button>
             </div>
-            {!isOnline && !replay && (
+            {!isOnline && !replay && !tutorial && (
               <div className="sheet-section">
-                <label className="sheet-label">Velocidade do bot</label>
+                <label className="sheet-label">{t('game.botSpeed')}</label>
                 <div className="seg small">
                   {[0.5, 1, 2, 4].map((v) => (
                     <button key={v} className={game.speed === v ? 'on' : ''} onClick={() => game.setSpeed(v)}>
-                      {v}×
+                      {t('game.speedX', { v })}
                     </button>
                   ))}
                 </div>
               </div>
             )}
-            {kind === 'bot' && (
+            {kind === 'bot' && !tutorial && (
               <label className="check">
-                <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> Ver a mão do bot
+                <input type="checkbox" checked={showBotHand} onChange={(e) => setShowBotHand(e.target.checked)} /> {t('game.showBotHand')}
               </label>
             )}
             <div className="sheet-section">
@@ -1189,7 +1291,7 @@ function Table({
         )}
 
         {sheet === 'hand' && human !== null && (
-          <SheetFrame title={`Sua mão (${orderedHand.length})`} onClose={() => setSheet(null)}>
+          <SheetFrame title={t('game.yourHand', { n: orderedHand.length })} onClose={() => setSheet(null)}>
             {state.battle && <BattleInfo state={state} human={human} />}
             {targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
             {decision && (
@@ -1206,26 +1308,26 @@ function Table({
             )}
             {mode && !decision && (
               <div className="defense-slot in-sheet">
-                <CancelButton sub={mode.kind === 'attack' ? 'o ataque' : 'os DON!!'} onClick={() => setMode(null)} />
+                <CancelButton sub={mode.kind === 'attack' ? t('game.cancelAttackSub') : t('game.cancelDonSub')} onClick={() => setMode(null)} />
               </div>
             )}
             <p className="muted small hand-sheet-hint">
               {myPending?.kind === 'counter'
                 ? !myPending.options.length
-                  ? 'Nenhuma carta serve como Counter agora: conclua a etapa.'
+                  ? t('game.sheetCounterNone')
                   : quickCounter
-                    ? 'Toque numa carta destacada para usar o Counter na hora.'
-                    : 'Toque numa carta destacada e confirme para usar o Counter.'
+                    ? t('game.sheetCounterQuick')
+                    : t('game.sheetCounterConfirm')
                 : targets
-                  ? `${handHint}.`
+                  ? t('game.sentence', { text: handHint })
                   : myPending?.kind === 'selectTargets'
-                    ? myPending.prompt
-                    : 'Toque numa carta para ver as ações. Segure para ler. Na mesa, arraste uma carta para cima e solte-a entre as outras para mudar a ordem.'}
+                    ? promptText(tryT, myPending)
+                    : t('game.sheetHandHint')}
             </p>
             {orderedHand.length > 1 && (
               <div className="btn-row center hand-sheet-tools">
-                <button className="btn small" onClick={sortHand} title="Ordena a mão por custo e nome (só a exibição)">
-                  ⇅ Ordenar por custo
+                <button className="btn small" onClick={sortHand} title={t('game.sortHandTitle')}>
+                  {t('game.sortHand')}
                 </button>
               </div>
             )}
@@ -1238,34 +1340,38 @@ function Table({
         )}
 
         {sheet === 'log' && (
-          <SheetFrame title="Histórico" onClose={() => setSheet(null)}>
+          <SheetFrame title={t('game.log')} onClose={() => setSheet(null)}>
             <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
           </SheetFrame>
         )}
 
         {sheet !== null && typeof sheet === 'object' && (
           <SheetFrame
-            title={`Descarte de ${state.players[sheet.trash].name} (${state.players[sheet.trash].trash.length})`}
+            title={t('game.trashOf', { name: state.players[sheet.trash].name, n: state.players[sheet.trash].trash.length })}
             onClose={() => setSheet(null)}
           >
             <div className="card-list">
               {[...state.players[sheet.trash].trash].reverse().map((uid) => (
                 <CardView key={uid} state={state} uid={uid} onClick={() => setZoom(uid)} onHover={setHovered} />
               ))}
-              {state.players[sheet.trash].trash.length === 0 && <p className="muted">Nenhuma carta no descarte.</p>}
+              {state.players[sheet.trash].trash.length === 0 && <p className="muted">{t('game.trashEmpty')}</p>}
             </div>
           </SheetFrame>
         )}
 
         {logCard && <StaticCardZoom card={logCard} className="log-zoom" onClose={() => setLogCard(null)} />}
 
-        {state.phase === 'gameover' && showResult && (
+        {tutorial?.overlay}
+        {kind === 'bot' && !replay && !tutorial && coachTips && human !== null && !intro && !zoom && !logCard && !sheet && <CoachTipPill state={state} human={human} />}
+        {tutorial && !wide && <div className={['coach-float', tutorial.floatAt ?? 'top'].join(' ')}>{tutorial.coach}</div>}
+
+        {state.phase === 'gameover' && showResult && !tutorial && (
           <GameResult
             state={state}
             human={human}
             actions={game.actions()}
             onExit={onExit}
-            exitLabel={`Voltar ao ${backTo}`}
+            exitLabel={toTournament ? t('game.backToTournament') : t('game.backToMenu')}
             onRematch={
               replay
                 ? () => {
@@ -1275,8 +1381,8 @@ function Table({
                 : onRematch
             }
             rematchLabel={
-              (replay ? 'Assistir de novo' : rematchLabel) ??
-              (online && human !== null ? (online.room?.rematch[human] ? 'Aguardando o oponente…' : 'Pedir revanche') : undefined)
+              (replay ? t('game.watchAgain') : rematchLabel) ??
+              (online && human !== null ? (online.room?.rematch[human] ? t('game.waitingOpponent') : t('game.askRematch')) : undefined)
             }
             onReplay={game.downloadReplay}
             onLog={() => setSheet('log')}
@@ -1286,38 +1392,50 @@ function Table({
         )}
       </div>
 
-      {wide && (
+      {wide && tutorial && (
+        <aside className="side-panel lesson-panel">
+          <div className="panel-controls">
+            <button className="btn small" onClick={onExit}>
+              {t('tutorial.exitLesson')}
+            </button>
+          </div>
+          {tutorial.coach}
+          <CardDetail state={state} uid={detailUid} />
+        </aside>
+      )}
+      {wide && !tutorial && (
         <aside className="side-panel">
           <div className="panel-controls">
             <button className="btn small" onClick={onExit}>
-              ← {backTo === 'torneio' ? 'Torneio' : 'Menu'}
+              {toTournament ? t('game.sideTournament') : t('game.sideMenu')}
             </button>
             {human !== null && !isOnline && (
               <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
-                ↶ Desfazer
+                {t('game.undo')}
               </button>
             )}
             {!isOnline && !replay && (
               <>
                 <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
-                  {game.paused ? '▶ Continuar' : '❚❚ Pausar'}
+                  {game.paused ? t('game.resume') : t('game.pause')}
                 </button>
                 <select
                   className="speed"
                   value={game.speed}
                   onChange={(e) => game.setSpeed(Number(e.target.value))}
-                  title="Velocidade do bot"
+                  title={t('game.botSpeed')}
                 >
-                  <option value={0.5}>0.5×</option>
-                  <option value={1}>1×</option>
-                  <option value={2}>2×</option>
-                  <option value={4}>4×</option>
+                  {[0.5, 1, 2, 4].map((v) => (
+                    <option key={v} value={v}>
+                      {t('game.speedX', { v })}
+                    </option>
+                  ))}
                 </select>
               </>
             )}
             {(!isOnline || over) && (
-              <button className="btn small" onClick={game.downloadReplay} title="Salvar as ações como roteiro">
-                ⤓ Replay
+              <button className="btn small" onClick={game.downloadReplay} title={t('game.replayTitle')}>
+                {t('game.replayBtn')}
               </button>
             )}
           </div>
@@ -1337,6 +1455,29 @@ function Table({
           cue={cue}
         />
       )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ dicas do treinador
+
+/** Treino contra o bot com "Dicas do treinador": uma dica curta para o momento (some ao fechar até mudar). */
+function CoachTipPill({ state, human }: { state: GameState; human: PlayerId }) {
+  const t = useT();
+  const tryT = useTryT();
+  const tip = useMemo(() => coachTip(state, human), [state, human]);
+  const id = tip ? `${tip.key}|${state.turn}|${state.pending?.kind ?? ''}` : '';
+  const [closed, setClosed] = useState<string | null>(null);
+  if (!tip || closed === id) return null;
+  return (
+    <div className="coach-tip" role="status">
+      <span className="coach-tip-ico" aria-hidden="true">
+        <Icon name="learn" size={16} />
+      </span>
+      <span>{tryT(`coach.tip.${tip.key}`, tip.params) ?? tip.key}</span>
+      <button type="button" className="coach-tip-close" onClick={() => setClosed(id)} aria-label={t('common.close')}>
+        <Icon name="close" size={14} />
+      </button>
     </div>
   );
 }
@@ -1369,6 +1510,7 @@ function CenterBand(props: {
   pulse?: boolean;
 }) {
   const { state, human, mode, acting, watching } = props;
+  const t = useT();
   const b = state.battle;
   const mineTurn = human === null ? state.activePlayer === 0 : state.activePlayer === human;
   const centerDecision = Boolean(props.wide && props.decision);
@@ -1379,41 +1521,44 @@ function CenterBand(props: {
   else if (mode?.kind === 'attack')
     middle = (
       <button className="hint-pill" onClick={props.onCancelMode}>
-        Escolha o alvo do ataque <small>(toque aqui para cancelar)</small>
+        {t('game.pickAttackTarget')} <small>{t('game.tapToCancel')}</small>
       </button>
     );
   else if (mode?.kind === 'don' && props.donBar) middle = props.donBar;
-  else if (props.paused) middle = <span className="hint-pill">Pausado</span>;
+  else if (props.paused) middle = <span className="hint-pill">{t('game.paused')}</span>;
   else if (acting !== null && acting !== human && (state.players[acting].isBot || human !== null || watching) && state.phase === 'main')
     middle = (
       <span className="hint-pill thinking">
-        {state.players[acting].name} está pensando<span className="dots" />
+        {t('game.thinking', { name: state.players[acting].name })}
+        <span className="dots" />
       </span>
     );
   else if (state.pending?.kind === 'chooseFirst' && acting !== null && acting !== human)
     middle = (
       <span className="hint-pill thinking">
-        {state.players[acting].name} venceu o sorteio e está escolhendo quem começa<span className="dots" />
+        {t('game.wonRollChoosing', { name: state.players[acting].name })}
+        <span className="dots" />
       </span>
     );
   else if (state.phase === 'mulligan' && (human !== null || watching) && acting !== null && acting !== human)
     middle = (
       <span className="hint-pill thinking">
-        {state.players[acting].name} {state.pending?.kind === 'mulligan' ? 'está escolhendo a mão inicial' : 'está preparando o início da partida'}
+        {t(state.pending?.kind === 'mulligan' ? 'game.choosingHand' : 'game.preparingStart', { name: state.players[acting].name })}
         <span className="dots" />
       </span>
     );
   else if (props.canEnd)
-    middle = (
-      <span className="hint-pill soft">
-        {state.turn <= 2 ? 'Primeiro turno: sem ataques. ' : ''}Toque numa carta para agir ou arraste-a.
-      </span>
-    );
+    middle = <span className="hint-pill soft">{state.turn <= 2 ? t('game.firstTurnHint') : t('game.tapToAct')}</span>;
+
+  const [endTurn1, endTurn2 = ''] = t('game.endTurn').split('\n');
 
   return (
     <>
-      <div className={['turn-chip', mineTurn ? 'mine' : 'theirs', props.pulse ? 'pulse' : ''].join(' ')} title={mineTurn ? 'Seu turno' : 'Turno do oponente'}>
-        <small>Turno</small>
+      <div
+        className={['turn-chip', mineTurn ? 'mine' : 'theirs', props.pulse ? 'pulse' : ''].join(' ')}
+        title={mineTurn ? t('game.yourTurnTitle') : t('game.opponentTurnTitle')}
+      >
+        <small>{t('game.turn')}</small>
         <b>{state.phase === 'mulligan' ? '—' : state.turn}</b>
       </div>
       <div className={['band-middle', centerDecision ? 'with-decision' : ''].join(' ')}>
@@ -1426,21 +1571,21 @@ function CenterBand(props: {
         props.decision
       ) : human !== null ? (
         <button className={['end-turn', props.pulse && props.canEnd ? 'pulse' : ''].join(' ')} disabled={!props.canEnd} onClick={props.onEnd}>
-          Encerrar
+          {endTurn1}
           <br />
-          turno
+          {endTurn2}
         </button>
       ) : watching && props.hands ? (
         <button
           className={['end-turn', 'watching', 'hands-toggle', props.hands.on ? 'on' : ''].join(' ')}
           onClick={props.hands.onToggle}
           aria-pressed={props.hands.on}
-          title={props.hands.on ? 'Esconder as mãos dos jogadores' : 'Mostrar as mãos dos jogadores'}
+          title={props.hands.on ? t('game.hideHands') : t('game.showHands')}
         >
           <EyeIcon closed={!props.hands.on} />
         </button>
       ) : watching ? (
-        <span className="end-turn watching" title="Você está assistindo">
+        <span className="end-turn watching" title={t('game.watching')}>
           👁
         </span>
       ) : (
@@ -1468,47 +1613,48 @@ function DonBar(props: {
   onCancel: () => void;
 }) {
   const { count, step } = props;
+  const t = useT();
   // Em tela estreita (.brief) os textos encurtam para a barra caber numa linha entre o turno e "Encerrar turno".
   const counter = (
     <span className="don-bar-count">
       <span className="don-card mini" aria-hidden="true" />
       <b>{count}</b>
-      <span className="full">{count === 1 ? 'selecionado' : 'selecionados'}</span>
+      <span className="full">{t('game.donSelected', { n: count })}</span>
       <span className="brief">DON!!</span>
     </span>
   );
   if (step === 'character')
     return (
-      <div className="don-bar step" role="group" aria-label="Anexar DON!! a um Personagem">
+      <div className="don-bar step" role="group" aria-label={t('game.donToCharacterLabel')}>
         {counter}
         <span className="don-bar-hint">
-          <span className="full">Toque no Personagem que recebe</span>
-          <span className="brief">Toque no Personagem</span>
+          <span className="full">{t('game.donTapCharacter')}</span>
+          <span className="brief">{t('game.donTapCharacterShort')}</span>
         </span>
         <button className="don-bar-btn back" onClick={props.onBack}>
-          Voltar
+          {t('common.back')}
         </button>
-        <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label="Cancelar">
+        <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label={t('common.cancel')}>
           ✕
         </button>
       </div>
     );
   return (
-    <div className="don-bar" role="group" aria-label="Anexar DON!!">
+    <div className="don-bar" role="group" aria-label={t('game.donAttachLabel')}>
       {counter}
       {props.canLeader && (
-        <button className="don-bar-btn" onClick={props.onLeader} aria-label="Anexar ao Líder">
-          <span className="full">Anexar ao Líder</span>
-          <span className="brief">Líder</span>
+        <button className="don-bar-btn" onClick={props.onLeader} aria-label={t('game.donToLeader')}>
+          <span className="full">{t('game.donToLeader')}</span>
+          <span className="brief">{t('game.donToLeaderShort')}</span>
         </button>
       )}
       {props.characters > 0 && (
-        <button className="don-bar-btn" onClick={props.onCharacter} aria-label="Anexar a um Personagem">
-          <span className="full">Anexar a um Personagem</span>
-          <span className="brief">Personagem</span>
+        <button className="don-bar-btn" onClick={props.onCharacter} aria-label={t('game.donToCharacter')}>
+          <span className="full">{t('game.donToCharacter')}</span>
+          <span className="brief">{t('game.donToCharacterShort')}</span>
         </button>
       )}
-      <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label="Cancelar">
+      <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label={t('common.cancel')}>
         ✕
       </button>
     </div>
@@ -1553,13 +1699,16 @@ function TargetRequest({
   /** Aviso curto embaixo do pedido (ex.: por que não dá mais para cancelar). */
   hint?: string | null;
 }) {
+  const t = useT();
+  const tryT = useTryT();
+  const prompt = promptText(tryT, pending);
   const source = state.cards[pending.source] ? cardDef(state, pending.source) : null;
   // O motor costuma começar o pedido com "Nome da carta: "; o nome vai para a linha de cima.
   const prefix = source ? `${source.name}: ` : '';
-  const text = prefix && pending.prompt.startsWith(prefix) ? pending.prompt.slice(prefix.length) : pending.prompt;
-  const order = pending.ordered && picked.length > 0 ? picked.map((u, i) => `${i + 1}. ${cardDef(state, u).name}`).join(' → ') : null;
+  const text = prefix && prompt.startsWith(prefix) ? prompt.slice(prefix.length) : prompt;
+  const order = pending.ordered && picked.length > 0 ? orderText(t, state, picked) : null;
   return (
-    <div className="target-request" title={pending.prompt}>
+    <div className="target-request" title={prompt}>
       {source && (
         <div className="source-thumb">
           <CardView state={state} uid={pending.source} />
@@ -1569,9 +1718,9 @@ function TargetRequest({
         {source && <small>{source.name}</small>}
         <b>
           {text}
-          {pending.max > 0 && ` (${picked.length}/${pending.max})`}
+          {pending.max > 0 && ` ${t('game.countOf', { n: picked.length, max: pending.max })}`}
         </b>
-        {order && <small className="target-order">Ordem: {order}</small>}
+        {order && <small className="target-order">{t('game.order', { order })}</small>}
         {hint && <small className="target-hint">{hint}</small>}
       </div>
     </div>
@@ -1583,9 +1732,10 @@ function TargetRequest({
  * (nada foi para o motor ainda), ou desfaz no motor a ação em andamento (`cancel`).
  */
 function CancelButton({ sub, onClick, title }: { sub: string; onClick: () => void; title?: string }) {
+  const t = useT();
   return (
-    <button className="end-turn defense cancel" onClick={onClick} title={title ?? 'Cancelar e voltar'}>
-      <b>Cancelar</b>
+    <button className="end-turn defense cancel" onClick={onClick} title={title ?? t('game.cancelBack')}>
+      <b>{t('common.cancel')}</b>
       <small>{sub}</small>
     </button>
   );
@@ -1621,15 +1771,18 @@ function DecisionButton({
   /** Dentro da folha da mão: botão largo. */
   sheet?: boolean;
 }) {
-  const d = pending.kind === 'selectTargets' ? targetsDecision(pending, picked) : defenseDecision(state, pending);
+  const t = useT();
+  const tryT = useTryT();
+  const d =
+    pending.kind === 'selectTargets' ? targetsDecision(t, promptText(tryT, pending), pending, picked) : defenseDecision(t, state, pending);
   if (!d) return null;
   const act = () => onDispatch(d.action(human));
   return (
     <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
       {onCancel && pending.kind === 'selectTargets' && (
-        <button className="end-turn defense cancel side" onClick={onCancel} title="Desfazer a ação e voltar ao estado anterior">
-          <b>Cancelar</b>
-          <small>desfaz a ação</small>
+        <button className="end-turn defense cancel side" onClick={onCancel} title={t('game.undoActionTitle')}>
+          <b>{t('common.cancel')}</b>
+          <small>{t('game.undoActionSub')}</small>
         </button>
       )}
       <button
@@ -1657,7 +1810,7 @@ interface Decision {
 }
 
 /** Blocker/Counter: rótulo com o resultado previsto do ataque. */
-function defenseDecision(state: GameState, pending: Extract<Pending, { kind: 'block' | 'counter' }>): Decision | null {
+function defenseDecision(t: Translate, state: GameState, pending: Extract<Pending, { kind: 'block' | 'counter' }>): Decision | null {
   const b = state.battle;
   if (!b) return null;
   const atk = getPower(state, b.attacker) ?? 0;
@@ -1677,48 +1830,52 @@ function defenseDecision(state: GameState, pending: Extract<Pending, { kind: 'bl
   }
   // Sem carta de Counter na mão a etapa abre mesmo assim (senão o atacante saberia): só resta concluir.
   const none = counter && !pending.options.length;
-  const label = !counter ? 'Não bloquear' : !hits || none ? 'Concluir' : used ? 'Não usar mais Counter' : 'Não usar Counter';
-  const result = hits ? 'o ataque passa' : 'defendido';
+  const label = !counter
+    ? t('game.noBlock')
+    : !hits || none
+      ? t('game.finish')
+      : used
+        ? t('game.noMoreCounter')
+        : t('game.noCounter');
+  const result = hits ? t('game.attackPasses') : t('game.defended');
   return {
     label,
-    sub: none && hits && !used ? `sem Counter na mão · ${atk} ⚔ ${def}` : `${result} · ${atk} ⚔ ${def}`,
-    title: !counter
-      ? `Seguir sem bloquear: ${result} (${atk} contra ${def})`
-      : `Encerrar a etapa de Counter: ${result} (${atk} contra ${def})`,
+    sub: none && hits && !used ? t('game.noCounterInHandSub', { atk, def }) : t('game.resultSub', { result, atk, def }),
+    title: !counter ? t('game.noBlockTitle', { result, atk, def }) : t('game.endCounterTitle', { result, atk, def }),
     pulse: useless,
     action: (player) => (counter ? { type: 'pass', player } : { type: 'choose', player, uids: [] }),
   };
 }
 
 /** Escolha de alvos de efeito: "Confirmar (n/máx)", "Não escolher" ou "Continuar", com o contador. */
-function targetsDecision(pending: Extract<Pending, { kind: 'selectTargets' }>, picked: string[]): Decision {
+function targetsDecision(t: Translate, prompt: string, pending: Extract<Pending, { kind: 'selectTargets' }>, picked: string[]): Decision {
   const n = picked.length;
   const { max } = pending;
   // O mínimo nunca passa do que há para escolher.
   const need = Math.min(pending.min, pending.options.length);
   if (max === 0) {
     return {
-      label: 'Continuar',
-      sub: 'nada a escolher',
-      title: pending.prompt,
+      label: t('game.continue'),
+      sub: t('game.nothingToChoose'),
+      title: prompt,
       pulse: true,
       action: (player) => ({ type: 'choose', player, uids: [] }),
     };
   }
   if (n === 0 && need === 0) {
     return {
-      label: 'Não escolher',
-      sub: `nenhuma marcada · até ${max}`,
-      title: `${pending.prompt} — seguir sem escolher`,
+      label: t('game.skipChoice'),
+      sub: t('game.noneMarkedUpTo', { max }),
+      title: t('game.promptSkip', { prompt }),
       pulse: false,
       action: (player) => ({ type: 'choose', player, uids: [] }),
     };
   }
   const missing = need - n;
   return {
-    label: `Confirmar (${n}/${max})`,
-    sub: missing > 0 ? `marque mais ${missing}` : n < max ? 'pode marcar mais' : 'escolha completa',
-    title: pending.prompt,
+    label: t('game.confirmCount', { n, max }),
+    sub: missing > 0 ? t('game.markMore', { n: missing }) : n < max ? t('game.canMarkMore') : t('game.choiceComplete'),
+    title: prompt,
     pulse: n === max,
     disabled: missing > 0,
     action: (player) => ({ type: 'choose', player, uids: picked }),
@@ -1727,6 +1884,7 @@ function targetsDecision(pending: Extract<Pending, { kind: 'selectTargets' }>, p
 
 /** Poder do atacante contra o alvo, com o que falta para defender (como o "Dano previsto" do Pocket). */
 function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null }) {
+  const t = useT();
   const b = state.battle!;
   const atk = getPower(state, b.attacker) ?? 0;
   const def = getPower(state, b.target) ?? 0;
@@ -1734,21 +1892,21 @@ function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null
   const hits = atk >= def;
   const need = atk - def + 1000;
   let status: string;
-  if (human !== null && defender === human) status = hits ? `Faltam +${need} para defender` : 'Defendido!';
-  else status = hits ? 'O ataque vai acertar' : `Faltam +${def - atk} para acertar`;
+  if (human !== null && defender === human) status = hits ? t('game.needToDefend', { n: need }) : t('game.defendedBang');
+  else status = hits ? t('game.attackWillHit') : t('game.needToHit', { n: def - atk });
   // Etapa da batalha (a visão do oponente também traz o tipo da escolha pendente).
   // A carta do [Trigger] em resolução está fora das áreas (nem Vida nem descarte): aparece aqui.
   const trigger = state.limbo?.find((u) => state.cards[u]);
   const step =
     state.pending?.kind === 'block'
-      ? 'Etapa de Bloqueio'
+      ? t('game.stepBlock')
       : state.pending?.kind === 'counter'
-        ? 'Etapa de Counter'
+        ? t('game.stepCounter')
         : trigger
-          ? `[Trigger] ${cardDef(state, trigger).name}`
+          ? t('game.stepTrigger', { name: cardDef(state, trigger).name })
           : state.stack.some((f) => f.kind === 'damage')
-            ? 'Etapa de Dano'
-            : 'Ataque';
+            ? t('game.stepDamage')
+            : t('game.stepAttack');
   return (
     <div className="battle-info">
       <div key={step} className="battle-step">
@@ -1766,8 +1924,7 @@ function BattleInfo({ state, human }: { state: GameState; human: PlayerId | null
         </span>
       </div>
       <div className={['battle-status', hits ? 'hit' : 'safe'].join(' ')}>
-        {b.blocked ? 'Bloqueado · ' : ''}
-        {status}
+        {b.blocked ? t('game.blockedStatus', { status }) : status}
       </div>
     </div>
   );
@@ -1893,7 +2050,9 @@ function Prompt(props: {
   highlight: (uid: string) => Highlight;
 }) {
   const { state, human, picked, onDispatch, onCancel, cancelHint } = props;
-  const { lang } = useSettings();
+  const { locale } = useSettings();
+  const t = useT();
+  const tryT = useTryT();
   const pending = state.pending;
   // "Ver a mesa": a janela da pergunta recolhe para um balão no topo, para olhar o campo e a mão antes de
   // responder (ex.: usar ou não um efeito quando o oponente ataca). Volta sozinha quando a situação muda.
@@ -1901,17 +2060,19 @@ function Prompt(props: {
   useEffect(() => setPeek(false), [pending]);
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
   const peekButton = (
-    <button className="btn peek" onClick={() => setPeek(true)} title="Recolhe a pergunta para você olhar a mesa e a mão; depois volte e responda">
-      👁 Ver a mesa
+    <button className="btn peek" onClick={() => setPeek(true)} title={t('game.peekTitle')}>
+      {t('game.peek')}
     </button>
   );
+  /** Texto da pergunta no idioma da interface (chave do motor) ou o que veio do motor. */
+  const prompt = 'prompt' in pending ? promptText(tryT, pending) : '';
   if (peek && (pending.kind === 'confirm' || pending.kind === 'option' || pending.kind === 'selectTargets' || pending.kind === 'lifeCard')) {
-    const title = pending.kind === 'lifeCard' ? `Carta da Vida: ${cardDef(state, pending.card).name}` : pending.prompt;
+    const title = pending.kind === 'lifeCard' ? t('game.lifeCardTitle', { name: cardDef(state, pending.card).name }) : prompt;
     return (
-      <PromptPill title={title} subtitle="A mesa e a mão estão à vista. Toque numa carta para ler; depois volte à pergunta.">
+      <PromptPill title={title} subtitle={t('game.peekSub')}>
         <div className="btn-row center">
           <button className="btn primary" onClick={() => setPeek(false)}>
-            Voltar à pergunta
+            {t('game.backToQuestion')}
           </button>
         </div>
       </PromptPill>
@@ -1919,29 +2080,27 @@ function Prompt(props: {
   }
   /** Botão de desfazer a ação (quando o motor permite) ou o motivo de não dar mais. */
   const cancel = onCancel ? (
-    <button className="btn cancel" onClick={onCancel} title="Desfazer a ação e voltar ao estado anterior">
-      Cancelar
+    <button className="btn cancel" onClick={onCancel} title={t('game.undoActionTitle')}>
+      {t('common.cancel')}
     </button>
   ) : null;
-  const hint = !onCancel && cancelHint ? <p className="muted small cancel-hint">{cancelHint}.</p> : null;
+  const hint = !onCancel && cancelHint ? <p className="muted small cancel-hint">{t('game.sentence', { text: cancelHint })}</p> : null;
 
   switch (pending.kind) {
     case 'chooseFirst':
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
-            <div className="modal-kicker">Sorteio inicial</div>
-            <h2>Você venceu o sorteio!</h2>
-            <p className="muted">Quer jogar primeiro ou segundo?</p>
-            <p className="muted small">
-              Quem joga primeiro não compra carta no primeiro turno e recebe 1 DON!!; quem joga segundo compra e recebe 2 DON!!.
-            </p>
+            <div className="modal-kicker">{t('game.rollKicker')}</div>
+            <h2>{t('game.wonRoll')}</h2>
+            <p className="muted">{t('game.firstOrSecond')}</p>
+            <p className="muted small">{t('game.firstOrSecondHint')}</p>
             <div className="btn-row center">
               <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                Jogar primeiro
+                {t('game.playFirst')}
               </button>
               <button className="btn big" onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-                Jogar segundo
+                {t('game.playSecond')}
               </button>
             </div>
           </div>
@@ -1952,8 +2111,10 @@ function Prompt(props: {
       return (
         <div className="modal-backdrop">
           <div className="modal-card mulligan">
-            <div className="modal-kicker">{first ? 'Você jogará primeiro' : `${state.players[state.firstPlayer].name} jogará primeiro`}</div>
-            <h2>Mão inicial</h2>
+            <div className="modal-kicker">
+              {first ? t('game.youWillPlayFirst') : t('game.willPlayFirst', { name: state.players[state.firstPlayer].name })}
+            </div>
+            <h2>{t('game.openingHand')}</h2>
             <div className="mulligan-hand">
               {state.players[human].hand.map((uid, i) => (
                 <div key={uid} className="deal" style={{ animationDelay: `${i * 70}ms` }}>
@@ -1961,13 +2122,13 @@ function Prompt(props: {
                 </div>
               ))}
             </div>
-            <p className="muted small">Toque numa carta para ler. Você pode trocar a mão uma única vez.</p>
+            <p className="muted small">{t('game.mulliganHint')}</p>
             <div className="btn-row center">
               <button className="btn primary big" onClick={() => onDispatch({ type: 'mulligan', player: human, redraw: false })}>
-                Manter mão
+                {t('game.keepHand')}
               </button>
               <button className="btn big" onClick={() => onDispatch({ type: 'mulligan', player: human, redraw: true })}>
-                Trocar mão
+                {t('game.redrawHand')}
               </button>
             </div>
           </div>
@@ -1986,13 +2147,13 @@ function Prompt(props: {
           {cancel}
           {pending.max === 0 ? (
             <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-              Continuar
+              {t('game.continue')}
             </button>
           ) : (
             <>
               {pending.min === 0 && (
                 <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-                  Não escolher
+                  {t('game.skipChoice')}
                 </button>
               )}
               <button
@@ -2000,14 +2161,14 @@ function Prompt(props: {
                 disabled={picked.length < pending.min}
                 onClick={() => onDispatch({ type: 'choose', player: human, uids: picked })}
               >
-                Confirmar {pending.max > 1 ? `(${picked.length}/${pending.max})` : ''}
+                {pending.max > 1 ? t('game.confirmCount', { n: picked.length, max: pending.max }) : t('game.confirm')}
               </button>
             </>
           )}
         </div>
       );
       const order = pending.ordered && picked.length > 0 && (
-        <p className="muted small">Ordem: {picked.map((u, i) => `${i + 1}. ${cardDef(state, u).name}`).join(' → ')}</p>
+        <p className="muted small">{t('game.order', { order: orderText(t, state, picked) })}</p>
       );
       const options = (
         <div className="prompt-options">
@@ -2021,18 +2182,18 @@ function Prompt(props: {
           <div className="modal-backdrop">
             <div className="modal-card">
               <SourceLine state={state} uid={pending.source} />
-              <h3>{pending.prompt}</h3>
+              <h3>{prompt}</h3>
               <p className="muted small">
                 {pending.max === 0
                   ? offBoard.length
-                    ? 'Toque numa carta para ler.'
-                    : 'O oponente vê a mesma escolha, havendo carta para escolher ou não.'
+                    ? t('game.tapToRead')
+                    : t('game.opponentSeesChoice')
                   : pending.ordered
-                    ? 'Toque nas cartas na ordem desejada. Segure para ler.'
+                    ? t('game.tapInOrder')
                     : pending.max === 1
-                      ? 'Toque numa carta para marcá-la (tocar em outra troca a escolha) e confirme. Segure para ler.'
-                      : 'Toque nas cartas para escolher. Segure para ler.'}
-                {blocked > 0 && ' As cartas apagadas não podem ser escolhidas.'}
+                      ? t('game.tapOneConfirm')
+                      : t('game.tapToChoose')}
+                {blocked > 0 && ` ${t('game.dimmedUnavailable')}`}
               </p>
               {options}
               {order}
@@ -2047,7 +2208,7 @@ function Prompt(props: {
       if (offBoard.length === 0) return null;
       // Mistura de alvos na mesa e fora dela: o balão mostra as cartas de fora.
       return (
-        <PromptPill title={pending.prompt} subtitle={`Toque nas cartas destacadas (${picked.length}/${pending.max}).`}>
+        <PromptPill title={prompt} subtitle={t('game.tapHighlightedCount', { n: picked.length, max: pending.max })}>
           {options}
           {order}
           {confirm}
@@ -2062,14 +2223,14 @@ function Prompt(props: {
       return null;
     case 'manual': {
       // Efeito ainda não automatizado (⚙): o jogo só avisa e segue sem aplicá-lo.
-      const text = lang === 'pt' ? translateToPt(pending.text).text : pending.text;
+      const text = locale === 'pt-BR' ? translateToPt(pending.text).text : pending.text;
       const name = cardDef(state, pending.source).name;
       return (
-        <PromptPill title={`⚙ Efeito ainda não automático: ${name}`} subtitle={`${text} (Este efeito não é aplicado.)`} clamp>
+        <PromptPill title={t('game.manualTitle', { name })} subtitle={t('game.manualSub', { text })} clamp>
           <div className="btn-row">
             {cancel}
             <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
-              Continuar
+              {t('game.continue')}
             </button>
           </div>
         </PromptPill>
@@ -2079,11 +2240,11 @@ function Prompt(props: {
       // Toda carta que sai da Vida passa por aqui, com ou sem [Trigger]: o oponente só vê que uma
       // carta da Vida está sendo olhada, e não pode saber qual dos dois casos é.
       const def = cardDef(state, pending.card);
-      const trigger = def.abilities.some((a) => a.timing === 'trigger') ? cardText(def, lang).trigger : null;
+      const trigger = def.abilities.some((a) => a.timing === 'trigger') ? cardText(def, locale).trigger : null;
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
-            <div className="modal-kicker">{trigger ? '[Trigger] revelado da Vida' : 'Carta da Vida'}</div>
+            <div className="modal-kicker">{trigger ? t('game.triggerRevealed') : t('game.lifeCard')}</div>
             <div className="modal-feature">
               <CardView state={state} uid={pending.card} />
             </div>
@@ -2091,21 +2252,21 @@ function Prompt(props: {
             {trigger ? (
               <p className="effect trigger">{trigger}</p>
             ) : (
-              <p className="muted small">Esta carta não tem [Trigger]. O oponente não sabe qual carta saiu da sua Vida.</p>
+              <p className="muted small">{t('game.noTriggerHint')}</p>
             )}
             <div className="btn-row center">
               {trigger && (
                 <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                  Ativar [Trigger]
+                  {t('game.activateTrigger')}
                 </button>
               )}
               <button className={`btn big${trigger ? '' : ' primary'}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
                 {trigger ? (
                   <>
-                    Não ativar <small>(vai para a mão)</small>
+                    {t('game.noActivate')} <small>{t('game.goesToHand')}</small>
                   </>
                 ) : (
-                  'Colocar na mão'
+                  t('game.putInHand')
                 )}
               </button>
             </div>
@@ -2114,12 +2275,23 @@ function Prompt(props: {
         </div>
       );
     }
-    case 'option':
+    case 'option': {
+      // Cartas que a pergunta mostra (ex.: o topo do deck do oponente): a carta inteira, e toque para ler.
+      // Rótulos das opções: a chave do motor (`optionKeys`), quando há; senão o texto da carta (traduzido em pt-BR).
+      const { optionKeys, optionParts } = pending as typeof pending & KeyedOptions;
       return (
         <div className="modal-backdrop">
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
-            <h3>{pending.prompt}</h3>
+            {pending.shown?.length ? (
+              <div className="modal-feature">
+                {pending.shown.map((uid) => (
+                  <CardView key={uid} state={state} uid={uid} onClick={() => props.onCard(uid)} />
+                ))}
+              </div>
+            ) : null}
+            <h3>{prompt}</h3>
+            {pending.shown?.length ? <p className="muted small">{t('game.tapCardToRead')}</p> : null}
             <div className="btn-col">
               {pending.options.map((label, index) => (
                 <button
@@ -2127,7 +2299,11 @@ function Prompt(props: {
                   className={`btn${index === 0 ? ' primary' : ''}`}
                   onClick={() => onDispatch({ type: 'option', player: human, index })}
                 >
-                  {!pending.order && !pending.don && lang === 'pt' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label) ? translateToPt(label).text : label}
+                  {(optionParts?.[index] ? listText(tryT, optionParts[index]!) : undefined) ??
+                    tryT(optionKeys?.[index]) ??
+                    (!pending.order && !pending.don && locale === 'pt-BR' && /[a-z]/.test(label) && !/[ãçéêíóú]/i.test(label)
+                      ? translateToPt(label).text
+                      : label)}
                 </button>
               ))}
             </div>
@@ -2139,6 +2315,7 @@ function Prompt(props: {
           </div>
         </div>
       );
+    }
     case 'confirm':
       // Sem como pagar o custo a pergunta abre mesmo assim (para o oponente não deduzir a mão),
       // só com "Não usar".
@@ -2146,16 +2323,16 @@ function Prompt(props: {
         <div className="modal-backdrop">
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
-            <h3>{pending.prompt}</h3>
-            {pending.cannot && <p className="muted small">O oponente vê a mesma pergunta, dando para pagar ou não.</p>}
+            <h3>{prompt}</h3>
+            {pending.cannot && <p className="muted small">{t('game.opponentSeesQuestion')}</p>}
             <div className="btn-row center">
               {!pending.cannot && (
                 <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
-                  {pending.drawUpTo ? 'Comprar 1 carta' : 'Pagar e usar'}
+                  {pending.drawUpTo ? t('game.drawOne') : t('game.payAndUse')}
                 </button>
               )}
               <button className={`btn big${pending.cannot ? ' primary' : ''}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
-                {pending.drawUpTo ? 'Parar' : 'Não usar'}
+                {pending.drawUpTo ? t('game.stop') : t('game.dontUse')}
               </button>
             </div>
             <div className="btn-row center">
@@ -2225,7 +2402,9 @@ function CardZoom(props: {
   onAttackMode: (attacker: string) => void;
 }) {
   const { state, uid, legal } = props;
-  const { lang } = useSettings();
+  const { locale } = useSettings();
+  const t = useT();
+  const tryT = useTryT();
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
   const play = legal.find((a) => a.type === 'playCard' && a.uid === uid);
@@ -2242,7 +2421,7 @@ function CardZoom(props: {
   const eventCounter = isEvent ? props.onCounter : undefined;
   const hasActions = Boolean((play && !eventPlay) || canAttack || attach || detach || (props.onCounter && !eventCounter));
   const counter = counterValue(state, uid);
-  const eventText = isEvent ? cardText(def, lang).text : '';
+  const eventText = isEvent ? cardText(def, locale).text : '';
   // Habilidades ativáveis viram painéis brilhantes (modelo Pokémon TCG Pocket): em tela larga ficam ao lado da
   // carta, ligados a ela pela borda ciano; em tela estreita, sobre a parte de baixo da carta. Com painel na tela, o
   // fundo escurece mais e as ações secundárias (DON!!) viram botões discretos para não competir.
@@ -2252,7 +2431,7 @@ function CardZoom(props: {
   return (
     <div className={['modal-backdrop', 'zoom-backdrop', hasPlates ? 'dim' : ''].join(' ')} onClick={props.onClose}>
       <div className={['zoom', hasPlates ? 'with-plates' : ''].join(' ')} onClick={(e) => e.stopPropagation()}>
-        <button className="zoom-close" onClick={props.onClose} aria-label="Fechar">
+        <button className="zoom-close" onClick={props.onClose} aria-label={t('common.close')}>
           ✕
         </button>
         <div className="zoom-card">
@@ -2264,40 +2443,43 @@ function CardZoom(props: {
               <button className="ability-plate counter" onClick={eventCounter}>
                 <div className="plate-title">
                   <span className="plate-icon">🛡</span>
-                  Usar evento [Counter]
+                  {t('game.useEventCounter')}
                   {counter > 0 && <span className="plate-chip">+{counter}</span>}
                 </div>
                 <p className="plate-text">{eventText}</p>
-                <span className="plate-tap">Toque para usar</span>
+                <span className="plate-tap">{t('game.tapToUse')}</span>
               </button>
             )}
             {eventPlay && (
               <button className="ability-plate" onClick={() => props.onDispatch(eventPlay)}>
                 <div className="plate-title">
                   <span className="plate-icon">✦</span>
-                  Usar evento
-                  <span className="plate-chip">Custo {def.cost}</span>
+                  {t('game.useEvent')}
+                  <span className="plate-chip">{t('game.costN', { n: def.cost ?? '' })}</span>
                 </div>
                 <p className="plate-text">{eventText}</p>
-                <span className="plate-tap">Toque para usar</span>
+                <span className="plate-tap">{t('game.tapToUse')}</span>
               </button>
             )}
             {activates.map((a) => {
               const ability = def.abilities[a.ability];
+              // Rótulo curto da habilidade: a chave do motor (`labelKey`), quando há; senão o título de sempre.
+              const keyed = ability as typeof ability & KeyedLabel;
+              const title = tryT(keyed.labelKey, keyed.labelParams) ?? abilityTitle(ability, locale);
               return (
                 <button key={a.ability} className="ability-plate" onClick={() => props.onDispatch(a)}>
                   <div className="plate-title">
                     <span className="plate-icon">✦</span>
-                    {abilityTitle(ability, lang)}
+                    {title}
                     {abilityCostLabel(ability).map((c) => (
                       <span key={c} className="plate-chip">
                         {c}
                       </span>
                     ))}
-                    {ability.oncePerTurn && <span className="plate-chip soft">1× por turno</span>}
+                    {ability.oncePerTurn && <span className="plate-chip soft">{t('game.oncePerTurn')}</span>}
                   </div>
-                  <p className="plate-text">{abilityText(def, a.ability, lang)}</p>
-                  <span className="plate-tap">Toque para ativar</span>
+                  <p className="plate-text">{abilityText(def, a.ability, locale)}</p>
+                  <span className="plate-tap">{t('game.tapToActivate')}</span>
                 </button>
               );
             })}
@@ -2307,34 +2489,34 @@ function CardZoom(props: {
           <div className="zoom-actions">
             {props.onCounter && !eventCounter && (
               <button className="btn primary big" onClick={props.onCounter}>
-                🛡 Usar como Counter
+                {t('game.useAsCounter')}
                 {counter > 0 && <span className="cost-chip">+{counter}</span>}
               </button>
             )}
             {/* O Counter vai para o atacado; dá também para dar o bônus a outra carta (acaba no fim da batalha). */}
             {props.onCounter && !eventCounter && Boolean(props.counterTargets?.length) && (
               <div className="counter-other">
-                <small>ou dar a</small>
-                {props.counterTargets!.map((t) => (
+                <small>{t('game.orGiveTo')}</small>
+                {props.counterTargets!.map((target) => (
                   <button
-                    key={t}
+                    key={target}
                     className="btn small quiet"
-                    onClick={() => props.onCounterTo(t)}
-                    title={`Dar o Counter a ${cardDef(state, t).name} (o bônus acaba no fim da batalha)`}
+                    onClick={() => props.onCounterTo(target)}
+                    title={t('game.giveCounterTitle', { name: cardDef(state, target).name })}
                   >
-                    {cardDef(state, t).name} <small>({getPower(state, t)})</small>
+                    {cardDef(state, target).name} <small>({getPower(state, target)})</small>
                   </button>
                 ))}
               </div>
             )}
             {play && !eventPlay && (
               <button className="btn primary big" onClick={() => props.onDispatch(play)}>
-                Jogar <span className="cost-chip">{def.cost}</span>
+                {t('game.play')} <span className="cost-chip">{def.cost}</span>
               </button>
             )}
             {canAttack && (
               <button className="btn attack big" onClick={() => props.onAttackMode(uid)}>
-                ⚔ Atacar <span className="cost-chip">{getPower(state, uid)}</span>
+                {t('game.attack')} <span className="cost-chip">{getPower(state, uid)}</span>
               </button>
             )}
             {attach && (
@@ -2342,17 +2524,17 @@ function CardZoom(props: {
                 className={hasPlates ? 'btn small quiet' : 'btn don big'}
                 onClick={() => (props.donCount > 1 ? props.onAttachDons(uid, props.donCount) : props.onDispatch(attach))}
               >
-                {props.donCount > 1 ? `Anexar ${props.donCount} DON!!` : '+ 1 DON!!'}{' '}
-                <small>({state.players[owner].donActive} ativos)</small>
+                {props.donCount > 1 ? t('game.attachDons', { n: props.donCount }) : t('game.attachOneDon')}{' '}
+                <small>{t('game.donActiveCount', { n: state.players[owner].donActive })}</small>
               </button>
             )}
             {detach && (
               <button
                 className={hasPlates ? 'btn small quiet' : 'btn don big'}
                 onClick={() => props.onDispatch(detach)}
-                title="Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (até a carta atacar ou usar um efeito)"
+                title={t('game.detachDonTitle')}
               >
-                − 1 DON!! <small>({loose === 1 ? '1 pode voltar' : `${loose} podem voltar`})</small>
+                {t('game.detachOneDon')} <small>({t('game.donCanReturn', { n: loose })})</small>
               </button>
             )}
           </div>
@@ -2371,8 +2553,9 @@ function CardZoom(props: {
 }
 
 function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
+  const t = useT();
   if (!uid) {
-    return <div className="detail empty">Passe o mouse sobre uma carta para ver os detalhes. Clique para agir.</div>;
+    return <div className="detail empty">{t('game.detailEmpty')}</div>;
   }
   const def = cardDef(state, uid);
   const loc = locate(state, uid);
@@ -2394,12 +2577,13 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
 // ------------------------------------------------------------------ folhas
 
 function SheetFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const t = useT();
   return (
     <div className="modal-backdrop sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h3>{title}</h3>
-          <button className="zoom-close static" onClick={onClose} aria-label="Fechar">
+          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>
@@ -2418,6 +2602,7 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
   const [hover, setHover] = useState<{ def: CardDef; anchor: HTMLElement } | null>(null);
   const names = useMemo(() => logCardNames(state.defs), [state.defs]);
+  const tryT = useTryT();
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
   }, [state.log.length]);
@@ -2435,7 +2620,7 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
             ].join(' ')}
           >
             <LogText
-              text={e.secret ?? e.text}
+              text={logText(tryT, e)}
               names={names}
               onCard={(name) => {
                 const def = resolveLogCard(state, names, name, e.player);

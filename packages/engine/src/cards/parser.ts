@@ -2770,7 +2770,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
       steps: attr ? steps.map((st) => ({ ...st, if: { attackerAttribute: attr, ...st.if } })) : steps,
     };
     if (h.don) ab.don = h.don;
-    if (h.oncePerTurn) ab.oncePerTurn = true;
+    if (h.oncePerTurn) ab.oncePerTurn = ab.optional = true;
     return [ab];
   }
   const act = body.match(/^This effect can be activated when (?!your opponent attacks\.)(.+?)\. (.+)$/i);
@@ -2796,7 +2796,9 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     if (!steps) return null;
     const ab: Ability = { timing: 'onOpponentAttack', steps };
     if (h.don) ab.don = h.don;
-    if (h.oncePerTurn) ab.oncePerTurn = true;
+    // "can be activated": pode ser guardado para outro ataque (Q&A OP09-001), ao contrário do
+    // [On Your Opponent's Attack] obrigatório (PRB02-004).
+    if (h.oncePerTurn) ab.oncePerTurn = ab.optional = true;
     return [ab];
   }
   // "When X, Y. Then, Z." (reação com várias frases)

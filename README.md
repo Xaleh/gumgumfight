@@ -4,7 +4,8 @@ Simulador de **One Piece Card Game** no navegador, inspirado no [Duels.ink](http
 
 > **Status:** partidas contra um bot, replays, **multiplayer online** (salas privadas, fila casual e
 > ranqueada) e **torneios** (suíço com top cut e eliminação simples, com melhor de 3 e de 5). Cartas importadas da [optcgapi.com](https://optcgapi.com/documentation),
-> com textos em português (tradução automática) ou inglês e imagens opcionais.
+> com textos em português (tradução automática) ou inglês e imagens opcionais. Interface em **seis idiomas**
+> (🇧🇷 português do Brasil, 🇬🇧 inglês, 🇪🇸 espanhol, 🇯🇵 japonês, 🇫🇷 francês e 🇩🇪 alemão), escolhidos pela bandeira.
 
 ## Requisitos
 
@@ -57,6 +58,9 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `ONLINE_BOT_ROOMS` | `on`                       | Transmitir o treino contra o bot (o servidor joga pelo bot; exige login); `off` desliga |
 | `ONLINE_MAX_ROOMS` | `400`                      | Salas online ativas ao mesmo tempo no servidor (acima disso, 503); cada sala custa memória e CPU |
 | `ONLINE_MAX_BOT_ROOMS` | `100`                  | Treinos contra o bot transmitidos ao mesmo tempo (o servidor joga pelo bot); acima disso o treino roda no navegador |
+| `PUSH`          | `on`                          | Notificações no celular (Web Push); `off` desliga e some a opção nas configurações |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | (gerado) | Par de chaves das notificações (base64url). Sem elas, o servidor gera um na primeira vez e guarda no banco |
+| `VAPID_SUBJECT` | `https://gumgumfight.app`     | Contato do servidor para os serviços de push (`mailto:` ou `https:`) |
 | `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
 | `SUPPORT_PIX_KEY` / `SUPPORT_PIX_NAME` / `SUPPORT_PIX_CITY` | (vazio) | Pix do "café": chave (de preferência aleatória), nome e cidade de quem recebe |
 | `SUPPORT_COFFEE_URL` | (vazio) | Página da doação avulsa (ex.: Ko-fi) |
@@ -351,8 +355,10 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   rodada de 32, oitavas, quartas, semifinal ou final) as partidas passam a ser melhor de 3 e melhor de 5. Ex.: melhor
   de 3 a partir das quartas e melhor de 5 na final.
 - **Inscrição:** com um deck válido no formato. A lista fica **congelada** na inscrição (mudar o deck depois não muda
-  o do torneio; inscreva-o de novo para trocar). Os outros jogadores veem só o Líder; as listas completas ficam
-  visíveis para o organizador e, quando o torneio termina, para todos.
+  o do torneio; inscreva-o de novo para trocar, só enquanto as inscrições estão abertas: depois que o torneio começa,
+  ninguém troca nem o deck nem a lista). Enquanto as inscrições estão abertas, os outros jogadores **não veem** qual
+  deck cada um inscreveu (só o organizador, um Admin e o próprio jogador); quando o torneio começa, o Líder de cada um
+  aparece para todos. As listas completas ficam visíveis para o organizador e, quando o torneio termina, para todos.
 - **Partidas:** cada jogador clica em **Jogar partida** na página do torneio; quem entra primeiro espera o oponente
   na sala online (fila `tournament`, com relógio e regras das partidas online). Numa melhor de N, cada jogo é uma
   sala: o placar da série soma sozinho, quem perdeu um jogo começa o seguinte e a tela de fim de jogo tem o botão do
@@ -383,6 +389,10 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
 
 - **No primeiro login**, os decks e o perfil de estatísticas criados naquele navegador passam para a conta. Se a conta
   já tinha perfil, as partidas do navegador vão para ele.
+- **Foto da conta**: no menu da conta, "Trocar foto" (ou o clique no avatar) envia uma imagem própria no lugar da
+  foto do Google. O navegador recorta o centro e reduz para 256×256 JPEG antes de enviar; o servidor aceita JPEG, PNG
+  ou WebP (até 256 KB, tipo conferido pelos primeiros bytes) e guarda a imagem em `users.custom_picture`. Só o
+  próprio usuário e os admins a veem (`/api/users/:id/picture`). "Usar a foto do Google" volta para a original.
 - **Sair** apaga a sessão. Os decks continuam na conta (no navegador, aparecem como "da comunidade" até entrar de novo).
 - Código: `apps/server/src/auth/` (verificação do token, sessões e rotas) e `apps/web/src/auth.tsx` (botão e estado).
 
@@ -423,6 +433,19 @@ na linha de comando):
 npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a URL de /api/cards
 ```
 
+## Aprender a jogar (tutorial)
+
+Para quem nunca jogou One Piece Card Game: **Aprender** no menu (ou o convite "Primeira vez aqui?" na home) abre a
+**Rota do Aprendiz**, com 14 lições curtas em 4 capítulos (Fundamentos, O turno, Combate e Domínio). As lições rodam
+na mesa de verdade, com cenários prontos montados pelo motor: um treinador explica cada passo, destaca as áreas da mesa
+e pede uma jogada, travando as outras até a hora certa. Há também a anatomia da carta (toque e descubra), quizzes, um
+glossário de termos e uma partida final contra o bot fácil com dicas. Não precisa de login; o progresso fica no
+navegador e é guardado também no servidor (por conta ou por navegador). Quem termina as 14 lições ganha o título
+**Aprendiz da Grand Line** (mostrado só no hub do tutorial). Fora das lições: **Dicas do treinador** nas partidas contra
+o bot (opção nas Configurações, desligada por padrão), palavras-chave clicáveis no texto das cartas e, para a
+administração, o funil anônimo das lições (onde as pessoas desistem). Detalhes e como escrever uma lição nova:
+[`docs/tutorial.md`](docs/tutorial.md).
+
 ## Como jogar
 
 - **Mulligan:** no início, mantenha ou troque a mão (uma vez).
@@ -443,6 +466,16 @@ npm run simulate:all -w @gumgum/engine -- caminho/para/cards.json 300   # ou a U
   que os decks ainda existam.
 - Em **Opções de teste** (no menu, só para o perfil Dev), a **seed** controla o embaralhamento: a mesma seed com as mesmas jogadas
   reproduz a mesma partida.
+
+### Idiomas
+
+A interface inteira (menu, mesa, construtor de decks, online, torneios, estatísticas, configurações e mensagens de erro)
+está em **português do Brasil, inglês, espanhol, japonês, francês e alemão**. A troca é pela **bandeira** 🇧🇷 🇬🇧 🇪🇸 🇯🇵 🇫🇷 🇩🇪,
+na barra superior (ou na gaveta ☰ no celular), em **⚙️ Configurações** e no menu da partida. Na primeira visita o app segue
+o idioma do navegador (desconhecido → inglês); a escolha fica guardada neste navegador.
+
+O **texto das cartas** sai traduzido só em português (tradução automática revisável, ver abaixo); nos demais idiomas aparece o
+original em inglês, como nas cartas oficiais. Nomes de cartas, DON!!, Blocker, Rush, Counter, Trigger e K.O. não se traduzem.
 
 ## Estrutura
 
@@ -590,10 +623,44 @@ carregar, sem piscar o tema claro. As cores das cartas, dos DON!! e dos dados n�
 - Nomes de cartas, tipos ({Straw Hat Crew}) e palavras-chave (Rush, Blocker, Counter, Trigger...) ficam no original,
   como nas cartas físicas.
 
+### Som
+
+O jogo tem efeitos sonoros (cartas, DON!!, ataques, dano, dados, chat e o resultado) e duas músicas originais:
+"Brisa do Leste" no menu e "Valsa do Mar" na partida. Em **⚙️ Configurações** há um volume para os efeitos e outro para a música,
+com botão de mudo, guardados no navegador. O som só começa depois do primeiro toque na página (regra dos
+navegadores) e, no iPhone, respeita a chave de silencioso. Os efeitos são CC0 (Kenney e OpenGameArt) e a música foi
+composta para o projeto: veja `apps/web/src/assets/audio/CREDITS.md`.
+
+### No celular (app instalado, tela acesa e notificações)
+
+O site é um PWA: dá para instalar na tela de início e ele abre em tela cheia, como um aplicativo, sem passar por loja.
+
+- **Instalar:** no celular, o menu inicial mostra um convite. No Chrome/Android, o botão **Instalar** abre o pedido do
+  navegador; no iPhone/iPad, o convite ensina o caminho (Compartilhar → "Adicionar à Tela de Início"). "Agora não"
+  esconde o convite por 30 dias. A opção **Instalar o app** em **⚙️ Configurações** fica sempre disponível.
+- **Tela sempre acesa** (ligada por padrão, em **⚙️ Configurações** e no menu da partida): enquanto você joga, assiste
+  ou vê um replay, a tela do celular não apaga (Wake Lock). No menu, a tela apaga normalmente.
+- **Notificações** (desligadas por padrão; só ligam quando a pessoa ativa em **⚙️ Configurações** e aceita o pedido
+  do navegador): avisos no celular com o app em segundo plano ou fechado. Dá para escolher os tipos:
+  - **Partidas online:** o oponente entrou na sala que você criou (ou a fila encontrou uma partida) e chegou a sua vez
+    (no máximo um aviso a cada 30 s). O app conta ao servidor quando sai da tela; com ele na tela, nada é enviado.
+  - **Torneios:** check-in aberto (para quem ainda não confirmou), rodada nova (com o oponente e o prazo de
+    tolerância, ou o aviso de bye) e oponente esperando você na sala.
+
+  Tocar no aviso abre o app direto na partida ou na página do torneio. Desligar cancela a inscrição deste navegador no
+  servidor. No iPhone/iPad, as notificações só funcionam com o app instalado na tela de início (iOS 16.4 ou mais novo).
+  Os textos saem no idioma escolhido no app.
+
+O service worker (`/sw.js`, gerado a partir de `apps/web/src/service-worker.js` pelo plugin em `vite.config.ts`)
+guarda a casca do app para abrir rápido e sem internet (a página sempre é buscada primeiro na rede, então um deploy
+aparece na hora) e mostra as notificações. As notificações não dependem de serviço pago: o servidor assina e cifra
+cada mensagem (VAPID e RFC 8291, em `apps/server/src/push/`) e a entrega ao serviço de push do navegador (Google,
+Mozilla, Microsoft ou Apple). As chaves nascem sozinhas no banco; não há nada para configurar no deploy.
+
 ## Testes
 
 ```bash
-npm test                                   # regras, tradução, importador, API e 200 partidas bot x bot
+npm test                                   # regras, tradução, importador, API, 200 partidas bot x bot e as lições do tutorial
 npm run simulate -w @gumgum/engine -- 500  # estatísticas de N partidas bot x bot
 npm run typecheck
 ```
@@ -603,10 +670,13 @@ npm run typecheck
 | Método | Rota               | Descrição                                   |
 |--------|--------------------|---------------------------------------------|
 | GET    | `/api/health`      | Verificação de saúde                        |
-| GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google) |
+| GET    | `/api/config`      | Configurações públicas (imagens ligadas? Client ID do Google, chave pública das notificações) |
+| PUT    | `/api/push/subscription` | Liga as notificações deste navegador (`{ subscription, locale, matches, tournaments }`; repetir atualiza) |
+| DELETE | `/api/push/subscription` | Desliga (`{ endpoint }`) |
 | GET    | `/api/auth/me`     | Usuário logado (`{ user }` com `role`; `null` sem sessão) |
 | GET    | `/api/admin/users?q=` | Contas e perfis (só Admin)               |
 | PUT    | `/api/admin/users/:id/role` | Muda o perfil (`{ role: player \| streamer \| organizer \| admin \| dev }`; só Admin; a si mesmo, só para `dev`) |
+| GET    | `/api/admin/tutorial?days=` | Funil anônimo das lições do tutorial (só Admin; padrão 30 dias) |
 | POST   | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie |
 | POST   | `/api/auth/logout` | Sai (apaga a sessão)                        |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
@@ -618,7 +688,10 @@ npm run typecheck
 | DELETE | `/api/decks/:id`   | Apaga um deck do jogador                    |
 | POST   | `/api/matches`     | Envia o replay de uma partida (verificado pelo servidor) |
 | GET    | `/api/matches`     | Últimas partidas                            |
-| GET    | `/api/players/me`  | Perfil do jogador: conta ou navegador (nome, recompensa, tier) |
+| GET    | `/api/players/me`  | Perfil do jogador: conta ou navegador (nome, recompensa, tier, `apprentice`) |
+| GET    | `/api/tutorial/progress` | Progresso do tutorial da conta ou do navegador (`{ done, dismissed, apprentice }`) |
+| PUT    | `/api/tutorial/progress` | Soma lições feitas (`{ done, dismissed, completed, reset? }`) |
+| POST   | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event: start \| step \| fail \| exit \| complete }`) |
 | PUT    | `/api/players/me`  | Troca o nome (`{ name }`)                   |
 | GET    | `/api/stats/meta`  | Opções dos filtros: formatos, filas, tiers, Líderes |
 | GET    | `/api/stats`       | Totais, Líderes e matchups (filtros na query) |
@@ -633,6 +706,7 @@ npm run typecheck
 | GET    | `/api/online/rooms/:id/events?t=` | Canal SSE: visão do jogador, relógios, presença, emotes e chat |
 | POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
 | POST   | `/api/online/rooms/:id/emote` · `/chat` · `/rematch` · `/leave` | Emote, mensagem do chat (`{ t, text }`, até 120 caracteres, censurada), revanche (salas privadas) e cancelar a sala |
+| POST   | `/api/online/rooms/:id/focus` | O app do jogador saiu da tela ou voltou (`{ t, visible }`): fora da tela, a vez vira notificação |
 | GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim) |
 | POST   | `/api/online/bot` | Treino contra o bot transmitido, só com login (`{ deckId, botDeckId \| random, format, first? }`, `first`: 0 = jogador, 1 = bot, ausente = sorteio; 401 sem login; desligado com `ONLINE_BOT_ROOMS=off`) |
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |

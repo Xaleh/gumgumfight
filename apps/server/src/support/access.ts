@@ -9,6 +9,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { emailVerified, isAdmin, type User } from '../auth/store';
 import type { AccessOptions } from '../config';
 import type { DB } from '../db';
+import { fail } from '../errors';
 import { atLeast, isSupporterTier, type SupporterTier } from './tiers';
 
 /** Plano mínimo para entrar. */
@@ -77,6 +78,6 @@ export function registerAccessGate(app: FastifyInstance, { db, user, access, fet
     const path = req.url.split('?')[0];
     if (!path.startsWith('/api/') || OPEN_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith('/') ? p : `${p}/`))) return;
     const { allowed } = await check(req);
-    if (!allowed) return reply.code(403).send({ error: 'Este ambiente é só para apoiadores Tripulante ou acima.', code: 'supporters-only' });
+    if (!allowed) return reply.code(403).send({ ...fail('supportersOnly', 'Este ambiente é só para apoiadores Tripulante ou acima.'), code: 'supporters-only' });
   });
 }

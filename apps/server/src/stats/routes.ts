@@ -5,9 +5,11 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { seesProStats, type User } from '../auth/store';
 import { ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
+import { fail } from '../errors';
 import type { ApiCard } from '../present';
 import { FORMATS, type FormatId, isFormat, isQueue, isTier, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
 import { deriveMatch } from './derive';
+import { isApprentice } from '../tutorial/store';
 import {
   cardStats,
   findPlayer,
@@ -57,7 +59,7 @@ export interface MatchBody {
 
 type Query = Record<string, string | undefined>;
 
-const profile = (p: Player) => ({ ...p, tier: tierFor(p.bounty).id });
+const profileOf = (p: Player) => ({ ...p, tier: tierFor(p.bounty).id });
 
 function parseDeck(v: unknown): DeckList | null {
   const d = v as Partial<DeckList> | null;
@@ -138,15 +140,15 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
   app.get('/api/players/me', async (req) => {
     const owner = viewerHash(req);
     const p = owner ? findPlayer(db, owner) : null;
-    return p ? profile(p) : null;
+    return p ? { ...profileOf(p), apprentice: isApprentice(db, owner!) } : null;
   });
 
   app.put<{ Body: { name?: unknown } }>('/api/players/me', async (req, reply) => {
     const owner = viewerHash(req);
-    if (!owner) return reply.code(400).send({ error: 'Navegador sem código de dono (header x-deck-owner).' });
+    if (!owner) return reply.code(400).send(fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).'));
     const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ').slice(0, 24) : '';
-    if (name.length < 2) return reply.code(400).send({ error: 'O nome precisa de pelo menos 2 letras.' });
-    return profile(renamePlayer(db, owner, name));
+    if (name.length < 2) return reply.code(400).send(fail('nameTooShort', 'O nome precisa de pelo menos 2 letras.'));
+    return { ...profileOf(renamePlayer(db, owner, name)), apprentice: isApprentice(db, owner) };
   });
 
   /** Opções dos filtros: formatos, filas, tiers, Líderes com partidas e o perfil do jogador. */
@@ -167,7 +169,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
         queues: QUEUES,
         tiers: TIERS,
         leaders,
-        me: me ? profile(me) : null,
+        me: me ? profileOf(me) : null,
         myDecks: decks,
         cards: cardInfo([...leaders.map((l) => l.leader), ...decks.map((d) => d.leader)]),
       };
@@ -254,7 +256,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
 
   /** Cartas de um Líder (ou de uma lista): efetividade no deck, na mão inicial, compradas e jogadas. */
   app.get<{ Querystring: Query }>('/api/stats/cards', async (req, reply) => {
-    if (!req.query.leader && !req.query.deck) return reply.code(400).send({ error: 'Escolha um Líder ou uma lista.' });
+    if (!req.query.leader && !req.query.deck) return reply.code(400).send(fail('chooseLeaderOrList', 'Escolha um Líder ou uma lista.'));
     return cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
       const f = parseFilter(req);
       const rows = cardStats(db, f);

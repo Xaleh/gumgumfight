@@ -16,7 +16,8 @@ const dataCards = (set: string) => (JSON.parse(readFileSync(join(__dirname, '../
 const st12Cards = dataCards('st12');
 const st36Cards = dataCards('st36');
 const op01Arlong = dataCards('op01').filter((c) => c.id === 'OP01-063');
-const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards];
+const op09Shanks = dataCards('st23').filter((c) => c.id === 'OP09-001');
+const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards, ...op09Shanks];
 
 const deck = (leader: string): DeckList => ({ id: leader, name: leader, leader, cards: [{ id: 'ST01-006', count: 50 }] });
 
@@ -156,6 +157,46 @@ describe('Trello: Kaido OP17-058 [On Your Opponent\'s Attack] [Once Per Turn] DO
     expect(s.pending?.kind).not.toBe('confirm');
     s = noDefense(s);
     expect(s.players[0].donDeck).toBe(8);
+  });
+});
+
+describe("Líder Shanks OP09-001: [Once Per Turn] \"can be activated when your opponent attacks\" pode ser guardado (Q&A OP03)", () => {
+  /** Turno 4 (do oponente, jogador 1) com dois Personagens prontos para atacar o Líder Shanks. */
+  function opponentTurn() {
+    const s = toTurn(game(['OP09-001', 'ST02-001']), 4);
+    setDon(s, 1, 4);
+    const a = field(s, 1, 'ST01-003');
+    const b = field(s, 1, 'ST01-004');
+    return { s, a, b };
+  }
+  const attack = (s: GameState, attacker: string) =>
+    applyAction(s, { type: 'attack', player: 1, attacker, target: s.players[0].leader.uid });
+
+  it('recusar no primeiro ataque não gasta o uso: o segundo ataque pergunta de novo e aplica o −1000', () => {
+    let { s, a, b } = opponentTurn();
+    s = attack(s, a);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = noDefense(applyAction(s, { type: 'answer', player: 0, yes: false }));
+    expect(s.battle).toBeNull();
+
+    const base = getPower(s, b);
+    s = attack(s, b);
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [b] });
+    expect(getPower(s, b)).toBe(base - 1000);
+  });
+
+  it('depois de usar uma vez, o ataque seguinte no mesmo turno não pergunta mais', () => {
+    let { s, a, b } = opponentTurn();
+    s = attack(s, a);
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [a] });
+    s = noDefense(s);
+    expect(s.battle).toBeNull();
+    s = attack(s, b);
+    expect(s.pending?.kind).not.toBe('confirm');
   });
 });
 

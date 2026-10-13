@@ -14,8 +14,9 @@ import type { FastifyRequest } from 'fastify';
 import { existsSync } from 'node:fs';
 import { type GoogleKeys, googleKeyStore } from './auth/google';
 import { registerAuth } from './auth/routes';
-import { accountOwnerKey } from './auth/store';
+import { accountOwnerKey, isAdmin, type User } from './auth/store';
 import { type ServerOptions, serverOptions } from './config';
+import { fail, isPlayerError, type PlayerError } from './errors';
 import {
   type DB,
   deleteDeck,
@@ -25,6 +26,7 @@ import {
   listCards,
   listDecks,
   recentMatches,
+  renameDeck,
   type StoredDeck,
   upsertDeck,
 } from './db';
@@ -32,11 +34,14 @@ import { WEB_DIST } from './paths';
 import { type ApiCard, presentCards } from './present';
 import type { LobbyLimits } from './online/lobby';
 import { registerOnlineRoutes } from './online/routes';
+import { type PushSender, registerPushRoutes } from './push/routes';
+import { vapidKeys } from './push/store';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
 import { registerAccessGate } from './support/access';
-import { registerSupportRoutes, supportEnabled } from './support/routes';
+import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
+import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
 
 /** Objeto sem as chaves `undefined` (para não sobrescrever os padrões num spread). */
@@ -55,11 +60,15 @@ export function buildApp(
     onlineLimits?: Partial<LobbyLimits>;
     /** Testes: fetch usado na consulta do plano à produção (ACCESS=supporters). */
     fetchImpl?: typeof fetch;
+    /** Testes: envio das notificações (sem ele, vai para o serviço de push de verdade). */
+    pushSend?: PushSender;
   } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
   const server = opts.server ?? serverOptions;
+  // Notificações: as chaves VAPID nascem no banco na primeira vez (ou vêm do ambiente).
+  const pushKeys = server.push === false ? null : vapidKeys(db, server.vapidKeys);
   const present = (cards: ApiCard[]) =>
     presentCards(cards, getTranslations(db, 'pt', cards.length > 200 ? undefined : cards.map((c) => c.id)), server);
 
@@ -73,13 +82,15 @@ export function buildApp(
     support: supportEnabled(server.support),
     /** supporters: o site só abre para apoiadores (homologação). */
     access: server.access?.mode ?? 'open',
+    /** Chave pública VAPID para o navegador se inscrever nas notificações (null = desligadas). */
+    pushKey: pushKeys?.publicKey ?? null,
   }));
 
   app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => present(listCards(db, req.query.set)));
 
   app.get<{ Params: { id: string } }>('/api/cards/:id', async (req, reply) => {
     const [card] = present(getCards(db, [req.params.id]));
-    return card ?? reply.code(404).send({ error: 'Carta não encontrada' });
+    return card ?? reply.code(404).send(fail('cardNotFound', 'Carta não encontrada'));
   });
 
   /**
@@ -120,12 +131,15 @@ export function buildApp(
     if (typeof token !== 'string' || token.length < 16 || token.length > 128) return null;
     return createHash('sha256').update(token).digest('hex');
   };
+  /** Tarefas depois do login (as rotas de apoio põem aqui a consulta à Apoia.se). */
+  const afterLogin: Array<(user: User) => Promise<void>> = [];
   const auth = registerAuth(app, {
     db,
     clientId: server.googleClientId ?? null,
     keys: opts.googleKeys ?? googleKeyStore(),
     browserHash,
     adminEmails: server.adminEmails,
+    afterLogin,
   });
   // Homologação só para apoiadores (ACCESS=supporters): antes de todas as outras rotas.
   registerAccessGate(app, { db, user: auth.viewer, access: server.access ?? { mode: 'open' }, fetchImpl: opts.fetchImpl, now: opts.now });
@@ -138,6 +152,15 @@ export function buildApp(
     const user = auth.viewer(req);
     return user ? accountOwnerKey(user.id) : browserHash(req);
   };
+  const notifier = registerPushRoutes(app, {
+    db,
+    browserHash,
+    user: auth.viewer,
+    keys: pushKeys,
+    subject: server.vapidSubject ?? 'https://gumgumfight.app',
+    send: opts.pushSend,
+    log: (msg) => app.log.warn(msg),
+  });
   const isMine = (deck: StoredDeck, viewer: string | null) =>
     deck.kind === 'user' && deck.ownerHash !== null && deck.ownerHash === viewer;
   const publicDeck = ({ ownerHash: _hidden, ...deck }: StoredDeck) => deck;
@@ -146,6 +169,7 @@ export function buildApp(
   const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null) => {
     const report = validateDeck(deck, cards);
     const leader = cards.get(deck.leader);
+    const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id)] as const);
     return {
       id: deck.id,
       name: deck.name,
@@ -158,9 +182,11 @@ export function buildApp(
       valid: report.valid,
       errors: report.issues.filter((i) => i.level === 'error').map((i) => i.message),
       /** Por formato: o que impede o deck de ser usado nele (vazio = permitido). */
-      formats: Object.fromEntries(FORMATS.map((f) => [f.id, formatIssues(deck, f.id).map((i) => i.message)])) as Record<
+      formats: Object.fromEntries(byFormat.map(([id, issues]) => [id, issues.map((i) => i.message)])) as Record<FormatId, string[]>,
+      /** Os mesmos motivos, na mesma ordem, com a chave de tradução (`rules.…`) e os parâmetros. */
+      formatCodes: Object.fromEntries(byFormat.map(([id, issues]) => [id, issues.map(({ code, params }) => ({ code, params }))])) as Record<
         FormatId,
-        string[]
+        Array<{ code: string; params: Record<string, string | number> }>
       >,
       unscripted: report.unscripted.length,
       updatedAt: deck.updatedAt,
@@ -185,23 +211,23 @@ export function buildApp(
   /** Deck + definições de todas as cartas usadas (o que o cliente precisa para jogar). */
   app.get<{ Params: { id: string } }>('/api/decks/:id', async (req, reply) => {
     const deck = getDeck(db, req.params.id);
-    if (!deck) return reply.code(404).send({ error: 'Deck não encontrado' });
+    if (!deck) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
     const cards = present(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]));
     const summary = summarize(deck, new Map(cards.map((c) => [c.id, c])), viewerHash(req));
     return { deck: { ...publicDeck(deck), mine: summary.mine }, cards, summary };
   });
 
   type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown };
-  const parseDeckBody = (b: DeckBody | undefined): Omit<DeckList, 'id'> | string => {
-    if (!b || typeof b !== 'object') return 'Corpo inválido.';
+  const parseDeckBody = (b: DeckBody | undefined): Omit<DeckList, 'id'> | PlayerError => {
+    if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
     const name = typeof b.name === 'string' ? b.name.trim().slice(0, 60) : '';
-    if (!name) return 'Dê um nome ao deck.';
+    if (!name) return fail('deckNameRequired', 'Dê um nome ao deck.');
     const leader = typeof b.leader === 'string' ? b.leader.trim().toUpperCase() : '';
-    if (!Array.isArray(b.cards) || b.cards.length > 60) return 'Lista de cartas inválida.';
+    if (!Array.isArray(b.cards) || b.cards.length > 60) return fail('invalidCardList', 'Lista de cartas inválida.');
     const cards: DeckList['cards'] = [];
     for (const c of b.cards as Array<{ id?: unknown; count?: unknown }>) {
       if (typeof c?.id !== 'string' || !Number.isInteger(c.count) || (c.count as number) < 1 || (c.count as number) > 50) {
-        return 'Lista de cartas inválida.';
+        return fail('invalidCardList', 'Lista de cartas inválida.');
       }
       cards.push({ id: c.id.trim().toUpperCase(), count: c.count as number });
     }
@@ -211,9 +237,9 @@ export function buildApp(
   // Decks incompletos podem ser salvos (rascunho); só decks válidos aparecem para jogar.
   app.post<{ Body: DeckBody }>('/api/decks', async (req, reply) => {
     const owner = viewerHash(req);
-    if (!owner) return reply.code(400).send({ error: 'Navegador sem código de dono (header x-deck-owner).' });
+    if (!owner) return reply.code(400).send(fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).'));
     const parsed = parseDeckBody(req.body);
-    if (typeof parsed === 'string') return reply.code(400).send({ error: parsed });
+    if (isPlayerError(parsed)) return reply.code(400).send(parsed);
     const deck = { id: `u-${randomUUID().slice(0, 8)}`, ...parsed };
     upsertDeck(db, deck, 'user', owner);
     const stored = getDeck(db, deck.id)!;
@@ -222,25 +248,41 @@ export function buildApp(
 
   app.put<{ Params: { id: string }; Body: DeckBody }>('/api/decks/:id', async (req, reply) => {
     const existing = getDeck(db, req.params.id);
-    if (!existing) return reply.code(404).send({ error: 'Deck não encontrado' });
-    if (existing.kind !== 'user') return reply.code(403).send({ error: 'Decks prontos não podem ser alterados; duplique-o.' });
+    if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
+    if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckReadOnly', 'Decks prontos não podem ser alterados; duplique-o.'));
     const viewer = viewerHash(req);
     if (!isMine(existing, viewer)) {
-      return reply.code(403).send({ error: 'Este deck pertence a outro jogador; duplique-o para editar.' });
+      return reply.code(403).send(fail('deckNotMineEdit', 'Este deck pertence a outro jogador; duplique-o para editar.'));
     }
     const parsed = parseDeckBody(req.body);
-    if (typeof parsed === 'string') return reply.code(400).send({ error: parsed });
+    if (isPlayerError(parsed)) return reply.code(400).send(parsed);
     upsertDeck(db, { id: existing.id, ...parsed }, 'user');
+    const stored = getDeck(db, existing.id)!;
+    return summarize(stored, cardsFor([stored]), viewer);
+  });
+
+  /** Só o nome: o dono ou um admin/dev (que corrige o nome de decks de outros jogadores). */
+  app.put<{ Params: { id: string }; Body: { name?: unknown } }>('/api/decks/:id/name', async (req, reply) => {
+    const existing = getDeck(db, req.params.id);
+    if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
+    if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckReadOnly', 'Decks prontos não podem ser alterados; duplique-o.'));
+    const viewer = viewerHash(req);
+    if (!isMine(existing, viewer) && !isAdmin(auth.viewer(req)?.role)) {
+      return reply.code(403).send(fail('deckNotMineEdit', 'Este deck pertence a outro jogador; duplique-o para editar.'));
+    }
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 60) : '';
+    if (!name) return reply.code(400).send(fail('deckNameRequired', 'Dê um nome ao deck.'));
+    renameDeck(db, existing.id, name);
     const stored = getDeck(db, existing.id)!;
     return summarize(stored, cardsFor([stored]), viewer);
   });
 
   app.delete<{ Params: { id: string } }>('/api/decks/:id', async (req, reply) => {
     const existing = getDeck(db, req.params.id);
-    if (!existing) return reply.code(404).send({ error: 'Deck não encontrado' });
-    if (existing.kind !== 'user') return reply.code(403).send({ error: 'Decks prontos não podem ser apagados.' });
+    if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
+    if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckNoDelete', 'Decks prontos não podem ser apagados.'));
     if (!isMine(existing, viewerHash(req))) {
-      return reply.code(403).send({ error: 'Este deck pertence a outro jogador.' });
+      return reply.code(403).send(fail('deckNotMine', 'Este deck pertence a outro jogador.'));
     }
     deleteDeck(db, existing.id);
     return reply.code(204).send();
@@ -258,14 +300,24 @@ export function buildApp(
     botDelayMs: opts.botDelayMs,
     limits: { ...stripUndefined(server.onlineLimits ?? {}), ...opts.onlineLimits },
     onTournamentGame: (game) => reportFromGame(db, game),
+    notifier,
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
-  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined });
+  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined, notifier });
 
   registerReportRoutes(app, { db, user: auth.viewer });
-  registerSupportRoutes(app, { db, user: auth.viewer, options: server.support ?? {} });
+  registerSupportRoutes(app, {
+    db,
+    user: auth.viewer,
+    options: server.support ?? {},
+    afterLogin,
+    fetchImpl: opts.fetchImpl,
+    now: opts.now,
+    syncHours: opts.now ? 0 : apoiaseSyncHours(),
+  });
+  registerTutorialRoutes(app, { db, viewerHash, user: auth.viewer, now: opts.now });
 
   app.get('/api/matches', async () => recentMatches(db));
 
@@ -280,7 +332,7 @@ export function buildApp(
       },
     });
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') ? reply.code(404).send({ error: 'Não encontrado' }) : reply.sendFile('index.html'),
+      req.url.startsWith('/api/') ? reply.code(404).send(fail('notFound', 'Não encontrado')) : reply.sendFile('index.html'),
     );
   }
 

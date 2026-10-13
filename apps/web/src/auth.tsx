@@ -3,6 +3,7 @@
 
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api, type AppConfig, type User } from './api';
+import { useLocale } from './i18n';
 
 interface GsiButtonOptions {
   theme?: 'outline' | 'filled_blue' | 'filled_black';
@@ -63,6 +64,8 @@ interface AuthCtx {
   signOut: () => Promise<void>;
   /** Relê a sessão no servidor (ex.: depois de mudar o próprio perfil). */
   refresh: () => Promise<void>;
+  /** Troca a foto da conta (data URL) ou, com null, volta para a do Google. Lança o erro do servidor. */
+  changePicture: (image: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx | null>(null);
@@ -118,6 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(me.user);
   };
 
+  const changePicture = async (image: string | null) => {
+    const r = image ? await api.setPicture(image) : await api.removePicture();
+    setUser(r.user);
+  };
+
   const signOut = async () => {
     await api.logout().catch(() => undefined);
     window.google?.accounts.id.disableAutoSelect();
@@ -126,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ready, user, clientId, config, notice, error, signIn, signOut, refresh }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ ready, user, clientId, config, notice, error, signIn, signOut, refresh, changePicture }}>{children}</AuthContext.Provider>
   );
 }
 
@@ -138,6 +146,7 @@ export function useAuth(): AuthCtx {
 
 /** Botão oficial "Fazer login com o Google". */
 export function GoogleButton({ clientId, onCredential }: { clientId: string; onCredential: (c: string) => void }) {
+  const locale = useLocale();
   const box = useRef<HTMLDivElement>(null);
   const handler = useRef(onCredential);
   handler.current = onCredential;
@@ -154,7 +163,7 @@ export function GoogleButton({ clientId, onCredential }: { clientId: string; onC
           size: 'large',
           text: 'signin_with',
           shape: 'pill',
-          locale: 'pt-BR',
+          locale,
           width: Math.min(320, box.current.clientWidth || 320),
         });
       })
@@ -162,7 +171,7 @@ export function GoogleButton({ clientId, onCredential }: { clientId: string; onC
     return () => {
       cancelled = true;
     };
-  }, [clientId]);
+  }, [clientId, locale]);
 
   return failed ? <div className="muted small">{failed}</div> : <div ref={box} className="google-btn" />;
 }

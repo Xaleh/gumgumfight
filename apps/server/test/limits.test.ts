@@ -28,6 +28,7 @@ describe('tetos de salas', () => {
     const third = await createRoom(app, 3);
     expect(third.statusCode).toBe(429);
     expect(third.json().error).toMatch(/sua rede/);
+    expect(third.json().errorCode).toBe('tooManyRoomsFromIp');
     expect((await createRoom(app, 4, '10.0.0.2')).statusCode).toBe(201);
     // Entrar na fila também ocupa um lugar do IP.
     const q = await app.inject({ method: 'POST', url: '/api/online/queue', headers: owner(5), payload: { deckId: 'st01-luffy', format: 'egb', queue: 'casual' }, remoteAddress: '10.0.0.1' });

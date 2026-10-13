@@ -25,7 +25,16 @@ export interface ServerOptions {
    * login; os padrões estão em online/lobby.ts (DEFAULT_LIMITS).
    */
   onlineLimits?: { maxRooms?: number; maxBotRooms?: number };
-  /** Apoio ao projeto (Pix, Ko-fi, meta do mês). Sem nada configurado, o item "Apoiar" some do site. */
+  /**
+   * PUSH: notificações no celular (Web Push). "off" desliga: some a opção nas
+   * configurações do app. As chaves VAPID são geradas na primeira vez e guardadas no
+   * banco; VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY (base64url) fixam outras.
+   */
+  push?: boolean;
+  vapidKeys?: { publicKey?: string | null; privateKey?: string | null };
+  /** VAPID_SUBJECT: contato do servidor para os serviços de push (mailto: ou https:). */
+  vapidSubject?: string;
+  /** Apoio ao projeto (Pix, Apoia.se, meta do mês). Sem nada configurado, o item "Apoiar" some do site. */
   support?: SupportOptions;
   /**
    * ACCESS=supporters: o site só abre para apoiadores Tripulante ou acima (e admins).
@@ -39,14 +48,22 @@ export interface SupportOptions {
   pixKey?: string | null;
   pixName?: string | null;
   pixCity?: string | null;
-  /** SUPPORT_COFFEE_URL: página do "café" (doação avulsa). */
+  /** SUPPORT_COFFEE_URL: página de doação avulsa com cartão (opcional; o "Cafezim" é o Pix). */
   coffeeUrl?: string | null;
-  /** SUPPORT_MONTHLY_URL: página dos planos mensais. */
+  /** SUPPORT_MONTHLY_URL: página dos planos mensais (a campanha na Apoia.se). */
   monthlyUrl?: string | null;
   /** SUPPORT_GOAL_BRL: custo mensal do site (VPS + domínios), mostrado como meta. */
   goalBrl?: number | null;
   /** SUPPORT_CONTACT_URL: contato para lojas que querem patrocinar (mailto: ou link). */
   contactUrl?: string | null;
+  /**
+   * APOIASE_API_KEY / APOIASE_API_SECRET: chave e segredo da API pública da Apoia.se (pedidos
+   * na Central de Ajuda deles). Com os dois, o plano mensal vem da Apoia.se pelo e-mail da conta.
+   */
+  apoiaseKey?: string | null;
+  apoiaseSecret?: string | null;
+  /** APOIASE_API_URL: endereço da API (padrão https://api.apoia.se). */
+  apoiaseUrl?: string | null;
   /** KOFI_WEBHOOK_TOKEN: token de verificação do webhook do Ko-fi (sem ele, o webhook fica desligado). */
   kofiToken?: string | null;
   /** INTERNAL_TOKEN: token da consulta de plano feita pela homologação (sem ele, a consulta fica desligada). */
@@ -92,6 +109,9 @@ export function supportOptions(env = process.env): SupportOptions {
     monthlyUrl: link(env.SUPPORT_MONTHLY_URL),
     goalBrl: money(env.SUPPORT_GOAL_BRL),
     contactUrl: link(env.SUPPORT_CONTACT_URL),
+    apoiaseKey: text(env.APOIASE_API_KEY),
+    apoiaseSecret: text(env.APOIASE_API_SECRET),
+    apoiaseUrl: link(env.APOIASE_API_URL)?.replace(/\/+$/, '') ?? 'https://api.apoia.se',
     kofiToken: text(env.KOFI_WEBHOOK_TOKEN),
     internalToken: text(env.INTERNAL_TOKEN),
   };
@@ -113,6 +133,9 @@ export const serverOptions: ServerOptions = {
   onlineLimits: { maxRooms: positiveInt(process.env.ONLINE_MAX_ROOMS), maxBotRooms: positiveInt(process.env.ONLINE_MAX_BOT_ROOMS) },
   support: supportOptions(),
   access: accessOptions(),
+  push: !off(process.env.PUSH),
+  vapidKeys: { publicKey: process.env.VAPID_PUBLIC_KEY?.trim() || null, privateKey: process.env.VAPID_PRIVATE_KEY?.trim() || null },
+  vapidSubject: process.env.VAPID_SUBJECT?.trim() || undefined,
 };
 
 /**

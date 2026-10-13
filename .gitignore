@@ -8,3 +8,6 @@ dist/
 .DS_Store
 test-results/
 release/
+
+# worktrees temporários dos agentes
+.claude/worktrees/

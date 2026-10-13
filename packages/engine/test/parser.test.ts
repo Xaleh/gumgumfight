@@ -12,7 +12,7 @@ const canonical = (v: unknown): unknown =>
       : v;
 
 /** Remove o que é só apresentação (rótulos) para comparar a lógica. */
-const logic = (abilities: Ability[]) => canonical(abilities.map(({ label: _l, text: _t, ...rest }) => rest));
+const logic = (abilities: Ability[]) => canonical(abilities.map(({ label: _l, labelKey: _k, labelParams: _p, text: _t, ...rest }) => rest));
 
 describe('leitor automático de efeitos', () => {
   it('reproduz os scripts escritos à mão dos starter decks ST01–ST05', () => {

@@ -2,8 +2,9 @@
 // Usa o SQLite embutido no Node (`node:sqlite`): nenhum módulo nativo para
 // compilar ou baixar, então funciona igual no Windows, Linux e macOS.
 // Toda a SQL fica aqui, em stats/store.ts (consultas das estatísticas), em
-// auth/store.ts (contas e sessões) e em tournaments/store.ts (torneios); se um dia
-// for preciso migrar para Postgres, só esses arquivos mudam.
+// auth/store.ts (contas e sessões), em tournaments/store.ts (torneios) e em
+// push/store.ts (notificações); se um dia for preciso migrar para Postgres, só esses
+// arquivos mudam.
 
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -89,9 +90,11 @@ function migrate(db: DB) {
   if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
   migrateStats(db);
   migrateAuth(db);
+  migratePush(db);
   migrateTournaments(db);
   migrateCardIds(db);
   migrateSupport(db);
+  migrateTutorial(db);
 }
 
 /**
@@ -281,6 +284,8 @@ function migrateTournaments(db: DB) {
   if (!tCols.includes('round_wo')) db.exec('ALTER TABLE tournaments ADD COLUMN round_wo INTEGER NOT NULL DEFAULT 0');
   // tolerance_min: minutos para entrar na sala em cada rodada (escolha do organizador).
   if (!tCols.includes('tolerance_min')) db.exec('ALTER TABLE tournaments ADD COLUMN tolerance_min INTEGER NOT NULL DEFAULT 5');
+  // checkin_notice: hora de início (starts_at) cujo aviso de check-in já foi enviado por notificação.
+  if (!tCols.includes('checkin_notice')) db.exec('ALTER TABLE tournaments ADD COLUMN checkin_notice TEXT');
   const pCols = (db.prepare('PRAGMA table_info(tournament_players)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!pCols.includes('checked_in_at')) db.exec('ALTER TABLE tournament_players ADD COLUMN checked_in_at TEXT');
   const mCols = (db.prepare('PRAGMA table_info(tournament_matches)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
@@ -319,6 +324,32 @@ function migrateTournaments(db: DB) {
   `);
 }
 
+/**
+ * Tutorial "Aprender a jogar": o progresso de cada dono (conta `user:<id>` ou navegador, a mesma
+ * chave das estatísticas) e as contagens anônimas de eventos das lições (sem dono, sem IP: só
+ * lição, passo, evento e dia), para ver onde as pessoas desistem.
+ */
+function migrateTutorial(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tutorial_progress (
+      owner_hash   TEXT PRIMARY KEY,
+      done         TEXT NOT NULL DEFAULT '[]',  -- JSON: ids das lições concluídas
+      dismissed    INTEGER NOT NULL DEFAULT 0,  -- "Já sei jogar": sem convite na home
+      completed_at TEXT,                        -- concluiu a Rota inteira (título)
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tutorial_events (
+      day    TEXT NOT NULL,                     -- AAAA-MM-DD (UTC)
+      lesson TEXT NOT NULL,
+      step   TEXT NOT NULL,                     -- '' para eventos da lição inteira
+      event  TEXT NOT NULL,                     -- start | step | fail | exit | complete
+      count  INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, lesson, step, event)
+    );
+  `);
+}
+
 /** Contas (login com Google) e sessões abertas. Do token de sessão só o hash é guardado. */
 function migrateAuth(db: DB) {
   db.exec(`
@@ -343,6 +374,43 @@ function migrateAuth(db: DB) {
   // Perfil da conta: player (padrão), streamer (assiste vendo as mãos), organizer (torneios) ou admin.
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!userCols.includes('role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'player'");
+  // Foto escolhida pelo próprio usuário (no lugar da foto do Google): a imagem, o tipo e a versão (ms).
+  if (!userCols.includes('custom_picture')) {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN custom_picture BLOB;
+      ALTER TABLE users ADD COLUMN custom_picture_type TEXT;
+      ALTER TABLE users ADD COLUMN custom_picture_at INTEGER;
+    `);
+  }
+}
+
+/**
+ * Notificações (Web Push): uma linha por navegador inscrito. O dono é o navegador (hash do
+ * código de dono) e, com login, também a conta; cada linha guarda o idioma e quais avisos
+ * a pessoa quer. `server_keys` guarda o par de chaves VAPID gerado na primeira vez.
+ */
+function migratePush(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint    TEXT PRIMARY KEY,           -- URL do serviço de push (única por navegador)
+      p256dh      TEXT NOT NULL,
+      auth        TEXT NOT NULL,
+      owner_hash  TEXT NOT NULL,              -- navegador (SHA-256 do código de dono)
+      user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+      locale      TEXT NOT NULL DEFAULT 'pt-BR',
+      matches     INTEGER NOT NULL DEFAULT 1, -- partidas online: oponente chegou, sua vez
+      tournaments INTEGER NOT NULL DEFAULT 1, -- torneios: check-in, rodada nova, oponente na sala
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS push_subscriptions_owner ON push_subscriptions(owner_hash);
+    CREATE INDEX IF NOT EXISTS push_subscriptions_user ON push_subscriptions(user_id);
+
+    CREATE TABLE IF NOT EXISTS server_keys (
+      name  TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
 }
 
 /**
@@ -620,6 +688,11 @@ export function listDecks(db: DB): StoredDeck[] {
 export function getDeck(db: DB, id: string): StoredDeck | null {
   const row = db.prepare(`SELECT ${DECK_COLS} FROM decks WHERE id = ?`).get(id) as unknown as DeckRow | undefined;
   return row ? toDeck(row) : null;
+}
+
+/** Só o nome (o dono e as cartas continuam). */
+export function renameDeck(db: DB, id: string, name: string): boolean {
+  return Number(db.prepare(`UPDATE decks SET name = ?, updated_at = datetime('now') WHERE id = ? AND kind = 'user'`).run(name, id).changes) > 0;
 }
 
 export function deleteDeck(db: DB, id: string): boolean {

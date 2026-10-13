@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type FormatId, type OnlineSeat, type QueueKind } from '../api';
+import { useT } from '../i18n';
 
 /** Código de sala vindo do link (?sala=ABC123); lido uma vez e tirado da barra de endereço. */
 export function roomCodeFromUrl(): string | null {
@@ -74,18 +75,19 @@ export function useQueue(onEnter: (seat: OnlineSeat) => void, onError: (e: unkno
 
 /** Janela "Procurando oponente…" enquanto espera na fila. */
 export function QueueWait({ queue, onCancel }: { queue: QueueState; onCancel: () => void }) {
+  const t = useT();
   return (
     <div className="modal-backdrop page-sheet">
       <div className="modal-card queue-wait" role="dialog" aria-modal="true" aria-labelledby="queue-wait-title">
-        <div className="modal-kicker">{queue.kind === 'ranked' ? 'Ranqueada' : 'Casual'}</div>
+        <div className="modal-kicker">{queue.kind === 'ranked' ? t('menu.onlineRanked') : t('menu.onlineCasual')}</div>
         <h2 id="queue-wait-title">
-          Procurando oponente<span className="dots" />
+          {t('menu.onlineSearching')}<span className="dots" />
         </h2>
         <p className="queue-time">{fmtWait(queue.waited)}</p>
-        <p className="muted small">{queue.players > 1 ? `${queue.players} jogadores na fila` : 'Você é o único na fila agora.'}</p>
+        <p className="muted small">{queue.players > 1 ? t('menu.onlineQueuePlayers', { n: queue.players }) : t('menu.onlineQueueAlone')}</p>
         <div className="btn-row center">
           <button className="btn" onClick={onCancel}>
-            Cancelar
+            {t('common.cancel')}
           </button>
         </div>
       </div>

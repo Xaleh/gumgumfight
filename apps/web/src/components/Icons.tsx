@@ -150,10 +150,50 @@ const PATHS = {
     </>
   ),
   play: <polygon points="7 4 20 12 7 20 7 4" fill="currentColor" stroke="none" />,
+  phone: (
+    <>
+      <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+      <path d="M12 18h.01" />
+    </>
+  ),
+  /** Botão Compartilhar do Safari (quadrado com a seta para cima). */
+  share: (
+    <>
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" x2="12" y1="2" y2="15" />
+    </>
+  ),
   user: (
     <>
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" />
+    </>
+  ),
+  camera: (
+    <>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
+      <circle cx="12" cy="13" r="3" />
+    </>
+  ),
+  learn: (
+    <>
+      <path d="M2 9l10-5 10 5-10 5z" />
+      <path d="M6 11.2V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-4.8" />
+      <path d="M22 9v6" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z" />
+      <path d="M4 21.5A2.5 2.5 0 0 1 6.5 19H20v3H6.5" />
+    </>
+  ),
+  bulb: (
+    <>
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z" />
     </>
   ),
 } satisfies Record<string, ReactNode>;

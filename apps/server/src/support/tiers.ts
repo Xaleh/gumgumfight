@@ -12,7 +12,12 @@ export const isSupporterTier = (v: unknown): v is SupporterTier => SUPPORTER_TIE
 export const SUPPORTER_TOURNAMENTS_PER_MONTH = 5;
 /** Limite de jogadores nos torneios criados pela cota de apoiador. */
 export const SUPPORTER_MAX_PLAYERS = 64;
-/** Dias que um pagamento mensal mantém o plano ativo (30 dias + folga para a próxima cobrança). */
+/**
+ * Apoia.se: o apoio pago no mês vale até este dia do mês seguinte. A folga cobre a
+ * cobrança do cartão (no 1º dia útil) e o boleto (até 3 dias para compensar).
+ */
+export const APOIASE_GRACE_DAY = 10;
+/** Ko-fi: dias que um pagamento mensal mantém o plano ativo (30 dias + folga para a próxima cobrança). */
 export const PAYMENT_GRACE_DAYS = 35;
 /** Janela de inscrição antecipada dos Almirantes nos torneios do time (horas). */
 export const DEFAULT_PRIORITY_HOURS = 48;
@@ -51,6 +56,11 @@ export const TIER_INFO: Record<SupporterTier, TierInfo> = {
     perks: ['Tudo do Capitão', 'Prioridade de inscrição nos torneios premiados do time', 'Destaque na lista de Apoiadores'],
   },
 };
+
+/** De onde veio o plano: dado à mão pelo admin, ou pago na Apoia.se ou no Ko-fi. */
+export const SUPPORTER_SOURCES = ['manual', 'apoiase', 'kofi'] as const;
+export type SupporterSource = (typeof SUPPORTER_SOURCES)[number];
+export const isSupporterSource = (v: unknown): v is SupporterSource => SUPPORTER_SOURCES.includes(v as SupporterSource);
 
 /** Posição do plano na escada (0 = sem plano). */
 export const tierRank = (t: SupporterTier | null | undefined) => (t ? SUPPORTER_TIERS.indexOf(t) + 1 : 0);

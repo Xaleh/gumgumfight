@@ -1,6 +1,19 @@
 import type { Action, CardDef, GameState, LogEntry, PlayerId } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
+import { api, ApiError, errorMessage, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
+import { t } from '../i18n';
+
+/** Mensagem de erro de uma resposta do servidor: o `errorCode` traduzido, se o dicionário o conhece; senão o `error` que veio. */
+function serverError(body: Record<string, unknown> | null | undefined): string | undefined {
+  // errorMessage traduz `errors.<errorCode>` com os `errorParams` (e o `{issue}` do formato).
+  return errorMessage(body as Parameters<typeof errorMessage>[0], '') || undefined;
+}
+
+/** Texto de um erro de chamada à API (com `errorCode` nos dados da resposta, quando houver). */
+function errorText(e: unknown): string {
+  if (e instanceof ApiError) return serverError(e.data) ?? e.message;
+  return e instanceof Error ? e.message : String(e);
+}
 
 /** O que o servidor manda no evento "state" (online/room.ts: snapshot). */
 interface Snapshot {
@@ -95,6 +108,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       es.onopen = () => {
         seen();
         setConn('open');
+        // A sala não guarda isto no banco: repete a cada conexão (servidor reiniciado, reconexão).
+        if (!watching) void api.online.focus(seat.roomId, seat.token, document.visibilityState === 'visible');
       };
       es.addEventListener('ping', seen);
       es.addEventListener('state', (e) => {
@@ -160,11 +175,11 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
               // A sala existe: o canal pode ter sido recusado (sem permissão para ver as mãos, lotado).
               const ctrl = new AbortController();
               const res = await fetch(api.online.watchUrl(seat.roomId, hands), { signal: ctrl.signal });
-              const refused = res.ok ? null : ((await res.json().catch(() => null)) as { error?: string } | null);
+              const refused = res.ok ? null : ((await res.json().catch(() => null)) as { error?: string; errorCode?: string } | null);
               ctrl.abort();
               if (refused && (res.status === 403 || res.status === 429)) {
                 stopped = true;
-                setError(refused.error ?? 'Não foi possível assistir a esta partida.');
+                setError(serverError(refused) ?? t('ability.watchFailed'));
                 // Sem permissão só para as mãos: a partida continua visível sem elas.
                 if (hands && res.status === 403) setHandsRefused(true);
                 else setConn('gone');
@@ -199,6 +214,14 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     };
   }, [seat.roomId, seat.token, watching, hands]);
 
+  // App fora da tela (outro app, tela bloqueada): a sala passa a avisar a vez por notificação.
+  useEffect(() => {
+    if (watching) return;
+    const report = () => void api.online.focus(seat.roomId, seat.token, document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', report);
+    return () => document.removeEventListener('visibilitychange', report);
+  }, [seat.roomId, seat.token, watching]);
+
   // Ações em fila: cada POST leva a versão da mesa em que a ação foi feita.
   const queue = useRef<Action[]>([]);
   const busy = useRef(false);
@@ -213,7 +236,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
         setError(null);
       } catch (e) {
         queue.current = [];
-        setError(e instanceof Error ? e.message : String(e));
+        setError(errorText(e));
       }
     }
     busy.current = false;
@@ -228,11 +251,11 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   );
 
   const sendEmote = useCallback(
-    (emote: string) => api.online.emote(seat.roomId, seat.token, emote).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+    (emote: string) => api.online.emote(seat.roomId, seat.token, emote).catch((e) => setError(errorText(e))),
     [seat.roomId, seat.token],
   );
   const sendChat = useCallback(
-    (text: string) => api.online.chat(seat.roomId, seat.token, text).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+    (text: string) => api.online.chat(seat.roomId, seat.token, text).catch((e) => setError(errorText(e))),
     [seat.roomId, seat.token],
   );
   const sendDice = useCallback(
@@ -242,7 +265,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     [seat.roomId, seat.token, watching],
   );
   const askRematch = useCallback(
-    () => api.online.rematch(seat.roomId, seat.token).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+    () => api.online.rematch(seat.roomId, seat.token).catch((e) => setError(errorText(e))),
     [seat.roomId, seat.token],
   );
   const leave = useCallback(() => api.online.leave(seat.roomId, seat.token).catch(() => undefined), [seat.roomId, seat.token]);
@@ -256,7 +279,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }, [seat.roomId, seat.token]);
 

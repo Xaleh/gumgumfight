@@ -4,8 +4,9 @@
 
 import { randomBytes, randomInt } from 'node:crypto';
 import type { CardData, PlayerId } from '@gumgum/engine';
+import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId } from '../stats/catalog';
-import { newRoomData, randomToken, Room, type RoomData, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
+import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
 
 /** Quem quer jogar (perfil do jogador e deck escolhido). */
 export type SeatRequest = Omit<SeatInfo, 'token'>;
@@ -58,6 +59,8 @@ export interface LobbyDeps {
   log?: (msg: string) => void;
   rateLimit?: number;
   botDelayMs?: number;
+  /** Partida começou / vez de um jogador (notificações). */
+  onRoomEvent?: (room: Room, event: RoomEvent) => void;
 }
 
 /** Partida em andamento na lista "Assistir". */
@@ -112,7 +115,8 @@ const QUEUE_STALE_MS = 30_000;
 const RANKED_WINDOW_BASE = 2_000;
 const RANKED_WINDOW_PER_SECOND = 400;
 
-export type LobbyError = { error: string; code: number; roomId?: string };
+/** Recusa para o jogador: `code` é o status HTTP; `errorCode` (+ `errorParams`) é a chave que o cliente traduz. */
+export type LobbyError = { error: string; errorCode: string; errorParams?: ErrorParams; code: number; roomId?: string };
 
 const tournamentKey = (t: Pick<RoomTournament, 'id' | 'matchId' | 'game'>) => `${t.id}:${t.matchId}:${t.game}`;
 
@@ -180,15 +184,15 @@ export class Lobby {
    */
   admit(ip: string | null, kind: 'room' | 'bot' | 'tournament' = 'room'): LobbyError | null {
     const L = this.limits;
-    if (this.activeRooms >= L.maxRooms) return { code: 503, error: 'O servidor está cheio agora; tente de novo em alguns minutos.' };
+    if (this.activeRooms >= L.maxRooms) return { code: 503, ...fail('serverFull', 'O servidor está cheio agora; tente de novo em alguns minutos.') };
     if (kind === 'bot' && this.activeBotRooms() >= L.maxBotRooms) {
-      return { code: 503, error: 'O treino contra o bot do servidor está lotado agora; jogue contra o bot no navegador ou tente mais tarde.' };
+      return { code: 503, ...fail('botRoomsFull', 'O treino contra o bot do servidor está lotado agora; jogue contra o bot no navegador ou tente mais tarde.') };
     }
     if (!ip || kind === 'tournament') return null;
-    if (this.roomsOfIp(ip) >= L.perIpRooms) return { code: 429, error: 'Há partidas demais abertas a partir da sua rede.' };
+    if (this.roomsOfIp(ip) >= L.perIpRooms) return { code: 429, ...fail('tooManyRoomsFromIp', 'Há partidas demais abertas a partir da sua rede.') };
     const now = this.deps.now();
     const recent = (this.creates.get(ip) ?? []).filter((t) => now - t < L.perIpWindowMs);
-    if (recent.length >= L.perIpCreates) return { code: 429, error: 'Você abriu partidas demais em pouco tempo; espere alguns minutos.' };
+    if (recent.length >= L.perIpCreates) return { code: 429, ...fail('tooManyRoomsRecently', 'Você abriu partidas demais em pouco tempo; espere alguns minutos.') };
     recent.push(now);
     this.creates.set(ip, recent);
     return null;
@@ -203,6 +207,7 @@ export class Lobby {
       finish: this.deps.finish,
       rateLimit: this.deps.rateLimit,
       botDelayMs: this.deps.botDelayMs,
+      onEvent: this.deps.onRoomEvent,
     });
     this.rooms.set(room.id, room);
     if (data.code) this.codes.set(data.code, room.id);
@@ -250,7 +255,7 @@ export class Lobby {
 
   private busy(ownerHash: string): LobbyError | null {
     const playing = this.activeFor(ownerHash).find((r) => r.status === 'playing');
-    return playing ? { code: 409, error: 'Você já está numa partida online.', roomId: playing.roomId } : null;
+    return playing ? { code: 409, ...fail('alreadyPlaying', 'Você já está numa partida online.'), roomId: playing.roomId } : null;
   }
 
   createPrivate(seat: SeatRequest, format: FormatId): { room: Room; token: string } | LobbyError {
@@ -279,14 +284,14 @@ export class Lobby {
 
   joinPrivate(code: string, seat: SeatRequest): { room: Room; token: string } | LobbyError {
     const room = this.waitingRoom(code);
-    if (!room) return { code: 404, error: 'Sala não encontrada ou já começou.' };
-    if (room.data.seats[0].ownerHash === seat.ownerHash) return { code: 409, error: 'Esta sala é sua: envie o código para outra pessoa.' };
+    if (!room) return { code: 404, ...fail('roomNotFound', 'Sala não encontrada ou já começou.') };
+    if (room.data.seats[0].ownerHash === seat.ownerHash) return { code: 409, ...fail('ownRoom', 'Esta sala é sua: envie o código para outra pessoa.') };
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     this.leaveQueue(seat.ownerHash);
     const token = randomToken();
     room.data.seats.push({ ...seat, token });
-    room.start();
+    room.start(1);
     return { room, token };
   }
 
@@ -304,7 +309,7 @@ export class Lobby {
       newRoomData({ queue: 'bot', format, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
     );
     if (first !== undefined) room.data.firstPlayer = first;
-    room.start();
+    room.start(0);
     return { room, token };
   }
 
@@ -329,10 +334,10 @@ export class Lobby {
         // Jogos 2+ da série: quem perdeu o anterior começa.
         const first = existing.data.seats.findIndex((s) => s.userId && s.userId === tournament.firstUserId);
         if (first === 0 || first === 1) existing.data.firstPlayer = first;
-        existing.start();
+        existing.start(1);
         return { room: existing, token };
       }
-      return { code: 409, error: 'Esta partida já está em andamento.' };
+      return { code: 409, ...fail('matchInProgress', 'Esta partida já está em andamento.') };
     }
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
@@ -528,7 +533,7 @@ export class Lobby {
 
   /** Sai de uma sala: cancela a espera (sala privada) — numa partida em andamento, use "desistir". */
   leave(room: Room, seat: PlayerId): LobbyError | null {
-    if (room.status === 'playing') return { code: 409, error: 'A partida já começou: use "Desistir".' };
+    if (room.status === 'playing') return { code: 409, ...fail('leaveUseConcede', 'A partida já começou: use "Desistir".') };
     if (room.status === 'waiting' && seat === 0) this.close(room.id);
     return null;
   }
@@ -541,8 +546,8 @@ export class Lobby {
 
   /** Revanche (só salas privadas): quando os dois pedem, começa uma sala nova com os mesmos decks. */
   rematch(room: Room, seat: PlayerId): LobbyError | null {
-    if (room.data.queue !== 'private') return { code: 400, error: 'Revanche só nas salas privadas.' };
-    if (room.status !== 'finished') return { code: 409, error: 'A partida ainda não terminou.' };
+    if (room.data.queue !== 'private') return { code: 400, ...fail('rematchPrivateOnly', 'Revanche só nas salas privadas.') };
+    if (room.status !== 'finished') return { code: 409, ...fail('matchNotFinished', 'A partida ainda não terminou.') };
     if (room.data.rematchRoom) return null;
     const flags = (room.data.rematch ??= [false, false]);
     flags[seat] = true;
@@ -554,7 +559,8 @@ export class Lobby {
       // Quem foi o segundo assento passa a ser o primeiro (quem começa é sorteado).
       const seats = [room.data.seats[1], room.data.seats[0]].map((s) => ({ ...s, token: randomToken() }));
       const next = this.makeRoom(newRoomData({ queue: 'private', format: room.data.format, code: null, seats }));
-      next.start();
+      // Quem aceitou agora (o assento dele troca de lado na sala nova) não precisa de aviso.
+      next.start(seat === 0 ? 1 : 0);
       for (const ip of this.roomIps.get(room.id) ?? []) this.tagIp(next.id, ip);
       room.data.rematchRoom = next.id;
       // Espectadores seguem para a sala nova (sem token: continuam só assistindo).

@@ -232,9 +232,94 @@ describe('perfis (player, streamer, admin)', () => {
     expect(all.map((u: { role: string }) => u.role)).toEqual(['dev', 'organizer']);
   });
 
+  it('admin e dev renomeiam decks de outros jogadores; o player não', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const nami = await login(a, {});
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    const usopp = await login(a, { sub: '3003', email: 'usopp@example.com', name: 'Usopp' });
+    const deck = (await a.inject({ method: 'POST', url: '/api/decks', headers: zoro.cookie, payload: { name: 'Santoryu', leader: 'ST01-001', cards: luffy.cards } })).json();
+    const rename = (name: unknown, headers: Record<string, string>, id = deck.id) =>
+      a.inject({ method: 'PUT', url: `/api/decks/${id}/name`, headers, payload: { name } });
+
+    // Outro jogador (ou um navegador sem login) não renomeia; deck pronto ninguém renomeia.
+    expect((await rename('Roubado', usopp.cookie)).statusCode).toBe(403);
+    expect((await rename('Roubado', BROWSER)).statusCode).toBe(403);
+    expect((await rename('Luffy', nami.cookie, 'st01-luffy')).statusCode).toBe(403);
+    expect((await rename('   ', nami.cookie)).statusCode).toBe(400);
+
+    // O admin renomeia: o deck continua do Zoro, com as mesmas cartas.
+    const renamed = await rename('  Zoro Santoryu  ', nami.cookie);
+    expect(renamed.json()).toMatchObject({ name: 'Zoro Santoryu', mine: false, size: 50 });
+    const full = (await a.inject({ url: `/api/decks/${deck.id}`, headers: zoro.cookie })).json();
+    expect(full.deck).toMatchObject({ name: 'Zoro Santoryu', mine: true });
+    expect(full.summary.size).toBe(50);
+    // O admin continua sem poder mudar as cartas nem apagar.
+    expect((await a.inject({ method: 'PUT', url: `/api/decks/${deck.id}`, headers: nami.cookie, payload: { name: 'x', leader: 'ST01-001', cards: [] } })).statusCode).toBe(403);
+    expect((await a.inject({ method: 'DELETE', url: `/api/decks/${deck.id}`, headers: nami.cookie })).statusCode).toBe(403);
+
+    // O dono também usa a rota; o Dev tem o mesmo poder do admin.
+    expect((await rename('Meu Zoro', zoro.cookie)).json().name).toBe('Meu Zoro');
+    await a.inject({ method: 'PUT', url: `/api/admin/users/${nami.res.json().user.id}/role`, headers: nami.cookie, payload: { role: 'dev' } });
+    expect((await rename('Zoro (Dev)', nami.cookie)).json().name).toBe('Zoro (Dev)');
+  });
+
   it('e-mail não verificado pelo Google não vira admin', async () => {
     const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
     const r = await login(a, { email_verified: false });
     expect(r.res.json().user.role).toBe('player');
+  });
+});
+
+describe('foto da conta', () => {
+  // PNG 1×1 de verdade (os primeiros bytes decidem o tipo).
+  const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
+  const png = `data:image/png;base64,${PNG}`;
+
+  it('troca a foto, sobrevive a um novo login e volta para a do Google', async () => {
+    const a = app();
+    const nami = await login(a);
+    const put = (image: unknown, headers = nami.cookie) => a.inject({ method: 'PUT', url: '/api/auth/me/picture', headers, payload: { image } });
+
+    expect((await a.inject({ method: 'PUT', url: '/api/auth/me/picture', payload: { image: png } })).statusCode).toBe(401);
+    expect((await put('https://example.test/x.png')).json().errorCode).toBe('pictureInvalid');
+    // Data URL que diz ser imagem mas não é (o tipo vem dos bytes).
+    expect((await put(`data:image/png;base64,${Buffer.from('<svg onload=alert(1)>').toString('base64')}`)).json().errorCode).toBe('pictureInvalid');
+    expect((await put(`data:image/jpeg;base64,${Buffer.alloc(300 * 1024, 0xff).toString('base64')}`)).statusCode).toBe(413);
+
+    const saved = await put(png);
+    expect(saved.statusCode).toBe(200);
+    const user = saved.json().user;
+    expect(user.customPicture).toBe(true);
+    expect(user.picture).toMatch(new RegExp(`^/api/users/${user.id}/picture\\?v=\\d+$`));
+
+    const img = await a.inject({ url: user.picture, headers: nami.cookie });
+    expect(img.statusCode).toBe(200);
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(img.rawPayload.equals(Buffer.from(PNG, 'base64'))).toBe(true);
+    // Sem sessão ou de outra conta (sem ser admin), a foto não aparece.
+    expect((await a.inject({ url: user.picture })).statusCode).toBe(404);
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    expect((await a.inject({ url: user.picture, headers: zoro.cookie })).statusCode).toBe(404);
+
+    // Entrar de novo atualiza a foto do Google, mas a enviada continua valendo.
+    const again = await login(a, { picture: 'https://example.test/nami-2.png' });
+    expect(again.res.json().user).toMatchObject({ picture: user.picture, customPicture: true });
+
+    // Trocar de novo muda o endereço (o navegador não reaproveita a imagem velha).
+    expect((await put(png, again.cookie)).json().user.picture).not.toBe(user.picture);
+
+    const removed = await a.inject({ method: 'DELETE', url: '/api/auth/me/picture', headers: again.cookie });
+    expect(removed.json().user).toMatchObject({ picture: 'https://example.test/nami-2.png', customPicture: false });
+    expect((await a.inject({ url: user.picture, headers: again.cookie })).statusCode).toBe(404);
+  });
+
+  it('o admin vê a foto enviada na tela de perfis', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const admin = await login(a);
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    const pic = (await a.inject({ method: 'PUT', url: '/api/auth/me/picture', headers: zoro.cookie, payload: { image: png } })).json().user.picture;
+    const list = (await a.inject({ url: '/api/admin/users?q=zor', headers: admin.cookie })).json();
+    expect(list[0]).toMatchObject({ picture: pic, customPicture: true });
+    expect((await a.inject({ url: pic, headers: admin.cookie })).statusCode).toBe(200);
   });
 });

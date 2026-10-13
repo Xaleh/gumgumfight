@@ -4,6 +4,7 @@
 
 import { type Action, type CardData, type DeckList, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
 import { api, type FormatId } from '../api';
+import { t } from '../i18n';
 import type { GameMode, GameSetup, ReplayFile } from './useGame';
 
 export async function buildSetup(
@@ -35,7 +36,7 @@ export async function buildSetup(
       mode === 'replay'
         ? await decks.catch((e: unknown) => {
             const why = e instanceof Error ? e.message : String(e);
-            throw new Error(`Não foi possível abrir os decks deste replay (${why}). O deck pode ter sido apagado ou ser de outra conta.`);
+            throw new Error(t('replay.decksFailed', { why }));
           })
         : await decks;
   }
@@ -71,20 +72,20 @@ export function setupFromReplayText(text: string): Promise<GameSetup> {
   try {
     r = JSON.parse(text) as ReplayFile;
   } catch {
-    throw new Error('O arquivo não é um replay do GumGum Fight (não é um JSON válido).');
+    throw new Error(t('replay.notJson'));
   }
   return setupFromReplay(r);
 }
 
 export function setupFromReplay(r: ReplayFile): Promise<GameSetup> {
-  if (r?.format !== 'gumgumfight-replay' || !Array.isArray(r.actions)) throw new Error('O arquivo não é um replay do GumGum Fight.');
+  if (r?.format !== 'gumgumfight-replay' || !Array.isArray(r.actions)) throw new Error(t('replay.notReplay'));
   if ((r.version ?? 1) > REPLAY_VERSION) {
-    throw new Error('Este replay foi gravado por uma versão mais nova do jogo. Recarregue a página e tente de novo.');
+    throw new Error(t('replay.newerVersion'));
   }
   // Com as listas no arquivo (partidas online e replays baixados desde o card 73), os decks não precisam existir.
   const lists = r.decks ? { decks: r.decks, seed128: r.seed128 } : undefined;
   // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
   const first = r.chooseFirst ? undefined : r.firstPlayer;
-  const names = r.names ?? ['Jogador 1', 'Jogador 2'];
+  const names: [string, string] = r.names ?? [t('replay.player1'), t('replay.player2')];
   return buildSetup('replay', r.deckIds, names, r.seed, 'standard', first, r.actions, lists, Boolean(r.chooseFirst), r.version ?? 1);
 }

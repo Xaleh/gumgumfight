@@ -38,7 +38,7 @@ O GumGum Fight é um simulador do **One Piece Card Game** que roda no navegador.
 |---|---|---|
 | **Motor de regras** | Aplica as regras do jogo: `applyAction(estado, ação) → novo estado`. Função pura, determinística, sem dependências. | No navegador (partida contra o bot, replays) **e** no servidor (partidas online, verificação de replays). |
 | **Backend (API)** | Fastify + SQLite. Cartas, decks, contas, estatísticas, salas online, torneios. Em produção também entrega a interface compilada. | Um único processo Node na VPS, atrás do Nginx. |
-| **Frontend** | React + Vite. Menu, construtor de decks, mesa de jogo, espectador, estatísticas, torneios, administração. | Navegador (SPA, sem service worker). |
+| **Frontend** | React + Vite. Menu, construtor de decks, mesa de jogo, espectador, estatísticas, torneios, administração. | Navegador (SPA instalável como PWA: service worker com cache da casca e notificações). |
 | **Importador de cartas** | Busca as cartas oficiais na optcgapi.com e os spoilers na optcgleaks.com; normaliza e grava no SQLite. | CLI no servidor + sincronização periódica dentro do próprio processo da API. |
 | **Deploy** | GitHub Actions monta um pacote autocontido, envia por SSH, ativa no pm2 com rollback automático. | GitHub + VPS (Hostinger, produção) + servidor de homologação. |
 
@@ -87,8 +87,9 @@ Sem dependências de produção. Dev: `vitest ^3`, `tsx ^4.19`.
 | CSS | arquivo único `apps/web/src/styles.css` (~7.300 linhas) | Tema claro/escuro por `data-theme` no `<html>`. Fontes Google (`Bangers`, `Nunito`). |
 | Google Identity Services | script `https://accounts.google.com/gsi/client` | Botão de login (carregado sob demanda). |
 
-Não há roteador (react-router), gerenciador de estado, service worker nem biblioteca de componentes. O PWA se limita
-ao `manifest.webmanifest` (ícones, `display: standalone`).
+Não há roteador (react-router), gerenciador de estado nem biblioteca de componentes. O PWA é o
+`manifest.webmanifest` (ícones, `display: standalone`) mais um service worker escrito à mão (`/sw.js`, sem Workbox; ver
+[PWA](#pwa-instalação-tela-acesa-e-notificações)).
 
 ### Ferramentas de build, teste e deploy
 
@@ -143,13 +144,20 @@ gumgumfight/
 │   ├── src/online/              room.ts (uma partida + relógio), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE)
 │   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
+│   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
 ├── apps/web/                    React + Vite
 │   ├── src/App.tsx              seleção de tela (useState<Screen>, sem roteador)
 │   ├── src/api.ts               todos os fetches, header x-deck-owner, URLs de SSE
-│   ├── src/auth.tsx, settings.tsx   contexts
+│   ├── src/auth.tsx, settings.tsx   contexts (login; configurações, inclusive o idioma `locale`)
+│   ├── src/i18n/                idiomas da interface: index.ts (t/useT, plural), pt-BR.ts (chaves), en.ts, es.ts, ja.ts, fr.ts, de.ts, format.ts
+│   ├── src/components/Flags.tsx bandeiras SVG do seletor de idioma
+│   ├── src/audio.ts             efeitos e música (Web Audio); src/assets/audio/ com os MP3 e CREDITS.md
+│   ├── src/game/useMatchAudio.ts   sons derivados das mudanças de estado da partida
 │   ├── src/game/useGame.ts      partida local (motor + bot no navegador, undo, replay)
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
+│   ├── src/pwa.ts               service worker, convite de instalação, Wake Lock, inscrição nas notificações
+│   ├── src/service-worker.js    fonte do /sw.js (o plugin em vite.config.ts preenche versão e arquivos)
 │   ├── src/components/          Menu, DeckBuilder, GameScreen (2.319 linhas), Board, Watch, Tournaments, Stats, Admin…
 │   └── public/                  manifest, ícones, marca
 ├── data/
@@ -261,7 +269,8 @@ Os conceitos de tempo que a avaliação representa e os testes de posição que 
 ### Módulos e rotas
 
 `app.ts` registra, nesta ordem: health/config, cartas, coverage, traduções pendentes, decks, `registerAuth`,
-`registerStatsRoutes`, `registerOnlineRoutes` (devolve o `Lobby`), `registerTournamentRoutes` (recebe o `Lobby`),
+`registerPushRoutes` (devolve o `Notifier`), `registerStatsRoutes`, `registerOnlineRoutes` (devolve o `Lobby`; recebe o
+`Notifier`), `registerTournamentRoutes` (recebe o `Lobby` e o `Notifier`),
 `/api/matches`, e por fim o static + fallback para `index.html`. A tabela completa de rotas está no
 [Apêndice B](#b-rotas-da-api).
 
@@ -303,20 +312,66 @@ partida, torneio ou nome de jogador) não muda, com TTL de segurança (30 s e 5 
 
 `App.tsx` mantém `useState<Screen>`: `menu`, `builder`, `coverage` (Dev), `stats`, `admin` (Admin), `watch-list`,
 `watch`, `tournaments`, `game` (contra o bot / replay) e `online`. As telas `online` e `watch` ficam em
-`sessionStorage.gumgum.openMatch` para sobreviver a recarga. O único parâmetro de URL é `?sala=CÓDIGO` (convite de sala
-privada), lido uma vez e removido com `history.replaceState`.
+`sessionStorage.gumgum.openMatch` para sobreviver a recarga. Parâmetros de URL, lidos uma vez e removidos com
+`history.replaceState`: `?sala=CÓDIGO` (convite de sala privada), `?partida=<sala>` e `?torneio=<id>` (abertos ao tocar
+numa notificação: a partida online, se ainda estiver em `/api/online/active`, ou a página do torneio).
 
 ### Dados no navegador
 
 | Chave | Conteúdo |
 |---|---|
 | `localStorage.gumgum.owner` | token do dono dos decks/perfil (sem login) |
-| `localStorage.gumgum.settings` | `{lang, images, quickCounter, animations, replayCues, theme, opponentChat}` |
+| `localStorage.gumgum.settings` | `{locale, images, quickCounter, animations, replayCues, theme, opponentChat, sfxVolume, musicVolume, keepAwake, notify, notifyMatches, notifyTournaments}` (`lang: 'pt'\|'en'` antigo é migrado para `locale`) |
+| `localStorage.gumgum.installDismissed` | quando o convite de instalação foi dispensado ("Agora não" esconde por 30 dias) |
+| Cache Storage `gumgum-<versão>` | casca do app guardada pelo service worker |
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
 | `localStorage.gumgum.watchHands`, `gumgum.statsFilters`, `gumgum.statsMin` | preferências de espectador e estatísticas |
 | `sessionStorage.gumgum.openMatch` | partida/transmissão aberta |
 
 Nada de cache de cartas: o construtor baixa `GET /api/cards` inteiro toda vez que abre.
+
+### Idiomas da interface (`src/i18n/`)
+
+Seis idiomas, sem biblioteca externa: `pt-BR` (padrão e referência), `en`, `es`, `ja`, `fr`, `de`. Cada um é um arquivo
+`src/i18n/<locale>.ts` exportando um objeto com **as mesmas chaves** de `pt-BR.ts` (`satisfies Messages`): faltar ou sobrar uma
+chave em qualquer idioma é erro de `npm run typecheck`, que o CI roda. As chaves são `<tela>.camelCase`, agrupadas em seções
+marcadas (`// ==== menu ====`): `menu`, `home`, `deck`, `card`, `online`, `watch`, `admin`, `reports`, `tour`, `stats`, `game`,
+`board`, `dice`, `result`, `replay`, `ability`, `engine` (perguntas do motor), `log` (histórico da partida), `rules` (validação de
+deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `settings`.
+
+- **Sintaxe das mensagens:** `{nome}` interpola um parâmetro; `{n|# carta|# cartas}` escolhe a forma pelo `Intl.PluralRules`
+  do idioma (`one` | `other`; `#` vira o número formatado). Frases sempre inteiras, com parâmetros: nada de concatenar pedaços
+  (a ordem das palavras muda em japonês e alemão).
+- **Uso:** em componentes, `const t = useT()` (re-renderiza ao trocar o idioma); fora deles, `t()` do módulo (idioma em vigor).
+  `tryT(chave)` devolve `undefined` quando a chave não existe: é como a interface trata o que vem **do motor** (`promptKey`/
+  `promptParams`/`optionKeys` ao lado de `prompt`/`options` em `Pending`, `labelKey` em `Ability`) e **do servidor** (`errorCode`
+  ao lado de `error` nas respostas 4xx/5xx; `api.ts` traduz `errors.<errorCode>` e cai no texto do servidor se não conhecer).
+  Os textos em português do motor e do servidor continuam sendo gerados (replays, logs e clientes antigos).
+- **Motor → interface:** cada texto que o motor gera em português ganha ao lado uma mensagem estruturada
+  `Msg = { key, params?, parts? }` (`parts` = parâmetros que também são texto a traduzir, ex. a lista de custos, juntada por
+  `log.listAnd`/`engine.cost.join`). Onde aparece:
+  - `LogEntry.key/params/parts` (histórico, seção `log`; a linha secreta tem `secretKey…`, que `view.ts` só entrega ao dono);
+  - `GameState.winReasonKey/winReasonParams` (motivo do fim de jogo, `log.win*`);
+  - `Pending.promptKey/promptParams/promptParts` e `optionKeys/optionParts` (perguntas de efeito, seção `engine`);
+  - `Ability.labelKey/labelParams` (rótulos de habilidades roteirizadas);
+  - `StatusInfo.textKey/untilKey/tagKey` (marcadores de estado nas cartas, seção `status`);
+  - `DeckIssue`/`FormatIssue.code/params` e `parseDeckList().errorDetails` (validação de deck e formato, seção `rules`).
+  `apps/web/src/game/engineText.ts` (`msgText`, `logText`, `winReasonText`) traduz isso na interface; sem chave, mostra o texto.
+  Os avisos da mesa (`NOTICE_KEYS` em `GameScreen.tsx`) são decididos pela chave do log, com um regex de reserva para estados
+  antigos. Ainda só em português: as recusas `IllegalActionError` do motor (a interface só oferece ações legais, então só
+  aparecem em corridas) e os rótulos de "Escolha um" que vêm da DSL do leitor.
+- **Carga:** `pt-BR` vai no bundle principal; os outros são chunks separados (`import()` em `loadLocale`), baixados ao escolher.
+  `main.tsx` carrega o idioma salvo antes do primeiro render. `I18nProvider` (dentro do `SettingsProvider`) troca o dicionário,
+  ajusta `<html lang>` e o `locale` do botão do Google.
+- **Escolha e detecção:** `Settings.locale`, salvo em `gumgum.settings`; na primeira visita, `detectLocale()` lê
+  `navigator.languages` (pt→pt-BR, en, es, ja, fr, de; outro → en). Seletor `LocaleSeg` só com bandeiras (SVG em `Flags.tsx`,
+  porque emoji de bandeira vira letras no Windows), com o nome do idioma em `title`/`aria-label`; está em Configurações, no menu
+  da partida, na barra superior (`LocaleButton`) e na gaveta ☰.
+- **Datas e números:** `format.ts` (`fmtDateTime`, `fmtTime`, `fmtNumber`, `fmtBerries`…) usa o idioma em vigor.
+- **Texto das cartas:** `cardText(def, locale)` dá a tradução automática/manual só em `pt-BR`; nos demais, o original em inglês.
+  A tabela `card_translations` e `data/translations/<lang>.json` já aceitam outros idiomas, mas só `pt` é montado hoje.
+- **CSS:** `html[lang=ja]` usa `word-break: keep-all` + `overflow-wrap: anywhere`; textos de alemão e francês são mais longos,
+  por isso botões e segmentos usam `min-width: 0` e quebra onde cabe, e algumas chaves têm a forma curta `.Short`.
 
 ### Partida contra o bot
 
@@ -372,10 +427,47 @@ reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do prot
 As URLs apontam para `https://optcgapi.com/media/static/Card_Images/<ID>.jpg` (oficiais) e
 `https://images.optcgleaks.com/<set>/images/<id>.webp` (spoilers). **Esse tráfego não passa pela VPS.**
 
+### Áudio
+
+`audio.ts` (Web Audio API) tem dois canais com volume próprio, efeitos e música, ligados às configurações
+`sfxVolume` e `musicVolume`. O primeiro toque ou tecla destrava o áudio (os navegadores exigem um gesto) e
+pré-carrega os efeitos; a música só é baixada quando pedida e toca num `AudioBufferSourceNode` em loop (emenda
+sem corte), com crossfade na troca. `game/useMatchAudio.ts` deriva os sons da diferença entre o estado anterior e o
+novo da partida (como `Motion.tsx` faz com as animações), então valem para a partida contra o bot, online,
+espectador e replay (mudos nos pulos e no replay em 8×); `App.tsx` toca a música do menu fora da mesa e a mesa troca
+para a da partida. Os arquivos (MP3) ficam em `assets/audio`, com a origem e a licença de cada um em
+`assets/audio/CREDITS.md`: efeitos CC0 do Kenney e do OpenGameArt e duas músicas originais ("Brisa do Leste" no menu,
+"Valsa do Mar" na partida) geradas em MIDI por `scripts/audio/compose.py` e renderizadas com FluidSynth;
+`scripts/audio/sfx.py` refaz a conversão dos efeitos.
+
+### PWA: instalação, tela acesa e notificações
+
+- **Service worker** (`src/service-worker.js` → `/sw.js`, registrado em `main.tsx`). O plugin `gumgum-service-worker`
+  de `vite.config.ts` gera o arquivo na compilação com a versão (hash dos nomes do bundle) e a lista do precache
+  (`index.html`, JS de entrada, CSS, imagens, ícones e manifest; os dicionários dos outros idiomas entram no cache quando
+  usados, os áudios ficam com o cache HTTP). Página: rede primeiro, cópia guardada sem conexão. `/assets/*` e
+  `/icons/*`: cache primeiro. `/api/*` nunca passa pelo cache. Versão nova: `skipWaiting` + `clients.claim` e os caches
+  `gumgum-*` antigos são apagados. Em `npm run dev` o `/sw.js` é servido sem cache nenhum (só as notificações).
+- **Instalação** (`components/Install.tsx`): `beforeinstallprompt` é guardado em `pwa.ts` (sem a mini barra do
+  navegador) e vira o botão **Instalar**; no iPhone/iPad, instruções com o ícone de Compartilhar. A faixa aparece no
+  menu inicial só em telas de toque e fora do app instalado (`display-mode: standalone`); a opção em Configurações
+  sempre existe.
+- **Tela acesa** (`useWakeLock` em `App.tsx`): `navigator.wakeLock.request('screen')` nas telas `game`, `online` e
+  `watch` com `keepAwake` ligado; pedida de novo no `visibilitychange` (o navegador solta a trava em segundo plano).
+- **Notificações** (desligadas por padrão). Ligar em Configurações pede `Notification.requestPermission()` (num toque),
+  inscreve com `pushManager.subscribe` usando a chave VAPID de `/api/config` e manda a inscrição com o idioma e os
+  tipos escolhidos (`PUT /api/push/subscription`). `usePushSync` (em `App.tsx`) reenvia quando muda o idioma, a conta
+  ou os tipos; desligar (ou a permissão revogada no navegador) cancela a inscrição aqui e no servidor. No `push`, o
+  service worker não mostra o aviso se o app estiver visível (no Safari mostra sempre: o WebKit cancela inscrições que
+  recebem push sem notificação, e o servidor já evita esses envios); no clique, foca a janela aberta e manda
+  `gumgum:open` com o endereço, ou abre uma nova.
+
 ### Build
 
-`vite build` → `apps/web/dist`: `index.html` + `assets/index-<hash>.js` (715 KB, **203 KB gzip**) +
-`assets/index-<hash>.css` (116 KB, 26 KB gzip) + imagens locais (verso da carta 26 KB, DON!! 38 KB) + `public/`.
+`vite build` → `apps/web/dist`: `index.html` + `assets/index-<hash>.js` (845 KB, **260 KB gzip**) +
+`assets/index-<hash>.css` (127 KB, 28 KB gzip) + imagens locais (verso da carta 26 KB, DON!! 38 KB) + áudio
+(46 efeitos, 340 KB ao todo, baixados no primeiro toque; músicas de 800 KB e 585 KB e três vinhetas de 33 a 46 KB,
+baixadas quando tocam) + `public/`.
 
 ---
 
@@ -395,7 +487,7 @@ As URLs apontam para `https://optcgapi.com/media/static/Card_Images/<ID>.jpg` (o
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (18)
+### Tabelas (20)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -410,6 +502,8 @@ As URLs apontam para `https://optcgapi.com/media/static/Card_Images/<ID>.jpg` (o
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`. Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício | lobby (a cada ação) |
+| `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
+| `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
 | `tournament_players` | `(tournament_id, user_id)` | `name`, `deck_id`, **`deck` (JSON `DeckList` congelado)**, `seed`, `dropped` | inscrição, início, drop |
 | `supporter_payments` | `id` (transação do Ko-fi) | `email`, `kind`, `tier`, `amount`, `currency`, `paid_at`, `user_id` | webhook do Ko-fi |
@@ -675,6 +769,11 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
    tela de resultado, replay (`GET /replay`, só depois do fim) e revanche; depois o varredor apaga sala e linha.
 6. **Reinício do servidor**: `lobby.restore` lê `live_matches`, refaz cada sala (`createGame` + replay das ações),
    relógios recomeçam do valor salvo; navegadores reconectam (o `EventSource` reconecta sozinho em 2 s, `retry: 2000`).
+7. **Notificações** (`RoomDeps.onEvent` → `roomNotice` em `online/routes.ts` → `Notifier`): `start` avisa quem esperava
+   na sala (nunca quem acabou de entrar: `start(by)`) e `turn` avisa quando `actingPlayer` passa para um jogador
+   humano, no máximo uma vez a cada 30 s por assento (`TURN_NOTICE_MS`). Só recebe quem está longe do app: sem
+   conexão com a sala ou com o app fora da tela, informado pelo navegador em `POST /rooms/:id/focus {t, visible}` a cada
+   `visibilitychange` e a cada conexão do SSE (o estado fica só em memória).
 
 ### Eventos SSE (servidor → navegador)
 
@@ -726,7 +825,8 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   partir da qual a série é melhor de 3/5: 8 = quartas, 2 = final), `max_players` (2–256), `starts_at` (com
   `check_in`, hora do início automático), `check_in` (check-in, início automático e W.O. por ausência), `tolerance_min` (minutos para entrar na sala, 1–60), `status`
   (`registration → running → finished`), `round`, `round_at` (quando a rodada atual foi gerada), `round_wo` (a
-  varredura de ausentes da rodada já foi feita), `organizer_id`.
+  varredura de ausentes da rodada já foi feita), `checkin_notice` (`starts_at` cujo aviso de check-in já saiu por
+  notificação), `organizer_id`.
 - **`tournament_players`**: `deck` é o `DeckList` **congelado** na inscrição (validado com `playableDeck` no formato),
   `seed` = ordem sorteada no início, `dropped`, `checked_in_at`.
 - **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none`
@@ -748,6 +848,9 @@ com relógio injetado nos testes não roda sozinho e é chamado por `app.tournam
   é fechada (`lobby.closeIfWaiting`). A varredura roda uma vez por rodada (`round_wo`), então o organizador pode
   zerar/corrigir depois sem que o W.O. volte. Na chave, `singleNextRound` dá bye a quem avançaria contra uma mesa sem
   vencedor; sem ninguém para avançar, `next` encerra.
+- **Notificações** (para quem ligou os avisos de torneios): check-in aberto (uma vez por `starts_at`, só para quem não
+  confirmou), rodada nova em `start`, `next` e no início automático (oponente e prazo de tolerância, ou bye) e, em
+  `play`, "oponente esperando na sala" para o outro jogador quando a sala do jogo é criada.
 - **Atalho da tela inicial**: `GET /api/tournaments/me` (a cada 10 s, só logado) devolve os torneios em que a conta está
   em jogo agora (check-in aberto ou `running`), com a partida da rodada, o oponente, a situação da sala e o prazo.
 
@@ -1063,11 +1166,12 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | Área | Rotas |
 |---|---|
 | Saúde/config | `GET /api/health`, `GET /api/config` |
+| Notificações | `PUT/DELETE /api/push/subscription` |
 | Conta | `GET /api/auth/me`, `POST /api/auth/google`, `POST /api/auth/logout`, `GET /api/admin/users?q=`, `PUT /api/admin/users/:id/role` |
 | Cartas | `GET /api/cards?set=`, `GET /api/cards/:id`, `GET /api/coverage`, `GET /api/translations/pending` |
 | Decks | `GET /api/decks`, `GET/PUT/DELETE /api/decks/:id`, `POST /api/decks` |
 | Partidas/estatísticas | `POST /api/matches`, `GET /api/matches`, `GET/PUT /api/players/me`, `GET /api/stats/meta`, `GET /api/stats`, `GET /api/stats/trend?weeks=`, `GET /api/stats/cards?leader=|deck=` |
-| Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,chat,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
+| Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,chat,focus,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
 | Espectador | `GET /api/online/live`, `GET /api/online/watch/:code`, `GET /api/online/rooms/:id`, `GET /api/online/rooms/:id/watch?hands=1` (SSE) |
 | Auditoria | `GET /api/matches/:id`, `GET /api/matches/:id/replay`, `POST /api/matches/:id/report`, `GET /api/reports`, `PUT /api/reports/:id` |
 | Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/drop`, `POST /api/tournaments/:id/matches/:m/play` |

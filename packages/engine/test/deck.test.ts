@@ -16,6 +16,7 @@ describe('validação de deck', () => {
     const r = validateDeck(d, byId);
     expect(r.valid).toBe(false);
     expect(r.issues[0].message).toMatch(/faltam 4/);
+    expect(r.issues[0]).toMatchObject({ code: 'rules.tooFewCards', params: { total: 46, missing: 4 } });
   });
 
   it('no máximo 4 cópias', () => {
@@ -66,6 +67,7 @@ describe('lista em texto', () => {
       { id: 'ST01-013', count: 4 },
     ]);
     expect(r.errors).toEqual(['Linha não reconhecida: "lixo"']);
+    expect(r.errorDetails).toEqual([{ message: 'Linha não reconhecida: "lixo"', code: 'rules.listBadLine', params: { line: 'lixo' } }]);
   });
 
   it('aponta cartas que não existem no banco', () => {

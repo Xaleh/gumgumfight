@@ -15,6 +15,8 @@ import {
 } from '../auth/store';
 import type { SupportOptions } from '../config';
 import type { DB } from '../db';
+import { fail, isPlayerError, type PlayerError } from '../errors';
+import { type ApoiaseOptions, apoiaseAccounts, syncApoiase } from './apoiase';
 import { pixPayload } from './pix';
 import {
   createSponsor,
@@ -37,7 +39,29 @@ interface Deps {
   db: DB;
   user: (req: FastifyRequest) => User | null;
   options: SupportOptions;
+  /** Tarefas depois do login: aqui entra a consulta à Apoia.se. */
+  afterLogin?: Array<(user: User) => Promise<void>>;
+  /** Testes: fetch da API da Apoia.se e relógio. */
+  fetchImpl?: typeof fetch;
+  now?: () => number;
+  /** De quantas em quantas horas reconsultar quem tem plano da Apoia.se (0 = nunca; os testes chamam `apoiaseSyncAll`). */
+  syncHours?: number;
 }
+
+/**
+ * APOIASE_SYNC: de quantas em quantas horas o servidor reconsulta, na Apoia.se, quem tem
+ * plano de lá (padrão 6). "off" desliga. Nunca roda nos testes.
+ */
+export function apoiaseSyncHours(env = process.env): number {
+  if (/^(off|0|false|no)$/i.test(env.APOIASE_SYNC ?? '') || env.NODE_ENV === 'test' || env.VITEST) return 0;
+  const hours = Number(env.APOIASE_SYNC ?? 6);
+  return Number.isFinite(hours) && hours > 0 ? hours : 6;
+}
+
+/** Espera entre uma consulta e outra na rodada periódica (não sobrecarregar a API deles). */
+const SYNC_GAP_MS = 1_000;
+/** Intervalo mínimo entre dois "Já apoio: verificar" da mesma conta. */
+const MANUAL_SYNC_MS = 30_000;
 
 /** Valores sugeridos do café (o primeiro, sem valor, deixa quem paga digitar). */
 export const COFFEE_AMOUNTS = [null, 5, 10, 25] as const;
@@ -77,24 +101,24 @@ function parseUntil(v: unknown, startOfDay = false): string | null | 'invalid' {
 
 type SponsorBody = { name?: unknown; url?: unknown; offer?: unknown; placements?: unknown; startsAt?: unknown; endsAt?: unknown; sort?: unknown };
 
-function parseSponsor(b: SponsorBody | undefined): SponsorInput | string {
-  if (!b || typeof b !== 'object') return 'Corpo inválido.';
+function parseSponsor(b: SponsorBody | undefined): SponsorInput | PlayerError {
+  if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
   const name = typeof b.name === 'string' ? b.name.trim().replace(/\s+/g, ' ').slice(0, 60) : '';
-  if (name.length < 2) return 'Dê o nome da loja.';
+  if (name.length < 2) return fail('sponsorNameRequired', 'Dê o nome da loja.');
   const url = typeof b.url === 'string' && b.url.trim() ? b.url.trim().slice(0, 300) : null;
-  if (url && !/^https?:\/\/[^\s]+$/i.test(url)) return 'O link precisa começar com http:// ou https://.';
+  if (url && !/^https?:\/\/[^\s]+$/i.test(url)) return fail('sponsorUrlInvalid', 'O link precisa começar com http:// ou https://.');
   const offer = typeof b.offer === 'string' && b.offer.trim() ? b.offer.trim().replace(/\s+/g, ' ').slice(0, 160) : null;
   const placements = Array.isArray(b.placements) ? PLACEMENTS.filter((p) => (b.placements as unknown[]).includes(p)) : (['tournaments'] as Placement[]);
-  if (!placements.length) return 'Escolha onde a loja aparece.';
+  if (!placements.length) return fail('sponsorPlacementRequired', 'Escolha onde a loja aparece.');
   const startsAt = parseUntil(b.startsAt, true);
   const endsAt = parseUntil(b.endsAt);
-  if (startsAt === 'invalid' || endsAt === 'invalid') return 'Data inválida.';
-  if (startsAt && endsAt && endsAt <= startsAt) return 'O fim precisa ser depois do início.';
+  if (startsAt === 'invalid' || endsAt === 'invalid') return fail('invalidDate', 'Data inválida.');
+  if (startsAt && endsAt && endsAt <= startsAt) return fail('sponsorEndBeforeStart', 'O fim precisa ser depois do início.');
   const sort = Number.isInteger(Number(b.sort)) ? Math.max(-999, Math.min(999, Number(b.sort))) : 0;
   return { name, url, offer, placements, startsAt, endsAt, sort };
 }
 
-export function registerSupportRoutes(app: FastifyInstance, { db, user, options }: Deps) {
+export function registerSupportRoutes(app: FastifyInstance, { db, user, options, afterLogin, fetchImpl, now = Date.now, syncHours = 0 }: Deps) {
   // O Ko-fi manda o webhook como formulário (campo `data` com o JSON).
   app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string', bodyLimit: 64 * 1024 }, (_req, body, done) => {
     done(null, Object.fromEntries(new URLSearchParams(String(body))));
@@ -116,6 +140,76 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
     }
   })();
 
+  // ---------------------------------------------------------------- Apoia.se
+
+  const apoiase: ApoiaseOptions | null =
+    options.apoiaseKey && options.apoiaseSecret
+      ? { apiKey: options.apoiaseKey, apiSecret: options.apoiaseSecret, apiUrl: options.apoiaseUrl ?? 'https://api.apoia.se', fetchImpl }
+      : null;
+
+  if (apoiase) {
+    // No login: quem apoia na Apoia.se com o e-mail da conta já entra com o plano.
+    afterLogin?.push(async (u) => {
+      await syncApoiase(db, u.id, apoiase, now());
+    });
+
+    /** Rodada periódica: renova o plano de quem continua pagando (quem parou, vence sozinho no dia 10). */
+    let running = false;
+    const syncAll = async () => {
+      if (running) return { checked: 0, applied: 0 };
+      running = true;
+      let checked = 0;
+      let applied = 0;
+      try {
+        for (const id of apoiaseAccounts(db, now())) {
+          try {
+            if ((await syncApoiase(db, id, apoiase, now())).applied) applied++;
+            checked++;
+          } catch (e) {
+            app.log.warn({ err: e }, 'Apoia.se: consulta falhou');
+          }
+          if (syncHours > 0) await new Promise((r) => setTimeout(r, SYNC_GAP_MS));
+        }
+      } finally {
+        running = false;
+      }
+      if (checked) app.log.info(`Apoia.se: ${checked} apoio(s) conferido(s), ${applied} plano(s) atualizado(s)`);
+      return { checked, applied };
+    };
+    app.decorate('apoiaseSyncAll', syncAll);
+    if (syncHours > 0) {
+      const timer = setInterval(() => void syncAll(), syncHours * 3_600_000);
+      timer.unref?.();
+      app.addHook('onClose', async () => clearInterval(timer));
+    }
+  }
+
+  const lastManual = new Map<string, number>();
+  /** "Já apoio na Apoia.se: verificar": consulta agora o apoio da conta logada. */
+  app.post('/api/support/apoiase/sync', async (req, reply) => {
+    const u = user(req);
+    if (!u) return reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+    if (!apoiase) return reply.code(404).send(fail('notFound', 'Não encontrado'));
+    const last = lastManual.get(u.id) ?? 0;
+    if (now() - last < MANUAL_SYNC_MS) {
+      return reply.code(429).send(fail('apoiaseTooSoon', 'Espere alguns segundos para verificar de novo.'));
+    }
+    lastManual.set(u.id, now());
+    try {
+      const r = await syncApoiase(db, u.id, apoiase, now());
+      if (!r.status) return reply.code(409).send(fail('apoiaseUnverifiedEmail', 'O Google não confirmou o e-mail desta conta.'));
+      return {
+        isBacker: r.status.isBacker,
+        isPaidThisMonth: r.status.isPaidThisMonth,
+        tier: r.user?.supporterTier ?? null,
+        until: r.user?.supporterUntil ?? null,
+      };
+    } catch (e) {
+      req.log.warn({ err: e }, 'Apoia.se: consulta falhou');
+      return reply.code(502).send(fail('apoiaseUnavailable', 'Não deu para consultar a Apoia.se agora. Tente de novo mais tarde.'));
+    }
+  });
+
   /** Tudo o que o modal "Apoiar o projeto" mostra. */
   app.get('/api/support', async (req) => {
     const counts = activeCounts(db);
@@ -126,6 +220,8 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
       coffeeUrl: options.coffeeUrl ?? null,
       monthlyUrl: options.monthlyUrl ?? null,
       contactUrl: options.contactUrl ?? null,
+      /** O plano mensal vem da Apoia.se pelo e-mail da conta (o modal mostra "Já apoio: verificar"). */
+      apoiase: Boolean(apoiase),
       goal: options.goalBrl ?? null,
       /** Soma mensal dos planos ativos (estimativa do que já está coberto). */
       covered: SUPPORTER_TIERS.reduce((sum, t) => sum + counts[t] * TIER_INFO[t].price, 0),
@@ -154,8 +250,8 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
   /** Aparecer (ou não) na lista de Apoiadores. */
   app.put<{ Body: { public?: unknown } }>('/api/support/me', async (req, reply) => {
     const u = user(req);
-    if (!u) return reply.code(401).send({ error: 'Entre com a conta Google.' });
-    if (typeof req.body?.public !== 'boolean') return reply.code(400).send({ error: 'Valor inválido.' });
+    if (!u) return reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+    if (typeof req.body?.public !== 'boolean') return reply.code(400).send(fail('invalidBody', 'Corpo inválido.'));
     setSupporterPublic(db, u.id, req.body.public);
     return { public: req.body.public };
   });
@@ -241,8 +337,8 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
 
   const admin = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = user(req);
-    if (!u) void reply.code(401).send({ error: 'Entre com a conta Google.' });
-    else if (!isAdmin(u.role)) void reply.code(403).send({ error: 'Só administradores podem fazer isso.' });
+    if (!u) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+    else if (!isAdmin(u.role)) void reply.code(403).send(fail('adminOnly', 'Só administradores podem fazer isso.'));
     else return u;
     return null;
   };
@@ -251,10 +347,10 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
   app.put<{ Params: { id: string }; Body: { tier?: unknown; until?: unknown } }>('/api/admin/users/:id/supporter', async (req, reply) => {
     if (!admin(req, reply)) return reply;
     const tier = req.body?.tier ?? null;
-    if (tier !== null && !isSupporterTier(tier)) return reply.code(400).send({ error: 'Plano inválido.' });
+    if (tier !== null && !isSupporterTier(tier)) return reply.code(400).send(fail('supporterInvalidTier', 'Plano inválido.'));
     const until = parseUntil(req.body?.until);
-    if (until === 'invalid') return reply.code(400).send({ error: 'Data inválida.' });
-    if (!setSupporter(db, req.params.id, tier, until)) return reply.code(404).send({ error: 'Conta não encontrada.' });
+    if (until === 'invalid') return reply.code(400).send(fail('invalidDate', 'Data inválida.'));
+    if (!setSupporter(db, req.params.id, tier, until)) return reply.code(404).send(fail('accountNotFound', 'Conta não encontrada.'));
     const u = getUser(db, req.params.id)!;
     return { id: u.id, supporterTier: u.supporterTier, supporterUntil: u.supporterUntil, supporterSource: u.supporterSource };
   });
@@ -267,7 +363,7 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
   app.post<{ Body: SponsorBody }>('/api/admin/sponsors', async (req, reply) => {
     if (!admin(req, reply)) return reply;
     const input = parseSponsor(req.body);
-    if (typeof input === 'string') return reply.code(400).send({ error: input });
+    if (isPlayerError(input)) return reply.code(400).send(input);
     const sp = createSponsor(db, input);
     return reply.code(201).send({ ...sp, ...publicSponsor(sp) });
   });
@@ -275,29 +371,32 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options 
   app.put<{ Params: { id: string }; Body: SponsorBody }>('/api/admin/sponsors/:id', async (req, reply) => {
     if (!admin(req, reply)) return reply;
     const input = parseSponsor(req.body);
-    if (typeof input === 'string') return reply.code(400).send({ error: input });
+    if (isPlayerError(input)) return reply.code(400).send(input);
     const sp = updateSponsor(db, req.params.id, input);
-    return sp ? { ...sp, ...publicSponsor(sp) } : reply.code(404).send({ error: 'Loja não encontrada.' });
+    return sp ? { ...sp, ...publicSponsor(sp) } : reply.code(404).send(fail('sponsorNotFound', 'Loja não encontrada.'));
   });
 
   app.delete<{ Params: { id: string } }>('/api/admin/sponsors/:id', async (req, reply) => {
     if (!admin(req, reply)) return reply;
-    return deleteSponsor(db, req.params.id) ? reply.code(204).send() : reply.code(404).send({ error: 'Loja não encontrada.' });
+    return deleteSponsor(db, req.params.id) ? reply.code(204).send() : reply.code(404).send(fail('sponsorNotFound', 'Loja não encontrada.'));
   });
 
   /** Logo da loja: imagem PNG, JPEG ou WebP em base64 (ou data URL); null apaga. */
   app.put<{ Params: { id: string }; Body: { image?: unknown } }>('/api/admin/sponsors/:id/logo', { bodyLimit: 600 * 1024 }, async (req, reply) => {
     if (!admin(req, reply)) return reply;
-    if (!getSponsor(db, req.params.id)) return reply.code(404).send({ error: 'Loja não encontrada.' });
+    if (!getSponsor(db, req.params.id)) return reply.code(404).send(fail('sponsorNotFound', 'Loja não encontrada.'));
     const raw = req.body?.image;
     if (raw === null) {
       setSponsorLogo(db, req.params.id, null, null);
     } else {
-      if (typeof raw !== 'string') return reply.code(400).send({ error: 'Imagem inválida.' });
+      if (typeof raw !== 'string') return reply.code(400).send(fail('sponsorLogoType', 'Use uma imagem PNG, JPEG ou WebP.'));
       const data = Buffer.from(raw.replace(/^data:[^,]*,/, ''), 'base64');
-      if (data.length > MAX_LOGO_BYTES) return reply.code(400).send({ error: `O logo pode ter até ${Math.round(MAX_LOGO_BYTES / 1024)} KB.` });
+      if (data.length > MAX_LOGO_BYTES) {
+        const kb = Math.round(MAX_LOGO_BYTES / 1024);
+        return reply.code(400).send(fail('sponsorLogoSize', `O logo pode ter até ${kb} KB.`, { kb }));
+      }
       const type = imageType(data);
-      if (!type) return reply.code(400).send({ error: 'Use uma imagem PNG, JPEG ou WebP.' });
+      if (!type) return reply.code(400).send(fail('sponsorLogoType', 'Use uma imagem PNG, JPEG ou WebP.'));
       setSponsorLogo(db, req.params.id, data, type);
     }
     const sp = getSponsor(db, req.params.id)!;

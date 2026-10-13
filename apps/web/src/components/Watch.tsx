@@ -2,15 +2,16 @@ import { formatLabel } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import { api, type LiveRoom, ROLE_LABEL, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
+import { type MessageKey, useT } from '../i18n';
 import { LeaderArt } from './LeaderArt';
-import { TIER_LABEL } from './Online';
+import { tierName } from './Online';
 
-const QUEUE_LABEL: Record<LiveRoom['queue'], string> = {
-  ranked: '🏆 Ranqueada',
-  casual: 'Casual',
-  private: 'Sala privada',
-  bot: '🤖 Treino contra o bot',
-  tournament: '🏆 Torneio',
+const QUEUE_LABEL: Record<LiveRoom['queue'], MessageKey> = {
+  ranked: 'watch.queue.ranked',
+  casual: 'watch.queue.casual',
+  private: 'watch.queue.private',
+  bot: 'watch.queue.bot',
+  tournament: 'watch.queue.tournament',
 };
 
 const HANDS_PREF = 'gumgum.watchHands';
@@ -25,6 +26,7 @@ function savedHands(): boolean {
 
 /** Lista das partidas online em andamento para assistir (modo espectador). */
 export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: WatchTarget) => void }) {
+  const t = useT();
   const { user } = useAuth();
   const [rooms, setRooms] = useState<LiveRoom[] | null>(null);
   const [canHands, setCanHands] = useState(false);
@@ -45,10 +47,10 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
         })
         .catch((e) => !stop && setError(e instanceof Error ? e.message : String(e)));
     void load();
-    const t = setInterval(load, 5000);
+    const timer = setInterval(load, 5000);
     return () => {
       stop = true;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [user?.id]);
 
@@ -77,42 +79,40 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
     <div className="coverage watch">
       <header className="builder-header">
         <button className="btn small" onClick={onExit}>
-          ← Menu
+          {t('watch.menu')}
         </button>
-        <h2>Assistir partidas</h2>
+        <h2>{t('watch.title')}</h2>
       </header>
       <div className="coverage-body">
         {error && <div className="error">{error}</div>}
 
         {canHands ? (
           <label className="check watch-hands">
-            <input type="checkbox" checked={hands} onChange={(e) => toggleHands(e.target.checked)} /> Ver as mãos dos jogadores
-            <span className="muted small"> (perfil {user ? ROLE_LABEL[user.role] : 'Streamer'})</span>
+            <input type="checkbox" checked={hands} onChange={(e) => toggleHands(e.target.checked)} /> {t('watch.showHands')}
+            <span className="muted small"> {t('watch.handsRole', { role: user ? t(ROLE_LABEL[user.role]) : t('labels.role.streamer') })}</span>
           </label>
         ) : (
-          <p className="muted small">
-            Você assiste sem ver as mãos dos jogadores. Ver as mãos é só para os perfis Streamer e Admin.
-          </p>
+          <p className="muted small">{t('watch.noHandsHint')}</p>
         )}
 
         <div className="watch-list">
-          {rooms === null && !error && <p className="muted">Carregando…</p>}
-          {rooms?.length === 0 && <p className="muted">Nenhuma partida em andamento agora. A lista se atualiza sozinha.</p>}
+          {rooms === null && !error && <p className="muted">{t('common.loading')}</p>}
+          {rooms?.length === 0 && <p className="muted">{t('watch.empty')}</p>}
           {rooms?.map((r) => (
             <button key={r.id} className="watch-room" onClick={() => watch(r.id, r.mine)}>
               <div className="watch-meta">
                 <span className="watch-queue">
                   {r.tournament
-                    ? `🏆 ${r.tournament.name} · ${r.tournament.label}${r.tournament.bestOf > 1 ? ` · Jogo ${r.tournament.game}` : ''}`
-                    : QUEUE_LABEL[r.queue]}
+                    ? `${t('watch.tourLine', { name: r.tournament.name, label: r.tournament.label })}${r.tournament.bestOf > 1 ? t('watch.tourGame', { n: r.tournament.game }) : ''}`
+                    : t(QUEUE_LABEL[r.queue])}
                 </span>
                 {r.mine && (
-                  <span className="muted small" title="Você joga esta partida: ela aparece sem as mãos dos jogadores">
-                    Sua partida
+                  <span className="muted small" title={t('watch.mineTitle')}>
+                    {t('watch.mine')}
                   </span>
                 )}
                 <span className="muted small">
-                  {formatLabel(r.format)} · {r.turn ? `Turno ${r.turn}` : 'Mão inicial'}
+                  {formatLabel(r.format)} · {r.turn ? t('watch.turn', { n: r.turn }) : t('watch.openingHand')}
                   {r.spectators ? ` · 👁 ${r.spectators}` : ''}
                 </span>
               </div>
@@ -123,30 +123,30 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
                     <span className="watch-name">
                       <b>{p.bot ? '🤖 ' : ''}{p.name}</b>
                       <span className="muted small">
-                        {r.queue === 'ranked' ? `${TIER_LABEL[p.tier] ?? p.tier} · ` : ''}❤ {p.life} · ✋ {p.hand}
+                        {r.queue === 'ranked' ? `${tierName(t, p.tier)} · ` : ''}❤ {p.life} · ✋ {p.hand}
                       </span>
                     </span>
                   </div>
                 ))}
-                <span className="vs-badge">VS</span>
+                <span className="vs-badge">{t('watch.vs')}</span>
               </div>
             </button>
           ))}
         </div>
 
         <div className="field">
-          <label>Sala privada</label>
-          <p className="muted small">Salas privadas não aparecem na lista: peça o código a quem está jogando.</p>
+          <label>{t('watch.privateRoom')}</label>
+          <p className="muted small">{t('watch.privateHint')}</p>
           <div className="join-row">
             <input
               className="code-input"
               value={code}
               maxLength={6}
-              placeholder="Código"
+              placeholder={t('watch.codePlaceholder')}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             />
             <button className="btn" disabled={code.length !== 6} onClick={byCode}>
-              Assistir
+              {t('watch.watch')}
             </button>
           </div>
         </div>

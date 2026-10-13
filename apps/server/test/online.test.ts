@@ -169,6 +169,9 @@ describe('partidas online: salas privadas', () => {
     const std = await post('/api/online/queue', ALICE, { deckId: 'st01-luffy', queue: 'casual' });
     expect(std.statusCode).toBe(400);
     expect(std.json().error).toMatch(/não é permitido no formato Standard/);
+    expect(std.json()).toMatchObject({ errorCode: 'deckNotAllowedInFormat', errorParams: { format: 'Standard' } });
+    // O motivo também vai com a chave do motor, para o cliente traduzir o {issue}.
+    expect(std.json().errorParams).toMatchObject({ issueCode: 'rules.rotated', issueParams: { format: 'Standard' } });
     expect((await post('/api/online/rooms', ALICE, { deckId: 'st01-luffy', format: 'standard' })).statusCode).toBe(400);
     // Carta banida: nem no Extra Grand Battle.
     const banned = await post('/api/online/rooms', ALICE, { deckId: 'st10-law', format: 'egb' });
@@ -240,6 +243,7 @@ describe('partidas online: salas privadas', () => {
     const fast = await chat(tokens[0], 'de novo');
     expect(fast.statusCode).toBe(429);
     expect(fast.json().error).toMatch(/Espere/);
+    expect(fast.json().errorCode).toBe('chatTooFast');
     // O outro assento tem o próprio limite.
     expect((await chat(tokens[1], 'gg')).statusCode).toBe(204);
     expect(seen(c1)).toHaveLength(2);

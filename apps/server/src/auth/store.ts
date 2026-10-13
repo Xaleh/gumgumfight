@@ -2,7 +2,15 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import { type DB, transaction } from '../db';
-import { atLeast, isSupporterTier, PAYMENT_GRACE_DAYS, type SupporterTier, tierRank } from '../support/tiers';
+import {
+  atLeast,
+  isSupporterSource,
+  isSupporterTier,
+  PAYMENT_GRACE_DAYS,
+  type SupporterSource,
+  type SupporterTier,
+  tierRank,
+} from '../support/tiers';
 import type { GoogleIdentity } from './google';
 
 export const SESSION_DAYS = 60;
@@ -32,14 +40,17 @@ export interface User {
   id: string;
   email: string | null;
   name: string | null;
+  /** Foto mostrada: a enviada pelo usuário (URL do servidor) ou, sem ela, a do Google. */
   picture: string | null;
+  /** O usuário enviou a própria foto (pode voltar para a do Google). */
+  customPicture: boolean;
   role: Role;
   /** Plano de apoio ativo agora (null = sem plano ou vencido). */
   supporterTier: SupporterTier | null;
   /** Até quando o plano vale (null = sem prazo). */
   supporterUntil: string | null;
-  /** De onde veio o plano: manual (admin) ou kofi (pagamento). */
-  supporterSource: 'manual' | 'kofi' | null;
+  /** De onde veio o plano: manual (admin), apoiase ou kofi (pagamento). */
+  supporterSource: SupporterSource | null;
   /** Aceitou aparecer na lista pública de Apoiadores. */
   supporterPublic: boolean;
 }
@@ -62,13 +73,16 @@ type UserRow = {
   email: string | null;
   name: string | null;
   picture: string | null;
+  custom_picture_at: number | null;
   role: string;
   supporter_tier: string | null;
   supporter_until: string | null;
   supporter_source: string | null;
   supporter_public: number;
 };
-const USER_COLS = 'id, email, name, picture, role, supporter_tier, supporter_until, supporter_source, supporter_public';
+const USER_COLS = 'id, email, name, picture, custom_picture_at, role, supporter_tier, supporter_until, supporter_source, supporter_public';
+/** Endereço da foto enviada; a versão no endereço deixa o navegador guardar a imagem para sempre. */
+const customPictureUrl = (id: string, version: number) => `/api/users/${encodeURIComponent(id)}/picture?v=${version}`;
 
 /** Plano que vale agora: o gravado, se não venceu. */
 const activeTier = (r: Pick<UserRow, 'supporter_tier' | 'supporter_until'>, now = Date.now()): SupporterTier | null =>
@@ -78,16 +92,18 @@ const toUser = (r: UserRow): User => ({
   id: r.id,
   email: r.email,
   name: r.name,
-  picture: r.picture,
+  picture: r.custom_picture_at ? customPictureUrl(r.id, r.custom_picture_at) : r.picture,
+  customPicture: r.custom_picture_at != null,
   role: isRole(r.role) ? r.role : 'player',
   supporterTier: activeTier(r),
   supporterUntil: r.supporter_until,
-  supporterSource: r.supporter_source === 'kofi' ? 'kofi' : r.supporter_source === 'manual' ? 'manual' : null,
+  supporterSource: isSupporterSource(r.supporter_source) ? r.supporter_source : null,
   supporterPublic: Boolean(r.supporter_public),
 });
 
 /**
- * Cria a conta no primeiro login; nos seguintes, atualiza nome, e-mail e foto.
+ * Cria a conta no primeiro login; nos seguintes, atualiza nome, e-mail e foto do Google
+ * (a foto enviada pelo usuário, se houver, continua valendo).
  * `adminEmails`: e-mails (verificados pelo Google) que viram admin ao entrar (um Dev
  * continua Dev, que já é admin).
  */
@@ -114,6 +130,38 @@ export function getUser(db: DB, id: string): User | null {
   return r ? toUser(r) : null;
 }
 
+/** Tipos aceitos na foto enviada (o tipo vem dos primeiros bytes, não do que o navegador diz). */
+export type PictureType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+export function pictureType(data: Uint8Array): PictureType | null {
+  const at = (i: number, bytes: number[]) => bytes.every((b, k) => data[i + k] === b);
+  if (at(0, [0xff, 0xd8, 0xff])) return 'image/jpeg';
+  if (at(0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
+  if (at(0, [0x52, 0x49, 0x46, 0x46]) && at(8, [0x57, 0x45, 0x42, 0x50])) return 'image/webp';
+  return null;
+}
+
+/** Grava a foto enviada pelo usuário (`data` = null volta para a foto do Google). */
+export function setCustomPicture(db: DB, id: string, picture: { data: Uint8Array; type: PictureType } | null): boolean {
+  const res = picture
+    ? db
+        .prepare('UPDATE users SET custom_picture = ?, custom_picture_type = ?, custom_picture_at = ? WHERE id = ?')
+        // A versão sempre cresce, mesmo com duas trocas no mesmo milissegundo.
+        .run(picture.data, picture.type, Math.max(Date.now(), lastPictureVersion(db, id) + 1), id)
+    : db.prepare('UPDATE users SET custom_picture = NULL, custom_picture_type = NULL, custom_picture_at = NULL WHERE id = ?').run(id);
+  return Number(res.changes) > 0;
+}
+
+const lastPictureVersion = (db: DB, id: string) =>
+  (db.prepare('SELECT custom_picture_at AS v FROM users WHERE id = ?').get(id) as { v: number | null } | undefined)?.v ?? 0;
+
+export function getCustomPicture(db: DB, id: string): { data: Uint8Array; type: string } | null {
+  const r = db.prepare('SELECT custom_picture AS data, custom_picture_type AS type FROM users WHERE id = ? AND custom_picture IS NOT NULL').get(id) as
+    | { data: Uint8Array; type: string }
+    | undefined;
+  return r ?? null;
+}
+
 export function setUserRole(db: DB, id: string, role: Role): boolean {
   return Number(db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id).changes) > 0;
 }
@@ -137,18 +185,22 @@ export function setSupporterPublic(db: DB, id: string, visible: boolean) {
 }
 
 /**
- * Aplica um pagamento mensal à conta: o plano pago vale por PAYMENT_GRACE_DAYS a partir
- * do pagamento. Um plano manual maior e ainda válido é mantido (o admin decide sobre ele).
+ * Liga o plano pago na conta até `until`. Um plano manual maior e ainda válido é mantido
+ * (o admin decide sobre ele); uma resposta repetida não encurta um plano igual que já vai
+ * mais longe.
  */
-export function applySupporterPayment(db: DB, userId: string, tier: SupporterTier, paidAt: string): boolean {
+export function applySupporterPlan(db: DB, userId: string, tier: SupporterTier, until: string, source: Exclude<SupporterSource, 'manual'>): boolean {
   const user = getUser(db, userId);
   if (!user) return false;
-  const until = new Date(Date.parse(paidAt) + PAYMENT_GRACE_DAYS * 86_400_000).toISOString();
   if (user.supporterSource === 'manual' && tierRank(user.supporterTier) > tierRank(tier)) return false;
-  // Um pagamento antigo (reenvio do webhook) não encurta um plano mais novo do mesmo nível.
-  if (user.supporterSource === 'kofi' && user.supporterTier === tier && user.supporterUntil && user.supporterUntil > until) return false;
-  db.prepare("UPDATE users SET supporter_tier = ?, supporter_until = ?, supporter_source = 'kofi' WHERE id = ?").run(tier, until, userId);
+  if (user.supporterSource === source && user.supporterTier === tier && user.supporterUntil && user.supporterUntil >= until) return false;
+  db.prepare('UPDATE users SET supporter_tier = ?, supporter_until = ?, supporter_source = ? WHERE id = ?').run(tier, until, source, userId);
   return true;
+}
+
+/** Ko-fi: o pagamento mensal vale PAYMENT_GRACE_DAYS a partir de quando foi feito. */
+export function applySupporterPayment(db: DB, userId: string, tier: SupporterTier, paidAt: string): boolean {
+  return applySupporterPlan(db, userId, tier, new Date(Date.parse(paidAt) + PAYMENT_GRACE_DAYS * 86_400_000).toISOString(), 'kofi');
 }
 
 /** Conta com este e-mail confirmado pelo Google (para aplicar pagamentos e responder à homologação). */

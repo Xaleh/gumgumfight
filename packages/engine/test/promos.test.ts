@@ -263,7 +263,15 @@ describe('P-117 Nami (Líder): só {East Blue} no deck e vitória com o deck zer
     byId.set(other.id, other);
     const r = validateDeck({ ...deck('XX-TEST'), cards: [{ id: 'XX-TEST', count: 4 }, { id: 'EB-TEST', count: 46 }] }, byId);
     expect(r.valid).toBe(false);
-    expect(leaderRule(r)).toEqual([{ level: 'error', message: 'Usopp (XX-TEST): o Líder só permite cartas do tipo {East Blue}.', cardId: 'XX-TEST' }]);
+    expect(leaderRule(r)).toEqual([
+      {
+        level: 'error',
+        message: 'Usopp (XX-TEST): o Líder só permite cartas do tipo {East Blue}.',
+        code: 'rules.leaderOnlyType',
+        params: { name: 'Usopp', id: 'XX-TEST', type: 'East Blue' },
+        cardId: 'XX-TEST',
+      },
+    ]);
   });
 
   it('o [DON!! x1] descarta a última carta do deck e Nami vence em vez de perder', () => {

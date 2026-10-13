@@ -49,6 +49,12 @@ describe('cardStatuses', () => {
     expect(by.keyword).toMatchObject({ keyword: 'blocker', tone: 'good', text: 'Ganhou [Blocker]' });
     // Poder somado por duração; não vira ícone na carta (o número do poder já muda de cor).
     expect(by.power).toMatchObject({ label: '+3000 poder', onCard: false });
+    // Ao lado de cada texto, a chave de tradução e os parâmetros.
+    expect(by.cannotAttack).toMatchObject({ tagKey: 'status.cannotAttackTag', textKey: 'status.cannotAttack', untilKey: 'status.untilEndOfTurn' });
+    expect(by.cannotRest).toMatchObject({ untilKey: 'status.untilEndOfNextTurn', untilParams: { name: 'Luffy' } });
+    expect(by.skipRefresh).toMatchObject({ untilKey: 'status.untilNextRefresh', untilParams: { name: 'Luffy' } });
+    expect(by.keyword).toMatchObject({ textKey: 'status.gainedKeyword', textParams: { keyword: 'Blocker' } });
+    expect(by.power).toMatchObject({ tagKey: 'status.powerTag', tagParams: { amount: '+3000' }, textKey: 'status.power', textParams: { amount: '+3000' } });
   });
 
   it('a palavra-chave impressa não é marcada como ganha', () => {
