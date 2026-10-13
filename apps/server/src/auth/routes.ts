@@ -47,7 +47,14 @@ function setSessionCookie(req: FastifyRequest, reply: FastifyReply, token: strin
   reply.header('set-cookie', attrs.join('; '));
 }
 
-const publicUser = (u: User) => ({ id: u.id, name: u.name, email: u.email, picture: u.picture, role: u.role });
+const publicUser = (u: User) => ({
+  id: u.id,
+  name: u.name,
+  email: u.email,
+  picture: u.picture,
+  role: u.role,
+  supporter: u.supporterTier ? { tier: u.supporterTier, until: u.supporterUntil, source: u.supporterSource, public: u.supporterPublic } : null,
+});
 
 export function registerAuth(app: FastifyInstance, { db, clientId, keys, browserHash, adminEmails = [] }: Deps) {
   const cache = new WeakMap<FastifyRequest, User | null>();

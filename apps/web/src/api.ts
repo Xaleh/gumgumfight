@@ -145,15 +145,83 @@ export interface User {
   email: string | null;
   picture: string | null;
   role: Role;
+  /** Plano de apoio ativo (null = sem plano). */
+  supporter: SupporterState | null;
+}
+
+// ------------------------------------------------------------------ apoio ao projeto
+
+/** Planos de apoio mensal, do menor para o maior. */
+export type SupporterTier = 'grumete' | 'tripulante' | 'capitao' | 'almirante';
+export const SUPPORTER_TIERS: SupporterTier[] = ['grumete', 'tripulante', 'capitao', 'almirante'];
+export const TIER_LABEL: Record<SupporterTier, string> = { grumete: 'Grumete', tripulante: 'Tripulante', capitao: 'Capitão', almirante: 'Almirante' };
+export const tierRank = (t: SupporterTier | null | undefined) => (t ? SUPPORTER_TIERS.indexOf(t) + 1 : 0);
+/** A conta tem o benefício do plano `min` (admins têm todos, para testar e moderar). */
+export const hasPerk = (u: User | null | undefined, min: SupporterTier) => Boolean(u && (isAdmin(u.role) || tierRank(u.supporter?.tier) >= tierRank(min)));
+
+export interface SupporterState {
+  tier: SupporterTier;
+  /** Até quando vale (null = sem prazo). */
+  until: string | null;
+  source: 'manual' | 'kofi' | null;
+  /** Aparece na lista pública de Apoiadores. */
+  public: boolean;
+}
+
+export interface TierInfo {
+  id: SupporterTier;
+  label: string;
+  price: number;
+  perks: string[];
+}
+
+export interface SupportInfo {
+  enabled: boolean;
+  pix: { key: string; name: string; city: string; codes: Array<{ amount: number | null; code: string }> } | null;
+  coffeeUrl: string | null;
+  monthlyUrl: string | null;
+  contactUrl: string | null;
+  /** Custo mensal do site (meta). */
+  goal: number | null;
+  /** Soma mensal dos planos ativos. */
+  covered: number;
+  supporters: number;
+  tiers: TierInfo[];
+  me: (Omit<SupporterState, 'tier'> & { tier: SupporterTier | null }) | null;
+}
+
+export interface SupporterPayment {
+  id: string;
+  email: string | null;
+  kind: string;
+  tier: SupporterTier | null;
+  amount: number;
+  currency: string;
+  paidAt: string;
+  userId: string | null;
+  userName: string | null;
 }
 
 export interface AdminUser extends User {
   createdAt: string;
   lastLoginAt: string;
+  supporterTier: SupporterTier | null;
+  supporterUntil: string | null;
+  supporterSource: 'manual' | 'kofi' | null;
+}
+
+export interface AppConfig {
+  cardImages: boolean;
+  languages: string[];
+  googleClientId: string | null;
+  /** O apoio está configurado: o item "Apoiar o projeto" aparece. */
+  support: boolean;
+  /** supporters: o site só abre para apoiadores (homologação). */
+  access: 'open' | 'supporters';
 }
 
 export const api = {
-  config: () => get<{ cardImages: boolean; languages: string[]; googleClientId: string | null }>('/api/config'),
+  config: () => get<AppConfig>('/api/config'),
   me: () => get<{ user: User | null }>('/api/auth/me'),
   /** Troca o ID token do botão do Google por uma sessão (cookie). */
   googleLogin: (credential: string) => send<{ user: User; claimedDecks: number }>('POST', '/api/auth/google', { credential }),
@@ -179,6 +247,18 @@ export const api = {
   admin: {
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
     setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
+    /** Plano dado à mão; `until` "AAAA-MM-DD" ou null (sem prazo). */
+    setSupporter: (id: string, tier: SupporterTier | null, until: string | null) =>
+      send<Pick<AdminUser, 'id' | 'supporterTier' | 'supporterUntil' | 'supporterSource'>>('PUT', `/api/admin/users/${encodeURIComponent(id)}/supporter`, {
+        tier,
+        until,
+      }),
+    payments: () => get<SupporterPayment[]>('/api/admin/support/payments'),
+  },
+  support: {
+    info: () => get<SupportInfo>('/api/support'),
+    supporters: () => get<Array<{ name: string; tier: SupporterTier }>>('/api/support/supporters'),
+    setPublic: (visible: boolean) => send<{ public: boolean }>('PUT', '/api/support/me', { public: visible }),
   },
   tournaments: {
     list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean }>('/api/tournaments'),

@@ -34,6 +34,7 @@ import type { LobbyLimits } from './online/lobby';
 import { registerOnlineRoutes } from './online/routes';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
+import { registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
 import { reportFromGame } from './tournaments/store';
 
@@ -65,6 +66,10 @@ export function buildApp(
     cardImages: server.cardImages,
     languages: ['pt', 'en'],
     googleClientId: server.googleClientId ?? null,
+    /** O apoio está configurado: o item "Apoiar o projeto" aparece no menu. */
+    support: supportEnabled(server.support),
+    /** supporters: o site só abre para apoiadores (homologação). */
+    access: server.access?.mode ?? 'open',
   }));
 
   app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => present(listCards(db, req.query.set)));
@@ -254,6 +259,7 @@ export function buildApp(
   registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined });
 
   registerReportRoutes(app, { db, user: auth.viewer });
+  registerSupportRoutes(app, { db, user: auth.viewer, options: server.support ?? {} });
 
   app.get('/api/matches', async () => recentMatches(db));
 

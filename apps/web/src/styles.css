@@ -8035,3 +8035,48 @@ tr.clickable:hover td {
   -webkit-text-stroke: 1.5px #3a0a06;
   text-shadow: 0 3px 0 #3a0a06, 0 6px 16px rgba(0, 0, 0, 0.5);
 }
+
+/* ==================================================================
+   Apoio ao projeto: plano das contas na Administração.
+   ================================================================== */
+.admin-supporter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.admin-supporter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-supporter select,
+.admin-supporter input {
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-table th {
+  font-weight: 600;
+  color: var(--muted, inherit);
+}
+.admin-payments {
+  overflow-x: auto;
+}

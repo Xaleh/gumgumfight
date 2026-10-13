@@ -91,6 +91,41 @@ function migrate(db: DB) {
   migrateAuth(db);
   migrateTournaments(db);
   migrateCardIds(db);
+  migrateSupport(db);
+}
+
+/**
+ * Apoio ao projeto: o plano de cada conta, os pagamentos recebidos da plataforma de
+ * apoio (Ko-fi), a cota de torneios dos apoiadores, os torneios do time e as lojas
+ * patrocinadoras.
+ */
+function migrateSupport(db: DB) {
+  const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  // supporter_tier: grumete | tripulante | capitao | almirante (null = sem plano).
+  if (!userCols.includes('supporter_tier')) db.exec('ALTER TABLE users ADD COLUMN supporter_tier TEXT');
+  // supporter_until: até quando o plano vale (ISO; null = sem prazo, dado à mão pelo admin).
+  if (!userCols.includes('supporter_until')) db.exec('ALTER TABLE users ADD COLUMN supporter_until TEXT');
+  // supporter_source: manual (admin) | kofi (pagamento).
+  if (!userCols.includes('supporter_source')) db.exec('ALTER TABLE users ADD COLUMN supporter_source TEXT');
+  // supporter_public: a pessoa aceitou aparecer na lista de Apoiadores.
+  if (!userCols.includes('supporter_public')) db.exec('ALTER TABLE users ADD COLUMN supporter_public INTEGER NOT NULL DEFAULT 0');
+  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
+  if (!userCols.includes('email_verified')) db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+  db.exec(`
+    -- Pagamentos recebidos pelo webhook da plataforma de apoio (auditoria e idempotência).
+    CREATE TABLE IF NOT EXISTS supporter_payments (
+      id          TEXT PRIMARY KEY,             -- id da transação na plataforma
+      email       TEXT,                         -- e-mail de quem pagou (minúsculo)
+      kind        TEXT NOT NULL,                -- Donation | Subscription | ...
+      tier        TEXT,                         -- plano reconhecido (null = doação avulsa)
+      amount      REAL NOT NULL,
+      currency    TEXT NOT NULL,
+      paid_at     TEXT NOT NULL,
+      user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS supporter_payments_email ON supporter_payments(email, paid_at);
+  `);
 }
 
 /** Deck com os números de carta sem sufixo de versão ("P-029_r1" -> "P-029"), juntando as cópias. */
