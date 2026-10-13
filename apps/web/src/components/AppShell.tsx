@@ -3,7 +3,7 @@
 // (gaveta lateral), junto com a conta e os atalhos de admin/dev.
 
 import { useEffect, useRef, useState } from 'react';
-import { ROLE_LABEL } from '../api';
+import { ROLE_LABEL, TIER_LABEL } from '../api';
 import { GoogleButton, useAuth } from '../auth';
 import { useSettings } from '../settings';
 import { Icon, type IconName } from './Icons';
@@ -51,6 +51,11 @@ function AccountBlock() {
           <strong>
             {user.name ?? 'Conta Google'}
             {user.role !== 'player' && <span className={['role-tag', user.role].join(' ')}>{ROLE_LABEL[user.role]}</span>}
+            {user.supporter && (
+              <span className="supporter-tag" title="Plano de apoio">
+                ❤ {TIER_LABEL[user.supporter.tier]}
+              </span>
+            )}
           </strong>
           {user.email && <span className="muted small">{user.email}</span>}
         </div>

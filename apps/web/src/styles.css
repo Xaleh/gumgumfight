@@ -8080,3 +8080,233 @@ tr.clickable:hover td {
 .admin-payments {
   overflow-x: auto;
 }
+
+/* ==================================================================
+   Apoio ao projeto: modal (components/Support.tsx), lista de apoiadores
+   e selo de apoiador.
+   ================================================================== */
+.support-sheet .sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.page-sheet.centered .support-sheet {
+  width: min(640px, 100%);
+}
+.support-intro {
+  margin: 0;
+}
+.support-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.support-block h4 {
+  margin: 0;
+  font-size: 16px;
+}
+.support-block p {
+  margin: 0;
+}
+.support-goal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.support-goal-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.support-goal-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.support-goal-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+}
+.pix-amounts {
+  flex-wrap: wrap;
+}
+.pix-box {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.pix-qr {
+  width: 180px;
+  height: 180px;
+  flex: none;
+  padding: 6px;
+  border-radius: 12px;
+  /* O QR precisa de fundo branco e módulos pretos em qualquer tema. */
+  background: #fff;
+}
+.pix-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pix-qr.loading {
+  background: var(--panel2);
+}
+.pix-side {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.pix-code {
+  width: 100%;
+  font: 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  resize: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: inherit;
+}
+.support-cta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.support-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+.support-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+}
+.support-plan header {
+  display: flex;
+  flex-direction: column;
+}
+.support-plan header span {
+  font-weight: 800;
+  font-size: 18px;
+}
+.support-plan header small {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+}
+.support-plan ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.support-plan.current {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent);
+}
+.support-plan-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #2a1a00;
+}
+.support-plan.tier-almirante {
+  border-color: color-mix(in srgb, var(--gold) 60%, var(--line));
+}
+.support-fair {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+}
+.support-mine {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--gold) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line));
+}
+.support-mine p {
+  margin: 0 0 6px;
+}
+.support-mine-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.supporters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.supporters-list ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.supporters-list li {
+  font-size: 13px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.supporters-list li.tier-almirante {
+  border-color: var(--gold);
+  font-weight: 700;
+}
+.supporters-list.compact {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.supporter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+}
+.home-support-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

@@ -186,7 +186,7 @@ function ThemeSeg({ compact }: { compact?: boolean }) {
 }
 
 /** Interruptor liga/desliga de uma opção. */
-function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boolean; label: string; onChange: (on: boolean) => void }) {
+export function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boolean; label: string; onChange: (on: boolean) => void }) {
   return (
     <button
       type="button"
