@@ -73,8 +73,8 @@ feitos na ordem enquanto forem possíveis) ou `'bot'` (o bot fácil, na batalha 
 - **Progresso no servidor.** `GET`/`PUT /api/tutorial/progress` (tabela `tutorial_progress`, chave = conta `user:<id>`
   ou o hash do navegador). O `PUT` soma as lições feitas (`done`) às que já estavam lá; `reset: true` troca a lista
   (botão "Recomeçar o tutorial"). `dismissed` (o convite da home foi fechado) e o título nunca voltam atrás.
-- **Título "Aprendiz da Grand Line".** Quem conclui as 14 lições ganha o título: aparece ao lado do apelido no menu, no
-  hub e na faixa da partida online (o servidor manda `apprentice` em `/api/players/me` e nos jogadores da sala).
+- **Título "Aprendiz da Grand Line".** Quem conclui as 14 lições ganha o título, mostrado só no hub do tutorial. O
+  servidor ainda manda `apprentice` em `/api/players/me` e nos jogadores da sala, mas o menu e a partida online não o exibem.
 - **Dicas do treinador** (Configurações → "Dicas do treinador", ou o botão no fim da batalha final). Desligadas por
   padrão. Nas partidas contra o bot, um balão curto sugere o que olhar agora: manter ou trocar a mão, bloquear ou não,
   quanto Counter falta, Trigger, gastar DON!!, atacar. Textos: `coach.tip.<chave>`. O balão some ao fechar até a
