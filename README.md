@@ -424,7 +424,7 @@ na mesa de verdade, com cenários prontos montados pelo motor: um treinador expl
 e pede uma jogada, travando as outras até a hora certa. Há também a anatomia da carta (toque e descubra), quizzes, um
 glossário de termos e uma partida final contra o bot fácil com dicas. Não precisa de login; o progresso fica no
 navegador e é guardado também no servidor (por conta ou por navegador). Quem termina as 14 lições ganha o título
-**Aprendiz da Grand Line** (no perfil e na partida online). Fora das lições: **Dicas do treinador** nas partidas contra
+**Aprendiz da Grand Line** (mostrado só no hub do tutorial). Fora das lições: **Dicas do treinador** nas partidas contra
 o bot (opção nas Configurações, desligada por padrão), palavras-chave clicáveis no texto das cartas e, para a
 administração, o funil anônimo das lições (onde as pessoas desistem). Detalhes e como escrever uma lição nova:
 [`docs/tutorial.md`](docs/tutorial.md).

@@ -25,7 +25,6 @@ import { LiveNow, MetaBlock, TournamentBanner, TournamentsBlock, usePoll } from 
 import { Icon, type IconName } from './Icons';
 import { InstallBanner } from './Install';
 import { LearnBanner } from './LearnBanner';
-import { useTutorialProgress } from '../game/tutorial/progress';
 import { LeaderArt } from './LeaderArt';
 import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 import { ReplayLoader } from './ReplayLoader';
@@ -344,14 +343,11 @@ export function Menu({
   const userId = user?.id;
   /** Apelido do jogador (perfil deste navegador): nome nas partidas contra o bot e online. */
   const [nickname, setNickname] = useState<string | null>(null);
-  /** Concluiu o tutorial: título "Aprendiz da Grand Line" ao lado do apelido. */
-  const [apprentice, setApprentice] = useState(false);
-  const { completedAll } = useTutorialProgress();
   useEffect(() => {
     let cancelled = false;
     api
       .player()
-      .then((p) => !cancelled && (setNickname(p?.name ?? null), setApprentice(Boolean(p?.apprentice))))
+      .then((p) => !cancelled && setNickname(p?.name ?? null))
       .catch(() => undefined);
     const onRename = (e: Event) => setNickname((e as CustomEvent<string>).detail);
     window.addEventListener(NICKNAME_EVENT, onRename);
@@ -576,11 +572,6 @@ export function Menu({
               <button type="button" className="hero-link nickname-link" onClick={() => setShowSettings(true)} title={t('menu.nicknameTitle')}>
                 <Icon name="user" size={18} />
                 {nickname ?? t('menu.nickname')}
-                {(apprentice || completedAll) && (
-                  <span className="apprentice-tag" title={t('tutorial.titleHint')}>
-                    {t('tutorial.titleShort')}
-                  </span>
-                )}
                 <small>✎</small>
               </button>
             </div>

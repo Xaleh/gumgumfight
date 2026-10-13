@@ -51,7 +51,11 @@ export function Learn({ onExit, onLesson }: { onExit: () => void; onLesson: (id:
               ) : (
                 <span className="learn-all-done">
                   {t('tutorial.allDone')}{' '}
-                  {completedAll && <span className="apprentice-tag">{t('tutorial.titleShort')}</span>}
+                  {completedAll && (
+                    <span className="apprentice-tag" title={t('tutorial.titleHint')}>
+                      {t('tutorial.titleShort')}
+                    </span>
+                  )}
                 </span>
               )}
               {done.length === 0 && (
