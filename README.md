@@ -58,6 +58,19 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `ONLINE_MAX_ROOMS` | `400`                      | Salas online ativas ao mesmo tempo no servidor (acima disso, 503); cada sala custa memória e CPU |
 | `ONLINE_MAX_BOT_ROOMS` | `100`                  | Treinos contra o bot transmitidos ao mesmo tempo (o servidor joga pelo bot); acima disso o treino roda no navegador |
 | `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
+| `SUPPORT_PIX_KEY` / `SUPPORT_PIX_NAME` / `SUPPORT_PIX_CITY` | (vazio) | Pix do "café": chave (de preferência aleatória), nome e cidade de quem recebe |
+| `SUPPORT_COFFEE_URL` | (vazio) | Página da doação avulsa (ex.: Ko-fi) |
+| `SUPPORT_MONTHLY_URL` | (vazio) | Página dos planos mensais (Grumete, Tripulante, Capitão, Almirante) |
+| `SUPPORT_GOAL_BRL` | (vazio) | Custo mensal do site, mostrado como meta no "Apoiar o projeto" |
+| `SUPPORT_CONTACT_URL` | (vazio) | Contato para lojas que querem patrocinar (`mailto:` ou link) |
+| `KOFI_WEBHOOK_TOKEN` | (vazio) | Token do webhook do Ko-fi; vazio = webhook desligado (segredo: só no `deploy.env`) |
+| `INTERNAL_TOKEN` | (vazio) | Token da consulta de plano entre homologação e produção (igual nos dois; segredo) |
+| `ACCESS` | `open` | `supporters`: o site só abre para apoiadores Tripulante ou acima e admins (homologação) |
+| `SUPPORT_SOURCE_URL` | (vazio) | Com `ACCESS=supporters`: site onde o plano é consultado (a produção) |
+
+Sem nenhuma variável de apoio, o item "Apoiar o projeto" não aparece e as estatísticas ficam todas abertas, como
+antes. Com o apoio configurado, as Estatísticas Pro (ranqueada, torneios e filtro por faixa) passam a exigir o plano
+Tripulante. Detalhes, planos e o passo a passo estão em [`docs/apoio/`](docs/apoio/README.md).
 
 O backup é só copiar o arquivo `.db`.
 

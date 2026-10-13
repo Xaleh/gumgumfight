@@ -130,6 +130,14 @@ describe('torneios do time e lojas patrocinadoras', () => {
     // Selo do plano ao lado do nome.
     expect(ok.players.find((p: { userId: string }) => p.userId === almirante.id).supporter).toBe('almirante');
 
+    // Ligar a janela depois não tira quem já estava inscrito: ele ainda troca de deck.
+    const regular = login(db);
+    const other = (await req(app, 'POST', '/api/tournaments', admin, { ...body('Outra copa'), official: true })).json();
+    await req(app, 'POST', `/api/tournaments/${other.id}/register`, regular, { deckId: 'st01-luffy' });
+    await req(app, 'PUT', `/api/tournaments/${other.id}`, admin, { ...body('Outra copa'), official: true, priority: true });
+    expect((await req(app, 'POST', `/api/tournaments/${other.id}/register`, regular, { deckId: 'st02-kid' })).statusCode).toBe(200);
+    expect((await req(app, 'POST', `/api/tournaments/${other.id}/register`, player, { deckId: 'st02-kid' })).statusCode).toBe(403);
+
     // Passadas as 48 h, abre para todos.
     setClock(T0 + 49 * 3_600_000);
     expect((await reg(player, 'st03-crocodile')).statusCode).toBe(200);

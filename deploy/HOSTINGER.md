@@ -131,6 +131,47 @@ No [Google Cloud Console](https://console.cloud.google.com/apis/credentials), na
 autorizadas** do Client ID, use `https://gumgumfight.app` (o `www` e o `.cloud` redirecionam, não precisam entrar).
 Cadastre o Client ID na Variable `GOOGLE_CLIENT_ID` do GitHub e rode um deploy.
 
+## 7. Apoio ao projeto (opcional)
+
+Os valores ficam só no `deploy.env` da VM (os tokens são segredos: nunca no repositório nem nas Variables do GitHub).
+Na produção:
+
+```bash
+ssh gumgum@<IP-DA-VPS>
+nano ~/apps/gumgumfight/shared/deploy.env
+```
+
+```ini
+SUPPORT_PIX_KEY=<chave-aleatoria>
+SUPPORT_PIX_NAME=Seu Nome
+SUPPORT_PIX_CITY=Sua Cidade
+SUPPORT_COFFEE_URL=https://ko-fi.com/<seu-usuario>
+SUPPORT_MONTHLY_URL=https://ko-fi.com/<seu-usuario>/tiers
+SUPPORT_GOAL_BRL=120
+SUPPORT_CONTACT_URL=mailto:<seu-email>
+KOFI_WEBHOOK_TOKEN=<token do Ko-fi: Settings → API → Webhooks>
+INTERNAL_TOKEN=<texto aleatório longo, o mesmo da homologação>
+```
+
+Para aplicar sem esperar o próximo deploy:
+
+```bash
+pm2 startOrReload ~/apps/gumgumfight/current/deploy/ecosystem.config.cjs --update-env && pm2 save
+```
+
+No Ko-fi, em **Settings → API → Webhook URL**, use `https://gumgumfight.app/api/support/kofi`. O "Send Test" do Ko-fi
+deve aparecer na Administração → "Apoios recebidos".
+
+Na homologação (`gumgumfight.duckdns.org`), para abrir o site só para apoiadores:
+
+```ini
+ACCESS=supporters
+SUPPORT_SOURCE_URL=https://gumgumfight.app
+INTERNAL_TOKEN=<o mesmo da produção>
+```
+
+Rodar o `setup-vm.sh` de novo mantém essas linhas.
+
 ## Operação
 
 ```bash

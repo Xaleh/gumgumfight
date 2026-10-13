@@ -489,7 +489,7 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
       /** Limite de jogadores dos torneios da cota de apoiador (para o formulário de edição). */
       maxPlayersCap: t.quota && !isAdmin(u?.role) && !createsTournaments(u?.role) ? SUPPORTER_MAX_PLAYERS : MAX_PLAYERS,
       canManage: manage,
-      canRegister: canRegisterNow(t, u),
+      canRegister: canRegisterNow(t, u) || Boolean(u && t.status === 'registration' && players.some((p) => p.userId === u.id)),
       me: me
         ? {
             deckId: me.deckId,
@@ -774,11 +774,12 @@ export function registerTournamentRoutes(app: FastifyInstance, { db, user, prese
     const t = getTournament(db, req.params.id);
     if (!t) return reply.code(404).send({ error: 'Torneio não encontrado.' });
     if (t.status !== 'registration') return reply.code(409).send({ error: 'As inscrições deste torneio já fecharam.' });
-    if (!canRegisterNow(t, me)) {
+    const already = listPlayers(db, t.id).some((p) => p.userId === me.id);
+    // Inscrição antecipada: só barra inscrições novas (quem já está inscrito pode trocar de deck).
+    if (!already && !canRegisterNow(t, me)) {
       const opens = new Date(t.priorityUntil!).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
       return reply.code(403).send({ error: `Inscrição antecipada para apoiadores Almirante: abre para todos em ${opens}.` });
     }
-    const already = listPlayers(db, t.id).some((p) => p.userId === me.id);
     if (!already && t.maxPlayers !== null && countPlayers(db, t.id) >= t.maxPlayers) {
       return reply.code(409).send({ error: 'O torneio está lotado.' });
     }

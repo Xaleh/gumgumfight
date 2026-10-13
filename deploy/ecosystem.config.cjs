@@ -57,6 +57,20 @@ module.exports = {
         // Tetos de salas ativas (todas / só treino contra o bot); vazio = padrões do app.
         ONLINE_MAX_ROOMS: env.ONLINE_MAX_ROOMS || '',
         ONLINE_MAX_BOT_ROOMS: env.ONLINE_MAX_BOT_ROOMS || '',
+        // Apoio ao projeto (Pix, Ko-fi, meta do mês, contato das lojas); vazio = item "Apoiar" escondido.
+        SUPPORT_PIX_KEY: env.SUPPORT_PIX_KEY || '',
+        SUPPORT_PIX_NAME: env.SUPPORT_PIX_NAME || '',
+        SUPPORT_PIX_CITY: env.SUPPORT_PIX_CITY || '',
+        SUPPORT_COFFEE_URL: env.SUPPORT_COFFEE_URL || '',
+        SUPPORT_MONTHLY_URL: env.SUPPORT_MONTHLY_URL || '',
+        SUPPORT_GOAL_BRL: env.SUPPORT_GOAL_BRL || '',
+        SUPPORT_CONTACT_URL: env.SUPPORT_CONTACT_URL || '',
+        // Segredos: só aqui no deploy.env da VM, nunca no repositório nem nas Variables do GitHub.
+        KOFI_WEBHOOK_TOKEN: env.KOFI_WEBHOOK_TOKEN || '',
+        INTERNAL_TOKEN: env.INTERNAL_TOKEN || '',
+        // Homologação: ACCESS=supporters fecha o site para quem não é apoiador; o plano é consultado em SUPPORT_SOURCE_URL.
+        ACCESS: env.ACCESS || '',
+        SUPPORT_SOURCE_URL: env.SUPPORT_SOURCE_URL || '',
       },
     },
   ],

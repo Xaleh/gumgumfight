@@ -110,7 +110,12 @@ function migrateSupport(db: DB) {
   // supporter_public: a pessoa aceitou aparecer na lista de Apoiadores.
   if (!userCols.includes('supporter_public')) db.exec('ALTER TABLE users ADD COLUMN supporter_public INTEGER NOT NULL DEFAULT 0');
   // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
-  if (!userCols.includes('email_verified')) db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+  if (!userCols.includes('email_verified')) {
+    db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+    // Contas de antes desta coluna: endereços do Gmail são sempre confirmados pelo Google; os outros
+    // ficam confirmados no próximo login (até lá, o admin pode dar o plano à mão).
+    db.exec("UPDATE users SET email_verified = 1 WHERE lower(email) LIKE '%@gmail.com' OR lower(email) LIKE '%@googlemail.com'");
+  }
   db.exec(`
     -- Pagamentos recebidos pelo webhook da plataforma de apoio (auditoria e idempotência).
     CREATE TABLE IF NOT EXISTS supporter_payments (
