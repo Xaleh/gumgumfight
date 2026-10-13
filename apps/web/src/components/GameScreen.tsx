@@ -35,7 +35,7 @@ import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board } from './Board';
 import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
-import { CardView, type Highlight } from './CardView';
+import { CardView, type Highlight, StaticCard } from './CardView';
 import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
@@ -402,6 +402,29 @@ function Table({
     setNotice(logText(tryT, hit));
     const t = setTimeout(() => setNotice(null), 6000);
     return () => clearTimeout(t);
+  }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  /**
+   * Cartas que o oponente revelou (busca no deck, carta da mão, topo do deck…): aparecem na mesa até o
+   * jogador fechar. Sem isso só o histórico dizia qual carta foi, e a carta some na mão do oponente.
+   * Não aparece para quem escolheu a carta (já a viu), no tutorial nem para quem só assiste.
+   */
+  const [reveals, setReveals] = useState<RevealLine[]>([]);
+  const revealSeen = useRef(state.log.length);
+  useEffect(() => {
+    if (revealSeen.current > state.log.length) {
+      revealSeen.current = state.log.length; // desfazer / replay: nada de avisos antigos
+      setReveals([]);
+      return;
+    }
+    const fresh = state.log.slice(revealSeen.current);
+    revealSeen.current = state.log.length;
+    if (game.jumped || tutorial || human === null) return;
+    const lines = fresh.flatMap((e): RevealLine[] => {
+      if (!e.revealed?.length || e.revealedBy === human) return [];
+      const cards = e.revealed.map((id) => state.defs[id]).filter((d): d is CardDef => Boolean(d));
+      return cards.length ? [{ text: logText(tryT, e), cards }] : [];
+    });
+    if (lines.length) setReveals((r) => [...r, ...lines]);
   }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
@@ -1358,6 +1381,8 @@ function Table({
             </div>
           </SheetFrame>
         )}
+
+        {reveals.length > 0 && <RevealedCards lines={reveals} onCard={setLogCard} onClose={() => setReveals([])} />}
 
         {logCard && <StaticCardZoom card={logCard} className="log-zoom" onClose={() => setLogCard(null)} />}
 
@@ -2588,6 +2613,41 @@ function SheetFrame({ title, onClose, children }: { title: string; onClose: () =
           </button>
         </div>
         <div className="sheet-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Linha do histórico com cartas reveladas, para o aviso na mesa. */
+interface RevealLine {
+  text: string;
+  cards: CardDef[];
+}
+
+/** Cartas reveladas pelo oponente: a carta inteira (toque para ler) e a linha do histórico. */
+function RevealedCards({ lines, onCard, onClose }: { lines: RevealLine[]; onCard: (def: CardDef) => void; onClose: () => void }) {
+  const t = useT();
+  const n = lines.reduce((sum, l) => sum + l.cards.length, 0);
+  return (
+    <div className="modal-backdrop reveal-backdrop" onClick={onClose}>
+      <div className="modal-card" role="dialog" aria-label={t('game.revealedTitle', { n })} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-kicker">{t('game.revealedTitle', { n })}</div>
+        {lines.map((line, i) => (
+          <div key={i} className="reveal-line">
+            <div className="modal-feature reveal-cards">
+              {line.cards.map((def, j) => (
+                <StaticCard key={j} card={def} onClick={() => onCard(def)} />
+              ))}
+            </div>
+            <p className="small">{line.text}</p>
+          </div>
+        ))}
+        <p className="muted small">{t('game.tapCardToRead')}</p>
+        <div className="btn-row center">
+          <button className="btn primary big" onClick={onClose} autoFocus>
+            {t('game.revealedOk')}
+          </button>
+        </div>
       </div>
     </div>
   );

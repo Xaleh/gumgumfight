@@ -24,6 +24,17 @@ const extra: CardData[] = [
   { id: 'DR-002', name: 'Jailer', category: 'character', colors: ['blue'], cost: 1, power: 2000, types: [], text: "[On Play] Your opponent cannot play Character cards until the end of your opponent's next turn." },
   { id: 'DR-003', name: 'Hider', category: 'character', colors: ['yellow'], cost: 1, power: 2000, types: [], text: '[On Play] Add up to 1 card from your hand to the top of your Life cards.' },
   { id: 'DR-004', name: 'Bon Clay', category: 'character', colors: ['yellow'], cost: 5, power: 6000, types: [], text: '' },
+  {
+    id: 'DR-005',
+    name: 'Seeker',
+    category: 'character',
+    colors: ['yellow'],
+    cost: 1,
+    power: 2000,
+    types: [],
+    text: '[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Okama} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.',
+  },
+  { id: 'DR-006', name: 'Ivankov', category: 'character', colors: ['yellow'], cost: 4, power: 5000, types: ['Okama'], text: '' },
 ];
 const cards = [...baseCards, ...op02, ...st13, ...extra];
 
@@ -183,6 +194,8 @@ describe('Mão → Vida com exigência revela a carta (DV-33, 11-2-1)', () => {
     expect(line.text).toMatch(/revela.*Bon Clay.*topo da Vida/);
     expect(line.secret).toBeUndefined();
     expect(viewFor(s, 1, aliases(s)).log.some((l) => /Bon Clay/.test(l.text))).toBe(true);
+    // A interface mostra a carta revelada ao oponente (não a quem a escolheu).
+    expect(line).toMatchObject({ revealed: ['DR-004'], revealedBy: 0 });
   });
 
   it('sem exigência (qualquer carta) a carta vai escondida', () => {
@@ -194,5 +207,29 @@ describe('Mão → Vida com exigência revela a carta (DV-33, 11-2-1)', () => {
     expect(s.players[0].life.at(-1)).toBe(bon);
     expect(s.log.at(-1)!.text).toMatch(/coloca 1 carta\(s\) da mão no topo da Vida/);
     expect(s.log.some((l) => /Bon Clay/.test(l.text))).toBe(false);
+    expect(s.log.some((l) => l.revealed)).toBe(false);
+  });
+});
+
+describe('Carta revelada aparece para o oponente', () => {
+  it('busca no deck: a linha leva a carta, e a visão do oponente traz a definição mesmo com a carta na mão', () => {
+    let s = toTurn(started(), 3);
+    const ivan = take(s, 0, 'DR-006');
+    const deck = s.players[0].deck;
+    deck.splice(deck.indexOf(ivan), 1);
+    deck.unshift(ivan);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: toHand(s, 0, 'DR-005') });
+    expect(s.pending?.kind).toBe('selectTargets');
+    s = applyAction(s, { type: 'choose', player: 0, uids: [ivan] });
+    while (s.pending?.player === 0 && s.pending.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: (s.pending as { options: string[] }).options });
+    expect(s.players[0].hand).toContain(ivan);
+    const line = s.log.find((l) => l.key === 'log.revealsAddsToHand')!;
+    expect(line).toMatchObject({ revealed: ['DR-006'], revealedBy: 0 });
+    const theirs = viewFor(s, 1, aliases(s));
+    // Na mão do jogador 0 a carta está escondida para o oponente…
+    expect(theirs.players[0].hand.some((u) => theirs.cards[u].cardId === 'DR-006')).toBe(false);
+    // …mas a linha do log e a definição chegam a ele.
+    expect(theirs.log.find((l) => l.key === 'log.revealsAddsToHand')?.revealed).toEqual(['DR-006']);
+    expect(theirs.defs['DR-006']?.name).toBe('Ivankov');
   });
 });

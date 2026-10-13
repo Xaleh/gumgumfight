@@ -4337,6 +4337,20 @@ button.hint-pill::after,
 .zoom-backdrop.log-zoom {
   z-index: 90;
 }
+/* Cartas reveladas pelo oponente: por cima das escolhas pendentes, abaixo da carta ampliada. */
+.reveal-backdrop {
+  z-index: 60;
+}
+.modal-feature.reveal-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.reveal-line + .reveal-line {
+  border-top: 1px solid var(--line);
+  margin-top: 8px;
+}
 
 /* ------------------------------------------------------------------ replay: controles */
 
@@ -6704,6 +6718,43 @@ tr.clickable:hover td {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   margin: 6px 0;
+}
+.queue-leader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0 8px;
+  text-align: left;
+}
+.queue-leader p {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.leader-pick-hint {
+  margin: 0;
+}
+/* A folha é uma coluna flex: sem `flex: none`, o campo encolhe quando a lista é longa. */
+.leader-search {
+  flex: none;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+}
+.leader-search:focus {
+  outline: none;
+  border-color: var(--sky);
+}
+.leader-queue {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--green);
 }
 
 /* ------------------------------------------------------------------ modo espectador e perfis */

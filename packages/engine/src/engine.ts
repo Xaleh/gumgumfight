@@ -3292,7 +3292,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           playFree(state, uid, step.rested, frame.source, true); // vem do deck (só passa pela mão)
         } else {
           ps.hand.push(uid);
-          log(state, frame.controller, lg('revealsAddsToHand', `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }));
+          log(state, frame.controller, lg('revealsAddsToHand', `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }), { uids: [uid], by: ps.id });
         }
       }
       if (step.rest === 'bottom') {
@@ -3525,7 +3525,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (const uid of frame.choice.filter((u) => options.includes(u))) {
         removeFrom(ps.deck, uid);
         ps.hand.push(uid);
-        log(state, frame.controller, lg('revealsFromDeckToHand', `${ps.name} revela ${cardDef(state, uid).name} do deck e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }));
+        log(state, frame.controller, lg('revealsFromDeckToHand', `${ps.name} revela ${cardDef(state, uid).name} do deck e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }), { uids: [uid], by: ps.id });
       }
       return true;
     }
@@ -3685,7 +3685,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         askCards(state, frame, options, n, pr('chooseHandCardsToReveal', `${srcName}: escolha ${n} carta(s) da mão para revelar.`, { source: srcName, n }), { min: n });
         return false;
       }
-      log(state, frame.controller, lg('reveals', `${ps.name} revela ${frame.choice.map((u) => cardDef(state, u).name).join(', ')}.`, { player: ps.name, cards: frame.choice.map((u) => cardDef(state, u).name).join(', ') }));
+      log(state, frame.controller, lg('reveals', `${ps.name} revela ${frame.choice.map((u) => cardDef(state, u).name).join(', ')}.`, { player: ps.name, cards: frame.choice.map((u) => cardDef(state, u).name).join(', ') }), { uids: frame.choice, by: ps.id });
       frame.last = frame.choice.filter((u) => options.includes(u));
       return true;
     }
@@ -3744,7 +3744,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const card = ps.deck[0];
       frame.last = card ? [card] : [];
       frame.revealed = frame.last;
-      if (card) log(state, frame.controller, lg('revealsDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck.`, { player: ps.name, card: cardDef(state, card).name }));
+      if (card) log(state, frame.controller, lg('revealsDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck.`, { player: ps.name, card: cardDef(state, card).name }), { uids: [card] });
       return true;
     }
     case 'playRevealed': {
@@ -3903,7 +3903,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'revealOpponentTop': {
       const card = state.players[opponent(frame.controller)].deck[0];
       frame.last = card ? [card] : [];
-      if (card) log(state, frame.controller, lg('revealsOppDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`, { player: ps.name, card: cardDef(state, card).name }));
+      if (card) log(state, frame.controller, lg('revealsOppDeckTop', `${ps.name} revela ${cardDef(state, card).name} do topo do deck do oponente.`, { player: ps.name, card: cardDef(state, card).name }), { uids: [card] });
       return true;
     }
     case 'giveActiveDon': {
@@ -4069,7 +4069,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       for (let k = 0; k < step.count && pool.length; k++) picked.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
       frame.last = picked;
       frame.revealed = picked;
-      if (picked.length) log(state, frame.controller, lg('reveals', `${opp.name} revela ${picked.map((u) => cardDef(state, u).name).join(', ')}.`, { player: opp.name, cards: picked.map((u) => cardDef(state, u).name).join(', ') }));
+      if (picked.length) log(state, frame.controller, lg('reveals', `${opp.name} revela ${picked.map((u) => cardDef(state, u).name).join(', ')}.`, { player: opp.name, cards: picked.map((u) => cardDef(state, u).name).join(', ') }), { uids: picked });
       return true;
     }
     case 'opponentLifeToBottom': {
@@ -4608,7 +4608,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'revealLifeTop': {
       const card = ps.life[ps.life.length - 1];
       frame.last = card ? [card] : [];
-      if (card) log(state, frame.controller, lg('revealsLifeTop', `${ps.name} revela ${cardDef(state, card).name} do topo da Vida.`, { player: ps.name, card: cardDef(state, card).name }));
+      if (card) log(state, frame.controller, lg('revealsLifeTop', `${ps.name} revela ${cardDef(state, card).name} do topo da Vida.`, { player: ps.name, card: cardDef(state, card).name }), { uids: [card] });
       return true;
     }
     case 'activateEventFromTrash':
@@ -4975,6 +4975,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             { player: ps.name, n: picked.length, from, ...(names ? { cards: shown.map((u) => cardDef(state, u).name).join(', ') } : {}) },
             { from: { items: [{ key: step.trashOnly ? 'log.fromTrash' : step.fromTrash ? 'log.fromHandOrTrash' : 'log.fromHand' }] } },
           ),
+          reveal ? { uids: shown, by: ps.id } : undefined,
         );
       }
       return true;
@@ -6017,8 +6018,10 @@ function gameOver(state: GameState, winner: PlayerId | null, reason: Prompt) {
   }
 }
 
-function log(state: GameState, player: PlayerId | null, m: Prompt) {
-  state.log.push({ turn: state.turn, player, text: m.text, ...msgOf(m) });
+/** `reveal`: cartas reveladas a todos na linha; `by`, quem as escolheu da própria mão ou deck. */
+function log(state: GameState, player: PlayerId | null, m: Prompt, reveal?: { uids: string[]; by?: PlayerId }) {
+  const revealed = reveal?.uids.length ? { revealed: reveal.uids.map((u) => state.cards[u].cardId), ...(reveal.by !== undefined ? { revealedBy: reveal.by } : {}) } : {};
+  state.log.push({ turn: state.turn, player, text: m.text, ...msgOf(m), ...revealed });
 }
 
 /**

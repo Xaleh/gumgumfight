@@ -250,6 +250,15 @@ const ptBR = {
   'menu.onlineSearching': 'Procurando oponente',
   'menu.onlineQueuePlayers': '{n} jogadores na fila',
   'menu.onlineQueueAlone': 'Você é o único na fila agora.',
+  'menu.anyLeader': 'Qualquer Líder',
+  'menu.pickLeaderTitle': 'Contra qual Líder?',
+  'menu.pickLeaderHint': 'Durante 1 minuto você só enfrenta quem estiver com este Líder; se ninguém aparecer, joga contra qualquer oponente.',
+  'menu.searchLeader': 'Buscar Líder',
+  'menu.leaderInQueue': '{n} na fila',
+  'menu.leadersFailed': 'Não deu para carregar os Líderes. Tente de novo.',
+  'menu.noLeaderFound': 'Nenhum Líder encontrado.',
+  'menu.queueLeaderSearching': 'Procurando {name}: mais {time}, depois qualquer oponente.',
+  'menu.queueLeaderExpired': 'Ninguém com {name} agora: procurando qualquer oponente.',
   // ---- erro de tela (ErrorBoundary) ----
   'menu.errorHint': 'Algo deu errado ao desenhar a tela. A partida continua: tente de novo.',
   'menu.errorRetry': 'Tentar de novo',
@@ -1189,6 +1198,8 @@ const ptBR = {
   'game.detachDonTitle': 'Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (até a carta atacar ou usar um efeito)',
   'game.donCanReturn': '{n|# pode voltar|# podem voltar}',
   'game.tapCardToRead': 'Toque na carta para ler.',
+  'game.revealedTitle': '{n|Carta revelada|Cartas reveladas}',
+  'game.revealedOk': 'Entendi',
   // ==== /game ====
 
 
@@ -1972,6 +1983,7 @@ const ptBR = {
   'errors.roomNotFound': 'Sala não encontrada ou já começou.',
   'errors.ownRoom': 'Esta sala é sua: envie o código para outra pessoa.',
   'errors.notInQueue': 'Você não está mais na fila.',
+  'errors.invalidLeaderPick': 'Esse Líder não pode ser escolhido no formato {format}.',
   'errors.matchNotFound': 'Partida não encontrada.',
   'errors.matchInProgress': 'Esta partida já está em andamento.',
   'errors.noMatchWithCode': 'Nenhuma partida em andamento com esse código.',

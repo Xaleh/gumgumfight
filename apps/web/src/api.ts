@@ -400,8 +400,11 @@ export const api = {
     createRoom: (deckId: string, format: FormatId) =>
       send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format }),
     joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
-    enqueue: (deckId: string, format: FormatId, queue: QueueKind) =>
-      send<{ ticket: string }>('POST', '/api/online/queue', { deckId, format, queue }),
+    /** `leader` (só casual): Líder do oponente desejado no primeiro minuto. */
+    enqueue: (deckId: string, format: FormatId, queue: QueueKind, leader?: string | null) =>
+      send<{ ticket: string }>('POST', '/api/online/queue', { deckId, format, queue, ...(leader ? { leader } : {}) }),
+    /** Líderes que dá para escolher na fila casual do formato (e quantos estão na fila com cada um). */
+    leaders: (format: FormatId) => get<QueueLeader[]>(`/api/online/leaders?format=${encodeURIComponent(format)}`),
     poll: (ticket: string) => get<QueuePoll>(`/api/online/queue/${encodeURIComponent(ticket)}`),
     cancel: (ticket: string) => send<void>('DELETE', `/api/online/queue/${encodeURIComponent(ticket)}`),
     act: (roomId: string, t: string, seq: number, action: Action) =>
@@ -489,8 +492,19 @@ export interface OnlineStats {
 }
 
 export type QueuePoll =
-  | { status: 'waiting'; waited: number; players: number }
+  /** `leaderWait`: quanto falta para a escolha de Líder (`wantLeader`) expirar; 0 = qualquer oponente. */
+  | { status: 'waiting'; waited: number; players: number; wantLeader?: string | null; leaderWait?: number }
   | { status: 'matched'; roomId: string; token: string };
+
+/** Líder que dá para escolher como oponente na fila casual. */
+export interface QueueLeader {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  colors: string[];
+  /** Jogadores na fila casual do formato com este Líder agora. */
+  queue: number;
+}
 
 export interface OnlineRoomInfo {
   id: string;

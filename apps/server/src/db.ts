@@ -598,6 +598,12 @@ export function listCards(db: DB, set?: string) {
   return rows.map(toCard);
 }
 
+/** Todos os Líderes (para escolher o oponente na fila casual). */
+export function listLeaders(db: DB) {
+  const rows = db.prepare("SELECT data, provisional FROM cards WHERE category = 'leader' ORDER BY id").all() as unknown as CardRow[];
+  return rows.map(toCard);
+}
+
 export function getCards(db: DB, ids: string[]) {
   if (!ids.length) return [];
   const rows = db

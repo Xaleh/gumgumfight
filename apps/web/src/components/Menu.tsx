@@ -1,4 +1,4 @@
-import { type BotLevel, FORMATS, formatLabel, type PlayerId } from '@gumgum/engine';
+import { type BotLevel, cardLegality, FORMATS, formatLabel, type PlayerId } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
@@ -10,6 +10,7 @@ import {
   type FormatId,
   type OnlineSeat,
   type QueueKind,
+  type QueueLeader,
   type TournamentMine,
   type WatchTarget,
   whyNotPlayable,
@@ -26,7 +27,7 @@ import { Icon, type IconName } from './Icons';
 import { InstallBanner } from './Install';
 import { LearnBanner } from './LearnBanner';
 import { LeaderArt } from './LeaderArt';
-import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
+import { LeaderPicker, QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 import { ReplayLoader } from './ReplayLoader';
 import { SupportersList, SupportModal } from './Support';
 import { SponsorsStrip } from './Tournaments';
@@ -343,6 +344,13 @@ export function Menu({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState<null | 0 | 1>(null);
+  /** Casual: Líder do oponente escolhido (null = qualquer um) e a folha de escolha. */
+  const [casualLeader, setCasualLeader] = useState<QueueLeader | null>(null);
+  const [pickingLeader, setPickingLeader] = useState(false);
+  // Trocar de formato desfaz a escolha de um Líder que não vale no formato novo.
+  useEffect(() => {
+    setCasualLeader((l) => (l && cardLegality(l.id, format) !== 'legal' ? null : l));
+  }, [format]);
   const [code, setCode] = useState(URL_ROOM_CODE ?? '');
   const userId = user?.id;
   /** Apelido do jogador (perfil deste navegador): nome nas partidas contra o bot e online. */
@@ -524,7 +532,7 @@ export function Menu({
   const onlineNote = !d0 ? t('menu.pickDeck') : !onlineDeck ? t('menu.deckNotValidIn', { format: fmt }) : playing ? t('menu.finishCurrent') : null;
   const rankedNote = onlineNote ?? (!user ? t('menu.rankedNeedsLogin') : manualCards > 0 ? t('menu.rankedManualCards', { n: manualCards }) : null);
 
-  const enterQueue = (kind: QueueKind) => run(() => enqueue(onlineDeck!.id, format, kind));
+  const enterQueue = (kind: QueueKind) => run(() => enqueue(onlineDeck!.id, format, kind, kind === 'casual' ? casualLeader : null));
 
   const queueLive = (kind: QueueKind) =>
     stats ? <Live>{t('menu.queueLive', { n: stats.playing[kind], q: stats.queue[kind][format] })}</Live> : <Live off>{t('menu.counting')}</Live>;
@@ -737,7 +745,14 @@ export function Menu({
               action={t('menu.findMatch')}
               disabled={onlineBlocked}
               onAction={() => enterQueue('casual')}
-            />
+            >
+              <div className="mode-fields">
+                <button type="button" className="pick-btn" onClick={() => setPickingLeader(true)} title={t('menu.pickLeaderHint')}>
+                  <span>{interp(t('menu.opponent'), 'name', <strong>{casualLeader?.name ?? t('menu.anyLeader')}</strong>)}</span>
+                  <Icon name="chevron" size={14} />
+                </button>
+              </div>
+            </ModeCard>
             <ModeCard
               mode="private"
               cardRef={privateCard}
@@ -902,6 +917,17 @@ export function Menu({
       {showTests && <TestOptions seed={seed} onSeed={setSeed} onClose={() => setShowTests(false)} />}
       {showReplay && <ReplayLoader load={loadReplay} onStart={onStart} onClose={() => setShowReplay(false)} />}
 
+      {pickingLeader && (
+        <LeaderPicker
+          format={format}
+          value={casualLeader?.id ?? null}
+          onPick={(leader) => {
+            setCasualLeader(leader);
+            setPickingLeader(false);
+          }}
+          onClose={() => setPickingLeader(false)}
+        />
+      )}
       {picking !== null && (
         <DeckPicker
           title={picking === 0 ? t('menu.equippedDeck') : t('menu.opponentDeck')}
