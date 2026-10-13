@@ -735,7 +735,7 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
 | Fila | Como nasce | Observações |
 |---|---|---|
 | `private` | `POST /api/online/rooms` gera código de 6 letras (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`) e link `/?sala=CÓDIGO`; o segundo entra com `/rooms/join` | Revanche (os dois pedem → sala nova, assentos trocados); espera no máximo 30 min |
-| `casual` / `ranked` | `POST /api/online/queue` devolve um `ticket`; o navegador consulta `GET /queue/:ticket` a cada 1,5 s; quem para de consultar por 30 s sai da fila | Pareamento por ordem de chegada, mesmo formato. Ranqueada: só conta Google, deck sem ⚙, diferença de bounty ≤ 2.000 + 400/s de espera |
+| `casual` / `ranked` | `POST /api/online/queue` devolve um `ticket`; o navegador consulta `GET /queue/:ticket` a cada 1,5 s; quem para de consultar por 30 s sai da fila | Pareamento por ordem de chegada, mesmo formato. Casual: quem escolhe um Líder (`leader` no POST; lista em `GET /api/online/leaders?format=`) só forma par com ele no primeiro minuto e tem prioridade sobre ele; a escolha vale para os dois lados. Ranqueada: só conta Google, deck sem ⚙, diferença de bounty ≤ 2.000 + 400/s de espera |
 | `bot` | `POST /api/online/bot` (**só com login**, 401 sem conta) | Treino transmitido. O servidor joga o assento do bot a partir da **visão do bot** (sem espiar), com 700 ms de pausa e 800–2.000 ms aleatórios nas decisões escondidas. `first` (0 = jogador, 1 = bot) vira `firstPlayer`; sem ele, sorteio com escolha. `ONLINE_BOT_ROOMS=off` desliga |
 | `tournament` | `POST /api/tournaments/:id/matches/:m/play` | Uma sala por jogo da série; `firstPlayer` definido (quem perdeu o anterior) |
 
