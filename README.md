@@ -62,12 +62,14 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | (gerado) | Par de chaves das notificações (base64url). Sem elas, o servidor gera um na primeira vez e guarda no banco |
 | `VAPID_SUBJECT` | `https://gumgumfight.app`     | Contato do servidor para os serviços de push (`mailto:` ou `https:`) |
 | `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
-| `SUPPORT_PIX_KEY` / `SUPPORT_PIX_NAME` / `SUPPORT_PIX_CITY` | (vazio) | Pix do "café": chave (de preferência aleatória), nome e cidade de quem recebe |
-| `SUPPORT_COFFEE_URL` | (vazio) | Página da doação avulsa (ex.: Ko-fi) |
-| `SUPPORT_MONTHLY_URL` | (vazio) | Página dos planos mensais (Grumete, Tripulante, Capitão, Almirante) |
+| `SUPPORT_PIX_KEY` / `SUPPORT_PIX_NAME` / `SUPPORT_PIX_CITY` | (vazio) | Pix do "Doe um Cafezim": chave (de preferência aleatória), nome e cidade de quem recebe |
+| `SUPPORT_MONTHLY_URL` | (vazio) | Página da campanha mensal na Apoia.se (Grumete, Tripulante, Capitão, Almirante) |
+| `APOIASE_API_KEY` / `APOIASE_API_SECRET` | (vazio) | Chave e segredo da API da Apoia.se: o plano vem de lá pelo e-mail da conta (segredos: só no `deploy.env`) |
+| `APOIASE_SYNC` | `6` | Horas entre as reconsultas de quem tem plano da Apoia.se; `off` desliga |
+| `SUPPORT_COFFEE_URL` | (vazio) | Opcional: página de doação com cartão (ex.: Ko-fi, para público de fora do Brasil) |
 | `SUPPORT_GOAL_BRL` | (vazio) | Custo mensal do site, mostrado como meta no "Apoiar o projeto" |
 | `SUPPORT_CONTACT_URL` | (vazio) | Contato para lojas que querem patrocinar (`mailto:` ou link) |
-| `KOFI_WEBHOOK_TOKEN` | (vazio) | Token do webhook do Ko-fi; vazio = webhook desligado (segredo: só no `deploy.env`) |
+| `KOFI_WEBHOOK_TOKEN` | (vazio) | Opcional: token do webhook do Ko-fi; vazio = desligado (segredo: só no `deploy.env`) |
 | `INTERNAL_TOKEN` | (vazio) | Token da consulta de plano entre homologação e produção (igual nos dois; segredo) |
 | `ACCESS` | `open` | `supporters`: o site só abre para apoiadores Tripulante ou acima e admins (homologação) |
 | `SUPPORT_SOURCE_URL` | (vazio) | Com `ACCESS=supporters`: site onde o plano é consultado (a produção) |
