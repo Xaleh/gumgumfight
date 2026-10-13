@@ -62,6 +62,8 @@ interface AuthCtx {
   signOut: () => Promise<void>;
   /** Relê a sessão no servidor (ex.: depois de mudar o próprio perfil). */
   refresh: () => Promise<void>;
+  /** Troca a foto da conta (data URL) ou, com null, volta para a do Google. Lança o erro do servidor. */
+  changePicture: (image: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx | null>(null);
@@ -115,6 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(me.user);
   };
 
+  const changePicture = async (image: string | null) => {
+    const r = image ? await api.setPicture(image) : await api.removePicture();
+    setUser(r.user);
+  };
+
   const signOut = async () => {
     await api.logout().catch(() => undefined);
     window.google?.accounts.id.disableAutoSelect();
@@ -123,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ready, user, clientId, notice, error, signIn, signOut, refresh }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ ready, user, clientId, notice, error, signIn, signOut, refresh, changePicture }}>{children}</AuthContext.Provider>
   );
 }
 

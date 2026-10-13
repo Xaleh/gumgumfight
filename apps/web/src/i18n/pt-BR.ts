@@ -36,6 +36,10 @@ const ptBR = {
   'account.signInHint': 'Entre para guardar decks e estatísticas na sua conta e jogar a ranqueada.',
   'account.guest': 'Visitante',
   'account.loginOff': 'O login está desligado neste servidor.',
+  'account.changePhoto': 'Trocar foto',
+  'account.googlePhoto': 'Usar a foto do Google',
+  'account.photoSaving': 'Enviando…',
+  'account.photoUnreadable': 'Não foi possível abrir essa imagem.',
 
   // ---- configurações ----
   'settings.title': '⚙️ Configurações',
@@ -1932,6 +1936,8 @@ const ptBR = {
   'errors.invalidRole': 'Perfil inválido.',
   'errors.selfRoleOnlyDev': 'Você só pode mudar o seu próprio perfil para Dev.',
   'errors.accountNotFound': 'Conta não encontrada.',
+  'errors.pictureInvalid': 'Imagem inválida. Use JPG, PNG ou WebP.',
+  'errors.pictureTooBig': 'Imagem grande demais.',
   'errors.nameTooShort': 'O nome precisa de pelo menos 2 letras.',
   // ---- cartas e decks ----
   'errors.cardNotFound': 'Carta não encontrada',

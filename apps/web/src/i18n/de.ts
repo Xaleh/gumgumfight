@@ -36,6 +36,10 @@ export default {
   'account.signInHint': 'Melde dich an, um deine Decks und Statistiken in deinem Konto zu speichern und Ranked zu spielen.',
   'account.guest': 'Gast',
   'account.loginOff': 'Die Anmeldung ist auf diesem Server deaktiviert.',
+  'account.changePhoto': 'Foto ändern',
+  'account.googlePhoto': 'Google-Foto verwenden',
+  'account.photoSaving': 'Wird hochgeladen…',
+  'account.photoUnreadable': 'Dieses Bild konnte nicht geöffnet werden.',
 
   // ---- Einstellungen ----
   'settings.title': '⚙️ Einstellungen',
@@ -1929,6 +1933,8 @@ export default {
   'errors.invalidRole': 'Ungültige Rolle.',
   'errors.selfRoleOnlyDev': 'Deine eigene Rolle kannst du nur auf Dev ändern.',
   'errors.accountNotFound': 'Konto nicht gefunden.',
+  'errors.pictureInvalid': 'Ungültiges Bild. Verwende JPG, PNG oder WebP.',
+  'errors.pictureTooBig': 'Bild zu groß.',
   'errors.nameTooShort': 'Der Name braucht mindestens 2 Buchstaben.',
   // ---- Karten und Decks ----
   'errors.cardNotFound': 'Karte nicht gefunden',

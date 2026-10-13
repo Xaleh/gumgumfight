@@ -36,6 +36,10 @@ export default {
   'account.signInHint': 'ログインすると、デッキと戦績をアカウントに保存でき、ランクマッチもプレイできます。',
   'account.guest': 'ゲスト',
   'account.loginOff': 'このサーバーではログインが無効です。',
+  'account.changePhoto': '写真を変更',
+  'account.googlePhoto': 'Googleの写真を使う',
+  'account.photoSaving': 'アップロード中…',
+  'account.photoUnreadable': 'この画像を開けませんでした。',
 
   // ---- 設定 ----
   'settings.title': '⚙️ 設定',
@@ -1929,6 +1933,8 @@ export default {
   'errors.invalidRole': '無効な権限です。',
   'errors.selfRoleOnlyDev': '自分の権限は開発者にしか変更できません。',
   'errors.accountNotFound': 'アカウントが見つかりません。',
+  'errors.pictureInvalid': '無効な画像です。JPG・PNG・WebPを使ってください。',
+  'errors.pictureTooBig': '画像が大きすぎます。',
   'errors.nameTooShort': '名前は2文字以上にしてください。',
   // ---- カードとデッキ ----
   'errors.cardNotFound': 'カードが見つかりません',

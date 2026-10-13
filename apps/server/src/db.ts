@@ -297,6 +297,14 @@ function migrateAuth(db: DB) {
   // Perfil da conta: player (padrão), streamer (assiste vendo as mãos), organizer (torneios) ou admin.
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!userCols.includes('role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'player'");
+  // Foto escolhida pelo próprio usuário (no lugar da foto do Google): a imagem, o tipo e a versão (ms).
+  if (!userCols.includes('custom_picture')) {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN custom_picture BLOB;
+      ALTER TABLE users ADD COLUMN custom_picture_type TEXT;
+      ALTER TABLE users ADD COLUMN custom_picture_at INTEGER;
+    `);
+  }
 }
 
 /**
