@@ -1196,6 +1196,8 @@ export default {
   'game.detachDonTitle': 'Devuelve al área de coste 1 DON!! asignado en este turno y aún no usado (hasta que la carta ataque o use un efecto)',
   'game.donCanReturn': '{n|# puede volver|# pueden volver}',
   'game.tapCardToRead': 'Toca la carta para leerla.',
+  'game.revealedTitle': '{n|Carta revelada|Cartas reveladas}',
+  'game.revealedOk': 'Entendido',
   // ==== /game ====
 
 

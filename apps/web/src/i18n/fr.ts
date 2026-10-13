@@ -1196,6 +1196,8 @@ export default {
   'game.detachDonTitle': 'Renvoie dans la zone de coût 1 DON!! attachée ce tour et pas encore utilisée (jusqu’à ce que la carte attaque ou utilise un effet)',
   'game.donCanReturn': '{n|# peut revenir|# peuvent revenir}',
   'game.tapCardToRead': 'Touchez la carte pour la lire.',
+  'game.revealedTitle': '{n|Carte révélée|Cartes révélées}',
+  'game.revealedOk': 'Compris',
   // ==== /game ====
 
 
