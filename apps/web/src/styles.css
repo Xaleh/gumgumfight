@@ -8250,67 +8250,6 @@ tr.clickable:hover td {
   text-shadow: 0 3px 0 #3a0a06, 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
-/* ===========================================================   Apoio ao projeto: plano das contas na Administração.
-   ================================================================== */
-.admin-supporter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 100%;
-  padding-top: 6px;
-  border-top: 1px dashed var(--line);
-}
-.admin-supporter label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.admin-supporter select,
-.admin-supporter input {
-  font: inherit;
-  padding: 4px 6px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: inherit;
-}
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-.admin-table th,
-.admin-table td {
-  text-align: left;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line);
-}
-.admin-table th {
-  font-weight: 600;
-  color: var(--muted, inherit);
-}
-.admin-payments {
-  overflow-x: auto;
-}
-
-/* ==================================================================
-   Apoio ao projeto: modal (components/Support.tsx), lista de apoiadores
-   e selo de apoiador.
-   ================================================================== */
-.support-sheet .sheet-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.page-sheet.centered .support-sheet {
-  width: min(640px, 100%);
-}
-.support-intro {
-  margin: 0;
-}
-.support-block {
-=======
 /* ---------- Volume (efeitos e música, em Configurações) ---------- */
 .volume {
   display: flex;
@@ -8863,23 +8802,6 @@ html[lang='ja'] body {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--panel);
-}
-.support-block h4 {
-  margin: 0;
-  font-size: 16px;
-}
-.support-block p {
-  margin: 0;
-}
-.support-goal {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.support-goal-text {
   border-radius: 12px;
   background: var(--danger-bg);
   border: 1px solid var(--danger-line);
@@ -8939,65 +8861,6 @@ html[lang='ja'] body {
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
-}
-.support-goal-bar {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--panel2);
-  border: 1px solid var(--line);
-  overflow: hidden;
-}
-.support-goal-bar span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--gold));
-}
-.pix-amounts {
-  flex-wrap: wrap;
-}
-.pix-box {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-.pix-qr {
-  width: 180px;
-  height: 180px;
-  flex: none;
-  padding: 6px;
-  border-radius: 12px;
-  /* O QR precisa de fundo branco e módulos pretos em qualquer tema. */
-  background: #fff;
-}
-.pix-qr svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.pix-qr.loading {
-  background: var(--panel2);
-}
-.pix-side {
-  flex: 1 1 220px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-}
-.pix-code {
-  width: 100%;
-  font: 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
-  word-break: break-all;
-  resize: none;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--panel2);
-  color: inherit;
-}
-.support-cta {
   margin-top: 2px;
 }
 .coach-actions .btn {
@@ -9419,6 +9282,398 @@ html[lang='ja'] body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--mode-soft);
+  color: var(--mode-ink);
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mode-learn:hover {
+  filter: brightness(0.96);
+}
+@media (max-width: 640px) {
+  .learn-wrap {
+    padding-inline: 16px;
+  }
+  .learn-hero-inner {
+    padding-block: 22px 24px;
+  }
+  .learn-banner-actions {
+    justify-content: flex-start;
+  }
+  .lesson-panel-main {
+    padding-top: 16px;
+  }
+}
+
+/* título de quem concluiu o tutorial ("Aprendiz da Grand Line") */
+.apprentice-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--brand-yellow);
+  color: var(--brown);
+  border: 1px solid var(--brown);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* dica do treinador no treino contra o bot */
+.coach-tip {
+  position: absolute;
+  top: calc(var(--ch) * 0.44 + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  /* Acima do modal das escolhas (mulligan, bloqueio, Counter), que é quando a dica mais ajuda. */
+  z-index: 51;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(560px, calc(100% - 24px));
+  padding: 8px 8px 8px 10px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 2px solid var(--brown);
+  box-shadow: 0 3px 0 var(--brown), 0 10px 24px rgba(var(--shadow-rgb), 0.18);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--text);
+}
+.coach-tip-ico {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--brand-yellow);
+  color: var(--brown);
+}
+.coach-tip-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.coach-tip-close:hover {
+  background: var(--panel2);
+}
+.learn-coach-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.learn-coach-option > div {
+  flex: 1 1 260px;
+}
+.learn-coach-option p {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+/* termos do texto da carta com a definição do glossário do tutorial */
+.term-link {
+  display: inline;
+  padding: 0 2px;
+  margin: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline dotted 2px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.term-link:hover,
+.term-link.on {
+  background: color-mix(in srgb, var(--blue) 14%, transparent);
+}
+.term-def {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--note-bg);
+  border: 1px solid var(--note-line);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Administração → Tutorial: funil anônimo das lições (components/TutorialFunnel.tsx). */
+.tutorial-funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tutorial-funnel > .seg {
+  align-self: flex-start;
+}
+.funnel-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.funnel-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 104px);
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.funnel-row > span:not(:first-child) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.funnel-row.head {
+  border-top: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.funnel-row.head > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.funnel-row {
+  cursor: pointer;
+}
+button.funnel-row:hover,
+button.funnel-row[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+.funnel-steps {
+  margin: 0;
+  padding: 4px 12px 10px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.funnel-steps li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+@media (max-width: 560px) {
+  /* Celular: o nome da lição em cima e os quatro números embaixo, cada um com o seu rótulo. */
+  .funnel-row.head {
+    display: none;
+  }
+  .funnel-row.head + .funnel-group .funnel-row {
+    border-top: 0;
+  }
+  .funnel-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px 8px;
+    padding: 10px;
+  }
+  .funnel-row > span:first-child {
+    grid-column: 1 / -1;
+  }
+  .funnel-row > span:first-child small {
+    display: block;
+  }
+  .funnel-row > span:not(:first-child) {
+    text-align: left;
+  }
+  .funnel-row > span[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .funnel-steps {
+    padding-left: 26px;
+  }
+}
+
+/* ==================================================================
+   Apoio ao projeto: plano das contas na Administração.
+   ================================================================== */
+.admin-supporter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.admin-supporter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-supporter select,
+.admin-supporter input {
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-table th {
+  font-weight: 600;
+  color: var(--muted, inherit);
+}
+.admin-payments {
+  overflow-x: auto;
+}
+
+/* ==================================================================
+   Apoio ao projeto: modal (components/Support.tsx), lista de apoiadores
+   e selo de apoiador.
+   ================================================================== */
+.support-sheet .sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.page-sheet.centered .support-sheet {
+  width: min(640px, 100%);
+}
+.support-intro {
+  margin: 0;
+}
+.support-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+}
+.support-block h4 {
+  margin: 0;
+  font-size: 16px;
+}
+.support-block p {
+  margin: 0;
+}
+.support-goal {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.support-goal-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.support-goal-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.support-goal-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+}
+.pix-amounts {
+  flex-wrap: wrap;
+}
+.pix-box {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.pix-qr {
+  width: 180px;
+  height: 180px;
+  flex: none;
+  padding: 6px;
+  border-radius: 12px;
+  /* O QR precisa de fundo branco e módulos pretos em qualquer tema. */
+  background: #fff;
+}
+.pix-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pix-qr.loading {
+  background: var(--panel2);
+}
+.pix-side {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.pix-code {
+  width: 100%;
+  font: 12px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  resize: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: inherit;
+}
+.support-cta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   text-decoration: none;
 }
 .support-plans {
@@ -9786,245 +10041,17 @@ a.sponsor-card:hover {
 }
 .access-card .btn {
   text-decoration: none;
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: none;
-  background: var(--mode-soft);
-  color: var(--mode-ink);
-  font-weight: 900;
-  font-size: 13px;
-  cursor: pointer;
 }
-.mode-learn:hover {
-  filter: brightness(0.96);
-}
-@media (max-width: 640px) {
-  .learn-wrap {
-    padding-inline: 16px;
-  }
-  .learn-hero-inner {
-    padding-block: 22px 24px;
-  }
-  .learn-banner-actions {
-    justify-content: flex-start;
-  }
-  .lesson-panel-main {
-    padding-top: 16px;
-  }
-}
-
-/* título de quem concluiu o tutorial ("Aprendiz da Grand Line") */
-.apprentice-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--brand-yellow);
-  color: var(--brown);
-  border: 1px solid var(--brown);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
-
-/* dica do treinador no treino contra o bot */
-.coach-tip {
-  position: absolute;
-  top: calc(var(--ch) * 0.44 + 10px);
-  left: 50%;
-  transform: translateX(-50%);
-  /* Acima do modal das escolhas (mulligan, bloqueio, Counter), que é quando a dica mais ajuda. */
-  z-index: 51;
+.support-verify {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  width: max-content;
-  max-width: min(560px, calc(100% - 24px));
-  padding: 8px 8px 8px 10px;
-  border-radius: 14px;
-  background: var(--surface);
-  border: 2px solid var(--brown);
-  box-shadow: 0 3px 0 var(--brown), 0 10px 24px rgba(var(--shadow-rgb), 0.18);
-  font-weight: 800;
-  font-size: 13px;
-  line-height: 1.35;
-  color: var(--text);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
-.coach-tip-ico {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--brand-yellow);
-  color: var(--brown);
-}
-.coach-tip-close {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-.coach-tip-close:hover {
-  background: var(--panel2);
-}
-.learn-coach-option {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-.learn-coach-option > div {
-  flex: 1 1 260px;
-}
-.learn-coach-option p {
-  margin: 4px 0 0;
-  line-height: 1.45;
-}
-
-/* termos do texto da carta com a definição do glossário do tutorial */
-.term-link {
-  display: inline;
-  padding: 0 2px;
+.support-verify p {
   margin: 0;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: var(--blue);
-  font: inherit;
-  font-weight: 800;
-  text-decoration: underline dotted 2px;
-  text-underline-offset: 3px;
-  cursor: pointer;
 }
-.term-link:hover,
-.term-link.on {
-  background: color-mix(in srgb, var(--blue) 14%, transparent);
-}
-.term-def {
-  margin: 6px 0;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--note-bg);
-  border: 1px solid var(--note-line);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-/* Administração → Tutorial: funil anônimo das lições (components/TutorialFunnel.tsx). */
-.tutorial-funnel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.tutorial-funnel > .seg {
-  align-self: flex-start;
-}
-.funnel-table {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--panel);
-}
-.funnel-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(4, 104px);
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  padding: 8px 12px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-}
-.funnel-row > span:not(:first-child) {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.funnel-row.head {
-  border-top: 0;
-  font-size: 11px;
+.support-ok {
+  color: var(--ok);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--muted);
-}
-.funnel-row.head > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-button.funnel-row {
-  cursor: pointer;
-}
-button.funnel-row:hover,
-button.funnel-row[aria-expanded='true'] {
-  background: color-mix(in srgb, var(--text) 5%, transparent);
-}
-.funnel-steps {
-  margin: 0;
-  padding: 4px 12px 10px 34px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-}
-.funnel-steps li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-@media (max-width: 560px) {
-  /* Celular: o nome da lição em cima e os quatro números embaixo, cada um com o seu rótulo. */
-  .funnel-row.head {
-    display: none;
-  }
-  .funnel-row.head + .funnel-group .funnel-row {
-    border-top: 0;
-  }
-  .funnel-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 4px 8px;
-    padding: 10px;
-  }
-  .funnel-row > span:first-child {
-    grid-column: 1 / -1;
-  }
-  .funnel-row > span:first-child small {
-    display: block;
-  }
-  .funnel-row > span:not(:first-child) {
-    text-align: left;
-  }
-  .funnel-row > span[data-label]::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .funnel-steps {
-    padding-left: 26px;
-  }
 }

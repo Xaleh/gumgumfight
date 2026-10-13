@@ -3,6 +3,7 @@ import { type AdminUser, api, type Role, ROLE_LABEL } from '../api';
 import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, useT } from '../i18n';
+import { PaymentsPanel, SponsorsPanel, SupporterEditor } from './AdminSupport';
 import { ReportsPanel } from './Reports';
 import { TutorialFunnelPanel } from './TutorialFunnel';
 
@@ -19,7 +20,7 @@ const ROLE_HELP: Record<Role, MessageKey> = {
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
   const t = useT();
   const { user, refresh } = useAuth();
-  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial'>('users');
+  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors'>('users');
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,9 +74,17 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
           <button className={tab === 'tutorial' ? 'on' : ''} onClick={() => setTab('tutorial')}>
             {t('tutorial.admin.tab')}
           </button>
+          <button className={tab === 'payments' ? 'on' : ''} onClick={() => setTab('payments')}>
+            {t('admin.tabPayments')}
+          </button>
+          <button className={tab === 'sponsors' ? 'on' : ''} onClick={() => setTab('sponsors')}>
+            {t('admin.tabSponsors')}
+          </button>
         </div>
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
         {tab === 'tutorial' && <TutorialFunnelPanel />}
+        {tab === 'payments' && <PaymentsPanel />}
+        {tab === 'sponsors' && <SponsorsPanel />}
         {tab === 'users' && (
           <>
             <ul className="role-help muted small">
@@ -84,6 +93,9 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
                   <b>{t(ROLE_LABEL[r])}</b>: {t(ROLE_HELP[r])}
                 </li>
               ))}
+              <li>
+                <b>{t('admin.supportHelpLabel')}</b>: {t('admin.supportHelp')}
+              </li>
             </ul>
             <input className="admin-search" value={query} placeholder={t('admin.searchPlaceholder')} onChange={(e) => setQuery(e.target.value)} />
             {error && <div className="error">{error}</div>}
@@ -114,6 +126,14 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
                       </button>
                     ))}
                   </div>
+                  <SupporterEditor
+                    key={`${u.supporterTier}-${u.supporterUntil}`}
+                    u={u}
+                    onSaved={(saved) => {
+                      setUsers((list) => list?.map((x) => (x.id === saved.id ? { ...x, ...saved } : x)) ?? null);
+                      if (saved.id === user?.id) void refresh();
+                    }}
+                  />
                 </div>
               ))}
             </div>

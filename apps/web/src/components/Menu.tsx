@@ -28,6 +28,8 @@ import { LearnBanner } from './LearnBanner';
 import { LeaderArt } from './LeaderArt';
 import { QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 import { ReplayLoader } from './ReplayLoader';
+import { SupportersList, SupportModal } from './Support';
+import { SponsorsStrip } from './Tournaments';
 
 /** Código de sala do link de convite (lido uma vez, ao carregar a página). */
 const URL_ROOM_CODE = roomCodeFromUrl();
@@ -321,7 +323,8 @@ export function Menu({
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
-  const { user, notice: authNotice, error: authError } = useAuth();
+  const { user, config, notice: authNotice, error: authError } = useAuth();
+  const supportOn = Boolean(config?.support);
   const t = useT();
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const [error, setError] = useState<MessageKey | null>(null);
@@ -330,6 +333,7 @@ export function Menu({
   const [showSettings, setShowSettings] = useState(false);
   const [showTests, setShowTests] = useState(false);
   const [showReplay, setShowReplay] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const [deck0, setDeck0] = useState('');
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
@@ -540,6 +544,7 @@ export function Menu({
   const extra: NavItem[] = [
     { key: 'settings', label: t('menu.navSettings'), icon: 'sliders', onClick: () => setShowSettings(true) },
     { key: 'replay', label: t('menu.navReplay'), icon: 'play', onClick: () => setShowReplay(true) },
+    ...(supportOn ? [{ key: 'support', label: t('support.nav'), icon: 'heart' as const, onClick: () => setShowSupport(true) }] : []),
     ...(onAdmin ? [{ key: 'admin', label: t('menu.navAdmin'), icon: 'shield' as const, onClick: onAdmin }] : []),
     ...(onCoverage ? [{ key: 'coverage', label: t('menu.navCoverage'), icon: 'check' as const, onClick: onCoverage }] : []),
     ...(dev ? [{ key: 'tests', label: t('menu.testOptions'), icon: 'flask' as const, onClick: () => setShowTests(true) }] : []),
@@ -574,6 +579,11 @@ export function Menu({
                 {nickname ?? t('menu.nickname')}
                 <small>✎</small>
               </button>
+              {supportOn && (
+                <button type="button" className="hero-link home-support-pill" onClick={() => setShowSupport(true)} title={t('support.heroPillTitle')}>
+                  {t('support.heroPill')}
+                </button>
+              )}
             </div>
           </div>
           <div className="hero-stats" role="status" aria-live="off">
@@ -865,6 +875,7 @@ export function Menu({
           <TournamentsBlock list={tournaments} onOpen={onTournaments} />
           <MetaBlock onStats={onStats} />
         </div>
+        {supportOn && <SponsorsStrip placement="home" hideEmpty />}
       </main>
 
       <footer className="home-footer">
@@ -874,18 +885,20 @@ export function Menu({
             <span>GumGum Fight</span>
           </div>
           <nav className="footer-links" aria-label={t('menu.footerNav')}>
-            {[...nav.slice(1), extra[0]].map((item) => (
+            {[...nav.slice(1), ...extra.filter((e) => e.key === 'settings' || e.key === 'support')].map((item) => (
               <button key={item.key} type="button" className="text-link" onClick={item.onClick}>
                 {item.label}
               </button>
             ))}
           </nav>
+          {supportOn && <SupportersList compact />}
           <p className="disclaimer">{t('menu.disclaimer')}</p>
         </div>
       </footer>
 
       {queue && <QueueWait queue={queue} onCancel={cancel} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
       {showTests && <TestOptions seed={seed} onSeed={setSeed} onClose={() => setShowTests(false)} />}
       {showReplay && <ReplayLoader load={loadReplay} onStart={onStart} onClose={() => setShowReplay(false)} />}
 

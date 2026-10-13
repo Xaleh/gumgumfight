@@ -209,7 +209,7 @@ export interface SupporterState {
   tier: SupporterTier;
   /** Até quando vale (null = sem prazo). */
   until: string | null;
-  source: 'manual' | 'kofi' | null;
+  source: 'manual' | 'apoiase' | 'kofi' | null;
   /** Aparece na lista pública de Apoiadores. */
   public: boolean;
 }
@@ -227,6 +227,8 @@ export interface SupportInfo {
   coffeeUrl: string | null;
   monthlyUrl: string | null;
   contactUrl: string | null;
+  /** O plano mensal vem da Apoia.se pelo e-mail da conta (mostra "Já apoio: verificar"). */
+  apoiase: boolean;
   /** Custo mensal do site (meta). */
   goal: number | null;
   /** Soma mensal dos planos ativos. */
@@ -253,7 +255,7 @@ export interface AdminUser extends User {
   lastLoginAt: string;
   supporterTier: SupporterTier | null;
   supporterUntil: string | null;
-  supporterSource: 'manual' | 'kofi' | null;
+  supporterSource: 'manual' | 'apoiase' | 'kofi' | null;
 }
 
 export interface AppConfig {
@@ -344,6 +346,9 @@ export const api = {
     info: () => get<SupportInfo>('/api/support'),
     supporters: () => get<Array<{ name: string; tier: SupporterTier }>>('/api/support/supporters'),
     setPublic: (visible: boolean) => send<{ public: boolean }>('PUT', '/api/support/me', { public: visible }),
+    /** Consulta agora, na Apoia.se, o apoio do e-mail da conta. */
+    verifyApoiase: () =>
+      send<{ isBacker: boolean; isPaidThisMonth: boolean; tier: SupporterTier | null; until: string | null }>('POST', '/api/support/apoiase/sync'),
   },
   tournaments: {
     list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null }>('/api/tournaments'),

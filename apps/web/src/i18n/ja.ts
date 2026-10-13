@@ -1,6 +1,7 @@
 // 日本語.
 
 import type { Messages } from './pt-BR';
+import support from './support/ja';
 import tutorial from './tutorial/ja';
 
 export default {
@@ -136,7 +137,7 @@ export default {
   'menu.navCoverage': 'カード対応状況',
   'menu.footerNav': 'フッター',
   'menu.disclaimer':
-    '非営利のファンプロジェクトであり、バンダイ、東映アニメーション、集英社とは関係ありません。ポルトガル語の翻訳は自動翻訳による非公式のものです。',
+    'コミュニティと協力ショップに支えられたファンプロジェクトであり、バンダイ、東映アニメーション、集英社とは関係ありません。ポルトガル語の翻訳は自動翻訳による非公式のものです。',
   // ---- 接続 ----
   'menu.connecting': 'サーバーに接続中…',
   'menu.connectFailed': 'サーバーに接続できませんでした。npm run devのターミナルに出ている[server]のメッセージを確認してください。',
@@ -675,7 +676,7 @@ export default {
   'tour.create': '+ 大会を作成',
   'tour.signInToRegister': '大会に参加登録するには、メニューからGoogleアカウントでログインしてください。',
   'tour.emptyCreate': 'まだ大会はありません。最初の大会を作りましょう！',
-  'tour.emptyOrganizer': 'まだ大会はありません。大会は主催者権限のアカウントが作成します。',
+  'tour.emptyOrganizer': 'まだ大会はありません。大会は主催者と、Capitão・Almirante のサポーターが作成できます。',
   'tour.playersCount': '{n|#人}',
   'tour.playersOfMax': '{n}/{max}人',
   'tour.youRegistered': '✔ 参加登録済み',
@@ -2136,4 +2137,6 @@ export default {
   // ==== /status ====
   // ==== tutorial (i18n/tutorial) ====
   ...tutorial,
+  // ==== apoio ao projeto (i18n/support) ====
+  ...support,
 } satisfies Messages;
