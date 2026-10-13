@@ -240,7 +240,7 @@ export function buildApp(
     return reply.code(204).send();
   });
 
-  registerStatsRoutes(app, { db, viewerHash, present });
+  registerStatsRoutes(app, { db, viewerHash, user: auth.viewer, present, proGate: supportEnabled(server.support) });
   const lobby = registerOnlineRoutes(app, {
     db,
     viewerHash,

@@ -243,6 +243,11 @@ export const api = {
   statsMeta: () => get<StatsMeta>('/api/stats/meta'),
   stats: (f: StatsQuery) => get<StatsOverview>(`/api/stats?${statsQs(f)}`),
   cardStats: (f: StatsQuery) => get<CardStatsResponse>(`/api/stats/cards?${statsQs(f)}`),
+  /** Amostra das Estatísticas Pro (top 3 da ranqueada e dos torneios nos últimos 30 dias). */
+  statsTeaser: (format?: string) =>
+    get<{ total: number; leaders: number; top: Array<WinCount & { leader: string }>; cards: Record<string, CardInfo> }>(
+      `/api/stats/teaser${format ? `?format=${encodeURIComponent(format)}` : ''}`,
+    ),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
   admin: {
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
@@ -714,6 +719,10 @@ export interface WinCount {
 }
 
 export interface StatsMeta {
+  /** Estatísticas Pro liberadas para quem pede (plano Tripulante ou acima, ou servidor sem apoio configurado). */
+  pro: boolean;
+  /** O servidor separa as estatísticas gerais (casual) das Pro (ranqueada e torneios). */
+  proGate: boolean;
   formats: Array<{ id: FormatId; label: string }>;
   queues: Array<{ id: string; label: string }>;
   tiers: Tier[];

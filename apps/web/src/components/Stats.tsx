@@ -11,11 +11,18 @@ import {
   type TrendResponse,
   type WinCount,
 } from '../api';
+import { useAuth } from '../auth';
+import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
+import { SupportModal } from './Support';
 
 /** Abaixo disso, a taxa é mostrada esmaecida (amostra pequena). */
 const MIN_GAMES = 10;
 const FILTERS_KEY = 'gumgum.statsFilters';
+const SCOPE_KEY = 'gumgum.statsScope';
+
+/** Geral: partidas casuais, treino contra o bot e salas privadas. Pro: ranqueada e torneios encerrados. */
+type Scope = 'general' | 'pro';
 const MIN_KEY = 'gumgum.statsMin';
 
 type Tab = 'leaders' | 'matchups' | 'trend' | 'cards';
@@ -49,6 +56,84 @@ function loadMin(): number {
   } catch {
     return 10;
   }
+}
+
+function loadScope(): Scope {
+  try {
+    return localStorage.getItem(SCOPE_KEY) === 'pro' ? 'pro' : 'general';
+  } catch {
+    return 'general';
+  }
+}
+
+/** Amostra das Estatísticas Pro para quem não tem o plano: o top 3 aberto e o resto com cadeado. */
+function ProTeaser({ format, onSupport }: { format?: string; onSupport: (() => void) | null }) {
+  const { user } = useAuth();
+  const [data, setData] = useState<Awaited<ReturnType<typeof api.statsTeaser>> | null>(null);
+  useEffect(() => {
+    api
+      .statsTeaser(format)
+      .then(setData)
+      .catch(() => setData(null));
+  }, [format]);
+  return (
+    <section className="menu-card stats-panel pro-teaser">
+      <h3>
+        <Icon name="lock" size={18} /> Estatísticas Pro
+      </h3>
+      <p>
+        O meta competitivo: <b>ranqueada e torneios</b>, com filtro por <b>faixa de recompensa</b> para ver o que funciona entre os melhores, tendência
+        semanal e desempenho carta a carta. Partidas de torneio só entram depois que o torneio termina.
+      </p>
+      {data && data.total > 0 && (
+        <>
+          <p className="muted small">
+            Últimos 30 dias: {data.total} lados de partida competitiva, {data.leaders} Líderes diferentes. Os mais jogados:
+          </p>
+          <table className="stats-table">
+            <tbody>
+              {data.top.map((l, i) => (
+                <tr key={l.leader}>
+                  <td className="muted">{i + 1}º</td>
+                  <td>
+                    <CardName id={l.leader} info={data.cards[l.leader]} />
+                  </td>
+                  <td className="num">{((l.games / data.total) * 100).toFixed(1)}%</td>
+                  <td className="num">
+                    <WinRate w={l} compact />
+                  </td>
+                </tr>
+              ))}
+              {[0, 1, 2].map((i) => (
+                <tr key={`locked-${i}`} className="locked-row" aria-hidden="true">
+                  <td className="muted">{i + 4}º</td>
+                  <td>
+                    <span className="locked-bar" />
+                  </td>
+                  <td className="num">
+                    <Icon name="lock" size={14} />
+                  </td>
+                  <td className="num">
+                    <Icon name="lock" size={14} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {data && data.total === 0 && <p className="muted small">Ainda não há partidas ranqueadas ou de torneio suficientes neste filtro.</p>}
+      <div className="btn-row">
+        {onSupport && (
+          <button className="btn primary" onClick={onSupport}>
+            <Icon name="heart" size={18} /> Apoie a partir de R$ 15 (Tripulante)
+          </button>
+        )}
+      </div>
+      {!user && <p className="muted small">Já é apoiador? Entre com a sua conta Google para liberar.</p>}
+      <p className="muted small">As estatísticas das suas próprias partidas, de todas as filas, continuam grátis: escolha "Só eu" na aba Geral.</p>
+    </section>
+  );
 }
 
 function loadFilters(): StatsQuery {
@@ -787,6 +872,17 @@ function CardsTable({ data, min }: { data: CardStatsResponse; min: number }) {
 export function Stats({ onExit }: { onExit: () => void }) {
   const [meta, setMeta] = useState<StatsMeta | null>(null);
   const [filters, setFilters] = useState<StatsQuery>(loadFilters);
+  const { config } = useAuth();
+  const [scopePick, setScope] = useState<Scope>(loadScope);
+  const [showSupport, setShowSupport] = useState(false);
+  /** Sem a separação no servidor (apoio desligado), tudo é uma coisa só. */
+  const gated = meta?.proGate ?? false;
+  const scope: Scope = gated ? scopePick : 'pro';
+  /** Aba Pro sem o plano: mostra só a amostra. */
+  const locked = gated && scope === 'pro' && !meta?.pro;
+  /** Na aba Geral (fora de "Só eu"), só partidas casuais e sem filtro por faixa. */
+  const general = scope === 'general' && !filters.mine;
+  const query = useMemo<StatsQuery>(() => (general ? { ...filters, queue: 'casual', tiers: undefined } : filters), [filters, general]);
   /** Piso de partidas para mostrar uma linha (como o mínimo de exibição do Duels.ink). */
   const [min, setMin] = useState(loadMin);
   const [tab, setTab] = useState<Tab>('leaders');
@@ -809,17 +905,19 @@ export function Stats({ onExit }: { onExit: () => void }) {
     try {
       localStorage.setItem(FILTERS_KEY, JSON.stringify(filters));
       localStorage.setItem(MIN_KEY, String(min));
+      localStorage.setItem(SCOPE_KEY, scopePick);
     } catch {
       /* sem armazenamento */
     }
-  }, [filters, min]);
+  }, [filters, min, scopePick]);
 
   // Visão geral (Líderes e matchups).
   useEffect(() => {
+    if (locked) return;
     let cancelled = false;
     setLoading(true);
     api
-      .stats(filters)
+      .stats(query)
       .then((d) => {
         if (cancelled) return;
         setOverview(d);
@@ -830,21 +928,21 @@ export function Stats({ onExit }: { onExit: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [query, locked]);
 
   // Na aba de cartas, um Líder é obrigatório: o mais jogado com esses filtros.
   const cardsLeader = leader || overview?.leaders[0]?.leader || '';
   useEffect(() => {
-    if (tab !== 'cards' || !cardsLeader) return;
+    if (tab !== 'cards' || !cardsLeader || locked) return;
     let cancelled = false;
     api
-      .cardStats({ ...filters, leader: cardsLeader, deck: deck || undefined })
+      .cardStats({ ...query, leader: cardsLeader, deck: deck || undefined })
       .then((d) => !cancelled && setCards(d))
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       cancelled = true;
     };
-  }, [tab, filters, cardsLeader, deck]);
+  }, [tab, query, cardsLeader, deck, locked]);
 
   const set = (patch: Partial<StatsQuery>) => setFilters((f) => ({ ...f, ...patch }));
   const toggleTier = (id: string) =>
@@ -869,196 +967,221 @@ export function Stats({ onExit }: { onExit: () => void }) {
         {error && <div className="error">{error}</div>}
         {meta && <Profile me={meta.me} tiers={meta.tiers} onRename={(me) => setMeta({ ...meta, me })} />}
 
-        <details className="menu-card stats-filters" open>
-          <summary>Filtros</summary>
-          <div className="filter-grid">
-            <div className="field">
-              <label>Formato</label>
-              <Seg
-                value={filters.format ?? ''}
-                options={[['', 'Todos'], ...(meta?.formats.map((f): [string, string] => [f.id, f.label]) ?? [])]}
-                onChange={(format) => set({ format })}
-              />
-            </div>
-            <div className="field">
-              <label>Partida</label>
-              <Seg
-                value={filters.queue ?? ''}
-                options={[['', 'Todas'], ...(meta?.queues.map((q): [string, string] => [q.id, q.label]) ?? [])]}
-                onChange={(queue) => set({ queue })}
-              />
-            </div>
-            <div className="field">
-              <label>Oponente</label>
-              <Seg
-                value={filters.opponent ?? ''}
-                options={[
-                  ['', 'Todos'],
-                  ['bot', 'Bot'],
-                  ['human', 'Jogador'],
-                ]}
-                onChange={(opponent) => set({ opponent })}
-              />
-            </div>
-            <div className="field">
-              <label>Ordem do turno</label>
-              <Seg
-                value={filters.first ?? ''}
-                options={[
-                  ['', 'Todas'],
-                  ['first', 'Começando'],
-                  ['second', 'Em segundo'],
-                ]}
-                onChange={(first) => set({ first })}
-              />
-            </div>
-            <div className="field">
-              <label>Período</label>
-              <Seg
-                value={filters.days ?? ''}
-                options={[
-                  ['', 'Tudo'],
-                  ['7', '7 dias'],
-                  ['30', '30 dias'],
-                  ['90', '90 dias'],
-                ]}
-                onChange={(days) => set({ days })}
-              />
-            </div>
-            <div className="field">
-              <label>De quem</label>
-              <Seg
-                value={filters.mine ? 'mine' : 'all'}
-                options={[
-                  ['all', 'Todos os jogadores'],
-                  ['mine', 'Só eu'],
-                ]}
-                onChange={(v) => set({ mine: v === 'mine', by: 'human' })}
-              />
-            </div>
-            <div className="field">
-              <label>Mínimo de partidas por linha</label>
-              <Seg
-                value={String(min)}
-                options={[
-                  ['1', 'Todas'],
-                  ['10', '10'],
-                  ['50', '50'],
-                  ['100', '100'],
-                ]}
-                onChange={(v) => setMin(Number(v))}
-              />
-            </div>
-            <div className="field tier-field">
-              <label>Tiers (recompensa na hora da partida)</label>
-              <div className="tier-chips">
-                {meta?.tiers.map((t) => (
-                  <button
-                    key={t.id}
-                    className={['chip', filters.tiers?.includes(t.id) ? 'on' : ''].join(' ')}
-                    onClick={() => toggleTier(t.id)}
-                    title={`${beries(t.min)}${t.max === null ? ' ou mais' : ` a ${beries(t.max)}`}`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-                {!!filters.tiers?.length && (
-                  <button className="btn small pill" onClick={() => set({ tiers: [] })}>
-                    Todos
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </details>
-
-        {overview && <SummaryTiles s={overview.summary} />}
-
-        <div className="seg stats-tabs">
-          {(
-            [
-              ['leaders', 'Líderes'],
-              ['matchups', 'Matchups'],
-              ['trend', 'Tendência'],
-              ['cards', 'Cartas'],
-            ] as const
-          ).map(([v, label]) => (
-            <button key={v} className={tab === v ? 'on' : ''} onClick={() => setTab(v)}>
-              {label}
+        {gated && (
+          <div className="seg stats-scope" role="tablist" aria-label="Tipo de estatística">
+            <button role="tab" aria-selected={scope === 'general'} className={scope === 'general' ? 'on' : ''} onClick={() => setScope('general')}>
+              Geral
+              <small>casual, bot e salas privadas</small>
             </button>
-          ))}
-        </div>
+            <button role="tab" aria-selected={scope === 'pro'} className={scope === 'pro' ? 'on' : ''} onClick={() => setScope('pro')}>
+              <span className="stats-scope-label">{meta?.pro ? '★' : <Icon name="lock" size={14} />} Pro</span>
+              <small>ranqueada, torneios e faixas</small>
+            </button>
+          </div>
+        )}
 
-        <section className="menu-card stats-panel">
-          {overview && tab === 'leaders' && (
-            <LeadersTable
-              data={overview}
-              min={min}
-              onPick={(l) => {
-                setLeader(l);
-                setDeck('');
-                setTab('cards');
-              }}
-            />
-          )}
-          {overview && tab === 'matchups' && (
-            <Matchups data={overview} leader={leader} min={min} onLeader={setLeader} />
-          )}
-          {tab === 'trend' && (
-            <Trend
-              query={filters}
-              min={min}
-              onPick={(l) => {
-                setLeader(l);
-                setTab('matchups');
-              }}
-            />
-          )}
-          {tab === 'cards' && (
-            <>
-              <div className="stats-pickers">
-                <label>
-                  Líder
-                  <select
-                    value={cardsLeader}
-                    onChange={(e) => {
-                      setLeader(e.target.value);
-                      setDeck('');
-                    }}
-                  >
-                    {!leaderOptions.includes(cardsLeader) && cardsLeader && (
-                      <option value={cardsLeader}>{info[cardsLeader]?.name ?? cardsLeader}</option>
-                    )}
-                    {leaderOptions.map((l) => (
-                      <option key={l} value={l}>
-                        {info[l]?.name ?? l} ({l})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {myLists.length > 0 && (
-                  <label>
-                    Lista
-                    <select value={deck} onChange={(e) => setDeck(e.target.value)}>
-                      <option value="">Todas as listas</option>
-                      {myLists.map((d) => (
-                        <option key={d.hash} value={d.hash}>
-                          {d.deckId ?? d.hash} · {d.games} partidas
-                        </option>
+        {locked && <ProTeaser format={filters.format} onSupport={config?.support ? () => setShowSupport(true) : null} />}
+        {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+
+        {!locked && (
+          <>
+            <details className="menu-card stats-filters" open>
+              <summary>Filtros</summary>
+              <div className="filter-grid">
+                <div className="field">
+                  <label>Formato</label>
+                  <Seg
+                    value={filters.format ?? ''}
+                    options={[['', 'Todos'], ...(meta?.formats.map((f): [string, string] => [f.id, f.label]) ?? [])]}
+                    onChange={(format) => set({ format })}
+                  />
+                </div>
+                {!general && (
+                  <div className="field">
+                    <label>Partida</label>
+                    <Seg
+                      value={filters.queue ?? ''}
+                      options={[['', 'Todas'], ...(meta?.queues.map((q): [string, string] => [q.id, q.label]) ?? [])]}
+                      onChange={(queue) => set({ queue })}
+                    />
+                  </div>
+                )}
+                <div className="field">
+                  <label>Oponente</label>
+                  <Seg
+                    value={filters.opponent ?? ''}
+                    options={[
+                      ['', 'Todos'],
+                      ['bot', 'Bot'],
+                      ['human', 'Jogador'],
+                    ]}
+                    onChange={(opponent) => set({ opponent })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Ordem do turno</label>
+                  <Seg
+                    value={filters.first ?? ''}
+                    options={[
+                      ['', 'Todas'],
+                      ['first', 'Começando'],
+                      ['second', 'Em segundo'],
+                    ]}
+                    onChange={(first) => set({ first })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Período</label>
+                  <Seg
+                    value={filters.days ?? ''}
+                    options={[
+                      ['', 'Tudo'],
+                      ['7', '7 dias'],
+                      ['30', '30 dias'],
+                      ['90', '90 dias'],
+                    ]}
+                    onChange={(days) => set({ days })}
+                  />
+                </div>
+                <div className="field">
+                  <label>De quem</label>
+                  <Seg
+                    value={filters.mine ? 'mine' : 'all'}
+                    options={[
+                      ['all', 'Todos os jogadores'],
+                      ['mine', 'Só eu'],
+                    ]}
+                    onChange={(v) => set({ mine: v === 'mine', by: 'human' })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Mínimo de partidas por linha</label>
+                  <Seg
+                    value={String(min)}
+                    options={[
+                      ['1', 'Todas'],
+                      ['10', '10'],
+                      ['50', '50'],
+                      ['100', '100'],
+                    ]}
+                    onChange={(v) => setMin(Number(v))}
+                  />
+                </div>
+                {!general && (
+                  <div className="field tier-field">
+                    <label>Tiers (recompensa na hora da partida)</label>
+                    <div className="tier-chips">
+                      {meta?.tiers.map((t) => (
+                        <button
+                          key={t.id}
+                          className={['chip', filters.tiers?.includes(t.id) ? 'on' : ''].join(' ')}
+                          onClick={() => toggleTier(t.id)}
+                          title={`${beries(t.min)}${t.max === null ? ' ou mais' : ` a ${beries(t.max)}`}`}
+                        >
+                          {t.label}
+                        </button>
                       ))}
-                    </select>
-                  </label>
+                      {!!filters.tiers?.length && (
+                        <button className="btn small pill" onClick={() => set({ tiers: [] })}>
+                          Todos
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-              {!cardsLeader && <p className="muted">Nenhuma partida com esses filtros.</p>}
-              {cardsLeader && cards && <CardsTable data={cards} min={min} />}
-            </>
-          )}
-        </section>
-        <p className="muted small">
-          Cada partida é refeita pelo servidor a partir do replay antes de entrar nas estatísticas. Taxas com menos de{' '}
-          {MIN_GAMES} partidas aparecem esmaecidas: passe o mouse para ver o intervalo de confiança.
-        </p>
+            </details>
+
+            {overview && <SummaryTiles s={overview.summary} />}
+
+            <div className="seg stats-tabs">
+              {(
+                [
+                  ['leaders', 'Líderes'],
+                  ['matchups', 'Matchups'],
+                  ['trend', 'Tendência'],
+                  ['cards', 'Cartas'],
+                ] as const
+              ).map(([v, label]) => (
+                <button key={v} className={tab === v ? 'on' : ''} onClick={() => setTab(v)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <section className="menu-card stats-panel">
+              {overview && tab === 'leaders' && (
+                <LeadersTable
+                  data={overview}
+                  min={min}
+                  onPick={(l) => {
+                    setLeader(l);
+                    setDeck('');
+                    setTab('cards');
+                  }}
+                />
+              )}
+              {overview && tab === 'matchups' && (
+                <Matchups data={overview} leader={leader} min={min} onLeader={setLeader} />
+              )}
+              {tab === 'trend' && (
+                <Trend
+                  query={query}
+                  min={min}
+                  onPick={(l) => {
+                    setLeader(l);
+                    setTab('matchups');
+                  }}
+                />
+              )}
+              {tab === 'cards' && (
+                <>
+                  <div className="stats-pickers">
+                    <label>
+                      Líder
+                      <select
+                        value={cardsLeader}
+                        onChange={(e) => {
+                          setLeader(e.target.value);
+                          setDeck('');
+                        }}
+                      >
+                        {!leaderOptions.includes(cardsLeader) && cardsLeader && (
+                          <option value={cardsLeader}>{info[cardsLeader]?.name ?? cardsLeader}</option>
+                        )}
+                        {leaderOptions.map((l) => (
+                          <option key={l} value={l}>
+                            {info[l]?.name ?? l} ({l})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {myLists.length > 0 && (
+                      <label>
+                        Lista
+                        <select value={deck} onChange={(e) => setDeck(e.target.value)}>
+                          <option value="">Todas as listas</option>
+                          {myLists.map((d) => (
+                            <option key={d.hash} value={d.hash}>
+                              {d.deckId ?? d.hash} · {d.games} partidas
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  {!cardsLeader && <p className="muted">Nenhuma partida com esses filtros.</p>}
+                  {cardsLeader && cards && <CardsTable data={cards} min={min} />}
+                </>
+              )}
+            </section>
+            <p className="muted small">
+              Cada partida é refeita pelo servidor a partir do replay antes de entrar nas estatísticas. Taxas com menos de{' '}
+              {MIN_GAMES} partidas aparecem esmaecidas (amostra pequena): passe o mouse para ver o intervalo de confiança.
+              {scope === 'pro' && ' Partidas de torneio só entram depois que o torneio termina.'}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
