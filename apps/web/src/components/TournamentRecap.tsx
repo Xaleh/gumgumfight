@@ -104,7 +104,7 @@ function texts(tr: Translate, recap: Recap, locale: Locale): RecapTexts {
     round: (r: RecapRound) => (r.stage === 'elim' ? phaseName(tr, r.size) : tr('tour.roundN', { n: r.round })),
     cards: (n) => tr('recap.img.cards', { n }),
     date: date ? fmtDate(date, locale) : null,
-    format: formatLabel(recap.tournament.format as never),
+    format: recap.tournament.spoilers ? tr('tour.formatSpoilers') : formatLabel(recap.tournament.format as never),
     site: window.location.host,
   };
 }

@@ -9,8 +9,12 @@
 // Desde 1º/04/2026 a lista de banidas e de pares proibidos é a mesma nos dois formatos.
 // Fontes: en.onepiece-cardgame.com/news/restriction-261001.html e
 // en.onepiece-cardgame.com/news/blockicon-card.html. Para atualizar, é só mexer aqui.
+//
+// Spoilers (cartas anunciadas que ainda não foram lançadas) não são de formato nenhum:
+// valem nas partidas casuais, nas salas privadas e contra o bot, mas nunca na
+// ranqueada. Nos torneios, o organizador escolhe se aceita (ver `spoilerIssues`).
 
-import type { DeckList } from './types';
+import type { CardData, DeckList } from './types';
 
 export type FormatId = 'standard' | 'egb';
 
@@ -21,6 +25,13 @@ export const FORMATS: ReadonlyArray<{ id: FormatId; label: string }> = [
 
 export const isFormat = (v: unknown): v is FormatId => FORMATS.some((f) => f.id === v);
 export const formatLabel = (f: FormatId): string => FORMATS.find((x) => x.id === f)?.label ?? f;
+
+/**
+ * Nome do formato de um torneio. Com spoilers (só no EGB) é a terceira opção do
+ * organizador: todas as cartas, inclusive as que ainda não foram lançadas.
+ */
+export const tournamentFormatLabel = (t: { format: FormatId; spoilers?: boolean }): string =>
+  t.spoilers ? 'Todas as cartas + spoilers' : formatLabel(t.format);
 
 /** Cartas banidas em todos os formatos. `since` = data em que a proibição passa a valer. */
 export const BANNED_CARDS: ReadonlyArray<{ id: string; name: string; since?: string }> = [
@@ -62,8 +73,13 @@ export const STANDARD_BLOCK_1_EXCEPTIONS: ReadonlySet<string> = new Set([
   'ST02-007', // Jewelry Bonney
 ]);
 
-/** Data de hoje (AAAA-MM-DD, UTC), para as proibições com data marcada. */
-const today = (now: Date) => now.toISOString().slice(0, 10);
+/**
+ * Data de hoje no horário de Brasília (AAAA-MM-DD), para as proibições com data marcada:
+ * "a partir de 12/10" vale da meia-noite de 12/10 em Brasília (UTC−3, sem horário de verão
+ * desde 2019), e não das 21h do dia 11, como seria em UTC.
+ */
+const BRASILIA_OFFSET_MS = 3 * 3_600_000;
+const today = (now: Date) => new Date(now.getTime() - BRASILIA_OFFSET_MS).toISOString().slice(0, 10);
 const inEffect = (since: string | undefined, now: Date) => !since || since <= today(now);
 
 /** Número de bloco impresso na carta, quando dá para saber pelo número da coleção. */
@@ -116,4 +132,26 @@ export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: F
 /** Formatos em que o deck pode ser usado. */
 export function legalFormats(deck: Pick<DeckList, 'leader' | 'cards'>, now = new Date()): FormatId[] {
   return FORMATS.filter((f) => formatIssues(deck, f.id, now).length === 0).map((f) => f.id);
+}
+
+/** Cartas de spoiler do deck (Líder incluso), na ordem em que aparecem. */
+export function spoilerCards(deck: Pick<DeckList, 'leader' | 'cards'>, cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>): string[] {
+  const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean))];
+  return ids.filter((id) => cards.get(id)?.spoiler);
+}
+
+/** Onde as cartas de spoiler valem (o fim dos avisos). */
+const SPOILER_WHERE = 'só valem em partidas casuais, salas privadas, contra o bot e torneios com spoilers';
+
+/**
+ * Motivo de o deck não valer onde spoilers são proibidos (ranqueada e torneios sem
+ * spoilers); vazio = nenhuma carta de spoiler. Um aviso só, com as primeiras cartas.
+ */
+export function spoilerIssues(deck: Pick<DeckList, 'leader' | 'cards'>, cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>): FormatIssue[] {
+  const all = spoilerCards(deck, cards);
+  if (!all.length) return [];
+  const n = all.length;
+  const ids = all.slice(0, 3).join(', ') + (n > 3 ? '…' : '');
+  const what = n === 1 ? 'Carta ainda não lançada (spoiler)' : 'Cartas ainda não lançadas (spoilers)';
+  return [{ message: `${what}: ${ids}. Spoilers ${SPOILER_WHERE}.`, code: 'rules.spoiler', params: { n, ids }, cardId: all[0] }];
 }
