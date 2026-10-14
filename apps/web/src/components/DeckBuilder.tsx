@@ -16,11 +16,12 @@ import {
   MAX_COPIES,
   anyNumberAllowed,
   parseDeckList,
+  spoilerCards,
   validateDeck,
   withArt,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type ApiCard, deckGroups, type DeckSummary, isAdmin } from '../api';
+import { api, type ApiCard, deckGroups, type DeckSummary, isAdmin, spoilerText } from '../api';
 import { useAuth } from '../auth';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
@@ -217,7 +218,12 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
       }),
     [deckList, tryT],
   );
-  const formatProblems = useMemo(() => [...new Set(legality.flatMap((f) => f.texts))], [legality]);
+  /** Cartas de spoiler (ainda não lançadas): o deck não vale na ranqueada nem em torneio sem spoilers. */
+  const spoilers = useMemo(() => spoilerCards(deckList, byId), [deckList, byId]);
+  const formatProblems = useMemo(
+    () => [...new Set([...legality.flatMap((f) => f.texts), ...(spoilers.length ? [spoilerText(spoilers)] : [])])],
+    [legality, spoilers],
+  );
 
   // ------------------------------------------------------------------ edição
 
@@ -706,6 +712,11 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                   {f.issues.length ? '🚫' : '✓'} {f.label}
                 </span>
               ))}
+              {spoilers.length > 0 && (
+                <span className="format-chip bad" title={spoilerText(spoilers)}>
+                  🚫 {t('deck.rankedChip')}
+                </span>
+              )}
             </div>
           )}
           {formatProblems.length > 0 && (

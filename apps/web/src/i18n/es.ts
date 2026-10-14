@@ -193,7 +193,9 @@ export default {
   'menu.rankedDesc': 'Recompensa en juego. Te enfrentas a jugadores de un nivel cercano al tuyo.',
   'menu.chipGoogleLogin': 'Sesión con Google',
   'menu.chipNoManual': 'Sin efectos manuales',
+  'menu.chipReleasedOnly': 'Solo cartas lanzadas',
   'menu.rankedNeedsLogin': 'Inicia sesión con Google para jugar clasificatoria.',
+  'menu.rankedSpoilers': '{n|El mazo tiene # carta de spoiler aún no lanzada: la clasificatoria solo admite cartas lanzadas.|El mazo tiene # cartas de spoiler aún no lanzadas: la clasificatoria solo admite cartas lanzadas.}',
   'menu.rankedManualCards':
     '{n|El mazo tiene # carta con efecto manual (⚙), algo que la clasificatoria no permite.|El mazo tiene # cartas con efectos manuales (⚙), algo que la clasificatoria no permite.}',
   'menu.casualKicker': 'Casual',
@@ -419,6 +421,7 @@ export default {
   'deck.allowedIn': 'Válido en {format}',
   'deck.formatAllowed': '{format}: válido',
   'deck.formatNotAllowed': '{format}: no válido',
+  'deck.rankedChip': 'Clasificatoria (tiene spoilers)',
   // ---- validación del mazo (refleja validateDeck/formatIssues del motor) ----
   // ---- mazos guardados ----
   'deck.openDeckTitle': 'Abrir mazo: {name}',
@@ -767,6 +770,9 @@ export default {
   'tour.description': 'Descripción y reglas',
   'tour.descriptionPlaceholder': 'Premios, duración de cada ronda, dónde coordinar las partidas…',
   'tour.format': 'Formato',
+  'tour.formatSpoilers': 'Todas las cartas + spoilers',
+  'tour.formatReleasedHint': 'Solo valen cartas ya lanzadas: los mazos con spoilers no pueden inscribirse.',
+  'tour.formatSpoilersHint': 'Vale toda carta lanzada (como en Extra Grand Battle) y también las cartas de spoiler aún no lanzadas. Las prohibidas siguen prohibidas.',
   'tour.structure': 'Estructura',
   'tour.swissHint':
     'Todos juegan todas las rondas, siempre contra jugadores con la misma puntuación (una victoria vale 3 puntos). Los empates se deshacen por el % de victorias de los rivales. Opcionalmente, los mejores pasan a un top cut al final.',
@@ -852,6 +858,9 @@ export default {
   'tour.myDecks': 'Mis mazos',
   'tour.otherDecks': 'Otros mazos',
   'tour.noPlayableDeck': 'Ninguno de los mazos es válido en {format}. Crea uno en "Constructor de mazos".',
+  'tour.deckIssue': 'Tu mazo no será válido en el torneo: {issue} Inscríbete de nuevo con otro mazo o tu inscripción se cancelará al inicio.',
+  'tour.staleDecks': '{n|# inscrito tiene un mazo que no será válido en el torneo (carta prohibida)|# inscritos tienen mazos que no serán válidos en el torneo (carta prohibida)}: {names}. Pídeles que cambien el mazo o quítalos antes de empezar; en el inicio automático, esas inscripciones se cancelan.',
+  'tour.noPlayableDeckReleased': 'Ninguno de los mazos es válido en {format} solo con cartas lanzadas (los mazos con spoilers no valen). Crea uno en "Constructor de mazos".',
   'tour.changeDeck': 'Cambiar mazo',
   'tour.register': 'Inscribirme',
   'tour.confirmLeave': '¿Cancelar tu inscripción?',
@@ -2056,6 +2065,7 @@ export default {
   'errors.chooseDeck': 'Elige un mazo.',
   'errors.deckInvalid': 'Este mazo no es válido para jugar.',
   'errors.deckNotAllowedInFormat': 'Este mazo no está permitido en {format}. {issue}',
+  'errors.deckHasSpoilers': '{n|Este mazo tiene # carta de spoiler aún no lanzada|Este mazo tiene # cartas de spoiler aún no lanzadas} ({ids}). Los spoilers solo valen en partidas casuales, salas privadas, contra el bot y torneos con spoilers.',
   'errors.rankedNoManualCards': 'El modo manual no está permitido en clasificatoria: este mazo tiene {n|# carta|# cartas} con efectos aún no automatizados (⚙).',
   'errors.botChooseDeck': 'Mazo del bot: Elige un mazo.',
   'errors.botDeckInvalid': 'Mazo del bot: Este mazo no es válido para jugar.',
@@ -2136,6 +2146,9 @@ export default {
   'errors.tourStartedNoEdit': 'El torneo ya empezó: las reglas no pueden cambiar.',
   'errors.maxBelowRegistered': 'El límite es menor que el número de inscritos.',
   'errors.tourDecksNotAllowed': '{n|# jugador usa un mazo no permitido|# jugadores usan mazos no permitidos} en {format}.',
+  'errors.tourSpoilersNeedEgb': 'Los spoilers solo valen en el formato con todas las cartas (Extra Grand Battle).',
+  'errors.tourDeckNotAllowedAtStart': 'Este mazo no será válido al inicio del torneo ({date}). {issue}',
+  'errors.tourDecksNoLongerAllowed': '{n|# inscrito tiene un mazo que ya no es válido|# inscritos tienen mazos que ya no son válidos} en {format}: {names}. Pídeles que cambien el mazo o quítalos del torneo.',
   'errors.tourStarted': 'El torneo ya empezó.',
   'errors.tourNeedsTwoPlayers': 'Se necesitan al menos 2 inscritos.',
   'errors.tourNotRunning': 'El torneo no está en curso.',
@@ -2207,6 +2220,7 @@ export default {
   'rules.banned': '{id} está prohibida (no es válida en ningún formato).',
   'rules.rotated': '{id} es del bloque ① y rotó: no es válida en {format}.',
   'rules.bannedPair': '{a} y {b} no se pueden usar juntas en el mismo mazo.',
+  'rules.spoiler': '{n|Carta aún no lanzada (spoiler)|Cartas aún no lanzadas (spoilers)}: {ids}. Los spoilers solo valen en partidas casuales, salas privadas, contra el bot y torneos con spoilers.',
   // ---- lista de texto (parseDeckList) ----
   'rules.listBadLine': 'Línea no reconocida: "{line}"',
   'rules.listUnknownCard': 'Carta no encontrada en la base de datos: {id}',

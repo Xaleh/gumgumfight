@@ -9,6 +9,7 @@ import {
   type FormatId,
   formatIssues,
   parseArts,
+  spoilerCards,
   validateDeck,
 } from '@gumgum/engine';
 import Fastify from 'fastify';
@@ -193,6 +194,8 @@ export function buildApp(
         Array<{ code: string; params: Record<string, string | number> }>
       >,
       unscripted: report.unscripted.length,
+      /** Cartas de spoiler (ainda não lançadas): o deck não vale na ranqueada nem em torneio sem spoilers. */
+      spoilers: spoilerCards(deck, cards),
       updatedAt: deck.updatedAt,
       mine: isMine(deck, viewer),
     };

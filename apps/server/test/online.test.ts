@@ -471,6 +471,31 @@ describe('partidas online: filas', () => {
     });
   });
 
+  it('ranqueada: só cartas lançadas; spoilers valem no casual e nas salas privadas', async () => {
+    const { app, db } = setup();
+    const u = upsertGoogleUser(db, { sub: 'nami', email: 'nami@example.com', emailVerified: true, name: 'nami', picture: null });
+    const nami = { ...ALICE, cookie: `gg_session=${createSession(db, u.id)}` };
+    // Uma carta do deck, com outro número e marcada como spoiler (ainda não lançada).
+    const luffy = getDeck(db, 'st01-luffy')!;
+    const [base] = getCards(db, [luffy.cards[0].id]) as CardData[];
+    upsertCards(db, [{ ...base, id: 'OP99-001', spoiler: { source: 'teste' } }], { provisional: true, source: 'spoiler:teste.json' });
+    const cards = luffy.cards.map((c, i) => (i === 0 ? { id: 'OP99-001', count: c.count } : c));
+    const deck = (await app.inject({ method: 'POST', url: '/api/decks', headers: nami, payload: { name: 'Spoiler', leader: luffy.leader, cards } })).json();
+    const summary = (await app.inject({ url: '/api/decks', headers: nami })).json().find((d: { id: string }) => d.id === deck.id);
+    expect(summary).toMatchObject({ valid: true, spoilers: ['OP99-001'] });
+    expect(summary.formats.egb).toEqual([]);
+
+    const ranked = await app.inject({ method: 'POST', url: '/api/online/queue', headers: nami, payload: { deckId: deck.id, queue: 'ranked', format: 'egb' } });
+    expect(ranked.statusCode).toBe(400);
+    expect(ranked.json()).toMatchObject({ errorCode: 'deckHasSpoilers', errorParams: { n: 1, ids: 'OP99-001' } });
+    expect(ranked.json().error).toMatch(/ainda não foram lançadas/);
+    // Casual e sala privada aceitam o mesmo deck.
+    const casual = await app.inject({ method: 'POST', url: '/api/online/queue', headers: nami, payload: { deckId: deck.id, queue: 'casual', format: 'egb' } });
+    expect(casual.statusCode).toBe(201);
+    await app.inject({ method: 'DELETE', url: `/api/online/queue/${casual.json().ticket}` });
+    expect((await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: deck.id, format: 'egb' } })).statusCode).toBe(201);
+  });
+
   it('ranqueada: só com login e sem cartas com efeito ainda não automatizado', async () => {
     const { app, db } = setup();
     const anon = await app.inject({ method: 'POST', url: '/api/online/queue', headers: ALICE, payload: { deckId: 'st01-luffy', queue: 'ranked', format: 'egb' } });

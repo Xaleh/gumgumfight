@@ -193,7 +193,9 @@ export default {
   'menu.rankedDesc': '懸賞金を賭けた真剣勝負。実力の近いプレイヤーと対戦します。',
   'menu.chipGoogleLogin': 'Googleログイン',
   'menu.chipNoManual': '手動効果なし',
+  'menu.chipReleasedOnly': '発売済みカードのみ',
   'menu.rankedNeedsLogin': 'ランクマッチをプレイするにはGoogleでログインしてください。',
+  'menu.rankedSpoilers': 'このデッキには未発売のスポイラーカードが{n|#枚}あります。ランクマッチでは発売済みのカードしか使えません。',
   'menu.rankedManualCards':
     '{n|デッキに手動効果（⚙）のカードが#枚あります。ランクマッチでは使用できません。}',
   'menu.casualKicker': 'カジュアル',
@@ -419,6 +421,7 @@ export default {
   'deck.allowedIn': '{format}で使用可能',
   'deck.formatAllowed': '{format}：使用可能',
   'deck.formatNotAllowed': '{format}：使用不可',
+  'deck.rankedChip': 'ランクマッチ（スポイラーあり）',
   // ---- デッキのチェック（エンジンの validateDeck/formatIssues と対応） ----
   // ---- 保存済みデッキ ----
   'deck.openDeckTitle': 'デッキを開く：{name}',
@@ -767,6 +770,9 @@ export default {
   'tour.description': '説明とルール',
   'tour.descriptionPlaceholder': '賞品、各ラウンドの時間、対戦の連絡場所…',
   'tour.format': 'フォーマット',
+  'tour.formatSpoilers': '全カード＋スポイラー',
+  'tour.formatReleasedHint': '発売済みのカードのみ使用できます。スポイラーを含むデッキは登録できません。',
+  'tour.formatSpoilersHint': '発売済みの全カード（Extra Grand Battleと同じ）に加え、未発売のスポイラーカードも使用できます。禁止カードは引き続き使用できません。',
   'tour.structure': '方式',
   'tour.swissHint':
     '全員が毎ラウンド対戦し、常に同じ勝ち点のプレイヤーと当たります（勝利は3点）。同点の場合は対戦相手の勝率で順位を決めます。オプションで、最後に上位プレイヤーが決勝トーナメントに進みます。',
@@ -852,6 +858,9 @@ export default {
   'tour.myDecks': '自分のデッキ',
   'tour.otherDecks': 'その他のデッキ',
   'tour.noPlayableDeck': '{format}で使用できるデッキがありません。「デッキ構築」で作りましょう。',
+  'tour.deckIssue': 'あなたのデッキはこの大会で使用できなくなります：{issue} 別のデッキで登録し直してください。そうしないと開始時に登録が取り消されます。',
+  'tour.staleDecks': '大会で使用できなくなるデッキ（禁止カード）で登録しているプレイヤーが{n|#人}います：{names}。開始前にデッキの変更を依頼するか、大会から外してください。自動開始の場合、これらの登録は取り消されます。',
+  'tour.noPlayableDeckReleased': '発売済みカードのみの{format}で使用できるデッキがありません（スポイラーを含むデッキは使用不可）。「デッキ構築」で作りましょう。',
   'tour.changeDeck': 'デッキを変更',
   'tour.register': '参加登録',
   'tour.confirmLeave': '参加登録を取り消しますか？',
@@ -2056,6 +2065,7 @@ export default {
   'errors.chooseDeck': 'デッキを選んでください。',
   'errors.deckInvalid': 'このデッキではプレイできません。',
   'errors.deckNotAllowedInFormat': 'このデッキは{format}では使用できません。{issue}',
+  'errors.deckHasSpoilers': 'このデッキには未発売のスポイラーカードが{n|#枚}あります（{ids}）。スポイラーはカジュアル、プライベートルーム、ボット戦、スポイラー可の大会でのみ使用できます。',
   'errors.rankedNoManualCards': 'ランクマッチでは手動モードは使えません：このデッキにはまだ自動処理されない効果（⚙）のカードが{n|#枚}あります。',
   'errors.botChooseDeck': 'Botのデッキ：デッキを選んでください。',
   'errors.botDeckInvalid': 'Botのデッキ：このデッキではプレイできません。',
@@ -2136,6 +2146,9 @@ export default {
   'errors.tourStartedNoEdit': '大会は始まっています：ルールは変更できません。',
   'errors.maxBelowRegistered': '上限が登録済みプレイヤーの人数より少なくなっています。',
   'errors.tourDecksNotAllowed': '{format}で使用できないデッキを使っているプレイヤーが{n|#人}います。',
+  'errors.tourSpoilersNeedEgb': 'スポイラーは全カードのフォーマット（Extra Grand Battle）でのみ使用できます。',
+  'errors.tourDeckNotAllowedAtStart': 'このデッキは大会開始時（{date}）には使用できません。{issue}',
+  'errors.tourDecksNoLongerAllowed': '{format}で使用できなくなったデッキで登録しているプレイヤーが{n|#人}います：{names}。デッキの変更を依頼するか、大会から外してください。',
   'errors.tourStarted': '大会はすでに始まっています。',
   'errors.tourNeedsTwoPlayers': '登録済みプレイヤーが2人以上必要です。',
   'errors.tourNotRunning': '大会は開催中ではありません。',
@@ -2207,6 +2220,7 @@ export default {
   'rules.banned': '{id}は禁止カードです（どのフォーマットでも使用不可）。',
   'rules.rotated': '{id}はブロック①でローテーション落ちしています：{format}では使用不可。',
   'rules.bannedPair': '{a}と{b}は同じデッキに一緒に入れられません。',
+  'rules.spoiler': '未発売のカード（スポイラー）：{ids}。スポイラーはカジュアル、プライベートルーム、ボット戦、スポイラー可の大会でのみ使用できます。',
   // ---- テキストのリスト（parseDeckList） ----
   'rules.listBadLine': '認識できない行：「{line}」',
   'rules.listUnknownCard': 'データベースにないカード：{id}',

@@ -193,7 +193,9 @@ export default {
   'menu.rankedDesc': 'Bounty on the line. You face players close to your level.',
   'menu.chipGoogleLogin': 'Google sign-in',
   'menu.chipNoManual': 'No manual effects',
+  'menu.chipReleasedOnly': 'Released cards only',
   'menu.rankedNeedsLogin': 'Sign in with Google to play ranked.',
+  'menu.rankedSpoilers': "{n|This deck has # spoiler card that isn't released yet: ranked only allows released cards.|This deck has # spoiler cards that aren't released yet: ranked only allows released cards.}",
   'menu.rankedManualCards':
     '{n|The deck has # card with a manual effect (⚙), which ranked does not allow.|The deck has # cards with manual effects (⚙), which ranked does not allow.}',
   'menu.casualKicker': 'Casual',
@@ -419,6 +421,7 @@ export default {
   'deck.allowedIn': 'Legal in {format}',
   'deck.formatAllowed': '{format}: legal',
   'deck.formatNotAllowed': '{format}: not legal',
+  'deck.rankedChip': 'Ranked (has spoilers)',
   // ---- deck validation (mirrors the engine's validateDeck/formatIssues) ----
   // ---- saved decks ----
   'deck.openDeckTitle': 'Open deck: {name}',
@@ -767,6 +770,9 @@ export default {
   'tour.description': 'Description and rules',
   'tour.descriptionPlaceholder': 'Prizes, time of each round, where to arrange matches…',
   'tour.format': 'Format',
+  'tour.formatSpoilers': 'All cards + spoilers',
+  'tour.formatReleasedHint': 'Only released cards are allowed: decks with spoilers cannot register.',
+  'tour.formatSpoilersHint': 'Every released card is allowed (as in Extra Grand Battle), plus spoiler cards that are not released yet. Banned cards stay banned.',
   'tour.structure': 'Structure',
   'tour.swissHint':
     'Everyone plays every round, always against players with the same score (a win is worth 3 points). Ties are broken by opponents’ win %. Optionally, the top players advance to a top cut at the end.',
@@ -852,6 +858,9 @@ export default {
   'tour.myDecks': 'My decks',
   'tour.otherDecks': 'Other decks',
   'tour.noPlayableDeck': 'None of the decks is legal in {format}. Build one in "Deck builder".',
+  'tour.deckIssue': "Your deck won't be legal in this tournament: {issue} Register again with another deck, or your registration will be cancelled at the start.",
+  'tour.staleDecks': "{n|# player has a deck that won't be legal in the tournament (banned card)|# players have decks that won't be legal in the tournament (banned card)}: {names}. Ask them to change decks or remove them before starting; on automatic start, these registrations are cancelled.",
+  'tour.noPlayableDeckReleased': 'None of the decks is legal in {format} with released cards only (decks with spoilers are not allowed). Build one in "Deck builder".',
   'tour.changeDeck': 'Change deck',
   'tour.register': 'Register',
   'tour.confirmLeave': 'Cancel your registration?',
@@ -2056,6 +2065,7 @@ export default {
   'errors.chooseDeck': 'Choose a deck.',
   'errors.deckInvalid': "This deck isn't valid for play.",
   'errors.deckNotAllowedInFormat': "This deck isn't allowed in {format}. {issue}",
+  'errors.deckHasSpoilers': "{n|This deck has # spoiler card that isn't released yet|This deck has # spoiler cards that aren't released yet} ({ids}). Spoilers are only allowed in casual matches, private rooms, against the bot and in tournaments with spoilers.",
   'errors.rankedNoManualCards': "Manual mode isn't allowed in ranked: this deck has {n|# card|# cards} with effects not automated yet (⚙).",
   'errors.botChooseDeck': 'Bot deck: Choose a deck.',
   'errors.botDeckInvalid': "Bot deck: This deck isn't valid for play.",
@@ -2136,6 +2146,9 @@ export default {
   'errors.tourStartedNoEdit': "The tournament has started: the rules can't change.",
   'errors.maxBelowRegistered': 'The limit is lower than the number of registered players.',
   'errors.tourDecksNotAllowed': '{n|# player uses a deck|# players use decks} not allowed in {format}.',
+  'errors.tourSpoilersNeedEgb': 'Spoilers are only allowed in the all-cards format (Extra Grand Battle).',
+  'errors.tourDeckNotAllowedAtStart': "This deck won't be legal when the tournament starts ({date}). {issue}",
+  'errors.tourDecksNoLongerAllowed': '{n|# player has a deck|# players have decks} no longer legal in {format}: {names}. Ask them to change decks or remove them from the tournament.',
   'errors.tourStarted': 'The tournament has already started.',
   'errors.tourNeedsTwoPlayers': 'At least 2 registered players are needed.',
   'errors.tourNotRunning': "The tournament isn't in progress.",
@@ -2207,6 +2220,7 @@ export default {
   'rules.banned': '{id} is banned (not legal in any format).',
   'rules.rotated': '{id} has block ① and rotated out: not legal in {format}.',
   'rules.bannedPair': '{a} and {b} cannot be used together in the same deck.',
+  'rules.spoiler': '{n|Card not released yet (spoiler)|Cards not released yet (spoilers)}: {ids}. Spoilers are only allowed in casual matches, private rooms, against the bot and in tournaments with spoilers.',
   // ---- text list (parseDeckList) ----
   'rules.listBadLine': 'Line not recognized: "{line}"',
   'rules.listUnknownCard': 'Card not found in the database: {id}',

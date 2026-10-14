@@ -1,6 +1,5 @@
 // Blocos de baixo da Home: partidas ao vivo, torneios e Líderes mais jogados da semana.
 
-import { formatLabel } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
 import {
   api,
@@ -9,6 +8,7 @@ import {
   type RoomQueue,
   STRUCTURE_LABEL,
   TOURNAMENT_STATUS_LABEL,
+  tourFormatLabel,
   type TournamentMine,
   type TournamentSummary,
   type WatchTarget,
@@ -236,7 +236,7 @@ function TournamentRow({ t: tour, onOpen }: { t: TournamentSummary; onOpen: () =
       </strong>
       {tour.prize && <span className="sub tour-item-prize">🏆 {tour.prize}</span>}
       <span className="sub">
-        {t(STRUCTURE_LABEL[tour.structure])} · {formatLabel(tour.format)} ·{' '}
+        {t(STRUCTURE_LABEL[tour.structure])} · {tourFormatLabel(tour)} ·{' '}
         {tour.status === 'registration' ? t('home.registered', { count }) : t('home.playersCount', { count })}
       </span>
     </button>

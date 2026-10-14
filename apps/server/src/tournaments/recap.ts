@@ -78,6 +78,8 @@ export interface TournamentRecap {
     id: string;
     name: string;
     format: string;
+    /** Aceita cartas de spoiler ("Todas as cartas + spoilers"). */
+    spoilers: boolean;
     structure: Tournament['structure'];
     topCut: number | null;
     players: number;
@@ -229,6 +231,7 @@ export function buildRecap(db: DB, t: Tournament, { present, cardImages, sponsor
       id: t.id,
       name: t.name,
       format: t.format,
+      spoilers: t.spoilers,
       structure: t.structure,
       topCut: t.topCut,
       players: players.length,

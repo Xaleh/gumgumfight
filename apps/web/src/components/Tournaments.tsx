@@ -1,4 +1,4 @@
-import { FORMATS, formatLabel } from '@gumgum/engine';
+import { FORMATS } from '@gumgum/engine';
 import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   type AdminSponsor,
@@ -17,12 +17,13 @@ import {
   type TournamentSummary,
   TOURNAMENT_STATUS_LABEL,
   TIER_LABEL,
+  tourFormatLabel,
   type WatchTarget,
   winsNeeded,
 } from '../api';
 import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
-import { type Locale, type MessageKey, type Translate, useLocale, useT } from '../i18n';
+import { type Locale, type MessageKey, type Translate, tryT, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtTime } from '../i18n/format';
 import { useNow } from './HomeBlocks';
 import { Icon } from './Icons';
@@ -325,7 +326,7 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
               <OfficialBadges t={t} />
               <span className="muted small">
                 {dots(
-                  formatLabel(t.format),
+                  tourFormatLabel(t),
                   t.topCut ? tr('tour.plusTopCut', { text: tr(STRUCTURE_LABEL[t.structure]), n: t.topCut }) : tr(STRUCTURE_LABEL[t.structure]),
                   t.maxPlayers ? tr('tour.playersOfMax', { n: t.players, max: t.maxPlayers }) : tr('tour.playersCount', { n: t.players }),
                   t.status === 'running' &&
@@ -372,6 +373,7 @@ function TournamentForm({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
     format: initial?.format ?? 'standard',
+    spoilers: initial?.spoilers ?? false,
     structure: initial?.structure ?? 'swiss',
     rounds: initial && !initial.roundsAuto ? initial.swissRounds : null,
     swissBestOf: initial?.swissBestOf ?? 1,
@@ -434,13 +436,22 @@ function TournamentForm({
           </div>
           <div className="field">
             <label>{tr('tour.format')}</label>
-            <div className="seg small">
+            {/* Três opções: o "Todas as cartas + spoilers" quebra em duas linhas no celular. */}
+            <div className="seg small tour-format">
               {FORMATS.map((f) => (
-                <button key={f.id} className={form.format === f.id ? 'on' : ''} onClick={() => set('format', f.id)}>
+                <button
+                  key={f.id}
+                  className={form.format === f.id && !form.spoilers ? 'on' : ''}
+                  onClick={() => setForm((x) => ({ ...x, format: f.id, spoilers: false }))}
+                >
                   {f.label}
                 </button>
               ))}
+              <button className={form.spoilers ? 'on' : ''} onClick={() => setForm((x) => ({ ...x, format: 'egb', spoilers: true }))}>
+                {tr('tour.formatSpoilers')}
+              </button>
             </div>
+            <p className="muted small">{tr(form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint')}</p>
           </div>
           <div className="field">
             <label>{tr('tour.structure')}</label>
@@ -778,7 +789,7 @@ function TournamentPage({
               </div>
               <p className="muted small">
                 {dots(
-                  formatLabel(t.format),
+                  tourFormatLabel(t),
                   structureText(t),
                   t.maxPlayers
                     ? tr('tour.registeredOfMax', { n: t.players.length, max: t.maxPlayers })
@@ -830,6 +841,9 @@ function TournamentPage({
             {t.canManage && (
               <section className="menu-card tour-manage">
                 <h2>{tr('tour.manage')}</h2>
+                {t.staleDecks && t.staleDecks.length > 0 && (
+                  <div className="error">{tr('tour.staleDecks', { n: t.staleDecks.length, names: t.staleDecks.join(', ') })}</div>
+                )}
                 <div className="btn-row">
                   {t.status === 'registration' && (
                     <>
@@ -1033,7 +1047,7 @@ function MyArea({
   }
 
   if (t.status === 'registration' || late) {
-    const playable = decks?.filter((d) => canPlay(d, t.format)) ?? [];
+    const playable = decks?.filter((d) => canPlay(d, t.format, !t.spoilers)) ?? [];
     const mine = playable.filter((d) => d.kind === 'user' && d.mine);
     const others = playable.filter((d) => !(d.kind === 'user' && d.mine));
     const full = t.maxPlayers !== null && t.players.length >= t.maxPlayers && !t.me;
@@ -1042,6 +1056,9 @@ function MyArea({
         <h2>{tr(t.me ? 'tour.myRegistration' : late ? 'tour.lateRegistration' : 'tour.registration')}</h2>
         {late && <p className="small">{tr('tour.lateRegisterHint')}</p>}
         {t.me && <p className="small">{rich(tr('tour.registeredWith'), { deck: <b>{t.me.deckName}</b> })}</p>}
+        {t.me?.deckIssue && (
+          <div className="error">{tr('tour.deckIssue', { issue: tryT(t.me.deckIssue.code, t.me.deckIssue.params) ?? t.me.deckIssue.message })}</div>
+        )}
         {t.me && t.checkIn && (
           <div className="tour-checkin">
             {t.me.checkedInAt ? (
@@ -1071,7 +1088,7 @@ function MyArea({
         ) : (
           <>
             <div className="field">
-              <label htmlFor="tour-deck">{tr('tour.deckLabel', { format: formatLabel(t.format) })}</label>
+              <label htmlFor="tour-deck">{tr('tour.deckLabel', { format: tourFormatLabel(t) })}</label>
               <select id="tour-deck" className="admin-search" value={deckId} onChange={(e) => setDeckId(e.target.value)}>
                 <option value="">{tr(decks ? 'tour.chooseDeck' : 'common.loading')}</option>
                 {mine.length > 0 && (
@@ -1093,7 +1110,7 @@ function MyArea({
                   </optgroup>
                 )}
               </select>
-              {decks && !playable.length && <p className="muted small">{tr('tour.noPlayableDeck', { format: formatLabel(t.format) })}</p>}
+              {decks && !playable.length && <p className="muted small">{tr(t.spoilers ? 'tour.noPlayableDeck' : 'tour.noPlayableDeckReleased', { format: tourFormatLabel(t) })}</p>}
             </div>
             <div className="btn-row">
               <button

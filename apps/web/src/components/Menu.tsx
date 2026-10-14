@@ -532,7 +532,17 @@ export function Menu({
   const manualCards = d0?.unscripted ?? 0;
   const onlineBlocked = !onlineDeck || busy || Boolean(playing) || Boolean(queue);
   const onlineNote = !d0 ? t('menu.pickDeck') : !onlineDeck ? t('menu.deckNotValidIn', { format: fmt }) : playing ? t('menu.finishCurrent') : null;
-  const rankedNote = onlineNote ?? (!user ? t('menu.rankedNeedsLogin') : manualCards > 0 ? t('menu.rankedManualCards', { n: manualCards }) : null);
+  /** Cartas de spoiler (ainda não lançadas) no deck: a ranqueada só aceita cartas lançadas. */
+  const spoilerCards = d0?.spoilers?.length ?? 0;
+  const rankedNote =
+    onlineNote ??
+    (!user
+      ? t('menu.rankedNeedsLogin')
+      : spoilerCards > 0
+        ? t('menu.rankedSpoilers', { n: spoilerCards })
+        : manualCards > 0
+          ? t('menu.rankedManualCards', { n: manualCards })
+          : null);
 
   const enterQueue = (kind: QueueKind) => run(() => enqueue(onlineDeck!.id, format, kind, kind === 'casual' ? casualLeader : null));
 
@@ -726,7 +736,7 @@ export function Menu({
               title={t('menu.ranked')}
               badge={fmt}
               desc={t('menu.rankedDesc')}
-              chips={[t('menu.chipGoogleLogin'), t('menu.chipNoManual')]}
+              chips={[t('menu.chipGoogleLogin'), t('menu.chipReleasedOnly'), t('menu.chipNoManual')]}
               live={queueLive('ranked')}
               note={rankedNote}
               action={t('menu.findMatch')}

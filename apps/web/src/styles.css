@@ -8160,10 +8160,12 @@ tr.clickable:hover td {
   margin: 6px 0 0;
   padding-left: 18px;
 }
-.seg.tour-result {
+.seg.tour-result,
+.seg.tour-format {
   border-radius: 14px;
 }
-.seg.tour-result button {
+.seg.tour-result button,
+.seg.tour-format button {
   border-radius: 10px;
 }
 .tour-tabs button {

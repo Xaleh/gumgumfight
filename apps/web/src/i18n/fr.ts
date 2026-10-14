@@ -193,7 +193,9 @@ export default {
   'menu.rankedDesc': 'Votre prime est en jeu. Vous affrontez des joueurs proches de votre niveau.',
   'menu.chipGoogleLogin': 'Connexion Google',
   'menu.chipNoManual': 'Sans effets manuels',
+  'menu.chipReleasedOnly': 'Cartes sorties uniquement',
   'menu.rankedNeedsLogin': 'Connectez-vous avec Google pour jouer en classée.',
+  'menu.rankedSpoilers': '{n|Le deck contient # carte spoiler pas encore sortie : la classée n’accepte que les cartes sorties.|Le deck contient # cartes spoilers pas encore sorties : la classée n’accepte que les cartes sorties.}',
   'menu.rankedManualCards':
     '{n|Le deck contient # carte à effet manuel (⚙), ce que la classée n’autorise pas.|Le deck contient # cartes à effet manuel (⚙), ce que la classée n’autorise pas.}',
   'menu.casualKicker': 'Détente',
@@ -419,6 +421,7 @@ export default {
   'deck.allowedIn': 'Légal en {format}',
   'deck.formatAllowed': '{format} : légal',
   'deck.formatNotAllowed': '{format} : non légal',
+  'deck.rankedChip': 'Classée (contient des spoilers)',
   // ---- deck validation (mirrors the engine's validateDeck/formatIssues) ----
   // ---- saved decks ----
   'deck.openDeckTitle': 'Ouvrir le deck : {name}',
@@ -767,6 +770,9 @@ export default {
   'tour.description': 'Description et règles',
   'tour.descriptionPlaceholder': 'Lots, durée de chaque ronde, où organiser les parties…',
   'tour.format': 'Format',
+  'tour.formatSpoilers': 'Toutes les cartes + spoilers',
+  'tour.formatReleasedHint': 'Seules les cartes déjà sorties sont autorisées : les decks avec des spoilers ne peuvent pas s’inscrire.',
+  'tour.formatSpoilersHint': 'Toutes les cartes sorties sont autorisées (comme en Extra Grand Battle), ainsi que les cartes spoilers pas encore sorties. Les cartes bannies restent interdites.',
   'tour.structure': 'Structure',
   'tour.swissHint':
     'Tout le monde joue chaque ronde, toujours contre des joueurs ayant le même score (une victoire vaut 3 points). Les égalités sont départagées par le % de victoires des adversaires. En option, les meilleurs joueurs accèdent à une phase finale (top cut) à la fin.',
@@ -852,6 +858,9 @@ export default {
   'tour.myDecks': 'Mes decks',
   'tour.otherDecks': 'Autres decks',
   'tour.noPlayableDeck': 'Aucun deck n’est légal en {format}. Créez-en un dans « Création de deck ».',
+  'tour.deckIssue': 'Votre deck ne sera pas légal dans ce tournoi : {issue} Réinscrivez-vous avec un autre deck, sinon votre inscription sera annulée au début.',
+  'tour.staleDecks': '{n|# inscrit a un deck qui ne sera pas légal dans le tournoi (carte bannie)|# inscrits ont des decks qui ne seront pas légaux dans le tournoi (carte bannie)} : {names}. Demandez-leur de changer de deck ou retirez-les avant de commencer ; au démarrage automatique, ces inscriptions sont annulées.',
+  'tour.noPlayableDeckReleased': 'Aucun deck n’est légal en {format} avec uniquement des cartes sorties (les decks avec des spoilers ne sont pas autorisés). Créez-en un dans « Création de deck ».',
   'tour.changeDeck': 'Changer de deck',
   'tour.register': 'S’inscrire',
   'tour.confirmLeave': 'Annuler votre inscription ?',
@@ -2056,6 +2065,7 @@ export default {
   'errors.chooseDeck': 'Choisissez un deck.',
   'errors.deckInvalid': 'Ce deck n’est pas valide pour jouer.',
   'errors.deckNotAllowedInFormat': 'Ce deck n’est pas autorisé en {format}. {issue}',
+  'errors.deckHasSpoilers': '{n|Ce deck contient # carte spoiler pas encore sortie|Ce deck contient # cartes spoilers pas encore sorties} ({ids}). Les spoilers ne sont autorisés qu’en parties occasionnelles, salons privés, contre le bot et dans les tournois avec spoilers.',
   'errors.rankedNoManualCards': 'Le mode manuel n’est pas autorisé en classée : ce deck contient {n|# carte|# cartes} avec des effets pas encore automatisés (⚙).',
   'errors.botChooseDeck': 'Deck du bot : choisissez un deck.',
   'errors.botDeckInvalid': 'Deck du bot : ce deck n’est pas valide pour jouer.',
@@ -2136,6 +2146,9 @@ export default {
   'errors.tourStartedNoEdit': 'Le tournoi a commencé : les règles ne peuvent plus changer.',
   'errors.maxBelowRegistered': 'La limite est inférieure au nombre d’inscrits.',
   'errors.tourDecksNotAllowed': '{n|# joueur utilise un deck|# joueurs utilisent des decks} non autorisé(s) en {format}.',
+  'errors.tourSpoilersNeedEgb': 'Les spoilers ne sont autorisés que dans le format avec toutes les cartes (Extra Grand Battle).',
+  'errors.tourDeckNotAllowedAtStart': 'Ce deck ne sera pas légal au début du tournoi ({date}). {issue}',
+  'errors.tourDecksNoLongerAllowed': '{n|# inscrit a un deck qui n’est plus légal|# inscrits ont des decks qui ne sont plus légaux} en {format} : {names}. Demandez-leur de changer de deck ou retirez-les du tournoi.',
   'errors.tourStarted': 'Le tournoi a déjà commencé.',
   'errors.tourNeedsTwoPlayers': 'Il faut au moins 2 inscrits.',
   'errors.tourNotRunning': 'Le tournoi n’est pas en cours.',
@@ -2207,6 +2220,7 @@ export default {
   'rules.banned': '{id} est bannie (légale dans aucun format).',
   'rules.rotated': '{id} est du bloc ① et sortie de la rotation : non légale en {format}.',
   'rules.bannedPair': '{a} et {b} ne peuvent pas être utilisées ensemble dans le même deck.',
+  'rules.spoiler': '{n|Carte pas encore sortie (spoiler)|Cartes pas encore sorties (spoilers)} : {ids}. Les spoilers ne sont autorisés qu’en parties occasionnelles, salons privés, contre le bot et dans les tournois avec spoilers.',
   // ---- text list (parseDeckList) ----
   'rules.listBadLine': 'Ligne non reconnue : « {line} »',
   'rules.listUnknownCard': 'Carte absente de la base de données : {id}',

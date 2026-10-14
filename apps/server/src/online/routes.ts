@@ -12,7 +12,18 @@
 // Modo transmissão (/api/broadcast): ver online/broadcast.ts.
 
 import { randomInt } from 'node:crypto';
-import { buildCardDef, type CardData, cardLegality, cleanArts, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
+import {
+  buildCardDef,
+  type CardData,
+  cardLegality,
+  cleanArts,
+  type DeckList,
+  formatIssues,
+  formatLabel,
+  type PlayerId,
+  spoilerIssues,
+  validateDeck,
+} from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
@@ -102,17 +113,30 @@ const refused = (r: Extract<ActResult, { ok: false }>) => ({
   ...(r.errorParams ? { errorParams: r.errorParams } : {}),
 });
 
+/** O que mais, além do formato, o deck precisa cumprir. */
+export interface DeckRules {
+  /** Sem cartas com efeito manual (ranqueada). */
+  noManual?: boolean;
+  /** Sem cartas de spoiler, ainda não lançadas (ranqueada e torneios sem spoilers). */
+  noSpoilers?: boolean;
+  /** Data em que o deck precisa valer (banimentos com data); padrão: agora. */
+  at?: Date;
+}
+
+/** Regras da ranqueada: só cartas lançadas e nenhum efeito manual. */
+export const RANKED_RULES: DeckRules = { noManual: true, noSpoilers: true };
+
 /**
- * Deck pronto para jogar no formato (e sem cartas manuais, se `noManual`): usado
- * pelas salas online e pela inscrição nos torneios.
+ * Deck pronto para jogar no formato (e nas regras extras de `rules`): usado pelas
+ * salas online e pela inscrição nos torneios.
  */
-export function playableDeck(db: DB, deckId: unknown, format: FormatId, noManual: boolean): DeckList | LobbyError {
+export function playableDeck(db: DB, deckId: unknown, format: FormatId, rules: DeckRules = {}): DeckList | LobbyError {
   const deck = typeof deckId === 'string' && deckId ? getDeck(db, deckId) : null;
   if (!deck) return { code: 400, ...fail('chooseDeck', 'Escolha um deck.') };
   const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
   const report = validateDeck(deck, cards);
   if (!report.valid) return { code: 400, ...fail('deckInvalid', 'Esse deck não é válido para jogar.') };
-  const banned = formatIssues(deck, format);
+  const banned = formatIssues(deck, format, rules.at);
   if (banned.length) {
     // `issue` em português; `issueCode` + `issueParams` para o cliente traduzir o motivo (chave `rules.…`).
     const { message: issue, code: issueCode, params: issueParams } = banned[0];
@@ -126,9 +150,14 @@ export function playableDeck(db: DB, deckId: unknown, format: FormatId, noManual
       }),
     };
   }
+  const spoilers = rules.noSpoilers ? spoilerIssues(deck, cards) : [];
+  if (spoilers.length) {
+    const { message: issue, params } = spoilers[0];
+    return { code: 400, ...fail('deckHasSpoilers', `Esse deck tem cartas que ainda não foram lançadas. ${issue}`, params) };
+  }
   // Inclui cartas com script que ainda tenham alguma parte resolvida à mão.
   const manual = new Set([...report.unscripted, ...[...cards.values()].filter((c) => buildCardDef(c).manual).map((c) => c.id)]);
-  if (noManual && manual.size) {
+  if (rules.noManual && manual.size) {
     return {
       code: 400,
       ...fail(
@@ -237,8 +266,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     };
   };
 
-  /** Deck pronto para jogar no formato (e sem cartas manuais, na ranqueada). */
-  const deckFor = (deckId: unknown, format: FormatId, ranked: boolean) => playableDeck(db, deckId, format, ranked);
+  /** Deck pronto para jogar no formato (na ranqueada, também sem cartas manuais nem spoilers). */
+  const deckFor = (deckId: unknown, format: FormatId, ranked: boolean) => playableDeck(db, deckId, format, ranked ? RANKED_RULES : {});
   const formatOf = (v: unknown): FormatId => (isFormat(v) ? v : 'standard');
 
   /** Sala + assento a partir do token (query `t` ou corpo). */

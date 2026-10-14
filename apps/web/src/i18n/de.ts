@@ -193,7 +193,9 @@ export default {
   'menu.rankedDesc': 'Kopfgeld steht auf dem Spiel. Du triffst auf Spieler deines Niveaus.',
   'menu.chipGoogleLogin': 'Google-Anmeldung',
   'menu.chipNoManual': 'Keine manuellen Effekte',
+  'menu.chipReleasedOnly': 'Nur erschienene Karten',
   'menu.rankedNeedsLogin': 'Melde dich mit Google an, um Ranked zu spielen.',
+  'menu.rankedSpoilers': '{n|Das Deck hat # Spoiler-Karte, die noch nicht erschienen ist: In Ranked sind nur erschienene Karten erlaubt.|Das Deck hat # Spoiler-Karten, die noch nicht erschienen sind: In Ranked sind nur erschienene Karten erlaubt.}',
   'menu.rankedManualCards':
     '{n|Das Deck hat # Karte mit manuellem Effekt (⚙), was Ranked nicht erlaubt.|Das Deck hat # Karten mit manuellen Effekten (⚙), was Ranked nicht erlaubt.}',
   'menu.casualKicker': 'Casual',
@@ -419,6 +421,7 @@ export default {
   'deck.allowedIn': 'Legal in {format}',
   'deck.formatAllowed': '{format}: legal',
   'deck.formatNotAllowed': '{format}: nicht legal',
+  'deck.rankedChip': 'Ranked (enthält Spoiler)',
   // ---- Deckprüfung (spiegelt validateDeck/formatIssues der Engine) ----
   // ---- gespeicherte Decks ----
   'deck.openDeckTitle': 'Deck öffnen: {name}',
@@ -767,6 +770,9 @@ export default {
   'tour.description': 'Beschreibung und Regeln',
   'tour.descriptionPlaceholder': 'Preise, Dauer jeder Runde, wo die Partien vereinbart werden…',
   'tour.format': 'Format',
+  'tour.formatSpoilers': 'Alle Karten + Spoiler',
+  'tour.formatReleasedHint': 'Nur bereits erschienene Karten sind erlaubt: Decks mit Spoilern können sich nicht anmelden.',
+  'tour.formatSpoilersHint': 'Alle erschienenen Karten sind erlaubt (wie in Extra Grand Battle), dazu Spoiler-Karten, die noch nicht erschienen sind. Gebannte Karten bleiben verboten.',
   'tour.structure': 'Struktur',
   'tour.swissHint':
     'Alle spielen jede Runde, immer gegen Spieler mit gleicher Punktzahl (ein Sieg zählt 3 Punkte). Bei Gleichstand entscheidet die Siegquote der Gegner. Optional ziehen die besten Spieler am Ende in einen Top Cut ein.',
@@ -852,6 +858,9 @@ export default {
   'tour.myDecks': 'Meine Decks',
   'tour.otherDecks': 'Andere Decks',
   'tour.noPlayableDeck': 'Keines der Decks ist in {format} legal. Bau eines im „Deckbau“.',
+  'tour.deckIssue': 'Dein Deck wird in diesem Turnier nicht legal sein: {issue} Melde dich mit einem anderen Deck neu an, sonst wird deine Anmeldung beim Start storniert.',
+  'tour.staleDecks': '{n|# Spieler hat ein Deck, das im Turnier nicht legal sein wird (gebannte Karte)|# Spieler haben Decks, die im Turnier nicht legal sein werden (gebannte Karte)}: {names}. Bitte sie, das Deck zu wechseln, oder entferne sie vor dem Start; beim automatischen Start werden diese Anmeldungen storniert.',
+  'tour.noPlayableDeckReleased': 'Keines der Decks ist in {format} nur mit erschienenen Karten legal (Decks mit Spoilern sind nicht erlaubt). Bau eines im „Deckbau“.',
   'tour.changeDeck': 'Deck wechseln',
   'tour.register': 'Anmelden',
   'tour.confirmLeave': 'Deine Anmeldung zurückziehen?',
@@ -2056,6 +2065,7 @@ export default {
   'errors.chooseDeck': 'Wähle ein Deck.',
   'errors.deckInvalid': 'Dieses Deck ist nicht spielbereit.',
   'errors.deckNotAllowedInFormat': 'Dieses Deck ist in {format} nicht erlaubt. {issue}',
+  'errors.deckHasSpoilers': '{n|Dieses Deck hat # Spoiler-Karte, die noch nicht erschienen ist|Dieses Deck hat # Spoiler-Karten, die noch nicht erschienen sind} ({ids}). Spoiler sind nur in Casual-Partien, privaten Räumen, gegen den Bot und in Turnieren mit Spoilern erlaubt.',
   'errors.rankedNoManualCards': 'Manueller Modus ist in Ranked nicht erlaubt: Dieses Deck hat {n|# Karte|# Karten} mit noch nicht automatisierten Effekten (⚙).',
   'errors.botChooseDeck': 'Bot-Deck: Wähle ein Deck.',
   'errors.botDeckInvalid': 'Bot-Deck: Dieses Deck ist nicht spielbereit.',
@@ -2136,6 +2146,9 @@ export default {
   'errors.tourStartedNoEdit': 'Das Turnier hat begonnen: Die Regeln können nicht mehr geändert werden.',
   'errors.maxBelowRegistered': 'Das Limit liegt unter der Zahl der angemeldeten Spieler.',
   'errors.tourDecksNotAllowed': '{n|# Spieler nutzt ein Deck|# Spieler nutzen Decks}, das in {format} nicht erlaubt ist.',
+  'errors.tourSpoilersNeedEgb': 'Spoiler sind nur im Format mit allen Karten (Extra Grand Battle) erlaubt.',
+  'errors.tourDeckNotAllowedAtStart': 'Dieses Deck wird beim Turnierstart ({date}) nicht legal sein. {issue}',
+  'errors.tourDecksNoLongerAllowed': '{n|# Spieler hat ein Deck, das|# Spieler haben Decks, die} in {format} nicht mehr legal {n|ist|sind}: {names}. Bitte sie, das Deck zu wechseln, oder entferne sie aus dem Turnier.',
   'errors.tourStarted': 'Das Turnier hat bereits begonnen.',
   'errors.tourNeedsTwoPlayers': 'Es werden mindestens 2 angemeldete Spieler benötigt.',
   'errors.tourNotRunning': 'Das Turnier läuft nicht.',
@@ -2207,6 +2220,7 @@ export default {
   'rules.banned': '{id} ist gebannt (in keinem Format legal).',
   'rules.rotated': '{id} hat Block ① und ist rotiert: nicht legal in {format}.',
   'rules.bannedPair': '{a} und {b} dürfen nicht zusammen im selben Deck verwendet werden.',
+  'rules.spoiler': '{n|Noch nicht erschienene Karte (Spoiler)|Noch nicht erschienene Karten (Spoiler)}: {ids}. Spoiler sind nur in Casual-Partien, privaten Räumen, gegen den Bot und in Turnieren mit Spoilern erlaubt.',
   // ---- Textliste (parseDeckList) ----
   'rules.listBadLine': 'Zeile nicht erkannt: „{line}“',
   'rules.listUnknownCard': 'Karte nicht in der Datenbank gefunden: {id}',

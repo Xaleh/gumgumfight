@@ -23,7 +23,7 @@
 // decidiu a partida da rodada atual, ela pode voltar a ficar pendente) e inscrição
 // atrasada (só no suíço, durante a rodada 1: quem entra começa a rodada 2 com uma derrota).
 
-import { artImage } from '@gumgum/engine';
+import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, spoilerIssues, tournamentFormatLabel } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
 import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
@@ -34,7 +34,7 @@ import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
 import { TIME_BANK_MS } from '../online/room';
 import type { ApiCard } from '../present';
-import { FORMATS, isFormat, tierFor } from '../stats/catalog';
+import { isFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer, findPlayer } from '../stats/store';
 import { listReports } from '../reports/store';
 import { getSponsor, publicSponsor } from '../support/sponsors';
@@ -51,6 +51,7 @@ import {
   MAX_TOLERANCE_MIN,
   MIN_TOLERANCE_MIN,
   roundDeadline,
+  staleDecks,
   toleranceMs,
   tournamentTick,
 } from './clock';
@@ -131,6 +132,8 @@ type Body = {
   name?: unknown;
   description?: unknown;
   format?: unknown;
+  /** Aceita cartas de spoiler (só com o formato EGB: "Todas as cartas + spoilers"). */
+  spoilers?: unknown;
   structure?: unknown;
   rounds?: unknown;
   swissBestOf?: unknown;
@@ -158,6 +161,8 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
   if (name.length < 3) return fail('tourNameTooShort', 'Dê um nome ao torneio (pelo menos 3 letras).');
   const description = typeof b.description === 'string' ? b.description.trim().slice(0, 2000) : '';
   if (!isFormat(b.format)) return fail('invalidFormat', 'Formato inválido.');
+  const spoilers = b.spoilers === true;
+  if (spoilers && b.format !== 'egb') return fail('tourSpoilersNeedEgb', 'Spoilers só valem no formato com todas as cartas (Extra Grand Battle).');
   if (b.structure !== 'swiss' && b.structure !== 'single') return fail('invalidStructure', 'Estrutura inválida.');
   const swiss = b.structure === 'swiss';
   const int = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -194,6 +199,7 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
     name,
     description,
     format: b.format,
+    spoilers,
     structure: b.structure,
     rounds,
     swissBestOf,
@@ -308,6 +314,22 @@ export function registerTournamentRoutes(
   const cache = new ResponseCache();
   const nowIso = () => new Date(now()).toISOString();
 
+  /**
+   * Data em que os decks do torneio precisam valer: o início marcado, se ainda não chegou.
+   * Assim um banimento com data anterior ao torneio já barra a inscrição.
+   */
+  const legalAt = (t: Pick<Tournament, 'startsAt'>) => new Date(Math.max(now(), t.startsAt ? Date.parse(t.startsAt) : 0));
+  /** Data e hora de Brasília, para as mensagens em português. */
+  const brDate = (d: Date) => d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
+  const issueOut = (i: FormatIssue | null) => (i ? { message: i.message, code: i.code, params: i.params } : null);
+  /** O que impede a lista congelada de valer no torneio em `at` (formato e spoilers); null = vale. */
+  const frozenIssue = (deck: DeckList, t: Pick<Tournament, 'format' | 'spoilers'>, at: Date): FormatIssue | null => {
+    const issue = formatIssues(deck, t.format, at)[0];
+    if (issue || t.spoilers) return issue ?? null;
+    const ids = [deck.leader, ...deck.cards.map((c) => c.id)];
+    return spoilerIssues(deck, new Map(getCards(db, ids).map((c) => [c.id, c as CardData])))[0] ?? null;
+  };
+
   /** Aviso de torneio para uma conta (tocar abre a página do torneio). Avisos novos do mesmo torneio substituem os antigos. */
   const tournamentNotice = (t: Tournament, userId: string, body: (locale: string) => string, ttl: number) =>
     void notifier.notify(
@@ -362,6 +384,11 @@ export function registerTournamentRoutes(
     try {
       const r = tournamentTick(db, now(), (roomId) => lobby.closeIfWaiting(roomId));
       for (const id of r.checkIns) notifyCheckIn(id);
+      for (const { tournamentId, userIds } of r.removed) {
+        app.log.info(`torneio ${tournamentId}: inscrição cancelada no início (deck não vale mais no formato): ${userIds.join(', ')}`);
+        const t = getTournament(db, tournamentId);
+        if (t) for (const id of userIds) tournamentNotice(t, id, (locale) => pushText(locale, 'deckRemovedBody'), 3_600);
+      }
       for (const id of r.started) {
         app.log.info(`torneio ${id}: começou sozinho na hora marcada`);
         notifyRound(id);
@@ -474,6 +501,7 @@ export function registerTournamentRoutes(
       id: t.id,
       name: t.name,
       format: t.format,
+      spoilers: t.spoilers,
       structure: t.structure,
       topCut: t.topCut,
       status: t.status,
@@ -592,6 +620,7 @@ export function registerTournamentRoutes(
       name: t.name,
       description: t.description,
       format: t.format,
+      spoilers: t.spoilers,
       structure: t.structure,
       swissBestOf: t.swissBestOf,
       topCut: t.topCut,
@@ -648,8 +677,12 @@ export function registerTournamentRoutes(
             dropped: me.dropped,
             matchId: current?.id ?? null,
             checkedInAt: me.checkedInAt,
+            /** Antes do início: por que a lista inscrita não vai valer no torneio (null = vale). */
+            deckIssue: t.status === 'registration' ? issueOut(formatIssues(me.deck, t.format, legalAt(t))[0] ?? null) : null,
           }
         : null,
+      /** Para quem gerencia, antes do início: inscritos cujo deck não vai valer no torneio. */
+      staleDecks: manage && t.status === 'registration' ? staleDecks(t, players, legalAt(t)).map((p) => p.name) : [],
       players: players.map((p) => {
         const leader = showLeader(p.userId) ? cards.get(p.deck.leader) : undefined;
         return {
@@ -783,14 +816,16 @@ export function registerTournamentRoutes(
     if (input.maxPlayers !== null && input.maxPlayers < countPlayers(db, found.t.id)) {
       return reply.code(400).send(fail('maxBelowRegistered', 'O limite é menor que o número de inscritos.'));
     }
-    // Mudar o formato pode invalidar decks já inscritos: confere de novo.
-    if (input.format !== found.t.format) {
-      const bad = listPlayers(db, found.t.id).filter((p) => p.deckId && 'error' in playableDeck(db, p.deckId, input.format, false));
+    // Mudar o formato, tirar os spoilers ou adiar o início (para depois de um banimento com
+    // data) pode invalidar decks já inscritos: confere de novo as listas congeladas.
+    if (input.format !== found.t.format || input.spoilers !== found.t.spoilers || input.startsAt !== found.t.startsAt) {
+      const at = legalAt(input);
+      const bad = listPlayers(db, found.t.id).filter((p) => frozenIssue(p.deck, input, at));
       if (bad.length) {
-        const format = FORMATS.find((f) => f.id === input.format)?.label;
+        const format = tournamentFormatLabel(input);
         return reply
           .code(400)
-          .send(fail('tourDecksNotAllowed', `${bad.length} inscrito(s) usam decks que não valem no formato ${format}.`, { n: bad.length, format: format ?? input.format }));
+          .send(fail('tourDecksNotAllowed', `${bad.length} inscrito(s) usam decks que não valem no formato ${format}.`, { n: bad.length, format }));
       }
     }
     updateTournament(db, found.t.id, input);
@@ -814,6 +849,22 @@ export function registerTournamentRoutes(
     if (t.status !== 'registration') return reply.code(409).send(fail('tourStarted', 'O torneio já começou.'));
     const players = listPlayers(db, t.id);
     if (players.length < 2) return reply.code(400).send(fail('tourNeedsTwoPlayers', 'São precisos pelo menos 2 inscritos.'));
+    // Deck que deixou de valer depois da inscrição (banimento com data): o organizador
+    // decide, pedindo a troca do deck (nova inscrição) ou tirando o jogador.
+    const stale = staleDecks(t, players, new Date(now()));
+    if (stale.length) {
+      const names = stale.map((p) => p.name).join(', ');
+      const format = tournamentFormatLabel(t);
+      return reply
+        .code(409)
+        .send(
+          fail(
+            'tourDecksNoLongerAllowed',
+            `${stale.length} inscrito(s) estão com deck que não vale mais no formato ${format}: ${names}. Peça para trocarem o deck ou tire-os do torneio.`,
+            { n: stale.length, names, format },
+          ),
+        );
+    }
     beginTournament(db, t, players, nowIso());
     notifyRound(t.id);
     return detail(getTournament(db, t.id)!, me);
@@ -1077,8 +1128,22 @@ export function registerTournamentRoutes(
     if (!already && t.maxPlayers !== null && countPlayers(db, t.id) >= t.maxPlayers) {
       return reply.code(409).send(fail('tourFull', 'O torneio está lotado.'));
     }
-    const deck = playableDeck(db, req.body?.deckId, t.format, false);
+    const deck = playableDeck(db, req.body?.deckId, t.format, { noSpoilers: !t.spoilers, at: new Date(now()) });
     if ('error' in deck) return reply.code(deck.code).send(fail(deck.errorCode, deck.error, deck.errorParams));
+    // O deck precisa valer também no dia do torneio (banimento com data antes do início).
+    const at = legalAt(t);
+    const later = !late && at.getTime() > now() ? formatIssues(deck, t.format, at)[0] : undefined;
+    if (later) {
+      const date = brDate(at);
+      return reply.code(400).send(
+        fail('tourDeckNotAllowedAtStart', `Esse deck não vai valer no início do torneio (${date}). ${later.message}`, {
+          date,
+          issue: later.message,
+          issueCode: later.code,
+          issueParams: later.params,
+        }),
+      );
+    }
     const profile = ensurePlayer(db, accountOwnerKey(me.id));
     if (late) {
       lateRegister(db, t, me.id, profile.name, deck.id ?? null, deck, nowIso());
