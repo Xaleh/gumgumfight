@@ -14,7 +14,7 @@ import type { FastifyRequest } from 'fastify';
 import { existsSync } from 'node:fs';
 import { type GoogleKeys, googleKeyStore } from './auth/google';
 import { registerAuth } from './auth/routes';
-import { accountOwnerKey, isAdmin } from './auth/store';
+import { accountOwnerKey, isAdmin, type User } from './auth/store';
 import { type ServerOptions, serverOptions } from './config';
 import { fail, isPlayerError, type PlayerError } from './errors';
 import {
@@ -38,6 +38,8 @@ import { type PushSender, registerPushRoutes } from './push/routes';
 import { vapidKeys } from './push/store';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
+import { registerAccessGate } from './support/access';
+import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
@@ -56,6 +58,8 @@ export function buildApp(
     onlineRateLimit?: number;
     botDelayMs?: number;
     onlineLimits?: Partial<LobbyLimits>;
+    /** Testes: fetch usado na consulta do plano à produção (ACCESS=supporters). */
+    fetchImpl?: typeof fetch;
     /** Testes: envio das notificações (sem ele, vai para o serviço de push de verdade). */
     pushSend?: PushSender;
   } = {},
@@ -74,6 +78,10 @@ export function buildApp(
     cardImages: server.cardImages,
     languages: ['pt', 'en'],
     googleClientId: server.googleClientId ?? null,
+    /** O apoio está configurado: o item "Apoiar o projeto" aparece no menu. */
+    support: supportEnabled(server.support),
+    /** supporters: o site só abre para apoiadores (homologação). */
+    access: server.access?.mode ?? 'open',
     /** Chave pública VAPID para o navegador se inscrever nas notificações (null = desligadas). */
     pushKey: pushKeys?.publicKey ?? null,
   }));
@@ -123,13 +131,19 @@ export function buildApp(
     if (typeof token !== 'string' || token.length < 16 || token.length > 128) return null;
     return createHash('sha256').update(token).digest('hex');
   };
+  /** Tarefas depois do login (as rotas de apoio põem aqui a consulta à Apoia.se). */
+  const afterLogin: Array<(user: User) => Promise<void>> = [];
   const auth = registerAuth(app, {
     db,
     clientId: server.googleClientId ?? null,
     keys: opts.googleKeys ?? googleKeyStore(),
     browserHash,
     adminEmails: server.adminEmails,
+    afterLogin,
   });
+  // Homologação só para apoiadores (ACCESS=supporters): antes de todas as outras rotas.
+  registerAccessGate(app, { db, user: auth.viewer, access: server.access ?? { mode: 'open' }, fetchImpl: opts.fetchImpl, now: opts.now });
+
   /**
    * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o
    * navegador. Só o dono edita/apaga os decks que criou.
@@ -274,7 +288,7 @@ export function buildApp(
     return reply.code(204).send();
   });
 
-  registerStatsRoutes(app, { db, viewerHash, present });
+  registerStatsRoutes(app, { db, viewerHash, user: auth.viewer, present, proGate: supportEnabled(server.support) });
   const lobby = registerOnlineRoutes(app, {
     db,
     viewerHash,
@@ -294,6 +308,15 @@ export function buildApp(
   registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined, notifier });
 
   registerReportRoutes(app, { db, user: auth.viewer });
+  registerSupportRoutes(app, {
+    db,
+    user: auth.viewer,
+    options: server.support ?? {},
+    afterLogin,
+    fetchImpl: opts.fetchImpl,
+    now: opts.now,
+    syncHours: opts.now ? 0 : apoiaseSyncHours(),
+  });
   registerTutorialRoutes(app, { db, viewerHash, user: auth.viewer, now: opts.now });
 
   app.get('/api/matches', async () => recentMatches(db));

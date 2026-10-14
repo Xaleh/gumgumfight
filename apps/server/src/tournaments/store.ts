@@ -43,6 +43,16 @@ export interface Tournament {
   checkInNotice: string | null;
   organizerId: string;
   organizerName: string | null;
+  /** Torneio do time (Torneio da Tripulação). */
+  official: boolean;
+  /** Prêmio anunciado (null = sem prêmio). */
+  prize: string | null;
+  /** Loja patrocinadora. */
+  sponsorId: string | null;
+  /** Até quando só Almirantes se inscrevem (null = sem inscrição antecipada). */
+  priorityUntil: string | null;
+  /** Criado pela cota de apoiador. */
+  quota: boolean;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -86,6 +96,10 @@ export type TournamentInput = Pick<
   | 'startsAt'
   | 'checkIn'
   | 'toleranceMin'
+  | 'official'
+  | 'prize'
+  | 'sponsorId'
+  | 'priorityUntil'
 >;
 
 type TournamentRow = {
@@ -110,6 +124,11 @@ type TournamentRow = {
   checkin_notice: string | null;
   organizer_id: string;
   organizer_name: string | null;
+  official: number;
+  prize: string | null;
+  sponsor_id: string | null;
+  priority_until: string | null;
+  quota: number;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -137,6 +156,11 @@ const toTournament = (r: TournamentRow): Tournament => ({
   checkInNotice: r.checkin_notice ?? null,
   organizerId: r.organizer_id,
   organizerName: r.organizer_name,
+  official: Boolean(r.official),
+  prize: r.prize,
+  sponsorId: r.sponsor_id,
+  priorityUntil: r.priority_until,
+  quota: Boolean(r.quota),
   createdAt: r.created_at,
   startedAt: r.started_at,
   finishedAt: r.finished_at,
@@ -146,22 +170,39 @@ const toTournament = (r: TournamentRow): Tournament => ({
 const TOURNAMENT_COLS = 't.*, p.name AS organizer_name';
 const TOURNAMENT_FROM = `FROM tournaments t LEFT JOIN players p ON p.owner_hash = 'user:' || t.organizer_id`;
 
-export function createTournament(db: DB, input: TournamentInput, organizerId: string): Tournament {
+/**
+ * `quota`: criado pela cota mensal de apoiador (`at` = quando, para contar o mês).
+ */
+export function createTournament(db: DB, input: TournamentInput, organizerId: string, quota: { at: string } | null = null): Tournament {
   dataVersion.bump();
   const id = `t-${randomBytes(5).toString('hex')}`;
   db.prepare(
     `INSERT INTO tournaments (id, name, description, format, structure, rounds, swiss_best_of, top_cut, bo3_from, bo5_from,
-       max_players, starts_at, check_in, tolerance_min, organizer_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, ...inputValues(input), organizerId);
+       max_players, starts_at, check_in, tolerance_min, official, prize, sponsor_id, priority_until, organizer_id, quota)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, ...inputValues(input), organizerId, quota ? 1 : 0);
+  if (quota) db.prepare('INSERT INTO tournament_quota (tournament_id, organizer_id, created_at) VALUES (?, ?, ?)').run(id, organizerId, quota.at);
   return getTournament(db, id)!;
+}
+
+/** Torneios criados pela cota de apoiador desde `since` (ISO). */
+export function quotaUsed(db: DB, organizerId: string, since: string): number {
+  return Number(
+    (db.prepare('SELECT COUNT(*) AS n FROM tournament_quota WHERE organizer_id = ? AND created_at >= ?').get(organizerId, since) as { n: number }).n,
+  );
+}
+
+/** Devolve a vaga da cota (torneio apagado antes de começar). */
+export function releaseQuota(db: DB, tournamentId: string) {
+  db.prepare('DELETE FROM tournament_quota WHERE tournament_id = ?').run(tournamentId);
 }
 
 export function updateTournament(db: DB, id: string, input: TournamentInput) {
   dataVersion.bump();
   db.prepare(
     `UPDATE tournaments SET name = ?, description = ?, format = ?, structure = ?, rounds = ?, swiss_best_of = ?, top_cut = ?,
-       bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?, check_in = ?, tolerance_min = ?
+       bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?, check_in = ?, tolerance_min = ?,
+       official = ?, prize = ?, sponsor_id = ?, priority_until = ?
      WHERE id = ?`,
   ).run(...inputValues(input), id);
 }
@@ -181,6 +222,10 @@ const inputValues = (i: TournamentInput) =>
     i.startsAt,
     i.checkIn ? 1 : 0,
     i.toleranceMin,
+    i.official ? 1 : 0,
+    i.prize,
+    i.sponsorId,
+    i.priorityUntil,
   ] as const;
 
 export function deleteTournament(db: DB, id: string): boolean {

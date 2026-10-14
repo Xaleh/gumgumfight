@@ -1,6 +1,7 @@
 // Português (Brasil): idioma padrão e referência das chaves. Todo idioma novo precisa ter
 // exatamente estas chaves (ver `Messages`). Sintaxe de {param} e {n|# um|# vários}: index.ts.
 
+import supportPtBR from './support/pt-BR';
 import tutorialPtBR from './tutorial/pt-BR';
 
 const ptBR = {
@@ -136,7 +137,7 @@ const ptBR = {
   'menu.navCoverage': 'Cobertura das cartas',
   'menu.footerNav': 'Rodapé',
   'menu.disclaimer':
-    'Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para português são automáticas e não oficiais.',
+    'Projeto de fã, mantido pela comunidade e por lojas parceiras, sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para português são automáticas e não oficiais.',
   // ---- conexão ----
   'menu.connecting': 'Conectando ao servidor…',
   'menu.connectFailed': 'Não foi possível conectar ao servidor. Veja as mensagens [server] no terminal do npm run dev.',
@@ -685,7 +686,7 @@ const ptBR = {
   'tour.create': '+ Criar torneio',
   'tour.signInToRegister': 'Para se inscrever num torneio, entre com a conta Google no menu.',
   'tour.emptyCreate': 'Nenhum torneio ainda. Crie o primeiro!',
-  'tour.emptyOrganizer': 'Nenhum torneio ainda. Torneios são criados por contas com o perfil Organizador.',
+  'tour.emptyOrganizer': 'Nenhum torneio ainda. Torneios são criados por Organizadores e por apoiadores Capitão ou Almirante.',
   'tour.playersCount': '{n|# jogador|# jogadores}',
   'tour.playersOfMax': '{n}/{max} {n|jogador|jogadores}',
   'tour.youRegistered': '✔ Você está inscrito',
@@ -2152,6 +2153,8 @@ const ptBR = {
   // ==== /status ====
   // ==== tutorial (i18n/tutorial) ====
   ...tutorialPtBR,
+  // ==== apoio ao projeto (i18n/support) ====
+  ...supportPtBR,
 } as const;
 
 export type MessageKey = keyof typeof ptBR;

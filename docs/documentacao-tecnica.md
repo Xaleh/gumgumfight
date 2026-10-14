@@ -487,7 +487,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (17)
+### Tabelas (20)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -506,6 +506,9 @@ baixadas quando tocam) + `public/`.
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
 | `tournament_players` | `(tournament_id, user_id)` | `name`, `deck_id`, **`deck` (JSON `DeckList` congelado)**, `seed`, `dropped` | inscrição, início, drop |
+| `supporter_payments` | `id` (`apoiase:<conta>:<mês>` ou transação do Ko-fi) | `email`, `kind`, `tier`, `amount`, `currency`, `paid_at`, `user_id` | consulta à Apoia.se, webhook do Ko-fi |
+| `tournament_quota` | `tournament_id` | `organizer_id`, `created_at`: torneios criados pela cota de apoiador | criação de torneio |
+| `sponsors` | `id` (`sp-` + 8 hex) | `name`, `url`, `offer`, `placements`, `starts_at`, `ends_at`, `sort`, `logo` (BLOB), `logo_type` | admin |
 | `tournament_matches` | `id` autoincrement | `round`, `stage` (`swiss`/`elim`), `table_no`, `p1`, `p2` (null = bye), `best_of`, `wins1`, `wins2`, `result`, `next_first`, `room_id`, `match_id`, `reported_by` | avanço de rodada, fim de jogo online, organizador |
 | `sqlite_sequence` | — | interna (autoincrement) | — |
 
@@ -699,6 +702,19 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
   navegador passam para `user:<id>`; o perfil de estatísticas é fundido (partidas reapontadas, perfil do navegador
   apagado se a conta já tinha um).
 - **Privacidade**: o nome da conta Google nunca aparece para outros; o nome público é o de `players.name`.
+- **Plano de apoio** (`users.supporter_tier`, `supporter_until`, `supporter_source`, `supporter_public`): Grumete,
+  Tripulante, Capitão ou Almirante (`apps/server/src/support/tiers.ts`). Vem da Apoia.se (`support/apoiase.ts`): o
+  servidor consulta `GET https://api.apoia.se/backers/charges/<e-mail>` no login, em `POST /api/support/apoiase/sync`
+  e a cada 6 h para quem tem plano de lá; o plano sai do valor pago no mês e vale até o dia 10 do mês seguinte. Também
+  pode vir do webhook do Ko-fi (opcional, `POST /api/support/kofi`) ou ser dado à mão pelo admin.
+  O que cada plano libera: Tripulante,
+  Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`) e homologação
+  (`ACCESS=supporters`, `support/access.ts`); Capitão e Almirante, 5 torneios por mês de até 64 jogadores
+  (`tournament_quota`); Almirante, inscrição antecipada de 48 h nos torneios do time (`tournaments.priority_until`).
+  Admins têm todos os benefícios. Sem nenhuma variável `SUPPORT_*`, nada disso é exigido (estatísticas abertas).
+- **Lojas parceiras** (`sponsors`, logo em BLOB validado pelos bytes, só PNG/JPEG/WebP): `GET /api/sponsors`,
+  cadastro em `/api/admin/sponsors`. O torneio do time (`tournaments.official`, `prize`, `sponsor_id`) é marcado só
+  por admin. Partidas de torneio só entram nas estatísticas de todos depois que o torneio termina.
 
 ---
 
