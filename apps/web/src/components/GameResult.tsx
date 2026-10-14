@@ -1,4 +1,4 @@
-import { type Action, cardDef, type GameState, type PlayerId } from '@gumgum/engine';
+import { type Action, cardDef, cardImage, type GameState, type PlayerId } from '@gumgum/engine';
 import { Fragment, type ReactNode } from 'react';
 import { winReasonText } from '../game/engineText';
 import { useT, useTryT } from '../i18n';
@@ -56,6 +56,7 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
   }
 
   const oppLeader = cardDef(state, state.players[opp].leader.uid);
+  const oppLeaderImage = cardImage(state, state.players[opp].leader.uid);
   const lifeOf = (p: PlayerId) => {
     const ps = state.players[p];
     const max = Math.max(cardDef(state, ps.leader.uid).life ?? 0, ps.life.length);
@@ -78,8 +79,8 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
       <div className="result-sky" />
       <header className="result-head">
         <div className="result-avatar">
-          {oppLeader.imageUrl ? (
-            <img src={oppLeader.imageUrl} alt="" referrerPolicy="no-referrer" />
+          {oppLeaderImage ? (
+            <img src={oppLeaderImage} alt="" referrerPolicy="no-referrer" />
           ) : (
             <span>{oppLeader.name.slice(0, 1)}</span>
           )}

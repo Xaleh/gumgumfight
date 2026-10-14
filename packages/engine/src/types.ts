@@ -27,6 +27,8 @@ export interface CardData {
   set?: string;
   rarity?: string;
   imageUrl?: string;
+  /** Artes alternativas (Parallel, Manga, promos…): só aparência, a carta é a mesma. */
+  arts?: CardArt[];
   /** Observações da fonte que não fazem parte do efeito (errata, reimpressão...). */
   notes?: string[];
   /** "Also treat this card's name as [X]": nomes alternativos para regras e efeitos. */
@@ -38,6 +40,15 @@ export interface CardData {
    * Some sozinho quando a API publica a carta: os dados oficiais substituem os do spoiler.
    */
   spoiler?: CardSpoiler;
+}
+
+/** Uma arte alternativa da carta (ver `art.ts`). */
+export interface CardArt {
+  /** Identificador estável: o nome do arquivo da imagem sem a extensão ("OP01-016_p1"). */
+  id: string;
+  imageUrl: string;
+  /** Versão da impressão ("Parallel", "Manga", "Winner Pack Vol. 5"…), em inglês, como vem da fonte. */
+  label?: string;
 }
 
 export interface CardSpoiler {
@@ -1042,6 +1053,8 @@ export interface CardInstance {
   uid: string;
   cardId: string;
   owner: PlayerId;
+  /** Imagem da arte alternativa escolhida no deck (só aparência; as regras ignoram). */
+  art?: string;
 }
 
 export interface FieldCard {
@@ -1503,6 +1516,8 @@ export interface DeckList {
   name: string;
   leader: string;
   cards: Array<{ id: string; count: number }>;
+  /** Arte alternativa escolhida por carta: número da carta -> `CardArt.id`. Fica fora de `cards` (não muda o deck). */
+  arts?: Record<string, string>;
 }
 
 export interface PlayerSetup {

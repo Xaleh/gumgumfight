@@ -12,7 +12,7 @@
 // Modo transmissão (/api/broadcast): ver online/broadcast.ts.
 
 import { randomInt } from 'node:crypto';
-import { buildCardDef, type CardData, cardLegality, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
+import { buildCardDef, type CardData, cardLegality, cleanArts, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
@@ -138,7 +138,8 @@ export function playableDeck(db: DB, deckId: unknown, format: FormatId, noManual
       ),
     };
   }
-  return { id: deck.id, name: deck.name, leader: deck.leader, cards: deck.cards };
+  const arts = cleanArts(deck, cards);
+  return { id: deck.id, name: deck.name, leader: deck.leader, cards: deck.cards, ...(arts ? { arts } : {}) };
 }
 
 /** Grava a partida terminada nas estatísticas (refeita pelo motor, como as do navegador). */

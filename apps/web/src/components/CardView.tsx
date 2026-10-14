@@ -1,4 +1,5 @@
 import {
+  cardImage,
   buildCardDef,
   type CardData,
   type CardDef,
@@ -61,7 +62,9 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   const t = useT();
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const withImage = showImages && Boolean(def.imageUrl) && !imageFailed;
+  // Com a arte alternativa escolhida no deck, se houver.
+  const image = cardImage(state, uid);
+  const withImage = showImages && Boolean(image) && !imageFailed;
   const power = fc ? getPower(state, uid) : def.power;
   const delta = fc && def.power !== undefined && power !== undefined ? power - def.power : 0;
   // Custo atual em campo ("gains +12 cost", auras de custo): a carta mostra o valor que vale para os efeitos.
@@ -111,7 +114,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         <>
           <img
             className="card-img"
-            src={def.imageUrl}
+            src={image}
             alt={def.name}
             loading={eager ? 'eager' : 'lazy'}
             referrerPolicy="no-referrer"

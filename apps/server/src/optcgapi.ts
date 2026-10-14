@@ -5,7 +5,7 @@
 // card_image, card_image_id, set_id, rarity. O mapeamento também aceita nomes
 // alternativos comuns, para tolerar mudanças na API.
 
-import { type CardCategory, type CardData, type Color, normalizeTypeQuotes, parseCard } from '@gumgum/engine';
+import { type CardArt, type CardCategory, type CardData, type Color, normalizeTypeQuotes, parseCard } from '@gumgum/engine';
 
 export const DEFAULT_API_BASE = 'https://optcgapi.com/api';
 
@@ -267,6 +267,63 @@ export function mapApiCard(raw: Raw, vocab: Set<string> = new Set()): CardData |
   };
 }
 
+/**
+ * Versão da impressão, tirada do que `cleanName` remove do nome: "Nami (Parallel)" -> "Parallel",
+ * "Shanks (Parallel) (Manga) (Alternate Art)" -> "Parallel · Manga · Alternate Art". Números e
+ * códigos ("(001)", "(OP05-119)") ficam de fora. Sem nada no nome, a coleção em que saiu.
+ */
+export function printLabel(rawName: string, setName?: unknown): string | undefined {
+  const name = rawName.trim();
+  const tail = name.slice(cleanName(name).length);
+  const tags = [...tail.matchAll(/\(([^()]*)\)|\[([^\]]*)\]/g)]
+    .map((m) => (m[1] ?? m[2]).trim())
+    .filter((t) => t && !/^\d+$/.test(t) && !/^[A-Z]+\d*-\d+$/.test(t) && !/^[A-Z]+\d+$/.test(t));
+  if (tags.length) return tags.join(' · ');
+  const set = typeof setName === 'string' ? setName.trim() : '';
+  // A lista de promos não diz de qual evento ou produto a carta veio.
+  if (/^One Piece Promotion Cards$/i.test(set)) return 'Promo';
+  return set || undefined;
+}
+
+/** Identificador da arte: o nome do arquivo da imagem sem a extensão ("OP01-016_p1"). */
+export function artId(imageUrl: string): string {
+  const file = decodeURIComponent(imageUrl.split(/[?#]/)[0].split('/').pop() ?? '');
+  return file.replace(/\.[a-z0-9]+$/i, '') || imageUrl;
+}
+
+/** Arte candidata de uma linha da API (antes de saber qual é a imagem principal da carta). */
+interface ArtRow {
+  art: CardArt;
+  /** Ordem na escolha: Parallel/Alternate Art (`_p1`, `_p2`…), depois promos (`_pr1`…), depois o resto. */
+  rank: [number, number];
+}
+
+function artRow(raw: Raw, card: CardData): ArtRow | null {
+  const url = card.imageUrl;
+  if (!url) return null;
+  const imageId = String(raw.card_image_id ?? '');
+  const label = printLabel(String(raw.card_name ?? card.name), raw.set_name);
+  // Reimpressão: a mesma ilustração com outro selo ou borda.
+  if (/_r\d+$/i.test(imageId) || /\bReprint\b/i.test(label ?? '')) return null;
+  const p = imageId.match(/_p(\d+)$/i);
+  const pr = imageId.match(/_pr(\d+)$/i);
+  const rank: [number, number] = p ? [0, Number(p[1])] : pr ? [1, Number(pr[1])] : [2, 0];
+  return { art: { id: artId(url), imageUrl: url, ...(label ? { label } : {}) }, rank };
+}
+
+/** Artes alternativas da carta: sem a imagem principal, sem repetir imagem, na ordem de `ArtRow.rank`. */
+function collectArts(card: CardData, rows: ArtRow[]): CardArt[] | undefined {
+  const seen = new Set(card.imageUrl ? [card.imageUrl] : []);
+  const out: CardArt[] = [];
+  const sorted = rows.map((r, i) => ({ ...r, i })).sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.i - b.i);
+  for (const { art } of sorted) {
+    if (seen.has(art.imageUrl)) continue;
+    seen.add(art.imageUrl);
+    out.push(art);
+  }
+  return out.length ? out : undefined;
+}
+
 export function rowsOf(body: unknown): Raw[] {
   return (
     Array.isArray(body) ? body : ((body as { data?: unknown[] })?.data ?? (body as { cards?: unknown[] })?.cards ?? [])
@@ -354,9 +411,17 @@ export function mapApiResponse(
   const rows = rowsOf(body);
   const types = vocab ?? typeVocabulary(rows);
   const groups = new Map<string, Entry[]>();
+  // Artes de todas as linhas da carta, inclusive das reimpressões promocionais (que não entram na escolha dos dados).
+  const artRows = new Map<string, ArtRow[]>();
   let ignored = 0;
   for (const raw of rows) {
     const card = mapApiCard(raw, types);
+    const art = card && !isEventOnly(card) ? artRow(raw, card) : null;
+    if (card && art) {
+      const list = artRows.get(card.id);
+      if (list) list.push(art);
+      else artRows.set(card.id, [art]);
+    }
     if (!card || isPromoReprint(raw, card) || isEventOnly(card)) {
       ignored++;
       continue;
@@ -375,6 +440,8 @@ export function mapApiResponse(
   const raw = new Map<string, unknown>();
   for (const group of groups.values()) {
     const e = mergeEntries(group);
+    const arts = collectArts(e.card, artRows.get(e.card.id) ?? []);
+    if (arts) e.card.arts = arts;
     cards.push(e.card);
     raw.set(e.card.id, e.raw);
   }

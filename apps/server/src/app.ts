@@ -1,11 +1,14 @@
 import fastifyStatic from '@fastify/static';
 import {
+  artImage,
   automationStatus,
   type CardData,
+  cleanArts,
   type DeckList,
   FORMATS,
   type FormatId,
   formatIssues,
+  parseArts,
   validateDeck,
 } from '@gumgum/engine';
 import Fastify from 'fastify';
@@ -177,7 +180,7 @@ export function buildApp(
       kind: deck.kind,
       leader: deck.leader,
       leaderName: leader?.name ?? null,
-      leaderImage: (server.cardImages && leader?.imageUrl) || null,
+      leaderImage: (server.cardImages && leader && artImage(leader, deck.arts?.[leader.id])) || null,
       colors: leader?.colors ?? [],
       size: report.total,
       valid: report.valid,
@@ -218,7 +221,7 @@ export function buildApp(
     return { deck: { ...publicDeck(deck), mine: summary.mine }, cards, summary };
   });
 
-  type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown };
+  type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown; arts?: unknown };
   const parseDeckBody = (b: DeckBody | undefined): Omit<DeckList, 'id'> | PlayerError => {
     if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
     const name = typeof b.name === 'string' ? b.name.trim().slice(0, 60) : '';
@@ -232,7 +235,10 @@ export function buildApp(
       }
       cards.push({ id: c.id.trim().toUpperCase(), count: c.count as number });
     }
-    return { name, leader, cards };
+    const deck = { name, leader, cards, arts: parseArts(b.arts) };
+    // Só as artes que existem, das cartas que estão no deck.
+    const arts = cleanArts(deck, cardsFor([{ id: '', ...deck }]));
+    return { name, leader, cards, ...(arts ? { arts } : {}) };
   };
 
   // Decks incompletos podem ser salvos (rascunho); só decks válidos aparecem para jogar.

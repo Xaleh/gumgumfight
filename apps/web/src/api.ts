@@ -89,7 +89,7 @@ export interface CoverageRow {
   ptComplete: number;
 }
 
-export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards'>;
+export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards' | 'arts'>;
 
 export type ApiCard = CardData & { provisional?: boolean };
 

@@ -27,7 +27,10 @@ export function ptTranslation(card: CardData, manual?: TranslationRow): NonNulla
 export function presentCards(cards: ApiCard[], manual: Map<string, TranslationRow>, opts: ServerOptions): ApiCard[] {
   return cards.map((c) => {
     const out: ApiCard = { ...c, i18n: { ...c.i18n, pt: ptTranslation(c, manual.get(c.id)) } };
-    if (!opts.cardImages) delete out.imageUrl;
+    if (!opts.cardImages) {
+      delete out.imageUrl;
+      delete out.arts;
+    }
     return out;
   });
 }

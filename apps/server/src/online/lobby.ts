@@ -3,7 +3,7 @@
 // gravação das salas no banco (para sobreviver a reinícios e deploys).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import type { CardData, PlayerId } from '@gumgum/engine';
+import { type CardData, cardImage, type PlayerId } from '@gumgum/engine';
 import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId } from '../stats/catalog';
 import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
@@ -387,7 +387,7 @@ export class Lobby {
         name: s.name,
         leader: s.deck.leader,
         leaderName: st?.defs[s.deck.leader]?.name ?? null,
-        leaderImage: st?.defs[s.deck.leader]?.imageUrl ?? null,
+        leaderImage: (st && cardImage(st, st.players[i].leader.uid)) ?? null,
         colors: st?.defs[s.deck.leader]?.colors ?? [],
         tier: s.tier,
         bounty: s.bounty,

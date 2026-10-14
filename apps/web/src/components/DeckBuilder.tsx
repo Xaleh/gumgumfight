@@ -1,6 +1,9 @@
 import {
+  applyFirstArts,
   type CardData,
   cardLegality,
+  cardsWithArts,
+  cleanArts,
   type Color,
   DECK_SIZE,
   type DeckList,
@@ -14,6 +17,7 @@ import {
   anyNumberAllowed,
   parseDeckList,
   validateDeck,
+  withArt,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ApiCard, deckGroups, type DeckSummary, isAdmin } from '../api';
@@ -29,11 +33,13 @@ interface Draft {
   name: string;
   leader: string;
   cards: Map<string, number>;
+  /** Arte alternativa escolhida: número da carta -> id da arte (`CardArt.id`). */
+  arts: Map<string, string>;
   /** user = meu (editável); builtin/community = somente leitura, editar cria uma cópia. */
   kind: 'builtin' | 'community' | 'user';
 }
 
-const emptyDraft = (name: string): Draft => ({ id: null, name, leader: '', cards: new Map(), kind: 'user' });
+const emptyDraft = (name: string): Draft => ({ id: null, name, leader: '', cards: new Map(), arts: new Map(), kind: 'user' });
 
 const COLORS: Array<{ id: Color; label: MessageKey }> = [
   { id: 'red', label: 'deck.color.red' },
@@ -86,6 +92,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHoveredState] = useState<Hovered | null>(null);
   const [textModal, setTextModal] = useState<null | 'import' | 'export'>(null);
+  /** Carta com o seletor de arte alternativa aberto. */
+  const [artPicker, setArtPicker] = useState<CardData | null>(null);
   /** Carta aberta em modal (toque longo). */
   const [zoom, setZoom] = useState<CardData | null>(null);
   const closeZoom = useCallback(() => setZoom(null), []);
@@ -98,7 +106,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   const entryPress = useLongPress<HTMLDivElement>((e) => {
     const id = (e.target as HTMLElement).closest<HTMLElement>('.entry')?.dataset.card;
     const card = id ? byId.get(id) : undefined;
-    if (card) setZoom(card);
+    if (card) setZoom(shown(card));
   });
   const setHovered = useCallback((card: CardData | null, anchor?: HTMLElement) => {
     setHoveredState(card && anchor ? { card, anchor } : null);
@@ -127,6 +135,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
 
   const byId = useMemo(() => new Map(allCards.map((c) => [c.id, c])), [allCards]);
   const leader = draft.leader ? byId.get(draft.leader) : undefined;
+  /** A carta com a arte escolhida neste deck (Líder e lista do deck; o catálogo mostra a arte normal). */
+  const shown = (card: CardData) => withArt(card, draft.arts.get(card.id));
 
   const refreshDecks = useCallback(() => api.decks().then(setDecks), []);
 
@@ -185,9 +195,18 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   }, [allCards, query, colors, category, cost, set, onlyCompatible, onlyAutomated, leader, choosingLeader]);
 
   const deckList = useMemo(
-    () => ({ id: draft.id ?? 'rascunho', name: draft.name, leader: draft.leader, cards: [...draft.cards].map(([id, count]) => ({ id, count })) }),
+    () => ({
+      id: draft.id ?? 'rascunho',
+      name: draft.name,
+      leader: draft.leader,
+      cards: [...draft.cards].map(([id, count]) => ({ id, count })),
+      arts: Object.fromEntries(draft.arts),
+    }),
     [draft],
   );
+  /** Cartas do deck que têm arte alternativa, e se todas já estão com uma. */
+  const artCards = useMemo(() => cardsWithArts(deckList, byId), [deckList, byId]);
+  const allArts = artCards.length > 0 && artCards.length === Object.keys(cleanArts(deckList, byId) ?? {}).length;
   const report = useMemo(() => validateDeck(deckList, byId), [deckList, byId]);
   /** Em quais formatos o deck pode ser usado, e por que não nos outros. */
   const legality = useMemo(
@@ -211,7 +230,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
     }
     setDraft((d) => {
       const base = d.kind !== 'user' ? { ...d, id: null, kind: 'user' as const, name: t('deck.copyName', { name: d.name }) } : d;
-      return fn({ ...base, cards: new Map(base.cards) });
+      return fn({ ...base, cards: new Map(base.cards), arts: new Map(base.arts) });
     });
     setDirty(true);
   };
@@ -251,6 +270,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         name: deck.name,
         leader: deck.leader,
         cards: new Map(deck.cards.map((c) => [c.id, c.count])),
+        arts: new Map(Object.entries(deck.arts ?? {})),
         kind: deck.kind === 'builtin' ? 'builtin' : deck.mine ? 'user' : 'community',
       });
       setDirty(false);
@@ -283,7 +303,8 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
       }
       return;
     }
-    const input = { name: draft.name.trim() || t('deck.unnamed'), leader: draft.leader, cards: deckList.cards };
+    // Só as artes das cartas que ainda estão no deck.
+    const input = { name: draft.name.trim() || t('deck.unnamed'), leader: draft.leader, cards: deckList.cards, arts: cleanArts(deckList, byId) ?? {} };
     try {
       const saved = draft.id && draft.kind === 'user' ? await api.updateDeck(draft.id, input) : await api.createDeck(input);
       setDraft((d) => ({ ...d, id: saved.id, kind: 'user', name: saved.name }));
@@ -311,7 +332,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
   };
 
   const duplicate = () => {
-    setDraft((d) => ({ ...d, id: null, kind: 'user', name: t('deck.copyName', { name: d.name }), cards: new Map(d.cards) }));
+    setDraft((d) => ({ ...d, id: null, kind: 'user', name: t('deck.copyName', { name: d.name }), cards: new Map(d.cards), arts: new Map(d.arts) }));
     setDirty(true);
     setNotice(t('deck.copyCreated'));
   };
@@ -321,6 +342,27 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
     setDraft(emptyDraft(t('deck.newDeckName')));
     setDirty(false);
     setNotice(t('deck.pickLeaderToStart'));
+  };
+
+  /** Botão das artes: aplica a primeira arte alternativa em todas as cartas que têm uma; com todas aplicadas, volta às normais. */
+  const toggleArts = () => {
+    if (allArts) {
+      edit((d) => ({ ...d, arts: new Map() }));
+      setNotice(t('deck.artsRemoved'));
+      return;
+    }
+    const arts = applyFirstArts(deckList, byId);
+    edit((d) => ({ ...d, arts: new Map(Object.entries(arts)) }));
+    setNotice(t('deck.artsApplied', { n: Object.keys(arts).length }));
+  };
+
+  /** Escolha manual de uma arte (`null` = a arte normal). */
+  const chooseArt = (cardId: string, artId: string | null) => {
+    edit((d) => {
+      if (artId) d.arts.set(cardId, artId);
+      else d.arts.delete(cardId);
+      return d;
+    });
   };
 
   // ------------------------------------------------------------------ resumo
@@ -542,7 +584,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
           <div className="leader-slot">
             {leader ? (
               <>
-                <StaticCard card={leader} onHover={setHovered} onLongPress={setZoom} />
+                <StaticCard card={shown(leader)} onHover={setHovered} onLongPress={setZoom} />
                 <div>
                   <div className="muted small">{t('deck.leader')}</div>
                   <b>{leader.name}</b>
@@ -557,9 +599,16 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                       life: leader.life,
                     })}
                   </div>
-                  <button className="btn small" onClick={() => edit((d) => ({ ...d, leader: '' }))}>
-                    {t('deck.changeLeader')}
-                  </button>
+                  <div className="btn-row leader-actions">
+                    <button className="btn small" onClick={() => edit((d) => ({ ...d, leader: '' }))}>
+                      {t('deck.changeLeader')}
+                    </button>
+                    {leader.arts?.length ? (
+                      <button className="btn small" onClick={() => setArtPicker(leader)} title={t('deck.artChooseTitle')}>
+                        <Icon name="palette" size={16} /> {t('deck.artChoose')}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </>
             ) : (
@@ -606,7 +655,7 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                   <div
                     className={['entry', errorIds.has(e.id) || cardLegality(e.id, 'egb') === 'banned' ? 'bad' : ''].join(' ')}
                     data-card={e.id}
-                    onMouseEnter={(ev) => e.card && setHovered(e.card, ev.currentTarget)}
+                    onMouseEnter={(ev) => e.card && setHovered(shown(e.card), ev.currentTarget)}
                     onMouseLeave={() => setHovered(null)}
                   >
                     <span className={`entry-cost c-${e.card?.colors[0] ?? 'red'}`}>{e.card?.cost ?? '?'}</span>
@@ -618,6 +667,16 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                         {legalityNote(cardLegality(e.id, 'standard'), t)}
                       </small>
                     </span>
+                    {e.card?.arts?.length ? (
+                      <button
+                        className={['art-btn', draft.arts.has(e.id) ? 'on' : ''].join(' ')}
+                        onClick={() => e.card && setArtPicker(e.card)}
+                        title={t('deck.artChooseTitle')}
+                        aria-label={t('deck.artChooseTitle')}
+                      >
+                        <Icon name="palette" size={15} />
+                      </button>
+                    ) : null}
                     <button className="qty" onClick={() => remove(e.id)} aria-label={t('deck.removeOne')}>
                       −
                     </button>
@@ -683,6 +742,14 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
                 {t('deck.delete')}
               </button>
             )}
+            <button
+              className="btn"
+              onClick={toggleArts}
+              disabled={artCards.length === 0 || renaming}
+              title={artCards.length ? t('deck.artsApplyTitle', { n: artCards.length }) : t('deck.artsNone')}
+            >
+              <Icon name="palette" size={16} /> {allArts ? t('deck.artsRemove') : t('deck.artsApply')}
+            </button>
             <button className="btn" onClick={() => setTextModal('export')} disabled={!draft.leader && !entries.length}>
               {t('deck.exportList')}
             </button>
@@ -693,8 +760,19 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
         </aside>
       </div>
 
-      {canHover && hovered && !textModal && !zoom && <CardHoverPreview card={hovered.card} anchor={hovered.anchor} />}
+      {canHover && hovered && !textModal && !zoom && !artPicker && <CardHoverPreview card={hovered.card} anchor={hovered.anchor} />}
       {zoom && <StaticCardZoom card={zoom} onClose={closeZoom} />}
+      {artPicker && (
+        <ArtPicker
+          card={artPicker}
+          current={draft.arts.get(artPicker.id) ?? null}
+          onChoose={(artId) => {
+            chooseArt(artPicker.id, artId);
+            setArtPicker(null);
+          }}
+          onClose={() => setArtPicker(null)}
+        />
+      )}
 
       {textModal && (
         <TextModal
@@ -870,6 +948,60 @@ function LegalityBadge({ id }: { id: string }) {
     <span className="legality-badge rotated" title={t('deck.rotatedTitle')}>
       ①
     </span>
+  );
+}
+
+/** Escolha da arte de uma carta: a normal e as alternativas, com a versão de cada uma. */
+function ArtPicker({
+  card,
+  current,
+  onChoose,
+  onClose,
+}: {
+  card: CardData;
+  current: string | null;
+  onChoose: (artId: string | null) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const options = [
+    { id: null, imageUrl: card.imageUrl, label: t('deck.artOriginal') },
+    ...(card.arts ?? []).map((a) => ({ id: a.id as string | null, imageUrl: a.imageUrl, label: a.label ?? t('deck.artAlternate') })),
+  ];
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-card art-picker" role="dialog" aria-label={t('deck.artPickerTitle', { name: card.name })} onClick={(e) => e.stopPropagation()}>
+        <h3>{t('deck.artPickerTitle', { name: card.name })}</h3>
+        <p className="muted small">{t('deck.artPickerHint')}</p>
+        <div className="art-options">
+          {options.map((o) => (
+            <ArtOption key={o.id ?? ''} name={card.name} imageUrl={o.imageUrl} label={o.label} selected={o.id === current} onClick={() => onChoose(o.id)} />
+          ))}
+        </div>
+        <div className="btn-row center">
+          <button className="btn" onClick={onClose}>
+            {t('common.close')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Uma arte no seletor; some se a imagem não carrega (promo sem imagem na fonte). */
+function ArtOption({ name, imageUrl, label, selected, onClick }: { name: string; imageUrl?: string; label: string; selected: boolean; onClick: () => void }) {
+  const [failed, setFailed] = useState(false);
+  if (failed || !imageUrl) return null;
+  return (
+    <button className={['art-option', selected ? 'selected' : ''].join(' ')} onClick={onClick} aria-pressed={selected} title={label}>
+      <img src={imageUrl} alt={name} loading="lazy" referrerPolicy="no-referrer" draggable={false} onError={() => setFailed(true)} />
+      <span>{label}</span>
+    </button>
   );
 }
 

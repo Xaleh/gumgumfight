@@ -1,6 +1,6 @@
 // Rotas de partidas, perfil e estatísticas.
 
-import { type Action, type CardData, type DeckList, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
+import { type Action, type CardData, type DeckList, formatLabel, parseArts, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { seesProStats, type User } from '../auth/store';
 import { ResponseCache } from '../cache';
@@ -66,7 +66,8 @@ function parseDeck(v: unknown): DeckList | null {
   if (!d || typeof d.leader !== 'string' || !Array.isArray(d.cards) || d.cards.length > 60) return null;
   const cards = d.cards.filter((c) => typeof c?.id === 'string' && Number.isInteger(c.count) && c.count > 0 && c.count <= 50);
   if (cards.length !== d.cards.length) return null;
-  return { id: String(d.id ?? ''), name: String(d.name ?? '').slice(0, 60), leader: d.leader, cards };
+  const arts = parseArts(d.arts);
+  return { id: String(d.id ?? ''), name: String(d.name ?? '').slice(0, 60), leader: d.leader, cards, ...(arts ? { arts } : {}) };
 }
 
 /** Validade das estatísticas em cache (cada partida gravada já as invalida). */

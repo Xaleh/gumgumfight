@@ -9,6 +9,7 @@ import { buildCardDef } from './cards';
 import { nextRandom, type RngHolder, seedRng128, shuffleInPlace } from './rng';
 import { visibleCards } from './view';
 import type {
+  CardArt,
   Aura,
   Checkpoint,
   LeaderRule,
@@ -106,15 +107,26 @@ export function createGame(config: GameConfig): GameState {
   // Só as cartas dos dois decks entram no estado (que é copiado a cada ação).
   const used = new Set(config.players.flatMap((p) => [p.deck.leader, ...p.deck.cards.map((c) => c.id)]));
   const defs: Record<string, CardDef> = {};
-  for (const c of config.cards) if (used.has(c.id)) defs[c.id] = buildCardDef(c);
+  /** Artes de cada carta: a instância leva só a imagem escolhida, e a lista sai das definições (o estado é copiado a cada ação). */
+  const arts = new Map<string, CardArt[]>();
+  for (const c of config.cards) {
+    if (!used.has(c.id)) continue;
+    const def = buildCardDef(c);
+    if (def.arts) {
+      arts.set(c.id, def.arts);
+      delete def.arts;
+    }
+    defs[c.id] = def;
+  }
 
   const holder: RngHolder = { rng: config.seed | 0, ...(config.seed128 ? { rng128: seedRng128(config.seed128) } : {}) };
   const cards: GameState['cards'] = {};
   let counter = 0;
-  const makeInstance = (cardId: string, owner: PlayerId) => {
+  const makeInstance = (cardId: string, owner: PlayerId, artId?: string) => {
     if (!defs[cardId]) throw new Error(`Carta desconhecida: ${cardId}`);
     const uid = `c${++counter}`;
-    cards[uid] = { uid, cardId, owner };
+    const art = artId ? arts.get(cardId)?.find((a) => a.id === artId)?.imageUrl : undefined;
+    cards[uid] = { uid, cardId, owner, ...(art ? { art } : {}) };
     return uid;
   };
 
@@ -124,10 +136,10 @@ export function createGame(config: GameConfig): GameState {
     if (!leaderDef || leaderDef.category !== 'leader') {
       throw new Error(`Líder inválido no deck ${setup.deck.name}`);
     }
-    const leaderUid = makeInstance(setup.deck.leader, id);
+    const leaderUid = makeInstance(setup.deck.leader, id, setup.deck.arts?.[setup.deck.leader]);
     const deck: string[] = [];
     for (const entry of setup.deck.cards) {
-      for (let i = 0; i < entry.count; i++) deck.push(makeInstance(entry.id, id));
+      for (let i = 0; i < entry.count; i++) deck.push(makeInstance(entry.id, id, setup.deck.arts?.[entry.id]));
     }
     if (deck.length !== DECK_SIZE) {
       throw new Error(`O deck ${setup.deck.name} tem ${deck.length} cartas (precisa de ${DECK_SIZE})`);
