@@ -14,8 +14,9 @@
 // Vida virada continuam escondidos.
 //
 // Mesa atrasada: um espectador pode assistir com atraso (`Connection.delay`). As mãos dos dois
-// jogadores só aparecem nas partidas de torneio (fora delas, ninguém vê a mão do oponente), e
-// quem as vê sempre assiste atrasado (no mínimo MIN_HANDS_DELAY_MS): a partida pode estar
+// jogadores só aparecem nas partidas de torneio e nas salas privadas em que quem criou liberou
+// as mãos (`RoomData.showHands`, para um streamer transmitir o jogo de dois amigos); fora disso,
+// ninguém vê a mão do oponente. Quem as vê sempre assiste atrasado (no mínimo MIN_HANDS_DELAY_MS): a partida pode estar
 // numa live, e o oponente não pode abrir a transmissão para ver a mão do outro. Cada atraso
 // em uso tem a sua mesa, refeita a partir das ações gravadas e avançada no mesmo ritmo em que
 // elas aconteceram; emotes, chat, dados e o aviso de revanche chegam com o mesmo atraso.
@@ -177,6 +178,8 @@ export interface RoomData {
   timeline?: Array<[at: number, left0: number, left1: number]>;
   /** Quando a partida começou (ms). */
   startedAt?: number;
+  /** Sala privada: quem criou liberou as mãos dos jogadores para quem transmite (streamer e admin, com atraso). */
+  showHands?: boolean;
 }
 
 export interface Connection {
@@ -336,6 +339,11 @@ export class Room {
 
   get ranked() {
     return this.data.queue === 'ranked';
+  }
+
+  /** As mãos dos jogadores podem aparecer para quem assiste (com o perfil e o atraso): torneio ou sala privada liberada. */
+  get handsAllowed(): boolean {
+    return this.data.queue === 'tournament' || (this.data.queue === 'private' && Boolean(this.data.showHands));
   }
 
   seatOf(token: unknown): PlayerId | null {
@@ -626,8 +634,8 @@ export class Room {
   }
 
   attach(conn: Connection) {
-    // Mãos dos jogadores só nas partidas de torneio.
-    if (conn.hands && this.data.queue !== 'tournament') conn.hands = false;
+    // Mãos dos jogadores só onde são permitidas (torneio ou sala privada liberada).
+    if (conn.hands && !this.handsAllowed) conn.hands = false;
     if (isLate(conn)) {
       // Quem já assistia atrasado recebe o que venceu antes de quem chega agora.
       this.advanceLate();
@@ -830,6 +838,8 @@ export class Room {
       clock: late ? this.lateClock(late) : this.clock(),
       result: over ? this.data.result : null,
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
+      /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
+      handsAllowed: this.handsAllowed,
       /** Atraso da mesa desta conexão (ms); 0 = ao vivo. */
       delay: late ? late.delay : 0,
     };
@@ -847,8 +857,8 @@ export class Room {
     const pov = conn.seat ?? (late || !isLate(conn) ? (conn.as ?? null) : null);
     const room = this.info(conn.seat, late, pov);
     if (!state || !this.aliases) return { room, view: null, defs: {}, log: { from: 0, entries: [] }, lastAction: null };
-    // As mãos dos dois só saem da mesa atrasada de uma partida de torneio: fora disso, nada a mais.
-    const extra = late && conn.hands && this.data.queue === 'tournament' ? handsOf(late.state) : [];
+    // As mãos dos dois só saem da mesa atrasada, onde são permitidas: fora disso, nada a mais.
+    const extra = late && conn.hands && this.handsAllowed ? handsOf(late.state) : [];
     const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra);
     const newDefs: Record<string, CardDef> = {};
     for (const [id, def] of Object.entries(defs)) {

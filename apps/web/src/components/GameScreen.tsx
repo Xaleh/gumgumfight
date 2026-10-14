@@ -50,6 +50,7 @@ import {
   BroadcastTag,
   ChatBar,
   ChatBubbles,
+  HandsSharedTag,
   OnlineBanner,
   OnlineClock,
   OnlineResultInfo,
@@ -327,8 +328,8 @@ export function WatchGameScreen({
       kind="online"
       online={online}
       onExit={onExit}
-      // As mãos dos jogadores só aparecem nas partidas de torneio.
-      spectator={{ canHands: canHands && room.queue === 'tournament', onToggleHands: () => onSwitch({ ...target, hands: !target.hands }) }}
+      // As mãos dos jogadores só aparecem no torneio e nas salas privadas liberadas por quem criou.
+      spectator={{ canHands: canHands && Boolean(room.handsAllowed), onToggleHands: () => onSwitch({ ...target, hands: !target.hands }) }}
       broadcast={broadcast}
     />
   );
@@ -1066,6 +1067,7 @@ function Table({
       </div>
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
       {online && !watching && <SpectatorCount online={online} />}
+      {online && !watching && <HandsSharedTag online={online} />}
       {human !== null && !isOnline && !tutorial && (
         <button
           className={['auto-toggle', game.auto ? 'on' : ''].join(' ')}

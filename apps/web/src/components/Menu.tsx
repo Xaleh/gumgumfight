@@ -361,6 +361,8 @@ export function Menu({
   const [timeBank, setTimeBank] = useState<number | null>(null);
   /** "Transmitir esta partida": só com login. */
   const [broadcast, setBroadcast] = useState(false);
+  /** Sala privada: liberar as mãos dos jogadores para quem transmite (streamer). */
+  const [shareHands, setShareHands] = useState(false);
   const broadcasting = botRooms && broadcast && Boolean(user);
   /** Partidas online (ou treino contra o bot do servidor) ainda abertas: atalho para voltar. */
   const [active, setActive] = useState<ActiveRoom[]>([]);
@@ -744,7 +746,7 @@ export function Menu({
               highlight={Boolean(URL_ROOM_CODE)}
               onAction={() =>
                 run(async () => {
-                  const r = await api.online.createRoom(onlineDeck!.id, format);
+                  const r = await api.online.createRoom(onlineDeck!.id, format, shareHands);
                   onOnline({ roomId: r.roomId, token: r.token });
                 })
               }
@@ -775,6 +777,10 @@ export function Menu({
                   </button>
                 </div>
               </div>
+              <label className="check" title={t('menu.shareHandsTitle')}>
+                <input type="checkbox" checked={shareHands} onChange={(e) => setShareHands(e.target.checked)} />
+                {t('menu.shareHands')}
+              </label>
             </ModeCard>
             <ModeCard
               mode="bot"

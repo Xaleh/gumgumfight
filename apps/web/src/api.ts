@@ -295,8 +295,9 @@ export const api = {
     /** `key`: tela de transmissão (fonte do OBS); a chave faz as vezes do login e as opções do streamer decidem o que ela vê. */
     watchUrl: (roomId: string, hands: boolean, key?: string) =>
       `/api/online/rooms/${roomId}/watch${key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
-    createRoom: (deckId: string, format: FormatId) =>
-      send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format }),
+    /** `showHands`: libera as mãos dos jogadores para quem transmite (streamer, com atraso). */
+    createRoom: (deckId: string, format: FormatId, showHands = false) =>
+      send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format, ...(showHands ? { showHands } : {}) }),
     joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
     enqueue: (deckId: string, format: FormatId, queue: QueueKind) =>
       send<{ ticket: string }>('POST', '/api/online/queue', { deckId, format, queue }),
@@ -404,6 +405,8 @@ export interface LiveRoom {
   }>;
   turn: number;
   spectators: number;
+  /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
+  handsAllowed?: boolean;
   createdAt: number;
   /** Jogo de uma partida de torneio. */
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
@@ -459,6 +462,8 @@ export interface OnlineRoomInfo {
   rematch: [boolean, boolean];
   /** Atraso da mesa desta conexão em ms (quem vê as mãos); 0 ou ausente = ao vivo. */
   delay?: number;
+  /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
+  handsAllowed?: boolean;
 }
 
 // ------------------------------------------------------------------ torneios

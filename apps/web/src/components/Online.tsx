@@ -380,6 +380,7 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
               <h2>{t('online.privateRoom')}</h2>
               <p className="muted">{t('online.privateHint')}</p>
               <div className="room-code">{room.code}</div>
+              {room.handsAllowed && <p className="small">{t('online.handsSharedHint')}</p>}
               <div className="btn-row center">
                 <button className="btn primary" onClick={copy}>
                   {copied ? t('online.linkCopied') : t('online.shareLink')}
@@ -404,6 +405,18 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
         </section>
       </div>
     </div>
+  );
+}
+
+/** Aviso para os jogadores de uma sala privada que liberou as mãos para quem transmite. */
+export function HandsSharedTag({ online }: { online: OnlineGame }) {
+  const t = useT();
+  const room = online.room;
+  if (!room || room.queue !== 'private' || !room.handsAllowed) return null;
+  return (
+    <span className="delay-tag" title={t('online.handsSharedHint')}>
+      {t('online.handsShared')}
+    </span>
   );
 }
 

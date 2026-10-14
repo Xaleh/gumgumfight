@@ -7,8 +7,8 @@
 //
 // Espectadores usam outro canal (/watch), sem token: qualquer um assiste às partidas
 // das filas (e às privadas, com o código). Ver as mãos exige perfil streamer ou admin, só
-// vale nas partidas de torneio, é recusado para quem está jogando a própria partida e
-// mostra a mesa atrasada.
+// vale nas partidas de torneio e nas salas privadas liberadas por quem criou, é recusado
+// para quem está jogando a própria partida e mostra a mesa atrasada.
 // Modo transmissão (/api/broadcast): ver online/broadcast.ts.
 
 import { randomInt } from 'node:crypto';
@@ -264,14 +264,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return owner ? lobby.activeFor(owner) : [];
   });
 
-  type RoomBody = { deckId?: unknown; format?: unknown; code?: unknown };
+  type RoomBody = { deckId?: unknown; format?: unknown; code?: unknown; showHands?: unknown };
   app.post<{ Body: RoomBody }>('/api/online/rooms', async (req, reply) => {
     const format = formatOf(req.body?.format);
     const seat = seatFor(req, req.body, false, format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip);
     if (limit) return reply.code(limit.code).send(limit);
-    const r = lobby.createPrivate(seat, format);
+    const r = lobby.createPrivate(seat, format, req.body?.showHands === true);
     if (isError(r)) return reply.code(r.code).send(r);
     lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, code: r.room.data.code, token: r.token });
@@ -423,7 +423,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   /**
    * Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin, só em
-   * partida de torneio), na mesa atrasada (o atraso escolhido nas opções da transmissão, nunca abaixo do mínimo). `k`:
+   * partida de torneio ou sala privada liberada), na mesa atrasada (o atraso escolhido nas opções da transmissão, nunca abaixo do mínimo). `k`:
    * tela de transmissão; a chave faz as vezes do login e as opções do streamer decidem o que
    * a conexão vê (`broadcastView`).
    */
@@ -438,8 +438,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     } else if (req.query.hands === '1') {
       const account = user(req);
       if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers e administradores.'));
-      if (room.data.queue !== 'tournament') {
-        return reply.code(403).send(fail('handsTournamentOnly', 'As mãos dos jogadores só aparecem nas partidas de torneio.'));
+      if (!room.handsAllowed) {
+        return reply.code(403).send(fail('handsTournamentOnly', 'As mãos dos jogadores só aparecem nas partidas de torneio e nas salas privadas que liberaram as mãos.'));
       }
       if (room.isPlayer(accountOwnerKey(account!.id), account!.id)) {
         return reply.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));

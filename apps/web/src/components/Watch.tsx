@@ -61,8 +61,8 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
       /* sem armazenamento */
     }
   };
-  // As mãos só aparecem nas partidas de torneio, e nunca na própria partida.
-  const watch = (r: Pick<LiveRoom, 'id' | 'mine' | 'queue'>) => onWatch({ roomId: r.id, hands: canHands && hands && !r.mine && r.queue === 'tournament' });
+  // As mãos só aparecem no torneio e nas salas privadas liberadas, e nunca na própria partida.
+  const watch = (r: Pick<LiveRoom, 'id' | 'mine' | 'handsAllowed'>) => onWatch({ roomId: r.id, hands: canHands && hands && !r.mine && Boolean(r.handsAllowed) });
   /** Manda a partida para a tela de transmissão (o que ela mostra sai das opções do painel). */
   const transmit = (r: LiveRoom | null) => {
     setError(null);
@@ -70,11 +70,13 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   };
   const onAir = broadcast?.key ? broadcast.roomId : null;
 
-  const byCode = async () => {
+  /** Sala privada pelo código: assistir ou mandar para a transmissão. */
+  const byCode = async (send = false) => {
     setError(null);
     try {
       const room = await api.online.byCode(code);
-      watch(room);
+      if (send) transmit(room);
+      else watch(room);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -177,9 +179,14 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
               placeholder={t('watch.codePlaceholder')}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             />
-            <button className="btn" disabled={code.length !== 6} onClick={byCode}>
+            <button className="btn" disabled={code.length !== 6} onClick={() => void byCode()}>
               {t('watch.watch')}
             </button>
+            {broadcast?.key && (
+              <button className="btn" disabled={code.length !== 6} onClick={() => void byCode(true)} title={t('broadcast.transmitTitle')}>
+                {t('broadcast.transmit')}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -191,10 +198,10 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
 const DELAYS = [0, 60, 120, 180, 300, 600];
 
 /** O que a live mostra numa partida (como o servidor decide em `broadcastView`) e com quanto atraso (s). */
-export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | 'queue'>): { what: 'players' | 'own' | 'none'; delayS: number } {
+export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | 'queue' | 'handsAllowed'>): { what: 'players' | 'own' | 'none'; delayS: number } {
   const plain = room.queue === 'tournament' && s.delayTournaments ? s.delayS : 0;
   if (room.mine) return s.handsOwn ? { what: 'own', delayS: s.delayS } : { what: 'none', delayS: plain };
-  if (s.handsPlayers && room.queue === 'tournament') return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
+  if (s.handsPlayers && room.handsAllowed) return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
   return { what: 'none', delayS: plain };
 }
 

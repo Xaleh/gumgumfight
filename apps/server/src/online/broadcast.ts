@@ -6,9 +6,9 @@
 // fica guardada como está, para o streamer copiar o link de novo; gerar outra invalida a antiga.
 //
 // O que a live mostra (`broadcastView`) sai das opções do streamer:
-// - partida de torneio de outros: as mãos dos dois jogadores (`handsPlayers`), sempre com atraso
-//   de pelo menos MIN_HANDS_DELAY_MS, ou só a visão pública; nas outras partidas de outros, a
-//   mão do oponente nunca aparece: só a visão pública;
+// - partida de outros onde as mãos são permitidas (torneio, ou sala privada em que quem criou
+//   liberou): as mãos dos dois jogadores (`handsPlayers`), sempre com atraso de pelo menos
+//   MIN_HANDS_DELAY_MS, ou só a visão pública; nas outras, a mão do oponente nunca aparece;
 // - partida que ele joga: a mão dele (`handsOwn`, com o atraso que escolher, até 0) ou a pública;
 // - sem mãos, a mesa é ao vivo, exceto nas partidas de torneio com `delayTournaments`.
 
@@ -132,7 +132,7 @@ export function broadcastView(s: BroadcastSettings, room: Room, user: User): Pic
   const plain = room.data.queue === 'tournament' && s.delayTournaments ? delay : 0;
   const seat = seatOfUser(room, user);
   if (seat !== null) return s.handsOwn ? { as: seat, delay } : { delay: plain };
-  if (s.handsPlayers && room.data.queue === 'tournament') return { hands: true, delay: Math.max(MIN_HANDS_DELAY_MS, delay) };
+  if (s.handsPlayers && room.handsAllowed) return { hands: true, delay: Math.max(MIN_HANDS_DELAY_MS, delay) };
   return { delay: plain };
 }
 

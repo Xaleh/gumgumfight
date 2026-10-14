@@ -1092,6 +1092,61 @@ describe('modo espectador', () => {
     expect((await app.inject({ method: 'PUT', url: '/api/broadcast/room', headers: { cookie: nami.cookie }, payload: { roomId } })).statusCode).toBe(200);
   });
 
+  it('sala privada: quem cria pode liberar as mãos para quem transmite (e a revanche mantém)', async () => {
+    const { app, db } = setup();
+    const nami = login(db, 'nami', 'streamer');
+    const make = async (showHands?: boolean, owners = ['alice-0123456789abcdef', 'bob-0123456789abcdef00']) => {
+      const created = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: { 'x-deck-owner': owners[0] }, payload: { deckId: 'st01-luffy', format: 'egb', showHands } });
+      const { roomId, code } = created.json();
+      await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: { 'x-deck-owner': owners[1] }, payload: { code, deckId: 'st02-kid' } });
+      return getRoom(app, roomId);
+    };
+    const open = await make(true);
+    const closed = await make(undefined, ['carol-0123456789abcdef', 'dave-0123456789abcdef00']);
+    expect(open.handsAllowed).toBe(true);
+    expect(closed.handsAllowed).toBe(false);
+    // A informação vai para os jogadores (aviso na mesa) e para a lista de quem assiste.
+    const player = client(1);
+    open.attach(player.conn);
+    expect(player.room.handsAllowed).toBe(true);
+    expect((await app.inject(`/api/online/watch/${open.data.code}`)).json().handsAllowed).toBe(true);
+
+    // Quem vê as mãos na sala liberada: as duas, na mesa atrasada.
+    const streamer = client(null, true);
+    open.attach(streamer.conn);
+    expect(streamer.room.delay).toBe(HANDS_DELAY_MS);
+    const v = streamer.view!;
+    expect(v.players.every((p) => p.hand.every((u) => v.cards[u].cardId !== HIDDEN_CARD))).toBe(true);
+    const other = client(null, true);
+    closed.attach(other.conn);
+    expect(other.view!.players.every((p) => p.hand.every((u) => other.view!.cards[u].cardId === HIDDEN_CARD))).toBe(true);
+
+    // Modo transmissão segue a mesma regra.
+    const user = getUser(db, nami.id)!;
+    expect(broadcastView(DEFAULT_SETTINGS, open, user)).toEqual({ hands: true, delay: HANDS_DELAY_MS });
+    expect(broadcastView(DEFAULT_SETTINGS, closed, user)).toEqual({ delay: 0 });
+
+    // Canal: com o perfil, só na sala liberada.
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = app.server.address() as { port: number };
+    const watch = async (id: string) => {
+      const ctrl = new AbortController();
+      const res = await fetch(`http://127.0.0.1:${port}/api/online/rooms/${id}/watch?hands=1`, { signal: ctrl.signal, headers: { cookie: nami.cookie } });
+      ctrl.abort();
+      return res.status;
+    };
+    expect(await watch(open.id)).toBe(200);
+    expect(await watch(closed.id)).toBe(403);
+
+    // Revanche: a sala nova continua liberada.
+    const l = (app as unknown as { onlineLobby: Lobby }).onlineLobby;
+    expect(open.act(0, null, { type: 'concede', player: 0 }).ok).toBe(true);
+    expect(l.rematch(open, 0)).toBeNull();
+    expect(l.rematch(open, 1)).toBeNull();
+    expect(l.get(open.data.rematchRoom!)!.handsAllowed).toBe(true);
+    await app.close();
+  });
+
   it('revanche: os espectadores seguem para a sala nova', async () => {
     const { app } = setup();
     const { roomId, tokens } = await privateMatch(app);
