@@ -1,0 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap');
+*{box-sizing:border-box}
+html,body{margin:0;overflow:hidden;font-family:Nunito,sans-serif;color:#fdf5e0}
+.bg{position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,#1d4a72 0%,#12304b 42%,#0a1a2b 100%);overflow:hidden}
+.rays{position:absolute;left:50%;top:42%;width:300vmax;height:300vmax;transform:translate(-50%,-50%);background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.05) 0 6deg,transparent 6deg 12deg)}
+.stripe{position:absolute;left:0;right:0;bottom:0;height:14px;background:linear-gradient(90deg,#c9322b,#ee6f3c 30%,#f7cd48 60%,#c9322b)}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.y{color:#f7cd48}
+.pill{display:inline-block;background:#f7cd48;color:#3d1308;font-weight:900;border-radius:999px}
+.ghost{display:inline-block;border:3px solid rgba(253,245,224,.35);background:rgba(253,245,224,.08);font-weight:800;border-radius:999px}
+.disc{position:absolute;bottom:36px;left:0;right:0;text-align:center;color:rgba(253,245,224,.55);font-weight:700}

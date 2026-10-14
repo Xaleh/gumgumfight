@@ -1,0 +1,35 @@
+<html><head><link rel="stylesheet" href="fonts.css"><style>
+*{box-sizing:border-box}
+html,body{margin:0;width:1600px;height:300px;overflow:hidden;background:#0a1a2b;font-family:Nunito,sans-serif}
+.bg{position:absolute;inset:0;background:radial-gradient(900px 420px at 28% 50%,#1d4a72 0%,#12304b 45%,#0a1a2b 100%)}
+.rays{position:absolute;left:-400px;top:-850px;width:2000px;height:2000px;background:repeating-conic-gradient(from 0deg at 50% 50%,rgba(255,255,255,.045) 0 6deg,transparent 6deg 12deg);}
+.dots{position:absolute;inset:0;background-image:radial-gradient(rgba(247,205,72,.12) 1.4px,transparent 1.6px);background-size:14px 14px;-webkit-mask-image:linear-gradient(90deg,transparent 40%,#000 75%)}
+.stripe{position:absolute;left:0;right:0;bottom:0;height:8px;background:linear-gradient(90deg,#c9322b,#ee6f3c 30%,#f7cd48 60%,#c9322b)}
+.left{position:absolute;left:130px;top:46px;width:640px}
+.logo{height:96px;margin-left:-10px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.45))}
+.tag{margin-top:6px;color:#fdf5e0;font-weight:900;font-size:27px;white-space:nowrap;letter-spacing:.2px;text-shadow:0 2px 6px rgba(0,0,0,.4)}
+.tag em{font-style:normal;color:#f7cd48}
+.chips{display:flex;gap:10px;margin-top:18px}
+.chip{background:rgba(253,245,224,.1);border:2px solid rgba(253,245,224,.25);color:#fdf5e0;font-weight:800;font-size:16px;padding:5px 13px;border-radius:999px;white-space:nowrap}
+.chip.y{background:#f7cd48;border-color:#f7cd48;color:#3d1308}
+.shot{position:absolute;border:6px solid #fdf5e0;border-radius:14px;overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.55)}
+.shot img{display:block;width:100%}
+.s1{width:520px;right:120px;top:36px;transform:rotate(-4deg)}
+.s2{width:320px;right:540px;top:120px;transform:rotate(5deg);opacity:.98}
+.card{position:absolute;width:118px;border-radius:12px;box-shadow:0 12px 26px rgba(0,0,0,.5)}
+.c1{right:70px;top:150px;transform:rotate(14deg)}
+.c2{right:60px;top:46px;transform:rotate(22deg);width:96px}
+.badge{position:absolute;right:500px;top:20px;transform:rotate(-8deg);background:#c9322b;color:#fdf5e0;font:34px Bangers;letter-spacing:1.5px;padding:6px 18px 4px;border-radius:10px;border:4px solid #fdf5e0;box-shadow:0 8px 18px rgba(0,0,0,.5);z-index:5}
+</style></head><body>
+<div class="bg"></div><div class="rays"></div><div class="dots"></div>
+<div class="shot s2"><img src="home.png"></div>
+<div class="shot s1"><img src="mesa.png"></div>
+<img class="card c2" src="don-gg.png"><img class="card c1" src="card-back-gg.png">
+<div class="badge">GRÁTIS PRA SEMPRE!</div>
+<div class="left">
+  <img class="logo" src="header-logo-dark-bg.svg">
+  <div class="tag">O <em>One Piece Card Game</em> no navegador</div>
+  <div class="chips"><span class="chip y">Sem anúncios</span><span class="chip">Feito por fã</span><span class="chip">Bot, online e torneios</span></div>
+</div>
+<div class="stripe"></div>
+</body></html>

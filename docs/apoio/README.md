@@ -46,6 +46,8 @@ Authorization: Bearer <APOIASE_API_SECRET>
 ## Arquivos desta pasta
 
 - [`textos-apoiase.md`](textos-apoiase.md): texto da campanha na Apoia.se, as 4 recompensas e a mensagem de agradecimento.
+- [`post-inauguracao.md`](post-inauguracao.md): post de abertura da página, com versões curtas para redes sociais e Discord.
+- [`midia/`](midia/README.md): banner, foto de perfil, imagem dos planos, post e story; GIFs e trailers saem de `scripts/divulgacao/gerar.sh`.
 - [`regulamento-torneio-da-tripulacao.md`](regulamento-torneio-da-tripulacao.md): modelo do regulamento do torneio do time.
 - [`proposta-lojas.md`](proposta-lojas.md): proposta para lojas patrocinadoras, com as regras dos banners.
 - [`discord.md`](discord.md): como os planos viram cargos no Discord.
