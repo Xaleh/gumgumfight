@@ -476,6 +476,12 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Replays: a pergunta nova é uma `option` do passo `giveRestedDon`; a resposta implícita (índice 0, o máximo de virados) reproduz o comportamento antigo.
 - Testes: `packages/engine/test/card-audit.test.ts` ("Arlong OP15-023: DON!! da área de custo do dono…", 6 testes).
 
+**DV-45. Kouzuki Oden OP17-007: "{Land of Wano} type Character card or Character card with a type including "Whitebeard Pirates""** — médio — **corrigido**
+- Relato do dono do projeto (card 84 do Trello, 14/10/2026): com o Líder Newgate, o Oden OP17-007 não deixava jogar o Kouzuki Oden ST32-002 ({Land of Wano}/{Kouzuki Clan}, 6000).
+- Causa: a optcgapi perde o "or Character card" ("play up to 1 {Land of Wano} type Character card with a type including "Whitebeard Pirates" with 6000 power or less") e o leitor exigia os dois tipos ao mesmo tempo; só cartas como o próprio OP17-007 eram opções. Texto oficial (lista da Bandai): "{Land of Wano} type Character card or Character card with a type including "Whitebeard Pirates" with 6000 power or less", que o leitor já lê como no Crocodile OP09-046 (DV-42): os dois lados, com o poder valendo para ambos.
+- Correção: entrada em `SOURCE_TEXT_FIXES`. Varredura nas cartas da optcgapi (coleções, starter decks e promos): o OP17-007 é a única com esse corte.
+- Testes: `packages/engine/test/trello-bugs.test.ts` ("Trello (card 84): Kouzuki Oden OP17-007…").
+
 ---
 
 ## Itens a confirmar (sem ruling oficial claro)

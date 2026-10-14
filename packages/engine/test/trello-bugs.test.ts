@@ -17,7 +17,9 @@ const st12Cards = dataCards('st12');
 const st36Cards = dataCards('st36');
 const op01Arlong = dataCards('op01').filter((c) => c.id === 'OP01-063');
 const op09Shanks = dataCards('st23').filter((c) => c.id === 'OP09-001');
-const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards, ...op09Shanks];
+const op02Cards = dataCards('op02');
+const st32Oden = dataCards('st32').filter((c) => c.id === 'ST32-002');
+const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards, ...op09Shanks, ...op02Cards, ...st32Oden];
 
 const deck = (leader: string): DeckList => ({ id: leader, name: leader, leader, cards: [{ id: 'ST01-006', count: 50 }] });
 
@@ -315,6 +317,33 @@ describe('Trello: Mihawk ST12-003 joga um Personagem "Slash" (Arlong) da mão, v
     expect(s.log.map((l) => l.text)).toContain(
       'Dracule Mihawk: a condição não vale (A tem 3 Personagens, contando esta carta; precisa de 2 ou menos), o efeito não acontece.',
     );
+  });
+});
+
+describe('Trello (card 84): Kouzuki Oden OP17-007 joga um {Land of Wano} OU um "Whitebeard Pirates" com 6000 ou menos', () => {
+  it('a API perde o "or Character card": a correção da fonte devolve o texto oficial', () => {
+    const text = buildCardDef(cards.find((c) => c.id === 'OP17-007')!).text;
+    expect(text).toContain('{Land of Wano} type Character card or Character card with a type including "Whitebeard Pirates" with 6000 power or less');
+  });
+
+  it('com o Líder Newgate, o Oden ST32-002 (só Land of Wano) e os Whitebeard Pirates sem Wano são opções; acima de 6000 ou de outro tipo, não', () => {
+    let s = toTurn(game(['OP02-001', 'ST02-001']), 3);
+    setDon(s, 0, 7);
+    const oden = hand(s, 0, 'OP17-007');
+    const st32Oden = hand(s, 0, 'ST32-002'); // {Land of Wano}/{Kouzuki Clan}, 6000
+    const blenheim = hand(s, 0, 'OP02-012'); // {Whitebeard Pirates}, 3000
+    const whiteyBay = hand(s, 0, 'OP02-014'); // {Whitebeard Pirates Allies}: o tipo inclui "Whitebeard Pirates"
+    const op02Oden = hand(s, 0, 'OP02-030'); // {Land of Wano}, 8000: poder alto demais
+    const kingdew = hand(s, 0, 'OP02-006'); // {Whitebeard Pirates}, 7000: poder alto demais
+    const other = hand(s, 0, 'ST01-006'); // nenhum dos dois tipos
+    s = applyAction(s, { type: 'playCard', player: 0, uid: oden });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0, max: 1 });
+    const options = (s.pending as { options: string[] }).options;
+    expect(options).toEqual(expect.arrayContaining([st32Oden, blenheim, whiteyBay]));
+    for (const uid of [op02Oden, kingdew, other]) expect(options).not.toContain(uid);
+    s = applyAction(s, { type: 'choose', player: 0, uids: [st32Oden] });
+    expect(s.players[0].characters.map((c) => c.uid)).toContain(st32Oden);
+    expect(s.players[0].hand).not.toContain(st32Oden);
   });
 });
 
