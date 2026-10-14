@@ -666,6 +666,8 @@ describe('partidas online: relógio', () => {
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     const room = r.room;
+    // As mãos dos jogadores só aparecem nas partidas de torneio.
+    room.data.queue = 'tournament';
     const players = [client(0), client(1)];
     const watcher = client(null);
     const streamer = client(null, true);
@@ -726,6 +728,7 @@ describe('partidas online: relógio', () => {
     const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
+    r.room.data.queue = 'tournament';
     const first = actingPlayer(r.room.state!)!;
     r.room.act(first, 0, { type: 'answer', player: first, yes: true });
     r.room.act(first, 1, { type: 'mulligan', player: first, redraw: false });
@@ -757,6 +760,8 @@ describe('partidas online: relógio', () => {
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     const room = r.room;
+    // As mãos dos jogadores só aparecem nas partidas de torneio.
+    room.data.queue = 'tournament';
     const players = [client(0), client(1)];
     const one = client(null, true);
     one.conn.delay = 60_000;
@@ -826,10 +831,17 @@ describe('modo espectador', () => {
   };
   const hidden = (v: GameState, p: PlayerId) => v.players[p].hand.every((u) => v.cards[u].cardId === HIDDEN_CARD);
 
-  it('espectador vê a mesa sem as mãos; com "ver mãos", vê as duas (mas não os decks)', async () => {
+  it('espectador vê a mesa sem as mãos; com "ver mãos", vê as duas (mas não os decks), só em partida de torneio', async () => {
     const { app } = setup();
     const { roomId, tokens } = await privateMatch(app);
     const room = getRoom(app, roomId);
+    // Fora do torneio, pedir as mãos não mostra nada a mais.
+    const outside = client(null, true);
+    room.attach(outside.conn);
+    expect(outside.room.delay).toBe(0);
+    expect(hidden(outside.view!, 0) && hidden(outside.view!, 1)).toBe(true);
+    room.detach(outside.conn);
+    room.data.queue = 'tournament';
     const player = client(0);
     const watcher = client(null);
     const streamer = client(null, true);
@@ -936,7 +948,7 @@ describe('modo espectador', () => {
     expect((await app.inject(`/api/online/rooms/${roomId}/replay`)).statusCode).toBe(200);
   }, 120_000);
 
-  it('ver mãos: só streamer ou admin, e nunca na própria partida', async () => {
+  it('ver mãos: só streamer ou admin, só em partida de torneio e nunca na própria partida', async () => {
     const { app, db } = setup();
     const nami = login(db, 'nami', 'streamer');
     const usopp = login(db, 'usopp');
@@ -958,6 +970,9 @@ describe('modo espectador', () => {
     };
     expect(await open()).toBe(403);
     expect(await open(usopp.cookie)).toBe(403);
+    // Fora do torneio, ninguém vê as mãos.
+    expect(await open(admin.cookie)).toBe(403);
+    getRoom(app, roomId).data.queue = 'tournament';
     expect(await open(nami.cookie)).toBe(403); // nami joga esta partida
     expect(await open(nami.cookie, false)).toBe(200);
     expect(await open(admin.cookie)).toBe(200);
@@ -1052,16 +1067,17 @@ describe('modo espectador', () => {
     await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: { 'x-deck-owner': 'carol-0123456789abcdef' }, payload: { code, deckId: 'st02-kid' } });
     const own = getRoom(app, roomId);
     const s = { ...DEFAULT_SETTINGS };
-    // Partida de outros: as mãos dos dois, nunca com menos de 1 min de atraso.
-    expect(broadcastView(s, other, user)).toEqual({ hands: true, delay: 180_000 });
-    expect(broadcastView({ ...s, delayS: 0 }, other, user)).toEqual({ hands: true, delay: 60_000 });
-    expect(broadcastView({ ...s, handsPlayers: false }, other, user)).toEqual({ delay: 0 });
+    // Partida de outros fora do torneio: a mão do oponente nunca aparece.
+    expect(broadcastView(s, other, user)).toEqual({ delay: 0 });
     // Partida que ele joga: a mão dele, com o atraso que escolher (até ao vivo), ou a visão pública.
     expect(broadcastView(s, own, user)).toEqual({ delay: 0 });
     expect(broadcastView({ ...s, handsOwn: true }, own, user)).toEqual({ as: 0, delay: 180_000 });
     expect(broadcastView({ ...s, handsOwn: true, delayS: 0 }, own, user)).toEqual({ as: 0, delay: 0 });
-    // Torneio: atraso mesmo sem as mãos, se ele quiser.
+    // Partida de torneio de outros: as mãos dos dois, nunca com menos de 1 min de atraso.
     other.data.queue = 'tournament';
+    expect(broadcastView(s, other, user)).toEqual({ hands: true, delay: 180_000 });
+    expect(broadcastView({ ...s, delayS: 0 }, other, user)).toEqual({ hands: true, delay: 60_000 });
+    // Sem as mãos: atraso só se ele quiser.
     expect(broadcastView({ ...s, handsPlayers: false }, other, user)).toEqual({ delay: 0 });
     expect(broadcastView({ ...s, handsPlayers: false, delayTournaments: true, delayS: 120 }, other, user)).toEqual({ delay: 120_000 });
 

@@ -13,8 +13,9 @@
 // dois jogadores (as cartas das mãos entram como "extra" na visão pública); decks e
 // Vida virada continuam escondidos.
 //
-// Mesa atrasada: um espectador pode assistir com atraso (`Connection.delay`). Quem vê as mãos
-// dos jogadores sempre assiste atrasado (no mínimo MIN_HANDS_DELAY_MS): a partida pode estar
+// Mesa atrasada: um espectador pode assistir com atraso (`Connection.delay`). As mãos dos dois
+// jogadores só aparecem nas partidas de torneio (fora delas, ninguém vê a mão do oponente), e
+// quem as vê sempre assiste atrasado (no mínimo MIN_HANDS_DELAY_MS): a partida pode estar
 // numa live, e o oponente não pode abrir a transmissão para ver a mão do outro. Cada atraso
 // em uso tem a sua mesa, refeita a partir das ações gravadas e avançada no mesmo ritmo em que
 // elas aconteceram; emotes, chat, dados e o aviso de revanche chegam com o mesmo atraso.
@@ -625,6 +626,8 @@ export class Room {
   }
 
   attach(conn: Connection) {
+    // Mãos dos jogadores só nas partidas de torneio.
+    if (conn.hands && this.data.queue !== 'tournament') conn.hands = false;
     if (isLate(conn)) {
       // Quem já assistia atrasado recebe o que venceu antes de quem chega agora.
       this.advanceLate();
@@ -844,8 +847,8 @@ export class Room {
     const pov = conn.seat ?? (late || !isLate(conn) ? (conn.as ?? null) : null);
     const room = this.info(conn.seat, late, pov);
     if (!state || !this.aliases) return { room, view: null, defs: {}, log: { from: 0, entries: [] }, lastAction: null };
-    // As mãos dos dois só saem da mesa atrasada: sem ela, nada a mais (nem num caminho de erro).
-    const extra = late && conn.hands ? handsOf(late.state) : [];
+    // As mãos dos dois só saem da mesa atrasada de uma partida de torneio: fora disso, nada a mais.
+    const extra = late && conn.hands && this.data.queue === 'tournament' ? handsOf(late.state) : [];
     const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra);
     const newDefs: Record<string, CardDef> = {};
     for (const [id, def] of Object.entries(defs)) {

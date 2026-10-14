@@ -273,8 +273,9 @@ espectadores seguem para a partida nova.
 
 - **O que o espectador vê:** a visão pública da mesa (`viewFor` com `viewer = null`): campo, descarte, Vida virada para
   cima, cartas reveladas e o log público. Mãos, decks e Vida virada para baixo chegam escondidas.
-- **Ver mãos (Streamer e Admin):** a lista e a mesa têm o botão **Ver mãos**, que mostra as mãos dos dois jogadores
-  (decks e Vida continuam escondidos). O servidor confere o perfil da conta e recusa para quem está jogando a própria
+- **Ver mãos (Streamer e Admin, só em partidas de torneio):** nas partidas de torneio, a lista e a mesa têm o botão
+  **Ver mãos**, que mostra as mãos dos dois jogadores (decks e Vida continuam escondidos). Fora do torneio, ninguém vê
+  a mão do oponente. O servidor confere o perfil da conta, o tipo de partida e recusa para quem está jogando a própria
   partida. Com as mãos, a mesa chega **atrasada** (ações, relógio, chat, emotes e resultado): o atraso escolhido nas
   opções do modo transmissão (padrão 3 min, **nunca menos de 1 min**), para a partida poder ir para uma live sem o
   oponente ver a mão do outro pela transmissão; a mesa mostra o aviso "⏱ N min de atraso". Sem as mãos, ao vivo.
@@ -287,7 +288,8 @@ espectadores seguem para a partida nova.
   e o menu de qualquer partida aberta (jogando ou assistindo) tem **📡 Transmitir esta partida**: a tela de transmissão
   troca para ela sozinha (consulta a escolha a cada 3 s). Opções do painel:
   - **Atraso** (sem atraso, 1, 2, 3, 5 ou 10 min);
-  - **mãos dos jogadores** nas partidas que ele assiste (sempre com pelo menos 1 min de atraso);
+  - **mãos dos jogadores** nas partidas de torneio que ele assiste (sempre com pelo menos 1 min de atraso; nas outras
+    partidas, a mão do oponente nunca aparece);
   - **a própria mão** nas partidas que ele joga (a do oponente nunca aparece; vale o atraso escolhido, até nenhum);
   - **atraso nas partidas de torneio** mesmo sem as mãos (sem essa opção, sem mãos é ao vivo);
   - **chat dos jogadores** na live.
@@ -719,7 +721,7 @@ npm run typecheck
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |
 | GET    | `/api/online/watch/:code` | Sala privada pelo código, para assistir |
 | GET    | `/api/online/rooms/:id` | Resumo de uma sala (jogadores, turno, espectadores) |
-| GET    | `/api/online/rooms/:id/watch?hands=1` · `?k=` | Canal SSE do espectador (`hands=1`: só Streamer e Admin, mesa atrasada; `k`: tela de transmissão, a chave no lugar do login e as opções do streamer decidem o que ela vê) |
+| GET    | `/api/online/rooms/:id/watch?hands=1` · `?k=` | Canal SSE do espectador (`hands=1`: só Streamer e Admin, só em partida de torneio, mesa atrasada; `k`: tela de transmissão, a chave no lugar do login e as opções do streamer decidem o que ela vê) |
 | GET    | `/api/broadcast` | Modo transmissão da conta (`{ key, roomId, delayS, handsPlayers, handsOwn, delayTournaments, chat, minHandsDelayS }`; Streamer e Admin) |
 | POST   | `/api/broadcast/key` | Gera o link da transmissão (ou um novo, que invalida o anterior) |
 | PUT    | `/api/broadcast/room` | Partida na transmissão (`{ roomId \| null }`; vale a própria partida; 409 sem link) |

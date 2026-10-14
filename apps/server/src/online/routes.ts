@@ -6,8 +6,9 @@
 // proxy_read_timeout. O EventSource reconecta sozinho.
 //
 // Espectadores usam outro canal (/watch), sem token: qualquer um assiste às partidas
-// das filas (e às privadas, com o código). Ver as mãos exige perfil streamer ou admin,
-// é recusado para quem está jogando a própria partida e mostra a mesa atrasada.
+// das filas (e às privadas, com o código). Ver as mãos exige perfil streamer ou admin, só
+// vale nas partidas de torneio, é recusado para quem está jogando a própria partida e
+// mostra a mesa atrasada.
 // Modo transmissão (/api/broadcast): ver online/broadcast.ts.
 
 import { randomInt } from 'node:crypto';
@@ -421,8 +422,8 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   });
 
   /**
-   * Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin), na
-   * mesa atrasada (o atraso escolhido nas opções da transmissão, nunca abaixo do mínimo). `k`:
+   * Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin, só em
+   * partida de torneio), na mesa atrasada (o atraso escolhido nas opções da transmissão, nunca abaixo do mínimo). `k`:
    * tela de transmissão; a chave faz as vezes do login e as opções do streamer decidem o que
    * a conexão vê (`broadcastView`).
    */
@@ -437,6 +438,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     } else if (req.query.hands === '1') {
       const account = user(req);
       if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers e administradores.'));
+      if (room.data.queue !== 'tournament') {
+        return reply.code(403).send(fail('handsTournamentOnly', 'As mãos dos jogadores só aparecem nas partidas de torneio.'));
+      }
       if (room.isPlayer(accountOwnerKey(account!.id), account!.id)) {
         return reply.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));
       }

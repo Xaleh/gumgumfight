@@ -327,7 +327,8 @@ export function WatchGameScreen({
       kind="online"
       online={online}
       onExit={onExit}
-      spectator={{ canHands, onToggleHands: () => onSwitch({ ...target, hands: !target.hands }) }}
+      // As mãos dos jogadores só aparecem nas partidas de torneio.
+      spectator={{ canHands: canHands && room.queue === 'tournament', onToggleHands: () => onSwitch({ ...target, hands: !target.hands }) }}
       broadcast={broadcast}
     />
   );

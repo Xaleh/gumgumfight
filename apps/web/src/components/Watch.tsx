@@ -61,8 +61,8 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
       /* sem armazenamento */
     }
   };
-  // Na própria partida o servidor não mostra as mãos: assiste sem elas.
-  const watch = (roomId: string, mine = false) => onWatch({ roomId, hands: canHands && hands && !mine });
+  // As mãos só aparecem nas partidas de torneio, e nunca na própria partida.
+  const watch = (r: Pick<LiveRoom, 'id' | 'mine' | 'queue'>) => onWatch({ roomId: r.id, hands: canHands && hands && !r.mine && r.queue === 'tournament' });
   /** Manda a partida para a tela de transmissão (o que ela mostra sai das opções do painel). */
   const transmit = (r: LiveRoom | null) => {
     setError(null);
@@ -74,7 +74,7 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
     setError(null);
     try {
       const room = await api.online.byCode(code);
-      watch(room.id, room.mine);
+      watch(room);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -121,7 +121,7 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
           {rooms?.length === 0 && <p className="muted">{t('watch.empty')}</p>}
           {rooms?.map((r) => (
             <div key={r.id} className={['watch-room-row', onAir === r.id ? 'on-air' : ''].join(' ')}>
-              <button className="watch-room" onClick={() => watch(r.id, r.mine)}>
+              <button className="watch-room" onClick={() => watch(r)}>
                 <div className="watch-meta">
                   <span className="watch-queue">
                     {r.tournament
@@ -194,7 +194,7 @@ const DELAYS = [0, 60, 120, 180, 300, 600];
 export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | 'queue'>): { what: 'players' | 'own' | 'none'; delayS: number } {
   const plain = room.queue === 'tournament' && s.delayTournaments ? s.delayS : 0;
   if (room.mine) return s.handsOwn ? { what: 'own', delayS: s.delayS } : { what: 'none', delayS: plain };
-  if (s.handsPlayers) return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
+  if (s.handsPlayers && room.queue === 'tournament') return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
   return { what: 'none', delayS: plain };
 }
 
