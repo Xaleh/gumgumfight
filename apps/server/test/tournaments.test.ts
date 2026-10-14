@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
+import { proxiedImageUrl } from '../src/card-images';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, openDb } from '../src/db';
 import type { Lobby } from '../src/online/lobby';
@@ -549,5 +550,119 @@ describe('torneios: rotas', () => {
     view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
     expect(view.status).toBe('finished');
     expect(view.standings[0].userId).toBe(s2.p1.userId);
+  });
+
+  it('kit de divulgação: campeão, campanha com play/draw por jogo, top 4 e líderes', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const ps = Array.from({ length: 5 }, () => login(db));
+    const body = { name: 'Copa do Kit', format: 'egb', structure: 'swiss', rounds: 2, topCut: 2, bo3From: 2 };
+    const t = (await req(app, 'POST', '/api/tournaments', org, body)).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i % DECKS.length] });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
+    const recap = (who?: { headers: Record<string, string> }) => req(app, 'GET', `/api/tournaments/${t.id}/recap`, who);
+    // Só quem gerencia, e só no fim.
+    expect((await recap()).statusCode).toBe(401);
+    expect((await recap(ps[0])).statusCode).toBe(403);
+    expect((await recap(org)).json()).toMatchObject({ errorCode: 'tourNotFinished' });
+
+    const result = (m: { id: number }, payload: object) => req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, org, payload);
+    for (let r = 0; r < 2; r++) {
+      for (const m of view.rounds[r].matches.filter((x: any) => x.p2)) await result(m, { result: 'p1' });
+      view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    }
+    // Final em melhor de 3, jogada nas salas: p1 da final vence os dois jogos.
+    const final = view.rounds[2].matches[0];
+    expect(final.bestOf).toBe(3);
+    const lobby = (app as unknown as { onlineLobby: Lobby }).onlineLobby;
+    const who = (userId: string) => ps.find((p) => p.id === userId)!;
+    for (let g = 0; g < 2; g++) {
+      const a = (await req(app, 'POST', `/api/tournaments/${t.id}/matches/${final.id}/play`, who(final.p1.userId))).json();
+      const b = (await req(app, 'POST', `/api/tournaments/${t.id}/matches/${final.id}/play`, who(final.p2.userId))).json();
+      const room = lobby.get(a.roomId)!;
+      await app.inject({ method: 'POST', url: `/api/online/rooms/${room.id}/action`, payload: { t: b.token, seq: 0, action: { type: 'concede', player: room.seatOf(b.token)! } } });
+    }
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    expect(view.status).toBe('finished');
+
+    const res = await recap(org);
+    expect(res.statusCode).toBe(200);
+    const kit = res.json();
+    expect(kit.tournament).toMatchObject({ name: 'Copa do Kit', players: 5, swissRounds: 2, topCut: 2, earlyFinish: false });
+    expect(kit.champion).toMatchObject({ rank: 1, userId: final.p1.userId, elim: { wins: 1, losses: 0, byes: 0 } });
+    expect(kit.champion.swiss.wins + kit.champion.swiss.losses + kit.champion.swiss.byes).toBe(2);
+    // Lista: líder à parte, cartas ordenadas por custo, com a quantidade e a imagem pelo mesmo domínio.
+    expect(kit.champion.leader).toMatchObject({ category: 'leader', image: expect.stringMatching(/^\/card-img\/optcgapi\//) });
+    const costs = kit.champion.cards.map((c: any) => c.cost ?? 99);
+    expect(costs).toEqual([...costs].sort((x: number, y: number) => x - y));
+    expect(kit.champion.cards.reduce((n: number, c: any) => n + c.count, 0)).toBe(50);
+    expect(kit.top.map((p: any) => p.rank)).toEqual([1, 2, 3, 4]);
+    expect(kit.top[1].userId).toBe(final.p2.userId);
+    // Campanha: as 2 rodadas do suíço (lançadas ou bye) e a final jogada no site, com quem começou cada jogo.
+    expect(kit.campaign).toHaveLength(3);
+    const last = kit.campaign[2];
+    expect(last).toMatchObject({ stage: 'elim', size: 2, bestOf: 3, outcome: 'win', score: [2, 0], how: 'game' });
+    expect(last.opponent).toMatchObject({ name: expect.any(String), leader: { id: expect.any(String) } });
+    expect(last.games.map((g: any) => [g.game, g.won])).toEqual([
+      [1, true],
+      [2, true],
+    ]);
+    expect(last.games.every((g: any) => typeof g.first === 'boolean')).toBe(true);
+    // Quem perdeu o jogo 1 começa o jogo 2: o campeão estava na draw.
+    expect(last.games[1].first).toBe(false);
+    for (const r of kit.campaign.slice(0, 2)) {
+      expect(['organizer', 'bye']).toContain(r.how);
+      expect(r.games).toEqual([]);
+    }
+    // Líderes: todos os inscritos e o top 8 (aqui, os 5).
+    expect(kit.leadersAll.reduce((n: number, l: any) => n + l.count, 0)).toBe(5);
+    expect(kit.leadersAll[0].count).toBe(2);
+    expect(kit.leadersAll[0].leader.set).toMatch(/^ST0/);
+    expect(kit.leadersTop8).toEqual(kit.leadersAll);
+  });
+
+  it('kit de divulgação: torneio encerrado antes da hora avisa; sem imagens, sai sem arte', async () => {
+    const db = openDb(':memory:');
+    seed(db);
+    const app = buildApp(db, { server: { cardImages: false }, onlineRateLimit: 1e9, botDelayMs: 0 });
+    const org = login(db, 'organizer');
+    const ps = [login(db), login(db), login(db)];
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Curto', format: 'egb', structure: 'swiss', rounds: 3 })).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
+    const view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
+    for (const m of view.rounds[0].matches.filter((x: any) => x.p2)) await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, org, { result: 'p2' });
+    await req(app, 'POST', `/api/tournaments/${t.id}/finish`, org);
+    const kit = (await req(app, 'GET', `/api/tournaments/${t.id}/recap`, org)).json();
+    expect(kit).toMatchObject({ cardImages: false, tournament: { earlyFinish: true, players: 3, swissRounds: 1 } });
+    expect(kit.top).toHaveLength(3);
+    expect(kit.champion.leader.image).toBeNull();
+    expect(kit.top.flatMap((p: any) => p.cards).every((c: any) => c.image === null)).toBe(true);
+  });
+
+  it('imagens das cartas pelo mesmo domínio: só as origens conhecidas', async () => {
+    expect(proxiedImageUrl('https://optcgapi.com/media/static/Card_Images/OP01-001.jpg')).toBe('/card-img/optcgapi/static/Card_Images/OP01-001.jpg');
+    expect(proxiedImageUrl('https://images.optcgleaks.com/op18/images/abc.webp')).toBe('/card-img/optcgleaks/op18/images/abc.webp');
+    expect(proxiedImageUrl('https://example.com/x.jpg')).toBeNull();
+    expect(proxiedImageUrl('https://optcgapi.com/media/../etc/passwd.jpg')).toBeNull();
+    expect(proxiedImageUrl(null)).toBeNull();
+
+    const asked: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      asked.push(url);
+      return url.endsWith('OP01-001.jpg')
+        ? new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } })
+        : new Response('nope', { status: 404, headers: { 'content-type': 'text/html' } });
+    }) as typeof fetch;
+    const db = openDb(':memory:');
+    const app = buildApp(db, { server: { cardImages: true }, fetchImpl });
+    const ok = await app.inject({ method: 'GET', url: '/card-img/optcgapi/static/Card_Images/OP01-001.jpg' });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.headers['content-type']).toBe('image/jpeg');
+    expect(ok.rawPayload).toEqual(Buffer.from([1, 2, 3]));
+    expect(asked).toEqual(['https://optcgapi.com/media/static/Card_Images/OP01-001.jpg']);
+    expect((await app.inject({ method: 'GET', url: '/card-img/optcgapi/static/Card_Images/OP99-999.jpg' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/card-img/evil/x.jpg' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/card-img/optcgapi/static/a.html' })).statusCode).toBe(404);
+    expect(asked).toHaveLength(2);
   });
 });

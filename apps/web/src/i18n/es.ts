@@ -3,6 +3,7 @@
 import type { Messages } from './pt-BR';
 import support from './support/es';
 import tutorial from './tutorial/es';
+import recap from './recap/es';
 
 export default {
   // ---- general ----
@@ -2203,4 +2204,6 @@ export default {
   ...tutorial,
   // ==== apoio ao projeto (i18n/support) ====
   ...support,
+  // ==== kit de divulgação dos torneios (i18n/recap) ====
+  ...recap,
 } satisfies Messages;

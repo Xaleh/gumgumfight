@@ -214,7 +214,12 @@ limit_req_zone \$binary_remote_addr zone=gumgum_api:10m rate=30r/s;
 limit_conn_zone \$binary_remote_addr zone=gumgum_conn:10m;
 limit_req_status 429;
 limit_conn_status 429;
+
+# Imagens das cartas pelo mesmo domínio (/card-img/): o kit de divulgação dos torneios as
+# desenha num canvas, que só exporta PNG/PDF com imagens da mesma origem. Cache em disco.
+proxy_cache_path /var/cache/nginx/gumgum-cards levels=1:2 keys_zone=gumgum_cards:10m max_size=2g inactive=90d use_temp_path=off;
 EOF
+install -d -m 755 /var/cache/nginx
 
 PROXY_SETTINGS="$(cat <<EOF
         proxy_pass http://127.0.0.1:$PORT;
@@ -229,12 +234,38 @@ PROXY_SETTINGS="$(cat <<EOF
 EOF
 )"
 
+# /card-img/<origem>/<caminho> → a origem da imagem, com cache (as URLs vêm de
+# apps/server/src/card-images.ts; sem o Nginx, o próprio app atende esse caminho).
+card_img_location() {
+  cat <<EOF
+    location /card-img/$1/ {
+        limit_req zone=gumgum_api burst=200 nodelay;
+        proxy_pass https://$2/$3;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $2;
+        proxy_set_header Cookie "";
+        proxy_hide_header Set-Cookie;
+        proxy_ignore_headers Set-Cookie Cache-Control Expires;
+        proxy_cache gumgum_cards;
+        proxy_cache_valid 200 30d;
+        proxy_cache_valid 404 1h;
+        proxy_cache_lock on;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        add_header Cache-Control "public, max-age=604800" always;
+        add_header X-Cache \$upstream_cache_status always;
+    }
+EOF
+}
+CARD_IMG_BLOCK="$(card_img_location optcgapi optcgapi.com media/; card_img_location optcgleaks images.optcgleaks.com)"
+
 PROXY_BLOCK="$(cat <<EOF
     client_max_body_size 2m;
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
 
     location ^~ /.well-known/acme-challenge/ { root $WEBROOT; }
+
+$CARD_IMG_BLOCK
 
     location /api/ {
         limit_req zone=gumgum_api burst=100 nodelay;

@@ -1,5 +1,5 @@
 import { FORMATS, formatLabel } from '@gumgum/engine';
-import { Fragment, type ReactNode, useCallback, useEffect, useState } from 'react';
+import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   type AdminSponsor,
   api,
@@ -29,6 +29,9 @@ import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
 import { openReplay, ReportsPanel } from './Reports';
 import { SupportModal } from './Support';
+
+/** Kit de divulgação: carregado só quando aberto (desenho em canvas e geradores de ZIP/PDF). */
+const TournamentRecap = lazy(() => import('./TournamentRecap'));
 
 // Neste arquivo `t` costuma ser o torneio; a função de tradução (`useT()`) se chama `tr`.
 
@@ -72,7 +75,7 @@ const PHASES = [256, 32, 16, 8, 4, 2];
 const TOP_CUTS = [2, 4, 8, 16, 32, 64];
 
 /** Nome da fase da eliminatória pelo número de vagas (mesma regra do servidor). */
-function phaseName(tr: Translate, size: number): string {
+export function phaseName(tr: Translate, size: number): string {
   if (size <= 2) return tr('tour.phase.final');
   if (size === 4) return tr('tour.phase.semi');
   if (size === 8) return tr('tour.phase.quarter');
@@ -679,6 +682,7 @@ function TournamentPage({
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<Tab | null>(null);
   const [viewRound, setViewRound] = useState<number | null>(null);
+  const [recapOpen, setRecapOpen] = useState(false);
 
   const load = useCallback(
     () =>
@@ -866,6 +870,11 @@ function TournamentPage({
                       )}
                     </>
                   )}
+                  {t.status === 'finished' && (
+                    <button className="btn primary" disabled={busy} onClick={() => setRecapOpen(true)}>
+                      {tr('recap.button')}
+                    </button>
+                  )}
                   <button
                     className="btn danger"
                     disabled={busy}
@@ -882,8 +891,14 @@ function TournamentPage({
                 {t.status === 'registration' && t.checkIn && (
                   <p className="muted small">{tr('tour.autoStartHint', { date: dateTime(t.startsAt, locale), tolerance: minutes(tr, t.toleranceMs) })}</p>
                 )}
+                {t.status === 'finished' && <p className="muted small">{tr('recap.hint')}</p>}
                 {t.status !== 'registration' && <p className="muted small">{tr('tour.manageHint')}</p>}
               </section>
+            )}
+            {recapOpen && t.canManage && (
+              <Suspense fallback={null}>
+                <TournamentRecap id={t.id} onClose={() => setRecapOpen(false)} />
+              </Suspense>
             )}
 
             <div className="seg tour-tabs">
