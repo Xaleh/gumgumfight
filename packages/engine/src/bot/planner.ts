@@ -83,7 +83,10 @@ export function chooseBotAction(state: GameState, player: PlayerId, level: BotLe
   return planAction(state, player, plannerOptions(level, over));
 }
 
-export function planAction(state: GameState, player: PlayerId, opts: PlannerOptions): Action {
+export function planAction(full: GameState, player: PlayerId, opts: PlannerOptions): Action {
+  // O histórico e o checkpoint do "cancelar" não mudam nenhuma decisão, mas o motor copia o estado
+  // inteiro a cada jogada simulada: sem eles, a busca simula o dobro de jogadas no mesmo tempo.
+  const state: GameState = { ...full, log: [], checkpoint: undefined };
   const actions = legalActions(state, player);
   if (!actions.length) throw new Error('O bot não tem ações legais.');
   const planned = fromPlan(state, player);
@@ -92,9 +95,19 @@ export function planAction(state: GameState, player: PlayerId, opts: PlannerOpti
   if (pending) {
     // Mulligan e escolha de quem começa não têm o que simular.
     if (pending.kind === 'mulligan' || pending.kind === 'chooseFirst' || pending.kind === 'manual') return simpleBot(state, player);
-    return decidePending(state, player, actions, opts, 2)?.action ?? simpleBot(state, player);
+    return decidePending(state, player, actions, defenseOrPlan(state, player, opts), 2)?.action ?? simpleBot(state, player);
   }
-  return planTurn(state, player, opts);
+  return planTurn(state, player, defenseOrPlan(state, player, opts));
+}
+
+/**
+ * A ameaça do próximo ataque do oponente (`incomingThreat`) só pesa nas decisões do turno dele
+ * (Counter, bloqueio, gatilhos). No próprio turno ela deixava o bot passivo — guardando Blockers e
+ * cartas na mão em vez de pressionar — e ele perdia mais do que ganhava (medido em auto-jogo; a
+ * otimização dos pesos também a levou a quase zero).
+ */
+function defenseOrPlan(state: GameState, player: PlayerId, opts: PlannerOptions): PlannerOptions {
+  return state.activePlayer === player ? { ...opts, weights: { ...opts.weights, threat: 0 } } : opts;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,21 +203,23 @@ function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerO
 // Risco de Counter (a mão do oponente é escondida)
 // ---------------------------------------------------------------------------
 
-/** Probabilidade de o oponente conseguir somar `need` de Counter com `hand` cartas escondidas. */
-export function counterAbility(hand: number, need: number): number {
+/**
+ * Probabilidade de o oponente conseguir somar `need` de Counter com `hand` cartas escondidas: cada
+ * carta rende o que falta com chance `counterCard` para +1000, e `counterDrop` a menos por 1000 a mais.
+ */
+export function counterAbility(hand: number, need: number, w: Weights = DEFAULT_WEIGHTS): number {
   if (need <= 0) return 1;
   if (hand <= 0) return 0;
-  // Chance de uma carta qualquer render o que falta: cai com o tamanho da margem.
-  const perCard = Math.max(0.05, 0.6 - 0.12 * (need / 1000 - 1));
+  const perCard = Math.min(0.95, Math.max(0.05, w.counterCard - w.counterDrop * (need / 1000 - 1)));
   return 1 - (1 - perCard) ** hand;
 }
 
-/** Vontade do oponente de gastar Counter para salvar o alvo. */
-function counterWill(state: GameState, target: string, opp: PlayerId): number {
+/** Vontade do oponente de gastar Counter para salvar o alvo (vezes `counterWill`, até 1). */
+function counterWill(state: GameState, target: string, opp: PlayerId, w: Weights): number {
   const ps = state.players[opp];
-  if (target === ps.leader.uid) return [1, 0.9, 0.6, 0.35, 0.15][Math.min(4, ps.life.length)];
   const cost = cardDef(state, target).cost ?? 0;
-  return cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
+  const base = target === ps.leader.uid ? [1, 0.9, 0.6, 0.35, 0.15][Math.min(4, ps.life.length)] : cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
+  return Math.min(1, base * w.counterWill);
 }
 
 /**
@@ -223,7 +238,7 @@ function counterAdjust(before: GameState, after: GameState, me: PlayerId, action
   const tp = getPower(before, action.target);
   if (ap < tp) return 0;
   const need = ap - tp + 1000;
-  const p = counterAbility(hand, need) * counterWill(before, action.target, opp);
+  const p = counterAbility(hand, need, w) * counterWill(before, action.target, opp, w);
   if (p <= 0) return 0;
   const hit = evaluate(after, me, w);
   // Ataque falhou: a posição de antes (o atacante virado não muda a avaliação no próprio turno) e as
