@@ -23,7 +23,7 @@ import {
 } from '../api';
 import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
-import { type Locale, type MessageKey, type Translate, useLocale, useT } from '../i18n';
+import { type Locale, type MessageKey, type Translate, tryT, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtTime } from '../i18n/format';
 import { useNow } from './HomeBlocks';
 import { Icon } from './Icons';
@@ -841,6 +841,9 @@ function TournamentPage({
             {t.canManage && (
               <section className="menu-card tour-manage">
                 <h2>{tr('tour.manage')}</h2>
+                {t.staleDecks && t.staleDecks.length > 0 && (
+                  <div className="error">{tr('tour.staleDecks', { n: t.staleDecks.length, names: t.staleDecks.join(', ') })}</div>
+                )}
                 <div className="btn-row">
                   {t.status === 'registration' && (
                     <>
@@ -1053,6 +1056,9 @@ function MyArea({
         <h2>{tr(t.me ? 'tour.myRegistration' : late ? 'tour.lateRegistration' : 'tour.registration')}</h2>
         {late && <p className="small">{tr('tour.lateRegisterHint')}</p>}
         {t.me && <p className="small">{rich(tr('tour.registeredWith'), { deck: <b>{t.me.deckName}</b> })}</p>}
+        {t.me?.deckIssue && (
+          <div className="error">{tr('tour.deckIssue', { issue: tryT(t.me.deckIssue.code, t.me.deckIssue.params) ?? t.me.deckIssue.message })}</div>
+        )}
         {t.me && t.checkIn && (
           <div className="tour-checkin">
             {t.me.checkedInAt ? (

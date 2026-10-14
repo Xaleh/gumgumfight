@@ -10,6 +10,7 @@
 // idempotente: cada rodada é varrida uma vez (`round_wo`) e o aviso de check-in sai uma
 // vez por hora de início (`checkin_notice`).
 
+import { formatIssues } from '@gumgum/engine';
 import { randomInt } from 'node:crypto';
 import type { DB } from '../db';
 import { elimBestOf, type Pairing, singleFirstRound, singleRounds, swissPairings, swissRounds } from './pairing';
@@ -25,6 +26,7 @@ import {
   type Tournament,
   type TournamentMatch,
   type TournamentPlayer,
+  unregisterPlayer,
 } from './store';
 
 /** O check-in abre este tempo antes do início. */
@@ -59,6 +61,15 @@ export const elimRound = (t: Tournament, round: number, pairings: Pairing[]): Ro
   pairings,
 });
 
+/**
+ * Inscritos cujo deck (a lista congelada na inscrição) não vale mais no formato em `at`:
+ * uma carta banida com data marcada (ou incluída na lista depois da inscrição). Os spoilers
+ * não entram aqui: uma carta só deixa de ser spoiler, nunca passa a ser.
+ */
+export function staleDecks(t: Pick<Tournament, 'format'>, players: TournamentPlayer[], at: Date): TournamentPlayer[] {
+  return players.filter((p) => formatIssues(p.deck, t.format, at).length > 0);
+}
+
 /** Fecha as inscrições, sorteia a ordem e gera a primeira rodada. Exige pelo menos 2 inscritos. */
 export function beginTournament(db: DB, t: Tournament, players: TournamentPlayer[], at: string) {
   // Embaralha (Fisher-Yates) para sortear a ordem dos cabeças de chave e da 1ª rodada.
@@ -88,6 +99,8 @@ export function absentSides(t: Tournament, m: TournamentMatch, players: Tourname
 
 export interface TickResult {
   started: string[];
+  /** Inscrições canceladas no início automático porque o deck não valia mais no formato. */
+  removed: Array<{ tournamentId: string; userIds: string[] }>;
   /** Torneios cujo check-in acabou de abrir (o aviso por notificação sai uma vez por hora de início). */
   checkIns: string[];
   /** Partidas decididas por W.O., por torneio. */
@@ -99,7 +112,7 @@ export interface TickResult {
  * na sala dentro da tolerância. `closeRoom`: fecha a sala em espera de uma partida decidida.
  */
 export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string) => void): TickResult {
-  const result: TickResult = { started: [], checkIns: [], noShows: [] };
+  const result: TickResult = { started: [], removed: [], checkIns: [], noShows: [] };
   for (const t of listAutomatic(db)) {
     if (t.status === 'registration') {
       if (t.startsAt && checkInOpen(t, now) && t.checkInNotice !== t.startsAt && now < ms(t.startsAt)) {
@@ -108,6 +121,11 @@ export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string)
       }
       const start = ms(t.startsAt);
       if (Number.isNaN(start) || now < start || now - start > AUTO_START_GRACE_MS) continue;
+      // Deck que deixou de valer (banimento com data) não joga: a inscrição é cancelada.
+      // No início à mão, o organizador é avisado antes e decide (ver a rota /start).
+      const stale = staleDecks(t, listPlayers(db, t.id), new Date(now));
+      for (const p of stale) unregisterPlayer(db, t.id, p.userId);
+      if (stale.length) result.removed.push({ tournamentId: t.id, userIds: stale.map((p) => p.userId) });
       const players = listPlayers(db, t.id);
       if (players.length < 2) continue;
       beginTournament(db, t, players, new Date(now).toISOString());

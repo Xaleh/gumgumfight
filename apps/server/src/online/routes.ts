@@ -119,6 +119,8 @@ export interface DeckRules {
   noManual?: boolean;
   /** Sem cartas de spoiler, ainda não lançadas (ranqueada e torneios sem spoilers). */
   noSpoilers?: boolean;
+  /** Data em que o deck precisa valer (banimentos com data); padrão: agora. */
+  at?: Date;
 }
 
 /** Regras da ranqueada: só cartas lançadas e nenhum efeito manual. */
@@ -134,7 +136,7 @@ export function playableDeck(db: DB, deckId: unknown, format: FormatId, rules: D
   const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
   const report = validateDeck(deck, cards);
   if (!report.valid) return { code: 400, ...fail('deckInvalid', 'Esse deck não é válido para jogar.') };
-  const banned = formatIssues(deck, format);
+  const banned = formatIssues(deck, format, rules.at);
   if (banned.length) {
     // `issue` em português; `issueCode` + `issueParams` para o cliente traduzir o motivo (chave `rules.…`).
     const { message: issue, code: issueCode, params: issueParams } = banned[0];

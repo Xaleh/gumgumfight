@@ -4,6 +4,7 @@ import { buildApp } from '../src/app';
 import { proxiedImageUrl } from '../src/card-images';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
+import { registerPlayer } from '../src/tournaments/store';
 import type { Lobby } from '../src/online/lobby';
 import { seed } from '../src/seed';
 import { renamePlayer } from '../src/stats/store';
@@ -477,6 +478,59 @@ describe('torneios: rotas', () => {
     expect(view.standings.slice(0, 4).every((s: any) => s.inElim)).toBe(true);
   });
 
+  it('banimento com data: o deck precisa valer no início do torneio; quem ficou com deck proibido é barrado', async () => {
+    // Mihawk OP14-020 está banido a partir de 12/10/2026 (horário de Brasília).
+    let now = Date.parse('2026-10-10T12:00:00Z');
+    const { db, app } = setup(() => now);
+    const org = login(db, 'organizer');
+    const [a, b, c] = [login(db), login(db), login(db)];
+    // Um Líder com o número do Mihawk (os dados não importam, só o número) e as cartas do ST-01.
+    const [leader] = getCards(db, ['ST01-001']) as CardData[];
+    upsertCards(db, [{ ...leader, id: 'OP14-020' }], { provisional: true, source: 'test' });
+    const luffy = getDeck(db, 'st01-luffy')!;
+    const mihawk = (await req(app, 'POST', '/api/decks', a, { name: 'Mihawk', leader: 'OP14-020', cards: luffy.cards })).json();
+
+    // Torneio depois do banimento: a inscrição já é recusada, mesmo valendo hoje.
+    const later = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', structure: 'swiss', startsAt: '2026-10-13T22:00:00Z' })).json();
+    const refused = await req(app, 'POST', `/api/tournaments/${later.id}/register`, a, { deckId: mihawk.id });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json()).toMatchObject({ errorCode: 'tourDeckNotAllowedAtStart', errorParams: { date: '13/10/2026, 19:00', issueCode: 'rules.banned' } });
+
+    // Sem data de início: vale hoje. Marcar o início para depois do banimento é recusado.
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', structure: 'swiss' })).json();
+    const url = `/api/tournaments/${t.id}/register`;
+    expect((await req(app, 'POST', url, a, { deckId: mihawk.id })).json().me.deckIssue).toBeNull();
+    expect((await req(app, 'POST', url, b, { deckId: 'st02-kid' })).statusCode).toBe(200);
+    const moved = await req(app, 'PUT', `/api/tournaments/${t.id}`, org, { name: 'Copa', format: 'egb', structure: 'swiss', startsAt: '2026-10-13T22:00:00Z' });
+    expect(moved.json()).toMatchObject({ errorCode: 'tourDecksNotAllowed', errorParams: { n: 1 } });
+
+    // Meia-noite do dia 12 em Brasília: o deck inscrito deixa de valer.
+    now = Date.parse('2026-10-12T03:00:00Z');
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, a)).json().me.deckIssue).toMatchObject({ code: 'rules.banned', params: { id: 'OP14-020' } });
+    const nameA = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json().players.find((p: { userId: string }) => p.userId === a.id).name;
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json().staleDecks).toEqual([nameA]);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, b)).json().staleDecks).toEqual([]);
+    // Começar à mão: o organizador é avisado e decide.
+    const start = await req(app, 'POST', `/api/tournaments/${t.id}/start`, org);
+    expect(start.statusCode).toBe(409);
+    expect(start.json()).toMatchObject({ errorCode: 'tourDecksNoLongerAllowed', errorParams: { n: 1, names: nameA } });
+    // Trocando o deck, começa.
+    expect((await req(app, 'POST', url, a, { deckId: 'st01-luffy' })).json().me.deckIssue).toBeNull();
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json().status).toBe('running');
+
+    // Início automático: a inscrição com deck proibido é cancelada e o torneio começa com os outros.
+    // (Um deck inscrito antes de a carta entrar na lista de banidas, simulado direto no banco.)
+    const auto = (await req(app, 'POST', '/api/tournaments', org, { name: 'Auto', format: 'egb', structure: 'swiss', startsAt: '2026-10-12T20:00:00Z', checkIn: true })).json();
+    for (const [p, deckId] of [[b, 'st02-kid'], [c, 'st03-crocodile']] as const) await req(app, 'POST', `/api/tournaments/${auto.id}/register`, p, { deckId });
+    registerPlayer(db, auto.id, a.id, nameA, mihawk.id, { id: mihawk.id, name: 'Mihawk', leader: 'OP14-020', cards: luffy.cards });
+    now = Date.parse('2026-10-12T20:00:00Z');
+    const r = tick(app)!;
+    expect(r.removed).toEqual([{ tournamentId: auto.id, userIds: [a.id] }]);
+    expect(r.started).toContain(auto.id);
+    const view = (await req(app, 'GET', `/api/tournaments/${auto.id}`, org)).json();
+    expect(view.players.map((p: { userId: string }) => p.userId).sort()).toEqual([b.id, c.id].sort());
+  });
+
   it('check-in: abre 30 min antes, o torneio começa sozinho na hora e quem não aparece em 5 min perde por W.O.', async () => {
     let now = Date.parse('2026-10-10T19:00:00Z');
     const { db, app } = setup(() => now);
@@ -495,7 +549,7 @@ describe('torneios: rotas', () => {
     const checkin = (p: ReturnType<typeof login>) => req(app, 'POST', `/api/tournaments/${t.id}/checkin`, p);
     expect((await checkin(ps[0])).statusCode).toBe(409);
     expect((await req(app, 'GET', '/api/tournaments/me', ps[0])).json().entries).toEqual([]);
-    expect(tick(app)).toEqual({ started: [], checkIns: [], noShows: [] });
+    expect(tick(app)).toEqual({ started: [], removed: [], checkIns: [], noShows: [] });
     expect((await req(app, 'GET', `/api/tournaments/${t.id}`)).json().status).toBe('registration');
 
     // 19:30: check-in aberto para os inscritos (e só para eles).

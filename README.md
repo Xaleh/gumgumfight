@@ -193,7 +193,14 @@ começar uma partida online e antes de gravar uma partida nas estatísticas.
   que rotacionaram em 1º/04/2026, salvo as exceções oficiais (bloco X e cartas tratadas como bloco ④).
 
 As cartas banidas (com data de início, quando a proibição ainda não vale), os pares proibidos e as exceções da
-rotação ficam em `packages/engine/src/formats.ts`: atualizar a lista é só mexer lá. O construtor mostra em quais
+rotação ficam em `packages/engine/src/formats.ts`: atualizar a lista é só mexer lá. A data de início conta a partir da
+meia-noite no horário de Brasília. Para uma carta voltar ao jogo, basta tirá-la da lista.
+
+Nos torneios, o deck precisa valer **no início do torneio**: com data de início marcada depois de um banimento, a
+inscrição com a carta já é recusada (e adiar o início para depois do banimento é recusado se algum inscrito tiver a
+carta). Se a carta entrar na lista depois da inscrição, o jogador vê o aviso para trocar de deck e o organizador vê
+quem está nessa situação; o início à mão é bloqueado até resolver, e no início automático essas inscrições são
+canceladas (com aviso por notificação). O construtor mostra em quais
 formatos o deck vale, marca no catálogo as cartas banidas (🚫) e rotacionadas (①), e o menu desabilita os decks que
 não valem no formato escolhido.
 

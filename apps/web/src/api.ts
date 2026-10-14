@@ -990,7 +990,11 @@ export interface TournamentDetail {
     dropped: boolean;
     matchId: number | null;
     checkedInAt: string | null;
+    /** Antes do início: por que a lista inscrita não vai valer no torneio (carta banida com data). */
+    deckIssue?: { message: string; code: string; params: Params } | null;
   } | null;
+  /** Para quem gerencia, antes do início: inscritos cujo deck não vai valer no torneio. */
+  staleDecks?: string[];
   players: Array<{
     userId: string;
     name: string;

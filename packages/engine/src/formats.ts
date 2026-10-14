@@ -73,8 +73,13 @@ export const STANDARD_BLOCK_1_EXCEPTIONS: ReadonlySet<string> = new Set([
   'ST02-007', // Jewelry Bonney
 ]);
 
-/** Data de hoje (AAAA-MM-DD, UTC), para as proibições com data marcada. */
-const today = (now: Date) => now.toISOString().slice(0, 10);
+/**
+ * Data de hoje no horário de Brasília (AAAA-MM-DD), para as proibições com data marcada:
+ * "a partir de 12/10" vale da meia-noite de 12/10 em Brasília (UTC−3, sem horário de verão
+ * desde 2019), e não das 21h do dia 11, como seria em UTC.
+ */
+const BRASILIA_OFFSET_MS = 3 * 3_600_000;
+const today = (now: Date) => new Date(now.getTime() - BRASILIA_OFFSET_MS).toISOString().slice(0, 10);
 const inEffect = (since: string | undefined, now: Date) => !since || since <= today(now);
 
 /** Número de bloco impresso na carta, quando dá para saber pelo número da coleção. */

@@ -42,6 +42,9 @@ describe('formatos (Standard e Extra Grand Battle)', () => {
   it('proibição com data marcada só vale a partir da data', () => {
     expect(cardLegality('OP14-020', 'egb', new Date('2026-10-11T12:00:00Z'))).toBe('legal');
     expect(cardLegality('OP14-020', 'egb', new Date('2026-10-12T12:00:00Z'))).toBe('banned');
+    // A data é a de Brasília (UTC−3): 23h59 do dia 11 ainda vale; meia-noite do dia 12 já não.
+    expect(cardLegality('OP14-020', 'egb', new Date('2026-10-12T02:59:00Z'))).toBe('legal');
+    expect(cardLegality('OP14-020', 'egb', new Date('2026-10-12T03:00:00Z'))).toBe('banned');
   });
 
   it('pares proibidos não podem estar juntos (Líder incluso)', () => {
