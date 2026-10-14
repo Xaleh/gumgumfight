@@ -900,15 +900,19 @@ com relógio injetado nos testes não roda sozinho e é chamado por `app.tournam
   `stats_match_id` = partida em `matches` com o replay, `winner`, `counted` = entrou no placar; um jogo de uma sala
   que já não era a atual fica gravado com `counted = 0`). Gravada em `reportFromGame`. O replay em `matches.replay`
   passou a guardar `version`, `names` e `deckIds` (os antigos usam a versão 8 se `legacySetup`, senão a atual).
-- **`match_reports`**: relato de um jogador sobre uma partida (`match_id`, `tournament_id` quando é de torneio,
-  `reporter_id`, `text`, `resolved_at`/`resolved_by`/`note`; um por jogador e partida — relatar de novo troca o texto e
-  reabre).
+- **`match_reports`**: relato de bug de um jogador sobre uma partida (`match_id`, `tournament_id` quando é de torneio,
+  `reporter_id`, o formulário — `card` (a carta), `text` (a interação que deu problema), `expected` (o que deveria ter
+  acontecido), `notify` (quer ser avisado da correção) —, `resolved_at`/`resolved_by`/`note` e `notified_at`; um por
+  jogador e partida — relatar de novo troca o formulário e reabre).
 - **Rotas**: `GET /api/matches/:id/replay` (arquivo de replay para a mesa: quem jogou, o organizador do torneio ou
-  admin/dev), `GET /api/matches/:id` (resumo), `POST /api/matches/:id/report` (um dos jogadores, fila `ranked` ou
-  `tournament`), `GET /api/reports?tournament=&status=open|resolved|all` (admin/dev: todos; organizador: dos torneios
-  dele), `PUT /api/reports/:id` (`{resolved, note}`; admin/dev ou o organizador do torneio).
-- **Interface**: a tela de resultado das partidas online ranqueadas e de torneio tem **Relatar um problema**
-  (`ReportModal`); cada partida do torneio lista os **Jogos gravados** com "Assistir replay"
+  admin/dev), `GET /api/matches/:id` (resumo), `POST /api/matches/:id/report` (um dos jogadores, logado, em qualquer partida
+  gravada: `{text, card?, expected?, notify?}`), `GET /api/reports?tournament=&status=open|resolved|all` (admin/dev: todos; organizador: dos torneios
+  dele), `PUT /api/reports/:id` (`{resolved, note}`; admin/dev ou o organizador do torneio). Resolver um relato com
+  `notify` manda uma notificação (Web Push, `reportFixed*` em `push/messages.ts`) para os aparelhos da conta de quem
+  relatou, uma vez só (`notified_at`), mesmo com os avisos de partidas e torneios desligados (categoria `null`).
+- **Interface**: a tela de resultado de toda partida gravada (contra o bot, online, ranqueada, de torneio) tem
+  **Relatar um bug** abaixo de "Baixar replay" (`ReportModal`: carta — com as cartas da partida como sugestão —,
+  interação, o que deveria ter acontecido e o aviso da correção, que liga as notificações do aparelho se preciso); cada partida do torneio lista os **Jogos gravados** com "Assistir replay"
   (`setupFromReplay`, em `game/setup.ts`, monta a mesa em modo replay a partir do JSON); o organizador tem a aba
   **Relatos** no torneio e Admin/Dev a aba **Relatos de partidas** em Administração (`ReportsPanel`, em
   `components/Reports.tsx`).

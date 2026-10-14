@@ -51,8 +51,11 @@ export function deletePushSubscription(db: DB, endpoint: string) {
   db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(endpoint);
 }
 
-/** Inscrições de um navegador ou de uma conta que querem este tipo de aviso. */
-export function pushSubscriptionsFor(db: DB, who: { ownerHash?: string | null; userIds?: string[] }, category: PushCategory): PushSubscriptionRow[] {
+/**
+ * Inscrições de um navegador ou de uma conta que querem este tipo de aviso. `null`: todas
+ * (um aviso que a pessoa pediu na hora, como o da correção de um bug que ela relatou).
+ */
+export function pushSubscriptionsFor(db: DB, who: { ownerHash?: string | null; userIds?: string[] }, category: PushCategory | null): PushSubscriptionRow[] {
   const users = [...new Set(who.userIds ?? [])];
   const where = [
     ...(who.ownerHash ? ['owner_hash = ?'] : []),
@@ -61,7 +64,7 @@ export function pushSubscriptionsFor(db: DB, who: { ownerHash?: string | null; u
   if (!where.length) return [];
   const params = [...(who.ownerHash ? [who.ownerHash] : []), ...users];
   return (
-    db.prepare(`SELECT * FROM push_subscriptions WHERE (${where.join(' OR ')}) AND ${category} = 1`).all(...params) as Row[]
+    db.prepare(`SELECT * FROM push_subscriptions WHERE (${where.join(' OR ')})${category ? ` AND ${category} = 1` : ''}`).all(...params) as Row[]
   ).map(toSub);
 }
 

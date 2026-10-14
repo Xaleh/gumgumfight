@@ -530,7 +530,6 @@ export default {
   'online.seriesOver': ' — シリーズ終了。',
   'online.bounty': '懸賞金：',
   'online.rematchWanted': '{name}が再戦を希望しています！',
-  'online.report': '⚑ 問題を報告',
   // ---- 待機 ----
   'online.shareText': '対戦しませんか？ルームコード：{code}',
   'online.cannotWatch': '観戦できませんでした',
@@ -683,21 +682,31 @@ export default {
   'reports.filterOpen': '未対応',
   'reports.filterResolved': '対応済み',
   'reports.filterAll': 'すべて',
-  'reports.panelHint':
-    'プレイヤーはランクマッチと大会の対戦終了時に問題を報告できます。すべての対戦は記録されており、リプレイで何が起きたかを正確に確認できます。',
+  'reports.panelHint': 'プレイヤーは対戦の終了時（ボット戦・オンライン・ランクマッチ・大会）に不具合を報告します：カード、問題のあった処理、本来どうなるべきだったか。すべての対戦は記録され、リプレイで何が起きたかを正確に確認できます。',
   // ---- 問題を報告 ----
-  'reports.dialogLabel': '問題を報告',
-  'reports.title': '⚑ 問題を報告',
+  'reports.dialogLabel': '不具合を報告',
+  'reports.title': '⚑ 不具合を報告',
   'reports.sent': '報告を送信しました。',
   'reports.sentTournament': '大会の主催者と管理者が、記録されたリプレイをもとに対戦を確認します。',
   'reports.sentAdmins': '管理者が、記録されたリプレイをもとに対戦を確認します。',
-  'reports.describeTournament':
-    '何が起きたかを説明してください（カードが正しく動作しなかった、接続が切れた、相手の振る舞い…）。対戦のリプレイは記録されており、報告と一緒に{tournament}の主催者と管理者に送られます。',
-  'reports.describeAdmins':
-    '何が起きたかを説明してください（カードが正しく動作しなかった、接続が切れた、相手の振る舞い…）。対戦のリプレイは記録されており、報告と一緒に管理者に送られます。',
-  'reports.textPlaceholder': '何が起きましたか？',
+  'reports.describeTournament': '対戦で何がおかしかったかを教えてください。リプレイは記録され、報告と一緒に{tournament}の主催者と管理者に届きます。',
+  'reports.describeAdmins': '対戦で何がおかしかったかを教えてください。リプレイは記録され、報告と一緒に管理者に届きます。',
+  'reports.textPlaceholder': '例：【登場時】を発動したのに、対象を選べなかった。',
   'reports.sending': '送信中…',
   'reports.send': '報告を送信',
+  'reports.cardLabel': '問題のあったカード',
+  'reports.optional': '（任意）',
+  'reports.cardPlaceholder': 'カード名またはカード番号',
+  'reports.textLabel': 'どの処理で問題が起きましたか？',
+  'reports.expectedLabel': '本来はどうなるべきでしたか？',
+  'reports.expectedPlaceholder': '例：相手のコスト4以下のキャラを1枚選べるはずだった。',
+  'reports.notifyLabel': '不具合が修正されたら通知を受け取る',
+  'reports.notifyHint': '報告が解決されると、この端末に通知が届きます。',
+  'reports.notifyNoPush': 'この端末では通知をオンにできませんでした。通知を受け取るには設定でオンにしてください。希望は記録されています。',
+  'reports.sentNotify': '不具合が修正されたらお知らせします。',
+  'reports.loginFirst': '不具合を報告するにはGoogleアカウントでログインしてください。報告が対戦に紐づき、修正時にお知らせできます。',
+  'reports.wantsNotice': '🔔 通知を希望',
+  'reports.notifiedAt': '🔔 {date}に通知済み',
   // ==== /reports ====
 
 
@@ -1373,6 +1382,7 @@ export default {
   'result.exit': 'メニューに戻る',
   'result.review': '対戦を振り返る',
   'result.download': '⤓ リプレイをダウンロード',
+  'result.reportBug': '⚑ 不具合を報告',
   // ==== /result ====
 
 
@@ -2102,7 +2112,6 @@ export default {
   'errors.noReplay': 'この対戦には保存されたリプレイがありません。',
   'errors.matchOfOthers': 'この対戦は他のプレイヤーのものです。',
   'errors.reportOnlyPlayers': '問題を報告できるのは対戦したプレイヤーだけです。',
-  'errors.reportOnlyRankedOrTournament': '報告はランクマッチと大会の対戦のみです。',
   'errors.reportTooShort': '問題を説明してください（5文字以上）。',
   'errors.reportsViewForbidden': '報告を見られるのは大会の主催者（または管理者）だけです。',
   'errors.reportsOrganizersOnly': '報告を見られるのは主催者と管理者だけです。',

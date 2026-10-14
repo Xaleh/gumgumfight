@@ -20,10 +20,12 @@ interface Props {
   onClose?: () => void;
   /** Informações a mais (online: recompensa da ranqueada). */
   extra?: ReactNode;
+  /** Relatar um bug da partida (só para quem jogou uma partida gravada no servidor). */
+  onReport?: () => void;
 }
 
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
-export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra }: Props) {
+export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra, onReport }: Props) {
   const t = useT();
   const tryT = useTryT();
   const me: PlayerId = human ?? state.winner ?? 0;
@@ -149,6 +151,11 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
           <button className="btn small pill" onClick={onReplay}>
             {t('result.download')}
           </button>
+          {onReport && (
+            <button className="btn small pill" onClick={onReport}>
+              {t('result.reportBug')}
+            </button>
+          )}
         </div>
       </div>
     </div>

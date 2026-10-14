@@ -530,7 +530,6 @@ export default {
   'online.seriesOver': ' — serie terminada.',
   'online.bounty': 'Recompensa:',
   'online.rematchWanted': '¡{name} quiere la revancha!',
-  'online.report': '⚑ Reportar un problema',
   // ---- espera ----
   'online.shareText': '¿Jugamos? Código de sala: {code}',
   'online.cannotWatch': 'No se pudo ver',
@@ -683,21 +682,31 @@ export default {
   'reports.filterOpen': 'Abiertos',
   'reports.filterResolved': 'Resueltos',
   'reports.filterAll': 'Todos',
-  'reports.panelHint':
-    'Los jugadores reportan problemas al final de las partidas clasificatorias y de torneo. Todas las partidas quedan grabadas: la repetición muestra exactamente lo que pasó.',
+  'reports.panelHint': 'Los jugadores reportan bugs al final de sus partidas (contra el bot, online, clasificatorias y de torneo): la carta, la interacción que falló y lo que debería haber pasado. Toda partida queda grabada: la repetición muestra exactamente lo que pasó.',
   // ---- reportar un problema ----
-  'reports.dialogLabel': 'Reportar un problema',
-  'reports.title': '⚑ Reportar un problema',
+  'reports.dialogLabel': 'Reportar un bug',
+  'reports.title': '⚑ Reportar un bug',
   'reports.sent': 'Reporte enviado.',
   'reports.sentTournament': 'El organizador del torneo y los admins revisarán la partida a partir de la repetición grabada.',
   'reports.sentAdmins': 'Los admins revisarán la partida a partir de la repetición grabada.',
-  'reports.describeTournament':
-    'Describe lo que pasó (una carta que no funcionó como debía, una conexión caída, el comportamiento del rival…). La repetición de la partida queda grabada y va con el reporte al organizador de {tournament} y a los admins.',
-  'reports.describeAdmins':
-    'Describe lo que pasó (una carta que no funcionó como debía, una conexión caída, el comportamiento del rival…). La repetición de la partida queda grabada y va con el reporte a los admins.',
-  'reports.textPlaceholder': '¿Qué pasó?',
+  'reports.describeTournament': 'Cuéntanos qué salió mal en la partida. La repetición queda grabada y va junto con el reporte al organizador de {tournament} y a los administradores.',
+  'reports.describeAdmins': 'Cuéntanos qué salió mal en la partida. La repetición queda grabada y va junto con el reporte a los administradores.',
+  'reports.textPlaceholder': 'Ej.: activé el [On Play] y el efecto no me dejó elegir el objetivo.',
   'reports.sending': 'Enviando…',
   'reports.send': 'Enviar reporte',
+  'reports.cardLabel': '¿Qué carta falló?',
+  'reports.optional': '(opcional)',
+  'reports.cardPlaceholder': 'Nombre o número de la carta',
+  'reports.textLabel': '¿Qué interacción falló?',
+  'reports.expectedLabel': '¿Qué debería haber pasado?',
+  'reports.expectedPlaceholder': 'Ej.: debería poder elegir un Personaje del oponente con coste 4 o menos.',
+  'reports.notifyLabel': 'Quiero recibir un aviso cuando se corrija el bug',
+  'reports.notifyHint': 'Recibirás una notificación en este dispositivo cuando se resuelva el reporte.',
+  'reports.notifyNoPush': 'No se pudieron activar las notificaciones en este dispositivo; actívalas en Configuración para recibir el aviso. Tu pedido queda registrado.',
+  'reports.sentNotify': 'Te avisaremos cuando se corrija el bug.',
+  'reports.loginFirst': 'Inicia sesión con tu cuenta de Google para reportar un bug: así el reporte queda vinculado a tu partida y podemos avisarte cuando se corrija.',
+  'reports.wantsNotice': '🔔 quiere un aviso',
+  'reports.notifiedAt': '🔔 avisado el {date}',
   // ==== /reports ====
 
 
@@ -1373,6 +1382,7 @@ export default {
   'result.exit': 'Volver al menú',
   'result.review': 'Revisar la partida',
   'result.download': '⤓ Descargar repetición',
+  'result.reportBug': '⚑ Reportar un bug',
   // ==== /result ====
 
 
@@ -2102,7 +2112,6 @@ export default {
   'errors.noReplay': 'Esta partida no tiene repetición guardada.',
   'errors.matchOfOthers': 'Esta partida es de otros jugadores.',
   'errors.reportOnlyPlayers': 'Solo los jugadores de la partida pueden reportar un problema.',
-  'errors.reportOnlyRankedOrTournament': 'Los reportes son solo para partidas clasificatorias y de torneo.',
   'errors.reportTooShort': 'Describe el problema (al menos 5 letras).',
   'errors.reportsViewForbidden': 'Solo el organizador del torneo (o un admin) puede ver los reportes.',
   'errors.reportsOrganizersOnly': 'Solo los organizadores y los admins pueden ver los reportes.',

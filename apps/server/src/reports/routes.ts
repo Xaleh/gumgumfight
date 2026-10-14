@@ -1,25 +1,45 @@
-// Auditoria das partidas: replay de uma partida gravada e os problemas relatados pelos
-// jogadores ao fim de uma partida ranqueada ou de torneio.
+// Auditoria das partidas: replay de uma partida gravada e os problemas (bugs) relatados
+// pelos jogadores ao fim de qualquer partida gravada (contra o bot, online, ranqueada ou
+// de torneio), num formulário: a carta, a interação que deu problema, o que deveria ter
+// acontecido e se o jogador quer ser avisado quando o problema for resolvido.
 //
 // Quem relata: um dos dois jogadores da partida, logado. Quem vê e resolve: admin e
 // dev (tudo) e o organizador do torneio (os relatos e replays das partidas do torneio
-// dele). Os próprios jogadores podem rever o replay das partidas que jogaram.
+// dele). Os próprios jogadores podem rever o replay das partidas que jogaram. Ao resolver,
+// quem pediu o aviso recebe uma notificação (nos aparelhos com as notificações ligadas).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createsTournaments, isAdmin, type User } from '../auth/store';
 import type { DB } from '../db';
 import { fail } from '../errors';
+import { pushText } from '../push/messages';
+import { noNotifier, type Notifier } from '../push/routes';
 import { getTournament } from '../tournaments/store';
-import { createReport, getReport, listReports, type MatchReport, matchReplay, matchSummary, matchUsers, resolveReport } from './store';
+import {
+  createReport,
+  getReport,
+  listReports,
+  markReportNotified,
+  type MatchReport,
+  matchReplay,
+  matchSummary,
+  matchUsers,
+  resolveReport,
+} from './store';
 
 interface Deps {
   db: DB;
   user: (req: FastifyRequest) => User | null;
+  notifier?: Notifier;
 }
 
 const MAX_TEXT = 2000;
+const MAX_CARD = 120;
 
-export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
+/** Texto opcional do formulário: aparado e cortado (vazio = null). */
+const field = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+
+export function registerReportRoutes(app: FastifyInstance, { db, user, notifier = noNotifier }: Deps) {
   const account = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = user(req);
     if (!u) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
@@ -58,20 +78,22 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     return { ...m, reports: audits(me, m.tournament?.id ?? null) ? listReports(db, { status: 'all' }).filter((r) => r.matchId === id) : [] };
   });
 
-  /** Relata um problema na partida (ranqueada ou de torneio) que a conta acabou de jogar. */
-  app.post<{ Params: { id: string }; Body: { text?: unknown } }>('/api/matches/:id/report', async (req, reply) => {
+  /**
+   * Relata um problema na partida que a conta acabou de jogar. `text`: a interação que deu
+   * problema (obrigatória); `card`: a carta; `expected`: o que deveria ter acontecido;
+   * `notify`: avisar quando o problema for resolvido.
+   */
+  app.post<{ Params: { id: string }; Body: { text?: unknown; card?: unknown; expected?: unknown; notify?: unknown } }>('/api/matches/:id/report', async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
     const id = Number(req.params.id);
     const m = matchSummary(db, id);
     if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     if (!matchUsers(db, id).includes(me.id)) return reply.code(403).send(fail('reportOnlyPlayers', 'Só quem jogou a partida pode relatar um problema.'));
-    if (m.queue !== 'ranked' && m.queue !== 'tournament') {
-      return reply.code(400).send(fail('reportOnlyRankedOrTournament', 'Relatos valem para partidas ranqueadas e de torneio.'));
-    }
-    const text = typeof req.body?.text === 'string' ? req.body.text.trim().slice(0, MAX_TEXT) : '';
+    const text = field(req.body?.text, MAX_TEXT) ?? '';
     if (text.length < 5) return reply.code(400).send(fail('reportTooShort', 'Descreva o problema (pelo menos 5 letras).'));
-    return reply.code(201).send(withMatch(createReport(db, id, m.tournament?.id ?? null, me.id, text)));
+    const input = { text, card: field(req.body?.card, MAX_CARD), expected: field(req.body?.expected, MAX_TEXT), notify: req.body?.notify === true };
+    return reply.code(201).send(withMatch(createReport(db, id, m.tournament?.id ?? null, me.id, input)));
   });
 
   /**
@@ -92,7 +114,7 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     return { reports: listReports(db, { organizerId: me.id, status }).map(withMatch) };
   });
 
-  /** Resolve (ou reabre) um relato, com uma nota opcional. */
+  /** Resolve (ou reabre) um relato, com uma nota opcional. Resolvido: avisa quem pediu (uma vez só). */
   app.put<{ Params: { id: string }; Body: { resolved?: unknown; note?: unknown } }>('/api/reports/:id', async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
@@ -100,7 +122,26 @@ export function registerReportRoutes(app: FastifyInstance, { db, user }: Deps) {
     if (!r) return reply.code(404).send(fail('reportNotFound', 'Relato não encontrado.'));
     if (!audits(me, r.tournamentId)) return reply.code(403).send(fail('reportResolveForbidden', 'Só o organizador do torneio (ou um admin) resolve relatos.'));
     const resolved = req.body?.resolved !== false;
-    const note = typeof req.body?.note === 'string' && req.body.note.trim() ? req.body.note.trim().slice(0, MAX_TEXT) : null;
-    return withMatch(resolveReport(db, r.id, me.id, resolved, note)!);
+    const note = field(req.body?.note, MAX_TEXT);
+    const saved = resolveReport(db, r.id, me.id, resolved, note)!;
+    if (resolved && saved.notify && !saved.notifiedAt) {
+      markReportNotified(db, saved.id);
+      const card = saved.card;
+      void notifier.notify(
+        { userIds: [saved.reporterId] },
+        {
+          category: null,
+          text: (locale) => ({
+            title: pushText(locale, 'reportFixedTitle'),
+            body: card ? pushText(locale, 'reportFixedCardBody', { card }) : pushText(locale, 'reportFixedBody'),
+          }),
+          tag: `report-${saved.id}`,
+          url: '/',
+          ttl: 7 * 24 * 3600,
+        },
+      );
+      return withMatch(getReport(db, saved.id)!);
+    }
+    return withMatch(saved);
   });
 }

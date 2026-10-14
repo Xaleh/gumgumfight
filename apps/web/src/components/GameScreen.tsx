@@ -45,6 +45,7 @@ import { useBoardMotion } from './Motion';
 import { ReplayBar, type ReplayControls } from './ReplayBar';
 import { PlayHighlight } from './PlayHighlight';
 import { ReplayCue } from './ReplayCue';
+import { ReportModal } from './ReportModal';
 import {
   BroadcastIdle,
   BroadcastTag,
@@ -187,10 +188,13 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
   const game = useGame(setup);
   // Registra o resultado no servidor (que refaz a partida a partir das ações). Replays não contam de novo.
   const saved = useRef(false);
+  // Partida gravada no servidor: o relato de bug aponta para ela (e para o replay dela).
+  const [matchId, setMatchId] = useState<number | null>(null);
   useEffect(() => {
     if (game.state.phase !== 'gameover' || saved.current || setup.mode === 'replay') return;
     saved.current = true;
-    void api.saveMatch({
+    void api
+      .saveMatch({
       mode: setup.mode,
       format: setup.format,
       seed: setup.config.seed,
@@ -199,12 +203,14 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       deckIds: setup.deckIds,
       decks: [setup.config.players[0].deck, setup.config.players[1].deck],
       actions: game.actions(),
-    });
+      })
+      .then((r) => r && setMatchId(r.id));
   }, [game.state, setup, game.actions]);
   return (
     <GameTable
       game={{ ...game, downloadReplay: () => downloadReplay(game.exportReplay()) }}
       kind={setup.mode}
+      matchId={matchId}
       onExit={onExit}
       onRematch={onRematch}
       startNotice={setup.notice}
@@ -378,6 +384,7 @@ function Table({
   broadcast,
   startNotice,
   tutorial,
+  matchId,
 }: {
   game: TableGame;
   kind: TableKind;
@@ -394,6 +401,8 @@ function Table({
   startNotice?: string;
   /** Lição do tutorial: treinador, destaques e menos controles (sem Auto, desfazer, replay). */
   tutorial?: TableTutorial;
+  /** Partida contra o bot já gravada no servidor (o relato de bug aponta para ela; online vem da sala). */
+  matchId?: number | null;
 }) {
   const { state, dispatch, human } = game;
   const t = useT();
@@ -507,6 +516,17 @@ function Table({
   const [showBotHand, setShowBotHand] = useState(kind === 'replay' || watching);
   const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
   const [showResult, setShowResult] = useState(false);
+  // Relato de bug: só para quem jogou (não no replay, no tutorial nem para quem assiste) e com a partida gravada no servidor.
+  const [reporting, setReporting] = useState(false);
+  const recorded = isOnline ? (online?.room?.result?.matchId ?? null) : (matchId ?? null);
+  const reportMatch = human !== null && !watching && !tutorial && !broadcast && kind !== 'replay' ? recorded : null;
+  const reportCards = useMemo(
+    () =>
+      Object.values(state.defs)
+        .map((d) => ({ id: d.id, name: d.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [state.defs],
+  );
   /** Carta citada no histórico, ampliada (toque/clique no nome). */
   const [logCard, setLogCard] = useState<CardDef | null>(null);
   /**
@@ -1468,6 +1488,15 @@ function Table({
             onLog={() => setSheet('log')}
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
+            onReport={reportMatch !== null ? () => setReporting(true) : undefined}
+          />
+        )}
+        {reporting && reportMatch !== null && (
+          <ReportModal
+            matchId={reportMatch}
+            tournament={online?.room?.tournament?.name ?? null}
+            cards={reportCards}
+            onClose={() => setReporting(false)}
           />
         )}
       </div>

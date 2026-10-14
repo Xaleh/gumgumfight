@@ -1,16 +1,39 @@
 import { describe, expect, it } from 'vitest';
+import { createECDH, randomBytes } from 'node:crypto';
 import { buildApp } from '../src/app';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, openDb } from '../src/db';
 import type { Lobby } from '../src/online/lobby';
+import type { PushPayload } from '../src/push/routes';
 import { seed } from '../src/seed';
 
 function setup(now?: () => number) {
   const db = openDb(':memory:');
   seed(db);
-  const app = buildApp(db, { server: { cardImages: true }, onlineRateLimit: 1e9, botDelayMs: 0, now });
-  return { db, app, lobby: (app as unknown as { onlineLobby: Lobby }).onlineLobby };
+  const sent: Array<{ endpoint: string; payload: PushPayload }> = [];
+  const app = buildApp(db, {
+    server: { cardImages: true },
+    onlineRateLimit: 1e9,
+    botDelayMs: 0,
+    now,
+    pushSend: async (target, payload) => {
+      sent.push({ endpoint: target.endpoint, payload });
+      return 201;
+    },
+  });
+  return { db, app, sent, lobby: (app as unknown as { onlineLobby: Lobby }).onlineLobby };
 }
+
+/** Inscrição de notificações como a que o navegador gera. */
+function subscription(name: string) {
+  const ecdh = createECDH('prime256v1');
+  ecdh.generateKeys();
+  return {
+    endpoint: `https://fcm.googleapis.com/fcm/send/${name}`,
+    keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: randomBytes(16).toString('base64url') },
+  };
+}
+const flush = () => new Promise((r) => setImmediate(r));
 type App = ReturnType<typeof buildApp>;
 
 let n = 0;
@@ -109,8 +132,8 @@ describe('auditoria: jogos gravados, replay e relatos', () => {
     expect(all[0].text).toBe('Complemento: foi no turno 3.');
   });
 
-  it('ranqueada: o jogador relata e só admins veem; casual não tem relato', async () => {
-    const { db, app, lobby } = setup();
+  it('ranqueada e casual: o jogador relata o bug pelo formulário, só admins veem e quem pediu é avisado da correção', async () => {
+    const { db, app, lobby, sent } = setup();
     const admin = login(db, 'admin');
     const org = login(db, 'organizer');
     const [a, b] = [login(db), login(db)];
@@ -137,9 +160,48 @@ describe('auditoria: jogos gravados, replay e relatos', () => {
     expect((await req(app, 'GET', `/api/matches/${ranked}/replay`, b)).statusCode).toBe(200);
     expect((await req(app, 'GET', `/api/matches/${ranked}/replay`, org)).statusCode).toBe(403);
 
+    // Casual também tem relato: o formulário com a carta, a interação, o que deveria ter acontecido e o aviso.
     const casual = await play('casual');
-    const no = await req(app, 'POST', `/api/matches/${casual}/report`, a, { text: 'Só um teste de relato casual.' });
-    expect(no.statusCode).toBe(400);
+    expect((await req(app, 'POST', `/api/matches/${casual}/report`, b, { card: 'Nami', expected: 'Comprar 1 carta.' })).statusCode).toBe(400);
+    const bug = await req(app, 'POST', `/api/matches/${casual}/report`, b, {
+      card: '  Nami (ST01-007)  ',
+      text: 'Ativei o [On Play] e não comprei a carta.',
+      expected: 'Comprar 1 carta.',
+      notify: true,
+    });
+    expect(bug.statusCode).toBe(201);
+    expect(bug.json()).toMatchObject({
+      matchId: casual,
+      card: 'Nami (ST01-007)',
+      text: 'Ativei o [On Play] e não comprei a carta.',
+      expected: 'Comprar 1 carta.',
+      notify: true,
+      notifiedAt: null,
+      match: { queue: 'casual' },
+    });
+    const listed = (await req(app, 'GET', '/api/reports', admin)).json().reports;
+    expect(listed).toHaveLength(2);
+    expect(listed.find((r: { matchId: number }) => r.matchId === casual)).toMatchObject({ card: 'Nami (ST01-007)', notify: true });
+    // O relato da ranqueada não pediu aviso.
+    expect(listed.find((r: { matchId: number }) => r.matchId === ranked)).toMatchObject({ card: null, expected: null, notify: false });
+
+    // Resolver avisa quem pediu (nos aparelhos da conta), uma vez só: reabrir e resolver de novo não repete.
+    await req(app, 'PUT', '/api/push/subscription', b, { subscription: subscription('b'), matches: false, tournaments: false });
+    await req(app, 'PUT', '/api/push/subscription', a, { subscription: subscription('a') });
+    const done = (await req(app, 'PUT', `/api/reports/${bug.json().id}`, admin, { resolved: true, note: 'Corrigido.' })).json();
+    expect(done.notifiedAt).toBeTruthy();
+    await flush();
+    expect(sent.map((s) => s.endpoint)).toEqual(['https://fcm.googleapis.com/fcm/send/b']);
+    expect(sent[0].payload).toMatchObject({ title: 'Problema corrigido!', tag: `report-${bug.json().id}` });
+    expect(sent[0].payload.body).toContain('Nami (ST01-007)');
+    await req(app, 'PUT', `/api/reports/${bug.json().id}`, admin, { resolved: false });
+    await req(app, 'PUT', `/api/reports/${bug.json().id}`, admin, { resolved: true });
+    await flush();
+    expect(sent).toHaveLength(1);
+    // Sem pedido de aviso, resolver não notifica.
+    await req(app, 'PUT', `/api/reports/${created.json().id}`, admin, { resolved: true });
+    await flush();
+    expect(sent).toHaveLength(1);
   });
 
   it('a tolerância do W.O. é escolhida pelo organizador', async () => {
