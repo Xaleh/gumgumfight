@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type RecapRound, type TournamentRecap as Recap } from '../api';
 import { type Locale, type Translate, useLocale, useT } from '../i18n';
 import { fmtDate } from '../i18n/format';
-import { FORMAT_SIZE, type RecapAssets, type RecapFormat, recapPieces, type RecapTexts } from '../recap/draw';
+import { DECK_TILE_MAX_W, FORMAT_SIZE, type RecapAssets, type RecapFormat, type RecapImage, recapPieces, type RecapTexts } from '../recap/draw';
 import { makePdf, makeZip, saveFile } from '../recap/export';
 import { slug } from '../recap/layout';
 import { phaseName } from './Tournaments';
@@ -24,6 +24,28 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
     img.onerror = () => resolve(null);
     img.src = url;
   });
+}
+
+/**
+ * Cópia reduzida para a largura `maxW`. Cada carta decodificada em tamanho cheio (600 × 838)
+ * ocupa ~2 MB; com dezenas delas o iPhone fica sem memória e o iOS recarrega a página.
+ */
+function shrink(img: HTMLImageElement, maxW: number): RecapImage {
+  if (img.naturalWidth <= maxW) return img;
+  const canvas = document.createElement('canvas');
+  canvas.width = maxW;
+  canvas.height = Math.round((img.naturalHeight * maxW) / img.naturalWidth);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return img;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/** Solta a memória do canvas na hora (o Safari do iOS só a devolve quando o coletor passa). */
+function release(canvas: HTMLCanvasElement) {
+  canvas.width = 0;
+  canvas.height = 0;
 }
 
 /** Logo do GumGum: o SVG ganha largura e altura (sem elas, alguns navegadores não o desenham no canvas). */
@@ -132,7 +154,11 @@ export default function TournamentRecap({ id, onClose }: { id: string; onClose: 
         ].filter((u): u is string => Boolean(u)),
       ),
     ];
-    const images = new Map<string, HTMLImageElement | null>();
+    // Cartas que só aparecem nas decklists (miniaturas) ficam guardadas já reduzidas.
+    const leaders = new Set(
+      [...recap.top.map((p) => p.leader.image), ...recap.campaign.map((r) => r.opponent?.leader.image), ...recap.leadersAll.map((l) => l.leader.image)].filter(Boolean),
+    );
+    const images = new Map<string, RecapImage | null>();
     let done = 0;
     setProgress({ done, total: urls.length });
     const tick = () => alive && setProgress({ done: ++done, total: urls.length });
@@ -142,7 +168,7 @@ export default function TournamentRecap({ id, onClose }: { id: string; onClose: 
       recap.tournament.sponsor?.logoUrl ? loadImage(recap.tournament.sponsor.logoUrl) : Promise.resolve(null),
       ...urls.map((u) =>
         loadImage(u).then((img) => {
-          images.set(u, img);
+          images.set(u, img && !leaders.has(u) ? shrink(img, DECK_TILE_MAX_W) : img);
           tick();
         }),
       ),
@@ -188,7 +214,7 @@ export default function TournamentRecap({ id, onClose }: { id: string; onClose: 
           canvas.width = width;
           canvas.height = height;
           p.draw(canvas.getContext('2d')!, format);
-          const blob = await toBlob(canvas, 'image/png');
+          const blob = await toBlob(canvas, 'image/png').finally(() => release(canvas));
           if (!alive) return;
           made.push({ id: p.id, label: p.label, file: `${String(i + 1).padStart(2, '0')}-${p.id}.png`, blob, url: URL.createObjectURL(blob) });
         }
@@ -232,8 +258,9 @@ export default function TournamentRecap({ id, onClose }: { id: string; onClose: 
         canvas.height = bitmap.height;
         canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
         bitmap.close();
-        const jpeg = new Uint8Array(await (await toBlob(canvas, 'image/jpeg', 0.9)).arrayBuffer());
-        pages.push({ jpeg, width: canvas.width, height: canvas.height });
+        const { width, height } = canvas;
+        const jpeg = new Uint8Array(await (await toBlob(canvas, 'image/jpeg', 0.9).finally(() => release(canvas))).arrayBuffer());
+        pages.push({ jpeg, width, height });
       }
       saveFile(new Blob([makePdf(pages, { title: recap.tournament.name })], { type: 'application/pdf' }), `${base}.pdf`);
     } catch (e) {
