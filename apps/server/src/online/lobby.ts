@@ -25,6 +25,8 @@ interface Entry {
   since: number;
   lastSeen: number;
   matched: { roomId: string; token: string } | null;
+  /** Quando o par foi formado (a entrada fica na fila até MATCHED_TTL_MS depois, para repetir a resposta). */
+  matchedAt: number;
 }
 
 /**
@@ -113,8 +115,15 @@ const PRESENCE_MAX = 20_000;
 const WAITING_TTL_MS = 30 * 60_000;
 /** Sala terminada (tela de resultado e revanche). */
 const FINISHED_TTL_MS = 15 * 60_000;
-/** Quem para de consultar a fila sai dela. */
-const QUEUE_STALE_MS = 30_000;
+/**
+ * Quem para de consultar a fila sai dela. No celular, o navegador pausa a página quando o
+ * jogador troca de app ou apaga a tela; a espera continua (a notificação "a partida começou"
+ * e o abandono em ABANDON_MS cuidam de quem não voltar). Quem fecha a página sai na hora
+ * (o navegador cancela a fila no `pagehide`).
+ */
+const QUEUE_STALE_MS = 2 * 60_000;
+/** Por quanto tempo a fila repete o par formado (a resposta pode se perder na rede do celular). */
+const MATCHED_TTL_MS = 2 * 60_000;
 /** Faixa de recompensa aceita na ranqueada: começa em BASE e abre PER_SECOND a cada segundo de espera. */
 const RANKED_WINDOW_BASE = 2_000;
 const RANKED_WINDOW_PER_SECOND = 400;
@@ -478,6 +487,7 @@ export class Lobby {
       since: now,
       lastSeen: now,
       matched: null,
+      matchedAt: 0,
     };
     this.queue.push(entry);
     this.match();
@@ -490,11 +500,8 @@ export class Lobby {
     const now = this.deps.now();
     entry.lastSeen = now;
     this.match();
-    if (entry.matched) {
-      // Entregue: sai da fila.
-      this.queue = this.queue.filter((e) => e !== entry);
-      return { status: 'matched' as const, ...entry.matched };
-    }
+    // Fica na fila até MATCHED_TTL_MS: se a resposta se perder, a próxima consulta recebe o mesmo par.
+    if (entry.matched) return { status: 'matched' as const, ...entry.matched };
     return {
       status: 'waiting' as const,
       waited: now - entry.since,
@@ -562,6 +569,7 @@ export class Lobby {
     this.tagIp(room.id, b.ip);
     a.matched = { roomId: room.id, token: ta };
     b.matched = { roomId: room.id, token: tb };
+    a.matchedAt = b.matchedAt = this.deps.now();
   }
 
   /**
@@ -571,7 +579,7 @@ export class Lobby {
    */
   private match() {
     const now = this.deps.now();
-    this.queue = this.queue.filter((e) => e.matched || now - e.lastSeen < QUEUE_STALE_MS);
+    this.queue = this.queue.filter((e) => (e.matched ? now - e.matchedAt < MATCHED_TTL_MS : now - e.lastSeen < QUEUE_STALE_MS));
     const open = this.queue.filter((e) => !e.matched);
     for (const a of open) {
       if (a.matched || !this.picking(a, now)) continue;

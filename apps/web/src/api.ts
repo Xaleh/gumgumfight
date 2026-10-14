@@ -421,6 +421,9 @@ export const api = {
     leaders: (format: FormatId) => get<QueueLeader[]>(`/api/online/leaders?format=${encodeURIComponent(format)}`),
     poll: (ticket: string) => get<QueuePoll>(`/api/online/queue/${encodeURIComponent(ticket)}`),
     cancel: (ticket: string) => send<void>('DELETE', `/api/online/queue/${encodeURIComponent(ticket)}`),
+    /** Sai da fila ao fechar a página (vai mesmo com a página fechando). */
+    leaveQueue: (ticket: string) =>
+      fetch(`/api/online/queue/${encodeURIComponent(ticket)}`, { method: 'DELETE', keepalive: true }).catch(() => undefined),
     act: (roomId: string, t: string, seq: number, action: Action) =>
       send<{ ok: true; actionCount: number }>('POST', `/api/online/rooms/${roomId}/action`, { t, seq, action }),
     emote: (roomId: string, t: string, emote: string) => send<void>('POST', `/api/online/rooms/${roomId}/emote`, { t, emote }),
