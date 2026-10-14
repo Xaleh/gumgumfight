@@ -148,14 +148,17 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
               {t('result.review')}
             </button>
           )}
-          <button className="btn small pill" onClick={onReplay}>
-            {t('result.download')}
-          </button>
-          {onReport && (
-            <button className="btn small pill" onClick={onReport}>
-              {t('result.reportBug')}
+          {/* Lado a lado, abaixo dos botões grandes. */}
+          <div className="result-pills">
+            <button className="btn small pill" onClick={onReplay}>
+              {t('result.download')}
             </button>
-          )}
+            {onReport && (
+              <button className="btn small pill" onClick={onReport}>
+                {t('result.reportBug')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

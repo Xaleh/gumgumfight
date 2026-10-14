@@ -4885,6 +4885,12 @@ button.hint-pill::after,
 .result-actions .pill {
   align-self: center;
 }
+.result-pills {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 
 /* ------------------------------------------------------------------ tema escuro: retoques */
 
