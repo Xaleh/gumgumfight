@@ -1,18 +1,10 @@
 import { formatLabel } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, type LiveRoom, ROLE_LABEL, type WatchTarget } from '../api';
+import { api, type BroadcastInfo, type BroadcastSettings, broadcastUrl, type LiveRoom, ROLE_LABEL, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
-import { type MessageKey, useT } from '../i18n';
+import { useT } from '../i18n';
 import { LeaderArt } from './LeaderArt';
-import { tierName } from './Online';
-
-const QUEUE_LABEL: Record<LiveRoom['queue'], MessageKey> = {
-  ranked: 'watch.queue.ranked',
-  casual: 'watch.queue.casual',
-  private: 'watch.queue.private',
-  bot: 'watch.queue.bot',
-  tournament: 'watch.queue.tournament',
-};
+import { QUEUE_LABEL, tierName } from './Online';
 
 const HANDS_PREF = 'gumgum.watchHands';
 
@@ -33,6 +25,9 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   const [hands, setHands] = useState(savedHands);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** Modo transmissão (quem vê as mãos): o link do OBS e a partida na live. */
+  const [broadcast, setBroadcast] = useState<BroadcastInfo | null>(null);
+  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
   // A lista muda sozinha (partidas começam e terminam): atualiza a cada 5 s.
   useEffect(() => {
@@ -53,6 +48,10 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
       clearInterval(timer);
     };
   }, [user?.id]);
+  useEffect(() => {
+    if (!canHands) return setBroadcast(null);
+    api.broadcast.mine().then(setBroadcast, fail);
+  }, [canHands, user?.id]);
 
   const toggleHands = (on: boolean) => {
     setHands(on);
@@ -62,14 +61,22 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
       /* sem armazenamento */
     }
   };
-  // Na própria partida o servidor não mostra as mãos: assiste sem elas.
-  const watch = (roomId: string, mine = false) => onWatch({ roomId, hands: canHands && hands && !mine });
+  // As mãos só aparecem no torneio e nas salas privadas liberadas, e nunca na própria partida.
+  const watch = (r: Pick<LiveRoom, 'id' | 'mine' | 'handsAllowed'>) => onWatch({ roomId: r.id, hands: canHands && hands && !r.mine && Boolean(r.handsAllowed) });
+  /** Manda a partida para a tela de transmissão (o que ela mostra sai das opções do painel). */
+  const transmit = (r: LiveRoom | null) => {
+    setError(null);
+    api.broadcast.choose(r?.id ?? null).then(setBroadcast, fail);
+  };
+  const onAir = broadcast?.key ? broadcast.roomId : null;
 
-  const byCode = async () => {
+  /** Sala privada pelo código: assistir ou mandar para a transmissão. */
+  const byCode = async (send = false) => {
     setError(null);
     try {
       const room = await api.online.byCode(code);
-      watch(room.id, room.mine);
+      if (send) transmit(room);
+      else watch(room);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -95,42 +102,69 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
           <p className="muted small">{t('watch.noHandsHint')}</p>
         )}
 
+        {broadcast && (
+          <BroadcastPanel
+            info={broadcast}
+            onAir={rooms?.find((r) => r.id === onAir) ?? null}
+            onNewKey={() => {
+              if (broadcast.key && !window.confirm(t('broadcast.newKeyConfirm'))) return;
+              api.broadcast.newKey().then(setBroadcast, fail);
+            }}
+            onClear={() => transmit(null)}
+            onSettings={(s) => {
+              setBroadcast({ ...broadcast, ...s });
+              api.broadcast.settings(s).then(setBroadcast, fail);
+            }}
+          />
+        )}
+
         <div className="watch-list">
           {rooms === null && !error && <p className="muted">{t('common.loading')}</p>}
           {rooms?.length === 0 && <p className="muted">{t('watch.empty')}</p>}
           {rooms?.map((r) => (
-            <button key={r.id} className="watch-room" onClick={() => watch(r.id, r.mine)}>
-              <div className="watch-meta">
-                <span className="watch-queue">
-                  {r.tournament
-                    ? `${t('watch.tourLine', { name: r.tournament.name, label: r.tournament.label })}${r.tournament.bestOf > 1 ? t('watch.tourGame', { n: r.tournament.game }) : ''}`
-                    : t(QUEUE_LABEL[r.queue])}
-                </span>
-                {r.mine && (
-                  <span className="muted small" title={t('watch.mineTitle')}>
-                    {t('watch.mine')}
+            <div key={r.id} className={['watch-room-row', onAir === r.id ? 'on-air' : ''].join(' ')}>
+              <button className="watch-room" onClick={() => watch(r)}>
+                <div className="watch-meta">
+                  <span className="watch-queue">
+                    {r.tournament
+                      ? `${t('watch.tourLine', { name: r.tournament.name, label: r.tournament.label })}${r.tournament.bestOf > 1 ? t('watch.tourGame', { n: r.tournament.game }) : ''}`
+                      : t(QUEUE_LABEL[r.queue])}
                   </span>
-                )}
-                <span className="muted small">
-                  {formatLabel(r.format)} · {r.turn ? t('watch.turn', { n: r.turn }) : t('watch.openingHand')}
-                  {r.spectators ? ` · 👁 ${r.spectators}` : ''}
-                </span>
-              </div>
-              <div className="watch-players">
-                {r.players.map((p, i) => (
-                  <div key={i} className={['watch-player', i === 1 ? 'right' : ''].join(' ')}>
-                    <LeaderArt name={p.leaderName ?? p.leader} image={p.leaderImage} colors={p.colors} size="small" />
-                    <span className="watch-name">
-                      <b>{p.bot ? '🤖 ' : ''}{p.name}</b>
-                      <span className="muted small">
-                        {r.queue === 'ranked' ? `${tierName(t, p.tier)} · ` : ''}❤ {p.life} · ✋ {p.hand}
-                      </span>
+                  {r.mine && (
+                    <span className="muted small" title={t('watch.mineTitle')}>
+                      {t('watch.mine')}
                     </span>
-                  </div>
-                ))}
-                <span className="vs-badge">{t('watch.vs')}</span>
-              </div>
-            </button>
+                  )}
+                  <span className="muted small">
+                    {formatLabel(r.format)} · {r.turn ? t('watch.turn', { n: r.turn }) : t('watch.openingHand')}
+                    {r.spectators ? ` · 👁 ${r.spectators}` : ''}
+                  </span>
+                </div>
+                <div className="watch-players">
+                  {r.players.map((p, i) => (
+                    <div key={i} className={['watch-player', i === 1 ? 'right' : ''].join(' ')}>
+                      <LeaderArt name={p.leaderName ?? p.leader} image={p.leaderImage} colors={p.colors} size="small" />
+                      <span className="watch-name">
+                        <b>{p.bot ? '🤖 ' : ''}{p.name}</b>
+                        <span className="muted small">
+                          {r.queue === 'ranked' ? `${tierName(t, p.tier)} · ` : ''}❤ {p.life} · ✋ {p.hand}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                  <span className="vs-badge">{t('watch.vs')}</span>
+                </div>
+              </button>
+              {broadcast?.key && (
+                <button
+                  className={['btn', 'small', 'broadcast-btn', onAir === r.id ? 'primary' : ''].join(' ')}
+                  onClick={() => transmit(onAir === r.id ? null : r)}
+                  title={onAir === r.id ? t('broadcast.onAirTitle') : t('broadcast.transmitTitle')}
+                >
+                  {onAir === r.id ? t('broadcast.onAir') : t('broadcast.transmit')}
+                </button>
+              )}
+            </div>
           ))}
         </div>
 
@@ -145,12 +179,131 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
               placeholder={t('watch.codePlaceholder')}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             />
-            <button className="btn" disabled={code.length !== 6} onClick={byCode}>
+            <button className="btn" disabled={code.length !== 6} onClick={() => void byCode()}>
               {t('watch.watch')}
             </button>
+            {broadcast?.key && (
+              <button className="btn" disabled={code.length !== 6} onClick={() => void byCode(true)} title={t('broadcast.transmitTitle')}>
+                {t('broadcast.transmit')}
+              </button>
+            )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** Atrasos oferecidos (s); 0 = ao vivo onde o atraso não é obrigatório. */
+const DELAYS = [0, 60, 120, 180, 300, 600];
+
+/** O que a live mostra numa partida (como o servidor decide em `broadcastView`) e com quanto atraso (s). */
+export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | 'queue' | 'handsAllowed'>): { what: 'players' | 'own' | 'none'; delayS: number } {
+  const plain = room.queue === 'tournament' && s.delayTournaments ? s.delayS : 0;
+  if (room.mine) return s.handsOwn ? { what: 'own', delayS: s.delayS } : { what: 'none', delayS: plain };
+  if (s.handsPlayers && room.handsAllowed) return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
+  return { what: 'none', delayS: plain };
+}
+
+const SHOWS_LABEL = { players: 'broadcast.showsPlayers', own: 'broadcast.showsOwn', none: 'broadcast.showsNone' } as const;
+
+/** Painel do modo transmissão: o link para a fonte de navegador do OBS, a partida na live e as opções. */
+function BroadcastPanel({
+  info,
+  onAir,
+  onNewKey,
+  onClear,
+  onSettings,
+}: {
+  info: BroadcastInfo;
+  /** A partida na transmissão, se ainda está na lista. */
+  onAir: LiveRoom | null;
+  onNewKey: () => void;
+  onClear: () => void;
+  onSettings: (s: Partial<BroadcastSettings>) => void;
+}) {
+  const t = useT();
+  const [copied, setCopied] = useState(false);
+  const url = info.key ? broadcastUrl(info.key) : '';
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* sem acesso à área de transferência: o campo fica selecionado para copiar à mão */
+    }
+  };
+  const delayText = (sec: number) => (sec ? t('broadcast.delayMin', { n: Math.round((sec / 60) * 10) / 10 }) : t('broadcast.delayLive'));
+  const shows = onAir ? broadcastShows(info, onAir) : null;
+  const flag = (key: 'handsPlayers' | 'handsOwn' | 'delayTournaments' | 'chat', label: string, hint?: string) => (
+    <label className="check">
+      <input type="checkbox" checked={info[key]} onChange={(e) => onSettings({ [key]: e.target.checked })} /> {label}
+      {hint && <span className="muted small"> {hint}</span>}
+    </label>
+  );
+  return (
+    <section className="broadcast-panel">
+      <h3>{t('broadcast.title')}</h3>
+      {!info.key ? (
+        <>
+          <p className="muted small">{t('broadcast.intro')}</p>
+          <button className="btn primary" onClick={onNewKey}>
+            {t('broadcast.createLink')}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="muted small">{t('broadcast.obsHint')}</p>
+          <div className="join-row">
+            <input className="broadcast-url" readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label={t('broadcast.linkLabel')} />
+            <button className="btn" onClick={copy}>
+              {copied ? t('broadcast.copied') : t('broadcast.copy')}
+            </button>
+          </div>
+          <p className="small">
+            {info.roomId ? (
+              <>
+                <b>{t('broadcast.nowOnAir')}</b>{' '}
+                {onAir ? onAir.players.map((p) => p.name).join(` ${t('watch.vs')} `) : t('broadcast.onAirEnded')}
+                {shows && ` · ${t(SHOWS_LABEL[shows.what])} · ${delayText(shows.delayS)}`}
+              </>
+            ) : (
+              <span className="muted">{t('broadcast.nothingOnAir')}</span>
+            )}
+          </p>
+
+          <div className="broadcast-settings">
+            <label className="broadcast-delay">
+              {t('broadcast.delay')}{' '}
+              <select value={info.delayS} onChange={(e) => onSettings({ delayS: Number(e.target.value) })}>
+                {[...new Set([...DELAYS, info.delayS])]
+                  .sort((a, b) => a - b)
+                  .map((sec) => (
+                    <option key={sec} value={sec}>
+                      {sec ? t('broadcast.delayMin', { n: Math.round((sec / 60) * 10) / 10 }) : t('broadcast.delayNone')}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {flag('handsPlayers', t('broadcast.handsPlayers'), t('broadcast.handsPlayersHint', { n: Math.round(info.minHandsDelayS / 60) }))}
+            {flag('handsOwn', t('broadcast.handsOwn'), t('broadcast.handsOwnHint'))}
+            {flag('delayTournaments', t('broadcast.delayTournaments'))}
+            {flag('chat', t('broadcast.chat'))}
+          </div>
+
+          <div className="btn-row">
+            {info.roomId && (
+              <button className="btn small" onClick={onClear}>
+                {t('broadcast.clear')}
+              </button>
+            )}
+            <button className="btn small" onClick={onNewKey}>
+              {t('broadcast.newKey')}
+            </button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

@@ -382,6 +382,21 @@ function migrateAuth(db: DB) {
       ALTER TABLE users ADD COLUMN custom_picture_at INTEGER;
     `);
   }
+  // Modo transmissão (streamer): o link secreto da fonte do OBS e a partida escolhida para a live.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS broadcasts (
+      user_id           TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      key               TEXT NOT NULL UNIQUE,          -- segredo do link (o streamer copia de novo quando quiser)
+      room_id           TEXT,                          -- partida na transmissão (null = nenhuma)
+      delay_s           INTEGER NOT NULL DEFAULT 180,  -- atraso escolhido (0 a 600 s)
+      hands_players     INTEGER NOT NULL DEFAULT 1,    -- mãos dos dois jogadores nas partidas que assiste
+      hands_own         INTEGER NOT NULL DEFAULT 0,    -- a própria mão nas partidas que joga
+      delay_tournaments INTEGER NOT NULL DEFAULT 0,    -- atraso nas partidas de torneio mesmo sem mãos
+      chat              INTEGER NOT NULL DEFAULT 1,    -- chat dos jogadores na tela de transmissão
+      rev               INTEGER NOT NULL DEFAULT 0,    -- muda a cada troca de partida ou de opção
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '../audio';
-import { errorMessage, type OnlineRoomInfo } from '../api';
+import { errorMessage, type OnlineRoomInfo, type RoomQueue } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
 import { type MessageKey, type Translate, useLocale, useT, useTryT } from '../i18n';
 import { fmtBerries, fmtNumber } from '../i18n/format';
@@ -23,6 +23,15 @@ export function tierName(t: Translate, tier: string): string {
   const key = TIER_LABEL[tier];
   return key ? t(key) : tier;
 }
+
+/** Nome de cada tipo de sala na lista "Assistir" e na tela de transmissão. */
+export const QUEUE_LABEL: Record<RoomQueue, MessageKey> = {
+  ranked: 'watch.queue.ranked',
+  casual: 'watch.queue.casual',
+  private: 'watch.queue.private',
+  bot: 'watch.queue.bot',
+  tournament: 'watch.queue.tournament',
+};
 
 /** Ids dos emotes (o que vai para o servidor); o texto fica em `online.emote.<id>`. */
 const EMOTES = ['hello', 'gg', 'nice', 'think', 'wow', 'oops', 'thanks', 'hurry'] as const;
@@ -109,7 +118,8 @@ export function OnlineStatus({ online }: { online: OnlineGame }) {
  */
 function useShowOpponent(online: OnlineGame) {
   const { opponentChat } = useSettings();
-  return online.watching || (opponentChat && !online.muted);
+  // Quem assiste silencia o chat dos dois jogadores só para si (botão na faixa do espectador).
+  return online.watching ? !online.muted : opponentChat && !online.muted;
 }
 
 /** Painel de chat da partida: emotes (atalhos) e mensagens de texto curtas. */
@@ -370,6 +380,7 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
               <h2>{t('online.privateRoom')}</h2>
               <p className="muted">{t('online.privateHint')}</p>
               <div className="room-code">{room.code}</div>
+              {room.handsAllowed && <p className="small">{t('online.handsSharedHint')}</p>}
               <div className="btn-row center">
                 <button className="btn primary" onClick={copy}>
                   {copied ? t('online.linkCopied') : t('online.shareLink')}
@@ -394,6 +405,18 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
         </section>
       </div>
     </div>
+  );
+}
+
+/** Aviso para os jogadores de uma sala privada que liberou as mãos para quem transmite. */
+export function HandsSharedTag({ online }: { online: OnlineGame }) {
+  const t = useT();
+  const room = online.room;
+  if (!room || room.queue !== 'private' || !room.handsAllowed) return null;
+  return (
+    <span className="delay-tag" title={t('online.handsSharedHint')}>
+      {t('online.handsShared')}
+    </span>
   );
 }
 
@@ -432,6 +455,58 @@ export function SpectatorBar({
           {t('online.hands')}
         </button>
       )}
+      <button
+        className={['auto-toggle', online.muted ? '' : 'on'].join(' ')}
+        onClick={() => online.setMuted(!online.muted)}
+        aria-pressed={!online.muted}
+        title={t('online.watchChatTitle')}
+      >
+        <span className="knob" />
+        {t('online.watchChat')}
+      </button>
+      {online.room?.delay ? <DelayTag ms={online.room.delay} /> : null}
+    </div>
+  );
+}
+
+/** Aviso de que a mesa (com as mãos) está atrasada. */
+function DelayTag({ ms }: { ms: number }) {
+  const t = useT();
+  return (
+    <span className="delay-tag" title={t('online.delayTitle')}>
+      {t('online.delay', { n: Math.max(1, Math.round(ms / 60_000)) })}
+    </span>
+  );
+}
+
+/** Canto da tela de transmissão: o tipo de partida (ou o torneio), o atraso da mesa e quantos assistem. */
+export function BroadcastTag({ online }: { online: OnlineGame }) {
+  const t = useT();
+  const room = online.room;
+  if (!room) return null;
+  const tour = room.tournament;
+  return (
+    <div className="broadcast-tag">
+      <span className="broadcast-match">
+        {tour
+          ? `${t('watch.tourLine', { name: tour.name, label: tour.label })}${tour.bestOf > 1 ? t('watch.tourGame', { n: tour.game }) : ''}`
+          : t(QUEUE_LABEL[room.queue])}
+      </span>
+      {room.delay ? <DelayTag ms={room.delay} /> : null}
+      {room.spectators > 0 && <span className="spectator-count">👁 {room.spectators}</span>}
+    </div>
+  );
+}
+
+/** Tela de transmissão sem partida na mesa (esperando a escolha no app, carregando ou link inválido). */
+export function BroadcastIdle({ title, text }: { title: string; text?: string }) {
+  return (
+    <div className="broadcast-idle">
+      <div className="broadcast-idle-box">
+        <h1>GumGum Fight</h1>
+        <h2>{title}</h2>
+        {text && <p className="muted">{text}</p>}
+      </div>
     </div>
   );
 }

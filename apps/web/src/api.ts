@@ -396,9 +396,12 @@ export const api = {
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
-    watchUrl: (roomId: string, hands: boolean) => `/api/online/rooms/${roomId}/watch${hands ? '?hands=1' : ''}`,
-    createRoom: (deckId: string, format: FormatId) =>
-      send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format }),
+    /** `key`: tela de transmissão (fonte do OBS); a chave faz as vezes do login e as opções do streamer decidem o que ela vê. */
+    watchUrl: (roomId: string, hands: boolean, key?: string) =>
+      `/api/online/rooms/${roomId}/watch${key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
+    /** `showHands`: libera as mãos dos jogadores para quem transmite (streamer, com atraso). */
+    createRoom: (deckId: string, format: FormatId, showHands = false) =>
+      send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format, ...(showHands ? { showHands } : {}) }),
     joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
     /** `leader` (só casual): Líder do oponente desejado no primeiro minuto. */
     enqueue: (deckId: string, format: FormatId, queue: QueueKind, leader?: string | null) =>
@@ -427,7 +430,40 @@ export const api = {
     replay: (roomId: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay`),
     eventsUrl: (roomId: string, t: string) => `/api/online/rooms/${roomId}/events?t=${encodeURIComponent(t)}`,
   },
+  /** Modo transmissão (perfil Streamer ou Admin): o link da fonte do OBS e a partida da live. */
+  broadcast: {
+    mine: () => get<BroadcastInfo>('/api/broadcast'),
+    newKey: () => send<BroadcastInfo>('POST', '/api/broadcast/key'),
+    choose: (roomId: string | null) => send<BroadcastInfo>('PUT', '/api/broadcast/room', { roomId }),
+    settings: (s: Partial<BroadcastSettings>) => send<BroadcastInfo>('PUT', '/api/broadcast/settings', s),
+    /** O que a fonte do OBS mostra agora (sem login: a chave é o segredo); `rev` muda a cada troca. */
+    byKey: (key: string) => get<{ roomId: string | null; chat: boolean; rev: number }>(`/api/broadcast/${encodeURIComponent(key)}`),
+  },
 };
+
+/** Opções da transmissão do streamer (ver apps/server/src/online/broadcast.ts). */
+export interface BroadcastSettings {
+  /** Atraso em segundos (0 a 600). */
+  delayS: number;
+  /** Mãos dos dois jogadores nas partidas que ele assiste (com pelo menos `minHandsDelayS` de atraso). */
+  handsPlayers: boolean;
+  /** A mão dele nas partidas que ele joga. */
+  handsOwn: boolean;
+  /** Atraso nas partidas de torneio mesmo sem as mãos. */
+  delayTournaments: boolean;
+  /** Chat dos jogadores na tela de transmissão. */
+  chat: boolean;
+}
+
+/** Transmissão da conta: o link (null antes de criar), a partida escolhida e as opções. */
+export interface BroadcastInfo extends BroadcastSettings {
+  key: string | null;
+  roomId: string | null;
+  minHandsDelayS: number;
+}
+
+/** Endereço da tela de transmissão (fonte do OBS) de uma chave. */
+export const broadcastUrl = (key: string) => `${location.origin}/?transmissao=${encodeURIComponent(key)}`;
 
 // ------------------------------------------------------------------ online
 
@@ -442,6 +478,8 @@ export interface OnlineSeat {
 export interface WatchTarget {
   roomId: string;
   hands: boolean;
+  /** Tela de transmissão: a chave do link faz as vezes do login para ver as mãos. */
+  key?: string;
 }
 
 export type RoomQueue = 'private' | QueueKind | 'bot' | 'tournament';
@@ -474,6 +512,8 @@ export interface LiveRoom {
   }>;
   turn: number;
   spectators: number;
+  /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
+  handsAllowed?: boolean;
   createdAt: number;
   /** Jogo de uma partida de torneio. */
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
@@ -525,6 +565,8 @@ export interface OnlineRoomInfo {
   status: 'waiting' | 'playing' | 'finished';
   /** Seu assento; null = você está assistindo. */
   you: PlayerId | null;
+  /** De quem é a visão: o seu assento, ou o do streamer que transmite a própria partida (null = pública). */
+  pov?: PlayerId | null;
   players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean; apprentice?: boolean }>;
   spectators: number;
   clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null };
@@ -536,6 +578,10 @@ export interface OnlineRoomInfo {
     errorCode?: string;
   } | null;
   rematch: [boolean, boolean];
+  /** Atraso da mesa desta conexão em ms (quem vê as mãos); 0 ou ausente = ao vivo. */
+  delay?: number;
+  /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
+  handsAllowed?: boolean;
 }
 
 // ------------------------------------------------------------------ torneios

@@ -47,6 +47,24 @@ export interface ChatMessage {
   at: number;
 }
 
+const WATCH_MUTE = 'gumgum.watchChatOff';
+
+function savedWatchMute(): boolean {
+  try {
+    return localStorage.getItem(WATCH_MUTE) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveWatchMute(on: boolean) {
+  try {
+    localStorage.setItem(WATCH_MUTE, on ? '1' : '0');
+  } catch {
+    /* vale só nesta partida */
+  }
+}
+
 /** Quantas mensagens do chat ficam no histórico do painel. */
 const CHAT_HISTORY = 50;
 
@@ -66,6 +84,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const seat = { roomId: target.roomId, token: 'token' in target ? target.token : '' };
   const watching = !('token' in target);
   const hands = 'hands' in target && target.hands;
+  const key = 'key' in target ? target.key : undefined;
   const [state, setState] = useState<GameState | null>(null);
   const [room, setRoom] = useState<OnlineRoomInfo | null>(null);
   /** performance.now() de quando o relógio da sala chegou. */
@@ -77,8 +96,18 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   /** Última mensagem de texto de cada assento ainda em balão (some sozinha). */
   const [chatBubbles, setChatBubbles] = useState<ChatMessage[]>([]);
-  /** Silenciar o oponente só nesta partida (a configuração geral fica em Configurações). */
-  const [muted, setMuted] = useState(false);
+  /**
+   * Jogador: silenciar o oponente só nesta partida (a configuração geral fica em Configurações).
+   * Espectador: silenciar o chat dos dois jogadores só para si (lembrado neste navegador).
+   */
+  const [muted, setMutedState] = useState(() => watching && savedWatchMute());
+  const setMuted = useCallback(
+    (on: boolean) => {
+      setMutedState(on);
+      if (watching) saveWatchMute(on);
+    },
+    [watching],
+  );
   /** Lançamentos do dado do sorteio de cada assento (para ver o dado do oponente rolar). */
   const [diceThrows, setDiceThrows] = useState<[DiceThrow | null, DiceThrow | null]>([null, null]);
   const [rematch, setRematch] = useState<RematchTarget | null>(null);
@@ -104,7 +133,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       if (stopped) return;
       es?.close();
       seen();
-      es = new EventSource(watching ? api.online.watchUrl(seat.roomId, hands) : api.online.eventsUrl(seat.roomId, seat.token));
+      es = new EventSource(watching ? api.online.watchUrl(seat.roomId, hands, key) : api.online.eventsUrl(seat.roomId, seat.token));
       es.onopen = () => {
         seen();
         setConn('open');
@@ -174,7 +203,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
               await api.online.room(seat.roomId);
               // A sala existe: o canal pode ter sido recusado (sem permissão para ver as mãos, lotado).
               const ctrl = new AbortController();
-              const res = await fetch(api.online.watchUrl(seat.roomId, hands), { signal: ctrl.signal });
+              const res = await fetch(api.online.watchUrl(seat.roomId, hands, key), { signal: ctrl.signal });
               const refused = res.ok ? null : ((await res.json().catch(() => null)) as { error?: string; errorCode?: string } | null);
               ctrl.abort();
               if (refused && (res.status === 403 || res.status === 429)) {
@@ -212,7 +241,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       clearInterval(watchdog);
       es?.close();
     };
-  }, [seat.roomId, seat.token, watching, hands]);
+  }, [seat.roomId, seat.token, watching, hands, key]);
 
   // App fora da tela (outro app, tela bloqueada): a sala passa a avisar a vez por notificação.
   useEffect(() => {

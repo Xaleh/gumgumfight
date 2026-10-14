@@ -85,6 +85,8 @@ export interface LiveRoom {
   }>;
   turn: number;
   spectators: number;
+  /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
+  handsAllowed: boolean;
   createdAt: number;
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
 }
@@ -262,14 +264,17 @@ export class Lobby {
     return playing ? { code: 409, ...fail('alreadyPlaying', 'Você já está numa partida online.'), roomId: playing.roomId } : null;
   }
 
-  createPrivate(seat: SeatRequest, format: FormatId): { room: Room; token: string } | LobbyError {
+  /** `showHands`: quem cria libera as mãos dos jogadores para quem transmite (ver `Room.handsAllowed`). */
+  createPrivate(seat: SeatRequest, format: FormatId, showHands = false): { room: Room; token: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     // Uma sala de espera por jogador: a anterior é cancelada.
     for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
     this.leaveQueue(seat.ownerHash);
     const token = randomToken();
-    const room = this.makeRoom(newRoomData({ queue: 'private', format, code: this.newCode(), seats: [{ ...seat, token }] }));
+    const data = newRoomData({ queue: 'private', format, code: this.newCode(), seats: [{ ...seat, token }] });
+    if (showHands) data.showHands = true;
+    const room = this.makeRoom(data);
     this.deps.save?.(room.data);
     return { room, token };
   }
@@ -392,6 +397,7 @@ export class Lobby {
       })),
       turn: st?.turn ?? 0,
       spectators: room.spectators,
+      handsAllowed: room.handsAllowed,
       createdAt: room.data.createdAt,
       tournament: room.data.tournament
         ? {
@@ -613,7 +619,10 @@ export class Lobby {
       }
       // Quem foi o segundo assento passa a ser o primeiro (quem começa é sorteado).
       const seats = [room.data.seats[1], room.data.seats[0]].map((s) => ({ ...s, token: randomToken() }));
-      const next = this.makeRoom(newRoomData({ queue: 'private', format: room.data.format, code: null, seats }));
+      const data = newRoomData({ queue: 'private', format: room.data.format, code: null, seats });
+      // A revanche segue com a mesma escolha de quem criou a sala.
+      if (room.data.showHands) data.showHands = true;
+      const next = this.makeRoom(data);
       // Quem aceitou agora (o assento dele troca de lado na sala nova) não precisa de aviso.
       next.start(seat === 0 ? 1 : 0);
       for (const ip of this.roomIps.get(room.id) ?? []) this.tagIp(next.id, ip);

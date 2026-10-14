@@ -3,6 +3,7 @@ import { api, isAdmin, isDev, type OnlineSeat, type WatchTarget } from './api';
 import { audio } from './audio';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
+import { Broadcast } from './components/Broadcast';
 import { Coverage } from './components/Coverage';
 import { DeckBuilder } from './components/DeckBuilder';
 import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/GameScreen';
@@ -56,8 +57,15 @@ function savedScreen(): Screen {
 /** Parâmetros dos endereços abertos pelas notificações: a partida online e a página do torneio. */
 const ROOM_PARAM = 'partida';
 const TOURNAMENT_PARAM = 'torneio';
+/** Tela de transmissão (fonte do OBS): `/?transmissao=<chave do streamer>`. */
+const BROADCAST_PARAM = 'transmissao';
 
 export function App() {
+  const [broadcastKey] = useState(() => new URL(location.href).searchParams.get(BROADCAST_PARAM));
+  return broadcastKey ? <Broadcast broadcastKey={broadcastKey} /> : <MainApp />;
+}
+
+function MainApp() {
   const [screen, setScreen] = useState<Screen>(savedScreen);
   useEffect(() => {
     try {
