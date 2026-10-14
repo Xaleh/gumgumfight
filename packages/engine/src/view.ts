@@ -100,7 +100,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
   const defs: GameState['defs'] = { [HIDDEN_CARD]: HIDDEN_DEF };
   for (const uid of vis) {
     const c = state.cards[uid];
-    cards[alias(uid)] = { uid: alias(uid), cardId: c.cardId, owner: c.owner };
+    cards[alias(uid)] = { uid: alias(uid), cardId: c.cardId, owner: c.owner, ...(c.art ? { art: c.art } : {}) };
     defs[c.cardId] = state.defs[c.cardId];
   }
   // Cartas reveladas no log: públicas, mesmo que já tenham voltado para a mão ou o deck.

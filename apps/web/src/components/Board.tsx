@@ -1,4 +1,4 @@
-import { cardDef, type GameState, MAX_CHARACTERS, type PlayerId } from '@gumgum/engine';
+import { cardDef, cardImage, type GameState, MAX_CHARACTERS, type PlayerId } from '@gumgum/engine';
 import type { CSSProperties, ReactNode } from 'react';
 import { useT } from '../i18n';
 import { CardBack, CardView, type Highlight, JollyRoger } from './CardView';
@@ -88,12 +88,13 @@ function PlayerSide({ state, player, position, tools, ...h }: SideProps) {
           // Vida virada para cima é pública (3-10-2-1): mostra a carta.
           if (!ps.lifeFaceUp?.includes(uid)) return <div key={uid} className="life-card" style={vars({ '--i': i })} />;
           const def = cardDef(state, uid);
+          const image = cardImage(state, uid);
           return (
             <div
               key={uid}
               className="life-card face-up"
               title={t('board.lifeFaceUpTitle', { name: def.name })}
-              style={vars({ '--i': i, ...(def.imageUrl ? { '--face': `url("${def.imageUrl}")` } : {}) })}
+              style={vars({ '--i': i, ...(image ? { '--face': `url("${image}")` } : {}) })}
               onMouseEnter={() => h.onHover(uid)}
               onMouseLeave={() => h.onHover(null)}
             />

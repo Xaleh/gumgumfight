@@ -423,7 +423,9 @@ reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do prot
 
 ### Imagens
 
-`<img src={def.imageUrl} loading="lazy" referrerPolicy="no-referrer">`; se falhar, a carta é desenhada em HTML/CSS.
+`<img src={cardImage(state, uid)} loading="lazy" referrerPolicy="no-referrer">`; se falhar, a carta é desenhada em HTML/CSS.
+`cardImage` (`packages/engine/src/art.ts`) usa a arte alternativa da instância (`CardInstance.art`, preenchida por
+`createGame` a partir de `DeckList.arts`) ou `def.imageUrl`. `viewFor` só copia `art` das cartas visíveis.
 As URLs apontam para `https://optcgapi.com/media/static/Card_Images/<ID>.jpg` (oficiais) e
 `https://images.optcgleaks.com/<set>/images/<id>.webp` (spoilers). **Esse tráfego não passa pela VPS.**
 
@@ -554,11 +556,13 @@ limite relevante é o tempo das consultas de estatísticas (seção 15).
 | Efeito automatizado (DSL) | **não é gravado**: `buildCardDef` calcula a partir do texto (parser) ou de `CARD_SCRIPTS` em tempo de execução | — |
 | Erratas e correções de fonte | código (`errata.ts`, `source-fixes.ts`), aplicadas ao ler e ao gravar (`fixCard`) | — |
 | Imagem | **não é armazenada**: só a URL em `data.imageUrl`; o navegador baixa do site de origem | URL |
+| Artes alternativas | `data.arts` (`CardArt[]`: `id` = nome do arquivo da imagem, `imageUrl`, `label`); a importação parcial junta às já gravadas (`keepArts`) | JSON |
+| Arte escolhida no deck | `decks.arts` (número da carta -> `CardArt.id`), fora de `decks.cards` (não muda o `deckHash`) | JSON |
 | Cartas provisórias (antes da primeira importação) | `data/cards/*.json` (750 cartas escritas de memória, `provisional: true`) | JSON `{set, title, provisional, note, cards: CardData[]}` |
 | Tipos conhecidos | `data/card-types.json` (172) | JSON |
 
 O que o navegador recebe (`ApiCard`, `present.ts`): `CardData` + `provisional` + `i18n.pt = {text, trigger, source}`;
-com `CARD_IMAGES=off`, `imageUrl` é removido antes de sair.
+com `CARD_IMAGES=off`, `imageUrl` e `arts` são removidos antes de sair.
 
 ### Cartas oficiais (optcgapi.com)
 

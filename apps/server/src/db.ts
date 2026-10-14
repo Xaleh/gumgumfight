@@ -8,7 +8,7 @@
 
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { type CardData, type DeckList, fixCard } from '@gumgum/engine';
+import { type CardArt, type CardData, type DeckList, fixCard } from '@gumgum/engine';
 import { DatabaseSync } from 'node:sqlite';
 import { baseCardId } from './optcgapi';
 import { DB_PATH } from './paths';
@@ -85,6 +85,8 @@ function migrate(db: DB) {
   if (!cols.includes('raw')) db.exec('ALTER TABLE cards ADD COLUMN raw TEXT');
   const deckCols = (db.prepare('PRAGMA table_info(decks)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!deckCols.includes('kind')) db.exec("ALTER TABLE decks ADD COLUMN kind TEXT NOT NULL DEFAULT 'builtin'");
+  // arts: JSON { número da carta: arte alternativa } (fora de `cards`, para não mudar o deck nas estatísticas).
+  if (!deckCols.includes('arts')) db.exec('ALTER TABLE decks ADD COLUMN arts TEXT');
   // Dono do deck: SHA-256 do código do navegador (nunca o código em si) ou
   // "user:<id>" quando o deck pertence a uma conta (ver auth/store.ts).
   if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
@@ -527,12 +529,30 @@ export function listLiveMatches(db: DB): Array<{ id: string; data: string }> {
 
 // ------------------------------------------------------------------ cartas
 
+/**
+ * Junta as artes alternativas já gravadas às da importação: a sincronização dos spoilers
+ * importa só algumas coleções, e uma carta reimpressa nelas perderia as artes das outras (e a
+ * escolha feita nos decks). As da importação vêm primeiro.
+ */
+function keepArts(card: CardData, storedData: string): CardData {
+  let stored: CardArt[] | undefined;
+  try {
+    stored = (JSON.parse(storedData) as CardData).arts;
+  } catch {
+    return card;
+  }
+  if (!stored?.length) return card;
+  const seen = new Set([card.imageUrl, ...(card.arts ?? []).map((a) => a.imageUrl)]);
+  const extra = stored.filter((a) => !seen.has(a.imageUrl));
+  return extra.length ? { ...card, arts: [...(card.arts ?? []), ...extra] } : card;
+}
+
 export function upsertCards(
   db: DB,
   cards: CardData[],
   opts: { provisional: boolean; source: string; raw?: Map<string, unknown> },
 ): { written: number; skipped: number } {
-  const existing = db.prepare('SELECT provisional FROM cards WHERE id = ?');
+  const existing = db.prepare('SELECT provisional, data FROM cards WHERE id = ?');
   const write = db.prepare(`
     INSERT INTO cards (id, set_code, name, category, data, provisional, source, raw, updated_at)
     VALUES (@id, @set_code, @name, @category, @data, @provisional, @source, @raw, datetime('now'))
@@ -545,13 +565,14 @@ export function upsertCards(
   let skipped = 0;
   transaction(db, () => {
     for (const card of cards) {
-      const c = fixCard(card);
-      const row = existing.get(c.id) as { provisional: number } | undefined;
+      let c = fixCard(card);
+      const row = existing.get(c.id) as { provisional: number; data: string } | undefined;
       // Dados provisórios nunca sobrescrevem dados vindos da API.
       if (opts.provisional && row && !row.provisional) {
         skipped++;
         continue;
       }
+      if (row) c = keepArts(c, row.data);
       write.run({
         id: c.id,
         set_code: c.set ?? c.id.split('-')[0],
@@ -673,11 +694,19 @@ export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHa
 /** Grava um deck. O dono só é definido na criação (um update nunca troca o dono). */
 export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', ownerHash: string | null = null) {
   db.prepare(`
-    INSERT INTO decks (id, name, leader, cards, kind, owner_hash, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO decks (id, name, leader, cards, arts, kind, owner_hash, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET name = excluded.name, leader = excluded.leader,
-      cards = excluded.cards, kind = excluded.kind, updated_at = excluded.updated_at
-  `).run(deck.id, deck.name, deck.leader, JSON.stringify(deck.cards), kind, ownerHash);
+      cards = excluded.cards, arts = excluded.arts, kind = excluded.kind, updated_at = excluded.updated_at
+  `).run(
+    deck.id,
+    deck.name,
+    deck.leader,
+    JSON.stringify(deck.cards),
+    deck.arts && Object.keys(deck.arts).length ? JSON.stringify(deck.arts) : null,
+    kind,
+    ownerHash,
+  );
 }
 
 type DeckRow = {
@@ -685,16 +714,18 @@ type DeckRow = {
   name: string;
   leader: string;
   cards: string;
+  arts: string | null;
   kind: DeckKind;
   updated_at: string;
   owner_hash: string | null;
 };
-const DECK_COLS = 'id, name, leader, cards, kind, updated_at, owner_hash';
+const DECK_COLS = 'id, name, leader, cards, arts, kind, updated_at, owner_hash';
 const toDeck = (r: DeckRow): StoredDeck => ({
   id: r.id,
   name: r.name,
   leader: r.leader,
   cards: JSON.parse(r.cards),
+  ...(r.arts ? { arts: JSON.parse(r.arts) as Record<string, string> } : {}),
   kind: r.kind,
   updatedAt: r.updated_at,
   ownerHash: r.owner_hash,

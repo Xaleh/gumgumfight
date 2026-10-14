@@ -17,6 +17,7 @@
 // torneio começa sozinho na hora e cada rodada tem 5 min de tolerância para entrar na
 // sala (W.O. automático; ver clock.ts).
 
+import { artImage } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
 import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
@@ -582,7 +583,7 @@ export function registerTournamentRoutes(
           /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
           leader: showLeader(p.userId) ? p.deck.leader : null,
           leaderName: leader?.name ?? null,
-          leaderImage: (cardImages && leader?.imageUrl) || null,
+          leaderImage: (cardImages && leader && artImage(leader, p.deck.arts?.[leader.id])) || null,
           colors: leader?.colors ?? [],
           deck: showDeck(p.userId)
             ? { name: p.deck.name, leader: p.deck.leader, cards: p.deck.cards.map((c) => ({ ...c, name: cards.get(c.id)?.name ?? null })) }

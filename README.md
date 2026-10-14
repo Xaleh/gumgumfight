@@ -629,6 +629,15 @@ pode desligá-las nas configurações. Com `CARD_IMAGES=off`, o servidor remove 
 jogo usa só as cartas desenhadas em HTML (nome, custo, poder, texto). Se uma imagem falhar ao carregar, a carta
 desenhada é usada automaticamente.
 
+### Artes alternativas
+
+A importação guarda as outras impressões de cada carta (Parallel, Alternate Art, SP, Manga, promos) em `arts`; as
+reimpressões com a mesma ilustração ficam de fora. No construtor de decks, **Aplicar artes alternativas** põe a primeira
+arte alternativa em todas as cartas do deck que têm uma, e o ícone de paleta na linha da carta (ou o botão **Arte** do
+Líder) abre o seletor para trocar uma por uma. A escolha é salva no deck (`decks.arts`), não muda o deck nas
+estatísticas e aparece na mesa para os dois jogadores (o oponente só vê a arte das cartas que estão à vista).
+Com `CARD_IMAGES=off`, as artes somem junto com as imagens.
+
 ### Textos em português
 
 Cada jogador escolhe "Português" ou "English" em **⚙️ Configurações** (modal no menu) ou no menu da partida (a escolha
