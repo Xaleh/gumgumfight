@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateDeck } from '../src/deck';
-import { cardBlock, cardLegality, formatIssues, legalFormats } from '../src/formats';
+import { cardBlock, cardLegality, formatIssues, legalFormats, spoilerCards, spoilerIssues, tournamentFormatLabel } from '../src/formats';
 import type { CardData, DeckList } from '../src/types';
 import { cards, luffy } from './helpers';
 
@@ -67,5 +67,35 @@ describe('formatos (Standard e Extra Grand Battle)', () => {
       const r = formatIssues(d, format, NOW);
       expect(r.some((i) => i.cardId === 'ST10-001' && /banida/.test(i.message))).toBe(true);
     }
+  });
+});
+
+describe('spoilers (cartas ainda não lançadas)', () => {
+  const deck = { leader: 'OP99-001', cards: [{ id: 'ST01-002', count: 4 }, { id: 'OP99-010', count: 4 }, { id: 'OP99-011', count: 4 }, { id: 'OP99-012', count: 4 }] };
+  const spoiler = { spoiler: { source: 'teste' } };
+  const pool = new Map<string, Pick<CardData, 'spoiler'>>([
+    ['OP99-001', spoiler],
+    ['ST01-002', {}],
+    ['OP99-010', spoiler],
+    ['OP99-011', spoiler],
+    ['OP99-012', spoiler],
+  ]);
+
+  it('não são de formato nenhum: Standard e EGB só olham banidas e rotação', () => {
+    expect(formatIssues(deck, 'egb', NOW)).toEqual([]);
+  });
+
+  it('lista as cartas de spoiler (Líder incluso) num aviso só', () => {
+    expect(spoilerCards(deck, pool)).toEqual(['OP99-001', 'OP99-010', 'OP99-011', 'OP99-012']);
+    const [issue, ...rest] = spoilerIssues(deck, pool);
+    expect(rest).toEqual([]);
+    expect(issue).toMatchObject({ code: 'rules.spoiler', params: { n: 4, ids: 'OP99-001, OP99-010, OP99-011…' }, cardId: 'OP99-001' });
+    expect(issue.message).toMatch(/^Cartas ainda não lançadas \(spoilers\): OP99-001, OP99-010, OP99-011…\. /);
+    expect(spoilerIssues({ leader: 'ST01-002', cards: [] }, pool)).toEqual([]);
+  });
+
+  it('nome do formato de torneio com spoilers', () => {
+    expect(tournamentFormatLabel({ format: 'egb', spoilers: true })).toBe('Todas as cartas + spoilers');
+    expect(tournamentFormatLabel({ format: 'standard' })).toBe('Standard');
   });
 });

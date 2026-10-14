@@ -110,7 +110,7 @@ describe('artes nos decks', () => {
     expect(full.cards.find((c: CardData) => c.id === 'ST01-012').arts).toHaveLength(1);
 
     // A escolha chega à partida online (e à inscrição em torneio, que usa o mesmo deck).
-    const deck = playableDeck(db, created.json().id, 'egb', false);
+    const deck = playableDeck(db, created.json().id, 'egb');
     expect(deck).toMatchObject({ arts: { 'ST01-001': 'ST01-001_p2', 'ST01-012': 'ST01-012_p1' } });
 
     // Sem artes no corpo: voltam as normais.

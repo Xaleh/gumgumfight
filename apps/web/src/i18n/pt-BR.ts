@@ -193,7 +193,9 @@ const ptBR = {
   'menu.rankedDesc': 'Vale bounty. Você enfrenta quem está perto do seu nível.',
   'menu.chipGoogleLogin': 'Login com Google',
   'menu.chipNoManual': 'Sem efeitos manuais',
+  'menu.chipReleasedOnly': 'Só cartas lançadas',
   'menu.rankedNeedsLogin': 'Entre com o Google para jogar a ranqueada.',
+  'menu.rankedSpoilers': '{n|O deck tem # carta de spoiler, ainda não lançada: a ranqueada só aceita cartas lançadas.|O deck tem # cartas de spoiler, ainda não lançadas: a ranqueada só aceita cartas lançadas.}',
   'menu.rankedManualCards':
     '{n|O deck tem # carta com efeito manual (⚙), que a ranqueada não permite.|O deck tem # cartas com efeito manual (⚙), que a ranqueada não permite.}',
   'menu.casualKicker': 'Casual',
@@ -420,6 +422,7 @@ const ptBR = {
   'deck.allowedIn': 'Permitido no {format}',
   'deck.formatAllowed': '{format}: permitido',
   'deck.formatNotAllowed': '{format}: não permitido',
+  'deck.rankedChip': 'Ranqueada (tem spoilers)',
   // ---- validação do deck (espelha validateDeck/formatIssues do motor) ----
   // ---- decks salvos ----
   'deck.openDeckTitle': 'Deck aberto: {name}',
@@ -768,6 +771,9 @@ const ptBR = {
   'tour.description': 'Descrição e regras',
   'tour.descriptionPlaceholder': 'Premiação, horário de cada rodada, onde combinar as partidas…',
   'tour.format': 'Formato',
+  'tour.formatSpoilers': 'Todas as cartas + spoilers',
+  'tour.formatReleasedHint': 'Só valem cartas já lançadas: decks com spoilers não se inscrevem.',
+  'tour.formatSpoilersHint': 'Vale toda carta lançada (como no Extra Grand Battle) e também as cartas de spoiler, ainda não lançadas. As banidas continuam proibidas.',
   'tour.structure': 'Estrutura',
   'tour.swissHint':
     'Todos jogam todas as rodadas, sempre contra quem tem a mesma pontuação (vitória vale 3 pontos). Desempate por % de vitórias dos oponentes. Opcionalmente, os melhores vão para um top cut no fim.',
@@ -853,6 +859,7 @@ const ptBR = {
   'tour.myDecks': 'Meus decks',
   'tour.otherDecks': 'Outros decks',
   'tour.noPlayableDeck': 'Nenhum dos decks é permitido no {format}. Monte um em "Montar decks".',
+  'tour.noPlayableDeckReleased': 'Nenhum dos decks é permitido no {format} só com cartas lançadas (decks com spoilers não valem). Monte um em "Montar decks".',
   'tour.changeDeck': 'Trocar deck',
   'tour.register': 'Inscrever-se',
   'tour.confirmLeave': 'Cancelar a sua inscrição?',
@@ -2059,6 +2066,7 @@ const ptBR = {
   'errors.chooseDeck': 'Escolha um deck.',
   'errors.deckInvalid': 'Esse deck não é válido para jogar.',
   'errors.deckNotAllowedInFormat': 'Esse deck não é permitido no formato {format}. {issue}',
+  'errors.deckHasSpoilers': '{n|Esse deck tem # carta de spoiler, ainda não lançada|Esse deck tem # cartas de spoiler, ainda não lançadas} ({ids}). Spoilers só valem em partidas casuais, salas privadas, contra o bot e torneios com spoilers.',
   'errors.rankedNoManualCards':
     'Na ranqueada o modo manual não é permitido: este deck tem {n} carta(s) com efeito ainda não automatizado (⚙).',
   'errors.botChooseDeck': 'Deck do bot: Escolha um deck.',
@@ -2140,6 +2148,7 @@ const ptBR = {
   'errors.tourStartedNoEdit': 'O torneio já começou: não dá para mudar as regras.',
   'errors.maxBelowRegistered': 'O limite é menor que o número de inscritos.',
   'errors.tourDecksNotAllowed': '{n} inscrito(s) usam decks que não valem no formato {format}.',
+  'errors.tourSpoilersNeedEgb': 'Spoilers só valem no formato com todas as cartas (Extra Grand Battle).',
   'errors.tourStarted': 'O torneio já começou.',
   'errors.tourNeedsTwoPlayers': 'São precisos pelo menos 2 inscritos.',
   'errors.tourNotRunning': 'O torneio não está em andamento.',
@@ -2211,6 +2220,7 @@ const ptBR = {
   'rules.banned': '{id} está banida (não vale em nenhum formato).',
   'rules.rotated': '{id} tem o bloco ① e rotacionou: não vale no {format}.',
   'rules.bannedPair': '{a} e {b} não podem ser usadas juntas no mesmo deck.',
+  'rules.spoiler': '{n|Carta ainda não lançada (spoiler)|Cartas ainda não lançadas (spoilers)}: {ids}. Spoilers só valem em partidas casuais, salas privadas, contra o bot e torneios com spoilers.',
   // ---- lista em texto (parseDeckList) ----
   'rules.listBadLine': 'Linha não reconhecida: "{line}"',
   'rules.listUnknownCard': 'Carta não encontrada no banco: {id}',

@@ -23,7 +23,7 @@
 // decidiu a partida da rodada atual, ela pode voltar a ficar pendente) e inscrição
 // atrasada (só no suíço, durante a rodada 1: quem entra começa a rodada 2 com uma derrota).
 
-import { artImage } from '@gumgum/engine';
+import { artImage, tournamentFormatLabel } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
 import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
@@ -34,7 +34,7 @@ import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
 import { TIME_BANK_MS } from '../online/room';
 import type { ApiCard } from '../present';
-import { FORMATS, isFormat, tierFor } from '../stats/catalog';
+import { isFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer, findPlayer } from '../stats/store';
 import { listReports } from '../reports/store';
 import { getSponsor, publicSponsor } from '../support/sponsors';
@@ -131,6 +131,8 @@ type Body = {
   name?: unknown;
   description?: unknown;
   format?: unknown;
+  /** Aceita cartas de spoiler (só com o formato EGB: "Todas as cartas + spoilers"). */
+  spoilers?: unknown;
   structure?: unknown;
   rounds?: unknown;
   swissBestOf?: unknown;
@@ -158,6 +160,8 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
   if (name.length < 3) return fail('tourNameTooShort', 'Dê um nome ao torneio (pelo menos 3 letras).');
   const description = typeof b.description === 'string' ? b.description.trim().slice(0, 2000) : '';
   if (!isFormat(b.format)) return fail('invalidFormat', 'Formato inválido.');
+  const spoilers = b.spoilers === true;
+  if (spoilers && b.format !== 'egb') return fail('tourSpoilersNeedEgb', 'Spoilers só valem no formato com todas as cartas (Extra Grand Battle).');
   if (b.structure !== 'swiss' && b.structure !== 'single') return fail('invalidStructure', 'Estrutura inválida.');
   const swiss = b.structure === 'swiss';
   const int = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -194,6 +198,7 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
     name,
     description,
     format: b.format,
+    spoilers,
     structure: b.structure,
     rounds,
     swissBestOf,
@@ -474,6 +479,7 @@ export function registerTournamentRoutes(
       id: t.id,
       name: t.name,
       format: t.format,
+      spoilers: t.spoilers,
       structure: t.structure,
       topCut: t.topCut,
       status: t.status,
@@ -592,6 +598,7 @@ export function registerTournamentRoutes(
       name: t.name,
       description: t.description,
       format: t.format,
+      spoilers: t.spoilers,
       structure: t.structure,
       swissBestOf: t.swissBestOf,
       topCut: t.topCut,
@@ -783,14 +790,15 @@ export function registerTournamentRoutes(
     if (input.maxPlayers !== null && input.maxPlayers < countPlayers(db, found.t.id)) {
       return reply.code(400).send(fail('maxBelowRegistered', 'O limite é menor que o número de inscritos.'));
     }
-    // Mudar o formato pode invalidar decks já inscritos: confere de novo.
-    if (input.format !== found.t.format) {
-      const bad = listPlayers(db, found.t.id).filter((p) => p.deckId && 'error' in playableDeck(db, p.deckId, input.format, false));
+    // Mudar o formato (ou tirar os spoilers) pode invalidar decks já inscritos: confere de novo.
+    if (input.format !== found.t.format || input.spoilers !== found.t.spoilers) {
+      const rules = { noSpoilers: !input.spoilers };
+      const bad = listPlayers(db, found.t.id).filter((p) => p.deckId && 'error' in playableDeck(db, p.deckId, input.format, rules));
       if (bad.length) {
-        const format = FORMATS.find((f) => f.id === input.format)?.label;
+        const format = tournamentFormatLabel(input);
         return reply
           .code(400)
-          .send(fail('tourDecksNotAllowed', `${bad.length} inscrito(s) usam decks que não valem no formato ${format}.`, { n: bad.length, format: format ?? input.format }));
+          .send(fail('tourDecksNotAllowed', `${bad.length} inscrito(s) usam decks que não valem no formato ${format}.`, { n: bad.length, format }));
       }
     }
     updateTournament(db, found.t.id, input);
@@ -1077,7 +1085,7 @@ export function registerTournamentRoutes(
     if (!already && t.maxPlayers !== null && countPlayers(db, t.id) >= t.maxPlayers) {
       return reply.code(409).send(fail('tourFull', 'O torneio está lotado.'));
     }
-    const deck = playableDeck(db, req.body?.deckId, t.format, false);
+    const deck = playableDeck(db, req.body?.deckId, t.format, { noSpoilers: !t.spoilers });
     if ('error' in deck) return reply.code(deck.code).send(fail(deck.errorCode, deck.error, deck.errorParams));
     const profile = ensurePlayer(db, accountOwnerKey(me.id));
     if (late) {

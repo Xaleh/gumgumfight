@@ -288,6 +288,8 @@ function migrateTournaments(db: DB) {
   if (!tCols.includes('tolerance_min')) db.exec('ALTER TABLE tournaments ADD COLUMN tolerance_min INTEGER NOT NULL DEFAULT 5');
   // checkin_notice: hora de início (starts_at) cujo aviso de check-in já foi enviado por notificação.
   if (!tCols.includes('checkin_notice')) db.exec('ALTER TABLE tournaments ADD COLUMN checkin_notice TEXT');
+  // spoilers: o torneio aceita cartas de spoiler (ainda não lançadas); só com o formato EGB ("todas as cartas").
+  if (!tCols.includes('spoilers')) db.exec('ALTER TABLE tournaments ADD COLUMN spoilers INTEGER NOT NULL DEFAULT 0');
   // late_entry: inscrição atrasada liberada pelo organizador durante a rodada 1 do suíço
   // ('*' = qualquer um; senão, o id da conta liberada; null = fechada).
   if (!tCols.includes('late_entry')) db.exec('ALTER TABLE tournaments ADD COLUMN late_entry TEXT');

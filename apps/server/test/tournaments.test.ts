@@ -1,8 +1,9 @@
+import type { CardData } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { proxiedImageUrl } from '../src/card-images';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
-import { type DB, openDb } from '../src/db';
+import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
 import type { Lobby } from '../src/online/lobby';
 import { seed } from '../src/seed';
 import { renamePlayer } from '../src/stats/store';
@@ -235,6 +236,39 @@ describe('torneios: rotas', () => {
     // Sair libera a vaga.
     expect((await req(app, 'DELETE', url, a)).json().players).toHaveLength(1);
     expect((await req(app, 'POST', url, c, { deckId: 'st04-kaido' })).statusCode).toBe(200);
+  });
+
+  it('spoilers: só no "Todas as cartas + spoilers"; nos outros formatos, só cartas lançadas', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const a = login(db);
+    // Deck com uma carta de spoiler (ainda não lançada).
+    const luffy = getDeck(db, 'st01-luffy')!;
+    const [base] = getCards(db, [luffy.cards[0].id]) as CardData[];
+    upsertCards(db, [{ ...base, id: 'OP99-001', spoiler: { source: 'teste' } }], { provisional: true, source: 'spoiler:teste.json' });
+    const cards = luffy.cards.map((c, i) => (i === 0 ? { id: 'OP99-001', count: c.count } : c));
+    const deck = (await req(app, 'POST', '/api/decks', a, { name: 'Spoiler', leader: luffy.leader, cards })).json();
+
+    // Spoilers só com todas as cartas (EGB).
+    const std = await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'standard', spoilers: true, structure: 'swiss' });
+    expect(std.json()).toMatchObject({ errorCode: 'tourSpoilersNeedEgb' });
+
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', structure: 'swiss' })).json();
+    expect(t.spoilers).toBe(false);
+    const url = `/api/tournaments/${t.id}/register`;
+    const refused = await req(app, 'POST', url, a, { deckId: deck.id });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json()).toMatchObject({ errorCode: 'deckHasSpoilers', errorParams: { n: 1, ids: 'OP99-001' } });
+
+    const edit = { name: 'Copa', format: 'egb', structure: 'swiss' };
+    const open = (await req(app, 'PUT', `/api/tournaments/${t.id}`, org, { ...edit, spoilers: true })).json();
+    expect(open).toMatchObject({ format: 'egb', spoilers: true });
+    expect((await req(app, 'GET', '/api/tournaments', a)).json().tournaments[0].spoilers).toBe(true);
+    expect((await req(app, 'POST', url, a, { deckId: deck.id })).statusCode).toBe(200);
+    // Tirar os spoilers com um deck de spoiler inscrito é recusado.
+    const back = await req(app, 'PUT', `/api/tournaments/${t.id}`, org, edit);
+    expect(back.statusCode).toBe(400);
+    expect(back.json()).toMatchObject({ errorCode: 'tourDecksNotAllowed', errorParams: { n: 1, format: 'Extra Grand Battle' } });
   });
 
   it('suíço completo: partidas nas salas online, resultado automático, correção e desistência', async () => {

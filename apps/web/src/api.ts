@@ -1,5 +1,5 @@
 import { type MessageKey, type Params, t, tryT } from './i18n';
-import type { Action, CardData, DeckList, FormatId, PlayerId } from '@gumgum/engine';
+import { type Action, type CardData, type DeckList, type FormatId, formatLabel, type PlayerId } from '@gumgum/engine';
 
 export type { FormatId };
 
@@ -20,22 +20,38 @@ export interface DeckSummary {
   /** Os mesmos motivos, na mesma ordem, com a chave `rules.…` para traduzir (servidores antigos não mandam). */
   formatCodes?: Record<FormatId, Array<{ code: string; params: Params }>>;
   unscripted: number;
+  /** Cartas de spoiler, ainda não lançadas (servidores antigos não mandam): o deck não vale na ranqueada. */
+  spoilers?: string[];
   updatedAt: string;
   /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
   mine: boolean;
 }
 
-/** Deck completo e permitido no formato (cartas banidas ou rotacionadas impedem). */
-export function canPlay(deck: DeckSummary, format: FormatId): boolean {
-  return deck.valid && !deck.formats?.[format]?.length;
+/**
+ * Deck completo e permitido no formato (cartas banidas ou rotacionadas impedem). Com
+ * `noSpoilers` (ranqueada e torneios sem spoilers), cartas ainda não lançadas também impedem.
+ */
+export function canPlay(deck: DeckSummary, format: FormatId, noSpoilers = false): boolean {
+  return deck.valid && !deck.formats?.[format]?.length && !(noSpoilers && deck.spoilers?.length);
 }
 
 /** Por que o deck não pode ser usado no formato (null = pode). */
-export function whyNotPlayable(deck: DeckSummary, format: FormatId): string | null {
+export function whyNotPlayable(deck: DeckSummary, format: FormatId, noSpoilers = false): string | null {
   if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
   const issues = deck.formats?.[format] ?? [];
   const codes = deck.formatCodes?.[format];
-  return issues.length ? issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n') : null;
+  if (issues.length) return issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n');
+  return noSpoilers && deck.spoilers?.length ? spoilerText(deck.spoilers) : null;
+}
+
+/** Aviso de cartas de spoiler (as mesmas palavras de `spoilerIssues`, do motor). */
+export function spoilerText(ids: string[]): string {
+  return t('rules.spoiler', { n: ids.length, ids: ids.slice(0, 3).join(', ') + (ids.length > 3 ? '…' : '') });
+}
+
+/** Nome do formato de um torneio: com spoilers, "Todas as cartas + spoilers" (traduzido). */
+export function tourFormatLabel(tour: { format: FormatId; spoilers?: boolean }): string {
+  return tour.spoilers ? t('tour.formatSpoilers') : formatLabel(tour.format);
 }
 
 /** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. O título é chave (`t(title)`). */
@@ -617,6 +633,8 @@ export interface TournamentInput {
   name: string;
   description: string;
   format: FormatId;
+  /** Aceita cartas de spoiler, ainda não lançadas (só com `format: 'egb'`: "Todas as cartas + spoilers"). */
+  spoilers: boolean;
   structure: TournamentStructure;
   /** Rodadas do suíço: null = calculado pelo número de inscritos no início. */
   rounds: number | null;
@@ -645,6 +663,8 @@ export interface TournamentSummary {
   id: string;
   name: string;
   format: FormatId;
+  /** Aceita cartas de spoiler (servidores antigos não mandam). */
+  spoilers?: boolean;
   structure: TournamentStructure;
   topCut: number | null;
   status: TournamentStatus;
@@ -884,6 +904,8 @@ export interface TournamentRecap {
     id: string;
     name: string;
     format: string;
+    /** Aceita cartas de spoiler (recaps antigos não têm). */
+    spoilers?: boolean;
     structure: TournamentStructure;
     topCut: number | null;
     players: number;
@@ -909,6 +931,8 @@ export interface TournamentDetail {
   name: string;
   description: string;
   format: FormatId;
+  /** Aceita cartas de spoiler (servidores antigos não mandam). */
+  spoilers?: boolean;
   structure: TournamentStructure;
   swissBestOf: number;
   topCut: number | null;
