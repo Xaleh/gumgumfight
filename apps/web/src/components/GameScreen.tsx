@@ -429,11 +429,15 @@ function Table({
     const fresh = state.log.slice(noticeSeen.current);
     noticeSeen.current = state.log.length;
     const hit = [...fresh].reverse().find(isNotice);
-    if (!hit) return;
-    setNotice(logText(tryT, hit));
-    const t = setTimeout(() => setNotice(null), 6000);
-    return () => clearTimeout(t);
+    if (hit) setNotice(logText(tryT, hit));
   }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // O prazo do aviso fica fora do efeito do histórico: lá, a próxima linha (antes dos 6 s) cancelava o
+  // prazo sem criar outro, e o aviso ficava preso na mesa até o próximo.
+  useEffect(() => {
+    if (!notice || notice === startNotice) return;
+    const t = setTimeout(() => setNotice((n) => (n === notice ? null : n)), 6000);
+    return () => clearTimeout(t);
+  }, [notice, startNotice]);
   /**
    * Cartas que o oponente revelou (busca no deck, carta da mão, topo do deck…): aparecem na mesa até o
    * jogador fechar. Sem isso só o histórico dizia qual carta foi, e a carta some na mão do oponente.
