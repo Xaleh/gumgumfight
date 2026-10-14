@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api, type FormatId, type OnlineSeat, type QueueKind, type QueueLeader } from '../api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ApiError, api, type FormatId, type OnlineSeat, type QueueKind, type QueueLeader } from '../api';
 import { useT } from '../i18n';
 import { LeaderArt } from './LeaderArt';
 
@@ -24,7 +24,12 @@ const fmtWait = (ms: number) => {
 export interface QueueState {
   ticket: string;
   kind: QueueKind;
+  /** Deck e formato da fila (para voltar a ela sozinho, ver `useQueue`). */
+  deckId: string;
+  format: FormatId;
   waited: number;
+  /** Espera de antes de voltar à fila (o servidor conta do zero a cada bilhete). */
+  carried: number;
   players: number;
   /** Casual: Líder do oponente escolhido (só ele no primeiro minuto). */
   leader: QueueLeader | null;
@@ -32,48 +37,100 @@ export interface QueueState {
   leaderWait: number;
 }
 
+/** Intervalo entre as consultas à fila. */
+const POLL_MS = 1500;
+
+/** Falha que passa sozinha (sem rede, servidor reiniciando no deploy, limite de requisições): tenta de novo. */
+const transient = (e: unknown) => !(e instanceof ApiError) || e.status >= 500 || e.status === 429;
+
 /**
  * Fila casual/ranqueada: entra, consulta o servidor até formar a partida e chama
- * `onEnter` com o assento. Erros da consulta tiram da fila e vão para `onError`.
+ * `onEnter` com o assento. A busca só termina com a partida, com "Cancelar" ou com uma
+ * recusa do servidor (vai para `onError`): falhas de rede não a interrompem, e quem saiu
+ * da fila porque a página ficou parada (celular em segundo plano) volta para ela sozinho.
  */
 export function useQueue(onEnter: (seat: OnlineSeat) => void, onError: (e: unknown) => void) {
   const [queue, setQueue] = useState<QueueState | null>(null);
+  // Quem chama recria os callbacks a cada render; isso não pode reiniciar a consulta.
+  const enter = useRef(onEnter);
+  enter.current = onEnter;
+  const failed = useRef(onError);
+  failed.current = onError;
+  const current = useRef(queue);
+  current.current = queue;
 
   const ticket = queue?.ticket;
   useEffect(() => {
     if (!ticket) return;
     let stop = false;
+    let busy = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (result: { seat: OnlineSeat } | { error: unknown }) => {
+      stop = true;
+      setQueue(null);
+      if ('seat' in result) enter.current(result.seat);
+      else failed.current(result.error);
+    };
+    /** O servidor tirou o bilhete da fila: entra na partida formada nesse meio-tempo ou volta para a fila. */
+    const rejoin = async () => {
+      const q = current.current;
+      if (!q) return;
+      const playing = (await api.online.active()).find((r) => r.status === 'playing' && r.queue === q.kind);
+      if (stop) return;
+      if (playing) return finish({ seat: { roomId: playing.roomId, token: playing.token } });
+      // A escolha de Líder que já expirou não volta a valer.
+      const pick = q.leaderWait > 0 ? q.leader : null;
+      const r = await api.online.enqueue(q.deckId, q.format, q.kind, pick?.id);
+      if (stop) return void api.online.cancel(r.ticket).catch(() => undefined);
+      setQueue((s) => (s && s.ticket === ticket ? { ...s, ticket: r.ticket, carried: s.waited } : s));
+    };
     const tick = async () => {
+      if (stop || busy) return;
+      busy = true;
+      clearTimeout(timer);
       try {
         const r = await api.online.poll(ticket);
         if (stop) return;
-        if (r.status === 'matched') {
-          setQueue(null);
-          onEnter({ roomId: r.roomId, token: r.token });
-          return;
-        }
-        setQueue((q) => (q && q.ticket === ticket ? { ...q, waited: r.waited, players: r.players, leaderWait: r.leaderWait ?? 0 } : q));
+        if (r.status === 'matched') return finish({ seat: { roomId: r.roomId, token: r.token } });
+        setQueue((q) =>
+          q && q.ticket === ticket ? { ...q, waited: q.carried + r.waited, players: r.players, leaderWait: r.leaderWait ?? 0 } : q,
+        );
       } catch (e) {
-        if (!stop) {
-          setQueue(null);
-          onError(e);
+        if (stop) return;
+        try {
+          if (e instanceof ApiError && e.status === 404) await rejoin();
+          else if (!transient(e)) finish({ error: e });
+        } catch (again) {
+          if (!stop && !transient(again)) finish({ error: again });
         }
+      } finally {
+        busy = false;
+        if (!stop) timer = setTimeout(tick, POLL_MS);
       }
     };
+    // De volta ao app: consulta na hora, sem esperar o próximo ciclo.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void tick();
+    };
+    // Fechou a página: sai da fila para ninguém ser pareado com quem já foi embora.
+    const onHide = () => api.online.leaveQueue(ticket);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pagehide', onHide);
     void tick();
-    const t = setInterval(tick, 1500);
     return () => {
       stop = true;
-      clearInterval(t);
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pagehide', onHide);
     };
-  }, [ticket, onEnter, onError]);
+  }, [ticket]);
 
   return {
     queue,
     enqueue: async (deckId: string, format: FormatId, kind: QueueKind, leader: QueueLeader | null = null) => {
       const pick = kind === 'casual' ? leader : null;
       const r = await api.online.enqueue(deckId, format, kind, pick?.id);
-      setQueue({ ticket: r.ticket, kind, waited: 0, players: 1, leader: pick, leaderWait: pick ? LEADER_PICK_MS : 0 });
+      setQueue({ ticket: r.ticket, kind, deckId, format, waited: 0, carried: 0, players: 1, leader: pick, leaderWait: pick ? LEADER_PICK_MS : 0 });
     },
     cancel: () => {
       if (queue) void api.online.cancel(queue.ticket).catch(() => undefined);

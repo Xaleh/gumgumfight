@@ -332,6 +332,39 @@ describe('partidas online: filas', () => {
     expect(again.json().roomId).toBe(ma.roomId);
   });
 
+  it('quem fica um tempo sem consultar (celular em segundo plano) continua na fila; o par se repete até ser entregue', () => {
+    let t = 1_000_000;
+    const db = freshDb();
+    const l = new Lobby({ cards: (ids) => getCards(db, ids) as CardData[], now: () => t });
+    const seat = (name: string, deckId: string): SeatRequest => ({ ownerHash: name, userId: null, name, bounty: 0, tier: 'east-blue', deckId, deck: getDeck(db, deckId)! });
+    const join = (name: string, deckId: string) => {
+      const r = l.enqueue(seat(name, deckId), 'egb', 'casual');
+      if ('error' in r) throw new Error(r.error);
+      return r.ticket;
+    };
+    const a = join('a', 'st01-luffy');
+    // A página da Alice fica parada por 1 minuto; o Bob chega e forma par com ela.
+    t += 60_000;
+    expect(l.stats().queue.casual.egb).toBe(1);
+    const b = join('b', 'st02-kid');
+    const mb = l.poll(b);
+    expect(mb?.status).toBe('matched');
+    // A resposta se perdeu na rede: a próxima consulta recebe o mesmo par.
+    expect(l.poll(b)).toEqual(mb);
+    t += 30_000;
+    const ma = l.poll(a);
+    expect(ma?.status === 'matched' && mb?.status === 'matched' && ma.roomId === mb.roomId).toBe(true);
+
+    // Sem consultar por mais de 2 minutos, sai da fila.
+    t += 3 * 60_000;
+    const c = join('c', 'st03-crocodile');
+    t += 2 * 60_000 + 1;
+    l.sweep();
+    expect(l.poll(c)).toBeNull();
+    expect(l.poll(a)).toBeNull();
+    l.dispose();
+  });
+
   describe('casual: escolher o Líder do oponente', () => {
     const seat = (name: string, deckId: string, db: DB): SeatRequest => {
       const d = getDeck(db, deckId)!;
