@@ -8,7 +8,7 @@
 //
 // Rodar dentro do Xvfb, com o site no ar com CARD_IMAGES=off:
 //   xvfb-run -a -s "-screen 0 2000x2200x24" node gravar.mjs replay <replay.json> <saida.mp4> <W> <H> <escala> <velocidade> <segundos>
-//   xvfb-run -a -s "-screen 0 2000x2200x24" node gravar.mjs fluxo <home|tutorial|builder> <saida.mp4>
+//   xvfb-run -a -s "-screen 0 2000x2200x24" node gravar.mjs fluxo <home|tutorial|builder|spoilers> <saida.mp4>
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -104,17 +104,19 @@ if (cmd === 'replay') {
       await wait(4500);
       await stop();
     },
-    // Construtor: escolhe o Líder e adiciona 4 cópias de algumas cartas.
+    // Construtor: filtra OP17, escolhe o Rocks.D.Xebec e adiciona 4 cópias de algumas cartas.
     async builder() {
       await p.locator('header').getByRole('button', { name: /Montar decks/ }).first().click();
       await wait(1500);
+      await p.locator('.builder-catalog select').nth(1).selectOption({ label: 'OP17' });
+      await wait(800);
       const stop = record(s, out);
       await wait(1200);
       // Pelo título (o nome da carta): com as imagens ligadas, a carta é só a arte, sem o nome em texto.
       const card = (name) => p.locator(`.builder-catalog .card[title="${name}"]`).first();
-      await card('Edward.Newgate').click();
+      await card('Rocks.D.Xebec').click();
       await wait(1600);
-      for (const name of ['Sanji', 'Nami', 'Jinbe', 'Carrot', 'Franky', 'Komachiyo', 'Sai', 'Gordon']) {
+      for (const name of ['Streusen', 'Kyo', 'Miss Buckingham Stussy', 'Wang Zhi', 'Charlotte Linlin', 'Edward.Newgate', 'Shiki', 'Barbell']) {
         const c = card(name);
         await c.scrollIntoViewIfNeeded().catch(() => {});
         await c.hover();
@@ -124,6 +126,36 @@ if (cmd === 'replay') {
           await wait(170);
         }
         await wait(250);
+      }
+      await p.mouse.move(1100, 300);
+      await wait(2500);
+      await stop();
+    },
+    // Spoilers: "Só spoilers" no construtor, o detalhe de uma carta ainda não lançada e um deck com ela.
+    async spoilers() {
+      await p.locator('header').getByRole('button', { name: /Montar decks/ }).first().click();
+      await wait(1500);
+      const stop = record(s, out);
+      await wait(1200);
+      await p.locator('.builder-catalog select').nth(1).selectOption({ index: 1 }); // Só spoilers (não lançadas)
+      await wait(1800);
+      const cards = p.locator('.builder-catalog .card');
+      const leader = cards.first();
+      await leader.hover();
+      await wait(2600);
+      await leader.click();
+      await wait(1600);
+      const n = Math.min(await cards.count(), 7);
+      for (let i = 0; i < n; i++) {
+        const c = cards.nth(i);
+        await c.scrollIntoViewIfNeeded().catch(() => {});
+        await c.hover();
+        await wait(i === 0 ? 2200 : 500);
+        for (let k = 0; k < 4; k++) {
+          await c.click();
+          await wait(160);
+        }
+        await wait(200);
       }
       await p.mouse.move(1100, 300);
       await wait(2500);

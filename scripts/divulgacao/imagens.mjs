@@ -32,6 +32,7 @@ const LEGENDAS = [
   ['TORNEIOS DA COMUNIDADE', 'suíço, top cut e mata-mata'],
   ['REVEJA CADA JOGADA', 'replays e partidas ao vivo'],
   ['GRÁTIS. SEM ANÚNCIOS.', 'e sem vender os seus dados'],
+  ['CARTAS NOVAS ANTES DO LANÇAMENTO', 'teste os spoilers antes de chegarem às lojas'],
 ];
 
 const etapa = process.argv[2];
@@ -44,6 +45,7 @@ if (etapa === 'base') {
   await render('outro169.html', 'fim-16x9.png', 1920, 1080);
   await render('intro916.html', 'abertura-9x16.png', 1080, 1920);
   await render('outro916.html', 'fim-9x16.png', 1080, 1920);
+  await render('fundo916.html', 'fundo-9x16.png', 1080, 1920);
   const modelo = readFileSync(join(PAG, 'legendas/modelo.html'), 'utf8');
   for (const [i, [big, small]] of LEGENDAS.entries()) {
     for (const [fmt, W, H, F] of [['16x9', 1920, 240, 78], ['9x16', 1080, 300, 74]]) {

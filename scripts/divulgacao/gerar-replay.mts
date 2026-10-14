@@ -1,16 +1,23 @@
 // Partida bot x bot gravada como replay (.json), para gravar a mesa no "Assistir replay" do site.
 // Uso: npx tsx scripts/divulgacao/gerar-replay.mts <deck0> <deck1> <seed> <saida.json> [nome0] [nome1]
-// Precisa da API no ar (npm run dev): os decks e as cartas vêm de /api/decks/<id>.
+// Cada deck é o id de um deck do site (/api/decks/<id>) ou um arquivo .json com a lista (como os de decks/).
+// Precisa da API no ar (npm run dev), de onde vêm as cartas.
 //
 // O bot desempata com sorteio e tem prazo por decisão; aqui o desempate usa a seed e não há prazo, então a
 // mesma seed (com o mesmo motor e as mesmas cartas) dá a mesma partida. O replay-padrao.json, usado pelo
 // gerar.sh e com os cortes de montar.py, foi gerado antes disso: uma partida nova pede cortes novos.
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { type Action, actingPlayer, applyAction, chooseBotAction, createGame, type GameState, REPLAY_VERSION } from '../../packages/engine/src/index.ts';
 
 const [, , d0, d1, seedArg, out, n0 = 'Jogador 1', n1 = 'Jogador 2'] = process.argv;
 const API = process.env.API ?? 'http://127.0.0.1:3001';
-const get = async (id: string) => (await fetch(`${API}/api/decks/${id}`)).json();
+const get = async (id: string) => {
+  if (!id.endsWith('.json')) return (await fetch(`${API}/api/decks/${id}`)).json();
+  const deck = JSON.parse(readFileSync(id, 'utf8'));
+  const ids = new Set([deck.leader, ...deck.cards.map((c: { id: string }) => c.id)]);
+  const all = await (await fetch(`${API}/api/cards`)).json();
+  return { deck, cards: all.filter((c: { id: string }) => ids.has(c.id)) };
+};
 const [a, b] = await Promise.all([get(d0), get(d1)]);
 const cards = new Map();
 for (const c of [...a.cards, ...b.cards]) cards.set(c.id, c);
@@ -41,4 +48,4 @@ while (s.phase !== 'gameover' && actions.length < 3000) {
   s = applyAction(s, act);
 }
 console.log(JSON.stringify({ seed, turns: s.turn, winner: s.winner, actions: actions.length, life: s.players.map((p) => p.life?.length) }));
-writeFileSync(out, JSON.stringify({ format: 'gumgumfight-replay', version: REPLAY_VERSION, seed, decks: [a.deck, b.deck], firstPlayer: 0, names: [n0, n1], deckIds: [d0, d1], actions }));
+writeFileSync(out, JSON.stringify({ format: 'gumgumfight-replay', version: REPLAY_VERSION, seed, decks: [a.deck, b.deck], firstPlayer: 0, names: [n0, n1], deckIds: [a.deck.id, b.deck.id], actions }));

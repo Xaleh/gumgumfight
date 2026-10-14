@@ -34,13 +34,16 @@ Colar no editor da página. Onde está escrito **[GIF: …]** ou **[imagem: …]
 > - **Jogar online:** partida rápida, ranqueada (com recompensa em Berries, do East Blue ao Yonkou) e salas privadas
 >   para jogar com os amigos.
 > - **Torneios da comunidade:** suíço com top cut ou mata-mata, melhor de 1, 3 ou 5, com chave e relógio.
-> - **Montar decks** com o catálogo de cartas, nos formatos Standard e Extra Grand Battle, importando e exportando a
->   lista no formato da comunidade.
+> - **Montar decks** com todas as coleções lançadas, até a mais recente, nos formatos Standard e Extra Grand Battle,
+>   importando e exportando a lista no formato da comunidade.
+> - **Cartas novas antes do lançamento:** as cartas reveladas da próxima coleção entram no site como **spoilers**,
+>   assim que são anunciadas. Dá para montar o deck e testar contra o bot, na partida rápida e com os amigos antes de
+>   a coleção chegar às lojas. Quando ela sai, a carta vira oficial sozinha e o seu deck continua igual.
 > - **Assistir** partidas ao vivo e rever qualquer partida jogada por jogada no replay.
 > - **Estatísticas do meta:** Líderes mais jogados, matchups e desempenho carta a carta.
 > - **Instala como app** no celular, com notificações quando a sua partida ou o seu torneio começa.
 >
-> **[GIF: `gif-tutorial.gif`]** **[GIF: `gif-deckbuilder.gif`]**
+> **[GIF: `gif-tutorial.gif`]** **[GIF: `gif-deckbuilder.gif`]** **[GIF: `gif-spoilers.gif`]**
 >
 > ### Grátis hoje, grátis sempre
 >
@@ -138,5 +141,9 @@ Colar no editor da página. Onde está escrito **[GIF: …]** ou **[imagem: …]
 > **Apoiei com outro e-mail. E agora?** Fale com a equipe no Discord: o plano é liberado à mão.
 >
 > **Quando o plano vence?** No dia 10 do mês seguinte a cada pagamento. Enquanto o apoio continuar, ele renova sozinho.
+>
+> **Dá para jogar com as cartas que ainda não saíram?** Sim. Os spoilers da próxima coleção entram no site assim que
+> são revelados, com a etiqueta SPOILER. Valem contra o bot, na partida rápida, nas salas privadas e nos torneios
+> "Todas as cartas + spoilers"; na ranqueada, só depois do lançamento.
 >
 > **Prefiro Pix avulso.** Use o "Doe um Cafezim" no site: vai direto, sem cadastro.

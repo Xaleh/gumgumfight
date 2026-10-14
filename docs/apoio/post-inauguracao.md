@@ -21,6 +21,9 @@ O primeiro post da página na Apoia.se, com versões curtas para as redes sociai
 > ranqueada e salas com os amigos), entrar em torneios, montar decks, assistir partidas ao vivo e rever qualquer
 > jogada no replay.
 >
+> E tem as cartas novas antes de todo mundo: assim que as cartas da próxima coleção são reveladas, elas entram no site
+> como **spoilers**. Dá para montar o deck e testar antes de a coleção chegar às lojas.
+>
 > ### O que é grátis continua grátis. Para sempre.
 >
 > Jogar, aprender, montar decks, entrar em torneios e ver as suas estatísticas é e sempre vai ser de graça. Nenhum
@@ -68,6 +71,7 @@ Imagem: `post-inauguracao-1080.jpg` (feed) ou `story-inauguracao-1080x1920.jpg` 
 > 🏴‍☠️ A Apoia.se do GumGum Fight está no ar!
 >
 > O One Piece Card Game no navegador continua 100% grátis: jogar, aprender, montar decks e entrar em torneios.
+> E as cartas novas chegam como spoilers, para testar antes do lançamento.
 > Sem anúncios e sem vender os seus dados.
 >
 > O apoio paga o servidor e mantém o projeto vivo. Planos a partir de R$ 5, sem nenhuma vantagem dentro da partida.

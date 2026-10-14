@@ -24,14 +24,16 @@ gravação. A música dos vídeos é a "Valsa do Mar", composição original do 
 | `gif-partida.gif` | 680 px, ~16 s, ~4 MB | Topo do texto "Sobre": ataques, K.O. e a vitória |
 | `gif-partida-celular.gif` | 360 × 640, ~11 s, ~3 MB | Seção "Por que esta página existe" (mostra que roda no celular) |
 | `gif-tutorial.gif` | 800 px, ~12 s, ~3 MB | Seção do que dá para fazer: a lição 1 do tutorial até a vitória |
-| `gif-deckbuilder.gif` | 800 px, ~13 s, ~1,5 MB | Seção do que dá para fazer: montando um deck |
+| `gif-deckbuilder.gif` | 800 px, ~13 s, ~1,5 MB | Seção do que dá para fazer: montando um deck de OP17 (Rocks.D.Xebec) |
+| `gif-spoilers.gif` | 800 px, ~16 s, ~1,5 MB | Seção do que dá para fazer: "Só spoilers" no construtor e um deck com cartas ainda não lançadas |
 | `gif-home.gif` | 800 px, ~9 s, ~2 MB | Opcional: os modos de jogo da página inicial |
-| `trailer-16x9.mp4` | 1920 × 1080, ~42 s, com música | Vídeo da campanha (subir no YouTube e colar o link na Apoia.se) |
-| `trailer-9x16.mp4` | 1080 × 1920, ~41 s, com música | Reels, Shorts e TikTok |
+| `trailer-16x9.mp4` | 1920 × 1080, ~50 s, com música | Vídeo da campanha (subir no YouTube e colar o link na Apoia.se) |
+| `trailer-9x16.mp4` | 1080 × 1920, ~50 s, com música | Reels, Shorts e TikTok |
 
-Os trailers abrem com o logo, mostram uma partida real (Luffy x Kid) com as legendas "Treine contra o bot",
-"Jogue online", "Torneios da comunidade", "Reveja cada jogada" e "Grátis. Sem anúncios." e fecham com
-"Jogue grátis: gumgumfight.app" e o convite para apoiar.
+Os trailers abrem com o logo e mostram uma partida real da coleção mais nova: Monkey.D.Luffy (OP17, preto) x
+Rocks.D.Xebec (OP17, azul), decidida com 1 de Vida. As legendas são "Treine contra o bot", "Jogue online", "Cartas
+novas antes do lançamento" (sobre o construtor filtrando os spoilers), "Torneios da comunidade", "Reveja cada jogada"
+e "Grátis. Sem anúncios.". O fim é "Jogue grátis: gumgumfight.app" e o convite para apoiar.
 
 ## Como gerar de novo
 
@@ -39,8 +41,9 @@ Quando o site mudar (tela nova, layout novo), é só rodar o gerador outra vez:
 
 ```bash
 npm i --no-save playwright          # uma vez; precisa também de ffmpeg e Xvfb (xvfb-run)
+npm run cards:import -- --all       # uma vez: as coleções (a partida usa os decks de OP17)
 CARD_IMAGES=off npm run dev         # em outro terminal: o site sem as imagens oficiais
-bash scripts/divulgacao/gerar.sh    # ~15 minutos; tudo sai em scripts/divulgacao/saida/
+bash scripts/divulgacao/gerar.sh    # ~25 minutos; tudo sai em scripts/divulgacao/saida/
 ```
 
 Versão com as artes oficiais (cartas, verso e DON!!, como o jogador vê no site), para comparar: suba o site com
@@ -49,10 +52,11 @@ Versão com as artes oficiais (cartas, verso e DON!!, como o jogador vê no site
 
 O que cada parte faz:
 
-- `gerar-replay.mts`: joga uma partida bot x bot (Luffy ST01 x Kid ST10, seed 2: Luffy vence com 1 de Vida) e salva
-  o replay.
+- `decks/`: as listas da partida (Luffy preto e Rocks.D.Xebec azul, só cartas de OP17, válidas em Standard).
+- `gerar-replay.mts`: joga uma partida bot x bot e salva o replay. O `replay-padrao.json` é Luffy x Xebec com a seed 4
+  (Luffy vence com 1 de Vida em 13 turnos); com a mesma seed, os mesmos decks e o mesmo motor, a partida se repete.
 - `gravar.mjs`: abre o site num Chromium com janela de verdade (Xvfb) e grava com o ffmpeg em 1920 × 1080 e
-  1080 × 1920 a 30 fps: o replay no "Assistir replay" e os fluxos da home, do tutorial e do construtor.
+  1080 × 1920 a 30 fps: o replay no "Assistir replay" e os fluxos da home, do tutorial, do construtor e dos spoilers.
 - `imagens.mjs`: desenha as peças em HTML (`modelos/`): verso e DON!! do GumGum, banner, post, story, planos,
   perfil, aberturas e legendas dos trailers.
 - `montar.py`: corta os melhores momentos, junta com as aberturas e a música e gera os trailers e os GIFs. Os tempos
