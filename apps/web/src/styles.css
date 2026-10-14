@@ -6875,6 +6875,23 @@ tr.clickable:hover td {
 .broadcast-panel p {
   margin: 6px 0;
 }
+.broadcast-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 10px 0;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+}
+.broadcast-delay select {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px 8px;
+  background: var(--panel2);
+  color: var(--text);
+}
 .broadcast-panel .btn-row {
   justify-content: flex-start;
   margin-top: 8px;

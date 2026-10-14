@@ -1,6 +1,6 @@
 import { formatLabel } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, type BroadcastInfo, broadcastUrl, type LiveRoom, ROLE_LABEL, type WatchTarget } from '../api';
+import { api, type BroadcastInfo, type BroadcastSettings, broadcastUrl, type LiveRoom, ROLE_LABEL, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
 import { useT } from '../i18n';
 import { LeaderArt } from './LeaderArt';
@@ -26,7 +26,7 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   /** Modo transmissão (quem vê as mãos): o link do OBS e a partida na live. */
-  const [broadcast, setBroadcast] = useState<(BroadcastInfo & { key: string | null }) | null>(null);
+  const [broadcast, setBroadcast] = useState<BroadcastInfo | null>(null);
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
   // A lista muda sozinha (partidas começam e terminam): atualiza a cada 5 s.
@@ -63,10 +63,10 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   };
   // Na própria partida o servidor não mostra as mãos: assiste sem elas.
   const watch = (roomId: string, mine = false) => onWatch({ roomId, hands: canHands && hands && !mine });
-  /** Manda a partida para a tela de transmissão (com as mãos, se "Ver as mãos" estiver marcado). */
+  /** Manda a partida para a tela de transmissão (o que ela mostra sai das opções do painel). */
   const transmit = (r: LiveRoom | null) => {
     setError(null);
-    api.broadcast.choose(r?.id ?? null, Boolean(r && hands && !r.mine)).then(setBroadcast, fail);
+    api.broadcast.choose(r?.id ?? null).then(setBroadcast, fail);
   };
   const onAir = broadcast?.key ? broadcast.roomId : null;
 
@@ -109,6 +109,10 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
               api.broadcast.newKey().then(setBroadcast, fail);
             }}
             onClear={() => transmit(null)}
+            onSettings={(s) => {
+              setBroadcast({ ...broadcast, ...s });
+              api.broadcast.settings(s).then(setBroadcast, fail);
+            }}
           />
         )}
 
@@ -183,18 +187,33 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   );
 }
 
-/** Painel do modo transmissão: o link para a fonte de navegador do OBS e a partida que está na live. */
+/** Atrasos oferecidos (s); 0 = ao vivo onde o atraso não é obrigatório. */
+const DELAYS = [0, 60, 120, 180, 300, 600];
+
+/** O que a live mostra numa partida (como o servidor decide em `broadcastView`) e com quanto atraso (s). */
+export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | 'queue'>): { what: 'players' | 'own' | 'none'; delayS: number } {
+  const plain = room.queue === 'tournament' && s.delayTournaments ? s.delayS : 0;
+  if (room.mine) return s.handsOwn ? { what: 'own', delayS: s.delayS } : { what: 'none', delayS: plain };
+  if (s.handsPlayers) return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
+  return { what: 'none', delayS: plain };
+}
+
+const SHOWS_LABEL = { players: 'broadcast.showsPlayers', own: 'broadcast.showsOwn', none: 'broadcast.showsNone' } as const;
+
+/** Painel do modo transmissão: o link para a fonte de navegador do OBS, a partida na live e as opções. */
 function BroadcastPanel({
   info,
   onAir,
   onNewKey,
   onClear,
+  onSettings,
 }: {
-  info: BroadcastInfo & { key: string | null };
+  info: BroadcastInfo;
   /** A partida na transmissão, se ainda está na lista. */
   onAir: LiveRoom | null;
   onNewKey: () => void;
   onClear: () => void;
+  onSettings: (s: Partial<BroadcastSettings>) => void;
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -208,7 +227,14 @@ function BroadcastPanel({
       /* sem acesso à área de transferência: o campo fica selecionado para copiar à mão */
     }
   };
-  const minutes = Math.max(1, Math.round(info.delayMs / 60_000));
+  const delayText = (sec: number) => (sec ? t('broadcast.delayMin', { n: Math.round((sec / 60) * 10) / 10 }) : t('broadcast.delayLive'));
+  const shows = onAir ? broadcastShows(info, onAir) : null;
+  const flag = (key: 'handsPlayers' | 'handsOwn' | 'delayTournaments' | 'chat', label: string, hint?: string) => (
+    <label className="check">
+      <input type="checkbox" checked={info[key]} onChange={(e) => onSettings({ [key]: e.target.checked })} /> {label}
+      {hint && <span className="muted small"> {hint}</span>}
+    </label>
+  );
   return (
     <section className="broadcast-panel">
       <h3>{t('broadcast.title')}</h3>
@@ -233,13 +259,32 @@ function BroadcastPanel({
               <>
                 <b>{t('broadcast.nowOnAir')}</b>{' '}
                 {onAir ? onAir.players.map((p) => p.name).join(` ${t('watch.vs')} `) : t('broadcast.onAirEnded')}
-                {info.hands ? ` · ${t('broadcast.withHands', { n: minutes })}` : ''}
+                {shows && ` · ${t(SHOWS_LABEL[shows.what])} · ${delayText(shows.delayS)}`}
               </>
             ) : (
               <span className="muted">{t('broadcast.nothingOnAir')}</span>
             )}
           </p>
-          <p className="muted small">{t('broadcast.handsDelayHint', { n: minutes })}</p>
+
+          <div className="broadcast-settings">
+            <label className="broadcast-delay">
+              {t('broadcast.delay')}{' '}
+              <select value={info.delayS} onChange={(e) => onSettings({ delayS: Number(e.target.value) })}>
+                {[...new Set([...DELAYS, info.delayS])]
+                  .sort((a, b) => a - b)
+                  .map((sec) => (
+                    <option key={sec} value={sec}>
+                      {sec ? t('broadcast.delayMin', { n: Math.round((sec / 60) * 10) / 10 }) : t('broadcast.delayNone')}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {flag('handsPlayers', t('broadcast.handsPlayers'), t('broadcast.handsPlayersHint', { n: Math.round(info.minHandsDelayS / 60) }))}
+            {flag('handsOwn', t('broadcast.handsOwn'), t('broadcast.handsOwnHint'))}
+            {flag('delayTournaments', t('broadcast.delayTournaments'))}
+            {flag('chat', t('broadcast.chat'))}
+          </div>
+
           <div className="btn-row">
             {info.roomId && (
               <button className="btn small" onClick={onClear}>

@@ -292,9 +292,9 @@ export const api = {
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
-    /** `key`: chave da transmissão no lugar do login (fonte do OBS). */
+    /** `key`: tela de transmissão (fonte do OBS); a chave faz as vezes do login e as opções do streamer decidem o que ela vê. */
     watchUrl: (roomId: string, hands: boolean, key?: string) =>
-      `/api/online/rooms/${roomId}/watch${hands ? `?hands=1${key ? `&k=${encodeURIComponent(key)}` : ''}` : ''}`,
+      `/api/online/rooms/${roomId}/watch${key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
     createRoom: (deckId: string, format: FormatId) =>
       send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format }),
     joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
@@ -324,19 +324,34 @@ export const api = {
   },
   /** Modo transmissão (perfil Streamer ou Admin): o link da fonte do OBS e a partida da live. */
   broadcast: {
-    mine: () => get<BroadcastInfo & { key: string | null }>('/api/broadcast'),
-    newKey: () => send<BroadcastInfo & { key: string }>('POST', '/api/broadcast/key'),
-    choose: (roomId: string | null, hands = false) => send<BroadcastInfo & { key: string }>('PUT', '/api/broadcast/room', { roomId, hands }),
-    /** O que a fonte do OBS mostra agora (sem login: a chave é o segredo). */
-    byKey: (key: string) => get<BroadcastInfo>(`/api/broadcast/${encodeURIComponent(key)}`),
+    mine: () => get<BroadcastInfo>('/api/broadcast'),
+    newKey: () => send<BroadcastInfo>('POST', '/api/broadcast/key'),
+    choose: (roomId: string | null) => send<BroadcastInfo>('PUT', '/api/broadcast/room', { roomId }),
+    settings: (s: Partial<BroadcastSettings>) => send<BroadcastInfo>('PUT', '/api/broadcast/settings', s),
+    /** O que a fonte do OBS mostra agora (sem login: a chave é o segredo); `rev` muda a cada troca. */
+    byKey: (key: string) => get<{ roomId: string | null; chat: boolean; rev: number }>(`/api/broadcast/${encodeURIComponent(key)}`),
   },
 };
 
-/** Partida escolhida para a transmissão; `delayMs`: atraso da mesa com as mãos. */
-export interface BroadcastInfo {
+/** Opções da transmissão do streamer (ver apps/server/src/online/broadcast.ts). */
+export interface BroadcastSettings {
+  /** Atraso em segundos (0 a 600). */
+  delayS: number;
+  /** Mãos dos dois jogadores nas partidas que ele assiste (com pelo menos `minHandsDelayS` de atraso). */
+  handsPlayers: boolean;
+  /** A mão dele nas partidas que ele joga. */
+  handsOwn: boolean;
+  /** Atraso nas partidas de torneio mesmo sem as mãos. */
+  delayTournaments: boolean;
+  /** Chat dos jogadores na tela de transmissão. */
+  chat: boolean;
+}
+
+/** Transmissão da conta: o link (null antes de criar), a partida escolhida e as opções. */
+export interface BroadcastInfo extends BroadcastSettings {
+  key: string | null;
   roomId: string | null;
-  hands: boolean;
-  delayMs: number;
+  minHandsDelayS: number;
 }
 
 /** Endereço da tela de transmissão (fonte do OBS) de uma chave. */
@@ -429,6 +444,8 @@ export interface OnlineRoomInfo {
   status: 'waiting' | 'playing' | 'finished';
   /** Seu assento; null = você está assistindo. */
   you: PlayerId | null;
+  /** De quem é a visão: o seu assento, ou o do streamer que transmite a própria partida (null = pública). */
+  pov?: PlayerId | null;
   players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean; apprentice?: boolean }>;
   spectators: number;
   clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null };

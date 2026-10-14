@@ -530,6 +530,8 @@ const ptBR = {
   'online.hands': 'Ver mãos',
   'online.delay': '⏱ {n} min de atraso',
   'online.delayTitle': 'Com as mãos à mostra, a mesa chega atrasada: assim a partida pode ir para uma live sem entregar as cartas ao oponente.',
+  'online.watchChat': 'Chat',
+  'online.watchChatTitle': 'Mostra ou esconde as mensagens e emotes dos jogadores (só para você)',
   // ==== /online ====
 
 
@@ -565,10 +567,8 @@ const ptBR = {
   'broadcast.copied': 'Copiado!',
   'broadcast.nowOnAir': 'Na transmissão:',
   'broadcast.onAirEnded': 'partida encerrada',
-  'broadcast.withHands': 'com as mãos ({n} min de atraso)',
   'broadcast.clear': 'Tirar da tela',
   'broadcast.nothingOnAir': 'Nenhuma partida na transmissão.',
-  'broadcast.handsDelayHint': 'Com “Ver as mãos dos jogadores” marcado, a transmissão mostra as mãos com {n} min de atraso, para o oponente não ver as cartas pela live.',
   'broadcast.newKey': 'Gerar novo link',
   'broadcast.newKeyConfirm': 'Gerar um link novo? O link atual para de funcionar no OBS.',
   'broadcast.transmit': '📡 Transmitir',
@@ -583,6 +583,21 @@ const ptBR = {
   'broadcast.played': '{name} jogou',
   'broadcast.countered': '{name} usou Counter',
   'broadcast.activated': '{name} ativou',
+  'broadcast.sendThis': '📡 Transmitir esta partida',
+  'broadcast.sent': 'Partida enviada para a transmissão.',
+  'broadcast.delay': 'Atraso:',
+  'broadcast.delayMin': '{n} min',
+  'broadcast.delayNone': 'Sem atraso',
+  'broadcast.delayLive': 'ao vivo',
+  'broadcast.showsPlayers': 'mãos dos jogadores',
+  'broadcast.showsOwn': 'a sua mão',
+  'broadcast.showsNone': 'sem mãos',
+  'broadcast.handsPlayers': 'Mostrar as mãos dos jogadores nas partidas que você assiste',
+  'broadcast.handsPlayersHint': '(sempre com pelo menos {n} min de atraso)',
+  'broadcast.handsOwn': 'Mostrar a sua mão nas partidas que você joga',
+  'broadcast.handsOwnHint': '(a do oponente nunca aparece; vale o atraso escolhido)',
+  'broadcast.delayTournaments': 'Atraso também nas partidas de torneio, mesmo sem mãos',
+  'broadcast.chat': 'Mostrar o chat dos jogadores na transmissão',
   // ==== /watch ====
 
 
@@ -2006,7 +2021,7 @@ const ptBR = {
   'errors.handsForbidden': 'Ver as mãos é só para streamers e administradores.',
   'errors.handsOwnMatch': 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.',
   'errors.broadcastForbidden': 'O modo transmissão é só para os perfis Streamer e Admin.',
-  'errors.broadcastNoKey': 'Crie o link da transmissão antes.',
+  'errors.broadcastNoKey': 'Crie o link da transmissão antes (Assistir partidas → Modo transmissão).',
   'errors.broadcastNotFound': 'Link de transmissão inválido. Copie o link de novo no app.',
   'errors.tooManySpectators': 'Esta partida já tem espectadores demais.',
   'errors.leaveUseConcede': 'A partida já começou: use "Desistir".',

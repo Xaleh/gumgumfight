@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type WatchTarget } from '../api';
 import { useT } from '../i18n';
-import { WatchGameScreen } from './GameScreen';
+import { type TableBroadcast, WatchGameScreen } from './GameScreen';
 import { BroadcastIdle } from './Online';
 
 /** Intervalo entre as consultas da partida escolhida no app. */
@@ -17,9 +17,11 @@ export function Broadcast({ broadcastKey }: { broadcastKey: string }) {
   const [target, setTarget] = useState<WatchTarget | null>(null);
   const [invalid, setInvalid] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [options, setOptions] = useState<TableBroadcast>({ chat: true });
   /**
-   * Última escolha vista no servidor. A tela só troca de partida quando a escolha muda: na
-   * revanche ela segue sozinha para a sala nova (no ritmo da mesa atrasada), sem voltar.
+   * Última versão vista no servidor (muda a cada troca de partida ou de opção). A tela só
+   * reconecta quando ela muda: na revanche segue sozinha para a sala nova (no ritmo da mesa
+   * atrasada), sem voltar.
    */
   const chosen = useRef<string | null>(null);
 
@@ -32,10 +34,12 @@ export function Broadcast({ broadcastKey }: { broadcastKey: string }) {
           if (stop) return;
           setInvalid(false);
           setLoaded(true);
-          const id = b.roomId ? `${b.roomId}|${b.hands}` : '';
+          setOptions((o) => (o.chat === b.chat ? o : { chat: b.chat }));
+          const id = b.roomId ? `${b.roomId}|${b.rev}` : '';
           if (id === chosen.current) return;
           chosen.current = id;
-          setTarget(b.roomId ? { roomId: b.roomId, hands: b.hands, key: broadcastKey } : null);
+          // A chave decide o que a conexão vê (mãos, a visão do streamer, atraso): ver online/broadcast.ts.
+          setTarget(b.roomId ? { roomId: b.roomId, hands: false, key: broadcastKey } : null);
         })
         .catch((e) => {
           if (stop || !(e instanceof ApiError && e.status === 404)) return; // fora do ar: tenta de novo
@@ -62,10 +66,10 @@ export function Broadcast({ broadcastKey }: { broadcastKey: string }) {
   if (!target) return <BroadcastIdle title={loaded ? t('broadcast.waiting') : t('common.loading')} text={loaded ? t('broadcast.waitingHint') : undefined} />;
   return (
     <WatchGameScreen
-      key={`${target.roomId}|${target.hands}`}
+      key={`${target.roomId}|${chosen.current}`}
       target={target}
       canHands={false}
-      broadcast
+      broadcast={options}
       onExit={() => setTarget(null)}
       onSwitch={setTarget}
     />

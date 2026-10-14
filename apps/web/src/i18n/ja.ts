@@ -529,6 +529,8 @@ export default {
   'online.hands': '手札を表示',
   'online.delay': '⏱ {n}分遅延',
   'online.delayTitle': '手札を表示しているときは盤面が遅れて届きます。配信しても相手に手札が伝わりません。',
+  'online.watchChat': 'チャット',
+  'online.watchChatTitle': 'プレイヤーのメッセージとエモートを表示/非表示(自分だけ)',
   // ==== /online ====
 
 
@@ -564,10 +566,8 @@ export default {
   'broadcast.copied': 'コピーしました!',
   'broadcast.nowOnAir': '配信中:',
   'broadcast.onAirEnded': '対戦終了',
-  'broadcast.withHands': '手札あり({n}分遅延)',
   'broadcast.clear': '画面から外す',
   'broadcast.nothingOnAir': '配信中の対戦はありません。',
-  'broadcast.handsDelayHint': '「プレイヤーの手札を見る」をオンにすると、手札は{n}分遅れて配信されます。相手が配信から手札を見られないようにするためです。',
   'broadcast.newKey': '新しいリンクを作成',
   'broadcast.newKeyConfirm': '新しいリンクを作成しますか?今のリンクはOBSで使えなくなります。',
   'broadcast.transmit': '📡 配信する',
@@ -582,6 +582,21 @@ export default {
   'broadcast.played': '{name}がプレイ',
   'broadcast.countered': '{name}がカウンター',
   'broadcast.activated': '{name}が起動',
+  'broadcast.sendThis': '📡 この対戦を配信する',
+  'broadcast.sent': '対戦を配信に送りました。',
+  'broadcast.delay': '遅延:',
+  'broadcast.delayMin': '{n}分',
+  'broadcast.delayNone': '遅延なし',
+  'broadcast.delayLive': 'ライブ',
+  'broadcast.showsPlayers': 'プレイヤーの手札',
+  'broadcast.showsOwn': 'あなたの手札',
+  'broadcast.showsNone': '手札なし',
+  'broadcast.handsPlayers': '観戦する対戦でプレイヤーの手札を表示',
+  'broadcast.handsPlayersHint': '(常に{n}分以上の遅延)',
+  'broadcast.handsOwn': '自分の対戦で自分の手札を表示',
+  'broadcast.handsOwnHint': '(相手の手札は表示されません。選んだ遅延が適用されます)',
+  'broadcast.delayTournaments': '大会の対戦は手札なしでも遅延する',
+  'broadcast.chat': '配信にプレイヤーのチャットを表示',
   // ==== /watch ====
 
 

@@ -529,6 +529,8 @@ export default {
   'online.hands': 'Hände zeigen',
   'online.delay': '⏱ {n} Min. Verzögerung',
   'online.delayTitle': 'Mit sichtbaren Händen kommt der Tisch verzögert an: So kann die Partie in einen Livestream, ohne dem Gegner die Karten zu verraten.',
+  'online.watchChat': 'Chat',
+  'online.watchChatTitle': 'Nachrichten und Emotes der Spieler zeigen oder ausblenden (nur für dich)',
   // ==== /online ====
 
 
@@ -564,10 +566,8 @@ export default {
   'broadcast.copied': 'Kopiert!',
   'broadcast.nowOnAir': 'In der Übertragung:',
   'broadcast.onAirEnded': 'Partie beendet',
-  'broadcast.withHands': 'mit Händen ({n} Min. Verzögerung)',
   'broadcast.clear': 'Vom Bildschirm nehmen',
   'broadcast.nothingOnAir': 'Keine Partie in der Übertragung.',
-  'broadcast.handsDelayHint': 'Mit „Hände der Spieler zeigen“ zeigt die Übertragung die Hände mit {n} Min. Verzögerung, damit der Gegner die Karten nicht über den Stream sieht.',
   'broadcast.newKey': 'Neuen Link erzeugen',
   'broadcast.newKeyConfirm': 'Neuen Link erzeugen? Der aktuelle Link funktioniert dann in OBS nicht mehr.',
   'broadcast.transmit': '📡 Übertragen',
@@ -582,6 +582,21 @@ export default {
   'broadcast.played': '{name} hat gespielt',
   'broadcast.countered': '{name} hat Counter eingesetzt',
   'broadcast.activated': '{name} hat aktiviert',
+  'broadcast.sendThis': '📡 Diese Partie übertragen',
+  'broadcast.sent': 'Partie an die Übertragung gesendet.',
+  'broadcast.delay': 'Verzögerung:',
+  'broadcast.delayMin': '{n} Min.',
+  'broadcast.delayNone': 'Keine Verzögerung',
+  'broadcast.delayLive': 'live',
+  'broadcast.showsPlayers': 'Hände der Spieler',
+  'broadcast.showsOwn': 'deine Hand',
+  'broadcast.showsNone': 'ohne Hände',
+  'broadcast.handsPlayers': 'Hände der Spieler in Partien zeigen, die du ansiehst',
+  'broadcast.handsPlayersHint': '(immer mit mindestens {n} Min. Verzögerung)',
+  'broadcast.handsOwn': 'Deine Hand in Partien zeigen, die du spielst',
+  'broadcast.handsOwnHint': '(die des Gegners nie; es gilt die gewählte Verzögerung)',
+  'broadcast.delayTournaments': 'Turnierpartien auch ohne Hände verzögern',
+  'broadcast.chat': 'Chat der Spieler in der Übertragung zeigen',
   // ==== /watch ====
 
 

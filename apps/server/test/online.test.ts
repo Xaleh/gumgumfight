@@ -14,7 +14,8 @@ import {
 } from '@gumgum/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
-import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
+import { createSession, getUser, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
+import { broadcastView, DEFAULT_SETTINGS, handsDelayFor } from '../src/online/broadcast';
 import type { ServerOptions } from '../src/config';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
 import { Lobby, type SeatRequest } from '../src/online/lobby';
@@ -742,6 +743,55 @@ describe('partidas online: relógio', () => {
     restored.dispose();
     l.dispose();
   });
+
+  it('atrasos diferentes ao mesmo tempo, e a mesa vista pelo streamer que joga (só a mão dele)', () => {
+    vi.useFakeTimers();
+    let t = 2_000_000;
+    const step = (ms: number) => {
+      t += ms;
+      vi.advanceTimersByTime(ms);
+    };
+    const db = freshDb();
+    const l = lobby(db, () => t);
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    if ('error' in r) throw new Error(r.error);
+    l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
+    const room = r.room;
+    const players = [client(0), client(1)];
+    const one = client(null, true);
+    one.conn.delay = 60_000;
+    const three = client(null, true);
+    const mine = client(null);
+    mine.conn.as = 1;
+    mine.conn.delay = 60_000;
+    // Ver as mãos ao vivo não existe: o mínimo vale mesmo pedindo 0.
+    const live = client(null, true);
+    live.conn.delay = 0;
+    for (const c of [...players, one, three, mine, live]) room.attach(c.conn);
+    expect([one, three, mine, live].map((c) => c.room.delay)).toEqual([60_000, HANDS_DELAY_MS, 60_000, 60_000]);
+    // A visão do streamer que joga: a mão dele à mostra, a do oponente escondida.
+    const v = mine.view!;
+    expect(mine.room.pov).toBe(1);
+    expect(mine.room.you).toBeNull();
+    expect(v.players[1].hand.every((u) => v.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
+    expect(v.players[0].hand.every((u) => v.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+
+    const first = actingPlayer(room.state!)!;
+    room.act(first, 0, { type: 'answer', player: first, yes: true });
+    step(61_000);
+    expect(one.view!.actionCount).toBe(1);
+    expect(mine.view!.actionCount).toBe(1);
+    expect(live.view!.actionCount).toBe(1);
+    expect(three.view!.actionCount).toBe(0);
+    step(120_000);
+    expect(three.view!.actionCount).toBe(1);
+    // Sem ninguém com 1 min de atraso, aquela mesa some; as outras seguem.
+    for (const c of [one, mine, live]) room.detach(c.conn);
+    room.act(first, 1, { type: 'mulligan', player: first, redraw: false });
+    step(HANDS_DELAY_MS + 1_000);
+    expect(three.view!.actionCount).toBe(2);
+    l.dispose();
+  });
 });
 
 describe('partidas online: canal SSE', () => {
@@ -919,7 +969,7 @@ describe('modo espectador', () => {
     await app.close();
   });
 
-  it('modo transmissão: link do OBS, partida escolhida no app e as mãos pela chave', async () => {
+  it('modo transmissão: link do OBS, partida escolhida no app, opções e as mãos pela chave', async () => {
     const { app, db } = setup();
     const nami = login(db, 'nami', 'streamer');
     const usopp = login(db, 'usopp');
@@ -927,21 +977,40 @@ describe('modo espectador', () => {
     const send = (method: 'POST' | 'PUT', url: string, cookie: string, payload?: object) => app.inject({ method, url, headers: { cookie }, payload });
     expect((await get('/api/broadcast')).statusCode).toBe(401);
     expect((await get('/api/broadcast', usopp.cookie)).statusCode).toBe(403);
-    expect((await get('/api/broadcast', nami.cookie)).json()).toEqual({ key: null, roomId: null, hands: false, delayMs: HANDS_DELAY_MS });
+    expect((await get('/api/broadcast', nami.cookie)).json()).toEqual({
+      key: null,
+      roomId: null,
+      delayS: 180,
+      handsPlayers: true,
+      handsOwn: false,
+      delayTournaments: false,
+      chat: true,
+      minHandsDelayS: 60,
+    });
     expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: null })).statusCode).toBe(409);
+    expect((await send('PUT', '/api/broadcast/settings', nami.cookie, { chat: false })).statusCode).toBe(409);
 
     const key = (await send('POST', '/api/broadcast/key', nami.cookie)).json().key as string;
     expect(key).toMatch(/^[A-Za-z0-9_-]{32}$/);
-    expect((await get(`/api/broadcast/${key}`)).json()).toEqual({ roomId: null, hands: false, delayMs: HANDS_DELAY_MS });
+    const byKey = async (k = key) => (await get(`/api/broadcast/${k}`)).json();
+    const first = await byKey();
+    expect(first).toMatchObject({ roomId: null, chat: true });
     expect((await get('/api/broadcast/nao-existe')).statusCode).toBe(404);
 
     const { roomId } = await privateMatch(app);
     expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: 'nope' })).statusCode).toBe(404);
-    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId, hands: true })).statusCode).toBe(200);
-    expect((await get(`/api/broadcast/${key}`)).json()).toEqual({ roomId, hands: true, delayMs: HANDS_DELAY_MS });
-    expect((await get('/api/broadcast', nami.cookie)).json()).toMatchObject({ key, roomId, hands: true });
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId })).json()).toMatchObject({ key, roomId });
+    const chosen = await byKey();
+    expect(chosen.roomId).toBe(roomId);
+    expect(chosen.rev).toBeGreaterThan(first.rev);
 
-    // A fonte do OBS não tem o login: a chave libera as mãos (na mesa atrasada).
+    // Opções: campos inválidos ficam como estavam; o atraso vai de 0 a 10 min.
+    const settings = (await send('PUT', '/api/broadcast/settings', nami.cookie, { delayS: 9999, chat: false, handsOwn: 'sim' })).json();
+    expect(settings).toMatchObject({ delayS: 600, chat: false, handsOwn: false, handsPlayers: true });
+    expect((await byKey()).chat).toBe(false);
+    expect((await byKey()).rev).toBeGreaterThan(chosen.rev);
+
+    // A fonte do OBS não tem o login: a chave decide o que a conexão vê.
     await app.listen({ port: 0, host: '127.0.0.1' });
     const { port } = app.server.address() as { port: number };
     const open = async (query: string) => {
@@ -951,35 +1020,60 @@ describe('modo espectador', () => {
       return res.status;
     };
     expect(await open('hands=1')).toBe(403);
-    expect(await open(`hands=1&k=${key}`)).toBe(200);
-    expect(await open('hands=1&k=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).toBe(403);
+    expect(await open(`k=${key}`)).toBe(200);
+    expect(await open('k=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).toBe(403);
 
-    // Link novo: o antigo para de funcionar; a partida escolhida continua.
+    // Link novo: o antigo para de funcionar; a partida escolhida e as opções continuam.
     const fresh = (await send('POST', '/api/broadcast/key', nami.cookie)).json();
-    expect(fresh).toMatchObject({ roomId, hands: true });
+    expect(fresh).toMatchObject({ roomId, chat: false });
     expect((await get(`/api/broadcast/${key}`)).statusCode).toBe(404);
-    expect(await open(`hands=1&k=${key}`)).toBe(403);
-    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: null })).json()).toMatchObject({ roomId: null, hands: false });
+    expect(await open(`k=${key}`)).toBe(403);
+    expect((await send('PUT', '/api/broadcast/room', nami.cookie, { roomId: null })).json()).toMatchObject({ roomId: null });
 
     // Sem o perfil, o link some.
     setUserRole(db, nami.id, 'player');
     expect((await get(`/api/broadcast/${fresh.key}`)).statusCode).toBe(404);
-    expect(await open(`hands=1&k=${fresh.key}`)).toBe(403);
+    expect(await open(`k=${fresh.key}`)).toBe(403);
     await app.close();
   });
 
-  it('modo transmissão: na própria partida, só sem as mãos', async () => {
+  it('modo transmissão: o que a live mostra sai das opções do streamer', async () => {
     const { app, db } = setup();
     const nami = login(db, 'nami', 'streamer');
-    await app.inject({ method: 'POST', url: '/api/broadcast/key', headers: { cookie: nami.cookie } });
-    const created = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: { ...ALICE, cookie: nami.cookie }, payload: { deckId: 'st01-luffy', format: 'egb' } });
+    const user = getUser(db, nami.id)!;
+    const other = getRoom(app, (await privateMatch(app)).roomId);
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/online/rooms',
+      headers: { 'x-deck-owner': 'nami-0123456789abcdef', cookie: nami.cookie },
+      payload: { deckId: 'st01-luffy', format: 'egb' },
+    });
     const { roomId, code } = created.json();
-    const choose = (hands: boolean) => app.inject({ method: 'PUT', url: '/api/broadcast/room', headers: { cookie: nami.cookie }, payload: { roomId, hands } });
-    // Ainda esperando o oponente: não dá para assistir.
-    expect((await choose(false)).statusCode).toBe(404);
-    await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: BOB, payload: { code, deckId: 'st02-kid' } });
-    expect((await choose(true)).statusCode).toBe(403);
-    expect((await choose(false)).statusCode).toBe(200);
+    await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: { 'x-deck-owner': 'carol-0123456789abcdef' }, payload: { code, deckId: 'st02-kid' } });
+    const own = getRoom(app, roomId);
+    const s = { ...DEFAULT_SETTINGS };
+    // Partida de outros: as mãos dos dois, nunca com menos de 1 min de atraso.
+    expect(broadcastView(s, other, user)).toEqual({ hands: true, delay: 180_000 });
+    expect(broadcastView({ ...s, delayS: 0 }, other, user)).toEqual({ hands: true, delay: 60_000 });
+    expect(broadcastView({ ...s, handsPlayers: false }, other, user)).toEqual({ delay: 0 });
+    // Partida que ele joga: a mão dele, com o atraso que escolher (até ao vivo), ou a visão pública.
+    expect(broadcastView(s, own, user)).toEqual({ delay: 0 });
+    expect(broadcastView({ ...s, handsOwn: true }, own, user)).toEqual({ as: 0, delay: 180_000 });
+    expect(broadcastView({ ...s, handsOwn: true, delayS: 0 }, own, user)).toEqual({ as: 0, delay: 0 });
+    // Torneio: atraso mesmo sem as mãos, se ele quiser.
+    other.data.queue = 'tournament';
+    expect(broadcastView({ ...s, handsPlayers: false }, other, user)).toEqual({ delay: 0 });
+    expect(broadcastView({ ...s, handsPlayers: false, delayTournaments: true, delayS: 120 }, other, user)).toEqual({ delay: 120_000 });
+
+    // "Ver mãos" no app segue o atraso escolhido (com o mesmo mínimo).
+    expect(handsDelayFor(db, nami.id)).toBe(180_000);
+    await app.inject({ method: 'POST', url: '/api/broadcast/key', headers: { cookie: nami.cookie } });
+    await app.inject({ method: 'PUT', url: '/api/broadcast/settings', headers: { cookie: nami.cookie }, payload: { delayS: 30 } });
+    expect(handsDelayFor(db, nami.id)).toBe(60_000);
+    await app.inject({ method: 'PUT', url: '/api/broadcast/settings', headers: { cookie: nami.cookie }, payload: { delayS: 300 } });
+    expect(handsDelayFor(db, nami.id)).toBe(300_000);
+    // A própria partida pode ir para a transmissão.
+    expect((await app.inject({ method: 'PUT', url: '/api/broadcast/room', headers: { cookie: nami.cookie }, payload: { roomId } })).statusCode).toBe(200);
   });
 
   it('revanche: os espectadores seguem para a sala nova', async () => {

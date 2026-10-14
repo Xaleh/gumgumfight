@@ -47,6 +47,24 @@ export interface ChatMessage {
   at: number;
 }
 
+const WATCH_MUTE = 'gumgum.watchChatOff';
+
+function savedWatchMute(): boolean {
+  try {
+    return localStorage.getItem(WATCH_MUTE) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveWatchMute(on: boolean) {
+  try {
+    localStorage.setItem(WATCH_MUTE, on ? '1' : '0');
+  } catch {
+    /* vale só nesta partida */
+  }
+}
+
 /** Quantas mensagens do chat ficam no histórico do painel. */
 const CHAT_HISTORY = 50;
 
@@ -78,8 +96,18 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   /** Última mensagem de texto de cada assento ainda em balão (some sozinha). */
   const [chatBubbles, setChatBubbles] = useState<ChatMessage[]>([]);
-  /** Silenciar o oponente só nesta partida (a configuração geral fica em Configurações). */
-  const [muted, setMuted] = useState(false);
+  /**
+   * Jogador: silenciar o oponente só nesta partida (a configuração geral fica em Configurações).
+   * Espectador: silenciar o chat dos dois jogadores só para si (lembrado neste navegador).
+   */
+  const [muted, setMutedState] = useState(() => watching && savedWatchMute());
+  const setMuted = useCallback(
+    (on: boolean) => {
+      setMutedState(on);
+      if (watching) saveWatchMute(on);
+    },
+    [watching],
+  );
   /** Lançamentos do dado do sorteio de cada assento (para ver o dado do oponente rolar). */
   const [diceThrows, setDiceThrows] = useState<[DiceThrow | null, DiceThrow | null]>([null, null]);
   const [rematch, setRematch] = useState<RematchTarget | null>(null);

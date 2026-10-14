@@ -13,10 +13,13 @@
 // dois jogadores (as cartas das mãos entram como "extra" na visão pública); decks e
 // Vida virada continuam escondidos.
 //
-// Quem vê as mãos assiste à mesa com atraso (HANDS_DELAY_MS): a partida pode estar numa
-// live, e o oponente não pode abrir a transmissão para ver a mão do outro. A mesa atrasada
-// é refeita a partir das ações gravadas e avança no mesmo ritmo em que elas aconteceram;
-// emotes, chat, dados e o aviso de revanche chegam com o mesmo atraso.
+// Mesa atrasada: um espectador pode assistir com atraso (`Connection.delay`). Quem vê as mãos
+// dos jogadores sempre assiste atrasado (no mínimo MIN_HANDS_DELAY_MS): a partida pode estar
+// numa live, e o oponente não pode abrir a transmissão para ver a mão do outro. Cada atraso
+// em uso tem a sua mesa, refeita a partir das ações gravadas e avançada no mesmo ritmo em que
+// elas aconteceram; emotes, chat, dados e o aviso de revanche chegam com o mesmo atraso.
+// O modo transmissão também pode mostrar a mesa do ponto de vista do streamer que joga a
+// partida (`Connection.as`: a mão dele, nunca a do oponente).
 //
 // Salas de treino contra o bot (queue 'bot'): o assento do bot é jogado pelo próprio
 // servidor, que decide olhando só a visão do bot (como um jogador de verdade).
@@ -57,8 +60,11 @@ const RATE_WINDOW_MS = 10_000;
 const MAX_ACTIONS = 5000;
 /** Espectadores por sala. */
 export const MAX_SPECTATORS = 100;
-/** Atraso da mesa de quem vê as mãos dos jogadores (ver o começo do arquivo). */
+/** Atraso padrão da mesa de quem vê as mãos dos jogadores (ver o começo do arquivo). */
 export const HANDS_DELAY_MS = 3 * 60_000;
+/** Atraso mínimo para ver as mãos dos dois jogadores e o máximo de qualquer mesa atrasada. */
+export const MIN_HANDS_DELAY_MS = 60_000;
+export const MAX_DELAY_MS = 10 * 60_000;
 /** Pausa antes de cada jogada do bot, para a jogada ser visível. */
 const BOT_DELAY_MS = 700;
 /**
@@ -175,8 +181,12 @@ export interface RoomData {
 export interface Connection {
   /** Assento do jogador; null = espectador. */
   seat: PlayerId | null;
-  /** Espectador vendo as mãos dos dois jogadores (streamer ou admin), na mesa atrasada. */
+  /** Espectador vendo as mãos dos dois jogadores (streamer ou admin), sempre na mesa atrasada. */
   hands?: boolean;
+  /** Espectador que vê a mesa como este jogador (o streamer transmitindo a própria partida). */
+  as?: PlayerId;
+  /** Atraso da mesa deste espectador (ms); 0 ou ausente = ao vivo. Ver `lateDelay`. */
+  delay?: number;
   send: (event: string, data: unknown) => void;
   /** Encerra a resposta (o navegador reconecta sozinho). */
   end?: () => void;
@@ -197,8 +207,6 @@ export interface RoomDeps {
   rateLimit?: number;
   /** Pausa antes de cada jogada do bot (padrão BOT_DELAY_MS; os testes usam 0). */
   botDelayMs?: number;
-  /** Atraso da mesa de quem vê as mãos (padrão HANDS_DELAY_MS). */
-  handsDelayMs?: number;
   /** Momentos que viram notificação no celular (ver push/routes.ts). */
   onEvent?: (room: Room, event: RoomEvent) => void;
 }
@@ -222,11 +230,15 @@ export type ActResult = { ok: true; actionCount: number } | { ok: false; code: n
 
 export const randomToken = () => randomBytes(24).toString('base64url');
 
-/** A mesa atrasada: o estado depois das primeiras `count` ações. */
+/** Uma mesa atrasada: o estado depois das primeiras `count` ações, para quem assiste com `delay` de atraso. */
 interface LateTable {
+  delay: number;
   state: GameState;
   count: number;
   lastAction: Action | null;
+  /** Emotes, chat, dados e revanche que ainda não passaram do atraso desta mesa. */
+  events: LateEvent[];
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 /** Evento fora do jogo à espera do atraso: sai depois das `after` primeiras ações e de `at` + atraso. */
@@ -237,8 +249,13 @@ interface LateEvent {
   data: unknown;
 }
 
-/** Conexão que assiste à mesa atrasada (quem vê as mãos). */
-const isLate = (c: Connection) => c.seat === null && Boolean(c.hands);
+/** Atraso da mesa de uma conexão: jogadores, ao vivo; quem vê as mãos, nunca abaixo do mínimo. */
+export function lateDelay(c: Pick<Connection, 'seat' | 'hands' | 'delay'>): number {
+  if (c.seat !== null) return 0;
+  const delay = Math.min(MAX_DELAY_MS, Math.max(0, c.delay ?? 0));
+  return c.hands ? Math.max(MIN_HANDS_DELAY_MS, c.delay === undefined ? HANDS_DELAY_MS : delay) : delay;
+}
+const isLate = (c: Connection) => lateDelay(c) > 0;
 
 /**
  * Cartas a mais na visão de quem vê as mãos (sempre da mesa atrasada): as duas mãos e a carta
@@ -290,11 +307,10 @@ export class Room {
    */
   private diceThrows: [DiceThrow | null, DiceThrow | null] = [null, null];
   private diceAt: [number, number] = [0, 0];
-  /** Mesa atrasada; só existe enquanto alguém assiste vendo as mãos. */
-  private late: LateTable | null = null;
-  private lateTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Emotes, chat, dados e revanche que ainda não passaram do atraso. Só em memória. */
-  private lateEvents: LateEvent[] = [];
+  /** Mesas atrasadas, por atraso; cada uma só existe enquanto alguém assiste com aquele atraso. */
+  private readonly lates = new Map<number, LateTable>();
+  /** Emotes, chat, dados e revanche dos últimos MAX_DELAY_MS (para as mesas atrasadas que surgirem). Só em memória. */
+  private recentEvents: LateEvent[] = [];
   private lastAction: Action | null = null;
   /** Último aviso de "sua vez" de cada assento. */
   private turnNoticeAt: [number, number] = [-Infinity, -Infinity];
@@ -612,16 +628,16 @@ export class Room {
     if (isLate(conn)) {
       // Quem já assistia atrasado recebe o que venceu antes de quem chega agora.
       this.advanceLate();
-      // Sem a mesa atrasada (não deu para refazê-la), assiste ao vivo, sem as mãos.
-      if (!this.ensureLate()) conn.hands = false;
+      // Sem a mesa atrasada (não deu para refazê-la), assiste ao vivo, só com a visão pública.
+      if (!this.ensureLate(lateDelay(conn))) Object.assign(conn, { hands: false, as: undefined, delay: 0 });
     }
-    const late = isLate(conn) ? this.late : null;
+    const late = this.lateOf(conn);
     this.conns.add(conn);
     this.updatePresence();
     conn.send('state', this.snapshot(conn));
     // Quem chega durante o sorteio vê os dados já jogados (na mesa atrasada, os que já passaram do atraso).
-    const cutoff = this.deps.now() - this.delay;
     if ((late ? late.state : this.state)?.phase === 'mulligan') {
+      const cutoff = this.deps.now() - (late?.delay ?? 0);
       this.diceThrows.forEach((t, i) => t && (!late || this.diceAt[i] <= cutoff) && conn.send('dice', t));
     }
     this.broadcastPresence();
@@ -637,28 +653,38 @@ export class Room {
 
   // ------------------------------------------------------------------ mesa atrasada
 
-  private get delay() {
-    return this.deps.handsDelayMs ?? HANDS_DELAY_MS;
+  /** A mesa atrasada de uma conexão (null = assiste ao vivo). */
+  private lateOf(conn: Connection): LateTable | null {
+    return isLate(conn) ? (this.lates.get(lateDelay(conn)) ?? null) : null;
   }
 
-  /** Manda um evento agora para quem assiste ao vivo e, depois do atraso, para quem vê as mãos. */
-  private emit(event: string, data: unknown) {
-    for (const c of this.conns) if (!isLate(c)) c.send(event, data);
-    this.lateEvents.push({ at: this.deps.now(), after: this.data.actions.length, event, data });
+  /** Guarda um evento fora do jogo para as mesas atrasadas (as atuais e as que surgirem). */
+  private queueLate(event: string, data: unknown) {
+    const e: LateEvent = { at: this.deps.now(), after: this.data.actions.length, event, data };
+    this.recentEvents = this.recentEvents.filter((x) => x.at > e.at - MAX_DELAY_MS);
+    this.recentEvents.push(e);
+    for (const late of this.lates.values()) late.events.push(e);
     this.advanceLate();
   }
 
-  /** Refaz a mesa atrasada (o estado de `delay` atrás) para o primeiro espectador que vê as mãos. */
-  private ensureLate(): boolean {
-    if (this.late) return true;
+  /** Manda um evento agora para quem assiste ao vivo e, depois do atraso, para quem assiste atrasado. */
+  private emit(event: string, data: unknown) {
+    for (const c of this.conns) if (!isLate(c)) c.send(event, data);
+    this.queueLate(event, data);
+  }
+
+  /** Refaz a mesa de `delay` atrás para o primeiro espectador com esse atraso. */
+  private ensureLate(delay: number): boolean {
+    if (this.lates.has(delay)) return true;
     if (!this.state) return false;
     try {
-      const cutoff = this.deps.now() - this.delay;
+      const cutoff = this.deps.now() - delay;
       const timeline = this.data.timeline ?? [];
       let state = createGame(this.config());
       let count = 0;
       while (count < this.data.actions.length && timeline[count][0] <= cutoff) state = applyAction(state, this.data.actions[count++]);
-      this.late = { state, count, lastAction: count ? this.data.actions[count - 1] : null };
+      const events = this.recentEvents.filter((e) => e.at > cutoff);
+      this.lates.set(delay, { delay, state, count, lastAction: count ? this.data.actions[count - 1] : null, events, timer: null });
       return true;
     } catch (e) {
       this.deps.log(`Partida online ${this.id}: falha ao montar a mesa atrasada: ${e instanceof Error ? e.message : e}`);
@@ -666,28 +692,31 @@ export class Room {
     }
   }
 
-  /**
-   * Leva a mesa atrasada até `delay` atrás: aplica as ações e entrega os eventos que já passaram
-   * do atraso, na ordem em que aconteceram, e agenda o próximo passo. Sem ninguém vendo as mãos,
-   * a mesa atrasada é descartada (volta a ser refeita quando alguém chegar).
-   */
+  /** Avança todas as mesas atrasadas (e descarta as que ficaram sem espectador). */
   private advanceLate() {
-    if (this.lateTimer) clearTimeout(this.lateTimer);
-    this.lateTimer = null;
-    const cutoff = this.deps.now() - this.delay;
-    const viewers = [...this.conns].filter(isLate);
-    const late = this.late;
-    if (!late || !viewers.length) {
-      this.late = null;
-      this.lateEvents = this.lateEvents.filter((e) => e.at > cutoff);
+    for (const late of [...this.lates.values()]) this.advanceTable(late);
+  }
+
+  /**
+   * Leva uma mesa atrasada até `delay` atrás: aplica as ações e entrega os eventos que já passaram
+   * do atraso, na ordem em que aconteceram, e agenda o próximo passo. Sem ninguém com esse
+   * atraso, a mesa é descartada (volta a ser refeita quando alguém chegar).
+   */
+  private advanceTable(late: LateTable) {
+    if (late.timer) clearTimeout(late.timer);
+    late.timer = null;
+    const viewers = [...this.conns].filter((c) => isLate(c) && lateDelay(c) === late.delay);
+    if (!viewers.length) {
+      this.lates.delete(late.delay);
       return;
     }
+    const cutoff = this.deps.now() - late.delay;
     const timeline = this.data.timeline ?? [];
     try {
       for (;;) {
-        const event = this.lateEvents[0];
+        const event = late.events[0];
         if (event && event.at <= cutoff && event.after <= late.count) {
-          this.lateEvents.shift();
+          late.events.shift();
           for (const c of viewers) c.send(event.event, event.data);
           continue;
         }
@@ -701,20 +730,20 @@ export class Room {
           continue;
         }
         const wake = Math.min(nextAt, event?.at ?? Infinity);
-        if (wake !== Infinity) this.lateTimer = setTimeout(() => this.advanceLate(), wake - cutoff + 5);
+        if (wake !== Infinity) late.timer = setTimeout(() => this.advanceTable(late), wake - cutoff + 5);
         return;
       }
     } catch (e) {
-      // O motor é determinístico: não deveria acontecer. Quem via as mãos reconecta e a mesa é refeita.
+      // O motor é determinístico: não deveria acontecer. Quem assistia reconecta e a mesa é refeita.
       this.deps.log(`Partida online ${this.id}: falha na mesa atrasada: ${e instanceof Error ? e.message : e}`);
-      this.late = null;
+      this.lates.delete(late.delay);
       for (const c of viewers) c.end?.();
     }
   }
 
-  /** Relógio da mesa atrasada: como estava `delay` atrás. */
+  /** Relógio de uma mesa atrasada: como estava `delay` atrás. */
   private lateClock(late: LateTable) {
-    const at = this.deps.now() - this.delay;
+    const at = this.deps.now() - late.delay;
     const timeline = this.data.timeline ?? [];
     const prev = late.count ? timeline[late.count - 1] : [this.data.startedAt ?? at, TIME_BANK_MS, TIME_BANK_MS];
     const next = timeline[late.count];
@@ -743,8 +772,7 @@ export class Room {
   /** Avisos fora do jogo (revanche). `data` recebe null para os espectadores; quem vê as mãos recebe depois do atraso. */
   notify(event: string, data: (seat: PlayerId | null) => unknown) {
     for (const c of this.conns) if (!isLate(c)) c.send(event, data(c.seat));
-    this.lateEvents.push({ at: this.deps.now(), after: this.data.actions.length, event, data: data(null) });
-    this.advanceLate();
+    this.queueLate(event, data(null));
   }
 
   /** Estado novo para quem assiste ao vivo (a mesa atrasada avança sozinha, em `advanceLate`). */
@@ -759,8 +787,11 @@ export class Room {
     return { remaining, running: this.running, total: TIME_BANK_MS, awaySince: this.awaySince };
   }
 
-  /** Resumo da sala (sem o jogo) para a conexão `seat` (null = espectador); com `late`, como estava na mesa atrasada. */
-  info(seat: PlayerId | null, late: LateTable | null = null) {
+  /**
+   * Resumo da sala (sem o jogo) para a conexão `seat` (null = espectador); com `late`, como estava
+   * na mesa atrasada. `pov`: o jogador de quem é a visão (o próprio assento, ou o streamer que joga).
+   */
+  info(seat: PlayerId | null, late: LateTable | null = null, pov: PlayerId | null = seat) {
     const over = late ? late.state.phase === 'gameover' : this.status === 'finished';
     return {
       id: this.id,
@@ -782,6 +813,7 @@ export class Room {
         : null,
       status: late ? (over ? 'finished' : 'playing') : this.status,
       you: seat,
+      pov,
       players: this.data.seats.map((s, i) => ({
         name: s.name,
         bounty: s.bounty,
@@ -796,7 +828,7 @@ export class Room {
       result: over ? this.data.result : null,
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
       /** Atraso da mesa desta conexão (ms); 0 = ao vivo. */
-      delay: late ? this.delay : 0,
+      delay: late ? late.delay : 0,
     };
   }
 
@@ -805,14 +837,16 @@ export class Room {
    * as linhas do log que esta conexão ainda não recebeu.
    */
   snapshot(conn: Connection) {
-    const late = isLate(conn) ? this.late : null;
+    const late = this.lateOf(conn);
     const state = late ? late.state : this.state;
     const lastAction = late ? late.lastAction : this.lastAction;
-    const room = this.info(conn.seat, late);
+    // A visão de um jogador sem a mesa atrasada que ela exige seria o presente: fica a pública.
+    const pov = conn.seat ?? (late || !isLate(conn) ? (conn.as ?? null) : null);
+    const room = this.info(conn.seat, late, pov);
     if (!state || !this.aliases) return { room, view: null, defs: {}, log: { from: 0, entries: [] }, lastAction: null };
-    // As mãos só saem da mesa atrasada: sem ela, nada a mais (nem num caminho de erro).
-    const extra = late ? handsOf(late.state) : [];
-    const { defs, log, ...view } = viewFor(state, conn.seat, this.aliases, extra);
+    // As mãos dos dois só saem da mesa atrasada: sem ela, nada a mais (nem num caminho de erro).
+    const extra = late && conn.hands ? handsOf(late.state) : [];
+    const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra);
     const newDefs: Record<string, CardDef> = {};
     for (const [id, def] of Object.entries(defs)) {
       if (!conn.sentDefs.has(id)) {
@@ -828,7 +862,7 @@ export class Room {
       view,
       defs: newDefs,
       log: { from, entries },
-      lastAction: lastAction ? aliasRefs(state, conn.seat, this.aliases, lastAction, extra) : null,
+      lastAction: lastAction ? aliasRefs(state, pov, this.aliases, lastAction, extra) : null,
     };
   }
 
@@ -865,9 +899,8 @@ export class Room {
     this.timer = null;
     if (this.botTimer) clearTimeout(this.botTimer);
     this.botTimer = null;
-    if (this.lateTimer) clearTimeout(this.lateTimer);
-    this.lateTimer = null;
-    this.late = null;
+    for (const late of this.lates.values()) if (late.timer) clearTimeout(late.timer);
+    this.lates.clear();
     for (const c of this.conns) {
       if (closed) c.send('closed', {});
       c.end?.();

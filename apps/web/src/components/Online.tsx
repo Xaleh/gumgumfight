@@ -118,7 +118,8 @@ export function OnlineStatus({ online }: { online: OnlineGame }) {
  */
 function useShowOpponent(online: OnlineGame) {
   const { opponentChat } = useSettings();
-  return online.watching || (opponentChat && !online.muted);
+  // Quem assiste silencia o chat dos dois jogadores só para si (botão na faixa do espectador).
+  return online.watching ? !online.muted : opponentChat && !online.muted;
 }
 
 /** Painel de chat da partida: emotes (atalhos) e mensagens de texto curtas. */
@@ -441,6 +442,15 @@ export function SpectatorBar({
           {t('online.hands')}
         </button>
       )}
+      <button
+        className={['auto-toggle', online.muted ? '' : 'on'].join(' ')}
+        onClick={() => online.setMuted(!online.muted)}
+        aria-pressed={!online.muted}
+        title={t('online.watchChatTitle')}
+      >
+        <span className="knob" />
+        {t('online.watchChat')}
+      </button>
       {online.room?.delay ? <DelayTag ms={online.room.delay} /> : null}
     </div>
   );

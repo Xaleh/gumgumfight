@@ -529,6 +529,8 @@ export default {
   'online.hands': 'Montrer les mains',
   'online.delay': '⏱ {n} min de différé',
   'online.delayTitle': 'Avec les mains visibles, la table arrive en différé : la partie peut passer en live sans révéler les cartes à l\'adversaire.',
+  'online.watchChat': 'Chat',
+  'online.watchChatTitle': 'Affiche ou masque les messages et emotes des joueurs (pour vous seulement)',
   // ==== /online ====
 
 
@@ -564,10 +566,8 @@ export default {
   'broadcast.copied': 'Copié !',
   'broadcast.nowOnAir': 'En diffusion :',
   'broadcast.onAirEnded': 'partie terminée',
-  'broadcast.withHands': 'avec les mains ({n} min de différé)',
   'broadcast.clear': 'Retirer de l\'écran',
   'broadcast.nothingOnAir': 'Aucune partie en diffusion.',
-  'broadcast.handsDelayHint': 'Avec « Voir les mains des joueurs » coché, la diffusion montre les mains avec {n} min de différé, pour que l\'adversaire ne voie pas les cartes via le live.',
   'broadcast.newKey': 'Générer un nouveau lien',
   'broadcast.newKeyConfirm': 'Générer un nouveau lien ? Le lien actuel cessera de fonctionner dans OBS.',
   'broadcast.transmit': '📡 Diffuser',
@@ -582,6 +582,21 @@ export default {
   'broadcast.played': '{name} a joué',
   'broadcast.countered': '{name} a utilisé un Counter',
   'broadcast.activated': '{name} a activé',
+  'broadcast.sendThis': '📡 Diffuser cette partie',
+  'broadcast.sent': 'Partie envoyée à la diffusion.',
+  'broadcast.delay': 'Différé :',
+  'broadcast.delayMin': '{n} min',
+  'broadcast.delayNone': 'Sans différé',
+  'broadcast.delayLive': 'en direct',
+  'broadcast.showsPlayers': 'mains des joueurs',
+  'broadcast.showsOwn': 'votre main',
+  'broadcast.showsNone': 'sans mains',
+  'broadcast.handsPlayers': 'Montrer les mains des joueurs dans les parties que vous regardez',
+  'broadcast.handsPlayersHint': '(toujours avec au moins {n} min de différé)',
+  'broadcast.handsOwn': 'Montrer votre main dans les parties que vous jouez',
+  'broadcast.handsOwnHint': '(celle de l\'adversaire n\'apparaît jamais ; le différé choisi s\'applique)',
+  'broadcast.delayTournaments': 'Différé aussi pour les parties de tournoi, même sans mains',
+  'broadcast.chat': 'Montrer le chat des joueurs dans la diffusion',
   // ==== /watch ====
 
 

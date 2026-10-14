@@ -529,6 +529,8 @@ export default {
   'online.hands': 'Show hands',
   'online.delay': '⏱ {n} min delay',
   'online.delayTitle': 'With hands shown, the table arrives delayed: the match can go on a live stream without giving the cards away to the opponent.',
+  'online.watchChat': 'Chat',
+  'online.watchChatTitle': 'Show or hide the players\' messages and emotes (just for you)',
   // ==== /online ====
 
 
@@ -564,10 +566,8 @@ export default {
   'broadcast.copied': 'Copied!',
   'broadcast.nowOnAir': 'On air:',
   'broadcast.onAirEnded': 'match ended',
-  'broadcast.withHands': 'with hands ({n} min delay)',
   'broadcast.clear': 'Take off screen',
   'broadcast.nothingOnAir': 'No match on air.',
-  'broadcast.handsDelayHint': 'With “Show the players\' hands” checked, the stream shows the hands with a {n} min delay, so the opponent can\'t see the cards through the stream.',
   'broadcast.newKey': 'Generate new link',
   'broadcast.newKeyConfirm': 'Generate a new link? The current link stops working in OBS.',
   'broadcast.transmit': '📡 Broadcast',
@@ -582,6 +582,21 @@ export default {
   'broadcast.played': '{name} played',
   'broadcast.countered': '{name} used Counter',
   'broadcast.activated': '{name} activated',
+  'broadcast.sendThis': '📡 Broadcast this match',
+  'broadcast.sent': 'Match sent to the broadcast.',
+  'broadcast.delay': 'Delay:',
+  'broadcast.delayMin': '{n} min',
+  'broadcast.delayNone': 'No delay',
+  'broadcast.delayLive': 'live',
+  'broadcast.showsPlayers': 'players\' hands',
+  'broadcast.showsOwn': 'your hand',
+  'broadcast.showsNone': 'no hands',
+  'broadcast.handsPlayers': 'Show the players\' hands in matches you watch',
+  'broadcast.handsPlayersHint': '(always with at least {n} min delay)',
+  'broadcast.handsOwn': 'Show your hand in matches you play',
+  'broadcast.handsOwnHint': '(the opponent\'s never shows; uses the chosen delay)',
+  'broadcast.delayTournaments': 'Delay tournament matches too, even without hands',
+  'broadcast.chat': 'Show the players\' chat on the broadcast',
   // ==== /watch ====
 
 

@@ -22,7 +22,8 @@ import {
 } from '@gumgum/engine';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { api, type OnlineSeat, type WatchTarget } from '../api';
+import { api, isAdmin, type OnlineSeat, type WatchTarget } from '../api';
+import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
 import { coachTip } from '../game/tutorial/coachTips';
@@ -292,7 +293,7 @@ export function WatchGameScreen({
 }: {
   target: WatchTarget;
   canHands: boolean;
-  broadcast?: boolean;
+  broadcast?: TableBroadcast;
   onExit: () => void;
   onSwitch: (t: WatchTarget) => void;
 }) {
@@ -330,6 +331,11 @@ export function WatchGameScreen({
       broadcast={broadcast}
     />
   );
+}
+
+/** Tela de transmissão: `chat` = as mensagens e emotes dos jogadores aparecem na live. */
+export interface TableBroadcast {
+  chat: boolean;
 }
 
 /** A mesa, protegida: um erro ao desenhar não apaga a página (o jogo continua por fora). */
@@ -381,7 +387,7 @@ function Table({
   /** Modo espectador (partida online vista de fora). */
   spectator?: { canHands: boolean; onToggleHands: () => void };
   /** Tela de transmissão (fonte do OBS): sem menus nem botões, com o destaque da carta jogada. */
-  broadcast?: boolean;
+  broadcast?: TableBroadcast;
   /** Aviso na mesa ao começar (some sozinho em 10 s). */
   startNotice?: string;
   /** Lição do tutorial: treinador, destaques e menos controles (sem Auto, desfazer, replay). */
@@ -507,7 +513,21 @@ function Table({
   const myTurnIdle =
     human !== null && !game.auto && !pending && state.activePlayer === human && state.phase === 'main' && !state.stack.length;
   const acting = actingPlayer(state);
-  const bottom: PlayerId = human ?? 0;
+  // Espectador com a visão de um jogador (o streamer que transmite a própria partida): a mão dele embaixo.
+  const bottom: PlayerId = human ?? online?.room?.pov ?? 0;
+  const { user } = useAuth();
+  /** Streamer e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */
+  const canBroadcast = Boolean(online?.room && !broadcast && !tutorial && user && (user.role === 'streamer' || isAdmin(user.role)));
+  const sendToBroadcast = () =>
+    api.broadcast.choose(online!.room!.id).then(
+      () => {
+        const msg = t('broadcast.sent');
+        setSheet(null);
+        setNotice(msg);
+        setTimeout(() => setNotice((n) => (n === msg ? null : n)), 4000);
+      },
+      (e: unknown) => game.setError(e instanceof Error ? e.message : String(e)),
+    );
 
   // Mão na ordem do jogador: cartas novas entram no fim.
   const myHand = state.players[bottom].hand;
@@ -1169,7 +1189,7 @@ function Table({
           />
         )}
 
-        {online && <ChatBubbles online={online} bottom={bottom} />}
+        {online && (!broadcast || broadcast.chat) && <ChatBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
 
         {/* Na transmissão ninguém clica para fechar o aviso: os erros ficam fora da tela. */}
@@ -1272,6 +1292,11 @@ function Table({
               <button className="btn" onClick={() => setSheet('log')}>
                 {t('game.logBtn')}
               </button>
+              {canBroadcast && (
+                <button className="btn" onClick={sendToBroadcast}>
+                  {t('broadcast.sendThis')}
+                </button>
+              )}
               {(!isOnline || over) && !tutorial && (
                 <button className="btn" onClick={game.downloadReplay}>
                   {t('game.downloadReplay')}

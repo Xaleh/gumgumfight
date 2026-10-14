@@ -529,6 +529,8 @@ export default {
   'online.hands': 'Ver manos',
   'online.delay': '⏱ {n} min de retraso',
   'online.delayTitle': 'Con las manos a la vista, la mesa llega con retraso: así la partida puede ir a un directo sin revelarle las cartas al rival.',
+  'online.watchChat': 'Chat',
+  'online.watchChatTitle': 'Muestra u oculta los mensajes y emotes de los jugadores (solo para ti)',
   // ==== /online ====
 
 
@@ -564,10 +566,8 @@ export default {
   'broadcast.copied': '¡Copiado!',
   'broadcast.nowOnAir': 'En la transmisión:',
   'broadcast.onAirEnded': 'partida terminada',
-  'broadcast.withHands': 'con las manos ({n} min de retraso)',
   'broadcast.clear': 'Quitar de pantalla',
   'broadcast.nothingOnAir': 'Ninguna partida en la transmisión.',
-  'broadcast.handsDelayHint': 'Con «Ver las manos de los jugadores» marcado, la transmisión muestra las manos con {n} min de retraso, para que el rival no vea las cartas por el directo.',
   'broadcast.newKey': 'Generar enlace nuevo',
   'broadcast.newKeyConfirm': '¿Generar un enlace nuevo? El enlace actual dejará de funcionar en OBS.',
   'broadcast.transmit': '📡 Transmitir',
@@ -582,6 +582,21 @@ export default {
   'broadcast.played': '{name} jugó',
   'broadcast.countered': '{name} usó Counter',
   'broadcast.activated': '{name} activó',
+  'broadcast.sendThis': '📡 Transmitir esta partida',
+  'broadcast.sent': 'Partida enviada a la transmisión.',
+  'broadcast.delay': 'Retraso:',
+  'broadcast.delayMin': '{n} min',
+  'broadcast.delayNone': 'Sin retraso',
+  'broadcast.delayLive': 'en directo',
+  'broadcast.showsPlayers': 'manos de los jugadores',
+  'broadcast.showsOwn': 'tu mano',
+  'broadcast.showsNone': 'sin manos',
+  'broadcast.handsPlayers': 'Mostrar las manos de los jugadores en las partidas que ves',
+  'broadcast.handsPlayersHint': '(siempre con al menos {n} min de retraso)',
+  'broadcast.handsOwn': 'Mostrar tu mano en las partidas que juegas',
+  'broadcast.handsOwnHint': '(la del rival nunca aparece; vale el retraso elegido)',
+  'broadcast.delayTournaments': 'Retraso también en las partidas de torneo, incluso sin manos',
+  'broadcast.chat': 'Mostrar el chat de los jugadores en la transmisión',
   // ==== /watch ====
 
 
