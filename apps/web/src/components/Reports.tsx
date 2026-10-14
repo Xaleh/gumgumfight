@@ -33,8 +33,9 @@ export function MatchLine({ m }: { m: MatchSummary }) {
 }
 
 /**
- * Lista de relatos para quem audita (organizador, admin, dev): a partida, o replay e
- * a resolução com nota.
+ * Lista de relatos para quem audita (organizador, admin, dev): a partida, o formulário
+ * respondido (carta, interação, o que deveria ter acontecido), o replay e a resolução com
+ * nota. Resolver avisa o jogador que pediu (notificação).
  */
 export function ReportList({
   reports,
@@ -100,9 +101,31 @@ export function ReportList({
             ) : (
               <p className="muted small">{t('reports.matchMissing', { id: r.matchId })}</p>
             )}
-            <p className="report-text">
-              <b>{r.reporterName}</b> <span className="muted small">({dateTime(r.createdAt)})</span>: {r.text}
+            <p className="report-by">
+              <b>{r.reporterName}</b> <span className="muted small">({dateTime(r.createdAt)})</span>
+              {r.notify && (
+                <span className="muted small">
+                  {' '}
+                  · {r.notifiedAt ? t('reports.notifiedAt', { date: dateTime(r.notifiedAt) }) : t('reports.wantsNotice')}
+                </span>
+              )}
             </p>
+            <dl className="report-form">
+              {r.card && (
+                <>
+                  <dt>{t('reports.cardLabel')}</dt>
+                  <dd>{r.card}</dd>
+                </>
+              )}
+              <dt>{t('reports.textLabel')}</dt>
+              <dd className="report-text">{r.text}</dd>
+              {r.expected && (
+                <>
+                  <dt>{t('reports.expectedLabel')}</dt>
+                  <dd className="report-text">{r.expected}</dd>
+                </>
+              )}
+            </dl>
             {r.resolvedAt && (
               <p className="muted small">
                 {r.note ? t('reports.resolvedAtNote', { date: dateTime(r.resolvedAt), note: r.note }) : t('reports.resolvedAt', { date: dateTime(r.resolvedAt) })}

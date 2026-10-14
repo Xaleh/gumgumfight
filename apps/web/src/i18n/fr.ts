@@ -530,7 +530,6 @@ export default {
   'online.seriesOver': ' — série terminée.',
   'online.bounty': 'Prime :',
   'online.rematchWanted': '{name} veut une revanche !',
-  'online.report': '⚑ Signaler un problème',
   // ---- waiting ----
   'online.shareText': 'On joue ? Code du salon : {code}',
   'online.cannotWatch': 'Impossible de regarder',
@@ -683,21 +682,31 @@ export default {
   'reports.filterOpen': 'Ouverts',
   'reports.filterResolved': 'Résolus',
   'reports.filterAll': 'Tous',
-  'reports.panelHint':
-    'Les joueurs signalent des problèmes à la fin des parties classées et de tournoi. Chaque partie est enregistrée : le replay montre exactement ce qui s’est passé.',
+  'reports.panelHint': "Les joueurs signalent les bugs à la fin de leurs parties (contre le bot, en ligne, classées et de tournoi) : la carte, l'interaction qui a posé problème et ce qui aurait dû se passer. Chaque partie est enregistrée : le replay montre exactement ce qui s'est passé.",
   // ---- report a problem ----
-  'reports.dialogLabel': 'Signaler un problème',
-  'reports.title': '⚑ Signaler un problème',
+  'reports.dialogLabel': 'Signaler un bug',
+  'reports.title': '⚑ Signaler un bug',
   'reports.sent': 'Signalement envoyé.',
   'reports.sentTournament': 'L’organisateur du tournoi et les admins examineront la partie à partir du replay enregistré.',
   'reports.sentAdmins': 'Les admins examineront la partie à partir du replay enregistré.',
-  'reports.describeTournament':
-    'Décrivez ce qui s’est passé (une carte qui n’a pas fonctionné comme prévu, une connexion coupée, le comportement de votre adversaire…). Le replay de la partie est enregistré et accompagne le signalement envoyé à l’organisateur de {tournament} et aux admins.',
-  'reports.describeAdmins':
-    'Décrivez ce qui s’est passé (une carte qui n’a pas fonctionné comme prévu, une connexion coupée, le comportement de votre adversaire…). Le replay de la partie est enregistré et accompagne le signalement envoyé aux admins.',
-  'reports.textPlaceholder': 'Que s’est-il passé ?',
+  'reports.describeTournament': "Expliquez ce qui s'est mal passé pendant la partie. Le replay est enregistré et accompagne le signalement pour l'organisateur de {tournament} et les administrateurs.",
+  'reports.describeAdmins': "Expliquez ce qui s'est mal passé pendant la partie. Le replay est enregistré et accompagne le signalement pour les administrateurs.",
+  'reports.textPlaceholder': "Ex. : j'ai activé le [On Play] et l'effet ne m'a pas laissé choisir la cible.",
   'reports.sending': 'Envoi…',
   'reports.send': 'Envoyer le signalement',
+  'reports.cardLabel': 'Quelle carte a posé problème ?',
+  'reports.optional': '(facultatif)',
+  'reports.cardPlaceholder': 'Nom ou numéro de la carte',
+  'reports.textLabel': 'Quelle interaction a posé problème ?',
+  'reports.expectedLabel': "Qu'aurait-il dû se passer ?",
+  'reports.expectedPlaceholder': "Ex. : j'aurais dû pouvoir choisir un Personnage adverse de coût 4 ou moins.",
+  'reports.notifyLabel': 'Me prévenir quand le bug sera corrigé',
+  'reports.notifyHint': 'Vous recevrez une notification sur cet appareil quand le signalement sera résolu.',
+  'reports.notifyNoPush': "Les notifications n'ont pas pu être activées sur cet appareil ; activez-les dans les Paramètres pour recevoir l'avis. Votre demande est enregistrée.",
+  'reports.sentNotify': 'Vous serez prévenu quand le bug sera corrigé.',
+  'reports.loginFirst': 'Connectez-vous avec votre compte Google pour signaler un bug : le signalement est lié à votre partie et nous pourrons vous prévenir de la correction.',
+  'reports.wantsNotice': '🔔 veut être prévenu',
+  'reports.notifiedAt': '🔔 prévenu le {date}',
   // ==== /reports ====
 
 
@@ -1373,6 +1382,7 @@ export default {
   'result.exit': 'Retour au menu',
   'result.review': 'Revoir la partie',
   'result.download': '⤓ Télécharger le replay',
+  'result.reportBug': '⚑ Signaler un bug',
   // ==== /result ====
 
 
@@ -2102,7 +2112,6 @@ export default {
   'errors.noReplay': 'Cette partie n’a pas de replay enregistré.',
   'errors.matchOfOthers': 'Cette partie appartient à d’autres joueurs.',
   'errors.reportOnlyPlayers': 'Seuls les joueurs de la partie peuvent signaler un problème.',
-  'errors.reportOnlyRankedOrTournament': 'Les signalements sont réservés aux parties classées et de tournoi.',
   'errors.reportTooShort': 'Décrivez le problème (au moins 5 lettres).',
   'errors.reportsViewForbidden': 'Seul l’organisateur du tournoi (ou un admin) peut voir les signalements.',
   'errors.reportsOrganizersOnly': 'Seuls les organisateurs et les admins peuvent voir les signalements.',

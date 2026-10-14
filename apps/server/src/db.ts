@@ -312,7 +312,7 @@ function migrateTournaments(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS tournament_games_match ON tournament_games(tournament_id, match_id);
 
-    -- Problemas relatados pelos jogadores ao fim de uma partida ranqueada ou de torneio.
+    -- Problemas (bugs) relatados pelos jogadores ao fim de uma partida.
     CREATE TABLE IF NOT EXISTS match_reports (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       match_id      INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -327,6 +327,14 @@ function migrateTournaments(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS match_reports_open ON match_reports(resolved_at, created_at);
   `);
+  // Formulário de bug: a carta, o que deveria ter acontecido e se o jogador quer ser avisado da correção
+  // (`text` continua sendo a descrição do que aconteceu, a interação com problema).
+  const reportCols = (db.prepare('PRAGMA table_info(match_reports)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!reportCols.includes('card')) db.exec('ALTER TABLE match_reports ADD COLUMN card TEXT');
+  if (!reportCols.includes('expected')) db.exec('ALTER TABLE match_reports ADD COLUMN expected TEXT');
+  if (!reportCols.includes('notify')) db.exec('ALTER TABLE match_reports ADD COLUMN notify INTEGER NOT NULL DEFAULT 0');
+  // Quando o aviso da correção saiu (reabrir e resolver de novo não avisa duas vezes).
+  if (!reportCols.includes('notified_at')) db.exec('ALTER TABLE match_reports ADD COLUMN notified_at TEXT');
 }
 
 /**

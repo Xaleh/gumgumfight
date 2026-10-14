@@ -530,7 +530,6 @@ export default {
   'online.seriesOver': ' — series over.',
   'online.bounty': 'Bounty:',
   'online.rematchWanted': '{name} wants a rematch!',
-  'online.report': '⚑ Report a problem',
   // ---- waiting ----
   'online.shareText': "Let's play? Room code: {code}",
   'online.cannotWatch': 'Could not watch',
@@ -683,21 +682,31 @@ export default {
   'reports.filterOpen': 'Open',
   'reports.filterResolved': 'Resolved',
   'reports.filterAll': 'All',
-  'reports.panelHint':
-    'Players report problems at the end of ranked and tournament matches. Every match is recorded: the replay shows exactly what happened.',
+  'reports.panelHint': 'Players report bugs at the end of their matches (vs. the bot, online, ranked and tournament): the card, the interaction that went wrong and what should have happened. Every match is recorded: the replay shows exactly what happened.',
   // ---- report a problem ----
-  'reports.dialogLabel': 'Report a problem',
-  'reports.title': '⚑ Report a problem',
+  'reports.dialogLabel': 'Report a bug',
+  'reports.title': '⚑ Report a bug',
   'reports.sent': 'Report sent.',
   'reports.sentTournament': 'The tournament organizer and the admins will review the match from the recorded replay.',
   'reports.sentAdmins': 'The admins will review the match from the recorded replay.',
-  'reports.describeTournament':
-    "Describe what happened (a card that didn't work as it should, a dropped connection, your opponent's behaviour…). The match replay is recorded and goes with the report to the organizer of {tournament} and to the admins.",
-  'reports.describeAdmins':
-    "Describe what happened (a card that didn't work as it should, a dropped connection, your opponent's behaviour…). The match replay is recorded and goes with the report to the admins.",
-  'reports.textPlaceholder': 'What happened?',
+  'reports.describeTournament': 'Tell us what went wrong in the match. The replay is recorded and goes with the report to the organizer of {tournament} and to the admins.',
+  'reports.describeAdmins': 'Tell us what went wrong in the match. The replay is recorded and goes with the report to the admins.',
+  'reports.textPlaceholder': "E.g.: I activated the [On Play] and the effect didn't let me choose a target.",
   'reports.sending': 'Sending…',
   'reports.send': 'Send report',
+  'reports.cardLabel': 'Which card had the problem?',
+  'reports.optional': '(optional)',
+  'reports.cardPlaceholder': 'Card name or number',
+  'reports.textLabel': 'Which interaction went wrong?',
+  'reports.expectedLabel': 'What should have happened?',
+  'reports.expectedPlaceholder': "E.g.: I should have been able to choose one of the opponent's Characters with a cost of 4 or less.",
+  'reports.notifyLabel': 'Notify me when the bug is fixed',
+  'reports.notifyHint': 'You will get a notification on this device when the report is resolved.',
+  'reports.notifyNoPush': "Notifications couldn't be turned on for this device; turn them on in Settings to get the notice. Your request is saved.",
+  'reports.sentNotify': 'You will be notified when the bug is fixed.',
+  'reports.loginFirst': 'Sign in with your Google account to report a bug: the report is linked to your match and we can let you know when it is fixed.',
+  'reports.wantsNotice': '🔔 wants a notice',
+  'reports.notifiedAt': '🔔 notified on {date}',
   // ==== /reports ====
 
 
@@ -1373,6 +1382,7 @@ export default {
   'result.exit': 'Back to menu',
   'result.review': 'Review the match',
   'result.download': '⤓ Download replay',
+  'result.reportBug': '⚑ Report a bug',
   // ==== /result ====
 
 
@@ -2102,7 +2112,6 @@ export default {
   'errors.noReplay': 'This match has no saved replay.',
   'errors.matchOfOthers': 'This match belongs to other players.',
   'errors.reportOnlyPlayers': 'Only the match players can report a problem.',
-  'errors.reportOnlyRankedOrTournament': 'Reports are only for ranked and tournament matches.',
   'errors.reportTooShort': 'Describe the problem (at least 5 letters).',
   'errors.reportsViewForbidden': 'Only the tournament organizer (or an admin) can see the reports.',
   'errors.reportsOrganizersOnly': 'Only organizers and admins can see reports.',

@@ -25,7 +25,8 @@ export interface PushPayload {
 }
 
 export interface PushNote {
-  category: PushCategory;
+  /** null: vai para todas as inscrições da pessoa (aviso que ela pediu, ver `pushSubscriptionsFor`). */
+  category: PushCategory | null;
   /** Título e texto no idioma de cada inscrição. */
   text: (locale: string) => { title: string; body: string };
   tag: string;

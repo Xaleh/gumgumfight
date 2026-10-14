@@ -1,5 +1,5 @@
 // SQL da auditoria das partidas: o resumo e o replay de uma partida gravada
-// (`matches` + `match_seats`) e os problemas relatados pelos jogadores (`match_reports`).
+// (`matches` + `match_seats`) e os problemas (bugs) relatados pelos jogadores (`match_reports`).
 
 import { type DeckList, REPLAY_VERSION } from '@gumgum/engine';
 import { dataVersion } from '../cache';
@@ -121,11 +121,28 @@ export interface MatchReport {
   tournamentId: string | null;
   reporterId: string;
   reporterName: string;
+  /** O que aconteceu: a interação que deu problema. */
   text: string;
+  /** A carta com problema (texto livre; null = não informada). */
+  card: string | null;
+  /** O que deveria ter acontecido. */
+  expected: string | null;
+  /** O jogador quer ser avisado (notificação) quando o problema for resolvido. */
+  notify: boolean;
+  /** Quando o aviso da correção foi enviado. */
+  notifiedAt: string | null;
   createdAt: string;
   resolvedAt: string | null;
   resolvedBy: string | null;
   note: string | null;
+}
+
+/** O formulário do relato. */
+export interface ReportInput {
+  text: string;
+  card: string | null;
+  expected: string | null;
+  notify: boolean;
 }
 
 type ReportRow = {
@@ -135,13 +152,17 @@ type ReportRow = {
   reporter_id: string;
   reporter_name: string | null;
   text: string;
+  card: string | null;
+  expected: string | null;
+  notify: number;
+  notified_at: string | null;
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
   note: string | null;
 };
 
-const REPORT_COLS = `r.id, r.match_id, r.tournament_id, r.reporter_id, p.name AS reporter_name, r.text, r.created_at, r.resolved_at, r.resolved_by, r.note`;
+const REPORT_COLS = `r.id, r.match_id, r.tournament_id, r.reporter_id, p.name AS reporter_name, r.text, r.card, r.expected, r.notify, r.notified_at, r.created_at, r.resolved_at, r.resolved_by, r.note`;
 const REPORT_FROM = `FROM match_reports r LEFT JOIN players p ON p.owner_hash = 'user:' || r.reporter_id`;
 
 const toReport = (r: ReportRow): MatchReport => ({
@@ -151,19 +172,24 @@ const toReport = (r: ReportRow): MatchReport => ({
   reporterId: r.reporter_id,
   reporterName: r.reporter_name ?? 'Jogador',
   text: r.text,
+  card: r.card,
+  expected: r.expected,
+  notify: Boolean(r.notify),
+  notifiedAt: r.notified_at,
   createdAt: r.created_at,
   resolvedAt: r.resolved_at,
   resolvedBy: r.resolved_by,
   note: r.note,
 });
 
-/** Relato de um jogador sobre a partida (um por jogador e partida: relatar de novo troca o texto e reabre). */
-export function createReport(db: DB, matchId: number, tournamentId: string | null, reporterId: string, text: string): MatchReport {
+/** Relato de um jogador sobre a partida (um por jogador e partida: relatar de novo troca o formulário e reabre). */
+export function createReport(db: DB, matchId: number, tournamentId: string | null, reporterId: string, input: ReportInput): MatchReport {
   dataVersion.bump();
   db.prepare(
-    `INSERT INTO match_reports (match_id, tournament_id, reporter_id, text) VALUES (?, ?, ?, ?)
-     ON CONFLICT(match_id, reporter_id) DO UPDATE SET text = excluded.text, created_at = datetime('now'), resolved_at = NULL, resolved_by = NULL, note = NULL`,
-  ).run(matchId, tournamentId, reporterId, text);
+    `INSERT INTO match_reports (match_id, tournament_id, reporter_id, text, card, expected, notify) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(match_id, reporter_id) DO UPDATE SET text = excluded.text, card = excluded.card, expected = excluded.expected,
+       notify = excluded.notify, notified_at = NULL, created_at = datetime('now'), resolved_at = NULL, resolved_by = NULL, note = NULL`,
+  ).run(matchId, tournamentId, reporterId, input.text, input.card, input.expected, input.notify ? 1 : 0);
   const r = db.prepare(`SELECT ${REPORT_COLS} ${REPORT_FROM} WHERE r.match_id = ? AND r.reporter_id = ?`).get(matchId, reporterId) as ReportRow;
   return toReport(r);
 }
@@ -213,6 +239,11 @@ export function resolveReport(db: DB, id: number, by: string, resolved: boolean,
      WHERE id = ?`,
   ).run(resolved ? 1 : 0, resolved ? 1 : 0, by, note, id);
   return getReport(db, id);
+}
+
+/** Marca que o aviso da correção saiu. */
+export function markReportNotified(db: DB, id: number) {
+  db.prepare("UPDATE match_reports SET notified_at = datetime('now') WHERE id = ?").run(id);
 }
 
 /** Quantos relatos abertos há (admin: todos; organizador: dos torneios dele). */

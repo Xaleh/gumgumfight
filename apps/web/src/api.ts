@@ -384,10 +384,10 @@ export const api = {
     /** Kit de divulgação (quem gerencia, com o torneio encerrado). */
     recap: (id: string) => get<TournamentRecap>(`/api/tournaments/${encodeURIComponent(id)}/recap`),
   },
-  /** Auditoria: replay e relatos de problemas das partidas gravadas (ranqueadas e de torneio). */
+  /** Auditoria: replay e relatos de problemas (bugs) das partidas gravadas. */
   matches: {
     replay: (id: number) => get<Record<string, unknown>>(`/api/matches/${id}/replay`),
-    report: (id: number, text: string) => send<MatchReport>('POST', `/api/matches/${id}/report`, { text }),
+    report: (id: number, form: ReportForm) => send<MatchReport>('POST', `/api/matches/${id}/report`, form),
   },
   reports: {
     list: (opts: { tournament?: string; status?: 'open' | 'resolved' | 'all' } = {}) =>
@@ -763,13 +763,31 @@ export interface TournamentGame {
 }
 
 /** Problema relatado por um jogador ao fim de uma partida ranqueada ou de torneio. */
+/** Formulário de relato de bug ao fim da partida. */
+export interface ReportForm {
+  /** A interação que deu problema. */
+  text: string;
+  card?: string;
+  expected?: string;
+  notify?: boolean;
+}
+
 export interface MatchReport {
   id: number;
   matchId: number;
   tournamentId: string | null;
   reporterId: string;
   reporterName: string;
+  /** O que aconteceu: a interação que deu problema. */
   text: string;
+  /** A carta com problema. */
+  card: string | null;
+  /** O que deveria ter acontecido. */
+  expected: string | null;
+  /** O jogador quer ser avisado quando o problema for resolvido. */
+  notify: boolean;
+  /** Quando o aviso da correção foi enviado. */
+  notifiedAt: string | null;
   createdAt: string;
   resolvedAt: string | null;
   resolvedBy: string | null;

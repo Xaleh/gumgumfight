@@ -6,7 +6,6 @@ import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGam
 import { type MessageKey, type Translate, useLocale, useT, useTryT } from '../i18n';
 import { fmtBerries, fmtNumber } from '../i18n/format';
 import { useSettings } from '../settings';
-import { ReportModal } from './ReportModal';
 
 /** Nome de cada liga da ranqueada: chave do dicionário (mostrar com `tierName`). */
 export const TIER_LABEL: Record<string, MessageKey> = {
@@ -261,13 +260,12 @@ export function ChatBubbles({ online, bottom }: { online: OnlineGame; bottom: Pl
   );
 }
 
-/** Fim da partida online: recompensa (ranqueada), revanche e o relato de problema (ranqueada e torneio). */
+/** Fim da partida online: recompensa (ranqueada) e revanche (o relato de bug fica no resumo da partida, ver GameResult). */
 export function OnlineResultInfo({ online }: { online: OnlineGame }) {
   const t = useT();
   const locale = useLocale();
   const bounty = (n: number) => fmtBerries(n, locale);
   const { room } = online;
-  const [reporting, setReporting] = useState(false);
   if (!room) return null;
   if (room.you === null) {
     // Espectador: a recompensa dos dois.
@@ -315,16 +313,6 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
       {room.result?.error && <p className="muted small">{errorMessage(room.result, room.result.error)}</p>}
       {room.queue === 'private' && room.rematch[opp] && !room.rematch[me] && (
         <p className="muted small">{t('online.rematchWanted', { name: room.players[opp]?.name })}</p>
-      )}
-      {(room.queue === 'ranked' || room.queue === 'tournament') && room.result?.matchId != null && (
-        <p className="small">
-          <button className="btn small pill" onClick={() => setReporting(true)}>
-            {t('online.report')}
-          </button>
-        </p>
-      )}
-      {reporting && room.result?.matchId != null && (
-        <ReportModal matchId={room.result.matchId} tournament={tour?.name ?? null} onClose={() => setReporting(false)} />
       )}
     </div>
   );

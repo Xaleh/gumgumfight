@@ -396,9 +396,11 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   final, o encerramento. **Encerrar agora** termina antes.
 - **Auditoria:** todo jogo disputado nas salas fica gravado com o replay. Em cada partida da aba Rodadas, **Jogos
   gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os dois jogadores podem
-  **assistir ao replay**. Ao fim de uma partida de torneio ou ranqueada, o jogador pode **relatar um problema**
-  (botão ⚑ na tela de resultado); o relato, com o replay, aparece na aba **Relatos** do torneio para o organizador e
-  em **Administração → Relatos de partidas** para Admin e Dev, que o resolvem com uma nota.
+  **assistir ao replay**. Ao fim de qualquer partida (contra o bot, online, ranqueada ou de torneio), o jogador logado
+  pode **relatar um bug** (botão ⚑ abaixo de "Baixar replay"): a carta, a interação que deu problema, o que deveria ter
+  acontecido e se quer ser avisado da correção. O relato, com o replay, aparece na aba **Relatos** do torneio para o
+  organizador e em **Administração → Relatos de partidas** para Admin e Dev, que o resolvem com uma nota; quem pediu o
+  aviso recebe uma notificação.
 - **Correção de resultados:** um placar lançado errado pode ser corrigido em qualquer rodada, inclusive passadas (a
   classificação é recalculada). Na chave, corrigir quem venceu troca o jogador da partida seguinte, desde que ela
   ainda não tenha começado (senão, corrija ou zere antes a partida seguinte). Resultados do suíço não mudam depois

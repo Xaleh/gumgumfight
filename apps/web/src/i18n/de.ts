@@ -530,7 +530,6 @@ export default {
   'online.seriesOver': ' – Serie beendet.',
   'online.bounty': 'Kopfgeld:',
   'online.rematchWanted': '{name} will eine Revanche!',
-  'online.report': '⚑ Problem melden',
   // ---- Warten ----
   'online.shareText': 'Lust auf eine Partie? Raumcode: {code}',
   'online.cannotWatch': 'Zuschauen nicht möglich',
@@ -683,21 +682,31 @@ export default {
   'reports.filterOpen': 'Offen',
   'reports.filterResolved': 'Erledigt',
   'reports.filterAll': 'Alle',
-  'reports.panelHint':
-    'Spieler melden Probleme am Ende von Ranked- und Turnierpartien. Jede Partie wird aufgezeichnet: Das Replay zeigt genau, was passiert ist.',
+  'reports.panelHint': 'Spieler melden Bugs am Ende ihrer Partien (gegen den Bot, online, Ranked und Turnier): die Karte, die fehlerhafte Interaktion und was hätte passieren sollen. Jede Partie wird aufgezeichnet: Das Replay zeigt genau, was passiert ist.',
   // ---- Problem melden ----
-  'reports.dialogLabel': 'Problem melden',
-  'reports.title': '⚑ Problem melden',
+  'reports.dialogLabel': 'Bug melden',
+  'reports.title': '⚑ Bug melden',
   'reports.sent': 'Meldung gesendet.',
   'reports.sentTournament': 'Der Turnierveranstalter und die Admins prüfen die Partie anhand des aufgezeichneten Replays.',
   'reports.sentAdmins': 'Die Admins prüfen die Partie anhand des aufgezeichneten Replays.',
-  'reports.describeTournament':
-    'Beschreibe, was passiert ist (eine Karte, die nicht richtig funktioniert hat, eine abgebrochene Verbindung, das Verhalten deines Gegners…). Das Replay der Partie ist aufgezeichnet und geht mit der Meldung an den Veranstalter von {tournament} und an die Admins.',
-  'reports.describeAdmins':
-    'Beschreibe, was passiert ist (eine Karte, die nicht richtig funktioniert hat, eine abgebrochene Verbindung, das Verhalten deines Gegners…). Das Replay der Partie ist aufgezeichnet und geht mit der Meldung an die Admins.',
-  'reports.textPlaceholder': 'Was ist passiert?',
+  'reports.describeTournament': 'Erzähl uns, was in der Partie schiefgelaufen ist. Das Replay wird aufgezeichnet und geht mit der Meldung an den Organisator von {tournament} und an die Admins.',
+  'reports.describeAdmins': 'Erzähl uns, was in der Partie schiefgelaufen ist. Das Replay wird aufgezeichnet und geht mit der Meldung an die Admins.',
+  'reports.textPlaceholder': 'Z. B.: Ich habe [On Play] aktiviert und der Effekt ließ mich kein Ziel wählen.',
   'reports.sending': 'Sende…',
   'reports.send': 'Meldung senden',
+  'reports.cardLabel': 'Welche Karte hatte das Problem?',
+  'reports.optional': '(optional)',
+  'reports.cardPlaceholder': 'Kartenname oder -nummer',
+  'reports.textLabel': 'Welche Interaktion war fehlerhaft?',
+  'reports.expectedLabel': 'Was hätte passieren sollen?',
+  'reports.expectedPlaceholder': 'Z. B.: Ich hätte einen gegnerischen Charakter mit Kosten 4 oder weniger wählen können sollen.',
+  'reports.notifyLabel': 'Benachrichtige mich, wenn der Bug behoben ist',
+  'reports.notifyHint': 'Du bekommst eine Benachrichtigung auf diesem Gerät, wenn die Meldung erledigt ist.',
+  'reports.notifyNoPush': 'Benachrichtigungen konnten auf diesem Gerät nicht aktiviert werden; aktiviere sie in den Einstellungen, um den Hinweis zu bekommen. Dein Wunsch ist gespeichert.',
+  'reports.sentNotify': 'Du wirst benachrichtigt, wenn der Bug behoben ist.',
+  'reports.loginFirst': 'Melde dich mit deinem Google-Konto an, um einen Bug zu melden: So ist die Meldung mit deiner Partie verknüpft und wir können dich über die Korrektur informieren.',
+  'reports.wantsNotice': '🔔 möchte benachrichtigt werden',
+  'reports.notifiedAt': '🔔 benachrichtigt am {date}',
   // ==== /reports ====
 
 
@@ -1373,6 +1382,7 @@ export default {
   'result.exit': 'Zurück zum Menü',
   'result.review': 'Partie ansehen',
   'result.download': '⤓ Replay herunterladen',
+  'result.reportBug': '⚑ Bug melden',
   // ==== /result ====
 
 
@@ -2102,7 +2112,6 @@ export default {
   'errors.noReplay': 'Diese Partie hat kein gespeichertes Replay.',
   'errors.matchOfOthers': 'Diese Partie gehört anderen Spielern.',
   'errors.reportOnlyPlayers': 'Nur die Spieler der Partie können ein Problem melden.',
-  'errors.reportOnlyRankedOrTournament': 'Meldungen gibt es nur für Ranked- und Turnierpartien.',
   'errors.reportTooShort': 'Beschreibe das Problem (mindestens 5 Buchstaben).',
   'errors.reportsViewForbidden': 'Nur der Turnierveranstalter (oder ein Admin) kann die Meldungen sehen.',
   'errors.reportsOrganizersOnly': 'Nur Veranstalter und Admins können Meldungen sehen.',

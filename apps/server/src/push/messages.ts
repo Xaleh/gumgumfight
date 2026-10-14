@@ -25,6 +25,9 @@ const pt = {
   quarter: 'Quartas de final',
   r16: 'Oitavas de final',
   roundOf: 'Rodada de {n}',
+  reportFixedTitle: 'Problema corrigido!',
+  reportFixedCardBody: 'O problema que você relatou foi resolvido: {card}. Obrigado por ajudar!',
+  reportFixedBody: 'O problema que você relatou foi resolvido. Obrigado por ajudar!',
 };
 
 export type PushKey = keyof typeof pt;
@@ -49,6 +52,9 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     quarter: 'Quarterfinals',
     r16: 'Round of 16',
     roundOf: 'Round of {n}',
+    reportFixedTitle: 'Bug fixed!',
+    reportFixedCardBody: 'The problem you reported has been resolved: {card}. Thanks for helping!',
+    reportFixedBody: 'The problem you reported has been resolved. Thanks for helping!',
   },
   es: {
     matchStartTitle: '¡Partida encontrada!',
@@ -68,6 +74,9 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     quarter: 'Cuartos de final',
     r16: 'Octavos de final',
     roundOf: 'Ronda de {n}',
+    reportFixedTitle: '¡Problema corregido!',
+    reportFixedCardBody: 'El problema que reportaste fue resuelto: {card}. ¡Gracias por ayudar!',
+    reportFixedBody: 'El problema que reportaste fue resuelto. ¡Gracias por ayudar!',
   },
   ja: {
     matchStartTitle: '対戦相手が見つかりました！',
@@ -87,6 +96,9 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     quarter: '準々決勝',
     r16: 'ベスト16',
     roundOf: 'ベスト{n}',
+    reportFixedTitle: '不具合を修正しました！',
+    reportFixedCardBody: '報告いただいた問題を解決しました：{card}。ご協力ありがとうございます！',
+    reportFixedBody: '報告いただいた問題を解決しました。ご協力ありがとうございます！',
   },
   fr: {
     matchStartTitle: 'Partie trouvée !',
@@ -106,6 +118,9 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     quarter: 'Quarts de finale',
     r16: 'Huitièmes de finale',
     roundOf: 'Tour des {n}',
+    reportFixedTitle: 'Problème corrigé !',
+    reportFixedCardBody: 'Le problème que vous avez signalé a été résolu : {card}. Merci de votre aide !',
+    reportFixedBody: 'Le problème que vous avez signalé a été résolu. Merci de votre aide !',
   },
   de: {
     matchStartTitle: 'Match gefunden!',
@@ -125,6 +140,9 @@ const MESSAGES: Record<PushLocale, Record<PushKey, string>> = {
     quarter: 'Viertelfinale',
     r16: 'Achtelfinale',
     roundOf: 'Runde der letzten {n}',
+    reportFixedTitle: 'Problem behoben!',
+    reportFixedCardBody: 'Das von dir gemeldete Problem wurde behoben: {card}. Danke für deine Hilfe!',
+    reportFixedBody: 'Das von dir gemeldete Problem wurde behoben. Danke für deine Hilfe!',
   },
 };
 

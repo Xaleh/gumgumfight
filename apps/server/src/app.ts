@@ -317,7 +317,7 @@ export function buildApp(
   // Imagens das cartas pelo mesmo domínio (kit de divulgação; em produção o Nginx atende antes).
   registerCardImageRoutes(app, { enabled: server.cardImages, fetchImpl: opts.fetchImpl });
 
-  registerReportRoutes(app, { db, user: auth.viewer });
+  registerReportRoutes(app, { db, user: auth.viewer, notifier });
   registerSupportRoutes(app, {
     db,
     user: auth.viewer,

@@ -7948,6 +7948,10 @@ tr.clickable:hover td {
 
 /* ------------------------------------------------------------------ relatos de partidas */
 
+/* Abre por cima do resumo do fim da partida (`.result`). */
+.report-backdrop {
+  z-index: 85;
+}
 .report-sheet {
   max-width: 520px;
 }
@@ -7978,11 +7982,35 @@ tr.clickable:hover td {
   flex-wrap: wrap;
 }
 .report-players,
-.report-text {
+.report-by {
   margin: 6px 0 0;
 }
 .report-text {
   white-space: pre-wrap;
+}
+.report-form {
+  margin: 6px 0 0;
+}
+.report-form dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 800;
+  margin-top: 6px;
+}
+.report-form dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.report-body .field {
+  margin-bottom: 12px;
+}
+.report-body .field .admin-search {
+  margin: 0;
+}
+.report-body .check {
+  margin: 4px 0 6px;
 }
 .report-card .btn-row {
   margin-top: 8px;

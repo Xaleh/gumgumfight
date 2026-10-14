@@ -531,7 +531,6 @@ const ptBR = {
   'online.seriesOver': ' — série encerrada.',
   'online.bounty': 'Recompensa:',
   'online.rematchWanted': '{name} quer revanche!',
-  'online.report': '⚑ Relatar um problema',
   // ---- espera ----
   'online.shareText': 'Vamos jogar? Código da sala: {code}',
   'online.cannotWatch': 'Não foi possível assistir',
@@ -684,21 +683,31 @@ const ptBR = {
   'reports.filterOpen': 'Abertos',
   'reports.filterResolved': 'Resolvidos',
   'reports.filterAll': 'Todos',
-  'reports.panelHint':
-    'Os jogadores relatam problemas ao fim das partidas ranqueadas e de torneio. Toda partida fica gravada: o replay mostra exatamente o que aconteceu.',
+  'reports.panelHint': 'Os jogadores relatam bugs ao fim das partidas (contra o bot, online, ranqueadas e de torneio): a carta, a interação que deu problema e o que deveria ter acontecido. Toda partida fica gravada: o replay mostra exatamente o que aconteceu.',
   // ---- relatar um problema ----
-  'reports.dialogLabel': 'Relatar problema',
-  'reports.title': '⚑ Relatar um problema',
+  'reports.dialogLabel': 'Relatar um bug',
+  'reports.title': '⚑ Relatar um bug',
   'reports.sent': 'Relato enviado.',
   'reports.sentTournament': 'O organizador do torneio e os administradores vão analisar a partida pelo replay gravado.',
   'reports.sentAdmins': 'Os administradores vão analisar a partida pelo replay gravado.',
-  'reports.describeTournament':
-    'Descreva o que aconteceu (uma carta que não funcionou como devia, queda de conexão, comportamento do oponente…). O replay da partida fica gravado e vai junto com o relato para o organizador de {tournament} e para os administradores.',
-  'reports.describeAdmins':
-    'Descreva o que aconteceu (uma carta que não funcionou como devia, queda de conexão, comportamento do oponente…). O replay da partida fica gravado e vai junto com o relato para os administradores.',
-  'reports.textPlaceholder': 'O que aconteceu?',
+  'reports.describeTournament': 'Conte o que deu errado na partida. O replay fica gravado e vai junto com o relato para o organizador de {tournament} e para os administradores.',
+  'reports.describeAdmins': 'Conte o que deu errado na partida. O replay fica gravado e vai junto com o relato para os administradores.',
+  'reports.textPlaceholder': 'Ex.: ativei o [On Play] e o efeito não deixou escolher o alvo.',
   'reports.sending': 'Enviando…',
   'reports.send': 'Enviar relato',
+  'reports.cardLabel': 'Qual carta deu problema?',
+  'reports.optional': '(opcional)',
+  'reports.cardPlaceholder': 'Nome ou número da carta',
+  'reports.textLabel': 'Qual interação deu problema?',
+  'reports.expectedLabel': 'O que deveria ter acontecido?',
+  'reports.expectedPlaceholder': 'Ex.: eu deveria poder escolher um Personagem do oponente com custo 4 ou menos.',
+  'reports.notifyLabel': 'Quero ser avisado quando o bug for corrigido',
+  'reports.notifyHint': 'Você recebe uma notificação neste aparelho quando o relato for resolvido.',
+  'reports.notifyNoPush': 'As notificações não puderam ser ligadas neste aparelho; ligue em Configurações para receber o aviso. O pedido fica registrado.',
+  'reports.sentNotify': 'Você será avisado quando o bug for corrigido.',
+  'reports.loginFirst': 'Entre com a conta Google para relatar um bug: assim o relato fica ligado à sua partida e podemos avisar você quando for corrigido.',
+  'reports.wantsNotice': '🔔 quer ser avisado',
+  'reports.notifiedAt': '🔔 avisado em {date}',
   // ==== /reports ====
 
 
@@ -1374,6 +1383,7 @@ const ptBR = {
   'result.exit': 'Voltar ao menu',
   'result.review': 'Rever a partida',
   'result.download': '⤓ Baixar replay',
+  'result.reportBug': '⚑ Relatar um bug',
   // ==== /result ====
 
 
@@ -2106,7 +2116,6 @@ const ptBR = {
   'errors.noReplay': 'Esta partida não tem replay gravado.',
   'errors.matchOfOthers': 'Partida de outros jogadores.',
   'errors.reportOnlyPlayers': 'Só quem jogou a partida pode relatar um problema.',
-  'errors.reportOnlyRankedOrTournament': 'Relatos valem para partidas ranqueadas e de torneio.',
   'errors.reportTooShort': 'Descreva o problema (pelo menos 5 letras).',
   'errors.reportsViewForbidden': 'Só o organizador do torneio (ou um admin) vê os relatos.',
   'errors.reportsOrganizersOnly': 'Só organizadores e admins veem os relatos.',
