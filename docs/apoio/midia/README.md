@@ -43,6 +43,10 @@ CARD_IMAGES=off npm run dev         # em outro terminal: o site sem as imagens o
 bash scripts/divulgacao/gerar.sh    # ~15 minutos; tudo sai em scripts/divulgacao/saida/
 ```
 
+Versão com as artes oficiais (cartas, verso e DON!!, como o jogador vê no site), para comparar: suba o site com
+`CARD_IMAGES=on npm run dev` e rode `ARTE=oficial bash scripts/divulgacao/gerar.sh`. O resultado sai em
+`scripts/divulgacao/saida-oficial/`. As imagens da optcgapi vêm com a marca d'água "SAMPLE" em cada carta.
+
 O que cada parte faz:
 
 - `gerar-replay.mts`: joga uma partida bot x bot (Luffy ST01 x Kid ST10, seed 2: Luffy vence com 1 de Vida) e salva

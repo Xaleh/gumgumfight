@@ -56,6 +56,11 @@ if (etapa === 'base') {
   await render('perfil.html', 'perfil-512.png', 512, 512);
 } else if (etapa === 'pecas') {
   for (const f of ['mesa.png', 'mesa-vertical.png', 'home.png']) cpSync(join(SAIDA, f), join(PAG, f));
+  if (process.env.ARTE === 'oficial') {
+    // O banner usa o verso e o DON!! do próprio site (o Chromium lê a imagem pelo conteúdo, não pela extensão).
+    cpSync(join(AQUI, '../../apps/web/src/assets/card-back.webp'), join(PAG, 'card-back-gg.png'));
+    cpSync(join(AQUI, '../../apps/web/src/assets/don-card.jpg'), join(PAG, 'don-gg.png'));
+  }
   await render('banner.html', 'banner-apoiase.jpg', 1600, 300, { scale: 2 });
   await render('post.html', 'post-inauguracao-1080.jpg', 1080, 1080);
   await render('story.html', 'story-inauguracao-1080x1920.jpg', 1080, 1920);

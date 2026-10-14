@@ -4,9 +4,13 @@
 # O site precisa estar no ar SEM as imagens oficiais das cartas:
 #   CARD_IMAGES=off npm run dev
 # Resultado em scripts/divulgacao/saida/ (fora do git). Uso: bash scripts/divulgacao/gerar.sh
+#
+# Versão com as artes oficiais (cartas, verso e DON!!): site com CARD_IMAGES=on e
+#   ARTE=oficial bash scripts/divulgacao/gerar.sh          (resultado em saida-oficial/)
 set -euo pipefail
 AQUI="$(cd "$(dirname "$0")" && pwd)"
-export SAIDA="${SAIDA:-$AQUI/saida}"
+if [ "${ARTE:-}" = oficial ]; then export SAIDA="${SAIDA:-$AQUI/saida-oficial}"; else export SAIDA="${SAIDA:-$AQUI/saida}"; fi
+export ARTE="${ARTE:-}"
 mkdir -p "$SAIDA"
 cd "$AQUI"
 XVFB=(xvfb-run -a -s "-screen 0 2000x2200x24")

@@ -3,7 +3,8 @@
 // quebra a mesa (que usa unidades de viewport); com --force-device-scale-factor a mesa fica igual e nítida.
 //
 // O verso das cartas e a carta de DON!! do site são artes oficiais: na gravação, as duas imagens são trocadas
-// pelas versões do GumGum (verso-gumgum.png e don-gumgum.png, geradas por imagens.mjs em $SAIDA).
+// pelas versões do GumGum (verso-gumgum.png e don-gumgum.png, geradas por imagens.mjs em $SAIDA). Com ARTE=oficial
+// (e o site com CARD_IMAGES=on), nada é trocado: sai a mesa como o jogador vê, com as artes oficiais.
 //
 // Rodar dentro do Xvfb, com o site no ar com CARD_IMAGES=off:
 //   xvfb-run -a -s "-screen 0 2000x2200x24" node gravar.mjs replay <replay.json> <saida.mp4> <W> <H> <escala> <velocidade> <segundos>
@@ -20,7 +21,7 @@ async function open({ W, H, scale }) {
   const h = Math.round(H / scale);
   const b = await chromium.launch({ headless: false, args: [`--force-device-scale-factor=${scale}`, `--window-size=${w},${h + 100}`, '--window-position=0,0', '--hide-scrollbars'] });
   const ctx = await b.newContext({ viewport: null, locale: 'pt-BR', colorScheme: 'dark' });
-  await ctx.route(/card-back\.webp|don-card\.jpg/, (route) => {
+  if (process.env.ARTE !== 'oficial') await ctx.route(/card-back\.webp|don-card\.jpg/, (route) => {
     const u = route.request().url();
     if (u.includes('import')) return route.continue(); // o módulo JS do Vite, não a imagem
     route.fulfill({ contentType: 'image/png', body: readFileSync(`${SAIDA}/${u.includes('card-back') ? 'verso-gumgum.png' : 'don-gumgum.png'}`) });
@@ -95,11 +96,11 @@ if (cmd === 'replay') {
         await p.getByRole('button', { name: /^Próximo$/ }).click();
         await wait(2200);
       }
-      await p.locator('[data-uid]').filter({ hasText: 'Roronoa Zoro' }).first().click();
+      await p.locator('[data-uid][title="Roronoa Zoro"]').first().click();
       await wait(1300);
       await p.getByRole('button', { name: /Atacar/ }).first().click();
       await wait(1000);
-      await p.locator('[data-uid]').filter({ hasText: 'Crocodile' }).first().click();
+      await p.locator('[data-uid][title="Crocodile"]').first().click();
       await wait(4500);
       await stop();
     },
@@ -109,11 +110,12 @@ if (cmd === 'replay') {
       await wait(1500);
       const stop = record(s, out);
       await wait(1200);
-      const cards = p.locator('.builder-catalog .card');
-      await cards.filter({ hasText: 'Edward.Newgate' }).first().click();
+      // Pelo título (o nome da carta): com as imagens ligadas, a carta é só a arte, sem o nome em texto.
+      const card = (name) => p.locator(`.builder-catalog .card[title="${name}"]`).first();
+      await card('Edward.Newgate').click();
       await wait(1600);
       for (const name of ['Sanji', 'Nami', 'Jinbe', 'Carrot', 'Franky', 'Komachiyo', 'Sai', 'Gordon']) {
-        const c = cards.filter({ hasText: name }).first();
+        const c = card(name);
         await c.scrollIntoViewIfNeeded().catch(() => {});
         await c.hover();
         await wait(450);
