@@ -182,7 +182,7 @@ export function TournamentBanner({
     action = { label: m.room === 'playing' ? t('home.backToGame') : t('home.enterRoom'), run: () => act(onPlay) };
   } else {
     title = t('home.tournamentRunning', { name: entry.name });
-    sub = m && !m.opponent ? t('home.bye') : t('home.roundDone');
+    sub = m && !m.opponent ? t(m.result === 'loss' ? 'home.lateEntry' : 'home.bye') : t('home.roundDone');
     action = { label: t('home.openTournament'), run: onOpen };
   }
   return (

@@ -8086,6 +8086,37 @@ tr.clickable:hover td {
   margin: 0 0 10px;
   font-size: 15px;
 }
+.tour-confirm {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--panel2);
+}
+.tour-confirm p {
+  margin: 0;
+}
+.tour-late {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tour-late h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.tour-late p {
+  margin: 0;
+}
+.tour-late form input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
 
 
 /* ==================================================================
