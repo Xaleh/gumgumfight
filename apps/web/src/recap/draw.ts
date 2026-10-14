@@ -50,8 +50,11 @@ export interface RecapTexts {
   site: string;
 }
 
+/** Imagem pronta para desenhar: a original ou uma cópia reduzida (canvas). */
+export type RecapImage = HTMLImageElement | HTMLCanvasElement;
+
 export interface RecapAssets {
-  image: (url: string | null) => HTMLImageElement | null;
+  image: (url: string | null) => RecapImage | null;
   logo: HTMLImageElement | null;
   sponsorLogo: HTMLImageElement | null;
 }
@@ -100,6 +103,10 @@ const SAFE: Record<RecapFormat, { top: number; bottom: number }> = {
 };
 
 const SIDE = 56;
+const DECK_GAP = 14;
+/** Largura máxima de uma carta na decklist (4 colunas, o mínimo da grade): as cartas só
+ *  usadas ali podem ser reduzidas a isso antes de desenhar, sem perder qualidade. */
+export const DECK_TILE_MAX_W = Math.ceil((FORMAT_SIZE.feed.width - SIDE * 2 - 3 * DECK_GAP) / 4);
 
 // ------------------------------------------------------------------ utilitários
 
@@ -201,9 +208,9 @@ interface Rect {
 }
 
 /** Recorte da imagem (`src`, em frações da imagem) com a proporção do destino, centralizado. */
-function cover(img: HTMLImageElement, src: Rect, dest: Rect): Rect {
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
+function cover(img: RecapImage, src: Rect, dest: Rect): Rect {
+  const iw = ('naturalWidth' in img && img.naturalWidth) || img.width;
+  const ih = ('naturalHeight' in img && img.naturalHeight) || img.height;
   let sw = src.w * iw;
   let sh = src.h * ih;
   const cx = (src.x + src.w / 2) * iw;
@@ -214,7 +221,7 @@ function cover(img: HTMLImageElement, src: Rect, dest: Rect): Rect {
   return { x: cx - sw / 2, y: cy - sh / 2, w: sw, h: sh };
 }
 
-const drawCovered = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, src: Rect, dest: Rect) => {
+const drawCovered = (ctx: CanvasRenderingContext2D, img: RecapImage, src: Rect, dest: Rect) => {
   const s = cover(img, src, dest);
   ctx.drawImage(img, s.x, s.y, s.w, s.h, dest.x, dest.y, dest.w, dest.h);
 };
@@ -234,7 +241,7 @@ function colorFill(ctx: CanvasRenderingContext2D, c: RecapCard | null, r: Rect):
 }
 
 /** Carta inteira (arte ou bloco com nome e código), com cantos arredondados. */
-function drawCard(ctx: CanvasRenderingContext2D, card: RecapCard, img: HTMLImageElement | null, r: Rect) {
+function drawCard(ctx: CanvasRenderingContext2D, card: RecapCard, img: RecapImage | null, r: Rect) {
   const radius = r.w * 0.045;
   ctx.save();
   roundRect(ctx, r.x, r.y, r.w, r.h, radius);
@@ -270,7 +277,7 @@ function drawCard(ctx: CanvasRenderingContext2D, card: RecapCard, img: HTMLImage
 }
 
 /** Rosto do líder num círculo, com aro. */
-function drawFace(ctx: CanvasRenderingContext2D, card: RecapCard | null, img: HTMLImageElement | null, cx: number, cy: number, d: number, ring = C.cream) {
+function drawFace(ctx: CanvasRenderingContext2D, card: RecapCard | null, img: RecapImage | null, cx: number, cy: number, d: number, ring = C.cream) {
   const dest = { x: cx - d / 2, y: cy - d / 2, w: d, h: d };
   ctx.save();
   ctx.beginPath();
@@ -638,7 +645,7 @@ function drawDeck(ctx: CanvasRenderingContext2D, format: RecapFormat, recap: Tou
 
   const tiles: Array<{ card: RecapCard; count: number | null }> = [{ card: p.leader, count: null }, ...p.cards.map((c) => ({ card: c, count: c.count }))];
   const labelH = 32;
-  const gap = 14;
+  const gap = DECK_GAP;
   const g = gridLayout(tiles.length, W - SIDE * 2, area.bottom - y, { gap, labelH });
   const x0 = (W - g.gridW) / 2;
   y += Math.max(0, (area.bottom - y - g.gridH) / 2);
