@@ -879,6 +879,7 @@ function TournamentPage({
                     {tr('tour.delete')}
                   </button>
                 </div>
+                {t.lateWindow && <LateEntry t={t} busy={busy} run={run} />}
                 {t.status === 'registration' && t.checkIn && (
                   <p className="muted small">{tr('tour.autoStartHint', { date: dateTime(t.startsAt, locale), tolerance: minutes(tr, t.toleranceMs) })}</p>
                 )}
@@ -938,7 +939,9 @@ function TournamentPage({
                       current={t.status === 'running' && shownRound === t.round}
                       deadline={shownRound === t.round ? t.deadline : null}
                       busy={busy}
+                      canDrop={t.status === 'running'}
                       onScore={(wins) => run(() => api.tournaments.setScore(t.id, m.id, wins))}
+                      onDouble={(dropBoth) => run(() => api.tournaments.doubleLoss(t.id, m.id, dropBoth))}
                       onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false })}
                       onReplay={(statsMatchId) => run(() => openReplay(statsMatchId, onReplay))}
                     />
@@ -961,6 +964,7 @@ function TournamentPage({
                     t.status === 'registration' ? tr('tour.confirmRemove', { name }) : tr('tour.confirmDrop', { name }),
                   )
                 }
+                onReinstate={(userId, restore) => run(() => api.tournaments.reinstate(t.id, userId, restore))}
               />
             )}
           </>
@@ -990,8 +994,11 @@ function MyArea({
   const [decks, setDecks] = useState<DeckSummary[] | null>(null);
   const [deckId, setDeckId] = useState<string>(t.me?.deckId ?? '');
 
+  /** Inscrição atrasada liberada (suíço, rodada 1): o mesmo formulário, entrando com uma derrota. */
+  const late = t.status === 'running' && !t.me && t.canLateRegister;
+
   useEffect(() => {
-    if (t.status !== 'registration' || !user) return;
+    if ((t.status !== 'registration' && !late) || !user) return;
     let stop = false;
     api
       .decks()
@@ -1000,7 +1007,7 @@ function MyArea({
     return () => {
       stop = true;
     };
-  }, [t.status, user, setError]);
+  }, [t.status, late, user, setError]);
 
   if (!user) {
     return t.status === 'registration' ? (
@@ -1010,14 +1017,15 @@ function MyArea({
     ) : null;
   }
 
-  if (t.status === 'registration') {
+  if (t.status === 'registration' || late) {
     const playable = decks?.filter((d) => canPlay(d, t.format)) ?? [];
     const mine = playable.filter((d) => d.kind === 'user' && d.mine);
     const others = playable.filter((d) => !(d.kind === 'user' && d.mine));
     const full = t.maxPlayers !== null && t.players.length >= t.maxPlayers && !t.me;
     return (
       <section className="menu-card tour-me">
-        <h2>{tr(t.me ? 'tour.myRegistration' : 'tour.registration')}</h2>
+        <h2>{tr(t.me ? 'tour.myRegistration' : late ? 'tour.lateRegistration' : 'tour.registration')}</h2>
+        {late && <p className="small">{tr('tour.lateRegisterHint')}</p>}
         {t.me && <p className="small">{rich(tr('tour.registeredWith'), { deck: <b>{t.me.deckName}</b> })}</p>}
         {t.me && t.checkIn && (
           <div className="tour-checkin">
@@ -1041,7 +1049,7 @@ function MyArea({
             )}
           </div>
         )}
-        {!t.me && t.priorityOpen && !t.canRegister ? (
+        {!late && !t.me && t.priorityOpen && !t.canRegister ? (
           <p className="muted">{tr('tour.priorityNotice', { date: dateTime(t.priorityUntil, locale) })}</p>
         ) : full ? (
           <p className="muted">{tr('tour.full')}</p>
@@ -1078,7 +1086,7 @@ function MyArea({
                 disabled={busy || !deckId || (t.me?.deckId === deckId)}
                 onClick={() => run(() => api.tournaments.register(t.id, deckId))}
               >
-                {tr(t.me ? 'tour.changeDeck' : 'tour.register')}
+                {tr(t.me ? 'tour.changeDeck' : late ? 'tour.lateRegister' : 'tour.register')}
               </button>
               {t.me && (
                 <button className="btn" disabled={busy} onClick={() => run(() => api.tournaments.leave(t.id), tr('tour.confirmLeave'))}>
@@ -1127,7 +1135,11 @@ function MyArea({
       {!m ? (
         <p className="muted">{tr('tour.notInRound')}</p>
       ) : !opp ? (
-        <p>{rich(tr('tour.byeRound'), { bye: <b>{tr('tour.bye')}</b> })}</p>
+        m.result === 'loss' ? (
+          <p>{tr('tour.lateLossRound')}</p>
+        ) : (
+          <p>{rich(tr('tour.byeRound'), { bye: <b>{tr('tour.bye')}</b> })}</p>
+        )
       ) : (
         <>
           <p>
@@ -1149,7 +1161,7 @@ function MyArea({
             <p className="tour-my-result">
               {[
                 m.result === 'none'
-                  ? tr('tour.resultDoubleNoShow')
+                  ? tr(m.reportedBy === 'noshow' ? 'tour.resultDoubleNoShow' : 'tour.resultDoubleLoss')
                   : m.winner === user.id
                     ? tr(m.reportedBy === 'noshow' ? 'tour.resultWinNoShow' : 'tour.resultWin')
                     : tr('tour.resultLoss'),
@@ -1193,8 +1205,101 @@ const REPORTED: Record<NonNullable<TournamentMatchInfo['reportedBy']>, MessageKe
   bye: 'tour.reported.bye',
   drop: 'tour.reported.drop',
   noshow: 'tour.reported.noshow',
+  late: 'tour.reported.late',
   organizer: 'tour.reported.organizer',
 };
+
+/** Confirmação na própria linha (com uma opção marcável), no lugar do `confirm()` do navegador. */
+function InlineConfirm({
+  text,
+  option,
+  busy,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: {
+  text: string;
+  option?: { label: string; checked: boolean; onChange: (v: boolean) => void };
+  busy: boolean;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const tr = useT();
+  return (
+    <div className="tour-confirm" role="group">
+      <p className="small">{text}</p>
+      {option && (
+        <label className="check">
+          <input type="checkbox" checked={option.checked} onChange={(e) => option.onChange(e.target.checked)} />
+          {option.label}
+        </label>
+      )}
+      <div className="btn-row">
+        <button className="btn small primary" disabled={busy} onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+        <button className="btn small" disabled={busy} onClick={onCancel}>
+          {tr('common.cancel')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Inscrição atrasada (suíço, durante a rodada 1): liberar para todos, para um jogador pelo apelido, ou fechar. */
+function LateEntry({
+  t,
+  busy,
+  run,
+}: {
+  t: TournamentDetail;
+  busy: boolean;
+  run: (fn: () => Promise<TournamentDetail | void>, confirmText?: string) => Promise<void>;
+}) {
+  const tr = useT();
+  const [player, setPlayer] = useState('');
+  const status = !t.lateEntry ? tr('tour.lateClosed') : t.lateEntry.all ? tr('tour.lateOpenAll') : tr('tour.lateOpenFor', { name: t.lateEntry.name ?? '?' });
+  return (
+    <div className="tour-late">
+      <h3>{tr('tour.lateTitle')}</h3>
+      <p className="small">
+        <b>{status}</b> · <span className="muted">{tr('tour.lateHint')}</span>
+      </p>
+      <div className="btn-row">
+        {!t.lateEntry?.all && (
+          <button className="btn small" disabled={busy} onClick={() => run(() => api.tournaments.lateEntry(t.id, true))}>
+            {tr('tour.lateOpenAllBtn')}
+          </button>
+        )}
+        {t.lateEntry && (
+          <button className="btn small" disabled={busy} onClick={() => run(() => api.tournaments.lateEntry(t.id, false))}>
+            {tr('tour.lateCloseBtn')}
+          </button>
+        )}
+      </div>
+      <form
+        className="btn-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (player.trim()) void run(() => api.tournaments.lateEntry(t.id, true, player.trim())).then(() => setPlayer(''));
+        }}
+      >
+        <input
+          className="admin-search"
+          value={player}
+          maxLength={40}
+          placeholder={tr('tour.latePlayerPlaceholder')}
+          aria-label={tr('tour.latePlayerPlaceholder')}
+          onChange={(e) => setPlayer(e.target.value)}
+        />
+        <button className="btn small" type="submit" disabled={busy || !player.trim()}>
+          {tr('tour.lateOpenForBtn')}
+        </button>
+      </form>
+    </div>
+  );
+}
 
 /** Prazo para entrar na sala (contagem regressiva). */
 function Deadline({ deadline, mine }: { deadline: string; mine: boolean }) {
@@ -1222,7 +1327,9 @@ function MatchRow({
   current,
   deadline,
   busy,
+  canDrop,
   onScore,
+  onDouble,
   onWatch,
   onReplay,
 }: {
@@ -1234,7 +1341,11 @@ function MatchRow({
   /** Prazo para entrar na sala (tolerância correndo): mostra quem ainda falta. */
   deadline: string | null;
   busy: boolean;
+  /** Torneio em andamento: a derrota dupla pode também tirar os dois. */
+  canDrop: boolean;
   onScore: (wins: [number, number]) => void;
+  /** Derrota dupla (`dropBoth`: os dois saem do torneio). */
+  onDouble: (dropBoth: boolean) => void;
   onWatch: () => void;
   /** Abre o replay gravado de um jogo da série. */
   onReplay: (statsMatchId: number) => void;
@@ -1243,6 +1354,8 @@ function MatchRow({
   const locale = useLocale();
   const name = (p: TournamentMatchInfo['p1'] | null, won: boolean) =>
     p ? <span className={['tour-player', won ? 'won' : m.result ? 'lost' : ''].join(' ')}>{p.name}</span> : null;
+  const [askDouble, setAskDouble] = useState(false);
+  const [dropBoth, setDropBoth] = useState(false);
   const played = m.wins[0] + m.wins[1] > 0;
   const missing = deadline && !m.result && m.p2 ? [m.p1, m.p2].filter((_, i) => !m.present[i]).map((p) => p.name) : [];
   return (
@@ -1258,12 +1371,12 @@ function MatchRow({
             {name(m.p2, m.winner === m.p2.userId)}
           </>
         ) : (
-          <span className="muted small">{tr('tour.bye')}</span>
+          <span className="muted small">{tr(m.result === 'loss' ? 'tour.lateLoss' : 'tour.bye')}</span>
         )}
       </div>
       <div className="tour-match-side">
-        {m.result === 'none' && <span className="muted small">{tr('tour.doubleNoShow')}</span>}
-        {m.result && m.result !== 'none' && m.reportedBy && m.reportedBy !== 'bye' && <span className="muted small">{tr(REPORTED[m.reportedBy])}</span>}
+        {m.result === 'none' && <span className="muted small">{tr(m.reportedBy === 'noshow' ? 'tour.doubleNoShow' : 'tour.doubleLoss')}</span>}
+        {m.result && m.result !== 'none' && m.reportedBy && m.reportedBy !== 'bye' && m.reportedBy !== 'late' && <span className="muted small">{tr(REPORTED[m.reportedBy])}</span>}
         {!m.result && m.room === 'playing' && (
           <button className="btn small" onClick={onWatch}>
             {m.bestOf > 1 ? tr('tour.watchGameN', { n: m.game }) : tr('tour.watch')}
@@ -1294,12 +1407,36 @@ function MatchRow({
               </button>
             );
           })}
+          <button
+            className={m.result === 'none' ? 'on' : ''}
+            disabled={busy || m.result === 'none'}
+            title={tr('tour.doubleLossTitle')}
+            onClick={() => {
+              setDropBoth(false);
+              setAskDouble(true);
+            }}
+          >
+            {tr('tour.doubleLoss')}
+          </button>
           {current && (played || m.result) && (
             <button disabled={busy} title={tr('tour.clearScore')} onClick={() => onScore([0, 0])}>
               ✕
             </button>
           )}
         </div>
+      )}
+      {editable && m.p2 && askDouble && (
+        <InlineConfirm
+          text={tr('tour.confirmDoubleLoss', { a: m.p1.name, b: m.p2.name })}
+          option={canDrop ? { label: tr('tour.doubleLossDropBoth'), checked: dropBoth, onChange: setDropBoth } : undefined}
+          busy={busy}
+          confirmLabel={tr('tour.doubleLoss')}
+          onConfirm={() => {
+            setAskDouble(false);
+            onDouble(dropBoth);
+          }}
+          onCancel={() => setAskDouble(false)}
+        />
       )}
       {m.games.length > 0 && (
         <details className="tour-games">
@@ -1369,8 +1506,21 @@ function Standings({ t }: { t: TournamentDetail }) {
   );
 }
 
-function Players({ t, busy, onDrop }: { t: TournamentDetail; busy: boolean; onDrop: (userId: string, name: string) => void }) {
+function Players({
+  t,
+  busy,
+  onDrop,
+  onReinstate,
+}: {
+  t: TournamentDetail;
+  busy: boolean;
+  onDrop: (userId: string, name: string) => void;
+  /** Desfaz a desistência (`restore`: a partida da rodada volta a ficar pendente). */
+  onReinstate: (userId: string, restore: boolean) => void;
+}) {
   const tr = useT();
+  const [reinstating, setReinstating] = useState<string | null>(null);
+  const [restore, setRestore] = useState(false);
   if (!t.players.length) {
     return (
       <section className="menu-card">
@@ -1407,7 +1557,34 @@ function Players({ t, busy, onDrop }: { t: TournamentDetail; busy: boolean; onDr
                   {tr(t.status === 'registration' ? 'tour.remove' : 'tour.drop')}
                 </button>
               )}
+              {t.canManage && p.dropped && p.reinstate && (
+                <button
+                  className="btn small"
+                  disabled={busy}
+                  onClick={() => {
+                    setRestore(p.reinstate !== 'no');
+                    setReinstating(p.userId);
+                  }}
+                >
+                  {tr('tour.reinstate')}
+                </button>
+              )}
             </div>
+            {reinstating === p.userId && p.reinstate && (
+              <InlineConfirm
+                text={[tr('tour.confirmReinstate', { name: p.name }), p.reinstate === 'required' ? tr('tour.reinstateRestoreRequired') : null]
+                  .filter(Boolean)
+                  .join(' ')}
+                option={p.reinstate === 'optional' ? { label: tr('tour.reinstateRestore'), checked: restore, onChange: setRestore } : undefined}
+                busy={busy}
+                confirmLabel={tr('tour.reinstate')}
+                onConfirm={() => {
+                  setReinstating(null);
+                  onReinstate(p.userId, p.reinstate === 'required' || (p.reinstate === 'optional' && restore));
+                }}
+                onCancel={() => setReinstating(null)}
+              />
+            )}
             {p.deck && (
               <details className="tour-deck">
                 <summary className="small">{tr('tour.deckList', { name: p.deck.name })}</summary>

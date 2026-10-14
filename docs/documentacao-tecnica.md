@@ -860,13 +860,15 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   `check_in`, hora do início automático), `check_in` (check-in, início automático e W.O. por ausência), `tolerance_min` (minutos para entrar na sala, 1–60), `status`
   (`registration → running → finished`), `round`, `round_at` (quando a rodada atual foi gerada), `round_wo` (a
   varredura de ausentes da rodada já foi feita), `checkin_notice` (`starts_at` cujo aviso de check-in já saiu por
-  notificação), `organizer_id`.
+  notificação), `late_entry` (inscrição atrasada liberada: `*` = qualquer um, ou o id da conta; null = fechada),
+  `organizer_id`.
 - **`tournament_players`**: `deck` é o `DeckList` **congelado** na inscrição (validado com `playableDeck` no formato),
   `seed` = ordem sorteada no início, `dropped`, `checked_in_at`.
-- **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none`
-  (`none` = W.O. duplo: os dois perdem), nunca empate), `next_first` (quem perdeu começa o próximo jogo), `room_id`
-  (sala do jogo atual), `match_id` (última partida em `matches`), `reported_by` (`game`, `bye`, `drop`, `noshow` ou
-  id do organizador), `p1_in`/`p2_in` (quando cada jogador entrou na sala da série).
+- **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none | loss`
+  (`none` = derrota dupla: W.O. duplo ou lançada pelo organizador, os dois perdem; `loss` = derrota sem oponente da
+  inscrição atrasada, o espelho do bye), nunca empate), `next_first` (quem perdeu começa o próximo jogo), `room_id`
+  (sala do jogo atual), `match_id` (última partida em `matches`), `reported_by` (`game`, `bye`, `drop`, `noshow`,
+  `late` ou id do organizador), `p1_in`/`p2_in` (quando cada jogador entrou na sala da série).
 
 ### Check-in e relógio (`tournaments/clock.ts`)
 
@@ -909,7 +911,9 @@ com relógio injetado nos testes não roda sozinho e é chamado por `app.tournam
 
 ### Algoritmos (`tournaments/pairing.ts`)
 
-- **Suíço**: vitória = 3 pontos; bye conta como vitória e vai para o último colocado que ainda não teve. Classificação:
+- **Suíço**: vitória = 3 pontos; bye conta como vitória e vai para o último colocado que ainda não teve (só
+  `result = bye` conta como bye: a derrota `loss` da inscrição atrasada também não tem oponente, mas não é bye; ela
+  conta como jogada e perdida, sem entrar no OMW de ninguém). Classificação:
   pontos → OMW (média da taxa de vitória dos oponentes, mínimo 1/3 cada) → OOMW → seed sorteado. Pareamento pela
   classificação com backtracking (orçamento 50.000) para não repetir confrontos; se impossível, aceita repetição.
 - **Eliminação simples / top cut**: chave de tamanho 2^⌈log₂ n⌉, ordem `1, n, n/2+1, n/2, …` (1º e 2º só na final);
@@ -933,6 +937,25 @@ da partida seguinte se ela ainda não começou; resultados do suíço travam dep
 (`drop`: partida pendente vai para o oponente), avança (`next`: próxima rodada do suíço, top cut, próxima fase, ou
 encerramento) e encerra antes (`finish`). A página do torneio consulta `GET /api/tournaments/:id` a cada 5 s enquanto
 `running`; listas completas só para organizador/próprio jogador até o fim.
+
+Ferramentas de mesa (só quem gerencia; cada ação vai para o log do servidor):
+
+- **Derrota dupla** (`PUT …/matches/:m/result` com `{result: 'double', dropBoth?}`): `result = none`, 0 x 0,
+  `reported_by` = quem lançou; os dois seguem no torneio (`dropBoth`: saem, como no `drop`). Suíço: qualquer rodada,
+  até o top cut começar. Chave: na rodada atual os dois saem da chave (a mesa seguinte fica com bye); em rodada
+  passada, só se a partida seguinte ainda não começou: o vencedor antigo sai dela e o oponente fica de bye
+  (`vacateInMatch`).
+- **Desfazer desistência** (`POST …/players/:userId/reinstate` com `{restoreMatch?}`): `dropped = 0`, pareado a partir
+  da próxima rodada. Se a saída decidiu a partida da rodada atual (`drop`/`noshow`, com ele perdendo), ela pode voltar
+  a ficar pendente (`restoreMatch`). Suíço: enquanto o suíço não acabou. Chave: só quem ainda está na fase atual e não
+  perdeu nela jogando (se perdeu pela saída, volta obrigatoriamente devolvendo a partida). O detalhe do torneio diz
+  para quem gerencia, em cada inscrito que saiu, `reinstate` = `no | optional | required` (null = não pode voltar).
+  Notificação "Você voltou ao torneio".
+- **Inscrição atrasada** (`PUT …/late` com `{open, player?}` = apelido): só no suíço com ≥ 2 rodadas, enquanto a
+  rodada 1 está em andamento (gerar a rodada 2 fecha a janela). Liberada, a conta se inscreve pelo `POST …/register`
+  normal (deck validado e congelado, `max_players` vale): `lateRegister` grava o inscrito com `seed` = último + 1 e uma
+  partida da rodada 1 sem oponente com `result = loss`, `reported_by = late`. A liberação para um jogador específico é
+  usada uma vez.
 
 ---
 
@@ -1208,7 +1231,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,chat,focus,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
 | Espectador | `GET /api/online/live`, `GET /api/online/watch/:code`, `GET /api/online/rooms/:id`, `GET /api/online/rooms/:id/watch?hands=1` (SSE) |
 | Auditoria | `GET /api/matches/:id`, `GET /api/matches/:id/replay`, `POST /api/matches/:id/report`, `GET /api/reports`, `PUT /api/reports/:id` |
-| Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/drop`, `POST /api/tournaments/:id/matches/:m/play` |
+| Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/{drop,reinstate}`, `PUT /api/tournaments/:id/late`, `POST /api/tournaments/:id/matches/:m/play` |
 
 Corpos, filtros e códigos de erro estão descritos no `README.md` (seção "API").
 
