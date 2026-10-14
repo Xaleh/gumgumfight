@@ -30,10 +30,17 @@ if [ -n "$NEW_ADMIN_EMAILS" ]; then
   { grep -v '^ADMIN_EMAILS=' "$ENV_FILE" || true; echo "ADMIN_EMAILS=$NEW_ADMIN_EMAILS"; } > "$ENV_FILE.tmp"
   mv -f "$ENV_FILE.tmp" "$ENV_FILE"
 fi
-set -a
-# shellcheck disable=SC1090
-. "$ENV_FILE"
-set +a
+# Lê o deploy.env com as mesmas regras do ecosystem.config.cjs (KEY=valor, aspas opcionais) em vez de
+# executá-lo como shell: um valor com espaço (ex.: SUPPORT_PIX_NAME=Fulano de Tal) não quebra o deploy.
+while IFS= read -r line || [ -n "$line" ]; do
+  [[ "$line" =~ ^[[:space:]]*([A-Z_][A-Z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]] || continue
+  key="${BASH_REMATCH[1]}"
+  val="${BASH_REMATCH[2]}"
+  val="${val%"${val##*[![:space:]]}"}"
+  val="${val#[\"\']}"
+  val="${val%[\"\']}"
+  export "$key=$val"
+done < "$ENV_FILE"
 PORT="${PORT:-3310}"
 case "${HOST:-127.0.0.1}" in 0.0.0.0 | 127.0.0.1 | "") CHECK_HOST=127.0.0.1 ;; *) CHECK_HOST="$HOST" ;; esac
 NODE_BIN="${NODE_BIN:-node}"
