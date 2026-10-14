@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { actingPlayer, legalActions } from '../src/actions';
-import { DEFAULT_WEIGHTS, evaluate } from '../src/bot/evaluate';
+import { DEFAULT_WEIGHTS, evaluate, incomingThreat } from '../src/bot/evaluate';
 import { planAction, plannerOptions, resetPlanner } from '../src/bot/planner';
 import { chooseBotAction as simpleBot } from '../src/bot/simple';
 import { applyAction, cardDef } from '../src/engine';
@@ -141,8 +141,9 @@ describe('bot com busca: fase principal', () => {
 
   it('prefere a carta com efeito útil', () => {
     // 3 DON!!, Killer ([On Play] K.O. de Personagem virado de custo ≤ 3) e Vito (vanilla 5000) na mão. Do outro lado,
-    // Robin (5000, custo 3) virada e um Chopper [Blocker] ativo: o Líder não a alcança (bloqueio), o Killer sim.
+    // Robin (5000, custo 3) virada e um Chopper [Blocker] ativo; o Líder já atacou: só o Killer a alcança.
     const s = position([kid, luffy], 3);
+    s.players[0].leader.rested = true;
     fetchToHand(s, 0, 'ST02-005');
     fetchToHand(s, 0, 'ST02-002');
     inject(s, 1, 'ST01-008', 'field', { rested: true });
@@ -244,6 +245,25 @@ describe('avaliação', () => {
     const rested = structuredClone(s);
     inject(rested, 0, 'ST02-002', 'field', { rested: true });
     expect(evaluate(rested, 0, w)).toBeLessThan(evaluate(active, 0, w));
+  });
+
+  it('ameaça: o Blocker em pé e o Counter na mão seguram o ataque fatal do oponente', () => {
+    // Turno do Luffy (jogador 1), já sem DON!! ativo: Líder e Robin (5000) atacam o Kid (5000) com 1 de
+    // Vida — dois acertos, fatal.
+    const base = toTurn(started(1, [kid, luffy]), 4);
+    base.players[1].donRested += base.players[1].donActive;
+    base.players[1].donActive = 0;
+    base.players[0].life = base.players[0].life.slice(0, 1);
+    clearHand(base, 0);
+    inject(base, 1, 'ST01-008', 'field', { turn: 1 });
+    const open = incomingThreat(base, 0, w);
+    expect(open).toBeGreaterThanOrEqual(2 * w.threatHit + w.lethal);
+    const blocker = structuredClone(base);
+    inject(blocker, 0, 'ST02-004', 'field'); // Bege, [Blocker]
+    expect(incomingThreat(blocker, 0, w)).toBe(w.threatHit);
+    const counter = structuredClone(blocker);
+    fetchToHand(counter, 0, 'ST02-002'); // Vito, Counter +1000
+    expect(incomingThreat(counter, 0, w)).toBe(0);
   });
 
   it('Vida côncava: a última vale mais que a primeira', () => {

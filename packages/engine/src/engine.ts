@@ -1110,11 +1110,37 @@ function fieldCardMatches(state: GameState, source: string, fc: FieldCard, spec:
 // Ações
 // ---------------------------------------------------------------------------
 
+/**
+ * Cópia profunda do estado (só objetos simples, listas e primitivos), umas 4× mais rápida que o
+ * `structuredClone` — o bot com busca copia o estado a cada jogada simulada. Como o
+ * `structuredClone`, um objeto que aparece em dois lugares (ex.: `memo` de um efeito e as opções da
+ * escolha pendente) continua sendo um só na cópia.
+ */
+export function cloneState<T>(root: T): T {
+  const seen = new Map<object, unknown>();
+  const copy = (v: unknown): unknown => {
+    if (typeof v !== 'object' || v === null) return v;
+    const hit = seen.get(v);
+    if (hit !== undefined) return hit;
+    if (Array.isArray(v)) {
+      const out: unknown[] = new Array(v.length);
+      seen.set(v, out);
+      for (let i = 0; i < v.length; i++) out[i] = copy(v[i]);
+      return out;
+    }
+    const out: Record<string, unknown> = {};
+    seen.set(v, out);
+    for (const k in v) out[k] = copy((v as Record<string, unknown>)[k]);
+    return out;
+  };
+  return copy(root) as T;
+}
+
 export function applyAction(prev: GameState, action: Action): GameState {
   if (prev.phase === 'gameover') throw new IllegalActionError('A partida já terminou.');
   // As definições das cartas não mudam durante a partida: são compartilhadas, não copiadas.
   const { defs, ...rest } = prev;
-  const state = structuredClone(rest) as GameState;
+  const state = cloneState(rest) as GameState;
   state.defs = defs;
   const p = action.player;
   const pending = state.pending;
@@ -1236,7 +1262,7 @@ function restoreCheckpoint(state: GameState, p: PlayerId) {
   // Campos criados depois do checkpoint (contadores, fila de efeitos…) também voltam ao que eram.
   const kept = new Set(['defs', 'cards', 'log', 'actionCount', ...Object.keys(cp.snap)]);
   for (const k of Object.keys(state)) if (!kept.has(k)) delete (state as unknown as Record<string, unknown>)[k];
-  Object.assign(state, structuredClone(cp.snap));
+  Object.assign(state, cloneState(cp.snap));
   const name = (uid: string) => cardDef(state, uid).name;
   const a = info.action;
   const player = state.players[p].name;
