@@ -381,6 +381,8 @@ export const api = {
     lateEntry: (id: string, open: boolean, player?: string) =>
       send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/late`, { open, player }),
     play: (id: string, matchId: number) => send<OnlineSeat>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/play`),
+    /** Kit de divulgação (quem gerencia, com o torneio encerrado). */
+    recap: (id: string) => get<TournamentRecap>(`/api/tournaments/${encodeURIComponent(id)}/recap`),
   },
   /** Auditoria: replay e relatos de problemas das partidas gravadas (ranqueadas e de torneio). */
   matches: {
@@ -806,6 +808,80 @@ export interface TournamentStanding {
 }
 
 export type TournamentStage = 'swiss' | 'elim';
+
+/** Carta do kit de divulgação; `image` vem pelo mesmo domínio (`/card-img/…`) para desenhar no canvas. */
+export interface RecapCard {
+  id: string;
+  name: string;
+  set: string | null;
+  cost: number | null;
+  category: string;
+  colors: string[];
+  image: string | null;
+}
+
+export interface RecapRecord {
+  wins: number;
+  losses: number;
+  byes: number;
+}
+
+export interface RecapPlayer {
+  rank: number;
+  userId: string;
+  name: string;
+  dropped: boolean;
+  deckName: string;
+  leader: RecapCard;
+  /** Sem o líder, ordenadas por custo, cada carta uma vez com a quantidade. */
+  cards: Array<RecapCard & { count: number }>;
+  swiss: RecapRecord | null;
+  elim: RecapRecord | null;
+}
+
+export interface RecapRound {
+  round: number;
+  stage: TournamentStage;
+  size: number;
+  bestOf: number;
+  opponent: { name: string; leader: RecapCard } | null;
+  outcome: 'win' | 'loss' | 'bye' | 'none' | 'pending';
+  /** Placar do ponto de vista do campeão. */
+  score: [number, number];
+  how: 'game' | 'bye' | 'drop' | 'noshow' | 'late' | 'organizer' | null;
+  /** Jogos que contaram: venceu? começou (na play) ou foi o segundo (na draw)? null = sem o dado. */
+  games: Array<{ game: number; won: boolean | null; first: boolean | null }>;
+}
+
+export interface LeaderCount {
+  leader: RecapCard;
+  count: number;
+}
+
+export interface TournamentRecap {
+  tournament: {
+    id: string;
+    name: string;
+    format: string;
+    structure: TournamentStructure;
+    topCut: number | null;
+    players: number;
+    swissRounds: number | null;
+    startedAt: string | null;
+    finishedAt: string | null;
+    organizerName: string | null;
+    official: boolean;
+    prize: string | null;
+    sponsor: PublicSponsor | null;
+    earlyFinish: boolean;
+  };
+  champion: RecapPlayer | null;
+  campaign: RecapRound[];
+  top: RecapPlayer[];
+  leadersTop8: LeaderCount[];
+  leadersAll: LeaderCount[];
+  cardImages: boolean;
+}
 
 export interface TournamentDetail {
   id: string;

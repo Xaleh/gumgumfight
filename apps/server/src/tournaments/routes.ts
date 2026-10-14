@@ -102,6 +102,7 @@ import {
   updateTournament,
   vacateInMatch,
 } from './store';
+import { buildRecap } from './recap';
 import { isApprentice } from '../tutorial/store';
 
 interface Deps {
@@ -854,6 +855,30 @@ export function registerTournamentRoutes(
     finishTournament(db, found.t.id);
     return detail(getTournament(db, found.t.id)!, found.me);
   });
+
+  /**
+   * Kit de divulgação (só quem gerencia, só com o torneio encerrado): campeão, campanha
+   * com play/draw por jogo, listas do top 4 e líderes. As imagens e o PDF são gerados no
+   * navegador de quem pede, a partir destes dados.
+   */
+  app.get<{ Params: { id: string } }>('/api/tournaments/:id/recap', async (req, reply) => {
+    const found = managed(req, reply);
+    if (!found) return reply;
+    const { t } = found;
+    if (t.status !== 'finished') return reply.code(409).send(fail('tourNotFinished', 'O kit de divulgação sai quando o torneio termina.'));
+    return buildRecap(db, t, { present, cardImages, sponsor: sponsorOf(t.sponsorId), naturalEnd: endedNaturally(t) });
+  });
+
+  /** O torneio terminou pelas rodadas previstas (e não por "encerrar agora"). */
+  const endedNaturally = (t: Tournament) => {
+    const players = listPlayers(db, t.id);
+    const matches = listMatches(db, t.id);
+    if (!matches.length || !roundComplete(t, matches)) return false;
+    const step = nextStep(t, players, matches);
+    if (step === 'finish') return true;
+    // Chave sem ninguém para avançar (W.O. duplo nas mesas que restavam) também acaba sozinha.
+    return step === 'elim' && singleNextRound(players, matches.filter((m) => m.round === t.round)).length === 0;
+  };
 
   /**
    * Derrota dupla lançada à mão: os dois perdem e seguem no torneio (`dropBoth`: também

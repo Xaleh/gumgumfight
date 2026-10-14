@@ -3,6 +3,7 @@
 
 import supportPtBR from './support/pt-BR';
 import tutorialPtBR from './tutorial/pt-BR';
+import recapPtBR from './recap/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -2242,6 +2243,8 @@ const ptBR = {
   ...tutorialPtBR,
   // ==== apoio ao projeto (i18n/support) ====
   ...supportPtBR,
+  // ==== kit de divulgação dos torneios (i18n/recap) ====
+  ...recapPtBR,
 } as const;
 
 export type MessageKey = keyof typeof ptBR;

@@ -41,6 +41,7 @@ import { registerReportRoutes } from './reports/routes';
 import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
+import { registerCardImageRoutes } from './card-images';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
 
@@ -306,6 +307,9 @@ export function buildApp(
   app.decorate('onlineLobby', lobby);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
   registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined, notifier });
+
+  // Imagens das cartas pelo mesmo domínio (kit de divulgação; em produção o Nginx atende antes).
+  registerCardImageRoutes(app, { enabled: server.cardImages, fetchImpl: opts.fetchImpl });
 
   registerReportRoutes(app, { db, user: auth.viewer });
   registerSupportRoutes(app, {

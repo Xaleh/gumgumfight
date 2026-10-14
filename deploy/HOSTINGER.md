@@ -193,6 +193,11 @@ Como root: `sudo -u gumgum pm2 logs gumgumfight`. Banco: `/home/gumgum/apps/gumg
 Mudar opções do app (`CARD_IMAGES`, `ONLINE_BOT_ROOMS`): edite `shared/deploy.env` e rode
 `pm2 startOrReload ~/apps/gumgumfight/current/deploy/ecosystem.config.cjs --update-env`.
 
+Imagens das cartas pelo mesmo domínio (`/card-img/`, usadas pelo kit de divulgação dos torneios): o bootstrap
+configura o Nginx com cache em disco (`/var/cache/nginx/gumgum-cards`, até 2 GB). Numa VPS configurada antes disso,
+rode o bootstrap de novo (`SKIP_UPGRADE=1 bash /root/bootstrap-hostinger.sh`) para ligar o cache; enquanto isso, o
+próprio app atende `/card-img/` buscando na origem.
+
 ## Segurança (recomendado depois que tudo funcionar)
 
 1. **Chave SSH para o root.** No hPanel → VPS → *Configurações → Chaves SSH*, adicione a chave pública da sua

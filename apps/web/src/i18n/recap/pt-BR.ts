@@ -1,0 +1,59 @@
+// Textos do kit de divulgação dos torneios (português do Brasil, referência das chaves):
+// a janela que gera as peças e os textos desenhados nas próprias imagens (`recap.img.*`).
+
+const recapPtBR = {
+  'recap.button': 'Kit de divulgação',
+  'recap.hint': 'Kit de divulgação: imagens prontas para as redes sociais (campeão, campanha, decklists do top 4 e líderes) e o mesmo conteúdo em PDF.',
+  'recap.title': 'Kit de divulgação',
+  'recap.intro': 'Imagens prontas para postar, numeradas na ordem do carrossel, e o mesmo conteúdo num PDF A4. Os textos saem no idioma do site.',
+  'recap.formatFeed': 'Feed (1080×1350)',
+  'recap.formatStory': 'Stories (1080×1920)',
+  'recap.loadingImages': 'Carregando as imagens das cartas… {done}/{total}',
+  'recap.rendering': 'Desenhando as peças…',
+  'recap.renderError': 'Não deu para gerar as imagens ({reason}).',
+  'recap.noArt': 'As imagens das cartas estão desligadas no servidor: as peças saem com o nome e o código de cada carta, sem a arte.',
+  'recap.missingArt': '{n|# imagem não carregou|# imagens não carregaram}: essas cartas aparecem com o nome e o código.',
+  'recap.downloadPng': 'Baixar PNG',
+  'recap.downloadAll': 'Baixar tudo (ZIP)',
+  'recap.downloadPdf': 'Baixar PDF',
+  'recap.piece.champion': 'Campeão',
+  'recap.piece.campaign': 'Campanha do campeão',
+  'recap.piece.deck': 'Decklist do {n}º lugar',
+  'recap.piece.leadersTop8': 'Líderes do Top 8',
+  'recap.piece.leadersAll': 'Líderes de todos os inscritos',
+  // ---- textos nas imagens ----
+  'recap.img.champion': 'Campeão',
+  'recap.img.campaignTitle': 'Campanha do campeão',
+  'recap.img.leadersTitle': 'Resumo: líderes',
+  'recap.img.top8': 'Top 8',
+  'recap.img.allPlayers': 'Todos os inscritos',
+  'recap.img.othersN': '+{n|# outro líder|# outros líderes}',
+  'recap.img.players': '{n|# jogador|# jogadores}',
+  'recap.img.place1': '1º lugar',
+  'recap.img.place2': '2º lugar',
+  'recap.img.place3': '3º lugar',
+  'recap.img.place4': '4º lugar',
+  'recap.img.swissRecord': '{wins}-{losses} no suíço',
+  'recap.img.elimRecord': '{wins}-{losses} no top cut',
+  'recap.img.bracketRecord': '{wins}-{losses} na chave',
+  'recap.img.earlyFinish': 'Torneio encerrado antes da última rodada',
+  'recap.img.play': 'Play',
+  'recap.img.draw': 'Draw',
+  'recap.img.playDrawLegend': 'Play: o campeão começou o jogo · Draw: jogou em segundo',
+  'recap.img.game': 'J{n}',
+  'recap.img.bye': 'Bye',
+  'recap.img.noShow': 'W.O.',
+  'recap.img.doubleNoShow': 'W.O. duplo',
+  'recap.img.doubleLoss': 'Derrota dupla',
+  'recap.img.late': 'Inscrição atrasada',
+  'recap.img.reported': 'Resultado lançado',
+  'recap.img.dropWin': 'Oponente desistiu',
+  'recap.img.pending': 'Sem resultado',
+  'recap.img.cards': '{n|# carta|# cartas}',
+  'errors.tourNotFinished': 'O kit de divulgação sai quando o torneio termina.',
+} as const;
+
+export type RecapKey = keyof typeof recapPtBR;
+export type RecapMessages = Record<RecapKey, string>;
+
+export default recapPtBR;

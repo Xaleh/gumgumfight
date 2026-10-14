@@ -10341,3 +10341,55 @@ a.sponsor-card:hover {
   color: var(--ok);
   font-weight: 700;
 }
+
+/* ==================================================================
+   Kit de divulgação do torneio (components/TournamentRecap.tsx): prévia
+   das peças, formato (feed / stories) e downloads.
+   ================================================================== */
+.page-sheet .sheet.recap-sheet {
+  width: min(960px, 100%);
+}
+/* a janela rola inteira: nada encolhe dentro dela */
+.recap-sheet .sheet-body > * {
+  flex-shrink: 0;
+}
+.recap-intro {
+  margin: 0;
+}
+.recap-format {
+  align-self: flex-start;
+}
+.recap-warn {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+}
+.recap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+.recap-grid.story {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+.recap-piece {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.recap-piece img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(var(--shadow-rgb), 0.25);
+  background: #0a1a2b;
+}
+.recap-piece figcaption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}

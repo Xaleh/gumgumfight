@@ -957,6 +957,26 @@ Ferramentas de mesa (só quem gerencia; cada ação vai para o log do servidor):
   partida da rodada 1 sem oponente com `result = loss`, `reported_by = late`. A liberação para um jogador específico é
   usada uma vez.
 
+### Kit de divulgação
+
+Com o torneio `finished`, quem gerencia abre "Kit de divulgação" e baixa as peças para redes sociais, em
+1080×1350 (feed/carrossel) ou 1080×1920 (stories): campeão, campanha do campeão (uma linha por rodada, com play/draw
+por jogo), decklists do top 4 (arte das cartas, líder primeiro, depois por custo, quantidade em selo e código), pizza
+dos líderes do top 8 (só com mais de 8 inscritos) e de todos os inscritos (fatias com a arte do líder). Cada peça sai
+em PNG; "Baixar tudo" gera um ZIP numerado na ordem do carrossel e "Baixar PDF", um A4 com uma peça por página.
+
+- **Dados:** `GET /api/tournaments/:id/recap` (`tournaments/recap.ts`; só quem gerencia, 409 antes do fim). Play/draw
+  vem de `tournament_games.stats_match_id` → `match_seats.went_first` da conta; jogos lançados pelo organizador ou por
+  W.O. não têm o dado e aparecem como "Resultado lançado"/"W.O.". Encerrado por `finish` → `earlyFinish` (aviso na peça).
+- **Desenho:** no navegador de quem organiza, em canvas (`apps/web/src/recap/draw.ts`), sem custo na VPS. O
+  componente (`TournamentRecap.tsx`), o desenho e os geradores de ZIP e PDF (`recap/export.ts`, sem dependências:
+  ZIP sem compressão e PDF com JPEG embutido) ficam num chunk carregado só quando o kit é aberto.
+- **Imagens das cartas:** o canvas só exporta com imagens da mesma origem, então o recap devolve as URLs reescritas
+  para `/card-img/<origem>/<caminho>` (`card-images.ts`; origens aceitas: optcgapi e optcgleaks). Em produção o Nginx
+  atende esse caminho com `proxy_pass` + `proxy_cache` em disco (`deploy/bootstrap-hostinger.sh`); sem o Nginx (ou
+  antes de rodar o bootstrap de novo), o próprio app busca na origem. Com `CARD_IMAGES=off`, o kit sai sem arte
+  (nome e código).
+
 ---
 
 ## 13. Infraestrutura: build, CI/CD, VPS

@@ -47,6 +47,8 @@ export default defineConfig({
     host: true,
     // 127.0.0.1 em vez de localhost: evita tentar IPv6 (::1) quando o servidor escuta só em IPv4.
     proxy: {
+      // Imagens das cartas pelo mesmo domínio (kit de divulgação dos torneios).
+      '/card-img': 'http://127.0.0.1:3001',
       '/api': {
         target: 'http://127.0.0.1:3001',
         // Quando o servidor reinicia, fecha também os canais SSE das partidas online
