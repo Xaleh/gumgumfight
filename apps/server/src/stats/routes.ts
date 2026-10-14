@@ -2,11 +2,12 @@
 
 import { type Action, type CardData, type DeckList, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { seesProStats, type User } from '../auth/store';
 import { ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
-import { FORMATS, type FormatId, isFormat, isQueue, isTier, QUEUES, TIERS, tierFor } from './catalog';
+import { FORMATS, type FormatId, isFormat, isQueue, isTier, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
 import { deriveMatch } from './derive';
 import { isApprentice } from '../tutorial/store';
 import {
@@ -28,8 +29,22 @@ import {
 interface Deps {
   db: DB;
   viewerHash: (req: FastifyRequest) => string | null;
+  /** Conta logada (o plano de apoio decide entre as estatísticas gerais e as Pro). */
+  user: (req: FastifyRequest) => User | null;
   present: (cards: ApiCard[]) => ApiCard[];
+  /**
+   * As Estatísticas Pro exigem o plano (só quando o apoio está configurado no servidor;
+   * sem ele, todo mundo vê tudo, como antes).
+   */
+  proGate: boolean;
 }
+
+/** Filas das estatísticas gerais (grátis): partidas casuais, treino contra o bot e salas privadas. */
+export const FREE_QUEUES: QueueId[] = ['casual'];
+/** Filas competitivas (Estatísticas Pro). */
+export const PRO_QUEUES: QueueId[] = ['ranked', 'tournament'];
+/** Abaixo disto, um recorte aparece como "amostra pequena" na tela. */
+export const SMALL_SAMPLE = 20;
 
 export interface MatchBody {
   mode?: unknown;
@@ -57,10 +72,14 @@ function parseDeck(v: unknown): DeckList | null {
 /** Validade das estatísticas em cache (cada partida gravada já as invalida). */
 const STATS_TTL_MS = 30_000;
 
-export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, present }: Deps) {
+export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user, present, proGate }: Deps) {
   const cache = new ResponseCache();
-  /** Chave do cache: a rota com a query e, quando a resposta depende de quem pede, o dono. */
-  const cacheKey = (req: FastifyRequest, personal: boolean) => `${req.url}|${personal ? (viewerHash(req) ?? '-') : ''}`;
+  const pro = (req: FastifyRequest) => !proGate || seesProStats(user(req));
+  /**
+   * Chave do cache: a rota com a query, o tipo de acesso (geral ou Pro) e, quando a
+   * resposta depende de quem pede, o dono.
+   */
+  const cacheKey = (req: FastifyRequest, personal: boolean) => `${req.url}|${pro(req) ? 'pro' : 'free'}|${personal ? (viewerHash(req) ?? '-') : ''}`;
   /** Nome, cores e imagem das cartas citadas numa resposta. */
   const cardInfo = (ids: Iterable<string>) => {
     const out: Record<string, { name: string; category: string; colors: string[]; imageUrl?: string }> = {};
@@ -140,6 +159,12 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
       const { leaders } = statsDimensions(db);
       const decks = me ? myDecks(db, me.id) : [];
       return {
+        /** Estatísticas Pro liberadas (plano Tripulante ou acima). */
+        pro: pro(req),
+        /** O servidor separa as estatísticas gerais das Pro (apoio configurado). */
+        proGate,
+        freeQueues: FREE_QUEUES,
+        smallSample: SMALL_SAMPLE,
         formats: FORMATS,
         queues: QUEUES,
         tiers: TIERS,
@@ -170,9 +195,40 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, pres
     if (q.mine === '1') {
       // Sem perfil ainda: nenhum resultado (id que nunca existe).
       filter.playerId = (owner && findPlayer(db, owner)?.id) || '-';
+      // As próprias partidas: todas as filas, para todo mundo.
+      return filter;
+    }
+    if (pro(req)) {
+      // Meta competitivo: torneio só entra depois de terminar.
+      filter.hideLiveTournaments = true;
+    } else {
+      // Estatísticas gerais: só partidas casuais (inclui treino contra o bot e salas privadas), sem filtro por faixa.
+      // Pedir a ranqueada ou um torneio sem o plano dá resultado vazio (a tela nem oferece a opção).
+      filter.queues = FREE_QUEUES;
+      filter.tiers = undefined;
     }
     return filter;
   };
+
+  /**
+   * Amostra das Estatísticas Pro para quem não tem o plano: os 3 Líderes mais jogados na
+   * ranqueada e nos torneios encerrados dos últimos 30 dias.
+   */
+  app.get<{ Querystring: Query }>('/api/stats/teaser', async (req, reply) =>
+    cache.send(req, reply, `${req.url}|teaser`, STATS_TTL_MS, () => {
+      const f: StatsFilter = {
+        by: 'human',
+        format: isFormat(req.query.format) ? req.query.format : undefined,
+        queues: PRO_QUEUES,
+        hideLiveTournaments: true,
+        days: 30,
+      };
+      const all = leaderStats(db, f);
+      const total = all.reduce((n, l) => n + l.games, 0);
+      const top = all.slice(0, 3).map((l) => ({ leader: l.leader, games: l.games, wins: l.wins }));
+      return { total, leaders: all.length, top, cards: cardInfo(top.map((l) => l.leader)) };
+    }),
+  );
 
   /** Visão geral: totais, Líderes e matchups. */
   app.get<{ Querystring: Query }>('/api/stats', async (req, reply) =>

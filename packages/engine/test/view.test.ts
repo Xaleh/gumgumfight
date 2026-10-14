@@ -36,8 +36,9 @@ function checkView(state: GameState, viewer: PlayerId, aliases: Aliases) {
   expect(view.seed).toBe(0);
   expect(view.rng).toBe(0);
   expect(view.rng128).toBeUndefined();
-  // Definições: só as das cartas visíveis.
+  // Definições: só as das cartas visíveis e as reveladas a todos no log.
   const visibleIds = new Set([...vis].map((u) => state.cards[u].cardId));
+  for (const e of state.log) for (const id of e.revealed ?? []) visibleIds.add(id);
   for (const id of Object.keys(view.defs)) if (id !== HIDDEN_CARD) expect(visibleIds.has(id)).toBe(true);
   // Mesmas quantidades em todas as zonas.
   for (const p of [0, 1] as const) {

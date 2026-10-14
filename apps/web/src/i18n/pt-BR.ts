@@ -1,6 +1,7 @@
 // Português (Brasil): idioma padrão e referência das chaves. Todo idioma novo precisa ter
 // exatamente estas chaves (ver `Messages`). Sintaxe de {param} e {n|# um|# vários}: index.ts.
 
+import supportPtBR from './support/pt-BR';
 import tutorialPtBR from './tutorial/pt-BR';
 
 const ptBR = {
@@ -136,7 +137,7 @@ const ptBR = {
   'menu.navCoverage': 'Cobertura das cartas',
   'menu.footerNav': 'Rodapé',
   'menu.disclaimer':
-    'Projeto de fã, sem fins lucrativos e sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para português são automáticas e não oficiais.',
+    'Projeto de fã, mantido pela comunidade e por lojas parceiras, sem vínculo com a Bandai, Toei Animation ou Shueisha. As traduções para português são automáticas e não oficiais.',
   // ---- conexão ----
   'menu.connecting': 'Conectando ao servidor…',
   'menu.connectFailed': 'Não foi possível conectar ao servidor. Veja as mensagens [server] no terminal do npm run dev.',
@@ -251,6 +252,15 @@ const ptBR = {
   'menu.onlineSearching': 'Procurando oponente',
   'menu.onlineQueuePlayers': '{n} jogadores na fila',
   'menu.onlineQueueAlone': 'Você é o único na fila agora.',
+  'menu.anyLeader': 'Qualquer Líder',
+  'menu.pickLeaderTitle': 'Contra qual Líder?',
+  'menu.pickLeaderHint': 'Durante 1 minuto você só enfrenta quem estiver com este Líder; se ninguém aparecer, joga contra qualquer oponente.',
+  'menu.searchLeader': 'Buscar Líder',
+  'menu.leaderInQueue': '{n} na fila',
+  'menu.leadersFailed': 'Não deu para carregar os Líderes. Tente de novo.',
+  'menu.noLeaderFound': 'Nenhum Líder encontrado.',
+  'menu.queueLeaderSearching': 'Procurando {name}: mais {time}, depois qualquer oponente.',
+  'menu.queueLeaderExpired': 'Ninguém com {name} agora: procurando qualquer oponente.',
   // ---- erro de tela (ErrorBoundary) ----
   'menu.errorHint': 'Algo deu errado ao desenhar a tela. A partida continua: tente de novo.',
   'menu.errorRetry': 'Tentar de novo',
@@ -724,7 +734,7 @@ const ptBR = {
   'tour.create': '+ Criar torneio',
   'tour.signInToRegister': 'Para se inscrever num torneio, entre com a conta Google no menu.',
   'tour.emptyCreate': 'Nenhum torneio ainda. Crie o primeiro!',
-  'tour.emptyOrganizer': 'Nenhum torneio ainda. Torneios são criados por contas com o perfil Organizador.',
+  'tour.emptyOrganizer': 'Nenhum torneio ainda. Torneios são criados por Organizadores e por apoiadores Capitão ou Almirante.',
   'tour.playersCount': '{n|# jogador|# jogadores}',
   'tour.playersOfMax': '{n}/{max} {n|jogador|jogadores}',
   'tour.youRegistered': '✔ Você está inscrito',
@@ -1236,6 +1246,8 @@ const ptBR = {
   'game.detachDonTitle': 'Devolve à área de custo 1 DON!! anexado neste turno e ainda não usado (até a carta atacar ou usar um efeito)',
   'game.donCanReturn': '{n|# pode voltar|# podem voltar}',
   'game.tapCardToRead': 'Toque na carta para ler.',
+  'game.revealedTitle': '{n|Carta revelada|Cartas reveladas}',
+  'game.revealedOk': 'Entendi',
   // ==== /game ====
 
 
@@ -2019,6 +2031,7 @@ const ptBR = {
   'errors.roomNotFound': 'Sala não encontrada ou já começou.',
   'errors.ownRoom': 'Esta sala é sua: envie o código para outra pessoa.',
   'errors.notInQueue': 'Você não está mais na fila.',
+  'errors.invalidLeaderPick': 'Esse Líder não pode ser escolhido no formato {format}.',
   'errors.matchNotFound': 'Partida não encontrada.',
   'errors.matchInProgress': 'Esta partida já está em andamento.',
   'errors.noMatchWithCode': 'Nenhuma partida em andamento com esse código.',
@@ -2192,6 +2205,8 @@ const ptBR = {
   // ==== /status ====
   // ==== tutorial (i18n/tutorial) ====
   ...tutorialPtBR,
+  // ==== apoio ao projeto (i18n/support) ====
+  ...supportPtBR,
 } as const;
 
 export type MessageKey = keyof typeof ptBR;

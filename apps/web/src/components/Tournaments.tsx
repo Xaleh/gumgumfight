@@ -1,10 +1,14 @@
 import { FORMATS, formatLabel } from '@gumgum/engine';
 import { Fragment, type ReactNode, useCallback, useEffect, useState } from 'react';
 import {
+  type AdminSponsor,
   api,
   canPlay,
   type DeckSummary,
+  isAdmin,
   type OnlineSeat,
+  type OrganizeLimits,
+  type PublicSponsor,
   STRUCTURE_LABEL,
   type TournamentDetail,
   type TournamentInput,
@@ -12,6 +16,7 @@ import {
   type TournamentStage,
   type TournamentSummary,
   TOURNAMENT_STATUS_LABEL,
+  TIER_LABEL,
   type WatchTarget,
   winsNeeded,
 } from '../api';
@@ -20,8 +25,10 @@ import type { GameSetup } from '../game/useGame';
 import { type Locale, type MessageKey, type Translate, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtTime } from '../i18n/format';
 import { useNow } from './HomeBlocks';
+import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
 import { openReplay, ReportsPanel } from './Reports';
+import { SupportModal } from './Support';
 
 // Neste arquivo `t` costuma ser o torneio; a função de tradução (`useT()`) se chama `tr`.
 
@@ -142,14 +149,16 @@ export function Tournaments({
   onReplay: (setup: GameSetup, tournamentId: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(initialId ?? null);
-  const [creating, setCreating] = useState(false);
+  /** Criando um torneio: o limite de jogadores de quem cria (null = não está criando). */
+  const [creating, setCreating] = useState<number | null>(null);
 
-  if (creating) {
+  if (creating !== null) {
     return (
       <TournamentForm
-        onCancel={() => setCreating(false)}
+        cap={creating}
+        onCancel={() => setCreating(null)}
         onSaved={(t) => {
-          setCreating(false);
+          setCreating(null);
           setOpenId(t.id);
         }}
       />
@@ -167,17 +176,99 @@ export function Tournaments({
       />
     );
   }
-  return <TournamentList onExit={onExit} onOpen={setOpenId} onCreate={() => setCreating(true)} />;
+  return <TournamentList onExit={onExit} onOpen={setOpenId} onCreate={setCreating} />;
+}
+
+// ------------------------------------------------------------------ torneio do time e lojas parceiras
+
+/** Selos do torneio: do time, prêmio, loja e inscrição antecipada. */
+function OfficialBadges({
+  t,
+  hideSponsor,
+}: {
+  t: Pick<TournamentSummary, 'official' | 'prize' | 'sponsor' | 'priorityUntil' | 'status'>;
+  /** Na página do torneio a loja aparece com o logo logo abaixo. */
+  hideSponsor?: boolean;
+}) {
+  const tr = useT();
+  const locale = useLocale();
+  if (!t.official && !t.prize && !t.sponsor) return null;
+  const early = t.priorityUntil && Date.parse(t.priorityUntil) > Date.now() && t.status === 'registration';
+  return (
+    <span className="tour-official-line">
+      {t.official && <span className="tour-badge official">{tr('tour.officialBadge')}</span>}
+      {t.prize && <span className="tour-prize">🏆 {t.prize}</span>}
+      {t.sponsor && !hideSponsor && <span className="muted small">{tr('tour.sponsoredBy', { name: t.sponsor.name })}</span>}
+      {early && <span className="muted small">{tr('tour.priorityUntil', { date: dateTime(t.priorityUntil, locale) })}</span>}
+    </span>
+  );
+}
+
+function SponsorCard({ sp }: { sp: PublicSponsor }) {
+  const inner = (
+    <>
+      {sp.logoUrl ? <img src={sp.logoUrl} alt="" loading="lazy" /> : <span className="sponsor-initial">{sp.name.slice(0, 1)}</span>}
+      <span className="sponsor-text">
+        <b>{sp.name}</b>
+        {sp.offer && <span className="small">{sp.offer}</span>}
+      </span>
+    </>
+  );
+  return sp.url ? (
+    <a className="sponsor-card" href={sp.url} target="_blank" rel="noopener noreferrer sponsored">
+      {inner}
+    </a>
+  ) : (
+    <div className="sponsor-card">{inner}</div>
+  );
+}
+
+/** Faixa "Lojas parceiras" com o convite para novas lojas. */
+export function SponsorsStrip({ placement, hideEmpty }: { placement: 'tournaments' | 'home'; /** Sem lojas, nem mostra o convite. */ hideEmpty?: boolean }) {
+  const tr = useT();
+  const [data, setData] = useState<{ sponsors: PublicSponsor[]; contactUrl: string | null } | null>(null);
+  useEffect(() => {
+    api
+      .sponsors(placement)
+      .then(setData)
+      .catch(() => setData(null));
+  }, [placement]);
+  if (!data || (!data.sponsors.length && (!data.contactUrl || hideEmpty))) return null;
+  return (
+    <section className="menu-card sponsors-strip" aria-label={tr('sponsors.title')}>
+      <div className="sponsors-head">
+        <h3>
+          <Icon name="store" size={18} /> {tr('sponsors.title')}
+        </h3>
+        {data.contactUrl && (
+          <a className="text-link small" href={data.contactUrl} target="_blank" rel="noopener noreferrer">
+            {tr('sponsors.become')}
+          </a>
+        )}
+      </div>
+      {data.sponsors.length > 0 ? (
+        <div className="sponsors-list">
+          {data.sponsors.map((sp) => (
+            <SponsorCard key={sp.id} sp={sp} />
+          ))}
+        </div>
+      ) : (
+        <p className="muted small">{tr('sponsors.empty')}</p>
+      )}
+    </section>
+  );
 }
 
 // ------------------------------------------------------------------ lista
 
-function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOpen: (id: string) => void; onCreate: () => void }) {
-  const { user } = useAuth();
+function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOpen: (id: string) => void; onCreate: (cap: number) => void }) {
+  const { user, config } = useAuth();
   const tr = useT();
   const locale = useLocale();
-  const [data, setData] = useState<{ tournaments: TournamentSummary[]; canCreate: boolean } | null>(null);
+  const [data, setData] = useState<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSupport, setShowSupport] = useState(false);
+  const quota = data?.organize?.kind === 'supporter' ? data.organize : null;
 
   useEffect(() => {
     let stop = false;
@@ -198,7 +289,7 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
         </button>
         <h2>{tr('tour.title')}</h2>
         {data?.canCreate && (
-          <button className="btn small primary tour-create" onClick={onCreate}>
+          <button className="btn small primary tour-create" onClick={() => onCreate(data.organize?.maxPlayers ?? 256)}>
             {tr('tour.create')}
           </button>
         )}
@@ -206,15 +297,29 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
       <div className="coverage-body">
         {error && <div className="error">{error}</div>}
         {!user && <p className="muted small">{tr('tour.signInToRegister')}</p>}
+        {quota && (
+          <p className="muted small tour-quota">{tr('tour.quota', { used: quota.used, perMonth: quota.perMonth, max: quota.maxPlayers })}</p>
+        )}
+        {data && !data.organize && config?.support && (
+          <p className="small tour-quota">
+            {tr('tour.quotaInvite', { n: 5 })}{' '}
+            <button className="text-link" onClick={() => setShowSupport(true)}>
+              {tr('tour.quotaInviteLink')}
+            </button>
+          </p>
+        )}
+        {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+        <SponsorsStrip placement="tournaments" />
         {data === null && !error && <p className="muted">{tr('common.loading')}</p>}
         {data?.tournaments.length === 0 && <p className="muted">{tr(data.canCreate ? 'tour.emptyCreate' : 'tour.emptyOrganizer')}</p>}
         <div className="tour-list">
           {data?.tournaments.map((t) => (
-            <button key={t.id} className="tour-card" onClick={() => onOpen(t.id)}>
+            <button key={t.id} className={['tour-card', t.official ? 'official' : ''].join(' ')} onClick={() => onOpen(t.id)}>
               <div className="tour-card-head">
                 <strong>{t.name}</strong>
                 <span className={['tour-status', t.status].join(' ')}>{tr(TOURNAMENT_STATUS_LABEL[t.status])}</span>
               </div>
+              <OfficialBadges t={t} />
               <span className="muted small">
                 {dots(
                   formatLabel(t.format),
@@ -243,14 +348,23 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
 
 function TournamentForm({
   initial,
+  cap,
   onCancel,
   onSaved,
 }: {
   initial?: TournamentDetail;
+  /** Limite de jogadores de quem cria (plano de apoiador: 64). */
+  cap: number;
   onCancel: () => void;
   onSaved: (t: TournamentDetail) => void;
 }) {
   const tr = useT();
+  const { user } = useAuth();
+  const admin = isAdmin(user?.role);
+  const [sponsors, setSponsors] = useState<AdminSponsor[]>([]);
+  useEffect(() => {
+    if (admin) api.admin.sponsors().then(setSponsors, () => setSponsors([]));
+  }, [admin]);
   const [form, setForm] = useState<TournamentInput>(() => ({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
@@ -265,6 +379,10 @@ function TournamentForm({
     startsAt: initial?.startsAt ?? null,
     checkIn: initial?.checkIn ?? true,
     toleranceMin: initial?.toleranceMin ?? 5,
+    official: initial?.official ?? false,
+    prize: initial?.prize ?? null,
+    sponsorId: initial?.sponsor?.id ?? null,
+    priority: Boolean(initial?.priorityUntil),
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -413,11 +531,12 @@ function TournamentForm({
                 className="admin-search"
                 type="number"
                 min={2}
-                max={256}
-                placeholder={tr('tour.noLimit')}
+                max={cap}
+                placeholder={cap < 256 ? tr('tour.capPlaceholder', { max: cap }) : tr('tour.noLimit')}
                 value={form.maxPlayers ?? ''}
                 onChange={(e) => set('maxPlayers', num(e.target.value))}
               />
+              {cap < 256 && <p className="muted small">{tr('tour.capHint', { max: cap })}</p>}
             </div>
             <div className="field">
               <label htmlFor="tour-start">{tr('tour.startsAtLabel')}</label>
@@ -458,6 +577,53 @@ function TournamentForm({
             <p className="muted small">{tr('tour.noStartHint')}</p>
           )}
           {form.structure === 'swiss' && <p className="muted small">{tr('tour.roundsAutoHint')}</p>}
+          {admin && (
+            <div className="field tour-official-form">
+              <label className="check">
+                <input type="checkbox" checked={Boolean(form.official)} onChange={(e) => set('official', e.target.checked)} />
+                {tr('tour.officialCheck')}
+              </label>
+              {form.official && (
+                <>
+                  <div className="tour-form-row">
+                    <div className="field">
+                      <label htmlFor="tour-prize">{tr('tour.prize')}</label>
+                      <input
+                        id="tour-prize"
+                        className="admin-search"
+                        maxLength={200}
+                        placeholder={tr('tour.prizePlaceholder')}
+                        value={form.prize ?? ''}
+                        onChange={(e) => set('prize', e.target.value || null)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="tour-sponsor">{tr('tour.sponsor')}</label>
+                      <select
+                        id="tour-sponsor"
+                        className="admin-search"
+                        value={form.sponsorId ?? ''}
+                        onChange={(e) => set('sponsorId', e.target.value || null)}
+                      >
+                        <option value="">{tr('tour.sponsorNone')}</option>
+                        {sponsors.map((sp) => (
+                          <option key={sp.id} value={sp.id}>
+                            {sp.name}
+                            {sp.active ? '' : ` ${tr('tour.sponsorInactive')}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <label className="check">
+                    <input type="checkbox" checked={Boolean(form.priority)} onChange={(e) => set('priority', e.target.checked)} />
+                    {tr('tour.priorityCheck')}
+                  </label>
+                  <p className="muted small">{tr('tour.officialHint')}</p>
+                </>
+              )}
+            </div>
+          )}
           {error && <div className="error">{error}</div>}
           <div className="btn-row">
             <button className="btn" onClick={onCancel}>
@@ -552,6 +718,7 @@ function TournamentPage({
     return (
       <TournamentForm
         initial={t}
+        cap={t.maxPlayersCap}
         onCancel={() => setEditing(false)}
         onSaved={(saved) => {
           setT(saved);
@@ -641,6 +808,13 @@ function TournamentPage({
                 </p>
               )}
               <p className="muted small">{tr('tour.clockInfo', { clock: clock(tr, t.clockMs) })}</p>
+              <OfficialBadges t={t} hideSponsor />
+              {t.sponsor && (
+                <div className="tour-sponsor">
+                  <span className="muted small">{tr('tour.sponsorLabel')}</span>
+                  <SponsorCard sp={t.sponsor} />
+                </div>
+              )}
               {t.description && <p className="tour-desc">{t.description}</p>}
               {t.status === 'finished' && t.standings[0] && (
                 <p className="tour-champion">{rich(tr('tour.champion'), { name: <b>{t.standings[0].name}</b> })}</p>
@@ -867,7 +1041,9 @@ function MyArea({
             )}
           </div>
         )}
-        {full ? (
+        {!t.me && t.priorityOpen && !t.canRegister ? (
+          <p className="muted">{tr('tour.priorityNotice', { date: dateTime(t.priorityUntil, locale) })}</p>
+        ) : full ? (
           <p className="muted">{tr('tour.full')}</p>
         ) : (
           <>
@@ -1210,7 +1386,14 @@ function Players({ t, busy, onDrop }: { t: TournamentDetail; busy: boolean; onDr
             <div className="tour-entry-head">
               <LeaderArt name={p.leader ? (p.leaderName ?? p.leader) : undefined} image={p.leaderImage} colors={p.colors} size="small" />
               <span className="watch-name">
-                <b>{p.name}</b>
+                <b>
+                  {p.name}
+                  {p.supporter && (
+                    <span className="supporter-tag" title={tr('support.tagTitleTier', { tier: TIER_LABEL[p.supporter] })}>
+                      ❤ {TIER_LABEL[p.supporter]}
+                    </span>
+                  )}
+                </b>
                 <span className="muted small">
                   {dots(
                     p.leader ? (p.leaderName ?? p.leader) : tr('tour.deckHidden'),

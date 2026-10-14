@@ -2,7 +2,7 @@
 // que o servidor confere e troca por uma sessão em cookie httpOnly.
 
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { api, type User } from './api';
+import { api, type AppConfig, type User } from './api';
 import { useLocale } from './i18n';
 
 interface GsiButtonOptions {
@@ -55,6 +55,8 @@ interface AuthCtx {
   user: User | null;
   /** Client ID do Google; null = login desligado no servidor. */
   clientId: string | null;
+  /** Configuração pública do servidor (apoio ligado, acesso só para apoiadores…). */
+  config: AppConfig | null;
   /** Aviso depois do login (ex.: decks trazidos do navegador). */
   notice: string | null;
   error: string | null;
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .then(([config, me]) => {
           if (cancelled) return;
           setClientId(config.googleClientId);
+          setConfig(config);
           setUser(me.user);
           setReady(true);
         })
@@ -130,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ready, user, clientId, notice, error, signIn, signOut, refresh, changePicture }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ ready, user, clientId, config, notice, error, signIn, signOut, refresh, changePicture }}>{children}</AuthContext.Provider>
   );
 }
 

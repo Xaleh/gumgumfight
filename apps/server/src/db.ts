@@ -93,7 +93,84 @@ function migrate(db: DB) {
   migratePush(db);
   migrateTournaments(db);
   migrateCardIds(db);
+  migrateSupport(db);
   migrateTutorial(db);
+}
+
+/**
+ * Apoio ao projeto: o plano de cada conta, os pagamentos recebidos da plataforma de
+ * apoio (Ko-fi), a cota de torneios dos apoiadores, os torneios do time e as lojas
+ * patrocinadoras.
+ */
+function migrateSupport(db: DB) {
+  const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  // supporter_tier: grumete | tripulante | capitao | almirante (null = sem plano).
+  if (!userCols.includes('supporter_tier')) db.exec('ALTER TABLE users ADD COLUMN supporter_tier TEXT');
+  // supporter_until: até quando o plano vale (ISO; null = sem prazo, dado à mão pelo admin).
+  if (!userCols.includes('supporter_until')) db.exec('ALTER TABLE users ADD COLUMN supporter_until TEXT');
+  // supporter_source: manual (admin) | kofi (pagamento).
+  if (!userCols.includes('supporter_source')) db.exec('ALTER TABLE users ADD COLUMN supporter_source TEXT');
+  // supporter_public: a pessoa aceitou aparecer na lista de Apoiadores.
+  if (!userCols.includes('supporter_public')) db.exec('ALTER TABLE users ADD COLUMN supporter_public INTEGER NOT NULL DEFAULT 0');
+  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
+  if (!userCols.includes('email_verified')) {
+    db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+    // Contas de antes desta coluna: endereços do Gmail são sempre confirmados pelo Google; os outros
+    // ficam confirmados no próximo login (até lá, o admin pode dar o plano à mão).
+    db.exec("UPDATE users SET email_verified = 1 WHERE lower(email) LIKE '%@gmail.com' OR lower(email) LIKE '%@googlemail.com'");
+  }
+  db.exec(`
+    -- Pagamentos recebidos pelo webhook da plataforma de apoio (auditoria e idempotência).
+    CREATE TABLE IF NOT EXISTS supporter_payments (
+      id          TEXT PRIMARY KEY,             -- id da transação na plataforma
+      email       TEXT,                         -- e-mail de quem pagou (minúsculo)
+      kind        TEXT NOT NULL,                -- Donation | Subscription | ...
+      tier        TEXT,                         -- plano reconhecido (null = doação avulsa)
+      amount      REAL NOT NULL,
+      currency    TEXT NOT NULL,
+      paid_at     TEXT NOT NULL,
+      user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS supporter_payments_email ON supporter_payments(email, paid_at);
+
+    -- Torneios criados pela cota de apoiador (Capitão e Almirante: 5 por mês). Apagar um
+    -- torneio que não começou devolve a vaga; um que já começou continua contando.
+    CREATE TABLE IF NOT EXISTS tournament_quota (
+      tournament_id TEXT PRIMARY KEY,
+      organizer_id  TEXT NOT NULL,
+      created_at    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS tournament_quota_org ON tournament_quota(organizer_id, created_at);
+
+    -- Lojas patrocinadoras: aparecem na página de torneios (e, se marcado, na home) e no
+    -- torneio que patrocinam. O logo fica no próprio banco (sobrevive aos deploys).
+    CREATE TABLE IF NOT EXISTS sponsors (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      url         TEXT,                         -- site ou loja online (http/https)
+      offer       TEXT,                         -- oferta do mês (texto curto)
+      placements  TEXT NOT NULL DEFAULT 'tournaments',  -- onde aparece: tournaments, home (separados por vírgula)
+      starts_at   TEXT,                         -- período ativo (null = sem limite)
+      ends_at     TEXT,
+      sort        INTEGER NOT NULL DEFAULT 0,
+      logo        BLOB,
+      logo_type   TEXT,                         -- image/png | image/jpeg | image/webp
+      logo_version INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+  const tCols = (db.prepare('PRAGMA table_info(tournaments)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  // official: torneio do time (Torneio da Tripulação), marcado só por admin.
+  if (!tCols.includes('official')) db.exec('ALTER TABLE tournaments ADD COLUMN official INTEGER NOT NULL DEFAULT 0');
+  // prize: prêmio anunciado (texto livre, ex.: "1 booster box, cortesia da Loja X").
+  if (!tCols.includes('prize')) db.exec('ALTER TABLE tournaments ADD COLUMN prize TEXT');
+  // sponsor_id: loja patrocinadora (sponsors.id).
+  if (!tCols.includes('sponsor_id')) db.exec('ALTER TABLE tournaments ADD COLUMN sponsor_id TEXT');
+  // priority_until: até quando só Almirantes se inscrevem (inscrição antecipada).
+  if (!tCols.includes('priority_until')) db.exec('ALTER TABLE tournaments ADD COLUMN priority_until TEXT');
+  // quota: criado pela cota de apoiador (o criador gerencia mesmo sem o perfil Organizador).
+  if (!tCols.includes('quota')) db.exec('ALTER TABLE tournaments ADD COLUMN quota INTEGER NOT NULL DEFAULT 0');
 }
 
 /** Deck com os números de carta sem sufixo de versão ("P-029_r1" -> "P-029"), juntando as cópias. */
@@ -533,6 +610,12 @@ export function listCards(db: DB, set?: string) {
       ? db.prepare('SELECT data, provisional FROM cards WHERE set_code = ? ORDER BY id').all(set)
       : db.prepare('SELECT data, provisional FROM cards ORDER BY id').all()
   ) as unknown as CardRow[];
+  return rows.map(toCard);
+}
+
+/** Todos os Líderes (para escolher o oponente na fila casual). */
+export function listLeaders(db: DB) {
+  const rows = db.prepare("SELECT data, provisional FROM cards WHERE category = 'leader' ORDER BY id").all() as unknown as CardRow[];
   return rows.map(toCard);
 }
 

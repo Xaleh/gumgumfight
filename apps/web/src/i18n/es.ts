@@ -1,6 +1,7 @@
 // Español.
 
 import type { Messages } from './pt-BR';
+import support from './support/es';
 import tutorial from './tutorial/es';
 
 export default {
@@ -136,7 +137,7 @@ export default {
   'menu.navCoverage': 'Cobertura de cartas',
   'menu.footerNav': 'Pie de página',
   'menu.disclaimer':
-    'Proyecto de fans, sin fines de lucro y sin afiliación con Bandai, Toei Animation ni Shueisha. Las traducciones al portugués son automáticas y no oficiales.',
+    'Proyecto de fans, mantenido por la comunidad y por tiendas asociadas, sin afiliación con Bandai, Toei Animation ni Shueisha. Las traducciones al portugués son automáticas y no oficiales.',
   // ---- conexión ----
   'menu.connecting': 'Conectando con el servidor…',
   'menu.connectFailed': 'No se pudo conectar con el servidor. Revisa los mensajes [server] en la terminal de npm run dev.',
@@ -250,6 +251,15 @@ export default {
   'menu.onlineSearching': 'Buscando rival',
   'menu.onlineQueuePlayers': '{n} jugadores en cola',
   'menu.onlineQueueAlone': 'Ahora mismo eres el único en la cola.',
+  'menu.anyLeader': 'Cualquier Líder',
+  'menu.pickLeaderTitle': '¿Contra qué Líder?',
+  'menu.pickLeaderHint': 'Durante 1 minuto solo te enfrentas a quien use este Líder; si nadie aparece, juegas contra cualquier rival.',
+  'menu.searchLeader': 'Buscar Líder',
+  'menu.leaderInQueue': '{n} en la cola',
+  'menu.leadersFailed': 'No se pudieron cargar los Líderes. Inténtalo de nuevo.',
+  'menu.noLeaderFound': 'No se encontró ningún Líder.',
+  'menu.queueLeaderSearching': 'Buscando {name}: quedan {time}, luego cualquier rival.',
+  'menu.queueLeaderExpired': 'Nadie con {name} ahora: buscando cualquier rival.',
   // ---- error de pantalla (ErrorBoundary) ----
   'menu.errorHint': 'Algo salió mal al dibujar la pantalla. La partida sigue: inténtalo de nuevo.',
   'menu.errorRetry': 'Reintentar',
@@ -723,7 +733,7 @@ export default {
   'tour.create': '+ Crear torneo',
   'tour.signInToRegister': 'Para inscribirte en un torneo, inicia sesión con tu cuenta de Google en el menú.',
   'tour.emptyCreate': 'Aún no hay torneos. ¡Crea el primero!',
-  'tour.emptyOrganizer': 'Aún no hay torneos. Los torneos los crean las cuentas con el rol Organizador.',
+  'tour.emptyOrganizer': 'Aún no hay torneos. Los torneos los crean los Organizadores y los colaboradores Capitão o Almirante.',
   'tour.playersCount': '{n|# jugador|# jugadores}',
   'tour.playersOfMax': '{n}/{max} {n|jugador|jugadores}',
   'tour.youRegistered': '✔ Estás inscrito',
@@ -1235,6 +1245,8 @@ export default {
   'game.detachDonTitle': 'Devuelve al área de coste 1 DON!! asignado en este turno y aún no usado (hasta que la carta ataque o use un efecto)',
   'game.donCanReturn': '{n|# puede volver|# pueden volver}',
   'game.tapCardToRead': 'Toca la carta para leerla.',
+  'game.revealedTitle': '{n|Carta revelada|Cartas reveladas}',
+  'game.revealedOk': 'Entendido',
   // ==== /game ====
 
 
@@ -2015,6 +2027,7 @@ export default {
   'errors.roomNotFound': 'Sala no encontrada o ya empezada.',
   'errors.ownRoom': 'Esta es tu sala: envía el código a otra persona.',
   'errors.notInQueue': 'Ya no estás en la cola.',
+  'errors.invalidLeaderPick': 'Ese Líder no se puede elegir en el formato {format}.',
   'errors.matchNotFound': 'Partida no encontrada.',
   'errors.matchInProgress': 'Esta partida ya está en curso.',
   'errors.noMatchWithCode': 'No hay ninguna partida en curso con ese código.',
@@ -2188,4 +2201,6 @@ export default {
   // ==== /status ====
   // ==== tutorial (i18n/tutorial) ====
   ...tutorial,
+  // ==== apoio ao projeto (i18n/support) ====
+  ...support,
 } satisfies Messages;

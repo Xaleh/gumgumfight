@@ -1,6 +1,7 @@
 // Deutsch.
 
 import type { Messages } from './pt-BR';
+import support from './support/de';
 import tutorial from './tutorial/de';
 
 export default {
@@ -136,7 +137,7 @@ export default {
   'menu.navCoverage': 'Kartenabdeckung',
   'menu.footerNav': 'Fußzeile',
   'menu.disclaimer':
-    'Fanprojekt, nicht kommerziell und nicht mit Bandai, Toei Animation oder Shueisha verbunden. Die portugiesischen Übersetzungen sind automatisch und inoffiziell.',
+    'Fanprojekt, getragen von der Community und Partnerläden, nicht mit Bandai, Toei Animation oder Shueisha verbunden. Die portugiesischen Übersetzungen sind automatisch und inoffiziell.',
   // ---- Verbindung ----
   'menu.connecting': 'Verbinde mit dem Server…',
   'menu.connectFailed': 'Keine Verbindung zum Server möglich. Prüfe die [server]-Meldungen im Terminal von npm run dev.',
@@ -250,6 +251,15 @@ export default {
   'menu.onlineSearching': 'Suche einen Gegner',
   'menu.onlineQueuePlayers': '{n} Spieler in der Warteschlange',
   'menu.onlineQueueAlone': 'Du bist gerade allein in der Warteschlange.',
+  'menu.anyLeader': 'Beliebiger Leader',
+  'menu.pickLeaderTitle': 'Gegen welchen Leader?',
+  'menu.pickLeaderHint': '1 Minute lang triffst du nur auf Spieler mit diesem Leader; taucht niemand auf, spielst du gegen einen beliebigen Gegner.',
+  'menu.searchLeader': 'Leader suchen',
+  'menu.leaderInQueue': '{n} in der Warteschlange',
+  'menu.leadersFailed': 'Die Leader konnten nicht geladen werden. Versuch es noch einmal.',
+  'menu.noLeaderFound': 'Kein Leader gefunden.',
+  'menu.queueLeaderSearching': 'Suche nach {name}: noch {time}, danach beliebiger Gegner.',
+  'menu.queueLeaderExpired': 'Gerade niemand mit {name}: Suche nach einem beliebigen Gegner.',
   // ---- Bildschirmfehler (ErrorBoundary) ----
   'menu.errorHint': 'Beim Zeichnen des Bildschirms ist etwas schiefgelaufen. Die Partie läuft weiter: Versuch es noch einmal.',
   'menu.errorRetry': 'Erneut versuchen',
@@ -723,7 +733,7 @@ export default {
   'tour.create': '+ Turnier erstellen',
   'tour.signInToRegister': 'Um dich für ein Turnier anzumelden, logge dich im Menü mit deinem Google-Konto ein.',
   'tour.emptyCreate': 'Noch keine Turniere. Erstelle das erste!',
-  'tour.emptyOrganizer': 'Noch keine Turniere. Turniere werden von Konten mit der Rolle Veranstalter erstellt.',
+  'tour.emptyOrganizer': 'Noch keine Turniere. Turniere werden von Veranstaltern und von Unterstützern der Stufen Capitão oder Almirante erstellt.',
   'tour.playersCount': '{n|# Spieler|# Spieler}',
   'tour.playersOfMax': '{n}/{max} {n|Spieler|Spieler}',
   'tour.youRegistered': '✔ Du bist angemeldet',
@@ -1235,6 +1245,8 @@ export default {
   'game.detachDonTitle': 'Legt 1 DON!!, das in diesem Zug angelegt und noch nicht genutzt wurde (bis die Karte angreift oder einen Effekt nutzt), zurück in den Kostenbereich',
   'game.donCanReturn': '{n|# kann zurück|# können zurück}',
   'game.tapCardToRead': 'Tippe auf die Karte, um sie zu lesen.',
+  'game.revealedTitle': '{n|Aufgedeckte Karte|Aufgedeckte Karten}',
+  'game.revealedOk': 'Verstanden',
   // ==== /game ====
 
 
@@ -2015,6 +2027,7 @@ export default {
   'errors.roomNotFound': 'Raum nicht gefunden oder bereits gestartet.',
   'errors.ownRoom': 'Das ist dein Raum: Schick den Code an jemand anderen.',
   'errors.notInQueue': 'Du bist nicht mehr in der Warteschlange.',
+  'errors.invalidLeaderPick': 'Dieser Leader kann im Format {format} nicht gewählt werden.',
   'errors.matchNotFound': 'Partie nicht gefunden.',
   'errors.matchInProgress': 'Diese Partie läuft bereits.',
   'errors.noMatchWithCode': 'Keine laufende Partie mit diesem Code.',
@@ -2188,4 +2201,6 @@ export default {
   // ==== /status ====
   // ==== tutorial (i18n/tutorial) ====
   ...tutorial,
+  // ==== apoio ao projeto (i18n/support) ====
+  ...support,
 } satisfies Messages;

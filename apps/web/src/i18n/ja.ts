@@ -1,6 +1,7 @@
 // 日本語.
 
 import type { Messages } from './pt-BR';
+import support from './support/ja';
 import tutorial from './tutorial/ja';
 
 export default {
@@ -136,7 +137,7 @@ export default {
   'menu.navCoverage': 'カード対応状況',
   'menu.footerNav': 'フッター',
   'menu.disclaimer':
-    '非営利のファンプロジェクトであり、バンダイ、東映アニメーション、集英社とは関係ありません。ポルトガル語の翻訳は自動翻訳による非公式のものです。',
+    'コミュニティと協力ショップに支えられたファンプロジェクトであり、バンダイ、東映アニメーション、集英社とは関係ありません。ポルトガル語の翻訳は自動翻訳による非公式のものです。',
   // ---- 接続 ----
   'menu.connecting': 'サーバーに接続中…',
   'menu.connectFailed': 'サーバーに接続できませんでした。npm run devのターミナルに出ている[server]のメッセージを確認してください。',
@@ -250,6 +251,15 @@ export default {
   'menu.onlineSearching': '対戦相手を探しています',
   'menu.onlineQueuePlayers': 'マッチング待ち{n}人',
   'menu.onlineQueueAlone': '現在マッチング待ちはあなただけです。',
+  'menu.anyLeader': 'どのリーダーでも',
+  'menu.pickLeaderTitle': '対戦したいリーダーは？',
+  'menu.pickLeaderHint': '1分間はこのリーダーを使うプレイヤーとだけマッチングします。見つからなければ、誰とでも対戦します。',
+  'menu.searchLeader': 'リーダーを検索',
+  'menu.leaderInQueue': '{n}人が待機中',
+  'menu.leadersFailed': 'リーダーを読み込めませんでした。もう一度お試しください。',
+  'menu.noLeaderFound': 'リーダーが見つかりません。',
+  'menu.queueLeaderSearching': '{name}を検索中：残り{time}、その後は誰とでも対戦します。',
+  'menu.queueLeaderExpired': '現在{name}のプレイヤーはいません：誰とでも対戦します。',
   // ---- 画面エラー（ErrorBoundary） ----
   'menu.errorHint': '画面の描画中に問題が発生しました。対戦は続いています。もう一度お試しください。',
   'menu.errorRetry': '再試行',
@@ -723,7 +733,7 @@ export default {
   'tour.create': '+ 大会を作成',
   'tour.signInToRegister': '大会に参加登録するには、メニューからGoogleアカウントでログインしてください。',
   'tour.emptyCreate': 'まだ大会はありません。最初の大会を作りましょう！',
-  'tour.emptyOrganizer': 'まだ大会はありません。大会は主催者権限のアカウントが作成します。',
+  'tour.emptyOrganizer': 'まだ大会はありません。大会は主催者と、Capitão・Almirante のサポーターが作成できます。',
   'tour.playersCount': '{n|#人}',
   'tour.playersOfMax': '{n}/{max}人',
   'tour.youRegistered': '✔ 参加登録済み',
@@ -1235,6 +1245,8 @@ export default {
   'game.detachDonTitle': 'このターンに付与してまだ使っていない（カードがアタックするか効果を使うまで）ドン!!を1枚、コストエリアに戻します',
   'game.donCanReturn': '{n|#枚戻せる}',
   'game.tapCardToRead': 'カードをタップすると詳細を読めます。',
+  'game.revealedTitle': '{n|公開されたカード}',
+  'game.revealedOk': 'OK',
   // ==== /game ====
 
 
@@ -2015,6 +2027,7 @@ export default {
   'errors.roomNotFound': 'ルームが見つからないか、すでに始まっています。',
   'errors.ownRoom': 'これはあなたのルームです。コードを他の人に送ってください。',
   'errors.notInQueue': 'マッチング待ちから外れています。',
+  'errors.invalidLeaderPick': 'このリーダーは{format}フォーマットでは選べません。',
   'errors.matchNotFound': '対戦が見つかりません。',
   'errors.matchInProgress': 'この対戦はすでに進行中です。',
   'errors.noMatchWithCode': 'そのコードで進行中の対戦はありません。',
@@ -2188,4 +2201,6 @@ export default {
   // ==== /status ====
   // ==== tutorial (i18n/tutorial) ====
   ...tutorial,
+  // ==== apoio ao projeto (i18n/support) ====
+  ...support,
 } satisfies Messages;

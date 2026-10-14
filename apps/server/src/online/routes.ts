@@ -12,10 +12,10 @@
 // Modo transmissão (/api/broadcast): ver online/broadcast.ts.
 
 import { randomInt } from 'node:crypto';
-import { buildCardDef, type CardData, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
+import { buildCardDef, type CardData, cardLegality, type DeckList, formatIssues, formatLabel, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, seesHands, type User } from '../auth/store';
-import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLiveMatches, saveLiveMatch } from '../db';
+import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
 import { type FormatId, isFormat, tierFor } from '../stats/catalog';
@@ -292,14 +292,42 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return { roomId: r.room.id, token: r.token };
   });
 
-  app.post<{ Body: RoomBody & { queue?: unknown } }>('/api/online/queue', async (req, reply) => {
+  /** Líderes permitidos no formato, para escolher o oponente na fila casual. */
+  const formatLeaders = (format: FormatId) => listLeaders(db).filter((c) => cardLegality(c.id, format) === 'legal');
+
+  /**
+   * Líderes que dá para escolher na fila casual do formato, com quantos jogadores
+   * daquele Líder estão na fila agora (`queue`).
+   */
+  app.get<{ Querystring: { format?: string } }>('/api/online/leaders', async (req) => {
+    const format = formatOf(req.query.format);
+    const waiting = lobby.casualLeaders(format);
+    return present(formatLeaders(format)).map((c) => ({
+      id: c.id,
+      name: c.name,
+      imageUrl: c.imageUrl ?? null,
+      colors: c.colors,
+      queue: waiting[c.id] ?? 0,
+    }));
+  });
+
+  /**
+   * Entra na fila. Na casual, `leader` (opcional) é o Líder do oponente desejado:
+   * no primeiro minuto só forma par com ele; depois, com qualquer um.
+   */
+  app.post<{ Body: RoomBody & { queue?: unknown; leader?: unknown } }>('/api/online/queue', async (req, reply) => {
     const queue = req.body?.queue === 'ranked' ? 'ranked' : 'casual';
     const format = formatOf(req.body?.format);
+    const leader = queue === 'casual' && typeof req.body?.leader === 'string' && req.body.leader ? req.body.leader : null;
+    const pick = leader ? getCards(db, [leader])[0] : null;
+    if (leader && (pick?.category !== 'leader' || cardLegality(leader, format) !== 'legal')) {
+      return reply.code(400).send(fail('invalidLeaderPick', 'Esse Líder não pode ser escolhido neste formato.', { format: formatLabel(format) }));
+    }
     const seat = seatFor(req, req.body, queue === 'ranked', format);
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip);
     if (limit) return reply.code(limit.code).send(limit);
-    const r = lobby.enqueue(seat, format, queue, req.ip);
+    const r = lobby.enqueue(seat, format, queue, req.ip, leader);
     if (isError(r)) return reply.code(r.code).send(r);
     return reply.code(201).send(r);
   });
