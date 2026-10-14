@@ -9,9 +9,9 @@
 //   fim do turno fica exposto ao contra-ataque.
 // - DON!!: cada DON!! em campo é tempo permanente (DON!! −X custa de verdade).
 // - Deck: ficar sem cartas perde a partida.
-// - Ameaça: quantos ataques do oponente passam pela melhor defesa no turno dele (`threatProfile`).
+// - Ameaça: quantos ataques do oponente passam pela melhor defesa no turno dele (`incomingHits`).
 //
-// Os pesos padrão saíram de uma otimização em auto-jogo (SPSA, ~14 mil partidas; ver
+// Os pesos padrão saíram de uma otimização em auto-jogo (SPSA, ~29 mil partidas; ver
 // docs/bot-tempo.md e `scripts/tune-weights.ts`): partindo dos pesos escritos à mão, cada rodada põe
 // duas variações dos pesos para jogar entre si e anda na direção da que venceu mais.
 //
@@ -80,34 +80,34 @@ export interface Weights {
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
-  life: [0, 11000, 19400, 24900, 28800, 32300],
-  lifeExtra: 3500,
-  lifeOpp: [0, 30500, 42600, 47500, 51400, 54300],
-  lifeOppExtra: 2900,
-  handCard: 2400,
-  handCardOpp: 1900,
-  handCardBase: 1400,
-  handCounter: 700,
-  handCounterEvent: 800,
+  life: [0, 11450, 19300, 25450, 29150, 33800],
+  lifeExtra: 4650,
+  lifeOpp: [0, 37400, 52000, 57100, 61550, 64700],
+  lifeOppExtra: 3150,
+  handCard: 2900,
+  handCardOpp: 1600,
+  handCardBase: 1500,
+  handCounter: 1100,
+  handCounterEvent: 550,
   handSoftCap: 7,
-  charCost: 860,
-  charBase: 1200,
-  charPower: 360,
-  blocker: 1000,
-  rush: 270,
+  charCost: 810,
+  charBase: 1220,
+  charPower: 590,
+  blocker: 1550,
+  rush: 210,
   doubleAttack: 800,
-  stage: 1600,
-  exposed: 840,
-  don: 2400,
+  stage: 1700,
+  exposed: 490,
+  don: 2200,
   donReady: 300,
   deckLow: 25000,
   deckLowAt: 2,
   threat: 1,
-  threatHit: 1800,
-  lethal: 4200,
-  counterCard: 0.6,
-  counterDrop: 0.12,
-  counterWill: 1,
+  threatHit: 2250,
+  lethal: 2700,
+  counterCard: 0.42,
+  counterDrop: 0.34,
+  counterWill: 0.5,
   win: 10_000_000,
 };
 
@@ -195,10 +195,10 @@ function handCounters(state: GameState, ps: PlayerState): { value: number; cost:
 }
 
 /**
- * Cartas para cobrir `need` de poder com os Counters que sobram (o menor que basta sozinho; senão os
- * maiores até cobrir). Tira as usadas de `pool` e paga os Eventos com `don`. null se não cobre.
+ * Cobre `need` de poder com os Counters que sobram (o menor que basta sozinho; senão os maiores até
+ * cobrir), tirando os usados de `pool` e pagando os Eventos com `don`. false se não cobre.
  */
-function spendCounters(pool: { value: number; cost: number }[], need: number, don: { left: number }): number | null {
+function spendCounters(pool: { value: number; cost: number }[], need: number, don: { left: number }): boolean {
   const usable = pool.filter((c) => c.cost <= don.left);
   const single = usable.filter((c) => c.value >= need).sort((a, b) => a.value - b.value || a.cost - b.cost)[0];
   const take = (c: { value: number; cost: number }) => {
@@ -207,35 +207,32 @@ function spendCounters(pool: { value: number; cost: number }[], need: number, do
   };
   if (single) {
     take(single);
-    return 1;
+    return true;
   }
   let sum = 0;
-  let n = 0;
   for (const c of usable.sort((a, b) => b.value - a.value)) {
     if (c.cost > don.left) continue;
     take(c);
     sum += c.value;
-    n++;
-    if (sum >= need) return n;
+    if (sum >= need) return true;
   }
-  return null;
+  return false;
 }
 
 /**
- * O próximo ataque do oponente contra o Líder de `player`: no turno do oponente, com os atacantes que
- * ainda podem atacar e o DON!! ativo dele; no próprio turno, com o tabuleiro do oponente desvirado e
- * o DON!! que ele terá no turno seguinte. O oponente distribui o DON!! para acertar o Líder com o
- * máximo de ataques; a defesa usa os [Blocker]s em pé nos ataques mais caros de cobrir e os Counters
- * da mão nos mais baratos. Devolve, para cada número de ataques parados com Counter (0, 1, …), os
- * ataques que ainda acertam e as cartas gastas; null se ninguém alcança o Líder.
+ * Quantos ataques do próximo ataque do oponente acertam o Líder de `player` mesmo com a melhor defesa:
+ * no turno do oponente, com os atacantes que ainda podem atacar e o DON!! ativo dele; no próprio
+ * turno, com o tabuleiro do oponente desvirado e o DON!! que ele terá no turno seguinte. O oponente
+ * distribui o DON!! para acertar o Líder com o máximo de ataques; a defesa usa os [Blocker]s em pé nos
+ * ataques mais caros de cobrir e os Counters da mão nos mais baratos.
  */
-export function threatProfile(state: GameState, player: PlayerId): { hits: number; cards: number }[] | null {
-  if (state.phase === 'gameover') return null;
+export function incomingHits(state: GameState, player: PlayerId): number {
+  if (state.phase === 'gameover') return 0;
   const opp = opponent(player);
   const ps = state.players[player];
   const os = state.players[opp];
   const oppTurn = state.activePlayer === opp;
-  if ((oppTurn ? state.turn : state.turn + 1) <= 2) return null;
+  if ((oppTurn ? state.turn : state.turn + 1) <= 2) return 0;
 
   // O Líder no turno do oponente: sem o DON!! anexado (só conta no turno do dono).
   const leaderPower = getPower(state, ps.leader.uid) - (oppTurn ? 0 : ps.leader.don * 1000);
@@ -261,7 +258,7 @@ export function threatProfile(state: GameState, player: PlayerId): { hits: numbe
     a.power += k * 1000;
     live.push(a);
   }
-  if (!live.length) return null;
+  if (!live.length) return 0;
   for (; don > 0; don--) live.reduce((m, a) => (a.power < m.power ? a : m)).power += 1000;
 
   // Defesa: Blockers nos ataques mais caros; Counters nos mais baratos.
@@ -278,31 +275,23 @@ export function threatProfile(state: GameState, player: PlayerId): { hits: numbe
   open.sort((a, b) => a.power - b.power);
 
   let hits = open.reduce((n, a) => n + a.hits, 0);
-  const steps = [{ hits, cards: 0 }];
   const pool = handCounters(state, ps);
   const donLeft = { left: ps.donActive };
-  let cards = 0;
   for (const a of open) {
-    const n = spendCounters(pool, a.power - leaderPower + 1000, donLeft);
-    if (n === null) break;
-    cards += n;
+    if (!spendCounters(pool, a.power - leaderPower + 1000, donLeft)) break;
     hits -= a.hits;
-    steps.push({ hits, cards });
   }
-  return steps;
+  return hits;
 }
 
 /**
- * Quanto custa ao `player` o próximo ataque do oponente (`threatProfile`): os ataques que passam pela
- * defesa completa (`threatHit` cada) e, se nem ela salva o Líder, `lethal`.
+ * Quanto custa ao `player` o próximo ataque do oponente: `threatHit` por ataque que passa pela
+ * defesa completa (`incomingHits`) e, se nem ela salva o Líder, `lethal`.
  */
 export function incomingThreat(state: GameState, player: PlayerId, w: Weights = DEFAULT_WEIGHTS): number {
   if (!w.threat) return 0;
-  const steps = threatProfile(state, player);
-  if (!steps) return 0;
-  const full = steps[steps.length - 1];
-  const life = state.players[player].life.length;
-  return w.threat * (full.hits * w.threatHit + (full.hits > life ? w.lethal : 0));
+  const hits = incomingHits(state, player);
+  return w.threat * (hits * w.threatHit + (hits > state.players[player].life.length ? w.lethal : 0));
 }
 
 /**

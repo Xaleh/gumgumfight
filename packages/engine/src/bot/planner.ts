@@ -69,8 +69,6 @@ interface Sim {
   state: GameState;
   /** Ajustes que a simulação não representa (chance de Counter do oponente). */
   penalty: number;
-  /** Cartas que o oponente deve ter gastado em Counters nos ataques da linha (valor esperado). */
-  spent: number;
   /** As decisões do bot ao longo da simulação (a ação pedida e as respostas às perguntas dela). */
   trace: Step[];
 }
@@ -106,7 +104,7 @@ export function planAction(full: GameState, player: PlayerId, opts: PlannerOptio
  * A ameaça do próximo ataque do oponente (`incomingThreat`) só pesa nas decisões do turno dele
  * (Counter, bloqueio, gatilhos). No próprio turno ela deixava o bot passivo — guardando Blockers e
  * cartas na mão em vez de pressionar — e ele perdia mais do que ganhava (medido em auto-jogo; a
- * otimização dos pesos também a levou a zero).
+ * otimização dos pesos também a levou a quase zero).
  */
 function defenseOrPlan(state: GameState, player: PlayerId, opts: PlannerOptions): PlannerOptions {
   return state.activePlayer === player ? { ...opts, weights: { ...opts.weights, threat: 0 } } : opts;
@@ -163,7 +161,7 @@ function opponentAnswer(state: GameState, me: PlayerId, pending: Pending, opts: 
  * escolhas aninhadas do bot são decididas pela avaliação enquanto houver `depth`; depois, pelo bot
  * heurístico. Devolve null quando o motor recusa a jogada (a visão não permite simular tudo).
  */
-function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerOptions, depth: number, spent = 0): Sim | null {
+function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerOptions, depth: number): Sim | null {
   const trace: Step[] = [];
   if (action.player === me) trace.push({ key: stateKey(state, me), action });
   let s: GameState;
@@ -196,11 +194,9 @@ function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerO
       return null;
     }
   }
-  if (action.type === 'attack' && action.player === me) {
-    const risk = counterAdjust(state, s, me, action, opts.weights, spent);
-    return { state: s, penalty: risk.penalty, trace, spent: risk.spent };
-  }
-  return { state: s, penalty: 0, trace, spent: 0 };
+  let penalty = 0;
+  if (action.type === 'attack' && action.player === me) penalty += counterAdjust(state, s, me, action, opts.weights);
+  return { state: s, penalty, trace };
 }
 
 // ---------------------------------------------------------------------------
@@ -221,10 +217,8 @@ export function counterAbility(hand: number, need: number, w: Weights = DEFAULT_
 /** Vontade do oponente de gastar Counter para salvar o alvo (vezes `counterWill`, até 1). */
 function counterWill(state: GameState, target: string, opp: PlayerId, w: Weights): number {
   const ps = state.players[opp];
-  const base = target === ps.leader.uid ? [1, 0.9, 0.6, 0.35, 0.15][Math.min(4, ps.life.length)] : (() => {
-    const cost = cardDef(state, target).cost ?? 0;
-    return cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
-  })();
+  const cost = cardDef(state, target).cost ?? 0;
+  const base = target === ps.leader.uid ? [1, 0.9, 0.6, 0.35, 0.15][Math.min(4, ps.life.length)] : cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
   return Math.min(1, base * w.counterWill);
 }
 
@@ -232,36 +226,26 @@ function counterWill(state: GameState, target: string, opp: PlayerId, w: Weights
  * Ajuste pela chance de o oponente usar Counter no ataque: a diferença entre o ataque falhando (ele
  * gasta as cartas que a margem exige) e o resultado simulado (sem Counter), vezes a chance disso.
  * Negativo quando o acerto valia mais que as cartas dele; positivo quando forçar o Counter é o lucro
- * (Vida alta do oponente, margem que exige duas cartas). `spent`: cartas que ele já deve ter gastado
- * nos ataques anteriores da linha — a mão que sobra para este ataque é menor (o terceiro ataque passa
- * mais que o primeiro). Devolve o ajuste e as cartas esperadas deste Counter.
+ * (Vida alta do oponente, margem que exige duas cartas).
  */
-function counterAdjust(
-  before: GameState,
-  after: GameState,
-  me: PlayerId,
-  action: Extract<Action, { type: 'attack' }>,
-  w: Weights,
-  spent: number,
-): { penalty: number; spent: number } {
-  const none = { penalty: 0, spent: 0 };
+function counterAdjust(before: GameState, after: GameState, me: PlayerId, action: Extract<Action, { type: 'attack' }>, w: Weights): number {
   const opp = opponent(me);
-  const hand = Math.max(0, before.players[opp].hand.length - spent);
-  if (hand <= 0) return none;
+  const hand = before.players[opp].hand.length;
+  if (!hand) return 0;
   const target = locate(before, action.target);
-  if (!target) return none;
+  if (!target) return 0;
   const ap = getPower(before, action.attacker);
   const tp = getPower(before, action.target);
-  if (ap < tp) return none;
+  if (ap < tp) return 0;
   const need = ap - tp + 1000;
   const p = counterAbility(hand, need, w) * counterWill(before, action.target, opp, w);
-  if (p <= 0) return none;
+  if (p <= 0) return 0;
   const hit = evaluate(after, me, w);
   // Ataque falhou: a posição de antes (o atacante virado não muda a avaliação no próprio turno) e as
   // cartas gastas no Counter fora da mão do oponente (uma a cada 2000 que ele precisou cobrir).
   const cards = Math.min(hand, Math.max(1, Math.ceil(need / 2000)));
   const miss = evaluate(before, me, w) + w.handCardOpp * cards;
-  return { penalty: (miss - hit) * p, spent: p * cards };
+  return (miss - hit) * p;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +325,6 @@ interface Node {
   trace: Step[];
   depth: number;
   penalty: number;
-  spent: number;
   score: number;
 }
 
@@ -417,21 +400,19 @@ function candidateMoves(state: GameState, player: PlayerId): Action[][] {
 }
 
 /** Aplica uma sequência de jogadas do bot; para (null) se algo interromper antes da última. */
-function simulateSeq(state: GameState, me: PlayerId, moves: Action[], opts: PlannerOptions, depth: number, spent: number): Sim | null {
+function simulateSeq(state: GameState, me: PlayerId, moves: Action[], opts: PlannerOptions, depth: number): Sim | null {
   let s = state;
   const trace: Step[] = [];
   let penalty = 0;
-  let used = 0;
   for (let i = 0; i < moves.length; i++) {
-    const r = simulate(s, me, moves[i], opts, depth, spent + used);
+    const r = simulate(s, me, moves[i], opts, depth);
     if (!r) return null;
     trace.push(...r.trace);
     penalty += r.penalty;
-    used += r.spent;
     s = r.state;
     if (i < moves.length - 1 && (s.pending || s.phase === 'gameover' || s.activePlayer !== me)) return null;
   }
-  return { state: s, penalty, trace, spent: used };
+  return { state: s, penalty, trace };
 }
 
 /**
@@ -485,7 +466,7 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
   const noise = () => opts.random() * NOISE;
   const score = (s: GameState, penalty: number, depth: number) => evaluate(s, player, opts.weights) + penalty - depth * ACTION_COST + noise();
 
-  let beam: Node[] = [{ state, trace: [], depth: 0, penalty: 0, spent: 0, score: evaluate(state, player, opts.weights) }];
+  let beam: Node[] = [{ state, trace: [], depth: 0, penalty: 0, score: evaluate(state, player, opts.weights) }];
   let best: { score: number; trace: Step[]; complete: boolean } | null = null;
   const offer = (candidate: { score: number; trace: Step[]; complete: boolean }) => {
     if (!best || candidate.score > best.score) best = candidate;
@@ -511,7 +492,7 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
       finish(node, expand);
       if (!expand) continue;
       for (const move of candidateMoves(node.state, player)) {
-        const r = simulateSeq(node.state, player, move, opts, 1, node.spent);
+        const r = simulateSeq(node.state, player, move, opts, 1);
         if (!r) continue;
         const trace = [...node.trace, ...r.trace];
         const penalty = node.penalty + r.penalty;
@@ -522,7 +503,7 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
           offer({ score: score(r.state, penalty, d), trace, complete: true });
           continue;
         }
-        const child: Node = { state: r.state, trace, depth: d, penalty, spent: node.spent + r.spent, score: score(r.state, penalty, d) };
+        const child: Node = { state: r.state, trace, depth: d, penalty, score: score(r.state, penalty, d) };
         const k = dedupeKey(child.state, player);
         const seen = next.get(k);
         if (!seen || seen.score < child.score) next.set(k, child);
