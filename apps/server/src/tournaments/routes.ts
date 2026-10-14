@@ -16,6 +16,12 @@
 // Torneio com hora marcada e check-in (`checkIn`): o check-in abre 30 min antes, o
 // torneio começa sozinho na hora e cada rodada tem 5 min de tolerância para entrar na
 // sala (W.O. automático; ver clock.ts).
+//
+// Ferramentas do organizador para situações de mesa: derrota dupla lançada à mão
+// (penalidade: os dois perdem e seguem no torneio, a menos que ele os tire), desfazer
+// a desistência de um jogador (ele volta a ser pareado na próxima rodada e, se a saída
+// decidiu a partida da rodada atual, ela pode voltar a ficar pendente) e inscrição
+// atrasada (só no suíço, durante a rodada 1: quem entra começa a rodada 2 com uma derrota).
 
 import { artImage } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -29,7 +35,7 @@ import { playableDeck } from '../online/routes';
 import { TIME_BANK_MS } from '../online/room';
 import type { ApiCard } from '../present';
 import { FORMATS, isFormat, tierFor } from '../stats/catalog';
-import { ensurePlayer } from '../stats/store';
+import { ensurePlayer, findPlayer } from '../stats/store';
 import { listReports } from '../reports/store';
 import { getSponsor, publicSponsor } from '../support/sponsors';
 import { pushText, roundName } from '../push/messages';
@@ -48,8 +54,20 @@ import {
   toleranceMs,
   tournamentTick,
 } from './clock';
-import { elimLabel, singleFirstRound, singleNextRound, singleRounds, standings, swissPairings, swissRounds, winnerOf, winsNeeded } from './pairing';
 import {
+  elimLabel,
+  losersOf,
+  singleFirstRound,
+  singleNextRound,
+  singleRounds,
+  standings,
+  swissPairings,
+  swissRounds,
+  winnerOf,
+  winsNeeded,
+} from './pairing';
+import {
+  accountsByName,
   checkInPlayer,
   countPlayers,
   createTournament,
@@ -59,6 +77,7 @@ import {
   getMatch,
   getTournament,
   insertRound,
+  lateRegister,
   listGames,
   listMatches,
   listPlayers,
@@ -67,9 +86,12 @@ import {
   myTournaments,
   quotaUsed,
   registerPlayer,
+  reinstatePlayer,
   releaseQuota,
   replaceInMatch,
   seriesResult,
+  setDoubleLoss,
+  setLateEntry,
   setMatchRoom,
   setMatchScore,
   type Tournament,
@@ -79,7 +101,9 @@ import {
   tournamentsOf,
   unregisterPlayer,
   updateTournament,
+  vacateInMatch,
 } from './store';
+import { buildRecap } from './recap';
 import { isApprentice } from '../tutorial/store';
 
 interface Deps {
@@ -227,6 +251,51 @@ function parseScore(body: { wins?: unknown; result?: unknown } | undefined, best
   if (!Array.isArray(w) || w.length !== 2 || !w.every((n) => Number.isInteger(n) && n >= 0 && n <= need)) return fail('invalidScore', 'Placar inválido.');
   if (w[0] === need && w[1] === need) return fail('invalidScore', 'Placar inválido.');
   return [w[0], w[1]];
+}
+
+/**
+ * Janela da inscrição atrasada: suíço com pelo menos 2 rodadas, enquanto a rodada 1
+ * está em andamento (gerar a rodada 2 fecha a janela sozinho).
+ */
+const lateWindow = (t: Tournament) => t.status === 'running' && t.structure === 'swiss' && t.round === 1 && (t.rounds ?? 0) >= 2;
+
+/** A conta pode se inscrever atrasada agora (liberada para todos ou só para ela). */
+const lateAllowed = (t: Tournament, u: User | null) => Boolean(u && lateWindow(t) && (t.lateEntry === '*' || t.lateEntry === u.id));
+
+/**
+ * Desfazer a desistência: se o jogador pode voltar e o que acontece com a partida da
+ * rodada atual que a saída decidiu (`drop`/`noshow`, com ele perdendo): `no` = não há o
+ * que devolver; `optional` = o organizador escolhe; `required` = na chave, ele só volta
+ * devolvendo a partida (senão já perdeu nesta fase).
+ */
+type ReinstateOptions = { restore: 'no' | 'optional' | 'required'; match: TournamentMatch | null };
+
+function reinstateOptions(
+  t: Tournament,
+  players: TournamentPlayer[],
+  matches: TournamentMatch[],
+  userId: string,
+): ReinstateOptions | ({ code: number } & PlayerError) {
+  if (t.status !== 'running') return { code: 409, ...fail('tourNotRunning', 'O torneio não está em andamento.') };
+  const p = players.find((x) => x.userId === userId);
+  if (!p) return { code: 404, ...fail('playerNotRegistered', 'Jogador não inscrito.') };
+  if (!p.dropped) return { code: 409, ...fail('playerNotDropped', 'Este jogador não saiu do torneio.') };
+  const current = matches.filter((m) => m.round === t.round);
+  const mine = current.find((m) => m.p1 === userId || m.p2 === userId) ?? null;
+  const lost = Boolean(mine && losersOf(mine).includes(userId));
+  const opp = mine && (mine.p1 === userId ? mine.p2 : mine.p1);
+  const oppDropped = Boolean(opp && players.find((x) => x.userId === opp)?.dropped);
+  // A partida volta a ficar pendente se foi a saída que a decidiu e o oponente segue no
+  // torneio (num W.O. duplo os dois saíram: o oponente pode voltar depois).
+  const restorable =
+    mine && mine.p2 && lost && (mine.reportedBy === 'drop' || mine.reportedBy === 'noshow') && (!oppDropped || mine.result === 'none') ? mine : null;
+  if (current[0]?.stage === 'elim') {
+    const out = matches.some((m) => m.stage === 'elim' && m.round < t.round && losersOf(m).includes(userId));
+    if (!mine || out) return { code: 409, ...fail('reinstateNotInBracket', 'Na chave, só volta quem ainda está na fase atual.') };
+    if (lost && !restorable) return { code: 409, ...fail('reinstateLostInBracket', 'O jogador já perdeu nesta fase da chave.') };
+    return { restore: lost ? 'required' : 'no', match: restorable };
+  }
+  return { restore: restorable ? 'optional' : 'no', match: restorable };
 }
 
 /** Validade do torneio completo em cache (só por garantia: cada gravação já o invalida). */
@@ -488,8 +557,8 @@ export function registerTournamentRoutes(
             wins: m.wins,
             result: m.result,
             winner: winnerOf(m),
-            /** Quem lançou: game (salas online), bye, drop (desistência), noshow (W.O. automático) ou organizer. */
-            reportedBy: m.reportedBy === null || ['game', 'bye', 'drop', 'noshow'].includes(m.reportedBy) ? m.reportedBy : 'organizer',
+            /** Quem lançou: game (salas online), bye, drop (desistência), noshow (W.O. automático), late (inscrição atrasada) ou organizer. */
+            reportedBy: m.reportedBy === null || ['game', 'bye', 'drop', 'noshow', 'late'].includes(m.reportedBy) ? m.reportedBy : 'organizer',
             roomId: m.roomId,
             room: m.roomId ? (lobby.get(m.roomId)?.status ?? null) : null,
             /** Jogo da série em disputa agora (1, 2, 3…). */
@@ -511,6 +580,12 @@ export function registerTournamentRoutes(
       };
     });
     const me = u ? players.find((p) => p.userId === u.id) : undefined;
+    const reinstate = (userId: string) => {
+      if (!manage || t.status !== 'running') return null;
+      const r = reinstateOptions(t, players, matches, userId);
+      return 'code' in r ? null : r.restore;
+    };
+    const lateName = t.lateEntry && t.lateEntry !== '*' ? (findPlayer(db, accountOwnerKey(t.lateEntry))?.name ?? '?') : null;
     const current = me && t.status === 'running' ? matches.find((m) => m.round === t.round && (m.p1 === me.userId || m.p2 === me.userId)) : undefined;
     return {
       id: t.id,
@@ -560,6 +635,11 @@ export function registerTournamentRoutes(
       maxPlayersCap: t.quota && !isAdmin(u?.role) && !createsTournaments(u?.role) ? SUPPORTER_MAX_PLAYERS : MAX_PLAYERS,
       canManage: manage,
       canRegister: canRegisterNow(t, u) || Boolean(u && t.status === 'registration' && players.some((p) => p.userId === u.id)),
+      /** Inscrição atrasada liberada para quem pede (entra na rodada 2 com uma derrota). */
+      canLateRegister: !me && lateAllowed(t, u),
+      /** Para quem gerencia: a janela da inscrição atrasada está aberta (suíço, rodada 1) e a quem ela foi liberada. */
+      lateWindow: manage && lateWindow(t),
+      lateEntry: manage && lateWindow(t) && t.lateEntry ? { all: t.lateEntry === '*', name: lateName } : null,
       me: me
         ? {
             deckId: me.deckId,
@@ -579,6 +659,8 @@ export function registerTournamentRoutes(
           supporter: tiers.get(p.userId) ?? null,
           seed: t.status === 'registration' ? null : p.seed,
           dropped: p.dropped,
+          /** Para quem gerencia: o jogador que saiu pode voltar (e se a partida da rodada pode ou precisa ser devolvida). */
+          reinstate: p.dropped ? reinstate(p.userId) : null,
           checkedIn: Boolean(p.checkedInAt),
           /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
           leader: showLeader(p.userId) ? p.deck.leader : null,
@@ -776,11 +858,75 @@ export function registerTournamentRoutes(
   });
 
   /**
+   * Kit de divulgação (só quem gerencia, só com o torneio encerrado): campeão, campanha
+   * com play/draw por jogo, listas do top 4 e líderes. As imagens e o PDF são gerados no
+   * navegador de quem pede, a partir destes dados.
+   */
+  app.get<{ Params: { id: string } }>('/api/tournaments/:id/recap', async (req, reply) => {
+    const found = managed(req, reply);
+    if (!found) return reply;
+    const { t } = found;
+    if (t.status !== 'finished') return reply.code(409).send(fail('tourNotFinished', 'O kit de divulgação sai quando o torneio termina.'));
+    return buildRecap(db, t, { present, cardImages, sponsor: sponsorOf(t.sponsorId), naturalEnd: endedNaturally(t) });
+  });
+
+  /** O torneio terminou pelas rodadas previstas (e não por "encerrar agora"). */
+  const endedNaturally = (t: Tournament) => {
+    const players = listPlayers(db, t.id);
+    const matches = listMatches(db, t.id);
+    if (!matches.length || !roundComplete(t, matches)) return false;
+    const step = nextStep(t, players, matches);
+    if (step === 'finish') return true;
+    // Chave sem ninguém para avançar (W.O. duplo nas mesas que restavam) também acaba sozinha.
+    return step === 'elim' && singleNextRound(players, matches.filter((m) => m.round === t.round)).length === 0;
+  };
+
+  /**
+   * Derrota dupla lançada à mão: os dois perdem e seguem no torneio (`dropBoth`: também
+   * saem). Suíço: em qualquer rodada, até o top cut começar. Chave: na rodada atual os
+   * dois saem da chave (a mesa seguinte fica com bye); numa rodada passada, só se a
+   * partida seguinte ainda não começou: o vencedor antigo sai dela e o oponente fica de bye.
+   */
+  const doubleLoss = (t: Tournament, me: User, m: TournamentMatch, dropBoth: boolean): ({ code: number } & PlayerError) | null => {
+    const matches = listMatches(db, t.id);
+    const live = t.status === 'running' && m.round === t.round;
+    let next: TournamentMatch | undefined;
+    const oldWinner = winnerOf(m);
+    if (!live && m.stage === 'swiss' && m.result !== 'none' && matches.some((x) => x.stage === 'elim')) {
+      return { code: 409, ...fail('topCutStartedSwissLocked', 'O top cut já começou: os resultados do suíço não mudam mais.') };
+    }
+    if (!live && m.stage === 'elim' && oldWinner) {
+      next = matches.find((x) => x.round === m.round + 1 && (x.p1 === oldWinner || x.p2 === oldWinner));
+      if (next && !next.p2) {
+        return { code: 409, ...fail('doubleLossByeNext', 'O vencedor desta partida passou de bye na fase seguinte: a mesa ficaria vazia.') };
+      }
+      if (next?.result) {
+        const round = roundLabel(matches, next.round);
+        return { code: 409, ...fail('fixNextMatchFirst', `Corrija antes o resultado da partida seguinte (${round}, mesa ${next.table}).`, { round, table: next.table }) };
+      }
+      if (next && (next.wins[0] + next.wins[1] > 0 || (next.roomId && lobby.get(next.roomId)?.status === 'playing'))) {
+        return { code: 409, ...fail('nextMatchStarted', 'A partida seguinte da chave já começou: zere o placar dela antes de corrigir esta.') };
+      }
+    }
+    if (m.roomId) lobby.closeIfWaiting(m.roomId);
+    setDoubleLoss(db, t.id, m.id, me.id);
+    if (next && oldWinner) {
+      if (next.roomId) lobby.closeIfWaiting(next.roomId);
+      vacateInMatch(db, t.id, next.id, oldWinner);
+    }
+    const out = dropBoth && t.status === 'running' ? [m.p1, m.p2!].filter((id) => !listPlayers(db, t.id).find((p) => p.userId === id)?.dropped) : [];
+    for (const id of out) dropPlayer(db, getTournament(db, t.id)!, id);
+    app.log.info(`torneio ${t.id}: derrota dupla na partida ${m.id} lançada por ${me.id}${out.length ? ` (saem: ${out.join(', ')})` : ''}`);
+    return null;
+  };
+
+  /**
    * Lança ou corrige o placar de uma partida (`{ wins: [p1, p2] }` ou `{ result: p1 | p2 }`).
    * Rodada atual: qualquer placar, inclusive parcial ou zerado. Rodadas passadas: só
    * placares com vencedor, e só enquanto a troca de vencedor não desmontar o que veio depois.
+   * `{ result: 'double', dropBoth? }`: derrota dupla (ver `doubleLoss`).
    */
-  app.put<{ Params: { id: string; matchId: string }; Body: { wins?: unknown; result?: unknown } }>(
+  app.put<{ Params: { id: string; matchId: string }; Body: { wins?: unknown; result?: unknown; dropBoth?: unknown } }>(
     '/api/tournaments/:id/matches/:matchId/result',
     async (req, reply) => {
       const found = managed(req, reply);
@@ -790,6 +936,10 @@ export function registerTournamentRoutes(
       if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
       if (t.status === 'registration') return reply.code(409).send(fail('tourNotStarted', 'O torneio ainda não começou.'));
       if (!m.p2) return reply.code(400).send(fail('matchIsBye', 'Esta partida é um bye.'));
+      if (req.body?.result === 'double') {
+        const r = doubleLoss(t, me, m, Boolean(req.body.dropBoth));
+        return r ? reply.code(r.code).send(fail(r.errorCode, r.error, r.errorParams)) : detail(getTournament(db, t.id)!, me);
+      }
       const wins = parseScore(req.body, m.bestOf);
       if (isPlayerError(wins)) return reply.code(400).send(wins);
       const result = seriesResult(m.bestOf, wins);
@@ -835,6 +985,65 @@ export function registerTournamentRoutes(
     return r ? reply.code(r.code).send(fail(r.errorCode, r.error)) : detail(getTournament(db, t.id)!, me);
   });
 
+  /**
+   * Desfaz a desistência (ou a saída por W.O.): o jogador volta a ser pareado a partir da
+   * próxima rodada. `restoreMatch`: a partida da rodada atual que a saída decidiu volta a
+   * ficar pendente (ver `reinstateOptions`).
+   */
+  app.post<{ Params: { id: string; userId: string }; Body: { restoreMatch?: unknown } }>(
+    '/api/tournaments/:id/players/:userId/reinstate',
+    async (req, reply) => {
+      const found = managed(req, reply);
+      if (!found) return reply;
+      const { t, me } = found;
+      const userId = req.params.userId;
+      const players = listPlayers(db, t.id);
+      const opts = reinstateOptions(t, players, listMatches(db, t.id), userId);
+      if ('code' in opts) return reply.code(opts.code).send(fail(opts.errorCode, opts.error, opts.errorParams));
+      const restore = Boolean(req.body?.restoreMatch);
+      if (restore && !opts.match) return reply.code(409).send(fail('reinstateNothingToRestore', 'Não há partida desta rodada para devolver.'));
+      if (!restore && opts.restore === 'required') {
+        return reply.code(409).send(fail('reinstateNeedsRestore', 'Na chave, o jogador só volta devolvendo a partida desta rodada.'));
+      }
+      reinstatePlayer(db, t.id, userId, restore ? opts.match!.id : null);
+      app.log.info(`torneio ${t.id}: ${userId} voltou ao torneio por ${me.id}${restore ? ` (partida ${opts.match!.id} devolvida)` : ''}`);
+      tournamentNotice(t, userId, (locale) => pushText(locale, restore ? 'reinstatedMatchBody' : 'reinstatedBody'), 3600);
+      return detail(getTournament(db, t.id)!, me);
+    },
+  );
+
+  /**
+   * Libera (`{ open: true }`, para todos ou só para `player`, pelo apelido) ou fecha a
+   * inscrição atrasada. Só no suíço com pelo menos 2 rodadas, durante a rodada 1.
+   */
+  app.put<{ Params: { id: string }; Body: { open?: unknown; player?: unknown } }>('/api/tournaments/:id/late', async (req, reply) => {
+    const found = managed(req, reply);
+    if (!found) return reply;
+    const { t, me } = found;
+    if (!lateWindow(t)) {
+      return reply
+        .code(409)
+        .send(fail('lateEntryUnavailable', 'A inscrição atrasada só existe no suíço com pelo menos 2 rodadas, enquanto a rodada 1 está em andamento.'));
+    }
+    let value: string | null = null;
+    if (req.body?.open) {
+      const name = typeof req.body.player === 'string' ? req.body.player.trim().replace(/\s+/g, ' ') : '';
+      if (!name) value = '*';
+      else {
+        const accounts = accountsByName(db, name);
+        if (!accounts.length) return reply.code(404).send(fail('lateEntryPlayerNotFound', `Nenhum jogador com o apelido "${name}".`, { name }));
+        if (accounts.length > 1) return reply.code(409).send(fail('lateEntryPlayerAmbiguous', `Há mais de um jogador com o apelido "${name}".`, { name }));
+        if (listPlayers(db, t.id).some((p) => p.userId === accounts[0].userId)) {
+          return reply.code(409).send(fail('lateEntryAlreadyRegistered', `${accounts[0].name} já está inscrito.`, { name: accounts[0].name }));
+        }
+        value = accounts[0].userId;
+      }
+    }
+    setLateEntry(db, t.id, value);
+    app.log.info(`torneio ${t.id}: inscrição atrasada ${value ? `liberada (${value})` : 'fechada'} por ${me.id}`);
+    return detail(getTournament(db, t.id)!, me);
+  });
+
   const removePlayer = (t: Tournament, userId: string): ({ code: number } & PlayerError) | null => {
     const p = listPlayers(db, t.id).find((x) => x.userId === userId);
     if (!p) return { code: 404, ...fail('playerNotRegistered', 'Jogador não inscrito.') };
@@ -854,10 +1063,12 @@ export function registerTournamentRoutes(
     if (!me) return reply;
     const t = getTournament(db, req.params.id);
     if (!t) return reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
-    if (t.status !== 'registration') return reply.code(409).send(fail('registrationClosed', 'As inscrições deste torneio já fecharam.'));
     const already = listPlayers(db, t.id).some((p) => p.userId === me.id);
+    // Inscrição atrasada (liberada pelo organizador na rodada 1 do suíço): entra com uma derrota.
+    const late = t.status === 'running' && !already && lateAllowed(t, me);
+    if (t.status !== 'registration' && !late) return reply.code(409).send(fail('registrationClosed', 'As inscrições deste torneio já fecharam.'));
     // Inscrição antecipada: só barra inscrições novas (quem já está inscrito pode trocar de deck).
-    if (!already && !canRegisterNow(t, me)) {
+    if (!already && !late && !canRegisterNow(t, me)) {
       const opens = new Date(t.priorityUntil!).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
       return reply
         .code(403)
@@ -869,6 +1080,11 @@ export function registerTournamentRoutes(
     const deck = playableDeck(db, req.body?.deckId, t.format, false);
     if ('error' in deck) return reply.code(deck.code).send(fail(deck.errorCode, deck.error, deck.errorParams));
     const profile = ensurePlayer(db, accountOwnerKey(me.id));
+    if (late) {
+      lateRegister(db, t, me.id, profile.name, deck.id ?? null, deck, nowIso());
+      app.log.info(`torneio ${t.id}: inscrição atrasada de ${me.id} (derrota na rodada 1)`);
+      return detail(getTournament(db, t.id)!, me);
+    }
     registerPlayer(db, t.id, me.id, profile.name, deck.id ?? null, deck);
     return detail(t, me);
   });

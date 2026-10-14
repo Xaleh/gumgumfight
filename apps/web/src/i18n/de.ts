@@ -3,6 +3,7 @@
 import type { Messages } from './pt-BR';
 import support from './support/de';
 import tutorial from './tutorial/de';
+import recap from './recap/de';
 
 export default {
   // ---- Allgemein ----
@@ -301,6 +302,7 @@ export default {
   'home.enterRoom': 'Raum betreten',
   'home.tournamentRunning': '{name} läuft',
   'home.bye': 'Du hast in dieser Runde ein Freilos. Warte auf die nächste.',
+  'home.lateEntry': 'Du bist nachgemeldet: Runde 1 zählt als Niederlage. Warte auf Runde 2.',
   'home.roundDone': 'Deine Partie in dieser Runde ist vorbei. Warte auf die nächste Runde.',
   // ---- Turniere ----
   'home.tournaments': 'Turniere',
@@ -879,6 +881,30 @@ export default {
   'tour.vs': 'vs.',
   'tour.bye': 'Freilos',
   'tour.doubleNoShow': 'Beide nicht erschienen',
+  'tour.doubleLoss': 'Doppelte Niederlage',
+  'tour.doubleLossTitle': 'Beide verlieren diese Partie (Strafe)',
+  'tour.confirmDoubleLoss': '{a} und {b} eine doppelte Niederlage geben? Beide verlieren diese Partie und bleiben im Turnier.',
+  'tour.doubleLossDropBoth': 'Beide auch aus dem Turnier nehmen',
+  'tour.resultDoubleLoss': 'Doppelte Niederlage: Beide haben diese Partie verloren.',
+  'tour.reinstate': 'Zurückholen',
+  'tour.confirmReinstate': '{name} kehrt ins Turnier zurück und wird ab der nächsten Runde gepaart.',
+  'tour.reinstateRestore': 'Partie dieser Runde zurücksetzen (sie ist wieder offen und wird gespielt)',
+  'tour.reinstateRestoreRequired': 'Im Turnierbaum wird die Partie dieser Runde wieder offen und gespielt.',
+  'tour.reported.late': 'Nachmeldung',
+  'tour.lateLoss': 'Nachmeldung (Niederlage)',
+  'tour.lateLossRound': 'Du hast dich nachgemeldet: Runde 1 zählt als Niederlage. Du steigst in Runde 2 ein.',
+  'tour.lateRegistration': 'Nachmeldung',
+  'tour.lateRegisterHint': 'Der Veranstalter hat deine Nachmeldung freigegeben: Du steigst in Runde 2 mit einer Niederlage in Runde 1 ein.',
+  'tour.lateRegister': 'Am Turnier teilnehmen',
+  'tour.lateTitle': 'Nachmeldung',
+  'tour.lateHint': 'Wer jetzt einsteigt, beginnt in Runde 2 mit einer Niederlage in Runde 1. Das Erstellen von Runde 2 schließt die Nachmeldung.',
+  'tour.lateClosed': 'Geschlossen',
+  'tour.lateOpenAll': 'Für alle offen',
+  'tour.lateOpenFor': 'Nur für {name} offen',
+  'tour.lateOpenAllBtn': 'Für alle öffnen',
+  'tour.lateCloseBtn': 'Schließen',
+  'tour.latePlayerPlaceholder': 'Spitzname des Spielers',
+  'tour.lateOpenForBtn': 'Nur für diesen Spieler öffnen',
   'tour.watch': '👁 Zuschauen',
   'tour.watchGameN': '👁 Spiel {n} ansehen',
   'tour.missing': 'Noch nicht da: {names}',
@@ -2116,6 +2142,16 @@ export default {
   'errors.nextMatchStarted': 'Die nächste Partie im Turnierbaum hat bereits begonnen: Setze ihr Ergebnis zurück, bevor du diese korrigierst.',
   'errors.playerNotRegistered': 'Spieler nicht angemeldet.',
   'errors.playerAlreadyDropped': 'Dieser Spieler ist bereits aus dem Turnier ausgestiegen.',
+  'errors.playerNotDropped': 'Dieser Spieler ist nicht aus dem Turnier ausgestiegen.',
+  'errors.reinstateNotInBracket': 'Im Turnierbaum kann nur zurück, wer noch in der aktuellen Phase ist.',
+  'errors.reinstateLostInBracket': 'Der Spieler hat in dieser Phase des Turnierbaums bereits verloren.',
+  'errors.reinstateNothingToRestore': 'Es gibt keine Partie dieser Runde zum Zurücksetzen.',
+  'errors.reinstateNeedsRestore': 'Im Turnierbaum kann der Spieler nur zurück, wenn die Partie dieser Runde zurückgesetzt wird.',
+  'errors.lateEntryUnavailable': 'Nachmeldungen gibt es nur im Schweizer System mit mindestens 2 Runden, während Runde 1 läuft.',
+  'errors.lateEntryPlayerNotFound': 'Kein Spieler mit dem Spitznamen „{name}“.',
+  'errors.lateEntryPlayerAmbiguous': 'Mehrere Spieler nutzen den Spitznamen „{name}“.',
+  'errors.lateEntryAlreadyRegistered': '{name} ist bereits angemeldet.',
+  'errors.doubleLossByeNext': 'Der Sieger dieser Partie hatte in der nächsten Phase ein Freilos: Der Tisch bliebe leer.',
   // ---- Turniere: Spieler ----
   'errors.registrationClosed': 'Die Anmeldung für dieses Turnier ist geschlossen.',
   'errors.tourFull': 'Das Turnier ist voll.',
@@ -2215,4 +2251,6 @@ export default {
   ...tutorial,
   // ==== apoio ao projeto (i18n/support) ====
   ...support,
+  // ==== kit de divulgação dos torneios (i18n/recap) ====
+  ...recap,
 } satisfies Messages;

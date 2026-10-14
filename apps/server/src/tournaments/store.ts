@@ -53,6 +53,11 @@ export interface Tournament {
   priorityUntil: string | null;
   /** Criado pela cota de apoiador. */
   quota: boolean;
+  /**
+   * Inscrição atrasada liberada pelo organizador (só no suíço, durante a rodada 1):
+   * '*' = qualquer um; senão, o id da conta liberada; null = fechada.
+   */
+  lateEntry: string | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -129,6 +134,7 @@ type TournamentRow = {
   sponsor_id: string | null;
   priority_until: string | null;
   quota: number;
+  late_entry: string | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -161,6 +167,7 @@ const toTournament = (r: TournamentRow): Tournament => ({
   sponsorId: r.sponsor_id,
   priorityUntil: r.priority_until,
   quota: Boolean(r.quota),
+  lateEntry: r.late_entry ?? null,
   createdAt: r.created_at,
   startedAt: r.started_at,
   finishedAt: r.finished_at,
@@ -340,6 +347,50 @@ export function countPlayers(db: DB, tournamentId: string): number {
   return Number((db.prepare('SELECT COUNT(*) AS n FROM tournament_players WHERE tournament_id = ?').get(tournamentId) as { n: number }).n);
 }
 
+/** Conta (com perfil público) pelo apelido, sem diferenciar maiúsculas: todas as que usam o nome. */
+export function accountsByName(db: DB, name: string): Array<{ userId: string; name: string }> {
+  const rows = db
+    .prepare("SELECT substr(owner_hash, 6) AS user_id, name FROM players WHERE owner_hash LIKE 'user:%' AND lower(name) = lower(?) LIMIT 5")
+    .all(name.trim()) as Array<{ user_id: string; name: string }>;
+  return rows.map((r) => ({ userId: r.user_id, name: r.name }));
+}
+
+/** Libera (`'*'` ou o id de uma conta) ou fecha (null) a inscrição atrasada. */
+export function setLateEntry(db: DB, id: string, value: string | null) {
+  dataVersion.bump();
+  db.prepare('UPDATE tournaments SET late_entry = ? WHERE id = ?').run(value, id);
+}
+
+/**
+ * Inscrição atrasada (suíço, durante a rodada 1): o jogador entra com a derrota da
+ * rodada 1 (partida sem oponente, `loss`) e é o último na ordem sorteada. A liberação
+ * para uma conta específica é usada uma vez.
+ */
+export function lateRegister(db: DB, t: Tournament, userId: string, name: string, deckId: string | null, deck: DeckList, at: string) {
+  dataVersion.bump();
+  transaction(db, () => {
+    const { seed } = db.prepare('SELECT COALESCE(MAX(seed), 0) + 1 AS seed FROM tournament_players WHERE tournament_id = ?').get(t.id) as {
+      seed: number;
+    };
+    db.prepare('INSERT INTO tournament_players (tournament_id, user_id, name, deck_id, deck, seed) VALUES (?, ?, ?, ?, ?, ?)').run(
+      t.id,
+      userId,
+      name,
+      deckId,
+      JSON.stringify(deck),
+      seed,
+    );
+    const { table } = db
+      .prepare('SELECT COALESCE(MAX(table_no), 0) + 1 AS "table" FROM tournament_matches WHERE tournament_id = ? AND round = 1')
+      .get(t.id) as { table: number };
+    db.prepare(
+      `INSERT INTO tournament_matches (tournament_id, round, stage, table_no, p1, p2, best_of, result, reported_by, updated_at)
+       VALUES (?, 1, 'swiss', ?, ?, NULL, ?, 'loss', 'late', ?)`,
+    ).run(t.id, table, userId, t.swissBestOf, at);
+    if (t.lateEntry === userId) db.prepare('UPDATE tournaments SET late_entry = NULL WHERE id = ?').run(t.id);
+  });
+}
+
 /**
  * Desistência durante o torneio: o jogador sai das próximas rodadas e, se a partida
  * dele na rodada atual ainda não tem resultado, o oponente vence.
@@ -352,6 +403,24 @@ export function dropPlayer(db: DB, t: Tournament, userId: string) {
       `UPDATE tournament_matches SET result = CASE WHEN p1 = ? THEN 'p2' ELSE 'p1' END, reported_by = 'drop', updated_at = datetime('now')
        WHERE tournament_id = ? AND round = ? AND result IS NULL AND p2 IS NOT NULL AND (p1 = ? OR p2 = ?)`,
     ).run(userId, t.id, t.round, userId, userId);
+  });
+}
+
+/**
+ * Desfaz a desistência (ou a saída por W.O.): o jogador volta a ser pareado a partir da
+ * próxima rodada. `restoreMatchId`: a partida da rodada atual que a saída decidiu volta
+ * a ficar pendente (0 x 0), para ser jogada.
+ */
+export function reinstatePlayer(db: DB, tournamentId: string, userId: string, restoreMatchId: number | null) {
+  dataVersion.bump();
+  transaction(db, () => {
+    db.prepare('UPDATE tournament_players SET dropped = 0 WHERE tournament_id = ? AND user_id = ?').run(tournamentId, userId);
+    if (restoreMatchId !== null) {
+      db.prepare(
+        `UPDATE tournament_matches SET wins1 = 0, wins2 = 0, result = NULL, reported_by = NULL, room_id = NULL, next_first = NULL,
+           updated_at = datetime('now') WHERE tournament_id = ? AND id = ?`,
+      ).run(tournamentId, restoreMatchId);
+    }
   });
 }
 
@@ -497,6 +566,28 @@ export function setMatchScore(db: DB, tournamentId: string, id: number, bestOf: 
     `UPDATE tournament_matches SET wins1 = ?, wins2 = ?, result = ?, reported_by = ?, updated_at = datetime('now')
      WHERE tournament_id = ? AND id = ?`,
   ).run(wins[0], wins[1], result, wins[0] || wins[1] ? reportedBy : null, tournamentId, id);
+}
+
+/** Derrota dupla lançada pelo organizador: os dois perdem (0 x 0) e a sala da série é liberada. */
+export function setDoubleLoss(db: DB, tournamentId: string, id: number, reportedBy: string) {
+  dataVersion.bump();
+  db.prepare(
+    `UPDATE tournament_matches SET wins1 = 0, wins2 = 0, result = 'none', reported_by = ?, room_id = NULL, updated_at = datetime('now')
+     WHERE tournament_id = ? AND id = ?`,
+  ).run(reportedBy, tournamentId, id);
+}
+
+/**
+ * Tira um jogador de uma partida da chave ainda não jogada (a partida anterior virou
+ * derrota dupla): quem sobra fica de bye.
+ */
+export function vacateInMatch(db: DB, tournamentId: string, id: number, userId: string) {
+  dataVersion.bump();
+  db.prepare(
+    `UPDATE tournament_matches SET p1 = CASE WHEN p1 = ? THEN p2 ELSE p1 END, p2 = NULL, wins1 = 0, wins2 = 0, result = 'bye',
+       reported_by = 'bye', room_id = NULL, next_first = NULL, updated_at = datetime('now')
+     WHERE tournament_id = ? AND id = ? AND p2 IS NOT NULL AND (p1 = ? OR p2 = ?)`,
+  ).run(userId, tournamentId, id, userId, userId);
 }
 
 /** Troca um jogador de uma partida ainda não jogada (correção de um resultado da rodada anterior da chave). */

@@ -18,12 +18,15 @@
 //
 // Melhor de N: cada partida (série) termina quando alguém vence a maioria dos jogos.
 //
-// W.O. duplo (`none`): nenhum dos dois apareceu; os dois perdem (e, na chave, os dois
-// saem: a mesa seguinte fica com bye).
+// Derrota dupla (`none`): W.O. duplo (nenhum dos dois apareceu) ou penalidade lançada
+// pelo organizador; os dois perdem (e, na chave, os dois saem: a mesa seguinte fica com bye).
+//
+// Derrota sem oponente (`loss`, o espelho do bye): a rodada 1 de quem se inscreveu
+// atrasado no suíço. Conta como jogada e perdida, sem mexer no OMW de ninguém.
 
 export type Structure = 'swiss' | 'single';
 export type Stage = 'swiss' | 'elim';
-export type MatchResult = 'p1' | 'p2' | 'bye' | 'none';
+export type MatchResult = 'p1' | 'p2' | 'bye' | 'none' | 'loss';
 
 export const WIN_POINTS = 3;
 const MIN_WIN_RATE = 1 / 3;
@@ -40,7 +43,7 @@ export interface TMatch {
   stage: Stage;
   table: number;
   p1: string;
-  /** null = bye. */
+  /** null = bye (ou a derrota da inscrição atrasada, `loss`). */
   p2: string | null;
   result: MatchResult | null;
 }
@@ -104,7 +107,7 @@ export function singleRounds(players: number): number {
   return Math.max(1, Math.ceil(Math.log2(Math.max(2, players))));
 }
 
-/** Vencedor de uma partida com resultado (null = pendente ou W.O. duplo). */
+/** Vencedor de uma partida com resultado (null = pendente, derrota dupla ou derrota sem oponente). */
 export function winnerOf(m: Pick<TMatch, 'p1' | 'p2' | 'result'>): string | null {
   if (m.result === 'p1' || m.result === 'bye') return m.p1;
   if (m.result === 'p2') return m.p2;
@@ -113,11 +116,11 @@ export function winnerOf(m: Pick<TMatch, 'p1' | 'p2' | 'result'>): string | null
 
 export function loserOf(m: Pick<TMatch, 'p1' | 'p2' | 'result'>): string | null {
   if (m.result === 'p1') return m.p2;
-  if (m.result === 'p2') return m.p1;
+  if (m.result === 'p2' || m.result === 'loss') return m.p1;
   return null;
 }
 
-/** Quem perdeu a partida: um lado, ou os dois no W.O. duplo. */
+/** Quem perdeu a partida: um lado, ou os dois na derrota dupla. */
 export function losersOf(m: Pick<TMatch, 'p1' | 'p2' | 'result'>): string[] {
   if (m.result === 'none') return [m.p1, m.p2].filter((id): id is string => Boolean(id));
   const l = loserOf(m);
@@ -149,13 +152,21 @@ function records(players: TPlayer[], matches: TMatch[]) {
       }
       continue;
     }
+    if (m.result === 'loss') {
+      // Inscrição atrasada: derrota sem oponente.
+      if (a) {
+        a.losses++;
+        a.played++;
+      }
+      continue;
+    }
     if (!a || !b) continue;
     a.played++;
     b.played++;
     a.opponents.push(m.p2!);
     b.opponents.push(m.p1);
     if (m.result === 'none') {
-      // W.O. duplo: derrota para os dois.
+      // Derrota dupla: para os dois.
       a.losses++;
       b.losses++;
       continue;
@@ -232,7 +243,8 @@ export function swissPairings(players: TPlayer[], matches: TMatch[]): Pairing[] 
   const hadBye = new Set<string>();
   for (const m of matches) {
     if (m.p2) played.add(`${m.p1}|${m.p2}`).add(`${m.p2}|${m.p1}`);
-    else hadBye.add(m.p1);
+    // A derrota da inscrição atrasada também não tem oponente, mas não é bye.
+    else if (m.result === 'bye') hadBye.add(m.p1);
   }
   const out: Pairing[] = [];
   let pool = order;
