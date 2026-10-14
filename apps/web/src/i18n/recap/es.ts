@@ -44,6 +44,8 @@ export default {
   'recap.img.bye': 'Bye',
   'recap.img.noShow': 'W.O.',
   'recap.img.doubleNoShow': 'W.O. doble',
+  'recap.img.doubleLoss': 'Derrota doble',
+  'recap.img.late': 'Inscripción tardía',
   'recap.img.reported': 'Resultado cargado',
   'recap.img.dropWin': 'El rival abandonó',
   'recap.img.pending': 'Sin resultado',

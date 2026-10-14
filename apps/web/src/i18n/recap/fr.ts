@@ -44,6 +44,8 @@ export default {
   'recap.img.bye': 'Bye',
   'recap.img.noShow': 'Forfait',
   'recap.img.doubleNoShow': 'Double forfait',
+  'recap.img.doubleLoss': 'Double défaite',
+  'recap.img.late': 'Inscription tardive',
   'recap.img.reported': 'Résultat saisi',
   'recap.img.dropWin': 'L’adversaire a abandonné',
   'recap.img.pending': 'Sans résultat',

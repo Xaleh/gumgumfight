@@ -369,8 +369,17 @@ export const api = {
     /** Placar da série [p1, p2] ([0, 0] apaga). */
     setScore: (id: string, matchId: number, wins: [number, number]) =>
       send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/result`, { wins }),
+    /** Derrota dupla: os dois perdem (`dropBoth`: e saem do torneio). */
+    doubleLoss: (id: string, matchId: number, dropBoth: boolean) =>
+      send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/result`, { result: 'double', dropBoth }),
     drop: (id: string, userId: string) =>
       send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/drop`),
+    /** Desfaz a desistência (`restoreMatch`: a partida da rodada atual volta a ficar pendente). */
+    reinstate: (id: string, userId: string, restoreMatch: boolean) =>
+      send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/reinstate`, { restoreMatch }),
+    /** Libera a inscrição atrasada (para todos, ou só para o apelido `player`) ou a fecha. */
+    lateEntry: (id: string, open: boolean, player?: string) =>
+      send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/late`, { open, player }),
     play: (id: string, matchId: number) => send<OnlineSeat>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/play`),
     /** Kit de divulgação (quem gerencia, com o torneio encerrado). */
     recap: (id: string) => get<TournamentRecap>(`/api/tournaments/${encodeURIComponent(id)}/recap`),
@@ -708,7 +717,7 @@ export interface TournamentMine {
     opponent: string | null;
     bestOf: number;
     game: number;
-    result: TournamentResult | 'bye' | 'none' | null;
+    result: TournamentResult | 'bye' | 'none' | 'loss' | null;
     winner: string | null;
     room: 'waiting' | 'playing' | 'finished' | null;
   } | null;
@@ -730,11 +739,11 @@ export interface TournamentMatchInfo {
   wins: [number, number];
   /** Jogo da série em disputa (1, 2, 3…). */
   game: number;
-  /** none = W.O. duplo (ninguém apareceu). */
-  result: TournamentResult | 'bye' | 'none' | null;
+  /** none = derrota dupla (W.O. duplo ou lançada pelo organizador); loss = inscrição atrasada (derrota sem oponente). */
+  result: TournamentResult | 'bye' | 'none' | 'loss' | null;
   winner: string | null;
-  /** game = sala online; drop = desistência; noshow = W.O. automático. */
-  reportedBy: 'game' | 'bye' | 'drop' | 'noshow' | 'organizer' | null;
+  /** game = sala online; drop = desistência; noshow = W.O. automático; late = inscrição atrasada. */
+  reportedBy: 'game' | 'bye' | 'drop' | 'noshow' | 'late' | 'organizer' | null;
   roomId: string | null;
   /** Situação da sala online (null = nenhuma sala aberta agora). */
   room: 'waiting' | 'playing' | 'finished' | null;
@@ -839,7 +848,7 @@ export interface RecapRound {
   outcome: 'win' | 'loss' | 'bye' | 'none' | 'pending';
   /** Placar do ponto de vista do campeão. */
   score: [number, number];
-  how: 'game' | 'bye' | 'drop' | 'noshow' | 'organizer' | null;
+  how: 'game' | 'bye' | 'drop' | 'noshow' | 'late' | 'organizer' | null;
   /** Jogos que contaram: venceu? começou (na play) ou foi o segundo (na draw)? null = sem o dado. */
   games: Array<{ game: number; won: boolean | null; first: boolean | null }>;
 }
@@ -923,6 +932,12 @@ export interface TournamentDetail {
   maxPlayersCap: number;
   canManage: boolean;
   canRegister: boolean;
+  /** Inscrição atrasada liberada para quem vê (entra na rodada 2 com uma derrota). */
+  canLateRegister: boolean;
+  /** Para quem gerencia: a janela da inscrição atrasada está aberta (suíço, rodada 1). */
+  lateWindow: boolean;
+  /** Para quem gerencia: a quem a inscrição atrasada foi liberada (null = fechada). */
+  lateEntry: { all: boolean; name: string | null } | null;
   me: {
     deckId: string | null;
     deckName: string;
@@ -936,6 +951,11 @@ export interface TournamentDetail {
     name: string;
     seed: number | null;
     dropped: boolean;
+    /**
+     * Para quem gerencia, nos que saíram: pode voltar ao torneio? `optional` = a partida da
+     * rodada pode ser devolvida; `required` = só volta devolvendo-a; null = não pode voltar.
+     */
+    reinstate: 'no' | 'optional' | 'required' | null;
     checkedIn: boolean;
     /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
     leader: string | null;

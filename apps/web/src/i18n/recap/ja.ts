@@ -44,6 +44,8 @@ export default {
   'recap.img.bye': '不戦勝',
   'recap.img.noShow': '不戦',
   'recap.img.doubleNoShow': '両者不戦',
+  'recap.img.doubleLoss': '両者敗北',
+  'recap.img.late': '遅れて参加',
   'recap.img.reported': '結果を入力',
   'recap.img.dropWin': '相手がドロップ',
   'recap.img.pending': '結果なし',

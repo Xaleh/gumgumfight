@@ -37,6 +37,8 @@ export interface RecapTexts {
   bye: string;
   noShow: string;
   doubleNoShow: string;
+  doubleLoss: string;
+  late: string;
   reported: string;
   dropWin: string;
   pending: string;
@@ -539,7 +541,7 @@ function drawCampaign(ctx: CanvasRenderingContext2D, format: RecapFormat, recap:
       text(ctx, r.opponent.name, nameX, mid - 4 * s, { size: 30 * s, weight: 900, color: C.cream, maxW: nameW, min: 16 });
       text(ctx, leaderLabel(r.opponent.leader), nameX, mid + 28 * s, { size: 23 * s, weight: 700, color: C.muted, maxW: nameW, min: 13 });
     } else {
-      text(ctx, tx.bye, nameX - faceD - 18, mid, { size: 30 * s, weight: 900, color: C.muted, baseline: 'middle', maxW: nameW + faceD });
+      text(ctx, r.how === 'late' ? tx.late : tx.bye, nameX - faceD - 18, mid, { size: 30 * s, weight: 900, color: C.muted, baseline: 'middle', maxW: nameW + faceD });
     }
 
     // Jogos: um selo por jogo com play/draw, verde se venceu, vermelho se perdeu.
@@ -563,7 +565,19 @@ function drawCampaign(ctx: CanvasRenderingContext2D, format: RecapFormat, recap:
       }
     } else {
       const tag =
-        r.how === 'noshow' ? (r.outcome === 'none' ? tx.doubleNoShow : tx.noShow) : r.how === 'drop' ? tx.dropWin : r.how === 'bye' ? null : r.outcome === 'pending' ? tx.pending : tx.reported;
+        r.how === 'noshow'
+          ? r.outcome === 'none'
+            ? tx.doubleNoShow
+            : tx.noShow
+          : r.how === 'drop'
+            ? tx.dropWin
+            : r.how === 'bye' || r.how === 'late'
+              ? null
+              : r.outcome === 'pending'
+                ? tx.pending
+                : r.outcome === 'none'
+                  ? tx.doubleLoss
+                  : tx.reported;
       if (tag) text(ctx, tag, gamesX + gamesW, mid, { size: 22 * s, weight: 800, color: C.muted, align: 'right', baseline: 'middle', maxW: gamesW });
     }
 
@@ -571,7 +585,8 @@ function drawCampaign(ctx: CanvasRenderingContext2D, format: RecapFormat, recap:
     roundRect(ctx, scoreX, mid - pillH / 2, scoreW, pillH, pillH / 2);
     ctx.fillStyle = color;
     ctx.fill();
-    const score = r.outcome === 'bye' ? 'BYE' : r.outcome === 'pending' ? '—' : r.outcome === 'none' ? 'W.O.' : `${r.score[0]}-${r.score[1]}`;
+    const score =
+      r.outcome === 'bye' ? 'BYE' : r.outcome === 'pending' || r.how === 'late' ? '—' : r.outcome === 'none' ? (r.how === 'noshow' ? 'W.O.' : '0-0') : `${r.score[0]}-${r.score[1]}`;
     text(ctx, score, scoreX + scoreW / 2, mid + 2, { size: 40 * s, family: DISPLAY, color: C.cream, align: 'center', baseline: 'middle', maxW: scoreW - 16 });
     y += rowH + gap;
   }

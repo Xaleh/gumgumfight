@@ -63,8 +63,8 @@ export interface RecapRound {
   outcome: 'win' | 'loss' | 'bye' | 'none' | 'pending';
   /** Placar da série do ponto de vista do campeão. */
   score: [number, number];
-  /** Como o resultado saiu: jogos no site, bye, desistência, W.O. automático ou lançado pelo organizador. */
-  how: 'game' | 'bye' | 'drop' | 'noshow' | 'organizer' | null;
+  /** Como o resultado saiu: jogos no site, bye, desistência, W.O. automático, inscrição atrasada ou lançado pelo organizador. */
+  how: 'game' | 'bye' | 'drop' | 'noshow' | 'late' | 'organizer' | null;
   games: RecapGame[];
 }
 
@@ -116,7 +116,7 @@ const iso = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.
 const how = (m: TournamentMatch): RecapRound['how'] => {
   if (!m.result) return null;
   if (m.reportedBy === null) return 'organizer';
-  return (['game', 'bye', 'drop', 'noshow'] as const).find((r) => r === m.reportedBy) ?? 'organizer';
+  return (['game', 'bye', 'drop', 'noshow', 'late'] as const).find((r) => r === m.reportedBy) ?? 'organizer';
 };
 
 /** Quem começou cada jogo gravado nas estatísticas, por conta (`user:<id>`). */

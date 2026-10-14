@@ -44,6 +44,8 @@ const recapPtBR = {
   'recap.img.bye': 'Bye',
   'recap.img.noShow': 'W.O.',
   'recap.img.doubleNoShow': 'W.O. duplo',
+  'recap.img.doubleLoss': 'Derrota dupla',
+  'recap.img.late': 'Inscrição atrasada',
   'recap.img.reported': 'Resultado lançado',
   'recap.img.dropWin': 'Oponente desistiu',
   'recap.img.pending': 'Sem resultado',

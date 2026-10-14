@@ -44,6 +44,8 @@ export default {
   'recap.img.bye': 'Bye',
   'recap.img.noShow': 'No-show',
   'recap.img.doubleNoShow': 'Double no-show',
+  'recap.img.doubleLoss': 'Double loss',
+  'recap.img.late': 'Late registration',
   'recap.img.reported': 'Result entered',
   'recap.img.dropWin': 'Opponent dropped',
   'recap.img.pending': 'No result',

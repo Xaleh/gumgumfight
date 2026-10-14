@@ -44,6 +44,8 @@ export default {
   'recap.img.bye': 'Freilos',
   'recap.img.noShow': 'Nicht erschienen',
   'recap.img.doubleNoShow': 'Beide nicht erschienen',
+  'recap.img.doubleLoss': 'Doppelniederlage',
+  'recap.img.late': 'Späte Anmeldung',
   'recap.img.reported': 'Ergebnis eingetragen',
   'recap.img.dropWin': 'Gegner ausgestiegen',
   'recap.img.pending': 'Kein Ergebnis',

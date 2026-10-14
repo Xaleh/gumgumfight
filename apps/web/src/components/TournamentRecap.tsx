@@ -74,6 +74,8 @@ function texts(tr: Translate, recap: Recap, locale: Locale): RecapTexts {
     bye: tr('recap.img.bye'),
     noShow: tr('recap.img.noShow'),
     doubleNoShow: tr('recap.img.doubleNoShow'),
+    doubleLoss: tr('recap.img.doubleLoss'),
+    late: tr('recap.img.late'),
     reported: tr('recap.img.reported'),
     dropWin: tr('recap.img.dropWin'),
     pending: tr('recap.img.pending'),

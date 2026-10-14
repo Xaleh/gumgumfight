@@ -5,6 +5,7 @@ import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/
 import { type DB, openDb } from '../src/db';
 import type { Lobby } from '../src/online/lobby';
 import { seed } from '../src/seed';
+import { renamePlayer } from '../src/stats/store';
 import { AUTO_START_GRACE_MS, CHECK_IN_MS, DEFAULT_TOLERANCE_MIN, type TickResult } from '../src/tournaments/clock';
 import {
   bracketOrder,
@@ -104,6 +105,22 @@ describe('torneios: pareamentos e classificação', () => {
     expect([16, 8, 4, 2].map((n) => elimBestOf(n, cfg))).toEqual([1, 3, 3, 5]);
     expect(elimBestOf(2, { bo3From: null, bo5From: null })).toBe(1);
     expect([2, 4, 8, 16, 32].map(elimLabel)).toEqual(['Final', 'Semifinal', 'Quartas de final', 'Oitavas de final', 'Rodada de 32']);
+  });
+
+  it('derrota sem oponente (inscrição atrasada): conta como jogada e perdida, não é bye nem mexe no OMW', () => {
+    const ps = players(4);
+    const late: TPlayer = { userId: 'late', seed: 5, dropped: false };
+    const r1: TMatch[] = [
+      { round: 1, stage: 'swiss', table: 1, p1: 'p1', p2: 'p2', result: 'p1' },
+      { round: 1, stage: 'swiss', table: 2, p1: 'p3', p2: 'p4', result: 'p1' },
+      { round: 1, stage: 'swiss', table: 3, p1: 'late', p2: null, result: 'loss' },
+    ];
+    const s = standings([...ps, late], r1);
+    expect(s.find((r) => r.userId === 'late')).toMatchObject({ points: 0, wins: 0, losses: 1, byes: 0, omw: 0 });
+    // O OMW de quem jogou não muda com a derrota do atrasado.
+    expect(s.find((r) => r.userId === 'p1')!.omw).toBeCloseTo(1 / 3);
+    // Com 5 jogadores, o bye da rodada 2 vai para o último colocado sem bye: o atrasado.
+    expect(swissPairings([...ps, late], r1).find((p) => p.p2 === null)).toEqual({ p1: 'late', p2: null });
   });
 
   it('eliminação simples: vencedores avançam; quem desistiu dá bye', () => {
@@ -664,5 +681,201 @@ describe('torneios: rotas', () => {
     expect((await app.inject({ method: 'GET', url: '/card-img/evil/x.jpg' })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/card-img/optcgapi/static/a.html' })).statusCode).toBe(404);
     expect(asked).toHaveLength(2);
+  });
+
+  it('derrota dupla à mão: os dois perdem e seguem no torneio (ou saem); suíço trava depois do top cut', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const ps = [login(db), login(db), login(db), login(db)];
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Liga', format: 'egb', structure: 'swiss', rounds: 2, topCut: 2 })).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
+    const [m1, m2] = view.rounds[0].matches;
+    const set = (m: { id: number }, payload: object, by = org) => req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, by, payload);
+    expect((await set(m1, { result: 'double' }, ps[0])).statusCode).toBe(403);
+    view = (await set(m1, { result: 'double' })).json();
+    expect(view.rounds[0].matches[0]).toMatchObject({ result: 'none', winner: null, wins: [0, 0], reportedBy: 'organizer' });
+    for (const id of [m1.p1.userId, m1.p2.userId]) {
+      expect(view.players.find((p: any) => p.userId === id).dropped).toBe(false);
+      expect(view.standings.find((s: any) => s.userId === id)).toMatchObject({ points: 0, losses: 1 });
+    }
+    // A outra mesa: derrota dupla e os dois saem.
+    view = (await set(m2, { result: 'double', dropBoth: true })).json();
+    for (const id of [m2.p1.userId, m2.p2.userId]) expect(view.players.find((p: any) => p.userId === id).dropped).toBe(true);
+    expect(view.roundComplete).toBe(true);
+    // Corrigir de volta para uma vitória continua possível.
+    view = (await set(m2, { result: 'p1' })).json();
+    expect(view.rounds[0].matches[1]).toMatchObject({ result: 'p1', winner: m2.p1.userId });
+    // Rodada 2: quem levou a derrota dupla sem sair é pareado.
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    const r2 = view.rounds[1].matches.flatMap((m: any) => [m.p1.userId, m.p2?.userId]);
+    expect(r2).toContain(m1.p1.userId);
+    expect(r2).toContain(m1.p2.userId);
+    // Rodada passada do suíço: derrota dupla vale até o top cut começar.
+    view = (await set(m2, { result: 'double' })).json();
+    expect(view.rounds[0].matches[1].result).toBe('none');
+    for (const m of view.rounds[1].matches.filter((x: any) => x.p2)) await set(m, { result: 'p1' });
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    expect(view.stage).toBe('elim');
+    const blocked = await set(view.rounds[1].matches[0], { result: 'double' });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().errorCode).toBe('topCutStartedSwissLocked');
+  });
+
+  it('derrota dupla na chave: rodada passada tira o vencedor antigo da partida seguinte (o oponente fica de bye)', async () => {
+    const { db, app } = setup();
+    const admin = login(db, 'admin');
+    const ps = Array.from({ length: 8 }, () => login(db));
+    const t = (await req(app, 'POST', '/api/tournaments', admin, { name: 'Mata-mata', format: 'egb', structure: 'single' })).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i % DECKS.length] });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, admin)).json();
+    const set = (m: { id: number }, payload: object) => req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, admin, payload);
+    for (const m of view.rounds[0].matches) await set(m, { result: 'p1' });
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
+    const [q1] = view.rounds[0].matches;
+    const semi = view.rounds[1].matches.find((m: any) => m.p1.userId === q1.p1.userId || m.p2.userId === q1.p1.userId);
+    const opp = semi.p1.userId === q1.p1.userId ? semi.p2.userId : semi.p1.userId;
+    view = (await set(q1, { result: 'double' })).json();
+    expect(view.rounds[0].matches[0]).toMatchObject({ result: 'none', winner: null });
+    expect(view.rounds[1].matches.find((m: any) => m.id === semi.id)).toMatchObject({ p1: expect.objectContaining({ userId: opp }), p2: null, result: 'bye' });
+    expect(view.standings.find((s: any) => s.userId === q1.p1.userId).alive).toBe(false);
+    // A semifinal decidida trava a derrota dupla na quarta de final dela.
+    const other = view.rounds[1].matches.find((m: any) => m.p2);
+    await set(other, { result: 'p1' });
+    const q2 = view.rounds[0].matches.find((m: any) => m.p1.userId === other.p1.userId);
+    const blocked = await set(q2, { result: 'double' });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().errorCode).toBe('fixNextMatchFirst');
+    // Rodada atual da chave: os dois saem e a mesa seguinte fica com bye.
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
+    const final = view.rounds[2].matches[0];
+    view = (await set(final, { result: 'double' })).json();
+    expect(view.roundComplete).toBe(true);
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, admin)).json();
+    expect(view.status).toBe('finished');
+  });
+
+  it('desfazer desistência: volta na próxima rodada e, se a saída decidiu a partida, ela pode voltar a ficar pendente', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const ps = [login(db), login(db), login(db), login(db)];
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Liga', format: 'egb', structure: 'swiss', rounds: 3 })).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
+    const who = (userId: string) => ps.find((p) => p.id === userId)!;
+    const [m1, m2] = view.rounds[0].matches;
+    const reinstate = (userId: string, body: object = {}, by = org) => req(app, 'POST', `/api/tournaments/${t.id}/players/${userId}/reinstate`, by, body);
+    // Quem não saiu não "volta".
+    expect((await reinstate(m1.p1.userId)).json().errorCode).toBe('playerNotDropped');
+    // O jogador desiste no meio da rodada: o oponente vence por desistência.
+    view = (await req(app, 'DELETE', `/api/tournaments/${t.id}/register`, who(m1.p1.userId))).json();
+    expect(view.rounds[0].matches[0]).toMatchObject({ result: 'p2', reportedBy: 'drop' });
+    // Só quem gerencia vê se o jogador pode voltar.
+    expect(view.players.find((p: any) => p.userId === m1.p1.userId).reinstate).toBeNull();
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    expect(view.players.find((p: any) => p.userId === m1.p1.userId).reinstate).toBe('optional');
+    expect((await reinstate(m1.p1.userId, {}, who(m1.p2.userId))).statusCode).toBe(403);
+    view = (await reinstate(m1.p1.userId, { restoreMatch: true })).json();
+    expect(view.players.find((p: any) => p.userId === m1.p1.userId)).toMatchObject({ dropped: false, reinstate: null });
+    expect(view.rounds[0].matches[0]).toMatchObject({ result: null, wins: [0, 0], reportedBy: null });
+    expect(view.roundComplete).toBe(false);
+    // Desiste de novo, e agora volta sem devolver a partida (o resultado fica).
+    await req(app, 'POST', `/api/tournaments/${t.id}/players/${m1.p1.userId}/drop`, org);
+    view = (await reinstate(m1.p1.userId)).json();
+    expect(view.rounds[0].matches[0]).toMatchObject({ result: 'p2', reportedBy: 'drop' });
+    await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m2.id}/result`, org, { result: 'p1' });
+    // Saiu depois de a partida terminar: não há o que devolver.
+    await req(app, 'POST', `/api/tournaments/${t.id}/players/${m2.p2.userId}/drop`, org);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json().players.find((p: any) => p.userId === m2.p2.userId).reinstate).toBe('no');
+    expect((await reinstate(m2.p2.userId, { restoreMatch: true })).json().errorCode).toBe('reinstateNothingToRestore');
+    view = (await reinstate(m2.p2.userId)).json();
+    // A rodada 2 pareia os quatro.
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    expect(view.rounds[1].matches.filter((m: any) => m.p2)).toHaveLength(2);
+    // Os outros jogadores não veem as opções de quem gerencia.
+    await req(app, 'POST', `/api/tournaments/${t.id}/players/${m2.p2.userId}/drop`, org);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, ps[0])).json().players.every((p: any) => p.reinstate === null)).toBe(true);
+  });
+
+  it('desfazer desistência na chave: só devolvendo a partida da fase atual', async () => {
+    const { db, app } = setup();
+    const admin = login(db, 'admin');
+    const ps = Array.from({ length: 4 }, () => login(db));
+    const t = (await req(app, 'POST', '/api/tournaments', admin, { name: 'Mata-mata', format: 'egb', structure: 'single' })).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, admin)).json();
+    const [s1, s2] = view.rounds[0].matches;
+    const reinstate = (userId: string, body: object = {}) => req(app, 'POST', `/api/tournaments/${t.id}/players/${userId}/reinstate`, admin, body);
+    await req(app, 'POST', `/api/tournaments/${t.id}/players/${s1.p1.userId}/drop`, admin);
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, admin)).json();
+    expect(view.players.find((p: any) => p.userId === s1.p1.userId).reinstate).toBe('required');
+    expect((await reinstate(s1.p1.userId)).json().errorCode).toBe('reinstateNeedsRestore');
+    view = (await reinstate(s1.p1.userId, { restoreMatch: true })).json();
+    expect(view.rounds[0].matches[0].result).toBeNull();
+    // Perdeu jogando: não volta.
+    await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${s2.id}/result`, admin, { result: 'p1' });
+    await req(app, 'POST', `/api/tournaments/${t.id}/players/${s2.p2.userId}/drop`, admin);
+    expect((await reinstate(s2.p2.userId)).json().errorCode).toBe('reinstateLostInBracket');
+  });
+
+  it('inscrição atrasada: só no suíço com 2+ rodadas, durante a rodada 1; entra com uma derrota e é pareado na rodada 2', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const ps = [login(db), login(db), login(db), login(db)];
+    const [late, zoro, other] = [login(db), login(db), login(db)];
+    renamePlayer(db, `user:${zoro.id}`, 'Zoro');
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Liga', format: 'egb', structure: 'swiss', rounds: 3, maxPlayers: 6 })).json();
+    const lateUrl = `/api/tournaments/${t.id}/late`;
+    // Antes de começar não existe.
+    expect((await req(app, 'PUT', lateUrl, org, { open: true })).json().errorCode).toBe('lateEntryUnavailable');
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i] });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
+    expect(view).toMatchObject({ lateWindow: true, lateEntry: null });
+    const register = (p: ReturnType<typeof login>, deckId = 'st01-luffy') => req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId });
+    // Fechada: ninguém entra.
+    expect((await register(late)).json().errorCode).toBe('registrationClosed');
+    expect((await req(app, 'PUT', lateUrl, ps[0], { open: true })).statusCode).toBe(403);
+    // Liberada só para um jogador (pelo apelido): os outros não entram.
+    expect((await req(app, 'PUT', lateUrl, org, { open: true, player: 'Ninguém' })).json().errorCode).toBe('lateEntryPlayerNotFound');
+    view = (await req(app, 'PUT', lateUrl, org, { open: true, player: 'zoro' })).json();
+    expect(view.lateEntry).toEqual({ all: false, name: 'Zoro' });
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, zoro)).json()).toMatchObject({ canLateRegister: true, lateWindow: false, lateEntry: null });
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, late)).json().canLateRegister).toBe(false);
+    expect((await register(late)).statusCode).toBe(409);
+    // O deck é validado no formato.
+    expect((await register(zoro, 'st10-law')).statusCode).toBe(400);
+    view = (await register(zoro)).json();
+    expect(view.me).toMatchObject({ deckId: 'st01-luffy', dropped: false });
+    const zr1 = view.rounds[0].matches.find((m: any) => m.p1.userId === zoro.id);
+    expect(zr1).toMatchObject({ p2: null, result: 'loss', winner: null, reportedBy: 'late', table: 3 });
+    expect(view.standings.find((s: any) => s.userId === zoro.id)).toMatchObject({ points: 0, losses: 1, wins: 0, byes: 0 });
+    expect(view.players.find((p: any) => p.userId === zoro.id).seed).toBe(5);
+    // A liberação individual foi usada; o deck não muda mais.
+    expect(view.lateEntry).toBeNull();
+    expect((await register(zoro, 'st02-kid')).statusCode).toBe(409);
+    // Liberada para todos: entra mais um; o limite de jogadores continua valendo.
+    await req(app, 'PUT', lateUrl, org, { open: true });
+    expect((await register(late)).statusCode).toBe(200);
+    expect((await register(other)).json().errorCode).toBe('tourFull');
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    expect(view.rounds[0].matches).toHaveLength(4);
+    expect(view.roundComplete).toBe(false);
+    for (const m of view.rounds[0].matches.filter((x: any) => x.p2)) await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, org, { result: 'p1' });
+    // Rodada 2: os seis são pareados (sem bye) e a janela fecha sozinha.
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json();
+    expect(view).toMatchObject({ round: 2, totalRounds: 3, lateWindow: false, lateEntry: null });
+    const r2 = view.rounds[1].matches;
+    expect(r2.every((m: any) => m.p2)).toBe(true);
+    expect(r2.flatMap((m: any) => [m.p1.userId, m.p2.userId])).toEqual(expect.arrayContaining([zoro.id, late.id]));
+    expect((await register(other)).json().errorCode).toBe('registrationClosed');
+    expect((await req(app, 'PUT', lateUrl, org, { open: true })).json().errorCode).toBe('lateEntryUnavailable');
+
+    // Eliminação simples e suíço de 1 rodada não têm inscrição atrasada.
+    for (const body of [{ structure: 'single' }, { structure: 'swiss', rounds: 1 }]) {
+      const t2 = (await req(app, 'POST', '/api/tournaments', org, { name: 'Outro', format: 'egb', ...body })).json();
+      for (const [i, p] of ps.slice(0, 2).entries()) await req(app, 'POST', `/api/tournaments/${t2.id}/register`, p, { deckId: DECKS[i] });
+      expect((await req(app, 'POST', `/api/tournaments/${t2.id}/start`, org)).json().lateWindow).toBe(false);
+      expect((await req(app, 'PUT', `/api/tournaments/${t2.id}/late`, org, { open: true })).statusCode).toBe(409);
+    }
   });
 });

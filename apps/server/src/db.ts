@@ -265,11 +265,11 @@ function migrateTournaments(db: DB) {
       best_of       INTEGER NOT NULL DEFAULT 1,
       wins1         INTEGER NOT NULL DEFAULT 0,  -- jogos vencidos na série
       wins2         INTEGER NOT NULL DEFAULT 0,
-      result        TEXT,                      -- p1 | p2 | bye | none (W.O. duplo; null = série em andamento); não há empate
+      result        TEXT,                      -- p1 | p2 | bye | none (derrota dupla) | loss (inscrição atrasada); null = série em andamento; não há empate
       next_first    TEXT,                      -- quem começa o próximo jogo da série (quem perdeu o anterior)
       room_id       TEXT,                      -- sala online do jogo atual da série
       match_id      INTEGER,                   -- partida gravada nas estatísticas
-      reported_by   TEXT,                      -- game (sala online), bye, drop (desistência), noshow (W.O. automático) ou id de quem lançou
+      reported_by   TEXT,                      -- game (sala online), bye, drop (desistência), noshow (W.O. automático), late (inscrição atrasada) ou id de quem lançou
       updated_at    TEXT
     );
     CREATE INDEX IF NOT EXISTS tournament_matches_round ON tournament_matches(tournament_id, round);
@@ -286,6 +286,9 @@ function migrateTournaments(db: DB) {
   if (!tCols.includes('tolerance_min')) db.exec('ALTER TABLE tournaments ADD COLUMN tolerance_min INTEGER NOT NULL DEFAULT 5');
   // checkin_notice: hora de início (starts_at) cujo aviso de check-in já foi enviado por notificação.
   if (!tCols.includes('checkin_notice')) db.exec('ALTER TABLE tournaments ADD COLUMN checkin_notice TEXT');
+  // late_entry: inscrição atrasada liberada pelo organizador durante a rodada 1 do suíço
+  // ('*' = qualquer um; senão, o id da conta liberada; null = fechada).
+  if (!tCols.includes('late_entry')) db.exec('ALTER TABLE tournaments ADD COLUMN late_entry TEXT');
   const pCols = (db.prepare('PRAGMA table_info(tournament_players)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!pCols.includes('checked_in_at')) db.exec('ALTER TABLE tournament_players ADD COLUMN checked_in_at TEXT');
   const mCols = (db.prepare('PRAGMA table_info(tournament_matches)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
