@@ -85,6 +85,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const watching = !('token' in target);
   const hands = 'hands' in target && target.hands;
   const key = 'key' in target ? target.key : undefined;
+  /** Judge do torneio: vê as duas mãos ao vivo e tem o painel de Judge. */
+  const judge = 'judge' in target && Boolean(target.judge);
   const [state, setState] = useState<GameState | null>(null);
   const [room, setRoom] = useState<OnlineRoomInfo | null>(null);
   /** performance.now() de quando o relógio da sala chegou. */
@@ -133,7 +135,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       if (stopped) return;
       es?.close();
       seen();
-      es = new EventSource(watching ? api.online.watchUrl(seat.roomId, hands, key) : api.online.eventsUrl(seat.roomId, seat.token));
+      es = new EventSource(watching ? api.online.watchUrl(seat.roomId, hands, key, judge) : api.online.eventsUrl(seat.roomId, seat.token));
       es.onopen = () => {
         seen();
         setConn('open');
@@ -203,7 +205,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
               await api.online.room(seat.roomId);
               // A sala existe: o canal pode ter sido recusado (sem permissão para ver as mãos, lotado).
               const ctrl = new AbortController();
-              const res = await fetch(api.online.watchUrl(seat.roomId, hands, key), { signal: ctrl.signal });
+              const res = await fetch(api.online.watchUrl(seat.roomId, hands, key, judge), { signal: ctrl.signal });
               const refused = res.ok ? null : ((await res.json().catch(() => null)) as { error?: string; errorCode?: string } | null);
               ctrl.abort();
               if (refused && (res.status === 403 || res.status === 429)) {
@@ -241,7 +243,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
       clearInterval(watchdog);
       es?.close();
     };
-  }, [seat.roomId, seat.token, watching, hands, key]);
+  }, [seat.roomId, seat.token, watching, hands, key, judge]);
 
   // App fora da tela (outro app, tela bloqueada): a sala passa a avisar a vez por notificação.
   useEffect(() => {
@@ -315,6 +317,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   return {
     watching,
     hands,
+    judge,
     state,
     room,
     clockAt,
@@ -345,7 +348,7 @@ export type OnlineGame = ReturnType<typeof useOnlineGame>;
 /** Tempo restante de cada jogador agora (o relógio do jogador da vez continua correndo no navegador). */
 export function remainingNow(room: OnlineRoomInfo, clockAt: number, now = performance.now()): [number, number] {
   const r = [...room.clock.remaining] as [number, number];
-  if (room.clock.running !== null && room.status === 'playing') {
+  if (room.clock.running !== null && room.status === 'playing' && !room.clock.paused) {
     r[room.clock.running] = Math.max(0, r[room.clock.running] - (now - clockAt));
   }
   return r;

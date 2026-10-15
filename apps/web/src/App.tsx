@@ -30,7 +30,8 @@ type Screen =
   | { name: 'lesson'; id: string }
   /** `tournament`: veio da página de um torneio (e volta para ela); `home`: veio do "Ao vivo agora" do menu. */
   | { name: 'watch'; target: WatchTarget; tournament?: string; home?: boolean }
-  | { name: 'tournaments'; id?: string }
+  /** `lobby`: abre direto o lobby do torneio (chamado de Judge na notificação). */
+  | { name: 'tournaments'; id?: string; lobby?: boolean }
   /** `back`: tela para onde "Voltar" leva (replay aberto da página de um torneio ou da administração). */
   | { name: 'game'; setup: GameSetup; key: number; back?: Screen }
   | { name: 'online'; seat: OnlineSeat; tournament?: string };
@@ -46,7 +47,7 @@ function savedScreen(): Screen {
       return { name: 'online', seat: { roomId: s.seat.roomId, token: s.seat.token }, tournament };
     }
     if (s?.name === 'watch' && typeof s.target?.roomId === 'string') {
-      return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands) }, tournament };
+      return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands), ...(s.target.judge ? { judge: true } : {}) }, tournament };
     }
   } catch {
     /* sem armazenamento */
@@ -112,13 +113,14 @@ function MainApp() {
             if (r) setScreen((s) => (s.name === 'online' && s.seat.roomId === r.roomId ? s : { name: 'online', seat: { roomId: r.roomId, token: r.token } }));
           })
           .catch(() => undefined);
-      } else if (tournament) setScreen({ name: 'tournaments', id: tournament });
+      } else if (tournament) setScreen({ name: 'tournaments', id: tournament, lobby: url.searchParams.get('lobby') === '1' });
     };
     const here = new URL(location.href);
     if (here.searchParams.has(ROOM_PARAM) || here.searchParams.has(TOURNAMENT_PARAM)) {
       open(here.href);
       here.searchParams.delete(ROOM_PARAM);
       here.searchParams.delete(TOURNAMENT_PARAM);
+      here.searchParams.delete('lobby');
       history.replaceState(null, '', here.toString());
     }
     const onMessage = (e: MessageEvent) => {
@@ -154,7 +156,9 @@ function MainApp() {
   if (screen.name === 'tournaments') {
     return (
       <Tournaments
+        key={`${screen.id ?? ''}:${screen.lobby ? 'lobby' : ''}`}
         initialId={screen.id}
+        initialLobby={screen.lobby}
         onExit={() => setScreen({ name: 'menu' })}
         onPlay={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
         onWatch={(target, tournament) => setScreen({ name: 'watch', target, tournament })}

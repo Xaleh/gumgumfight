@@ -61,6 +61,7 @@ import {
   SpectatorCount,
   seriesAfter,
 } from './Online';
+import { JudgePanel, PauseBanner } from './Judge';
 
 /**
  * Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen): pela chave do motor
@@ -334,8 +335,8 @@ export function WatchGameScreen({
       kind="online"
       online={online}
       onExit={onExit}
-      // As mãos dos jogadores só aparecem no torneio e nas salas privadas liberadas por quem criou.
-      spectator={{ canHands: canHands && Boolean(room.handsAllowed), onToggleHands: () => onSwitch({ ...target, hands: !target.hands }) }}
+      // As mãos dos jogadores só aparecem no torneio e nas salas privadas liberadas por quem criou; o Judge já as vê ao vivo.
+      spectator={{ canHands: canHands && Boolean(room.handsAllowed) && !target.judge, onToggleHands: () => onSwitch({ ...target, hands: !target.hands }), judge: Boolean(target.judge) }}
       broadcast={broadcast}
     />
   );
@@ -393,8 +394,8 @@ function Table({
   onRematch?: () => void;
   /** Texto do botão de revanche (ex.: próximo jogo da série do torneio). */
   rematchLabel?: string;
-  /** Modo espectador (partida online vista de fora). */
-  spectator?: { canHands: boolean; onToggleHands: () => void };
+  /** Modo espectador (partida online vista de fora). `judge`: entrou como Judge do torneio (painel de Judge). */
+  spectator?: { canHands: boolean; onToggleHands: () => void; judge?: boolean };
   /** Tela de transmissão (fonte do OBS): sem menus nem botões, com o destaque da carta jogada. */
   broadcast?: TableBroadcast;
   /** Aviso na mesa ao começar (some sozinho em 10 s). */
@@ -461,6 +462,16 @@ function Table({
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
   const toTournament = Boolean(online?.room?.tournament);
+  /** "Chamar o Judge" (jogador numa partida de torneio em andamento, ainda não pausada): congela a partida até o Judge liberar. */
+  const callJudge =
+    online && !watching && online.room?.tournament && online.room.status === 'playing' && !online.room.pause
+      ? () => {
+          if (!window.confirm(t('judge.callConfirm'))) return;
+          const tour = online.room!.tournament!;
+          api.tournaments.call(tour.id, tour.matchId).catch((e) => online.setError(e instanceof Error ? e.message : String(e)));
+          setSheet(null);
+        }
+      : undefined;
   const wide = useMediaQuery('(min-width: 1000px)');
   /**
    * Visão do Streamer (quem assiste, no desktop): a mesa em pé como num tablet, a Vida grande na
@@ -1305,6 +1316,8 @@ function Table({
 
         {online && (!broadcast || broadcast.chat) && <ChatBubbles online={online} bottom={bottom} />}
         {online && <OnlineStatus online={online} />}
+        {online && !broadcast && <PauseBanner online={online} />}
+        {online && spectator?.judge && <JudgePanel online={online} />}
 
         {/* Na transmissão ninguém clica para fechar o aviso: os erros ficam fora da tela. */}
         {game.error && !broadcast && (
@@ -1414,6 +1427,11 @@ function Table({
               {(!isOnline || over) && !tutorial && (
                 <button className="btn" onClick={game.downloadReplay}>
                   {t('game.downloadReplay')}
+                </button>
+              )}
+              {callJudge && (
+                <button className="btn judge-call" onClick={callJudge}>
+                  {t('judge.call')}
                 </button>
               )}
               {human !== null && state.phase === 'main' && !tutorial && (
@@ -1591,6 +1609,11 @@ function Table({
             <button className="btn small" onClick={onExit}>
               {toTournament ? t('game.sideTournament') : t('game.sideMenu')}
             </button>
+            {callJudge && (
+              <button className="btn small judge-call" onClick={callJudge}>
+                {t('judge.call')}
+              </button>
+            )}
             {human !== null && !isOnline && (
               <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
                 {t('game.undo')}
