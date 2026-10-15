@@ -1646,7 +1646,7 @@ function Table({
               (replay ? t('game.watchAgain') : rematchLabel) ??
               (online && human !== null ? (online.room?.rematch[human] ? t('game.waitingOpponent') : t('game.askRematch')) : undefined)
             }
-            onReplay={game.downloadReplay}
+            onReplay={toTournament ? undefined : game.downloadReplay}
             onLog={() => setSheet('log')}
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}

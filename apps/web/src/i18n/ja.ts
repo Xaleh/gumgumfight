@@ -531,6 +531,7 @@ export default {
   'online.seriesScore': 'シリーズのスコア',
   'online.seriesWon': ' — シリーズに勝利しました！',
   'online.seriesOver': ' — シリーズ終了。',
+  'online.decksSealed': '大会の対戦：相手のデッキリストとリプレイは大会終了まで非公開です（大会ページで公開されます）。',
   'online.bounty': '懸賞金：',
   'online.rematchWanted': '{name}が再戦を希望しています！',
   // ---- 待機 ----
@@ -939,6 +940,7 @@ export default {
   'tour.gameNoWinner': '勝者なし',
   'tour.notCounted': 'スコアに含まれません',
   'tour.watchReplay': '▶ リプレイを見る',
+  'tour.replaysAtEnd': '自分の対戦のリプレイは大会終了時に公開されます（デッキリストは終了時にのみ公開されます）。',
   // ---- 大会：順位 ----
   'tour.colPlayer': 'プレイヤー',
   'tour.colPoints': '勝点',
@@ -2240,6 +2242,8 @@ export default {
   'errors.rematchPrivateOnly': '再戦はプライベートルームのみです。',
   'errors.matchNotFinished': '対戦はまだ終わっていません。',
   'errors.replayAfterEnd': 'リプレイは対戦終了後にのみ利用できます。',
+  'errors.replayTournament': '大会の対戦では、リプレイは大会ページにあります：主催者とジャッジ向け、プレイヤーには大会終了後に公開されます。',
+  'errors.replayTournamentRunning': 'この対戦のリプレイは大会終了後に利用できます（デッキリストは終了時にのみ公開されます）。',
   'errors.resultNotSaved': '結果を保存できませんでした。',
   // ---- 場での操作、ダイス、エモート、チャット ----
   'errors.matchNotStarted': '対戦はまだ始まっていません。',

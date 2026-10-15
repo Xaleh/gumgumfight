@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deckOfPlayer, formatDeckList, parseDeckList, validateDeck } from '../src/deck';
+import { HIDDEN_CARD } from '../src/view';
 import { createGame } from '../src/engine';
 import type { CardData, DeckList, GameState } from '../src/types';
 import { createAliases, viewFor } from '../src/view';
@@ -95,5 +96,13 @@ describe('deckOfPlayer: a lista refeita a partir das cartas da partida', () => {
     expect(deckOfPlayer(viewFor(over, null, aliases), 1)).toEqual({ leader: kid.leader, cards: sorted(kid) });
     // Em texto, no formato do construtor.
     expect(formatDeckList(deckOfPlayer(over, 1)!)).toMatch(/^1xST02-001\n4x/);
+    // Partida de torneio (`revealEnd` desligado): o fim não revela nada a mais, e a lista do oponente segue fechada.
+    const sealed = viewFor(over, 0, aliases, undefined, { revealEnd: false });
+    expect(deckOfPlayer(sealed, 1)).toBeNull();
+    expect(sealed.players[1].hand.every((u) => sealed.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+    expect(sealed.players[1].deck.every((u) => sealed.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+    // A própria mão continua à vista; a lista inteira, não (o próprio deck fica virado para baixo).
+    expect(sealed.players[0].hand.every((u) => sealed.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
+    expect(deckOfPlayer(viewFor(over, null, aliases, undefined, { revealEnd: false }), 1)).toBeNull();
   });
 });

@@ -532,6 +532,7 @@ const ptBR = {
   'online.seriesScore': 'placar da série',
   'online.seriesWon': ' — você venceu a série!',
   'online.seriesOver': ' — série encerrada.',
+  'online.decksSealed': 'Partida de torneio: a lista do oponente e o replay ficam fechados até o torneio terminar (abrem na página do torneio).',
   'online.bounty': 'Recompensa:',
   'online.rematchWanted': '{name} quer revanche!',
   // ---- espera ----
@@ -940,6 +941,7 @@ const ptBR = {
   'tour.gameNoWinner': 'sem vencedor',
   'tour.notCounted': 'não contou no placar',
   'tour.watchReplay': '▶ Assistir replay',
+  'tour.replaysAtEnd': 'Os replays dos seus jogos abrem quando o torneio termina (as listas dos decks só se abrem no fim).',
   // ---- torneios: classificação ----
   'tour.colPlayer': 'Jogador',
   'tour.colPoints': 'Pts',
@@ -2244,6 +2246,8 @@ const ptBR = {
   'errors.rematchPrivateOnly': 'Revanche só nas salas privadas.',
   'errors.matchNotFinished': 'A partida ainda não terminou.',
   'errors.replayAfterEnd': 'Replay disponível só depois do fim da partida.',
+  'errors.replayTournament': 'Numa partida de torneio o replay fica na página do torneio: para o organizador e os Judges, e para os jogadores quando o torneio termina.',
+  'errors.replayTournamentRunning': 'O replay desta partida fica disponível quando o torneio terminar (as listas dos decks só se abrem no fim).',
   'errors.resultNotSaved': 'Não foi possível gravar o resultado.',
   // ---- ações na mesa, dado, emotes e chat ----
   'errors.matchNotStarted': 'A partida ainda não começou.',

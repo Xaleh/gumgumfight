@@ -531,6 +531,7 @@ export default {
   'online.seriesScore': 'Serienstand',
   'online.seriesWon': ' – du hast die Serie gewonnen!',
   'online.seriesOver': ' – Serie beendet.',
+  'online.decksSealed': 'Turnierpartie: Die Deckliste des Gegners und das Replay bleiben bis zum Turnierende verschlossen (sie öffnen sich auf der Turnierseite).',
   'online.bounty': 'Kopfgeld:',
   'online.rematchWanted': '{name} will eine Revanche!',
   // ---- Warten ----
@@ -939,6 +940,7 @@ export default {
   'tour.gameNoWinner': 'kein Sieger',
   'tour.notCounted': 'zählt nicht zum Ergebnis',
   'tour.watchReplay': '▶ Replay ansehen',
+  'tour.replaysAtEnd': 'Die Replays deiner Partien öffnen sich am Turnierende (Decklisten werden erst am Ende aufgedeckt).',
   // ---- Turniere: Tabelle ----
   'tour.colPlayer': 'Spieler',
   'tour.colPoints': 'Pkt.',
@@ -2240,6 +2242,8 @@ export default {
   'errors.rematchPrivateOnly': 'Revanchen gibt es nur in privaten Räumen.',
   'errors.matchNotFinished': 'Die Partie ist noch nicht vorbei.',
   'errors.replayAfterEnd': 'Das Replay ist erst nach dem Ende der Partie verfügbar.',
+  'errors.replayTournament': 'In einer Turnierpartie liegt das Replay auf der Turnierseite: für den Veranstalter und die Judges, und für die Spieler nach dem Turnierende.',
+  'errors.replayTournamentRunning': 'Das Replay dieser Partie wird am Turnierende verfügbar (Decklisten werden erst am Ende aufgedeckt).',
   'errors.resultNotSaved': 'Das Ergebnis konnte nicht gespeichert werden.',
   // ---- Aktionen am Tisch, Würfel, Emotes und Chat ----
   'errors.matchNotStarted': 'Die Partie hat noch nicht begonnen.',
