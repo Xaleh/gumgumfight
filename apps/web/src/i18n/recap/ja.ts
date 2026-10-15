@@ -50,5 +50,18 @@ export default {
   'recap.img.dropWin': '相手がドロップ',
   'recap.img.pending': '結果なし',
   'recap.img.cards': '{n}枚',
+  // ---- 対戦終了時のデッキリスト (MatchDeck.tsx) ----
+  'matchDeck.opponent': '▤ 相手のデッキリスト',
+  'matchDeck.of': '▤ {name}のデッキリスト',
+  'matchDeck.title': '{name}のデッキリスト',
+  'matchDeck.intro': 'デッキの全リストです。画像として保存・共有するか、テキストとしてデッキビルダーに取り込めます。',
+  'matchDeck.download': '画像を保存',
+  'matchDeck.copy': 'デッキリストをコピー',
+  'matchDeck.copyFailed': '自動でコピーできませんでした。下のテキストを選択してコピーしてください。',
+  'matchDeck.text': 'テキストのリスト',
+  'matchDeck.noArt': 'カード画像がオフのため、リストはイラストなしでカード名とカード番号のみ表示されます。',
+  'matchDeck.unavailable': 'デッキリストは対戦終了後に見られます。',
+  'matchDeck.img.kicker': 'デッキリスト',
+  'matchDeck.img.vs': 'vs. {name}',
   'errors.tourNotFinished': '告知キットは大会終了後に利用できます。',
 } satisfies RecapMessages;

@@ -50,5 +50,18 @@ export default {
   'recap.img.dropWin': 'L’adversaire a abandonné',
   'recap.img.pending': 'Sans résultat',
   'recap.img.cards': '{n|# carte|# cartes}',
+  // ---- decklist d'un joueur en fin de partie (MatchDeck.tsx) ----
+  'matchDeck.opponent': "▤ Decklist de l'adversaire",
+  'matchDeck.of': '▤ Decklist de {name}',
+  'matchDeck.title': 'Decklist de {name}',
+  'matchDeck.intro': 'La liste complète du deck : en image, à garder ou partager, ou en texte, à importer dans le constructeur de decks.',
+  'matchDeck.download': "Télécharger l'image",
+  'matchDeck.copy': 'Copier la decklist',
+  'matchDeck.copyFailed': 'Copie automatique impossible : sélectionnez et copiez le texte ci-dessous.',
+  'matchDeck.text': 'Liste en texte',
+  'matchDeck.noArt': "Les images des cartes sont désactivées : la liste affiche le nom et le code de chaque carte, sans l'illustration.",
+  'matchDeck.unavailable': "La decklist n'est disponible qu'une fois la partie terminée.",
+  'matchDeck.img.kicker': 'Decklist',
+  'matchDeck.img.vs': 'vs. {name}',
   'errors.tourNotFinished': 'Le kit de communication est disponible à la fin du tournoi.',
 } satisfies RecapMessages;

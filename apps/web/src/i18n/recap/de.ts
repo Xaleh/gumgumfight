@@ -50,5 +50,18 @@ export default {
   'recap.img.dropWin': 'Gegner ausgestiegen',
   'recap.img.pending': 'Kein Ergebnis',
   'recap.img.cards': '{n|# Karte|# Karten}',
+  // ---- Deckliste eines Spielers am Ende der Partie (MatchDeck.tsx) ----
+  'matchDeck.opponent': '▤ Deckliste des Gegners',
+  'matchDeck.of': '▤ Deckliste von {name}',
+  'matchDeck.title': 'Deckliste von {name}',
+  'matchDeck.intro': 'Die komplette Deckliste: als Bild zum Aufbewahren oder Teilen, oder als Text zum Importieren in den Deck-Builder.',
+  'matchDeck.download': 'Bild herunterladen',
+  'matchDeck.copy': 'Deckliste kopieren',
+  'matchDeck.copyFailed': 'Automatisches Kopieren nicht möglich: markiere und kopiere den Text unten.',
+  'matchDeck.text': 'Liste als Text',
+  'matchDeck.noArt': 'Die Kartenbilder sind ausgeschaltet: die Liste zeigt Name und Nummer jeder Karte, ohne Artwork.',
+  'matchDeck.unavailable': 'Die Deckliste gibt es erst, wenn die Partie beendet ist.',
+  'matchDeck.img.kicker': 'Deckliste',
+  'matchDeck.img.vs': 'vs. {name}',
   'errors.tourNotFinished': 'Das Promo-Kit gibt es, sobald das Turnier beendet ist.',
 } satisfies RecapMessages;

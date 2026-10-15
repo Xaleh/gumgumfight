@@ -1,5 +1,6 @@
 // Textos do kit de divulgação dos torneios (português do Brasil, referência das chaves):
-// a janela que gera as peças e os textos desenhados nas próprias imagens (`recap.img.*`).
+// a janela que gera as peças e os textos desenhados nas próprias imagens (`recap.img.*`),
+// e a decklist de um jogador no fim da partida (`matchDeck.*`), que usa a mesma peça.
 
 const recapPtBR = {
   'recap.button': 'Kit de divulgação',
@@ -50,6 +51,19 @@ const recapPtBR = {
   'recap.img.dropWin': 'Oponente desistiu',
   'recap.img.pending': 'Sem resultado',
   'recap.img.cards': '{n|# carta|# cartas}',
+  // ---- decklist de um jogador no fim da partida (MatchDeck.tsx) ----
+  'matchDeck.opponent': '▤ Decklist do oponente',
+  'matchDeck.of': '▤ Decklist de {name}',
+  'matchDeck.title': 'Decklist de {name}',
+  'matchDeck.intro': 'A lista completa do deck: como imagem, para guardar ou compartilhar, ou em texto, para importar no construtor de decks.',
+  'matchDeck.download': 'Baixar imagem',
+  'matchDeck.copy': 'Copiar decklist',
+  'matchDeck.copyFailed': 'Não deu para copiar automaticamente: selecione e copie o texto abaixo.',
+  'matchDeck.text': 'Lista em texto',
+  'matchDeck.noArt': 'As imagens das cartas estão desligadas: a lista sai com o nome e o código de cada carta, sem a arte.',
+  'matchDeck.unavailable': 'A decklist só fica disponível com a partida encerrada.',
+  'matchDeck.img.kicker': 'Decklist',
+  'matchDeck.img.vs': 'vs. {name}',
   'errors.tourNotFinished': 'O kit de divulgação sai quando o torneio termina.',
 } as const;
 

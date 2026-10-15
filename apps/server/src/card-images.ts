@@ -11,29 +11,12 @@
 // alternativa sem Nginx (desenvolvimento, testes, instalação simples): busca na origem
 // e devolve a imagem com cache longo no navegador.
 
+import { CARD_IMAGE_ORIGINS, CARD_IMAGE_PREFIX, CARD_IMAGE_SAFE_PATH as SAFE_PATH, proxiedImageUrl } from '@gumgum/engine';
 import type { FastifyInstance } from 'fastify';
 
-/** Origens aceitas: prefixo público → endereço de origem. Só estas (nada de proxy aberto). */
-export const CARD_IMAGE_ORIGINS: Record<string, string> = {
-  optcgapi: 'https://optcgapi.com/media/',
-  optcgleaks: 'https://images.optcgleaks.com/',
-};
-
-export const CARD_IMAGE_PREFIX = '/card-img/';
-
-/** Caminho seguro: letras, números e `_ - . /`, sem `..` e com extensão de imagem. */
-const SAFE_PATH = /^(?!.*\.\.)[A-Za-z0-9_\-./]+\.(?:jpe?g|png|webp)$/i;
-
-/** URL da imagem pelo mesmo domínio (null = origem desconhecida: o kit desenha a carta sem arte). */
-export function proxiedImageUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  for (const [key, base] of Object.entries(CARD_IMAGE_ORIGINS)) {
-    if (!url.startsWith(base)) continue;
-    const path = url.slice(base.length).split(/[?#]/)[0];
-    return SAFE_PATH.test(path) ? `${CARD_IMAGE_PREFIX}${key}/${path}` : null;
-  }
-  return null;
-}
+// A tabela de origens e a reescrita das URLs ficam no motor (`art.ts`), porque o navegador
+// também reescreve (decklist do oponente no fim da partida); aqui só a rota.
+export { CARD_IMAGE_ORIGINS, CARD_IMAGE_PREFIX, proxiedImageUrl };
 
 /** Tamanho máximo de uma imagem de carta (as da optcgapi têm ~100 KB). */
 const MAX_BYTES = 4 * 1024 * 1024;

@@ -10503,6 +10503,45 @@ a.sponsor-card:hover {
 }
 
 
+/* ------------------------------------------------------------------ decklist de um jogador no fim da partida */
+
+/* acima do resumo da partida (.result, z-index 80), como o relato de bug */
+.deck-backdrop {
+  z-index: 85;
+}
+.page-sheet .sheet.deck-sheet {
+  width: min(560px, 100%);
+}
+/* a janela rola inteira: nada encolhe dentro dela */
+.deck-sheet .sheet-body > * {
+  flex-shrink: 0;
+}
+.deck-intro {
+  margin: 0;
+}
+.deck-preview {
+  margin: 0;
+}
+.deck-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(var(--shadow-rgb), 0.25);
+  background: #0a1a2b;
+}
+.deck-text summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+.deck-text textarea {
+  width: 100%;
+  margin-top: 8px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
 /* ------------------------------------------------------------------ visão do Streamer (desktop) */
 
 /*

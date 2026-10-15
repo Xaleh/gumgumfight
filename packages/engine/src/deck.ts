@@ -11,7 +11,8 @@
 import { buildCardDef, needsManual } from './cards';
 import { DECK_SIZE, hasType } from './engine';
 import { type FormatId, formatIssues, type RuleParams } from './formats';
-import type { CardData, DeckList, LeaderRule } from './types';
+import type { CardData, DeckList, GameState, LeaderRule, PlayerId } from './types';
+import { HIDDEN_CARD, HIDDEN_REF } from './view';
 
 export const MAX_COPIES = 4;
 
@@ -204,4 +205,25 @@ export function formatDeckList(deck: Pick<DeckList, 'leader' | 'cards'>): string
   const lines = deck.leader ? [`1x${deck.leader}`] : [];
   for (const c of deck.cards) lines.push(`${c.count}x${c.id}`);
   return lines.join('\n');
+}
+
+/**
+ * A lista do deck de um jogador refeita a partir das cartas da partida (Líder fora, as demais
+ * por número, em ordem). Serve para ver a lista do oponente no fim: a visão de cada jogador só
+ * traz todas as cartas com a partida encerrada. Antes disso (ou num estado incompleto) alguma
+ * carta do jogador ainda está escondida e a resposta é null.
+ */
+export function deckOfPlayer(state: Pick<GameState, 'cards' | 'players'>, player: PlayerId): Pick<DeckList, 'leader' | 'cards'> | null {
+  const ps = state.players[player];
+  const leaderUid = ps.leader.uid;
+  const counts = new Map<string, number>();
+  let leader: string | null = null;
+  for (const c of Object.values(state.cards)) {
+    if (c.uid === HIDDEN_REF || c.owner !== player) continue;
+    if (c.cardId === HIDDEN_CARD) return null;
+    if (c.uid === leaderUid) leader = c.cardId;
+    else counts.set(c.cardId, (counts.get(c.cardId) ?? 0) + 1);
+  }
+  if (!leader) return null;
+  return { leader, cards: [...counts].sort(([a], [b]) => a.localeCompare(b)).map(([id, count]) => ({ id, count })) };
 }

@@ -50,5 +50,18 @@ export default {
   'recap.img.dropWin': 'El rival abandonó',
   'recap.img.pending': 'Sin resultado',
   'recap.img.cards': '{n|# carta|# cartas}',
+  // ---- decklist de un jugador al final de la partida (MatchDeck.tsx) ----
+  'matchDeck.opponent': '▤ Decklist del oponente',
+  'matchDeck.of': '▤ Decklist de {name}',
+  'matchDeck.title': 'Decklist de {name}',
+  'matchDeck.intro': 'La lista completa del mazo: como imagen, para guardar o compartir, o en texto, para importar en el constructor de mazos.',
+  'matchDeck.download': 'Descargar imagen',
+  'matchDeck.copy': 'Copiar decklist',
+  'matchDeck.copyFailed': 'No se pudo copiar automáticamente: selecciona y copia el texto de abajo.',
+  'matchDeck.text': 'Lista en texto',
+  'matchDeck.noArt': 'Las imágenes de las cartas están desactivadas: la lista sale con el nombre y el código de cada carta, sin el arte.',
+  'matchDeck.unavailable': 'La decklist solo está disponible cuando termina la partida.',
+  'matchDeck.img.kicker': 'Decklist',
+  'matchDeck.img.vs': 'vs. {name}',
   'errors.tourNotFinished': 'El kit de difusión está disponible cuando termina el torneo.',
 } satisfies RecapMessages;
