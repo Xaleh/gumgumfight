@@ -11006,35 +11006,162 @@ a.sponsor-card:hover {
   }
 }
 
-/* ---- histórico numa gaveta à esquerda, a partir do botão ao lado do menu ---- */
-.game.streamer .sheet-backdrop.drawer {
-  align-items: stretch;
-  justify-items: start;
+/* ---- painel lateral à direita (histórico, partidas em transmissão, decklist): encolhe a mesa ---- */
+.game.streamer.with-panel {
+  grid-template-columns: minmax(0, 1fr) 380px;
 }
-.game.streamer .drawer .sheet {
-  width: min(400px, 92%);
-  height: 100%;
-  max-height: none;
-  margin: 0;
-  justify-self: start;
-  border-radius: 0 24px 24px 0;
-  box-shadow: 12px 0 40px rgba(var(--shadow2-rgb), 0.3);
-  animation: drawer-in 0.25s cubic-bezier(0.2, 1, 0.3, 1);
+.round-btn.log-btn.on {
+  background: var(--blue);
 }
-.game.streamer .drawer .sheet-body {
+.streamer-panel {
+  gap: 10px;
+  padding: 10px 12px;
+}
+.panel-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-tabs .seg {
   flex: 1;
 }
-.game.streamer .drawer .sheet-body .log {
+.panel-tabs .seg button {
+  flex: 1;
+}
+.streamer-panel .log {
+  flex: 1;
   min-height: 0;
-  flex: 1;
 }
-@keyframes drawer-in {
-  from {
-    transform: translateX(-30px);
-    opacity: 0;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
+/* Partidas: torneios (cada um abre as salas da rodada) e avulsas */
+.matches-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* os filhos não encolhem com a rolagem (o .seg e os grupos têm overflow hidden e virariam altura zero) */
+.matches-panel > *,
+.deck-panel > * {
+  flex: none;
+}
+.matches-panel h4 {
+  margin: 6px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.matches-panel .watch-list {
+  margin: 0;
+  gap: 8px;
+}
+.live-group {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.live-group-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.live-group-head:hover {
+  background: var(--glass);
+}
+.live-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-group-head .chev {
+  width: 8px;
+  height: 8px;
+  margin: 0 4px 3px 0;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.2s;
+}
+.live-group.open .live-group-head .chev {
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+.live-group .watch-list {
+  padding: 0 8px 8px;
+  gap: 6px;
+}
+.live-group .watch-room {
+  border-radius: 12px;
+}
+/* a partida assistida agora */
+.watch-room.current {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(47, 125, 246, 0.35);
+}
+.watch-current {
+  background: var(--blue);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+/* Decklist: o jogador no alto, o Líder e as cartas com a quantidade */
+.deck-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.deck-who button {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deck-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.deck-head b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deck-panel .card-list {
+  --cw: 106px;
+  justify-content: flex-start;
+}
+.count-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  background: var(--slate);
+  color: #fff;
+  border: 2px solid var(--panel);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.3;
+  z-index: 2;
 }

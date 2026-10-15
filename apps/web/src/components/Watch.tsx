@@ -123,38 +123,7 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
           {rooms?.length === 0 && <p className="muted">{t('watch.empty')}</p>}
           {rooms?.map((r) => (
             <div key={r.id} className={['watch-room-row', onAir === r.id ? 'on-air' : ''].join(' ')}>
-              <button className="watch-room" onClick={() => watch(r)}>
-                <div className="watch-meta">
-                  <span className="watch-queue">
-                    {r.tournament
-                      ? `${t('watch.tourLine', { name: r.tournament.name, label: r.tournament.label })}${r.tournament.bestOf > 1 ? t('watch.tourGame', { n: r.tournament.game }) : ''}`
-                      : t(QUEUE_LABEL[r.queue])}
-                  </span>
-                  {r.mine && (
-                    <span className="muted small" title={t('watch.mineTitle')}>
-                      {t('watch.mine')}
-                    </span>
-                  )}
-                  <span className="muted small">
-                    {formatLabel(r.format)} · {r.turn ? t('watch.turn', { n: r.turn }) : t('watch.openingHand')}
-                    {r.spectators ? ` · 👁 ${r.spectators}` : ''}
-                  </span>
-                </div>
-                <div className="watch-players">
-                  {r.players.map((p, i) => (
-                    <div key={i} className={['watch-player', i === 1 ? 'right' : ''].join(' ')}>
-                      <LeaderArt name={p.leaderName ?? p.leader} image={p.leaderImage} colors={p.colors} size="small" />
-                      <span className="watch-name">
-                        <b>{p.bot ? '🤖 ' : ''}{p.name}</b>
-                        <span className="muted small">
-                          {r.queue === 'ranked' ? `${tierName(t, p.tier)} · ` : ''}❤ {p.life} · ✋ {p.hand}
-                        </span>
-                      </span>
-                    </div>
-                  ))}
-                  <span className="vs-badge">{t('watch.vs')}</span>
-                </div>
-              </button>
+              <LiveRoomRow room={r} onClick={() => watch(r)} />
               {broadcast?.key && (
                 <button
                   className={['btn', 'small', 'broadcast-btn', onAir === r.id ? 'primary' : ''].join(' ')}
@@ -191,6 +160,47 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Linha de uma partida ao vivo: tipo de sala (ou torneio), formato, turno, espectadores e os dois jogadores.
+ * `short`: dentro do grupo do torneio (painel de quem transmite), só a rodada e o jogo. `current`: a partida assistida agora.
+ */
+export function LiveRoomRow({ room: r, onClick, short, current }: { room: LiveRoom; onClick: () => void; short?: boolean; current?: boolean }) {
+  const t = useT();
+  const tour = r.tournament;
+  const game = tour && tour.bestOf > 1 ? t('watch.tourGame', { n: tour.game }) : '';
+  return (
+    <button className={['watch-room', current ? 'current' : ''].join(' ')} onClick={onClick} aria-current={current ? 'true' : undefined}>
+      <div className="watch-meta">
+        <span className="watch-queue">{tour ? (short ? `${tour.label}${game}` : `${t('watch.tourLine', { name: tour.name, label: tour.label })}${game}`) : t(QUEUE_LABEL[r.queue])}</span>
+        {current && <span className="watch-current">{t('watch.current')}</span>}
+        {r.mine && (
+          <span className="muted small" title={t('watch.mineTitle')}>
+            {t('watch.mine')}
+          </span>
+        )}
+        <span className="muted small">
+          {formatLabel(r.format)} · {r.turn ? t('watch.turn', { n: r.turn }) : t('watch.openingHand')}
+          {r.spectators ? ` · 👁 ${r.spectators}` : ''}
+        </span>
+      </div>
+      <div className="watch-players">
+        {r.players.map((p, i) => (
+          <div key={i} className={['watch-player', i === 1 ? 'right' : ''].join(' ')}>
+            <LeaderArt name={p.leaderName ?? p.leader} image={p.leaderImage} colors={p.colors} size="small" />
+            <span className="watch-name">
+              <b>{p.bot ? '🤖 ' : ''}{p.name}</b>
+              <span className="muted small">
+                {r.queue === 'ranked' ? `${tierName(t, p.tier)} · ` : ''}❤ {p.life} · ✋ {p.hand}
+              </span>
+            </span>
+          </div>
+        ))}
+        <span className="vs-badge">{t('watch.vs')}</span>
+      </div>
+    </button>
   );
 }
 
