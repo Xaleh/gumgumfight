@@ -11692,6 +11692,7 @@ a.sponsor-card:hover {
 /* a faixa de turno fica abaixo do logo, sobre a mensagem da faixa central */
 .game.streamer.lateral .turn-banner {
   top: 62%;
+}
 
 /* ------------------------------------------------------------------ Judge: pausa, painel e chamado */
 
