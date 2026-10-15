@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 378 528">
   <!-- Verso da carta DON!! no estilo oficial (branco, bordas e letras verdes). Trocar pela arte oficial quando houver fonte. -->
-  <rect x="3" y="3" width="372" height="522" rx="20" fill="#fff" stroke="#1d7a5f" stroke-width="12"/>
-  <g stroke="#1d7a5f" stroke-opacity=".25" stroke-width="1.5" fill="none">
-    <path d="M24 130 L354 64M16 262 L362 176M24 414 L354 308M86 16 L292 512M292 16 L86 512M189 16 L189 512M16 264 L362 264"/>
+  <rect x="3" y="3" width="372" height="522" rx="18" fill="#fff" stroke="#1d7a5f" stroke-width="7"/>
+  <g stroke="#1d7a5f" stroke-opacity=".22" stroke-width="1.2" fill="none">
+    <path d="M20 140 L358 70M12 270 L366 190M20 420 L358 320M96 12 L282 516M282 12 L96 516M189 12 L189 516M12 262 L366 262"/>
   </g>
   <g fill="none" stroke="#1d7a5f">
-    <circle cx="189" cy="206" r="122" stroke-width="7"/>
-    <circle cx="189" cy="206" r="104" stroke-width="3"/>
-    <circle cx="189" cy="206" r="82" stroke-width="12" stroke-dasharray="4 5"/>
-    <circle cx="189" cy="206" r="58" stroke-width="5"/>
-    <circle cx="189" cy="206" r="22" stroke-width="8"/>
+    <circle cx="189" cy="214" r="96" stroke-width="5"/>
+    <circle cx="189" cy="214" r="82" stroke-width="2"/>
+    <circle cx="189" cy="214" r="64" stroke-width="9" stroke-dasharray="3 4"/>
+    <circle cx="189" cy="214" r="45" stroke-width="3.5"/>
+    <circle cx="189" cy="214" r="16" stroke-width="6"/>
   </g>
-  <path d="M189 62 L203 206 L189 350 L175 206 Z" fill="#1d7a5f"/>
-  <path d="M98 154 L189 206 L280 258" fill="none" stroke="#1d7a5f" stroke-width="6" stroke-linecap="round"/>
-  <text x="189" y="412" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="900" font-size="52" fill="#1d7a5f">ONE PIECE</text>
-  <text x="189" y="456" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="29" letter-spacing="3" fill="#1d7a5f">CARD GAME</text>
+  <path d="M189 100 L199 214 L189 328 L179 214 Z" fill="#1d7a5f"/>
+  <path d="M118 173 L189 214 L260 255" fill="none" stroke="#1d7a5f" stroke-width="4" stroke-linecap="round"/>
+  <text x="189" y="392" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-weight="900" font-size="38" fill="#1d7a5f">ONE PIECE</text>
+  <text x="189" y="424" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="21" letter-spacing="3" fill="#1d7a5f">CARD GAME</text>
 </svg>
