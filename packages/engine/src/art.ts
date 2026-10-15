@@ -73,3 +73,35 @@ export function parseArts(v: unknown): Record<string, string> | undefined {
   }
   return Object.keys(out).length ? out : undefined;
 }
+
+// ------------------------------------------------------------------ imagens pelo mesmo domínio
+
+/**
+ * Origens das imagens aceitas pela rota `/card-img/` do servidor: prefixo público → endereço de
+ * origem. Só estas (nada de proxy aberto). O navegador precisa da mesma tabela para reescrever
+ * as URLs antes de desenhar cartas num canvas (ver `proxiedImageUrl`).
+ */
+export const CARD_IMAGE_ORIGINS: Record<string, string> = {
+  optcgapi: 'https://optcgapi.com/media/',
+  optcgleaks: 'https://images.optcgleaks.com/',
+};
+
+export const CARD_IMAGE_PREFIX = '/card-img/';
+
+/** Caminho seguro: letras, números e `_ - . /`, sem `..` e com extensão de imagem. */
+export const CARD_IMAGE_SAFE_PATH = /^(?!.*\.\.)[A-Za-z0-9_\-./]+\.(?:jpe?g|png|webp)$/i;
+
+/**
+ * URL da imagem pelo mesmo domínio do site (`/card-img/<origem>/<caminho>`), para o canvas poder
+ * ser exportado (uma imagem de outro domínio sem CORS "contamina" o canvas). Null = origem
+ * desconhecida: a carta é desenhada sem arte.
+ */
+export function proxiedImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  for (const [key, base] of Object.entries(CARD_IMAGE_ORIGINS)) {
+    if (!url.startsWith(base)) continue;
+    const path = url.slice(base.length).split(/[?#]/)[0];
+    return CARD_IMAGE_SAFE_PATH.test(path) ? `${CARD_IMAGE_PREFIX}${key}/${path}` : null;
+  }
+  return null;
+}

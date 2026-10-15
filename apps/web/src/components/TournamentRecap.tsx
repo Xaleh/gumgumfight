@@ -1,78 +1,19 @@
 // Kit de divulgação do torneio encerrado: as peças para redes sociais (PNG, na ordem do
 // carrossel), tudo num ZIP e o mesmo conteúdo num PDF A4. Gerado no navegador de quem
 // organiza, a partir de GET /api/tournaments/:id/recap. Carregado sob demanda (fora do
-// bundle principal), junto com o desenho e os geradores de ZIP/PDF.
+// bundle principal), junto com o desenho e os geradores de ZIP/PDF. As imagens, fontes e
+// o logo são carregados por `recap/assets.ts` (compartilhado com a decklist do oponente).
 
 import { formatLabel } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type RecapRound, type TournamentRecap as Recap } from '../api';
 import { type Locale, type Translate, useLocale, useT } from '../i18n';
 import { fmtDate } from '../i18n/format';
-import { DECK_TILE_MAX_W, FORMAT_SIZE, type RecapAssets, type RecapFormat, type RecapImage, recapPieces, type RecapTexts } from '../recap/draw';
+import { errorText, loadFonts, loadImage, loadLogo, type RecapImage, release, shrink, toBlob } from '../recap/assets';
+import { DECK_TILE_MAX_W, FORMAT_SIZE, type RecapAssets, type RecapFormat, recapPieces, type RecapTexts } from '../recap/draw';
 import { makePdf, makeZip, saveFile } from '../recap/export';
 import { slug } from '../recap/layout';
 import { phaseName } from './Tournaments';
-
-const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-function loadImage(url: string): Promise<HTMLImageElement | null> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.decoding = 'async';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
-}
-
-/**
- * Cópia reduzida para a largura `maxW`. Cada carta decodificada em tamanho cheio (600 × 838)
- * ocupa ~2 MB; com dezenas delas o iPhone fica sem memória e o iOS recarrega a página.
- */
-function shrink(img: HTMLImageElement, maxW: number): RecapImage {
-  if (img.naturalWidth <= maxW) return img;
-  const canvas = document.createElement('canvas');
-  canvas.width = maxW;
-  canvas.height = Math.round((img.naturalHeight * maxW) / img.naturalWidth);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return img;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas;
-}
-
-/** Solta a memória do canvas na hora (o Safari do iOS só a devolve quando o coletor passa). */
-function release(canvas: HTMLCanvasElement) {
-  canvas.width = 0;
-  canvas.height = 0;
-}
-
-/** Logo do GumGum: o SVG ganha largura e altura (sem elas, alguns navegadores não o desenham no canvas). */
-async function loadLogo(): Promise<HTMLImageElement | null> {
-  try {
-    const svg = await (await fetch('/brand/header-logo-dark-bg.svg')).text();
-    const sized = svg.replace('<svg ', '<svg width="1854" height="448" ');
-    const url = URL.createObjectURL(new Blob([sized], { type: 'image/svg+xml' }));
-    const img = await loadImage(url);
-    URL.revokeObjectURL(url);
-    return img;
-  } catch {
-    return null;
-  }
-}
-
-/** Fontes da marca prontas antes de desenhar (o canvas não espera por elas). */
-async function loadFonts() {
-  try {
-    await Promise.all(['64px Bangers', '900 32px Nunito', '800 32px Nunito', '700 32px Nunito'].map((f) => document.fonts.load(f)));
-  } catch {
-    // Sem as fontes, o canvas usa as alternativas da pilha.
-  }
-}
-
-const toBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
-  new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), type, quality));
 
 function texts(tr: Translate, recap: Recap, locale: Locale): RecapTexts {
   const date = recap.tournament.finishedAt ?? recap.tournament.startedAt;

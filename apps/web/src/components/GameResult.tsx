@@ -1,4 +1,4 @@
-import { type Action, cardDef, cardImage, type GameState, type PlayerId } from '@gumgum/engine';
+import { type Action, cardDef, cardImage, deckOfPlayer, type GameState, type PlayerId } from '@gumgum/engine';
 import { Fragment, type ReactNode } from 'react';
 import { winReasonText } from '../game/engineText';
 import { useT, useTryT } from '../i18n';
@@ -22,10 +22,12 @@ interface Props {
   extra?: ReactNode;
   /** Relatar um bug da partida (só para quem jogou uma partida gravada no servidor). */
   onReport?: () => void;
+  /** Ver a decklist de um jogador (a do oponente; quem assiste vê as duas). */
+  onDeck?: (player: PlayerId) => void;
 }
 
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
-export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra, onReport }: Props) {
+export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra, onReport, onDeck }: Props) {
   const t = useT();
   const tryT = useTryT();
   const me: PlayerId = human ?? state.winner ?? 0;
@@ -66,6 +68,8 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
   };
   const myLife = lifeOf(me);
   const oppLife = lifeOf(opp);
+  // Decklists completas (a visão só traz todas as cartas do oponente com a partida encerrada).
+  const decks: PlayerId[] = (human === null ? ([0, 1] as PlayerId[]) : [opp]).filter((p) => deckOfPlayer(state, p) !== null);
   const pips = ({ left, max }: { left: number; max: number }) => (
     <span className="pips">
       {Array.from({ length: max }, (_, i) => (
@@ -148,6 +152,12 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
               {t('result.review')}
             </button>
           )}
+          {onDeck &&
+            decks.map((p) => (
+              <button key={p} className="btn small pill" onClick={() => onDeck(p)}>
+                {human === null ? t('matchDeck.of', { name: state.players[p].name }) : t('matchDeck.opponent')}
+              </button>
+            ))}
           <button className="btn small pill" onClick={onReplay}>
             {t('result.download')}
           </button>

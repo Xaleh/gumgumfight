@@ -20,7 +20,7 @@ import {
   translateToPt,
   zoneOf,
 } from '@gumgum/engine';
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api, isAdmin, type OnlineSeat, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
@@ -46,6 +46,9 @@ import { ReplayBar, type ReplayControls } from './ReplayBar';
 import { PlayHighlight } from './PlayHighlight';
 import { ReplayCue } from './ReplayCue';
 import { ReportModal } from './ReportModal';
+
+/** Decklist de um jogador no fim da partida: desenhada em canvas, fora do bundle principal (junto com o kit de divulgação). */
+const MatchDeck = lazy(() => import('./MatchDeck'));
 import {
   BroadcastIdle,
   BroadcastTag,
@@ -540,6 +543,8 @@ function Table({
   const [showResult, setShowResult] = useState(false);
   // Relato de bug: só para quem jogou (não no replay, no tutorial nem para quem assiste) e com a partida gravada no servidor.
   const [reporting, setReporting] = useState(false);
+  /** Decklist aberta no resumo do fim (o jogador cujo deck aparece). */
+  const [deckOf, setDeckOf] = useState<PlayerId | null>(null);
   const recorded = isOnline ? (online?.room?.result?.matchId ?? null) : (matchId ?? null);
   const reportMatch = human !== null && !watching && !tutorial && !broadcast && kind !== 'replay' ? recorded : null;
   const reportCards = useMemo(
@@ -1557,7 +1562,13 @@ function Table({
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
             onReport={reportMatch !== null ? () => setReporting(true) : undefined}
+            onDeck={setDeckOf}
           />
+        )}
+        {deckOf !== null && state.phase === 'gameover' && (
+          <Suspense fallback={null}>
+            <MatchDeck state={state} player={deckOf} onClose={() => setDeckOf(null)} />
+          </Suspense>
         )}
         {reporting && reportMatch !== null && (
           <ReportModal

@@ -1,5 +1,9 @@
+import { type CardData, createAliases, createGame, type DeckList, type GameState, parseDeckList, viewFor } from '@gumgum/engine';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { LeaderCount, RecapCard } from '../src/api';
+import { matchDeck } from '../src/recap/matchDeck';
 import { crc32, makePdf, makeZip } from '../src/recap/export';
 import { CARD_RATIO, gridLayout, leaderLabel, legendRows, pieSlices, slug } from '../src/recap/layout';
 
@@ -98,5 +102,36 @@ describe('kit de divulgação: arquivos', () => {
     const offsets = [...s.slice(startxref).matchAll(/^(\d{10}) 00000 n $/gm)].map((m) => Number(m[1]));
     expect(offsets).toHaveLength(9);
     offsets.forEach((o, i) => expect(s.slice(o).startsWith(`${i + 1} 0 obj`)).toBe(true));
+  });
+});
+
+describe('decklist de um jogador no fim da partida', () => {
+  const engineCards = () =>
+    ['st01', 'st02'].flatMap((set) => (JSON.parse(readFileSync(join(__dirname, '../../../data/cards', `${set}.json`), 'utf8')) as { cards: CardData[] }).cards);
+  const deckFile = (name: string) => JSON.parse(readFileSync(join(__dirname, '../../../data/decks', `${name}.json`), 'utf8')) as DeckList;
+
+  it('monta a lista por custo e número, com as imagens pelo mesmo domínio e o texto do construtor', () => {
+    const luffy = deckFile('st01-luffy');
+    const kid = deckFile('st02-kid');
+    const state = createGame({ seed: 3, players: [{ name: 'Alex', deck: luffy }, { name: 'Bot', deck: kid, isBot: true }], cards: engineCards() });
+    const aliases = createAliases(state, () => Math.random().toString(36).slice(2));
+    expect(matchDeck(viewFor(state, 0, aliases), 1)).toBeNull(); // em andamento: a visão esconde o deck
+    const over: GameState = { ...state, phase: 'gameover', winner: 0 };
+    const deck = matchDeck(viewFor(over, 0, aliases), 1)!;
+    expect(deck).toMatchObject({ player: 1, name: 'Bot', opponent: 'Alex', total: 50 });
+    expect(deck.leader.id).toBe(kid.leader);
+    expect(deck.cards.reduce((n, c) => n + c.count, 0)).toBe(50);
+    // Por custo e, no empate, por número.
+    const costs = deck.cards.map((c) => c.cost ?? 99);
+    expect(costs).toEqual([...costs].sort((a, b) => a - b));
+    // Imagens oficiais reescritas para /card-img/ (as de origem desconhecida saem sem arte).
+    for (const c of [deck.leader, ...deck.cards]) expect(c.image === null || c.image.startsWith('/card-img/')).toBe(true);
+    expect(matchDeck(over, 1, { images: false }).leader.image).toBeNull();
+    // Texto no formato do construtor, que o próprio motor lê de volta.
+    expect(deck.text.split('\n')[0]).toBe(`1x${kid.leader}`);
+    const parsed = parseDeckList(deck.text, new Map(engineCards().map((c) => [c.id, c])));
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.leader).toBe(kid.leader);
+    expect(parsed.cards.reduce((n, c) => n + c.count, 0)).toBe(50);
   });
 });

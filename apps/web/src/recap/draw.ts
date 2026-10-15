@@ -7,7 +7,10 @@
 // com a cor, o nome e o código.
 
 import type { LeaderCount, RecapCard, RecapPlayer, RecapRound, TournamentRecap } from '../api';
+import type { RecapImage } from './assets';
 import { CARD_RATIO, gridLayout, leaderLabel, legendRows, pieSlices } from './layout';
+
+export type { RecapImage };
 
 export type RecapFormat = 'feed' | 'story';
 
@@ -49,9 +52,6 @@ export interface RecapTexts {
   format: string;
   site: string;
 }
-
-/** Imagem pronta para desenhar: a original ou uma cópia reduzida (canvas). */
-export type RecapImage = HTMLImageElement | HTMLCanvasElement;
 
 export interface RecapAssets {
   image: (url: string | null) => RecapImage | null;
@@ -393,9 +393,9 @@ function header(ctx: CanvasRenderingContext2D, W: number, format: RecapFormat, r
   return y + 34;
 }
 
-function footer(ctx: CanvasRenderingContext2D, W: number, H: number, format: RecapFormat, tx: RecapTexts): number {
+function footer(ctx: CanvasRenderingContext2D, W: number, H: number, format: RecapFormat, line: string): number {
   const y = H - SAFE[format].bottom - 8;
-  text(ctx, tx.site, W / 2, y, { size: 26, weight: 800, color: C.faint, align: 'center' });
+  text(ctx, line, W / 2, y, { size: 26, weight: 800, color: C.faint, align: 'center', maxW: W - SIDE * 2 });
   return y - 44;
 }
 
@@ -404,7 +404,7 @@ function frame(ctx: CanvasRenderingContext2D, format: RecapFormat, recap: Tourna
   const { width: W, height: H } = FORMAT_SIZE[format];
   background(ctx, W, H);
   const top = header(ctx, W, format, recap, tx, assets);
-  const bottom = footer(ctx, W, H, format, tx);
+  const bottom = footer(ctx, W, H, format, tx.site);
   return { top, bottom };
 }
 
@@ -643,12 +643,22 @@ function drawDeck(ctx: CanvasRenderingContext2D, format: RecapFormat, recap: Tou
   });
   y += 56;
 
-  const tiles: Array<{ card: RecapCard; count: number | null }> = [{ card: p.leader, count: null }, ...p.cards.map((c) => ({ card: c, count: c.count }))];
+  deckGrid(ctx, W, { top: y, bottom: area.bottom }, p.leader, p.cards, assets);
+}
+
+/** Cartas numa lista: a decklist de um jogador. */
+export interface DeckCard extends RecapCard {
+  count: number;
+}
+
+/** Grade das cartas de uma decklist: o Líder primeiro (moldura amarela), as demais com a quantidade em selo e o código embaixo. */
+function deckGrid(ctx: CanvasRenderingContext2D, W: number, area: Area, leader: RecapCard, cards: DeckCard[], assets: RecapAssets) {
+  const tiles: Array<{ card: RecapCard; count: number | null }> = [{ card: leader, count: null }, ...cards.map((c) => ({ card: c, count: c.count }))];
   const labelH = 32;
   const gap = DECK_GAP;
-  const g = gridLayout(tiles.length, W - SIDE * 2, area.bottom - y, { gap, labelH });
+  const g = gridLayout(tiles.length, W - SIDE * 2, area.bottom - area.top, { gap, labelH });
   const x0 = (W - g.gridW) / 2;
-  y += Math.max(0, (area.bottom - y - g.gridH) / 2);
+  const y = area.top + Math.max(0, (area.bottom - area.top - g.gridH) / 2);
   tiles.forEach((t, i) => {
     const col = i % g.cols;
     const row = Math.floor(i / g.cols);
@@ -684,6 +694,64 @@ function drawDeck(ctx: CanvasRenderingContext2D, format: RecapFormat, recap: Tou
       min: 10,
     });
   });
+}
+
+// ------------------------------------------------------------------ decklist de uma partida
+
+/** Textos da imagem da decklist de um jogador no fim da partida (já traduzidos). */
+export interface MatchDeckTexts {
+  /** Selo acima do nome ("Decklist"). */
+  kicker: string;
+  /** "vs. Nome" (quem jogou contra esse deck). */
+  vs: string | null;
+  /** Data da partida, já formatada. */
+  date: string | null;
+  cards: (n: number) => string;
+  site: string;
+}
+
+export interface MatchDeck {
+  /** Nome de quem jogou com o deck. */
+  name: string;
+  leader: RecapCard;
+  cards: DeckCard[];
+}
+
+/** Logo do GumGum no topo da peça; devolve onde o conteúdo começa. */
+function logoHeader(ctx: CanvasRenderingContext2D, format: RecapFormat, assets: RecapAssets): number {
+  const y0 = SAFE[format].top;
+  const logoH = 62;
+  if (assets.logo) {
+    const logoW = (logoH * (assets.logo.naturalWidth || assets.logo.width)) / (assets.logo.naturalHeight || assets.logo.height || 1);
+    ctx.drawImage(assets.logo, SIDE - 6, y0, logoW, logoH);
+  } else {
+    text(ctx, 'GumGum Fight', SIDE, y0 + 48, { size: 48, family: DISPLAY, color: C.yellow });
+  }
+  return y0 + logoH + 34;
+}
+
+/**
+ * Decklist de um jogador de uma partida (o oponente, no resumo do fim): a mesma grade das
+ * decklists do kit, com o nome do jogador, o Líder, quem ele enfrentou e a data.
+ */
+export function drawMatchDeck(ctx: CanvasRenderingContext2D, format: RecapFormat, deck: MatchDeck, tx: MatchDeckTexts, assets: RecapAssets) {
+  const { width: W, height: H } = FORMAT_SIZE[format];
+  background(ctx, W, H);
+  let y = logoHeader(ctx, format, assets);
+  const bottom = footer(ctx, W, H, format, [tx.site, tx.date].filter(Boolean).join('  ·  '));
+  text(ctx, tx.kicker.toLocaleUpperCase(), W / 2, y + 50, { size: 50, weight: 900, color: C.yellow, align: 'center', maxW: W - SIDE * 2, stroke: { color: C.brown, width: 9 } });
+  y += 64;
+  text(ctx, deck.name, W / 2, y + 66, { size: 78, family: DISPLAY, color: C.cream, align: 'center', maxW: W - SIDE * 2, min: 40, stroke: { color: 'rgba(0,0,0,0.4)', width: 9 } });
+  y += 82;
+  const total = deck.cards.reduce((n, c) => n + c.count, 0);
+  text(ctx, [leaderLabel(deck.leader), tx.cards(total)].join('  ·  '), W / 2, y + 30, { size: 30, weight: 800, color: C.muted, align: 'center', maxW: W - SIDE * 2 });
+  y += 40;
+  if (tx.vs) {
+    text(ctx, tx.vs, W / 2, y + 26, { size: 26, weight: 800, color: C.faint, align: 'center', maxW: W - SIDE * 2 });
+    y += 36;
+  }
+  y += 16;
+  deckGrid(ctx, W, { top: y, bottom }, deck.leader, deck.cards, assets);
 }
 
 /** Caixa que contém a fatia (para centralizar a arte do líder nela). */
