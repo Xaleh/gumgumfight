@@ -36,14 +36,63 @@ interface SideProps extends BoardHandlers {
   /** Botões ao lado do deck e do lixo (histórico, chat). */
   tools?: ReactNode;
   /**
-   * Visão do Streamer (desktop, tela inteira): a Vida sai da linha do Líder e vira uma coluna grande
-   * numa ponta do campo e os DON!! ficam na outra, como no playmat (Vida à esquerda e DON!! à direita
-   * de quem está embaixo; o oponente espelhado). Sem a fileira de DON!! na pilha vertical, as cartas crescem.
+   * Visão do Streamer (desktop, tela inteira), como no playmat: a Vida numa coluna grande na ponta de fora
+   * do campo; na outra ponta os contadores de DON!! e o deck grande; ao lado do Líder só o Stage e o
+   * descarte; a fileira de DON!! (deck de DON!! e as cartas, grandes) embaixo, à esquerda, podendo ficar
+   * por baixo da mão aberta. O oponente espelhado.
    */
   lifeAside?: boolean;
 }
 
-const vars = (v: Record<string, string | number>) => v as CSSProperties;
+export const vars = (v: Record<string, string | number>) => v as CSSProperties;
+
+type FieldState = GameState['players'][number]['characters'][number];
+
+/** Carta em campo (Líder, Personagem ou Stage) com os DON!! anexados deitados por baixo. */
+export function FieldCard({
+  state,
+  uid,
+  fc,
+  h,
+}: {
+  state: GameState;
+  uid: string;
+  fc: FieldState;
+  h: Pick<BoardHandlers, 'canDragAttached' | 'onCard' | 'highlight' | 'onHover' | 'canDragAttacker'>;
+}) {
+  const t = useT();
+  // DON!! anexados neste turno e ainda não usados podem ser arrastados de volta para a fileira de DON!!.
+  const loose = fc.donLoose ?? 0;
+  const draggable = loose > 0 && h.canDragAttached(uid);
+  return (
+    <div className="enter field-card">
+      {fc.don > 0 && (
+        <div
+          className={['attached-don', draggable ? 'loose' : ''].join(' ')}
+          title={draggable ? t('board.attachedDonLoose', { n: fc.don, loose }) : t('board.attachedDon', { n: fc.don })}
+          data-uid={uid}
+          data-drag={draggable ? 'attached' : undefined}
+          onClick={() => h.onCard(uid)}
+        >
+          {Array.from({ length: Math.min(fc.don, 4) }, (_, i) => (
+            <span key={i} className="don-card flat" style={vars({ '--k': i })} />
+          ))}
+          <b>+{fc.don}</b>
+        </div>
+      )}
+      <CardView
+        state={state}
+        uid={uid}
+        fc={fc}
+        hideDon
+        highlight={h.highlight(uid)}
+        onClick={() => h.onCard(uid)}
+        onHover={h.onHover}
+        drag={h.canDragAttacker(uid) ? 'attacker' : undefined}
+      />
+    </div>
+  );
+}
 
 function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SideProps) {
   const t = useT();
@@ -53,39 +102,7 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
   const slots = Array.from({ length: MAX_CHARACTERS }, (_, i) => ps.characters[i] ?? null);
   const maxLife = cardDef(state, ps.leader.uid).life ?? ps.life.length;
 
-  const fieldCard = (uid: string, fc: (typeof ps.characters)[number]) => {
-    // DON!! anexados neste turno e ainda não usados podem ser arrastados de volta para a fileira de DON!!.
-    const loose = fc.donLoose ?? 0;
-    const draggable = loose > 0 && h.canDragAttached(uid);
-    return (
-      <div key={uid} className="enter field-card">
-        {fc.don > 0 && (
-          <div
-            className={['attached-don', draggable ? 'loose' : ''].join(' ')}
-            title={draggable ? t('board.attachedDonLoose', { n: fc.don, loose }) : t('board.attachedDon', { n: fc.don })}
-            data-uid={uid}
-            data-drag={draggable ? 'attached' : undefined}
-            onClick={() => h.onCard(uid)}
-          >
-            {Array.from({ length: Math.min(fc.don, 4) }, (_, i) => (
-              <span key={i} className="don-card flat" style={vars({ '--k': i })} />
-            ))}
-            <b>+{fc.don}</b>
-          </div>
-        )}
-        <CardView
-          state={state}
-          uid={uid}
-          fc={fc}
-          hideDon
-          highlight={h.highlight(uid)}
-          onClick={() => h.onCard(uid)}
-          onHover={h.onHover}
-          drag={h.canDragAttacker(uid) ? 'attacker' : undefined}
-        />
-      </div>
-    );
-  };
+  const fieldCard = (uid: string, fc: FieldState) => <FieldCard key={uid} state={state} uid={uid} fc={fc} h={h} />;
 
   const life = (
     <div className="zone life-zone" title={t('board.lifeTitle', { n: ps.life.length })}>
@@ -132,17 +149,15 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
   const picked = h.donPicked(player);
   const attached = ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
   const onField = ps.donActive + ps.donRested;
-  const don = (
-    <div
-      className={['don-row', position, donGlow ? 'glow' : '', donDrop ? 'drop' : ''].join(' ')}
-      title={t('board.donTitle', { deck: ps.donDeck, active: ps.donActive, rested: ps.donRested, attached })}
-    >
-      {/* Deck de DON!! fixo à esquerda; os DON!! entram à direita dele. */}
-      <div className="don-deck" data-anchor={`dondeck-${player}`}>
-        {ps.donDeck > 0 ? <span className="don-card back" /> : <span className="don-card empty" />}
-        <span className="pile-count">{ps.donDeck}</span>
-      </div>
-      <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
+  // Deck de DON!! fixo à esquerda; os DON!! entram à direita dele.
+  const donDeck = (
+    <div className="don-deck" data-anchor={`dondeck-${player}`}>
+      {ps.donDeck > 0 ? <span className="don-card back" /> : <span className="don-card empty" />}
+      <span className="pile-count">{ps.donDeck}</span>
+    </div>
+  );
+  const donCards = (
+    <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
         {Array.from({ length: ps.donActive }, (_, i) => (
           <span
             key={`a${i}`}
@@ -160,6 +175,8 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
           <span key={`r${i}`} className="don-card rested" />
         ))}
       </div>
+  );
+  const donStats = (
       <dl className="don-stats" aria-label="DON!!">
         <div>
           <dt>{t('board.donDeck')}</dt>
@@ -178,24 +195,45 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
           <dd>{attached}</dd>
         </div>
       </dl>
+  );
+  const donRow = (children: ReactNode) => (
+    <div
+      className={['don-row', position, donGlow ? 'glow' : '', donDrop ? 'drop' : ''].join(' ')}
+      title={t('board.donTitle', { deck: ps.donDeck, active: ps.donActive, rested: ps.donRested, attached })}
+    >
+      {children}
     </div>
   );
+  const don = donRow(
+    <>
+      {donDeck}
+      {donCards}
+      {donStats}
+    </>,
+  );
 
+  const deckPile = (
+    <div className="pile" title={t('board.deckTitle', { n: ps.deck.length })} data-anchor={`deck-${player}`}>
+      <CardBack />
+      <span className="pile-count">{ps.deck.length}</span>
+    </div>
+  );
+  const trashPile = (
+    <div
+      className="pile clickable"
+      data-anchor={`trash-${player}`}
+      onClick={() => h.onTrash(player)}
+      title={t('board.trashTitle', { n: ps.trash.length })}
+    >
+      {trashTop ? <CardView state={state} uid={trashTop} /> : <div className="slot-empty">{t('board.trashSlot')}</div>}
+      <span className="pile-count">{ps.trash.length}</span>
+    </div>
+  );
+  // Mesa de quem transmite (`lifeAside`): só o descarte fica ao lado do Líder; o deck vai para a ponta, grande.
   const piles = (
     <div className="zone piles">
-      <div className="pile" title={t('board.deckTitle', { n: ps.deck.length })} data-anchor={`deck-${player}`}>
-        <CardBack />
-        <span className="pile-count">{ps.deck.length}</span>
-      </div>
-      <div
-        className="pile clickable"
-        data-anchor={`trash-${player}`}
-        onClick={() => h.onTrash(player)}
-        title={t('board.trashTitle', { n: ps.trash.length })}
-      >
-        {trashTop ? <CardView state={state} uid={trashTop} /> : <div className="slot-empty">{t('board.trashSlot')}</div>}
-        <span className="pile-count">{ps.trash.length}</span>
-      </div>
+      {!lifeAside && deckPile}
+      {trashPile}
     </div>
   );
 
@@ -236,6 +274,26 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
     </div>
   );
 
+  /**
+   * Mesa de quem transmite: a ponta de fora do lado oposto à Vida, com os contadores de DON!! e o deck grande
+   * (como no playmat: deck na ponta direita de quem está embaixo; o oponente espelhado).
+   */
+  const aux = (
+    <div className="side-aux">
+      {position === 'bottom' ? (
+        <>
+          {donStats}
+          {deckPile}
+        </>
+      ) : (
+        <>
+          {deckPile}
+          {donStats}
+        </>
+      )}
+    </div>
+  );
+
   const main =
     position === 'top' ? (
       <>
@@ -258,10 +316,16 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
     >
       {lifeAside ? (
         <>
-          {position === 'bottom' ? <div className="life-col">{life}</div> : <div className="don-col">{don}</div>}
+          {position === 'bottom' ? <div className="life-col">{life}</div> : aux}
           <div className="side-main">
             {position === 'top' ? (
               <>
+                {donRow(
+                  <>
+                    {donDeck}
+                    {donCards}
+                  </>,
+                )}
                 {base}
                 {field}
               </>
@@ -269,10 +333,16 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
               <>
                 {field}
                 {base}
+                {donRow(
+                  <>
+                    {donDeck}
+                    {donCards}
+                  </>,
+                )}
               </>
             )}
           </div>
-          {position === 'bottom' ? <div className="don-col">{don}</div> : <div className="life-col">{life}</div>}
+          {position === 'bottom' ? aux : <div className="life-col">{life}</div>}
         </>
       ) : (
         main
@@ -409,7 +479,8 @@ export function HandFan({
 }: Pick<BoardHandlers, 'highlight' | 'onCard' | 'onCardDouble' | 'onHover'> & {
   state: GameState;
   player: PlayerId;
-  position: 'top' | 'bottom';
+  /** `left`/`right`: mesa lateral, o leque segurado na borda da tela. */
+  position: 'top' | 'bottom' | 'left' | 'right';
   closing?: boolean;
 }) {
   const t = useT();

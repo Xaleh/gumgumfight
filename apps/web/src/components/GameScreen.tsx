@@ -36,6 +36,7 @@ import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
 import { Board, HandFan, handIsKnown } from './Board';
+import { LateralBoard } from './LateralBoard';
 import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
 import { CardView, type Highlight, StaticCard } from './CardView';
 import { DiceRoll } from './DiceRoll';
@@ -495,7 +496,9 @@ function Table({
    * lateral, o histórico junto do menu e as mãos minimizadas, abertas só ao clicar (sem o olho).
    */
   const streamer = watching && !broadcast && wide;
-  const { quickCounter, animations, replayCues, coachTips, locale } = useSettings();
+  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, update: updateSettings } = useSettings();
+  /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, 2.5D) é o padrão; o menu troca para a mesa em pé. */
+  const lateral = streamer && streamerLayout === 'lateral';
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -1232,6 +1235,44 @@ function Table({
       </>
     ) : null;
 
+  const centerBand = (
+        <CenterBand
+          state={state}
+          human={human}
+          watching={watching}
+          streamer={streamer}
+          wide={wide}
+          pulse={animate && myTurnIdle}
+          hands={
+            !streamer && spectator?.canHands && online ? { on: online.hands, onToggle: spectator.onToggleHands } : undefined
+          }
+          acting={acting}
+          mode={mode}
+          donBar={donBar}
+          paused={game.paused}
+          canEnd={myTurnIdle}
+          onEnd={() => dispatch({ type: 'endTurn', player: human! })}
+          onCancelMode={() => setMode(null)}
+          onTogglePause={() => game.setPaused((p) => !p)}
+          request={targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
+          decision={
+            decision ? (
+              <DecisionButton
+                state={state}
+                pending={decision}
+                picked={picked}
+                human={human!}
+                onDispatch={dispatch}
+                onCancel={canCancel ? cancelAction : undefined}
+                clock={online && !watching ? <OnlineClock online={online} player={human!} /> : undefined}
+              />
+            ) : mode && human !== null ? (
+              <CancelButton sub={mode.kind === 'attack' ? t('game.cancelAttackSub') : t('game.cancelDonSub')} onClick={() => setMode(null)} />
+            ) : null
+          }
+        />
+  );
+
   const detailUid = hovered ?? selected;
 
   return (
@@ -1245,6 +1286,7 @@ function Table({
         tutorial ? 'lesson' : '',
         broadcast ? 'broadcast' : '',
         streamer ? 'streamer' : '',
+        lateral ? 'lateral' : '',
         streamer && panel ? 'with-panel' : '',
       ].join(' ')}
       onPointerDown={onPointerDown}
@@ -1252,6 +1294,17 @@ function Table({
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="board-col">
+        {lateral ? (
+          <LateralBoard
+            state={state}
+            left={bottom}
+            corner={corner}
+            center={centerBand}
+            bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
+            miniHands={{ open: openHand, canOpen: Boolean(online?.hands || spectator?.canHands), onToggle: toggleHand }}
+            {...handlers}
+          />
+        ) : (
         <Board
           state={state}
           bottom={bottom}
@@ -1269,52 +1322,17 @@ function Table({
           handHint={handHint}
           lifted={lifted}
           ghost={drag?.kind === 'hand' ? drag.uid : null}
-          center={
-            <CenterBand
-              state={state}
-              human={human}
-              watching={watching}
-              streamer={streamer}
-              wide={wide}
-              pulse={animate && myTurnIdle}
-              hands={
-                !streamer && spectator?.canHands && online ? { on: online.hands, onToggle: spectator.onToggleHands } : undefined
-              }
-              acting={acting}
-              mode={mode}
-              donBar={donBar}
-              paused={game.paused}
-              canEnd={myTurnIdle}
-              onEnd={() => dispatch({ type: 'endTurn', player: human! })}
-              onCancelMode={() => setMode(null)}
-              onTogglePause={() => game.setPaused((p) => !p)}
-              request={targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
-              decision={
-                decision ? (
-                  <DecisionButton
-                    state={state}
-                    pending={decision}
-                    picked={picked}
-                    human={human!}
-                    onDispatch={dispatch}
-                    onCancel={canCancel ? cancelAction : undefined}
-                    clock={online && !watching ? <OnlineClock online={online} player={human!} /> : undefined}
-                  />
-                ) : mode && human !== null ? (
-                  <CancelButton sub={mode.kind === 'attack' ? t('game.cancelAttackSub') : t('game.cancelDonSub')} onClick={() => setMode(null)} />
-                ) : null
-              }
-            />
-          }
+          center={centerBand}
           {...handlers}
         />
+        )}
 
         {streamer && fanPlayer !== null && handIsKnown(state, fanPlayer) && (
           <HandFan
             key={fanPlayer}
             state={state}
             player={fanPlayer}
-            position={fanPlayer === bottom ? 'bottom' : 'top'}
+            position={lateral ? (fanPlayer === bottom ? 'left' : 'right') : fanPlayer === bottom ? 'bottom' : 'top'}
             closing={openHand === null}
             highlight={highlight}
             onCard={onCard}
@@ -1453,6 +1471,11 @@ function Table({
               <button className="btn" onClick={() => (streamer ? openPanel('log') : setSheet('log'))}>
                 {t('game.logBtn')}
               </button>
+              {streamer && (
+                <button className="btn" onClick={() => updateSettings({ streamerLayout: lateral ? 'upright' : 'lateral' })} title={t('game.layoutTitle')}>
+                  {lateral ? t('game.layoutToUpright') : t('game.layoutToLateral')}
+                </button>
+              )}
               {streamer && spectator?.onSwitchRoom && (
                 <button className="btn" onClick={() => openPanel('matches')}>
                   {t('game.matchesBtn')}
