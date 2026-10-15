@@ -11378,12 +11378,10 @@ a.sponsor-card:hover {
   display: block;
   width: var(--ch);
   height: var(--cw);
-  border-radius: calc(var(--cw) * 0.07);
-  background: #fff;
+  border-radius: calc(var(--cw) * 0.055);
   box-shadow: 0 2px 6px rgba(var(--shadow2-rgb), 0.35);
-  overflow: hidden;
 }
-/* o verso é em pé: desenhado girado dentro da caixa deitada */
+/* o verso oficial (recortado com os cantos arredondados) é em pé: desenhado girado dentro da caixa deitada */
 .lat-donback::before {
   content: '';
   position: absolute;
@@ -11391,7 +11389,7 @@ a.sponsor-card:hover {
   top: 50%;
   width: var(--cw);
   height: var(--ch);
-  background: url('./assets/don-back.svg') center / 100% 100% no-repeat;
+  background: url('./assets/don-back.png') center / 100% 100% no-repeat;
   transform: translate(-50%, -50%) rotate(90deg);
 }
 .lat-donback.empty {
