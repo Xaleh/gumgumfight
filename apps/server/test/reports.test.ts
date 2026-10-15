@@ -69,7 +69,7 @@ describe('auditoria: jogos gravados, replay e relatos', () => {
     const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Liga', format: 'egb', structure: 'swiss', rounds: 1 })).json();
     await req(app, 'POST', `/api/tournaments/${t.id}/register`, ps[0], { deckId: 'st01-luffy' });
     await req(app, 'POST', `/api/tournaments/${t.id}/register`, ps[1], { deckId: 'st02-kid' });
-    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).json();
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
     const m = view.rounds[0].matches[0];
     const statsId = await playTournamentGame(app, lobby, t.id, m, ps, m.p2.userId);
 
@@ -210,7 +210,7 @@ describe('auditoria: jogos gravados, replay e relatos', () => {
     const org = login(db, 'organizer');
     const ps = [login(db), login(db)];
     const startsAt = '2026-10-10T20:00:00.000Z';
-    const body = { name: 'Rápido', format: 'egb', structure: 'swiss', startsAt, checkIn: true };
+    const body = { name: 'Rápido', format: 'egb', structure: 'swiss', startsAt, checkIn: true, autoStart: true };
     expect((await req(app, 'POST', '/api/tournaments', org, { ...body, toleranceMin: 0 })).statusCode).toBe(400);
     expect((await req(app, 'POST', '/api/tournaments', org, { ...body, toleranceMin: 90 })).statusCode).toBe(400);
     expect((await req(app, 'POST', '/api/tournaments', org, body)).json().toleranceMin).toBe(5);

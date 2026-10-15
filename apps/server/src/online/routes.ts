@@ -33,6 +33,7 @@ import { type FormatId, isFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
 import { isApprentice } from '../tutorial/store';
+import { actsAsJudge, getTournament } from '../tournaments/store';
 import { pushText } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
 import {
@@ -483,13 +484,22 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    * Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin, só em
    * partida de torneio ou sala privada liberada), na mesa atrasada (o atraso escolhido nas opções da transmissão, nunca abaixo do mínimo). `k`:
    * tela de transmissão; a chave faz as vezes do login e as opções do streamer decidem o que
-   * a conexão vê (`broadcastView`).
+   * a conexão vê (`broadcastView`). `judge=1`: o Judge do torneio (ou o organizador) entra em
+   * qualquer sala do torneio, mesmo em espera, e vê as duas mãos ao vivo, sem atraso.
    */
-  app.get<{ Params: { id: string }; Querystring: { hands?: string; k?: string } }>('/api/online/rooms/:id/watch', (req, reply) => {
+  app.get<{ Params: { id: string }; Querystring: { hands?: string; k?: string; judge?: string } }>('/api/online/rooms/:id/watch', (req, reply) => {
     const room = watchable(req.params.id);
-    if (!room || room.status === 'waiting') return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
-    let view: Pick<Connection, 'hands' | 'as' | 'delay'> = {};
-    if (req.query.k !== undefined) {
+    const judge = req.query.judge === '1';
+    if (!room || (room.status === 'waiting' && !judge)) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    let view: Pick<Connection, 'hands' | 'as' | 'delay' | 'judge'> = {};
+    if (judge) {
+      const account = user(req);
+      if (!account) return reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+      const t = room.data.tournament ? getTournament(db, room.data.tournament.id) : null;
+      if (!t || !actsAsJudge(db, t, account)) return reply.code(403).send(fail('judgeForbidden', 'Só o Judge ou o organizador deste torneio entra na sala como Judge.'));
+      app.log.info(`torneio ${t.id}: ${account.id} entrou como Judge na sala ${room.id}`);
+      view = { judge: true };
+    } else if (req.query.k !== undefined) {
       const found = broadcastByKey(db, String(req.query.k));
       if (!found || !seesHands(found.user.role)) return reply.code(403).send(fail('broadcastNotFound', 'Link de transmissão inválido. Copie o link de novo no app.'));
       view = broadcastView(found.broadcast, room, found.user);
