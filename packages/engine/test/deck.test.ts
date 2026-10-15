@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { formatDeckList, parseDeckList, validateDeck } from '../src/deck';
-import type { CardData, DeckList } from '../src/types';
+import { deckOfPlayer, formatDeckList, parseDeckList, validateDeck } from '../src/deck';
+import { createGame } from '../src/engine';
+import type { CardData, DeckList, GameState } from '../src/types';
+import { createAliases, viewFor } from '../src/view';
 import { cards, kid, luffy } from './helpers';
 
 const byId = new Map<string, CardData>(cards.map((c) => [c.id, c]));
@@ -72,5 +74,26 @@ describe('lista em texto', () => {
 
   it('aponta cartas que não existem no banco', () => {
     expect(parseDeckList('4xOP99-999', byId).errors).toEqual(['Carta não encontrada no banco: OP99-999']);
+  });
+});
+
+describe('deckOfPlayer: a lista refeita a partir das cartas da partida', () => {
+  const byIdCards = cards;
+  it('com a partida encerrada, a visão do oponente traz a lista inteira', () => {
+    const state = createGame({ seed: 7, players: [{ name: 'A', deck: luffy }, { name: 'B', deck: kid }], cards: byIdCards });
+    // No estado completo, as duas listas batem com os decks de origem (ordem por número).
+    const sorted = (d: DeckList) => [...d.cards].sort((a, b) => a.id.localeCompare(b.id));
+    expect(deckOfPlayer(state, 0)).toEqual({ leader: luffy.leader, cards: sorted(luffy) });
+    expect(deckOfPlayer(state, 1)).toEqual({ leader: kid.leader, cards: sorted(kid) });
+    // Em andamento, a visão de A esconde o deck e a mão de B (e o próprio deck de A, virado para baixo): sem lista.
+    const aliases = createAliases(state, () => Math.random().toString(36).slice(2));
+    expect(deckOfPlayer(viewFor(state, 0, aliases), 1)).toBeNull();
+    expect(deckOfPlayer(viewFor(state, 0, aliases), 0)).toBeNull();
+    // Encerrada: tudo visível, inclusive para quem assiste.
+    const over: GameState = { ...state, phase: 'gameover', winner: 0 };
+    expect(deckOfPlayer(viewFor(over, 0, aliases), 1)).toEqual({ leader: kid.leader, cards: sorted(kid) });
+    expect(deckOfPlayer(viewFor(over, null, aliases), 1)).toEqual({ leader: kid.leader, cards: sorted(kid) });
+    // Em texto, no formato do construtor.
+    expect(formatDeckList(deckOfPlayer(over, 1)!)).toMatch(/^1xST02-001\n4x/);
   });
 });

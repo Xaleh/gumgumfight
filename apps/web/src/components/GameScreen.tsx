@@ -2,6 +2,7 @@ import {
   type Action,
   actingPlayer,
   cancelAllowed,
+  type CardData,
   type CardDef,
   cardDef,
   cardStatuses,
@@ -20,9 +21,9 @@ import {
   translateToPt,
   zoneOf,
 } from '@gumgum/engine';
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { api, isAdmin, type OnlineSeat, type WatchTarget } from '../api';
+import { api, isAdmin, type LiveRoom, type OnlineSeat, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
@@ -46,6 +47,10 @@ import { ReplayBar, type ReplayControls } from './ReplayBar';
 import { PlayHighlight } from './PlayHighlight';
 import { ReplayCue } from './ReplayCue';
 import { ReportModal } from './ReportModal';
+import { DeckPanel, MatchesPanel } from './StreamerPanel';
+
+/** Decklist de um jogador no fim da partida: desenhada em canvas, fora do bundle principal (junto com o kit de divulgação). */
+const MatchDeck = lazy(() => import('./MatchDeck'));
 import {
   BroadcastIdle,
   BroadcastTag,
@@ -105,6 +110,8 @@ interface Drag {
   dons?: number[];
 }
 type Sheet = null | 'menu' | 'log' | 'hand' | { trash: PlayerId };
+/** Painel lateral da visão do Streamer. */
+type Panel = null | 'log' | 'matches' | 'deck';
 
 type TryT = ReturnType<typeof useTryT>;
 /** Campos que o motor passa a mandar junto das perguntas e das habilidades: a chave do texto no dicionário e os parâmetros. */
@@ -336,7 +343,14 @@ export function WatchGameScreen({
       online={online}
       onExit={onExit}
       // As mãos dos jogadores só aparecem no torneio e nas salas privadas liberadas por quem criou; o Judge já as vê ao vivo.
-      spectator={{ canHands: canHands && Boolean(room.handsAllowed) && !target.judge, onToggleHands: () => onSwitch({ ...target, hands: !target.hands }), judge: Boolean(target.judge) }}
+      spectator={{
+        canHands: canHands && Boolean(room.handsAllowed) && !target.judge,
+        onToggleHands: () => onSwitch({ ...target, hands: !target.hands }),
+        judge: Boolean(target.judge),
+        roomId: room.id,
+        // Painel "Partidas": troca de sala mantendo "Ver mãos" onde ele vale (a mesma regra da tela "Assistir").
+        onSwitchRoom: (r) => onSwitch({ roomId: r.id, hands: target.hands && canHands && !r.mine && Boolean(r.handsAllowed) }),
+      }}
       broadcast={broadcast}
     />
   );
@@ -394,8 +408,11 @@ function Table({
   onRematch?: () => void;
   /** Texto do botão de revanche (ex.: próximo jogo da série do torneio). */
   rematchLabel?: string;
-  /** Modo espectador (partida online vista de fora). `judge`: entrou como Judge do torneio (painel de Judge). */
-  spectator?: { canHands: boolean; onToggleHands: () => void; judge?: boolean };
+  /**
+   * Modo espectador (partida online vista de fora). `judge`: entrou como Judge do torneio (painel de Judge).
+   * `roomId`/`onSwitchRoom`: os painéis de decklist e de partidas de quem transmite.
+   */
+  spectator?: { canHands: boolean; onToggleHands: () => void; judge?: boolean; roomId?: string; onSwitchRoom?: (room: LiveRoom) => void };
   /** Tela de transmissão (fonte do OBS): sem menus nem botões, com o destaque da carta jogada. */
   broadcast?: TableBroadcast;
   /** Aviso na mesa ao começar (some sozinho em 10 s). */
@@ -527,6 +544,12 @@ function Table({
   const [mode, setMode] = useState<Mode>(null);
   const [pickedUids, setPicked] = useState<string[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
+  /** Visão do Streamer: o painel lateral à direita (histórico, partidas em transmissão ou decklist), que encolhe a mesa. */
+  const [panel, setPanel] = useState<Panel>(null);
+  const openPanel = (p: Panel) => {
+    setPanel(p);
+    setSheet(null);
+  };
   const [drag, setDrag] = useState<Drag | null>(null);
   /** Visão do Streamer: de quem é a mão aberta no leque, e a que está virando de volta antes de sumir. */
   const [openHand, setOpenHand] = useState<PlayerId | null>(null);
@@ -551,6 +574,8 @@ function Table({
   const [showResult, setShowResult] = useState(false);
   // Relato de bug: só para quem jogou (não no replay, no tutorial nem para quem assiste) e com a partida gravada no servidor.
   const [reporting, setReporting] = useState(false);
+  /** Decklist aberta no resumo do fim (o jogador cujo deck aparece). */
+  const [deckOf, setDeckOf] = useState<PlayerId | null>(null);
   const recorded = isOnline ? (online?.room?.result?.matchId ?? null) : (matchId ?? null);
   const reportMatch = human !== null && !watching && !tutorial && !broadcast && kind !== 'replay' ? recorded : null;
   const reportCards = useMemo(
@@ -562,15 +587,17 @@ function Table({
   );
   /** Carta citada no histórico, ampliada (toque/clique no nome). */
   const [logCard, setLogCard] = useState<CardDef | null>(null);
+  /** Carta da decklist (painel de quem transmite), ampliada por cima da mesa. */
+  const [deckCard, setDeckCard] = useState<CardData | null>(null);
   /**
    * Linhas do histórico já vistas: o botão de histórico do celular mostra quantas chegaram desde a última
    * vez que o painel foi aberto (no desktop o histórico fica sempre à vista no painel lateral).
    */
   const [logSeen, setLogSeen] = useState(state.log.length);
   useEffect(() => {
-    if (sheet === 'log' || logSeen > state.log.length) setLogSeen(state.log.length); // desfazer / replay encolhem o log
-  }, [sheet, state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const logNew = sheet === 'log' ? 0 : Math.max(0, state.log.length - logSeen);
+    if (sheet === 'log' || panel === 'log' || logSeen > state.log.length) setLogSeen(state.log.length); // desfazer / replay encolhem o log
+  }, [sheet, panel, state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const logNew = sheet === 'log' || panel === 'log' ? 0 : Math.max(0, state.log.length - logSeen);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
   const [handOrder, setHandOrder] = useState<string[]>([]);
   /** Carta da mão erguida sob o dedo. */
@@ -1161,9 +1188,15 @@ function Table({
         <button className="round-btn" onClick={() => setSheet('menu')} aria-label={t('game.menuLabel')}>
           <span className="burger" />
         </button>
-        {/* Visão do Streamer: sem painel lateral, o histórico abre numa gaveta a partir do botão ao lado do menu. */}
+        {/* Visão do Streamer: o histórico abre no painel lateral, a partir do botão ao lado do menu. */}
         {streamer && (
-          <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label={t('game.logLabel')} title={t('game.log')}>
+          <button
+            className={['round-btn', 'log-btn', panel === 'log' ? 'on' : ''].join(' ')}
+            onClick={() => setPanel((p) => (p === 'log' ? null : 'log'))}
+            aria-label={t('game.logLabel')}
+            aria-pressed={panel === 'log'}
+            title={t('game.log')}
+          >
             <Icon name="history" size={20} />
             {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
           </button>
@@ -1212,6 +1245,7 @@ function Table({
         tutorial ? 'lesson' : '',
         broadcast ? 'broadcast' : '',
         streamer ? 'streamer' : '',
+        streamer && panel ? 'with-panel' : '',
       ].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
@@ -1416,9 +1450,19 @@ function Table({
                   {game.paused ? t('game.resume') : t('game.pause')}
                 </button>
               )}
-              <button className="btn" onClick={() => setSheet('log')}>
+              <button className="btn" onClick={() => (streamer ? openPanel('log') : setSheet('log'))}>
                 {t('game.logBtn')}
               </button>
+              {streamer && spectator?.onSwitchRoom && (
+                <button className="btn" onClick={() => openPanel('matches')}>
+                  {t('game.matchesBtn')}
+                </button>
+              )}
+              {streamer && spectator?.roomId && (
+                <button className="btn" onClick={() => openPanel('deck')}>
+                  {t('game.decklistBtn')}
+                </button>
+              )}
               {canBroadcast && (
                 <button className="btn" onClick={sendToBroadcast}>
                   {t('broadcast.sendThis')}
@@ -1524,7 +1568,7 @@ function Table({
         )}
 
         {sheet === 'log' && (
-          <SheetFrame title={t('game.log')} onClose={() => setSheet(null)} className={streamer ? 'drawer' : undefined}>
+          <SheetFrame title={t('game.log')} onClose={() => setSheet(null)}>
             <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
           </SheetFrame>
         )}
@@ -1546,6 +1590,7 @@ function Table({
         {reveals.length > 0 && <RevealedCards lines={reveals} onCard={setLogCard} onClose={() => setReveals([])} />}
 
         {logCard && <StaticCardZoom card={logCard} className="log-zoom" onClose={() => setLogCard(null)} />}
+        {deckCard && <StaticCardZoom card={deckCard} className="log-zoom" onClose={() => setDeckCard(null)} />}
 
         {tutorial?.overlay}
         {kind === 'bot' && !replay && !tutorial && coachTips && human !== null && !intro && !zoom && !logCard && !sheet && <CoachTipPill state={state} human={human} />}
@@ -1575,7 +1620,13 @@ function Table({
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
             onReport={reportMatch !== null ? () => setReporting(true) : undefined}
+            onDeck={setDeckOf}
           />
+        )}
+        {deckOf !== null && state.phase === 'gameover' && (
+          <Suspense fallback={null}>
+            <MatchDeck state={state} player={deckOf} onClose={() => setDeckOf(null)} />
+          </Suspense>
         )}
         {reporting && reportMatch !== null && (
           <ReportModal
@@ -1601,6 +1652,33 @@ function Table({
       {wide && broadcast && (
         <aside className="side-panel">
           <LogPanel state={state} />
+        </aside>
+      )}
+      {streamer && panel && (
+        <aside className="side-panel streamer-panel" aria-label={t('game.panelLabel')}>
+          <div className="panel-tabs">
+            <div className="seg small" role="tablist">
+              <button type="button" role="tab" aria-selected={panel === 'log'} className={panel === 'log' ? 'on' : ''} onClick={() => setPanel('log')}>
+                {t('game.log')}
+              </button>
+              {spectator?.onSwitchRoom && (
+                <button type="button" role="tab" aria-selected={panel === 'matches'} className={panel === 'matches' ? 'on' : ''} onClick={() => setPanel('matches')}>
+                  {t('game.matches')}
+                </button>
+              )}
+              {spectator?.roomId && (
+                <button type="button" role="tab" aria-selected={panel === 'deck'} className={panel === 'deck' ? 'on' : ''} onClick={() => setPanel('deck')}>
+                  {t('game.decklist')}
+                </button>
+              )}
+            </div>
+            <button className="zoom-close static" onClick={() => setPanel(null)} aria-label={t('game.closePanel')} title={t('game.closePanel')}>
+              ✕
+            </button>
+          </div>
+          {panel === 'log' && <LogPanel state={state} onCardZoom={setLogCard} />}
+          {panel === 'matches' && spectator?.onSwitchRoom && <MatchesPanel currentId={spectator.roomId ?? null} onWatch={spectator.onSwitchRoom} />}
+          {panel === 'deck' && spectator?.roomId && <DeckPanel roomId={spectator.roomId} onZoom={setDeckCard} />}
         </aside>
       )}
       {wide && !tutorial && !broadcast && !streamer && (
@@ -2785,10 +2863,10 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
 
 // ------------------------------------------------------------------ folhas
 
-function SheetFrame({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
+function SheetFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const t = useT();
   return (
-    <div className={['modal-backdrop', 'sheet-backdrop', className ?? ''].join(' ')} onClick={onClose}>
+    <div className="modal-backdrop sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h3>{title}</h3>

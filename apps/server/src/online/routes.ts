@@ -481,6 +481,31 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   });
 
   /**
+   * Decks dos dois jogadores (lista completa e as cartas), para o painel de decklist de quem transmite.
+   * A mesma regra de "Ver mãos": só Streamer/Admin, só nas salas que liberam as mãos (torneio e privada
+   * liberada) e nunca na própria partida.
+   */
+  app.get<{ Params: { id: string } }>('/api/online/rooms/:id/decks', async (req, reply) => {
+    const room = watchable(req.params.id);
+    if (!room || room.status === 'waiting') return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    const account = user(req);
+    if (!seesHands(account?.role)) return reply.code(403).send(fail('handsForbidden', 'Ver as mãos é só para streamers e administradores.'));
+    if (!room.handsAllowed) {
+      return reply.code(403).send(fail('handsTournamentOnly', 'As mãos dos jogadores só aparecem nas partidas de torneio e nas salas privadas que liberaram as mãos.'));
+    }
+    if (room.isPlayer(accountOwnerKey(account!.id), account!.id)) {
+      return reply.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));
+    }
+    const players = room.data.seats.map((s) => ({
+      name: s.name,
+      bot: Boolean(s.bot),
+      deck: { name: s.deck.name, leader: s.deck.leader, cards: s.deck.cards, ...(s.deck.arts ? { arts: s.deck.arts } : {}) },
+    }));
+    const ids = [...new Set(players.flatMap((p) => [p.deck.leader, ...p.deck.cards.map((c) => c.id)]))];
+    return { players, cards: present(getCards(db, ids)) };
+  });
+
+  /**
    * Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin, só em
    * partida de torneio ou sala privada liberada), na mesa atrasada (o atraso escolhido nas opções da transmissão, nunca abaixo do mínimo). `k`:
    * tela de transmissão; a chave faz as vezes do login e as opções do streamer decidem o que

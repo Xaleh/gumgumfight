@@ -279,6 +279,9 @@ está na fila e os espectadores também contam.
 - **Sem desfazer, Auto ou pausa** no online. Chat da partida (mensagens curtas, com palavrões censurados no servidor, e
   emotes de uma lista fixa; em Configurações dá para esconder o que o oponente manda), revanche nas salas privadas e
   o replay completo para baixar no fim.
+- **Decklist do oponente:** no resumo do fim de qualquer partida (bot ou online; em replays e para quem assiste, um
+  botão por jogador), um botão abre a lista completa do deck adversário como imagem (a mesma peça das decklists do kit de divulgação dos
+  torneios, 1080×1350) para baixar e compartilhar, e em texto para copiar e importar no construtor de decks.
 - **Proteção contra abuso:** abrir salas não exige login, então há tetos: salas ativas no servidor
   (`ONLINE_MAX_ROOMS`), salas de treino contra o bot (`ONLINE_MAX_BOT_ROOMS`), e por IP (16 salas ou lugares na fila
   ao mesmo tempo e 60 criações a cada 10 min; `apps/server/src/online/lobby.ts`, `DEFAULT_LIMITS`). O Nginx dos scripts

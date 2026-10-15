@@ -50,5 +50,18 @@ export default {
   'recap.img.dropWin': 'Opponent dropped',
   'recap.img.pending': 'No result',
   'recap.img.cards': '{n|# card|# cards}',
+  // ---- a player's decklist at the end of a match (MatchDeck.tsx) ----
+  'matchDeck.opponent': "▤ Opponent's decklist",
+  'matchDeck.of': "▤ {name}'s decklist",
+  'matchDeck.title': "{name}'s decklist",
+  'matchDeck.intro': 'The full decklist: as an image, to keep or share, or as text, to import into the deck builder.',
+  'matchDeck.download': 'Download image',
+  'matchDeck.copy': 'Copy decklist',
+  'matchDeck.copyFailed': 'Could not copy automatically: select and copy the text below.',
+  'matchDeck.text': 'Text list',
+  'matchDeck.noArt': 'Card images are off: the list shows the name and code of each card, without the art.',
+  'matchDeck.unavailable': 'The decklist is only available once the match is over.',
+  'matchDeck.img.kicker': 'Decklist',
+  'matchDeck.img.vs': 'vs. {name}',
   'errors.tourNotFinished': 'The promo kit is available once the tournament ends.',
 } satisfies RecapMessages;

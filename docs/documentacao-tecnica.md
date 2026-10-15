@@ -1031,7 +1031,24 @@ em PNG; "Baixar tudo" gera um ZIP numerado na ordem do carrossel e "Baixar PDF",
   para `/card-img/<origem>/<caminho>` (`card-images.ts`; origens aceitas: optcgapi e optcgleaks). Em produção o Nginx
   atende esse caminho com `proxy_pass` + `proxy_cache` em disco (`deploy/bootstrap-hostinger.sh`); sem o Nginx (ou
   antes de rodar o bootstrap de novo), o próprio app busca na origem. Com `CARD_IMAGES=off`, o kit sai sem arte
-  (nome e código).
+  (nome e código). A reescrita (`proxiedImageUrl`) e a tabela de origens ficam no motor (`art.ts`), porque o
+  navegador também reescreve (decklist do oponente, abaixo); `card-images.ts` só registra a rota.
+
+### Decklist do oponente no fim da partida
+
+No resumo do fim de qualquer partida (`GameResult.tsx`), o botão "Decklist do oponente" (quem assiste vê um botão
+por jogador) abre `MatchDeck.tsx`: a lista completa do deck como imagem, a mesma peça das decklists do kit (grade com o
+Líder primeiro, quantidade em selo e código; `drawMatchDeck` em `recap/draw.ts`, 1080×1350, com o nome do jogador,
+"vs. oponente" e a data), para baixar em PNG, e em texto no formato do construtor (`1xST01-001`, `4x…`) para copiar
+(`navigator.clipboard`; sem ele, a lista fica num `<textarea>` para selecionar).
+
+- **Dados:** nada vem do servidor. `deckOfPlayer` (motor, `deck.ts`) refaz a lista a partir de `state.cards` (as cartas
+  do jogador, menos o Líder); `viewFor` só entrega todas as cartas do oponente com `phase = 'gameover'` (antes, alguma
+  está escondida e a função devolve null, e o botão nem aparece). `recap/matchDeck.ts` ordena por custo e número, usa a
+  arte alternativa da instância (`cardImage`) reescrita por `proxiedImageUrl` e monta o texto com `formatDeckList`.
+- **Imagens desligadas** (servidor ou preferência do jogador): a peça sai com nome e código, como no kit.
+- O componente, o desenho e os carregadores de imagens, fontes e logo (`recap/assets.ts`, compartilhados com o kit)
+  ficam no chunk do kit, carregado só ao abrir.
 
 ---
 
