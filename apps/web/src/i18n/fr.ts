@@ -1328,6 +1328,10 @@ export default {
   'board.sortTitle': 'Trier votre main par coût et par nom (affichage seulement)',
   'board.expand': '⤢ Voir la main',
   'board.expandTitle': 'Voir toutes les cartes de votre main en grand',
+  'board.showHand': 'Voir la main',
+  'board.showHandOf': 'Voir la main de {name}',
+  'board.hideHand': 'Cacher la main',
+  'board.handEmpty': 'Main vide',
   // ---- animations (Motion) ----
   'board.motionDoubleAttack': 'Double Attack !',
   'board.motionBanish': 'Banish !',

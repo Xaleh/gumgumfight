@@ -1,4 +1,4 @@
-import { cardDef, cardImage, type GameState, MAX_CHARACTERS, type PlayerId } from '@gumgum/engine';
+import { cardDef, cardImage, type GameState, HIDDEN_REF, MAX_CHARACTERS, type PlayerId } from '@gumgum/engine';
 import type { CSSProperties, ReactNode } from 'react';
 import { useT } from '../i18n';
 import { CardBack, CardView, type Highlight, JollyRoger } from './CardView';
@@ -35,11 +35,17 @@ interface SideProps extends BoardHandlers {
   position: 'top' | 'bottom';
   /** Botões ao lado do deck e do lixo (histórico, chat). */
   tools?: ReactNode;
+  /**
+   * Visão do Streamer (desktop, tela inteira): a Vida sai da linha do Líder e vira uma coluna grande
+   * numa ponta do campo e os DON!! ficam na outra, como no playmat (Vida à esquerda e DON!! à direita
+   * de quem está embaixo; o oponente espelhado). Sem a fileira de DON!! na pilha vertical, as cartas crescem.
+   */
+  lifeAside?: boolean;
 }
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
 
-function PlayerSide({ state, player, position, tools, ...h }: SideProps) {
+function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SideProps) {
   const t = useT();
   const ps = state.players[player];
   const isActive = state.activePlayer === player && state.phase === 'main';
@@ -83,7 +89,7 @@ function PlayerSide({ state, player, position, tools, ...h }: SideProps) {
 
   const life = (
     <div className="zone life-zone" title={t('board.lifeTitle', { n: ps.life.length })}>
-      <div className="life-stack" key={ps.life.length} data-anchor={`life-${player}`}>
+      <div className="life-stack" key={ps.life.length} data-anchor={`life-${player}`} style={vars({ '--n': ps.life.length })}>
         {ps.life.map((uid, i) => {
           // Vida virada para cima é pública (3-10-2-1): mostra a carta.
           if (!ps.lifeFaceUp?.includes(uid)) return <div key={uid} className="life-card" style={vars({ '--i': i })} />;
@@ -198,7 +204,7 @@ function PlayerSide({ state, player, position, tools, ...h }: SideProps) {
       {position === 'bottom' ? (
         <>
           <div className="base-side left">
-            {life}
+            {!lifeAside && life}
             {stage}
           </div>
           {leader}
@@ -213,7 +219,7 @@ function PlayerSide({ state, player, position, tools, ...h }: SideProps) {
           {leader}
           <div className="base-side right">
             {stage}
-            {life}
+            {!lifeAside && life}
           </div>
         </>
       )}
@@ -230,23 +236,46 @@ function PlayerSide({ state, player, position, tools, ...h }: SideProps) {
     </div>
   );
 
+  const main =
+    position === 'top' ? (
+      <>
+        {don}
+        {base}
+        {field}
+      </>
+    ) : (
+      <>
+        {field}
+        {base}
+        {don}
+      </>
+    );
+
   return (
     <section
-      className={['side', position, isActive ? 'active-side' : '', h.fieldDrop(player) ? 'drop-ok' : ''].join(' ')}
+      className={['side', position, isActive ? 'active-side' : '', h.fieldDrop(player) ? 'drop-ok' : '', lifeAside ? 'life-aside' : ''].join(' ')}
       data-drop={position === 'bottom' ? 'field' : undefined}
     >
-      {position === 'top' ? (
+      {lifeAside ? (
         <>
-          {don}
-          {base}
-          {field}
+          {position === 'bottom' ? <div className="life-col">{life}</div> : <div className="don-col">{don}</div>}
+          <div className="side-main">
+            {position === 'top' ? (
+              <>
+                {base}
+                {field}
+              </>
+            ) : (
+              <>
+                {field}
+                {base}
+              </>
+            )}
+          </div>
+          {position === 'bottom' ? <div className="don-col">{don}</div> : <div className="life-col">{life}</div>}
         </>
       ) : (
-        <>
-          {field}
-          {base}
-          {don}
-        </>
+        main
       )}
     </section>
   );
@@ -307,6 +336,117 @@ export function Hand({
   );
 }
 
+/** Coração das faixas de Vida (cheio = Vida que resta; vazio = perdida). */
+export function HeartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21.3 3.9 13.4C1.4 10.9 1.6 6.6 4.4 4.6 6.9 2.8 10.2 3.4 12 5.8c1.8-2.4 5.1-3 7.6-1.2 2.8 2 3 6.3.5 8.8L12 21.3z" />
+    </svg>
+  );
+}
+
+/** O servidor mandou as cartas desta mão? (sem elas o leque só viraria versos) */
+export function handIsKnown(state: GameState, player: PlayerId): boolean {
+  return state.players[player].hand.every((uid) => !uid.startsWith(HIDDEN_REF));
+}
+
+/**
+ * Mão minimizada (visão do Streamer): uma pilha pequena de versos com a conta de cartas. Clicando, as
+ * cartas viram e aparecem grandes (ver `HandFan`); clicando de novo, voltam a ficar escondidas.
+ */
+export function MiniHand({
+  state,
+  player,
+  position,
+  open,
+  canOpen,
+  onToggle,
+}: {
+  state: GameState;
+  player: PlayerId;
+  position: 'top' | 'bottom';
+  /** As cartas desta mão estão abertas no leque. */
+  open: boolean;
+  /** Dá para abrir (o servidor manda as mãos, ou dá para pedir). */
+  canOpen: boolean;
+  onToggle: () => void;
+}) {
+  const t = useT();
+  const ps = state.players[player];
+  const n = ps.hand.length;
+  const stack = Math.min(n, 7);
+  const title = !canOpen ? t('watch.noHandsHint') : open ? t('board.hideHand') : t('board.showHandOf', { name: ps.name });
+  return (
+    <div className={['mini-hand', position, open ? 'open' : '', canOpen ? '' : 'locked'].join(' ')} data-anchor={`hand-${player}`}>
+      <button type="button" className="mini-hand-btn" onClick={onToggle} disabled={!canOpen} aria-expanded={open} aria-label={title} title={title}>
+        <span className="mini-stack" style={vars({ '--n': Math.max(stack, 1) })}>
+          {Array.from({ length: stack }, (_, i) => (
+            <span key={i} className="mini-card" style={vars({ '--i': i })} />
+          ))}
+          {n === 0 && <span className="mini-card empty" />}
+        </span>
+        <span className="mini-count">
+          <b>{t('board.handCount', { n })}</b>
+          <small>{open ? t('board.hideHand') : t('board.showHand')}</small>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Leque aberto de uma mão (visão do Streamer): as cartas viram do verso para a frente, uma a uma, no
+ * mesmo leque da mão do jogador (`.hand-card`), na borda de baixo. A do oponente fica na borda de cima,
+ * com o leque girado 180° (cartas de cabeça para baixo), como se ele segurasse a mão do outro lado da
+ * mesa. `closing`: a virada de volta antes de sumir.
+ */
+export function HandFan({
+  state,
+  player,
+  position,
+  closing,
+  ...h
+}: Pick<BoardHandlers, 'highlight' | 'onCard' | 'onCardDouble' | 'onHover'> & {
+  state: GameState;
+  player: PlayerId;
+  position: 'top' | 'bottom';
+  closing?: boolean;
+}) {
+  const t = useT();
+  const ps = state.players[player];
+  const hand = ps.hand;
+  const n = hand.length;
+  return (
+    <div className={['hand-fan', position, closing ? 'closing' : ''].join(' ')} role="group" aria-label={t('board.showHandOf', { name: ps.name })}>
+      <div className="fan-hand" style={vars({ '--n': Math.max(n, 1) })}>
+        {hand.map((uid, i) => {
+          const offset = i - (n - 1) / 2;
+          return (
+            <div key={uid} className="hand-card" style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i, '--i': i })}>
+              <div className="fan-flip">
+                <div className="fan-face back">
+                  <CardBack />
+                </div>
+                <div className="fan-face front">
+                  <CardView
+                    state={state}
+                    uid={uid}
+                    highlight={h.highlight(uid)}
+                    onClick={() => h.onCard(uid)}
+                    onDoubleClick={() => h.onCardDouble(uid)}
+                    onHover={h.onHover}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {n === 0 && <span className="hand-fan-empty">{t('board.handEmpty')}</span>}
+      </div>
+    </div>
+  );
+}
+
 /** Faixa do jogador: nome, Líder, Vida e mão. */
 export function PlayerBanner({
   state,
@@ -329,9 +469,11 @@ export function PlayerBanner({
   const isActive = state.activePlayer === player && state.phase === 'main';
   return (
     <div className={['banner', align, isActive ? 'active' : '', isActive && pulse ? 'pulse' : ''].join(' ')}>
-      <div className="banner-life" title={t('board.lifeTitle', { n: ps.life.length })}>
+      <div className="banner-life" title={t('board.lifeTitle', { n: ps.life.length })} aria-label={t('board.lifeTitle', { n: ps.life.length })}>
         {Array.from({ length: max }, (_, i) => (
-          <span key={i} className={i < ps.life.length ? 'on' : ''} />
+          <span key={i} className={i < ps.life.length ? 'on' : ''}>
+            <HeartIcon />
+          </span>
         ))}
       </div>
       <div className="banner-name">
@@ -367,6 +509,13 @@ interface BoardProps extends BoardHandlers {
   center: ReactNode;
   /** Conteúdo a mais na faixa de cada jogador (partidas online). */
   bannerExtra?: (player: PlayerId) => ReactNode;
+  /**
+   * Visão do Streamer: as mãos ficam minimizadas (pilha de versos com a conta) e abrem num leque
+   * grande só quando clicadas (`open` = de quem é o leque aberto).
+   */
+  miniHands?: { open: PlayerId | null; canOpen: boolean; onToggle: (player: PlayerId) => void };
+  /** Visão do Streamer: a Vida grande na lateral do campo (ver `PlayerSide`). */
+  lifeAside?: boolean;
 }
 
 export function Board({
@@ -385,15 +534,28 @@ export function Board({
   turnPulse,
   handHint,
   bannerExtra,
+  miniHands,
+  lifeAside,
   ...handlers
 }: BoardProps) {
   const t = useT();
   const top = (bottom === 0 ? 1 : 0) as PlayerId;
+  const miniHand = (player: PlayerId, position: 'top' | 'bottom') =>
+    miniHands && (
+      <MiniHand
+        state={state}
+        player={player}
+        position={position}
+        open={miniHands.open === player}
+        canOpen={miniHands.canOpen}
+        onToggle={() => miniHands.onToggle(player)}
+      />
+    );
   return (
     <div className="mat">
       <div className="top-strip">
         <div className="corner">{corner}</div>
-        <Hand state={state} player={top} reveal={revealTop} position="top" {...handlers} />
+        {miniHands ? miniHand(top, 'top') : <Hand state={state} player={top} reveal={revealTop} position="top" {...handlers} />}
         <PlayerBanner state={state} player={top} align="right" extra={bannerExtra?.(top)} />
       </div>
       {/* A arena inteira aceita cartas arrastadas da mão (jogar ou usar Counter). */}
@@ -403,18 +565,18 @@ export function Board({
             <JollyRoger />
           </div>
         </div>
-        <PlayerSide state={state} player={top} position="top" {...handlers} />
+        <PlayerSide state={state} player={top} position="top" lifeAside={lifeAside} {...handlers} />
         <div className="center-band" data-drop="field">
           {center}
         </div>
-        <PlayerSide state={state} player={bottom} position="bottom" tools={sideTools} {...handlers} />
+        <PlayerSide state={state} player={bottom} position="bottom" tools={sideTools} lifeAside={lifeAside} {...handlers} />
       </div>
       <div className="bottom-strip">
         <div className="my-bar">
           <PlayerBanner state={state} player={bottom} align="left" pulse={turnPulse} extra={bannerExtra?.(bottom)} />
         </div>
-        {handHint && <div className="hand-hint">{handHint}</div>}
-        {state.players[bottom].hand.length > 0 && (onExpandHand || onSortHand) && (
+        {handHint && !miniHands && <div className="hand-hint">{handHint}</div>}
+        {!miniHands && state.players[bottom].hand.length > 0 && (onExpandHand || onSortHand) && (
           <div className="hand-tools">
             {onSortHand && (
               <button className="hand-expand sort" onClick={onSortHand} title={t('board.sortTitle')}>
@@ -428,16 +590,20 @@ export function Board({
             )}
           </div>
         )}
-        <Hand
-          state={state}
-          player={bottom}
-          reveal={revealBottom}
-          position="bottom"
-          order={handOrder}
-          lifted={lifted}
-          ghost={ghost}
-          {...handlers}
-        />
+        {miniHands ? (
+          miniHand(bottom, 'bottom')
+        ) : (
+          <Hand
+            state={state}
+            player={bottom}
+            reveal={revealBottom}
+            position="bottom"
+            order={handOrder}
+            lifted={lifted}
+            ghost={ghost}
+            {...handlers}
+          />
+        )}
       </div>
     </div>
   );
