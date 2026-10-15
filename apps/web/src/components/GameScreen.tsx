@@ -34,7 +34,7 @@ import { listText, logText, msgText } from '../game/engineText';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, SettingsControls, useSettings } from '../settings';
-import { Board } from './Board';
+import { Board, HandFan, handIsKnown } from './Board';
 import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
 import { CardView, type Highlight, StaticCard } from './CardView';
 import { DiceRoll } from './DiceRoll';
@@ -462,6 +462,11 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const toTournament = Boolean(online?.room?.tournament);
   const wide = useMediaQuery('(min-width: 1000px)');
+  /**
+   * Visão do Streamer (quem assiste, no desktop): a mesa em pé como num tablet, a Vida grande na
+   * lateral, o histórico junto do menu e as mãos minimizadas, abertas só ao clicar (sem o olho).
+   */
+  const streamer = watching && !broadcast && wide;
   const { quickCounter, animations, replayCues, coachTips, locale } = useSettings();
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
@@ -512,6 +517,23 @@ function Table({
   const [pickedUids, setPicked] = useState<string[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  /** Visão do Streamer: de quem é a mão aberta no leque, e a que está virando de volta antes de sumir. */
+  const [openHand, setOpenHand] = useState<PlayerId | null>(null);
+  const [closingHand, setClosingHand] = useState<PlayerId | null>(null);
+  const openHandRef = useRef(openHand);
+  openHandRef.current = openHand;
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeHand = useCallback(() => {
+    const p = openHandRef.current;
+    if (p === null) return;
+    setOpenHand(null);
+    setClosingHand(p);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setClosingHand(null), 480);
+  }, []);
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
   // Espectador: as mãos que o servidor manda escondidas aparecem viradas para baixo.
   const [showBotHand, setShowBotHand] = useState(kind === 'replay' || watching);
   const [banner, setBanner] = useState<{ text: string; kicker: string; mine: boolean; key: number } | null>(null);
@@ -573,6 +595,27 @@ function Table({
       },
       (e: unknown) => game.setError(e instanceof Error ? e.message : String(e)),
     );
+
+  /**
+   * Visão do Streamer: clique na mão minimizada de um jogador abre o leque dela (e fecha a outra).
+   * Se o servidor ainda não manda as mãos, o mesmo clique liga "Ver mãos" (a mesa passa a ser a
+   * atrasada) e o leque abre quando as cartas chegarem.
+   */
+  const toggleHand = (p: PlayerId) => {
+    if (openHand === p) return closeHand();
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setClosingHand(null);
+    setOpenHand(p);
+    if (online && !online.hands && spectator?.canHands) spectator.onToggleHands();
+  };
+  // "Ver mãos" desligado no canto: o leque aberto vira de volta e some.
+  const hadHands = useRef(Boolean(online?.hands));
+  useEffect(() => {
+    const has = Boolean(online?.hands);
+    if (hadHands.current && !has) closeHand();
+    hadHands.current = has;
+  }, [online?.hands, closeHand]);
+  const fanPlayer = openHand ?? closingHand;
 
   // Mão na ordem do jogador: cartas novas entram no fim.
   const myHand = state.players[bottom].hand;
@@ -1107,6 +1150,13 @@ function Table({
         <button className="round-btn" onClick={() => setSheet('menu')} aria-label={t('game.menuLabel')}>
           <span className="burger" />
         </button>
+        {/* Visão do Streamer: sem painel lateral, o histórico abre numa gaveta a partir do botão ao lado do menu. */}
+        {streamer && (
+          <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label={t('game.logLabel')} title={t('game.log')}>
+            <Icon name="history" size={20} />
+            {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
+          </button>
+        )}
       </div>
       {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
       {online && !watching && <SpectatorCount online={online} />}
@@ -1150,6 +1200,7 @@ function Table({
         replay ? 'replaying' : '',
         tutorial ? 'lesson' : '',
         broadcast ? 'broadcast' : '',
+        streamer ? 'streamer' : '',
       ].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
@@ -1164,6 +1215,8 @@ function Table({
           corner={corner}
           sideTools={sideTools}
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
+          miniHands={streamer ? { open: openHand, canOpen: Boolean(online?.hands || spectator?.canHands), onToggle: toggleHand } : undefined}
+          lifeAside={streamer}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}
           onSortHand={human !== null && myHand.length > 1 ? sortHand : undefined}
@@ -1176,10 +1229,11 @@ function Table({
               state={state}
               human={human}
               watching={watching}
+              streamer={streamer}
               wide={wide}
               pulse={animate && myTurnIdle}
               hands={
-                spectator?.canHands && online ? { on: online.hands, onToggle: spectator.onToggleHands } : undefined
+                !streamer && spectator?.canHands && online ? { on: online.hands, onToggle: spectator.onToggleHands } : undefined
               }
               acting={acting}
               mode={mode}
@@ -1209,6 +1263,21 @@ function Table({
           }
           {...handlers}
         />
+
+        {streamer && fanPlayer !== null && handIsKnown(state, fanPlayer) && (
+          <HandFan
+            key={fanPlayer}
+            state={state}
+            player={fanPlayer}
+            position={fanPlayer === bottom ? 'bottom' : 'top'}
+            closing={openHand === null}
+            onClose={closeHand}
+            highlight={highlight}
+            onCard={onCard}
+            onCardDouble={onCardDouble}
+            onHover={setHovered}
+          />
+        )}
 
         {banner && state.phase === 'main' && (
           <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs', animate ? 'sweep' : ''].join(' ')}>
@@ -1438,7 +1507,7 @@ function Table({
         )}
 
         {sheet === 'log' && (
-          <SheetFrame title={t('game.log')} onClose={() => setSheet(null)}>
+          <SheetFrame title={t('game.log')} onClose={() => setSheet(null)} className={streamer ? 'drawer' : undefined}>
             <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
           </SheetFrame>
         )}
@@ -1517,7 +1586,7 @@ function Table({
           <LogPanel state={state} />
         </aside>
       )}
-      {wide && !tutorial && !broadcast && (
+      {wide && !tutorial && !broadcast && !streamer && (
         <aside className="side-panel">
           <div className="panel-controls">
             <button className="btn small" onClick={onExit}>
@@ -1605,6 +1674,8 @@ function CenterBand(props: {
   watching?: boolean;
   /** Espectador Streamer/Admin: o olho mostra ou esconde as mãos dos jogadores. */
   hands?: { on: boolean; onToggle: () => void };
+  /** Visão do Streamer (desktop): as mãos abrem clicando nelas, então a faixa fica sem o olho. */
+  streamer?: boolean;
   acting: PlayerId | null;
   mode: Mode;
   /** DON!! marcados: contador e barra de ações (DonBar), no lugar da dica. */
@@ -1698,6 +1769,8 @@ function CenterBand(props: {
         >
           <EyeIcon closed={!props.hands.on} />
         </button>
+      ) : watching && props.streamer ? (
+        <span className="end-turn placeholder" aria-hidden="true" />
       ) : watching ? (
         <span className="end-turn watching" title={t('game.watching')}>
           👁
@@ -2690,10 +2763,10 @@ function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
 
 // ------------------------------------------------------------------ folhas
 
-function SheetFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function SheetFrame({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
   const t = useT();
   return (
-    <div className="modal-backdrop sheet-backdrop" onClick={onClose}>
+    <div className={['modal-backdrop', 'sheet-backdrop', className ?? ''].join(' ')} onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <h3>{title}</h3>

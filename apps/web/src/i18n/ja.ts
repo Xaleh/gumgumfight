@@ -1328,6 +1328,10 @@ export default {
   'board.sortTitle': '手札をコストと名前で並べ替えます（表示のみ）',
   'board.expand': '⤢ 手札を見る',
   'board.expandTitle': '手札のすべてのカードを大きく表示します',
+  'board.showHand': '手札を見る',
+  'board.showHandOf': '{name}の手札を見る',
+  'board.hideHand': '手札を隠す',
+  'board.handEmpty': '手札なし',
   // ---- アニメーション（Motion） ----
   'board.motionDoubleAttack': 'ダブルアタック！',
   'board.motionBanish': 'バニッシュ！',

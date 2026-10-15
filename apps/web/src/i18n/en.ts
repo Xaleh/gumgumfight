@@ -1328,6 +1328,10 @@ export default {
   'board.sortTitle': 'Sort your hand by cost and name (display only)',
   'board.expand': '⤢ View hand',
   'board.expandTitle': 'See every card in your hand at full size',
+  'board.showHand': 'View hand',
+  'board.showHandOf': "View {name}'s hand",
+  'board.hideHand': 'Hide hand',
+  'board.handEmpty': 'Empty hand',
   // ---- animations (Motion) ----
   'board.motionDoubleAttack': 'Double Attack!',
   'board.motionBanish': 'Banish!',

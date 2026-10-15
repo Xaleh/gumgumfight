@@ -2105,20 +2105,31 @@ input[type='number'] {
   opacity: 0.75;
   font-weight: 700;
 }
+/* Vida como corações: cheio = Vida que resta, vazio = perdida (as bolinhas não diziam o que eram). */
 .banner-life {
   display: flex;
-  gap: 3px;
+  gap: 2px;
 }
 .banner-life span {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.3);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  width: 14px;
+  height: 14px;
+  display: block;
+  flex: none;
 }
-.banner-life span.on {
-  background: radial-gradient(circle at 35% 30%, #fff3a8 0 18%, #ffcf3f 40%, #e79a00 100%);
-  box-shadow: 0 0 4px rgba(255, 207, 63, 0.7);
+.banner-life svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: rgba(0, 0, 0, 0.32);
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  transition: fill 0.25s;
+}
+.banner-life span.on svg {
+  fill: #ff4d6d;
+  stroke: #ffd3dc;
+  filter: drop-shadow(0 0 3px rgba(255, 77, 109, 0.75));
 }
 .tag {
   background: rgba(255, 255, 255, 0.2);
@@ -10489,4 +10500,464 @@ a.sponsor-card:hover {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+}
+
+
+/* ------------------------------------------------------------------ visão do Streamer (desktop) */
+
+/*
+ * Quem assiste uma partida no desktop vê a mesa em pé, como num tablet na vertical: a coluna da mesa
+ * fica mais alta que larga (a consulta de contêiner do .board-col cai nas regras "mesa em pé"), o
+ * Líder abaixo dos Personagens, a Vida grande na lateral do campo (como no playmat), o histórico numa
+ * gaveta a partir do botão ao lado do menu e as mãos minimizadas, abertas só ao clicar.
+ */
+.game.streamer {
+  grid-template-columns: 1fr;
+  background:
+    radial-gradient(90% 70% at 50% 0%, rgba(255, 112, 76, 0.14), transparent 60%),
+    radial-gradient(90% 70% at 50% 100%, rgba(56, 132, 255, 0.16), transparent 60%),
+    var(--bg);
+}
+.game.streamer .board-col {
+  /* proporção de tablet em pé: a altura manda, e a largura sobra dos dois lados */
+  width: min(100%, calc(100dvh * 0.8));
+  margin: 0 auto;
+}
+.game.streamer .mat {
+  /* a Vida grande ao lado do campo pede mais ~1,5 carta de largura; as faixas de cima e de baixo
+     são mais baixas (sem leque) e sobram mais altura para as cartas */
+  --cw: max(38px, min(calc((100cqw - 20px) / 7.3), calc((100cqh - 150px) / 8.7), 124px));
+  --ch: calc(var(--cw) * 1.396);
+  --hcw: calc(var(--cw) * 1.2);
+  width: min(100%, calc(var(--cw) * 7.6));
+}
+
+/* faixa de cima: [menu · histórico] [mão minimizada do oponente] [faixa do oponente] e, embaixo, as etiquetas de quem assiste */
+.game.streamer .top-strip {
+  height: auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 6px 4px 2px;
+}
+.game.streamer .corner {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  top: 0;
+  left: 0;
+  margin: 0;
+  flex-direction: row;
+  align-items: center;
+}
+.game.streamer .corner .spectator-bar {
+  display: none;
+}
+.game.streamer .corner-row {
+  gap: 6px;
+}
+.game.streamer .top-strip .mini-hand {
+  grid-column: 2;
+  grid-row: 1;
+}
+.game.streamer .top-strip .banner.right {
+  grid-column: 3;
+  grid-row: 1;
+  position: relative;
+  top: 0;
+  right: 0;
+  max-width: none;
+  border-radius: 999px;
+  padding: 5px 10px 5px 8px;
+}
+/* as etiquetas de quem assiste (assistindo · Ver mãos · Chat · atraso) numa linha só, abaixo dos botões */
+.game.streamer .top-strip .spectator-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 26px;
+}
+
+/* faixa de baixo: [faixa do jogador] [mão minimizada] */
+.game.streamer .bottom-strip {
+  height: auto;
+  min-height: 0;
+  margin: 2px 0 0;
+  padding: 2px 4px 6px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+}
+.game.streamer .my-bar {
+  grid-column: 1;
+  height: auto;
+}
+.game.streamer .my-bar .banner {
+  position: relative;
+  top: 0;
+  left: 0;
+  max-width: none;
+  border-radius: 999px;
+  padding: 5px 8px 5px 10px;
+}
+.game.streamer .bottom-strip .mini-hand {
+  grid-column: 2;
+}
+/* a mesma largura da faixa do outro lado, para a mão ficar no meio */
+.game.streamer .bottom-strip::after {
+  content: '';
+  grid-column: 3;
+  min-width: 40px;
+}
+
+/* a mesa sem o painel: bordas suaves e sombra, no centro da tela */
+.game.streamer.wide .mat {
+  border-left: 1px solid var(--mat-line2);
+  border-right: 1px solid var(--mat-line2);
+  box-shadow: 0 0 80px rgba(var(--shadow-rgb), 0.22);
+}
+
+/* ---- Vida grande na lateral do campo ---- */
+.side.life-aside {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: calc(var(--cw) * 0.18);
+  width: 100%;
+  padding: 0 calc(var(--cw) * 0.1);
+}
+.side.life-aside.top {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.side.life-aside .side-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--cw) * 0.1);
+  min-width: 0;
+}
+.side.life-aside .life-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.side.life-aside .life-zone {
+  --lw: calc(var(--cw) * 1.2);
+  --lh: calc(var(--cw) * 0.86);
+  /* passo entre as cartas da pilha (a Vida comum, 4 a 6 cartas, cabe na altura do lado) */
+  --lo: calc(var(--cw) * 0.46);
+  width: var(--lw);
+  gap: 6px;
+}
+.side.life-aside .life-stack {
+  width: var(--lw);
+  height: calc(var(--lh) + max(var(--n) - 1, 0) * var(--lo));
+  min-height: var(--lh);
+}
+.side.life-aside .life-card {
+  --lw: calc(var(--cw) * 1.2);
+  --lh: calc(var(--cw) * 0.86);
+  top: calc(var(--i) * var(--lo));
+  border-radius: calc(var(--cw) * 0.06);
+  box-shadow: 0 3px 8px rgba(24, 58, 102, 0.4);
+}
+.side.life-aside .life-count {
+  font-size: max(13px, calc(var(--cw) * 0.2));
+  padding: 2px 10px;
+}
+/* o lado do oponente é a mesa dele girada: a conta fica acima da pilha */
+.side.life-aside.top .life-zone {
+  flex-direction: column-reverse;
+}
+
+/* ---- mão minimizada: pilha de versos com a conta; clique abre o leque ---- */
+.mini-hand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+.mini-hand-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 14px 4px 6px;
+  background: var(--overlay);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.22);
+  transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
+}
+.mini-hand-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(var(--shadow-rgb), 0.28);
+}
+.mini-hand-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.mini-hand-btn:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.mini-hand.open .mini-hand-btn {
+  background: linear-gradient(180deg, #4da3ff, var(--blue));
+  color: #fff;
+  box-shadow: 0 3px 0 #1f5fc8, 0 6px 16px rgba(47, 125, 246, 0.4);
+}
+.mini-stack {
+  --mw: 26px;
+  --mh: calc(var(--mw) * 1.396);
+  position: relative;
+  width: calc(var(--mw) + (var(--n) - 1) * 7px);
+  height: var(--mh);
+  flex: none;
+}
+.mini-card {
+  position: absolute;
+  left: calc(var(--i) * 7px);
+  top: 0;
+  width: var(--mw);
+  height: var(--mh);
+  border-radius: 3px;
+  background: url('./assets/card-back.webp') center / 100% 100% no-repeat;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  /* as cartas mais embaixo da pilha ficam um tiquinho mais escuras, para a pilha ter volume */
+  filter: brightness(calc(1 - var(--i) * 0.04));
+}
+.mini-card.empty {
+  background: var(--slot-bg);
+  border: 1.5px dashed var(--slot-line);
+  box-shadow: none;
+}
+.mini-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.mini-count b {
+  font-size: 15px;
+  font-weight: 900;
+}
+.mini-count small {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.7;
+}
+.mini-hand.open .mini-count small {
+  opacity: 0.9;
+}
+/* oponente (faixa de cima): a pilha do mesmo jeito, mas espelhada para parecer a mão dele vista de frente */
+.mini-hand.top .mini-hand-btn {
+  flex-direction: row-reverse;
+  padding: 4px 6px 4px 14px;
+}
+.mini-hand.top .mini-count {
+  align-items: flex-end;
+}
+
+/* ---- leque aberto: as cartas viram do verso para a frente, grandes, por cima do campo do jogador ---- */
+.hand-fan {
+  --fcw: clamp(84px, calc(var(--cw) * 1.5), 156px);
+  --fch: calc(var(--fcw) * 1.396);
+  --step: min(calc(var(--fcw) * 0.96), calc((100cqw - 48px - var(--fcw)) / max(var(--n) - 1, 1)));
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 45;
+  max-width: calc(100% - 12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 10px;
+  border-radius: 20px;
+  background: rgba(10, 18, 38, 0.82);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: fan-in 0.3s cubic-bezier(0.2, 1, 0.3, 1) both;
+  perspective: 1200px;
+}
+.hand-fan.bottom {
+  bottom: 70px;
+}
+.hand-fan.top {
+  top: 92px;
+  flex-direction: column-reverse;
+}
+.hand-fan.closing {
+  animation: fan-out 0.3s 0.2s ease-in both;
+  pointer-events: none;
+}
+.hand-fan-cards {
+  position: relative;
+  width: calc(var(--fcw) + var(--step) * max(var(--n) - 1, 0));
+  height: var(--fch);
+  max-width: 100%;
+}
+.hand-fan-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 800;
+  font-size: 13px;
+}
+.fan-card {
+  position: absolute;
+  top: 0;
+  left: calc(var(--i) * var(--step));
+  width: var(--fcw);
+  height: var(--fch);
+  z-index: var(--i);
+  transition: transform 0.18s;
+}
+.fan-card:hover {
+  z-index: 60;
+  transform: translateY(-6%) scale(1.04);
+}
+/* a virada: o verso e a frente nas duas faces de um mesmo bloco, um atrás do outro */
+.fan-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: fan-flip-in 0.55s cubic-bezier(0.3, 0.9, 0.3, 1) both;
+  animation-delay: calc(var(--i) * 55ms);
+}
+.hand-fan.closing .fan-flip {
+  animation: fan-flip-out 0.4s ease-in both;
+  animation-delay: calc(var(--i) * 25ms);
+}
+.fan-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.fan-face.back {
+  transform: rotateY(180deg);
+}
+.fan-face .card {
+  --cw: var(--fcw);
+  width: 100%;
+  height: 100%;
+}
+.fan-face.front .card.clickable {
+  cursor: zoom-in;
+}
+.hand-fan-label {
+  border: 0;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hand-fan-label span {
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 10.5px;
+}
+.hand-fan-label:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+@keyframes fan-flip-in {
+  0% {
+    transform: rotateY(180deg) translateY(14px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotateY(0deg) translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes fan-flip-out {
+  0% {
+    transform: rotateY(0deg);
+  }
+  100% {
+    transform: rotateY(180deg) translateY(10px);
+  }
+}
+@keyframes fan-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes fan-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fan-flip,
+  .hand-fan.closing .fan-flip {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
+  }
+}
+
+/* ---- histórico numa gaveta à esquerda, a partir do botão ao lado do menu ---- */
+.game.streamer .sheet-backdrop.drawer {
+  align-items: stretch;
+  justify-items: start;
+}
+.game.streamer .drawer .sheet {
+  width: min(400px, 92%);
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  justify-self: start;
+  border-radius: 0 24px 24px 0;
+  box-shadow: 12px 0 40px rgba(var(--shadow2-rgb), 0.3);
+  animation: drawer-in 0.25s cubic-bezier(0.2, 1, 0.3, 1);
+}
+.game.streamer .drawer .sheet-body {
+  flex: 1;
+}
+.game.streamer .drawer .sheet-body .log {
+  min-height: 0;
+  flex: 1;
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
 }

@@ -1329,6 +1329,10 @@ const ptBR = {
   'board.sortTitle': 'Ordenar a mão por custo e nome (só a exibição)',
   'board.expand': '⤢ Ver mão',
   'board.expandTitle': 'Ver todas as cartas da mão em tamanho grande',
+  'board.showHand': 'Ver mão',
+  'board.showHandOf': 'Ver a mão de {name}',
+  'board.hideHand': 'Esconder a mão',
+  'board.handEmpty': 'Mão vazia',
   // ---- animações (Motion) ----
   'board.motionDoubleAttack': 'Double Attack!',
   'board.motionBanish': 'Banish!',
