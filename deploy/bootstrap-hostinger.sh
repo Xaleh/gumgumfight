@@ -149,6 +149,10 @@ CARD_IMAGES="$(get_env CARD_IMAGES)"; CARD_IMAGES="${CARD_IMAGES:-on}"
 GOOGLE_CLIENT_ID="$(get_env GOOGLE_CLIENT_ID)"
 ADMIN_EMAILS="$(get_env ADMIN_EMAILS)"
 ONLINE_BOT_ROOMS="$(get_env ONLINE_BOT_ROOMS)"; ONLINE_BOT_ROOMS="${ONLINE_BOT_ROOMS:-on}"
+PARTNER_IPS="$(get_env PARTNER_IPS)"
+# Apoio, homologação e ajustes finos (preenchidos à mão no deploy.env): mantidos como estão.
+KEEP_LINES=""
+[ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+|PUSH|VAPID_[A-Z_]+|SPOILER_SYNC)=' "$ENV_FILE" || true)"
 cat > "$ENV_FILE" <<EOF
 # Gerado por deploy/bootstrap-hostinger.sh — lido a cada deploy (deploy/remote-deploy.sh e ecosystem.config.cjs).
 PORT=$PORT
@@ -164,7 +168,11 @@ GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 ADMIN_EMAILS=$ADMIN_EMAILS
 # on | off (off: desliga o treino online contra o bot do servidor)
 ONLINE_BOT_ROOMS=$ONLINE_BOT_ROOMS
+# IPs dos servidores de apps parceiros (API para parceiros), separados por vírgula: ficam fora do limite
+# por IP do Nginx (o app limita cada token). Depois de mudar, rode este script de novo (SKIP_UPGRADE=1).
+PARTNER_IPS=$PARTNER_IPS
 EOF
+[ -n "$KEEP_LINES" ] && printf '%s\n' "$KEEP_LINES" >> "$ENV_FILE"
 chown "$DEPLOY_USER:$DEPLOY_USER" "$ENV_FILE"
 info "Configuração salva em $ENV_FILE"
 
@@ -208,10 +216,25 @@ fi
 # então o Nginx segura rajadas antes de chegarem ao app. 30 req/s por IP com rajada de 100
 # comporta uma rede inteira (NAT) jogando; um atacante sozinho fica nisso. As conexões
 # simultâneas incluem os canais SSE (um por jogador/espectador): 64 por IP.
+# Apps parceiros (PARTNER_IPS no deploy.env): todas as chamadas deles saem de um IP só, então esse IP
+# fica fora do limite por IP; o app limita cada token (120 req/min, ver apps/server/src/partners/).
+PARTNER_GEO=""
+for ip in ${PARTNER_IPS//,/ }; do
+  [[ "$ip" =~ ^[0-9a-fA-F.:/]+$ ]] || die "PARTNER_IPS inválido: $ip"
+  PARTNER_GEO+="    $ip 1;"$'\n'
+done
 cat > /etc/nginx/conf.d/gumgumfight-limits.conf <<EOF
 # GumGum Fight — gerado por deploy/bootstrap-hostinger.sh
-limit_req_zone \$binary_remote_addr zone=gumgum_api:10m rate=30r/s;
-limit_conn_zone \$binary_remote_addr zone=gumgum_conn:10m;
+# IPs de parceiros (PARTNER_IPS): chave de limite vazia = sem limite por IP.
+geo \$gumgum_partner {
+    default 0;
+${PARTNER_GEO}}
+map \$gumgum_partner \$gumgum_limit_key {
+    0 \$binary_remote_addr;
+    1 "";
+}
+limit_req_zone \$gumgum_limit_key zone=gumgum_api:10m rate=30r/s;
+limit_conn_zone \$gumgum_limit_key zone=gumgum_conn:10m;
 limit_req_status 429;
 limit_conn_status 429;
 

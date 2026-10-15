@@ -23,6 +23,8 @@ export interface DeckSummary {
   /** Cartas de spoiler, ainda não lançadas (servidores antigos não mandam): o deck não vale na ranqueada. */
   spoilers?: string[];
   updatedAt: string;
+  /** Hash da lista exata (o mesmo das partidas gravadas); servidores antigos não mandam. */
+  deckHash?: string;
   /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
   mine: boolean;
 }
@@ -274,6 +276,27 @@ export interface AdminUser extends User {
   supporterSource: 'manual' | 'apoiase' | 'kofi' | null;
 }
 
+// ------------------------------------------------------------------ apps parceiros (tokens e OAuth)
+
+/** Permissões de um token de parceiro; `profile` é sempre concedida. */
+export type TokenScope = 'profile' | 'decks:read' | 'decks:write' | 'matches:read' | 'stats:read';
+
+/** Um item da tela "Apps conectados": token pessoal ou app vinculado pelo OAuth (nunca o texto do token). */
+export interface ConnectedToken {
+  id: string;
+  name: string | null;
+  kind: 'personal' | 'app';
+  client: { id: string; name: string } | null;
+  scopes: TokenScope[];
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+/** O que a tela de consentimento do OAuth mostra; com `errorCode`, o pedido do app estava errado. */
+export type OAuthConsentInfo =
+  | { client: { id: string; name: string }; scopes: TokenScope[]; loggedIn: boolean; already: boolean; errorCode?: undefined }
+  | { errorCode: string; error: string; redirect: string | null };
+
 export interface AppConfig {
   cardImages: boolean;
   languages: string[];
@@ -421,6 +444,19 @@ export const api = {
     play: (id: string, matchId: number) => send<OnlineSeat>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/play`),
     /** Kit de divulgação (quem gerencia, com o torneio encerrado). */
     recap: (id: string) => get<TournamentRecap>(`/api/tournaments/${encodeURIComponent(id)}/recap`),
+  },
+  /** Tela "Apps conectados": tokens pessoais e apps vinculados (só com login). */
+  tokens: {
+    list: () => get<{ scopes: TokenScope[]; tokens: ConnectedToken[] }>('/api/tokens'),
+    /** O texto do token vem só nesta resposta. */
+    create: (name: string, scopes: TokenScope[]) => send<ConnectedToken & { token: string }>('POST', '/api/tokens', { name, scopes }),
+    /** Revoga um token pessoal ou, se for um app, todos os tokens dele para a conta. */
+    revoke: (id: string) => send<void>('DELETE', `/api/tokens/${encodeURIComponent(id)}`),
+  },
+  /** Tela de consentimento do OAuth (`/oauth/authorize?…`): `query` é a query da página, sem o `?`. */
+  oauth: {
+    consent: (query: string) => get<OAuthConsentInfo>(`/api/oauth/consent?${query}`),
+    decide: (params: Record<string, string>, decision: 'allow' | 'deny') => send<{ redirect: string }>('POST', '/api/oauth/consent', { ...params, decision }),
   },
   /** Auditoria: replay e relatos de problemas (bugs) das partidas gravadas. */
   matches: {

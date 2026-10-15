@@ -86,7 +86,9 @@ export function recordMatch(db: DB, m: MatchInput, facts: MatchFacts): number {
           m.format,
           m.queue,
           facts.firstPlayer,
-          JSON.stringify(replay),
+          // O replay guarda também o vencedor e o motivo: quem baixa o arquivo (parceiros) sabe
+          // o resultado sem rodar o motor.
+          JSON.stringify({ ...replay, winner: facts.winner, reasonKey: facts.reasonKey }),
         ).lastInsertRowid,
     );
     const playedAt = (db.prepare('SELECT created_at FROM matches WHERE id = ?').get(matchId) as { created_at: string }).created_at;

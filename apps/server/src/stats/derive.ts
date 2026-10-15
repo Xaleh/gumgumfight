@@ -36,6 +36,8 @@ export interface MatchFacts {
   winner: PlayerId | null;
   turns: number;
   reason: string | null;
+  /** Chave de tradução do motivo (`log.winNoLife`…), para quem lê o replay fora do GGF. */
+  reasonKey: string | null;
   firstPlayer: PlayerId;
   seats: [SeatFacts, SeatFacts];
 }
@@ -123,5 +125,5 @@ export function deriveMatch(input: ReplayInput, cards: CardData[]): MatchFacts {
     };
   }) as [SeatFacts, SeatFacts];
 
-  return { winner: state.winner, turns: state.turn, reason: state.winReason, firstPlayer: state.firstPlayer, seats };
+  return { winner: state.winner, turns: state.turn, reason: state.winReason, reasonKey: state.winReasonKey ?? null, firstPlayer: state.firstPlayer, seats };
 }

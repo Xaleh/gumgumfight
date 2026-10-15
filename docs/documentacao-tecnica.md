@@ -141,6 +141,8 @@ gumgumfight/
 │   ├── src/seed.ts, seed-cli.ts  decks prontos, cartas provisórias, traduções
 │   ├── src/present.ts           ApiCard: i18n e remoção de imagens
 │   ├── src/auth/                google.ts (JWKS/RS256), store.ts (users, sessions, roles), routes.ts
+│   ├── src/partners/            API para parceiros: store.ts (api_tokens, oauth_clients, oauth_codes), tokens.ts (middleware Bearer, /api/tokens), oauth.ts, webhook.ts, matches.ts
+│   ├── src/oauth-client-cli.ts  cadastro dos clientes OAuth (npm run oauth:client)
 │   ├── src/online/              room.ts (uma partida + relógio + mesa atrasada), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE), broadcast.ts (modo transmissão)
 │   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
@@ -268,8 +270,10 @@ Os conceitos de tempo que a avaliação representa e os testes de posição que 
 
 ### Módulos e rotas
 
-`app.ts` registra, nesta ordem: health/config, cartas, coverage, traduções pendentes, decks, `registerAuth`,
-`registerPushRoutes` (devolve o `Notifier`), `registerStatsRoutes`, `registerOnlineRoutes` (devolve o `Lobby`; recebe o
+`app.ts` registra, nesta ordem: health/config, cartas, coverage, traduções pendentes, `registerBearerAuth` (hook
+`onRequest` dos tokens de parceiros, antes de todas as rotas), `registerAuth`, decks,
+`registerPushRoutes` (devolve o `Notifier`), `registerStatsRoutes`, `registerPartnerMatchRoutes`,
+`registerTokenRoutes`, `registerOAuthRoutes`, `registerOnlineRoutes` (devolve o `Lobby`; recebe o
 `Notifier`), `registerTournamentRoutes` (recebe o `Lobby` e o `Notifier`),
 `/api/matches`, e por fim o static + fallback para `index.html`. A tabela completa de rotas está no
 [Apêndice B](#b-rotas-da-api).
@@ -279,6 +283,9 @@ Os conceitos de tempo que a avaliação representa e os testes de posição que 
 - **Sem login**: o navegador gera `gumgum.owner` (24 bytes aleatórios em hex) e manda em **todo** fetch no header
   `x-deck-owner`. O servidor guarda só `sha256(token)` (`owner_hash`).
 - **Com login**: o cookie `gg_session` identifica a conta; o dono passa a ser `user:<id>`.
+- **Com token de parceiro** (`Authorization: Bearer ggf_…`, `partners/tokens.ts`): a conta dona do token, sempre como
+  Player, limitada aos scopes do token e às rotas que declaram `config.scope`; cookie e `x-deck-owner` são ignorados.
+  120 req/min por token (429). Detalhes na seção 10.
 - Rate limit nas ações das salas (60 ações / 10 s por assento), nos emotes (1 / 3 s) e no chat (1 / 1,5 s e 10 / min por
   assento). O chat (`Room.chat`) limpa o texto (sem controle/quebras, até 120 caracteres) e censura palavrões em PT/EN
   (`online/profanity.ts`: palavra inteira, sem acentos, com trocas de letra por número/símbolo, repetição e soletrado) antes
@@ -288,7 +295,9 @@ Os conceitos de tempo que a avaliação representa e os testes de posição que 
   bot (`ONLINE_MAX_BOT_ROOMS`, 503; o menu cai para o treino no navegador), 16 salas ou lugares na fila por IP ao mesmo tempo (429) e 60 criações por IP a cada
   10 min (429). Os IPs ficam só em memória (nunca no banco). Partidas de torneio só passam pelo teto global.
 - **Rate limit por IP no Nginx** (scripts de deploy): `/api/` com 30 req/s por IP, rajada de 100, e 64 conexões
-  simultâneas por IP (os canais SSE contam). Acima disso, 429 antes de chegar ao app.
+  simultâneas por IP (os canais SSE contam). Acima disso, 429 antes de chegar ao app. Os IPs dos servidores de apps
+  parceiros (`PARTNER_IPS` no `deploy.env`, `geo` + `map` em `gumgumfight-limits.conf`) ficam fora desse limite: para
+  eles vale o limite por token do app.
 
 ### Limites de corpo
 
@@ -489,7 +498,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (21)
+### Tabelas (24)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -513,12 +522,16 @@ baixadas quando tocam) + `public/`.
 | `tournament_quota` | `tournament_id` | `organizer_id`, `created_at`: torneios criados pela cota de apoiador | criação de torneio |
 | `sponsors` | `id` (`sp-` + 8 hex) | `name`, `url`, `offer`, `placements`, `starts_at`, `ends_at`, `sort`, `logo` (BLOB), `logo_type` | admin |
 | `tournament_matches` | `id` autoincrement | `round`, `stage` (`swiss`/`elim`), `table_no`, `p1`, `p2` (null = bye), `best_of`, `wins1`, `wins2`, `result`, `next_first`, `room_id`, `match_id`, `reported_by` | avanço de rodada, fim de jogo online, organizador |
+| `api_tokens` | `id` (`tk-` + 12 hex) | `token_hash` (sha256, único), `user_id`, `client_id` (null = pessoal), `kind` (`personal/access/refresh`), `name`, `scopes`, `parent_id` (access → refresh), `expires_at`, `last_used_at`, `revoked_at`. Índice por conta. | `/api/tokens`, `/api/oauth/token`, revogações |
+| `oauth_clients` | `id` (`sweetapp`) | `name`, `secret_hash`, `redirect_uris` (JSON, igualdade exata), `scopes`, `webhook_url`, `webhook_secret` (em claro: assina os avisos) | `oauth-client-cli.ts` |
+| `oauth_codes` | `code_hash` | `client_id`, `user_id`, `scopes`, `redirect_uri`, `code_challenge` (S256), `expires_at` (5 min), `used_at`, `token_id` (refresh emitido; revogado se o code for reusado) | consentimento, `/api/oauth/token` |
 | `sqlite_sequence` | — | interna (autoincrement) | — |
 
 Diagrama das relações principais:
 
 ```
 users 1──n sessions            users 1──n tournaments (organizer_id)
+users 1──n api_tokens ──(client_id)──> oauth_clients 1──n oauth_codes
 users 1──n tournament_players n──1 tournaments 1──n tournament_matches ──(match_id)──> matches
 players (owner_hash = user:<id> | sha256(navegador))
 matches 1──2 match_seats ──n match_cards
@@ -647,7 +660,8 @@ Nunca se grava `timeout` vindo do navegador (400), nem partidas que não chegara
   "legacySetup": true,                         // só partidas começadas antes do REPLAY_VERSION 9
   "decks": [ { "id": "st01-luffy", "name": "...", "leader": "ST01-001", "cards": [ { "id": "ST01-002", "count": 4 }, ... ] },
              { "id": "st02-kid",  ... } ],
-  "actions": [ { "type": "mulligan", "player": 0, "redraw": false }, { "type": "playCard", "player": 0, "uid": "c7" }, ... ]
+  "actions": [ { "type": "mulligan", "player": 0, "redraw": false }, { "type": "playCard", "player": 0, "uid": "c7" }, ... ],
+  "winner": 0, "reasonKey": "log.winNoLife"   // resultado, para quem lê o arquivo sem rodar o motor (partidas novas)
 }
 ```
 
@@ -720,6 +734,52 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
 - **Lojas parceiras** (`sponsors`, logo em BLOB validado pelos bytes, só PNG/JPEG/WebP): `GET /api/sponsors`,
   cadastro em `/api/admin/sponsors`. O torneio do time (`tournaments.official`, `prize`, `sponsor_id`) é marcado só
   por admin. Partidas de torneio só entram nas estatísticas de todos depois que o torneio termina.
+
+### API para parceiros (`partners/`)
+
+Um app parceiro age em nome do usuário com um **token de acesso** em `Authorization: Bearer` (a terceira identidade,
+ao lado do cookie e do `x-deck-owner`). Visão de usuário, rotas e scopes estão no `README.md` ("API para parceiros");
+aqui, o desenho:
+
+- **Tokens** (`store.ts`): prefixo legível + 32 bytes aleatórios em base64url (`ggf_pat_` pessoal, `ggf_at_` access,
+  `ggf_rt_` refresh, `ggf_cs_` client_secret, `ggf_whs_` webhook_secret); no banco só `sha256`. Pessoal: sem validade,
+  até 10 ativos por conta. OAuth: access 1 h (`parent_id` = o refresh), refresh 90 dias renovado a cada uso.
+- **Middleware** (`tokens.ts`, hook `onRequest` global, só em `/api/*` com esquema `Bearer`; `/api/internal/*` tem o
+  próprio Bearer): acha o token pelo hash; 401 `invalid_token` se não existe, revogado, expirado, é refresh ou a conta
+  sumiu; **allowlist** pelo `config.scope` da rota (sem ele, 403 `token_not_allowed`; faltando o scope, 403
+  `insufficient_scope`); janela deslizante de 120 req/min por token em memória (429 + `Retry-After`); preenche
+  `req.apiAuth` (`{ token, user (role forçado a player), scopes }`), que `registerAuth().viewer` consulta antes do
+  cookie; `last_used_at` é gravado no máximo 1×/min por token. O logger do Fastify tem `redact` em
+  `req.headers.authorization`.
+- **Rotas liberadas** (`config: { scope }`): `profile` → `/api/auth/me` (resposta reduzida), `/api/players/me`;
+  `decks:read` → `GET /api/decks` (`mine=1` filtra por dono), `GET /api/decks/:id` (os próprios e os prontos);
+  `decks:write` → `POST/PUT/DELETE /api/decks` (o `PUT` aceita `expectedUpdatedAt`/`If-Unmodified-Since` e responde
+  409 `deck_conflict` com a versão atual; o resumo dos decks ganhou `deckHash`); `matches:read` →
+  `GET /api/players/me/matches` (`matches.ts`: `match_seats` por `player_id`, `since`, `cursor` = `match_id`, até 100),
+  `GET /api/matches/:id` (resumo com `seats[].cards` de `match_cards`; o lado do oponente vem `null` fora de torneio
+  encerrado), `GET /api/matches/:id/replay`; `stats:read` → `/api/stats*`.
+- **Tela "Apps conectados"** (`/api/tokens`, só com cookie): lista tokens pessoais e apps autorizados (um por
+  `client_id` com refresh ativo), cria (`{ name, scopes }`) e revoga (um app = todos os tokens dele para a conta).
+- **OAuth** (`oauth.ts`): `GET /oauth/authorize` confere `client_id` e `redirect_uri` (igualdade exata; erro = página
+  HTML sem redirecionar), `state`, `S256` e os scopes (erro = volta com `?error=`), e responde o `index.html` com
+  `X-Frame-Options: DENY`; o `App.tsx` abre a tela `OAuthConsent` nesse caminho, que usa `GET/POST
+  /api/oauth/consent` (cookie). `POST /api/oauth/token` (form ou JSON; cliente no corpo ou em Basic; 10/min por
+  cliente): `authorization_code` confere code (hash, 5 min, uso único, mesmo cliente e `redirect_uri`,
+  `sha256(code_verifier)` em base64url = `code_challenge`) e emite o par; reuso do code revoga o refresh gravado em
+  `oauth_codes.token_id`; `refresh_token` revoga o antigo (e os access dele) e emite outro; refresh já revogado
+  derruba toda a cadeia do cliente naquela conta. `POST /api/oauth/revoke` sempre 200.
+  Cadastro de clientes: `npm run oauth:client -- add|list|secret|webhook|remove` (`oauth-client-cli.ts`, também no
+  pacote de produção).
+- **Webhook** (`webhook.ts`, `WebhookDispatcher`): chamado com o `matchId` depois de `recordMatch` (`finishMatch` em
+  `online/routes.ts` e `POST /api/matches`). Para cada lado humano com conta, os clientes com `webhook_url` que a
+  conta autorizou com `matches:read` recebem `POST` com o evento (`match.finished`, `id` `evt-…`, `userId`, `matchId`,
+  `queue`, `format`, `won`), `X-GGF-Timestamp` e `X-GGF-Signature` (`sha256=` + HMAC-SHA256 do segredo sobre
+  `<timestamp>.<corpo>`). Depois da resposta, timeout 5 s, `redirect: 'manual'`, só https em produção; sem 2xx, tenta
+  de novo após 1 e 10 min (em memória) e desiste com log. `app.webhooks.idle()` espera as entregas (testes).
+- **Nginx**: `PARTNER_IPS` no `deploy.env` tira os IPs dos parceiros do limite por IP (`geo`/`map` nos scripts de
+  deploy); o limite real passa a ser o por token.
+- Testes: `apps/server/test/partners.test.ts` (tokens, allowlist, conflito, log, rate limit, partidas, OAuth completo,
+  webhook) e `apps/web/test/deeplink.test.ts` (o `?deck=` do construtor, `apps/web/src/deeplink.ts`).
 
 ---
 
@@ -1309,6 +1369,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | `ONLINE_BOT_ROOMS` | `on` | transmitir o treino contra o bot (servidor joga pelo bot; exige login) |
 | `ONLINE_MAX_ROOMS` / `ONLINE_MAX_BOT_ROOMS` | `400` / `100` | tetos de salas ativas (todas / treino contra o bot transmitido) |
 | `PM2_MAX_MEMORY` | `1500M` | só em `shared/deploy.env` da VM: memória em que o pm2 reinicia o app |
+| `PARTNER_IPS` | vazio | só em `shared/deploy.env` da VM: IPs dos servidores de apps parceiros, fora do limite por IP do Nginx |
 | `NODE_ENV` | — | `production` desliga a leitura do `.env`; `test` desliga o sync |
 
 ### B. Rotas da API
@@ -1324,6 +1385,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,chat,focus,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
 | Espectador | `GET /api/online/live`, `GET /api/online/watch/:code`, `GET /api/online/rooms/:id`, `GET /api/online/rooms/:id/watch?hands=1` (SSE) |
 | Auditoria | `GET /api/matches/:id`, `GET /api/matches/:id/replay`, `POST /api/matches/:id/report`, `GET /api/reports`, `PUT /api/reports/:id` |
+| Parceiros | `GET/POST /api/tokens`, `DELETE /api/tokens/:id`, `GET /api/players/me/matches?since=&limit=&cursor=`, `GET /oauth/authorize`, `GET/POST /api/oauth/consent`, `POST /api/oauth/token`, `POST /api/oauth/revoke` |
 | Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/{drop,reinstate}`, `PUT /api/tournaments/:id/late`, `POST /api/tournaments/:id/matches/:m/play` |
 
 Corpos, filtros e códigos de erro estão descritos no `README.md` (seção "API").
@@ -1337,6 +1399,7 @@ npm run cards:import -- ST-01 OP-01        # importar coleções da optcgapi
 npm run cards:import -- --all              # tudo
 npm run cards:import -- --spoilers         # buscar spoilers e trocar por oficiais
 npm run db:seed                            # reaplicar decks prontos / cartas provisórias / traduções
+npm run oauth:client -- add sweetapp "sweetapp" --redirect https://… [--scopes "…"] [--webhook https://…]  # cliente OAuth (parceiros)
 npm run translations:check -w @gumgum/server
 npm run cards:check-official -w @gumgum/server
 npm run simulate -w @gumgum/engine -- 500  # N partidas bot x bot (bot heurístico)

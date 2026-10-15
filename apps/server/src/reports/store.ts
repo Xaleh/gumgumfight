@@ -30,7 +30,7 @@ export interface MatchSummary {
 }
 
 type MatchRow = { id: number; queue: string | null; format: string | null; winner: number | null; turns: number | null; reason: string | null; created_at: string };
-type SeatRow = { seat: number; name: string | null; owner_hash: string | null; leader: string; deck_id: string | null; won: number };
+type SeatRow = { seat: number; name: string | null; owner_hash: string | null; leader: string; deck_id: string | null; deck_hash: string; won: number };
 type GameRow = { tournament_id: string; name: string; match_id: number; game: number; round: number; table_no: number };
 
 const userOf = (ownerHash: string | null) => (ownerHash?.startsWith('user:') ? ownerHash.slice('user:'.length) : null);
@@ -38,7 +38,7 @@ const userOf = (ownerHash: string | null) => (ownerHash?.startsWith('user:') ? o
 function seats(db: DB, matchId: number): SeatRow[] {
   return db
     .prepare(
-      `SELECT ms.seat, p.name, p.owner_hash, ms.leader, ms.deck_id, ms.won
+      `SELECT ms.seat, p.name, p.owner_hash, ms.leader, ms.deck_id, ms.deck_hash, ms.won
        FROM match_seats ms LEFT JOIN players p ON p.id = ms.player_id WHERE ms.match_id = ? ORDER BY ms.seat`,
     )
     .all(matchId) as SeatRow[];
@@ -74,6 +74,29 @@ export function matchSummary(db: DB, matchId: number): MatchSummary | null {
   };
 }
 
+/**
+ * O que o resumo para parceiros precisa além de `matchSummary`: o modo, quem começou, a versão
+ * do replay, a chave do motivo e a lista exata (hash) de cada lado.
+ */
+export function matchExtra(db: DB, matchId: number): { mode: string; firstPlayer: number | null; replayVersion: number; reasonKey: string | null; deckHashes: string[] } {
+  const m = db.prepare('SELECT mode, first_player, replay FROM matches WHERE id = ?').get(matchId) as
+    | { mode: string; first_player: number | null; replay: string | null }
+    | undefined;
+  let stored: { version?: number; legacySetup?: boolean; reasonKey?: string | null } = {};
+  try {
+    stored = m?.replay ? (JSON.parse(m.replay) as typeof stored) : {};
+  } catch {
+    /* replay antigo ilegível: só os campos da tabela */
+  }
+  return {
+    mode: m?.mode ?? 'bot',
+    firstPlayer: m?.first_player ?? null,
+    replayVersion: stored.version ?? (stored.legacySetup ? 8 : REPLAY_VERSION),
+    reasonKey: stored.reasonKey ?? null,
+    deckHashes: seats(db, matchId).map((s) => s.deck_hash),
+  };
+}
+
 /** Contas que jogaram a partida. */
 export function matchUsers(db: DB, matchId: number): string[] {
   return seats(db, matchId)
@@ -96,10 +119,16 @@ export function matchReplay(db: DB, matchId: number): Record<string, unknown> | 
     version?: number;
     names?: string[];
     deckIds?: Array<string | null>;
+    winner?: number | null;
+    reasonKey?: string | null;
   };
   const ss = seats(db, matchId);
+  const m = db.prepare('SELECT winner FROM matches WHERE id = ?').get(matchId) as { winner: number | null };
   return {
     format: 'gumgumfight-replay',
+    /** Assento vencedor (null = sem vencedor) e a chave do motivo, para ler o resultado sem rodar o motor. */
+    winner: stored.winner ?? m.winner,
+    reasonKey: stored.reasonKey ?? null,
     // Partidas gravadas antes de o replay guardar a versão: a preparação antiga marca as anteriores à 9.
     version: stored.version ?? (stored.legacySetup ? 8 : REPLAY_VERSION),
     seed: stored.seed,

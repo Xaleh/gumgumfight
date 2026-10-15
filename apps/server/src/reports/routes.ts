@@ -14,6 +14,7 @@ import type { DB } from '../db';
 import { fail } from '../errors';
 import { pushText } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
+import { seatCards } from '../partners/matches';
 import { getTournament } from '../tournaments/store';
 import {
   createReport,
@@ -21,6 +22,7 @@ import {
   listReports,
   markReportNotified,
   type MatchReport,
+  matchExtra,
   matchReplay,
   matchSummary,
   matchUsers,
@@ -53,8 +55,11 @@ export function registerReportRoutes(app: FastifyInstance, { db, user, notifier 
   };
   const withMatch = (r: MatchReport) => ({ ...r, match: matchSummary(db, r.matchId) });
 
-  /** Replay de uma partida gravada: para quem jogou, para quem audita o torneio e para admins. */
-  app.get<{ Params: { id: string } }>('/api/matches/:id/replay', async (req, reply) => {
+  /**
+   * Replay de uma partida gravada: para quem jogou, para quem audita o torneio e para admins.
+   * Com token de parceiro (matches:read), só para quem jogou.
+   */
+  app.get<{ Params: { id: string } }>('/api/matches/:id/replay', { config: { scope: 'matches:read' } }, async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
     const id = Number(req.params.id);
@@ -67,15 +72,38 @@ export function registerReportRoutes(app: FastifyInstance, { db, user, notifier 
     return replay ?? reply.code(404).send(fail('noReplay', 'Esta partida não tem replay gravado.'));
   });
 
-  /** Resumo de uma partida gravada (mesmas regras de acesso do replay). */
-  app.get<{ Params: { id: string } }>('/api/matches/:id', async (req, reply) => {
+  /**
+   * Resumo de uma partida gravada (mesmas regras de acesso do replay), com as cartas de cada
+   * lado (`seats`): o próprio lado vem completo; o do oponente vem com `cards: null`, salvo
+   * em torneio já encerrado (listas públicas) ou para quem audita. `you` é o assento de quem pede.
+   */
+  app.get<{ Params: { id: string } }>('/api/matches/:id', { config: { scope: 'matches:read' } }, async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
     const id = Number(req.params.id);
     const m = matchSummary(db, id);
     if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
-    if (!matchUsers(db, id).includes(me.id) && !audits(me, m.tournament?.id ?? null)) return reply.code(403).send(fail('matchOfOthers', 'Partida de outros jogadores.'));
-    return { ...m, reports: audits(me, m.tournament?.id ?? null) ? listReports(db, { status: 'all' }).filter((r) => r.matchId === id) : [] };
+    const auditor = audits(me, m.tournament?.id ?? null);
+    const you = m.players.find((p) => p.userId === me.id)?.seat ?? null;
+    if (you === null && !auditor) return reply.code(403).send(fail('matchOfOthers', 'Partida de outros jogadores.'));
+    const extra = matchExtra(db, id);
+    const listsPublic = auditor || (m.tournament ? getTournament(db, m.tournament.id)?.status === 'finished' : false);
+    const seats = m.players.map((p) => ({
+      seat: p.seat,
+      leader: p.leader,
+      deckHash: extra.deckHashes[p.seat] ?? null,
+      cards: p.seat === you || listsPublic ? seatCards(db, id, p.seat) : null,
+    }));
+    return {
+      ...m,
+      mode: extra.mode,
+      firstPlayer: extra.firstPlayer,
+      replayVersion: extra.replayVersion,
+      reasonKey: extra.reasonKey,
+      you,
+      seats,
+      reports: auditor ? listReports(db, { status: 'all' }).filter((r) => r.matchId === id) : [],
+    };
   });
 
   /**

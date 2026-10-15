@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { audio } from './audio';
+import { ConnectedApps } from './components/ConnectedApps';
 import { Flag } from './components/Flags';
 import { InstallButton } from './components/Install';
 import { DEFAULT_LOCALE, detectLocale, I18nProvider, isLocale, type Locale, LOCALES, type MessageKey, useT } from './i18n';
@@ -327,7 +328,7 @@ function VolumeControl({ kind }: { kind: 'sfxVolume' | 'musicVolume' }) {
 }
 
 /** Uma opção do modal: título e explicação à esquerda, controle à direita. */
-function OptionRow({ title, hint, disabled, children }: { title: string; hint?: string; disabled?: boolean; children: ReactNode }) {
+function OptionRow({ title, hint, disabled, children }: { title: string; hint?: string; disabled?: boolean; children?: ReactNode }) {
   return (
     <div className={['option-row', disabled ? 'disabled' : ''].join(' ')}>
       <div className="option-text">
@@ -615,6 +616,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </OptionRow>
             <NotificationRows />
             <InstallRow />
+            <OptionRow title={t('settings.apps')} hint={t('settings.appsHint')} />
+            <ConnectedApps />
           </div>
           <p className="muted small">{t('settings.footer')}</p>
         </div>

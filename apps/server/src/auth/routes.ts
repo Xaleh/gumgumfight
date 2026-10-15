@@ -3,8 +3,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { DB } from '../db';
 import { fail } from '../errors';
+import { tierFor } from '../stats/catalog';
+import { findPlayer } from '../stats/store';
 import { type GoogleKeys, LoginError, verifyGoogleIdToken } from './google';
 import {
+  accountOwnerKey,
   claimBrowserData,
   createSession,
   deleteSession,
@@ -71,8 +74,12 @@ export const MAX_PICTURE_BYTES = 256 * 1024;
 
 export function registerAuth(app: FastifyInstance, { db, clientId, keys, browserHash, adminEmails = [], afterLogin = [] }: Deps) {
   const cache = new WeakMap<FastifyRequest, User | null>();
-  /** Usuário logado nesta requisição (cookie de sessão válido), ou null. */
+  /**
+   * Usuário logado nesta requisição: a conta do token de parceiro (`Authorization: Bearer`,
+   * ver partners/tokens.ts) ou a do cookie de sessão válido; null sem nenhum dos dois.
+   */
   const viewer = (req: FastifyRequest): User | null => {
+    if (req.apiAuth) return req.apiAuth.user;
     if (cache.has(req)) return cache.get(req)!;
     const token = readCookie(req, COOKIE);
     const user = token && token.length <= 128 ? sessionUser(db, token) : null;
@@ -80,8 +87,16 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
     return user;
   };
 
-  app.get('/api/auth/me', async (req) => {
+  /**
+   * Com token de parceiro: só o id da conta (sempre Player) e o perfil público de jogador;
+   * nunca e-mail, nome ou foto do Google.
+   */
+  app.get('/api/auth/me', { config: { scope: 'profile' } }, async (req) => {
     const u = viewer(req);
+    if (req.apiAuth && u) {
+      const p = findPlayer(db, accountOwnerKey(u.id));
+      return { user: { id: u.id, role: 'player' }, player: p ? { id: p.id, name: p.name, bounty: p.bounty, tier: tierFor(p.bounty).id } : null };
+    }
     return { user: u ? publicUser(u) : null };
   });
 

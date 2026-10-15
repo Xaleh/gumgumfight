@@ -177,6 +177,27 @@ INTERNAL_TOKEN=<o mesmo da produção>
 
 Rodar o `setup-vm.sh` de novo mantém essas linhas.
 
+## 8. API para parceiros (opcional)
+
+Apps parceiros (ex.: um construtor de decks) agem em nome do usuário com tokens de acesso (`Authorization: Bearer`;
+ver "API para parceiros" no `README.md`). Dois ajustes na VPS:
+
+1. **Cliente OAuth** (o botão "Vincular" no app): cadastre o app pela linha de comando, no servidor, e passe o
+   `client_secret` (e o `webhook_secret`, se houver) por um canal seguro. Eles aparecem uma vez só:
+
+   ```bash
+   cd ~/apps/gumgumfight/current/server
+   DB_PATH=~/apps/gumgumfight/shared/gumgum.db node oauth-client-cli.mjs add sweetapp "sweetapp" \
+     --redirect https://sweetapp.example/integrations/ggf/callback --webhook https://sweetapp.example/integrations/ggf/webhook
+   DB_PATH=~/apps/gumgumfight/shared/gumgum.db node oauth-client-cli.mjs list
+   ```
+
+2. **IP do parceiro fora do limite por IP do Nginx**: todas as chamadas do app saem do servidor dele, então os
+   usuários dele somados contariam como um IP só contra os 30 req/s. Coloque o IP (ou os IPs, separados por
+   vírgula) em `PARTNER_IPS` no `deploy.env` e rode o bootstrap de novo (`SKIP_UPGRADE=1 bash
+   /root/bootstrap-hostinger.sh`), que regenera `/etc/nginx/conf.d/gumgumfight-limits.conf`. A partir daí, o limite
+   que vale para esse IP é o do app: 120 requisições por minuto por token.
+
 ## Operação
 
 ```bash
