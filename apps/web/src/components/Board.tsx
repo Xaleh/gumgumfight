@@ -44,7 +44,55 @@ interface SideProps extends BoardHandlers {
   lifeAside?: boolean;
 }
 
-const vars = (v: Record<string, string | number>) => v as CSSProperties;
+export const vars = (v: Record<string, string | number>) => v as CSSProperties;
+
+type FieldState = GameState['players'][number]['characters'][number];
+
+/** Carta em campo (Líder, Personagem ou Stage) com os DON!! anexados deitados por baixo. */
+export function FieldCard({
+  state,
+  uid,
+  fc,
+  h,
+}: {
+  state: GameState;
+  uid: string;
+  fc: FieldState;
+  h: Pick<BoardHandlers, 'canDragAttached' | 'onCard' | 'highlight' | 'onHover' | 'canDragAttacker'>;
+}) {
+  const t = useT();
+  // DON!! anexados neste turno e ainda não usados podem ser arrastados de volta para a fileira de DON!!.
+  const loose = fc.donLoose ?? 0;
+  const draggable = loose > 0 && h.canDragAttached(uid);
+  return (
+    <div className="enter field-card">
+      {fc.don > 0 && (
+        <div
+          className={['attached-don', draggable ? 'loose' : ''].join(' ')}
+          title={draggable ? t('board.attachedDonLoose', { n: fc.don, loose }) : t('board.attachedDon', { n: fc.don })}
+          data-uid={uid}
+          data-drag={draggable ? 'attached' : undefined}
+          onClick={() => h.onCard(uid)}
+        >
+          {Array.from({ length: Math.min(fc.don, 4) }, (_, i) => (
+            <span key={i} className="don-card flat" style={vars({ '--k': i })} />
+          ))}
+          <b>+{fc.don}</b>
+        </div>
+      )}
+      <CardView
+        state={state}
+        uid={uid}
+        fc={fc}
+        hideDon
+        highlight={h.highlight(uid)}
+        onClick={() => h.onCard(uid)}
+        onHover={h.onHover}
+        drag={h.canDragAttacker(uid) ? 'attacker' : undefined}
+      />
+    </div>
+  );
+}
 
 function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SideProps) {
   const t = useT();
@@ -54,39 +102,7 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
   const slots = Array.from({ length: MAX_CHARACTERS }, (_, i) => ps.characters[i] ?? null);
   const maxLife = cardDef(state, ps.leader.uid).life ?? ps.life.length;
 
-  const fieldCard = (uid: string, fc: (typeof ps.characters)[number]) => {
-    // DON!! anexados neste turno e ainda não usados podem ser arrastados de volta para a fileira de DON!!.
-    const loose = fc.donLoose ?? 0;
-    const draggable = loose > 0 && h.canDragAttached(uid);
-    return (
-      <div key={uid} className="enter field-card">
-        {fc.don > 0 && (
-          <div
-            className={['attached-don', draggable ? 'loose' : ''].join(' ')}
-            title={draggable ? t('board.attachedDonLoose', { n: fc.don, loose }) : t('board.attachedDon', { n: fc.don })}
-            data-uid={uid}
-            data-drag={draggable ? 'attached' : undefined}
-            onClick={() => h.onCard(uid)}
-          >
-            {Array.from({ length: Math.min(fc.don, 4) }, (_, i) => (
-              <span key={i} className="don-card flat" style={vars({ '--k': i })} />
-            ))}
-            <b>+{fc.don}</b>
-          </div>
-        )}
-        <CardView
-          state={state}
-          uid={uid}
-          fc={fc}
-          hideDon
-          highlight={h.highlight(uid)}
-          onClick={() => h.onCard(uid)}
-          onHover={h.onHover}
-          drag={h.canDragAttacker(uid) ? 'attacker' : undefined}
-        />
-      </div>
-    );
-  };
+  const fieldCard = (uid: string, fc: FieldState) => <FieldCard key={uid} state={state} uid={uid} fc={fc} h={h} />;
 
   const life = (
     <div className="zone life-zone" title={t('board.lifeTitle', { n: ps.life.length })}>
@@ -463,7 +479,8 @@ export function HandFan({
 }: Pick<BoardHandlers, 'highlight' | 'onCard' | 'onCardDouble' | 'onHover'> & {
   state: GameState;
   player: PlayerId;
-  position: 'top' | 'bottom';
+  /** `left`/`right`: mesa lateral, o leque segurado na borda da tela. */
+  position: 'top' | 'bottom' | 'left' | 'right';
   closing?: boolean;
 }) {
   const t = useT();

@@ -10,6 +10,8 @@ export type { Locale };
 /** `system` segue o tema do aparelho (prefers-color-scheme). */
 export type Theme = 'system' | 'light' | 'dark';
 
+export type StreamerLayout = 'lateral' | 'upright';
+
 export interface Settings {
   /** Idioma da interface. O texto das cartas sai traduzido só em pt-BR; nos demais, o original em inglês. */
   locale: Locale;
@@ -29,6 +31,8 @@ export interface Settings {
   theme: Theme;
   /** Online: mostrar as mensagens e os emotes que o oponente manda. */
   opponentChat: boolean;
+  /** Visão do Streamer: mesa lateral (jogadores à esquerda e à direita, 2.5D) ou em pé. */
+  streamerLayout: StreamerLayout;
   /** Volume dos efeitos sonoros (0 = mudo … 1). */
   sfxVolume: number;
   /** Volume da música de fundo (0 = mudo … 1). */
@@ -80,6 +84,7 @@ const DEFAULTS: Settings = {
   coachTips: false,
   theme: 'system',
   opponentChat: true,
+  streamerLayout: 'lateral',
   sfxVolume: 0.8,
   musicVolume: 0.5,
   keepAwake: true,
@@ -120,6 +125,7 @@ function load(): Settings {
       ...saved,
       locale: savedLocale(saved),
       theme,
+      streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
       serverImages: false,
       pushKey: null,
       sfxVolume: volume(saved.sfxVolume, DEFAULTS.sfxVolume),
