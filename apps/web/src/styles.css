@@ -11548,6 +11548,20 @@ a.sponsor-card:hover {
   display: grid;
   place-items: center;
 }
+/*
+ * A carta em pé é mais alta que a caixa deitada: a célula da grade fica do tamanho da caixa (e não do
+ * conteúdo), para a carta ser centrada nela e, girada, coincidir com a caixa e com a aura do Líder.
+ */
+.lat-leader,
+.lat-stage,
+.lat-slot,
+.lat-side,
+.lat-don,
+.lat-trash-card,
+.lat-life-card {
+  grid-template-columns: 100%;
+  grid-template-rows: 100%;
+}
 .lat-leader > .field-card,
 .lat-stage > .field-card,
 .lat-slot > .field-card {
