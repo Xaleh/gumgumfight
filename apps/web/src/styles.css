@@ -11207,7 +11207,7 @@ a.sponsor-card:hover {
 .game.streamer.lateral .mat {
   --hud-h: 54px;
   --lat-h: calc(100cqh - 2 * var(--hud-h) - 40px);
-  --cw: max(38px, min(calc(var(--lat-h) / 9.4), calc((100cqw - 120px) / 12.6), 150px));
+  --cw: max(38px, min(calc(var(--lat-h) / 7.9), calc((100cqw - 120px) / 13.6), 150px));
   /* espaçamentos de cada lado: cost area → Líder e Líder → Personagens (crescem até o limite com a tela larga) */
   --g1: calc(var(--cw) * 0.7);
   --g2: calc(var(--cw) * 0.35);
@@ -11283,7 +11283,7 @@ a.sponsor-card:hover {
 .lat-table {
   position: relative;
   height: var(--lat-h);
-  width: min(100%, calc(var(--cw) * 15.8));
+  width: min(100%, calc(var(--cw) * 16.8));
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -11313,7 +11313,7 @@ a.sponsor-card:hover {
   box-sizing: border-box;
   display: grid;
   /* os espaços entre as colunas crescem com a tela, até um limite; a sobra fica nas pontas */
-  grid-template-columns: var(--ch) minmax(var(--g1), calc(var(--cw) * 1.3)) var(--cw) minmax(var(--g2), calc(var(--cw) * 1.3)) var(--cw);
+  grid-template-columns: var(--ch) minmax(var(--g1), calc(var(--cw) * 1.3)) var(--ch) minmax(var(--g2), calc(var(--cw) * 1.3)) var(--ch);
   grid-template-areas: 'cost . mid . chars';
   justify-content: space-between;
   align-items: stretch;
@@ -11533,13 +11533,30 @@ a.sponsor-card:hover {
   grid-row: 3;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--cw) * 0.3);
+  gap: calc(var(--cw) * 0.35);
 }
+/*
+ * Como na mesa de verdade vista de cima: a carta ativa fica deitada, com o topo apontando para o
+ * oponente (o jogador a lê do seu lado), e a carta virada fica em pé. Cada espaço é uma caixa deitada
+ * (ch × cw); a carta gira dentro dela, e a virada gira de volta.
+ */
 .lat-leader,
 .lat-stage,
 .lat-slot {
-  width: var(--cw);
-  height: var(--ch);
+  width: var(--ch);
+  height: var(--cw);
+  display: grid;
+  place-items: center;
+}
+.lat-leader > .field-card,
+.lat-stage > .field-card,
+.lat-slot > .field-card {
+  rotate: 90deg;
+}
+.lat-leader > .field-card > .card.rested,
+.lat-stage > .field-card > .card.rested,
+.lat-slot > .field-card > .card.rested {
+  transform: rotate(-90deg);
 }
 .lat-leader.active::after {
   content: '';
@@ -11550,15 +11567,16 @@ a.sponsor-card:hover {
   box-shadow: 0 0 14px rgba(255, 190, 40, 0.5);
   pointer-events: none;
 }
-.lat-stage > .slot-empty {
+.lat-stage > .slot-empty,
+.lat-slot > .slot-empty {
   width: var(--cw);
   height: var(--ch);
+  rotate: 90deg;
 }
 .lat-deck {
   grid-row: 5;
   width: var(--ch);
   height: var(--cw);
-  margin-left: calc((var(--cw) - var(--ch)) / 2);
 }
 
 /* Personagens: coluna de 5, abaixo da fileira de Vida, encostada no meio da mesa */
@@ -11566,8 +11584,8 @@ a.sponsor-card:hover {
   position: relative;
   padding-top: calc(var(--cw) * 1.25);
   display: grid;
-  grid-template-rows: repeat(5, var(--ch));
-  row-gap: calc(var(--cw) * 0.1);
+  grid-template-rows: repeat(5, var(--cw));
+  row-gap: calc(var(--cw) * 0.18);
   align-content: start;
 }
 .lat-chars > .lat-label {
@@ -11685,9 +11703,9 @@ a.sponsor-card:hover {
 .hand-fan.right .hand-card > .fan-flip > .fan-face .card {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
 }
-/* carta virada (deitada) do mesmo tamanho das outras: na mesa lateral há espaço ao lado das colunas */
+/* carta virada: em pé (gira de volta dentro do espaço deitado), do mesmo tamanho das outras */
 .game.streamer.lateral .card.rested {
-  transform: rotate(90deg);
+  transform: rotate(-90deg);
 }
 /* a faixa de turno fica abaixo do logo, sobre a mensagem da faixa central */
 .game.streamer.lateral .turn-banner {

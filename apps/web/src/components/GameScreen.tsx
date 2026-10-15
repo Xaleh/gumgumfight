@@ -456,7 +456,9 @@ function Table({
   /**
    * Cartas que o oponente revelou (busca no deck, carta da mão, topo do deck…): aparecem na mesa até o
    * jogador fechar. Sem isso só o histórico dizia qual carta foi, e a carta some na mão do oponente.
-   * Não aparece para quem escolheu a carta (já a viu), no tutorial nem para quem só assiste.
+   * Não aparece para quem escolheu a carta (já a viu), no tutorial, no replay nem na tela de transmissão
+   * (ninguém fecha). Para quem assiste (o streamer) aparecem as revelações dos dois lados, e somem
+   * sozinhas depois de um tempo.
    */
   const [reveals, setReveals] = useState<RevealLine[]>([]);
   const revealSeen = useRef(state.log.length);
@@ -468,7 +470,7 @@ function Table({
     }
     const fresh = state.log.slice(revealSeen.current);
     revealSeen.current = state.log.length;
-    if (game.jumped || tutorial || human === null) return;
+    if (game.jumped || tutorial || broadcast || (human === null && !spectator)) return;
     const lines = fresh.flatMap((e): RevealLine[] => {
       if (!e.revealed?.length || e.revealedBy === human) return [];
       const cards = e.revealed.map((id) => state.defs[id]).filter((d): d is CardDef => Boolean(d));
@@ -476,6 +478,12 @@ function Table({
     });
     if (lines.length) setReveals((r) => [...r, ...lines]);
   }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Quem assiste não precisa clicar: o aviso some sozinho (o streamer pode fechar antes).
+  useEffect(() => {
+    if (!spectator || reveals.length === 0) return;
+    const timer = setTimeout(() => setReveals([]), 12_000);
+    return () => clearTimeout(timer);
+  }, [spectator, reveals]);
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
