@@ -138,12 +138,15 @@ export function TournamentBanner({
   onOpen,
   onPlay,
   onCheckIn,
+  onReady,
 }: {
   entry: TournamentMine;
   onOpen: () => void;
   /** Entra na sala da partida (devolve o assento). */
   onPlay: () => Promise<OnlineSeat>;
   onCheckIn: () => Promise<unknown>;
+  /** "Estou pronto" enquanto o organizador não inicia a rodada. */
+  onReady?: (ready: boolean) => Promise<unknown>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -168,6 +171,13 @@ export function TournamentBanner({
       ? t('home.checkedInStarts', { time: clockTime(entry.startsAt, locale) })
       : t('home.confirmPresence', { time: clockTime(entry.startsAt, locale) });
     action = entry.checkedIn ? { label: t('home.openTournament'), run: onOpen } : { label: t('home.doCheckIn'), run: () => act(onCheckIn) };
+  } else if (pending && entry.roundStarted === false) {
+    const params = { name: entry.name, label: entry.label, table: m.table, opponent: m.opponent, game: m.game };
+    title = m.bestOf > 1 ? t('home.matchTitleGame', params) : t('home.matchTitle', params);
+    sub = t('tour.waitingBegin');
+    action = onReady
+      ? { label: m.ready ? t('tour.readyOn') : t('tour.readyBtn'), run: () => act(() => onReady(!m.ready)) }
+      : { label: t('home.openTournament'), run: onOpen };
   } else if (pending) {
     const params = { name: entry.name, label: entry.label, table: m.table, opponent: m.opponent, game: m.game };
     title = m.bestOf > 1 ? t('home.matchTitleGame', params) : t('home.matchTitle', params);

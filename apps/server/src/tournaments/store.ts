@@ -2,6 +2,7 @@
 
 import { randomBytes } from 'node:crypto';
 import type { DeckList } from '@gumgum/engine';
+import { isAdmin, type User } from '../auth/store';
 import { dataVersion } from '../cache';
 import { type DB, transaction } from '../db';
 import type { FormatId } from '../stats/catalog';
@@ -32,16 +33,22 @@ export interface Tournament {
   maxPlayers: number | null;
   startsAt: string | null;
   /**
-   * Torneio com hora marcada: check-in 30 min antes, começa sozinho em `startsAt` e,
-   * em cada rodada, quem não entra na sala em 5 min perde por W.O. (ver clock.ts).
+   * Torneio com hora marcada: check-in 30 min antes e, em cada rodada iniciada, quem não
+   * entra na sala em `toleranceMin` minutos perde por W.O. (ver clock.ts).
    */
   checkIn: boolean;
+  /** Com check-in: começa sozinho em `startsAt` (para quando o organizador não está presente). */
+  autoStart: boolean;
+  /** Warnings que um jogador pode receber antes de o organizador decidir eliminá-lo (null = sem regra). */
+  maxWarnings: number | null;
   /** Minutos para entrar na sala em cada rodada (W.O. depois disso). */
   toleranceMin: number;
   status: TournamentStatus;
   round: number;
-  /** Quando a rodada atual foi gerada (a tolerância do W.O. conta daqui). */
+  /** Quando a rodada atual foi gerada (os pareamentos aparecem; as salas ainda não abrem). */
   roundAt: string | null;
+  /** Quando o organizador iniciou a rodada atual: as salas abrem e a tolerância do W.O. conta daqui (null = à espera). */
+  roundStartedAt: string | null;
   /** A varredura de ausentes da rodada atual já foi feita. */
   roundSwept: boolean;
   /** Hora de início (`startsAt`) cujo aviso de check-in já saiu por notificação. */
@@ -75,6 +82,8 @@ export interface TournamentPlayer extends TPlayer {
   registeredAt: string;
   /** Check-in feito (torneios com hora marcada). */
   checkedInAt: string | null;
+  /** O organizador decidiu manter o jogador depois do limite de warnings (warnings dados antes disto já foram vistos). */
+  warningsReviewedAt: string | null;
 }
 
 export interface TournamentMatch extends TMatch {
@@ -89,6 +98,8 @@ export interface TournamentMatch extends TMatch {
   reportedBy: string | null;
   /** Quando p1 e p2 entraram na sala da série (presença para o W.O. automático). */
   entered: [string | null, string | null];
+  /** "Estou pronto" de p1 e p2 (sinal para o organizador iniciar a rodada). */
+  ready: [boolean, boolean];
 }
 
 export type TournamentInput = Pick<
@@ -106,6 +117,8 @@ export type TournamentInput = Pick<
   | 'maxPlayers'
   | 'startsAt'
   | 'checkIn'
+  | 'autoStart'
+  | 'maxWarnings'
   | 'toleranceMin'
   | 'official'
   | 'prize'
@@ -128,10 +141,13 @@ type TournamentRow = {
   max_players: number | null;
   starts_at: string | null;
   check_in: number;
+  auto_start: number;
+  max_warnings: number | null;
   tolerance_min: number;
   status: TournamentStatus;
   round: number;
   round_at: string | null;
+  round_started_at: string | null;
   round_wo: number;
   checkin_notice: string | null;
   organizer_id: string;
@@ -162,10 +178,13 @@ const toTournament = (r: TournamentRow): Tournament => ({
   maxPlayers: r.max_players,
   startsAt: r.starts_at,
   checkIn: Boolean(r.check_in),
+  autoStart: Boolean(r.auto_start),
+  maxWarnings: r.max_warnings ?? null,
   toleranceMin: r.tolerance_min,
   status: r.status,
   round: r.round,
   roundAt: r.round_at,
+  roundStartedAt: r.round_started_at ?? null,
   roundSwept: Boolean(r.round_wo),
   checkInNotice: r.checkin_notice ?? null,
   organizerId: r.organizer_id,
@@ -193,8 +212,9 @@ export function createTournament(db: DB, input: TournamentInput, organizerId: st
   const id = `t-${randomBytes(5).toString('hex')}`;
   db.prepare(
     `INSERT INTO tournaments (id, name, description, format, structure, rounds, swiss_best_of, top_cut, bo3_from, bo5_from,
-       max_players, starts_at, check_in, tolerance_min, official, prize, sponsor_id, priority_until, spoilers, organizer_id, quota)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       max_players, starts_at, check_in, tolerance_min, official, prize, sponsor_id, priority_until, spoilers, auto_start, max_warnings,
+       organizer_id, quota)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, ...inputValues(input), organizerId, quota ? 1 : 0);
   if (quota) db.prepare('INSERT INTO tournament_quota (tournament_id, organizer_id, created_at) VALUES (?, ?, ?)').run(id, organizerId, quota.at);
   return getTournament(db, id)!;
@@ -217,7 +237,7 @@ export function updateTournament(db: DB, id: string, input: TournamentInput) {
   db.prepare(
     `UPDATE tournaments SET name = ?, description = ?, format = ?, structure = ?, rounds = ?, swiss_best_of = ?, top_cut = ?,
        bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?, check_in = ?, tolerance_min = ?,
-       official = ?, prize = ?, sponsor_id = ?, priority_until = ?, spoilers = ?
+       official = ?, prize = ?, sponsor_id = ?, priority_until = ?, spoilers = ?, auto_start = ?, max_warnings = ?
      WHERE id = ?`,
   ).run(...inputValues(input), id);
 }
@@ -242,6 +262,8 @@ const inputValues = (i: TournamentInput) =>
     i.sponsorId,
     i.priorityUntil,
     i.spoilers ? 1 : 0,
+    i.autoStart ? 1 : 0,
+    i.maxWarnings,
   ] as const;
 
 export function deleteTournament(db: DB, id: string): boolean {
@@ -305,13 +327,15 @@ type PlayerRow = {
   dropped: number;
   registered_at: string;
   checked_in_at: string | null;
+  warnings_reviewed_at: string | null;
 };
 
 export function listPlayers(db: DB, tournamentId: string): TournamentPlayer[] {
   const rows = db
     .prepare(
       // O nome segue o perfil público (se a pessoa trocar de nome, a lista acompanha).
-      `SELECT tp.user_id, COALESCE(p.name, tp.name) AS name, tp.deck_id, tp.deck, tp.seed, tp.dropped, tp.registered_at, tp.checked_in_at
+      `SELECT tp.user_id, COALESCE(p.name, tp.name) AS name, tp.deck_id, tp.deck, tp.seed, tp.dropped, tp.registered_at, tp.checked_in_at,
+         tp.warnings_reviewed_at
        FROM tournament_players tp LEFT JOIN players p ON p.owner_hash = 'user:' || tp.user_id
        WHERE tp.tournament_id = ? ORDER BY COALESCE(tp.seed, 1e9), tp.registered_at, tp.user_id`,
     )
@@ -325,6 +349,7 @@ export function listPlayers(db: DB, tournamentId: string): TournamentPlayer[] {
     dropped: Boolean(r.dropped),
     registeredAt: r.registered_at,
     checkedInAt: r.checked_in_at,
+    warningsReviewedAt: r.warnings_reviewed_at ?? null,
   }));
 }
 
@@ -452,10 +477,12 @@ type MatchRow = {
   reported_by: string | null;
   p1_in: string | null;
   p2_in: string | null;
+  p1_ready: number;
+  p2_ready: number;
 };
 
 const MATCH_COLS =
-  'id, round, stage, table_no, p1, p2, best_of, wins1, wins2, result, next_first, room_id, match_id, reported_by, p1_in, p2_in';
+  'id, round, stage, table_no, p1, p2, best_of, wins1, wins2, result, next_first, room_id, match_id, reported_by, p1_in, p2_in, p1_ready, p2_ready';
 
 const toMatch = (r: MatchRow): TournamentMatch => ({
   id: r.id,
@@ -472,6 +499,7 @@ const toMatch = (r: MatchRow): TournamentMatch => ({
   matchId: r.match_id,
   reportedBy: r.reported_by,
   entered: [r.p1_in, r.p2_in],
+  ready: [Boolean(r.p1_ready), Boolean(r.p2_ready)],
 });
 
 export function listMatches(db: DB, tournamentId: string): TournamentMatch[] {
@@ -518,7 +546,20 @@ function writeRound(db: DB, id: string, { round, stage, bestOf, pairings }: Roun
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   pairings.forEach((p, i) => write.run(id, round, stage, i + 1, p.p1, p.p2, bestOf, p.p2 ? null : 'bye', p.p2 ? null : 'bye', at));
-  db.prepare('UPDATE tournaments SET round = ?, round_at = ?, round_wo = 0 WHERE id = ?').run(round, at, id);
+  db.prepare('UPDATE tournaments SET round = ?, round_at = ?, round_started_at = NULL, round_wo = 0 WHERE id = ?').run(round, at, id);
+}
+
+/** O organizador iniciou a rodada atual: as salas abrem e a tolerância do W.O. conta de `at`. */
+export function startRound(db: DB, id: string, at: string) {
+  dataVersion.bump();
+  db.prepare('UPDATE tournaments SET round_started_at = ? WHERE id = ? AND round_started_at IS NULL').run(at, id);
+}
+
+/** "Estou pronto" de um lado da partida (sinal para o organizador; zera a cada rodada, porque cada rodada tem partidas novas). */
+export function setReady(db: DB, tournamentId: string, id: number, side: 'p1' | 'p2', ready: boolean) {
+  dataVersion.bump();
+  const col = side === 'p1' ? 'p1_ready' : 'p2_ready';
+  db.prepare(`UPDATE tournament_matches SET ${col} = ? WHERE tournament_id = ? AND id = ?`).run(ready ? 1 : 0, tournamentId, id);
 }
 
 /** Marca que o aviso de check-in para a hora de início `startsAt` já foi enviado. */
@@ -697,4 +738,213 @@ export function reportFromGame(
        reported_by = CASE WHEN ? THEN reported_by ELSE 'game' END, updated_at = datetime('now')
      WHERE id = ?`,
   ).run(wins[0], wins[1], result, loser, game.statsMatchId, m.result ? 1 : 0, m.id);
+}
+
+// ------------------------------------------------------------------ Judges
+
+export interface TournamentJudge {
+  userId: string;
+  name: string;
+  addedAt: string;
+}
+
+export function listJudges(db: DB, tournamentId: string): TournamentJudge[] {
+  const rows = db
+    .prepare(
+      `SELECT j.user_id, COALESCE(p.name, '?') AS name, j.added_at FROM tournament_judges j
+       LEFT JOIN players p ON p.owner_hash = 'user:' || j.user_id WHERE j.tournament_id = ? ORDER BY j.added_at, j.user_id`,
+    )
+    .all(tournamentId) as Array<{ user_id: string; name: string; added_at: string }>;
+  return rows.map((r) => ({ userId: r.user_id, name: r.name, addedAt: r.added_at }));
+}
+
+export function addJudge(db: DB, tournamentId: string, userId: string, addedBy: string, at: string) {
+  dataVersion.bump();
+  db.prepare('INSERT OR IGNORE INTO tournament_judges (tournament_id, user_id, added_by, added_at) VALUES (?, ?, ?, ?)').run(
+    tournamentId,
+    userId,
+    addedBy,
+    at,
+  );
+}
+
+export function removeJudge(db: DB, tournamentId: string, userId: string): boolean {
+  dataVersion.bump();
+  return Number(db.prepare('DELETE FROM tournament_judges WHERE tournament_id = ? AND user_id = ?').run(tournamentId, userId).changes) > 0;
+}
+
+/** A conta é Judge deste torneio (está na lista do organizador). */
+export function isListedJudge(db: DB, tournamentId: string, userId: string): boolean {
+  return Boolean(db.prepare('SELECT 1 FROM tournament_judges WHERE tournament_id = ? AND user_id = ?').get(tournamentId, userId));
+}
+
+/**
+ * Quem faz o papel de Judge num torneio: os Judges da lista, o organizador (com ou sem
+ * lista: sem nenhum Judge escolhido, ele é o Judge) e quem administra o site.
+ */
+export function actsAsJudge(db: DB, t: Pick<Tournament, 'id' | 'organizerId'>, user: Pick<User, 'id' | 'role'> | null | undefined): boolean {
+  if (!user) return false;
+  if (isAdmin(user.role) || user.id === t.organizerId) return true;
+  return isListedJudge(db, t.id, user.id);
+}
+
+// ------------------------------------------------------------------ chamados de Judge
+
+export interface TournamentCall {
+  id: number;
+  matchId: number;
+  roomId: string | null;
+  game: number;
+  openedBy: string;
+  openedAt: string;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  note: string | null;
+}
+
+type CallRow = {
+  id: number;
+  match_id: number;
+  room_id: string | null;
+  game: number;
+  opened_by: string;
+  opened_at: string;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  note: string | null;
+};
+
+const toCall = (r: CallRow): TournamentCall => ({
+  id: r.id,
+  matchId: r.match_id,
+  roomId: r.room_id,
+  game: r.game,
+  openedBy: r.opened_by,
+  openedAt: r.opened_at,
+  resolvedBy: r.resolved_by,
+  resolvedAt: r.resolved_at,
+  note: r.note,
+});
+
+const CALL_COLS = 'id, match_id, room_id, game, opened_by, opened_at, resolved_by, resolved_at, note';
+
+export function listCalls(db: DB, tournamentId: string): TournamentCall[] {
+  return (db.prepare(`SELECT ${CALL_COLS} FROM tournament_calls WHERE tournament_id = ? ORDER BY opened_at DESC, id DESC`).all(tournamentId) as CallRow[]).map(
+    toCall,
+  );
+}
+
+/** Chamado ainda aberto da partida (a sala está pausada à espera do Judge). */
+export function openCall(db: DB, tournamentId: string, matchId: number): TournamentCall | null {
+  const r = db
+    .prepare(`SELECT ${CALL_COLS} FROM tournament_calls WHERE tournament_id = ? AND match_id = ? AND resolved_at IS NULL ORDER BY id DESC`)
+    .get(tournamentId, matchId) as CallRow | undefined;
+  return r ? toCall(r) : null;
+}
+
+export function createCall(db: DB, tournamentId: string, c: { matchId: number; roomId: string | null; game: number; openedBy: string; at: string }): TournamentCall {
+  dataVersion.bump();
+  const { lastInsertRowid } = db
+    .prepare('INSERT INTO tournament_calls (tournament_id, match_id, room_id, game, opened_by, opened_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(tournamentId, c.matchId, c.roomId, c.game, c.openedBy, c.at);
+  return toCall(db.prepare(`SELECT ${CALL_COLS} FROM tournament_calls WHERE id = ?`).get(Number(lastInsertRowid)) as CallRow);
+}
+
+/** Fecha os chamados abertos da partida (a sala voltou a correr), com o relato do Judge. */
+export function resolveCalls(db: DB, tournamentId: string, matchId: number, by: string, at: string, note: string | null) {
+  dataVersion.bump();
+  db.prepare(
+    'UPDATE tournament_calls SET resolved_by = ?, resolved_at = ?, note = ? WHERE tournament_id = ? AND match_id = ? AND resolved_at IS NULL',
+  ).run(by, at, note, tournamentId, matchId);
+}
+
+// ------------------------------------------------------------------ warnings
+
+export interface TournamentWarning {
+  id: number;
+  userId: string;
+  givenBy: string;
+  givenAt: string;
+  round: number;
+  matchId: number | null;
+  callId: number | null;
+  reason: string;
+  revokedAt: string | null;
+  revokedBy: string | null;
+}
+
+type WarningRow = {
+  id: number;
+  user_id: string;
+  given_by: string;
+  given_at: string;
+  round: number;
+  match_id: number | null;
+  call_id: number | null;
+  reason: string;
+  revoked_at: string | null;
+  revoked_by: string | null;
+};
+
+const toWarning = (r: WarningRow): TournamentWarning => ({
+  id: r.id,
+  userId: r.user_id,
+  givenBy: r.given_by,
+  givenAt: r.given_at,
+  round: r.round,
+  matchId: r.match_id,
+  callId: r.call_id,
+  reason: r.reason,
+  revokedAt: r.revoked_at,
+  revokedBy: r.revoked_by,
+});
+
+const WARNING_COLS = 'id, user_id, given_by, given_at, round, match_id, call_id, reason, revoked_at, revoked_by';
+
+export function listWarnings(db: DB, tournamentId: string): TournamentWarning[] {
+  return (db.prepare(`SELECT ${WARNING_COLS} FROM tournament_warnings WHERE tournament_id = ? ORDER BY given_at, id`).all(tournamentId) as WarningRow[]).map(
+    toWarning,
+  );
+}
+
+export function addWarning(
+  db: DB,
+  tournamentId: string,
+  w: { userId: string; givenBy: string; at: string; round: number; matchId: number | null; callId: number | null; reason: string },
+): TournamentWarning {
+  dataVersion.bump();
+  const { lastInsertRowid } = db
+    .prepare('INSERT INTO tournament_warnings (tournament_id, user_id, given_by, given_at, round, match_id, call_id, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(tournamentId, w.userId, w.givenBy, w.at, w.round, w.matchId, w.callId, w.reason);
+  return toWarning(db.prepare(`SELECT ${WARNING_COLS} FROM tournament_warnings WHERE id = ?`).get(Number(lastInsertRowid)) as WarningRow);
+}
+
+/** O organizador anula um warning (ele continua no histórico, sem contar). */
+export function revokeWarning(db: DB, tournamentId: string, id: number, by: string, at: string): boolean {
+  dataVersion.bump();
+  return (
+    Number(
+      db.prepare('UPDATE tournament_warnings SET revoked_at = ?, revoked_by = ? WHERE tournament_id = ? AND id = ? AND revoked_at IS NULL').run(at, by, tournamentId, id)
+        .changes,
+    ) > 0
+  );
+}
+
+/** O organizador viu os warnings do jogador e decidiu mantê-lo (a decisão pendente some até o próximo warning). */
+export function reviewWarnings(db: DB, tournamentId: string, userId: string, at: string) {
+  dataVersion.bump();
+  db.prepare('UPDATE tournament_players SET warnings_reviewed_at = ? WHERE tournament_id = ? AND user_id = ?').run(at, tournamentId, userId);
+}
+
+/** Situação dos warnings de um jogador: quantos valem e se o organizador precisa decidir (limite atingido sem decisão). */
+export function warningStatus(
+  t: Pick<Tournament, 'maxWarnings'>,
+  p: Pick<TournamentPlayer, 'dropped' | 'warningsReviewedAt'>,
+  warnings: TournamentWarning[],
+): { count: number; limitReached: boolean; pending: boolean } {
+  const active = warnings.filter((w) => !w.revokedAt);
+  const limitReached = t.maxWarnings !== null && active.length >= t.maxWarnings;
+  const last = active[active.length - 1];
+  const pending = limitReached && !p.dropped && Boolean(last) && (!p.warningsReviewedAt || last.givenAt > p.warningsReviewedAt);
+  return { count: active.length, limitReached, pending };
 }

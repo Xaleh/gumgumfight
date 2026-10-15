@@ -379,8 +379,30 @@ export const api = {
     me: () => get<{ entries: TournamentMine[] }>('/api/tournaments/me'),
     /** Cancela a inscrição ou, com o torneio em andamento, desiste. */
     leave: (id: string) => send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/register`),
-    start: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/start`),
-    next: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/next`),
+    /** `begin`: gera a rodada e já a inicia (sem ele, os jogadores marcam "Estou pronto" e o organizador inicia depois). */
+    start: (id: string, begin = false) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/start`, { begin }),
+    next: (id: string, begin = false) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/next`, { begin }),
+    /** Inicia a rodada atual: as salas de todas as mesas abrem ao mesmo tempo. */
+    beginRound: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/rounds/begin`),
+    ready: (id: string, matchId: number, ready: boolean) =>
+      send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/ready`, { ready }),
+    lobby: (id: string) => get<TournamentLobby>(`/api/tournaments/${encodeURIComponent(id)}/lobby`),
+    addJudge: (id: string, player: string) => send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/judges`, { player }),
+    removeJudge: (id: string, userId: string) =>
+      send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/judges/${encodeURIComponent(userId)}`),
+    /** "Chamar o Judge": pausa a partida (um dos jogadores, o Judge ou o organizador). */
+    call: (id: string, matchId: number) => send<{ callId: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/call`),
+    /** O Judge (ou o organizador) retoma a partida; `note` é o relato ao organizador. */
+    resume: (id: string, matchId: number, note?: string) =>
+      send<void>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/resume`, { note }),
+    warn: (id: string, userId: string, reason: string, matchId?: number) =>
+      send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/warnings`, { reason, matchId }),
+    revokeWarning: (id: string, warningId: number) =>
+      send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/warnings/${warningId}`),
+    /** O organizador mantém no torneio quem atingiu o limite de warnings (destrava a próxima rodada). */
+    keepPlayer: (id: string, userId: string) =>
+      send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/warnings/keep`),
+    incidents: (id: string) => get<TournamentIncidents>(`/api/tournaments/${encodeURIComponent(id)}/incidents`),
     finish: (id: string) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/finish`),
     /** Placar da série [p1, p2] ([0, 0] apaga). */
     setScore: (id: string, matchId: number, wins: [number, number]) =>
@@ -426,8 +448,8 @@ export const api = {
     /** Decks dos dois jogadores (painel de decklist de quem transmite): a mesma permissão de "Ver mãos". */
     decks: (roomId: string) => get<RoomDecks>(`/api/online/rooms/${encodeURIComponent(roomId)}/decks`),
     /** `key`: tela de transmissão (fonte do OBS); a chave faz as vezes do login e as opções do streamer decidem o que ela vê. */
-    watchUrl: (roomId: string, hands: boolean, key?: string) =>
-      `/api/online/rooms/${roomId}/watch${key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
+    watchUrl: (roomId: string, hands: boolean, key?: string, judge = false) =>
+      `/api/online/rooms/${roomId}/watch${judge ? '?judge=1' : key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
     /** `showHands`: libera as mãos dos jogadores para quem transmite (streamer, com atraso). */
     createRoom: (deckId: string, format: FormatId, showHands = false) =>
       send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format, ...(showHands ? { showHands } : {}) }),
@@ -512,6 +534,8 @@ export interface WatchTarget {
   hands: boolean;
   /** Tela de transmissão: a chave do link faz as vezes do login para ver as mãos. */
   key?: string;
+  /** Judge do torneio (ou organizador): entra na sala vendo as duas mãos ao vivo, retoma a partida pausada e dá warnings. */
+  judge?: boolean;
 }
 
 export type RoomQueue = 'private' | QueueKind | 'bot' | 'tournament';
@@ -605,9 +629,11 @@ export interface OnlineRoomInfo {
   you: PlayerId | null;
   /** De quem é a visão: o seu assento, ou o do streamer que transmite a própria partida (null = pública). */
   pov?: PlayerId | null;
-  players: Array<{ name: string; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean; apprentice?: boolean }>;
+  players: Array<{ name: string; userId?: string | null; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean; apprentice?: boolean }>;
   spectators: number;
-  clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null };
+  clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null; paused?: boolean };
+  /** Partida de torneio pausada por um chamado de Judge (`by`: assento que chamou; null = o Judge/organizador). */
+  pause?: { by: PlayerId | null; at: number } | null;
   /** `error`: texto em português; mostrar com `errorMessage(result, …)`, que traduz `errorCode`. */
   result: {
     matchId: number | null;
@@ -656,8 +682,12 @@ export interface TournamentInput {
   maxPlayers: number | null;
   /** ISO. Com `checkIn`, o torneio começa sozinho nesta hora. */
   startsAt: string | null;
-  /** Check-in 30 min antes, início automático na hora e tolerância por rodada (W.O. automático). */
+  /** Check-in 30 min antes e tolerância por rodada iniciada (W.O. automático). */
   checkIn: boolean;
+  /** Com check-in: o torneio começa sozinho na hora marcada (para quando o organizador não está presente). */
+  autoStart: boolean;
+  /** Warnings que um jogador pode receber antes de o organizador ter de decidir a eliminação (null = sem regra). */
+  maxWarnings: number | null;
   /** Minutos para entrar na sala em cada rodada (1 a 60). */
   toleranceMin: number;
   /** Só admin: torneio do time (Torneio da Tripulação), prêmio, loja patrocinadora e inscrição antecipada de 48 h para Almirantes. */
@@ -682,6 +712,7 @@ export interface TournamentSummary {
   maxPlayers: number | null;
   startsAt: string | null;
   checkIn: boolean;
+  autoStart?: boolean;
   checkInOpensAt: string | null;
   organizerName: string | null;
   /** Você está inscrito. */
@@ -741,6 +772,8 @@ export interface TournamentMine {
   label: string | null;
   /** Prazo para entrar na sala na rodada atual. */
   deadline: string | null;
+  /** A rodada já foi iniciada pelo organizador (as salas abriram). */
+  roundStarted?: boolean;
   match: {
     id: number;
     table: number;
@@ -751,7 +784,115 @@ export interface TournamentMine {
     result: TournamentResult | 'bye' | 'none' | 'loss' | null;
     winner: string | null;
     room: 'waiting' | 'playing' | 'finished' | null;
+    /** Você marcou "Estou pronto". */
+    ready?: boolean;
   } | null;
+}
+
+/** Warnings de um inscrito: a contagem é pública; os motivos só para o Judge, o organizador e o próprio jogador. */
+export interface TournamentWarnings {
+  count: number;
+  max: number | null;
+  limitReached: boolean;
+  /** Para quem gerencia: atingiu o limite e falta decidir (manter ou eliminar). */
+  pending: boolean;
+  list: Array<{ id: number; reason: string; givenAt: string; round: number; byName: string; revoked: boolean }> | null;
+}
+
+/** Um lado de uma mesa do lobby. */
+export interface LobbyPlayer {
+  userId: string;
+  name: string;
+  leaderName: string | null;
+  leaderImage: string | null;
+  colors: string[];
+  checkedIn: boolean;
+  dropped: boolean;
+  warnings: { count: number; max: number | null; pending: boolean } | null;
+}
+
+export interface LobbyTable {
+  id: number;
+  table: number;
+  bestOf: number;
+  wins: [number, number];
+  game: number;
+  result: TournamentResult | 'bye' | 'none' | 'loss' | null;
+  winner: string | null;
+  reportedBy: TournamentMatchInfo['reportedBy'];
+  roomId: string | null;
+  room: 'waiting' | 'playing' | 'finished' | null;
+  /** Sala pausada por um chamado de Judge. */
+  paused: boolean;
+  p1: LobbyPlayer & LobbySide;
+  p2: (LobbyPlayer & LobbySide) | null;
+  /** Chamado de Judge aberto (`byName` só para o Judge e o organizador). */
+  call: { id: number; openedAt: string; byName: string | null } | null;
+}
+
+export interface LobbySide {
+  ready: boolean;
+  present: boolean;
+  /** Só para o Judge e o organizador (null para os outros). */
+  connected: boolean | null;
+  remaining: number | null;
+  running: boolean;
+}
+
+/** Lobby do torneio (`GET /api/tournaments/:id/lobby`). */
+export interface TournamentLobby {
+  id: string;
+  name: string;
+  status: TournamentStatus;
+  round: number;
+  label: string | null;
+  stage: TournamentStage | null;
+  roundAt: string | null;
+  roundStartedAt: string | null;
+  deadline: string | null;
+  clockMs: number;
+  startsAt: string | null;
+  checkIn: boolean;
+  autoStart: boolean;
+  checkInOpen: boolean;
+  checkedIn: number;
+  roundComplete: boolean;
+  viewer: { userId: string | null; manage: boolean; judge: boolean };
+  judges: TournamentPlayerRef[];
+  warningsPending: TournamentPlayerRef[];
+  players: LobbyPlayer[];
+  tables: LobbyTable[];
+  pendingTables: number;
+  readyTables: number;
+  /** Salas pedindo a presença do Judge agora (só o Judge e o organizador). */
+  calls: Array<{ matchId: number; table: number; roomId: string | null; openedAt: string; names: string[] }>;
+}
+
+/** Ocorrências do torneio: chamados de Judge (com o relato) e warnings. */
+export interface TournamentIncidents {
+  calls: Array<{
+    id: number;
+    matchId: number;
+    roomId: string | null;
+    game: number;
+    openedByName: string;
+    openedAt: string;
+    resolvedByName: string | null;
+    resolvedAt: string | null;
+    note: string | null;
+    match: { round: number; table: number; names: Array<string | null> } | null;
+  }>;
+  warnings: Array<{
+    id: number;
+    userId: string;
+    name: string;
+    byName: string;
+    givenAt: string;
+    round: number;
+    reason: string;
+    revokedAt: string | null;
+    match: { round: number; table: number; names: Array<string | null> } | null;
+  }>;
 }
 
 export interface TournamentPlayerRef {
@@ -780,6 +921,10 @@ export interface TournamentMatchInfo {
   room: 'waiting' | 'playing' | 'finished' | null;
   /** Cada jogador já entrou na sala da série (ou, na rodada 1, fez check-in). */
   present: [boolean, boolean];
+  /** "Estou pronto" de cada jogador (antes de a rodada começar). */
+  ready?: [boolean, boolean];
+  /** Chamado de Judge aberto: a sala está pausada à espera dele. */
+  call?: { id: number; openedAt: string; byName: string } | null;
   /** Jogos disputados nas salas desta série (todos ficam gravados). `statsMatchId`: replay, para quem pode vê-lo. */
   games: TournamentGame[];
 }
@@ -959,8 +1104,11 @@ export interface TournamentDetail {
   clockMs: number;
   maxPlayers: number | null;
   startsAt: string | null;
-  /** Torneio com hora marcada: check-in, início automático e W.O. por ausência. */
+  /** Torneio com hora marcada: check-in, início automático (opção) e W.O. por ausência. */
   checkIn: boolean;
+  autoStart: boolean;
+  /** Warnings até o organizador ter de decidir a eliminação (null = sem regra). */
+  maxWarnings: number | null;
   checkInMs: number;
   toleranceMin: number;
   toleranceMs: number;
@@ -969,6 +1117,11 @@ export interface TournamentDetail {
   /** Inscritos que já fizeram check-in. */
   checkedIn: number;
   roundAt: string | null;
+  /** A rodada atual foi iniciada pelo organizador (as salas abriram); null = pareamentos à espera do início. */
+  roundStartedAt: string | null;
+  /** Mesas da rodada atual ainda por jogar e quantas têm os dois jogadores prontos. */
+  tables: number;
+  readyTables: number;
   /** Prazo para entrar na sala na rodada atual (null = sem tolerância correndo). */
   deadline: string | null;
   createdAt: string;
@@ -984,6 +1137,14 @@ export interface TournamentDetail {
   /** Limite de jogadores que quem pede pode escolher ao editar. */
   maxPlayersCap: number;
   canManage: boolean;
+  /** Quem vê é Judge deste torneio (ou organizador/admin). */
+  isJudge: boolean;
+  /** Judges escolhidos pelo organizador (sem nenhum, o organizador é o Judge). */
+  judges: TournamentPlayerRef[];
+  /** Para quem gerencia: jogadores que atingiram o limite de warnings e esperam a decisão (a próxima rodada fica travada). */
+  warningsPending: TournamentPlayerRef[];
+  /** Chamados de Judge abertos agora (salas pausadas), para o Judge e o organizador. */
+  openCalls: Array<{ id: number; matchId: number; table: number; roomId: string | null; openedAt: string; names: string[] }>;
   canRegister: boolean;
   /** Inscrição atrasada liberada para quem vê (entra na rodada 2 com uma derrota). */
   canLateRegister: boolean;
@@ -997,7 +1158,10 @@ export interface TournamentDetail {
     leader: string;
     dropped: boolean;
     matchId: number | null;
+    /** "Estou pronto" na partida da rodada. */
+    ready: boolean;
     checkedInAt: string | null;
+    warnings: TournamentWarnings;
     /** Antes do início: por que a lista inscrita não vai valer no torneio (carta banida com data). */
     deckIssue?: { message: string; code: string; params: Params } | null;
   } | null;
@@ -1014,6 +1178,7 @@ export interface TournamentDetail {
      */
     reinstate: 'no' | 'optional' | 'required' | null;
     checkedIn: boolean;
+    warnings: TournamentWarnings;
     /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
     leader: string | null;
     leaderName: string | null;

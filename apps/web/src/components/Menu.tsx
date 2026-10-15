@@ -634,6 +634,9 @@ export function Menu({
             onOpen={() => onTournaments(myEntry.id)}
             onPlay={() => api.tournaments.play(myEntry.id, myEntry.match!.id).then((seat) => (onTournamentMatch(seat, myEntry.id), seat))}
             onCheckIn={() => api.tournaments.checkIn(myEntry.id).then(() => setMyEntry({ ...myEntry, checkedIn: true }))}
+            onReady={(ready) =>
+              api.tournaments.ready(myEntry.id, myEntry.match!.id, ready).then(() => setMyEntry({ ...myEntry, match: { ...myEntry.match!, ready } }))
+            }
           />
         )}
         {playing ? (

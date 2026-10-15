@@ -1,6 +1,7 @@
 // Relógio dos torneios com hora marcada (`check_in`): o check-in abre 30 minutos antes
-// do início; na hora marcada o torneio começa sozinho (rodada 1 sorteada entre todos os
-// inscritos, com a sala de cada mesa pronta para os dois jogadores); e em cada rodada
+// do início; com `auto_start`, na hora marcada o torneio começa sozinho (rodada 1 sorteada
+// entre todos os inscritos e iniciada na hora; sem a opção, o organizador dá o start, mesmo
+// com a hora atingida); e em cada rodada iniciada pelo organizador (`round_started_at`)
 // cada jogador tem alguns minutos para entrar na sala. Quem não entra perde por W.O. e sai
 // do torneio; se nenhum dos dois entra, os dois perdem (W.O. duplo). Na rodada 1, o
 // check-in feito antes também vale como presença. Os 5 minutos são o padrão: o
@@ -22,6 +23,7 @@ import {
   markRoundSwept,
   noShow,
   type RoundSpec,
+  startRound,
   startTournament,
   type Tournament,
   type TournamentMatch,
@@ -49,9 +51,9 @@ export const checkInOpensAt = (t: Pick<Tournament, 'checkIn' | 'startsAt'>): str
 export const checkInOpen = (t: Pick<Tournament, 'checkIn' | 'startsAt' | 'status'>, now: number): boolean =>
   t.checkIn && t.status === 'registration' && Boolean(t.startsAt) && now >= ms(t.startsAt) - CHECK_IN_MS;
 
-/** Prazo para entrar na sala na rodada atual (ISO), ou null quando não há tolerância correndo. */
-export const roundDeadline = (t: Pick<Tournament, 'checkIn' | 'status' | 'roundAt' | 'roundSwept' | 'toleranceMin'>): string | null =>
-  t.checkIn && t.status === 'running' && t.roundAt && !t.roundSwept ? new Date(ms(t.roundAt) + toleranceMs(t)).toISOString() : null;
+/** Prazo para entrar na sala na rodada atual (ISO), ou null quando não há tolerância correndo (rodada ainda não iniciada). */
+export const roundDeadline = (t: Pick<Tournament, 'checkIn' | 'status' | 'roundStartedAt' | 'roundSwept' | 'toleranceMin'>): string | null =>
+  t.checkIn && t.status === 'running' && t.roundStartedAt && !t.roundSwept ? new Date(ms(t.roundStartedAt) + toleranceMs(t)).toISOString() : null;
 
 /** Rodada da eliminatória: melhor de N pelo tamanho da fase. */
 export const elimRound = (t: Tournament, round: number, pairings: Pairing[]): RoundSpec => ({
@@ -108,8 +110,9 @@ export interface TickResult {
 }
 
 /**
- * Um passo do relógio: começa os torneios cuja hora chegou e dá W.O. a quem não entrou
- * na sala dentro da tolerância. `closeRoom`: fecha a sala em espera de uma partida decidida.
+ * Um passo do relógio: começa os torneios com início automático cuja hora chegou (a rodada 1
+ * já sai iniciada: `round_started_at`) e dá W.O. a quem não entrou na sala dentro da tolerância
+ * da rodada iniciada. `closeRoom`: fecha a sala em espera de uma partida decidida.
  */
 export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string) => void): TickResult {
   const result: TickResult = { started: [], removed: [], checkIns: [], noShows: [] };
@@ -120,7 +123,7 @@ export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string)
         result.checkIns.push(t.id);
       }
       const start = ms(t.startsAt);
-      if (Number.isNaN(start) || now < start || now - start > AUTO_START_GRACE_MS) continue;
+      if (!t.autoStart || Number.isNaN(start) || now < start || now - start > AUTO_START_GRACE_MS) continue;
       // Deck que deixou de valer (banimento com data) não joga: a inscrição é cancelada.
       // No início à mão, o organizador é avisado antes e decide (ver a rota /start).
       const stale = staleDecks(t, listPlayers(db, t.id), new Date(now));
@@ -128,11 +131,14 @@ export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string)
       if (stale.length) result.removed.push({ tournamentId: t.id, userIds: stale.map((p) => p.userId) });
       const players = listPlayers(db, t.id);
       if (players.length < 2) continue;
-      beginTournament(db, t, players, new Date(now).toISOString());
+      const at = new Date(now).toISOString();
+      beginTournament(db, t, players, at);
+      // Sem o organizador para dar o start, a rodada 1 começa na hora.
+      startRound(db, t.id, at);
       result.started.push(t.id);
       continue;
     }
-    if (t.status !== 'running' || t.roundSwept || !t.roundAt || now < ms(t.roundAt) + toleranceMs(t)) continue;
+    if (t.status !== 'running' || t.roundSwept || !t.roundStartedAt || now < ms(t.roundStartedAt) + toleranceMs(t)) continue;
     const players = listPlayers(db, t.id);
     for (const m of listMatches(db, t.id).filter((x) => x.round === t.round)) {
       const absent = absentSides(t, m, players);

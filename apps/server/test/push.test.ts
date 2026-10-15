@@ -305,6 +305,7 @@ describe('Web Push: torneios', () => {
         rounds: 2,
         startsAt: '2026-10-10T20:00:00.000Z',
         checkIn: true,
+        autoStart: true,
         toleranceMin: 10,
       })
     ).json();
@@ -334,8 +335,8 @@ describe('Web Push: torneios', () => {
 
     clock('2026-10-10T20:00:00Z');
     expect(tick(app)!.started).toEqual([t.id]);
-    expect(to(sent, 'zoro').map((p) => p.body)).toEqual(['Rodada 1: entre na sala contra Sanji em até 10 min.']);
-    expect(to(sent, 'sanji').map((p) => p.body)).toEqual(['Ronda 1: entra en la sala contra Zoro en un máximo de 10 min.']);
+    expect(to(sent, 'zoro').map((p) => p.body)).toEqual(['Rodada 1: a rodada começou! Entre na sala contra Sanji em até 10 min.']);
+    expect(to(sent, 'sanji').map((p) => p.body)).toEqual(['Ronda 1: ¡la ronda empezó! Entra en la sala contra Zoro en un máximo de 10 min.']);
     expect(to(sent, 'robin')).toEqual([]);
     sent.length = 0;
 
@@ -363,10 +364,10 @@ describe('Web Push: torneios', () => {
       await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: ['st01-luffy', 'st02-kid', 'st03-crocodile'][i] });
       await subscribe(app, p.headers, `p${i}`, { locale: 'en' });
     }
-    expect((await req(app, 'POST', `/api/tournaments/${t.id}/start`, org)).statusCode).toBe(200);
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).statusCode).toBe(200);
     const bodies = sent.map((s) => s.payload.body).sort();
     expect(bodies).toHaveLength(3);
     expect(bodies.filter((b) => b === 'Semifinal: you have a bye (automatic win).')).toHaveLength(1);
-    expect(bodies.filter((b) => /^Semifinal: your match against .+ is ready\.$/.test(b))).toHaveLength(2);
+    expect(bodies.filter((b) => /^Semifinal: the round has started! Join the room against .+\.$/.test(b))).toHaveLength(2);
   });
 });

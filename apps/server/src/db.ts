@@ -299,6 +299,67 @@ function migrateTournaments(db: DB) {
   // p1_in / p2_in: quando cada jogador entrou na sala da série (presença para o W.O. automático).
   if (!mCols.includes('p1_in')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p1_in TEXT');
   if (!mCols.includes('p2_in')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p2_in TEXT');
+  // Judge, chamados e warnings; início manual das rodadas (ver tournaments/routes.ts).
+  // auto_start: com check_in, o torneio começa sozinho na hora marcada (opção para quando o organizador não está).
+  // Antes desta coluna todo torneio com check-in começava sozinho: os já marcados continuam assim.
+  if (!tCols.includes('auto_start')) {
+    db.exec('ALTER TABLE tournaments ADD COLUMN auto_start INTEGER NOT NULL DEFAULT 0');
+    db.exec("UPDATE tournaments SET auto_start = 1 WHERE check_in = 1 AND status = 'registration'");
+  }
+  // max_warnings: warnings até a eliminação (null = o organizador decide caso a caso).
+  if (!tCols.includes('max_warnings')) db.exec('ALTER TABLE tournaments ADD COLUMN max_warnings INTEGER');
+  // round_started_at: quando o organizador iniciou a rodada atual (as salas abrem e a tolerância conta daqui);
+  // null = rodada gerada, à espera do início. Rodadas em andamento antes da coluna contam como iniciadas.
+  if (!tCols.includes('round_started_at')) {
+    db.exec('ALTER TABLE tournaments ADD COLUMN round_started_at TEXT');
+    db.exec("UPDATE tournaments SET round_started_at = round_at WHERE status = 'running'");
+  }
+  // warnings_reviewed_at: o organizador decidiu manter o jogador depois de ele atingir o limite de warnings.
+  if (!pCols.includes('warnings_reviewed_at')) db.exec('ALTER TABLE tournament_players ADD COLUMN warnings_reviewed_at TEXT');
+  // p1_ready / p2_ready: "Estou pronto" de cada jogador na rodada (sinal para o organizador iniciar).
+  if (!mCols.includes('p1_ready')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p1_ready INTEGER NOT NULL DEFAULT 0');
+  if (!mCols.includes('p2_ready')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p2_ready INTEGER NOT NULL DEFAULT 0');
+  db.exec(`
+    -- Judges de um torneio (escolhidos pelo organizador; sem nenhum, o organizador é o Judge).
+    CREATE TABLE IF NOT EXISTS tournament_judges (
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      user_id       TEXT NOT NULL REFERENCES users(id),
+      added_by      TEXT NOT NULL,
+      added_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (tournament_id, user_id)
+    );
+
+    -- Chamados de Judge: a sala fica pausada de opened_at até resolved_at (nota = relato do Judge ao organizador).
+    CREATE TABLE IF NOT EXISTS tournament_calls (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      match_id      INTEGER NOT NULL,
+      room_id       TEXT,
+      game          INTEGER NOT NULL DEFAULT 1,
+      opened_by     TEXT NOT NULL,              -- conta que chamou (jogador, Judge ou organizador)
+      opened_at     TEXT NOT NULL,
+      resolved_by   TEXT,
+      resolved_at   TEXT,
+      note          TEXT
+    );
+    CREATE INDEX IF NOT EXISTS tournament_calls_open ON tournament_calls(tournament_id, resolved_at);
+
+    -- Warnings dados pelo Judge ou pelo organizador; valem o torneio inteiro (revoked_at = anulado pelo organizador).
+    CREATE TABLE IF NOT EXISTS tournament_warnings (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      user_id       TEXT NOT NULL,
+      given_by      TEXT NOT NULL,
+      given_at      TEXT NOT NULL,
+      round         INTEGER NOT NULL DEFAULT 0,
+      match_id      INTEGER,
+      call_id       INTEGER,
+      reason        TEXT NOT NULL,
+      revoked_at    TEXT,
+      revoked_by    TEXT
+    );
+    CREATE INDEX IF NOT EXISTS tournament_warnings_player ON tournament_warnings(tournament_id, user_id);
+  `);
   db.exec(`
     -- Todos os jogos disputados nas salas de cada partida (série), para a auditoria do organizador.
     CREATE TABLE IF NOT EXISTS tournament_games (
