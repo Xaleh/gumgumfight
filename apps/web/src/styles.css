@@ -10745,9 +10745,9 @@ a.sponsor-card:hover {
   gap: 0;
 }
 /*
- * Fileira de DON!!: deck de DON!! e as cartas, grandes, à esquerda sob o Stage. A fileira reserva pouca
- * altura e transborda para a faixa de baixo (a mão aberta pode cobrir os DON!!); mais de 5 viram duas
- * fileiras menores. No lado do oponente a fileira transborda para cima.
+ * Fileira de DON!!: deck de DON!! e as cartas, grandes, à esquerda sob o Stage, numa fileira só (com
+ * muitos, as cartas se sobrepõem para caber, como nas outras mesas). A fileira reserva pouca altura e
+ * transborda para a faixa de baixo (a mão aberta pode cobrir os DON!!); no lado do oponente, para cima.
  */
 .game.streamer .don-row,
 .game.streamer .don-row.top {
@@ -10772,21 +10772,13 @@ a.sponsor-card:hover {
 .game.streamer .don-cards {
   flex: none;
   display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  width: calc(var(--dw) * 5 * 1.14 + 2px);
-  gap: calc(var(--dw) * 0.14);
+  flex-wrap: nowrap;
+  width: calc(var(--cw) * 4.5);
+  gap: 0;
 }
-.side.life-aside.top .don-cards {
-  align-content: flex-end;
-  flex-wrap: wrap-reverse;
-}
+/* a mesma sobreposição das outras mesas (a regra da mesa deitada zera a margem; aqui ela volta) */
 .game.streamer .don-cards > .don-card + .don-card {
-  margin-left: 0;
-}
-/* mais de 5 na fileira: duas fileiras de 5, menores */
-.game.streamer .don-cards.many {
-  --dw: calc(var(--cw) * 0.38);
+  margin-left: min(calc(var(--dw) * 0.12), calc((100% - var(--n) * var(--dw)) / max(var(--n) - 1, 1)));
 }
 .side.life-aside .life-zone {
   --lw: calc(var(--cw) * 1.2);

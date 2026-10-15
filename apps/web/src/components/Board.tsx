@@ -140,9 +140,8 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
       <span className="pile-count">{ps.donDeck}</span>
     </div>
   );
-  // `many`: mais de 5 na fileira (na mesa de quem transmite, viram duas fileiras menores).
   const donCards = (
-    <div className={['don-cards', onField > 5 ? 'many' : ''].join(' ')} style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
+    <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
         {Array.from({ length: ps.donActive }, (_, i) => (
           <span
             key={`a${i}`}
