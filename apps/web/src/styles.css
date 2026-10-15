@@ -10522,7 +10522,7 @@ a.sponsor-card:hover {
 .game.streamer .mat {
   /* Cada lado tem só duas linhas de cartas (Personagens e Líder): a altura manda no tamanho; a largura
      precisa caber Vida + campo + DON!! (~10 cartas) e raramente limita numa tela 16:9. */
-  --cw: max(38px, min(calc((100cqw - 40px) / 10.2), calc((100cqh - 180px) / 6.9), 150px));
+  --cw: max(38px, min(calc((100cqw - 40px) / 13.2), calc((100cqh - 180px) / 6.9), 150px));
   --ch: calc(var(--cw) * 1.396);
   --hcw: calc(var(--cw) * 1.2);
   width: 100%;
@@ -10538,8 +10538,12 @@ a.sponsor-card:hover {
   width: calc(var(--cw) * 0.86);
   height: calc(var(--cw) * 0.86 * 1.396);
 }
+/* Stage afastado à esquerda do Líder; deck e descarte afastados à direita (o oponente espelhado) */
+.game.streamer .base-side.left {
+  padding-right: calc(var(--cw) * 0.5);
+}
 .game.streamer .base-side.right {
-  padding-left: 0;
+  padding-left: calc(var(--cw) * 0.5);
 }
 
 /* faixa de cima: [menu · histórico] [mão minimizada do oponente] [faixa do oponente] e, embaixo, as etiquetas de quem assiste */
@@ -10634,9 +10638,10 @@ a.sponsor-card:hover {
 }
 
 /* ---- Vida grande numa ponta do campo, DON!! na outra ---- */
+/* As pontas dividem a sobra por igual, para o Líder e os Personagens ficarem no centro exato da tela. */
 .side.life-aside {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   grid-template-areas: none;
   align-items: center;
   column-gap: calc(var(--cw) * 0.3);
@@ -10656,19 +10661,25 @@ a.sponsor-card:hover {
   align-items: center;
   justify-content: center;
 }
-/* os DON!! na altura da linha do Líder (área de custo embaixo, como no playmat; o oponente em cima) */
+/* Vida encostada na ponta de fora; DON!! na outra ponta, na altura dos Personagens (o oponente espelhado) */
+.side.life-aside.bottom .life-col {
+  justify-self: start;
+}
 .side.life-aside.bottom .don-col {
-  align-self: end;
-  padding-bottom: calc(var(--cw) * 0.1);
+  justify-self: end;
+  align-self: start;
 }
 .side.life-aside.top .don-col {
-  align-self: start;
-  padding-top: calc(var(--cw) * 0.1);
+  justify-self: start;
+  align-self: end;
+}
+.side.life-aside.top .life-col {
+  justify-self: end;
 }
 /* bloco de DON!!: deck à esquerda, até 5 por fileira, contadores embaixo (como na mesa deitada) */
 .game.streamer .don-row,
 .game.streamer .don-row.top {
-  --dw: calc(var(--cw) * 0.46);
+  --dw: calc(var(--cw) * 0.52);
   display: grid;
   grid-template-columns: auto auto;
   grid-template-areas: 'deck cards' 'stats stats';
