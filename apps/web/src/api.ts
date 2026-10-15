@@ -423,6 +423,8 @@ export const api = {
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
+    /** Decks dos dois jogadores (painel de decklist de quem transmite): a mesma permissão de "Ver mãos". */
+    decks: (roomId: string) => get<RoomDecks>(`/api/online/rooms/${encodeURIComponent(roomId)}/decks`),
     /** `key`: tela de transmissão (fonte do OBS); a chave faz as vezes do login e as opções do streamer decidem o que ela vê. */
     watchUrl: (roomId: string, hands: boolean, key?: string) =>
       `/api/online/rooms/${roomId}/watch${key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
@@ -547,6 +549,12 @@ export interface LiveRoom {
   createdAt: number;
   /** Jogo de uma partida de torneio. */
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
+}
+
+/** Decks dos jogadores de uma sala, com as cartas usadas (painel de decklist de quem transmite). */
+export interface RoomDecks {
+  players: Array<{ name: string; bot: boolean; deck: Omit<DeckList, 'id'> }>;
+  cards: ApiCard[];
 }
 
 /** Contadores públicos do menu (só números). */

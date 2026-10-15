@@ -1055,6 +1055,36 @@ describe('modo espectador', () => {
     expect(refused.statusCode).toBe(404);
   });
 
+  it('decks da sala para o painel de decklist: só streamer/admin, só com as mãos liberadas', async () => {
+    const { app, db } = setup();
+    const { roomId } = await privateMatch(app);
+    const streamer = { cookie: login(db, 'nami', 'streamer').cookie };
+    // Sala privada sem as mãos liberadas: nem o streamer vê os decks.
+    expect((await app.inject(`/api/online/rooms/${roomId}/decks`)).statusCode).toBe(403);
+    const closed = await app.inject({ url: `/api/online/rooms/${roomId}/decks`, headers: streamer });
+    expect(closed.statusCode).toBe(403);
+    expect(closed.json().errorCode).toBe('handsTournamentOnly');
+
+    // Sala privada que liberou as mãos: os dois decks inteiros e as cartas usadas.
+    const EVE = { 'x-deck-owner': 'eve-0123456789abcdef000' };
+    const DAVE = { 'x-deck-owner': 'dave-0123456789abcdef00' };
+    const created = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: EVE, payload: { deckId: 'st01-luffy', format: 'egb', showHands: true } });
+    expect(created.statusCode, created.body).toBe(201);
+    const joined = await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: DAVE, payload: { code: created.json().code, deckId: 'st02-kid' } });
+    expect(joined.statusCode).toBe(200);
+    const open = created.json().roomId as string;
+    expect((await app.inject(`/api/online/rooms/${open}/decks`)).statusCode).toBe(403);
+    expect((await app.inject({ url: `/api/online/rooms/${open}/decks`, headers: { cookie: login(db, 'carol').cookie } })).statusCode).toBe(403);
+    const res = await app.inject({ url: `/api/online/rooms/${open}/decks`, headers: streamer });
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json();
+    expect(body.players.map((p: { deck: { leader: string } }) => p.deck.leader)).toEqual([getDeck(db, 'st01-luffy')!.leader, getDeck(db, 'st02-kid')!.leader]);
+    expect(body.players[0].deck.cards.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(50);
+    const ids = new Set(body.cards.map((c: { id: string }) => c.id));
+    for (const p of body.players) for (const c of [{ id: p.deck.leader }, ...p.deck.cards]) expect(ids.has(c.id)).toBe(true);
+    expect((await app.inject({ url: '/api/online/rooms/nope/decks', headers: streamer })).statusCode).toBe(404);
+  });
+
   it('transmitir o treino contra o bot: só com login; "Quem começa" vale na sala do servidor', async () => {
     const { app, db } = setup();
     const anon = await app.inject({ method: 'POST', url: '/api/online/bot', headers: ALICE, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' } });
