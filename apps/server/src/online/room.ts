@@ -180,6 +180,13 @@ export interface RoomData {
   startedAt?: number;
   /** Sala privada: quem criou liberou as mãos dos jogadores para quem transmite (streamer e admin, com atraso). */
   showHands?: boolean;
+  /**
+   * Partida de torneio pausada à espera do Judge (chamado de um jogador, `by` = assento, ou do
+   * próprio Judge/organizador, `by` = null): o relógio para e nenhuma jogada é aceita até `resume`.
+   */
+  pause?: { by: PlayerId | null; at: number } | null;
+  /** Pausas já feitas (`[de, até]`; `até` = null na pausa em curso), para a mesa atrasada descontar o tempo parado. */
+  pauses?: Array<[number, number | null]>;
 }
 
 export interface Connection {
@@ -191,6 +198,8 @@ export interface Connection {
   as?: PlayerId;
   /** Atraso da mesa deste espectador (ms); 0 ou ausente = ao vivo. Ver `lateDelay`. */
   delay?: number;
+  /** Judge do torneio (ou organizador): vê as duas mãos ao vivo, sem atraso, só nas salas de torneio. */
+  judge?: boolean;
   send: (event: string, data: unknown) => void;
   /** Encerra a resposta (o navegador reconecta sozinho). */
   end?: () => void;
@@ -254,8 +263,8 @@ interface LateEvent {
 }
 
 /** Atraso da mesa de uma conexão: jogadores, ao vivo; quem vê as mãos, nunca abaixo do mínimo. */
-export function lateDelay(c: Pick<Connection, 'seat' | 'hands' | 'delay'>): number {
-  if (c.seat !== null) return 0;
+export function lateDelay(c: Pick<Connection, 'seat' | 'hands' | 'delay' | 'judge'>): number {
+  if (c.seat !== null || c.judge) return 0;
   const delay = Math.min(MAX_DELAY_MS, Math.max(0, c.delay ?? 0));
   return c.hands ? Math.max(MIN_HANDS_DELAY_MS, c.delay === undefined ? HANDS_DELAY_MS : delay) : delay;
 }
@@ -296,6 +305,8 @@ export class Room {
   private aliases: Aliases | null = null;
   private readonly conns = new Set<Connection>();
   private running: PlayerId | null = null;
+  /** Pausada pelo Judge: o relógio não corre e as jogadas são recusadas (`data.pause`). */
+  private paused = false;
   private since = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
@@ -414,6 +425,8 @@ export class Room {
 
   private startClock() {
     this.running = this.state && this.state.phase !== 'gameover' ? actingPlayer(this.state) : null;
+    this.paused = Boolean(this.data.pause) && this.running !== null;
+    if (!this.paused && this.data.pause) this.data.pause = null;
     this.since = this.deps.now();
     this.awaySince = null;
     this.updatePresence();
@@ -421,17 +434,17 @@ export class Room {
     this.driveBot();
   }
 
-  /** Desconta do jogador da vez o tempo desde a última mudança. */
+  /** Desconta do jogador da vez o tempo desde a última mudança (nada durante a pausa). */
   private settle() {
     const now = this.deps.now();
-    if (this.running !== null) this.data.remaining[this.running] = Math.max(0, this.data.remaining[this.running] - (now - this.since));
+    if (this.running !== null && !this.paused) this.data.remaining[this.running] = Math.max(0, this.data.remaining[this.running] - (now - this.since));
     this.since = now;
   }
 
   private schedule() {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
-    if (this.running === null) return;
+    if (this.running === null || this.paused) return;
     const now = this.deps.now();
     const left = this.data.remaining[this.running] - (now - this.since);
     const away = this.awaySince === null ? Infinity : this.awaySince + ABANDON_MS - now;
@@ -442,7 +455,7 @@ export class Room {
   /** O relógio do jogador da vez acabou, ou ele está ausente há tempo demais. */
   private tick() {
     this.timer = null;
-    if (this.running === null || !this.state || this.state.phase === 'gameover') return;
+    if (this.running === null || this.paused || !this.state || this.state.phase === 'gameover') return;
     this.settle();
     const p = this.running;
     const now = this.deps.now();
@@ -506,6 +519,7 @@ export class Room {
   act(seat: PlayerId, seq: unknown, raw: unknown): ActResult {
     if (!this.state || !this.aliases) return { ok: false, code: 409, ...fail('matchNotStarted', 'A partida ainda não começou.') };
     if (this.state.phase === 'gameover') return { ok: false, code: 409, ...fail('matchOver', 'A partida já terminou.') };
+    if (this.paused) return { ok: false, code: 409, ...fail('roomPaused', 'A partida está pausada à espera do Judge.') };
     const action = raw as Action;
     if (!action || typeof action !== 'object' || typeof action.type !== 'string') {
       return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
@@ -536,12 +550,57 @@ export class Room {
     return { ok: true, actionCount: this.state.actionCount };
   }
 
+  // ------------------------------------------------------------------ pausa (chamado de Judge)
+
+  get isPaused() {
+    return this.paused;
+  }
+
+  /**
+   * Chamado de Judge: congela a partida. `by`: o assento que chamou (null = o próprio Judge ou o
+   * organizador). O tempo de quem estava jogando para de contar, o abandono também, e as jogadas
+   * dos dois são recusadas até `resume`; o chat continua aberto para falarem com o Judge.
+   */
+  pause(by: PlayerId | null): ActResult {
+    if (!this.state || this.state.phase === 'gameover') return { ok: false, code: 409, ...fail('matchNotStarted', 'A partida ainda não começou.') };
+    if (this.paused) return { ok: false, code: 409, ...fail('roomAlreadyPaused', 'A partida já está pausada.') };
+    this.settle();
+    const now = this.deps.now();
+    this.paused = true;
+    this.data.pause = { by, at: now };
+    (this.data.pauses ??= []).push([now, null]);
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    if (this.botTimer) clearTimeout(this.botTimer);
+    this.botTimer = null;
+    this.save();
+    this.broadcast();
+    return { ok: true, actionCount: this.state.actionCount };
+  }
+
+  /** O Judge (ou o organizador) libera a partida: o relógio volta de onde parou e o abandono recomeça do zero. */
+  resume(): ActResult {
+    if (!this.paused) return { ok: false, code: 409, ...fail('roomNotPaused', 'A partida não está pausada.') };
+    const now = this.deps.now();
+    this.paused = false;
+    this.data.pause = null;
+    const last = this.data.pauses?.[this.data.pauses.length - 1];
+    if (last && last[1] === null) last[1] = now;
+    this.since = now;
+    this.awaySince = this.running !== null && !this.connected(this.running) ? now : null;
+    this.schedule();
+    this.driveBot();
+    this.save();
+    this.broadcast();
+    return { ok: true, actionCount: this.state?.actionCount ?? 0 };
+  }
+
   /** Se a vez é do bot do servidor, agenda a jogada dele. */
   private driveBot() {
     if (this.botTimer) clearTimeout(this.botTimer);
     this.botTimer = null;
     const seat = this.running;
-    if (seat === null || !this.data.seats[seat]?.bot) return;
+    if (seat === null || this.paused || !this.data.seats[seat]?.bot) return;
     const hidden = hiddenDecision(this.state?.pending);
     const delay =
       this.deps.botDelayMs ??
@@ -634,8 +693,9 @@ export class Room {
   }
 
   attach(conn: Connection) {
-    // Mãos dos jogadores só onde são permitidas (torneio ou sala privada liberada).
+    // Mãos dos jogadores só onde são permitidas (torneio ou sala privada liberada); o Judge, só em sala de torneio.
     if (conn.hands && !this.handsAllowed) conn.hands = false;
+    if (conn.judge && this.data.queue !== 'tournament') conn.judge = false;
     if (isLate(conn)) {
       // Quem já assistia atrasado recebe o que venceu antes de quem chega agora.
       this.advanceLate();
@@ -761,10 +821,14 @@ export class Room {
     const remaining: [number, number] = [prev[1], prev[2]];
     const running = late.state.phase === 'gameover' ? null : actingPlayer(late.state);
     if (running !== null) {
+      // O tempo parado pelo Judge entre a ação anterior e este instante não conta.
+      let pausedMs = 0;
+      for (const [from, to] of this.data.pauses ?? []) pausedMs += Math.max(0, Math.min(to ?? this.deps.now(), at) - Math.max(from, prev[0]));
       // Nunca abaixo do que ele tinha na ação seguinte (o servidor pode ter ficado fora do ar no meio).
-      remaining[running] = Math.max(next ? next[1 + running] : 0, remaining[running] - Math.max(0, at - prev[0]));
+      remaining[running] = Math.max(next ? next[1 + running] : 0, remaining[running] - Math.max(0, at - prev[0] - pausedMs));
     }
-    return { remaining, running, total: TIME_BANK_MS, awaySince: null };
+    const pausedAt = this.data.pause && this.data.pause.at <= at ? this.data.pause : null;
+    return { remaining, running, total: TIME_BANK_MS, awaySince: null, paused: Boolean(pausedAt) };
   }
 
   private updatePresence() {
@@ -794,8 +858,8 @@ export class Room {
   clock() {
     const now = this.deps.now();
     const remaining = [...this.data.remaining] as [number, number];
-    if (this.running !== null) remaining[this.running] = Math.max(0, remaining[this.running] - (now - this.since));
-    return { remaining, running: this.running, total: TIME_BANK_MS, awaySince: this.awaySince };
+    if (this.running !== null && !this.paused) remaining[this.running] = Math.max(0, remaining[this.running] - (now - this.since));
+    return { remaining, running: this.running, total: TIME_BANK_MS, awaySince: this.awaySince, paused: this.paused };
   }
 
   /**
@@ -827,6 +891,8 @@ export class Room {
       pov,
       players: this.data.seats.map((s, i) => ({
         name: s.name,
+        /** Conta do jogador (para o Judge dar warning); null sem login ou bot. */
+        userId: s.bot ? null : s.userId,
         bounty: s.bounty,
         tier: s.tier,
         apprentice: Boolean(s.apprentice),
@@ -836,6 +902,8 @@ export class Room {
       })),
       spectators: this.spectators,
       clock: late ? this.lateClock(late) : this.clock(),
+      /** Pausada pelo chamado de Judge (`by`: assento que chamou; null = o Judge/organizador). */
+      pause: !late && this.paused && this.data.pause ? { by: this.data.pause.by, at: this.data.pause.at } : null,
       result: over ? this.data.result : null,
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
@@ -857,8 +925,8 @@ export class Room {
     const pov = conn.seat ?? (late || !isLate(conn) ? (conn.as ?? null) : null);
     const room = this.info(conn.seat, late, pov);
     if (!state || !this.aliases) return { room, view: null, defs: {}, log: { from: 0, entries: [] }, lastAction: null };
-    // As mãos dos dois só saem da mesa atrasada, onde são permitidas: fora disso, nada a mais.
-    const extra = late && conn.hands && this.handsAllowed ? handsOf(late.state) : [];
+    // As mãos dos dois só saem da mesa atrasada (ou ao vivo para o Judge), onde são permitidas: fora disso, nada a mais.
+    const extra = this.handsAllowed && ((late && conn.hands) || (!late && conn.judge)) ? handsOf(state) : [];
     const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra);
     const newDefs: Record<string, CardDef> = {};
     for (const [id, def] of Object.entries(defs)) {

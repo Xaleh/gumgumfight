@@ -11,10 +11,12 @@ import {
   type PublicSponsor,
   STRUCTURE_LABEL,
   type TournamentDetail,
+  type TournamentIncidents,
   type TournamentInput,
   type TournamentMatchInfo,
   type TournamentStage,
   type TournamentSummary,
+  type TournamentWarnings,
   TOURNAMENT_STATUS_LABEL,
   TIER_LABEL,
   tourFormatLabel,
@@ -33,6 +35,8 @@ import { SupportModal } from './Support';
 
 /** Kit de divulgação: carregado só quando aberto (desenho em canvas e geradores de ZIP/PDF). */
 const TournamentRecap = lazy(() => import('./TournamentRecap'));
+/** Lobby do torneio (mesas em cartões, relógios para o Judge): carregado quando aberto. */
+const TournamentLobby = lazy(() => import('./TournamentLobby'));
 
 // Neste arquivo `t` costuma ser o torneio; a função de tradução (`useT()`) se chama `tr`.
 
@@ -139,12 +143,15 @@ function rich(text: string, slots: Record<string, ReactNode>): ReactNode {
  */
 export function Tournaments({
   initialId,
+  initialLobby,
   onExit,
   onPlay,
   onWatch,
   onReplay,
 }: {
   initialId?: string;
+  /** Abre direto o lobby do torneio (toque na notificação de chamado de Judge). */
+  initialLobby?: boolean;
   onExit: () => void;
   /** Entra na sala online da partida do torneio. */
   onPlay: (seat: OnlineSeat, tournamentId: string) => void;
@@ -172,6 +179,7 @@ export function Tournaments({
     return (
       <TournamentPage
         id={openId}
+        initialLobby={initialLobby}
         onExit={onExit}
         onDeleted={() => setOpenId(null)}
         onPlay={(seat) => onPlay(seat, openId)}
@@ -383,6 +391,8 @@ function TournamentForm({
     maxPlayers: initial?.maxPlayers ?? null,
     startsAt: initial?.startsAt ?? null,
     checkIn: initial?.checkIn ?? true,
+    autoStart: initial?.autoStart ?? false,
+    maxWarnings: initial?.maxWarnings ?? null,
     toleranceMin: initial?.toleranceMin ?? 5,
     official: initial?.official ?? false,
     prize: initial?.prize ?? null,
@@ -399,7 +409,8 @@ function TournamentForm({
     setError(null);
     try {
       // Sem data de início não há check-in nem início automático.
-      const input = { ...form, checkIn: form.checkIn && Boolean(form.startsAt) };
+      const checkIn = form.checkIn && Boolean(form.startsAt);
+      const input = { ...form, checkIn, autoStart: checkIn && form.autoStart };
       onSaved(initial ? await api.tournaments.update(initial.id, input) : await api.tournaments.create(input));
     } catch (e) {
       setError(errorText(e));
@@ -571,25 +582,49 @@ function TournamentForm({
               </label>
               <p className="muted small">{tr('tour.checkInHint')}</p>
               {form.checkIn && (
-                <div className="tour-form-row">
-                  <div className="field">
-                    <label htmlFor="tour-tolerance">{tr('tour.tolerance')}</label>
-                    <input
-                      id="tour-tolerance"
-                      className="admin-search"
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={form.toleranceMin}
-                      onChange={(e) => set('toleranceMin', Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
-                    />
+                <>
+                  <div className="tour-form-row">
+                    <div className="field">
+                      <label htmlFor="tour-tolerance">{tr('tour.tolerance')}</label>
+                      <input
+                        id="tour-tolerance"
+                        className="admin-search"
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={form.toleranceMin}
+                        onChange={(e) => set('toleranceMin', Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+                      />
+                    </div>
                   </div>
-                </div>
+                  <label className="check">
+                    <input type="checkbox" checked={form.autoStart} onChange={(e) => set('autoStart', e.target.checked)} />
+                    {tr('tour.autoStartOption')}
+                  </label>
+                  <p className="muted small">{tr(form.autoStart ? 'tour.autoStartOnHint' : 'tour.autoStartOffHint')}</p>
+                </>
               )}
             </div>
           ) : (
             <p className="muted small">{tr('tour.noStartHint')}</p>
           )}
+          <div className="field">
+            <label htmlFor="tour-warnings">{tr('tour.maxWarnings')}</label>
+            <select
+              id="tour-warnings"
+              className="admin-search"
+              value={form.maxWarnings ?? ''}
+              onChange={(e) => set('maxWarnings', e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">{tr('tour.maxWarningsNone')}</option>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {tr('tour.maxWarningsN', { n })}
+                </option>
+              ))}
+            </select>
+            <p className="muted small">{tr('tour.maxWarningsHint')}</p>
+          </div>
           {form.structure === 'swiss' && <p className="muted small">{tr('tour.roundsAutoHint')}</p>}
           {admin && (
             <div className="field tour-official-form">
@@ -655,7 +690,7 @@ function TournamentForm({
 
 // ------------------------------------------------------------------ página do torneio
 
-type Tab = 'rounds' | 'standings' | 'players' | 'reports';
+type Tab = 'rounds' | 'standings' | 'players' | 'reports' | 'incidents';
 
 /** Texto do botão de avançar, conforme o próximo passo. */
 function nextLabel(tr: Translate, t: TournamentDetail): string {
@@ -670,6 +705,7 @@ function nextLabel(tr: Translate, t: TournamentDetail): string {
 
 function TournamentPage({
   id,
+  initialLobby,
   onExit,
   onDeleted,
   onPlay,
@@ -677,6 +713,7 @@ function TournamentPage({
   onReplay,
 }: {
   id: string;
+  initialLobby?: boolean;
   /** Volta para o menu principal. */
   onExit: () => void;
   onDeleted: () => void;
@@ -694,6 +731,7 @@ function TournamentPage({
   const [tab, setTab] = useState<Tab | null>(null);
   const [viewRound, setViewRound] = useState<number | null>(null);
   const [recapOpen, setRecapOpen] = useState(false);
+  const [lobbyOpen, setLobbyOpen] = useState(Boolean(initialLobby));
 
   const load = useCallback(
     () =>
@@ -728,6 +766,21 @@ function TournamentPage({
       setBusy(false);
     }
   };
+
+  if (lobbyOpen && t) {
+    return (
+      <Suspense fallback={<p className="muted">{tr('common.loading')}</p>}>
+        <TournamentLobby
+          id={t.id}
+          onClose={() => setLobbyOpen(false)}
+          onPlay={onPlay}
+          onWatch={onWatch}
+          run={run}
+          busy={busy}
+        />
+      </Suspense>
+    );
+  }
 
   if (editing && t) {
     return (
@@ -804,12 +857,26 @@ function TournamentPage({
                     t.checkInOpen
                       ? tr('tour.checkInOpen', { before: minutes(tr, t.checkInMs) })
                       : tr('tour.checkInOpensAt', { time: time(t.checkInOpensAt, locale), before: minutes(tr, t.checkInMs) }),
-                    tr('tour.autoStart', { date: dateTime(t.startsAt, locale) }),
+                    t.autoStart ? tr('tour.autoStart', { date: dateTime(t.startsAt, locale) }) : tr('tour.manualStart', { date: dateTime(t.startsAt, locale) }),
                     tr('tour.checkedInCount', { n: t.checkedIn, total: t.players.length }),
                   )}
                 </p>
               )}
               {t.checkIn && t.status === 'running' && <p className="muted small">{tr('tour.toleranceInfo', { tolerance: minutes(tr, t.toleranceMs) })}</p>}
+              {t.maxWarnings !== null && <p className="muted small">{tr('tour.maxWarningsInfo', { n: t.maxWarnings })}</p>}
+              {(t.judges.length > 0 || t.isJudge) && (
+                <p className="small tour-judges-line">
+                  <b>{tr('tour.judgesLabel')}</b> {t.judges.length ? t.judges.map((j) => j.name).join(', ') : tr('tour.judgeIsOrganizer')}
+                  {t.isJudge && <span className="tour-badge gold">{tr('tour.youAreJudge')}</span>}
+                </p>
+              )}
+              {t.status !== 'finished' && (
+                <div className="btn-row tour-lobby-row">
+                  <button className="btn primary small" onClick={() => setLobbyOpen(true)}>
+                    {t.openCalls.length ? tr('tour.openLobbyCalls', { n: t.openCalls.length }) : tr('tour.openLobby')}
+                  </button>
+                </div>
+              )}
               {(t.bo3From || t.bo5From) && (
                 <p className="muted small">
                   {tr('tour.elimLine', {
@@ -865,12 +932,21 @@ function TournamentPage({
                       </button>
                     </>
                   )}
+                  {t.status === 'running' && !t.roundStartedAt && (
+                    <button
+                      className="btn primary"
+                      disabled={busy}
+                      onClick={() => run(() => api.tournaments.beginRound(t.id), tr('tour.confirmBeginRound', { ready: t.readyTables, tables: t.tables }))}
+                    >
+                      {tr('tour.beginRound', { ready: t.readyTables, tables: t.tables })}
+                    </button>
+                  )}
                   {t.status === 'running' && (
                     <>
                       <button
                         className="btn primary"
-                        disabled={busy || !t.roundComplete}
-                        title={t.roundComplete ? undefined : tr('tour.roundIncomplete')}
+                        disabled={busy || !t.roundComplete || t.warningsPending.length > 0}
+                        title={t.roundComplete ? (t.warningsPending.length ? tr('tour.warningsPendingTitle') : undefined) : tr('tour.roundIncomplete')}
                         onClick={() =>
                           run(() => api.tournaments.next(t.id), lastRound ? tr('tour.confirmLastRound') : undefined).then(() => setViewRound(null))
                         }
@@ -902,9 +978,18 @@ function TournamentPage({
                     {tr('tour.delete')}
                   </button>
                 </div>
+                {t.status === 'running' && !t.roundStartedAt && <p className="muted small">{tr('tour.beginRoundHint')}</p>}
+                {t.warningsPending.length > 0 && (
+                  <WarningsPending t={t} busy={busy} run={run} />
+                )}
                 {t.lateWindow && <LateEntry t={t} busy={busy} run={run} />}
+                {t.status !== 'finished' && <Judges t={t} busy={busy} run={run} />}
                 {t.status === 'registration' && t.checkIn && (
-                  <p className="muted small">{tr('tour.autoStartHint', { date: dateTime(t.startsAt, locale), tolerance: minutes(tr, t.toleranceMs) })}</p>
+                  <p className="muted small">
+                    {t.autoStart
+                      ? tr('tour.autoStartHint', { date: dateTime(t.startsAt, locale), tolerance: minutes(tr, t.toleranceMs) })
+                      : tr('tour.manualStartHint', { date: dateTime(t.startsAt, locale), tolerance: minutes(tr, t.toleranceMs) })}
+                  </p>
                 )}
                 {t.status === 'finished' && <p className="muted small">{tr('recap.hint')}</p>}
                 {t.status !== 'registration' && <p className="muted small">{tr('tour.manageHint')}</p>}
@@ -933,6 +1018,11 @@ function TournamentPage({
               {t.canManage && t.status !== 'registration' && (
                 <button className={activeTab === 'reports' ? 'on' : ''} onClick={() => setTab('reports')}>
                   {t.openReports ? tr('tour.tabReportsCount', { n: t.openReports }) : tr('tour.tabReports')}
+                </button>
+              )}
+              {t.isJudge && t.status !== 'registration' && (
+                <button className={activeTab === 'incidents' ? 'on' : ''} onClick={() => setTab('incidents')}>
+                  {tr('tour.tabIncidents')}
                 </button>
               )}
             </div>
@@ -969,9 +1059,11 @@ function TournamentPage({
                       deadline={shownRound === t.round ? t.deadline : null}
                       busy={busy}
                       canDrop={t.status === 'running'}
+                      judge={t.isJudge}
+                      started={Boolean(t.roundStartedAt)}
                       onScore={(wins) => run(() => api.tournaments.setScore(t.id, m.id, wins))}
                       onDouble={(dropBoth) => run(() => api.tournaments.doubleLoss(t.id, m.id, dropBoth))}
-                      onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false })}
+                      onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(t.isJudge ? { judge: true } : {}) })}
                       onReplay={(statsMatchId) => run(() => openReplay(statsMatchId, onReplay))}
                     />
                   ))}
@@ -982,6 +1074,8 @@ function TournamentPage({
             {activeTab === 'standings' && <Standings t={t} />}
 
             {activeTab === 'reports' && t.canManage && <ReportsPanel tournament={t.id} onReplay={onReplay} />}
+
+            {activeTab === 'incidents' && t.isJudge && <Incidents t={t} busy={busy} run={run} />}
 
             {activeTab === 'players' && (
               <Players
@@ -994,6 +1088,9 @@ function TournamentPage({
                   )
                 }
                 onReinstate={(userId, restore) => run(() => api.tournaments.reinstate(t.id, userId, restore))}
+                onWarn={(userId, reason) => run(() => api.tournaments.warn(t.id, userId, reason))}
+                onRevoke={(warningId) => run(() => api.tournaments.revokeWarning(t.id, warningId))}
+                onKeep={(userId) => run(() => api.tournaments.keepPlayer(t.id, userId))}
               />
             )}
           </>
@@ -1044,6 +1141,15 @@ function MyArea({
         <p className="muted small">{tr('tour.signInToRegisterHere')}</p>
       </section>
     ) : null;
+  }
+
+  // Judge do torneio (sem gerenciá-lo): não joga o torneio.
+  if (!t.me && t.isJudge && !t.canManage && t.status !== 'finished') {
+    return (
+      <section className="menu-card tour-me">
+        <p className="small">{tr('errors.judgeCannotRegister')}</p>
+      </section>
+    );
   }
 
   if (t.status === 'registration' || late) {
@@ -1200,6 +1306,20 @@ function MyArea({
                 tr('tour.waitNextRound'),
               ].join(' ')}
             </p>
+          ) : !t.roundStartedAt ? (
+            <>
+              <p className="muted small">{tr('tour.waitingBegin')}</p>
+              <button
+                className={['btn', t.me.ready ? '' : 'primary'].join(' ')}
+                disabled={busy}
+                onClick={() => run(() => api.tournaments.ready(t.id, m.id, !t.me!.ready))}
+              >
+                {t.me.ready ? tr('tour.readyOn') : tr('tour.readyBtn')}
+              </button>
+              <p className="muted small">
+                {m.ready?.[1 - mine!] ? tr('tour.oppReady', { name: opp.name }) : tr('tour.oppNotReady', { name: opp.name })}
+              </p>
+            </>
           ) : (
             <>
               {t.deadline && (!m.present[mine!] || !m.present[1 - mine!]) && <Deadline deadline={t.deadline} mine={m.present[mine!]} />}
@@ -1223,6 +1343,7 @@ function MyArea({
           )}
         </>
       )}
+      {t.me.warnings.count > 0 && <MyWarnings w={t.me.warnings} />}
       <div className="btn-row">
         <button className="btn small" disabled={busy} onClick={() => run(() => api.tournaments.leave(t.id), tr('tour.confirmDropSelf'))}>
           {tr('tour.dropSelf')}
@@ -1360,6 +1481,8 @@ function MatchRow({
   deadline,
   busy,
   canDrop,
+  judge,
+  started,
   onScore,
   onDouble,
   onWatch,
@@ -1370,6 +1493,10 @@ function MatchRow({
   editable: boolean;
   /** Rodada atual (só nela o placar pode ser apagado). */
   current: boolean;
+  /** Quem vê é Judge: assiste vendo as mãos e o chamado aberto. */
+  judge: boolean;
+  /** A rodada já foi iniciada (antes disso, as mesas mostram quem está pronto). */
+  started: boolean;
   /** Prazo para entrar na sala (tolerância correndo): mostra quem ainda falta. */
   deadline: string | null;
   busy: boolean;
@@ -1409,12 +1536,16 @@ function MatchRow({
       <div className="tour-match-side">
         {m.result === 'none' && <span className="muted small">{tr(m.reportedBy === 'noshow' ? 'tour.doubleNoShow' : 'tour.doubleLoss')}</span>}
         {m.result && m.result !== 'none' && m.reportedBy && m.reportedBy !== 'bye' && m.reportedBy !== 'late' && <span className="muted small">{tr(REPORTED[m.reportedBy])}</span>}
+        {!m.result && m.call && <span className="tour-call-tag">{judge ? tr('tour.callOpenBy', { name: m.call.byName }) : tr('tour.callOpen')}</span>}
         {!m.result && m.room === 'playing' && (
-          <button className="btn small" onClick={onWatch}>
-            {m.bestOf > 1 ? tr('tour.watchGameN', { n: m.game }) : tr('tour.watch')}
+          <button className={['btn', 'small', m.call ? 'danger' : ''].join(' ')} onClick={onWatch}>
+            {judge ? tr('tour.watchAsJudge') : m.bestOf > 1 ? tr('tour.watchGameN', { n: m.game }) : tr('tour.watch')}
           </button>
         )}
-        {!m.result && m.room !== 'playing' && (
+        {!m.result && m.room !== 'playing' && !started && current && m.p2 && (
+          <span className="muted small">{tr('tour.readyCount', { n: (m.ready ?? []).filter(Boolean).length })}</span>
+        )}
+        {!m.result && m.room !== 'playing' && (started || !current) && (
           <span className="muted small">
             {missing.length
               ? tr('tour.missing', { names: missing.length > 1 ? tr('tour.andNames', { a: missing[0], b: missing[1] }) : missing[0] })
@@ -1543,16 +1674,27 @@ function Players({
   busy,
   onDrop,
   onReinstate,
+  onWarn,
+  onRevoke,
+  onKeep,
 }: {
   t: TournamentDetail;
   busy: boolean;
   onDrop: (userId: string, name: string) => void;
   /** Desfaz a desistência (`restore`: a partida da rodada volta a ficar pendente). */
   onReinstate: (userId: string, restore: boolean) => void;
+  /** Warning do Judge ou do organizador (com o motivo). */
+  onWarn: (userId: string, reason: string) => void;
+  /** O organizador anula um warning. */
+  onRevoke: (warningId: number) => void;
+  /** O organizador mantém quem atingiu o limite de warnings. */
+  onKeep: (userId: string) => void;
 }) {
   const tr = useT();
+  const { user } = useAuth();
   const [reinstating, setReinstating] = useState<string | null>(null);
   const [restore, setRestore] = useState(false);
+  const [warning, setWarning] = useState<{ userId: string; reason: string } | null>(null);
   if (!t.players.length) {
     return (
       <section className="menu-card">
@@ -1583,7 +1725,17 @@ function Players({
                     t.checkIn && t.status === 'registration' && p.checkedIn && tr('tour.checkedInTag'),
                   )}
                 </span>
+                {(p.warnings.count > 0 || p.warnings.pending) && <WarningDots w={p.warnings} />}
               </span>
+              {t.isJudge && t.status === 'running' && !p.dropped && p.userId !== user?.id && (
+                <button
+                  className={['btn', 'small', warning?.userId === p.userId ? 'on' : ''].join(' ')}
+                  disabled={busy}
+                  onClick={() => setWarning(warning?.userId === p.userId ? null : { userId: p.userId, reason: '' })}
+                >
+                  {tr('tour.warnBtn')}
+                </button>
+              )}
               {t.canManage && t.status !== 'finished' && !p.dropped && (
                 <button className="btn small" disabled={busy} onClick={() => onDrop(p.userId, p.name)}>
                   {tr(t.status === 'registration' ? 'tour.remove' : 'tour.drop')}
@@ -1617,6 +1769,63 @@ function Players({
                 onCancel={() => setReinstating(null)}
               />
             )}
+            {warning?.userId === p.userId && (
+              <form
+                className="tour-warn-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (warning.reason.trim().length < 3) return;
+                  onWarn(p.userId, warning.reason.trim());
+                  setWarning(null);
+                }}
+              >
+                <input
+                  className="admin-search"
+                  maxLength={300}
+                  autoFocus
+                  placeholder={tr('tour.warnReasonPlaceholder')}
+                  value={warning.reason}
+                  onChange={(e) => setWarning({ ...warning, reason: e.target.value })}
+                />
+                <button className="btn small danger" type="submit" disabled={busy || warning.reason.trim().length < 3}>
+                  {tr('tour.warnConfirm', { name: p.name })}
+                </button>
+                <button className="btn small" type="button" onClick={() => setWarning(null)}>
+                  {tr('common.cancel')}
+                </button>
+              </form>
+            )}
+            {p.warnings.pending && t.canManage && !p.dropped && (
+              <div className="tour-confirm tour-warn-pending" role="group">
+                <p className="small">{tr('tour.warnLimitReached', { name: p.name, n: p.warnings.count, max: p.warnings.max })}</p>
+                <div className="btn-row">
+                  <button className="btn small danger" disabled={busy} onClick={() => onDrop(p.userId, p.name)}>
+                    {tr('tour.eliminate')}
+                  </button>
+                  <button className="btn small primary" disabled={busy} onClick={() => onKeep(p.userId)}>
+                    {tr('tour.keepPlayer')}
+                  </button>
+                </div>
+              </div>
+            )}
+            {p.warnings.list && p.warnings.list.length > 0 && (
+              <details className="tour-warn-list">
+                <summary className="small">{tr('tour.warnHistory', { n: p.warnings.count })}</summary>
+                <ul className="small">
+                  {p.warnings.list.map((w) => (
+                    <li key={w.id} className={w.revoked ? 'muted' : ''}>
+                      {tr('tour.warnLine', { reason: w.reason, by: w.byName, round: w.round })}
+                      {w.revoked && <span className="tour-badge">{tr('tour.warnRevoked')}</span>}
+                      {!w.revoked && t.canManage && t.status !== 'finished' && (
+                        <button className="btn small" disabled={busy} onClick={() => onRevoke(w.id)}>
+                          {tr('tour.warnRevoke')}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {p.deck && (
               <details className="tour-deck">
                 <summary className="small">{tr('tour.deckList', { name: p.deck.name })}</summary>
@@ -1634,6 +1843,206 @@ function Players({
       </div>
       {t.status === 'registration' && !t.canManage && <p className="muted small">{tr('tour.decksRevealHint')}</p>}
       {t.status === 'running' && !t.canManage && <p className="muted small">{tr('tour.decksPublicHint')}</p>}
+    </section>
+  );
+}
+
+// ------------------------------------------------------------------ Judge, warnings e ocorrências
+
+/** Bolinhas de warning (●●○ = 2 de 3); sem limite, só a contagem. */
+export function WarningDots({ w }: { w: Pick<TournamentWarnings, 'count' | 'max' | 'pending' | 'limitReached'> }) {
+  const tr = useT();
+  const title = w.max !== null ? tr('tour.warnOfMax', { n: w.count, max: w.max }) : tr('tour.warnCount', { n: w.count });
+  return (
+    <span className={['warn-dots', w.limitReached ? 'limit' : '', w.pending ? 'pending' : ''].join(' ')} title={title} aria-label={title}>
+      {w.max !== null
+        ? Array.from({ length: Math.max(w.max, w.count) }, (_, i) => (
+            <span key={i} className={['warn-dot', i < w.count ? 'on' : ''].join(' ')} />
+          ))
+        : Array.from({ length: w.count }, (_, i) => <span key={i} className="warn-dot on" />)}
+      {w.pending && <span className="warn-pending-tag">{tr('tour.warnPendingTag')}</span>}
+    </span>
+  );
+}
+
+/** Os warnings de quem está vendo (na área "Sua partida"). */
+function MyWarnings({ w }: { w: TournamentWarnings }) {
+  const tr = useT();
+  return (
+    <div className="tour-my-warnings">
+      <p className="small">
+        <b>{w.max !== null ? tr('tour.myWarnings', { n: w.count, max: w.max }) : tr('tour.myWarningsNoMax', { n: w.count })}</b> <WarningDots w={w} />
+      </p>
+      {w.list && (
+        <ul className="small">
+          {w.list
+            .filter((x) => !x.revoked)
+            .map((x) => (
+              <li key={x.id}>{tr('tour.warnLine', { reason: x.reason, by: x.byName, round: x.round })}</li>
+            ))}
+        </ul>
+      )}
+      {w.limitReached && <p className="small tour-warn-limit">{tr('tour.myWarnLimit')}</p>}
+    </div>
+  );
+}
+
+/** Para o organizador: quem atingiu o limite de warnings e espera a decisão (a próxima rodada fica travada). */
+function WarningsPending({
+  t,
+  busy,
+  run,
+}: {
+  t: TournamentDetail;
+  busy: boolean;
+  run: (fn: () => Promise<TournamentDetail | void>, confirmText?: string) => Promise<void>;
+}) {
+  const tr = useT();
+  return (
+    <div className="error tour-warn-block">
+      <p className="small">{tr('tour.warningsPendingIntro')}</p>
+      {t.warningsPending.map((p) => {
+        const w = t.players.find((x) => x.userId === p.userId)?.warnings;
+        return (
+          <div key={p.userId} className="btn-row tour-warn-pending-row">
+            <b>{p.name}</b>
+            {w && <WarningDots w={w} />}
+            <button className="btn small danger" disabled={busy} onClick={() => run(() => api.tournaments.drop(t.id, p.userId), tr('tour.confirmDrop', { name: p.name }))}>
+              {tr('tour.eliminate')}
+            </button>
+            <button className="btn small primary" disabled={busy} onClick={() => run(() => api.tournaments.keepPlayer(t.id, p.userId))}>
+              {tr('tour.keepPlayer')}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Judges do torneio (organizador): adicionar pelo apelido e remover. */
+function Judges({
+  t,
+  busy,
+  run,
+}: {
+  t: TournamentDetail;
+  busy: boolean;
+  run: (fn: () => Promise<TournamentDetail | void>, confirmText?: string) => Promise<void>;
+}) {
+  const tr = useT();
+  const [name, setName] = useState('');
+  return (
+    <div className="tour-late tour-judges">
+      <h3>{tr('tour.judgesTitle')}</h3>
+      <p className="small muted">{tr('tour.judgesHint')}</p>
+      {t.judges.length > 0 ? (
+        <ul className="tour-judge-list">
+          {t.judges.map((j) => (
+            <li key={j.userId}>
+              <b>{j.name}</b>
+              <button className="btn small" disabled={busy} onClick={() => run(() => api.tournaments.removeJudge(t.id, j.userId))}>
+                {tr('tour.judgeRemove')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="small">
+          <b>{tr('tour.judgeIsOrganizer')}</b>
+        </p>
+      )}
+      <form
+        className="btn-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim()) void run(() => api.tournaments.addJudge(t.id, name.trim())).then(() => setName(''));
+        }}
+      >
+        <input
+          className="admin-search"
+          value={name}
+          maxLength={40}
+          placeholder={tr('tour.judgePlaceholder')}
+          aria-label={tr('tour.judgePlaceholder')}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button className="btn small" type="submit" disabled={busy || !name.trim()}>
+          {tr('tour.judgeAdd')}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/** Ocorrências (Judge e organizador): chamados de Judge com o relato e os warnings. */
+function Incidents({
+  t,
+  busy,
+  run,
+}: {
+  t: TournamentDetail;
+  busy: boolean;
+  run: (fn: () => Promise<TournamentDetail | void>, confirmText?: string) => Promise<void>;
+}) {
+  const tr = useT();
+  const locale = useLocale();
+  const [data, setData] = useState<TournamentIncidents | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let stop = false;
+    api.tournaments
+      .incidents(t.id)
+      .then((d) => !stop && setData(d))
+      .catch((e) => !stop && setError(errorText(e)));
+    return () => {
+      stop = true;
+    };
+  }, [t.id, t.openCalls.length, t.players]);
+  const where = (m: { round: number; table: number; names: Array<string | null> } | null) =>
+    m ? tr('tour.incidentWhere', { round: m.round, table: m.table, a: m.names[0] ?? '?', b: m.names[1] ?? '?' }) : '';
+  return (
+    <section className="menu-card tour-incidents">
+      {error && <div className="error">{error}</div>}
+      {!data && !error && <p className="muted">{tr('common.loading')}</p>}
+      {data && (
+        <>
+          <h3>{tr('tour.incidentCalls', { n: data.calls.length })}</h3>
+          {data.calls.length === 0 && <p className="muted small">{tr('tour.incidentNoCalls')}</p>}
+          <ul className="tour-incident-list">
+            {data.calls.map((c) => (
+              <li key={c.id} className={c.resolvedAt ? '' : 'open'}>
+                <b>{where(c.match)}</b>
+                <span className="small">
+                  {dots(
+                    tr('tour.incidentOpened', { name: c.openedByName, time: time(c.openedAt, locale) }),
+                    c.resolvedAt ? tr('tour.incidentResolved', { name: c.resolvedByName ?? '?', time: time(c.resolvedAt, locale) }) : tr('tour.incidentStillOpen'),
+                  )}
+                </span>
+                {c.note && <span className="small tour-incident-note">{c.note}</span>}
+              </li>
+            ))}
+          </ul>
+          <h3>{tr('tour.incidentWarnings', { n: data.warnings.length })}</h3>
+          {data.warnings.length === 0 && <p className="muted small">{tr('tour.incidentNoWarnings')}</p>}
+          <ul className="tour-incident-list">
+            {data.warnings.map((w) => (
+              <li key={w.id} className={w.revokedAt ? 'muted' : ''}>
+                <b>{w.name}</b>
+                <span className="small">
+                  {dots(tr('tour.warnLine', { reason: w.reason, by: w.byName, round: w.round }), w.match && where(w.match), time(w.givenAt, locale))}
+                </span>
+                {w.revokedAt && <span className="tour-badge">{tr('tour.warnRevoked')}</span>}
+                {!w.revokedAt && t.canManage && t.status !== 'finished' && (
+                  <button className="btn small" disabled={busy} onClick={() => run(() => api.tournaments.revokeWarning(t.id, w.id))}>
+                    {tr('tour.warnRevoke')}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

@@ -702,7 +702,7 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
   `sha256(token)`. Login apaga a sessão anterior e as expiradas.
 - **Perfis** (`users.role`): `player`, `streamer` (vê mãos ao assistir, com atraso, e usa o modo transmissão), `organizer` (cria/gerencia torneios), `admin`
   (gerencia tudo, muda perfis), `dev` (admin + telas de desenvolvimento). `ADMIN_EMAILS` promove a admin no login com
-  e-mail verificado.
+  e-mail verificado. **Judge** não é perfil da conta: é um papel por torneio (`tournament_judges`, seção 12).
 - **Migração do navegador para a conta** (`claimBrowserData`): no primeiro login, decks `user` do `owner_hash` do
   navegador passam para `user:<id>`; o perfil de estatísticas é fundido (partidas reapontadas, perfil do navegador
   apagado se a conta já tinha um).
@@ -805,6 +805,9 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   cada 5 s.
 - `GET /api/online/rooms/:id/watch` abre o SSE do espectador com `viewFor(state, null)`: campo, lixo, Vida virada para
   cima, cartas reveladas e log público. Mãos, decks e Vida virada chegam como `?`.
+- `?judge=1` (**Judge do torneio**, organizador ou admin, via `actsAsJudge`): entra em qualquer sala do torneio (até em
+  espera) vendo as duas mãos **ao vivo**, sem atraso (`Connection.judge`, `lateDelay` = 0), com o log inteiro desde o
+  começo (toda conexão nova recebe o log do 0). Fora de sala de torneio, `judge` é ignorado. Cada entrada vai para o log do servidor.
 - `?hands=1` (**Streamer**, **Admin** e **Dev**, via `seesHands`, **só onde `Room.handsAllowed`**: partida de torneio
   ou sala privada com `RoomData.showHands`, marcado por quem criou em `POST /api/online/rooms {showHands}` e mantido na
   revanche): `extra` = as duas mãos + a carta da Vida sendo olhada. Recusado (403) fora disso (`handsTournamentOnly`) e
@@ -863,16 +866,60 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   partir da qual a série é melhor de 3/5: 8 = quartas, 2 = final), `max_players` (2–256), `starts_at` (com
   `check_in`, hora do início automático), `check_in` (check-in, início automático e W.O. por ausência), `tolerance_min` (minutos para entrar na sala, 1–60), `status`
   (`registration → running → finished`), `round`, `round_at` (quando a rodada atual foi gerada), `round_wo` (a
-  varredura de ausentes da rodada já foi feita), `checkin_notice` (`starts_at` cujo aviso de check-in já saiu por
+  varredura de ausentes da rodada já foi feita), `round_started_at` (quando o organizador **iniciou** a rodada atual:
+  as salas abrem e a tolerância conta daqui; null = pareamentos gerados, à espera do início), `auto_start` (com
+  `check_in`: começa sozinho na hora marcada; opção para quando o organizador não está), `max_warnings` (warnings por
+  jogador até o organizador ter de decidir a eliminação; null = sem regra), `checkin_notice` (`starts_at` cujo aviso de check-in já saiu por
   notificação), `late_entry` (inscrição atrasada liberada: `*` = qualquer um, ou o id da conta; null = fechada),
   `organizer_id`.
 - **`tournament_players`**: `deck` é o `DeckList` **congelado** na inscrição (validado com `playableDeck` no formato),
-  `seed` = ordem sorteada no início, `dropped`, `checked_in_at`.
+  `seed` = ordem sorteada no início, `dropped`, `checked_in_at`, `warnings_reviewed_at` (o organizador decidiu manter o
+  jogador depois do limite de warnings).
+- **`tournament_judges`** (`tournament_id`, `user_id`, `added_by`, `added_at`): os Judges do torneio. **`tournament_calls`**:
+  chamados de Judge (`match_id`, `room_id`, `game`, `opened_by`, `opened_at`, `resolved_by`/`resolved_at`, `note` = o
+  relato do Judge ao organizador). **`tournament_warnings`**: `user_id`, `given_by`, `given_at`, `round`, `match_id`,
+  `call_id` (o chamado de origem, se houver), `reason`, `revoked_at`/`revoked_by` (anulado pelo organizador).
 - **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none | loss`
   (`none` = derrota dupla: W.O. duplo ou lançada pelo organizador, os dois perdem; `loss` = derrota sem oponente da
   inscrição atrasada, o espelho do bye), nunca empate), `next_first` (quem perdeu começa o próximo jogo), `room_id`
   (sala do jogo atual), `match_id` (última partida em `matches`), `reported_by` (`game`, `bye`, `drop`, `noshow`,
-  `late` ou id do organizador), `p1_in`/`p2_in` (quando cada jogador entrou na sala da série).
+  `late` ou id do organizador), `p1_in`/`p2_in` (quando cada jogador entrou na sala da série), `p1_ready`/`p2_ready`
+  ("Estou pronto" de cada um, sinal para o organizador iniciar a rodada).
+
+### Judge, chamados e warnings
+
+- **Judge** (`PUT /api/tournaments/:id/judges {player}` pelo apelido, `DELETE …/judges/:userId`; só quem gerencia): papel
+  **só daquele torneio**. Um inscrito não vira Judge (`judgeIsPlayer`) e um Judge não se inscreve (`judgeCannotRegister`).
+  `actsAsJudge` (`tournaments/store.ts`) = Judges da lista, o organizador (sem Judge escolhido, ele é o Judge) e admin/dev;
+  nas rotas, `judged()` faz as vezes de `managed()` para o que o Judge pode fazer. O detalhe traz `isJudge` e `judges`.
+- **Chamar o Judge** (`POST …/matches/:m/call`, por um dos jogadores, pelo Judge ou pelo organizador, com a sala em jogo):
+  `Room.pause(by)` congela a sala (`RoomData.pause`, gravado em `live_matches`: sobrevive a reinício): o relógio de quem
+  jogava para (`settle` não desconta, `schedule` não agenda), o abandono não conta, toda jogada é recusada (409
+  `roomPaused`); **chat e emotes continuam**. `tournament_calls` ganha o chamado e os Judges + o organizador recebem a
+  notificação (`judgeCallBody`, abre `?torneio=…&lobby=1`). `POST …/matches/:m/resume {note}` (só Judge/organizador):
+  `Room.resume()` volta o relógio de onde parou, dá 2 min novos de abandono e fecha o chamado com a nota. Resultado
+  lançado, derrota dupla ou desistência numa partida com sala pausada (`releaseRoom`) retoma a sala e fecha o chamado.
+  A mesa atrasada desconta as pausas no relógio (`RoomData.pauses`, `lateClock`).
+- **Warnings** (`POST …/players/:userId/warnings {reason, matchId?}`, Judge ou organizador; motivo obrigatório; nunca a
+  si mesmo): valem o torneio inteiro; o jogador é avisado (`warningBody`). A contagem é pública; os motivos, só para
+  Judge, organizador e o próprio jogador. `warningStatus`: com `max_warnings`, ao atingir o limite o jogador fica com
+  decisão **pendente** (`warningsPending` no detalhe) e **`next` recusa (409 `warningsPending`)** até o organizador
+  **manter** (`POST …/players/:userId/warnings/keep` → `warnings_reviewed_at`; um warning novo pede decisão de novo),
+  **anular** um warning (`DELETE …/warnings/:id`) ou **eliminar** (`drop`). Só o organizador elimina; o Judge relata.
+- **Ocorrências** (`GET …/incidents`, Judge/organizador): chamados (com nota) e warnings, com nomes.
+
+### Início das rodadas e lobby
+
+- **Duas etapas**: `start`/`next` **geram** a rodada (pareamentos à vista, `round_started_at = null`; jogadores marcam
+  "Estou pronto" em `PUT …/matches/:m/ready {ready}`); `POST …/rounds/begin` **inicia** (todas as salas abrem ao mesmo
+  tempo: `play` recusa antes, 409 `roundNotStarted`; a tolerância do W.O. conta daqui). `{begin: true}` em `start`/`next`
+  faz as duas de uma vez. Notificações: na geração, oponente da rodada (`roundBody`); no início, "a rodada começou"
+  (`roundStartBody`/`roundStartDeadlineBody`). O detalhe traz `roundStartedAt`, `tables` e `readyTables`.
+- **Lobby** (`GET /api/tournaments/:id/lobby`, sem cache, leve): as mesas da rodada em cartões (jogadores, placar,
+  `result`/`winner`, `room`, `paused`, `ready`, `present`) e, antes do início, os inscritos com `checkedIn`. **Só para
+  Judge/organizador** (`viewer.judge`): `remaining`/`running` (relógio de cada jogador, de `Room.clock()`), `connected`,
+  quem abriu o chamado (`call.byName`), `calls` (salas pedindo presença) e `warningsPending`. Jogadores recebem `null`
+  nesses campos: nunca veem o relógio dos outros.
 
 ### Check-in e relógio (`tournaments/clock.ts`)
 
@@ -880,9 +927,10 @@ Torneio com `check_in = 1` (exige `starts_at`): `tournamentTick` roda a cada 5 s
 com relógio injetado nos testes não roda sozinho e é chamado por `app.tournamentTick()`).
 
 - **Check-in** (`POST /api/tournaments/:id/checkin`): aberto de `starts_at − 30 min` até o início, só para inscritos.
-- **Início automático**: em `starts_at` (até 1 h depois, se o servidor estava fora do ar; passado isso, o organizador
-  começa à mão), com ≥ 2 inscritos, `beginTournament` sorteia e grava a rodada 1 entre **todos** os inscritos.
-- **W.O. por ausência**: `round_at + tolerance_min` depois de cada rodada gerada, cada partida pendente com placar 0 x 0 é
+- **Início automático** (só com `auto_start`; sem ele, **o organizador dá o start mesmo com a hora atingida**): em
+  `starts_at` (até 1 h depois, se o servidor estava fora do ar; passado isso, o organizador começa à mão), com ≥ 2
+  inscritos, `beginTournament` sorteia e grava a rodada 1 entre **todos** os inscritos e `startRound` já a inicia.
+- **W.O. por ausência**: `round_started_at + tolerance_min` depois de cada rodada **iniciada**, cada partida pendente com placar 0 x 0 é
   conferida: presença = entrou na sala (`p1_in`/`p2_in`, gravado em `play`) ou, na rodada 1, fez check-in. O ausente
   perde (`reported_by = noshow`) e sai (`dropped`); os dois ausentes = `result = none` e os dois saem. A sala em espera
   é fechada (`lobby.closeIfWaiting`). A varredura roda uma vez por rodada (`round_wo`), então o organizador pode
