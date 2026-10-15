@@ -357,6 +357,15 @@ export class Room {
     return this.data.queue === 'tournament' || (this.data.queue === 'private' && Boolean(this.data.showHands));
   }
 
+  /**
+   * Partida de torneio: o fim não revela as cartas escondidas (o que sobrou no deck e na mão
+   * do oponente), e o replay não sai da sala. As listas só se abrem quando o torneio termina,
+   * na página dele; até lá, ninguém leva a lista do adversário da mesa.
+   */
+  get sealed(): boolean {
+    return this.data.queue === 'tournament';
+  }
+
   seatOf(token: unknown): PlayerId | null {
     if (typeof token !== 'string') return null;
     const i = this.data.seats.findIndex((s) => s.token === token);
@@ -927,7 +936,8 @@ export class Room {
     if (!state || !this.aliases) return { room, view: null, defs: {}, log: { from: 0, entries: [] }, lastAction: null };
     // As mãos dos dois só saem da mesa atrasada (ou ao vivo para o Judge), onde são permitidas: fora disso, nada a mais.
     const extra = this.handsAllowed && ((late && conn.hands) || (!late && conn.judge)) ? handsOf(state) : [];
-    const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra);
+    const opts = { revealEnd: !this.sealed };
+    const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra, opts);
     const newDefs: Record<string, CardDef> = {};
     for (const [id, def] of Object.entries(defs)) {
       if (!conn.sentDefs.has(id)) {
@@ -943,14 +953,14 @@ export class Room {
       view,
       defs: newDefs,
       log: { from, entries },
-      lastAction: lastAction ? aliasRefs(state, pov, this.aliases, lastAction, extra) : null,
+      lastAction: lastAction ? aliasRefs(state, pov, this.aliases, lastAction, extra, opts) : null,
     };
   }
 
 
-  /** Replay completo (só depois do fim da partida). */
+  /** Replay completo (só depois do fim da partida; nunca numa partida de torneio, `sealed`). */
   replay() {
-    if (!this.state || this.state.phase !== 'gameover') return null;
+    if (!this.state || this.state.phase !== 'gameover' || this.sealed) return null;
     return {
       format: 'gumgumfight-replay' as const,
       version: this.data.replayVersion ?? 8,

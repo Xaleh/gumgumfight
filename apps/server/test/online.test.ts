@@ -5,6 +5,7 @@ import {
   type CardData,
   type CardDef,
   chooseSimpleBotAction as chooseBotAction,
+  deckOfPlayer,
   type GameState,
   HIDDEN_CARD,
   legalActions,
@@ -796,6 +797,34 @@ describe('partidas online: relógio', () => {
     expect(room.state!.winner).toBe(first);
     expect(room.state!.winReason).toContain('sem tempo');
     l.dispose();
+  });
+
+  it('partida de torneio: o fim não revela a lista do oponente e o replay não sai da sala', async () => {
+    const { app } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    room.data.queue = 'tournament';
+    const cs = [client(0), client(1)];
+    const watcher = client(null);
+    for (const c of [...cs, watcher]) room.attach(c.conn);
+    const loser = actingPlayer(cs[0].view!)!;
+    expect((await act(app, roomId, tokens[loser], cs[loser].view!.actionCount, { type: 'concede', player: loser })).statusCode).toBe(200);
+    for (const c of [...cs, watcher]) expect(c.view!.phase).toBe('gameover');
+    // Cada um vê o que via em jogo: a própria mão, nunca a mão e o deck do oponente (nem quem assiste).
+    for (const p of [0, 1] as const) {
+      const v = cs[p].view!;
+      const opp = (1 - p) as PlayerId;
+      expect(v.players[p].hand.every((u) => v.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
+      expect(v.players[opp].hand.every((u) => v.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+      expect(v.players[opp].deck.every((u) => v.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+      expect(deckOfPlayer(v, opp)).toBeNull();
+    }
+    const w = watcher.view!;
+    expect(w.players.every((ps) => ps.hand.every((u) => w.cards[u].cardId === HIDDEN_CARD))).toBe(true);
+    // O replay (com as duas listas) fica na página do torneio, não na sala.
+    const replay = await app.inject(`/api/online/rooms/${roomId}/replay?t=${tokens[0]}`);
+    expect(replay.statusCode).toBe(403);
+    expect(replay.json().errorCode).toBe('replayTournament');
   });
 
   it('jogador da vez desconectado por muito tempo perde por abandono', () => {

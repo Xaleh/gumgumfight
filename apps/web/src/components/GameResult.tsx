@@ -14,7 +14,8 @@ interface Props {
   onRematch?: () => void;
   /** Texto do botão de revanche (online: "Pedir revanche"). */
   rematchLabel?: string;
-  onReplay: () => void;
+  /** Baixar o replay (não nas partidas de torneio: o replay fica na página do torneio, depois do fim). */
+  onReplay?: () => void;
   onLog: () => void;
   /** Replay: fecha o resumo para rever a partida (voltar ações). */
   onClose?: () => void;
@@ -68,7 +69,8 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
   };
   const myLife = lifeOf(me);
   const oppLife = lifeOf(opp);
-  // Decklists completas (a visão só traz todas as cartas do oponente com a partida encerrada).
+  // Decklists completas (a visão só traz todas as cartas do oponente com a partida encerrada;
+  // numa partida de torneio, nem aí: a lista fica fechada até o fim do torneio e o botão não aparece).
   const decks: PlayerId[] = (human === null ? ([0, 1] as PlayerId[]) : [opp]).filter((p) => deckOfPlayer(state, p) !== null);
   const pips = ({ left, max }: { left: number; max: number }) => (
     <span className="pips">
@@ -158,9 +160,11 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
                 {human === null ? t('matchDeck.of', { name: state.players[p].name }) : t('matchDeck.opponent')}
               </button>
             ))}
-          <button className="btn small pill" onClick={onReplay}>
-            {t('result.download')}
-          </button>
+          {onReplay && (
+            <button className="btn small pill" onClick={onReplay}>
+              {t('result.download')}
+            </button>
+          )}
           {onReport && (
             <button className="btn small pill" onClick={onReport}>
               {t('result.reportBug')}

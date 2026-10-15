@@ -301,6 +301,7 @@ export function OnlineResultInfo({ online }: { online: OnlineGame }) {
           )}
         </p>
       )}
+      {tour && <p className="muted small">{t('online.decksSealed')}</p>}
       {room.queue === 'ranked' && mine && mine.before !== null && mine.after !== null && (
         <p className="bounty-change">
           {t('online.bounty')} {bounty(mine.before)} → <b>{bounty(mine.after)}</b>{' '}

@@ -281,7 +281,9 @@ está na fila e os espectadores também contam.
   o replay completo para baixar no fim.
 - **Decklist do oponente:** no resumo do fim de qualquer partida (bot ou online; em replays e para quem assiste, um
   botão por jogador), um botão abre a lista completa do deck adversário como imagem (a mesma peça das decklists do kit de divulgação dos
-  torneios, 1080×1350) para baixar e compartilhar, e em texto para copiar e importar no construtor de decks.
+  torneios, 1080×1350) para baixar e compartilhar, e em texto para copiar e importar no construtor de decks. **Nas partidas
+  de torneio, não:** o fim da partida não revela a mão nem o deck do oponente, o botão não aparece e o replay não sai da
+  sala; as listas (e os replays, na página do torneio) só se abrem quando o torneio termina.
 - **Proteção contra abuso:** abrir salas não exige login, então há tetos: salas ativas no servidor
   (`ONLINE_MAX_ROOMS`), salas de treino contra o bot (`ONLINE_MAX_BOT_ROOMS`), e por IP (16 salas ou lugares na fila
   ao mesmo tempo e 60 criações a cada 10 min; `apps/server/src/online/lobby.ts`, `DEFAULT_LIMITS`). O Nginx dos scripts
@@ -413,8 +415,9 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   site), tira jogadores e avança: próxima rodada do suíço, início do top cut, próxima fase da chave e, depois da
   final, o encerramento. **Encerrar agora** termina antes.
 - **Auditoria:** todo jogo disputado nas salas fica gravado com o replay. Em cada partida da aba Rodadas, **Jogos
-  gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os dois jogadores podem
-  **assistir ao replay**. Ao fim de qualquer partida (contra o bot, online, ranqueada ou de torneio), o jogador logado
+  gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os Judges podem
+  **assistir ao replay**; os dois jogadores também, mas só quando o torneio termina (o replay traz as duas listas, e as
+  listas ficam fechadas até o fim: no resumo do fim de cada jogo não há "Decklist do oponente" nem "Baixar replay"). Ao fim de qualquer partida (contra o bot, online, ranqueada ou de torneio), o jogador logado
   pode **relatar um bug** (botão ⚑ abaixo de "Baixar replay"): a carta, a interação que deu problema, o que deveria ter
   acontecido e se quer ser avisado da correção. O relato, com o replay, aparece na aba **Relatos** do torneio para o
   organizador e em **Administração → Relatos de partidas** para Admin e Dev, que o resolvem com uma nota; quem pediu o
@@ -765,7 +768,7 @@ npm run typecheck
 | POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
 | POST   | `/api/online/rooms/:id/emote` · `/chat` · `/rematch` · `/leave` | Emote, mensagem do chat (`{ t, text }`, até 120 caracteres, censurada), revanche (salas privadas) e cancelar a sala |
 | POST   | `/api/online/rooms/:id/focus` | O app do jogador saiu da tela ou voltou (`{ t, visible }`): fora da tela, a vez vira notificação |
-| GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim) |
+| GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim; nunca numa partida de torneio) |
 | POST   | `/api/online/bot` | Treino contra o bot transmitido, só com login (`{ deckId, botDeckId \| random, format, first? }`, `first`: 0 = jogador, 1 = bot, ausente = sorteio; 401 sem login; desligado com `ONLINE_BOT_ROOMS=off`) |
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |
 | GET    | `/api/online/watch/:code` | Sala privada pelo código, para assistir |

@@ -531,6 +531,7 @@ export default {
   'online.seriesScore': 'marcador de la serie',
   'online.seriesWon': ' — ¡ganaste la serie!',
   'online.seriesOver': ' — serie terminada.',
+  'online.decksSealed': 'Partida de torneo: la lista del rival y la repetición quedan cerradas hasta que termine el torneo (se abren en la página del torneo).',
   'online.bounty': 'Recompensa:',
   'online.rematchWanted': '¡{name} quiere la revancha!',
   // ---- espera ----
@@ -939,6 +940,7 @@ export default {
   'tour.gameNoWinner': 'sin ganador',
   'tour.notCounted': 'no cuenta en el marcador',
   'tour.watchReplay': '▶ Ver repetición',
+  'tour.replaysAtEnd': 'Las repeticiones de tus partidas se abren cuando termina el torneo (las listas de los mazos solo se revelan al final).',
   // ---- torneos: clasificación ----
   'tour.colPlayer': 'Jugador',
   'tour.colPoints': 'Pts',
@@ -2240,6 +2242,8 @@ export default {
   'errors.rematchPrivateOnly': 'La revancha es solo para salas privadas.',
   'errors.matchNotFinished': 'La partida aún no ha terminado.',
   'errors.replayAfterEnd': 'La repetición solo está disponible cuando termina la partida.',
+  'errors.replayTournament': 'En una partida de torneo la repetición queda en la página del torneo: para el organizador y los Judges, y para los jugadores cuando termina el torneo.',
+  'errors.replayTournamentRunning': 'La repetición de esta partida estará disponible cuando termine el torneo (las listas de los mazos solo se revelan al final).',
   'errors.resultNotSaved': 'No se pudo guardar el resultado.',
   // ---- acciones en la mesa, dado, emotes y chat ----
   'errors.matchNotStarted': 'La partida aún no ha empezado.',

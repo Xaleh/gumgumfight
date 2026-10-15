@@ -531,6 +531,7 @@ export default {
   'online.seriesScore': 'score de la série',
   'online.seriesWon': ' — vous avez gagné la série !',
   'online.seriesOver': ' — série terminée.',
+  'online.decksSealed': 'Partie de tournoi : la liste de l’adversaire et le replay restent fermés jusqu’à la fin du tournoi (ils s’ouvrent sur la page du tournoi).',
   'online.bounty': 'Prime :',
   'online.rematchWanted': '{name} veut une revanche !',
   // ---- waiting ----
@@ -939,6 +940,7 @@ export default {
   'tour.gameNoWinner': 'aucun vainqueur',
   'tour.notCounted': 'non comptée dans le score',
   'tour.watchReplay': '▶ Voir le replay',
+  'tour.replaysAtEnd': 'Les replays de vos parties s’ouvrent à la fin du tournoi (les listes des decks ne sont révélées qu’à la fin).',
   // ---- tournaments: standings ----
   'tour.colPlayer': 'Joueur',
   'tour.colPoints': 'Pts',
@@ -2240,6 +2242,8 @@ export default {
   'errors.rematchPrivateOnly': 'Les revanches sont réservées aux salons privés.',
   'errors.matchNotFinished': 'La partie n’est pas encore terminée.',
   'errors.replayAfterEnd': 'Le replay n’est disponible qu’après la fin de la partie.',
+  'errors.replayTournament': 'Dans une partie de tournoi, le replay se trouve sur la page du tournoi : pour l’organisateur et les Judges, et pour les joueurs une fois le tournoi terminé.',
+  'errors.replayTournamentRunning': 'Le replay de cette partie sera disponible à la fin du tournoi (les listes des decks ne sont révélées qu’à la fin).',
   'errors.resultNotSaved': 'Impossible d’enregistrer le résultat.',
   // ---- ações na mesa, dado, emotes e chat ----
   'errors.matchNotStarted': 'La partie n’a pas encore commencé.',

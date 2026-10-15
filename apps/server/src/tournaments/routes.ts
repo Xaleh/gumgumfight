@@ -681,8 +681,11 @@ export function registerTournamentRoutes(
         bestOf: ms[0]?.bestOf ?? 1,
         matches: ms.map((m) => {
           const absent = absentSides(t, m, players);
-          /** O replay de cada jogo: para quem audita e para os dois jogadores. */
-          const seesReplays = manage || judge || m.p1 === u?.id || m.p2 === u?.id;
+          /**
+           * O replay de cada jogo (com as duas listas): para quem audita e, quando o torneio
+           * termina, para os dois jogadores (até lá, as listas ficam fechadas).
+           */
+          const seesReplays = manage || judge || (t.status === 'finished' && (m.p1 === u?.id || m.p2 === u?.id));
           const call = calls.find((c) => c.matchId === m.id && !c.resolvedAt) ?? null;
           return {
             id: m.id,

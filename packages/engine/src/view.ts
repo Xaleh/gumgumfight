@@ -61,12 +61,21 @@ export function identityAliases(state: GameState): Aliases {
 
 const handle = (owner: PlayerId, zone: Zone, index: number) => `${HIDDEN_REF}${owner}:${zone}:${index}`;
 
+export interface ViewOptions {
+  /**
+   * Com a partida encerrada, todas as cartas ficam à vista (a decklist do oponente, o
+   * que sobrou no deck dele…). Desligado, o fim não revela nada a mais: cada um segue
+   * vendo o que via em jogo (partidas de torneio, cujas listas só se abrem no fim dele).
+   */
+  revealEnd?: boolean;
+}
+
 /**
  * Cartas que `viewer` pode ver agora (null = espectador: só o público). `extra`:
  * cartas a mais que ele está vendo (ex.: o topo do próprio deck nas ferramentas manuais).
  */
-export function visibleCards(state: GameState, viewer: PlayerId | null, extra: Iterable<string> = []): Set<string> {
-  if (state.phase === 'gameover') return new Set(Object.keys(state.cards));
+export function visibleCards(state: GameState, viewer: PlayerId | null, extra: Iterable<string> = [], { revealEnd = true }: ViewOptions = {}): Set<string> {
+  if (state.phase === 'gameover' && revealEnd) return new Set(Object.keys(state.cards));
   const out = new Set<string>(extra);
   for (const ps of state.players) {
     out.add(ps.leader.uid);
@@ -90,8 +99,8 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
 }
 
 /** Estado visto por `viewer`. */
-export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Aliases, extra?: Iterable<string>): GameState {
-  const vis = visibleCards(state, viewer, extra);
+export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Aliases, extra?: Iterable<string>, opts?: ViewOptions): GameState {
+  const vis = visibleCards(state, viewer, extra, opts);
   const alias = (uid: string) => aliases.toAlias[uid] ?? uid;
   const ref = (uid: string) => (vis.has(uid) ? alias(uid) : HIDDEN_REF);
   const refs = (uids: string[] | undefined) => uids?.filter((u) => vis.has(u)).map(alias);
@@ -386,7 +395,7 @@ export function actionFromView(state: GameState, aliases: Aliases, action: Actio
 }
 
 /** Apelido de um uid real (para traduzir a última ação para os clientes). */
-export function aliasRefs(state: GameState, viewer: PlayerId | null, aliases: Aliases, action: Action, extra?: Iterable<string>): Action {
-  const vis = visibleCards(state, viewer, extra);
+export function aliasRefs(state: GameState, viewer: PlayerId | null, aliases: Aliases, action: Action, extra?: Iterable<string>, opts?: ViewOptions): Action {
+  const vis = visibleCards(state, viewer, extra, opts);
   return aliasAction(action, (uid) => (vis.has(uid) ? aliases.toAlias[uid] ?? uid : HIDDEN_REF));
 }

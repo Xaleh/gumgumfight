@@ -1046,6 +1046,15 @@ Líder primeiro, quantidade em selo e código; `drawMatchDeck` em `recap/draw.ts
   do jogador, menos o Líder); `viewFor` só entrega todas as cartas do oponente com `phase = 'gameover'` (antes, alguma
   está escondida e a função devolve null, e o botão nem aparece). `recap/matchDeck.ts` ordena por custo e número, usa a
   arte alternativa da instância (`cardImage`) reescrita por `proxiedImageUrl` e monta o texto com `formatDeckList`.
+- **Partidas de torneio (listas fechadas até o fim):** as listas de um torneio só se abrem quando ele termina, então
+  o fim de um jogo de torneio não pode entregá-las. `viewFor`/`visibleCards`/`aliasRefs` aceitam `{ revealEnd: false }`
+  (`ViewOptions`): o fim não revela nada a mais, cada um segue vendo o que via em jogo (a própria mão; a mão e o deck do
+  oponente continuam `?`). A sala passa isso quando é de torneio (`Room.sealed`, `queue = 'tournament'`), e aí
+  `deckOfPlayer` devolve null e o botão não aparece. Pelo mesmo motivo, `Room.replay()` devolve null nessas salas e
+  `GET /api/online/rooms/:id/replay` responde 403 (`replayTournament`); o resumo não mostra "Baixar replay" e avisa
+  (`online.decksSealed`). Os replays gravados (`GET /api/matches/:id/replay` e `statsMatchId` na página do torneio)
+  saem para o organizador, os Judges e admins sempre, e para os dois jogadores só com `status = 'finished'`
+  (`replayTournamentRunning` até lá).
 - **Imagens desligadas** (servidor ou preferência do jogador): a peça sai com nome e código, como no kit.
 - O componente, o desenho e os carregadores de imagens, fontes e logo (`recap/assets.ts`, compartilhados com o kit)
   ficam no chunk do kit, carregado só ao abrir.

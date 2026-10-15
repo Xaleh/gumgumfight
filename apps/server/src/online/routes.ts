@@ -671,10 +671,16 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   /**
    * Replay completo, para baixar depois do fim (antes disso revelaria as cartas
-   * escondidas). Jogadores e espectadores: depois do fim, tudo já é público.
+   * escondidas). Jogadores e espectadores: depois do fim, tudo já é público. Numa
+   * partida de torneio, não: o replay (com as duas listas) fica na página do torneio,
+   * para quem audita e, quando o torneio termina, para os dois jogadores.
    */
   app.get<{ Params: { id: string } }>('/api/online/rooms/:id/replay', async (req, reply) => {
-    const replay = lobby.get(req.params.id)?.replay();
+    const room = lobby.get(req.params.id);
+    if (room?.sealed) {
+      return reply.code(403).send(fail('replayTournament', 'Numa partida de torneio o replay fica na página do torneio: para o organizador e os Judges, e para os jogadores quando o torneio termina.'));
+    }
+    const replay = room?.replay();
     return replay ?? reply.code(404).send(fail('replayAfterEnd', 'Replay disponível só depois do fim da partida.'));
   });
 
