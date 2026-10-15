@@ -36,8 +36,9 @@ interface SideProps extends BoardHandlers {
   /** Botões ao lado do deck e do lixo (histórico, chat). */
   tools?: ReactNode;
   /**
-   * Visão do Streamer (mesa em pé no desktop): a Vida sai da linha do Líder e vira uma coluna grande
-   * ao lado do campo, como no playmat (à esquerda de quem está embaixo, à direita do oponente).
+   * Visão do Streamer (desktop, tela inteira): a Vida sai da linha do Líder e vira uma coluna grande
+   * numa ponta do campo e os DON!! ficam na outra, como no playmat (Vida à esquerda e DON!! à direita
+   * de quem está embaixo; o oponente espelhado). Sem a fileira de DON!! na pilha vertical, as cartas crescem.
    */
   lifeAside?: boolean;
 }
@@ -257,9 +258,21 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
     >
       {lifeAside ? (
         <>
-          {position === 'bottom' && <div className="life-col">{life}</div>}
-          <div className="side-main">{main}</div>
-          {position === 'top' && <div className="life-col">{life}</div>}
+          {position === 'bottom' ? <div className="life-col">{life}</div> : <div className="don-col">{don}</div>}
+          <div className="side-main">
+            {position === 'top' ? (
+              <>
+                {base}
+                {field}
+              </>
+            ) : (
+              <>
+                {field}
+                {base}
+              </>
+            )}
+          </div>
+          {position === 'bottom' ? <div className="don-col">{don}</div> : <div className="life-col">{life}</div>}
         </>
       ) : (
         main
