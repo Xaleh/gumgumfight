@@ -395,59 +395,54 @@ export function MiniHand({
 }
 
 /**
- * Leque aberto de uma mão (visão do Streamer): as cartas viram do verso para a frente, uma a uma,
- * em tamanho grande por cima do campo do jogador. `closing`: a virada de volta antes de sumir.
+ * Leque aberto de uma mão (visão do Streamer): as cartas viram do verso para a frente, uma a uma, no
+ * mesmo leque da mão do jogador (`.hand-card`), na borda de baixo. A do oponente fica na borda de cima,
+ * com o leque girado 180° (cartas de cabeça para baixo), como se ele segurasse a mão do outro lado da
+ * mesa. `closing`: a virada de volta antes de sumir.
  */
 export function HandFan({
   state,
   player,
   position,
   closing,
-  onClose,
   ...h
 }: Pick<BoardHandlers, 'highlight' | 'onCard' | 'onCardDouble' | 'onHover'> & {
   state: GameState;
   player: PlayerId;
   position: 'top' | 'bottom';
   closing?: boolean;
-  onClose: () => void;
 }) {
   const t = useT();
   const ps = state.players[player];
   const hand = ps.hand;
   const n = hand.length;
   return (
-    <div
-      className={['hand-fan', position, closing ? 'closing' : ''].join(' ')}
-      style={vars({ '--n': Math.max(n, 1) })}
-      role="group"
-      aria-label={t('board.showHandOf', { name: ps.name })}
-    >
-      <div className="hand-fan-cards">
-        {hand.map((uid, i) => (
-          <div key={uid} className="fan-card" style={vars({ '--i': i })}>
-            <div className="fan-flip">
-              <div className="fan-face back">
-                <CardBack />
-              </div>
-              <div className="fan-face front">
-                <CardView
-                  state={state}
-                  uid={uid}
-                  highlight={h.highlight(uid)}
-                  onClick={() => h.onCard(uid)}
-                  onDoubleClick={() => h.onCardDouble(uid)}
-                  onHover={h.onHover}
-                />
+    <div className={['hand-fan', position, closing ? 'closing' : ''].join(' ')} role="group" aria-label={t('board.showHandOf', { name: ps.name })}>
+      <div className="fan-hand" style={vars({ '--n': Math.max(n, 1) })}>
+        {hand.map((uid, i) => {
+          const offset = i - (n - 1) / 2;
+          return (
+            <div key={uid} className="hand-card" style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i, '--i': i })}>
+              <div className="fan-flip">
+                <div className="fan-face back">
+                  <CardBack />
+                </div>
+                <div className="fan-face front">
+                  <CardView
+                    state={state}
+                    uid={uid}
+                    highlight={h.highlight(uid)}
+                    onClick={() => h.onCard(uid)}
+                    onDoubleClick={() => h.onCardDouble(uid)}
+                    onHover={h.onHover}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {n === 0 && <span className="hand-fan-empty">{t('board.handEmpty')}</span>}
       </div>
-      <button type="button" className="hand-fan-label" onClick={onClose} title={t('board.hideHand')}>
-        <b>{ps.name}</b> · {t('board.handCount', { n })} · <span>{t('board.hideHand')}</span>
-      </button>
     </div>
   );
 }

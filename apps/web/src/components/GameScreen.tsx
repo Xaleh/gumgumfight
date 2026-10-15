@@ -1271,7 +1271,6 @@ function Table({
             player={fanPlayer}
             position={fanPlayer === bottom ? 'bottom' : 'top'}
             closing={openHand === null}
-            onClose={closeHand}
             highlight={highlight}
             onCard={onCard}
             onCardDouble={onCardDouble}

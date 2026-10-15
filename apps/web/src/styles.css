@@ -10826,67 +10826,60 @@ a.sponsor-card:hover {
   align-items: flex-end;
 }
 
-/* ---- leque aberto: as cartas viram do verso para a frente, grandes, por cima do campo do jogador ---- */
+/* ---- leque aberto: a mão em leque, como na mesa do jogador; as cartas viram do verso para a frente ---- */
 .hand-fan {
-  --fcw: clamp(84px, calc(var(--cw) * 1.4), 170px);
-  --fch: calc(var(--fcw) * 1.396);
-  --step: min(calc(var(--fcw) * 0.96), calc((100cqw - 48px - var(--fcw)) / max(var(--n) - 1, 1)));
+  --hcw: calc(var(--cw) * 1.25);
   position: absolute;
-  left: 50%;
-  translate: -50% 0;
+  left: 0;
+  right: 0;
   z-index: 45;
-  max-width: calc(100% - 12px);
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px 10px;
-  border-radius: 20px;
-  background: rgba(10, 18, 38, 0.82);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  animation: fan-in 0.3s cubic-bezier(0.2, 1, 0.3, 1) both;
-  perspective: 1200px;
+  justify-content: center;
+  pointer-events: none;
+  perspective: 1400px;
+  animation: fan-in 0.25s ease-out both;
 }
 .hand-fan.bottom {
-  bottom: 70px;
+  bottom: 52px;
 }
 .hand-fan.top {
-  top: 92px;
-  flex-direction: column-reverse;
+  top: 52px;
 }
 .hand-fan.closing {
-  animation: fan-out 0.3s 0.2s ease-in both;
-  pointer-events: none;
+  animation: fan-out 0.25s 0.3s ease-in both;
 }
-.hand-fan-cards {
+/* o leque: a mesma geometria da mão do jogador (.hand-card), com a largura toda da mesa para abrir;
+   a caixa tem a altura de uma carta (as pontas do arco descem um pouco além dela) */
+.fan-hand {
   position: relative;
-  width: calc(var(--fcw) + var(--step) * max(var(--n) - 1, 0));
-  height: var(--fch);
-  max-width: 100%;
+  width: 100%;
+  height: calc(var(--hcw) * 1.396 + 20px);
+}
+/* a mão do oponente vista do outro lado da mesa: leque girado, cartas de cabeça para baixo */
+.hand-fan.top .fan-hand {
+  rotate: 180deg;
+}
+.fan-hand .hand-card {
+  pointer-events: auto;
+}
+@media (hover: hover) {
+  .fan-hand .hand-card:hover {
+    transform: translateY(-22%) rotate(0deg) scale(1.06);
+    z-index: 50;
+  }
 }
 .hand-fan-empty {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.75);
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  background: var(--overlay);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 14px;
   font-weight: 800;
   font-size: 13px;
-}
-.fan-card {
-  position: absolute;
-  top: 0;
-  left: calc(var(--i) * var(--step));
-  width: var(--fcw);
-  height: var(--fch);
-  z-index: var(--i);
-  transition: transform 0.18s;
-}
-.fan-card:hover {
-  z-index: 60;
-  transform: translateY(-6%) scale(1.04);
+  white-space: nowrap;
 }
 /* a virada: o verso e a frente nas duas faces de um mesmo bloco, um atrás do outro */
 .fan-flip {
@@ -10911,32 +10904,12 @@ a.sponsor-card:hover {
   transform: rotateY(180deg);
 }
 .fan-face .card {
-  --cw: var(--fcw);
+  --cw: var(--hcw);
   width: 100%;
   height: 100%;
 }
 .fan-face.front .card.clickable {
   cursor: zoom-in;
-}
-.hand-fan-label {
-  border: 0;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border-radius: 999px;
-  padding: 5px 14px;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.hand-fan-label span {
-  opacity: 0.75;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-size: 10.5px;
-}
-.hand-fan-label:hover {
-  background: rgba(255, 255, 255, 0.18);
 }
 @keyframes fan-flip-in {
   0% {
@@ -10962,11 +10935,9 @@ a.sponsor-card:hover {
 @keyframes fan-in {
   from {
     opacity: 0;
-    scale: 0.96;
   }
   to {
     opacity: 1;
-    scale: 1;
   }
 }
 @keyframes fan-out {
@@ -10975,7 +10946,6 @@ a.sponsor-card:hover {
   }
   to {
     opacity: 0;
-    scale: 0.97;
   }
 }
 @media (prefers-reduced-motion: reduce) {
