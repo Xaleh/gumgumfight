@@ -10561,7 +10561,7 @@ a.sponsor-card:hover {
 .game.streamer .mat {
   /* Cada lado tem só duas linhas de cartas (Personagens e Líder): a altura manda no tamanho; a largura
      precisa caber Vida + campo + DON!! (~10 cartas) e raramente limita numa tela 16:9. */
-  --cw: max(38px, min(calc((100cqw - 40px) / 13.2), calc((100cqh - 180px) / 6.9), 150px));
+  --cw: max(38px, min(calc((100cqw - 40px) / 10.6), calc((100cqh - 176px) / 8), 150px));
   --ch: calc(var(--cw) * 1.396);
   --hcw: calc(var(--cw) * 1.2);
   width: 100%;
@@ -10676,7 +10676,7 @@ a.sponsor-card:hover {
   box-shadow: 0 0 80px rgba(var(--shadow-rgb), 0.22);
 }
 
-/* ---- Vida grande numa ponta do campo, DON!! na outra ---- */
+/* ---- como no playmat: Vida numa ponta, contadores de DON!! e deck na outra, DON!! embaixo ---- */
 /* As pontas dividem a sobra por igual, para o Líder e os Personagens ficarem no centro exato da tela. */
 .side.life-aside {
   display: grid;
@@ -10688,6 +10688,7 @@ a.sponsor-card:hover {
   padding: 0 calc(var(--cw) * 0.15);
 }
 .side.life-aside .side-main {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -10695,66 +10696,97 @@ a.sponsor-card:hover {
   min-width: 0;
 }
 .side.life-aside .life-col,
-.side.life-aside .don-col {
+.side.life-aside .side-aux {
   display: flex;
   align-items: center;
   justify-content: center;
 }
-/* Vida encostada na ponta de fora; DON!! na outra ponta, na altura dos Personagens (o oponente espelhado) */
 .side.life-aside.bottom .life-col {
   justify-self: start;
-}
-.side.life-aside.bottom .don-col {
-  justify-self: end;
-  align-self: start;
-}
-.side.life-aside.top .don-col {
-  justify-self: start;
-  align-self: end;
 }
 .side.life-aside.top .life-col {
   justify-self: end;
 }
-/* bloco de DON!!: deck à esquerda, até 5 por fileira, contadores embaixo (como na mesa deitada) */
+/* a ponta de fora oposta à Vida: contadores de DON!! em cima e o deck grande, na altura dos Personagens e do Líder */
+.side.life-aside .side-aux {
+  flex-direction: column;
+  gap: calc(var(--cw) * 0.3);
+}
+.side.life-aside.bottom .side-aux {
+  justify-self: end;
+  align-self: start;
+  padding-top: calc(var(--cw) * 0.05);
+}
+.side.life-aside.top .side-aux {
+  justify-self: start;
+  align-self: end;
+  padding-bottom: calc(var(--cw) * 0.05);
+}
+.side.life-aside .side-aux .pile .card {
+  --cw-pile: var(--cw);
+  border-radius: calc(var(--cw) * 0.07);
+}
+.side.life-aside .side-aux .pile-count {
+  font-size: max(13px, calc(var(--cw) * 0.2));
+  right: -8px;
+  bottom: -6px;
+}
+.side.life-aside .don-stats {
+  grid-template-columns: auto auto;
+  column-gap: 12px;
+  padding: 4px 10px;
+  font-size: max(12px, calc(var(--cw) * 0.14));
+}
+.side.life-aside .don-stats div {
+  gap: 3px;
+}
+/* Stage afastado do Líder de um lado; descarte do outro (o deck foi para a ponta) */
+.side.life-aside .piles {
+  gap: 0;
+}
+/*
+ * Fileira de DON!!: deck de DON!! e as cartas, grandes, à esquerda sob o Stage. A fileira reserva pouca
+ * altura e transborda para a faixa de baixo (a mão aberta pode cobrir os DON!!); mais de 5 viram duas
+ * fileiras menores. No lado do oponente a fileira transborda para cima.
+ */
 .game.streamer .don-row,
 .game.streamer .don-row.top {
-  --dw: calc(var(--cw) * 0.52);
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-template-areas: 'deck cards' 'stats stats';
-  align-items: start;
-  column-gap: calc(var(--cw) * 0.1);
-  row-gap: 4px;
-  width: auto;
+  --dw: calc(var(--cw) * 0.62);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: calc(var(--dw) * 0.18);
+  align-self: flex-start;
+  width: calc(var(--cw) * 5.4);
+  height: calc(var(--cw) * 0.6);
   min-height: 0;
+  margin-left: calc(var(--cw) * -0.3);
+  z-index: 1;
+}
+.side.life-aside.top .don-row {
+  align-items: flex-end;
 }
 .game.streamer .don-deck {
-  grid-area: deck;
+  flex: none;
 }
 .game.streamer .don-cards {
-  grid-area: cards;
   flex: none;
+  display: flex;
   flex-wrap: wrap;
-  width: calc(var(--dw) * 5 * 1.12 + 2px);
-  gap: calc(var(--dw) * 0.12);
+  align-content: flex-start;
+  width: calc(var(--dw) * 5 * 1.14 + 2px);
+  gap: calc(var(--dw) * 0.14);
+}
+.side.life-aside.top .don-cards {
+  align-content: flex-end;
+  flex-wrap: wrap-reverse;
 }
 .game.streamer .don-cards > .don-card + .don-card {
   margin-left: 0;
 }
-.game.streamer .don-stats {
-  grid-area: stats;
-  grid-template-columns: auto auto;
-  column-gap: 10px;
-  padding: 3px 8px;
-  font-size: max(11px, calc(var(--cw) * 0.12));
-  justify-self: start;
-}
-.game.streamer .don-stats div {
-  gap: 2px;
-}
-/* o lado do oponente é a mesa dele girada: os contadores de DON!! em cima */
-.side.life-aside.top .don-row {
-  grid-template-areas: 'stats stats' 'deck cards';
+/* mais de 5 na fileira: duas fileiras de 5, menores */
+.game.streamer .don-cards.many {
+  --dw: calc(var(--cw) * 0.38);
 }
 .side.life-aside .life-zone {
   --lw: calc(var(--cw) * 1.2);

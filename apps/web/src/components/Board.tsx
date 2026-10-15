@@ -36,9 +36,10 @@ interface SideProps extends BoardHandlers {
   /** Botões ao lado do deck e do lixo (histórico, chat). */
   tools?: ReactNode;
   /**
-   * Visão do Streamer (desktop, tela inteira): a Vida sai da linha do Líder e vira uma coluna grande
-   * numa ponta do campo e os DON!! ficam na outra, como no playmat (Vida à esquerda e DON!! à direita
-   * de quem está embaixo; o oponente espelhado). Sem a fileira de DON!! na pilha vertical, as cartas crescem.
+   * Visão do Streamer (desktop, tela inteira), como no playmat: a Vida numa coluna grande na ponta de fora
+   * do campo; na outra ponta os contadores de DON!! e o deck grande; ao lado do Líder só o Stage e o
+   * descarte; a fileira de DON!! (deck de DON!! e as cartas, grandes) embaixo, à esquerda, podendo ficar
+   * por baixo da mão aberta. O oponente espelhado.
    */
   lifeAside?: boolean;
 }
@@ -132,17 +133,16 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
   const picked = h.donPicked(player);
   const attached = ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
   const onField = ps.donActive + ps.donRested;
-  const don = (
-    <div
-      className={['don-row', position, donGlow ? 'glow' : '', donDrop ? 'drop' : ''].join(' ')}
-      title={t('board.donTitle', { deck: ps.donDeck, active: ps.donActive, rested: ps.donRested, attached })}
-    >
-      {/* Deck de DON!! fixo à esquerda; os DON!! entram à direita dele. */}
-      <div className="don-deck" data-anchor={`dondeck-${player}`}>
-        {ps.donDeck > 0 ? <span className="don-card back" /> : <span className="don-card empty" />}
-        <span className="pile-count">{ps.donDeck}</span>
-      </div>
-      <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
+  // Deck de DON!! fixo à esquerda; os DON!! entram à direita dele.
+  const donDeck = (
+    <div className="don-deck" data-anchor={`dondeck-${player}`}>
+      {ps.donDeck > 0 ? <span className="don-card back" /> : <span className="don-card empty" />}
+      <span className="pile-count">{ps.donDeck}</span>
+    </div>
+  );
+  // `many`: mais de 5 na fileira (na mesa de quem transmite, viram duas fileiras menores).
+  const donCards = (
+    <div className={['don-cards', onField > 5 ? 'many' : ''].join(' ')} style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
         {Array.from({ length: ps.donActive }, (_, i) => (
           <span
             key={`a${i}`}
@@ -160,6 +160,8 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
           <span key={`r${i}`} className="don-card rested" />
         ))}
       </div>
+  );
+  const donStats = (
       <dl className="don-stats" aria-label="DON!!">
         <div>
           <dt>{t('board.donDeck')}</dt>
@@ -178,24 +180,45 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
           <dd>{attached}</dd>
         </div>
       </dl>
+  );
+  const donRow = (children: ReactNode) => (
+    <div
+      className={['don-row', position, donGlow ? 'glow' : '', donDrop ? 'drop' : ''].join(' ')}
+      title={t('board.donTitle', { deck: ps.donDeck, active: ps.donActive, rested: ps.donRested, attached })}
+    >
+      {children}
     </div>
   );
+  const don = donRow(
+    <>
+      {donDeck}
+      {donCards}
+      {donStats}
+    </>,
+  );
 
+  const deckPile = (
+    <div className="pile" title={t('board.deckTitle', { n: ps.deck.length })} data-anchor={`deck-${player}`}>
+      <CardBack />
+      <span className="pile-count">{ps.deck.length}</span>
+    </div>
+  );
+  const trashPile = (
+    <div
+      className="pile clickable"
+      data-anchor={`trash-${player}`}
+      onClick={() => h.onTrash(player)}
+      title={t('board.trashTitle', { n: ps.trash.length })}
+    >
+      {trashTop ? <CardView state={state} uid={trashTop} /> : <div className="slot-empty">{t('board.trashSlot')}</div>}
+      <span className="pile-count">{ps.trash.length}</span>
+    </div>
+  );
+  // Mesa de quem transmite (`lifeAside`): só o descarte fica ao lado do Líder; o deck vai para a ponta, grande.
   const piles = (
     <div className="zone piles">
-      <div className="pile" title={t('board.deckTitle', { n: ps.deck.length })} data-anchor={`deck-${player}`}>
-        <CardBack />
-        <span className="pile-count">{ps.deck.length}</span>
-      </div>
-      <div
-        className="pile clickable"
-        data-anchor={`trash-${player}`}
-        onClick={() => h.onTrash(player)}
-        title={t('board.trashTitle', { n: ps.trash.length })}
-      >
-        {trashTop ? <CardView state={state} uid={trashTop} /> : <div className="slot-empty">{t('board.trashSlot')}</div>}
-        <span className="pile-count">{ps.trash.length}</span>
-      </div>
+      {!lifeAside && deckPile}
+      {trashPile}
     </div>
   );
 
@@ -236,6 +259,26 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
     </div>
   );
 
+  /**
+   * Mesa de quem transmite: a ponta de fora do lado oposto à Vida, com os contadores de DON!! e o deck grande
+   * (como no playmat: deck na ponta direita de quem está embaixo; o oponente espelhado).
+   */
+  const aux = (
+    <div className="side-aux">
+      {position === 'bottom' ? (
+        <>
+          {donStats}
+          {deckPile}
+        </>
+      ) : (
+        <>
+          {deckPile}
+          {donStats}
+        </>
+      )}
+    </div>
+  );
+
   const main =
     position === 'top' ? (
       <>
@@ -258,10 +301,16 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
     >
       {lifeAside ? (
         <>
-          {position === 'bottom' ? <div className="life-col">{life}</div> : <div className="don-col">{don}</div>}
+          {position === 'bottom' ? <div className="life-col">{life}</div> : aux}
           <div className="side-main">
             {position === 'top' ? (
               <>
+                {donRow(
+                  <>
+                    {donDeck}
+                    {donCards}
+                  </>,
+                )}
                 {base}
                 {field}
               </>
@@ -269,10 +318,16 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
               <>
                 {field}
                 {base}
+                {donRow(
+                  <>
+                    {donDeck}
+                    {donCards}
+                  </>,
+                )}
               </>
             )}
           </div>
-          {position === 'bottom' ? <div className="don-col">{don}</div> : <div className="life-col">{life}</div>}
+          {position === 'bottom' ? aux : <div className="life-col">{life}</div>}
         </>
       ) : (
         main
