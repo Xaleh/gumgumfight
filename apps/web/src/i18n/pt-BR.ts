@@ -567,6 +567,7 @@ const ptBR = {
   'online.seriesScore': 'placar da série',
   'online.seriesWon': ' — você venceu a série!',
   'online.seriesOver': ' — série encerrada.',
+  'online.decksSealed': 'Partida de torneio: a lista do oponente e o replay ficam fechados até o torneio terminar (abrem na página do torneio).',
   'online.bounty': 'Recompensa:',
   'online.rematchWanted': '{name} quer revanche!',
   // ---- espera ----
@@ -658,7 +659,7 @@ const ptBR = {
   'broadcast.showsOwn': 'a sua mão',
   'broadcast.showsNone': 'sem mãos',
   'broadcast.handsPlayers': 'Mostrar as mãos dos jogadores nas partidas de torneio e nas salas privadas liberadas que você assiste',
-  'broadcast.handsPlayersHint': '(sempre com pelo menos {n} min de atraso)',
+  'broadcast.handsPlayersHint': '(sempre com pelo menos {n} min de atraso, salvo nos torneios com mãos ao vivo)',
   'broadcast.handsOwn': 'Mostrar a sua mão nas partidas que você joga',
   'broadcast.handsOwnHint': '(a do oponente nunca aparece; vale o atraso escolhido)',
   'broadcast.delayTournaments': 'Atraso também nas partidas de torneio, mesmo sem mãos',
@@ -975,6 +976,7 @@ const ptBR = {
   'tour.gameNoWinner': 'sem vencedor',
   'tour.notCounted': 'não contou no placar',
   'tour.watchReplay': '▶ Assistir replay',
+  'tour.replaysAtEnd': 'Os replays dos seus jogos abrem quando o torneio termina (as listas dos decks só se abrem no fim).',
   // ---- torneios: classificação ----
   'tour.colPlayer': 'Jogador',
   'tour.colPoints': 'Pts',
@@ -1009,6 +1011,10 @@ const ptBR = {
   'tour.maxWarningsNone': 'Sem limite (o organizador decide caso a caso)',
   'tour.maxWarningsN': '{n|# warning|# warnings}',
   'tour.maxWarningsHint': 'O Judge dá warnings aos jogadores. Ao atingir o limite, o organizador é avisado e decide se elimina o jogador; a próxima rodada só é gerada depois da decisão.',
+  'tour.liveHandsOption': 'Mãos ao vivo na transmissão (sem o atraso mínimo)',
+  'tour.liveHandsHint':
+    'Quem transmite (perfil Streamer ou Admin) pode mostrar as mãos dos dois jogadores sem atraso. Sem esta opção, as mãos chegam sempre com pelo menos 1 min de atraso, para um jogador não ver a mão do oponente pela live. Use só quando os jogadores não assistem à transmissão durante a partida.',
+  'tour.liveHandsInfo': '📡 Mãos ao vivo na transmissão: quem transmite pode mostrar as mãos dos jogadores sem atraso.',
   'tour.manualStart': 'o organizador dá o start a partir de {date}',
   'tour.maxWarningsInfo': 'Limite de warnings: {n} (ao atingir, o organizador decide a eliminação).',
   'tour.judgesLabel': 'Judge:',
@@ -2293,6 +2299,8 @@ const ptBR = {
   'errors.rematchPrivateOnly': 'Revanche só nas salas privadas.',
   'errors.matchNotFinished': 'A partida ainda não terminou.',
   'errors.replayAfterEnd': 'Replay disponível só depois do fim da partida.',
+  'errors.replayTournament': 'Numa partida de torneio o replay fica na página do torneio: para o organizador e os Judges, e para os jogadores quando o torneio termina.',
+  'errors.replayTournamentRunning': 'O replay desta partida fica disponível quando o torneio terminar (as listas dos decks só se abrem no fim).',
   'errors.resultNotSaved': 'Não foi possível gravar o resultado.',
   // ---- ações na mesa, dado, emotes e chat ----
   'errors.matchNotStarted': 'A partida ainda não começou.',
@@ -2311,7 +2319,7 @@ const ptBR = {
   'errors.chatMessageTooLong': 'A mensagem pode ter no máximo {max} caracteres.',
   'errors.chatTooFast': 'Espere um pouco antes de mandar outra mensagem.',
   // ---- replays e relatos ----
-  'errors.replayForbidden': 'Só quem jogou a partida, o organizador do torneio ou um admin pode ver este replay.',
+  'errors.replayForbidden': 'Só quem jogou a partida, o organizador ou um Judge do torneio, ou um admin pode ver este replay.',
   'errors.noReplay': 'Esta partida não tem replay gravado.',
   'errors.matchOfOthers': 'Partida de outros jogadores.',
   'errors.reportOnlyPlayers': 'Só quem jogou a partida pode relatar um problema.',

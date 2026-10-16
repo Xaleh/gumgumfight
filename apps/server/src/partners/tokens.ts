@@ -103,8 +103,9 @@ export function registerBearerAuth(app: FastifyInstance, { db, now = Date.now }:
     const path = req.url.split('?')[0];
     // Só a API; a consulta interna de plano (homologação → produção) tem o próprio Bearer.
     if (!path.startsWith('/api/') || path.startsWith('/api/internal/')) return;
-    // Rota inexistente: o 404 de sempre.
-    if (!req.routeOptions.url) return;
+    // Rota inexistente: o 404 de sempre. Com o @fastify/static registrado, a rota coringa `/*` dele
+    // é quem recebe um caminho de API desconhecido, e então chama o handler de 404.
+    if (req.is404 || !req.routeOptions.url || req.routeOptions.url === '/*') return;
     const m = /^Bearer\s+(\S+)$/i.exec(header.trim());
     const token = m && m[1].length <= 256 ? findToken(db, m[1]) : null;
     const t = now();

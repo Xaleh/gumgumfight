@@ -566,6 +566,7 @@ export default {
   'online.seriesScore': 'シリーズのスコア',
   'online.seriesWon': ' — シリーズに勝利しました！',
   'online.seriesOver': ' — シリーズ終了。',
+  'online.decksSealed': '大会の対戦：相手のデッキリストとリプレイは大会終了まで非公開です（大会ページで公開されます）。',
   'online.bounty': '懸賞金：',
   'online.rematchWanted': '{name}が再戦を希望しています！',
   // ---- 待機 ----
@@ -657,7 +658,7 @@ export default {
   'broadcast.showsOwn': 'あなたの手札',
   'broadcast.showsNone': '手札なし',
   'broadcast.handsPlayers': '観戦する大会の対戦と許可されたプライベートルームでプレイヤーの手札を表示',
-  'broadcast.handsPlayersHint': '(常に{n}分以上の遅延)',
+  'broadcast.handsPlayersHint': '(常に{n}分以上の遅延。手札リアルタイム表示の大会を除く)',
   'broadcast.handsOwn': '自分の対戦で自分の手札を表示',
   'broadcast.handsOwnHint': '(相手の手札は表示されません。選んだ遅延が適用されます)',
   'broadcast.delayTournaments': '大会の対戦は手札なしでも遅延する',
@@ -974,6 +975,7 @@ export default {
   'tour.gameNoWinner': '勝者なし',
   'tour.notCounted': 'スコアに含まれません',
   'tour.watchReplay': '▶ リプレイを見る',
+  'tour.replaysAtEnd': '自分の対戦のリプレイは大会終了時に公開されます（デッキリストは終了時にのみ公開されます）。',
   // ---- 大会：順位 ----
   'tour.colPlayer': 'プレイヤー',
   'tour.colPoints': '勝点',
@@ -1008,6 +1010,10 @@ export default {
   'tour.maxWarningsNone': '上限なし（主催者がその都度判断）',
   'tour.maxWarningsN': '{n|#件の警告}',
   'tour.maxWarningsHint': 'ジャッジはプレイヤーに警告を与えます。上限に達すると主催者に通知され、主催者がそのプレイヤーを失格にするか判断します。次のラウンドは判断後にのみ作成されます。',
+  'tour.liveHandsOption': '配信で手札をリアルタイム表示(最小遅延なし)',
+  'tour.liveHandsHint':
+    '配信者(ストリーマーまたは管理者)は両プレイヤーの手札を遅延なしで表示できます。このオプションがないと、プレイヤーが配信で相手の手札を見られないように、手札は常に1分以上遅れて届きます。対局中にプレイヤーが配信を見ない場合にのみ使ってください。',
+  'tour.liveHandsInfo': '📡 配信で手札をリアルタイム表示:配信者はプレイヤーの手札を遅延なしで表示できます。',
   'tour.manualStart': '{date}以降に主催者が開始します',
   'tour.maxWarningsInfo': '警告の上限：{n}（達した場合、主催者が失格を判断します）。',
   'tour.judgesLabel': 'ジャッジ：',
@@ -2289,6 +2295,8 @@ export default {
   'errors.rematchPrivateOnly': '再戦はプライベートルームのみです。',
   'errors.matchNotFinished': '対戦はまだ終わっていません。',
   'errors.replayAfterEnd': 'リプレイは対戦終了後にのみ利用できます。',
+  'errors.replayTournament': '大会の対戦では、リプレイは大会ページにあります：主催者とジャッジ向け、プレイヤーには大会終了後に公開されます。',
+  'errors.replayTournamentRunning': 'この対戦のリプレイは大会終了後に利用できます（デッキリストは終了時にのみ公開されます）。',
   'errors.resultNotSaved': '結果を保存できませんでした。',
   // ---- 場での操作、ダイス、エモート、チャット ----
   'errors.matchNotStarted': '対戦はまだ始まっていません。',
@@ -2307,7 +2315,7 @@ export default {
   'errors.chatMessageTooLong': 'メッセージは最大{max}文字です。',
   'errors.chatTooFast': '次のメッセージを送るまで少しお待ちください。',
   // ---- リプレイと報告 ----
-  'errors.replayForbidden': 'このリプレイを見られるのは、対戦したプレイヤー、大会の主催者、管理者だけです。',
+  'errors.replayForbidden': 'このリプレイを見られるのは、対戦したプレイヤー、大会の主催者またはジャッジ、管理者だけです。',
   'errors.noReplay': 'この対戦には保存されたリプレイがありません。',
   'errors.matchOfOthers': 'この対戦は他のプレイヤーのものです。',
   'errors.reportOnlyPlayers': '問題を報告できるのは対戦したプレイヤーだけです。',

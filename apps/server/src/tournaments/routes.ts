@@ -163,6 +163,8 @@ type Body = {
   format?: unknown;
   /** Aceita cartas de spoiler (só com o formato EGB: "Todas as cartas + spoilers"). */
   spoilers?: unknown;
+  /** Quem transmite vê as mãos dos jogadores ao vivo (sem o atraso mínimo). */
+  liveHands?: unknown;
   structure?: unknown;
   rounds?: unknown;
   swissBestOf?: unknown;
@@ -195,6 +197,7 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
   const description = typeof b.description === 'string' ? b.description.trim().slice(0, 2000) : '';
   if (!isFormat(b.format)) return fail('invalidFormat', 'Formato inválido.');
   const spoilers = b.spoilers === true;
+  const liveHands = b.liveHands === true;
   if (spoilers && b.format !== 'egb') return fail('tourSpoilersNeedEgb', 'Spoilers só valem no formato com todas as cartas (Extra Grand Battle).');
   if (b.structure !== 'swiss' && b.structure !== 'single') return fail('invalidStructure', 'Estrutura inválida.');
   const swiss = b.structure === 'swiss';
@@ -238,6 +241,7 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
     description,
     format: b.format,
     spoilers,
+    liveHands,
     structure: b.structure,
     rounds,
     swissBestOf,
@@ -681,8 +685,11 @@ export function registerTournamentRoutes(
         bestOf: ms[0]?.bestOf ?? 1,
         matches: ms.map((m) => {
           const absent = absentSides(t, m, players);
-          /** O replay de cada jogo: para quem audita e para os dois jogadores. */
-          const seesReplays = manage || judge || m.p1 === u?.id || m.p2 === u?.id;
+          /**
+           * O replay de cada jogo (com as duas listas): para quem audita e, quando o torneio
+           * termina, para os dois jogadores (até lá, as listas ficam fechadas).
+           */
+          const seesReplays = manage || judge || (t.status === 'finished' && (m.p1 === u?.id || m.p2 === u?.id));
           const call = calls.find((c) => c.matchId === m.id && !c.resolvedAt) ?? null;
           return {
             id: m.id,
@@ -782,6 +789,8 @@ export function registerTournamentRoutes(
       autoStart: t.autoStart,
       /** Warnings até o organizador decidir a eliminação (null = sem regra). */
       maxWarnings: t.maxWarnings,
+      /** Quem transmite vê as mãos dos jogadores ao vivo, sem o atraso mínimo. */
+      liveHands: t.liveHands,
       checkInMs: CHECK_IN_MS,
       toleranceMin: t.toleranceMin,
       toleranceMs: toleranceMs(t),
@@ -1726,6 +1735,7 @@ export function registerTournamentRoutes(
         bestOf: m.bestOf,
         wins: { [m.p1]: m.wins[0], [m.p2]: m.wins[1] },
         firstUserId: m.nextFirst,
+        liveHands: t.liveHands,
       },
     );
     if ('error' in r) return reply.code(r.code).send(r);

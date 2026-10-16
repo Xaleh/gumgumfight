@@ -66,26 +66,44 @@ describe('auditoria: jogos gravados, replay e relatos', () => {
     const admin = login(db, 'admin');
     const ps = [login(db), login(db)];
     const outsider = login(db);
+    const judge = login(db);
+    await req(app, 'PUT', '/api/players/me', judge, { name: 'Robin' });
     const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Liga', format: 'egb', structure: 'swiss', rounds: 1 })).json();
+    expect((await req(app, 'PUT', `/api/tournaments/${t.id}/judges`, org, { player: 'Robin' })).statusCode).toBe(200);
     await req(app, 'POST', `/api/tournaments/${t.id}/register`, ps[0], { deckId: 'st01-luffy' });
     await req(app, 'POST', `/api/tournaments/${t.id}/register`, ps[1], { deckId: 'st02-kid' });
     let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
     const m = view.rounds[0].matches[0];
     const statsId = await playTournamentGame(app, lobby, t.id, m, ps, m.p2.userId);
 
-    // O jogo aparece na partida, com o replay para o organizador e para os dois jogadores (não para outros).
+    // O jogo aparece na partida, com o replay para o organizador; para os dois jogadores só quando o
+    // torneio termina (o replay traz as duas listas, fechadas até lá); para outros, nunca.
     view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
     const games = view.rounds[0].matches[0].games;
     expect(games).toHaveLength(1);
     expect(games[0]).toMatchObject({ game: 1, counted: true, statsMatchId: statsId, winner: { userId: m.p1.userId } });
-    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, ps[1])).json().rounds[0].matches[0].games[0].statsMatchId).toBe(statsId);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, ps[1])).json().rounds[0].matches[0].games[0]).toMatchObject({ game: 1, statsMatchId: null });
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, judge)).json().rounds[0].matches[0].games[0].statsMatchId).toBe(statsId);
     expect((await req(app, 'GET', `/api/tournaments/${t.id}`, outsider)).json().rounds[0].matches[0].games[0].statsMatchId).toBeNull();
     expect(view.openReports).toBe(0);
 
-    // Replay: quem jogou, o organizador e admins; nem anônimo, nem outro jogador ou outro organizador.
+    // Replay: o organizador e admins; quem jogou, só no fim do torneio; nem anônimo, nem outro jogador ou outro organizador.
     expect((await req(app, 'GET', `/api/matches/${statsId}/replay`)).statusCode).toBe(401);
     expect((await req(app, 'GET', `/api/matches/${statsId}/replay`, outsider)).statusCode).toBe(403);
     expect((await req(app, 'GET', `/api/matches/${statsId}/replay`, otherOrg)).statusCode).toBe(403);
+    const running = await req(app, 'GET', `/api/matches/${statsId}/replay`, ps[0]);
+    expect(running.statusCode).toBe(403);
+    expect(running.json().errorCode).toBe('replayTournamentRunning');
+    expect((await req(app, 'GET', `/api/matches/${statsId}/replay`, org)).statusCode).toBe(200);
+    // O Judge do torneio também (como a página mostra o botão), e o resumo da partida; os relatos, não.
+    expect((await req(app, 'GET', `/api/matches/${statsId}/replay`, judge)).statusCode).toBe(200);
+    expect((await req(app, 'GET', `/api/matches/${statsId}`, judge)).json()).toMatchObject({ queue: 'tournament', reports: [] });
+    expect((await req(app, 'GET', `/api/reports?tournament=${t.id}`, judge)).statusCode).toBe(403);
+    // Torneio encerrado (uma rodada): as listas se abrem, e com elas o replay para quem jogou.
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/next`, org)).json().status).toBe('finished');
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, ps[1])).json().rounds[0].matches[0].games[0].statsMatchId).toBe(statsId);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, outsider)).json().rounds[0].matches[0].games[0].statsMatchId).toBeNull();
+    expect((await req(app, 'GET', `/api/matches/${statsId}/replay`, outsider)).statusCode).toBe(403);
     const replay = (await req(app, 'GET', `/api/matches/${statsId}/replay`, ps[0])).json();
     expect(replay).toMatchObject({ format: 'gumgumfight-replay', seed: 0 });
     expect(typeof replay.version).toBe('number');

@@ -89,6 +89,8 @@ export interface LiveRoom {
   spectators: number;
   /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
   handsAllowed: boolean;
+  /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio em que o organizador liberou). */
+  handsLive: boolean;
   createdAt: number;
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
 }
@@ -407,6 +409,7 @@ export class Lobby {
       turn: st?.turn ?? 0,
       spectators: room.spectators,
       handsAllowed: room.handsAllowed,
+      handsLive: room.handsLive,
       createdAt: room.data.createdAt,
       tournament: room.data.tournament
         ? {

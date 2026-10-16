@@ -566,6 +566,7 @@ export default {
   'online.seriesScore': 'marcador de la serie',
   'online.seriesWon': ' — ¡ganaste la serie!',
   'online.seriesOver': ' — serie terminada.',
+  'online.decksSealed': 'Partida de torneo: la lista del rival y la repetición quedan cerradas hasta que termine el torneo (se abren en la página del torneo).',
   'online.bounty': 'Recompensa:',
   'online.rematchWanted': '¡{name} quiere la revancha!',
   // ---- espera ----
@@ -657,7 +658,7 @@ export default {
   'broadcast.showsOwn': 'tu mano',
   'broadcast.showsNone': 'sin manos',
   'broadcast.handsPlayers': 'Mostrar las manos de los jugadores en las partidas de torneo y salas privadas permitidas que ves',
-  'broadcast.handsPlayersHint': '(siempre con al menos {n} min de retraso)',
+  'broadcast.handsPlayersHint': '(siempre con al menos {n} min de retraso, salvo en torneos con manos en vivo)',
   'broadcast.handsOwn': 'Mostrar tu mano en las partidas que juegas',
   'broadcast.handsOwnHint': '(la del rival nunca aparece; vale el retraso elegido)',
   'broadcast.delayTournaments': 'Retraso también en las partidas de torneo, incluso sin manos',
@@ -974,6 +975,7 @@ export default {
   'tour.gameNoWinner': 'sin ganador',
   'tour.notCounted': 'no cuenta en el marcador',
   'tour.watchReplay': '▶ Ver repetición',
+  'tour.replaysAtEnd': 'Las repeticiones de tus partidas se abren cuando termina el torneo (las listas de los mazos solo se revelan al final).',
   // ---- torneos: clasificación ----
   'tour.colPlayer': 'Jugador',
   'tour.colPoints': 'Pts',
@@ -1008,6 +1010,10 @@ export default {
   'tour.maxWarningsNone': 'Sin límite (el organizador decide caso por caso)',
   'tour.maxWarningsN': '{n|# warning|# warnings}',
   'tour.maxWarningsHint': 'El Judge da warnings a los jugadores. Al alcanzar el límite, el organizador recibe un aviso y decide si elimina al jugador; la siguiente ronda solo se genera después de la decisión.',
+  'tour.liveHandsOption': 'Manos en vivo en la transmisión (sin retraso mínimo)',
+  'tour.liveHandsHint':
+    'Quien transmite (perfil Streamer o Admin) puede mostrar las manos de los dos jugadores sin retraso. Sin esta opción, las manos llegan siempre con al menos 1 min de retraso, para que un jugador no vea la mano del rival por la transmisión. Úsala solo cuando los jugadores no miran la transmisión durante la partida.',
+  'tour.liveHandsInfo': '📡 Manos en vivo en la transmisión: quien transmite puede mostrar las manos de los jugadores sin retraso.',
   'tour.manualStart': 'el organizador da el inicio a partir del {date}',
   'tour.maxWarningsInfo': 'Límite de warnings: {n} (al alcanzarlo, el organizador decide la eliminación).',
   'tour.judgesLabel': 'Judge:',
@@ -2289,6 +2295,8 @@ export default {
   'errors.rematchPrivateOnly': 'La revancha es solo para salas privadas.',
   'errors.matchNotFinished': 'La partida aún no ha terminado.',
   'errors.replayAfterEnd': 'La repetición solo está disponible cuando termina la partida.',
+  'errors.replayTournament': 'En una partida de torneo la repetición queda en la página del torneo: para el organizador y los Judges, y para los jugadores cuando termina el torneo.',
+  'errors.replayTournamentRunning': 'La repetición de esta partida estará disponible cuando termine el torneo (las listas de los mazos solo se revelan al final).',
   'errors.resultNotSaved': 'No se pudo guardar el resultado.',
   // ---- acciones en la mesa, dado, emotes y chat ----
   'errors.matchNotStarted': 'La partida aún no ha empezado.',
@@ -2307,7 +2315,7 @@ export default {
   'errors.chatMessageTooLong': 'Los mensajes pueden tener como máximo {max} caracteres.',
   'errors.chatTooFast': 'Espera un momento antes de enviar otro mensaje.',
   // ---- repeticiones y reportes ----
-  'errors.replayForbidden': 'Solo los jugadores de la partida, el organizador del torneo o un admin pueden ver esta repetición.',
+  'errors.replayForbidden': 'Solo los jugadores de la partida, el organizador o un Judge del torneo, o un admin pueden ver esta repetición.',
   'errors.noReplay': 'Esta partida no tiene repetición guardada.',
   'errors.matchOfOthers': 'Esta partida es de otros jugadores.',
   'errors.reportOnlyPlayers': 'Solo los jugadores de la partida pueden reportar un problema.',

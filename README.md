@@ -282,7 +282,9 @@ está na fila e os espectadores também contam.
   o replay completo para baixar no fim.
 - **Decklist do oponente:** no resumo do fim de qualquer partida (bot ou online; em replays e para quem assiste, um
   botão por jogador), um botão abre a lista completa do deck adversário como imagem (a mesma peça das decklists do kit de divulgação dos
-  torneios, 1080×1350) para baixar e compartilhar, e em texto para copiar e importar no construtor de decks.
+  torneios, 1080×1350) para baixar e compartilhar, e em texto para copiar e importar no construtor de decks. **Nas partidas
+  de torneio, não:** o fim da partida não revela a mão nem o deck do oponente, o botão não aparece e o replay não sai da
+  sala; as listas (e os replays, na página do torneio) só se abrem quando o torneio termina.
 - **Proteção contra abuso:** abrir salas não exige login, então há tetos: salas ativas no servidor
   (`ONLINE_MAX_ROOMS`), salas de treino contra o bot (`ONLINE_MAX_BOT_ROOMS`), e por IP (16 salas ou lugares na fila
   ao mesmo tempo e 60 criações a cada 10 min; `apps/server/src/online/lobby.ts`, `DEFAULT_LIMITS`). O Nginx dos scripts
@@ -314,6 +316,9 @@ espectadores seguem para a partida nova.
   a partida e recusa para quem está jogando a própria partida. Com as mãos, a mesa chega **atrasada** (ações, relógio, chat, emotes e resultado): o atraso escolhido nas
   opções do modo transmissão (padrão 3 min, **nunca menos de 1 min**), para a partida poder ir para uma live sem o
   oponente ver a mão do outro pela transmissão; a mesa mostra o aviso "⏱ N min de atraso". Sem as mãos, ao vivo.
+  Exceção: o organizador (ou um admin) pode marcar no torneio **Mãos ao vivo na transmissão**; nas partidas desse
+  torneio vale o atraso escolhido pelo streamer, até nenhum (as mãos saem ao vivo). A decisão é do organizador: serve
+  para eventos em que os jogadores não assistem à live durante a partida. Salas privadas continuam com o mínimo de 1 min.
 - **Interagir assistindo:** quem assiste toca numa carta à vista para ampliá-la e ler o efeito (no computador, passar
   o mouse mostra a carta no painel lateral), abre o descarte dos dois jogadores e o histórico, e o botão **Chat** da
   faixa do espectador esconde ou mostra as mensagens e emotes dos jogadores só para si (lembrado no navegador).
@@ -325,7 +330,8 @@ espectadores seguem para a partida nova.
   troca para ela sozinha (consulta a escolha a cada 3 s). Opções do painel:
   - **Atraso** (sem atraso, 1, 2, 3, 5 ou 10 min);
   - **mãos dos jogadores** nas partidas de torneio e salas privadas liberadas que ele assiste (sempre com pelo menos
-    1 min de atraso; nas outras partidas, a mão do oponente nunca aparece);
+    1 min de atraso, salvo nos torneios com **Mãos ao vivo na transmissão**, em que vale o atraso escolhido, até
+    nenhum; nas outras partidas, a mão do oponente nunca aparece);
   - **a própria mão** nas partidas que ele joga (a do oponente nunca aparece; vale o atraso escolhido, até nenhum);
   - **atraso nas partidas de torneio** mesmo sem as mãos (sem essa opção, sem mãos é ao vivo);
   - **chat dos jogadores** na live.
@@ -414,8 +420,9 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   site), tira jogadores e avança: próxima rodada do suíço, início do top cut, próxima fase da chave e, depois da
   final, o encerramento. **Encerrar agora** termina antes.
 - **Auditoria:** todo jogo disputado nas salas fica gravado com o replay. Em cada partida da aba Rodadas, **Jogos
-  gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os dois jogadores podem
-  **assistir ao replay**. Ao fim de qualquer partida (contra o bot, online, ranqueada ou de torneio), o jogador logado
+  gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os Judges podem
+  **assistir ao replay**; os dois jogadores também, mas só quando o torneio termina (o replay traz as duas listas, e as
+  listas ficam fechadas até o fim: no resumo do fim de cada jogo não há "Decklist do oponente" nem "Baixar replay"). Ao fim de qualquer partida (contra o bot, online, ranqueada ou de torneio), o jogador logado
   pode **relatar um bug** (botão ⚑ abaixo de "Baixar replay"): a carta, a interação que deu problema, o que deveria ter
   acontecido e se quer ser avisado da correção. O relato, com o replay, aparece na aba **Relatos** do torneio para o
   organizador e em **Administração → Relatos de partidas** para Admin e Dev, que o resolvem com uma nota; quem pediu o
@@ -864,7 +871,7 @@ npm run typecheck
 | POST   | `/api/online/rooms/:id/action` | Ação (`{ t, seq, action }`; `seq` = `actionCount` da visão) |
 | POST   | `/api/online/rooms/:id/emote` · `/chat` · `/rematch` · `/leave` | Emote, mensagem do chat (`{ t, text }`, até 120 caracteres, censurada), revanche (salas privadas) e cancelar a sala |
 | POST   | `/api/online/rooms/:id/focus` | O app do jogador saiu da tela ou voltou (`{ t, visible }`): fora da tela, a vez vira notificação |
-| GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim) |
+| GET    | `/api/online/rooms/:id/replay` | Replay completo (só depois do fim; nunca numa partida de torneio) |
 | POST   | `/api/online/bot` | Treino contra o bot transmitido, só com login (`{ deckId, botDeckId \| random, format, first? }`, `first`: 0 = jogador, 1 = bot, ausente = sorteio; 401 sem login; desligado com `ONLINE_BOT_ROOMS=off`) |
 | GET    | `/api/online/live` | Partidas para assistir (`{ rooms, hands }`; `hands`: quem pede pode ver as mãos) |
 | GET    | `/api/online/watch/:code` | Sala privada pelo código, para assistir |
@@ -877,7 +884,7 @@ npm run typecheck
 | GET    | `/api/broadcast/:key` | O que a tela de transmissão mostra (`{ roomId, chat, rev }`; `rev` muda a cada troca; sem login, 404 com chave inválida) |
 | GET    | `/api/tournaments` | Torneios (`{ tournaments, canCreate }`) |
 | GET    | `/api/tournaments/:id` | Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer |
-| POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, swissBestOf: 1 \| 3, topCut, bo3From, bo5From, maxPlayers, startsAt }`; Organizador e Admin) |
+| POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, swissBestOf: 1 \| 3, topCut, bo3From, bo5From, maxPlayers, startsAt, liveHands }`; Organizador e Admin) |
 | PUT / DELETE | `/api/tournaments/:id` | Edita (só com inscrições abertas) / apaga (organizador do torneio ou Admin) |
 | POST / DELETE | `/api/tournaments/:id/register` | Inscreve ou troca o deck (`{ deckId }`) / cancela a inscrição ou desiste |
 | POST   | `/api/tournaments/:id/start` · `/next` · `/finish` | Começa, avança (rodada do suíço, top cut, próxima fase ou encerramento) e encerra antes |

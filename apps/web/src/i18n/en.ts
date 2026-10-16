@@ -566,6 +566,7 @@ export default {
   'online.seriesScore': 'series score',
   'online.seriesWon': ' — you won the series!',
   'online.seriesOver': ' — series over.',
+  'online.decksSealed': 'Tournament match: your opponent\'s deck list and the replay stay sealed until the tournament ends (they open on the tournament page).',
   'online.bounty': 'Bounty:',
   'online.rematchWanted': '{name} wants a rematch!',
   // ---- waiting ----
@@ -657,7 +658,7 @@ export default {
   'broadcast.showsOwn': 'your hand',
   'broadcast.showsNone': 'no hands',
   'broadcast.handsPlayers': 'Show the players\' hands in tournament matches and allowed private rooms you watch',
-  'broadcast.handsPlayersHint': '(always with at least {n} min delay)',
+  'broadcast.handsPlayersHint': '(always with at least {n} min delay, except in tournaments with live hands)',
   'broadcast.handsOwn': 'Show your hand in matches you play',
   'broadcast.handsOwnHint': '(the opponent\'s never shows; uses the chosen delay)',
   'broadcast.delayTournaments': 'Delay tournament matches too, even without hands',
@@ -974,6 +975,7 @@ export default {
   'tour.gameNoWinner': 'no winner',
   'tour.notCounted': 'not counted in the score',
   'tour.watchReplay': '▶ Watch replay',
+  'tour.replaysAtEnd': 'Replays of your games open when the tournament ends (deck lists are only revealed at the end).',
   // ---- tournaments: standings ----
   'tour.colPlayer': 'Player',
   'tour.colPoints': 'Pts',
@@ -1008,6 +1010,10 @@ export default {
   'tour.maxWarningsNone': 'No limit (the organizer decides case by case)',
   'tour.maxWarningsN': '{n|# warning|# warnings}',
   'tour.maxWarningsHint': 'The Judge gives warnings to players. When the limit is reached, the organizer is alerted and decides whether to eliminate the player; the next round is only generated after the decision.',
+  'tour.liveHandsOption': 'Live hands on stream (no minimum delay)',
+  'tour.liveHandsHint':
+    'Streamers (Streamer or Admin role) can show both players\' hands with no delay. Without this option, hands always arrive with at least 1 min delay, so a player cannot see the opponent\'s hand through the stream. Use it only when players do not watch the stream during the match.',
+  'tour.liveHandsInfo': '📡 Live hands on stream: streamers can show the players\' hands with no delay.',
   'tour.manualStart': 'the organizer gives the start from {date}',
   'tour.maxWarningsInfo': 'Warning limit: {n} (when reached, the organizer decides on elimination).',
   'tour.judgesLabel': 'Judge:',
@@ -2289,6 +2295,8 @@ export default {
   'errors.rematchPrivateOnly': 'Rematches are only for private rooms.',
   'errors.matchNotFinished': "The match isn't over yet.",
   'errors.replayAfterEnd': 'The replay is available only after the match ends.',
+  'errors.replayTournament': 'In a tournament match the replay lives on the tournament page: for the organizer and the Judges, and for the players once the tournament ends.',
+  'errors.replayTournamentRunning': 'The replay of this match becomes available when the tournament ends (deck lists are only revealed at the end).',
   'errors.resultNotSaved': "Couldn't save the result.",
   // ---- ações na mesa, dado, emotes e chat ----
   'errors.matchNotStarted': "The match hasn't started yet.",
@@ -2307,7 +2315,7 @@ export default {
   'errors.chatMessageTooLong': 'Messages can have at most {max} characters.',
   'errors.chatTooFast': 'Wait a moment before sending another message.',
   // ---- replays e relatos ----
-  'errors.replayForbidden': 'Only the match players, the tournament organizer or an admin can view this replay.',
+  'errors.replayForbidden': 'Only the match players, the tournament organizer or a Judge, or an admin can view this replay.',
   'errors.noReplay': 'This match has no saved replay.',
   'errors.matchOfOthers': 'This match belongs to other players.',
   'errors.reportOnlyPlayers': 'Only the match players can report a problem.',

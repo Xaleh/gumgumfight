@@ -566,6 +566,7 @@ export default {
   'online.seriesScore': 'Serienstand',
   'online.seriesWon': ' – du hast die Serie gewonnen!',
   'online.seriesOver': ' – Serie beendet.',
+  'online.decksSealed': 'Turnierpartie: Die Deckliste des Gegners und das Replay bleiben bis zum Turnierende verschlossen (sie öffnen sich auf der Turnierseite).',
   'online.bounty': 'Kopfgeld:',
   'online.rematchWanted': '{name} will eine Revanche!',
   // ---- Warten ----
@@ -657,7 +658,7 @@ export default {
   'broadcast.showsOwn': 'deine Hand',
   'broadcast.showsNone': 'ohne Hände',
   'broadcast.handsPlayers': 'Hände der Spieler in Turnierpartien und freigegebenen privaten Räumen zeigen, die du ansiehst',
-  'broadcast.handsPlayersHint': '(immer mit mindestens {n} Min. Verzögerung)',
+  'broadcast.handsPlayersHint': '(immer mit mindestens {n} Min. Verzögerung, außer in Turnieren mit Handkarten live)',
   'broadcast.handsOwn': 'Deine Hand in Partien zeigen, die du spielst',
   'broadcast.handsOwnHint': '(die des Gegners nie; es gilt die gewählte Verzögerung)',
   'broadcast.delayTournaments': 'Turnierpartien auch ohne Hände verzögern',
@@ -974,6 +975,7 @@ export default {
   'tour.gameNoWinner': 'kein Sieger',
   'tour.notCounted': 'zählt nicht zum Ergebnis',
   'tour.watchReplay': '▶ Replay ansehen',
+  'tour.replaysAtEnd': 'Die Replays deiner Partien öffnen sich am Turnierende (Decklisten werden erst am Ende aufgedeckt).',
   // ---- Turniere: Tabelle ----
   'tour.colPlayer': 'Spieler',
   'tour.colPoints': 'Pkt.',
@@ -1008,6 +1010,10 @@ export default {
   'tour.maxWarningsNone': 'Kein Limit (der Veranstalter entscheidet von Fall zu Fall)',
   'tour.maxWarningsN': '{n|# Verwarnung|# Verwarnungen}',
   'tour.maxWarningsHint': 'Der Judge gibt Spielern Verwarnungen. Wird das Limit erreicht, wird der Veranstalter benachrichtigt und entscheidet, ob der Spieler ausgeschlossen wird; die nächste Runde wird erst nach der Entscheidung erstellt.',
+  'tour.liveHandsOption': 'Handkarten live im Stream (ohne Mindestverzögerung)',
+  'tour.liveHandsHint':
+    'Streamer (Rolle Streamer oder Admin) können die Handkarten beider Spieler ohne Verzögerung zeigen. Ohne diese Option kommen die Handkarten immer mit mindestens 1 Min. Verzögerung, damit kein Spieler die Hand des Gegners über den Stream sieht. Nur verwenden, wenn die Spieler den Stream während der Partie nicht ansehen.',
+  'tour.liveHandsInfo': '📡 Handkarten live im Stream: Streamer können die Handkarten der Spieler ohne Verzögerung zeigen.',
   'tour.manualStart': 'der Veranstalter gibt den Start ab {date}',
   'tour.maxWarningsInfo': 'Limit für Verwarnungen: {n} (wird es erreicht, entscheidet der Veranstalter über den Ausschluss).',
   'tour.judgesLabel': 'Judge:',
@@ -2289,6 +2295,8 @@ export default {
   'errors.rematchPrivateOnly': 'Revanchen gibt es nur in privaten Räumen.',
   'errors.matchNotFinished': 'Die Partie ist noch nicht vorbei.',
   'errors.replayAfterEnd': 'Das Replay ist erst nach dem Ende der Partie verfügbar.',
+  'errors.replayTournament': 'In einer Turnierpartie liegt das Replay auf der Turnierseite: für den Veranstalter und die Judges, und für die Spieler nach dem Turnierende.',
+  'errors.replayTournamentRunning': 'Das Replay dieser Partie wird am Turnierende verfügbar (Decklisten werden erst am Ende aufgedeckt).',
   'errors.resultNotSaved': 'Das Ergebnis konnte nicht gespeichert werden.',
   // ---- Aktionen am Tisch, Würfel, Emotes und Chat ----
   'errors.matchNotStarted': 'Die Partie hat noch nicht begonnen.',
@@ -2307,7 +2315,7 @@ export default {
   'errors.chatMessageTooLong': 'Nachrichten dürfen höchstens {max} Zeichen haben.',
   'errors.chatTooFast': 'Warte einen Moment, bevor du eine weitere Nachricht sendest.',
   // ---- Replays und Meldungen ----
-  'errors.replayForbidden': 'Nur die Spieler der Partie, der Turnierveranstalter oder ein Admin können dieses Replay ansehen.',
+  'errors.replayForbidden': 'Nur die Spieler der Partie, der Turnierveranstalter oder ein Judge des Turniers oder ein Admin können dieses Replay ansehen.',
   'errors.noReplay': 'Diese Partie hat kein gespeichertes Replay.',
   'errors.matchOfOthers': 'Diese Partie gehört anderen Spielern.',
   'errors.reportOnlyPlayers': 'Nur die Spieler der Partie können ein Problem melden.',
