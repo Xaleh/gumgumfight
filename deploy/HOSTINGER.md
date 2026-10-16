@@ -185,11 +185,15 @@ ver "API para parceiros" no `README.md`). Dois ajustes na VPS:
 1. **Cliente OAuth** (o botão "Vincular" no app): cadastre o app pela linha de comando, no servidor, e passe o
    `client_secret` (e o `webhook_secret`, se houver) por um canal seguro. Eles aparecem uma vez só:
 
+   O `node` da sessão pode ser mais antigo que o do app (`node:sqlite` exige Node 22.13): use o `NODE_BIN` do
+   `deploy.env`, o mesmo que o pm2 usa. Troque o domínio pelo do app (sem `<` e `>`).
+
    ```bash
    cd ~/apps/gumgumfight/current/server
-   DB_PATH=~/apps/gumgumfight/shared/gumgum.db node oauth-client-cli.mjs add sweetapp "sweetapp" \
+   NODE_BIN=$(sed -n 's/^NODE_BIN=//p' ~/apps/gumgumfight/shared/deploy.env)
+   DB_PATH=~/apps/gumgumfight/shared/gumgum.db "$NODE_BIN" oauth-client-cli.mjs add sweetapp "sweetapp" \
      --redirect https://sweetapp.example/integrations/ggf/callback --webhook https://sweetapp.example/integrations/ggf/webhook
-   DB_PATH=~/apps/gumgumfight/shared/gumgum.db node oauth-client-cli.mjs list
+   DB_PATH=~/apps/gumgumfight/shared/gumgum.db "$NODE_BIN" oauth-client-cli.mjs list
    ```
 
 2. **IP do parceiro fora do limite por IP do Nginx**: todas as chamadas do app saem do servidor dele, então os
