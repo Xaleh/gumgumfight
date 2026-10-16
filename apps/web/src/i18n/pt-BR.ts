@@ -2266,7 +2266,7 @@ const ptBR = {
   'errors.chatMessageTooLong': 'A mensagem pode ter no máximo {max} caracteres.',
   'errors.chatTooFast': 'Espere um pouco antes de mandar outra mensagem.',
   // ---- replays e relatos ----
-  'errors.replayForbidden': 'Só quem jogou a partida, o organizador do torneio ou um admin pode ver este replay.',
+  'errors.replayForbidden': 'Só quem jogou a partida, o organizador ou um Judge do torneio, ou um admin pode ver este replay.',
   'errors.noReplay': 'Esta partida não tem replay gravado.',
   'errors.matchOfOthers': 'Partida de outros jogadores.',
   'errors.reportOnlyPlayers': 'Só quem jogou a partida pode relatar um problema.',

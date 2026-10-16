@@ -2262,7 +2262,7 @@ export default {
   'errors.chatMessageTooLong': 'メッセージは最大{max}文字です。',
   'errors.chatTooFast': '次のメッセージを送るまで少しお待ちください。',
   // ---- リプレイと報告 ----
-  'errors.replayForbidden': 'このリプレイを見られるのは、対戦したプレイヤー、大会の主催者、管理者だけです。',
+  'errors.replayForbidden': 'このリプレイを見られるのは、対戦したプレイヤー、大会の主催者またはジャッジ、管理者だけです。',
   'errors.noReplay': 'この対戦には保存されたリプレイがありません。',
   'errors.matchOfOthers': 'この対戦は他のプレイヤーのものです。',
   'errors.reportOnlyPlayers': '問題を報告できるのは対戦したプレイヤーだけです。',
