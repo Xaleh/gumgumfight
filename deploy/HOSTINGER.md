@@ -200,7 +200,9 @@ ver "API para parceiros" no `README.md`). Dois ajustes na VPS:
    usuários dele somados contariam como um IP só contra os 30 req/s. Coloque o IP (ou os IPs, separados por
    vírgula) em `PARTNER_IPS` no `deploy.env` e rode o bootstrap de novo (`SKIP_UPGRADE=1 bash
    /root/bootstrap-hostinger.sh`), que regenera `/etc/nginx/conf.d/gumgumfight-limits.conf`. A partir daí, o limite
-   que vale para esse IP é o do app: 120 requisições por minuto por token.
+   que vale para esse IP é o do app: 120 requisições por minuto por token. Isso só se aplica onde o Nginx roda no
+   host (a produção): na homologação com Nginx Proxy Manager (Docker), o `setup-vm.sh` não configura limite por IP,
+   então não há o que liberar.
 
 ## Operação
 
