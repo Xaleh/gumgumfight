@@ -263,7 +263,7 @@ card_img_location() {
   cat <<EOF
     location /card-img/$1/ {
         limit_req zone=gumgum_api burst=200 nodelay;
-        proxy_pass https://$2/$3;
+        proxy_pass https://$2/${3:-};
         proxy_ssl_server_name on;
         proxy_set_header Host $2;
         proxy_set_header Cookie "";
