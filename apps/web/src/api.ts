@@ -570,6 +570,8 @@ export interface LiveRoom {
   spectators: number;
   /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
   handsAllowed?: boolean;
+  /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio em que o organizador liberou). */
+  handsLive?: boolean;
   createdAt: number;
   /** Jogo de uma partida de torneio. */
   tournament: { id: string; name: string; round: number; label: string; game: number; bestOf: number } | null;
@@ -646,6 +648,8 @@ export interface OnlineRoomInfo {
   delay?: number;
   /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
   handsAllowed?: boolean;
+  /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio em que o organizador liberou). */
+  handsLive?: boolean;
 }
 
 // ------------------------------------------------------------------ torneios
@@ -686,6 +690,8 @@ export interface TournamentInput {
   checkIn: boolean;
   /** Com check-in: o torneio começa sozinho na hora marcada (para quando o organizador não está presente). */
   autoStart: boolean;
+  /** Quem transmite (Streamer e Admin) pode mostrar as mãos dos jogadores ao vivo, sem o atraso mínimo de 1 min. */
+  liveHands: boolean;
   /** Warnings que um jogador pode receber antes de o organizador ter de decidir a eliminação (null = sem regra). */
   maxWarnings: number | null;
   /** Minutos para entrar na sala em cada rodada (1 a 60). */
@@ -1107,6 +1113,8 @@ export interface TournamentDetail {
   /** Torneio com hora marcada: check-in, início automático (opção) e W.O. por ausência. */
   checkIn: boolean;
   autoStart: boolean;
+  /** Quem transmite pode mostrar as mãos dos jogadores ao vivo, sem o atraso mínimo (servidores antigos não mandam). */
+  liveHands?: boolean;
   /** Warnings até o organizador ter de decidir a eliminação (null = sem regra). */
   maxWarnings: number | null;
   checkInMs: number;

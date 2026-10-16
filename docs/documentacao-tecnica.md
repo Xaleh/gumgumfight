@@ -812,10 +812,15 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   ou sala privada com `RoomData.showHands`, marcado por quem criou em `POST /api/online/rooms {showHands}` e mantido na
   revanche): `extra` = as duas mãos + a carta da Vida sendo olhada. Recusado (403) fora disso (`handsTournamentOnly`) e
   para quem joga a própria partida. A `Room` também garante a regra: sem `handsAllowed`, `hands` é ignorado ao
-  conectar e nunca entra no `extra`. `room.handsAllowed` (e `handsAllowed` na lista) avisa jogadores e espectadores. Decks e Vida virada continuam escondidos. O atraso é o `delay_s` da conta (padrão 3 min).
+  conectar e nunca entra no `extra`. `room.handsAllowed` (e `handsAllowed` na lista) avisa jogadores e espectadores. Decks e Vida virada continuam escondidos. O atraso é o `delay_s` da conta (padrão 3 min),
+  nunca abaixo de `Room.minHandsDelay` (1 min; 0 em torneio com `live_hands`, ver abaixo).
 - **Mesa atrasada** (`Connection.delay`, ms; `lateDelay` aplica as regras: jogadores sempre ao vivo, quem vê as duas
   mãos nunca abaixo de `MIN_HANDS_DELAY_MS` = 1 min, teto `MAX_DELAY_MS` = 10 min): a partida pode estar numa live, e
-  o oponente não pode ver a mão do outro pela transmissão. `RoomData.timeline` guarda, para cada ação, o instante e o
+  o oponente não pode ver a mão do outro pela transmissão. **Mãos ao vivo** (`tournaments.live_hands`, opção do
+  organizador no formulário do torneio, copiada para `RoomTournament.liveHands` ao abrir cada sala; `Room.handsLive`
+  e `handsLive` no `room` e na lista): nessas partidas o mínimo cai a 0 (`Room.minHandsDelay`), vale o atraso
+  escolhido pelo streamer e, sem atraso, as duas mãos saem da mesa ao vivo (`snapshot`). Só em torneio: a sala
+  privada liberada mantém o mínimo. `RoomData.timeline` guarda, para cada ação, o instante e o
   tempo dos dois jogadores logo depois dela (e `startedAt`, o começo). A sala mantém **uma mesa por atraso em uso**
   (`lates`: estado + quantas ações aplicadas + fila de eventos + timer), criada quando chega o primeiro espectador com
   aquele atraso (`createGame` + as ações com instante ≤ agora − atraso) e descartada quando sai o último. Um
@@ -832,8 +837,8 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   (24 bytes, base64url); `PUT /api/broadcast/room` escolhe a partida (a lista "Assistir" e o menu da partida);
   `PUT /api/broadcast/settings` grava as opções. A tela `/?transmissao=<chave>` (componente `Broadcast`) consulta
   `GET /api/broadcast/:key` a cada 3 s e abre o canal com `k=<chave>`; o servidor decide o que a conexão vê
-  (`broadcastView`): partida de outros com `handsAllowed` → as duas mãos (`handsPlayers`, atraso ≥ 1 min) ou a
-  pública; outras partidas de outros → sempre a pública; partida dele →
+  (`broadcastView`): partida de outros com `handsAllowed` → as duas mãos (`handsPlayers`, atraso ≥ 1 min, ou o
+  escolhido, até 0, em torneio com `handsLive`) ou a pública; outras partidas de outros → sempre a pública; partida dele →
   `as` (`handsOwn`, o atraso escolhido, até 0) ou a pública; sem mãos, ao vivo, exceto torneio com
   `delayTournaments`. A tela só reconecta quando `rev` muda (outra partida ou outra opção), então segue a revanche no
   ritmo da mesa atrasada sem voltar para a sala velha. O perfil do dono é conferido a cada pedido. A mesa em modo

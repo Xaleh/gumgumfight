@@ -392,6 +392,7 @@ function TournamentForm({
     startsAt: initial?.startsAt ?? null,
     checkIn: initial?.checkIn ?? true,
     autoStart: initial?.autoStart ?? false,
+    liveHands: initial?.liveHands ?? false,
     maxWarnings: initial?.maxWarnings ?? null,
     toleranceMin: initial?.toleranceMin ?? 5,
     official: initial?.official ?? false,
@@ -624,6 +625,13 @@ function TournamentForm({
               ))}
             </select>
             <p className="muted small">{tr('tour.maxWarningsHint')}</p>
+          </div>
+          <div className="field">
+            <label className="check">
+              <input type="checkbox" checked={form.liveHands} onChange={(e) => set('liveHands', e.target.checked)} />
+              {tr('tour.liveHandsOption')}
+            </label>
+            <p className="muted small">{tr('tour.liveHandsHint')}</p>
           </div>
           {form.structure === 'swiss' && <p className="muted small">{tr('tour.roundsAutoHint')}</p>}
           {admin && (
@@ -864,6 +872,7 @@ function TournamentPage({
               )}
               {t.checkIn && t.status === 'running' && <p className="muted small">{tr('tour.toleranceInfo', { tolerance: minutes(tr, t.toleranceMs) })}</p>}
               {t.maxWarnings !== null && <p className="muted small">{tr('tour.maxWarningsInfo', { n: t.maxWarnings })}</p>}
+              {t.liveHands && <p className="muted small">{tr('tour.liveHandsInfo')}</p>}
               {(t.judges.length > 0 || t.isJudge) && (
                 <p className="small tour-judges-line">
                   <b>{tr('tour.judgesLabel')}</b> {t.judges.length ? t.judges.map((j) => j.name).join(', ') : tr('tour.judgeIsOrganizer')}

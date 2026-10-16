@@ -113,6 +113,8 @@ export interface RoomTournament {
   wins: Record<string, number>;
   /** Conta que começa este jogo (quem perdeu o anterior); ausente = sorteio. */
   firstUserId?: string | null;
+  /** O organizador liberou as mãos ao vivo para quem transmite (sem o atraso mínimo; ver `Room.handsLive`). */
+  liveHands?: boolean;
 }
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
@@ -192,7 +194,7 @@ export interface RoomData {
 export interface Connection {
   /** Assento do jogador; null = espectador. */
   seat: PlayerId | null;
-  /** Espectador vendo as mãos dos dois jogadores (streamer ou admin), sempre na mesa atrasada. */
+  /** Espectador vendo as mãos dos dois jogadores (streamer ou admin), na mesa atrasada (ao vivo só com `Room.handsLive`). */
   hands?: boolean;
   /** Espectador que vê a mesa como este jogador (o streamer transmitindo a própria partida). */
   as?: PlayerId;
@@ -262,13 +264,15 @@ interface LateEvent {
   data: unknown;
 }
 
-/** Atraso da mesa de uma conexão: jogadores, ao vivo; quem vê as mãos, nunca abaixo do mínimo. */
-export function lateDelay(c: Pick<Connection, 'seat' | 'hands' | 'delay' | 'judge'>): number {
+/**
+ * Atraso da mesa de uma conexão: jogadores, ao vivo; quem vê as mãos, nunca abaixo de `minHands`
+ * (MIN_HANDS_DELAY_MS, ou 0 onde o organizador liberou as mãos ao vivo; ver `Room.handsLive`).
+ */
+export function lateDelay(c: Pick<Connection, 'seat' | 'hands' | 'delay' | 'judge'>, minHands = MIN_HANDS_DELAY_MS): number {
   if (c.seat !== null || c.judge) return 0;
   const delay = Math.min(MAX_DELAY_MS, Math.max(0, c.delay ?? 0));
-  return c.hands ? Math.max(MIN_HANDS_DELAY_MS, c.delay === undefined ? HANDS_DELAY_MS : delay) : delay;
+  return c.hands ? Math.max(minHands, c.delay === undefined ? HANDS_DELAY_MS : delay) : delay;
 }
-const isLate = (c: Connection) => lateDelay(c) > 0;
 
 /**
  * Cartas a mais na visão de quem vê as mãos (sempre da mesa atrasada): as duas mãos e a carta
@@ -355,6 +359,28 @@ export class Room {
   /** As mãos dos jogadores podem aparecer para quem assiste (com o perfil e o atraso): torneio ou sala privada liberada. */
   get handsAllowed(): boolean {
     return this.data.queue === 'tournament' || (this.data.queue === 'private' && Boolean(this.data.showHands));
+  }
+
+  /**
+   * As mãos podem aparecer ao vivo, sem o atraso mínimo: partida de torneio em que o organizador
+   * liberou as mãos ao vivo. Fora disso, quem vê as mãos assiste com pelo menos MIN_HANDS_DELAY_MS.
+   */
+  get handsLive(): boolean {
+    return this.data.queue === 'tournament' && Boolean(this.data.tournament?.liveHands);
+  }
+
+  /** Atraso mínimo de quem vê as mãos nesta sala (ms). */
+  get minHandsDelay(): number {
+    return this.handsLive ? 0 : MIN_HANDS_DELAY_MS;
+  }
+
+  /** Atraso da mesa desta conexão (ver `lateDelay`). */
+  delayOf(c: Pick<Connection, 'seat' | 'hands' | 'delay' | 'judge'>): number {
+    return lateDelay(c, this.minHandsDelay);
+  }
+
+  private isLate(c: Connection): boolean {
+    return this.delayOf(c) > 0;
   }
 
   /**
@@ -705,11 +731,11 @@ export class Room {
     // Mãos dos jogadores só onde são permitidas (torneio ou sala privada liberada); o Judge, só em sala de torneio.
     if (conn.hands && !this.handsAllowed) conn.hands = false;
     if (conn.judge && this.data.queue !== 'tournament') conn.judge = false;
-    if (isLate(conn)) {
+    if (this.isLate(conn)) {
       // Quem já assistia atrasado recebe o que venceu antes de quem chega agora.
       this.advanceLate();
       // Sem a mesa atrasada (não deu para refazê-la), assiste ao vivo, só com a visão pública.
-      if (!this.ensureLate(lateDelay(conn))) Object.assign(conn, { hands: false, as: undefined, delay: 0 });
+      if (!this.ensureLate(this.delayOf(conn))) Object.assign(conn, { hands: false, as: undefined, delay: 0 });
     }
     const late = this.lateOf(conn);
     this.conns.add(conn);
@@ -728,14 +754,14 @@ export class Room {
     this.conns.delete(conn);
     this.updatePresence();
     this.broadcastPresence();
-    if (isLate(conn)) this.advanceLate();
+    if (this.isLate(conn)) this.advanceLate();
   }
 
   // ------------------------------------------------------------------ mesa atrasada
 
   /** A mesa atrasada de uma conexão (null = assiste ao vivo). */
   private lateOf(conn: Connection): LateTable | null {
-    return isLate(conn) ? (this.lates.get(lateDelay(conn)) ?? null) : null;
+    return this.isLate(conn) ? (this.lates.get(this.delayOf(conn)) ?? null) : null;
   }
 
   /** Guarda um evento fora do jogo para as mesas atrasadas (as atuais e as que surgirem). */
@@ -749,7 +775,7 @@ export class Room {
 
   /** Manda um evento agora para quem assiste ao vivo e, depois do atraso, para quem assiste atrasado. */
   private emit(event: string, data: unknown) {
-    for (const c of this.conns) if (!isLate(c)) c.send(event, data);
+    for (const c of this.conns) if (!this.isLate(c)) c.send(event, data);
     this.queueLate(event, data);
   }
 
@@ -785,7 +811,7 @@ export class Room {
   private advanceTable(late: LateTable) {
     if (late.timer) clearTimeout(late.timer);
     late.timer = null;
-    const viewers = [...this.conns].filter((c) => isLate(c) && lateDelay(c) === late.delay);
+    const viewers = [...this.conns].filter((c) => this.isLate(c) && this.delayOf(c) === late.delay);
     if (!viewers.length) {
       this.lates.delete(late.delay);
       return;
@@ -855,13 +881,13 @@ export class Room {
 
   /** Avisos fora do jogo (revanche). `data` recebe null para os espectadores; quem vê as mãos recebe depois do atraso. */
   notify(event: string, data: (seat: PlayerId | null) => unknown) {
-    for (const c of this.conns) if (!isLate(c)) c.send(event, data(c.seat));
+    for (const c of this.conns) if (!this.isLate(c)) c.send(event, data(c.seat));
     this.queueLate(event, data(null));
   }
 
   /** Estado novo para quem assiste ao vivo (a mesa atrasada avança sozinha, em `advanceLate`). */
   broadcast() {
-    for (const c of this.conns) if (!isLate(c)) c.send('state', this.snapshot(c));
+    for (const c of this.conns) if (!this.isLate(c)) c.send('state', this.snapshot(c));
   }
 
   clock() {
@@ -917,6 +943,8 @@ export class Room {
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
       handsAllowed: this.handsAllowed,
+      /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio com mãos ao vivo). */
+      handsLive: this.handsLive,
       /** Atraso da mesa desta conexão (ms); 0 = ao vivo. */
       delay: late ? late.delay : 0,
     };
@@ -931,11 +959,12 @@ export class Room {
     const state = late ? late.state : this.state;
     const lastAction = late ? late.lastAction : this.lastAction;
     // A visão de um jogador sem a mesa atrasada que ela exige seria o presente: fica a pública.
-    const pov = conn.seat ?? (late || !isLate(conn) ? (conn.as ?? null) : null);
+    const pov = conn.seat ?? (late || !this.isLate(conn) ? (conn.as ?? null) : null);
     const room = this.info(conn.seat, late, pov);
     if (!state || !this.aliases) return { room, view: null, defs: {}, log: { from: 0, entries: [] }, lastAction: null };
-    // As mãos dos dois só saem da mesa atrasada (ou ao vivo para o Judge), onde são permitidas: fora disso, nada a mais.
-    const extra = this.handsAllowed && ((late && conn.hands) || (!late && conn.judge)) ? handsOf(state) : [];
+    // As mãos dos dois só saem da mesa atrasada (ou ao vivo para o Judge e, no torneio com mãos ao vivo,
+    // para quem as vê sem atraso), onde são permitidas: fora disso, nada a mais.
+    const extra = this.handsAllowed && ((late && conn.hands) || (!late && (conn.judge || (conn.hands && this.handsLive)))) ? handsOf(state) : [];
     const opts = { revealEnd: !this.sealed };
     const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra, opts);
     const newDefs: Record<string, CardDef> = {};

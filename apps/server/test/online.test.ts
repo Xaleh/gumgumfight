@@ -990,6 +990,31 @@ describe('partidas online: relógio', () => {
     expect(three.view!.actionCount).toBe(2);
     l.dispose();
   });
+  it('torneio com mãos ao vivo: quem vê as mãos assiste em tempo real, com as duas mãos à vista', () => {
+    const db = freshDb();
+    const l = lobby(db, () => 1_000_000);
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    if ('error' in r) throw new Error(r.error);
+    l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
+    const room = r.room;
+    room.data.queue = 'tournament';
+    room.data.tournament = { id: 't-1', name: 'Liga', round: 1, label: 'Rodada 1', matchId: 1, game: 1, bestOf: 1, wins: {}, liveHands: true };
+    const live = client(null, true);
+    live.conn.delay = 0;
+    const late = client(null, true);
+    late.conn.delay = 120_000;
+    const dflt = client(null, true);
+    for (const c of [live, late, dflt]) room.attach(c.conn);
+    // Sem atraso: mesa ao vivo e as duas mãos à vista; quem pediu atraso continua atrasado; sem escolha, o padrão.
+    expect([live, late, dflt].map((c) => c.room.delay)).toEqual([0, 120_000, HANDS_DELAY_MS]);
+    expect(live.room.handsLive).toBe(true);
+    const v = live.view!;
+    expect(v.players.every((p) => p.hand.every((u) => v.cards[u].cardId !== HIDDEN_CARD))).toBe(true);
+    // A lista de quem assiste informa a liberação.
+    expect(l.live({ bots: true })[0]!.handsLive).toBe(true);
+    l.dispose();
+  });
+
 });
 
 describe('partidas online: canal SSE', () => {
@@ -1305,14 +1330,33 @@ describe('modo espectador', () => {
     expect(broadcastView({ ...s, handsPlayers: false, delayTournaments: true, delayS: 120 }, other, user)).toEqual({ delay: 120_000 });
 
     // "Ver mãos" no app segue o atraso escolhido (com o mesmo mínimo).
-    expect(handsDelayFor(db, nami.id)).toBe(180_000);
+    expect(handsDelayFor(db, nami.id, other)).toBe(180_000);
     await app.inject({ method: 'POST', url: '/api/broadcast/key', headers: { cookie: nami.cookie } });
     await app.inject({ method: 'PUT', url: '/api/broadcast/settings', headers: { cookie: nami.cookie }, payload: { delayS: 30 } });
-    expect(handsDelayFor(db, nami.id)).toBe(60_000);
+    expect(handsDelayFor(db, nami.id, other)).toBe(60_000);
     await app.inject({ method: 'PUT', url: '/api/broadcast/settings', headers: { cookie: nami.cookie }, payload: { delayS: 300 } });
-    expect(handsDelayFor(db, nami.id)).toBe(300_000);
+    expect(handsDelayFor(db, nami.id, other)).toBe(300_000);
     // A própria partida pode ir para a transmissão.
     expect((await app.inject({ method: 'PUT', url: '/api/broadcast/room', headers: { cookie: nami.cookie }, payload: { roomId } })).statusCode).toBe(200);
+
+    // Torneio em que o organizador liberou as mãos ao vivo: vale o atraso escolhido, até nenhum.
+    other.data.tournament = { id: 't-1', name: 'Liga', round: 1, label: 'Rodada 1', matchId: 1, game: 1, bestOf: 1, wins: {}, liveHands: true };
+    expect(other.handsLive).toBe(true);
+    expect(other.minHandsDelay).toBe(0);
+    expect(broadcastView({ ...s, delayS: 0 }, other, user)).toEqual({ hands: true, delay: 0 });
+    expect(broadcastView({ ...s, delayS: 120 }, other, user)).toEqual({ hands: true, delay: 120_000 });
+    expect(handsDelayFor(db, nami.id, other)).toBe(300_000);
+    await app.inject({ method: 'PUT', url: '/api/broadcast/settings', headers: { cookie: nami.cookie }, payload: { delayS: 0 } });
+    expect(handsDelayFor(db, nami.id, other)).toBe(0);
+    // Sem a liberação (ou fora do torneio), o mínimo de 1 min continua.
+    other.data.tournament.liveHands = false;
+    expect(other.handsLive).toBe(false);
+    expect(handsDelayFor(db, nami.id, other)).toBe(60_000);
+    other.data.tournament.liveHands = true;
+    other.data.queue = 'private';
+    other.data.showHands = true;
+    expect(other.handsLive).toBe(false);
+    expect(broadcastView({ ...s, delayS: 0 }, other, user)).toEqual({ hands: true, delay: 60_000 });
   });
 
   it('sala privada: quem cria pode liberar as mãos para quem transmite (e a revanche mantém)', async () => {

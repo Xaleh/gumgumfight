@@ -537,7 +537,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       if (room.isPlayer(accountOwnerKey(account!.id), account!.id)) {
         return reply.code(403).send(fail('handsOwnMatch', 'Você está jogando esta partida: não dá para assisti-la vendo as mãos.'));
       }
-      view = { hands: true, delay: handsDelayFor(db, account!.id) };
+      view = { hands: true, delay: handsDelayFor(db, account!.id, room) };
     }
     if (room.spectators >= MAX_SPECTATORS) return reply.code(429).send(fail('tooManySpectators', 'Esta partida já tem espectadores demais.'));
     stream(req, reply, room, { seat: null, ...view });
