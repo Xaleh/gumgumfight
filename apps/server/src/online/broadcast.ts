@@ -8,7 +8,8 @@
 // O que a live mostra (`broadcastView`) sai das opções do streamer:
 // - partida de outros onde as mãos são permitidas (torneio, ou sala privada em que quem criou
 //   liberou): as mãos dos dois jogadores (`handsPlayers`), sempre com atraso de pelo menos
-//   MIN_HANDS_DELAY_MS, ou só a visão pública; nas outras, a mão do oponente nunca aparece;
+//   MIN_HANDS_DELAY_MS (salvo torneio em que o organizador liberou as mãos ao vivo, `Room.handsLive`:
+//   vale o atraso escolhido, até nenhum), ou só a visão pública; nas outras, a mão do oponente nunca aparece;
 // - partida que ele joga: a mão dele (`handsOwn`, com o atraso que escolher, até 0) ou a pública;
 // - sem mãos, a mesa é ao vivo, exceto nas partidas de torneio com `delayTournaments`.
 
@@ -16,7 +17,7 @@ import { randomBytes } from 'node:crypto';
 import type { PlayerId } from '@gumgum/engine';
 import { accountOwnerKey, getUser, type User } from '../auth/store';
 import type { DB } from '../db';
-import { type Connection, HANDS_DELAY_MS, MAX_DELAY_MS, MIN_HANDS_DELAY_MS, type Room } from './room';
+import { type Connection, HANDS_DELAY_MS, MAX_DELAY_MS, type Room } from './room';
 
 /** Opções da transmissão que o streamer escolhe. */
 export interface BroadcastSettings {
@@ -132,12 +133,12 @@ export function broadcastView(s: BroadcastSettings, room: Room, user: User): Pic
   const plain = room.data.queue === 'tournament' && s.delayTournaments ? delay : 0;
   const seat = seatOfUser(room, user);
   if (seat !== null) return s.handsOwn ? { as: seat, delay } : { delay: plain };
-  if (s.handsPlayers && room.handsAllowed) return { hands: true, delay: Math.max(MIN_HANDS_DELAY_MS, delay) };
+  if (s.handsPlayers && room.handsAllowed) return { hands: true, delay: Math.max(room.minHandsDelay, delay) };
   return { delay: plain };
 }
 
-/** Atraso de quem vê as mãos no app (o escolhido nas opções da transmissão, nunca abaixo do mínimo). */
-export function handsDelayFor(db: DB, userId: string): number {
+/** Atraso de quem vê as mãos no app (o escolhido nas opções da transmissão, nunca abaixo do mínimo da sala). */
+export function handsDelayFor(db: DB, userId: string, room: Pick<Room, 'minHandsDelay'>): number {
   const s = getBroadcast(db, userId) ?? DEFAULT_SETTINGS;
-  return Math.max(MIN_HANDS_DELAY_MS, s.delayS * 1000);
+  return Math.max(room.minHandsDelay, s.delayS * 1000);
 }

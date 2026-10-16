@@ -208,10 +208,11 @@ export function LiveRoomRow({ room: r, onClick, short, current }: { room: LiveRo
 const DELAYS = [0, 60, 120, 180, 300, 600];
 
 /** O que a live mostra numa partida (como o servidor decide em `broadcastView`) e com quanto atraso (s). */
-export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | 'queue' | 'handsAllowed'>): { what: 'players' | 'own' | 'none'; delayS: number } {
+export function broadcastShows(s: BroadcastInfo, room: Pick<LiveRoom, 'mine' | 'queue' | 'handsAllowed' | 'handsLive'>): { what: 'players' | 'own' | 'none'; delayS: number } {
   const plain = room.queue === 'tournament' && s.delayTournaments ? s.delayS : 0;
   if (room.mine) return s.handsOwn ? { what: 'own', delayS: s.delayS } : { what: 'none', delayS: plain };
-  if (s.handsPlayers && room.handsAllowed) return { what: 'players', delayS: Math.max(s.minHandsDelayS, s.delayS) };
+  // Torneio com mãos ao vivo: vale o atraso escolhido, até nenhum; fora disso, nunca abaixo do mínimo.
+  if (s.handsPlayers && room.handsAllowed) return { what: 'players', delayS: room.handsLive ? s.delayS : Math.max(s.minHandsDelayS, s.delayS) };
   return { what: 'none', delayS: plain };
 }
 

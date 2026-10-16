@@ -315,6 +315,9 @@ espectadores seguem para a partida nova.
   a partida e recusa para quem está jogando a própria partida. Com as mãos, a mesa chega **atrasada** (ações, relógio, chat, emotes e resultado): o atraso escolhido nas
   opções do modo transmissão (padrão 3 min, **nunca menos de 1 min**), para a partida poder ir para uma live sem o
   oponente ver a mão do outro pela transmissão; a mesa mostra o aviso "⏱ N min de atraso". Sem as mãos, ao vivo.
+  Exceção: o organizador (ou um admin) pode marcar no torneio **Mãos ao vivo na transmissão**; nas partidas desse
+  torneio vale o atraso escolhido pelo streamer, até nenhum (as mãos saem ao vivo). A decisão é do organizador: serve
+  para eventos em que os jogadores não assistem à live durante a partida. Salas privadas continuam com o mínimo de 1 min.
 - **Interagir assistindo:** quem assiste toca numa carta à vista para ampliá-la e ler o efeito (no computador, passar
   o mouse mostra a carta no painel lateral), abre o descarte dos dois jogadores e o histórico, e o botão **Chat** da
   faixa do espectador esconde ou mostra as mensagens e emotes dos jogadores só para si (lembrado no navegador).
@@ -326,7 +329,8 @@ espectadores seguem para a partida nova.
   troca para ela sozinha (consulta a escolha a cada 3 s). Opções do painel:
   - **Atraso** (sem atraso, 1, 2, 3, 5 ou 10 min);
   - **mãos dos jogadores** nas partidas de torneio e salas privadas liberadas que ele assiste (sempre com pelo menos
-    1 min de atraso; nas outras partidas, a mão do oponente nunca aparece);
+    1 min de atraso, salvo nos torneios com **Mãos ao vivo na transmissão**, em que vale o atraso escolhido, até
+    nenhum; nas outras partidas, a mão do oponente nunca aparece);
   - **a própria mão** nas partidas que ele joga (a do oponente nunca aparece; vale o atraso escolhido, até nenhum);
   - **atraso nas partidas de torneio** mesmo sem as mãos (sem essa opção, sem mãos é ao vivo);
   - **chat dos jogadores** na live.
@@ -781,7 +785,7 @@ npm run typecheck
 | GET    | `/api/broadcast/:key` | O que a tela de transmissão mostra (`{ roomId, chat, rev }`; `rev` muda a cada troca; sem login, 404 com chave inválida) |
 | GET    | `/api/tournaments` | Torneios (`{ tournaments, canCreate }`) |
 | GET    | `/api/tournaments/:id` | Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer |
-| POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, swissBestOf: 1 \| 3, topCut, bo3From, bo5From, maxPlayers, startsAt }`; Organizador e Admin) |
+| POST   | `/api/tournaments` | Cria (`{ name, description, format, structure: swiss \| single, rounds, swissBestOf: 1 \| 3, topCut, bo3From, bo5From, maxPlayers, startsAt, liveHands }`; Organizador e Admin) |
 | PUT / DELETE | `/api/tournaments/:id` | Edita (só com inscrições abertas) / apaga (organizador do torneio ou Admin) |
 | POST / DELETE | `/api/tournaments/:id/register` | Inscreve ou troca o deck (`{ deckId }`) / cancela a inscrição ou desiste |
 | POST   | `/api/tournaments/:id/start` · `/next` · `/finish` | Começa, avança (rodada do suíço, top cut, próxima fase ou encerramento) e encerra antes |

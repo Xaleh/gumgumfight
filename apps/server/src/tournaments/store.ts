@@ -20,6 +20,11 @@ export interface Tournament {
    * "Todas as cartas + spoilers" do organizador. Sem isso, como na ranqueada, só valem cartas lançadas.
    */
   spoilers: boolean;
+  /**
+   * Quem transmite (Streamer e Admin) pode ver as mãos dos dois jogadores ao vivo, sem o atraso
+   * mínimo de 1 min. Decisão do organizador: sem isso, as mãos chegam sempre atrasadas.
+   */
+  liveHands: boolean;
   structure: Structure;
   /** Rodadas do suíço (null = calculado no início). Eliminação simples: definido no início. */
   rounds: number | null;
@@ -108,6 +113,7 @@ export type TournamentInput = Pick<
   | 'description'
   | 'format'
   | 'spoilers'
+  | 'liveHands'
   | 'structure'
   | 'rounds'
   | 'swissBestOf'
@@ -132,6 +138,7 @@ type TournamentRow = {
   description: string;
   format: FormatId;
   spoilers: number;
+  live_hands: number;
   structure: Structure;
   rounds: number | null;
   swiss_best_of: number;
@@ -169,6 +176,7 @@ const toTournament = (r: TournamentRow): Tournament => ({
   description: r.description,
   format: r.format,
   spoilers: Boolean(r.spoilers),
+  liveHands: Boolean(r.live_hands),
   structure: r.structure,
   rounds: r.rounds,
   swissBestOf: r.swiss_best_of,
@@ -213,8 +221,8 @@ export function createTournament(db: DB, input: TournamentInput, organizerId: st
   db.prepare(
     `INSERT INTO tournaments (id, name, description, format, structure, rounds, swiss_best_of, top_cut, bo3_from, bo5_from,
        max_players, starts_at, check_in, tolerance_min, official, prize, sponsor_id, priority_until, spoilers, auto_start, max_warnings,
-       organizer_id, quota)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       live_hands, organizer_id, quota)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, ...inputValues(input), organizerId, quota ? 1 : 0);
   if (quota) db.prepare('INSERT INTO tournament_quota (tournament_id, organizer_id, created_at) VALUES (?, ?, ?)').run(id, organizerId, quota.at);
   return getTournament(db, id)!;
@@ -237,7 +245,8 @@ export function updateTournament(db: DB, id: string, input: TournamentInput) {
   db.prepare(
     `UPDATE tournaments SET name = ?, description = ?, format = ?, structure = ?, rounds = ?, swiss_best_of = ?, top_cut = ?,
        bo3_from = ?, bo5_from = ?, max_players = ?, starts_at = ?, check_in = ?, tolerance_min = ?,
-       official = ?, prize = ?, sponsor_id = ?, priority_until = ?, spoilers = ?, auto_start = ?, max_warnings = ?
+       official = ?, prize = ?, sponsor_id = ?, priority_until = ?, spoilers = ?, auto_start = ?, max_warnings = ?,
+       live_hands = ?
      WHERE id = ?`,
   ).run(...inputValues(input), id);
 }
@@ -264,6 +273,7 @@ const inputValues = (i: TournamentInput) =>
     i.spoilers ? 1 : 0,
     i.autoStart ? 1 : 0,
     i.maxWarnings,
+    i.liveHands ? 1 : 0,
   ] as const;
 
 export function deleteTournament(db: DB, id: string): boolean {

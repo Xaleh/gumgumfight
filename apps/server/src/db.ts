@@ -308,6 +308,8 @@ function migrateTournaments(db: DB) {
   }
   // max_warnings: warnings até a eliminação (null = o organizador decide caso a caso).
   if (!tCols.includes('max_warnings')) db.exec('ALTER TABLE tournaments ADD COLUMN max_warnings INTEGER');
+  // live_hands: o organizador libera as mãos ao vivo para quem transmite (sem o atraso mínimo de 1 min).
+  if (!tCols.includes('live_hands')) db.exec('ALTER TABLE tournaments ADD COLUMN live_hands INTEGER NOT NULL DEFAULT 0');
   // round_started_at: quando o organizador iniciou a rodada atual (as salas abrem e a tolerância conta daqui);
   // null = rodada gerada, à espera do início. Rodadas em andamento antes da coluna contam como iniciadas.
   if (!tCols.includes('round_started_at')) {

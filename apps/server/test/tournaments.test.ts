@@ -314,6 +314,9 @@ describe('torneios: rotas', () => {
     // A partida aparece em "Assistir" com o nome do torneio.
     const live = (await req(app, 'GET', '/api/online/live')).json().rooms;
     expect(live[0].tournament).toEqual({ id: t.id, name: 'Liga', round: 1, label: 'Rodada 1', game: 1, bestOf: 1 });
+    // Sem "mãos ao vivo" no torneio, quem vê as mãos assiste com o atraso mínimo.
+    expect(live[0].handsLive).toBe(false);
+    expect(room.handsLive).toBe(false);
     // O jogador do segundo assento desiste: o primeiro vence.
     const loserSeat = room.seatOf(second.token)!;
     await app.inject({ method: 'POST', url: `/api/online/rooms/${room.id}/action`, payload: { t: second.token, seq: 0, action: { type: 'concede', player: loserSeat } } });
