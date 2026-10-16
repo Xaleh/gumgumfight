@@ -2262,7 +2262,7 @@ export default {
   'errors.chatMessageTooLong': 'Messages can have at most {max} characters.',
   'errors.chatTooFast': 'Wait a moment before sending another message.',
   // ---- replays e relatos ----
-  'errors.replayForbidden': 'Only the match players, the tournament organizer or an admin can view this replay.',
+  'errors.replayForbidden': 'Only the match players, the tournament organizer or a Judge, or an admin can view this replay.',
   'errors.noReplay': 'This match has no saved replay.',
   'errors.matchOfOthers': 'This match belongs to other players.',
   'errors.reportOnlyPlayers': 'Only the match players can report a problem.',
