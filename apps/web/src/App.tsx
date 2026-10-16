@@ -10,9 +10,11 @@ import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/Game
 import { Learn } from './components/Learn';
 import { Lesson } from './components/Lesson';
 import { Menu } from './components/Menu';
+import { OAuthConsent } from './components/OAuthConsent';
 import { Stats } from './components/Stats';
 import { Tournaments } from './components/Tournaments';
 import { Watch } from './components/Watch';
+import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
 import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
 import { usePushSync, useWakeLock } from './pwa';
@@ -20,7 +22,8 @@ import { useSettings } from './settings';
 
 type Screen =
   | { name: 'menu' }
-  | { name: 'builder' }
+  /** `link`: lista vinda de um deep link (`/?deck=`); `linkInvalid`: havia um link, mas sem lista legível. */
+  | { name: 'builder'; link?: DeckLink; linkInvalid?: boolean }
   | { name: 'coverage' }
   | { name: 'stats' }
   | { name: 'admin' }
@@ -61,8 +64,13 @@ const TOURNAMENT_PARAM = 'torneio';
 /** Tela de transmissão (fonte do OBS): `/?transmissao=<chave do streamer>`. */
 const BROADCAST_PARAM = 'transmissao';
 
+/** Tela de consentimento do OAuth dos apps parceiros (o servidor responde o index.html neste caminho). */
+const OAUTH_PATH = '/oauth/authorize';
+
 export function App() {
   const [broadcastKey] = useState(() => new URL(location.href).searchParams.get(BROADCAST_PARAM));
+  const [oauthQuery] = useState(() => (location.pathname === OAUTH_PATH ? location.search.replace(/^\?/, '') : null));
+  if (oauthQuery !== null) return <OAuthConsent query={oauthQuery} />;
   return broadcastKey ? <Broadcast broadcastKey={broadcastKey} /> : <MainApp />;
 }
 
@@ -123,6 +131,13 @@ function MainApp() {
       here.searchParams.delete('lobby');
       history.replaceState(null, '', here.toString());
     }
+    // Deep link do construtor (`/?deck=<lista>&name=&format=`): abre o construtor preenchido, sem salvar nada.
+    if (here.searchParams.has('deck')) {
+      const { link, invalid } = parseDeckLink(here.searchParams);
+      setScreen({ name: 'builder', ...(link ? { link } : {}), ...(invalid ? { linkInvalid: true } : {}) });
+      for (const p of DECK_LINK_PARAMS) here.searchParams.delete(p);
+      history.replaceState(null, '', here.toString());
+    }
     const onMessage = (e: MessageEvent) => {
       if (e.data?.type === 'gumgum:open' && typeof e.data.url === 'string') open(e.data.url);
     };
@@ -130,7 +145,7 @@ function MainApp() {
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, []);
   const dev = isDev(role);
-  if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} link={screen.link} linkInvalid={screen.linkInvalid} />;
   if (screen.name === 'learn') return <Learn onExit={() => setScreen({ name: 'menu' })} onLesson={(id) => setScreen({ name: 'lesson', id })} />;
   if (screen.name === 'lesson') {
     return (

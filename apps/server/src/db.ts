@@ -23,8 +23,13 @@ export function openDb(path = DB_PATH): DB {
   return db;
 }
 
+/** Bancos com uma transação aberta: uma `transaction` dentro de outra só roda a função (vale a de fora). */
+const inTransaction = new WeakSet<DB>();
+
 export function transaction<T>(db: DB, fn: () => T): T {
+  if (inTransaction.has(db)) return fn();
   db.exec('BEGIN');
+  inTransaction.add(db);
   try {
     const out = fn();
     db.exec('COMMIT');
@@ -32,6 +37,8 @@ export function transaction<T>(db: DB, fn: () => T): T {
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
+  } finally {
+    inTransaction.delete(db);
   }
 }
 
@@ -97,6 +104,55 @@ function migrate(db: DB) {
   migrateCardIds(db);
   migrateSupport(db);
   migrateTutorial(db);
+  migratePartners(db);
+}
+
+/**
+ * API para parceiros (ver partners/): tokens de acesso que agem em nome de uma conta
+ * (pessoais ou do OAuth), os clientes OAuth cadastrados e os codes do fluxo de autorização.
+ * Dos tokens, codes e segredos só o sha256 fica no banco (como as sessões).
+ */
+function migratePartners(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS api_tokens (
+      id           TEXT PRIMARY KEY,          -- 'tk-' + 12 hex, mostrado na tela
+      token_hash   TEXT NOT NULL UNIQUE,      -- sha256(token) em hex
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_id    TEXT,                      -- NULL = token pessoal; senão oauth_clients.id
+      kind         TEXT NOT NULL,             -- 'personal' | 'access' | 'refresh'
+      name         TEXT,                      -- rótulo dado pelo usuário ("sweetapp")
+      scopes       TEXT NOT NULL,             -- separados por espaço
+      parent_id    TEXT,                      -- access → o refresh que o gerou
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at   TEXT,                      -- NULL = sem validade (pessoal)
+      last_used_at TEXT,
+      revoked_at   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS api_tokens_user ON api_tokens(user_id);
+
+    CREATE TABLE IF NOT EXISTS oauth_clients (
+      id             TEXT PRIMARY KEY,        -- 'sweetapp'
+      name           TEXT NOT NULL,           -- mostrado na tela de consentimento
+      secret_hash    TEXT NOT NULL,           -- sha256 do client_secret
+      redirect_uris  TEXT NOT NULL,           -- JSON: lista exata de URIs aceitas
+      scopes         TEXT NOT NULL,           -- scopes que o cliente pode pedir
+      webhook_url    TEXT,                    -- aviso "partida terminada"
+      webhook_secret TEXT,                    -- guardado em claro: é usado para assinar
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS oauth_codes (
+      code_hash      TEXT PRIMARY KEY,
+      client_id      TEXT NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+      user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      scopes         TEXT NOT NULL,
+      redirect_uri   TEXT NOT NULL,
+      code_challenge TEXT NOT NULL,           -- S256
+      expires_at     TEXT NOT NULL,           -- agora + 5 min
+      used_at        TEXT,
+      token_id       TEXT                     -- refresh token emitido com este code (revogado se o code for usado de novo)
+    );
+  `);
 }
 
 /**

@@ -177,6 +177,33 @@ INTERNAL_TOKEN=<o mesmo da produção>
 
 Rodar o `setup-vm.sh` de novo mantém essas linhas.
 
+## 8. API para parceiros (opcional)
+
+Apps parceiros (ex.: um construtor de decks) agem em nome do usuário com tokens de acesso (`Authorization: Bearer`;
+ver "API para parceiros" no `README.md`). Dois ajustes na VPS:
+
+1. **Cliente OAuth** (o botão "Vincular" no app): cadastre o app pela linha de comando, no servidor, e passe o
+   `client_secret` (e o `webhook_secret`, se houver) por um canal seguro. Eles aparecem uma vez só:
+
+   O `node` da sessão pode ser mais antigo que o do app (`node:sqlite` exige Node 22.13): use o `NODE_BIN` do
+   `deploy.env`, o mesmo que o pm2 usa. Troque o domínio pelo do app (sem `<` e `>`).
+
+   ```bash
+   cd ~/apps/gumgumfight/current/server
+   NODE_BIN=$(sed -n 's/^NODE_BIN=//p' ~/apps/gumgumfight/shared/deploy.env)
+   DB_PATH=~/apps/gumgumfight/shared/gumgum.db "$NODE_BIN" oauth-client-cli.mjs add sweetapp "sweetapp" \
+     --redirect https://sweetapp.example/integrations/ggf/callback --webhook https://sweetapp.example/integrations/ggf/webhook
+   DB_PATH=~/apps/gumgumfight/shared/gumgum.db "$NODE_BIN" oauth-client-cli.mjs list
+   ```
+
+2. **IP do parceiro fora do limite por IP do Nginx**: todas as chamadas do app saem do servidor dele, então os
+   usuários dele somados contariam como um IP só contra os 30 req/s. Coloque o IP (ou os IPs, separados por
+   vírgula) em `PARTNER_IPS` no `deploy.env` e rode o bootstrap de novo (`SKIP_UPGRADE=1 bash
+   /root/bootstrap-hostinger.sh`), que regenera `/etc/nginx/conf.d/gumgumfight-limits.conf`. A partir daí, o limite
+   que vale para esse IP é o do app: 120 requisições por minuto por token. Isso só se aplica onde o Nginx roda no
+   host (a produção): na homologação com Nginx Proxy Manager (Docker), o `setup-vm.sh` não configura limite por IP,
+   então não há o que liberar.
+
 ## Operação
 
 ```bash

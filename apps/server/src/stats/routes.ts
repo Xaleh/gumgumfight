@@ -37,6 +37,8 @@ interface Deps {
    * sem ele, todo mundo vê tudo, como antes).
    */
   proGate: boolean;
+  /** Chamado com o id de cada partida gravada (avisos "partida terminada" aos apps parceiros). */
+  onMatch?: (matchId: number) => void;
 }
 
 /** Filas das estatísticas gerais (grátis): partidas casuais, treino contra o bot e salas privadas. */
@@ -73,7 +75,7 @@ function parseDeck(v: unknown): DeckList | null {
 /** Validade das estatísticas em cache (cada partida gravada já as invalida). */
 const STATS_TTL_MS = 30_000;
 
-export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user, present, proGate }: Deps) {
+export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user, present, proGate, onMatch }: Deps) {
   const cache = new ResponseCache();
   const pro = (req: FastifyRequest) => !proGate || seesProStats(user(req));
   /**
@@ -135,10 +137,11 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
       return { controller: human ? 'human' : 'bot', ownerHash: human ? owner : null, deckId: deckIds[p] ?? null };
     };
     const id = recordMatch(db, { mode, format, queue: 'casual', replay, seats: [seat(0), seat(1)] }, facts);
+    onMatch?.(id);
     return { id, winner: facts.winner, turns: facts.turns };
   });
 
-  app.get('/api/players/me', async (req) => {
+  app.get('/api/players/me', { config: { scope: 'profile' } }, async (req) => {
     const owner = viewerHash(req);
     const p = owner ? findPlayer(db, owner) : null;
     return p ? { ...profileOf(p), apprentice: isApprentice(db, owner!) } : null;
@@ -153,7 +156,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
   });
 
   /** Opções dos filtros: formatos, filas, tiers, Líderes com partidas e o perfil do jogador. */
-  app.get('/api/stats/meta', async (req, reply) =>
+  app.get('/api/stats/meta', { config: { scope: 'stats:read' } }, async (req, reply) =>
     cache.send(req, reply, cacheKey(req, true), STATS_TTL_MS, () => {
       const owner = viewerHash(req);
       const me = owner ? findPlayer(db, owner) : null;
@@ -232,7 +235,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
   );
 
   /** Visão geral: totais, Líderes e matchups. */
-  app.get<{ Querystring: Query }>('/api/stats', async (req, reply) =>
+  app.get<{ Querystring: Query }>('/api/stats', { config: { scope: 'stats:read' } }, async (req, reply) =>
     cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
       const f = parseFilter(req);
       const leaders = leaderStats(db, f);
@@ -247,7 +250,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
   );
 
   /** Tendência semanal: uso e vitórias por Líder nas últimas semanas (padrão 6, máximo 26). */
-  app.get<{ Querystring: Query }>('/api/stats/trend', async (req, reply) =>
+  app.get<{ Querystring: Query }>('/api/stats/trend', { config: { scope: 'stats:read' } }, async (req, reply) =>
     cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
       const weeks = Math.min(26, Math.max(2, Math.floor(Number(req.query.weeks) || 6)));
       const t = trendStats(db, parseFilter(req), weeks);
@@ -256,7 +259,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
   );
 
   /** Cartas de um Líder (ou de uma lista): efetividade no deck, na mão inicial, compradas e jogadas. */
-  app.get<{ Querystring: Query }>('/api/stats/cards', async (req, reply) => {
+  app.get<{ Querystring: Query }>('/api/stats/cards', { config: { scope: 'stats:read' } }, async (req, reply) => {
     if (!req.query.leader && !req.query.deck) return reply.code(400).send(fail('chooseLeaderOrList', 'Escolha um Líder ou uma lista.'));
     return cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
       const f = parseFilter(req);

@@ -151,6 +151,8 @@ ADMIN_EMAILS=""
 [ -f "$ENV_FILE" ] && ADMIN_EMAILS="$(sed -n 's/^ADMIN_EMAILS=//p' "$ENV_FILE" | tail -1)"
 ONLINE_BOT_ROOMS="on"
 [ -f "$ENV_FILE" ] && ONLINE_BOT_ROOMS="$(sed -n 's/^ONLINE_BOT_ROOMS=//p' "$ENV_FILE" | tail -1)" && ONLINE_BOT_ROOMS="${ONLINE_BOT_ROOMS:-on}"
+PARTNER_IPS=""
+[ -f "$ENV_FILE" ] && PARTNER_IPS="$(sed -n 's/^PARTNER_IPS=//p' "$ENV_FILE" | tail -1)"
 # Apoio (Pix, Apoia.se, Ko-fi), homologação, Discord e ajustes finos (preenchidos à mão no deploy.env): mantidos como estão.
 KEEP_LINES=""
 [ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+)=' "$ENV_FILE" || true)"
@@ -169,6 +171,9 @@ GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 ADMIN_EMAILS=$ADMIN_EMAILS
 # on | off (off: desliga o treino online contra o bot do servidor)
 ONLINE_BOT_ROOMS=$ONLINE_BOT_ROOMS
+# IPs dos servidores de apps parceiros (API para parceiros), separados por vírgula: ficam fora do limite
+# por IP do Nginx (o app limita cada token). Depois de mudar, rode este script de novo.
+PARTNER_IPS=$PARTNER_IPS
 EOF
 [ -n "$KEEP_LINES" ] && printf '%s\n' "$KEEP_LINES" >> "$ENV_FILE"
 info "Configuração salva em $ENV_FILE"
@@ -188,11 +193,24 @@ if [ "$PROXY" = nginx ]; then
     info "$CONF já existe com HTTPS configurado: mantido como está."
     grep -q "127.0.0.1:$PORT" "$CONF" || info "ATENÇÃO: o arquivo não aponta para a porta $PORT. Ajuste o proxy_pass manualmente."
   else
-    # Limites por IP na API (zonas no contexto http): ver deploy/bootstrap-hostinger.sh.
+    # Limites por IP na API (zonas no contexto http): ver deploy/bootstrap-hostinger.sh. Os IPs de apps
+    # parceiros (PARTNER_IPS) ficam fora do limite por IP: o app limita cada token.
+    PARTNER_GEO=""
+    for ip in ${PARTNER_IPS//,/ }; do
+      [[ "$ip" =~ ^[0-9a-fA-F.:/]+$ ]] || { echo "PARTNER_IPS inválido: $ip" >&2; exit 1; }
+      PARTNER_GEO+="    $ip 1;"$'\n'
+    done
     sudo tee /etc/nginx/conf.d/gumgumfight-limits.conf >/dev/null <<EOF
 # GumGum Fight — gerado por deploy/setup-vm.sh
-limit_req_zone \$binary_remote_addr zone=gumgum_api:10m rate=30r/s;
-limit_conn_zone \$binary_remote_addr zone=gumgum_conn:10m;
+geo \$gumgum_partner {
+    default 0;
+${PARTNER_GEO}}
+map \$gumgum_partner \$gumgum_limit_key {
+    0 \$binary_remote_addr;
+    1 "";
+}
+limit_req_zone \$gumgum_limit_key zone=gumgum_api:10m rate=30r/s;
+limit_conn_zone \$gumgum_limit_key zone=gumgum_conn:10m;
 limit_req_status 429;
 limit_conn_status 429;
 EOF

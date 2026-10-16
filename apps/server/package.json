@@ -10,7 +10,8 @@
     "cards:import": "tsx src/import-cards.ts",
     "cards:check-official": "tsx src/check-official.ts",
     "translations:check": "tsx src/check-translations.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "oauth:client": "tsx src/oauth-client-cli.ts"
   },
   "dependencies": {
     "@fastify/static": "^8.0.3",

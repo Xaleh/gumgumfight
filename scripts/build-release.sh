@@ -9,7 +9,7 @@ rm -rf release
 npm run build -w @gumgum/web
 
 npx esbuild \
-  apps/server/src/index.ts apps/server/src/import-cards.ts apps/server/src/seed-cli.ts \
+  apps/server/src/index.ts apps/server/src/import-cards.ts apps/server/src/seed-cli.ts apps/server/src/oauth-client-cli.ts \
   --bundle --platform=node --target=node22 --format=esm \
   --outdir=release/server --out-extension:.js=.mjs \
   --banner:js="import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" \

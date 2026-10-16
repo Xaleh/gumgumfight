@@ -18,7 +18,8 @@ export const ACCESS_TIER: SupporterTier = 'tripulante';
 const CACHE_OK_MS = 10 * 60_000;
 const CACHE_NO_MS = 2 * 60_000;
 
-const OPEN_PREFIXES = ['/api/health', '/api/config', '/api/auth/', '/api/access', '/api/support'];
+// /api/oauth: o backend do app parceiro troca code/refresh por tokens sem sessão (a credencial é o client_secret).
+const OPEN_PREFIXES = ['/api/health', '/api/config', '/api/auth/', '/api/access', '/api/support', '/api/oauth/'];
 
 interface Deps {
   db: DB;

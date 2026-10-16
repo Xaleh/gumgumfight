@@ -119,10 +119,12 @@ function parseSponsor(b: SponsorBody | undefined): SponsorInput | PlayerError {
 }
 
 export function registerSupportRoutes(app: FastifyInstance, { db, user, options, afterLogin, fetchImpl, now = Date.now, syncHours = 0 }: Deps) {
-  // O Ko-fi manda o webhook como formulário (campo `data` com o JSON).
-  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string', bodyLimit: 64 * 1024 }, (_req, body, done) => {
-    done(null, Object.fromEntries(new URLSearchParams(String(body))));
-  });
+  // O Ko-fi manda o webhook como formulário (campo `data` com o JSON); o OAuth dos parceiros usa o mesmo parser.
+  if (!app.hasContentTypeParser('application/x-www-form-urlencoded')) {
+    app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string', bodyLimit: 64 * 1024 }, (_req, body, done) => {
+      done(null, Object.fromEntries(new URLSearchParams(String(body))));
+    });
+  }
 
   const pix = (() => {
     const { pixKey, pixName, pixCity } = options;

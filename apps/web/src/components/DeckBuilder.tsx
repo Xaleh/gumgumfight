@@ -10,6 +10,7 @@ import {
   FORMATS,
   formatIssues,
   formatDeckList,
+  formatLabel,
   needsManual,
   isColorCompatible,
   leaderAllows,
@@ -23,6 +24,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ApiCard, deckGroups, type DeckSummary, isAdmin, spoilerText } from '../api';
 import { useAuth } from '../auth';
+import type { DeckLink } from '../deeplink';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, fillSlots, StaticCardZoom } from './CardInfo';
@@ -80,7 +82,11 @@ function useMediaQuery(query: string) {
   return match;
 }
 
-export function DeckBuilder({ onExit }: { onExit: () => void }) {
+/**
+ * `link`: lista vinda de um deep link (`/?deck=`): o construtor abre com ela preenchida, como
+ * deck novo não salvo; `linkInvalid`: havia um link, mas sem lista legível (só um aviso).
+ */
+export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void; link?: DeckLink; linkInvalid?: boolean }) {
   const [allCards, setAllCards] = useState<ApiCard[]>([]);
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const auth = useAuth();
@@ -146,9 +152,28 @@ export function DeckBuilder({ onExit }: { onExit: () => void }) {
       .then(([cards, list]) => {
         setAllCards(cards);
         setDecks(list);
+        if (link) applyLink(link, new Map(cards.map((c) => [c.id, c])));
+        else if (linkInvalid) setNotice(t('deck.linkInvalid'));
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Lista de um deep link: vira um deck novo, não salvo, com os avisos do parser (como o Importar lista). */
+  const applyLink = (l: DeckLink, cards: Map<string, CardData>) => {
+    const parsed = parseDeckList(l.text, cards);
+    const total = parsed.cards.reduce((n, c) => n + c.count, 0);
+    const errors = parsed.errorDetails.map((e) => tryT(e.code, e.params) ?? e.message);
+    if (!parsed.leader && !total) {
+      setNotice(t('deck.linkInvalid'));
+      setError(errors.length ? errors.join('\n') : null);
+      return;
+    }
+    setDraft({ id: null, name: l.name ?? t('deck.newDeckName'), leader: parsed.leader ?? '', cards: new Map(parsed.cards.map((c) => [c.id, c.count])), arts: new Map(), kind: 'user' });
+    setDirty(true);
+    setNotice(l.format ? t('deck.linkImportedFormat', { format: formatLabel(l.format) }) : t('deck.linkImported'));
+    setError(errors.length ? errors.join('\n') : null);
+  };
 
   useEffect(() => setLimit(PAGE), [query, colors, category, cost, set, onlyCompatible, onlyAutomated, draft.leader]);
 

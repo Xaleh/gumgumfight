@@ -77,6 +77,8 @@ interface Deps {
   botDelayMs?: number;
   /** Fim de uma partida de torneio: lança o resultado no torneio. */
   onTournamentGame?: (game: { tournamentId: string; matchId: number; roomId: string; winner: string | null; statsMatchId: number | null }) => void;
+  /** Chamado com o id de cada partida gravada (avisos "partida terminada" aos apps parceiros). */
+  onMatch?: (matchId: number) => void;
   /** Notificações no celular (partida começou, sua vez). */
   notifier?: Notifier;
 }
@@ -173,7 +175,7 @@ export function playableDeck(db: DB, deckId: unknown, format: FormatId, rules: D
 }
 
 /** Grava a partida terminada nas estatísticas (refeita pelo motor, como as do navegador). */
-function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGame']): RoomResult {
+function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGame'], onMatch?: Deps['onMatch']): RoomResult {
   const replay = {
     seed: 0,
     seed128: room.data.seed128!,
@@ -199,6 +201,7 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
   const mode = room.data.queue === 'bot' ? 'bot' : 'online';
   const queue = room.ranked ? 'ranked' : room.data.queue === 'tournament' ? 'tournament' : 'casual';
   const matchId = recordMatch(db, { mode, format: room.data.format, queue, replay, seats: [seat(0), seat(1)] }, facts);
+  onMatch?.(matchId);
   const t = room.data.tournament;
   if (t) {
     const winner = room.state?.winner ?? null;
@@ -217,7 +220,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   const { db, viewerHash, user, present } = deps;
   const lobby = new Lobby({
     cards: (ids) => present(getCards(db, ids)),
-    finish: (room) => finishMatch(db, room, deps.onTournamentGame),
+    finish: (room) => finishMatch(db, room, deps.onTournamentGame, deps.onMatch),
     save: (data) => saveLiveMatch(db, data.id, data),
     remove: (id) => deleteLiveMatch(db, id),
     now: deps.now,

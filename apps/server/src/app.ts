@@ -35,11 +35,17 @@ import {
   upsertDeck,
 } from './db';
 import { WEB_DIST } from './paths';
+import { registerPartnerMatchRoutes } from './partners/matches';
+import { registerOAuthRoutes } from './partners/oauth';
+import { isoToSqlite, sqliteToIso } from './partners/store';
+import { registerBearerAuth, registerTokenRoutes } from './partners/tokens';
+import { WebhookDispatcher } from './partners/webhook';
 import { type ApiCard, presentCards } from './present';
 import type { LobbyLimits } from './online/lobby';
 import { registerOnlineRoutes } from './online/routes';
 import { type PushSender, registerPushRoutes } from './push/routes';
 import { vapidKeys } from './push/store';
+import { deckHash } from './stats/derive';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
 import { registerAccessGate } from './support/access';
@@ -55,7 +61,8 @@ const stripUndefined = <T extends object>(o: T): Partial<T> => Object.fromEntrie
 export function buildApp(
   db: DB,
   opts: {
-    logger?: boolean;
+    /** true = log padrão; um objeto vale como opções do pino (os testes passam um `stream`). */
+    logger?: boolean | Record<string, unknown>;
     server?: ServerOptions;
     googleKeys?: GoogleKeys;
     /** Testes: relógio, limite de ações, atraso do bot e tetos de salas nas partidas online. */
@@ -67,10 +74,16 @@ export function buildApp(
     fetchImpl?: typeof fetch;
     /** Testes: envio das notificações (sem ele, vai para o serviço de push de verdade). */
     pushSend?: PushSender;
+    /** Testes: esperas entre as tentativas do webhook dos parceiros (ms). */
+    webhookRetryMs?: number[];
   } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
-  const app = Fastify({ logger: opts.logger ?? false, trustProxy: true });
+  // redact: o header Authorization (tokens de parceiros) nunca vai para o log.
+  const logger = opts.logger
+    ? { ...(typeof opts.logger === 'object' ? opts.logger : {}), redact: ['req.headers.authorization', 'headers.authorization', 'authorization'] }
+    : false;
+  const app = Fastify({ logger, trustProxy: true });
   const server = opts.server ?? serverOptions;
   // Notificações: as chaves VAPID nascem no banco na primeira vez (ou vêm do ambiente).
   const pushKeys = server.push === false ? null : vapidKeys(db, server.vapidKeys);
@@ -138,6 +151,8 @@ export function buildApp(
   };
   /** Tarefas depois do login (as rotas de apoio põem aqui a consulta à Apoia.se). */
   const afterLogin: Array<(user: User) => Promise<void>> = [];
+  // API para parceiros: `Authorization: Bearer` vale como a conta dona do token (antes de todas as rotas).
+  registerBearerAuth(app, { db, now: opts.now });
   const auth = registerAuth(app, {
     db,
     clientId: server.googleClientId ?? null,
@@ -168,6 +183,9 @@ export function buildApp(
   });
   const isMine = (deck: StoredDeck, viewer: string | null) =>
     deck.kind === 'user' && deck.ownerHash !== null && deck.ownerHash === viewer;
+  /** Avisos "partida terminada" aos apps vinculados (fase 3 da API para parceiros). */
+  const webhooks = new WebhookDispatcher({ db, fetchImpl: opts.fetchImpl, log: (msg) => app.log.warn(msg), retryMs: opts.webhookRetryMs });
+  app.decorate('webhooks', webhooks);
   const publicDeck = ({ ownerHash: _hidden, ...deck }: StoredDeck) => deck;
 
   /** Deck com resumo de validação (usado nas listas). */
@@ -197,6 +215,8 @@ export function buildApp(
       /** Cartas de spoiler (ainda não lançadas): o deck não vale na ranqueada nem em torneio sem spoilers. */
       spoilers: spoilerCards(deck, cards),
       updatedAt: deck.updatedAt,
+      /** Hash da lista exata (o mesmo de `deckHash` nas partidas), para parceiros casarem deck e partida. */
+      deckHash: deckHash(deck),
       mine: isMine(deck, viewer),
     };
   };
@@ -208,23 +228,26 @@ export function buildApp(
       ]),
     );
 
-  app.get('/api/decks', async (req) => {
-    const decks = listDecks(db);
-    const cards = cardsFor(decks);
+  /** `mine=1`: só os decks de quem pede (conta ou navegador). */
+  app.get<{ Querystring: { mine?: string } }>('/api/decks', { config: { scope: 'decks:read' } }, async (req) => {
     const viewer = viewerHash(req);
+    const decks = req.query.mine === '1' ? listDecks(db).filter((d) => isMine(d, viewer)) : listDecks(db);
+    const cards = cardsFor(decks);
     return decks.map((d) => summarize(d, cards, viewer));
   });
 
-  /** Deck + definições de todas as cartas usadas (o que o cliente precisa para jogar). */
-  app.get<{ Params: { id: string } }>('/api/decks/:id', async (req, reply) => {
+  /** Deck + definições de todas as cartas usadas (o que o cliente precisa para jogar). Com token, só os próprios e os prontos. */
+  app.get<{ Params: { id: string } }>('/api/decks/:id', { config: { scope: 'decks:read' } }, async (req, reply) => {
     const deck = getDeck(db, req.params.id);
     if (!deck) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
+    const viewer = viewerHash(req);
+    if (req.apiAuth && deck.kind === 'user' && !isMine(deck, viewer)) return reply.code(403).send(fail('deckNotMine', 'Este deck pertence a outro jogador.'));
     const cards = present(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]));
-    const summary = summarize(deck, new Map(cards.map((c) => [c.id, c])), viewerHash(req));
+    const summary = summarize(deck, new Map(cards.map((c) => [c.id, c])), viewer);
     return { deck: { ...publicDeck(deck), mine: summary.mine }, cards, summary };
   });
 
-  type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown; arts?: unknown };
+  type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown; arts?: unknown; expectedUpdatedAt?: unknown };
   const parseDeckBody = (b: DeckBody | undefined): Omit<DeckList, 'id'> | PlayerError => {
     if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
     const name = typeof b.name === 'string' ? b.name.trim().slice(0, 60) : '';
@@ -245,7 +268,7 @@ export function buildApp(
   };
 
   // Decks incompletos podem ser salvos (rascunho); só decks válidos aparecem para jogar.
-  app.post<{ Body: DeckBody }>('/api/decks', async (req, reply) => {
+  app.post<{ Body: DeckBody }>('/api/decks', { config: { scope: 'decks:write' } }, async (req, reply) => {
     const owner = viewerHash(req);
     if (!owner) return reply.code(400).send(fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).'));
     const parsed = parseDeckBody(req.body);
@@ -256,13 +279,30 @@ export function buildApp(
     return reply.code(201).send(summarize(stored, cardsFor([stored]), owner));
   });
 
-  app.put<{ Params: { id: string }; Body: DeckBody }>('/api/decks/:id', async (req, reply) => {
+  /**
+   * Detecção de conflito (apps que sincronizam decks): com `If-Unmodified-Since` ou
+   * `expectedUpdatedAt` no corpo, um deck alterado no site depois dessa data responde 409
+   * `deck_conflict` com a versão atual, em vez de sobrescrevê-la.
+   */
+  app.put<{ Params: { id: string }; Body: DeckBody }>('/api/decks/:id', { config: { scope: 'decks:write' } }, async (req, reply) => {
     const existing = getDeck(db, req.params.id);
     if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
     if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckReadOnly', 'Decks prontos não podem ser alterados; duplique-o.'));
     const viewer = viewerHash(req);
     if (!isMine(existing, viewer)) {
       return reply.code(403).send(fail('deckNotMineEdit', 'Este deck pertence a outro jogador; duplique-o para editar.'));
+    }
+    const expectedRaw = req.body?.expectedUpdatedAt ?? req.headers['if-unmodified-since'];
+    if (expectedRaw !== undefined) {
+      const expected = isoToSqlite(expectedRaw);
+      if (!expected) return reply.code(400).send(fail('invalidExpectedUpdatedAt', 'expectedUpdatedAt inválido (use ISO 8601).'));
+      if (existing.updatedAt > expected) {
+        const current = summarize(existing, cardsFor([existing]), viewer);
+        return reply.code(409).send({
+          ...fail('deck_conflict', 'O deck foi alterado no GumGum Fight depois da versão que você tem.'),
+          current: { ...publicDeck(existing), updatedAt: sqliteToIso(existing.updatedAt), summary: current },
+        });
+      }
     }
     const parsed = parseDeckBody(req.body);
     if (isPlayerError(parsed)) return reply.code(400).send(parsed);
@@ -287,7 +327,7 @@ export function buildApp(
     return summarize(stored, cardsFor([stored]), viewer);
   });
 
-  app.delete<{ Params: { id: string } }>('/api/decks/:id', async (req, reply) => {
+  app.delete<{ Params: { id: string } }>('/api/decks/:id', { config: { scope: 'decks:write' } }, async (req, reply) => {
     const existing = getDeck(db, req.params.id);
     if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
     if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckNoDelete', 'Decks prontos não podem ser apagados.'));
@@ -298,7 +338,10 @@ export function buildApp(
     return reply.code(204).send();
   });
 
-  registerStatsRoutes(app, { db, viewerHash, user: auth.viewer, present, proGate: supportEnabled(server.support) });
+  registerStatsRoutes(app, { db, viewerHash, user: auth.viewer, present, proGate: supportEnabled(server.support), onMatch: (id) => webhooks.matchFinished(id) });
+  registerPartnerMatchRoutes(app, { db, user: auth.viewer });
+  registerTokenRoutes(app, { db, user: auth.viewer });
+  registerOAuthRoutes(app, { db, user: auth.viewer, now: opts.now, sendIndex: existsSync(WEB_DIST) ? (reply) => reply.sendFile('index.html') : undefined });
   const lobby = registerOnlineRoutes(app, {
     db,
     viewerHash,
@@ -310,6 +353,7 @@ export function buildApp(
     botDelayMs: opts.botDelayMs,
     limits: { ...stripUndefined(server.onlineLimits ?? {}), ...opts.onlineLimits },
     onTournamentGame: (game) => reportFromGame(db, game),
+    onMatch: (id) => webhooks.matchFinished(id),
     notifier,
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).

@@ -12122,3 +12122,92 @@ a.sponsor-card:hover {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------- apps conectados (Configurações) */
+.apps-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 12px;
+}
+.apps-login {
+  padding: 0 0 12px;
+}
+.token-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.token-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.token-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(242, 193, 78, 0.12);
+  border: 1px solid rgba(242, 193, 78, 0.5);
+}
+.token-text {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 12px;
+  word-break: break-all;
+  user-select: all;
+}
+.token-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.token-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.token-form input {
+  max-width: 320px;
+}
+
+/* ---------------------------------------------------------------- consentimento do OAuth (apps parceiros) */
+.oauth-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.oauth-sheet {
+  width: min(100%, 440px);
+}
+.oauth-scopes {
+  margin: 8px 0 14px;
+  padding-left: 20px;
+  line-height: 1.6;
+}
+.oauth-actions,
+.oauth-login {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.oauth-login {
+  flex-direction: column;
+  align-items: flex-start;
+}

@@ -73,6 +73,7 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `INTERNAL_TOKEN` | (vazio) | Token da consulta de plano entre homologação e produção (igual nos dois; segredo) |
 | `ACCESS` | `open` | `supporters`: o site só abre para apoiadores Tripulante ou acima e admins (homologação) |
 | `SUPPORT_SOURCE_URL` | (vazio) | Com `ACCESS=supporters`: site onde o plano é consultado (a produção) |
+| `PARTNER_IPS` | (vazio; só no `deploy.env` da VM) | IPs dos servidores de apps parceiros, separados por vírgula: ficam fora do limite por IP do Nginx (o app limita cada token) |
 
 Sem nenhuma variável de apoio, o item "Apoiar o projeto" não aparece e as estatísticas ficam todas abertas, como
 antes. Com o apoio configurado, as Estatísticas Pro (ranqueada, torneios e filtro por faixa) passam a exigir o plano
@@ -466,6 +467,101 @@ cookie `HttpOnly` / `SameSite=Lax` (e `Secure` em HTTPS). O banco guarda só o i
 
 Sem `GOOGLE_CLIENT_ID`, o botão não aparece e `POST /api/auth/google` responde 503.
 
+## API para parceiros (apps que agem em nome do usuário)
+
+Um app parceiro (um construtor de decks, por exemplo) pode criar e atualizar os decks do usuário, ler as partidas e
+os replays dele e consultar as estatísticas pessoais, com autorização dele. A identidade vem num **token de acesso**
+enviado em `Authorization: Bearer <token>`: o token sempre aponta para uma conta Google e carrega **scopes** que
+limitam o que ele pode fazer. Sem login nada muda; quem não vincula nada também não. Código em
+`apps/server/src/partners/` (tokens e middleware, OAuth, webhook, partidas) e na tela "Apps conectados"
+(`apps/web/src/components/ConnectedApps.tsx`).
+
+### Deep link do construtor (sem vínculo)
+
+`https://gumgumfight.app/?deck=<lista>&name=<nome>&format=<standard|egb>` abre o construtor já preenchido, como
+deck novo **não salvo** (um link pode vir de qualquer lugar, então nada é gravado até o usuário clicar em Salvar):
+
+- `deck`: o texto do "Exportar lista" (`1xOP01-001`, uma carta por linha, Líder incluído) em UTF-8, codificado em
+  **base64url** sem `=`. Os números das cartas são os da optcgapi, sem sufixo de arte alternativa (`_p1`, `_r1`).
+- `name` (opcional): nome sugerido, até 60 caracteres. `format` (opcional): só muda o aviso.
+- Base64 inválido ou lista vazia: o construtor abre normalmente, com um aviso. Linhas não reconhecidas aparecem como
+  no "Importar lista". Decodificador e testes: `apps/web/src/deeplink.ts`, `apps/web/test/deeplink.test.ts`.
+
+### Tokens e scopes
+
+Em ⚙️ Configurações → **Apps conectados** (só com login), o usuário gera um **token pessoal** (`ggf_pat_…`, até 10
+ativos por conta), vê o que cada app pode fazer e quando foi usado pela última vez, e revoga. O token aparece uma
+única vez; no banco fica só o `sha256`. Sair do site não revoga os tokens. Scopes (`profile` é sempre concedido):
+
+| Scope | Libera |
+|---|---|
+| `profile` | `GET /api/auth/me` (só `{ user: { id, role: 'player' }, player: { id, name, bounty, tier } }`: nunca e-mail, nome ou foto do Google) e `GET /api/players/me` |
+| `decks:read` | `GET /api/decks?mine=1` (os próprios, com `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos) |
+| `decks:write` | `POST /api/decks`, `PUT /api/decks/:id`, `DELETE /api/decks/:id` (só os próprios) |
+| `matches:read` | `GET /api/players/me/matches`, `GET /api/matches/:id`, `GET /api/matches/:id/replay` (só partidas que o usuário jogou) |
+| `stats:read` | `GET /api/stats*` (com `mine=1`, as próprias; sem ele, as consultas públicas de sempre) |
+
+Regras do token, em qualquer rota:
+
+- É uma **allowlist**: só as rotas acima aceitam token (`config: { scope }` no Fastify). Qualquer outra (admin, login,
+  partidas online, torneios, `PUT /api/players/me`, `POST /api/matches`, os próprios `/api/tokens`…) responde
+  **403 `token_not_allowed`**. Scope faltando: **403 `insufficient_scope`** (o scope que faltou vem em `errorParams`).
+  Token inexistente, revogado, expirado ou um refresh usado como Bearer: **401 `invalid_token`**.
+- Através de token, **toda conta age como Player**: o perfil real (admin, organizador, streamer) não vale. Cookie e
+  `x-deck-owner` são ignorados na requisição com token.
+- **120 requisições por minuto por token** (429 `rate_limited` com `Retry-After`). O header `Authorization` nunca vai
+  para o log.
+- Erros no mesmo formato de sempre: `{ error, errorCode }`.
+
+Rotas específicas para apps:
+
+- `GET /api/players/me/matches?since=<ISO>&limit=50&cursor=<id>`: partidas do jogador, mais novas primeiro
+  (`limit` até 100; `cursor` = `id` do último item da página anterior; `nextCursor` vem na resposta). Cada item:
+  `id, playedAt, mode, queue, format, seat, won, wentFirst, mulligan, turns, leader, oppLeader, oppController, deckId,
+  deckHash, tier, bountyBefore, bountyAfter, tournamentId`. Nunca o nome nem o id do oponente.
+- `GET /api/matches/:id`: resumo com `winner, turns, reasonKey, firstPlayer, replayVersion, you` (seu assento) e
+  `seats[]` (`seat, leader, deckHash, cards[]` com `id, copies, opening, drawn, played`). O lado do oponente vem com
+  `cards: null`, salvo em torneio já encerrado. O replay (`/replay`) traz `winner` e `reasonKey` no arquivo.
+- `PUT /api/decks/:id` aceita `expectedUpdatedAt` no corpo (ou o header `If-Unmodified-Since`): se o deck mudou no
+  site depois dessa data, responde **409 `deck_conflict`** com a versão atual em `current` (lista, `updatedAt` e
+  resumo), em vez de sobrescrever. `POST` e `PUT` devolvem `updatedAt` (UTC, `AAAA-MM-DD HH:MM:SS`; mande-o de volta
+  igual, ou em ISO) e `deckHash` (sha256 de `LÍDER|4xOP01-016|…` com as cartas em ordem alfabética, 16 hex: o mesmo
+  das partidas, para casar deck e partida).
+
+### OAuth (botão "Vincular" no app)
+
+O mesmo resultado dos tokens pessoais, sem copiar e colar: **authorization code + PKCE (S256)**, access token de 1 h
+(`ggf_at_…`) e refresh token de 90 dias com rotação (`ggf_rt_…`). O app precisa estar cadastrado
+(`npm run oauth:client -- add <id> "<nome>" --redirect <uri> [--scopes "…"] [--webhook <url>]`; o `client_secret`
+aparece uma vez; `list`, `secret`, `webhook` e `remove` completam o comando).
+
+1. O app manda o usuário para `GET /oauth/authorize?response_type=code&client_id=…&redirect_uri=…&scope=…&state=…&code_challenge=…&code_challenge_method=S256`.
+   `redirect_uri` é comparada por igualdade exata com as cadastradas; `state` é obrigatório. `client_id` ou
+   `redirect_uri` errados: página de erro, sem redirecionar; outros erros voltam com `?error=…&state=…`.
+2. A tela de consentimento (uma tela do site; sem login, mostra o botão do Google) lista o que o app poderá fazer.
+   **Permitir** gera um code de uso único, válido por 5 min, e volta para `redirect_uri?code=…&state=…`; **Cancelar**
+   volta com `error=access_denied`. Quem já autorizou o app com os mesmos scopes pula a tela.
+3. O backend do app chama `POST /api/oauth/token` (`application/x-www-form-urlencoded` ou JSON; credenciais no
+   corpo ou em `Authorization: Basic`) com `grant_type=authorization_code, code, redirect_uri, client_id,
+   client_secret, code_verifier` e recebe `{ access_token, token_type: 'Bearer', expires_in: 3600, refresh_token, scope }`.
+   Usar o code duas vezes revoga os tokens do primeiro uso. 10 tentativas por minuto por cliente.
+4. Renovação: `grant_type=refresh_token` devolve um par novo e o refresh usado deixa de valer; usar de novo um refresh
+   já trocado revoga toda a cadeia daquele app para aquela conta (sinal de vazamento).
+5. `POST /api/oauth/revoke` (`token, client_id, client_secret`) quando o usuário desvincula no app; 200 sempre.
+   Na tela "Apps conectados" o app aparece com os scopes e "Revogar" apaga todos os tokens dele para a conta.
+
+A API não tem CORS de propósito: o app chama o site do backend dele, nunca do navegador.
+
+### Webhook "partida terminada"
+
+Para apps cadastrados com `--webhook <url>` (só `https://` em produção), quando uma partida de um usuário que
+autorizou o app (com `matches:read`) é gravada, o servidor faz `POST <url>` com
+`{ event: 'match.finished', id, createdAt, userId, matchId, queue, format, won }` e os headers `X-GGF-Timestamp`
+(segundos Unix) e `X-GGF-Signature` (`sha256=` + HMAC-SHA256 com o `webhook_secret` sobre `<timestamp>.<corpo>`).
+O aviso é só um sinal: os dados vêm pelas rotas acima, com o token do usuário. Entrega depois da resposta, timeout de
+5 s, sem seguir redirecionamentos; sem 2xx, tenta de novo 1 min e 10 min depois (em memória) e desiste com um log.
+Tokens pessoais não recebem webhook.
+
 ## Efeitos automáticos e cartas ainda não automatizadas
 
 Toda carta da base é jogável:
@@ -746,11 +842,14 @@ npm run typecheck
 | POST   | `/api/auth/logout` | Sai (apaga a sessão)                        |
 | GET    | `/api/cards?set=`  | Lista cartas (opcionalmente por coleção)    |
 | GET    | `/api/cards/:id`   | Uma carta                                   |
-| GET    | `/api/decks`       | Lista decks, com validação                  |
+| GET    | `/api/decks?mine=1` | Lista decks, com validação (`mine=1`: só os seus) |
 | GET    | `/api/decks/:id`   | Deck + definições das cartas usadas         |
 | POST   | `/api/decks`       | Cria um deck (`{ name, leader, cards }`)    |
-| PUT    | `/api/decks/:id`   | Atualiza um deck do jogador                 |
+| PUT    | `/api/decks/:id`   | Atualiza um deck do jogador (`expectedUpdatedAt` ou `If-Unmodified-Since`: 409 `deck_conflict` se mudou depois) |
 | DELETE | `/api/decks/:id`   | Apaga um deck do jogador                    |
+| GET    | `/api/tokens` · POST · DELETE `/:id` | Apps conectados: lista, cria (`{ name, scopes }` → `{ id, token }`, uma vez) e revoga tokens de parceiros (só com sessão) |
+| GET    | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador para apps (mais novas primeiro, paginadas) |
+| GET    | `/oauth/authorize` · `/api/oauth/consent` · POST `/api/oauth/token` · `/api/oauth/revoke` | Fluxo OAuth dos apps parceiros (ver "API para parceiros") |
 | POST   | `/api/matches`     | Envia o replay de uma partida (verificado pelo servidor) |
 | GET    | `/api/matches`     | Últimas partidas                            |
 | GET    | `/api/players/me`  | Perfil do jogador: conta ou navegador (nome, recompensa, tier, `apprentice`) |
