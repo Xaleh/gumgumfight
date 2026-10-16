@@ -2266,7 +2266,7 @@ export default {
   'errors.chatMessageTooLong': 'Los mensajes pueden tener como máximo {max} caracteres.',
   'errors.chatTooFast': 'Espera un momento antes de enviar otro mensaje.',
   // ---- repeticiones y reportes ----
-  'errors.replayForbidden': 'Solo los jugadores de la partida, el organizador del torneo o un admin pueden ver esta repetición.',
+  'errors.replayForbidden': 'Solo los jugadores de la partida, el organizador o un Judge del torneo, o un admin pueden ver esta repetición.',
   'errors.noReplay': 'Esta partida no tiene repetición guardada.',
   'errors.matchOfOthers': 'Esta partida es de otros jugadores.',
   'errors.reportOnlyPlayers': 'Solo los jugadores de la partida pueden reportar un problema.',

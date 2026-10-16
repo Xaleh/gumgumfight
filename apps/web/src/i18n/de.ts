@@ -2266,7 +2266,7 @@ export default {
   'errors.chatMessageTooLong': 'Nachrichten dürfen höchstens {max} Zeichen haben.',
   'errors.chatTooFast': 'Warte einen Moment, bevor du eine weitere Nachricht sendest.',
   // ---- Replays und Meldungen ----
-  'errors.replayForbidden': 'Nur die Spieler der Partie, der Turnierveranstalter oder ein Admin können dieses Replay ansehen.',
+  'errors.replayForbidden': 'Nur die Spieler der Partie, der Turnierveranstalter oder ein Judge des Turniers oder ein Admin können dieses Replay ansehen.',
   'errors.noReplay': 'Diese Partie hat kein gespeichertes Replay.',
   'errors.matchOfOthers': 'Diese Partie gehört anderen Spielern.',
   'errors.reportOnlyPlayers': 'Nur die Spieler der Partie können ein Problem melden.',

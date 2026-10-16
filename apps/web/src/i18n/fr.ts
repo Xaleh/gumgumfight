@@ -2266,7 +2266,7 @@ export default {
   'errors.chatMessageTooLong': 'Les messages peuvent contenir au plus {max} caractères.',
   'errors.chatTooFast': 'Patientez un instant avant d’envoyer un autre message.',
   // ---- replays e relatos ----
-  'errors.replayForbidden': 'Seuls les joueurs de la partie, l’organisateur du tournoi ou un admin peuvent voir ce replay.',
+  'errors.replayForbidden': 'Seuls les joueurs de la partie, l’organisateur ou un Judge du tournoi, ou un admin peuvent voir ce replay.',
   'errors.noReplay': 'Cette partie n’a pas de replay enregistré.',
   'errors.matchOfOthers': 'Cette partie appartient à d’autres joueurs.',
   'errors.reportOnlyPlayers': 'Seuls les joueurs de la partie peuvent signaler un problème.',
