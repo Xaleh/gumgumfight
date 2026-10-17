@@ -1388,21 +1388,105 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 
 ### B. Rotas da API
 
-| Área | Rotas |
-|---|---|
-| Saúde/config | `GET /api/health`, `GET /api/config` |
-| Notificações | `PUT/DELETE /api/push/subscription` |
-| Conta | `GET /api/auth/me`, `POST /api/auth/google`, `POST /api/auth/logout`, `GET /api/admin/users?q=`, `PUT /api/admin/users/:id/role` |
-| Cartas | `GET /api/cards?set=`, `GET /api/cards/:id`, `GET /api/coverage`, `GET /api/translations/pending` |
-| Decks | `GET /api/decks`, `GET/PUT/DELETE /api/decks/:id`, `POST /api/decks` |
-| Partidas/estatísticas | `POST /api/matches`, `GET /api/matches`, `GET/PUT /api/players/me`, `GET /api/stats/meta`, `GET /api/stats`, `GET /api/stats/trend?weeks=`, `GET /api/stats/cards?leader=|deck=` |
-| Online | `GET /api/online/config`, `GET /api/online/stats`, `GET /api/online/active`, `POST /api/online/rooms`, `POST /api/online/rooms/join`, `POST /api/online/queue`, `GET/DELETE /api/online/queue/:ticket`, `POST /api/online/bot`, `GET /api/online/rooms/:id/events?t=` (SSE), `POST /api/online/rooms/:id/{action,dice,emote,chat,focus,rematch,leave}`, `GET /api/online/rooms/:id/replay` |
-| Espectador | `GET /api/online/live`, `GET /api/online/watch/:code`, `GET /api/online/rooms/:id`, `GET /api/online/rooms/:id/watch?hands=1` (SSE) |
-| Auditoria | `GET /api/matches/:id`, `GET /api/matches/:id/replay`, `POST /api/matches/:id/report`, `GET /api/reports`, `PUT /api/reports/:id` |
-| Parceiros | `GET/POST /api/tokens`, `DELETE /api/tokens/:id`, `GET /api/players/me/matches?since=&limit=&cursor=`, `GET /oauth/authorize`, `GET/POST /api/oauth/consent`, `POST /api/oauth/token`, `POST /api/oauth/revoke` |
-| Torneios | `GET /api/tournaments`, `GET /api/tournaments/me`, `GET /api/tournaments/:id`, `POST /api/tournaments`, `PUT/DELETE /api/tournaments/:id`, `POST/DELETE /api/tournaments/:id/register`, `POST /api/tournaments/:id/checkin`, `POST /api/tournaments/:id/{start,next,finish}`, `PUT /api/tournaments/:id/matches/:m/result`, `POST /api/tournaments/:id/players/:userId/{drop,reinstate}`, `PUT /api/tournaments/:id/late`, `POST /api/tournaments/:id/matches/:m/play` |
+Quem chama, na coluna da direita:
 
-Corpos, filtros e códigos de erro estão descritos no `README.md` (seção "API").
+- **Pública**: sem login nem token.
+- **Navegador**: o header `x-deck-owner` (código do navegador) ou a sessão; sem ele, 400 `noOwner`.
+- **Dono**: o deck ou perfil pertence a quem pede (navegador ou conta `user:<id>`).
+- **Sessão**: login com Google (cookie `gg_session`); 401 sem ele.
+- **Assento**: o token `t` do assento da sala (`{ roomId, token }` devolvido ao criar/entrar).
+- **Jogou**: uma das contas da partida (replay de torneio só depois que ele termina).
+- **Organizador**: organizador do torneio (perfil Organizador ou cota de apoiador) ou Admin.
+- **Judge**: Judge do torneio, o organizador ou Admin.
+- **Streamer**: perfil Streamer ou Admin.
+- **Admin**: perfis Admin e Dev.
+- **Token (scope)**: também aceita um token de parceiro com o scope; as outras rotas respondem 403 `token_not_allowed` a tokens.
+- **Cliente OAuth**: `client_id` + `client_secret` de um app cadastrado.
+
+| Método | Rota | Descrição | Quem chama |
+|--------|------|-----------|------------|
+| GET | `/api/health` | Verificação de saúde | Pública |
+| GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio, acesso) | Pública |
+| GET | `/api/access` | Acesso ao site na homologação só para apoiadores (`{ allowed, reason }`) | Pública |
+| GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (por coleção) e uma carta | Pública |
+| GET | `/api/coverage` | Cobertura dos efeitos automatizados por coleção | Pública |
+| GET | `/api/translations/pending` | Cartas com tradução automática parcial | Pública |
+| GET | `/card-img/:origin/*` | Imagens das cartas pelo mesmo domínio (em produção o Nginx atende antes) | Pública |
+| PUT · DELETE | `/api/push/subscription` | Liga (`{ subscription, locale, matches, tournaments }`) / desliga (`{ endpoint }`) as notificações do navegador | Navegador |
+| GET | `/api/auth/me` | Usuário logado (`{ user }` com `role`; `null` sem sessão). Com token: só `{ id, role: 'player' }` e o perfil público | Pública; Token (`profile`) |
+| POST | `/api/auth/google` | Login: `{ credential }` (ID token do Google); abre a sessão em cookie | Pública |
+| POST | `/api/auth/logout` | Sai (apaga a sessão) | Sessão |
+| PUT · DELETE | `/api/auth/me/picture` | Troca a foto da conta (`{ image }` data URL) / volta para a do Google | Sessão |
+| GET | `/api/users/:id/picture` | Foto enviada por um usuário | Dono ou Admin |
+| GET | `/api/admin/users?q=` | Contas e perfis | Admin |
+| PUT | `/api/admin/users/:id/role` | Muda o perfil (`{ role }`; a si mesmo, só para `dev`) | Admin |
+| PUT | `/api/admin/users/:id/supporter` | Plano de apoio dado à mão (`{ tier, until }`) | Admin |
+| GET | `/api/admin/tutorial?days=` | Funil anônimo das lições do tutorial | Admin |
+| GET · POST · PUT · DELETE | `/api/admin/sponsors`, `/api/admin/sponsors/:id`, `/api/admin/sponsors/:id/logo` | Lojas parceiras | Admin |
+| GET | `/api/admin/support/payments` | Pagamentos recebidos (Apoia.se, Ko-fi) | Admin |
+| GET | `/api/decks?mine=1` | Lista decks com validação; `mine=1`: só os de quem pede | Pública; Token (`decks:read`) |
+| GET | `/api/decks/:id` | Deck + definições das cartas usadas (com token: só os próprios e os prontos) | Pública; Token (`decks:read`) |
+| POST | `/api/decks` | Cria um deck (`{ name, leader, cards, arts? }`) | Navegador; Token (`decks:write`) |
+| PUT | `/api/decks/:id` | Atualiza um deck (`expectedUpdatedAt` ou `If-Unmodified-Since`: 409 `deck_conflict` se mudou depois) | Dono; Token (`decks:write`) |
+| PUT | `/api/decks/:id/name` | Só o nome | Dono ou Admin |
+| DELETE | `/api/decks/:id` | Apaga um deck | Dono; Token (`decks:write`) |
+| GET · POST | `/api/tokens` | Apps conectados: lista; cria (`{ name, scopes }` → `{ id, token }`, uma vez só) | Sessão |
+| DELETE | `/api/tokens/:id` | Revoga um token pessoal ou todos os tokens de um app | Sessão |
+| GET | `/oauth/authorize?…` | Início do fluxo OAuth: confere o pedido e responde a tela de consentimento | Pública |
+| GET · POST | `/api/oauth/consent` | O que a tela mostra / a decisão (`decision: allow \| deny` → `{ redirect }`) | Pública (GET); Sessão (POST) |
+| POST | `/api/oauth/token` | Troca `authorization_code` (+ `code_verifier`) ou `refresh_token` por tokens (10/min por cliente) | Cliente OAuth |
+| POST | `/api/oauth/revoke` | Revoga um token do app (`{ token }`); 200 sempre | Cliente OAuth |
+| POST | `/api/matches` | Envia o replay de uma partida contra o bot (o servidor refaz a partida antes de gravar) | Navegador |
+| GET | `/api/matches` | Últimas 20 partidas (resumo sem jogadores) | Pública |
+| GET | `/api/matches/:id` | Resumo de uma partida com as cartas de cada lado (`seats`; o oponente vem `null` fora de torneio encerrado) | Jogou, Judge, Admin; Token (`matches:read`) |
+| GET | `/api/matches/:id/replay` | Arquivo de replay para a mesa | Jogou, Judge, Admin; Token (`matches:read`) |
+| POST | `/api/matches/:id/report` | Relata um problema (`{ text, card?, expected?, notify? }`) | Jogou |
+| GET | `/api/reports?tournament=&status=` | Relatos abertos/resolvidos | Admin; Organizador (dos seus torneios) |
+| PUT | `/api/reports/:id` | Resolve ou reabre (`{ resolved, note? }`) | Admin; Organizador |
+| GET | `/api/players/me` | Perfil de jogador (nome, recompensa, tier, `apprentice`) | Navegador; Token (`profile`) |
+| PUT | `/api/players/me` | Troca o nome público (`{ name }`) | Navegador |
+| GET | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador, mais novas primeiro, paginadas | Sessão; Token (`matches:read`) |
+| GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
+| POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
+| GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |
+| GET | `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=\|deck=` | Totais, Líderes e matchups; tendência semanal; cartas de um Líder. Ranqueada e torneios só com o plano (salvo `mine=1`) | Pública; Token (`stats:read`) |
+| GET | `/api/stats/teaser?format=` | Amostra das Estatísticas Pro para quem não tem o plano | Pública |
+| GET | `/api/online/config` · `/api/online/stats` · `/api/online/leaders?format=` | Configuração do online, contadores do menu e Líderes na fila casual | Pública |
+| GET | `/api/online/active` | Partidas em andamento de quem pede (com o token do assento) | Navegador |
+| POST | `/api/online/rooms` · `/api/online/rooms/join` · `/api/online/queue` | Cria uma sala privada; entra numa; entra na fila (`{ deckId, format, queue }`; ranqueada exige login) | Navegador |
+| GET · DELETE | `/api/online/queue/:ticket` | Consulta a fila / sai dela | Quem tem o ticket |
+| POST | `/api/online/bot` | Treino contra o bot transmitido (`{ deckId, botDeckId \| random, format, first? }`) | Sessão |
+| GET | `/api/online/rooms/:id/events?t=` | Canal SSE do jogador | Assento |
+| POST | `/api/online/rooms/:id/{action,dice,emote,chat,focus,rematch,leave}` | Ação, dado, emote, chat (censurado), presença, revanche, sair | Assento |
+| GET | `/api/online/rooms/:id/replay` | Replay completo da sala (depois do fim; nunca de torneio) | Pública |
+| GET | `/api/online/live` · `/api/online/watch/:code` · `/api/online/rooms/:id` | Partidas para assistir; sala privada pelo código; resumo de uma sala | Pública |
+| GET | `/api/online/rooms/:id/watch?hands=1` · `?k=` · `?judge=1` | Canal SSE do espectador (`hands`: mesa atrasada com as mãos; `k`: tela de transmissão; `judge`: o Judge vê as mãos ao vivo) | Pública; `hands`: Streamer; `k`: chave; `judge`: Judge |
+| GET | `/api/online/rooms/:id/decks` | Decks dos jogadores de uma sala (painel de quem transmite) | Streamer |
+| GET · POST · PUT | `/api/broadcast`, `/api/broadcast/key`, `/api/broadcast/room`, `/api/broadcast/settings` | Modo transmissão: link do OBS, partida escolhida e opções | Streamer |
+| GET | `/api/broadcast/:key` | O que a tela de transmissão mostra (a chave faz as vezes do login) | Chave |
+| GET | `/api/tournaments` · `/api/tournaments/:id` · `/api/tournaments/:id/lobby` | Torneios, detalhe e lobby (o que quem pede pode fazer vem na resposta) | Pública |
+| GET | `/api/tournaments/me` | Torneios em que a conta está em jogo agora | Sessão |
+| POST | `/api/tournaments` | Cria (`{ name, format, structure, rounds, swissBestOf, topCut, bo3From, bo5From, maxPlayers, startsAt, checkIn, … }`) | Organizador ou apoiador Capitão/Almirante (cota) |
+| PUT · DELETE | `/api/tournaments/:id` | Edita (só com inscrições abertas) / apaga | Organizador |
+| POST · DELETE | `/api/tournaments/:id/register` · POST `/checkin` | Inscreve ou troca o deck (`{ deckId }`); cancela ou desiste; check-in | Sessão |
+| PUT | `/api/tournaments/:id/matches/:m/ready` · POST `/play` | "Estou pronto"; abre ou entra na sala do jogo atual | Sessão (jogador da mesa) |
+| POST | `/api/tournaments/:id/matches/:m/call` | Chama o Judge (pausa a sala) | Sessão (jogador da mesa) ou Judge |
+| POST | `/api/tournaments/:id/{start,next,finish}` · `/rounds/begin` | Começa, avança, encerra; inicia a rodada atual | Organizador |
+| PUT · DELETE | `/api/tournaments/:id/judges` · `/judges/:userId` | Escolhe / remove Judges | Organizador |
+| POST | `/api/tournaments/:id/matches/:m/resume` · `/players/:userId/warnings` | Retoma a partida pausada; dá um warning | Judge |
+| GET | `/api/tournaments/:id/incidents` | Chamados e warnings do torneio | Judge |
+| DELETE | `/api/tournaments/:id/warnings/:w` · POST `/players/:userId/warnings/keep` | Anula um warning; mantém o jogador no limite | Organizador |
+| PUT | `/api/tournaments/:id/matches/:m/result` | Placar da série (`{ wins }` ou `{ result }`) | Organizador |
+| POST | `/api/tournaments/:id/players/:userId/{drop,reinstate}` · PUT `/late` | Tira / devolve um jogador; libera a inscrição atrasada | Organizador |
+| GET | `/api/tournaments/:id/recap` | Kit de divulgação (torneio encerrado) | Organizador |
+| GET | `/api/sponsors?placement=` · `/api/sponsors/:id/logo` | Lojas parceiras e o logo | Pública |
+| GET | `/api/support` · `/api/support/supporters` | Apoio ao projeto e lista pública de apoiadores | Pública |
+| PUT | `/api/support/me` | Aparecer na lista de apoiadores (`{ public }`) | Sessão |
+| POST | `/api/support/apoiase/sync` | Consulta agora o apoio na Apoia.se | Sessão |
+| POST | `/api/support/kofi` | Webhook do Ko-fi (token de verificação no corpo) | Ko-fi (`KOFI_WEBHOOK_TOKEN`) |
+| GET | `/api/internal/supporter?email=` | Plano de uma conta, consultado pela homologação | `INTERNAL_TOKEN` em `Authorization: Bearer` |
+
+Corpos, filtros, erros e o fluxo OAuth dos parceiros estão descritos no `README.md` (seções "API" e "API para parceiros").
 
 ### C. Comandos
 
