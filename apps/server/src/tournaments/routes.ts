@@ -80,6 +80,7 @@ import {
 import {
   accountsByName,
   actsAsJudge,
+  addIntervention,
   addJudge,
   addWarning,
   checkInPlayer,
@@ -91,10 +92,12 @@ import {
   finishTournament,
   getMatch,
   getTournament,
+  type InterventionRole,
   insertRound,
   lateRegister,
   listCalls,
   listGames,
+  listInterventions,
   listJudges,
   listMatches,
   listPlayers,
@@ -1253,6 +1256,23 @@ export function registerTournamentRoutes(
     return detail(getTournament(db, t.id)!, me);
   });
 
+  // ---------------------------------------------------------------- modo manual do Judge
+  //
+  // Enquanto nem toda carta faz exatamente o que deveria, quem responde pela partida pode corrigir a
+  // mesa: Admin e Dev em qualquer torneio, o organizador no dele e os Judges da lista só no torneio
+  // deles e só enquanto ele está em andamento (`liveMatch` exige `running`: a permissão acaba sozinha
+  // com o torneio). Só em partidas de torneio, sem confirmação dos jogadores, e tudo fica na auditoria
+  // (`tournament_interventions`, nas ocorrências do torneio).
+
+  /** Papel de quem intervém, para a auditoria. */
+  const interventionRole = (t: Tournament, me: User): InterventionRole =>
+    me.role === 'admin' || me.role === 'dev' ? me.role : me.id === t.organizerId ? 'organizer' : 'judge';
+  /** Nome público de quem intervém (vai para o log da partida). */
+  const publicName = (me: User) => findPlayer(db, accountOwnerKey(me.id))?.name ?? 'Judge';
+  /** Nota obrigatória do desfazer e das correções: o motivo, para o organizador e para corrigirmos a carta. */
+  const manualNote = (v: unknown) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, REASON_MAX) : '');
+  const gameOf = (m: TournamentMatch) => m.wins[0] + m.wins[1] + 1;
+
   /** Partida da rodada atual, com a sala em jogo (para o chamado de Judge e a retomada). */
   const liveMatch = (t: Tournament, matchId: number): { m: TournamentMatch; room: NonNullable<ReturnType<Lobby['get']>> } | ({ code: number } & PlayerError) => {
     const m = getMatch(db, t.id, matchId);
@@ -1300,13 +1320,109 @@ export function registerTournamentRoutes(
     const live = liveMatch(t, Number(req.params.matchId));
     if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
     const { m, room } = live;
+    const manual = Boolean(room.manualMode);
     const r = room.resume();
     if (!r.ok) return reply.code(r.code).send(fail(r.errorCode ?? 'invalidAction', r.error, r.errorParams));
     const note = typeof req.body?.note === 'string' && req.body.note.trim() ? req.body.note.trim().slice(0, REASON_MAX) : null;
     resolveCalls(db, t.id, m.id, me.id, nowIso(), note);
+    // Retomar também encerra o modo manual.
+    if (manual) addIntervention(db, t.id, { matchId: m.id, roomId: room.id, game: gameOf(m), userId: me.id, role: interventionRole(t, me), kind: 'manual_off', note, at: nowIso() });
     app.log.info(`torneio ${t.id}: partida ${m.id} retomada por ${me.id}${note ? ` (${note})` : ''}`);
     return reply.code(204).send();
   });
+
+
+  // ---------------------------------------------------------------- modo manual do Judge (rotas)
+
+  /** Entra (`on: true`) ou sai do modo manual. Entrar pausa a partida (com um chamado aberto pelo Judge, se ainda não havia). */
+  app.post<{ Params: { id: string; matchId: string }; Body: { on?: unknown; note?: unknown } }>(
+    '/api/tournaments/:id/matches/:matchId/manual',
+    async (req, reply) => {
+      const found = judged(req, reply);
+      if (!found) return reply;
+      const { t, me } = found;
+      const live = liveMatch(t, Number(req.params.matchId));
+      if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
+      const { m, room } = live;
+      const on = req.body?.on !== false;
+      const r = on ? room.enterManual({ id: me.id, name: publicName(me) }) : room.leaveManual();
+      if (!r.ok) return reply.code(r.code).send(fail(r.errorCode ?? 'invalidAction', r.error, r.errorParams));
+      const at = nowIso();
+      if (on && 'pausedNow' in r && r.pausedNow) createCall(db, t.id, { matchId: m.id, roomId: room.id, game: gameOf(m), openedBy: me.id, at });
+      const note = manualNote(req.body?.note) || null;
+      addIntervention(db, t.id, { matchId: m.id, roomId: room.id, game: gameOf(m), userId: me.id, role: interventionRole(t, me), kind: on ? 'manual_on' : 'manual_off', note, at });
+      app.log.info(`torneio ${t.id}: partida ${m.id} ${on ? 'entrou no' : 'saiu do'} modo manual (por ${me.id})`);
+      return { manual: room.manualMode, actionCount: r.actionCount };
+    },
+  );
+
+  /** Últimas jogadas da partida, para o Judge escolher até onde desfazer (só no modo manual). */
+  app.get<{ Params: { id: string; matchId: string } }>('/api/tournaments/:id/matches/:matchId/manual', async (req, reply) => {
+    const found = judged(req, reply);
+    if (!found) return reply;
+    const live = liveMatch(found.t, Number(req.params.matchId));
+    if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
+    const { room } = live;
+    if (!room.manualMode) return reply.code(409).send(fail('roomNotManual', 'A partida não está no modo manual.'));
+    return { actionCount: room.state?.actionCount ?? 0, history: room.history() };
+  });
+
+  /** Desfaz as jogadas: ficam só as primeiras `to` ações (`seq`: a versão da mesa que o Judge viu). */
+  app.post<{ Params: { id: string; matchId: string }; Body: { seq?: unknown; to?: unknown; note?: unknown } }>(
+    '/api/tournaments/:id/matches/:matchId/undo',
+    async (req, reply) => {
+      const found = judged(req, reply);
+      if (!found) return reply;
+      const { t, me } = found;
+      const live = liveMatch(t, Number(req.params.matchId));
+      if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
+      const { m, room } = live;
+      const note = manualNote(req.body?.note);
+      if (note.length < 3) return reply.code(400).send(fail('manualNoteRequired', 'Escreva o motivo da correção.'));
+      const r = room.judgeUndo(req.body?.seq, req.body?.to);
+      if (!r.ok) return reply.code(r.code).send(fail(r.errorCode ?? 'invalidAction', r.error, r.errorParams));
+      addIntervention(db, t.id, {
+        matchId: m.id,
+        roomId: room.id,
+        game: gameOf(m),
+        userId: me.id,
+        role: interventionRole(t, me),
+        kind: 'undo',
+        payload: { to: req.body?.to },
+        removed: r.removed,
+        note,
+        at: nowIso(),
+      });
+      app.log.info(`torneio ${t.id}: partida ${m.id}: ${r.removed?.length ?? 0} jogada(s) desfeita(s) por ${me.id} (${note})`);
+      return { actionCount: r.actionCount };
+    },
+  );
+
+  /**
+   * Correção do Judge pelo lado de `player`: `op` (ferramenta manual: comprar, mover, K.O., poder, DON!!…)
+   * ou `action` (concluir um efeito manual, passar ou encerrar o turno no lugar do jogador).
+   */
+  app.post<{ Params: { id: string; matchId: string }; Body: { seq?: unknown; player?: unknown; op?: unknown; action?: unknown; note?: unknown } }>(
+    '/api/tournaments/:id/matches/:matchId/judge-action',
+    async (req, reply) => {
+      const found = judged(req, reply);
+      if (!found) return reply;
+      const { t, me } = found;
+      const live = liveMatch(t, Number(req.params.matchId));
+      if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
+      const { m, room } = live;
+      const note = manualNote(req.body?.note);
+      if (note.length < 3) return reply.code(400).send(fail('manualNoteRequired', 'Escreva o motivo da correção.'));
+      const r = room.judgeAct(req.body?.seq, req.body?.player, { op: req.body?.op, action: req.body?.action });
+      if (!r.ok) return reply.code(r.code).send(fail(r.errorCode ?? 'invalidAction', r.error, r.errorParams));
+      const at = nowIso();
+      addIntervention(db, t.id, { matchId: m.id, roomId: room.id, game: gameOf(m), userId: me.id, role: interventionRole(t, me), kind: 'judge_action', payload: r.action, note, at });
+      // A correção terminou a partida: a sala voltou a correr sozinha e o chamado fecha.
+      if (!room.isPaused && openCall(db, t.id, m.id)) resolveCalls(db, t.id, m.id, me.id, at, note);
+      app.log.info(`torneio ${t.id}: partida ${m.id}: correção do Judge ${me.id} (${note})`);
+      return { actionCount: r.actionCount };
+    },
+  );
 
   /** Partida decidida por fora (placar, derrota dupla, desistência): uma sala pausada volta a correr e o chamado fecha. */
   const releaseRoom = (t: Tournament, m: TournamentMatch, by: string) => {
@@ -1389,6 +1505,13 @@ export function registerTournamentRoutes(
         .slice()
         .reverse()
         .map((w) => ({ ...w, name: name(w.userId), byName: name(w.givenBy), match: w.matchId ? table(w.matchId) : null })),
+      // Modo manual: quem desfez ou corrigiu o quê (as ações desfeitas só contam, não vão para a tela).
+      interventions: listInterventions(db, t.id).map(({ removed, ...i }) => ({
+        ...i,
+        removedCount: removed?.length ?? 0,
+        byName: name(i.userId) === '?' ? (findPlayer(db, accountOwnerKey(i.userId))?.name ?? '?') : name(i.userId),
+        match: table(i.matchId),
+      })),
     };
   });
 

@@ -2055,6 +2055,17 @@ function Incidents({
               </li>
             ))}
           </ul>
+          <h3>{tr('tour.incidentInterventions', { n: data.interventions?.length ?? 0 })}</h3>
+          {!data.interventions?.length && <p className="muted small">{tr('tour.incidentNoInterventions')}</p>}
+          <ul className="tour-incident-list">
+            {(data.interventions ?? []).map((i) => (
+              <li key={i.id}>
+                <b>{dots(where(i.match), tr('tour.interventionBy', { name: i.byName, role: tr(`tour.interventionRole.${i.role}`) }))}</b>
+                <span className="small">{dots(tr(`tour.intervention.${i.kind}`, { n: i.removedCount }), time(i.at, locale))}</span>
+                {i.note && <span className="small tour-incident-note">{i.note}</span>}
+              </li>
+            ))}
+          </ul>
         </>
       )}
     </section>

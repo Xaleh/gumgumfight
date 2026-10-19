@@ -193,9 +193,12 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
 - **`applyAction(prev, action)`** (`engine.ts:998`): clona o estado (sem clonar `defs`), aplica e devolve o novo;
   lança `IllegalActionError`. Nunca muda `prev`, então uma ação recusada não deixa rastro.
 - **`legalActions(state, player)`** e **`actingPlayer(state)`** (`actions.ts`): usadas pela UI, pelo bot e pelo servidor.
-- **Ações** (17 tipos): `mulligan`, `playCard`, `attachDon`, `detachDon`, `cancel`, `activate`, `attack`, `endTurn`,
+- **Ações** (18 tipos): `mulligan`, `playCard`, `attachDon`, `detachDon`, `cancel`, `activate`, `attack`, `endTurn`,
   `choose`, `answer`, `counter`, `pass`, `option`, `concede`, `timeout` (só o servidor), `manual`/`manualDone`
-  (só testes; recusadas online).
+  (`manual` só nos testes; recusada quando vem do jogador online) e `judge` (correção do Judge no modo manual de
+  torneio: a mesma `ManualOp` de `manual`, pelo lado de `player`, fora da vez e com qualquer pendência, sem o
+  `manualAllowed`; loga `log.judgeIntervention` com o nome `by` e apaga o `cancel`/`checkpoint` da jogada em andamento.
+  Só o servidor a cria, pela rota do Judge; seção 12).
 - **Determinismo**: o RNG vive dentro do estado. `mulberry32` (32 bits) nas partidas locais; `sfc32` (128 bits,
   seed do `crypto`) nas online, porque 32 bits poderiam ser descobertos por força bruta a partir da mão inicial.
 - **Replays**: `REPLAY_VERSION = 11`; `upgradeReplayActions` insere respostas implícitas de versões antigas. Não há
@@ -932,7 +935,8 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
 - O navegador nunca recebe seed, RNG, mão do oponente ou ordem do deck. Ids das cartas são apelidos por sala.
 - Decisões que dependem de informação escondida sempre abrem para o dono, mesmo com uma só resposta, para o tempo
   de resposta não vazar informação; o bot responde com atraso aleatório.
-- Ações `manual`/`timeout` vindas do cliente são recusadas; `MAX_ACTIONS = 5000` por partida.
+- Ações `manual`/`timeout`/`judge` vindas do cliente são recusadas (a `judge` só sai da rota do Judge, seção 12);
+  `MAX_ACTIONS = 5000` por partida.
 
 ---
 
@@ -958,6 +962,9 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   chamados de Judge (`match_id`, `room_id`, `game`, `opened_by`, `opened_at`, `resolved_by`/`resolved_at`, `note` = o
   relato do Judge ao organizador). **`tournament_warnings`**: `user_id`, `given_by`, `given_at`, `round`, `match_id`,
   `call_id` (o chamado de origem, se houver), `reason`, `revoked_at`/`revoked_by` (anulado pelo organizador).
+  **`tournament_interventions`**: a auditoria do modo manual (`match_id`, `room_id`, `game`, `user_id`, `role` =
+  `admin | dev | organizer | judge` no momento, `kind` = `manual_on | manual_off | undo | judge_action`, `payload` JSON
+  (a ação `judge`/a resposta no lugar do jogador, ou `{ to }` no desfazer), `removed` JSON (as ações desfeitas), `note`, `at`).
 - **`tournament_matches`**: uma linha por série (`best_of`, `wins1`, `wins2`, `result` ∈ `p1 | p2 | bye | none | loss`
   (`none` = derrota dupla: W.O. duplo ou lançada pelo organizador, os dois perdem; `loss` = derrota sem oponente da
   inscrição atrasada, o espelho do bye), nunca empate), `next_first` (quem perdeu começa o próximo jogo), `room_id`
@@ -985,7 +992,31 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   decisão **pendente** (`warningsPending` no detalhe) e **`next` recusa (409 `warningsPending`)** até o organizador
   **manter** (`POST …/players/:userId/warnings/keep` → `warnings_reviewed_at`; um warning novo pede decisão de novo),
   **anular** um warning (`DELETE …/warnings/:id`) ou **eliminar** (`drop`). Só o organizador elimina; o Judge relata.
-- **Ocorrências** (`GET …/incidents`, Judge/organizador): chamados (com nota) e warnings, com nomes.
+- **Modo manual** (enquanto nem toda carta faz exatamente o que deveria): quem responde pela partida desfaz jogadas e
+  corrige a mesa, para o jogador não perder por falta de automação. **Quem**: Admin e Dev em qualquer torneio, o
+  organizador no dele e os Judges da lista só no torneio deles (`judged()`), sempre com o torneio em `running` e a
+  partida da rodada atual em jogo (`liveMatch`): a permissão do Judge acaba sozinha quando o torneio termina ou quando ele
+  sai da lista. Só em partidas de torneio (`Room.enterManual` recusa as outras filas, `manualTournamentOnly`), e **os
+  jogadores não confirmam nada**: a decisão é de quem está no modo manual.
+  - `POST …/matches/:m/manual {on, note?}`: `Room.enterManual` pausa a sala se ainda não estava (com um chamado aberto
+    pelo Judge) e grava `RoomData.manual = {by, name, at}` (sobrevive a reinício; `room.manual` vai para todos, a faixa
+    "X está corrigindo a mesa"). `on: false` (`leaveManual`) sai, e a partida continua pausada; `resume` também sai.
+  - `GET …/matches/:m/manual`: `Room.history()` refaz a partida e devolve as últimas 30 ações (`count` = quantas ficam
+    voltando para antes dela, `logFrom`/`logTo` = as linhas do log dela; o log da visão tem as mesmas linhas).
+  - `POST …/matches/:m/undo {seq, to, note}`: `Room.judgeUndo` corta `actions`/`timeline` nas primeiras `to` e chama
+    `rebuild()` (mesmos apelidos, mesma seed: refazer a jogada dá o mesmo resultado, inclusive compras e embaralhamentos).
+    O relógio fica como está. Os clientes recebem o estado com `actionCount` menor e o log encolhe sozinho
+    (`log.from` = o tamanho novo); as mesas atrasadas que passaram do novo fim são refeitas.
+  - `POST …/matches/:m/judge-action {seq, player, op | action, note}`: `Room.judgeAct` traduz as cartas pela visão do
+    Judge (as duas mãos à vista) e aplica `{type:'judge', player, op, by}` ou, no lugar do jogador, só `manualDone`,
+    `pass` ou `endTurn`. Se a correção terminar a partida, a sala sai da pausa e o chamado fecha.
+  - `seq` é a versão da mesa que o Judge viu (409 `boardChanged` se mudou); `note` é obrigatória (≥ 3 caracteres,
+    `manualNoteRequired`) no desfazer e nas correções. Tudo vai para `tournament_interventions`.
+  - Web: botão "🛠 Modo manual" no painel do Judge (`Judge.tsx`, `ManualTools`): motivo, lista de jogadas com "Voltar
+    para antes desta", ferramentas por lado (comprar, embaralhar, DON!!), por carta (mover, K.O., virar, ±1000, dar DON!!)
+    e "no lugar de" quem a partida espera.
+- **Ocorrências** (`GET …/incidents`, Judge/organizador): chamados (com nota), warnings e intervenções do modo manual
+  (`interventions`: quem, com que papel, o quê, `removedCount`, nota), com nomes.
 
 ### Início das rodadas e lobby
 
@@ -1492,7 +1523,9 @@ Quem chama, na coluna da direita:
 | POST | `/api/tournaments/:id/{start,next,finish}` · `/rounds/begin` | Começa, avança, encerra; inicia a rodada atual | Organizador |
 | PUT · DELETE | `/api/tournaments/:id/judges` · `/judges/:userId` | Escolhe / remove Judges | Organizador |
 | POST | `/api/tournaments/:id/matches/:m/resume` · `/players/:userId/warnings` | Retoma a partida pausada; dá um warning | Judge |
-| GET | `/api/tournaments/:id/incidents` | Chamados e warnings do torneio | Judge |
+| GET | `/api/tournaments/:id/incidents` | Chamados, warnings e intervenções do modo manual | Judge |
+| POST · GET | `/api/tournaments/:id/matches/:m/manual` | Entra/sai do modo manual (`{ on, note? }`); últimas jogadas para desfazer | Judge (torneio em andamento) |
+| POST | `/api/tournaments/:id/matches/:m/undo` · `/judge-action` | Desfaz jogadas (`{ seq, to, note }`); corrige a mesa (`{ seq, player, op \| action, note }`) | Judge (torneio em andamento) |
 | DELETE | `/api/tournaments/:id/warnings/:w` · POST `/players/:userId/warnings/keep` | Anula um warning; mantém o jogador no limite | Organizador |
 | PUT | `/api/tournaments/:id/matches/:m/result` | Placar da série (`{ wins }` ou `{ result }`) | Organizador |
 | POST | `/api/tournaments/:id/players/:userId/{drop,reinstate}` · PUT `/late` | Tira / devolve um jogador; libera a inscrição atrasada | Organizador |
