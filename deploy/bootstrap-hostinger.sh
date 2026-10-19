@@ -150,9 +150,9 @@ GOOGLE_CLIENT_ID="$(get_env GOOGLE_CLIENT_ID)"
 ADMIN_EMAILS="$(get_env ADMIN_EMAILS)"
 ONLINE_BOT_ROOMS="$(get_env ONLINE_BOT_ROOMS)"; ONLINE_BOT_ROOMS="${ONLINE_BOT_ROOMS:-on}"
 PARTNER_IPS="$(get_env PARTNER_IPS)"
-# Apoio, homologação e ajustes finos (preenchidos à mão no deploy.env): mantidos como estão.
+# Apoio, homologação, replay embutido e ajustes finos (preenchidos à mão no deploy.env): mantidos como estão.
 KEEP_LINES=""
-[ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+|PUSH|VAPID_[A-Z_]+|SPOILER_SYNC)=' "$ENV_FILE" || true)"
+[ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+|PUSH|VAPID_[A-Z_]+|SPOILER_SYNC|REPLAY_EMBED_ORIGINS|REPLAY_LINK_SECRET)=' "$ENV_FILE" || true)"
 cat > "$ENV_FILE" <<EOF
 # Gerado por deploy/bootstrap-hostinger.sh — lido a cada deploy (deploy/remote-deploy.sh e ecosystem.config.cjs).
 PORT=$PORT

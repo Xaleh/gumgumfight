@@ -204,6 +204,11 @@ ver "API para parceiros" no `README.md`). Dois ajustes na VPS:
    host (a produção): na homologação com Nginx Proxy Manager (Docker), o `setup-vm.sh` não configura limite por IP,
    então não há o que liberar.
 
+3. **Replay embutido** (iframe no site do parceiro): coloque o endereço do site dele (só a origem, sem caminho; mais
+   de um separado por vírgula, ex.: `https://sweetapp.com.br,https://homolog.sweetapp.com.br`) em
+   `REPLAY_EMBED_ORIGINS` no `deploy.env` e recarregue o pm2 com `--update-env` (abaixo, em "Operação"). Sem isso, o
+   navegador recusa o iframe (`frame-ancestors`). O Nginx não muda: os cabeçalhos vêm do app.
+
 ## Operação
 
 ```bash

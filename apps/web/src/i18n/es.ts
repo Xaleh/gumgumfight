@@ -1619,6 +1619,7 @@ export default {
   'replay.stopsAt': 'La repetición se detiene en la acción {n}: {message}',
   // ---- ver repetición (archivo) ----
   'replay.title': 'Ver repetición',
+  'replay.embedFailed': 'No se pudo abrir la repetición',
   'replay.chooseFile': 'Elige el archivo .json de la repetición',
   'replay.changeFile': 'Cambiar archivo',
   'replay.dropHint': 'o arrastra el archivo aquí',
@@ -2325,6 +2326,8 @@ export default {
   // ---- repeticiones y reportes ----
   'errors.replayForbidden': 'Solo los jugadores de la partida, el organizador o un Judge del torneo, o un admin pueden ver esta repetición.',
   'errors.noReplay': 'Esta partida no tiene repetición guardada.',
+  'errors.replay_link_expired': 'Este enlace de repetición caducó; pide uno nuevo.',
+  'errors.replay_link_invalid': 'Enlace de repetición no válido.',
   'errors.matchOfOthers': 'Esta partida es de otros jugadores.',
   'errors.reportOnlyPlayers': 'Solo los jugadores de la partida pueden reportar un problema.',
   'errors.reportTooShort': 'Describe el problema (al menos 5 letras).',

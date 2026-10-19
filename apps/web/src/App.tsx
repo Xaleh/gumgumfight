@@ -11,10 +11,12 @@ import { Learn } from './components/Learn';
 import { Lesson } from './components/Lesson';
 import { Menu } from './components/Menu';
 import { OAuthConsent } from './components/OAuthConsent';
+import { ReplayEmbed } from './components/ReplayEmbed';
 import { Stats } from './components/Stats';
 import { Tournaments } from './components/Tournaments';
 import { Watch } from './components/Watch';
 import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
+import { isReplayPath } from './embed';
 import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
 import { usePushSync, useWakeLock } from './pwa';
@@ -70,7 +72,10 @@ const OAUTH_PATH = '/oauth/authorize';
 export function App() {
   const [broadcastKey] = useState(() => new URL(location.href).searchParams.get(BROADCAST_PARAM));
   const [oauthQuery] = useState(() => (location.pathname === OAUTH_PATH ? location.search.replace(/^\?/, '') : null));
+  const [replayPage] = useState(() => isReplayPath(location.pathname));
   if (oauthQuery !== null) return <OAuthConsent query={oauthQuery} />;
+  // Replay embutido em apps parceiros (`/replay/<id>?t=`): só a mesa, em modo replay.
+  if (replayPage) return <ReplayEmbed />;
   return broadcastKey ? <Broadcast broadcastKey={broadcastKey} /> : <MainApp />;
 }
 

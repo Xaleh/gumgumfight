@@ -1620,6 +1620,7 @@ const ptBR = {
   'replay.stopsAt': 'O replay para na ação {n}: {message}',
   // ---- assistir replay (arquivo) ----
   'replay.title': 'Assistir replay',
+  'replay.embedFailed': 'Não deu para abrir o replay',
   'replay.chooseFile': 'Escolher o arquivo .json do replay',
   'replay.changeFile': 'Trocar o arquivo',
   'replay.dropHint': 'ou arraste o arquivo para cá',
@@ -2329,6 +2330,8 @@ const ptBR = {
   // ---- replays e relatos ----
   'errors.replayForbidden': 'Só quem jogou a partida, o organizador ou um Judge do torneio, ou um admin pode ver este replay.',
   'errors.noReplay': 'Esta partida não tem replay gravado.',
+  'errors.replay_link_expired': 'Este link de replay expirou; peça um novo.',
+  'errors.replay_link_invalid': 'Link de replay inválido.',
   'errors.matchOfOthers': 'Partida de outros jogadores.',
   'errors.reportOnlyPlayers': 'Só quem jogou a partida pode relatar um problema.',
   'errors.reportTooShort': 'Descreva o problema (pelo menos 5 letras).',

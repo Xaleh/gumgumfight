@@ -8,7 +8,9 @@ import { join } from 'node:path';
 import { Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
+import type { ServerOptions } from '../src/config';
 import { type DB, getCards, openDb } from '../src/db';
+import { checkReplayToken, REPLAY_LINK_TTL_S, replayLinkSecret, signReplayToken } from '../src/partners/replay-link';
 import { createToken, getToken, setClientWebhook, upsertClient } from '../src/partners/store';
 import { seed } from '../src/seed';
 
@@ -45,12 +47,13 @@ interface SetupOpts {
   fetchImpl?: typeof fetch;
   logStream?: Writable;
   webhookRetryMs?: number[];
+  server?: Partial<ServerOptions>;
 }
 function setup(o: SetupOpts = {}) {
   const db = openDb(':memory:');
   seed(db);
   const app = buildApp(db, {
-    server: { cardImages: true, googleClientId: CLIENT_ID, adminEmails: o.adminEmails ?? [] },
+    server: { cardImages: true, googleClientId: CLIENT_ID, adminEmails: o.adminEmails ?? [], ...o.server },
     googleKeys: keys,
     now: o.now,
     fetchImpl: o.fetchImpl,
@@ -357,6 +360,148 @@ describe('partidas para apps', () => {
     const replay = (await a.inject({ url: `/api/matches/${saved.id}/replay`, headers: tk.bearer })).json();
     expect(replay).toMatchObject({ format: 'gumgumfight-replay', winner: saved.winner });
     expect(replay.actions.length).toBeGreaterThan(0);
+  });
+});
+
+// ------------------------------------------------------------------ replay embutido
+
+const SWEET_ORIGIN = 'https://sweet.example';
+
+/** Põe a partida gravada num torneio (só as linhas que o resumo da partida lê). */
+function inTournament(db: DB, matchId: number, organizerId: string, status: 'running' | 'finished') {
+  db.prepare("INSERT INTO tournaments (id, name, format, structure, status, organizer_id) VALUES ('t-embed', 'Copa', 'standard', 'swiss', ?, ?)").run(status, organizerId);
+  const tm = db.prepare("INSERT INTO tournament_matches (tournament_id, round, table_no, p1) VALUES ('t-embed', 1, 1, ?)").run(organizerId);
+  db.prepare("INSERT INTO tournament_games (tournament_id, match_id, game, stats_match_id, played_at) VALUES ('t-embed', ?, 1, ?, datetime('now'))").run(
+    Number(tm.lastInsertRowid),
+    matchId,
+  );
+}
+
+describe('replay embutido (iframe com link assinado)', () => {
+  it('token: ligado à partida, com validade, e recusa assinatura mexida ou formato errado', () => {
+    const secret = randomBytes(32);
+    const now = 1_800_000_000;
+    const token = signReplayToken(secret, 42, now + 60);
+    expect(checkReplayToken(secret, 42, token, now)).toBe('ok');
+    expect(checkReplayToken(secret, 43, token, now)).toBe('invalid');
+    expect(checkReplayToken(secret, 42, token, now + 60)).toBe('expired');
+    expect(checkReplayToken(randomBytes(32), 42, token, now)).toBe('invalid');
+    const [exp, sig] = token.split('.');
+    // Trocar a validade invalida a assinatura.
+    expect(checkReplayToken(secret, 42, `${(now + 99_999).toString(36)}.${sig}`, now)).toBe('invalid');
+    expect(checkReplayToken(secret, 42, `${exp}.${sig.slice(0, -1)}${sig.endsWith('A') ? 'B' : 'A'}`, now)).toBe('invalid');
+    for (const bad of [undefined, '', 'abc', `${exp}.`, `.${sig}`, `${exp}.${sig}.x`, 'x'.repeat(500)]) expect(checkReplayToken(secret, 42, bad, now)).toBe('invalid');
+  });
+
+  it('o segredo nasce no banco na primeira vez e depois é o mesmo; REPLAY_LINK_SECRET fixa outro', () => {
+    const db = openDb(':memory:');
+    const a = replayLinkSecret(db);
+    expect(a).toHaveLength(32);
+    expect(replayLinkSecret(db).equals(a)).toBe(true);
+    expect(replayLinkSecret(db, 'segredo-do-env').toString()).toBe('segredo-do-env');
+  });
+
+  it('POST /api/matches/:id/replay-link → GET /api/replay/:id sem sessão, com as cartas usadas; expira em 1 hora', async () => {
+    let clock = Date.now();
+    const { app: a, db } = setup({ now: () => clock, server: { replayEmbedOrigins: [SWEET_ORIGIN] } });
+    const { cookie } = await login(a);
+    const zoro = await login(a, ZORO);
+    const tk = await personalToken(a, cookie, ['matches:read']);
+    const decksOnly = await personalToken(a, cookie, ['decks:read'], 'só decks');
+    const zoroTk = await personalToken(a, zoro.cookie, ['matches:read']);
+    const saved = (await a.inject({ method: 'POST', url: '/api/matches', headers: cookie, payload: botMatch(db, 13) })).json();
+    const linkUrl = `/api/matches/${saved.id}/replay-link`;
+
+    // Quem não jogou, sem login, sem o scope ou partida inexistente: sem link.
+    expect((await a.inject({ method: 'POST', url: linkUrl, headers: zoroTk.bearer })).json().errorCode).toBe('replayForbidden');
+    expect((await a.inject({ method: 'POST', url: linkUrl })).statusCode).toBe(401);
+    expect((await a.inject({ method: 'POST', url: linkUrl, headers: decksOnly.bearer })).json().errorCode).toBe('insufficient_scope');
+    expect((await a.inject({ method: 'POST', url: '/api/matches/99999/replay-link', headers: tk.bearer })).statusCode).toBe(404);
+
+    const res = await a.inject({ method: 'POST', url: linkUrl, headers: tk.bearer, payload: { lang: 'pt-BR', layout: 'lateral' } });
+    expect(res.statusCode).toBe(201);
+    const link = res.json() as { url: string; token: string; matchId: number; expiresAt: string };
+    expect(link.matchId).toBe(saved.id);
+    expect(Date.parse(link.expiresAt) - clock).toBeGreaterThan((REPLAY_LINK_TTL_S - 2) * 1000);
+    expect(Date.parse(link.expiresAt) - clock).toBeLessThanOrEqual(REPLAY_LINK_TTL_S * 1000);
+    const url = new URL(link.url);
+    expect(url.pathname).toBe(`/replay/${saved.id}`);
+    expect(Object.fromEntries(url.searchParams)).toEqual({ t: link.token, embed: '1', lang: 'pt-BR', layout: 'lateral' });
+    // Valores desconhecidos ficam de fora; embed: false tira o embed=1. O site (cookie) também pede o link.
+    const plain = (await a.inject({ method: 'POST', url: linkUrl, headers: cookie, payload: { lang: '<script>', layout: 'x', embed: false } })).json();
+    expect([...new URL(plain.url).searchParams.keys()]).toEqual(['t']);
+
+    // Sem cookie nem Bearer: o token basta.
+    const got = await a.inject({ url: `/api/replay/${saved.id}?t=${link.token}` });
+    expect(got.statusCode).toBe(200);
+    expect(got.headers['cache-control']).toBe('no-store');
+    const body = got.json() as { replay: { format: string; actions: unknown[]; decks: DeckList[] }; cards: CardData[]; origins: string[] };
+    expect(body.replay).toMatchObject({ format: 'gumgumfight-replay', winner: saved.winner });
+    expect(body.replay.actions.length).toBeGreaterThan(0);
+    expect(body.origins).toEqual([SWEET_ORIGIN]);
+    const used = new Set([luffy.leader, ...luffy.cards.map((c) => c.id)]);
+    expect(new Set(body.cards.map((c) => c.id))).toEqual(used);
+
+    // De outra partida, mexido ou ausente: inválido.
+    const other = (await a.inject({ method: 'POST', url: '/api/matches', headers: cookie, payload: botMatch(db, 17) })).json();
+    expect((await a.inject({ url: `/api/replay/${other.id}?t=${link.token}` })).json().errorCode).toBe('replay_link_invalid');
+    expect((await a.inject({ url: `/api/replay/${saved.id}?t=${link.token.slice(0, -2)}xx` })).statusCode).toBe(401);
+    expect((await a.inject({ url: `/api/replay/${saved.id}` })).json().errorCode).toBe('replay_link_invalid');
+    expect((await a.inject({ url: `/api/replay/abc?t=${link.token}` })).statusCode).toBe(401);
+
+    // Um Bearer não abre esta rota (ela não declara scope).
+    expect((await a.inject({ url: `/api/replay/${saved.id}?t=${link.token}`, headers: tk.bearer })).json().errorCode).toBe('token_not_allowed');
+
+    clock += REPLAY_LINK_TTL_S * 1000 + 1000;
+    const late = await a.inject({ url: `/api/replay/${saved.id}?t=${link.token}` });
+    expect(late.statusCode).toBe(401);
+    expect(late.json().errorCode).toBe('replay_link_expired');
+  });
+
+  it('partida de torneio: sem link nem replay até o torneio terminar', async () => {
+    const { app: a, db } = setup();
+    const { cookie, user } = await login(a);
+    const tk = await personalToken(a, cookie, ['matches:read']);
+    const saved = (await a.inject({ method: 'POST', url: '/api/matches', headers: cookie, payload: botMatch(db, 19) })).json();
+    inTournament(db, saved.id, user.id, 'running');
+    const linkUrl = `/api/matches/${saved.id}/replay-link`;
+    expect((await a.inject({ method: 'POST', url: linkUrl, headers: tk.bearer })).json().errorCode).toBe('replayTournamentRunning');
+    // Um link assinado antes (ou por fora) também não abre enquanto o torneio corre.
+    const token = signReplayToken(replayLinkSecret(db), saved.id, Math.floor(Date.now() / 1000) + 600);
+    const sealed = await a.inject({ url: `/api/replay/${saved.id}?t=${token}` });
+    expect(sealed.statusCode).toBe(403);
+    expect(sealed.json().errorCode).toBe('replayTournamentRunning');
+
+    db.prepare("UPDATE tournaments SET status = 'finished' WHERE id = 't-embed'").run();
+    expect((await a.inject({ method: 'POST', url: linkUrl, headers: tk.bearer })).statusCode).toBe(201);
+    expect((await a.inject({ url: `/api/replay/${saved.id}?t=${token}` })).statusCode).toBe(200);
+  });
+
+  it('iframe: só /replay/<id> libera as origens dos parceiros; o resto do site responde frame-ancestors none', async () => {
+    const { app: a } = setup({ server: { replayEmbedOrigins: [SWEET_ORIGIN, 'http://localhost:4000'] } });
+    const page = await a.inject({ url: '/replay/1?t=x&embed=1' });
+    expect(page.headers['content-security-policy']).toBe(`frame-ancestors 'self' ${SWEET_ORIGIN} http://localhost:4000`);
+    expect(page.headers['x-frame-options']).toBeUndefined();
+    expect(page.headers['referrer-policy']).toBe('no-referrer');
+    for (const url of ['/api/health', '/api/cards/ST01-001', '/api/replay/1?t=x', '/qualquer']) {
+      const res = await a.inject({ url });
+      expect(res.headers['content-security-policy'], url).toBe("frame-ancestors 'none'");
+      expect(res.headers['x-frame-options'], url).toBe('DENY');
+    }
+    // Sem REPLAY_EMBED_ORIGINS, só o próprio site.
+    const { app: closed } = setup();
+    expect((await closed.inject({ url: '/replay/1' })).headers['content-security-policy']).toBe("frame-ancestors 'self'");
+  });
+
+  it('homologação só para apoiadores: o replay com link assinado continua abrindo', async () => {
+    const db = openDb(':memory:');
+    seed(db);
+    const open = buildApp(db, { server: { cardImages: true } });
+    const gated = buildApp(db, { server: { cardImages: true, access: { mode: 'supporters' } } });
+    const saved = (await open.inject({ method: 'POST', url: '/api/matches', headers: BROWSER, payload: botMatch(db, 23) })).json();
+    const token = signReplayToken(replayLinkSecret(db), saved.id, Math.floor(Date.now() / 1000) + 600);
+    expect((await gated.inject({ url: `/api/replay/${saved.id}?t=${token}` })).statusCode).toBe(200);
+    expect((await gated.inject({ url: '/api/cards' })).statusCode).toBe(403);
   });
 });
 

@@ -1619,6 +1619,7 @@ export default {
   'replay.stopsAt': 'Das Replay stoppt bei Aktion {n}: {message}',
   // ---- Replay ansehen (Datei) ----
   'replay.title': 'Replay ansehen',
+  'replay.embedFailed': 'Das Replay konnte nicht geöffnet werden',
   'replay.chooseFile': 'Replay-Datei (.json) wählen',
   'replay.changeFile': 'Datei wechseln',
   'replay.dropHint': 'oder die Datei hierher ziehen',
@@ -2325,6 +2326,8 @@ export default {
   // ---- Replays und Meldungen ----
   'errors.replayForbidden': 'Nur die Spieler der Partie, der Turnierveranstalter oder ein Judge des Turniers oder ein Admin können dieses Replay ansehen.',
   'errors.noReplay': 'Diese Partie hat kein gespeichertes Replay.',
+  'errors.replay_link_expired': 'Dieser Replay-Link ist abgelaufen; fordere einen neuen an.',
+  'errors.replay_link_invalid': 'Ungültiger Replay-Link.',
   'errors.matchOfOthers': 'Diese Partie gehört anderen Spielern.',
   'errors.reportOnlyPlayers': 'Nur die Spieler der Partie können ein Problem melden.',
   'errors.reportTooShort': 'Beschreibe das Problem (mindestens 5 Buchstaben).',

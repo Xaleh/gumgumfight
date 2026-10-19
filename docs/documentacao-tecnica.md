@@ -757,7 +757,7 @@ aqui, o desenho:
   409 `deck_conflict` com a versão atual; o resumo dos decks ganhou `deckHash`); `matches:read` →
   `GET /api/players/me/matches` (`matches.ts`: `match_seats` por `player_id`, `since`, `cursor` = `match_id`, até 100),
   `GET /api/matches/:id` (resumo com `seats[].cards` de `match_cards`; o lado do oponente vem `null` fora de torneio
-  encerrado), `GET /api/matches/:id/replay`; `stats:read` → `/api/stats*`.
+  encerrado), `GET /api/matches/:id/replay`, `POST /api/matches/:id/replay-link`; `stats:read` → `/api/stats*`.
 - **Tela "Apps conectados"** (`/api/tokens`, só com cookie): lista tokens pessoais e apps autorizados (um por
   `client_id` com refresh ativo), cria (`{ name, scopes }`) e revoga (um app = todos os tokens dele para a conta).
 - **OAuth** (`oauth.ts`): `GET /oauth/authorize` confere `client_id` e `redirect_uri` (igualdade exata; erro = página
@@ -776,10 +776,24 @@ aqui, o desenho:
   `queue`, `format`, `won`), `X-GGF-Timestamp` e `X-GGF-Signature` (`sha256=` + HMAC-SHA256 do segredo sobre
   `<timestamp>.<corpo>`). Depois da resposta, timeout 5 s, `redirect: 'manual'`, só https em produção; sem 2xx, tenta
   de novo após 1 e 10 min (em memória) e desiste com log. `app.webhooks.idle()` espera as entregas (testes).
+- **Replay embutido** (`replay-link.ts`): `POST /api/matches/:id/replay-link` usa a mesma regra de
+  `GET /api/matches/:id/replay` (`replayDenied` em `reports/routes.ts`) e devolve `/replay/<id>?t=<token>&embed=1`
+  (+ `lang`, `layout`). Token `<exp base 36>.<HMAC-SHA256 base64url de "replay:<id>:<exp>">`, 1 h, segredo em
+  `REPLAY_LINK_SECRET` ou `server_keys` (`replay_link`, gerado na primeira vez); conferido com `timingSafeEqual`.
+  `GET /api/replay/:id?t=` (sem `config.scope`: Bearer recebe 403; aberto no `ACCESS=supporters`) confere o token,
+  fecha torneio em andamento (403 `replayTournamentRunning` mesmo com link válido) e responde
+  `{ replay, cards, origins }` com só as cartas usadas. `GET /replay/:id` entrega o `index.html` com
+  `frame-ancestors 'self' <REPLAY_EMBED_ORIGINS>` e `Referrer-Policy: no-referrer`; um hook `onSend` em `app.ts` põe
+  `frame-ancestors 'none'` + `X-Frame-Options: DENY` em toda resposta que não definiu a própria CSP. No web,
+  `embed.ts` lê o endereço e os comandos, `main.tsx` pula o service worker e aplica o `lang` do link, o `AccessGate`
+  não bloqueia o caminho, `ReplayEmbed.tsx` monta a partida (`setupFromReplay` com as cartas recebidas) e a
+  `GameScreen` recebe `embed` (`bare` esconde menu, sair e baixar; `layout` liga a visão do Streamer em pé ou lateral;
+  `useEmbedBridge` faz o postMessage `seek/play/pause` ↔ `ready/pos/ended`, conferindo `e.source === parent` e a origem).
 - **Nginx**: `PARTNER_IPS` no `deploy.env` tira os IPs dos parceiros do limite por IP (`geo`/`map` nos scripts de
   deploy); o limite real passa a ser o por token.
 - Testes: `apps/server/test/partners.test.ts` (tokens, allowlist, conflito, log, rate limit, partidas, OAuth completo,
-  webhook) e `apps/web/test/deeplink.test.ts` (o `?deck=` do construtor, `apps/web/src/deeplink.ts`).
+  webhook, link do replay embutido e CSP), `apps/web/test/deeplink.test.ts` (o `?deck=` do construtor,
+  `apps/web/src/deeplink.ts`) e `apps/web/test/embed.test.ts` (endereço `/replay/<id>` e comandos postMessage).
 
 ---
 
@@ -1402,6 +1416,7 @@ Quem chama, na coluna da direita:
 - **Admin**: perfis Admin e Dev.
 - **Token (scope)**: também aceita um token de parceiro com o scope; as outras rotas respondem 403 `token_not_allowed` a tokens.
 - **Cliente OAuth**: `client_id` + `client_secret` de um app cadastrado.
+- **Link assinado**: o `t` gerado por `POST /api/matches/:id/replay-link` (1 h, só aquela partida).
 
 | Método | Rota | Descrição | Quem chama |
 |--------|------|-----------|------------|
@@ -1440,6 +1455,9 @@ Quem chama, na coluna da direita:
 | GET | `/api/matches` | Últimas 20 partidas (resumo sem jogadores) | Pública |
 | GET | `/api/matches/:id` | Resumo de uma partida com as cartas de cada lado (`seats`; o oponente vem `null` fora de torneio encerrado) | Jogou, Judge, Admin; Token (`matches:read`) |
 | GET | `/api/matches/:id/replay` | Arquivo de replay para a mesa | Jogou, Judge, Admin; Token (`matches:read`) |
+| POST | `/api/matches/:id/replay-link` | Link assinado do replay embutido (`{ lang?, layout?, embed? }` → `{ url, token, expiresAt }`) | Jogou, Judge, Admin; Token (`matches:read`) |
+| GET | `/api/replay/:id?t=` | Replay embutido: arquivo, cartas usadas e origens dos parceiros | Link assinado |
+| GET | `/replay/:id?t=` | Página do replay embutido (pode ir para um iframe nas origens de `REPLAY_EMBED_ORIGINS`) | Link assinado |
 | POST | `/api/matches/:id/report` | Relata um problema (`{ text, card?, expected?, notify? }`) | Jogou |
 | GET | `/api/reports?tournament=&status=` | Relatos abertos/resolvidos | Admin; Organizador (dos seus torneios) |
 | PUT | `/api/reports/:id` | Resolve ou reabre (`{ resolved, note? }`) | Admin; Organizador |

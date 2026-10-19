@@ -41,6 +41,13 @@ export interface ServerOptions {
    * Usado na homologação, que consulta o plano na produção (SUPPORT_SOURCE_URL).
    */
   access?: AccessOptions;
+  /**
+   * REPLAY_EMBED_ORIGINS: sites (origens, separadas por vírgula ou espaço, ex.: https://sweetapp.com.br)
+   * que podem pôr a página `/replay/<id>` num iframe e mandar comandos por postMessage. Vazio = só o próprio site.
+   */
+  replayEmbedOrigins?: string[];
+  /** REPLAY_LINK_SECRET: segredo das assinaturas dos links de replay (sem ele, um gerado e guardado no banco). */
+  replayLinkSecret?: string | null;
 }
 
 export interface SupportOptions {
@@ -125,6 +132,18 @@ export function accessOptions(env = process.env): AccessOptions {
   };
 }
 
+/** Origens válidas (`https://host[:porta]`, sem caminho); o resto é ignorado. */
+export const parseOrigins = (v: string | undefined) =>
+  [
+    ...new Set(
+      (v ?? '')
+        .split(/[,;\s]+/)
+        .map((o) => o.trim().replace(/\/+$/, ''))
+        .filter((o) => /^https?:\/\/[a-z0-9.-]+(:\d{1,5})?$/i.test(o))
+        .map((o) => o.toLowerCase()),
+    ),
+  ];
+
 export const serverOptions: ServerOptions = {
   cardImages: !off(process.env.CARD_IMAGES),
   googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
@@ -136,6 +155,8 @@ export const serverOptions: ServerOptions = {
   push: !off(process.env.PUSH),
   vapidKeys: { publicKey: process.env.VAPID_PUBLIC_KEY?.trim() || null, privateKey: process.env.VAPID_PRIVATE_KEY?.trim() || null },
   vapidSubject: process.env.VAPID_SUBJECT?.trim() || undefined,
+  replayEmbedOrigins: parseOrigins(process.env.REPLAY_EMBED_ORIGINS),
+  replayLinkSecret: process.env.REPLAY_LINK_SECRET?.trim() || null,
 };
 
 /**

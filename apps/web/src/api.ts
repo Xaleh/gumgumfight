@@ -461,6 +461,9 @@ export const api = {
   /** Auditoria: replay e relatos de problemas (bugs) das partidas gravadas. */
   matches: {
     replay: (id: number) => get<Record<string, unknown>>(`/api/matches/${id}/replay`),
+    /** Replay embutido (`/replay/<id>?t=`): o link assinado é a credencial. Vem com as cartas usadas e as origens dos parceiros. */
+    embedReplay: (id: number, token: string) =>
+      get<{ replay: Record<string, unknown>; cards: ApiCard[]; origins: string[] }>(`/api/replay/${id}?t=${encodeURIComponent(token)}`),
     report: (id: number, form: ReportForm) => send<MatchReport>('POST', `/api/matches/${id}/report`, form),
   },
   reports: {

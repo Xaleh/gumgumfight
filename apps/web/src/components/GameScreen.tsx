@@ -28,6 +28,8 @@ import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
 import { coachTip } from '../game/tutorial/coachTips';
+import type { EmbedLayout } from '../embed';
+import { useEmbedBridge } from '../game/useEmbedBridge';
 import { type GameSetup, useGame } from '../game/useGame';
 import { audio } from '../audio';
 import { type Translate, useT, useTryT } from '../i18n';
@@ -192,9 +194,20 @@ export interface TableGame {
 
 type TableKind = GameSetup['mode'] | 'online';
 
+/** Replay embutido num app parceiro (`/replay/<id>`, ver `embed.ts`). */
+export interface TableEmbed {
+  /** embed=1: sem o menu da mesa nem os botões de sair e de baixar o replay. */
+  bare: boolean;
+  /** Telas largas: a mesa em pé (tablet) ou lateral, como na visão do Streamer. */
+  layout?: EmbedLayout;
+  /** Origens que podem mandar comandos por postMessage (as do servidor). */
+  origins: string[];
+}
+
 /** Partida no navegador: contra o bot ou replay. */
-export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onExit: () => void; onRematch?: () => void }) {
+export function GameScreen({ setup, onExit, onRematch, embed }: { setup: GameSetup; onExit: () => void; onRematch?: () => void; embed?: TableEmbed }) {
   const game = useGame(setup);
+  useEmbedBridge(game, embed ? embed.origins : null);
   // Registra o resultado no servidor (que refaz a partida a partir das ações). Replays não contam de novo.
   const saved = useRef(false);
   // Partida gravada no servidor: o relato de bug aponta para ela (e para o replay dela).
@@ -223,6 +236,7 @@ export function GameScreen({ setup, onExit, onRematch }: { setup: GameSetup; onE
       onExit={onExit}
       onRematch={onRematch}
       startNotice={setup.notice}
+      embed={embed}
     />
   );
 }
@@ -401,6 +415,7 @@ function Table({
   startNotice,
   tutorial,
   matchId,
+  embed,
 }: {
   game: TableGame;
   kind: TableKind;
@@ -422,6 +437,8 @@ function Table({
   tutorial?: TableTutorial;
   /** Partida contra o bot já gravada no servidor (o relato de bug aponta para ela; online vem da sala). */
   matchId?: number | null;
+  /** Replay embutido num app parceiro. */
+  embed?: TableEmbed;
 }) {
   const { state, dispatch, human } = game;
   const t = useT();
@@ -503,10 +520,14 @@ function Table({
    * Visão do Streamer (quem assiste, no desktop): a mesa em pé como num tablet, a Vida grande na
    * lateral, o histórico junto do menu e as mãos minimizadas, abertas só ao clicar (sem o olho).
    */
-  const streamer = watching && !broadcast && wide;
+  // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
+  const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
   const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, 2.5D) é o padrão; o menu troca para a mesa em pé. */
-  const lateral = streamer && streamerLayout === 'lateral';
+  const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
+  /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
+  const canOpenHands = Boolean(online?.hands || spectator?.canHands || kind === 'replay');
+  const bare = Boolean(embed?.bare);
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -1196,9 +1217,11 @@ function Table({
   ) : (
     <>
       <div className="corner-row">
-        <button className="round-btn" onClick={() => setSheet('menu')} aria-label={t('game.menuLabel')}>
-          <span className="burger" />
-        </button>
+        {!bare && (
+          <button className="round-btn" onClick={() => setSheet('menu')} aria-label={t('game.menuLabel')}>
+            <span className="burger" />
+          </button>
+        )}
         {/* Visão do Streamer: o histórico abre no painel lateral, a partir do botão ao lado do menu. */}
         {streamer && (
           <button
@@ -1309,7 +1332,7 @@ function Table({
             corner={corner}
             center={centerBand}
             bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
-            miniHands={{ open: openHand, canOpen: Boolean(online?.hands || spectator?.canHands), onToggle: toggleHand }}
+            miniHands={{ open: openHand, canOpen: canOpenHands, onToggle: toggleHand }}
             {...handlers}
           />
         ) : (
@@ -1321,7 +1344,7 @@ function Table({
           corner={corner}
           sideTools={sideTools}
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
-          miniHands={streamer ? { open: openHand, canOpen: Boolean(online?.hands || spectator?.canHands), onToggle: toggleHand } : undefined}
+          miniHands={streamer ? { open: openHand, canOpen: canOpenHands, onToggle: toggleHand } : undefined}
           lifeAside={streamer}
           handOrder={handView}
           onExpandHand={human !== null ? () => setSheet('hand') : undefined}
@@ -1479,7 +1502,7 @@ function Table({
               <button className="btn" onClick={() => (streamer ? openPanel('log') : setSheet('log'))}>
                 {t('game.logBtn')}
               </button>
-              {streamer && (
+              {streamer && !embed?.layout && (
                 <button className="btn" onClick={() => updateSettings({ streamerLayout: lateral ? 'upright' : 'lateral' })} title={t('game.layoutTitle')}>
                   {lateral ? t('game.layoutToUpright') : t('game.layoutToLateral')}
                 </button>
@@ -1632,7 +1655,7 @@ function Table({
             state={state}
             human={human}
             actions={game.actions()}
-            onExit={onExit}
+            onExit={bare ? undefined : onExit}
             exitLabel={toTournament ? t('game.backToTournament') : t('game.backToMenu')}
             onRematch={
               replay
@@ -1646,7 +1669,7 @@ function Table({
               (replay ? t('game.watchAgain') : rematchLabel) ??
               (online && human !== null ? (online.room?.rematch[human] ? t('game.waitingOpponent') : t('game.askRematch')) : undefined)
             }
-            onReplay={toTournament ? undefined : game.downloadReplay}
+            onReplay={toTournament || bare ? undefined : game.downloadReplay}
             onLog={() => setSheet('log')}
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
@@ -1714,45 +1737,47 @@ function Table({
       )}
       {wide && !tutorial && !broadcast && !streamer && (
         <aside className="side-panel">
-          <div className="panel-controls">
-            <button className="btn small" onClick={onExit}>
-              {toTournament ? t('game.sideTournament') : t('game.sideMenu')}
-            </button>
-            {callJudge && (
-              <button className="btn small judge-call" onClick={callJudge}>
-                {t('judge.call')}
+          {!bare && (
+            <div className="panel-controls">
+              <button className="btn small" onClick={onExit}>
+                {toTournament ? t('game.sideTournament') : t('game.sideMenu')}
               </button>
-            )}
-            {human !== null && !isOnline && (
-              <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
-                {t('game.undo')}
-              </button>
-            )}
-            {!isOnline && !replay && (
-              <>
-                <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
-                  {game.paused ? t('game.resume') : t('game.pause')}
+              {callJudge && (
+                <button className="btn small judge-call" onClick={callJudge}>
+                  {t('judge.call')}
                 </button>
-                <select
-                  className="speed"
-                  value={game.speed}
-                  onChange={(e) => game.setSpeed(Number(e.target.value))}
-                  title={t('game.botSpeed')}
-                >
-                  {[0.5, 1, 2, 4].map((v) => (
-                    <option key={v} value={v}>
-                      {t('game.speedX', { v })}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-            {(!isOnline || over) && (
-              <button className="btn small" onClick={game.downloadReplay} title={t('game.replayTitle')}>
-                {t('game.replayBtn')}
-              </button>
-            )}
-          </div>
+              )}
+              {human !== null && !isOnline && (
+                <button className="btn small" onClick={game.undo} disabled={!game.canUndo}>
+                  {t('game.undo')}
+                </button>
+              )}
+              {!isOnline && !replay && (
+                <>
+                  <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
+                    {game.paused ? t('game.resume') : t('game.pause')}
+                  </button>
+                  <select
+                    className="speed"
+                    value={game.speed}
+                    onChange={(e) => game.setSpeed(Number(e.target.value))}
+                    title={t('game.botSpeed')}
+                  >
+                    {[0.5, 1, 2, 4].map((v) => (
+                      <option key={v} value={v}>
+                        {t('game.speedX', { v })}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              {(!isOnline || over) && (
+                <button className="btn small" onClick={game.downloadReplay} title={t('game.replayTitle')}>
+                  {t('game.replayBtn')}
+                </button>
+              )}
+            </div>
+          )}
           <CardDetail state={state} uid={detailUid} />
           <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
         </aside>
