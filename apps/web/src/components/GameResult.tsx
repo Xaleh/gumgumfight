@@ -8,7 +8,8 @@ interface Props {
   state: GameState;
   human: PlayerId | null;
   actions: Action[];
-  onExit: () => void;
+  /** Sem ele, sem o botão de saída (replay embutido num app parceiro). */
+  onExit?: () => void;
   /** Texto do botão de saída (padrão "Voltar ao menu"). */
   exitLabel?: string;
   onRematch?: () => void;
@@ -146,9 +147,11 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
               {rematchLabel ?? t('result.rematch')}
             </button>
           )}
-          <button className="btn big" onClick={onExit}>
-            {exitLabel ?? t('result.exit')}
-          </button>
+          {onExit && (
+            <button className="btn big" onClick={onExit}>
+              {exitLabel ?? t('result.exit')}
+            </button>
+          )}
           {onClose && (
             <button className="btn big" onClick={onClose}>
               {t('result.review')}

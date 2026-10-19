@@ -11,7 +11,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createsTournaments, isAdmin, type User } from '../auth/store';
 import type { DB } from '../db';
-import { fail } from '../errors';
+import { fail, type PlayerError } from '../errors';
 import { pushText } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
 import { seatCards } from '../partners/matches';
@@ -41,47 +41,54 @@ const MAX_CARD = 120;
 /** Texto opcional do formulário: aparado e cortado (vazio = null). */
 const field = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 
+/** Pode auditar (ver relatos e replays) as partidas do torneio: admin/dev ou o organizador dele. */
+function audits(db: DB, u: User, tournamentId: string | null) {
+  if (isAdmin(u.role)) return true;
+  if (!tournamentId || !createsTournaments(u.role)) return false;
+  return getTournament(db, tournamentId)?.organizerId === u.id;
+}
+/** Pode ver o replay (e o resumo) de uma partida do torneio como quem audita: além deles, os Judges da lista. */
+const judges = (db: DB, u: User, tournamentId: string | null) => Boolean(tournamentId && isListedJudge(db, tournamentId, u.id));
+/**
+ * Quem jogou vê o replay da própria partida, menos num torneio em andamento: o replay traz as
+ * duas listas, e as listas de um torneio só se abrem quando ele termina.
+ */
+function played(db: DB, u: User, id: number, tournamentId: string | null) {
+  if (!matchUsers(db, id).includes(u.id)) return false;
+  return !tournamentId || getTournament(db, tournamentId)?.status === 'finished';
+}
+
+/**
+ * Por que a conta não pode ver o replay da partida (null = pode): para quem jogou (num torneio, só
+ * depois do fim), para quem audita o torneio, os Judges dele e admins. Vale também para o link do
+ * replay embutido (`POST /api/matches/:id/replay-link`).
+ */
+export function replayDenied(db: DB, me: User, id: number): { status: 403 | 404; body: PlayerError } | null {
+  const m = matchSummary(db, id);
+  if (!m) return { status: 404, body: fail('matchNotFound', 'Partida não encontrada.') };
+  const tournamentId = m.tournament?.id ?? null;
+  if (played(db, me, id, tournamentId) || audits(db, me, tournamentId) || judges(db, me, tournamentId)) return null;
+  if (m.tournament && matchUsers(db, id).includes(me.id)) {
+    return { status: 403, body: fail('replayTournamentRunning', 'O replay desta partida fica disponível quando o torneio terminar (as listas dos decks só se abrem no fim).') };
+  }
+  return { status: 403, body: fail('replayForbidden', 'Só quem jogou a partida, o organizador ou um Judge do torneio, ou um admin pode ver este replay.') };
+}
+
 export function registerReportRoutes(app: FastifyInstance, { db, user, notifier = noNotifier }: Deps) {
   const account = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = user(req);
     if (!u) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
     return u;
   };
-  /** Pode auditar (ver relatos e replays) as partidas do torneio: admin/dev ou o organizador dele. */
-  const audits = (u: User, tournamentId: string | null) => {
-    if (isAdmin(u.role)) return true;
-    if (!tournamentId || !createsTournaments(u.role)) return false;
-    return getTournament(db, tournamentId)?.organizerId === u.id;
-  };
-  /** Pode ver o replay (e o resumo) de uma partida do torneio como quem audita: além deles, os Judges da lista. */
-  const judges = (u: User, tournamentId: string | null) => Boolean(tournamentId && isListedJudge(db, tournamentId, u.id));
   const withMatch = (r: MatchReport) => ({ ...r, match: matchSummary(db, r.matchId) });
-  /**
-   * Quem jogou vê o replay da própria partida, menos num torneio em andamento: o replay traz as
-   * duas listas, e as listas de um torneio só se abrem quando ele termina.
-   */
-  const played = (u: User, id: number, tournamentId: string | null) => {
-    if (!matchUsers(db, id).includes(u.id)) return false;
-    return !tournamentId || getTournament(db, tournamentId)?.status === 'finished';
-  };
 
-  /**
-   * Replay de uma partida gravada: para quem jogou (num torneio, só depois do fim), para quem audita o
-   * torneio, os Judges dele e admins. Com token de parceiro (matches:read), só para quem jogou.
-   */
+  /** Replay de uma partida gravada (regras em `replayDenied`). Com token de parceiro (matches:read), só para quem jogou. */
   app.get<{ Params: { id: string } }>('/api/matches/:id/replay', { config: { scope: 'matches:read' } }, async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
     const id = Number(req.params.id);
-    const m = matchSummary(db, id);
-    if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
-    const tournamentId = m.tournament?.id ?? null;
-    if (!played(me, id, tournamentId) && !audits(me, tournamentId) && !judges(me, tournamentId)) {
-      if (m.tournament && matchUsers(db, id).includes(me.id)) {
-        return reply.code(403).send(fail('replayTournamentRunning', 'O replay desta partida fica disponível quando o torneio terminar (as listas dos decks só se abrem no fim).'));
-      }
-      return reply.code(403).send(fail('replayForbidden', 'Só quem jogou a partida, o organizador ou um Judge do torneio, ou um admin pode ver este replay.'));
-    }
+    const denied = replayDenied(db, me, id);
+    if (denied) return reply.code(denied.status).send(denied.body);
     const replay = matchReplay(db, id);
     return replay ?? reply.code(404).send(fail('noReplay', 'Esta partida não tem replay gravado.'));
   });
@@ -98,8 +105,8 @@ export function registerReportRoutes(app: FastifyInstance, { db, user, notifier 
     const m = matchSummary(db, id);
     if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     const tournamentId = m.tournament?.id ?? null;
-    const auditor = audits(me, tournamentId);
-    const judge = judges(me, tournamentId);
+    const auditor = audits(db, me, tournamentId);
+    const judge = judges(db, me, tournamentId);
     const you = m.players.find((p) => p.userId === me.id)?.seat ?? null;
     if (you === null && !auditor && !judge) return reply.code(403).send(fail('matchOfOthers', 'Partida de outros jogadores.'));
     const extra = matchExtra(db, id);
@@ -151,7 +158,7 @@ export function registerReportRoutes(app: FastifyInstance, { db, user, notifier 
     const tournamentId = typeof req.query.tournament === 'string' && req.query.tournament ? req.query.tournament : undefined;
     const status = req.query.status === 'resolved' || req.query.status === 'all' ? req.query.status : 'open';
     if (tournamentId) {
-      if (!audits(me, tournamentId)) return reply.code(403).send(fail('reportsViewForbidden', 'Só o organizador do torneio (ou um admin) vê os relatos.'));
+      if (!audits(db, me, tournamentId)) return reply.code(403).send(fail('reportsViewForbidden', 'Só o organizador do torneio (ou um admin) vê os relatos.'));
       return { reports: listReports(db, { tournamentId, status }).map(withMatch) };
     }
     if (isAdmin(me.role)) return { reports: listReports(db, { status }).map(withMatch) };
@@ -165,7 +172,7 @@ export function registerReportRoutes(app: FastifyInstance, { db, user, notifier 
     if (!me) return reply;
     const r = getReport(db, Number(req.params.id));
     if (!r) return reply.code(404).send(fail('reportNotFound', 'Relato não encontrado.'));
-    if (!audits(me, r.tournamentId)) return reply.code(403).send(fail('reportResolveForbidden', 'Só o organizador do torneio (ou um admin) resolve relatos.'));
+    if (!audits(db, me, r.tournamentId)) return reply.code(403).send(fail('reportResolveForbidden', 'Só o organizador do torneio (ou um admin) resolve relatos.'));
     const resolved = req.body?.resolved !== false;
     const note = field(req.body?.note, MAX_TEXT);
     const saved = resolveReport(db, r.id, me.id, resolved, note)!;

@@ -74,6 +74,8 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `ACCESS` | `open` | `supporters`: o site só abre para apoiadores Tripulante ou acima e admins (homologação) |
 | `SUPPORT_SOURCE_URL` | (vazio) | Com `ACCESS=supporters`: site onde o plano é consultado (a produção) |
 | `PARTNER_IPS` | (vazio; só no `deploy.env` da VM) | IPs dos servidores de apps parceiros, separados por vírgula: ficam fora do limite por IP do Nginx (o app limita cada token) |
+| `REPLAY_EMBED_ORIGINS` | (vazio) | Sites que podem pôr o replay embutido (`/replay/<id>`) num iframe, separados por vírgula (ex.: `https://sweetapp.com.br`); vazio = só o próprio site |
+| `REPLAY_LINK_SECRET` | (gerado) | Segredo das assinaturas dos links de replay; sem ele, o servidor gera um na primeira vez e guarda no banco (trocar invalida os links abertos) |
 
 Sem nenhuma variável de apoio, o item "Apoiar o projeto" não aparece e as estatísticas ficam todas abertas, como
 antes. Com o apoio configurado, as Estatísticas Pro (ranqueada, torneios e filtro por faixa) passam a exigir o plano
@@ -498,7 +500,7 @@ ativos por conta), vê o que cada app pode fazer e quando foi usado pela última
 | `profile` | `GET /api/auth/me` (só `{ user: { id, role: 'player' }, player: { id, name, bounty, tier } }`: nunca e-mail, nome ou foto do Google) e `GET /api/players/me` |
 | `decks:read` | `GET /api/decks?mine=1` (os próprios, com `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos) |
 | `decks:write` | `POST /api/decks`, `PUT /api/decks/:id`, `DELETE /api/decks/:id` (só os próprios) |
-| `matches:read` | `GET /api/players/me/matches`, `GET /api/matches/:id`, `GET /api/matches/:id/replay` (só partidas que o usuário jogou) |
+| `matches:read` | `GET /api/players/me/matches`, `GET /api/matches/:id`, `GET /api/matches/:id/replay` e `POST /api/matches/:id/replay-link` (só partidas que o usuário jogou) |
 | `stats:read` | `GET /api/stats*` (com `mine=1`, as próprias; sem ele, as consultas públicas de sempre) |
 
 Regras do token, em qualquer rota:
@@ -561,6 +563,53 @@ autorizou o app (com `matches:read`) é gravada, o servidor faz `POST <url>` com
 O aviso é só um sinal: os dados vêm pelas rotas acima, com o token do usuário. Entrega depois da resposta, timeout de
 5 s, sem seguir redirecionamentos; sem 2xx, tenta de novo 1 min e 10 min depois (em memória) e desiste com um log.
 Tokens pessoais não recebem webhook.
+
+### Replay embutido (iframe)
+
+O app parceiro mostra o replay de uma partida dentro da página dele (histórico de partidas, página do deck) com a
+mesa do GumGum Fight num iframe, sem reimplementar nada:
+
+1. O backend do app chama `POST /api/matches/:id/replay-link` (token com `matches:read`; mesmas regras do
+   `/replay`: só partidas que o usuário jogou, e de torneio só depois do fim). Corpo opcional:
+   `{ lang: 'pt-BR', layout: 'tablet' | 'lateral', embed: true }`. Resposta **201**
+   `{ url, token, matchId, expiresAt }`.
+2. A página do app põe a `url` num iframe:
+   `<iframe src="https://gumgumfight.app/replay/123?t=…&embed=1&lang=pt-BR" allow="fullscreen"></iframe>`.
+
+O link (`t`) é assinado com HMAC-SHA256, vale **1 hora** e serve só para aquela partida, sem sessão: quem tiver o
+link vê o replay até ele expirar, então gere um por exibição em vez de guardar. Expirado: `replay_link_expired`;
+mexido ou de outra partida: `replay_link_invalid` (a página mostra o erro). Parâmetros da página:
+
+- `embed=1`: sem o menu da mesa e sem os botões de sair e de baixar o replay (sem ele, a página funciona sozinha e
+  "Voltar" leva ao site).
+- `lang`: idioma da interface (`pt-BR`, `en`, `es`, `fr`, `de`, `ja`; `pt` e `en-US` também valem).
+- `layout` (telas largas): `tablet` (a mesa em pé, com a Vida na lateral) ou `lateral` (jogadores à esquerda e à
+  direita), como na visão do Streamer; sem ele, a mesa de sempre com o histórico ao lado.
+- `autoplay=1`: começa rodando; sem ele, parado no início (passo a passo), com a barra do replay.
+
+Só `/replay/*` pode ir para um iframe, e só nos sites de `REPLAY_EMBED_ORIGINS`
+(`Content-Security-Policy: frame-ancestors 'self' <origens>`); o resto do site responde `frame-ancestors 'none'`
+e `X-Frame-Options: DENY`. Imagens, CSS e textos vêm do nosso domínio; o replay chega com as definições só das
+cartas usadas (`GET /api/replay/:id?t=`), então não há CORS. Na homologação só para apoiadores, o replay com link
+assinado abre sem login.
+
+**postMessage** (os dois lados conferem a origem): a página do app manda para o iframe
+`{ type: 'seek', pos }` (posição = número de ações já aplicadas, de 0 ao total), `{ type: 'play' }` e
+`{ type: 'pause' }`; o player responde para a janela-mãe, com `source: 'gumgumfight-replay'`,
+`{ type: 'ready', pos, total }` ao abrir, `{ type: 'pos', pos, total }` a cada ação e `{ type: 'ended' }` no fim.
+
+```js
+const frame = document.querySelector('iframe');
+addEventListener('message', (e) => {
+  if (e.origin !== 'https://gumgumfight.app' || e.data?.source !== 'gumgumfight-replay') return;
+  if (e.data.type === 'pos') progresso.value = e.data.pos / e.data.total;
+});
+frame.contentWindow.postMessage({ type: 'seek', pos: 40 }, 'https://gumgumfight.app');
+```
+
+Código: `apps/server/src/partners/replay-link.ts` (token, rotas e CSP), `apps/web/src/embed.ts` (endereço e
+protocolo), `apps/web/src/components/ReplayEmbed.tsx` e `apps/web/src/game/useEmbedBridge.ts`. Testes em
+`apps/server/test/partners.test.ts` e `apps/web/test/embed.test.ts`.
 
 ## Efeitos automáticos e cartas ainda não automatizadas
 

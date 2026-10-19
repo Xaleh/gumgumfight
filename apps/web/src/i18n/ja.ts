@@ -1619,6 +1619,7 @@ export default {
   'replay.stopsAt': 'リプレイはアクション{n}で停止します：{message}',
   // ---- リプレイを見る（ファイル） ----
   'replay.title': 'リプレイを見る',
+  'replay.embedFailed': 'リプレイを開けませんでした',
   'replay.chooseFile': 'リプレイの.jsonファイルを選択',
   'replay.changeFile': 'ファイルを変更',
   'replay.dropHint': 'またはここにファイルをドラッグ',
@@ -2325,6 +2326,8 @@ export default {
   // ---- リプレイと報告 ----
   'errors.replayForbidden': 'このリプレイを見られるのは、対戦したプレイヤー、大会の主催者またはジャッジ、管理者だけです。',
   'errors.noReplay': 'この対戦には保存されたリプレイがありません。',
+  'errors.replay_link_expired': 'このリプレイのリンクは期限切れです。新しいリンクを発行してください。',
+  'errors.replay_link_invalid': 'リプレイのリンクが無効です。',
   'errors.matchOfOthers': 'この対戦は他のプレイヤーのものです。',
   'errors.reportOnlyPlayers': '問題を報告できるのは対戦したプレイヤーだけです。',
   'errors.reportTooShort': '問題を説明してください（5文字以上）。',

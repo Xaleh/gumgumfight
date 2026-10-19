@@ -4,6 +4,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../api';
 import { GoogleButton, useAuth } from '../auth';
+import { isReplayPath } from '../embed';
 import { useT } from '../i18n';
 
 type Access = Awaited<ReturnType<typeof api.access>>;
@@ -12,7 +13,8 @@ export function AccessGate({ children }: { children: ReactNode }) {
   const { ready, user, clientId, config, signIn, signOut, error } = useAuth();
   const t = useT();
   const [access, setAccess] = useState<Access | null>(null);
-  const gated = config?.access === 'supporters';
+  // O replay embutido (link assinado) abre sem a tela de bloqueio: o servidor também o libera.
+  const gated = config?.access === 'supporters' && !isReplayPath(location.pathname);
 
   useEffect(() => {
     if (!gated) return;

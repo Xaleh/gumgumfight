@@ -153,9 +153,9 @@ ONLINE_BOT_ROOMS="on"
 [ -f "$ENV_FILE" ] && ONLINE_BOT_ROOMS="$(sed -n 's/^ONLINE_BOT_ROOMS=//p' "$ENV_FILE" | tail -1)" && ONLINE_BOT_ROOMS="${ONLINE_BOT_ROOMS:-on}"
 PARTNER_IPS=""
 [ -f "$ENV_FILE" ] && PARTNER_IPS="$(sed -n 's/^PARTNER_IPS=//p' "$ENV_FILE" | tail -1)"
-# Apoio (Pix, Apoia.se, Ko-fi), homologação, Discord e ajustes finos (preenchidos à mão no deploy.env): mantidos como estão.
+# Apoio (Pix, Apoia.se, Ko-fi), homologação, Discord, replay embutido e ajustes finos (preenchidos à mão no deploy.env): mantidos como estão.
 KEEP_LINES=""
-[ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+)=' "$ENV_FILE" || true)"
+[ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+|REPLAY_EMBED_ORIGINS|REPLAY_LINK_SECRET)=' "$ENV_FILE" || true)"
 cat > "$ENV_FILE" <<EOF
 # Gerado por deploy/setup-vm.sh — lido a cada deploy.
 PORT=$PORT

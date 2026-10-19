@@ -1619,6 +1619,7 @@ export default {
   'replay.stopsAt': 'The replay stops at action {n}: {message}',
   // ---- watch replay (file) ----
   'replay.title': 'Watch replay',
+  'replay.embedFailed': 'Couldn\'t open the replay',
   'replay.chooseFile': 'Choose the replay .json file',
   'replay.changeFile': 'Change file',
   'replay.dropHint': 'or drag the file here',
@@ -2325,6 +2326,8 @@ export default {
   // ---- replays e relatos ----
   'errors.replayForbidden': 'Only the match players, the tournament organizer or a Judge, or an admin can view this replay.',
   'errors.noReplay': 'This match has no saved replay.',
+  'errors.replay_link_expired': 'This replay link has expired; ask for a new one.',
+  'errors.replay_link_invalid': 'Invalid replay link.',
   'errors.matchOfOthers': 'This match belongs to other players.',
   'errors.reportOnlyPlayers': 'Only the match players can report a problem.',
   'errors.reportTooShort': 'Describe the problem (at least 5 letters).',

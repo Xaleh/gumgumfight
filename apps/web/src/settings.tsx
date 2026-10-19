@@ -162,8 +162,9 @@ function applyTheme(resolved: 'light' | 'dark') {
 
 const SettingsContext = createContext<Ctx | null>(null);
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<Settings>(load);
+/** `locale`: idioma desta página, no lugar do salvo (o `lang=` do replay embutido); só é gravado se a pessoa mudar algo. */
+export function SettingsProvider({ children, locale }: { children: ReactNode; locale?: Locale }) {
+  const [settings, setSettings] = useState<Settings>(() => (locale ? { ...load(), locale } : load()));
 
   // O servidor pode ainda estar subindo: tenta algumas vezes.
   useEffect(() => {

@@ -78,6 +78,10 @@ module.exports = {
         // Homologação: ACCESS=supporters fecha o site para quem não é apoiador; o plano é consultado em SUPPORT_SOURCE_URL.
         ACCESS: env.ACCESS || '',
         SUPPORT_SOURCE_URL: env.SUPPORT_SOURCE_URL || '',
+        // Replay embutido: sites que podem pôr /replay/<id> num iframe (vírgula); vazio = só o próprio site.
+        REPLAY_EMBED_ORIGINS: env.REPLAY_EMBED_ORIGINS || '',
+        // Segredo dos links de replay (vazio = gerado na primeira vez e guardado no banco).
+        REPLAY_LINK_SECRET: env.REPLAY_LINK_SECRET || '',
       },
     },
   ],

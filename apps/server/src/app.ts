@@ -14,7 +14,7 @@ import {
 } from '@gumgum/engine';
 import Fastify from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { existsSync } from 'node:fs';
 import { type GoogleKeys, googleKeyStore } from './auth/google';
 import { registerAuth } from './auth/routes';
@@ -37,6 +37,7 @@ import {
 import { WEB_DIST } from './paths';
 import { registerPartnerMatchRoutes } from './partners/matches';
 import { registerOAuthRoutes } from './partners/oauth';
+import { registerReplayLinkRoutes, replayLinkSecret } from './partners/replay-link';
 import { isoToSqlite, sqliteToIso } from './partners/store';
 import { registerBearerAuth, registerTokenRoutes } from './partners/tokens';
 import { WebhookDispatcher } from './partners/webhook';
@@ -89,6 +90,12 @@ export function buildApp(
   const pushKeys = server.push === false ? null : vapidKeys(db, server.vapidKeys);
   const present = (cards: ApiCard[]) =>
     presentCards(cards, getTranslations(db, 'pt', cards.length > 200 ? undefined : cards.map((c) => c.id)), server);
+
+  // Nenhuma página vai para um iframe, menos o replay embutido (`/replay/<id>`, com as origens dos parceiros).
+  app.addHook('onSend', async (_req, reply) => {
+    if (reply.hasHeader('content-security-policy')) return;
+    reply.header('x-frame-options', 'DENY').header('content-security-policy', "frame-ancestors 'none'");
+  });
 
   app.get('/api/health', async () => ({ ok: true }));
 
@@ -341,7 +348,17 @@ export function buildApp(
   registerStatsRoutes(app, { db, viewerHash, user: auth.viewer, present, proGate: supportEnabled(server.support), onMatch: (id) => webhooks.matchFinished(id) });
   registerPartnerMatchRoutes(app, { db, user: auth.viewer });
   registerTokenRoutes(app, { db, user: auth.viewer });
-  registerOAuthRoutes(app, { db, user: auth.viewer, now: opts.now, sendIndex: existsSync(WEB_DIST) ? (reply) => reply.sendFile('index.html') : undefined });
+  const sendIndex = existsSync(WEB_DIST) ? (reply: FastifyReply) => reply.sendFile('index.html') : undefined;
+  registerOAuthRoutes(app, { db, user: auth.viewer, now: opts.now, sendIndex });
+  registerReplayLinkRoutes(app, {
+    db,
+    user: auth.viewer,
+    present,
+    origins: server.replayEmbedOrigins ?? [],
+    secret: replayLinkSecret(db, server.replayLinkSecret),
+    now: opts.now,
+    sendIndex,
+  });
   const lobby = registerOnlineRoutes(app, {
     db,
     viewerHash,

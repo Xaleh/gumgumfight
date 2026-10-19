@@ -21,11 +21,13 @@ export async function buildSetup(
   chooseFirst = firstPlayer === undefined,
   /** Versão do replay (as anteriores à atual ganham as respostas implícitas e, até a 8, a preparação antiga). */
   replayVersion?: number,
+  /** Replay com as listas: as definições das cartas já em mãos (o replay embutido); sem elas, a base inteira. */
+  known?: CardData[],
 ): Promise<GameSetup> {
   let a: { deck: DeckList; cards: CardData[] };
   let b: typeof a;
   if (online) {
-    const all = await api.cards();
+    const all = known ?? (await api.cards());
     const used = new Set(online.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]));
     const pool = all.filter((c) => used.has(c.id));
     a = { deck: online.decks[0], cards: pool };
@@ -77,7 +79,8 @@ export function setupFromReplayText(text: string): Promise<GameSetup> {
   return setupFromReplay(r);
 }
 
-export function setupFromReplay(r: ReplayFile): Promise<GameSetup> {
+/** `cards`: as definições das cartas já em mãos (o replay embutido as recebe junto). */
+export function setupFromReplay(r: ReplayFile, cards?: CardData[]): Promise<GameSetup> {
   if (r?.format !== 'gumgumfight-replay' || !Array.isArray(r.actions)) throw new Error(t('replay.notReplay'));
   if ((r.version ?? 1) > REPLAY_VERSION) {
     throw new Error(t('replay.newerVersion'));
@@ -87,5 +90,5 @@ export function setupFromReplay(r: ReplayFile): Promise<GameSetup> {
   // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
   const first = r.chooseFirst ? undefined : r.firstPlayer;
   const names: [string, string] = r.names ?? [t('replay.player1'), t('replay.player2')];
-  return buildSetup('replay', r.deckIds, names, r.seed, 'standard', first, r.actions, lists, Boolean(r.chooseFirst), r.version ?? 1);
+  return buildSetup('replay', r.deckIds, names, r.seed, 'standard', first, r.actions, lists, Boolean(r.chooseFirst), r.version ?? 1, cards);
 }

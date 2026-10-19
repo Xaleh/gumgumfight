@@ -3,7 +3,7 @@
 // na produção (SUPPORT_SOURCE_URL + INTERNAL_TOKEN), porque o banco da homologação é outro.
 //
 // Ficam abertos só o necessário para a tela de bloqueio: saúde, configuração, login e
-// a própria consulta de acesso.
+// a própria consulta de acesso (e o replay embutido com link assinado).
 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { emailVerified, isAdmin, type User } from '../auth/store';
@@ -19,7 +19,8 @@ const CACHE_OK_MS = 10 * 60_000;
 const CACHE_NO_MS = 2 * 60_000;
 
 // /api/oauth: o backend do app parceiro troca code/refresh por tokens sem sessão (a credencial é o client_secret).
-const OPEN_PREFIXES = ['/api/health', '/api/config', '/api/auth/', '/api/access', '/api/support', '/api/oauth/'];
+// /api/replay: o replay embutido no app parceiro, sem sessão (a credencial é o link assinado).
+const OPEN_PREFIXES = ['/api/health', '/api/config', '/api/auth/', '/api/access', '/api/support', '/api/oauth/', '/api/replay/'];
 
 interface Deps {
   db: DB;
