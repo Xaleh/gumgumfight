@@ -1139,6 +1139,23 @@ describe('modo espectador', () => {
     expect((await app.inject({ url: '/api/online/rooms/nope/decks', headers: streamer })).statusCode).toBe(404);
   });
 
+  it('deck do próprio jogador (painel de decklist da mesa): só o do assento do token', async () => {
+    const { app, db } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const res = await app.inject(`/api/online/rooms/${roomId}/my-deck?t=${tokens[1]}`);
+    expect(res.statusCode, res.body).toBe(200);
+    const body = res.json();
+    expect(body.players).toHaveLength(1);
+    expect(body.players[0].deck.leader).toBe(getDeck(db, 'st02-kid')!.leader);
+    expect(body.players[0].deck.cards.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(50);
+    const ids = new Set(body.cards.map((c: { id: string }) => c.id));
+    for (const c of [{ id: body.players[0].deck.leader }, ...body.players[0].deck.cards]) expect(ids.has(c.id)).toBe(true);
+    expect((await app.inject(`/api/online/rooms/${roomId}/my-deck?t=${tokens[0]}`)).json().players[0].deck.leader).toBe(getDeck(db, 'st01-luffy')!.leader);
+    // Sem token (quem assiste) ou com token errado: nada.
+    expect((await app.inject(`/api/online/rooms/${roomId}/my-deck`)).statusCode).toBe(404);
+    expect((await app.inject(`/api/online/rooms/${roomId}/my-deck?t=nope`)).statusCode).toBe(404);
+  });
+
   it('transmitir o treino contra o bot: só com login; "Quem começa" vale na sala do servidor', async () => {
     const { app, db } = setup();
     const anon = await app.inject({ method: 'POST', url: '/api/online/bot', headers: ALICE, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb' } });

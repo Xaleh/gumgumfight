@@ -8,6 +8,7 @@ import {
   cardStatuses,
   counterTargets,
   counterValue,
+  type GameConfig,
   type GameState,
   getCost,
   getPower,
@@ -23,7 +24,7 @@ import {
 } from '@gumgum/engine';
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { api, isAdmin, type LiveRoom, type OnlineSeat, type WatchTarget } from '../api';
+import { api, isAdmin, type LiveRoom, type OnlineSeat, type RoomDecks, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
@@ -50,7 +51,7 @@ import { ReplayBar, type ReplayControls } from './ReplayBar';
 import { PlayHighlight } from './PlayHighlight';
 import { ReplayCue } from './ReplayCue';
 import { ReportModal } from './ReportModal';
-import { DeckPanel, MatchesPanel } from './StreamerPanel';
+import { DeckListPanel, DeckPanel, MatchesPanel } from './StreamerPanel';
 
 /** Decklist de um jogador no fim da partida: desenhada em canvas, fora do bundle principal (junto com o kit de divulgação). */
 const MatchDeck = lazy(() => import('./MatchDeck'));
@@ -113,7 +114,7 @@ interface Drag {
   dons?: number[];
 }
 type Sheet = null | 'menu' | 'log' | 'hand' | { trash: PlayerId };
-/** Painel lateral da visão do Streamer. */
+/** Painel lateral no desktop: do Streamer (histórico, partidas, decklists) ou de quem joga (histórico, a própria decklist). */
 type Panel = null | 'log' | 'matches' | 'deck';
 
 type TryT = ReturnType<typeof useTryT>;
@@ -228,17 +229,28 @@ export function GameScreen({ setup, onExit, onRematch, embed }: { setup: GameSet
       })
       .then((r) => r && setMatchId(r.id));
   }, [game.state, setup, game.actions]);
+  const human = game.human;
+  const ownDeck = useCallback(() => Promise.resolve(localDeck(setup.config, human ?? 0)), [setup.config, human]);
   return (
     <GameTable
       game={{ ...game, downloadReplay: () => downloadReplay(game.exportReplay()) }}
       kind={setup.mode}
       matchId={matchId}
+      ownDeck={human !== null ? ownDeck : undefined}
       onExit={onExit}
       onRematch={onRematch}
       startNotice={setup.notice}
       embed={embed}
     />
   );
+}
+
+/** O deck de quem joga no navegador, do jeito do painel de decklist (as cartas já vêm na configuração). */
+function localDeck(config: GameConfig, player: PlayerId): RoomDecks {
+  const { name, isBot, deck } = config.players[player];
+  const ids = new Set([deck.leader, ...deck.cards.map((c) => c.id)]);
+  const { id: _id, ...list } = deck;
+  return { players: [{ name, bot: Boolean(isBot), deck: list }], cards: config.cards.filter((c) => ids.has(c.id)) };
 }
 
 const noop = () => undefined;
@@ -416,6 +428,7 @@ function Table({
   tutorial,
   matchId,
   embed,
+  ownDeck,
 }: {
   game: TableGame;
   kind: TableKind;
@@ -439,6 +452,8 @@ function Table({
   matchId?: number | null;
   /** Replay embutido num app parceiro. */
   embed?: TableEmbed;
+  /** Partida no navegador: o deck de quem joga, para o painel de decklist (online vem da sala). */
+  ownDeck?: () => Promise<RoomDecks>;
 }) {
   const { state, dispatch, human } = game;
   const t = useT();
@@ -522,7 +537,7 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, update: updateSettings } = useSettings();
+  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, sidePanel, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, 2.5D) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -576,8 +591,24 @@ function Table({
   const [mode, setMode] = useState<Mode>(null);
   const [pickedUids, setPicked] = useState<string[]>([]);
   const [sheet, setSheet] = useState<Sheet>(null);
-  /** Visão do Streamer: o painel lateral à direita (histórico, partidas em transmissão ou decklist), que encolhe a mesa. */
-  const [panel, setPanel] = useState<Panel>(null);
+  /**
+   * Quem joga, no desktop: o painel lateral com o histórico e a própria decklist, que dá para esconder
+   * para jogar com a mesa na tela toda (a escolha vale para as próximas partidas).
+   */
+  const playerPanel = wide && !tutorial && !broadcast && !streamer;
+  /** O deck de quem joga, para a decklist do painel: online vem da sala (pelo token); no navegador, da configuração. */
+  const loadOwnDeck = human === null || tutorial ? undefined : online ? (watching ? undefined : online.loadMyDeck) : ownDeck;
+  /**
+   * O painel lateral à direita, que encolhe a mesa: na visão do Streamer, histórico, partidas em transmissão
+   * ou decklist (começa fechado); para quem joga, histórico ou a própria decklist.
+   */
+  const [panel, setPanelState] = useState<Panel>(() => (streamer || !sidePanel ? null : 'log'));
+  const setPanel = (p: Panel) => {
+    setPanelState(p);
+    if (playerPanel) updateSettings({ sidePanel: p !== null });
+  };
+  /** O painel na tela agora (no celular não há painel: o histórico abre numa folha). */
+  const shownPanel = streamer || playerPanel ? panel : null;
   const openPanel = (p: Panel) => {
     setPanel(p);
     setSheet(null);
@@ -627,9 +658,9 @@ function Table({
    */
   const [logSeen, setLogSeen] = useState(state.log.length);
   useEffect(() => {
-    if (sheet === 'log' || panel === 'log' || logSeen > state.log.length) setLogSeen(state.log.length); // desfazer / replay encolhem o log
-  }, [sheet, panel, state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const logNew = sheet === 'log' || panel === 'log' ? 0 : Math.max(0, state.log.length - logSeen);
+    if (sheet === 'log' || shownPanel === 'log' || logSeen > state.log.length) setLogSeen(state.log.length); // desfazer / replay encolhem o log
+  }, [sheet, shownPanel, state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const logNew = sheet === 'log' || shownPanel === 'log' ? 0 : Math.max(0, state.log.length - logSeen);
   /** Ordem da mão escolhida pelo jogador (só exibição). */
   const [handOrder, setHandOrder] = useState<string[]>([]);
   /** Carta da mão erguida sob o dedo. */
@@ -1222,11 +1253,11 @@ function Table({
             <span className="burger" />
           </button>
         )}
-        {/* Visão do Streamer: o histórico abre no painel lateral, a partir do botão ao lado do menu. */}
-        {streamer && (
+        {/* Desktop (Streamer e quem joga): o histórico abre e fecha o painel lateral, a partir do botão ao lado do menu. */}
+        {(streamer || playerPanel) && (
           <button
             className={['round-btn', 'log-btn', panel === 'log' ? 'on' : ''].join(' ')}
-            onClick={() => setPanel((p) => (p === 'log' ? null : 'log'))}
+            onClick={() => setPanel(panel === 'log' ? null : 'log')}
             aria-label={t('game.logLabel')}
             aria-pressed={panel === 'log'}
             title={t('game.log')}
@@ -1319,6 +1350,7 @@ function Table({
         streamer ? 'streamer' : '',
         lateral ? 'lateral' : '',
         streamer && panel ? 'with-panel' : '',
+        playerPanel && !panel ? 'no-panel' : '',
       ].join(' ')}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
@@ -1499,9 +1531,14 @@ function Table({
                   {game.paused ? t('game.resume') : t('game.pause')}
                 </button>
               )}
-              <button className="btn" onClick={() => (streamer ? openPanel('log') : setSheet('log'))}>
+              <button className="btn" onClick={() => (streamer || playerPanel ? openPanel('log') : setSheet('log'))}>
                 {t('game.logBtn')}
               </button>
+              {playerPanel && loadOwnDeck && (
+                <button className="btn" onClick={() => openPanel('deck')}>
+                  {t('game.decklistBtn')}
+                </button>
+              )}
               {streamer && !embed?.layout && (
                 <button className="btn" onClick={() => updateSettings({ streamerLayout: lateral ? 'upright' : 'lateral' })} title={t('game.layoutTitle')}>
                   {lateral ? t('game.layoutToUpright') : t('game.layoutToLateral')}
@@ -1522,7 +1559,7 @@ function Table({
                   {t('broadcast.sendThis')}
                 </button>
               )}
-              {(!isOnline || over) && !tutorial && (
+              {(over || replay) && !tutorial && (
                 <button className="btn" onClick={game.downloadReplay}>
                   {t('game.downloadReplay')}
                 </button>
@@ -1552,6 +1589,7 @@ function Table({
             {!isOnline && !replay && !tutorial && (
               <div className="sheet-section">
                 <label className="sheet-label">{t('game.botSpeed')}</label>
+                <p className="muted small sheet-hint">{t('game.botSpeedHint')}</p>
                 <div className="seg small">
                   {[0.5, 1, 2, 4].map((v) => (
                     <button key={v} className={game.speed === v ? 'on' : ''} onClick={() => game.setSpeed(v)}>
@@ -1709,7 +1747,7 @@ function Table({
         </aside>
       )}
       {streamer && panel && (
-        <aside className="side-panel streamer-panel" aria-label={t('game.panelLabel')}>
+        <aside className="side-panel tabbed-panel streamer-panel" aria-label={t('game.panelLabel')}>
           <div className="panel-tabs">
             <div className="seg small" role="tablist">
               <button type="button" role="tab" aria-selected={panel === 'log'} className={panel === 'log' ? 'on' : ''} onClick={() => setPanel('log')}>
@@ -1735,8 +1773,23 @@ function Table({
           {panel === 'deck' && spectator?.roomId && <DeckPanel roomId={spectator.roomId} onZoom={setDeckCard} />}
         </aside>
       )}
-      {wide && !tutorial && !broadcast && !streamer && (
-        <aside className="side-panel">
+      {playerPanel && panel && (
+        <aside className="side-panel tabbed-panel player-panel" aria-label={t('game.panelLabel')}>
+          <div className="panel-tabs">
+            <div className="seg small" role="tablist">
+              <button type="button" role="tab" aria-selected={panel !== 'deck'} className={panel !== 'deck' ? 'on' : ''} onClick={() => setPanel('log')}>
+                {t('game.log')}
+              </button>
+              {loadOwnDeck && (
+                <button type="button" role="tab" aria-selected={panel === 'deck'} className={panel === 'deck' ? 'on' : ''} onClick={() => setPanel('deck')}>
+                  {t('game.decklist')}
+                </button>
+              )}
+            </div>
+            <button className="zoom-close static" onClick={() => setPanel(null)} aria-label={t('game.closePanel')} title={t('game.closePanelFull')}>
+              ✕
+            </button>
+          </div>
           {!bare && (
             <div className="panel-controls">
               <button className="btn small" onClick={onExit}>
@@ -1752,34 +1805,27 @@ function Table({
                   {t('game.undo')}
                 </button>
               )}
+              {/* A velocidade do bot fica só no menu da partida. */}
               {!isOnline && !replay && (
-                <>
-                  <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
-                    {game.paused ? t('game.resume') : t('game.pause')}
-                  </button>
-                  <select
-                    className="speed"
-                    value={game.speed}
-                    onChange={(e) => game.setSpeed(Number(e.target.value))}
-                    title={t('game.botSpeed')}
-                  >
-                    {[0.5, 1, 2, 4].map((v) => (
-                      <option key={v} value={v}>
-                        {t('game.speedX', { v })}
-                      </option>
-                    ))}
-                  </select>
-                </>
+                <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
+                  {game.paused ? t('game.resume') : t('game.pause')}
+                </button>
               )}
-              {(!isOnline || over) && (
+              {(over || replay) && (
                 <button className="btn small" onClick={game.downloadReplay} title={t('game.replayTitle')}>
                   {t('game.replayBtn')}
                 </button>
               )}
             </div>
           )}
-          <CardDetail state={state} uid={detailUid} />
-          <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
+          {panel === 'deck' && loadOwnDeck ? (
+            <DeckListPanel load={loadOwnDeck} onZoom={setDeckCard} />
+          ) : (
+            <>
+              <CardDetail state={state} uid={detailUid} />
+              <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
+            </>
+          )}
         </aside>
       )}
 

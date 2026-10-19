@@ -508,6 +508,16 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return { players, cards: present(getCards(db, ids)) };
   });
 
+  /** Deck de quem joga (painel de decklist da mesa no desktop): só o do próprio assento, pelo token. */
+  app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/my-deck', async (req, reply) => {
+    const found = seatIn(req.params.id, req.query.t);
+    if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    const s = found.room.data.seats[found.seat];
+    const deck = { name: s.deck.name, leader: s.deck.leader, cards: s.deck.cards, ...(s.deck.arts ? { arts: s.deck.arts } : {}) };
+    const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)])];
+    return { players: [{ name: s.name, bot: Boolean(s.bot), deck }], cards: present(getCards(db, ids)) };
+  });
+
   /**
    * Canal do espectador (SSE). `hands=1`: vê as mãos dos dois jogadores (streamer ou admin, só em
    * partida de torneio ou sala privada liberada), na mesa atrasada (o atraso escolhido nas opções da transmissão, nunca abaixo do mínimo). `k`:

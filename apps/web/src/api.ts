@@ -486,6 +486,9 @@ export const api = {
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
     /** Decks dos dois jogadores (painel de decklist de quem transmite): a mesma permissão de "Ver mãos". */
     decks: (roomId: string) => get<RoomDecks>(`/api/online/rooms/${encodeURIComponent(roomId)}/decks`),
+    /** O deck de quem joga (só o do próprio assento, pelo token): painel de decklist da mesa. */
+    myDeck: (roomId: string, token: string) =>
+      get<RoomDecks>(`/api/online/rooms/${encodeURIComponent(roomId)}/my-deck?t=${encodeURIComponent(token)}`),
     /** `key`: tela de transmissão (fonte do OBS); a chave faz as vezes do login e as opções do streamer decidem o que ela vê. */
     watchUrl: (roomId: string, hands: boolean, key?: string, judge = false) =>
       `/api/online/rooms/${roomId}/watch${judge ? '?judge=1' : key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
