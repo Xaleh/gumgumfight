@@ -625,7 +625,17 @@ Toda carta da base é jogável:
   aplicar o efeito à mão foram retiradas: a interface não as tem mais e o servidor recusa a ação `manual` nas
   partidas online para qualquer perfil; o motor ainda a aceita só para os testes.)
 - **Cobertura:** a tela "📊 Cobertura das cartas" (no menu, só para o perfil Dev) e `GET /api/coverage` mostram, por coleção,
-  quantas cartas são automáticas, quantas são manuais e como está a tradução.
+  quantas cartas são automáticas, quantas são manuais e como está a tradução. Na tela, só para o Dev:
+  - **Coleções:** tocar numa coleção mostra as cartas ⚙ linha por linha (✓ entendida, ✗ não entendida) com o trecho
+    onde o leitor automático parou destacado.
+  - **Frases que faltam:** as frases que o leitor não entende na base inteira, com números, nomes e tipos trocados por
+    marcadores, da que resolveria mais cartas para a que resolveria menos. Ensinar uma frase ao leitor
+    (`packages/engine/src/cards/parser.ts`) automatiza todas as cartas da linha.
+  - **Novas ⚙:** as cartas que entraram com efeito parcial ou manual (spoilers e `cards:import`) desde a última vez que o
+    Dev marcou como vistas. O item do menu mostra quantas são ("Cobertura das cartas · 3 novas ⚙"). Texto que muda
+    numa carta ⚙ (spoiler virando oficial com outra redação) a deixa nova de novo.
+  Nenhum comando "automatiza" uma carta: ela deixa de ser ⚙ quando o leitor, um script (`scripts.ts`) ou uma correção
+  de texto (`errata.ts`, `SOURCE_TEXT_FIXES`) passa a cobri-la, no próximo deploy.
 
 Para checar a robustez depois de importar coleções novas (decks aleatórios de toda a base, simulações bot x bot
 na linha de comando):

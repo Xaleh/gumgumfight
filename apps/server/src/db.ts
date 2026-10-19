@@ -6,9 +6,10 @@
 // push/store.ts (notificações); se um dia for preciso migrar para Postgres, só esses
 // arquivos mudam.
 
+import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { type CardArt, type CardData, type DeckList, fixCard } from '@gumgum/engine';
+import { type CardArt, type CardData, type DeckList, fixCard, needsManual } from '@gumgum/engine';
 import { DatabaseSync } from 'node:sqlite';
 import { baseCardId } from './optcgapi';
 import { DB_PATH } from './paths';
@@ -105,6 +106,91 @@ function migrate(db: DB) {
   migrateSupport(db);
   migrateTutorial(db);
   migratePartners(db);
+  migrateCardGaps(db);
+}
+
+/**
+ * Cartas com efeito que o leitor não entende (⚙), para o aviso de "novas" ao Dev (card-gaps.ts):
+ * `text_key` é o hash do texto quando a carta entrou na lista (texto novo = carta nova de novo) e
+ * `reviewed_at`, quando o Dev marcou como vista. Num banco que já tinha cartas, as ⚙ de antes da
+ * tabela entram como vistas: só as que chegarem depois são novas.
+ */
+function migrateCardGaps(db: DB) {
+  const existed = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_gaps'").get();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS card_gaps (
+      card_id     TEXT PRIMARY KEY,
+      text_key    TEXT NOT NULL,
+      first_seen  TEXT NOT NULL,
+      reviewed_at TEXT
+    );
+  `);
+  if (!existed) recordCardGaps(db, { reviewed: true });
+}
+
+const gapTextKey = (c: CardData) => createHash('sha1').update(`${c.text ?? ''}\u0000${c.trigger ?? ''}`).digest('hex').slice(0, 16);
+
+/**
+ * Atualiza a lista das cartas ⚙ com o banco atual: carta ⚙ que não estava (ou cujo texto mudou)
+ * entra como nova; carta que deixou de ser ⚙ (ou sumiu) sai. Roda ao subir o servidor, depois
+ * da sincronização dos spoilers e do `cards:import`. `reviewed`: entram já como vistas.
+ */
+export function recordCardGaps(db: DB, opts: { reviewed?: boolean; now?: Date } = {}): { added: number; removed: number } {
+  const at = (opts.now ?? new Date()).toISOString();
+  const known = new Map(
+    (db.prepare('SELECT card_id, text_key FROM card_gaps').all() as unknown as Array<{ card_id: string; text_key: string }>).map((r) => [r.card_id, r.text_key]),
+  );
+  const put = db.prepare(`
+    INSERT INTO card_gaps (card_id, text_key, first_seen, reviewed_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(card_id) DO UPDATE SET text_key = excluded.text_key, first_seen = excluded.first_seen, reviewed_at = excluded.reviewed_at
+  `);
+  const del = db.prepare('DELETE FROM card_gaps WHERE card_id = ?');
+  let added = 0;
+  let removed = 0;
+  transaction(db, () => {
+    const gaps = new Set<string>();
+    for (const c of listCards(db)) {
+      if (!needsManual(c)) continue;
+      gaps.add(c.id);
+      const key = gapTextKey(c);
+      if (known.get(c.id) === key) continue;
+      put.run(c.id, key, at, opts.reviewed ? at : null);
+      added++;
+    }
+    for (const id of known.keys()) {
+      if (gaps.has(id)) continue;
+      del.run(id);
+      removed++;
+    }
+  });
+  return { added, removed };
+}
+
+export interface CardGapRow {
+  cardId: string;
+  firstSeen: string;
+  reviewedAt: string | null;
+}
+
+export function listCardGaps(db: DB): Map<string, CardGapRow> {
+  const rows = db.prepare('SELECT card_id, first_seen, reviewed_at FROM card_gaps').all() as unknown as Array<{
+    card_id: string;
+    first_seen: string;
+    reviewed_at: string | null;
+  }>;
+  return new Map(rows.map((r) => [r.card_id, { cardId: r.card_id, firstSeen: r.first_seen, reviewedAt: r.reviewed_at }]));
+}
+
+/** Marca como vistas as cartas novas (todas, ou só `ids`). Devolve quantas mudaram. */
+export function markCardGapsReviewed(db: DB, ids?: string[], now = new Date()): number {
+  const at = now.toISOString();
+  if (!ids) return Number(db.prepare('UPDATE card_gaps SET reviewed_at = ? WHERE reviewed_at IS NULL').run(at).changes);
+  const mark = db.prepare('UPDATE card_gaps SET reviewed_at = ? WHERE card_id = ? AND reviewed_at IS NULL');
+  let n = 0;
+  transaction(db, () => {
+    for (const id of ids) n += Number(mark.run(at, id).changes);
+  });
+  return n;
 }
 
 /**

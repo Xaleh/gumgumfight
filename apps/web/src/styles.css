@@ -5966,6 +5966,122 @@ button.hint-pill::after,
   margin: 0 3px 0 8px;
   vertical-align: middle;
 }
+/* cobertura: lacunas do leitor (Dev) */
+.cov-tabs {
+  max-width: 560px;
+  margin-bottom: 12px;
+}
+.cov-click {
+  cursor: pointer;
+}
+.cov-click:hover td {
+  background: var(--panel2);
+}
+.cov-detail > td {
+  background: var(--bg2);
+  padding: 10px;
+}
+.gap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gap-list > .btn {
+  align-self: flex-start;
+}
+.gap-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+}
+.gap-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.gap-card ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gap-line {
+  display: flex;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.gap-mark {
+  flex: none;
+  width: 14px;
+  font-weight: 800;
+}
+.gap-line.ok {
+  color: var(--muted);
+}
+.gap-line.ok .gap-mark {
+  color: var(--ok);
+}
+.gap-line.gap .gap-mark {
+  color: var(--danger);
+}
+.gap-line mark {
+  background: rgba(229, 72, 77, 0.18);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.gap-where {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.gap-where code,
+.gap-patterns code {
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.gap-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gap-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+.gap-chip.cov-partial,
+.gap-chip.cov-manual,
+.gap-chip.gap-new {
+  border-color: transparent;
+  color: #fff;
+}
+.gap-chip.cov-partial {
+  background: #6f9a1f;
+}
+.gap-chip.cov-manual {
+  background: #a8860a;
+}
+.gap-chip.gap-new {
+  background: var(--accent);
+}
+.gap-seen {
+  margin-left: auto;
+}
 
 /* ------------------------------------------------------------------ estatísticas */
 

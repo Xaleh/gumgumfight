@@ -1,6 +1,7 @@
 import { fixCard } from '../errata';
 import type { CardData, CardDef } from '../types';
-import { parseCard } from './parser';
+import { type LineDiagnosis, lineDiagnosis } from './diagnose';
+import { diagnoseLine, diagnoseTrigger, effectLines, parseCard } from './parser';
 import { CARD_SCRIPTS } from './scripts';
 import { detectKeywords, KEYWORD_ONLY, splitEffects } from './split';
 
@@ -68,6 +69,29 @@ function computeStatus(card: CardData): AutomationStatus {
   return parsed.unparsed.length < lines ? 'partial' : 'manual';
 }
 
+export interface CardDiagnosis {
+  status: AutomationStatus;
+  /** As linhas de efeito e o [Trigger], na ordem da carta (vazio para script e sem efeito). */
+  lines: LineDiagnosis[];
+}
+
+/**
+ * Linha por linha, o que o leitor automático entendeu e onde parou (ferramentas de Dev).
+ * Usa as mesmas linhas de `parseCard`: uma linha recusada aqui é uma habilidade manual na partida.
+ */
+export function diagnoseCard(card: CardData): CardDiagnosis {
+  const status = automationStatus(card);
+  if (status === 'scripted' || status === 'vanilla') return { status, lines: [] };
+  const lines: LineDiagnosis[] = [];
+  for (const line of effectLines(card.text ?? '')) {
+    if (!KEYWORD_ONLY.test(line)) lines.push(lineDiagnosis(line, diagnoseLine(line, card.category)));
+  }
+  const trigger = card.trigger?.trim();
+  if (trigger) lines.push(lineDiagnosis(`[Trigger] ${trigger}`, diagnoseTrigger(trigger)));
+  return { status, lines };
+}
+
 export { CARD_SCRIPTS };
+export { gapPattern, type GapStage, type LineDiagnosis } from './diagnose';
 export { detectKeywords, manualAbilities, splitEffects } from './split';
 export { diagnoseLine, parseBody, parseCard, parseCardFilter, parseCondition, parseTarget, type ParsedCard } from './parser';
