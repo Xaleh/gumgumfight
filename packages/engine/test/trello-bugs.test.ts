@@ -528,6 +528,36 @@ describe('Trello (replay do card 70): Zoro OP12-020 x bot Kid ST36, partida inte
       if (i === actions.length - 1) expect(s.phase).not.toBe('mulligan');
     });
     expect(mihawkChecked).toBe(true);
-    expect(redirects).toBe(3);
+    // Gravado com 3 trocas: no turno 6, o Líder OP10-099 pulou o topo já virado (Cavendish) e virou o
+    // Killer. Hoje o custo não pode ser pago ali; com uma Vida virada a menos, o Kid troca o alvo 2 vezes.
+    expect(redirects).toBe(2);
+  });
+});
+
+describe('Trello: "turn 1 card from the top of your Life cards face-up" não pula a carta do topo já virada (Kid OP10-099)', () => {
+  /** Turno 1 do Kid (jogador 0), com a carta de Vida em `index` (0 = topo) já virada para cima. */
+  const kidWithFaceUp = (index: number) => {
+    const s = game(['OP10-099', 'ST12-001']);
+    const life = s.players[0].life;
+    s.players[0].lifeFaceUp = [life[life.length - 1 - index]];
+    return s;
+  };
+
+  it('com a carta do topo já virada para cima, o custo não pode ser pago: não pergunta e não vira a próxima', () => {
+    let s = kidWithFaceUp(0);
+    const before = [...s.players[0].lifeFaceUp!];
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(s.pending?.kind === 'confirm' && s.pending.player === 0).toBe(false);
+    expect(s.players[0].lifeFaceUp).toEqual(before);
+  });
+
+  it('com a do topo virada para baixo (e outra virada para cima), vira a do topo', () => {
+    let s = kidWithFaceUp(1);
+    const life = s.players[0].life;
+    const top = life[life.length - 1];
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    expect(s.players[0].lifeFaceUp).toEqual([life[life.length - 2], top]);
   });
 });

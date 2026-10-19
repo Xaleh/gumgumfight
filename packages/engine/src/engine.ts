@@ -2705,6 +2705,17 @@ function lifeEnds(ps: PlayerState, up: boolean): string[] {
   return [...new Set([top, bottom])].filter(ok) as string[];
 }
 
+/**
+ * As N cartas do topo da Vida que podem ser viradas para cima (`up`) ou para baixo, do topo para o fundo.
+ * "Turn N cards from the top of your Life cards face-up" só olha essas: a do topo já virada não é pulada.
+ */
+function lifeTop(ps: PlayerState, n: number, up: boolean): string[] {
+  return ps.life
+    .slice(Math.max(0, ps.life.length - n))
+    .reverse()
+    .filter((u) => (up ? !ps.lifeFaceUp?.includes(u) : Boolean(ps.lifeFaceUp?.includes(u))));
+}
+
 function faceDownLife(ps: PlayerState): string[] {
   return [...ps.life].reverse().filter((u) => !ps.lifeFaceUp?.includes(u));
 }
@@ -2806,7 +2817,9 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if (cost.lifeFace) {
     const avail = cost.lifeFace.topOrBottom
       ? lifeEnds(ps, cost.lifeFace.up).length
-      : cost.lifeFace.up
+      : cost.lifeFace.fromTop
+        ? lifeTop(ps, cost.lifeFace.count, cost.lifeFace.up).length
+        : cost.lifeFace.up
         ? faceDownLife(ps).length
         : ps.life.filter((u) => ps.lifeFaceUp?.includes(u)).length;
     if (avail < cost.lifeFace.count) return false;
@@ -3759,7 +3772,11 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         );
         return true;
       }
-      const pool = step.up ? faceDownLife(ps) : [...ps.life].reverse().filter((u) => ps.lifeFaceUp!.includes(u));
+      const pool = step.fromTop
+        ? lifeTop(ps, step.count, step.up)
+        : step.up
+          ? faceDownLife(ps)
+          : [...ps.life].reverse().filter((u) => ps.lifeFaceUp!.includes(u));
       const flipped = pool.slice(0, step.count);
       for (const uid of flipped) {
         if (step.up) ps.lifeFaceUp.push(uid);

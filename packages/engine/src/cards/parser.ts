@@ -2514,7 +2514,8 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
   } else if ((m = part.match(/^trash (\d+) cards? from the top( or bottom)? of your Life cards$/i))) {
     cost.lifeToTrash = { count: Number(m[1]), ...(m[2] ? { choose: true } : {}) };
   } else if ((m = part.match(/^turn (\d+) cards? from the top of your Life cards face-(up|down)$/i))) {
-    cost.lifeFace = { count: Number(m[1]), up: m[2].toLowerCase() === 'up' };
+    // Só as N cartas do topo: se a do topo já está virada, não dá para pagar (não pula para a próxima).
+    cost.lifeFace = { count: Number(m[1]), up: m[2].toLowerCase() === 'up', fromTop: true };
   } else if ((m = part.match(/^reveal (\d+) (.+?) from your hand$/i))) {
     const f = parseCardFilter(`${m[1]} ${m[2]}`);
     if (!f) return false;

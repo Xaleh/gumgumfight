@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig, GameState } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 11;
+export const REPLAY_VERSION = 12;
 
 /**
  * Configuração para refazer um replay da versão `version`: até a versão 8, a preparação antiga
@@ -59,7 +59,10 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * gravada é uma escolha de alvo; senão "Nenhum"); "reveal 1 card … play up to 1", "you may deal 1 damage" e
  * "your opponent may add 1 DON!!" (sim). Uma escolha gravada com mais alvos do que hoje cabe fica com os primeiros, e uma resposta gravada
  * para uma pergunta que hoje não aparece (o efeito deixou de ser oferecido) é descartada; dali em diante
- * a partida pode tomar outro rumo.
+ * a partida pode tomar outro rumo. Até a versão 11, "turn N cards from the top of your Life cards face-up"
+ * pulava a carta do topo já virada e virava a próxima (Eustass"Captain"Kid OP10-099): hoje o custo só
+ * olha as N do topo. A resposta gravada para a pergunta que hoje não aparece é descartada (acima), e a
+ * pergunta que o roteiro antigo não tem é recusada; dali em diante a partida pode tomar outro rumo.
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -105,6 +108,8 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
       if (current?.do === 'playRevealed' || current?.do === 'opponentAddDon' || (current?.do === 'payCost' && after?.do === 'takeDamage')) {
         return { type: 'answer', player: p.player, yes: true };
       }
+      // Versão 11: "turn N cards from the top of your Life cards face-up" com o topo antes pulado.
+      if (current?.do === 'payCost' && current.cost.lifeFace?.fromTop) return { type: 'answer', player: p.player, yes: false };
     }
     return null;
   };
