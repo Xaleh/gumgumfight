@@ -1,5 +1,5 @@
 import type { CardData } from '@gumgum/engine';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type LiveRoom, type RoomDecks } from '../api';
 import { useT } from '../i18n';
 import { StaticCard } from './CardView';
@@ -91,11 +91,21 @@ export function MatchesPanel({ currentId, onWatch }: { currentId: string | null;
 const CATEGORY_ORDER: Record<string, number> = { leader: 0, character: 1, event: 2, stage: 3 };
 
 /**
- * Painel de decklist de quem transmite: o deck de um dos jogadores da partida (escolhido no alto), com o
- * Líder e as cartas em ordem de tipo, custo e nome, cada uma com a quantidade; clicando, a carta ampliada (`onZoom`, por cima da mesa).
+ * Painel de decklist de quem transmite: o deck de um dos jogadores da partida (escolhido no alto).
  * O servidor só entrega os decks com a mesma permissão de "Ver mãos".
  */
 export function DeckPanel({ roomId, onZoom }: { roomId: string; onZoom: (card: CardData) => void }) {
+  const load = useCallback(() => api.online.decks(roomId), [roomId]);
+  return <DeckListPanel load={load} onZoom={onZoom} />;
+}
+
+/**
+ * Decklist da mesa: os decks que `load` traz (os dois, para quem transmite; só o próprio, para quem joga),
+ * com o Líder e as cartas em ordem de tipo, custo e nome, cada uma com a quantidade; clicando, a carta
+ * ampliada (`onZoom`, por cima da mesa). Com mais de um deck, o jogador é escolhido no alto.
+ * `load` precisa ser estável (useCallback): cada nova função busca de novo.
+ */
+export function DeckListPanel({ load, onZoom }: { load: () => Promise<RoomDecks>; onZoom: (card: CardData) => void }) {
   const t = useT();
   const [data, setData] = useState<RoomDecks | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,14 +114,14 @@ export function DeckPanel({ roomId, onZoom }: { roomId: string; onZoom: (card: C
     let stop = false;
     setData(null);
     setError(null);
-    api.online.decks(roomId).then(
+    load().then(
       (d) => !stop && setData(d),
       (e: unknown) => !stop && setError(e instanceof Error ? e.message : String(e)),
     );
     return () => {
       stop = true;
     };
-  }, [roomId]);
+  }, [load]);
   const cards = useMemo(() => new Map((data?.cards ?? []).map((c) => [c.id, c])), [data]);
   const player = data?.players[who] ?? data?.players[0];
   const leader = player ? cards.get(player.deck.leader) : undefined;
@@ -130,7 +140,7 @@ export function DeckPanel({ roomId, onZoom }: { roomId: string; onZoom: (card: C
     <div className="deck-panel">
       {error && <p className="muted small">{error}</p>}
       {!data && !error && <p className="muted small">{t('common.loading')}</p>}
-      {data && (
+      {data && data.players.length > 1 && (
         <div className="seg small deck-who" role="tablist">
           {data.players.map((p, i) => (
             <button key={i} type="button" role="tab" aria-selected={who === i} className={who === i ? 'on' : ''} onClick={() => setWho(i)}>

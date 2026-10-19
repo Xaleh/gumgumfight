@@ -1511,6 +1511,7 @@ export default {
   'game.decklistBtn': '🃏 Deckliste',
   'game.panelLabel': 'Seitenleiste',
   'game.closePanel': 'Seitenleiste schließen',
+  'game.closePanelFull': 'Seitenleiste schließen (der Tisch füllt den ganzen Bildschirm; die Verlaufstaste neben dem Menü öffnet sie wieder)',
   'watch.tournamentsLive': 'Turniere',
   'watch.standaloneLive': 'Einzelpartien',
   'watch.noTournaments': 'Gerade läuft kein Turnier.',

@@ -34,6 +34,8 @@ export interface Settings {
   opponentChat: boolean;
   /** Visão do Streamer: mesa lateral (jogadores à esquerda e à direita, 2.5D) ou em pé. */
   streamerLayout: StreamerLayout;
+  /** Partida no desktop: o painel lateral (histórico e decklist) aberto; fechado, a mesa ocupa a tela toda. */
+  sidePanel: boolean;
   /** Volume dos efeitos sonoros (0 = mudo … 1). */
   sfxVolume: number;
   /** Volume da música de fundo (0 = mudo … 1). */
@@ -59,6 +61,8 @@ const EDITABLE: Editable[] = [
   'coachTips',
   'theme',
   'opponentChat',
+  'streamerLayout',
+  'sidePanel',
   'sfxVolume',
   'musicVolume',
   'keepAwake',
@@ -86,6 +90,7 @@ const DEFAULTS: Settings = {
   theme: 'system',
   opponentChat: true,
   streamerLayout: 'lateral',
+  sidePanel: true,
   sfxVolume: 0.8,
   musicVolume: 0.5,
   keepAwake: true,
@@ -127,6 +132,7 @@ function load(): Settings {
       locale: savedLocale(saved),
       theme,
       streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
+      sidePanel: saved.sidePanel !== false,
       serverImages: false,
       pushKey: null,
       sfxVolume: volume(saved.sfxVolume, DEFAULTS.sfxVolume),

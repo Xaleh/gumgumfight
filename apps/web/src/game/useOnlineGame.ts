@@ -300,6 +300,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     [seat.roomId, seat.token],
   );
   const leave = useCallback(() => api.online.leave(seat.roomId, seat.token).catch(() => undefined), [seat.roomId, seat.token]);
+  /** O deck de quem joga (painel de decklist da mesa); quem assiste não tem token. */
+  const loadMyDeck = useCallback(() => api.online.myDeck(seat.roomId, seat.token), [seat.roomId, seat.token]);
   const downloadReplay = useCallback(async () => {
     try {
       const replay = await api.online.replay(seat.roomId);
@@ -337,6 +339,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     rematch,
     askRematch,
     leave,
+    loadMyDeck,
     downloadReplay,
     actions,
     handsRefused,

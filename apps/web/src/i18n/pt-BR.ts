@@ -1512,6 +1512,7 @@ const ptBR = {
   'game.decklistBtn': '🃏 Decklist',
   'game.panelLabel': 'Painel lateral',
   'game.closePanel': 'Fechar painel',
+  'game.closePanelFull': 'Fechar painel (a mesa ocupa a tela toda; o botão de histórico ao lado do menu abre de novo)',
   'watch.tournamentsLive': 'Torneios',
   'watch.standaloneLive': 'Avulsas',
   'watch.noTournaments': 'Nenhum torneio em andamento agora.',

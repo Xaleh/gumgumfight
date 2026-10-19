@@ -1919,6 +1919,10 @@ input[type='number'] {
 .game.wide {
   grid-template-columns: 1fr 340px;
 }
+/* Quem joga escondeu o painel lateral: a mesa ocupa a tela toda. */
+.game.wide.no-panel {
+  grid-template-columns: 1fr;
+}
 .game.dragging,
 .game.dragging * {
   cursor: grabbing !important;
@@ -11115,14 +11119,15 @@ a.sponsor-card:hover {
   }
 }
 
-/* ---- painel lateral à direita (histórico, partidas em transmissão, decklist): encolhe a mesa ---- */
+/* ---- painel lateral à direita (histórico, partidas em transmissão, decklist): encolhe a mesa.
+   O de quem joga (histórico e a própria decklist) usa as mesmas abas. ---- */
 .game.streamer.with-panel {
   grid-template-columns: minmax(0, 1fr) 380px;
 }
 .round-btn.log-btn.on {
   background: var(--blue);
 }
-.streamer-panel {
+.tabbed-panel {
   gap: 10px;
   padding: 10px 12px;
 }
@@ -11259,6 +11264,10 @@ a.sponsor-card:hover {
 .deck-panel .card-list {
   --cw: 106px;
   justify-content: flex-start;
+}
+/* painel de quem joga (340px, mais estreito que o do Streamer): três cartas por linha */
+.player-panel .deck-panel .card-list {
+  --cw: 96px;
 }
 .count-badge {
   position: absolute;

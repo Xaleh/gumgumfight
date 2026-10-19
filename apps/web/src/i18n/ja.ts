@@ -1511,6 +1511,7 @@ export default {
   'game.decklistBtn': '🃏 デッキリスト',
   'game.panelLabel': 'サイドパネル',
   'game.closePanel': 'パネルを閉じる',
+  'game.closePanelFull': 'パネルを閉じる（盤面が画面いっぱいに広がります。メニュー横の履歴ボタンで再び開けます）',
   'watch.tournamentsLive': '大会',
   'watch.standaloneLive': '単独の対戦',
   'watch.noTournaments': '現在進行中の大会はありません。',

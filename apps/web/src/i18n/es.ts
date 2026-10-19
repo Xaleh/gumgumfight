@@ -1511,6 +1511,7 @@ export default {
   'game.decklistBtn': '🃏 Decklist',
   'game.panelLabel': 'Panel lateral',
   'game.closePanel': 'Cerrar panel',
+  'game.closePanelFull': 'Cerrar panel (la mesa ocupa toda la pantalla; el botón de historial junto al menú lo abre de nuevo)',
   'watch.tournamentsLive': 'Torneos',
   'watch.standaloneLive': 'Sueltas',
   'watch.noTournaments': 'Ningún torneo en curso ahora.',
