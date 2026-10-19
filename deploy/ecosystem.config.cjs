@@ -48,6 +48,11 @@ module.exports = {
         WEB_DIST: path.join(RELEASE, 'web'),
         DATA_DIR: path.join(RELEASE, 'data'),
         CARD_IMAGES: env.CARD_IMAGES || 'on',
+        // Fontes das cartas em ordem de prioridade (vazio = optcgapi / optcgleaks). Ex.: cardkaizoku,optcgapi
+        CARD_SOURCES: env.CARD_SOURCES || '',
+        SPOILER_SOURCES: env.SPOILER_SOURCES || '',
+        // Horas entre as buscas dos spoilers (padrão 6); off desliga.
+        SPOILER_SYNC: env.SPOILER_SYNC || '',
         // Client ID do login com Google (vazio = login desligado).
         GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID || '',
         // Contas Google que viram Admin ao entrar (e-mails separados por vírgula).
