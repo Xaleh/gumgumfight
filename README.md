@@ -52,6 +52,8 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `DATA_DIR`      | `data`                        | Decks prontos, cartas provisórias e traduções |
 | `CARD_IMAGES`   | `on`                          | `off` desliga as imagens oficiais das cartas |
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
+| `CARD_SOURCES`  | `optcgapi`                    | Fontes das cartas lançadas, em ordem de prioridade (ex.: `cardkaizoku,optcgapi`; veja [Cadeia de fontes](#cadeia-de-fontes)) |
+| `SPOILER_SOURCES` | `optcgleaks`                | Fontes dos spoilers, em ordem de prioridade (ex.: `cardkaizoku,optcgleaks`) |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
@@ -732,15 +734,15 @@ dono escolhe a ordem entre os seus). As divergências que ainda faltam corrigir 
 
 ## Dados das cartas
 
-As cartas vêm da [optcgapi.com](https://optcgapi.com/documentation) e ficam salvas no SQLite local. O jogo não
-consulta a API durante as partidas.
+As cartas vêm da [optcgapi.com](https://optcgapi.com/documentation) (e, se configurado, de outras fontes: veja
+[Cadeia de fontes](#cadeia-de-fontes)) e ficam salvas no SQLite local. O jogo não consulta a API durante as partidas.
 
 ```bash
 npm run cards:import                      # ST-01 e ST-02 (os decks de teste)
-npm run cards:import -- ST-03 OP-01       # coleções específicas (ST-xx = starter deck, OP/EB/PRB = boosters)
+npm run cards:import -- ST-03 OP-01 P     # coleções específicas (ST-xx = starter deck, OP/EB/PRB = boosters, P = promocionais)
 npm run cards:import -- --all             # tudo (coleções, starter decks e promocionais P-xxx)
 npm run cards:import -- --dry-run ST-01   # mostra o resultado sem gravar
-npm run cards:import -- --file resp.json  # importa uma resposta da API salva em arquivo (sem rede)
+npm run cards:import -- --file resp.json  # importa uma resposta da optcgapi salva em arquivo (sem rede, só a optcgapi)
 ```
 
 - Versões com arte alternativa (mesmo ID) são unificadas; cartas DON!! são ignoradas. Promo reimpressa em starter deck
@@ -757,10 +759,45 @@ npm run cards:import -- --file resp.json  # importa uma resposta da API salva em
   sobrescrevem cartas vindas da API.
 - Os scripts de efeito (`packages/engine/src/cards/scripts.ts`) precisam ser conferidos contra o texto oficial.
 
+### Cadeia de fontes
+
+Cada carta pode vir de mais de uma fonte, numa ordem de prioridade definida no `deploy.env` (homologação e produção
+precisam da mesma cadeia, senão as bases ficam diferentes):
+
+```bash
+CARD_SOURCES=cardkaizoku,optcgapi        # cartas lançadas (padrão: optcgapi)
+SPOILER_SOURCES=cardkaizoku,optcgleaks   # spoilers (padrão: optcgleaks)
+```
+
+Fontes disponíveis: `optcgapi` (oficiais), `optcgleaks` (spoilers) e `cardkaizoku` (as duas). O `sweetapp` entra na
+frente quando o adaptador existir. Os adaptadores ficam em `apps/server/src/card-sources/`.
+
+- **Por carta:** vale a primeira fonte da cadeia que tem a carta (gravada em `cards.source`, ex.: `api:cardkaizoku.com`).
+  Campo **vazio** (atributo `""`, Vida do Líder, tipo cortado) é completado pela fonte seguinte; valor **diferente** não é
+  misturado: vale o da fonte de maior prioridade.
+- **Exceções do Cardkaizoku** (já errou contador, cor e poder): custo, poder, contador, Vida e cores vêm da fonte seguinte
+  sempre que ela tem a carta. O texto dele só substitui o da fonte seguinte se o leitor de efeitos entender pelo menos
+  tanto quanto (texto fora do padrão não pode derrubar a automação). O símbolo "➀" do site vira "①" e "DON!! −1" vira
+  "DON!! -1".
+- **Imagens:** o CDN do Cardkaizoku recusa links de fora, então a imagem (e as artes alternativas) vem da primeira fonte
+  que tem imagem. Carta que só o Cardkaizoku tem aparece desenhada em HTML.
+- **Lançada ou anunciada:** o Cardkaizoku mistura as duas. Como fonte oficial ele só traz coleções que outra fonte oficial
+  (ou o banco) já tem, e promocionais que outra fonte tem ou que já estão à venda (com produto no TCGplayer). O resto
+  (OP18, EB05, ST37, ST38, promos japonesas sem versão em inglês) entra pela cadeia de spoilers.
+- **Relatório:** a importação mostra, por coleção, quantas cartas vieram de cada fonte, quantos campos foram completados e as
+  divergências por campo. O detalhe carta a carta fica em `card-source-diff.json`, na pasta do banco (`apps/server/var/`
+  ou `shared/` na VM), uma seção por importação (`official`, `official:sync`, `spoiler:OP18`…).
+- Para trocar a cadeia de uma coleção sem risco: `CARD_SOURCES=cardkaizoku,optcgapi npm run cards:import -- --dry-run OP-05`
+  e compare as contagens de automação; depois rode sem `--dry-run`. Na VM, o "Run workflow" do GitHub aceita `--all`
+  em "Coleções para importar".
+- **Termos de uso:** os termos do Cardkaizoku pedem autorização por escrito para reproduzir o conteúdo do site. Peça antes
+  de ligar a fonte na produção.
+
 ### Spoilers (coleções ainda não lançadas)
 
-A optcgapi só publica uma coleção depois do lançamento. As cartas já anunciadas (hoje EB05 e OP18) entram no jogo como
-**spoilers**, com a etiqueta **SPOILER**, e viram cartas oficiais sozinhas quando a API publica a coleção.
+A optcgapi só publica uma coleção depois do lançamento. As cartas já anunciadas (hoje EB05 e OP18; com o Cardkaizoku na cadeia,
+também ST37, ST38 e promocionais ainda sem versão em inglês) entram no jogo como **spoilers**, com a etiqueta **SPOILER**, e viram cartas oficiais sozinhas
+quando a API publica a coleção.
 
 Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
 
@@ -768,33 +805,40 @@ Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
 {
   "set": "OP18",
   "title": "The Dominance of God (OP-18)",
-  "feed": "optcgleaks",
+  "feed": true,
   "source": "optcgleaks.com",
   "url": "https://optcgleaks.com/op18",
   "cards": []
 }
 ```
 
-- **Busca automática** (`"feed": "optcgleaks"`): o servidor baixa as cartas reveladas de
-  [optcgleaks.com](https://optcgleaks.com/) (`https://images.optcgleaks.com/<coleção>/<coleção>.json`), com textos em
-  inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX") e as reimpressões de outras coleções. Uma carta
-  que sai do site sai do banco; uma resposta vazia ou com erro não apaga nada. Para acompanhar uma coleção nova, basta
-  criar o arquivo dela.
+- **Busca automática** (`"feed": true`; arquivos antigos com `"feed": "optcgleaks"` também valem): o servidor baixa as
+  cartas reveladas das fontes de `SPOILER_SOURCES`, juntadas pela [cadeia](#cadeia-de-fontes):
+  - [optcgleaks.com](https://optcgleaks.com/) (`https://images.optcgleaks.com/<coleção>/<coleção>.json`), com textos em
+    inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX") e as reimpressões de outras coleções.
+  - [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) (`https://cdn.cardkaizoku.com/manifest.json` aponta o arquivo
+    com todas as cartas do site), sem imagens. Carta com o texto ainda não revelado fica de fora.
+
+  Uma carta que sai de todas as fontes sai do banco; uma resposta vazia, ou uma rodada em que alguma fonte falhou, não
+  apaga nada. Uma fonte que não tem a coleção (404) não conta como erro. Para acompanhar uma coleção nova, basta criar o
+  arquivo dela. O arquivo `p.json` acompanha as promocionais: as que já são oficiais no banco não viram spoiler.
 - **Cartas escritas à mão** (`cards`): mesmos campos de `data/cards` (`CardData`) e têm prioridade sobre as baixadas,
   para corrigir um erro do site ou incluir uma carta de outra fonte. `source`/`url` do arquivo valem para essas cartas;
   cada uma pode ter o seu `"spoiler": { "source": "...", "url": "..." }`. Cartas sem número, nome ou categoria são ignoradas
   e aparecem no log. Uma carta apagada do arquivo sai do banco.
 - **Troca automática:** ao iniciar e a cada `SPOILER_SYNC` horas, o servidor primeiro baixa os spoilers e depois procura as
-  coleções na API (`/allSets/`, `/allDecks/` e, se a coleção ainda não estiver listada, `/sets/card/<id>/`). Quando a
-  coleção sai, ela é importada inteira: os dados e a imagem oficiais substituem os do spoiler e a etiqueta some. Os decks
+  coleções na API (`/allSets/`, `/allDecks/` e, se a coleção ainda não estiver listada, `/sets/card/<id>/`; promocionais em
+  `/allPromos/`). Quando a coleção sai, ela é importada inteira, passando pela cadeia de `CARD_SOURCES`: os dados e a
+  imagem oficiais substituem os do spoiler e a etiqueta some. Os decks
   continuam iguais, porque o número da carta não muda. Coleções já oficiais não são mais buscadas no site de spoilers.
   Para fazer tudo na hora: `npm run cards:import -- --spoilers`.
 - Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
 - No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
 - Deck com spoiler não entra na ranqueada nem em torneio que não seja "Todas as cartas + spoilers" (veja [Formatos](#formatos)).
   Quando a coleção sai e a etiqueta some, o mesmo deck passa a valer em todo lugar.
-- O [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) tem as mesmas cartas, mas errou contador, cor e poder em algumas
-  e as imagens dele só abrem no próprio site; por isso não é usado na busca automática.
+- O [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) costuma revelar antes e tem promocionais que as outras fontes não
+  têm, mas errou contador, cor e poder em algumas e as imagens dele só abrem no próprio site. Por isso fica desligado por
+  padrão e, quando ligado, esses campos e a imagem vêm da fonte seguinte (veja [Cadeia de fontes](#cadeia-de-fontes)).
 
 ### Imagens
 

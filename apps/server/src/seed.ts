@@ -41,7 +41,7 @@ export function seed(db: DB) {
 
 /**
  * Arquivo de spoilers (data/spoilers/<coleção>.json): cartas anunciadas que a API
- * ainda não tem. `feed` liga a busca automática num site de spoilers; as cartas
+ * ainda não tem. `feed` liga a busca automática nos sites de spoiler; as cartas
  * escritas em `cards` têm prioridade sobre as baixadas. `source`/`url` do arquivo
  * valem para as cartas que não têm os seus.
  */
@@ -49,7 +49,8 @@ export interface SpoilerFile {
   set: string;
   title?: string;
   release?: string;
-  feed?: 'optcgleaks';
+  /** Liga a busca automática nas fontes de SPOILER_SOURCES (true; arquivos antigos têm "optcgleaks"). */
+  feed?: boolean | string;
   source?: string;
   url?: string;
   cards?: Array<Partial<CardData> & { id: string; name: string; category: CardCategory }>;

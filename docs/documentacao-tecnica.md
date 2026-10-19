@@ -39,7 +39,7 @@ O GumGum Fight é um simulador do **One Piece Card Game** que roda no navegador.
 | **Motor de regras** | Aplica as regras do jogo: `applyAction(estado, ação) → novo estado`. Função pura, determinística, sem dependências. | No navegador (partida contra o bot, replays) **e** no servidor (partidas online, verificação de replays). |
 | **Backend (API)** | Fastify + SQLite. Cartas, decks, contas, estatísticas, salas online, torneios. Em produção também entrega a interface compilada. | Um único processo Node na VPS, atrás do Nginx. |
 | **Frontend** | React + Vite. Menu, construtor de decks, mesa de jogo, espectador, estatísticas, torneios, administração. | Navegador (SPA instalável como PWA: service worker com cache da casca e notificações). |
-| **Importador de cartas** | Busca as cartas oficiais na optcgapi.com e os spoilers na optcgleaks.com; normaliza e grava no SQLite. | CLI no servidor + sincronização periódica dentro do próprio processo da API. |
+| **Importador de cartas** | Busca as cartas oficiais e os spoilers numa cadeia de fontes com prioridade (`CARD_SOURCES` / `SPOILER_SOURCES`: optcgapi.com, optcgleaks.com, cardkaizoku.com); normaliza e grava no SQLite. | CLI no servidor + sincronização periódica dentro do próprio processo da API. |
 | **Deploy** | GitHub Actions monta um pacote autocontido, envia por SSH, ativa no pm2 com rollback automático. | GitHub + VPS (Hostinger, produção) + servidor de homologação. |
 
 Princípios que explicam várias decisões do código:
@@ -136,6 +136,7 @@ gumgumfight/
 │   ├── src/config.ts, env.ts, paths.ts   variáveis de ambiente e caminhos
 │   ├── src/optcgapi.ts          mapeamento da optcgapi → CardData
 │   ├── src/card-import.ts, import-cards.ts   CLI de importação
+│   ├── src/card-sources/                     cadeia de fontes (optcgapi, optcgleaks, cardkaizoku) e resolução por carta
 │   ├── src/spoiler-feed.ts, spoiler-sync.ts  optcgleaks + troca por cartas oficiais
 │   ├── src/official-cards.ts, check-official.ts, check-translations.ts  scripts de conferência
 │   ├── src/seed.ts, seed-cli.ts  decks prontos, cartas provisórias, traduções
@@ -165,7 +166,7 @@ gumgumfight/
 ├── data/
 │   ├── cards/*.json             34 arquivos de cartas provisórias (750 cartas; ST01–ST36 parciais, OP01, OP02)
 │   ├── decks/*.json             36 decks prontos (um por starter deck)
-│   ├── spoilers/eb05.json, op18.json   coleções futuras (feed optcgleaks)
+│   ├── spoilers/*.json                 coleções futuras e promos anunciadas (feed pela cadeia SPOILER_SOURCES)
 │   ├── translations/pt.json     traduções revisadas (hoje vazio)
 │   └── card-types.json          172 tipos conhecidos (para separar "Heart Pirates Supernovas")
 ├── deploy/                      bootstrap-hostinger.sh, setup-vm.sh, remote-deploy.sh, ecosystem.config.cjs, HOSTINGER.md
@@ -563,7 +564,7 @@ limite relevante é o tempo das consultas de estatísticas (seção 15).
 |---|---|---|
 | Dados da carta (id, nome, categoria, cores, custo, Vida, poder, counter, atributos, tipos, texto, trigger, coleção, raridade, URL da imagem, notas, aliases, marca de spoiler) | `cards.data` | JSON `CardData` (`packages/engine/src/types.ts:14-41`) |
 | Resposta original da API (para remapear sem baixar de novo) | `cards.raw` | JSON bruto da optcgapi |
-| Origem e status | `cards.source` (`api:optcgapi.com`, `api:arquivo`, `fixture:<arquivo>.json`, `spoiler:<arquivo>.json`, `spoiler:feed:optcgleaks.com`), `cards.provisional` | texto / 0-1 |
+| Origem e status | `cards.source` (`api:optcgapi.com`, `api:cardkaizoku.com`, `api:arquivo`, `fixture:<arquivo>.json`, `spoiler:<arquivo>.json`, `spoiler:feed:optcgleaks.com`, `spoiler:feed:cardkaizoku.com`), `cards.provisional` | texto / 0-1 |
 | Tradução revisada | `card_translations` (`lang = 'pt'`) | texto |
 | Tradução automática | **não é gravada**: calculada por `translateCardPt` a cada resposta, com cache em memória (até 20.000 entradas) | — |
 | Efeito automatizado (DSL) | **não é gravado**: `buildCardDef` calcula a partir do texto (parser) ou de `CARD_SCRIPTS` em tempo de execução | — |
@@ -590,8 +591,12 @@ Fonte: `https://optcgapi.com/api` (`CARD_API_BASE`). Endpoints usados:
 
 Fluxo do `npm run cards:import -- [coleções | --all | --file x.json] [--dry-run]` (`import-cards.ts`):
 
-1. Uma requisição por fonte, **em sequência**, `fetch` nativo com `user-agent: gumgumfight-importer`. Sem retry nem
-   atraso; erro HTTP aborta.
+0. Monta a cadeia de `CARD_SOURCES` (padrão `optcgapi`; com `--file`, só a optcgapi) e busca cada fonte em sequência.
+   Uma fonte que falha é pulada (com aviso); sem nenhuma, a importação aborta. Os passos 1 a 4 são os da optcgapi
+   (`card-sources/optcgapi.ts` + `optcgapi.ts`); o Cardkaizoku (`card-sources/cardkaizoku.ts`) lê
+   `https://cdn.cardkaizoku.com/manifest.json` → `cardData.current` (um JSON com todas as cartas).
+1. Uma requisição por endpoint, **em sequência**, `fetch` nativo com `user-agent: gumgumfight-importer`. Sem retry nem
+   atraso.
 2. Monta o vocabulário de tipos (`data/card-types.json` + tipos citados nos textos).
 3. `mapApiResponse` sobre **todas** as linhas de uma vez: agrupa por id (versões alternativas, reimpressões em starter
    deck), escolhe a linha primária (`card_image_id === id`), decide `power/cost/counter/life/colors/attributes` por
@@ -600,7 +605,13 @@ Fluxo do `npm run cards:import -- [coleções | --all | --file x.json] [--dry-ru
    divide tipos pelo maior tipo conhecido.
 4. Ignora: DON!!, categorias desconhecidas, promos reimpressas de coleção (`set_name` com "promotion") e líderes só de
    evento (P-700/800/900). Sufixos `_r1`/`_p1` viram o número base.
-5. `upsertCards(provisional: false, source: 'api:optcgapi.com', raw)` numa transação. Cartas da API **substituem**
+5. `resolveChain` (`card-sources/chain.ts`) junta as fontes carta a carta: vence a primeira que tem a carta; campo vazio
+   vem da seguinte; campos fracos da fonte (Cardkaizoku: custo, poder, contador, Vida, cores) vêm da seguinte quando ela
+   tem a carta; o texto da vencedora só fica se `parseCard` não deixar mais habilidades sem entender que o da seguinte;
+   imagem e artes da primeira fonte com imagem. Fonte que mistura spoilers (Cardkaizoku) só traz coleções confirmadas
+   por outra fonte oficial ou pelo banco, e promos que outra fonte tem ou que estão à venda (`products` não vazio).
+   Relatório (fonte por coleção, campos completados, divergências) no console e em `card-source-diff.json` ao lado do banco.
+6. `upsertCards(provisional: false, source: 'api:<fonte vencedora>', raw)` numa transação. Cartas oficiais **substituem**
    provisórias e spoilers; o inverso nunca acontece.
 
 Em produção a importação roda na VPS: manualmente (`node release/server/import-cards.mjs` com o `DB_PATH`
@@ -613,17 +624,20 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
 
 **Spoilers** (coleções ainda não lançadas; hoje EB05 e OP18, `data/spoilers/<set>.json`):
 
-- Arquivo: `{set, title, release, feed: "optcgleaks", source, url, cards: []}`. `cards` aceita cartas escritas à mão
+- Arquivo: `{set, title, release, feed: true, source, url, cards: []}` (`feed: "optcgleaks"` dos arquivos antigos também liga). `cards` aceita cartas escritas à mão
   (mesmo `CardData`), com prioridade sobre o feed; cartas sem id válido (`/^[A-Z]+\d*-\d+$/`), nome ou categoria são
   ignoradas e logadas.
 - Feed: `https://images.optcgleaks.com/<set>/<set>.json`. Só o array `cards` é usado (`sp_cards` e `unknown_id_cards`
   ficam de fora). Mapeamento em `spoiler-feed.ts`: entidades HTML, `<br>`, `NOTE:` → `notes`, `<Blocker>` → `[Blocker]`,
   imagem `https://images.optcgleaks.com/<set>/images/<image.id>.webp`, `spoiler: {source: 'optcgleaks.com', url}`.
-- `refreshSpoilerFeeds`: pula a coleção se já há cartas oficiais dela; resposta vazia/erro não apaga nada; grava com
-  `provisional = 1`, `source = 'spoiler:feed:optcgleaks.com'`; `pruneSpoilers` remove as que saíram do site.
+- `refreshSpoilerFeeds`: busca a coleção em cada fonte de `SPOILER_SOURCES` (404 = a fonte não tem) e junta com
+  `resolveChain`; pula a coleção se já há cartas oficiais dela (menos `P`, que sai carta a carta); resposta vazia ou
+  qualquer fonte com erro não apaga nada; grava com `provisional = 1`, `source = 'spoiler:feed:<fonte vencedora>'` e
+  `spoiler.source` da vencedora; `pruneSpoilers` (`spoiler:feed:%`) remove as que saíram de todas as fontes.
 - `syncSpoilers`: pega as coleções com spoilers pendentes, procura em `/allSets/` e `/allDecks/`; se não listada, tenta
-  `/sets/card/<primeiro id>/` e, achando, busca as demais uma a uma. 404 = "ainda não publicada". O que vier é
-  importado como oficial (`provisional = 0`), e a etiqueta SPOILER some sem mexer nos decks (o número não muda).
+  `/sets/card/<primeiro id>/` e, achando, busca as demais uma a uma; promos pendentes buscam `/allPromos/`. 404 = "ainda
+  não publicada". O que vier passa pela cadeia de `CARD_SOURCES` (as outras fontes só nas coleções que a API publicou)
+  e é importado como oficial (`provisional = 0`); a etiqueta SPOILER some sem mexer nos decks (o número não muda).
 - Agendamento: dentro do processo da API, 15 s após subir e depois a cada `SPOILER_SYNC` horas (padrão 6, `off`
   desliga). Tráfego: ~2 requisições ao optcgleaks + 2 à optcgapi por rodada (mais uma por carta pendente quando a
   coleção aparece). Também executável à mão: `npm run cards:import -- --spoilers`.

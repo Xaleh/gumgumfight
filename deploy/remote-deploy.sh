@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ativa um release na VM. Chamado pelo GitHub Actions a cada deploy:
 #   bash <release>/deploy/remote-deploy.sh <diretório do release>
-# Variável opcional: IMPORT_SETS="ST-01 ST-02" importa cartas da optcgapi depois do deploy.
+# Variável opcional: IMPORT_SETS="ST-01 ST-02" (ou "--all") importa cartas depois do deploy, pela cadeia CARD_SOURCES do deploy.env.
 # Variável opcional: GOOGLE_CLIENT_ID (login com Google) é gravado em shared/deploy.env.
 # Variável opcional: ADMIN_EMAILS (contas Google que são sempre admin) é gravado em shared/deploy.env.
 set -euo pipefail
