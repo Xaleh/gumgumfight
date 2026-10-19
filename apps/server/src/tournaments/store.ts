@@ -868,6 +868,91 @@ export function resolveCalls(db: DB, tournamentId: string, matchId: number, by: 
   ).run(by, at, note, tournamentId, matchId);
 }
 
+// ------------------------------------------------------------------ modo manual do Judge (auditoria)
+
+export type InterventionKind = 'manual_on' | 'manual_off' | 'undo' | 'judge_action';
+/** Papel de quem interveio naquele momento (o Judge da lista perde o modo manual quando o torneio termina). */
+export type InterventionRole = 'admin' | 'dev' | 'organizer' | 'judge';
+
+export interface TournamentIntervention {
+  id: number;
+  matchId: number;
+  roomId: string | null;
+  game: number;
+  userId: string;
+  role: InterventionRole;
+  kind: InterventionKind;
+  /** A correção (ação do motor) ou `{ to }` no desfazer. */
+  payload: unknown;
+  /** As ações desfeitas. */
+  removed: unknown[] | null;
+  note: string | null;
+  at: string;
+}
+
+type InterventionRow = {
+  id: number;
+  match_id: number;
+  room_id: string | null;
+  game: number;
+  user_id: string;
+  role: InterventionRole;
+  kind: InterventionKind;
+  payload: string | null;
+  removed: string | null;
+  note: string | null;
+  at: string;
+};
+
+const INTERVENTION_COLS = 'id, match_id, room_id, game, user_id, role, kind, payload, removed, note, at';
+
+const toIntervention = (r: InterventionRow): TournamentIntervention => ({
+  id: r.id,
+  matchId: r.match_id,
+  roomId: r.room_id,
+  game: r.game,
+  userId: r.user_id,
+  role: r.role,
+  kind: r.kind,
+  payload: r.payload ? JSON.parse(r.payload) : null,
+  removed: r.removed ? (JSON.parse(r.removed) as unknown[]) : null,
+  note: r.note,
+  at: r.at,
+});
+
+/** Intervenções do torneio, as mais recentes primeiro. */
+export function listInterventions(db: DB, tournamentId: string): TournamentIntervention[] {
+  return (
+    db.prepare(`SELECT ${INTERVENTION_COLS} FROM tournament_interventions WHERE tournament_id = ? ORDER BY at DESC, id DESC`).all(tournamentId) as InterventionRow[]
+  ).map(toIntervention);
+}
+
+export function addIntervention(
+  db: DB,
+  tournamentId: string,
+  i: { matchId: number; roomId: string | null; game: number; userId: string; role: InterventionRole; kind: InterventionKind; payload?: unknown; removed?: unknown[]; note: string | null; at: string },
+): TournamentIntervention {
+  dataVersion.bump();
+  const { lastInsertRowid } = db
+    .prepare(
+      'INSERT INTO tournament_interventions (tournament_id, match_id, room_id, game, user_id, role, kind, payload, removed, note, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(
+      tournamentId,
+      i.matchId,
+      i.roomId,
+      i.game,
+      i.userId,
+      i.role,
+      i.kind,
+      i.payload === undefined ? null : JSON.stringify(i.payload),
+      i.removed ? JSON.stringify(i.removed) : null,
+      i.note,
+      i.at,
+    );
+  return toIntervention(db.prepare(`SELECT ${INTERVENTION_COLS} FROM tournament_interventions WHERE id = ?`).get(Number(lastInsertRowid)) as InterventionRow);
+}
+
 // ------------------------------------------------------------------ warnings
 
 export interface TournamentWarning {

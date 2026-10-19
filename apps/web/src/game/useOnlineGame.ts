@@ -153,6 +153,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
         setClockAt(performance.now());
         if (s.view) {
           if (s.lastAction && s.view.actionCount > seq.current) setActions((a) => [...a, s.lastAction!]);
+          // O Judge desfez jogadas (modo manual de torneio): as ações vistas até aqui não valem mais.
+          else if (s.view.actionCount < seq.current) setActions([]);
           seq.current = s.view.actionCount;
           finished.current = s.view.phase === 'gameover';
           setState({ ...(s.view as GameState), defs: defs.current, log: log.current });

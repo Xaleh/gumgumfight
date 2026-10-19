@@ -417,6 +417,23 @@ function migrateTournaments(db: DB) {
       revoked_by    TEXT
     );
     CREATE INDEX IF NOT EXISTS tournament_warnings_player ON tournament_warnings(tournament_id, user_id);
+
+    -- Intervenções do modo manual do Judge numa partida: entrar/sair, desfazer jogadas e corrigir a mesa.
+    CREATE TABLE IF NOT EXISTS tournament_interventions (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      match_id      INTEGER NOT NULL,
+      room_id       TEXT,
+      game          INTEGER NOT NULL DEFAULT 1,
+      user_id       TEXT NOT NULL,              -- quem fez
+      role          TEXT NOT NULL,              -- papel naquele momento: admin | dev | organizer | judge
+      kind          TEXT NOT NULL,              -- manual_on | manual_off | undo | judge_action
+      payload       TEXT,                       -- JSON: a correção (ação do motor) ou { to } no desfazer
+      removed       TEXT,                       -- JSON: as ações desfeitas
+      note          TEXT,
+      at            TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS tournament_interventions_match ON tournament_interventions(tournament_id, match_id);
   `);
   db.exec(`
     -- Todos os jogos disputados nas salas de cada partida (série), para a auditoria do organizador.

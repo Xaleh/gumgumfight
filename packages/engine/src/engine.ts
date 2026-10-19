@@ -1171,6 +1171,21 @@ export function applyAction(prev: GameState, action: Action): GameState {
     return state;
   }
 
+  if (action.type === 'judge') {
+    // O Judge corrige a mesa (efeito que o motor não fez como devia): vale com qualquer pendência e
+    // fora da vez, sempre pelas regras da ferramenta manual do lado de `player`.
+    if (prev.phase !== 'main') throw new IllegalActionError('O Judge só corrige a mesa depois do mulligan.');
+    log(state, null, lg('judgeIntervention', `⚖ Correção do Judge (${action.by}):`, { name: action.by }));
+    applyManualOp(state, p, action.op);
+    // A ação em andamento não pode mais ser cancelada: voltar ao checkpoint apagaria a correção.
+    delete state.cancel;
+    delete state.checkpoint;
+    checkDefeat(state);
+    run(state);
+    state.actionCount++;
+    return state;
+  }
+
   if (action.type === 'manual') {
     if (!manualAllowed(prev, p)) throw new IllegalActionError('Ferramentas manuais indisponíveis agora.');
     applyManualOp(state, p, action.op);

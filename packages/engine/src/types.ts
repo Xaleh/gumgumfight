@@ -1490,6 +1490,11 @@ export type Action =
   /** O jogador ficou sem tempo (só o servidor das partidas online envia). */
   | { type: 'timeout'; player: PlayerId; abandoned?: boolean }
   | { type: 'manual'; player: PlayerId; op: ManualOp }
+  /**
+   * Correção do Judge no modo manual de torneio (só o servidor envia, pela rota do Judge): `op` feita
+   * pelo lado de `player`, fora da vez e de qualquer pendência. `by`: o nome de quem corrigiu (vai para o log).
+   */
+  | { type: 'judge'; player: PlayerId; op: ManualOp; by: string }
   | { type: 'manualDone'; player: PlayerId }
   | { type: 'option'; player: PlayerId; index: number };
 

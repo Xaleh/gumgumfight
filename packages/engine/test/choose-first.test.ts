@@ -83,6 +83,19 @@ describe('vencedor do sorteio escolhe quem começa', () => {
     expect(chooseBotAction(s, s.rollWinner!)).toEqual({ type: 'answer', player: s.rollWinner, yes: true });
   });
 
+  it('as mãos ficam viradas até a escolha de quem começa', () => {
+    let s = game(3);
+    let i = 0;
+    const aliases = createAliases(s, () => `a${i++}`);
+    const w = s.rollWinner!;
+    const hidden = (st: GameState, p: PlayerId) => viewFor(st, p, aliases).players[p].hand.every((u) => u.startsWith('~'));
+    expect(hidden(s, w)).toBe(true);
+    expect(hidden(s, (1 - w) as PlayerId)).toBe(true);
+    s = applyAction(s, { type: 'answer', player: w, yes: false });
+    expect(hidden(s, w)).toBe(false);
+    expect(hidden(s, (1 - w) as PlayerId)).toBe(false);
+  });
+
   it('a escolha aparece na visão do oponente (online)', () => {
     const s = game(3);
     let i = 0;

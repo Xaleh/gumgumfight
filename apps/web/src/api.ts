@@ -1,5 +1,5 @@
 import { type MessageKey, type Params, t, tryT } from './i18n';
-import { type Action, type CardData, type DeckList, type FormatId, formatLabel, type PlayerId } from '@gumgum/engine';
+import { type Action, type CardData, type DeckList, type FormatId, formatLabel, type ManualOp, type PlayerId } from '@gumgum/engine';
 
 export type { FormatId };
 
@@ -418,6 +418,22 @@ export const api = {
     /** O Judge (ou o organizador) retoma a partida; `note` é o relato ao organizador. */
     resume: (id: string, matchId: number, note?: string) =>
       send<void>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/resume`, { note }),
+    /** Modo manual do Judge: entra (pausa a partida) ou sai (a partida continua pausada até retomar). */
+    manual: (id: string, matchId: number, on: boolean, note?: string) =>
+      send<{ manual: { by: string; name: string; at: number } | null; actionCount: number }>(
+        'POST',
+        `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/manual`,
+        { on, note },
+      ),
+    /** Últimas jogadas (da mais recente para a mais antiga), para escolher até onde desfazer. */
+    manualHistory: (id: string, matchId: number) =>
+      get<{ actionCount: number; history: ManualHistoryItem[] }>(`/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/manual`),
+    /** Desfaz as jogadas: ficam só as primeiras `to` (`seq`: a versão da mesa que o Judge vê). */
+    undo: (id: string, matchId: number, seq: number, to: number, note: string) =>
+      send<{ actionCount: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/undo`, { seq, to, note }),
+    /** Correção do Judge pelo lado de `player`: ferramenta manual (`op`) ou resposta no lugar dele (`action`). */
+    judgeAction: (id: string, matchId: number, body: { seq: number; player: PlayerId; note: string; op?: ManualOp; action?: { type: 'manualDone' | 'pass' | 'endTurn' } }) =>
+      send<{ actionCount: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/judge-action`, body),
     warn: (id: string, userId: string, reason: string, matchId?: number) =>
       send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/warnings`, { reason, matchId }),
     revokeWarning: (id: string, warningId: number) =>
@@ -678,6 +694,8 @@ export interface OnlineRoomInfo {
   clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null; paused?: boolean };
   /** Partida de torneio pausada por um chamado de Judge (`by`: assento que chamou; null = o Judge/organizador). */
   pause?: { by: PlayerId | null; at: number } | null;
+  /** Modo manual do Judge: quem está corrigindo a mesa (a partida fica pausada). */
+  manual?: { name: string; at: number } | null;
   /** `error`: texto em português; mostrar com `errorMessage(result, …)`, que traduz `errorCode`. */
   result: {
     matchId: number | null;
@@ -941,6 +959,29 @@ export interface TournamentIncidents {
     revokedAt: string | null;
     match: { round: number; table: number; names: Array<string | null> } | null;
   }>;
+  /** Modo manual do Judge: entrar/sair, desfazer jogadas e correções (as mais recentes primeiro). */
+  interventions?: Array<{
+    id: number;
+    matchId: number;
+    game: number;
+    role: 'admin' | 'dev' | 'organizer' | 'judge';
+    kind: 'manual_on' | 'manual_off' | 'undo' | 'judge_action';
+    payload: unknown;
+    removedCount: number;
+    note: string | null;
+    at: string;
+    byName: string;
+    match: { round: number; table: number; names: Array<string | null> } | null;
+  }>;
+}
+
+/** Uma jogada na lista do desfazer: `count` = quantas ações ficam voltando para antes dela; `logFrom`/`logTo` = as linhas do log dela. */
+export interface ManualHistoryItem {
+  count: number;
+  type: string;
+  player: PlayerId;
+  logFrom: number;
+  logTo: number;
 }
 
 export interface TournamentPlayerRef {

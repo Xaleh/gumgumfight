@@ -141,6 +141,10 @@ export function describeReplayAction(state: GameState, a: Action, locale: Locale
       const m = manualLabel(a.op, name, tr);
       return cue(tr('replay.manual', { title: m.title }), m.target ? cards([m.target]) : [], tr('replay.manualTool'));
     }
+    case 'judge': {
+      const m = manualLabel(a.op, name, tr);
+      return cue(tr('replay.manual', { title: m.title }), m.target ? cards([m.target]) : [], tr('replay.judgeTool', { name: a.by }));
+    }
     case 'manualDone':
       return cue(tr('replay.continue'), [], p?.kind === 'manual' ? tr('replay.manualApplied', { name: name(p.source) }) : undefined);
     case 'option': {

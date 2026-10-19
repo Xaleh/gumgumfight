@@ -718,6 +718,8 @@ function Table({
   }, [online?.hands, closeHand]);
   const fanPlayer = openHand ?? closingHand;
 
+  // As mãos ficam viradas até o vencedor do sorteio escolher quem começa: ver a mão pesaria na escolha.
+  const handsSecret = state.pending?.kind === 'chooseFirst';
   // Mão na ordem do jogador: cartas novas entram no fim.
   const myHand = state.players[bottom].hand;
   const orderedHand = useMemo(() => {
@@ -1371,16 +1373,16 @@ function Table({
         <Board
           state={state}
           bottom={bottom}
-          revealBottom
-          revealTop={showBotHand}
+          revealBottom={!handsSecret}
+          revealTop={showBotHand && !handsSecret}
           corner={corner}
           sideTools={sideTools}
           bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
           miniHands={streamer ? { open: openHand, canOpen: canOpenHands, onToggle: toggleHand } : undefined}
           lifeAside={streamer}
           handOrder={handView}
-          onExpandHand={human !== null ? () => setSheet('hand') : undefined}
-          onSortHand={human !== null && myHand.length > 1 ? sortHand : undefined}
+          onExpandHand={human !== null && !handsSecret ? () => setSheet('hand') : undefined}
+          onSortHand={human !== null && !handsSecret && myHand.length > 1 ? sortHand : undefined}
           turnPulse={animate && myTurnIdle}
           handHint={handHint}
           lifted={lifted}
@@ -1610,7 +1612,7 @@ function Table({
           </SheetFrame>
         )}
 
-        {sheet === 'hand' && human !== null && (
+        {sheet === 'hand' && human !== null && !handsSecret && (
           <SheetFrame title={t('game.yourHand', { n: orderedHand.length })} onClose={() => setSheet(null)}>
             {state.battle && <BattleInfo state={state} human={human} />}
             {targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
