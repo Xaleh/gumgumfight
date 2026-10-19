@@ -31,7 +31,18 @@ const op11Shirahoshi: CardData = {
   types: ['Merfolk', 'Fish-Man Island'],
   text: 'This Leader cannot attack.\n[Activate: Main] [Once Per Turn] You may rest 1 of your DON!! cards and turn 1 card from the top of your Life cards face-up: Play up to 1 {Neptunian} type Character card or [Megalo] with a cost equal to or less than the number of DON!! cards on your field from your hand.',
 };
-const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards, ...op09Shanks, ...op02Cards, ...st32Oden, op11Shirahoshi];
+const op08Pudding: CardData = {
+  id: 'OP08-058',
+  name: 'Charlotte Pudding',
+  category: 'leader',
+  colors: ['purple', 'yellow'],
+  life: 4,
+  power: 5000,
+  attributes: ['Wisdom'],
+  types: ['Big Mom Pirates'],
+  text: '[When Attacking] You may turn 2 cards from the top of your Life cards face-up: Add up to 1 DON!! card from your DON!! deck and rest it.',
+};
+const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards, ...op09Shanks, ...op02Cards, ...st32Oden, op11Shirahoshi, op08Pudding];
 
 const deck = (leader: string): DeckList => ({ id: leader, name: leader, leader, cards: [{ id: 'ST01-006', count: 50 }] });
 
@@ -598,5 +609,38 @@ describe('Trello: "turn 1 card from the top of your Life cards face-up" no custo
     s = applyAction(s, activate(s)!);
     expect(s.players[0].lifeFaceUp).toEqual([life[life.length - 2], top]);
     expect(s.players[0].donRested).toBe(rested + 1);
+  });
+});
+
+describe('Trello: "turn 2 cards from the top of your Life cards face-up" (Pudding OP08-058)', () => {
+  /** Turno 3 da Pudding (jogador 0) atacando o Líder, com as cartas de Vida em `faceUp` (0 = topo) já viradas para cima. */
+  const attack = (faceUp: number[]) => {
+    let s = toTurn(game(['OP08-058', 'ST12-001']), 3);
+    const life = s.players[0].life;
+    s.players[0].lifeFaceUp = faceUp.map((i) => life[life.length - 1 - i]);
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    return s;
+  };
+  const asked = (s: GameState) => s.pending?.kind === 'confirm' && s.pending.player === 0;
+
+  // Regra confirmada pelo dono do projeto: só paga com as 2 cartas do topo viradas para baixo.
+  it('com as 2 do topo viradas para baixo, pergunta e vira as 2', () => {
+    let s = attack([2]);
+    const life = s.players[0].life;
+    expect(asked(s)).toBe(true);
+    s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    expect(s.players[0].lifeFaceUp).toEqual([life[life.length - 3], life[life.length - 1], life[life.length - 2]]);
+  });
+
+  it('com a 2ª carta do topo já virada para cima, o custo não pode ser pago', () => {
+    const s = attack([1]);
+    expect(asked(s)).toBe(false);
+    expect(s.players[0].lifeFaceUp).toHaveLength(1);
+  });
+
+  it('com a carta do topo já virada para cima, o custo não pode ser pago', () => {
+    const s = attack([0]);
+    expect(asked(s)).toBe(false);
+    expect(s.players[0].lifeFaceUp).toHaveLength(1);
   });
 });
