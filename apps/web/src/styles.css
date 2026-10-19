@@ -484,6 +484,10 @@ input[type='number'] {
   margin-bottom: 6px;
   font-weight: 800;
 }
+/* explicação curta logo abaixo do rótulo, numa seção do menu da partida */
+.sheet-hint {
+  margin: -2px 0 8px;
+}
 .seed {
   display: flex;
   gap: 6px;

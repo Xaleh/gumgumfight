@@ -1589,6 +1589,7 @@ function Table({
             {!isOnline && !replay && !tutorial && (
               <div className="sheet-section">
                 <label className="sheet-label">{t('game.botSpeed')}</label>
+                <p className="muted small sheet-hint">{t('game.botSpeedHint')}</p>
                 <div className="seg small">
                   {[0.5, 1, 2, 4].map((v) => (
                     <button key={v} className={game.speed === v ? 'on' : ''} onClick={() => game.setSpeed(v)}>
@@ -1804,24 +1805,11 @@ function Table({
                   {t('game.undo')}
                 </button>
               )}
+              {/* A velocidade do bot fica só no menu da partida. */}
               {!isOnline && !replay && (
-                <>
-                  <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
-                    {game.paused ? t('game.resume') : t('game.pause')}
-                  </button>
-                  <select
-                    className="speed"
-                    value={game.speed}
-                    onChange={(e) => game.setSpeed(Number(e.target.value))}
-                    title={t('game.botSpeed')}
-                  >
-                    {[0.5, 1, 2, 4].map((v) => (
-                      <option key={v} value={v}>
-                        {t('game.speedX', { v })}
-                      </option>
-                    ))}
-                  </select>
-                </>
+                <button className="btn small" onClick={() => game.setPaused((p) => !p)}>
+                  {game.paused ? t('game.resume') : t('game.pause')}
+                </button>
               )}
               {(over || replay) && (
                 <button className="btn small" onClick={game.downloadReplay} title={t('game.replayTitle')}>
