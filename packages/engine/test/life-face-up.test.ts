@@ -175,3 +175,53 @@ describe('fieldToLife "face-up" (DV-18)', () => {
     expect(s.players[0].lifeFaceUp).toEqual([]);
   });
 });
+
+describe('virar Vida para cima: o log diz qual carta é (pública)', () => {
+  const flips: CardData[] = [
+    event('FU-F01', '[Main] You may turn 1 card from the top of your Life cards face-up: Draw 1 card.'),
+    event('FU-F02', '[Main] You may turn 2 cards from the top of your Life cards face-up: Draw 1 card.'),
+    event('FU-F03', '[Main] You may turn 1 card from the top or bottom of your Life cards face-up: Draw 1 card.'),
+  ];
+  const flipDeck: DeckList = {
+    ...deck,
+    cards: [...deck.cards.map((c) => (c.id === 'ST01-006' ? { ...c, count: c.count - flips.length } : c)), ...flips.map((c) => ({ id: c.id, count: 1 }))],
+  };
+  /** Joga o evento `cardId` e paga o custo de virar a Vida. */
+  const flip = (cardId: string) => {
+    let s = createGame({ seed: 5, firstPlayer: 0, cards: [...cards, ...flips], players: [{ name: 'A', deck: flipDeck }, { name: 'B', deck: flipDeck }] });
+    s = applyAction(s, { type: 'mulligan', player: 0, redraw: false });
+    s = applyAction(s, { type: 'mulligan', player: 1, redraw: false });
+    s = toTurn(s, 3);
+    s = play(s, give(s, 0, cardId));
+    if (s.pending?.kind === 'confirm') s = applyAction(s, { type: 'answer', player: 0, yes: true });
+    // Topo ou fundo (as duas pontas podem ser viradas): o topo.
+    if (s.pending?.kind === 'option') s = applyAction(s, { type: 'option', player: 0, index: 0 });
+    return s;
+  };
+  const name = (s: GameState, uid: string) => s.defs[s.cards[uid].cardId].name;
+
+  it('1 carta do topo: a linha nomeia a carta', () => {
+    const s = flip('FU-F01');
+    const up = s.players[0].lifeFaceUp ?? [];
+    expect(up).toHaveLength(1);
+    const line = s.log.find((e) => e.key === 'log.flipsLifeUpCards');
+    expect(line?.params).toMatchObject({ player: 'A', n: 1, cards: name(s, up[0]) });
+    expect(line?.text).toContain(name(s, up[0]));
+  });
+
+  it('2 cartas: a linha nomeia as duas', () => {
+    const s = flip('FU-F02');
+    const up = s.players[0].lifeFaceUp ?? [];
+    expect(up).toHaveLength(2);
+    const line = s.log.find((e) => e.key === 'log.flipsLifeUpCards');
+    expect(line?.params).toMatchObject({ n: 2, cards: up.map((u) => name(s, u)).join(', ') });
+  });
+
+  it('topo ou fundo: a linha nomeia a carta virada', () => {
+    const s = flip('FU-F03');
+    const up = s.players[0].lifeFaceUp ?? [];
+    expect(up).toHaveLength(1);
+    const line = s.log.find((e) => e.key === 'log.flipsLifeTopUpCard' || e.key === 'log.flipsLifeBottomUpCard');
+    expect(line?.params).toMatchObject({ player: 'A', card: name(s, up[0]) });
+  });
+});

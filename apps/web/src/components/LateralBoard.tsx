@@ -152,7 +152,7 @@ function LateralHalf({ state, player, side, ...h }: BoardHandlers & { state: Gam
             const faceUp = ps.lifeFaceUp?.includes(uid);
             return (
               <div key={uid} className={['lat-life-card', faceUp ? 'face-up' : ''].join(' ')} style={vars({ '--i': i })}>
-                {faceUp ? <CardView state={state} uid={uid} onHover={h.onHover} /> : <CardBack />}
+                {faceUp ? <CardView state={state} uid={uid} onClick={() => h.onCard(uid)} onHover={h.onHover} /> : <CardBack />}
               </div>
             );
           })}
