@@ -467,7 +467,6 @@ export default {
   'deck.noDeckYet': 'Noch keine Decks.',
   // ---- Liste importieren / exportieren ----
   'deck.listFormatHint': 'Format: eine Karte pro Zeile, z. B. {example}. Der Leader darf in der Liste stehen ({leaderExample}).',
-  'deck.noneRecognized': 'Keine Karte erkannt.',
   'deck.imported': 'Liste importiert: {n|# Karte|# Karten}.',
   'deck.importedSkipped': 'Liste importiert: {n|# Karte|# Karten}, {skipped|# Zeile ignoriert|# Zeilen ignoriert}.',
   'deck.copy': 'Kopieren',
@@ -476,6 +475,15 @@ export default {
   'deck.linkImportedFormat': 'Liste aus einem Link importiert ({format}) – prüfen und speichern.',
   'deck.linkInvalid': 'Der Link enthielt keine gültige Liste.',
   'deck.import': 'Importieren',
+  'deck.importHint': 'Füge unten die aus einer anderen Seite oder App exportierte Liste ein (Strg+V). Die Vorschau zeigt vor dem Import, was gelesen wird; die Liste ersetzt die Karten des geöffneten Decks.',
+  'deck.exportHint': 'Kopiere die Liste, um sie aufzubewahren oder in einer anderen Seite oder App zu nutzen.',
+  'deck.importPreview': 'Vorschau',
+  'deck.previewEmpty': 'Füge eine Liste ein, um den Leader und die erkannten Karten zu sehen.',
+  'deck.previewNoLeader': 'Keiner in der Liste: wähle ihn später im Katalog.',
+  'deck.previewCards': 'Karten',
+  'deck.previewSkipped': '{n|# Zeile wird ignoriert|# Zeilen werden ignoriert}:',
+  'deck.importCount': '{n|# Karte|# Karten} importieren',
+  'deck.paste': 'Einfügen',
   // ==== /deck ====
 
 

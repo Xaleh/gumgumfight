@@ -467,7 +467,6 @@ export default {
   'deck.noDeckYet': 'まだデッキがありません。',
   // ---- リストの読み込み / 書き出し ----
   'deck.listFormatHint': '形式：1行に1枚、例：{example}。リーダーもリストに含められます（{leaderExample}）。',
-  'deck.noneRecognized': '認識できたカードがありません。',
   'deck.imported': 'リストを読み込みました：{n|#枚}。',
   'deck.importedSkipped': 'リストを読み込みました：{n|#枚}、{skipped|#行を無視}。',
   'deck.copy': 'コピー',
@@ -476,6 +475,15 @@ export default {
   'deck.linkImportedFormat': 'リンクからリストを読み込みました（{format}）。確認して保存してください。',
   'deck.linkInvalid': 'リンクに有効なリストが含まれていませんでした。',
   'deck.import': '読み込む',
+  'deck.importHint': '他のサイトやアプリから書き出したリストを下に貼り付けてください（Ctrl+V）。読み込む前にプレビューで内容を確認できます。リストは開いているデッキのカードを置き換えます。',
+  'deck.exportHint': 'リストをコピーして保存したり、他のサイトやアプリで使えます。',
+  'deck.importPreview': 'プレビュー',
+  'deck.previewEmpty': 'リストを貼り付けると、リーダーと認識されたカードが表示されます。',
+  'deck.previewNoLeader': 'リストにありません：後でカタログから選んでください。',
+  'deck.previewCards': 'カード',
+  'deck.previewSkipped': '無視される行：{n|#行|#行}',
+  'deck.importCount': '{n|#枚|#枚}を読み込む',
+  'deck.paste': '貼り付け',
   // ==== /deck ====
 
 

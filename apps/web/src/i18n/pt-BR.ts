@@ -468,7 +468,6 @@ const ptBR = {
   'deck.noDeckYet': 'Nenhum deck ainda.',
   // ---- importar / exportar lista ----
   'deck.listFormatHint': 'Formato: uma carta por linha, como {example}. O Líder pode vir na lista ({leaderExample}).',
-  'deck.noneRecognized': 'Nenhuma carta reconhecida.',
   'deck.imported': 'Lista importada: {n|# carta|# cartas}.',
   'deck.importedSkipped': 'Lista importada: {n|# carta|# cartas}, {skipped|# linha ignorada|# linhas ignoradas}.',
   'deck.copy': 'Copiar',
@@ -477,6 +476,15 @@ const ptBR = {
   'deck.linkImportedFormat': 'Lista importada de um link ({format}) — confira e salve.',
   'deck.linkInvalid': 'O link não trazia uma lista válida.',
   'deck.import': 'Importar',
+  'deck.importHint': 'Cole abaixo a lista exportada de outro site ou app (Ctrl+V). A prévia mostra o que será lido antes de importar; a lista substitui as cartas do deck aberto.',
+  'deck.exportHint': 'Copie a lista para guardar ou usar em outro site ou app.',
+  'deck.importPreview': 'Prévia',
+  'deck.previewEmpty': 'Cole uma lista para ver o Líder e as cartas reconhecidas.',
+  'deck.previewNoLeader': 'Nenhum na lista: escolha depois no catálogo.',
+  'deck.previewCards': 'Cartas',
+  'deck.previewSkipped': '{n|# linha será ignorada|# linhas serão ignoradas}:',
+  'deck.importCount': 'Importar {n|# carta|# cartas}',
+  'deck.paste': 'Colar',
   // ==== /deck ====
 
 

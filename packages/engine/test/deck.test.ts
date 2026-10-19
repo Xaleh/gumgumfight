@@ -73,6 +73,16 @@ describe('lista em texto', () => {
     expect(r.errorDetails).toEqual([{ message: 'Linha não reconhecida: "lixo"', code: 'rules.listBadLine', params: { line: 'lixo' } }]);
   });
 
+  it('ignora o sufixo de versão do número (_v1, _p1) e o nome depois dele', () => {
+    const r = parseDeckList('1 ST01-001_v1 Monkey.D.Luffy\n4 ST01-002_p1 Usopp\n2xST01-013_r1\nST01-013_v2 x2', byId);
+    expect(r.errors).toEqual([]);
+    expect(r.leader).toBe('ST01-001');
+    expect(r.cards).toEqual([
+      { id: 'ST01-002', count: 4 },
+      { id: 'ST01-013', count: 4 },
+    ]);
+  });
+
   it('aponta cartas que não existem no banco', () => {
     expect(parseDeckList('4xOP99-999', byId).errors).toEqual(['Carta não encontrada no banco: OP99-999']);
   });

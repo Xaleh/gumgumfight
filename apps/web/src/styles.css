@@ -5640,25 +5640,117 @@ button.hint-pill::after,
   background: var(--panel);
   padding-top: 8px;
 }
-.modal {
-  width: min(520px, 100%);
+/* Importar / exportar lista: a caixa de texto grande e, ao importar, a prévia ao lado (embaixo no celular). */
+.modal-card.text-modal {
+  width: min(560px, 100%);
   text-align: left;
+  padding: 20px;
 }
-.modal h3 {
-  margin: 0 0 6px;
+.modal-card.text-modal.importing {
+  width: min(880px, 100%);
 }
-.modal textarea {
+.text-modal h3 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+.text-modal > p {
+  margin: 0 0 12px;
+}
+.text-modal-body {
+  display: grid;
+  gap: 14px;
+}
+.text-modal.importing .text-modal-body {
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+.text-modal-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.text-modal-input p {
+  margin: 0;
+}
+.text-modal textarea {
   width: 100%;
+  min-height: min(52vh, 440px);
+  resize: vertical;
   background: var(--bg2);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px;
-  font-family: ui-monospace, monospace;
-  font-size: 13px;
-  margin: 8px 0;
+  border-radius: 12px;
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.5;
 }
-.builder .overlay,
+.text-modal textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.text-modal-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: min(52vh, 440px);
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel2);
+  overflow-y: auto;
+}
+.text-modal-preview h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.text-modal-preview p {
+  margin: 0;
+}
+.text-modal-preview dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+.text-modal-preview dt {
+  font-weight: 800;
+}
+.text-modal-preview dd {
+  margin: 0;
+  font-weight: 700;
+}
+.text-modal-preview dd.ok {
+  color: var(--ok);
+}
+.text-modal-preview dd.missing {
+  color: var(--gold);
+}
+.text-modal-preview .text-modal-skipped {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.text-modal .issues {
+  word-break: break-word;
+}
+.text-modal .btn-row {
+  margin-top: 16px;
+}
+@media (max-width: 760px) {
+  .text-modal.importing .text-modal-body {
+    grid-template-columns: 1fr;
+  }
+  .text-modal textarea {
+    min-height: 34vh;
+  }
+  .text-modal-preview {
+    max-height: none;
+  }
+}
 .builder .modal-backdrop {
   position: fixed;
 }
