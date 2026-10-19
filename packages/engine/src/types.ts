@@ -738,7 +738,7 @@ type EffectStepBody =
   | { do: 'lifeToTrash'; count: number; choose?: boolean }
   | { do: 'revealFromHand'; count: number; filter?: CardFilter }
   /** `topOrBottom`: "turn 1 card from the top or bottom of your Life cards …" (ST29-008, ST36-005): o jogador escolhe qual. */
-  | { do: 'lifeFace'; count: number; up: boolean; topOrBottom?: true }
+  | { do: 'lifeFace'; count: number; up: boolean; topOrBottom?: true; fromTop?: true }
   /** "… will not become active in your opponent's next Refresh Phase" */
   | { do: 'skipRefresh'; target: TargetRef }
   /** "Trash up to 1 of your opponent's Characters" (vai para o descarte sem ser K.O.) */
@@ -922,7 +922,7 @@ export interface AbilityCost {
   /** "You may reveal N … from your hand:" */
   reveal?: { count: number; filter?: CardFilter };
   /** "You may turn N card from the top of your Life cards face-up / face-down:" */
-  lifeFace?: { count: number; up: boolean; topOrBottom?: true };
+  lifeFace?: { count: number; up: boolean; topOrBottom?: true; fromTop?: true };
   /** "you may rest 1 of your opponent's Characters instead" */
   restOpponentChars?: number;
   /** "give this Character −2000 power during this turn" */
