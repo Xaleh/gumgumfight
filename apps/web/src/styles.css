@@ -11919,6 +11919,58 @@ a.sponsor-card:hover {
 .game.wide .judge-panel {
   bottom: 16px;
 }
+.judge-panel-body {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+}
+.judge-manual {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.judge-manual h4 {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+}
+.judge-manual-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.judge-manual-head .btn {
+  margin-left: auto;
+}
+.judge-manual-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.judge-manual textarea.invalid {
+  border-color: var(--danger);
+}
+.judge-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.judge-history li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--panel2);
+}
+.judge-history li .btn {
+  align-self: flex-start;
+}
 
 /* ------------------------------------------------------------------ torneio: warnings, judges, ocorrências */
 

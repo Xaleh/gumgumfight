@@ -201,6 +201,7 @@ function aliasAction(action: Action, ref: (uid: string) => string): Action {
     case 'choose':
       return { ...action, uids: action.uids.map(ref) };
     case 'manual':
+    case 'judge':
       return 'uid' in action.op ? { ...action, op: { ...action.op, uid: ref(action.op.uid) } as ManualOp } : action;
     default:
       return action;
@@ -381,7 +382,8 @@ export function actionFromView(state: GameState, aliases: Aliases, action: Actio
       const uids = action.uids.map(real);
       return uids.every((u): u is string => u !== null) ? { ...action, uids } : bad;
     }
-    case 'manual': {
+    case 'manual':
+    case 'judge': {
       const op = action.op as ManualOp;
       if (op && 'uid' in op) {
         const uid = real(op.uid);

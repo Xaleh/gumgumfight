@@ -178,3 +178,55 @@ describe('ferramentas manuais', () => {
     expect(() => applyAction(s, { type: 'manual', player: 0, op: { op: 'move', uid, to: 'character' } })).toThrow(/cheia/);
   });
 });
+
+describe('correção do Judge (modo manual de torneio)', () => {
+  it('vale fora da vez e com pendência do oponente, e o log diz quem corrigiu', () => {
+    // Turno 4 é do jogador 1: o jogador 0 não pode usar as ferramentas, o Judge pode corrigir o lado dele.
+    let s = toTurn(game(), 4);
+    expect(manualAllowed(s, 0)).toBe(false);
+    const hand = s.players[0].hand.length;
+    const n = s.actionCount;
+    s = applyAction(s, { type: 'judge', player: 0, op: { op: 'draw', count: 2 }, by: 'Juíza' });
+    expect(s.players[0].hand.length).toBe(hand + 2);
+    expect(s.actionCount).toBe(n + 1);
+    expect(s.activePlayer).toBe(1);
+    const lines = s.log.slice(-2);
+    expect(lines[0]).toMatchObject({ key: 'log.judgeIntervention', params: { name: 'Juíza' }, player: null });
+    expect(lines[1]).toMatchObject({ key: 'log.manualDraw' });
+  });
+
+  it('corrige com um efeito manual pendente e apaga o cancelamento da jogada em andamento', () => {
+    let s = toTurn(game(), 3);
+    const uid = give(s, 0, 'MAN-001');
+    s = applyAction(s, { type: 'playCard', player: 0, uid });
+    expect(s.cancel).toBeDefined();
+    const target = s.players[1].characters[0]?.uid ?? putOnField(s, 1, 'ST02-009');
+    s = applyAction(s, { type: 'judge', player: 1, op: { op: 'ko', uid: target }, by: 'J' });
+    expect(s.players[1].trash).toContain(target);
+    expect(s.pending).toMatchObject({ kind: 'manual', player: 0 });
+    expect(s.cancel).toBeUndefined();
+    expect(s.checkpoint).toBeUndefined();
+    expect(legalActions(s, 0)).toEqual([{ type: 'manualDone', player: 0 }]);
+  });
+
+  it('segue as regras da ferramenta manual (mão do oponente fica fora)', () => {
+    const s = toTurn(game(), 3);
+    const theirs = s.players[1].hand[0];
+    expect(() => applyAction(s, { type: 'judge', player: 0, op: { op: 'move', uid: theirs, to: 'trash' }, by: 'J' })).toThrow(/oponente/);
+    const fixed = applyAction(s, { type: 'judge', player: 1, op: { op: 'move', uid: theirs, to: 'trash' }, by: 'J' });
+    expect(fixed.players[1].trash).toContain(theirs);
+  });
+
+  it('não vale no mulligan', () => {
+    const s = createGame({
+      seed: 3,
+      firstPlayer: 0,
+      cards,
+      players: [
+        { name: 'A', deck: deck('ST01-001', 'ST01-006') },
+        { name: 'B', deck: deck('ST02-001', 'ST02-009') },
+      ],
+    });
+    expect(() => applyAction(s, { type: 'judge', player: 0, op: { op: 'draw', count: 1 }, by: 'J' })).toThrow(/mulligan/);
+  });
+});

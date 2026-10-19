@@ -44,6 +44,7 @@ import {
   hiddenDecision,
   IllegalActionError,
   type LogEntry,
+  type ManualOp,
   type PlayerId,
   REPLAY_VERSION,
   upgradeReplayActions,
@@ -189,6 +190,11 @@ export interface RoomData {
   pause?: { by: PlayerId | null; at: number } | null;
   /** Pausas já feitas (`[de, até]`; `até` = null na pausa em curso), para a mesa atrasada descontar o tempo parado. */
   pauses?: Array<[number, number | null]>;
+  /**
+   * Modo manual do Judge (partida de torneio pausada): quem entrou (`by` = conta, `name` = nome no log)
+   * pode desfazer jogadas (`judgeUndo`) e corrigir a mesa (`judgeAct`). Sai com `leaveManual` ou ao retomar.
+   */
+  manual?: { by: string; name: string; at: number } | null;
 }
 
 export interface Connection {
@@ -462,6 +468,7 @@ export class Room {
     this.running = this.state && this.state.phase !== 'gameover' ? actingPlayer(this.state) : null;
     this.paused = Boolean(this.data.pause) && this.running !== null;
     if (!this.paused && this.data.pause) this.data.pause = null;
+    if (!this.paused && this.data.manual) this.data.manual = null;
     this.since = this.deps.now();
     this.awaySince = null;
     this.updatePresence();
@@ -613,12 +620,13 @@ export class Room {
     return { ok: true, actionCount: this.state.actionCount };
   }
 
-  /** O Judge (ou o organizador) libera a partida: o relógio volta de onde parou e o abandono recomeça do zero. */
+  /** O Judge (ou o organizador) libera a partida: o relógio volta de onde parou e o abandono recomeça do zero. Sai do modo manual. */
   resume(): ActResult {
     if (!this.paused) return { ok: false, code: 409, ...fail('roomNotPaused', 'A partida não está pausada.') };
     const now = this.deps.now();
     this.paused = false;
     this.data.pause = null;
+    this.data.manual = null;
     const last = this.data.pauses?.[this.data.pauses.length - 1];
     if (last && last[1] === null) last[1] = now;
     this.since = now;
@@ -628,6 +636,148 @@ export class Room {
     this.save();
     this.broadcast();
     return { ok: true, actionCount: this.state?.actionCount ?? 0 };
+  }
+
+  // ------------------------------------------------------------------ modo manual do Judge
+
+  get manualMode() {
+    return this.data.manual ?? null;
+  }
+
+  /**
+   * O Judge entra no modo manual (só em partida de torneio): a partida pausa, se ainda não estava
+   * (`pausedNow`), e só ele mexe na mesa até sair (`leaveManual`) ou retomar (`resume`).
+   */
+  enterManual(by: { id: string; name: string }): ActResult & { pausedNow?: boolean } {
+    if (this.data.queue !== 'tournament') return { ok: false, code: 409, ...fail('manualTournamentOnly', 'O modo manual só existe nas partidas de torneio.') };
+    if (!this.state || this.state.phase === 'gameover') return { ok: false, code: 409, ...fail('matchNotStarted', 'A partida ainda não começou.') };
+    if (this.data.manual) return { ok: false, code: 409, ...fail('roomAlreadyManual', 'A partida já está no modo manual.') };
+    let pausedNow = false;
+    if (!this.paused) {
+      const r = this.pause(null);
+      if (!r.ok) return r;
+      pausedNow = true;
+    }
+    this.data.manual = { by: by.id, name: by.name, at: this.deps.now() };
+    this.save();
+    this.broadcast();
+    return { ok: true, actionCount: this.state.actionCount, pausedNow };
+  }
+
+  /** Sai do modo manual; a partida continua pausada até o Judge retomar. */
+  leaveManual(): ActResult {
+    if (!this.data.manual) return { ok: false, code: 409, ...fail('roomNotManual', 'A partida não está no modo manual.') };
+    this.data.manual = null;
+    this.save();
+    this.broadcast();
+    return { ok: true, actionCount: this.state?.actionCount ?? 0 };
+  }
+
+  /** Recusa do modo manual: a sala precisa estar nele, com a mesa na versão que o Judge viu (`seq`). */
+  private manualRefusal(seq: unknown): ActResult | null {
+    if (!this.state || !this.aliases || this.state.phase === 'gameover') return { ok: false, code: 409, ...fail('matchNotStarted', 'A partida ainda não começou.') };
+    if (!this.data.manual || !this.paused) return { ok: false, code: 409, ...fail('roomNotManual', 'A partida não está no modo manual.') };
+    if (seq !== this.state.actionCount) return { ok: false, code: 409, ...fail('boardChanged', 'A mesa mudou; tente de novo.') };
+    return null;
+  }
+
+  /**
+   * Últimas `limit` ações, para o Judge escolher até onde desfazer: `count` é quantas ações ficam se ele
+   * voltar para antes desta, e `logFrom`/`logTo` são as linhas do log que ela gerou (o log da visão tem
+   * as mesmas linhas, na mesma ordem). Refaz a partida desde o começo (só no modo manual, raro).
+   */
+  history(limit = 30): Array<{ count: number; type: Action['type']; player: PlayerId; logFrom: number; logTo: number }> {
+    if (!this.state) return [];
+    const actions = this.data.actions;
+    const first = Math.max(0, actions.length - limit);
+    const out: Array<{ count: number; type: Action['type']; player: PlayerId; logFrom: number; logTo: number }> = [];
+    let state = createGame(this.config());
+    for (let i = 0; i < actions.length; i++) {
+      const logFrom = state.log.length;
+      state = applyAction(state, actions[i]);
+      if (i >= first) out.push({ count: i, type: actions[i].type, player: actions[i].player, logFrom, logTo: state.log.length });
+    }
+    return out.reverse();
+  }
+
+  /**
+   * O Judge desfaz as jogadas: ficam só as primeiras `count` ações e a partida é refeita a partir
+   * delas (o motor é determinístico: refazer a mesma jogada dá o mesmo resultado, inclusive compras
+   * e embaralhamentos). O relógio fica como está. Devolve as ações removidas (para a auditoria).
+   */
+  judgeUndo(seq: unknown, count: unknown): ActResult & { removed?: Action[] } {
+    const refused = this.manualRefusal(seq);
+    if (refused) return refused;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0 || count >= this.data.actions.length) {
+      return { ok: false, code: 400, ...fail('invalidUndo', 'Escolha uma jogada para desfazer.') };
+    }
+    const removed = this.data.actions.slice(count);
+    const actions = this.data.actions;
+    const timeline = this.data.timeline;
+    this.data.actions = actions.slice(0, count);
+    if (timeline) this.data.timeline = timeline.slice(0, count);
+    try {
+      this.rebuild();
+    } catch (e) {
+      // Não deveria acontecer (as mesmas ações já foram aplicadas): volta como estava.
+      this.data.actions = actions;
+      if (timeline) this.data.timeline = timeline;
+      this.rebuild();
+      this.deps.log(`Partida online ${this.id}: falha ao desfazer: ${e instanceof Error ? e.message : e}`);
+      return { ok: false, code: 500, ...fail('undoFailed', 'Não foi possível desfazer.') };
+    }
+    // Eventos fora do jogo presos a ações que não existem mais saem logo depois do novo fim.
+    for (const e of this.recentEvents) e.after = Math.min(e.after, count);
+    // As mesas atrasadas que passaram do novo fim são refeitas (quem assiste com atraso recebe a mesa de novo).
+    for (const late of [...this.lates.values()]) {
+      if (late.count <= count) continue;
+      if (late.timer) clearTimeout(late.timer);
+      this.lates.delete(late.delay);
+      if (this.ensureLate(late.delay)) {
+        for (const c of this.conns) if (this.isLate(c) && this.delayOf(c) === late.delay) c.send('state', this.snapshot(c));
+      } else {
+        for (const c of this.conns) if (this.isLate(c) && this.delayOf(c) === late.delay) c.end?.();
+      }
+    }
+    this.save();
+    this.broadcast();
+    this.advanceLate();
+    return { ok: true, actionCount: this.state!.actionCount, removed };
+  }
+
+  /**
+   * Correção do Judge no modo manual, pelo lado de `player`: `op` é uma ferramenta manual (vira a ação
+   * `judge` do motor, com o nome de quem corrigiu no log) e `action` é uma resposta no lugar do jogador
+   * (concluir um efeito manual, passar ou encerrar o turno). As cartas vêm com os apelidos da visão do
+   * Judge (as duas mãos à vista). O relógio continua parado.
+   */
+  judgeAct(seq: unknown, player: unknown, input: { op?: unknown; action?: unknown }): ActResult & { action?: Action } {
+    const refused = this.manualRefusal(seq);
+    if (refused) return refused;
+    if (player !== 0 && player !== 1) return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
+    if (this.data.actions.length >= MAX_ACTIONS) return { ok: false, code: 409, ...fail('matchTooLong', 'Partida longa demais.') };
+    let action: Action;
+    if (input.op !== undefined) {
+      const op = input.op as ManualOp;
+      if (!op || typeof op !== 'object' || typeof op.op !== 'string') return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
+      action = { type: 'judge', player, op, by: this.data.manual!.name };
+    } else {
+      const type = (input.action as { type?: unknown } | null)?.type;
+      if (type !== 'manualDone' && type !== 'pass' && type !== 'endTurn') return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
+      action = { type, player };
+    }
+    const real = actionFromView(this.state!, this.aliases!, action, handsOf(this.state!));
+    if (typeof real === 'string') return { ok: false, code: 422, error: real };
+    try {
+      this.commit(real);
+    } catch (e) {
+      if (e instanceof IllegalActionError) return { ok: false, code: 422, error: e.message };
+      this.deps.log(`Partida online ${this.id}: erro do motor na correção do Judge: ${e instanceof Error ? e.stack : e}`);
+      return { ok: false, code: 422, ...fail('invalidAction', 'Ação inválida.') };
+    }
+    // A correção terminou a partida (K.O. no Líder sem Vida, deck vazio…): não há mais o que pausar.
+    if (this.state!.phase === 'gameover' && this.paused) this.resume();
+    return { ok: true, actionCount: this.state!.actionCount, action: real };
   }
 
   /** Se a vez é do bot do servidor, agenda a jogada dele. */
@@ -939,6 +1089,8 @@ export class Room {
       clock: late ? this.lateClock(late) : this.clock(),
       /** Pausada pelo chamado de Judge (`by`: assento que chamou; null = o Judge/organizador). */
       pause: !late && this.paused && this.data.pause ? { by: this.data.pause.by, at: this.data.pause.at } : null,
+      /** Modo manual do Judge (só ao vivo): quem está corrigindo a mesa. */
+      manual: !late && this.paused && this.data.manual ? { name: this.data.manual.name, at: this.data.manual.at } : null,
       result: over ? this.data.result : null,
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */

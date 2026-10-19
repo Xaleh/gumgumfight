@@ -1,4 +1,4 @@
-import { type CardData, HIDDEN_CARD } from '@gumgum/engine';
+import { actingPlayer, type CardData, HIDDEN_CARD, legalActions, type PlayerId } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { proxiedImageUrl } from '../src/card-images';
@@ -1211,6 +1211,117 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     expect(await open(org)).toBe(200);
     const admin = login(db, 'admin');
     expect(await open(admin)).toBe(200);
+    await app.close();
+  });
+
+  it('modo manual: Judge da lista, organizador e admin desfazem e corrigem a mesa, sem os jogadores decidirem; tudo vai para a auditoria', async () => {
+    const { db, app } = setup();
+    const { org, t, who, lobby } = await arena(app, db);
+    const judge = login(db);
+    await req(app, 'PUT', '/api/players/me', judge, { name: 'Robin' });
+    await req(app, 'PUT', `/api/tournaments/${t.id}/judges`, org, { player: 'Robin' });
+    const otherOrg = login(db, 'organizer');
+    const admin = login(db, 'admin');
+    const view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
+    const m = view.rounds[0].matches[0];
+    const a = who(m.p1.userId);
+    const seatA = (await play(app, t.id, a, m)).json();
+    await play(app, t.id, who(m.p2.userId), m);
+    const room = lobby.get(seatA.roomId)!;
+    // Sorteio e mulligans: a partida chega ao primeiro turno.
+    while (room.state!.phase !== 'main') {
+      const p = actingPlayer(room.state!)!;
+      expect(room.act(p, room.state!.actionCount, legalActions(room.state!, p)[0]).ok).toBe(true);
+    }
+    const base = `/api/tournaments/${t.id}/matches/${m.id}`;
+    type Who = ReturnType<typeof login>;
+    const manual = (w: Who, body: object) => req(app, 'POST', `${base}/manual`, w, body);
+    const fix = (w: Who, body: object) => req(app, 'POST', `${base}/judge-action`, w, body);
+    const undo = (w: Who, body: object) => req(app, 'POST', `${base}/undo`, w, body);
+    const seq = () => room.state!.actionCount;
+    // Jogador e organizador de outro torneio não entram no modo manual.
+    expect((await manual(a, { on: true })).statusCode).toBe(403);
+    expect((await manual(otherOrg, { on: true })).statusCode).toBe(403);
+    // Fora do modo manual não há desfazer nem correção.
+    expect((await undo(judge, { seq: seq(), to: 0, note: 'teste' })).json()).toMatchObject({ errorCode: 'roomNotManual' });
+    expect((await req(app, 'GET', `${base}/manual`, judge)).json()).toMatchObject({ errorCode: 'roomNotManual' });
+    // O Judge da lista entra: a partida pausa (com chamado aberto) e todos veem quem está corrigindo.
+    const watcher = spectator(false);
+    room.attach(watcher.conn);
+    expect((await manual(judge, { on: true, note: 'Efeito da carta não resolveu' })).json()).toMatchObject({ manual: { name: 'Robin' } });
+    expect(room.isPaused).toBe(true);
+    expect(watcher.snapshot.room.manual).toMatchObject({ name: 'Robin' });
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, judge)).json().openCalls).toMatchObject([{ matchId: m.id }]);
+    expect((await manual(org, { on: true })).json()).toMatchObject({ errorCode: 'roomAlreadyManual' });
+    // Os jogadores não jogam enquanto isso.
+    const p = actingPlayer(room.state!)!;
+    const other = (1 - p) as PlayerId;
+    expect(room.act(p, seq(), { type: 'endTurn', player: p })).toMatchObject({ ok: false, errorCode: 'roomPaused' });
+    // Correção pelo lado de quem não é da vez: nota obrigatória e a mesa na versão que o Judge viu.
+    const start = seq();
+    const hand = room.state!.players[other].hand.length;
+    expect((await fix(judge, { seq: seq(), player: other, op: { op: 'draw', count: 1 } })).json()).toMatchObject({ errorCode: 'manualNoteRequired' });
+    expect((await fix(judge, { seq: seq() - 1, player: other, op: { op: 'draw', count: 1 }, note: 'compra do efeito' })).json()).toMatchObject({
+      errorCode: 'boardChanged',
+    });
+    expect((await fix(judge, { seq: seq(), player: other, op: { op: 'draw', count: 1 }, note: 'compra do efeito' })).json()).toEqual({ actionCount: start + 1 });
+    expect(room.state!.players[other].hand.length).toBe(hand + 1);
+    expect(room.state!.log.at(-2)).toMatchObject({ key: 'log.judgeIntervention', params: { name: 'Robin' } });
+    expect(room.isPaused).toBe(true);
+    // Cartas pelos apelidos da visão do Judge (que vê as duas mãos).
+    const judgeView = spectator(true);
+    room.attach(judgeView.conn);
+    const alias = judgeView.snapshot.view.players[other].hand[0];
+    const trash = room.state!.players[other].trash.length;
+    expect((await fix(judge, { seq: seq(), player: other, op: { op: 'move', uid: alias, to: 'trash' }, note: 'descarte do efeito' })).statusCode).toBe(200);
+    expect(room.state!.players[other].trash.length).toBe(trash + 1);
+    // O admin responde no lugar do jogador da vez (só concluir, passar ou encerrar o turno).
+    expect((await fix(admin, { seq: seq(), player: p, action: { type: 'attack' }, note: 'ataque' })).json()).toMatchObject({ errorCode: 'invalidAction' });
+    expect((await fix(admin, { seq: seq(), player: p, action: { type: 'endTurn' }, note: 'turno travado' })).statusCode).toBe(200);
+    expect(room.state!.activePlayer).toBe(other);
+    // As últimas jogadas, da mais recente para a mais antiga.
+    const hist = (await req(app, 'GET', `${base}/manual`, judge)).json();
+    expect(hist.actionCount).toBe(seq());
+    expect(hist.history.slice(0, 3)).toMatchObject([
+      { type: 'endTurn', player: p, count: start + 2 },
+      { type: 'judge', player: other, count: start + 1 },
+      { type: 'judge', player: other, count: start },
+    ]);
+    expect(hist.history[2].logTo).toBeGreaterThan(hist.history[2].logFrom);
+    // O organizador desfaz até antes da primeira correção: a mesa volta como estava, e o log encolhe para quem assiste.
+    expect((await undo(org, { seq: seq(), to: start, note: '' })).json()).toMatchObject({ errorCode: 'manualNoteRequired' });
+    expect((await undo(org, { seq: seq(), to: seq(), note: 'nada' })).json()).toMatchObject({ errorCode: 'invalidUndo' });
+    expect((await undo(org, { seq: seq(), to: start, note: 'voltar antes das correções' })).json()).toEqual({ actionCount: start });
+    expect(room.state!.players[other].hand.length).toBe(hand);
+    expect(room.state!.activePlayer).toBe(p);
+    expect(watcher.snapshot.view.actionCount).toBe(start);
+    expect(watcher.snapshot.log).toEqual({ from: room.state!.log.length, entries: [] });
+    expect(room.isPaused).toBe(true);
+    // Sair do modo manual deixa a partida pausada; retomar libera.
+    expect((await manual(judge, { on: false })).json()).toMatchObject({ manual: null });
+    expect(room.isPaused).toBe(true);
+    expect((await req(app, 'POST', `${base}/resume`, judge, { note: 'corrigido' })).statusCode).toBe(204);
+    expect(room.isPaused).toBe(false);
+    // A mesa refeita continua jogável.
+    expect(room.act(p, seq(), { type: 'endTurn', player: p }).ok).toBe(true);
+    // Auditoria: quem, com que papel, o quê.
+    const inc = (await req(app, 'GET', `/api/tournaments/${t.id}/incidents`, org)).json();
+    expect(inc.interventions.map((i: any) => [i.kind, i.role, i.byName])).toEqual([
+      ['manual_off', 'judge', 'Robin'],
+      ['undo', 'organizer', 'Shanks'],
+      ['judge_action', 'admin', expect.any(String)],
+      ['judge_action', 'judge', 'Robin'],
+      ['judge_action', 'judge', 'Robin'],
+      ['manual_on', 'judge', 'Robin'],
+    ]);
+    expect(inc.interventions[1]).toMatchObject({ removedCount: 3, note: 'voltar antes das correções', payload: { to: start }, match: { table: m.table } });
+    expect(inc.interventions[3].payload).toMatchObject({ type: 'judge', op: { op: 'move', to: 'trash' } });
+    // O Judge tirado da lista perde o modo manual; com o torneio encerrado, ninguém mais corrige.
+    await req(app, 'DELETE', `/api/tournaments/${t.id}/judges/${judge.id}`, org);
+    expect((await manual(judge, { on: true })).statusCode).toBe(403);
+    await req(app, 'POST', `/api/tournaments/${t.id}/finish`, org);
+    expect((await manual(org, { on: true })).json()).toMatchObject({ errorCode: 'matchNotCurrentRound' });
+    expect((await manual(admin, { on: true })).statusCode).toBe(409);
     await app.close();
   });
 
