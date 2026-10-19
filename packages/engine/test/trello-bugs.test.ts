@@ -19,7 +19,19 @@ const op01Arlong = dataCards('op01').filter((c) => c.id === 'OP01-063');
 const op09Shanks = dataCards('st23').filter((c) => c.id === 'OP09-001');
 const op02Cards = dataCards('op02');
 const st32Oden = dataCards('st32').filter((c) => c.id === 'ST32-002');
-const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards, ...op09Shanks, ...op02Cards, ...st32Oden];
+// OP11 não está em data/cards: texto da Cardkaizoku (a optcgapi traz "Megalo" entre aspas; o motor lê igual).
+const op11Shirahoshi: CardData = {
+  id: 'OP11-022',
+  name: 'Shirahoshi',
+  category: 'leader',
+  colors: ['green', 'yellow'],
+  life: 5,
+  power: 5000,
+  attributes: ['Wisdom'],
+  types: ['Merfolk', 'Fish-Man Island'],
+  text: 'This Leader cannot attack.\n[Activate: Main] [Once Per Turn] You may rest 1 of your DON!! cards and turn 1 card from the top of your Life cards face-up: Play up to 1 {Neptunian} type Character card or [Megalo] with a cost equal to or less than the number of DON!! cards on your field from your hand.',
+};
+const cards = [...baseCards, ...bugCards, ...st12Cards, ...st36Cards, ...op01Arlong, ...eb02Cards, ...op09Shanks, ...op02Cards, ...st32Oden, op11Shirahoshi];
 
 const deck = (leader: string): DeckList => ({ id: leader, name: leader, leader, cards: [{ id: 'ST01-006', count: 50 }] });
 
@@ -559,5 +571,32 @@ describe('Trello: "turn 1 card from the top of your Life cards face-up" não pul
     expect(s.pending).toMatchObject({ kind: 'confirm', player: 0 });
     s = applyAction(s, { type: 'answer', player: 0, yes: true });
     expect(s.players[0].lifeFaceUp).toEqual([life[life.length - 2], top]);
+  });
+});
+
+describe('Trello: "turn 1 card from the top of your Life cards face-up" no custo composto (Shirahoshi OP11-022)', () => {
+  /** Turno 3 da Shirahoshi (jogador 0), com a carta de Vida em `index` (0 = topo) já virada para cima. */
+  const shirahoshiWithFaceUp = (index: number) => {
+    const s = toTurn(game(['OP11-022', 'ST12-001']), 3);
+    const life = s.players[0].life;
+    s.players[0].lifeFaceUp = [life[life.length - 1 - index]];
+    return s;
+  };
+  const activate = (s: GameState) => legalActions(s, 0).find((a) => a.type === 'activate' && a.uid === s.players[0].leader.uid);
+
+  it('com a carta do topo já virada para cima, o [Activate: Main] não é oferecido', () => {
+    const s = shirahoshiWithFaceUp(0);
+    expect(s.players[0].donActive).toBeGreaterThan(0);
+    expect(activate(s)).toBeUndefined();
+  });
+
+  it('com a do topo virada para baixo (e outra virada para cima), vira 1 DON!! e a carta do topo', () => {
+    let s = shirahoshiWithFaceUp(1);
+    const life = s.players[0].life;
+    const top = life[life.length - 1];
+    const rested = s.players[0].donRested;
+    s = applyAction(s, activate(s)!);
+    expect(s.players[0].lifeFaceUp).toEqual([life[life.length - 2], top]);
+    expect(s.players[0].donRested).toBe(rested + 1);
   });
 });
