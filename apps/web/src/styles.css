@@ -2317,7 +2317,10 @@ input[type='number'] {
   background: url('./assets/card-back.webp') center / 100% 100% no-repeat;
   transform: translate(-50%, -50%) rotate(90deg);
 }
-/* Virada para cima (pública): a frente no lugar do verso. */
+/* Virada para cima (pública): a frente no lugar do verso; o toque amplia a carta. */
+.life-card.face-up {
+  cursor: pointer;
+}
 .life-card.face-up::after {
   background: var(--face, none) center / 100% 100% no-repeat, var(--surface);
 }

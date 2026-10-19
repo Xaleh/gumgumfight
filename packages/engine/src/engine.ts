@@ -3744,23 +3744,33 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         if (step.up) ps.lifeFaceUp.push(uid);
         else removeFrom(ps.lifeFaceUp, uid);
         const top = uid === ps.life[ps.life.length - 1];
+        // Virada para cima, a carta fica pública (3-10-2-1): o log diz qual é.
+        const card = cardDef(state, uid).name;
         log(
           state,
           frame.controller,
-          lg(
-            `flipsLife${top ? 'Top' : 'Bottom'}${step.up ? 'Up' : 'Down'}`,
-            `${ps.name} vira a carta do ${top ? 'topo' : 'fundo'} da Vida para ${step.up ? 'cima' : 'baixo'}.`,
-            { player: ps.name },
-          ),
+          step.up
+            ? lg(
+                `flipsLife${top ? 'Top' : 'Bottom'}UpCard`,
+                `${ps.name} vira a carta do ${top ? 'topo' : 'fundo'} da Vida para cima: ${card}.`,
+                { player: ps.name, card },
+              )
+            : lg(`flipsLife${top ? 'Top' : 'Bottom'}Down`, `${ps.name} vira a carta do ${top ? 'topo' : 'fundo'} da Vida para baixo.`, { player: ps.name }),
         );
         return true;
       }
       const pool = step.up ? faceDownLife(ps) : [...ps.life].reverse().filter((u) => ps.lifeFaceUp!.includes(u));
-      for (const uid of pool.slice(0, step.count)) {
+      const flipped = pool.slice(0, step.count);
+      for (const uid of flipped) {
         if (step.up) ps.lifeFaceUp.push(uid);
         else removeFrom(ps.lifeFaceUp, uid);
       }
-      const n = Math.min(step.count, pool.length);
+      const n = flipped.length;
+      if (step.up && n) {
+        const cards = flipped.map((u) => cardDef(state, u).name).join(', ');
+        log(state, frame.controller, lg('flipsLifeUpCards', `${ps.name} vira ${n} carta(s) de Vida para cima: ${cards}.`, { player: ps.name, n, cards }));
+        return true;
+      }
       log(
         state,
         frame.controller,

@@ -118,6 +118,8 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
               className="life-card face-up"
               title={t('board.lifeFaceUpTitle', { name: def.name })}
               style={vars({ '--i': i, ...(image ? { '--face': `url("${image}")` } : {}) })}
+              data-uid={uid}
+              onClick={() => h.onCard(uid)}
               onMouseEnter={() => h.onHover(uid)}
               onMouseLeave={() => h.onHover(null)}
             />
