@@ -334,11 +334,13 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
         showcase = { x: arena.x, y: arena.y, w: h / 1.396, h };
       }
       const duration = (showcase ? 1300 : ko ? 620 : 540) * tempo;
-      const group = m.from.zone === 'deck' && m.to.zone === 'life' ? 0 : m.from.zone === 'deck' && m.to.zone === 'hand' ? 2 : 1;
+      const toLife = m.from.zone === 'deck' && m.to.zone === 'life';
+      // No fim do mulligan a Vida sai do deck depois da troca da mão (5-2-1-7); no resto do jogo, antes.
+      const group = toLife ? (prev.phase === 'mulligan' ? 2.5 : 0) : m.from.zone === 'deck' && m.to.zone === 'hand' ? 2 : 1;
       out.push({
         item: { id: nextId++, kind: 'card', state: st, uid, from, to, flip, showcase, ko, delay: 0, duration, hide: hideTarget },
         group,
-        step: group === 0 ? 120 : 95,
+        step: toLife ? 120 : 95,
       });
       if (ko) out.push({ item: { id: nextId++, kind: 'burst', at: from, tone: 'ko', delay: 0, duration: 520 }, group, step: 0 });
     }

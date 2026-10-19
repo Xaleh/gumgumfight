@@ -102,11 +102,9 @@ describe('partidas online: salas privadas', () => {
     expect(c0.room.status).toBe('playing');
     expect(c1.room.players.map((p: { connected: boolean }) => p.connected)).toEqual([true, true]);
     expect(c0.events.filter((e) => e.event === 'presence').pop()!.data).toEqual({ connected: [true, true], spectators: 0 });
-    // Minha mão aparece; a do oponente e os decks, não.
-    expect(v0.players[0].hand.every((u) => v0.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
-    expect(v0.players[1].hand.every((u) => v0.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+    // Antes da escolha de quem começa, nem a própria mão aparece; os decks, nunca.
+    expect(v0.players[0].hand.every((u) => v0.cards[u].cardId === HIDDEN_CARD)).toBe(true);
     expect(v0.players[0].deck.every((u) => v0.cards[u].cardId === HIDDEN_CARD)).toBe(true);
-    expect(v1.players[0].hand.every((u) => v1.cards[u].cardId === HIDDEN_CARD)).toBe(true);
     expect(v0.seed).toBe(0);
 
     // O vencedor do sorteio escolhe quem começa (os dois veem a escolha pendente).
@@ -117,6 +115,12 @@ describe('partidas online: salas privadas', () => {
     const first = (1 - winner) as PlayerId;
     const other = winner;
     expect(c0.view!.firstPlayer).toBe(first);
+    // Depois dela, minha mão aparece; a do oponente, não.
+    const w0 = c0.view!;
+    const w1 = c1.view!;
+    expect(w0.players[0].hand.every((u) => w0.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
+    expect(w0.players[1].hand.every((u) => w0.cards[u].cardId === HIDDEN_CARD)).toBe(true);
+    expect(w1.players[0].hand.every((u) => w1.cards[u].cardId === HIDDEN_CARD)).toBe(true);
     const n = c0.view!.actionCount;
     // Ação do jogador errado, versão velha e token inválido.
     expect((await act(app, roomId, tokens[other], n, { type: 'mulligan', player: other, redraw: false })).statusCode).toBe(422);
@@ -967,16 +971,16 @@ describe('partidas online: relógio', () => {
     live.conn.delay = 0;
     for (const c of [...players, one, three, mine, live]) room.attach(c.conn);
     expect([one, three, mine, live].map((c) => c.room.delay)).toEqual([60_000, HANDS_DELAY_MS, 60_000, 60_000]);
-    // A visão do streamer que joga: a mão dele à mostra, a do oponente escondida.
-    const v = mine.view!;
     expect(mine.room.pov).toBe(1);
     expect(mine.room.you).toBeNull();
-    expect(v.players[1].hand.every((u) => v.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
-    expect(v.players[0].hand.every((u) => v.cards[u].cardId === HIDDEN_CARD)).toBe(true);
 
     const first = actingPlayer(room.state!)!;
     room.act(first, 0, { type: 'answer', player: first, yes: true });
     step(61_000);
+    // A visão do streamer que joga: a mão dele à mostra (já decidido quem começa), a do oponente escondida.
+    const v = mine.view!;
+    expect(v.players[1].hand.every((u) => v.cards[u].cardId !== HIDDEN_CARD)).toBe(true);
+    expect(v.players[0].hand.every((u) => v.cards[u].cardId === HIDDEN_CARD)).toBe(true);
     expect(one.view!.actionCount).toBe(1);
     expect(mine.view!.actionCount).toBe(1);
     expect(live.view!.actionCount).toBe(1);

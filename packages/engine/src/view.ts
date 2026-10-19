@@ -83,7 +83,8 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
     if (ps.stage) out.add(ps.stage.uid);
     for (const u of ps.trash) out.add(u);
     for (const u of ps.lifeFaceUp ?? []) if (ps.life.includes(u)) out.add(u);
-    if (ps.id === viewer) for (const u of ps.hand) out.add(u);
+    // A mão fica virada até o vencedor do sorteio escolher quem começa: ela pesaria na escolha.
+    if (ps.id === viewer && state.pending?.kind !== 'chooseFirst') for (const u of ps.hand) out.add(u);
   }
   // Cartas reveladas por efeitos em resolução ("reveal …").
   for (const f of state.stack) if (f.kind === 'effect') for (const u of f.revealed ?? []) out.add(u);
