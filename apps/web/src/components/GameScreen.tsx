@@ -1559,7 +1559,7 @@ function Table({
                   {t('broadcast.sendThis')}
                 </button>
               )}
-              {(!isOnline || over) && !tutorial && (
+              {(over || replay) && !tutorial && (
                 <button className="btn" onClick={game.downloadReplay}>
                   {t('game.downloadReplay')}
                 </button>
@@ -1823,7 +1823,7 @@ function Table({
                   </select>
                 </>
               )}
-              {(!isOnline || over) && (
+              {(over || replay) && (
                 <button className="btn small" onClick={game.downloadReplay} title={t('game.replayTitle')}>
                   {t('game.replayBtn')}
                 </button>
