@@ -165,6 +165,7 @@ export function validateDeck(
  *   1xST01-001      (o Líder também pode vir na lista)
  *   4xST01-002
  *   4 ST01-013
+ *   4 OP14-013_v1 Monkey.D.Luffy   (sufixo de versão/arte ignorado; o nome depois do número também)
  * Linhas vazias e comentários (#, //) são ignorados.
  * `errors` traz os problemas em português; `errorDetails`, na mesma ordem, as chaves de tradução.
  */
@@ -179,7 +180,9 @@ export function parseDeckList(
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.replace(/(#|\/\/).*$/, '').trim();
     if (!line) continue;
-    const m = line.match(/^(\d+)\s*[xX×]?\s*([A-Za-z]+\d*-\d+)\b/) ?? line.match(/^([A-Za-z]+\d*-\d+)\s*[xX×]?\s*(\d+)?$/);
+    const m =
+      line.match(/^(\d+)\s*[xX×]?\s*([A-Za-z]+\d*-\d+)(?:_[A-Za-z]+\d*)?\b/) ??
+      line.match(/^([A-Za-z]+\d*-\d+)(?:_[A-Za-z]+\d*)?\s*[xX×]?\s*(\d+)?$/);
     if (!m) {
       fail(`Linha não reconhecida: "${rawLine.trim()}"`, 'listBadLine', { line: rawLine.trim() });
       continue;

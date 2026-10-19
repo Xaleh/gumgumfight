@@ -142,6 +142,18 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
 
   const byId = useMemo(() => new Map(allCards.map((c) => [c.id, c])), [allCards]);
   const leader = draft.leader ? byId.get(draft.leader) : undefined;
+  /** Prévia do Importar lista, refeita a cada tecla: o Líder, quantas cartas e as linhas que ficariam de fora. */
+  const previewList = useCallback(
+    (text: string): ListPreview => {
+      const parsed = parseDeckList(text, byId);
+      return {
+        leader: parsed.leader ? (byId.get(parsed.leader) ?? null) : null,
+        total: parsed.cards.reduce((s, c) => s + c.count, 0),
+        errors: parsed.errorDetails.map((e) => tryT(e.code, e.params) ?? e.message),
+      };
+    },
+    [byId, tryT],
+  );
   /** A carta com a arte escolhida neste deck (Líder e lista do deck; o catálogo mostra a arte normal). */
   const shown = (card: CardData) => withArt(card, draft.arts.get(card.id));
 
@@ -815,22 +827,18 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
           mode={textModal}
           initial={textModal === 'export' ? formatDeckList(deckList) : ''}
           onClose={() => setTextModal(null)}
+          preview={previewList}
           onImport={(text) => {
             const parsed = parseDeckList(text, byId);
             const total = parsed.cards.reduce((s, c) => s + c.count, 0);
-            const errors = parsed.errorDetails.map((e) => tryT(e.code, e.params) ?? e.message);
-            if (!parsed.leader && !total) return errors.length ? errors : [t('deck.noneRecognized')];
+            const skipped = parsed.errorDetails.length;
+            if (!parsed.leader && !total) return;
             edit((d) => ({
               ...d,
               leader: parsed.leader ?? d.leader,
               cards: new Map(parsed.cards.map((c) => [c.id, c.count])),
             }));
-            setNotice(
-              errors.length
-                ? t('deck.importedSkipped', { n: total, skipped: errors.length })
-                : t('deck.imported', { n: total }),
-            );
-            return errors.length ? errors : null;
+            setNotice(skipped ? t('deck.importedSkipped', { n: total, skipped }) : t('deck.imported', { n: total }));
           }}
         />
       )}
@@ -1041,40 +1049,119 @@ function ArtOption({ name, imageUrl, label, selected, onClick }: { name: string;
   );
 }
 
+interface ListPreview {
+  leader: CardData | null;
+  total: number;
+  errors: string[];
+}
+
+const LIST_PLACEHOLDER = '1xOP01-001\n4xOP01-016\n4 OP01-013 Sanji\n4 OP14-013_v1 Monkey.D.Luffy\n…';
+
+/** Importar (colar uma lista, com prévia ao vivo do que será lido) ou exportar (copiar) a lista em texto. */
 function TextModal({
   mode,
   initial,
   onClose,
+  preview,
   onImport,
 }: {
   mode: 'import' | 'export';
   initial: string;
   onClose: () => void;
-  onImport: (text: string) => string[] | null;
+  preview: (text: string) => ListPreview;
+  onImport: (text: string) => void;
 }) {
   const t = useT();
   const [text, setText] = useState(initial);
-  const [problems, setProblems] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
+  const importing = mode === 'import';
+  const result = useMemo(() => (importing && text.trim() ? preview(text) : null), [importing, text, preview]);
+  const canImport = !!result && (!!result.leader || result.total > 0);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const paste = () => {
+    navigator.clipboard
+      ?.readText()
+      .then((clip) => clip && setText(clip))
+      .catch(() => undefined);
+  };
+  const title = importing ? t('deck.importList') : t('deck.exportList');
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="overlay-box modal" onClick={(e) => e.stopPropagation()}>
-        <h3>{mode === 'export' ? t('deck.exportList') : t('deck.importList')}</h3>
-        <p className="muted small">
-          {fillSlots(t('deck.listFormatHint'), { example: <code>4xOP01-016</code>, leaderExample: <code>1xST01-001</code> })}
-        </p>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={14} readOnly={mode === 'export'} />
-        {problems && (
-          <ul className="issues">
-            {problems.map((p, i) => (
-              <li key={i} className="warning">
-                {p}
-              </li>
-            ))}
-          </ul>
-        )}
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className={['modal-card', 'text-modal', importing ? 'importing' : ''].join(' ')} role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
+        <h3>{title}</h3>
+        <p className="muted small">{importing ? t('deck.importHint') : t('deck.exportHint')}</p>
+        <div className="text-modal-body">
+          <div className="text-modal-input">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              readOnly={!importing}
+              placeholder={importing ? LIST_PLACEHOLDER : undefined}
+              spellCheck={false}
+              autoFocus={importing}
+              onFocus={importing ? undefined : (e) => e.currentTarget.select()}
+              aria-label={title}
+            />
+            <p className="muted small">
+              {fillSlots(t('deck.listFormatHint'), { example: <code>4xOP01-016</code>, leaderExample: <code>1xST01-001</code> })}
+            </p>
+          </div>
+          {importing && (
+            <aside className="text-modal-preview" aria-live="polite">
+              <h4>{t('deck.importPreview')}</h4>
+              {!result ? (
+                <p className="muted small">{t('deck.previewEmpty')}</p>
+              ) : (
+                <>
+                  <dl>
+                    <dt>{t('deck.leader')}</dt>
+                    <dd className={result.leader ? '' : 'missing'}>{result.leader ? `${result.leader.name} · ${result.leader.id}` : t('deck.previewNoLeader')}</dd>
+                    <dt>{t('deck.previewCards')}</dt>
+                    <dd className={result.total === DECK_SIZE ? 'ok' : 'missing'}>
+                      <b>{result.total}</b>/{DECK_SIZE}
+                    </dd>
+                  </dl>
+                  {result.errors.length > 0 && (
+                    <>
+                      <p className="small text-modal-skipped">{t('deck.previewSkipped', { n: result.errors.length })}</p>
+                      <ul className="issues">
+                        {result.errors.map((p, i) => (
+                          <li key={i} className="warning">
+                            {p}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              )}
+            </aside>
+          )}
+        </div>
         <div className="btn-row">
-          {mode === 'export' ? (
+          {importing ? (
+            <>
+              <button
+                className="btn primary"
+                disabled={!canImport}
+                onClick={() => {
+                  onImport(text);
+                  onClose();
+                }}
+              >
+                {canImport ? t('deck.importCount', { n: result.total }) : t('deck.import')}
+              </button>
+              {typeof navigator.clipboard?.readText === 'function' && (
+                <button className="btn" onClick={paste}>
+                  {t('deck.paste')}
+                </button>
+              )}
+            </>
+          ) : (
             <button
               className="btn primary"
               onClick={() => {
@@ -1086,20 +1173,9 @@ function TextModal({
             >
               {copied ? t('deck.copied') : t('deck.copy')}
             </button>
-          ) : (
-            <button
-              className="btn primary"
-              onClick={() => {
-                const errs = onImport(text);
-                if (errs) setProblems(errs);
-                else onClose();
-              }}
-            >
-              {t('deck.import')}
-            </button>
           )}
           <button className="btn" onClick={onClose}>
-            {t('common.close')}
+            {importing ? t('common.cancel') : t('common.close')}
           </button>
         </div>
       </div>

@@ -467,7 +467,6 @@ export default {
   'deck.noDeckYet': 'Aún no hay mazos.',
   // ---- importar / exportar lista ----
   'deck.listFormatHint': 'Formato: una carta por línea, como {example}. El Líder puede estar en la lista ({leaderExample}).',
-  'deck.noneRecognized': 'No se reconoció ninguna carta.',
   'deck.imported': 'Lista importada: {n|# carta|# cartas}.',
   'deck.importedSkipped': 'Lista importada: {n|# carta|# cartas}, {skipped|# línea ignorada|# líneas ignoradas}.',
   'deck.copy': 'Copiar',
@@ -476,6 +475,15 @@ export default {
   'deck.linkImportedFormat': 'Lista importada desde un enlace ({format}): revísala y guarda.',
   'deck.linkInvalid': 'El enlace no traía una lista válida.',
   'deck.import': 'Importar',
+  'deck.importHint': 'Pega abajo la lista exportada de otro sitio o app (Ctrl+V). La vista previa muestra lo que se leerá antes de importar; la lista reemplaza las cartas del deck abierto.',
+  'deck.exportHint': 'Copia la lista para guardarla o usarla en otro sitio o app.',
+  'deck.importPreview': 'Vista previa',
+  'deck.previewEmpty': 'Pega una lista para ver el Líder y las cartas reconocidas.',
+  'deck.previewNoLeader': 'Ninguno en la lista: elígelo después en el catálogo.',
+  'deck.previewCards': 'Cartas',
+  'deck.previewSkipped': '{n|# línea será ignorada|# líneas serán ignoradas}:',
+  'deck.importCount': 'Importar {n|# carta|# cartas}',
+  'deck.paste': 'Pegar',
   // ==== /deck ====
 
 

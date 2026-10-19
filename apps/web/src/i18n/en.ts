@@ -467,7 +467,6 @@ export default {
   'deck.noDeckYet': 'No decks yet.',
   // ---- import / export list ----
   'deck.listFormatHint': 'Format: one card per line, like {example}. The Leader may be in the list ({leaderExample}).',
-  'deck.noneRecognized': 'No card recognized.',
   'deck.imported': 'List imported: {n|# card|# cards}.',
   'deck.importedSkipped': 'List imported: {n|# card|# cards}, {skipped|# line ignored|# lines ignored}.',
   'deck.copy': 'Copy',
@@ -476,6 +475,15 @@ export default {
   'deck.linkImportedFormat': 'List imported from a link ({format}) — check it and save.',
   'deck.linkInvalid': 'The link did not carry a valid list.',
   'deck.import': 'Import',
+  'deck.importHint': 'Paste below the list exported from another site or app (Ctrl+V). The preview shows what will be read before you import; the list replaces the cards of the open deck.',
+  'deck.exportHint': 'Copy the list to keep it or use it in another site or app.',
+  'deck.importPreview': 'Preview',
+  'deck.previewEmpty': 'Paste a list to see the Leader and the recognized cards.',
+  'deck.previewNoLeader': 'None in the list: pick one later from the catalog.',
+  'deck.previewCards': 'Cards',
+  'deck.previewSkipped': '{n|# line will be skipped|# lines will be skipped}:',
+  'deck.importCount': 'Import {n|# card|# cards}',
+  'deck.paste': 'Paste',
   // ==== /deck ====
 
 
