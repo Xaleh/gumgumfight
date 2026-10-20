@@ -4387,6 +4387,18 @@ button.hint-pill::after,
   border-top: 1px solid var(--line);
   margin-top: 8px;
 }
+/* a mesma revelação repetida (ex.: duas buscas seguidas da mesma carta) */
+.reveal-times {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.5;
+}
 
 /* ------------------------------------------------------------------ replay: controles */
 

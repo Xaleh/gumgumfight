@@ -506,9 +506,9 @@ function Table({
     const lines = fresh.flatMap((e): RevealLine[] => {
       if (!e.revealed?.length || e.revealedBy === human) return [];
       const cards = e.revealed.map((id) => state.defs[id]).filter((d): d is CardDef => Boolean(d));
-      return cards.length ? [{ text: logText(tryT, e), cards }] : [];
+      return cards.length ? [{ text: logText(tryT, e), cards, count: 1 }] : [];
     });
-    if (lines.length) setReveals((r) => [...r, ...lines]);
+    if (lines.length) setReveals((r) => mergeReveals(r, lines));
   }, [state.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
   // Quem assiste não precisa clicar: o aviso some sozinho (o streamer pode fechar antes).
   useEffect(() => {
@@ -2988,6 +2988,19 @@ function SheetFrame({ title, onClose, children }: { title: string; onClose: () =
 interface RevealLine {
   text: string;
   cards: CardDef[];
+  /** Quantas vezes a mesma linha se repetiu antes de o aviso ser fechado (ex.: duas buscas seguidas da mesma carta). */
+  count: number;
+}
+
+/** Junta as revelações novas às do aviso aberto: a linha repetida vira uma só, com as cartas lado a lado e "×N". */
+function mergeReveals(open: RevealLine[], lines: RevealLine[]): RevealLine[] {
+  const out = [...open];
+  for (const line of lines) {
+    const i = out.findIndex((l) => l.text === line.text);
+    if (i < 0) out.push(line);
+    else out[i] = { ...out[i], cards: [...out[i].cards, ...line.cards], count: out[i].count + line.count };
+  }
+  return out;
 }
 
 /** Cartas reveladas pelo oponente: a carta inteira (toque para ler) e a linha do histórico. */
@@ -3005,7 +3018,10 @@ function RevealedCards({ lines, onCard, onClose }: { lines: RevealLine[]; onCard
                 <StaticCard key={j} card={def} onClick={() => onCard(def)} />
               ))}
             </div>
-            <p className="small">{line.text}</p>
+            <p className="small">
+              {line.text}
+              {line.count > 1 && <b className="reveal-times">×{line.count}</b>}
+            </p>
           </div>
         ))}
         <p className="muted small">{t('game.tapCardToRead')}</p>
