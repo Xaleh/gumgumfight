@@ -11768,7 +11768,11 @@ a.sponsor-card:hover {
 .game.streamer.lateral .mat {
   --hud-h: 54px;
   --lat-h: calc(100cqh - 2 * var(--hud-h) - 40px);
-  --cw: max(38px, min(calc(var(--lat-h) / 7.9), calc((100cqw - 120px) / 13.6), 150px));
+  /*
+   * Pela altura: a coluna do Líder (Líder na altura do 3º Personagem, a folga do Líder virado com DON!!,
+   * o Stage e o deck) mede 7.71 cartas, mais o respiro das pontas (0.6) e o da mesa (28px).
+   */
+  --cw: max(38px, min(calc((var(--lat-h) - 28px) / 8.31), calc((100cqw - 120px) / 13.6), 150px));
   /* espaçamentos de cada lado: cost area → Líder e Líder → Personagens (crescem até o limite com a tela larga) */
   --g1: calc(var(--cw) * 0.7);
   --g2: calc(var(--cw) * 0.55);
@@ -11901,6 +11905,8 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  /* a carta em pé é mais alta que a caixa: sem `place-content`, a linha da grade começa no topo e a carta desce */
+  place-content: center;
   place-items: center;
 }
 .lat-side > .card,
@@ -12003,6 +12009,7 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  place-content: center;
   place-items: center;
   z-index: var(--i);
   cursor: pointer;
@@ -12058,6 +12065,7 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  place-content: center;
   place-items: center;
   z-index: var(--i);
 }
@@ -12074,19 +12082,32 @@ a.sponsor-card:hover {
   padding: 1px 8px;
 }
 
-/* coluna do Líder: a fileira de Vida reserva o alto; Líder centrado com o Stage abaixo; o deck no fim */
+/*
+ * coluna do Líder: a fileira de Vida no alto (alinhada com o deck de DON!!); o Líder na altura do
+ * Personagem do meio; o Stage abaixo; o deck no fim (alinhado com o descarte)
+ */
 .lat-mid {
   position: relative;
   display: grid;
-  grid-template-rows: calc(var(--cw) * 1.25) 1fr auto 1fr auto;
+  grid-template-rows:
+    /* o topo do 3º Personagem: a fileira de Vida (1.25) e dois Personagens com o espaço entre eles (1.18) */
+    calc(var(--cw) * (1.25 + 2 * 1.18))
+    var(--cw)
+    /* folga para o Líder virado (em pé) e os DON!! anexados não cobrirem o Stage */
+    minmax(calc(var(--cw) * 0.8), 1fr)
+    var(--cw)
+    minmax(calc(var(--cw) * 0.3), 1fr)
+    var(--cw);
   min-height: 0;
 }
 .lat-leader-block {
-  grid-row: 3;
-  display: flex;
-  flex-direction: column;
-  /* folga para o Líder virado (em pé) e os DON!! anexados não cobrirem o Stage */
-  gap: calc(var(--cw) * 0.9);
+  display: contents;
+}
+.lat-leader {
+  grid-row: 2;
+}
+.lat-stage {
+  grid-row: 4;
 }
 /*
  * Como na mesa de verdade vista de cima: a carta ativa fica deitada, com o topo apontando para o
@@ -12169,7 +12190,7 @@ a.sponsor-card:hover {
   rotate: 90deg;
 }
 .lat-deck {
-  grid-row: 5;
+  grid-row: 6;
   width: var(--ch);
   height: var(--cw);
 }
