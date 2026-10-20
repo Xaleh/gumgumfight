@@ -11744,7 +11744,7 @@ a.sponsor-card:hover {
   --cw: max(38px, min(calc(var(--lat-h) / 7.9), calc((100cqw - 120px) / 13.6), 150px));
   /* espaçamentos de cada lado: cost area → Líder e Líder → Personagens (crescem até o limite com a tela larga) */
   --g1: calc(var(--cw) * 0.7);
-  --g2: calc(var(--cw) * 0.35);
+  --g2: calc(var(--cw) * 0.55);
   --ch: calc(var(--cw) * 1.396);
   --hcw: var(--cw);
   width: 100%;
@@ -11930,6 +11930,11 @@ a.sponsor-card:hover {
   bottom: -6px;
   font-size: max(11px, calc(var(--cw) * 0.16));
 }
+/* os contadores do jogador da direita ficam de pé para quem assiste (o lado dele é girado 180°) */
+.lat-half.right .pile-count,
+.lat-half.right .life-count {
+  rotate: 180deg;
+}
 .lat-dons {
   --dw: var(--cw);
   --step: min(calc(var(--cw) * 0.4), calc((var(--lat-h) - var(--cw) * 3.4) / max(var(--n) - 1, 1)));
@@ -12058,7 +12063,8 @@ a.sponsor-card:hover {
   grid-row: 3;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--cw) * 0.35);
+  /* folga para o Líder virado (em pé) e os DON!! anexados não cobrirem o Stage */
+  gap: calc(var(--cw) * 0.9);
 }
 /*
  * Como na mesa de verdade vista de cima: a carta ativa fica deitada, com o topo apontando para o
@@ -12119,7 +12125,7 @@ a.sponsor-card:hover {
 .lateral .attached-don .don-card.flat {
   left: 0;
   bottom: auto;
-  top: calc(var(--cw) * (0.2 + var(--k) * 0.05));
+  top: calc(var(--cw) * (0.32 + var(--k) * 0.07));
   width: var(--cw);
   height: var(--ch);
   /* o primeiro por cima: cada um aparece um pouco mais que o de cima */
