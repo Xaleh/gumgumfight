@@ -748,6 +748,60 @@ describe('torneios: rotas', () => {
     expect(kit.top.flatMap((p: any) => p.cards).every((c: any) => c.image === null)).toBe(true);
   });
 
+  it('painel do meta: só torneios encerrados, Líderes por participação e vitórias, campeões e ranking', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const ps = Array.from({ length: 4 }, () => login(db));
+    const meta = async (q = '') => (await req(app, 'GET', `/api/tournaments/meta${q}`)).json();
+    expect(await meta()).toMatchObject({ totals: { events: 0, players: 0, leaders: 0, matches: 0 }, latest: null, leaders: [], upcoming: [] });
+
+    // Eliminação simples com 4 jogadores: dois com o mesmo deck (espelho não conta vitória de Líder).
+    const decks = [DECKS[0], DECKS[0], DECKS[1], DECKS[2]];
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa do Meta', format: 'egb', structure: 'single' })).json();
+    for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: decks[i] });
+    // Inscrições abertas: aparece nos próximos, sem entrar no meta.
+    let m = await meta();
+    expect(m.upcoming).toMatchObject([{ id: t.id, status: 'registration', players: 4 }]);
+    expect(m.totals.events).toBe(0);
+
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
+    const set = (x: { id: number }, result: string) => req(app, 'PUT', `/api/tournaments/${t.id}/matches/${x.id}/result`, org, { result });
+    for (const x of view.rounds[0].matches) await set(x, 'p1');
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org, { begin: true })).json();
+    // Em andamento: ainda fora do meta.
+    expect((await meta()).totals.events).toBe(0);
+    const final = view.rounds[1].matches[0];
+    await set(final, 'p2');
+    view = (await req(app, 'POST', `/api/tournaments/${t.id}/next`, org, { begin: true })).json();
+    expect(view.status).toBe('finished');
+
+    const leaderOf = new Map(ps.map((p, i) => [p.id, getDeck(db, decks[i])!.leader]));
+    const champ = final.p2.userId;
+    m = await meta();
+    expect(m.upcoming).toEqual([]);
+    expect(m.totals).toEqual({ events: 1, players: 4, leaders: 3, matches: 3 });
+    expect(m.latest).toMatchObject({ id: t.id, name: 'Copa do Meta', players: 4, champion: { leader: leaderOf.get(champ) } });
+    expect(m.latest.finishedAt).toMatch(/Z$/);
+    expect(m.recent).toHaveLength(1);
+    // Participação: o Líder repetido primeiro, com 50% das inscrições.
+    expect(m.leaders[0]).toMatchObject({ leader: getDeck(db, DECKS[0])!.leader, entries: 2, share: 0.5 });
+    expect(m.leaders.reduce((n: number, l: any) => n + l.entries, 0)).toBe(4);
+    expect(m.leaders.reduce((n: number, l: any) => n + l.titles, 0)).toBe(1);
+    expect(m.leaders.find((l: any) => l.leader === leaderOf.get(champ)).titles).toBe(1);
+    // Vitórias de Líder: as 3 séries menos os espelhos.
+    const mirrors = [...view.rounds[0].matches, final].filter((x: any) => leaderOf.get(x.p1.userId) === leaderOf.get(x.p2.userId)).length;
+    expect(m.leaders.reduce((n: number, l: any) => n + l.wins, 0)).toBe(3 - mirrors);
+    expect(m.leaders.reduce((n: number, l: any) => n + l.wins - l.losses, 0)).toBe(0);
+    // Ranking: o campeão em primeiro, com 2 vitórias; nomes e Líderes, sem id de conta.
+    expect(m.players[0]).toEqual({ name: expect.any(String), events: 1, titles: 1, wins: 2, losses: 0, leader: leaderOf.get(champ) });
+    expect(m.players).toHaveLength(4);
+    expect(m.cards[leaderOf.get(champ)!]).toMatchObject({ category: 'leader' });
+
+    // Filtros: outro formato e período.
+    expect((await meta('?format=standard')).totals.events).toBe(0);
+    expect((await meta('?format=egb&days=30')).totals.events).toBe(1);
+  });
+
   it('imagens das cartas pelo mesmo domínio: só as origens conhecidas', async () => {
     expect(proxiedImageUrl('https://optcgapi.com/media/static/Card_Images/OP01-001.jpg')).toBe('/card-img/optcgapi/static/Card_Images/OP01-001.jpg');
     expect(proxiedImageUrl('https://images.optcgleaks.com/op18/images/abc.webp')).toBe('/card-img/optcgleaks/op18/images/abc.webp');

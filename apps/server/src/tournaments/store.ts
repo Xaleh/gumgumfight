@@ -300,6 +300,32 @@ export function listTournaments(db: DB, limit = 100): Array<Tournament & { playe
   return rows.map((r) => ({ ...toTournament(r), players: Number(r.players) }));
 }
 
+/** Torneios encerrados (painel do meta), do mais recente ao mais antigo. `since`: encerrados a partir desta data do SQLite. */
+export function listFinished(db: DB, opts: { format?: FormatId; since?: string } = {}): Tournament[] {
+  const rows = db
+    .prepare(
+      `SELECT ${TOURNAMENT_COLS} ${TOURNAMENT_FROM}
+       WHERE t.status = 'finished' AND (? IS NULL OR t.format = ?) AND (? IS NULL OR t.finished_at >= ?)
+       ORDER BY t.finished_at DESC, t.rowid DESC`,
+    )
+    .all(opts.format ?? null, opts.format ?? null, opts.since ?? null, opts.since ?? null) as TournamentRow[];
+  return rows.map(toTournament);
+}
+
+/** Torneios em andamento e com inscrições abertas (painel do meta): os em andamento primeiro, depois pela hora marcada. */
+export function listOpen(db: DB, opts: { format?: FormatId; limit: number }): Array<Tournament & { players: number }> {
+  const rows = db
+    .prepare(
+      `SELECT ${TOURNAMENT_COLS}, (SELECT COUNT(*) FROM tournament_players tp WHERE tp.tournament_id = t.id) AS players
+       ${TOURNAMENT_FROM}
+       WHERE t.status <> 'finished' AND (? IS NULL OR t.format = ?)
+       ORDER BY CASE t.status WHEN 'running' THEN 0 ELSE 1 END, t.starts_at IS NULL, t.starts_at, t.created_at
+       LIMIT ?`,
+    )
+    .all(opts.format ?? null, opts.format ?? null, opts.limit) as Array<TournamentRow & { players: number }>;
+  return rows.map((r) => ({ ...toTournament(r), players: Number(r.players) }));
+}
+
 /** Ids dos torneios em que a conta está inscrita. */
 export function tournamentsOf(db: DB, userId: string): Set<string> {
   const rows = db.prepare('SELECT tournament_id FROM tournament_players WHERE user_id = ?').all(userId) as Array<{ tournament_id: string }>;

@@ -8523,6 +8523,148 @@ tr.clickable:hover td {
 .tour-tabs button {
   white-space: nowrap;
 }
+
+/* painel do meta dos torneios (aba "Meta" da lista) */
+.tour-views {
+  margin-bottom: 12px;
+}
+.tmeta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tmeta-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tmeta-filters .seg {
+  flex-wrap: wrap;
+}
+.tmeta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.tmeta-upcoming,
+.tmeta-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tmeta-recent {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.tmeta-event {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.tmeta-event:hover {
+  border-color: var(--muted);
+}
+.tmeta-event.big {
+  padding: 14px;
+}
+.tmeta-event-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.tmeta-event-text strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.tmeta-leaders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.tmeta-leader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+.tmeta-leader-nums {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tmeta-leader-nums b {
+  font-size: 18px;
+}
+.tmeta-dist {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tmeta-dist li {
+  display: grid;
+  grid-template-columns: 34px minmax(80px, 1.2fr) 2fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.tmeta-dist-name {
+  font-weight: 700;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tmeta-dist-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg2);
+  overflow: hidden;
+}
+.tmeta-dist-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--card-color, var(--muted));
+}
+.tmeta-dist-num {
+  min-width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tmeta-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 520px) {
+  .tmeta-dist li {
+    grid-template-columns: 34px 1fr auto;
+  }
+  .tmeta-dist-bar {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+}
 .tour-score {
   font-weight: 800;
   font-variant-numeric: tabular-nums;

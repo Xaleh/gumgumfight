@@ -113,7 +113,7 @@ interface Options {
 }
 
 /** Data do SQLite ("2026-10-14 02:06:46", em UTC) em ISO; as que já são ISO ficam como estão. */
-const iso = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(d) ? `${d.replace(' ', 'T')}Z` : d);
+export const iso = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(d) ? `${d.replace(' ', 'T')}Z` : d);
 
 const how = (m: TournamentMatch): RecapRound['how'] => {
   if (!m.result) return null;

@@ -486,6 +486,9 @@ export const api = {
   },
   tournaments: {
     list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null }>('/api/tournaments'),
+    /** Painel do meta: torneios encerrados no formato e nos últimos `days` dias (sem: todos). */
+    meta: (q: { format?: FormatId; days?: number } = {}) =>
+      get<TournamentMeta>(`/api/tournaments/meta?${new URLSearchParams({ ...(q.format ? { format: q.format } : {}), ...(q.days ? { days: String(q.days) } : {}) })}`),
     get: (id: string) => get<TournamentDetail>(`/api/tournaments/${encodeURIComponent(id)}`),
     create: (t: TournamentInput) => send<TournamentDetail>('POST', '/api/tournaments', t),
     update: (id: string, t: TournamentInput) => send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}`, t),
@@ -884,6 +887,41 @@ export interface TournamentSummary {
   sponsor: PublicSponsor | null;
   /** Até quando só Almirantes se inscrevem. */
   priorityUntil: string | null;
+}
+
+/** Torneio encerrado no painel do meta. */
+export interface MetaEvent {
+  id: string;
+  name: string;
+  format: FormatId;
+  spoilers: boolean;
+  official: boolean;
+  finishedAt: string | null;
+  players: number;
+  /** 1º da classificação final (null = sem partidas decididas). */
+  champion: { name: string; leader: string } | null;
+}
+
+/** Painel do meta dos torneios (só torneios encerrados; vitórias contam séries, sem bye nem espelho). */
+export interface TournamentMeta {
+  totals: { events: number; players: number; leaders: number; matches: number };
+  latest: MetaEvent | null;
+  recent: MetaEvent[];
+  upcoming: Array<{
+    id: string;
+    name: string;
+    format: FormatId;
+    spoilers: boolean;
+    official: boolean;
+    prize: string | null;
+    status: 'registration' | 'running';
+    startsAt: string | null;
+    players: number;
+    maxPlayers: number | null;
+  }>;
+  leaders: Array<{ leader: string; entries: number; share: number; wins: number; losses: number; titles: number }>;
+  players: Array<{ name: string; events: number; titles: number; wins: number; losses: number; leader: string }>;
+  cards: Record<string, CardInfo>;
 }
 
 /** Limites de quem organiza: Organizador/Admin sem cota; apoiador Capitão ou Almirante com cota mensal. */
