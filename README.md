@@ -55,7 +55,8 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `CARD_SOURCES`  | `optcgapi`                    | Fontes das cartas lançadas, em ordem de prioridade (ex.: `cardkaizoku,optcgapi`; veja [Cadeia de fontes](#cadeia-de-fontes)) |
 | `SPOILER_SOURCES` | `optcgleaks`                | Fontes dos spoilers, em ordem de prioridade (ex.: `cardkaizoku,optcgleaks`) |
 | `CARD_CDN_URL`  | (vazio)                       | Endereço público da CDN própria das imagens (ex.: `https://cards.gumgumfight.cloud`); vazio = imagens direto das fontes (veja [CDN própria](#cdn-própria-das-imagens-cloudflare-r2)) |
-| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | (vazio) | Conta, bucket e token do Cloudflare R2 da CDN (segredos: só no `deploy.env`) |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | (vazio) | Conta (o Account ID ou o endpoint S3 inteiro), bucket e token do Cloudflare R2 da CDN (segredos: só no `deploy.env`) |
+| `R2_ENDPOINT`   | (vazio)                       | Só para bucket com jurisdição (ex.: `https://<id>.eu.r2.cloudflarestorage.com`) |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
