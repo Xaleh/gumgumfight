@@ -17,10 +17,13 @@ import {
   type CardData,
   cardLegality,
   cleanArts,
+  countsInStats,
   type DeckList,
   formatIssues,
   formatLabel,
   type PlayerId,
+  playMode,
+  type PlayMode,
   spoilerIssues,
   validateDeck,
 } from '@gumgum/engine';
@@ -29,7 +32,7 @@ import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
-import { type FormatId, isFormat, tierFor } from '../stats/catalog';
+import { type FormatId, isFormat, isPlayFormat, type PlayFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
 import { isApprentice } from '../tutorial/store';
@@ -121,7 +124,7 @@ const refused = (r: Extract<ActResult, { ok: false }>) => ({
 export interface DeckRules {
   /** Sem cartas com efeito manual (ranqueada). */
   noManual?: boolean;
-  /** Sem cartas de spoiler, ainda não lançadas (ranqueada e torneios sem spoilers). */
+  /** Sem cartas de spoiler, ainda não lançadas (ranqueada e torneios, salas privadas e treinos sem spoilers). */
   noSpoilers?: boolean;
   /** Data em que o deck precisa valer (banimentos com data); padrão: agora. */
   at?: Date;
@@ -134,7 +137,7 @@ export const RANKED_RULES: DeckRules = { noManual: true, noSpoilers: true };
  * Deck pronto para jogar no formato (e nas regras extras de `rules`): usado pelas
  * salas online e pela inscrição nos torneios.
  */
-export function playableDeck(db: DB, deckId: unknown, format: FormatId, rules: DeckRules = {}): DeckList | LobbyError {
+export function playableDeck(db: DB, deckId: unknown, format: PlayFormat, rules: DeckRules = {}): DeckList | LobbyError {
   const deck = typeof deckId === 'string' && deckId ? getDeck(db, deckId) : null;
   if (!deck) return { code: 400, ...fail('chooseDeck', 'Escolha um deck.') };
   const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
@@ -191,8 +194,9 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
     deckIds: room.data.seats.map((s) => s.deckId),
   };
   const ids = [...new Set(replay.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
+  const cards = getCards(db, ids) as CardData[];
   // Com os textos para o motor do começo da partida (os mesmos com que a sala foi jogada).
-  const facts = deriveMatch(replay, pinEngineTexts(getCards(db, ids) as CardData[], room.data.engineTexts));
+  const facts = deriveMatch(replay, pinEngineTexts(cards, room.data.engineTexts));
   const seat = (p: PlayerId) => {
     const s = room.data.seats[p];
     return s.bot
@@ -202,9 +206,12 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
   // Treino contra o bot entra nas estatísticas como as partidas contra o bot do navegador.
   const mode = room.data.queue === 'bot' ? 'bot' : 'online';
   const queue = room.ranked ? 'ranked' : room.data.queue === 'tournament' ? 'tournament' : 'casual';
-  const matchId = recordMatch(db, { mode, format: room.data.format, queue, replay, seats: [seat(0), seat(1)] }, facts);
-  onMatch?.(matchId);
   const t = room.data.tournament;
+  // Salas de torneio abertas antes do campo `spoilers`: vale a escolha do torneio.
+  const spoilerMode = room.data.spoilers ?? (t ? Boolean(getTournament(db, t.id)?.spoilers) : false);
+  const listed = countsInStats(room.data.format, { spoilerMode, spoilerCards: cards.some((c) => c.spoiler) });
+  const matchId = recordMatch(db, { mode, format: room.data.format, queue, listed, replay, seats: [seat(0), seat(1)] }, facts);
+  onMatch?.(matchId);
   if (t) {
     const winner = room.state?.winner ?? null;
     onTournamentGame?.({
@@ -251,13 +258,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     req: FastifyRequest,
     body: { deckId?: unknown } | undefined,
     ranked: boolean,
-    format: FormatId,
+    format: PlayFormat,
+    noSpoilers = false,
   ): SeatRequest | LobbyError => {
     const ownerHash = viewerHash(req);
     if (!ownerHash) return { code: 400, ...fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).') };
     const account = user(req);
     if (ranked && !account) return { code: 401, ...fail('rankedLoginRequired', 'A ranqueada é só para quem entrou com a conta Google.') };
-    const deck = deckFor(body?.deckId, format, ranked);
+    const deck = deckFor(body?.deckId, format, ranked, noSpoilers);
     if (isError(deck)) return deck;
     const profile = ensurePlayer(db, ownerHash);
     return {
@@ -273,8 +281,16 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   };
 
   /** Deck pronto para jogar no formato (na ranqueada, também sem cartas manuais nem spoilers). */
-  const deckFor = (deckId: unknown, format: FormatId, ranked: boolean) => playableDeck(db, deckId, format, ranked ? RANKED_RULES : {});
+  const deckFor = (deckId: unknown, format: PlayFormat, ranked: boolean, noSpoilers = false) =>
+    playableDeck(db, deckId, format, ranked ? RANKED_RULES : { noSpoilers });
+  /** Formato oficial das filas. */
   const formatOf = (v: unknown): FormatId => (isFormat(v) ? v : 'standard');
+  /**
+   * Regras de cartas da sala privada ou do treino contra o bot (inclui o Livre). Sem `spoilers`
+   * (apps de antes da escolha), aceita spoilers, como antes.
+   */
+  const modeOf = (b: { format?: unknown; spoilers?: unknown } | undefined): PlayMode =>
+    playMode(isPlayFormat(b?.format) ? b.format : 'standard', b?.spoilers !== false);
 
   /** Sala + assento a partir do token (query `t` ou corpo). */
   const seatIn = (id: string, token: unknown): { room: Room; seat: PlayerId } | null => {
@@ -300,14 +316,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return owner ? lobby.activeFor(owner) : [];
   });
 
-  type RoomBody = { deckId?: unknown; format?: unknown; code?: unknown; showHands?: unknown };
+  type RoomBody = { deckId?: unknown; format?: unknown; spoilers?: unknown; code?: unknown; showHands?: unknown };
   app.post<{ Body: RoomBody }>('/api/online/rooms', async (req, reply) => {
-    const format = formatOf(req.body?.format);
-    const seat = seatFor(req, req.body, false, format);
+    const mode = modeOf(req.body);
+    const seat = seatFor(req, req.body, false, mode.format, !mode.spoilers);
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip);
     if (limit) return reply.code(limit.code).send(limit);
-    const r = lobby.createPrivate(seat, format, req.body?.showHands === true);
+    const r = lobby.createPrivate(seat, mode, req.body?.showHands === true);
     if (isError(r)) return reply.code(r.code).send(r);
     lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, code: r.room.data.code, token: r.token });
@@ -316,9 +332,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   app.post<{ Body: RoomBody }>('/api/online/rooms/join', async (req, reply) => {
     const code = typeof req.body?.code === 'string' ? req.body.code : '';
     if (!/^[A-Za-z0-9]{6}$/.test(code.trim())) return reply.code(400).send(fail('invalidRoomCode', 'Código de sala inválido.'));
-    const format = lobby.privateFormat(code);
-    if (!format) return reply.code(404).send(fail('roomNotFound', 'Sala não encontrada ou já começou.'));
-    const seat = seatFor(req, req.body, false, format);
+    const mode = lobby.privateMode(code);
+    if (!mode) return reply.code(404).send(fail('roomNotFound', 'Sala não encontrada ou já começou.'));
+    const seat = seatFor(req, req.body, false, mode.format, !mode.spoilers);
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip);
     if (limit) return reply.code(limit.code).send(limit);
@@ -387,18 +403,19 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   app.post<{ Body: RoomBody & { botDeckId?: unknown; first?: unknown } }>('/api/online/bot', async (req, reply) => {
     if (!botRooms) return reply.code(404).send(fail('botRoomsOff', 'O treino online contra o bot está desligado neste servidor.'));
     if (!user(req)) return reply.code(401).send(fail('botRoomLoginRequired', 'Para transmitir o treino contra o bot, entre com a conta Google.'));
-    const format = formatOf(req.body?.format);
-    const seat = seatFor(req, req.body, false, format);
+    const mode = modeOf(req.body);
+    const { format } = mode;
+    const seat = seatFor(req, req.body, false, format, !mode.spoilers);
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip, 'bot');
     if (limit) return reply.code(limit.code).send(limit);
     let botDeckId = req.body?.botDeckId;
     if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
-      const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false)));
+      const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false, !mode.spoilers)));
       if (!pool.length) return reply.code(400).send(fail('noBuiltinDeckInFormat', `Nenhum deck pronto é permitido no ${formatLabel(format)}.`, { format: formatLabel(format) }));
       botDeckId = pool[randomInt(pool.length)].id;
     }
-    const botDeck = deckFor(botDeckId, format, false);
+    const botDeck = deckFor(botDeckId, format, false, !mode.spoilers);
     if (isError(botDeck)) {
       // Mesmo motivo do deck do jogador, com o prefixo "Deck do bot" (chave própria: botChooseDeck, botDeckInvalid…).
       const errorCode = `bot${botDeck.errorCode[0].toUpperCase()}${botDeck.errorCode.slice(1)}`;
@@ -406,7 +423,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     }
     const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: botDeck.id!, deck: botDeck };
     const first = req.body?.first;
-    const r = lobby.createBotRoom(seat, bot, format, first === 0 || first === 1 ? first : undefined);
+    const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined);
     if (isError(r)) return reply.code(r.code).send(r);
     lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, token: r.token });

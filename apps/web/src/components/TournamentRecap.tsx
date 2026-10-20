@@ -4,9 +4,8 @@
 // bundle principal), junto com o desenho e os geradores de ZIP/PDF. As imagens, fontes e
 // o logo são carregados por `recap/assets.ts` (compartilhado com a decklist do oponente).
 
-import { formatLabel } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
-import { api, type RecapRound, type TournamentRecap as Recap } from '../api';
+import { api, modeLabel, type RecapRound, type TournamentRecap as Recap } from '../api';
 import { type Locale, type Translate, useLocale, useT } from '../i18n';
 import { fmtDate } from '../i18n/format';
 import { errorText, loadFonts, loadImage, loadLogo, type RecapImage, release, shrink, toBlob } from '../recap/assets';
@@ -45,7 +44,7 @@ function texts(tr: Translate, recap: Recap, locale: Locale): RecapTexts {
     round: (r: RecapRound) => (r.stage === 'elim' ? phaseName(tr, r.size) : tr('tour.roundN', { n: r.round })),
     cards: (n) => tr('recap.img.cards', { n }),
     date: date ? fmtDate(date, locale) : null,
-    format: recap.tournament.spoilers ? tr('tour.formatSpoilers') : formatLabel(recap.tournament.format as never),
+    format: modeLabel(recap.tournament, tr),
     site: window.location.host,
   };
 }

@@ -18,7 +18,7 @@ import {
   viewFor,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FormatId } from '../api';
+import type { PlayFormat } from '../api';
 import { t } from '../i18n';
 import { motionWait } from './motion';
 
@@ -29,7 +29,9 @@ export interface GameSetup {
   config: GameConfig;
   deckIds: [string, string];
   /** Formato escolhido no menu (vai para as estatísticas). */
-  format: FormatId;
+  format: PlayFormat;
+  /** Treino que aceita spoilers (não entra nas estatísticas). */
+  spoilers?: boolean;
   /** Ações gravadas (modo replay / roteiro). */
   script?: Action[];
   /** Nível do bot (padrão `hard`). */

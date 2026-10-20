@@ -5,7 +5,7 @@ import type { DeckList } from '@gumgum/engine';
 import { isAdmin, type User } from '../auth/store';
 import { dataVersion } from '../cache';
 import { type DB, transaction } from '../db';
-import type { FormatId } from '../stats/catalog';
+import type { FormatId, PlayFormat } from '../stats/catalog';
 import { type MatchResult, type Pairing, type Stage, type Structure, type TMatch, type TPlayer, winsNeeded } from './pairing';
 
 export type TournamentStatus = 'registration' | 'running' | 'finished';
@@ -14,10 +14,10 @@ export interface Tournament {
   id: string;
   name: string;
   description: string;
-  format: FormatId;
+  format: PlayFormat;
   /**
-   * Aceita cartas de spoiler (ainda não lançadas). Só com o formato EGB: é a opção
-   * "Todas as cartas + spoilers" do organizador. Sem isso, como na ranqueada, só valem cartas lançadas.
+   * Aceita cartas de spoiler (ainda não lançadas), no Standard ou no EGB; o Livre sempre
+   * aceita. Sem isso, como na ranqueada, só valem cartas lançadas.
    */
   spoilers: boolean;
   /**
@@ -136,7 +136,7 @@ type TournamentRow = {
   id: string;
   name: string;
   description: string;
-  format: FormatId;
+  format: PlayFormat;
   spoilers: number;
   live_hands: number;
   structure: Structure;
@@ -300,12 +300,16 @@ export function listTournaments(db: DB, limit = 100): Array<Tournament & { playe
   return rows.map((r) => ({ ...toTournament(r), players: Number(r.players) }));
 }
 
-/** Torneios encerrados (painel do meta), do mais recente ao mais antigo. `since`: encerrados a partir desta data do SQLite. */
+/**
+ * Torneios encerrados (painel do meta), do mais recente ao mais antigo. `since`: encerrados a partir desta data do SQLite.
+ * Só Standard e EGB puros: o Livre e os torneios com spoilers ficam fora do meta, como das estatísticas.
+ */
 export function listFinished(db: DB, opts: { format?: FormatId; since?: string } = {}): Tournament[] {
   const rows = db
     .prepare(
       `SELECT ${TOURNAMENT_COLS} ${TOURNAMENT_FROM}
-       WHERE t.status = 'finished' AND (? IS NULL OR t.format = ?) AND (? IS NULL OR t.finished_at >= ?)
+       WHERE t.status = 'finished' AND t.format IN ('standard', 'egb') AND t.spoilers = 0
+         AND (? IS NULL OR t.format = ?) AND (? IS NULL OR t.finished_at >= ?)
        ORDER BY t.finished_at DESC, t.rowid DESC`,
     )
     .all(opts.format ?? null, opts.format ?? null, opts.since ?? null, opts.since ?? null) as TournamentRow[];

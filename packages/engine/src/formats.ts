@@ -11,12 +11,20 @@
 // en.onepiece-cardgame.com/news/blockicon-card.html. Para atualizar, é só mexer aqui.
 //
 // Spoilers (cartas anunciadas que ainda não foram lançadas) não são de formato nenhum:
-// valem nas partidas casuais, nas salas privadas e contra o bot, mas nunca na
-// ranqueada. Nos torneios, o organizador escolhe se aceita (ver `spoilerIssues`).
+// valem na fila casual e, se quem cria escolher, nas salas privadas, nos treinos contra
+// o bot e nos torneios (ver `PlayMode` e `spoilerIssues`); nunca na ranqueada.
+//
+// Livre ("vale tudo") não é formato oficial: vale toda carta, inclusive as banidas, os
+// pares proibidos e os spoilers. Só existe nos torneios, nas salas privadas e contra o
+// bot, e as partidas não entram nas estatísticas (ver `countsInStats`).
 
 import type { CardData, DeckList } from './types';
 
+/** Formatos oficiais: os das filas, dos selos do deck e das estatísticas. */
 export type FormatId = 'standard' | 'egb';
+
+/** Formato de uma partida: um oficial ou o Livre (torneios, salas privadas e bot). */
+export type PlayFormat = FormatId | 'free';
 
 export const FORMATS: ReadonlyArray<{ id: FormatId; label: string }> = [
   { id: 'standard', label: 'Standard' },
@@ -24,14 +32,35 @@ export const FORMATS: ReadonlyArray<{ id: FormatId; label: string }> = [
 ];
 
 export const isFormat = (v: unknown): v is FormatId => FORMATS.some((f) => f.id === v);
-export const formatLabel = (f: FormatId): string => FORMATS.find((x) => x.id === f)?.label ?? f;
+export const isPlayFormat = (v: unknown): v is PlayFormat => v === 'free' || isFormat(v);
+export const formatLabel = (f: PlayFormat): string => (f === 'free' ? 'Livre' : (FORMATS.find((x) => x.id === f)?.label ?? f));
+
+/** Regras de cartas de uma partida: o formato e se aceita spoilers (o Livre sempre aceita). */
+export interface PlayMode {
+  format: PlayFormat;
+  spoilers: boolean;
+}
 
 /**
- * Nome do formato de um torneio. Com spoilers (só no EGB) é a terceira opção do
- * organizador: todas as cartas, inclusive as que ainda não foram lançadas.
+ * Formatos de quem cria um torneio, uma sala privada ou um treino contra o bot. Com a escolha
+ * dos spoilers no Standard e no EGB, são cinco opções: os dois puros, os dois + spoilers e o Livre.
  */
-export const tournamentFormatLabel = (t: { format: FormatId; spoilers?: boolean }): string =>
-  t.spoilers ? 'Todas as cartas + spoilers' : formatLabel(t.format);
+export const PLAY_FORMATS: ReadonlyArray<PlayFormat> = ['standard', 'egb', 'free'];
+
+/** Regras pedidas por quem cria, normalizadas: o Livre sempre aceita spoilers. */
+export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ format, spoilers: format === 'free' || spoilers });
+
+/** Nome das regras de cartas: "Standard", "Standard + spoilers", "Livre (vale tudo)"… */
+export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean }): string =>
+  m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + spoilers` : formatLabel(m.format);
+
+/**
+ * Se a partida entra nas estatísticas: só Standard e EGB puros. Fica de fora o Livre, o
+ * torneio que aceita spoilers (`spoilerMode`) e a partida com carta de spoiler em algum
+ * deck (`spoilerCards`): a coleção ainda pode estar incompleta.
+ */
+export const countsInStats = (format: PlayFormat, opts: { spoilerMode?: boolean; spoilerCards?: boolean } = {}): boolean =>
+  format !== 'free' && !opts.spoilerMode && !opts.spoilerCards;
 
 /** Cartas banidas em todos os formatos. `since` = data em que a proibição passa a valer. */
 export const BANNED_CARDS: ReadonlyArray<{ id: string; name: string; since?: string }> = [
@@ -89,7 +118,8 @@ export function cardBlock(id: string): number | null {
 
 export type CardLegality = 'legal' | 'banned' | 'rotated';
 
-export function cardLegality(id: string, format: FormatId, now = new Date()): CardLegality {
+export function cardLegality(id: string, format: PlayFormat, now = new Date()): CardLegality {
+  if (format === 'free') return 'legal';
   if (BANNED_CARDS.some((b) => b.id === id && inEffect(b.since, now))) return 'banned';
   if (format === 'standard' && cardBlock(id) === 1 && !STANDARD_BLOCK_1_EXCEPTIONS.has(id)) return 'rotated';
   return 'legal';
@@ -108,7 +138,8 @@ export interface FormatIssue {
 }
 
 /** Motivos de o deck não valer no formato (vazio = permitido). Só olha os números das cartas. */
-export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: FormatId, now = new Date()): FormatIssue[] {
+export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: PlayFormat, now = new Date()): FormatIssue[] {
+  if (format === 'free') return [];
   const issues: FormatIssue[] = [];
   const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean))];
   const label = formatLabel(format);
@@ -141,11 +172,11 @@ export function spoilerCards(deck: Pick<DeckList, 'leader' | 'cards'>, cards: Re
 }
 
 /** Onde as cartas de spoiler valem (o fim dos avisos). */
-const SPOILER_WHERE = 'só valem em partidas casuais, salas privadas, contra o bot e torneios com spoilers';
+const SPOILER_WHERE = 'só valem na fila casual e nas salas privadas, treinos contra o bot e torneios com spoilers';
 
 /**
- * Motivo de o deck não valer onde spoilers são proibidos (ranqueada e torneios sem
- * spoilers); vazio = nenhuma carta de spoiler. Um aviso só, com as primeiras cartas.
+ * Motivo de o deck não valer onde spoilers são proibidos (ranqueada e torneios, salas
+ * privadas e treinos sem spoilers); vazio = nenhuma carta de spoiler. Um aviso só, com as primeiras cartas.
  */
 export function spoilerIssues(deck: Pick<DeckList, 'leader' | 'cards'>, cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>): FormatIssue[] {
   const all = spoilerCards(deck, cards);

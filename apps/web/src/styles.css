@@ -1636,6 +1636,13 @@ input[type='number'] {
 .mode-card .seg.small button {
   min-height: 36px;
 }
+/* "Cartas" da sala privada e do treino: três opções numa carta estreita (o texto quebra se precisar). */
+.mode-card .seg.rules-seg button {
+  min-width: 0;
+  padding-inline: 4px;
+  white-space: normal;
+  line-height: 1.15;
+}
 .mode-card .check {
   font-size: 12px;
 }

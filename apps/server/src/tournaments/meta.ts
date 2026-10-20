@@ -2,14 +2,15 @@
 // ChinoizeCupStats): totais, último torneio e campeão, próximos torneios, Líderes por
 // participação e taxa de vitória, e o ranking de jogadores.
 //
-// Só entram torneios encerrados (como nas Estatísticas Pro, o meta competitivo não mostra
-// torneio em andamento) e só o que já é público na página de cada um depois do fim: o
-// Líder de cada inscrito, o resultado das séries e a classificação. As vitórias contam
-// séries (melhor de 1, 3 ou 5), não jogos; bye, derrota dupla e espelho ficam de fora.
+// Só entram torneios encerrados de Standard ou EGB puros (como nas Estatísticas Pro, o meta
+// competitivo não mostra torneio em andamento; o Livre e os torneios com spoilers ficam de
+// fora) e só o que já é público na página de cada um depois do fim: o Líder de cada inscrito,
+// o resultado das séries e a classificação. As vitórias contam séries (melhor de 1, 3 ou 5),
+// não jogos; bye, derrota dupla e espelho ficam de fora.
 
 import { type DB, getCards } from '../db';
 import type { ApiCard } from '../present';
-import type { FormatId } from '../stats/catalog';
+import type { FormatId, PlayFormat } from '../stats/catalog';
 import { standings, winnerOf } from './pairing';
 import { iso } from './recap';
 import { listFinished, listMatches, listOpen, listPlayers, type Tournament } from './store';
@@ -17,7 +18,7 @@ import { listFinished, listMatches, listOpen, listPlayers, type Tournament } fro
 export interface MetaEvent {
   id: string;
   name: string;
-  format: FormatId;
+  format: PlayFormat;
   spoilers: boolean;
   official: boolean;
   finishedAt: string | null;
@@ -29,7 +30,7 @@ export interface MetaEvent {
 export interface MetaUpcoming {
   id: string;
   name: string;
-  format: FormatId;
+  format: PlayFormat;
   spoilers: boolean;
   official: boolean;
   prize: string | null;

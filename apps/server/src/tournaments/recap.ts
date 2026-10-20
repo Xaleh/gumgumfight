@@ -78,7 +78,7 @@ export interface TournamentRecap {
     id: string;
     name: string;
     format: string;
-    /** Aceita cartas de spoiler ("Todas as cartas + spoilers"). */
+    /** Aceita cartas de spoiler (Standard ou EGB + spoilers; o Livre sempre aceita). */
     spoilers: boolean;
     structure: Tournament['structure'];
     topCut: number | null;

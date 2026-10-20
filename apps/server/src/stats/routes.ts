@@ -1,13 +1,13 @@
 // Rotas de partidas, perfil e estatísticas.
 
-import { type Action, type CardData, type DeckList, formatLabel, parseArts, type PlayerId, validateDeck } from '@gumgum/engine';
+import { type Action, type CardData, countsInStats, type DeckList, formatLabel, parseArts, type PlayerId, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { seesProStats, type User } from '../auth/store';
 import { ResponseCache } from '../cache';
 import { type DB, getCards } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
-import { FORMATS, type FormatId, isFormat, isQueue, isTier, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
+import { FORMATS, isFormat, isPlayFormat, isQueue, isTier, type PlayFormat, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
 import { deriveMatch } from './derive';
 import { isApprentice } from '../tutorial/store';
 import {
@@ -50,7 +50,10 @@ export const SMALL_SAMPLE = 20;
 
 export interface MatchBody {
   mode?: unknown;
+  /** Formato do treino: Standard, EGB ou Livre. */
   format?: unknown;
+  /** O treino aceitava spoilers (aí a partida não entra nas estatísticas). */
+  spoilers?: unknown;
   seed?: unknown;
   firstPlayer?: unknown;
   chooseFirst?: unknown;
@@ -101,7 +104,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
   app.post<{ Body: MatchBody }>('/api/matches', async (req, reply) => {
     const b = req.body;
     const mode = b?.mode === 'demo' ? 'demo' : 'bot';
-    const format: FormatId = isFormat(b?.format) ? b.format : 'standard';
+    const format: PlayFormat = isPlayFormat(b?.format) ? b.format : 'standard';
     const decks = Array.isArray(b?.decks) ? b.decks.map(parseDeck) : [];
     if (typeof b?.seed !== 'number' || !Array.isArray(b.actions) || decks.length !== 2 || decks.some((d) => !d)) {
       return reply.code(400).send({ error: 'Dados de partida inválidos' });
@@ -136,7 +139,9 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
       const human = mode === 'bot' && p === 0 && owner !== null;
       return { controller: human ? 'human' : 'bot', ownerHash: human ? owner : null, deckId: deckIds[p] ?? null };
     };
-    const id = recordMatch(db, { mode, format, queue: 'casual', replay, seats: [seat(0), seat(1)] }, facts);
+    // Só Standard e EGB puros entram nas estatísticas (sem Livre e sem spoilers).
+    const listed = countsInStats(format, { spoilerMode: b.spoilers === true, spoilerCards: cards.some((c) => c.spoiler) });
+    const id = recordMatch(db, { mode, format, queue: 'casual', listed, replay, seats: [seat(0), seat(1)] }, facts);
     onMatch?.(id);
     return { id, winner: facts.winner, turns: facts.turns };
   });

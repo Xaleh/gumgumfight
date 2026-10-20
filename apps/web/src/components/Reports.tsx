@@ -1,6 +1,5 @@
-import { formatLabel } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, type FormatId, type MatchReport, type MatchSummary, type RoomQueue } from '../api';
+import { api, type MatchReport, type MatchSummary, modeLabel, type RoomQueue } from '../api';
 import { setupFromReplay } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { useLocale, useT } from '../i18n';
@@ -86,7 +85,7 @@ export function ReportList({
               <span className={['tour-status', r.resolvedAt ? 'finished' : 'running'].join(' ')}>{r.resolvedAt ? t('reports.resolved') : t('reports.open')}</span>
               {m && (
                 <span className="muted small">
-                  {queueKey ? t(queueKey) : m.queue} · {formatLabel(m.format as FormatId)} · {dateTime(m.playedAt)}
+                  {queueKey ? t(queueKey) : m.queue} · {modeLabel(m)} · {dateTime(m.playedAt)}
                   {m.tournament &&
                     t('reports.tourInfo', { name: m.tournament.name, round: m.tournament.round, table: m.tournament.table, game: m.tournament.game })}
                 </span>

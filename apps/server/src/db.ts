@@ -809,6 +809,7 @@ function migratePush(db: DB) {
  * fatos: uma linha por lado da partida, com todas as dimensões dos filtros
  * (formato, fila, tier, Líderes, quem começou), para que as consultas não
  * precisem de joins. `match_cards` detalha cada carta do deck daquele lado.
+ * `listed = 0`: partida que não entra nas estatísticas (Livre, spoilers; ver `countsInStats`).
  */
 function migrateStats(db: DB) {
   const cols = (db.prepare('PRAGMA table_info(matches)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
@@ -882,6 +883,17 @@ function migrateStats(db: DB) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+  const seatCols = (db.prepare('PRAGMA table_info(match_seats)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!seatCols.includes('listed')) {
+    db.exec('ALTER TABLE match_seats ADD COLUMN listed INTEGER NOT NULL DEFAULT 1');
+    // As partidas dos torneios que já aceitavam spoilers saem das estatísticas.
+    const hasTournaments = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tournament_games'").get();
+    if (hasTournaments) {
+      db.exec(`UPDATE match_seats SET listed = 0 WHERE match_id IN (
+        SELECT g.stats_match_id FROM tournament_games g JOIN tournaments t ON t.id = g.tournament_id
+        WHERE t.spoilers = 1 AND g.stats_match_id IS NOT NULL)`);
+    }
+  }
 }
 
 // ------------------------------------------------------------------ partidas online

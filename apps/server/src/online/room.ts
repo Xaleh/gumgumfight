@@ -52,7 +52,7 @@ import {
   viewFor,
 } from '@gumgum/engine';
 import { type ErrorParams, fail } from '../errors';
-import type { FormatId } from '../stats/catalog';
+import type { PlayFormat } from '../stats/catalog';
 import { censor } from './profanity';
 
 export const TIME_BANK_MS = 17 * 60_000 + 30_000;
@@ -157,7 +157,12 @@ export interface RoomData {
   id: string;
   code: string | null;
   queue: RoomQueue;
-  format: FormatId;
+  format: PlayFormat;
+  /**
+   * Sala privada, treino contra o bot e torneio: aceita cartas de spoiler (o Livre sempre
+   * aceita). As filas não têm o campo: a casual aceita spoilers e a ranqueada não.
+   */
+  spoilers?: boolean;
   createdAt: number;
   seats: SeatInfo[];
   seed128: number[] | null;
@@ -302,10 +307,11 @@ function handsOf(state: GameState): string[] {
 }
 
 export function newRoomData(
-  init: Pick<RoomData, 'queue' | 'format' | 'code' | 'tournament'> & { id?: string; seats: SeatInfo[] },
+  init: Pick<RoomData, 'queue' | 'format' | 'spoilers' | 'code' | 'tournament'> & { id?: string; seats: SeatInfo[] },
 ): RoomData {
   return {
     ...(init.tournament ? { tournament: init.tournament } : {}),
+    ...(init.spoilers !== undefined ? { spoilers: init.spoilers } : {}),
     id: init.id ?? randomBytes(9).toString('base64url'),
     code: init.code,
     queue: init.queue,
@@ -1079,6 +1085,7 @@ export class Room {
       code: this.data.code,
       queue: this.data.queue,
       format: this.data.format,
+      ...(this.data.spoilers !== undefined ? { spoilers: this.data.spoilers } : {}),
       tournament: this.data.tournament
         ? {
             id: this.data.tournament.id,

@@ -3,7 +3,7 @@
 // pelos replays gravados no servidor (auditoria dos torneios e das ranqueadas).
 
 import { type Action, type CardData, type DeckList, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
-import { api, type FormatId } from '../api';
+import { api, type PlayFormat } from '../api';
 import { t } from '../i18n';
 import type { GameMode, GameSetup, ReplayFile } from './useGame';
 
@@ -12,7 +12,7 @@ export async function buildSetup(
   deckIds: [string, string],
   names: [string, string],
   seed: number,
-  format: FormatId,
+  format: PlayFormat,
   firstPlayer?: PlayerId,
   script?: Action[],
   /** Replay com as listas exatas da partida (e, online, a seed de 128 bits). */

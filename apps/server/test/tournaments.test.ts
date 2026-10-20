@@ -4,7 +4,7 @@ import { buildApp } from '../src/app';
 import { proxiedImageUrl } from '../src/card-images';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
-import { registerPlayer } from '../src/tournaments/store';
+import { listFinished, registerPlayer } from '../src/tournaments/store';
 import type { Lobby } from '../src/online/lobby';
 import type { Connection } from '../src/online/room';
 import { seed } from '../src/seed';
@@ -240,7 +240,7 @@ describe('torneios: rotas', () => {
     expect((await req(app, 'POST', url, c, { deckId: 'st04-kaido' })).statusCode).toBe(200);
   });
 
-  it('spoilers: só no "Todas as cartas + spoilers"; nos outros formatos, só cartas lançadas', async () => {
+  it('spoilers: só nos torneios com spoilers (Standard ou EGB); nos outros, só cartas lançadas', async () => {
     const { db, app } = setup();
     const org = login(db, 'organizer');
     const a = login(db);
@@ -251,9 +251,9 @@ describe('torneios: rotas', () => {
     const cards = luffy.cards.map((c, i) => (i === 0 ? { id: 'OP99-001', count: c.count } : c));
     const deck = (await req(app, 'POST', '/api/decks', a, { name: 'Spoiler', leader: luffy.leader, cards })).json();
 
-    // Spoilers só com todas as cartas (EGB).
+    // Standard + spoilers também é uma opção.
     const std = await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'standard', spoilers: true, structure: 'swiss' });
-    expect(std.json()).toMatchObject({ errorCode: 'tourSpoilersNeedEgb' });
+    expect(std.json()).toMatchObject({ format: 'standard', spoilers: true });
 
     const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', structure: 'swiss' })).json();
     expect(t.spoilers).toBe(false);
@@ -271,6 +271,40 @@ describe('torneios: rotas', () => {
     const back = await req(app, 'PUT', `/api/tournaments/${t.id}`, org, edit);
     expect(back.statusCode).toBe(400);
     expect(back.json()).toMatchObject({ errorCode: 'tourDecksNotAllowed', errorParams: { n: 1, format: 'Extra Grand Battle' } });
+  });
+
+  it('Livre (vale tudo): aceita carta banida e spoiler; fica fora do meta', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const a = login(db);
+    // Deck com uma carta banida (OP06-047) no lugar da primeira.
+    const luffy = getDeck(db, 'st01-luffy')!;
+    const [base] = getCards(db, [luffy.cards[0].id]) as CardData[];
+    upsertCards(db, [{ ...base, id: 'OP06-047' }], { provisional: false, source: 'teste' });
+    const cards = luffy.cards.map((c, i) => (i === 0 ? { id: 'OP06-047', count: c.count } : c));
+    const deck = (await req(app, 'POST', '/api/decks', a, { name: 'Banida', leader: luffy.leader, cards })).json();
+
+    const egb = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', structure: 'swiss' })).json();
+    const refused = await req(app, 'POST', `/api/tournaments/${egb.id}/register`, a, { deckId: deck.id });
+    expect(refused.json()).toMatchObject({ errorCode: 'deckNotAllowedInFormat' });
+
+    // O Livre sempre aceita spoilers, mesmo sem pedir.
+    const free = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'free', structure: 'swiss' })).json();
+    expect(free).toMatchObject({ format: 'free', spoilers: true });
+    expect((await req(app, 'POST', `/api/tournaments/${free.id}/register`, a, { deckId: deck.id })).statusCode).toBe(200);
+    // Voltar para o EGB com o deck da banida inscrito é recusado.
+    const back = await req(app, 'PUT', `/api/tournaments/${free.id}`, org, { name: 'Copa', format: 'egb', structure: 'swiss' });
+    expect(back.json()).toMatchObject({ errorCode: 'tourDecksNotAllowed', errorParams: { n: 1, format: 'Extra Grand Battle' } });
+
+    expect((await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'vale-tudo', structure: 'swiss' })).json()).toMatchObject({
+      errorCode: 'invalidFormat',
+    });
+
+    // O meta só olha Standard e EGB puros: o Livre e o EGB + spoilers ficam de fora.
+    const spoilers = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', spoilers: true, structure: 'swiss' })).json();
+    db.prepare("UPDATE tournaments SET status = 'finished', finished_at = datetime('now')").run();
+    expect(listFinished(db).map((t) => t.id)).toEqual([egb.id]);
+    expect(listFinished(db, { format: 'egb' }).map((t) => t.id)).not.toContain(spoilers.id);
   });
 
   it('suíço completo: partidas nas salas online, resultado automático, correção e desistência', async () => {

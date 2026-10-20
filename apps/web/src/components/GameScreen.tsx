@@ -220,6 +220,7 @@ export function GameScreen({ setup, onExit, onRematch, embed }: { setup: GameSet
       .saveMatch({
       mode: setup.mode,
       format: setup.format,
+      ...(setup.spoilers ? { spoilers: true } : {}),
       seed: setup.config.seed,
       firstPlayer: setup.config.firstPlayer,
       chooseFirst: setup.config.chooseFirst,

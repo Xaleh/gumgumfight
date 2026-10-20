@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import type { DeckList, PlayerId } from '@gumgum/engine';
 import { dataVersion } from '../cache';
 import { type DB, transaction } from '../db';
-import { bountyDelta, type Controller, type FormatId, type QueueId, START_BOUNTY, tierFor } from './catalog';
+import { bountyDelta, type Controller, type FormatId, type PlayFormat, type QueueId, START_BOUNTY, tierFor } from './catalog';
 import type { MatchFacts, ReplayInput } from './derive';
 
 // ------------------------------------------------------------------ jogadores
@@ -54,8 +54,10 @@ export interface SeatInput {
 
 export interface MatchInput {
   mode: string;
-  format: FormatId;
+  format: PlayFormat;
   queue: QueueId;
+  /** Entra nas estatísticas (só Standard e EGB puros; ver `countsInStats`). Padrão: sim. */
+  listed?: boolean;
   replay: ReplayInput;
   seats: [SeatInput, SeatInput];
 }
@@ -106,8 +108,8 @@ export function recordMatch(db: DB, m: MatchInput, facts: MatchFacts): number {
     const saveList = db.prepare('INSERT OR IGNORE INTO deck_lists (hash, leader, cards) VALUES (?, ?, ?)');
     const saveSeat = db.prepare(`
       INSERT INTO match_seats (match_id, seat, controller, player_id, deck_id, deck_hash, leader, opp_leader,
-        opp_controller, tier, bounty_before, bounty_after, went_first, won, mulligan, format, queue, played_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        opp_controller, tier, bounty_before, bounty_after, went_first, won, mulligan, format, queue, played_at, listed)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const saveCard = db.prepare(
       'INSERT INTO match_cards (match_id, seat, card_id, copies, opening, drawn, played) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
@@ -140,6 +142,7 @@ export function recordMatch(db: DB, m: MatchInput, facts: MatchFacts): number {
         m.format,
         m.queue,
         playedAt,
+        m.listed === false ? 0 : 1,
       );
       for (const [cardId, c] of f.cards) {
         if (c.copies > 0) saveCard.run(matchId, p, cardId, c.copies, c.opening, c.drawn, c.played);
@@ -181,7 +184,7 @@ type Param = string | number;
 
 /** WHERE sobre match_seats (alias s). */
 function where(f: StatsFilter): { sql: string; params: Param[] } {
-  const parts: string[] = ['s.controller = ?'];
+  const parts: string[] = ['s.listed = 1', 's.controller = ?'];
   const params: Param[] = [f.by];
   const eq = (col: string, v: Param | undefined) => {
     if (v === undefined) return;
@@ -339,7 +342,7 @@ export function cardStats(db: DB, f: StatsFilter): CardStatRow[] {
 /** Líderes e listas presentes nas partidas (opções dos filtros). */
 export function statsDimensions(db: DB) {
   const leaders = db
-    .prepare('SELECT leader, COUNT(*) AS games FROM match_seats GROUP BY leader ORDER BY games DESC')
+    .prepare('SELECT leader, COUNT(*) AS games FROM match_seats WHERE listed = 1 GROUP BY leader ORDER BY games DESC')
     .all() as unknown as Array<{ leader: string; games: number }>;
   return { leaders };
 }
@@ -349,7 +352,7 @@ export function myDecks(db: DB, playerId: string) {
     .prepare(
       `SELECT s.deck_hash AS hash, s.leader, MAX(s.deck_id) AS deckId, COUNT(*) AS games, SUM(s.won) AS wins,
               MAX(s.played_at) AS lastPlayed
-       FROM match_seats s WHERE s.player_id = ? GROUP BY s.deck_hash, s.leader ORDER BY lastPlayed DESC LIMIT 50`,
+       FROM match_seats s WHERE s.player_id = ? AND s.listed = 1 GROUP BY s.deck_hash, s.leader ORDER BY lastPlayed DESC LIMIT 50`,
     )
     .all(playerId) as unknown as Array<{ hash: string; leader: string; deckId: string | null; lastPlayed: string } & WinRow>;
 }

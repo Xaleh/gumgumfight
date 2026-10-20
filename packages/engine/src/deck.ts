@@ -10,7 +10,7 @@
 
 import { buildCardDef, needsManual } from './cards';
 import { DECK_SIZE, hasType } from './engine';
-import { type FormatId, formatIssues, type RuleParams } from './formats';
+import { formatIssues, type PlayFormat, type RuleParams } from './formats';
 import type { CardData, DeckList, GameState, LeaderRule, PlayerId } from './types';
 import { HIDDEN_CARD, HIDDEN_REF } from './view';
 
@@ -78,7 +78,7 @@ export function leaderAllows(leader: CardData, card: CardData): boolean {
 
 export interface ValidateOptions {
   /** Formato da partida: sem ele, só as regras de construção são conferidas. */
-  format?: FormatId;
+  format?: PlayFormat;
   /** Data usada nas proibições com data marcada (padrão: agora). */
   now?: Date;
 }

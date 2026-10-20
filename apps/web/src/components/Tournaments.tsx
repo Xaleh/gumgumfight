@@ -1,4 +1,4 @@
-import { FORMATS } from '@gumgum/engine';
+import { formatLabel, PLAY_FORMATS, playMode } from '@gumgum/engine';
 import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   type AdminSponsor,
@@ -19,7 +19,7 @@ import {
   type TournamentWarnings,
   TOURNAMENT_STATUS_LABEL,
   TIER_LABEL,
-  tourFormatLabel,
+  modeLabel,
   type WatchTarget,
   winsNeeded,
 } from '../api';
@@ -351,7 +351,7 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
                   <OfficialBadges t={t} />
                   <span className="muted small">
                     {dots(
-                      tourFormatLabel(t),
+                      modeLabel(t),
                       t.topCut ? tr('tour.plusTopCut', { text: tr(STRUCTURE_LABEL[t.structure]), n: t.topCut }) : tr(STRUCTURE_LABEL[t.structure]),
                       t.maxPlayers ? tr('tour.playersOfMax', { n: t.players, max: t.maxPlayers }) : tr('tour.playersCount', { n: t.players }),
                       t.status === 'running' &&
@@ -467,22 +467,21 @@ function TournamentForm({
           </div>
           <div className="field">
             <label>{tr('tour.format')}</label>
-            {/* Três opções: o "Todas as cartas + spoilers" quebra em duas linhas no celular. */}
             <div className="seg small tour-format">
-              {FORMATS.map((f) => (
-                <button
-                  key={f.id}
-                  className={form.format === f.id && !form.spoilers ? 'on' : ''}
-                  onClick={() => setForm((x) => ({ ...x, format: f.id, spoilers: false }))}
-                >
-                  {f.label}
+              {PLAY_FORMATS.map((f) => (
+                <button key={f} className={form.format === f ? 'on' : ''} onClick={() => setForm((x) => ({ ...x, ...playMode(f, x.spoilers) }))}>
+                  {f === 'free' ? tr('mode.freeShort') : formatLabel(f)}
                 </button>
               ))}
-              <button className={form.spoilers ? 'on' : ''} onClick={() => setForm((x) => ({ ...x, format: 'egb', spoilers: true }))}>
-                {tr('tour.formatSpoilers')}
-              </button>
             </div>
-            <p className="muted small">{tr(form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint')}</p>
+            {/* O Livre sempre aceita spoilers: a opção fica marcada e travada. */}
+            <label className="check">
+              <input type="checkbox" checked={form.spoilers} disabled={form.format === 'free'} onChange={(e) => set('spoilers', e.target.checked)} />
+              {tr('tour.spoilersOption')}
+            </label>
+            <p className="muted small">
+              {tr(form.format === 'free' ? 'tour.formatFreeHint' : form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint')}
+            </p>
           </div>
           <div className="field">
             <label>{tr('tour.structure')}</label>
@@ -869,7 +868,7 @@ function TournamentPage({
               </div>
               <p className="muted small">
                 {dots(
-                  tourFormatLabel(t),
+                  modeLabel(t),
                   structureText(t),
                   t.maxPlayers
                     ? tr('tour.registeredOfMax', { n: t.players.length, max: t.maxPlayers })
@@ -1223,7 +1222,7 @@ function MyArea({
         ) : (
           <>
             <div className="field">
-              <label htmlFor="tour-deck">{tr('tour.deckLabel', { format: tourFormatLabel(t) })}</label>
+              <label htmlFor="tour-deck">{tr('tour.deckLabel', { format: modeLabel(t) })}</label>
               <select id="tour-deck" className="admin-search" value={deckId} onChange={(e) => setDeckId(e.target.value)}>
                 <option value="">{tr(decks ? 'tour.chooseDeck' : 'common.loading')}</option>
                 {mine.length > 0 && (
@@ -1245,7 +1244,7 @@ function MyArea({
                   </optgroup>
                 )}
               </select>
-              {decks && !playable.length && <p className="muted small">{tr(t.spoilers ? 'tour.noPlayableDeck' : 'tour.noPlayableDeckReleased', { format: tourFormatLabel(t) })}</p>}
+              {decks && !playable.length && <p className="muted small">{tr(t.spoilers ? 'tour.noPlayableDeck' : 'tour.noPlayableDeckReleased', { format: modeLabel(t) })}</p>}
             </div>
             <div className="btn-row">
               <button

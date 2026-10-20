@@ -214,11 +214,22 @@ formatos o deck vale, marca no catálogo as cartas banidas (🚫) e rotacionadas
 não valem no formato escolhido.
 
 **Spoilers** (cartas anunciadas e ainda não lançadas, veja [Spoilers](#spoilers-coleções-ainda-não-lançadas)) não fazem
-parte de formato nenhum: valem nas partidas casuais, nas salas privadas e contra o bot, mas **nunca na ranqueada**, que
-só aceita cartas já lançadas. Nos torneios, o organizador escolhe explicitamente entre **Standard**, **Extra Grand
-Battle** (os dois só com cartas lançadas) e **Todas as cartas + spoilers** (o EGB com os spoilers; as banidas continuam
-proibidas). O servidor confere na fila ranqueada e na inscrição do torneio; o construtor avisa quando o deck tem
-spoilers e o menu desabilita a ranqueada para ele.
+parte de formato nenhum: valem na fila casual, mas **nunca na ranqueada**, que só aceita cartas já lançadas. Nos
+torneios, nas salas privadas e no treino contra o bot, quem cria escolhe entre cinco opções:
+
+| Opção | Banidas | Rotacionadas (bloco ①) | Spoilers | Estatísticas e meta |
+|---|---|---|---|---|
+| **Extra Grand Battle** | não | sim | não | sim |
+| **Extra Grand Battle + spoilers** | não | sim | sim | não |
+| **Standard** | não | não | não | sim |
+| **Standard + spoilers** | não | não | sim | não |
+| **Livre (vale tudo)** | sim | sim | sim | não |
+
+O **Livre** não é formato oficial: vale toda carta, inclusive as banidas e os pares proibidos. É só por diversão e não
+existe nas filas. No menu, o formato (Standard ou EGB) vale para todos os modos, e as salas privadas e o treino contra
+o bot têm a escolha **Cartas**: lançadas, + spoilers ou Livre. Quem entra numa sala privada joga nas regras de quem a
+criou. O servidor confere na fila ranqueada, na sala privada e na inscrição do torneio; o construtor avisa quando o
+deck tem spoilers e o menu desabilita a ranqueada para ele.
 
 Quem entra com a conta Google (veja [Contas](#contas-login-com-google)) edita os próprios decks em qualquer aparelho.
 Sem login, cada navegador recebe um código aleatório (guardado no navegador) e só ele pode editar ou apagar os decks
@@ -232,6 +243,10 @@ No menu, **📈 Estatísticas** mostra vitórias por Líder, por matchup (Líder
 formato (Standard ou Extra Grand Battle, escolhido no menu antes da partida), fila (casual ou ranqueada), oponente
 (bot ou jogador), ordem do turno, período, tier e "só as minhas partidas". Partidas bot x bot gravadas por versões
 antigas ficam fora das estatísticas de pessoas (só pelo filtro `by=bot` da API).
+
+Só entram **Standard e EGB puros**: as partidas no Livre, nas salas, treinos e torneios com spoilers e as que têm
+alguma carta de spoiler num dos decks (a coleção ainda pode estar incompleta) são gravadas, com replay, mas ficam de
+fora das estatísticas (`match_seats.listed = 0`) e do meta dos torneios.
 
 - **Coleta confiável:** no fim da partida o navegador envia o replay (seed, listas e ações). O servidor refaz a
   partida com o motor e só grava o que a simulação confirma; um replay que não confere é recusado (422). Assim, a
@@ -380,8 +395,8 @@ Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas
 Em **Torneios** (no menu), contas com perfil **Organizador** ou **Admin** criam torneios; qualquer conta Google se
 inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia qualquer um.
 
-- **Criação:** nome, descrição e regras, formato (Standard, Extra Grand Battle ou Todas as cartas + spoilers; nos dois
-  primeiros só valem cartas já lançadas), estrutura, limite de jogadores e
+- **Criação:** nome, descrição e regras, formato (Standard, Extra Grand Battle ou Livre) e se aceita spoilers (veja
+  [Formatos](#formatos); o Livre sempre aceita), estrutura, limite de jogadores e
   início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
 - **Check-in, início automático e W.O. por ausência** (torneios com data de início; ligado por padrão ao criar):
   - O **check-in** abre 30 minutos antes do início, na página do torneio e num atalho no alto da tela inicial, para
@@ -414,7 +429,7 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 - **Melhor de 3 / melhor de 5 na eliminatória:** o organizador escolhe a partir de qual fase (toda a eliminatória,
   rodada de 32, oitavas, quartas, semifinal ou final) as partidas passam a ser melhor de 3 e melhor de 5. Ex.: melhor
   de 3 a partir das quartas e melhor de 5 na final.
-- **Inscrição:** com um deck válido no formato (e sem spoilers, salvo no "Todas as cartas + spoilers"). A lista fica **congelada** na inscrição (mudar o deck depois não muda
+- **Inscrição:** com um deck válido no formato (e sem spoilers, salvo nos torneios que aceitam spoilers). A lista fica **congelada** na inscrição (mudar o deck depois não muda
   o do torneio; inscreva-o de novo para trocar, só enquanto as inscrições estão abertas: depois que o torneio começa,
   ninguém troca nem o deck nem a lista). Enquanto as inscrições estão abertas, os outros jogadores **não veem** qual
   deck cada um inscreveu (só o organizador, um Admin e o próprio jogador); quando o torneio começa, o Líder de cada um
@@ -860,7 +875,8 @@ Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
   Para fazer tudo na hora: `npm run cards:import -- --spoilers`.
 - Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
 - No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
-- Deck com spoiler não entra na ranqueada nem em torneio que não seja "Todas as cartas + spoilers" (veja [Formatos](#formatos)).
+- Deck com spoiler não entra na ranqueada nem em torneio, sala privada ou treino sem spoilers (veja [Formatos](#formatos)),
+  e a partida com ele não conta nas estatísticas.
   Quando a coleção sai e a etiqueta some, o mesmo deck passa a valer em todo lugar.
 - O [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) costuma revelar antes e tem promocionais que as outras fontes não
   têm, mas errou contador, cor e poder em algumas e as imagens dele só abrem no próprio site. Por isso fica desligado por

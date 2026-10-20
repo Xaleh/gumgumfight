@@ -240,6 +240,30 @@ describe('API de estatísticas', () => {
     expect((await app.inject('/api/stats?by=bot')).json().summary.games).toBe(2);
   });
 
+  it('só Standard e EGB puros entram: Livre, treino com spoilers e carta de spoiler ficam de fora', async () => {
+    const { db, app } = setup();
+    const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
+    const post = (seed: number, extra: object) => {
+      const r = playOut(decks, cards, seed);
+      return app.inject({ method: 'POST', url: '/api/matches', headers: ALICE, payload: { mode: 'bot', seed, decks, actions: r.actions, ...extra } });
+    };
+    expect((await post(21, { format: 'free' })).statusCode).toBe(200);
+    expect((await post(22, { format: 'egb', spoilers: true })).statusCode).toBe(200);
+    const stats = async () => (await app.inject({ url: '/api/stats', headers: ALICE })).json();
+    expect((await stats()).summary.games).toBe(0);
+    expect((await app.inject({ url: '/api/stats/meta', headers: ALICE })).json().myDecks).toEqual([]);
+    // Gravadas mesmo assim (replay e relatórios), só fora das estatísticas.
+    expect(db.prepare('SELECT COUNT(*) AS n FROM match_seats WHERE listed = 0').get()).toEqual({ n: 4 });
+
+    // Carta de spoiler no deck (mesmo num treino sem a opção) também fica de fora.
+    db.prepare("UPDATE cards SET data = json_set(data, '$.spoiler', json('{\"source\":\"teste\"}')) WHERE id = ?").run(decks[0].cards[0].id);
+    expect((await post(23, { format: 'egb' })).statusCode).toBe(200);
+    expect((await stats()).summary.games).toBe(0);
+    db.prepare("UPDATE cards SET data = json_remove(data, '$.spoiler') WHERE id = ?").run(decks[0].cards[0].id);
+    expect((await post(24, { format: 'egb' })).statusCode).toBe(200);
+    expect((await stats()).summary.games).toBe(1);
+  });
+
   it('Estatísticas Pro: partida de torneio só entra no meta depois que o torneio termina', async () => {
     const { db, app } = setup();
     const { decks, cards } = await decksAndCards(app, ['st01-luffy', 'st02-kid']);
