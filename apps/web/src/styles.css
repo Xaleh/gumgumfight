@@ -12688,6 +12688,31 @@ a.sponsor-card:hover {
   justify-content: flex-start;
   margin-top: 8px;
 }
+/* divulgação do torneio (convite para os grupos de WhatsApp) */
+.tour-share {
+  margin-top: 8px;
+}
+.tour-share.created {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ok) 12%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, var(--line));
+}
+.tour-share.created p {
+  margin: 0 0 8px;
+}
+.tour-share-row {
+  justify-content: flex-start;
+}
+.tour-share a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.tour-share .btn.whatsapp {
+  background: color-mix(in srgb, var(--ok) 15%, var(--panel));
+  border-color: var(--ok);
+}
 .tour-incidents h3 {
   margin: 10px 0 4px;
 }
