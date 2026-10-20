@@ -11786,11 +11786,11 @@ a.sponsor-card:hover {
   border: 0;
   box-shadow: none;
 }
+/* o playmat (como o do regional de Londres): fundo azul-marinho quase preto, nos dois temas */
 .game.streamer.lateral {
   background:
-    radial-gradient(45% 80% at 0% 50%, rgba(255, 112, 76, 0.26), transparent 70%),
-    radial-gradient(45% 80% at 100% 50%, rgba(56, 132, 255, 0.28), transparent 70%),
-    linear-gradient(180deg, var(--mat-1) 0%, var(--mat-2) 50%, var(--mat-3) 100%);
+    radial-gradient(60% 70% at 50% 50%, #1c2632 0%, transparent 100%),
+    linear-gradient(180deg, #121821 0%, #0e131a 100%);
 }
 
 /* ---- HUD ---- */
@@ -12226,16 +12226,6 @@ a.sponsor-card:hover {
   justify-items: center;
   row-gap: 8px;
 }
-.lat-center::after {
-  content: '';
-  grid-row: 1 / -1;
-  grid-column: 1;
-  width: 10px;
-  height: 100%;
-  border-radius: 6px;
-  background: var(--mat-line);
-  z-index: 0;
-}
 .lat-center::before {
   content: '';
   grid-row: 3;
@@ -12324,6 +12314,66 @@ a.sponsor-card:hover {
 /* a faixa de turno fica abaixo do logo, sobre a mensagem da faixa central */
 .game.streamer.lateral .turn-banner {
   top: 62%;
+}
+
+/*
+ * O desenho do playmat: a bússola dourada grande no meio, pegando os dois campos, e as molduras
+ * douradas finas de cada espaço (sempre à vista, com ou sem carta). `.zones-only`: só as molduras da
+ * Vida, dos decks e do descarte.
+ */
+.lat-scene {
+  --pm-gold: #d9ac4a;
+  --slot-text: rgba(217, 172, 74, 0.7);
+}
+.lat-table {
+  background: url('./assets/playmat-compass.svg') center / auto 84% no-repeat;
+}
+.lat-scene .slot-empty,
+.lat-scene .lat-donback.empty {
+  background: none;
+  border: 0;
+}
+.lat-dondeck::before,
+.lat-dons::before,
+.lat-trash::before,
+.lat-life::before,
+.lat-leader::before,
+.lat-stage::before,
+.lat-slot::before,
+.lat-deck::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--cw) * -0.06);
+  border: 1.5px solid var(--pm-gold);
+  border-radius: calc(var(--cw) * 0.08);
+  opacity: 0.8;
+  pointer-events: none;
+}
+/* a Vida: a moldura cabe a fileira cheia (5 cartas semi-empilhadas), com o nome da área fora dela */
+.lat-life::before {
+  right: auto;
+  width: calc(var(--ch) + var(--cw) * 1.22);
+}
+.lat-life > .lat-label {
+  left: calc(var(--ch) + var(--cw) * 1.16);
+}
+/* os nomes das áreas do lado de fora das molduras */
+.lat-scene .lat-label {
+  margin-left: calc(var(--cw) * 0.06);
+}
+.lat-dons::before {
+  inset: calc(var(--cw) * -0.06);
+  bottom: 0;
+}
+.zones-only .lat-dons::before,
+.zones-only .lat-leader::before,
+.zones-only .lat-stage::before,
+.zones-only .lat-slot::before,
+.zones-only .lat-stage > .slot-empty,
+.zones-only .lat-leader > .lat-label,
+.zones-only .lat-stage > .lat-label,
+.zones-only .lat-chars > .lat-label {
+  display: none;
 }
 
 /* ------------------------------------------------------------------ Judge: pausa, painel e chamado */
