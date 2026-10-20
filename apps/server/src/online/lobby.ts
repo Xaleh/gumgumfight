@@ -3,9 +3,9 @@
 // gravação das salas no banco (para sobreviver a reinícios e deploys).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { type CardData, cardImage, type PlayerId } from '@gumgum/engine';
+import { type CardData, cardImage, type PlayerId, type PlayMode } from '@gumgum/engine';
 import { type ErrorParams, fail } from '../errors';
-import { FORMATS, type FormatId } from '../stats/catalog';
+import { FORMATS, type FormatId, type PlayFormat } from '../stats/catalog';
 import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
 
 /** Quem quer jogar (perfil do jogador e deck escolhido). */
@@ -71,7 +71,9 @@ export interface LobbyDeps {
 export interface LiveRoom {
   id: string;
   queue: RoomData['queue'];
-  format: FormatId;
+  format: PlayFormat;
+  /** Aceita cartas de spoiler (sala privada, treino contra o bot e torneio; ausente nas filas). */
+  spoilers?: boolean;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -276,14 +278,14 @@ export class Lobby {
   }
 
   /** `showHands`: quem cria libera as mãos dos jogadores para quem transmite (ver `Room.handsAllowed`). */
-  createPrivate(seat: SeatRequest, format: FormatId, showHands = false): { room: Room; token: string } | LobbyError {
+  createPrivate(seat: SeatRequest, mode: PlayMode, showHands = false): { room: Room; token: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     // Uma sala de espera por jogador: a anterior é cancelada.
     for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
     this.leaveQueue(seat.ownerHash);
     const token = randomToken();
-    const data = newRoomData({ queue: 'private', format, code: this.newCode(), seats: [{ ...seat, token }] });
+    const data = newRoomData({ queue: 'private', ...mode, code: this.newCode(), seats: [{ ...seat, token }] });
     if (showHands) data.showHands = true;
     const room = this.makeRoom(data);
     this.deps.save?.(room.data);
@@ -297,9 +299,13 @@ export class Lobby {
     return room?.status === 'waiting' ? room : undefined;
   }
 
-  /** Formato da sala privada do código (quem entra joga no formato de quem criou). */
-  privateFormat(code: string): FormatId | null {
-    return this.waitingRoom(code)?.data.format ?? null;
+  /**
+   * Regras de cartas da sala privada do código (quem entra joga nas regras de quem criou).
+   * Salas criadas antes da escolha de spoilers não têm o campo: aceitavam spoilers.
+   */
+  privateMode(code: string): PlayMode | null {
+    const data = this.waitingRoom(code)?.data;
+    return data ? { format: data.format, spoilers: data.spoilers ?? true } : null;
   }
 
   joinPrivate(code: string, seat: SeatRequest): { room: Room; token: string } | LobbyError {
@@ -319,14 +325,14 @@ export class Lobby {
    * Treino contra o bot do servidor: começa na hora; a partida pode ser assistida.
    * `first`: quem começa (0 = o jogador, 1 = o bot); sem ele, o sorteio decide.
    */
-  createBotRoom(seat: SeatRequest, bot: SeatRequest, format: FormatId, first?: PlayerId): { room: Room; token: string } | LobbyError {
+  createBotRoom(seat: SeatRequest, bot: SeatRequest, mode: PlayMode, first?: PlayerId): { room: Room; token: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
     this.leaveQueue(seat.ownerHash);
     const token = randomToken();
     const room = this.makeRoom(
-      newRoomData({ queue: 'bot', format, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
+      newRoomData({ queue: 'bot', ...mode, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
     );
     if (first !== undefined) room.data.firstPlayer = first;
     room.start(0);
@@ -339,7 +345,7 @@ export class Lobby {
    * volta. Cada jogo de uma melhor de N tem a sua sala; um jogo terminado sem
    * vencedor é trocado por outra sala.
    */
-  tournamentRoom(seat: SeatRequest, format: FormatId, tournament: RoomTournament): { room: Room; token: string } | LobbyError {
+  tournamentRoom(seat: SeatRequest, mode: PlayMode, tournament: RoomTournament): { room: Room; token: string } | LobbyError {
     const id = this.tournamentRooms.get(tournamentKey(tournament));
     const existing = id ? this.rooms.get(id) : undefined;
     if (existing && existing.status !== 'finished') {
@@ -364,7 +370,7 @@ export class Lobby {
     for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
     this.leaveQueue(seat.ownerHash);
     const token = randomToken();
-    const room = this.makeRoom(newRoomData({ queue: 'tournament', format, code: null, tournament, seats: [{ ...seat, token }] }));
+    const room = this.makeRoom(newRoomData({ queue: 'tournament', ...mode, code: null, tournament, seats: [{ ...seat, token }] }));
     this.deps.save?.(room.data);
     return { room, token };
   }
@@ -393,6 +399,7 @@ export class Lobby {
       id: room.id,
       queue: room.data.queue,
       format: room.data.format,
+      ...(room.data.spoilers !== undefined ? { spoilers: room.data.spoilers } : {}),
       status: room.status === 'finished' ? 'finished' : 'playing',
       players: room.data.seats.map((s, i) => ({
         name: s.name,
@@ -630,7 +637,7 @@ export class Lobby {
       }
       // Quem foi o segundo assento passa a ser o primeiro (quem começa é sorteado).
       const seats = [room.data.seats[1], room.data.seats[0]].map((s) => ({ ...s, token: randomToken() }));
-      const data = newRoomData({ queue: 'private', format: room.data.format, code: null, seats });
+      const data = newRoomData({ queue: 'private', format: room.data.format, spoilers: room.data.spoilers, code: null, seats });
       // A revanche segue com a mesma escolha de quem criou a sala.
       if (room.data.showHands) data.showHands = true;
       const next = this.makeRoom(data);

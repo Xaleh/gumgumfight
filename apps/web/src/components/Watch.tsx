@@ -1,6 +1,5 @@
-import { formatLabel } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, type BroadcastInfo, type BroadcastSettings, broadcastUrl, type LiveRoom, ROLE_LABEL, type WatchTarget } from '../api';
+import { api, type BroadcastInfo, type BroadcastSettings, broadcastUrl, type LiveRoom, modeLabel, ROLE_LABEL, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
 import { useT } from '../i18n';
 import { LeaderArt } from './LeaderArt';
@@ -182,7 +181,7 @@ export function LiveRoomRow({ room: r, onClick, short, current }: { room: LiveRo
           </span>
         )}
         <span className="muted small">
-          {formatLabel(r.format)} · {r.turn ? t('watch.turn', { n: r.turn }) : t('watch.openingHand')}
+          {modeLabel(r)} · {r.turn ? t('watch.turn', { n: r.turn }) : t('watch.openingHand')}
           {r.spectators ? ` · 👁 ${r.spectators}` : ''}
         </span>
       </div>

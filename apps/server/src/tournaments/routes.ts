@@ -33,7 +33,7 @@
 // decidiu a partida da rodada atual, ela pode voltar a ficar pendente) e inscrição
 // atrasada (só no suíço, durante a rodada 1: quem entra começa a rodada 2 com uma derrota).
 
-import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, spoilerIssues, tournamentFormatLabel } from '@gumgum/engine';
+import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, playMode, playModeLabel, spoilerIssues } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
 import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
@@ -44,7 +44,7 @@ import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
 import { TIME_BANK_MS } from '../online/room';
 import type { ApiCard } from '../present';
-import { isFormat, tierFor } from '../stats/catalog';
+import { isFormat, isPlayFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer, findPlayer } from '../stats/store';
 import { listReports } from '../reports/store';
 import { getSponsor, publicSponsor } from '../support/sponsors';
@@ -164,8 +164,9 @@ const PHASE_SIZES = [2, 4, 8, 16, 32, 64, 128, 256];
 type Body = {
   name?: unknown;
   description?: unknown;
+  /** Standard, EGB ou Livre (vale tudo, inclusive as banidas). */
   format?: unknown;
-  /** Aceita cartas de spoiler (só com o formato EGB: "Todas as cartas + spoilers"). */
+  /** Aceita cartas de spoiler (Standard ou EGB + spoilers; o Livre sempre aceita). */
   spoilers?: unknown;
   /** Quem transmite vê as mãos dos jogadores ao vivo (sem o atraso mínimo). */
   liveHands?: unknown;
@@ -199,10 +200,9 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
   const name = typeof b.name === 'string' ? b.name.trim().replace(/\s+/g, ' ').slice(0, 80) : '';
   if (name.length < 3) return fail('tourNameTooShort', 'Dê um nome ao torneio (pelo menos 3 letras).');
   const description = typeof b.description === 'string' ? b.description.trim().slice(0, 2000) : '';
-  if (!isFormat(b.format)) return fail('invalidFormat', 'Formato inválido.');
-  const spoilers = b.spoilers === true;
+  if (!isPlayFormat(b.format)) return fail('invalidFormat', 'Formato inválido.');
+  const { format, spoilers } = playMode(b.format, b.spoilers === true);
   const liveHands = b.liveHands === true;
-  if (spoilers && b.format !== 'egb') return fail('tourSpoilersNeedEgb', 'Spoilers só valem no formato com todas as cartas (Extra Grand Battle).');
   if (b.structure !== 'swiss' && b.structure !== 'single') return fail('invalidStructure', 'Estrutura inválida.');
   const swiss = b.structure === 'swiss';
   const int = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -243,7 +243,7 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
   return {
     name,
     description,
-    format: b.format,
+    format,
     spoilers,
     liveHands,
     structure: b.structure,
@@ -1126,7 +1126,7 @@ export function registerTournamentRoutes(
       const at = legalAt(input);
       const bad = listPlayers(db, found.t.id).filter((p) => frozenIssue(p.deck, input, at));
       if (bad.length) {
-        const format = tournamentFormatLabel(input);
+        const format = playModeLabel(input);
         return reply
           .code(400)
           .send(fail('tourDecksNotAllowed', `${bad.length} inscrito(s) usam decks que não valem no formato ${format}.`, { n: bad.length, format }));
@@ -1171,7 +1171,7 @@ export function registerTournamentRoutes(
     const stale = staleDecks(t, players, new Date(now()));
     if (stale.length) {
       const names = stale.map((p) => p.name).join(', ');
-      const format = tournamentFormatLabel(t);
+      const format = playModeLabel(t);
       return reply
         .code(409)
         .send(
@@ -1864,7 +1864,7 @@ export function registerTournamentRoutes(
         deckId: player.deckId,
         deck: player.deck,
       },
-      t.format,
+      { format: t.format, spoilers: t.spoilers },
       {
         id: t.id,
         name: t.name,

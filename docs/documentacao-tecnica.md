@@ -242,8 +242,11 @@ volta a ação feita sobre a visão.
 
 ### Formatos (`formats.ts`)
 
-`standard` e `egb`. Banidas (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação do bloco ① em
-Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 14 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
+`standard` e `egb` (`FormatId`, os oficiais: filas, selos do deck e estatísticas) e `free`, o Livre (`PlayFormat`: só
+torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `PlayMode` =
+formato + `spoilers` (`playMode` liga os spoilers no Livre); `countsInStats` diz se a partida entra nas estatísticas
+(só Standard e EGB puros, sem spoilers). Banidas (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
+do bloco ① em Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 14 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
 regras especiais do Líder.
 
 ### Tradução
@@ -533,7 +536,7 @@ baixadas quando tocam) + `public/`.
 | `players` | `id` (`p-` + 12 hex) | `owner_hash` (único: `sha256(navegador)` ou `user:<id>`), `name` (público, "Pirata XXXX"), `bounty` (Beries), `ranked_games` | primeira partida/consulta, ranqueada, `PUT /api/players/me` |
 | `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida | gravação de partida |
 | `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON)**, `created_at` | gravação de partida |
-| `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`. Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
+| `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
 | `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
@@ -976,7 +979,7 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
 
 ### Modelo
 
-- **`tournaments`**: `format` (`standard`/`egb`), `structure` (`swiss` | `single`), `rounds` (1–15 ou null =
+- **`tournaments`**: `format` (`standard`/`egb`/`free`), `spoilers` (aceita cartas de spoiler; sempre 1 no `free`), `structure` (`swiss` | `single`), `rounds` (1–15 ou null =
   ⌈log₂ n⌉ no início), `swiss_best_of` (1 | 3), `top_cut` (2…64 | null), `bo3_from`/`bo5_from` (tamanho da fase a
   partir da qual a série é melhor de 3/5: 8 = quartas, 2 = final), `max_players` (2–256), `starts_at` (com
   `check_in`, hora do início automático), `check_in` (check-in, início automático e W.O. por ausência), `tolerance_min` (minutos para entrar na sala, 1–60), `status`

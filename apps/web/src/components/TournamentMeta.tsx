@@ -4,7 +4,7 @@
 
 import { FORMATS } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
-import { api, type CardInfo, type FormatId, type TournamentMeta as Meta, tourFormatLabel } from '../api';
+import { api, type CardInfo, type FormatId, type TournamentMeta as Meta, modeLabel } from '../api';
 import { useLocale, useT } from '../i18n';
 import { fmtDate, fmtDateTime, fmtNumber } from '../i18n/format';
 import { LeaderArt } from './LeaderArt';
@@ -55,7 +55,7 @@ export default function TournamentMeta({ onOpen }: { onOpen: (id: string) => voi
           </button>
           {FORMATS.map((f) => (
             <button key={f.id} className={format === f.id ? 'on' : ''} onClick={() => setFormat(f.id)}>
-              {tourFormatLabel({ format: f.id })}
+              {modeLabel({ format: f.id })}
             </button>
           ))}
         </div>
@@ -100,7 +100,7 @@ export default function TournamentMeta({ onOpen }: { onOpen: (id: string) => voi
                     <span className="muted small">
                       {[
                         data.latest.finishedAt && fmtDate(data.latest.finishedAt, locale),
-                        tourFormatLabel(data.latest),
+                        modeLabel(data.latest),
                         tr('tour.playersCount', { n: data.latest.players }),
                       ]
                         .filter(Boolean)
@@ -132,7 +132,7 @@ export default function TournamentMeta({ onOpen }: { onOpen: (id: string) => voi
                     <span className="muted small">
                       {[
                         u.startsAt && u.status === 'registration' ? fmtDateTime(u.startsAt, locale) : null,
-                        tourFormatLabel(u),
+                        modeLabel(u),
                         u.maxPlayers ? tr('tour.playersOfMax', { n: u.players, max: u.maxPlayers }) : tr('tour.playersCount', { n: u.players }),
                       ]
                         .filter(Boolean)

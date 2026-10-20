@@ -1,7 +1,7 @@
-import { type MessageKey, type Params, t, tryT } from './i18n';
-import { type Action, type CardData, type DeckList, type FormatId, formatLabel, type ManualOp, type PlayerId } from '@gumgum/engine';
+import { type MessageKey, type Params, t, type Translate, tryT } from './i18n';
+import { type Action, type CardData, type DeckList, type FormatId, formatLabel, type ManualOp, type PlayerId, type PlayFormat, type PlayMode } from '@gumgum/engine';
 
-export type { FormatId };
+export type { FormatId, PlayFormat, PlayMode };
 
 export interface DeckSummary {
   id: string;
@@ -30,18 +30,19 @@ export interface DeckSummary {
 }
 
 /**
- * Deck completo e permitido no formato (cartas banidas ou rotacionadas impedem). Com
- * `noSpoilers` (ranqueada e torneios sem spoilers), cartas ainda não lançadas também impedem.
+ * Deck completo e permitido no formato (cartas banidas ou rotacionadas impedem; no Livre, nada
+ * impede). Com `noSpoilers` (ranqueada e torneios, salas e treinos sem spoilers), cartas ainda
+ * não lançadas também impedem.
  */
-export function canPlay(deck: DeckSummary, format: FormatId, noSpoilers = false): boolean {
-  return deck.valid && !deck.formats?.[format]?.length && !(noSpoilers && deck.spoilers?.length);
+export function canPlay(deck: DeckSummary, format: PlayFormat, noSpoilers = false): boolean {
+  return deck.valid && !(format !== 'free' && deck.formats?.[format]?.length) && !(noSpoilers && deck.spoilers?.length);
 }
 
 /** Por que o deck não pode ser usado no formato (null = pode). */
-export function whyNotPlayable(deck: DeckSummary, format: FormatId, noSpoilers = false): string | null {
+export function whyNotPlayable(deck: DeckSummary, format: PlayFormat, noSpoilers = false): string | null {
   if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
-  const issues = deck.formats?.[format] ?? [];
-  const codes = deck.formatCodes?.[format];
+  const issues = (format !== 'free' && deck.formats?.[format]) || [];
+  const codes = format !== 'free' ? deck.formatCodes?.[format] : undefined;
   if (issues.length) return issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n');
   return noSpoilers && deck.spoilers?.length ? spoilerText(deck.spoilers) : null;
 }
@@ -51,9 +52,11 @@ export function spoilerText(ids: string[]): string {
   return t('rules.spoiler', { n: ids.length, ids: ids.slice(0, 3).join(', ') + (ids.length > 3 ? '…' : '') });
 }
 
-/** Nome do formato de um torneio: com spoilers, "Todas as cartas + spoilers" (traduzido). */
-export function tourFormatLabel(tour: { format: FormatId; spoilers?: boolean }): string {
-  return tour.spoilers ? t('tour.formatSpoilers') : formatLabel(tour.format);
+/** Nome das regras de cartas de um torneio ou sala: "Standard", "Standard + spoilers", "Livre (vale tudo)"… (traduzido). */
+export function modeLabel(m: { format: PlayFormat | string; spoilers?: boolean }, tr: Translate = t): string {
+  if (m.format === 'free') return tr('mode.free');
+  const format = formatLabel(m.format as FormatId);
+  return m.spoilers ? tr('mode.withSpoilers', { format }) : format;
 }
 
 /** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. O título é chave (`t(title)`). */
@@ -593,8 +596,8 @@ export const api = {
     /** Contadores do menu; a consulta também conta este navegador como conectado. */
     stats: () => get<OnlineStats>('/api/online/stats'),
     /** Treino contra o bot transmitido: o servidor joga pelo bot e a partida aparece em "Assistir" (exige login). */
-    botRoom: (deckId: string, botDeckId: string, format: FormatId, first?: PlayerId) =>
-      send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, format, ...(first !== undefined ? { first } : {}) }),
+    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId) =>
+      send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, ...mode, ...(first !== undefined ? { first } : {}) }),
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
@@ -607,8 +610,8 @@ export const api = {
     watchUrl: (roomId: string, hands: boolean, key?: string, judge = false) =>
       `/api/online/rooms/${roomId}/watch${judge ? '?judge=1' : key ? `?k=${encodeURIComponent(key)}` : hands ? '?hands=1' : ''}`,
     /** `showHands`: libera as mãos dos jogadores para quem transmite (streamer, com atraso). */
-    createRoom: (deckId: string, format: FormatId, showHands = false) =>
-      send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, format, ...(showHands ? { showHands } : {}) }),
+    createRoom: (deckId: string, mode: PlayMode, showHands = false) =>
+      send<{ roomId: string; code: string; token: string }>('POST', '/api/online/rooms', { deckId, ...mode, ...(showHands ? { showHands } : {}) }),
     joinRoom: (code: string, deckId: string) => send<{ roomId: string; token: string }>('POST', '/api/online/rooms/join', { code, deckId }),
     /** `leader` (só casual): Líder do oponente desejado no primeiro minuto. */
     enqueue: (deckId: string, format: FormatId, queue: QueueKind, leader?: string | null) =>
@@ -708,7 +711,9 @@ export interface LiveRoom {
   /** Quem pede joga esta partida (só na lista "Assistir"): não dá para vê-la com as mãos. */
   mine?: boolean;
   queue: RoomQueue;
-  format: FormatId;
+  format: PlayFormat;
+  /** Aceita cartas de spoiler (sala privada, treino contra o bot e torneio; ausente nas filas). */
+  spoilers?: boolean;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -770,7 +775,9 @@ export interface OnlineRoomInfo {
   id: string;
   code: string | null;
   queue: RoomQueue;
-  format: FormatId;
+  format: PlayFormat;
+  /** Aceita cartas de spoiler (sala privada, treino contra o bot e torneio; ausente nas filas). */
+  spoilers?: boolean;
   /** Jogo de uma partida de torneio; `score`: placar da série antes deste jogo, na ordem dos assentos. */
   tournament: {
     id: string;
@@ -828,8 +835,9 @@ export const TOURNAMENT_STATUS_LABEL: Record<TournamentStatus, MessageKey> = {
 export interface TournamentInput {
   name: string;
   description: string;
-  format: FormatId;
-  /** Aceita cartas de spoiler, ainda não lançadas (só com `format: 'egb'`: "Todas as cartas + spoilers"). */
+  /** Standard, EGB ou Livre (vale tudo, inclusive as banidas). */
+  format: PlayFormat;
+  /** Aceita cartas de spoiler, ainda não lançadas (o Livre sempre aceita). */
   spoilers: boolean;
   structure: TournamentStructure;
   /** Rodadas do suíço: null = calculado pelo número de inscritos no início. */
@@ -864,7 +872,7 @@ export interface TournamentInput {
 export interface TournamentSummary {
   id: string;
   name: string;
-  format: FormatId;
+  format: PlayFormat;
   /** Aceita cartas de spoiler (servidores antigos não mandam). */
   spoilers?: boolean;
   structure: TournamentStructure;
@@ -893,7 +901,7 @@ export interface TournamentSummary {
 export interface MetaEvent {
   id: string;
   name: string;
-  format: FormatId;
+  format: PlayFormat;
   spoilers: boolean;
   official: boolean;
   finishedAt: string | null;
@@ -910,7 +918,7 @@ export interface TournamentMeta {
   upcoming: Array<{
     id: string;
     name: string;
-    format: FormatId;
+    format: PlayFormat;
     spoilers: boolean;
     official: boolean;
     prize: string | null;
@@ -1305,7 +1313,7 @@ export interface TournamentDetail {
   id: string;
   name: string;
   description: string;
-  format: FormatId;
+  format: PlayFormat;
   /** Aceita cartas de spoiler (servidores antigos não mandam). */
   spoilers?: boolean;
   structure: TournamentStructure;
@@ -1439,7 +1447,9 @@ export function phaseLabel(size: number): string {
 
 export interface MatchUpload {
   mode: 'bot';
-  format: FormatId;
+  format: PlayFormat;
+  /** O treino aceitava spoilers (aí não entra nas estatísticas). */
+  spoilers?: boolean;
   seed: number;
   firstPlayer?: PlayerId;
   /** O vencedor do sorteio escolheu quem começa (primeira ação). */

@@ -3,7 +3,7 @@
 // GET /api/stats/meta, então mudar uma faixa ou um formato é só mexer aqui.
 
 // Formatos: definidos no motor, junto das regras de cartas banidas e rotacionadas.
-export { FORMATS, type FormatId, isFormat } from '@gumgum/engine';
+export { FORMATS, type FormatId, isFormat, isPlayFormat, type PlayFormat } from '@gumgum/engine';
 
 export const QUEUES = [
   { id: 'casual', label: 'Casual' },

@@ -1,4 +1,4 @@
-import { type BotLevel, cardLegality, FORMATS, formatLabel, type PlayerId } from '@gumgum/engine';
+import { type BotLevel, cardLegality, FORMATS, type PlayerId, playMode, type PlayMode } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
@@ -8,6 +8,7 @@ import {
   deckGroups,
   type DeckSummary,
   type FormatId,
+  modeLabel,
   type OnlineSeat,
   type QueueKind,
   type QueueLeader,
@@ -40,6 +41,37 @@ const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 const LAST_DECKS = 'gumgum.lastDecks';
 const LAST_FORMAT = 'gumgum.format';
 const LAST_BOT_LEVEL = 'gumgum.botLevel';
+const LAST_PRIVATE_RULES = 'gumgum.privateRules';
+const LAST_BOT_RULES = 'gumgum.botRules';
+
+/**
+ * Cartas das salas privadas e do treino contra o bot: só as lançadas, também os spoilers ou
+ * Livre (vale tudo, inclusive as banidas). Com o formato escolhido, dá as cinco opções.
+ */
+type Rules = 'released' | 'spoilers' | 'free';
+
+const RULES: ReadonlyArray<[Rules, MessageKey]> = [
+  ['released', 'menu.rulesReleased'],
+  ['spoilers', 'menu.rulesSpoilers'],
+  ['free', 'menu.rulesFree'],
+];
+
+function savedRules(key: string): Rules {
+  try {
+    const v = localStorage.getItem(key);
+    return v === 'spoilers' || v === 'free' ? v : 'released';
+  } catch {
+    return 'released';
+  }
+}
+
+function saveRules(key: string, rules: Rules) {
+  try {
+    localStorage.setItem(key, rules);
+  } catch {
+    /* sem armazenamento local */
+  }
+}
 
 function savedBotLevel(): BotLevel {
   try {
@@ -76,7 +108,8 @@ function DeckPicker({
   title,
   decks,
   value,
-  format,
+  mode,
+  anyValid,
   allowRandom,
   onPick,
   onClose,
@@ -84,7 +117,10 @@ function DeckPicker({
   title: string;
   decks: DeckSummary[];
   value: string;
-  format: FormatId;
+  /** Regras em que o deck vai jogar (os que não valem nelas aparecem marcados). */
+  mode: PlayMode;
+  /** Deck equipado: qualquer deck completo pode ser escolhido (ele vale em modos diferentes, o Livre inclusive). */
+  anyValid?: boolean;
   allowRandom?: boolean;
   onPick: (id: string) => void;
   onClose: () => void;
@@ -128,14 +164,16 @@ function DeckPicker({
                     <button
                       key={d.id}
                       className={['deck-pick', d.id === value ? 'on' : ''].join(' ')}
-                      disabled={!canPlay(d, format)}
+                      disabled={anyValid ? !d.valid : !canPlay(d, mode.format, !mode.spoilers)}
                       onClick={() => onPick(d.id)}
-                      title={whyNotPlayable(d, format) ?? d.name}
+                      title={whyNotPlayable(d, mode.format, !mode.spoilers) ?? d.name}
                     >
                       <DeckArt deck={d} small />
                       <span className="name">{d.name}</span>
                       {!d.valid && <span className="muted small">{d.size}/50</span>}
-                      {d.valid && !canPlay(d, format) && <span className="muted small">{t('menu.notAllowedShort', { format: formatLabel(format) })}</span>}
+                      {d.valid && !canPlay(d, mode.format, !mode.spoilers) && (
+                        <span className="muted small">{t('menu.notAllowedShort', { format: modeLabel(mode) })}</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -195,6 +233,27 @@ const fmtClock = (ms: number) => {
   const s = Math.round(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
+
+/** Escolha das cartas da sala privada ou do treino contra o bot. */
+function RulesField({ id, value, onChange }: { id: string; value: Rules; onChange: (rules: Rules) => void }) {
+  const t = useT();
+  return (
+    <div className="mode-field">
+      <span className="mode-field-label" id={id}>
+        {t('menu.rules')}
+      </span>
+      <div className="seg small rules-seg" role="group" aria-labelledby={id}>
+        {RULES.map(([v, label]) => (
+          <button key={v} type="button" className={value === v ? 'on' : ''} aria-pressed={value === v} onClick={() => onChange(v)}>
+            {t(label)}
+          </button>
+        ))}
+      </div>
+      {/* Estatísticas só de Standard e EGB puros. */}
+      {value !== 'released' && <span className="muted small">{t('menu.rulesNoStats')}</span>}
+    </div>
+  );
+}
 
 /** Card de um modo de jogo: cor própria, contador ao vivo e botão de ação. */
 function ModeCard({
@@ -341,6 +400,8 @@ export function Menu({
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
   const [botLevel, setBotLevel] = useState<BotLevel>(savedBotLevel);
   const [format, setFormat] = useState<FormatId>(savedFormat);
+  const [privateRules, setPrivateRules] = useState<Rules>(() => savedRules(LAST_PRIVATE_RULES));
+  const [botRules, setBotRules] = useState<Rules>(() => savedRules(LAST_BOT_RULES));
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState<null | 0 | 1>(null);
@@ -503,14 +564,14 @@ export function Menu({
     try {
       // Sem apelido: um nome que funcione nas frases do log, que são em terceira pessoa ("You kept their hand" não).
       const names: [string, string] = [nickname ?? t('menu.youName'), t('menu.botName')];
-      const pool = decks.filter((d) => canPlay(d, format) && d.kind === 'builtin');
-      if (deck1 === RANDOM && !pool.length) throw new Error(t('menu.noBuiltinDeck', { format: formatLabel(format) }));
+      const pool = decks.filter((d) => playsIn(d, botMode) && d.kind === 'builtin');
+      if (deck1 === RANDOM && !pool.length) throw new Error(t('menu.noBuiltinDeck', { format: modeLabel(botMode) }));
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
       const firstPlayer = first === 'random' ? undefined : (Number(first) as PlayerId);
       let notice: string | undefined;
       if (broadcasting) {
         try {
-          onOnline(await api.online.botRoom(deck0, opp, format, firstPlayer));
+          onOnline(await api.online.botRoom(deck0, opp, botMode, firstPlayer));
           return;
         } catch (e) {
           // Servidor lotado: o treino roda no navegador, sem transmissão.
@@ -523,8 +584,8 @@ export function Menu({
       } catch {
         /* sem armazenamento local */
       }
-      const setup = await buildSetup('bot', [deck0, opp], names, seed, format, firstPlayer);
-      onStart({ ...setup, botLevel, ...(notice ? { notice } : {}) });
+      const setup = await buildSetup('bot', [deck0, opp], names, seed, botMode.format, firstPlayer);
+      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);
       setLoading(false);
@@ -536,16 +597,33 @@ export function Menu({
 
   const d0 = decks.find((d) => d.id === deck0);
   const d1 = decks.find((d) => d.id === deck1);
-  const fmt = formatLabel(format);
-  /** Os dois decks precisam valer no formato escolhido. */
-  const botReady = Boolean(d0 && canPlay(d0, format) && (deck1 === RANDOM || (d1 && canPlay(d1, format))));
-  /** Deck para as partidas online (completo e permitido no formato). */
+  const fmt = modeLabel({ format });
+  /** Regras das salas privadas e do treino: o formato escolhido (com ou sem spoilers) ou o Livre. */
+  const modeOf = (rules: Rules): PlayMode => (rules === 'free' ? playMode('free', true) : playMode(format, rules === 'spoilers'));
+  const privateMode = modeOf(privateRules);
+  const botMode = modeOf(botRules);
+  /** O deck é completo e vale nas regras. */
+  function playsIn(d: DeckSummary | undefined, mode: PlayMode): d is DeckSummary {
+    return Boolean(d && canPlay(d, mode.format, !mode.spoilers));
+  }
+  /** Os dois decks precisam valer nas regras do treino. */
+  const botReady = playsIn(d0, botMode) && (deck1 === RANDOM || playsIn(d1, botMode));
+  /** Deck para as filas (completo e permitido no formato). */
   const onlineDeck = d0 && canPlay(d0, format) ? d0 : undefined;
+  /** Deck para a sala privada (vale nas regras escolhidas para ela). */
+  const privateDeck = playsIn(d0, privateMode) ? d0 : undefined;
   const playing = active.find((r) => r.status === 'playing');
   const waiting = active.find((r) => r.status === 'waiting');
   const manualCards = d0?.unscripted ?? 0;
   const onlineBlocked = !onlineDeck || busy || Boolean(playing) || Boolean(queue);
   const onlineNote = !d0 ? t('menu.pickDeck') : !onlineDeck ? t('menu.deckNotValidIn', { format: fmt }) : playing ? t('menu.finishCurrent') : null;
+  const privateNote = !d0
+    ? t('menu.pickDeck')
+    : !privateDeck
+      ? t('menu.deckNotValidIn', { format: modeLabel(privateMode) })
+      : playing
+        ? t('menu.finishCurrent')
+        : null;
   /** Cartas de spoiler (ainda não lançadas) no deck: a ranqueada só aceita cartas lançadas. */
   const spoilerCards = d0?.spoilers?.length ?? 0;
   const rankedNote =
@@ -791,20 +869,28 @@ export function Menu({
               icon="key"
               kicker={t('menu.privateKicker')}
               title={t('menu.private')}
-              badge={fmt}
+              badge={modeLabel(privateMode)}
               desc={t('menu.privateDesc')}
               live={stats ? <Live>{t('menu.privateLive', { n: stats.playing.private, w: stats.waiting })}</Live> : <Live off>{t('menu.counting')}</Live>}
-              note={onlineNote}
+              note={privateNote}
               action={t('menu.createRoom')}
-              disabled={onlineBlocked}
+              disabled={!privateDeck || busy || Boolean(playing) || Boolean(queue)}
               highlight={Boolean(URL_ROOM_CODE)}
               onAction={() =>
                 run(async () => {
-                  const r = await api.online.createRoom(onlineDeck!.id, format, shareHands);
+                  const r = await api.online.createRoom(privateDeck!.id, privateMode, shareHands);
                   onOnline({ roomId: r.roomId, token: r.token });
                 })
               }
             >
+              <RulesField
+                id="private-rules-label"
+                value={privateRules}
+                onChange={(r) => {
+                  setPrivateRules(r);
+                  saveRules(LAST_PRIVATE_RULES, r);
+                }}
+              />
               <div className="mode-field">
                 <label htmlFor="room-code">{t('menu.roomCode')}</label>
                 <div className="code-row">
@@ -842,10 +928,10 @@ export function Menu({
               icon="bot"
               kicker={t('menu.botKicker')}
               title={t('menu.vsBot')}
-              badge={fmt}
+              badge={modeLabel(botMode)}
               desc={t('menu.botDesc')}
               live={broadcasting && stats ? <Live>{t('menu.botLive', { n: stats.playing.bot })}</Live> : <Live off>{t('menu.botLocal')}</Live>}
-              note={!d0 || botReady ? null : t('menu.bothDecksValid', { format: fmt })}
+              note={!d0 || botReady ? null : t('menu.bothDecksValid', { format: modeLabel(botMode) })}
               action={loading ? t('common.loading') : t('menu.battle')}
               disabled={!botReady || loading}
               onAction={startBot}
@@ -859,6 +945,14 @@ export function Menu({
                   <span>{interp(t('menu.opponent'), 'name', <strong>{deck1 === RANDOM ? t('menu.randomDeck') : (d1?.name ?? t('menu.choose'))}</strong>)}</span>
                   <Icon name="chevron" size={14} />
                 </button>
+                <RulesField
+                  id="bot-rules-label"
+                  value={botRules}
+                  onChange={(r) => {
+                    setBotRules(r);
+                    saveRules(LAST_BOT_RULES, r);
+                  }}
+                />
                 <div className="mode-field">
                   <span className="mode-field-label" id="first-label">
                     {t('menu.whoStarts')}
@@ -968,7 +1062,8 @@ export function Menu({
           title={picking === 0 ? t('menu.equippedDeck') : t('menu.opponentDeck')}
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
-          format={format}
+          mode={picking === 0 ? { format, spoilers: true } : botMode}
+          anyValid={picking === 0}
           allowRandom={picking === 1}
           onPick={(id) => {
             if (picking === 0) setDeck0(id);

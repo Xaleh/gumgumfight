@@ -192,6 +192,19 @@ describe('partidas online: salas privadas', () => {
     expect((await post('/api/online/rooms/join', BOB, { code: room.code, deckId: 'st13-luffy' })).statusCode).toBe(200);
   });
 
+  it('Livre (vale tudo) nas salas privadas: banidas e rotacionadas valem; a fila não tem Livre', async () => {
+    const { app } = setup();
+    const post = (url: string, headers: Record<string, string>, payload: object) => app.inject({ method: 'POST', url, headers, payload });
+    const room = await post('/api/online/rooms', ALICE, { deckId: 'st10-law', format: 'free', spoilers: false });
+    expect(room.statusCode).toBe(201);
+    expect((await post('/api/online/rooms/join', BOB, { code: room.json().code, deckId: 'st01-luffy' })).statusCode).toBe(200);
+    const info = (await app.inject({ url: `/api/online/rooms/${room.json().roomId}` })).json();
+    expect(info).toMatchObject({ format: 'free', spoilers: true });
+    // Na fila, "free" não é formato: vale o Standard (o padrão).
+    const queue = await post('/api/online/queue', ALICE, { deckId: 'st10-law', queue: 'casual', format: 'free' });
+    expect(queue.json()).toMatchObject({ errorCode: 'deckNotAllowedInFormat', errorParams: { format: 'Standard' } });
+  });
+
   it('não dá para entrar na própria sala nem com código errado', async () => {
     const { app } = setup();
     const created = (await app.inject({ method: 'POST', url: '/api/online/rooms', headers: ALICE, payload: { deckId: 'st01-luffy', format: 'egb' } })).json();
@@ -499,6 +512,13 @@ describe('partidas online: filas', () => {
     expect(casual.statusCode).toBe(201);
     await app.inject({ method: 'DELETE', url: `/api/online/queue/${casual.json().ticket}` });
     expect((await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: deck.id, format: 'egb' } })).statusCode).toBe(201);
+    // Sala privada sem spoilers (EGB puro): quem cria escolhe; quem entra segue a escolha.
+    const pure = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: nami, payload: { deckId: deck.id, format: 'egb', spoilers: false } });
+    expect(pure.json()).toMatchObject({ errorCode: 'deckHasSpoilers' });
+    const kid = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: nami, payload: { deckId: 'st02-kid', format: 'egb', spoilers: false } });
+    expect(kid.statusCode).toBe(201);
+    const join = await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: BOB, payload: { code: kid.json().code, deckId: deck.id } });
+    expect(join.json()).toMatchObject({ errorCode: 'deckHasSpoilers' });
   });
 
   it('ranqueada: só com login e sem cartas com efeito ainda não automatizado', async () => {
@@ -765,7 +785,7 @@ describe('partidas online: relógio', () => {
     let t = 1_000_000;
     const db = freshDb();
     const l = lobby(db, () => t);
-    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), { format: 'standard', spoilers: true });
     if ('error' in r) throw new Error(r.error);
     const j = l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     if ('error' in j) throw new Error(j.error);
@@ -836,7 +856,7 @@ describe('partidas online: relógio', () => {
     let t = 0;
     const db = freshDb();
     const l = lobby(db, () => t);
-    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), { format: 'standard', spoilers: true });
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     const room = r.room;
@@ -859,7 +879,7 @@ describe('partidas online: relógio', () => {
     };
     const db = freshDb();
     const l = lobby(db, () => t);
-    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), { format: 'standard', spoilers: true });
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     const room = r.room;
@@ -922,7 +942,7 @@ describe('partidas online: relógio', () => {
     let t = 5_000_000;
     const db = freshDb();
     const l = lobby(db, () => t);
-    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), { format: 'standard', spoilers: true });
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     r.room.data.queue = 'tournament';
@@ -953,7 +973,7 @@ describe('partidas online: relógio', () => {
     };
     const db = freshDb();
     const l = lobby(db, () => t);
-    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), { format: 'standard', spoilers: true });
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     const room = r.room;
@@ -997,7 +1017,7 @@ describe('partidas online: relógio', () => {
   it('torneio com mãos ao vivo: quem vê as mãos assiste em tempo real, com as duas mãos à vista', () => {
     const db = freshDb();
     const l = lobby(db, () => 1_000_000);
-    const r = l.createPrivate(seat('a', 'st01-luffy', db), 'standard');
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), { format: 'standard', spoilers: true });
     if ('error' in r) throw new Error(r.error);
     l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
     const room = r.room;

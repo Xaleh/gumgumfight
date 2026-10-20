@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { validateDeck } from '../src/deck';
-import { cardBlock, cardLegality, formatIssues, legalFormats, spoilerCards, spoilerIssues, tournamentFormatLabel } from '../src/formats';
+import {
+  cardBlock,
+  cardLegality,
+  countsInStats,
+  formatIssues,
+  legalFormats,
+  playMode,
+  playModeLabel,
+  spoilerCards,
+  spoilerIssues,
+} from '../src/formats';
 import type { CardData, DeckList } from '../src/types';
 import { cards, luffy } from './helpers';
 
@@ -97,8 +107,41 @@ describe('spoilers (cartas ainda não lançadas)', () => {
     expect(spoilerIssues({ leader: 'ST01-002', cards: [] }, pool)).toEqual([]);
   });
 
-  it('nome do formato de torneio com spoilers', () => {
-    expect(tournamentFormatLabel({ format: 'egb', spoilers: true })).toBe('Todas as cartas + spoilers');
-    expect(tournamentFormatLabel({ format: 'standard' })).toBe('Standard');
+  it('nome das regras de cartas (torneios, salas privadas e bot)', () => {
+    const modes = [playMode('egb', false), playMode('egb', true), playMode('standard', false), playMode('standard', true), playMode('free', false)];
+    expect(modes.map(playModeLabel)).toEqual([
+      'Extra Grand Battle',
+      'Extra Grand Battle + spoilers',
+      'Standard',
+      'Standard + spoilers',
+      'Livre (vale tudo)',
+    ]);
+    expect(playModeLabel({ format: 'standard' })).toBe('Standard');
+  });
+});
+
+describe('Livre (vale tudo)', () => {
+  it('aceita cartas banidas, rotacionadas e pares proibidos', () => {
+    expect(cardLegality('ST10-001', 'free', NOW)).toBe('legal');
+    expect(cardLegality('OP01-001', 'free', NOW)).toBe('legal');
+    expect(formatIssues({ leader: 'OP11-040', cards: [{ id: 'OP11-067', count: 4 }, { id: 'ST10-001', count: 1 }] }, 'free', NOW)).toEqual([]);
+    const d: DeckList = { ...luffy, cards: [...luffy.cards.slice(1), { id: 'ST10-001', count: 1 }] };
+    expect(validateDeck(d, byId, { format: 'free', now: NOW }).valid).toBe(validateDeck(d, byId).valid);
+  });
+
+  it('sempre aceita spoilers e não é formato oficial', () => {
+    expect(playMode('free', false)).toEqual({ format: 'free', spoilers: true });
+    expect(playMode('standard', true)).toEqual({ format: 'standard', spoilers: true });
+    expect(legalFormats({ leader: 'ST10-001', cards: [] }, NOW)).toEqual([]);
+  });
+});
+
+describe('estatísticas: só Standard e EGB puros', () => {
+  it('fora o Livre, os torneios com spoilers e as partidas com carta de spoiler', () => {
+    expect(countsInStats('standard')).toBe(true);
+    expect(countsInStats('egb', { spoilerMode: false, spoilerCards: false })).toBe(true);
+    expect(countsInStats('free')).toBe(false);
+    expect(countsInStats('egb', { spoilerMode: true })).toBe(false);
+    expect(countsInStats('standard', { spoilerCards: true })).toBe(false);
   });
 });

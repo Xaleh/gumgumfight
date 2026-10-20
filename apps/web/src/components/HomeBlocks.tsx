@@ -8,7 +8,7 @@ import {
   type RoomQueue,
   STRUCTURE_LABEL,
   TOURNAMENT_STATUS_LABEL,
-  tourFormatLabel,
+  modeLabel,
   type TournamentMine,
   type TournamentSummary,
   type WatchTarget,
@@ -246,7 +246,7 @@ function TournamentRow({ t: tour, onOpen }: { t: TournamentSummary; onOpen: () =
       </strong>
       {tour.prize && <span className="sub tour-item-prize">🏆 {tour.prize}</span>}
       <span className="sub">
-        {t(STRUCTURE_LABEL[tour.structure])} · {tourFormatLabel(tour)} ·{' '}
+        {t(STRUCTURE_LABEL[tour.structure])} · {modeLabel(tour)} ·{' '}
         {tour.status === 'registration' ? t('home.registered', { count }) : t('home.playersCount', { count })}
       </span>
     </button>
