@@ -40,6 +40,18 @@ export interface CardData {
    * Some sozinho quando a API publica a carta: os dados oficiais substituem os do spoiler.
    */
   spoiler?: CardSpoiler;
+  /**
+   * Texto para o motor (escrito pelo perfil Dev na tela de Cobertura): redação equivalente que o
+   * leitor automático entende, usada no lugar de `text` e `trigger` só para montar as habilidades
+   * (`forEngine`). O texto exibido continua o oficial.
+   */
+  engineText?: CardEngineText;
+}
+
+/** `text` e `trigger` que o motor lê no lugar dos oficiais (sem `trigger` = a carta não tem [Trigger]). */
+export interface CardEngineText {
+  text: string;
+  trigger?: string;
 }
 
 /** Uma arte alternativa da carta (ver `art.ts`). */

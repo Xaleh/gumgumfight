@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { automationStatus, diagnoseCard, gapPattern, parseCard } from '../src/cards';
+import { automationStatus, buildCardDef, diagnoseCard, forEngine, gapPattern, parseCard } from '../src/cards';
 import type { CardData } from '../src/types';
 
 const char = (id: string, text: string, trigger?: string): CardData => ({
@@ -67,5 +67,19 @@ describe('diagnóstico do leitor (lacunas para o Dev)', () => {
       const refused = d.lines.filter((l) => !l.ok).map((l) => l.line);
       expect(refused, c.id).toEqual(parseCard(c).unparsed);
     }
+  });
+
+  it('texto para o motor: o leitor lê o texto novo, a carta mostra o oficial', () => {
+    const official = char('DG-005', "[On Play] Swap out up to 1 of your opponent's Characters.", 'Do something unusual with this card.');
+    const card = { ...official, engineText: { text: "[On Play] K.O. up to 1 of your opponent's Characters with 3000 power or less." } };
+    expect(automationStatus(official)).toBe('manual');
+    expect(automationStatus(card)).toBe('auto');
+    // Sem [Trigger] no texto para o motor: o leitor não vê o [Trigger] oficial.
+    expect(forEngine(card).trigger).toBeUndefined();
+    expect(diagnoseCard(card).lines.map((l) => l.ok)).toEqual([true]);
+    const def = buildCardDef(card);
+    expect([def.text, def.trigger]).toEqual([official.text, official.trigger]);
+    expect(def.manual).toBe(false);
+    expect(def.abilities.map((a) => a.timing)).toEqual(['onPlay']);
   });
 });

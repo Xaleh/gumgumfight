@@ -634,8 +634,15 @@ Toda carta da base é jogável:
   - **Novas ⚙:** as cartas que entraram com efeito parcial ou manual (spoilers e `cards:import`) desde a última vez que o
     Dev marcou como vistas. O item do menu mostra quantas são ("Cobertura das cartas · 3 novas ⚙"). Texto que muda
     numa carta ⚙ (spoiler virando oficial com outra redação) a deixa nova de novo.
-  Nenhum comando "automatiza" uma carta: ela deixa de ser ⚙ quando o leitor, um script (`scripts.ts`) ou uma correção
-  de texto (`errata.ts`, `SOURCE_TEXT_FIXES`) passa a cobri-la, no próximo deploy.
+  - **Textos para o motor:** em cada carta ⚙ (ou pelo número de qualquer carta), o botão "Texto para o motor" abre um
+    editor: o texto oficial e o que o leitor faz com ele de um lado; do outro, uma redação equivalente em inglês que o
+    leitor entende, com a prévia ao vivo (cada linha ✓/✗, a situação da carta e a tradução gerada do que o leitor leu,
+    para conferir que diz o mesmo que a carta). Gravar vale na hora, sem deploy, para partidas novas; a carta continua
+    mostrando o texto oficial. Fica o histórico (quem e quando). Se o texto oficial mudar (errata, fonte nova), o texto
+    para o motor deixa de valer até o Dev revisar. Só resolve o que o leitor já sabe fazer: mecânica nova continua
+    precisando de código, e carta com script (`scripts.ts`) não usa texto para o motor.
+  Fora do texto para o motor, uma carta deixa de ser ⚙ quando o leitor, um script (`scripts.ts`) ou uma correção de
+  texto (`errata.ts`, `SOURCE_TEXT_FIXES`) passa a cobri-la, no próximo deploy.
 
 Para checar a robustez depois de importar coleções novas (decks aleatórios de toda a base, simulações bot x bot
 na linha de comando):

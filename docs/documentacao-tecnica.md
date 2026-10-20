@@ -133,6 +133,7 @@ gumgumfight/
 │   ├── src/index.ts             entrypoint: abre o banco, seed, agenda sync de spoilers, listen
 │   ├── src/app.ts               buildApp: rotas de cartas, decks, coverage, static; registra os módulos
 │   ├── src/card-gaps.ts         lacunas do leitor para o Dev (diagnóstico, ranking das frases, cartas novas com ⚙)
+│   ├── src/card-engine-texts.ts texto para o motor (Dev): prévia, gravar, apagar, histórico
 │   ├── src/db.ts                schema SQLite (migrações idempotentes) e acesso a cards/decks/live_matches
 │   ├── src/config.ts, env.ts, paths.ts   variáveis de ambiente e caminhos
 │   ├── src/optcgapi.ts          mapeamento da optcgapi → CardData
@@ -222,6 +223,11 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
    e `pattern` (`gapPattern`: números, nomes, tipos, atributos e cores trocados por marcadores, para juntar frases
    iguais de cartas diferentes). As linhas recusadas são as mesmas de `parseCard(card).unparsed` (teste em
    `diagnose.test.ts`).
+6. **Texto para o motor** (`CardData.engineText = { text, trigger? }`, escrito pelo Dev): `forEngine(card)` troca
+   `text`/`trigger` por ele antes de ler; `buildCardDef`, `automationStatus` e `diagnoseCard` usam `forEngine`, e o
+   `CardDef` continua com o texto oficial (é o exibido). Sem `trigger` no texto para o motor, o leitor não vê [Trigger].
+   O servidor põe o campo nas cartas em `listCards`/`getCards` (junção com `card_engine_texts`) só enquanto o hash do
+   texto oficial for o de quando foi escrito; a tradução em português sai do texto para o motor.
 
 ### Visão por jogador (`view.ts`)
 
@@ -509,12 +515,14 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (25)
+### Tabelas (27)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
 | `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
+| `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
+| `card_engine_text_history` | `id` | Cada gravação (`action = set`, com o texto) e remoção (`remove`) do texto para o motor, com quem e quando | idem |
 | `card_gaps` | `card_id` | Cartas ⚙ (efeito parcial ou manual): `text_key` (hash do texto quando entrou), `first_seen`, `reviewed_at` (null = nova para o Dev). Na criação da tabela, as ⚙ que o banco já tinha entram como vistas | `recordCardGaps` (ao subir o servidor, na sincronização dos spoilers e no `cards:import`), `POST /api/dev/card-gaps/reviewed` |
 | `decks` | `id` (`st01-luffy`, `u-xxxxxxxx`) | `name`, `leader`, **`cards` (JSON `[{id,count}]`)**, `kind` (`builtin`/`user`), `owner_hash`, `updated_at` | seed (builtin), `POST/PUT /api/decks` |
 | `users` | `id` (`u-` + 12 hex) | `google_sub` (único), `email`, `name`, `picture`, `role` (`player/streamer/organizer/admin/dev`), `created_at`, `last_login_at` | login Google, admin |
@@ -525,7 +533,7 @@ baixadas quando tocam) + `public/`.
 | `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON)**, `created_at` | gravação de partida |
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`. Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
-| `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício | lobby (a cada ação) |
+| `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
 | `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
@@ -1483,6 +1491,10 @@ Quem chama, na coluna da direita:
 | GET | `/api/dev/card-gaps/cards?set=` · `?ids=a,b` · `?new=1` | Cartas ⚙ com o diagnóstico linha por linha (`LineDiagnosis`) | Dev |
 | GET | `/api/dev/card-gaps/new-count` | Número de cartas novas com ⚙ (selo do menu) | Dev |
 | POST | `/api/dev/card-gaps/reviewed` | Marca as novas como vistas (`{ ids? }`; sem `ids`, todas) | Dev |
+| GET | `/api/dev/engine-texts` | Textos para o motor gravados (situação oficial → com o texto, `stale`, autor) | Dev |
+| GET | `/api/dev/engine-texts/:id` | Uma carta: texto oficial, texto para o motor, leitura de cada um (linhas e tradução), `stale`, histórico | Dev |
+| POST | `/api/dev/engine-texts/preview` | `{ cardId, text, trigger }`: o que o leitor faria, sem gravar | Dev |
+| PUT · DELETE | `/api/dev/engine-texts/:id` | Grava (`{ text, trigger }`) / apaga o texto para o motor (recusa carta com script e texto igual ao oficial) | Dev |
 | GET | `/card-img/:origin/*` | Imagens das cartas pelo mesmo domínio (em produção o Nginx atende antes) | Pública |
 | PUT · DELETE | `/api/push/subscription` | Liga (`{ subscription, locale, matches, tournaments }`) / desliga (`{ endpoint }`) as notificações do navegador | Navegador |
 | GET | `/api/auth/me` | Usuário logado (`{ user }` com `role`; `null` sem sessão). Com token: só `{ id, role: 'player' }` e o perfil público | Pública; Token (`profile`) |

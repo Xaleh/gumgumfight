@@ -106,7 +106,116 @@ function migrate(db: DB) {
   migrateSupport(db);
   migrateTutorial(db);
   migratePartners(db);
+  migrateEngineTexts(db);
   migrateCardGaps(db);
+}
+
+/**
+ * Texto para o motor (card-engine-texts.ts): redação que o leitor entende, escrita pelo Dev, usada
+ * no lugar do texto oficial só para montar as habilidades. `base_key` é o hash do texto oficial
+ * quando foi escrito: se o oficial mudar (errata, fonte nova), o texto para o motor deixa de valer
+ * até o Dev revisar. O histórico guarda cada gravação e remoção, com quem fez.
+ */
+function migrateEngineTexts(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS card_engine_texts (
+      card_id     TEXT PRIMARY KEY,
+      text        TEXT NOT NULL,
+      trigger     TEXT,
+      base_key    TEXT NOT NULL,
+      author_id   TEXT,
+      author_name TEXT,
+      updated_at  TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS card_engine_text_history (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id     TEXT NOT NULL,
+      action      TEXT NOT NULL,        -- set | remove
+      text        TEXT,
+      trigger     TEXT,
+      base_key    TEXT,
+      author_id   TEXT,
+      author_name TEXT,
+      at          TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS card_engine_text_history_card ON card_engine_text_history(card_id, id);
+  `);
+}
+
+export interface EngineTextRow {
+  cardId: string;
+  text: string;
+  trigger: string | null;
+  baseKey: string;
+  authorName: string | null;
+  updatedAt: string;
+}
+
+export interface EngineTextHistoryRow {
+  action: 'set' | 'remove';
+  text: string | null;
+  trigger: string | null;
+  authorName: string | null;
+  at: string;
+}
+
+export function listEngineTexts(db: DB): EngineTextRow[] {
+  const rows = db.prepare('SELECT card_id, text, trigger, base_key, author_name, updated_at FROM card_engine_texts ORDER BY card_id').all() as unknown as Array<{
+    card_id: string;
+    text: string;
+    trigger: string | null;
+    base_key: string;
+    author_name: string | null;
+    updated_at: string;
+  }>;
+  return rows.map((r) => ({ cardId: r.card_id, text: r.text, trigger: r.trigger, baseKey: r.base_key, authorName: r.author_name, updatedAt: r.updated_at }));
+}
+
+export function getEngineText(db: DB, cardId: string): EngineTextRow | null {
+  return listEngineTexts(db).find((r) => r.cardId === cardId) ?? null;
+}
+
+/** Grava (ou troca) o texto para o motor de uma carta, com o hash do texto oficial de agora. */
+export function setEngineText(
+  db: DB,
+  e: { cardId: string; text: string; trigger: string | null; baseKey: string; author: { id: string; name: string | null } },
+  now = new Date(),
+) {
+  const at = now.toISOString();
+  transaction(db, () => {
+    db.prepare(`
+      INSERT INTO card_engine_texts (card_id, text, trigger, base_key, author_id, author_name, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(card_id) DO UPDATE SET text = excluded.text, trigger = excluded.trigger, base_key = excluded.base_key,
+        author_id = excluded.author_id, author_name = excluded.author_name, updated_at = excluded.updated_at
+    `).run(e.cardId, e.text, e.trigger, e.baseKey, e.author.id, e.author.name, at);
+    db.prepare(
+      "INSERT INTO card_engine_text_history (card_id, action, text, trigger, base_key, author_id, author_name, at) VALUES (?, 'set', ?, ?, ?, ?, ?, ?)",
+    ).run(e.cardId, e.text, e.trigger, e.baseKey, e.author.id, e.author.name, at);
+  });
+}
+
+/** Apaga o texto para o motor (a carta volta a ser lida pelo texto oficial). false = não havia. */
+export function removeEngineText(db: DB, cardId: string, author: { id: string; name: string | null }, now = new Date()): boolean {
+  let removed = false;
+  transaction(db, () => {
+    removed = Number(db.prepare('DELETE FROM card_engine_texts WHERE card_id = ?').run(cardId).changes) > 0;
+    if (removed) {
+      db.prepare("INSERT INTO card_engine_text_history (card_id, action, author_id, author_name, at) VALUES (?, 'remove', ?, ?, ?)").run(
+        cardId,
+        author.id,
+        author.name,
+        now.toISOString(),
+      );
+    }
+  });
+  return removed;
+}
+
+export function engineTextHistory(db: DB, cardId: string, limit = 20): EngineTextHistoryRow[] {
+  const rows = db
+    .prepare('SELECT action, text, trigger, author_name, at FROM card_engine_text_history WHERE card_id = ? ORDER BY id DESC LIMIT ?')
+    .all(cardId, limit) as unknown as Array<{ action: 'set' | 'remove'; text: string | null; trigger: string | null; author_name: string | null; at: string }>;
+  return rows.map((r) => ({ action: r.action, text: r.text, trigger: r.trigger, authorName: r.author_name, at: r.at }));
 }
 
 /**
@@ -128,7 +237,9 @@ function migrateCardGaps(db: DB) {
   if (!existed) recordCardGaps(db, { reviewed: true });
 }
 
-const gapTextKey = (c: CardData) => createHash('sha1').update(`${c.text ?? ''}\u0000${c.trigger ?? ''}`).digest('hex').slice(0, 16);
+/** Hash do texto oficial (texto e [Trigger], depois das correções e da errata). */
+export const officialTextKey = (c: Pick<CardData, 'text' | 'trigger'>) =>
+  createHash('sha1').update(`${c.text ?? ''}\u0000${c.trigger ?? ''}`).digest('hex').slice(0, 16);
 
 /**
  * Atualiza a lista das cartas ⚙ com o banco atual: carta ⚙ que não estava (ou cujo texto mudou)
@@ -152,7 +263,7 @@ export function recordCardGaps(db: DB, opts: { reviewed?: boolean; now?: Date } 
     for (const c of listCards(db)) {
       if (!needsManual(c)) continue;
       gaps.add(c.id);
-      const key = gapTextKey(c);
+      const key = officialTextKey(c);
       if (known.get(c.id) === key) continue;
       put.run(c.id, key, at, opts.reviewed ? at : null);
       added++;
@@ -856,29 +967,37 @@ export function hasOfficialCards(db: DB, set: string): boolean {
   return Boolean(db.prepare('SELECT 1 FROM cards WHERE set_code = ? AND provisional = 0 LIMIT 1').get(set));
 }
 
-type CardRow = { data: string; provisional: number };
+type CardRow = { data: string; provisional: number; e_text: string | null; e_trigger: string | null; e_base: string | null };
+/** As colunas de `CardRow`: a carta e o texto para o motor (card_engine_texts), se houver. */
+const CARD_COLUMNS = 'c.data, c.provisional, e.text AS e_text, e.trigger AS e_trigger, e.base_key AS e_base';
+const CARD_FROM = 'cards c LEFT JOIN card_engine_texts e ON e.card_id = c.id';
 // Correções de nome/tipos e errata valem também para as cartas já gravadas (importadas antes de a correção entrar na tabela).
-const toCard = (r: CardRow) => ({ ...fixCard(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
+// O texto para o motor só vale enquanto o texto oficial for o mesmo de quando foi escrito.
+const toCard = (r: CardRow) => {
+  const card: CardData & { provisional: boolean } = { ...fixCard(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) };
+  if (r.e_text !== null && r.e_base === officialTextKey(card)) card.engineText = { text: r.e_text, ...(r.e_trigger ? { trigger: r.e_trigger } : {}) };
+  return card;
+};
 
 export function listCards(db: DB, set?: string) {
   const rows = (
     set
-      ? db.prepare('SELECT data, provisional FROM cards WHERE set_code = ? ORDER BY id').all(set)
-      : db.prepare('SELECT data, provisional FROM cards ORDER BY id').all()
+      ? db.prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} WHERE c.set_code = ? ORDER BY c.id`).all(set)
+      : db.prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} ORDER BY c.id`).all()
   ) as unknown as CardRow[];
   return rows.map(toCard);
 }
 
 /** Todos os Líderes (para escolher o oponente na fila casual). */
 export function listLeaders(db: DB) {
-  const rows = db.prepare("SELECT data, provisional FROM cards WHERE category = 'leader' ORDER BY id").all() as unknown as CardRow[];
+  const rows = db.prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} WHERE c.category = 'leader' ORDER BY c.id`).all() as unknown as CardRow[];
   return rows.map(toCard);
 }
 
 export function getCards(db: DB, ids: string[]) {
   if (!ids.length) return [];
   const rows = db
-    .prepare(`SELECT data, provisional FROM cards WHERE id IN (${ids.map(() => '?').join(',')})`)
+    .prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} WHERE c.id IN (${ids.map(() => '?').join(',')})`)
     .all(...ids) as unknown as CardRow[];
   return rows.map(toCard);
 }

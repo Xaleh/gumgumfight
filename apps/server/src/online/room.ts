@@ -36,6 +36,7 @@ import {
   applyAction,
   type CardData,
   type CardDef,
+  type CardEngineText,
   chooseBotAction,
   createAliases,
   createGame,
@@ -145,6 +146,12 @@ export interface RoomResult {
   errorCode?: string;
 }
 
+/** As cartas com os textos para o motor fixados na sala (sem `pinned`, as cartas como estão). */
+export function pinEngineTexts(cards: CardData[], pinned: Record<string, CardEngineText> | undefined): CardData[] {
+  if (!pinned) return cards;
+  return cards.map(({ engineText: _now, ...c }) => (pinned[c.id] ? { ...c, engineText: pinned[c.id] } : c));
+}
+
 /** O que é gravado no banco para refazer a sala depois de reiniciar o servidor. */
 export interface RoomData {
   id: string;
@@ -174,6 +181,11 @@ export interface RoomData {
    * versão 9 não têm o campo e são refeitas com a preparação antiga (`legacySetup`).
    */
   replayVersion?: number;
+  /**
+   * Textos para o motor (perfil Dev) das cartas da partida quando ela começou: a sala é refeita com
+   * eles mesmo que o Dev mude o texto depois. Salas gravadas antes do campo usam os de agora.
+   */
+  engineTexts?: Record<string, CardEngineText>;
   /**
    * Quando cada ação de `actions` aconteceu (ms) e o tempo dos dois jogadores logo depois dela:
    * é o que a mesa atrasada de quem vê as mãos reproduz. Salas gravadas antes do campo não o têm.
@@ -409,6 +421,12 @@ export class Room {
     if (this.state || this.data.seats.length !== 2) return;
     this.data.seed128 = [0, 1, 2, 3].map(() => randomInt(0, 2 ** 32) | 0);
     this.data.replayVersion = REPLAY_VERSION;
+    this.data.engineTexts = Object.fromEntries(
+      this.deps
+        .cards(this.cardIds())
+        .filter((c) => c.engineText)
+        .map((c) => [c.id, c.engineText!]),
+    );
     this.data.startedAt = this.deps.now();
     this.data.timeline = [];
     this.rebuild();
@@ -418,16 +436,19 @@ export class Room {
     if (seats.length) this.deps.onEvent?.(this, { type: 'start', seats });
   }
 
+  private cardIds() {
+    return [...new Set(this.data.seats.flatMap((s) => [s.deck.leader, ...s.deck.cards.map((c) => c.id)]))];
+  }
+
   private config() {
     const [a, b] = this.data.seats;
-    const ids = [...new Set([a, b].flatMap((s) => [s.deck.leader, ...s.deck.cards.map((c) => c.id)]))];
     return {
       seed: 0,
       seed128: this.data.seed128!,
       chooseFirst: Boolean(this.data.chooseFirst),
       ...(this.data.firstPlayer !== undefined ? { firstPlayer: this.data.firstPlayer } : {}),
       ...(this.legacySetup ? { legacySetup: true } : {}),
-      cards: this.deps.cards(ids),
+      cards: pinEngineTexts(this.deps.cards(this.cardIds()), this.data.engineTexts),
       players: [
         { name: a.name, deck: a.deck, isBot: Boolean(a.bot) },
         { name: b.name, deck: b.deck, isBot: Boolean(b.bot) },

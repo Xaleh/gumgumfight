@@ -8,7 +8,7 @@
 //   GET  /api/dev/card-gaps/new-count            só o número de novas (selo do menu)
 //   POST /api/dev/card-gaps/reviewed {ids?}      marca as novas como vistas (todas, sem `ids`)
 
-import { type CardData, type CardDiagnosis, diagnoseCard, type GapStage, type LineDiagnosis, needsManual } from '@gumgum/engine';
+import { type CardData, type CardDiagnosis, diagnoseCard, forEngine, type GapStage, type LineDiagnosis, needsManual } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { isDev, type User } from './auth/store';
 import { type CardGapRow, type DB, listCardGaps, listCards, markCardGapsReviewed } from './db';
@@ -24,6 +24,8 @@ export interface GapCard {
   provisional: boolean;
   /** Entrou com ⚙ e o Dev ainda não marcou como vista. */
   isNew: boolean;
+  /** O leitor lê o texto para o motor (as linhas abaixo são dele), não o oficial. */
+  engineText: boolean;
   firstSeen: string | null;
   lines: LineDiagnosis[];
 }
@@ -42,8 +44,9 @@ export interface GapPattern {
 const setOf = (c: CardData) => c.set ?? c.id.split('-')[0];
 
 const cache = new Map<string, CardDiagnosis>();
-function diagnosis(c: CardData): CardDiagnosis {
-  const key = `${c.id}\u0000${c.text}\u0000${c.trigger ?? ''}`;
+export function diagnosis(c: CardData): CardDiagnosis {
+  const read = forEngine(c);
+  const key = `${c.id}\u0000${read.text}\u0000${read.trigger ?? ''}`;
   let d = cache.get(key);
   if (!d) {
     d = diagnoseCard(c);
@@ -68,6 +71,7 @@ export function gapCards(cards: Array<CardData & { provisional?: boolean }>, row
       status: d.status as GapCard['status'],
       provisional: Boolean(c.provisional),
       isNew: Boolean(row && !row.reviewedAt),
+      engineText: Boolean(c.engineText),
       firstSeen: row?.firstSeen ?? null,
       lines: d.lines,
     });
@@ -116,14 +120,16 @@ export function gapSummary(cards: GapCard[], limit = 300) {
 
 const MAX_IDS = 500;
 
+/** Só o perfil Dev (a tela de Cobertura é dele): devolve a conta, ou responde o erro e devolve null. */
+export const devGuard = (user: (req: FastifyRequest) => User | null) => (req: FastifyRequest, reply: FastifyReply) => {
+  const me = user(req);
+  if (!me) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
+  else if (!isDev(me.role)) void reply.code(403).send(fail('devOnly', 'Só para o perfil Dev.'));
+  return me && isDev(me.role) ? me : null;
+};
+
 export function registerCardGapRoutes(app: FastifyInstance, { db, user }: { db: DB; user: (req: FastifyRequest) => User | null }) {
-  /** Só o perfil Dev (a tela de Cobertura é dele); responde o erro e devolve false para os outros. */
-  const devOnly = (req: FastifyRequest, reply: FastifyReply) => {
-    const me = user(req);
-    if (!me) void reply.code(401).send(fail('loginRequired', 'Entre com a conta Google.'));
-    else if (!isDev(me.role)) void reply.code(403).send(fail('devOnly', 'Só para o perfil Dev.'));
-    return Boolean(me && isDev(me.role));
-  };
+  const devOnly = devGuard(user);
   const all = () => gapCards(listCards(db), listCardGaps(db));
 
   app.get('/api/dev/card-gaps', async (req, reply) => {

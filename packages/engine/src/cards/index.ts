@@ -5,6 +5,19 @@ import { diagnoseLine, diagnoseTrigger, effectLines, parseCard } from './parser'
 import { CARD_SCRIPTS } from './scripts';
 import { detectKeywords, KEYWORD_ONLY, splitEffects } from './split';
 
+/**
+ * A carta como o leitor automático a lê: com o texto para o motor (`engineText`), quando houver, no
+ * lugar do texto e do [Trigger] oficiais.
+ */
+export function forEngine<T extends Pick<CardData, 'text' | 'trigger' | 'engineText'>>(card: T): T {
+  const e = card.engineText;
+  if (!e) return card;
+  const out = { ...card, text: e.text };
+  if (e.trigger?.trim()) out.trigger = e.trigger;
+  else delete out.trigger;
+  return out;
+}
+
 export function buildCardDef(card: CardData): CardDef {
   // Nome e tipos oficiais e a errata oficial valem sobre o que a base de cartas trouxer.
   const data = fixCard(card);
@@ -18,8 +31,9 @@ export function buildCardDef(card: CardData): CardDef {
       manual: script.abilities.some((a) => a.manual),
     };
   }
-  // Sem script: o leitor automático; o que ele não reconhecer fica manual.
-  const parsed = parseCard(data);
+  // Sem script: o leitor automático (com o texto para o motor, se houver); o que ele não reconhecer
+  // fica manual. O texto exibido continua o oficial.
+  const parsed = parseCard(forEngine(data));
   return {
     ...data,
     keywords: parsed.keywords,
@@ -40,7 +54,8 @@ export type AutomationStatus = 'vanilla' | 'scripted' | 'auto' | 'partial' | 'ma
  * scripted = script escrito à mão; auto = lida por completo pelo leitor automático;
  * partial = parte dos efeitos automática, parte manual; manual = nada reconhecido.
  */
-export function automationStatus(card: CardData): AutomationStatus {
+export function automationStatus(official: CardData): AutomationStatus {
+  const card = forEngine(official);
   const key = `${card.id}\u0000${card.text}\u0000${card.trigger ?? ''}`;
   let status = statusCache.get(key);
   if (!status) {
@@ -79,8 +94,9 @@ export interface CardDiagnosis {
  * Linha por linha, o que o leitor automático entendeu e onde parou (ferramentas de Dev).
  * Usa as mesmas linhas de `parseCard`: uma linha recusada aqui é uma habilidade manual na partida.
  */
-export function diagnoseCard(card: CardData): CardDiagnosis {
-  const status = automationStatus(card);
+export function diagnoseCard(official: CardData): CardDiagnosis {
+  const status = automationStatus(official);
+  const card = forEngine(official);
   if (status === 'scripted' || status === 'vanilla') return { status, lines: [] };
   const lines: LineDiagnosis[] = [];
   for (const line of effectLines(card.text ?? '')) {
