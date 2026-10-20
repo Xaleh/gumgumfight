@@ -132,6 +132,7 @@ import {
   vacateInMatch,
   warningStatus,
 } from './store';
+import { buildMeta } from './meta';
 import { buildRecap } from './recap';
 import { isApprentice } from '../tutorial/store';
 
@@ -353,6 +354,8 @@ function reinstateOptions(
 
 /** Validade do torneio completo em cache (só por garantia: cada gravação já o invalida). */
 const DETAIL_TTL_MS = 5_000;
+/** Validade do painel do meta em cache (cada torneio alterado já o invalida). */
+const META_TTL_MS = 60_000;
 
 export function registerTournamentRoutes(
   app: FastifyInstance,
@@ -641,6 +644,20 @@ export function registerTournamentRoutes(
       /** Limites de quem pede (null = não organiza): a tela mostra "3 de 5 este mês". */
       organize: limits,
     };
+  });
+
+  /**
+   * Painel do meta: torneios encerrados (no formato e nos últimos `days` dias, se pedidos),
+   * Líderes, campeões e o ranking de jogadores. Público: usa só o que a página de cada
+   * torneio já mostra depois do fim.
+   */
+  app.get<{ Querystring: { format?: string; days?: string } }>('/api/tournaments/meta', async (req, reply) => {
+    const format = isFormat(req.query.format) ? req.query.format : undefined;
+    const days = Number(req.query.days);
+    const period = Number.isInteger(days) && days > 0 && days <= 3650 ? days : undefined;
+    return cache.send(req, reply, `meta:${format ?? '-'}:${period ?? '-'}`, META_TTL_MS, () =>
+      buildMeta(db, { format, days: period, now: now(), present }),
+    );
   });
 
   const roundComplete = (t: Tournament, matches: TournamentMatch[]) => matches.filter((m) => m.round === t.round).every((m) => m.result);

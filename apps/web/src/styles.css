@@ -8523,6 +8523,204 @@ tr.clickable:hover td {
 .tour-tabs button {
   white-space: nowrap;
 }
+
+/* painel do meta dos torneios (aba "Meta" da lista) */
+.tour-views {
+  margin-bottom: 12px;
+}
+.tmeta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tmeta-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tmeta-filters .seg {
+  flex-wrap: wrap;
+}
+.tmeta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.tmeta-upcoming,
+.tmeta-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tmeta-recent {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.tmeta-event {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+/* Mesma cor de borda dos cartões da lista de torneios; sobe um pouco, como os cartões de modo. */
+.tmeta-event:hover,
+.tmeta-event:focus-visible {
+  border-color: var(--blue);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(var(--shadow-rgb), 0.16);
+  outline: none;
+}
+.tmeta-event:active {
+  transform: translateY(0);
+}
+.tmeta-event.big {
+  padding: 14px;
+}
+.tmeta-event-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.tmeta-event-text strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.tmeta-leaders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.tmeta-leader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+.tmeta-leader-nums {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tmeta-leader-nums b {
+  font-size: 18px;
+}
+.tmeta-dist {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tmeta-dist li {
+  display: grid;
+  grid-template-columns: 34px minmax(80px, 1.2fr) 2fr auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 -8px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  transition: background 0.15s ease;
+}
+.tmeta-dist li:hover {
+  background: var(--panel2);
+}
+.tmeta-dist-name {
+  font-weight: 700;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tmeta-dist-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bg2);
+  overflow: hidden;
+}
+.tmeta-dist-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--card-color, var(--muted));
+  transform-origin: left;
+  /* A lista é montada de novo a cada filtro: as barras crescem ao carregar e ao trocar o filtro. */
+  animation: tmeta-grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.tmeta-dist li:nth-child(n + 2) .tmeta-dist-bar span {
+  animation-delay: 0.03s;
+}
+.tmeta-dist li:nth-child(n + 4) .tmeta-dist-bar span {
+  animation-delay: 0.06s;
+}
+.tmeta-dist li:nth-child(n + 8) .tmeta-dist-bar span {
+  animation-delay: 0.09s;
+}
+@keyframes tmeta-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.tmeta .cov-table tbody tr {
+  transition: background 0.15s ease;
+}
+.tmeta .cov-table tbody tr:hover {
+  background: var(--panel2);
+}
+.tmeta-dist-num {
+  min-width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.tmeta-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tmeta-event,
+  .tmeta-dist li,
+  .tmeta .cov-table tbody tr {
+    transition: none;
+  }
+  .tmeta-event:hover,
+  .tmeta-event:focus-visible {
+    transform: none;
+  }
+  .tmeta-dist-bar span {
+    animation: none;
+  }
+}
+@media (max-width: 520px) {
+  .tmeta-dist li {
+    grid-template-columns: 34px 1fr auto;
+  }
+  .tmeta-dist-bar {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+}
 .tour-score {
   font-weight: 800;
   font-variant-numeric: tabular-nums;

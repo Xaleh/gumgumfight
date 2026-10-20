@@ -437,6 +437,11 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   classificação é recalculada). Na chave, corrigir quem venceu troca o jogador da partida seguinte, desde que ela
   ainda não tenha começado (senão, corrija ou zere antes a partida seguinte). Resultados do suíço não mudam depois
   que o top cut começa, porque ele foi semeado por eles.
+- **Meta dos torneios:** a aba **Meta** da lista de torneios é um painel público com os torneios encerrados
+  (filtro por formato e período): totais, último torneio com o campeão, próximos torneios, Líderes em destaque
+  (taxa de vitória, inscrições e títulos), distribuição do meta, ranking de jogadores e torneios recentes
+  (`GET /api/tournaments/meta?format=&days=`, em `apps/server/src/tournaments/meta.ts`). Usa só o que a página de
+  cada torneio já mostra depois do fim; as vitórias contam séries, sem bye, derrota dupla e espelho.
 - **Desistência:** o jogador (ou o organizador) pode tirá-lo do torneio; a partida pendente dele na rodada atual vai
   para o oponente e ele não é mais pareado.
 
