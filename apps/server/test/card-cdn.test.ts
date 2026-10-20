@@ -119,7 +119,7 @@ describe('CDN própria das imagens', () => {
       source: 'api:test',
     });
     const logs: string[] = [];
-    await syncCardCdn(db, store, { fetchImpl: images().fetchImpl, log: (m) => logs.push(m) });
+    await syncCardCdn(db, store, { fetchImpl: images().fetchImpl, log: (m) => logs.push(m), officialRegions: [] });
     const index = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8'));
     expect(index.schemaVersion).toBe(1);
     expect(Object.keys(index.cards)).toEqual(['OP01-016']);
@@ -166,7 +166,7 @@ describe('R2 (API S3)', () => {
     }) as typeof fetch;
     const env = { CARD_CDN_URL: CDN, R2_ACCOUNT_ID: 'errado', R2_BUCKET: 'b', R2_ACCESS_KEY_ID: 'c', R2_SECRET_ACCESS_KEY: 'd' };
     const logs: string[] = [];
-    const r = await syncCardCdn(db, cdnFromEnv(env, fetchImpl)!, { fetchImpl, log: (m) => logs.push(m) });
+    const r = await syncCardCdn(db, cdnFromEnv(env, fetchImpl)!, { fetchImpl, log: (m) => logs.push(m), officialRegions: [] });
     expect(r).toMatchObject({ uploaded: 0, failed: [], unavailable: 'R2 inacessível em errado.r2.cloudflarestorage.com (ENOTFOUND)' });
     expect(calls).toEqual(['https://errado.r2.cloudflarestorage.com/b/index.json']);
     expect(logs[0]).toMatch(/bucket inacessível.*ENOTFOUND.*R2_ACCOUNT_ID/);

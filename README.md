@@ -57,6 +57,7 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `CARD_CDN_URL`  | (vazio)                       | Endereço público da CDN própria das imagens (ex.: `https://cards.gumgumfight.cloud`); vazio = imagens direto das fontes (veja [CDN própria](#cdn-própria-das-imagens-cloudflare-r2)) |
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | (vazio) | Conta (o Account ID ou o endpoint S3 inteiro), bucket e token do Cloudflare R2 da CDN (segredos: só no `deploy.env`) |
 | `R2_ENDPOINT`   | (vazio)                       | Só para bucket com jurisdição (ex.: `https://<id>.eu.r2.cloudflarestorage.com`) |
+| `CARD_IMAGE_SOURCES` | `bandai-en,bandai-asia,bandai-jp` | Listas oficiais da Bandai onde procurar a imagem das cartas sem imagem, em ordem (com a CDN ligada); `off` desliga |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
@@ -889,6 +890,19 @@ imagens, e o parceiro SweetApp pode usar a mesma CDN. Código em `apps/server/sr
 - **Nunca copia** de origens fora da lista do `/card-img/` (optcgapi, optcgleaks): imagens do Cardkaizoku ficam de fora
   pelos termos de uso do site. Uma imagem que falha fica com o endereço original e é tentada de novo na próxima rodada.
 - O kit de divulgação dos torneios continua usando `/card-img/` (origem `cdn`), com o cache do Nginx.
+
+**Imagens oficiais da Bandai** (`card-cdn/official.ts`): carta sem imagem em nenhuma fonte de dados (promos japonesas,
+cartas que só o Cardkaizoku tem) ou com um desenho provisório (o SVG que a optcgapi manda em algumas promos de evento)
+procura a imagem nas listas oficiais, na ordem de `CARD_IMAGE_SOURCES`: inglês (`en.onepiece-cardgame.com`), inglês
+da Ásia (`asia-en.onepiece-cardgame.com`) e japonês (`www.onepiece-cardgame.com`).
+
+- Só as coleções das cartas que faltam são consultadas (promocionais: as séries "Promotion card" e "Other Product
+  Card"), cada uma no máximo uma vez por dia, com 1 s entre as páginas. O que a lista mostra fica guardado
+  (`card_official_images`): reimportar a carta não consulta a Bandai de novo.
+- A primeira região que tem a carta vence. A impressão base vira a imagem; as outras (`_p1`…) viram artes, com o
+  produto de origem como rótulo. Imagem japonesa vai para a CDN como `/P/jp/P-152.png` e a carta ganha `imageLang: "jp"`.
+- Desenho provisório recusado fica registrado (não é baixado de novo) e, na rodada seguinte, a carta procura a oficial.
+- Tudo roda junto da cópia para a CDN (importação, sincronização dos spoilers e `--images`).
 
 **Configuração no Cloudflare (uma vez):**
 

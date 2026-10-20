@@ -139,7 +139,8 @@ gumgumfight/
 │   ├── src/optcgapi.ts          mapeamento da optcgapi → CardData
 │   ├── src/card-import.ts, import-cards.ts   CLI de importação
 │   ├── src/card-sources/                     cadeia de fontes (optcgapi, optcgleaks, cardkaizoku) e resolução por carta
-│   ├── src/card-cdn/                         CDN própria das imagens (Cloudflare R2, SigV4 sem SDK) e index.json
+│   ├── src/card-cdn/                         CDN própria das imagens (Cloudflare R2, SigV4 sem SDK), index.json e
+│   │                                         imagens oficiais da Bandai (official.ts: listas EN, Ásia e JP)
 │   ├── src/spoiler-feed.ts, spoiler-sync.ts  optcgleaks + troca por cartas oficiais
 │   ├── src/official-cards.ts, check-official.ts, check-translations.ts  scripts de conferência
 │   ├── src/seed.ts, seed-cli.ts  decks prontos, cartas provisórias, traduções
