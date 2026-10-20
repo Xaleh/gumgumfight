@@ -58,6 +58,8 @@ module.exports = {
         R2_SECRET_ACCESS_KEY: env.R2_SECRET_ACCESS_KEY || '',
         // Só para buckets com jurisdição (ex.: https://<id>.eu.r2.cloudflarestorage.com).
         R2_ENDPOINT: env.R2_ENDPOINT || '',
+        // Listas oficiais da Bandai para as cartas sem imagem (vazio = inglês, inglês da Ásia e japonês; off desliga).
+        CARD_IMAGE_SOURCES: env.CARD_IMAGE_SOURCES || '',
         SPOILER_SOURCES: env.SPOILER_SOURCES || '',
         // Horas entre as buscas dos spoilers (padrão 6); off desliga.
         SPOILER_SYNC: env.SPOILER_SYNC || '',

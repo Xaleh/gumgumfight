@@ -29,6 +29,8 @@ export interface CardData {
   imageUrl?: string;
   /** Artes alternativas (Parallel, Manga, promos…): só aparência, a carta é a mesma. */
   arts?: CardArt[];
+  /** Idioma da imagem quando não é a impressão em inglês (ex.: "jp": promo que só saiu no Japão). */
+  imageLang?: string;
   /** Observações da fonte que não fazem parte do efeito (errata, reimpressão...). */
   notes?: string[];
   /** "Also treat this card's name as [X]": nomes alternativos para regras e efeitos. */

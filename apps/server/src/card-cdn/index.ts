@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { CARD_IMAGE_ORIGINS, type CardArt, type CardData } from '@gumgum/engine';
 import { type DB, transaction } from '../db';
 import { artId } from '../optcgapi';
+import { type BandaiRegion, fillOfficialImages, type FetchText, imageLang, imageRegionsFromEnv } from './official';
 import { networkCause, type R2Config, R2Error, r2Client } from './r2';
 
 /** Onde as imagens ficam guardadas. */
@@ -127,6 +128,7 @@ export async function mirrorCardImages(
         result.skipped++;
         continue;
       }
+      // Já copiada, ou recusada antes (não é imagem): não baixa de novo.
       if (!known.get(url)) pending.set(url, { set: r.set_code || r.id.split('-')[0] });
     }
   }
@@ -156,10 +158,14 @@ export async function mirrorCardImages(
         const body = Buffer.from(await res.arrayBuffer());
         if (!body.length || body.length > MAX_BYTES) throw new Error(`${body.length} bytes`);
         const type = sniffImageType(body);
-        if (!type) throw new Error(`não é PNG, JPEG nem WebP (${res.headers.get('content-type') ?? 'sem tipo'})`);
+        const lang = imageLang(url);
+        if (!type) {
+          // Desenho provisório (SVG da optcgapi): fica registrado para não baixar de novo, e a carta
+          // passa a procurar a imagem nas listas oficiais.
+          remember.run(url, '', 'rejected', lang, res.headers.get('content-type') ?? '', body.length);
+          throw new Error(`não é PNG, JPEG nem WebP (${res.headers.get('content-type') ?? 'sem tipo'})`);
+        }
         const hash = createHash('sha256').update(body).digest('hex').slice(0, 12);
-        // Idioma da impressão: por enquanto todas as fontes são em inglês.
-        const lang = 'en';
         const key = `${set}/${lang}/${artId(url)}.${EXT[type]}`;
         await store.put(key, body, type, IMMUTABLE);
         remember.run(url, key, hash, lang, type, body.length);
@@ -181,7 +187,7 @@ export async function mirrorCardImages(
   const swap = (url: string | undefined) => {
     if (!url || onCdn(url)) return url;
     const m = known.get(url) as Mirrored | undefined;
-    if (!m) return url;
+    if (!m?.object_key) return url;
     if (!pending.has(url)) result.reused++;
     return cdnUrl(m);
   };
@@ -227,8 +233,20 @@ export async function publishImageIndex(db: DB, store: ImageStore): Promise<numb
 export async function syncCardCdn(
   db: DB,
   store: ImageStore,
-  opts: { fetchImpl?: typeof fetch; maxDownloads?: number; log: (msg: string) => void },
+  opts: {
+    fetchImpl?: typeof fetch;
+    maxDownloads?: number;
+    log: (msg: string) => void;
+    /** Listas oficiais da Bandai para as cartas sem imagem (padrão: CARD_IMAGE_SOURCES). */
+    officialRegions?: BandaiRegion[];
+    fetchText?: FetchText;
+  },
 ): Promise<MirrorResult> {
+  // Primeiro as cartas sem imagem ganham a oficial (se houver); depois tudo vai para a CDN.
+  // Imagens recusadas nesta rodada só procuram a oficial na próxima.
+  await fillOfficialImages(db, opts.officialRegions ?? imageRegionsFromEnv(), { fetchText: opts.fetchText, log: opts.log }).catch((err) =>
+    opts.log(`Imagens oficiais: falha (${err instanceof Error ? err.message : err})`),
+  );
   const r = await mirrorCardImages(db, store, opts);
   if (r.unavailable) opts.log(`CDN das imagens: bucket inacessível, nada copiado: ${r.unavailable}. Confira R2_ACCOUNT_ID e o token.`);
   if (r.uploaded || r.failed.length) {

@@ -68,6 +68,23 @@ function migrate(db: DB) {
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Impressões vistas nas listas oficiais da Bandai (card-cdn/official.ts) e quando cada coleção foi consultada.
+    CREATE TABLE IF NOT EXISTS card_official_images (
+      card_id   TEXT NOT NULL,
+      variant   TEXT NOT NULL,
+      region    TEXT NOT NULL,
+      lang      TEXT NOT NULL,
+      image_url TEXT NOT NULL,
+      label     TEXT,
+      PRIMARY KEY (card_id, variant, region)
+    );
+    CREATE TABLE IF NOT EXISTS card_official_checks (
+      region     TEXT NOT NULL,
+      series     TEXT NOT NULL,
+      checked_at TEXT NOT NULL,
+      PRIMARY KEY (region, series)
+    );
+
     CREATE TABLE IF NOT EXISTS decks (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
