@@ -538,7 +538,7 @@ function Table({
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
   const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, sidePanel, update: updateSettings } = useSettings();
-  /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, 2.5D) é o padrão; o menu troca para a mesa em pé. */
+  /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
   const canOpenHands = Boolean(online?.hands || spectator?.canHands || kind === 'replay');

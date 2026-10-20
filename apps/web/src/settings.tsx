@@ -33,7 +33,7 @@ export interface Settings {
   theme: Theme;
   /** Online: mostrar as mensagens e os emotes que o oponente manda. */
   opponentChat: boolean;
-  /** Visão do Streamer: mesa lateral (jogadores à esquerda e à direita, 2.5D) ou em pé. */
+  /** Visão do Streamer: mesa lateral (jogadores à esquerda e à direita, vista de cima) ou em pé. */
   streamerLayout: StreamerLayout;
   /** Partida no desktop: o painel lateral (histórico e decklist) aberto; fechado, a mesa ocupa a tela toda. */
   sidePanel: boolean;

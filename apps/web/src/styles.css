@@ -11754,13 +11754,14 @@ a.sponsor-card:hover {
 }
 
 
-/* ------------------------------------------------------------------ visão do Streamer: mesa lateral (2.5D) */
+/* ------------------------------------------------------------------ visão do Streamer: mesa lateral */
 
 /*
  * Os jogadores um de cada lado da tela, como a câmera de cima das transmissões de loja: cada playmat
- * girado 90° (o da direita girado 180°, com as cartas de cabeça para baixo) e a mesa em leve
- * perspectiva. O HUD (menu, histórico, etiquetas, faixas, contadores e as pílulas das mãos) fica nas
- * linhas de cima e de baixo, fora da mesa; os leques das mãos abertas ficam nas bordas da tela.
+ * girado 90° (o da direita girado 180°, com as cartas de cabeça para baixo) e a mesa vista bem de cima,
+ * com a câmera perpendicular a ela (sem perspectiva). O HUD (menu, histórico, etiquetas, faixas,
+ * contadores e as pílulas das mãos) fica nas linhas de cima e de baixo, fora da mesa; os leques das
+ * mãos abertas ficam nas bordas da tela.
  * Todas as cartas do mesmo tamanho (`--cw`), medido pela altura: uma coluna de 5 Personagens abaixo
  * da fileira de Vida. A mesa não tem borda: o playmat ocupa a tela toda, como se fosse maior que ela.
  */
@@ -11832,14 +11833,11 @@ a.sponsor-card:hover {
   margin: 0 2px;
 }
 
-/* ---- a mesa em perspectiva ---- */
+/* ---- a mesa, vista de cima ---- */
 .lat-scene {
   flex: 1;
   min-height: 0;
-  /* margem para a borda de baixo, mais perto da câmera, não sair da tela */
   padding: 0 48px;
-  perspective: 2200px;
-  perspective-origin: 50% 30%;
 }
 .lat-table {
   position: relative;
@@ -11850,8 +11848,6 @@ a.sponsor-card:hover {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 14px 18px;
-  transform: rotateX(10deg);
-  transform-origin: 50% 0;
 }
 
 /* ---- cada lado: [cost area] [Líder] [Personagens]; o da direita girado 180° ---- */
