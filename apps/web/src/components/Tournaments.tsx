@@ -37,6 +37,8 @@ import { SupportModal } from './Support';
 const TournamentRecap = lazy(() => import('./TournamentRecap'));
 /** Lobby do torneio (mesas em cartões, relógios para o Judge): carregado quando aberto. */
 const TournamentLobby = lazy(() => import('./TournamentLobby'));
+/** Painel do meta (aba "Meta" da lista): carregado quando aberto. */
+const TournamentMeta = lazy(() => import('./TournamentMeta'));
 
 // Neste arquivo `t` costuma ser o torneio; a função de tradução (`useT()`) se chama `tr`.
 
@@ -280,6 +282,7 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
   const [data, setData] = useState<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSupport, setShowSupport] = useState(false);
+  const [view, setView] = useState<'list' | 'meta'>('list');
   const quota = data?.organize?.kind === 'supporter' ? data.organize : null;
 
   useEffect(() => {
@@ -307,50 +310,66 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
         )}
       </header>
       <div className="coverage-body">
-        {error && <div className="error">{error}</div>}
-        {!user && <p className="muted small">{tr('tour.signInToRegister')}</p>}
-        {quota && (
-          <p className="muted small tour-quota">{tr('tour.quota', { used: quota.used, perMonth: quota.perMonth, max: quota.maxPlayers })}</p>
-        )}
-        {data && !data.organize && config?.support && (
-          <p className="small tour-quota">
-            {tr('tour.quotaInvite', { n: 5 })}{' '}
-            <button className="text-link" onClick={() => setShowSupport(true)}>
-              {tr('tour.quotaInviteLink')}
-            </button>
-          </p>
-        )}
-        {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
-        <SponsorsStrip placement="tournaments" />
-        {data === null && !error && <p className="muted">{tr('common.loading')}</p>}
-        {data?.tournaments.length === 0 && <p className="muted">{tr(data.canCreate ? 'tour.emptyCreate' : 'tour.emptyOrganizer')}</p>}
-        <div className="tour-list">
-          {data?.tournaments.map((t) => (
-            <button key={t.id} className={['tour-card', t.official ? 'official' : ''].join(' ')} onClick={() => onOpen(t.id)}>
-              <div className="tour-card-head">
-                <strong>{t.name}</strong>
-                <span className={['tour-status', t.status].join(' ')}>{tr(TOURNAMENT_STATUS_LABEL[t.status])}</span>
-              </div>
-              <OfficialBadges t={t} />
-              <span className="muted small">
-                {dots(
-                  tourFormatLabel(t),
-                  t.topCut ? tr('tour.plusTopCut', { text: tr(STRUCTURE_LABEL[t.structure]), n: t.topCut }) : tr(STRUCTURE_LABEL[t.structure]),
-                  t.maxPlayers ? tr('tour.playersOfMax', { n: t.players, max: t.maxPlayers }) : tr('tour.playersCount', { n: t.players }),
-                  t.status === 'running' &&
-                    (t.totalRounds ? tr('tour.roundOfTotalShort', { n: t.round, total: t.totalRounds }) : tr('tour.roundN', { n: t.round })),
-                )}
-              </span>
-              <span className="muted small">
-                {dots(
-                  t.organizerName ? tr('tour.organizedBy', { name: t.organizerName }) : null,
-                  t.startsAt && t.status === 'registration' ? tr('tour.startsAt', { date: dateTime(t.startsAt, locale) }) : null,
-                )}
-              </span>
-              {t.registered && <span className="tour-registered">{tr('tour.youRegistered')}</span>}
-            </button>
-          ))}
+        <div className="seg tour-tabs tour-views">
+          <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>
+            {tr('tmeta.tabList')}
+          </button>
+          <button className={view === 'meta' ? 'on' : ''} onClick={() => setView('meta')}>
+            {tr('tmeta.tabMeta')}
+          </button>
         </div>
+        {view === 'meta' ? (
+          <Suspense fallback={<p className="muted">{tr('common.loading')}</p>}>
+            <TournamentMeta onOpen={onOpen} />
+          </Suspense>
+        ) : (
+          <>
+            {error && <div className="error">{error}</div>}
+            {!user && <p className="muted small">{tr('tour.signInToRegister')}</p>}
+            {quota && (
+              <p className="muted small tour-quota">{tr('tour.quota', { used: quota.used, perMonth: quota.perMonth, max: quota.maxPlayers })}</p>
+            )}
+            {data && !data.organize && config?.support && (
+              <p className="small tour-quota">
+                {tr('tour.quotaInvite', { n: 5 })}{' '}
+                <button className="text-link" onClick={() => setShowSupport(true)}>
+                  {tr('tour.quotaInviteLink')}
+                </button>
+              </p>
+            )}
+            {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+            <SponsorsStrip placement="tournaments" />
+            {data === null && !error && <p className="muted">{tr('common.loading')}</p>}
+            {data?.tournaments.length === 0 && <p className="muted">{tr(data.canCreate ? 'tour.emptyCreate' : 'tour.emptyOrganizer')}</p>}
+            <div className="tour-list">
+              {data?.tournaments.map((t) => (
+                <button key={t.id} className={['tour-card', t.official ? 'official' : ''].join(' ')} onClick={() => onOpen(t.id)}>
+                  <div className="tour-card-head">
+                    <strong>{t.name}</strong>
+                    <span className={['tour-status', t.status].join(' ')}>{tr(TOURNAMENT_STATUS_LABEL[t.status])}</span>
+                  </div>
+                  <OfficialBadges t={t} />
+                  <span className="muted small">
+                    {dots(
+                      tourFormatLabel(t),
+                      t.topCut ? tr('tour.plusTopCut', { text: tr(STRUCTURE_LABEL[t.structure]), n: t.topCut }) : tr(STRUCTURE_LABEL[t.structure]),
+                      t.maxPlayers ? tr('tour.playersOfMax', { n: t.players, max: t.maxPlayers }) : tr('tour.playersCount', { n: t.players }),
+                      t.status === 'running' &&
+                        (t.totalRounds ? tr('tour.roundOfTotalShort', { n: t.round, total: t.totalRounds }) : tr('tour.roundN', { n: t.round })),
+                    )}
+                  </span>
+                  <span className="muted small">
+                    {dots(
+                      t.organizerName ? tr('tour.organizedBy', { name: t.organizerName }) : null,
+                      t.startsAt && t.status === 'registration' ? tr('tour.startsAt', { date: dateTime(t.startsAt, locale) }) : null,
+                    )}
+                  </span>
+                  {t.registered && <span className="tour-registered">{tr('tour.youRegistered')}</span>}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
