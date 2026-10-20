@@ -3949,6 +3949,20 @@ button.hint-pill::after,
 .modal-card .btn-col {
   margin-top: 6px;
 }
+/* grupos de botões empilhados (opções e "Ver a mesa"/"Cancelar"): respiro entre eles */
+.modal-card :is(.btn-col, .btn-row) + :is(.btn-col, .btn-row) {
+  margin-top: 14px;
+}
+.modal-card .btn-row {
+  gap: 10px;
+}
+/* "Ver a mesa" e "Cancelar" lado a lado, do mesmo tamanho */
+.modal-card .btn-row > .btn.peek,
+.modal-card .btn-row > .btn.cancel {
+  min-width: 120px;
+  padding: 9px 18px;
+  font-size: 14px;
+}
 .modal-kicker {
   display: inline-block;
   background: linear-gradient(180deg, #4da3ff, var(--blue));
@@ -4372,6 +4386,18 @@ button.hint-pill::after,
 .reveal-line + .reveal-line {
   border-top: 1px solid var(--line);
   margin-top: 8px;
+}
+/* a mesma revelação repetida (ex.: duas buscas seguidas da mesma carta) */
+.reveal-times {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.5;
 }
 
 /* ------------------------------------------------------------------ replay: controles */
@@ -11736,25 +11762,15 @@ a.sponsor-card:hover {
  * perspectiva. O HUD (menu, histórico, etiquetas, faixas, contadores e as pílulas das mãos) fica nas
  * linhas de cima e de baixo, fora da mesa; os leques das mãos abertas ficam nas bordas da tela.
  * Todas as cartas do mesmo tamanho (`--cw`), medido pela altura: uma coluna de 5 Personagens abaixo
- * da fileira de Vida.
+ * da fileira de Vida. A mesa não tem borda: o playmat ocupa a tela toda, como se fosse maior que ela.
  */
-:root {
-  --lat-logo: #111;
-  --lat-wood: #2b1c16;
-  --lat-wood2: #4a3127;
-}
-:root[data-theme='dark'] {
-  --lat-logo: #fff;
-  --lat-wood: #1a1310;
-  --lat-wood2: #3a2820;
-}
 .game.streamer.lateral .mat {
   --hud-h: 54px;
   --lat-h: calc(100cqh - 2 * var(--hud-h) - 40px);
   --cw: max(38px, min(calc(var(--lat-h) / 7.9), calc((100cqw - 120px) / 13.6), 150px));
   /* espaçamentos de cada lado: cost area → Líder e Líder → Personagens (crescem até o limite com a tela larga) */
   --g1: calc(var(--cw) * 0.7);
-  --g2: calc(var(--cw) * 0.35);
+  --g2: calc(var(--cw) * 0.55);
   --ch: calc(var(--cw) * 1.396);
   --hcw: var(--cw);
   width: 100%;
@@ -11767,8 +11783,9 @@ a.sponsor-card:hover {
 }
 .game.streamer.lateral {
   background:
-    radial-gradient(120% 90% at 50% 10%, rgba(80, 60, 50, 0.35), transparent 60%),
-    var(--bg);
+    radial-gradient(45% 80% at 0% 50%, rgba(255, 112, 76, 0.26), transparent 70%),
+    radial-gradient(45% 80% at 100% 50%, rgba(56, 132, 255, 0.28), transparent 70%),
+    linear-gradient(180deg, var(--mat-1) 0%, var(--mat-2) 50%, var(--mat-3) 100%);
 }
 
 /* ---- HUD ---- */
@@ -11833,18 +11850,8 @@ a.sponsor-card:hover {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 14px 18px;
-  border-radius: 24px;
   transform: rotateX(10deg);
   transform-origin: 50% 0;
-  background:
-    radial-gradient(60% 100% at 0% 50%, rgba(255, 112, 76, 0.26), transparent 70%),
-    radial-gradient(60% 100% at 100% 50%, rgba(56, 132, 255, 0.28), transparent 70%),
-    linear-gradient(180deg, var(--mat-1) 0%, var(--mat-2) 50%, var(--mat-3) 100%);
-  box-shadow:
-    0 50px 80px rgba(0, 0, 0, 0.55),
-    0 0 0 12px var(--lat-wood),
-    0 0 0 14px var(--lat-wood2),
-    inset 0 0 70px rgba(0, 0, 0, 0.08);
 }
 
 /* ---- cada lado: [cost area] [Líder] [Personagens]; o da direita girado 180° ---- */
@@ -11948,6 +11955,11 @@ a.sponsor-card:hover {
   right: -8px;
   bottom: -6px;
   font-size: max(11px, calc(var(--cw) * 0.16));
+}
+/* os contadores do jogador da direita ficam de pé para quem assiste (o lado dele é girado 180°) */
+.lat-half.right .pile-count,
+.lat-half.right .life-count {
+  rotate: 180deg;
 }
 .lat-dons {
   --dw: var(--cw);
@@ -12077,7 +12089,8 @@ a.sponsor-card:hover {
   grid-row: 3;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--cw) * 0.35);
+  /* folga para o Líder virado (em pé) e os DON!! anexados não cobrirem o Stage */
+  gap: calc(var(--cw) * 0.9);
 }
 /*
  * Como na mesa de verdade vista de cima: a carta ativa fica deitada, com o topo apontando para o
@@ -12090,6 +12103,8 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  /* a carta em pé é mais alta que a caixa: sem `place-content`, a linha da grade começa no topo e a carta desce */
+  place-content: center;
   place-items: center;
 }
 .lat-leader > .field-card,
@@ -12102,14 +12117,54 @@ a.sponsor-card:hover {
 .lat-slot > .field-card > .card.rested {
   transform: rotate(-90deg);
 }
-.lat-leader.active::after {
+/* a aura do Líder do turno contorna a própria carta e gira junto quando ela é virada */
+.lat-leader.active > .field-card::after {
   content: '';
   position: absolute;
   inset: -5px;
-  border-radius: 12px;
+  border-radius: calc(var(--cw) * 0.07 + 5px);
   border: 2px solid rgba(255, 211, 77, 0.9);
   box-shadow: 0 0 14px rgba(255, 190, 40, 0.5);
+  transition: transform 0.22s;
   pointer-events: none;
+}
+.lat-leader.active > .field-card:has(> .card.rested)::after {
+  transform: rotate(-90deg);
+}
+/*
+ * DON!! anexados do mesmo tamanho dos da cost area: por baixo da carta, aparecendo na borda de baixo
+ * dela (voltada para o jogador), e virados junto com a carta.
+ */
+.lateral .field-card > .attached-don {
+  --fw: var(--cw);
+  left: 0;
+  top: 0;
+  bottom: auto;
+  width: 100%;
+  height: 100%;
+  transform: none;
+  transition: transform 0.22s;
+}
+.lateral .field-card:has(> .card.rested) > .attached-don {
+  transform: rotate(-90deg);
+}
+.lateral .attached-don .don-card.flat {
+  left: 0;
+  bottom: auto;
+  top: calc(var(--cw) * (0.32 + var(--k) * 0.07));
+  width: var(--cw);
+  height: var(--ch);
+  /* o primeiro por cima: cada um aparece um pouco mais que o de cima */
+  z-index: calc(4 - var(--k));
+}
+.lateral .attached-don .don-card.flat::after {
+  transform: translate(-50%, -50%);
+}
+.lateral .attached-don b {
+  right: auto;
+  left: -6px;
+  bottom: calc(var(--cw) * -0.2);
+  z-index: 5;
 }
 .lat-stage > .slot-empty,
 .lat-slot > .slot-empty {
@@ -12170,10 +12225,8 @@ a.sponsor-card:hover {
   grid-column: 1;
   width: calc(var(--cw) * 1.05);
   height: calc(var(--cw) * 1.3);
-  background: var(--lat-logo);
-  -webkit-mask: url('./assets/uaiuai-no-mi.png') center / contain no-repeat;
-  mask: url('./assets/uaiuai-no-mi.png') center / contain no-repeat;
-  opacity: 0.9;
+  background: url('./assets/uaiuai-no-mi.png') center / contain no-repeat;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
   z-index: 1;
 }
 .lat-center > .turn-chip {
