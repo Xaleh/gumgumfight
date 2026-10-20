@@ -3949,6 +3949,20 @@ button.hint-pill::after,
 .modal-card .btn-col {
   margin-top: 6px;
 }
+/* grupos de botões empilhados (opções e "Ver a mesa"/"Cancelar"): respiro entre eles */
+.modal-card :is(.btn-col, .btn-row) + :is(.btn-col, .btn-row) {
+  margin-top: 14px;
+}
+.modal-card .btn-row {
+  gap: 10px;
+}
+/* "Ver a mesa" e "Cancelar" lado a lado, do mesmo tamanho */
+.modal-card .btn-row > .btn.peek,
+.modal-card .btn-row > .btn.cancel {
+  min-width: 120px;
+  padding: 9px 18px;
+  font-size: 14px;
+}
 .modal-kicker {
   display: inline-block;
   background: linear-gradient(180deg, #4da3ff, var(--blue));
