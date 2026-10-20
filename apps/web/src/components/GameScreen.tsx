@@ -537,8 +537,7 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, streamerFrames, sidePanel, update: updateSettings } =
-    useSettings();
+  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -1352,7 +1351,6 @@ function Table({
         broadcast ? 'broadcast' : '',
         streamer ? 'streamer' : '',
         lateral ? `lateral playmat-${streamerPlaymat}` : '',
-        lateral && !streamerFrames ? 'zones-only' : '',
         streamer && panel ? 'with-panel' : '',
         playerPanel && !panel ? 'no-panel' : '',
       ].join(' ')}
@@ -1601,15 +1599,6 @@ function Table({
                       {t(`game.playmat.${pm}`)}
                     </button>
                   ))}
-                </div>
-                <label className="sheet-label playmat-frames">{t('game.playmatFrames')}</label>
-                <div className="seg small">
-                  <button className={streamerFrames ? 'on' : ''} onClick={() => updateSettings({ streamerFrames: true })}>
-                    {t('game.playmatFramesAll')}
-                  </button>
-                  <button className={streamerFrames ? '' : 'on'} onClick={() => updateSettings({ streamerFrames: false })}>
-                    {t('game.playmatFramesZones')}
-                  </button>
                 </div>
               </div>
             )}

@@ -40,8 +40,6 @@ export interface Settings {
   streamerLayout: StreamerLayout;
   /** Visão do Streamer, mesa lateral: a cor do playmat. */
   streamerPlaymat: Playmat;
-  /** Visão do Streamer, mesa lateral: moldura em todos os espaços (false: só Vida, decks e descarte). */
-  streamerFrames: boolean;
   /** Partida no desktop: o painel lateral (histórico e decklist) aberto; fechado, a mesa ocupa a tela toda. */
   sidePanel: boolean;
   /** Volume dos efeitos sonoros (0 = mudo … 1). */
@@ -71,7 +69,6 @@ const EDITABLE: Editable[] = [
   'opponentChat',
   'streamerLayout',
   'streamerPlaymat',
-  'streamerFrames',
   'sidePanel',
   'sfxVolume',
   'musicVolume',
@@ -101,7 +98,6 @@ const DEFAULTS: Settings = {
   opponentChat: true,
   streamerLayout: 'lateral',
   streamerPlaymat: 'navy',
-  streamerFrames: true,
   sidePanel: true,
   sfxVolume: 0.8,
   musicVolume: 0.5,
@@ -145,7 +141,6 @@ function load(): Settings {
       theme,
       streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
       streamerPlaymat: PLAYMATS.includes(saved.streamerPlaymat as Playmat) ? (saved.streamerPlaymat as Playmat) : 'navy',
-      streamerFrames: saved.streamerFrames !== false,
       sidePanel: saved.sidePanel !== false,
       serverImages: false,
       pushKey: null,

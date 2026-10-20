@@ -12314,8 +12314,8 @@ a.sponsor-card:hover {
 
 /*
  * O desenho do playmat: a bússola dourada grande no meio, pegando os dois campos, e as molduras
- * douradas finas de cada espaço (sempre à vista, com ou sem carta). `.zones-only`: só as molduras da
- * Vida, dos decks e do descarte. As cores (`.playmat-*`, também nas bolinhas do menu): o centro
+ * douradas finas de cada espaço (sempre à vista, com ou sem carta), menos nos Personagens, que
+ * disputariam com a bússola. As cores (`.playmat-*`, também nas bolinhas do menu): o centro
  * (`--pm-c`), o alto e o pé (`--pm-a`, `--pm-b`), as molduras (`--pm-gold`) e os nomes das áreas.
  */
 .playmat-navy {
@@ -12368,9 +12368,6 @@ a.sponsor-card:hover {
   flex-wrap: wrap;
   border-radius: 16px;
 }
-.sheet-label.playmat-frames {
-  margin-top: 10px;
-}
 /* a bússola num pseudo-elemento, por baixo das metades da mesa, para o playmat branco escurecer o dourado */
 .lat-table::before {
   content: '';
@@ -12393,7 +12390,6 @@ a.sponsor-card:hover {
 .lat-life::before,
 .lat-leader::before,
 .lat-stage::before,
-.lat-slot::before,
 .lat-deck::before {
   content: '';
   position: absolute;
@@ -12419,14 +12415,8 @@ a.sponsor-card:hover {
   inset: calc(var(--cw) * -0.06);
   bottom: 0;
 }
-.zones-only .lat-dons::before,
-.zones-only .lat-leader::before,
-.zones-only .lat-stage::before,
-.zones-only .lat-slot::before,
-.zones-only .lat-stage > .slot-empty,
-.zones-only .lat-leader > .lat-label,
-.zones-only .lat-stage > .lat-label,
-.zones-only .lat-chars > .lat-label {
+/* os Personagens sem moldura nem nome: a área fica livre para a bússola */
+.lat-chars > .lat-label {
   display: none;
 }
 
