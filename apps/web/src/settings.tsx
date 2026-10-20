@@ -1,3 +1,4 @@
+import { registerCardCdn } from '@gumgum/engine';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { audio } from './audio';
@@ -179,7 +180,11 @@ export function SettingsProvider({ children, locale }: { children: ReactNode; lo
     const load = (attempt: number) =>
       api
         .config()
-        .then((c) => !cancelled && setSettings((s) => ({ ...s, serverImages: c.cardImages, pushKey: c.pushKey ?? null })))
+        .then((c) => {
+          if (cancelled) return;
+          registerCardCdn(c.cardCdn);
+          setSettings((s) => ({ ...s, serverImages: c.cardImages, pushKey: c.pushKey ?? null }));
+        })
         .catch(() => {
           if (!cancelled && attempt < 15) timer = setTimeout(() => load(attempt + 1), 2000);
         });

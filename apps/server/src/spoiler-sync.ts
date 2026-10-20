@@ -29,6 +29,7 @@ import {
   type SourceKind,
   writeOfficial,
 } from './card-sources';
+import { type ImageStore, syncCardCdn } from './card-cdn';
 import { type DB, hasOfficialCards, pendingSpoilers, pruneSpoilers, SPOILER_SOURCE, upsertCards } from './db';
 import { DEFAULT_API_BASE, rowsOf } from './optcgapi';
 import { readSpoilerFiles } from './seed';
@@ -222,7 +223,18 @@ export async function syncSpoilers(
  * cadeias do ambiente (uma fonte usada nas duas é baixada uma vez só). As divergências entre
  * fontes vão para o log e para var/card-source-diff.json.
  */
-export async function spoilerRound(db: DB, opts: { base: string; dir: string; log: (msg: string) => void; fetchJson?: FetchJson }) {
+export async function spoilerRound(
+  db: DB,
+  opts: {
+    base: string;
+    dir: string;
+    log: (msg: string) => void;
+    fetchJson?: FetchJson;
+    /** CDN própria: no fim da rodada copia as imagens novas (até `cdnMaxDownloads`). */
+    cdn?: ImageStore | null;
+    cdnMaxDownloads?: number;
+  },
+) {
   const cache = new Map<string, CardSource>();
   const ctx = { base: opts.base, fetchJson: opts.fetchJson };
   for (const kind of ['spoiler', 'official'] as const) for (const w of chainNames(kind).warnings) opts.log(`Fontes das cartas: ${w}`);
@@ -250,6 +262,7 @@ export async function spoilerRound(db: DB, opts: { base: string; dir: string; lo
     chain: chainFromEnv('official', ctx, cache),
     onReport: (r, chain) => report('Oficiais', 'official:sync', r, chain),
   });
+  if (opts.cdn) await syncCardCdn(db, opts.cdn, { maxDownloads: opts.cdnMaxDownloads, log: opts.log });
   return { feed, sync };
 }
 
@@ -257,10 +270,17 @@ export async function spoilerRound(db: DB, opts: { base: string; dir: string; lo
  * Busca os spoilers e troca pelos oficiais ao iniciar e depois a cada `hours` horas.
  * A primeira rodada espera alguns segundos para não atrasar a subida do servidor.
  */
-export function scheduleSpoilerSync(db: DB, opts: { base: string; dir: string; hours: number; log: (msg: string) => void }) {
+export function scheduleSpoilerSync(
+  db: DB,
+  opts: { base: string; dir: string; hours: number; log: (msg: string) => void; cdn?: ImageStore | null },
+) {
+  let running = false;
   const run = async () => {
+    // A primeira cópia das imagens para a CDN pode demorar mais que o intervalo.
+    if (running) return;
+    running = true;
     try {
-      const { sync: r } = await spoilerRound(db, opts);
+      const { sync: r } = await spoilerRound(db, { ...opts, cdnMaxDownloads: 500 });
       if (!r.pending.length) return;
       opts.log(
         `Spoilers (${r.pending.join(', ')}): ${r.official.length} carta(s) agora oficiais` +
@@ -268,6 +288,8 @@ export function scheduleSpoilerSync(db: DB, opts: { base: string; dir: string; h
       );
     } catch (err) {
       opts.log(`Spoilers: falha na sincronização: ${errorText(err)}`);
+    } finally {
+      running = false;
     }
   };
   setTimeout(run, 15_000).unref();

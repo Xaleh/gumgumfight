@@ -152,7 +152,7 @@ ONLINE_BOT_ROOMS="$(get_env ONLINE_BOT_ROOMS)"; ONLINE_BOT_ROOMS="${ONLINE_BOT_R
 PARTNER_IPS="$(get_env PARTNER_IPS)"
 # Apoio, homologação, replay embutido e ajustes finos (preenchidos à mão no deploy.env): mantidos como estão.
 KEEP_LINES=""
-[ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+|PUSH|VAPID_[A-Z_]+|SPOILER_SYNC|CARD_SOURCES|SPOILER_SOURCES|REPLAY_EMBED_ORIGINS|REPLAY_LINK_SECRET)=' "$ENV_FILE" || true)"
+[ -f "$ENV_FILE" ] && KEEP_LINES="$(grep -E '^(SUPPORT_[A-Z_]+|APOIASE_[A-Z_]+|KOFI_WEBHOOK_TOKEN|INTERNAL_TOKEN|ACCESS|PM2_MAX_MEMORY|ONLINE_MAX_ROOMS|ONLINE_MAX_BOT_ROOMS|DISCORD_[A-Z_]+|PUSH|VAPID_[A-Z_]+|SPOILER_SYNC|CARD_SOURCES|SPOILER_SOURCES|CARD_CDN_URL|R2_[A-Z_]+|REPLAY_EMBED_ORIGINS|REPLAY_LINK_SECRET)=' "$ENV_FILE" || true)"
 cat > "$ENV_FILE" <<EOF
 # Gerado por deploy/bootstrap-hostinger.sh — lido a cada deploy (deploy/remote-deploy.sh e ecosystem.config.cjs).
 PORT=$PORT
@@ -280,6 +280,12 @@ card_img_location() {
 EOF
 }
 CARD_IMG_BLOCK="$(card_img_location optcgapi optcgapi.com media/; card_img_location optcgleaks images.optcgleaks.com)"
+# CDN própria das imagens (CARD_CDN_URL no deploy.env): mesma rota, origem "cdn".
+CARD_CDN_HOST="$(get_env CARD_CDN_URL | sed -E 's#^https?://##; s#/.*$##')"
+if [[ "$CARD_CDN_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
+  CARD_IMG_BLOCK="$CARD_IMG_BLOCK
+$(card_img_location cdn "$CARD_CDN_HOST")"
+fi
 
 PROXY_BLOCK="$(cat <<EOF
     client_max_body_size 2m;

@@ -54,6 +54,8 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
 | `CARD_SOURCES`  | `optcgapi`                    | Fontes das cartas lançadas, em ordem de prioridade (ex.: `cardkaizoku,optcgapi`; veja [Cadeia de fontes](#cadeia-de-fontes)) |
 | `SPOILER_SOURCES` | `optcgleaks`                | Fontes dos spoilers, em ordem de prioridade (ex.: `cardkaizoku,optcgleaks`) |
+| `CARD_CDN_URL`  | (vazio)                       | Endereço público da CDN própria das imagens (ex.: `https://cards.gumgumfight.cloud`); vazio = imagens direto das fontes (veja [CDN própria](#cdn-própria-das-imagens-cloudflare-r2)) |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | (vazio) | Conta, bucket e token do Cloudflare R2 da CDN (segredos: só no `deploy.env`) |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
@@ -846,6 +848,46 @@ Com `CARD_IMAGES=on` (padrão), o navegador carrega as imagens direto das URLs i
 pode desligá-las nas configurações. Com `CARD_IMAGES=off`, o servidor remove as URLs de todas as respostas e o
 jogo usa só as cartas desenhadas em HTML (nome, custo, poder, texto). Se uma imagem falhar ao carregar, a carta
 desenhada é usada automaticamente.
+
+### CDN própria das imagens (Cloudflare R2)
+
+Com a CDN configurada, cada imagem é baixada **uma vez** da fonte (optcgapi, optcgleaks), gravada num bucket do
+Cloudflare R2 e a carta passa a apontar para lá. O jogo deixa de depender dos sites de terceiros para mostrar as
+imagens, e o parceiro SweetApp pode usar a mesma CDN. Código em `apps/server/src/card-cdn/`.
+
+- **Endereços:** `<CARD_CDN_URL>/<coleção>/<idioma>/<arte>.<ext>?v=<hash>` (ex.: `/OP01/en/OP01-016_p1.jpg?v=3f2a…`). A
+  chave de uma arte não muda; o `?v=` é o hash do conteúdo e muda quando a imagem muda, então o cache é de um ano
+  (`immutable`).
+- **Índice para parceiros:** `<CARD_CDN_URL>/index.json` (`schemaVersion: 1`): número da carta → nome, coleção, `spoiler`,
+  imagem principal e artes, só das cartas que já estão na CDN. Atualizado a cada rodada que copia ou reaproveita imagens.
+- **Quando copia:** no fim de toda importação (`cards:import`), em cada rodada da sincronização dos spoilers (até 500
+  imagens novas por rodada) e à mão com `npm run cards:import -- --images` (use para a primeira carga, ~5 mil imagens).
+  Reimportar uma carta não baixa a imagem de novo (tabela `card_images`: endereço de origem → objeto no bucket).
+- **Nunca copia** de origens fora da lista do `/card-img/` (optcgapi, optcgleaks): imagens do Cardkaizoku ficam de fora
+  pelos termos de uso do site. Uma imagem que falha fica com o endereço original e é tentada de novo na próxima rodada.
+- O kit de divulgação dos torneios continua usando `/card-img/` (origem `cdn`), com o cache do Nginx.
+
+**Configuração no Cloudflare (uma vez):**
+
+1. O domínio público do bucket precisa estar no Cloudflare. O `gumgumfight.app` usa o DNS da Hostinger; o caminho mais
+   simples é levar só o `gumgumfight.cloud` para o Cloudflare (plano grátis: trocar os nameservers na Hostinger e
+   recriar os registros A de `@` e `www` para a VPS) e usar `cards.gumgumfight.cloud`.
+2. **R2 → Create bucket** (ex.: `ggf-cards`). Em **Settings → Custom Domains**, conecte `cards.gumgumfight.cloud`.
+3. Em **Settings → CORS policy**, libere leitura (`GET`, `HEAD`) para `https://gumgumfight.app`,
+   `https://gumgumfight.duckdns.org` e as origens dos parceiros (SweetApp).
+4. **R2 → Manage API tokens → Create API token** com *Object Read & Write* só nesse bucket. Guarde o Access Key ID e o
+   Secret (aparecem uma vez) e o Account ID.
+5. No `shared/deploy.env` da VPS (homologação e produção):
+   ```bash
+   CARD_CDN_URL=https://cards.gumgumfight.cloud
+   R2_ACCOUNT_ID=<account id>
+   R2_BUCKET=ggf-cards
+   R2_ACCESS_KEY_ID=<access key id>
+   R2_SECRET_ACCESS_KEY=<secret>
+   ```
+   Rode `deploy/bootstrap-hostinger.sh` de novo (cria a rota `/card-img/cdn/` no Nginx) e faça a primeira carga pelo
+   "Run workflow" do GitHub com `--images` em "Coleções para importar" (o deploy já lê o `deploy.env`). Na VPS, à mão:
+   `cd ~/apps/gumgumfight && set -a && . shared/deploy.env && set +a && DB_PATH=shared/gumgum.db node current/server/import-cards.mjs --images`.
 
 ### Artes alternativas
 

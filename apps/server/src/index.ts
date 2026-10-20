@@ -1,5 +1,6 @@
 import './env';
 import { buildApp } from './app';
+import { cdnFromEnv } from './card-cdn';
 import { spoilerSyncHours } from './config';
 import { countCards, type DB, openDb } from './db';
 import { DEFAULT_API_BASE } from './optcgapi';
@@ -37,6 +38,7 @@ if (syncHours) {
     dir: join(DATA_DIR, 'spoilers'),
     hours: syncHours,
     log: (msg) => console.log(msg),
+    cdn: cdnFromEnv(),
   });
 }
 
