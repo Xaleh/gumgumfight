@@ -7,7 +7,7 @@ import { CardBack, CardView } from './CardView';
 /**
  * Mesa lateral da visão do Streamer, como a câmera de cima das transmissões de loja: os jogadores um
  * de cada lado da tela (o da esquerda é o ponto de vista; o da direita é o mesmo bloco girado 180°,
- * com as cartas de cabeça para baixo), cada playmat girado 90° e a mesa em leve perspectiva.
+ * com as cartas de cabeça para baixo), cada playmat girado 90° e a mesa vista bem de cima, sem perspectiva.
  *
  * Cada lado, da borda para o centro: a cost area (deck de DON!! deitado, os DON!! semi-empilhados e o
  * descarte no canto), a coluna do Líder (Vida deitada no alto, Líder, Stage e o deck no fim da mesa) e

@@ -13,6 +13,9 @@ export type { Locale };
 export type Theme = 'system' | 'light' | 'dark';
 
 export type StreamerLayout = 'lateral' | 'upright';
+/** Cor do playmat da mesa lateral (todos com a bússola dourada no meio). */
+export type Playmat = 'navy' | 'red' | 'green' | 'white';
+export const PLAYMATS: readonly Playmat[] = ['navy', 'red', 'green', 'white'];
 
 export interface Settings {
   /** Idioma da interface. O texto das cartas sai traduzido só em pt-BR; nos demais, o original em inglês. */
@@ -33,8 +36,10 @@ export interface Settings {
   theme: Theme;
   /** Online: mostrar as mensagens e os emotes que o oponente manda. */
   opponentChat: boolean;
-  /** Visão do Streamer: mesa lateral (jogadores à esquerda e à direita, 2.5D) ou em pé. */
+  /** Visão do Streamer: mesa lateral (jogadores à esquerda e à direita, vista de cima) ou em pé. */
   streamerLayout: StreamerLayout;
+  /** Visão do Streamer, mesa lateral: a cor do playmat. */
+  streamerPlaymat: Playmat;
   /** Partida no desktop: o painel lateral (histórico e decklist) aberto; fechado, a mesa ocupa a tela toda. */
   sidePanel: boolean;
   /** Volume dos efeitos sonoros (0 = mudo … 1). */
@@ -63,6 +68,7 @@ const EDITABLE: Editable[] = [
   'theme',
   'opponentChat',
   'streamerLayout',
+  'streamerPlaymat',
   'sidePanel',
   'sfxVolume',
   'musicVolume',
@@ -91,6 +97,7 @@ const DEFAULTS: Settings = {
   theme: 'system',
   opponentChat: true,
   streamerLayout: 'lateral',
+  streamerPlaymat: 'navy',
   sidePanel: true,
   sfxVolume: 0.8,
   musicVolume: 0.5,
@@ -133,6 +140,7 @@ function load(): Settings {
       locale: savedLocale(saved),
       theme,
       streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
+      streamerPlaymat: PLAYMATS.includes(saved.streamerPlaymat as Playmat) ? (saved.streamerPlaymat as Playmat) : 'navy',
       sidePanel: saved.sidePanel !== false,
       serverImages: false,
       pushKey: null,

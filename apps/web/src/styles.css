@@ -11754,20 +11754,25 @@ a.sponsor-card:hover {
 }
 
 
-/* ------------------------------------------------------------------ visão do Streamer: mesa lateral (2.5D) */
+/* ------------------------------------------------------------------ visão do Streamer: mesa lateral */
 
 /*
  * Os jogadores um de cada lado da tela, como a câmera de cima das transmissões de loja: cada playmat
- * girado 90° (o da direita girado 180°, com as cartas de cabeça para baixo) e a mesa em leve
- * perspectiva. O HUD (menu, histórico, etiquetas, faixas, contadores e as pílulas das mãos) fica nas
- * linhas de cima e de baixo, fora da mesa; os leques das mãos abertas ficam nas bordas da tela.
+ * girado 90° (o da direita girado 180°, com as cartas de cabeça para baixo) e a mesa vista bem de cima,
+ * com a câmera perpendicular a ela (sem perspectiva). O HUD (menu, histórico, etiquetas, faixas,
+ * contadores e as pílulas das mãos) fica nas linhas de cima e de baixo, fora da mesa; os leques das
+ * mãos abertas ficam nas bordas da tela.
  * Todas as cartas do mesmo tamanho (`--cw`), medido pela altura: uma coluna de 5 Personagens abaixo
  * da fileira de Vida. A mesa não tem borda: o playmat ocupa a tela toda, como se fosse maior que ela.
  */
 .game.streamer.lateral .mat {
   --hud-h: 54px;
   --lat-h: calc(100cqh - 2 * var(--hud-h) - 40px);
-  --cw: max(38px, min(calc(var(--lat-h) / 7.9), calc((100cqw - 120px) / 13.6), 150px));
+  /*
+   * Pela altura: a coluna do Líder (Líder na altura do 3º Personagem, a folga do Líder virado com DON!!,
+   * o Stage e o deck) mede 7.71 cartas, mais o respiro das pontas (0.6) e o da mesa (28px).
+   */
+  --cw: max(38px, min(calc((var(--lat-h) - 28px) / 8.31), calc((100cqw - 120px) / 13.6), 150px));
   /* espaçamentos de cada lado: cost area → Líder e Líder → Personagens (crescem até o limite com a tela larga) */
   --g1: calc(var(--cw) * 0.7);
   --g2: calc(var(--cw) * 0.55);
@@ -11781,11 +11786,11 @@ a.sponsor-card:hover {
   border: 0;
   box-shadow: none;
 }
+/* o playmat: a cor escolhida pelo Streamer (ver "O desenho do playmat"), nos dois temas */
 .game.streamer.lateral {
   background:
-    radial-gradient(45% 80% at 0% 50%, rgba(255, 112, 76, 0.26), transparent 70%),
-    radial-gradient(45% 80% at 100% 50%, rgba(56, 132, 255, 0.28), transparent 70%),
-    linear-gradient(180deg, var(--mat-1) 0%, var(--mat-2) 50%, var(--mat-3) 100%);
+    radial-gradient(60% 70% at 50% 50%, var(--pm-c) 0%, transparent 100%),
+    linear-gradient(180deg, var(--pm-a) 0%, var(--pm-b) 100%);
 }
 
 /* ---- HUD ---- */
@@ -11832,14 +11837,11 @@ a.sponsor-card:hover {
   margin: 0 2px;
 }
 
-/* ---- a mesa em perspectiva ---- */
+/* ---- a mesa, vista de cima ---- */
 .lat-scene {
   flex: 1;
   min-height: 0;
-  /* margem para a borda de baixo, mais perto da câmera, não sair da tela */
   padding: 0 48px;
-  perspective: 2200px;
-  perspective-origin: 50% 30%;
 }
 .lat-table {
   position: relative;
@@ -11850,8 +11852,6 @@ a.sponsor-card:hover {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 14px 18px;
-  transform: rotateX(10deg);
-  transform-origin: 50% 0;
 }
 
 /* ---- cada lado: [cost area] [Líder] [Personagens]; o da direita girado 180° ---- */
@@ -11905,6 +11905,8 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  /* a carta em pé é mais alta que a caixa: sem `place-content`, a linha da grade começa no topo e a carta desce */
+  place-content: center;
   place-items: center;
 }
 .lat-side > .card,
@@ -12007,6 +12009,7 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  place-content: center;
   place-items: center;
   z-index: var(--i);
   cursor: pointer;
@@ -12062,6 +12065,7 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  place-content: center;
   place-items: center;
   z-index: var(--i);
 }
@@ -12078,19 +12082,32 @@ a.sponsor-card:hover {
   padding: 1px 8px;
 }
 
-/* coluna do Líder: a fileira de Vida reserva o alto; Líder centrado com o Stage abaixo; o deck no fim */
+/*
+ * coluna do Líder: a fileira de Vida no alto (alinhada com o deck de DON!!); o Líder na altura do
+ * Personagem do meio; o Stage abaixo; o deck no fim (alinhado com o descarte)
+ */
 .lat-mid {
   position: relative;
   display: grid;
-  grid-template-rows: calc(var(--cw) * 1.25) 1fr auto 1fr auto;
+  grid-template-rows:
+    /* o topo do 3º Personagem: a fileira de Vida (1.25) e dois Personagens com o espaço entre eles (1.18) */
+    calc(var(--cw) * (1.25 + 2 * 1.18))
+    var(--cw)
+    /* folga para o Líder virado (em pé) e os DON!! anexados não cobrirem o Stage */
+    minmax(calc(var(--cw) * 0.8), 1fr)
+    var(--cw)
+    minmax(calc(var(--cw) * 0.3), 1fr)
+    var(--cw);
   min-height: 0;
 }
 .lat-leader-block {
-  grid-row: 3;
-  display: flex;
-  flex-direction: column;
-  /* folga para o Líder virado (em pé) e os DON!! anexados não cobrirem o Stage */
-  gap: calc(var(--cw) * 0.9);
+  display: contents;
+}
+.lat-leader {
+  grid-row: 2;
+}
+.lat-stage {
+  grid-row: 4;
 }
 /*
  * Como na mesa de verdade vista de cima: a carta ativa fica deitada, com o topo apontando para o
@@ -12173,7 +12190,7 @@ a.sponsor-card:hover {
   rotate: 90deg;
 }
 .lat-deck {
-  grid-row: 5;
+  grid-row: 6;
   width: var(--ch);
   height: var(--cw);
 }
@@ -12196,7 +12213,7 @@ a.sponsor-card:hover {
   place-items: center;
 }
 
-/* a faixa central na vertical: turno em cima, o logo no meio e a mensagem logo abaixo */
+/* a faixa central na vertical: turno em cima, a mensagem no meio (no miolo da bússola) e o logo embaixo */
 .lat-center {
   position: relative;
   width: calc(var(--cw) * 2);
@@ -12204,29 +12221,20 @@ a.sponsor-card:hover {
   display: grid;
   /* coluna de largura fixa: a mensagem mais larga que ela transborda centrada, sem empurrar a faixa */
   grid-template-columns: calc(var(--cw) * 2);
-  grid-template-rows: auto 1fr auto auto 1fr;
+  grid-template-rows: auto 1fr auto 1fr auto;
   align-items: center;
   justify-items: center;
   row-gap: 8px;
 }
-.lat-center::after {
-  content: '';
-  grid-row: 1 / -1;
-  grid-column: 1;
-  width: 10px;
-  height: 100%;
-  border-radius: 6px;
-  background: var(--mat-line);
-  z-index: 0;
-}
 .lat-center::before {
   content: '';
-  grid-row: 3;
+  grid-row: 5;
   grid-column: 1;
-  width: calc(var(--cw) * 1.05);
-  height: calc(var(--cw) * 1.3);
-  background: url('./assets/uaiuai-no-mi.png') center / contain no-repeat;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+  width: calc(var(--cw) * 0.75);
+  height: calc(var(--cw) * 0.93);
+  /* o logo de uma cor só, no dourado da bússola */
+  background: url('./assets/uaiuai-no-mi-gold.png') center / contain no-repeat;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
   z-index: 1;
 }
 .lat-center > .turn-chip {
@@ -12236,7 +12244,7 @@ a.sponsor-card:hover {
   margin-top: 4px;
 }
 .lat-center > .band-middle {
-  grid-row: 4;
+  grid-row: 3;
   grid-column: 1;
   z-index: 3;
   justify-content: center;
@@ -12304,9 +12312,114 @@ a.sponsor-card:hover {
 .game.streamer.lateral .card.rested {
   transform: rotate(-90deg);
 }
-/* a faixa de turno fica abaixo do logo, sobre a mensagem da faixa central */
-.game.streamer.lateral .turn-banner {
-  top: 62%;
+
+/*
+ * O desenho do playmat: a bússola dourada grande no meio, pegando os dois campos, e as molduras
+ * douradas finas de cada espaço (sempre à vista, com ou sem carta), menos nos Personagens, que
+ * disputariam com a bússola. As cores (`.playmat-*`, também nas bolinhas do menu): o centro
+ * (`--pm-c`), o alto e o pé (`--pm-a`, `--pm-b`), as molduras (`--pm-gold`) e os nomes das áreas.
+ */
+.playmat-navy {
+  /* como o do regional de Londres: azul-marinho quase preto */
+  --pm-c: #1c2632;
+  --pm-a: #121821;
+  --pm-b: #0e131a;
+  --pm-gold: #d9ac4a;
+  --pm-label: rgba(217, 172, 74, 0.7);
+}
+.playmat-red {
+  /* vinho, do vermelho da marca */
+  --pm-c: #6a1d1a;
+  --pm-a: #4a1311;
+  --pm-b: #2e0b0a;
+  --pm-gold: #e0b04c;
+  --pm-label: rgba(224, 176, 76, 0.75);
+}
+.playmat-green {
+  /* verde-esmeralda escuro, do verde da marca */
+  --pm-c: #175239;
+  --pm-a: #0f3b29;
+  --pm-b: #08251a;
+  --pm-gold: #dcae4a;
+  --pm-label: rgba(220, 174, 74, 0.75);
+}
+.playmat-white {
+  /* marfim: dourado mais escuro para aparecer no claro */
+  --pm-c: #fdfaf4;
+  --pm-a: #f2ede3;
+  --pm-b: #e5ded0;
+  --pm-gold: #b5852a;
+  --pm-label: rgba(150, 108, 30, 0.8);
+}
+.lat-scene {
+  --slot-text: var(--pm-label);
+}
+.playmat-dot {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  border-radius: 50%;
+  background: var(--pm-c);
+  border: 1.5px solid var(--pm-gold);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.seg.playmat-pick {
+  flex-wrap: wrap;
+  border-radius: 16px;
+}
+/* a bússola num pseudo-elemento, por baixo das metades da mesa, para o playmat branco escurecer o dourado */
+.lat-table::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('./assets/playmat-compass.svg') center / auto 76% no-repeat;
+  pointer-events: none;
+}
+.playmat-white .lat-table::before,
+.playmat-white .lat-center::before {
+  filter: brightness(0.8) saturate(1.25);
+}
+.lat-scene .slot-empty,
+.lat-scene .lat-donback.empty {
+  background: none;
+  border: 0;
+}
+.lat-dondeck::before,
+.lat-dons::before,
+.lat-trash::before,
+.lat-life::before,
+.lat-leader::before,
+.lat-stage::before,
+.lat-deck::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--cw) * -0.06);
+  border: 1.5px solid var(--pm-gold);
+  border-radius: calc(var(--cw) * 0.08);
+  opacity: 0.8;
+  pointer-events: none;
+}
+/* a Vida: a moldura cabe a fileira cheia (5 cartas semi-empilhadas), com o nome da área fora dela */
+.lat-life::before {
+  right: auto;
+  width: calc(var(--ch) + var(--cw) * 1.22);
+}
+.lat-life > .lat-label {
+  left: calc(var(--ch) + var(--cw) * 1.16);
+}
+/* os nomes das áreas do lado de fora das molduras */
+.lat-scene .lat-label {
+  margin-left: calc(var(--cw) * 0.06);
+}
+.lat-dons::before {
+  inset: calc(var(--cw) * -0.06);
+  bottom: 0;
+}
+/* os Personagens sem moldura nem nome: a área fica livre para a bússola */
+.lat-chars > .lat-label {
+  display: none;
 }
 
 /* ------------------------------------------------------------------ Judge: pausa, painel e chamado */
