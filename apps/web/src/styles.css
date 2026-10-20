@@ -12322,7 +12322,7 @@ a.sponsor-card:hover {
   --slot-text: rgba(217, 172, 74, 0.7);
 }
 .lat-table {
-  background: url('./assets/playmat-compass.svg') center / auto 84% no-repeat;
+  background: url('./assets/playmat-compass.svg') center / auto 76% no-repeat;
 }
 .lat-scene .slot-empty,
 .lat-scene .lat-donback.empty {

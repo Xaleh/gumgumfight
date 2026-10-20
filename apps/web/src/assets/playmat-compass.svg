@@ -1,51 +1,116 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-130 -130 260 260">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-170 -170 340 340">
+  <!-- A bússola do verso das cartas, em dourado (redesenhada a partir das medidas do card-back.webp). -->
   <defs>
-    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="-110" y1="110" x2="110" y2="-110">
-      <stop offset="0" stop-color="#b98a2e"/>
-      <stop offset="0.5" stop-color="#f1c75a"/>
-      <stop offset="1" stop-color="#c89637"/>
+    <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="-150" y1="150" x2="150" y2="-150">
+      <stop offset="0" stop-color="#a87a26"/><stop offset="0.35" stop-color="#e2b54e"/><stop offset="0.55" stop-color="#f5d27a"/><stop offset="0.75" stop-color="#d6a843"/><stop offset="1" stop-color="#b18329"/>
     </linearGradient>
-    <linearGradient id="d" gradientUnits="userSpaceOnUse" x1="-110" y1="110" x2="110" y2="-110">
-      <stop offset="0" stop-color="#8f6a22"/>
-      <stop offset="1" stop-color="#b5862f"/>
-    </linearGradient>
-    <g id="spoke"><line x1="0" y1="-64" x2="0" y2="-90"/></g>
-    <g id="tick"><line x1="0" y1="-47" x2="0" y2="-57"/></g>
-    <g id="tick2"><line x1="0" y1="-27" x2="0" y2="-35"/></g>
+    <path id="needle" d="M0 -165 L0.59 -162.5 L1.19 -160 L1.76 -157.5 L2.3 -155 L2.83 -152.5 L3.33 -150 L3.82 -147.5 L4.29 -145 L4.75 -142.5 L5.19 -140 L5.62 -137.5 L6.04 -135 L6.45 -132.5 L6.85 -130 L7.24 -127.5 L7.62 -125 L8 -122.5 L8.37 -120 L8.74 -117.5 L9.1 -115 L9.46 -112.5 L9.82 -110 L10.17 -107.5 L10.53 -105 L10.88 -102.5 L11.23 -100 L11.58 -97.5 L11.94 -95 L12.29 -92.5 L12.65 -90 L13 -87.5 L13.36 -85 L13.72 -82.5 L14.08 -80 L14.45 -77.5 L14.81 -75 L15.18 -72.5 L15.55 -70 L15.92 -67.5 L16.29 -65 L16.66 -62.5 L17.04 -60 L17.41 -57.5 L17.79 -55 L18.16 -52.5 L18.53 -50 L18.9 -47.5 L19.27 -45 L19.64 -42.5 L20 -40 L20.36 -37.5 L20.72 -35 L21.07 -32.5 L21.41 -30 L21.74 -27.5 L22.07 -25 L22.39 -22.5 L22.69 -20 L22.99 -17.5 L23.27 -15 L23.54 -12.5 L23.79 -10 L24.02 -7.5 L24.24 -5 L24.44 -2.5 L24.61 -0 L24.44 2.5 L24.24 5 L24.02 7.5 L23.79 10 L23.54 12.5 L23.27 15 L22.99 17.5 L22.69 20 L22.39 22.5 L22.07 25 L21.74 27.5 L21.41 30 L21.07 32.5 L20.72 35 L20.36 37.5 L20 40 L19.64 42.5 L19.27 45 L18.9 47.5 L18.53 50 L18.16 52.5 L17.79 55 L17.41 57.5 L17.04 60 L16.66 62.5 L16.29 65 L15.92 67.5 L15.55 70 L15.18 72.5 L14.81 75 L14.45 77.5 L14.08 80 L13.72 82.5 L13.36 85 L13 87.5 L12.65 90 L12.29 92.5 L11.94 95 L11.58 97.5 L11.23 100 L10.88 102.5 L10.53 105 L10.17 107.5 L9.82 110 L9.46 112.5 L9.1 115 L8.74 117.5 L8.37 120 L8 122.5 L7.62 125 L7.24 127.5 L6.85 130 L6.45 132.5 L6.04 135 L5.62 137.5 L5.19 140 L4.75 142.5 L4.29 145 L3.82 147.5 L3.33 150 L2.83 152.5 L2.3 155 L1.76 157.5 L1.19 160 L0.59 162.5 L0 165 L-0.59 162.5 L-1.19 160 L-1.76 157.5 L-2.3 155 L-2.83 152.5 L-3.33 150 L-3.82 147.5 L-4.29 145 L-4.75 142.5 L-5.19 140 L-5.62 137.5 L-6.04 135 L-6.45 132.5 L-6.85 130 L-7.24 127.5 L-7.62 125 L-8 122.5 L-8.37 120 L-8.74 117.5 L-9.1 115 L-9.46 112.5 L-9.82 110 L-10.17 107.5 L-10.53 105 L-10.88 102.5 L-11.23 100 L-11.58 97.5 L-11.94 95 L-12.29 92.5 L-12.65 90 L-13 87.5 L-13.36 85 L-13.72 82.5 L-14.08 80 L-14.45 77.5 L-14.81 75 L-15.18 72.5 L-15.55 70 L-15.92 67.5 L-16.29 65 L-16.66 62.5 L-17.04 60 L-17.41 57.5 L-17.79 55 L-18.16 52.5 L-18.53 50 L-18.9 47.5 L-19.27 45 L-19.64 42.5 L-20 40 L-20.36 37.5 L-20.72 35 L-21.07 32.5 L-21.41 30 L-21.74 27.5 L-22.07 25 L-22.39 22.5 L-22.69 20 L-22.99 17.5 L-23.27 15 L-23.54 12.5 L-23.79 10 L-24.02 7.5 L-24.24 5 L-24.44 2.5 L-24.61 -0 L-24.44 -2.5 L-24.24 -5 L-24.02 -7.5 L-23.79 -10 L-23.54 -12.5 L-23.27 -15 L-22.99 -17.5 L-22.69 -20 L-22.39 -22.5 L-22.07 -25 L-21.74 -27.5 L-21.41 -30 L-21.07 -32.5 L-20.72 -35 L-20.36 -37.5 L-20 -40 L-19.64 -42.5 L-19.27 -45 L-18.9 -47.5 L-18.53 -50 L-18.16 -52.5 L-17.79 -55 L-17.41 -57.5 L-17.04 -60 L-16.66 -62.5 L-16.29 -65 L-15.92 -67.5 L-15.55 -70 L-15.18 -72.5 L-14.81 -75 L-14.45 -77.5 L-14.08 -80 L-13.72 -82.5 L-13.36 -85 L-13 -87.5 L-12.65 -90 L-12.29 -92.5 L-11.94 -95 L-11.58 -97.5 L-11.23 -100 L-10.88 -102.5 L-10.53 -105 L-10.17 -107.5 L-9.82 -110 L-9.46 -112.5 L-9.1 -115 L-8.74 -117.5 L-8.37 -120 L-8 -122.5 L-7.62 -125 L-7.24 -127.5 L-6.85 -130 L-6.45 -132.5 L-6.04 -135 L-5.62 -137.5 L-5.19 -140 L-4.75 -142.5 L-4.29 -145 L-3.82 -147.5 L-3.33 -150 L-2.83 -152.5 L-2.3 -155 L-1.76 -157.5 L-1.19 -160 L-0.59 -162.5 Z"/>
+    <mask id="under-needle"><rect x="-170" y="-170" width="340" height="340" fill="#fff"/><use href="#needle" transform="rotate(34.7)" fill="#000"/></mask>
+    <mask id="needle-cut"><g transform="rotate(34.7)"><use href="#needle" fill="#fff"/><path d="M15.61 -0 L15.44 -2.5 L15.24 -5 L15.02 -7.5 L14.79 -10 L14.54 -12.5 L14.27 -15 L13.99 -17.5 L13.69 -20 L13.39 -22.5 L13.07 -25 L12.74 -27.5 L12.41 -30 L12.07 -32.5 L11.72 -35 L11.36 -37.5 L11 -40 L10.64 -42.5 L10.27 -45 L9.9 -47.5 L9.53 -50 L9.16 -52.5 L8.79 -55 L8.41 -57.5 L8.04 -60 L7.66 -62.5 L7.29 -65 L6.92 -67.5 L6.55 -70 L6.18 -72.5 L5.81 -75 L5.45 -77.5 L5.08 -80 L4.72 -82.5 L4.36 -85 L4 -87.5 L3.65 -90 L3.29 -92.5 L2.94 -95 L2.58 -97.5 L2.23 -100 L1.88 -102.5 L1.53 -105 L1.17 -107.5 L0.82 -110 L0.46 -112.5 L0 -114.5 L-0.46 -112.5 L-0.82 -110 L-1.17 -107.5 L-1.53 -105 L-1.88 -102.5 L-2.23 -100 L-2.58 -97.5 L-2.94 -95 L-3.29 -92.5 L-3.65 -90 L-4 -87.5 L-4.36 -85 L-4.72 -82.5 L-5.08 -80 L-5.45 -77.5 L-5.81 -75 L-6.18 -72.5 L-6.55 -70 L-6.92 -67.5 L-7.29 -65 L-7.66 -62.5 L-8.04 -60 L-8.41 -57.5 L-8.79 -55 L-9.16 -52.5 L-9.53 -50 L-9.9 -47.5 L-10.27 -45 L-10.64 -42.5 L-11 -40 L-11.36 -37.5 L-11.72 -35 L-12.07 -32.5 L-12.41 -30 L-12.74 -27.5 L-13.07 -25 L-13.39 -22.5 L-13.69 -20 L-13.99 -17.5 L-14.27 -15 L-14.54 -12.5 L-14.79 -10 L-15.02 -7.5 L-15.24 -5 L-15.44 -2.5 L-15.61 -0 Z" fill="#000"/><circle r="16.5" fill="#fff"/><circle r="12.5" fill="#000"/></g></mask>
   </defs>
-  <g fill="none" stroke="url(#g)">
-    <circle r="96" stroke-width="3.2"/>
-    <circle r="90" stroke-width="1.2"/>
-    <circle r="62" stroke-width="2.4"/>
-    <circle r="58" stroke-width="0.9"/>
-    <circle r="44" stroke-width="3"/>
-    <circle r="38" stroke-width="0.9"/>
-    <circle r="23" stroke-width="3"/>
-    <g id="spokes" stroke-width="1.3">
-      <use href="#spoke"/><use href="#spoke" transform="rotate(15)"/><use href="#spoke" transform="rotate(30)"/>
-      <use href="#spoke" transform="rotate(45)"/><use href="#spoke" transform="rotate(60)"/><use href="#spoke" transform="rotate(75)"/>
-      <use href="#spoke" transform="rotate(90)"/><use href="#spoke" transform="rotate(105)"/><use href="#spoke" transform="rotate(120)"/>
-      <use href="#spoke" transform="rotate(135)"/><use href="#spoke" transform="rotate(150)"/><use href="#spoke" transform="rotate(165)"/>
-    </g>
-    <use href="#spokes" transform="rotate(180)"/>
-    <g id="ticks" stroke-width="0.8">
-      <use href="#tick"/><use href="#tick" transform="rotate(5)"/><use href="#tick" transform="rotate(10)"/><use href="#tick" transform="rotate(15)"/>
-      <use href="#tick" transform="rotate(20)"/><use href="#tick" transform="rotate(25)"/><use href="#tick" transform="rotate(30)"/><use href="#tick" transform="rotate(35)"/>
-      <use href="#tick" transform="rotate(40)"/><use href="#tick" transform="rotate(45)"/><use href="#tick" transform="rotate(50)"/><use href="#tick" transform="rotate(55)"/>
-    </g>
-    <use href="#ticks" transform="rotate(60)"/><use href="#ticks" transform="rotate(120)"/>
-    <use href="#ticks" transform="rotate(180)"/><use href="#ticks" transform="rotate(240)"/><use href="#ticks" transform="rotate(300)"/>
-    <g id="ticks2" stroke-width="0.8">
-      <use href="#tick2"/><use href="#tick2" transform="rotate(7.5)"/><use href="#tick2" transform="rotate(15)"/><use href="#tick2" transform="rotate(22.5)"/>
-      <use href="#tick2" transform="rotate(30)"/><use href="#tick2" transform="rotate(37.5)"/><use href="#tick2" transform="rotate(45)"/><use href="#tick2" transform="rotate(52.5)"/>
-    </g>
-    <use href="#ticks2" transform="rotate(60)"/><use href="#ticks2" transform="rotate(120)"/>
-    <use href="#ticks2" transform="rotate(180)"/><use href="#ticks2" transform="rotate(240)"/><use href="#ticks2" transform="rotate(300)"/>
+  <g fill="none" stroke="url(#gold)" mask="url(#under-needle)">
+    <circle r="137.5" stroke-width="6.5"/>
+    <circle r="114.25" stroke-width="9.5"/>
+    <circle r="104.5" stroke-width="2.4"/>
+    <circle r="71.25" stroke-width="6.5"/>
+    <circle r="64.5" stroke-width="1.8"/>
+    <circle r="37.75" stroke-width="5"/>
+    <line x1="0" y1="-37.75" x2="0" y2="-137.5" stroke-width="2.2"/>
+    <line x1="26.69" y1="-26.69" x2="97.23" y2="-97.23" stroke-width="2.2"/>
+    <line x1="37.75" y1="-0" x2="137.5" y2="-0" stroke-width="2.2"/>
+    <line x1="26.69" y1="26.69" x2="97.23" y2="97.23" stroke-width="2.2"/>
+    <line x1="0" y1="37.75" x2="0" y2="137.5" stroke-width="2.2"/>
+    <line x1="-26.69" y1="26.69" x2="-97.23" y2="97.23" stroke-width="2.2"/>
+    <line x1="-37.75" y1="0" x2="-137.5" y2="0" stroke-width="2.2"/>
+    <line x1="-26.69" y1="-26.69" x2="-97.23" y2="-97.23" stroke-width="2.2"/>
+    <line x1="7.8" y1="-39.23" x2="24.39" y2="-122.6" stroke-width="1.4"/>
+    <line x1="22.22" y1="-33.26" x2="69.45" y2="-103.93" stroke-width="1.4"/>
+    <line x1="33.26" y1="-22.22" x2="103.93" y2="-69.45" stroke-width="1.4"/>
+    <line x1="39.23" y1="-7.8" x2="122.6" y2="-24.39" stroke-width="1.4"/>
+    <line x1="39.23" y1="7.8" x2="122.6" y2="24.39" stroke-width="1.4"/>
+    <line x1="33.26" y1="22.22" x2="103.93" y2="69.45" stroke-width="1.4"/>
+    <line x1="22.22" y1="33.26" x2="69.45" y2="103.93" stroke-width="1.4"/>
+    <line x1="7.8" y1="39.23" x2="24.39" y2="122.6" stroke-width="1.4"/>
+    <line x1="-7.8" y1="39.23" x2="-24.39" y2="122.6" stroke-width="1.4"/>
+    <line x1="-22.22" y1="33.26" x2="-69.45" y2="103.93" stroke-width="1.4"/>
+    <line x1="-33.26" y1="22.22" x2="-103.93" y2="69.45" stroke-width="1.4"/>
+    <line x1="-39.23" y1="7.8" x2="-122.6" y2="24.39" stroke-width="1.4"/>
+    <line x1="-39.23" y1="-7.8" x2="-122.6" y2="-24.39" stroke-width="1.4"/>
+    <line x1="-33.26" y1="-22.22" x2="-103.93" y2="-69.45" stroke-width="1.4"/>
+    <line x1="-22.22" y1="-33.26" x2="-69.45" y2="-103.93" stroke-width="1.4"/>
+    <line x1="-7.8" y1="-39.23" x2="-24.39" y2="-122.6" stroke-width="1.4"/>
+    <line x1="5.13" y1="-78.33" x2="6.54" y2="-99.79" stroke-width="1.2"/>
+    <line x1="10.25" y1="-77.83" x2="13.05" y2="-99.14" stroke-width="1.2"/>
+    <line x1="20.32" y1="-75.83" x2="25.88" y2="-96.59" stroke-width="1.2"/>
+    <line x1="25.23" y1="-74.33" x2="32.14" y2="-94.69" stroke-width="1.2"/>
+    <line x1="30.04" y1="-72.52" x2="38.27" y2="-92.39" stroke-width="1.2"/>
+    <line x1="34.72" y1="-70.4" x2="44.23" y2="-89.69" stroke-width="1.2"/>
+    <line x1="39.25" y1="-67.98" x2="50" y2="-86.6" stroke-width="1.2"/>
+    <line x1="47.79" y1="-62.28" x2="60.88" y2="-79.34" stroke-width="1.2"/>
+    <line x1="51.76" y1="-59.02" x2="65.93" y2="-75.18" stroke-width="1.2"/>
+    <line x1="59.02" y1="-51.76" x2="75.18" y2="-65.93" stroke-width="1.2"/>
+    <line x1="62.28" y1="-47.79" x2="79.34" y2="-60.88" stroke-width="1.2"/>
+    <line x1="67.98" y1="-39.25" x2="86.6" y2="-50" stroke-width="1.2"/>
+    <line x1="70.4" y1="-34.72" x2="89.69" y2="-44.23" stroke-width="1.2"/>
+    <line x1="72.52" y1="-30.04" x2="92.39" y2="-38.27" stroke-width="1.2"/>
+    <line x1="74.33" y1="-25.23" x2="94.69" y2="-32.14" stroke-width="1.2"/>
+    <line x1="75.83" y1="-20.32" x2="96.59" y2="-25.88" stroke-width="1.2"/>
+    <line x1="77.83" y1="-10.25" x2="99.14" y2="-13.05" stroke-width="1.2"/>
+    <line x1="78.33" y1="-5.13" x2="99.79" y2="-6.54" stroke-width="1.2"/>
+    <line x1="78.33" y1="5.13" x2="99.79" y2="6.54" stroke-width="1.2"/>
+    <line x1="77.83" y1="10.25" x2="99.14" y2="13.05" stroke-width="1.2"/>
+    <line x1="75.83" y1="20.32" x2="96.59" y2="25.88" stroke-width="1.2"/>
+    <line x1="74.33" y1="25.23" x2="94.69" y2="32.14" stroke-width="1.2"/>
+    <line x1="72.52" y1="30.04" x2="92.39" y2="38.27" stroke-width="1.2"/>
+    <line x1="70.4" y1="34.72" x2="89.69" y2="44.23" stroke-width="1.2"/>
+    <line x1="67.98" y1="39.25" x2="86.6" y2="50" stroke-width="1.2"/>
+    <line x1="62.28" y1="47.79" x2="79.34" y2="60.88" stroke-width="1.2"/>
+    <line x1="59.02" y1="51.76" x2="75.18" y2="65.93" stroke-width="1.2"/>
+    <line x1="51.76" y1="59.02" x2="65.93" y2="75.18" stroke-width="1.2"/>
+    <line x1="47.79" y1="62.28" x2="60.88" y2="79.34" stroke-width="1.2"/>
+    <line x1="39.25" y1="67.98" x2="50" y2="86.6" stroke-width="1.2"/>
+    <line x1="34.72" y1="70.4" x2="44.23" y2="89.69" stroke-width="1.2"/>
+    <line x1="30.04" y1="72.52" x2="38.27" y2="92.39" stroke-width="1.2"/>
+    <line x1="25.23" y1="74.33" x2="32.14" y2="94.69" stroke-width="1.2"/>
+    <line x1="20.32" y1="75.83" x2="25.88" y2="96.59" stroke-width="1.2"/>
+    <line x1="10.25" y1="77.83" x2="13.05" y2="99.14" stroke-width="1.2"/>
+    <line x1="5.13" y1="78.33" x2="6.54" y2="99.79" stroke-width="1.2"/>
+    <line x1="-5.13" y1="78.33" x2="-6.54" y2="99.79" stroke-width="1.2"/>
+    <line x1="-10.25" y1="77.83" x2="-13.05" y2="99.14" stroke-width="1.2"/>
+    <line x1="-20.32" y1="75.83" x2="-25.88" y2="96.59" stroke-width="1.2"/>
+    <line x1="-25.23" y1="74.33" x2="-32.14" y2="94.69" stroke-width="1.2"/>
+    <line x1="-30.04" y1="72.52" x2="-38.27" y2="92.39" stroke-width="1.2"/>
+    <line x1="-34.72" y1="70.4" x2="-44.23" y2="89.69" stroke-width="1.2"/>
+    <line x1="-39.25" y1="67.98" x2="-50" y2="86.6" stroke-width="1.2"/>
+    <line x1="-47.79" y1="62.28" x2="-60.88" y2="79.34" stroke-width="1.2"/>
+    <line x1="-51.76" y1="59.02" x2="-65.93" y2="75.18" stroke-width="1.2"/>
+    <line x1="-59.02" y1="51.76" x2="-75.18" y2="65.93" stroke-width="1.2"/>
+    <line x1="-62.28" y1="47.79" x2="-79.34" y2="60.88" stroke-width="1.2"/>
+    <line x1="-67.98" y1="39.25" x2="-86.6" y2="50" stroke-width="1.2"/>
+    <line x1="-70.4" y1="34.72" x2="-89.69" y2="44.23" stroke-width="1.2"/>
+    <line x1="-72.52" y1="30.04" x2="-92.39" y2="38.27" stroke-width="1.2"/>
+    <line x1="-74.33" y1="25.23" x2="-94.69" y2="32.14" stroke-width="1.2"/>
+    <line x1="-75.83" y1="20.32" x2="-96.59" y2="25.88" stroke-width="1.2"/>
+    <line x1="-77.83" y1="10.25" x2="-99.14" y2="13.05" stroke-width="1.2"/>
+    <line x1="-78.33" y1="5.13" x2="-99.79" y2="6.54" stroke-width="1.2"/>
+    <line x1="-78.33" y1="-5.13" x2="-99.79" y2="-6.54" stroke-width="1.2"/>
+    <line x1="-77.83" y1="-10.25" x2="-99.14" y2="-13.05" stroke-width="1.2"/>
+    <line x1="-75.83" y1="-20.32" x2="-96.59" y2="-25.88" stroke-width="1.2"/>
+    <line x1="-74.33" y1="-25.23" x2="-94.69" y2="-32.14" stroke-width="1.2"/>
+    <line x1="-72.52" y1="-30.04" x2="-92.39" y2="-38.27" stroke-width="1.2"/>
+    <line x1="-70.4" y1="-34.72" x2="-89.69" y2="-44.23" stroke-width="1.2"/>
+    <line x1="-67.98" y1="-39.25" x2="-86.6" y2="-50" stroke-width="1.2"/>
+    <line x1="-62.28" y1="-47.79" x2="-79.34" y2="-60.88" stroke-width="1.2"/>
+    <line x1="-59.02" y1="-51.76" x2="-75.18" y2="-65.93" stroke-width="1.2"/>
+    <line x1="-51.76" y1="-59.02" x2="-65.93" y2="-75.18" stroke-width="1.2"/>
+    <line x1="-47.79" y1="-62.28" x2="-60.88" y2="-79.34" stroke-width="1.2"/>
+    <line x1="-39.25" y1="-67.98" x2="-50" y2="-86.6" stroke-width="1.2"/>
+    <line x1="-34.72" y1="-70.4" x2="-44.23" y2="-89.69" stroke-width="1.2"/>
+    <line x1="-30.04" y1="-72.52" x2="-38.27" y2="-92.39" stroke-width="1.2"/>
+    <line x1="-25.23" y1="-74.33" x2="-32.14" y2="-94.69" stroke-width="1.2"/>
+    <line x1="-20.32" y1="-75.83" x2="-25.88" y2="-96.59" stroke-width="1.2"/>
+    <line x1="-10.25" y1="-77.83" x2="-13.05" y2="-99.14" stroke-width="1.2"/>
+    <line x1="-5.13" y1="-78.33" x2="-6.54" y2="-99.79" stroke-width="1.2"/>
   </g>
-  <!-- a agulha, inclinada para cima e para a direita, com um furo no centro -->
-  <g transform="rotate(38)">
-    <path d="M0 -124 L15 0 L0 124 Z" fill="url(#g)"/>
-    <path d="M0 -124 L-15 0 L0 124 Z" fill="url(#d)"/>
-    <circle r="11" fill="#141b24" stroke="url(#g)" stroke-width="3"/>
-  </g>
+  <rect x="-170" y="-170" width="340" height="340" fill="url(#gold)" mask="url(#needle-cut)"/>
 </svg>
