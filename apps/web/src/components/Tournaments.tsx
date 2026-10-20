@@ -164,6 +164,8 @@ export function Tournaments({
   const [openId, setOpenId] = useState<string | null>(initialId ?? null);
   /** Criando um torneio: o limite de jogadores de quem cria (null = não está criando). */
   const [creating, setCreating] = useState<number | null>(null);
+  /** Torneio que acabou de ser criado: a página abre com o convite para os grupos em destaque. */
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   if (creating !== null) {
     return (
@@ -172,6 +174,7 @@ export function Tournaments({
         onCancel={() => setCreating(null)}
         onSaved={(t) => {
           setCreating(null);
+          setCreatedId(t.id);
           setOpenId(t.id);
         }}
       />
@@ -182,6 +185,7 @@ export function Tournaments({
       <TournamentPage
         id={openId}
         initialLobby={initialLobby}
+        justCreated={createdId === openId}
         onExit={onExit}
         onDeleted={() => setOpenId(null)}
         onPlay={(seat) => onPlay(seat, openId)}
@@ -191,6 +195,35 @@ export function Tournaments({
     );
   }
   return <TournamentList onExit={onExit} onOpen={setOpenId} onCreate={setCreating} />;
+}
+
+// ------------------------------------------------------------------ divulgação
+
+/** Link da página do torneio (o mesmo das notificações: abre direto no torneio). */
+const tournamentLink = (id: string) => `${location.origin}/?torneio=${encodeURIComponent(id)}`;
+
+/** Divulgação do torneio: manda o convite (com o link da página) num grupo de WhatsApp ou copia o texto. */
+function ShareTournament({ text, created }: { text: string; created?: boolean }) {
+  const tr = useT();
+  const [copied, setCopied] = useState(false);
+  const copy = () =>
+    navigator.clipboard?.writeText(text).then(
+      () => setCopied(true),
+      () => undefined,
+    );
+  return (
+    <div className={['tour-share', created ? 'created' : ''].join(' ')}>
+      {created && <p className="small">{tr('tour.createdShare')}</p>}
+      <div className="btn-row tour-share-row">
+        <a className="btn small whatsapp" href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer">
+          {tr('tour.shareWhatsApp')}
+        </a>
+        <button className="btn small" onClick={copy}>
+          {copied ? tr('tour.inviteCopied') : tr('tour.copyInvite')}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ------------------------------------------------------------------ torneio do time e lojas parceiras
@@ -732,6 +765,7 @@ function nextLabel(tr: Translate, t: TournamentDetail): string {
 function TournamentPage({
   id,
   initialLobby,
+  justCreated,
   onExit,
   onDeleted,
   onPlay,
@@ -740,6 +774,8 @@ function TournamentPage({
 }: {
   id: string;
   initialLobby?: boolean;
+  /** Acabou de ser criado: o convite para os grupos aparece em destaque. */
+  justCreated?: boolean;
   /** Volta para o menu principal. */
   onExit: () => void;
   onDeleted: () => void;
@@ -840,6 +876,18 @@ function TournamentPage({
     if (t.topCut) text = tr('tour.plusTopCut', { text, n: t.topCut });
     return text;
   };
+  /** Convite para os grupos: nome, regras, início, prêmio e o link da página do torneio. */
+  const invite = (t: TournamentDetail) =>
+    tr('tour.shareText', {
+      name: t.name,
+      details: dots(
+        modeLabel(t),
+        structureText(t),
+        t.startsAt && t.status === 'registration' && tr('tour.startsAt', { date: dateTime(t.startsAt, locale) }),
+        t.prize && `🏆 ${t.prize}`,
+      ),
+      link: tournamentLink(t.id),
+    });
 
   return (
     <div className="coverage tournaments">
@@ -897,6 +945,7 @@ function TournamentPage({
                   {t.isJudge && <span className="tour-badge gold">{tr('tour.youAreJudge')}</span>}
                 </p>
               )}
+              {t.status !== 'finished' && <ShareTournament text={invite(t)} created={justCreated} />}
               {t.status !== 'finished' && (
                 <div className="btn-row tour-lobby-row">
                   <button className="btn primary small" onClick={() => setLobbyOpen(true)}>
