@@ -12232,8 +12232,9 @@ a.sponsor-card:hover {
   grid-column: 1;
   width: calc(var(--cw) * 0.75);
   height: calc(var(--cw) * 0.93);
-  background: url('./assets/uaiuai-no-mi.png') center / contain no-repeat;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+  /* o logo de uma cor só, no dourado da bússola */
+  background: url('./assets/uaiuai-no-mi-gold.png') center / contain no-repeat;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
   z-index: 1;
 }
 .lat-center > .turn-chip {
@@ -12376,7 +12377,8 @@ a.sponsor-card:hover {
   background: url('./assets/playmat-compass.svg') center / auto 76% no-repeat;
   pointer-events: none;
 }
-.playmat-white .lat-table::before {
+.playmat-white .lat-table::before,
+.playmat-white .lat-center::before {
   filter: brightness(0.8) saturate(1.25);
 }
 .lat-scene .slot-empty,
