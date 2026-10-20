@@ -37,7 +37,7 @@ import { type Translate, useT, useTryT } from '../i18n';
 import { listText, logText, msgText } from '../game/engineText';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
-import { cardText, SettingsControls, useSettings } from '../settings';
+import { cardText, PLAYMATS, SettingsControls, useSettings } from '../settings';
 import { Board, HandFan, handIsKnown } from './Board';
 import { LateralBoard } from './LateralBoard';
 import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
@@ -537,7 +537,8 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, sidePanel, update: updateSettings } = useSettings();
+  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, streamerFrames, sidePanel, update: updateSettings } =
+    useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -1350,7 +1351,8 @@ function Table({
         tutorial ? 'lesson' : '',
         broadcast ? 'broadcast' : '',
         streamer ? 'streamer' : '',
-        lateral ? 'lateral' : '',
+        lateral ? `lateral playmat-${streamerPlaymat}` : '',
+        lateral && !streamerFrames ? 'zones-only' : '',
         streamer && panel ? 'with-panel' : '',
         playerPanel && !panel ? 'no-panel' : '',
       ].join(' ')}
@@ -1588,6 +1590,29 @@ function Table({
                 {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : t('game.exitToMenu')}
               </button>
             </div>
+            {lateral && (
+              <div className="sheet-section">
+                <label className="sheet-label">{t('game.playmat')}</label>
+                <p className="muted small sheet-hint">{t('game.playmatHint')}</p>
+                <div className="seg small playmat-pick">
+                  {PLAYMATS.map((pm) => (
+                    <button key={pm} className={streamerPlaymat === pm ? 'on' : ''} onClick={() => updateSettings({ streamerPlaymat: pm })}>
+                      <span className={`playmat-dot playmat-${pm}`} aria-hidden />
+                      {t(`game.playmat.${pm}`)}
+                    </button>
+                  ))}
+                </div>
+                <label className="sheet-label playmat-frames">{t('game.playmatFrames')}</label>
+                <div className="seg small">
+                  <button className={streamerFrames ? 'on' : ''} onClick={() => updateSettings({ streamerFrames: true })}>
+                    {t('game.playmatFramesAll')}
+                  </button>
+                  <button className={streamerFrames ? '' : 'on'} onClick={() => updateSettings({ streamerFrames: false })}>
+                    {t('game.playmatFramesZones')}
+                  </button>
+                </div>
+              </div>
+            )}
             {!isOnline && !replay && !tutorial && (
               <div className="sheet-section">
                 <label className="sheet-label">{t('game.botSpeed')}</label>

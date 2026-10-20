@@ -11786,11 +11786,11 @@ a.sponsor-card:hover {
   border: 0;
   box-shadow: none;
 }
-/* o playmat (como o do regional de Londres): fundo azul-marinho quase preto, nos dois temas */
+/* o playmat: a cor escolhida pelo Streamer (ver "O desenho do playmat"), nos dois temas */
 .game.streamer.lateral {
   background:
-    radial-gradient(60% 70% at 50% 50%, #1c2632 0%, transparent 100%),
-    linear-gradient(180deg, #121821 0%, #0e131a 100%);
+    radial-gradient(60% 70% at 50% 50%, var(--pm-c) 0%, transparent 100%),
+    linear-gradient(180deg, var(--pm-a) 0%, var(--pm-b) 100%);
 }
 
 /* ---- HUD ---- */
@@ -12315,14 +12315,72 @@ a.sponsor-card:hover {
 /*
  * O desenho do playmat: a bússola dourada grande no meio, pegando os dois campos, e as molduras
  * douradas finas de cada espaço (sempre à vista, com ou sem carta). `.zones-only`: só as molduras da
- * Vida, dos decks e do descarte.
+ * Vida, dos decks e do descarte. As cores (`.playmat-*`, também nas bolinhas do menu): o centro
+ * (`--pm-c`), o alto e o pé (`--pm-a`, `--pm-b`), as molduras (`--pm-gold`) e os nomes das áreas.
  */
-.lat-scene {
+.playmat-navy {
+  /* como o do regional de Londres: azul-marinho quase preto */
+  --pm-c: #1c2632;
+  --pm-a: #121821;
+  --pm-b: #0e131a;
   --pm-gold: #d9ac4a;
-  --slot-text: rgba(217, 172, 74, 0.7);
+  --pm-label: rgba(217, 172, 74, 0.7);
 }
-.lat-table {
+.playmat-red {
+  /* vinho, do vermelho da marca */
+  --pm-c: #6a1d1a;
+  --pm-a: #4a1311;
+  --pm-b: #2e0b0a;
+  --pm-gold: #e0b04c;
+  --pm-label: rgba(224, 176, 76, 0.75);
+}
+.playmat-green {
+  /* verde-esmeralda escuro, do verde da marca */
+  --pm-c: #175239;
+  --pm-a: #0f3b29;
+  --pm-b: #08251a;
+  --pm-gold: #dcae4a;
+  --pm-label: rgba(220, 174, 74, 0.75);
+}
+.playmat-white {
+  /* marfim: dourado mais escuro para aparecer no claro */
+  --pm-c: #fdfaf4;
+  --pm-a: #f2ede3;
+  --pm-b: #e5ded0;
+  --pm-gold: #b5852a;
+  --pm-label: rgba(150, 108, 30, 0.8);
+}
+.lat-scene {
+  --slot-text: var(--pm-label);
+}
+.playmat-dot {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  border-radius: 50%;
+  background: var(--pm-c);
+  border: 1.5px solid var(--pm-gold);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.seg.playmat-pick {
+  flex-wrap: wrap;
+  border-radius: 16px;
+}
+.sheet-label.playmat-frames {
+  margin-top: 10px;
+}
+/* a bússola num pseudo-elemento, por baixo das metades da mesa, para o playmat branco escurecer o dourado */
+.lat-table::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: url('./assets/playmat-compass.svg') center / auto 76% no-repeat;
+  pointer-events: none;
+}
+.playmat-white .lat-table::before {
+  filter: brightness(0.8) saturate(1.25);
 }
 .lat-scene .slot-empty,
 .lat-scene .lat-donback.empty {
