@@ -3208,6 +3208,12 @@ export function diagnoseLine(raw: string, category: CardCategory): string | null
   return r ? null : (failure ?? 'desconhecido');
 }
 
+/** Diagnóstico de um [Trigger] não reconhecido (como `diagnoseLine`). */
+export function diagnoseTrigger(trigger: string): string | null {
+  failure = null;
+  return parseTriggerText(trigger) ? null : (failure ?? 'desconhecido');
+}
+
 function parseLine(raw: string, category: CardCategory): Ability[] | null {
   const parsedHeader = parseHeader(clean(raw));
   if (!parsedHeader) return fail(`header: ${raw.slice(0, 60)}`);

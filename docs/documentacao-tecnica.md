@@ -132,6 +132,7 @@ gumgumfight/
 ├── apps/server/                 API Fastify
 │   ├── src/index.ts             entrypoint: abre o banco, seed, agenda sync de spoilers, listen
 │   ├── src/app.ts               buildApp: rotas de cartas, decks, coverage, static; registra os módulos
+│   ├── src/card-gaps.ts         lacunas do leitor para o Dev (diagnóstico, ranking das frases, cartas novas com ⚙)
 │   ├── src/db.ts                schema SQLite (migrações idempotentes) e acesso a cards/decks/live_matches
 │   ├── src/config.ts, env.ts, paths.ts   variáveis de ambiente e caminhos
 │   ├── src/optcgapi.ts          mapeamento da optcgapi → CardData
@@ -215,6 +216,12 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
    ~130 variantes de `EffectStep`). Uma linha só é automática se for entendida **por inteiro**.
 4. `automationStatus(card)` ∈ `scripted | vanilla | auto | partial | manual`. `partial` e `manual` são as cartas com ⚙:
    jogáveis, mas o efeito pausa o jogo e segue sem aplicar; proibidas na ranqueada.
+5. `diagnoseCard(card)` (ferramentas de Dev): para cada linha de `effectLines` e o [Trigger], se o leitor entendeu e,
+   se não, `stage` (a parte do leitor que recusou: `clause`, `condition`, `search`, `cost`, `static`, `header`,
+   `timing`, `keyword`, `empty`, `unknown`), `fragment` (o primeiro trecho recusado, de `diagnoseLine`/`diagnoseTrigger`)
+   e `pattern` (`gapPattern`: números, nomes, tipos, atributos e cores trocados por marcadores, para juntar frases
+   iguais de cartas diferentes). As linhas recusadas são as mesmas de `parseCard(card).unparsed` (teste em
+   `diagnose.test.ts`).
 
 ### Visão por jogador (`view.ts`)
 
@@ -502,12 +509,13 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (24)
+### Tabelas (25)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
 | `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
+| `card_gaps` | `card_id` | Cartas ⚙ (efeito parcial ou manual): `text_key` (hash do texto quando entrou), `first_seen`, `reviewed_at` (null = nova para o Dev). Na criação da tabela, as ⚙ que o banco já tinha entram como vistas | `recordCardGaps` (ao subir o servidor, na sincronização dos spoilers e no `cards:import`), `POST /api/dev/card-gaps/reviewed` |
 | `decks` | `id` (`st01-luffy`, `u-xxxxxxxx`) | `name`, `leader`, **`cards` (JSON `[{id,count}]`)**, `kind` (`builtin`/`user`), `owner_hash`, `updated_at` | seed (builtin), `POST/PUT /api/decks` |
 | `users` | `id` (`u-` + 12 hex) | `google_sub` (único), `email`, `name`, `picture`, `role` (`player/streamer/organizer/admin/dev`), `created_at`, `last_login_at` | login Google, admin |
 | `sessions` | `token_hash` | `user_id`, `created_at`, `expires_at` (60 dias) | login/logout |
@@ -1471,6 +1479,10 @@ Quem chama, na coluna da direita:
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (por coleção) e uma carta | Pública |
 | GET | `/api/coverage` | Cobertura dos efeitos automatizados por coleção | Pública |
 | GET | `/api/translations/pending` | Cartas com tradução automática parcial | Pública |
+| GET | `/api/dev/card-gaps` | Lacunas do leitor: cartas ⚙ por coleção e por parte do leitor, ranking das frases que faltam (até 300) e o número de novas | Dev |
+| GET | `/api/dev/card-gaps/cards?set=` · `?ids=a,b` · `?new=1` | Cartas ⚙ com o diagnóstico linha por linha (`LineDiagnosis`) | Dev |
+| GET | `/api/dev/card-gaps/new-count` | Número de cartas novas com ⚙ (selo do menu) | Dev |
+| POST | `/api/dev/card-gaps/reviewed` | Marca as novas como vistas (`{ ids? }`; sem `ids`, todas) | Dev |
 | GET | `/card-img/:origin/*` | Imagens das cartas pelo mesmo domínio (em produção o Nginx atende antes) | Pública |
 | PUT · DELETE | `/api/push/subscription` | Liga (`{ subscription, locale, matches, tournaments }`) / desliga (`{ endpoint }`) as notificações do navegador | Navegador |
 | GET | `/api/auth/me` | Usuário logado (`{ user }` com `role`; `null` sem sessão). Com token: só `{ id, role: 'player' }` e o perfil público | Pública; Token (`profile`) |

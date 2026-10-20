@@ -29,7 +29,7 @@ import {
   type SourceKind,
   writeOfficial,
 } from './card-sources';
-import { type DB, hasOfficialCards, pendingSpoilers, pruneSpoilers, SPOILER_SOURCE, upsertCards } from './db';
+import { type DB, hasOfficialCards, pendingSpoilers, pruneSpoilers, recordCardGaps, SPOILER_SOURCE, upsertCards } from './db';
 import { DEFAULT_API_BASE, rowsOf } from './optcgapi';
 import { readSpoilerFiles } from './seed';
 import { OPTCGLEAKS } from './spoiler-feed';
@@ -250,7 +250,10 @@ export async function spoilerRound(db: DB, opts: { base: string; dir: string; lo
     chain: chainFromEnv('official', ctx, cache),
     onReport: (r, chain) => report('Oficiais', 'official:sync', r, chain),
   });
-  return { feed, sync };
+  // Cartas que chegaram com efeito que o leitor não entende: aviso ao Dev (tela de Cobertura).
+  const gaps = recordCardGaps(db);
+  if (gaps.added) opts.log(`Cobertura: ${gaps.added} carta(s) nova(s) com efeito parcial ou manual (⚙)`);
+  return { feed, sync, gaps };
 }
 
 /**

@@ -52,6 +52,7 @@ import { registerReportRoutes } from './reports/routes';
 import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
+import { registerCardGapRoutes } from './card-gaps';
 import { registerCardImageRoutes } from './card-images';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
@@ -380,6 +381,7 @@ export function buildApp(
 
   // Imagens das cartas pelo mesmo domínio (kit de divulgação; em produção o Nginx atende antes).
   registerCardImageRoutes(app, { enabled: server.cardImages, fetchImpl: opts.fetchImpl });
+  registerCardGapRoutes(app, { db, user: auth.viewer });
 
   registerReportRoutes(app, { db, user: auth.viewer, notifier });
   registerSupportRoutes(app, {

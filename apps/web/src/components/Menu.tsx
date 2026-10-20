@@ -353,6 +353,20 @@ export function Menu({
   }, [format]);
   const [code, setCode] = useState(URL_ROOM_CODE ?? '');
   const userId = user?.id;
+  /** Dev: cartas que entraram com ⚙ e ainda não foram vistas (selo no item "Cobertura das cartas"). */
+  const [newGaps, setNewGaps] = useState(0);
+  const coverageOn = Boolean(onCoverage);
+  useEffect(() => {
+    if (!coverageOn) return;
+    let cancelled = false;
+    api
+      .cardGapsNewCount()
+      .then((r) => !cancelled && setNewGaps(r.newCount))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [coverageOn, userId]);
   /** Apelido do jogador (perfil deste navegador): nome nas partidas contra o bot e online. */
   const [nickname, setNickname] = useState<string | null>(null);
   useEffect(() => {
@@ -566,7 +580,9 @@ export function Menu({
     { key: 'replay', label: t('menu.navReplay'), icon: 'play', onClick: () => setShowReplay(true) },
     ...(supportOn ? [{ key: 'support', label: t('support.nav'), icon: 'heart' as const, onClick: () => setShowSupport(true) }] : []),
     ...(onAdmin ? [{ key: 'admin', label: t('menu.navAdmin'), icon: 'shield' as const, onClick: onAdmin }] : []),
-    ...(onCoverage ? [{ key: 'coverage', label: t('menu.navCoverage'), icon: 'check' as const, onClick: onCoverage }] : []),
+    ...(onCoverage
+      ? [{ key: 'coverage', label: newGaps ? t('menu.navCoverageNew', { n: newGaps }) : t('menu.navCoverage'), icon: 'check' as const, onClick: onCoverage }]
+      : []),
     ...(dev ? [{ key: 'tests', label: t('menu.testOptions'), icon: 'flask' as const, onClick: () => setShowTests(true) }] : []),
   ];
 

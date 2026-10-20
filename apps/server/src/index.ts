@@ -1,7 +1,7 @@
 import './env';
 import { buildApp } from './app';
 import { spoilerSyncHours } from './config';
-import { countCards, type DB, openDb } from './db';
+import { countCards, type DB, openDb, recordCardGaps } from './db';
 import { DEFAULT_API_BASE } from './optcgapi';
 import { join } from 'node:path';
 import { DATA_DIR, DB_PATH } from './paths';
@@ -22,6 +22,9 @@ try {
 // Sempre sincroniza os decks e cartas provisórias (nunca sobrescreve cartas da API).
 const r = seed(db);
 console.log(`Banco ${DB_PATH}: ${countCards(db)} cartas, ${r.decks} decks.`);
+// Cartas ⚙ que entraram desde a última vez (cartas provisórias novas ou o leitor mudou).
+const gaps = recordCardGaps(db);
+if (gaps.added) console.log(`Cobertura: ${gaps.added} carta(s) nova(s) com efeito parcial ou manual (⚙).`);
 if (r.spoilers.written || r.spoilers.removed || r.spoilers.invalid.length) {
   console.log(
     `Spoilers: ${r.spoilers.written} cartas, ${r.spoilers.official} já oficiais, ${r.spoilers.removed} removidas` +
