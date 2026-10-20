@@ -5,7 +5,7 @@ import { type CardData, proxiedImageUrl, registerCardCdn } from '@gumgum/engine'
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { cdnFromEnv, dirStore, mirrorCardImages, publishImageIndex, syncCardCdn } from '../src/card-cdn';
-import { r2Client, signRequest } from '../src/card-cdn/r2';
+import { r2Client, r2Endpoint, signRequest } from '../src/card-cdn/r2';
 import { getCards, openDb, upsertCards } from '../src/db';
 
 const CDN = 'https://cards.ggf.test';
@@ -148,6 +148,30 @@ describe('CDN própria das imagens', () => {
 });
 
 describe('R2 (API S3)', () => {
+  it('aceita o Account ID sozinho ou o endpoint S3 que o painel mostra', () => {
+    expect(r2Endpoint('abc123')).toBe('https://abc123.r2.cloudflarestorage.com');
+    expect(r2Endpoint('https://abc123.r2.cloudflarestorage.com/')).toBe('https://abc123.r2.cloudflarestorage.com');
+    expect(r2Endpoint('https://abc123.r2.cloudflarestorage.com/ggf-cards')).toBe('https://abc123.r2.cloudflarestorage.com');
+    expect(r2Endpoint('abc123.eu.r2.cloudflarestorage.com')).toBe('https://abc123.eu.r2.cloudflarestorage.com');
+  });
+
+  it('bucket inacessível: confere antes, não baixa nada e diz o motivo', async () => {
+    const db = openDb(':memory:');
+    upsertCards(db, [card('OP01-001'), card('OP01-002')], { provisional: false, source: 'api:test' });
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      calls.push(String(url));
+      if (String(url).includes('r2.cloudflarestorage.com')) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+      return new Response(PNG, { headers: { 'content-type': 'image/png' } });
+    }) as typeof fetch;
+    const env = { CARD_CDN_URL: CDN, R2_ACCOUNT_ID: 'errado', R2_BUCKET: 'b', R2_ACCESS_KEY_ID: 'c', R2_SECRET_ACCESS_KEY: 'd' };
+    const logs: string[] = [];
+    const r = await syncCardCdn(db, cdnFromEnv(env, fetchImpl)!, { fetchImpl, log: (m) => logs.push(m) });
+    expect(r).toMatchObject({ uploaded: 0, failed: [], unavailable: 'R2 inacessível em errado.r2.cloudflarestorage.com (ENOTFOUND)' });
+    expect(calls).toEqual(['https://errado.r2.cloudflarestorage.com/b/index.json']);
+    expect(logs[0]).toMatch(/bucket inacessível.*ENOTFOUND.*R2_ACCOUNT_ID/);
+  });
+
   it('assinatura SigV4 igual ao exemplo da documentação da AWS (GET Object)', () => {
     const headers = signRequest({
       method: 'GET',

@@ -56,6 +56,8 @@ module.exports = {
         R2_BUCKET: env.R2_BUCKET || '',
         R2_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID || '',
         R2_SECRET_ACCESS_KEY: env.R2_SECRET_ACCESS_KEY || '',
+        // Só para buckets com jurisdição (ex.: https://<id>.eu.r2.cloudflarestorage.com).
+        R2_ENDPOINT: env.R2_ENDPOINT || '',
         SPOILER_SOURCES: env.SPOILER_SOURCES || '',
         // Horas entre as buscas dos spoilers (padrão 6); off desliga.
         SPOILER_SYNC: env.SPOILER_SYNC || '',
