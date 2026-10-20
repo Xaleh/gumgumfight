@@ -12377,9 +12377,15 @@ a.sponsor-card:hover {
   background: url('./assets/playmat-compass.svg') center / auto 76% no-repeat;
   pointer-events: none;
 }
-.playmat-white .lat-table::before,
-.playmat-white .lat-center::before {
+.playmat-white .lat-table::before {
   filter: brightness(0.8) saturate(1.25);
+}
+/* no branco, o logo chapado (sem o degradê, que some no claro): o desenho vira máscara de uma cor só */
+.playmat-white .lat-center::before {
+  background: #8a611a;
+  -webkit-mask: url('./assets/uaiuai-no-mi-gold.png') center / contain no-repeat;
+  mask: url('./assets/uaiuai-no-mi-gold.png') center / contain no-repeat;
+  filter: none;
 }
 .lat-scene .slot-empty,
 .lat-scene .lat-donback.empty {
