@@ -12308,8 +12308,11 @@ a.sponsor-card:hover {
 .hand-fan.right .hand-card > .fan-flip > .fan-face .card {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
 }
-/* carta virada: em pé (gira de volta dentro do espaço deitado), do mesmo tamanho das outras */
-.game.streamer.lateral .card.rested {
+/*
+ * carta virada: em pé (gira de volta dentro do espaço deitado), do mesmo tamanho das outras. Só na
+ * mesa: o zoom e os painéis por cima mostram a carta de pé, para ler.
+ */
+.lat-scene .card.rested {
   transform: rotate(-90deg);
 }
 
