@@ -33,7 +33,10 @@ async function main() {
   if (args.includes('--images')) {
     if (!cdn) throw new Error('CDN própria não configurada (CARD_CDN_URL, R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)');
     const r = await syncCardCdn(openDb(), cdn, { log });
-    for (const f of r.failed) console.error(`Falhou: ${f.url} (${f.error})`);
+    if (r.unavailable) throw new Error('o bucket do R2 não respondeu (veja a linha acima)');
+    // As que falharam são tentadas de novo na próxima rodada; o log mostra só algumas.
+    for (const f of r.failed.slice(0, 20)) console.error(`Falhou: ${f.url} (${f.error})`);
+    if (r.failed.length > 20) console.error(`… e mais ${r.failed.length - 20}.`);
     if (!r.uploaded && !r.failed.length) console.log(`CDN das imagens: nada novo (${r.cards} cartas na CDN).`);
     return;
   }

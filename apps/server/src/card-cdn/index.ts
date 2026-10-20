@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { CARD_IMAGE_ORIGINS, type CardArt, type CardData } from '@gumgum/engine';
 import { type DB, transaction } from '../db';
 import { artId } from '../optcgapi';
-import { type R2Config, r2Client } from './r2';
+import { networkCause, type R2Config, R2Error, r2Client } from './r2';
 
 /** Onde as imagens ficam guardadas. */
 export interface ImageStore {
@@ -58,7 +58,7 @@ export function cdnFromEnv(env: NodeJS.ProcessEnv = process.env, fetchImpl?: typ
     secretAccessKey: env.R2_SECRET_ACCESS_KEY?.trim() ?? '',
   };
   if (!publicBase || Object.values(cfg).some((v) => !v)) return null;
-  return r2Store({ ...cfg, publicBase }, fetchImpl);
+  return r2Store({ ...cfg, publicBase, ...(env.R2_ENDPOINT?.trim() ? { endpoint: env.R2_ENDPOINT.trim() } : {}) }, fetchImpl);
 }
 
 /** Endereço público da CDN (CARD_CDN_URL), para o navegador e o proxy /card-img/cdn/. */
@@ -93,6 +93,8 @@ export interface MirrorResult {
   /** Imagens de origem desconhecida (ficam com o endereço original). */
   skipped: number;
   failed: Array<{ url: string; error: string }>;
+  /** O bucket não respondeu: nada foi copiado nesta rodada (motivo). */
+  unavailable?: string;
 }
 
 /**
@@ -129,13 +131,27 @@ export async function mirrorCardImages(
     }
   }
 
-  // Baixa e grava as que faltam, algumas por vez.
+  // Antes de baixar milhares de imagens, confere se o bucket responde (Account ID, token, rede).
+  if (pending.size) {
+    try {
+      await store.has('index.json');
+    } catch (err) {
+      result.unavailable = err instanceof Error ? err.message : String(err);
+      return result;
+    }
+  }
+
+  // Baixa e grava as que faltam, algumas por vez. Se o bucket parar de responder no meio, para.
   const queue = [...pending].slice(0, opts.maxDownloads ?? Infinity);
   const worker = async () => {
     for (let item = queue.shift(); item; item = queue.shift()) {
       const [url, { set }] = item;
       try {
-        const res = await fetchImpl(url, { headers: { 'user-agent': 'gumgumfight-importer' }, signal: AbortSignal.timeout(30_000) });
+        const res = await fetchImpl(url, { headers: { 'user-agent': 'gumgumfight-importer' }, signal: AbortSignal.timeout(30_000) }).catch(
+          (err: unknown) => {
+            throw new Error(`download: ${networkCause(err)}`);
+          },
+        );
         if (!res.ok) throw new Error(`${res.status}`);
         const body = Buffer.from(await res.arrayBuffer());
         if (!body.length || body.length > MAX_BYTES) throw new Error(`${body.length} bytes`);
@@ -149,6 +165,11 @@ export async function mirrorCardImages(
         remember.run(url, key, hash, lang, type, body.length);
         result.uploaded++;
       } catch (err) {
+        if (err instanceof R2Error && err.status === 0) {
+          result.unavailable = err.message;
+          queue.length = 0;
+          return;
+        }
         result.failed.push({ url, error: err instanceof Error ? err.message : String(err) });
       }
     }
@@ -209,6 +230,7 @@ export async function syncCardCdn(
   opts: { fetchImpl?: typeof fetch; maxDownloads?: number; log: (msg: string) => void },
 ): Promise<MirrorResult> {
   const r = await mirrorCardImages(db, store, opts);
+  if (r.unavailable) opts.log(`CDN das imagens: bucket inacessível, nada copiado: ${r.unavailable}. Confira R2_ACCOUNT_ID e o token.`);
   if (r.uploaded || r.failed.length) {
     opts.log(
       `CDN das imagens: ${r.uploaded} copiadas, ${r.reused} reaproveitadas, ${r.cards} cartas na CDN` +

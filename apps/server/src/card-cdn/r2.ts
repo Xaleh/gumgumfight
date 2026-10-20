@@ -14,7 +14,7 @@ export interface R2Config {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
-  /** Padrão: https://<accountId>.r2.cloudflarestorage.com */
+  /** Padrão: https://<accountId>.r2.cloudflarestorage.com (R2_ENDPOINT, para jurisdição .eu ou .fedramp). */
   endpoint?: string;
 }
 
@@ -74,6 +74,24 @@ export function signRequest(req: {
   };
 }
 
+/** Motivo de um erro de rede do fetch ("fetch failed" esconde a causa: ENOTFOUND, ECONNREFUSED...). */
+export function networkCause(err: unknown): string {
+  const cause = (err as { cause?: { code?: string; message?: string } })?.cause;
+  const base = err instanceof Error ? err.message : String(err);
+  return cause?.code ?? cause?.message ?? base;
+}
+
+/**
+ * Endereço da API do R2. Aceita o Account ID sozinho ou o endpoint S3 inteiro, como o painel mostra
+ * ("https://<id>.r2.cloudflarestorage.com", ou ".eu." nos buckets com jurisdição europeia).
+ */
+export function r2Endpoint(accountIdOrUrl: string): string {
+  const v = accountIdOrUrl.trim().replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(v)) return v.replace(/(\.r2\.cloudflarestorage\.com)\/.*$/i, '$1');
+  if (/\.r2\.cloudflarestorage\.com$/i.test(v)) return `https://${v}`;
+  return `https://${v}.r2.cloudflarestorage.com`;
+}
+
 export class R2Error extends Error {
   constructor(
     readonly status: number,
@@ -84,7 +102,8 @@ export class R2Error extends Error {
 }
 
 export function r2Client(cfg: R2Config, fetchImpl: typeof fetch = fetch) {
-  const endpoint = (cfg.endpoint ?? `https://${cfg.accountId}.r2.cloudflarestorage.com`).replace(/\/$/, '');
+  const endpoint = r2Endpoint(cfg.endpoint ?? cfg.accountId);
+  const host = new URL(endpoint).host;
   const objectUrl = (key: string) => `${endpoint}/${encodePath(cfg.bucket)}/${encodePath(key)}`;
   const send = async (method: 'PUT' | 'HEAD', key: string, body?: Buffer, headers: Record<string, string> = {}) => {
     const url = objectUrl(key);
@@ -97,9 +116,15 @@ export function r2Client(cfg: R2Config, fetchImpl: typeof fetch = fetch) {
       secretAccessKey: cfg.secretAccessKey,
       region: 'auto',
     });
-    return fetchImpl(url, { method, headers: signed, body: body ? new Uint8Array(body) : undefined, signal: AbortSignal.timeout(30_000) });
+    try {
+      return await fetchImpl(url, { method, headers: signed, body: body ? new Uint8Array(body) : undefined, signal: AbortSignal.timeout(30_000) });
+    } catch (err) {
+      // Sem conexão com o R2 (Account ID errado, DNS, firewall): status 0.
+      throw new R2Error(0, `R2 inacessível em ${host} (${networkCause(err)})`);
+    }
   };
   return {
+    host,
     async has(key: string): Promise<boolean> {
       const res = await send('HEAD', key);
       if (res.status === 404) return false;
