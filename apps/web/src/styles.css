@@ -8569,9 +8569,21 @@ tr.clickable:hover td {
   border-radius: 16px;
   padding: 10px 12px;
   cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
-.tmeta-event:hover {
-  border-color: var(--muted);
+/* Mesma cor de borda dos cartões da lista de torneios; sobe um pouco, como os cartões de modo. */
+.tmeta-event:hover,
+.tmeta-event:focus-visible {
+  border-color: var(--blue);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(var(--shadow-rgb), 0.16);
+  outline: none;
+}
+.tmeta-event:active {
+  transform: translateY(0);
 }
 .tmeta-event.big {
   padding: 14px;
@@ -8626,6 +8638,13 @@ tr.clickable:hover td {
   grid-template-columns: 34px minmax(80px, 1.2fr) 2fr auto;
   align-items: center;
   gap: 10px;
+  margin: 0 -8px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  transition: background 0.15s ease;
+}
+.tmeta-dist li:hover {
+  background: var(--panel2);
 }
 .tmeta-dist-name {
   font-weight: 700;
@@ -8645,6 +8664,29 @@ tr.clickable:hover td {
   height: 100%;
   border-radius: 999px;
   background: var(--card-color, var(--muted));
+  transform-origin: left;
+  /* A lista é montada de novo a cada filtro: as barras crescem ao carregar e ao trocar o filtro. */
+  animation: tmeta-grow 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.tmeta-dist li:nth-child(n + 2) .tmeta-dist-bar span {
+  animation-delay: 0.03s;
+}
+.tmeta-dist li:nth-child(n + 4) .tmeta-dist-bar span {
+  animation-delay: 0.06s;
+}
+.tmeta-dist li:nth-child(n + 8) .tmeta-dist-bar span {
+  animation-delay: 0.09s;
+}
+@keyframes tmeta-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.tmeta .cov-table tbody tr {
+  transition: background 0.15s ease;
+}
+.tmeta .cov-table tbody tr:hover {
+  background: var(--panel2);
 }
 .tmeta-dist-num {
   min-width: 70px;
@@ -8655,6 +8697,20 @@ tr.clickable:hover td {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tmeta-event,
+  .tmeta-dist li,
+  .tmeta .cov-table tbody tr {
+    transition: none;
+  }
+  .tmeta-event:hover,
+  .tmeta-event:focus-visible {
+    transform: none;
+  }
+  .tmeta-dist-bar span {
+    animation: none;
+  }
 }
 @media (max-width: 520px) {
   .tmeta-dist li {
