@@ -37,8 +37,9 @@ function site(pages: Record<string, string>) {
 }
 
 /** Lista de um site sem a carta pedida (só o <select>, com uma promo de outro número). */
-const JP_PROMO = `<select name="series"><option value="550901">プロモーションカード</option></select>
-<dl class="modalCol" id="P-152"><dt></dt><dd><img class="lazy" data-src="../images/cardlist/card/P-152.png?1"><div class="getInfo"><h3>入手方法</h3>プレミアムカードコレクション</div></dd></dl>`;
+// Como no site japonês: colchetes japoneses no seletor e um botão logo depois do produto.
+const JP_PROMO = `<select name="series"><option value="550117">ブースターパック <br class="spInline">世界最強の戦士【OP-17】</option><option value="550901">プロモーションカード</option></select>
+<dl class="modalCol" id="P-152"><dt></dt><dd><img class="lazy" data-src="../images/cardlist/card/P-152.png?1"><div class="getInfo"><h3>入手情報</h3>プレミアムカードコレクション                <div class="getInfoBtnCol"><a href="./?series=550901" class="getInfoBtn">カードリスト</a></div></div></dd></dl>`;
 
 describe('listas oficiais da Bandai', () => {
   it('lê as coleções do seletor (código entre colchetes; sem código = promocionais)', () => {
@@ -48,6 +49,16 @@ describe('listas oficiais da Bandai', () => {
       { id: '569001', label: 'STARTER DECK -Straw Hat Crew- [ST-01]', sets: ['ST01'] },
       { id: '569901', label: 'Promotion card', sets: ['P'] },
       { id: '569801', label: 'Other Product Card', sets: ['P'] },
+    ]);
+  });
+
+  it('site japonês: colchetes japoneses e o botão depois do produto', () => {
+    expect(parseSeriesList(JP_PROMO).map((x) => [x.id, x.sets])).toEqual([
+      ['550117', ['OP17']],
+      ['550901', ['P']],
+    ]);
+    expect(parseCardList(JP_PROMO, JP.base)).toEqual([
+      { variant: 'P-152', cardId: 'P-152', imageUrl: `${JP.base}/images/cardlist/card/P-152.png`, label: 'プレミアムカードコレクション' },
     ]);
   });
 

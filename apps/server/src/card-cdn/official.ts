@@ -63,7 +63,7 @@ const decode = (s: string) =>
 export interface BandaiSeries {
   id: string;
   label: string;
-  /** Coleções da série ("OP15", "EB04"); sem código entre colchetes = promocionais ("P"). */
+  /** Coleções da série ("OP15", "EB04"); sem código entre colchetes = promocionais ("P"), como "Family Deck Set". */
   sets: string[];
 }
 
@@ -76,7 +76,8 @@ export function parseSeriesList(html: string): BandaiSeries[] {
   const out: BandaiSeries[] = [];
   for (const m of select.matchAll(/<option[^>]*value="(\d+)"[^>]*>([\s\S]*?)<\/option>/gi)) {
     const label = decode(decode(m[2]));
-    const codes = [...label.matchAll(/\[([A-Z]+-?\d+(?:-[A-Z]+-?\d+)*)\]/g)].flatMap((c) => setCodes(c[1]));
+    // Colchetes comuns no inglês ("[OP-17]") e japoneses no site do Japão ("【OP-17】").
+    const codes = [...label.matchAll(/[[【]([A-Z]+-?\d+(?:-[A-Z]+-?\d+)*)[\]】]/g)].flatMap((c) => setCodes(c[1]));
     out.push({ id: m[1], label, sets: codes.length ? codes : ['P'] });
   }
   return out;
@@ -101,7 +102,8 @@ export function parseCardList(html: string, base: string): BandaiPrint[] {
     const src = m[2].match(/data-src="([^"]*images\/cardlist\/card\/[^"]+)"/)?.[1];
     if (!src) continue;
     const imageUrl = new URL(src, `${base}/cardlist/`).href.replace(/\?.*$/, '');
-    const info = m[2].match(/<div class="getInfo">\s*<h3>[\s\S]*?<\/h3>([\s\S]*?)<\/div>/)?.[1];
+    // No site japonês o produto vem seguido de um botão ("<div class="getInfoBtnCol">…"): para antes dele.
+    const info = m[2].match(/<div class="getInfo">\s*<h3>[\s\S]*?<\/h3>([\s\S]*?)(?:<div|<\/div>)/)?.[1];
     const label = info ? decode(info) : '';
     out.push({ variant, cardId, imageUrl, ...(label && label !== '-' ? { label } : {}) });
   }
