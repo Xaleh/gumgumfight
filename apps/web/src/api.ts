@@ -376,6 +376,8 @@ export type OAuthConsentInfo =
 
 export interface AppConfig {
   cardImages: boolean;
+  /** CDN própria das imagens (null = imagens direto das fontes). */
+  cardCdn?: string | null;
   languages: string[];
   googleClientId: string | null;
   /** O apoio está configurado: o item "Apoiar o projeto" aparece. */

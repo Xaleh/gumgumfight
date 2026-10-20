@@ -11,6 +11,7 @@ import {
   parseArts,
   spoilerCards,
   validateDeck,
+  registerCardCdn,
 } from '@gumgum/engine';
 import Fastify from 'fastify';
 import { createHash, randomUUID } from 'node:crypto';
@@ -103,6 +104,8 @@ export function buildApp(
 
   app.get('/api/config', async () => ({
     cardImages: server.cardImages,
+    /** CDN própria das imagens: o navegador a aceita no /card-img/ (kit de divulgação). */
+    cardCdn: server.cardCdn ?? null,
     languages: ['pt', 'en'],
     googleClientId: server.googleClientId ?? null,
     /** O apoio está configurado: o item "Apoiar o projeto" aparece no menu. */
@@ -381,6 +384,8 @@ export function buildApp(
   registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined, notifier });
 
   // Imagens das cartas pelo mesmo domínio (kit de divulgação; em produção o Nginx atende antes).
+  // A CDN própria entra como origem "cdn" do /card-img/ (e das URLs reescritas do kit de divulgação).
+  registerCardCdn(server.cardCdn);
   registerCardImageRoutes(app, { enabled: server.cardImages, fetchImpl: opts.fetchImpl });
   registerCardGapRoutes(app, { db, user: auth.viewer });
   registerEngineTextRoutes(app, { db, user: auth.viewer });

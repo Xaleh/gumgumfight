@@ -50,6 +50,12 @@ module.exports = {
         CARD_IMAGES: env.CARD_IMAGES || 'on',
         // Fontes das cartas em ordem de prioridade (vazio = optcgapi / optcgleaks). Ex.: cardkaizoku,optcgapi
         CARD_SOURCES: env.CARD_SOURCES || '',
+        // CDN própria das imagens (Cloudflare R2): endereço público + credenciais do bucket (segredos só aqui).
+        CARD_CDN_URL: env.CARD_CDN_URL || '',
+        R2_ACCOUNT_ID: env.R2_ACCOUNT_ID || '',
+        R2_BUCKET: env.R2_BUCKET || '',
+        R2_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID || '',
+        R2_SECRET_ACCESS_KEY: env.R2_SECRET_ACCESS_KEY || '',
         SPOILER_SOURCES: env.SPOILER_SOURCES || '',
         // Horas entre as buscas dos spoilers (padrão 6); off desliga.
         SPOILER_SYNC: env.SPOILER_SYNC || '',

@@ -57,6 +57,17 @@ function migrate(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS cards_set ON cards(set_code);
 
+    -- Imagens copiadas para a CDN própria (card-cdn/): endereço de origem -> objeto no bucket.
+    CREATE TABLE IF NOT EXISTS card_images (
+      source_url   TEXT PRIMARY KEY,
+      object_key   TEXT NOT NULL,
+      hash         TEXT NOT NULL,
+      lang         TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      bytes        INTEGER NOT NULL,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS decks (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
@@ -888,8 +899,9 @@ function keepArts(card: CardData, storedData: string): CardData {
     return card;
   }
   if (!stored?.length) return card;
-  const seen = new Set([card.imageUrl, ...(card.arts ?? []).map((a) => a.imageUrl)]);
-  const extra = stored.filter((a) => !seen.has(a.imageUrl));
+  // Pelo id da arte, não pela URL: a mesma arte já copiada para a CDN própria tem outro endereço.
+  const seen = new Set([card.imageUrl, ...(card.arts ?? []).flatMap((a) => [a.imageUrl, a.id])]);
+  const extra = stored.filter((a) => !seen.has(a.imageUrl) && !seen.has(a.id));
   return extra.length ? { ...card, arts: [...(card.arts ?? []), ...extra] } : card;
 }
 

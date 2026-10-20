@@ -86,6 +86,15 @@ export const CARD_IMAGE_ORIGINS: Record<string, string> = {
   optcgleaks: 'https://images.optcgleaks.com/',
 };
 
+/**
+ * CDN própria das imagens (CARD_CDN_URL, ex.: "https://cards.gumgumfight.cloud"): entra na tabela
+ * como origem "cdn". O servidor registra ao subir; o navegador, ao ler /api/config.
+ */
+export function registerCardCdn(base: string | null | undefined): void {
+  if (base) CARD_IMAGE_ORIGINS.cdn = base.replace(/\/*$/, '/');
+  else delete CARD_IMAGE_ORIGINS.cdn;
+}
+
 export const CARD_IMAGE_PREFIX = '/card-img/';
 
 /** Caminho seguro: letras, números e `_ - . /`, sem `..` e com extensão de imagem. */

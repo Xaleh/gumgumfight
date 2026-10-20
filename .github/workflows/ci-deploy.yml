@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       import_sets:
-        description: 'Coleções para importar após o deploy, pela cadeia CARD_SOURCES (ex.: ST-01 ST-02, P ou --all). Vazio = não importa.'
+        description: 'Coleções para importar após o deploy, pela cadeia CARD_SOURCES (ex.: ST-01 ST-02, P, --all ou --images). Vazio = não importa.'
         required: false
         default: ''
 

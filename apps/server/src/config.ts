@@ -5,6 +5,8 @@ const off = (v: string | undefined) => /^(off|0|false|no|nao|não)$/i.test(v ?? 
 export interface ServerOptions {
   /** CARD_IMAGES=off desliga as imagens oficiais: as URLs nem chegam ao navegador. */
   cardImages: boolean;
+  /** CARD_CDN_URL: endereço público da CDN própria das imagens (card-cdn/); null = imagens nas fontes. */
+  cardCdn?: string | null;
   /** GOOGLE_CLIENT_ID: Client ID do OAuth (tipo "Aplicativo da Web"). Sem ele, o login fica desligado. */
   googleClientId?: string | null;
   /**
@@ -146,6 +148,7 @@ export const parseOrigins = (v: string | undefined) =>
 
 export const serverOptions: ServerOptions = {
   cardImages: !off(process.env.CARD_IMAGES),
+  cardCdn: process.env.CARD_CDN_URL?.trim().replace(/\/+$/, '') || null,
   googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
   adminEmails: parseEmails(process.env.ADMIN_EMAILS),
   onlineBotRooms: !off(process.env.ONLINE_BOT_ROOMS),
