@@ -114,8 +114,41 @@ export interface GapCard {
   status: 'partial' | 'manual';
   provisional: boolean;
   isNew: boolean;
+  /** As linhas são do texto para o motor, não do oficial. */
+  engineText: boolean;
   firstSeen: string | null;
   lines: GapLine[];
+}
+
+/** O que o leitor faz com um texto: situação, linha por linha, e a tradução que sai do que ele leu. */
+export interface EngineReading {
+  status: 'vanilla' | 'scripted' | 'auto' | 'partial' | 'manual';
+  lines: GapLine[];
+  pt: { text: string; trigger?: string; complete: boolean };
+}
+
+/** Uma carta na tela de edição do texto para o motor (perfil Dev). */
+export interface EngineTextDetail {
+  card: { id: string; name: string; set: string; category: string; text: string; trigger: string | null };
+  scripted: boolean;
+  engineText: { text: string; trigger: string | null; authorName: string | null; updatedAt: string } | null;
+  /** O texto oficial mudou depois que o texto para o motor foi escrito: ele não vale até ser revisto. */
+  stale: boolean;
+  official: EngineReading;
+  current: EngineReading;
+  history: Array<{ action: 'set' | 'remove'; text: string | null; trigger: string | null; authorName: string | null; at: string }>;
+}
+
+export interface EngineTextItem {
+  cardId: string;
+  name: string | null;
+  set: string | null;
+  missing: boolean;
+  stale: boolean;
+  status: EngineReading['status'] | null;
+  officialStatus: EngineReading['status'] | null;
+  authorName: string | null;
+  updatedAt: string;
 }
 
 /** Frase que o leitor não entende, com as cartas que ficariam automáticas se ele aprendesse. */
@@ -384,6 +417,14 @@ export const api = {
       `/api/dev/card-gaps/cards?${'set' in q ? `set=${encodeURIComponent(q.set)}` : 'ids' in q ? `ids=${q.ids.map(encodeURIComponent).join(',')}` : 'new=1'}`,
     ),
   markCardGapsReviewed: (ids?: string[]) => send<{ reviewed: number }>('POST', '/api/dev/card-gaps/reviewed', ids ? { ids } : {}),
+  /** Perfil Dev: texto para o motor (redação que o leitor entende, no lugar do texto oficial). */
+  engineTexts: () => get<{ texts: EngineTextItem[] }>('/api/dev/engine-texts'),
+  engineText: (id: string) => get<EngineTextDetail>(`/api/dev/engine-texts/${encodeURIComponent(id)}`),
+  previewEngineText: (cardId: string, text: string, trigger: string) =>
+    send<EngineReading>('POST', '/api/dev/engine-texts/preview', { cardId, text, trigger }),
+  saveEngineText: (id: string, text: string, trigger: string) =>
+    send<EngineTextDetail>('PUT', `/api/dev/engine-texts/${encodeURIComponent(id)}`, { text, trigger }),
+  removeEngineText: (id: string) => send<EngineTextDetail>('DELETE', `/api/dev/engine-texts/${encodeURIComponent(id)}`),
   createDeck: (d: DeckInput) => send<DeckSummary>('POST', '/api/decks', d),
   updateDeck: (id: string, d: DeckInput) => send<DeckSummary>('PUT', `/api/decks/${encodeURIComponent(id)}`, d),
   /** Só o nome: o dono ou um admin/dev (em decks de outros jogadores). */

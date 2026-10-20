@@ -10,6 +10,7 @@ export {
   type CardDiagnosis,
   detectKeywords,
   diagnoseCard,
+  forEngine,
   gapPattern,
   type GapStage,
   type LineDiagnosis,
