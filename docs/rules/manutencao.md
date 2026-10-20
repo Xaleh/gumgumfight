@@ -16,6 +16,7 @@ A Bandai publica regras novas em quatro lugares (mais a conferência dos dados d
 
 Responsável: quem abrir o card da coleção no Trello (ex.: "Automação das cartas da OP-19"). O card de coleção só fecha quando estes itens estiverem feitos.
 
+0. Abrir "📊 Cobertura das cartas" → **Novas ⚙** (perfil Dev): as cartas da coleção que o leitor não entende, com o trecho onde ele parou. A aba **Frases que faltam** diz qual frase ensinar primeiro ao `parser.ts` (a que resolve mais cartas). Carta com redação incomum para algo que o leitor já sabe fazer: **Texto para o motor** (na hora, sem deploy; conferir a tradução gerada na prévia). Frase que se repete em várias cartas: ensinar ao `parser.ts`. Texto estragado na fonte vai em `SOURCE_TEXT_FIXES`; carta única demais, em `scripts.ts`. Marcar como vistas as que já viraram card no Trello.
 1. Baixar o `qa_<coleção>.pdf` e ler todas as perguntas.
 2. Para cada resposta que muda o jeito de automatizar (substituição, momento de ativação, alvo, custo, "if/then"), anotar em `interacoes/<tema>.md` com o número da carta e o link.
 3. Conferir se o leitor (`parser.ts`) e os scripts (`scripts.ts`) fazem o que o Q&A diz; o que não fizer vira item em `divergencias.md` e card no Trello com o texto oficial, o comportamento atual e a resposta oficial.

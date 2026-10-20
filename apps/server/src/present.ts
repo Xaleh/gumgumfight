@@ -1,7 +1,7 @@
 // Prepara as cartas para enviar ao navegador: anexa traduções e aplica a
 // configuração de imagens.
 
-import { type CardData, translateCardPt } from '@gumgum/engine';
+import { type CardData, forEngine, translateCardPt } from '@gumgum/engine';
 import type { TranslationRow } from './db';
 import type { ServerOptions } from './config';
 
@@ -13,10 +13,12 @@ const cache = new Map<string, NonNullable<NonNullable<CardData['i18n']>['pt']>>(
 export function ptTranslation(card: CardData, manual?: TranslationRow): NonNullable<CardData['i18n']>['pt'] {
   if (manual) return { text: manual.text, trigger: manual.trigger ?? undefined, source: 'manual' };
   // Linhas que o motor automatiza são descritas a partir dos passos; as demais, por regras de frase.
-  const key = `${card.id}\u0000${card.text}\u0000${card.trigger ?? ''}`;
+  // Com texto para o motor, a tradução sai dele (é a mesma regra, numa redação que o leitor entende).
+  const read = forEngine(card);
+  const key = `${card.id}\u0000${read.text}\u0000${read.trigger ?? ''}`;
   let pt = cache.get(key);
   if (!pt) {
-    const t = translateCardPt(card);
+    const t = translateCardPt(read);
     pt = { text: t.text, trigger: t.trigger, source: t.complete ? 'auto' : 'partial' };
     if (cache.size > 20000) cache.clear();
     cache.set(key, pt);

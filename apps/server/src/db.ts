@@ -6,9 +6,10 @@
 // push/store.ts (notificações); se um dia for preciso migrar para Postgres, só esses
 // arquivos mudam.
 
+import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { type CardArt, type CardData, type DeckList, fixCard } from '@gumgum/engine';
+import { type CardArt, type CardData, type DeckList, fixCard, needsManual } from '@gumgum/engine';
 import { DatabaseSync } from 'node:sqlite';
 import { baseCardId } from './optcgapi';
 import { DB_PATH } from './paths';
@@ -116,6 +117,202 @@ function migrate(db: DB) {
   migrateSupport(db);
   migrateTutorial(db);
   migratePartners(db);
+  migrateEngineTexts(db);
+  migrateCardGaps(db);
+}
+
+/**
+ * Texto para o motor (card-engine-texts.ts): redação que o leitor entende, escrita pelo Dev, usada
+ * no lugar do texto oficial só para montar as habilidades. `base_key` é o hash do texto oficial
+ * quando foi escrito: se o oficial mudar (errata, fonte nova), o texto para o motor deixa de valer
+ * até o Dev revisar. O histórico guarda cada gravação e remoção, com quem fez.
+ */
+function migrateEngineTexts(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS card_engine_texts (
+      card_id     TEXT PRIMARY KEY,
+      text        TEXT NOT NULL,
+      trigger     TEXT,
+      base_key    TEXT NOT NULL,
+      author_id   TEXT,
+      author_name TEXT,
+      updated_at  TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS card_engine_text_history (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id     TEXT NOT NULL,
+      action      TEXT NOT NULL,        -- set | remove
+      text        TEXT,
+      trigger     TEXT,
+      base_key    TEXT,
+      author_id   TEXT,
+      author_name TEXT,
+      at          TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS card_engine_text_history_card ON card_engine_text_history(card_id, id);
+  `);
+}
+
+export interface EngineTextRow {
+  cardId: string;
+  text: string;
+  trigger: string | null;
+  baseKey: string;
+  authorName: string | null;
+  updatedAt: string;
+}
+
+export interface EngineTextHistoryRow {
+  action: 'set' | 'remove';
+  text: string | null;
+  trigger: string | null;
+  authorName: string | null;
+  at: string;
+}
+
+export function listEngineTexts(db: DB): EngineTextRow[] {
+  const rows = db.prepare('SELECT card_id, text, trigger, base_key, author_name, updated_at FROM card_engine_texts ORDER BY card_id').all() as unknown as Array<{
+    card_id: string;
+    text: string;
+    trigger: string | null;
+    base_key: string;
+    author_name: string | null;
+    updated_at: string;
+  }>;
+  return rows.map((r) => ({ cardId: r.card_id, text: r.text, trigger: r.trigger, baseKey: r.base_key, authorName: r.author_name, updatedAt: r.updated_at }));
+}
+
+export function getEngineText(db: DB, cardId: string): EngineTextRow | null {
+  return listEngineTexts(db).find((r) => r.cardId === cardId) ?? null;
+}
+
+/** Grava (ou troca) o texto para o motor de uma carta, com o hash do texto oficial de agora. */
+export function setEngineText(
+  db: DB,
+  e: { cardId: string; text: string; trigger: string | null; baseKey: string; author: { id: string; name: string | null } },
+  now = new Date(),
+) {
+  const at = now.toISOString();
+  transaction(db, () => {
+    db.prepare(`
+      INSERT INTO card_engine_texts (card_id, text, trigger, base_key, author_id, author_name, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(card_id) DO UPDATE SET text = excluded.text, trigger = excluded.trigger, base_key = excluded.base_key,
+        author_id = excluded.author_id, author_name = excluded.author_name, updated_at = excluded.updated_at
+    `).run(e.cardId, e.text, e.trigger, e.baseKey, e.author.id, e.author.name, at);
+    db.prepare(
+      "INSERT INTO card_engine_text_history (card_id, action, text, trigger, base_key, author_id, author_name, at) VALUES (?, 'set', ?, ?, ?, ?, ?, ?)",
+    ).run(e.cardId, e.text, e.trigger, e.baseKey, e.author.id, e.author.name, at);
+  });
+}
+
+/** Apaga o texto para o motor (a carta volta a ser lida pelo texto oficial). false = não havia. */
+export function removeEngineText(db: DB, cardId: string, author: { id: string; name: string | null }, now = new Date()): boolean {
+  let removed = false;
+  transaction(db, () => {
+    removed = Number(db.prepare('DELETE FROM card_engine_texts WHERE card_id = ?').run(cardId).changes) > 0;
+    if (removed) {
+      db.prepare("INSERT INTO card_engine_text_history (card_id, action, author_id, author_name, at) VALUES (?, 'remove', ?, ?, ?)").run(
+        cardId,
+        author.id,
+        author.name,
+        now.toISOString(),
+      );
+    }
+  });
+  return removed;
+}
+
+export function engineTextHistory(db: DB, cardId: string, limit = 20): EngineTextHistoryRow[] {
+  const rows = db
+    .prepare('SELECT action, text, trigger, author_name, at FROM card_engine_text_history WHERE card_id = ? ORDER BY id DESC LIMIT ?')
+    .all(cardId, limit) as unknown as Array<{ action: 'set' | 'remove'; text: string | null; trigger: string | null; author_name: string | null; at: string }>;
+  return rows.map((r) => ({ action: r.action, text: r.text, trigger: r.trigger, authorName: r.author_name, at: r.at }));
+}
+
+/**
+ * Cartas com efeito que o leitor não entende (⚙), para o aviso de "novas" ao Dev (card-gaps.ts):
+ * `text_key` é o hash do texto quando a carta entrou na lista (texto novo = carta nova de novo) e
+ * `reviewed_at`, quando o Dev marcou como vista. Num banco que já tinha cartas, as ⚙ de antes da
+ * tabela entram como vistas: só as que chegarem depois são novas.
+ */
+function migrateCardGaps(db: DB) {
+  const existed = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_gaps'").get();
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS card_gaps (
+      card_id     TEXT PRIMARY KEY,
+      text_key    TEXT NOT NULL,
+      first_seen  TEXT NOT NULL,
+      reviewed_at TEXT
+    );
+  `);
+  if (!existed) recordCardGaps(db, { reviewed: true });
+}
+
+/** Hash do texto oficial (texto e [Trigger], depois das correções e da errata). */
+export const officialTextKey = (c: Pick<CardData, 'text' | 'trigger'>) =>
+  createHash('sha1').update(`${c.text ?? ''}\u0000${c.trigger ?? ''}`).digest('hex').slice(0, 16);
+
+/**
+ * Atualiza a lista das cartas ⚙ com o banco atual: carta ⚙ que não estava (ou cujo texto mudou)
+ * entra como nova; carta que deixou de ser ⚙ (ou sumiu) sai. Roda ao subir o servidor, depois
+ * da sincronização dos spoilers e do `cards:import`. `reviewed`: entram já como vistas.
+ */
+export function recordCardGaps(db: DB, opts: { reviewed?: boolean; now?: Date } = {}): { added: number; removed: number } {
+  const at = (opts.now ?? new Date()).toISOString();
+  const known = new Map(
+    (db.prepare('SELECT card_id, text_key FROM card_gaps').all() as unknown as Array<{ card_id: string; text_key: string }>).map((r) => [r.card_id, r.text_key]),
+  );
+  const put = db.prepare(`
+    INSERT INTO card_gaps (card_id, text_key, first_seen, reviewed_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(card_id) DO UPDATE SET text_key = excluded.text_key, first_seen = excluded.first_seen, reviewed_at = excluded.reviewed_at
+  `);
+  const del = db.prepare('DELETE FROM card_gaps WHERE card_id = ?');
+  let added = 0;
+  let removed = 0;
+  transaction(db, () => {
+    const gaps = new Set<string>();
+    for (const c of listCards(db)) {
+      if (!needsManual(c)) continue;
+      gaps.add(c.id);
+      const key = officialTextKey(c);
+      if (known.get(c.id) === key) continue;
+      put.run(c.id, key, at, opts.reviewed ? at : null);
+      added++;
+    }
+    for (const id of known.keys()) {
+      if (gaps.has(id)) continue;
+      del.run(id);
+      removed++;
+    }
+  });
+  return { added, removed };
+}
+
+export interface CardGapRow {
+  cardId: string;
+  firstSeen: string;
+  reviewedAt: string | null;
+}
+
+export function listCardGaps(db: DB): Map<string, CardGapRow> {
+  const rows = db.prepare('SELECT card_id, first_seen, reviewed_at FROM card_gaps').all() as unknown as Array<{
+    card_id: string;
+    first_seen: string;
+    reviewed_at: string | null;
+  }>;
+  return new Map(rows.map((r) => [r.card_id, { cardId: r.card_id, firstSeen: r.first_seen, reviewedAt: r.reviewed_at }]));
+}
+
+/** Marca como vistas as cartas novas (todas, ou só `ids`). Devolve quantas mudaram. */
+export function markCardGapsReviewed(db: DB, ids?: string[], now = new Date()): number {
+  const at = now.toISOString();
+  if (!ids) return Number(db.prepare('UPDATE card_gaps SET reviewed_at = ? WHERE reviewed_at IS NULL').run(at).changes);
+  const mark = db.prepare('UPDATE card_gaps SET reviewed_at = ? WHERE card_id = ? AND reviewed_at IS NULL');
+  let n = 0;
+  transaction(db, () => {
+    for (const id of ids) n += Number(mark.run(at, id).changes);
+  });
+  return n;
 }
 
 /**
@@ -782,29 +979,37 @@ export function hasOfficialCards(db: DB, set: string): boolean {
   return Boolean(db.prepare('SELECT 1 FROM cards WHERE set_code = ? AND provisional = 0 LIMIT 1').get(set));
 }
 
-type CardRow = { data: string; provisional: number };
+type CardRow = { data: string; provisional: number; e_text: string | null; e_trigger: string | null; e_base: string | null };
+/** As colunas de `CardRow`: a carta e o texto para o motor (card_engine_texts), se houver. */
+const CARD_COLUMNS = 'c.data, c.provisional, e.text AS e_text, e.trigger AS e_trigger, e.base_key AS e_base';
+const CARD_FROM = 'cards c LEFT JOIN card_engine_texts e ON e.card_id = c.id';
 // Correções de nome/tipos e errata valem também para as cartas já gravadas (importadas antes de a correção entrar na tabela).
-const toCard = (r: CardRow) => ({ ...fixCard(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) });
+// O texto para o motor só vale enquanto o texto oficial for o mesmo de quando foi escrito.
+const toCard = (r: CardRow) => {
+  const card: CardData & { provisional: boolean } = { ...fixCard(JSON.parse(r.data) as CardData), provisional: Boolean(r.provisional) };
+  if (r.e_text !== null && r.e_base === officialTextKey(card)) card.engineText = { text: r.e_text, ...(r.e_trigger ? { trigger: r.e_trigger } : {}) };
+  return card;
+};
 
 export function listCards(db: DB, set?: string) {
   const rows = (
     set
-      ? db.prepare('SELECT data, provisional FROM cards WHERE set_code = ? ORDER BY id').all(set)
-      : db.prepare('SELECT data, provisional FROM cards ORDER BY id').all()
+      ? db.prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} WHERE c.set_code = ? ORDER BY c.id`).all(set)
+      : db.prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} ORDER BY c.id`).all()
   ) as unknown as CardRow[];
   return rows.map(toCard);
 }
 
 /** Todos os Líderes (para escolher o oponente na fila casual). */
 export function listLeaders(db: DB) {
-  const rows = db.prepare("SELECT data, provisional FROM cards WHERE category = 'leader' ORDER BY id").all() as unknown as CardRow[];
+  const rows = db.prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} WHERE c.category = 'leader' ORDER BY c.id`).all() as unknown as CardRow[];
   return rows.map(toCard);
 }
 
 export function getCards(db: DB, ids: string[]) {
   if (!ids.length) return [];
   const rows = db
-    .prepare(`SELECT data, provisional FROM cards WHERE id IN (${ids.map(() => '?').join(',')})`)
+    .prepare(`SELECT ${CARD_COLUMNS} FROM ${CARD_FROM} WHERE c.id IN (${ids.map(() => '?').join(',')})`)
     .all(...ids) as unknown as CardRow[];
   return rows.map(toCard);
 }

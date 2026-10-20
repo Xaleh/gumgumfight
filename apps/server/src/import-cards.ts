@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { cdnFromEnv, syncCardCdn } from './card-cdn';
 import { fetchJson } from './card-import';
 import { buildChain, chainNames, formatReport, type Layer, resolveChain, saveDiffReport, writeOfficial } from './card-sources';
-import { hasOfficialCards, openDb } from './db';
+import { hasOfficialCards, openDb, recordCardGaps } from './db';
 import { DEFAULT_API_BASE } from './optcgapi';
 import { DATA_DIR, fromUserCwd } from './paths';
 import { spoilerRound } from './spoiler-sync';
@@ -104,6 +104,8 @@ async function main() {
     return;
   }
   console.log(`Gravadas ${writeOfficial(db, resolved)} cartas no banco.`);
+  const gaps = recordCardGaps(db);
+  if (gaps.added) console.log(`Cobertura: ${gaps.added} carta(s) nova(s) com efeito parcial ou manual (⚙); ver a tela "Cobertura das cartas" (Dev).`);
   if (cdn) await syncCardCdn(db, cdn, { log });
 }
 

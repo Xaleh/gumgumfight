@@ -54,6 +54,7 @@ import {
   type Connection,
   MAX_SPECTATORS,
   MIN_HANDS_DELAY_MS,
+  pinEngineTexts,
   type Room,
   type RoomData,
   type RoomEvent,
@@ -190,7 +191,8 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
     deckIds: room.data.seats.map((s) => s.deckId),
   };
   const ids = [...new Set(replay.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
-  const facts = deriveMatch(replay, getCards(db, ids) as CardData[]);
+  // Com os textos para o motor do começo da partida (os mesmos com que a sala foi jogada).
+  const facts = deriveMatch(replay, pinEngineTexts(getCards(db, ids) as CardData[], room.data.engineTexts));
   const seat = (p: PlayerId) => {
     const s = room.data.seats[p];
     return s.bot

@@ -7,7 +7,13 @@ export { DEFAULT_WEIGHTS as BOT_WEIGHTS, evaluate, type Weights as BotWeights } 
 export {
   automationStatus,
   buildCardDef,
+  type CardDiagnosis,
   detectKeywords,
+  diagnoseCard,
+  forEngine,
+  gapPattern,
+  type GapStage,
+  type LineDiagnosis,
   hasScript,
   manualAbilities,
   needsManual,

@@ -30,7 +30,7 @@ import {
   writeOfficial,
 } from './card-sources';
 import { type ImageStore, syncCardCdn } from './card-cdn';
-import { type DB, hasOfficialCards, pendingSpoilers, pruneSpoilers, SPOILER_SOURCE, upsertCards } from './db';
+import { type DB, hasOfficialCards, pendingSpoilers, pruneSpoilers, recordCardGaps, SPOILER_SOURCE, upsertCards } from './db';
 import { DEFAULT_API_BASE, rowsOf } from './optcgapi';
 import { readSpoilerFiles } from './seed';
 import { OPTCGLEAKS } from './spoiler-feed';
@@ -262,8 +262,11 @@ export async function spoilerRound(
     chain: chainFromEnv('official', ctx, cache),
     onReport: (r, chain) => report('Oficiais', 'official:sync', r, chain),
   });
+  // Cartas que chegaram com efeito que o leitor não entende: aviso ao Dev (tela de Cobertura).
+  const gaps = recordCardGaps(db);
+  if (gaps.added) opts.log(`Cobertura: ${gaps.added} carta(s) nova(s) com efeito parcial ou manual (⚙)`);
   if (opts.cdn) await syncCardCdn(db, opts.cdn, { maxDownloads: opts.cdnMaxDownloads, log: opts.log });
-  return { feed, sync };
+  return { feed, sync, gaps };
 }
 
 /**

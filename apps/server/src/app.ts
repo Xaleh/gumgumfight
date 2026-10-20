@@ -53,6 +53,8 @@ import { registerReportRoutes } from './reports/routes';
 import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
+import { registerEngineTextRoutes } from './card-engine-texts';
+import { registerCardGapRoutes } from './card-gaps';
 import { registerCardImageRoutes } from './card-images';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
@@ -385,6 +387,8 @@ export function buildApp(
   // A CDN própria entra como origem "cdn" do /card-img/ (e das URLs reescritas do kit de divulgação).
   registerCardCdn(server.cardCdn);
   registerCardImageRoutes(app, { enabled: server.cardImages, fetchImpl: opts.fetchImpl });
+  registerCardGapRoutes(app, { db, user: auth.viewer });
+  registerEngineTextRoutes(app, { db, user: auth.viewer });
 
   registerReportRoutes(app, { db, user: auth.viewer, notifier });
   registerSupportRoutes(app, {
