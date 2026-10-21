@@ -478,6 +478,19 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     }
   };
 
+  /** A lista já existe num deck de outro (ou pronto): favorita esse deck e abre-o; mudar as cartas depois cria um deck novo. */
+  const favoriteDupe = async (d: DeckDuplicate) => {
+    try {
+      await api.favoriteDeck(d.id, true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    setDecks((ds) => ds.map((x) => (x.id === d.id ? { ...x, favorite: true } : x)));
+    await openDeck(d.id);
+    setNotice(t('decks.builder.dupFavorited', { name: d.name }));
+  };
+
   const del = async () => {
     if (!draft.id || !canDelete) return;
     if (!window.confirm(t(draft.kind === 'user' ? 'deck.confirmDelete' : 'deck.confirmDeleteOther', { name: draft.name }))) return;
@@ -670,7 +683,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         <div className="dk-dupe" role="alert">
           <span>{dupe.mine ? t('decks.builder.dupMine', { name: dupe.name }) : t('decks.builder.dupOther', { name: dupe.name })}</span>
           <div className="btn-row">
-            <button className="btn small primary" onClick={() => (dupe.mine ? load(dupe.id) : setViewing(dupe.id))}>
+            {!dupe.mine && (
+              <button className="btn small primary" onClick={() => void favoriteDupe(dupe)}>
+                <Icon name="star" size={16} /> {t('decks.builder.dupFavorite', { name: dupe.name })}
+              </button>
+            )}
+            <button className={['btn small', dupe.mine ? 'primary' : ''].join(' ')} onClick={() => (dupe.mine ? load(dupe.id) : setViewing(dupe.id))}>
               {t('decks.builder.dupOpen', { name: dupe.name })}
             </button>
             <button className="btn small" onClick={() => void save({ allowDuplicate: true })}>

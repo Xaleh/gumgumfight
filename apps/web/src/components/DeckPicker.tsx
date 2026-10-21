@@ -29,7 +29,7 @@ import { Icon } from './Icons';
 export const RANDOM_DECK = 'random';
 
 export const DECK_TABS: DeckTab[] = ['recent', 'favorites', 'mine', 'community', 'builtin'];
-const SORTS: DeckSort[] = ['recent', 'name', 'color', 'games'];
+const SORTS: DeckSort[] = ['recent', 'name', 'color', 'leader', 'games'];
 export const COLOR_LABEL: Record<string, MessageKey> = {
   red: 'deck.color.red',
   green: 'deck.color.green',

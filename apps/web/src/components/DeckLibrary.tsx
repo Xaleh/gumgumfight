@@ -12,7 +12,7 @@ import { DeckTile } from './DeckTile';
 import { Icon } from './Icons';
 
 const TABS: DeckTab[] = ['mine', 'favorites', 'community', 'builtin'];
-const SORTS: DeckSort[] = ['updated', 'recent', 'name', 'color', 'games'];
+const SORTS: DeckSort[] = ['updated', 'recent', 'name', 'color', 'leader', 'games'];
 
 export function DeckLibrary({
   decks,
@@ -51,7 +51,9 @@ export function DeckLibrary({
   const [picked, setTab] = useState<DeckTab | null>(null);
   const tab = picked ?? (decks.some((d) => d.kind === 'user' && d.mine) ? 'mine' : 'builtin');
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<DeckSort>('updated');
+  /** Ordem escolhida; até a pessoa escolher, a Comunidade junta os decks do mesmo Líder. */
+  const [pickedSort, setSort] = useState<DeckSort | null>(null);
+  const sort = pickedSort ?? (tab === 'community' ? 'leader' : 'updated');
   const [colors, setColors] = useState<string[]>([]);
 
   const counts = useMemo(() => Object.fromEntries(TABS.map((tb) => [tb, decks.filter((d) => inTab(d, tb, local)).length])), [decks, local]);

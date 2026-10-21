@@ -5,7 +5,7 @@ import type { CardData } from '@gumgum/engine';
 import type { DeckSummary } from './api';
 
 export type DeckTab = 'recent' | 'favorites' | 'mine' | 'community' | 'builtin';
-export type DeckSort = 'recent' | 'updated' | 'name' | 'color' | 'games';
+export type DeckSort = 'recent' | 'updated' | 'name' | 'color' | 'leader' | 'games';
 
 /** Ordem das cores no filtro e na ordenação por cor. */
 export const DECK_COLORS = ['red', 'green', 'blue', 'purple', 'black', 'yellow'] as const;
@@ -83,6 +83,9 @@ export function sortDecks(decks: DeckSummary[], sort: DeckSort, local: ReadonlyM
     updated: (a, b) => deckTime(b.updatedAt) - deckTime(a.updatedAt) || byName(a, b),
     name: byName,
     color: (a, b) => colorRank(a) - colorRank(b) || (a.leaderName ?? '').localeCompare(b.leaderName ?? '') || byName(a, b),
+    // Decks do mesmo Líder juntos (pelo nome; no empate, pelo número), o editado por último antes.
+    leader: (a, b) =>
+      (a.leaderName ?? '').localeCompare(b.leaderName ?? '') || a.leader.localeCompare(b.leader) || deckTime(b.updatedAt) - deckTime(a.updatedAt) || byName(a, b),
     games: (a, b) => (b.games ?? 0) - (a.games ?? 0) || byName(a, b),
   };
   return [...decks].sort(cmp[sort]);
