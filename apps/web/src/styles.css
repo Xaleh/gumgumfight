@@ -9197,6 +9197,115 @@ tr.clickable:hover td {
     transform: translateY(10px) scale(0.96);
   }
 }
+/* [Trigger] revelado da Vida: clarão dourado, selo "TRIGGER!" e o painel com o texto. */
+.motion-layer.spot-trigger .spot-backdrop {
+  background:
+    repeating-linear-gradient(-32deg, transparent 0 46px, rgba(255, 214, 70, 0.12) 46px 50px, transparent 50px 120px),
+    repeating-linear-gradient(-32deg, transparent 0 90px, rgba(255, 236, 160, 0.18) 90px 92px, transparent 92px 230px),
+    radial-gradient(circle at 50% 50%, rgba(255, 196, 40, 0.28), transparent 55%),
+    rgba(24, 14, 30, 0.64);
+  background-size: 300% 300%, 300% 300%, auto, auto;
+}
+.flight.spot-trigger .flight-face > .card {
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(255, 245, 210, 0.95), 0 0 46px 6px rgba(255, 196, 40, 0.7);
+}
+.trigger-flash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 190%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 10%, rgba(255, 220, 90, 0.75) 24%, rgba(255, 150, 30, 0.35) 42%, transparent 64%),
+    repeating-conic-gradient(from 8deg, rgba(255, 236, 150, 0.5) 0 5deg, transparent 5deg 24deg);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: trigger-flash 0.75s ease-out calc(var(--in) * 0.8) both;
+}
+@keyframes trigger-flash {
+  0% {
+    opacity: 0;
+    scale: 0.3;
+    rotate: 0deg;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.25;
+    rotate: 25deg;
+  }
+}
+.trigger-seal {
+  position: absolute;
+  left: 50%;
+  top: -7%;
+  translate: -50% 0;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: seal-in 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) calc(var(--in) * 0.85) both, spot-plate-out 0.22s ease-in calc(var(--in) + var(--hold) - 0.2s) forwards;
+}
+.trigger-seal b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.12em;
+  padding: 0.08em 0.4em 0.02em;
+  transform: rotate(-6deg);
+  border-radius: calc(var(--cw) * 0.04);
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  font-size: calc(var(--cw) * 0.2);
+  line-height: 1;
+  letter-spacing: 2px;
+  color: #2a1600;
+  background: linear-gradient(180deg, #fff3a8, #ffd23a 48%, #f59e0b);
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 5px #2a1600,
+    0 0 30px 8px rgba(255, 190, 40, 0.75),
+    0 10px 24px rgba(0, 0, 0, 0.45);
+}
+.trigger-seal .seal-icon {
+  font-family: var(--font);
+  font-size: 0.7em;
+}
+.trigger-seal small {
+  display: block;
+  margin-top: calc(var(--cw) * 0.035);
+  font-size: calc(var(--cw) * 0.06);
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes seal-in {
+  from {
+    opacity: 0;
+    scale: 2.4;
+  }
+  60% {
+    opacity: 1;
+    scale: 0.92;
+  }
+}
+.spot-trigger .spot-plate {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 5px rgba(255, 200, 50, 0.95),
+    0 0 32px 10px rgba(255, 190, 40, 0.6),
+    0 14px 34px rgba(5, 12, 40, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .trigger-flash {
+    display: none;
+  }
+}
 /* impacto */
 .burst.strike {
   background:
