@@ -1297,6 +1297,7 @@ const ptBR = {
   'judge.playsOnlyChoices': 'Só escolhas e respostas',
   'judge.playsLoading': 'Carregando as jogadas…',
   'judge.playsNone': 'Nenhuma jogada encontrada.',
+  'judge.playsFailed': 'Esta partida só pôde ser refeita até a jogada #{n} de {total}: o motor recusou a seguinte ("{why}"). Uma carta da partida provavelmente mudou depois do jogo; as jogadas seguintes não aparecem aqui.',
   'judge.playsMore': 'Mostrar mais {n|# jogada|# jogadas}',
   'judge.playsTurn': 'Turno {n}',
   'judge.playsEffect': 'Efeito de {name}:',

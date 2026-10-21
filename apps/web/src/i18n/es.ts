@@ -1296,6 +1296,7 @@ export default {
   'judge.playsOnlyChoices': 'Solo elecciones y respuestas',
   'judge.playsLoading': 'Cargando las jugadas…',
   'judge.playsNone': 'No se encontró ninguna jugada.',
+  'judge.playsFailed': 'Esta partida solo pudo rehacerse hasta la jugada #{n} de {total}: el motor rechazó la siguiente ("{why}"). Probablemente una carta de la partida cambió después del juego; las jugadas siguientes no aparecen aquí.',
   'judge.playsMore': 'Mostrar {n|# jugada más|# jugadas más}',
   'judge.playsTurn': 'Turno {n}',
   'judge.playsEffect': 'Efecto de {name}:',

@@ -16,16 +16,22 @@ import type { GameSetup } from './useGame';
 export function playsFromSetup(setup: GameSetup): JudgePlays {
   let state = createGame(setup.config);
   const plays: JudgePlay[] = [];
-  for (const [count, action] of (setup.script ?? []).entries()) {
+  const script = setup.script ?? [];
+  let failed: JudgePlays['failed'];
+  for (const [count, action] of script.entries()) {
     const before = state;
     try {
       state = applyAction(before, action);
-    } catch {
+    } catch (e) {
+      // O motor recusou a jogada gravada: a partida refeita aqui já não é a jogada (uma carta mudou desde então).
+      failed = { count, total: script.length, message: e instanceof Error ? e.message : String(e) };
       break;
     }
-    plays.push({ count, turn: before.turn, player: action.player, action, pending: before.pending ?? null, lines: state.log.slice(before.log.length) });
+    const logFrom = before.log.length;
+    plays.push({ count, turn: before.turn, player: action.player, action, pending: before.pending ?? null, lines: state.log.slice(logFrom), logFrom });
   }
   return {
+    ...(failed ? { failed } : {}),
     actionCount: state.actionCount,
     names: [state.players[0].name, state.players[1].name],
     plays,

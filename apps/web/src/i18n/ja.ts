@@ -1296,6 +1296,7 @@ export default {
   'judge.playsOnlyChoices': '選択と回答のみ',
   'judge.playsLoading': 'プレイを読み込み中…',
   'judge.playsNone': 'プレイが見つかりません。',
+  'judge.playsFailed': 'この対戦はプレイ #{n}（全{total}件）までしか再現できませんでした：次のプレイがエンジンに拒否されました（「{why}」）。対戦後にカードが変更された可能性があります。以降のプレイはここに表示されません。',
   'judge.playsMore': 'さらに{n|#件}表示',
   'judge.playsTurn': 'ターン {n}',
   'judge.playsEffect': '{name} の効果：',

@@ -4,6 +4,7 @@ import {
   actionFromView,
   applyAction,
   type BotLevel,
+  type CardEngineText,
   chooseBotAction,
   chooseSimpleBotAction,
   createGame,
@@ -76,6 +77,11 @@ export interface ReplayFile {
   names: [string, string];
   deckIds: [string, string];
   actions: Action[];
+  /**
+   * Partidas online: os textos para o motor fixados no começo da partida (número da carta → texto).
+   * Refazer o replay com eles dá a mesma partida mesmo depois de um texto mudar; sem o campo, os de agora.
+   */
+  engineTexts?: Record<string, CardEngineText>;
 }
 
 interface Entry {

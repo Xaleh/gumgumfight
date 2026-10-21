@@ -208,6 +208,8 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
     version: room.data.replayVersion ?? 8,
     names: room.data.seats.map((s) => s.name),
     deckIds: room.data.seats.map((s) => s.deckId),
+    // Os textos para o motor do começo da partida: quem refaz o replay depois joga com as mesmas cartas.
+    engineTexts: room.data.engineTexts ?? {},
   };
   const ids = [...new Set(replay.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
   const cards = getCards(db, ids) as CardData[];

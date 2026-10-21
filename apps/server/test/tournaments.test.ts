@@ -6,7 +6,7 @@ import { proxiedImageUrl } from '../src/card-images';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
 import { listFinished, registerPlayer } from '../src/tournaments/store';
-import { listReports } from '../src/reports/store';
+import { listReports, matchReplay } from '../src/reports/store';
 import type { Lobby } from '../src/online/lobby';
 import type { Connection } from '../src/online/room';
 import { seed } from '../src/seed';
@@ -1406,6 +1406,40 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     await app.close();
   });
 
+  it('as jogadas do Judge vêm da própria mesa: uma carta mudar no banco no meio da partida não quebra a lista', async () => {
+    const { db, app } = setup();
+    const { org, t, who, lobby } = await arena(app, db);
+    const view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
+    const m = view.rounds[0].matches[0];
+    const a = who(m.p1.userId);
+    const seatA = (await play(app, t.id, a, m)).json();
+    await play(app, t.id, who(m.p2.userId), m);
+    const room = lobby.get(seatA.roomId)!;
+    while (room.state!.phase !== 'main') {
+      const p = actingPlayer(room.state!)!;
+      expect(room.act(p, room.state!.actionCount, legalActions(room.state!, p)[0]).ok).toBe(true);
+    }
+    const first = room.state!.activePlayer;
+    expect(room.act(first, room.state!.actionCount, { type: 'endTurn', player: first }).ok).toBe(true);
+    // As cartas da partida mudam no banco (texto corrigido, spoiler trocado pela oficial…): refazer a partida
+    // com elas daria outra mesa. Aqui elas somem de vez, o caso extremo.
+    (room as unknown as { deps: { cards: () => CardData[] } }).deps.cards = () => [];
+    const base = `/api/tournaments/${t.id}/matches/${m.id}`;
+    const res = await req(app, 'GET', `${base}/plays`, org);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().plays).toHaveLength(room.state!.actionCount);
+    expect(res.json().plays.at(-1)).toMatchObject({ action: { type: 'endTurn' }, logFrom: expect.any(Number) });
+    // O chamado com a jogada apontada também.
+    expect((await req(app, 'POST', `${base}/call`, a, { reason: 'stuck', logIndex: room.state!.log.length - 1 })).statusCode).toBe(200);
+    expect((await req(app, 'GET', `${base}/call`, org)).json().call).toMatchObject({ play: room.state!.actionCount - 1 });
+    // E as jogadas seguintes entram na lista conforme a mesa anda.
+    expect((await req(app, 'POST', `${base}/resume`, org, { outcome: 'no_issue' })).statusCode).toBe(204);
+    const p = room.state!.activePlayer;
+    expect(room.act(p, room.state!.actionCount, { type: 'endTurn', player: p }).ok).toBe(true);
+    expect((await req(app, 'GET', `${base}/plays`, org)).json().plays).toHaveLength(room.state!.actionCount);
+    await app.close();
+  });
+
   it('chamado com o motivo e a jogada apontada pelo jogador; o Judge fecha com um desfecho pronto e o erro do app vira um relato de ajuste', async () => {
     const { db, app } = setup();
     const { org, t, who, lobby } = await arena(app, db);
@@ -1460,6 +1494,8 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     expect(reports[0].text).toContain('encerrou o turno');
     expect(reports[0].text).toContain('O Judge voltou 1 jogada(s).');
     expect((await req(app, 'GET', `/api/tournaments/${t.id}/incidents`, org)).json().calls[0].reportId).toBe(reports[0].id);
+    // O replay gravado leva os textos para o motor do começo da partida (refazê-lo depois dá a mesma partida).
+    expect(matchReplay(db, reports[0].matchId)).toMatchObject({ engineTexts: room.data.engineTexts ?? {} });
     await app.close();
   });
 

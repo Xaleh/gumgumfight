@@ -1296,6 +1296,7 @@ export default {
   'judge.playsOnlyChoices': 'Only choices and answers',
   'judge.playsLoading': 'Loading the plays…',
   'judge.playsNone': 'No plays found.',
+  'judge.playsFailed': 'This match could only be replayed up to play #{n} of {total}: the engine refused the next one ("{why}"). A card from the match probably changed after the game; the following plays are not shown here.',
   'judge.playsMore': 'Show {n|# more play|# more plays}',
   'judge.playsTurn': 'Turn {n}',
   'judge.playsEffect': 'Effect of {name}:',

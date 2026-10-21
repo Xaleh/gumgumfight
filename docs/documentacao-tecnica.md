@@ -535,7 +535,7 @@ baixadas quando tocam) + `public/`.
 | `broadcasts` | `user_id` | `key` (único: segredo do link do OBS, guardado como está para o streamer copiar de novo), `room_id` (partida na transmissão), opções `delay_s` (0–600), `hands_players`, `hands_own`, `delay_tournaments`, `chat` (0/1), `rev` (sobe a cada troca), `updated_at` | `/api/broadcast/*` |
 | `players` | `id` (`p-` + 12 hex) | `owner_hash` (único: `sha256(navegador)` ou `user:<id>`), `name` (público, "Pirata XXXX"), `bounty` (Beries), `ranked_games` | primeira partida/consulta, ranqueada, `PUT /api/players/me` |
 | `deck_lists` | `hash` (16 hex) | `leader`, `cards` (JSON) — lista **exata** e imutável usada numa partida | gravação de partida |
-| `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON)**, `created_at` | gravação de partida |
+| `matches` | `id` autoincrement | `seed`, `mode`, `deck0`, `deck1`, `winner`, `turns`, `reason`, `format`, `queue`, `first_player`, **`replay` (JSON; nas online, com os `engineTexts` do começo da partida, para refazê-la depois com as mesmas regras)**, `created_at` | gravação de partida |
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
@@ -1062,8 +1062,9 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
     aberta antes dela, completa: as opções que havia, as cartas vistas, a carta da Vida; `lines` = as linhas do log que
     ela gerou, com as secretas; `by` = o Judge que respondeu no lugar do jogador, de `RoomData.answeredBy`), o `pending`
     de agora, `names` e `cards`/`defs` (uid → número e o texto só das cartas citadas). **Nunca vai a seed** (com ela daria
-    para prever o deck). O caminho refeito fica em memória (`playsCache`, apagado pelo `rebuild`): a próxima chamada só
-    avança as ações novas.
+    para prever o deck). As jogadas são registradas pela própria mesa, enquanto ela anda (`rebuild` e `commit`), e não
+    refeitas depois: refazer a partida com as cartas como estão no banco naquele momento podia dar outra mesa (uma carta
+    corrigida no meio do jogo) e o motor recusava uma jogada gravada ("Aguardando o outro jogador.").
   - `POST …/matches/:m/undo {seq, to, note}`: `Room.judgeUndo` corta `actions`/`timeline` nas primeiras `to` e chama
     `rebuild()` (mesmos apelidos, mesma seed: refazer a jogada dá o mesmo resultado, inclusive compras e embaralhamentos).
     O relógio fica como está. Os clientes recebem o estado com `actionCount` menor e o log encolhe sozinho
