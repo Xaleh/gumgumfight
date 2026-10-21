@@ -584,9 +584,9 @@ interface BoardProps extends BoardHandlers {
   bannerExtra?: (player: PlayerId) => ReactNode;
   /**
    * Visão do Streamer: as mãos ficam minimizadas (pilha de versos com a conta) e abrem num leque
-   * grande só quando clicadas (`open` = de quem é o leque aberto).
+   * grande só quando clicadas (`open` = de quem são os leques abertos; as duas podem ficar abertas).
    */
-  miniHands?: { open: PlayerId | null; canOpen: boolean; onToggle: (player: PlayerId) => void };
+  miniHands?: { open: readonly PlayerId[]; canOpen: boolean; onToggle: (player: PlayerId) => void };
   /** Visão do Streamer: a Vida grande na lateral do campo (ver `PlayerSide`). */
   lifeAside?: boolean;
 }
@@ -619,7 +619,7 @@ export function Board({
         state={state}
         player={player}
         position={position}
-        open={miniHands.open === player}
+        open={miniHands.open.includes(player)}
         canOpen={miniHands.canOpen}
         onToggle={() => miniHands.onToggle(player)}
       />

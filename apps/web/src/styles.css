@@ -11718,6 +11718,17 @@ a.sponsor-card:hover {
 .game.streamer.with-panel {
   grid-template-columns: minmax(0, 1fr) 380px;
 }
+/*
+ * O leque da mão do jogador da direita vaza da mesa: fica por trás do painel. A mesa vira um contexto
+ * de empilhamento (o z-index do leque vale só dentro dela) e o painel, que vem depois, fica por cima.
+ * Os modais da mesa ficam dentro dela (absolutos), então nada da mesa precisa cobrir o painel.
+ */
+.game.streamer .board-col {
+  isolation: isolate;
+}
+.game.streamer .side-panel {
+  position: relative;
+}
 .round-btn.log-btn.on {
   background: var(--blue);
 }
@@ -11887,20 +11898,26 @@ a.sponsor-card:hover {
  * com a câmera perpendicular a ela (sem perspectiva). O HUD (menu, histórico, etiquetas, faixas,
  * contadores e as pílulas das mãos) fica nas linhas de cima e de baixo, fora da mesa; os leques das
  * mãos abertas ficam nas bordas da tela.
- * Todas as cartas do mesmo tamanho (`--cw`), medido pela altura: uma coluna de 5 Personagens abaixo
- * da fileira de Vida. A mesa não tem borda: o playmat ocupa a tela toda, como se fosse maior que ela.
+ * Todas as cartas do mesmo tamanho (`--cw`), medido pela altura da coluna do Líder (a Vida no alto,
+ * ao lado do 1º Personagem). A mesa não tem borda: o playmat ocupa a tela toda, como se fosse maior que ela.
  */
 .game.streamer.lateral .mat {
   --hud-h: 54px;
-  --lat-h: calc(100cqh - 2 * var(--hud-h) - 40px);
+  --lat-h: calc(100cqh - 2 * var(--hud-h) - 12px);
+  /* espaço entre dois Personagens: cabe a ponta de um Personagem virado (em pé) sem encostar no vizinho */
+  --cgap: calc(var(--cw) * 0.4);
   /*
    * Pela altura: a coluna do Líder (Líder na altura do 3º Personagem, a folga do Líder virado com DON!!,
-   * o Stage e o deck) mede 7.71 cartas, mais o respiro das pontas (0.6) e o da mesa (28px).
+   * o Stage e o deck) mede 6.85 cartas, mais o respiro das pontas (0.4) e o da mesa (16px).
+   * Pela largura: as duas metades (3 cartas deitadas e os dois espaços mínimos) e a faixa central.
    */
-  --cw: max(38px, min(calc((var(--lat-h) - 28px) / 8.31), calc((100cqw - 120px) / 13.6), 150px));
-  /* espaçamentos de cada lado: cost area → Líder e Líder → Personagens (crescem até o limite com a tela larga) */
-  --g1: calc(var(--cw) * 0.7);
-  --g2: calc(var(--cw) * 0.55);
+  --cw: max(38px, min(calc((var(--lat-h) - 16px) / 7.25), calc((100cqw - 132px) / 14.4), 160px));
+  /*
+   * espaçamentos de cada lado: cost area → Líder e Líder → Personagens (crescem até o limite com a tela
+   * larga). Iguais, para a coluna do Líder ficar no meio da metade; cabem a ponta da fileira de Vida e o nome da área.
+   */
+  --g1: var(--cw);
+  --g2: var(--g1);
   --ch: calc(var(--cw) * 1.396);
   --hcw: var(--cw);
   width: 100%;
@@ -11976,7 +11993,7 @@ a.sponsor-card:hover {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: 14px 18px;
+  padding: 8px 18px;
 }
 
 /* ---- cada lado: [cost area] [Líder] [Personagens]; o da direita girado 180° ---- */
@@ -11985,7 +12002,7 @@ a.sponsor-card:hover {
   height: 100%;
   width: 100%;
   /* as pontas (deck de DON!! e Vida de um lado; descarte e deck do outro) ficam dentro da mesa, com margem */
-  padding: calc(var(--cw) * 0.3) 0;
+  padding: calc(var(--cw) * 0.2) 0;
   box-sizing: border-box;
   display: grid;
   /* os espaços entre as colunas crescem com a tela, até um limite; a sobra fica nas pontas */
@@ -12168,12 +12185,13 @@ a.sponsor-card:hover {
   cursor: pointer;
 }
 
-/* Vida: fileira deitada no alto, à direita do deck de DON!!, com a conta */
+/* Vida: fileira deitada no alto da coluna do Líder (centrada nela, ao lado do 1º Personagem), com a conta */
 .lat-life {
   --lstep: min(calc(var(--cw) * 0.45), calc(var(--cw) * 1.1 / max(var(--n) - 1, 1)));
   position: absolute;
-  left: calc(var(--ch) + var(--g1));
-  top: calc(var(--cw) * 0.3);
+  /* a fileira cheia mede ch + 1.1 cartas; a coluna do Líder fica no meio da metade (espaços iguais) */
+  left: calc(50% - (var(--ch) + var(--cw) * 1.1) / 2);
+  top: calc(var(--cw) * 0.2);
   width: calc(var(--ch) + (var(--n) - 1) * var(--lstep));
   height: var(--cw);
   z-index: 2;
@@ -12215,13 +12233,14 @@ a.sponsor-card:hover {
   position: relative;
   display: grid;
   grid-template-rows:
-    /* o topo do 3º Personagem: a fileira de Vida (1.25) e dois Personagens com o espaço entre eles (1.18) */
-    calc(var(--cw) * (1.25 + 2 * 1.18))
+    /* o topo do 3º Personagem: dois Personagens com o espaço entre eles (a Vida fica no alto deste espaço) */
+    calc(2 * (var(--cw) + var(--cgap)))
     var(--cw)
     /* folga para o Líder virado (em pé) e os DON!! anexados não cobrirem o Stage */
-    minmax(calc(var(--cw) * 0.8), 1fr)
+    minmax(calc(var(--cw) * 0.75), 7.5fr)
     var(--cw)
-    minmax(calc(var(--cw) * 0.3), 1fr)
+    /* as folgas na proporção dos mínimos: com `1fr` nas duas, a medida da metade conta 0.75 também aqui e ela vaza da mesa */
+    minmax(calc(var(--cw) * 0.3), 3fr)
     var(--cw);
   min-height: 0;
 }
@@ -12253,6 +12272,14 @@ a.sponsor-card:hover {
 .lat-stage > .field-card,
 .lat-slot > .field-card {
   rotate: 90deg;
+}
+/* o Líder um pouco maior que as outras cartas, para se destacar (o espaço dele continua do tamanho das outras) */
+.lat-leader {
+  --lw: calc(var(--cw) * 1.1);
+}
+.lat-leader > .field-card {
+  --cw: var(--lw);
+  --ch: calc(var(--lw) * 1.396);
 }
 .lat-leader > .field-card > .card.rested,
 .lat-stage > .field-card > .card.rested,
@@ -12320,17 +12347,13 @@ a.sponsor-card:hover {
   height: var(--cw);
 }
 
-/* Personagens: coluna de 5, abaixo da fileira de Vida, encostada no meio da mesa */
+/* Personagens: coluna de 5, do alto da mesa, encostada no meio dela */
 .lat-chars {
   position: relative;
-  padding-top: calc(var(--cw) * 1.25);
   display: grid;
   grid-template-rows: repeat(5, var(--cw));
-  row-gap: calc(var(--cw) * 0.18);
+  row-gap: var(--cgap);
   align-content: start;
-}
-.lat-chars > .lat-label {
-  top: calc(var(--cw) * 1.25);
 }
 .lat-slot {
   position: relative;
@@ -12403,29 +12426,35 @@ a.sponsor-card:hover {
   height: 0;
   overflow: visible;
 }
+/*
+ * Uma fileira só, que sempre cabe na altura da tela (menos as linhas do HUD, de 54px): até ~8 cartas o
+ * passo é o de sempre (0.82 carta); com mais, as cartas se sobrepõem mais e o arco abre menos (até ±35°).
+ */
 .hand-fan.left .hand-card,
 .hand-fan.right .hand-card {
-  top: calc(var(--o) * var(--hcw) * 0.82 - var(--hcw) * 0.698);
+  --step: min(calc(var(--hcw) * 0.82), calc((100cqh - 2 * 54px - var(--hcw) * 1.3) / max(var(--n) - 1, 1)));
+  --ang: min(7deg, calc(70deg / max(var(--n) - 1, 1)));
+  top: calc(var(--o) * var(--step) - var(--hcw) * 0.698);
   transform-origin: 50% 50%;
   transition: transform 0.18s, left 0.18s, right 0.18s;
 }
 .hand-fan.left .hand-card {
   left: calc(var(--hcw) * -0.36);
-  transform: rotate(calc(90deg + var(--o) * 7deg));
+  transform: rotate(calc(90deg + var(--o) * var(--ang)));
 }
 .hand-fan.right .hand-card {
   left: auto;
   right: calc(var(--hcw) * -0.36);
-  transform: rotate(calc(-90deg - var(--o) * 7deg));
+  transform: rotate(calc(-90deg - var(--o) * var(--ang)));
 }
-/* no hover a carta sobe um pouco, como se começasse a ser puxada da mão */
+/* no hover a carta é puxada da mão para a mesa, por cima das vizinhas, e aparece inteira */
 @media (hover: hover) {
   .hand-fan.left .fan-hand .hand-card:hover {
-    transform: translateX(calc(var(--hcw) * 0.28)) rotate(calc(90deg + var(--o) * 7deg));
+    transform: translateX(calc(var(--hcw) * 0.5)) rotate(calc(90deg + var(--o) * var(--ang))) scale(1.05);
     z-index: 50;
   }
   .hand-fan.right .fan-hand .hand-card:hover {
-    transform: translateX(calc(var(--hcw) * -0.28)) rotate(calc(-90deg - var(--o) * 7deg));
+    transform: translateX(calc(var(--hcw) * -0.5)) rotate(calc(-90deg - var(--o) * var(--ang))) scale(1.05);
     z-index: 50;
   }
 }
