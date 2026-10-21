@@ -296,6 +296,10 @@ export function claimBrowserData(db: DB, browserHash: string, userId: string): {
     const decks = Number(
       db.prepare("UPDATE decks SET owner_hash = ? WHERE owner_hash = ? AND kind = 'user'").run(account, browserHash).changes,
     );
+    db.prepare(
+      'INSERT OR IGNORE INTO deck_favorites (owner_hash, deck_id, created_at) SELECT ?, deck_id, created_at FROM deck_favorites WHERE owner_hash = ?',
+    ).run(account, browserHash);
+    db.prepare('DELETE FROM deck_favorites WHERE owner_hash = ?').run(browserHash);
     const anon = db.prepare('SELECT id FROM players WHERE owner_hash = ?').get(browserHash) as { id: string } | undefined;
     if (anon) {
       const mine = db.prepare('SELECT id FROM players WHERE owner_hash = ?').get(account) as { id: string } | undefined;

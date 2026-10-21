@@ -40,6 +40,43 @@ export interface DeckSummary {
   deckHash?: string;
   /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
   mine: boolean;
+  /** Favorito seu (da conta ou, sem login, deste navegador); servidores antigos não mandam. */
+  favorite?: boolean;
+  /** Partidas jogadas com o deck por pessoas (não pelo robô); servidores antigos não mandam. */
+  games?: number;
+  /** Sua última partida com o deck (null = nunca jogou). */
+  lastPlayedAt?: string | null;
+}
+
+/** Deck com a mesma lista que o construtor tentou salvar (resposta 409 `deckDuplicate`). */
+export interface DeckDuplicate {
+  id: string;
+  name: string;
+  kind: DeckSummary['kind'];
+  mine: boolean;
+}
+
+/** Limpeza de decks (Admin/Dev): cópias idênticas, rascunhos abandonados e decks sem uso. */
+export type DeckCleanupKind = 'dupes' | 'drafts' | 'idle';
+export interface DeckCleanupRow {
+  id: string;
+  name: string;
+  kind: DeckSummary['kind'];
+  owner: 'account' | 'browser' | null;
+  ownerName: string | null;
+  size: number;
+  games: number;
+  lastPlayedAt: string | null;
+  updatedAt: string;
+  /** Fica (o original do grupo ou um deck pronto). */
+  keep: boolean;
+}
+export interface DeckCleanup {
+  kind: DeckCleanupKind;
+  userDecks: number;
+  counts: Record<DeckCleanupKind, number>;
+  rules: { draftMaxCards: number; draftDays: number; idleDays: number };
+  groups: Array<{ leader: string; leaderName: string | null; colors: string[]; rows: DeckCleanupRow[] }>;
 }
 
 /**
@@ -446,7 +483,11 @@ export const api = {
   saveEngineText: (id: string, text: string, trigger: string) =>
     send<EngineTextDetail>('PUT', `/api/dev/engine-texts/${encodeURIComponent(id)}`, { text, trigger }),
   removeEngineText: (id: string) => send<EngineTextDetail>('DELETE', `/api/dev/engine-texts/${encodeURIComponent(id)}`),
-  createDeck: (d: DeckInput) => send<DeckSummary>('POST', '/api/decks', d),
+  /** `checkDuplicate`: responde 409 `deckDuplicate` (com `duplicate`) quando já existe um deck com a mesma lista. */
+  createDeck: (d: DeckInput, opts: { checkDuplicate?: boolean } = {}) => send<DeckSummary>('POST', '/api/decks', { ...d, ...opts }),
+  favoriteDeck: (id: string, favorite: boolean) => send<{ id: string; favorite: boolean }>('PUT', `/api/decks/${encodeURIComponent(id)}/favorite`, { favorite }),
+  deckCleanup: (kind: DeckCleanupKind) => get<DeckCleanup>(`/api/admin/decks/cleanup?kind=${kind}`),
+  deleteDecks: (ids: string[]) => send<{ deleted: number }>('POST', '/api/admin/decks/delete', { ids }),
   updateDeck: (id: string, d: DeckInput) => send<DeckSummary>('PUT', `/api/decks/${encodeURIComponent(id)}`, d),
   /** Só o nome: o dono ou um admin/dev (em decks de outros jogadores). */
   renameDeck: (id: string, name: string) => send<DeckSummary>('PUT', `/api/decks/${encodeURIComponent(id)}/name`, { name }),

@@ -253,14 +253,40 @@ describe('perfis (player, streamer, admin)', () => {
     const full = (await a.inject({ url: `/api/decks/${deck.id}`, headers: zoro.cookie })).json();
     expect(full.deck).toMatchObject({ name: 'Zoro Santoryu', mine: true });
     expect(full.summary.size).toBe(50);
-    // O admin continua sem poder mudar as cartas nem apagar.
+    // O admin continua sem poder mudar as cartas.
     expect((await a.inject({ method: 'PUT', url: `/api/decks/${deck.id}`, headers: nami.cookie, payload: { name: 'x', leader: 'ST01-001', cards: [] } })).statusCode).toBe(403);
-    expect((await a.inject({ method: 'DELETE', url: `/api/decks/${deck.id}`, headers: nami.cookie })).statusCode).toBe(403);
 
     // O dono também usa a rota; o Dev tem o mesmo poder do admin.
     expect((await rename('Meu Zoro', zoro.cookie)).json().name).toBe('Meu Zoro');
     await a.inject({ method: 'PUT', url: `/api/admin/users/${nami.res.json().user.id}/role`, headers: nami.cookie, payload: { role: 'dev' } });
     expect((await rename('Zoro (Dev)', nami.cookie)).json().name).toBe('Zoro (Dev)');
+  });
+
+  it('admin e dev apagam decks de outros jogadores; o player não; deck pronto ninguém apaga', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const nami = await login(a, {});
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    const usopp = await login(a, { sub: '3003', email: 'usopp@example.com', name: 'Usopp' });
+    const create = async (name: string) =>
+      (await a.inject({ method: 'POST', url: '/api/decks', headers: zoro.cookie, payload: { name, leader: 'ST01-001', cards: luffy.cards } })).json().id as string;
+    const del = (id: string, headers: Record<string, string>) => a.inject({ method: 'DELETE', url: `/api/decks/${id}`, headers });
+    const exists = async (id: string) => (await a.inject({ url: `/api/decks/${id}` })).statusCode === 200;
+
+    const first = await create('Cópia 1');
+    expect((await del(first, usopp.cookie)).statusCode).toBe(403);
+    expect((await del(first, BROWSER)).statusCode).toBe(403);
+    expect((await del('st01-luffy', nami.cookie)).statusCode).toBe(403);
+    expect(await exists(first)).toBe(true);
+
+    // O admin apaga o deck do Zoro.
+    expect((await del(first, nami.cookie)).statusCode).toBe(204);
+    expect(await exists(first)).toBe(false);
+
+    // O Dev também.
+    const second = await create('Cópia 2');
+    await a.inject({ method: 'PUT', url: `/api/admin/users/${nami.res.json().user.id}/role`, headers: nami.cookie, payload: { role: 'dev' } });
+    expect((await del(second, nami.cookie)).statusCode).toBe(204);
+    expect(await exists(second)).toBe(false);
   });
 
   it('e-mail não verificado pelo Google não vira admin', async () => {
