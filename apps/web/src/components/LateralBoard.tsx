@@ -23,13 +23,13 @@ export interface LateralBoardProps extends BoardHandlers {
   /** Faixa central (turno, batalha, mensagens), na vertical. */
   center: ReactNode;
   bannerExtra?: (player: PlayerId) => ReactNode;
-  miniHands: { open: PlayerId | null; canOpen: boolean; onToggle: (player: PlayerId) => void };
+  miniHands: { open: readonly PlayerId[]; canOpen: boolean; onToggle: (player: PlayerId) => void };
 }
 
 export function LateralBoard({ state, left, corner, center, bannerExtra, miniHands, ...h }: LateralBoardProps) {
   const right = (left === 0 ? 1 : 0) as PlayerId;
   const mini = (player: PlayerId, position: 'top' | 'bottom') => (
-    <MiniHand state={state} player={player} position={position} open={miniHands.open === player} canOpen={miniHands.canOpen} onToggle={() => miniHands.onToggle(player)} />
+    <MiniHand state={state} player={player} position={position} open={miniHands.open.includes(player)} canOpen={miniHands.canOpen} onToggle={() => miniHands.onToggle(player)} />
   );
   return (
     <div className="mat lateral">
