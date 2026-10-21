@@ -6,7 +6,6 @@ import {
   ApiError,
   canPlay,
   currentSpoilerSet,
-  deckGroups,
   type DeckSummary,
   type FormatId,
   modeLabel,
@@ -29,6 +28,8 @@ import { Icon, type IconName } from './Icons';
 import { InstallBanner } from './Install';
 import { LearnBanner } from './LearnBanner';
 import { LeaderArt } from './LeaderArt';
+import { DeckPicker, RANDOM_DECK } from './DeckPicker';
+import { useFavoriteToggle } from './DeckTile';
 import { LeaderPicker, QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
 import { ReplayLoader } from './ReplayLoader';
 import { SupportersList, SupportModal } from './Support';
@@ -91,7 +92,7 @@ function savedFormat(): FormatId {
   }
 }
 
-const RANDOM = 'random';
+const RANDOM = RANDOM_DECK;
 
 /** Arte do Líder do deck (ou o "?" do sorteio). */
 function DeckArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
@@ -102,87 +103,6 @@ function DeckArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
       colors={deck?.colors}
       size={small ? 'small' : undefined}
     />
-  );
-}
-
-function DeckPicker({
-  title,
-  decks,
-  value,
-  mode,
-  anyValid,
-  allowRandom,
-  onPick,
-  onClose,
-}: {
-  title: string;
-  decks: DeckSummary[];
-  value: string;
-  /** Regras em que o deck vai jogar (os que não valem nelas aparecem marcados). */
-  mode: PlayMode;
-  /** Deck equipado: qualquer deck completo pode ser escolhido (ele vale em modos diferentes, o Livre inclusive). */
-  anyValid?: boolean;
-  allowRandom?: boolean;
-  onPick: (id: string) => void;
-  onClose: () => void;
-}) {
-  const t = useT();
-  const body = useRef<HTMLDivElement>(null);
-  // Ao abrir, a folha mostra o deck já escolhido (a lista pode ser longa).
-  useEffect(() => {
-    const b = body.current;
-    const on = b?.querySelector<HTMLElement>('.deck-pick.on');
-    if (!b || !on) return;
-    // Rola só a folha (não a página atrás dela), e só se o deck está fora da parte visível.
-    const top = on.getBoundingClientRect().top - b.getBoundingClientRect().top;
-    if (top + on.offsetHeight > b.clientHeight) b.scrollTop = top - (b.clientHeight - on.offsetHeight) / 2;
-  }, []);
-  return (
-    <div className="modal-backdrop sheet-backdrop page-sheet" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-head">
-          <h3>{title}</h3>
-          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
-            ✕
-          </button>
-        </div>
-        <div className="sheet-body" ref={body}>
-          {allowRandom && (
-            <div className="picker-grid">
-              <button className={['deck-pick', value === RANDOM ? 'on' : ''].join(' ')} onClick={() => onPick(RANDOM)}>
-                <DeckArt small />
-                <span className="name">{t('menu.randomDeck')}</span>
-              </button>
-            </div>
-          )}
-          {deckGroups(decks)
-            .filter(([, list]) => list.length)
-            .map(([label, list]) => (
-              <div key={label} className="picker-group">
-                <label className="sheet-label">{t(label)}</label>
-                <div className="picker-grid">
-                  {list.map((d) => (
-                    <button
-                      key={d.id}
-                      className={['deck-pick', d.id === value ? 'on' : ''].join(' ')}
-                      disabled={anyValid ? !d.valid : !canPlay(d, mode.format, spoilerRule(mode))}
-                      onClick={() => onPick(d.id)}
-                      title={whyNotPlayable(d, mode.format, anyValid ? 'all' : spoilerRule(mode)) ?? d.name}
-                    >
-                      <DeckArt deck={d} small />
-                      <span className="name">{d.name}</span>
-                      {!d.valid && <span className="muted small">{d.size}/50</span>}
-                      {d.valid && !canPlay(d, mode.format, anyValid ? 'all' : spoilerRule(mode)) && (
-                        <span className="muted small">{t('menu.notAllowedShort', { format: modeLabel(mode) })}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -367,7 +287,8 @@ export function Menu({
 }: {
   onStart: (s: GameSetup) => void;
   onOnline: (s: OnlineSeat) => void;
-  onBuildDecks: () => void;
+  /** Construtor de decks (com `deckId`: já abre esse deck). */
+  onBuildDecks: (deckId?: string) => void;
   /** Tutorial "Aprender a jogar". */
   onLearn: () => void;
   /** Cobertura das cartas (só para Dev). */
@@ -393,6 +314,7 @@ export function Menu({
   const [error, setError] = useState<MessageKey | null>(null);
   /** Erro de uma ação dos modos (fila, sala, bot). */
   const [actionError, setActionError] = useState<string | null>(null);
+  const toggleFavorite = useFavoriteToggle(setDecks, setActionError);
   const [showSettings, setShowSettings] = useState(false);
   const [showTests, setShowTests] = useState(false);
   const [showReplay, setShowReplay] = useState(false);
@@ -658,7 +580,7 @@ export function Menu({
   const nav: NavItem[] = [
     { key: 'play', label: t('menu.navPlay'), icon: 'swords', current: true, onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
     { key: 'learn', label: t('menu.navLearn'), icon: 'learn', onClick: onLearn },
-    { key: 'builder', label: t('menu.navDecks'), icon: 'deck', onClick: onBuildDecks },
+    { key: 'builder', label: t('menu.navDecks'), icon: 'deck', onClick: () => onBuildDecks() },
     { key: 'tournaments', label: t('menu.navTournaments'), icon: 'crown', onClick: () => onTournaments() },
     { key: 'watch', label: t('menu.navWatch'), icon: 'eye', onClick: onWatch },
     { key: 'stats', label: t('menu.navStats'), icon: 'chart', onClick: onStats },
@@ -820,7 +742,7 @@ export function Menu({
                 </button>
               ))}
             </div>
-            <button type="button" className="text-link" onClick={onBuildDecks}>
+            <button type="button" className="text-link" onClick={() => onBuildDecks()}>
               {t('menu.navDecks')}
             </button>
           </div>
@@ -1070,10 +992,12 @@ export function Menu({
       {picking !== null && (
         <DeckPicker
           title={picking === 0 ? t('menu.equippedDeck') : t('menu.opponentDeck')}
+          context={picking === 0 ? t('decks.context.equipped') : t('decks.context.bot', { rules: modeLabel(botMode) })}
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
-          mode={picking === 0 ? { format, spoilers: true } : botMode}
-          anyValid={picking === 0}
+          // Deck equipado: qualquer deck completo (ele vale em modos diferentes, o Livre inclusive); cada modo confere as regras.
+          canUse={(d) => (picking === 0 ? d.valid : canPlay(d, botMode.format, spoilerRule(botMode)))}
+          whyNot={(d) => (picking === 0 ? whyNotPlayable(d, 'free') : whyNotPlayable(d, botMode.format, spoilerRule(botMode)))}
           allowRandom={picking === 1}
           onPick={(id) => {
             if (picking === 0) setDeck0(id);
@@ -1081,6 +1005,8 @@ export function Menu({
             setPicking(null);
           }}
           onClose={() => setPicking(null)}
+          onFavorite={toggleFavorite}
+          onEdit={(id) => onBuildDecks(id)}
         />
       )}
     </div>

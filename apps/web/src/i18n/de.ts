@@ -4,6 +4,7 @@ import type { Messages } from './pt-BR';
 import support from './support/de';
 import tutorial from './tutorial/de';
 import recap from './recap/de';
+import decks from './decks/de';
 
 export default {
   // ---- Allgemein ----
@@ -393,11 +394,12 @@ export default {
   // ---- Hinweise und Bestätigungen ----
   'deck.confirmDiscard': 'Ungespeicherte Änderungen an diesem Deck verwerfen?',
   'deck.confirmDelete': 'Deck „{name}“ löschen?',
+  'deck.confirmDeleteOther': 'Dieses Deck gehört einem anderen Spieler. „{name}“ für alle löschen?',
   'deck.noticeBuiltinEditing': 'Vorgefertigte Decks können nicht geändert werden: Du bearbeitest eine Kopie.',
   'deck.noticeCommunityEditing': 'Dieses Deck gehört einem anderen Spieler: Du bearbeitest deine eigene Kopie.',
   'deck.noticeBuiltinOpened': 'Vorgefertigtes Deck: Änderungen erstellen eine Kopie.',
   'deck.noticeCommunityOpened': 'Deck eines anderen Spielers: Änderungen erstellen deine eigene Kopie.',
-  'deck.noticeCommunityOpenedAdmin': 'Deck eines anderen Spielers: Als Admin kannst du den Namen korrigieren; Kartenänderungen erstellen deine eigene Kopie.',
+  'deck.noticeCommunityOpenedAdmin': 'Deck eines anderen Spielers: Als Admin kannst du den Namen korrigieren oder es löschen; Kartenänderungen erstellen deine eigene Kopie.',
   'deck.maxCopies': 'Höchstens {n|# Kopie|# Kopien} von {name}.',
   'deck.savedReady': 'Deck gespeichert und spielbereit!',
   'deck.savedDraft': 'Entwurf gespeichert. Vervollständige das Deck, um damit zu spielen.',
@@ -2687,4 +2689,5 @@ export default {
   ...support,
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
+  ...decks,
 } satisfies Messages;

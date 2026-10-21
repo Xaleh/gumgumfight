@@ -4,6 +4,7 @@ import type { Messages } from './pt-BR';
 import support from './support/en';
 import tutorial from './tutorial/en';
 import recap from './recap/en';
+import decks from './decks/en';
 
 export default {
   // ---- general ----
@@ -393,11 +394,12 @@ export default {
   // ---- notices and confirmations ----
   'deck.confirmDiscard': 'Discard the unsaved changes to this deck?',
   'deck.confirmDelete': 'Delete the deck "{name}"?',
+  'deck.confirmDeleteOther': 'This deck belongs to another player. Delete "{name}" for everyone?',
   'deck.noticeBuiltinEditing': 'Preset decks cannot be changed: you are editing a copy.',
   'deck.noticeCommunityEditing': 'This deck belongs to another player: you are editing your own copy.',
   'deck.noticeBuiltinOpened': 'Preset deck: changing it creates a copy.',
   'deck.noticeCommunityOpened': "Another player's deck: changing it creates your own copy.",
-  'deck.noticeCommunityOpenedAdmin': "Another player's deck: as an admin you can fix its name; changing the cards creates your own copy.",
+  'deck.noticeCommunityOpenedAdmin': "Another player's deck: as an admin you can fix its name or delete it; changing the cards creates your own copy.",
   'deck.maxCopies': 'Maximum of {n|# copy|# copies} of {name}.',
   'deck.savedReady': 'Deck saved and ready to play!',
   'deck.savedDraft': 'Draft saved. Complete the deck to play with it.',
@@ -2687,4 +2689,5 @@ export default {
   ...support,
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
+  ...decks,
 } satisfies Messages;

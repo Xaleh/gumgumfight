@@ -4,6 +4,7 @@ import type { Messages } from './pt-BR';
 import support from './support/ja';
 import tutorial from './tutorial/ja';
 import recap from './recap/ja';
+import decks from './decks/ja';
 
 export default {
   // ---- 全般 ----
@@ -393,11 +394,12 @@ export default {
   // ---- お知らせと確認 ----
   'deck.confirmDiscard': 'このデッキの未保存の変更を破棄しますか？',
   'deck.confirmDelete': 'デッキ「{name}」を削除しますか？',
+  'deck.confirmDeleteOther': 'このデッキは他のプレイヤーのものです。「{name}」を全員から削除しますか？',
   'deck.noticeBuiltinEditing': '構築済みデッキは変更できません。コピーを編集しています。',
   'deck.noticeCommunityEditing': 'このデッキは他のプレイヤーのものです。自分用のコピーを編集しています。',
   'deck.noticeBuiltinOpened': '構築済みデッキ：変更するとコピーが作成されます。',
   'deck.noticeCommunityOpened': '他のプレイヤーのデッキ：変更すると自分用のコピーが作成されます。',
-  'deck.noticeCommunityOpenedAdmin': '他のプレイヤーのデッキ：管理者として名前を修正できます。カードを変更すると自分用のコピーが作成されます。',
+  'deck.noticeCommunityOpenedAdmin': '他のプレイヤーのデッキ：管理者として名前の修正や削除ができます。カードを変更すると自分用のコピーが作成されます。',
   'deck.maxCopies': '{name}は最大{n|#枚}までです。',
   'deck.savedReady': 'デッキを保存しました。プレイできます！',
   'deck.savedDraft': '下書きを保存しました。デッキを完成させるとプレイできます。',
@@ -2687,4 +2689,5 @@ export default {
   ...support,
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
+  ...decks,
 } satisfies Messages;
