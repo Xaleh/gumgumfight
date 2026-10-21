@@ -48,7 +48,7 @@ import type { ApiCard } from '../present';
 import { isFormat, isPlayFormat, tierFor } from '../stats/catalog';
 import { ensurePlayer, findPlayer } from '../stats/store';
 import { listReports } from '../reports/store';
-import { getSponsor, publicSponsor } from '../support/sponsors';
+import { getSponsor, imageType, publicSponsor } from '../support/sponsors';
 import { pushText, roundName } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
 import {
@@ -84,11 +84,13 @@ import {
   actsAsJudge,
   addIntervention,
   addJudge,
+  addPrize,
   addWarning,
   checkInPlayer,
   createCall,
   countPlayers,
   createTournament,
+  deletePrize,
   deleteTournament,
   dropPlayer,
   finishTournament,
@@ -103,11 +105,16 @@ import {
   listJudges,
   listMatches,
   listPlayers,
+  listPrizes,
   listTournaments,
   listWarnings,
   markEntered,
+  MAX_PRIZE_IMAGE_BYTES,
+  MAX_PRIZES,
   openCall,
   myTournaments,
+  type PrizeInput,
+  prizeImage,
   quotaUsed,
   registerPlayer,
   reinstatePlayer,
@@ -122,14 +129,17 @@ import {
   setLateEntry,
   setMatchRoom,
   setMatchScore,
+  setPrizeImage,
   setReady,
   startRound,
   type Tournament,
   type TournamentInput,
   type TournamentMatch,
   type TournamentPlayer,
+  type TournamentPrize,
   tournamentsOf,
   unregisterPlayer,
+  updatePrize,
   updateTournament,
   vacateInMatch,
   warningStatus,
@@ -267,6 +277,44 @@ function parseInput(b: Body | undefined): ParsedInput | PlayerError {
     priority: Boolean(b.official) && Boolean(b.priority),
   };
 }
+
+type PrizeBody = { place?: unknown; title?: unknown; url?: unknown; image?: unknown };
+
+/** Valida um item da premiação: o que é (obrigatório), a colocação e o link do produto. */
+function parsePrize(b: PrizeBody | undefined): PrizeInput | PlayerError {
+  if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
+  const clean = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().replace(/\s+/g, ' ').slice(0, max) : null);
+  const title = clean(b.title, 120);
+  if (!title) return fail('prizeTitleRequired', 'Diga qual é o prêmio.');
+  const url = typeof b.url === 'string' && b.url.trim() ? b.url.trim().slice(0, 500) : null;
+  if (url && !/^https?:\/\/[^\s]+$/i.test(url)) return fail('prizeUrlInvalid', 'O link do produto precisa começar com http:// ou https://.');
+  return { place: clean(b.place, 40), title, url };
+}
+
+/**
+ * Foto do prêmio no corpo: `undefined` = não mexe; null = apaga; texto = PNG, JPEG ou WebP
+ * em base64 (ou data URL), conferida pelos primeiros bytes.
+ */
+function parsePrizeImage(raw: unknown): { data: Buffer; type: string } | null | undefined | PlayerError {
+  if (raw === undefined || raw === null) return raw;
+  if (typeof raw !== 'string') return fail('prizeImageType', 'Use uma foto PNG, JPEG ou WebP.');
+  const data = Buffer.from(raw.replace(/^data:[^,]*,/, ''), 'base64');
+  if (data.length > MAX_PRIZE_IMAGE_BYTES) {
+    const kb = Math.round(MAX_PRIZE_IMAGE_BYTES / 1024);
+    return fail('prizeImageSize', `A foto pode ter até ${kb} KB.`, { kb });
+  }
+  const type = imageType(data);
+  return type ? { data, type } : fail('prizeImageType', 'Use uma foto PNG, JPEG ou WebP.');
+}
+
+/** O que a página do torneio mostra de um prêmio. */
+const publicPrize = (tournamentId: string, p: TournamentPrize) => ({
+  id: p.id,
+  place: p.place,
+  title: p.title,
+  url: p.url,
+  imageUrl: p.imageType ? `/api/tournaments/${encodeURIComponent(tournamentId)}/prizes/${p.id}/image?v=${p.imageVersion}` : null,
+});
 
 /** Início do mês civil em Brasília (UTC−3, sem horário de verão desde 2019), em ISO. */
 export function monthStart(ms: number): string {
@@ -829,6 +877,9 @@ export function registerTournamentRoutes(
       official: t.official,
       prize: t.prize,
       sponsor: sponsorOf(t.sponsorId),
+      /** Premiação apresentada pelo organizador (colocação, prêmio, link do produto e foto). */
+      prizes: listPrizes(db, t.id).map((p) => publicPrize(t.id, p)),
+      maxPrizes: MAX_PRIZES,
       /** Inscrição antecipada: até esta hora só Almirantes se inscrevem. */
       priorityUntil: t.priorityUntil,
       priorityOpen: priorityOpen(t),
@@ -1268,6 +1319,69 @@ export function registerTournamentRoutes(
     if (!removeJudge(db, t.id, req.params.userId)) return reply.code(404).send(fail('judgeNotFound', 'Esta conta não é Judge do torneio.'));
     app.log.info(`torneio ${t.id}: ${req.params.userId} deixou de ser Judge (por ${me.id})`);
     return detail(getTournament(db, t.id)!, me);
+  });
+
+  // ---------------------------------------------------------------- premiação
+  //
+  // O organizador apresenta os prêmios na página do torneio (em qualquer fase: a foto da
+  // entrega pode vir depois do fim). A foto vai junto no corpo, em base64.
+
+  const PRIZE_BODY_LIMIT = Math.ceil((MAX_PRIZE_IMAGE_BYTES * 4) / 3) + 16 * 1024;
+
+  /** Novo item da premiação (`{ place, title, url, image }`). */
+  app.post<{ Params: { id: string }; Body: PrizeBody }>('/api/tournaments/:id/prizes', { bodyLimit: PRIZE_BODY_LIMIT }, async (req, reply) => {
+    const found = managed(req, reply);
+    if (!found) return reply;
+    const { t, me } = found;
+    const input = parsePrize(req.body);
+    if (isPlayerError(input)) return reply.code(400).send(input);
+    const image = parsePrizeImage(req.body?.image);
+    if (isPlayerError(image)) return reply.code(400).send(image);
+    if (listPrizes(db, t.id).length >= MAX_PRIZES) {
+      return reply.code(409).send(fail('prizeLimit', `A premiação tem até ${MAX_PRIZES} itens.`, { max: MAX_PRIZES }));
+    }
+    const prizeId = addPrize(db, t.id, input);
+    if (image) setPrizeImage(db, t.id, prizeId, image.data, image.type);
+    return reply.code(201).send(detail(t, me));
+  });
+
+  /** Edita um item; `image` ausente mantém a foto, null a apaga. */
+  app.put<{ Params: { id: string; prizeId: string }; Body: PrizeBody }>(
+    '/api/tournaments/:id/prizes/:prizeId',
+    { bodyLimit: PRIZE_BODY_LIMIT },
+    async (req, reply) => {
+      const found = managed(req, reply);
+      if (!found) return reply;
+      const { t, me } = found;
+      const input = parsePrize(req.body);
+      if (isPlayerError(input)) return reply.code(400).send(input);
+      const image = parsePrizeImage(req.body?.image);
+      if (isPlayerError(image)) return reply.code(400).send(image);
+      const prizeId = Number(req.params.prizeId);
+      if (!updatePrize(db, t.id, prizeId, input)) return reply.code(404).send(fail('prizeNotFound', 'Prêmio não encontrado.'));
+      if (image !== undefined) setPrizeImage(db, t.id, prizeId, image?.data ?? null, image?.type ?? null);
+      return detail(t, me);
+    },
+  );
+
+  app.delete<{ Params: { id: string; prizeId: string } }>('/api/tournaments/:id/prizes/:prizeId', async (req, reply) => {
+    const found = managed(req, reply);
+    if (!found) return reply;
+    const { t, me } = found;
+    if (!deletePrize(db, t.id, Number(req.params.prizeId))) return reply.code(404).send(fail('prizeNotFound', 'Prêmio não encontrado.'));
+    return detail(t, me);
+  });
+
+  app.get<{ Params: { id: string; prizeId: string } }>('/api/tournaments/:id/prizes/:prizeId/image', async (req, reply) => {
+    const img = prizeImage(db, req.params.id, Number(req.params.prizeId));
+    if (!img) return reply.code(404).send(fail('prizeNotFound', 'Prêmio não encontrado.'));
+    // A URL muda a cada nova foto (?v=), então pode ficar em cache por bastante tempo.
+    return reply
+      .header('content-type', img.type)
+      .header('cache-control', 'public, max-age=86400')
+      .header('x-content-type-options', 'nosniff')
+      .header('content-security-policy', "default-src 'none'")
+      .send(img.data);
   });
 
   // ---------------------------------------------------------------- modo manual do Judge

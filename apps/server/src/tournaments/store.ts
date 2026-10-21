@@ -1083,3 +1083,84 @@ export function warningStatus(
   const pending = limitReached && !p.dropped && Boolean(last) && (!p.warningsReviewedAt || last.givenAt > p.warningsReviewedAt);
   return { count: active.length, limitReached, pending };
 }
+
+// ------------------------------------------------------------------ premiação
+
+/** Itens da premiação por torneio. */
+export const MAX_PRIZES = 10;
+/** Tamanho máximo da foto de um prêmio (bytes; a tela reduz a foto antes de enviar). */
+export const MAX_PRIZE_IMAGE_BYTES = 500 * 1024;
+
+export interface TournamentPrize {
+  id: number;
+  /** Colocação (texto livre; null = sem colocação, ex.: um sorteio). */
+  place: string | null;
+  title: string;
+  /** Link do produto. */
+  url: string | null;
+  imageType: string | null;
+  imageVersion: number;
+}
+
+export interface PrizeInput {
+  place: string | null;
+  title: string;
+  url: string | null;
+}
+
+type PrizeRow = { id: number; place: string | null; title: string; url: string | null; image_type: string | null; image_version: number };
+
+const toPrize = (r: PrizeRow): TournamentPrize => ({
+  id: r.id,
+  place: r.place,
+  title: r.title,
+  url: r.url,
+  imageType: r.image_type,
+  imageVersion: r.image_version,
+});
+
+export function listPrizes(db: DB, tournamentId: string): TournamentPrize[] {
+  return (
+    db.prepare('SELECT id, place, title, url, image_type, image_version FROM tournament_prizes WHERE tournament_id = ? ORDER BY id').all(tournamentId) as PrizeRow[]
+  ).map(toPrize);
+}
+
+export function addPrize(db: DB, tournamentId: string, input: PrizeInput): number {
+  dataVersion.bump();
+  const r = db.prepare('INSERT INTO tournament_prizes (tournament_id, place, title, url) VALUES (?, ?, ?, ?)').run(tournamentId, input.place, input.title, input.url);
+  return Number(r.lastInsertRowid);
+}
+
+export function updatePrize(db: DB, tournamentId: string, id: number, input: PrizeInput): boolean {
+  dataVersion.bump();
+  return (
+    Number(
+      db.prepare('UPDATE tournament_prizes SET place = ?, title = ?, url = ? WHERE tournament_id = ? AND id = ?').run(input.place, input.title, input.url, tournamentId, id)
+        .changes,
+    ) > 0
+  );
+}
+
+export function deletePrize(db: DB, tournamentId: string, id: number): boolean {
+  dataVersion.bump();
+  return Number(db.prepare('DELETE FROM tournament_prizes WHERE tournament_id = ? AND id = ?').run(tournamentId, id).changes) > 0;
+}
+
+/** Troca (ou apaga, com null) a foto do prêmio; a versão muda a URL da imagem. */
+export function setPrizeImage(db: DB, tournamentId: string, id: number, image: Buffer | null, type: string | null): boolean {
+  dataVersion.bump();
+  return (
+    Number(
+      db
+        .prepare('UPDATE tournament_prizes SET image = ?, image_type = ?, image_version = image_version + 1 WHERE tournament_id = ? AND id = ?')
+        .run(image, type, tournamentId, id).changes,
+    ) > 0
+  );
+}
+
+export function prizeImage(db: DB, tournamentId: string, id: number): { data: Buffer; type: string } | null {
+  const r = db.prepare('SELECT image, image_type FROM tournament_prizes WHERE tournament_id = ? AND id = ?').get(tournamentId, id) as
+    | { image: Uint8Array | null; image_type: string | null }
+    | undefined;
+  return r?.image && r.image_type ? { data: Buffer.from(r.image), type: r.image_type } : null;
+}
