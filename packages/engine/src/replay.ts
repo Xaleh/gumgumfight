@@ -67,7 +67,8 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * declaração do ataque, no mesmo lote do "When your Leader … attacks"; a escolha da ordem que o roteiro
  * antigo não tem fica com a primeira opção, o efeito que antes resolvia primeiro.) Até a versão 12, "set up
  * to N of your DON!! cards as active" desvirava N sem perguntar (Cavendish EB01-012); a pergunta "quantos?"
- * é respondida com a quantidade máxima.
+ * é respondida com a quantidade máxima. Uma jogada que o motor de hoje recusa encerra a conversão: dali em
+ * diante o roteiro fica como estava, e quem o refaz para nela (o replay abre até ali).
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -153,13 +154,24 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     for (const u of p.options) if (uids.length < p.min && !uids.includes(u)) uids.push(u);
     return { ...a, uids };
   };
-  for (const a of actions) {
-    for (let i = implicit(a); i; i = implicit(a)) step(i);
-    if (state.phase === 'gameover') break;
-    if (!fits(a)) continue;
-    step(completed(a));
+  for (const [n, a] of actions.entries()) {
+    try {
+      for (let i = implicit(a); i; i = implicit(a)) step(i);
+      if (state.phase === 'gameover') break;
+      if (!fits(a)) continue;
+      step(completed(a));
+    } catch {
+      // O motor de hoje recusa a jogada gravada (a regra mudou de um jeito que a conversão não cobre): o
+      // roteiro segue como estava daqui em diante, e o replay anda até esta jogada (`ReplayCursor.failed`)
+      // em vez de não abrir.
+      return [...out, ...actions.slice(n)];
+    }
   }
-  for (let i = implicit(); i; i = implicit()) step(i);
+  try {
+    for (let i = implicit(); i; i = implicit()) step(i);
+  } catch {
+    // Idem, numa resposta implícita do fim do roteiro.
+  }
   return out;
 }
 
