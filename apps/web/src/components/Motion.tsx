@@ -173,6 +173,19 @@ function measure(el: Element, size?: HTMLElement | null): Box | null {
   return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: s.offsetWidth || r.width, h: s.offsetHeight || r.height };
 }
 
+/** Girado 90° pelo CSS (a caixa na tela fica mais larga que alta). */
+function lying(el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  return el.offsetWidth < el.offsetHeight && r.width > r.height;
+}
+
+/** Largura de um DON!! na mesa, tirada do deck de DON!! (o da mesa lateral é deitado). */
+function donWidth(root: Element) {
+  const back = root.querySelector<HTMLElement>('.lat-donback');
+  if (back) return back.offsetHeight;
+  return root.querySelector<HTMLElement>('[data-anchor^="dondeck-"] .don-card')?.offsetWidth ?? 0;
+}
+
 function capture(root: Element | null): Boxes {
   const m: Boxes = new Map();
   if (!root) return m;
@@ -214,11 +227,24 @@ function capture(root: Element | null): Boxes {
     } else if (name === 'arena') {
       b = measure(el);
     } else if (name.startsWith('don-')) {
-      el.querySelectorAll<HTMLElement>(':scope > .don-card').forEach((d, i) => {
+      // Na mesa lateral cada DON!! vem dentro de um `.lat-don` (e o ativo fica deitado).
+      const dons = el.querySelectorAll<HTMLElement>(':scope > .don-card, :scope > .lat-don > .don-card');
+      dons.forEach((d, i) => {
         const db = measure(d);
-        if (db) m.set(`don:${name.slice(4)}:${i}`, db);
+        if (db) m.set(`don:${name.slice(4)}:${i}`, lying(d) ? { ...db, rot: true } : db);
       });
-      b = measure(el);
+      // Sem DON!! na área: um DON!! no lugar do primeiro (não a área inteira, que na mesa lateral é uma coluna).
+      const r = el.getBoundingClientRect();
+      const w = dons[0]?.offsetWidth || donWidth(root) || Math.min(r.width, r.height / 1.396);
+      if (r.width || r.height) {
+        b = el.classList.contains('lat-dons')
+          ? { x: r.left + w * 0.698, y: r.top + w / 2, w, h: w * 1.396, rot: true }
+          : { x: r.left + r.width / 2, y: r.top + r.height / 2, w, h: w * 1.396 };
+      }
+    } else if (name.startsWith('dondeck-') && el.querySelector('.lat-donback')) {
+      // Deck de DON!! da mesa lateral: deitado.
+      const r = measure(el);
+      if (r) b = { x: r.x, y: r.y, w: r.h, h: r.w, rot: true };
     } else {
       const inner = el.querySelector<HTMLElement>('.card, .slot-empty, .don-card');
       b = measure(inner ?? el);
@@ -495,7 +521,7 @@ function donPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, 
     let deckIn = Math.max(0, b.donDeck - a.donDeck);
     let poolGain = Math.max(0, poolB - poolA + incs.length - decs.length);
     const deckBox = (boxes: Boxes) => boxes.get(`anchor:dondeck-${p}`);
-    const poolEls = Array.from(root.querySelectorAll<HTMLElement>(`[data-anchor="don-${p}"] > .don-card`));
+    const poolEls = Array.from(root.querySelectorAll<HTMLElement>(`[data-anchor="don-${p}"] > .don-card, [data-anchor="don-${p}"] > .lat-don > .don-card`));
     let newSlot = 0;
     /** Os DON!! novos entram por último entre os ativos. */
     const poolDst = (): [Box | undefined, Element | null] => {
