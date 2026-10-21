@@ -33,7 +33,7 @@
 // decidiu a partida da rodada atual, ela pode voltar a ficar pendente) e inscrição
 // atrasada (só no suíço, durante a rodada 1: quem entra começa a rodada 2 com uma derrota).
 
-import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, playMode, playModeLabel, tournamentSpoilerRule } from '@gumgum/engine';
+import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, playMode, playModeLabel, spoilerRule } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
 import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
@@ -42,6 +42,7 @@ import { type DB, getCards } from '../db';
 import { fail, isPlayerError, type PlayerError } from '../errors';
 import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
+import { tournamentSpoilerSet } from '../spoiler-set';
 import { TIME_BANK_MS } from '../online/room';
 import type { ApiCard } from '../present';
 import { isFormat, isPlayFormat, tierFor } from '../stats/catalog';
@@ -606,6 +607,7 @@ export function registerTournamentRoutes(
       name: t.name,
       format: t.format,
       spoilers: t.spoilers,
+      spoilerSet: tournamentSpoilerSet(db, t),
       structure: t.structure,
       topCut: t.topCut,
       status: t.status,
@@ -779,6 +781,8 @@ export function registerTournamentRoutes(
       description: t.description,
       format: t.format,
       spoilers: t.spoilers,
+      /** Com spoilers, a coleção aceita ("Standard + EB05"); null = sem spoilers, Livre ou não se sabe. */
+      spoilerSet: tournamentSpoilerSet(db, t),
       structure: t.structure,
       swissBestOf: t.swissBestOf,
       topCut: t.topCut,
@@ -1119,7 +1123,7 @@ export function registerTournamentRoutes(
       const at = legalAt(input);
       const bad = listPlayers(db, found.t.id).filter((p) => deckIssue(db, p.deck, input, at));
       if (bad.length) {
-        const format = playModeLabel(input);
+        const format = playModeLabel({ ...input, spoilerSet: tournamentSpoilerSet(db, input) });
         return reply
           .code(400)
           .send(fail('tourDecksNotAllowed', `${bad.length} inscrito(s) usam decks que não valem no formato ${format}.`, { n: bad.length, format }));
@@ -1159,12 +1163,12 @@ export function registerTournamentRoutes(
     if (t.status !== 'registration') return reply.code(409).send(fail('tourStarted', 'O torneio já começou.'));
     const players = listPlayers(db, t.id);
     if (players.length < 2) return reply.code(400).send(fail('tourNeedsTwoPlayers', 'São precisos pelo menos 2 inscritos.'));
-    // Deck que deixou de valer depois da inscrição (banimento com data, spoiler de coleção incompleta): o organizador
+    // Deck que deixou de valer depois da inscrição (banimento com data, spoiler de outra coleção): o organizador
     // decide, pedindo a troca do deck (nova inscrição) ou tirando o jogador.
     const stale = staleDecks(db, t, players, new Date(now()));
     if (stale.length) {
       const names = stale.map((p) => p.name).join(', ');
-      const format = playModeLabel(t);
+      const format = playModeLabel({ ...t, spoilerSet: tournamentSpoilerSet(db, t) });
       return reply
         .code(409)
         .send(
@@ -1761,7 +1765,7 @@ export function registerTournamentRoutes(
     if (!already && t.maxPlayers !== null && countPlayers(db, t.id) >= t.maxPlayers) {
       return reply.code(409).send(fail('tourFull', 'O torneio está lotado.'));
     }
-    const deck = playableDeck(db, req.body?.deckId, t.format, { spoilers: tournamentSpoilerRule(t), at: new Date(now()) });
+    const deck = playableDeck(db, req.body?.deckId, t.format, { spoilers: spoilerRule(t), spoilerSet: tournamentSpoilerSet(db, t), at: new Date(now()) });
     if ('error' in deck) return reply.code(deck.code).send(fail(deck.errorCode, deck.error, deck.errorParams));
     // O deck precisa valer também no dia do torneio (banimento com data antes do início).
     const at = legalAt(t);
@@ -1857,7 +1861,7 @@ export function registerTournamentRoutes(
         deckId: player.deckId,
         deck: player.deck,
       },
-      { format: t.format, spoilers: t.spoilers },
+      { format: t.format, spoilers: t.spoilers, ...(t.spoilerSet ? { spoilerSet: t.spoilerSet } : {}) },
       {
         id: t.id,
         name: t.name,

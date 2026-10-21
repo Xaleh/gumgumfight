@@ -163,6 +163,8 @@ export interface RoomData {
    * aceita). As filas não têm o campo: a casual aceita spoilers e a ranqueada não.
    */
   spoilers?: boolean;
+  /** Com spoilers (fora do Livre), a coleção aceita, a próxima a ser lançada na criação ("Standard + EB05"). */
+  spoilerSet?: string;
   createdAt: number;
   seats: SeatInfo[];
   seed128: number[] | null;
@@ -307,11 +309,12 @@ function handsOf(state: GameState): string[] {
 }
 
 export function newRoomData(
-  init: Pick<RoomData, 'queue' | 'format' | 'spoilers' | 'code' | 'tournament'> & { id?: string; seats: SeatInfo[] },
+  init: Pick<RoomData, 'queue' | 'format' | 'spoilers' | 'spoilerSet' | 'code' | 'tournament'> & { id?: string; seats: SeatInfo[] },
 ): RoomData {
   return {
     ...(init.tournament ? { tournament: init.tournament } : {}),
     ...(init.spoilers !== undefined ? { spoilers: init.spoilers } : {}),
+    ...(init.spoilerSet ? { spoilerSet: init.spoilerSet } : {}),
     id: init.id ?? randomBytes(9).toString('base64url'),
     code: init.code,
     queue: init.queue,
@@ -1086,6 +1089,7 @@ export class Room {
       queue: this.data.queue,
       format: this.data.format,
       ...(this.data.spoilers !== undefined ? { spoilers: this.data.spoilers } : {}),
+      ...(this.data.spoilerSet ? { spoilerSet: this.data.spoilerSet } : {}),
       tournament: this.data.tournament
         ? {
             id: this.data.tournament.id,

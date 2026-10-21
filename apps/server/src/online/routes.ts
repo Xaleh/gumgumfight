@@ -25,6 +25,7 @@ import {
   playMode,
   type PlayMode,
   spoilerIssues,
+  spoilerRule,
   type SpoilerRule,
   validateDeck,
 } from '@gumgum/engine';
@@ -32,6 +33,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
 import { fail } from '../errors';
+import { currentSpoilerSet } from '../spoiler-set';
 import type { ApiCard } from '../present';
 import { type FormatId, isFormat, isPlayFormat, type PlayFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
@@ -127,9 +129,12 @@ export interface DeckRules {
   noManual?: boolean;
   /**
    * Cartas de spoiler (ainda não lançadas) aceitas: `none` na ranqueada e nos torneios, salas
-   * privadas e treinos sem spoilers; `complete` nos torneios com spoilers. Padrão: todas.
+   * privadas e treinos sem spoilers; `next` (só a próxima coleção) com spoilers fora do Livre.
+   * Padrão: todas (fila casual e Livre).
    */
   spoilers?: SpoilerRule;
+  /** Com `next`, a coleção aceita (a gravada na sala ou no torneio); sem ela, a próxima de agora. */
+  spoilerSet?: string | null;
   /** Data em que o deck precisa valer (banimentos com data); padrão: agora. */
   at?: Date;
 }
@@ -161,13 +166,14 @@ export function playableDeck(db: DB, deckId: unknown, format: PlayFormat, rules:
       }),
     };
   }
-  const spoilers = rules.spoilers ? spoilerIssues(deck, cards, rules.spoilers) : [];
+  const nextSet = rules.spoilers === 'next' ? (rules.spoilerSet ?? currentSpoilerSet(db)) : null;
+  const spoilers = rules.spoilers ? spoilerIssues(deck, cards, rules.spoilers, nextSet) : [];
   if (spoilers.length) {
     const { message: issue, params } = spoilers[0];
-    if (rules.spoilers === 'complete') {
+    if (rules.spoilers === 'next') {
       return {
         code: 400,
-        ...fail('deckHasIncompleteSpoilers', `Esse deck tem cartas de coleções que ainda não foram reveladas por completo. ${issue}`, params),
+        ...fail('deckHasOtherSetSpoilers', `Esse deck tem cartas de spoiler de outra coleção, não da próxima a ser lançada. ${issue}`, params),
       };
     }
     return { code: 400, ...fail('deckHasSpoilers', `Esse deck tem cartas que ainda não foram lançadas. ${issue}`, params) };
@@ -269,13 +275,13 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     body: { deckId?: unknown } | undefined,
     ranked: boolean,
     format: PlayFormat,
-    noSpoilers = false,
+    spoilers: Pick<DeckRules, 'spoilers' | 'spoilerSet'> = {},
   ): SeatRequest | LobbyError => {
     const ownerHash = viewerHash(req);
     if (!ownerHash) return { code: 400, ...fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).') };
     const account = user(req);
     if (ranked && !account) return { code: 401, ...fail('rankedLoginRequired', 'A ranqueada é só para quem entrou com a conta Google.') };
-    const deck = deckFor(body?.deckId, format, ranked, noSpoilers);
+    const deck = deckFor(body?.deckId, format, ranked, spoilers);
     if (isError(deck)) return deck;
     const profile = ensurePlayer(db, ownerHash);
     return {
@@ -291,16 +297,22 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   };
 
   /** Deck pronto para jogar no formato (na ranqueada, também sem cartas manuais nem spoilers). */
-  const deckFor = (deckId: unknown, format: PlayFormat, ranked: boolean, noSpoilers = false) =>
-    playableDeck(db, deckId, format, ranked ? RANKED_RULES : noSpoilers ? { spoilers: 'none' } : {});
+  const deckFor = (deckId: unknown, format: PlayFormat, ranked: boolean, spoilers: Pick<DeckRules, 'spoilers' | 'spoilerSet'> = {}) =>
+    playableDeck(db, deckId, format, ranked ? RANKED_RULES : spoilers);
   /** Formato oficial das filas. */
   const formatOf = (v: unknown): FormatId => (isFormat(v) ? v : 'standard');
   /**
    * Regras de cartas da sala privada ou do treino contra o bot (inclui o Livre). Sem `spoilers`
-   * (apps de antes da escolha), aceita spoilers, como antes.
+   * (apps de antes da escolha), aceita spoilers, como antes. Com spoilers fora do Livre, grava a
+   * coleção aceita: a próxima a ser lançada agora.
    */
-  const modeOf = (b: { format?: unknown; spoilers?: unknown } | undefined): PlayMode =>
-    playMode(isPlayFormat(b?.format) ? b.format : 'standard', b?.spoilers !== false);
+  const modeOf = (b: { format?: unknown; spoilers?: unknown } | undefined): PlayMode => {
+    const mode = playMode(isPlayFormat(b?.format) ? b.format : 'standard', b?.spoilers !== false);
+    const set = spoilerRule(mode) === 'next' ? currentSpoilerSet(db) : null;
+    return set ? { ...mode, spoilerSet: set } : mode;
+  };
+  /** Regra de spoilers da sala para o deck de quem senta. */
+  const seatRules = (mode: PlayMode): Pick<DeckRules, 'spoilers' | 'spoilerSet'> => ({ spoilers: spoilerRule(mode), spoilerSet: mode.spoilerSet });
 
   /** Sala + assento a partir do token (query `t` ou corpo). */
   const seatIn = (id: string, token: unknown): { room: Room; seat: PlayerId } | null => {
@@ -329,7 +341,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   type RoomBody = { deckId?: unknown; format?: unknown; spoilers?: unknown; code?: unknown; showHands?: unknown };
   app.post<{ Body: RoomBody }>('/api/online/rooms', async (req, reply) => {
     const mode = modeOf(req.body);
-    const seat = seatFor(req, req.body, false, mode.format, !mode.spoilers);
+    const seat = seatFor(req, req.body, false, mode.format, seatRules(mode));
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip);
     if (limit) return reply.code(limit.code).send(limit);
@@ -344,7 +356,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (!/^[A-Za-z0-9]{6}$/.test(code.trim())) return reply.code(400).send(fail('invalidRoomCode', 'Código de sala inválido.'));
     const mode = lobby.privateMode(code);
     if (!mode) return reply.code(404).send(fail('roomNotFound', 'Sala não encontrada ou já começou.'));
-    const seat = seatFor(req, req.body, false, mode.format, !mode.spoilers);
+    const seat = seatFor(req, req.body, false, mode.format, seatRules(mode));
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip);
     if (limit) return reply.code(limit.code).send(limit);
@@ -415,17 +427,17 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (!user(req)) return reply.code(401).send(fail('botRoomLoginRequired', 'Para transmitir o treino contra o bot, entre com a conta Google.'));
     const mode = modeOf(req.body);
     const { format } = mode;
-    const seat = seatFor(req, req.body, false, format, !mode.spoilers);
+    const seat = seatFor(req, req.body, false, format, seatRules(mode));
     if (isError(seat)) return reply.code(seat.code).send(seat);
     const limit = lobby.admit(req.ip, 'bot');
     if (limit) return reply.code(limit.code).send(limit);
     let botDeckId = req.body?.botDeckId;
     if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
-      const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false, !mode.spoilers)));
+      const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false, seatRules(mode))));
       if (!pool.length) return reply.code(400).send(fail('noBuiltinDeckInFormat', `Nenhum deck pronto é permitido no ${formatLabel(format)}.`, { format: formatLabel(format) }));
       botDeckId = pool[randomInt(pool.length)].id;
     }
-    const botDeck = deckFor(botDeckId, format, false, !mode.spoilers);
+    const botDeck = deckFor(botDeckId, format, false, seatRules(mode));
     if (isError(botDeck)) {
       // Mesmo motivo do deck do jogador, com o prefixo "Deck do bot" (chave própria: botChooseDeck, botDeckInvalid…).
       const errorCode = `bot${botDeck.errorCode[0].toUpperCase()}${botDeck.errorCode.slice(1)}`;

@@ -10,6 +10,7 @@
 
 import { type DB, getCards } from '../db';
 import type { ApiCard } from '../present';
+import { tournamentSpoilerSet } from '../spoiler-set';
 import type { FormatId, PlayFormat } from '../stats/catalog';
 import { standings, winnerOf } from './pairing';
 import { iso } from './recap';
@@ -32,6 +33,8 @@ export interface MetaUpcoming {
   name: string;
   format: PlayFormat;
   spoilers: boolean;
+  /** Com spoilers, a coleção aceita ("Standard + EB05"). */
+  spoilerSet: string | null;
   official: boolean;
   prize: string | null;
   status: 'registration' | 'running';
@@ -163,6 +166,7 @@ export function buildMeta(db: DB, { format, days, now, present }: MetaOptions): 
       name: t.name,
       format: t.format,
       spoilers: t.spoilers,
+      spoilerSet: tournamentSpoilerSet(db, t),
       official: t.official,
       prize: t.prize,
       status: t.status === 'running' ? 'running' : 'registration',

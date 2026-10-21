@@ -489,7 +489,7 @@ describe('partidas online: filas', () => {
     });
   });
 
-  it('ranqueada: só cartas lançadas; spoilers valem no casual e nas salas privadas', async () => {
+  it('ranqueada: só cartas lançadas; spoilers valem no casual e, da próxima coleção, nas salas privadas', async () => {
     const { app, db } = setup();
     const u = upsertGoogleUser(db, { sub: 'nami', email: 'nami@example.com', emailVerified: true, name: 'nami', picture: null });
     const nami = { ...ALICE, cookie: `gg_session=${createSession(db, u.id)}` };
@@ -511,7 +511,21 @@ describe('partidas online: filas', () => {
     const casual = await app.inject({ method: 'POST', url: '/api/online/queue', headers: nami, payload: { deckId: deck.id, queue: 'casual', format: 'egb' } });
     expect(casual.statusCode).toBe(201);
     await app.inject({ method: 'DELETE', url: `/api/online/queue/${casual.json().ticket}` });
-    expect((await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: deck.id, format: 'egb' } })).statusCode).toBe(201);
+    // Sala privada "+ spoilers": só a próxima coleção a ser lançada (EB05, pela data do arquivo data/spoilers).
+    upsertCards(db, [{ ...base, id: 'EB05-001', spoiler: { source: 'teste' } }], { provisional: true, source: 'spoiler:teste.json' });
+    expect((await app.inject({ url: '/api/config' })).json().spoilerSet).toBe('EB05');
+    const other = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: deck.id, format: 'egb' } });
+    expect(other.json()).toMatchObject({ errorCode: 'deckHasOtherSetSpoilers', errorParams: { n: 1, ids: 'OP99-001', set: 'EB05' } });
+    const eb05 = luffy.cards.map((c, i) => (i === 0 ? { id: 'EB05-001', count: c.count } : c));
+    const next = (await app.inject({ method: 'POST', url: '/api/decks', headers: BOB, payload: { name: 'EB05', leader: luffy.leader, cards: eb05 } })).json();
+    const room = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: next.id, format: 'egb' } });
+    expect(room.statusCode).toBe(201);
+    // Quem entra segue a coleção gravada na sala.
+    const joinOther = await app.inject({ method: 'POST', url: '/api/online/rooms/join', headers: nami, payload: { code: room.json().code, deckId: deck.id } });
+    expect(joinOther.json()).toMatchObject({ errorCode: 'deckHasOtherSetSpoilers', errorParams: { set: 'EB05' } });
+    expect((await app.inject({ url: `/api/online/rooms/${room.json().roomId}` })).json()).toMatchObject({ spoilers: true, spoilerSet: 'EB05' });
+    // No Livre, qualquer coleção (a sala nova substitui a que esperava oponente).
+    expect((await app.inject({ method: 'POST', url: '/api/online/rooms', headers: BOB, payload: { deckId: deck.id, format: 'free' } })).statusCode).toBe(201);
     // Sala privada sem spoilers (EGB puro): quem cria escolhe; quem entra segue a escolha.
     const pure = await app.inject({ method: 'POST', url: '/api/online/rooms', headers: nami, payload: { deckId: deck.id, format: 'egb', spoilers: false } });
     expect(pure.json()).toMatchObject({ errorCode: 'deckHasSpoilers' });

@@ -11,9 +11,10 @@
 // idempotente: cada rodada é varrida uma vez (`round_wo`) e o aviso de check-in sai uma
 // vez por hora de início (`checkin_notice`).
 
-import { type CardData, type DeckList, type FormatIssue, formatIssues, spoilerIssues, tournamentSpoilerRule } from '@gumgum/engine';
+import { type CardData, type DeckList, type FormatIssue, formatIssues, spoilerIssues, spoilerRule } from '@gumgum/engine';
 import { randomInt } from 'node:crypto';
 import { type DB, getCards } from '../db';
+import { tournamentSpoilerSet } from '../spoiler-set';
 import { elimBestOf, type Pairing, singleFirstRound, singleRounds, swissPairings, swissRounds } from './pairing';
 import {
   listAutomatic,
@@ -65,28 +66,37 @@ export const elimRound = (t: Tournament, round: number, pairings: Pairing[]): Ro
 
 /**
  * O que impede a lista congelada de valer no torneio em `at` (formato e spoilers); null = vale.
- * Spoilers: sem a opção, nenhum; com ela, só os das coleções já reveladas por completo.
+ * Spoilers: sem a opção, nenhum; com ela, só os da próxima coleção a ser lançada (`tournamentSpoilerSet`).
  */
-export function deckIssue(db: DB, deck: DeckList, t: Pick<Tournament, 'format' | 'spoilers'>, at: Date): FormatIssue | null {
+export function deckIssue(
+  db: DB,
+  deck: DeckList,
+  t: Pick<Tournament, 'format' | 'spoilers'> & Partial<Pick<Tournament, 'spoilerSet' | 'status'>>,
+  at: Date,
+): FormatIssue | null {
   const issue = formatIssues(deck, t.format, at)[0];
-  const rule = tournamentSpoilerRule(t);
+  const rule = spoilerRule(t);
   if (issue || rule === 'all') return issue ?? null;
   const ids = [deck.leader, ...deck.cards.map((c) => c.id)];
-  return spoilerIssues(deck, new Map(getCards(db, ids).map((c) => [c.id, c as CardData])), rule)[0] ?? null;
+  const cards = new Map(getCards(db, ids).map((c) => [c.id, c as CardData]));
+  return spoilerIssues(deck, cards, rule, tournamentSpoilerSet(db, t))[0] ?? null;
 }
 
 /**
  * Inscritos cujo deck (a lista congelada na inscrição) não vale mais no torneio em `at`: uma
  * carta banida com data marcada (ou incluída na lista depois da inscrição), ou um spoiler de
- * coleção ainda incompleta (inscrições de antes de os torneios com spoilers exigirem a coleção
- * completa). Uma carta só deixa de ser spoiler, e uma coleção só passa a estar completa.
+ * outra coleção que não a próxima a ser lançada (inscrições de antes da regra).
  */
-export function staleDecks(db: DB, t: Pick<Tournament, 'format' | 'spoilers'>, players: TournamentPlayer[], at: Date): TournamentPlayer[] {
+export function staleDecks(db: DB, t: Pick<Tournament, 'format' | 'spoilers'> & Partial<Pick<Tournament, 'spoilerSet' | 'status'>>, players: TournamentPlayer[], at: Date): TournamentPlayer[] {
   return players.filter((p) => deckIssue(db, p.deck, t, at) !== null);
 }
 
-/** Fecha as inscrições, sorteia a ordem e gera a primeira rodada. Exige pelo menos 2 inscritos. */
+/**
+ * Fecha as inscrições, sorteia a ordem e gera a primeira rodada. Exige pelo menos 2 inscritos.
+ * Com spoilers, grava a coleção aceita (a próxima a ser lançada agora): ela fica no histórico.
+ */
 export function beginTournament(db: DB, t: Tournament, players: TournamentPlayer[], at: string) {
+  const spoilerSet = tournamentSpoilerSet(db, t);
   // Embaralha (Fisher-Yates) para sortear a ordem dos cabeças de chave e da 1ª rodada.
   const order = players.map((p) => p.userId);
   for (let i = order.length - 1; i > 0; i--) {
@@ -96,9 +106,9 @@ export function beginTournament(db: DB, t: Tournament, players: TournamentPlayer
   const seeded = players.map((p) => ({ ...p, seed: order.indexOf(p.userId) + 1 }));
   if (t.structure === 'swiss') {
     const rounds = t.rounds ?? swissRounds(players.length);
-    startTournament(db, t.id, order, rounds, { round: 1, stage: 'swiss', bestOf: t.swissBestOf, pairings: swissPairings(seeded, []) }, at);
+    startTournament(db, t.id, order, rounds, { round: 1, stage: 'swiss', bestOf: t.swissBestOf, pairings: swissPairings(seeded, []) }, at, spoilerSet);
   } else {
-    startTournament(db, t.id, order, singleRounds(players.length), elimRound(t, 1, singleFirstRound(seeded)), at);
+    startTournament(db, t.id, order, singleRounds(players.length), elimRound(t, 1, singleFirstRound(seeded)), at, spoilerSet);
   }
 }
 
@@ -137,7 +147,7 @@ export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string)
       }
       const start = ms(t.startsAt);
       if (!t.autoStart || Number.isNaN(start) || now < start || now - start > AUTO_START_GRACE_MS) continue;
-      // Deck que deixou de valer (banimento com data, spoiler de coleção incompleta) não joga: a inscrição é cancelada.
+      // Deck que deixou de valer (banimento com data, spoiler de outra coleção) não joga: a inscrição é cancelada.
       // No início à mão, o organizador é avisado antes e decide (ver a rota /start).
       const stale = staleDecks(db, t, listPlayers(db, t.id), new Date(now));
       for (const p of stale) unregisterPlayer(db, t.id, p.userId);

@@ -3547,6 +3547,8 @@ button.hint-pill {
 .tag-kw-doubleAttack { --tag: #8a1c1c; --tag-ink: #420a0a; }
 .tag-kw-banish { --tag: #2b2b33; --tag-ink: #000; }
 .tag-kw-unblockable { --tag: #3f51b5; --tag-ink: #1e2659; }
+/* carta de spoiler (ainda não lançada): fora dos efeitos, sempre a última da pilha */
+.tag-spoiler { --tag: #7b2ff7; --tag-ink: #3a1078; }
 
 .card.back {
   /* Verso original das cartas de One Piece Card Game. */
@@ -5388,23 +5390,6 @@ button.hint-pill::after,
   border-radius: 999px;
   padding: 0 6px;
   font-size: 11px;
-}
-.spoiler-tag {
-  position: absolute;
-  top: 3%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 2;
-  padding: 0 0.45em;
-  border-radius: 999px;
-  background: #7b2ff7;
-  color: #fff;
-  font-size: max(8px, calc(var(--cw) * 0.1));
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1.5;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
-  pointer-events: none;
 }
 .spoiler-note {
   color: var(--spoiler-text);

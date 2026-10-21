@@ -1,10 +1,11 @@
-import { type BotLevel, cardLegality, FORMATS, type PlayerId, playMode, type PlayMode } from '@gumgum/engine';
+import { type BotLevel, cardLegality, FORMATS, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
   api,
   ApiError,
   canPlay,
+  currentSpoilerSet,
   deckGroups,
   type DeckSummary,
   type FormatId,
@@ -164,14 +165,14 @@ function DeckPicker({
                     <button
                       key={d.id}
                       className={['deck-pick', d.id === value ? 'on' : ''].join(' ')}
-                      disabled={anyValid ? !d.valid : !canPlay(d, mode.format, mode.spoilers ? 'all' : 'none')}
+                      disabled={anyValid ? !d.valid : !canPlay(d, mode.format, spoilerRule(mode))}
                       onClick={() => onPick(d.id)}
-                      title={whyNotPlayable(d, mode.format, mode.spoilers ? 'all' : 'none') ?? d.name}
+                      title={whyNotPlayable(d, mode.format, anyValid ? 'all' : spoilerRule(mode)) ?? d.name}
                     >
                       <DeckArt deck={d} small />
                       <span className="name">{d.name}</span>
                       {!d.valid && <span className="muted small">{d.size}/50</span>}
-                      {d.valid && !canPlay(d, mode.format, mode.spoilers ? 'all' : 'none') && (
+                      {d.valid && !canPlay(d, mode.format, anyValid ? 'all' : spoilerRule(mode)) && (
                         <span className="muted small">{t('menu.notAllowedShort', { format: modeLabel(mode) })}</span>
                       )}
                     </button>
@@ -237,6 +238,7 @@ const fmtClock = (ms: number) => {
 /** Escolha das cartas da sala privada ou do treino contra o bot. */
 function RulesField({ id, value, onChange }: { id: string; value: Rules; onChange: (rules: Rules) => void }) {
   const t = useT();
+  const set = currentSpoilerSet();
   return (
     <div className="mode-field">
       <span className="mode-field-label" id={id}>
@@ -245,7 +247,8 @@ function RulesField({ id, value, onChange }: { id: string; value: Rules; onChang
       <div className="seg small rules-seg" role="group" aria-labelledby={id}>
         {RULES.map(([v, label]) => (
           <button key={v} type="button" className={value === v ? 'on' : ''} aria-pressed={value === v} onClick={() => onChange(v)}>
-            {t(label)}
+            {/* "+ EB05": com spoilers só vale a próxima coleção a ser lançada. */}
+            {v === 'spoilers' && set ? t('menu.rulesSpoilerSet', { set }) : t(label)}
           </button>
         ))}
       </div>
@@ -598,13 +601,20 @@ export function Menu({
   const d0 = decks.find((d) => d.id === deck0);
   const d1 = decks.find((d) => d.id === deck1);
   const fmt = modeLabel({ format });
-  /** Regras das salas privadas e do treino: o formato escolhido (com ou sem spoilers) ou o Livre. */
-  const modeOf = (rules: Rules): PlayMode => (rules === 'free' ? playMode('free', true) : playMode(format, rules === 'spoilers'));
+  /**
+   * Regras das salas privadas e do treino: o formato escolhido (com ou sem spoilers) ou o Livre.
+   * Com spoilers, só vale a próxima coleção a ser lançada ("Standard + EB05").
+   */
+  const modeOf = (rules: Rules): PlayMode => {
+    if (rules === 'free') return playMode('free', true);
+    const set = rules === 'spoilers' ? currentSpoilerSet() : null;
+    return { ...playMode(format, rules === 'spoilers'), ...(set ? { spoilerSet: set } : {}) };
+  };
   const privateMode = modeOf(privateRules);
   const botMode = modeOf(botRules);
   /** O deck é completo e vale nas regras. */
   function playsIn(d: DeckSummary | undefined, mode: PlayMode): d is DeckSummary {
-    return Boolean(d && canPlay(d, mode.format, mode.spoilers ? 'all' : 'none'));
+    return Boolean(d && canPlay(d, mode.format, spoilerRule(mode)));
   }
   /** Os dois decks precisam valer nas regras do treino. */
   const botReady = playsIn(d0, botMode) && (deck1 === RANDOM || playsIn(d1, botMode));

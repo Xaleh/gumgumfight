@@ -12,9 +12,9 @@
 //
 // Spoilers (cartas anunciadas que ainda não foram lançadas) não são de formato nenhum:
 // valem na fila casual e, se quem cria escolher, nas salas privadas e nos treinos contra
-// o bot (ver `PlayMode` e `spoilerIssues`); nunca na ranqueada. Nos torneios com spoilers
-// só valem as coleções já reveladas por completo (`COMPLETE_SPOILER_SETS`): coleção pela
-// metade só no Livre.
+// o bot (ver `PlayMode` e `spoilerIssues`); nunca na ranqueada. Fora do Livre, "+ spoilers"
+// quer dizer só a próxima coleção a ser lançada (`nextSpoilerSet`): hoje "Standard + EB05";
+// quando a EB05 sai, passa sozinho a "Standard + OP18". As outras coleções, só no Livre.
 //
 // Livre ("vale tudo") não é formato oficial: vale toda carta, inclusive as banidas, os
 // pares proibidos e os spoilers. Só existe nos torneios, nas salas privadas e contra o
@@ -41,6 +41,8 @@ export const formatLabel = (f: PlayFormat): string => (f === 'free' ? 'Livre' : 
 export interface PlayMode {
   format: PlayFormat;
   spoilers: boolean;
+  /** Com spoilers (fora do Livre), a coleção aceita: a próxima a ser lançada quando a sala ou o torneio foi criado. */
+  spoilerSet?: string;
 }
 
 /**
@@ -52,9 +54,12 @@ export const PLAY_FORMATS: ReadonlyArray<PlayFormat> = ['standard', 'egb', 'free
 /** Regras pedidas por quem cria, normalizadas: o Livre sempre aceita spoilers. */
 export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ format, spoilers: format === 'free' || spoilers });
 
-/** Nome das regras de cartas: "Standard", "Standard + spoilers", "Livre (vale tudo)"… */
-export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean }): string =>
-  m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + spoilers` : formatLabel(m.format);
+/**
+ * Nome das regras de cartas: "Standard", "Standard + EB05" (a coleção de spoiler aceita),
+ * "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"…
+ */
+export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoilerSet?: string | null }): string =>
+  m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
 
 /**
  * Se a partida entra nas estatísticas: só Standard e EGB puros. Fica de fora o Livre, o
@@ -167,29 +172,34 @@ export function legalFormats(deck: Pick<DeckList, 'leader' | 'cards'>, now = new
   return FORMATS.filter((f) => formatIssues(deck, f.id, now).length === 0).map((f) => f.id);
 }
 
-/**
- * Coleções de spoiler com todas as cartas já reveladas: as únicas cujos spoilers valem nos
- * torneios com spoilers (fora do Livre não faz sentido jogar com a coleção incompleta). Ao
- * terminar a revelação de uma coleção, é só incluí-la aqui; depois do lançamento ela pode sair.
- */
-export const COMPLETE_SPOILER_SETS: ReadonlySet<string> = new Set(['EB05']);
-
 /** Coleção pelo número da carta ("OP18-001" → "OP18"). */
 export const cardSet = (id: string): string => id.split('-')[0];
 
 /**
- * Quais cartas de spoiler a partida aceita: todas (casual, salas e treinos com spoilers, Livre),
- * só as das coleções já reveladas por completo (torneios com spoilers) ou nenhuma.
+ * Próxima coleção a ser lançada: entre as que ainda têm cartas de spoiler (`withSpoilers`), a de
+ * lançamento mais cedo (`release`, AAAA-MM-DD; sem data = promocionais e afins, nunca contam).
+ * Quando a coleção sai e as cartas viram oficiais, a seguinte assume sozinha. null = nenhuma.
  */
-export type SpoilerRule = 'all' | 'complete' | 'none';
+export function nextSpoilerSet(sets: ReadonlyArray<{ set: string; release?: string }>, withSpoilers: ReadonlySet<string>): string | null {
+  const next = sets
+    .filter((s) => s.release && withSpoilers.has(s.set.toUpperCase()))
+    .sort((a, b) => a.release!.localeCompare(b.release!) || a.set.localeCompare(b.set))[0];
+  return next ? next.set.toUpperCase() : null;
+}
 
-/** Regra de spoilers de um torneio: o Livre aceita todas; com spoilers, só as coleções completas. */
-export const tournamentSpoilerRule = (m: { format: PlayFormat; spoilers?: boolean }): SpoilerRule =>
-  m.format === 'free' ? 'all' : m.spoilers ? 'complete' : 'none';
+/**
+ * Quais cartas de spoiler a partida aceita: todas (fila casual e Livre), só as da próxima coleção a
+ * ser lançada (Standard ou EGB + spoilers: torneios, salas privadas e treinos) ou nenhuma.
+ */
+export type SpoilerRule = 'all' | 'next' | 'none';
 
-/** Das cartas de spoiler, as que a regra não aceita. */
-export const barredSpoilers = (ids: readonly string[], rule: SpoilerRule): string[] =>
-  rule === 'all' ? [] : rule === 'complete' ? ids.filter((id) => !COMPLETE_SPOILER_SETS.has(cardSet(id))) : [...ids];
+/** Regra de spoilers de um torneio, sala privada ou treino: o Livre aceita todas; com spoilers, só a próxima coleção. */
+export const spoilerRule = (m: { format: PlayFormat; spoilers?: boolean }): SpoilerRule =>
+  m.format === 'free' ? 'all' : m.spoilers ? 'next' : 'none';
+
+/** Das cartas de spoiler, as que a regra não aceita (`nextSet`: a próxima coleção, para `next`). */
+export const barredSpoilers = (ids: readonly string[], rule: SpoilerRule, nextSet: string | null = null): string[] =>
+  rule === 'all' ? [] : rule === 'next' ? ids.filter((id) => cardSet(id) !== nextSet) : [...ids];
 
 /** Cartas de spoiler do deck (Líder incluso), na ordem em que aparecem. */
 export function spoilerCards(deck: Pick<DeckList, 'leader' | 'cards'>, cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>): string[] {
@@ -202,26 +212,27 @@ const SPOILER_WHERE = 'só valem na fila casual e nas salas privadas, treinos co
 
 /**
  * Motivo de o deck não valer pela regra de spoilers (`none`: ranqueada e torneios, salas privadas
- * e treinos sem spoilers; `complete`: torneios com spoilers, que só aceitam as coleções já
- * reveladas por completo); vazio = nenhuma carta barrada. Um aviso só, com as primeiras cartas.
+ * e treinos sem spoilers; `next`: com spoilers, só a próxima coleção, `nextSet`); vazio = nenhuma
+ * carta barrada. Um aviso só, com as primeiras cartas.
  */
 export function spoilerIssues(
   deck: Pick<DeckList, 'leader' | 'cards'>,
   cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>,
   rule: SpoilerRule = 'none',
+  nextSet: string | null = null,
 ): FormatIssue[] {
-  const all = barredSpoilers(spoilerCards(deck, cards), rule);
+  const all = barredSpoilers(spoilerCards(deck, cards), rule, nextSet);
   if (!all.length) return [];
   const n = all.length;
   const ids = all.slice(0, 3).join(', ') + (n > 3 ? '…' : '');
-  if (rule === 'complete') {
-    const sets = [...COMPLETE_SPOILER_SETS].join(', ') || '—';
-    const what = n === 1 ? 'Carta de coleção ainda não revelada por completo (spoiler)' : 'Cartas de coleções ainda não reveladas por completo (spoilers)';
+  if (rule === 'next') {
+    const set = nextSet ?? '—';
+    const what = n === 1 ? 'Carta de spoiler de outra coleção' : 'Cartas de spoiler de outras coleções';
     return [
       {
-        message: `${what}: ${ids}. Nos torneios com spoilers só valem as coleções já reveladas por completo (${sets}); as demais, só no Livre.`,
-        code: 'rules.spoilerIncomplete',
-        params: { n, ids, sets },
+        message: `${what}: ${ids}. Com spoilers, fora do Livre, só vale a próxima coleção a ser lançada (${set}); as demais, só no Livre.`,
+        code: 'rules.spoilerNotNext',
+        params: { n, ids, set },
         cardId: all[0],
       },
     ];

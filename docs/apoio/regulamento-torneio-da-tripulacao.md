@@ -10,7 +10,7 @@ Modelo para colar na descrição do torneio do time. Troque o que está entre `<
 só apoiadores Almirante se inscrevem (prioridade); depois, as inscrições abrem para todos até lotar ou até
 `<data e hora>`. Quem já está inscrito tem a vaga garantida.
 
-**Formato:** `<Standard, Extra Grand Battle, Standard + spoilers, Extra Grand Battle + spoilers ou Livre (vale tudo)>` (sem "+ spoilers", só cartas já lançadas; com "+ spoilers", também as das coleções já reveladas por completo; no Livre vale até carta banida e coleção ainda incompleta), suíço de `<N>` rodadas em melhor de `<1 ou 3>`, com top `<8>` em
+**Formato:** `<Standard, Extra Grand Battle, Standard + <coleção>, Extra Grand Battle + <coleção> ou Livre (vale tudo)>` (sem "+ <coleção>", só cartas já lançadas; com "+ <coleção>", também os spoilers da próxima coleção a ser lançada, ex.: EB05; no Livre vale até carta banida e spoiler de qualquer coleção), suíço de `<N>` rodadas em melhor de `<1 ou 3>`, com top `<8>` em
 melhor de 3 e final em melhor de 5. A lista fica congelada na inscrição.
 
 **Horário:** começa em `<data e hora de Brasília>`. Check-in obrigatório nos 30 minutos antes. Em cada rodada, quem não
