@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, useT } from '../i18n';
 import { PaymentsPanel, SponsorsPanel, SupporterEditor } from './AdminSupport';
+import { DeckCleanupPanel } from './DeckCleanup';
 import { ReportsPanel } from './Reports';
 import { TutorialFunnelPanel } from './TutorialFunnel';
 
@@ -20,7 +21,7 @@ const ROLE_HELP: Record<Role, MessageKey> = {
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
   const t = useT();
   const { user, refresh } = useAuth();
-  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors'>('users');
+  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors' | 'decks'>('users');
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,11 +81,15 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
           <button className={tab === 'sponsors' ? 'on' : ''} onClick={() => setTab('sponsors')}>
             {t('admin.tabSponsors')}
           </button>
+          <button className={tab === 'decks' ? 'on' : ''} onClick={() => setTab('decks')}>
+            {t('decks.cleanup.tab')}
+          </button>
         </div>
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
         {tab === 'tutorial' && <TutorialFunnelPanel />}
         {tab === 'payments' && <PaymentsPanel />}
         {tab === 'sponsors' && <SponsorsPanel />}
+        {tab === 'decks' && <DeckCleanupPanel />}
         {tab === 'users' && (
           <>
             <ul className="role-help muted small">

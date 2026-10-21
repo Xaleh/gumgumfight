@@ -24,6 +24,9 @@ import { type ServerOptions, serverOptions } from './config';
 import { fail, isPlayerError, type PlayerError } from './errors';
 import {
   type DB,
+  deckFavorites,
+  deckGames,
+  deckLastPlayed,
   deleteDeck,
   getCards,
   getDeck,
@@ -32,6 +35,7 @@ import {
   listDecks,
   recentMatches,
   renameDeck,
+  setDeckFavorite,
   type StoredDeck,
   upsertDeck,
 } from './db';
@@ -55,6 +59,7 @@ import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './suppo
 import { registerTournamentRoutes } from './tournaments/routes';
 import { registerEngineTextRoutes } from './card-engine-texts';
 import { registerCardGapRoutes } from './card-gaps';
+import { registerDeckCleanupRoutes } from './decks/cleanup';
 import { registerCardImageRoutes } from './card-images';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
@@ -178,7 +183,7 @@ export function buildApp(
 
   /**
    * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o
-   * navegador. Só o dono edita/apaga os decks que criou.
+   * navegador. Só o dono edita os decks que criou; admin/dev também renomeiam e apagam.
    */
   const viewerHash = (req: FastifyRequest): string | null => {
     const user = auth.viewer(req);
@@ -200,8 +205,16 @@ export function buildApp(
   app.decorate('webhooks', webhooks);
   const publicDeck = ({ ownerHash: _hidden, ...deck }: StoredDeck) => deck;
 
+  /** O que cada jogador tem de cada deck: favoritos, última partida dele e partidas de todos. */
+  type DeckUsage = { favorites: Set<string>; lastPlayed: Map<string, string>; games: Map<string, number> };
+  const usageFor = (viewer: string | null): DeckUsage => ({
+    favorites: deckFavorites(db, viewer),
+    lastPlayed: deckLastPlayed(db, viewer),
+    games: deckGames(db),
+  });
+
   /** Deck com resumo de validação (usado nas listas). */
-  const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null) => {
+  const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null, usage: DeckUsage = usageFor(viewer)) => {
     const report = validateDeck(deck, cards);
     const leader = cards.get(deck.leader);
     const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id)] as const);
@@ -230,6 +243,12 @@ export function buildApp(
       /** Hash da lista exata (o mesmo de `deckHash` nas partidas), para parceiros casarem deck e partida. */
       deckHash: deckHash(deck),
       mine: isMine(deck, viewer),
+      /** Favorito de quem pede (conta ou navegador). */
+      favorite: usage.favorites.has(deck.id),
+      /** Partidas jogadas com este deck (por pessoas, não pelo robô). */
+      games: usage.games.get(deck.id) ?? 0,
+      /** Última partida de quem pede com este deck (null = nunca jogou). */
+      lastPlayedAt: usage.lastPlayed.get(deck.id) ?? null,
     };
   };
   const cardsFor = (decks: DeckList[]) =>
@@ -245,7 +264,8 @@ export function buildApp(
     const viewer = viewerHash(req);
     const decks = req.query.mine === '1' ? listDecks(db).filter((d) => isMine(d, viewer)) : listDecks(db);
     const cards = cardsFor(decks);
-    return decks.map((d) => summarize(d, cards, viewer));
+    const usage = usageFor(viewer);
+    return decks.map((d) => summarize(d, cards, viewer, usage));
   });
 
   /** Deck + definições de todas as cartas usadas (o que o cliente precisa para jogar). Com token, só os próprios e os prontos. */
@@ -259,7 +279,7 @@ export function buildApp(
     return { deck: { ...publicDeck(deck), mine: summary.mine }, cards, summary };
   });
 
-  type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown; arts?: unknown; expectedUpdatedAt?: unknown };
+  type DeckBody = { name?: unknown; leader?: unknown; cards?: unknown; arts?: unknown; expectedUpdatedAt?: unknown; checkDuplicate?: unknown };
   const parseDeckBody = (b: DeckBody | undefined): Omit<DeckList, 'id'> | PlayerError => {
     if (!b || typeof b !== 'object') return fail('invalidBody', 'Corpo inválido.');
     const name = typeof b.name === 'string' ? b.name.trim().slice(0, 60) : '';
@@ -274,8 +294,12 @@ export function buildApp(
       cards.push({ id: c.id.trim().toUpperCase(), count: c.count as number });
     }
     const deck = { name, leader, cards, arts: parseArts(b.arts) };
+    const known = cardsFor([{ id: '', ...deck }]);
+    // Deck sem Líder não fica salvo (nem como rascunho).
+    if (!leader) return fail('deckLeaderRequired', 'Escolha um Líder antes de salvar o deck.');
+    if (known.get(leader)?.category !== 'leader') return fail('deckLeaderInvalid', `${leader} não é um Líder.`, { id: leader });
     // Só as artes que existem, das cartas que estão no deck.
-    const arts = cleanArts(deck, cardsFor([{ id: '', ...deck }]));
+    const arts = cleanArts(deck, known);
     return { name, leader, cards, ...(arts ? { arts } : {}) };
   };
 
@@ -285,6 +309,18 @@ export function buildApp(
     if (!owner) return reply.code(400).send(fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).'));
     const parsed = parseDeckBody(req.body);
     if (isPlayerError(parsed)) return reply.code(400).send(parsed);
+    // O site pede para avisar quando a lista já existe (evita cópias sem mudança); os parceiros não.
+    if (req.body?.checkDuplicate === true) {
+      const hash = deckHash(parsed);
+      const same = listDecks(db).filter((d) => deckHash(d) === hash);
+      const dupe = same.find((d) => isMine(d, owner)) ?? same.find((d) => d.kind === 'builtin') ?? same[0];
+      if (dupe) {
+        return reply.code(409).send({
+          ...fail('deckDuplicate', `Esta lista é igual ao deck "${dupe.name}".`, { name: dupe.name }),
+          duplicate: { id: dupe.id, name: dupe.name, kind: dupe.kind, mine: isMine(dupe, owner) },
+        });
+      }
+    }
     const deck = { id: `u-${randomUUID().slice(0, 8)}`, ...parsed };
     upsertDeck(db, deck, 'user', owner);
     const stored = getDeck(db, deck.id)!;
@@ -339,11 +375,23 @@ export function buildApp(
     return summarize(stored, cardsFor([stored]), viewer);
   });
 
+  /** Favorito de quem pede (conta ou, sem login, o navegador): qualquer deck, até os prontos e os da comunidade. */
+  app.put<{ Params: { id: string }; Body: { favorite?: unknown } }>('/api/decks/:id/favorite', async (req, reply) => {
+    const deck = getDeck(db, req.params.id);
+    if (!deck) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
+    const owner = viewerHash(req);
+    if (!owner) return reply.code(400).send(fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).'));
+    if (typeof req.body?.favorite !== 'boolean') return reply.code(400).send(fail('invalidBody', 'Corpo inválido.'));
+    setDeckFavorite(db, owner, deck.id, req.body.favorite);
+    return { id: deck.id, favorite: req.body.favorite };
+  });
+
   app.delete<{ Params: { id: string } }>('/api/decks/:id', { config: { scope: 'decks:write' } }, async (req, reply) => {
     const existing = getDeck(db, req.params.id);
     if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
     if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckNoDelete', 'Decks prontos não podem ser apagados.'));
-    if (!isMine(existing, viewerHash(req))) {
+    // Admin/dev apaga decks de outros jogadores (limpeza de cópias abandonadas).
+    if (!isMine(existing, viewerHash(req)) && !isAdmin(auth.viewer(req)?.role)) {
       return reply.code(403).send(fail('deckNotMine', 'Este deck pertence a outro jogador.'));
     }
     deleteDeck(db, existing.id);
@@ -389,6 +437,7 @@ export function buildApp(
   registerCardImageRoutes(app, { enabled: server.cardImages, fetchImpl: opts.fetchImpl });
   registerCardGapRoutes(app, { db, user: auth.viewer });
   registerEngineTextRoutes(app, { db, user: auth.viewer });
+  registerDeckCleanupRoutes(app, { db, user: auth.viewer, now: opts.now });
 
   registerReportRoutes(app, { db, user: auth.viewer, notifier });
   registerSupportRoutes(app, {

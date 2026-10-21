@@ -25,7 +25,8 @@ import { useSettings } from './settings';
 type Screen =
   | { name: 'menu' }
   /** `link`: lista vinda de um deep link (`/?deck=`); `linkInvalid`: havia um link, mas sem lista legível. */
-  | { name: 'builder'; link?: DeckLink; linkInvalid?: boolean }
+  /** `open`: id de um deck salvo para abrir direto no editor (vindo do seletor de deck). */
+  | { name: 'builder'; link?: DeckLink; linkInvalid?: boolean; open?: string }
   | { name: 'coverage' }
   | { name: 'stats' }
   | { name: 'admin' }
@@ -150,7 +151,9 @@ function MainApp() {
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, []);
   const dev = isDev(role);
-  if (screen.name === 'builder') return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} link={screen.link} linkInvalid={screen.linkInvalid} />;
+  if (screen.name === 'builder') {
+    return <DeckBuilder onExit={() => setScreen({ name: 'menu' })} link={screen.link} linkInvalid={screen.linkInvalid} openId={screen.open} />;
+  }
   if (screen.name === 'learn') return <Learn onExit={() => setScreen({ name: 'menu' })} onLesson={(id) => setScreen({ name: 'lesson', id })} />;
   if (screen.name === 'lesson') {
     return (
@@ -235,7 +238,7 @@ function MainApp() {
   return (
     <Menu
       onStart={(setup) => setScreen({ name: 'game', setup, key: Date.now() })}
-      onBuildDecks={() => setScreen({ name: 'builder' })}
+      onBuildDecks={(id) => setScreen({ name: 'builder', ...(id ? { open: id } : {}) })}
       onLearn={() => setScreen({ name: 'learn' })}
       onCoverage={dev ? () => setScreen({ name: 'coverage' }) : undefined}
       onStats={() => setScreen({ name: 'stats' })}

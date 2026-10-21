@@ -4,6 +4,7 @@ import type { Messages } from './pt-BR';
 import support from './support/fr';
 import tutorial from './tutorial/fr';
 import recap from './recap/fr';
+import decks from './decks/fr';
 
 export default {
   // ---- general ----
@@ -392,11 +393,12 @@ export default {
   // ---- notices and confirmations ----
   'deck.confirmDiscard': 'Abandonner les modifications non enregistrées de ce deck ?',
   'deck.confirmDelete': 'Supprimer le deck « {name} » ?',
+  'deck.confirmDeleteOther': 'Ce deck appartient à un autre joueur. Supprimer « {name} » pour tout le monde ?',
   'deck.noticeBuiltinEditing': 'Les decks prédéfinis ne peuvent pas être modifiés : vous éditez une copie.',
   'deck.noticeCommunityEditing': 'Ce deck appartient à un autre joueur : vous éditez votre propre copie.',
   'deck.noticeBuiltinOpened': 'Deck prédéfini : le modifier crée une copie.',
   'deck.noticeCommunityOpened': 'Deck d’un autre joueur : le modifier crée votre propre copie.',
-  'deck.noticeCommunityOpenedAdmin': 'Deck d’un autre joueur : en tant qu’admin, vous pouvez corriger son nom ; modifier les cartes crée votre propre copie.',
+  'deck.noticeCommunityOpenedAdmin': 'Deck d’un autre joueur : en tant qu’admin, vous pouvez corriger son nom ou le supprimer ; modifier les cartes crée votre propre copie.',
   'deck.maxCopies': '{n|# exemplaire|# exemplaires} maximum de {name}.',
   'deck.savedReady': 'Deck enregistré et prêt à jouer !',
   'deck.savedDraft': 'Brouillon enregistré. Complétez le deck pour jouer avec.',
@@ -2708,4 +2710,5 @@ export default {
   ...support,
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
+  ...decks,
 } satisfies Messages;

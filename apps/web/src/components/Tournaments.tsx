@@ -24,12 +24,15 @@ import {
   modeLabel,
   type WatchTarget,
   winsNeeded,
+  whyNotPlayable,
 } from '../api';
 import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { type Locale, type MessageKey, type Translate, tryT, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtTime } from '../i18n/format';
 import { prizePhoto } from '../picture';
+import { DeckPicker } from './DeckPicker';
+import { DeckStateChip, LeaderBanner, useFavoriteToggle } from './DeckTile';
 import { useNow } from './HomeBlocks';
 import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
@@ -1209,6 +1212,12 @@ function MyArea({
   const locale = useLocale();
   const [decks, setDecks] = useState<DeckSummary[] | null>(null);
   const [deckId, setDeckId] = useState<string>(t.me?.deckId ?? '');
+  const [picking, setPicking] = useState(false);
+  const setLoadedDecks = useCallback(
+    (fn: DeckSummary[] | ((ds: DeckSummary[]) => DeckSummary[])) => setDecks((ds) => (ds ? (typeof fn === 'function' ? fn(ds) : fn) : ds)),
+    [],
+  );
+  const toggleFavorite = useFavoriteToggle(setLoadedDecks, setError);
 
   /** Inscrição atrasada liberada (suíço, rodada 1): o mesmo formulário, entrando com uma derrota. */
   const late = t.status === 'running' && !t.me && t.canLateRegister;
@@ -1243,9 +1252,9 @@ function MyArea({
   }
 
   if (t.status === 'registration' || late) {
-    const playable = decks?.filter((d) => canPlay(d, t.format, tournamentSpoilerRule(t))) ?? [];
-    const mine = playable.filter((d) => d.kind === 'user' && d.mine);
-    const others = playable.filter((d) => !(d.kind === 'user' && d.mine));
+    const spoilerRule = tournamentSpoilerRule(t);
+    const playable = decks?.filter((d) => canPlay(d, t.format, spoilerRule)) ?? [];
+    const chosen = decks?.find((d) => d.id === deckId);
     const full = t.maxPlayers !== null && t.players.length >= t.maxPlayers && !t.me;
     return (
       <section className="menu-card tour-me">
@@ -1284,30 +1293,44 @@ function MyArea({
         ) : (
           <>
             <div className="field">
-              <label htmlFor="tour-deck">{tr('tour.deckLabel', { format: modeLabel(t) })}</label>
-              <select id="tour-deck" className="admin-search" value={deckId} onChange={(e) => setDeckId(e.target.value)}>
-                <option value="">{tr(decks ? 'tour.chooseDeck' : 'common.loading')}</option>
-                {mine.length > 0 && (
-                  <optgroup label={tr('tour.myDecks')}>
-                    {mine.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </optgroup>
+              <span className="field-label" id="tour-deck">
+                {tr('tour.deckLabel', { format: modeLabel(t) })}
+              </span>
+              <button type="button" className="dk-chosen" aria-labelledby="tour-deck" disabled={!decks} onClick={() => setPicking(true)}>
+                {chosen ? (
+                  <>
+                    <LeaderBanner deck={chosen} />
+                    <span className="dk-chosen-info">
+                      <b>{chosen.name}</b>
+                      <DeckStateChip deck={chosen} />
+                    </span>
+                  </>
+                ) : (
+                  <span className="dk-chosen-info muted">{tr(decks ? 'tour.chooseDeck' : 'common.loading')}</span>
                 )}
-                {others.length > 0 && (
-                  <optgroup label={tr('tour.otherDecks')}>
-                    {others.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+                <span className="dk-chosen-action">
+                  {tr(chosen ? 'decks.change' : 'decks.choose')}
+                  <Icon name="chevron" size={14} />
+                </span>
+              </button>
               {decks && !playable.length && <p className="muted small">{tr(t.spoilers ? 'tour.noPlayableDeck' : 'tour.noPlayableDeckReleased', { format: modeLabel(t) })}</p>}
             </div>
+            {picking && decks && (
+              <DeckPicker
+                title={tr('decks.choose')}
+                context={tr('decks.context.tournament', { rules: modeLabel(t) })}
+                decks={decks}
+                value={deckId}
+                canUse={(d) => canPlay(d, t.format, spoilerRule)}
+                whyNot={(d) => whyNotPlayable(d, t.format, spoilerRule)}
+                onPick={(id) => {
+                  setDeckId(id);
+                  setPicking(false);
+                }}
+                onClose={() => setPicking(false)}
+                onFavorite={toggleFavorite}
+              />
+            )}
             <div className="btn-row">
               <button
                 className="btn primary"

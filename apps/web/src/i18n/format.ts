@@ -24,3 +24,17 @@ export const fmtNumber = (n: number, locale?: Locale) => n.toLocaleString(loc(lo
 
 /** Bounty em Berries: ฿ 12.345. */
 export const fmtBerries = (n: number, locale?: Locale) => `฿ ${fmtNumber(n, locale)}`;
+
+/** "há 2 horas", "ontem", "há 3 semanas"… (relativo a `now`, pelo Intl do navegador). */
+export function fmtAgo(ms: number, locale?: Locale, now = Date.now()): string {
+  const rtf = new Intl.RelativeTimeFormat(loc(locale), { numeric: 'auto' });
+  const s = Math.round((ms - now) / 1000);
+  const abs = Math.abs(s);
+  if (abs < 60) return rtf.format(0, 'minute');
+  if (abs < 3600) return rtf.format(Math.round(s / 60), 'minute');
+  if (abs < 86_400) return rtf.format(Math.round(s / 3600), 'hour');
+  if (abs < 7 * 86_400) return rtf.format(Math.round(s / 86_400), 'day');
+  if (abs < 30 * 86_400) return rtf.format(Math.round(s / (7 * 86_400)), 'week');
+  if (abs < 365 * 86_400) return rtf.format(Math.round(s / (30 * 86_400)), 'month');
+  return rtf.format(Math.round(s / (365 * 86_400)), 'year');
+}
