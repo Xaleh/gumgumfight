@@ -11,6 +11,32 @@ export function registerServiceWorker() {
   });
 }
 
+/** Hora da última recarga por arquivo de uma versão anterior (evita recarregar sem fim). */
+const STALE_RELOAD = 'gumgum.staleReload';
+/** Outra falha dentro deste intervalo não recarrega de novo: o erro aparece na tela. */
+const STALE_RELOAD_MS = 30_000;
+
+/**
+ * Deploy novo com o app aberto: as telas carregadas sob demanda (painel do meta, kit de
+ * divulgação, lobby do torneio, idiomas) apontam para arquivos da versão anterior, que não
+ * existem mais no servidor nem no cache do service worker. Sem isto, a falha cai na proteção
+ * de erros da raiz e o app volta para a tela inicial; aqui a página recarrega uma vez e
+ * pega a versão nova.
+ */
+export function reloadOnStaleChunks() {
+  window.addEventListener('vite:preloadError', () => {
+    try {
+      const last = Number(sessionStorage.getItem(STALE_RELOAD));
+      if (last && Date.now() - last < STALE_RELOAD_MS) return;
+      sessionStorage.setItem(STALE_RELOAD, String(Date.now()));
+    } catch {
+      // Sem armazenamento não há como saber se já recarregou: melhor não arriscar um loop.
+      return;
+    }
+    location.reload();
+  });
+}
+
 // ------------------------------------------------------------------ instalação
 
 /** Evento do Chrome/Edge/Samsung que permite abrir o pedido de instalação a partir de um botão. */

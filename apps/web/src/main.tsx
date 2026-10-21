@@ -6,7 +6,7 @@ import { AccessGate } from './components/AccessGate';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { isReplayPath, parseReplayEmbed } from './embed';
 import { loadLocale, t } from './i18n';
-import { registerServiceWorker } from './pwa';
+import { registerServiceWorker, reloadOnStaleChunks } from './pwa';
 import { initialLocale, SettingsProvider } from './settings';
 import './styles.css';
 
@@ -14,6 +14,7 @@ import './styles.css';
 // inteiro para o cache dentro do site do parceiro) e no idioma do link (`lang=`), se houver.
 const replayPage = isReplayPath(location.pathname);
 if (!replayPage) registerServiceWorker();
+reloadOnStaleChunks();
 const linkLocale = replayPage ? parseReplayEmbed(location.pathname, location.search)?.lang : undefined;
 
 // Dicionário do idioma salvo antes do primeiro render, para a tela não piscar em português.
