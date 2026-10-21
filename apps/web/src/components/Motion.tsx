@@ -237,8 +237,10 @@ function capture(root: Element | null): Boxes {
       const r = el.getBoundingClientRect();
       const w = dons[0]?.offsetWidth || donWidth(root) || Math.min(r.width, r.height / 1.396);
       if (r.width || r.height) {
+        // O lado direito da mesa lateral é girado 180°: lá o primeiro DON!! fica no fim da coluna.
+        const flip = Boolean(el.closest('.lat-half.right'));
         b = el.classList.contains('lat-dons')
-          ? { x: r.left + w * 0.698, y: r.top + w / 2, w, h: w * 1.396, rot: true }
+          ? { x: flip ? r.right - w * 0.698 : r.left + w * 0.698, y: flip ? r.bottom - w / 2 : r.top + w / 2, w, h: w * 1.396, rot: true }
           : { x: r.left + r.width / 2, y: r.top + r.height / 2, w, h: w * 1.396 };
       }
     } else if (name.startsWith('dondeck-') && el.querySelector('.lat-donback')) {
@@ -519,7 +521,8 @@ function donPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, 
     const poolB = b.donActive + b.donRested;
     let deckOut = Math.max(0, a.donDeck - b.donDeck);
     let deckIn = Math.max(0, b.donDeck - a.donDeck);
-    let poolGain = Math.max(0, poolB - poolA + incs.length - decs.length);
+    /** DON!! que chegam à área de custo (das cartas e do deck de DON!!). */
+    let poolGain = Math.max(0, poolB - poolA + incs.length);
     const deckBox = (boxes: Boxes) => boxes.get(`anchor:dondeck-${p}`);
     const poolEls = Array.from(root.querySelectorAll<HTMLElement>(`[data-anchor="don-${p}"] > .don-card, [data-anchor="don-${p}"] > .lat-don > .don-card`));
     let newSlot = 0;
