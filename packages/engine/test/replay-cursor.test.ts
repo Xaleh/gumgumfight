@@ -70,3 +70,21 @@ describe('ReplayCursor', () => {
     expect(c.seek(10)).toEqual(states[10]);
   });
 });
+
+describe('replay gravado com um motor anterior', () => {
+  it('uma jogada que o motor de hoje recusa não impede o replay de abrir: ele anda até ela', () => {
+    // Uma resposta a uma pergunta aberta, gravada como se fosse do outro jogador: o motor de hoje
+    // recusa ("Aguardando o outro jogador."), como acontece quando a regra mudou depois do jogo.
+    const k = replay.actions.findIndex((a, i) => i > 40 && (a.type === 'pass' || a.type === 'choose'));
+    const bad = { ...replay.actions[k], player: (1 - replay.actions[k].player) as PlayerId };
+    const actions = [...replay.actions.slice(0, k), bad, ...replay.actions.slice(k + 1)];
+    let upgraded: Action[] = [];
+    expect(() => (upgraded = upgradeReplayActions(config, actions))).not.toThrow();
+    // O roteiro segue como estava a partir da jogada recusada (nada se perde).
+    expect(upgraded.slice(-(actions.length - k))).toEqual(actions.slice(k));
+    const cursor = new ReplayCursor(start(), upgraded);
+    cursor.seek(upgraded.length);
+    expect(cursor.failed).toMatchObject({ index: upgraded.indexOf(bad), message: 'Aguardando o outro jogador.' });
+    expect(cursor.pos).toBe(upgraded.indexOf(bad));
+  });
+});
