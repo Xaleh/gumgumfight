@@ -3,10 +3,12 @@ import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useSt
 import {
   type AdminSponsor,
   api,
+  APP_OUTCOMES,
   canPlay,
   currentSpoilerSet,
   type DeckSummary,
   isAdmin,
+  type JudgePlays,
   type OnlineSeat,
   type OrganizeLimits,
   type PrizeInput,
@@ -28,6 +30,8 @@ import {
   whyNotPlayable,
 } from '../api';
 import { useAuth } from '../auth';
+import { playsFromSetup } from '../game/judgePlays';
+import { setupFromReplay } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { type Locale, type MessageKey, type Translate, tryT, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtTime } from '../i18n/format';
@@ -36,6 +40,7 @@ import { DeckPicker } from './DeckPicker';
 import { DeckStateChip, LeaderBanner, useFavoriteToggle } from './DeckTile';
 import { useNow } from './HomeBlocks';
 import { Icon } from './Icons';
+import { PlaysSheet } from './JudgePlays';
 import { LeaderArt } from './LeaderArt';
 import { openReplay, ReportsPanel } from './Reports';
 import { SupportModal } from './Support';
@@ -805,6 +810,8 @@ function TournamentPage({
   const [viewRound, setViewRound] = useState<number | null>(null);
   const [recapOpen, setRecapOpen] = useState(false);
   const [lobbyOpen, setLobbyOpen] = useState(Boolean(initialLobby));
+  /** "Jogadas e escolhas" de um jogo gravado (Judge e organizador). */
+  const [plays, setPlays] = useState<JudgePlays | null>(null);
 
   const load = useCallback(
     () =>
@@ -1090,6 +1097,7 @@ function TournamentPage({
                 {t.status !== 'registration' && <p className="muted small">{tr('tour.manageHint')}</p>}
               </section>
             )}
+            {plays && <PlaysSheet data={plays} onClose={() => setPlays(null)} />}
             {recapOpen && t.canManage && (
               <Suspense fallback={null}>
                 <TournamentRecap id={t.id} onClose={() => setRecapOpen(false)} />
@@ -1160,6 +1168,17 @@ function TournamentPage({
                       onDouble={(dropBoth) => run(() => api.tournaments.doubleLoss(t.id, m.id, dropBoth))}
                       onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(t.isJudge ? { judge: true } : {}) })}
                       onReplay={(statsMatchId) => run(() => openReplay(statsMatchId, onReplay))}
+                      onPlays={
+                        t.isJudge || t.canManage
+                          ? (statsMatchId) =>
+                              run(() =>
+                                api.matches
+                                  .replay(statsMatchId)
+                                  .then((r) => setupFromReplay(r as never))
+                                  .then((setup) => setPlays(playsFromSetup(setup))),
+                              )
+                          : undefined
+                      }
                       replaysSealed={t.status === 'running' && !t.canManage && !t.isJudge && Boolean(user && (m.p1.userId === user.id || m.p2?.userId === user.id))}
                     />
                   ))}
@@ -1604,6 +1623,7 @@ function MatchRow({
   onDouble,
   onWatch,
   onReplay,
+  onPlays,
   replaysSealed,
 }: {
   m: TournamentMatchInfo;
@@ -1628,6 +1648,8 @@ function MatchRow({
   onWatch: () => void;
   /** Abre o replay gravado de um jogo da série. */
   onReplay: (statsMatchId: number) => void;
+  /** Judge e organizador: as jogadas do jogo gravado, com o que cada jogador escolheu. */
+  onPlays?: (statsMatchId: number) => void;
 }) {
   const tr = useT();
   const locale = useLocale();
@@ -1734,6 +1756,11 @@ function MatchRow({
                 {g.statsMatchId !== null && (
                   <button className="btn small" disabled={busy} onClick={() => onReplay(g.statsMatchId!)}>
                     {tr('tour.watchReplay')}
+                  </button>
+                )}
+                {g.statsMatchId !== null && onPlays && (
+                  <button className="btn small" disabled={busy} onClick={() => onPlays(g.statsMatchId!)}>
+                    {tr('tour.gamePlays')}
                   </button>
                 )}
               </li>
@@ -2366,6 +2393,17 @@ function Incidents({
                     c.resolvedAt ? tr('tour.incidentResolved', { name: c.resolvedByName ?? '?', time: time(c.resolvedAt, locale) }) : tr('tour.incidentStillOpen'),
                   )}
                 </span>
+                {(c.reason || c.details) && (
+                  <span className="small">
+                    {dots(c.reason && tr(`judge.reason.${c.reason}`), c.details && `“${c.details}”`, c.play !== null && tr('judge.callPlay', { n: c.play + 1, turn: c.playTurn ?? '?' }))}
+                  </span>
+                )}
+                {c.outcome && (
+                  <span className="small">
+                    <b>{tr(`judge.outcome.${c.outcome}`)}</b>
+                    {APP_OUTCOMES.includes(c.outcome) && ` · ${tr(c.reportId !== null ? 'tour.incidentFixFiled' : 'tour.incidentFixWaiting')}`}
+                  </span>
+                )}
                 {c.note && <span className="small tour-incident-note">{c.note}</span>}
               </li>
             ))}

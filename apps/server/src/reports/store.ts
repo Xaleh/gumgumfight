@@ -164,6 +164,10 @@ export interface MatchReport {
   resolvedAt: string | null;
   resolvedBy: string | null;
   note: string | null;
+  /** `judge`: chamado de ajuste aberto sozinho quando o Judge precisou corrigir a mesa (erro do app). */
+  source: 'player' | 'judge';
+  /** A jogada do problema (posição da ação no replay), quando se sabe. */
+  play: number | null;
 }
 
 /** O formulário do relato. */
@@ -189,9 +193,11 @@ type ReportRow = {
   resolved_at: string | null;
   resolved_by: string | null;
   note: string | null;
+  source: string | null;
+  play: number | null;
 };
 
-const REPORT_COLS = `r.id, r.match_id, r.tournament_id, r.reporter_id, p.name AS reporter_name, r.text, r.card, r.expected, r.notify, r.notified_at, r.created_at, r.resolved_at, r.resolved_by, r.note`;
+const REPORT_COLS = `r.id, r.match_id, r.tournament_id, r.reporter_id, p.name AS reporter_name, r.text, r.card, r.expected, r.notify, r.notified_at, r.created_at, r.resolved_at, r.resolved_by, r.note, r.source, r.play`;
 const REPORT_FROM = `FROM match_reports r LEFT JOIN players p ON p.owner_hash = 'user:' || r.reporter_id`;
 
 const toReport = (r: ReportRow): MatchReport => ({
@@ -209,6 +215,8 @@ const toReport = (r: ReportRow): MatchReport => ({
   resolvedAt: r.resolved_at,
   resolvedBy: r.resolved_by,
   note: r.note,
+  source: r.source === 'judge' ? 'judge' : 'player',
+  play: r.play,
 });
 
 /** Relato de um jogador sobre a partida (um por jogador e partida: relatar de novo troca o formulário e reabre). */
@@ -221,6 +229,21 @@ export function createReport(db: DB, matchId: number, tournamentId: string | nul
   ).run(matchId, tournamentId, reporterId, input.text, input.card, input.expected, input.notify ? 1 : 0);
   const r = db.prepare(`SELECT ${REPORT_COLS} ${REPORT_FROM} WHERE r.match_id = ? AND r.reporter_id = ?`).get(matchId, reporterId) as ReportRow;
   return toReport(r);
+}
+
+/**
+ * Chamado de ajuste da plataforma aberto pelo Judge (erro do app que precisou de correção na mesa). Um por
+ * Judge e partida, como os relatos: um segundo chamado na mesma partida soma o texto e reabre o relato.
+ */
+export function createJudgeReport(db: DB, matchId: number, tournamentId: string, judgeId: string, input: { text: string; card: string | null; play: number | null }): number {
+  dataVersion.bump();
+  db.prepare(
+    `INSERT INTO match_reports (match_id, tournament_id, reporter_id, text, card, expected, notify, source, play) VALUES (?, ?, ?, ?, ?, NULL, 0, 'judge', ?)
+     ON CONFLICT(match_id, reporter_id) DO UPDATE SET text = match_reports.text || char(10) || char(10) || excluded.text,
+       card = COALESCE(match_reports.card, excluded.card), play = COALESCE(match_reports.play, excluded.play), source = 'judge',
+       resolved_at = NULL, resolved_by = NULL, note = NULL`,
+  ).run(matchId, tournamentId, judgeId, input.text, input.card, input.play);
+  return (db.prepare('SELECT id FROM match_reports WHERE match_id = ? AND reporter_id = ?').get(matchId, judgeId) as { id: number }).id;
 }
 
 export function getReport(db: DB, id: number): MatchReport | null {

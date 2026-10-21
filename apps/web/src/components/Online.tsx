@@ -421,15 +421,20 @@ export function SpectatorCount({ online }: { online: OnlineGame }) {
   );
 }
 
-/** Faixa do espectador: aviso de que está assistindo e, para streamer/admin, o botão "Ver mãos". */
+/**
+ * Faixa do espectador: aviso de que está assistindo, para streamer/admin o botão "Ver mãos" e, para o
+ * Judge ou o organizador do torneio que abriu a mesa por outro caminho (a lista "Ao vivo"), "Entrar como Judge".
+ */
 export function SpectatorBar({
   online,
   canHands,
   onToggleHands,
+  onJudge,
 }: {
   online: OnlineGame;
   canHands: boolean;
   onToggleHands: () => void;
+  onJudge?: () => void;
 }) {
   const t = useT();
   const n = online.room?.spectators ?? 1;
@@ -454,6 +459,11 @@ export function SpectatorBar({
         {t('online.watchChat')}
       </button>
       {online.room?.delay ? <DelayTag ms={online.room.delay} /> : null}
+      {onJudge && (
+        <button className="btn small primary" onClick={onJudge}>
+          {t('tour.watchAsJudge')}
+        </button>
+      )}
     </div>
   );
 }

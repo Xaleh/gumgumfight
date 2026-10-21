@@ -12741,6 +12741,41 @@ a.sponsor-card:hover {
   max-height: min(70vh, 640px);
   overflow-y: auto;
 }
+/* Coluna que rola: sem isto o navegador espreme os filhos (o campo do relato virava uma linha). */
+.judge-panel-body > *,
+.judge-manual > * {
+  flex-shrink: 0;
+}
+.judge-label {
+  font-weight: 700;
+}
+.judge-panel-body .btn.link {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-decoration: underline;
+  color: inherit;
+}
+.judge-help {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+.judge-behalf {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--panel2);
+}
+.judge-behalf h4,
+.judge-behalf p {
+  margin: 0;
+}
 .judge-manual {
   display: flex;
   flex-direction: column;
@@ -12770,7 +12805,37 @@ a.sponsor-card:hover {
 .judge-manual textarea.invalid {
   border-color: var(--danger);
 }
-.judge-history {
+
+/* "Jogadas e escolhas" (Judge e organizador) */
+.plays-sheet .sheet-body {
+  gap: 10px;
+}
+.plays-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.plays-tools input[type='text'],
+.plays-tools .admin-search {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.plays-undo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--danger);
+}
+.plays-undo p {
+  margin: 0;
+}
+.plays-undo textarea.invalid {
+  border-color: var(--danger);
+}
+.plays-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -12778,16 +12843,167 @@ a.sponsor-card:hover {
   padding: 0;
   list-style: none;
 }
-.judge-history li {
+.plays-turn {
+  margin-top: 6px;
+  font-weight: 900;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.plays-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 6px 8px;
-  border-radius: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
   background: var(--panel2);
+  border-left: 3px solid transparent;
 }
-.judge-history li .btn {
+.plays-row.answer {
+  border-left-color: var(--gold);
+}
+.plays-row.judge {
+  border-left-color: var(--danger);
+}
+.plays-row .btn {
   align-self: flex-start;
+}
+.plays-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+.plays-n {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.plays-ask {
+  overflow-wrap: anywhere;
+}
+.plays-by {
+  color: var(--danger);
+  font-weight: 700;
+}
+.plays-row.pointed {
+  outline: 2px solid var(--gold);
+}
+.plays-pointed {
+  font-weight: 800;
+}
+
+/* Chamar o Judge (jogador): o motivo, a linha do histórico e o texto */
+.call-sheet .sheet-body {
+  gap: 10px;
+}
+.call-sheet .sheet-body > * {
+  flex-shrink: 0;
+}
+.call-sheet h4 {
+  margin: 4px 0 0;
+}
+.call-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.call-reasons .btn.on,
+.judge-panel .btn.on {
+  background: var(--panel2);
+  border-color: var(--gold);
+}
+.call-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.call-line {
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.call-line.on {
+  border-color: var(--gold);
+  background: var(--panel2);
+  font-weight: 700;
+}
+
+/* Painel do Judge: o chamado aberto e o desfecho */
+.judge-call-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--gold);
+}
+.judge-call-box q {
+  font-style: italic;
+}
+.judge-outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.judge-outcomes p {
+  margin: 0;
+}
+.judge-outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+}
+.judge-outcome {
+  justify-content: flex-start;
+  text-align: left;
+}
+/* O painel estica os campos de texto; o botão de escolha fica do tamanho dele. */
+.judge-panel-body .judge-outcome input {
+  width: auto;
+  flex: none;
+  margin: 2px 0 0;
+}
+.judge-outcome.on {
+  font-weight: 700;
+}
+.plays-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.plays-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.plays-chip.on {
+  border-color: var(--ok);
+  font-weight: 800;
+}
+.plays-lines {
+  margin: 0;
+  padding-left: 16px;
 }
 
 /* ------------------------------------------------------------------ torneio: warnings, judges, ocorrências */

@@ -5,6 +5,7 @@ import type { DeckList } from '@gumgum/engine';
 import { isAdmin, type User } from '../auth/store';
 import { dataVersion } from '../cache';
 import { type DB, transaction } from '../db';
+import { createJudgeReport } from '../reports/store';
 import type { FormatId, PlayFormat } from '../stats/catalog';
 import { type MatchResult, type Pairing, type Stage, type Structure, type TMatch, type TPlayer, winsNeeded } from './pairing';
 
@@ -777,6 +778,8 @@ export function reportFromGame(
     `INSERT INTO tournament_games (tournament_id, match_id, game, stats_match_id, room_id, winner, counted, played_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
   ).run(t.id, m.id, m.wins[0] + m.wins[1] + 1, game.statsMatchId, game.roomId, game.winner, counted ? 1 : 0);
+  // O jogo gravado leva os chamados de ajuste que esperavam pelo replay.
+  fileFixReports(db, t.id, m.id);
   if (t.status !== 'running' || m.roomId !== game.roomId) return;
   const wins: [number, number] = [...m.wins];
   if (!m.result && game.winner === m.p1) wins[0]++;
@@ -840,6 +843,27 @@ export function actsAsJudge(db: DB, t: Pick<Tournament, 'id' | 'organizerId'>, u
 
 // ------------------------------------------------------------------ chamados de Judge
 
+/** O que o jogador relata ao chamar o Judge (um toque, em vez de escrever). */
+export const CALL_REASONS = ['effect', 'choice', 'misclick', 'stuck', 'rules', 'conduct', 'other'] as const;
+export type CallReason = (typeof CALL_REASONS)[number];
+
+/**
+ * Como o Judge fecha o chamado (um toque, em vez de escrever o relato): `no_issue` = a jogada estava certa
+ * (erro de escolha do jogador), `misclick` = o jogador errou e o Judge voltou a jogada para ele refazer,
+ * `app_fixed`/`app_unfixed` = erro do app, com ou sem correção na mesa (os dois abrem o chamado de ajuste
+ * da plataforma, `APP_OUTCOMES`), `rules` = dúvida de regra, `conduct` = conduta, `other` = outro (com o relato).
+ */
+export const CALL_OUTCOMES = ['no_issue', 'misclick', 'app_fixed', 'app_unfixed', 'rules', 'conduct', 'other'] as const;
+export type CallOutcome = (typeof CALL_OUTCOMES)[number];
+export const APP_OUTCOMES: readonly CallOutcome[] = ['app_fixed', 'app_unfixed'];
+
+/** Chamado de ajuste da plataforma, esperando o jogo ser gravado para virar um relato (com o replay). */
+export interface CallFix {
+  text: string;
+  card: string | null;
+  play: number | null;
+}
+
 export interface TournamentCall {
   id: number;
   matchId: number;
@@ -850,6 +874,20 @@ export interface TournamentCall {
   resolvedBy: string | null;
   resolvedAt: string | null;
   note: string | null;
+  /** O motivo escolhido por quem chamou (null = chamado antigo, ou aberto pelo próprio Judge). */
+  reason: CallReason | null;
+  /** O texto de quem chamou (opcional). */
+  details: string | null;
+  /** A jogada relatada (posição da ação na partida) e o turno dela. */
+  play: number | null;
+  playTurn: number | null;
+  /** A jogada apontada e as seguintes, em texto, como estavam ao chamar (para o chamado de ajuste). */
+  playText: string | null;
+  /** O desfecho escolhido pelo Judge ao retomar. */
+  outcome: CallOutcome | null;
+  fix: CallFix | null;
+  /** O relato (match_reports) aberto para o ajuste da plataforma. */
+  reportId: number | null;
 }
 
 type CallRow = {
@@ -862,6 +900,14 @@ type CallRow = {
   resolved_by: string | null;
   resolved_at: string | null;
   note: string | null;
+  reason: string | null;
+  details: string | null;
+  play: number | null;
+  play_turn: number | null;
+  play_text: string | null;
+  outcome: string | null;
+  fix: string | null;
+  report_id: number | null;
 };
 
 const toCall = (r: CallRow): TournamentCall => ({
@@ -874,9 +920,17 @@ const toCall = (r: CallRow): TournamentCall => ({
   resolvedBy: r.resolved_by,
   resolvedAt: r.resolved_at,
   note: r.note,
+  reason: (CALL_REASONS as readonly string[]).includes(r.reason ?? '') ? (r.reason as CallReason) : null,
+  details: r.details,
+  play: r.play,
+  playTurn: r.play_turn,
+  playText: r.play_text,
+  outcome: (CALL_OUTCOMES as readonly string[]).includes(r.outcome ?? '') ? (r.outcome as CallOutcome) : null,
+  fix: r.fix ? (JSON.parse(r.fix) as CallFix) : null,
+  reportId: r.report_id,
 });
 
-const CALL_COLS = 'id, match_id, room_id, game, opened_by, opened_at, resolved_by, resolved_at, note';
+const CALL_COLS = 'id, match_id, room_id, game, opened_by, opened_at, resolved_by, resolved_at, note, reason, details, play, play_turn, play_text, outcome, fix, report_id';
 
 export function listCalls(db: DB, tournamentId: string): TournamentCall[] {
   return (db.prepare(`SELECT ${CALL_COLS} FROM tournament_calls WHERE tournament_id = ? ORDER BY opened_at DESC, id DESC`).all(tournamentId) as CallRow[]).map(
@@ -892,20 +946,67 @@ export function openCall(db: DB, tournamentId: string, matchId: number): Tournam
   return r ? toCall(r) : null;
 }
 
-export function createCall(db: DB, tournamentId: string, c: { matchId: number; roomId: string | null; game: number; openedBy: string; at: string }): TournamentCall {
+export function createCall(
+  db: DB,
+  tournamentId: string,
+  c: {
+    matchId: number;
+    roomId: string | null;
+    game: number;
+    openedBy: string;
+    at: string;
+    reason?: CallReason | null;
+    details?: string | null;
+    play?: { count: number; turn: number; text: string | null } | null;
+  },
+): TournamentCall {
   dataVersion.bump();
   const { lastInsertRowid } = db
-    .prepare('INSERT INTO tournament_calls (tournament_id, match_id, room_id, game, opened_by, opened_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(tournamentId, c.matchId, c.roomId, c.game, c.openedBy, c.at);
+    .prepare(
+      'INSERT INTO tournament_calls (tournament_id, match_id, room_id, game, opened_by, opened_at, reason, details, play, play_turn, play_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+    .run(tournamentId, c.matchId, c.roomId, c.game, c.openedBy, c.at, c.reason ?? null, c.details ?? null, c.play?.count ?? null, c.play?.turn ?? null, c.play?.text ?? null);
   return toCall(db.prepare(`SELECT ${CALL_COLS} FROM tournament_calls WHERE id = ?`).get(Number(lastInsertRowid)) as CallRow);
 }
 
-/** Fecha os chamados abertos da partida (a sala voltou a correr), com o relato do Judge. */
-export function resolveCalls(db: DB, tournamentId: string, matchId: number, by: string, at: string, note: string | null) {
+/**
+ * Fecha os chamados abertos da partida (a sala voltou a correr), com o relato e o desfecho escolhido pelo
+ * Judge. Com `fix` (erro do app), o chamado de ajuste da plataforma sai assim que o jogo estiver gravado.
+ */
+export function resolveCalls(
+  db: DB,
+  tournamentId: string,
+  matchId: number,
+  by: string,
+  at: string,
+  note: string | null,
+  close: { outcome?: CallOutcome | null; fix?: CallFix | null } = {},
+) {
   dataVersion.bump();
   db.prepare(
-    'UPDATE tournament_calls SET resolved_by = ?, resolved_at = ?, note = ? WHERE tournament_id = ? AND match_id = ? AND resolved_at IS NULL',
-  ).run(by, at, note, tournamentId, matchId);
+    'UPDATE tournament_calls SET resolved_by = ?, resolved_at = ?, note = ?, outcome = ?, fix = ? WHERE tournament_id = ? AND match_id = ? AND resolved_at IS NULL',
+  ).run(by, at, note, close.outcome ?? null, close.fix ? JSON.stringify(close.fix) : null, tournamentId, matchId);
+  fileFixReports(db, tournamentId, matchId);
+}
+
+/**
+ * Chamados de ajuste da plataforma (erro do app) da partida que ainda não viraram relato: cada um entra
+ * em "Relatos de partidas" (Admin e Dev, e a aba Relatos do torneio) assim que o jogo da sala do
+ * chamado está gravado, com o replay. Roda ao fechar o chamado e quando o jogo é gravado.
+ */
+export function fileFixReports(db: DB, tournamentId: string, matchId: number) {
+  const rows = db
+    .prepare(
+      `SELECT c.id, c.resolved_by, c.fix, g.stats_match_id FROM tournament_calls c
+       JOIN tournament_games g ON g.tournament_id = c.tournament_id AND g.match_id = c.match_id AND g.room_id = c.room_id
+       WHERE c.tournament_id = ? AND c.match_id = ? AND c.fix IS NOT NULL AND c.report_id IS NULL AND c.resolved_by IS NOT NULL
+         AND g.stats_match_id IS NOT NULL`,
+    )
+    .all(tournamentId, matchId) as Array<{ id: number; resolved_by: string; fix: string; stats_match_id: number }>;
+  for (const r of rows) {
+    const reportId = createJudgeReport(db, r.stats_match_id, tournamentId, r.resolved_by, JSON.parse(r.fix) as CallFix);
+    db.prepare('UPDATE tournament_calls SET report_id = ? WHERE id = ?').run(reportId, r.id);
+  }
 }
 
 // ------------------------------------------------------------------ modo manual do Judge (auditoria)

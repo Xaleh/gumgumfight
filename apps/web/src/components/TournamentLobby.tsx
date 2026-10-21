@@ -97,6 +97,7 @@ export default function TournamentLobby({
                 <span className="lobby-call-ico">⚖</span>
                 <div className="lobby-call-text">
                   <strong>{tr('lobby.callBanner', { table: c.table, a: c.names[0], b: c.names[1] })}</strong>
+                  {c.reason && <span className="small">{tr(`judge.reason.${c.reason}`)}</span>}
                   <span className="small">{tr('lobby.callSince', { time: clockTime(c.openedAt, locale) })}</span>
                 </div>
                 {c.roomId && (

@@ -86,6 +86,11 @@ import {
   addJudge,
   addPrize,
   addWarning,
+  APP_OUTCOMES,
+  CALL_OUTCOMES,
+  CALL_REASONS,
+  type CallOutcome,
+  type CallReason,
   checkInPlayer,
   createCall,
   countPlayers,
@@ -133,6 +138,7 @@ import {
   setReady,
   startRound,
   type Tournament,
+  type TournamentCall,
   type TournamentInput,
   type TournamentMatch,
   type TournamentPlayer,
@@ -144,6 +150,7 @@ import {
   vacateInMatch,
   warningStatus,
 } from './store';
+import { fixTicket, pointedText } from './calls';
 import { buildMeta } from './meta';
 import { buildRecap } from './recap';
 import { isApprentice } from '../tutorial/store';
@@ -1041,7 +1048,7 @@ export function registerTournamentRoutes(
         p1: side(m.p1, 0)!,
         p2: side(m.p2, 1),
         /** Chamado de Judge aberto (só o Judge e o organizador veem quem chamou e desde quando). */
-        call: call && judge ? { id: call.id, openedAt: call.openedAt, byName: byId.get(call.openedBy)?.name ?? '?' } : call ? { id: call.id, openedAt: call.openedAt, byName: null } : null,
+        call: call && judge ? { id: call.id, openedAt: call.openedAt, byName: byId.get(call.openedBy)?.name ?? '?', reason: call.reason } : call ? { id: call.id, openedAt: call.openedAt, byName: null, reason: null } : null,
       };
     });
     const pending = tables.filter((m) => m.p2 && !m.result);
@@ -1073,7 +1080,7 @@ export function registerTournamentRoutes(
       readyTables: pending.filter((m) => m.p1.ready && m.p2!.ready).length,
       /** Salas pedindo a presença do Judge agora (só o Judge e o organizador). */
       calls: judge
-        ? tables.filter((m) => m.call).map((m) => ({ matchId: m.id, table: m.table, roomId: m.roomId, openedAt: m.call!.openedAt, names: [m.p1.name, m.p2?.name ?? '?'] }))
+        ? tables.filter((m) => m.call).map((m) => ({ matchId: m.id, table: m.table, roomId: m.roomId, openedAt: m.call!.openedAt, names: [m.p1.name, m.p2?.name ?? '?'], reason: m.call!.reason }))
         : [],
     };
   });
@@ -1415,7 +1422,7 @@ export function registerTournamentRoutes(
    * "Chamar o Judge": um dos jogadores (ou o Judge/organizador) pausa a partida. O relógio para,
    * nenhuma jogada é aceita e os Judges e o organizador recebem o aviso.
    */
-  app.post<{ Params: { id: string; matchId: string } }>('/api/tournaments/:id/matches/:matchId/call', async (req, reply) => {
+  app.post<{ Params: { id: string; matchId: string }; Body: { reason?: unknown; details?: unknown; logIndex?: unknown } }>('/api/tournaments/:id/matches/:matchId/call', async (req, reply) => {
     const me = account(req, reply);
     if (!me) return reply;
     const t = getTournament(db, req.params.id);
@@ -1427,9 +1434,17 @@ export function registerTournamentRoutes(
     const judge = isJudge(t, me);
     if (!player && !judge) return reply.code(403).send(fail('notYourMatch', 'Esta partida não é sua.'));
     const seat = player ? room.data.seats.findIndex((s) => s.userId === me.id) : -1;
+    // O relato de quem chama (tudo opcional): o motivo, um texto e a linha do histórico da jogada do problema
+    // (o histórico de quem joga tem as mesmas linhas do da partida; a sala acha a jogada que a gerou).
+    const reason = (CALL_REASONS as readonly unknown[]).includes(req.body?.reason) ? (req.body!.reason as CallReason) : null;
+    const details = manualNote(req.body?.details) || null;
+    const logIndex = req.body?.logIndex;
+    const at = typeof logIndex === 'number' && Number.isInteger(logIndex) && logIndex >= 0 ? room.playAtLine(logIndex) : null;
+    const plays = at ? room.plays() : null;
+    const play = at && plays && room.state ? { ...at, text: pointedText(room.state, plays, at.count) } : null;
     const r = room.pause(seat === 0 || seat === 1 ? seat : null);
     if (!r.ok) return reply.code(r.code).send(fail(r.errorCode ?? 'invalidAction', r.error, r.errorParams));
-    const call = createCall(db, t.id, { matchId: m.id, roomId: room.id, game: m.wins[0] + m.wins[1] + 1, openedBy: me.id, at: nowIso() });
+    const call = createCall(db, t.id, { matchId: m.id, roomId: room.id, game: m.wins[0] + m.wins[1] + 1, openedBy: me.id, at: nowIso(), reason, details, play });
     const names = listPlayers(db, t.id);
     const name = (id: string | null) => names.find((p) => p.userId === id)?.name ?? '?';
     app.log.info(`torneio ${t.id}: chamado de Judge ${call.id} na partida ${m.id} (mesa ${m.table}) por ${me.id}`);
@@ -1440,19 +1455,85 @@ export function registerTournamentRoutes(
     return { callId: call.id };
   });
 
-  /** O Judge (ou o organizador) retoma a partida pausada; `note` é o relato dele ao organizador. */
-  app.post<{ Params: { id: string; matchId: string }; Body: { note?: unknown } }>('/api/tournaments/:id/matches/:matchId/resume', async (req, reply) => {
+  /** Intervenções do Judge na partida desde que o chamado abriu (desfazer e correções). */
+  const callFixes = (t: Tournament, m: TournamentMatch, call: TournamentCall) =>
+    listInterventions(db, t.id)
+      .filter((i) => i.matchId === m.id && i.at >= call.openedAt && (i.kind === 'undo' || i.kind === 'judge_action'))
+      .reverse();
+
+  /** O chamado de ajuste da plataforma do chamado aberto (null sem chamado ou sem a partida). */
+  const callFix = (t: Tournament, m: TournamentMatch, room: NonNullable<ReturnType<Lobby['get']>>, me: User, outcome: CallOutcome, note: string | null) => {
+    const call = openCall(db, t.id, m.id);
+    const plays = room.plays();
+    if (!call || !plays || !room.state) return null;
+    const names = new Map(listPlayers(db, t.id).map((p) => [p.userId, p.name]));
+    return fixTicket({
+      call,
+      outcome,
+      note,
+      judgeName: publicName(me),
+      callerName: names.get(call.openedBy) ?? findPlayer(db, accountOwnerKey(call.openedBy))?.name ?? '?',
+      where: `${t.name}, rodada ${m.round}, mesa ${m.table}, jogo ${gameOf(m)}`,
+      state: room.state,
+      plays,
+      fixes: callFixes(t, m, call),
+    });
+  };
+
+  /**
+   * O chamado aberto da partida, para o painel do Judge: quem chamou, o motivo, o texto e a jogada apontada,
+   * e o que o Judge já fez desde então (`undone`/`fixes`: o desfecho "erro do app" já vem sugerido).
+   */
+  app.get<{ Params: { id: string; matchId: string } }>('/api/tournaments/:id/matches/:matchId/call', async (req, reply) => {
+    const found = judged(req, reply);
+    if (!found) return reply;
+    const { t } = found;
+    const m = getMatch(db, t.id, Number(req.params.matchId));
+    if (!m) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
+    const call = openCall(db, t.id, m.id);
+    if (!call) return { call: null };
+    const fixes = callFixes(t, m, call);
+    const names = new Map(listPlayers(db, t.id).map((p) => [p.userId, p.name]));
+    return {
+      call: {
+        id: call.id,
+        openedAt: call.openedAt,
+        byName: names.get(call.openedBy) ?? findPlayer(db, accountOwnerKey(call.openedBy))?.name ?? '?',
+        /** Chamado por um dos jogadores (e não pelo próprio Judge ou pelo organizador). */
+        byPlayer: call.openedBy === m.p1 || call.openedBy === m.p2,
+        reason: call.reason,
+        details: call.details,
+        play: call.play,
+        playTurn: call.playTurn,
+        undone: fixes.filter((f) => f.kind === 'undo').reduce((n, f) => n + (f.removed?.length ?? 0), 0),
+        fixes: fixes.filter((f) => f.kind === 'judge_action').length,
+      },
+    };
+  });
+
+  /**
+   * O Judge (ou o organizador) retoma a partida pausada, com o desfecho do chamado (`outcome`, um toque:
+   * `CALL_OUTCOMES`) e, opcional, o relato ao organizador (`note`, obrigatório só no "outro"). Erro do app
+   * (`APP_OUTCOMES`) abre o chamado de ajuste da plataforma para Admin e Dev.
+   */
+  app.post<{ Params: { id: string; matchId: string }; Body: { note?: unknown; outcome?: unknown } }>('/api/tournaments/:id/matches/:matchId/resume', async (req, reply) => {
     const found = judged(req, reply);
     if (!found) return reply;
     const { t, me } = found;
     const live = liveMatch(t, Number(req.params.matchId));
     if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
     const { m, room } = live;
+    const raw = req.body?.outcome;
+    if (raw !== undefined && raw !== null && !(CALL_OUTCOMES as readonly unknown[]).includes(raw)) return reply.code(400).send(fail('invalidOutcome', 'Desfecho inválido.'));
+    const outcome = (raw ?? null) as CallOutcome | null;
+    const note = typeof req.body?.note === 'string' && req.body.note.trim() ? req.body.note.trim().slice(0, REASON_MAX) : null;
+    if (outcome === 'other' && !note) return reply.code(400).send(fail('outcomeNoteRequired', 'Escreva o que aconteceu.'));
+    // O chamado de ajuste lê a mesa antes de a partida voltar a correr.
+    const fix = outcome && APP_OUTCOMES.includes(outcome) ? callFix(t, m, room, me, outcome, note) : null;
     const manual = Boolean(room.manualMode);
     const r = room.resume();
     if (!r.ok) return reply.code(r.code).send(fail(r.errorCode ?? 'invalidAction', r.error, r.errorParams));
-    const note = typeof req.body?.note === 'string' && req.body.note.trim() ? req.body.note.trim().slice(0, REASON_MAX) : null;
-    resolveCalls(db, t.id, m.id, me.id, nowIso(), note);
+    resolveCalls(db, t.id, m.id, me.id, nowIso(), note, { outcome, fix });
     // Retomar também encerra o modo manual.
     if (manual) addIntervention(db, t.id, { matchId: m.id, roomId: room.id, game: gameOf(m), userId: me.id, role: interventionRole(t, me), kind: 'manual_off', note, at: nowIso() });
     app.log.info(`torneio ${t.id}: partida ${m.id} retomada por ${me.id}${note ? ` (${note})` : ''}`);
@@ -1484,15 +1565,18 @@ export function registerTournamentRoutes(
     },
   );
 
-  /** Últimas jogadas da partida, para o Judge escolher até onde desfazer (só no modo manual). */
-  app.get<{ Params: { id: string; matchId: string } }>('/api/tournaments/:id/matches/:matchId/manual', async (req, reply) => {
+  /**
+   * Todas as jogadas da partida em andamento (`Room.plays`), para o Judge e o organizador conferirem o
+   * que cada jogador fez e escolheu (a pergunta aberta, as opções que havia e a resposta) e, no modo
+   * manual, escolherem até onde desfazer. Não precisa do modo manual: conferir não pausa a mesa.
+   */
+  app.get<{ Params: { id: string; matchId: string } }>('/api/tournaments/:id/matches/:matchId/plays', async (req, reply) => {
     const found = judged(req, reply);
     if (!found) return reply;
     const live = liveMatch(found.t, Number(req.params.matchId));
     if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
-    const { room } = live;
-    if (!room.manualMode) return reply.code(409).send(fail('roomNotManual', 'A partida não está no modo manual.'));
-    return { actionCount: room.state?.actionCount ?? 0, history: room.history() };
+    const plays = live.room.plays();
+    return plays ?? reply.code(409).send(fail('matchNotStarted', 'A partida ainda não começou.'));
   });
 
   /** Desfaz as jogadas: ficam só as primeiras `to` ações (`seq`: a versão da mesa que o Judge viu). */
@@ -1545,8 +1629,8 @@ export function registerTournamentRoutes(
       if (!r.ok) return reply.code(r.code).send(fail(r.errorCode ?? 'invalidAction', r.error, r.errorParams));
       const at = nowIso();
       addIntervention(db, t.id, { matchId: m.id, roomId: room.id, game: gameOf(m), userId: me.id, role: interventionRole(t, me), kind: 'judge_action', payload: r.action, note, at });
-      // A correção terminou a partida: a sala voltou a correr sozinha e o chamado fecha.
-      if (!room.isPaused && openCall(db, t.id, m.id)) resolveCalls(db, t.id, m.id, me.id, at, note);
+      // A correção terminou a partida: a sala voltou a correr sozinha e o chamado fecha como erro do app corrigido.
+      if (!room.isPaused && openCall(db, t.id, m.id)) resolveCalls(db, t.id, m.id, me.id, at, note, { outcome: 'app_fixed', fix: callFix(t, m, room, me, 'app_fixed', note) });
       app.log.info(`torneio ${t.id}: partida ${m.id}: correção do Judge ${me.id} (${note})`);
       return { actionCount: r.actionCount };
     },
@@ -1628,7 +1712,7 @@ export function registerTournamentRoutes(
       return m ? { round: m.round, table: m.table, names: [name(m.p1), m.p2 ? name(m.p2) : null] } : null;
     };
     return {
-      calls: listCalls(db, t.id).map((c) => ({ ...c, openedByName: name(c.openedBy), resolvedByName: c.resolvedBy ? name(c.resolvedBy) : null, match: table(c.matchId) })),
+      calls: listCalls(db, t.id).map(({ fix: _fix, ...c }) => ({ ...c, openedByName: name(c.openedBy), resolvedByName: c.resolvedBy ? name(c.resolvedBy) : null, match: table(c.matchId) })),
       warnings: listWarnings(db, t.id)
         .slice()
         .reverse()

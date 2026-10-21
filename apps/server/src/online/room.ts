@@ -46,6 +46,7 @@ import {
   IllegalActionError,
   type LogEntry,
   type ManualOp,
+  type Pending,
   type PlayerId,
   REPLAY_VERSION,
   upgradeReplayActions,
@@ -62,6 +63,8 @@ export const ABANDON_MS = 2 * 60_000;
 const RATE_LIMIT = 60;
 const RATE_WINDOW_MS = 10_000;
 const MAX_ACTIONS = 5000;
+/** Respostas que o Judge dá no lugar do jogador, no modo manual (`Room.judgeAct`). */
+const JUDGE_ANSWERS = ['choose', 'answer', 'option', 'pass', 'manualDone', 'endTurn'] as const;
 /** Espectadores por sala. */
 export const MAX_SPECTATORS = 100;
 /** Atraso padrão da mesa de quem vê as mãos dos jogadores (ver o começo do arquivo). */
@@ -214,6 +217,11 @@ export interface RoomData {
    * pode desfazer jogadas (`judgeUndo`) e corrigir a mesa (`judgeAct`). Sai com `leaveManual` ou ao retomar.
    */
   manual?: { by: string; name: string; at: number } | null;
+  /**
+   * Respostas que o Judge deu no lugar do jogador (posição da ação → nome de quem respondeu): no
+   * replay elas são ações comuns do jogador, e as jogadas do Judge (`plays`) precisam dizer quem foi.
+   */
+  answeredBy?: Record<number, string>;
 }
 
 export interface Connection {
@@ -289,6 +297,78 @@ interface LateEvent {
   data: unknown;
 }
 
+/** Uma jogada da partida, para o Judge (ver `Room.plays`). */
+export interface JudgePlay {
+  /** Posição da ação: desfazer até `count` volta para antes dela. */
+  count: number;
+  turn: number;
+  player: PlayerId;
+  /** A ação, com os uids reais. */
+  action: Action;
+  /** A pergunta aberta antes da ação (null = o jogador agiu no próprio turno). */
+  pending: Pending | null;
+  /** Linhas do log que a ação gerou, com as secretas; `logFrom` = a posição da primeira no log da partida. */
+  lines: LogEntry[];
+  logFrom: number;
+  /** Resposta dada pelo Judge no lugar do jogador: o nome de quem respondeu. */
+  by?: string;
+}
+
+export interface JudgePlays {
+  actionCount: number;
+  names: [string, string];
+  plays: JudgePlay[];
+  /** A pergunta aberta agora (para o Judge responder no lugar do jogador). */
+  pending: Pending | null;
+  /** uid → número da carta, só das cartas citadas nas jogadas e nas perguntas. */
+  cards: Record<string, string>;
+  defs: Record<string, CardDef>;
+}
+
+/** Cartas citadas por uma ação. */
+function playRefs(a: Action): string[] {
+  switch (a.type) {
+    case 'playCard':
+    case 'activate':
+      return [a.uid];
+    case 'attachDon':
+    case 'detachDon':
+      return [a.target];
+    case 'attack':
+      return [a.attacker, a.target];
+    case 'counter':
+      return a.target ? [a.uid, a.target] : [a.uid];
+    case 'choose':
+      return a.uids;
+    case 'manual':
+    case 'judge':
+      return 'uid' in a.op ? [a.op.uid] : [];
+    default:
+      return [];
+  }
+}
+
+/** Cartas citadas por uma pergunta (as opções, a carta de origem, as mostradas). */
+function pendingRefs(p: Pending | null | undefined): string[] {
+  if (!p) return [];
+  switch (p.kind) {
+    case 'selectTargets':
+      return [p.source, ...p.options, ...(p.shown ?? [])];
+    case 'block':
+    case 'counter':
+      return p.options;
+    case 'lifeCard':
+      return [p.card];
+    case 'confirm':
+    case 'manual':
+      return [p.source];
+    case 'option':
+      return [p.source, ...(p.shown ?? []), ...(p.don ?? []).filter((d) => d !== 'active' && d !== 'rested')];
+    default:
+      return [];
+  }
+}
+
 /**
  * Atraso da mesa de uma conexão: jogadores, ao vivo; quem vê as mãos, nunca abaixo de `minHands`
  * (MIN_HANDS_DELAY_MS, ou 0 onde o organizador liberou as mãos ao vivo; ver `Room.handsLive`).
@@ -358,6 +438,8 @@ export class Room {
   /** Emotes, chat, dados e revanche dos últimos MAX_DELAY_MS (para as mesas atrasadas que surgirem). Só em memória. */
   private recentEvents: LateEvent[] = [];
   private lastAction: Action | null = null;
+  /** Caminho já refeito das jogadas para o Judge (`plays`); some quando a partida é refeita (desfazer). */
+  private playsCache: { state: GameState; plays: JudgePlay[] } | null = null;
   /** Último aviso de "sua vez" de cada assento. */
   private turnNoticeAt: [number, number] = [-Infinity, -Infinity];
   /** O jogador está com o app fora da tela (o navegador avisa em /focus). Só em memória. */
@@ -489,6 +571,7 @@ export class Room {
     this.data.startedAt ??= now;
     for (const a of this.data.actions) state = applyAction(state, a);
     this.state = state;
+    this.playsCache = null;
     this.lastAction = this.data.actions[this.data.actions.length - 1] ?? null;
     // O tempo em que o servidor ficou fora do ar não conta para ninguém.
     this.startClock();
@@ -712,22 +795,68 @@ export class Room {
   }
 
   /**
-   * Últimas `limit` ações, para o Judge escolher até onde desfazer: `count` é quantas ações ficam se ele
-   * voltar para antes desta, e `logFrom`/`logTo` são as linhas do log que ela gerou (o log da visão tem
-   * as mesmas linhas, na mesma ordem). Refaz a partida desde o começo (só no modo manual, raro).
+   * As jogadas da partida inteira, para o Judge e o organizador conferirem o que cada jogador fez e
+   * escolheu (e, no modo manual, até onde desfazer). Cada uma traz a ação com os uids reais, a pergunta
+   * que estava aberta antes dela (`pending`, completa: os alvos que havia para escolher, a carta da
+   * Vida…) e as linhas do log que ela gerou, com as secretas (o Judge vê tudo). `cards`/`defs` dão o
+   * nome e o texto só das cartas citadas. Nunca vai a seed: com ela daria para prever o deck.
+   * Refaz a partida uma vez e guarda o caminho (`playsCache`); as próximas chamadas só avançam.
    */
-  history(limit = 30): Array<{ count: number; type: Action['type']; player: PlayerId; logFrom: number; logTo: number }> {
-    if (!this.state) return [];
-    const actions = this.data.actions;
-    const first = Math.max(0, actions.length - limit);
-    const out: Array<{ count: number; type: Action['type']; player: PlayerId; logFrom: number; logTo: number }> = [];
-    let state = createGame(this.config());
-    for (let i = 0; i < actions.length; i++) {
-      const logFrom = state.log.length;
-      state = applyAction(state, actions[i]);
-      if (i >= first) out.push({ count: i, type: actions[i].type, player: actions[i].player, logFrom, logTo: state.log.length });
+  plays(): JudgePlays | null {
+    const cache = this.playPath();
+    if (!cache) return null;
+    const { state } = cache;
+    const answered = this.data.answeredBy ?? {};
+    const plays = cache.plays.map((p) => (answered[p.count] ? { ...p, by: answered[p.count] } : p));
+    const cards: Record<string, string> = {};
+    const defs: Record<string, CardDef> = {};
+    const cite = (uid: unknown) => {
+      if (typeof uid !== 'string' || cards[uid] || !state.cards[uid]) return;
+      const id = state.cards[uid].cardId;
+      cards[uid] = id;
+      defs[id] ??= state.defs[id];
+    };
+    for (const p of plays) {
+      playRefs(p.action).forEach(cite);
+      pendingRefs(p.pending).forEach(cite);
     }
-    return out.reverse();
+    pendingRefs(state.pending).forEach(cite);
+    return {
+      actionCount: state.actionCount,
+      names: [state.players[0].name, state.players[1].name],
+      plays,
+      pending: state.pending ?? null,
+      cards,
+      defs,
+    };
+  }
+
+  /** O caminho refeito das jogadas (`plays`), avançado até a última ação. */
+  private playPath(): { state: GameState; plays: JudgePlay[] } | null {
+    if (!this.state) return null;
+    const actions = this.data.actions;
+    let cache = this.playsCache;
+    if (!cache || cache.plays.length > actions.length) cache = this.playsCache = { state: createGame(this.config()), plays: [] };
+    let state = cache.state;
+    for (let i = cache.plays.length; i < actions.length; i++) {
+      const action = actions[i];
+      const before = state;
+      state = applyAction(before, action);
+      const logFrom = before.log.length;
+      cache.plays.push({ count: i, turn: before.turn, player: action.player, action, pending: before.pending ?? null, lines: state.log.slice(logFrom), logFrom });
+    }
+    cache.state = state;
+    return cache;
+  }
+
+  /**
+   * A jogada que gerou a linha `index` do log (o jogador aponta a jogada do problema pelo próprio
+   * histórico, que tem as mesmas linhas, na mesma ordem). null = linha da preparação ou que não existe mais.
+   */
+  playAtLine(index: number): { count: number; turn: number } | null {
+    const path = this.playPath();
+    const play = path?.plays.find((p) => index >= p.logFrom && index < p.logFrom + p.lines.length);
+    return play ? { count: play.count, turn: play.turn } : null;
   }
 
   /**
@@ -744,14 +873,17 @@ export class Room {
     const removed = this.data.actions.slice(count);
     const actions = this.data.actions;
     const timeline = this.data.timeline;
+    const answered = this.data.answeredBy;
     this.data.actions = actions.slice(0, count);
     if (timeline) this.data.timeline = timeline.slice(0, count);
+    if (answered) this.data.answeredBy = Object.fromEntries(Object.entries(answered).filter(([i]) => Number(i) < count));
     try {
       this.rebuild();
     } catch (e) {
       // Não deveria acontecer (as mesmas ações já foram aplicadas): volta como estava.
       this.data.actions = actions;
       if (timeline) this.data.timeline = timeline;
+      if (answered) this.data.answeredBy = answered;
       this.rebuild();
       this.deps.log(`Partida online ${this.id}: falha ao desfazer: ${e instanceof Error ? e.message : e}`);
       return { ok: false, code: 500, ...fail('undoFailed', 'Não foi possível desfazer.') };
@@ -778,36 +910,66 @@ export class Room {
   /**
    * Correção do Judge no modo manual, pelo lado de `player`: `op` é uma ferramenta manual (vira a ação
    * `judge` do motor, com o nome de quem corrigiu no log) e `action` é uma resposta no lugar do jogador
-   * (concluir um efeito manual, passar ou encerrar o turno). As cartas vêm com os apelidos da visão do
-   * Judge (as duas mãos à vista). O relógio continua parado.
+   * à pergunta aberta (`JUDGE_ANSWERS`: escolher os alvos, sim/não, uma opção, passar, concluir o efeito
+   * manual ou encerrar o turno). As cartas vêm com os apelidos da visão do Judge (as duas mãos à vista)
+   * ou com os uids de `plays` (o Judge vê tudo: as opções de uma escolha podem estar no deck). O
+   * relógio continua parado.
    */
   judgeAct(seq: unknown, player: unknown, input: { op?: unknown; action?: unknown }): ActResult & { action?: Action } {
     const refused = this.manualRefusal(seq);
     if (refused) return refused;
     if (player !== 0 && player !== 1) return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
     if (this.data.actions.length >= MAX_ACTIONS) return { ok: false, code: 409, ...fail('matchTooLong', 'Partida longa demais.') };
+    const state = this.state!;
+    // Apelido, uid real ou a posição de uma carta virada na visão ("~0:life:2").
+    const real = (ref: unknown): string | null => {
+      if (typeof ref !== 'string') return null;
+      const at = /^~([01]):(hand|deck|life):(\d+)$/.exec(ref);
+      if (at) return state.players[Number(at[1]) as PlayerId][at[2] as 'hand' | 'deck' | 'life'][Number(at[3])] ?? null;
+      const uid = this.aliases!.toUid[ref] ?? ref;
+      return state.cards[uid] ? uid : null;
+    };
+    const bad = { ok: false as const, code: 422, ...fail('invalidAction', 'Ação inválida.') };
     let action: Action;
     if (input.op !== undefined) {
       const op = input.op as ManualOp;
       if (!op || typeof op !== 'object' || typeof op.op !== 'string') return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
-      action = { type: 'judge', player, op, by: this.data.manual!.name };
+      if ('uid' in op) {
+        const uid = real(op.uid);
+        if (!uid) return bad;
+        action = { type: 'judge', player, op: { ...op, uid }, by: this.data.manual!.name };
+      } else action = { type: 'judge', player, op, by: this.data.manual!.name };
     } else {
-      const type = (input.action as { type?: unknown } | null)?.type;
-      if (type !== 'manualDone' && type !== 'pass' && type !== 'endTurn') return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
-      action = { type, player };
+      const raw = (input.action ?? {}) as { type?: unknown; uids?: unknown; yes?: unknown; index?: unknown };
+      if (!JUDGE_ANSWERS.includes(raw.type as (typeof JUDGE_ANSWERS)[number])) return { ok: false, code: 400, ...fail('invalidAction', 'Ação inválida.') };
+      if (raw.type === 'choose') {
+        if (!Array.isArray(raw.uids)) return bad;
+        const uids = raw.uids.map(real);
+        if (!uids.every((u): u is string => u !== null)) return bad;
+        action = { type: 'choose', player, uids };
+      } else if (raw.type === 'answer') {
+        if (typeof raw.yes !== 'boolean') return bad;
+        action = { type: 'answer', player, yes: raw.yes };
+      } else if (raw.type === 'option') {
+        if (typeof raw.index !== 'number' || !Number.isInteger(raw.index)) return bad;
+        action = { type: 'option', player, index: raw.index };
+      } else action = { type: raw.type as 'manualDone' | 'pass' | 'endTurn', player };
     }
-    const real = actionFromView(this.state!, this.aliases!, action, handsOf(this.state!));
-    if (typeof real === 'string') return { ok: false, code: 422, error: real };
+    // Uma resposta no lugar do jogador fica marcada com o nome de quem respondeu (a correção `judge` já o
+    // leva); se o motor recusar a ação, a marca sai junto.
+    const at = this.data.actions.length;
     try {
-      this.commit(real);
+      if (action.type !== 'judge') (this.data.answeredBy ??= {})[at] = this.data.manual!.name;
+      this.commit(action);
     } catch (e) {
+      if (this.data.actions.length === at && this.data.answeredBy) delete this.data.answeredBy[at];
       if (e instanceof IllegalActionError) return { ok: false, code: 422, error: e.message };
       this.deps.log(`Partida online ${this.id}: erro do motor na correção do Judge: ${e instanceof Error ? e.stack : e}`);
       return { ok: false, code: 422, ...fail('invalidAction', 'Ação inválida.') };
     }
     // A correção terminou a partida (K.O. no Líder sem Vida, deck vazio…): não há mais o que pausar.
     if (this.state!.phase === 'gameover' && this.paused) this.resume();
-    return { ok: true, actionCount: this.state!.actionCount, action: real };
+    return { ok: true, actionCount: this.state!.actionCount, action };
   }
 
   /** Se a vez é do bot do servidor, agenda a jogada dele. */

@@ -452,12 +452,46 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   final, o encerramento. **Encerrar agora** termina antes.
 - **Auditoria:** todo jogo disputado nas salas fica gravado com o replay. Em cada partida da aba Rodadas, **Jogos
   gravados** lista os jogos (inclusive os que não contaram no placar) e o organizador e os Judges podem
-  **assistir ao replay**; os dois jogadores também, mas só quando o torneio termina (o replay traz as duas listas, e as
+  **assistir ao replay** ou abrir as **📜 Jogadas** do jogo (o que cada jogador escolheu, veja abaixo); os dois jogadores
+  também podem assistir ao replay, mas só quando o torneio termina (o replay traz as duas listas, e as
   listas ficam fechadas até o fim: no resumo do fim de cada jogo não há "Decklist do oponente" nem "Baixar replay"). Ao fim de qualquer partida (contra o bot, online, ranqueada ou de torneio), o jogador logado
   pode **relatar um bug** (botão ⚑ abaixo de "Baixar replay"): a carta, a interação que deu problema, o que deveria ter
   acontecido e se quer ser avisado da correção. O relato, com o replay, aparece na aba **Relatos** do torneio para o
   organizador e em **Administração → Relatos de partidas** para Admin e Dev, que o resolvem com uma nota; quem pediu o
   aviso recebe uma notificação.
+- **Judge e organizador na mesa:** o organizador escolhe os Judges do torneio pelo apelido (sem Judge escolhido, ele
+  mesmo faz o papel; Admin e Dev também podem). Para agir numa partida, entre pela página do torneio ou pelo lobby em
+  **⚖ Entrar como Judge** (quem abrir a mesa pela lista "Ao vivo" ganha o mesmo botão na faixa do espectador). O
+  painel do Judge, no canto da mesa, tem o guia **"O que posso fazer como Judge?"**:
+  - **⏸ Pausar** congela a partida (relógio parado, nenhuma jogada aceita, o chat continua). Os jogadores também
+    podem **⚖ Chamar o Judge**: escolhem com um toque o que aconteceu (uma carta não fez o que devia, escolhi e não
+    aconteceu o esperado, cliquei errado, a partida travou, dúvida de regra, problema com o oponente), tocam na linha
+    do histórico da jogada do problema e, se quiserem, escrevem uma frase. O Judge e o organizador recebem a
+    notificação, e o chamado aparece no topo do painel do Judge com **📜 Ver a jogada** (a lista abre na jogada
+    apontada, em destaque).
+  - **📜 Jogadas e escolhas** (não pausa a partida): cada jogada, da mais recente para a mais antiga, com a pergunta
+    que estava aberta, o efeito que a abriu, as opções que havia (✔ no que o jogador escolheu), as cartas vistas e o que
+    aconteceu depois, inclusive as cartas escondidas. Uma escolha que não gerou nenhuma linha no histórico fica
+    marcada. Serve para saber se o problema foi do app ou do jogador (ex.: o efeito pedia um Personagem de 4000 do
+    descarte: o Perospero estava entre as opções? Ele foi o escolhido? Ele voltou ao campo?). Há filtro por carta ou
+    jogador e "Só escolhas e respostas". Depois do jogo, o mesmo vale em **📜 Jogadas**, em Jogos gravados.
+  - **🛠 Modo manual** (pausa a partida; os jogadores não confirmam nada e cada correção pede o motivo, que vai para
+    as Ocorrências do torneio):
+    - **Voltar jogada:** "Escolher a jogada para voltar" abre as jogadas da partida inteira; "Voltar para antes desta"
+      desfaz a jogada e todas as seguintes (a partida é refeita até ali, com as mesmas compras e embaralhamentos).
+      Depois de retomar, o jogador refaz a jogada.
+    - **No lugar do jogador:** responde a pergunta aberta (escolher os alvos, bloquear ou não, usar ou não Counter,
+      sim/não, uma opção, a carta da Vida, concluir um efeito manual) ou encerra o turno, quando o app travou ou não
+      ofereceu a opção certa. A resposta fica marcada nas jogadas como dada pelo Judge.
+    - **Corrigir a mesa** pelo lado de cada jogador: comprar, embaralhar, mover uma carta entre as zonas, K.O., virar e
+      desvirar, ±1000 de poder e DON!!.
+  - **▶ Retomar** libera a partida (e sai do modo manual): o Judge fecha o chamado escolhendo o desfecho, sem precisar
+    escrever (sem problema no app / erro do jogador, jogada refeita / erro do app, com ou sem correção na mesa /
+    dúvida de regra / conduta / outro, este com o relato). Depois de voltar jogadas ou corrigir a mesa, "erro do app"
+    já vem marcado. **Erro do app abre sozinho um chamado de ajuste da plataforma** em Administração → Relatos de
+    partidas (e na aba Relatos do torneio) assim que o jogo termina, com o replay, a jogada apontada, o relato do
+    jogador e o que o Judge fez. **Warnings** valem o torneio
+    inteiro; só o organizador elimina. Tudo fica na aba **Ocorrências** do torneio.
 - **Correção de resultados:** um placar lançado errado pode ser corrigido em qualquer rodada, inclusive passadas (a
   classificação é recalculada). Na chave, corrigir quem venceu troca o jogador da partida seguinte, desde que ela
   ainda não tenha começado (senão, corrija ou zere antes a partida seguinte). Resultados do suíço não mudam depois

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { api, type MatchReport, type MatchSummary, modeLabel, type RoomQueue } from '../api';
+import { api, type JudgePlays, type MatchReport, type MatchSummary, modeLabel, type RoomQueue } from '../api';
+import { playsFromSetup } from '../game/judgePlays';
 import { setupFromReplay } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { useLocale, useT } from '../i18n';
 import { fmtDateTime } from '../i18n/format';
 import { QUEUE_KEY } from './HomeBlocks';
+import { PlaysSheet } from './JudgePlays';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -54,6 +56,8 @@ export function ReportList({
   const [busy, setBusy] = useState<number | null>(null);
   const [noteFor, setNoteFor] = useState<number | null>(null);
   const [note, setNote] = useState('');
+  /** As jogadas da partida do relato, abertas na jogada do problema. */
+  const [plays, setPlays] = useState<{ data: JudgePlays; report: MatchReport } | null>(null);
 
   const run = async (id: number, fn: () => Promise<unknown>) => {
     setBusy(id);
@@ -76,6 +80,13 @@ export function ReportList({
   if (!reports.length) return <p className="muted">{t('reports.none')}</p>;
   return (
     <div className="report-list">
+      {plays && (
+        <PlaysSheet
+          data={plays.data}
+          focus={plays.report.play !== null ? { count: plays.report.play, by: plays.report.reporterName } : undefined}
+          onClose={() => setPlays(null)}
+        />
+      )}
       {reports.map((r) => {
         const m = r.match;
         const queueKey = m ? QUEUE_KEY[m.queue as RoomQueue] : undefined;
@@ -83,6 +94,8 @@ export function ReportList({
           <article key={r.id} className={['report-card', r.resolvedAt ? 'resolved' : ''].join(' ')}>
             <header className="report-head">
               <span className={['tour-status', r.resolvedAt ? 'finished' : 'running'].join(' ')}>{r.resolvedAt ? t('reports.resolved') : t('reports.open')}</span>
+              {r.source === 'judge' && <span className="tour-badge">{t('reports.fromJudge')}</span>}
+              {r.play !== null && <span className="muted small">{t('reports.playN', { n: r.play + 1 })}</span>}
               {m && (
                 <span className="muted small">
                   {queueKey ? t(queueKey) : m.queue} · {modeLabel(m)} · {dateTime(m.playedAt)}
@@ -133,6 +146,20 @@ export function ReportList({
             <div className="btn-row">
               <button className="btn small" disabled={busy === r.id} onClick={() => run(r.id, () => openReplay(r.matchId, onReplay))}>
                 {t('reports.watchReplay')}
+              </button>
+              <button
+                className="btn small"
+                disabled={busy === r.id}
+                onClick={() =>
+                  run(r.id, () =>
+                    api.matches
+                      .replay(r.matchId)
+                      .then((x) => setupFromReplay(x as never))
+                      .then((setup) => setPlays({ data: playsFromSetup(setup), report: r })),
+                  )
+                }
+              >
+                {t('tour.gamePlays')}
               </button>
               {r.resolvedAt ? (
                 <button className="btn small" disabled={busy === r.id} onClick={() => resolve(r, false)}>

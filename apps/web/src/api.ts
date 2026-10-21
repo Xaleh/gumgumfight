@@ -3,10 +3,13 @@ import {
   type Action,
   barredSpoilers,
   type CardData,
+  type CardDef,
   type DeckList,
   type FormatId,
   formatLabel,
+  type LogEntry,
   type ManualOp,
+  type Pending,
   type PlayerId,
   type PlayFormat,
   type PlayMode,
@@ -594,11 +597,17 @@ export const api = {
     updatePrize: (id: string, prizeId: number, prize: PrizeInput) =>
       send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/prizes/${prizeId}`, prize),
     removePrize: (id: string, prizeId: number) => send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/prizes/${prizeId}`),
-    /** "Chamar o Judge": pausa a partida (um dos jogadores, o Judge ou o organizador). */
-    call: (id: string, matchId: number) => send<{ callId: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/call`),
-    /** O Judge (ou o organizador) retoma a partida; `note` é o relato ao organizador. */
-    resume: (id: string, matchId: number, note?: string) =>
-      send<void>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/resume`, { note }),
+    /**
+     * "Chamar o Judge": pausa a partida (um dos jogadores, o Judge ou o organizador). O jogador conta o motivo,
+     * um texto e a linha do próprio histórico da jogada do problema (`logIndex`), tudo opcional.
+     */
+    call: (id: string, matchId: number, report?: { reason?: CallReason; details?: string; logIndex?: number }) =>
+      send<{ callId: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/call`, report ?? {}),
+    /** O chamado aberto da partida, para o painel do Judge (null = nenhum). */
+    callInfo: (id: string, matchId: number) => get<{ call: JudgeCall | null }>(`/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/call`),
+    /** O Judge (ou o organizador) retoma a partida, com o desfecho do chamado e o relato ao organizador. */
+    resume: (id: string, matchId: number, note?: string, outcome?: CallOutcome) =>
+      send<void>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/resume`, { note, outcome }),
     /** Modo manual do Judge: entra (pausa a partida) ou sai (a partida continua pausada até retomar). */
     manual: (id: string, matchId: number, on: boolean, note?: string) =>
       send<{ manual: { by: string; name: string; at: number } | null; actionCount: number }>(
@@ -606,14 +615,13 @@ export const api = {
         `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/manual`,
         { on, note },
       ),
-    /** Últimas jogadas (da mais recente para a mais antiga), para escolher até onde desfazer. */
-    manualHistory: (id: string, matchId: number) =>
-      get<{ actionCount: number; history: ManualHistoryItem[] }>(`/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/manual`),
+    /** Todas as jogadas da partida em andamento, com o que cada jogador escolheu (Judge e organizador). */
+    plays: (id: string, matchId: number) => get<JudgePlays>(`/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/plays`),
     /** Desfaz as jogadas: ficam só as primeiras `to` (`seq`: a versão da mesa que o Judge vê). */
     undo: (id: string, matchId: number, seq: number, to: number, note: string) =>
       send<{ actionCount: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/undo`, { seq, to, note }),
     /** Correção do Judge pelo lado de `player`: ferramenta manual (`op`) ou resposta no lugar dele (`action`). */
-    judgeAction: (id: string, matchId: number, body: { seq: number; player: PlayerId; note: string; op?: ManualOp; action?: { type: 'manualDone' | 'pass' | 'endTurn' } }) =>
+    judgeAction: (id: string, matchId: number, body: { seq: number; player: PlayerId; note: string; op?: ManualOp; action?: JudgeAnswer }) =>
       send<{ actionCount: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/judge-action`, body),
     warn: (id: string, userId: string, reason: string, matchId?: number) =>
       send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/warnings`, { reason, matchId }),
@@ -1122,7 +1130,7 @@ export interface LobbyTable {
   p1: LobbyPlayer & LobbySide;
   p2: (LobbyPlayer & LobbySide) | null;
   /** Chamado de Judge aberto (`byName` só para o Judge e o organizador). */
-  call: { id: number; openedAt: string; byName: string | null } | null;
+  call: { id: number; openedAt: string; byName: string | null; reason: CallReason | null } | null;
 }
 
 export interface LobbySide {
@@ -1160,7 +1168,32 @@ export interface TournamentLobby {
   pendingTables: number;
   readyTables: number;
   /** Salas pedindo a presença do Judge agora (só o Judge e o organizador). */
-  calls: Array<{ matchId: number; table: number; roomId: string | null; openedAt: string; names: string[] }>;
+  calls: Array<{ matchId: number; table: number; roomId: string | null; openedAt: string; names: string[]; reason: CallReason | null }>;
+}
+
+/** O motivo de quem chama o Judge (um toque). */
+export const CALL_REASONS = ['effect', 'choice', 'misclick', 'stuck', 'rules', 'conduct', 'other'] as const;
+export type CallReason = (typeof CALL_REASONS)[number];
+/** O desfecho com que o Judge fecha o chamado; os de erro do app abrem o chamado de ajuste da plataforma. */
+export const CALL_OUTCOMES = ['no_issue', 'misclick', 'app_fixed', 'app_unfixed', 'rules', 'conduct', 'other'] as const;
+export type CallOutcome = (typeof CALL_OUTCOMES)[number];
+export const APP_OUTCOMES: readonly CallOutcome[] = ['app_fixed', 'app_unfixed'];
+
+/** O chamado aberto da partida, para o painel do Judge. */
+export interface JudgeCall {
+  id: number;
+  openedAt: string;
+  byName: string;
+  /** Chamado por um dos jogadores (e não pelo próprio Judge ou pelo organizador). */
+  byPlayer: boolean;
+  reason: CallReason | null;
+  details: string | null;
+  /** A jogada apontada (posição da ação, a mesma de `JudgePlay.count`) e o turno dela. */
+  play: number | null;
+  playTurn: number | null;
+  /** O que o Judge já fez desde que o chamado abriu: jogadas desfeitas e correções na mesa. */
+  undone: number;
+  fixes: number;
 }
 
 /** Ocorrências do torneio: chamados de Judge (com o relato) e warnings. */
@@ -1175,6 +1208,13 @@ export interface TournamentIncidents {
     resolvedByName: string | null;
     resolvedAt: string | null;
     note: string | null;
+    reason: CallReason | null;
+    details: string | null;
+    play: number | null;
+    playTurn: number | null;
+    outcome: CallOutcome | null;
+    /** O chamado de ajuste da plataforma (relato para Admin e Dev), quando o desfecho foi erro do app. */
+    reportId: number | null;
     match: { round: number; table: number; names: Array<string | null> } | null;
   }>;
   warnings: Array<{
@@ -1204,14 +1244,39 @@ export interface TournamentIncidents {
   }>;
 }
 
-/** Uma jogada na lista do desfazer: `count` = quantas ações ficam voltando para antes dela; `logFrom`/`logTo` = as linhas do log dela. */
-export interface ManualHistoryItem {
+/** Uma jogada da partida, para o Judge: desfazer até `count` volta para antes dela. */
+export interface JudgePlay {
   count: number;
-  type: string;
+  turn: number;
   player: PlayerId;
-  logFrom: number;
-  logTo: number;
+  /** A ação, com os uids reais (os de `JudgePlays.cards`). */
+  action: Action;
+  /** A pergunta aberta antes da ação (as opções que havia); null = o jogador agiu no próprio turno. */
+  pending: Pending | null;
+  /** Linhas do log que a ação gerou, com as secretas (o Judge vê tudo). */
+  lines: LogEntry[];
+  /** Resposta dada pelo Judge no lugar do jogador: o nome de quem respondeu. */
+  by?: string;
 }
+
+/** As jogadas de uma partida, com os nomes e textos só das cartas citadas (nunca a seed). */
+export interface JudgePlays {
+  actionCount: number;
+  names: [string, string];
+  plays: JudgePlay[];
+  /** A pergunta aberta agora (para responder no lugar do jogador, no modo manual). */
+  pending: Pending | null;
+  /** uid → número da carta. */
+  cards: Record<string, string>;
+  defs: Record<string, CardDef>;
+}
+
+/** Resposta do Judge no lugar do jogador à pergunta aberta (as cartas pelos uids de `JudgePlays`). */
+export type JudgeAnswer =
+  | { type: 'choose'; uids: string[] }
+  | { type: 'answer'; yes: boolean }
+  | { type: 'option'; index: number }
+  | { type: 'pass' | 'manualDone' | 'endTurn' };
 
 export interface TournamentPlayerRef {
   userId: string;
@@ -1286,6 +1351,10 @@ export interface MatchReport {
   resolvedAt: string | null;
   resolvedBy: string | null;
   note: string | null;
+  /** `judge`: chamado de ajuste aberto sozinho quando o Judge fechou um chamado como erro do app. */
+  source: 'player' | 'judge';
+  /** A jogada do problema (posição da ação no replay). */
+  play: number | null;
   /** A partida gravada (quando a lista vem com o resumo). */
   match?: MatchSummary | null;
 }
