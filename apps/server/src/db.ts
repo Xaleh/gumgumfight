@@ -675,6 +675,21 @@ function migrateTournaments(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS tournament_games_match ON tournament_games(tournament_id, match_id);
 
+    -- Premiação apresentada pelo organizador na página do torneio: um item por colocação, com
+    -- link do produto e/ou foto enviada (a foto fica no próprio banco, como o logo das lojas).
+    CREATE TABLE IF NOT EXISTS tournament_prizes (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      place         TEXT,                      -- colocação (texto livre: "1º lugar", "Top 4", "Participação")
+      title         TEXT NOT NULL,             -- o que é o prêmio
+      url           TEXT,                      -- link do produto (http/https)
+      image         BLOB,
+      image_type    TEXT,                      -- image/png | image/jpeg | image/webp
+      image_version INTEGER NOT NULL DEFAULT 0,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS tournament_prizes_tournament ON tournament_prizes(tournament_id);
+
     -- Problemas (bugs) relatados pelos jogadores ao fim de uma partida.
     CREATE TABLE IF NOT EXISTS match_reports (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,

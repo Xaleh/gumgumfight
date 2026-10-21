@@ -8,12 +8,14 @@ import {
   isAdmin,
   type OnlineSeat,
   type OrganizeLimits,
+  type PrizeInput,
   type PublicSponsor,
   STRUCTURE_LABEL,
   type TournamentDetail,
   type TournamentIncidents,
   type TournamentInput,
   type TournamentMatchInfo,
+  type TournamentPrize,
   type TournamentStage,
   type TournamentSummary,
   type TournamentWarnings,
@@ -27,6 +29,7 @@ import { useAuth } from '../auth';
 import type { GameSetup } from '../game/useGame';
 import { type Locale, type MessageKey, type Translate, tryT, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtTime } from '../i18n/format';
+import { prizePhoto } from '../picture';
 import { useNow } from './HomeBlocks';
 import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
@@ -980,6 +983,8 @@ function TournamentPage({
                 <p className="tour-champion">{rich(tr('tour.champion'), { name: <b>{t.standings[0].name}</b> })}</p>
               )}
             </section>
+
+            <Prizes t={t} busy={busy} run={run} onSaved={setT} />
 
             <MyArea t={t} busy={busy} run={run} onPlay={onPlay} setError={setError} />
 
@@ -2055,6 +2060,232 @@ function Judges({
         </button>
       </form>
     </div>
+  );
+}
+
+/**
+ * Premiação: o que cada colocação ganha, com o link do produto e/ou a foto enviada. Todos
+ * veem; o organizador cadastra, edita e remove os itens aqui mesmo (em qualquer fase).
+ */
+function Prizes({
+  t,
+  busy,
+  run,
+  onSaved,
+}: {
+  t: TournamentDetail;
+  busy: boolean;
+  run: (fn: () => Promise<TournamentDetail | void>, confirmText?: string) => Promise<void>;
+  onSaved: (t: TournamentDetail) => void;
+}) {
+  const tr = useT();
+  /** Item em edição (`new` = cadastrando um novo). */
+  const [editing, setEditing] = useState<number | 'new' | null>(null);
+  const prizes = t.prizes ?? [];
+  if (!prizes.length && !t.canManage) return null;
+  const max = t.maxPrizes ?? 10;
+  const form = (initial?: TournamentPrize) => (
+    <PrizeForm
+      tournamentId={t.id}
+      initial={initial}
+      onCancel={() => setEditing(null)}
+      onSaved={(next) => {
+        onSaved(next);
+        setEditing(null);
+      }}
+    />
+  );
+  return (
+    <section className="menu-card tour-prizes">
+      <div className="tour-prizes-head">
+        <h3>🏆 {tr('tour.prizesTitle')}</h3>
+        {t.canManage && editing === null && prizes.length < max && (
+          <button className="btn small" disabled={busy} onClick={() => setEditing('new')}>
+            {tr('tour.prizeAdd')}
+          </button>
+        )}
+      </div>
+      {!prizes.length && editing === null && <p className="muted small">{tr('tour.prizesEmpty')}</p>}
+      {prizes.length > 0 && (
+        <ul className="tour-prize-list">
+          {prizes.map((p) =>
+            editing === p.id ? (
+              <li key={p.id} className="tour-prize-editing">
+                {form(p)}
+              </li>
+            ) : (
+              <li key={p.id} className="tour-prize-item">
+                {p.imageUrl ? (
+                  <a className="tour-prize-photo" href={p.url ?? p.imageUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={p.imageUrl} alt={p.title} loading="lazy" />
+                  </a>
+                ) : (
+                  <span className="tour-prize-photo empty" aria-hidden="true">
+                    🏆
+                  </span>
+                )}
+                <div className="tour-prize-body">
+                  {p.place && <span className="tour-badge gold">{p.place}</span>}
+                  <strong>{p.title}</strong>
+                  {p.url && (
+                    <a className="text-link" href={p.url} target="_blank" rel="noopener noreferrer">
+                      {tr('tour.prizeLink')} ↗
+                    </a>
+                  )}
+                  {t.canManage && editing === null && (
+                    <div className="btn-row">
+                      <button className="btn small" disabled={busy} onClick={() => setEditing(p.id)}>
+                        {tr('tour.prizeEdit')}
+                      </button>
+                      <button
+                        className="btn small danger"
+                        disabled={busy}
+                        onClick={() => run(() => api.tournaments.removePrize(t.id, p.id), tr('tour.prizeConfirmRemove', { title: p.title }))}
+                      >
+                        {tr('tour.prizeRemove')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+      {editing === 'new' && form()}
+      {t.canManage && prizes.length >= max && <p className="muted small">{tr('tour.prizesLimit', { n: max })}</p>}
+    </section>
+  );
+}
+
+/** Cadastro ou edição de um item da premiação (a foto é reduzida no navegador antes de enviar). */
+function PrizeForm({
+  tournamentId,
+  initial,
+  onCancel,
+  onSaved,
+}: {
+  tournamentId: string;
+  initial?: TournamentPrize;
+  onCancel: () => void;
+  onSaved: (t: TournamentDetail) => void;
+}) {
+  const tr = useT();
+  const [place, setPlace] = useState(initial?.place ?? '');
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [url, setUrl] = useState(initial?.url ?? '');
+  /** Foto nova em data URL; null = tirar a foto; undefined = manter a atual. */
+  const [image, setImage] = useState<string | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const preview = image === undefined ? (initial?.imageUrl ?? null) : image;
+  const id = initial ? `prize-${initial.id}` : 'prize-new';
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      setImage(await prizePhoto(file));
+      setError(null);
+    } catch {
+      setError(tr('tour.prizePhotoUnreadable'));
+    }
+  };
+  const save = async () => {
+    const body: PrizeInput = { place: place.trim() || null, title: title.trim(), url: url.trim() || null };
+    if (image !== undefined) body.image = image;
+    setBusy(true);
+    setError(null);
+    try {
+      onSaved(initial ? await api.tournaments.updatePrize(tournamentId, initial.id, body) : await api.tournaments.addPrize(tournamentId, body));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="tour-prize-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      {error && <div className="error">{error}</div>}
+      <div className="tour-form-row">
+        <div className="field">
+          <label htmlFor={`${id}-place`}>{tr('tour.prizePlace')}</label>
+          <input
+            id={`${id}-place`}
+            className="admin-search"
+            maxLength={40}
+            placeholder={tr('tour.prizePlacePlaceholder')}
+            value={place}
+            onChange={(e) => setPlace(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`${id}-title`}>{tr('tour.prizeTitle')}</label>
+          <input
+            id={`${id}-title`}
+            className="admin-search"
+            maxLength={120}
+            required
+            placeholder={tr('tour.prizeTitlePlaceholder')}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="field">
+        <label htmlFor={`${id}-url`}>{tr('tour.prizeUrl')}</label>
+        <input
+          id={`${id}-url`}
+          className="admin-search"
+          type="url"
+          maxLength={500}
+          placeholder="https://"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+        />
+      </div>
+      <div className="field">
+        <label>{tr('tour.prizePhoto')}</label>
+        <div className="tour-prize-photo-row">
+          {preview && (
+            <span className="tour-prize-photo">
+              <img src={preview} alt="" />
+            </span>
+          )}
+          <label className="btn small">
+            {preview ? tr('tour.prizePhotoChange') : tr('tour.prizePhotoChoose')}
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                void onFile(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {preview && (
+            <button type="button" className="btn small" onClick={() => setImage(null)}>
+              {tr('tour.prizePhotoRemove')}
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="btn-row">
+        <button type="submit" className="btn primary small" disabled={busy || !title.trim()}>
+          {busy ? tr('common.saving') : tr('common.save')}
+        </button>
+        <button type="button" className="btn small" disabled={busy} onClick={onCancel}>
+          {tr('common.cancel')}
+        </button>
+      </div>
+    </form>
   );
 }
 

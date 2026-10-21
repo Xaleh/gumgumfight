@@ -530,6 +530,10 @@ export const api = {
     addJudge: (id: string, player: string) => send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/judges`, { player }),
     removeJudge: (id: string, userId: string) =>
       send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/judges/${encodeURIComponent(userId)}`),
+    addPrize: (id: string, prize: PrizeInput) => send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/prizes`, prize),
+    updatePrize: (id: string, prizeId: number, prize: PrizeInput) =>
+      send<TournamentDetail>('PUT', `/api/tournaments/${encodeURIComponent(id)}/prizes/${prizeId}`, prize),
+    removePrize: (id: string, prizeId: number) => send<TournamentDetail>('DELETE', `/api/tournaments/${encodeURIComponent(id)}/prizes/${prizeId}`),
     /** "Chamar o Judge": pausa a partida (um dos jogadores, o Judge ou o organizador). */
     call: (id: string, matchId: number) => send<{ callId: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/call`),
     /** O Judge (ou o organizador) retoma a partida; `note` é o relato ao organizador. */
@@ -1325,6 +1329,23 @@ export interface TournamentRecap {
   cardImages: boolean;
 }
 
+/** Item da premiação de um torneio: colocação, o prêmio, link do produto e foto enviada. */
+export interface TournamentPrize {
+  id: number;
+  place: string | null;
+  title: string;
+  url: string | null;
+  imageUrl: string | null;
+}
+
+export interface PrizeInput {
+  place: string | null;
+  title: string;
+  url: string | null;
+  /** Foto em data URL (PNG, JPEG ou WebP); null apaga; ausente mantém. */
+  image?: string | null;
+}
+
 export interface TournamentDetail {
   id: string;
   name: string;
@@ -1379,6 +1400,10 @@ export interface TournamentDetail {
   official: boolean;
   prize: string | null;
   sponsor: PublicSponsor | null;
+  /** Premiação apresentada pelo organizador (servidores antigos não mandam). */
+  prizes?: TournamentPrize[];
+  /** Itens da premiação que o organizador pode cadastrar. */
+  maxPrizes?: number;
   /** Inscrição antecipada: até esta hora só Almirantes se inscrevem. */
   priorityUntil: string | null;
   priorityOpen: boolean;

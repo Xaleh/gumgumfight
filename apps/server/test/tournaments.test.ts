@@ -1515,3 +1515,61 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     expect((await play(app, t.id, who(m.p1.userId), m)).statusCode).toBe(200);
   });
 });
+
+describe('torneios: premiação', () => {
+  // PNG de 1×1 (só os bytes do cabeçalho importam para o tipo).
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+  it('o organizador apresenta os prêmios com link do produto e foto; todos veem', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const player = login(db);
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', structure: 'swiss' })).json();
+    expect(t.prizes).toEqual([]);
+    const url = `/api/tournaments/${t.id}/prizes`;
+    expect((await req(app, 'POST', url, player, { title: 'Box' })).statusCode).toBe(403);
+    expect((await req(app, 'POST', url, org, { title: '  ' })).json()).toMatchObject({ errorCode: 'prizeTitleRequired' });
+    expect((await req(app, 'POST', url, org, { title: 'Box', url: 'javascript:alert(1)' })).json()).toMatchObject({ errorCode: 'prizeUrlInvalid' });
+    expect((await req(app, 'POST', url, org, { title: 'Box', image: 'PHN2Zz48L3N2Zz4=' })).json()).toMatchObject({ errorCode: 'prizeImageType' });
+
+    const first = await req(app, 'POST', url, org, { place: '1º lugar', title: 'Booster box OP-10', url: 'https://loja.example/op10', image: `data:image/png;base64,${PNG.toString('base64')}` });
+    expect(first.statusCode).toBe(201);
+    const [prize] = first.json().prizes;
+    expect(prize).toMatchObject({ place: '1º lugar', title: 'Booster box OP-10', url: 'https://loja.example/op10' });
+    expect(prize.imageUrl).toMatch(new RegExp(`^/api/tournaments/${t.id}/prizes/${prize.id}/image\\?v=1$`));
+    const img = await req(app, 'GET', prize.imageUrl);
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(img.rawPayload.equals(PNG)).toBe(true);
+
+    // Sem colocação, sem link e sem foto também vale; quem não gerencia vê a premiação.
+    await req(app, 'POST', url, org, { title: 'Sorteio de sleeves' });
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, player)).json().prizes.map((p: { title: string }) => p.title)).toEqual([
+      'Booster box OP-10',
+      'Sorteio de sleeves',
+    ]);
+
+    // Editar sem `image` mantém a foto; null apaga.
+    const kept = (await req(app, 'PUT', `${url}/${prize.id}`, org, { place: 'Campeão', title: 'Booster box OP-11' })).json().prizes[0];
+    expect(kept).toMatchObject({ place: 'Campeão', title: 'Booster box OP-11', url: null, imageUrl: prize.imageUrl });
+    expect((await req(app, 'PUT', `${url}/${prize.id}`, org, { title: 'Booster box OP-11', image: null })).json().prizes[0].imageUrl).toBeNull();
+    expect((await req(app, 'GET', prize.imageUrl)).statusCode).toBe(404);
+    expect((await req(app, 'PUT', `${url}/999`, org, { title: 'X' })).statusCode).toBe(404);
+
+    expect((await req(app, 'DELETE', `${url}/${prize.id}`, player)).statusCode).toBe(403);
+    expect((await req(app, 'DELETE', `${url}/${prize.id}`, org)).json().prizes).toHaveLength(1);
+    expect((await req(app, 'DELETE', `${url}/${prize.id}`, org)).statusCode).toBe(404);
+
+    // Prêmio de outro torneio não se mexe por este.
+    const other = (await req(app, 'POST', '/api/tournaments', org, { name: 'Outra', format: 'egb', structure: 'swiss' })).json();
+    const mine = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json().prizes[0];
+    expect((await req(app, 'DELETE', `/api/tournaments/${other.id}/prizes/${mine.id}`, org)).statusCode).toBe(404);
+  });
+
+  it('até 10 itens', async () => {
+    const { db, app } = setup();
+    const org = login(db, 'organizer');
+    const t = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'egb', structure: 'swiss' })).json();
+    for (let i = 0; i < 10; i++) expect((await req(app, 'POST', `/api/tournaments/${t.id}/prizes`, org, { title: `Prêmio ${i}` })).statusCode).toBe(201);
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/prizes`, org, { title: 'Mais um' })).json()).toMatchObject({ errorCode: 'prizeLimit' });
+  });
+});

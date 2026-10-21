@@ -10970,6 +10970,94 @@ button.funnel-row[aria-expanded='true'] {
   gap: 4px;
   margin-top: 8px;
 }
+/* Premiação apresentada pelo organizador: um cartão por item, com a foto do prêmio. */
+.tour-prizes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tour-prizes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tour-prizes-head h3 {
+  margin: 0;
+}
+.tour-prizes p {
+  margin: 0;
+}
+.tour-prize-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 10px;
+}
+.tour-prize-editing {
+  grid-column: 1 / -1;
+}
+.tour-prize-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--panel2);
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, var(--line));
+  min-width: 0;
+}
+.tour-prize-photo {
+  flex: 0 0 auto;
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tour-prize-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.tour-prize-photo.empty {
+  font-size: 32px;
+}
+.tour-prize-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tour-prize-body .tour-badge {
+  margin-left: 0;
+}
+.tour-prize-body .text-link {
+  padding: 0;
+}
+.tour-prize-form {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--gold) 60%, var(--line));
+}
+.tour-prize-form .admin-search {
+  margin-bottom: 0;
+}
+.tour-prize-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .tour-official-form {
   padding: 10px 12px;
   border-radius: 14px;
