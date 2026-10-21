@@ -136,6 +136,24 @@ function migrate(db: DB) {
   migratePartners(db);
   migrateEngineTexts(db);
   migrateCardGaps(db);
+  migrateDecks(db);
+}
+
+/**
+ * Favoritos (por conta ou, sem login, por navegador) e limpeza: deck sem Líder não
+ * fica salvo (o construtor não deixa mais salvar; os antigos são apagados aqui).
+ */
+function migrateDecks(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS deck_favorites (
+      owner_hash TEXT NOT NULL,
+      deck_id    TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (owner_hash, deck_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS seats_deck ON match_seats(deck_id);
+  `);
+  db.exec("DELETE FROM decks WHERE kind = 'user' AND trim(leader) = ''");
 }
 
 /**
@@ -1144,6 +1162,39 @@ export function renameDeck(db: DB, id: string, name: string): boolean {
 
 export function deleteDeck(db: DB, id: string): boolean {
   return Number(db.prepare(`DELETE FROM decks WHERE id = ? AND kind = 'user'`).run(id).changes) > 0;
+}
+
+/** Marca ou desmarca um deck como favorito de quem pede (conta ou navegador). */
+export function setDeckFavorite(db: DB, ownerHash: string, deckId: string, on: boolean) {
+  if (on) db.prepare('INSERT OR IGNORE INTO deck_favorites (owner_hash, deck_id) VALUES (?, ?)').run(ownerHash, deckId);
+  else db.prepare('DELETE FROM deck_favorites WHERE owner_hash = ? AND deck_id = ?').run(ownerHash, deckId);
+}
+
+/** Ids dos decks favoritos de quem pede. */
+export function deckFavorites(db: DB, ownerHash: string | null): Set<string> {
+  if (!ownerHash) return new Set();
+  const rows = db.prepare('SELECT deck_id FROM deck_favorites WHERE owner_hash = ?').all(ownerHash) as Array<{ deck_id: string }>;
+  return new Set(rows.map((r) => r.deck_id));
+}
+
+/** Partidas jogadas por pessoas (não pelo robô) com cada deck salvo. */
+export function deckGames(db: DB): Map<string, number> {
+  const rows = db
+    .prepare("SELECT deck_id, COUNT(*) AS n FROM match_seats WHERE controller = 'human' AND deck_id IS NOT NULL GROUP BY deck_id")
+    .all() as Array<{ deck_id: string; n: number }>;
+  return new Map(rows.map((r) => [r.deck_id, Number(r.n)]));
+}
+
+/** Última partida de quem pede com cada deck (para "Recentes"). */
+export function deckLastPlayed(db: DB, ownerHash: string | null): Map<string, string> {
+  if (!ownerHash) return new Map();
+  const rows = db
+    .prepare(
+      `SELECT s.deck_id, MAX(s.played_at) AS at FROM match_seats s JOIN players p ON p.id = s.player_id
+       WHERE p.owner_hash = ? AND s.deck_id IS NOT NULL GROUP BY s.deck_id`,
+    )
+    .all(ownerHash) as Array<{ deck_id: string; at: string }>;
+  return new Map(rows.map((r) => [r.deck_id, r.at]));
 }
 
 // ------------------------------------------------------------------ partidas
