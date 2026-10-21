@@ -164,14 +164,14 @@ function DeckPicker({
                     <button
                       key={d.id}
                       className={['deck-pick', d.id === value ? 'on' : ''].join(' ')}
-                      disabled={anyValid ? !d.valid : !canPlay(d, mode.format, !mode.spoilers)}
+                      disabled={anyValid ? !d.valid : !canPlay(d, mode.format, mode.spoilers ? 'all' : 'none')}
                       onClick={() => onPick(d.id)}
-                      title={whyNotPlayable(d, mode.format, !mode.spoilers) ?? d.name}
+                      title={whyNotPlayable(d, mode.format, mode.spoilers ? 'all' : 'none') ?? d.name}
                     >
                       <DeckArt deck={d} small />
                       <span className="name">{d.name}</span>
                       {!d.valid && <span className="muted small">{d.size}/50</span>}
-                      {d.valid && !canPlay(d, mode.format, !mode.spoilers) && (
+                      {d.valid && !canPlay(d, mode.format, mode.spoilers ? 'all' : 'none') && (
                         <span className="muted small">{t('menu.notAllowedShort', { format: modeLabel(mode) })}</span>
                       )}
                     </button>
@@ -604,7 +604,7 @@ export function Menu({
   const botMode = modeOf(botRules);
   /** O deck é completo e vale nas regras. */
   function playsIn(d: DeckSummary | undefined, mode: PlayMode): d is DeckSummary {
-    return Boolean(d && canPlay(d, mode.format, !mode.spoilers));
+    return Boolean(d && canPlay(d, mode.format, mode.spoilers ? 'all' : 'none'));
   }
   /** Os dois decks precisam valer nas regras do treino. */
   const botReady = playsIn(d0, botMode) && (deck1 === RANDOM || playsIn(d1, botMode));

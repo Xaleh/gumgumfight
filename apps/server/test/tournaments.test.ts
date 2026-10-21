@@ -240,16 +240,25 @@ describe('torneios: rotas', () => {
     expect((await req(app, 'POST', url, c, { deckId: 'st04-kaido' })).statusCode).toBe(200);
   });
 
-  it('spoilers: só nos torneios com spoilers (Standard ou EGB); nos outros, só cartas lançadas', async () => {
+  it('spoilers: só nos torneios com spoilers (Standard ou EGB) e só de coleção já revelada por completo', async () => {
     const { db, app } = setup();
     const org = login(db, 'organizer');
     const a = login(db);
-    // Deck com uma carta de spoiler (ainda não lançada).
+    // Decks com uma carta de spoiler (ainda não lançada): uma da EB05 (coleção já revelada por
+    // completo) e uma da OP18 (coleção ainda pela metade).
     const luffy = getDeck(db, 'st01-luffy')!;
     const [base] = getCards(db, [luffy.cards[0].id]) as CardData[];
-    upsertCards(db, [{ ...base, id: 'OP99-001', spoiler: { source: 'teste' } }], { provisional: true, source: 'spoiler:teste.json' });
-    const cards = luffy.cards.map((c, i) => (i === 0 ? { id: 'OP99-001', count: c.count } : c));
-    const deck = (await req(app, 'POST', '/api/decks', a, { name: 'Spoiler', leader: luffy.leader, cards })).json();
+    upsertCards(
+      db,
+      ['EB05-001', 'OP18-001'].map((id) => ({ ...base, id, spoiler: { source: 'teste' } })),
+      { provisional: true, source: 'spoiler:teste.json' },
+    );
+    const spoilerDeck = async (id: string) =>
+      (
+        await req(app, 'POST', '/api/decks', a, { name: id, leader: luffy.leader, cards: luffy.cards.map((c, i) => (i === 0 ? { id, count: c.count } : c)) })
+      ).json();
+    const deck = await spoilerDeck('EB05-001');
+    const partial = await spoilerDeck('OP18-001');
 
     // Standard + spoilers também é uma opção.
     const std = await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'standard', spoilers: true, structure: 'swiss' });
@@ -260,17 +269,35 @@ describe('torneios: rotas', () => {
     const url = `/api/tournaments/${t.id}/register`;
     const refused = await req(app, 'POST', url, a, { deckId: deck.id });
     expect(refused.statusCode).toBe(400);
-    expect(refused.json()).toMatchObject({ errorCode: 'deckHasSpoilers', errorParams: { n: 1, ids: 'OP99-001' } });
+    expect(refused.json()).toMatchObject({ errorCode: 'deckHasSpoilers', errorParams: { n: 1, ids: 'EB05-001' } });
 
     const edit = { name: 'Copa', format: 'egb', structure: 'swiss' };
     const open = (await req(app, 'PUT', `/api/tournaments/${t.id}`, org, { ...edit, spoilers: true })).json();
     expect(open).toMatchObject({ format: 'egb', spoilers: true });
     expect((await req(app, 'GET', '/api/tournaments', a)).json().tournaments[0].spoilers).toBe(true);
+    // Coleção ainda incompleta não vale nem com spoilers: só no Livre.
+    const incomplete = await req(app, 'POST', url, a, { deckId: partial.id });
+    expect(incomplete.statusCode).toBe(400);
+    expect(incomplete.json()).toMatchObject({ errorCode: 'deckHasIncompleteSpoilers', errorParams: { n: 1, ids: 'OP18-001', sets: 'EB05' } });
     expect((await req(app, 'POST', url, a, { deckId: deck.id })).statusCode).toBe(200);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}`, a)).json().me.deckIssue).toBeNull();
     // Tirar os spoilers com um deck de spoiler inscrito é recusado.
     const back = await req(app, 'PUT', `/api/tournaments/${t.id}`, org, edit);
     expect(back.statusCode).toBe(400);
     expect(back.json()).toMatchObject({ errorCode: 'tourDecksNotAllowed', errorParams: { n: 1, format: 'Extra Grand Battle' } });
+
+    // No Livre, a coleção incompleta vale; voltar para o EGB + spoilers com ela inscrita é recusado.
+    const free = (await req(app, 'POST', '/api/tournaments', org, { name: 'Copa', format: 'free', structure: 'swiss' })).json();
+    expect((await req(app, 'POST', `/api/tournaments/${free.id}/register`, a, { deckId: partial.id })).statusCode).toBe(200);
+    const toSpoilers = await req(app, 'PUT', `/api/tournaments/${free.id}`, org, { ...edit, spoilers: true });
+    expect(toSpoilers.json()).toMatchObject({ errorCode: 'tourDecksNotAllowed', errorParams: { n: 1, format: 'Extra Grand Battle + spoilers' } });
+
+    // Inscrição de antes da regra (OP18 num torneio com spoilers): aviso a quem se inscreveu e
+    // a quem gerencia, e o início à mão é barrado até a troca do deck.
+    db.prepare('UPDATE tournaments SET format = ?, spoilers = 1 WHERE id = ?').run('egb', free.id);
+    const old = (await req(app, 'GET', `/api/tournaments/${free.id}`, a)).json();
+    expect(old.me.deckIssue).toMatchObject({ code: 'rules.spoilerIncomplete', params: { ids: 'OP18-001', sets: 'EB05' } });
+    expect((await req(app, 'GET', `/api/tournaments/${free.id}`, org)).json().staleDecks).toHaveLength(1);
   });
 
   it('Livre (vale tudo): aceita carta banida e spoiler; fica fora do meta', async () => {

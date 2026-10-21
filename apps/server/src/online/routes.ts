@@ -25,6 +25,7 @@ import {
   playMode,
   type PlayMode,
   spoilerIssues,
+  type SpoilerRule,
   validateDeck,
 } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -124,14 +125,17 @@ const refused = (r: Extract<ActResult, { ok: false }>) => ({
 export interface DeckRules {
   /** Sem cartas com efeito manual (ranqueada). */
   noManual?: boolean;
-  /** Sem cartas de spoiler, ainda não lançadas (ranqueada e torneios, salas privadas e treinos sem spoilers). */
-  noSpoilers?: boolean;
+  /**
+   * Cartas de spoiler (ainda não lançadas) aceitas: `none` na ranqueada e nos torneios, salas
+   * privadas e treinos sem spoilers; `complete` nos torneios com spoilers. Padrão: todas.
+   */
+  spoilers?: SpoilerRule;
   /** Data em que o deck precisa valer (banimentos com data); padrão: agora. */
   at?: Date;
 }
 
 /** Regras da ranqueada: só cartas lançadas e nenhum efeito manual. */
-export const RANKED_RULES: DeckRules = { noManual: true, noSpoilers: true };
+export const RANKED_RULES: DeckRules = { noManual: true, spoilers: 'none' };
 
 /**
  * Deck pronto para jogar no formato (e nas regras extras de `rules`): usado pelas
@@ -157,9 +161,15 @@ export function playableDeck(db: DB, deckId: unknown, format: PlayFormat, rules:
       }),
     };
   }
-  const spoilers = rules.noSpoilers ? spoilerIssues(deck, cards) : [];
+  const spoilers = rules.spoilers ? spoilerIssues(deck, cards, rules.spoilers) : [];
   if (spoilers.length) {
     const { message: issue, params } = spoilers[0];
+    if (rules.spoilers === 'complete') {
+      return {
+        code: 400,
+        ...fail('deckHasIncompleteSpoilers', `Esse deck tem cartas de coleções que ainda não foram reveladas por completo. ${issue}`, params),
+      };
+    }
     return { code: 400, ...fail('deckHasSpoilers', `Esse deck tem cartas que ainda não foram lançadas. ${issue}`, params) };
   }
   // Inclui cartas com script que ainda tenham alguma parte resolvida à mão.
@@ -282,7 +292,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
 
   /** Deck pronto para jogar no formato (na ranqueada, também sem cartas manuais nem spoilers). */
   const deckFor = (deckId: unknown, format: PlayFormat, ranked: boolean, noSpoilers = false) =>
-    playableDeck(db, deckId, format, ranked ? RANKED_RULES : { noSpoilers });
+    playableDeck(db, deckId, format, ranked ? RANKED_RULES : noSpoilers ? { spoilers: 'none' } : {});
   /** Formato oficial das filas. */
   const formatOf = (v: unknown): FormatId => (isFormat(v) ? v : 'standard');
   /**

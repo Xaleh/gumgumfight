@@ -11,9 +11,9 @@
 // idempotente: cada rodada é varrida uma vez (`round_wo`) e o aviso de check-in sai uma
 // vez por hora de início (`checkin_notice`).
 
-import { formatIssues } from '@gumgum/engine';
+import { type CardData, type DeckList, type FormatIssue, formatIssues, spoilerIssues, tournamentSpoilerRule } from '@gumgum/engine';
 import { randomInt } from 'node:crypto';
-import type { DB } from '../db';
+import { type DB, getCards } from '../db';
 import { elimBestOf, type Pairing, singleFirstRound, singleRounds, swissPairings, swissRounds } from './pairing';
 import {
   listAutomatic,
@@ -64,12 +64,25 @@ export const elimRound = (t: Tournament, round: number, pairings: Pairing[]): Ro
 });
 
 /**
- * Inscritos cujo deck (a lista congelada na inscrição) não vale mais no formato em `at`:
- * uma carta banida com data marcada (ou incluída na lista depois da inscrição). Os spoilers
- * não entram aqui: uma carta só deixa de ser spoiler, nunca passa a ser.
+ * O que impede a lista congelada de valer no torneio em `at` (formato e spoilers); null = vale.
+ * Spoilers: sem a opção, nenhum; com ela, só os das coleções já reveladas por completo.
  */
-export function staleDecks(t: Pick<Tournament, 'format'>, players: TournamentPlayer[], at: Date): TournamentPlayer[] {
-  return players.filter((p) => formatIssues(p.deck, t.format, at).length > 0);
+export function deckIssue(db: DB, deck: DeckList, t: Pick<Tournament, 'format' | 'spoilers'>, at: Date): FormatIssue | null {
+  const issue = formatIssues(deck, t.format, at)[0];
+  const rule = tournamentSpoilerRule(t);
+  if (issue || rule === 'all') return issue ?? null;
+  const ids = [deck.leader, ...deck.cards.map((c) => c.id)];
+  return spoilerIssues(deck, new Map(getCards(db, ids).map((c) => [c.id, c as CardData])), rule)[0] ?? null;
+}
+
+/**
+ * Inscritos cujo deck (a lista congelada na inscrição) não vale mais no torneio em `at`: uma
+ * carta banida com data marcada (ou incluída na lista depois da inscrição), ou um spoiler de
+ * coleção ainda incompleta (inscrições de antes de os torneios com spoilers exigirem a coleção
+ * completa). Uma carta só deixa de ser spoiler, e uma coleção só passa a estar completa.
+ */
+export function staleDecks(db: DB, t: Pick<Tournament, 'format' | 'spoilers'>, players: TournamentPlayer[], at: Date): TournamentPlayer[] {
+  return players.filter((p) => deckIssue(db, p.deck, t, at) !== null);
 }
 
 /** Fecha as inscrições, sorteia a ordem e gera a primeira rodada. Exige pelo menos 2 inscritos. */
@@ -124,9 +137,9 @@ export function tournamentTick(db: DB, now: number, closeRoom?: (roomId: string)
       }
       const start = ms(t.startsAt);
       if (!t.autoStart || Number.isNaN(start) || now < start || now - start > AUTO_START_GRACE_MS) continue;
-      // Deck que deixou de valer (banimento com data) não joga: a inscrição é cancelada.
+      // Deck que deixou de valer (banimento com data, spoiler de coleção incompleta) não joga: a inscrição é cancelada.
       // No início à mão, o organizador é avisado antes e decide (ver a rota /start).
-      const stale = staleDecks(t, listPlayers(db, t.id), new Date(now));
+      const stale = staleDecks(db, t, listPlayers(db, t.id), new Date(now));
       for (const p of stale) unregisterPlayer(db, t.id, p.userId);
       if (stale.length) result.removed.push({ tournamentId: t.id, userIds: stale.map((p) => p.userId) });
       const players = listPlayers(db, t.id);

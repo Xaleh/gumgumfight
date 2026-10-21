@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { validateDeck } from '../src/deck';
 import {
+  barredSpoilers,
   cardBlock,
   cardLegality,
+  COMPLETE_SPOILER_SETS,
   countsInStats,
   formatIssues,
   legalFormats,
@@ -10,6 +12,7 @@ import {
   playModeLabel,
   spoilerCards,
   spoilerIssues,
+  tournamentSpoilerRule,
 } from '../src/formats';
 import type { CardData, DeckList } from '../src/types';
 import { cards, luffy } from './helpers';
@@ -105,6 +108,28 @@ describe('spoilers (cartas ainda não lançadas)', () => {
     expect(issue).toMatchObject({ code: 'rules.spoiler', params: { n: 4, ids: 'OP99-001, OP99-010, OP99-011…' }, cardId: 'OP99-001' });
     expect(issue.message).toMatch(/^Cartas ainda não lançadas \(spoilers\): OP99-001, OP99-010, OP99-011…\. /);
     expect(spoilerIssues({ leader: 'ST01-002', cards: [] }, pool)).toEqual([]);
+  });
+
+  it('torneio com spoilers: só as coleções já reveladas por completo; o Livre aceita todas', () => {
+    expect(COMPLETE_SPOILER_SETS.has('EB05')).toBe(true);
+    expect(COMPLETE_SPOILER_SETS.has('OP18')).toBe(false);
+    expect(tournamentSpoilerRule({ format: 'egb', spoilers: false })).toBe('none');
+    expect(tournamentSpoilerRule({ format: 'standard', spoilers: true })).toBe('complete');
+    expect(tournamentSpoilerRule({ format: 'free', spoilers: true })).toBe('all');
+    expect(barredSpoilers(['EB05-001', 'OP18-001'], 'complete')).toEqual(['OP18-001']);
+    expect(barredSpoilers(['EB05-001', 'OP18-001'], 'none')).toEqual(['EB05-001', 'OP18-001']);
+    expect(barredSpoilers(['EB05-001', 'OP18-001'], 'all')).toEqual([]);
+
+    const mixed = new Map<string, Pick<CardData, 'spoiler'>>([
+      ['EB05-001', spoiler],
+      ['OP18-001', spoiler],
+    ]);
+    const deck = { leader: 'EB05-001', cards: [{ id: 'OP18-001', count: 4 }] };
+    const [issue, ...rest] = spoilerIssues(deck, mixed, 'complete');
+    expect(rest).toEqual([]);
+    expect(issue).toMatchObject({ code: 'rules.spoilerIncomplete', params: { n: 1, ids: 'OP18-001', sets: 'EB05' }, cardId: 'OP18-001' });
+    expect(spoilerIssues({ leader: 'EB05-001', cards: [] }, mixed, 'complete')).toEqual([]);
+    expect(spoilerIssues({ leader: 'EB05-001', cards: [] }, mixed)).toHaveLength(1);
   });
 
   it('nome das regras de cartas (torneios, salas privadas e bot)', () => {

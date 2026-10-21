@@ -1,4 +1,4 @@
-import { formatLabel, PLAY_FORMATS, playMode } from '@gumgum/engine';
+import { COMPLETE_SPOILER_SETS, formatLabel, PLAY_FORMATS, playMode, tournamentSpoilerRule } from '@gumgum/engine';
 import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   type AdminSponsor,
@@ -513,7 +513,9 @@ function TournamentForm({
               {tr('tour.spoilersOption')}
             </label>
             <p className="muted small">
-              {tr(form.format === 'free' ? 'tour.formatFreeHint' : form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint')}
+              {tr(form.format === 'free' ? 'tour.formatFreeHint' : form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint', {
+                sets: [...COMPLETE_SPOILER_SETS].join(', ') || '—',
+              })}
             </p>
           </div>
           <div className="field">
@@ -1230,7 +1232,7 @@ function MyArea({
   }
 
   if (t.status === 'registration' || late) {
-    const playable = decks?.filter((d) => canPlay(d, t.format, !t.spoilers)) ?? [];
+    const playable = decks?.filter((d) => canPlay(d, t.format, tournamentSpoilerRule(t))) ?? [];
     const mine = playable.filter((d) => d.kind === 'user' && d.mine);
     const others = playable.filter((d) => !(d.kind === 'user' && d.mine));
     const full = t.maxPlayers !== null && t.players.length >= t.maxPlayers && !t.me;
