@@ -37,7 +37,7 @@ export function DeckLibrary({
   onMenu: () => void;
   onNew: () => void;
   onImport: () => void;
-  /** Abre um deck meu no editor. */
+  /** Abre um deck meu no editor (ou, para Admin/Dev, o de outro jogador, para corrigir o nome). */
   onOpen: (id: string) => void;
   /** Abre o deck de outro (ou pronto) no visualizador. */
   onView: (id: string) => void;
@@ -100,6 +100,8 @@ export function DeckLibrary({
         {visible.map((d) => {
           const mine = d.kind === 'user' && d.mine;
           const canDelete = d.kind === 'user' && (mine || staff);
+          // Admin/Dev corrige o nome de decks de outros jogadores no editor (as cartas continuam deles).
+          const canRename = d.kind === 'user' && !mine && staff;
           const dupe = d.kind === 'user' && Boolean(d.deckHash && (repeated.get(d.deckHash) ?? 0) > 1);
           return (
             <DeckTile
@@ -120,6 +122,11 @@ export function DeckLibrary({
                   <button type="button" className="btn small primary" onClick={() => (mine ? onOpen(d.id) : onView(d.id))}>
                     {mine ? t('decks.edit') : t('decks.viewList')}
                   </button>
+                  {canRename && (
+                    <button type="button" className="btn small" onClick={() => onOpen(d.id)}>
+                      {t('decks.editName')}
+                    </button>
+                  )}
                   <button type="button" className="btn small icon" onClick={() => onDuplicate(d.id)} aria-label={t('decks.duplicate')} title={t('decks.duplicate')}>
                     <Icon name="copy" size={16} />
                   </button>

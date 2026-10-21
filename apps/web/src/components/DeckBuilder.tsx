@@ -606,15 +606,18 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const storageHint = auth.user ? t('deck.storageAccount') : `${t('deck.storageBrowser')}${auth.clientId ? ` ${t('deck.storageSignIn')}` : ''}`;
   const viewerOf = (id: string) => {
     const d = decks.find((x) => x.id === id);
+    const mine = d?.kind === 'user' && d.mine;
+    // Admin/Dev abre o deck de outro jogador como ele é, para corrigir o nome; mudar as cartas cria uma cópia.
+    const rename = !mine && staff && d?.kind === 'user';
     return (
       <DeckViewer
         deckId={id}
         onClose={() => setViewing(null)}
         onEdit={() => {
           setViewing(null);
-          void openDeck(id, { copy: !(d?.kind === 'user' && d.mine) });
+          void openDeck(id, { copy: !mine && !rename });
         }}
-        editLabel={d?.kind === 'user' && d.mine ? t('decks.edit') : t('decks.duplicate')}
+        editLabel={mine ? t('decks.edit') : rename ? t('decks.editName') : t('decks.duplicate')}
       />
     );
   };
