@@ -8278,7 +8278,8 @@ tr.clickable:hover td {
 }
 .tour-form-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  /* 180px: o seletor "Jogo único / Melhor de 3" cabe sem cortar no celular. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0 12px;
 }
 .tour-form-row .field:last-child {
