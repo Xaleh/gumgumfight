@@ -8,7 +8,7 @@ export default {
   'decks.tab.favorites': 'Favoriten',
   'decks.tab.mine': 'Meine Decks',
   'decks.tab.community': 'Community',
-  'decks.tab.builtin': 'Vorgefertigt',
+  'decks.tab.builtin': 'Starter Decks',
   'decks.tabsLabel': 'Deckgruppen',
   'decks.search': 'Nach Name oder Leader suchen…',
   'decks.searchLabel': 'Deck suchen',
@@ -24,7 +24,7 @@ export default {
   'decks.empty.favorites': 'Markiere Decks mit dem Stern, um sie hier zu sehen.',
   'decks.empty.mine': 'Du hast noch kein Deck gebaut.',
   'decks.empty.community': 'Keine Decks von anderen Spielern.',
-  'decks.empty.builtin': 'Keine vorgefertigten Decks.',
+  'decks.empty.builtin': 'Keine Starter Decks.',
   'decks.empty.search': 'Kein Deck gefunden.',
 
   // ---- Deckkarte ----
@@ -37,7 +37,7 @@ export default {
   'decks.favoriteRemove': 'Aus Favoriten entfernen',
   'decks.meta.used': 'benutzt {ago}',
   'decks.meta.edited': 'bearbeitet {ago}',
-  'decks.meta.builtin': 'Vorgefertigtes Deck',
+  'decks.meta.builtin': 'Starter Deck',
   'decks.meta.games': '{n|# Partie|# Partien}',
 
   // ---- Deckauswahl zum Spielen ----

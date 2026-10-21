@@ -8,7 +8,7 @@ export default {
   'decks.tab.favorites': 'お気に入り',
   'decks.tab.mine': '自分のデッキ',
   'decks.tab.community': 'コミュニティ',
-  'decks.tab.builtin': '構築済み',
+  'decks.tab.builtin': 'スタートデッキ',
   'decks.tabsLabel': 'デッキのグループ',
   'decks.search': '名前またはリーダーで検索…',
   'decks.searchLabel': 'デッキを検索',
@@ -24,7 +24,7 @@ export default {
   'decks.empty.favorites': '星を付けたデッキがここに表示されます。',
   'decks.empty.mine': 'まだデッキを作っていません。',
   'decks.empty.community': '他のプレイヤーのデッキはありません。',
-  'decks.empty.builtin': '構築済みデッキはありません。',
+  'decks.empty.builtin': 'スタートデッキはありません。',
   'decks.empty.search': 'デッキが見つかりません。',
 
   // ---- デッキのカード ----
@@ -37,7 +37,7 @@ export default {
   'decks.favoriteRemove': 'お気に入りから外す',
   'decks.meta.used': '{ago}に使用',
   'decks.meta.edited': '{ago}に編集',
-  'decks.meta.builtin': '構築済みデッキ',
+  'decks.meta.builtin': 'スタートデッキ',
   'decks.meta.games': '{n|#戦}',
 
   // ---- 対戦用のデッキ選択 ----

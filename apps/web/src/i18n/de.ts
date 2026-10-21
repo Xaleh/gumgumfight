@@ -2629,7 +2629,7 @@ export default {
   'labels.deckIncomplete': 'Unvollständig: {size}/50',
   'labels.deckGroup.mine': 'Meine Decks',
   'labels.deckGroup.community': 'Community-Decks',
-  'labels.deckGroup.builtin': 'Vorgefertigte Decks',
+  'labels.deckGroup.builtin': 'Starter Decks',
   'labels.phase.final': 'Finale',
   'labels.phase.semifinal': 'Halbfinale',
   'labels.phase.quarterfinal': 'Viertelfinale',

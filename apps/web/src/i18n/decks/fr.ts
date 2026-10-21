@@ -8,7 +8,7 @@ export default {
   'decks.tab.favorites': 'Favoris',
   'decks.tab.mine': 'Mes decks',
   'decks.tab.community': 'Communauté',
-  'decks.tab.builtin': 'Prédéfinis',
+  'decks.tab.builtin': 'Starter Decks',
   'decks.tabsLabel': 'Groupes de decks',
   'decks.search': 'Chercher par nom ou Leader…',
   'decks.searchLabel': 'Chercher un deck',
@@ -24,7 +24,7 @@ export default {
   'decks.empty.favorites': 'Ajoutez une étoile à des decks pour les voir ici.',
   'decks.empty.mine': 'Vous n’avez encore construit aucun deck.',
   'decks.empty.community': 'Aucun deck d’autres joueurs.',
-  'decks.empty.builtin': 'Aucun deck prédéfini.',
+  'decks.empty.builtin': 'Aucun Starter Deck.',
   'decks.empty.search': 'Aucun deck trouvé.',
 
   // ---- carte d’un deck ----
@@ -37,7 +37,7 @@ export default {
   'decks.favoriteRemove': 'Retirer des favoris',
   'decks.meta.used': 'utilisé {ago}',
   'decks.meta.edited': 'modifié {ago}',
-  'decks.meta.builtin': 'Deck prédéfini',
+  'decks.meta.builtin': 'Starter Deck',
   'decks.meta.games': '{n|# partie|# parties}',
 
   // ---- sélecteur de deck pour jouer ----

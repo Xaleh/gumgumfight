@@ -2629,7 +2629,7 @@ export default {
   'labels.deckIncomplete': 'Incompleto: {size}/50',
   'labels.deckGroup.mine': 'Mis mazos',
   'labels.deckGroup.community': 'Mazos de la comunidad',
-  'labels.deckGroup.builtin': 'Mazos prediseñados',
+  'labels.deckGroup.builtin': 'Starter Decks',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Cuartos de final',

@@ -8,7 +8,7 @@ const decksPtBR = {
   'decks.tab.favorites': 'Favoritos',
   'decks.tab.mine': 'Meus decks',
   'decks.tab.community': 'Comunidade',
-  'decks.tab.builtin': 'Prontos',
+  'decks.tab.builtin': 'Starter Decks',
   'decks.tabsLabel': 'Grupos de decks',
   'decks.search': 'Buscar por nome ou Líder…',
   'decks.searchLabel': 'Buscar deck',
@@ -24,7 +24,7 @@ const decksPtBR = {
   'decks.empty.favorites': 'Marque decks com a estrela para vê-los aqui.',
   'decks.empty.mine': 'Você ainda não montou nenhum deck.',
   'decks.empty.community': 'Nenhum deck de outros jogadores.',
-  'decks.empty.builtin': 'Nenhum deck pronto.',
+  'decks.empty.builtin': 'Nenhum Starter Deck.',
   'decks.empty.search': 'Nenhum deck encontrado.',
 
   // ---- cartão de um deck ----
@@ -37,7 +37,7 @@ const decksPtBR = {
   'decks.favoriteRemove': 'Tirar dos favoritos',
   'decks.meta.used': 'usado {ago}',
   'decks.meta.edited': 'editado {ago}',
-  'decks.meta.builtin': 'Deck pronto',
+  'decks.meta.builtin': 'Starter Deck',
   'decks.meta.games': '{n|# partida|# partidas}',
 
   // ---- seletor de deck para jogar ----

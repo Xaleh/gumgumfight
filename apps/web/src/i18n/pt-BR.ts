@@ -2633,7 +2633,7 @@ const ptBR = {
   'labels.deckIncomplete': 'Incompleto: {size}/50',
   'labels.deckGroup.mine': 'Meus decks',
   'labels.deckGroup.community': 'Decks da comunidade',
-  'labels.deckGroup.builtin': 'Decks prontos',
+  'labels.deckGroup.builtin': 'Starter Decks',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Quartas de final',

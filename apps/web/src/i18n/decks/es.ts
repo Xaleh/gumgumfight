@@ -8,7 +8,7 @@ export default {
   'decks.tab.favorites': 'Favoritos',
   'decks.tab.mine': 'Mis mazos',
   'decks.tab.community': 'Comunidad',
-  'decks.tab.builtin': 'Prediseñados',
+  'decks.tab.builtin': 'Starter Decks',
   'decks.tabsLabel': 'Grupos de mazos',
   'decks.search': 'Buscar por nombre o Líder…',
   'decks.searchLabel': 'Buscar mazo',
@@ -24,7 +24,7 @@ export default {
   'decks.empty.favorites': 'Marca mazos con la estrella para verlos aquí.',
   'decks.empty.mine': 'Todavía no has creado ningún mazo.',
   'decks.empty.community': 'No hay mazos de otros jugadores.',
-  'decks.empty.builtin': 'No hay mazos prediseñados.',
+  'decks.empty.builtin': 'No hay Starter Decks.',
   'decks.empty.search': 'No se encontró ningún mazo.',
 
   // ---- tarjeta de un mazo ----
@@ -37,7 +37,7 @@ export default {
   'decks.favoriteRemove': 'Quitar de favoritos',
   'decks.meta.used': 'usado {ago}',
   'decks.meta.edited': 'editado {ago}',
-  'decks.meta.builtin': 'Mazo prediseñado',
+  'decks.meta.builtin': 'Starter Deck',
   'decks.meta.games': '{n|# partida|# partidas}',
 
   // ---- selector de mazo para jugar ----
