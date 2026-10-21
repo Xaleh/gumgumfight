@@ -1652,6 +1652,14 @@ function handleMainAction(state: GameState, action: Action) {
       for (const lead of [action.attacker, action.target]) {
         if (locate(state, lead)?.zone === 'leader') emit(state, { kind: 'leaderBattle', player: ownerOf(state, lead), card: lead });
       }
+      // [When Attacking] e [On Your Opponent's Attack] disparam na declaração do ataque, junto com
+      // os "When your Leader attacks": mesmo lote, o jogador escolhe a ordem (8-6-1). Os do jogador
+      // do turno resolvem antes (10-2-16).
+      pushAbilities(state, action.attacker, 'whenAttacking');
+      const def = state.players[opponent(p)];
+      for (const fc of [def.leader, ...def.characters, ...(def.stage ? [def.stage] : [])]) {
+        pushAbilities(state, fc.uid, 'onOpponentAttack');
+      }
       return;
     }
 
@@ -2218,13 +2226,8 @@ function stepBattle(state: GameState) {
 
   switch (b.step) {
     case 'whenAttacking': {
+      // Os [When Attacking] já dispararam na declaração do ataque e resolveram antes de chegar aqui.
       b.step = 'block';
-      // [When Attacking] (jogador do turno) resolve antes do [On Your Opponent's Attack] (10-2-16).
-      pushAbilities(state, b.attacker, 'whenAttacking');
-      const def = state.players[defender];
-      for (const fc of [def.leader, ...def.characters, ...(def.stage ? [def.stage] : [])]) {
-        pushAbilities(state, fc.uid, 'onOpponentAttack');
-      }
       return;
     }
 

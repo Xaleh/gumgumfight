@@ -63,6 +63,9 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * pulava a carta do topo já virada e virava a próxima (Eustass"Captain"Kid OP10-099): hoje o custo só
  * olha as N do topo. A resposta gravada para a pergunta que hoje não aparece é descartada (acima), e a
  * pergunta que o roteiro antigo não tem é recusada; dali em diante a partida pode tomar outro rumo.
+ * (Também sem mudar a versão: o [When Attacking] e o [On Your Opponent's Attack] hoje disparam na
+ * declaração do ataque, no mesmo lote do "When your Leader … attacks"; a escolha da ordem que o roteiro
+ * antigo não tem fica com a primeira opção, o efeito que antes resolvia primeiro.)
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
