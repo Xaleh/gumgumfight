@@ -96,7 +96,10 @@ function LateralHalf({ state, player, side, ...h }: BoardHandlers & { state: Gam
   const maxLife = Math.max(cardDef(state, ps.leader.uid).life ?? 0, ps.life.length);
   const dons = [...Array.from({ length: ps.donActive }, () => false), ...Array.from({ length: ps.donRested }, () => true)];
   const attached = ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
-  /** Descarte aberto: as últimas cartas semi-empilhadas a partir do canto (clicar numa amplia). */
+  /**
+   * Descarte aberto: as últimas cartas semi-empilhadas a partir do canto. Clicar de novo abre a lista
+   * com todas as cartas (com muitas, o semi-empilhamento não mostra o que há no descarte).
+   */
   const [spread, setSpread] = useState(false);
   const shown = spread ? ps.trash.slice(-TRASH_SPREAD) : ps.trash.slice(-1);
   const slots = Array.from({ length: MAX_CHARACTERS }, (_, i) => ps.characters[i] ?? null);
@@ -127,8 +130,8 @@ function LateralHalf({ state, player, side, ...h }: BoardHandlers & { state: Gam
               key={uid}
               className="lat-trash-card"
               style={vars({ '--i': i, '--k': shown.length - 1 - i })}
-              onClick={() => (spread ? h.onCard(uid) : setSpread(true))}
-              title={spread ? undefined : t('board.trashSpreadTitle')}
+              onClick={() => (spread ? h.onTrash(player) : setSpread(true))}
+              title={spread ? t('board.trashTitle', { n: ps.trash.length }) : t('board.trashSpreadTitle')}
             >
               <CardView state={state} uid={uid} onHover={h.onHover} />
             </div>
