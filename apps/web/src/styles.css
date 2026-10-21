@@ -1430,7 +1430,7 @@ input[type='number'] {
   gap: 16px;
   align-items: stretch;
 }
-@media (min-width: 1100px) {
+@media (min-width: 1240px) {
   .mode-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
@@ -1636,6 +1636,8 @@ input[type='number'] {
 }
 /* "Cartas" da sala privada e do treino: três opções numa carta estreita (o texto quebra se precisar). */
 .mode-card .seg.rules-seg button {
+  /* Largura pelo texto: o "+ Spoilers" só quebra quando não cabe mesmo. */
+  flex: 1 1 auto;
   min-width: 0;
   padding-inline: 4px;
   white-space: normal;
@@ -7509,22 +7511,122 @@ tr.clickable:hover td {
   margin-bottom: 12px;
 }
 .admin-users {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+/* cartão de uma conta, no mesmo molde do cartão de deck (.dk-tile) */
+.admin-user {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(var(--shadow-rgb), 0.1);
+  transition: box-shadow 0.15s;
+}
+.admin-user:hover {
+  box-shadow: 0 6px 18px rgba(var(--shadow-rgb), 0.16);
+}
+.admin-user-banner {
+  position: relative;
+  display: block;
+  height: 92px;
+  overflow: hidden;
+  background: var(--panel2);
+}
+.admin-user-banner img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 25%;
+}
+.admin-user-initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: 18px;
+  color: var(--muted);
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 48px;
+  line-height: 1;
+}
+.admin-user-banner::after {
+  content: '';
+  position: absolute;
+  inset: 40% 0 0;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.62));
+}
+.admin-user-banner .role-tag {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  margin: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.admin-user-name {
+  position: absolute;
+  z-index: 1;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #fff;
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+.admin-user-body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 10px 12px 12px;
 }
-.admin-user {
-  display: flex;
+.admin-user-email {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.admin-user-role {
+  display: inline-flex;
+  align-self: flex-start;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 8px 10px;
+  gap: 6px;
 }
-.admin-user .seg {
-  margin-left: auto;
+.admin-user-role select {
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+}
+@media (max-width: 560px) {
+  .admin-users {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .admin-user-banner {
+    height: 76px;
+  }
+  .admin-user-name {
+    font-size: 19px;
+  }
+  .admin-user-initial {
+    place-items: center start;
+    padding-left: 12px;
+    font-size: 40px;
+  }
 }
 
 /* ==================================================================
@@ -8248,6 +8350,9 @@ tr.clickable:hover td {
 .tour-me p {
   margin: 0 0 10px;
 }
+.tour-me > .btn {
+  margin-bottom: 8px;
+}
 .tour-me .btn-row {
   flex-wrap: wrap;
 }
@@ -8273,10 +8378,24 @@ tr.clickable:hover td {
 }
 .tour-form-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  /* 180px: o seletor "Jogo único / Melhor de 3" cabe sem cortar no celular. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0 12px;
 }
 .tour-form-row .field:last-child {
+  margin-bottom: 14px;
+}
+.tour-form .field > .check {
+  margin-top: 10px;
+}
+.tour-form .field > p.small {
+  margin: 6px 0 0;
+}
+.tour-form > p.small {
+  margin: 0 0 14px;
+}
+/* Administração: as abas não encostam no conteúdo da aba. */
+.admin .coverage-body > .tour-tabs {
   margin-bottom: 14px;
 }
 .tour-tabs {
@@ -8634,9 +8753,13 @@ tr.clickable:hover td {
 .tour-late p {
   margin: 0;
 }
+.tour-late form {
+  align-items: center;
+}
 .tour-late form input {
   flex: 1 1 160px;
   min-width: 0;
+  margin-bottom: 0;
 }
 
 
@@ -10991,23 +11114,27 @@ a.sponsor-card:hover {
 .sponsor-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
-  padding: 10px;
+  padding: 14px;
   border-radius: 12px;
   background: var(--bg2);
   border: 1px solid var(--line);
 }
-.sponsor-form .field {
+.sponsor-form .field,
+.sponsor-form .tour-form-row .field:last-child {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
   flex: 1;
   min-width: 140px;
   margin: 0;
 }
+.sponsor-form .admin-search {
+  margin-bottom: 0;
+}
 .sponsor-form .tour-form-row {
-  gap: 8px;
+  gap: 12px;
 }
 .sponsor-placements {
   display: flex;
@@ -12969,6 +13096,9 @@ a.sponsor-card:hover {
   justify-content: flex-start;
   margin: 8px 0;
 }
+.lobby-head {
+  margin-bottom: 12px;
+}
 .lobby-head p {
   margin: 6px 0 0;
 }
@@ -13930,7 +14060,8 @@ div.dk-tile-main {
 .dk-stat {
   display: flex;
   flex-direction: column;
-  padding: 8px 10px;
+  gap: 2px;
+  padding: 10px 14px;
   border-radius: 12px;
   background: var(--panel2);
   font-size: 12px;
@@ -14227,6 +14358,10 @@ div.dk-tile-main {
 .dk-cleanup-stats {
   display: flex;
   gap: 8px;
+}
+.dk-cleanup > p,
+.dk-cleanup > .error {
+  margin: 0;
 }
 .dk-cleanup-group {
   border-radius: 14px;

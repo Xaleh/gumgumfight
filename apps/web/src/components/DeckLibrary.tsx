@@ -12,7 +12,7 @@ import { DeckTile } from './DeckTile';
 import { Icon } from './Icons';
 
 const TABS: DeckTab[] = ['mine', 'favorites', 'community', 'builtin'];
-const SORTS: DeckSort[] = ['updated', 'recent', 'name', 'color', 'games'];
+const SORTS: DeckSort[] = ['updated', 'recent', 'name', 'color', 'leader', 'games'];
 
 export function DeckLibrary({
   decks,
@@ -37,7 +37,7 @@ export function DeckLibrary({
   onMenu: () => void;
   onNew: () => void;
   onImport: () => void;
-  /** Abre um deck meu no editor. */
+  /** Abre um deck meu no editor (ou, para Admin/Dev, o de outro jogador, para corrigir o nome). */
   onOpen: (id: string) => void;
   /** Abre o deck de outro (ou pronto) no visualizador. */
   onView: (id: string) => void;
@@ -51,7 +51,9 @@ export function DeckLibrary({
   const [picked, setTab] = useState<DeckTab | null>(null);
   const tab = picked ?? (decks.some((d) => d.kind === 'user' && d.mine) ? 'mine' : 'builtin');
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<DeckSort>('updated');
+  /** Ordem escolhida; até a pessoa escolher, a Comunidade junta os decks do mesmo Líder. */
+  const [pickedSort, setSort] = useState<DeckSort | null>(null);
+  const sort = pickedSort ?? (tab === 'community' ? 'leader' : 'updated');
   const [colors, setColors] = useState<string[]>([]);
 
   const counts = useMemo(() => Object.fromEntries(TABS.map((tb) => [tb, decks.filter((d) => inTab(d, tb, local)).length])), [decks, local]);
@@ -98,6 +100,8 @@ export function DeckLibrary({
         {visible.map((d) => {
           const mine = d.kind === 'user' && d.mine;
           const canDelete = d.kind === 'user' && (mine || staff);
+          // Admin/Dev corrige o nome de decks de outros jogadores no editor (as cartas continuam deles).
+          const canRename = d.kind === 'user' && !mine && staff;
           const dupe = d.kind === 'user' && Boolean(d.deckHash && (repeated.get(d.deckHash) ?? 0) > 1);
           return (
             <DeckTile
@@ -118,6 +122,11 @@ export function DeckLibrary({
                   <button type="button" className="btn small primary" onClick={() => (mine ? onOpen(d.id) : onView(d.id))}>
                     {mine ? t('decks.edit') : t('decks.viewList')}
                   </button>
+                  {canRename && (
+                    <button type="button" className="btn small" onClick={() => onOpen(d.id)}>
+                      {t('decks.editName')}
+                    </button>
+                  )}
                   <button type="button" className="btn small icon" onClick={() => onDuplicate(d.id)} aria-label={t('decks.duplicate')} title={t('decks.duplicate')}>
                     <Icon name="copy" size={16} />
                   </button>

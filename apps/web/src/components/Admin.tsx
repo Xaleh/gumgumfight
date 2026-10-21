@@ -108,38 +108,44 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
             {users?.length === 0 && <p className="muted">{t('admin.noAccounts')}</p>}
             <div className="admin-users">
               {users?.map((u) => (
-                <div key={u.id} className="admin-user">
-                  {u.picture ? (
-                    <img className="account-avatar" src={u.picture} alt="" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span className="account-avatar">{(u.name ?? u.email ?? '?').slice(0, 1).toUpperCase()}</span>
-                  )}
-                  <span className="account-who">
-                    <strong>{u.name ?? t('admin.googleAccount')}</strong>
-                    {u.email && <span className="muted small">{u.email}</span>}
+                <article key={u.id} className="admin-user">
+                  <span className="admin-user-banner">
+                    {u.picture ? (
+                      <img src={u.picture} alt="" referrerPolicy="no-referrer" loading="lazy" />
+                    ) : (
+                      <span className="admin-user-initial" aria-hidden="true">
+                        {(u.name ?? u.email ?? '?').slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className={['role-tag', u.role].join(' ')}>{t(ROLE_LABEL[u.role])}</span>
+                    <b className="admin-user-name">{u.name ?? t('admin.googleAccount')}</b>
                   </span>
-                  <div className="seg small">
-                    {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-                      <button
-                        key={r}
-                        className={u.role === r ? 'on' : ''}
-                        disabled={(u.id === user?.id && r !== 'dev') || saving === u.id}
-                        title={u.id === user?.id && r !== 'dev' ? t('admin.selfRoleTitle') : t(ROLE_HELP[r])}
-                        onClick={() => u.role !== r && change(u, r)}
-                      >
-                        {t(ROLE_LABEL[r])}
-                      </button>
-                    ))}
+                  <div className="admin-user-body">
+                    {u.email && (
+                      <span className="admin-user-email muted small" title={u.email}>
+                        {u.email}
+                      </span>
+                    )}
+                    <label className="admin-user-role muted small" title={u.id === user?.id ? t('admin.selfRoleTitle') : t(ROLE_HELP[u.role])}>
+                      {t('admin.role')}
+                      <select value={u.role} disabled={saving === u.id} onChange={(e) => change(u, e.target.value as Role)}>
+                        {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                          <option key={r} value={r} disabled={u.id === user?.id && r !== 'dev' && r !== u.role}>
+                            {t(ROLE_LABEL[r])}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <SupporterEditor
+                      key={`${u.supporterTier}-${u.supporterUntil}`}
+                      u={u}
+                      onSaved={(saved) => {
+                        setUsers((list) => list?.map((x) => (x.id === saved.id ? { ...x, ...saved } : x)) ?? null);
+                        if (saved.id === user?.id) void refresh();
+                      }}
+                    />
                   </div>
-                  <SupporterEditor
-                    key={`${u.supporterTier}-${u.supporterUntil}`}
-                    u={u}
-                    onSaved={(saved) => {
-                      setUsers((list) => list?.map((x) => (x.id === saved.id ? { ...x, ...saved } : x)) ?? null);
-                      if (saved.id === user?.id) void refresh();
-                    }}
-                  />
-                </div>
+                </article>
               ))}
             </div>
           </>

@@ -697,6 +697,7 @@ const ptBR = {
   'admin.searchPlaceholder': 'Buscar por nome ou e-mail',
   'admin.noAccounts': 'Nenhuma conta encontrada.',
   'admin.googleAccount': 'Conta Google',
+  'admin.role': 'Perfil',
   'admin.selfRoleTitle': 'Você só pode mudar o seu próprio perfil para Dev',
   // ---- cobertura das cartas ----
   'admin.coverage.menu': '← Menu',
@@ -2668,7 +2669,7 @@ const ptBR = {
   'labels.deckIncomplete': 'Incompleto: {size}/50',
   'labels.deckGroup.mine': 'Meus decks',
   'labels.deckGroup.community': 'Decks da comunidade',
-  'labels.deckGroup.builtin': 'Decks prontos',
+  'labels.deckGroup.builtin': 'Starter Decks',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Quartas de final',

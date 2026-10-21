@@ -696,6 +696,7 @@ export default {
   'admin.searchPlaceholder': 'Chercher par nom ou e-mail',
   'admin.noAccounts': 'Aucun compte trouvé.',
   'admin.googleAccount': 'Compte Google',
+  'admin.role': 'Rôle',
   'admin.selfRoleTitle': 'Vous ne pouvez changer votre propre rôle qu’en Dev',
   // ---- card coverage ----
   'admin.coverage.menu': '← Menu',
@@ -2664,7 +2665,7 @@ export default {
   'labels.deckIncomplete': 'Incomplet : {size}/50',
   'labels.deckGroup.mine': 'Mes decks',
   'labels.deckGroup.community': 'Decks de la communauté',
-  'labels.deckGroup.builtin': 'Decks prédéfinis',
+  'labels.deckGroup.builtin': 'Starter Decks',
   'labels.phase.final': 'Finale',
   'labels.phase.semifinal': 'Demi-finale',
   'labels.phase.quarterfinal': 'Quarts de finale',

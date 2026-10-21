@@ -696,6 +696,7 @@ export default {
   'admin.searchPlaceholder': 'Busca por nombre o correo',
   'admin.noAccounts': 'No se encontraron cuentas.',
   'admin.googleAccount': 'Cuenta de Google',
+  'admin.role': 'Rol',
   'admin.selfRoleTitle': 'Solo puedes cambiar tu propio rol a Dev',
   // ---- cobertura de cartas ----
   'admin.coverage.menu': '← Menú',
@@ -2664,7 +2665,7 @@ export default {
   'labels.deckIncomplete': 'Incompleto: {size}/50',
   'labels.deckGroup.mine': 'Mis mazos',
   'labels.deckGroup.community': 'Mazos de la comunidad',
-  'labels.deckGroup.builtin': 'Mazos prediseñados',
+  'labels.deckGroup.builtin': 'Starter Decks',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Cuartos de final',
