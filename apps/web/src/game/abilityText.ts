@@ -84,6 +84,13 @@ export function abilityText(def: CardDef, index: number, locale: Locale): string
   return out.replace(/^(\s*\[[^\]]+\])+\s*/, '').trim() || out;
 }
 
+/** Texto do [Trigger] da carta (fica à parte do texto principal): traduzido em pt-BR, original nos demais. */
+export function triggerText(def: CardDef, locale: Locale): string {
+  const src = def.trigger?.trim() ?? '';
+  if (locale !== 'pt-BR' || !src) return src;
+  return def.i18n?.pt?.trigger?.trim() || translateToPt(src).text;
+}
+
 /** Marcadores em inglês: os mesmos do texto original das cartas (os idiomas sem tradução das cartas usam estes). */
 const TITLE_EN: Partial<Record<Ability['timing'], string>> = {
   activateMain: '[Activate: Main]',
