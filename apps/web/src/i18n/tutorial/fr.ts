@@ -282,11 +282,11 @@ export default {
   'tutorial.giveDon.how.title': 'Donner des DON!!',
   'tutorial.giveDon.how.body': 'Pendant la Main Phase, vous pouvez donner des DON!! actifs à votre Leader ou à un Personnage. Chaque DON!! donné vaut +1000 de puissance pendant votre tour.',
   'tutorial.giveDon.give.title': 'Donnez 1 DON!! à Robin',
-  'tutorial.giveDon.give.body': 'Touchez Robin et choisissez +1 DON!! (ou faites glisser un DON!! actif sur elle).',
+  'tutorial.giveDon.give.body': 'Touchez un DON!! actif, puis Robin (ou faites glisser un DON!! actif sur elle).',
   'tutorial.giveDon.attack.title': 'Maintenant, attaquez',
   'tutorial.giveDon.attack.body': 'Avec 6000, Robin égale Pacifista, et l’égalité profite à l’attaquant. Attaquez Pacifista avec Robin.',
   'tutorial.giveDon.leader.title': 'Encore, avec le Leader',
-  'tutorial.giveDon.leader.body': 'Il reste 2 DON!!. Donnez-les à votre Leader et attaquez le Leader adverse.',
+  'tutorial.giveDon.leader.body': 'Il reste 2 DON!!. Touchez le 2e DON!! pour marquer les deux, puis votre Leader, et attaquez le Leader adverse.',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body': 'Certaines cartes demandent des DON!! donnés pour activer un effet. Zoro a [DON!! x1] : avec au moins 1 DON!! donné, il gagne +1000 de plus.',
   'tutorial.giveDon.back.title': 'Et ensuite ?',
@@ -309,7 +309,7 @@ export default {
   'tutorial.defense.next.body': 'Cette fois, Pacifista (6000) va attaquer votre Leader (5000). Sans Blocker en jeu, on passe directement au Counter Step.',
   'tutorial.defense.counter.title': 'Utilisez un Counter',
   'tutorial.defense.counter.body':
-    'Les cartes de votre main avec Counter peuvent être défaussées pour donner de la puissance à votre Leader pendant ce combat. Il lui faut PLUS de 6000, car l’égalité profite à l’attaquant. Touchez les Counters puis Plus de Counter.',
+    'Les cartes de votre main avec Counter peuvent être défaussées pour donner de la puissance à votre Leader pendant ce combat. Il lui faut PLUS de 6000, car l’égalité profite à l’attaquant. Touchez les Counters pour les marquer, puis le bouton Utiliser Counter.',
   'tutorial.defense.counter.fail':
     'Votre Leader a subi un dégât. Le défenseur doit avoir plus de puissance que l’attaquant : 6000 contre 6000, c’est perdu. Réessayez (Nami donne +1000 ; Brook, +2000).',
   'tutorial.defense.recap.title': 'Défense réussie',

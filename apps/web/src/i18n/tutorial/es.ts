@@ -282,11 +282,11 @@ export default {
   'tutorial.giveDon.how.title': 'Dar DON!!',
   'tutorial.giveDon.how.body': 'En la Main Phase puedes dar DON!! activos a tu Líder o a un Personaje. Cada DON!! dado vale +1000 de poder durante tu turno.',
   'tutorial.giveDon.give.title': 'Dale 1 DON!! a Robin',
-  'tutorial.giveDon.give.body': 'Toca a Robin y elige +1 DON!! (o arrastra un DON!! activo hasta ella).',
+  'tutorial.giveDon.give.body': 'Toca un DON!! activo y luego a Robin (o arrastra un DON!! activo hasta ella).',
   'tutorial.giveDon.attack.title': 'Ahora sí, ataca',
   'tutorial.giveDon.attack.body': 'Con 6000, Robin empata con Pacifista, y el empate es para el atacante. Ataca a Pacifista con Robin.',
   'tutorial.giveDon.leader.title': 'Otra vez, con el Líder',
-  'tutorial.giveDon.leader.body': 'Te quedan 2 DON!!. Dáselos a tu Líder y ataca al Líder del oponente.',
+  'tutorial.giveDon.leader.body': 'Te quedan 2 DON!!. Toca el 2.º DON!! para marcar los dos, luego tu Líder, y ataca al Líder del oponente.',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body': 'Algunas cartas piden DON!! dados para activar un efecto. Zoro tiene [DON!! x1]: con al menos 1 DON!! dado, gana +1000 extra.',
   'tutorial.giveDon.back.title': '¿Y después?',
@@ -309,7 +309,7 @@ export default {
   'tutorial.defense.next.body': 'Ahora Pacifista (6000) va a atacar a tu Líder (5000). Sin Blocker en el campo, se pasa directo al Counter Step.',
   'tutorial.defense.counter.title': 'Usa Counter',
   'tutorial.defense.counter.body':
-    'Las cartas de tu mano con Counter se pueden descartar para dar poder a tu Líder en esta batalla. Necesita MÁS de 6000, porque el empate es del atacante. Toca los Counters y luego No más Counter.',
+    'Las cartas de tu mano con Counter se pueden descartar para dar poder a tu Líder en esta batalla. Necesita MÁS de 6000, porque el empate es del atacante. Toca los Counters para marcarlos y luego el botón Usar Counter.',
   'tutorial.defense.counter.fail':
     'Tu Líder recibió daño. El defensor necesita más poder que el atacante: 6000 contra 6000 pierde. Inténtalo de nuevo (Nami da +1000; Brook, +2000).',
   'tutorial.defense.recap.title': 'Defensa hecha',
