@@ -696,6 +696,7 @@ export default {
   'admin.searchPlaceholder': 'Nach Name oder E-Mail suchen',
   'admin.noAccounts': 'Keine Konten gefunden.',
   'admin.googleAccount': 'Google-Konto',
+  'admin.role': 'Rolle',
   'admin.selfRoleTitle': 'Deine eigene Rolle kannst du nur auf Dev ändern',
   // ---- Kartenabdeckung ----
   'admin.coverage.menu': '← Menü',

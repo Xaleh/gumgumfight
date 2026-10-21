@@ -696,6 +696,7 @@ export default {
   'admin.searchPlaceholder': '名前またはメールアドレスで検索',
   'admin.noAccounts': 'アカウントが見つかりません。',
   'admin.googleAccount': 'Googleアカウント',
+  'admin.role': '権限',
   'admin.selfRoleTitle': '自分の権限は開発者にしか変更できません',
   // ---- カード対応状況 ----
   'admin.coverage.menu': '← メニュー',
