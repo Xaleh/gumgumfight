@@ -12426,29 +12426,35 @@ a.sponsor-card:hover {
   height: 0;
   overflow: visible;
 }
+/*
+ * Uma fileira só, que sempre cabe na altura da tela (menos as linhas do HUD, de 54px): até ~8 cartas o
+ * passo é o de sempre (0.82 carta); com mais, as cartas se sobrepõem mais e o arco abre menos (até ±35°).
+ */
 .hand-fan.left .hand-card,
 .hand-fan.right .hand-card {
-  top: calc(var(--o) * var(--hcw) * 0.82 - var(--hcw) * 0.698);
+  --step: min(calc(var(--hcw) * 0.82), calc((100cqh - 2 * 54px - var(--hcw) * 1.3) / max(var(--n) - 1, 1)));
+  --ang: min(7deg, calc(70deg / max(var(--n) - 1, 1)));
+  top: calc(var(--o) * var(--step) - var(--hcw) * 0.698);
   transform-origin: 50% 50%;
   transition: transform 0.18s, left 0.18s, right 0.18s;
 }
 .hand-fan.left .hand-card {
   left: calc(var(--hcw) * -0.36);
-  transform: rotate(calc(90deg + var(--o) * 7deg));
+  transform: rotate(calc(90deg + var(--o) * var(--ang)));
 }
 .hand-fan.right .hand-card {
   left: auto;
   right: calc(var(--hcw) * -0.36);
-  transform: rotate(calc(-90deg - var(--o) * 7deg));
+  transform: rotate(calc(-90deg - var(--o) * var(--ang)));
 }
-/* no hover a carta sobe um pouco, como se começasse a ser puxada da mão */
+/* no hover a carta é puxada da mão para a mesa, por cima das vizinhas, e aparece inteira */
 @media (hover: hover) {
   .hand-fan.left .fan-hand .hand-card:hover {
-    transform: translateX(calc(var(--hcw) * 0.28)) rotate(calc(90deg + var(--o) * 7deg));
+    transform: translateX(calc(var(--hcw) * 0.5)) rotate(calc(90deg + var(--o) * var(--ang))) scale(1.05);
     z-index: 50;
   }
   .hand-fan.right .fan-hand .hand-card:hover {
-    transform: translateX(calc(var(--hcw) * -0.28)) rotate(calc(-90deg - var(--o) * 7deg));
+    transform: translateX(calc(var(--hcw) * -0.5)) rotate(calc(-90deg - var(--o) * var(--ang))) scale(1.05);
     z-index: 50;
   }
 }
