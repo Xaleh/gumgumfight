@@ -4,7 +4,7 @@
 // ele refaz a partida e lê tudo do próprio estado do jogo.
 
 import { createHash } from 'node:crypto';
-import { type Action, applyAction, type CardData, createGame, type DeckList, type GameState, type PlayerId } from '@gumgum/engine';
+import { type Action, applyAction, type CardData, type CardEngineText, createGame, type DeckList, type GameState, type PlayerId } from '@gumgum/engine';
 
 export interface ReplayInput {
   seed: number;
@@ -18,6 +18,11 @@ export interface ReplayInput {
   legacySetup?: boolean;
   decks: [DeckList, DeckList];
   actions: Action[];
+  /**
+   * Partidas online: os textos para o motor fixados no começo da partida (número da carta → texto), para
+   * quem refaz o replay depois jogar com as mesmas cartas mesmo que um texto mude.
+   */
+  engineTexts?: Record<string, CardEngineText>;
 }
 
 export interface SeatFacts {

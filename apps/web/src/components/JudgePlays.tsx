@@ -102,6 +102,9 @@ export function PlaysSheet({
             </label>
           </div>
           {error && <div className="error small">{error}</div>}
+          {data?.failed && (
+            <div className="error small">{t('judge.playsFailed', { n: data.failed.count + 1, total: data.failed.total, why: data.failed.message })}</div>
+          )}
           {!data ? (
             !error && <p className="muted small">{t('judge.playsLoading')}</p>
           ) : visible.length === 0 ? (

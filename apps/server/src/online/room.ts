@@ -325,6 +325,12 @@ export interface JudgePlays {
   defs: Record<string, CardDef>;
 }
 
+/** A jogada `count` (`action`), do estado de antes (`before`) para o de depois (`after`). */
+function playOf(count: number, before: GameState, action: Action, after: GameState): JudgePlay {
+  const logFrom = before.log.length;
+  return { count, turn: before.turn, player: action.player, action, pending: before.pending ?? null, lines: after.log.slice(logFrom), logFrom };
+}
+
 /** Cartas citadas por uma ação. */
 function playRefs(a: Action): string[] {
   switch (a.type) {
@@ -438,8 +444,8 @@ export class Room {
   /** Emotes, chat, dados e revanche dos últimos MAX_DELAY_MS (para as mesas atrasadas que surgirem). Só em memória. */
   private recentEvents: LateEvent[] = [];
   private lastAction: Action | null = null;
-  /** Caminho já refeito das jogadas para o Judge (`plays`); some quando a partida é refeita (desfazer). */
-  private playsCache: { state: GameState; plays: JudgePlay[] } | null = null;
+  /** As jogadas da partida para o Judge (`plays`), registradas enquanto a mesa anda (`rebuild` e `commit`). */
+  private plays_: JudgePlay[] = [];
   /** Último aviso de "sua vez" de cada assento. */
   private turnNoticeAt: [number, number] = [-Infinity, -Infinity];
   /** O jogador está com o app fora da tela (o navegador avisa em /focus). Só em memória. */
@@ -569,9 +575,16 @@ export class Room {
       this.data.timeline = this.data.actions.map(() => [now, this.data.remaining[0], this.data.remaining[1]]);
     }
     this.data.startedAt ??= now;
-    for (const a of this.data.actions) state = applyAction(state, a);
+    // As jogadas para o Judge saem daqui e de `commit`, da própria mesa: refazer a partida depois, com as
+    // cartas como estão no banco naquele momento, poderia dar outra mesa (uma carta corrigida no meio do jogo).
+    const plays: JudgePlay[] = [];
+    for (const [i, a] of this.data.actions.entries()) {
+      const before = state;
+      state = applyAction(before, a);
+      plays.push(playOf(i, before, a, state));
+    }
     this.state = state;
-    this.playsCache = null;
+    this.plays_ = plays;
     this.lastAction = this.data.actions[this.data.actions.length - 1] ?? null;
     // O tempo em que o servidor ficou fora do ar não conta para ninguém.
     this.startClock();
@@ -626,7 +639,9 @@ export class Room {
   /** Aplica uma ação já com uids reais e avisa todo mundo. */
   private commit(action: Action) {
     this.settle();
-    this.state = applyAction(this.state!, action);
+    const prev = this.state!;
+    this.state = applyAction(prev, action);
+    this.plays_.push(playOf(this.data.actions.length, prev, action, this.state));
     this.data.actions.push(action);
     (this.data.timeline ??= []).push([this.deps.now(), this.data.remaining[0], this.data.remaining[1]]);
     this.lastAction = action;
@@ -800,14 +815,12 @@ export class Room {
    * que estava aberta antes dela (`pending`, completa: os alvos que havia para escolher, a carta da
    * Vida…) e as linhas do log que ela gerou, com as secretas (o Judge vê tudo). `cards`/`defs` dão o
    * nome e o texto só das cartas citadas. Nunca vai a seed: com ela daria para prever o deck.
-   * Refaz a partida uma vez e guarda o caminho (`playsCache`); as próximas chamadas só avançam.
    */
   plays(): JudgePlays | null {
-    const cache = this.playPath();
-    if (!cache) return null;
-    const { state } = cache;
+    const state = this.state;
+    if (!state) return null;
     const answered = this.data.answeredBy ?? {};
-    const plays = cache.plays.map((p) => (answered[p.count] ? { ...p, by: answered[p.count] } : p));
+    const plays = this.plays_.map((p) => (answered[p.count] ? { ...p, by: answered[p.count] } : p));
     const cards: Record<string, string> = {};
     const defs: Record<string, CardDef> = {};
     const cite = (uid: unknown) => {
@@ -831,31 +844,12 @@ export class Room {
     };
   }
 
-  /** O caminho refeito das jogadas (`plays`), avançado até a última ação. */
-  private playPath(): { state: GameState; plays: JudgePlay[] } | null {
-    if (!this.state) return null;
-    const actions = this.data.actions;
-    let cache = this.playsCache;
-    if (!cache || cache.plays.length > actions.length) cache = this.playsCache = { state: createGame(this.config()), plays: [] };
-    let state = cache.state;
-    for (let i = cache.plays.length; i < actions.length; i++) {
-      const action = actions[i];
-      const before = state;
-      state = applyAction(before, action);
-      const logFrom = before.log.length;
-      cache.plays.push({ count: i, turn: before.turn, player: action.player, action, pending: before.pending ?? null, lines: state.log.slice(logFrom), logFrom });
-    }
-    cache.state = state;
-    return cache;
-  }
-
   /**
    * A jogada que gerou a linha `index` do log (o jogador aponta a jogada do problema pelo próprio
    * histórico, que tem as mesmas linhas, na mesma ordem). null = linha da preparação ou que não existe mais.
    */
   playAtLine(index: number): { count: number; turn: number } | null {
-    const path = this.playPath();
-    const play = path?.plays.find((p) => index >= p.logFrom && index < p.logFrom + p.lines.length);
+    const play = this.plays_.find((p) => index >= p.logFrom && index < p.logFrom + p.lines.length);
     return play ? { count: play.count, turn: play.turn } : null;
   }
 
@@ -1348,6 +1342,7 @@ export class Room {
       deckIds: this.data.seats.map((s) => s.deckId),
       decks: this.data.seats.map((s) => s.deck),
       actions: this.data.actions,
+      engineTexts: this.data.engineTexts ?? {},
     };
   }
 

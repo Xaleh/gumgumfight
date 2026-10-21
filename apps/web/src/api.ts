@@ -1253,8 +1253,9 @@ export interface JudgePlay {
   action: Action;
   /** A pergunta aberta antes da ação (as opções que havia); null = o jogador agiu no próprio turno. */
   pending: Pending | null;
-  /** Linhas do log que a ação gerou, com as secretas (o Judge vê tudo). */
+  /** Linhas do log que a ação gerou, com as secretas (o Judge vê tudo); `logFrom` = a posição da primeira. */
   lines: LogEntry[];
+  logFrom: number;
   /** Resposta dada pelo Judge no lugar do jogador: o nome de quem respondeu. */
   by?: string;
 }
@@ -1269,6 +1270,11 @@ export interface JudgePlays {
   /** uid → número da carta. */
   cards: Record<string, string>;
   defs: Record<string, CardDef>;
+  /**
+   * Jogo gravado refeito no navegador: o motor recusou a jogada `count` (de `total`), e a lista para antes
+   * dela. Acontece quando uma carta da partida mudou desde o jogo.
+   */
+  failed?: { count: number; total: number; message: string };
 }
 
 /** Resposta do Judge no lugar do jogador à pergunta aberta (as cartas pelos uids de `JudgePlays`). */

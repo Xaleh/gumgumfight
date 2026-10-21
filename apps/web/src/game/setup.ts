@@ -2,7 +2,7 @@
 // e, no replay, do roteiro gravado. Usado pelo menu, pelo arquivo de replay baixado e
 // pelos replays gravados no servidor (auditoria dos torneios e das ranqueadas).
 
-import { type Action, type CardData, type DeckList, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
+import { type Action, type CardData, type CardEngineText, type DeckList, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
 import { api, type PlayFormat } from '../api';
 import { t } from '../i18n';
 import type { GameMode, GameSetup, ReplayFile } from './useGame';
@@ -80,7 +80,7 @@ export function setupFromReplayText(text: string): Promise<GameSetup> {
 }
 
 /** `cards`: as definições das cartas já em mãos (o replay embutido as recebe junto). */
-export function setupFromReplay(r: ReplayFile, cards?: CardData[]): Promise<GameSetup> {
+export async function setupFromReplay(r: ReplayFile, cards?: CardData[]): Promise<GameSetup> {
   if (r?.format !== 'gumgumfight-replay' || !Array.isArray(r.actions)) throw new Error(t('replay.notReplay'));
   if ((r.version ?? 1) > REPLAY_VERSION) {
     throw new Error(t('replay.newerVersion'));
@@ -90,5 +90,12 @@ export function setupFromReplay(r: ReplayFile, cards?: CardData[]): Promise<Game
   // Com a escolha do vencedor, o primeiro jogador sai da própria ação gravada.
   const first = r.chooseFirst ? undefined : r.firstPlayer;
   const names: [string, string] = r.names ?? [t('replay.player1'), t('replay.player2')];
-  return buildSetup('replay', r.deckIds, names, r.seed, 'standard', first, r.actions, lists, Boolean(r.chooseFirst), r.version ?? 1, cards);
+  // Com os textos para o motor da partida (replays online gravados com eles), as cartas jogam como jogaram.
+  const known = r.engineTexts && lists ? pinEngineTexts(cards ?? (await api.cards()), r.engineTexts) : cards;
+  return buildSetup('replay', r.deckIds, names, r.seed, 'standard', first, r.actions, lists, Boolean(r.chooseFirst), r.version ?? 1, known);
+}
+
+/** As cartas com os textos para o motor fixados na partida: a que não tinha texto fixado joga sem nenhum (como no servidor). */
+function pinEngineTexts(cards: CardData[], pinned: Record<string, CardEngineText>): CardData[] {
+  return cards.map(({ engineText: _now, ...c }) => (pinned[c.id] ? { ...c, engineText: pinned[c.id] } : c));
 }

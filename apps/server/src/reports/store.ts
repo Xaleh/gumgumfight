@@ -121,6 +121,7 @@ export function matchReplay(db: DB, matchId: number): Record<string, unknown> | 
     deckIds?: Array<string | null>;
     winner?: number | null;
     reasonKey?: string | null;
+    engineTexts?: Record<string, unknown>;
   };
   const ss = seats(db, matchId);
   const m = db.prepare('SELECT winner FROM matches WHERE id = ?').get(matchId) as { winner: number | null };
@@ -139,6 +140,7 @@ export function matchReplay(db: DB, matchId: number): Record<string, unknown> | 
     deckIds: stored.deckIds ?? ss.map((s) => s.deck_id),
     decks: stored.decks,
     actions: stored.actions,
+    ...(stored.engineTexts ? { engineTexts: stored.engineTexts } : {}),
   };
 }
 

@@ -1296,6 +1296,7 @@ export default {
   'judge.playsOnlyChoices': 'Seulement les choix et les réponses',
   'judge.playsLoading': 'Chargement des actions…',
   'judge.playsNone': 'Aucune action trouvée.',
+  'judge.playsFailed': 'Cette partie n’a pu être rejouée que jusqu’à l’action #{n} sur {total} : le moteur a refusé la suivante (« {why} »). Une carte de la partie a probablement changé après le jeu ; les actions suivantes ne sont pas affichées ici.',
   'judge.playsMore': 'Afficher {n|# action de plus|# actions de plus}',
   'judge.playsTurn': 'Tour {n}',
   'judge.playsEffect': 'Effet de {name} :',

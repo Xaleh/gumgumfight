@@ -1296,6 +1296,7 @@ export default {
   'judge.playsOnlyChoices': 'Nur Entscheidungen und Antworten',
   'judge.playsLoading': 'Spielzüge werden geladen…',
   'judge.playsNone': 'Keine Spielzüge gefunden.',
+  'judge.playsFailed': 'Diese Partie ließ sich nur bis Spielzug #{n} von {total} nachspielen: Die Engine hat den nächsten abgelehnt („{why}“). Wahrscheinlich hat sich eine Karte der Partie nach dem Spiel geändert; die folgenden Spielzüge fehlen hier.',
   'judge.playsMore': '{n|# weiteren Spielzug|# weitere Spielzüge} zeigen',
   'judge.playsTurn': 'Zug {n}',
   'judge.playsEffect': 'Effekt von {name}:',
