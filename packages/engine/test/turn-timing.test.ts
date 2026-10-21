@@ -154,6 +154,8 @@ describe('"at the end of this turn" depois dos [End of Your Turn], na mesma End 
     expect(s.delayed).toHaveLength(1);
     const from = s.log.length;
     s = endTurn(s);
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['1', '0'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.turn).toBe(4);
     expect(s.players[0].characters.find((c) => c.uid === kidChar)!.rested).toBe(false);
     // 1 DON!! ativo durante o turno do oponente (para o Counter, por exemplo).
@@ -171,7 +173,8 @@ describe('"at the end of this turn" depois dos [End of Your Turn], na mesma End 
     onField(s0, 0, 'TT-001');
     ps.donRested += ps.donActive;
     ps.donActive = 0;
-    const s = endTurn(s0);
+    let s = endTurn(s0);
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
     expect(s.turn).toBe(4);
     // Antes: o DON!! só ficava ativo no fim do turno 4 (do oponente).
     expect(s.players[0].donActive).toBe(1);

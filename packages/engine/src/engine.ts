@@ -3286,7 +3286,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'setDonActive': {
       if (restricted(state, frame.controller, 'noSetDonActiveByCharacter') && cardDef(state, frame.source).category === 'character') return true;
-      const n = Math.min(step.count, ps.donRested);
+      const n = upToCount(state, frame, step, ps.donRested, pr('howManyDonToSetActive', `${srcName}: quantos DON!! deixar ativos?`, { source: srcName }));
+      if (n === null) return false;
       ps.donRested -= n;
       ps.donActive += n;
       if (n) log(state, frame.controller, lg('donSetActive', `${n} DON!! de ${ps.name} fica(m) ativo(s).`, { n, player: ps.name }));

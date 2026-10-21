@@ -62,8 +62,9 @@ export interface ReplayFile {
    *    perguntam (`option`/`answer`); nos antigos, a resposta que o motor dava sozinho (`upgradeReplayActions`).
    * 12: "turn N cards from the top of your Life cards face-up" só olha as N do topo (não pula a já virada);
    *    nos antigos, a pergunta que o roteiro não tem é recusada (`answer`).
+   * 13: "set up to N of your DON!! cards as active" pergunta quantos (`option`); nos antigos, o máximo.
    */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
   seed: number;
   /** Partidas online: seed de 128 bits. */
   seed128?: number[];

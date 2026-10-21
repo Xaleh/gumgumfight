@@ -1975,6 +1975,7 @@ export default {
   'engine.chooseDonToReturn': '{source}: Wähle DON!! {index} von {count} zum Zurücklegen ins DON!!-Deck.',
   'engine.howManyActiveDonToRest': '{source}: Wie viele aktive DON!! erschöpfen (von {n|# Karte|# Karten})?',
   'engine.howManyDonToRestForPower': '{source}: Wie viele DON!! erschöpfen (je +{power} Stärke)?',
+  'engine.howManyDonToSetActive': '{source}: Wie viele DON!! aktiv setzen?',
   'engine.opponentMayAddDon': '{source}: {n|# aktive DON!!|# aktive DON!!} aus deinem DON!!-Deck hinzufügen?',
   // ---- Hand, Deck und Ablage ----
   'engine.drawUpToFirst': '{source}: 1 Karte ziehen? ({drawn} von bis zu {max})',

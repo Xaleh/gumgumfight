@@ -15,6 +15,17 @@ const auditCards = (JSON.parse(readFileSync(join(__dirname, 'fixtures/bugs-audit
 // Cartas de teste: um Evento que faz o oponente descartar (ST33-004).
 const synthetic: CardData[] = [
   { id: 'AU-001', name: 'Descarte', category: 'event', colors: ['blue'], cost: 0, types: [], text: '[Main] Your opponent trashes 1 card from their hand.' },
+  {
+    id: 'EB01-012',
+    name: 'Cavendish',
+    category: 'character',
+    colors: ['green'],
+    cost: 5,
+    power: 6000,
+    counter: 1000,
+    types: ['Beautiful Pirates', 'Supernovas'],
+    text: '[On Play]/[When Attacking] If your Leader has the {Supernovas} type and you have no other [Cavendish] Characters, set up to 2 of your DON!! cards as active.',
+  },
 ];
 const cards = [...baseCards, ...auditCards, ...synthetic];
 const byId = (id: string) => cards.find((c) => c.id === id)!;
@@ -351,6 +362,18 @@ describe('"up to N" aceita 0 nos passos de Vida e nos DON!! virados', () => {
     expect(s.pending).toMatchObject({ kind: 'option', options: ['1', '0'] });
     s = option(s, 1);
     expect(s.players[1].life).toHaveLength(life);
+  });
+
+  it('Cavendish EB01-012: "set up to 2 of your DON!! cards as active" pergunta quantos (2, 1 ou 0)', () => {
+    expect(stepsOf('EB01-012', 'onPlay')).toMatchObject([{ do: 'setDonActive', count: 2, upTo: true }]);
+    for (const [index, active] of [[0, 2], [1, 1], [2, 0]]) {
+      let s = toTurn(game(['ST02-001', 'ST01-001']), 3);
+      setDon(s, 0, 5, 3);
+      s = applyAction(s, { type: 'playCard', player: 0, uid: hand(s, 0, 'EB01-012') });
+      expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['2', '1', '0'] });
+      s = option(s, index);
+      expect(s.players[0]).toMatchObject({ donActive: active, donRested: 8 - active });
+    }
   });
 });
 

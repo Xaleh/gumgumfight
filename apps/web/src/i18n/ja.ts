@@ -1975,6 +1975,7 @@ export default {
   'engine.chooseDonToReturn': '{source}: ドン!!デッキに戻すドン!!を選んでください（{count}枚中{index}枚目）。',
   'engine.howManyActiveDonToRest': '{source}: アクティブのドン!!を何枚レストにしますか（{n|#枚}中）？',
   'engine.howManyDonToRestForPower': '{source}: ドン!!を何枚レストにしますか（1枚につきパワー+{power}）？',
+  'engine.howManyDonToSetActive': '{source}: ドン!!を何枚アクティブにしますか？',
   'engine.opponentMayAddDon': '{source}: ドン!!デッキからアクティブのドン!!を{n|#枚}追加しますか？',
   // ---- 手札、デッキ、トラッシュ ----
   'engine.drawUpToFirst': '{source}: カードを1枚引きますか？（最大{max}枚中{drawn}枚）',

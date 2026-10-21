@@ -1975,6 +1975,7 @@ export default {
   'engine.chooseDonToReturn': '{source}: choisissez la DON!! {index} sur {count} à renvoyer dans le deck DON!!.',
   'engine.howManyActiveDonToRest': '{source}: combien de DON!! redressées incliner (sur {n|# carte|# cartes}) ?',
   'engine.howManyDonToRestForPower': '{source}: combien de DON!! incliner (+{power} de puissance chacune) ?',
+  'engine.howManyDonToSetActive': '{source}: combien de DON!! redresser ?',
   'engine.opponentMayAddDon': '{source}: ajouter {n|# DON!! redressée|# DON!! redressées} depuis votre deck DON!! ?',
   // ---- hand, deck and trash ----
   'engine.drawUpToFirst': '{source}: piocher 1 carte ? ({drawn} sur {max} max.)',

@@ -1975,6 +1975,7 @@ export default {
   'engine.chooseDonToReturn': '{source}: choose DON!! {index} of {count} to return to the DON!! deck.',
   'engine.howManyActiveDonToRest': '{source}: how many active DON!! to rest (out of {n|# card|# cards})?',
   'engine.howManyDonToRestForPower': '{source}: how many DON!! to rest (+{power} power each)?',
+  'engine.howManyDonToSetActive': '{source}: how many DON!! to set as active?',
   'engine.opponentMayAddDon': '{source}: add {n|# active DON!!|# active DON!!} from your DON!! deck?',
   // ---- hand, deck and trash ----
   'engine.drawUpToFirst': '{source}: draw 1 card? ({drawn} of up to {max})',
