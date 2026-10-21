@@ -433,6 +433,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     if (confirmDiscard()) void openDeck(id);
   };
 
+  /** Sem nome (vazio ou o "Novo deck" de partida), o deck leva o nome do Líder. */
+  const nameToSave = () => {
+    const name = draft.name.trim();
+    return name && name !== t('deck.newDeckName') ? name : (leader?.name ?? t('deck.unnamed'));
+  };
+
   /** `allowDuplicate`: salva mesmo que já exista um deck com a mesma lista (depois do aviso). */
   const save = async ({ allowDuplicate = false } = {}) => {
     if (!renaming && !draft.leader) {
@@ -441,7 +447,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     }
     if (renaming) {
       try {
-        const saved = await api.renameDeck(draft.id!, draft.name.trim() || t('deck.unnamed'));
+        const saved = await api.renameDeck(draft.id!, nameToSave());
         setDraft((d) => ({ ...d, name: saved.name }));
         setDirty(false);
         setNotice(t('deck.renamed'));
@@ -453,7 +459,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       return;
     }
     // Só as artes das cartas que ainda estão no deck.
-    const input = { name: draft.name.trim() || t('deck.unnamed'), leader: draft.leader, cards: deckList.cards, arts: cleanArts(deckList, byId) ?? {} };
+    const input = { name: nameToSave(), leader: draft.leader, cards: deckList.cards, arts: cleanArts(deckList, byId) ?? {} };
     try {
       const saved =
         draft.id && draft.kind === 'user' ? await api.updateDeck(draft.id, input) : await api.createDeck(input, { checkDuplicate: !allowDuplicate });
