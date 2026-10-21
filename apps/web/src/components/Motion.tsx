@@ -34,6 +34,8 @@ interface Box {
   h: number;
   /** Deitada (Vida, carta virada). */
   rot?: boolean;
+  /** Giro do lado da mesa (graus): a metade direita da mesa lateral é girada 180°. */
+  turn?: number;
   /** Mostra a frente da carta. */
   face?: boolean;
 }
@@ -62,6 +64,10 @@ interface DonFlight {
   to: Box;
   /** Vai para uma carta: some ao chegar (os anexados aparecem embaixo dela). */
   fade: boolean;
+  /** reveal: sai do deck de DON!! virado e desvira no voo; hide: vira ao voltar para o deck. */
+  flip: 'none' | 'reveal' | 'hide';
+  /** Verso com a arte oficial (o deck de DON!! da mesa lateral); senão o verso listrado da mesa em pé. */
+  art: boolean;
   delay: number;
   duration: number;
   hide: Element | null;
@@ -170,7 +176,13 @@ function measure(el: Element, size?: HTMLElement | null): Box | null {
   const r = el.getBoundingClientRect();
   if (r.width === 0 && r.height === 0) return null;
   const s = size ?? (el as HTMLElement);
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: s.offsetWidth || r.width, h: s.offsetHeight || r.height };
+  const turn = turnOf(el);
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: s.offsetWidth || r.width, h: s.offsetHeight || r.height, ...(turn ? { turn } : {}) };
+}
+
+/** A metade direita da mesa lateral é girada 180° (para quem assiste, cada jogador vê o próprio lado de frente). */
+function turnOf(el: Element) {
+  return el.closest('.lat-half.right') ? 180 : 0;
 }
 
 /** Girado 90° pelo CSS (a caixa na tela fica mais larga que alta). */
@@ -217,7 +229,7 @@ function capture(root: Element | null): Boxes {
       const r = measure(top ?? el);
       // As cartas de Vida ficam deitadas: a altura delas é a largura da carta.
       const w = top ? top.offsetHeight : el.offsetWidth * 0.7;
-      if (r) b = { x: r.x, y: r.y, w, h: w * 1.396, rot: true };
+      if (r) b = { x: r.x, y: r.y, w, h: w * 1.396, rot: true, turn: r.turn };
     } else if (name.startsWith('hand-')) {
       const cards = el.querySelectorAll<HTMLElement>('.hand-card');
       const mid = cards[Math.floor(cards.length / 2)];
@@ -238,15 +250,15 @@ function capture(root: Element | null): Boxes {
       const w = dons[0]?.offsetWidth || donWidth(root) || Math.min(r.width, r.height / 1.396);
       if (r.width || r.height) {
         // O lado direito da mesa lateral é girado 180°: lá o primeiro DON!! fica no fim da coluna.
-        const flip = Boolean(el.closest('.lat-half.right'));
+        const turn = turnOf(el);
         b = el.classList.contains('lat-dons')
-          ? { x: flip ? r.right - w * 0.698 : r.left + w * 0.698, y: flip ? r.bottom - w / 2 : r.top + w / 2, w, h: w * 1.396, rot: true }
-          : { x: r.left + r.width / 2, y: r.top + r.height / 2, w, h: w * 1.396 };
+          ? { x: turn ? r.right - w * 0.698 : r.left + w * 0.698, y: turn ? r.bottom - w / 2 : r.top + w / 2, w, h: w * 1.396, rot: true, turn }
+          : { x: r.left + r.width / 2, y: r.top + r.height / 2, w, h: w * 1.396, turn };
       }
     } else if (name.startsWith('dondeck-') && el.querySelector('.lat-donback')) {
       // Deck de DON!! da mesa lateral: deitado.
       const r = measure(el);
-      if (r) b = { x: r.x, y: r.y, w: r.h, h: r.w, rot: true };
+      if (r) b = { ...r, w: r.h, h: r.w, rot: true };
     } else {
       const inner = el.querySelector<HTMLElement>('.card, .slot-empty, .don-card');
       b = measure(inner ?? el);
@@ -347,7 +359,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
         const slot = lifeSlots[m.to.player];
         lifeEl = slot.els[slot.next++] ?? null;
         const lb = lifeEl && measure(lifeEl);
-        if (lb && lifeEl) to = { x: lb.x, y: lb.y, w: (lifeEl as HTMLElement).offsetHeight, h: (lifeEl as HTMLElement).offsetHeight * 1.396, rot: true };
+        if (lb && lifeEl) to = { x: lb.x, y: lb.y, w: (lifeEl as HTMLElement).offsetHeight, h: (lifeEl as HTMLElement).offsetHeight * 1.396, rot: true, turn: lb.turn };
       }
       if (!from || !to) continue;
       const fromFace = Boolean(from.face) && known(prev, m.src);
@@ -534,10 +546,11 @@ function donPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, 
     let used = 0;
     const poolSrc = () => before.get(`don:${p}:${Math.max(0, a.donActive - 1 - used++)}`) ?? before.get(`anchor:don-${p}`);
     const cardBox = (boxes: Boxes, uid: string) => boxes.get(`field:${uid}`);
-    const add = (from: Box | undefined, to: Box | undefined, hide: Element | null, group: number, fade = false) => {
+    const art = Boolean(root.querySelector('.lat-donback'));
+    const add = (from: Box | undefined, to: Box | undefined, hide: Element | null, group: number, fade = false, flip: DonFlight['flip'] = 'none') => {
       if (!from || !to || count >= MAX_DON) return;
       count++;
-      out.push({ item: { id: nextId++, kind: 'don', from, to, fade, delay: 0, duration: 480 * tempo, hide }, group, step: 85 });
+      out.push({ item: { id: nextId++, kind: 'don', from, to, fade, flip, art, delay: 0, duration: 480 * tempo, hide }, group, step: 85 });
     };
     // Das cartas para a área de custo (Fase de Recuperação) ou para o deck de DON!!.
     for (const uid of decs) {
@@ -547,24 +560,24 @@ function donPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, 
         add(cardBox(before, uid), to, el, 1);
       } else if (deckIn > 0) {
         deckIn--;
-        add(cardBox(before, uid), deckBox(after), null, 1, true);
+        add(cardBox(before, uid), deckBox(after), null, 1, true, 'hide');
       }
     }
     // Do deck de DON!!: primeiro para a área de custo, o resto direto para as cartas.
     const fromDeckToPool = Math.min(deckOut, poolGain);
     for (let i = 0; i < fromDeckToPool; i++) {
       const [to, el] = poolDst();
-      add(deckBox(before), to, el, 3);
+      add(deckBox(before), to, el, 3, false, 'reveal');
     }
     deckOut -= fromDeckToPool;
     for (const uid of incs) {
       if (deckOut > 0) {
         deckOut--;
-        add(deckBox(before), cardBox(after, uid), null, 3, true);
+        add(deckBox(before), cardBox(after, uid), null, 3, true, 'reveal');
       } else add(poolSrc(), cardBox(after, uid), null, 1, true);
     }
     // Da área de custo de volta ao deck de DON!! (custos DON!! −N).
-    for (let i = 0; i < deckIn; i++) add(poolSrc(), deckBox(after), null, 1, true);
+    for (let i = 0; i < deckIn; i++) add(poolSrc(), deckBox(after), null, 1, true, 'hide');
   }
 }
 
@@ -688,12 +701,12 @@ const vars = (v: Record<string, string | number>) => v as CSSProperties;
 /** transform que leva um elemento de tamanho `base` (preso em 0,0) até a caixa `b`. */
 function place(b: Box, base: { w: number; h: number }, opts: { lift?: number; tilt?: number; grow?: number } = {}) {
   const s = (b.w / base.w) * (opts.grow ?? 1);
-  const rot = (b.rot ? 90 : 0) + (opts.tilt ?? 0);
+  const rot = (b.rot ? 90 : 0) + (b.turn ?? 0) + (opts.tilt ?? 0);
   return `translate(${(b.x - base.w / 2).toFixed(1)}px, ${(b.y - base.h / 2 - (opts.lift ?? 0)).toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${s.toFixed(3)})`;
 }
 
 function midBox(a: Box, b: Box): Box {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, w: (a.w + b.w) / 2, h: (a.h + b.h) / 2, rot: a.rot && b.rot };
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, w: (a.w + b.w) / 2, h: (a.h + b.h) / 2, rot: a.rot && b.rot, turn: ((a.turn ?? 0) + (b.turn ?? 0)) / 2 };
 }
 
 const EASE = 'cubic-bezier(.25,.8,.3,1)';
@@ -797,20 +810,22 @@ function CardFlightView({ f, onDone }: { f: CardFlight; onDone: (id: number) => 
 }
 
 function DonFlightView({ f, onDone }: { f: DonFlight; onDone: (id: number) => void }) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
+    const inn = inner.current;
     const finish = () => {
       showEl(f.hide);
       onDone(f.id);
     };
-    if (!el || typeof el.animate !== 'function') {
+    if (!el || !inn || typeof el.animate !== 'function') {
       finish();
       return;
     }
     const base = f.from;
-    // Para uma carta: chega do tamanho de um DON!! e some sobre ela.
-    const to = f.fade ? { ...f.to, w: base.w, h: base.h, rot: false } : f.to;
+    // Para uma carta: chega do tamanho de um DON!! e some sobre ela. Para o deck de DON!!: pousa nele, virado.
+    const to = f.fade && f.flip !== 'hide' ? { ...f.to, w: base.w, h: base.h, rot: false } : f.to;
     const dist = Math.hypot(f.to.x - f.from.x, f.to.y - f.from.y);
     const anim = el.animate(
       [
@@ -821,12 +836,37 @@ function DonFlightView({ f, onDone }: { f: DonFlight; onDone: (id: number) => vo
       ],
       { duration: f.duration, delay: f.delay, fill: 'both' },
     );
+    // Virar: desvira na subida ao sair do deck; vira na descida ao voltar para ele.
+    let flipAnim: Animation | null = null;
+    if (f.flip !== 'none') {
+      const [s, e, f0, f1] = f.flip === 'reveal' ? [180, 0, 0.08, 0.45] : [0, 180, 0.45, 0.85];
+      flipAnim = inn.animate(
+        [
+          { transform: `perspective(600px) rotateY(${s}deg)`, offset: 0 },
+          { transform: `perspective(600px) rotateY(${s}deg)`, offset: f0, easing: 'ease-in-out' },
+          { transform: `perspective(600px) rotateY(${e}deg)`, offset: f1 },
+          { transform: `perspective(600px) rotateY(${e}deg)`, offset: 1 },
+        ],
+        { duration: f.duration, delay: f.delay, fill: 'both' },
+      );
+    }
     anim.onfinish = finish;
     anim.oncancel = finish;
-    return () => stop(anim);
+    return () => {
+      stop(anim);
+      flipAnim?.cancel();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return <span ref={ref} className="don-card flight-don" style={vars({ '--dw': `${f.from.w}px`, width: `${f.from.w}px`, height: `${f.from.h}px` })} />;
+  // Enquanto espera a vez, o DON!! que sai do deck fica sobre ele mostrando o verso (como o próprio deck).
+  return (
+    <div ref={ref} className="flight-don" style={vars({ '--dw': `${f.from.w}px`, width: `${f.from.w}px`, height: `${f.from.h}px` })}>
+      <div ref={inner} className="flight-inner" style={{ transform: `perspective(600px) rotateY(${f.flip === 'reveal' ? 180 : 0}deg)` }}>
+        <span className="don-card flight-face front" />
+        <span className={['don-card', 'back', 'flight-face', f.art ? 'art' : ''].join(' ')} />
+      </div>
+    </div>
+  );
 }
 
 function BurstView({ b, onDone }: { b: Burst; onDone: (id: number) => void }) {
