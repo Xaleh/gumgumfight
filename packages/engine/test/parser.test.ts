@@ -75,7 +75,7 @@ describe('modelos de frase', () => {
       steps(
         '[On Play] If your Leader has the [Supernovas] type and you have 2 or less Life cards, set up to 2 of your DON!! cards as active.',
       ),
-    ).toEqual([[{ do: 'setDonActive', count: 2, if: { leaderHasType: 'Supernovas', lifeMax: 2 } }]]);
+    ).toEqual([[{ do: 'setDonActive', count: 2, upTo: true, if: { leaderHasType: 'Supernovas', lifeMax: 2 } }]]);
   });
 
   it('"Leader\'s type includes "CP"" conta CP9 e CP0 (trecho do tipo, não o tipo inteiro)', () => {

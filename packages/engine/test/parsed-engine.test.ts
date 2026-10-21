@@ -508,6 +508,7 @@ describe('efeitos lidos automaticamente', () => {
   it('restrição: não pode jogar Personagens neste turno', () => {
     let s = toTurn(game(), 3);
     s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-035') });
+    if (s.pending?.kind === 'option') s = applyAction(s, { type: 'option', player: 0, index: 0 }); // quantos DON!! desvirar
     const other = s.players[0].hand[0];
     s.cards[other] = { ...s.cards[other], cardId: 'PX-001' };
     expect(playError(s, 0, other)).toMatch(/não pode jogar/);

@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig, GameState } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 12;
+export const REPLAY_VERSION = 13;
 
 /**
  * Configuração para refazer um replay da versão `version`: até a versão 8, a preparação antiga
@@ -65,7 +65,9 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * pergunta que o roteiro antigo não tem é recusada; dali em diante a partida pode tomar outro rumo.
  * (Também sem mudar a versão: o [When Attacking] e o [On Your Opponent's Attack] hoje disparam na
  * declaração do ataque, no mesmo lote do "When your Leader … attacks"; a escolha da ordem que o roteiro
- * antigo não tem fica com a primeira opção, o efeito que antes resolvia primeiro.)
+ * antigo não tem fica com a primeira opção, o efeito que antes resolvia primeiro.) Até a versão 12, "set up
+ * to N of your DON!! cards as active" desvirava N sem perguntar (Cavendish EB01-012); a pergunta "quantos?"
+ * é respondida com a quantidade máxima.
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
   let state = createGame(config);
@@ -95,10 +97,10 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     if (p.kind === 'selectTargets' && p.hidden && !p.options.length) {
       return next?.type === 'choose' && !next.uids.length && next.player === p.player ? null : { type: 'choose', player: p.player, uids: [] };
     }
-    // Versão 10: escolhas novas da auditoria das cartas.
+    // Versão 10: escolhas novas da auditoria das cartas (e a da versão 12, `setDonActive`).
     const current = currentStep();
     if (p.kind === 'option' && !(next?.type === 'option' && next.player === p.player)) {
-      if (current && ['trashLife', 'opponentLifeToHand', 'addLifeFromDeck', 'giveRestedDon', 'lifeFace'].includes(current.do)) return { type: 'option', player: p.player, index: 0 };
+      if (current && ['trashLife', 'opponentLifeToHand', 'addLifeFromDeck', 'giveRestedDon', 'lifeFace', 'setDonActive'].includes(current.do)) return { type: 'option', player: p.player, index: 0 };
       if (current?.do === 'restOwn') return { type: 'option', player: p.player, index: p.options.length - 1 };
       if (current?.do === 'restDonOrCharacter') {
         const card = p.options.findIndex((o) => !/DON!!|Nenhum/.test(o));

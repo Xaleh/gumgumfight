@@ -1386,7 +1386,7 @@ const CLAUSES: ClauseRule[] = [
       {
         do: 'chooseOne',
         chooser: 'self',
-        options: [[{ do: 'setActive', target: 'self' }], [{ do: 'setDonActive', count: Number(m[1]) }]],
+        options: [[{ do: 'setActive', target: 'self' }], [{ do: 'setDonActive', count: Number(m[1]), upTo: true }]],
         labels: ['Desvirar este Personagem', `Desvirar ${m[1]} DON!!`],
       },
     ],
@@ -1455,12 +1455,12 @@ const CLAUSES: ClauseRule[] = [
   ],
   [/^Rest up to (\d+) of your opponent's DON!! cards?$/i, (m) => [{ do: 'restOpponentDon', count: Number(m[1]) }]],
   [/^Rest (.+)$/i, (m) => withTarget(m[1], (target) => ({ do: 'rest', target }))],
-  [/^Set up to (\d+) of your DON!! cards? as active$/i, (m) => [{ do: 'setDonActive', count: Number(m[1]) }]],
+  [/^Set up to (\d+) of your DON!! cards? as active$/i, (m) => [{ do: 'setDonActive', count: Number(m[1]), upTo: true }]],
   [
     /^Set (up to \d+ of your .+?) and up to (\d+) of your DON!! cards? as active$/i,
     (m) => {
       const target = parseTarget(m[1]);
-      return target ? [{ do: 'setActive', target }, { do: 'setDonActive', count: Number(m[2]) }] : null;
+      return target ? [{ do: 'setActive', target }, { do: 'setDonActive', count: Number(m[2]), upTo: true }] : null;
     },
   ],
   [

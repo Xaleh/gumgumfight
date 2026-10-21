@@ -726,8 +726,8 @@ type EffectStepBody =
   | { do: 'drawUntil'; count: number }
   /** "Your opponent returns N DON!! cards from their field to their DON!! deck." */
   | { do: 'opponentReturnsDon'; count: number; activeOnly?: boolean }
-  /** "Set up to N of your DON!! cards as active." */
-  | { do: 'setDonActive'; count: number }
+  /** "Set up to N of your DON!! cards as active." (`upTo`: o jogador escolhe quantos, de 0 a N) */
+  | { do: 'setDonActive'; count: number; upTo?: true }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
   | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean; lifeFaceDown?: boolean; rested?: boolean; toTrash?: boolean }
   /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */

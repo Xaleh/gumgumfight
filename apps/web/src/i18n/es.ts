@@ -1978,6 +1978,7 @@ export default {
   'engine.chooseDonToReturn': '{source}: elige el DON!! {index} de {count} para devolver al mazo de DON!!.',
   'engine.howManyActiveDonToRest': '{source}: ¿cuántos DON!! activos giras (de {n|# carta|# cartas})?',
   'engine.howManyDonToRestForPower': '{source}: ¿cuántos DON!! giras (+{power} de poder cada uno)?',
+  'engine.howManyDonToSetActive': '{source}: ¿cuántos DON!! dejas activos?',
   'engine.opponentMayAddDon': '{source}: ¿añadir {n|# DON!! activo|# DON!! activos} de tu mazo de DON!!?',
   // ---- mano, mazo y descarte ----
   'engine.drawUpToFirst': '{source}: ¿robar 1 carta? ({drawn} de hasta {max})',

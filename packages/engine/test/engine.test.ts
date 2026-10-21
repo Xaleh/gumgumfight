@@ -156,6 +156,9 @@ describe('batalha', () => {
     s = applyAction(s, { type: 'counter', player: 1, uid: repel });
     expect(s.pending?.kind).toBe('selectTargets');
     s = applyAction(s, { type: 'choose', player: 1, uids: [s.players[1].leader.uid] });
+    // "set up to 1": o jogador escolhe quantos (1 ou 0).
+    expect(s.pending).toMatchObject({ kind: 'option', player: 1, options: ['1', '0'] });
+    s = applyAction(s, { type: 'option', player: 1, index: 0 });
     expect(s.players[1].life).toHaveLength(5);
     expect(s.players[1].donActive).toBe(1); // pagou 2, desvirou 1
     expect(s.players[1].donRested).toBe(1);
@@ -194,6 +197,8 @@ describe('batalha', () => {
     s = passCounter(applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid }));
     expect(s.pending).toEqual({ kind: 'lifeCard', player: 1, card: scalpel });
     s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    expect(s.pending).toMatchObject({ kind: 'option', player: 1, options: ['2', '1', '0'] });
+    s = applyAction(s, { type: 'option', player: 1, index: 0 });
     expect(s.players[1].donActive).toBe(2);
     expect(s.players[1].trash).toContain(scalpel);
   });

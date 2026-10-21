@@ -1980,6 +1980,7 @@ const ptBR = {
   'engine.chooseDonToReturn': '{source}: escolha o {index}º de {count} DON!! a devolver ao deck de DON!!.',
   'engine.howManyActiveDonToRest': '{source}: quantos DON!! ativos virar (de {n|# carta|# cartas})?',
   'engine.howManyDonToRestForPower': '{source}: quantos DON!! virar (+{power} de poder cada)?',
+  'engine.howManyDonToSetActive': '{source}: quantos DON!! deixar ativos?',
   'engine.opponentMayAddDon': '{source}: adicionar {n|# DON!! ativo|# DON!! ativos} do seu deck de DON!!?',
   // ---- mão, deck e descarte ----
   'engine.drawUpToFirst': '{source}: comprar 1 carta? ({drawn} de até {max})',

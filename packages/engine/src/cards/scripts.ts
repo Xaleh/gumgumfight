@@ -244,10 +244,10 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         timing: 'counter',
         steps: [
           { do: 'power', target: ownLeaderOrChar(), amount: 2000, duration: 'battle' },
-          { do: 'setDonActive', count: 1 },
+          { do: 'setDonActive', count: 1, upTo: true },
         ],
       },
-      { timing: 'trigger', steps: [{ do: 'setDonActive', count: 2 }] },
+      { timing: 'trigger', steps: [{ do: 'setDonActive', count: 2, upTo: true }] },
     ],
   },
   'ST02-016': {
@@ -258,7 +258,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         timing: 'counter',
         steps: [
           { do: 'power', target: ownLeaderOrChar(), amount: 4000, duration: 'battle' },
-          { do: 'setDonActive', count: 1 },
+          { do: 'setDonActive', count: 1, upTo: true },
         ],
       },
     ],
