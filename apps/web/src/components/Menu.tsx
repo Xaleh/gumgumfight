@@ -1,10 +1,11 @@
-import { type BotLevel, cardLegality, FORMATS, type PlayerId, playMode, type PlayMode } from '@gumgum/engine';
+import { type BotLevel, cardLegality, FORMATS, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
   api,
   ApiError,
   canPlay,
+  currentSpoilerSet,
   type DeckSummary,
   type FormatId,
   modeLabel,
@@ -157,6 +158,7 @@ const fmtClock = (ms: number) => {
 /** Escolha das cartas da sala privada ou do treino contra o bot. */
 function RulesField({ id, value, onChange }: { id: string; value: Rules; onChange: (rules: Rules) => void }) {
   const t = useT();
+  const set = currentSpoilerSet();
   return (
     <div className="mode-field">
       <span className="mode-field-label" id={id}>
@@ -165,7 +167,8 @@ function RulesField({ id, value, onChange }: { id: string; value: Rules; onChang
       <div className="seg small rules-seg" role="group" aria-labelledby={id}>
         {RULES.map(([v, label]) => (
           <button key={v} type="button" className={value === v ? 'on' : ''} aria-pressed={value === v} onClick={() => onChange(v)}>
-            {t(label)}
+            {/* "+ EB05": com spoilers só vale a próxima coleção a ser lançada. */}
+            {v === 'spoilers' && set ? t('menu.rulesSpoilerSet', { set }) : t(label)}
           </button>
         ))}
       </div>
@@ -520,13 +523,20 @@ export function Menu({
   const d0 = decks.find((d) => d.id === deck0);
   const d1 = decks.find((d) => d.id === deck1);
   const fmt = modeLabel({ format });
-  /** Regras das salas privadas e do treino: o formato escolhido (com ou sem spoilers) ou o Livre. */
-  const modeOf = (rules: Rules): PlayMode => (rules === 'free' ? playMode('free', true) : playMode(format, rules === 'spoilers'));
+  /**
+   * Regras das salas privadas e do treino: o formato escolhido (com ou sem spoilers) ou o Livre.
+   * Com spoilers, só vale a próxima coleção a ser lançada ("Standard + EB05").
+   */
+  const modeOf = (rules: Rules): PlayMode => {
+    if (rules === 'free') return playMode('free', true);
+    const set = rules === 'spoilers' ? currentSpoilerSet() : null;
+    return { ...playMode(format, rules === 'spoilers'), ...(set ? { spoilerSet: set } : {}) };
+  };
   const privateMode = modeOf(privateRules);
   const botMode = modeOf(botRules);
   /** O deck é completo e vale nas regras. */
   function playsIn(d: DeckSummary | undefined, mode: PlayMode): d is DeckSummary {
-    return Boolean(d && canPlay(d, mode.format, mode.spoilers ? 'all' : 'none'));
+    return Boolean(d && canPlay(d, mode.format, spoilerRule(mode)));
   }
   /** Os dois decks precisam valer nas regras do treino. */
   const botReady = playsIn(d0, botMode) && (deck1 === RANDOM || playsIn(d1, botMode));
@@ -986,8 +996,8 @@ export function Menu({
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
           // Deck equipado: qualquer deck completo (ele vale em modos diferentes, o Livre inclusive); cada modo confere as regras.
-          canUse={(d) => (picking === 0 ? d.valid : canPlay(d, botMode.format, botMode.spoilers ? 'all' : 'none'))}
-          whyNot={(d) => (picking === 0 ? whyNotPlayable(d, 'free') : whyNotPlayable(d, botMode.format, botMode.spoilers ? 'all' : 'none'))}
+          canUse={(d) => (picking === 0 ? d.valid : canPlay(d, botMode.format, spoilerRule(botMode)))}
+          whyNot={(d) => (picking === 0 ? whyNotPlayable(d, 'free') : whyNotPlayable(d, botMode.format, spoilerRule(botMode)))}
           allowRandom={picking === 1}
           onPick={(id) => {
             if (picking === 0) setDeck0(id);

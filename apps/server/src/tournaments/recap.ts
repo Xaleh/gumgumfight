@@ -6,6 +6,7 @@
 import { proxiedImageUrl } from '../card-images';
 import { type DB, getCards } from '../db';
 import type { ApiCard } from '../present';
+import { tournamentSpoilerSet } from '../spoiler-set';
 import type { publicSponsor } from '../support/sponsors';
 import { type Stage, standings, winnerOf } from './pairing';
 import { listGames, listMatches, listPlayers, type Tournament, type TournamentMatch, type TournamentPlayer } from './store';
@@ -80,6 +81,8 @@ export interface TournamentRecap {
     format: string;
     /** Aceita cartas de spoiler (Standard ou EGB + spoilers; o Livre sempre aceita). */
     spoilers: boolean;
+    /** Com spoilers, a coleção aceita (gravada no início). */
+    spoilerSet: string | null;
     structure: Tournament['structure'];
     topCut: number | null;
     players: number;
@@ -232,6 +235,7 @@ export function buildRecap(db: DB, t: Tournament, { present, cardImages, sponsor
       name: t.name,
       format: t.format,
       spoilers: t.spoilers,
+      spoilerSet: tournamentSpoilerSet(db, t),
       structure: t.structure,
       topCut: t.topCut,
       players: players.length,

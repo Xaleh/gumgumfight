@@ -21,6 +21,11 @@ export interface Tournament {
    */
   spoilers: boolean;
   /**
+   * Com spoilers (fora do Livre), a coleção aceita: a próxima a ser lançada, gravada no início
+   * do torneio (antes disso, null: vale a próxima de agora; ver `tournamentSpoilerSet`).
+   */
+  spoilerSet: string | null;
+  /**
    * Quem transmite (Streamer e Admin) pode ver as mãos dos dois jogadores ao vivo, sem o atraso
    * mínimo de 1 min. Decisão do organizador: sem isso, as mãos chegam sempre atrasadas.
    */
@@ -138,6 +143,7 @@ type TournamentRow = {
   description: string;
   format: PlayFormat;
   spoilers: number;
+  spoiler_set: string | null;
   live_hands: number;
   structure: Structure;
   rounds: number | null;
@@ -176,6 +182,7 @@ const toTournament = (r: TournamentRow): Tournament => ({
   description: r.description,
   format: r.format,
   spoilers: Boolean(r.spoilers),
+  spoilerSet: r.spoiler_set ?? null,
   liveHands: Boolean(r.live_hands),
   structure: r.structure,
   rounds: r.rounds,
@@ -563,13 +570,16 @@ export interface RoundSpec {
   pairings: Pairing[];
 }
 
-/** Começa o torneio: grava a ordem sorteada, o número de rodadas e a primeira rodada (`at`: hora de início, ISO). */
-export function startTournament(db: DB, id: string, seeds: string[], rounds: number, first: RoundSpec, at: string) {
+/**
+ * Começa o torneio: grava a ordem sorteada, o número de rodadas, a coleção de spoiler aceita
+ * (`spoilerSet`) e a primeira rodada (`at`: hora de início, ISO).
+ */
+export function startTournament(db: DB, id: string, seeds: string[], rounds: number, first: RoundSpec, at: string, spoilerSet: string | null = null) {
   dataVersion.bump();
   transaction(db, () => {
     const seed = db.prepare('UPDATE tournament_players SET seed = ? WHERE tournament_id = ? AND user_id = ?');
     seeds.forEach((userId, i) => seed.run(i + 1, id, userId));
-    db.prepare("UPDATE tournaments SET status = 'running', rounds = ?, started_at = ? WHERE id = ?").run(rounds, at, id);
+    db.prepare("UPDATE tournaments SET status = 'running', rounds = ?, started_at = ?, spoiler_set = ? WHERE id = ?").run(rounds, at, spoilerSet, id);
     writeRound(db, id, first, at);
   });
 }

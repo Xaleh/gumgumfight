@@ -4,7 +4,6 @@ import {
   barredSpoilers,
   cardBlock,
   cardLegality,
-  COMPLETE_SPOILER_SETS,
   countsInStats,
   formatIssues,
   legalFormats,
@@ -12,7 +11,8 @@ import {
   playModeLabel,
   spoilerCards,
   spoilerIssues,
-  tournamentSpoilerRule,
+  nextSpoilerSet,
+  spoilerRule,
 } from '../src/formats';
 import type { CardData, DeckList } from '../src/types';
 import { cards, luffy } from './helpers';
@@ -110,13 +110,24 @@ describe('spoilers (cartas ainda não lançadas)', () => {
     expect(spoilerIssues({ leader: 'ST01-002', cards: [] }, pool)).toEqual([]);
   });
 
-  it('torneio com spoilers: só as coleções já reveladas por completo; o Livre aceita todas', () => {
-    expect(COMPLETE_SPOILER_SETS.has('EB05')).toBe(true);
-    expect(COMPLETE_SPOILER_SETS.has('OP18')).toBe(false);
-    expect(tournamentSpoilerRule({ format: 'egb', spoilers: false })).toBe('none');
-    expect(tournamentSpoilerRule({ format: 'standard', spoilers: true })).toBe('complete');
-    expect(tournamentSpoilerRule({ format: 'free', spoilers: true })).toBe('all');
-    expect(barredSpoilers(['EB05-001', 'OP18-001'], 'complete')).toEqual(['OP18-001']);
+  it('com spoilers (fora do Livre), só a próxima coleção a ser lançada; o Livre aceita todas', () => {
+    const files = [
+      { set: 'OP18', release: '2026-11-20' },
+      { set: 'EB05', release: '2026-10-30' },
+      { set: 'ST37' },
+      { set: 'P' },
+    ];
+    expect(nextSpoilerSet(files, new Set(['EB05', 'OP18', 'ST37', 'P']))).toBe('EB05');
+    // A EB05 saiu (as cartas viraram oficiais): a OP18 assume sozinha.
+    expect(nextSpoilerSet(files, new Set(['OP18', 'ST37', 'P']))).toBe('OP18');
+    // Sem data de lançamento (starters e promos) nunca é a próxima coleção.
+    expect(nextSpoilerSet(files, new Set(['ST37', 'P']))).toBeNull();
+
+    expect(spoilerRule({ format: 'egb', spoilers: false })).toBe('none');
+    expect(spoilerRule({ format: 'standard', spoilers: true })).toBe('next');
+    expect(spoilerRule({ format: 'free', spoilers: true })).toBe('all');
+    expect(barredSpoilers(['EB05-001', 'OP18-001'], 'next', 'EB05')).toEqual(['OP18-001']);
+    expect(barredSpoilers(['EB05-001', 'OP18-001'], 'next', null)).toEqual(['EB05-001', 'OP18-001']);
     expect(barredSpoilers(['EB05-001', 'OP18-001'], 'none')).toEqual(['EB05-001', 'OP18-001']);
     expect(barredSpoilers(['EB05-001', 'OP18-001'], 'all')).toEqual([]);
 
@@ -125,11 +136,15 @@ describe('spoilers (cartas ainda não lançadas)', () => {
       ['OP18-001', spoiler],
     ]);
     const deck = { leader: 'EB05-001', cards: [{ id: 'OP18-001', count: 4 }] };
-    const [issue, ...rest] = spoilerIssues(deck, mixed, 'complete');
+    const [issue, ...rest] = spoilerIssues(deck, mixed, 'next', 'EB05');
     expect(rest).toEqual([]);
-    expect(issue).toMatchObject({ code: 'rules.spoilerIncomplete', params: { n: 1, ids: 'OP18-001', sets: 'EB05' }, cardId: 'OP18-001' });
-    expect(spoilerIssues({ leader: 'EB05-001', cards: [] }, mixed, 'complete')).toEqual([]);
+    expect(issue).toMatchObject({ code: 'rules.spoilerNotNext', params: { n: 1, ids: 'OP18-001', set: 'EB05' }, cardId: 'OP18-001' });
+    expect(spoilerIssues({ leader: 'EB05-001', cards: [] }, mixed, 'next', 'EB05')).toEqual([]);
     expect(spoilerIssues({ leader: 'EB05-001', cards: [] }, mixed)).toHaveLength(1);
+
+    expect(playModeLabel({ format: 'standard', spoilers: true, spoilerSet: 'EB05' })).toBe('Standard + EB05');
+    expect(playModeLabel({ format: 'standard', spoilers: true })).toBe('Standard + spoilers');
+    expect(playModeLabel({ format: 'free', spoilers: true, spoilerSet: 'EB05' })).toBe('Livre (vale tudo)');
   });
 
   it('nome das regras de cartas (torneios, salas privadas e bot)', () => {

@@ -220,19 +220,22 @@ torneios, nas salas privadas e no treino contra o bot, quem cria escolhe entre c
 | Opção | Banidas | Rotacionadas (bloco ①) | Spoilers | Estatísticas e meta |
 |---|---|---|---|---|
 | **Extra Grand Battle** | não | sim | não | sim |
-| **Extra Grand Battle + spoilers** | não | sim | sim | não |
+| **Extra Grand Battle + EB05** (próxima coleção) | não | sim | só a próxima coleção | não |
 | **Standard** | não | não | não | sim |
-| **Standard + spoilers** | não | não | sim | não |
+| **Standard + EB05** (próxima coleção) | não | não | só a próxima coleção | não |
 | **Livre (vale tudo)** | sim | sim | sim | não |
 
-Nos **torneios** "+ spoilers" só valem os spoilers das coleções **já reveladas por completo** (`COMPLETE_SPOILER_SETS`
-em `packages/engine/src/formats.ts`; hoje, só a EB05): fora do Livre não faz sentido jogar torneio com coleção
-incompleta. Coleção ainda pela metade (hoje, a OP18) só vale no Livre. Quando uma coleção termina de ser revelada, é só
-incluí-la na lista. Nas salas privadas e no treino contra o bot, "+ spoilers" aceita todos.
+Fora do Livre, "+ spoilers" quer dizer **só a próxima coleção a ser lançada**, e as telas mostram o nome dela no lugar
+de "spoilers" ("Standard + EB05"). A próxima coleção sai sozinha dos arquivos `data/spoilers` (campo `release`): entre as
+coleções que ainda têm cartas de spoiler no banco, a de lançamento mais cedo (starters e promos sem data não contam).
+Quando ela é lançada e a [sincronização](#spoilers-coleções-ainda-não-lançadas) troca as cartas pelas oficiais, a
+seguinte assume (hoje EB05; depois, OP18). As outras coleções de spoiler só valem no Livre (e na fila casual). A sala
+privada guarda a coleção de quando foi criada, e o torneio grava a dele ao começar (o histórico continua dizendo
+"+ EB05"); antes de começar, vale a próxima de agora. O servidor informa a coleção em `/api/config` (`spoilerSet`).
 
 O **Livre** não é formato oficial: vale toda carta, inclusive as banidas e os pares proibidos. É só por diversão e não
 existe nas filas. No menu, o formato (Standard ou EGB) vale para todos os modos, e as salas privadas e o treino contra
-o bot têm a escolha **Cartas**: lançadas, + spoilers ou Livre. Quem entra numa sala privada joga nas regras de quem a
+o bot têm a escolha **Cartas**: lançadas, + a próxima coleção (ex.: "+ EB05") ou Livre. Quem entra numa sala privada joga nas regras de quem a
 criou. O servidor confere na fila ranqueada, na sala privada e na inscrição do torneio; o construtor avisa quando o
 deck tem spoilers e o menu desabilita a ranqueada para ele.
 
@@ -434,7 +437,7 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 - **Melhor de 3 / melhor de 5 na eliminatória:** o organizador escolhe a partir de qual fase (toda a eliminatória,
   rodada de 32, oitavas, quartas, semifinal ou final) as partidas passam a ser melhor de 3 e melhor de 5. Ex.: melhor
   de 3 a partir das quartas e melhor de 5 na final.
-- **Inscrição:** com um deck válido no formato (e sem spoilers, salvo nos torneios que aceitam spoilers, e aí só das coleções já reveladas por completo; no Livre, todos). A lista fica **congelada** na inscrição (mudar o deck depois não muda
+- **Inscrição:** com um deck válido no formato (e sem spoilers, salvo nos torneios que aceitam spoilers, e aí só da próxima coleção a ser lançada; no Livre, todos). A lista fica **congelada** na inscrição (mudar o deck depois não muda
   o do torneio; inscreva-o de novo para trocar, só enquanto as inscrições estão abertas: depois que o torneio começa,
   ninguém troca nem o deck nem a lista). Enquanto as inscrições estão abertas, os outros jogadores **não veem** qual
   deck cada um inscreveu (só o organizador, um Admin e o próprio jogador); quando o torneio começa, o Líder de cada um
@@ -851,12 +854,17 @@ Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
 {
   "set": "OP18",
   "title": "The Dominance of God (OP-18)",
+  "release": "2026-11-20",
   "feed": true,
   "source": "optcgleaks.com",
   "url": "https://optcgleaks.com/op18",
   "cards": []
 }
 ```
+
+`release` (data de lançamento) define a ordem das coleções: a de data mais cedo que ainda tem cartas de spoiler é a
+"próxima coleção" dos modos "+ spoilers" fora do Livre (veja [Formatos](#formatos)). Arquivo sem `release` (starters,
+promos) nunca é a próxima coleção.
 
 - **Busca automática** (`"feed": true`; arquivos antigos com `"feed": "optcgleaks"` também valem): o servidor baixa as
   cartas reveladas das fontes de `SPOILER_SOURCES`, juntadas pela [cadeia](#cadeia-de-fontes):
@@ -881,8 +889,8 @@ Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
 - Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
 - No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
 - Deck com spoiler não entra na ranqueada nem em torneio, sala privada ou treino sem spoilers (veja [Formatos](#formatos)),
-  e a partida com ele não conta nas estatísticas. Nos torneios com spoilers (fora do Livre) só valem as coleções já
-  reveladas por completo (`COMPLETE_SPOILER_SETS`).
+  e a partida com ele não conta nas estatísticas. Com spoilers, fora do Livre, só vale a próxima coleção a ser
+  lançada (veja [Formatos](#formatos)). Na carta, a etiqueta **SPOILER** fica junto das tags de efeito, abaixo do poder.
   Quando a coleção sai e a etiqueta some, o mesmo deck passa a valer em todo lugar.
 - O [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) costuma revelar antes e tem promocionais que as outras fontes não
   têm, mas errou contador, cor e poder em algumas e as imagens dele só abrem no próprio site. Por isso fica desligado por

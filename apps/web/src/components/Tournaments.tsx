@@ -1,9 +1,10 @@
-import { COMPLETE_SPOILER_SETS, formatLabel, PLAY_FORMATS, playMode, tournamentSpoilerRule } from '@gumgum/engine';
+import { formatLabel, PLAY_FORMATS, playMode, spoilerRule } from '@gumgum/engine';
 import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   type AdminSponsor,
   api,
   canPlay,
+  currentSpoilerSet,
   type DeckSummary,
   isAdmin,
   type OnlineSeat,
@@ -428,6 +429,8 @@ function TournamentForm({
   const tr = useT();
   const { user } = useAuth();
   const admin = isAdmin(user?.role);
+  /** Com spoilers, só vale a próxima coleção a ser lançada. */
+  const spoilerSetNow = currentSpoilerSet();
   const [sponsors, setSponsors] = useState<AdminSponsor[]>([]);
   useEffect(() => {
     if (admin) api.admin.sponsors().then(setSponsors, () => setSponsors([]));
@@ -513,11 +516,11 @@ function TournamentForm({
             {/* O Livre sempre aceita spoilers: a opção fica marcada e travada. */}
             <label className="check">
               <input type="checkbox" checked={form.spoilers} disabled={form.format === 'free'} onChange={(e) => set('spoilers', e.target.checked)} />
-              {tr('tour.spoilersOption')}
+              {spoilerSetNow ? tr('tour.spoilersOptionSet', { set: spoilerSetNow }) : tr('tour.spoilersOption')}
             </label>
             <p className="muted small">
               {tr(form.format === 'free' ? 'tour.formatFreeHint' : form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint', {
-                sets: [...COMPLETE_SPOILER_SETS].join(', ') || '—',
+                set: spoilerSetNow ?? '—',
               })}
             </p>
           </div>
@@ -1241,8 +1244,9 @@ function MyArea({
   }
 
   if (t.status === 'registration' || late) {
-    const spoilerRule = tournamentSpoilerRule(t);
-    const playable = decks?.filter((d) => canPlay(d, t.format, spoilerRule)) ?? [];
+    const rule = spoilerRule(t);
+    const spoilerSet = t.spoilerSet ?? currentSpoilerSet();
+    const playable = decks?.filter((d) => canPlay(d, t.format, rule, spoilerSet)) ?? [];
     const chosen = decks?.find((d) => d.id === deckId);
     const full = t.maxPlayers !== null && t.players.length >= t.maxPlayers && !t.me;
     return (
@@ -1310,8 +1314,8 @@ function MyArea({
                 context={tr('decks.context.tournament', { rules: modeLabel(t) })}
                 decks={decks}
                 value={deckId}
-                canUse={(d) => canPlay(d, t.format, spoilerRule)}
-                whyNot={(d) => whyNotPlayable(d, t.format, spoilerRule)}
+                canUse={(d) => canPlay(d, t.format, rule, spoilerSet)}
+                whyNot={(d) => whyNotPlayable(d, t.format, rule, spoilerSet)}
                 onPick={(id) => {
                   setDeckId(id);
                   setPicking(false);

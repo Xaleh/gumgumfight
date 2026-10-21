@@ -74,6 +74,8 @@ export interface LiveRoom {
   format: PlayFormat;
   /** Aceita cartas de spoiler (sala privada, treino contra o bot e torneio; ausente nas filas). */
   spoilers?: boolean;
+  /** Com spoilers (fora do Livre), a coleção aceita. */
+  spoilerSet?: string;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -305,7 +307,7 @@ export class Lobby {
    */
   privateMode(code: string): PlayMode | null {
     const data = this.waitingRoom(code)?.data;
-    return data ? { format: data.format, spoilers: data.spoilers ?? true } : null;
+    return data ? { format: data.format, spoilers: data.spoilers ?? true, ...(data.spoilerSet ? { spoilerSet: data.spoilerSet } : {}) } : null;
   }
 
   joinPrivate(code: string, seat: SeatRequest): { room: Room; token: string } | LobbyError {
@@ -400,6 +402,7 @@ export class Lobby {
       queue: room.data.queue,
       format: room.data.format,
       ...(room.data.spoilers !== undefined ? { spoilers: room.data.spoilers } : {}),
+      ...(room.data.spoilerSet ? { spoilerSet: room.data.spoilerSet } : {}),
       status: room.status === 'finished' ? 'finished' : 'playing',
       players: room.data.seats.map((s, i) => ({
         name: s.name,
@@ -637,7 +640,7 @@ export class Lobby {
       }
       // Quem foi o segundo assento passa a ser o primeiro (quem começa é sorteado).
       const seats = [room.data.seats[1], room.data.seats[0]].map((s) => ({ ...s, token: randomToken() }));
-      const data = newRoomData({ queue: 'private', format: room.data.format, spoilers: room.data.spoilers, code: null, seats });
+      const data = newRoomData({ queue: 'private', format: room.data.format, spoilers: room.data.spoilers, spoilerSet: room.data.spoilerSet, code: null, seats });
       // A revanche segue com a mesma escolha de quem criou a sala.
       if (room.data.showHands) data.showHands = true;
       const next = this.makeRoom(data);

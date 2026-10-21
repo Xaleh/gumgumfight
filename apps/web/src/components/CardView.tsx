@@ -142,8 +142,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
           ⚙
         </span>
       )}
-      <StatusMarkers statuses={statuses} />
-      <SpoilerTag card={def} />
+      <StatusMarkers statuses={statuses} spoiler={def} />
     </div>
   );
 }
@@ -169,24 +168,30 @@ export const statusText = (s: CardStatus, tryT: TryTranslate) => tryT(s.textKey,
 /** Até quando o estado vale, no idioma da interface. */
 export const statusUntil = (s: CardStatus, tryT: TryTranslate) => tryT(s.untilKey, s.untilParams) ?? s.until;
 
-function StatusMarkers({ statuses }: { statuses: CardStatus[] }) {
+/** Tags no topo direito da carta: os efeitos temporários e, por último, a de spoiler. */
+function StatusMarkers({ statuses, spoiler }: { statuses: CardStatus[]; spoiler?: CardData }) {
   const t = useT();
-  if (!statuses.length) return null;
+  if (!statuses.length && !spoiler?.spoiler) return null;
   return (
-    <div className="card-status" aria-label={t('card.activeEffects')}>
+    <div className="card-status" aria-label={statuses.length ? t('card.activeEffects') : undefined}>
       {statuses.map((s, i) => (
         <StatusTag key={i} status={s} title />
       ))}
+      {spoiler && <SpoilerTag card={spoiler} />}
     </div>
   );
 }
 
-/** Etiqueta das cartas anunciadas que ainda não saíram na API oficial. */
+/**
+ * Etiqueta das cartas anunciadas que ainda não saíram na API oficial, no estilo das tags de
+ * efeito da partida e no mesmo lugar (topo direito, abaixo do poder), sem cobrir os números.
+ */
 export function SpoilerTag({ card }: { card: CardData }) {
   const t = useT();
   if (!card.spoiler) return null;
   return (
-    <span className="spoiler-tag" title={t('card.spoilerTitle', { source: card.spoiler.source })}>
+    <span className="status-tag tag-spoiler" title={t('card.spoilerTitle', { source: card.spoiler.source })}>
+      <span className="tag-icon">👁</span>
       {t('card.spoilerBadge')}
     </span>
   );
@@ -326,7 +331,7 @@ export function StaticCard({
         />
       )}
       {(!withImage || !imageLoaded) && <CardFace def={def} power={def.power} delta={0} keywords={def.keywords} />}
-      <SpoilerTag card={card} />
+      <StatusMarkers statuses={[]} spoiler={card} />
       {badge}
     </div>
   );

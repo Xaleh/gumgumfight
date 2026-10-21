@@ -2,7 +2,7 @@
 // que o servidor confere e troca por uma sessão em cookie httpOnly.
 
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { api, type AppConfig, type User } from './api';
+import { api, type AppConfig, setCurrentSpoilerSet, type User } from './api';
 import { useLocale } from './i18n';
 
 interface GsiButtonOptions {
@@ -88,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (cancelled) return;
           setClientId(config.googleClientId);
           setConfig(config);
+          setCurrentSpoilerSet(config.spoilerSet);
           setUser(me.user);
           setReady(true);
         })

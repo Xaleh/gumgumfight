@@ -3,7 +3,6 @@ import {
   type Action,
   barredSpoilers,
   type CardData,
-  COMPLETE_SPOILER_SETS,
   type DeckList,
   type FormatId,
   formatLabel,
@@ -79,37 +78,55 @@ export interface DeckCleanup {
   groups: Array<{ leader: string; leaderName: string | null; colors: string[]; rows: DeckCleanupRow[] }>;
 }
 
+let spoilerSetNow: string | null = null;
+
+/**
+ * Próxima coleção a ser lançada (`/api/config`): a única cujos spoilers valem nos modos
+ * "+ spoilers" fora do Livre ("Standard + EB05"). null = nenhuma (ou o servidor não informou).
+ */
+export const currentSpoilerSet = (): string | null => spoilerSetNow;
+export const setCurrentSpoilerSet = (set: string | null | undefined) => {
+  spoilerSetNow = set ?? null;
+};
+
 /**
  * Deck completo e permitido no formato (cartas banidas ou rotacionadas impedem; no Livre, nada
  * impede). Pela regra de spoilers (`none`: ranqueada e torneios, salas e treinos sem spoilers;
- * `complete`: torneios com spoilers), cartas ainda não lançadas também impedem.
+ * `next`: com spoilers, só a coleção `spoilerSet`, a próxima a ser lançada), cartas ainda não
+ * lançadas também impedem.
  */
-export function canPlay(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all'): boolean {
-  return deck.valid && !(format !== 'free' && deck.formats?.[format]?.length) && !barredSpoilers(deck.spoilers ?? [], spoilers).length;
+export function canPlay(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all', spoilerSet = currentSpoilerSet()): boolean {
+  return (
+    deck.valid && !(format !== 'free' && deck.formats?.[format]?.length) && !barredSpoilers(deck.spoilers ?? [], spoilers, spoilerSet).length
+  );
 }
 
 /** Por que o deck não pode ser usado no formato (null = pode). */
-export function whyNotPlayable(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all'): string | null {
+export function whyNotPlayable(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all', spoilerSet = currentSpoilerSet()): string | null {
   if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
   const issues = (format !== 'free' && deck.formats?.[format]) || [];
   const codes = format !== 'free' ? deck.formatCodes?.[format] : undefined;
   if (issues.length) return issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n');
-  const barred = barredSpoilers(deck.spoilers ?? [], spoilers);
-  return barred.length ? spoilerText(barred, spoilers) : null;
+  const barred = barredSpoilers(deck.spoilers ?? [], spoilers, spoilerSet);
+  return barred.length ? spoilerText(barred, spoilers, spoilerSet) : null;
 }
 
 /** Aviso de cartas de spoiler (as mesmas palavras de `spoilerIssues`, do motor). */
-export function spoilerText(ids: string[], rule: SpoilerRule = 'none'): string {
+export function spoilerText(ids: string[], rule: SpoilerRule = 'none', spoilerSet = currentSpoilerSet()): string {
   const params = { n: ids.length, ids: ids.slice(0, 3).join(', ') + (ids.length > 3 ? '…' : '') };
-  if (rule === 'complete') return t('rules.spoilerIncomplete', { ...params, sets: [...COMPLETE_SPOILER_SETS].join(', ') || '—' });
+  if (rule === 'next') return t('rules.spoilerNotNext', { ...params, set: spoilerSet ?? '—' });
   return t('rules.spoiler', params);
 }
 
-/** Nome das regras de cartas de um torneio ou sala: "Standard", "Standard + spoilers", "Livre (vale tudo)"… (traduzido). */
-export function modeLabel(m: { format: PlayFormat | string; spoilers?: boolean }, tr: Translate = t): string {
+/**
+ * Nome das regras de cartas de um torneio ou sala: "Standard", "Standard + EB05" (a coleção de
+ * spoiler aceita), "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"… (traduzido).
+ */
+export function modeLabel(m: { format: PlayFormat | string; spoilers?: boolean; spoilerSet?: string | null }, tr: Translate = t): string {
   if (m.format === 'free') return tr('mode.free');
   const format = formatLabel(m.format as FormatId);
-  return m.spoilers ? tr('mode.withSpoilers', { format }) : format;
+  if (!m.spoilers) return format;
+  return m.spoilerSet ? tr('mode.withSpoilerSet', { format, set: m.spoilerSet }) : tr('mode.withSpoilers', { format });
 }
 
 /** Agrupa decks para listas: meus, da comunidade (outros jogadores) e prontos. O título é chave (`t(title)`). */
@@ -442,6 +459,8 @@ export interface AppConfig {
   access: 'open' | 'supporters';
   /** Chave pública para as notificações (null = desligadas no servidor). */
   pushKey?: string | null;
+  /** Próxima coleção a ser lançada, a dos modos "+ spoilers" fora do Livre (servidores antigos não mandam). */
+  spoilerSet?: string | null;
 }
 
 export const api = {
@@ -771,6 +790,8 @@ export interface LiveRoom {
   format: PlayFormat;
   /** Aceita cartas de spoiler (sala privada, treino contra o bot e torneio; ausente nas filas). */
   spoilers?: boolean;
+  /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
+  spoilerSet?: string | null;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -835,6 +856,8 @@ export interface OnlineRoomInfo {
   format: PlayFormat;
   /** Aceita cartas de spoiler (sala privada, treino contra o bot e torneio; ausente nas filas). */
   spoilers?: boolean;
+  /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
+  spoilerSet?: string | null;
   /** Jogo de uma partida de torneio; `score`: placar da série antes deste jogo, na ordem dos assentos. */
   tournament: {
     id: string;
@@ -932,6 +955,8 @@ export interface TournamentSummary {
   format: PlayFormat;
   /** Aceita cartas de spoiler (servidores antigos não mandam). */
   spoilers?: boolean;
+  /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
+  spoilerSet?: string | null;
   structure: TournamentStructure;
   topCut: number | null;
   status: TournamentStatus;
@@ -977,6 +1002,8 @@ export interface TournamentMeta {
     name: string;
     format: PlayFormat;
     spoilers: boolean;
+    /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
+    spoilerSet?: string | null;
     official: boolean;
     prize: string | null;
     status: 'registration' | 'running';
@@ -1346,6 +1373,8 @@ export interface TournamentRecap {
     format: string;
     /** Aceita cartas de spoiler (recaps antigos não têm). */
     spoilers?: boolean;
+    /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
+    spoilerSet?: string | null;
     structure: TournamentStructure;
     topCut: number | null;
     players: number;
@@ -1373,6 +1402,8 @@ export interface TournamentDetail {
   format: PlayFormat;
   /** Aceita cartas de spoiler (servidores antigos não mandam). */
   spoilers?: boolean;
+  /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
+  spoilerSet?: string | null;
   structure: TournamentStructure;
   swissBestOf: number;
   topCut: number | null;

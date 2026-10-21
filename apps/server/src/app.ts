@@ -63,6 +63,7 @@ import { registerDeckCleanupRoutes } from './decks/cleanup';
 import { registerCardImageRoutes } from './card-images';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
+import { currentSpoilerSet } from './spoiler-set';
 
 /** Objeto sem as chaves `undefined` (para não sobrescrever os padrões num spread). */
 const stripUndefined = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
@@ -119,6 +120,8 @@ export function buildApp(
     access: server.access?.mode ?? 'open',
     /** Chave pública VAPID para o navegador se inscrever nas notificações (null = desligadas). */
     pushKey: pushKeys?.publicKey ?? null,
+    /** Próxima coleção a ser lançada: a dos modos "+ spoilers" fora do Livre ("Standard + EB05"); null = nenhuma. */
+    spoilerSet: currentSpoilerSet(db),
   }));
 
   app.get<{ Querystring: { set?: string } }>('/api/cards', async (req) => present(listCards(db, req.query.set)));

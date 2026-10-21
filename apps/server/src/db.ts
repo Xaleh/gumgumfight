@@ -589,6 +589,8 @@ function migrateTournaments(db: DB) {
   if (!tCols.includes('checkin_notice')) db.exec('ALTER TABLE tournaments ADD COLUMN checkin_notice TEXT');
   // spoilers: o torneio aceita cartas de spoiler (ainda não lançadas); só com o formato EGB ("todas as cartas").
   if (!tCols.includes('spoilers')) db.exec('ALTER TABLE tournaments ADD COLUMN spoilers INTEGER NOT NULL DEFAULT 0');
+  // spoiler_set: a coleção de spoiler aceita (a próxima a ser lançada), gravada no início do torneio.
+  if (!tCols.includes('spoiler_set')) db.exec('ALTER TABLE tournaments ADD COLUMN spoiler_set TEXT');
   // late_entry: inscrição atrasada liberada pelo organizador durante a rodada 1 do suíço
   // ('*' = qualquer um; senão, o id da conta liberada; null = fechada).
   if (!tCols.includes('late_entry')) db.exec('ALTER TABLE tournaments ADD COLUMN late_entry TEXT');
@@ -1004,6 +1006,11 @@ export function pendingSpoilers(db: DB): string[] {
       id: string;
     }>
   ).map((r) => r.id);
+}
+
+/** Coleções (pelo número da carta, como nas regras de spoilers) que ainda têm cartas de spoiler. */
+export function spoilerSetCodes(db: DB): Set<string> {
+  return new Set(pendingSpoilers(db).map((id) => id.split('-')[0]));
 }
 
 /**
