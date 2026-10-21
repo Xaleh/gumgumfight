@@ -37,8 +37,10 @@ const SQUEEZE_STEPS = ['1', '2', '3', '4'] as const;
  * Aperta a barra quando as seções não cabem ao lado do bloco da direita: esconde a palavra
  * "conectados" (1), o nome da conta (2), os ícones das seções (3) e, por fim, manda as seções
  * para o menu ☰ (4). A largura dos textos muda com o idioma e o nome da conta, então mede em vez
- * de usar um ponto de quebra fixo. Mede a cada render (o contador e o nome mudam), ao mudar a
- * largura da barra e quando as fontes terminam de carregar.
+ * de usar um ponto de quebra fixo. Mede a cada render (o contador e o nome mudam), quando as
+ * fontes terminam de carregar e quando muda o tamanho da barra, do logo ou do bloco da direita
+ * (imagens que carregam depois do render, como o logo e a foto, mudam o espaço das seções sem
+ * re-render).
  */
 function useSqueeze(innerRef: RefObject<HTMLDivElement>, navRef: RefObject<HTMLElement>) {
   useLayoutEffect(() => {
@@ -47,15 +49,21 @@ function useSqueeze(innerRef: RefObject<HTMLDivElement>, navRef: RefObject<HTMLE
   useEffect(() => {
     const inner = innerRef.current;
     if (!inner) return;
-    let lastWidth = inner.clientWidth;
+    // Em um frame à parte: o próprio `fit` muda esses tamanhos (evita o aviso de loop do observer).
+    let frame = 0;
     const ro = new ResizeObserver(() => {
-      if (inner.clientWidth === lastWidth) return;
-      lastWidth = inner.clientWidth;
-      fit();
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fit);
     });
     ro.observe(inner);
+    for (const child of Array.from(inner.children)) {
+      if (child !== navRef.current) ro.observe(child);
+    }
     void document.fonts?.ready.then(fit);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
   }, []);
 
   function fit() {
