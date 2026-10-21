@@ -817,3 +817,22 @@ describe('Arlong OP15-023: DON!! da área de custo do dono ao Líder ou Personag
     expect(canPayCost(s, 0, arlong, cost)).toBe(false); // sem DON!! virado do oponente
   });
 });
+
+describe('Efeitos que disparam ao atacar: o jogador escolhe a ordem', () => {
+  it('Líder Rocks.D.Xebec OP17-039 [When Attacking] e Edward.Newgate OP17-040 ("When your Leader … attacks") no mesmo lote', () => {
+    let s = toTurn(game(['OP17-039', 'ST02-001']), 3);
+    const newgate = field(s, 0, 'OP17-040');
+    const leader = s.players[0].leader.uid;
+    s = applyAction(s, { type: 'attack', player: 0, attacker: leader, target: s.players[1].leader.uid });
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, options: ['Edward.Newgate', 'Rocks.D.Xebec [Ao Atacar]'] });
+    // Primeiro o Xebec, recusando o custo; o do Newgate continua disponível depois.
+    s = option(s, 1);
+    expect(s.pending).toMatchObject({ kind: 'confirm', source: leader });
+    s = answer(s, false);
+    expect(s.pending).toMatchObject({ kind: 'confirm', source: newgate });
+    const before = getPower(s, leader);
+    s = answer(s, true);
+    if (s.pending?.kind === 'selectTargets') s = choose(s, [s.pending.options[0]]);
+    expect(getPower(s, leader)).toBe(before + 3000);
+  });
+});
