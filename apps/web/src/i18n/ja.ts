@@ -2629,7 +2629,7 @@ export default {
   'labels.deckIncomplete': '未完成：{size}/50',
   'labels.deckGroup.mine': '自分のデッキ',
   'labels.deckGroup.community': 'コミュニティのデッキ',
-  'labels.deckGroup.builtin': '構築済みデッキ',
+  'labels.deckGroup.builtin': 'スタートデッキ',
   'labels.phase.final': '決勝',
   'labels.phase.semifinal': '準決勝',
   'labels.phase.quarterfinal': '準々決勝',

@@ -433,6 +433,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     if (confirmDiscard()) void openDeck(id);
   };
 
+  /** Sem nome (vazio ou o "Novo deck" de partida), o deck leva o nome do Líder. */
+  const nameToSave = () => {
+    const name = draft.name.trim();
+    return name && name !== t('deck.newDeckName') ? name : (leader?.name ?? t('deck.unnamed'));
+  };
+
   /** `allowDuplicate`: salva mesmo que já exista um deck com a mesma lista (depois do aviso). */
   const save = async ({ allowDuplicate = false } = {}) => {
     if (!renaming && !draft.leader) {
@@ -441,7 +447,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     }
     if (renaming) {
       try {
-        const saved = await api.renameDeck(draft.id!, draft.name.trim() || t('deck.unnamed'));
+        const saved = await api.renameDeck(draft.id!, nameToSave());
         setDraft((d) => ({ ...d, name: saved.name }));
         setDirty(false);
         setNotice(t('deck.renamed'));
@@ -453,7 +459,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       return;
     }
     // Só as artes das cartas que ainda estão no deck.
-    const input = { name: draft.name.trim() || t('deck.unnamed'), leader: draft.leader, cards: deckList.cards, arts: cleanArts(deckList, byId) ?? {} };
+    const input = { name: nameToSave(), leader: draft.leader, cards: deckList.cards, arts: cleanArts(deckList, byId) ?? {} };
     try {
       const saved =
         draft.id && draft.kind === 'user' ? await api.updateDeck(draft.id, input) : await api.createDeck(input, { checkDuplicate: !allowDuplicate });
@@ -470,6 +476,19 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
       }
       setError(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  /** A lista já existe num deck de outro (ou pronto): favorita esse deck e abre-o; mudar as cartas depois cria um deck novo. */
+  const favoriteDupe = async (d: DeckDuplicate) => {
+    try {
+      await api.favoriteDeck(d.id, true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      return;
+    }
+    setDecks((ds) => ds.map((x) => (x.id === d.id ? { ...x, favorite: true } : x)));
+    await openDeck(d.id);
+    setNotice(t('decks.builder.dupFavorited', { name: d.name }));
   };
 
   const del = async () => {
@@ -587,15 +606,18 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const storageHint = auth.user ? t('deck.storageAccount') : `${t('deck.storageBrowser')}${auth.clientId ? ` ${t('deck.storageSignIn')}` : ''}`;
   const viewerOf = (id: string) => {
     const d = decks.find((x) => x.id === id);
+    const mine = d?.kind === 'user' && d.mine;
+    // Admin/Dev abre o deck de outro jogador como ele é, para corrigir o nome; mudar as cartas cria uma cópia.
+    const rename = !mine && staff && d?.kind === 'user';
     return (
       <DeckViewer
         deckId={id}
         onClose={() => setViewing(null)}
         onEdit={() => {
           setViewing(null);
-          void openDeck(id, { copy: !(d?.kind === 'user' && d.mine) });
+          void openDeck(id, { copy: !mine && !rename });
         }}
-        editLabel={d?.kind === 'user' && d.mine ? t('decks.edit') : t('decks.duplicate')}
+        editLabel={mine ? t('decks.edit') : rename ? t('decks.editName') : t('decks.duplicate')}
       />
     );
   };
@@ -664,7 +686,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         <div className="dk-dupe" role="alert">
           <span>{dupe.mine ? t('decks.builder.dupMine', { name: dupe.name }) : t('decks.builder.dupOther', { name: dupe.name })}</span>
           <div className="btn-row">
-            <button className="btn small primary" onClick={() => (dupe.mine ? load(dupe.id) : setViewing(dupe.id))}>
+            {!dupe.mine && (
+              <button className="btn small primary" onClick={() => void favoriteDupe(dupe)}>
+                <Icon name="star" size={16} /> {t('decks.builder.dupFavorite', { name: dupe.name })}
+              </button>
+            )}
+            <button className={['btn small', dupe.mine ? 'primary' : ''].join(' ')} onClick={() => (dupe.mine ? load(dupe.id) : setViewing(dupe.id))}>
               {t('decks.builder.dupOpen', { name: dupe.name })}
             </button>
             <button className="btn small" onClick={() => void save({ allowDuplicate: true })}>

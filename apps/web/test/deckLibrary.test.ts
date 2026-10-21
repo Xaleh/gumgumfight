@@ -74,6 +74,14 @@ describe('ordenação', () => {
     expect(ids(sortDecks([a, b, c], 'updated', NONE))).toEqual(['c', 'a', 'b']);
   });
 
+  it('por Líder: os do mesmo Líder juntos, o editado por último antes', () => {
+    const zoro = { leader: 'ST01-002', leaderName: 'Roronoa Zoro' };
+    const z1 = deck({ id: 'z1', ...zoro, updatedAt: '2026-10-04 00:00:00' });
+    const z2 = deck({ id: 'z2', ...zoro, updatedAt: '2026-10-06 00:00:00' });
+    const luffy2 = deck({ id: 'l2', leader: 'OP05-060', updatedAt: '2026-10-09 00:00:00' });
+    expect(ids(sortDecks([z1, a, luffy2, b, z2, c], 'leader', NONE))).toEqual(['l2', 'c', 'a', 'b', 'z2', 'z1']);
+  });
+
   it('usados por último: a partida no servidor ou a escolha neste navegador, a mais nova', () => {
     expect(ids(sortDecks([a, b, c], 'recent', NONE))).toEqual(['b', 'c', 'a']);
     const local = new Map([['a', deckTime('2026-10-06 00:00:00')]]);
