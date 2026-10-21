@@ -3,10 +3,13 @@ import {
   type Action,
   barredSpoilers,
   type CardData,
+  type CardDef,
   type DeckList,
   type FormatId,
   formatLabel,
+  type LogEntry,
   type ManualOp,
+  type Pending,
   type PlayerId,
   type PlayFormat,
   type PlayMode,
@@ -606,14 +609,13 @@ export const api = {
         `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/manual`,
         { on, note },
       ),
-    /** Últimas jogadas (da mais recente para a mais antiga), para escolher até onde desfazer. */
-    manualHistory: (id: string, matchId: number) =>
-      get<{ actionCount: number; history: ManualHistoryItem[] }>(`/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/manual`),
+    /** Todas as jogadas da partida em andamento, com o que cada jogador escolheu (Judge e organizador). */
+    plays: (id: string, matchId: number) => get<JudgePlays>(`/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/plays`),
     /** Desfaz as jogadas: ficam só as primeiras `to` (`seq`: a versão da mesa que o Judge vê). */
     undo: (id: string, matchId: number, seq: number, to: number, note: string) =>
       send<{ actionCount: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/undo`, { seq, to, note }),
     /** Correção do Judge pelo lado de `player`: ferramenta manual (`op`) ou resposta no lugar dele (`action`). */
-    judgeAction: (id: string, matchId: number, body: { seq: number; player: PlayerId; note: string; op?: ManualOp; action?: { type: 'manualDone' | 'pass' | 'endTurn' } }) =>
+    judgeAction: (id: string, matchId: number, body: { seq: number; player: PlayerId; note: string; op?: ManualOp; action?: JudgeAnswer }) =>
       send<{ actionCount: number }>('POST', `/api/tournaments/${encodeURIComponent(id)}/matches/${matchId}/judge-action`, body),
     warn: (id: string, userId: string, reason: string, matchId?: number) =>
       send<TournamentDetail>('POST', `/api/tournaments/${encodeURIComponent(id)}/players/${encodeURIComponent(userId)}/warnings`, { reason, matchId }),
@@ -1204,14 +1206,39 @@ export interface TournamentIncidents {
   }>;
 }
 
-/** Uma jogada na lista do desfazer: `count` = quantas ações ficam voltando para antes dela; `logFrom`/`logTo` = as linhas do log dela. */
-export interface ManualHistoryItem {
+/** Uma jogada da partida, para o Judge: desfazer até `count` volta para antes dela. */
+export interface JudgePlay {
   count: number;
-  type: string;
+  turn: number;
   player: PlayerId;
-  logFrom: number;
-  logTo: number;
+  /** A ação, com os uids reais (os de `JudgePlays.cards`). */
+  action: Action;
+  /** A pergunta aberta antes da ação (as opções que havia); null = o jogador agiu no próprio turno. */
+  pending: Pending | null;
+  /** Linhas do log que a ação gerou, com as secretas (o Judge vê tudo). */
+  lines: LogEntry[];
+  /** Resposta dada pelo Judge no lugar do jogador: o nome de quem respondeu. */
+  by?: string;
 }
+
+/** As jogadas de uma partida, com os nomes e textos só das cartas citadas (nunca a seed). */
+export interface JudgePlays {
+  actionCount: number;
+  names: [string, string];
+  plays: JudgePlay[];
+  /** A pergunta aberta agora (para responder no lugar do jogador, no modo manual). */
+  pending: Pending | null;
+  /** uid → número da carta. */
+  cards: Record<string, string>;
+  defs: Record<string, CardDef>;
+}
+
+/** Resposta do Judge no lugar do jogador à pergunta aberta (as cartas pelos uids de `JudgePlays`). */
+export type JudgeAnswer =
+  | { type: 'choose'; uids: string[] }
+  | { type: 'answer'; yes: boolean }
+  | { type: 'option'; index: number }
+  | { type: 'pass' | 'manualDone' | 'endTurn' };
 
 export interface TournamentPlayerRef {
   userId: string;

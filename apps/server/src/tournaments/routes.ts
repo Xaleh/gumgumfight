@@ -1484,15 +1484,18 @@ export function registerTournamentRoutes(
     },
   );
 
-  /** Últimas jogadas da partida, para o Judge escolher até onde desfazer (só no modo manual). */
-  app.get<{ Params: { id: string; matchId: string } }>('/api/tournaments/:id/matches/:matchId/manual', async (req, reply) => {
+  /**
+   * Todas as jogadas da partida em andamento (`Room.plays`), para o Judge e o organizador conferirem o
+   * que cada jogador fez e escolheu (a pergunta aberta, as opções que havia e a resposta) e, no modo
+   * manual, escolherem até onde desfazer. Não precisa do modo manual: conferir não pausa a mesa.
+   */
+  app.get<{ Params: { id: string; matchId: string } }>('/api/tournaments/:id/matches/:matchId/plays', async (req, reply) => {
     const found = judged(req, reply);
     if (!found) return reply;
     const live = liveMatch(found.t, Number(req.params.matchId));
     if ('code' in live) return reply.code(live.code).send(fail(live.errorCode, live.error, live.errorParams));
-    const { room } = live;
-    if (!room.manualMode) return reply.code(409).send(fail('roomNotManual', 'A partida não está no modo manual.'));
-    return { actionCount: room.state?.actionCount ?? 0, history: room.history() };
+    const plays = live.room.plays();
+    return plays ?? reply.code(409).send(fail('matchNotStarted', 'A partida ainda não começou.'));
   });
 
   /** Desfaz as jogadas: ficam só as primeiras `to` ações (`seq`: a versão da mesa que o Judge viu). */

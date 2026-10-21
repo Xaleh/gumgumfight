@@ -1,4 +1,4 @@
-import { actingPlayer, type CardData, HIDDEN_CARD, legalActions, type PlayerId } from '@gumgum/engine';
+import { type Action, actingPlayer, type Aliases, aliasRefs, type CardData, cardDef, HIDDEN_CARD, legalActions, type PlayerId } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { dataVersion } from '../src/cache';
@@ -1337,6 +1337,74 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     await app.close();
   });
 
+  it('Judge: confere o que cada jogador escolheu e, no modo manual, responde a escolha aberta no lugar dele', async () => {
+    const { db, app } = setup();
+    const { org, ps, t, who, lobby } = await arena(app, db);
+    const view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
+    // A mesa de quem joga com o Luffy (ST01, o primeiro inscrito).
+    const m = view.rounds[0].matches.find((x: { p1: { userId: string }; p2: { userId: string } }) => [x.p1.userId, x.p2.userId].includes(ps[0].id));
+    const seatA = (await play(app, t.id, who(m.p1.userId), m)).json();
+    await play(app, t.id, who(m.p2.userId), m);
+    const room = lobby.get(seatA.roomId)!;
+    const base = `/api/tournaments/${t.id}/matches/${m.id}`;
+    const aliases = (room as unknown as { aliases: Aliases }).aliases;
+    const act = (a: Action) => room.act(a.player, room.state!.actionCount, aliasRefs(room.state!, a.player, aliases, a));
+    while (room.state!.phase !== 'main') {
+      const p = actingPlayer(room.state!)!;
+      expect(act(legalActions(room.state!, p)[0]).ok).toBe(true);
+    }
+    // O Líder Luffy (ST01) dá 1 DON!! virado a um Personagem ou a ele mesmo: precisa de um DON!! virado.
+    const luffy = room.state!.players.findIndex((ps) => room.state!.cards[ps.leader.uid].cardId === 'ST01-001') as PlayerId;
+    expect(luffy).toBeGreaterThanOrEqual(0);
+    let ready = false;
+    for (let turn = 0; turn < 12 && !ready; turn++) {
+      const s = room.state!;
+      if (s.activePlayer === luffy && !s.pending) {
+        const card = legalActions(s, luffy).find((a) => a.type === 'playCard' && cardDef(s, a.uid).category === 'character');
+        if (card) expect(act(card).ok).toBe(true);
+        while (room.state!.pending) act(legalActions(room.state!, actingPlayer(room.state!)!)[0]);
+        ready = room.state!.players[luffy].donRested > 0;
+        if (ready) break;
+      }
+      expect(act({ type: 'endTurn', player: room.state!.activePlayer }).ok).toBe(true);
+      while (room.state!.pending) act(legalActions(room.state!, actingPlayer(room.state!)!)[0]);
+    }
+    expect(ready).toBe(true);
+    expect(act({ type: 'activate', player: luffy, uid: room.state!.players[luffy].leader.uid, ability: 0 }).ok).toBe(true);
+    const asked = room.state!.pending!;
+    expect(asked).toMatchObject({ kind: 'selectTargets', player: luffy });
+    // O jogador chama o Judge com a escolha aberta.
+    expect((await req(app, 'POST', `${base}/call`, who(room.data.seats[luffy].userId!))).statusCode).toBe(200);
+    // O Judge vê a pergunta aberta com as opções completas (os nomes das cartas vêm junto).
+    const plays = (await req(app, 'GET', `${base}/plays`, org)).json();
+    expect(plays.pending).toMatchObject({ kind: 'selectTargets', player: luffy, options: (asked as { options: string[] }).options });
+    expect(plays.plays.at(-1)).toMatchObject({ action: { type: 'activate', player: luffy }, pending: null });
+    const target = plays.pending.options[0];
+    expect(plays.defs[plays.cards[target]]).toBeTruthy();
+    // "Passar" não responde uma escolha de alvos (era o que o painel oferecia antes).
+    const fix = (body: object) => req(app, 'POST', `${base}/judge-action`, org, { seq: room.state!.actionCount, player: luffy, note: 'o jogador escolheu o alvo errado', ...body });
+    expect((await req(app, 'POST', `${base}/manual`, org, { on: true })).statusCode).toBe(200);
+    expect((await fix({ action: { type: 'pass' } })).statusCode).toBe(422);
+    // A escolha no lugar do jogador, pelo uid que veio nas jogadas.
+    const don = room.state!.players[luffy].donRested;
+    expect((await fix({ action: { type: 'choose', uids: [target] } })).statusCode).toBe(200);
+    expect(room.state!.pending).toBeNull();
+    expect(room.state!.players[luffy].donRested).toBe(don - 1);
+    // A escolha fica nas jogadas, com a pergunta que estava aberta (as opções que havia).
+    const after = (await req(app, 'GET', `${base}/plays`, org)).json();
+    expect(after.plays.at(-1)).toMatchObject({ action: { type: 'choose', uids: [target] }, pending: { kind: 'selectTargets', options: plays.pending.options }, by: 'Shanks' });
+    // A resposta recusada (o "passar") não ficou marcada; desfazer a resposta tira a marca.
+    expect(after.plays.filter((x: { by?: string }) => x.by)).toHaveLength(1);
+    const count = after.plays.at(-1).count;
+    expect((await req(app, 'POST', `${base}/undo`, org, { seq: room.state!.actionCount, to: count, note: 'escolher de novo' })).statusCode).toBe(200);
+    expect(room.data.answeredBy).toEqual({});
+    expect((await fix({ action: { type: 'choose', uids: [target] } })).statusCode).toBe(200);
+    // E na auditoria, como resposta do organizador.
+    const inc = (await req(app, 'GET', `/api/tournaments/${t.id}/incidents`, org)).json();
+    expect(inc.interventions[0]).toMatchObject({ kind: 'judge_action', role: 'organizer', payload: { type: 'choose', uids: [target] } });
+    await app.close();
+  });
+
   it('modo manual: Judge da lista, organizador e admin desfazem e corrigem a mesa, sem os jogadores decidirem; tudo vai para a auditoria', async () => {
     const { db, app } = setup();
     const { org, t, who, lobby } = await arena(app, db);
@@ -1367,7 +1435,10 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     expect((await manual(otherOrg, { on: true })).statusCode).toBe(403);
     // Fora do modo manual não há desfazer nem correção.
     expect((await undo(judge, { seq: seq(), to: 0, note: 'teste' })).json()).toMatchObject({ errorCode: 'roomNotManual' });
-    expect((await req(app, 'GET', `${base}/manual`, judge)).json()).toMatchObject({ errorCode: 'roomNotManual' });
+    // Conferir as jogadas não precisa do modo manual (nem pausa a mesa); os jogadores não as veem.
+    expect((await req(app, 'GET', `${base}/plays`, judge)).json().plays).toHaveLength(seq());
+    expect((await req(app, 'GET', `${base}/plays`, a)).statusCode).toBe(403);
+    expect(room.isPaused).toBe(false);
     // O Judge da lista entra: a partida pausa (com chamado aberto) e todos veem quem está corrigindo.
     const watcher = spectator(false);
     room.attach(watcher.conn);
@@ -1402,15 +1473,20 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     expect((await fix(admin, { seq: seq(), player: p, action: { type: 'attack' }, note: 'ataque' })).json()).toMatchObject({ errorCode: 'invalidAction' });
     expect((await fix(admin, { seq: seq(), player: p, action: { type: 'endTurn' }, note: 'turno travado' })).statusCode).toBe(200);
     expect(room.state!.activePlayer).toBe(other);
-    // As últimas jogadas, da mais recente para a mais antiga.
-    const hist = (await req(app, 'GET', `${base}/manual`, judge)).json();
+    // As jogadas da partida inteira, na ordem, com as linhas do log de cada uma.
+    const hist = (await req(app, 'GET', `${base}/plays`, judge)).json();
     expect(hist.actionCount).toBe(seq());
-    expect(hist.history.slice(0, 3)).toMatchObject([
-      { type: 'endTurn', player: p, count: start + 2 },
-      { type: 'judge', player: other, count: start + 1 },
-      { type: 'judge', player: other, count: start },
+    expect(hist.plays).toHaveLength(seq());
+    expect(hist.plays.slice(-3)).toMatchObject([
+      { count: start, player: other, action: { type: 'judge', op: { op: 'draw' } } },
+      { count: start + 1, player: other, action: { type: 'judge', op: { op: 'move', to: 'trash' } } },
+      { count: start + 2, player: p, action: { type: 'endTurn' }, pending: null },
     ]);
-    expect(hist.history[2].logTo).toBeGreaterThan(hist.history[2].logFrom);
+    expect(hist.plays.at(-3).lines[0]).toMatchObject({ key: 'log.judgeIntervention' });
+    // A carta descartada pelo Judge vem com o número e o texto, e a seed nunca sai.
+    const moved = hist.plays.at(-2).action.op.uid;
+    expect(hist.defs[hist.cards[moved]].name).toEqual(expect.any(String));
+    expect(JSON.stringify(hist)).not.toMatch(/seed/);
     // O organizador desfaz até antes da primeira correção: a mesa volta como estava, e o log encolhe para quem assiste.
     expect((await undo(org, { seq: seq(), to: start, note: '' })).json()).toMatchObject({ errorCode: 'manualNoteRequired' });
     expect((await undo(org, { seq: seq(), to: seq(), note: 'nada' })).json()).toMatchObject({ errorCode: 'invalidUndo' });

@@ -342,6 +342,22 @@ export function WatchGameScreen({
   const t = useT();
   const online = useOnlineGame(target);
   const { state, room } = online;
+  const userId = useAuth().user?.id;
+  // Mesa de torneio aberta sem o papel de Judge (pela lista "Ao vivo", por exemplo): quem é Judge ou
+  // organizador do torneio ganha o botão "Entrar como Judge" (o painel, as jogadas e o modo manual).
+  const tourId = room?.tournament?.id ?? null;
+  const [judgeOf, setJudgeOf] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tourId || target.judge || !userId || broadcast) return;
+    let live = true;
+    api.tournaments
+      .get(tourId)
+      .then((d) => live && d.isJudge && setJudgeOf(tourId))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [tourId, target.judge, userId, broadcast]);
   useEffect(() => {
     if (online.rematch) onSwitch({ ...target, roomId: online.rematch.roomId });
   }, [online.rematch, onSwitch, target]);
@@ -374,6 +390,7 @@ export function WatchGameScreen({
         canHands: canHands && Boolean(room.handsAllowed) && !target.judge,
         onToggleHands: () => onSwitch({ ...target, hands: !target.hands }),
         judge: Boolean(target.judge),
+        ...(judgeOf && judgeOf === tourId && !target.judge ? { onJudge: () => onSwitch({ roomId: room.id, hands: false, judge: true }) } : {}),
         roomId: room.id,
         // Painel "Partidas": troca de sala mantendo "Ver mãos" onde ele vale (a mesma regra da tela "Assistir").
         onSwitchRoom: (r) => onSwitch({ roomId: r.id, hands: target.hands && canHands && !r.mine && Boolean(r.handsAllowed) }),
@@ -441,7 +458,15 @@ function Table({
    * Modo espectador (partida online vista de fora). `judge`: entrou como Judge do torneio (painel de Judge).
    * `roomId`/`onSwitchRoom`: os painéis de decklist e de partidas de quem transmite.
    */
-  spectator?: { canHands: boolean; onToggleHands: () => void; judge?: boolean; roomId?: string; onSwitchRoom?: (room: LiveRoom) => void };
+  spectator?: {
+    canHands: boolean;
+    onToggleHands: () => void;
+    judge?: boolean;
+    /** Quem é Judge/organizador do torneio e assiste sem o papel: entra como Judge. */
+    onJudge?: () => void;
+    roomId?: string;
+    onSwitchRoom?: (room: LiveRoom) => void;
+  };
   /** Tela de transmissão (fonte do OBS): sem menus nem botões, com o destaque da carta jogada. */
   broadcast?: TableBroadcast;
   /** Aviso na mesa ao começar (some sozinho em 10 s). */
@@ -1242,7 +1267,7 @@ function Table({
           </button>
         )}
       </div>
-      {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} />}
+      {spectator && online && <SpectatorBar online={online} canHands={spectator.canHands} onToggleHands={spectator.onToggleHands} onJudge={spectator.onJudge} />}
       {online && !watching && <SpectatorCount online={online} />}
       {online && !watching && <HandsSharedTag online={online} />}
       {human !== null && !isOnline && !tutorial && (
