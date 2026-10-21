@@ -12887,6 +12887,104 @@ a.sponsor-card:hover {
   color: var(--danger);
   font-weight: 700;
 }
+.plays-row.pointed {
+  outline: 2px solid var(--gold);
+}
+.plays-pointed {
+  font-weight: 800;
+}
+
+/* Chamar o Judge (jogador): o motivo, a linha do histórico e o texto */
+.call-sheet .sheet-body {
+  gap: 10px;
+}
+.call-sheet .sheet-body > * {
+  flex-shrink: 0;
+}
+.call-sheet h4 {
+  margin: 4px 0 0;
+}
+.call-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.call-reasons .btn.on,
+.judge-panel .btn.on {
+  background: var(--panel2);
+  border-color: var(--gold);
+}
+.call-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.call-line {
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.call-line.on {
+  border-color: var(--gold);
+  background: var(--panel2);
+  font-weight: 700;
+}
+
+/* Painel do Judge: o chamado aberto e o desfecho */
+.judge-call-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--gold);
+}
+.judge-call-box q {
+  font-style: italic;
+}
+.judge-outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.judge-outcomes p {
+  margin: 0;
+}
+.judge-outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+}
+.judge-outcome {
+  justify-content: flex-start;
+  text-align: left;
+}
+/* O painel estica os campos de texto; o botão de escolha fica do tamanho dele. */
+.judge-panel-body .judge-outcome input {
+  width: auto;
+  flex: none;
+  margin: 2px 0 0;
+}
+.judge-outcome.on {
+  font-weight: 700;
+}
 .plays-cards {
   display: flex;
   flex-wrap: wrap;

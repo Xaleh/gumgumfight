@@ -4,7 +4,7 @@
 // e, no modo manual, para escolher até onde voltar a partida.
 
 import type { Action } from '@gumgum/engine';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { JudgePlay, JudgePlays } from '../api';
 import { logText } from '../game/engineText';
@@ -34,6 +34,7 @@ export function PlaysSheet({
   data,
   error,
   message,
+  focus,
   onClose,
   undo,
 }: {
@@ -41,6 +42,8 @@ export function PlaysSheet({
   error?: string | null;
   /** Aviso do painel depois de agir (jogadas desfeitas, erro do servidor). */
   message?: { ok: boolean; text: string } | null;
+  /** A jogada apontada por quem chamou o Judge (`count`) e o nome dele: a lista abre nela, em destaque. */
+  focus?: { count: number; by: string };
   onClose: () => void;
   undo?: PlaysUndo;
 }) {
@@ -50,6 +53,14 @@ export function PlaysSheet({
   const [filter, setFilter] = useState('');
   const [choicesOnly, setChoicesOnly] = useState(false);
   const [shown, setShown] = useState(PAGE);
+  const focused = useRef(false);
+  // Abre na jogada apontada: mostra jogadas até ela e rola até lá (uma vez, quando as jogadas chegam).
+  useEffect(() => {
+    if (!focus || !data || focused.current) return;
+    focused.current = true;
+    setShown((n) => Math.max(n, data.plays.length - focus.count + 5));
+    requestAnimationFrame(() => document.querySelector(`[data-play="${focus.count}"]`)?.scrollIntoView({ block: 'center' }));
+  }, [focus, data]);
   const rows = useMemo(
     () => (data ? data.plays.map((play) => ({ play, cue: describePlay(data, play, locale) })).reverse() : []),
     [data, locale],
@@ -105,6 +116,7 @@ export function PlaysSheet({
                   title={cue.title}
                   sub={cue.sub}
                   turnStart={i === 0 || visible[i - 1].play.turn !== play.turn}
+                  pointedBy={focus?.count === play.count ? focus.by : undefined}
                   undo={undo}
                   logLine={(e) => logText(tryT, e)}
                 />
@@ -129,6 +141,7 @@ function PlayRow({
   title,
   sub,
   turnStart,
+  pointedBy,
   undo,
   logLine,
 }: {
@@ -137,6 +150,8 @@ function PlayRow({
   title: string;
   sub?: string;
   turnStart: boolean;
+  /** A jogada apontada no chamado: o nome de quem chamou. */
+  pointedBy?: string;
   undo?: PlaysUndo;
   logLine: (e: JudgePlay['lines'][number]) => string;
 }) {
@@ -152,7 +167,8 @@ function PlayRow({
   return (
     <>
       {turnStart && <li className="plays-turn">{t('judge.playsTurn', { n: play.turn })}</li>}
-      <li className={['plays-row', play.action.type === 'judge' || play.by ? 'judge' : '', p ? 'answer' : ''].join(' ')}>
+      <li data-play={play.count} className={['plays-row', play.action.type === 'judge' || play.by ? 'judge' : '', p ? 'answer' : '', pointedBy ? 'pointed' : ''].join(' ')}>
+        {pointedBy && <div className="plays-pointed small">{t('judge.playsPointed', { name: pointedBy })}</div>}
         <div className="plays-head">
           <span className="plays-n">#{play.count + 1}</span>
           <b>{data.names[play.player]}</b>

@@ -1013,12 +1013,32 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   **só daquele torneio**. Um inscrito não vira Judge (`judgeIsPlayer`) e um Judge não se inscreve (`judgeCannotRegister`).
   `actsAsJudge` (`tournaments/store.ts`) = Judges da lista, o organizador (sem Judge escolhido, ele é o Judge) e admin/dev;
   nas rotas, `judged()` faz as vezes de `managed()` para o que o Judge pode fazer. O detalhe traz `isJudge` e `judges`.
-- **Chamar o Judge** (`POST …/matches/:m/call`, por um dos jogadores, pelo Judge ou pelo organizador, com a sala em jogo):
+- **Chamar o Judge** (`POST …/matches/:m/call {reason?, details?, logIndex?}`, por um dos jogadores, pelo Judge ou pelo
+  organizador, com a sala em jogo). O jogador conta o que aconteceu com um toque (`reason` ∈ `CALL_REASONS`: `effect`,
+  `choice`, `misclick`, `stuck`, `rules`, `conduct`, `other`), um texto opcional e a jogada do problema, tocando numa
+  linha do próprio histórico (`logIndex`: o log da visão tem as mesmas linhas, na mesma ordem); `Room.playAtLine` acha a
+  jogada que gerou a linha e o chamado guarda `play`/`play_turn` e `play_text` (a jogada e as 3 seguintes em texto,
+  porque o Judge pode desfazê-las). Tudo opcional (cliente antigo chama sem nada).
   `Room.pause(by)` congela a sala (`RoomData.pause`, gravado em `live_matches`: sobrevive a reinício): o relógio de quem
   jogava para (`settle` não desconta, `schedule` não agenda), o abandono não conta, toda jogada é recusada (409
   `roomPaused`); **chat e emotes continuam**. `tournament_calls` ganha o chamado e os Judges + o organizador recebem a
-  notificação (`judgeCallBody`, abre `?torneio=…&lobby=1`). `POST …/matches/:m/resume {note}` (só Judge/organizador):
-  `Room.resume()` volta o relógio de onde parou, dá 2 min novos de abandono e fecha o chamado com a nota. Resultado
+  notificação (`judgeCallBody`, abre `?torneio=…&lobby=1`). `GET …/matches/:m/call` (Judge/organizador): o chamado
+  aberto (`byName`, `byPlayer`, `reason`, `details`, `play`, `playTurn`) e o que o Judge já fez desde então (`undone`,
+  `fixes`, das intervenções). `POST …/matches/:m/resume {outcome?, note?}` (só Judge/organizador): `Room.resume()` volta
+  o relógio de onde parou, dá 2 min novos de abandono e fecha o chamado com o desfecho (`outcome` ∈ `CALL_OUTCOMES`:
+  `no_issue`, `misclick`, `app_fixed`, `app_unfixed`, `rules`, `conduct`, `other`; `other` pede a `note`) e a nota.
+  **Chamado de ajuste da plataforma**: com erro do app (`APP_OUTCOMES`; também quando a correção do Judge termina a
+  partida, como `app_fixed`), `fixTicket` (`tournaments/calls.ts`) monta o texto (desfecho, relato do jogador, a jogada
+  apontada com a pergunta, as opções e o histórico, as seguintes, o que o Judge voltou e corrigiu, a nota) e a carta
+  suspeita, guardados em `tournament_calls.fix`. Como `match_reports` precisa da partida gravada (o replay),
+  `fileFixReports` cria o relato (`source = 'judge'`, `play`, `reporter_id` = o Judge; um por Judge e partida, um segundo
+  chamado soma o texto) assim que o jogo da sala do chamado está em `tournament_games` (ao fechar o chamado e em
+  `reportFromGame`) e grava `report_id`. O relato aparece em Administração → Relatos de partidas e na aba Relatos do
+  torneio, com "⚖ Chamado de ajuste (Judge)", "Jogada #N" e "📜 Jogadas" (aberta na jogada).
+  Web: "Chamar o Judge" abre `CallJudgeSheet` (`Judge.tsx`); o painel do Judge mostra o chamado (`CallBox`, com
+  "📜 Ver a jogada", que abre a lista de jogadas destacando a apontada) e o desfecho em botões, com o sugerido marcado
+  (`suggestedOutcome`: depois de voltar jogadas ou corrigir, `app_fixed`, ou `misclick` se o jogador disse que clicou
+  errado e só houve desfazer). O lobby mostra o motivo; as Ocorrências, o motivo, a jogada, o desfecho e o relato aberto. Resultado
   lançado, derrota dupla ou desistência numa partida com sala pausada (`releaseRoom`) retoma a sala e fecha o chamado.
   A mesa atrasada desconta as pausas no relógio (`RoomData.pauses`, `lateClock`).
 - **Warnings** (`POST …/players/:userId/warnings {reason, matchId?}`, Judge ou organizador; motivo obrigatório; nunca a
@@ -1578,11 +1598,12 @@ Quem chama, na coluna da direita:
 | PUT · DELETE | `/api/tournaments/:id` | Edita (só com inscrições abertas) / apaga | Organizador |
 | POST · DELETE | `/api/tournaments/:id/register` · POST `/checkin` | Inscreve ou troca o deck (`{ deckId }`); cancela ou desiste; check-in | Sessão |
 | PUT | `/api/tournaments/:id/matches/:m/ready` · POST `/play` | "Estou pronto"; abre ou entra na sala do jogo atual | Sessão (jogador da mesa) |
-| POST | `/api/tournaments/:id/matches/:m/call` | Chama o Judge (pausa a sala) | Sessão (jogador da mesa) ou Judge |
+| POST | `/api/tournaments/:id/matches/:m/call` | Chama o Judge (pausa a sala), com o motivo, o texto e a linha do histórico da jogada (`{ reason?, details?, logIndex? }`) | Sessão (jogador da mesa) ou Judge |
 | POST | `/api/tournaments/:id/{start,next,finish}` · `/rounds/begin` | Começa, avança, encerra; inicia a rodada atual | Organizador |
 | PUT · DELETE | `/api/tournaments/:id/judges` · `/judges/:userId` | Escolhe / remove Judges | Organizador |
-| POST | `/api/tournaments/:id/matches/:m/resume` · `/players/:userId/warnings` | Retoma a partida pausada; dá um warning | Judge |
+| POST | `/api/tournaments/:id/matches/:m/resume` · `/players/:userId/warnings` | Retoma a partida pausada com o desfecho (`{ outcome?, note? }`; erro do app abre o chamado de ajuste); dá um warning | Judge |
 | GET | `/api/tournaments/:id/incidents` | Chamados, warnings e intervenções do modo manual | Judge |
+| GET | `/api/tournaments/:id/matches/:m/call` | O chamado aberto (motivo, texto, jogada apontada, o que o Judge já fez) | Judge |
 | POST | `/api/tournaments/:id/matches/:m/manual` | Entra/sai do modo manual (`{ on, note? }`) | Judge (torneio em andamento) |
 | GET | `/api/tournaments/:id/matches/:m/plays` | Todas as jogadas da partida em andamento, com a pergunta aberta e o que foi escolhido (sem a seed) | Judge (torneio em andamento) |
 | POST | `/api/tournaments/:id/matches/:m/undo` · `/judge-action` | Desfaz jogadas (`{ seq, to, note }`); corrige a mesa ou responde no lugar do jogador (`{ seq, player, op \| action, note }`) | Judge (torneio em andamento) |

@@ -70,7 +70,7 @@ import {
   SpectatorCount,
   seriesAfter,
 } from './Online';
-import { JudgePanel, PauseBanner } from './Judge';
+import { CallJudgeSheet, JudgePanel, PauseBanner } from './Judge';
 
 /**
  * Linhas do histórico que viram aviso na mesa (ver `notice` em GameScreen): pela chave do motor
@@ -546,12 +546,12 @@ function Table({
   // Partida de torneio: "voltar" leva para a página do torneio.
   const toTournament = Boolean(online?.room?.tournament);
   /** "Chamar o Judge" (jogador numa partida de torneio em andamento, ainda não pausada): congela a partida até o Judge liberar. */
+  // A janela do chamado: o motivo, a jogada do problema e um texto (o Judge já entra sabendo o que conferir).
+  const [calling, setCalling] = useState(false);
   const callJudge =
     online && !watching && online.room?.tournament && online.room.status === 'playing' && !online.room.pause
       ? () => {
-          if (!window.confirm(t('judge.callConfirm'))) return;
-          const tour = online.room!.tournament!;
-          api.tournaments.call(tour.id, tour.matchId).catch((e) => online.setError(e instanceof Error ? e.message : String(e)));
+          setCalling(true);
           setSheet(null);
         }
       : undefined;
@@ -1437,6 +1437,7 @@ function Table({
         {online && <OnlineStatus online={online} />}
         {online && !broadcast && <PauseBanner online={online} />}
         {online && spectator?.judge && <JudgePanel online={online} />}
+        {online && calling && !online.room?.pause && <CallJudgeSheet online={online} onClose={() => setCalling(false)} />}
 
         {/* Na transmissão ninguém clica para fechar o aviso: os erros ficam fora da tela. */}
         {game.error && !broadcast && (

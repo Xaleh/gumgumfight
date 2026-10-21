@@ -680,6 +680,23 @@ function migrateTournaments(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS tournament_interventions_match ON tournament_interventions(tournament_id, match_id);
   `);
+  // Chamado de Judge com o relato do jogador e o desfecho escolhido pelo Judge (ver tournaments/store.ts):
+  // reason/details = o motivo (CALL_REASONS) e o texto do jogador; play/play_turn/play_text = a jogada relatada (posição
+  // da ação, o turno e o texto dela e das seguintes, guardado ao chamar: o Judge pode desfazê-la); outcome = o desfecho (CALL_OUTCOMES); fix = o chamado de ajuste da plataforma (JSON), que vira um
+  // relato em match_reports quando o jogo é gravado (report_id).
+  const callCols = (db.prepare('PRAGMA table_info(tournament_calls)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  for (const [col, type] of [
+    ['reason', 'TEXT'],
+    ['details', 'TEXT'],
+    ['play', 'INTEGER'],
+    ['play_turn', 'INTEGER'],
+    ['play_text', 'TEXT'],
+    ['outcome', 'TEXT'],
+    ['fix', 'TEXT'],
+    ['report_id', 'INTEGER'],
+  ]) {
+    if (!callCols.includes(col)) db.exec(`ALTER TABLE tournament_calls ADD COLUMN ${col} ${type}`);
+  }
   db.exec(`
     -- Todos os jogos disputados nas salas de cada partida (série), para a auditoria do organizador.
     CREATE TABLE IF NOT EXISTS tournament_games (
@@ -733,6 +750,9 @@ function migrateTournaments(db: DB) {
   if (!reportCols.includes('notify')) db.exec('ALTER TABLE match_reports ADD COLUMN notify INTEGER NOT NULL DEFAULT 0');
   // Quando o aviso da correção saiu (reabrir e resolver de novo não avisa duas vezes).
   if (!reportCols.includes('notified_at')) db.exec('ALTER TABLE match_reports ADD COLUMN notified_at TEXT');
+  // Chamado de ajuste aberto pelo Judge (source = 'judge'), com a jogada do problema (play = posição da ação).
+  if (!reportCols.includes('source')) db.exec("ALTER TABLE match_reports ADD COLUMN source TEXT NOT NULL DEFAULT 'player'");
+  if (!reportCols.includes('play')) db.exec('ALTER TABLE match_reports ADD COLUMN play INTEGER');
 }
 
 /**

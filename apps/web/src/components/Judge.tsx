@@ -5,13 +5,121 @@
 
 import { cardDef, type ManualOp, type ManualZone, type PlayerId } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
-import { api, ApiError, errorMessage, type JudgeAnswer, type JudgePlays } from '../api';
+import { createPortal } from 'react-dom';
+import {
+  api,
+  APP_OUTCOMES,
+  ApiError,
+  CALL_OUTCOMES,
+  CALL_REASONS,
+  type CallOutcome,
+  type CallReason,
+  errorMessage,
+  type JudgeAnswer,
+  type JudgeCall,
+  type JudgePlays,
+} from '../api';
+import { logText } from '../game/engineText';
 import { askText, citedName, optionText } from '../game/judgePlays';
 import type { OnlineGame } from '../game/useOnlineGame';
 import { type MessageKey, useLocale, useT, useTryT } from '../i18n';
 import { PlaysSheet } from './JudgePlays';
 
 const errorText = (e: unknown) => (e instanceof ApiError ? errorMessage(e.data, e.message) : e instanceof Error ? e.message : String(e));
+
+/** Turnos do histórico mostrados de cada vez na escolha da jogada (os mais recentes primeiro). */
+const CALL_TURNS = 3;
+
+/**
+ * "Chamar o Judge" do jogador: o que aconteceu (um toque), a jogada do problema (uma linha do próprio
+ * histórico, que o servidor liga à jogada exata) e um texto opcional. O Judge já entra sabendo o que conferir.
+ */
+export function CallJudgeSheet({ online, onClose }: { online: OnlineGame; onClose: () => void }) {
+  const t = useT();
+  const tryT = useTryT();
+  const [reason, setReason] = useState<CallReason | null>(null);
+  const [line, setLine] = useState<number | null>(null);
+  const [details, setDetails] = useState('');
+  const [turns, setTurns] = useState(CALL_TURNS);
+  const [missing, setMissing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const tour = online.room?.tournament;
+  const log = online.state?.log ?? [];
+  if (!tour) return null;
+  const last = log.length ? log[log.length - 1].turn : 0;
+  // As linhas dos últimos turnos, da mais nova para a mais antiga, com a posição no histórico.
+  const lines = log
+    .map((e, index) => ({ e, index }))
+    .filter(({ e }) => e.turn > last - turns)
+    .reverse();
+  const send = async () => {
+    if (!reason) {
+      setMissing(true);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await api.tournaments.call(tour.id, tour.matchId, { reason, ...(details.trim() ? { details: details.trim() } : {}), ...(line !== null ? { logIndex: line } : {}) });
+      onClose();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return createPortal(
+    <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
+      <div className="sheet call-sheet" role="dialog" aria-modal="true" aria-label={t('judge.callTitle')} onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h3>⚖ {t('judge.callTitle')}</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">
+          <p className="muted small">{t('judge.callIntro')}</p>
+          <h4>{t('judge.callReasonTitle')}</h4>
+          <div className="call-reasons">
+            {CALL_REASONS.map((r) => (
+              <button key={r} className={['btn', 'small', reason === r ? 'on' : ''].join(' ')} aria-pressed={reason === r} onClick={() => (setReason(r), setMissing(false))}>
+                {t(`judge.reason.${r}`)}
+              </button>
+            ))}
+          </div>
+          {missing && <div className="error small">{t('judge.callReasonMissing')}</div>}
+          <h4>{t('judge.callPlayTitle')}</h4>
+          <ol className="call-lines">
+            <li>
+              <button className={['call-line', line === null ? 'on' : ''].join(' ')} onClick={() => setLine(null)}>
+                {t('judge.callPlayNone')}
+              </button>
+            </li>
+            {lines.map(({ e, index }) => (
+              <li key={index}>
+                <button className={['call-line', line === index ? 'on' : ''].join(' ')} onClick={() => setLine(index)}>
+                  {logText(tryT, e)}
+                </button>
+              </li>
+            ))}
+          </ol>
+          {last - turns > 0 && (
+            <button className="btn small" onClick={() => setTurns((n) => n + CALL_TURNS)}>
+              {t('judge.callMore')}
+            </button>
+          )}
+          <textarea className="admin-search" rows={2} maxLength={300} placeholder={t('judge.callDetails')} value={details} onChange={(e) => setDetails(e.target.value)} />
+          {error && <div className="error small">{error}</div>}
+          <button className="btn primary" disabled={busy} onClick={() => void send()}>
+            {t('judge.callSend')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 /** Faixa sobre a mesa enquanto a partida está pausada por um chamado de Judge. */
 export function PauseBanner({ online }: { online: OnlineGame }) {
@@ -63,6 +171,35 @@ function useJudgePlays(tour: { id: string; matchId: number }, actionCount: numbe
   return { data, error };
 }
 
+/** O chamado aberto da partida (quem chamou, o motivo, a jogada apontada), buscado enquanto a sala está pausada. */
+function useJudgeCall(tour: { id: string; matchId: number }, paused: boolean, actionCount: number) {
+  const [call, setCall] = useState<JudgeCall | null>(null);
+  useEffect(() => {
+    if (!paused) {
+      setCall(null);
+      return;
+    }
+    let live = true;
+    api.tournaments
+      .callInfo(tour.id, tour.matchId)
+      .then((r) => live && setCall(r.call))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [paused, tour.id, tour.matchId, actionCount]);
+  return call;
+}
+
+/**
+ * O desfecho que o painel sugere: depois de voltar jogadas ou corrigir a mesa, erro do app (ou, se o próprio
+ * jogador disse que clicou errado, a jogada refeita); sem correção, nenhum (o Judge escolhe).
+ */
+function suggestedOutcome(call: JudgeCall | null): CallOutcome | null {
+  if (!call || (!call.undone && !call.fixes)) return null;
+  return call.reason === 'misclick' && !call.fixes ? 'misclick' : 'app_fixed';
+}
+
 /** Painel do Judge na sala: pausar/retomar (com o relato ao organizador), as jogadas, o modo manual e warnings. */
 export function JudgePanel({ online }: { online: OnlineGame }) {
   const t = useT();
@@ -75,6 +212,10 @@ export function JudgePanel({ online }: { online: OnlineGame }) {
   const [open, setOpen] = useState(true);
   const [help, setHelp] = useState(false);
   const [playsOpen, setPlaysOpen] = useState(false);
+  /** A lista de jogadas aberta na jogada apontada pelo chamado. */
+  const [playsFocus, setPlaysFocus] = useState<number | null>(null);
+  const [outcome, setOutcome] = useState<{ call: number; value: CallOutcome } | null>(null);
+  const [outcomeMissing, setOutcomeMissing] = useState(false);
   // Motivo do modo manual: o mesmo no painel e na lista de jogadas (desfazer e corrigir pedem o motivo).
   const [reason, setReason] = useState('');
   const [missing, setMissing] = useState(false);
@@ -83,8 +224,23 @@ export function JudgePanel({ online }: { online: OnlineGame }) {
   const playing = room?.status === 'playing';
   const manual = Boolean(room?.manual) && playing;
   const plays = useJudgePlays(tour ?? { id: '', matchId: 0 }, seq, Boolean(tour) && playing && (playsOpen || manual));
+  const call = useJudgeCall(tour ?? { id: '', matchId: 0 }, Boolean(tour) && Boolean(room?.pause) && playing, seq);
   if (!room || !tour) return null;
   const paused = Boolean(room.pause);
+  const chosen = call && outcome?.call === call.id ? outcome.value : suggestedOutcome(call);
+  const resume = () => {
+    // Com o chamado à vista, o Judge fecha com um desfecho pronto; "outro" pede o relato.
+    if (call && (!chosen || (chosen === 'other' && !note.trim()))) {
+      setOutcomeMissing(true);
+      return;
+    }
+    setOutcomeMissing(false);
+    void run(() => api.tournaments.resume(tour.id, tour.matchId, note.trim() || undefined, chosen ?? undefined).then(() => setNote('')), t('judge.resumed'));
+  };
+  const openPlays = (focus: number | null) => {
+    setPlaysFocus(focus);
+    setPlaysOpen(true);
+  };
   const run = async (fn: () => Promise<unknown>, after?: string) => {
     setBusy(true);
     setError(null);
@@ -125,6 +281,26 @@ export function JudgePanel({ online }: { online: OnlineGame }) {
         <div className="judge-panel-body">
           {paused ? (
             <>
+              {call && <CallBox call={call} onSeePlay={() => openPlays(call.play)} />}
+              {call && (
+                <fieldset className="judge-outcomes">
+                  <legend className="small judge-label">{t('judge.outcomeTitle')}</legend>
+                  {(call.undone > 0 || call.fixes > 0) && <p className="muted small">{t('judge.outcomeDone', { n: call.undone, f: call.fixes })}</p>}
+                  {CALL_OUTCOMES.map((o) => (
+                    <label key={o} className={['judge-outcome', 'small', chosen === o ? 'on' : ''].join(' ')}>
+                      <input
+                        type="radio"
+                        name={`judge-outcome-${call.id}`}
+                        checked={chosen === o}
+                        onChange={() => (setOutcome({ call: call.id, value: o }), setOutcomeMissing(false))}
+                      />
+                      {t(`judge.outcome.${o}`)}
+                    </label>
+                  ))}
+                  {chosen && APP_OUTCOMES.includes(chosen) && <p className="muted small">{t('judge.outcomeApp')}</p>}
+                  {outcomeMissing && <div className="error small">{t(chosen === 'other' ? 'judge.outcomeNoteMissing' : 'judge.outcomeMissing')}</div>}
+                </fieldset>
+              )}
               <label className="small judge-label" htmlFor="judge-resume-note">
                 {t('judge.noteLabel')}
               </label>
@@ -137,11 +313,7 @@ export function JudgePanel({ online }: { online: OnlineGame }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
-              <button
-                className="btn primary small"
-                disabled={busy}
-                onClick={() => run(() => api.tournaments.resume(tour.id, tour.matchId, note.trim() || undefined).then(() => setNote('')), t('judge.resumed'))}
-              >
+              <button className="btn primary small" disabled={busy} onClick={resume}>
                 {t('judge.resume')}
               </button>
             </>
@@ -153,7 +325,7 @@ export function JudgePanel({ online }: { online: OnlineGame }) {
             )
           )}
           {playing && (
-            <button className="btn small" onClick={() => setPlaysOpen(true)}>
+            <button className="btn small" onClick={() => openPlays(null)}>
               {t('judge.plays')}
             </button>
           )}
@@ -173,7 +345,7 @@ export function JudgePanel({ online }: { online: OnlineGame }) {
               setReason={setReason}
               missing={missing}
               plays={plays.data}
-              onOpenPlays={() => setPlaysOpen(true)}
+              onOpenPlays={() => openPlays(call?.play ?? null)}
             />
           )}
           <div className="judge-warn-row">
@@ -228,9 +400,33 @@ export function JudgePanel({ online }: { online: OnlineGame }) {
           data={plays.data}
           error={plays.error}
           message={error ? { ok: false, text: error } : done ? { ok: true, text: done } : null}
+          focus={playsFocus !== null && call ? { count: playsFocus, by: call.byName } : undefined}
           onClose={() => setPlaysOpen(false)}
           undo={manual ? { busy, note: reason, setNote: setReason, missing, onUndo: undo } : undefined}
         />
+      )}
+    </div>
+  );
+}
+
+/** O chamado aberto: quem chamou, o que aconteceu, o texto dele e a jogada apontada (com o atalho para ela). */
+function CallBox({ call, onSeePlay }: { call: JudgeCall; onSeePlay: () => void }) {
+  const t = useT();
+  if (!call.byPlayer && !call.reason) return <p className="muted small">{t('judge.callByJudge', { name: call.byName })}</p>;
+  return (
+    <div className="judge-call-box">
+      <strong className="small">{t('judge.callBox', { name: call.byName })}</strong>
+      {call.reason && <span className="small">{t(`judge.reason.${call.reason}`)}</span>}
+      {call.details && <q className="small">{call.details}</q>}
+      {call.play !== null ? (
+        <div className="judge-manual-row">
+          <span className="small">{t('judge.callPlay', { n: call.play + 1, turn: call.playTurn ?? '?' })}</span>
+          <button className="btn small" onClick={onSeePlay}>
+            {t('judge.callSeePlay')}
+          </button>
+        </div>
+      ) : (
+        <span className="muted small">{t('judge.callNoPlay')}</span>
       )}
     </div>
   );

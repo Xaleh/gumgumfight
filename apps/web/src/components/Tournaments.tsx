@@ -3,6 +3,7 @@ import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useSt
 import {
   type AdminSponsor,
   api,
+  APP_OUTCOMES,
   canPlay,
   currentSpoilerSet,
   type DeckSummary,
@@ -2392,6 +2393,17 @@ function Incidents({
                     c.resolvedAt ? tr('tour.incidentResolved', { name: c.resolvedByName ?? '?', time: time(c.resolvedAt, locale) }) : tr('tour.incidentStillOpen'),
                   )}
                 </span>
+                {(c.reason || c.details) && (
+                  <span className="small">
+                    {dots(c.reason && tr(`judge.reason.${c.reason}`), c.details && `“${c.details}”`, c.play !== null && tr('judge.callPlay', { n: c.play + 1, turn: c.playTurn ?? '?' }))}
+                  </span>
+                )}
+                {c.outcome && (
+                  <span className="small">
+                    <b>{tr(`judge.outcome.${c.outcome}`)}</b>
+                    {APP_OUTCOMES.includes(c.outcome) && ` · ${tr(c.reportId !== null ? 'tour.incidentFixFiled' : 'tour.incidentFixWaiting')}`}
+                  </span>
+                )}
                 {c.note && <span className="small tour-incident-note">{c.note}</span>}
               </li>
             ))}

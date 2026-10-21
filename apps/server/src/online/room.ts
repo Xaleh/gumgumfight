@@ -307,8 +307,9 @@ export interface JudgePlay {
   action: Action;
   /** A pergunta aberta antes da ação (null = o jogador agiu no próprio turno). */
   pending: Pending | null;
-  /** Linhas do log que a ação gerou, com as secretas. */
+  /** Linhas do log que a ação gerou, com as secretas; `logFrom` = a posição da primeira no log da partida. */
   lines: LogEntry[];
+  logFrom: number;
   /** Resposta dada pelo Judge no lugar do jogador: o nome de quem respondeu. */
   by?: string;
 }
@@ -802,18 +803,9 @@ export class Room {
    * Refaz a partida uma vez e guarda o caminho (`playsCache`); as próximas chamadas só avançam.
    */
   plays(): JudgePlays | null {
-    if (!this.state) return null;
-    const actions = this.data.actions;
-    let cache = this.playsCache;
-    if (!cache || cache.plays.length > actions.length) cache = this.playsCache = { state: createGame(this.config()), plays: [] };
-    let state = cache.state;
-    for (let i = cache.plays.length; i < actions.length; i++) {
-      const action = actions[i];
-      const before = state;
-      state = applyAction(before, action);
-      cache.plays.push({ count: i, turn: before.turn, player: action.player, action, pending: before.pending ?? null, lines: state.log.slice(before.log.length) });
-    }
-    cache.state = state;
+    const cache = this.playPath();
+    if (!cache) return null;
+    const { state } = cache;
     const answered = this.data.answeredBy ?? {};
     const plays = cache.plays.map((p) => (answered[p.count] ? { ...p, by: answered[p.count] } : p));
     const cards: Record<string, string> = {};
@@ -837,6 +829,34 @@ export class Room {
       cards,
       defs,
     };
+  }
+
+  /** O caminho refeito das jogadas (`plays`), avançado até a última ação. */
+  private playPath(): { state: GameState; plays: JudgePlay[] } | null {
+    if (!this.state) return null;
+    const actions = this.data.actions;
+    let cache = this.playsCache;
+    if (!cache || cache.plays.length > actions.length) cache = this.playsCache = { state: createGame(this.config()), plays: [] };
+    let state = cache.state;
+    for (let i = cache.plays.length; i < actions.length; i++) {
+      const action = actions[i];
+      const before = state;
+      state = applyAction(before, action);
+      const logFrom = before.log.length;
+      cache.plays.push({ count: i, turn: before.turn, player: action.player, action, pending: before.pending ?? null, lines: state.log.slice(logFrom), logFrom });
+    }
+    cache.state = state;
+    return cache;
+  }
+
+  /**
+   * A jogada que gerou a linha `index` do log (o jogador aponta a jogada do problema pelo próprio
+   * histórico, que tem as mesmas linhas, na mesma ordem). null = linha da preparação ou que não existe mais.
+   */
+  playAtLine(index: number): { count: number; turn: number } | null {
+    const path = this.playPath();
+    const play = path?.plays.find((p) => index >= p.logFrom && index < p.logFrom + p.lines.length);
+    return play ? { count: play.count, turn: play.turn } : null;
   }
 
   /**

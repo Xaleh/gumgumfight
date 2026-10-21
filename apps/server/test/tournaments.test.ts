@@ -6,6 +6,7 @@ import { proxiedImageUrl } from '../src/card-images';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
 import { listFinished, registerPlayer } from '../src/tournaments/store';
+import { listReports } from '../src/reports/store';
 import type { Lobby } from '../src/online/lobby';
 import type { Connection } from '../src/online/room';
 import { seed } from '../src/seed';
@@ -1402,6 +1403,88 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     // E na auditoria, como resposta do organizador.
     const inc = (await req(app, 'GET', `/api/tournaments/${t.id}/incidents`, org)).json();
     expect(inc.interventions[0]).toMatchObject({ kind: 'judge_action', role: 'organizer', payload: { type: 'choose', uids: [target] } });
+    await app.close();
+  });
+
+  it('chamado com o motivo e a jogada apontada pelo jogador; o Judge fecha com um desfecho pronto e o erro do app vira um relato de ajuste', async () => {
+    const { db, app } = setup();
+    const { org, t, who, lobby } = await arena(app, db);
+    const view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
+    const m = view.rounds[0].matches[0];
+    const a = who(m.p1.userId);
+    const seatA = (await play(app, t.id, a, m)).json();
+    await play(app, t.id, who(m.p2.userId), m);
+    const room = lobby.get(seatA.roomId)!;
+    while (room.state!.phase !== 'main') {
+      const p = actingPlayer(room.state!)!;
+      expect(room.act(p, room.state!.actionCount, legalActions(room.state!, p)[0]).ok).toBe(true);
+    }
+    // Dois turnos: a linha do fim do 1º turno é a jogada que o jogador aponta.
+    const first = room.state!.activePlayer;
+    expect(room.act(first, room.state!.actionCount, { type: 'endTurn', player: first }).ok).toBe(true);
+    const line = room.state!.log.length - 1;
+    const pointed = room.state!.actionCount - 1;
+    const turn = room.state!.turn - 1;
+    const base = `/api/tournaments/${t.id}/matches/${m.id}`;
+    // O jogador chama: o motivo, um texto e a linha do próprio histórico (as mesmas linhas da partida).
+    expect((await req(app, 'POST', `${base}/call`, a, { reason: 'effect', details: '  Cliquei   no Perospero e ele não voltou ', logIndex: line })).statusCode).toBe(200);
+    expect(room.isPaused).toBe(true);
+    expect((await req(app, 'GET', `${base}/call`, a)).statusCode).toBe(403);
+    const asked = (await req(app, 'GET', `${base}/call`, org)).json();
+    expect(asked.call).toMatchObject({ byName: m.p1.name, byPlayer: true, reason: 'effect', details: 'Cliquei no Perospero e ele não voltou', play: pointed, playTurn: turn, undone: 0, fixes: 0 });
+    // O Judge volta a jogada apontada: o painel já sabe que houve correção (o desfecho "erro do app" vem sugerido).
+    expect((await req(app, 'POST', `${base}/manual`, org, { on: true })).statusCode).toBe(200);
+    expect((await req(app, 'POST', `${base}/undo`, org, { seq: room.state!.actionCount, to: pointed, note: 'efeito não resolveu' })).statusCode).toBe(200);
+    expect((await req(app, 'GET', `${base}/call`, org)).json().call).toMatchObject({ undone: 1, fixes: 0 });
+    // O desfecho: um da lista; "outro" pede o relato.
+    expect((await req(app, 'POST', `${base}/resume`, org, { outcome: 'talvez' })).json()).toMatchObject({ errorCode: 'invalidOutcome' });
+    expect((await req(app, 'POST', `${base}/resume`, org, { outcome: 'other' })).json()).toMatchObject({ errorCode: 'outcomeNoteRequired' });
+    expect(room.isPaused).toBe(true);
+    expect((await req(app, 'POST', `${base}/resume`, org, { outcome: 'app_fixed' })).statusCode).toBe(204);
+    expect(room.isPaused).toBe(false);
+    expect((await req(app, 'GET', `${base}/call`, org)).json()).toEqual({ call: null });
+    const inc = (await req(app, 'GET', `/api/tournaments/${t.id}/incidents`, org)).json();
+    expect(inc.calls[0]).toMatchObject({ reason: 'effect', outcome: 'app_fixed', play: pointed, reportId: null });
+    expect(inc.calls[0].fix).toBeUndefined();
+    // O chamado de ajuste espera o jogo ser gravado (precisa do replay): ao terminar, entra nos relatos.
+    expect(listReports(db, { tournamentId: t.id })).toHaveLength(0);
+    const p = room.state!.activePlayer;
+    expect(room.act(p, room.state!.actionCount, { type: 'concede', player: p }).ok).toBe(true);
+    const reports = listReports(db, { tournamentId: t.id });
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({ source: 'judge', reporterId: org.id, play: pointed, notify: false, resolvedAt: null });
+    expect(reports[0].text).toContain('Desfecho: erro do app, mesa corrigida pelo Judge');
+    expect(reports[0].text).toContain(`Relato de ${m.p1.name}: uma carta não fez o que devia. "Cliquei no Perospero e ele não voltou"`);
+    // A jogada apontada como estava ao chamar (o Judge a desfez depois), com o fim do turno no histórico.
+    expect(reports[0].text).toContain(`Jogada apontada: #${pointed + 1} (turno ${turn}, `);
+    expect(reports[0].text).toContain('encerrou o turno');
+    expect(reports[0].text).toContain('O Judge voltou 1 jogada(s).');
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}/incidents`, org)).json().calls[0].reportId).toBe(reports[0].id);
+    await app.close();
+  });
+
+  it('chamado fechado como erro do jogador não abre relato (e o chamado sem motivo, de cliente antigo, continua valendo)', async () => {
+    const { db, app } = setup();
+    const { org, t, who, lobby } = await arena(app, db);
+    const view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
+    const m = view.rounds[0].matches[0];
+    const a = who(m.p1.userId);
+    const seatA = (await play(app, t.id, a, m)).json();
+    await play(app, t.id, who(m.p2.userId), m);
+    const room = lobby.get(seatA.roomId)!;
+    while (room.state!.phase !== 'main') {
+      const p = actingPlayer(room.state!)!;
+      expect(room.act(p, room.state!.actionCount, legalActions(room.state!, p)[0]).ok).toBe(true);
+    }
+    const base = `/api/tournaments/${t.id}/matches/${m.id}`;
+    // Cliente antigo: sem motivo nem jogada.
+    expect((await req(app, 'POST', `${base}/call`, a)).statusCode).toBe(200);
+    expect((await req(app, 'GET', `${base}/call`, org)).json().call).toMatchObject({ reason: null, play: null });
+    expect((await req(app, 'POST', `${base}/resume`, org, { outcome: 'no_issue' })).statusCode).toBe(204);
+    const p = room.state!.activePlayer;
+    expect(room.act(p, room.state!.actionCount, { type: 'concede', player: p }).ok).toBe(true);
+    expect(listReports(db, { tournamentId: t.id })).toHaveLength(0);
+    expect((await req(app, 'GET', `/api/tournaments/${t.id}/incidents`, org)).json().calls[0]).toMatchObject({ outcome: 'no_issue', reportId: null });
     await app.close();
   });
 
