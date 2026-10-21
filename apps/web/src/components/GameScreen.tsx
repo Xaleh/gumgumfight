@@ -91,12 +91,11 @@ const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virad
 const isNotice = (e: { key?: string; text: string }) => (e.key ? NOTICE_KEYS.has(e.key) : NOTICE_RE.test(e.text));
 
 /**
- * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
- * cada DON!! tocado na fileira, para marcar exatamente ele. Sem `step`, a faixa central mostra a barra de ações
- * (Anexar ao Líder / a um Personagem / Cancelar) e a mesa segue normal; com `step: 'character'`, só os
- * Personagens que podem receber DON!! ficam destacados e o toque num deles anexa.
+ * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição dos
+ * DON!! marcados na fileira: tocar no 3º marca os 3 primeiros. O Líder e os Personagens que podem receber DON!!
+ * ficam destacados e o toque num deles anexa todos os marcados; a faixa central mostra quantos são.
  */
-type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; picked: number[]; step?: 'character' };
+type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; picked: number[] };
 /** attached = DON!! anexado numa carta, arrastado de volta para a área de custo (detachDon). */
 type DragKind = 'hand' | 'attacker' | 'don' | 'attached';
 interface Drag {
@@ -902,10 +901,8 @@ function Table({
       if (has((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === uid)) return 'option';
       return null;
     }
-    if (mode?.kind === 'don' && mode.step === 'character') {
-      return canReceiveDon(uid, 'character') ? 'option' : null;
-    }
-    // DON!! marcados sem ação escolhida: a mesa continua com os destaques normais.
+    // DON!! marcados: quem pode recebê-los brilha; o resto da mesa segue com os destaques normais.
+    if (mode?.kind === 'don' && canReceiveDon(uid)) return 'option';
     if (uid === selected && !wide) return null;
     if (uid === selected) return 'selected';
     if (canPlay(uid)) return 'playable';
@@ -948,14 +945,10 @@ function Table({
       setMode(null);
       if (uid === mode.attacker) return;
     }
-    if (mode?.kind === 'don' && mode.step === 'character') {
-      if (canReceiveDon(uid, 'character')) {
-        attachDons(uid, mode.picked.length);
-        setMode(null);
-        return;
-      }
-      // Tocou fora dos alvos: volta para a barra de ações, com os DON!! ainda marcados.
-      setMode({ kind: 'don', picked: mode.picked });
+    // DON!! marcados: o toque no Líder ou num Personagem anexa todos; fora deles, a carta abre como sempre.
+    if (mode?.kind === 'don' && canReceiveDon(uid)) {
+      attachDons(uid, mode.picked.length);
+      setMode(null);
       return;
     }
     // Carta escondida (mão do oponente) não abre.
@@ -981,53 +974,26 @@ function Table({
     for (let i = 0; i < n; i++) dispatch({ type: 'attachDon', player: human, target });
   };
 
-  /** A carta pode receber DON!! agora? `kind` restringe a Líder ou a Personagem. */
-  const canReceiveDon = (uid: string, kind?: 'leader' | 'character') => {
-    if (!has((a) => a.type === 'attachDon' && a.target === uid)) return false;
-    if (!kind || human === null) return true;
-    const isLeader = state.players[human].leader.uid === uid;
-    return kind === 'leader' ? isLeader : !isLeader;
-  };
+  /** A carta (Líder ou Personagem) pode receber DON!! agora? */
+  const canReceiveDon = (uid: string) => has((a) => a.type === 'attachDon' && a.target === uid);
 
-  /** Toque num DON!! ativo: marca exatamente aquele (ou desmarca, se já estava marcado). */
+  /**
+   * Toque num DON!! ativo: marca ele e os anteriores da fileira (tocar no 3º marca 3). Tocar no último marcado
+   * desmarca só ele, para acertar a quantidade.
+   */
   const onDon = (player: PlayerId, index: number) => {
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
     if (index < 0 || index >= max) return;
-    const cur = mode?.kind === 'don' ? mode.picked : [];
+    const cur = mode?.kind === 'don' ? mode.picked.length : 0;
+    const count = index === cur - 1 ? index : index + 1;
     // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
-    audio.play('don-pick', { pitch: cur.includes(index) ? -3 : Math.min(6, cur.length) });
-    setMode((m) => {
-      const cur = m?.kind === 'don' ? m.picked : [];
-      const picked = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index].sort((a, b) => a - b);
-      return picked.length > 0 ? { kind: 'don', picked, step: m?.kind === 'don' ? m.step : undefined } : null;
-    });
+    audio.play('don-pick', { pitch: count < cur ? -3 : Math.min(6, count - 1) });
+    setMode(count > 0 ? { kind: 'don', picked: Array.from({ length: count }, (_, i) => i) } : null);
   };
 
-  /** Barra de ações dos DON!! marcados (na faixa central): o que fazer com eles. */
-  const donBar =
-    mode?.kind === 'don' && human !== null
-      ? (() => {
-          const me = state.players[human];
-          const { picked } = mode;
-          const count = picked.length;
-          return (
-            <DonBar
-              count={count}
-              step={mode.step}
-              canLeader={canReceiveDon(me.leader.uid, 'leader')}
-              characters={me.characters.filter((c) => canReceiveDon(c.uid, 'character')).length}
-              onLeader={() => {
-                attachDons(me.leader.uid, count);
-                setMode(null);
-              }}
-              onCharacter={() => setMode({ kind: 'don', picked, step: 'character' })}
-              onBack={() => setMode({ kind: 'don', picked })}
-              onCancel={() => setMode(null)}
-            />
-          );
-        })()
-      : null;
+  /** DON!! marcados (na faixa central): quantos são e onde tocar. */
+  const donBar = mode?.kind === 'don' && human !== null ? <DonBar count={mode.picked.length} onCancel={() => setMode(null)} /> : null;
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
@@ -2008,21 +1974,11 @@ function CenterBand(props: {
 }
 
 /**
- * DON!! marcados na fileira: quantos são e o que fazer com eles, como no OPTCG Sim. Primeiro a escolha da
- * ação (Líder anexa na hora; Personagem passa a destacar os alvos), depois o alvo. Sem arrastar, no celular.
+ * DON!! marcados na fileira: quantos são e onde tocar para anexá-los (o Líder ou um Personagem, que ficam
+ * destacados na mesa), como no OPTCG Sim. Sem arrastar, no celular.
  */
-function DonBar(props: {
-  count: number;
-  step?: 'character';
-  canLeader: boolean;
-  /** Quantos Personagens podem receber DON!! agora. */
-  characters: number;
-  onLeader: () => void;
-  onCharacter: () => void;
-  onBack: () => void;
-  onCancel: () => void;
-}) {
-  const { count, step } = props;
+function DonBar(props: { count: number; onCancel: () => void }) {
+  const { count } = props;
   const t = useT();
   // Em tela estreita (.brief) os textos encurtam para a barra caber numa linha entre o turno e "Encerrar turno".
   const counter = (
@@ -2033,37 +1989,13 @@ function DonBar(props: {
       <span className="brief">DON!!</span>
     </span>
   );
-  if (step === 'character')
-    return (
-      <div className="don-bar step" role="group" aria-label={t('game.donToCharacterLabel')}>
-        {counter}
-        <span className="don-bar-hint">
-          <span className="full">{t('game.donTapCharacter')}</span>
-          <span className="brief">{t('game.donTapCharacterShort')}</span>
-        </span>
-        <button className="don-bar-btn back" onClick={props.onBack}>
-          {t('common.back')}
-        </button>
-        <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label={t('common.cancel')}>
-          ✕
-        </button>
-      </div>
-    );
   return (
     <div className="don-bar" role="group" aria-label={t('game.donAttachLabel')}>
       {counter}
-      {props.canLeader && (
-        <button className="don-bar-btn" onClick={props.onLeader} aria-label={t('game.donToLeader')}>
-          <span className="full">{t('game.donToLeader')}</span>
-          <span className="brief">{t('game.donToLeaderShort')}</span>
-        </button>
-      )}
-      {props.characters > 0 && (
-        <button className="don-bar-btn" onClick={props.onCharacter} aria-label={t('game.donToCharacter')}>
-          <span className="full">{t('game.donToCharacter')}</span>
-          <span className="brief">{t('game.donToCharacterShort')}</span>
-        </button>
-      )}
+      <span className="don-bar-hint">
+        <span className="full">{t('game.donTapTarget')}</span>
+        <span className="brief">{t('game.donTapTargetShort')}</span>
+      </span>
       <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label={t('common.cancel')}>
         ✕
       </button>

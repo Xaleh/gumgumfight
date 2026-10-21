@@ -1524,14 +1524,9 @@ export default {
   'game.watching': 'Vous regardez',
   // ---- marked DON!! ----
   'game.donSelected': '{n|sélectionnée|sélectionnées}',
-  'game.donToCharacterLabel': 'Attacher des DON!! à un Personnage',
-  'game.donTapCharacter': 'Touchez le Personnage qui les reçoit',
-  'game.donTapCharacterShort': 'Touchez le Personnage',
+  'game.donTapTarget': 'Touchez le Leader ou un Personnage',
+  'game.donTapTargetShort': 'Touchez la cible',
   'game.donAttachLabel': 'Attacher des DON!!',
-  'game.donToLeader': 'Attacher au Leader',
-  'game.donToLeaderShort': 'Leader',
-  'game.donToCharacter': 'Attacher à un Personnage',
-  'game.donToCharacterShort': 'Personnage',
   // ---- target selection ----
   'game.countOf': '({n}/{max})',
   'game.order': 'Ordre : {order}',

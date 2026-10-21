@@ -1525,14 +1525,9 @@ const ptBR = {
   'game.watching': 'Você está assistindo',
   // ---- DON!! marcados ----
   'game.donSelected': '{n|selecionado|selecionados}',
-  'game.donToCharacterLabel': 'Anexar DON!! a um Personagem',
-  'game.donTapCharacter': 'Toque no Personagem que recebe',
-  'game.donTapCharacterShort': 'Toque no Personagem',
+  'game.donTapTarget': 'Toque no Líder ou num Personagem',
+  'game.donTapTargetShort': 'Toque no destino',
   'game.donAttachLabel': 'Anexar DON!!',
-  'game.donToLeader': 'Anexar ao Líder',
-  'game.donToLeaderShort': 'Líder',
-  'game.donToCharacter': 'Anexar a um Personagem',
-  'game.donToCharacterShort': 'Personagem',
   // ---- escolha de alvos ----
   'game.countOf': '({n}/{max})',
   'game.order': 'Ordem: {order}',

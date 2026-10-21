@@ -1524,14 +1524,9 @@ export default {
   'game.watching': 'Du schaust zu',
   // ---- markierte DON!! ----
   'game.donSelected': 'ausgewählt',
-  'game.donToCharacterLabel': 'DON!! an einen Charakter anlegen',
-  'game.donTapCharacter': 'Tippe auf den Charakter, der sie erhält',
-  'game.donTapCharacterShort': 'Charakter antippen',
+  'game.donTapTarget': 'Tippe auf den Leader oder einen Charakter',
+  'game.donTapTargetShort': 'Ziel antippen',
   'game.donAttachLabel': 'DON!! anlegen',
-  'game.donToLeader': 'An Leader anlegen',
-  'game.donToLeaderShort': 'Leader',
-  'game.donToCharacter': 'An Charakter anlegen',
-  'game.donToCharacterShort': 'Charakter',
   // ---- Zielauswahl ----
   'game.countOf': '({n}/{max})',
   'game.order': 'Reihenfolge: {order}',

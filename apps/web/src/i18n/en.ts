@@ -1524,14 +1524,9 @@ export default {
   'game.watching': 'You are watching',
   // ---- marked DON!! ----
   'game.donSelected': 'selected',
-  'game.donToCharacterLabel': 'Attach DON!! to a Character',
-  'game.donTapCharacter': 'Tap the Character that receives them',
-  'game.donTapCharacterShort': 'Tap the Character',
+  'game.donTapTarget': 'Tap the Leader or a Character',
+  'game.donTapTargetShort': 'Tap the target',
   'game.donAttachLabel': 'Attach DON!!',
-  'game.donToLeader': 'Attach to Leader',
-  'game.donToLeaderShort': 'Leader',
-  'game.donToCharacter': 'Attach to a Character',
-  'game.donToCharacterShort': 'Character',
   // ---- target selection ----
   'game.countOf': '({n}/{max})',
   'game.order': 'Order: {order}',

@@ -2772,7 +2772,7 @@ button.hint-pill {
   font-weight: 700;
 }
 
-/* DON!! marcados: contador + o que fazer com eles (Líder / Personagem / cancelar), na faixa central */
+/* DON!! marcados: contador + onde tocar (Líder ou Personagem) + cancelar, na faixa central */
 .don-bar {
   display: flex;
   flex-wrap: wrap;
@@ -2838,9 +2838,6 @@ button.hint-pill {
 }
 .don-bar-btn:active {
   transform: scale(0.96);
-}
-.don-bar-btn.back {
-  background: var(--slate);
 }
 .don-bar-btn.cancel {
   width: 30px;

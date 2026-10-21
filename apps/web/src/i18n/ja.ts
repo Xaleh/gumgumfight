@@ -1524,14 +1524,9 @@ export default {
   'game.watching': '観戦中',
   // ---- 選択中のドン!! ----
   'game.donSelected': '選択中',
-  'game.donToCharacterLabel': 'ドン!!をキャラに付与',
-  'game.donTapCharacter': '付与するキャラをタップ',
-  'game.donTapCharacterShort': 'キャラをタップ',
+  'game.donTapTarget': 'リーダーかキャラをタップ',
+  'game.donTapTargetShort': '付与先をタップ',
   'game.donAttachLabel': 'ドン!!を付与',
-  'game.donToLeader': 'リーダーに付与',
-  'game.donToLeaderShort': 'リーダー',
-  'game.donToCharacter': 'キャラに付与',
-  'game.donToCharacterShort': 'キャラ',
   // ---- 対象の選択 ----
   'game.countOf': '（{n}/{max}）',
   'game.order': '順番：{order}',

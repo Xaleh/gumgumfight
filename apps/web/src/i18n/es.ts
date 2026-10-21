@@ -1524,14 +1524,9 @@ export default {
   'game.watching': 'Estás viendo',
   // ---- DON!! marcados ----
   'game.donSelected': 'seleccionados',
-  'game.donToCharacterLabel': 'Asignar DON!! a un Personaje',
-  'game.donTapCharacter': 'Toca el Personaje que los recibe',
-  'game.donTapCharacterShort': 'Toca el Personaje',
+  'game.donTapTarget': 'Toca el Líder o un Personaje',
+  'game.donTapTargetShort': 'Toca el destino',
   'game.donAttachLabel': 'Asignar DON!!',
-  'game.donToLeader': 'Asignar al Líder',
-  'game.donToLeaderShort': 'Líder',
-  'game.donToCharacter': 'Asignar a un Personaje',
-  'game.donToCharacterShort': 'Personaje',
   // ---- selección de objetivos ----
   'game.countOf': '({n}/{max})',
   'game.order': 'Orden: {order}',
