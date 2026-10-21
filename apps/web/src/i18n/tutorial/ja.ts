@@ -274,11 +274,11 @@ export default {
   'tutorial.giveDon.how.title': 'ドン!!を付与する',
   'tutorial.giveDon.how.body': 'メインフェイズに、アクティブなドン!!をリーダーかキャラクターに付与できます。付与したドン!!1枚につき、自分のターン中パワー+1000。',
   'tutorial.giveDon.give.title': 'ロビンにドン!!を1枚',
-  'tutorial.giveDon.give.body': 'ロビンをタップして「+1 DON!!」を選択（またはアクティブなドン!!をロビンへドラッグ）。',
+  'tutorial.giveDon.give.body': 'アクティブなドン!!をタップしてからロビンをタップ（またはドン!!をロビンへドラッグ）。',
   'tutorial.giveDon.attack.title': 'さあ、アタック',
   'tutorial.giveDon.attack.body': '6000になったロビンはパシフィスタと同値。同値はアタック側の勝ちです。ロビンでパシフィスタにアタック。',
   'tutorial.giveDon.leader.title': '今度はリーダーで',
-  'tutorial.giveDon.leader.body': 'ドン!!が2枚残っています。リーダーに付与して、相手のリーダーにアタックしましょう。',
+  'tutorial.giveDon.leader.body': 'ドン!!が2枚残っています。2枚目のドン!!をタップして2枚選び、リーダーをタップして相手のリーダーにアタックしましょう。',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body': '付与されたドン!!で効果が働くカードもあります。ゾロは[DON!! x1]：ドン!!が1枚以上付与されていると、さらに+1000。',
   'tutorial.giveDon.back.title': 'そのあとは？',
@@ -299,7 +299,7 @@ export default {
   'tutorial.defense.next.body': '今度はパシフィスタ（6000）があなたのリーダー（5000）にアタック。ブロッカーがいないので、すぐにカウンターステップです。',
   'tutorial.defense.counter.title': 'カウンターを使う',
   'tutorial.defense.counter.body':
-    'カウンターを持つ手札をトラッシュすると、このバトル中リーダーのパワーが上がります。同値はアタック側の勝ちなので、6000より「多く」必要です。カウンターをタップしてから「これ以上カウンターしない」を。',
+    'カウンターを持つ手札をトラッシュすると、このバトル中リーダーのパワーが上がります。同値はアタック側の勝ちなので、6000より「多く」必要です。カウンターをタップして選び、「カウンター使用」ボタンを。',
   'tutorial.defense.counter.fail': 'リーダーがダメージを受けました。防御側はアタック側より多いパワーが必要で、6000対6000では負けです。もう一度（ナミは+1000、ブルックは+2000）。',
   'tutorial.defense.recap.title': '防御成功',
   'tutorial.defense.recap.body':

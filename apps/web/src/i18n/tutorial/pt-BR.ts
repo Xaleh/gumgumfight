@@ -308,11 +308,11 @@ const tutorialPtBR = {
   'tutorial.giveDon.how.body':
     'Na Main Phase, você pode dar DON!! ativos ao seu Líder ou a um Personagem. Cada DON!! dado vale +1000 de poder durante o seu turno.',
   'tutorial.giveDon.give.title': 'Dê 1 DON!! à Robin',
-  'tutorial.giveDon.give.body': 'Toque na Robin e escolha +1 DON!! (ou arraste um DON!! ativo até ela).',
+  'tutorial.giveDon.give.body': 'Toque num DON!! ativo e depois na Robin (ou arraste um DON!! ativo até ela).',
   'tutorial.giveDon.attack.title': 'Agora sim, ataque',
   'tutorial.giveDon.attack.body': 'Com 6000, a Robin empata com o Pacifista, e empate é do atacante. Ataque o Pacifista com a Robin.',
   'tutorial.giveDon.leader.title': 'De novo, com o Líder',
-  'tutorial.giveDon.leader.body': 'Sobraram 2 DON!!. Dê ao seu Líder e ataque o Líder do oponente.',
+  'tutorial.giveDon.leader.body': 'Sobraram 2 DON!!. Toque no 2º DON!! para marcar os dois, depois no seu Líder, e ataque o Líder do oponente.',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body':
     'Algumas cartas pedem DON!! dados para ligar um efeito. O Zoro tem [DON!! x1]: com pelo menos 1 DON!! dado a ele, ganha +1000 a mais.',
@@ -339,7 +339,7 @@ const tutorialPtBR = {
   'tutorial.defense.next.body': 'Agora o Pacifista (6000) vai atacar seu Líder (5000). Sem Blocker em campo, vem direto o Counter Step.',
   'tutorial.defense.counter.title': 'Use Counter',
   'tutorial.defense.counter.body':
-    'Cartas da mão com Counter podem ser descartadas para dar poder ao seu Líder nesta batalha. Ele precisa ficar com MAIS de 6000, porque empate é do atacante. Toque nos Counters e depois em Não usar mais Counter.',
+    'Cartas da mão com Counter podem ser descartadas para dar poder ao seu Líder nesta batalha. Ele precisa ficar com MAIS de 6000, porque empate é do atacante. Toque nos Counters para marcá-los e depois no botão Usar Counter.',
   'tutorial.defense.counter.fail':
     'Seu Líder levou dano. O defensor precisa ficar com mais poder que o atacante: 6000 contra 6000 perde. Tente de novo (a Nami dá +1000; o Brook, +2000).',
   'tutorial.defense.recap.title': 'Defesa feita',

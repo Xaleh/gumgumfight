@@ -91,12 +91,11 @@ const NOTICE_RE = /a condição não vale|não pode bloquear|não pode ser virad
 const isNotice = (e: { key?: string; text: string }) => (e.key ? NOTICE_KEYS.has(e.key) : NOTICE_RE.test(e.text));
 
 /**
- * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição de
- * cada DON!! tocado na fileira, para marcar exatamente ele. Sem `step`, a faixa central mostra a barra de ações
- * (Anexar ao Líder / a um Personagem / Cancelar) e a mesa segue normal; com `step: 'character'`, só os
- * Personagens que podem receber DON!! ficam destacados e o toque num deles anexa.
+ * Modo 'don': DON!! ativos marcados para anexar de uma vez (modelo do OPTCG Sim). `picked` guarda a posição dos
+ * DON!! marcados na fileira: tocar no 3º marca os 3 primeiros. O Líder e os Personagens que podem receber DON!!
+ * ficam destacados e o toque num deles anexa todos os marcados; a faixa central mostra quantos são.
  */
-type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; picked: number[]; step?: 'character' };
+type Mode = null | { kind: 'attack'; attacker: string } | { kind: 'don'; picked: number[] };
 /** attached = DON!! anexado numa carta, arrastado de volta para a área de custo (detachDon). */
 type DragKind = 'hand' | 'attacker' | 'don' | 'attached';
 interface Drag {
@@ -890,6 +889,7 @@ function Table({
         if (myPending.options.includes(uid)) return 'option';
         if (myPending.shown?.includes(uid)) return 'disabled';
       }
+      if (myPending.kind === 'counter' && picked.includes(uid)) return 'selected';
       if ((myPending.kind === 'block' || myPending.kind === 'counter') && myPending.options.includes(uid)) return 'option';
     }
     if (state.battle) {
@@ -901,10 +901,8 @@ function Table({
       if (has((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === uid)) return 'option';
       return null;
     }
-    if (mode?.kind === 'don' && mode.step === 'character') {
-      return canReceiveDon(uid, 'character') ? 'option' : null;
-    }
-    // DON!! marcados sem ação escolhida: a mesa continua com os destaques normais.
+    // DON!! marcados: quem pode recebê-los brilha; o resto da mesa segue com os destaques normais.
+    if (mode?.kind === 'don' && canReceiveDon(uid)) return 'option';
     if (uid === selected && !wide) return null;
     if (uid === selected) return 'selected';
     if (canPlay(uid)) return 'playable';
@@ -925,8 +923,11 @@ function Table({
         return;
       }
       if (myPending.kind === 'counter' && myPending.options.includes(uid)) {
-        // Sem a opção "Counter sem confirmação", abre a carta com o botão de usar.
+        // "Counter sem confirmação" usa na hora. Sem ela, os Counters de Personagem (só o valor) são
+        // marcados e vão todos de uma vez no botão de decisão; o Evento [Counter], com custo e efeito
+        // próprios, abre a carta com o botão de usar.
         if (quickCounter) useCounter(uid);
+        else if (cardDef(state, uid).category !== 'event') setPicked((p) => (p.includes(uid) ? p.filter((x) => x !== uid) : [...p, uid]));
         else {
           setSelected(uid);
           setZoom(uid);
@@ -944,14 +945,10 @@ function Table({
       setMode(null);
       if (uid === mode.attacker) return;
     }
-    if (mode?.kind === 'don' && mode.step === 'character') {
-      if (canReceiveDon(uid, 'character')) {
-        attachDons(uid, mode.picked.length);
-        setMode(null);
-        return;
-      }
-      // Tocou fora dos alvos: volta para a barra de ações, com os DON!! ainda marcados.
-      setMode({ kind: 'don', picked: mode.picked });
+    // DON!! marcados: o toque no Líder ou num Personagem anexa todos; fora deles, a carta abre como sempre.
+    if (mode?.kind === 'don' && canReceiveDon(uid)) {
+      attachDons(uid, mode.picked.length);
+      setMode(null);
       return;
     }
     // Carta escondida (mão do oponente) não abre.
@@ -977,53 +974,26 @@ function Table({
     for (let i = 0; i < n; i++) dispatch({ type: 'attachDon', player: human, target });
   };
 
-  /** A carta pode receber DON!! agora? `kind` restringe a Líder ou a Personagem. */
-  const canReceiveDon = (uid: string, kind?: 'leader' | 'character') => {
-    if (!has((a) => a.type === 'attachDon' && a.target === uid)) return false;
-    if (!kind || human === null) return true;
-    const isLeader = state.players[human].leader.uid === uid;
-    return kind === 'leader' ? isLeader : !isLeader;
-  };
+  /** A carta (Líder ou Personagem) pode receber DON!! agora? */
+  const canReceiveDon = (uid: string) => has((a) => a.type === 'attachDon' && a.target === uid);
 
-  /** Toque num DON!! ativo: marca exatamente aquele (ou desmarca, se já estava marcado). */
+  /**
+   * Toque num DON!! ativo: marca ele e os anteriores da fileira (tocar no 3º marca 3). Tocar no último marcado
+   * desmarca só ele, para acertar a quantidade.
+   */
   const onDon = (player: PlayerId, index: number) => {
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
     if (index < 0 || index >= max) return;
-    const cur = mode?.kind === 'don' ? mode.picked : [];
+    const cur = mode?.kind === 'don' ? mode.picked.length : 0;
+    const count = index === cur - 1 ? index : index + 1;
     // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
-    audio.play('don-pick', { pitch: cur.includes(index) ? -3 : Math.min(6, cur.length) });
-    setMode((m) => {
-      const cur = m?.kind === 'don' ? m.picked : [];
-      const picked = cur.includes(index) ? cur.filter((i) => i !== index) : [...cur, index].sort((a, b) => a - b);
-      return picked.length > 0 ? { kind: 'don', picked, step: m?.kind === 'don' ? m.step : undefined } : null;
-    });
+    audio.play('don-pick', { pitch: count < cur ? -3 : Math.min(6, count - 1) });
+    setMode(count > 0 ? { kind: 'don', picked: Array.from({ length: count }, (_, i) => i) } : null);
   };
 
-  /** Barra de ações dos DON!! marcados (na faixa central): o que fazer com eles. */
-  const donBar =
-    mode?.kind === 'don' && human !== null
-      ? (() => {
-          const me = state.players[human];
-          const { picked } = mode;
-          const count = picked.length;
-          return (
-            <DonBar
-              count={count}
-              step={mode.step}
-              canLeader={canReceiveDon(me.leader.uid, 'leader')}
-              characters={me.characters.filter((c) => canReceiveDon(c.uid, 'character')).length}
-              onLeader={() => {
-                attachDons(me.leader.uid, count);
-                setMode(null);
-              }}
-              onCharacter={() => setMode({ kind: 'don', picked, step: 'character' })}
-              onBack={() => setMode({ kind: 'don', picked })}
-              onCancel={() => setMode(null)}
-            />
-          );
-        })()
-      : null;
+  /** DON!! marcados (na faixa central): quantos são e onde tocar. */
+  const donBar = mode?.kind === 'don' && human !== null ? <DonBar count={mode.picked.length} onCancel={() => setMode(null)} /> : null;
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
@@ -2004,21 +1974,11 @@ function CenterBand(props: {
 }
 
 /**
- * DON!! marcados na fileira: quantos são e o que fazer com eles, como no OPTCG Sim. Primeiro a escolha da
- * ação (Líder anexa na hora; Personagem passa a destacar os alvos), depois o alvo. Sem arrastar, no celular.
+ * DON!! marcados na fileira: quantos são e onde tocar para anexá-los (o Líder ou um Personagem, que ficam
+ * destacados na mesa), como no OPTCG Sim. Sem arrastar, no celular.
  */
-function DonBar(props: {
-  count: number;
-  step?: 'character';
-  canLeader: boolean;
-  /** Quantos Personagens podem receber DON!! agora. */
-  characters: number;
-  onLeader: () => void;
-  onCharacter: () => void;
-  onBack: () => void;
-  onCancel: () => void;
-}) {
-  const { count, step } = props;
+function DonBar(props: { count: number; onCancel: () => void }) {
+  const { count } = props;
   const t = useT();
   // Em tela estreita (.brief) os textos encurtam para a barra caber numa linha entre o turno e "Encerrar turno".
   const counter = (
@@ -2029,37 +1989,13 @@ function DonBar(props: {
       <span className="brief">DON!!</span>
     </span>
   );
-  if (step === 'character')
-    return (
-      <div className="don-bar step" role="group" aria-label={t('game.donToCharacterLabel')}>
-        {counter}
-        <span className="don-bar-hint">
-          <span className="full">{t('game.donTapCharacter')}</span>
-          <span className="brief">{t('game.donTapCharacterShort')}</span>
-        </span>
-        <button className="don-bar-btn back" onClick={props.onBack}>
-          {t('common.back')}
-        </button>
-        <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label={t('common.cancel')}>
-          ✕
-        </button>
-      </div>
-    );
   return (
     <div className="don-bar" role="group" aria-label={t('game.donAttachLabel')}>
       {counter}
-      {props.canLeader && (
-        <button className="don-bar-btn" onClick={props.onLeader} aria-label={t('game.donToLeader')}>
-          <span className="full">{t('game.donToLeader')}</span>
-          <span className="brief">{t('game.donToLeaderShort')}</span>
-        </button>
-      )}
-      {props.characters > 0 && (
-        <button className="don-bar-btn" onClick={props.onCharacter} aria-label={t('game.donToCharacter')}>
-          <span className="full">{t('game.donToCharacter')}</span>
-          <span className="brief">{t('game.donToCharacterShort')}</span>
-        </button>
-      )}
+      <span className="don-bar-hint">
+        <span className="full">{t('game.donTapTarget')}</span>
+        <span className="brief">{t('game.donTapTargetShort')}</span>
+      </span>
       <button className="don-bar-btn cancel" onClick={props.onCancel} aria-label={t('common.cancel')}>
         ✕
       </button>
@@ -2167,7 +2103,7 @@ function DecisionButton({
 }: {
   state: GameState;
   pending: Extract<Pending, { kind: 'block' | 'counter' | 'selectTargets' }>;
-  /** Alvos já marcados (escolha de alvos). */
+  /** Alvos já marcados (escolha de alvos) ou Counters marcados para usar de uma vez. */
   picked: string[];
   human: PlayerId;
   onDispatch: (a: Action) => void;
@@ -2180,9 +2116,11 @@ function DecisionButton({
   const t = useT();
   const tryT = useTryT();
   const d =
-    pending.kind === 'selectTargets' ? targetsDecision(t, promptText(tryT, pending), pending, picked) : defenseDecision(t, state, pending);
+    pending.kind === 'selectTargets' ? targetsDecision(t, promptText(tryT, pending), pending, picked) : defenseDecision(t, state, pending, picked);
   if (!d) return null;
-  const act = () => onDispatch(d.action(human));
+  const act = () => {
+    for (const a of [d.action(human)].flat()) onDispatch(a);
+  };
   return (
     <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
       {onCancel && pending.kind === 'selectTargets' && (
@@ -2212,11 +2150,20 @@ interface Decision {
   /** Chama o olhar: não há mais o que fazer antes de concluir. */
   pulse: boolean;
   disabled?: boolean;
-  action: (player: PlayerId) => Action;
+  /** Várias ações saem em sequência (os Counters marcados e o fim da etapa). */
+  action: (player: PlayerId) => Action | Action[];
 }
 
-/** Blocker/Counter: rótulo com o resultado previsto do ataque. */
-function defenseDecision(t: Translate, state: GameState, pending: Extract<Pending, { kind: 'block' | 'counter' }>): Decision | null {
+/**
+ * Blocker/Counter: rótulo com o resultado previsto do ataque. Com Counters marcados, o botão usa todos
+ * (o valor vai para o atacado) e já encerra a etapa, mostrando o resultado com eles somados.
+ */
+function defenseDecision(
+  t: Translate,
+  state: GameState,
+  pending: Extract<Pending, { kind: 'block' | 'counter' }>,
+  picked: string[] = [],
+): Decision | null {
   const b = state.battle;
   if (!b) return null;
   const atk = getPower(state, b.attacker) ?? 0;
@@ -2224,6 +2171,19 @@ function defenseDecision(t: Translate, state: GameState, pending: Extract<Pendin
   const hits = atk >= def;
   const need = atk - def + 1000;
   const counter = pending.kind === 'counter';
+  const marked = counter ? picked.filter((u) => pending.options.includes(u)) : [];
+  if (marked.length) {
+    const amount = marked.reduce((sum, u) => sum + counterValue(state, u), 0);
+    const total = def + amount;
+    const result = atk >= total ? t('game.attackPasses') : t('game.defended');
+    return {
+      label: t('game.useCounters', { amount }),
+      sub: t('game.resultSub', { result, atk, def: total }),
+      title: t('game.useCountersTitle', { n: marked.length, result, atk, def: total }),
+      pulse: atk < total,
+      action: (player) => [...marked.map((uid): Action => ({ type: 'counter', player, uid })), { type: 'pass', player }],
+    };
+  }
   // Já houve Counter nesta batalha: o alvo carrega um bônus de poder "até o fim da batalha".
   const used = counter && state.modifiers.some((m) => m.uid === b.target && m.kind === 'power' && m.duration === 'battle');
   // Nada na mão muda o resultado: o ataque já falha, ou os Counters somados não chegam ao que falta
