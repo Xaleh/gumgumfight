@@ -881,16 +881,22 @@ function TournamentPage({
     if (t.topCut) text = tr('tour.plusTopCut', { text, n: t.topCut });
     return text;
   };
-  /** Convite para os grupos: nome, regras, início, prêmio e o link da página do torneio. */
+  /** "\n\n🎁 *Premiação*\n• 1º lugar: 1 booster box https://…": uma linha por item (vazio sem premiação). */
+  const prizeLines = (prizes: TournamentPrize[]) =>
+    prizes.length
+      ? `\n\n🎁 *${tr('tour.prizesTitle')}*\n${prizes.map((p) => `• ${p.place ? `${p.place}: ` : ''}${p.title}${p.url ? ` ${p.url}` : ''}`).join('\n')}`
+      : '';
+  /** Convite para os grupos: nome, regras, início, prêmio, a premiação (com os links dos produtos) e o link da página do torneio. */
   const invite = (t: TournamentDetail) =>
     tr('tour.shareText', {
       name: t.name,
-      details: dots(
-        modeLabel(t),
-        structureText(t),
-        t.startsAt && t.status === 'registration' && tr('tour.startsAt', { date: dateTime(t.startsAt, locale) }),
-        t.prize && `🏆 ${t.prize}`,
-      ),
+      details:
+        dots(
+          modeLabel(t),
+          structureText(t),
+          t.startsAt && t.status === 'registration' && tr('tour.startsAt', { date: dateTime(t.startsAt, locale) }),
+          t.prize && `🏆 ${t.prize}`,
+        ) + prizeLines(t.prizes ?? []),
       link: tournamentLink(t.id),
     });
 
