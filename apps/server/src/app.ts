@@ -178,7 +178,7 @@ export function buildApp(
 
   /**
    * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o
-   * navegador. Só o dono edita/apaga os decks que criou.
+   * navegador. Só o dono edita os decks que criou; admin/dev também renomeiam e apagam.
    */
   const viewerHash = (req: FastifyRequest): string | null => {
     const user = auth.viewer(req);
@@ -343,7 +343,8 @@ export function buildApp(
     const existing = getDeck(db, req.params.id);
     if (!existing) return reply.code(404).send(fail('deckNotFound', 'Deck não encontrado'));
     if (existing.kind !== 'user') return reply.code(403).send(fail('builtinDeckNoDelete', 'Decks prontos não podem ser apagados.'));
-    if (!isMine(existing, viewerHash(req))) {
+    // Admin/dev apaga decks de outros jogadores (limpeza de cópias abandonadas).
+    if (!isMine(existing, viewerHash(req)) && !isAdmin(auth.viewer(req)?.role)) {
       return reply.code(403).send(fail('deckNotMine', 'Este deck pertence a outro jogador.'));
     }
     deleteDeck(db, existing.id);

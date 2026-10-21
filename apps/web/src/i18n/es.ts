@@ -392,11 +392,12 @@ export default {
   // ---- avisos y confirmaciones ----
   'deck.confirmDiscard': '¿Descartar los cambios sin guardar de este mazo?',
   'deck.confirmDelete': '¿Eliminar el mazo "{name}"?',
+  'deck.confirmDeleteOther': 'Este mazo es de otro jugador. ¿Eliminar "{name}" para todos?',
   'deck.noticeBuiltinEditing': 'Los mazos prediseñados no se pueden cambiar: estás editando una copia.',
   'deck.noticeCommunityEditing': 'Este mazo es de otro jugador: estás editando tu propia copia.',
   'deck.noticeBuiltinOpened': 'Mazo prediseñado: al cambiarlo se crea una copia.',
   'deck.noticeCommunityOpened': 'Mazo de otro jugador: al cambiarlo se crea tu propia copia.',
-  'deck.noticeCommunityOpenedAdmin': 'Mazo de otro jugador: como admin puedes corregir su nombre; cambiar las cartas crea tu propia copia.',
+  'deck.noticeCommunityOpenedAdmin': 'Mazo de otro jugador: como admin puedes corregir su nombre o eliminarlo; cambiar las cartas crea tu propia copia.',
   'deck.maxCopies': 'Máximo de {n|# copia|# copias} de {name}.',
   'deck.savedReady': '¡Mazo guardado y listo para jugar!',
   'deck.savedDraft': 'Borrador guardado. Completa el mazo para jugar con él.',

@@ -198,9 +198,10 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
   }, [dirty]);
 
   const confirmDiscard = () => !dirty || window.confirm(t('deck.confirmDiscard'));
-  /** Admin/dev corrige o nome de um deck de outro jogador sem criar cópia (as cartas continuam somente leitura). */
+  /** Admin/dev corrige o nome de um deck de outro jogador sem criar cópia (as cartas continuam somente leitura) ou o apaga. */
   const staff = isAdmin(auth.user?.role);
   const renaming = staff && draft.kind === 'community' && draft.id !== null;
+  const canDelete = draft.id !== null && (draft.kind === 'user' || renaming);
 
   const sets = useMemo(() => [...new Set(allCards.map((c) => c.set ?? c.id.split('-')[0]))].sort(), [allCards]);
   /** Quantos filtros estão fora do padrão (selo do botão "Filtros" no celular). */
@@ -361,8 +362,8 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
   };
 
   const del = async () => {
-    if (!draft.id || draft.kind !== 'user') return;
-    if (!window.confirm(t('deck.confirmDelete', { name: draft.name }))) return;
+    if (!draft.id || !canDelete) return;
+    if (!window.confirm(t(draft.kind === 'user' ? 'deck.confirmDelete' : 'deck.confirmDeleteOther', { name: draft.name }))) return;
     try {
       await api.deleteDeck(draft.id);
       setDraft(emptyDraft(t('deck.newDeckName')));
@@ -785,7 +786,7 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
                 {t('deck.duplicate')}
               </button>
             )}
-            {draft.id && draft.kind === 'user' && (
+            {canDelete && (
               <button className="btn danger" onClick={del}>
                 {t('deck.delete')}
               </button>

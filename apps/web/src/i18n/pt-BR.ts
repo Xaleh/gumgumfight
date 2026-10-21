@@ -393,11 +393,12 @@ const ptBR = {
   // ---- avisos e confirmações ----
   'deck.confirmDiscard': 'Descartar as alterações não salvas deste deck?',
   'deck.confirmDelete': 'Apagar o deck "{name}"?',
+  'deck.confirmDeleteOther': 'Este deck é de outro jogador. Apagar "{name}" para todos?',
   'deck.noticeBuiltinEditing': 'Decks prontos não são alterados: você está editando uma cópia.',
   'deck.noticeCommunityEditing': 'Este deck é de outro jogador: você está editando uma cópia sua.',
   'deck.noticeBuiltinOpened': 'Deck pronto: ao alterar, uma cópia será criada.',
   'deck.noticeCommunityOpened': 'Deck de outro jogador: ao alterar, uma cópia sua será criada.',
-  'deck.noticeCommunityOpenedAdmin': 'Deck de outro jogador: como admin, você pode corrigir o nome dele; mudar as cartas cria uma cópia sua.',
+  'deck.noticeCommunityOpenedAdmin': 'Deck de outro jogador: como admin, você pode corrigir o nome dele ou apagá-lo; mudar as cartas cria uma cópia sua.',
   'deck.maxCopies': 'Máximo de {n|# cópia|# cópias} de {name}.',
   'deck.savedReady': 'Deck salvo e pronto para jogar!',
   'deck.savedDraft': 'Rascunho salvo. Complete o deck para poder jogar.',
