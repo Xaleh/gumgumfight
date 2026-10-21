@@ -1,5 +1,18 @@
 import { type MessageKey, type Params, t, type Translate, tryT } from './i18n';
-import { type Action, type CardData, type DeckList, type FormatId, formatLabel, type ManualOp, type PlayerId, type PlayFormat, type PlayMode } from '@gumgum/engine';
+import {
+  type Action,
+  barredSpoilers,
+  type CardData,
+  COMPLETE_SPOILER_SETS,
+  type DeckList,
+  type FormatId,
+  formatLabel,
+  type ManualOp,
+  type PlayerId,
+  type PlayFormat,
+  type PlayMode,
+  type SpoilerRule,
+} from '@gumgum/engine';
 
 export type { FormatId, PlayFormat, PlayMode };
 
@@ -31,25 +44,28 @@ export interface DeckSummary {
 
 /**
  * Deck completo e permitido no formato (cartas banidas ou rotacionadas impedem; no Livre, nada
- * impede). Com `noSpoilers` (ranqueada e torneios, salas e treinos sem spoilers), cartas ainda
- * não lançadas também impedem.
+ * impede). Pela regra de spoilers (`none`: ranqueada e torneios, salas e treinos sem spoilers;
+ * `complete`: torneios com spoilers), cartas ainda não lançadas também impedem.
  */
-export function canPlay(deck: DeckSummary, format: PlayFormat, noSpoilers = false): boolean {
-  return deck.valid && !(format !== 'free' && deck.formats?.[format]?.length) && !(noSpoilers && deck.spoilers?.length);
+export function canPlay(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all'): boolean {
+  return deck.valid && !(format !== 'free' && deck.formats?.[format]?.length) && !barredSpoilers(deck.spoilers ?? [], spoilers).length;
 }
 
 /** Por que o deck não pode ser usado no formato (null = pode). */
-export function whyNotPlayable(deck: DeckSummary, format: PlayFormat, noSpoilers = false): string | null {
+export function whyNotPlayable(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all'): string | null {
   if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
   const issues = (format !== 'free' && deck.formats?.[format]) || [];
   const codes = format !== 'free' ? deck.formatCodes?.[format] : undefined;
   if (issues.length) return issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n');
-  return noSpoilers && deck.spoilers?.length ? spoilerText(deck.spoilers) : null;
+  const barred = barredSpoilers(deck.spoilers ?? [], spoilers);
+  return barred.length ? spoilerText(barred, spoilers) : null;
 }
 
 /** Aviso de cartas de spoiler (as mesmas palavras de `spoilerIssues`, do motor). */
-export function spoilerText(ids: string[]): string {
-  return t('rules.spoiler', { n: ids.length, ids: ids.slice(0, 3).join(', ') + (ids.length > 3 ? '…' : '') });
+export function spoilerText(ids: string[], rule: SpoilerRule = 'none'): string {
+  const params = { n: ids.length, ids: ids.slice(0, 3).join(', ') + (ids.length > 3 ? '…' : '') };
+  if (rule === 'complete') return t('rules.spoilerIncomplete', { ...params, sets: [...COMPLETE_SPOILER_SETS].join(', ') || '—' });
+  return t('rules.spoiler', params);
 }
 
 /** Nome das regras de cartas de um torneio ou sala: "Standard", "Standard + spoilers", "Livre (vale tudo)"… (traduzido). */
