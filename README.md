@@ -225,6 +225,11 @@ torneios, nas salas privadas e no treino contra o bot, quem cria escolhe entre c
 | **Standard + spoilers** | não | não | sim | não |
 | **Livre (vale tudo)** | sim | sim | sim | não |
 
+Nos **torneios** "+ spoilers" só valem os spoilers das coleções **já reveladas por completo** (`COMPLETE_SPOILER_SETS`
+em `packages/engine/src/formats.ts`; hoje, só a EB05): fora do Livre não faz sentido jogar torneio com coleção
+incompleta. Coleção ainda pela metade (hoje, a OP18) só vale no Livre. Quando uma coleção termina de ser revelada, é só
+incluí-la na lista. Nas salas privadas e no treino contra o bot, "+ spoilers" aceita todos.
+
 O **Livre** não é formato oficial: vale toda carta, inclusive as banidas e os pares proibidos. É só por diversão e não
 existe nas filas. No menu, o formato (Standard ou EGB) vale para todos os modos, e as salas privadas e o treino contra
 o bot têm a escolha **Cartas**: lançadas, + spoilers ou Livre. Quem entra numa sala privada joga nas regras de quem a
@@ -429,7 +434,7 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
 - **Melhor de 3 / melhor de 5 na eliminatória:** o organizador escolhe a partir de qual fase (toda a eliminatória,
   rodada de 32, oitavas, quartas, semifinal ou final) as partidas passam a ser melhor de 3 e melhor de 5. Ex.: melhor
   de 3 a partir das quartas e melhor de 5 na final.
-- **Inscrição:** com um deck válido no formato (e sem spoilers, salvo nos torneios que aceitam spoilers). A lista fica **congelada** na inscrição (mudar o deck depois não muda
+- **Inscrição:** com um deck válido no formato (e sem spoilers, salvo nos torneios que aceitam spoilers, e aí só das coleções já reveladas por completo; no Livre, todos). A lista fica **congelada** na inscrição (mudar o deck depois não muda
   o do torneio; inscreva-o de novo para trocar, só enquanto as inscrições estão abertas: depois que o torneio começa,
   ninguém troca nem o deck nem a lista). Enquanto as inscrições estão abertas, os outros jogadores **não veem** qual
   deck cada um inscreveu (só o organizador, um Admin e o próprio jogador); quando o torneio começa, o Líder de cada um
@@ -876,7 +881,8 @@ Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
 - Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
 - No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
 - Deck com spoiler não entra na ranqueada nem em torneio, sala privada ou treino sem spoilers (veja [Formatos](#formatos)),
-  e a partida com ele não conta nas estatísticas.
+  e a partida com ele não conta nas estatísticas. Nos torneios com spoilers (fora do Livre) só valem as coleções já
+  reveladas por completo (`COMPLETE_SPOILER_SETS`).
   Quando a coleção sai e a etiqueta some, o mesmo deck passa a valer em todo lugar.
 - O [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) costuma revelar antes e tem promocionais que as outras fontes não
   têm, mas errou contador, cor e poder em algumas e as imagens dele só abrem no próprio site. Por isso fica desligado por

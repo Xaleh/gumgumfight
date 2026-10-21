@@ -1,4 +1,4 @@
-import { formatLabel, PLAY_FORMATS, playMode } from '@gumgum/engine';
+import { COMPLETE_SPOILER_SETS, formatLabel, PLAY_FORMATS, playMode, tournamentSpoilerRule } from '@gumgum/engine';
 import { Fragment, lazy, type ReactNode, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   type AdminSponsor,
@@ -516,7 +516,9 @@ function TournamentForm({
               {tr('tour.spoilersOption')}
             </label>
             <p className="muted small">
-              {tr(form.format === 'free' ? 'tour.formatFreeHint' : form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint')}
+              {tr(form.format === 'free' ? 'tour.formatFreeHint' : form.spoilers ? 'tour.formatSpoilersHint' : 'tour.formatReleasedHint', {
+                sets: [...COMPLETE_SPOILER_SETS].join(', ') || '—',
+              })}
             </p>
           </div>
           <div className="field">
@@ -1239,7 +1241,8 @@ function MyArea({
   }
 
   if (t.status === 'registration' || late) {
-    const playable = decks?.filter((d) => canPlay(d, t.format, !t.spoilers)) ?? [];
+    const spoilerRule = tournamentSpoilerRule(t);
+    const playable = decks?.filter((d) => canPlay(d, t.format, spoilerRule)) ?? [];
     const chosen = decks?.find((d) => d.id === deckId);
     const full = t.maxPlayers !== null && t.players.length >= t.maxPlayers && !t.me;
     return (
@@ -1307,8 +1310,8 @@ function MyArea({
                 context={tr('decks.context.tournament', { rules: modeLabel(t) })}
                 decks={decks}
                 value={deckId}
-                canUse={(d) => canPlay(d, t.format, !t.spoilers)}
-                whyNot={(d) => whyNotPlayable(d, t.format, !t.spoilers)}
+                canUse={(d) => canPlay(d, t.format, spoilerRule)}
+                whyNot={(d) => whyNotPlayable(d, t.format, spoilerRule)}
                 onPick={(id) => {
                   setDeckId(id);
                   setPicking(false);

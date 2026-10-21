@@ -11954,7 +11954,11 @@ a.sponsor-card:hover {
 }
 .lat-dons {
   --dw: var(--cw);
-  --step: min(calc(var(--cw) * 0.4), calc((var(--lat-h) - var(--cw) * 3.4) / max(var(--n) - 1, 1)));
+  /*
+   * a altura da área: a mesa (menos os 16px dela e o respiro das pontas, 0.4) sem o deck de DON!!, o descarte e
+   * os dois espaços (2.5). O último DON!! (deitado, 1 carta; em pé passa 0.2 de cada lado) termina nela, antes do descarte.
+   */
+  --step: min(calc(var(--cw) * 0.4), calc((var(--lat-h) - 16px - var(--cw) * 4.1) / max(var(--n) - 1, 1)));
   position: relative;
   flex: 1;
   min-height: calc(var(--cw) * 0.6);
@@ -11967,6 +11971,8 @@ a.sponsor-card:hover {
   width: var(--ch);
   height: var(--cw);
   display: grid;
+  /* a carta em pé é mais alta que a caixa: sem `place-content`, ela desce e o DON!! deitado sai da caixa */
+  place-content: center;
   place-items: center;
   z-index: var(--i);
 }

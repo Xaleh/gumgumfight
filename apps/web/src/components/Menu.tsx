@@ -526,7 +526,7 @@ export function Menu({
   const botMode = modeOf(botRules);
   /** O deck é completo e vale nas regras. */
   function playsIn(d: DeckSummary | undefined, mode: PlayMode): d is DeckSummary {
-    return Boolean(d && canPlay(d, mode.format, !mode.spoilers));
+    return Boolean(d && canPlay(d, mode.format, mode.spoilers ? 'all' : 'none'));
   }
   /** Os dois decks precisam valer nas regras do treino. */
   const botReady = playsIn(d0, botMode) && (deck1 === RANDOM || playsIn(d1, botMode));
@@ -986,8 +986,8 @@ export function Menu({
           decks={decks}
           value={picking === 0 ? deck0 : deck1}
           // Deck equipado: qualquer deck completo (ele vale em modos diferentes, o Livre inclusive); cada modo confere as regras.
-          canUse={(d) => (picking === 0 ? d.valid : canPlay(d, botMode.format, !botMode.spoilers))}
-          whyNot={(d) => (picking === 0 ? whyNotPlayable(d, 'free') : whyNotPlayable(d, botMode.format, !botMode.spoilers))}
+          canUse={(d) => (picking === 0 ? d.valid : canPlay(d, botMode.format, botMode.spoilers ? 'all' : 'none'))}
+          whyNot={(d) => (picking === 0 ? whyNotPlayable(d, 'free') : whyNotPlayable(d, botMode.format, botMode.spoilers ? 'all' : 'none'))}
           allowRandom={picking === 1}
           onPick={(id) => {
             if (picking === 0) setDeck0(id);

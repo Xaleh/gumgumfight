@@ -11,8 +11,10 @@
 // en.onepiece-cardgame.com/news/blockicon-card.html. Para atualizar, é só mexer aqui.
 //
 // Spoilers (cartas anunciadas que ainda não foram lançadas) não são de formato nenhum:
-// valem na fila casual e, se quem cria escolher, nas salas privadas, nos treinos contra
-// o bot e nos torneios (ver `PlayMode` e `spoilerIssues`); nunca na ranqueada.
+// valem na fila casual e, se quem cria escolher, nas salas privadas e nos treinos contra
+// o bot (ver `PlayMode` e `spoilerIssues`); nunca na ranqueada. Nos torneios com spoilers
+// só valem as coleções já reveladas por completo (`COMPLETE_SPOILER_SETS`): coleção pela
+// metade só no Livre.
 //
 // Livre ("vale tudo") não é formato oficial: vale toda carta, inclusive as banidas, os
 // pares proibidos e os spoilers. Só existe nos torneios, nas salas privadas e contra o
@@ -165,6 +167,30 @@ export function legalFormats(deck: Pick<DeckList, 'leader' | 'cards'>, now = new
   return FORMATS.filter((f) => formatIssues(deck, f.id, now).length === 0).map((f) => f.id);
 }
 
+/**
+ * Coleções de spoiler com todas as cartas já reveladas: as únicas cujos spoilers valem nos
+ * torneios com spoilers (fora do Livre não faz sentido jogar com a coleção incompleta). Ao
+ * terminar a revelação de uma coleção, é só incluí-la aqui; depois do lançamento ela pode sair.
+ */
+export const COMPLETE_SPOILER_SETS: ReadonlySet<string> = new Set(['EB05']);
+
+/** Coleção pelo número da carta ("OP18-001" → "OP18"). */
+export const cardSet = (id: string): string => id.split('-')[0];
+
+/**
+ * Quais cartas de spoiler a partida aceita: todas (casual, salas e treinos com spoilers, Livre),
+ * só as das coleções já reveladas por completo (torneios com spoilers) ou nenhuma.
+ */
+export type SpoilerRule = 'all' | 'complete' | 'none';
+
+/** Regra de spoilers de um torneio: o Livre aceita todas; com spoilers, só as coleções completas. */
+export const tournamentSpoilerRule = (m: { format: PlayFormat; spoilers?: boolean }): SpoilerRule =>
+  m.format === 'free' ? 'all' : m.spoilers ? 'complete' : 'none';
+
+/** Das cartas de spoiler, as que a regra não aceita. */
+export const barredSpoilers = (ids: readonly string[], rule: SpoilerRule): string[] =>
+  rule === 'all' ? [] : rule === 'complete' ? ids.filter((id) => !COMPLETE_SPOILER_SETS.has(cardSet(id))) : [...ids];
+
 /** Cartas de spoiler do deck (Líder incluso), na ordem em que aparecem. */
 export function spoilerCards(deck: Pick<DeckList, 'leader' | 'cards'>, cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>): string[] {
   const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean))];
@@ -175,14 +201,31 @@ export function spoilerCards(deck: Pick<DeckList, 'leader' | 'cards'>, cards: Re
 const SPOILER_WHERE = 'só valem na fila casual e nas salas privadas, treinos contra o bot e torneios com spoilers';
 
 /**
- * Motivo de o deck não valer onde spoilers são proibidos (ranqueada e torneios, salas
- * privadas e treinos sem spoilers); vazio = nenhuma carta de spoiler. Um aviso só, com as primeiras cartas.
+ * Motivo de o deck não valer pela regra de spoilers (`none`: ranqueada e torneios, salas privadas
+ * e treinos sem spoilers; `complete`: torneios com spoilers, que só aceitam as coleções já
+ * reveladas por completo); vazio = nenhuma carta barrada. Um aviso só, com as primeiras cartas.
  */
-export function spoilerIssues(deck: Pick<DeckList, 'leader' | 'cards'>, cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>): FormatIssue[] {
-  const all = spoilerCards(deck, cards);
+export function spoilerIssues(
+  deck: Pick<DeckList, 'leader' | 'cards'>,
+  cards: ReadonlyMap<string, Pick<CardData, 'spoiler'>>,
+  rule: SpoilerRule = 'none',
+): FormatIssue[] {
+  const all = barredSpoilers(spoilerCards(deck, cards), rule);
   if (!all.length) return [];
   const n = all.length;
   const ids = all.slice(0, 3).join(', ') + (n > 3 ? '…' : '');
+  if (rule === 'complete') {
+    const sets = [...COMPLETE_SPOILER_SETS].join(', ') || '—';
+    const what = n === 1 ? 'Carta de coleção ainda não revelada por completo (spoiler)' : 'Cartas de coleções ainda não reveladas por completo (spoilers)';
+    return [
+      {
+        message: `${what}: ${ids}. Nos torneios com spoilers só valem as coleções já reveladas por completo (${sets}); as demais, só no Livre.`,
+        code: 'rules.spoilerIncomplete',
+        params: { n, ids, sets },
+        cardId: all[0],
+      },
+    ];
+  }
   const what = n === 1 ? 'Carta ainda não lançada (spoiler)' : 'Cartas ainda não lançadas (spoilers)';
   return [{ message: `${what}: ${ids}. Spoilers ${SPOILER_WHERE}.`, code: 'rules.spoiler', params: { n, ids }, cardId: all[0] }];
 }

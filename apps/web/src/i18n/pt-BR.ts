@@ -900,7 +900,7 @@ const ptBR = {
   'tour.format': 'Formato',
   'tour.formatReleasedHint': 'Só valem cartas já lançadas: decks com spoilers não se inscrevem.',
   'tour.spoilersOption': 'Aceitar cartas de spoiler (ainda não lançadas)',
-  'tour.formatSpoilersHint': 'Valem também as cartas de spoiler, ainda não lançadas. As banidas continuam proibidas. Torneio com spoilers não entra nas estatísticas nem no meta.',
+  'tour.formatSpoilersHint': 'Valem também as cartas de spoiler, ainda não lançadas, mas só das coleções já reveladas por completo (hoje: {sets}); coleção ainda incompleta, só no Livre. As banidas continuam proibidas. Torneio com spoilers não entra nas estatísticas nem no meta.',
   'tour.formatFreeHint': 'Vale tudo: toda carta, inclusive as banidas, as rotacionadas e os spoilers. Só por diversão: não entra nas estatísticas nem no meta.',
   'mode.free': 'Livre (vale tudo)',
   'mode.freeShort': 'Livre',
@@ -2452,6 +2452,7 @@ const ptBR = {
   'errors.deckInvalid': 'Esse deck não é válido para jogar.',
   'errors.deckNotAllowedInFormat': 'Esse deck não é permitido no formato {format}. {issue}',
   'errors.deckHasSpoilers': '{n|Esse deck tem # carta de spoiler, ainda não lançada|Esse deck tem # cartas de spoiler, ainda não lançadas} ({ids}). Spoilers só valem na fila casual e nas salas privadas, treinos contra o bot e torneios com spoilers.',
+  'errors.deckHasIncompleteSpoilers': '{n|Esse deck tem # carta de spoiler de coleção ainda não revelada por completo|Esse deck tem # cartas de spoiler de coleções ainda não reveladas por completo} ({ids}). Nos torneios com spoilers só valem as coleções já reveladas por completo ({sets}); as demais, só no Livre.',
   'errors.rankedNoManualCards':
     'Na ranqueada o modo manual não é permitido: este deck tem {n} carta(s) com efeito ainda não automatizado (⚙).',
   'errors.botChooseDeck': 'Deck do bot: Escolha um deck.',
@@ -2633,6 +2634,7 @@ const ptBR = {
   'rules.rotated': '{id} tem o bloco ① e rotacionou: não vale no {format}.',
   'rules.bannedPair': '{a} e {b} não podem ser usadas juntas no mesmo deck.',
   'rules.spoiler': '{n|Carta ainda não lançada (spoiler)|Cartas ainda não lançadas (spoilers)}: {ids}. Spoilers só valem na fila casual e nas salas privadas, treinos contra o bot e torneios com spoilers.',
+  'rules.spoilerIncomplete': '{n|Carta de coleção ainda não revelada por completo (spoiler)|Cartas de coleções ainda não reveladas por completo (spoilers)}: {ids}. Nos torneios com spoilers só valem as coleções já reveladas por completo ({sets}); as demais, só no Livre.',
   // ---- lista em texto (parseDeckList) ----
   'rules.listBadLine': 'Linha não reconhecida: "{line}"',
   'rules.listUnknownCard': 'Carta não encontrada no banco: {id}',

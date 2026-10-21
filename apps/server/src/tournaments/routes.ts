@@ -33,7 +33,7 @@
 // decidiu a partida da rodada atual, ela pode voltar a ficar pendente) e inscrição
 // atrasada (só no suíço, durante a rodada 1: quem entra começa a rodada 2 com uma derrota).
 
-import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, playMode, playModeLabel, spoilerIssues } from '@gumgum/engine';
+import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, playMode, playModeLabel, tournamentSpoilerRule } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
 import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
@@ -57,6 +57,7 @@ import {
   checkInOpen,
   checkInOpensAt,
   DEFAULT_TOLERANCE_MIN,
+  deckIssue,
   elimRound,
   MAX_TOLERANCE_MIN,
   MIN_TOLERANCE_MIN,
@@ -372,14 +373,6 @@ export function registerTournamentRoutes(
   /** Data e hora de Brasília, para as mensagens em português. */
   const brDate = (d: Date) => d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
   const issueOut = (i: FormatIssue | null) => (i ? { message: i.message, code: i.code, params: i.params } : null);
-  /** O que impede a lista congelada de valer no torneio em `at` (formato e spoilers); null = vale. */
-  const frozenIssue = (deck: DeckList, t: Pick<Tournament, 'format' | 'spoilers'>, at: Date): FormatIssue | null => {
-    const issue = formatIssues(deck, t.format, at)[0];
-    if (issue || t.spoilers) return issue ?? null;
-    const ids = [deck.leader, ...deck.cards.map((c) => c.id)];
-    return spoilerIssues(deck, new Map(getCards(db, ids).map((c) => [c.id, c as CardData])))[0] ?? null;
-  };
-
   /** Aviso de torneio para uma conta (tocar abre a página do torneio, ou `url`). Avisos novos do mesmo torneio substituem os antigos. */
   const tournamentNotice = (t: Tournament, userId: string, body: (locale: string) => string, ttl: number, url?: string) =>
     void notifier.notify(
@@ -871,11 +864,11 @@ export function registerTournamentRoutes(
             checkedInAt: me.checkedInAt,
             warnings: warningsOf(me),
             /** Antes do início: por que a lista inscrita não vai valer no torneio (null = vale). */
-            deckIssue: t.status === 'registration' ? issueOut(formatIssues(me.deck, t.format, legalAt(t))[0] ?? null) : null,
+            deckIssue: t.status === 'registration' ? issueOut(deckIssue(db, me.deck, t, legalAt(t))) : null,
           }
         : null,
       /** Para quem gerencia, antes do início: inscritos cujo deck não vai valer no torneio. */
-      staleDecks: manage && t.status === 'registration' ? staleDecks(t, players, legalAt(t)).map((p) => p.name) : [],
+      staleDecks: manage && t.status === 'registration' ? staleDecks(db, t, players, legalAt(t)).map((p) => p.name) : [],
       players: players.map((p) => {
         const leader = showLeader(p.userId) ? cards.get(p.deck.leader) : undefined;
         return {
@@ -1124,7 +1117,7 @@ export function registerTournamentRoutes(
     // data) pode invalidar decks já inscritos: confere de novo as listas congeladas.
     if (input.format !== found.t.format || input.spoilers !== found.t.spoilers || input.startsAt !== found.t.startsAt) {
       const at = legalAt(input);
-      const bad = listPlayers(db, found.t.id).filter((p) => frozenIssue(p.deck, input, at));
+      const bad = listPlayers(db, found.t.id).filter((p) => deckIssue(db, p.deck, input, at));
       if (bad.length) {
         const format = playModeLabel(input);
         return reply
@@ -1166,9 +1159,9 @@ export function registerTournamentRoutes(
     if (t.status !== 'registration') return reply.code(409).send(fail('tourStarted', 'O torneio já começou.'));
     const players = listPlayers(db, t.id);
     if (players.length < 2) return reply.code(400).send(fail('tourNeedsTwoPlayers', 'São precisos pelo menos 2 inscritos.'));
-    // Deck que deixou de valer depois da inscrição (banimento com data): o organizador
+    // Deck que deixou de valer depois da inscrição (banimento com data, spoiler de coleção incompleta): o organizador
     // decide, pedindo a troca do deck (nova inscrição) ou tirando o jogador.
-    const stale = staleDecks(t, players, new Date(now()));
+    const stale = staleDecks(db, t, players, new Date(now()));
     if (stale.length) {
       const names = stale.map((p) => p.name).join(', ');
       const format = playModeLabel(t);
@@ -1768,7 +1761,7 @@ export function registerTournamentRoutes(
     if (!already && t.maxPlayers !== null && countPlayers(db, t.id) >= t.maxPlayers) {
       return reply.code(409).send(fail('tourFull', 'O torneio está lotado.'));
     }
-    const deck = playableDeck(db, req.body?.deckId, t.format, { noSpoilers: !t.spoilers, at: new Date(now()) });
+    const deck = playableDeck(db, req.body?.deckId, t.format, { spoilers: tournamentSpoilerRule(t), at: new Date(now()) });
     if ('error' in deck) return reply.code(deck.code).send(fail(deck.errorCode, deck.error, deck.errorParams));
     // O deck precisa valer também no dia do torneio (banimento com data antes do início).
     const at = legalAt(t);
