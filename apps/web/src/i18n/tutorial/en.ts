@@ -310,7 +310,7 @@ export default {
   'tutorial.defense.next.body': 'Now Pacifista (6000) will attack your Leader (5000). With no Blocker on the field, it goes straight to the Counter Step.',
   'tutorial.defense.counter.title': 'Use a Counter',
   'tutorial.defense.counter.body':
-    'Cards in your hand with Counter can be trashed to give your Leader power for this battle. It needs MORE than 6000, because ties go to the attacker. Tap the Counters, then No more Counter.',
+    'Cards in your hand with Counter can be trashed to give your Leader power for this battle. It needs MORE than 6000, because ties go to the attacker. Tap the Counters to mark them, then the Use Counter button.',
   'tutorial.defense.counter.fail':
     'Your Leader took damage. The defender needs more power than the attacker: 6000 against 6000 loses. Try again (Nami gives +1000; Brook, +2000).',
   'tutorial.defense.recap.title': 'Defended',

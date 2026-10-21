@@ -339,7 +339,7 @@ const tutorialPtBR = {
   'tutorial.defense.next.body': 'Agora o Pacifista (6000) vai atacar seu Líder (5000). Sem Blocker em campo, vem direto o Counter Step.',
   'tutorial.defense.counter.title': 'Use Counter',
   'tutorial.defense.counter.body':
-    'Cartas da mão com Counter podem ser descartadas para dar poder ao seu Líder nesta batalha. Ele precisa ficar com MAIS de 6000, porque empate é do atacante. Toque nos Counters e depois em Não usar mais Counter.',
+    'Cartas da mão com Counter podem ser descartadas para dar poder ao seu Líder nesta batalha. Ele precisa ficar com MAIS de 6000, porque empate é do atacante. Toque nos Counters para marcá-los e depois no botão Usar Counter.',
   'tutorial.defense.counter.fail':
     'Seu Líder levou dano. O defensor precisa ficar com mais poder que o atacante: 6000 contra 6000 perde. Tente de novo (a Nami dá +1000; o Brook, +2000).',
   'tutorial.defense.recap.title': 'Defesa feita',

@@ -309,7 +309,7 @@ export default {
   'tutorial.defense.next.body': 'Jetzt greift Pacifista (6000) deinen Leader (5000) an. Ohne Blocker im Spiel geht es direkt zum Counter Step.',
   'tutorial.defense.counter.title': 'Setz Counter ein',
   'tutorial.defense.counter.body':
-    'Handkarten mit Counter kannst du abwerfen, um deinem Leader in diesem Kampf Stärke zu geben. Er braucht MEHR als 6000, denn Gleichstand geht an den Angreifer. Tippe auf die Counter und dann auf Kein Counter mehr.',
+    'Handkarten mit Counter kannst du abwerfen, um deinem Leader in diesem Kampf Stärke zu geben. Er braucht MEHR als 6000, denn Gleichstand geht an den Angreifer. Tippe auf die Counter, um sie auszuwählen, und dann auf den Button Counter einsetzen.',
   'tutorial.defense.counter.fail':
     'Dein Leader hat Schaden genommen. Der Verteidiger braucht mehr Stärke als der Angreifer: 6000 gegen 6000 verliert. Versuch es nochmal (Nami gibt +1000, Brook +2000).',
   'tutorial.defense.recap.title': 'Verteidigt',

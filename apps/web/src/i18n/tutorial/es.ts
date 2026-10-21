@@ -309,7 +309,7 @@ export default {
   'tutorial.defense.next.body': 'Ahora Pacifista (6000) va a atacar a tu Líder (5000). Sin Blocker en el campo, se pasa directo al Counter Step.',
   'tutorial.defense.counter.title': 'Usa Counter',
   'tutorial.defense.counter.body':
-    'Las cartas de tu mano con Counter se pueden descartar para dar poder a tu Líder en esta batalla. Necesita MÁS de 6000, porque el empate es del atacante. Toca los Counters y luego No más Counter.',
+    'Las cartas de tu mano con Counter se pueden descartar para dar poder a tu Líder en esta batalla. Necesita MÁS de 6000, porque el empate es del atacante. Toca los Counters para marcarlos y luego el botón Usar Counter.',
   'tutorial.defense.counter.fail':
     'Tu Líder recibió daño. El defensor necesita más poder que el atacante: 6000 contra 6000 pierde. Inténtalo de nuevo (Nami da +1000; Brook, +2000).',
   'tutorial.defense.recap.title': 'Defensa hecha',

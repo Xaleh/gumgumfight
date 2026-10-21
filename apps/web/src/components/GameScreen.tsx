@@ -890,6 +890,7 @@ function Table({
         if (myPending.options.includes(uid)) return 'option';
         if (myPending.shown?.includes(uid)) return 'disabled';
       }
+      if (myPending.kind === 'counter' && picked.includes(uid)) return 'selected';
       if ((myPending.kind === 'block' || myPending.kind === 'counter') && myPending.options.includes(uid)) return 'option';
     }
     if (state.battle) {
@@ -925,8 +926,11 @@ function Table({
         return;
       }
       if (myPending.kind === 'counter' && myPending.options.includes(uid)) {
-        // Sem a opção "Counter sem confirmação", abre a carta com o botão de usar.
+        // "Counter sem confirmação" usa na hora. Sem ela, os Counters de Personagem (só o valor) são
+        // marcados e vão todos de uma vez no botão de decisão; o Evento [Counter], com custo e efeito
+        // próprios, abre a carta com o botão de usar.
         if (quickCounter) useCounter(uid);
+        else if (cardDef(state, uid).category !== 'event') setPicked((p) => (p.includes(uid) ? p.filter((x) => x !== uid) : [...p, uid]));
         else {
           setSelected(uid);
           setZoom(uid);
@@ -2167,7 +2171,7 @@ function DecisionButton({
 }: {
   state: GameState;
   pending: Extract<Pending, { kind: 'block' | 'counter' | 'selectTargets' }>;
-  /** Alvos já marcados (escolha de alvos). */
+  /** Alvos já marcados (escolha de alvos) ou Counters marcados para usar de uma vez. */
   picked: string[];
   human: PlayerId;
   onDispatch: (a: Action) => void;
@@ -2180,9 +2184,11 @@ function DecisionButton({
   const t = useT();
   const tryT = useTryT();
   const d =
-    pending.kind === 'selectTargets' ? targetsDecision(t, promptText(tryT, pending), pending, picked) : defenseDecision(t, state, pending);
+    pending.kind === 'selectTargets' ? targetsDecision(t, promptText(tryT, pending), pending, picked) : defenseDecision(t, state, pending, picked);
   if (!d) return null;
-  const act = () => onDispatch(d.action(human));
+  const act = () => {
+    for (const a of [d.action(human)].flat()) onDispatch(a);
+  };
   return (
     <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
       {onCancel && pending.kind === 'selectTargets' && (
@@ -2212,11 +2218,20 @@ interface Decision {
   /** Chama o olhar: não há mais o que fazer antes de concluir. */
   pulse: boolean;
   disabled?: boolean;
-  action: (player: PlayerId) => Action;
+  /** Várias ações saem em sequência (os Counters marcados e o fim da etapa). */
+  action: (player: PlayerId) => Action | Action[];
 }
 
-/** Blocker/Counter: rótulo com o resultado previsto do ataque. */
-function defenseDecision(t: Translate, state: GameState, pending: Extract<Pending, { kind: 'block' | 'counter' }>): Decision | null {
+/**
+ * Blocker/Counter: rótulo com o resultado previsto do ataque. Com Counters marcados, o botão usa todos
+ * (o valor vai para o atacado) e já encerra a etapa, mostrando o resultado com eles somados.
+ */
+function defenseDecision(
+  t: Translate,
+  state: GameState,
+  pending: Extract<Pending, { kind: 'block' | 'counter' }>,
+  picked: string[] = [],
+): Decision | null {
   const b = state.battle;
   if (!b) return null;
   const atk = getPower(state, b.attacker) ?? 0;
@@ -2224,6 +2239,19 @@ function defenseDecision(t: Translate, state: GameState, pending: Extract<Pendin
   const hits = atk >= def;
   const need = atk - def + 1000;
   const counter = pending.kind === 'counter';
+  const marked = counter ? picked.filter((u) => pending.options.includes(u)) : [];
+  if (marked.length) {
+    const amount = marked.reduce((sum, u) => sum + counterValue(state, u), 0);
+    const total = def + amount;
+    const result = atk >= total ? t('game.attackPasses') : t('game.defended');
+    return {
+      label: t('game.useCounters', { amount }),
+      sub: t('game.resultSub', { result, atk, def: total }),
+      title: t('game.useCountersTitle', { n: marked.length, result, atk, def: total }),
+      pulse: atk < total,
+      action: (player) => [...marked.map((uid): Action => ({ type: 'counter', player, uid })), { type: 'pass', player }],
+    };
+  }
   // Já houve Counter nesta batalha: o alvo carrega um bônus de poder "até o fim da batalha".
   const used = counter && state.modifiers.some((m) => m.uid === b.target && m.kind === 'power' && m.duration === 'battle');
   // Nada na mão muda o resultado: o ataque já falha, ou os Counters somados não chegam ao que falta

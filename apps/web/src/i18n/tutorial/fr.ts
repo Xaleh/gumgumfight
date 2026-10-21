@@ -309,7 +309,7 @@ export default {
   'tutorial.defense.next.body': 'Cette fois, Pacifista (6000) va attaquer votre Leader (5000). Sans Blocker en jeu, on passe directement au Counter Step.',
   'tutorial.defense.counter.title': 'Utilisez un Counter',
   'tutorial.defense.counter.body':
-    'Les cartes de votre main avec Counter peuvent être défaussées pour donner de la puissance à votre Leader pendant ce combat. Il lui faut PLUS de 6000, car l’égalité profite à l’attaquant. Touchez les Counters puis Plus de Counter.',
+    'Les cartes de votre main avec Counter peuvent être défaussées pour donner de la puissance à votre Leader pendant ce combat. Il lui faut PLUS de 6000, car l’égalité profite à l’attaquant. Touchez les Counters pour les marquer, puis le bouton Utiliser Counter.',
   'tutorial.defense.counter.fail':
     'Votre Leader a subi un dégât. Le défenseur doit avoir plus de puissance que l’attaquant : 6000 contre 6000, c’est perdu. Réessayez (Nami donne +1000 ; Brook, +2000).',
   'tutorial.defense.recap.title': 'Défense réussie',
