@@ -16,8 +16,9 @@
 
 import { type Action, cardDef, type GameState, getPower, hasKeyword, HIDDEN_CARD, type PlayerId } from '@gumgum/engine';
 import { type CSSProperties, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { abilityText, abilityTitle } from '../game/abilityText';
+import { abilityText, abilityTitle, triggerText } from '../game/abilityText';
 import { holdMotion } from '../game/motion';
+import { freshTrigger } from '../game/trigger';
 import { type Locale, t as tr } from '../i18n';
 import { CardBack, CardView } from './CardView';
 
@@ -93,16 +94,24 @@ interface Label {
 /**
  * Destaque de uma carta no centro da mesa: ela sai do lugar, cresce com a tela
  * escurecida e volta. 'attack': faixa com o poder (ataque bem-sucedido);
- * 'ability': painel brilhante com o texto da habilidade ativada.
+ * 'ability': painel brilhante com o texto da habilidade ativada; 'trigger': a
+ * carta sai virada da Vida, desvira com o selo "TRIGGER!" e o texto do [Trigger],
+ * e vai para onde o efeito a deixou.
  */
 interface Feature {
   id: number;
   kind: 'spot';
-  tone: 'attack' | 'ability';
+  tone: 'attack' | 'ability' | 'trigger';
   state: GameState;
   uid: string;
   from: Box;
   stage: Box;
+  /** Para onde a carta vai depois do destaque (sem ele, volta para `from`). */
+  to?: Box;
+  /** Some no centro em vez de voltar (o [Trigger] ainda em resolução, fora das áreas). */
+  fade?: boolean;
+  /** Sai virada (a carta de Vida) e desvira na ida. */
+  reveal?: boolean;
   hide: Element | null;
   title: string;
   subtitle: string;
@@ -321,7 +330,9 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
     if (!t) push(removed, key(s), uid);
     else if (t.zone !== s.zone || t.player !== s.player) moves.push({ from: s, to: t, src: uid, dst: uid });
   }
-  for (const [uid, t] of b) if (!a.has(uid)) push(added, key(t), uid);
+  // A carta do [Trigger] em destaque faz o próprio caminho (da Vida ao destino).
+  const own = spot?.tone === 'trigger' ? spot.uid : null;
+  for (const [uid, t] of b) if (!a.has(uid) && uid !== own) push(added, key(t), uid);
   for (const p of [0, 1] as PlayerId[]) {
     for (const [fz, tz] of PAIRS) {
       const r = removed.get(`${p}:${fz}`);
@@ -420,6 +431,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
     items.push(spot);
     hideEl(spot.hide);
     end = Math.max(end, spot.duration + 200);
+    if (spot.to) items.push({ id: nextId++, kind: 'burst', at: spot.to, tone: 'land', delay: spot.duration * 0.96, duration: 480 });
   }
   if (end > 0) holdMotion(end + 60);
   return items;
@@ -433,6 +445,42 @@ function spotPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes,
   const h = Math.min(arena.h * 0.62, 400);
   const stage: Box = { x: arena.x, y: arena.y, w: h / 1.396, h };
   const bottomSide = (box: Box) => box.y > arena.y;
+  const trig = freshTrigger(prev, next);
+  if (trig?.uid) {
+    const p = trig.player;
+    const def = cardDef(next, trig.uid);
+    const from = before.get(`anchor:life-${p}`) ?? after.get(`anchor:life-${p}`);
+    if (from) {
+      // Onde o efeito deixou a carta (descarte, campo, mão); ainda resolvendo, ela some no centro.
+      const where = spots(next).get(trig.uid);
+      const to = where ? (after.get(`${where.zone}:${trig.uid}`) ?? after.get(`anchor:${where.zone}-${where.player}`)) : undefined;
+      const ability = def.abilities.find((a) => a.timing === 'trigger');
+      const flyIn = 560 * tempo;
+      const hold = 1900 * tempo;
+      const back = 420 * tempo;
+      return {
+        id: nextId++,
+        kind: 'spot',
+        tone: 'trigger',
+        state: next,
+        uid: trig.uid,
+        from: { ...from, face: false },
+        stage,
+        ...(to ? { to } : { fade: true }),
+        reveal: true,
+        hide: to && where ? findEl(root, where.zone, trig.uid) : null,
+        title: ability ? abilityTitle(ability, opts.lang) : '[Trigger]',
+        subtitle: next.players[p].name,
+        text: triggerText(def, opts.lang),
+        bottom: bottomSide(from),
+        delay: 0,
+        flyIn,
+        hold,
+        back,
+        duration: flyIn + hold + back,
+      };
+    }
+  }
   const b = prev.battle;
   if (b && b.step !== 'end' && known(prev, b.attacker) && prev.cards[b.target]) {
     const defender = prev.cards[b.target].owner;
@@ -945,6 +993,7 @@ function LabelView({ l, onDone }: { l: Label; onDone: (id: number) => void }) {
 
 function SpotView({ s, onDone }: { s: Feature; onDone: (id: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
   const base = s.stage;
   useLayoutEffect(() => {
     const el = ref.current;
@@ -959,23 +1008,85 @@ function SpotView({ s, onDone }: { s: Feature; onDone: (id: number) => void }) {
     const tIn = s.flyIn / s.duration;
     const tOut = (s.flyIn + s.hold) / s.duration;
     const tilt = s.bottom ? -7 : 7;
+    const last = s.fade
+      ? { transform: place(s.stage, base, { grow: 0.86 }), opacity: 0, offset: 1 }
+      : { transform: place(s.to ?? s.from, base), opacity: 1, offset: 1 };
     const anim = el.animate(
       unwind([
-        { transform: place(s.from, base), offset: 0, easing: 'cubic-bezier(.2,.9,.3,1)' },
-        { transform: place(s.stage, base, { tilt, grow: 1.06 }), offset: tIn * 0.85, easing: 'ease-out' },
-        { transform: place(s.stage, base), offset: tIn },
-        { transform: place(s.stage, base), offset: tOut, easing: 'cubic-bezier(.5,0,.4,1)' },
-        { transform: place(s.from, base), offset: 1 },
+        { transform: place(s.from, base), opacity: 1, offset: 0, easing: 'cubic-bezier(.2,.9,.3,1)' },
+        { transform: place(s.stage, base, { tilt, grow: 1.06 }), opacity: 1, offset: tIn * 0.85, easing: 'ease-out' },
+        { transform: place(s.stage, base), opacity: 1, offset: tIn },
+        { transform: place(s.stage, base), opacity: 1, offset: tOut, easing: 'cubic-bezier(.5,0,.4,1)' },
+        last,
       ]),
       { duration: s.duration, delay: s.delay, fill: 'both' },
     );
+    // A carta de Vida sobe virada e desvira antes de chegar ao centro.
+    const persp = 'perspective(900px)';
+    const flipAnim =
+      s.reveal && inner.current
+        ? inner.current.animate(
+            [
+              { transform: `${persp} rotateY(180deg)`, offset: 0 },
+              { transform: `${persp} rotateY(180deg)`, offset: tIn * 0.25, easing: 'ease-in-out' },
+              { transform: `${persp} rotateY(0deg)`, offset: tIn * 0.9 },
+              { transform: `${persp} rotateY(0deg)`, offset: 1 },
+            ],
+            { duration: s.duration, delay: s.delay, fill: 'both' },
+          )
+        : null;
     anim.onfinish = finish;
     anim.oncancel = finish;
-    return () => stop(anim);
+    return () => {
+      stop(anim);
+      flipAnim?.cancel();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const def = cardDef(s.state, s.uid);
   const color = def.colors[0] ?? 'red';
+  const plate = (
+    <div className="spot-plate">
+      <div className="plate-title">
+        <span className="plate-icon">{s.tone === 'trigger' ? '⚡' : '✦'}</span>
+        {s.title}
+      </div>
+      {s.text && <p className="plate-text">{s.text}</p>}
+    </div>
+  );
+  if (s.tone === 'trigger') {
+    return (
+      <div
+        ref={ref}
+        className={['flight', 'spot', 'spot-trigger', `c-${color}`].join(' ')}
+        style={vars({
+          width: `${base.w}px`,
+          height: `${base.h}px`,
+          '--cw': `${base.w}px`,
+          '--in': `${s.flyIn}ms`,
+          '--hold': `${s.hold}ms`,
+          '--out': `${s.back}ms`,
+        })}
+      >
+        <div className="trigger-flash" />
+        <div ref={inner} className="flight-inner" style={{ transform: 'perspective(900px) rotateY(180deg)' }}>
+          <div className="flight-face front">
+            <CardView state={s.state} uid={s.uid} eager />
+          </div>
+          <div className="flight-face back">
+            <CardBack />
+          </div>
+        </div>
+        <div className="trigger-seal">
+          <b>
+            <span className="seal-icon">⚡</span>TRIGGER!
+          </b>
+          <small>{s.subtitle}</small>
+        </div>
+        {plate}
+      </div>
+    );
+  }
   return (
     <div
       ref={ref}
@@ -999,13 +1110,7 @@ function SpotView({ s, onDone }: { s: Feature; onDone: (id: number) => void }) {
           <small>{s.subtitle}</small>
         </div>
       ) : (
-        <div className="spot-plate">
-          <div className="plate-title">
-            <span className="plate-icon">✦</span>
-            {s.title}
-          </div>
-          {s.text && <p className="plate-text">{s.text}</p>}
-        </div>
+        plate
       )}
     </div>
   );

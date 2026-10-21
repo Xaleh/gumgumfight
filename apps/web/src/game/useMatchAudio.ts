@@ -1,6 +1,7 @@
 import { type Action, cardDef, type GameState, HIDDEN_CARD, type PlayerId } from '@gumgum/engine';
 import { useEffect, useRef } from 'react';
 import { audio } from '../audio';
+import { freshTrigger } from './trigger';
 
 type Zone = 'deck' | 'hand' | 'life' | 'trash' | 'field';
 interface Spot {
@@ -189,8 +190,8 @@ export function useMatchAudio(state: GameState, opts: MatchAudioOptions) {
     if (lifeLost) audio.play('hit', { delay: impactAt });
     if (kos) burst('ko', kos, impactAt);
 
-    // [Trigger] revelado da Vida.
-    if (state.stack.some((f) => f.kind === 'effect' && f.trigger) && !prev.stack.some((f) => f.kind === 'effect' && f.trigger)) audio.play('trigger');
+    // [Trigger] revelado da Vida (pelo histórico: o [Trigger] sem escolhas já resolveu no estado novo).
+    if (freshTrigger(prev, state)) audio.play('trigger');
 
     // Habilidade ativada pelo jogador.
     if (lastAction?.type === 'activate' && state.log.length > prev.log.length && known(state, lastAction.uid)) audio.play('ability');
