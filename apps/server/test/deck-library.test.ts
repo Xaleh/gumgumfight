@@ -164,7 +164,7 @@ describe('limpeza de decks (Admin/Dev)', () => {
     const list = luffy.cards.slice(1);
     const original = (await create(app, { name: 'Luffy do Bob', leader: 'ST01-001', cards: list }, BOB)).json();
     const bobCopy = (await create(app, { name: 'Cópia do Luffy do Bob', leader: 'ST01-001', cards: list })).json();
-    backdate(db, original.id, 10);
+    backdate(db, bobCopy.id, 10);
     const draft = (await create(app, { name: 'teste', leader: 'ST01-001', cards: [{ id: 'ST01-002', count: 4 }] })).json();
     const freshDraft = (await create(app, { name: 'novo', leader: 'ST01-001', cards: [] })).json();
     const idle = (await create(app, { name: 'Antigo', leader: 'ST01-001', cards: luffy.cards.slice(2) })).json();
@@ -181,7 +181,7 @@ describe('limpeza de decks (Admin/Dev)', () => {
       ['st01-luffy', true],
       [copy.id, false],
     ]);
-    // Entre decks de jogadores, fica o mais antigo (nenhum foi jogado).
+    // Entre decks de jogadores, fica o criado primeiro (nenhum foi jogado), mesmo que a cópia seja mais antiga na edição.
     expect(groupOf(bobCopy.id).rows.map((r: { id: string; keep: boolean }) => [r.id, r.keep])).toEqual([
       [original.id, true],
       [bobCopy.id, false],

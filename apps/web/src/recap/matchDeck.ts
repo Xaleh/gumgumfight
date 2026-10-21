@@ -2,7 +2,7 @@
 // do estado: as cartas que ele tem na partida, por custo e número, com a arte escolhida e as
 // URLs reescritas pelo mesmo domínio (o canvas só exporta assim). Sem canvas, para poder testar.
 
-import { cardImage, deckOfPlayer, formatDeckList, type GameState, type PlayerId, proxiedImageUrl } from '@gumgum/engine';
+import { artImage, type CardData, cardImage, deckOfPlayer, type DeckList, formatDeckList, type GameState, type PlayerId, proxiedImageUrl } from '@gumgum/engine';
 import type { RecapCard } from '../api';
 import type { DeckCard, MatchDeck } from './draw';
 
@@ -51,5 +51,36 @@ export function matchDeck(state: GameState, player: PlayerId, { images = true } 
     cards,
     total: cards.reduce((n, c) => n + c.count, 0),
     text: formatDeckList({ leader: list.leader, cards: cards.map((c) => ({ id: c.id, count: c.count })) }),
+  };
+}
+
+/**
+ * A mesma decklist a partir de um deck salvo (visualizador de decks): `name` é o nome do deck
+ * e não há oponente. `cards` precisa trazer o Líder e todas as cartas da lista.
+ */
+export function savedDeckData(deck: Pick<DeckList, 'name' | 'leader' | 'cards' | 'arts'>, cards: ReadonlyMap<string, CardData>, { images = true } = {}): MatchDeckData {
+  const card = (id: string): RecapCard => {
+    const def = cards.get(id);
+    return {
+      id,
+      name: def?.name ?? id,
+      set: def?.set ?? id.split('-')[0] ?? null,
+      cost: def?.cost ?? null,
+      category: def?.category ?? 'character',
+      colors: def?.colors ?? [],
+      image: images && def ? proxiedImageUrl(artImage(def, deck.arts?.[id])) : null,
+    };
+  };
+  const list: DeckCard[] = deck.cards
+    .map((c) => ({ ...card(c.id), count: c.count }))
+    .sort((a, b) => (a.cost ?? 99) - (b.cost ?? 99) || a.id.localeCompare(b.id));
+  return {
+    player: 0,
+    name: deck.name,
+    opponent: '',
+    leader: card(deck.leader),
+    cards: list,
+    total: list.reduce((n, c) => n + c.count, 0),
+    text: formatDeckList({ leader: deck.leader, cards: list.map((c) => ({ id: c.id, count: c.count })) }),
   };
 }

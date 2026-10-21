@@ -4,6 +4,7 @@ import type { Messages } from './pt-BR';
 import support from './support/fr';
 import tutorial from './tutorial/fr';
 import recap from './recap/fr';
+import decks from './decks/fr';
 
 export default {
   // ---- general ----
@@ -2683,4 +2684,5 @@ export default {
   ...support,
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
+  ...decks,
 } satisfies Messages;

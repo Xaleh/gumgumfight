@@ -75,7 +75,11 @@ export function cleanupCandidates(db: DB, kind: CleanupKind, now: number) {
     rows,
   });
 
-  // Cópias idênticas: mesmo Líder e mesmas cartas. Fica o deck pronto, se houver; senão o mais jogado (o mais antigo no empate).
+  // Ordem de criação (o rowid não muda quando o deck é editado): no empate, o original é o criado primeiro.
+  const created = new Map(
+    (db.prepare('SELECT id, rowid AS n FROM decks').all() as Array<{ id: string; n: number }>).map((r) => [r.id, Number(r.n)]),
+  );
+  // Cópias idênticas: mesmo Líder e mesmas cartas. Fica o deck pronto, se houver; senão o mais jogado (o criado primeiro no empate).
   const byHash = new Map<string, StoredDeck[]>();
   for (const d of decks) {
     if (!d.leader || !size(d)) continue;
@@ -87,7 +91,7 @@ export function cleanupCandidates(db: DB, kind: CleanupKind, now: number) {
     .map((g) => {
       const original =
         g.find((d) => d.kind === 'builtin') ??
-        [...g].sort((a, b) => (games.get(b.id) ?? 0) - (games.get(a.id) ?? 0) || a.updatedAt.localeCompare(b.updatedAt))[0];
+        [...g].sort((a, b) => (games.get(b.id) ?? 0) - (games.get(a.id) ?? 0) || (created.get(a.id) ?? 0) - (created.get(b.id) ?? 0))[0];
       return group(g[0].leader, [original, ...g.filter((d) => d !== original)].map((d) => row(d, d === original)));
     })
     .sort((a, b) => b.rows.length - a.rows.length);

@@ -11,7 +11,7 @@ import { errorText, loadFonts, loadImage, loadLogo, type RecapImage, release, sh
 import { DECK_TILE_MAX_W, drawMatchDeck, FORMAT_SIZE, type RecapAssets } from '../recap/draw';
 import { saveFile } from '../recap/export';
 import { slug } from '../recap/layout';
-import { matchDeck } from '../recap/matchDeck';
+import { matchDeck, type MatchDeckData } from '../recap/matchDeck';
 import { useSettings } from '../settings';
 
 interface Output {
@@ -19,12 +19,15 @@ interface Output {
   url: string;
 }
 
-export default function MatchDeck({ state, player, onClose }: { state: GameState; player: PlayerId; onClose: () => void }) {
+/** A decklist de um jogador da partida (`state` + `player`) ou uma pronta (`data`: um deck salvo, no visualizador). */
+type Source = { state: GameState; player: PlayerId; data?: undefined } | { data: MatchDeckData; state?: undefined; player?: undefined };
+
+export default function MatchDeck({ onClose, ...source }: Source & { onClose: () => void }) {
   const t = useT();
   const locale = useLocale();
   const settings = useSettings();
   // Calculada uma vez: o estado online é trocado a cada evento da sala (revanche pedida…) e a lista não muda.
-  const [deck] = useState(() => matchDeck(state, player, { images: settings.showImages }));
+  const [deck] = useState(() => source.data ?? matchDeck(source.state, source.player, { images: settings.showImages }));
   const [assets, setAssets] = useState<(RecapAssets & { missing: number }) | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [output, setOutput] = useState<Output | null>(null);
@@ -88,7 +91,7 @@ export default function MatchDeck({ state, player, onClose }: { state: GameState
           deck,
           {
             kicker: t('matchDeck.img.kicker'),
-            vs: t('matchDeck.img.vs', { name: deck.opponent }),
+            vs: deck.opponent ? t('matchDeck.img.vs', { name: deck.opponent }) : '',
             date: fmtDate(Date.now(), locale),
             cards: (n) => t('recap.img.cards', { n }),
             site: window.location.host,
@@ -128,7 +131,7 @@ export default function MatchDeck({ state, player, onClose }: { state: GameState
     return () => clearTimeout(timer);
   }, [copied]);
 
-  const name = deck?.name ?? state.players[player].name;
+  const name = deck?.name ?? source.state?.players[source.player].name ?? '';
   const file = deck ? `decklist-${slug(name)}-${deck.leader.id}.png` : 'decklist.png';
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered deck-backdrop" onClick={onClose}>

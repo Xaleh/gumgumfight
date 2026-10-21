@@ -4,6 +4,7 @@
 import supportPtBR from './support/pt-BR';
 import tutorialPtBR from './tutorial/pt-BR';
 import recapPtBR from './recap/pt-BR';
+import decksPtBR from './decks/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -2687,6 +2688,8 @@ const ptBR = {
   ...supportPtBR,
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recapPtBR,
+  // ==== listas de decks: seletor, visualizador, biblioteca e limpeza (i18n/decks) ====
+  ...decksPtBR,
 } as const;
 
 export type MessageKey = keyof typeof ptBR;

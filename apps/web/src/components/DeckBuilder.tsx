@@ -6,7 +6,6 @@ import {
   cleanArts,
   type Color,
   DECK_SIZE,
-  type DeckList,
   FORMATS,
   formatIssues,
   formatDeckList,
@@ -21,14 +20,18 @@ import {
   validateDeck,
   withArt,
 } from '@gumgum/engine';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type ApiCard, deckGroups, type DeckSummary, isAdmin, spoilerText } from '../api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { api, type ApiCard, ApiError, type DeckDuplicate, type DeckSummary, isAdmin, spoilerText } from '../api';
 import { useAuth } from '../auth';
+import { deckNumbers } from '../deckLibrary';
 import type { DeckLink } from '../deeplink';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, fillSlots, StaticCardZoom } from './CardInfo';
 import { StaticCard } from './CardView';
+import { DeckLibrary } from './DeckLibrary';
+import { CostCurve, useFavoriteToggle } from './DeckTile';
+import { DeckViewer } from './DeckViewer';
 import { Icon } from './Icons';
 
 interface Draft {
@@ -43,6 +46,10 @@ interface Draft {
 }
 
 const emptyDraft = (name: string): Draft => ({ id: null, name, leader: '', cards: new Map(), arts: new Map(), kind: 'user' });
+
+/** O que desfazer/refazer restaura: Líder, cartas e artes (o nome e o deck salvo continuam). */
+type Snapshot = Pick<Draft, 'leader' | 'cards' | 'arts'>;
+const HISTORY_MAX = 100;
 
 const COLORS: Array<{ id: Color; label: MessageKey }> = [
   { id: 'red', label: 'deck.color.red' },
@@ -83,10 +90,11 @@ function useMediaQuery(query: string) {
 }
 
 /**
- * `link`: lista vinda de um deep link (`/?deck=`): o construtor abre com ela preenchida, como
- * deck novo não salvo; `linkInvalid`: havia um link, mas sem lista legível (só um aviso).
+ * Abre na biblioteca de decks; o editor abre ao escolher um deck. `link`: lista vinda de um deep
+ * link (`/?deck=`): o editor abre com ela preenchida, como deck novo não salvo; `linkInvalid`:
+ * havia um link, mas sem lista legível (só um aviso); `openId`: um deck salvo para abrir direto.
  */
-export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void; link?: DeckLink; linkInvalid?: boolean }) {
+export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () => void; link?: DeckLink; linkInvalid?: boolean; openId?: string }) {
   const [allCards, setAllCards] = useState<ApiCard[]>([]);
   const [decks, setDecks] = useState<DeckSummary[]>([]);
   const auth = useAuth();
@@ -95,6 +103,21 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
   const tryT = useTryT();
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(t('deck.newDeckName')));
   const [dirty, setDirty] = useState(false);
+  /** Biblioteca (galeria de decks) ou o editor de um deck. */
+  const [view, setView] = useState<'library' | 'editor'>(link || linkInvalid || openId ? 'editor' : 'library');
+  /** Desfazer/refazer (Líder, cartas e artes). */
+  const [past, setPast] = useState<Snapshot[]>([]);
+  const [future, setFuture] = useState<Snapshot[]>([]);
+  /** Aviso rápido da última mudança, com "Desfazer". */
+  const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
+  /** O deck atual em lista, grade ou curva. */
+  const [mode, setMode] = useState<'list' | 'grid' | 'curve'>('list');
+  /** Tela estreita: catálogo ou deck (abas no pé da tela). */
+  const [mobileTab, setMobileTab] = useState<'catalog' | 'deck'>('catalog');
+  /** Deck salvo com a mesma lista (aviso antes de criar uma cópia sem mudança). */
+  const [dupe, setDupe] = useState<DeckDuplicate | null>(null);
+  /** Visualizador aberto: o rascunho (`draft`) ou um deck da biblioteca (id). */
+  const [viewing, setViewing] = useState<'draft' | string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hovered, setHoveredState] = useState<Hovered | null>(null);
@@ -166,6 +189,7 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
         setDecks(list);
         if (link) applyLink(link, new Map(cards.map((c) => [c.id, c])));
         else if (linkInvalid) setNotice(t('deck.linkInvalid'));
+        else if (openId) void openDeck(openId);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,23 +289,85 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
 
   // ------------------------------------------------------------------ edição
 
-  /** Decks prontos são somente leitura: a primeira alteração cria uma cópia. */
-  const edit = (fn: (d: Draft) => Draft) => {
+  /**
+   * Decks prontos são somente leitura: a primeira alteração cria uma cópia. Cada mudança de
+   * Líder, cartas ou artes entra no desfazer (`record: false` para o nome); `label` vira o aviso rápido.
+   */
+  const edit = (fn: (d: Draft) => Draft, { label, record = true }: { label?: string; record?: boolean } = {}) => {
     if (draft.kind !== 'user') {
       setNotice(
         draft.kind === 'builtin' ? t('deck.noticeBuiltinEditing') : t('deck.noticeCommunityEditing'),
       );
     }
+    if (record) {
+      setPast((p) => [...p.slice(-(HISTORY_MAX - 1)), { leader: draft.leader, cards: draft.cards, arts: draft.arts }]);
+      setFuture([]);
+    }
+    setDupe(null);
     setDraft((d) => {
       const base = d.kind !== 'user' ? { ...d, id: null, kind: 'user' as const, name: t('deck.copyName', { name: d.name }) } : d;
       return fn({ ...base, cards: new Map(base.cards), arts: new Map(base.arts) });
     });
     setDirty(true);
+    if (label) setToast({ text: label, key: Date.now() });
   };
+
+  const snapshot = (): Snapshot => ({ leader: draft.leader, cards: draft.cards, arts: draft.arts });
+  const undo = () => {
+    const prev = past[past.length - 1];
+    if (!prev) return;
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => [snapshot(), ...f]);
+    setDraft((d) => ({ ...d, ...prev }));
+    setDirty(true);
+    setDupe(null);
+    setToast(null);
+  };
+  const redo = () => {
+    const next = future[0];
+    if (!next) return;
+    setFuture((f) => f.slice(1));
+    setPast((p) => [...p, snapshot()]);
+    setDraft((d) => ({ ...d, ...next }));
+    setDirty(true);
+    setDupe(null);
+    setToast(null);
+  };
+  const resetHistory = () => {
+    setPast([]);
+    setFuture([]);
+    setToast(null);
+    setDupe(null);
+  };
+
+  // Ctrl+Z / Ctrl+Shift+Z (ou Ctrl+Y) no editor, fora dos campos de texto.
+  useEffect(() => {
+    if (view !== 'editor') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || (e.target as HTMLElement).closest('input, textarea, select')) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((key === 'z' && e.shiftKey) || key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // O aviso rápido some sozinho.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const add = (card: CardData) => {
     if (card.category === 'leader') {
-      edit((d) => ({ ...d, leader: card.id }));
+      edit((d) => ({ ...d, leader: card.id }), { label: t('decks.builder.leaderSet', { name: card.name }) });
       return;
     }
     const current = draft.cards.get(card.id) ?? 0;
@@ -289,51 +375,70 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
       setNotice(t('deck.maxCopies', { n: MAX_COPIES, name: card.name }));
       return;
     }
-    edit((d) => {
-      d.cards.set(card.id, current + 1);
-      return d;
-    });
+    edit(
+      (d) => {
+        d.cards.set(card.id, current + 1);
+        return d;
+      },
+      { label: t('decks.builder.added', { name: card.name }) },
+    );
   };
 
   const remove = (id: string) => {
     if (!draft.cards.has(id)) return;
-    edit((d) => {
-      const n = (d.cards.get(id) ?? 0) - 1;
-      if (n > 0) d.cards.set(id, n);
-      else d.cards.delete(id);
-      return d;
-    });
+    edit(
+      (d) => {
+        const n = (d.cards.get(id) ?? 0) - 1;
+        if (n > 0) d.cards.set(id, n);
+        else d.cards.delete(id);
+        return d;
+      },
+      { label: t('decks.builder.removed', { name: byId.get(id)?.name ?? id }) },
+    );
   };
 
-  const load = async (id: string) => {
-    if (!confirmDiscard()) return;
+  /** Abre um deck salvo no editor; `copy`: já como cópia minha, não salva (o "Duplicar" da biblioteca). */
+  const openDeck = async (id: string, { copy = false } = {}) => {
     try {
       const { deck } = await api.deck(id);
-      setDraft({
-        id: deck.id,
-        name: deck.name,
-        leader: deck.leader,
-        cards: new Map(deck.cards.map((c) => [c.id, c.count])),
-        arts: new Map(Object.entries(deck.arts ?? {})),
-        kind: deck.kind === 'builtin' ? 'builtin' : deck.mine ? 'user' : 'community',
-      });
-      setDirty(false);
-      setNotice(
-        deck.kind === 'builtin'
-          ? t('deck.noticeBuiltinOpened')
-          : deck.mine
-            ? null
-            : staff
-              ? t('deck.noticeCommunityOpenedAdmin')
-              : t('deck.noticeCommunityOpened'),
-      );
+      const cards = new Map(deck.cards.map((c) => [c.id, c.count]));
+      const arts = new Map(Object.entries(deck.arts ?? {}));
+      if (copy) {
+        setDraft({ id: null, name: t('deck.copyName', { name: deck.name }), leader: deck.leader, cards, arts, kind: 'user' });
+        setDirty(true);
+        setNotice(t('deck.copyCreated'));
+      } else {
+        setDraft({ id: deck.id, name: deck.name, leader: deck.leader, cards, arts, kind: deck.kind === 'builtin' ? 'builtin' : deck.mine ? 'user' : 'community' });
+        setDirty(false);
+        setNotice(
+          deck.kind === 'builtin'
+            ? t('deck.noticeBuiltinOpened')
+            : deck.mine
+              ? null
+              : staff
+                ? t('deck.noticeCommunityOpenedAdmin')
+                : t('deck.noticeCommunityOpened'),
+        );
+      }
+      resetHistory();
       setError(null);
+      setMobileTab('catalog');
+      setView('editor');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const save = async () => {
+  const load = (id: string) => {
+    if (confirmDiscard()) void openDeck(id);
+  };
+
+  /** `allowDuplicate`: salva mesmo que já exista um deck com a mesma lista (depois do aviso). */
+  const save = async ({ allowDuplicate = false } = {}) => {
+    if (!renaming && !draft.leader) {
+      setError(t('decks.builder.needLeader'));
+      return;
+    }
     if (renaming) {
       try {
         const saved = await api.renameDeck(draft.id!, draft.name.trim() || t('deck.unnamed'));
@@ -350,13 +455,19 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
     // Só as artes das cartas que ainda estão no deck.
     const input = { name: draft.name.trim() || t('deck.unnamed'), leader: draft.leader, cards: deckList.cards, arts: cleanArts(deckList, byId) ?? {} };
     try {
-      const saved = draft.id && draft.kind === 'user' ? await api.updateDeck(draft.id, input) : await api.createDeck(input);
+      const saved =
+        draft.id && draft.kind === 'user' ? await api.updateDeck(draft.id, input) : await api.createDeck(input, { checkDuplicate: !allowDuplicate });
       setDraft((d) => ({ ...d, id: saved.id, kind: 'user', name: saved.name }));
       setDirty(false);
+      setDupe(null);
       setNotice(saved.valid ? t('deck.savedReady') : t('deck.savedDraft'));
       setError(null);
       await refreshDecks();
     } catch (e) {
+      if (e instanceof ApiError && e.errorCode === 'deckDuplicate' && e.data.duplicate) {
+        setDupe(e.data.duplicate as DeckDuplicate);
+        return;
+      }
       setError(e instanceof Error ? e.message : String(e));
     }
   };
@@ -368,11 +479,37 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
       await api.deleteDeck(draft.id);
       setDraft(emptyDraft(t('deck.newDeckName')));
       setDirty(false);
-      setNotice(t('deck.deleted'));
+      resetHistory();
+      setNotice(null);
+      setError(null);
+      await refreshDecks();
+      setView('library');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /** Apagar pela biblioteca: o meu, ou (admin/dev) o de outro jogador. */
+  const deleteFromLibrary = async (d: DeckSummary) => {
+    if (!window.confirm(t(d.mine ? 'deck.confirmDelete' : 'deck.confirmDeleteOther', { name: d.name }))) return;
+    try {
+      await api.deleteDeck(d.id);
+      setError(null);
       await refreshDecks();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  /** Volta para a biblioteca (avisa antes de perder alterações). */
+  const toLibrary = () => {
+    if (!confirmDiscard()) return;
+    setDraft(emptyDraft(t('deck.newDeckName')));
+    setDirty(false);
+    resetHistory();
+    setNotice(null);
+    setError(null);
+    setView('library');
   };
 
   const duplicate = () => {
@@ -385,7 +522,11 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
     if (!confirmDiscard()) return;
     setDraft(emptyDraft(t('deck.newDeckName')));
     setDirty(false);
+    resetHistory();
+    setError(null);
     setNotice(t('deck.pickLeaderToStart'));
+    setMobileTab('catalog');
+    setView('editor');
   };
 
   /** Botão das artes: aplica a primeira arte alternativa em todas as cartas que têm uma; com todas aplicadas, volta às normais. */
@@ -441,42 +582,95 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
   }, [entries]);
 
   const errorIds = new Set(report.issues.filter((i) => i.level === 'error' && i.cardId).map((i) => i.cardId));
+  const numbers = useMemo(() => deckNumbers(deckList.cards, byId), [deckList, byId]);
+  const toggleFavorite = useFavoriteToggle(setDecks, setError);
+  const storageHint = auth.user ? t('deck.storageAccount') : `${t('deck.storageBrowser')}${auth.clientId ? ` ${t('deck.storageSignIn')}` : ''}`;
+  const viewerOf = (id: string) => {
+    const d = decks.find((x) => x.id === id);
+    return (
+      <DeckViewer
+        deckId={id}
+        onClose={() => setViewing(null)}
+        onEdit={() => {
+          setViewing(null);
+          void openDeck(id, { copy: !(d?.kind === 'user' && d.mine) });
+        }}
+        editLabel={d?.kind === 'user' && d.mine ? t('decks.edit') : t('decks.duplicate')}
+      />
+    );
+  };
 
   // ------------------------------------------------------------------ render
 
-  return (
-    <div className="builder">
-      <header className="builder-header">
-        <button
-          className="btn small"
-          onClick={() => {
-            if (confirmDiscard()) onExit();
+  if (view === 'library') {
+    return (
+      <div className="builder library">
+        <DeckLibrary
+          decks={decks}
+          staff={staff}
+          hint={storageHint}
+          error={error}
+          onMenu={onExit}
+          onNew={newDeck}
+          onImport={() => {
+            newDeck();
+            setTextModal('import');
           }}
-        >
-          {t('deck.backMenu')}
+          onOpen={(id) => void openDeck(id)}
+          onView={(id) => setViewing(id)}
+          onDuplicate={(id) => void openDeck(id, { copy: true })}
+          onDelete={deleteFromLibrary}
+          onFavorite={toggleFavorite}
+        />
+        {viewing && viewing !== 'draft' && viewerOf(viewing)}
+      </div>
+    );
+  }
+
+  return (
+    <div className={['builder', narrow ? `tab-${mobileTab}` : ''].join(' ')}>
+      <header className="builder-header">
+        <button className="btn small" onClick={toLibrary}>
+          {t('decks.builder.back')}
         </button>
         <h2>{t('deck.title')}</h2>
-        <div className="builder-decks">
-          <button className="btn small primary" onClick={newDeck}>
-            {t('deck.new')}
-            <span className="wide">{t('deck.newSuffix')}</span>
+        <div className="builder-tools">
+          <button type="button" className="btn small icon" onClick={undo} disabled={!past.length} aria-label={t('decks.builder.undo')} title={t('decks.builder.undoTitle')}>
+            <Icon name="undo" size={18} />
           </button>
-          <DeckDropdown
-            decks={decks}
-            currentId={draft.id}
-            onPick={load}
-            hint={
-              auth.user
-                ? t('deck.storageAccount')
-                : `${t('deck.storageBrowser')}${auth.clientId ? ` ${t('deck.storageSignIn')}` : ''}`
-            }
-          />
+          <button type="button" className="btn small icon" onClick={redo} disabled={!future.length} aria-label={t('decks.builder.redo')} title={t('decks.builder.redoTitle')}>
+            <Icon name="redo" size={18} />
+          </button>
+          <button type="button" className="btn small" onClick={() => setViewing('draft')} disabled={!draft.leader && !entries.length}>
+            <Icon name="eye" size={16} /> <span className="wide">{t('decks.builder.view')}</span>
+          </button>
+          <button
+            className="btn small primary"
+            onClick={() => void save()}
+            disabled={(!dirty && draft.id !== null) || (!renaming && !draft.leader)}
+            title={!renaming && !draft.leader ? t('decks.builder.needLeader') : undefined}
+          >
+            {renaming ? t('deck.saveName') : draft.id && draft.kind === 'user' ? t('common.save') : t('deck.saveDeck')}
+          </button>
         </div>
       </header>
 
       {error && (
         <div className="error" onClick={() => setError(null)}>
           {error}
+        </div>
+      )}
+      {dupe && (
+        <div className="dk-dupe" role="alert">
+          <span>{dupe.mine ? t('decks.builder.dupMine', { name: dupe.name }) : t('decks.builder.dupOther', { name: dupe.name })}</span>
+          <div className="btn-row">
+            <button className="btn small primary" onClick={() => (dupe.mine ? load(dupe.id) : setViewing(dupe.id))}>
+              {t('decks.builder.dupOpen', { name: dupe.name })}
+            </button>
+            <button className="btn small" onClick={() => void save({ allowDuplicate: true })}>
+              {t('decks.builder.dupSave')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -617,7 +811,7 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
             maxLength={60}
             onChange={(e) => {
               const name = e.target.value;
-              if (!renaming) return edit((d) => ({ ...d, name }));
+              if (!renaming) return edit((d) => ({ ...d, name }), { record: false });
               setDraft((d) => ({ ...d, name }));
               setDirty(true);
             }}
@@ -644,7 +838,7 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
                     })}
                   </div>
                   <div className="btn-row leader-actions">
-                    <button className="btn small" onClick={() => edit((d) => ({ ...d, leader: '' }))}>
+                    <button className="btn small" onClick={() => edit((d) => ({ ...d, leader: '' }), { label: t('decks.builder.leaderCleared') })}>
                       {t('deck.changeLeader')}
                     </button>
                     {leader.arts?.length ? (
@@ -675,6 +869,50 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
             <div className="small muted">{t('deck.counters', { c1: counters.c1, c2: counters.c2 })}</div>
           </div>
 
+          <div className="seg small dk-modes" role="group" aria-label={t('decks.builder.modeLabel')}>
+            {(['list', 'grid', 'curve'] as const).map((m) => (
+              <button key={m} type="button" className={mode === m ? 'on' : ''} aria-pressed={mode === m} onClick={() => setMode(m)}>
+                <Icon name={m === 'list' ? 'list' : m === 'grid' ? 'grid' : 'bars'} size={14} /> {t(`decks.builder.mode.${m}`)}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'grid' && (
+            <div className="dk-deck-grid">
+              {entries.length === 0 && <div className="muted small">{canHover ? t('deck.emptyMouse') : t('deck.emptyTouch')}</div>}
+              {entries.map((e) =>
+                e.card ? (
+                  <div key={e.id} className={['dk-deck-cell', errorIds.has(e.id) ? 'bad' : ''].join(' ')}>
+                    <StaticCard card={shown(e.card)} onHover={setHovered} onLongPress={setZoom} onContextMenu={() => remove(e.id)} />
+                    <div className="dk-qty">
+                      <button type="button" onClick={() => remove(e.id)} aria-label={t('deck.removeOne')}>
+                        −
+                      </button>
+                      <b>{e.count}</b>
+                      <button
+                        type="button"
+                        onClick={() => e.card && add(e.card)}
+                        disabled={e.count >= MAX_COPIES && !anyNumberAllowed(e.card)}
+                        aria-label={t('deck.addOne')}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ) : null,
+              )}
+            </div>
+          )}
+
+          {mode === 'curve' && (
+            <div className="dk-deck-curve">
+              <CostCurve curve={numbers.curve} tall />
+              <div className="small">{t('decks.builder.types', { c: numbers.byCategory.character, e: numbers.byCategory.event, s: numbers.byCategory.stage })}</div>
+              <div className="small muted">{t('decks.counters', { c1: numbers.counter1000, c2: numbers.counter2000 })}</div>
+            </div>
+          )}
+
+          {mode === 'list' && (
           <div
             className="deck-entries"
             {...entryPress.handlers}
@@ -738,6 +976,7 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
               );
             })}
           </div>
+          )}
 
           {(draft.leader || entries.length > 0) && (
             <div className="format-legality">
@@ -778,9 +1017,6 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
           )}
 
           <div className="deck-actions">
-            <button className="btn primary" onClick={save} disabled={!dirty && draft.id !== null}>
-              {renaming ? t('deck.saveName') : draft.id && draft.kind === 'user' ? t('common.save') : t('deck.saveDeck')}
-            </button>
             {draft.id && (
               <button className="btn" onClick={duplicate}>
                 {t('deck.duplicate')}
@@ -843,6 +1079,40 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
           }}
         />
       )}
+
+      {toast && (
+        <div className="dk-toast" role="status" key={toast.key}>
+          <span>{toast.text}</span>
+          {past.length > 0 && (
+            <button type="button" onClick={undo}>
+              {t('decks.builder.undo')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {narrow && (
+        <nav className="dk-builder-tabs" aria-label={t('decks.builder.sections')}>
+          <button type="button" className={mobileTab === 'catalog' ? 'on' : ''} aria-current={mobileTab === 'catalog' ? 'page' : undefined} onClick={() => setMobileTab('catalog')}>
+            <Icon name="grid" size={20} />
+            {t('decks.builder.tabCatalog')}
+          </button>
+          <button type="button" className={mobileTab === 'deck' ? 'on' : ''} aria-current={mobileTab === 'deck' ? 'page' : undefined} onClick={() => setMobileTab('deck')}>
+            <b className={report.total === DECK_SIZE ? 'ok' : ''}>
+              {report.total}/{DECK_SIZE}
+            </b>
+            {t('decks.builder.tabDeck')}
+          </button>
+        </nav>
+      )}
+
+      {viewing === 'draft' && (
+        <DeckViewer
+          data={{ deck: deckList, cards: [draft.leader, ...draft.cards.keys()].map((id) => byId.get(id)).filter((c): c is ApiCard => Boolean(c)) }}
+          onClose={() => setViewing(null)}
+        />
+      )}
+      {viewing && viewing !== 'draft' && viewerOf(viewing)}
     </div>
   );
 }
@@ -850,134 +1120,6 @@ export function DeckBuilder({ onExit, link, linkInvalid }: { onExit: () => void;
 /** Nota na linha do deck atual para carta rotacionada ou banida (no Standard). */
 function legalityNote(legality: 'legal' | 'rotated' | 'banned', t: Translate): string {
   return legality === 'legal' ? '' : ` · ${t(legality === 'rotated' ? 'deck.entryRotated' : 'deck.entryBanned')}`;
-}
-
-function deckRowTitle(d: DeckSummary, t: Translate): string {
-  return FORMATS.map((f) => t(d.formats[f.id].length ? 'deck.formatNotAllowed' : 'deck.formatAllowed', { format: f.label })).join(' · ');
-}
-
-/** Cores do deck e o selo de estado: ✓ (Standard), EGB (só Extra Grand Battle), 🚫 ou o tamanho de um rascunho. */
-function DeckRowInfo({ d }: { d: DeckSummary }) {
-  const t = useT();
-  return (
-    <>
-      <span className="deck-colors">
-        {d.colors.map((c) => (
-          <i key={c} className={`dot c-${c}`} />
-        ))}
-      </span>
-      <span className="deck-row-name">{d.name}</span>
-      <span
-        className={['deck-row-size', d.valid && !d.formats.standard.length ? 'ok' : 'bad'].join(' ')}
-        title={d.valid ? deckRowTitle(d, t) : undefined}
-      >
-        {!d.valid ? `${d.size}/${DECK_SIZE}` : !d.formats.standard.length ? '✓' : !d.formats.egb.length ? 'EGB' : '🚫'}
-      </span>
-    </>
-  );
-}
-
-/**
- * Decks salvos num menu suspenso (meus, da comunidade e prontos), com busca por nome ou Líder.
- * Fecha ao escolher, ao clicar fora ou com Esc.
- */
-function DeckDropdown({
-  decks,
-  currentId,
-  onPick,
-  hint,
-}: {
-  decks: DeckSummary[];
-  currentId: string | null;
-  onPick: (id: string) => void;
-  /** Onde os decks ficam guardados (conta Google ou este navegador). */
-  hint: string;
-}) {
-  const t = useT();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery('');
-    inputRef.current?.focus();
-    const onDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('pointerdown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  const current = decks.find((d) => d.id === currentId);
-  const needle = query.trim().toLowerCase();
-  const groups = deckGroups(decks).map(
-    ([title, group]) =>
-      [title, needle ? group.filter((d) => `${d.name} ${d.leaderName ?? ''} ${d.leader}`.toLowerCase().includes(needle)) : group] as const,
-  );
-
-  return (
-    <div className="deck-dd" ref={ref}>
-      <button
-        type="button"
-        className={['deck-dd-btn', open ? 'open' : ''].join(' ')}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        title={current ? t('deck.openDeckTitle', { name: current.name }) : t('deck.openSavedTitle')}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {current ? <DeckRowInfo d={current} /> : <span className="deck-row-name muted">{t('deck.openSaved')}</span>}
-        <span className="deck-dd-count" title={t('deck.decksCount', { n: decks.length })}>
-          {decks.length}
-        </span>
-        <Icon name="chevron" size={16} />
-      </button>
-      {open && (
-        <div className="deck-dd-pop">
-          <input
-            ref={inputRef}
-            className="search deck-dd-search"
-            placeholder={t('deck.searchDecksPlaceholder')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label={t('deck.searchDecksLabel')}
-          />
-          <div className="deck-list" role="listbox" aria-label={t('deck.savedDecks')}>
-            {groups.map(([title, group]) =>
-              title === 'labels.deckGroup.community' && !group.length ? null : (
-                <div key={title}>
-                  <div className="deck-list-title">{t(title)}</div>
-                  {group.length === 0 && <div className="muted small">{needle ? t('deck.noDeckFound') : t('deck.noDeckYet')}</div>}
-                  {group.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      role="option"
-                      aria-selected={d.id === currentId}
-                      className={['deck-row', d.id === currentId ? 'on' : ''].join(' ')}
-                      onClick={() => {
-                        setOpen(false);
-                        onPick(d.id);
-                      }}
-                    >
-                      <DeckRowInfo d={d} />
-                    </button>
-                  ))}
-                </div>
-              ),
-            )}
-          </div>
-          <p className="muted small owner-hint">{hint}</p>
-        </div>
-      )}
-    </div>
-  );
 }
 
 /** Selo no catálogo para cartas banidas ou rotacionadas (bloco ①). */

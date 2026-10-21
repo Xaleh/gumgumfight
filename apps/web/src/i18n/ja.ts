@@ -4,6 +4,7 @@ import type { Messages } from './pt-BR';
 import support from './support/ja';
 import tutorial from './tutorial/ja';
 import recap from './recap/ja';
+import decks from './decks/ja';
 
 export default {
   // ---- 全般 ----
@@ -2683,4 +2684,5 @@ export default {
   ...support,
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
+  ...decks,
 } satisfies Messages;
