@@ -1430,7 +1430,7 @@ input[type='number'] {
   gap: 16px;
   align-items: stretch;
 }
-@media (min-width: 1100px) {
+@media (min-width: 1240px) {
   .mode-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
@@ -1636,6 +1636,8 @@ input[type='number'] {
 }
 /* "Cartas" da sala privada e do treino: três opções numa carta estreita (o texto quebra se precisar). */
 .mode-card .seg.rules-seg button {
+  /* Largura pelo texto: o "+ Spoilers" só quebra quando não cabe mesmo. */
+  flex: 1 1 auto;
   min-width: 0;
   padding-inline: 4px;
   white-space: normal;
@@ -8348,6 +8350,9 @@ tr.clickable:hover td {
 .tour-me p {
   margin: 0 0 10px;
 }
+.tour-me > .btn {
+  margin-bottom: 8px;
+}
 .tour-me .btn-row {
   flex-wrap: wrap;
 }
@@ -8373,10 +8378,24 @@ tr.clickable:hover td {
 }
 .tour-form-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  /* 180px: o seletor "Jogo único / Melhor de 3" cabe sem cortar no celular. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0 12px;
 }
 .tour-form-row .field:last-child {
+  margin-bottom: 14px;
+}
+.tour-form .field > .check {
+  margin-top: 10px;
+}
+.tour-form .field > p.small {
+  margin: 6px 0 0;
+}
+.tour-form > p.small {
+  margin: 0 0 14px;
+}
+/* Administração: as abas não encostam no conteúdo da aba. */
+.admin .coverage-body > .tour-tabs {
   margin-bottom: 14px;
 }
 .tour-tabs {
@@ -8734,9 +8753,13 @@ tr.clickable:hover td {
 .tour-late p {
   margin: 0;
 }
+.tour-late form {
+  align-items: center;
+}
 .tour-late form input {
   flex: 1 1 160px;
   min-width: 0;
+  margin-bottom: 0;
 }
 
 
@@ -11091,23 +11114,27 @@ a.sponsor-card:hover {
 .sponsor-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
-  padding: 10px;
+  padding: 14px;
   border-radius: 12px;
   background: var(--bg2);
   border: 1px solid var(--line);
 }
-.sponsor-form .field {
+.sponsor-form .field,
+.sponsor-form .tour-form-row .field:last-child {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
   flex: 1;
   min-width: 140px;
   margin: 0;
 }
+.sponsor-form .admin-search {
+  margin-bottom: 0;
+}
 .sponsor-form .tour-form-row {
-  gap: 8px;
+  gap: 12px;
 }
 .sponsor-placements {
   display: flex;
@@ -12951,6 +12978,9 @@ a.sponsor-card:hover {
   justify-content: flex-start;
   margin: 8px 0;
 }
+.lobby-head {
+  margin-bottom: 12px;
+}
 .lobby-head p {
   margin: 6px 0 0;
 }
@@ -13912,7 +13942,8 @@ div.dk-tile-main {
 .dk-stat {
   display: flex;
   flex-direction: column;
-  padding: 8px 10px;
+  gap: 2px;
+  padding: 10px 14px;
   border-radius: 12px;
   background: var(--panel2);
   font-size: 12px;
@@ -14209,6 +14240,10 @@ div.dk-tile-main {
 .dk-cleanup-stats {
   display: flex;
   gap: 8px;
+}
+.dk-cleanup > p,
+.dk-cleanup > .error {
+  margin: 0;
 }
 .dk-cleanup-group {
   border-radius: 14px;
