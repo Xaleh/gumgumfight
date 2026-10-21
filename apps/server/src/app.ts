@@ -414,8 +414,13 @@ export function buildApp(
         else res.setHeader('cache-control', 'no-cache');
       },
     });
+    // Arquivo de /assets que não existe é 404, nunca a página: depois de um deploy, a aba aberta
+    // na versão anterior pede arquivos que já saíram, e HTML no lugar de JS quebra a tela (e o
+    // service worker o guardaria no cache no lugar do arquivo).
     app.setNotFoundHandler((req, reply) =>
-      req.url.startsWith('/api/') ? reply.code(404).send(fail('notFound', 'Não encontrado')) : reply.sendFile('index.html'),
+      req.url.startsWith('/api/') || req.url.startsWith('/assets/')
+        ? reply.code(404).send(fail('notFound', 'Não encontrado'))
+        : reply.sendFile('index.html'),
     );
   }
 

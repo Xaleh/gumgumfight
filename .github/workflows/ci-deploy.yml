@@ -57,6 +57,8 @@ jobs:
           curl -fsS http://127.0.0.1:3399/api/health
           curl -fsS http://127.0.0.1:3399/api/decks | grep -q st01-luffy
           curl -fsS http://127.0.0.1:3399/ | grep -q '<div id="root">'
+          # Arquivo de uma versão anterior: 404, nunca a página (ver setNotFoundHandler em app.ts).
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3399/assets/versao-anterior-0000.js)" = 404
           node release/server/import-cards.mjs --dry-run --file apps/server/test/fixtures/optcgapi-sample.json
 
       - name: Empacota
