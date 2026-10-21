@@ -212,9 +212,10 @@ function capture(root: Element | null): Boxes {
       face: !el.classList.contains('back'),
     });
   });
-  root.querySelectorAll<HTMLElement>('.pile [data-uid]').forEach((el) => {
+  // Na mesa lateral o descarte fica deitado.
+  root.querySelectorAll<HTMLElement>('.pile [data-uid], .lat-trash-card [data-uid]').forEach((el) => {
     const b = measure(el);
-    if (b) m.set(`trash:${el.dataset.uid}`, { ...b, face: true });
+    if (b) m.set(`trash:${el.dataset.uid}`, { ...b, face: true, ...(lying(el) ? { rot: true } : {}) });
   });
   root.querySelectorAll<HTMLElement>('[data-hand-uid]').forEach((el) => {
     const b = measure(el);
@@ -508,7 +509,7 @@ function findEl(root: Element, zone: Zone, uid: string): Element | null {
   const q = CSS.escape(uid);
   if (zone === 'hand') return root.querySelector(`[data-hand-uid="${q}"]`);
   if (zone === 'field') return root.querySelector(`.field-card [data-uid="${q}"]`);
-  if (zone === 'trash') return root.querySelector(`.pile [data-uid="${q}"]`);
+  if (zone === 'trash') return root.querySelector(`.pile [data-uid="${q}"], .lat-trash-card [data-uid="${q}"]`);
   return null;
 }
 
@@ -705,6 +706,24 @@ function place(b: Box, base: { w: number; h: number }, opts: { lift?: number; ti
   return `translate(${(b.x - base.w / 2).toFixed(1)}px, ${(b.y - base.h / 2 - (opts.lift ?? 0)).toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${s.toFixed(3)})`;
 }
 
+/**
+ * Cada quadro gira pelo caminho mais curto a partir do anterior (270° → 0° vira −90° → 0°,
+ * não uma volta de 270°): a metade direita da mesa lateral soma 180° aos 90° da carta deitada.
+ */
+function unwind(frames: Keyframe[]): Keyframe[] {
+  let prev: number | null = null;
+  return frames.map((k) => {
+    if (typeof k.transform !== 'string') return k;
+    const transform = k.transform.replace(/rotate\((-?[\d.]+)deg\)/, (_, a: string) => {
+      let deg = Number(a);
+      if (prev !== null) deg -= Math.round((deg - prev) / 360) * 360;
+      prev = deg;
+      return `rotate(${deg.toFixed(1)}deg)`;
+    });
+    return { ...k, transform };
+  });
+}
+
 function midBox(a: Box, b: Box): Box {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, w: (a.w + b.w) / 2, h: (a.h + b.h) / 2, rot: a.rot && b.rot, turn: ((a.turn ?? 0) + (b.turn ?? 0)) / 2 };
 }
@@ -761,7 +780,7 @@ function CardFlightView({ f, onDone }: { f: CardFlight; onDone: (id: number) => 
         ];
       }
     }
-    const anim = el.animate(frames, { duration: f.duration, delay: f.delay, fill: 'both' });
+    const anim = el.animate(unwind(frames), { duration: f.duration, delay: f.delay, fill: 'both' });
     // Virar a carta: no centro da vitrine ou no meio do voo.
     const [f0, f1] = f.showcase ? [0.3, 0.46] : [0.2, 0.7];
     const persp = 'perspective(900px)';
@@ -828,12 +847,12 @@ function DonFlightView({ f, onDone }: { f: DonFlight; onDone: (id: number) => vo
     const to = f.fade && f.flip !== 'hide' ? { ...f.to, w: base.w, h: base.h, rot: false } : f.to;
     const dist = Math.hypot(f.to.x - f.from.x, f.to.y - f.from.y);
     const anim = el.animate(
-      [
+      unwind([
         { transform: place(f.from, base), offset: 0, easing: 'ease-out' },
         { transform: place(midBox(f.from, to), base, { lift: Math.min(40, 10 + dist * 0.1), tilt: 14, grow: 1.35 }), offset: 0.45, easing: 'ease-in' },
         { transform: place(to, base), opacity: 1, offset: 0.9 },
         { transform: place(to, base, { grow: f.fade ? 0.6 : 1 }), opacity: f.fade ? 0 : 1, offset: 1 },
-      ],
+      ]),
       { duration: f.duration, delay: f.delay, fill: 'both' },
     );
     // Virar: desvira na subida ao sair do deck; vira na descida ao voltar para ele.
@@ -941,13 +960,13 @@ function SpotView({ s, onDone }: { s: Feature; onDone: (id: number) => void }) {
     const tOut = (s.flyIn + s.hold) / s.duration;
     const tilt = s.bottom ? -7 : 7;
     const anim = el.animate(
-      [
+      unwind([
         { transform: place(s.from, base), offset: 0, easing: 'cubic-bezier(.2,.9,.3,1)' },
         { transform: place(s.stage, base, { tilt, grow: 1.06 }), offset: tIn * 0.85, easing: 'ease-out' },
         { transform: place(s.stage, base), offset: tIn },
         { transform: place(s.stage, base), offset: tOut, easing: 'cubic-bezier(.5,0,.4,1)' },
         { transform: place(s.from, base), offset: 1 },
-      ],
+      ]),
       { duration: s.duration, delay: s.delay, fill: 'both' },
     );
     anim.onfinish = finish;
