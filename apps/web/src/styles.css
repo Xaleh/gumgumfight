@@ -11718,6 +11718,17 @@ a.sponsor-card:hover {
 .game.streamer.with-panel {
   grid-template-columns: minmax(0, 1fr) 380px;
 }
+/*
+ * O leque da mão do jogador da direita vaza da mesa: fica por trás do painel. A mesa vira um contexto
+ * de empilhamento (o z-index do leque vale só dentro dela) e o painel, que vem depois, fica por cima.
+ * Os modais da mesa ficam dentro dela (absolutos), então nada da mesa precisa cobrir o painel.
+ */
+.game.streamer .board-col {
+  isolation: isolate;
+}
+.game.streamer .side-panel {
+  position: relative;
+}
 .round-btn.log-btn.on {
   background: var(--blue);
 }
