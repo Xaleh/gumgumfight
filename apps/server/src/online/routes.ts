@@ -32,6 +32,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
+import { ResponseCache } from '../cache';
 import { fail } from '../errors';
 import { currentSpoilerSet } from '../spoiler-set';
 import type { ApiCard } from '../present';
@@ -468,8 +469,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
       ...init,
       sentDefs: new Set(),
       sentLog: 0,
-      send: (event, data) => {
-        if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      send: (event, data) => conn.sendJson!(event, JSON.stringify(data)),
+      sendJson: (event, json) => {
+        if (!res.writableEnded) res.write(`event: ${event}\ndata: ${json}\n\n`);
       },
       end: () => res.end(),
     };
@@ -501,16 +503,26 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   };
 
   /**
+   * Cache com ETag da lista "Assistir" (a tela consulta a cada 5 s e a página inicial a cada 15 s): a lista é
+   * montada no máximo uma vez por TTL, e só quando uma sala entra, sai, começa, termina ou muda de
+   * espectadores (`lobby.version`); o navegador recebe 304 sem corpo quando nada mudou.
+   */
+  const liveCache = new ResponseCache(lobby.version, undefined, deps.now);
+  const LIVE_TTL_MS = 2000;
+
+  /**
    * Partidas em andamento para assistir. `hands`: quem pede pode ligar "Ver mãos".
    * `mine`: quem pede joga a partida (nela, as mãos nunca aparecem).
    */
-  app.get('/api/online/live', async (req) => {
+  app.get('/api/online/live', async (req, reply) => {
     const account = user(req);
-    const owner = viewerHash(req);
-    return {
-      rooms: lobby.live({ bots: botRooms }).map((r) => ({ ...r, mine: lobby.get(r.id)?.isPlayer(owner, account?.id ?? null) ?? false })),
-      hands: seesHands(account?.role),
-    };
+    const hands = seesHands(account?.role);
+    // Quem joga uma das partidas listadas (quase ninguém) tem a própria entrada no cache; o resto compartilha uma.
+    const mine = lobby.playing(viewerHash(req), account?.id ?? null, { bots: botRooms });
+    return liveCache.send(req, reply, `live:${hands ? 1 : 0}:${mine.join(',')}`, LIVE_TTL_MS, () => ({
+      rooms: lobby.live({ bots: botRooms }).map((r) => ({ ...r, mine: mine.includes(r.id) })),
+      hands,
+    }));
   });
 
   /** Sala privada pelo código, para assistir. */

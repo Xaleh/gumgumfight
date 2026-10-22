@@ -1122,6 +1122,67 @@ describe('modo espectador', () => {
     expect(room.spectators).toBe(1);
   });
 
+  it('fan-out compartilhado: a visão pública é calculada e serializada uma vez por envio; defs e log são por conexão', async () => {
+    const { app } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    // Conexões como as do canal SSE: recebem o texto pronto por `sendJson` (nunca o objeto por `send`).
+    const raw = (seat: PlayerId | null, hands = false) => {
+      const got: Array<{ event: string; json: string }> = [];
+      const conn: Connection = {
+        seat,
+        hands,
+        sentDefs: new Set(),
+        sentLog: 0,
+        send: (event) => {
+          throw new Error(`${event}: com sendJson, nada vai por send`);
+        },
+        sendJson: (event, json) => got.push({ event, json }),
+      };
+      const states = () => got.filter((e) => e.event === 'state').map((e) => JSON.parse(e.json));
+      return { conn, got, states, last: () => states().at(-1)! };
+    };
+    const player = raw(0);
+    const [a, b] = [raw(null), raw(null)];
+    for (const c of [player, a, b]) room.attach(c.conn);
+    // O primeiro state de cada espectador traz a mesma visão e todas as definições de cartas (só o contador de espectadores difere).
+    expect(a.last().view).toEqual(b.last().view);
+    expect(Object.keys(a.last().defs)).toEqual(Object.keys(b.last().defs));
+    expect(Object.keys(a.last().defs).length).toBeGreaterThan(0);
+    expect(a.last().log.from).toBe(0);
+    // presence e emotes também vão prontos.
+    expect(JSON.parse(a.got.filter((e) => e.event === 'presence').at(-1)!.json)).toEqual({ connected: [true, false], spectators: 2 });
+
+    // Uma jogada: a visão pública (`actionCount` + `cards`) é serializada uma vez para os dois espectadores e uma para o jogador.
+    const stringify = vi.spyOn(JSON, 'stringify');
+    const first = actingPlayer(a.last().view)!;
+    expect((await act(app, roomId, tokens[first], 0, { type: 'answer', player: first, yes: true })).statusCode).toBe(200);
+    const views = stringify.mock.calls.filter(([v]) => v && typeof v === 'object' && 'actionCount' in (v as object) && 'cards' in (v as object));
+    stringify.mockRestore();
+    expect(views).toHaveLength(2);
+    expect(a.last().view.actionCount).toBe(1);
+    expect(a.got.at(-1)!.json).toBe(b.got.at(-1)!.json);
+    expect(a.got.at(-1)!.json).not.toBe(player.got.at(-1)!.json);
+    // Só o que é novo para a conexão: nenhuma definição repetida e só as linhas novas do log.
+    expect(a.last().defs).toEqual({});
+    expect(a.last().log.from).toBe(a.states()[0].log.entries.length);
+
+    // Quem chega agora recebe tudo (defs e log inteiros) sem mexer no que os outros já têm.
+    const c = raw(null);
+    room.attach(c.conn);
+    expect(Object.keys(c.last().defs)).toEqual(Object.keys(a.states()[0].defs));
+    expect(c.last().log.from).toBe(0);
+    expect(c.last().view).toEqual(a.last().view);
+    expect(c.last().room).toEqual({ ...a.last().room, spectators: 3, clock: c.last().room.clock });
+    // Uma conexão de teste sem `sendJson` continua recebendo o objeto por `send`.
+    const plain = client(null);
+    room.attach(plain.conn);
+    expect(plain.view!.actionCount).toBe(1);
+    expect(plain.room.spectators).toBe(4);
+    for (const x of [a, b, c, player]) room.detach(x.conn);
+    room.detach(plain.conn);
+  });
+
   it('lista de partidas: filas e treino contra o bot aparecem; salas privadas só pelo código', async () => {
     const { app, db } = setup();
     const { roomId } = await privateMatch(app);
