@@ -211,6 +211,8 @@ export interface Condition {
   anyCharacterMinBasePower?: number;
   /** "If your opponent's Character has been K.O.'d during this turn" */
   opponentCharacterKOThisTurn?: boolean;
+  /** "If a card has been removed from your opponent's Life cards during this turn" */
+  opponentLifeRemovedThisTurn?: boolean;
   /** "If you have 5 {X} type Characters with different card names" */
   distinctTyped?: { type: string; count: number };
   /** haveNamed: "… Characters with 6000 base power" */
@@ -349,6 +351,8 @@ export interface Condition {
   selfMinPower?: number;
   /** "If you have any DON!! cards given" */
   anyDonGiven?: boolean;
+  /** "If your Leader has any DON!! cards given" */
+  leaderAnyDonGiven?: boolean;
   /** "If this Character was played on this turn" */
   selfPlayedThisTurn?: boolean;
   /** "If you have N or more {X} type Characters" ("{X} or {Y}": `types` traz todos; `type` é o primeiro). */
@@ -359,6 +363,8 @@ export interface Condition {
   chosenMatches?: CardFilter;
   /** "If you do": o passo anterior afetou ao menos uma carta. */
   lastDone?: boolean;
+  /** "If you did not add a card to your hand" (P-134): a busca anterior não pegou carta. */
+  searchMissed?: boolean;
   /** "you may K.O. … If you do, …" (ST08-013): algum alvo do último K.O. foi mesmo nocauteado (está no descarte). */
   lastKOd?: boolean;
   /** "If you have a {X} type Character with a cost of N or more" */
@@ -1284,6 +1290,8 @@ export type Frame =
       trashed?: string[];
       /** Personagens que o último passo de K.O. tentou nocautear (para "If you do" depois do K.O.). */
       koTargets?: string[];
+      /** Cartas que a última busca no deck pegou ("If you did not add a card to your hand"). */
+      searched?: number;
       /**
        * Efeito de [Trigger]: a carta (`source`) fica fora de qualquer área enquanto ele resolve
        * (`GameState.limbo`) e vai para o descarte quando o frame termina, se o efeito não a moveu
@@ -1408,6 +1416,8 @@ export interface GameState {
   koThisTurn?: PlayerId[];
   /** Jogadores que descartaram da mão por efeito neste turno. */
   handTrashedThisTurn?: PlayerId[];
+  /** Jogadores que tiveram uma carta removida da Vida neste turno. */
+  lifeRemovedThisTurn?: PlayerId[];
   /** "take an extra turn after this one" */
   extraTurn?: PlayerId;
   /** Substituições criadas por efeitos até o fim do turno. */

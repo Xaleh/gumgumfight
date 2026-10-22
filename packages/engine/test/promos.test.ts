@@ -1,6 +1,7 @@
 // Promos (P-xxx) que vinham com texto estragado da optcgapi ou com efeito manual/parcial (DV-37):
 // o texto é corrigido por SOURCE_TEXT_FIXES e cada efeito agora é lido pelo leitor automático.
-// As cartas estão em fixtures/promos.json, como a importação do servidor as monta a partir da API.
+// As cartas estão em fixtures/promos.json, como a importação do servidor as monta a partir da API, e
+// em fixtures/promos-cardkaizoku.json as que vêm do Cardkaizoku (primeira fonte da cadeia) fora do padrão.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,7 +10,7 @@ import { chooseBotAction } from '../src/bot/simple';
 import { automationStatus, buildCardDef } from '../src/cards';
 import { parseCard } from '../src/cards/parser';
 import { validateDeck } from '../src/deck';
-import { applyAction, getPower, koProtected } from '../src/engine';
+import { applyAction, costInHand, getPower, hasKeyword, koProtected } from '../src/engine';
 import { fixCard } from '../src/errata';
 import { translateCardPt } from '../src/i18n/render';
 import { applySourceFixes, SOURCE_TEXT_FIXES } from '../src/source-fixes';
@@ -18,7 +19,10 @@ import { cards as baseCards, noDefense, started, toTurn } from './helpers';
 
 const promos = (JSON.parse(readFileSync(join(__dirname, 'fixtures/promos.json'), 'utf8')) as { cards: CardData[] }).cards;
 const promo = (id: string) => promos.find((c) => c.id === id)!;
-const cards = [...baseCards, ...promos];
+const kaizoku = (JSON.parse(readFileSync(join(__dirname, 'fixtures/promos-cardkaizoku.json'), 'utf8')) as { cards: CardData[] }).cards;
+const kz = (id: string) => kaizoku.find((c) => c.id === id)!;
+// P-117 está nas duas fontes: na partida vale a versão da optcgapi.
+const cards = [...baseCards, ...promos, ...kaizoku.filter((c) => !promos.some((p) => p.id === c.id))];
 
 /** Troca a carta do fundo do deck por `cardId` e devolve o uid (só para testes). */
 function take(s: GameState, player: PlayerId, cardId: string): string {
@@ -66,10 +70,13 @@ describe('textos estragados na fonte (SOURCE_TEXT_FIXES)', () => {
   it('a troca só vale para o trecho estragado e aplicar de novo não muda nada', () => {
     // As cartas de coleção da tabela (OP03-013, OP03-112) estão em card-audit.test.ts.
     for (const id of Object.keys(SOURCE_TEXT_FIXES).filter((k) => k.startsWith('P-'))) {
-      const fixed = applySourceFixes(promo(id));
-      expect(fixed.text).not.toBe(promo(id).text);
+      const card = SOURCE_TEXT_FIXES[id].some(([from]) => kz(id)?.text?.includes(from.replace(/\$$/, ''))) ? kz(id) : promo(id);
+      const fixed = applySourceFixes(card);
+      expect([id, fixed.text]).not.toEqual([id, card.text]);
       expect(applySourceFixes(fixed)).toBe(fixed);
     }
+    // A versão da optcgapi (o texto oficial) não muda.
+    for (const id of ['P-117']) expect(applySourceFixes(promo(id)).text).toBe(promo(id).text);
     // Fonte já corrigida (ou outro texto): a carta volta igual.
     const ok = fixCard(promo('P-115'));
     expect(fixCard(ok)).toBe(ok);
@@ -80,6 +87,13 @@ describe('textos estragados na fonte (SOURCE_TEXT_FIXES)', () => {
       expect([c.id, automationStatus(fixCard(c))]).toEqual([c.id, 'auto']);
       expect(parseCard(fixCard(c)).unparsed).toEqual([]);
       expect(translateCardPt(fixCard(c)).complete).toBe(true);
+    }
+  });
+
+  it('as promos do Cardkaizoku também (antes: 18 manuais e 6 parciais)', () => {
+    for (const c of kaizoku) {
+      expect([c.id, automationStatus(fixCard(c))]).toEqual([c.id, 'auto']);
+      expect([c.id, translateCardPt(fixCard(c)).complete]).toEqual([c.id, true]);
     }
   });
 });
@@ -324,5 +338,92 @@ describe('bot: P-136 Usopp sem alvo {Land of Wano} (simulate:all com as promos)'
     expect(chooseBotAction(s, 0)).not.toMatchObject({ type: 'activate', uid: usopp });
     onField(s, 0, 'P-036'); // {Land of Wano}
     expect(chooseBotAction(s, 0)).toMatchObject({ type: 'activate', uid: usopp });
+  });
+});
+
+describe('promos do Cardkaizoku: o que o leitor passou a entender', () => {
+  it('P-040 Kaido: com o oponente com 10 DON!! no campo, não é nocauteado (nem em batalha, nem por efeito)', () => {
+    const s = toTurn(started(), 3);
+    const kaido = onField(s, 1, 'P-040');
+    const opp = s.players[0];
+    expect(koProtected(s, kaido, true)).toBe(false);
+    opp.donActive += opp.donDeck;
+    opp.donDeck = 0;
+    expect(koProtected(s, kaido, true)).toBe(true);
+    expect(koProtected(s, kaido, false)).toBe(true);
+  });
+
+  it('P-120 Sanji: custa 2 a menos na mão depois que sai uma carta da Vida do oponente neste turno', () => {
+    let s = toTurn(started(), 3);
+    const sanji = toHand(s, 0, 'P-120');
+    expect(costInHand(s, sanji)).toBe(6);
+    s = noDefense(applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid }));
+    expect(costInHand(s, sanji)).toBe(4);
+    // No turno seguinte a contagem recomeça.
+    s = toTurn(s, 5);
+    expect(costInHand(s, sanji)).toBe(6);
+  });
+
+  it('P-122 Ace & Sabo & Luffy: +2000 para até 1 de cada nome', () => {
+    let s = toTurn(started(), 3);
+    setLeader(s, 0, 'P-122');
+    const [sabo, ace, luffy] = ['P-126', 'P-128', 'P-132'].map((id) => onField(s, 0, id));
+    s = applyAction(s, { type: 'activate', player: 0, uid: s.players[0].leader.uid, ability: 0 });
+    for (const uid of [sabo, ace, luffy]) {
+      expect(s.pending).toMatchObject({ kind: 'selectTargets', options: [uid] });
+      s = choose(s, [uid]);
+    }
+    for (const uid of [sabo, ace, luffy]) expect(getPower(s, uid)).toBe(8000);
+  });
+
+  it('P-126 Sabo: virando 1 DON!!, ele e até 1 [Monkey.D.Luffy] ou [Portgas.D.Ace] com 6000 de poder base ganham [Rush]', () => {
+    let s = toTurn(started(), 3);
+    addDon(s, 0, 4);
+    const luffy = onField(s, 0, 'P-132');
+    const sabo = toHand(s, 0, 'P-126');
+    s = play(s, sabo);
+    s = answer(s, true);
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', options: [luffy] });
+    s = choose(s, [luffy]);
+    expect(hasKeyword(s, sabo, 'rush')).toBe(true);
+    expect(hasKeyword(s, luffy, 'rush')).toBe(true);
+  });
+
+  it('P-134: sem adicionar carta à mão, compra 1; adicionando, não compra', () => {
+    const run = (withSabo: boolean) => {
+      let s = toTurn(started(), 3);
+      const ev = toHand(s, 0, 'P-134');
+      const deck = s.players[0].deck;
+      const sabo = withSabo ? take(s, 0, 'P-126') : undefined;
+      if (sabo) deck.unshift(sabo);
+      const hand = s.players[0].hand.length;
+      s = play(s, ev);
+      if (sabo) {
+        expect(s.pending).toMatchObject({ kind: 'selectTargets' });
+        s = choose(s, [sabo]);
+      }
+      // Ordem do resto no fundo do deck.
+      while (s.pending?.kind === 'selectTargets') s = choose(s, s.pending.min ? s.pending.options : []);
+      return { s, hand, sabo };
+    };
+    const hit = run(true);
+    expect(hit.s.players[0].hand).toContain(hit.sabo);
+    expect(hit.s.players[0].hand).toHaveLength(hit.hand); // -1 do Evento, +1 do Sabo
+    const miss = run(false);
+    expect(miss.s.players[0].hand).toHaveLength(miss.hand); // -1 do Evento, +1 da compra
+  });
+
+  it('P-159 Luffy [On K.O.]: só joga da mão se o Líder tiver DON!! anexado', () => {
+    const ko = (leaderDon: number) => {
+      let s = toTurn(started(), 3);
+      const luffy = onField(s, 1, 'P-159');
+      s.players[1].leader.don = leaderDon;
+      s.players[1].donDeck -= leaderDon;
+      s.players[0].leader.don = 1;
+      s.players[0].donActive -= 1;
+      return noDefense(applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: luffy }));
+    };
+    expect(ko(1).pending).toMatchObject({ kind: 'confirm', player: 1 });
+    expect(ko(0).pending).toBeNull();
   });
 });

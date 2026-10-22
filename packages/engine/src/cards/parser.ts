@@ -865,6 +865,13 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^your opponent has (\d+) or more DON!! cards on their field$/i))) {
     return { opponentMinDonOnField: Number(m[1]) };
   }
+  if ((m = t.match(/^your opponent has (\d+) DON!! cards on their field$/i))) {
+    return { opponentMinDonOnField: Number(m[1]), opponentMaxDonOnField: Number(m[1]) };
+  }
+  if (/^your Leader has any DON!! cards given$/i.test(t)) return { leaderAnyDonGiven: true };
+  if (/^a card has been removed from your opponent's Life cards during this turn$/i.test(t)) return { opponentLifeRemovedThisTurn: true };
+  // "Look at … add it to your hand. … If you did not add a card to your hand, draw 1 card." (P-134)
+  if (/^you did not add a card to your hand$/i.test(t)) return { searchMissed: true };
   if ((m = t.match(/^you have (\d+) or more Life cards$/i))) return { lifeMin: Number(m[1]) };
   if ((m = t.match(/^your opponent has a Character with (\d+) or more power$/i))) {
     return { opponentCharacterMinPower: Number(m[1]) };
@@ -2048,12 +2055,26 @@ function parseClause(clause: string): EffectStep[] | null {
     const first = parseClause(addSelf[1]);
     return first && [...first, { do: 'addThisToHand' }];
   }
+  // "Up to 1 each of your [A], [B] and [C] gain +2000 power during this turn" (P-122): um passo por nome.
+  const each = c.match(/^up to (\d+) each of your ((?:\[[^\]]+\],? )+and \[[^\]]+\])(.*?) gains? (.+)$/i);
+  if (each) {
+    const parts = [...each[2].matchAll(/\[([^\]]+)\]/g)].map((x) => parseClause(`Up to ${each[1]} of your [${x[1]}]${each[3]} gains ${each[4]}`));
+    if (parts.every(Boolean)) return parts.flatMap((x) => x!);
+  }
   for (const [re, make] of CLAUSES) {
     const m = c.match(re);
     if (m) {
       const steps = make(m);
       if (steps) return steps;
     }
+  }
+  // "This Character and up to 1 of your [A] or [B] … gain [Rush] during this turn" (P-126): esta carta
+  // sempre, a outra é escolha (como o +1000 do P-036).
+  const andOther = c.match(/^This (?:Character|Leader) and (up to \d+ (?:each )?of your .+?) gains? (.+)$/i);
+  if (andOther) {
+    const self = parseClause(`This Character gains ${andOther[2]}`);
+    const other = self && parseClause(`${capitalizeFirst(andOther[1])} gains ${andOther[2]}`);
+    if (other) return [...self, ...other];
   }
   // Duas ações com "and": "Draw 1 card and none of your Characters can be K.O.'d during this turn"
   for (const at of [...c.matchAll(/ and /gi)].map((x) => x.index!)) {
@@ -3068,6 +3089,8 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     return [{ ...base, staticCanAttackActive: true }];
   }
   if (/^this Character cannot be K\.O\.'d in battle$/i.test(s)) return [{ ...base, staticNoBattleKO: true }];
+  // "this Character cannot be K.O.'d" (P-040): nem em batalha nem por efeitos.
+  if (/^this Character cannot be K\.O\.'d$/i.test(s)) return [{ ...base, staticNoBattleKO: true }, { ...base, staticNoEffectKO: true }];
   if (/^this (?:Character|Stage) cannot be K\.O\.'d by effects$/i.test(s)) return [{ ...base, staticNoEffectKO: true }];
   // "by "Strike" attribute Leaders or Characters" (P-007) = "… attribute cards".
   if ((m = s.match(/^this Character cannot be K\.O\.'d in battle by "?(\w+)"? attribute (Characters|cards|Leaders or Characters)$/i))) {

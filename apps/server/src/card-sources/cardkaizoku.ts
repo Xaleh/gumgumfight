@@ -56,10 +56,14 @@ const num = (v: unknown): number | undefined => {
 /** Custo de DON!! "➀" (símbolo do site) vira "①" (o das cartas impressas, que o leitor entende). */
 const DINGBAT_DIGITS = /[➀-➉]/g;
 
-/** Texto do site no padrão do motor: além do que vale para o optcgleaks, custo ➀ e "DON!! −1" com hífen. */
+/**
+ * Texto do site no padrão do motor: além do que vale para o optcgleaks, custo ➀, "DON!! −1" com hífen e
+ * as quebras de linha estragadas ("</br>" no P-098; "<\br>" no P-096, que o JSON lê como "<", backspace, "r>").
+ */
 export function normalizeKaizokuText(raw: string): string {
   const text = normalizeLeaksText(
     raw
+      .replace(/<(?:\/|\\|\x08)b?r>/gi, '\n')
       .replace(DINGBAT_DIGITS, (d) => String.fromCharCode(0x2460 + d.charCodeAt(0) - 0x2780))
       .replace(/DON!! ?[−–]\s?(\d)/g, 'DON!! -$1')
       .replace(/[“”]/g, '"')

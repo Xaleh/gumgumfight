@@ -339,7 +339,8 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push('você tiver no campo um número de DON!! igual ou menor que o do oponente');
         break;
       case 'opponentMinDonOnField':
-        out.push(`o oponente tiver ${c.opponentMinDonOnField} ou mais DON!! no campo`);
+        if (c.opponentMinDonOnField === c.opponentMaxDonOnField) out.push(`o oponente tiver ${c.opponentMinDonOnField} DON!! no campo`);
+        else out.push(`o oponente tiver ${c.opponentMinDonOnField} ou mais DON!! no campo`);
         break;
       case 'opponentLifeMax':
         if (c.opponentLifeMin === c.opponentLifeMax) out.push(`o oponente tiver ${c.opponentLifeMax} ${plural(c.opponentLifeMax!, 'carta', 'cartas')} de Vida`);
@@ -470,6 +471,9 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'opponentCharacterKOThisTurn':
         out.push('um Personagem do oponente tiver sido nocauteado neste turno');
         break;
+      case 'opponentLifeRemovedThisTurn':
+        out.push('uma carta tiver saído da Vida do oponente neste turno');
+        break;
       case 'distinctTyped':
         out.push(`você tiver ${c.distinctTyped!.count} Personagens do tipo {${c.distinctTyped!.type}} com nomes diferentes`);
         break;
@@ -516,6 +520,7 @@ function condition(c: Condition, ctx: Ctx): string {
         out.push(`você e o oponente tiverem, juntos, ${c.totalLifeMin} ou mais cartas de Vida`);
         break;
       case 'opponentMaxDonOnField':
+        if (c.opponentMinDonOnField === c.opponentMaxDonOnField) break;
         out.push(`o oponente tiver ${c.opponentMaxDonOnField} ou menos DON!! no campo`);
         break;
       case 'leaderNameIncludes':
@@ -595,6 +600,9 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'anyDonGiven':
         out.push('você tiver algum DON!! anexado');
         break;
+      case 'leaderAnyDonGiven':
+        out.push('o seu Líder tiver algum DON!! anexado');
+        break;
       case 'selfPlayedThisTurn':
         out.push(`${ctx.self} tiver sido jogado neste turno`);
         break;
@@ -626,6 +634,9 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'lastDone':
       case 'lastKOd':
         out.push('fizer isso');
+        break;
+      case 'searchMissed':
+        out.push('você não tiver adicionado uma carta à mão');
         break;
       case 'chosenMatches':
         out.push(`essa carta for ${filter(c.chosenMatches!, 1, false).replace(/^1 (?=carta)/, 'uma ').replace(/^1 /, 'um ')}`);

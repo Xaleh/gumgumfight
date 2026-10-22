@@ -95,6 +95,11 @@ describe('Cardkaizoku: mapeamento', () => {
       text: '[On Play] Draw 1 card.',
       trigger: 'Draw 1 card.',
     });
+    // Quebras de linha estragadas: "</br>" (P-098) e "<\br>", que o JSON lê como "<", backspace, "r>" (P-096).
+    expect(mapKaizokuCard(kz('P-098', { text: '[Blocker]</br>[On Play] Draw 1 card.' }))!.text).toBe('[Blocker]\n[On Play] Draw 1 card.');
+    expect(mapKaizokuCard(kz('P-096', { text: JSON.parse('"[On Play] Draw 1 card.<\\br>[Activate: Main] Draw 1 card."') }))!.text).toBe(
+      '[On Play] Draw 1 card.\n[Activate: Main] Draw 1 card.',
+    );
   });
 
   it('texto ainda não revelado, "-" de carta sem efeito e Líder de evento', () => {

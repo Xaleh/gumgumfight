@@ -394,6 +394,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
     return false;
   }
   if (cond.opponentCharacterKOThisTurn && !(state.koThisTurn ?? []).includes(opp.id)) return false;
+  if (cond.opponentLifeRemovedThisTurn && !(state.lifeRemovedThisTurn ?? []).includes(opp.id)) return false;
   if (cond.distinctTyped) {
     const names = new Set(ps.characters.filter((c) => hasType(cardDef(state, c.uid), cond.distinctTyped!.type)).map((c) => cardDef(state, c.uid).name));
     if (names.size < cond.distinctTyped.count) return false;
@@ -494,6 +495,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.opponentHandMin !== undefined && opp.hand.length < cond.opponentHandMin) return false;
   if (cond.selfMinPower !== undefined && (!locate(state, source) || getPower(state, source) < cond.selfMinPower)) return false;
   if (cond.anyDonGiven && ![ps.leader, ...ps.characters].some((c) => c.don > 0)) return false;
+  if (cond.leaderAnyDonGiven && ps.leader.don === 0) return false;
   if (cond.selfPlayedThisTurn && locate(state, source)?.fc.playedOnTurn !== state.turn) return false;
   if (
     cond.minTypedCharacters &&
@@ -1777,6 +1779,7 @@ function endTurn(state: GameState) {
   state.koThisTurn = [];
   state.tempReplacements = [];
   state.handTrashedThisTurn = [];
+  state.lifeRemovedThisTurn = [];
   state.onPlayNegated = (state.onPlayNegated ?? []).filter((n) => n.untilTurn > state.turn);
   // "You lose at the end of the turn in which your deck becomes 0 cards."
   const out = state.players.filter((pl) => pl.deck.length === 0 && leaderRule(state, pl.id, 'deckOutEndOfTurn')).map((pl) => pl.id);
@@ -2491,6 +2494,7 @@ function chosenMatches(state: GameState, card: string, filter: CardFilter): bool
 
 function stepConditionMet(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   if (step.if?.lastDone && !frame.last?.length) return false;
+  if (step.if?.searchMissed && frame.searched) return false;
   if (step.if?.lastKOd && !(frame.koTargets ?? []).some((u) => state.players[ownerOf(state, u)].trash.includes(u))) return false;
   if (step.if?.revealedHasChosenCost) {
     const card = frame.last?.[0];
@@ -3365,6 +3369,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           log(state, frame.controller, lg('revealsAddsToHand', `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }), { uids: [uid], by: ps.id });
         }
       }
+      frame.searched = chosen.length;
       if (step.rest === 'bottom') {
         ps.deck.push(...rest);
         if (rest.length) log(state, frame.controller, lg('placesAtBottom', `${ps.name} coloca ${rest.length} carta(s) no fundo do deck.`, { player: ps.name, n: rest.length }));
@@ -6044,6 +6049,7 @@ function lifeToHandCard(state: GameState, player: PlayerId, uid: string) {
 
 /** Uma carta saiu da Vida de `player` (dispara "When a card is removed from … Life cards" e "becomes 0"). */
 function lifeRemoved(state: GameState, player: PlayerId) {
+  if (!(state.lifeRemovedThisTurn ?? []).includes(player)) (state.lifeRemovedThisTurn ??= []).push(player);
   emit(state, { kind: 'lifeRemoved', player });
   if (state.players[player].life.length === 0) emit(state, { kind: 'lifeZero', player });
 }
