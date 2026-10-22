@@ -148,6 +148,7 @@ gumgumfight/
 │   ├── src/auth/                google.ts (JWKS/RS256), store.ts (users, sessions, roles), routes.ts
 │   ├── src/partners/            API para parceiros: store.ts (api_tokens, oauth_clients, oauth_codes), tokens.ts (middleware Bearer, /api/tokens), oauth.ts, webhook.ts, matches.ts
 │   ├── src/oauth-client-cli.ts  cadastro dos clientes OAuth (npm run oauth:client)
+│   ├── src/decisions/           extrator de decisões dos replays (extract.ts) e a CLI decisions-cli.ts (npm run decisions)
 │   ├── src/online/              room.ts (uma partida + relógio + mesa atrasada), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE), broadcast.ts (modo transmissão)
 │   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
@@ -280,6 +281,14 @@ e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
 Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
 [`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`; contra um
 "humano fraco" que defende como gente (`scripts/human.ts`): `npx tsx packages/engine/scripts/vs-human.ts 200 hard`.
+
+**Decisões de gente** (`apps/server/src/decisions/extract.ts`, CLI `npm run decisions -w @gumgum/server`): refaz os
+replays gravados em `matches.replay` e emite um registro por decisão de um lado humano (a situação que ele via, as
+ações legais, a escolha, por número de carta) com a escolha do bot na mesma visão (`viewFor`) e se concordam. Filtra
+por fila, data, perfis de maior recompensa (`--top`) ou colocados nos torneios encerrados (`--tournament-top`, pela
+classificação de `standings`). O resumo mostra a concordância por tipo de decisão, quem defende o Líder (humano x bot,
+por Vida e por margem do ataque) e os pares de discordância na fase principal; `--out` grava o JSONL. Só lê o banco
+([`docs/bot-tempo.md`, seção 11](bot-tempo.md)).
 
 ---
 
