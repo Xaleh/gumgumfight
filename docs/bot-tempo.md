@@ -273,6 +273,35 @@ Líder no fim e protege Personagens caros. Serve para pegar o que o auto-jogo n�
 deixa passar o ataque decisivo. O `hard` vence ~83% contra ele; um humano de verdade joga a fase principal
 bem melhor que o `simple.ts`, então a medida é um piso, não um retrato.
 
+## 11. Decisões de gente: o extrator dos replays
+
+Toda partida gravada (contra o bot, online, ranqueada, torneio) guarda o replay completo (`matches.replay`: seed,
+decks e ações), e o motor é determinístico: o servidor refaz a partida e reconstrói, em cada decisão, exatamente a
+visão que o jogador tinha (`viewFor`), a mesma com que o bot decide. `apps/server/src/decisions/extract.ts` percorre
+os replays e emite um registro por decisão de um lado humano:
+
+- quem (perfil, conta, tier e recompensa na hora), a fila e o formato, se venceu;
+- a situação: turno, Vida e mão dos dois lados, DON!! ativo, a batalha em curso (atacante, alvo, poderes e a margem
+  que o Counter teria de cobrir) nas decisões de defesa;
+- o tipo da decisão (`main`, `counter`, `block`, `lifeCard`, `selectTargets`, `option`, `confirm`, `mulligan`,
+  `chooseFirst`), quantas ações legais havia e a escolha, descrita por números de carta;
+- a escolha do bot (`hard` por padrão) na mesma visão, e se bate com a do humano.
+
+```bash
+# No servidor (ou numa cópia do banco): só lê, não grava nada.
+DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --limit 500 --out decisoes.jsonl
+DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --tournament-top 4 --queue tournament
+DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --top 20 --queue ranked --bot none
+```
+
+O resumo no terminal responde às três perguntas desta rodada: em que tipo de decisão o bot mais discorda das pessoas;
+com que frequência um humano usa Counter ou bloqueia um ataque ao Líder, por Vida e por margem (é o que os parâmetros
+`counterWill`, `counterStack`, `counterCard` da seção 3 chutam hoje); e, na fase principal, que par "humano fez X, bot
+faria Y" mais aparece (ex.: `playCard → attack` é o "desenvolver ou pressionar" da seção 8). O JSONL serve para o
+resto: calibrar esses parâmetros por regressão, ou ajustar os pesos da avaliação para concordar com os melhores
+colocados em vez de só por auto-jogo (seção 9). Partidas cujo replay não refaz (versão antiga, texto de carta que
+mudou) são contadas e puladas.
+
 ## Como medir
 
 ```bash
