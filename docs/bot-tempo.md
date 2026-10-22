@@ -285,7 +285,14 @@ os replays e emite um registro por decisão de um lado humano:
   que o Counter teria de cobrir) nas decisões de defesa;
 - o tipo da decisão (`main`, `counter`, `block`, `lifeCard`, `selectTargets`, `option`, `confirm`, `mulligan`,
   `chooseFirst`), quantas ações legais havia e a escolha, descrita por números de carta;
+- no Counter, quanto a mão podia dar (Counters impressos e Eventos [Counter] pagáveis) e quanto a carta usada deu,
+  para separar "não quis" de "não tinha como";
 - a escolha do bot (`hard` por padrão) na mesma visão, e se bate com a do humano.
+
+E, por turno do lado humano (`<saída>-turnos.jsonl`), o turno inteiro: cartas jogadas, ataques, DON!! anexados e
+DON!! que sobrou, ao lado do turno que o bot jogaria a partir da mesma posição inicial (com o oponente respondendo
+como na simulação do planejador). Comparar clique a clique na fase principal é barulhento (o bot anexa DON!! e
+ataca; a pessoa ataca e anexa em outra hora); o turno inteiro é o que responde "desenvolver ou pressionar".
 
 ```bash
 # Numa cópia do banco (o backup diário da VPS, ~/backups/gumgum-<dia>.db, copiado por scp): só lê, não grava nada.
@@ -297,10 +304,18 @@ DB_PATH=~/apps/gumgumfight/shared/gumgum.db node --disable-warning=ExperimentalW
   ~/apps/gumgumfight/current/server/decisions-cli.mjs --limit 500 --out ~/decisoes.jsonl
 ```
 
-O resumo no terminal responde às três perguntas desta rodada: em que tipo de decisão o bot mais discorda das pessoas;
-com que frequência um humano usa Counter ou bloqueia um ataque ao Líder, por Vida e por margem (é o que os parâmetros
-`counterWill`, `counterStack`, `counterCard` da seção 3 chutam hoje); e, na fase principal, que par "humano fez X, bot
-faria Y" mais aparece (ex.: `playCard → attack` é o "desenvolver ou pressionar" da seção 8). O JSONL serve para o
+O resumo no terminal responde às perguntas desta rodada: em que tipo de decisão o bot mais discorda das pessoas;
+com que frequência um humano usa Counter ou bloqueia um ataque ao Líder, por Vida e por margem, e só quando a mão
+bastava (é o que os parâmetros `counterWill`, `counterStack`, `counterCard` da seção 3 chutam hoje); o ataque fatal
+(quantos a mão parava, quantos o humano e o bot pararam, e as posições em que o humano segurou e o bot passaria, para
+reproduzir); e, nos turnos inteiros, quem joga mais cartas e quem ataca mais, também com o oponente em 2 de Vida ou
+menos (o "desenvolver ou pressionar" da seção 8).
+
+**Primeira rodada em produção (421 partidas, 32 mil decisões, outubro de 2026).** O bot concorda com as pessoas em
+47% dos cliques da fase principal e 72% dos Counters. Na defesa do Líder as pessoas defendem muito mais com Vida alta
+(Counter com 4 de Vida: 33% contra 5% do bot; com 5: 28% contra 3%) e um pouco mais no ataque fatal (73% contra 54%);
+com 1 a 3 de Vida os dois se parecem. Os quatro primeiros dos torneios defendem *menos* que o bot com 2 e 3 de Vida
+(34% e 21% contra 62% e 56%) e escolhem jogar primeiro em só 15% das vezes (o bot, sempre). O JSONL serve para o
 resto: calibrar esses parâmetros por regressão, ou ajustar os pesos da avaliação para concordar com os melhores
 colocados em vez de só por auto-jogo (seção 9). Partidas cujo replay não refaz (versão antiga, texto de carta que
 mudou) são contadas e puladas.

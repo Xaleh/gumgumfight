@@ -51,8 +51,14 @@ describe('extrator de decisões', () => {
     expect(selectMatches(db, { queue: 'ranked' })).toEqual([]);
     expect(topRankedPlayers(db, 5)).toEqual([]); // ninguém jogou ranqueada
 
-    const { records, error } = extractMatch(db, matchId, { bot: 'normal', budgetMs: 30 });
+    const { records, turns, error } = extractMatch(db, matchId, { bot: 'normal', budgetMs: 30 });
     expect(error).toBeUndefined();
+    // Um turno inteiro por turno do lado humano (a partir do 3º), com o que ele fez e o que o bot faria.
+    expect(turns.length).toBeGreaterThan(0);
+    expect(turns.every((t) => t.seat === 0 && t.turn > 2 && t.bot && t.human.donLeft >= 0)).toBe(true);
+    expect(turns.map((t) => t.turn)).toEqual([...new Set(turns.map((t) => t.turn))]);
+    const played = turns.flatMap((t) => t.human.played);
+    expect(played.length).toBe(records.filter((d) => d.kind === 'main' && d.chosen.type === 'playCard' && d.turn > 2).length);
     // Só o lado humano (assento 0): cada ação dele no replay vira um registro.
     const humanActions = r.actions.filter((a) => a.player === 0);
     expect(records.length).toBe(humanActions.length);
@@ -66,12 +72,19 @@ describe('extrator de decisões', () => {
     const play = records.find((d) => d.chosen.type === 'playCard');
     expect(play?.chosen.card).toMatch(/^ST01-/);
     const counter = records.find((d) => d.kind === 'counter');
-    if (counter) expect(counter.battle).toMatchObject({ targetIsLeader: expect.any(Boolean), need: expect.any(Number) });
+    if (counter) {
+      expect(counter.battle).toMatchObject({ targetIsLeader: expect.any(Boolean), need: expect.any(Number) });
+      expect(counter.counters).toBeGreaterThanOrEqual(0);
+      if (counter.chosen.type === 'counter') expect(counter.chosenValue).toBeGreaterThan(0);
+    }
 
-    const s = summarize(records, 1, 0);
+    const s = summarize(records, 1, 0, turns);
     expect(s.decisions).toBe(records.length);
     expect(s.kinds.main.n).toBeGreaterThan(0);
-    expect(formatSummary(s)).toContain('Partidas: 1 (0 não refizeram)');
+    expect(s.turns?.n).toBe(turns.length);
+    const text = formatSummary(s);
+    expect(text).toContain('Partidas: 1 (0 não refizeram)');
+    expect(text).toContain('Turnos inteiros');
   });
 
   it('o lado do bot não gera decisões, e uma partida sem replay é pulada', () => {

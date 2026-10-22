@@ -10,7 +10,7 @@
 //   --limit <N>                          no máximo N partidas (padrão 200, as mais recentes)
 //   --bot <hard|normal|none>             nível do bot comparado em cada decisão (padrão hard; none = só extrai)
 //   --budget <ms>                        teto de tempo por decisão do bot (padrão 250)
-//   --out <arquivo.jsonl>                grava um registro por decisão (sem ele, só o resumo)
+//   --out <arquivo.jsonl>                grava um registro por decisão e, em <arquivo>-turnos.jsonl, um por turno (sem ele, só o resumo)
 //
 //   DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --tournament-top 4 --out top.jsonl
 //
@@ -18,7 +18,7 @@
 
 import { appendFileSync, writeFileSync } from 'node:fs';
 import type { BotLevel } from '@gumgum/engine';
-import { extractMatch, formatSummary, selectMatches, summarize, topRankedPlayers, topTournamentPlayers, type DecisionRecord } from './decisions/extract';
+import { extractMatch, formatSummary, selectMatches, summarize, topRankedPlayers, topTournamentPlayers, type DecisionRecord, type TurnRecord } from './decisions/extract';
 import { openDb } from './db';
 import { DB_PATH, fromUserCwd } from './paths';
 
@@ -49,12 +49,16 @@ const botArg = opt('bot') ?? 'hard';
 const bot = botArg === 'none' ? undefined : (botArg as BotLevel);
 const budgetMs = num('budget', 250);
 const out = opt('out') ? fromUserCwd(opt('out')!) : null;
+/** Os turnos inteiros vão num arquivo ao lado (`<saída>-turnos.jsonl`). */
+const outTurns = out ? out.replace(/\.jsonl$/, '') + '-turnos.jsonl' : null;
 if (out) writeFileSync(out, '');
+if (outTurns) writeFileSync(outTurns, '');
 
 const ids = selectMatches(db, { queue: opt('queue'), since: opt('since'), players: players.size ? [...players] : undefined, limit: num('limit', 200) });
 console.log(`Banco: ${DB_PATH} | ${ids.length} partidas${players.size ? ` de ${players.size} perfis` : ''}${bot ? ` | bot ${bot} (${budgetMs} ms por decisão)` : ''}`);
 
 const all: DecisionRecord[] = [];
+const allTurns: TurnRecord[] = [];
 let failed = 0;
 const t0 = Date.now();
 ids.forEach((id, i) => {
@@ -64,9 +68,11 @@ ids.forEach((id, i) => {
     if (process.env.VERBOSE) console.error(`partida ${id}: ${r.error}`);
   }
   all.push(...r.records);
+  allTurns.push(...r.turns);
   if (out && r.records.length) appendFileSync(out, r.records.map((rec) => JSON.stringify(rec)).join('\n') + '\n');
+  if (outTurns && r.turns.length) appendFileSync(outTurns, r.turns.map((rec) => JSON.stringify(rec)).join('\n') + '\n');
   process.stdout.write(`\rpartida ${i + 1}/${ids.length} | decisões ${all.length} | ${((Date.now() - t0) / 1000).toFixed(0)} s   `);
 });
 console.log('\n');
-console.log(formatSummary(summarize(all, ids.length, failed)));
-if (out) console.log(`\nRegistros em ${out}`);
+console.log(formatSummary(summarize(all, ids.length, failed, allTurns)));
+if (out) console.log(`\nRegistros em ${out} e turnos em ${outTurns}`);
