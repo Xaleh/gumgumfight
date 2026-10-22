@@ -58,6 +58,8 @@ const ACTION_COST = 30;
 const NOISE = 20;
 /** Teto de passos de resolução automática numa simulação (efeitos em cadeia). */
 const MAX_STEPS = 60;
+/** Filhos por jogada (variantes de DON!! do mesmo ataque) que entram no feixe a cada passo. */
+const SIBLINGS = 2;
 
 /** Uma decisão do bot dentro de uma linha simulada: a chave do estado em que ela vale e a ação. */
 interface Step {
@@ -71,6 +73,8 @@ interface Sim {
   penalty: number;
   /** As decisões do bot ao longo da simulação (a ação pedida e as respostas às perguntas dela). */
   trace: Step[];
+  /** Os acertos no Líder do oponente nesta linha: o Counter que cada um exigiria dele (ver `counterAdjust`). */
+  hits: number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +111,10 @@ export function planAction(full: GameState, player: PlayerId, opts: PlannerOptio
  * otimização dos pesos também a levou a quase zero).
  */
 function defenseOrPlan(state: GameState, player: PlayerId, opts: PlannerOptions): PlannerOptions {
-  return state.activePlayer === player ? { ...opts, weights: { ...opts.weights, threat: 0 } } : opts;
+  if (state.activePlayer !== player) return opts;
+  // No próprio turno só o ataque fatal na mesa pesa (`lethalPlan`): deixar o Líder ao alcance de um
+  // ataque que a melhor defesa não segura é o erro que qualquer humano castiga.
+  return { ...opts, weights: { ...opts.weights, threat: opts.weights.lethalPlan ? 1 : 0, threatHit: 0, lethal: opts.weights.lethalPlan } };
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +168,7 @@ function opponentAnswer(state: GameState, me: PlayerId, pending: Pending, opts: 
  * escolhas aninhadas do bot são decididas pela avaliação enquanto houver `depth`; depois, pelo bot
  * heurístico. Devolve null quando o motor recusa a jogada (a visão não permite simular tudo).
  */
-function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerOptions, depth: number): Sim | null {
+function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerOptions, depth: number, prior: number[] = []): Sim | null {
   const trace: Step[] = [];
   if (action.player === me) trace.push({ key: stateKey(state, me), action });
   let s: GameState;
@@ -195,8 +202,15 @@ function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerO
     }
   }
   let penalty = 0;
-  if (action.type === 'attack' && action.player === me) penalty += counterAdjust(state, s, me, action, opts.weights);
-  return { state: s, penalty, trace };
+  let hits = prior;
+  if (action.type === 'attack' && action.player === me) {
+    penalty += counterAdjust(state, s, me, action, opts.weights, prior);
+    const opp = state.players[opponent(me)];
+    if (action.target === opp.leader.uid && (s.phase === 'gameover' || s.players[opp.id].life.length < opp.life.length)) {
+      hits = [...prior, getPower(state, action.attacker) - getPower(state, action.target) + 1000];
+    }
+  }
+  return { state: s, penalty, trace, hits };
 }
 
 // ---------------------------------------------------------------------------
@@ -205,21 +219,45 @@ function simulate(state: GameState, me: PlayerId, action: Action, opts: PlannerO
 
 /**
  * Probabilidade de o oponente conseguir somar `need` de Counter com `hand` cartas escondidas: cada
- * carta rende o que falta com chance `counterCard` para +1000, e `counterDrop` a menos por 1000 a mais.
+ * carta tem Counter com chance `counterCard` (+2000 com `counterBig`), e as cartas somam.
  */
 export function counterAbility(hand: number, need: number, w: Weights = DEFAULT_WEIGHTS): number {
   if (need <= 0) return 1;
   if (hand <= 0) return 0;
-  const perCard = Math.min(0.95, Math.max(0.05, w.counterCard - w.counterDrop * (need / 1000 - 1)));
-  return 1 - (1 - perCard) ** hand;
+  const steps = Math.ceil(need / 1000);
+  const p2 = Math.min(1, Math.max(0, w.counterBig));
+  const p1 = Math.min(1 - p2, Math.max(0, w.counterCard - p2));
+  const p0 = 1 - p1 - p2;
+  // dist[s] = chance de as cartas vistas somarem s mil (s = steps vale "steps ou mais").
+  let dist = new Float64Array(steps + 1);
+  dist[0] = 1;
+  for (let c = 0; c < hand; c++) {
+    const next = new Float64Array(steps + 1);
+    for (let i = 0; i <= steps; i++) {
+      if (!dist[i]) continue;
+      next[i] += dist[i] * p0;
+      next[Math.min(steps, i + 1)] += dist[i] * p1;
+      next[Math.min(steps, i + 2)] += dist[i] * p2;
+    }
+    dist = next;
+  }
+  return dist[steps];
 }
 
-/** Vontade do oponente de gastar Counter para salvar o alvo (vezes `counterWill`, até 1). */
-function counterWill(state: GameState, target: string, opp: PlayerId, w: Weights): number {
+/**
+ * Vontade do oponente de gastar Counter para salvar o alvo. Um ataque fatal ao Líder ele defende
+ * sempre que pode; nos outros, cresce com o que está em jogo (Vida baixa, Personagem caro) e cai a cada
+ * 1000 a mais que ele teria de cobrir (`counterStack`: gastar duas cartas por uma Vida é raro).
+ */
+function counterWill(state: GameState, target: string, opp: PlayerId, need: number, w: Weights): number {
   const ps = state.players[opp];
+  const life = ps.life.length;
+  if (target === ps.leader.uid && !life) return 1;
   const cost = cardDef(state, target).cost ?? 0;
-  const base = target === ps.leader.uid ? [1, 0.9, 0.6, 0.35, 0.15][Math.min(4, ps.life.length)] : cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
-  return Math.min(1, base * w.counterWill);
+  const base = target === ps.leader.uid ? [1, 1, 0.9, 0.5, 0.25][Math.min(4, life)] : cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
+  // Com o Líder quase sem Vida ele gasta duas cartas sem pensar; com Vida alta, raramente.
+  const stack = target === ps.leader.uid ? Math.max(0, (life - 1) / 4) : 1;
+  return Math.min(1, base * w.counterWill) * w.counterStack ** (Math.max(0, Math.ceil(need / 1000) - 1) * stack);
 }
 
 /**
@@ -228,23 +266,46 @@ function counterWill(state: GameState, target: string, opp: PlayerId, w: Weights
  * Negativo quando o acerto valia mais que as cartas dele; positivo quando forçar o Counter é o lucro
  * (Vida alta do oponente, margem que exige duas cartas).
  */
-function counterAdjust(before: GameState, after: GameState, me: PlayerId, action: Extract<Action, { type: 'attack' }>, w: Weights): number {
+function counterAdjust(before: GameState, after: GameState, me: PlayerId, action: Extract<Action, { type: 'attack' }>, w: Weights, prior: number[] = []): number {
   const opp = opponent(me);
   const hand = before.players[opp].hand.length;
-  if (!hand) return 0;
+  if (!hand && !prior.length) return 0;
   const target = locate(before, action.target);
   if (!target) return 0;
   const ap = getPower(before, action.attacker);
   const tp = getPower(before, action.target);
   if (ap < tp) return 0;
   const need = ap - tp + 1000;
-  const p = counterAbility(hand, need, w) * counterWill(before, action.target, opp, w);
+  const lethal = after.phase === 'gameover' && after.winner === me && action.target === before.players[opp].leader.uid;
+  let p: number;
+  if (lethal) {
+    // Para sobreviver ele só precisa parar um dos acertos da linha: o mais barato, com a mão que tinha
+    // na hora (cada acerto anterior lhe deu uma carta da Vida). Um ataque fatal ele defende sempre que pode.
+    p = 0;
+    [...prior, need].forEach((n, i, all) => (p = Math.max(p, counterAbility(hand - (all.length - 1 - i), n, w))));
+  } else {
+    p = counterAbility(hand, need, w) * counterWill(before, action.target, opp, need, w);
+  }
   if (p <= 0) return 0;
-  const hit = evaluate(after, me, w);
   // Ataque falhou: a posição de antes (o atacante virado não muda a avaliação no próprio turno) e as
   // cartas gastas no Counter fora da mão do oponente (uma a cada 2000 que ele precisou cobrir).
   const cards = Math.min(hand, Math.max(1, Math.ceil(need / 2000)));
+  if (lethal) {
+    // Acerto que vence a partida: vale `winCap` (e não `win`) vezes a chance de passar, para a posição
+    // que sobra se ele for parado continuar pesando na escolha. Essa posição é avaliada no fim do turno
+    // (como as linhas que não vencem), e não no meio dele: o DON!! pronto e os Personagens ainda em pé
+    // valeriam a mais só para a linha fatal.
+    let ended = before;
+    try {
+      ended = applyAction(before, { type: 'endTurn', player: me });
+    } catch {
+      /* fica a posição do meio do turno */
+    }
+    const miss = evaluate(ended, me, w) + w.handCardOpp * cards;
+    return p * miss + (1 - p) * w.winCap - w.win;
+  }
   const miss = evaluate(before, me, w) + w.handCardOpp * cards;
+  const hit = evaluate(after, me, w);
   return (miss - hit) * p;
 }
 
@@ -325,6 +386,8 @@ interface Node {
   trace: Step[];
   depth: number;
   penalty: number;
+  /** Os acertos no Líder do oponente nesta linha (ver `Sim.hits`). */
+  hits: number[];
   score: number;
 }
 
@@ -399,20 +462,83 @@ function candidateMoves(state: GameState, player: PlayerId): Action[][] {
   return out;
 }
 
-/** Aplica uma sequência de jogadas do bot; para (null) se algo interromper antes da última. */
-function simulateSeq(state: GameState, me: PlayerId, moves: Action[], opts: PlannerOptions, depth: number): Sim | null {
+/**
+ * Linhas "tudo no Líder": cada atacante recebe o DON!! que precisa para alcançar o Líder do oponente
+ * (os mais baratos primeiro), e o que sobra vai por cima (espalhado, ou nada: guardado para jogar
+ * cartas). A busca em feixe não acha essas linhas sozinha: cada acerto no Líder vale menos que um K.O.
+ * ou uma carta jogada, então os nós que levam ao ataque fatal são cortados antes do fim.
+ */
+function allOutLines(state: GameState, player: PlayerId): Action[][] {
+  const me = state.players[player];
+  const leader = state.players[opponent(player)].leader.uid;
+  const attacks = legalActions(state, player).filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack' && a.target === leader);
+  if (attacks.length < 2) return [];
+  const lp = getPower(state, leader);
+  const plan = attacks
+    .map((atk) => ({ atk, power: getPower(state, atk.attacker), need: Math.max(0, Math.ceil((lp - getPower(state, atk.attacker)) / 1000)) }))
+    .sort((a, b) => a.need - b.need);
+  let don = me.donActive;
+  const chosen: typeof plan = [];
+  for (const p of plan) {
+    if (p.need > don) continue;
+    don -= p.need;
+    chosen.push(p);
+  }
+  if (chosen.length < 2) return [];
+  const out: Action[][] = [];
+  const give = (target: string): Action => ({ type: 'attachDon', player, target });
+  for (const order of [1, -1]) {
+    const ordered = [...chosen].sort((a, b) => order * (b.power - a.power));
+    for (const spread of [false, true]) {
+      const extra = ordered.map(() => 0);
+      if (spread) for (let i = 0, d = don; d > 0; d--, i = (i + 1) % extra.length) extra[i]++;
+      const moves: Action[] = [];
+      ordered.forEach((p, i) => moves.push(...Array.from({ length: p.need + extra[i] }, () => give(p.atk.attacker)), p.atk));
+      out.push(moves);
+    }
+  }
+  return out;
+}
+
+/** A jogada que uma sequência representa (o ataque, a carta, a habilidade), sem contar o DON!! anexado. */
+function moveKey(moves: Action[]): string {
+  const a = moves[moves.length - 1];
+  switch (a.type) {
+    case 'attack':
+      return `atk:${a.attacker}>${a.target}`;
+    case 'playCard':
+      return `play:${a.uid}`;
+    case 'activate':
+      return `act:${a.uid}:${a.ability}`;
+    case 'attachDon':
+      return `don:${a.target}`;
+    default:
+      return a.type;
+  }
+}
+
+/**
+ * Aplica uma sequência de jogadas do bot; para (null) se algo interromper antes da última. Com
+ * `partial`, uma interrupção (partida decidida, pergunta ao bot, vez do oponente) devolve a linha até ali.
+ */
+function simulateSeq(state: GameState, me: PlayerId, moves: Action[], opts: PlannerOptions, depth: number, partial = false, prior: number[] = []): Sim | null {
   let s = state;
   const trace: Step[] = [];
   let penalty = 0;
+  let hits = prior;
   for (let i = 0; i < moves.length; i++) {
-    const r = simulate(s, me, moves[i], opts, depth);
-    if (!r) return null;
+    const r = simulate(s, me, moves[i], opts, depth, hits);
+    if (!r) return i > 0 && partial ? { state: s, penalty, trace, hits } : null;
     trace.push(...r.trace);
     penalty += r.penalty;
+    hits = r.hits;
     s = r.state;
-    if (i < moves.length - 1 && (s.pending || s.phase === 'gameover' || s.activePlayer !== me)) return null;
+    if (i < moves.length - 1 && (s.pending || s.phase === 'gameover' || s.activePlayer !== me)) {
+      if (partial) break;
+      return null;
+    }
   }
-  return { state: s, penalty, trace };
+  return { state: s, penalty, trace, hits };
 }
 
 /**
@@ -466,9 +592,10 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
   const noise = () => opts.random() * NOISE;
   const score = (s: GameState, penalty: number, depth: number) => evaluate(s, player, opts.weights) + penalty - depth * ACTION_COST + noise();
 
-  let beam: Node[] = [{ state, trace: [], depth: 0, penalty: 0, score: evaluate(state, player, opts.weights) }];
+  let beam: Node[] = [{ state, trace: [], depth: 0, penalty: 0, hits: [], score: evaluate(state, player, opts.weights) }];
   let best: { score: number; trace: Step[]; complete: boolean } | null = null;
   const offer = (candidate: { score: number; trace: Step[]; complete: boolean }) => {
+    opts.onDecision?.(`oferta (${candidate.score.toFixed(0)}): ${candidate.trace.map((st) => JSON.stringify(st.action)).join(' → ')}`, 1);
     if (!best || candidate.score > best.score) best = candidate;
   };
 
@@ -491,26 +618,52 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
       const expand = depth < opts.maxDepth && (depth === 0 || !over());
       finish(node, expand);
       if (!expand) continue;
-      for (const move of candidateMoves(node.state, player)) {
-        const r = simulateSeq(node.state, player, move, opts, 1);
+      // As linhas "tudo no Líder" só antes do primeiro ataque da linha.
+      const attacked = node.trace.some((st) => st.action.type === 'attack');
+      const moves = [...candidateMoves(node.state, player).map((m) => ({ m, allOut: false })), ...(attacked ? [] : allOutLines(node.state, player).map((m) => ({ m, allOut: true })))];
+      // Variantes da mesma jogada (DON!! a mais no mesmo ataque) não podem encher o feixe sozinhas:
+      // no máximo `SIBLINGS` filhos por jogada, para o feixe manter alternativas de verdade.
+      const groups = new Map<string, Node[]>();
+      for (const { m: move, allOut } of moves) {
+        const r = simulateSeq(node.state, player, move, opts, 1, allOut, node.hits);
         if (!r) continue;
         const trace = [...node.trace, ...r.trace];
         const penalty = node.penalty + r.penalty;
-        const d = node.depth + move.length;
+        const d = node.depth + (allOut ? r.trace.filter((st) => st.action.type === 'attack' || st.action.type === 'attachDon').length : move.length);
         // Partida decidida, ou a simulação parou numa pergunta que a profundidade não cobriu: a linha
         // termina aqui (o que vier depois é replanejado na hora).
         if (r.state.phase === 'gameover' || r.state.pending || r.state.activePlayer !== player) {
           offer({ score: score(r.state, penalty, d), trace, complete: true });
           continue;
         }
-        const child: Node = { state: r.state, trace, depth: d, penalty, score: score(r.state, penalty, d) };
-        const k = dedupeKey(child.state, player);
-        const seen = next.get(k);
-        if (!seen || seen.score < child.score) next.set(k, child);
+        const child: Node = { state: r.state, trace, depth: d, penalty, hits: r.hits, score: score(r.state, penalty, d) };
+        const g = allOut ? 'allOut' : moveKey(move);
+        const list = groups.get(g) ?? [];
+        list.push(child);
+        groups.set(g, list);
+      }
+      for (const list of groups.values()) {
+        for (const child of list.sort((a, b) => b.score - a.score).slice(0, SIBLINGS)) {
+          const k = dedupeKey(child.state, player);
+          const seen = next.get(k);
+          if (!seen || seen.score < child.score) next.set(k, child);
+        }
       }
     }
     if (!next.size) break;
-    beam = [...next.values()].sort((a, b) => b.score - a.score).slice(0, opts.beamWidth);
+    const sorted = [...next.values()].sort((a, b) => b.score - a.score);
+    beam = sorted.slice(0, opts.beamWidth);
+    // Um acerto no Líder pontua na hora; uma carta jogada só pelo que põe em campo. Sem reserva, o feixe
+    // enche de ataques e nunca vê a linha que baixa duas cartas antes de atacar: a melhor linha de cada
+    // número de cartas jogadas (ou habilidades ativadas) fica no feixe mesmo fora das primeiras.
+    const plays = (n: Node) => n.trace.filter((st) => st.action.type === 'playCard' || st.action.type === 'activate').length;
+    const represented = new Set(beam.map(plays));
+    for (const n of sorted.slice(opts.beamWidth)) {
+      const k = plays(n);
+      if (represented.has(k)) continue;
+      represented.add(k);
+      beam.push(n);
+    }
   }
 
   const chosen = best!;

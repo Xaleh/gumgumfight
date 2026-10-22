@@ -153,6 +153,24 @@ describe('bot com busca: fase principal', () => {
     expect(inTrash(state, 1, 'ST01-008')).toBe(true);
   });
 
+  it('acha o ataque fatal com vários atacantes pequenos', () => {
+    // Oponente com 2 de Vida e a mão vazia; o bot tem o Líder, quatro Personagens de 1000 a 6000 e 4 DON!!: três
+    // acertos no Líder vencem, mas cada acerto vale menos que o K.O. do Zoro virado (a linha "tudo no Líder" e a
+    // reserva do feixe existem para a busca não cortar a linha fatal antes do fim).
+    const s = position([kid, luffy], 9);
+    s.players[1].life = s.players[1].life.slice(0, 2);
+    clearHand(s, 1);
+    s.players[0].donActive = 4;
+    inject(s, 0, 'ST02-002', 'field'); // Vito 5000
+    inject(s, 0, 'ST02-006', 'field'); // Koby 6000
+    inject(s, 0, 'ST02-012', 'field'); // Bepo 3000
+    inject(s, 0, 'ST02-004', 'field'); // Bege 1000
+    inject(s, 1, 'ST01-013', 'field', { rested: true }); // Zoro 5000, custo 3, virado
+    const { state } = botTurn(s, 0);
+    expect(state.phase).toBe('gameover');
+    expect(state.winner).toBe(0);
+  });
+
   it('conta com o Blocker do oponente', () => {
     // Oponente com 0 de Vida e um Chopper [Blocker] ativo; o bot tem Líder e Zoro ativos: um ataque leva o bloqueio, o outro vence.
     const s = position([kid, luffy], 5);

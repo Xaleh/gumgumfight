@@ -80,12 +80,22 @@ A mão do oponente é escondida, então o bot não simula o Counter dele; ele de
 risco = P(ele consegue o Counter) × P(ele quer gastar) × (valor do acerto − valor do ataque falhar)
 ```
 
-- `P(consegue)` cresce com o tamanho da mão e cai com a margem de poder que ele precisaria cobrir
-  (`counterAbility`): margem de +1000 com 5 cartas é quase certa; +4000 com 1 carta é rara.
-- `P(quer)` cresce quando o alvo é o Líder com pouca Vida ou um Personagem caro (`counterWill`).
+- `P(consegue)` (`counterAbility`): cada carta escondida tem Counter com chance `counterCard` (0,72; é
+  +2000 com `counterBig`, 0,2) e **as cartas somam**: margem de +1000 contra 5 cartas é quase certa de ser
+  coberta; +4000 contra 1 carta, impossível. Os valores vêm da composição dos decks prontos (49% das cartas
+  têm +1000, 15% +2000), puxados para cima porque quem joga guarda os Counters na mão.
+- `P(quer)` (`counterWill`) cresce quando o alvo é o Líder com pouca Vida (0,25 com 4 ou mais, 0,5 com 3,
+  0,9 com 2, 1 com 1) ou um Personagem caro, e cai a cada 1000 a mais que ele teria de cobrir
+  (`counterStack`: gastar duas cartas por uma Vida é raro com Vida alta, normal com Vida baixa).
+- **Ataque fatal**: ele defende sempre que pode, e para sobreviver basta parar **um** dos acertos da linha.
+  O risco do ataque que venceria é a chance de ele cobrir o acerto **mais barato** da linha, com a mão que
+  tinha naquele momento (cada acerto anterior lhe deu uma carta da Vida). Antes, cada ataque era avaliado
+  sozinho e o bot apostava a partida num terceiro ataque "70% de chance de passar" contra 5 cartas na mão.
 - "Falhar" ainda tira uma carta da mão dele, então o risco raramente anula um ataque com margem.
-- Os parâmetros desse modelo (`counterCard`, `counterDrop`, `counterWill`) ficam nos pesos e entram
-  na otimização da seção 9.
+- Uma vitória **provável** vale `winCap` (120 000, mais ou menos uma partida inteira de material) vezes a
+  chance de passar, e não `win` (10 milhões): com `win`, 5% de chance de vencer agora valia mais que
+  qualquer posição, e o bot jogava o turno inteiro fora em ataques que o oponente parava com uma carta.
+  A posição que sobra quando o ataque fatal é parado é avaliada no fim do turno, como as outras linhas.
 
 | Conceito | Onde está | Teste |
 |---|---|---|
@@ -106,9 +116,11 @@ avaliação soma a **ameaça** do que ainda falta (`incomingHits` / `incomingThr
 
 Assim a escolha "Counter agora ou guardar" compara as duas linhas já contando o resto do turno.
 
-A ameaça **não** entra no planejamento do próprio turno (`defenseOrPlan` em `planner.ts`): ali ela
-deixava o bot passivo — guardando Blockers e cartas na mão em vez de pressionar — e ele perdia mais do
-que ganhava (seção 9).
+No planejamento do próprio turno (`defenseOrPlan` em `planner.ts`) só o **ataque fatal na mesa** pesa
+(`lethalPlan`, 60 000): encerrar o turno com o oponente tendo mais acertos que a Vida do bot aguenta,
+contando os Blockers em pé e os Counters da mão, é o erro que qualquer humano castiga. O resto da ameaça
+(ataques que passam sem matar) fica de fora: ali ela deixava o bot passivo — guardando Blockers e cartas
+na mão em vez de pressionar — e ele perdia mais do que ganhava (seção 9).
 
 | Conceito | Onde está | Teste |
 |---|---|---|
@@ -121,7 +133,21 @@ do dono: ele é a janela para removê-lo. Efeitos de "virar 1 Personagem do opon
 ataque vem **no mesmo turno**; virar e não atacar é o erro clássico do bot antigo.
 
 No bot novo isso sai da simulação: a linha "ativar efeito de virar → atacar o virado → K.O." pontua o
-Personagem removido; a linha "só virar" pontua zero (e paga o custo por ação). Do lado defensivo, o
+Personagem removido; a linha "só virar" pontua zero (e paga o custo por ação).
+
+A busca em feixe tem um ponto cego: cada passo guarda só as melhores linhas pela avaliação **daquele
+momento**, e um acerto no Líder pontua na hora enquanto uma carta jogada só vale o que põe em campo. Dois
+remendos em `planTurn`:
+
+- **Linhas "tudo no Líder"** (`allOutLines`): antes do primeiro ataque, o bot também simula a linha inteira
+  "cada atacante com o DON!! que precisa para alcançar o Líder, o que sobra por cima" (nas duas ordens, com e
+  sem o DON!! extra). Sem isso, o feixe enchia de K.O.s e cartas jogadas e a linha de quatro acertos era cortada
+  antes do fim (teste `acha o ataque fatal com vários atacantes pequenos`). Note que "quatro acertos contra 3 de
+  Vida e a mão vazia" não é vitória garantida: cada acerto dá uma carta ao oponente, e o modelo de Counter
+  (seção 3) conta com elas — a linha vale pelo que tem de chance de passar.
+- **Reserva no feixe**: no máximo `SIBLINGS` (2) variantes da mesma jogada (o mesmo ataque com mais ou menos
+  DON!!) por passo, e a melhor linha de cada número de cartas jogadas fica no feixe mesmo fora das primeiras.
+  Sem a reserva, com 7 DON!! e duas cartas na mão o bot nunca via a linha que baixa as duas antes de atacar. Do lado defensivo, o
 Personagem que atacou fica **exposto** ao contra-ataque, e a avaliação desconta parte do valor dele
 quando o oponente consegue alcançá-lo.
 
@@ -178,7 +204,13 @@ jogar outra coisa), não por regra.
   decisões de defesa (seção 3a); no planejamento ela deixou o bot pior (seção 9).
 - **Pesos**: otimizados em auto-jogo contra versões do próprio bot (seção 9). Um estilo de jogo muito
   diferente (um humano que segura Counters até o fim, por exemplo) pode explorar o que o auto-jogo não
-  mostra: relatos de partidas reais são o melhor guia para a próxima rodada.
+  mostra: relatos de partidas reais são o melhor guia para a próxima rodada. O "humano fraco" de
+  `scripts/human.ts` (seção 10) é a primeira tentativa de medir isso sem gente.
+- **Desenvolver ou pressionar**: com o oponente em 2 de Vida e a mão cheia, a avaliação ainda prefere três
+  ataques com margem a baixar duas cartas e atacar com o resto. As tabelas de Vida (seção 2) vieram do
+  auto-jogo, em que a pressão paga; contra quem usa Counter em todo ataque com Vida baixa, o que o bot ganha
+  é só drenar a mão. Se os relatos apontarem isso, o próximo passo é reduzir os dois últimos degraus de
+  `lifeOpp` ou condicioná-los ao tamanho da mão do oponente.
 
 ## 9. Como os pesos foram ajustados (e o que não funcionou)
 
@@ -223,6 +255,24 @@ Resultado contra o bot anterior (assentos e quem começa alternados, 10 decks pr
 | Pesos por regressão logística sobre 21 mil posições de 2000 partidas | 43–44% | Prevê melhor quem vence (AUC 0,83 contra 0,79) e joga pior: correlação não é decisão (ex.: "Personagem na mão" valia mais que em campo, e o bot parava de baixar os de custo 1) |
 | Só as tabelas de Vida da regressão | 44% | Idem |
 
+**Rodada 3 (decisões ruins contra humanos).** As mudanças desta rodada não saíram de otimização, e sim de
+traços de partidas (`trace-game.ts`, `trace-human.ts`) em que o bot `hard` fazia o que um jogador fraco
+castiga: apostar a partida num ataque fatal que o oponente parava com uma carta (seção 3), não achar o ataque
+fatal com quatro atacantes pequenos (seção 4), encerrar o turno com o Líder ao alcance de um ataque fatal
+(seção 3a) e nunca explorar a linha que baixa duas cartas antes de atacar (seção 4). Medidas, 200 partidas
+cada, `hard` x `hard` anterior e contra o "humano fraco" (seção 10): o auto-jogo não distingue as versões
+(50–54%, dentro do ruído), e o humano fraco perde para as duas (~83%). As correções ficam pelo raciocínio e
+pelos testes de posição, não por uma medida: o que falta é o relato de quem joga contra o bot.
+
+## 10. Humano fraco
+
+`scripts/human.ts` é um oponente para medição (não é um nível do jogo): desenvolve e ataca como o bot
+heurístico (`simple.ts`), mas defende como gente — segura o ataque fatal sempre que pode, usa Counter com
+Vida baixa (com `HUMAN=careful`, em todo ataque ao Líder com 2 de Vida ou menos), bloqueia para salvar o
+Líder no fim e protege Personagens caros. Serve para pegar o que o auto-jogo não pega: o bot contra quem não
+deixa passar o ataque decisivo. O `hard` vence ~83% contra ele; um humano de verdade joga a fase principal
+bem melhor que o `simple.ts`, então a medida é um piso, não um retrato.
+
 ## Como medir
 
 ```bash
@@ -236,6 +286,10 @@ npx tsx packages/engine/scripts/duel.ts 1 200 hard '{"exposed":800}' '{}'
 npm run tune-weights -w @gumgum/engine -- tune.jsonl 150 96 normal
 # Ver uma partida jogada a jogada (DBG=<turno> mostra a linha escolhida em cada decisão):
 npx tsx packages/engine/scripts/trace-game.ts 3 hard hard st10-law st09-yamato
+# Contra o "humano fraco" (seção 10): taxa de vitória do bot, e uma partida jogada a jogada
+npx tsx packages/engine/scripts/vs-human.ts 200 hard
+HUMAN=careful npx tsx packages/engine/scripts/vs-human.ts 200 hard
+npx tsx packages/engine/scripts/trace-human.ts 5 hard st02-kid st01-luffy
 ```
 
 Medições de referência (ST01 x ST02, 100 partidas, assento e quem começa alternados):
