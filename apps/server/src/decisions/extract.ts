@@ -246,7 +246,7 @@ export function extractMatch(db: DB, matchId: number, opts: ExtractOptions = {})
 
   const ids = [...new Set(stored.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
   const cards = pinEngineTexts(getCards(db, ids) as CardData[], stored.engineTexts);
-  let config: GameConfig = {
+  const config: GameConfig = {
     seed: stored.seed,
     seed128: stored.seed128,
     firstPlayer: stored.firstPlayer,
@@ -258,17 +258,31 @@ export function extractMatch(db: DB, matchId: number, opts: ExtractOptions = {})
       { name: 'B', deck: stored.decks[1] },
     ],
   };
+  // Partidas do navegador gravadas antes de o replay guardar a versão: refeitas como atuais, param na primeira
+  // pergunta que o motor passou a fazer depois. Nesse caso, a segunda tentativa passa as ações pelo
+  // `upgradeReplayActions` (que insere as respostas que o motor antigo dava sozinho).
   const version = stored.version ?? (stored.legacySetup ? 8 : REPLAY_VERSION);
-  let actions = stored.actions;
+  const attempts: Array<{ config: GameConfig; actions: Action[] }> = [];
   try {
     if (version < REPLAY_VERSION) {
-      config = replayConfig(config, version);
-      actions = upgradeReplayActions(config, actions);
+      const c = replayConfig(config, version);
+      attempts.push({ config: c, actions: upgradeReplayActions(c, stored.actions) });
+    } else {
+      attempts.push({ config, actions: stored.actions });
+      if (stored.version === undefined) attempts.push({ config, actions: upgradeReplayActions(config, stored.actions) });
     }
   } catch (e) {
     return { records: [], error: `replay da versão ${version} não refaz: ${e instanceof Error ? e.message : String(e)}` };
   }
+  let last: MatchExtraction = { records: [], error: 'sem tentativa' };
+  for (const attempt of attempts) {
+    last = replayMatch(matchId, m, attempt.config, attempt.actions, humans, opts);
+    if (!last.error) return last;
+  }
+  return last;
+}
 
+function replayMatch(matchId: number, m: MatchRow, config: GameConfig, actions: Action[], humans: SeatRow[], opts: ExtractOptions): MatchExtraction {
   const records: DecisionRecord[] = [];
   let state: GameState;
   try {

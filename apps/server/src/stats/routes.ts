@@ -1,6 +1,6 @@
 // Rotas de partidas, perfil e estatísticas.
 
-import { type Action, type CardData, countsInStats, type DeckList, formatLabel, parseArts, type PlayerId, validateDeck } from '@gumgum/engine';
+import { type Action, type CardData, countsInStats, type DeckList, formatLabel, parseArts, type PlayerId, REPLAY_VERSION, validateDeck } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { seesProStats, type User } from '../auth/store';
 import { ResponseCache } from '../cache';
@@ -119,7 +119,10 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
     }
 
     const firstPlayer = b.firstPlayer === 0 || b.firstPlayer === 1 ? (b.firstPlayer as PlayerId) : undefined;
+    // A versão do motor que gravou: sem ela, um replay antigo é refeito como se fosse atual e para na primeira
+    // pergunta que o motor passou a fazer depois (`upgradeReplayActions` só roda para versões anteriores).
     const replay = {
+      version: REPLAY_VERSION,
       seed: b.seed,
       firstPlayer,
       ...(b.chooseFirst === true && firstPlayer === undefined ? { chooseFirst: true } : {}),
