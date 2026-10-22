@@ -180,6 +180,40 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   // Spoilers com erro de digitação (deduzidos; o leitor já tolerava).
   'EB05-039': [['{Vinsmoke Family}', '{The Vinsmoke Family}']], // Pink Hornet
   'EB05-048': [['with a cost of O cannot', 'with a cost of 0 cannot']], // Hedgehog Stinger
+  // Promos com o texto do Cardkaizoku (tradução própria do site, fora do padrão das cartas), conferidas
+  // em 22/10/2026. Com a carta na optcgapi, o texto é o dela (a lista oficial); sem ela, o efeito é o
+  // mesmo na redação das cartas oficiais com o mesmo efeito.
+  'P-093': [["If the number of Don!! cards you have in play is equal to or less than your opponent's Don!! cards, add up to one Don!! from your Don!! deck and set it as rested.", "If the number of DON!! cards on your field is equal to or less than the number on your opponent's field, add up to 1 DON!! card from your DON!! deck and rest it."]], // Trafalgar Law (optcgapi)
+  'P-096': [['Give up to 1 rested DON!! card to your [Nami].', 'Give up to 1 rested DON!! card to 1 of your [Nami] cards.']], // Girl (optcgapi)
+  'P-098': [['5 Characteres with', '5 Characters with'], ["bottom of its owner's deck", "bottom of the owner's deck"]], // Buggy (optcgapi)
+  'P-100': [["Negate the effects of all of your opponent's Characters and Leader", "Negate the effects of your opponent's Leader and all of their Characters"]], // Marshall.D.Teach (optcgapi)
+  'P-107': [['If you or your opponent have 10 DON!! cards', 'If either you or your opponent has 10 DON!! cards']], // Gol.D.Roger (optcgapi)
+  'P-109': [['Blocker. [On Play]', '[Blocker]\n[On Play]']], // Portgas.D.Ace
+  'P-113': [['This Character gains Blocker and', 'This Character gains [Blocker] and']], // Jewelry Bonney (optcgapi)
+  'P-117': [ // Nami (optcgapi)
+    [
+      'Per the rules of the game, you can only include cards with the {East Blue} type in your deck. ALso, when your deck is reduced to 0, you win the game instead of losing, according to the rules.',
+      'Under the rules of this game, you can only include {East Blue} type cards in your deck and when your deck is reduced to 0, you win the game instead of losing.',
+    ],
+  ],
+  'P-118': [['play from your hand up to 1 Character card with a cost of 5 or less that has the {Egghead} type or has a [Trigger]', 'play up to 1 {Egghead} type Character card or Character card with a [Trigger] with a cost of 5 or less from your hand']], // Lilith
+  'P-120': [["If your opponent's Life has had a card removed this turn,", "If a card has been removed from your opponent's Life cards during this turn,"]], // Sanji
+  'P-122': [['Give up to 1 of your {Sabo}, up to 1 of your {Portgas D. Ace}, and up to 1 of your {Monkey D. Luffy} each +2000 power for this turn.', 'Up to 1 each of your [Sabo], [Portgas.D.Ace] and [Monkey.D.Luffy] gain +2000 power during this turn.']], // Ace & Sabo & Luffy
+  'P-126': [['You may rest 1 DON!!: Give this Character and up to one of your [Monkey.D.Luffy] and [Portgas.D.Ace] with a base power of 6000 [Rush] during this turn.', 'You may rest 1 of your DON!! cards: This Character and up to 1 of your [Monkey.D.Luffy] or [Portgas.D.Ace] with 6000 base power gain [Rush] during this turn.']], // Sabo
+  'P-128': [["If you have a character named [Sabo] or [Monkey.D.Luffy] in play, give up to one of your opponent's characters -3000 during this turn.", "If you have a [Sabo] or [Monkey.D.Luffy] Character, give up to 1 of your opponent's Characters -3000 power during this turn."]], // Portgas.D.Ace
+  'P-129': [['Give up to one of your Characters with an original power of 6000 +2000 power during this turn.', 'Up to 1 of your Characters with 6000 base power gains +2000 power during this turn.']], // Makino
+  'P-130': [['in any order. Discard 1 card from your hand.', 'in any order and trash 1 card from your hand.']], // Monkey.D.Garp
+  'P-132': [['You may rest 4 of your DON!!: You may play up to 1 each [Sabo] and [Portgas.D.Ace] from your hand with a power of 6000.', 'You may rest 4 of your DON!! cards: Play up to 1 each of [Sabo] and [Portgas.D.Ace] with 6000 power from your hand.']], // Monkey.D.Luffy
+  'P-133': [['If you have a character in play with no base effect, this character gains', 'If you have a Character with no base effect, this Character gains']], // Yamato
+  'P-134': [['Look at the top 3 cards of your deck; reveal and add up to 1 [Sabo], [Monkey D. Luffy], or [Portgas D. Ace] to your hand.', 'Look at 3 cards from the top of your deck; reveal up to 1 [Sabo], [Monkey.D.Luffy] or [Portgas.D.Ace] and add it to your hand.']], // Habitual Dine and Dashers
+  'P-141': [["Up to 1 of your opponent's Leaders or Characters gain -1000 power during this turn.", "Give up to 1 of your opponent's Leader or Character cards -1000 power during this turn."]], // Roronoa Zoro
+  'P-150': [['[Your Turn]/[On Play] Play up to 1 Character with [Trigger] and a cost of 1 from your trash.', '[Your Turn] [On Play] Play up to 1 Character card with a [Trigger] and a cost of 1 from your trash.']], // Kuzan
+  'P-151': [ // Smoker
+    ['trash 1 card from your hand and add up to 1 rested DON!! from your DON!! deck.', 'trash 1 card from your hand and add up to 1 DON!! card from your DON!! deck and rest it.'],
+    ['add it to your hand, and place the rest', 'add it to your hand. Then, place the rest'],
+  ],
+  'P-153': [['-3000 power until the end of this turn.', '-3000 power during this turn.']], // Portgas.D.Ace
+  'P-159': [['If your Leader has any given DON!! cards,', 'If your Leader has any DON!! cards given,'], ['with a power of 6000 or less', 'with 6000 power or less']], // Monkey.D.Luffy
 };
 
 function patchText(text: string, swaps: ReadonlyArray<readonly [string, string]>): string {
