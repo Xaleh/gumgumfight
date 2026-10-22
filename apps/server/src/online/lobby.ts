@@ -4,9 +4,10 @@
 
 import { randomBytes, randomInt } from 'node:crypto';
 import { type CardData, cardImage, type PlayerId, type PlayMode } from '@gumgum/engine';
+import { DataVersion } from '../cache';
 import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId, type PlayFormat } from '../stats/catalog';
-import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomTournament, type SeatInfo } from './room';
+import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomStatus, type RoomTournament, type SeatInfo } from './room';
 
 /** Quem quer jogar (perfil do jogador e deck escolhido). */
 export type SeatRequest = Omit<SeatInfo, 'token'>;
@@ -143,6 +144,12 @@ const tournamentKey = (t: Pick<RoomTournament, 'id' | 'matchId' | 'game'>) => `$
 
 export class Lobby {
   readonly rooms = new Map<string, Room>();
+  /**
+   * Versão da lista "Assistir" (`live`): muda quando uma sala entra, sai, começa, termina ou
+   * ganha/perde espectador. Jogadas não contam (seria a cada instante com muitas salas): a vida,
+   * a mão e o turno de cada partida saem com o atraso do TTL do cache de `GET /api/online/live`.
+   */
+  readonly version = new DataVersion();
   private readonly codes = new Map<string, string>();
   /** Partida de torneio ("torneio:partida") → sala. */
   private readonly tournamentRooms = new Map<string, string>();
@@ -220,11 +227,19 @@ export class Lobby {
   }
 
   private makeRoom(data: RoomData) {
+    let statusSeen: RoomStatus | null = null;
     const room = new Room(data, {
       cards: this.deps.cards,
       now: this.deps.now,
       log: this.deps.log,
-      save: (r) => this.deps.save?.(r.data),
+      save: (r) => {
+        if (r.status !== statusSeen) {
+          statusSeen = r.status;
+          this.version.bump();
+        }
+        this.deps.save?.(r.data);
+      },
+      onPresence: () => this.version.bump(),
       finish: this.deps.finish,
       rateLimit: this.deps.rateLimit,
       botDelayMs: this.deps.botDelayMs,
@@ -233,6 +248,8 @@ export class Lobby {
     this.rooms.set(room.id, room);
     if (data.code) this.codes.set(data.code, room.id);
     if (data.tournament) this.tournamentRooms.set(tournamentKey(data.tournament), room.id);
+    statusSeen = room.status;
+    this.version.bump();
     return room;
   }
 
@@ -247,6 +264,7 @@ export class Lobby {
         this.rooms.delete(data.id);
         if (data.code) this.codes.delete(data.code);
         this.deps.remove?.(data.id);
+        this.version.bump();
       }
     }
   }
@@ -385,14 +403,23 @@ export class Lobby {
    */
   live(opts: { bots: boolean }): LiveRoom[] {
     const out: LiveRoom[] = [];
-    for (const room of this.rooms.values()) {
-      if (room.status !== 'playing' || !room.state) continue;
-      if (room.data.queue === 'private' || (room.data.queue === 'bot' && !opts.bots)) continue;
-      out.push(this.summary(room));
-    }
+    for (const room of this.rooms.values()) if (this.listed(room, opts)) out.push(this.summary(room));
     // Torneios e ranqueadas primeiro; dentro de cada fila, as mais novas.
     const rank = (q: string) => (q === 'tournament' ? 0 : q === 'ranked' ? 1 : q === 'casual' ? 2 : 3);
     return out.sort((a, b) => rank(a.queue) - rank(b.queue) || b.createdAt - a.createdAt);
+  }
+
+  /** A sala entra na lista "Assistir"? */
+  private listed(room: Room, opts: { bots: boolean }) {
+    if (room.status !== 'playing' || !room.state) return false;
+    return room.data.queue !== 'private' && (room.data.queue !== 'bot' || opts.bots);
+  }
+
+  /** Ids das salas da lista "Assistir" que esta conta (ou navegador) joga. */
+  playing(ownerHash: string | null, userId: string | null, opts: { bots: boolean }): string[] {
+    const out: string[] = [];
+    for (const room of this.rooms.values()) if (this.listed(room, opts) && room.isPlayer(ownerHash, userId)) out.push(room.id);
+    return out;
   }
 
   summary(room: Room): LiveRoom {
@@ -669,6 +696,7 @@ export class Lobby {
     this.finishedAt.delete(id);
     this.roomIps.delete(id);
     this.deps.remove?.(id);
+    this.version.bump();
   }
 
   /** Apaga salas velhas e entradas abandonadas da fila. */

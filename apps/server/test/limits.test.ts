@@ -5,7 +5,8 @@ import { buildApp } from '../src/app';
 import { createSession, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { dataVersion, ResponseCache } from '../src/cache';
 import { openDb } from '../src/db';
-import type { LobbyLimits } from '../src/online/lobby';
+import type { Lobby, LobbyLimits } from '../src/online/lobby';
+import type { Connection } from '../src/online/room';
 import { seed } from '../src/seed';
 
 const owner = (n: number) => ({ 'x-deck-owner': `browser-${n}-0123456789abcdef` });
@@ -77,6 +78,68 @@ describe('tetos de salas', () => {
 });
 
 describe('cache com ETag', () => {
+  it('GET /api/online/live: ETag e 304; a lista muda na hora com sala nova, espectador e fim, e as jogadas saem pelo TTL', async () => {
+    let now = 1_000_000;
+    const db = openDb(':memory:');
+    seed(db);
+    const app = buildApp(db, { server: { cardImages: true, onlineBotRooms: true }, onlineRateLimit: 1e9, botDelayMs: 0, now: () => now });
+    const live = (headers: Record<string, string> = {}) => app.inject({ url: '/api/online/live', headers });
+    const empty = await live();
+    expect(empty.statusCode).toBe(200);
+    expect(empty.json().rooms).toEqual([]);
+    const e0 = empty.headers.etag as string;
+    expect(e0).toMatch(/^"/);
+    expect(empty.headers['cache-control']).toContain('no-cache');
+    expect((await live({ 'if-none-match': e0 })).statusCode).toBe(304);
+
+    // Uma sala nova entra na lista na hora (sem esperar o TTL).
+    const u = upsertGoogleUser(db, { sub: 'zoro', email: 'zoro@example.com', emailVerified: true, name: 'Zoro', picture: null });
+    const zoro = { ...owner(1), cookie: `gg_session=${createSession(db, u.id)}` };
+    const bot = await app.inject({ method: 'POST', url: '/api/online/bot', headers: zoro, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb', first: 0 } });
+    expect(bot.statusCode, bot.body).toBe(201);
+    const { roomId, token } = bot.json();
+    const one = await live({ 'if-none-match': e0 });
+    expect(one.statusCode).toBe(200);
+    expect(one.json().rooms.map((r: { id: string; mine: boolean }) => [r.id, r.mine])).toEqual([[roomId, false]]);
+    const e1 = one.headers.etag as string;
+    expect(e1).not.toBe(e0);
+    // Quem joga a partida tem a própria resposta (`mine`), sem misturar com a dos outros.
+    const mine = await live(zoro);
+    expect(mine.json().rooms[0].mine).toBe(true);
+    expect(mine.headers.etag).not.toBe(e1);
+    expect((await live({ 'if-none-match': e1 })).statusCode).toBe(304);
+
+    // Um espectador entrando muda o contador na hora.
+    const room = (app as unknown as { onlineLobby: Lobby }).onlineLobby.get(roomId)!;
+    const conn: Connection = { seat: null, sentDefs: new Set(), sentLog: 0, send: () => {} };
+    room.attach(conn);
+    const watched = await live({ 'if-none-match': e1 });
+    expect(watched.statusCode).toBe(200);
+    expect(watched.json().rooms[0].spectators).toBe(1);
+    const e2 = watched.headers.etag as string;
+
+    // Uma jogada não invalida o cache (seria a cada instante com muitas salas): a mão nova aparece depois do TTL.
+    expect(room.state!.pending).toMatchObject({ kind: 'mulligan', player: 0 });
+    expect(watched.json().rooms[0].turn).toBe(0);
+    const played = await app.inject({ method: 'POST', url: `/api/online/rooms/${roomId}/action`, payload: { t: token, seq: 0, action: { type: 'mulligan', player: 0, redraw: false } } });
+    expect(played.statusCode, played.body).toBe(200);
+    // O bot responde ao mulligan dele num timer; o turno 1 começa.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(room.state!.turn).toBe(1);
+    expect((await live({ 'if-none-match': e2 })).statusCode).toBe(304);
+    now += 2001;
+    const later = await live({ 'if-none-match': e2 });
+    expect(later.statusCode).toBe(200);
+    expect(later.json().rooms[0].turn).toBe(1);
+
+    // O fim da partida tira a sala da lista na hora.
+    room.detach(conn);
+    expect((await live()).json().rooms[0].spectators).toBe(0);
+    expect((await app.inject({ method: 'POST', url: `/api/online/rooms/${roomId}/action`, payload: { t: token, seq: room.state!.actionCount, action: { type: 'concede', player: 0 } } })).statusCode).toBe(200);
+    expect((await live()).json().rooms).toEqual([]);
+  });
+
+
   it('reaproveita a resposta até a próxima gravação e responde 304 ao If-None-Match', () => {
     let calls = 0;
     let now = 0;
