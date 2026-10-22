@@ -224,6 +224,15 @@ export interface RoomData {
   answeredBy?: Record<number, string>;
 }
 
+/** Visão compartilhada entre conexões (ver `Room.sharedState`): `room`, `view` e `lastAction` já em JSON. */
+interface SharedState {
+  room: string;
+  view: string;
+  defs: Record<string, CardDef>;
+  log: LogEntry[];
+  lastAction: string;
+}
+
 export interface Connection {
   /** Assento do jogador; null = espectador. */
   seat: PlayerId | null;
@@ -236,6 +245,11 @@ export interface Connection {
   /** Judge do torneio (ou organizador): vê as duas mãos ao vivo, sem atraso, só nas salas de torneio. */
   judge?: boolean;
   send: (event: string, data: unknown) => void;
+  /**
+   * Entrega um evento já serializado (o `state`, igual para todos os espectadores com a mesma
+   * visão, é serializado uma vez e escrito em cada canal). Sem isso, o objeto vai por `send`.
+   */
+  sendJson?: (event: string, json: string) => void;
   /** Encerra a resposta (o navegador reconecta sozinho). */
   end?: () => void;
   /** Definições e linhas do log já enviadas por esta conexão. */
@@ -257,6 +271,8 @@ export interface RoomDeps {
   botDelayMs?: number;
   /** Momentos que viram notificação no celular (ver push/routes.ts). */
   onEvent?: (room: Room, event: RoomEvent) => void;
+  /** Uma conexão entrou ou saiu (o número de espectadores da lista "Assistir" mudou). */
+  onPresence?: (room: Room) => void;
 }
 
 /**
@@ -890,7 +906,7 @@ export class Room {
       if (late.timer) clearTimeout(late.timer);
       this.lates.delete(late.delay);
       if (this.ensureLate(late.delay)) {
-        for (const c of this.conns) if (this.isLate(c) && this.delayOf(c) === late.delay) c.send('state', this.snapshot(c));
+        this.sendState([...this.conns].filter((c) => this.isLate(c) && this.delayOf(c) === late.delay));
       } else {
         for (const c of this.conns) if (this.isLate(c) && this.delayOf(c) === late.delay) c.end?.();
       }
@@ -1064,6 +1080,7 @@ export class Room {
   }
 
   attach(conn: Connection) {
+    this.deps.onPresence?.(this);
     // Mãos dos jogadores só onde são permitidas (torneio ou sala privada liberada); o Judge, só em sala de torneio.
     if (conn.hands && !this.handsAllowed) conn.hands = false;
     if (conn.judge && this.data.queue !== 'tournament') conn.judge = false;
@@ -1076,7 +1093,7 @@ export class Room {
     const late = this.lateOf(conn);
     this.conns.add(conn);
     this.updatePresence();
-    conn.send('state', this.snapshot(conn));
+    this.sendState([conn]);
     // Quem chega durante o sorteio vê os dados já jogados (na mesa atrasada, os que já passaram do atraso).
     if ((late ? late.state : this.state)?.phase === 'mulligan') {
       const cutoff = this.deps.now() - (late?.delay ?? 0);
@@ -1088,6 +1105,7 @@ export class Room {
 
   detach(conn: Connection) {
     this.conns.delete(conn);
+    this.deps.onPresence?.(this);
     this.updatePresence();
     this.broadcastPresence();
     if (this.isLate(conn)) this.advanceLate();
@@ -1111,7 +1129,8 @@ export class Room {
 
   /** Manda um evento agora para quem assiste ao vivo e, depois do atraso, para quem assiste atrasado. */
   private emit(event: string, data: unknown) {
-    for (const c of this.conns) if (!this.isLate(c)) c.send(event, data);
+    const json = JSON.stringify(data);
+    for (const c of this.conns) if (!this.isLate(c)) this.deliver(c, event, json);
     this.queueLate(event, data);
   }
 
@@ -1168,7 +1187,7 @@ export class Room {
           late.state = applyAction(late.state, action);
           late.count++;
           late.lastAction = action;
-          for (const c of viewers) c.send('state', this.snapshot(c));
+          this.sendState(viewers);
           continue;
         }
         const wake = Math.min(nextAt, event?.at ?? Infinity);
@@ -1211,8 +1230,8 @@ export class Room {
 
   private broadcastPresence() {
     const presence = [0, 1].map((s) => this.connected(s as PlayerId));
-    const spectators = this.spectators;
-    for (const c of this.conns) c.send('presence', { connected: presence, spectators });
+    const json = JSON.stringify({ connected: presence, spectators: this.spectators });
+    for (const c of this.conns) this.deliver(c, 'presence', json);
   }
 
   /** Avisos fora do jogo (revanche). `data` recebe null para os espectadores; quem vê as mãos recebe depois do atraso. */
@@ -1223,7 +1242,7 @@ export class Room {
 
   /** Estado novo para quem assiste ao vivo (a mesa atrasada avança sozinha, em `advanceLate`). */
   broadcast() {
-    for (const c of this.conns) if (!this.isLate(c)) c.send('state', this.snapshot(c));
+    this.sendState([...this.conns].filter((c) => !this.isLate(c)));
   }
 
   clock() {
@@ -1291,41 +1310,76 @@ export class Room {
   }
 
   /**
-   * Estado para uma conexão: a visão do jogador, mais só as definições de cartas e
-   * as linhas do log que esta conexão ainda não recebeu.
+   * O que entra no `state` de uma conexão: a mesa (ao vivo ou atrasada), o ponto de vista e as
+   * cartas a mais (as mãos). Conexões com a mesma `key` recebem a mesma visão.
    */
-  snapshot(conn: Connection) {
+  private viewOf(conn: Connection) {
     const late = this.lateOf(conn);
-    const state = late ? late.state : this.state;
-    const lastAction = late ? late.lastAction : this.lastAction;
     // A visão de um jogador sem a mesa atrasada que ela exige seria o presente: fica a pública.
     const pov = conn.seat ?? (late || !this.isLate(conn) ? (conn.as ?? null) : null);
-    const room = this.info(conn.seat, late, pov);
-    if (!state || !this.aliases) return { room, view: null, defs: {}, log: { from: 0, entries: [] }, lastAction: null };
     // As mãos dos dois só saem da mesa atrasada (ou ao vivo para o Judge e, no torneio com mãos ao vivo,
     // para quem as vê sem atraso), onde são permitidas: fora disso, nada a mais.
-    const extra = this.handsAllowed && ((late && conn.hands) || (!late && (conn.judge || (conn.hands && this.handsLive)))) ? handsOf(state) : [];
+    const hands = this.handsAllowed && Boolean((late && conn.hands) || (!late && (conn.judge || (conn.hands && this.handsLive))));
+    return { late, pov, hands, key: `${late?.delay ?? 0}:${conn.seat}:${pov}:${hands ? 1 : 0}` };
+  }
+
+  /**
+   * Partes do `state` iguais para todas as conexões com a mesma visão, já em JSON (fan-out
+   * compartilhado): `viewFor` e a serialização rodam uma vez por visão e não uma vez por conexão,
+   * então 100 espectadores sem mãos custam o mesmo que 1. Só `defs` e `log` dependem da conexão
+   * (o que ela ainda não recebeu) e são montados por fora, em `stateJson`.
+   */
+  private sharedState(conn: Connection, v: ReturnType<Room['viewOf']>): SharedState {
+    const state = v.late ? v.late.state : this.state;
+    const lastAction = v.late ? v.late.lastAction : this.lastAction;
+    const room = JSON.stringify(this.info(conn.seat, v.late, v.pov));
+    if (!state || !this.aliases) return { room, view: 'null', defs: {}, log: [], lastAction: 'null' };
+    const extra = v.hands ? handsOf(state) : [];
     const opts = { revealEnd: !this.sealed };
-    const { defs, log, ...view } = viewFor(state, pov, this.aliases, extra, opts);
-    const newDefs: Record<string, CardDef> = {};
-    for (const [id, def] of Object.entries(defs)) {
-      if (!conn.sentDefs.has(id)) {
-        conn.sentDefs.add(id);
-        newDefs[id] = def;
-      }
-    }
-    const from = Math.min(conn.sentLog, log.length);
-    const entries: LogEntry[] = log.slice(from);
-    conn.sentLog = log.length;
+    const { defs, log, ...view } = viewFor(state, v.pov, this.aliases, extra, opts);
     return {
       room,
-      view,
-      defs: newDefs,
-      log: { from, entries },
-      lastAction: lastAction ? aliasRefs(state, pov, this.aliases, lastAction, extra, opts) : null,
+      view: JSON.stringify(view),
+      defs,
+      log,
+      lastAction: lastAction ? JSON.stringify(aliasRefs(state, v.pov, this.aliases, lastAction, extra, opts)) : 'null',
     };
   }
 
+  /**
+   * O `state` de uma conexão (JSON): a visão compartilhada mais só as definições de cartas e as
+   * linhas do log que esta conexão ainda não recebeu.
+   */
+  private stateJson(conn: Connection, shared: SharedState): string {
+    const newDefs: Record<string, CardDef> = {};
+    for (const id in shared.defs) {
+      if (!conn.sentDefs.has(id)) {
+        conn.sentDefs.add(id);
+        newDefs[id] = shared.defs[id];
+      }
+    }
+    const from = Math.min(conn.sentLog, shared.log.length);
+    const entries: LogEntry[] = from === 0 ? shared.log : shared.log.slice(from);
+    conn.sentLog = shared.log.length;
+    return `{"room":${shared.room},"view":${shared.view},"defs":${JSON.stringify(newDefs)},"log":${JSON.stringify({ from, entries })},"lastAction":${shared.lastAction}}`;
+  }
+
+  /** Entrega um evento já serializado (ou o objeto, para conexões sem `sendJson`). */
+  private deliver(conn: Connection, event: string, json: string) {
+    if (conn.sendJson) conn.sendJson(event, json);
+    else conn.send(event, JSON.parse(json));
+  }
+
+  /** Manda o `state` a estas conexões, calculando cada visão distinta uma só vez. */
+  private sendState(conns: Iterable<Connection>) {
+    const shared = new Map<string, SharedState>();
+    for (const conn of conns) {
+      const v = this.viewOf(conn);
+      let s = shared.get(v.key);
+      if (!s) shared.set(v.key, (s = this.sharedState(conn, v)));
+      this.deliver(conn, 'state', this.stateJson(conn, s));
+    }
+  }
 
   /** Replay completo (só depois do fim da partida; nunca numa partida de torneio, `sealed`). */
   replay() {

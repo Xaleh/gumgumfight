@@ -447,7 +447,7 @@ reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do prot
 | Menu | `GET /api/tournaments` | 60 s | aba visível |
 | Menu (bloco "ao vivo") | `GET /api/online/live` | 15 s | aba visível |
 | Menu (bloco meta) | `GET /api/stats?days=7` | 5 min | aba visível |
-| Assistir partidas | `GET /api/online/live` | 5 s | sempre, enquanto a lista está aberta |
+| Assistir partidas | `GET /api/online/live` | 5 s | sempre, enquanto a lista está aberta (cache no servidor + ETag/304) |
 | Fila casual/ranqueada | `GET /api/online/queue/:ticket` | 1,5 s | enquanto está na fila |
 | Página do torneio | `GET /api/tournaments/:id` | 5 s | torneio `running` (304 sem corpo quando nada mudou) |
 | Partida online | `ping` SSE (servidor → cliente) | 20 s | canal aberto |
@@ -931,7 +931,7 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   o oponente não pode ver a mão do outro pela transmissão. **Mãos ao vivo** (`tournaments.live_hands`, opção do
   organizador no formulário do torneio, copiada para `RoomTournament.liveHands` ao abrir cada sala; `Room.handsLive`
   e `handsLive` no `room` e na lista): nessas partidas o mínimo cai a 0 (`Room.minHandsDelay`), vale o atraso
-  escolhido pelo streamer e, sem atraso, as duas mãos saem da mesa ao vivo (`snapshot`). Só em torneio: a sala
+  escolhido pelo streamer e, sem atraso, as duas mãos saem da mesa ao vivo (`sendState`). Só em torneio: a sala
   privada liberada mantém o mínimo. `RoomData.timeline` guarda, para cada ação, o instante e o
   tempo dos dois jogadores logo depois dela (e `startedAt`, o começo). A sala mantém **uma mesa por atraso em uso**
   (`lates`: estado + quantas ações aplicadas + fila de eventos + timer), criada quando chega o primeiro espectador com
@@ -960,9 +960,13 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   silencia o chat dos jogadores só para ele (`localStorage.gumgum.watchChatOff`).
 - Limite **100 espectadores por sala** (429 acima). Espectadores não se identificam: entram só como número.
 - Na revanche de sala privada, os espectadores seguem para a sala nova automaticamente.
-- Cada espectador recebe o **mesmo volume** de dados que um jogador (um `state` completo por ação, ~9,5 KB). Não há
-  fan-out compartilhado: `viewFor` e `JSON.stringify` rodam uma vez por conexão por ação (o resultado é o mesmo para
-  todos os espectadores sem mãos, mas hoje não é reaproveitado — ver seção 15).
+- Cada espectador recebe o **mesmo volume** de dados que um jogador (um `state` completo por ação, ~9,5 KB), mas o
+  custo de CPU é por **visão**, não por conexão (**fan-out compartilhado**, `Room.sendState`): a cada envio, as
+  conexões são agrupadas pela visão (mesa ao vivo ou atrasada, assento, ponto de vista e mãos), e `viewFor`,
+  `info` e a serialização rodam uma vez por grupo. Só `defs` e `log` (o que cada conexão ainda não recebeu) são
+  montados por conexão, por concatenação de JSON já pronto; o canal SSE escreve o texto como está
+  (`Connection.sendJson`). `presence` e os eventos fora do jogo também são serializados uma vez. 100 espectadores
+  sem mãos custam o mesmo que 1.
 
 ### Segurança da partida
 
@@ -1436,14 +1440,17 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
    e teto de 400 salas (`ONLINE_MAX_ROOMS`). Para ir além, subir os dois juntos (2 MB por sala como regra) e, se preciso,
    `node_args: '--max-old-space-size=…'`. Manter a swap de 2 GB como rede de segurança.
 2. **Otimizações no código (dias), na ordem de retorno:**
-   - **Fan-out compartilhado no espectador**: calcular `viewFor(state, null)` e o JSON uma vez por ação e enviar o
-     mesmo buffer a todos os espectadores sem mãos (hoje é uma vez por conexão). Corta o custo por espectador de
-     ~0,35 ms para quase zero; deixa 100 espectadores por sala custarem o mesmo que 1.
+   - **Fan-out compartilhado no espectador** (feito, `Room.sendState`): `viewFor` e o JSON são calculados uma vez
+     por visão por ação e o mesmo texto vai a todos os espectadores sem mãos. Corta o custo por espectador de
+     ~0,35 ms para quase zero; 100 espectadores por sala custam o mesmo que 1.
    - **Deltas no `state`**: mandar só o que mudou (ou o estado comprimido) em vez de ~9,5 KB por ação. Reduz a banda
      do SSE em ~80 %. Alternativa mais simples: ligar compressão no canal (`Content-Encoding: gzip` com flush por
      evento no próprio Node, já que o Nginx não comprime `text/event-stream` com `proxy_buffering off`).
-   - **Cache com ETag em `GET /api/online/live`** (a lista "Assistir" consulta a cada 5 s). Estatísticas e torneio
-     completo já ficam em cache com ETag (`cache.ts`).
+   - **Cache com ETag em `GET /api/online/live`** (feito): a lista "Assistir" (5 s) e o bloco "ao vivo" do menu
+     (15 s) saem de um `ResponseCache` próprio, invalidado por `Lobby.version` (sala que entra, sai, começa,
+     termina ou muda de espectadores) e por um TTL de 2 s para o que as jogadas mudam (vida, mão, turno); quem
+     joga uma das partidas listadas (`mine`) tem a própria entrada. Estatísticas e torneio completo já ficavam
+     em cache com ETag (`cache.ts`).
    - **`GET /api/cards` com `ETag`/`Last-Modified`** (máximo de `cards.updated_at`) e `Cache-Control`. Evita ~280 KB
      por abertura do construtor.
    - **Consultas pesadas de estatísticas num `worker_thread`** com a própria conexão `DatabaseSync` (SQLite em WAL
@@ -1472,7 +1479,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | **Ponto único de falha**: um processo, uma máquina, um arquivo | tudo | pm2 `autorestart`, salas persistidas em `live_matches`, backup diário | monitoramento externo de `/api/health`; passo 4 da seção 15 a longo prazo |
 | **SQLite síncrono bloqueia o event loop** | `node:sqlite` | consultas hoje levam ms; índices em `match_seats`/`match_cards` | cache de stats; worker thread |
 | **Reinício por memória** (1500 MB) | `ecosystem.config.cjs` | salas voltam do banco; o teto de 400 salas segura antes | subir os dois juntos ao escalar (seção 15) |
-| **SSE sem compressão e sem deltas** | `online/room.ts` `snapshot` | — | deltas / gzip no Node |
+| **SSE sem compressão e sem deltas** | `online/room.ts` `sendState` | fan-out compartilhado (CPU por visão, não por conexão) | deltas / gzip no Node |
 | **Polling de 5 s na página do torneio** por jogador | `Tournaments.tsx` | cache no servidor + ETag/304 (`cache.ts`) | SSE do torneio, se o volume crescer |
 | **Hotlink das imagens** em `optcgapi.com` / `optcgleaks.com` (podem bloquear, mudar URL ou sair do ar) | `imageUrl` | fallback para a carta desenhada; `CARD_IMAGES=off` | cache/proxy próprio de imagens (custaria ~50–100 KB × cartas de banda e disco) |
 | **Abrir salas não exige login** (o código do navegador é gerado à vontade; o treino transmitido exige) | `online/routes.ts` | tetos de salas por servidor e por IP (`lobby.admit`), `limit_req`/`limit_conn` no Nginx | acompanhar os 429/503 nos logs e ajustar `DEFAULT_LIMITS` |

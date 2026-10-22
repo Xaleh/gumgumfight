@@ -320,8 +320,11 @@ está na fila e os espectadores também contam.
   (`ONLINE_MAX_ROOMS`), salas de treino contra o bot (`ONLINE_MAX_BOT_ROOMS`), e por IP (16 salas ou lugares na fila
   ao mesmo tempo e 60 criações a cada 10 min; `apps/server/src/online/lobby.ts`, `DEFAULT_LIMITS`). O Nginx dos scripts
   de deploy ainda limita `/api/` a 30 requisições/s por IP (rajada de 100) e 64 conexões simultâneas por IP.
-- **Cache:** o torneio completo (`GET /api/tournaments/:id`, consultado a cada 5 s por jogador) e as estatísticas
-  ficam em cache no servidor, invalidado a cada gravação, e saem com `ETag` (o navegador recebe 304 quando nada mudou).
+- **Cache:** o torneio completo (`GET /api/tournaments/:id`, consultado a cada 5 s por jogador), as estatísticas e a
+  lista de partidas para assistir (`GET /api/online/live`, a cada 5 s) ficam em cache no servidor, invalidado a cada
+  mudança, e saem com `ETag` (o navegador recebe 304 quando nada mudou).
+- **Espectadores:** o estado de cada jogada é calculado e serializado uma vez por visão e enviado como está a todos
+  os espectadores com a mesma visão (fan-out compartilhado): 100 espectadores numa sala custam o mesmo que 1.
 - **Transporte:** SSE (`EventSource`) do servidor para o navegador e POST para as ações. Funciona atrás do Nginx / Nginx
   Proxy Manager sem configuração extra (header `X-Accel-Buffering: no` e um `ping` a cada 20 s, abaixo do
   `proxy_read_timeout` de 60 s).
