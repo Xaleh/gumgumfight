@@ -84,9 +84,12 @@ risco = P(ele consegue o Counter) × P(ele quer gastar) × (valor do acerto − 
   +2000 com `counterBig`, 0,2) e **as cartas somam**: margem de +1000 contra 5 cartas é quase certa de ser
   coberta; +4000 contra 1 carta, impossível. Os valores vêm da composição dos decks prontos (49% das cartas
   têm +1000, 15% +2000), puxados para cima porque quem joga guarda os Counters na mão.
-- `P(quer)` (`counterWill`) cresce quando o alvo é o Líder com pouca Vida (0,25 com 4 ou mais, 0,5 com 3,
-  0,9 com 2, 1 com 1) ou um Personagem caro, e cai a cada 1000 a mais que ele teria de cobrir
-  (`counterStack`: gastar duas cartas por uma Vida é raro com Vida alta, normal com Vida baixa).
+- `P(quer)` (`counterWill`) cresce quando o alvo é o Líder com pouca Vida (0,38 com 4 ou mais, 0,55 com 3,
+  0,75 com 2, 0,85 com 1) ou um Personagem caro, e cai a cada 1000 a mais que ele teria de cobrir
+  (`counterStack`: gastar duas cartas por uma Vida é raro com Vida alta, normal com Vida baixa). A tabela do
+  Líder veio dos replays (seção 11): quando a mão bastava, as pessoas defenderam 78% com 1 de Vida, 68% com 2,
+  48% com 3 e 33 a 36% com 4 ou mais; a tabela anterior (1, 0,9, 0,5, 0,25) era otimista com Vida baixa e
+  pessimista com Vida alta.
 - **Ataque fatal**: ele defende sempre que pode, e para sobreviver basta parar **um** dos acertos da linha.
   O risco do ataque que venceria é a chance de ele cobrir o acerto **mais barato** da linha, com a mão que
   tinha naquele momento (cada acerto anterior lhe deu uma carta da Vida). Antes, cada ataque era avaliado
@@ -311,11 +314,22 @@ bastava (é o que os parâmetros `counterWill`, `counterStack`, `counterCard` da
 reproduzir); e, nos turnos inteiros, quem joga mais cartas e quem ataca mais, também com o oponente em 2 de Vida ou
 menos (o "desenvolver ou pressionar" da seção 8).
 
-**Primeira rodada em produção (421 partidas, 32 mil decisões, outubro de 2026).** O bot concorda com as pessoas em
-47% dos cliques da fase principal e 72% dos Counters. Na defesa do Líder as pessoas defendem muito mais com Vida alta
-(Counter com 4 de Vida: 33% contra 5% do bot; com 5: 28% contra 3%) e um pouco mais no ataque fatal (73% contra 54%);
-com 1 a 3 de Vida os dois se parecem. Os quatro primeiros dos torneios defendem *menos* que o bot com 2 e 3 de Vida
-(34% e 21% contra 62% e 56%) e escolhem jogar primeiro em só 15% das vezes (o bot, sempre). O JSONL serve para o
+**Primeira rodada em produção (421 partidas, 32 mil decisões, 2 078 turnos, outubro de 2026).** O bot concorda com
+as pessoas em 47% dos cliques da fase principal e 72% dos Counters.
+
+- **Ataque fatal**: quando a mão bastava (135 casos), as pessoas seguraram 94% e o bot seguraria 99%; a diferença
+  bruta (73% contra 54%) eram 54 casos de gente gastando Counter sem ter como parar o ataque. Um único caso em que
+  o humano segurou e o bot passaria (+8000 com quatro cartas e 2 DON!!).
+- **Defesa do Líder quando a mão bastava**, humano x bot: 1 de Vida 78% x 82%, 2 de Vida 68% x 70%, 3 de Vida
+  48% x 55%, 4 de Vida 36% x 5%, 5 de Vida 31% x 4%. Só com Vida alta o bot destoa; os quatro primeiros dos torneios
+  também defendem ~30% com 4 de Vida. Hipótese: Counter com cartas mortas (as que não vão jogar), que o bot avalia
+  como qualquer outra carta da mão. Falta medir o custo da carta usada contra o DON!! disponível antes de mexer.
+- **Modelo do oponente**: a tabela de `counterWill` foi recalibrada com esses números (seção 3).
+- **Turnos inteiros**: por turno, as pessoas jogam mais cartas (1,13 contra 0,97 do bot), atacam mais (2,39 contra
+  2,24) e anexam menos DON!! (1,65 contra 2,04): mais ataques com menos margem, enquanto o bot concentra DON!! em
+  poucos ataques. Com o oponente em 2 de Vida ou menos, atacaram mais que o bot em 46% dos turnos e menos em 15%.
+- **Quem começa**: as pessoas escolhem jogar primeiro em 49% das vezes; os quatro primeiros dos torneios, em 15%.
+  O bot com busca passou a jogar segundo. O JSONL serve para o
 resto: calibrar esses parâmetros por regressão, ou ajustar os pesos da avaliação para concordar com os melhores
 colocados em vez de só por auto-jogo (seção 9). Partidas cujo replay não refaz (versão antiga, texto de carta que
 mudou) são contadas e puladas.
