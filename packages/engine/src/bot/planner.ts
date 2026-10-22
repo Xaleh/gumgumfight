@@ -97,8 +97,11 @@ export function planAction(full: GameState, player: PlayerId, opts: PlannerOptio
   if (planned) return planned;
   const pending = state.pending;
   if (pending) {
-    // Mulligan e escolha de quem começa não têm o que simular.
-    if (pending.kind === 'mulligan' || pending.kind === 'chooseFirst' || pending.kind === 'manual') return simpleBot(state, player);
+    // Mulligan e escolha de quem começa não têm o que simular. Quem começa: o segundo (compra na primeira vez e
+    // tem 2 DON!! no primeiro turno); nos replays, os melhores colocados dos torneios escolhem jogar primeiro em
+    // só 15% das vezes (docs/bot-tempo.md, seção 11).
+    if (pending.kind === 'chooseFirst') return { type: 'answer', player, yes: false };
+    if (pending.kind === 'mulligan' || pending.kind === 'manual') return simpleBot(state, player);
     return decidePending(state, player, actions, defenseOrPlan(state, player, opts), 2)?.action ?? simpleBot(state, player);
   }
   return planTurn(state, player, defenseOrPlan(state, player, opts));
@@ -254,7 +257,10 @@ function counterWill(state: GameState, target: string, opp: PlayerId, need: numb
   const life = ps.life.length;
   if (target === ps.leader.uid && !life) return 1;
   const cost = cardDef(state, target).cost ?? 0;
-  const base = target === ps.leader.uid ? [1, 1, 0.9, 0.5, 0.25][Math.min(4, life)] : cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
+  // Líder: calibrado nos replays (seção 11 de docs/bot-tempo.md): quando a mão bastava, as pessoas defenderam
+  // 78% com 1 de Vida, 68% com 2, 48% com 3 e 33 a 36% com 4 ou mais (um pouco acima aqui, porque esses números
+  // incluem os ataques que exigiam mais de uma carta, descontados abaixo por `counterStack`).
+  const base = target === ps.leader.uid ? [1, 0.85, 0.75, 0.55, 0.38][Math.min(4, life)] : cost >= 5 ? 0.7 : cost >= 3 ? 0.45 : 0.2;
   // Com o Líder quase sem Vida ele gasta duas cartas sem pensar; com Vida alta, raramente.
   const stack = target === ps.leader.uid ? Math.max(0, (life - 1) / 4) : 1;
   return Math.min(1, base * w.counterWill) * w.counterStack ** (Math.max(0, Math.ceil(need / 1000) - 1) * stack);
