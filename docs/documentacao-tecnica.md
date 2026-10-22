@@ -265,16 +265,21 @@ e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
   é o bot dos testes de simulação (`sim.ts`) e do `simulate:all`.
 - **`normal`** e **`hard`** (`planner.ts` + `evaluate.ts`): simulam as jogadas com `applyAction` e comparam pela
   função de avaliação (`evaluate`, pesos em `DEFAULT_WEIGHTS`). `normal` olha uma jogada à frente; `hard` faz busca
-  em feixe sobre o turno inteiro (jogadas compostas "anexar k DON!! e atacar", teto de 250 ms por busca) e guarda a
-  linha escolhida para as decisões seguintes enquanto a partida seguir o previsto. As escolhas pendentes (bloqueio,
-  Counter, carta da Vida, alvos, opções, "pagar X?") simulam cada resposta possível. O oponente, na simulação,
-  bloqueia do jeito que mais prejudica o bot e nunca usa Counter (a mão dele é escondida): o Counter entra como um
-  ajuste de probabilidade pelo tamanho da mão e pela margem do ataque (`counterAdjust`).
+  em feixe sobre o turno inteiro (jogadas compostas "anexar k DON!! e atacar", linhas "tudo no Líder" para achar o
+  ataque fatal, vaga reservada no feixe para a melhor linha de cada número de cartas jogadas, teto de 250 ms por
+  busca) e guarda a linha escolhida para as decisões seguintes enquanto a partida seguir o previsto. As escolhas
+  pendentes (bloqueio, Counter, carta da Vida, alvos, opções, "pagar X?") simulam cada resposta possível. O
+  oponente, na simulação, bloqueia do jeito que mais prejudica o bot e nunca usa Counter (a mão dele é escondida):
+  o Counter entra como um ajuste de probabilidade pelo tamanho da mão e pela margem do ataque (`counterAdjust`;
+  as cartas escondidas somam, e um ataque fatal ele defende sempre que pode, parando o acerto mais barato da linha).
+  Uma vitória provável vale `winCap` vezes a chance de passar, não `win`, para a posição que sobra se o ataque
+  for parado continuar pesando.
 - Para a simulação funcionar na visão, os frames de efeito **do próprio jogador** vão inteiros na visão (passos,
   escolhas, alvos, com uids apelidados); os do oponente seguem só com a carta de origem.
 
 Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
-[`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`.
+[`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`; contra um
+"humano fraco" que defende como gente (`scripts/human.ts`): `npx tsx packages/engine/scripts/vs-human.ts 200 hard`.
 
 ---
 

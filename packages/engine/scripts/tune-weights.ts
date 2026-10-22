@@ -29,7 +29,7 @@ const A = 0.12;
 const SCALARS = [
   'handCard', 'handCardOpp', 'handCardBase', 'handCounter', 'handCounterEvent',
   'charCost', 'charBase', 'charPower', 'blocker', 'rush', 'stage', 'exposed', 'don',
-  'threat', 'threatHit', 'lethal', 'counterCard', 'counterDrop', 'counterWill',
+  'threat', 'threatHit', 'lethal', 'counterCard', 'counterBig', 'counterWill', 'counterStack', 'winCap', 'lethalPlan',
 ] as const satisfies readonly (keyof BotWeights)[];
 
 type Theta = Record<string, number>;

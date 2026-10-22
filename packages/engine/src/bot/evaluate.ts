@@ -69,12 +69,26 @@ export interface Weights {
   lethal: number;
   /**
    * Modelo do Counter do oponente nos ataques do bot (a mão dele é escondida; ver `counterAbility` no
-   * planejador): chance de uma carta cobrir +1000, quanto ela cai a cada 1000 a mais e um fator sobre
-   * a vontade dele de gastar Counter.
+   * planejador): chance de uma carta escondida ter Counter (`counterCard`) e de ser +2000 (`counterBig`,
+   * parte da anterior); as cartas somam. `counterWill` é um fator sobre a vontade dele de gastar
+   * Counter num ataque que não é fatal, e `counterStack` o quanto essa vontade cai a cada 1000 a mais
+   * que ele teria de cobrir (gastar duas cartas por uma Vida é raro). Um ataque fatal ele defende sempre que pode.
    */
   counterCard: number;
-  counterDrop: number;
+  counterBig: number;
   counterWill: number;
+  counterStack: number;
+  /**
+   * Valor de uma vitória *provável* (ataque fatal que o oponente talvez consiga parar), na escala da
+   * avaliação: a linha vale `winCap` vezes a chance de passar mais a posição se falhar. Sem o teto, qualquer
+   * chance de vencer (vezes `win`) engolia a posição que sobra quando o ataque é parado.
+   */
+  winCap: number;
+  /**
+   * No próprio turno: castigo por encerrar com o oponente tendo ataque fatal na mesa (`incomingHits` >
+   * Vida, contando os Blockers em pé e os Counters da mão). Um humano acha esse ataque sempre.
+   */
+  lethalPlan: number;
   /** Partida decidida. */
   win: number;
 }
@@ -105,9 +119,12 @@ export const DEFAULT_WEIGHTS: Weights = {
   threat: 1,
   threatHit: 2250,
   lethal: 2700,
-  counterCard: 0.42,
-  counterDrop: 0.34,
-  counterWill: 0.5,
+  counterCard: 0.72,
+  counterBig: 0.2,
+  counterWill: 1,
+  counterStack: 0.6,
+  winCap: 120_000,
+  lethalPlan: 60_000,
   win: 10_000_000,
 };
 
