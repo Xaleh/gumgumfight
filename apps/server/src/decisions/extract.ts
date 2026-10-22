@@ -15,6 +15,8 @@ import {
   type CardData,
   type CardEngineText,
   chooseBotAction,
+  chooseSimpleBotAction,
+  counterValue,
   createGame,
   type DeckList,
   type GameConfig,
@@ -22,6 +24,7 @@ import {
   getPower,
   identityAliases,
   legalActions,
+  playCost,
   type PlayerId,
   REPLAY_VERSION,
   replayConfig,
@@ -75,6 +78,12 @@ export interface DecisionRecord {
   oppDon: number;
   /** Na defesa (Counter, bloqueio): a batalha em curso. */
   battle?: { attacker: string; attackerPower: number; target: string; targetPower: number; targetIsLeader: boolean; need: number };
+  /**
+   * No Counter: quanto a mão podia dar (Counters impressos e Eventos [Counter] que o DON!! ativo paga) e quanto
+   * a carta usada deu. Separa "não quis" de "não tinha como".
+   */
+  counters?: number;
+  chosenValue?: number;
   /** Quantas ações legais havia. */
   legal: number;
   chosen: Choice;
@@ -224,25 +233,111 @@ function decisionKind(state: GameState, player: PlayerId): DecisionKind | null {
   return state.activePlayer === player ? 'main' : null;
 }
 
+/** O que um lado fez num turno inteiro (fase principal), para comparar com o turno que o bot jogaria. */
+export interface TurnSummary {
+  /** Cartas jogadas da mão, por número. */
+  played: string[];
+  /** Ataques: atacante → alvo (números de carta). */
+  attacks: Array<{ attacker: string; target: string }>;
+  /** DON!! anexados no turno. */
+  donAttached: number;
+  /** DON!! ativo que sobrou ao encerrar. */
+  donLeft: number;
+}
+
+export interface TurnRecord {
+  match: number;
+  seat: PlayerId;
+  player: string | null;
+  queue: string;
+  turn: number;
+  life: number;
+  oppLife: number;
+  hand: number;
+  oppHand: number;
+  don: number;
+  human: TurnSummary;
+  /** O turno que o bot jogaria a partir da mesma posição inicial (o oponente não bloqueia nem usa Counter). */
+  bot?: TurnSummary;
+  won: boolean;
+}
+
 export interface MatchExtraction {
   records: DecisionRecord[];
+  turns: TurnRecord[];
   /** Por que a partida foi pulada (replay ilegível ou que não refaz). */
   error?: string;
+}
+
+/** O +poder que uma carta da mão dá como Counter (impresso, ou o de um Evento [Counter] pagável com `don`). */
+function counterPower(state: GameState, uid: string, don: number): number {
+  const def = state.defs[state.cards[uid].cardId];
+  if (def.category === 'event') {
+    const ab = def.abilities.find((a) => a.timing === 'counter');
+    if (!ab || playCost(state, uid) > don) return 0;
+    return ab.steps.reduce((sum, st) => sum + (st.do === 'power' && st.amount > 0 ? st.amount : 0), 0);
+  }
+  return counterValue(state, uid);
+}
+
+const EMPTY_TURN = (): TurnSummary => ({ played: [], attacks: [], donAttached: 0, donLeft: 0 });
+
+/** Acumula uma ação da fase principal no resumo do turno. */
+function noteTurnAction(state: GameState, a: Action, t: TurnSummary) {
+  const id = (uid: string) => state.cards[uid]?.cardId ?? uid;
+  if (a.type === 'playCard') t.played.push(id(a.uid));
+  else if (a.type === 'attack') t.attacks.push({ attacker: id(a.attacker), target: id(a.target) });
+  else if (a.type === 'attachDon') t.donAttached++;
+  else if (a.type === 'detachDon') t.donAttached--;
+  else if (a.type === 'endTurn') t.donLeft = state.players[a.player].donActive;
+}
+
+/**
+ * O turno que o bot jogaria a partir de `state` (início da fase principal de `player`): as perguntas ao
+ * oponente são respondidas como na simulação do planejador (não bloqueia, não usa Counter, Vida para a mão).
+ */
+function botTurn(state: GameState, player: PlayerId, aliases: ReturnType<typeof identityAliases>, opts: ExtractOptions): TurnSummary {
+  const t = EMPTY_TURN();
+  let s = state;
+  for (let i = 0; i < 80 && s.phase !== 'gameover'; i++) {
+    const p = s.pending?.player ?? s.activePlayer;
+    let a: Action;
+    if (p !== player) {
+      const pd = s.pending!;
+      a =
+        pd.kind === 'block' ? { type: 'choose', player: p, uids: [] }
+        : pd.kind === 'counter' ? { type: 'pass', player: p }
+        : pd.kind === 'lifeCard' ? { type: 'answer', player: p, yes: false }
+        : chooseSimpleBotAction(s, p);
+    } else {
+      const fromBot = actionFromView(s, aliases, chooseBotAction(viewFor(s, player, aliases), player, opts.bot!, { timeBudgetMs: opts.budgetMs ?? 250, random: () => 0.5 }));
+      if (typeof fromBot === 'string') break;
+      a = fromBot;
+      if (!s.pending) noteTurnAction(s, a, t);
+    }
+    try {
+      s = applyAction(s, a);
+    } catch {
+      break;
+    }
+    if (a.type === 'endTurn' && a.player === player) break;
+  }
+  return t;
 }
 
 /** Refaz uma partida e devolve as decisões dos lados humanos. */
 export function extractMatch(db: DB, matchId: number, opts: ExtractOptions = {}): MatchExtraction {
   const m = db.prepare('SELECT id, mode, format, queue, replay FROM matches WHERE id = ?').get(matchId) as MatchRow | undefined;
-  if (!m?.replay) return { records: [], error: 'sem replay' };
+  if (!m?.replay) return { records: [], turns: [], error: 'sem replay' };
   let stored: StoredReplay;
   try {
     stored = JSON.parse(m.replay) as StoredReplay;
   } catch {
-    return { records: [], error: 'replay ilegível' };
+    return { records: [], turns: [], error: 'replay ilegível' };
   }
   const seats = seatsOf(db, matchId);
   const humans = seats.filter((s) => s.controller === 'human');
-  if (!humans.length) return { records: [] };
+  if (!humans.length) return { records: [], turns: [] };
 
   const ids = [...new Set(stored.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
   const cards = pinEngineTexts(getCards(db, ids) as CardData[], stored.engineTexts);
@@ -272,9 +367,9 @@ export function extractMatch(db: DB, matchId: number, opts: ExtractOptions = {})
       if (stored.version === undefined) attempts.push({ config, actions: upgradeReplayActions(config, stored.actions) });
     }
   } catch (e) {
-    return { records: [], error: `replay da versão ${version} não refaz: ${e instanceof Error ? e.message : String(e)}` };
+    return { records: [], turns: [], error: `replay da versão ${version} não refaz: ${e instanceof Error ? e.message : String(e)}` };
   }
-  let last: MatchExtraction = { records: [], error: 'sem tentativa' };
+  let last: MatchExtraction = { records: [], turns: [], error: 'sem tentativa' };
   for (const attempt of attempts) {
     last = replayMatch(matchId, m, attempt.config, attempt.actions, humans, opts);
     if (!last.error) return last;
@@ -284,21 +379,48 @@ export function extractMatch(db: DB, matchId: number, opts: ExtractOptions = {})
 
 function replayMatch(matchId: number, m: MatchRow, config: GameConfig, actions: Action[], humans: SeatRow[], opts: ExtractOptions): MatchExtraction {
   const records: DecisionRecord[] = [];
+  const turns: TurnRecord[] = [];
   let state: GameState;
   try {
     state = createGame(config);
   } catch (e) {
-    return { records: [], error: e instanceof Error ? e.message : String(e) };
+    return { records: [], turns: [], error: e instanceof Error ? e.message : String(e) };
   }
   resetPlanner();
   const aliases = identityAliases(state);
   const bySeat = new Map(humans.map((s) => [s.seat, s]));
+  /** O turno em andamento de um lado humano (fase principal), até o `endTurn`. */
+  let current: TurnRecord | null = null;
   try {
     for (let i = 0; i < actions.length; i++) {
       const a = actions[i];
       if (state.phase === 'gameover') break;
       const seat = bySeat.get(a.player);
       const kind = seat && !NOT_DECISIONS.has(a.type) ? decisionKind(state, a.player) : null;
+      if (seat && kind === 'main' && !state.pending && state.turn > 2) {
+        if (!current || current.turn !== state.turn || current.seat !== a.player) {
+          const me = state.players[a.player];
+          const opp = state.players[a.player === 0 ? 1 : 0];
+          const rec: TurnRecord = {
+            match: matchId,
+            seat: a.player,
+            player: seat.player_id,
+            queue: m.queue ?? 'casual',
+            turn: state.turn,
+            life: me.life.length,
+            oppLife: opp.life.length,
+            hand: me.hand.length,
+            oppHand: opp.hand.length,
+            don: me.donActive,
+            human: EMPTY_TURN(),
+            won: Boolean(seat.won),
+          };
+          if (opts.bot) rec.bot = botTurn(state, a.player, aliases, opts);
+          current = rec;
+          turns.push(rec);
+        }
+        noteTurnAction(state, a, current.human);
+      }
       if (seat && kind) {
         const me = state.players[a.player];
         const opp = state.players[a.player === 0 ? 1 : 0];
@@ -340,6 +462,10 @@ function replayMatch(matchId: number, m: MatchRow, config: GameConfig, actions: 
             need: Math.max(0, ap - tp + 1000),
           };
         }
+        if (kind === 'counter') {
+          rec.counters = me.hand.reduce((sum, uid) => sum + counterPower(state, uid, me.donActive), 0);
+          if (a.type === 'counter') rec.chosenValue = counterPower(state, a.uid, me.donActive);
+        }
         if (opts.bot) {
           // O bot decide pela visão do jogador (sem ver a mão do oponente nem o deck), como no servidor.
           const view = viewFor(state, a.player, aliases);
@@ -354,9 +480,9 @@ function replayMatch(matchId: number, m: MatchRow, config: GameConfig, actions: 
       state = applyAction(state, a);
     }
   } catch (e) {
-    return { records, error: `ação ${records.length ? records[records.length - 1].index + 1 : 0} recusada: ${e instanceof Error ? e.message : String(e)}` };
+    return { records, turns, error: `ação ${records.length ? records[records.length - 1].index + 1 : 0} recusada: ${e instanceof Error ? e.message : String(e)}` };
   }
-  return { records };
+  return { records, turns };
 }
 
 // ------------------------------------------------------------------ resumo
@@ -373,6 +499,31 @@ export interface Summary {
   counterByNeed: Record<string, { n: number; human: number; bot: number; botCompared: number }>;
   /** Fase principal: os pares (tipo do humano → tipo do bot) mais frequentes quando discordam. */
   mainDisagreements: Array<{ human: string; bot: string; n: number }>;
+  /** Counter no Líder só quando a mão bastava para parar o ataque: a vontade, separada da capacidade. */
+  leaderCounterAble: Record<string, { n: number; human: number; bot: number; botCompared: number }>;
+  /**
+   * Ataque fatal ao Líder (0 de Vida): quantos a mão podia parar, quantos o humano e o bot pararam, e
+   * quantas vezes o humano gastou Counter sem ter como parar.
+   */
+  lethal: { n: number; able: number; humanStopped: number; botStopped: number; botCompared: number; humanWasted: number };
+  /** Posições em que a mão parava o ataque fatal, o humano usou Counter e o bot passaria (até 30). */
+  lethalMisses: Array<{ match: number; index: number; need: number; counters: number; hand: number; don: number; card: string; attacker: string; attackerPower: number }>;
+  /** Turnos inteiros (fase principal): o que o humano fez e o que o bot faria da mesma posição. */
+  turns: TurnStats | null;
+}
+
+export interface TurnStats {
+  n: number;
+  /** Médias por turno: cartas jogadas, ataques, DON!! anexados e DON!! que sobrou. */
+  human: { played: number; attacks: number; donAttached: number; donLeft: number };
+  bot: { played: number; attacks: number; donAttached: number; donLeft: number };
+  /** Em quantos turnos o humano jogou mais cartas que o bot, e em quantos atacou mais. */
+  humanPlayedMore: number;
+  botPlayedMore: number;
+  humanAttackedMore: number;
+  botAttackedMore: number;
+  /** O mesmo, só com o oponente em 2 de Vida ou menos (quando "pressionar" é a pergunta). */
+  lowLife: { n: number; humanPlayedMore: number; botPlayedMore: number; humanAttackedMore: number; botAttackedMore: number };
 }
 
 const bump = <T extends Record<string, number>>(table: Record<string, T>, key: string, blank: T, f: (row: T) => void) => {
@@ -380,8 +531,20 @@ const bump = <T extends Record<string, number>>(table: Record<string, T>, key: s
   f(row);
 };
 
-export function summarize(records: DecisionRecord[], matches: number, failed: number): Summary {
-  const s: Summary = { matches, failed, decisions: records.length, kinds: {}, leaderDefense: {}, counterByNeed: {}, mainDisagreements: [] };
+export function summarize(records: DecisionRecord[], matches: number, failed: number, turns: TurnRecord[] = []): Summary {
+  const s: Summary = {
+    matches,
+    failed,
+    decisions: records.length,
+    kinds: {},
+    leaderDefense: {},
+    counterByNeed: {},
+    mainDisagreements: [],
+    leaderCounterAble: {},
+    lethal: { n: 0, able: 0, humanStopped: 0, botStopped: 0, botCompared: 0, humanWasted: 0 },
+    lethalMisses: [],
+    turns: null,
+  };
   const pairs = new Map<string, number>();
   for (const r of records) {
     bump(s.kinds, r.kind, { n: 0, agree: 0, compared: 0 }, (row) => {
@@ -402,7 +565,35 @@ export function summarize(records: DecisionRecord[], matches: number, failed: nu
         }
       };
       bump(s.leaderDefense, `${r.kind}:vida${Math.min(5, r.life)}`, { n: 0, human: 0, bot: 0, botCompared: 0 }, add);
-      if (r.kind === 'counter') bump(s.counterByNeed, `+${Math.min(4, r.battle.need / 1000)}000`, { n: 0, human: 0, bot: 0, botCompared: 0 }, add);
+      if (r.kind === 'counter') {
+        bump(s.counterByNeed, `+${Math.min(4, r.battle.need / 1000)}000`, { n: 0, human: 0, bot: 0, botCompared: 0 }, add);
+        const able = (r.counters ?? 0) >= r.battle.need;
+        if (able) bump(s.leaderCounterAble, `vida${Math.min(5, r.life)}`, { n: 0, human: 0, bot: 0, botCompared: 0 }, add);
+        if (r.life === 0) {
+          const L = s.lethal;
+          L.n++;
+          if (able) L.able++;
+          if (!able && r.chosen.type === 'counter') L.humanWasted++;
+          if (able && r.chosen.type === 'counter') L.humanStopped++;
+          if (r.bot) {
+            L.botCompared++;
+            if (able && r.bot.type === 'counter') L.botStopped++;
+            if (able && r.chosen.type === 'counter' && r.bot.type === 'pass' && s.lethalMisses.length < 30) {
+              s.lethalMisses.push({
+                match: r.match,
+                index: r.index,
+                need: r.battle.need,
+                counters: r.counters ?? 0,
+                hand: r.hand,
+                don: r.don,
+                card: r.chosen.card ?? '?',
+                attacker: r.battle.attacker,
+                attackerPower: r.battle.attackerPower,
+              });
+            }
+          }
+        }
+      }
     }
     if (r.kind === 'main' && r.bot && !r.agree) {
       // Mesmo tipo de jogada com outra carta ou outro alvo também é discordância, marcada como tal.
@@ -417,6 +608,24 @@ export function summarize(records: DecisionRecord[], matches: number, failed: nu
       const [human, bot] = k.split('→');
       return { human, bot, n };
     });
+  const compared = turns.filter((t) => t.bot);
+  if (compared.length) {
+    const avg = (f: (t: TurnSummary) => number, side: 'human' | 'bot') => compared.reduce((sum, t) => sum + f(t[side]!), 0) / compared.length;
+    const means = (side: 'human' | 'bot') => ({
+      played: avg((t) => t.played.length, side),
+      attacks: avg((t) => t.attacks.length, side),
+      donAttached: avg((t) => t.donAttached, side),
+      donLeft: avg((t) => t.donLeft, side),
+    });
+    const count = (list: TurnRecord[]) => ({
+      n: list.length,
+      humanPlayedMore: list.filter((t) => t.human.played.length > t.bot!.played.length).length,
+      botPlayedMore: list.filter((t) => t.human.played.length < t.bot!.played.length).length,
+      humanAttackedMore: list.filter((t) => t.human.attacks.length > t.bot!.attacks.length).length,
+      botAttackedMore: list.filter((t) => t.human.attacks.length < t.bot!.attacks.length).length,
+    });
+    s.turns = { human: means('human'), bot: means('bot'), ...count(compared), lowLife: count(compared.filter((t) => t.oppLife <= 2)) };
+  }
   return s;
 }
 
@@ -443,10 +652,36 @@ export function formatSummary(s: Summary): string {
     out.push('Counter no Líder por margem exigida:');
     for (const [k, row] of need) out.push(`  ${k.padEnd(14)} ${String(row.n).padStart(6)}   humano ${pct(row.human, row.n)}   bot ${pct(row.bot, row.botCompared)}`);
   }
+  const able = Object.entries(s.leaderCounterAble).sort();
+  if (able.length) {
+    out.push('');
+    out.push('Counter no Líder quando a mão bastava para parar o ataque (a vontade, sem a capacidade):');
+    for (const [k, row] of able) out.push(`  ${k.padEnd(14)} ${String(row.n).padStart(6)}   humano ${pct(row.human, row.n)}   bot ${pct(row.bot, row.botCompared)}`);
+  }
+  if (s.lethal.n) {
+    const L = s.lethal;
+    out.push('');
+    out.push(`Ataque fatal ao Líder: ${L.n} | a mão parava ${L.able} | humano parou ${pct(L.humanStopped, L.able)} | bot pararia ${pct(L.botStopped, L.botCompared ? L.able : 0)} | humano gastou Counter sem ter como parar: ${L.humanWasted}`);
+    if (s.lethalMisses.length) {
+      out.push('  Parava, o humano segurou e o bot passaria (partida, ação, precisa, mão dava, mão, DON!!, carta usada, atacante):');
+      for (const x of s.lethalMisses) out.push(`    ${x.match} ${x.index}  +${x.need} de ${x.counters} | ${x.hand} cartas, ${x.don} DON!! | ${x.card} | ${x.attacker} ${x.attackerPower}`);
+    }
+  }
   if (s.mainDisagreements.length) {
     out.push('');
     out.push('Fase principal, quando discordam (humano → bot):');
     for (const d of s.mainDisagreements) out.push(`  ${d.human.padEnd(10)} → ${d.bot.padEnd(28)} ${String(d.n).padStart(6)}`);
+  }
+  if (s.turns) {
+    const t = s.turns;
+    const f = (x: number) => x.toFixed(2);
+    out.push('');
+    out.push(`Turnos inteiros (${t.n}; médias por turno: cartas jogadas / ataques / DON!! anexados / DON!! que sobrou):`);
+    out.push(`  humano  ${f(t.human.played)} / ${f(t.human.attacks)} / ${f(t.human.donAttached)} / ${f(t.human.donLeft)}`);
+    out.push(`  bot     ${f(t.bot.played)} / ${f(t.bot.attacks)} / ${f(t.bot.donAttached)} / ${f(t.bot.donLeft)}`);
+    out.push(`  humano jogou mais cartas em ${pct(t.humanPlayedMore, t.n)} dos turnos, menos em ${pct(t.botPlayedMore, t.n)}; atacou mais em ${pct(t.humanAttackedMore, t.n)}, menos em ${pct(t.botAttackedMore, t.n)}`);
+    const l = t.lowLife;
+    if (l.n) out.push(`  com o oponente em 2 de Vida ou menos (${l.n}): jogou mais cartas em ${pct(l.humanPlayedMore, l.n)}, menos em ${pct(l.botPlayedMore, l.n)}; atacou mais em ${pct(l.humanAttackedMore, l.n)}, menos em ${pct(l.botAttackedMore, l.n)}`);
   }
   return out.join('\n');
 }
