@@ -287,7 +287,8 @@ replays gravados em `matches.replay` e emite um registro por decisão de um lado
 ações legais, a escolha, por número de carta) com a escolha do bot na mesma visão (`viewFor`) e se concordam. Filtra
 por fila, data, perfis de maior recompensa (`--top`) ou colocados nos torneios encerrados (`--tournament-top`, pela
 classificação de `standings`). O resumo mostra a concordância por tipo de decisão, quem defende o Líder (humano x bot,
-por Vida e por margem do ataque) e os pares de discordância na fase principal; `--out` grava o JSONL. Só lê o banco
+por Vida e por margem do ataque) e os pares de discordância na fase principal; `--out` grava o JSONL. Só lê o banco;
+no pacote de produção é `release/server/decisions-cli.mjs`
 ([`docs/bot-tempo.md`, seção 11](bot-tempo.md)).
 
 ---

@@ -288,10 +288,13 @@ os replays e emite um registro por decisão de um lado humano:
 - a escolha do bot (`hard` por padrão) na mesma visão, e se bate com a do humano.
 
 ```bash
-# No servidor (ou numa cópia do banco): só lê, não grava nada.
+# Numa cópia do banco (o backup diário da VPS, ~/backups/gumgum-<dia>.db, copiado por scp): só lê, não grava nada.
 DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --limit 500 --out decisoes.jsonl
 DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --tournament-top 4 --queue tournament
 DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --top 20 --queue ranked --bot none
+# Na própria VPS, com o pacote de produção (sem o repositório):
+DB_PATH=~/apps/gumgumfight/shared/gumgum.db node --disable-warning=ExperimentalWarning \
+  ~/apps/gumgumfight/current/server/decisions-cli.mjs --limit 500 --out ~/decisoes.jsonl
 ```
 
 O resumo no terminal responde às três perguntas desta rodada: em que tipo de decisão o bot mais discorda das pessoas;
