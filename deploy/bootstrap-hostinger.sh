@@ -17,6 +17,8 @@
 #   8. HTTPS (Let's Encrypt, webroot) para todos os nomes que já apontam para esta VPS.
 #      (.app é um TLD com HTTPS obrigatório nos navegadores: sem certificado o site não abre.)
 #   9. pm2 sobe sozinho no boot. Backup diário do banco (7 dias) em ~gumgum/backups.
+#  10. Nginx de volta sozinho: o systemd tenta subi-lo de novo a cada 10 s se ele falhar, e um watchdog
+#      (a cada minuto) o reinicia se o site parar de responder com o app no ar.
 #
 # Variáveis opcionais:
 #   DOMAIN=gumgumfight.app             domínio principal do site
@@ -259,13 +261,21 @@ EOF
 
 # /card-img/<origem>/<caminho> → a origem da imagem, com cache (as URLs vêm de
 # apps/server/src/card-images.ts; sem o Nginx, o próprio app atende esse caminho).
+# A origem fica numa variável: assim o Nginx resolve o nome em tempo de execução (pelo "resolver"
+# do bloco server), e não ao carregar a configuração. Com o nome escrito direto no proxy_pass, um
+# DNS fora do ar na hora de um reinício (ex.: atualização automática do Ubuntu) derruba o site
+# inteiro: "host not found in upstream" e o Nginx se recusa a subir (foi assim em 23/10/2026: 6 h
+# fora do ar). O rewrite encaixa o caminho da origem, porque proxy_pass com variável não o faz.
 card_img_location() {
+  local name="$1" host="$2" prefix="${3:-}"
   cat <<EOF
-    location /card-img/$1/ {
+    location /card-img/$name/ {
         limit_req zone=gumgum_api burst=200 nodelay;
-        proxy_pass https://$2/${3:-};
+        set \$gumgum_origin $host;
+        rewrite ^/card-img/$name/(.*)\$ /$prefix\$1 break;
+        proxy_pass https://\$gumgum_origin;
         proxy_ssl_server_name on;
-        proxy_set_header Host $2;
+        proxy_set_header Host $host;
         proxy_set_header Cookie "";
         proxy_hide_header Set-Cookie;
         proxy_ignore_headers Set-Cookie Cache-Control Expires;
@@ -287,8 +297,13 @@ if [[ "$CARD_CDN_HOST" =~ ^[A-Za-z0-9.-]+$ ]]; then
 $(card_img_location cdn "$CARD_CDN_HOST")"
 fi
 
+# Servidores DNS do sistema (no Ubuntu, o systemd-resolved em 127.0.0.53), para os nomes em variável.
+RESOLVERS="$(awk '/^nameserver/ {print $2}' /etc/resolv.conf 2>/dev/null | grep -E '^[0-9.]+$' | head -3 | tr '\n' ' ')"
+RESOLVERS="${RESOLVERS:-1.1.1.1 8.8.8.8 }"
+
 PROXY_BLOCK="$(cat <<EOF
     client_max_body_size 2m;
+    resolver ${RESOLVERS}valid=300s ipv6=off;
     gzip on;
     gzip_types text/css application/javascript application/json image/svg+xml;
 
@@ -426,6 +441,93 @@ else
   info "Pulado: $DOMAIN ainda não aponta para esta VPS."
 fi
 
+# ---------------------------------------------------------------- Nginx de volta sozinho
+step "Nginx: reinício automático e watchdog"
+# O serviço padrão do Nginx desiste na primeira falha ao subir (foi o que deixou o site 6 h fora do ar
+# em 23/10/2026). Aqui o systemd tenta de novo a cada 10 s, sem limite, até conseguir.
+install -d /etc/systemd/system/nginx.service.d
+cat > /etc/systemd/system/nginx.service.d/gumgum-restart.conf <<'EOF'
+# GumGum Fight — gerado por deploy/bootstrap-hostinger.sh
+# Se o Nginx falhar ao subir ou morrer, o systemd tenta de novo a cada 10 s, sem desistir.
+[Unit]
+StartLimitIntervalSec=0
+
+[Service]
+Restart=on-failure
+RestartSec=10s
+EOF
+
+# Watchdog: a cada minuto confere o site pelo Nginx, como um navegador faria. Três falhas seguidas
+# com o app respondendo em 127.0.0.1:$PORT: reinicia o Nginx (se a configuração dele estiver válida).
+cat > /usr/local/sbin/gumgum-watchdog <<'EOF'
+#!/usr/bin/env bash
+# GumGum Fight — gerado por deploy/bootstrap-hostinger.sh; roda a cada minuto (gumgum-watchdog.timer).
+# Confere o site pelo Nginx. Três falhas seguidas com o app no ar: reinicia o Nginx, se a
+# configuração dele estiver válida. O app em si é do pm2 (autorestart): aqui só fica registrado.
+# Registro: journalctl -t gumgum-watchdog
+set -u
+DOMAIN="${DOMAIN:-gumgumfight.app}"
+PORT="${PORT:-3310}"
+LIMIT="${LIMIT:-3}"
+STATE=/run/gumgum-watchdog.fails
+log() { logger -t gumgum-watchdog "$*"; }
+fails() { cat "$STATE" 2>/dev/null || echo 0; }
+
+# Pelo Nginx, com HTTPS quando há certificado; senão, HTTP.
+if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+  site_ok() { curl -fsS -m 10 -o /dev/null --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/health"; }
+else
+  site_ok() { curl -fsS -m 10 -o /dev/null -H "Host: $DOMAIN" "http://127.0.0.1/api/health"; }
+fi
+if site_ok; then
+  [ "$(fails)" = 0 ] || log "site de volta ao normal"
+  echo 0 > "$STATE"
+  exit 0
+fi
+# O app responde direto? Se não, o problema é dele (o pm2 reinicia sozinho): só registra.
+if ! curl -fsS -m 10 -o /dev/null "http://127.0.0.1:$PORT/api/health"; then
+  log "o app não responde em 127.0.0.1:$PORT (o pm2 cuida; veja: pm2 logs gumgumfight)"
+  exit 0
+fi
+n=$(( $(fails) + 1 ))
+echo "$n" > "$STATE"
+log "falha $n/$LIMIT: o app responde, mas o site pelo Nginx não (nginx.service: $(systemctl is-active nginx))"
+[ "$n" -ge "$LIMIT" ] || exit 0
+if nginx -t >/dev/null 2>&1; then
+  log "reiniciando o Nginx"
+  systemctl restart nginx && echo 0 > "$STATE"
+else
+  log "nginx -t falhou, não reinicio: $(nginx -t 2>&1 | tail -n 2 | tr '\n' ' ')"
+fi
+EOF
+chmod 755 /usr/local/sbin/gumgum-watchdog
+cat > /etc/systemd/system/gumgum-watchdog.service <<EOF
+[Unit]
+Description=GumGum Fight: confere o site pelo Nginx e o reinicia se parar de responder
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=DOMAIN=$DOMAIN PORT=$PORT
+ExecStart=/usr/local/sbin/gumgum-watchdog
+EOF
+cat > /etc/systemd/system/gumgum-watchdog.timer <<'EOF'
+[Unit]
+Description=GumGum Fight: watchdog do Nginx, a cada minuto
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+EOF
+systemctl daemon-reload
+systemctl enable --now gumgum-watchdog.timer >/dev/null 2>&1
+info "nginx.service: Restart=on-failure a cada 10 s, sem limite de tentativas."
+info "Watchdog a cada minuto (gumgum-watchdog.timer). Registro: journalctl -t gumgum-watchdog"
+
 # ---------------------------------------------------------------- pm2 no boot
 step "pm2 no boot (usuário $DEPLOY_USER)"
 env PATH="$PATH:$(dirname "$NODE_BIN")" "$PM2_BIN" startup systemd -u "$DEPLOY_USER" --hp "$HOME_DIR" >/dev/null 2>&1 \
@@ -476,4 +578,5 @@ cat <<EOF
    Teste o acesso do deploy, da sua máquina:  ssh -i gumgum_deploy $DEPLOY_USER@$MY_IP 'echo ok'
    Depois: GitHub → Actions → "CI e deploy" → Run workflow (main), import_sets = "ST-01 ST-02".
    O site fica em https://$DOMAIN. Logs: sudo -u $DEPLOY_USER pm2 logs gumgumfight
+   Nginx: journalctl -u nginx --since today   Watchdog: journalctl -t gumgum-watchdog
 EOF

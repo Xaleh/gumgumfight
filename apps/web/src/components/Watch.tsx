@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type BroadcastInfo, type BroadcastSettings, broadcastUrl, type LiveRoom, modeLabel, ROLE_LABEL, type WatchTarget } from '../api';
 import { useAuth } from '../auth';
 import { useT } from '../i18n';
+import { poll } from '../poll';
 import { LeaderArt } from './LeaderArt';
 import { QUEUE_LABEL, tierName } from './Online';
 
@@ -28,23 +29,27 @@ export function Watch({ onExit, onWatch }: { onExit: () => void; onWatch: (t: Wa
   const [broadcast, setBroadcast] = useState<BroadcastInfo | null>(null);
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
-  // A lista muda sozinha (partidas começam e terminam): atualiza a cada 5 s.
+  // A lista muda sozinha (partidas começam e terminam): atualiza a cada 5 s (ver `poll`).
   useEffect(() => {
     let stop = false;
-    const load = () =>
-      api.online
-        .live()
-        .then((r) => {
-          if (stop) return;
-          setRooms(r.rooms);
-          setCanHands(r.hands);
-        })
-        .catch((e) => !stop && setError(e instanceof Error ? e.message : String(e)));
-    void load();
-    const timer = setInterval(load, 5000);
+    const cancel = poll(
+      () =>
+        api.online.live().then(
+          (r) => {
+            if (stop) return;
+            setRooms(r.rooms);
+            setCanHands(r.hands);
+          },
+          (e) => {
+            if (!stop) setError(e instanceof Error ? e.message : String(e));
+            throw e;
+          },
+        ),
+      5000,
+    );
     return () => {
       stop = true;
-      clearInterval(timer);
+      cancel();
     };
   }, [user?.id]);
   useEffect(() => {

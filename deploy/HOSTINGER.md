@@ -84,6 +84,10 @@ O script leva alguns minutos (atualiza o Ubuntu) e, no fim, imprime um resumo co
 - Nginx: `gumgumfight.app` → app; os outros nomes redirecionam (301) para `https://gumgumfight.app`.
 - Certificado Let's Encrypt para todos os nomes que já apontam para a VPS, com renovação automática.
 - pm2 sobe sozinho no boot; backup diário do banco (7 cópias rotativas) em `~gumgum/backups`.
+- Nginx de volta sozinho: se falhar ao subir ou morrer, o systemd tenta de novo a cada 10 s; um watchdog
+  (`gumgum-watchdog.timer`, a cada minuto) confere `/api/health` pelo Nginx e o reinicia depois de 3 falhas seguidas
+  com o app no ar (`journalctl -t gumgum-watchdog`). As origens das imagens (`/card-img/`) são resolvidas em tempo de
+  execução: um DNS fora na hora de um reinício não impede mais o Nginx de subir.
 
 Pode rodar de novo quantas vezes quiser: por exemplo, se o DNS do `.cloud` propagar depois, rode de novo e ele
 inclui o nome no certificado (`SKIP_UPGRADE=1` pula o `apt upgrade` e fica rápido).
@@ -250,3 +254,9 @@ próprio app atende `/card-img/` buscando na origem.
   `DEPLOY_SSH_KEY`, ou `DEPLOY_USER` não é `gumgum`.
 - **Deploy falha em "Host key verification failed":** `DEPLOY_KNOWN_HOSTS` errado; use a linha que o script imprime.
 - **502 Bad Gateway:** o app não está rodando; `pm2 logs gumgumfight` mostra o motivo.
+- **Site não abre (a página aparece do cache, "Conectando ao servidor…"), `pm2 status` online e CPU em 0%:** o Nginx
+  parou; nada chega ao app. `systemctl status nginx` e `journalctl -u nginx --since today` dizem por quê (em 23/10/2026
+  foi uma atualização automática do Ubuntu reiniciando o Nginx enquanto o DNS de uma origem das imagens estava fora:
+  "host not found in upstream"). O watchdog reinicia o Nginx sozinho em até 3 minutos; se ele não resolver,
+  `nginx -t` mostra o erro de configuração e `systemctl restart nginx` sobe de novo. Da sua máquina, o sintoma é
+  `curl -m 10 https://gumgumfight.app/api/health` sem resposta enquanto `ssh` funciona.
