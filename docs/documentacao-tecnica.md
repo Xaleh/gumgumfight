@@ -102,6 +102,7 @@ Não há roteador (react-router), gerenciador de estado nem biblioteca de compon
 | pm2 | Mantém o processo no ar (`deploy/ecosystem.config.cjs`, modo `fork`, 1 instância, `max_memory_restart: 400M`). |
 | Nginx + certbot | Proxy reverso, TLS (Let's Encrypt), gzip. |
 | ufw, fail2ban, cron + `sqlite3` | Firewall (22/80/443), proteção do SSH, backup diário do banco. |
+| systemd (`nginx.service.d`, `gumgum-watchdog.timer`) | Nginx tenta subir de novo a cada 10 s se falhar; watchdog por minuto reinicia o Nginx se `/api/health` parar de responder com o app no ar. |
 
 ---
 
@@ -455,6 +456,12 @@ partida não acabou, espera 3 s, consulta `/api/online/active` (jogador) ou `/ap
 reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do protocolo na seção 11.
 
 ### Polling (todas as consultas periódicas)
+
+Todas passam por `poll` (`apps/web/src/poll.ts`): a próxima consulta só é agendada quando a anterior termina (nunca
+duas em andamento) e, quando falha, o espaçamento dobra a cada tentativa (até 8× o intervalo), voltando ao normal no
+primeiro sucesso. Sem isso, cada tique durante uma queda do servidor empilhava um pedido pendente no navegador, e na
+volta todos saíam de uma vez pela mesma conexão HTTP/2, estourando o `limit_conn` do Nginx (429) na hora em que o site
+voltava (23/10/2026).
 
 | Tela | Rota | Intervalo | Condição |
 |---|---|---|---|
@@ -1305,7 +1312,8 @@ importa `IMPORT_SETS` se pedido; o workflow então confere `https://<site>/api/h
 | SO | Ubuntu, `apt upgrade` no bootstrap |
 | Domínios | `gumgumfight.app` (principal, HSTS obrigatório no TLD `.app`); `www`, `gumgumfight.cloud`, `www.gumgumfight.cloud` → 301 |
 | Processo | pm2, app `gumgumfight`, usuário `gumgum` (sem sudo), `fork`, 1 instância, `autorestart`, **`max_memory_restart: 1500M`** (`PM2_MAX_MEMORY` em `deploy.env`), `--disable-warning=ExperimentalWarning`, `HOST=127.0.0.1`, `PORT=3310` |
-| Nginx | `proxy_pass http://127.0.0.1:3310`, HTTP/1.1, `proxy_buffering off`, `proxy_read_timeout 90s`, `client_max_body_size 2m`, `gzip_types text/css application/javascript application/json image/svg+xml` (**SSE não é comprimido**), HTTP/2 quando disponível, ACME webroot. Em `location /api/`: `limit_req` 30 r/s por IP (rajada 100) e `limit_conn` 64 por IP (`/etc/nginx/conf.d/gumgumfight-limits.conf`) |
+| Nginx | `proxy_pass http://127.0.0.1:3310`, HTTP/1.1, `proxy_buffering off`, `proxy_read_timeout 90s`, `client_max_body_size 2m`, `gzip_types text/css application/javascript application/json image/svg+xml` (**SSE não é comprimido**), HTTP/2 quando disponível, ACME webroot. Em `location /api/`: `limit_req` 30 r/s por IP (rajada 100) e `limit_conn` 64 por IP (`/etc/nginx/conf.d/gumgumfight-limits.conf`). As origens de `/card-img/` ficam em variável com `resolver` do sistema: resolvidas em tempo de execução, a configuração carrega mesmo com o DNS fora |
+| Nginx de volta sozinho | `nginx.service.d/gumgum-restart.conf`: `Restart=on-failure`, `RestartSec=10s`, `StartLimitIntervalSec=0`. `gumgum-watchdog.timer` (1 min): `curl` em `/api/health` pelo Nginx; 3 falhas seguidas com o app respondendo em `127.0.0.1:3310` → `nginx -t && systemctl restart nginx` (`journalctl -t gumgum-watchdog`) |
 | TLS | Let's Encrypt via certbot (`certbot.timer` renova; hook recarrega o Nginx) |
 | Firewall | ufw: 22, 80, 443. fail2ban no SSH. Opção `HARDEN_SSH=1` desliga senha do root |
 | Banco | `~gumgum/apps/gumgumfight/shared/gumgum.db`; backup diário 04:15 (7 cópias) |

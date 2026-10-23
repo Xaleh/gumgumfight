@@ -15,12 +15,14 @@ import {
 } from '../api';
 import { type Locale, type MessageKey, type Translate, useLocale, useT } from '../i18n';
 import { fmtTime, fmtWeekdayTime } from '../i18n/format';
+import { poll } from '../poll';
 import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
 
 /**
  * Busca `load` agora e a cada `ms` enquanto a aba está visível (e de novo ao voltar
- * para ela). `null` = ainda sem resposta.
+ * para ela), sem sobrepor consultas e espaçando as tentativas quando falha (ver `poll`).
+ * `null` = ainda sem resposta.
  */
 export function usePoll<T>(load: () => Promise<T>, ms: number): T | null {
   const [value, setValue] = useState<T | null>(null);
@@ -28,20 +30,10 @@ export function usePoll<T>(load: () => Promise<T>, ms: number): T | null {
   loader.current = load;
   useEffect(() => {
     let stop = false;
-    const tick = () => {
-      if (document.hidden) return;
-      loader
-        .current()
-        .then((v) => !stop && setValue(v))
-        .catch(() => undefined);
-    };
-    tick();
-    const timer = setInterval(tick, ms);
-    document.addEventListener('visibilitychange', tick);
+    const cancel = poll(() => loader.current().then((v) => !stop && setValue(v)), ms);
     return () => {
       stop = true;
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', tick);
+      cancel();
     };
   }, [ms]);
   return value;

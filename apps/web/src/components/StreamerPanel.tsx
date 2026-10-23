@@ -2,6 +2,7 @@ import type { CardData } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type LiveRoom, type RoomDecks } from '../api';
 import { useT } from '../i18n';
+import { poll } from '../poll';
 import { StaticCard } from './CardView';
 import { LiveRoomRow } from './Watch';
 
@@ -19,20 +20,24 @@ export function MatchesPanel({ currentId, onWatch }: { currentId: string | null;
   // A lista muda sozinha (partidas começam e terminam): atualiza a cada 5 s, como na tela "Assistir".
   useEffect(() => {
     let stop = false;
-    const load = () =>
-      api.online
-        .live()
-        .then((r) => {
-          if (stop) return;
-          setRooms(r.rooms);
-          setError(null);
-        })
-        .catch((e) => !stop && setError(e instanceof Error ? e.message : String(e)));
-    void load();
-    const timer = setInterval(load, 5000);
+    const cancel = poll(
+      () =>
+        api.online.live().then(
+          (r) => {
+            if (stop) return;
+            setRooms(r.rooms);
+            setError(null);
+          },
+          (e) => {
+            if (!stop) setError(e instanceof Error ? e.message : String(e));
+            throw e;
+          },
+        ),
+      5000,
+    );
     return () => {
       stop = true;
-      clearInterval(timer);
+      cancel();
     };
   }, []);
 

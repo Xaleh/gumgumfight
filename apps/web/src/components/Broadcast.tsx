@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type WatchTarget } from '../api';
 import { useT } from '../i18n';
+import { poll } from '../poll';
 import { type TableBroadcast, WatchGameScreen } from './GameScreen';
 import { BroadcastIdle } from './Online';
 
@@ -42,17 +43,17 @@ export function Broadcast({ broadcastKey }: { broadcastKey: string }) {
           setTarget(b.roomId ? { roomId: b.roomId, hands: false, key: broadcastKey } : null);
         })
         .catch((e) => {
-          if (stop || !(e instanceof ApiError && e.status === 404)) return; // fora do ar: tenta de novo
+          if (stop) return;
+          if (!(e instanceof ApiError && e.status === 404)) throw e; // fora do ar: tenta de novo, espaçando
           setInvalid(true);
           setLoaded(true);
           chosen.current = null;
           setTarget(null);
         });
-    void load();
-    const timer = setInterval(load, POLL_MS);
+    const cancel = poll(load, POLL_MS);
     return () => {
       stop = true;
-      clearInterval(timer);
+      cancel();
     };
   }, [broadcastKey]);
 

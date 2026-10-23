@@ -35,6 +35,7 @@ import { setupFromReplay } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { type Locale, type MessageKey, type Translate, tryT, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtTime } from '../i18n/format';
+import { poll } from '../poll';
 import { prizePhoto } from '../picture';
 import { DeckPicker } from './DeckPicker';
 import { DeckStateChip, LeaderBanner, useFavoriteToggle } from './DeckTile';
@@ -822,15 +823,26 @@ function TournamentPage({
     [id],
   );
 
-  // Os resultados das partidas online chegam sozinhos: atualiza a cada 5 s durante o torneio.
+  // Os resultados das partidas online chegam sozinhos: atualiza a cada 5 s durante o torneio
+  // (sem sobrepor consultas e espaçando as tentativas quando falha: ver `poll`).
   useEffect(() => {
     void load();
   }, [load, user?.id]);
   useEffect(() => {
     if (t?.status !== 'running') return;
-    const timer = setInterval(() => void load(), 5000);
-    return () => clearInterval(timer);
-  }, [t?.status, load]);
+    return poll(
+      () =>
+        api.tournaments.get(id).then(
+          (d) => setT(d),
+          (e) => {
+            setError(errorText(e));
+            throw e;
+          },
+        ),
+      5000,
+      { immediate: false },
+    );
+  }, [t?.status, id]);
 
   /** Ação que devolve o torneio atualizado. */
   const run = async (fn: () => Promise<TournamentDetail | void>, confirmText?: string) => {

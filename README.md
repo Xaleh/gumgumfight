@@ -122,7 +122,8 @@ Node padrão for mais antigo) e um site separado no proxy.
 3. **No servidor**, rode um dos scripts com a chave pública de deploy:
    - **VPS nova e só para este site** (ex.: a VPS KVM da Hostinger, Ubuntu limpo, como root): `deploy/bootstrap-hostinger.sh`
      faz tudo — atualiza o sistema, instala Node 22, pm2, Nginx, HTTPS (Let's Encrypt), firewall, fail2ban, swap,
-     cria o usuário `gumgum` que recebe o deploy e um backup diário do banco. O passo a passo completo, com o DNS
+     cria o usuário `gumgum` que recebe o deploy, um backup diário do banco e um watchdog que reinicia o Nginx se
+     o site parar de responder. O passo a passo completo, com o DNS
      da Hostinger e os valores dos secrets, está em [`deploy/HOSTINGER.md`](deploy/HOSTINGER.md).
      ```bash
      CERTBOT_EMAIL=voce@exemplo.com bash bootstrap-hostinger.sh "COLE AQUI O CONTEÚDO DE gumgum_deploy.pub"
@@ -288,7 +289,8 @@ troca de aparelho encontra "Voltar à partida" no topo da mesma tela.
 
 Os cards mostram ao vivo quantas partidas estão em andamento e quantas pessoas estão na fila de cada modo, e o
 cabeçalho mostra quantas pessoas estão conectadas. Esses números vêm de `GET /api/online/stats` (só contagens, sem
-nomes), que a tela inicial consulta a cada 10 s enquanto a aba está visível. Essa consulta também é o sinal de
+nomes), que a tela inicial consulta a cada 10 s enquanto a aba está visível (como toda consulta periódica do app,
+sem sobrepor pedidos e espaçando as tentativas quando o servidor não responde; `apps/web/src/poll.ts`). Essa consulta também é o sinal de
 presença: quem fecha a tela inicial sai dos "conectados" depois de 30 s. Jogadores conectados a uma partida, quem
 está na fila e os espectadores também contam.
 
