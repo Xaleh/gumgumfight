@@ -280,7 +280,12 @@ function capture(root: Element | null): Boxes {
 
 // ------------------------------------------------------------------ plano
 
-/** Elementos escondidos até a carta voadora pousar (contador: várias podem ir para o mesmo lugar). */
+/**
+ * Elementos escondidos até a carta voadora pousar (contador: várias podem ir para o mesmo lugar).
+ * Cada voo esconde o destino ao montar (`holdHidden`) e o mostra de novo ao pousar, ou ao ser descartado
+ * antes disso (pulo no replay, velocidade máxima, mesa trocada no meio do voo): sem isso o
+ * `data-motion-hide` ficava preso no elemento e a carta sumia da mesa até o React recriá-lo.
+ */
 const hidden = new WeakMap<Element, number>();
 function hideEl(el: Element | null) {
   if (!el) return;
@@ -292,6 +297,19 @@ function showEl(el: Element | null) {
   const n = (hidden.get(el) ?? 1) - 1;
   hidden.set(el, n);
   if (n <= 0) el.removeAttribute('data-motion-hide');
+}
+/**
+ * Esconde `el` agora e devolve a função que o mostra de novo (só a primeira chamada conta: o pouso e a
+ * limpeza do efeito chamam as duas). Para usar dentro do efeito de layout de cada voo.
+ */
+function holdHidden(el: Element | null): () => void {
+  hideEl(el);
+  let shown = false;
+  return () => {
+    if (shown) return;
+    shown = true;
+    showEl(el);
+  };
 }
 
 let nextId = 1;
@@ -423,13 +441,11 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
     }
   }
   const items = out.map((p) => p.item);
-  for (const it of items) if (it.kind === 'card' || it.kind === 'don') hideEl(it.hide);
   // O impacto do ataque vem quando a carta atacante volta ao lugar.
   const impactAt = spot?.tone === 'attack' ? spot.flyIn + spot.hold + spot.back * 0.7 : 0;
   items.push(...hits(prev, next, after, root, impactAt, spot?.tone === 'attack' ? prev.battle?.target : undefined));
   if (spot) {
     items.push(spot);
-    hideEl(spot.hide);
     end = Math.max(end, spot.duration + 200);
     if (spot.to) items.push({ id: nextId++, kind: 'burst', at: spot.to, tone: 'land', delay: spot.duration * 0.96, duration: 480 });
   }
@@ -793,8 +809,9 @@ function CardFlightView({ f, onDone }: { f: CardFlight; onDone: (id: number) => 
   useLayoutEffect(() => {
     const el = ref.current;
     const inn = inner.current;
+    const show = holdHidden(f.hide);
     const finish = () => {
-      showEl(f.hide);
+      show();
       onDone(f.id);
     };
     if (!el || !inn || typeof el.animate !== 'function') {
@@ -850,6 +867,8 @@ function CardFlightView({ f, onDone }: { f: CardFlight; onDone: (id: number) => 
     return () => {
       stop(anim);
       flipAnim?.cancel();
+      // Voo descartado antes de pousar: o destino volta a aparecer.
+      show();
     };
     // Cada voo roda uma vez.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -882,8 +901,9 @@ function DonFlightView({ f, onDone }: { f: DonFlight; onDone: (id: number) => vo
   useLayoutEffect(() => {
     const el = ref.current;
     const inn = inner.current;
+    const show = holdHidden(f.hide);
     const finish = () => {
-      showEl(f.hide);
+      show();
       onDone(f.id);
     };
     if (!el || !inn || typeof el.animate !== 'function') {
@@ -922,6 +942,7 @@ function DonFlightView({ f, onDone }: { f: DonFlight; onDone: (id: number) => vo
     return () => {
       stop(anim);
       flipAnim?.cancel();
+      show();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -997,8 +1018,9 @@ function SpotView({ s, onDone }: { s: Feature; onDone: (id: number) => void }) {
   const base = s.stage;
   useLayoutEffect(() => {
     const el = ref.current;
+    const show = holdHidden(s.hide);
     const finish = () => {
-      showEl(s.hide);
+      show();
       onDone(s.id);
     };
     if (!el || typeof el.animate !== 'function') {
@@ -1040,6 +1062,7 @@ function SpotView({ s, onDone }: { s: Feature; onDone: (id: number) => void }) {
     return () => {
       stop(anim);
       flipAnim?.cancel();
+      show();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
