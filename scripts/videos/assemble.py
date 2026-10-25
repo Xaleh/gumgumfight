@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Monta o MP4 final: frames do screencast + narração + música e efeitos que o app tocou."""
-import glob, json, os, random, subprocess, sys
+import glob, json, os, random, re, subprocess, sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +16,18 @@ _cache = {}
 def load(path):
     if path not in _cache: _cache[path] = decode(path)
     return _cache[path]
+
+# Níveis finais: narração a −16 LUFS; música (as faixas têm −15 LUFS) quase inaudível, a uns −40 LUFS
+# sob a fala e −34 nos intervalos; efeitos (≈ −25 LUFS) um pouco abaixo da voz.
+NARRATION_LUFS = -16.0
+MUSIC_GAP, MUSIC_SPEECH = 10 ** (-19 / 20), 10 ** (-25 / 20)
+SFX_GAIN = 0.6
+
+def loudness(buf):
+    raw = buf.astype(np.float32).tobytes()
+    log = subprocess.run(['ffmpeg', '-v', 'info', '-f', 'f32le', '-ar', str(SR), '-ac', '2', '-i', '-', '-af', 'ebur128', '-f', 'null', '-'], input=raw, capture_output=True).stderr.decode()
+    vals = re.findall(r'I:\s+(-?[\d.]+) LUFS', log)
+    return float(vals[-1]) if vals else None
 
 curve = lambda v: max(0.0, min(1.0, v)) ** 2
 
@@ -71,7 +83,7 @@ def main(vid, out_name=None):
             files = [f'{AUDIO}/{f}' for f in files]
         if not files: continue
         _, vs, _ = vol_at(e['t'])
-        add(sfx, load(random.choice(files)), e['t'] + e.get('delay', 0) / 1000, 0.75 * curve(vs) / curve(0.8) * e.get('gain', 1))
+        add(sfx, load(random.choice(files)), e['t'] + e.get('delay', 0) / 1000, SFX_GAIN * curve(vs) / curve(0.8) * e.get('gain', 1))
 
     # Música: faixa pedida em loop, com volume do app e abaixando sob a narração
     music = np.zeros((n, 2), np.float32)
@@ -100,15 +112,16 @@ def main(vid, out_name=None):
         k = int(0.08 * SR)
         g = np.convolve(g, np.ones(k) / k, mode='same').astype(np.float32)
         duck = np.convolve(speech_mask, np.ones(int(0.4 * SR)) / int(0.4 * SR), mode='same').astype(np.float32)
-        level = 0.34 - 0.20 * duck
+        # quase inaudível: um fundo bem baixo, ainda menor sob a narração
+        level = MUSIC_GAP - (MUSIC_GAP - MUSIC_SPEECH) * duck
         music *= (g * level)[:, None]
 
-    mix = narr * 1.0 + sfx + music
+    lufs = loudness(narr) if speech_mask.any() else None
+    if lufs is not None and lufs > -70: narr *= 10 ** ((NARRATION_LUFS - lufs) / 20)
+    mix = narr + sfx + music
     # fade final
     f = int(0.6 * SR)
     mix[-f:] *= np.linspace(1, 0, f)[:, None]
-    peak = np.abs(mix).max() or 1
-    if peak > 0.98: mix *= 0.98 / peak
     wav = f'{ROOT}/out/{vid}/mix.f32'
     mix.astype(np.float32).tofile(wav)
 
@@ -132,7 +145,7 @@ def main(vid, out_name=None):
         '-vf', 'fps=30,scale=1080:1920:flags=lanczos,format=yuv420p',
         '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-crf', '21',
         '-maxrate', f'{kbps}k', '-bufsize', f'{kbps * 2}k',
-        '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '48000', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-t', f'{end:.3f}', out,
+        '-af', 'alimiter=limit=0.89:level=false', '-ar', '48000', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', '-t', f'{end:.3f}', out,
     ], check=True, cwd=f'{ROOT}/out/{vid}')
     size = os.path.getsize(out) / 1e6
     print(f'{out}: {end:.1f}s, {size:.1f} MB')
