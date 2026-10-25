@@ -48,8 +48,6 @@ async function run(S) {
     await S.tap(S.role('button', { name: /Importar \d+ cartas/ }));
     await S.sleep(500);
     await S.tap(S.role('button', { name: /\/50/ }));
-    await S.sleep(1800);
-    await S.tap(S.role('button', { name: 'Salvar deck' }));
   });
   await S.seg(t4, async () => {
     await S.tap(S.role('button', { name: 'Decks' }));

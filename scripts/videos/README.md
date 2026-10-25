@@ -8,19 +8,20 @@ de celular, título, legendas, toque visível, música e efeitos do próprio app
 |---|---|---|
 | 1 | `1-apelido.mp4` | Apelido ✎ na home → Configurações → digitar → Salvar → nome na home e na mesa |
 | 2 | `2-animacoes.mp4` | Partida com animações (dados, cartas voando, faixa de turno) → desmarcar no menu da partida → mesma partida sem animações |
-| 3 | `3-chat-legendado.mp4` | Sala privada com um segundo jogador: 💬, mensagens rápidas, texto, balões, Silenciar e "Chat do oponente" desligado |
-| 4 | `4-sons-legendado.mp4` | Barras e mudo de Música e Efeitos no menu da partida (o som do vídeo segue os controles) |
-| 5 | `5-notificacoes-legendado.mp4` | Ligar Notificações, pedido de permissão, escolhas, avisos simulados com o app fechado e o toque abrindo o torneio |
-| 6 | `6-counter-legendado.mp4` | Counter padrão (marcar e confirmar) e "Counter sem confirmação" (um toque) |
-| 7 | `7-trailer-legendado.mp4` | Partida, importação de lista, montagem de deck e lobby de torneio com as mesas enchendo |
-| 8 | `8-inscricao-legendado.mp4` | Ver torneios → página do torneio → Escolher deck (Meus decks) → Usar este deck → Inscrever-se → Fazer check-in |
+| 3 | `3-chat.mp4` | Sala privada com um segundo jogador: 💬, mensagens rápidas, texto, balões, Silenciar e "Chat do oponente" desligado |
+| 4 | `4-sons.mp4` | Barras e mudo de Música e Efeitos no menu da partida (o som do vídeo segue os controles) |
+| 5 | `5-notificacoes.mp4` | Ligar Notificações, pedido de permissão, escolhas, avisos simulados com o app fechado e o toque abrindo o torneio |
+| 6 | `6-counter.mp4` | Counter padrão (marcar e confirmar) e "Counter sem confirmação" (um toque) |
+| 7 | `7-trailer.mp4` | Partida, importação de lista, montagem de deck e lobby de torneio com as mesas enchendo |
+| 8 | `8-inscricao.mp4` | Ver torneios → página do torneio → Escolher deck (Meus decks) → Usar este deck → Inscrever-se → Fazer check-in |
 
-Os `-legendado` ainda não têm narração (o texto da fala aparece inteiro na legenda): a geração parou quando o
-ElevenLabs desativou a conta gratuita usada. Com a narração em `raw/`, é só gravar de novo (passo 2 abaixo).
+Todos têm narração (ElevenLabs, voz "Renan Matheus"); os áudios usados ficam em `raw/`. Sem narração em
+`narr/<video>.json`, o vídeo sai com o texto inteiro da fala na legenda.
 
 ## Como gerar
 
-Com o app no ar (`npm run dev` na raiz; de preferência com o banco recém-criado, para a home ficar limpa):
+Com o app no ar (`npm run dev` na raiz), de preferência com o banco recém-criado antes de cada vídeo: os vídeos
+de torneio criam torneios de teste, que aparecem na home dos seguintes.
 
 1. `node prompts.cjs` gera `prompts.json` com o texto de cada vídeo: os trechos (`SEGS` em `videos/*.cjs`)
    separados por `<break time="1.6s" />`.
