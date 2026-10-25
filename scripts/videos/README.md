@@ -13,6 +13,7 @@ de celular, título, legendas, toque visível, música e efeitos do próprio app
 | 5 | `5-notificacoes-legendado.mp4` | Ligar Notificações, pedido de permissão, escolhas, avisos simulados com o app fechado e o toque abrindo o torneio |
 | 6 | `6-counter-legendado.mp4` | Counter padrão (marcar e confirmar) e "Counter sem confirmação" (um toque) |
 | 7 | `7-trailer-legendado.mp4` | Partida, importação de lista, montagem de deck e lobby de torneio com as mesas enchendo |
+| 8 | `8-inscricao-legendado.mp4` | Ver torneios → página do torneio → Escolher deck (Meus decks) → Usar este deck → Inscrever-se → Fazer check-in |
 
 Os `-legendado` ainda não têm narração (o texto da fala aparece inteiro na legenda): a geração parou quando o
 ElevenLabs desativou a conta gratuita usada. Com a narração em `raw/`, é só gravar de novo (passo 2 abaixo).

@@ -1,5 +1,5 @@
 const out = {};
-for (const n of ['apelido','animacoes','chat','sons','notificacoes','counter','trailer']) {
+for (const n of ['apelido', 'animacoes', 'chat', 'sons', 'notificacoes', 'counter', 'trailer', 'inscricao']) {
   const v = require(`./videos/${n}.cjs`);
   out[n] = { ids: v.SEGS.map(s => s.id), text: v.SEGS.map(s => s.say).join(' <break time="1.6s" /> ') };
 }

@@ -81,5 +81,19 @@
    "t7"
   ],
   "text": "GumGum Fight: o One Piece Card Game direto no navegador, no celular ou no computador. <break time=\"1.6s\" /> Treine contra o bot, ou jogue online: partidas casuais, ranqueadas, ou em salas com os amigos. <break time=\"1.6s\" /> Já tem um deck? Cole a lista e importe. O Líder e as cartas são reconhecidos na hora. <break time=\"1.6s\" /> Ou monte do zero: escolha o Líder e toque nas cartas do catálogo. A curva de custo e a validação aparecem enquanto você monta. <break time=\"1.6s\" /> E tem torneios da comunidade, com rodadas, relógio e lobby ao vivo. Os jogadores confirmam que estão prontos, o organizador inicia a rodada. <break time=\"1.6s\" /> E as mesas vão sendo preenchidas em tempo real, conforme cada um entra na sua sala. <break time=\"1.6s\" /> GumGum Fight. Monte sua tripulação e venha jogar!"
+ },
+ "inscricao": {
+  "ids": [
+   "i1",
+   "i2",
+   "i3",
+   "i4",
+   "i5",
+   "i6",
+   "i7",
+   "i8",
+   "i9"
+  ],
+  "text": "Quer participar de um torneio no GumGum Fight? A inscrição é feita com a sua conta Google: entre com ela pelo menu. <break time=\"1.6s\" /> Na tela inicial, toque em Ver torneios e escolha um torneio com as inscrições abertas. <break time=\"1.6s\" /> A página do torneio mostra o formato, a data de início, o check-in e quantos jogadores já se inscreveram. <break time=\"1.6s\" /> Na parte de Inscrição, toque em Escolher deck. Dá para usar um dos seus decks, um favorito ou um deck pronto. <break time=\"1.6s\" /> Toque no deck e confirme em Usar este deck. Se ele não valer no formato do torneio, o app avisa. <break time=\"1.6s\" /> Agora é só tocar em Inscrever-se. Pronto: o seu nome já aparece na lista de inscritos. <break time=\"1.6s\" /> Atenção: a lista do deck fica congelada como estava na inscrição. Se mudar o deck depois, inscreva de novo com Trocar deck. <break time=\"1.6s\" /> Quando o check-in abrir, toque em Fazer check-in para confirmar a presença. Sem ele, você pode perder por W.O. <break time=\"1.6s\" /> Na hora do torneio, a sua sala aparece nesta página e na tela inicial. Boa sorte!"
  }
 }

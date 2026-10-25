@@ -30,20 +30,32 @@ const PLAYERS = [
   ['Usopp4ever', 'st21-luffy'], ['RobinArqueologa', 'st34-katakuri'], ['FrankySuper', 'st33-kuzan'], ['BrookYohoho', 'st26-luffy'],
 ];
 
-async function setup({ begin = false, name = 'Copa GumGum' } = {}) {
+/**
+ * Torneio com 8 inscritos. `checkIn`: começa em 20 min, com o check-in já aberto. `me`: cria também uma
+ * conta ainda não inscrita (o jogador que aparece no vídeo), com esse apelido.
+ */
+async function setup({ name = 'Copa GumGum', checkIn = false, me = null } = {}) {
   const db = new DatabaseSync(DB);
   const org = mkUser(db, 'organizador', 'organizer');
   const players = PLAYERS.map(([n, deck], i) => ({ name: n, deck, ...mkUser(db, `p${i}`, 'player') }));
+  const mine = me ? mkUser(db, 'eu', 'player') : null;
+  if (mine) db.prepare('UPDATE users SET name = ?, email = ? WHERE id = ?').run('Capitão Gum', 'capitao.gum@exemplo.com', mine.id);
   db.close();
+  if (mine) {
+    await call(mine.tok, 'PUT', '/api/players/me', { name: me });
+    // um deck salvo na conta, para a aba "Meus decks"
+    const src = await call(mine.tok, 'GET', '/api/decks/st23-shanks');
+    mine.deck = await call(mine.tok, 'POST', '/api/decks', { name: 'Shanks do Capitão', leader: src.deck.leader, cards: src.deck.cards });
+  }
   await call(org.tok, 'PUT', '/api/players/me', { name: 'Organizador' });
   for (const p of players) await call(p.tok, 'PUT', '/api/players/me', { name: p.name });
   const t = await call(org.tok, 'POST', '/api/tournaments', {
-    name, format: 'free', structure: 'swiss', rounds: 3, swissBestOf: 1, checkIn: false,
-    startsAt: new Date(Date.now() + 10 * 60e3).toISOString(), autoStart: false, toleranceMin: 60,
+    name, format: 'free', structure: 'swiss', rounds: 3, swissBestOf: 1, checkIn,
+    startsAt: new Date(Date.now() + (checkIn ? 20 : 10) * 60e3).toISOString(), autoStart: false, toleranceMin: checkIn ? 10 : 60,
   });
   const id = t.id ?? t.tournament?.id;
   for (const p of players) await call(p.tok, 'POST', `/api/tournaments/${id}/register`, { deckId: p.deck });
-  return { id, org, players };
+  return { id, org, players, me: mine };
 }
 
 module.exports = { setup, call, API };

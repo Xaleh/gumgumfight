@@ -5,6 +5,7 @@
 
 import { type CardData, DECK_SIZE, FORMATS, withArt } from '@gumgum/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, type DeckSummary } from '../api';
 import {
   DECK_COLORS,
@@ -200,7 +201,9 @@ export function DeckPicker({
   const leader = current && detail ? detail.cards.get(current.leader) : undefined;
   const tabLabels = DECK_TABS.map((tb) => [tb, t(`decks.tab.${tb}`)] as [DeckTab, string]);
 
-  return (
+  // No body: dentro de um cartão com `backdrop-filter` (`.menu-card`, a inscrição do torneio), a
+  // folha `position: fixed` ficaria presa ao cartão em vez de cobrir a tela.
+  return createPortal(
     <div className="modal-backdrop page-sheet dk-picker-backdrop" onClick={onClose}>
       <div className="dk-picker" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="dk-picker-head">
@@ -383,6 +386,7 @@ export function DeckPicker({
           />
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
