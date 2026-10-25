@@ -1,0 +1,85 @@
+{
+ "apelido": {
+  "ids": [
+   "a1",
+   "a2",
+   "a3",
+   "a4",
+   "a5",
+   "a6",
+   "a7"
+  ],
+  "text": "Quer mudar o nome que aparece para os seus oponentes no GumGum Fight? É rapidinho! <break time=\"1.6s\" /> Na tela inicial, toque no botão Apelido, logo abaixo do título. <break time=\"1.6s\" /> As configurações abrem com o campo Apelido no topo. Apague o nome atual e digite o novo, com duas a vinte e quatro letras. <break time=\"1.6s\" /> Agora é só tocar em Salvar. <break time=\"1.6s\" /> Feche a janela e pronto: o novo apelido já aparece na tela inicial. <break time=\"1.6s\" /> E é esse nome que o seu oponente vê nas partidas online, contra o bot e no ranking. <break time=\"1.6s\" /> Dá para trocar também no menu da partida, ou nas Configurações do menu principal. Bons jogos!"
+ },
+ "animacoes": {
+  "ids": [
+   "b1",
+   "b2",
+   "b3",
+   "b4",
+   "b5",
+   "b6"
+  ],
+  "text": "Vamos ver a diferença que as animações fazem na mesa do GumGum Fight. <break time=\"1.6s\" /> Com elas ligadas, o sorteio de quem começa é feito com dados. Dá até para chacoalhar antes de jogar! <break time=\"1.6s\" /> Na partida, as cartas voam pela mesa, os ataques ganham efeito, e uma faixa anuncia de quem é o turno. <break time=\"1.6s\" /> Prefere uma mesa mais rápida e leve? Abra o menu da partida e desmarque Animações. <break time=\"1.6s\" /> Pronto! Agora cada jogada aparece na hora, sem voo e sem faixa de turno. Ótimo para celulares mais simples, ou para quem gosta de jogar rápido. <break time=\"1.6s\" /> Essa opção também fica nas Configurações, no menu da tela inicial, e vale para todas as partidas."
+ },
+ "chat": {
+  "ids": [
+   "c1",
+   "c2",
+   "c3",
+   "c4",
+   "c5",
+   "c6",
+   "c7"
+  ],
+  "text": "Nas partidas online, você pode conversar com o seu oponente pelo chat. Aqui, uma sala privada com um amigo. <break time=\"1.6s\" /> Durante a partida, toque no balão de conversa, no canto da mesa. <break time=\"1.6s\" /> Escolha uma mensagem rápida, como Olá, ou escreva o seu próprio texto e toque em Enviar. <break time=\"1.6s\" /> As mensagens do oponente aparecem em balões sobre a mesa. Com o chat fechado, um número mostra quantas chegaram. <break time=\"1.6s\" /> Quer silêncio só nesta partida? Toque em Silenciar, dentro do chat. Tocando de novo, o chat volta. <break time=\"1.6s\" /> Para desligar em todas as partidas, desmarque Chat do oponente nas configurações. Desligado vale para os dois lados: você não vê o que ele manda, e também não manda nada. <break time=\"1.6s\" /> Jogue do jeito que for mais confortável para você!"
+ },
+ "sons": {
+  "ids": [
+   "d1",
+   "d2",
+   "d3",
+   "d4",
+   "d5",
+   "d6",
+   "d7"
+  ],
+  "text": "O GumGum Fight tem trilha sonora original e efeitos para cada jogada. E você controla os dois separadamente. <break time=\"1.6s\" /> Durante a partida, abra o menu da mesa e desça até Efeitos sonoros e Música. <break time=\"1.6s\" /> Arraste a barra da música para baixar ou aumentar o volume. <break time=\"1.6s\" /> Toque no alto-falante para silenciar na hora. Tocando de novo, o som volta no volume de antes. <break time=\"1.6s\" /> Os efeitos sonoros funcionam do mesmo jeito: cartas, DON, ataques, dados e o resultado da partida. <break time=\"1.6s\" /> Por exemplo: música desligada e só os efeitos ligados. <break time=\"1.6s\" /> Na tela inicial, os mesmos controles ficam em Configurações, no menu. A escolha fica salva neste aparelho."
+ },
+ "notificacoes": {
+  "ids": [
+   "e1",
+   "e2",
+   "e3",
+   "e4",
+   "e5",
+   "e6",
+   "e7"
+  ],
+  "text": "Com as notificações ligadas, o GumGum Fight te avisa no celular, mesmo com o app fechado. <break time=\"1.6s\" /> Abra o menu, toque em Configurações e ligue a opção Notificações. <break time=\"1.6s\" /> O navegador vai pedir permissão. Toque em Permitir. <break time=\"1.6s\" /> Depois, escolha o que quer receber. Partidas online: quando o oponente entra na sala e quando chega a sua vez. E torneios: check-in aberto, rodada nova e oponente esperando por você. <break time=\"1.6s\" /> Veja um exemplo simulado de como os avisos chegam, com o app fechado. <break time=\"1.6s\" /> Tocando no aviso, o app abre direto na partida, ou na página do torneio. <break time=\"1.6s\" /> No iPhone, as notificações funcionam com o app instalado na tela de início. Veja a opção Instalar o app, nas configurações."
+ },
+ "counter": {
+  "ids": [
+   "f1",
+   "f2",
+   "f3",
+   "f4",
+   "f5",
+   "f6",
+   "f7"
+  ],
+  "text": "Na etapa de Counter, você usa cartas da mão para dar mais poder a quem está sendo atacado. E o GumGum Fight tem dois jeitos de fazer isso. <break time=\"1.6s\" /> No modo padrão, você toca nas cartas para marcar os Counters. Dá para marcar várias, e desmarcar se mudar de ideia. <break time=\"1.6s\" /> Quando estiver tudo certo, confirme no botão, e os Counters são usados de uma vez. <break time=\"1.6s\" /> Quer mais agilidade? Ligue a opção Counter sem confirmação, nas configurações ou no menu da partida. <break time=\"1.6s\" /> Agora, quando o oponente atacar... <break time=\"1.6s\" /> É só tocar na carta, ou arrastar até a mesa, e o Counter é usado na hora. Mais rápido, mas sem volta! <break time=\"1.6s\" /> Escolha o modo que combina com o seu jeito de jogar!"
+ },
+ "trailer": {
+  "ids": [
+   "t1",
+   "t2",
+   "t3",
+   "t4",
+   "t5",
+   "t6",
+   "t7"
+  ],
+  "text": "GumGum Fight: o One Piece Card Game direto no navegador, no celular ou no computador. <break time=\"1.6s\" /> Treine contra o bot, ou jogue online: partidas casuais, ranqueadas, ou em salas com os amigos. <break time=\"1.6s\" /> Já tem um deck? Cole a lista e importe. O Líder e as cartas são reconhecidos na hora. <break time=\"1.6s\" /> Ou monte do zero: escolha o Líder e toque nas cartas do catálogo. A curva de custo e a validação aparecem enquanto você monta. <break time=\"1.6s\" /> E tem torneios da comunidade, com rodadas, relógio e lobby ao vivo. Os jogadores confirmam que estão prontos, o organizador inicia a rodada. <break time=\"1.6s\" /> E as mesas vão sendo preenchidas em tempo real, conforme cada um entra na sua sala. <break time=\"1.6s\" /> GumGum Fight. Monte sua tripulação e venha jogar!"
+ }
+}

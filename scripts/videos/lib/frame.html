@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 432px; height: 768px; overflow: hidden; }
+  body {
+    font-family: Nunito, sans-serif;
+    color: #fff;
+    background:
+      radial-gradient(500px 300px at 0% 0%, rgba(238,111,60,.35), transparent 60%),
+      radial-gradient(500px 400px at 100% 100%, rgba(242,183,51,.25), transparent 60%),
+      linear-gradient(180deg, #12304b 0%, #0b1726 100%);
+    position: relative;
+  }
+  #head { position: absolute; left: 0; right: 0; top: 0; height: 64px; display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+  #head img { width: 40px; height: 40px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  #head .brand { font-family: Bangers, Impact, sans-serif; font-size: 13px; letter-spacing: 1.5px; color: #f7cd48; line-height: 1; }
+  #title { font-family: Bangers, Impact, sans-serif; font-size: 25px; letter-spacing: .8px; line-height: 1.02; color: #fff; text-shadow: 0 2px 0 #c9322b; }
+  #phone {
+    position: absolute; left: 50%; top: 66px; width: 308px; height: 634px; transform: translateX(-50%);
+    border-radius: 30px; background: #05070c; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.55), 0 0 0 2px #2a3b55;
+  }
+  #screen { position: relative; width: 296px; height: 622px; border-radius: 24px; overflow: hidden; background: #fff; }
+  #app { position: absolute; left: 0; top: 0; width: 390px; height: 820px; border: 0; transform: scale(0.75897436); transform-origin: 0 0; }
+  #cap { pointer-events: none;
+    position: absolute; left: 12px; right: 12px; bottom: 3px; height: 64px; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-weight: 900; font-size: 17px; line-height: 1.16; text-shadow: 0 2px 4px rgba(0,0,0,.6);
+    transition: opacity .25s;
+  }
+  #cap b { color: #f7cd48; }
+  #cap small { display: block; font-size: 14.5px; line-height: 1.2; font-weight: 800; }
+  #badge {
+    position: absolute; left: 50%; top: 74px; transform: translateX(-50%) scale(.6); opacity: 0; z-index: 5; pointer-events: none;
+    font-family: Bangers, Impact, sans-serif; font-size: 21px; letter-spacing: 1px; padding: 5px 14px; border-radius: 999px;
+    background: #f7cd48; color: #3d1308; box-shadow: 0 4px 14px rgba(0,0,0,.45); border: 3px solid #3d1308; white-space: nowrap;
+    transition: transform .3s cubic-bezier(.2,1.6,.4,1), opacity .2s;
+  }
+  #badge.on { transform: translateX(-50%) scale(1); opacity: 1; }
+  #badge.off { background: #e9e2d4; color: #3d1308; }
+  #badge.red { background: #c9322b; color: #fff; border-color: #fff; }
+  /* Notificação simulada (Android) sobre a tela do celular */
+  #notes { position: absolute; left: 50%; top: 82px; width: 296px; transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .note {
+    background: rgba(248,248,250,.97); color: #1b1b1f; border-radius: 18px; padding: 10px 12px; box-shadow: 0 8px 22px rgba(0,0,0,.35);
+    display: grid; grid-template-columns: 34px 1fr; gap: 2px 10px; font-family: Roboto, Nunito, sans-serif;
+    transform: translateY(-140%); opacity: 0; transition: transform .45s cubic-bezier(.2,1.1,.3,1), opacity .3s;
+  }
+  .note.in { transform: translateY(0); opacity: 1; }
+  .note.out { transform: translateY(-140%); opacity: 0; }
+  .note img { width: 34px; height: 34px; border-radius: 50%; grid-row: span 3; }
+  .note .app { font-size: 10.5px; color: #555; font-weight: 700; }
+  .note .t { font-size: 13px; font-weight: 900; }
+  .note .b { font-size: 12px; font-weight: 700; color: #333; line-height: 1.25; }
+  #perm { position: absolute; left: 50%; top: 76px; width: 286px; transform: translate(-50%, -20px); opacity: 0; z-index: 7; transition: all .3s;
+    background: #fff; color: #202124; border-radius: 14px; padding: 14px 14px 10px; box-shadow: 0 10px 26px rgba(0,0,0,.4); font-family: Roboto, Nunito, sans-serif; }
+  #perm { pointer-events: none; } #perm.on { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+  #perm .site { font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+  #perm .q { font-size: 13px; display: flex; gap: 8px; align-items: center; font-weight: 700; }
+  #perm .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  #perm button { font: 800 13px Nunito, sans-serif; border-radius: 999px; padding: 7px 14px; border: 1px solid #c7c7c7; background: #fff; color: #1a73e8; }
+  #perm button.allow { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+  .__tap{position:fixed;z-index:99;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(255,255,255,.55);border:3px solid rgba(238,111,60,.95);pointer-events:none;animation:__tap .55s ease-out forwards}
+  @keyframes __tap{0%{transform:scale(.4);opacity:1}70%{opacity:.9}100%{transform:scale(1.25);opacity:0}}
+  #lock { position: absolute; inset: 0; z-index: 3; opacity: 0; pointer-events: none; transition: opacity .5s; color: #fff; text-align: center;
+    background: radial-gradient(300px 300px at 30% 20%, #ee6f3c 0%, transparent 70%), radial-gradient(300px 300px at 80% 90%, #f2b733 0%, transparent 70%), linear-gradient(160deg, #12304b, #0b1726); }
+  #lock.on { opacity: 1; }
+  #lock .clock { margin-top: 150px; font: 300 64px Roboto, Nunito, sans-serif; letter-spacing: 1px; }
+  #lock .date { font: 700 14px Nunito, sans-serif; opacity: .9; }
+  /* Tela cheia (abertura / encerramento) */
+  #card {
+    position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    text-align: center; padding: 30px; opacity: 0; pointer-events: none; transition: opacity .45s;
+    background:
+      radial-gradient(500px 300px at 50% 30%, rgba(238,111,60,.45), transparent 70%),
+      linear-gradient(180deg, #12304b 0%, #0b1726 100%);
+  }
+  #card.on { opacity: 1; }
+  #card img { width: 120px; height: 120px; border-radius: 28px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  #card .k { font-family: Bangers, Impact, sans-serif; font-size: 18px; letter-spacing: 2px; color: #f7cd48; }
+  #card .h { font-family: Bangers, Impact, sans-serif; font-size: 44px; line-height: 1; letter-spacing: 1px; text-shadow: 0 3px 0 #c9322b; }
+  #card .s { font-weight: 800; font-size: 17px; opacity: .92; }
+  #card .u { font-weight: 900; font-size: 18px; color: #f7cd48; }
+</style>
+</head>
+<body>
+  <div id="head">
+    <img src="/icons/app-icon-192.png" alt="" />
+    <div>
+      <div class="brand">GUMGUM FIGHT · DICAS</div>
+      <div id="title"></div>
+    </div>
+  </div>
+  <div id="phone"><div id="screen"><iframe id="app" src="about:blank"></iframe><div id="lock"><div class="clock">20:41</div><div class="date">sábado, 25 de outubro</div></div></div></div>
+  <div id="badge"></div>
+  <div id="notes"></div>
+  <div id="cap"></div>
+  <div id="perm"><div class="site">gumgumfight.app quer</div><div class="q">🔔 Mostrar notificações</div><div class="row"><button class="block">Bloquear</button><button class="allow">Permitir</button></div></div>
+  <div id="card"></div>
+  <script>
+    window.$title = (t) => { document.getElementById('title').textContent = t; };
+    window.$cap = (html) => {
+      const c = document.getElementById('cap');
+      c.style.opacity = 0;
+      setTimeout(() => { c.innerHTML = html ? "<span>" + html + "</span>" : ""; c.style.opacity = 1; }, 180);
+    };
+    window.$badge = (text, kind) => {
+      const b = document.getElementById('badge');
+      if (!text) { b.className = ''; return; }
+      b.textContent = text; b.className = 'on ' + (kind || '');
+    };
+    window.$note = ({ title, body, app = 'GumGum Fight', ms = 4200 }) => {
+      const n = document.createElement('div');
+      n.className = 'note';
+      n.innerHTML = `<img src="/icons/app-icon-192.png"><div class="app">${app} · agora</div><div class="t"></div><div class="b"></div>`;
+      n.querySelector('.t').textContent = title; n.querySelector('.b').textContent = body;
+      document.getElementById('notes').prepend(n);
+      requestAnimationFrame(() => requestAnimationFrame(() => n.classList.add('in')));
+      if (ms) setTimeout(() => { n.classList.add('out'); setTimeout(() => n.remove(), 500); }, ms);
+    };
+    window.$clearNotes = () => document.querySelectorAll('.note').forEach((n) => { n.classList.add('out'); setTimeout(() => n.remove(), 500); });
+    window.$perm = () => new Promise((resolve) => {
+      const p = document.getElementById('perm'); p.classList.add('on');
+      const done = (v) => { p.classList.remove('on'); resolve(v); };
+      p.querySelector('.allow').onclick = () => done('granted');
+      p.querySelector('.block').onclick = () => done('denied');
+    });
+    window.$lock = (on) => document.getElementById('lock').classList.toggle('on', !!on);
+    addEventListener('pointerdown', (e) => {
+      const d = document.createElement('div'); d.className = '__tap';
+      d.style.left = e.clientX + 'px'; d.style.top = e.clientY + 'px';
+      document.body.appendChild(d); setTimeout(() => d.remove(), 700);
+    }, true);
+    window.$card = (html) => {
+      const c = document.getElementById('card');
+      if (html) { c.innerHTML = html; c.classList.add('on'); } else c.classList.remove('on');
+    };
+  </script>
+</body>
+</html>
