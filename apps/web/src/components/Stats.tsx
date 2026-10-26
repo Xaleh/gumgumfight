@@ -1,9 +1,15 @@
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   api,
   type CardInfo,
   type CardStatsResponse,
+  type GlobalCompare,
+  type GlobalMatchups,
+  type GlobalQueue,
+  type GlobalStats,
+  type GlobalTrendResponse,
   type PlayerProfile,
+  type SplitCount,
   type StatsMeta,
   type StatsOverview,
   type StatsQuery,
@@ -13,7 +19,7 @@ import {
 } from '../api';
 import { type Locale, type Translate, useLocale, useT } from '../i18n';
 import { useAuth } from '../auth';
-import { fmtBerries, fmtNumber } from '../i18n/format';
+import { fmtBerries, fmtDateTime, fmtNumber } from '../i18n/format';
 import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
 import { SupportModal } from './Support';
@@ -23,21 +29,41 @@ const MIN_GAMES = 10;
 const FILTERS_KEY = 'gumgum.statsFilters';
 const MIN_KEY = 'gumgum.statsMin';
 const SCOPE_KEY = 'gumgum.statsScope';
+const QUEUE_KEY = 'gumgum.statsGlobalQueue';
 
-/** Geral: partidas casuais, treino contra o bot e salas privadas. Pro: ranqueada e torneios encerrados. */
-type Scope = 'general' | 'pro';
+/**
+ * Geral: partidas casuais, treino contra o bot e salas privadas. Pro: ranqueada e torneios encerrados.
+ * Global: as filas do TCG Matchmaking (meta global, baixado pelo servidor).
+ */
+type Scope = 'general' | 'pro' | 'global';
 
 function loadScope(): Scope {
   try {
-    return localStorage.getItem(SCOPE_KEY) === 'pro' ? 'pro' : 'general';
+    const v = localStorage.getItem(SCOPE_KEY);
+    return v === 'pro' || v === 'global' ? v : 'general';
   } catch {
     return 'general';
   }
 }
 
+function loadQueue(): string {
+  try {
+    return localStorage.getItem(QUEUE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 type Tab = 'leaders' | 'matchups' | 'trend' | 'cards';
+type GlobalTab = 'leaders' | 'matchups' | 'trend' | 'compare';
 
 const rate = (w: WinCount) => (w.games ? w.wins / w.games : null);
+
+/** Como segundo: a contagem própria quando existe (meta global, onde só parte das partidas diz quem começou), senão o que não foi como primeiro. */
+const secondOf = (w: WinCount & { firstGames: number; firstWins: number } & Partial<SplitCount>): WinCount =>
+  w.secondGames !== undefined && w.secondWins !== undefined
+    ? { games: w.secondGames, wins: w.secondWins }
+    : { games: w.games - w.firstGames, wins: w.wins - w.firstWins };
 const fmtPct = (r: number | null) => (r === null ? '—' : `${(r * 100).toFixed(1)}%`);
 
 /**
@@ -394,7 +420,20 @@ function MetaSummary({ data, min }: { data: StatsOverview; min: number }) {
   );
 }
 
-function LeadersTable({ data, min, onPick }: { data: StatsOverview; min: number; onPick: (leader: string) => void }) {
+function LeadersTable({
+  data,
+  min,
+  onPick,
+  lists = true,
+  rowTitle,
+}: {
+  data: StatsOverview;
+  min: number;
+  onPick: (leader: string) => void;
+  /** Coluna de listas (o meta global não tem). */
+  lists?: boolean;
+  rowTitle?: string;
+}) {
   type K = 'games' | 'rate' | 'first' | 'second' | 'lists';
   const t = useT();
   const { th, apply } = useSort<K>('games');
@@ -409,7 +448,7 @@ function LeadersTable({ data, min, onPick }: { data: StatsOverview; min: number;
         : k === 'first'
           ? rate({ games: l.firstGames, wins: l.firstWins })
           : k === 'second'
-            ? rate({ games: l.games - l.firstGames, wins: l.wins - l.firstWins })
+            ? rate(secondOf(l))
             : l.lists,
   );
   if (!data.leaders.length) return <p className="muted">{t('stats.noGamesFilters')}</p>;
@@ -426,7 +465,7 @@ function LeadersTable({ data, min, onPick }: { data: StatsOverview; min: number;
               <th className="wr-col">{t('stats.colInterval')}</th>
               {th('first', t('stats.colFirstShort'), t('stats.colFirstTitle'))}
               {th('second', t('stats.colSecondShort'), t('stats.colSecondTitle'))}
-              {th('lists', t('stats.colLists'), t('stats.colListsTitle'))}
+              {lists && th('lists', t('stats.colLists'), t('stats.colListsTitle'))}
             </tr>
           </thead>
           <tbody>
@@ -435,7 +474,7 @@ function LeadersTable({ data, min, onPick }: { data: StatsOverview; min: number;
                 key={l.leader}
                 className="clickable"
                 onClick={() => onPick(l.leader)}
-                title={t('stats.rowCardsTitle')}
+                title={rowTitle ?? t('stats.rowCardsTitle')}
               >
                 <td>
                   <CardName id={l.leader} info={data.cards[l.leader]} />
@@ -453,9 +492,9 @@ function LeadersTable({ data, min, onPick }: { data: StatsOverview; min: number;
                   <WinRate w={{ games: l.firstGames, wins: l.firstWins }} />
                 </td>
                 <td>
-                  <WinRate w={{ games: l.games - l.firstGames, wins: l.wins - l.firstWins }} />
+                  <WinRate w={secondOf(l)} />
                 </td>
-                <td>{l.lists}</td>
+                {lists && <td>{l.lists}</td>}
               </tr>
             ))}
           </tbody>
@@ -524,7 +563,7 @@ function Matchups({
                     <WinRate w={{ games: m.firstGames, wins: m.firstWins }} />
                   </td>
                   <td>
-                    <WinRate w={{ games: m.games - m.firstGames, wins: m.wins - m.firstWins }} />
+                    <WinRate w={secondOf(m)} />
                   </td>
                 </tr>
               ))}
@@ -644,19 +683,32 @@ const shortDate = (iso: string, locale: Locale) =>
     month: '2-digit',
   });
 
-/** Diferença em pontos percentuais, com a mesma cor das taxas. */
-function Delta({ d }: { d: number | null }) {
+/** Diferença em pontos percentuais, com a mesma cor das taxas (`scale` realça diferenças pequenas, como as de participação). */
+function Delta({ d, scale = 1 }: { d: number | null; scale?: number }) {
   const t = useT();
   if (d === null) return <>—</>;
   return (
-    <span className="delta" style={{ background: rateColor(0.5 + d) }}>
+    <span className="delta" style={{ background: rateColor(0.5 + d * scale) }}>
       {t('stats.pp', { sign: d >= 0 ? '+' : '−', value: Math.abs(d * 100).toFixed(1) })}
     </span>
   );
 }
 
-/** Quem sobe e quem cai: participação e vitórias por semana. */
-function Trend({ query, min, onPick }: { query: StatsQuery; min: number; onPick: (leader: string) => void }) {
+/** Quem sobe e quem cai: participação e vitórias por semana. `load` busca as últimas N semanas (daqui ou do meta global). */
+function Trend({
+  load,
+  min,
+  onPick,
+  empty,
+  footer,
+}: {
+  load: (weeks: number) => Promise<TrendResponse>;
+  min: number;
+  onPick: (leader: string) => void;
+  /** Texto quando não há semana nenhuma (meta global ainda coletando). */
+  empty?: (data: TrendResponse) => ReactNode;
+  footer?: string;
+}) {
   const t = useT();
   const locale = useLocale();
   const [data, setData] = useState<TrendResponse | null>(null);
@@ -664,14 +716,13 @@ function Trend({ query, min, onPick }: { query: StatsQuery; min: number; onPick:
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    api
-      .trend(query, weeks)
+    load(weeks)
       .then((d) => !cancelled && setData(d))
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
     return () => {
       cancelled = true;
     };
-  }, [query, weeks]);
+  }, [load, weeks]);
 
   const table = useMemo(() => {
     if (!data) return null;
@@ -698,6 +749,7 @@ function Trend({ query, min, onPick }: { query: StatsQuery; min: number; onPick:
 
   if (error) return <div className="error">{error}</div>;
   if (!data || !table) return <p className="muted">{t('common.loading')}</p>;
+  if (!data.weeks.length && empty) return <p className="muted">{empty(data)}</p>;
   const n = data.weeks.length;
   const name = (id: string) => data.cards[id]?.name ?? id;
   const movers = [...table.leaders]
@@ -786,7 +838,7 @@ function Trend({ query, min, onPick }: { query: StatsQuery; min: number; onPick:
           </table>
         </div>
       )}
-      <p className="muted small">{t('stats.trendFooter')}</p>
+      <p className="muted small">{footer ?? t('stats.trendFooter')}</p>
     </>
   );
 }
@@ -900,6 +952,306 @@ function CardsTable({ data, min }: { data: CardStatsResponse; min: number }) {
 }
 
 /** Estatísticas de vitórias por Líder, matchup e carta, com filtros. */
+
+/** Resumo da fila do meta global: partidas, Líderes e a vantagem de quem começa (só nas partidas em que se sabe quem começou). */
+function GlobalTiles({ data }: { data: StatsOverview }) {
+  const t = useT();
+  const locale = useLocale();
+  const s = data.summary;
+  const games = (n: number) => t('stats.gamesCount', { n });
+  const tiles: Array<[string, ReactNode, string]> = [
+    [t('stats.tileMatches'), fmtNumber(s.matches, locale), t('stats.tileLeadersCount', { n: data.leaders.length })],
+    [t('stats.first'), fmtPct(rate(s.first)), games(s.first.games)],
+    [t('stats.tileSecond'), fmtPct(rate(s.second)), games(s.second.games)],
+  ];
+  return (
+    <div className="stat-tiles">
+      {tiles.map(([label, value, sub]) => (
+        <div key={label} className="stat-tile">
+          <span className="muted small">{label}</span>
+          <b>{value}</b>
+          <span className="muted small">{sub}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** O mesmo Líder aqui e lá: participação (por lado da partida) e vitórias, com a diferença em pontos. */
+function CompareTable({
+  queue,
+  format,
+  formatLabel,
+  min,
+  hereLabel,
+}: {
+  queue: string;
+  format: string;
+  formatLabel: string;
+  min: number;
+  /** Qual recorte daqui entra na comparação (Geral, Pro ou tudo). */
+  hereLabel: string;
+}) {
+  type K = 'here' | 'global' | 'rateHere' | 'rateGlobal' | 'dShare' | 'dRate';
+  const t = useT();
+  const { th, apply } = useSort<K>('global');
+  const [data, setData] = useState<GlobalCompare | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    api
+      .globalCompare(queue, format)
+      .then((d) => !cancelled && (setData(d), setError(null)))
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [queue, format]);
+  if (error) return <div className="error">{error}</div>;
+  if (!data) return <p className="muted">{t('common.loading')}</p>;
+  const share = (w: WinCount | null, total: number) => (w && total ? w.games / total : null);
+  const rows = apply(
+    data.rows
+      .filter((r) => (r.here?.games ?? 0) >= min || (r.global?.games ?? 0) >= min)
+      .map((r) => {
+        const sh = share(r.here, data.here.games);
+        const sg = share(r.global, data.global.games);
+        const rh = r.here ? rate(r.here) : null;
+        const rg = r.global ? rate(r.global) : null;
+        return { ...r, sh, sg, rh, rg, dShare: sh !== null && sg !== null ? sh - sg : null, dRate: rh !== null && rg !== null ? rh - rg : null };
+      }),
+    (r, k) => (k === 'here' ? r.sh : k === 'global' ? r.sg : k === 'rateHere' ? r.rh : k === 'rateGlobal' ? r.rg : k === 'dShare' ? r.dShare : r.dRate),
+  );
+  const usage = (s: number | null, w: WinCount | null) =>
+    s === null || !w ? (
+      '—'
+    ) : (
+      <>
+        {fmtPct(s)} <span className="muted small">{w.games}</span>
+      </>
+    );
+  return (
+    <>
+      <p className="muted small">
+        {t('stats.compareIntro', { format: formatLabel, here: data.here.games, scope: hereLabel, global: data.global.games, queue: data.queue.name })}
+      </p>
+      {!rows.length && <p className="muted">{t('stats.noCompare', { min })}</p>}
+      {rows.length > 0 && (
+        <div className="table-scroll">
+          <table className="cov-table stat-table">
+            <thead>
+              <tr>
+                <th>{t('stats.leader')}</th>
+                {th('here', t('stats.colShareHere'))}
+                {th('global', t('stats.colShareGlobal'))}
+                {th('dShare', t('stats.colDelta'), t('stats.colDeltaTitle'))}
+                {th('rateHere', t('stats.colRateHere'))}
+                {th('rateGlobal', t('stats.colRateGlobal'))}
+                {th('dRate', t('stats.colDelta'), t('stats.colDeltaTitle'))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.leader}>
+                  <td>
+                    <CardName id={r.leader} info={data.cards[r.leader]} />
+                  </td>
+                  <td>{usage(r.sh, r.here)}</td>
+                  <td>{usage(r.sg, r.global)}</td>
+                  <td>
+                    <Delta d={r.dShare} scale={2} />
+                  </td>
+                  <td>{r.here ? <WinRate w={r.here} /> : '—'}</td>
+                  <td>{r.global ? <WinRate w={r.global} /> : '—'}</td>
+                  <td>
+                    <Delta d={r.dRate} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="muted small">{t('stats.compareFooter', { n: min })}</p>
+    </>
+  );
+}
+
+/** Escopo Global: as filas do TCG Matchmaking, com Líderes, matchups, tendência e a comparação com as partidas daqui. */
+function GlobalPanel({
+  meta,
+  formats,
+  min,
+  onMin,
+  hereLabel,
+}: {
+  meta: NonNullable<StatsMeta['global']>;
+  formats: StatsMeta['formats'];
+  min: number;
+  onMin: (n: number) => void;
+  hereLabel: string;
+}) {
+  const t = useT();
+  const locale = useLocale();
+  const [queue, setQueue] = useState(loadQueue);
+  const [tab, setTab] = useState<GlobalTab>('leaders');
+  const [leader, setLeader] = useState('');
+  const [data, setData] = useState<GlobalStats | null>(null);
+  /** Matchups do Líder em foco (a resposta principal só traz a matriz dos mais jogados). */
+  const [detail, setDetail] = useState<GlobalMatchups | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(QUEUE_KEY, queue);
+    } catch {
+      /* sem armazenamento */
+    }
+  }, [queue]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .globalStats(queue || undefined)
+      .then((d) => {
+        if (cancelled) return;
+        setData(d);
+        setError(null);
+        // Sem fila escolhida (ou fila que sumiu), o servidor manda a primeira: fica com ela.
+        if (d.queue && d.queue.key !== queue) setQueue(d.queue.key);
+      })
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [queue]);
+
+  const queues = data?.queues.length ? data.queues : meta.queues;
+  const current: GlobalQueue | null = data?.queue ?? queues.find((q) => q.key === queue) ?? queues[0] ?? null;
+  const key = current?.key ?? '';
+
+  useEffect(() => {
+    if (!leader || !key) return;
+    let cancelled = false;
+    api
+      .globalMatchups(key, leader)
+      .then((d) => !cancelled && setDetail(d))
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [key, leader]);
+
+  const overview: StatsOverview | null =
+    data?.queue && data.summary ? { summary: data.summary, leaders: data.leaders, matchups: data.matchups, cards: data.cards } : null;
+  const detailReady = !leader || (detail?.leader === leader && detail.queue?.key === key);
+  /** A visão geral com os matchups do Líder em foco no lugar dos da matriz. */
+  const withDetail: StatsOverview | null =
+    overview && leader && detailReady && detail
+      ? { ...overview, matchups: [...overview.matchups.filter((m) => m.leader !== leader), ...detail.matchups], cards: { ...overview.cards, ...detail.cards } }
+      : overview;
+  const loadTrend = useCallback((w: number) => api.globalTrend(key, w), [key]);
+  const tabs: Array<[GlobalTab, string]> = [
+    ['leaders', t('stats.tabLeaders')],
+    ['matchups', t('stats.tabMatchups')],
+    ['trend', t('stats.tabTrend')],
+    ...(current?.format ? [['compare', t('stats.tabCompare')] as [GlobalTab, string]] : []),
+  ];
+  const shown: GlobalTab = tab === 'compare' && !current?.format ? 'leaders' : tab;
+  const toMatchups = (l: string) => {
+    setLeader(l);
+    setTab('matchups');
+  };
+
+  return (
+    <>
+      <details className="menu-card stats-filters" open>
+        <summary>{t('stats.filters')}</summary>
+        <div className="filter-grid">
+          <div className="field">
+            <label>{t('stats.filterGlobalQueue')}</label>
+            <div className="stats-pickers">
+              <select
+                value={key}
+                onChange={(e) => {
+                  setQueue(e.target.value);
+                  setLeader('');
+                }}
+              >
+                {queues.map((q) => (
+                  <option key={q.key} value={q.key}>
+                    {q.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="field">
+            <label>{t('stats.filterMin')}</label>
+            <Seg
+              value={String(min)}
+              options={[
+                ['1', t('stats.allFem')],
+                ['10', '10'],
+                ['50', '50'],
+                ['100', '100'],
+              ]}
+              onChange={(v) => onMin(Number(v))}
+            />
+          </div>
+        </div>
+      </details>
+      <p className="muted small">
+        {t('stats.globalIntro')}
+        {current?.minBounty ? ` ${t('stats.globalMinBounty', { n: current.minBounty })}` : ''}
+      </p>
+      {error && <div className="error">{error}</div>}
+      {overview && <GlobalTiles data={overview} />}
+      <div className="seg stats-tabs">
+        {tabs.map(([v, label]) => (
+          <button key={v} className={shown === v ? 'on' : ''} onClick={() => setTab(v)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <section className="menu-card stats-panel">
+        {!data && !error && <p className="muted">{t('common.loading')}</p>}
+        {data && !data.queue && <p className="muted">{t('stats.globalCollecting')}</p>}
+        {overview && shown === 'leaders' && <LeadersTable data={overview} min={min} lists={false} rowTitle={t('stats.rowMatchupsTitle')} onPick={toMatchups} />}
+        {overview && shown === 'matchups' && !detailReady && <p className="muted">{t('common.loading')}</p>}
+        {withDetail && shown === 'matchups' && detailReady && <Matchups data={withDetail} leader={leader} min={min} onLeader={setLeader} />}
+        {key && shown === 'trend' && (
+          <Trend
+            load={loadTrend}
+            min={min}
+            onPick={toMatchups}
+            empty={(d) => {
+              const since = (d as GlobalTrendResponse).since;
+              return t('stats.globalTrendCollecting', { since: since ? shortDate(since, locale) : '—' });
+            }}
+            footer={t('stats.globalTrendFooter')}
+          />
+        )}
+        {current?.format && shown === 'compare' && (
+          <CompareTable
+            queue={current.key}
+            format={current.format}
+            formatLabel={formats.find((f) => f.id === current.format)?.label ?? current.format}
+            min={min}
+            hereLabel={hereLabel}
+          />
+        )}
+      </section>
+      {current && (
+        <p className="muted small">
+          {t('stats.globalUpdated', { queue: current.name, date: fmtDateTime(current.lastModified ?? current.fetchedAt, locale) })} {t('stats.globalCredit')}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function Stats({ onExit }: { onExit: () => void }) {
   const t = useT();
   const locale = useLocale();
@@ -938,7 +1290,10 @@ export function Stats({ onExit }: { onExit: () => void }) {
 
   /** Sem a separação no servidor (apoio desligado), tudo é uma coisa só. */
   const gated = meta?.proGate ?? false;
-  const scope: Scope = gated ? scopePick : 'pro';
+  /** Meta global ligado no servidor (antes de `meta` chegar, vale a escolha guardada, para as estatísticas daqui não piscarem). */
+  const globalOn = meta ? !!meta.global : scopePick === 'global';
+  const scope: Scope = scopePick === 'global' ? (globalOn ? 'global' : gated ? 'general' : 'pro') : gated ? scopePick : 'pro';
+  const isGlobal = scope === 'global';
   /** Aba Pro sem o plano: mostra só a amostra. */
   const locked = gated && scope === 'pro' && !meta?.pro;
   /** Na aba Geral (fora de "Só eu"), só partidas casuais e sem filtro por faixa. */
@@ -947,7 +1302,7 @@ export function Stats({ onExit }: { onExit: () => void }) {
 
   // Visão geral (Líderes e matchups).
   useEffect(() => {
-    if (locked) return;
+    if (locked || isGlobal) return;
     let cancelled = false;
     setLoading(true);
     api
@@ -962,12 +1317,12 @@ export function Stats({ onExit }: { onExit: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [query, locked]);
+  }, [query, locked, isGlobal]);
 
   // Na aba de cartas, um Líder é obrigatório: o mais jogado com esses filtros.
   const cardsLeader = leader || overview?.leaders[0]?.leader || '';
   useEffect(() => {
-    if (tab !== 'cards' || !cardsLeader || locked) return;
+    if (tab !== 'cards' || !cardsLeader || locked || isGlobal) return;
     let cancelled = false;
     api
       .cardStats({ ...query, leader: cardsLeader, deck: deck || undefined })
@@ -976,8 +1331,9 @@ export function Stats({ onExit }: { onExit: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [tab, query, cardsLeader, deck, locked]);
+  }, [tab, query, cardsLeader, deck, locked, isGlobal]);
 
+  const loadTrend = useCallback((w: number) => api.trend(query, w), [query]);
   const set = (patch: Partial<StatsQuery>) => setFilters((f) => ({ ...f, ...patch }));
   const toggleTier = (id: string) =>
     set({
@@ -1001,25 +1357,40 @@ export function Stats({ onExit }: { onExit: () => void }) {
         {error && <div className="error">{error}</div>}
         {meta && <Profile me={meta.me} tiers={meta.tiers} onRename={(me) => setMeta({ ...meta, me })} />}
 
-        {gated && (
+        {(gated || globalOn) && (
           <div className="seg stats-scope" role="tablist" aria-label={t('stats.scopeLabel')}>
-            <button role="tab" aria-selected={scope === 'general'} className={scope === 'general' ? 'on' : ''} onClick={() => setScope('general')}>
-              {t('stats.scopeGeneral')}
-              <small>{t('stats.scopeGeneralSub')}</small>
-            </button>
-            <button role="tab" aria-selected={scope === 'pro'} className={scope === 'pro' ? 'on' : ''} onClick={() => setScope('pro')}>
-              <span className="stats-scope-label">
-                {meta?.pro ? '★' : <Icon name="lock" size={14} />} {t('stats.scopePro')}
-              </span>
-              <small>{t('stats.scopeProSub')}</small>
-            </button>
+            {gated ? (
+              <>
+                <button role="tab" aria-selected={scope === 'general'} className={scope === 'general' ? 'on' : ''} onClick={() => setScope('general')}>
+                  {t('stats.scopeGeneral')}
+                  <small>{t('stats.scopeGeneralSub')}</small>
+                </button>
+                <button role="tab" aria-selected={scope === 'pro'} className={scope === 'pro' ? 'on' : ''} onClick={() => setScope('pro')}>
+                  <span className="stats-scope-label">
+                    {meta?.pro ? '★' : <Icon name="lock" size={14} />} {t('stats.scopePro')}
+                  </span>
+                  <small>{t('stats.scopeProSub')}</small>
+                </button>
+              </>
+            ) : (
+              <button role="tab" aria-selected={!isGlobal} className={!isGlobal ? 'on' : ''} onClick={() => setScope('pro')}>
+                {t('stats.scopeLocal')}
+                <small>{t('stats.scopeLocalSub')}</small>
+              </button>
+            )}
+            {globalOn && (
+              <button role="tab" aria-selected={isGlobal} className={isGlobal ? 'on' : ''} onClick={() => setScope('global')}>
+                <span className="stats-scope-label">🌍 {t('stats.scopeGlobal')}</span>
+                <small>{t('stats.scopeGlobalSub')}</small>
+              </button>
+            )}
           </div>
         )}
 
         {locked && <ProTeaser format={filters.format} onSupport={config?.support ? () => setShowSupport(true) : null} />}
         {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
 
-        {!locked && (
+        {!locked && !isGlobal && (
           <>
             <details className="menu-card stats-filters" open>
               <summary>{t('stats.filters')}</summary>
@@ -1162,7 +1533,7 @@ export function Stats({ onExit }: { onExit: () => void }) {
               )}
               {tab === 'trend' && (
                 <Trend
-                  query={query}
+                  load={loadTrend}
                   min={min}
                   onPick={(l) => {
                     setLeader(l);
@@ -1216,6 +1587,16 @@ export function Stats({ onExit }: { onExit: () => void }) {
               {scope === 'pro' && ` ${t('stats.proFooter')}`}
             </p>
           </>
+        )}
+
+        {isGlobal && meta?.global && (
+          <GlobalPanel
+            meta={meta.global}
+            formats={meta.formats}
+            min={min}
+            onMin={setMin}
+            hereLabel={gated ? (meta.pro ? t('stats.scopePro') : t('stats.scopeGeneral')) : t('stats.scopeLocal')}
+          />
         )}
       </div>
     </div>

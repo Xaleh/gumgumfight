@@ -50,6 +50,21 @@ export interface ServerOptions {
   replayEmbedOrigins?: string[];
   /** REPLAY_LINK_SECRET: segredo das assinaturas dos links de replay (sem ele, um gerado e guardado no banco). */
   replayLinkSecret?: string | null;
+  /**
+   * Meta global: estatísticas das filas do TCG Matchmaking pela OPTCG Logpose API
+   * (GLOBAL_STATS_API_KEY, GLOBAL_STATS_CLIENT, GLOBAL_STATS_API_URL). Sem a chave, o recurso
+   * fica desligado e o escopo "Global" some das Estatísticas.
+   */
+  globalStats?: GlobalStatsOptions | null;
+}
+
+export interface GlobalStatsOptions {
+  /** GLOBAL_STATS_API_KEY: chave dada pelo mantenedor da API (segredo: só no `deploy.env`). */
+  apiKey: string;
+  /** GLOBAL_STATS_CLIENT: o `x-client-name` cadastrado junto com a chave (padrão `gumgum`). */
+  client: string;
+  /** GLOBAL_STATS_API_URL: endereço da API (padrão https://optcg-api.vercel.app). */
+  apiUrl: string;
 }
 
 export interface SupportOptions {
@@ -146,6 +161,16 @@ export const parseOrigins = (v: string | undefined) =>
     ),
   ];
 
+export function globalStatsOptions(env = process.env): GlobalStatsOptions | null {
+  const apiKey = text(env.GLOBAL_STATS_API_KEY);
+  if (!apiKey) return null;
+  return {
+    apiKey,
+    client: text(env.GLOBAL_STATS_CLIENT) ?? 'gumgum',
+    apiUrl: link(env.GLOBAL_STATS_API_URL)?.replace(/\/+$/, '') ?? 'https://optcg-api.vercel.app',
+  };
+}
+
 export const serverOptions: ServerOptions = {
   cardImages: !off(process.env.CARD_IMAGES),
   cardCdn: process.env.CARD_CDN_URL?.trim().replace(/\/+$/, '') || null,
@@ -160,7 +185,18 @@ export const serverOptions: ServerOptions = {
   vapidSubject: process.env.VAPID_SUBJECT?.trim() || undefined,
   replayEmbedOrigins: parseOrigins(process.env.REPLAY_EMBED_ORIGINS),
   replayLinkSecret: process.env.REPLAY_LINK_SECRET?.trim() || null,
+  globalStats: globalStatsOptions(),
 };
+
+/**
+ * GLOBAL_STATS_SYNC: de quantas em quantas horas o servidor busca as estatísticas das filas do
+ * TCG Matchmaking (padrão 6). "off" desliga. Nunca roda nos testes.
+ */
+export function globalStatsSyncHours(env = process.env): number | null {
+  if (off(env.GLOBAL_STATS_SYNC) || env.NODE_ENV === 'test' || env.VITEST) return null;
+  const hours = Number(env.GLOBAL_STATS_SYNC ?? 6);
+  return Number.isFinite(hours) && hours > 0 ? hours : 6;
+}
 
 /**
  * SPOILER_SYNC: de quantas em quantas horas o servidor procura na API as cartas de

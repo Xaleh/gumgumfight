@@ -1532,6 +1532,34 @@ export default {
   'stats.listOption': '{name} · {n|# partie|# parties}',
   'stats.footer':
     'Le serveur rejoue chaque partie à partir de son replay avant qu’elle n’entre dans les stats. Les taux avec moins de {n|# partie|# parties} sont estompés : survolez-les pour voir l’intervalle de confiance.',
+  // ---- méta global (TCG Matchmaking) ----
+  'stats.scopeLocal': 'GumGum Fight',
+  'stats.scopeLocalSub': 'les parties d’ici',
+  'stats.scopeGlobal': 'Global',
+  'stats.scopeGlobalSub': 'TCG Matchmaking',
+  'stats.filterGlobalQueue': 'File',
+  'stats.tabCompare': 'Comparer',
+  'stats.tileMatches': 'Parties',
+  'stats.tileLeadersCount': '{n|# Leader|# Leaders}',
+  'stats.globalIntro':
+    'Parties de la file classée de TCG Matchmaking, le classement Discord d’OPTCGSim. Qui a commencé n’est connu que pour une partie des parties, et l’utilisation compte par côté de la partie, comme dans les stats d’ici.',
+  'stats.globalMinBounty': 'File réservée aux joueurs avec une prime supérieure à {n|# milliard|# milliards} là-bas.',
+  'stats.globalCollecting': 'Le serveur n’a pas encore téléchargé cette file. Revenez plus tard.',
+  'stats.globalTrendCollecting': 'La tendance a besoin des résumés de deux semaines consécutives (collecte depuis le {since}).',
+  'stats.globalTrendFooter':
+    'Parties de chaque semaine : la différence entre les totaux de la file à la fin de la semaine et à la fin de la précédente. Les semaines commencent le lundi.',
+  'stats.globalUpdated': 'Données de la file {queue} de TCG Matchmaking, mises à jour le {date}.',
+  'stats.globalCredit': 'Source : TCG Matchmaking (Discord), via l’OPTCG Logpose API de Matheus.',
+  'stats.compareIntro': '{format} : {here|# partie|# parties} ici ({scope}) et {global|# partie|# parties} dans la file {queue}. Utilisation par côté de la partie.',
+  'stats.colShareHere': 'Usage ici',
+  'stats.colShareGlobal': 'Usage là-bas',
+  'stats.colRateHere': 'Victoires ici',
+  'stats.colRateGlobal': 'Victoires là-bas',
+  'stats.colDelta': 'Δ',
+  'stats.colDeltaTitle': 'Ici moins là-bas, en points de pourcentage',
+  'stats.noCompare': 'Aucun Leader avec {min|# partie|# parties} ou plus d’un des côtés.',
+  'stats.compareFooter':
+    'Sont listés les Leaders avec au moins {n|# partie|# parties} d’un des côtés ; un côté sans partie affiche —. Les taux avec un petit échantillon sont estompés.',
   // ==== /stats ====
 
 

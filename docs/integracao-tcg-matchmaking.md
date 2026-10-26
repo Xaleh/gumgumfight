@@ -1,8 +1,19 @@
 # Plano: meta global do TCG Matchmaking nas Estatísticas
 
-> Status: **plano**, nada implementado ainda. Escrito em 26/10/2026 a partir da conversa com o Matheus
-> (criador da API), da documentação dela (`https://optcg-api.vercel.app/docs`, OpenAPI 3.0.3, "OPTCG Logpose
-> API") e do código atual. A seção 2 lista o que ainda falta confirmar.
+> Status: **implementado** (26/10/2026): servidor (`apps/server/src/stats/global.ts`, `global-routes.ts`),
+> escopo Global na tela de Estatísticas e a documentação no README. Este arquivo é o plano original, com as
+> notas do que a API real mostrou; o que vale é o README ("Meta global") e a documentação técnica.
+>
+> O que o JSON real mostrou, além da documentação: `leader` é id de carta (`OP17-039`), `total_matches` e
+> `weighted_win_rate` **não vêm** no JSON, as taxas são porcentagens (53.85), `play_rate` é a fração das
+> partidas da fila em que o Líder apareceu (soma 200% entre os Líderes; por isso a tela usa a participação por
+> lado, que soma 100%, como nas estatísticas daqui), e `first_games + second_games` é bem menor que
+> `number_of_matches` (quem começou só é conhecido numa parte das partidas). As filas são atualizadas em lote
+> (todas com `lastModified` no mesmo minuto); `lw_eastern` estava parada desde 22/08. Ficaram de fora: a
+> `weighted_win_rate` (não existe no JSON) e a linha "no mundo" na tela inicial (ideia para depois).
+>
+> Plano original (escrito a partir da conversa com o Matheus, da documentação da API em
+> `https://optcg-api.vercel.app/docs` e do código de então):
 
 ## 1. O que é e por que vale a pena
 

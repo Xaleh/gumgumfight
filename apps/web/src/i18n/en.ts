@@ -1532,6 +1532,34 @@ export default {
   'stats.listOption': '{name} · {n|# game|# games}',
   'stats.footer':
     'The server replays every game from its replay before it enters the stats. Rates with fewer than {n|# game|# games} are dimmed: hover to see the confidence interval.',
+  // ---- global meta (TCG Matchmaking) ----
+  'stats.scopeLocal': 'GumGum Fight',
+  'stats.scopeLocalSub': 'games played here',
+  'stats.scopeGlobal': 'Global',
+  'stats.scopeGlobalSub': 'TCG Matchmaking',
+  'stats.filterGlobalQueue': 'Queue',
+  'stats.tabCompare': 'Compare',
+  'stats.tileMatches': 'Games',
+  'stats.tileLeadersCount': '{n|# Leader|# Leaders}',
+  'stats.globalIntro':
+    'Games from the TCG Matchmaking ranked queue, the Discord ranked ladder for OPTCGSim. Who went first is only known for part of the games, and usage counts per side of a game, as in the stats here.',
+  'stats.globalMinBounty': 'Queue restricted to players with a bounty above {n|# billion|# billion} there.',
+  'stats.globalCollecting': 'The server has not downloaded this queue yet. Come back later.',
+  'stats.globalTrendCollecting': 'The trend needs summaries from two consecutive weeks (collecting since {since}).',
+  'stats.globalTrendFooter':
+    'Games per week: the difference between the queue totals at the end of the week and at the end of the previous one. Weeks start on Monday.',
+  'stats.globalUpdated': 'TCG Matchmaking data for the {queue} queue, updated {date}.',
+  'stats.globalCredit': 'Source: TCG Matchmaking (Discord), via the OPTCG Logpose API by Matheus.',
+  'stats.compareIntro': '{format}: {here|# game|# games} here ({scope}) and {global|# game|# games} in the {queue} queue. Usage per side of a game.',
+  'stats.colShareHere': 'Usage here',
+  'stats.colShareGlobal': 'Usage there',
+  'stats.colRateHere': 'Wins here',
+  'stats.colRateGlobal': 'Wins there',
+  'stats.colDelta': 'Δ',
+  'stats.colDeltaTitle': 'Here minus there, in percentage points',
+  'stats.noCompare': 'No Leader with {min|# game|# games} or more on either side.',
+  'stats.compareFooter':
+    'Leaders with at least {n|# game|# games} on one of the sides are listed; a side without games shows —. Rates with a small sample are dimmed.',
   // ==== /stats ====
 
 

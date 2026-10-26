@@ -59,6 +59,10 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `R2_ENDPOINT`   | (vazio)                       | Só para bucket com jurisdição (ex.: `https://<id>.eu.r2.cloudflarestorage.com`) |
 | `CARD_IMAGE_SOURCES` | `bandai-en,bandai-asia,bandai-jp` | Listas oficiais da Bandai onde procurar a imagem das cartas sem imagem, em ordem (com a CDN ligada); `off` desliga |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
+| `GLOBAL_STATS_API_KEY` | (vazio) | Chave da OPTCG Logpose API (meta global do TCG Matchmaking; veja [Meta global](#meta-global-tcg-matchmaking)); vazio = escopo Global desligado (segredo: só no `deploy.env`) |
+| `GLOBAL_STATS_CLIENT` | `gumgum` | O `x-client-name` cadastrado junto com a chave |
+| `GLOBAL_STATS_API_URL` | `https://optcg-api.vercel.app` | Endereço da API |
+| `GLOBAL_STATS_SYNC` | `6` | Horas entre as buscas das filas do TCG Matchmaking; `off` desliga |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
 | `ONLINE_BOT_ROOMS` | `on`                       | Transmitir o treino contra o bot (o servidor joga pelo bot; exige login); `off` desliga |
@@ -279,6 +283,28 @@ fora das estatísticas (`match_seats.listed = 0`) e do meta dos torneios.
   pelo próprio servidor de partidas (modo `online`), o único que grava a ranqueada.
 - O jogador é a conta Google ou, sem login, o navegador (o mesmo código de dono dos decks). O nome do cartaz de
   "WANTED" é o nome público e pode ser trocado na tela de estatísticas (o nome da conta Google não aparece para os outros).
+
+### Meta global (TCG Matchmaking)
+
+Com `GLOBAL_STATS_API_KEY` configurada, a tela de Estatísticas ganha o escopo **🌍 Global**: as filas ranqueadas do
+**TCG Matchmaking** (a ranqueada por Discord do OPTCGSim, a maior fonte de partidas online do jogo), publicadas
+pela **OPTCG Logpose API** do Matheus (`https://optcg-api.vercel.app/docs`). É aberto a todo mundo, sem plano.
+
+- **Filas** (LW Standard, LW Extra Regulation, as "1Billion"/"2Billion" só de jogadores com recompensa alta lá, a
+  Special Queue e as da temporada anterior), com as abas **Líderes** e **Matchups** nas mesmas tabelas das
+  estatísticas daqui (quem começou só é conhecido numa parte das partidas, então as contagens de primeiro e de
+  segundo vêm separadas), **Tendência** e **Comparar**: o mesmo Líder aqui e lá, participação e vitórias, com a
+  diferença em pontos. "Aqui" é o que quem pede vê (Geral, ou Pro com o plano), no formato equivalente da fila
+  (Extra Regulation = EGB; a Special Queue não compara).
+- **O navegador nunca fala com a API deles.** O servidor busca a cada `GLOBAL_STATS_SYNC` horas (padrão 6; a API
+  entrega uma URL assinada de 1 h do JSON de cada fila, baixada na hora e nunca guardada), grava o último JSON de
+  cada fila (`global_stats_queues`) e um resumo diário dos Líderes (`global_stats_history`), e as rotas
+  `GET /api/stats/global`, `/global/trend` e `/global/compare` (`apps/server/src/stats/global-routes.ts`) só leem o
+  banco. Se `lastModified` não mudou, o JSON não é baixado de novo. Com a API fora do ar, a tela continua com o
+  último instantâneo (a data aparece no rodapé).
+- **Tendência própria:** a API só tem a foto atual (totais acumulados da fila), então as partidas de cada semana
+  são a diferença entre o resumo do fim da semana e o do fim da anterior; a aba só aparece com duas semanas de
+  coleta. Um admin força uma rodada com `POST /api/admin/stats/global/sync`.
 
 ## Multiplayer online
 
@@ -1081,6 +1107,7 @@ pode chamar sem login nem token:
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (opcionalmente por coleção) |
 | GET | `/api/decks` · `/api/decks/:id` | Decks prontos e da comunidade, com validação por formato; `mine=1` filtra os seus (navegador ou conta) |
 | GET | `/api/stats/meta` · `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=` | Estatísticas gerais: filtros, totais, Líderes, matchups, tendência semanal e cartas de um Líder |
+| GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |
 | GET | `/api/sponsors` · `/api/support` · `/api/support/supporters` | Lojas parceiras, apoio ao projeto e lista pública de apoiadores |

@@ -527,6 +527,16 @@ export const api = {
       `/api/stats/teaser${format ? `?format=${encodeURIComponent(format)}` : ''}`,
     ),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
+  /** Meta global (TCG Matchmaking): Líderes e matchups de uma fila (sem fila: a primeira). */
+  globalStats: (queue?: string) => get<GlobalStats>(`/api/stats/global${queue ? `?queue=${encodeURIComponent(queue)}` : ''}`),
+  /** Todos os matchups de um Líder da fila (a resposta principal traz só a matriz dos mais jogados). */
+  globalMatchups: (queue: string, leader: string) =>
+    get<GlobalMatchups>(`/api/stats/global/matchups?queue=${encodeURIComponent(queue)}&leader=${encodeURIComponent(leader)}`),
+  /** Tendência semanal da fila, a partir dos resumos diários que o servidor guarda. */
+  globalTrend: (queue: string, weeks = 6) => get<GlobalTrendResponse>(`/api/stats/global/trend?queue=${encodeURIComponent(queue)}&weeks=${weeks}`),
+  /** O mesmo Líder nas partidas daqui (no formato da fila) e na fila deles. */
+  globalCompare: (queue: string, format?: string) =>
+    get<GlobalCompare>(`/api/stats/global/compare?queue=${encodeURIComponent(queue)}${format ? `&format=${encodeURIComponent(format)}` : ''}`),
   tutorial: {
     progress: () => get<TutorialProgressDto>('/api/tutorial/progress'),
     saveProgress: (p: { done: string[]; dismissed: boolean; completed: boolean; reset?: boolean }) => send<TutorialProgressDto>('PUT', '/api/tutorial/progress', p),
@@ -1708,6 +1718,8 @@ export interface StatsMeta {
   me: PlayerProfile | null;
   myDecks: Array<WinCount & { hash: string; leader: string; deckId: string | null; lastPlayed: string }>;
   cards: Record<string, CardInfo>;
+  /** Meta global (TCG Matchmaking): as filas já baixadas pelo servidor; null = desligado neste servidor. */
+  global: { queues: GlobalQueue[] } | null;
 }
 
 export interface StatsQuery {
@@ -1766,6 +1778,61 @@ export interface TrendResponse {
   /** Segunda-feira de cada semana (AAAA-MM-DD), da mais antiga à atual. */
   weeks: string[];
   rows: Array<WinCount & { week: string; leader: string }>;
+  cards: Record<string, CardInfo>;
+}
+
+/** Fila do TCG Matchmaking já baixada pelo servidor (meta global). */
+export interface GlobalQueue {
+  /** Chave na API deles (`lw`, `lw_eastern`...). */
+  key: string;
+  /** Nome na API deles ("LW Standard"). */
+  name: string;
+  sort: number;
+  /** Formato nosso equivalente (para comparar); null = sem equivalente (Special Queue). */
+  format: FormatId | null;
+  /** Só jogadores com recompensa (rating deles) acima de N bilhões; null = fila aberta. */
+  minBounty: number | null;
+  /** Quando o JSON mudou na API deles (null = não informado). */
+  lastModified: string | null;
+  /** Quando o servidor baixou. */
+  fetchedAt: string;
+}
+
+/** Contagens de quem foi segundo separadas das de quem começou (lá, só uma parte das partidas tem essa informação). */
+export interface SplitCount {
+  secondGames: number;
+  secondWins: number;
+}
+
+export interface GlobalStats {
+  /** Fila servida (null = o servidor ainda não baixou nenhuma). */
+  queue: GlobalQueue | null;
+  queues: GlobalQueue[];
+  summary: StatsSummary | null;
+  leaders: Array<StatsOverview['leaders'][number] & SplitCount & { label: string }>;
+  matchups: Array<StatsOverview['matchups'][number] & SplitCount>;
+  cards: Record<string, CardInfo>;
+}
+
+export interface GlobalMatchups {
+  queue: GlobalQueue | null;
+  leader: string;
+  matchups: GlobalStats['matchups'];
+  cards: Record<string, CardInfo>;
+}
+
+export interface GlobalTrendResponse extends TrendResponse {
+  queue: GlobalQueue | null;
+  /** Primeiro dia com resumo guardado (null = nenhum ainda). */
+  since: string | null;
+}
+
+export interface GlobalCompare {
+  queue: GlobalQueue;
+  format: FormatId;
+  here: { games: number };
+  global: { games: number };
+  rows: Array<{ leader: string; here: WinCount | null; global: WinCount | null }>;
   cards: Record<string, CardInfo>;
 }
 

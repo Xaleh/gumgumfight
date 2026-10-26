@@ -1,13 +1,14 @@
 import './env';
 import { buildApp } from './app';
 import { cdnFromEnv } from './card-cdn';
-import { spoilerSyncHours } from './config';
+import { globalStatsSyncHours, serverOptions, spoilerSyncHours } from './config';
 import { countCards, type DB, openDb, recordCardGaps } from './db';
 import { DEFAULT_API_BASE } from './optcgapi';
 import { join } from 'node:path';
 import { DATA_DIR, DB_PATH } from './paths';
 import { seed } from './seed';
 import { scheduleSpoilerSync } from './spoiler-sync';
+import { scheduleGlobalStatsSync } from './stats/global';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -43,6 +44,12 @@ if (syncHours) {
     log: (msg) => console.log(msg),
     cdn: cdnFromEnv(),
   });
+}
+
+// Meta global: busca as estatísticas das filas do TCG Matchmaking (só com a chave configurada).
+const globalHours = globalStatsSyncHours();
+if (serverOptions.globalStats && globalHours) {
+  scheduleGlobalStatsSync(db, { api: serverOptions.globalStats, hours: globalHours, log: (msg) => console.log(msg) });
 }
 
 const app = buildApp(db, { logger: process.env.NODE_ENV !== 'test' });

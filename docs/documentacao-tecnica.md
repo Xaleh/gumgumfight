@@ -151,7 +151,8 @@ gumgumfight/
 │   ├── src/oauth-client-cli.ts  cadastro dos clientes OAuth (npm run oauth:client)
 │   ├── src/decisions/           extrator de decisões dos replays (extract.ts) e a CLI decisions-cli.ts (npm run decisions)
 │   ├── src/online/              room.ts (uma partida + relógio + mesa atrasada), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE), broadcast.ts (modo transmissão)
-│   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts
+│   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts,
+│   │                            global.ts e global-routes.ts (meta global: TCG Matchmaking pela OPTCG Logpose API)
 │   ├── src/tournaments/         pairing.ts (suíço, chave), store.ts (SQL), routes.ts
 │   ├── src/push/                webpush.ts (VAPID + RFC 8291), store.ts (SQL), messages.ts (textos), routes.ts (Notifier)
 │   └── test/                    9 arquivos de teste + fixtures da optcgapi/optcgleaks
@@ -310,7 +311,8 @@ no pacote de produção é `release/server/decisions-cli.mjs`
 
 `app.ts` registra, nesta ordem: health/config, cartas, coverage, traduções pendentes, `registerBearerAuth` (hook
 `onRequest` dos tokens de parceiros, antes de todas as rotas), `registerAuth`, decks,
-`registerPushRoutes` (devolve o `Notifier`), `registerStatsRoutes`, `registerPartnerMatchRoutes`,
+`registerPushRoutes` (devolve o `Notifier`), `registerStatsRoutes` (que registra também as rotas do meta global,
+`stats/global-routes.ts`), `registerPartnerMatchRoutes`,
 `registerTokenRoutes`, `registerOAuthRoutes`, `registerOnlineRoutes` (devolve o `Lobby`; recebe o
 `Notifier`), `registerTournamentRoutes` (recebe o `Lobby` e o `Notifier`),
 `/api/matches`, e por fim o static + fallback para `index.html`. A tabela completa de rotas está no
@@ -542,7 +544,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (27)
+### Tabelas (29)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -572,6 +574,8 @@ baixadas quando tocam) + `public/`.
 | `api_tokens` | `id` (`tk-` + 12 hex) | `token_hash` (sha256, único), `user_id`, `client_id` (null = pessoal), `kind` (`personal/access/refresh`), `name`, `scopes`, `parent_id` (access → refresh), `expires_at`, `last_used_at`, `revoked_at`. Índice por conta. | `/api/tokens`, `/api/oauth/token`, revogações |
 | `oauth_clients` | `id` (`sweetapp`) | `name`, `secret_hash`, `redirect_uris` (JSON, igualdade exata), `scopes`, `webhook_url`, `webhook_secret` (em claro: assina os avisos) | `oauth-client-cli.ts` |
 | `oauth_codes` | `code_hash` | `client_id`, `user_id`, `scopes`, `redirect_uri`, `code_challenge` (S256), `expires_at` (5 min), `used_at`, `token_id` (refresh emitido; revogado se o code for reusado) | consentimento, `/api/oauth/token` |
+| `global_stats_queues` | `queue` (chave da fila na OPTCG Logpose API, ex. `lw`) | `name`, `sort`, `last_modified` (do JSON na API), `fetched_at`, **`body` (JSON `GlobalSnapshot`: Líderes e matchups normalizados)** | sync do meta global (`stats/global.ts`) |
+| `global_stats_history` | `(queue, day)` | `body` (JSON `[[leader, games, wins], …]`): resumo diário dos Líderes de cada fila, para a tendência | sync do meta global (um por dia) |
 | `sqlite_sequence` | — | interna (autoincrement) | — |
 
 Diagrama das relações principais:
@@ -1333,6 +1337,7 @@ instala Node 22 via nvm sem trocar o padrão, cria site separado, `proxy_read_ti
 | `images.optcgleaks.com` / `optcgleaks.com` | imagens e feed dos spoilers | spoilers param de atualizar; nada é apagado |
 | `accounts.google.com`, `www.googleapis.com` | botão de login e chaves públicas | login indisponível; quem já tem cookie continua logado (chaves ficam em cache até expirar) |
 | `fonts.googleapis.com` | fontes da interface | fallback para fontes do sistema |
+| `optcg-api.vercel.app` e `res.cloudinary.com` | meta global (servidor, a cada 6 h, só com `GLOBAL_STATS_API_KEY`): lista de filas, URL assinada e o JSON de cada fila do TCG Matchmaking | o escopo Global mostra o último instantâneo guardado (a data aparece no rodapé); nada mais depende disso |
 
 ---
 
@@ -1610,6 +1615,8 @@ Quem chama, na coluna da direita:
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |
 | GET | `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=\|deck=` | Totais, Líderes e matchups; tendência semanal; cartas de um Líder. Ranqueada e torneios só com o plano (salvo `mine=1`) | Pública; Token (`stats:read`) |
 | GET | `/api/stats/teaser?format=` | Amostra das Estatísticas Pro para quem não tem o plano | Pública |
+| GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups da fila (no formato de `/api/stats`, com `secondGames`/`secondWins`), tendência semanal dos resumos diários e a comparação com as partidas daqui (o que quem pede vê). 404 `globalOff` sem a chave | Pública; Token (`stats:read`) |
+| POST | `/api/admin/stats/global/sync` | Força uma rodada do sync do meta global | Admin |
 | GET | `/api/online/config` · `/api/online/stats` · `/api/online/leaders?format=` | Configuração do online, contadores do menu e Líderes na fila casual | Pública |
 | GET | `/api/online/active` | Partidas em andamento de quem pede (com o token do assento) | Navegador |
 | POST | `/api/online/rooms` · `/api/online/rooms/join` · `/api/online/queue` | Cria uma sala privada; entra numa; entra na fila (`{ deckId, format, queue }`; ranqueada exige login) | Navegador |

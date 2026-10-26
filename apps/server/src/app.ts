@@ -401,7 +401,16 @@ export function buildApp(
     return reply.code(204).send();
   });
 
-  registerStatsRoutes(app, { db, viewerHash, user: auth.viewer, present, proGate: supportEnabled(server.support), onMatch: (id) => webhooks.matchFinished(id) });
+  registerStatsRoutes(app, {
+    db,
+    viewerHash,
+    user: auth.viewer,
+    present,
+    proGate: supportEnabled(server.support),
+    onMatch: (id) => webhooks.matchFinished(id),
+    globalStats: server.globalStats ?? null,
+    fetchImpl: opts.fetchImpl,
+  });
   registerPartnerMatchRoutes(app, { db, user: auth.viewer });
   registerTokenRoutes(app, { db, user: auth.viewer });
   const sendIndex = existsSync(WEB_DIST) ? (reply: FastifyReply) => reply.sendFile('index.html') : undefined;
