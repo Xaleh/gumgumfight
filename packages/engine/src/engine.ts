@@ -1506,7 +1506,8 @@ function handlePendingResponse(state: GameState, action: Action) {
         // no descarte nem na Vida e não sai "from your trash" (Q&A OP14-082, OP15-097, OP15-079).
         // Vai para o descarte quando o efeito termina, se ele não a moveu (jogada, mão...).
         (state.limbo ??= []).push(card);
-        log(state, p, lg('triggerActivated', `[Trigger] ${def.name} ativado!`, { card: def.name }));
+        // A carta vai junto (`revealed`): a interface sem animações mostra ao oponente qual foi.
+        log(state, p, lg('triggerActivated', `[Trigger] ${def.name} ativado!`, { card: def.name }), { uids: [card], by: p });
         pushEffect(state, card, p, trig!.steps);
         const top = state.stack[state.stack.length - 1];
         if (top.kind === 'effect' && top.source === card) top.trigger = true;

@@ -513,6 +513,7 @@ function Table({
   /**
    * Cartas que o oponente revelou (busca no deck, carta da mão, topo do deck…): aparecem na mesa até o
    * jogador fechar. Sem isso só o histórico dizia qual carta foi, e a carta some na mão do oponente.
+   * O [Trigger] do oponente também aparece aqui quando as animações estão desligadas.
    * Não aparece para quem escolheu a carta (já a viu), no tutorial, no replay nem na tela de transmissão
    * (ninguém fecha). Para quem assiste (o streamer) aparecem as revelações dos dois lados, e somem
    * sozinhas depois de um tempo.
@@ -530,6 +531,8 @@ function Table({
     if (game.jumped || tutorial || broadcast || (human === null && !spectator)) return;
     const lines = fresh.flatMap((e): RevealLine[] => {
       if (!e.revealed?.length || e.revealedBy === human) return [];
+      // [Trigger] do oponente: com as animações ligadas a carta já aparece no centro da mesa.
+      if (e.key === 'log.triggerActivated' && animate) return [];
       const cards = e.revealed.map((id) => state.defs[id]).filter((d): d is CardDef => Boolean(d));
       return cards.length ? [{ text: logText(tryT, e), cards, count: 1 }] : [];
     });
