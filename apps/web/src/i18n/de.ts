@@ -67,6 +67,8 @@ export default {
   'settings.quickCounter': 'Counter ohne Bestätigung',
   'settings.quickCounterHint': 'Im Counter-Schritt wird der Counter sofort eingesetzt, wenn du eine Karte antippst (oder auf den Tisch ziehst).',
   'settings.quickCounterTitle': 'Im Counter-Schritt wird der Counter sofort eingesetzt, wenn du eine Karte antippst oder auf den Tisch ziehst',
+  'settings.donQuickPick': 'DON!! mit einem Tipp',
+  'settings.donQuickPickHint': 'Ein Tipp auf das 3. aktive DON!! markiert alle 3 auf einmal (weniger Klicks). Aus: Jeder Tipp markiert oder entfernt ein DON!!.',
   'settings.animations': 'Animationen',
   'settings.animationsHint': 'Karten, die über den Tisch fliegen, Banner beim Zugwechsel und der Würfelwurf zu Beginn.',
   'settings.replayCues': 'Klicks in Replays',

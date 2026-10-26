@@ -67,6 +67,8 @@ export default {
   'settings.quickCounter': 'カウンターを確認なしで使用',
   'settings.quickCounterHint': 'カウンターステップでカードをタップする（または場にドラッグする）と、すぐにカウンターを使用します。',
   'settings.quickCounterTitle': 'カウンターステップでカードをタップするか場にドラッグすると、すぐにカウンターを使用します',
+  'settings.donQuickPick': 'ドン!!をワンタップで選択',
+  'settings.donQuickPickHint': '3枚目のアクティブなドン!!をタップすると3枚まとめて選択します（クリックが少なくなります）。オフの場合はタップごとに1枚ずつ選択・解除します。',
   'settings.animations': 'アニメーション',
   'settings.animationsHint': '場を飛び交うカード、ターン交代の表示、開始時のダイスロール。',
   'settings.replayCues': 'リプレイでの操作表示',

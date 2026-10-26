@@ -312,7 +312,7 @@ const tutorialPtBR = {
   'tutorial.giveDon.attack.title': 'Agora sim, ataque',
   'tutorial.giveDon.attack.body': 'Com 6000, a Robin empata com o Pacifista, e empate é do atacante. Ataque o Pacifista com a Robin.',
   'tutorial.giveDon.leader.title': 'De novo, com o Líder',
-  'tutorial.giveDon.leader.body': 'Sobraram 2 DON!!. Toque no 2º DON!! para marcar os dois, depois no seu Líder, e ataque o Líder do oponente.',
+  'tutorial.giveDon.leader.body': 'Sobraram 2 DON!!. Toque nos dois DON!! para marcá-los, depois no seu Líder, e ataque o Líder do oponente.',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body':
     'Algumas cartas pedem DON!! dados para ligar um efeito. O Zoro tem [DON!! x1]: com pelo menos 1 DON!! dado a ele, ganha +1000 a mais.',

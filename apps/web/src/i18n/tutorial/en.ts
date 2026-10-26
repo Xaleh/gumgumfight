@@ -287,7 +287,7 @@ export default {
   'tutorial.giveDon.attack.title': 'Now attack',
   'tutorial.giveDon.attack.body': 'With 6000, Robin ties Pacifista, and ties go to the attacker. Attack Pacifista with Robin.',
   'tutorial.giveDon.leader.title': 'Again, with the Leader',
-  'tutorial.giveDon.leader.body': 'You have 2 DON!! left. Tap the 2nd DON!! to mark both, then your Leader, and attack your opponent’s Leader.',
+  'tutorial.giveDon.leader.body': 'You have 2 DON!! left. Tap both DON!! to mark them, then your Leader, and attack your opponent’s Leader.',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body': 'Some cards need DON!! given to them to switch on an effect. Zoro has [DON!! x1]: with at least 1 DON!! given to him, he gets an extra +1000.',
   'tutorial.giveDon.back.title': 'And afterwards?',

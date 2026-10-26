@@ -575,7 +575,7 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, update: updateSettings } = useSettings();
+  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -1018,18 +1018,23 @@ function Table({
   const canReceiveDon = (uid: string) => has((a) => a.type === 'attachDon' && a.target === uid);
 
   /**
-   * Toque num DON!! ativo: marca ele e os anteriores da fileira (tocar no 3º marca 3). Tocar no último marcado
-   * desmarca só ele, para acertar a quantidade.
+   * Toque num DON!! ativo: marca ou desmarca só ele (o padrão). Com "DON!! em um toque" (`donQuickPick`), marca ele
+   * e os anteriores da fileira (tocar no 3º marca 3), e tocar no último marcado desmarca só ele.
    */
   const onDon = (player: PlayerId, index: number) => {
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
     if (index < 0 || index >= max) return;
-    const cur = mode?.kind === 'don' ? mode.picked.length : 0;
-    const count = index === cur - 1 ? index : index + 1;
+    const marked = mode?.kind === 'don' ? mode.picked : [];
+    const cur = marked.length;
+    let picked: number[];
+    if (donQuickPick) {
+      const count = index === cur - 1 ? index : index + 1;
+      picked = Array.from({ length: count }, (_, i) => i);
+    } else picked = marked.includes(index) ? marked.filter((i) => i !== index) : [...marked, index].sort((a, b) => a - b);
     // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
-    audio.play('don-pick', { pitch: count < cur ? -3 : Math.min(6, count - 1) });
-    setMode(count > 0 ? { kind: 'don', picked: Array.from({ length: count }, (_, i) => i) } : null);
+    audio.play('don-pick', { pitch: picked.length < cur ? -3 : Math.min(6, picked.length - 1) });
+    setMode(picked.length > 0 ? { kind: 'don', picked } : null);
   };
 
   /** DON!! marcados (na faixa central): quantos são e onde tocar. */

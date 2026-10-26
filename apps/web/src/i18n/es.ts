@@ -67,6 +67,8 @@ export default {
   'settings.quickCounter': 'Counter sin confirmación',
   'settings.quickCounterHint': 'En el paso de Counter, tocar una carta (o arrastrarla a la mesa) usa el Counter al instante.',
   'settings.quickCounterTitle': 'En el paso de Counter, tocar una carta o arrastrarla a la mesa usa el Counter al instante',
+  'settings.donQuickPick': 'DON!! en un toque',
+  'settings.donQuickPickHint': 'Tocar el 3.er DON!! activo marca los 3 a la vez (menos clics). Desactivado, cada toque marca o desmarca un DON!!.',
   'settings.animations': 'Animaciones',
   'settings.animationsHint': 'Cartas volando por la mesa, aviso de cambio de turno y la tirada de dado inicial.',
   'settings.replayCues': 'Clics en las repeticiones',

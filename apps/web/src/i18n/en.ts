@@ -67,6 +67,8 @@ export default {
   'settings.quickCounter': 'Counter without confirmation',
   'settings.quickCounterHint': 'In the Counter step, tapping a card (or dragging it to the table) uses the Counter right away.',
   'settings.quickCounterTitle': 'In the Counter step, tapping a card or dragging it to the table uses the Counter right away',
+  'settings.donQuickPick': 'DON!! in one tap',
+  'settings.donQuickPickHint': 'Tapping the 3rd active DON!! marks all 3 at once (fewer clicks). Off: each tap marks or unmarks one DON!!.',
   'settings.animations': 'Animations',
   'settings.animationsHint': 'Cards flying across the table, turn-change banner and the opening dice roll.',
   'settings.replayCues': 'Clicks in replays',

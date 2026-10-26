@@ -67,6 +67,8 @@ const ptBR = {
   'settings.quickCounter': 'Counter sem confirmação',
   'settings.quickCounterHint': 'Na etapa de Counter, tocar numa carta (ou arrastá-la até a mesa) usa o Counter na hora.',
   'settings.quickCounterTitle': 'Na etapa de Counter, tocar numa carta ou arrastá-la até a mesa usa o Counter na hora',
+  'settings.donQuickPick': 'DON!! em um toque',
+  'settings.donQuickPickHint': 'Tocar no 3º DON!! ativo marca os 3 de uma vez (menos cliques). Desligado, cada toque marca ou desmarca um DON!!.',
   'settings.animations': 'Animações',
   'settings.animationsHint': 'Cartas voando pela mesa, faixa de troca de turno e sorteio inicial com dados.',
   'settings.replayCues': 'Cliques no replay',

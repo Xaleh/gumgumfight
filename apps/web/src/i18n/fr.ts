@@ -67,6 +67,8 @@ export default {
   'settings.quickCounter': 'Counter sans confirmation',
   'settings.quickCounterHint': 'À l’étape Counter, toucher une carte (ou la glisser sur la table) utilise le Counter immédiatement.',
   'settings.quickCounterTitle': 'À l’étape Counter, toucher une carte ou la glisser sur la table utilise le Counter immédiatement',
+  'settings.donQuickPick': 'DON!! en une touche',
+  'settings.donQuickPickHint': 'Toucher le 3e DON!! actif marque les 3 d’un coup (moins de clics). Désactivé : chaque touche marque ou démarque un DON!!.',
   'settings.animations': 'Animations',
   'settings.animationsHint': 'Cartes qui traversent la table, bannière de changement de tour et lancer de dé d’ouverture.',
   'settings.replayCues': 'Clics dans les replays',
