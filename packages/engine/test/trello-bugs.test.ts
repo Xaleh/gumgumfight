@@ -372,8 +372,8 @@ describe('Trello (card 84): Kouzuki Oden OP17-007 joga um {Land of Wano} OU um "
 
 describe('Trello: [Blocker] vira ao bloquear; "cannot be rested" (Arlong EB02-011) impede bloquear e ser virado', () => {
   /** Turno 4 (do jogador 1), com Duval ativo no campo do jogador 0. */
-  function defending() {
-    const s = toTurn(game(['ST12-001', 'ST12-001']), 4);
+  function defending(leader = 'OP11-021') {
+    const s = toTurn(game(['ST12-001', leader]), 4);
     setDon(s, 1, 4);
     const duval = field(s, 0, 'ST12-014');
     return { s, duval };
@@ -381,6 +381,20 @@ describe('Trello: [Blocker] vira ao bloquear; "cannot be rested" (Arlong EB02-01
   const attackLeader = (s: GameState, attacker: PlayerId) =>
     applyAction(s, { type: 'attack', player: attacker, attacker: s.players[attacker].leader.uid, target: s.players[opponentOf(attacker)].leader.uid });
   const opponentOf = (p: PlayerId): PlayerId => (p === 0 ? 1 : 0);
+  /** Joga Arlong com o Líder {Fish-Man} (Jinbe OP11-021): o 1º passo dá 1 DON!! virado ao Líder. */
+  const playArlong = (s: GameState, arlong: string) => {
+    s = applyAction(s, { type: 'playCard', player: 1, uid: arlong });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1, promptKey: 'engine.chooseRestedDonReceiver' });
+    return applyAction(s, { type: 'choose', player: 1, uids: [s.players[1].leader.uid] });
+  };
+
+  it('sem Líder {Fish-Man} ou {East Blue}, o "Then" também não acontece (CR 4-10-2)', () => {
+    let { s, duval } = defending('ST12-001');
+    s = applyAction(s, { type: 'playCard', player: 1, uid: hand(s, 1, 'EB02-011') });
+    expect(s.log.map((l) => l.text)).toContain('Arlong: a condição não vale (o Líder de B não tem o tipo {Fish-Man} nem {East Blue}), o efeito não acontece.');
+    expect(s.pending).toBeNull();
+    expect(cannotBeRested(s, duval)).toBe(false);
+  });
 
   it('Duval bloqueia o ataque, fica virado e passa a ser o alvo', () => {
     let { s, duval } = defending();
@@ -395,9 +409,7 @@ describe('Trello: [Blocker] vira ao bloquear; "cannot be rested" (Arlong EB02-01
   it('sob "cannot be rested", Duval não entra nas opções de Blocker (Q&A EB02-011), não ataca, e volta a bloquear quando o efeito acaba', () => {
     let { s, duval } = defending();
     const arlong = hand(s, 1, 'EB02-011');
-    s = applyAction(s, { type: 'playCard', player: 1, uid: arlong });
-    // O 1º passo (DON!! ao Líder) pede Líder {Fish-Man} ou {East Blue}: não vale, e o histórico explica; o 2º escolhe o alvo.
-    expect(s.log.map((l) => l.text)).toContain('Arlong: a condição não vale (o Líder de B não tem o tipo {Fish-Man} nem {East Blue}), o efeito não acontece.');
+    s = playArlong(s, arlong);
     expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 1, options: [duval] });
     s = applyAction(s, { type: 'choose', player: 1, uids: [duval] });
     expect(cannotBeRested(s, duval)).toBe(true);
@@ -424,7 +436,7 @@ describe('Trello: [Blocker] vira ao bloquear; "cannot be rested" (Arlong EB02-01
     let { s, duval } = defending();
     const kuina = field(s, 1, 'ST12-002');
     const arlong = hand(s, 1, 'EB02-011');
-    s = applyAction(s, { type: 'playCard', player: 1, uid: arlong });
+    s = playArlong(s, arlong);
     s = applyAction(s, { type: 'choose', player: 1, uids: [duval] });
     s = applyAction(s, { type: 'activate', player: 1, uid: kuina, ability: 0 });
     if (s.pending?.kind === 'selectTargets') {

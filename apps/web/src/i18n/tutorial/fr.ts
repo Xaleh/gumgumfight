@@ -286,7 +286,7 @@ export default {
   'tutorial.giveDon.attack.title': 'Maintenant, attaquez',
   'tutorial.giveDon.attack.body': 'Avec 6000, Robin égale Pacifista, et l’égalité profite à l’attaquant. Attaquez Pacifista avec Robin.',
   'tutorial.giveDon.leader.title': 'Encore, avec le Leader',
-  'tutorial.giveDon.leader.body': 'Il reste 2 DON!!. Touchez le 2e DON!! pour marquer les deux, puis votre Leader, et attaquez le Leader adverse.',
+  'tutorial.giveDon.leader.body': 'Il reste 2 DON!!. Touchez les deux DON!! pour les marquer, puis votre Leader, et attaquez le Leader adverse.',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body': 'Certaines cartes demandent des DON!! donnés pour activer un effet. Zoro a [DON!! x1] : avec au moins 1 DON!! donné, il gagne +1000 de plus.',
   'tutorial.giveDon.back.title': 'Et ensuite ?',

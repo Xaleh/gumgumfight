@@ -26,6 +26,8 @@ export interface Settings {
   serverImages: boolean;
   /** Etapa de Counter: tocar/arrastar usa a carta na hora, sem confirmar. */
   quickCounter: boolean;
+  /** DON!! em um toque: tocar no 3º DON!! marca os 3 primeiros (desligado, cada toque marca ou desmarca um só). */
+  donQuickPick: boolean;
   /** Cartas voando pela mesa, faixa de turno e sorteio com dados. */
   animations: boolean;
   /** Replay: mostra o clique/seleção do jogador (contorno, toque e legenda) antes de cada ação. */
@@ -62,6 +64,7 @@ const EDITABLE: Editable[] = [
   'locale',
   'images',
   'quickCounter',
+  'donQuickPick',
   'animations',
   'replayCues',
   'coachTips',
@@ -91,6 +94,7 @@ const DEFAULTS: Settings = {
   images: true,
   serverImages: false,
   quickCounter: false,
+  donQuickPick: false,
   animations: true,
   replayCues: true,
   coachTips: false,
@@ -456,6 +460,10 @@ export function SettingsControls() {
         <input type="checkbox" checked={s.quickCounter} onChange={(e) => s.update({ quickCounter: e.target.checked })} />
         {t('settings.quickCounter')}
       </label>
+      <label className="check" title={t('settings.donQuickPickHint')}>
+        <input type="checkbox" checked={s.donQuickPick} onChange={(e) => s.update({ donQuickPick: e.target.checked })} />
+        {t('settings.donQuickPick')}
+      </label>
       <label className="check" title={t('settings.animationsHint')}>
         <input type="checkbox" checked={s.animations} onChange={(e) => s.update({ animations: e.target.checked })} />
         {t('settings.animations')}
@@ -603,6 +611,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </OptionRow>
             <OptionRow title={t('settings.quickCounter')} hint={t('settings.quickCounterHint')}>
               <Switch on={s.quickCounter} label={t('settings.quickCounter')} onChange={(on) => s.update({ quickCounter: on })} />
+            </OptionRow>
+            <OptionRow title={t('settings.donQuickPick')} hint={t('settings.donQuickPickHint')}>
+              <Switch on={s.donQuickPick} label={t('settings.donQuickPick')} onChange={(on) => s.update({ donQuickPick: on })} />
             </OptionRow>
             <OptionRow title={t('settings.animations')} hint={t('settings.animationsHint')}>
               <Switch on={s.animations} label={t('settings.animations')} onChange={(on) => s.update({ animations: on })} />

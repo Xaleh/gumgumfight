@@ -2771,6 +2771,11 @@ button.hint-pill {
   color: var(--muted);
   font-weight: 700;
 }
+/* Habilidade paga que ainda pode ser desfeita: laranja, para não parecer a dica comum. */
+button.hint-pill.undo-pill {
+  background: linear-gradient(180deg, #ffb347, #e8891a);
+  --halo: 0 0 0 3px rgba(255, 179, 71, 0.6), 0 0 22px 6px rgba(255, 159, 28, 0.7);
+}
 
 /* DON!! marcados: contador + onde tocar (Líder ou Personagem) + cancelar, na faixa central */
 .don-bar {
@@ -6808,29 +6813,53 @@ tr.clickable:hover td {
 .emote-bar {
   position: relative;
 }
+/* Botão do chat: bloco laranja com o ícone e "CHAT" escrito (o ícone redondo sumia na mesa). */
 .chat-btn {
   position: relative;
+  min-width: 48px;
+  padding: 6px 6px 5px;
+  border: 0;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background: linear-gradient(180deg, #ff9d62, var(--accent));
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92), 0 4px 14px rgba(238, 111, 60, 0.6);
+}
+.chat-btn .chat-ico {
+  font-size: 18px;
+  line-height: 1;
 }
 .chat-unread {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -6px;
+  right: -6px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--danger);
   color: #fff;
   font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0;
   line-height: 18px;
   text-align: center;
-  box-shadow: 0 2px 6px rgba(var(--shadow-rgb), 0.3);
+  box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(var(--shadow-rgb), 0.3);
 }
 /* Painel do chat: ao lado do botão, cabe numa tela de celular. */
 .chat-panel {
   position: absolute;
-  left: 46px;
+  left: 56px;
   top: 0;
   width: min(320px, calc(100vw - 70px));
   display: flex;
@@ -8163,6 +8192,10 @@ tr.clickable:hover td {
 /* ------------------------------------------------------------------ torneios */
 
 .tournaments .builder-header .tour-create {
+  margin-left: auto;
+}
+/* "⌂ Menu" à direita: o "← Voltar" da esquerda volta uma tela só. */
+.builder-header .header-menu {
   margin-left: auto;
 }
 .tour-page {
@@ -13337,7 +13370,43 @@ a.sponsor-card:hover {
     box-shadow: 0 0 0 6px rgba(229, 72, 77, 0.45), 0 0 28px rgba(229, 72, 77, 0.95);
   }
 }
+/* A rodada começou e você ainda não entrou na sala: aura laranja piscando e o aviso. */
+.lobby-card.table.must-enter {
+  border-color: #ff9f1c;
+  animation: lobby-aura-orange 1.1s infinite;
+}
+.lobby-enter-alert {
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 159, 28, 0.16);
+  color: var(--text);
+  font-weight: 800;
+}
+.lobby-actions .btn.pulse {
+  animation: lobby-btn-pulse 1.1s infinite;
+}
+@keyframes lobby-aura-orange {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(255, 159, 28, 0.25), 0 0 12px rgba(255, 159, 28, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 159, 28, 0.5), 0 0 30px rgba(255, 159, 28, 0.95);
+  }
+}
+@keyframes lobby-btn-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .lobby-card.table.must-enter,
+  .lobby-actions .btn.pulse,
   .lobby-card.table.calling,
   .lobby-call,
   .tour-call-tag {

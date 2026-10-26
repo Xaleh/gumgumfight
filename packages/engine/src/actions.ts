@@ -28,6 +28,8 @@ export function legalActions(state: GameState, player: PlayerId): Action[] {
   if (!isIdle(state) || state.activePlayer !== player) return [];
   const ps = state.players[player];
   const out: Action[] = [];
+  // Habilidade paga que já terminou: ainda dá para desfazer (ver `CancelInfo.done`).
+  if (cancelAllowed(state, player)) out.push({ type: 'cancel', player });
 
   for (const uid of ps.hand) if (!playError(state, player, uid)) out.push({ type: 'playCard', player, uid });
 

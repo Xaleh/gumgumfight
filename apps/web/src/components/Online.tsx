@@ -170,8 +170,11 @@ export function ChatBar({ online }: { online: OnlineGame }) {
 
   return (
     <div className="emote-bar">
-      <button className="round-btn chat-btn" onClick={() => setOpen((o) => !o)} aria-label={t('online.chatLabel')} title={t('online.chatTitle')}>
-        💬
+      <button className="chat-btn" onClick={() => setOpen((o) => !o)} aria-label={t('online.chatLabel')} title={t('online.chatTitle')}>
+        <span className="chat-ico" aria-hidden="true">
+          💬
+        </span>
+        <span className="chat-word">{t('online.chat')}</span>
         {unread > 0 && !open && <span className="chat-unread">{unread > 9 ? '9+' : unread}</span>}
       </button>
       {open && (

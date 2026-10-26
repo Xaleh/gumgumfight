@@ -864,8 +864,12 @@ type EffectStepBody =
   /** "… cannot be K.O.'d during this turn" (só Personagens; inBattle = apenas em batalha). */
   | { do: 'cannotBeKO'; target: TargetRef; duration: Duration; inBattle?: boolean; byEffect?: true | 'opponent' };
 
-/** Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado). */
-export type EffectStep = EffectStepBody & { if?: StepCondition };
+/**
+ * Um passo de efeito; `if` é checado na hora de resolver (falhou = o passo é pulado).
+ * `afterIf`: o passo vem de um "Then, …" depois de um "If X, …": se o último "if" do efeito
+ * falhou, ele também não acontece (CR 4-10-2).
+ */
+export type EffectStep = EffectStepBody & { if?: StepCondition; afterIf?: true };
 
 
 
@@ -1292,6 +1296,8 @@ export type Frame =
       koTargets?: string[];
       /** Cartas que a última busca no deck pegou ("If you did not add a card to your hand"). */
       searched?: number;
+      /** O último passo com condição da carta ("If X, …") não a cumpriu (para o "Then" seguinte, CR 4-10-2). */
+      ifFailed?: boolean;
       /**
        * Efeito de [Trigger]: a carta (`source`) fica fora de qualquer área enquanto ele resolve
        * (`GameState.limbo`) e vai para o descarte quando o frame termina, se o efeito não a moveu
@@ -1476,6 +1482,13 @@ export interface CancelInfo {
   action: Action;
   /** 'revealed': uma carta escondida ficou visível desde o começo da ação. */
   blocked?: 'revealed';
+  /** O jogador pagou um custo nesta ação (ativou uma habilidade ou respondeu "Pagar e usar"). */
+  paid?: true;
+  /**
+   * A ação já terminou (nada mais a escolher), mas ainda pode ser desfeita até a próxima ação do
+   * jogador: só quando ele pagou um custo e nada escondido apareceu (clicou para pagar sem querer).
+   */
+  done?: true;
 }
 
 /** O que o `cancel` restaura. As definições, as instâncias das cartas e o log ficam como estão. */

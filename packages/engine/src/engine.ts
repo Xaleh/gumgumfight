@@ -1190,6 +1190,11 @@ export function applyAction(prev: GameState, action: Action): GameState {
 
   if (action.type === 'manual') {
     if (!manualAllowed(prev, p)) throw new IllegalActionError('Ferramentas manuais indisponíveis agora.');
+    // Ação já terminada: a correção manual não pode ser desfeita junto com ela.
+    if (state.cancel?.done) {
+      delete state.cancel;
+      delete state.checkpoint;
+    }
     applyManualOp(state, p, action.op);
     checkDefeat(state);
     run(state);
@@ -1200,6 +1205,7 @@ export function applyAction(prev: GameState, action: Action): GameState {
 
   if (pending) {
     if (pending.player !== p) throw new IllegalActionError('Aguardando o outro jogador.');
+    if (pending.kind === 'confirm' && action.type === 'answer' && action.yes && state.cancel?.player === p) state.cancel.paid = true;
     handlePendingResponse(state, action);
   } else {
     if (state.phase !== 'main' || state.activePlayer !== p) throw new IllegalActionError('Não é o seu turno.');
@@ -1208,7 +1214,7 @@ export function applyAction(prev: GameState, action: Action): GameState {
     const checkpoint = makeCheckpoint(prev);
     handleMainAction(state, action);
     state.checkpoint = checkpoint;
-    state.cancel = { player: p, action };
+    state.cancel = { player: p, action, ...(action.type === 'activate' ? { paid: true as const } : {}) };
   }
 
   run(state);
@@ -1244,12 +1250,16 @@ function makeCheckpoint(state: GameState): Checkpoint {
 function settleCancel(state: GameState, actor: PlayerId) {
   const info = state.cancel;
   if (!info) return;
-  const keep = state.phase !== 'gameover' && state.pending !== null && state.pending.player === info.player && actor === info.player;
-  if (!keep) {
+  const choosing = state.phase !== 'gameover' && state.pending !== null && state.pending.player === info.player && actor === info.player;
+  // Pagou um custo e a ação terminou na própria vez: dá para desfazer até a próxima ação.
+  const done = !choosing && Boolean(info.paid) && actor === info.player && isIdle(state) && state.activePlayer === info.player;
+  if ((!choosing && !done) || (done && info.blocked)) {
     delete state.cancel;
     delete state.checkpoint;
     return;
   }
+  if (done) info.done = true;
+  else delete info.done;
   const cp = state.checkpoint;
   if (!cp) return;
   const actorSaw = new Set(cp.seen[info.player]);
@@ -1258,7 +1268,10 @@ function settleCancel(state: GameState, actor: PlayerId) {
     for (const uid of visibleCards(state, v)) if (!before.has(uid) && !actorSaw.has(uid)) return true;
     return false;
   });
-  if (revealed) {
+  if (revealed && done) {
+    delete state.cancel;
+    delete state.checkpoint;
+  } else if (revealed) {
     info.blocked = 'revealed';
     delete state.checkpoint;
   }
@@ -1302,7 +1315,8 @@ function restoreCheckpoint(state: GameState, p: PlayerId) {
 export function cancelError(state: GameState, player: PlayerId): string | null {
   if (state.phase === 'gameover') return 'A partida já terminou.';
   const c = state.cancel;
-  if (!c || c.player !== player || !state.pending || state.pending.player !== player) return 'Não há ação para cancelar.';
+  const open = c?.done ? isIdle(state) && state.activePlayer === player : state.pending?.player === player;
+  if (!c || c.player !== player || !open) return 'Não há ação para cancelar.';
   if (c.blocked === 'revealed') return 'Não dá mais para cancelar: uma carta foi revelada.';
   return null;
 }
@@ -1506,7 +1520,8 @@ function handlePendingResponse(state: GameState, action: Action) {
         // no descarte nem na Vida e não sai "from your trash" (Q&A OP14-082, OP15-097, OP15-079).
         // Vai para o descarte quando o efeito termina, se ele não a moveu (jogada, mão...).
         (state.limbo ??= []).push(card);
-        log(state, p, lg('triggerActivated', `[Trigger] ${def.name} ativado!`, { card: def.name }));
+        // A carta vai junto (`revealed`): a interface sem animações mostra ao oponente qual foi.
+        log(state, p, lg('triggerActivated', `[Trigger] ${def.name} ativado!`, { card: def.name }), { uids: [card], by: p });
         pushEffect(state, card, p, trig!.steps);
         const top = state.stack[state.stack.length - 1];
         if (top.kind === 'effect' && top.source === card) top.trigger = true;
@@ -2990,7 +3005,16 @@ const INTERNAL_CONDITIONS: Array<keyof Condition> = ['lastDone', 'lastKOd', 'cho
 function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   const ps = state.players[frame.controller];
   const srcName = cardDef(state, frame.source).name;
-  if (!frame.choice && !frame.memo && !stepConditionMet(state, frame, step)) {
+  const fresh = !frame.choice && !frame.memo;
+  // "If X, A. Then, B.": com o "if" falho, o "Then" também não acontece (CR 4-10-2, OP06-116).
+  if (fresh && step.afterIf && frame.ifFailed) {
+    if (step.do === 'payCost' && step.scope) frame.i += step.scope;
+    return true;
+  }
+  const met = !fresh || stepConditionMet(state, frame, step);
+  // Só um "If X, …" conta para o "Then" ("If you do" é outra regra).
+  if (fresh && step.if && Object.keys(step.if).some((k) => k !== 'lastDone' && k !== 'lastKOd')) frame.ifFailed = !met;
+  if (!met) {
     // "If you have 2 or less Characters, play…": a condição da carta não vale. O histórico diz
     // o motivo (o jogador costuma achar que o efeito falhou, ou que a carta que queria escolher
     // não servia). Condições internas (depende da escolha anterior) continuam silenciosas.

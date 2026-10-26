@@ -2,7 +2,9 @@
 // quem perdeu (L, escurecido). O Judge e o organizador veem também o relógio de cada jogador,
 // quem está conectado, a aura vermelha piscando nas salas que chamaram o Judge (com o banner no
 // topo) e a aura verde nas mesas com os dois jogadores prontos. Antes do início, os inscritos
-// aparecem em cinza e ganham cor ao fazer check-in.
+// aparecem em cinza e ganham cor ao fazer check-in. Com a rodada começada, a mesa de quem ainda
+// não entrou na sala pisca em laranja para ele. Qualquer um assiste às mesas em andamento; o Judge
+// e o organizador também podem entrar como Judge.
 
 import { useEffect, useState } from 'react';
 import { api, type LobbyPlayer, type LobbySide, type LobbyTable, type OnlineSeat, type TournamentDetail, type TournamentLobby as Lobby, type WatchTarget } from '../api';
@@ -198,7 +200,7 @@ export default function TournamentLobby({
                     onPlay(await api.tournaments.play(id, m.id));
                   })
                 }
-                onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(judge ? { judge: true } : {}) })}
+                onWatch={(asJudge) => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(asJudge ? { judge: true } : {}) })}
               />
             ))}
           </div>
@@ -242,11 +244,15 @@ function TableCard({
   busy: boolean;
   onReady: (ready: boolean) => void;
   onPlay: () => void;
-  onWatch: () => void;
+  /** `asJudge`: entra com o papel de Judge (painel, mãos ao vivo); senão assiste como qualquer espectador. */
+  onWatch: (asJudge: boolean) => void;
 }) {
   const tr = useT();
   const started = Boolean(lobby.roundStartedAt);
   const mine = m.p1.userId === me ? 0 : m.p2?.userId === me ? 1 : null;
+  const mySide = mine === 0 ? m.p1 : mine === 1 ? m.p2 : null;
+  // A rodada começou e o jogador ainda não entrou na sala: a mesa dele pisca até ele entrar.
+  const mustEnter = Boolean(mySide && m.p2 && started && !m.result && m.room !== 'playing' && !mySide.present);
   const bothReady = Boolean(m.p2 && m.p1.ready && m.p2.ready);
   const calling = Boolean(m.call);
   const state = m.result
@@ -294,7 +300,7 @@ function TableCard({
     );
   };
   return (
-    <div className={['lobby-card', 'table', state, mine !== null ? 'mine' : ''].join(' ')}>
+    <div className={['lobby-card', 'table', state, mine !== null ? 'mine' : '', mustEnter ? 'must-enter' : ''].join(' ')}>
       <div className="lobby-card-head">
         <span className="muted small">{tr('tour.tableN', { n: m.table })}</span>
         <span className="small lobby-state">
@@ -321,6 +327,11 @@ function TableCard({
                         : tr('lobby.stateIdle')}
         </span>
       </div>
+      {mustEnter && (
+        <div className="lobby-enter-alert small" role="alert">
+          {tr('lobby.mustEnter')}
+        </div>
+      )}
       {side(m.p1, 0)}
       {m.p2 && <span className="lobby-vs muted small">{tr('tour.vs')}</span>}
       {side(m.p2, 1)}
@@ -331,13 +342,18 @@ function TableCard({
           </button>
         )}
         {mine !== null && !m.result && started && (
-          <button className="btn small primary" disabled={busy} onClick={onPlay}>
+          <button className={['btn', 'small', 'primary', mustEnter ? 'pulse' : ''].join(' ')} disabled={busy} onClick={onPlay}>
             {m.room === 'playing' ? tr('tour.backToGame') : tr('tour.playMatch')}
           </button>
         )}
         {mine === null && !m.result && m.room === 'playing' && (
-          <button className={['btn', 'small', calling ? 'danger' : ''].join(' ')} onClick={onWatch}>
-            {judge ? tr('tour.watchAsJudge') : tr('tour.watch')}
+          <button className={['btn', 'small', calling && !judge ? 'danger' : ''].join(' ')} onClick={() => onWatch(false)}>
+            {tr('tour.watch')}
+          </button>
+        )}
+        {mine === null && judge && !m.result && m.room === 'playing' && (
+          <button className={['btn', 'small', calling ? 'danger' : ''].join(' ')} onClick={() => onWatch(true)}>
+            {tr('tour.watchAsJudge')}
           </button>
         )}
       </div>

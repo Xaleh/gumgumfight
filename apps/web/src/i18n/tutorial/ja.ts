@@ -278,7 +278,7 @@ export default {
   'tutorial.giveDon.attack.title': 'さあ、アタック',
   'tutorial.giveDon.attack.body': '6000になったロビンはパシフィスタと同値。同値はアタック側の勝ちです。ロビンでパシフィスタにアタック。',
   'tutorial.giveDon.leader.title': '今度はリーダーで',
-  'tutorial.giveDon.leader.body': 'ドン!!が2枚残っています。2枚目のドン!!をタップして2枚選び、リーダーをタップして相手のリーダーにアタックしましょう。',
+  'tutorial.giveDon.leader.body': 'ドン!!が2枚残っています。2枚のドン!!を両方タップして選び、リーダーをタップして相手のリーダーにアタックしましょう。',
   'tutorial.giveDon.donX.title': '[DON!! x1]',
   'tutorial.giveDon.donX.body': '付与されたドン!!で効果が働くカードもあります。ゾロは[DON!! x1]：ドン!!が1枚以上付与されていると、さらに+1000。',
   'tutorial.giveDon.back.title': 'そのあとは？',

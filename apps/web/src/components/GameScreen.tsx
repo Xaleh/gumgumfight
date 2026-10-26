@@ -332,11 +332,14 @@ export function WatchGameScreen({
   broadcast,
   onExit,
   onSwitch,
+  exitTo,
 }: {
   target: WatchTarget;
   canHands: boolean;
   broadcast?: TableBroadcast;
   onExit: () => void;
+  /** Para onde "Sair" leva (o texto do botão); padrão: o torneio da sala, ou o menu. */
+  exitTo?: ExitTo;
   onSwitch: (t: WatchTarget) => void;
 }) {
   const t = useT();
@@ -385,6 +388,7 @@ export function WatchGameScreen({
       kind="online"
       online={online}
       onExit={onExit}
+      exitTo={exitTo}
       // As mãos dos jogadores só aparecem no torneio e nas salas privadas liberadas por quem criou; o Judge já as vê ao vivo.
       spectator={{
         canHands: canHands && Boolean(room.handsAllowed) && !target.judge,
@@ -432,11 +436,15 @@ export interface TableTutorial {
   floatAt?: 'top' | 'bottom';
 }
 
+/** Para onde o botão de sair da mesa leva: o torneio, o menu ou a tela anterior (ex.: a lista "Assistir"). */
+type ExitTo = 'tournament' | 'menu' | 'back';
+
 function Table({
   game,
   kind,
   online,
   onExit,
+  exitTo: exitToProp,
   onRematch,
   rematchLabel,
   spectator,
@@ -451,6 +459,7 @@ function Table({
   kind: TableKind;
   online?: OnlineGame;
   onExit: () => void;
+  exitTo?: ExitTo;
   onRematch?: () => void;
   /** Texto do botão de revanche (ex.: próximo jogo da série do torneio). */
   rematchLabel?: string;
@@ -513,6 +522,7 @@ function Table({
   /**
    * Cartas que o oponente revelou (busca no deck, carta da mão, topo do deck…): aparecem na mesa até o
    * jogador fechar. Sem isso só o histórico dizia qual carta foi, e a carta some na mão do oponente.
+   * O [Trigger] do oponente também aparece aqui quando as animações estão desligadas.
    * Não aparece para quem escolheu a carta (já a viu), no tutorial, no replay nem na tela de transmissão
    * (ninguém fecha). Para quem assiste (o streamer) aparecem as revelações dos dois lados, e somem
    * sozinhas depois de um tempo.
@@ -530,6 +540,8 @@ function Table({
     if (game.jumped || tutorial || broadcast || (human === null && !spectator)) return;
     const lines = fresh.flatMap((e): RevealLine[] => {
       if (!e.revealed?.length || e.revealedBy === human) return [];
+      // [Trigger] do oponente: com as animações ligadas a carta já aparece no centro da mesa.
+      if (e.key === 'log.triggerActivated' && animate) return [];
       const cards = e.revealed.map((id) => state.defs[id]).filter((d): d is CardDef => Boolean(d));
       return cards.length ? [{ text: logText(tryT, e), cards, count: 1 }] : [];
     });
@@ -544,7 +556,8 @@ function Table({
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
-  const toTournament = Boolean(online?.room?.tournament);
+  const exitTo: ExitTo = exitToProp ?? (online?.room?.tournament ? 'tournament' : 'menu');
+  const toTournament = exitTo === 'tournament';
   /** "Chamar o Judge" (jogador numa partida de torneio em andamento, ainda não pausada): congela a partida até o Judge liberar. */
   // A janela do chamado: o motivo, a jogada do problema e um texto (o Judge já entra sabendo o que conferir).
   const [calling, setCalling] = useState(false);
@@ -562,7 +575,7 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, update: updateSettings } = useSettings();
+  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -871,6 +884,10 @@ function Table({
     setPicked([]);
     setZoom(null);
   };
+  /** Habilidade paga que já terminou e ainda pode ser desfeita (clicou para pagar sem querer): a carta dela. */
+  const undoAction = canCancel && !tutorial && state.cancel?.done ? state.cancel.action : null;
+  const undoUid = undoAction?.type === 'activate' || undoAction?.type === 'playCard' ? undoAction.uid : null;
+  const undoName = undoUid && state.cards[undoUid] ? cardDef(state, undoUid).name : null;
   const targetsInHand = targets ? targets.options.filter((u) => zoneOf(state, u) === 'hand').length : 0;
   /** Onde estão os alvos destacados (mão, mesa ou os dois), com ou sem ordem: uma frase inteira para cada caso. */
   const targetsHint = () => {
@@ -1005,18 +1022,23 @@ function Table({
   const canReceiveDon = (uid: string) => has((a) => a.type === 'attachDon' && a.target === uid);
 
   /**
-   * Toque num DON!! ativo: marca ele e os anteriores da fileira (tocar no 3º marca 3). Tocar no último marcado
-   * desmarca só ele, para acertar a quantidade.
+   * Toque num DON!! ativo: marca ou desmarca só ele (o padrão). Com "DON!! em um toque" (`donQuickPick`), marca ele
+   * e os anteriores da fileira (tocar no 3º marca 3), e tocar no último marcado desmarca só ele.
    */
   const onDon = (player: PlayerId, index: number) => {
     if (player !== human || !myTurnIdle || !has((a) => a.type === 'attachDon')) return;
     const max = state.players[human].donActive;
     if (index < 0 || index >= max) return;
-    const cur = mode?.kind === 'don' ? mode.picked.length : 0;
-    const count = index === cur - 1 ? index : index + 1;
+    const marked = mode?.kind === 'don' ? mode.picked : [];
+    const cur = marked.length;
+    let picked: number[];
+    if (donQuickPick) {
+      const count = index === cur - 1 ? index : index + 1;
+      picked = Array.from({ length: count }, (_, i) => i);
+    } else picked = marked.includes(index) ? marked.filter((i) => i !== index) : [...marked, index].sort((a, b) => a - b);
     // Marcar sobe um pouco o tom (uma ficha a mais na pilha); desmarcar desce.
-    audio.play('don-pick', { pitch: count < cur ? -3 : Math.min(6, count - 1) });
-    setMode(count > 0 ? { kind: 'don', picked: Array.from({ length: count }, (_, i) => i) } : null);
+    audio.play('don-pick', { pitch: picked.length < cur ? -3 : Math.min(6, picked.length - 1) });
+    setMode(picked.length > 0 ? { kind: 'don', picked } : null);
   };
 
   /** DON!! marcados (na faixa central): quantos são e onde tocar. */
@@ -1316,7 +1338,7 @@ function Table({
           onEnd={() => dispatch({ type: 'endTurn', player: human! })}
           onCancelMode={() => setMode(null)}
           onTogglePause={() => game.setPaused((p) => !p)}
-          request={targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
+          request={targets ? <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} /> : !mode && undoName ? <UndoPill name={undoName} onUndo={cancelAction} /> : undefined}
           decision={
             decision ? (
               <DecisionButton
@@ -1588,7 +1610,7 @@ function Table({
                 </button>
               )}
               <button className="btn" onClick={onExit}>
-                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : t('game.exitToMenu')}
+                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : exitTo === 'back' ? t('game.exitBack') : t('game.exitToMenu')}
               </button>
             </div>
             {lateral && (
@@ -1713,7 +1735,7 @@ function Table({
             human={human}
             actions={game.actions()}
             onExit={bare ? undefined : onExit}
-            exitLabel={toTournament ? t('game.backToTournament') : t('game.backToMenu')}
+            exitLabel={toTournament ? t('game.backToTournament') : exitTo === 'back' ? t('common.back') : t('game.backToMenu')}
             onRematch={
               replay
                 ? () => {
@@ -1726,7 +1748,7 @@ function Table({
               (replay ? t('game.watchAgain') : rematchLabel) ??
               (online && human !== null ? (online.room?.rematch[human] ? t('game.waitingOpponent') : t('game.askRematch')) : undefined)
             }
-            onReplay={toTournament || bare ? undefined : game.downloadReplay}
+            onReplay={online?.room?.tournament || bare ? undefined : game.downloadReplay}
             onLog={() => setSheet('log')}
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
@@ -1812,7 +1834,7 @@ function Table({
           {!bare && (
             <div className="panel-controls">
               <button className="btn small" onClick={onExit}>
-                {toTournament ? t('game.sideTournament') : t('game.sideMenu')}
+                {toTournament ? t('game.sideTournament') : exitTo === 'back' ? t('game.sideBack') : t('game.sideMenu')}
               </button>
               {callJudge && (
                 <button className="btn small judge-call" onClick={callJudge}>
@@ -2105,6 +2127,16 @@ function TargetRequest({
  * Botão grande de cancelar, no lugar de "Encerrar turno": sai do modo de ataque ou de DON!! marcados
  * (nada foi para o motor ainda), ou desfaz no motor a ação em andamento (`cancel`).
  */
+/** Habilidade paga que já terminou: ainda dá para voltar atrás até a próxima jogada. */
+function UndoPill({ name, onUndo }: { name: string; onUndo: () => void }) {
+  const t = useT();
+  return (
+    <button className="hint-pill undo-pill" onClick={onUndo} title={t('game.undoActionTitle')}>
+      ↶ {t('game.undoPaid', { name })} <small>{t('game.undoPaidSub')}</small>
+    </button>
+  );
+}
+
 function CancelButton({ sub, onClick, title }: { sub: string; onClick: () => void; title?: string }) {
   const t = useT();
   return (
