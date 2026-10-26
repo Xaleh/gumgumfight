@@ -53,6 +53,7 @@ Impacto: **alto** = muda o resultado de partidas comuns; **médio** = cartas esp
 | DV-41 | Auditoria das cartas: leituras que dependiam de ruling ou de interface nova (**corrigido**; as regras confirmadas estão no item) | texto das cartas | baixo | C17 |
 | DV-42 | Auditoria das cartas, rodada 2 (OP01 a OP09): 24 cartas com efeito lido ou executado errado, mais as regras de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
 | DV-43 | Auditoria das cartas, rodada 3 (starter decks, promos e spoilers EB05/OP18): 19 cartas, as 20 com atributos juntos e 3 pendências de DV-41 (**corrigido**) | texto das cartas | alto | C17 |
+| DV-46 | "If X, A. Then, B.": o B acontecia com o "if" falho (**corrigido**) | 4-10-2 | médio | — |
 
 ## Cards de correção no Trello
 
@@ -416,7 +417,7 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Itens levantados nas rodadas (todos resolvidos):
 - ~~Ms. All Sunday OP12-075: "your opponent may add 1 DON!! card" adiciona sem perguntar ao oponente.~~ Corrigido: o oponente responde se adiciona (`opponentAddDon.may`).
 - ~~Usopp OP15-024: "cannot be rested by your opponent's Leader and Character effects" também bloqueia Eventos e Stages do oponente.~~ Corrigido na rodada 3 (DV-43).
-- ~~"If X, A. Then, B." aplica a condição só a A.~~ **Conforme** (regra confirmada pelo dono do projeto em 09/10/2026): o B só depende do A quando o A é custo do efeito ("You may X: …", "you may X. If you do, …"); fora isso, o B acontece mesmo que o A não aconteça. Ex.: Hody Jones OP06-035 ("Rest up to a total of 2 … Then, add 1 card from the top of your Life cards to your hand") vira as cartas com 0 de Vida; Leo OP10-057 descarta 1 carta mesmo com outro Líder (o "If your Leader is [Usopp]" é condição, não custo). O motor já fazia assim.
+- ~~"If X, A. Then, B." aplica a condição só a A.~~ Considerado conforme em 09/10/2026 e revisto em 26/10/2026 (DV-46): com o "if" falho, o "Then" seguinte também não acontece (CR 4-10-2). Continua valendo que o B acontece quando o A não pôde ser feito sem um "if" (Hody Jones OP06-035: "Rest up to a total of 2 … Then, add 1 card from the top of your Life cards to your hand" vira as cartas com 0 de Vida).
 - ~~`haveCharacterNamed` não conta o Líder.~~ Corrigido (regra confirmada em 09/10/2026: "If you have [X]" é qualquer carta sua com o nome, Líder incluído, como o +4000 do evento do OP17 para [Shanks]): "If you have [Jewelry Bonney]" (EB04-056), "[A] and [B]" (OP16-040, OP15-064, OP15-072, ST30-016) e "[Gecko Moria] with 10000 power or more on your field" (OP15-080) contam o Líder e o Stage; "If you have a [X] Character" (OP02-031, OP07-030, OP08-109) continua só com Personagens (`Condition.haveCharacterOnly`). Testes em `card-audit.test.ts`.
 - `onlyTypeIncludes` falha quando você não tem nenhum Personagem (EB03-038): **conforme** (confirmado pelo dono do projeto: sem Personagens em campo, o efeito de adicionar 2 DON!! não acontece).
 - ~~Gecko Moria OP06-086 ("Play 1 card and play the other card rested") e Thatch OP03-005 ("trash this Character at the end of this turn" para a carta que voltou ao campo).~~ Corrigidos na rodada 3 (DV-43).
@@ -482,6 +483,12 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Correção: entrada em `SOURCE_TEXT_FIXES`. Varredura nas cartas da optcgapi (coleções, starter decks e promos): o OP17-007 é a única com esse corte.
 - Testes: `packages/engine/test/trello-bugs.test.ts` ("Trello (card 84): Kouzuki Oden OP17-007…").
 
+**DV-46. "If X, A. Then, B.": o "Then" acontecia com o "if" falho** — médio — **corrigido**
+- Relato do dono do projeto (26/10/2026): Jewelry Bonney OP12-118 ("If you have 8 or more rested cards, draw 2 cards and trash 1 card from your hand. Then, set up to 1 of your DON!! cards as active.") deixava 1 DON!! ativo com menos de 8 cartas viradas.
+- Regra: CR 4-10-2 (v1.2.1): "if a preceding 'if' clause has not been resolved as outlined in 4-10-1., the following clause in that text cannot be resolved." Q&A OP06-116 Reject, OP14-112 Boa Hancock e OP13-108 confirmam. Isso substitui a leitura de DV-41.
+- Correção: o leitor marca os passos de um "Then, …" que segue um "If X, …" (`EffectStep.afterIf`, também numa cadeia de "Then"); o motor guarda no frame se o último "if" da carta falhou (`ifFailed`; "If you do" não conta) e pula esses passos. Cartas afetadas nas bases locais: OP01-002, OP02-070, OP09-078, OP09-089, OP09-098, OP11-066, OP12-020, OP12-118, OP14-020, OP14-112, ST22-015, ST24-005, ST34-002, EB02-011, EB05-033 e P-151.
+- Testes: `packages/engine/test/card-audit.test.ts` (Bonney com 7 e com 10 cartas viradas) e `trello-bugs.test.ts` (Arlong EB02-011 sem Líder {Fish-Man}/{East Blue}).
+
 ---
 
 ## Itens a confirmar (sem ruling oficial claro)
@@ -489,7 +496,6 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Dano de efeito de 2 ou mais com 1 de Vida: o motor segue a leitura literal de 1-2-1-1-1 (perde no 2º ponto). O Q&A EB03-055 Robin diz que dano de efeito com 0 de Vida vence; não há ruling para "2 de dano de efeito com 1 de Vida". Rever se a Bandai publicar um.
 - Substituição de dano ("If you would take damage, … instead") oferecida mesmo com 0 de Vida.
 - `handCounter.set` sobrescrevendo um Counter maior (CR 2-10-4: vale o maior).
-- Cadeia "If … Then …" (4-10): a condição vale só para o trecho dela; o "Then" depende só de custo ("You may X:", "If you do") — regra confirmada pelo dono do projeto (DV-41).
 - `cancel` e `detachDon` (desfazer) estão fora das regras oficiais — o Q&A proíbe mover DON!! já dado. São conveniências de interface protegidas contra vazamento; manter documentado.
 
 ## Conferência completa por regra

@@ -2990,7 +2990,16 @@ const INTERNAL_CONDITIONS: Array<keyof Condition> = ['lastDone', 'lastKOd', 'cho
 function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boolean {
   const ps = state.players[frame.controller];
   const srcName = cardDef(state, frame.source).name;
-  if (!frame.choice && !frame.memo && !stepConditionMet(state, frame, step)) {
+  const fresh = !frame.choice && !frame.memo;
+  // "If X, A. Then, B.": com o "if" falho, o "Then" também não acontece (CR 4-10-2, OP06-116).
+  if (fresh && step.afterIf && frame.ifFailed) {
+    if (step.do === 'payCost' && step.scope) frame.i += step.scope;
+    return true;
+  }
+  const met = !fresh || stepConditionMet(state, frame, step);
+  // Só um "If X, …" conta para o "Then" ("If you do" é outra regra).
+  if (fresh && step.if && Object.keys(step.if).some((k) => k !== 'lastDone' && k !== 'lastKOd')) frame.ifFailed = !met;
+  if (!met) {
     // "If you have 2 or less Characters, play…": a condição da carta não vale. O histórico diz
     // o motivo (o jogador costuma achar que o efeito falhou, ou que a carta que queria escolher
     // não servia). Condições internas (depende da escolha anterior) continuam silenciosas.

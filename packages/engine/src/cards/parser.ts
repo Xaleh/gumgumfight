@@ -2225,7 +2225,19 @@ export function parseBody(body: string): EffectStep[] | null {
   const steps: EffectStep[] = [];
   // "This effect can be activated when X." no meio do efeito: condição para o resto.
   let gate: Condition | undefined;
+  // "If X, A. Then, B.": o B só acontece se o "if" valeu (CR 4-10-2). `chainIf`: a frase anterior da
+  // cadeia tinha condição da carta; `sentence`: a frase em leitura (fechada no começo da próxima).
+  let chainIf = false;
+  let sentence: { from: number; then: boolean; cond: boolean } | undefined;
+  const closeSentence = () => {
+    if (!sentence) return;
+    if (sentence.then && chainIf) for (let k = sentence.from; k < steps.length; k++) steps[k] = { ...steps[k], afterIf: true };
+    chainIf = sentence.cond || (sentence.then && chainIf);
+    sentence = undefined;
+  };
   for (let i = 0; i < sentences.length; i++) {
+    closeSentence();
+    sentence = { from: steps.length, then: /^Then,/i.test(sentences[i]), cond: false };
     let s = sentences[i].replace(/\.$/, '').replace(/^Then,\s*/i, '');
     const gateM = s.match(/^This effect can be activated when (.+)$/i);
     if (gateM) {
@@ -2303,6 +2315,7 @@ export function parseBody(body: string): EffectStep[] | null {
       const c = parseCondition(ifm[1]);
       if (!c) return fail(`cond: ${ifm[1]}`);
       cond = c;
+      if (Object.keys(c).length) sentence.cond = true;
       s = ifm[2];
       // "If …, look at 5 cards…; reveal…": a busca com condição.
       if (/^look at /i.test(s)) {
@@ -2310,6 +2323,7 @@ export function parseBody(body: string): EffectStep[] | null {
         if (!sub) return null;
         const firstLen = sub.findIndex((st) => st.do !== 'search') === -1 ? sub.length : 1;
         steps.push(...sub.slice(0, firstLen).map((st) => ({ ...st, if: { ...cond, ...st.if } })), ...sub.slice(firstLen));
+        closeSentence();
         return steps;
       }
     }
@@ -2348,6 +2362,7 @@ export function parseBody(body: string): EffectStep[] | null {
       else for (let k = before; k < steps.length; k++) steps[k] = { ...steps[k], if: { ...steps[k].if, lastDone: true } };
     }
   }
+  closeSentence();
   return steps;
 }
 

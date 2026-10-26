@@ -143,13 +143,28 @@ describe('"If you have 8 or more rested cards" conta os DON!! virados', () => {
     expect(s.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
   });
 
-  it('com 7 cartas viradas não compra', () => {
+  it('com 7 cartas viradas não compra nem deixa DON!! ativo (o "Then" depende do "If", CR 4-10-2)', () => {
     let s = toTurn(game(), 3);
     emptyHand(s, 0);
     setDon(s, 0, 5, 2);
     const bonney = hand(s, 0, 'OP12-118');
     s = applyAction(s, { type: 'playCard', player: 0, uid: bonney });
     expect(s.players[0].hand).toHaveLength(0);
+    expect(s.pending).toBeNull();
+    expect(s.players[0]).toMatchObject({ donActive: 0, donRested: 7 });
+  });
+
+  it('com 8 ou mais, depois de comprar e descartar deixa 1 DON!! ativo', () => {
+    let s = toTurn(game(), 3);
+    emptyHand(s, 0);
+    setDon(s, 0, 5, 5);
+    const bonney = hand(s, 0, 'OP12-118');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: bonney });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].hand[0]] });
+    expect(s.pending).toMatchObject({ kind: 'option', promptKey: 'engine.howManyDonToSetActive' });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
+    expect(s.players[0].hand).toHaveLength(1);
+    expect(s.players[0]).toMatchObject({ donActive: 1, donRested: 9 });
   });
 
   it('OP06-038, ST24-001 e ST16-003 usam a mesma contagem', () => {
@@ -351,7 +366,7 @@ describe('"up to N" aceita 0 nos passos de Vida e nos DON!! virados', () => {
     expect(stepsOf('OP10-109', 'onKO')).toEqual([{ do: 'trashLife', side: 'opponent', count: 1, upTo: true }]);
     const hancock = stepsOf('OP14-112', 'onPlay');
     expect(hancock[0]).toMatchObject({ do: 'addLifeFromDeck', count: 1, upTo: true });
-    expect(hancock[1]).toEqual({ do: 'opponentLifeToHand', count: 1, upTo: true });
+    expect(hancock[1]).toEqual({ do: 'opponentLifeToHand', count: 1, upTo: true, afterIf: true });
   });
 
   it('escolher 0 não mexe na Vida', () => {
