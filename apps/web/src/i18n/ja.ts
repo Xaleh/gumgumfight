@@ -1577,6 +1577,8 @@ export default {
   'game.cancelDonSub': 'ドン!!',
   'game.cancelBack': 'キャンセルして戻る',
   'game.undoActionTitle': 'アクションを取り消して前の状態に戻ります',
+  'game.undoPaid': '{name}を取り消す',
+  'game.undoPaidSub': '間違えて支払った？タップで元に戻せます',
   'game.undoActionSub': 'アクションを取り消す',
   // ---- 対戦メニュー / サイドパネル ----
   'game.matchSheet': '対戦',

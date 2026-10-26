@@ -1577,6 +1577,8 @@ export default {
   'game.cancelDonSub': 'the DON!!',
   'game.cancelBack': 'Cancel and go back',
   'game.undoActionTitle': 'Undo the action and go back to the previous state',
+  'game.undoPaid': 'Undo {name}',
+  'game.undoPaidSub': 'paid by mistake? tap to go back',
   'game.undoActionSub': 'undoes the action',
   // ---- match menu / side panel ----
   'game.matchSheet': 'Match',

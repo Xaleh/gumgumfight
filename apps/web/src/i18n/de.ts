@@ -1577,6 +1577,8 @@ export default {
   'game.cancelDonSub': 'DON!!',
   'game.cancelBack': 'Abbrechen und zurück',
   'game.undoActionTitle': 'Aktion rückgängig machen und zum vorherigen Stand zurückkehren',
+  'game.undoPaid': '{name} rückgängig machen',
+  'game.undoPaidSub': 'aus Versehen bezahlt? Tippe, um es zurückzunehmen',
   'game.undoActionSub': 'macht die Aktion rückgängig',
   // ---- Menü der Partie / Seitenleiste ----
   'game.matchSheet': 'Partie',

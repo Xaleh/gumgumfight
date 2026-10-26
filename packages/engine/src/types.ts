@@ -1482,6 +1482,13 @@ export interface CancelInfo {
   action: Action;
   /** 'revealed': uma carta escondida ficou visível desde o começo da ação. */
   blocked?: 'revealed';
+  /** O jogador pagou um custo nesta ação (ativou uma habilidade ou respondeu "Pagar e usar"). */
+  paid?: true;
+  /**
+   * A ação já terminou (nada mais a escolher), mas ainda pode ser desfeita até a próxima ação do
+   * jogador: só quando ele pagou um custo e nada escondido apareceu (clicou para pagar sem querer).
+   */
+  done?: true;
 }
 
 /** O que o `cancel` restaura. As definições, as instâncias das cartas e o log ficam como estão. */

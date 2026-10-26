@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { legalActions } from '../src/actions';
-import { applyAction, cancelAllowed, cancelError, detachDonError, IllegalActionError, locate } from '../src/engine';
+import { applyAction, cancelAllowed, cancelError, detachDonError, getPower, IllegalActionError, locate } from '../src/engine';
 import type { Action, GameState } from '../src/types';
 import { actionFromView, createAliases, viewFor } from '../src/view';
 import { countDon, fetchToHand, noDefense, putOnField, started, toTurn } from './helpers';
@@ -190,13 +190,32 @@ describe('cancelar a ação em andamento (cancel)', () => {
     expect(() => applyAction(s, { type: 'cancel', player: 0 })).toThrow(IllegalActionError);
   });
 
-  it('o registro some assim que a escolha é feita e o efeito termina', () => {
+  it('o registro some assim que a escolha é feita e o efeito termina (sem custo pago)', () => {
     let s = toTurn(started(), 3);
     const karoo = fetchToHand(s, 0, 'ST01-003');
     s = applyAction(s, { type: 'playCard', player: 0, uid: karoo });
-    s = applyAction(s, { type: 'activate', player: 0, uid: s.players[0].leader.uid, ability: 0 });
-    s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].leader.uid] });
+    expect(s.cancel).toBeUndefined();
+    expect(s.checkpoint).toBeUndefined();
+  });
+
+  it('habilidade paga que já terminou: dá para desfazer até a próxima ação', () => {
+    let s = toTurn(started(), 3);
+    const leader = s.players[0].leader.uid;
+    const karoo = fetchToHand(s, 0, 'ST01-003');
+    s = applyAction(s, { type: 'playCard', player: 0, uid: karoo });
+    const before = { donActive: s.players[0].donActive, power: getPower(s, leader) };
+    s = applyAction(s, { type: 'activate', player: 0, uid: leader, ability: 0 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [leader] });
     expect(s.pending).toBeNull();
+    expect(s.cancel).toMatchObject({ player: 0, done: true });
+    expect(legalActions(s, 0)).toContainEqual({ type: 'cancel', player: 0 });
+    expect(legalActions(s, 1)).toEqual([]);
+    const undone = applyAction(s, { type: 'cancel', player: 0 });
+    expect(undone.players[0].donActive).toBe(before.donActive);
+    expect(getPower(undone, leader)).toBe(before.power);
+    expect(undone.cancel).toBeUndefined();
+    // A próxima ação fecha a janela.
+    s = applyAction(s, { type: 'endTurn', player: 0 });
     expect(s.cancel).toBeUndefined();
     expect(s.checkpoint).toBeUndefined();
   });
@@ -249,7 +268,7 @@ describe('cancelar a ação em andamento (cancel)', () => {
     for (const viewer of [0, 1, null] as const) {
       const view = viewFor(s, viewer, aliases);
       expect(view.checkpoint).toBeUndefined();
-      expect(view.cancel).toEqual({ player: 0, action: { type: 'activate', player: 0, uid: aliases.toAlias[leader], ability: 0 } });
+      expect(view.cancel).toEqual({ player: 0, action: { type: 'activate', player: 0, uid: aliases.toAlias[leader], ability: 0 }, paid: true });
       expect(JSON.stringify(view)).not.toContain(`"${leader}"`);
     }
     const mine = viewFor(s, 0, aliases);

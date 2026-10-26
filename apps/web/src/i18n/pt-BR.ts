@@ -1578,6 +1578,8 @@ const ptBR = {
   'game.cancelDonSub': 'os DON!!',
   'game.cancelBack': 'Cancelar e voltar',
   'game.undoActionTitle': 'Desfazer a ação e voltar ao estado anterior',
+  'game.undoPaid': 'Desfazer {name}',
+  'game.undoPaidSub': 'pagou sem querer? toque para voltar atrás',
   'game.undoActionSub': 'desfaz a ação',
   // ---- menu da partida / painel lateral ----
   'game.matchSheet': 'Partida',

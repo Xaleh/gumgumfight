@@ -707,7 +707,7 @@ describe('partidas online: cancelar a ação e devolver DON!!', () => {
     const before = view(0);
     await step(0, { type: 'activate', player: 0, uid: leader().uid, ability: 0 });
     expect(view(0).pending).toMatchObject({ kind: 'selectTargets', player: 0 });
-    expect(view(0).cancel).toEqual({ player: 0, action: { type: 'activate', player: 0, uid: leader().uid, ability: 0 } });
+    expect(view(0).cancel).toEqual({ player: 0, action: { type: 'activate', player: 0, uid: leader().uid, ability: 0 }, paid: true });
     expect(view(1).cancel).toMatchObject({ player: 0, action: { type: 'activate', player: 0 } });
     expect(view(0).checkpoint).toBeUndefined();
     expect(view(1).checkpoint).toBeUndefined();
@@ -723,11 +723,16 @@ describe('partidas online: cancelar a ação e devolver DON!!', () => {
       expect(v.players[0].donRested).toBe(before.players[0].donRested);
       expect(v.log[v.log.length - 1].text).toMatch(/cancela a ativação/);
     }
-    // Depois do cancelamento a habilidade pode ser ativada de novo; cancelar fora de hora é recusado.
+    // Depois do cancelamento a habilidade pode ser ativada de novo; terminada (custo pago), ainda dá para
+    // desfazê-la uma vez; cancelar fora de hora é recusado.
     await step(0, { type: 'activate', player: 0, uid: leader().uid, ability: 0 });
     expect(view(0).pending).toMatchObject({ kind: 'selectTargets', player: 0 });
     await step(0, { type: 'choose', player: 0, uids: [] });
     expect(view(0).pending).toBeNull();
+    expect(view(1).cancel).toMatchObject({ player: 0, done: true });
+    await step(1, { type: 'cancel', player: 1 }, 422);
+    await step(0, { type: 'cancel', player: 0 });
+    expect(view(1).players[0].donRested).toBe(before.players[0].donRested);
     await step(0, { type: 'cancel', player: 0 }, 422);
 
     // O replay guarda as ações como foram feitas (cancel e detachDon inclusive): refazer a sala dá a mesma mesa.

@@ -1577,6 +1577,8 @@ export default {
   'game.cancelDonSub': 'la DON!!',
   'game.cancelBack': 'Annuler et revenir',
   'game.undoActionTitle': 'Annuler l’action et revenir à l’état précédent',
+  'game.undoPaid': 'Annuler {name}',
+  'game.undoPaidSub': 'payé par erreur ? touchez pour revenir',
   'game.undoActionSub': 'annule l’action',
   // ---- match menu / side panel ----
   'game.matchSheet': 'Partie',

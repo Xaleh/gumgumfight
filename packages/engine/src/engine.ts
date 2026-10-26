@@ -1190,6 +1190,11 @@ export function applyAction(prev: GameState, action: Action): GameState {
 
   if (action.type === 'manual') {
     if (!manualAllowed(prev, p)) throw new IllegalActionError('Ferramentas manuais indisponíveis agora.');
+    // Ação já terminada: a correção manual não pode ser desfeita junto com ela.
+    if (state.cancel?.done) {
+      delete state.cancel;
+      delete state.checkpoint;
+    }
     applyManualOp(state, p, action.op);
     checkDefeat(state);
     run(state);
@@ -1200,6 +1205,7 @@ export function applyAction(prev: GameState, action: Action): GameState {
 
   if (pending) {
     if (pending.player !== p) throw new IllegalActionError('Aguardando o outro jogador.');
+    if (pending.kind === 'confirm' && action.type === 'answer' && action.yes && state.cancel?.player === p) state.cancel.paid = true;
     handlePendingResponse(state, action);
   } else {
     if (state.phase !== 'main' || state.activePlayer !== p) throw new IllegalActionError('Não é o seu turno.');
@@ -1208,7 +1214,7 @@ export function applyAction(prev: GameState, action: Action): GameState {
     const checkpoint = makeCheckpoint(prev);
     handleMainAction(state, action);
     state.checkpoint = checkpoint;
-    state.cancel = { player: p, action };
+    state.cancel = { player: p, action, ...(action.type === 'activate' ? { paid: true as const } : {}) };
   }
 
   run(state);
@@ -1244,12 +1250,16 @@ function makeCheckpoint(state: GameState): Checkpoint {
 function settleCancel(state: GameState, actor: PlayerId) {
   const info = state.cancel;
   if (!info) return;
-  const keep = state.phase !== 'gameover' && state.pending !== null && state.pending.player === info.player && actor === info.player;
-  if (!keep) {
+  const choosing = state.phase !== 'gameover' && state.pending !== null && state.pending.player === info.player && actor === info.player;
+  // Pagou um custo e a ação terminou na própria vez: dá para desfazer até a próxima ação.
+  const done = !choosing && Boolean(info.paid) && actor === info.player && isIdle(state) && state.activePlayer === info.player;
+  if ((!choosing && !done) || (done && info.blocked)) {
     delete state.cancel;
     delete state.checkpoint;
     return;
   }
+  if (done) info.done = true;
+  else delete info.done;
   const cp = state.checkpoint;
   if (!cp) return;
   const actorSaw = new Set(cp.seen[info.player]);
@@ -1258,7 +1268,10 @@ function settleCancel(state: GameState, actor: PlayerId) {
     for (const uid of visibleCards(state, v)) if (!before.has(uid) && !actorSaw.has(uid)) return true;
     return false;
   });
-  if (revealed) {
+  if (revealed && done) {
+    delete state.cancel;
+    delete state.checkpoint;
+  } else if (revealed) {
     info.blocked = 'revealed';
     delete state.checkpoint;
   }
@@ -1302,7 +1315,8 @@ function restoreCheckpoint(state: GameState, p: PlayerId) {
 export function cancelError(state: GameState, player: PlayerId): string | null {
   if (state.phase === 'gameover') return 'A partida já terminou.';
   const c = state.cancel;
-  if (!c || c.player !== player || !state.pending || state.pending.player !== player) return 'Não há ação para cancelar.';
+  const open = c?.done ? isIdle(state) && state.activePlayer === player : state.pending?.player === player;
+  if (!c || c.player !== player || !open) return 'Não há ação para cancelar.';
   if (c.blocked === 'revealed') return 'Não dá mais para cancelar: uma carta foi revelada.';
   return null;
 }

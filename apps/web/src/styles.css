@@ -2771,6 +2771,11 @@ button.hint-pill {
   color: var(--muted);
   font-weight: 700;
 }
+/* Habilidade paga que ainda pode ser desfeita: laranja, para não parecer a dica comum. */
+button.hint-pill.undo-pill {
+  background: linear-gradient(180deg, #ffb347, #e8891a);
+  --halo: 0 0 0 3px rgba(255, 179, 71, 0.6), 0 0 22px 6px rgba(255, 159, 28, 0.7);
+}
 
 /* DON!! marcados: contador + onde tocar (Líder ou Personagem) + cancelar, na faixa central */
 .don-bar {

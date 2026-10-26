@@ -884,6 +884,10 @@ function Table({
     setPicked([]);
     setZoom(null);
   };
+  /** Habilidade paga que já terminou e ainda pode ser desfeita (clicou para pagar sem querer): a carta dela. */
+  const undoAction = canCancel && !tutorial && state.cancel?.done ? state.cancel.action : null;
+  const undoUid = undoAction?.type === 'activate' || undoAction?.type === 'playCard' ? undoAction.uid : null;
+  const undoName = undoUid && state.cards[undoUid] ? cardDef(state, undoUid).name : null;
   const targetsInHand = targets ? targets.options.filter((u) => zoneOf(state, u) === 'hand').length : 0;
   /** Onde estão os alvos destacados (mão, mesa ou os dois), com ou sem ordem: uma frase inteira para cada caso. */
   const targetsHint = () => {
@@ -1334,7 +1338,7 @@ function Table({
           onEnd={() => dispatch({ type: 'endTurn', player: human! })}
           onCancelMode={() => setMode(null)}
           onTogglePause={() => game.setPaused((p) => !p)}
-          request={targets && <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} />}
+          request={targets ? <TargetRequest state={state} pending={targets} picked={picked} hint={cancelHint} /> : !mode && undoName ? <UndoPill name={undoName} onUndo={cancelAction} /> : undefined}
           decision={
             decision ? (
               <DecisionButton
@@ -2123,6 +2127,16 @@ function TargetRequest({
  * Botão grande de cancelar, no lugar de "Encerrar turno": sai do modo de ataque ou de DON!! marcados
  * (nada foi para o motor ainda), ou desfaz no motor a ação em andamento (`cancel`).
  */
+/** Habilidade paga que já terminou: ainda dá para voltar atrás até a próxima jogada. */
+function UndoPill({ name, onUndo }: { name: string; onUndo: () => void }) {
+  const t = useT();
+  return (
+    <button className="hint-pill undo-pill" onClick={onUndo} title={t('game.undoActionTitle')}>
+      ↶ {t('game.undoPaid', { name })} <small>{t('game.undoPaidSub')}</small>
+    </button>
+  );
+}
+
 function CancelButton({ sub, onClick, title }: { sub: string; onClick: () => void; title?: string }) {
   const t = useT();
   return (

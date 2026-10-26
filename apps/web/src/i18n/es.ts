@@ -1577,6 +1577,8 @@ export default {
   'game.cancelDonSub': 'los DON!!',
   'game.cancelBack': 'Cancelar y volver',
   'game.undoActionTitle': 'Deshacer la acción y volver al estado anterior',
+  'game.undoPaid': 'Deshacer {name}',
+  'game.undoPaidSub': '¿pagaste sin querer? toca para volver atrás',
   'game.undoActionSub': 'deshace la acción',
   // ---- menú de la partida / panel lateral ----
   'game.matchSheet': 'Partida',
