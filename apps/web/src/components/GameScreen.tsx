@@ -332,11 +332,14 @@ export function WatchGameScreen({
   broadcast,
   onExit,
   onSwitch,
+  exitTo,
 }: {
   target: WatchTarget;
   canHands: boolean;
   broadcast?: TableBroadcast;
   onExit: () => void;
+  /** Para onde "Sair" leva (o texto do botão); padrão: o torneio da sala, ou o menu. */
+  exitTo?: ExitTo;
   onSwitch: (t: WatchTarget) => void;
 }) {
   const t = useT();
@@ -385,6 +388,7 @@ export function WatchGameScreen({
       kind="online"
       online={online}
       onExit={onExit}
+      exitTo={exitTo}
       // As mãos dos jogadores só aparecem no torneio e nas salas privadas liberadas por quem criou; o Judge já as vê ao vivo.
       spectator={{
         canHands: canHands && Boolean(room.handsAllowed) && !target.judge,
@@ -432,11 +436,15 @@ export interface TableTutorial {
   floatAt?: 'top' | 'bottom';
 }
 
+/** Para onde o botão de sair da mesa leva: o torneio, o menu ou a tela anterior (ex.: a lista "Assistir"). */
+type ExitTo = 'tournament' | 'menu' | 'back';
+
 function Table({
   game,
   kind,
   online,
   onExit,
+  exitTo: exitToProp,
   onRematch,
   rematchLabel,
   spectator,
@@ -451,6 +459,7 @@ function Table({
   kind: TableKind;
   online?: OnlineGame;
   onExit: () => void;
+  exitTo?: ExitTo;
   onRematch?: () => void;
   /** Texto do botão de revanche (ex.: próximo jogo da série do torneio). */
   rematchLabel?: string;
@@ -547,7 +556,8 @@ function Table({
   const isOnline = kind === 'online';
   const watching = Boolean(spectator);
   // Partida de torneio: "voltar" leva para a página do torneio.
-  const toTournament = Boolean(online?.room?.tournament);
+  const exitTo: ExitTo = exitToProp ?? (online?.room?.tournament ? 'tournament' : 'menu');
+  const toTournament = exitTo === 'tournament';
   /** "Chamar o Judge" (jogador numa partida de torneio em andamento, ainda não pausada): congela a partida até o Judge liberar. */
   // A janela do chamado: o motivo, a jogada do problema e um texto (o Judge já entra sabendo o que conferir).
   const [calling, setCalling] = useState(false);
@@ -1591,7 +1601,7 @@ function Table({
                 </button>
               )}
               <button className="btn" onClick={onExit}>
-                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : t('game.exitToMenu')}
+                {tutorial ? t('tutorial.exitLesson') : toTournament ? t('game.exitToTournament') : exitTo === 'back' ? t('game.exitBack') : t('game.exitToMenu')}
               </button>
             </div>
             {lateral && (
@@ -1716,7 +1726,7 @@ function Table({
             human={human}
             actions={game.actions()}
             onExit={bare ? undefined : onExit}
-            exitLabel={toTournament ? t('game.backToTournament') : t('game.backToMenu')}
+            exitLabel={toTournament ? t('game.backToTournament') : exitTo === 'back' ? t('common.back') : t('game.backToMenu')}
             onRematch={
               replay
                 ? () => {
@@ -1729,7 +1739,7 @@ function Table({
               (replay ? t('game.watchAgain') : rematchLabel) ??
               (online && human !== null ? (online.room?.rematch[human] ? t('game.waitingOpponent') : t('game.askRematch')) : undefined)
             }
-            onReplay={toTournament || bare ? undefined : game.downloadReplay}
+            onReplay={online?.room?.tournament || bare ? undefined : game.downloadReplay}
             onLog={() => setSheet('log')}
             onClose={replay ? () => setShowResult(false) : undefined}
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
@@ -1815,7 +1825,7 @@ function Table({
           {!bare && (
             <div className="panel-controls">
               <button className="btn small" onClick={onExit}>
-                {toTournament ? t('game.sideTournament') : t('game.sideMenu')}
+                {toTournament ? t('game.sideTournament') : exitTo === 'back' ? t('game.sideBack') : t('game.sideMenu')}
               </button>
               {callJudge && (
                 <button className="btn small judge-call" onClick={callJudge}>

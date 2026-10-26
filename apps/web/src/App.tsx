@@ -34,13 +34,16 @@ type Screen =
   /** Tutorial "Aprender a jogar": a lista de lições e uma lição aberta. */
   | { name: 'learn' }
   | { name: 'lesson'; id: string }
-  /** `tournament`: veio da página de um torneio (e volta para ela); `home`: veio do "Ao vivo agora" do menu. */
-  | { name: 'watch'; target: WatchTarget; tournament?: string; home?: boolean }
+  /**
+   * `tournament`: veio da página de um torneio (e volta para ela; `lobby`: para o lobby dele);
+   * `home`: veio do "Ao vivo agora" do menu.
+   */
+  | { name: 'watch'; target: WatchTarget; tournament?: string; lobby?: boolean; home?: boolean }
   /** `lobby`: abre direto o lobby do torneio (chamado de Judge na notificação). */
   | { name: 'tournaments'; id?: string; lobby?: boolean }
   /** `back`: tela para onde "Voltar" leva (replay aberto da página de um torneio ou da administração). */
   | { name: 'game'; setup: GameSetup; key: number; back?: Screen }
-  | { name: 'online'; seat: OnlineSeat; tournament?: string };
+  | { name: 'online'; seat: OnlineSeat; tournament?: string; lobby?: boolean };
 
 /** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
 const OPEN_MATCH = 'gumgum.openMatch';
@@ -49,11 +52,12 @@ function savedScreen(): Screen {
   try {
     const s = JSON.parse(sessionStorage.getItem(OPEN_MATCH) ?? 'null') as Screen | null;
     const tournament = s && 'tournament' in s && typeof s.tournament === 'string' ? s.tournament : undefined;
+    const lobby = s && tournament && 'lobby' in s && s.lobby === true ? { lobby: true } : {};
     if (s?.name === 'online' && typeof s.seat?.roomId === 'string' && typeof s.seat.token === 'string') {
-      return { name: 'online', seat: { roomId: s.seat.roomId, token: s.seat.token }, tournament };
+      return { name: 'online', seat: { roomId: s.seat.roomId, token: s.seat.token }, tournament, ...lobby };
     }
     if (s?.name === 'watch' && typeof s.target?.roomId === 'string') {
-      return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands), ...(s.target.judge ? { judge: true } : {}) }, tournament };
+      return { name: 'watch', target: { roomId: s.target.roomId, hands: Boolean(s.target.hands), ...(s.target.judge ? { judge: true } : {}) }, tournament, ...lobby };
     }
   } catch {
     /* sem armazenamento */
@@ -183,8 +187,8 @@ function MainApp() {
         initialId={screen.id}
         initialLobby={screen.lobby}
         onExit={() => setScreen({ name: 'menu' })}
-        onPlay={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
-        onWatch={(target, tournament) => setScreen({ name: 'watch', target, tournament })}
+        onPlay={(seat, tournament, lobby) => setScreen({ name: 'online', seat, tournament, ...(lobby ? { lobby } : {}) })}
+        onWatch={(target, tournament, lobby) => setScreen({ name: 'watch', target, tournament, ...(lobby ? { lobby } : {}) })}
         onReplay={(setup, tournament) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'tournaments', id: tournament } })}
       />
     );
@@ -198,10 +202,13 @@ function MainApp() {
         key={screen.target.roomId}
         target={screen.target}
         canHands={role === 'streamer' || isAdmin(role)}
+        exitTo={screen.tournament ? 'tournament' : screen.home ? 'menu' : 'back'}
         onExit={() =>
-          setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : screen.home ? { name: 'menu' } : { name: 'watch-list' })
+          setScreen(
+            screen.tournament ? { name: 'tournaments', id: screen.tournament, lobby: screen.lobby } : screen.home ? { name: 'menu' } : { name: 'watch-list' },
+          )
         }
-        onSwitch={(target) => setScreen({ name: 'watch', target, tournament: screen.tournament, home: screen.home })}
+        onSwitch={(target) => setScreen({ ...screen, target })}
       />
     );
   }
@@ -210,8 +217,8 @@ function MainApp() {
       <OnlineGameScreen
         key={screen.seat.roomId}
         seat={screen.seat}
-        onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament } : { name: 'menu' })}
-        onSwitch={(seat) => setScreen({ name: 'online', seat, tournament: screen.tournament })}
+        onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament, lobby: screen.lobby } : { name: 'menu' })}
+        onSwitch={(seat) => setScreen({ ...screen, seat })}
       />
     );
   }

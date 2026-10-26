@@ -168,9 +168,9 @@ export function Tournaments({
   /** Abre direto o lobby do torneio (toque na notificação de chamado de Judge). */
   initialLobby?: boolean;
   onExit: () => void;
-  /** Entra na sala online da partida do torneio. */
-  onPlay: (seat: OnlineSeat, tournamentId: string) => void;
-  onWatch: (target: WatchTarget, tournamentId: string) => void;
+  /** Entra na sala online da partida do torneio (`lobby`: a partida foi aberta do lobby, e "Voltar" leva para ele). */
+  onPlay: (seat: OnlineSeat, tournamentId: string, lobby?: boolean) => void;
+  onWatch: (target: WatchTarget, tournamentId: string, lobby?: boolean) => void;
   /** Abre o replay gravado de um jogo (auditoria). */
   onReplay: (setup: GameSetup, tournamentId: string) => void;
 }) {
@@ -200,9 +200,10 @@ export function Tournaments({
         initialLobby={initialLobby}
         justCreated={createdId === openId}
         onExit={onExit}
+        onBack={() => setOpenId(null)}
         onDeleted={() => setOpenId(null)}
-        onPlay={(seat) => onPlay(seat, openId)}
-        onWatch={(t) => onWatch(t, openId)}
+        onPlay={(seat, lobby) => onPlay(seat, openId, lobby)}
+        onWatch={(t, lobby) => onWatch(t, openId, lobby)}
         onReplay={(setup) => onReplay(setup, openId)}
       />
     );
@@ -784,6 +785,7 @@ function TournamentPage({
   initialLobby,
   justCreated,
   onExit,
+  onBack,
   onDeleted,
   onPlay,
   onWatch,
@@ -795,9 +797,11 @@ function TournamentPage({
   justCreated?: boolean;
   /** Volta para o menu principal. */
   onExit: () => void;
+  /** Volta uma tela: a lista de torneios. */
+  onBack: () => void;
   onDeleted: () => void;
-  onPlay: (seat: OnlineSeat) => void;
-  onWatch: (t: WatchTarget) => void;
+  onPlay: (seat: OnlineSeat, lobby?: boolean) => void;
+  onWatch: (t: WatchTarget, lobby?: boolean) => void;
   onReplay: (setup: GameSetup) => void;
 }) {
   const { user } = useAuth();
@@ -865,8 +869,8 @@ function TournamentPage({
         <TournamentLobby
           id={t.id}
           onClose={() => setLobbyOpen(false)}
-          onPlay={onPlay}
-          onWatch={onWatch}
+          onPlay={(seat) => onPlay(seat, true)}
+          onWatch={(w) => onWatch(w, true)}
           run={run}
           busy={busy}
         />
@@ -928,10 +932,13 @@ function TournamentPage({
   return (
     <div className="coverage tournaments">
       <header className="builder-header">
-        <button className="btn small" onClick={onExit}>
-          {tr('tour.backMenu')}
+        <button className="btn small" onClick={onBack}>
+          {tr('tour.backList')}
         </button>
         <h2>{t?.name ?? tr('tour.tournament')}</h2>
+        <button className="btn small header-menu" onClick={onExit}>
+          {tr('tour.menu')}
+        </button>
       </header>
       <div className="coverage-body tour-page">
         {error && <div className="error">{error}</div>}
@@ -1178,7 +1185,7 @@ function TournamentPage({
                       started={Boolean(t.roundStartedAt)}
                       onScore={(wins) => run(() => api.tournaments.setScore(t.id, m.id, wins))}
                       onDouble={(dropBoth) => run(() => api.tournaments.doubleLoss(t.id, m.id, dropBoth))}
-                      onWatch={() => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(t.isJudge ? { judge: true } : {}) })}
+                      onWatch={(asJudge) => m.roomId && onWatch({ roomId: m.roomId, hands: false, ...(asJudge ? { judge: true } : {}) })}
                       onReplay={(statsMatchId) => run(() => openReplay(statsMatchId, onReplay))}
                       onPlays={
                         t.isJudge || t.canManage
@@ -1657,7 +1664,8 @@ function MatchRow({
   onScore: (wins: [number, number]) => void;
   /** Derrota dupla (`dropBoth`: os dois saem do torneio). */
   onDouble: (dropBoth: boolean) => void;
-  onWatch: () => void;
+  /** `asJudge`: entra com o papel de Judge; senão assiste como espectador. */
+  onWatch: (asJudge: boolean) => void;
   /** Abre o replay gravado de um jogo da série. */
   onReplay: (statsMatchId: number) => void;
   /** Judge e organizador: as jogadas do jogo gravado, com o que cada jogador escolheu. */
@@ -1692,8 +1700,13 @@ function MatchRow({
         {m.result && m.result !== 'none' && m.reportedBy && m.reportedBy !== 'bye' && m.reportedBy !== 'late' && <span className="muted small">{tr(REPORTED[m.reportedBy])}</span>}
         {!m.result && m.call && <span className="tour-call-tag">{judge ? tr('tour.callOpenBy', { name: m.call.byName }) : tr('tour.callOpen')}</span>}
         {!m.result && m.room === 'playing' && (
-          <button className={['btn', 'small', m.call ? 'danger' : ''].join(' ')} onClick={onWatch}>
-            {judge ? tr('tour.watchAsJudge') : m.bestOf > 1 ? tr('tour.watchGameN', { n: m.game }) : tr('tour.watch')}
+          <button className={['btn', 'small', m.call && !judge ? 'danger' : ''].join(' ')} onClick={() => onWatch(false)}>
+            {m.bestOf > 1 ? tr('tour.watchGameN', { n: m.game }) : tr('tour.watch')}
+          </button>
+        )}
+        {judge && !m.result && m.room === 'playing' && (
+          <button className={['btn', 'small', m.call ? 'danger' : ''].join(' ')} onClick={() => onWatch(true)}>
+            {tr('tour.watchAsJudge')}
           </button>
         )}
         {!m.result && m.room !== 'playing' && !started && current && m.p2 && (
