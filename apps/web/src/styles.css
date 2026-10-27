@@ -3806,7 +3806,7 @@ button.hint-pill::after,
   font-size: 20px;
   white-space: nowrap;
   border: 3px solid rgba(255, 255, 255, 0.95);
-  animation: banner 1.7s ease forwards;
+  animation: banner 1.25s ease forwards;
   box-shadow: 0 8px 26px rgba(var(--shadow-rgb), 0.35);
 }
 .turn-banner.mine {
@@ -7803,7 +7803,7 @@ tr.clickable:hover td {
     inset 0 -1px 0 rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-  animation: tb-sweep 1.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: tb-sweep 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 .turn-banner.sweep small {
   display: block;
