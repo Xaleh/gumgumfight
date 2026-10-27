@@ -15,7 +15,7 @@ import type { ResponseCache } from '../cache';
 import type { DB } from '../db';
 import { fail } from '../errors';
 import { isFormat } from './catalog';
-import { getGlobalSnapshot, type GlobalQueue, globalTrend, listGlobalQueues, type SyncResult } from './global';
+import { getGlobalSnapshot, globalPrevious, type GlobalQueue, globalTrend, listGlobalQueues, type SyncResult } from './global';
 import { leaderStats, type StatsFilter } from './store';
 
 type CardInfo = Record<string, { name: string; category: string; colors: string[]; imageUrl?: string }>;
@@ -64,14 +64,17 @@ export function registerGlobalStatsRoutes(app: FastifyInstance, { db, cache, car
       const queues = listGlobalQueues(db);
       const queue = pickQueue(req.query.queue);
       const data = queue && getGlobalSnapshot(db, queue.key);
-      if (!queue || !data) return { queue: null, queues, summary: null, leaders: [], matchups: [], cards: {} };
+      if (!queue || !data) return { queue: null, queues, previous: null, summary: null, leaders: [], matchups: [], cards: {} };
       const { leaders, matchups } = data.snapshot;
       const sum = (k: 'games' | 'wins' | 'firstGames' | 'firstWins' | 'secondGames' | 'secondWins') => leaders.reduce((n, l) => n + l[k], 0);
       // Uma fila grande tem mais de 4.000 pares (meio megabyte): aqui vai só a matriz; o resto sai por Líder.
       const top = new Set(leaders.slice(0, MATRIX).map((l) => l.leader));
+      // Posição de cada Líder no resumo de comparação (subiu/desceu no ranking por partidas).
+      const prev = globalPrevious(db, queue.key);
       return {
         queue,
         queues,
+        previous: prev ? { day: prev.day } : null,
         summary: {
           games: sum('games'),
           wins: sum('wins'),
@@ -83,7 +86,10 @@ export function registerGlobalStatsRoutes(app: FastifyInstance, { db, cache, car
           mulligan: { games: 0, wins: 0 },
           keep: { games: 0, wins: 0 },
         },
-        leaders: leaders.map((l) => ({ ...l, lists: 0 })),
+        leaders: leaders.map((l, i) => {
+          const p = prev?.leaders.get(l.leader);
+          return { ...l, lists: 0, rank: i + 1, prevRank: p?.rank ?? null, prevGames: p?.games ?? null, prevWins: p?.wins ?? null };
+        }),
         matchups: matchups.filter((m) => top.has(m.leader) && top.has(m.oppLeader)),
         cards: infoFor(
           leaders.map((l) => l.leader),
@@ -113,7 +119,7 @@ export function registerGlobalStatsRoutes(app: FastifyInstance, { db, cache, car
       const queue = pickQueue(req.query.queue);
       if (!queue) return { queue: null, weeks: [], rows: [], since: null, cards: {} };
       const weeks = Math.min(26, Math.max(2, Math.floor(Number(req.query.weeks) || 6)));
-      const t = globalTrend(db, queue.key, weeks);
+      const t = globalTrend(db, queue.key, weeks, new Date(), queue.window);
       const labels = new Map(getGlobalSnapshot(db, queue.key)?.snapshot.leaders.map((l) => [l.leader, l.label]) ?? []);
       return { queue, ...t, cards: infoFor(t.rows.map((r) => r.leader), labels) };
     });

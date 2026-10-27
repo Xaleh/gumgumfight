@@ -1792,6 +1792,8 @@ export interface GlobalQueue {
   format: FormatId | null;
   /** Só jogadores com recompensa (rating deles) acima de N bilhões; null = fila aberta. */
   minBounty: number | null;
+  /** Janela móvel dos últimos 7 dias (filas "LW", Last Week); false = total acumulado da temporada. */
+  window: boolean;
   /** Quando o JSON mudou na API deles (null = não informado). */
   lastModified: string | null;
   /** Quando o servidor baixou. */
@@ -1808,8 +1810,21 @@ export interface GlobalStats {
   /** Fila servida (null = o servidor ainda não baixou nenhuma). */
   queue: GlobalQueue | null;
   queues: GlobalQueue[];
+  /** Resumo usado na seta de subiu/desceu (null = ainda não há com o que comparar). */
+  previous: { day: string } | null;
   summary: StatsSummary | null;
-  leaders: Array<StatsOverview['leaders'][number] & SplitCount & { label: string }>;
+  leaders: Array<
+    StatsOverview['leaders'][number] &
+      SplitCount & {
+        label: string;
+        /** Posição por partidas (1 = mais jogado). */
+        rank: number;
+        /** Posição, partidas e vitórias no resumo de comparação (null = não estava lá). */
+        prevRank: number | null;
+        prevGames: number | null;
+        prevWins: number | null;
+      }
+  >;
   matchups: Array<StatsOverview['matchups'][number] & SplitCount>;
   cards: Record<string, CardInfo>;
 }

@@ -290,21 +290,31 @@ Com `GLOBAL_STATS_API_KEY` configurada, a tela de Estatísticas ganha o escopo *
 **TCG Matchmaking** (a ranqueada por Discord do OPTCGSim, a maior fonte de partidas online do jogo), publicadas
 pela **OPTCG Logpose API** do Matheus (`https://optcg-api.vercel.app/docs`). É aberto a todo mundo, sem plano.
 
-- **Filas** (LW Standard, LW Extra Regulation, as "1Billion"/"2Billion" só de jogadores com recompensa alta lá, a
-  Special Queue e as da temporada anterior), com as abas **Líderes** e **Matchups** nas mesmas tabelas das
-  estatísticas daqui (quem começou só é conhecido numa parte das partidas, então as contagens de primeiro e de
-  segundo vêm separadas), **Tendência** e **Comparar**: o mesmo Líder aqui e lá, participação e vitórias, com a
-  diferença em pontos. "Aqui" é o que quem pede vê (Geral, ou Pro com o plano), no formato equivalente da fila
-  (Extra Regulation = EGB; a Special Queue não compara).
+- **Filas:** as "LW" (Last Week: LW Standard, LW Extra Regulation e as "1Billion"/"2Billion", só de jogadores com
+  recompensa alta lá) são a **janela dos últimos 7 dias**; as outras (OP17, OP17 1Billion) somam a temporada inteira,
+  e a Special Queue é uma fila à parte.
+- **Abas:** **Líderes** (com a posição por partidas e a seta de subiu/desceu, mais a variação da taxa de vitória),
+  **Por Líder** (como o "By leader" do OPlay: escolha com busca, arte, números principais e os matchups em artes, com
+  as vitórias começando e como segundo, o espelho e a contagem de favoráveis, equilibrados e desfavoráveis; clicar
+  num adversário abre a página dele), **Matchups**, **Tendência** e **Comparar** (o mesmo Líder aqui e lá,
+  participação e vitórias, com a diferença em pontos). "Aqui" é o que quem pede vê (Geral, ou Pro com o plano), no
+  formato equivalente da fila (Extra Regulation = EGB; a Special Queue não compara). Quem começou só é conhecido numa
+  parte das partidas, então as contagens de primeiro e de segundo vêm separadas.
 - **O navegador nunca fala com a API deles.** O servidor busca a cada `GLOBAL_STATS_SYNC` horas (padrão 6; a API
   entrega uma URL assinada de 1 h do JSON de cada fila, baixada na hora e nunca guardada), grava o último JSON de
   cada fila (`global_stats_queues`) e um resumo diário dos Líderes (`global_stats_history`), e as rotas
-  `GET /api/stats/global`, `/global/trend` e `/global/compare` (`apps/server/src/stats/global-routes.ts`) só leem o
-  banco. Se `lastModified` não mudou, o JSON não é baixado de novo. Com a API fora do ar, a tela continua com o
-  último instantâneo (a data aparece no rodapé).
-- **Tendência própria:** a API só tem a foto atual (totais acumulados da fila), então as partidas de cada semana
-  são a diferença entre o resumo do fim da semana e o do fim da anterior; a aba só aparece com duas semanas de
-  coleta. Um admin força uma rodada com `POST /api/admin/stats/global/sync`.
+  `GET /api/stats/global` (Líderes, a matriz dos 10 mais jogados e a posição anterior), `/global/matchups?leader=`
+  (os matchups de um Líder; a fila inteira teria milhares de pares), `/global/trend` e `/global/compare`
+  (`apps/server/src/stats/global-routes.ts`) só leem o banco. Se `lastModified` não mudou, o JSON não é baixado de
+  novo. Com a API fora do ar, a tela continua com o último instantâneo (a data aparece no rodapé).
+- **Subiu/desceu:** a posição de hoje é comparada com o resumo de 7 dias antes; enquanto a fila não tem uma semana de
+  coleta, com o resumo diferente mais recente (a data aparece acima da tabela). Resumos iguais ao atual (a API não
+  mudou) não contam.
+- **Tendência própria:** a API só tem a foto atual. Numa fila "LW", cada semana é o último resumo dela (a janela de
+  7 dias); numa fila da temporada, as partidas da semana são a diferença entre o resumo do fim da semana e o do fim
+  da anterior. Um admin força uma rodada do sync com `POST /api/admin/stats/global/sync`.
+- A aba **Por Líder** existe também nas estatísticas daqui, com as mesmas artes e números, a quantidade de listas e
+  um atalho para as cartas do Líder.
 
 ## Multiplayer online
 
