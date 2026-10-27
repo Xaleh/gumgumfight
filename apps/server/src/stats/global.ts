@@ -11,6 +11,11 @@
 // first_games, second_wins, second_games...). Quem começou só é conhecido numa parte das
 // partidas, por isso guardamos as contagens de primeiro e de segundo separadas.
 //
+// Dois tipos de fila: as "LW" (Last Week: `lw`, `lw_eastern`, `LWS1BillionBounty`...) são uma
+// janela móvel dos últimos 7 dias, recalculada a cada atualização; as outras (`OP17`...) somam a
+// temporada inteira. Isso muda a tendência: numa janela, cada resumo já é "a semana"; num total
+// acumulado, a semana é a diferença entre dois resumos.
+//
 // O navegador nunca fala com a API (a chave ficaria exposta): o servidor busca de tempos em
 // tempos (`scheduleGlobalStatsSync`), guarda o último JSON normalizado de cada fila
 // (`global_stats_queues`) e um resumo diário dos Líderes (`global_stats_history`, para a
@@ -33,6 +38,8 @@ export interface GlobalQueue {
   format: FormatId | null;
   /** Fila restrita a jogadores com recompensa acima de N bilhões (as filas "1Billion"/"2Billion"); null = aberta. */
   minBounty: number | null;
+  /** Janela móvel dos últimos 7 dias (filas "LW", Last Week); false = total acumulado da temporada. */
+  window: boolean;
   /** `lastModified` do JSON na API (null = a API não informou). */
   lastModified: string | null;
   /** Quando o servidor baixou o JSON. */
@@ -73,6 +80,11 @@ export function queueFormat(key: string, name = ''): FormatId | null {
   if (/special/i.test(s)) return null;
   if (/eastern|extra/i.test(s)) return 'egb';
   return 'standard';
+}
+
+/** Filas "LW" (Last Week): janela móvel dos últimos 7 dias. As outras (OP17...) acumulam a temporada. */
+export function queueWindow(key: string, name = ''): boolean {
+  return /^lw/i.test(key) || /^lw\b/i.test(name);
 }
 
 /** Filas "1Billion"/"2Billion": só jogadores com recompensa (rating deles) acima de N bilhões. */
@@ -155,6 +167,7 @@ const toQueue = (r: QueueRow): GlobalQueue => ({
   sort: r.sort,
   format: queueFormat(r.queue, r.name),
   minBounty: queueMinBounty(r.queue, r.name),
+  window: queueWindow(r.queue, r.name),
   lastModified: r.last_modified,
   fetchedAt: r.fetched_at,
 });
@@ -209,11 +222,12 @@ function monday(d: Date): string {
 
 /**
  * Uso e vitórias por Líder em cada uma das últimas `weeks` semanas, a partir dos resumos
- * diários. Os números da API são acumulados da fila, então as partidas de uma semana são a
- * diferença entre o último resumo da semana e o último da semana anterior (uma semana sem
- * resumo anterior não aparece; uma diferença negativa, se a fila for recalculada, vira zero).
+ * diários (vale o último resumo de cada semana). Numa fila "LW" (janela dos últimos 7 dias) o
+ * resumo já é a semana. Numa fila acumulada (temporada), as partidas de uma semana são a
+ * diferença entre o último resumo da semana e o da semana anterior (uma semana sem resumo
+ * anterior não aparece; uma diferença negativa, se a fila for recalculada, vira zero).
  */
-export function globalTrend(db: DB, key: string, weeks: number, now = new Date()): GlobalTrend {
+export function globalTrend(db: DB, key: string, weeks: number, now = new Date(), window = queueWindow(key)): GlobalTrend {
   const rows = db.prepare('SELECT day, body FROM global_stats_history WHERE queue = ? ORDER BY day').all(key) as unknown as Array<{ day: string; body: string }>;
   const since = rows[0]?.day ?? null;
   // Último resumo de cada semana.
@@ -234,6 +248,11 @@ export function globalTrend(db: DB, key: string, weeks: number, now = new Date()
   for (const wk of list) {
     const end = lastOfWeek.get(wk);
     if (!end) continue;
+    if (window) {
+      out.weeks.push(wk);
+      for (const [leader, [games, wins]] of end) if (games) out.rows.push({ week: wk, leader, games, wins: Math.min(games, wins) });
+      continue;
+    }
     // Base: a última semana com resumo antes desta.
     const prev = sortedWeeks.filter((w) => w < wk).pop();
     if (!prev) continue;
@@ -247,6 +266,32 @@ export function globalTrend(db: DB, key: string, weeks: number, now = new Date()
     }
   }
   return out;
+}
+
+export interface GlobalPrevious {
+  /** Dia (AAAA-MM-DD) do resumo usado na comparação. */
+  day: string;
+  /** Posição (por partidas), partidas e vitórias de cada Líder naquele dia. */
+  leaders: Map<string, { rank: number; games: number; wins: number }>;
+}
+
+/**
+ * Resumo para comparar com o atual (a seta de subiu/desceu): o mais recente com pelo menos
+ * 7 dias de diferença e dados diferentes; sem nenhum assim (fila recém-coletada), o mais
+ * recente com dados diferentes. Resumos iguais ao atual (a API não mudou) não servem.
+ */
+export function globalPrevious(db: DB, key: string): GlobalPrevious | null {
+  const rows = db.prepare('SELECT day, body FROM global_stats_history WHERE queue = ? ORDER BY day DESC').all(key) as unknown as Array<{ day: string; body: string }>;
+  const [current, ...older] = rows;
+  if (!current) return null;
+  const weekBefore = new Date(`${current.day}T00:00:00Z`);
+  weekBefore.setUTCDate(weekBefore.getUTCDate() - 7);
+  const limit = weekBefore.toISOString().slice(0, 10);
+  const changed = older.filter((r) => r.body !== current.body);
+  const ref = changed.find((r) => r.day <= limit) ?? changed[0];
+  if (!ref) return null;
+  const body = JSON.parse(ref.body) as HistoryBody;
+  return { day: ref.day, leaders: new Map(body.map(([leader, games, wins], i) => [leader, { rank: i + 1, games, wins }])) };
 }
 
 // ---- cliente da API e sincronização ----

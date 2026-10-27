@@ -6,7 +6,17 @@ import { createSession, upsertGoogleUser } from '../src/auth/store';
 import type { GlobalStatsOptions } from '../src/config';
 import { type DB, openDb } from '../src/db';
 import { seed } from '../src/seed';
-import { formatSyncResult, globalTrend, listGlobalQueues, normalizeSnapshot, queueFormat, queueMinBounty, syncGlobalStats } from '../src/stats/global';
+import {
+  formatSyncResult,
+  globalPrevious,
+  globalTrend,
+  listGlobalQueues,
+  normalizeSnapshot,
+  queueFormat,
+  queueMinBounty,
+  queueWindow,
+  syncGlobalStats,
+} from '../src/stats/global';
 
 /** Cinco Líderes da fila "lw" de verdade (26/10/2026), com os matchups só entre eles. */
 const FIXTURE = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'logpose-lw.json'), 'utf8')) as Array<Record<string, unknown>>;
@@ -30,8 +40,9 @@ function fakeApi(opts: { lastModified?: string | null; body?: unknown; queues?: 
     if (url.startsWith(JSON_URL)) return Response.json(state.body);
     if (h['x-client-name'] !== 'gumgum' || h['x-api-key'] !== 'k-1') return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (url === `${API.apiUrl}/stats`) return Response.json({ queues });
-    if (url === `${API.apiUrl}/stats/lw`) return Response.json({ queue: 'lw', url: JSON_URL, urlExpiresAt: '2026-10-26T23:32:51.633Z', lastModified: state.lastModified });
     if (url === `${API.apiUrl}/stats/Special_Queue`) return Response.json({ error: 'Cloudinary não configurado' }, { status: 503 });
+    const key = url.startsWith(`${API.apiUrl}/stats/`) ? decodeURIComponent(url.slice(`${API.apiUrl}/stats/`.length)) : '';
+    if (queues.some((q) => q.key === key)) return Response.json({ queue: key, url: JSON_URL, urlExpiresAt: '2026-10-26T23:32:51.633Z', lastModified: state.lastModified });
     return new Response('nada', { status: 404 });
   }) as typeof fetch;
   return { fetchImpl, state };
@@ -85,6 +96,12 @@ describe('Meta global: adaptador do JSON da OPTCG Logpose API', () => {
     expect(queueFormat('OP17-1BillionBounty', 'OP17 1Billion')).toBe('standard');
     expect(queueMinBounty('LWS2BillionBounty', 'LW Standard 2Billion')).toBe(2);
     expect(queueMinBounty('lw', 'LW Standard')).toBeNull();
+    // "LW" = Last Week: janela dos últimos 7 dias; as outras filas acumulam a temporada.
+    expect(queueWindow('lw', 'LW Standard')).toBe(true);
+    expect(queueWindow('LWS2BillionBounty', 'LW Standard 2Billion')).toBe(true);
+    expect(queueWindow('lw_eastern', 'LW Extra Regulation')).toBe(true);
+    expect(queueWindow('OP17', 'OP17')).toBe(false);
+    expect(queueWindow('Special_Queue', 'Special Queue')).toBe(false);
   });
 });
 
@@ -133,9 +150,10 @@ describe('Meta global: sincronização', () => {
     expect(listGlobalQueues(db)).toHaveLength(1);
   });
 
-  it('a tendência semanal é a diferença entre os últimos resumos de semanas seguidas', async () => {
+  /** Uma fila só, com um resumo por chamada de `run(dia, partidas, vitórias)` (Zoro fica parado em 100/50). */
+  const history = (key: string, name: string) => {
     const db = openDb(':memory:');
-    const api = fakeApi();
+    const api = fakeApi({ queues: [{ key, name }] });
     const run = async (day: string, games: number, wins: number) => {
       api.state.lastModified = `${day}T06:00:00.000Z`;
       api.state.body = [
@@ -144,12 +162,54 @@ describe('Meta global: sincronização', () => {
       ];
       await syncGlobalStats(db, { api: API, fetchImpl: api.fetchImpl, now: DAY(day) });
     };
+    return { db, run };
+  };
+
+  it('numa fila "LW" (janela de 7 dias), cada semana é o último resumo dela', async () => {
+    const { db, run } = history('lw', 'LW Standard');
+    await run('2026-10-13', 100, 50);
+    await run('2026-10-15', 120, 60);
+    await run('2026-10-22', 200, 110);
+    const t = globalTrend(db, 'lw', 4, new Date('2026-10-23T12:00:00Z'));
+    expect(t.weeks).toEqual(['2026-10-12', '2026-10-19']);
+    expect(t.rows).toEqual([
+      { week: '2026-10-12', leader: 'OP05-060', games: 120, wins: 60 },
+      { week: '2026-10-12', leader: 'OP01-001', games: 100, wins: 50 },
+      { week: '2026-10-19', leader: 'OP05-060', games: 200, wins: 110 },
+      { week: '2026-10-19', leader: 'OP01-001', games: 100, wins: 50 },
+    ]);
+  });
+
+  it('a seta de subiu/desceu compara com o resumo de 7 dias antes (ou o mais recente diferente)', async () => {
+    const { db, run } = history('lw', 'LW Standard');
+    // Um resumo só: nada para comparar.
+    await run('2026-10-10', 80, 40);
+    expect(globalPrevious(db, 'lw')).toBeNull();
+    // Dia seguinte, dados novos: compara com a véspera (ainda não há uma semana).
+    await run('2026-10-11', 90, 45);
+    let p = globalPrevious(db, 'lw')!;
+    expect(p.day).toBe('2026-10-10');
+    expect(p.leaders.get('OP01-001')).toEqual({ rank: 1, games: 100, wins: 50 });
+    expect(p.leaders.get('OP05-060')).toEqual({ rank: 2, games: 80, wins: 40 });
+    // Uma semana depois: vale o resumo de 7 dias antes, não a véspera.
+    await run('2026-10-17', 95, 50);
+    await run('2026-10-18', 150, 80);
+    p = globalPrevious(db, 'lw')!;
+    expect(p.day).toBe('2026-10-11');
+    // A API não mudou no dia seguinte (resumo igual): continua comparando com o mesmo dia.
+    const api = fakeApi({ queues: [{ key: 'lw', name: 'LW Standard' }], lastModified: '2026-10-18T06:00:00.000Z' });
+    await syncGlobalStats(db, { api: API, fetchImpl: api.fetchImpl, now: DAY('2026-10-19') });
+    expect(globalPrevious(db, 'lw')!.day).toBe('2026-10-11');
+  });
+
+  it('numa fila acumulada (temporada), a semana é a diferença entre os últimos resumos de semanas seguidas', async () => {
+    const { db, run } = history('OP17', 'OP17');
     // Semana de 12/10: dois resumos (vale o último); 19/10; 26/10 (segunda).
     await run('2026-10-13', 100, 50);
     await run('2026-10-15', 120, 60);
     await run('2026-10-22', 200, 110);
     await run('2026-10-26', 230, 120);
-    const t = globalTrend(db, 'lw', 4, new Date('2026-10-28T12:00:00Z'));
+    const t = globalTrend(db, 'OP17', 4, new Date('2026-10-28T12:00:00Z'));
     expect(t.since).toBe('2026-10-13');
     // A primeira semana não tem base; as duas seguintes são diferenças.
     expect(t.weeks).toEqual(['2026-10-19', '2026-10-26']);
@@ -159,7 +219,7 @@ describe('Meta global: sincronização', () => {
     ]);
     // Fila recalculada para menos: a diferença negativa vira zero (linha some), nunca negativa.
     await run('2026-10-27', 50, 20);
-    const t2 = globalTrend(db, 'lw', 4, new Date('2026-10-28T12:00:00Z'));
+    const t2 = globalTrend(db, 'OP17', 4, new Date('2026-10-28T12:00:00Z'));
     expect(t2.rows.filter((r) => r.week === '2026-10-26')).toEqual([]);
   });
 });
@@ -202,7 +262,9 @@ describe('Meta global: rotas', () => {
     expect(g.queue.key).toBe('lw');
     expect(g.summary).toMatchObject({ games: 115827, matches: 57914, players: 0 });
     expect(g.summary.first.games).toBeGreaterThan(0);
-    expect(g.leaders[0]).toMatchObject({ leader: 'OP17-039', games: 44841, wins: 24146, lists: 0 });
+    expect(g.leaders[0]).toMatchObject({ leader: 'OP17-039', games: 44841, wins: 24146, lists: 0, rank: 1, prevRank: null });
+    // Primeiro resumo: ainda não há com o que comparar a posição.
+    expect(g.previous).toBeNull();
     expect(g.leaders[0].secondGames).toBeGreaterThan(0);
     // A matriz (os 10 mais jogados): aqui, os 5 do recorte entre si.
     expect(g.matchups.length).toBe(25);
@@ -237,13 +299,15 @@ describe('Meta global: rotas', () => {
     expect((await app.inject('/api/stats/global/compare?queue=Special_Queue')).statusCode).toBe(400);
   });
 
-  it('a tendência começa vazia (ainda coletando) e informa desde quando há resumos', async () => {
+  it('a tendência de uma fila "LW" já tem a semana atual e informa desde quando há resumos', async () => {
     const { db, app } = setup();
     await app.inject({ method: 'POST', url: '/api/admin/stats/global/sync', headers: admin(db) });
     const t = (await app.inject('/api/stats/global/trend?queue=lw&weeks=4')).json();
     expect(t.queue.key).toBe('lw');
-    expect(t.weeks).toEqual([]);
-    expect(t.rows).toEqual([]);
+    // "LW" é uma janela de 7 dias: o primeiro resumo já é a semana atual.
+    expect(t.weeks).toHaveLength(1);
+    expect(t.rows).toHaveLength(5);
+    expect(t.rows[0]).toMatchObject({ leader: 'OP17-039', games: 44841, wins: 24146 });
     expect(t.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

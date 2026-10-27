@@ -9,7 +9,10 @@
 > partidas da fila em que o Líder apareceu (soma 200% entre os Líderes; por isso a tela usa a participação por
 > lado, que soma 100%, como nas estatísticas daqui), e `first_games + second_games` é bem menor que
 > `number_of_matches` (quem começou só é conhecido numa parte das partidas). As filas são atualizadas em lote
-> (todas com `lastModified` no mesmo minuto); `lw_eastern` estava parada desde 22/08. Ficaram de fora: a
+> (todas com `lastModified` no mesmo minuto); `lw_eastern` estava parada desde 22/08.
+> "LW" quer dizer **Last Week**: as filas `lw*` são a janela dos últimos 7 dias (a `lw` tinha 111 mil jogos; o Rocks,
+> 44.841, quase o mesmo dos 7 dias do OPlay), enquanto a `OP17` soma a temporada (2,3 milhões). A tendência e a seta
+> de subiu/desceu tratam os dois tipos de forma diferente (README, "Meta global"). Ficaram de fora: a
 > `weighted_win_rate` (não existe no JSON) e a linha "no mundo" na tela inicial (ideia para depois).
 >
 > Plano original (escrito a partir da conversa com o Matheus, da documentação da API em
