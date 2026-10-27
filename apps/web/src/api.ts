@@ -526,6 +526,8 @@ export const api = {
     get<{ total: number; leaders: number; top: Array<WinCount & { leader: string }>; cards: Record<string, CardInfo> }>(
       `/api/stats/teaser${format ? `?format=${encodeURIComponent(format)}` : ''}`,
     ),
+  /** Decks de um Líder: cartas no deck, deck médio e decks populares (com os filtros das estatísticas). */
+  leaderDecks: (f: StatsQuery) => get<LeaderDecksResponse>(`/api/stats/decks?${statsQs(f)}`),
   trend: (f: StatsQuery, weeks = 6) => get<TrendResponse>(`/api/stats/trend?${statsQs({ ...f, weeks: String(weeks) })}`),
   /** Meta global (TCG Matchmaking): Líderes e matchups de uma fila (sem fila: a primeira). */
   globalStats: (queue?: string) => get<GlobalStats>(`/api/stats/global${queue ? `?queue=${encodeURIComponent(queue)}` : ''}`),
@@ -1779,6 +1781,20 @@ export interface TrendResponse {
   weeks: string[];
   rows: Array<WinCount & { week: string; leader: string }>;
   cards: Record<string, CardInfo>;
+}
+
+export interface LeaderDecksResponse {
+  leader: string;
+  /** Partidas do Líder no filtro e listas diferentes. */
+  games: number;
+  lists: number;
+  /** Cartas por partidas com a carta: fração (0..1), partidas com 1..4 cópias e a cópia mais comum. */
+  cards: Array<{ cardId: string; games: number; share: number; copies: [number, number, number, number]; usual: number }>;
+  /** Deck médio (até 50 cartas). */
+  average: Array<{ id: string; count: number }>;
+  /** Listas mais jogadas. */
+  popular: Array<WinCount & { hash: string; players: number; cards: Array<{ id: string; count: number }> }>;
+  cardInfo: Record<string, CardInfo>;
 }
 
 /** Fila do TCG Matchmaking já baixada pelo servidor (meta global). */

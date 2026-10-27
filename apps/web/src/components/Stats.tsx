@@ -9,6 +9,7 @@ import {
   type GlobalQueue,
   type GlobalStats,
   type GlobalTrendResponse,
+  type LeaderDecksResponse,
   type PlayerProfile,
   type SplitCount,
   type StatsMeta,
@@ -21,6 +22,8 @@ import {
 import { type Locale, type Translate, useLocale, useT } from '../i18n';
 import { useAuth } from '../auth';
 import { useSettings } from '../settings';
+import { formatDeckList } from '@gumgum/engine';
+import type { DeckLink } from '../deeplink';
 import { bountyOptions, choiceOf, formatOptions, type PeriodId, periodOf, periodOptions, queueFor } from '../globalQueues';
 import { fmtBerries, fmtDateTime, fmtNumber } from '../i18n/format';
 import { Icon } from './Icons';
@@ -1154,6 +1157,7 @@ function LeaderView({
   lists,
   onLeader,
   action,
+  extra,
 }: {
   data: StatsOverview;
   leader: string;
@@ -1166,6 +1170,8 @@ function LeaderView({
   onLeader: (leader: string) => void;
   /** Botão extra embaixo dos números (ex.: ver as cartas). */
   action?: ReactNode;
+  /** Seções depois dos matchups (cartas no deck e decks populares). */
+  extra?: ReactNode;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -1314,8 +1320,142 @@ function LeaderView({
             </div>
           </>
         )}
+        {extra}
       </div>
     </div>
+  );
+}
+
+/** Quatro barras: quantas partidas com 1, 2, 3 e 4 cópias (a mais alta é a mais comum). */
+function CopyBars({ copies }: { copies: [number, number, number, number] }) {
+  const t = useT();
+  const total = copies.reduce((n, c) => n + c, 0);
+  const max = Math.max(1, ...copies);
+  return (
+    <div className="copy-bars">
+      {copies.map((c, i) => (
+        <span key={i} className="copy-bar" title={t('stats.copiesBarTitle', { n: i + 1, pct: fmtPct(total ? c / total : null) })}>
+          <i style={{ height: `${Math.max(c ? 6 : 2, Math.round((c / max) * 100))}%` }} className={c === max ? 'top' : ''} />
+          <small>{i + 1}</small>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Uma lista em artes pequenas, com a quantidade de cada carta. */
+function DeckStrip({ cards, info }: { cards: Array<{ id: string; count: number }>; info: Record<string, CardInfo> }) {
+  return (
+    <div className="deck-cards">
+      {cards.map((c) => (
+        <span key={c.id} className="deck-cards-item" title={`${c.count}x ${info[c.id]?.name ?? c.id} (${c.id})`}>
+          <CardArt id={c.id} info={info[c.id]} />
+          <b>{c.count}</b>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Cartas na primeira tela de "Cartas no deck", antes de "Mostrar todas". */
+const DECK_TILES = 21;
+
+/**
+ * Decks de um Líder nas estatísticas daqui (como o OPlay): cartas no deck (fração das partidas com a
+ * carta e as cópias), deck médio e decks populares, cada um com "Abrir no construtor".
+ */
+function LeaderDecks({ query, leader, onOpenDeck }: { query: StatsQuery; leader: string; onOpenDeck?: (link: DeckLink) => void }) {
+  const t = useT();
+  const [data, setData] = useState<LeaderDecksResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    setShowAll(false);
+    api
+      .leaderDecks({ ...query, leader, deck: undefined })
+      .then((d) => !cancelled && (setData(d), setError(null)))
+      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [query, leader]);
+  if (error) return <div className="error">{error}</div>;
+  if (!data) return <p className="muted">{t('common.loading')}</p>;
+  if (!data.games) return <p className="muted">{t('stats.noDecks')}</p>;
+  const info = data.cardInfo;
+  const leaderName = info[leader]?.name ?? leader;
+  const format = query.format === 'standard' || query.format === 'egb' ? query.format : undefined;
+  const open = (cards: Array<{ id: string; count: number }>, name: string) =>
+    onOpenDeck?.({ text: formatDeckList({ leader, cards }), name: name.slice(0, 60), ...(format ? { format } : {}) });
+  const shown = showAll ? data.cards : data.cards.slice(0, DECK_TILES);
+  const total = (cards: Array<{ count: number }>) => cards.reduce((n, c) => n + c.count, 0);
+  return (
+    <>
+      <h3 className="stats-sub">{t('stats.cardsInDeck')}</h3>
+      <p className="muted small">{t('stats.cardsInDeckHint')}</p>
+      <p className="muted small">{t('stats.decksSample', { games: data.games, lists: data.lists })}</p>
+      <div className="mu-grid">
+        {shown.map((c) => (
+          <div key={c.cardId} className="mu-tile deck-card">
+            <div className="mu-art">
+              <CardArt id={c.cardId} info={info[c.cardId]} />
+              <div className="mu-band">
+                <span>{pct0(c.share)}</span>
+                <small>{t('stats.ofDecks')}</small>
+              </div>
+            </div>
+            <span className="mu-line">
+              <span className="mu-name">{info[c.cardId]?.name ?? c.cardId}</span>
+            </span>
+            <span className="mu-line muted small">
+              <span>{c.cardId}</span>
+            </span>
+            <CopyBars copies={c.copies} />
+          </div>
+        ))}
+      </div>
+      {data.cards.length > DECK_TILES && (
+        <div className="mu-more">
+          <button type="button" className="btn small" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? t('stats.showFewer') : t('stats.showAllCards', { n: data.cards.length })}
+          </button>
+        </div>
+      )}
+
+      <h3 className="stats-sub">{t('stats.decksTitle')}</h3>
+      <p className="muted small">{t('stats.decksHint')}</p>
+      <div className="deck-box">
+        <div className="deck-box-head">
+          <b title={t('stats.averageDeckTitle')}>{t('stats.averageDeck')}</b>
+          <span className="muted small">{t('stats.deckCardsCount', { n: total(data.average) })}</span>
+          {onOpenDeck && (
+            <button type="button" className="btn small" onClick={() => open(data.average, `${leaderName} · ${t('stats.averageDeck')}`)}>
+              {t('stats.openInBuilder')}
+            </button>
+          )}
+        </div>
+        <DeckStrip cards={data.average} info={info} />
+      </div>
+      {data.popular.map((d, i) => (
+        <div key={d.hash} className="deck-box">
+          <div className="deck-box-head">
+            <b>{t('stats.popularDeck', { n: i + 1 })}</b>
+            <span className="small">
+              <b className={`mu-rate ${bucketOf(rate(d))}`}>{fmtPct(rate(d))}</b>{' '}
+              <span className="muted">{t('stats.popularDeckLine', { games: d.games, players: d.players })}</span>
+            </span>
+            {onOpenDeck && (
+              <button type="button" className="btn small" onClick={() => open(d.cards, `${leaderName} · ${t('stats.popularDeck', { n: i + 1 })}`)}>
+                {t('stats.openInBuilder')}
+              </button>
+            )}
+          </div>
+          <DeckStrip cards={d.cards} info={info} />
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -1653,6 +1793,7 @@ function GlobalPanel({
               min={min}
               movement={movement}
               onLeader={setLeader}
+              extra={<p className="muted small leader-note">{t('stats.globalNoDecks')}</p>}
             />
           </>
         )}
@@ -1690,7 +1831,7 @@ function GlobalPanel({
   );
 }
 
-export function Stats({ onExit }: { onExit: () => void }) {
+export function Stats({ onExit, onOpenDeck }: { onExit: () => void; onOpenDeck?: (link: DeckLink) => void }) {
   const t = useT();
   const locale = useLocale();
   const [meta, setMeta] = useState<StatsMeta | null>(null);
@@ -1994,6 +2135,7 @@ export function Stats({ onExit }: { onExit: () => void }) {
                         {t('stats.rowCardsTitle')}
                       </button>
                     }
+                    extra={<LeaderDecks query={query} leader={cardsLeader} onOpenDeck={onOpenDeck} />}
                   />
                 </>
               )}

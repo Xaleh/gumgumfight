@@ -14918,3 +14918,101 @@ div.dk-tile-main {
 .global-filters .seg.small button {
   white-space: nowrap;
 }
+
+/* ---- Estatísticas: cartas no deck, deck médio e decks populares (aba "Por Líder") ---- */
+.leader-main .stats-sub {
+  margin-top: 22px;
+}
+.leader-main .stats-sub:first-child {
+  margin-top: 0;
+}
+.leader-note {
+  margin-top: 18px;
+}
+.deck-card {
+  cursor: default;
+}
+.deck-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+.deck-card .mu-band {
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 6px;
+}
+.copy-bars {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  height: 46px;
+  margin-top: 2px;
+}
+.copy-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 2px;
+  text-align: center;
+}
+.copy-bar i {
+  display: block;
+  background: var(--line);
+  border-radius: 3px 3px 0 0;
+}
+.copy-bar i.top {
+  background: var(--blue);
+}
+.copy-bar small {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1;
+}
+.deck-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.deck-box-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+}
+.deck-box-head .btn {
+  margin-left: auto;
+}
+.deck-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.deck-cards-item {
+  position: relative;
+  width: 58px;
+}
+.deck-cards-item .card-art {
+  border-radius: 5px;
+}
+.deck-cards-item .card-art-name {
+  font-size: 8px;
+  padding: 2px;
+}
+.deck-cards-item b {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--panel);
+  font-size: 11px;
+  border: 2px solid var(--panel);
+}
