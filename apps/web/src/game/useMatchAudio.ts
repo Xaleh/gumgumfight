@@ -145,7 +145,7 @@ export function useMatchAudio(state: GameState, opts: MatchAudioOptions) {
     const battleOver = Boolean(prev.battle) && (!state.battle || state.battle.step === 'end');
     const lifeLost = state.players.some((p, i) => p.life.length < prev.players[i].life.length);
     // Num ataque, a carta atacante voa até o centro antes do impacto (ver `spotPlan` em Motion).
-    const impactAt = animate && prev.battle && battleOver ? 320 * tempo : 0;
+    const impactAt = animate && prev.battle && battleOver ? 260 * tempo : 0;
 
     // Início da partida e mulligan: embaralhar.
     const dealt = prev.players.every((p) => p.hand.length === 0 && p.life.length === 0) && state.players.some((p) => p.hand.length > 0);
