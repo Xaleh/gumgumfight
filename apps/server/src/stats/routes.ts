@@ -9,6 +9,7 @@ import { type DB, getCards } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
 import { FORMATS, isFormat, isPlayFormat, isQueue, isTier, type PlayFormat, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
+import { summarizeDecks } from './decks';
 import { deriveMatch } from './derive';
 import { listGlobalQueues, syncGlobalStats } from './global';
 import { registerGlobalStatsRoutes } from './global-routes';
@@ -16,6 +17,7 @@ import { isApprentice } from '../tutorial/store';
 import {
   cardStats,
   findPlayer,
+  leaderLists,
   leaderStats,
   matchupStats,
   myDecks,
@@ -282,6 +284,16 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
       const f = parseFilter(req);
       const rows = cardStats(db, f);
       return { summary: summary(db, f), rows, cards: cardInfo(rows.map((r) => r.cardId).concat(f.leader ?? [])) };
+    });
+  });
+
+  /** Decks de um Líder: cartas no deck (quantas partidas e quantas cópias), deck médio e decks populares. */
+  app.get<{ Querystring: Query }>('/api/stats/decks', { config: { scope: 'stats:read' } }, async (req, reply) => {
+    if (!req.query.leader) return reply.code(400).send(fail('chooseLeader', 'Escolha um Líder.'));
+    return cache.send(req, reply, cacheKey(req, req.query.mine === '1'), STATS_TTL_MS, () => {
+      const f = parseFilter(req);
+      const s = summarizeDecks(leaderLists(db, f));
+      return { leader: f.leader, ...s, cardInfo: cardInfo([f.leader!, ...s.cards.map((c) => c.cardId)]) };
     });
   });
 

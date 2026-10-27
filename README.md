@@ -317,7 +317,11 @@ pela **OPTCG Logpose API** do Matheus (`https://optcg-api.vercel.app/docs`). É 
   7 dias); numa fila da temporada, as partidas da semana são a diferença entre o resumo do fim da semana e o do fim
   da anterior. Um admin força uma rodada do sync com `POST /api/admin/stats/global/sync`.
 - A aba **Por Líder** existe também nas estatísticas daqui, com as mesmas artes e números, a quantidade de listas e
-  um atalho para as cartas do Líder.
+  um atalho para as cartas do Líder. Aqui, onde temos as listas de cada partida, ela ganha também **Cartas no deck**
+  (a fração das partidas do Líder com a carta e as barras de 1 a 4 cópias), o **Deck médio** (as cartas mais usadas,
+  com as cópias mais comuns, até 50) e os **Decks populares** (as listas mais jogadas, com vitórias, partidas e
+  jogadores), cada um com **Abrir no construtor** (`GET /api/stats/decks?leader=`, `apps/server/src/stats/decks.ts`).
+  Cada lista pesa pelas partidas que jogou. No Global essas partes não existem: o TCG Matchmaking não publica as listas.
 
 ## Multiplayer online
 
@@ -1120,6 +1124,7 @@ pode chamar sem login nem token:
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (opcionalmente por coleção) |
 | GET | `/api/decks` · `/api/decks/:id` | Decks prontos e da comunidade, com validação por formato; `mine=1` filtra os seus (navegador ou conta) |
 | GET | `/api/stats/meta` · `/api/stats` · `/api/stats/trend?weeks=` · `/api/stats/cards?leader=` | Estatísticas gerais: filtros, totais, Líderes, matchups, tendência semanal e cartas de um Líder |
+| GET | `/api/stats/decks?leader=` | Decks de um Líder (mesmos filtros de `/api/stats`): cartas no deck, deck médio e decks populares |
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |

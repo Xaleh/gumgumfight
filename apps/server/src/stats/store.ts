@@ -347,6 +347,19 @@ export function statsDimensions(db: DB) {
   return { leaders };
 }
 
+/** Listas exatas jogadas no filtro (normalmente um Líder), com partidas, vitórias e jogadores de cada uma. */
+export function leaderLists(db: DB, f: StatsFilter) {
+  const w = where(f);
+  const rows = db
+    .prepare(
+      `SELECT s.deck_hash AS hash, d.cards AS cards, COUNT(*) AS games, SUM(s.won) AS wins, COUNT(DISTINCT s.player_id) AS players
+       FROM match_seats s JOIN deck_lists d ON d.hash = s.deck_hash
+       WHERE ${w.sql} GROUP BY s.deck_hash`,
+    )
+    .all(...w.params) as unknown as Array<{ hash: string; cards: string; games: number; wins: number; players: number }>;
+  return rows.map((r) => ({ ...r, cards: JSON.parse(r.cards) as Array<{ id: string; count: number }> }));
+}
+
 export function myDecks(db: DB, playerId: string) {
   return db
     .prepare(

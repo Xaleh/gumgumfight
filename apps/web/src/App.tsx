@@ -171,7 +171,7 @@ function MainApp() {
     );
   }
   if (screen.name === 'coverage' && dev) return <Coverage onExit={() => setScreen({ name: 'menu' })} />;
-  if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} />;
+  if (screen.name === 'stats') return <Stats onExit={() => setScreen({ name: 'menu' })} onOpenDeck={(link) => setScreen({ name: 'builder', link })} />;
   if (screen.name === 'admin' && isAdmin(role)) {
     return (
       <Admin

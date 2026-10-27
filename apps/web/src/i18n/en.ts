@@ -1602,6 +1602,22 @@ export default {
   'stats.playersAll': 'All',
   'stats.playersBounty': '{n|# billion|# billion}+',
   'stats.queueBounty': 'bounty {n|# billion|# billion}+',
+  'stats.cardsInDeck': 'Cards in deck',
+  'stats.cardsInDeckHint': 'The number on the art is the share of this Leader’s games with the card in the deck. The bars below show how many copies those lists run: the tallest is the most common.',
+  'stats.decksSample': '{games|# game|# games} with {lists|# different list|# different lists}. Each list weighs by the games it played.',
+  'stats.ofDecks': 'of decks',
+  'stats.copiesBarTitle': '{n|# copy|# copies}: {pct} of the games with the card',
+  'stats.showAllCards': 'Show all ({n})',
+  'stats.decksTitle': 'Popular decks',
+  'stats.decksHint': 'Open any list in the deck builder.',
+  'stats.averageDeck': 'Average deck',
+  'stats.averageDeckTitle': 'The most used cards, each with its most common number of copies, up to 50 cards',
+  'stats.deckCardsCount': '{n|# card|# cards}',
+  'stats.popularDeck': 'Popular deck {n}',
+  'stats.popularDeckLine': 'win rate · {games|# game|# games} · {players|# player|# players}',
+  'stats.openInBuilder': 'Open in deck builder',
+  'stats.noDecks': 'No games with this Leader with these filters.',
+  'stats.globalNoDecks': 'Cards in deck and popular decks only exist in the stats here (GumGum Fight): TCG Matchmaking does not publish the lists.',
   // ==== /stats ====
 
 

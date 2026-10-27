@@ -1603,6 +1603,22 @@ const ptBR = {
   'stats.playersAll': 'Todos',
   'stats.playersBounty': '{n|# bilhão|# bilhões}+',
   'stats.queueBounty': 'recompensa {n|# bilhão|# bilhões}+',
+  'stats.cardsInDeck': 'Cartas no deck',
+  'stats.cardsInDeckHint': 'O número na arte é a fração das partidas deste Líder com a carta no deck. As barras embaixo mostram quantas cópias essas listas usam: a mais alta é a mais comum.',
+  'stats.decksSample': '{games|# partida|# partidas} com {lists|# lista diferente|# listas diferentes}. Cada lista pesa pelas partidas que jogou.',
+  'stats.ofDecks': 'dos decks',
+  'stats.copiesBarTitle': '{n|# cópia|# cópias}: {pct} das partidas com a carta',
+  'stats.showAllCards': 'Mostrar todas ({n})',
+  'stats.decksTitle': 'Decks populares',
+  'stats.decksHint': 'Abra qualquer lista no construtor de decks.',
+  'stats.averageDeck': 'Deck médio',
+  'stats.averageDeckTitle': 'As cartas mais usadas, com as cópias mais comuns de cada uma, até 50 cartas',
+  'stats.deckCardsCount': '{n|# carta|# cartas}',
+  'stats.popularDeck': 'Deck popular {n}',
+  'stats.popularDeckLine': 'de vitórias · {games|# partida|# partidas} · {players|# jogador|# jogadores}',
+  'stats.openInBuilder': 'Abrir no construtor',
+  'stats.noDecks': 'Nenhuma partida com este Líder nesses filtros.',
+  'stats.globalNoDecks': 'Cartas no deck e decks populares existem só nas estatísticas daqui (GumGum Fight): o TCG Matchmaking não publica as listas.',
   // ==== /stats ====
 
 

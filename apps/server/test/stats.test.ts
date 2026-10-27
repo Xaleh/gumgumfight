@@ -137,6 +137,18 @@ describe('API de estatísticas', () => {
     expect(cardsRes.rows.reduce((s: number, c: { openingGames: number }) => s + c.openingGames, 0)).toBeGreaterThan(0);
     expect((await app.inject('/api/stats/cards')).statusCode).toBe(400);
 
+    // Decks do Líder: a lista jogada inteira vira as cartas no deck, o deck médio e o deck popular.
+    const deckRes = (await app.inject({ url: '/api/stats/decks?leader=ST01-001', headers: ALICE })).json();
+    const size = decks[0].cards.reduce((n, c) => n + c.count, 0);
+    expect(deckRes).toMatchObject({ leader: 'ST01-001', games: 1, lists: 1 });
+    expect(deckRes.cards).toHaveLength(new Set(decks[0].cards.map((c) => c.id)).size);
+    expect(deckRes.cards.every((c: { share: number }) => c.share === 1)).toBe(true);
+    expect(deckRes.average.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(Math.min(50, size));
+    expect(deckRes.popular).toEqual([expect.objectContaining({ games: 1, players: 1, wins: r.winner === 0 ? 1 : 0 })]);
+    expect(deckRes.cardInfo['ST01-001'].name).toBe('Monkey.D.Luffy');
+    expect((await app.inject({ url: '/api/stats/decks?leader=ST02-001', headers: ALICE })).json()).toMatchObject({ games: 0, lists: 0, cards: [], popular: [] });
+    expect((await app.inject('/api/stats/decks')).statusCode).toBe(400);
+
     const trend = (await app.inject('/api/stats/trend?weeks=4')).json();
     expect(trend.weeks).toHaveLength(4);
     expect(new Date(`${trend.weeks[3]}T00:00:00Z`).getUTCDay()).toBe(1);

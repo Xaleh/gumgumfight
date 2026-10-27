@@ -1600,6 +1600,22 @@ export default {
   'stats.playersAll': 'すべて',
   'stats.playersBounty': '{n}ビリオン以上',
   'stats.queueBounty': '賞金{n}ビリオン以上',
+  'stats.cardsInDeck': 'デッキのカード',
+  'stats.cardsInDeckHint': 'カード上の数字は、このリーダーのゲームのうちそのカードがデッキにあった割合です。下のバーはそれらのリストの採用枚数で、いちばん高いものが最も多い枚数です。',
+  'stats.decksSample': '{games|#ゲーム}、{lists|#種類}のリスト。各リストはプレイしたゲーム数で重み付けします。',
+  'stats.ofDecks': 'のデッキ',
+  'stats.copiesBarTitle': '{n}枚: カードを入れたゲームの{pct}',
+  'stats.showAllCards': 'すべて表示（{n}）',
+  'stats.decksTitle': '人気デッキ',
+  'stats.decksHint': 'どのリストもデッキビルダーで開けます。',
+  'stats.averageDeck': '平均デッキ',
+  'stats.averageDeckTitle': '最もよく使われるカードを、それぞれ最も多い枚数で、50枚まで',
+  'stats.deckCardsCount': '{n|#枚}',
+  'stats.popularDeck': '人気デッキ{n}',
+  'stats.popularDeckLine': '勝率 · {games|#ゲーム} · {players|#人}',
+  'stats.openInBuilder': 'デッキビルダーで開く',
+  'stats.noDecks': 'この条件でこのリーダーのゲームはありません。',
+  'stats.globalNoDecks': 'デッキのカードと人気デッキはここ（GumGum Fight）の統計にのみあります。TCG Matchmakingはリストを公開していません。',
   // ==== /stats ====
 
 
