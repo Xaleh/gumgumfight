@@ -290,9 +290,12 @@ Com `GLOBAL_STATS_API_KEY` configurada, a tela de Estatísticas ganha o escopo *
 **TCG Matchmaking** (a ranqueada por Discord do OPTCGSim, a maior fonte de partidas online do jogo), publicadas
 pela **OPTCG Logpose API** do Matheus (`https://optcg-api.vercel.app/docs`). É aberto a todo mundo, sem plano.
 
-- **Filas:** as "LW" (Last Week: LW Standard, LW Extra Regulation e as "1Billion"/"2Billion", só de jogadores com
-  recompensa alta lá) são a **janela dos últimos 7 dias**; as outras (OP17, OP17 1Billion) somam a temporada inteira,
-  e a Special Queue é uma fila à parte.
+- **Filtros no lugar do nome das filas:** a API chama as filas de "LW Standard 1Billion", "OP17" etc.; a tela mostra
+  três escolhas e monta o nome a partir delas (`apps/web/src/globalQueues.ts`). **Período:** últimos 7 dias (as filas
+  "LW", Last Week, uma janela móvel), a temporada (OP17, o total acumulado) ou a fila especial; **formato:** Standard ou
+  Extra Grand Battle (o Extra Regulation deles); **recompensa dos jogadores:** todos, 1 bilhão+ ou 2 bilhões+ (o
+  rating de lá). Só aparecem as opções que existem para o resto da escolha, e uma combinação que não existe cai na
+  mais próxima.
 - **Abas:** **Líderes** (com a posição por partidas e a seta de subiu/desceu, mais a variação da taxa de vitória),
   **Por Líder** (como o "By leader" do OPlay: escolha com busca, arte, números principais e os matchups em artes, com
   as vitórias começando e como segundo, o espelho e a contagem de favoráveis, equilibrados e desfavoráveis; clicar

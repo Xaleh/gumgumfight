@@ -14910,3 +14910,11 @@ div.dk-tile-main {
 .rate-move.down {
   color: var(--danger);
 }
+
+/* Filtros do meta global: colunas mais largas (os rótulos do período não cabem em 260px). */
+.filter-grid.global-filters {
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+}
+.global-filters .seg.small button {
+  white-space: nowrap;
+}

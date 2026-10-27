@@ -1537,7 +1537,6 @@ export default {
   'stats.scopeLocalSub': 'games played here',
   'stats.scopeGlobal': 'Global',
   'stats.scopeGlobalSub': 'TCG Matchmaking',
-  'stats.filterGlobalQueue': 'Queue',
   'stats.tabCompare': 'Compare',
   'stats.tileMatches': 'Games',
   'stats.tileLeadersCount': '{n|# Leader|# Leaders}',
@@ -1548,9 +1547,9 @@ export default {
   'stats.globalTrendCollecting': 'The trend uses the summaries the server keeps every day (collecting since {since}).',
   'stats.globalTrendFooter':
     'Games per week: the difference between the queue totals at the end of the week and at the end of the previous one. Weeks start on Monday.',
-  'stats.globalUpdated': 'TCG Matchmaking data for the {queue} queue, updated {date}.',
+  'stats.globalUpdated': 'TCG Matchmaking data ({queue}), updated {date}.',
   'stats.globalCredit': 'Source: TCG Matchmaking (Discord), via the OPTCG Logpose API by Matheus.',
-  'stats.compareIntro': '{format}: {here|# game|# games} here ({scope}) and {global|# game|# games} in the {queue} queue. Usage per side of a game.',
+  'stats.compareIntro': '{format}: {here|# game|# games} here ({scope}) and {global|# game|# games} on TCG Matchmaking ({queue}). Usage per side of a game.',
   'stats.colShareHere': 'Usage here',
   'stats.colShareGlobal': 'Usage there',
   'stats.colRateHere': 'Wins here',
@@ -1594,7 +1593,15 @@ export default {
   'stats.rankUpTitle': 'Up {n|# place|# places} since {date} (was #{prev})',
   'stats.rankDownTitle': 'Down {n|# place|# places} since {date} (was #{prev})',
   'stats.rateMoveTitle': 'Win rate on {date}: {rate} (difference in percentage points)',
-  'stats.globalTrendFooterWindow': 'The "LW" queues are a rolling 7-day window: each week shows the window on its last collected day. Weeks start on Monday.',
+  'stats.globalTrendFooterWindow': '"Last 7 days" is a rolling window: each week shows the window on its last collected day. Weeks start on Monday.',
+  'stats.filterPlayers': 'Player bounty',
+  'stats.filterPlayersTitle': 'Bounty on TCG Matchmaking (their rating), not the one here',
+  'stats.periodWeek': 'Last 7 days',
+  'stats.periodSeason': '{season} season',
+  'stats.periodSpecial': 'Special queue',
+  'stats.playersAll': 'All',
+  'stats.playersBounty': '{n|# billion|# billion}+',
+  'stats.queueBounty': 'bounty {n|# billion|# billion}+',
   // ==== /stats ====
 
 

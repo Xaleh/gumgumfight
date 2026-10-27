@@ -40,6 +40,10 @@ export interface GlobalQueue {
   minBounty: number | null;
   /** Janela móvel dos últimos 7 dias (filas "LW", Last Week); false = total acumulado da temporada. */
   window: boolean;
+  /** Período, para o filtro da tela: últimos 7 dias, uma temporada (`season`) ou uma fila à parte (Special Queue). */
+  period: 'week' | 'season' | 'other';
+  /** Coleção da temporada ("OP17"); null fora das filas de temporada. */
+  season: string | null;
   /** `lastModified` do JSON na API (null = a API não informou). */
   lastModified: string | null;
   /** Quando o servidor baixou o JSON. */
@@ -85,6 +89,17 @@ export function queueFormat(key: string, name = ''): FormatId | null {
 /** Filas "LW" (Last Week): janela móvel dos últimos 7 dias. As outras (OP17...) acumulam a temporada. */
 export function queueWindow(key: string, name = ''): boolean {
   return /^lw/i.test(key) || /^lw\b/i.test(name);
+}
+
+/** Coleção de uma fila de temporada ("OP17", "OP17-1BillionBounty" → "OP17"); null nas outras. */
+export function queueSeason(key: string): string | null {
+  return key.match(/^((?:OP|EB|ST|PRB)\d+)/i)?.[1].toUpperCase() ?? null;
+}
+
+/** Período da fila no filtro da tela: as "LW" são a semana; as que começam pela coleção, a temporada; o resto, à parte. */
+export function queuePeriod(key: string, name = ''): GlobalQueue['period'] {
+  if (queueWindow(key, name)) return 'week';
+  return queueSeason(key) ? 'season' : 'other';
 }
 
 /** Filas "1Billion"/"2Billion": só jogadores com recompensa (rating deles) acima de N bilhões. */
@@ -168,6 +183,8 @@ const toQueue = (r: QueueRow): GlobalQueue => ({
   format: queueFormat(r.queue, r.name),
   minBounty: queueMinBounty(r.queue, r.name),
   window: queueWindow(r.queue, r.name),
+  period: queuePeriod(r.queue, r.name),
+  season: queuePeriod(r.queue, r.name) === 'season' ? queueSeason(r.queue) : null,
   lastModified: r.last_modified,
   fetchedAt: r.fetched_at,
 });

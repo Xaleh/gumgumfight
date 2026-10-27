@@ -1537,7 +1537,6 @@ export default {
   'stats.scopeLocalSub': 'las partidas de aquí',
   'stats.scopeGlobal': 'Global',
   'stats.scopeGlobalSub': 'TCG Matchmaking',
-  'stats.filterGlobalQueue': 'Cola',
   'stats.tabCompare': 'Comparar',
   'stats.tileMatches': 'Partidas',
   'stats.tileLeadersCount': '{n|# Líder|# Líderes}',
@@ -1548,9 +1547,9 @@ export default {
   'stats.globalTrendCollecting': 'La tendencia usa los resúmenes que el servidor guarda cada día (recopilando desde {since}).',
   'stats.globalTrendFooter':
     'Partidas de cada semana: la diferencia entre los totales de la cola al final de la semana y al final de la anterior. Las semanas empiezan el lunes.',
-  'stats.globalUpdated': 'Datos de la cola {queue} de TCG Matchmaking, actualizados el {date}.',
+  'stats.globalUpdated': 'Datos de TCG Matchmaking ({queue}), actualizados el {date}.',
   'stats.globalCredit': 'Fuente: TCG Matchmaking (Discord), a través de la OPTCG Logpose API, de Matheus.',
-  'stats.compareIntro': '{format}: {here|# partida|# partidas} aquí ({scope}) y {global|# partida|# partidas} en la cola {queue}. Uso por lado de la partida.',
+  'stats.compareIntro': '{format}: {here|# partida|# partidas} aquí ({scope}) y {global|# partida|# partidas} en TCG Matchmaking ({queue}). Uso por lado de la partida.',
   'stats.colShareHere': 'Uso aquí',
   'stats.colShareGlobal': 'Uso allí',
   'stats.colRateHere': 'Victorias aquí',
@@ -1594,7 +1593,15 @@ export default {
   'stats.rankUpTitle': 'Subió {n|# posición|# posiciones} desde el {date} (era {prev}º)',
   'stats.rankDownTitle': 'Bajó {n|# posición|# posiciones} desde el {date} (era {prev}º)',
   'stats.rateMoveTitle': 'Tasa de victorias el {date}: {rate} (diferencia en puntos porcentuales)',
-  'stats.globalTrendFooterWindow': 'Las colas "LW" son la ventana de los últimos 7 días: cada semana muestra la ventana en su último día recopilado. Las semanas empiezan el lunes.',
+  'stats.globalTrendFooterWindow': '"Últimos 7 días" es una ventana móvil: cada semana muestra la ventana en su último día recopilado. Las semanas empiezan el lunes.',
+  'stats.filterPlayers': 'Recompensa de los jugadores',
+  'stats.filterPlayersTitle': 'Recompensa en TCG Matchmaking (su rating), no la de aquí',
+  'stats.periodWeek': 'Últimos 7 días',
+  'stats.periodSeason': 'Temporada {season}',
+  'stats.periodSpecial': 'Cola especial',
+  'stats.playersAll': 'Todos',
+  'stats.playersBounty': '{n|# mil millones|# mil millones}+',
+  'stats.queueBounty': 'recompensa {n|# mil millones|# mil millones}+',
   // ==== /stats ====
 
 

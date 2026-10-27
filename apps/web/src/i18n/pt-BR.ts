@@ -1538,7 +1538,6 @@ const ptBR = {
   'stats.scopeLocalSub': 'as partidas daqui',
   'stats.scopeGlobal': 'Global',
   'stats.scopeGlobalSub': 'TCG Matchmaking',
-  'stats.filterGlobalQueue': 'Fila',
   'stats.tabCompare': 'Comparar',
   'stats.tileMatches': 'Partidas',
   'stats.tileLeadersCount': '{n|# Líder|# Líderes}',
@@ -1549,9 +1548,9 @@ const ptBR = {
   'stats.globalTrendCollecting': 'A tendência usa os resumos que o servidor guarda a cada dia (coletando desde {since}).',
   'stats.globalTrendFooter':
     'Partidas de cada semana: a diferença entre os totais da fila no fim da semana e no fim da anterior. Semanas começam na segunda-feira.',
-  'stats.globalUpdated': 'Dados da fila {queue} do TCG Matchmaking, atualizados em {date}.',
+  'stats.globalUpdated': 'Dados do TCG Matchmaking ({queue}), atualizados em {date}.',
   'stats.globalCredit': 'Fonte: TCG Matchmaking (Discord), pela OPTCG Logpose API, do Matheus.',
-  'stats.compareIntro': '{format}: {here|# partida|# partidas} aqui ({scope}) e {global|# partida|# partidas} na fila {queue}. Participação por lado da partida.',
+  'stats.compareIntro': '{format}: {here|# partida|# partidas} aqui ({scope}) e {global|# partida|# partidas} no TCG Matchmaking ({queue}). Participação por lado da partida.',
   'stats.colShareHere': 'Uso aqui',
   'stats.colShareGlobal': 'Uso lá',
   'stats.colRateHere': 'Vitórias aqui',
@@ -1595,7 +1594,15 @@ const ptBR = {
   'stats.rankUpTitle': 'Subiu {n|# posição|# posições} desde {date} (era {prev}º)',
   'stats.rankDownTitle': 'Desceu {n|# posição|# posições} desde {date} (era {prev}º)',
   'stats.rateMoveTitle': 'Taxa de vitória em {date}: {rate} (diferença em pontos percentuais)',
-  'stats.globalTrendFooterWindow': 'As filas "LW" são a janela dos últimos 7 dias: cada semana mostra a janela no último dia coletado dela. Semanas começam na segunda-feira.',
+  'stats.globalTrendFooterWindow': '"Últimos 7 dias" é uma janela móvel: cada semana mostra a janela no último dia coletado dela. Semanas começam na segunda-feira.',
+  'stats.filterPlayers': 'Recompensa dos jogadores',
+  'stats.filterPlayersTitle': 'Recompensa no TCG Matchmaking (o rating de lá), não a daqui',
+  'stats.periodWeek': 'Últimos 7 dias',
+  'stats.periodSeason': 'Temporada {season}',
+  'stats.periodSpecial': 'Fila especial',
+  'stats.playersAll': 'Todos',
+  'stats.playersBounty': '{n|# bilhão|# bilhões}+',
+  'stats.queueBounty': 'recompensa {n|# bilhão|# bilhões}+',
   // ==== /stats ====
 
 

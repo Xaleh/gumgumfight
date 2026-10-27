@@ -14,6 +14,8 @@ import {
   normalizeSnapshot,
   queueFormat,
   queueMinBounty,
+  queuePeriod,
+  queueSeason,
   queueWindow,
   syncGlobalStats,
 } from '../src/stats/global';
@@ -102,6 +104,12 @@ describe('Meta global: adaptador do JSON da OPTCG Logpose API', () => {
     expect(queueWindow('lw_eastern', 'LW Extra Regulation')).toBe(true);
     expect(queueWindow('OP17', 'OP17')).toBe(false);
     expect(queueWindow('Special_Queue', 'Special Queue')).toBe(false);
+    // Período do filtro da tela (sem "LW" no nome): semana, temporada ou fila à parte.
+    expect(queuePeriod('LWS1BillionBounty', 'LW Standard 1Billion')).toBe('week');
+    expect(queuePeriod('OP17-1BillionBounty', 'OP17 1Billion')).toBe('season');
+    expect(queueSeason('OP17-1BillionBounty')).toBe('OP17');
+    expect(queuePeriod('Special_Queue', 'Special Queue')).toBe('other');
+    expect(queueSeason('Special_Queue')).toBeNull();
   });
 });
 
@@ -256,7 +264,7 @@ describe('Meta global: rotas', () => {
 
     const meta = (await app.inject('/api/stats/meta')).json();
     expect(meta.global.queues).toHaveLength(1);
-    expect(meta.global.queues[0]).toMatchObject({ key: 'lw', name: 'LW Standard', format: 'standard' });
+    expect(meta.global.queues[0]).toMatchObject({ key: 'lw', name: 'LW Standard', format: 'standard', period: 'week', season: null, window: true });
 
     const g = (await app.inject('/api/stats/global?queue=lw')).json();
     expect(g.queue.key).toBe('lw');
