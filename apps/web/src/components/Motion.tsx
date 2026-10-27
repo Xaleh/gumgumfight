@@ -325,7 +325,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
   if (next.log.length < prev.log.length) return [];
   const spot = spotPlan(prev, next, before, after, root, tempo, opts);
   // Com uma carta em destaque, o resto da mesa espera ela voltar ao lugar.
-  const lead = spot ? spot.duration - 120 * tempo : 0;
+  const lead = spot ? spot.duration - 100 * tempo : 0;
   const a = spots(prev);
   const b = spots(next);
   interface Move {
@@ -403,14 +403,14 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
         const h = Math.min(arena.h * 0.56, 360);
         showcase = { x: arena.x, y: arena.y, w: h / 1.396, h };
       }
-      const duration = (showcase ? 950 : ko ? 480 : 420) * tempo;
+      const duration = (showcase ? 750 : ko ? 400 : 340) * tempo;
       const toLife = m.from.zone === 'deck' && m.to.zone === 'life';
       // No fim do mulligan a Vida sai do deck depois da troca da mão (5-2-1-7); no resto do jogo, antes.
       const group = toLife ? (prev.phase === 'mulligan' ? 2.5 : 0) : m.from.zone === 'deck' && m.to.zone === 'hand' ? 2 : 1;
       out.push({
         item: { id: nextId++, kind: 'card', state: st, uid, from, to, flip, showcase, ko, delay: 0, duration, hide: hideTarget },
         group,
-        step: toLife ? 90 : 70,
+        step: toLife ? 70 : 55,
       });
       if (ko) out.push({ item: { id: nextId++, kind: 'burst', at: from, tone: 'ko', delay: 0, duration: 520 }, group, step: 0 });
     }
@@ -423,7 +423,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
   let last = -1;
   let end = 0;
   for (const p of out) {
-    if (last !== -1 && p.group !== last) t += 100 * tempo;
+    if (last !== -1 && p.group !== last) t += 80 * tempo;
     last = p.group;
     p.item.delay = t;
     t += p.step * tempo;
@@ -471,9 +471,9 @@ function spotPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes,
       const where = spots(next).get(trig.uid);
       const to = where ? (after.get(`${where.zone}:${trig.uid}`) ?? after.get(`anchor:${where.zone}-${where.player}`)) : undefined;
       const ability = def.abilities.find((a) => a.timing === 'trigger');
-      const flyIn = 420 * tempo;
-      const hold = 1300 * tempo;
-      const back = 340 * tempo;
+      const flyIn = 340 * tempo;
+      const hold = 1000 * tempo;
+      const back = 280 * tempo;
       return {
         id: nextId++,
         kind: 'spot',
@@ -513,9 +513,9 @@ function spotPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes,
         hasKeyword(prev, b.attacker, 'doubleAttack') ? tr('board.motionDoubleAttack') : '',
         hasKeyword(prev, b.attacker, 'banish') ? tr('board.motionBanish') : '',
       ].filter(Boolean);
-      const flyIn = 320 * tempo;
-      const hold = 560 * tempo;
-      const back = 300 * tempo;
+      const flyIn = 260 * tempo;
+      const hold = 450 * tempo;
+      const back = 240 * tempo;
       return {
         id: nextId++,
         kind: 'spot',
@@ -542,9 +542,9 @@ function spotPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes,
     const def = cardDef(next, act.uid);
     const ability = def.abilities[act.ability];
     if (from && ability) {
-      const flyIn = 320 * tempo;
-      const hold = 1250 * tempo;
-      const back = 300 * tempo;
+      const flyIn = 260 * tempo;
+      const hold = 950 * tempo;
+      const back = 240 * tempo;
       return {
         id: nextId++,
         kind: 'spot',
@@ -615,7 +615,7 @@ function donPlan(prev: GameState, next: GameState, before: Boxes, after: Boxes, 
     const add = (from: Box | undefined, to: Box | undefined, hide: Element | null, group: number, fade = false, flip: DonFlight['flip'] = 'none') => {
       if (!from || !to || count >= MAX_DON) return;
       count++;
-      out.push({ item: { id: nextId++, kind: 'don', from, to, fade, flip, art, delay: 0, duration: 380 * tempo, hide }, group, step: 65 });
+      out.push({ item: { id: nextId++, kind: 'don', from, to, fade, flip, art, delay: 0, duration: 300 * tempo, hide }, group, step: 50 });
     };
     // Das cartas para a área de custo (Fase de Recuperação) ou para o deck de DON!!.
     for (const uid of decs) {
@@ -667,7 +667,7 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
   const strike = (box: Box, el: Element | null, label: string, tone: Label['tone']) => {
     shake(el, delay);
     out.push({ id: nextId++, kind: 'burst', at: box, tone: 'strike', delay, duration: 620 });
-    out.push({ id: nextId++, kind: 'label', at: box, text: label, tone, delay: delay + 40, duration: 900 });
+    out.push({ id: nextId++, kind: 'label', at: box, text: label, tone, delay: delay + 40, duration: 750 });
   };
   const lifeTargets = new Set<string>();
   for (const p of [0, 1] as PlayerId[]) {

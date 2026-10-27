@@ -3806,7 +3806,7 @@ button.hint-pill::after,
   font-size: 20px;
   white-space: nowrap;
   border: 3px solid rgba(255, 255, 255, 0.95);
-  animation: banner 1.25s ease forwards;
+  animation: banner 1s ease forwards;
   box-shadow: 0 8px 26px rgba(var(--shadow-rgb), 0.35);
 }
 .turn-banner.mine {
@@ -7803,7 +7803,7 @@ tr.clickable:hover td {
     inset 0 -1px 0 rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-  animation: tb-sweep 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation: tb-sweep 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 .turn-banner.sweep small {
   display: block;
@@ -9086,7 +9086,7 @@ tr.clickable:hover td {
   color: #fff;
   background: linear-gradient(90deg, color-mix(in srgb, var(--card-color, #ff5a2e) 85%, #000 15%), var(--card-color, #ff5a2e) 45%, color-mix(in srgb, var(--card-color, #ff5a2e) 70%, #fff 30%));
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45), inset 0 -3px 0 rgba(0, 0, 0, 0.25), inset 0 2px 0 rgba(255, 255, 255, 0.45);
-  animation: sash-in 0.32s cubic-bezier(0.2, 1, 0.3, 1) var(--in) both, sash-out 0.28s ease-in calc(var(--in) + var(--hold) - 0.28s) forwards;
+  animation: sash-in 0.24s cubic-bezier(0.2, 1, 0.3, 1) var(--in) both, sash-out 0.2s ease-in calc(var(--in) + var(--hold) - 0.2s) forwards;
 }
 .spot-sash.from-right {
   animation-name: sash-in-r, sash-out-r;

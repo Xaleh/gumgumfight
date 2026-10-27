@@ -832,7 +832,7 @@ function Table({
     const text = you ? t('game.yourTurn') : t('game.turnOf', { name });
     const kicker = state.turn === 1 ? (you ? t('game.youPlayFirst') : t('game.playsFirst', { name })) : t('game.turnN', { n: state.turn });
     setBanner({ text, kicker, mine, key: state.turn });
-    const timer = setTimeout(() => setBanner(null), 1400);
+    const timer = setTimeout(() => setBanner(null), 1100);
     return () => clearTimeout(timer);
     // Só muda na troca de turno (não a cada ação).
     // eslint-disable-next-line react-hooks/exhaustive-deps
