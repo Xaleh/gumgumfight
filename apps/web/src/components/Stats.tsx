@@ -3,6 +3,7 @@ import {
   api,
   type CardInfo,
   type CardStatsResponse,
+  type FormatId,
   type GlobalCompare,
   type GlobalMatchups,
   type GlobalQueue,
@@ -20,6 +21,7 @@ import {
 import { type Locale, type Translate, useLocale, useT } from '../i18n';
 import { useAuth } from '../auth';
 import { useSettings } from '../settings';
+import { bountyOptions, choiceOf, formatOptions, type PeriodId, periodOf, periodOptions, queueFor } from '../globalQueues';
 import { fmtBerries, fmtDateTime, fmtNumber } from '../i18n/format';
 import { Icon } from './Icons';
 import { LeaderArt } from './LeaderArt';
@@ -1348,10 +1350,13 @@ function CompareTable({
   formatLabel,
   min,
   hereLabel,
+  queueLabel,
 }: {
   queue: string;
   format: string;
   formatLabel: string;
+  /** Nome da fila na tela ("Standard · Últimos 7 dias"). */
+  queueLabel: string;
   min: number;
   /** Qual recorte daqui entra na comparação (Geral, Pro ou tudo). */
   hereLabel: string;
@@ -1398,7 +1403,7 @@ function CompareTable({
   return (
     <>
       <p className="muted small">
-        {t('stats.compareIntro', { format: formatLabel, here: data.here.games, scope: hereLabel, global: data.global.games, queue: data.queue.name })}
+        {t('stats.compareIntro', { format: formatLabel, here: data.here.games, scope: hereLabel, global: data.global.games, queue: queueLabel })}
       </p>
       {!rows.length && <p className="muted">{t('stats.noCompare', { min })}</p>}
       {rows.length > 0 && (
@@ -1495,6 +1500,33 @@ function GlobalPanel({
   const current: GlobalQueue | null = data?.queue ?? queues.find((q) => q.key === queue) ?? queues[0] ?? null;
   const key = current?.key ?? '';
 
+  // Filtros no lugar do nome das filas: período, formato e jogadores (a combinação aponta para uma fila).
+  const choice = current ? choiceOf(current) : null;
+  const periods = periodOptions(queues);
+  const formatsHere = choice ? formatOptions(queues, choice.period) : [];
+  const bountiesHere = choice ? bountyOptions(queues, choice.period, choice.format) : [];
+  const choose = (patch: Partial<NonNullable<typeof choice>>) => {
+    if (!choice) return;
+    const q = queueFor(queues, { ...choice, ...patch });
+    if (q && q.key !== key) {
+      setQueue(q.key);
+      setLeader('');
+    }
+  };
+  const formatName = (f: FormatId) => formats.find((x) => x.id === f)?.label ?? f;
+  const periodLabel = (p: PeriodId) => {
+    if (p === 'week') return t('stats.periodWeek');
+    if (p.startsWith('season:')) return t('stats.periodSeason', { season: p.slice('season:'.length) });
+    const q = queues.find((x) => periodOf(x) === p);
+    return q && /special/i.test(q.key) ? t('stats.periodSpecial') : (q?.name ?? p);
+  };
+  const bountyLabel = (b: number | null) => (b === null ? t('stats.playersAll') : t('stats.playersBounty', { n: b }));
+  /** Nome da fila na tela, montado pelos filtros ("Standard · Últimos 7 dias · recompensa 1 bilhão+"). */
+  const queueLabel = (q: GlobalQueue) =>
+    [q.format && q.period !== 'other' ? formatName(q.format) : null, periodLabel(periodOf(q)), q.minBounty ? t('stats.queueBounty', { n: q.minBounty }) : null]
+      .filter(Boolean)
+      .join(' · ');
+
   /** Líder da página "Por Líder": o escolhido ou o mais jogado da fila. */
   const focus = tab === 'leader' ? leader || data?.leaders[0]?.leader || '' : leader;
 
@@ -1547,25 +1579,33 @@ function GlobalPanel({
     <>
       <details className="menu-card stats-filters" open>
         <summary>{t('stats.filters')}</summary>
-        <div className="filter-grid">
-          <div className="field">
-            <label>{t('stats.filterGlobalQueue')}</label>
-            <div className="stats-pickers">
-              <select
-                value={key}
-                onChange={(e) => {
-                  setQueue(e.target.value);
-                  setLeader('');
-                }}
-              >
-                {queues.map((q) => (
-                  <option key={q.key} value={q.key}>
-                    {q.name}
-                  </option>
-                ))}
-              </select>
+        <div className="filter-grid global-filters">
+          {periods.length > 1 && (
+            <div className="field">
+              <label>{t('stats.filterPeriod')}</label>
+              <Seg value={choice?.period ?? ''} options={periods.map((p): [string, string] => [p, periodLabel(p)])} onChange={(period) => choose({ period })} />
             </div>
-          </div>
+          )}
+          {formatsHere.length > 1 && (
+            <div className="field">
+              <label>{t('stats.filterFormat')}</label>
+              <Seg
+                value={choice?.format ?? ''}
+                options={formatsHere.map((f): [string, string] => [f, formatName(f)])}
+                onChange={(format) => choose({ format: format as FormatId })}
+              />
+            </div>
+          )}
+          {bountiesHere.length > 1 && (
+            <div className="field">
+              <label title={t('stats.filterPlayersTitle')}>{t('stats.filterPlayers')}</label>
+              <Seg
+                value={String(choice?.minBounty ?? '')}
+                options={bountiesHere.map((b): [string, string] => [String(b ?? ''), bountyLabel(b)])}
+                onChange={(v) => choose({ minBounty: v ? Number(v) : null })}
+              />
+            </div>
+          )}
           <div className="field">
             <label>{t('stats.filterMin')}</label>
             <Seg
@@ -1637,12 +1677,13 @@ function GlobalPanel({
             formatLabel={formats.find((f) => f.id === current.format)?.label ?? current.format}
             min={min}
             hereLabel={hereLabel}
+            queueLabel={queueLabel(current)}
           />
         )}
       </section>
       {current && (
         <p className="muted small">
-          {t('stats.globalUpdated', { queue: current.name, date: fmtDateTime(current.lastModified ?? current.fetchedAt, locale) })} {t('stats.globalCredit')}
+          {t('stats.globalUpdated', { queue: queueLabel(current), date: fmtDateTime(current.lastModified ?? current.fetchedAt, locale) })} {t('stats.globalCredit')}
         </p>
       )}
     </>

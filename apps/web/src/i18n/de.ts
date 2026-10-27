@@ -1537,7 +1537,6 @@ export default {
   'stats.scopeLocalSub': 'die Spiele von hier',
   'stats.scopeGlobal': 'Global',
   'stats.scopeGlobalSub': 'TCG Matchmaking',
-  'stats.filterGlobalQueue': 'Warteschlange',
   'stats.tabCompare': 'Vergleich',
   'stats.tileMatches': 'Spiele',
   'stats.tileLeadersCount': '{n|# Leader|# Leader}',
@@ -1548,9 +1547,9 @@ export default {
   'stats.globalTrendCollecting': 'Der Trend nutzt die Zusammenfassungen, die der Server jeden Tag speichert (gesammelt seit {since}).',
   'stats.globalTrendFooter':
     'Spiele pro Woche: die Differenz zwischen den Gesamtwerten der Warteschlange am Ende der Woche und am Ende der Vorwoche. Wochen beginnen am Montag.',
-  'stats.globalUpdated': 'Daten der Warteschlange {queue} von TCG Matchmaking, aktualisiert am {date}.',
+  'stats.globalUpdated': 'Daten von TCG Matchmaking ({queue}), aktualisiert am {date}.',
   'stats.globalCredit': 'Quelle: TCG Matchmaking (Discord), über die OPTCG Logpose API von Matheus.',
-  'stats.compareIntro': '{format}: {here|# Spiel|# Spiele} hier ({scope}) und {global|# Spiel|# Spiele} in der Warteschlange {queue}. Nutzung pro Seite eines Spiels.',
+  'stats.compareIntro': '{format}: {here|# Spiel|# Spiele} hier ({scope}) und {global|# Spiel|# Spiele} bei TCG Matchmaking ({queue}). Nutzung pro Seite eines Spiels.',
   'stats.colShareHere': 'Nutzung hier',
   'stats.colShareGlobal': 'Nutzung dort',
   'stats.colRateHere': 'Siege hier',
@@ -1594,7 +1593,15 @@ export default {
   'stats.rankUpTitle': '{n|# Platz|# Plätze} gestiegen seit {date} (war #{prev})',
   'stats.rankDownTitle': '{n|# Platz|# Plätze} gefallen seit {date} (war #{prev})',
   'stats.rateMoveTitle': 'Siegquote am {date}: {rate} (Differenz in Prozentpunkten)',
-  'stats.globalTrendFooterWindow': 'Die "LW"-Warteschlangen sind ein gleitendes 7-Tage-Fenster: Jede Woche zeigt das Fenster an ihrem letzten gesammelten Tag. Wochen beginnen am Montag.',
+  'stats.globalTrendFooterWindow': '"Letzte 7 Tage" ist ein gleitendes Fenster: Jede Woche zeigt das Fenster an ihrem letzten gesammelten Tag. Wochen beginnen am Montag.',
+  'stats.filterPlayers': 'Kopfgeld der Spieler',
+  'stats.filterPlayersTitle': 'Kopfgeld bei TCG Matchmaking (deren Rating), nicht das hier',
+  'stats.periodWeek': 'Letzte 7 Tage',
+  'stats.periodSeason': 'Saison {season}',
+  'stats.periodSpecial': 'Sonder-Warteschlange',
+  'stats.playersAll': 'Alle',
+  'stats.playersBounty': '{n|# Milliarde|# Milliarden}+',
+  'stats.queueBounty': 'Kopfgeld {n|# Milliarde|# Milliarden}+',
   // ==== /stats ====
 
 

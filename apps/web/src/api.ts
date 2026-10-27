@@ -1794,6 +1794,10 @@ export interface GlobalQueue {
   minBounty: number | null;
   /** Janela móvel dos últimos 7 dias (filas "LW", Last Week); false = total acumulado da temporada. */
   window: boolean;
+  /** Período do filtro: últimos 7 dias, uma temporada (`season`) ou uma fila à parte (Special Queue). */
+  period: 'week' | 'season' | 'other';
+  /** Coleção da temporada ("OP17"); null fora das filas de temporada. */
+  season: string | null;
   /** Quando o JSON mudou na API deles (null = não informado). */
   lastModified: string | null;
   /** Quando o servidor baixou. */
