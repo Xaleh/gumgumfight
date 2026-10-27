@@ -159,6 +159,9 @@ SUPPORT_GOAL_BRL=120
 SUPPORT_CONTACT_URL=mailto:<seu-email>
 # Consulta de plano pela homologação (o mesmo texto nos dois servidores)
 INTERNAL_TOKEN=<texto aleatório longo>
+# Meta global (TCG Matchmaking): chave e nome de cliente dados pelo mantenedor da OPTCG Logpose API
+GLOBAL_STATS_API_KEY=<x-api-key>
+GLOBAL_STATS_CLIENT=gumgum
 ```
 
 Para aplicar sem esperar o próximo deploy:

@@ -1532,6 +1532,34 @@ export default {
   'stats.listOption': '{name} · {n|# partida|# partidas}',
   'stats.footer':
     'El servidor reproduce cada partida desde su repetición antes de que entre en las estadísticas. Las tasas con menos de {n|# partida|# partidas} aparecen atenuadas: pasa el ratón para ver el intervalo de confianza.',
+  // ---- meta global (TCG Matchmaking) ----
+  'stats.scopeLocal': 'GumGum Fight',
+  'stats.scopeLocalSub': 'las partidas de aquí',
+  'stats.scopeGlobal': 'Global',
+  'stats.scopeGlobalSub': 'TCG Matchmaking',
+  'stats.filterGlobalQueue': 'Cola',
+  'stats.tabCompare': 'Comparar',
+  'stats.tileMatches': 'Partidas',
+  'stats.tileLeadersCount': '{n|# Líder|# Líderes}',
+  'stats.globalIntro':
+    'Partidas de la cola clasificatoria de TCG Matchmaking, la clasificatoria por Discord de OPTCGSim. Quién empezó solo se sabe en parte de las partidas, y el uso cuenta por lado de la partida, como en las estadísticas de aquí.',
+  'stats.globalMinBounty': 'Cola solo para jugadores con recompensa superior a {n|# mil millones|# mil millones} allí.',
+  'stats.globalCollecting': 'El servidor aún no ha descargado esta cola. Vuelve más tarde.',
+  'stats.globalTrendCollecting': 'La tendencia necesita resúmenes de dos semanas seguidas (recopilando desde {since}).',
+  'stats.globalTrendFooter':
+    'Partidas de cada semana: la diferencia entre los totales de la cola al final de la semana y al final de la anterior. Las semanas empiezan el lunes.',
+  'stats.globalUpdated': 'Datos de la cola {queue} de TCG Matchmaking, actualizados el {date}.',
+  'stats.globalCredit': 'Fuente: TCG Matchmaking (Discord), a través de la OPTCG Logpose API, de Matheus.',
+  'stats.compareIntro': '{format}: {here|# partida|# partidas} aquí ({scope}) y {global|# partida|# partidas} en la cola {queue}. Uso por lado de la partida.',
+  'stats.colShareHere': 'Uso aquí',
+  'stats.colShareGlobal': 'Uso allí',
+  'stats.colRateHere': 'Victorias aquí',
+  'stats.colRateGlobal': 'Victorias allí',
+  'stats.colDelta': 'Δ',
+  'stats.colDeltaTitle': 'Aquí menos allí, en puntos porcentuales',
+  'stats.noCompare': 'Ningún Líder con {min|# partida|# partidas} o más en alguno de los lados.',
+  'stats.compareFooter':
+    'Entran los Líderes con al menos {n|# partida|# partidas} en uno de los lados; el lado sin partidas muestra —. Las tasas con muestra pequeña aparecen atenuadas.',
   // ==== /stats ====
 
 

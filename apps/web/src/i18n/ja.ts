@@ -1532,6 +1532,32 @@ export default {
   'stats.listOption': '{name} · {n|#ゲーム}',
   'stats.footer':
     'サーバーはすべてのゲームをリプレイから再生してから統計に加えます。{n|#ゲーム}未満の勝率は薄く表示されます。カーソルを合わせると信頼区間を表示します。',
+  // ---- グローバルメタ (TCG Matchmaking) ----
+  'stats.scopeLocal': 'GumGum Fight',
+  'stats.scopeLocalSub': 'ここでのゲーム',
+  'stats.scopeGlobal': 'グローバル',
+  'stats.scopeGlobalSub': 'TCG Matchmaking',
+  'stats.filterGlobalQueue': 'キュー',
+  'stats.tabCompare': '比較',
+  'stats.tileMatches': 'ゲーム',
+  'stats.tileLeadersCount': '{n|#リーダー}',
+  'stats.globalIntro':
+    'OPTCGSimのDiscordランク戦「TCG Matchmaking」のランクキューのゲームです。先攻・後攻は一部のゲームでのみ分かり、使用率はここの統計と同じくゲームの片側ごとに数えます。',
+  'stats.globalMinBounty': '向こうの賞金が{n}ビリオンを超えるプレイヤー限定のキューです。',
+  'stats.globalCollecting': 'サーバーはまだこのキューを取得していません。後でもう一度お試しください。',
+  'stats.globalTrendCollecting': 'トレンドには連続する2週間の集計が必要です（{since}から収集中）。',
+  'stats.globalTrendFooter': '各週のゲーム数は、週末時点と前週末時点のキュー合計の差です。週は月曜日から始まります。',
+  'stats.globalUpdated': 'TCG Matchmakingの{queue}キューのデータ（{date}更新）。',
+  'stats.globalCredit': '出典: TCG Matchmaking（Discord）、MatheusのOPTCG Logpose API経由。',
+  'stats.compareIntro': '{format}: ここ（{scope}）で{here|#ゲーム}、{queue}キューで{global|#ゲーム}。使用率はゲームの片側ごと。',
+  'stats.colShareHere': 'ここでの使用率',
+  'stats.colShareGlobal': '向こうの使用率',
+  'stats.colRateHere': 'ここでの勝率',
+  'stats.colRateGlobal': '向こうの勝率',
+  'stats.colDelta': 'Δ',
+  'stats.colDeltaTitle': 'ここ − 向こう（ポイント）',
+  'stats.noCompare': 'どちらかの側で{min|#ゲーム}以上のリーダーがいません。',
+  'stats.compareFooter': 'どちらかの側で{n|#ゲーム}以上のリーダーを表示します。ゲームのない側は—と表示されます。サンプルが少ない勝率は薄く表示されます。',
   // ==== /stats ====
 
 

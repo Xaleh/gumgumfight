@@ -1532,6 +1532,34 @@ export default {
   'stats.listOption': '{name} · {n|# Spiel|# Spiele}',
   'stats.footer':
     'Der Server spielt jedes Spiel anhand seines Replays nach, bevor es in die Statistik eingeht. Quoten mit weniger als {n|# Spiel|# Spielen} sind abgeblendet: Fahre mit der Maus darüber, um das Konfidenzintervall zu sehen.',
+  // ---- globales Meta (TCG Matchmaking) ----
+  'stats.scopeLocal': 'GumGum Fight',
+  'stats.scopeLocalSub': 'die Spiele von hier',
+  'stats.scopeGlobal': 'Global',
+  'stats.scopeGlobalSub': 'TCG Matchmaking',
+  'stats.filterGlobalQueue': 'Warteschlange',
+  'stats.tabCompare': 'Vergleich',
+  'stats.tileMatches': 'Spiele',
+  'stats.tileLeadersCount': '{n|# Leader|# Leader}',
+  'stats.globalIntro':
+    'Spiele aus der Ranked-Warteschlange von TCG Matchmaking, der Discord-Rangliste für OPTCGSim. Wer begonnen hat, ist nur bei einem Teil der Spiele bekannt, und die Nutzung zählt pro Seite eines Spiels, wie in der Statistik hier.',
+  'stats.globalMinBounty': 'Warteschlange nur für Spieler mit einem Kopfgeld über {n|# Milliarde|# Milliarden} dort.',
+  'stats.globalCollecting': 'Der Server hat diese Warteschlange noch nicht geladen. Komm später wieder.',
+  'stats.globalTrendCollecting': 'Der Trend braucht Zusammenfassungen aus zwei aufeinanderfolgenden Wochen (gesammelt seit {since}).',
+  'stats.globalTrendFooter':
+    'Spiele pro Woche: die Differenz zwischen den Gesamtwerten der Warteschlange am Ende der Woche und am Ende der Vorwoche. Wochen beginnen am Montag.',
+  'stats.globalUpdated': 'Daten der Warteschlange {queue} von TCG Matchmaking, aktualisiert am {date}.',
+  'stats.globalCredit': 'Quelle: TCG Matchmaking (Discord), über die OPTCG Logpose API von Matheus.',
+  'stats.compareIntro': '{format}: {here|# Spiel|# Spiele} hier ({scope}) und {global|# Spiel|# Spiele} in der Warteschlange {queue}. Nutzung pro Seite eines Spiels.',
+  'stats.colShareHere': 'Nutzung hier',
+  'stats.colShareGlobal': 'Nutzung dort',
+  'stats.colRateHere': 'Siege hier',
+  'stats.colRateGlobal': 'Siege dort',
+  'stats.colDelta': 'Δ',
+  'stats.colDeltaTitle': 'Hier minus dort, in Prozentpunkten',
+  'stats.noCompare': 'Kein Leader mit {min|# Spiel|# Spielen} oder mehr auf einer der Seiten.',
+  'stats.compareFooter':
+    'Gelistet sind Leader mit mindestens {n|# Spiel|# Spielen} auf einer der Seiten; eine Seite ohne Spiele zeigt —. Quoten mit kleiner Stichprobe sind abgeblendet.',
   // ==== /stats ====
 
 

@@ -4,11 +4,14 @@ import { type Action, type CardData, countsInStats, type DeckList, formatLabel, 
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { seesProStats, type User } from '../auth/store';
 import { ResponseCache } from '../cache';
+import type { GlobalStatsOptions } from '../config';
 import { type DB, getCards } from '../db';
 import { fail } from '../errors';
 import type { ApiCard } from '../present';
 import { FORMATS, isFormat, isPlayFormat, isQueue, isTier, type PlayFormat, type QueueId, QUEUES, TIERS, tierFor } from './catalog';
 import { deriveMatch } from './derive';
+import { listGlobalQueues, syncGlobalStats } from './global';
+import { registerGlobalStatsRoutes } from './global-routes';
 import { isApprentice } from '../tutorial/store';
 import {
   cardStats,
@@ -39,6 +42,10 @@ interface Deps {
   proGate: boolean;
   /** Chamado com o id de cada partida gravada (avisos "partida terminada" aos apps parceiros). */
   onMatch?: (matchId: number) => void;
+  /** Meta global (TCG Matchmaking): chave e endereço da API; null = desligado. */
+  globalStats?: GlobalStatsOptions | null;
+  /** Testes: fetch do sync do meta global. */
+  fetchImpl?: typeof fetch;
 }
 
 /** Filas das estatísticas gerais (grátis): partidas casuais, treino contra o bot e salas privadas. */
@@ -78,7 +85,7 @@ function parseDeck(v: unknown): DeckList | null {
 /** Validade das estatísticas em cache (cada partida gravada já as invalida). */
 const STATS_TTL_MS = 30_000;
 
-export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user, present, proGate, onMatch }: Deps) {
+export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user, present, proGate, onMatch, globalStats, fetchImpl }: Deps) {
   const cache = new ResponseCache();
   const pro = (req: FastifyRequest) => !proGate || seesProStats(user(req));
   /**
@@ -184,6 +191,8 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
         me: me ? profileOf(me) : null,
         myDecks: decks,
         cards: cardInfo([...leaders.map((l) => l.leader), ...decks.map((d) => d.leader)]),
+        /** Meta global (TCG Matchmaking): as filas já baixadas; null = desligado neste servidor. */
+        global: globalStats ? { queues: listGlobalQueues(db) } : null,
       };
     }),
   );
@@ -274,5 +283,18 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
       const rows = cardStats(db, f);
       return { summary: summary(db, f), rows, cards: cardInfo(rows.map((r) => r.cardId).concat(f.leader ?? [])) };
     });
+  });
+
+  registerGlobalStatsRoutes(app, {
+    db,
+    cache,
+    cardInfo,
+    enabled: !!globalStats,
+    // "Aqui" na comparação: o que quem pede vê fora de "Só eu" (geral = casual; Pro = tudo, torneios encerrados).
+    hereFilter: (req) => (pro(req) ? { by: 'human', hideLiveTournaments: true } : { by: 'human', queues: FREE_QUEUES }),
+    cacheKey: (req) => cacheKey(req, false),
+    ttlMs: STATS_TTL_MS,
+    user,
+    sync: globalStats ? () => syncGlobalStats(db, { api: globalStats, fetchImpl }) : undefined,
   });
 }

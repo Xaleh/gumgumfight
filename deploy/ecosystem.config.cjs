@@ -63,6 +63,12 @@ module.exports = {
         SPOILER_SOURCES: env.SPOILER_SOURCES || '',
         // Horas entre as buscas dos spoilers (padrão 6); off desliga.
         SPOILER_SYNC: env.SPOILER_SYNC || '',
+        // Meta global (TCG Matchmaking pela OPTCG Logpose API): chave (segredo, só aqui), x-client-name,
+        // endereço e horas entre as buscas (padrão 6; off desliga). Sem a chave, o escopo Global some.
+        GLOBAL_STATS_API_KEY: env.GLOBAL_STATS_API_KEY || '',
+        GLOBAL_STATS_CLIENT: env.GLOBAL_STATS_CLIENT || '',
+        GLOBAL_STATS_API_URL: env.GLOBAL_STATS_API_URL || '',
+        GLOBAL_STATS_SYNC: env.GLOBAL_STATS_SYNC || '',
         // Client ID do login com Google (vazio = login desligado).
         GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID || '',
         // Contas Google que viram Admin ao entrar (e-mails separados por vírgula).

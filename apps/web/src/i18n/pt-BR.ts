@@ -1533,6 +1533,34 @@ const ptBR = {
   'stats.listOption': '{name} · {n|# partida|# partidas}',
   'stats.footer':
     'Cada partida é refeita pelo servidor a partir do replay antes de entrar nas estatísticas. Taxas com menos de {n|# partida|# partidas} aparecem esmaecidas: passe o mouse para ver o intervalo de confiança.',
+  // ---- meta global (TCG Matchmaking) ----
+  'stats.scopeLocal': 'GumGum Fight',
+  'stats.scopeLocalSub': 'as partidas daqui',
+  'stats.scopeGlobal': 'Global',
+  'stats.scopeGlobalSub': 'TCG Matchmaking',
+  'stats.filterGlobalQueue': 'Fila',
+  'stats.tabCompare': 'Comparar',
+  'stats.tileMatches': 'Partidas',
+  'stats.tileLeadersCount': '{n|# Líder|# Líderes}',
+  'stats.globalIntro':
+    'Partidas da fila ranqueada do TCG Matchmaking, a ranqueada por Discord do OPTCGSim. Quem começou só é conhecido numa parte das partidas, e a participação é por lado da partida, como nas estatísticas daqui.',
+  'stats.globalMinBounty': 'Fila só de jogadores com recompensa acima de {n|# bilhão|# bilhões} lá.',
+  'stats.globalCollecting': 'O servidor ainda não baixou esta fila. Volte mais tarde.',
+  'stats.globalTrendCollecting': 'A tendência precisa de resumos de duas semanas seguidas (coletando desde {since}).',
+  'stats.globalTrendFooter':
+    'Partidas de cada semana: a diferença entre os totais da fila no fim da semana e no fim da anterior. Semanas começam na segunda-feira.',
+  'stats.globalUpdated': 'Dados da fila {queue} do TCG Matchmaking, atualizados em {date}.',
+  'stats.globalCredit': 'Fonte: TCG Matchmaking (Discord), pela OPTCG Logpose API, do Matheus.',
+  'stats.compareIntro': '{format}: {here|# partida|# partidas} aqui ({scope}) e {global|# partida|# partidas} na fila {queue}. Participação por lado da partida.',
+  'stats.colShareHere': 'Uso aqui',
+  'stats.colShareGlobal': 'Uso lá',
+  'stats.colRateHere': 'Vitórias aqui',
+  'stats.colRateGlobal': 'Vitórias lá',
+  'stats.colDelta': 'Δ',
+  'stats.colDeltaTitle': 'Aqui menos lá, em pontos percentuais',
+  'stats.noCompare': 'Nenhum Líder com {min|# partida|# partidas} ou mais de um dos lados.',
+  'stats.compareFooter':
+    'Entram os Líderes com pelo menos {n|# partida|# partidas} de um dos lados; o lado sem partidas mostra —. Taxas com amostra pequena aparecem esmaecidas.',
   // ==== /stats ====
 
 

@@ -1,0 +1,362 @@
+[
+ {
+  "leader": "OP17-039",
+  "leaderName": "Rocks.D.Xebec",
+  "wins": 24146,
+  "number_of_matches": 44841,
+  "raw_win_rate": 53.85,
+  "play_rate": 40.2,
+  "first_win_rate": 51.5,
+  "second_win_rate": 55.72,
+  "matchups": [
+   {
+    "opponent": "ST30-001",
+    "wins": 2285,
+    "total_games": 3992,
+    "matchup_win_rate": 57.24,
+    "first_wins": 346,
+    "first_games": 577,
+    "first_win_rate": 59.97,
+    "second_wins": 487,
+    "second_games": 881,
+    "second_win_rate": 55.28
+   },
+   {
+    "opponent": "OP05-098",
+    "wins": 1784,
+    "total_games": 3363,
+    "matchup_win_rate": 53.05,
+    "first_wins": 270,
+    "first_games": 609,
+    "first_win_rate": 44.33,
+    "second_wins": 422,
+    "second_games": 658,
+    "second_win_rate": 64.13
+   },
+   {
+    "opponent": "OP13-004",
+    "wins": 2070,
+    "total_games": 3724,
+    "matchup_win_rate": 55.59,
+    "first_wins": 339,
+    "first_games": 683,
+    "first_win_rate": 49.63,
+    "second_wins": 418,
+    "second_games": 710,
+    "second_win_rate": 58.87
+   },
+   {
+    "opponent": "OP17-079",
+    "wins": 1284,
+    "total_games": 3416,
+    "matchup_win_rate": 37.59,
+    "first_wins": 182,
+    "first_games": 626,
+    "first_win_rate": 29.07,
+    "second_wins": 257,
+    "second_games": 590,
+    "second_win_rate": 43.56
+   },
+   {
+    "opponent": "OP17-039",
+    "wins": 4851,
+    "total_games": 9702,
+    "matchup_win_rate": 50.0,
+    "first_wins": 850,
+    "first_games": 1851,
+    "first_win_rate": 45.92,
+    "second_wins": 1001,
+    "second_games": 1851,
+    "second_win_rate": 54.08
+   }
+  ]
+ },
+ {
+  "leader": "ST30-001",
+  "leaderName": "Luffy & Ace",
+  "wins": 10099,
+  "number_of_matches": 18821,
+  "raw_win_rate": 53.66,
+  "play_rate": 16.9,
+  "first_win_rate": 51.37,
+  "second_win_rate": 54.23,
+  "matchups": [
+   {
+    "opponent": "ST30-001",
+    "wins": 859,
+    "total_games": 1718,
+    "matchup_win_rate": 50.0,
+    "first_wins": 147,
+    "first_games": 303,
+    "first_win_rate": 48.51,
+    "second_wins": 156,
+    "second_games": 303,
+    "second_win_rate": 51.49
+   },
+   {
+    "opponent": "OP17-079",
+    "wins": 932,
+    "total_games": 1438,
+    "matchup_win_rate": 64.81,
+    "first_wins": 170,
+    "first_games": 295,
+    "first_win_rate": 57.63,
+    "second_wins": 159,
+    "second_games": 222,
+    "second_win_rate": 71.62
+   },
+   {
+    "opponent": "OP13-004",
+    "wins": 665,
+    "total_games": 1644,
+    "matchup_win_rate": 40.45,
+    "first_wins": 96,
+    "first_games": 316,
+    "first_win_rate": 30.38,
+    "second_wins": 133,
+    "second_games": 279,
+    "second_win_rate": 47.67
+   },
+   {
+    "opponent": "OP17-039",
+    "wins": 1707,
+    "total_games": 3992,
+    "matchup_win_rate": 42.76,
+    "first_wins": 394,
+    "first_games": 881,
+    "first_win_rate": 44.72,
+    "second_wins": 231,
+    "second_games": 577,
+    "second_win_rate": 40.03
+   },
+   {
+    "opponent": "OP05-098",
+    "wins": 665,
+    "total_games": 1532,
+    "matchup_win_rate": 43.41,
+    "first_wins": 125,
+    "first_games": 362,
+    "first_win_rate": 34.53,
+    "second_wins": 107,
+    "second_games": 211,
+    "second_win_rate": 50.71
+   }
+  ]
+ },
+ {
+  "leader": "OP13-004",
+  "leaderName": "Sabo",
+  "wins": 9436,
+  "number_of_matches": 18393,
+  "raw_win_rate": 51.3,
+  "play_rate": 16.5,
+  "first_win_rate": 45.07,
+  "second_win_rate": 58.17,
+  "matchups": [
+   {
+    "opponent": "OP17-039",
+    "wins": 1654,
+    "total_games": 3724,
+    "matchup_win_rate": 44.41,
+    "first_wins": 292,
+    "first_games": 710,
+    "first_win_rate": 41.13,
+    "second_wins": 344,
+    "second_games": 683,
+    "second_win_rate": 50.37
+   },
+   {
+    "opponent": "OP13-004",
+    "wins": 753,
+    "total_games": 1506,
+    "matchup_win_rate": 50.0,
+    "first_wins": 96,
+    "first_games": 248,
+    "first_win_rate": 38.71,
+    "second_wins": 152,
+    "second_games": 248,
+    "second_win_rate": 61.29
+   },
+   {
+    "opponent": "ST30-001",
+    "wins": 979,
+    "total_games": 1644,
+    "matchup_win_rate": 59.55,
+    "first_wins": 146,
+    "first_games": 279,
+    "first_win_rate": 52.33,
+    "second_wins": 220,
+    "second_games": 316,
+    "second_win_rate": 69.62
+   },
+   {
+    "opponent": "OP17-079",
+    "wins": 906,
+    "total_games": 1418,
+    "matchup_win_rate": 63.89,
+    "first_wins": 129,
+    "first_games": 236,
+    "first_win_rate": 54.66,
+    "second_wins": 181,
+    "second_games": 238,
+    "second_win_rate": 76.05
+   },
+   {
+    "opponent": "OP05-098",
+    "wins": 676,
+    "total_games": 1388,
+    "matchup_win_rate": 48.7,
+    "first_wins": 84,
+    "first_games": 265,
+    "first_win_rate": 31.7,
+    "second_wins": 165,
+    "second_games": 255,
+    "second_win_rate": 64.71
+   }
+  ]
+ },
+ {
+  "leader": "OP17-079",
+  "leaderName": "Monkey D. Luffy",
+  "wins": 8608,
+  "number_of_matches": 17274,
+  "raw_win_rate": 49.83,
+  "play_rate": 15.5,
+  "first_win_rate": 40.27,
+  "second_win_rate": 57.29,
+  "matchups": [
+   {
+    "opponent": "OP13-004",
+    "wins": 512,
+    "total_games": 1418,
+    "matchup_win_rate": 36.11,
+    "first_wins": 57,
+    "first_games": 238,
+    "first_win_rate": 23.95,
+    "second_wins": 107,
+    "second_games": 236,
+    "second_win_rate": 45.34
+   },
+   {
+    "opponent": "OP17-039",
+    "wins": 2132,
+    "total_games": 3416,
+    "matchup_win_rate": 62.41,
+    "first_wins": 333,
+    "first_games": 590,
+    "first_win_rate": 56.44,
+    "second_wins": 444,
+    "second_games": 626,
+    "second_win_rate": 70.93
+   },
+   {
+    "opponent": "ST30-001",
+    "wins": 506,
+    "total_games": 1438,
+    "matchup_win_rate": 35.19,
+    "first_wins": 63,
+    "first_games": 222,
+    "first_win_rate": 28.38,
+    "second_wins": 125,
+    "second_games": 295,
+    "second_win_rate": 42.37
+   },
+   {
+    "opponent": "OP05-098",
+    "wins": 464,
+    "total_games": 1275,
+    "matchup_win_rate": 36.39,
+    "first_wins": 48,
+    "first_games": 224,
+    "first_win_rate": 21.43,
+    "second_wins": 95,
+    "second_games": 219,
+    "second_win_rate": 43.38
+   },
+   {
+    "opponent": "OP17-079",
+    "wins": 694,
+    "total_games": 1388,
+    "matchup_win_rate": 50.0,
+    "first_wins": 73,
+    "first_games": 230,
+    "first_win_rate": 31.74,
+    "second_wins": 157,
+    "second_games": 230,
+    "second_win_rate": 68.26
+   }
+  ]
+ },
+ {
+  "leader": "OP05-098",
+  "leaderName": "Enel",
+  "wins": 8964,
+  "number_of_matches": 16498,
+  "raw_win_rate": 54.33,
+  "play_rate": 14.8,
+  "first_win_rate": 42.83,
+  "second_win_rate": 62.32,
+  "matchups": [
+   {
+    "opponent": "OP17-079",
+    "wins": 811,
+    "total_games": 1275,
+    "matchup_win_rate": 63.61,
+    "first_wins": 124,
+    "first_games": 219,
+    "first_win_rate": 56.62,
+    "second_wins": 176,
+    "second_games": 224,
+    "second_win_rate": 78.57
+   },
+   {
+    "opponent": "OP17-039",
+    "wins": 1579,
+    "total_games": 3363,
+    "matchup_win_rate": 46.95,
+    "first_wins": 236,
+    "first_games": 658,
+    "first_win_rate": 35.87,
+    "second_wins": 339,
+    "second_games": 609,
+    "second_win_rate": 55.67
+   },
+   {
+    "opponent": "OP05-098",
+    "wins": 648,
+    "total_games": 1296,
+    "matchup_win_rate": 50.0,
+    "first_wins": 78,
+    "first_games": 221,
+    "first_win_rate": 35.29,
+    "second_wins": 143,
+    "second_games": 221,
+    "second_win_rate": 64.71
+   },
+   {
+    "opponent": "ST30-001",
+    "wins": 867,
+    "total_games": 1532,
+    "matchup_win_rate": 56.59,
+    "first_wins": 104,
+    "first_games": 211,
+    "first_win_rate": 49.29,
+    "second_wins": 237,
+    "second_games": 362,
+    "second_win_rate": 65.47
+   },
+   {
+    "opponent": "OP13-004",
+    "wins": 712,
+    "total_games": 1388,
+    "matchup_win_rate": 51.3,
+    "first_wins": 90,
+    "first_games": 255,
+    "first_win_rate": 35.29,
+    "second_wins": 181,
+    "second_games": 265,
+    "second_win_rate": 68.3
+   }
+  ]
+ }
+]

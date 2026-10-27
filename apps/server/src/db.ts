@@ -137,6 +137,31 @@ function migrate(db: DB) {
   migrateEngineTexts(db);
   migrateCardGaps(db);
   migrateDecks(db);
+  migrateGlobalStats(db);
+}
+
+/**
+ * Meta global (stats/global.ts): o último JSON normalizado de cada fila do TCG Matchmaking e
+ * um resumo diário dos Líderes, para a tendência. O sync regrava a fila inteira; o histórico
+ * tem uma linha por fila e dia.
+ */
+function migrateGlobalStats(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS global_stats_queues (
+      queue         TEXT PRIMARY KEY,         -- chave da fila na API (lw, lw_eastern...)
+      name          TEXT NOT NULL,            -- nome da fila na API
+      sort          INTEGER NOT NULL,         -- ordem na lista da API
+      last_modified TEXT,                     -- lastModified do JSON na API
+      fetched_at    TEXT NOT NULL,            -- quando foi baixado
+      body          TEXT NOT NULL             -- JSON GlobalSnapshot (Líderes e matchups)
+    );
+    CREATE TABLE IF NOT EXISTS global_stats_history (
+      queue TEXT NOT NULL,
+      day   TEXT NOT NULL,                    -- AAAA-MM-DD (UTC)
+      body  TEXT NOT NULL,                    -- JSON [[leader, games, wins], ...]
+      PRIMARY KEY (queue, day)
+    );
+  `);
 }
 
 /**
