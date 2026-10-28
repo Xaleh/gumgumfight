@@ -2361,7 +2361,9 @@ function stepDamage(state: GameState, frame: DamageFrame) {
     if (frame.lost) {
       emit(state, { kind: 'damageTaken', player: frame.defender });
       emit(state, { kind: 'damageDealt', player: frame.defender });
-      lifeRemoved(state, frame.defender);
+      // "When your number of Life cards becomes 0" já aconteceu quando a carta saiu, ainda que um
+      // [Trigger] tenha devolvido Vida depois: o efeito dispara agora, depois dos [Trigger].
+      lifeRemoved(state, frame.defender, frame.zero);
     }
     return;
   }
@@ -2387,6 +2389,7 @@ function stepDamage(state: GameState, frame: DamageFrame) {
   const card = ps.life.pop()!;
   frame.remaining--;
   frame.lost = (frame.lost ?? 0) + 1;
+  if (ps.life.length === 0) frame.zero = true;
   log(state, frame.defender, lg('losesLife', `${ps.name} perde 1 Vida (${ps.life.length} restante(s)).`, { player: ps.name, n: ps.life.length }));
   if (frame.banish) {
     if (ps.lifeFaceUp?.includes(card)) removeFrom(ps.lifeFaceUp, card);
@@ -6072,10 +6075,10 @@ function lifeToHandCard(state: GameState, player: PlayerId, uid: string) {
 }
 
 /** Uma carta saiu da Vida de `player` (dispara "When a card is removed from … Life cards" e "becomes 0"). */
-function lifeRemoved(state: GameState, player: PlayerId) {
+function lifeRemoved(state: GameState, player: PlayerId, reachedZero = state.players[player].life.length === 0) {
   if (!(state.lifeRemovedThisTurn ?? []).includes(player)) (state.lifeRemovedThisTurn ??= []).push(player);
   emit(state, { kind: 'lifeRemoved', player });
-  if (state.players[player].life.length === 0) emit(state, { kind: 'lifeZero', player });
+  if (reachedZero) emit(state, { kind: 'lifeZero', player });
 }
 
 function removeFrom(arr: string[], uid: string) {
