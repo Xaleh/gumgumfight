@@ -97,9 +97,14 @@ export const STANDARD_BLOCK_1_EXCEPTIONS: ReadonlySet<string> = new Set([
   'OP02-013', // Portgas.D.Ace
   'OP03-122', // Sogeking
   'OP04-083', // Sabo
-  // Tratadas como bloco ④: valem até 31/03/2029.
+  // Tratadas como bloco ④ (lista "Cards Eligible for Use Under Block Number ④"): valem até 31/03/2029.
   'OP01-039', // Killer
   'OP01-055', // You Can Be My Samurai!!
+  'OP02-005', // Curly Dadan
+  'OP02-068', // Gum-Gum Rain
+  'OP03-008', // Buggy
+  'OP03-044', // Kaya
+  'OP03-048', // Nojiko
   'OP03-072', // Gum-Gum Jet Gatling
   'OP03-097', // Six King Pistol
   'OP04-016', // Bad Manners Kick Course
@@ -107,6 +112,7 @@ export const STANDARD_BLOCK_1_EXCEPTIONS: ReadonlySet<string> = new Set([
   'OP04-096', // Corrida Coliseum
   'ST01-011', // Brook
   'ST02-007', // Jewelry Bonney
+  'ST06-008', // Hina
 ]);
 
 /**

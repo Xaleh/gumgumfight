@@ -250,7 +250,7 @@ volta a ação feita sobre a visão.
 torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `PlayMode` =
 formato + `spoilers` (`playMode` liga os spoilers no Livre); `countsInStats` diz se a partida entra nas estatísticas
 (só Standard e EGB puros, sem spoilers). Banidas (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
-do bloco ① em Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 14 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
+do bloco ① em Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 20 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
 regras especiais do Líder.
 
 ### Tradução
