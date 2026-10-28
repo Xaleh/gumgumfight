@@ -38,9 +38,18 @@ describe('formatos (Standard e Extra Grand Battle)', () => {
   });
 
   it('exceções oficiais do bloco ① continuam no Standard', () => {
-    for (const id of ['OP01-016', 'OP01-120', 'OP02-013', 'OP03-122', 'OP04-083', 'ST01-011', 'OP04-096']) {
+    // Bloco X (Super Parallel).
+    for (const id of ['OP01-016', 'OP01-120', 'OP02-013', 'OP03-122', 'OP04-083']) {
       expect(cardLegality(id, 'standard', NOW)).toBe('legal');
     }
+    // Tratadas como bloco ④: as 15 da lista da Bandai.
+    const block4 = ['OP01-039', 'OP01-055', 'OP02-005', 'OP02-068', 'OP03-008', 'OP03-044', 'OP03-048', 'OP03-072', 'OP03-097', 'OP04-016', 'OP04-077', 'OP04-096', 'ST01-011', 'ST02-007', 'ST06-008'];
+    for (const id of block4) {
+      expect(cardLegality(id, 'standard', NOW)).toBe('legal');
+    }
+    // Reimpressão com o mesmo número não muda a vizinha: as demais cartas da coleção seguem rotacionadas.
+    expect(cardLegality('OP02-004', 'standard', NOW)).toBe('rotated');
+    expect(cardLegality('ST06-007', 'standard', NOW)).toBe('rotated');
   });
 
   it('cartas banidas não valem em nenhum formato', () => {
