@@ -36,17 +36,18 @@ Levar dano cedo não é ruim: cada carta de Vida que sai **vai para a mão** (e 
 jogador que gasta dois Counters para proteger a quinta Vida perde duas cartas para ganhar uma. O
 cálculo muda conforme a Vida cai: com 1 ou 2 de Vida cada ponto é a partida.
 
-Por isso a Vida entra na avaliação por **tabelas côncavas**, não por "1 Vida = N pontos" — uma para a
-própria Vida (`life`) e outra para a do oponente (`lifeOpp`). Os valores saíram da otimização em
-auto-jogo (seção 9):
+Por isso a Vida entra na avaliação por **tabelas**, não por "1 Vida = N pontos" — uma para a própria Vida
+(`life`) e outra para a do oponente (`lifeOpp`). A do oponente saiu da otimização em auto-jogo (seção 9); a
+própria, do ajuste por imitação dos 4 primeiros dos torneios (seção 11), que a baixou de
+11 450 / 19 300 / 25 450 / 29 150 / 33 800:
 
 | Vida | própria: acumulado | o último ponto vale | do oponente: acumulado | o último ponto vale |
 |---|---|---|---|---|
-| 5 | 33 800 | 4 650 | 64 700 | 3 150 |
-| 4 | 29 150 | 3 700 | 61 550 | 4 450 |
-| 3 | 25 450 | 6 150 | 57 100 | 5 100 |
-| 2 | 19 300 | 7 850 | 52 000 | 14 600 |
-| 1 | 11 450 | 11 450 | 37 400 | 37 400 |
+| 5 | 25 802 | 4 150 | 64 700 | 3 150 |
+| 4 | 21 652 | 4 199 | 61 550 | 4 450 |
+| 3 | 17 453 | 3 582 | 57 100 | 5 100 |
+| 2 | 13 871 | 4 878 | 52 000 | 14 600 |
+| 1 | 8 993 | 8 993 | 37 400 | 37 400 |
 | 0 | 0 | — | 0 | — |
 
 A assimetria é a principal lição da otimização: **as duas últimas Vidas do oponente valem quase três
@@ -55,16 +56,17 @@ partida (DON!! nos ataques ao Líder, ataques extras para drenar os Counters) em
 Personagens; com o oponente em 5 ou 4, cada acerto vale pouco mais que a carta que ele ganha (~1 600),
 e tirar um Personagem caro continua sendo melhor.
 
-Na defesa, uma carta com Counter +1000 na mão vale ~2 600: o bot deixa passar o ataque com 5 ou 4 de
-Vida (perde 4 650 ou 3 700, ganha a carta da Vida), começa a usar Counter com 3 de Vida quando uma
-carta basta, e defende com tudo em 2 ou 1 — contando também quantos ataques ainda vêm no turno
-(seção 3a).
+Na defesa, uma carta com Counter +1000 na mão vale ~2 600, e a carta que sai da Vida, 2 900: com 5 a 2 de
+Vida, perder um ponto custa de 3 600 a 4 900 e devolve uma carta, então o bot só defende quando o resto do
+turno do oponente (seção 3a) torna o acerto perigoso; com 1 de Vida, defende com o que precisar. Os 4 primeiros
+dos torneios defendem o Líder com 2 de Vida em 42 a 50% das vezes em que a mão bastava, e com 3 em 17 a 50%; a
+tabela anterior fazia o bot defender 67 a 72% e 54 a 61%.
 
 | Conceito | Onde está | Teste |
 |---|---|---|
 | Não contar com Vida alta | `evaluate.ts`: `life[]` + `handCard` | `com 5 de Vida deixa o ataque passar` |
 | Fechar a partida | `evaluate.ts`: `lifeOpp[]` | `conta com o Blocker do oponente` |
-| Defender com Vida baixa | idem | `com 2 de Vida usa Counter` |
+| Defender com Vida baixa | idem | `com 1 de Vida usa Counter`, `com 2 de Vida e nenhum outro atacante do oponente deixa passar` |
 | Bloquear para salvar o Líder no fim | `planner.ts`: `decidePending` simula cada bloqueio | `bloqueia com Vida baixa` |
 
 ## 3. Vantagem de cartas e pressão
@@ -341,6 +343,43 @@ resto: calibrar esses parâmetros por regressão, ou ajustar os pesos da avalia�
 colocados em vez de só por auto-jogo (seção 9). Partidas cujo replay não refaz (versão antiga, texto de carta que
 mudou) são contadas e puladas.
 
+**Torneio de 25/10/2026 (16 inscritos, 20 partidas, 3 699 decisões; os 8 primeiros fizeram 2 831).**
+
+- **Ataque fatal**: quando a mão bastava, os 8 primeiros seguraram 86% e o bot seguraria 100%. O bot já defende
+  melhor que as pessoas aqui.
+- **Defesa do Líder quando a mão bastava, 8 primeiros x bot**: 1 de Vida 71% x 64%, 2 de Vida 50% x 72%, 3 de Vida
+  50% x 53%, 4 de Vida 30% x 5%, 5 de Vida 23% x 18%. As duas diferenças da rodada anterior se repetem: com 2 de Vida
+  os bons jogadores deixam passar mais que o bot, e com 4 defendem muito mais.
+- **"Cartas mortas" descartadas como explicação**: nos Counters usados no Líder com 4 ou 5 de Vida, só 11% (15% nos 8
+  primeiros) eram Personagens acima do DON!! do próximo turno. O que muda é o custo: 2,6 em média com Vida alta, 3,2
+  com Vida baixa. Com Vida alta as pessoas gastam os Personagens baratos; o bot vale toda carta da mão pelo Counter
+  impresso, sem olhar o custo.
+- **Mulligan**: o bot concorda 88%. Com um único Personagem de custo até 3, as pessoas mantêm a mão 30% das vezes; o
+  bot troca sempre. Amostra pequena (10 mãos) para mudar a regra.
+- **Quem começa**: os 8 primeiros escolheram jogar primeiro em 14% das vezes, o que confirma o bot jogar segundo.
+- **Turnos inteiros**: as pessoas jogam mais cartas (1,18 contra 1,01), anexam menos DON!! (1,90 contra 2,29) e
+  sobram mais DON!! ativos (0,38 contra 0,08), com quase o mesmo número de ataques.
+
+**Ajuste por imitação nesse torneio (608 posições de defesa): não adotado.** A concordância nas posições fora do
+ajuste subiu de 66,1% para 69,4%, dentro do ruído de 121 posições (±4 pontos). Os pesos sugeridos
+(`life` 0/12 424/17 861/24 467/28 230/32 706, `threatHit` 3 725) aproximaram o bot das pessoas com 2 de Vida (Counter
+47% para 20%, humanos 27%) e o afastaram com 4 (11% para 0%, humanos 22%). Na conferência, 200 partidas cada:
+auto-jogo 50,0%, humano fraco 80,0% (o bot atual faz 82%), humano fraco cuidadoso 82,5% (82%). Neutro em tudo, então
+os pesos atuais continuam. A defesa com Vida alta não sai só dos degraus da Vida: deixar passar um ataque dá ao bot
+uma carta que ele não vê, que vale `handCard` (2 900), mais que uma carta conhecida média (~2 400 pelos Counters dos
+decks prontos). `--with-hand` inclui esse peso no ajuste para a próxima rodada, com mais posições (todos os
+torneios encerrados, `--tournament-top`).
+
+**Ajuste por imitação dos 4 primeiros de todos os torneios (578 posições, 17 partidas): adotado.** A concordância
+nas posições fora do ajuste subiu de 60,9% para 67,0% (115 posições, ±4,5 pontos). O ajuste baixou a própria Vida
+inteira (tabela da seção 2), `lethal` de 2 700 para 1 512 e subiu `threatHit` de 2 250 para 2 890. Defesa do Líder
+com Counter, humano / bot anterior / bot ajustado: 2 de Vida 42% / 67% / 42%, 3 de Vida 17% / 61% / 17%; com 1, 4
+e 5 de Vida nada mudou. Na conferência, 200 partidas cada: auto-jogo 50,0%, humano fraco 81,0% (o bot anterior faz
+82%), humano fraco cuidadoso 82,0% (82%). Foi adotado porque é a terceira amostra com a mesma direção (os bons
+jogadores defendem menos que o bot com 2 e 3 de Vida: 34% e 21% contra 62% e 56% em 22/10, 50% e 50% contra 72% e
+53% no torneio de 25/10) e não piorou em nenhuma conferência. A defesa com 4 de Vida (pessoas ~30%, bot 5%)
+continua: essa rodada rodou sem `handCard`, porque a opção `--with-hand` ainda não estava na VPS.
+
 ### Ajuste dos pesos por imitação (Fase 6 com dados de gente)
 
 `apps/server/src/decisions/tune.ts` (CLI `npm run decisions:tune -w @gumgum/server`) guarda as posições em que
@@ -353,8 +392,8 @@ própria Vida só cai lá por efeito de carta); os pesos da mão também mudaria
 ```bash
 # Os 8 primeiros do último torneio (só lê o banco; ~15 min de CPU no nível difícil)
 DB_PATH=/caminho/gumgum.db npm run decisions:tune -w @gumgum/server -- --tournament latest --placement 8
-# Os 4 primeiros de todos os torneios encerrados
-DB_PATH=/caminho/gumgum.db npm run decisions:tune -w @gumgum/server -- --tournament-top 4 --limit 500
+# Os 4 primeiros de todos os torneios encerrados, também com o valor da carta que sai da Vida
+DB_PATH=/caminho/gumgum.db npm run decisions:tune -w @gumgum/server -- --tournament-top 4 --limit 500 --with-hand
 ```
 
 Um quinto das posições fica de fora do ajuste e mede a concordância antes e depois sem viés; a saída mostra também a

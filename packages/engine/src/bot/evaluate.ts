@@ -13,7 +13,9 @@
 //
 // Os pesos padrão saíram de uma otimização em auto-jogo (SPSA, ~29 mil partidas; ver
 // docs/bot-tempo.md e `scripts/tune-weights.ts`): partindo dos pesos escritos à mão, cada rodada põe
-// duas variações dos pesos para jogar entre si e anda na direção da que venceu mais.
+// duas variações dos pesos para jogar entre si e anda na direção da que venceu mais. Os de defesa (`life`,
+// `threatHit`, `lethal`) vieram depois do ajuste por imitação das defesas dos melhores colocados dos torneios
+// (`apps/server/src/decisions/tune.ts`; docs/bot-tempo.md, seção 11).
 //
 // A função lê só a visão (`viewFor`): cartas escondidas aparecem como `?` e contam pelo número.
 
@@ -94,8 +96,8 @@ export interface Weights {
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
-  life: [0, 11450, 19300, 25450, 29150, 33800],
-  lifeExtra: 4650,
+  life: [0, 8993, 13871, 17453, 21652, 25802],
+  lifeExtra: 4150,
   lifeOpp: [0, 37400, 52000, 57100, 61550, 64700],
   lifeOppExtra: 3150,
   handCard: 2900,
@@ -117,8 +119,8 @@ export const DEFAULT_WEIGHTS: Weights = {
   deckLow: 25000,
   deckLowAt: 2,
   threat: 1,
-  threatHit: 2250,
-  lethal: 2700,
+  threatHit: 2890,
+  lethal: 1512,
   counterCard: 0.72,
   counterBig: 0.2,
   counterWill: 1,

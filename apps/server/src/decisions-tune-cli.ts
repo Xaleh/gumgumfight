@@ -12,6 +12,7 @@
 //   --rounds <N>               rodadas do SPSA (padrão 80)
 //   --batch <N>                posições por rodada (padrão 200)
 //   --level <hard|normal>      nível do bot (padrão hard)
+//   --with-hand                também ajusta `handCard` (o valor da carta que sai da Vida para a mão)
 //
 // Saída: a concordância antes e depois (numa parte das posições que o ajuste não viu), a defesa do Líder por
 // Vida (humano, bot atual, bot ajustado) e o json dos pesos, para conferir com `duel.ts` e `vs-human.ts`.
@@ -46,6 +47,7 @@ if ((opt('top') || opt('tournament-top')) && !players.size) {
 }
 
 const level = (opt('level') ?? 'hard') as BotLevel;
+const withHand = args.includes('--with-hand');
 const kinds = (opt('kinds') ?? 'counter,block').split(',') as DecisionKind[];
 const ids = selectMatches(db, {
   queue: opt('queue'),
@@ -77,7 +79,7 @@ const train = shuffled.slice(holdout.length);
 
 const before = agreement(holdout, BOT_WEIGHTS, level);
 console.log(`Concordância com as pessoas antes (${holdout.length} posições fora do ajuste): ${(100 * before).toFixed(1)}%`);
-const theta = spsa(train, initialTheta(), {
+const theta = spsa(train, initialTheta(BOT_WEIGHTS, withHand), {
   rounds: num('rounds', 80),
   batch: num('batch', 200),
   level,
@@ -94,5 +96,5 @@ console.log('\nDefesa do Líder por Vida (posições fora do ajuste): humano / b
 for (const k of Object.keys(now).sort()) console.log(`  ${k.padEnd(14)} ${String(now[k].n).padStart(5)}   ${pct(now[k].human, now[k].n)} / ${pct(now[k].bot, now[k].n)} / ${pct(next[k].bot, next[k].n)}`);
 
 console.log('\nPesos ajustados (json parcial para duel.ts e vs-human.ts):');
-console.log(JSON.stringify(partialWeights(tuned)));
-console.log(`Atuais: ${JSON.stringify(partialWeights(BOT_WEIGHTS))}`);
+console.log(JSON.stringify(partialWeights(tuned, withHand)));
+console.log(`Atuais: ${JSON.stringify(partialWeights(BOT_WEIGHTS, withHand))}`);

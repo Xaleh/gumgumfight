@@ -199,8 +199,16 @@ describe('bot com busca: defesa', () => {
     expect(botDecision(s, 1).type).toBe('pass');
   });
 
-  it('com 2 de Vida usa Counter', () => {
+  it('com 2 de Vida e nenhum outro atacante do oponente deixa passar (fica com a carta da Vida)', () => {
+    // Os melhores colocados dos torneios defendem o Líder com 2 de Vida só em 42 a 50% das vezes em que a mão
+    // bastava (docs/bot-tempo.md, seção 11); com o oponente sem mais nenhum ataque no turno, tomar o dano é de graça.
     const s = leaderAttack(2, ['ST01-008', 'ST01-011']);
+    expect(s.pending?.kind).toBe('counter');
+    expect(botDecision(s, 1).type).toBe('pass');
+  });
+
+  it('com 1 de Vida usa Counter', () => {
+    const s = leaderAttack(1, ['ST01-008', 'ST01-011']);
     expect(s.pending?.kind).toBe('counter');
     const a = botDecision(s, 1);
     expect(a.type).toBe('counter');
