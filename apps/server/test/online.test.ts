@@ -331,6 +331,30 @@ describe('partidas online: salas privadas', () => {
     expect(next.status).toBe('playing');
     expect(next.seatOf(msg.token)).toBe(1);
   });
+
+  it('revanche: quem pede pode trocar de deck (conferido nas regras da sala)', async () => {
+    const { app } = setup();
+    const { roomId, tokens } = await privateMatch(app);
+    const room = getRoom(app, roomId);
+    const c0 = client(0);
+    room.attach(c0.conn);
+    await act(app, roomId, tokens[0], 0, { type: 'concede', player: 0 });
+    const ask = (t: string, deckId?: string) =>
+      app.inject({ method: 'POST', url: `/api/online/rooms/${roomId}/rematch`, payload: { t, ...(deckId ? { deckId } : {}) } });
+    // Deck que não existe: recusado, e o pedido não conta.
+    expect((await ask(tokens[0], 'nao-existe')).statusCode).toBe(400);
+    expect(room.data.rematch?.[0] ?? false).toBe(false);
+    expect((await ask(tokens[0], 'st03-crocodile')).statusCode).toBe(204);
+    expect((await ask(tokens[1])).statusCode).toBe(204);
+    const msg = c0.events.find((e) => e.event === 'rematch')!.data;
+    const next = getRoom(app, msg.roomId);
+    // Os assentos trocam de lado: quem era o 0 (e trocou de deck) é o 1 na sala nova.
+    expect(next.data.seats[1].deckId).toBe('st03-crocodile');
+    expect(next.data.seats[1].deck.id).toBe('st03-crocodile');
+    expect(next.data.seats[0].deckId).toBe('st02-kid');
+    const mine = (await app.inject(`/api/online/rooms/${msg.roomId}/my-deck?t=${msg.token}`)).json();
+    expect(mine.deckId).toBe('st03-crocodile');
+  });
 });
 
 describe('partidas online: filas', () => {

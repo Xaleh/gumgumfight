@@ -738,7 +738,8 @@ export const api = {
       }).catch(() => undefined),
     /** Lançamento do dado do sorteio (velocidade em larguras/alturas da mesa por segundo). */
     dice: (roomId: string, t: string, vx: number, vy: number) => send<void>('POST', `/api/online/rooms/${roomId}/dice`, { t, vx, vy }),
-    rematch: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/rematch`, { t }),
+    /** Pede revanche; com `deckId`, troca o próprio deck para ela. */
+    rematch: (roomId: string, t: string, deckId?: string) => send<void>('POST', `/api/online/rooms/${roomId}/rematch`, { t, ...(deckId ? { deckId } : {}) }),
     leave: (roomId: string, t: string) => send<void>('POST', `/api/online/rooms/${roomId}/leave`, { t }),
     replay: (roomId: string) => get<Record<string, unknown>>(`/api/online/rooms/${roomId}/replay`),
     eventsUrl: (roomId: string, t: string) => `/api/online/rooms/${roomId}/events?t=${encodeURIComponent(t)}`,
@@ -842,6 +843,8 @@ export interface LiveRoom {
 
 /** Decks dos jogadores de uma sala, com as cartas usadas (painel de decklist de quem transmite). */
 export interface RoomDecks {
+  /** O deck salvo de quem joga (`my-deck`), quando veio de um. */
+  deckId?: string | null;
   players: Array<{ name: string; bot: boolean; deck: Omit<DeckList, 'id'> }>;
   cards: ApiCard[];
 }

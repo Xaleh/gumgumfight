@@ -232,11 +232,11 @@ function MainApp() {
         onRematch={
           setup.mode === 'replay'
             ? undefined
-            : () =>
+            : (next) =>
                 setScreen({
                   name: 'game',
                   key: Date.now(),
-                  setup: { ...setup, notice: undefined, config: { ...setup.config, seed: Math.floor(Math.random() * 1_000_000) } },
+                  setup: next ?? { ...setup, notice: undefined, config: { ...setup.config, seed: Math.floor(Math.random() * 1_000_000) } },
                 })
         }
       />

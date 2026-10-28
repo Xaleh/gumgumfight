@@ -145,6 +145,15 @@ export default {
   'decks.cleanup.deleted': '{n|# deck deleted|# decks deleted}.',
   'decks.cleanup.empty': 'Nothing to clean up here.',
 
+  // ---- deck confirmation before a match ----
+  'deckConfirm.title': 'Play with this deck?',
+  'deckConfirm.valid': 'Legal in this mode',
+  'deckConfirm.quickSwap': 'Quick swap',
+  'deckConfirm.allDecks': 'All decks…',
+  'deckConfirm.dontAsk': 'Don\'t ask again (you can turn it back on in Settings)',
+  'deckConfirm.rematch': 'Rematch',
+  'settings.confirmDeck': 'Confirm deck before matches',
+  'settings.confirmDeckHint': 'Before finding a match, creating or joining a room, practicing against the bot or asking for a rematch, shows the deck you are about to use, with the option to switch.',
   // ---- server errors ----
   'errors.deckLeaderRequired': 'Choose a Leader before saving the deck.',
   'errors.deckLeaderInvalid': '{id} is not a Leader.',

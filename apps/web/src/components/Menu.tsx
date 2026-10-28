@@ -21,13 +21,14 @@ import { useAuth } from '../auth';
 import { buildSetup, setupFromReplayText } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, useT } from '../i18n';
-import { NICKNAME_EVENT, SettingsModal } from '../settings';
+import { NICKNAME_EVENT, SettingsModal, useSettings } from '../settings';
 import { type NavItem, TopBar } from './AppShell';
 import { LiveNow, MetaBlock, TournamentBanner, TournamentsBlock, usePoll } from './HomeBlocks';
 import { Icon, type IconName } from './Icons';
 import { InstallBanner } from './Install';
 import { LearnBanner } from './LearnBanner';
 import { LeaderArt } from './LeaderArt';
+import { DeckConfirm } from './DeckConfirm';
 import { DeckPicker, RANDOM_DECK } from './DeckPicker';
 import { useFavoriteToggle } from './DeckTile';
 import { LeaderPicker, QueueWait, roomCodeFromUrl, useQueue } from './OnlineMenu';
@@ -93,6 +94,9 @@ function savedFormat(): FormatId {
 }
 
 const RANDOM = RANDOM_DECK;
+
+/** Modos que começam uma partida pelo menu (e pedem a confirmação do deck). */
+type StartKind = 'ranked' | 'casual' | 'private' | 'join' | 'bot';
 
 /** Arte do Líder do deck (ou o "?" do sorteio). */
 function DeckArt({ deck, small }: { deck?: DeckSummary; small?: boolean }) {
@@ -330,6 +334,9 @@ export function Menu({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState<null | 0 | 1>(null);
+  /** Modo esperando a confirmação do deck. */
+  const [confirming, setConfirming] = useState<StartKind | null>(null);
+  const { confirmDeck } = useSettings();
   /** Casual: Líder do oponente escolhido (null = qualquer um) e a folha de escolha. */
   const [casualLeader, setCasualLeader] = useState<QueueLeader | null>(null);
   const [pickingLeader, setPickingLeader] = useState(false);
@@ -483,7 +490,7 @@ export function Menu({
     }
   };
 
-  const startBot = async () => {
+  const startBot = async (mine: string) => {
     setLoading(true);
     setActionError(null);
     try {
@@ -496,7 +503,7 @@ export function Menu({
       let notice: string | undefined;
       if (broadcasting) {
         try {
-          onOnline(await api.online.botRoom(deck0, opp, botMode, firstPlayer));
+          onOnline(await api.online.botRoom(mine, opp, botMode, firstPlayer));
           return;
         } catch (e) {
           // Servidor lotado: o treino roda no navegador, sem transmissão.
@@ -509,7 +516,7 @@ export function Menu({
       } catch {
         /* sem armazenamento local */
       }
-      const setup = await buildSetup('bot', [deck0, opp], names, seed, botMode.format, firstPlayer);
+      const setup = await buildSetup('bot', [mine, opp], names, seed, botMode.format, firstPlayer);
       onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);
@@ -568,7 +575,44 @@ export function Menu({
           ? t('menu.rankedManualCards', { n: manualCards })
           : null);
 
-  const enterQueue = (kind: QueueKind) => run(() => enqueue(onlineDeck!.id, format, kind, kind === 'casual' ? casualLeader : null));
+  /** Por que o deck não vale no modo (null: vale). Quem entra numa sala joga nas regras de quem criou (conferidas no servidor). */
+  const whyNotIn = (kind: StartKind, d: DeckSummary): string | null => {
+    switch (kind) {
+      case 'ranked':
+        return (
+          whyNotPlayable(d, format) ??
+          (d.spoilers?.length ? t('menu.rankedSpoilers', { n: d.spoilers.length }) : d.unscripted ? t('menu.rankedManualCards', { n: d.unscripted }) : null)
+        );
+      case 'casual':
+        return whyNotPlayable(d, format);
+      case 'private':
+        return whyNotPlayable(d, privateMode.format, spoilerRule(privateMode));
+      case 'join':
+        return d.valid ? null : whyNotPlayable(d, 'free');
+      case 'bot':
+        return whyNotPlayable(d, botMode.format, spoilerRule(botMode));
+    }
+  };
+  /** Entra no modo com o deck. */
+  const start = (kind: StartKind, deckId: string) => {
+    switch (kind) {
+      case 'ranked':
+      case 'casual':
+        return run(() => enqueue(deckId, format, kind, kind === 'casual' ? casualLeader : null));
+      case 'private':
+        return run(async () => {
+          const r = await api.online.createRoom(deckId, privateMode, shareHands);
+          onOnline({ roomId: r.roomId, token: r.token });
+        });
+      case 'join':
+        // Quem entra joga no formato de quem criou a sala.
+        return run(async () => onOnline(await api.online.joinRoom(code, deckId)));
+      case 'bot':
+        return startBot(deckId);
+    }
+  };
+  /** Confirma o deck antes (se ligado nas configurações) ou entra direto com o equipado. */
+  const ask = (kind: StartKind) => (confirmDeck ? setConfirming(kind) : void start(kind, deck0));
 
   const queueLive = (kind: QueueKind) =>
     stats ? <Live>{t('menu.queueLive', { n: stats.playing[kind], q: stats.queue[kind][format] })}</Live> : <Live off>{t('menu.counting')}</Live>;
@@ -770,7 +814,7 @@ export function Menu({
               note={rankedNote}
               action={t('menu.findMatch')}
               disabled={onlineBlocked || Boolean(rankedNote)}
-              onAction={() => enterQueue('ranked')}
+              onAction={() => ask('ranked')}
             />
             <ModeCard
               mode="casual"
@@ -785,7 +829,7 @@ export function Menu({
               note={onlineNote}
               action={t('menu.findMatch')}
               disabled={onlineBlocked}
-              onAction={() => enterQueue('casual')}
+              onAction={() => ask('casual')}
             >
               <div className="mode-fields">
                 <button type="button" className="pick-btn" onClick={() => setPickingLeader(true)} title={t('menu.pickLeaderHint')}>
@@ -808,12 +852,7 @@ export function Menu({
               action={t('menu.createRoom')}
               disabled={!privateDeck || busy || Boolean(playing) || Boolean(queue)}
               highlight={Boolean(URL_ROOM_CODE)}
-              onAction={() =>
-                run(async () => {
-                  const r = await api.online.createRoom(privateDeck!.id, privateMode, shareHands);
-                  onOnline({ roomId: r.roomId, token: r.token });
-                })
-              }
+              onAction={() => ask('private')}
             >
               <RulesField
                 id="private-rules-label"
@@ -838,12 +877,7 @@ export function Menu({
                     type="button"
                     className="btn-outline"
                     disabled={!d0?.valid || busy || code.length !== 6 || Boolean(playing)}
-                    onClick={() =>
-                      run(async () => {
-                        // Quem entra joga no formato de quem criou a sala.
-                        onOnline(await api.online.joinRoom(code, d0!.id));
-                      })
-                    }
+                    onClick={() => ask('join')}
                   >
                     {t('menu.joinRoom')}
                   </button>
@@ -866,7 +900,7 @@ export function Menu({
               note={!d0 || botReady ? null : t('menu.bothDecksValid', { format: modeLabel(botMode) })}
               action={loading ? t('common.loading') : t('menu.battle')}
               disabled={!botReady || loading}
-              onAction={startBot}
+              onAction={() => ask('bot')}
             >
               <button type="button" className="mode-learn" onClick={onLearn}>
                 <Icon name="learn" size={16} />
@@ -987,6 +1021,33 @@ export function Menu({
             setPickingLeader(false);
           }}
           onClose={() => setPickingLeader(false)}
+        />
+      )}
+      {confirming && (
+        <DeckConfirm
+          kicker={
+            {
+              ranked: `${t('menu.ranked')} · ${fmt}`,
+              casual: `${t('menu.casual')} · ${fmt}`,
+              private: `${t('menu.private')} · ${modeLabel(privateMode)}`,
+              join: `${t('menu.private')} · ${code}`,
+              bot: `${t('menu.vsBot')} · ${modeLabel(botMode)}`,
+            }[confirming]
+          }
+          deckId={deck0}
+          decks={decks}
+          whyFor={(d) => whyNotIn(confirming, d)}
+          confirmLabel={
+            { ranked: t('menu.findMatch'), casual: t('menu.findMatch'), private: t('menu.createRoom'), join: t('menu.joinRoom'), bot: t('menu.battle') }[confirming]
+          }
+          opponent={confirming === 'bot' ? { deckId: deck1 === RANDOM ? undefined : deck1, label: deck1 === RANDOM ? t('menu.randomDeck') : (d1?.name ?? '') } : undefined}
+          onConfirm={(id) => {
+            setConfirming(null);
+            setDeck0(id);
+            void start(confirming, id);
+          }}
+          onCancel={() => setConfirming(null)}
+          onFavorite={toggleFavorite}
         />
       )}
       {picking !== null && (

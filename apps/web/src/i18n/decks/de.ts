@@ -145,6 +145,15 @@ export default {
   'decks.cleanup.deleted': '{n|# Deck gelöscht|# Decks gelöscht}.',
   'decks.cleanup.empty': 'Hier gibt es nichts zu bereinigen.',
 
+  // ---- Deck-Bestätigung vor dem Spiel ----
+  'deckConfirm.title': 'Mit diesem Deck spielen?',
+  'deckConfirm.valid': 'In diesem Modus erlaubt',
+  'deckConfirm.quickSwap': 'Schnell wechseln',
+  'deckConfirm.allDecks': 'Alle Decks…',
+  'deckConfirm.dontAsk': 'Nicht mehr fragen (in den Einstellungen wieder einschaltbar)',
+  'deckConfirm.rematch': 'Revanche',
+  'settings.confirmDeck': 'Deck vor dem Spiel bestätigen',
+  'settings.confirmDeckHint': 'Bevor du ein Spiel suchst, einen Raum erstellst oder betrittst, gegen den Bot übst oder eine Revanche forderst, wird das Deck angezeigt, mit dem du spielst – mit der Möglichkeit, es zu wechseln.',
   // ---- Serverfehler ----
   'errors.deckLeaderRequired': 'Wähle einen Leader, bevor du das Deck speicherst.',
   'errors.deckLeaderInvalid': '{id} ist kein Leader.',

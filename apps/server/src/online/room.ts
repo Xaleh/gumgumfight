@@ -140,6 +140,9 @@ export interface SeatInfo {
   apprentice?: boolean;
 }
 
+/** Deck escolhido para a revanche, já conferido nas regras da sala. */
+export type RematchDeck = Pick<SeatInfo, 'deckId' | 'deck'>;
+
 export interface RoomResult {
   matchId: number | null;
   /** Recompensa antes e depois (ranqueada). */
@@ -182,6 +185,8 @@ export interface RoomData {
   result: RoomResult | null;
   /** Ids das salas de revanche pedidas (por assento). */
   rematch?: [boolean, boolean];
+  /** Deck trocado no pedido de revanche (por assento; null: segue o mesmo). */
+  rematchDecks?: [RematchDeck | null, RematchDeck | null];
   rematchRoom?: string | null;
   tournament?: RoomTournament;
   /** Quem começa, quando não é sorteado (jogos 2+ de uma série de torneio). */
