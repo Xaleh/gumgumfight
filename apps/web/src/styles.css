@@ -15016,3 +15016,132 @@ div.dk-tile-main {
   font-size: 11px;
   border: 2px solid var(--panel);
 }
+
+/* PROTÓTIPO: confirmação do deck antes da partida */
+.modal-card.deck-confirm {
+  width: min(560px, 100%);
+}
+.deck-confirm .dc-main {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 14px;
+  text-align: left;
+  align-items: start;
+}
+.deck-confirm .dc-info {
+  display: grid;
+  gap: 8px;
+}
+.deck-confirm .dc-name {
+  font-size: 18px;
+  font-weight: 900;
+}
+.deck-confirm .dc-check {
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.deck-confirm .dc-check.ok {
+  color: var(--green);
+}
+.deck-confirm .dc-check.bad {
+  color: var(--red);
+}
+.deck-confirm .dc-vs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: var(--panel2);
+  text-align: left;
+}
+.deck-confirm .dc-vs .dk-banner {
+  width: 96px;
+  height: 44px;
+  border-radius: 10px;
+  flex: none;
+}
+.deck-confirm .dc-vs .dk-banner-name {
+  font-size: 14px;
+  right: 6px;
+  left: 6px;
+  bottom: 4px;
+}
+.deck-confirm .dc-vs-tag {
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 22px;
+  color: var(--red);
+}
+.deck-confirm .dc-recent {
+  margin-top: 14px;
+  text-align: left;
+}
+.deck-confirm .dc-recent-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.deck-confirm .dc-recent-tile {
+  all: unset;
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  display: grid;
+}
+.deck-confirm .dc-recent-tile:hover,
+.deck-confirm .dc-recent-tile:focus-visible {
+  border-color: var(--blue);
+}
+.deck-confirm .dc-recent-tile .dk-banner {
+  height: 52px;
+}
+.deck-confirm .dc-recent-tile .dk-banner-name {
+  font-size: 14px;
+  left: 6px;
+  right: 6px;
+  bottom: 4px;
+}
+.deck-confirm .dc-recent-name {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deck-confirm .dc-recent-tile.more {
+  border-style: dashed;
+  place-items: center;
+}
+.deck-confirm .dc-more-ico {
+  height: 52px;
+  display: grid;
+  place-items: center;
+  color: var(--blue);
+}
+.deck-confirm .dc-actions {
+  margin-top: 16px;
+}
+.deck-confirm .dc-skip {
+  justify-content: center;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 560px) {
+  .deck-confirm .dc-main {
+    grid-template-columns: 1fr;
+  }
+  .deck-confirm .dc-main .dk-banner.big {
+    height: 120px;
+  }
+  .deck-confirm .dc-recent-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
