@@ -7,6 +7,8 @@
 //   --top <N>                            só os N perfis de maior recompensa na ranqueada
 //   --tournament-top <N>                 só quem ficou entre os N primeiros de algum torneio encerrado
 //   --player <id>[,<id>…]                só estes perfis (players.id)
+//   --tournament <id|latest>             só os jogos deste torneio (latest: o último encerrado), com a colocação de cada um
+//   --split <N>                          com --tournament: repete o resumo só para os N primeiros e só para o resto
 //   --limit <N>                          no máximo N partidas (padrão 200, as mais recentes)
 //   --bot <hard|normal|none>             nível do bot comparado em cada decisão (padrão hard; none = só extrai)
 //   --budget <ms>                        teto de tempo por decisão do bot (padrão 250)
@@ -18,7 +20,7 @@
 
 import { appendFileSync, writeFileSync } from 'node:fs';
 import type { BotLevel } from '@gumgum/engine';
-import { extractMatch, formatSummary, selectMatches, summarize, topRankedPlayers, topTournamentPlayers, type DecisionRecord, type TurnRecord } from './decisions/extract';
+import { extractMatch, formatSummary, selectMatches, summarize, topRankedPlayers, topTournamentPlayers, tournamentInfo, type DecisionRecord, type TurnRecord } from './decisions/extract';
 import { openDb } from './db';
 import { DB_PATH, fromUserCwd } from './paths';
 
@@ -54,7 +56,21 @@ const outTurns = out ? out.replace(/\.jsonl$/, '') + '-turnos.jsonl' : null;
 if (out) writeFileSync(out, '');
 if (outTurns) writeFileSync(outTurns, '');
 
-const ids = selectMatches(db, { queue: opt('queue'), since: opt('since'), players: players.size ? [...players] : undefined, limit: num('limit', 200) });
+const tArg = opt('tournament');
+const tournament = tArg ? tournamentInfo(db, tArg) : null;
+if (tArg && !tournament) {
+  console.log(`Torneio não encontrado: ${tArg}`);
+  process.exit(1);
+}
+if (tournament) console.log(`Torneio: ${tournament.name} (${tournament.id}) | ${tournament.players} inscritos | encerrado em ${tournament.finishedAt ?? 'andamento'}`);
+
+const ids = selectMatches(db, {
+  queue: opt('queue'),
+  since: opt('since'),
+  tournament: tournament?.id,
+  players: players.size ? [...players] : undefined,
+  limit: num('limit', 200),
+});
 console.log(`Banco: ${DB_PATH} | ${ids.length} partidas${players.size ? ` de ${players.size} perfis` : ''}${bot ? ` | bot ${bot} (${budgetMs} ms por decisão)` : ''}`);
 
 const all: DecisionRecord[] = [];
@@ -62,7 +78,7 @@ const allTurns: TurnRecord[] = [];
 let failed = 0;
 const t0 = Date.now();
 ids.forEach((id, i) => {
-  const r = extractMatch(db, id, { bot, budgetMs });
+  const r = extractMatch(db, id, { bot, budgetMs, placements: tournament?.placements });
   if (r.error) {
     failed++;
     if (process.env.VERBOSE) console.error(`partida ${id}: ${r.error}`);
@@ -75,4 +91,14 @@ ids.forEach((id, i) => {
 });
 console.log('\n');
 console.log(formatSummary(summarize(all, ids.length, failed, allTurns)));
+const split = opt('split');
+if (tournament && split) {
+  const n = Number(split);
+  const top = (p: number | undefined) => p !== undefined && p <= n;
+  const turnPlace = (t: TurnRecord) => all.find((d) => d.match === t.match && d.seat === t.seat)?.placement;
+  console.log(`\n================ Só os ${n} primeiros do torneio ================\n`);
+  console.log(formatSummary(summarize(all.filter((d) => top(d.placement)), ids.length, failed, allTurns.filter((t) => top(turnPlace(t))))));
+  console.log(`\n================ Do ${n + 1}º lugar para baixo ================\n`);
+  console.log(formatSummary(summarize(all.filter((d) => !top(d.placement)), ids.length, failed, allTurns.filter((t) => !top(turnPlace(t))))));
+}
 if (out) console.log(`\nRegistros em ${out} e turnos em ${outTurns}`);
