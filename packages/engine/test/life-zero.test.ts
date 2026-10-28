@@ -62,7 +62,7 @@ function settle(s: GameState): GameState {
     if (p.kind === 'lifeCard') s = applyAction(s, { type: 'answer', player: p.player, yes: s.cards[p.card].cardId === 'LZ-E01' });
     else if (p.kind === 'confirm') s = applyAction(s, { type: 'answer', player: p.player, yes: true });
     else if (p.kind === 'option') s = applyAction(s, { type: 'option', player: p.player, index: 0 });
-    else if (p.kind === 'selectTargets' || p.kind === 'choose') s = applyAction(s, { type: 'choose', player: p.player, uids: (p as { options: string[] }).options.slice(0, Math.max(1, (p as { min?: number }).min ?? 1)) });
+    else if (p.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: p.player, uids: p.options.slice(0, Math.max(1, p.min)) });
     else break;
   }
   return s;
