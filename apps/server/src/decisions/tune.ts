@@ -104,9 +104,13 @@ export function defenseByLife(samples: Sample[], weights: BotWeights, level: Bot
 /** Parâmetros ajustados, em escala log: os 5 degraus da própria Vida e a ameaça do próximo ataque. */
 export type Theta = Record<string, number>;
 
-export function initialTheta(w: BotWeights = BOT_WEIGHTS): Theta {
+export function initialTheta(w: BotWeights = BOT_WEIGHTS, withHand = false): Theta {
   const t: Theta = { threatHit: Math.log(w.threatHit), lethal: Math.log(w.lethal) };
   for (let i = 1; i <= 5; i++) t[`life${i}`] = Math.log(w.life[i] - w.life[i - 1]);
+  // Opcional: o valor da carta da própria mão que o bot não vê (a que sai da Vida no ataque que ele deixa passar,
+  // a comprada por efeito). Pesa em toda defesa ("deixar passar dá uma carta"), mas também nos efeitos de compra
+  // do próprio turno: confira no auto-jogo com mais cuidado.
+  if (withHand) t.handCard = Math.log(w.handCard);
   return t;
 }
 
@@ -114,12 +118,19 @@ export function initialTheta(w: BotWeights = BOT_WEIGHTS): Theta {
 export function weightsOf(t: Theta, base: BotWeights = BOT_WEIGHTS): BotWeights {
   const life = [0];
   for (let i = 1; i <= 5; i++) life.push(Math.round(life[i - 1] + Math.exp(t[`life${i}`])));
-  return { ...base, life, lifeExtra: Math.round(Math.exp(t.life5)), threatHit: Math.round(Math.exp(t.threatHit)), lethal: Math.round(Math.exp(t.lethal)) };
+  return {
+    ...base,
+    life,
+    lifeExtra: Math.round(Math.exp(t.life5)),
+    threatHit: Math.round(Math.exp(t.threatHit)),
+    lethal: Math.round(Math.exp(t.lethal)),
+    ...(t.handCard !== undefined ? { handCard: Math.round(Math.exp(t.handCard)) } : {}),
+  };
 }
 
 /** Só o que o ajuste muda (o json parcial que `duel.ts` e `vs-human.ts` aceitam). */
-export function partialWeights(w: BotWeights): Partial<BotWeights> {
-  return { life: w.life, lifeExtra: w.lifeExtra, threatHit: w.threatHit, lethal: w.lethal };
+export function partialWeights(w: BotWeights, withHand = false): Partial<BotWeights> {
+  return { life: w.life, lifeExtra: w.lifeExtra, threatHit: w.threatHit, lethal: w.lethal, ...(withHand ? { handCard: w.handCard } : {}) };
 }
 
 export interface SpsaOptions {

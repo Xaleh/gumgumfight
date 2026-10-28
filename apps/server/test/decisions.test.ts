@@ -175,6 +175,8 @@ describe('extrator de decisões', () => {
     let rng = 7;
     const theta = spsa(samples, initialTheta(), { rounds: 1, batch: 10, level: 'normal', random: () => ((rng = (rng * 16807) % 2147483647) / 2147483647) });
     const w = weightsOf(theta);
+    expect(w.handCard).toBe(BOT_WEIGHTS.handCard); // fora do ajuste por padrão
+    expect(weightsOf(initialTheta(BOT_WEIGHTS, true)).handCard).toBe(BOT_WEIGHTS.handCard);
     expect(w.life).toHaveLength(6);
     expect(w.life.every((v, i) => i === 0 || v > w.life[i - 1])).toBe(true);
   });
