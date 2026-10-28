@@ -149,7 +149,8 @@ gumgumfight/
 │   ├── src/auth/                google.ts (JWKS/RS256), store.ts (users, sessions, roles), routes.ts
 │   ├── src/partners/            API para parceiros: store.ts (api_tokens, oauth_clients, oauth_codes), tokens.ts (middleware Bearer, /api/tokens), oauth.ts, webhook.ts, matches.ts
 │   ├── src/oauth-client-cli.ts  cadastro dos clientes OAuth (npm run oauth:client)
-│   ├── src/decisions/           extrator de decisões dos replays (extract.ts) e a CLI decisions-cli.ts (npm run decisions)
+│   ├── src/decisions/           extrator de decisões dos replays (extract.ts), ajuste de pesos por imitação (tune.ts);
+│   │                            CLIs decisions-cli.ts e decisions-tune-cli.ts (npm run decisions, decisions:tune)
 │   ├── src/online/              room.ts (uma partida + relógio + mesa atrasada), lobby.ts (salas, filas, presença), routes.ts (HTTP + SSE), broadcast.ts (modo transmissão)
 │   ├── src/stats/               catalog.ts (tiers, Elo), derive.ts (refaz replay), store.ts (SQL), routes.ts,
 │   │                            global.ts e global-routes.ts (meta global: TCG Matchmaking pela OPTCG Logpose API)
@@ -290,7 +291,10 @@ ações legais, a escolha, por número de carta) com a escolha do bot na mesma v
 por fila, data, perfis de maior recompensa (`--top`) ou colocados nos torneios encerrados (`--tournament-top`, pela
 classificação de `standings`). O resumo mostra a concordância por tipo de decisão, quem defende o Líder (humano x bot,
 por Vida e por margem do ataque) e os pares de discordância na fase principal; `--out` grava o JSONL. Só lê o banco;
-no pacote de produção é `release/server/decisions-cli.mjs`
+no pacote de produção é `release/server/decisions-cli.mjs`. `--tournament <id|latest>` restringe aos jogos de um torneio
+(via `tournament_games.stats_match_id`) e grava a colocação final de cada jogador. `npm run decisions:tune -w
+@gumgum/server` (`decisions/tune.ts`; no pacote, `decisions-tune-cli.mjs`) ajusta por SPSA os pesos de defesa do bot
+(`life`, `threatHit`, `lethal`) para concordar com as defesas dessas pessoas
 ([`docs/bot-tempo.md`, seção 11](bot-tempo.md)).
 
 ---

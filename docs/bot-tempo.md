@@ -297,11 +297,18 @@ DON!! que sobrou, ao lado do turno que o bot jogaria a partir da mesma posição
 como na simulação do planejador). Comparar clique a clique na fase principal é barulhento (o bot anexa DON!! e
 ataca; a pessoa ataca e anexa em outra hora); o turno inteiro é o que responde "desenvolver ou pressionar".
 
+Com `--tournament <id|latest>` o extrator lê só os jogos de um torneio e grava em cada registro a colocação final do
+jogador (`placement`); `--split N` repete o resumo para os N primeiros e para o resto. O resumo também mostra o
+mulligan por mão inicial (quantos Personagens de custo ≤ 3, humano x bot), a escolha de quem começa e, nos Counters
+usados no Líder, o tipo e o custo da carta e se ela caberia no DON!! do próximo turno (a hipótese das "cartas
+mortas" para a defesa com Vida alta).
+
 ```bash
 # Numa cópia do banco (o backup diário da VPS, ~/backups/gumgum-<dia>.db, copiado por scp): só lê, não grava nada.
 DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --limit 500 --out decisoes.jsonl
 DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --tournament-top 4 --queue tournament
 DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --top 20 --queue ranked --bot none
+DB_PATH=/caminho/gumgum.db npm run decisions -w @gumgum/server -- --tournament latest --split 8
 # Na própria VPS, com o pacote de produção (sem o repositório):
 DB_PATH=~/apps/gumgumfight/shared/gumgum.db node --disable-warning=ExperimentalWarning \
   ~/apps/gumgumfight/current/server/decisions-cli.mjs --limit 500 --out ~/decisoes.jsonl
@@ -333,6 +340,27 @@ as pessoas em 47% dos cliques da fase principal e 72% dos Counters.
 resto: calibrar esses parâmetros por regressão, ou ajustar os pesos da avaliação para concordar com os melhores
 colocados em vez de só por auto-jogo (seção 9). Partidas cujo replay não refaz (versão antiga, texto de carta que
 mudou) são contadas e puladas.
+
+### Ajuste dos pesos por imitação (Fase 6 com dados de gente)
+
+`apps/server/src/decisions/tune.ts` (CLI `npm run decisions:tune -w @gumgum/server`) guarda as posições em que
+jogadores decidiram uma defesa (Counter, bloqueio) e procura, por SPSA, os pesos que fazem o bot escolher o mesmo que
+eles na mesma visão. A nota de cada variação é a concordância com as pessoas, não a vitória contra outra versão do bot
+(o ajuste da seção 9). Só entram os pesos que pesam na defesa: os degraus da própria Vida (`life`) e a ameaça do
+próximo ataque (`threatHit`, `lethal`). Eles quase não mudam o próprio turno (a ameaça é zerada no planejamento, e a
+própria Vida só cai lá por efeito de carta); os pesos da mão também mudariam quais cartas o bot joga e ficam de fora.
+
+```bash
+# Os 8 primeiros do último torneio (só lê o banco; ~15 min de CPU no nível difícil)
+DB_PATH=/caminho/gumgum.db npm run decisions:tune -w @gumgum/server -- --tournament latest --placement 8
+# Os 4 primeiros de todos os torneios encerrados
+DB_PATH=/caminho/gumgum.db npm run decisions:tune -w @gumgum/server -- --tournament-top 4 --limit 500
+```
+
+Um quinto das posições fica de fora do ajuste e mede a concordância antes e depois sem viés; a saída mostra também a
+defesa do Líder por Vida (humano, bot atual, bot ajustado) e o json dos pesos. O resultado é um candidato: imitar a
+defesa dos melhores também imita os erros deles, então ele só vira padrão se não piorar no auto-jogo (`duel.ts`) nem
+contra o humano fraco (`vs-human.ts`).
 
 ## Como medir
 
