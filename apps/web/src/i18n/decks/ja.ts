@@ -145,6 +145,15 @@ export default {
   'decks.cleanup.deleted': 'デッキ{n|#件}を削除しました。',
   'decks.cleanup.empty': '整理するものはありません。',
 
+  // ---- 対戦前のデッキ確認 ----
+  'deckConfirm.title': 'このデッキで対戦しますか？',
+  'deckConfirm.valid': 'このモードで使用可能',
+  'deckConfirm.quickSwap': 'すぐに切り替え',
+  'deckConfirm.allDecks': 'すべてのデッキ…',
+  'deckConfirm.dontAsk': '今後は確認しない（設定で再びオンにできます）',
+  'deckConfirm.rematch': '再戦',
+  'settings.confirmDeck': '対戦前にデッキを確認',
+  'settings.confirmDeckHint': 'マッチ検索、ルームの作成・参加、Botとの練習、再戦の申し込みの前に、使うデッキを表示します。ここでデッキを変更することもできます。',
   // ---- サーバーエラー ----
   'errors.deckLeaderRequired': 'デッキを保存する前にリーダーを選んでください。',
   'errors.deckLeaderInvalid': '{id}はリーダーではありません。',

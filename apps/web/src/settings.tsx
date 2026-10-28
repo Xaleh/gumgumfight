@@ -38,6 +38,8 @@ export interface Settings {
   theme: Theme;
   /** Online: mostrar as mensagens e os emotes que o oponente manda. */
   opponentChat: boolean;
+  /** Antes de cada partida (fila, sala, treino, revanche): confirmar o deck, com a opção de trocar. */
+  confirmDeck: boolean;
   /** Visão do Streamer: mesa lateral (jogadores à esquerda e à direita, vista de cima) ou em pé. */
   streamerLayout: StreamerLayout;
   /** Visão do Streamer, mesa lateral: a cor do playmat. */
@@ -70,6 +72,7 @@ const EDITABLE: Editable[] = [
   'coachTips',
   'theme',
   'opponentChat',
+  'confirmDeck',
   'streamerLayout',
   'streamerPlaymat',
   'sidePanel',
@@ -100,6 +103,7 @@ const DEFAULTS: Settings = {
   coachTips: false,
   theme: 'system',
   opponentChat: true,
+  confirmDeck: true,
   streamerLayout: 'lateral',
   streamerPlaymat: 'navy',
   sidePanel: true,
@@ -623,6 +627,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </OptionRow>
             <OptionRow title={t('settings.coachTips')} hint={t('settings.coachTipsHint')}>
               <Switch on={s.coachTips} label={t('settings.coachTips')} onChange={(on) => s.update({ coachTips: on })} />
+            </OptionRow>
+            <OptionRow title={t('settings.confirmDeck')} hint={t('settings.confirmDeckHint')}>
+              <Switch on={s.confirmDeck} label={t('settings.confirmDeck')} onChange={(on) => s.update({ confirmDeck: on })} />
             </OptionRow>
             <OptionRow title={t('settings.opponentChat')} hint={t('settings.opponentChatHint')}>
               <Switch on={s.opponentChat} label={t('settings.opponentChat')} onChange={(on) => s.update({ opponentChat: on })} />

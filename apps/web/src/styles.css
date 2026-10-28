@@ -15017,7 +15017,7 @@ div.dk-tile-main {
   border: 2px solid var(--panel);
 }
 
-/* PROTÓTIPO: confirmação do deck antes da partida */
+/* Confirmação do deck antes da partida (filas, sala privada, treino e revanche) */
 .modal-card.deck-confirm {
   width: min(560px, 100%);
 }

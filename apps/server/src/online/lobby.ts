@@ -7,7 +7,7 @@ import { type CardData, cardImage, type PlayerId, type PlayMode } from '@gumgum/
 import { DataVersion } from '../cache';
 import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId, type PlayFormat } from '../stats/catalog';
-import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomStatus, type RoomTournament, type SeatInfo } from './room';
+import { newRoomData, randomToken, Room, type RoomData, type RoomEvent, type RoomQueue, type RoomResult, type RoomStatus, type RematchDeck, type RoomTournament, type SeatInfo } from './room';
 
 /** Quem quer jogar (perfil do jogador e deck escolhido). */
 export type SeatRequest = Omit<SeatInfo, 'token'>;
@@ -653,20 +653,25 @@ export class Lobby {
     if (room?.status === 'waiting') this.close(id);
   }
 
-  /** Revanche (só salas privadas): quando os dois pedem, começa uma sala nova com os mesmos decks. */
-  rematch(room: Room, seat: PlayerId): LobbyError | null {
+  /**
+   * Revanche (só salas privadas): quando os dois pedem, começa uma sala nova com os mesmos decks,
+   * ou com o que cada um trocou no pedido (`deck`, já conferido nas regras da sala).
+   */
+  rematch(room: Room, seat: PlayerId, deck?: RematchDeck): LobbyError | null {
     if (room.data.queue !== 'private') return { code: 400, ...fail('rematchPrivateOnly', 'Revanche só nas salas privadas.') };
     if (room.status !== 'finished') return { code: 409, ...fail('matchNotFinished', 'A partida ainda não terminou.') };
     if (room.data.rematchRoom) return null;
     const flags = (room.data.rematch ??= [false, false]);
     flags[seat] = true;
+    if (deck) (room.data.rematchDecks ??= [null, null])[seat] = deck;
     if (flags[0] && flags[1]) {
       for (const s of room.data.seats) {
         const busy = this.busy(s.ownerHash);
         if (busy) return busy;
       }
       // Quem foi o segundo assento passa a ser o primeiro (quem começa é sorteado).
-      const seats = [room.data.seats[1], room.data.seats[0]].map((s) => ({ ...s, token: randomToken() }));
+      const picked = room.data.rematchDecks ?? [null, null];
+      const seats = ([1, 0] as const).map((i) => ({ ...room.data.seats[i], ...picked[i], token: randomToken() }));
       const data = newRoomData({ queue: 'private', format: room.data.format, spoilers: room.data.spoilers, spoilerSet: room.data.spoilerSet, code: null, seats });
       // A revanche segue com a mesma escolha de quem criou a sala.
       if (room.data.showHands) data.showHands = true;

@@ -145,6 +145,15 @@ export default {
   'decks.cleanup.deleted': '{n|# deck supprimé|# decks supprimés}.',
   'decks.cleanup.empty': 'Rien à nettoyer ici.',
 
+  // ---- confirmation du deck avant la partie ----
+  'deckConfirm.title': 'Jouer avec ce deck ?',
+  'deckConfirm.valid': 'Valide dans ce mode',
+  'deckConfirm.quickSwap': 'Changement rapide',
+  'deckConfirm.allDecks': 'Tous les decks…',
+  'deckConfirm.dontAsk': 'Ne plus demander (réactivable dans les paramètres)',
+  'deckConfirm.rematch': 'Revanche',
+  'settings.confirmDeck': 'Confirmer le deck avant la partie',
+  'settings.confirmDeckHint': 'Avant de chercher une partie, de créer ou rejoindre un salon, de s’entraîner contre le bot ou de demander une revanche, affiche le deck qui sera utilisé, avec la possibilité d’en changer.',
   // ---- erreurs du serveur ----
   'errors.deckLeaderRequired': 'Choisissez un Leader avant d’enregistrer le deck.',
   'errors.deckLeaderInvalid': '{id} n’est pas un Leader.',

@@ -62,6 +62,7 @@ import {
   MAX_SPECTATORS,
   MIN_HANDS_DELAY_MS,
   pinEngineTexts,
+  type RematchDeck,
   type Room,
   type RoomData,
   type RoomEvent,
@@ -570,7 +571,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const s = found.room.data.seats[found.seat];
     const deck = { name: s.deck.name, leader: s.deck.leader, cards: s.deck.cards, ...(s.deck.arts ? { arts: s.deck.arts } : {}) };
     const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)])];
-    return { players: [{ name: s.name, bot: Boolean(s.bot), deck }], cards: present(getCards(db, ids)) };
+    return { deckId: s.deckId, players: [{ name: s.name, bot: Boolean(s.bot), deck }], cards: present(getCards(db, ids)) };
   });
 
   /**
@@ -723,10 +724,18 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     return r.ok ? reply.code(204).send() : reply.code(r.code).send(refused(r));
   });
 
-  app.post<{ Params: { id: string }; Body: SeatBody }>('/api/online/rooms/:id/rematch', async (req, reply) => {
+  /** Revanche; com `deckId`, troca o deck de quem pede (conferido nas regras da sala). */
+  app.post<{ Params: { id: string }; Body: SeatBody & { deckId?: unknown } }>('/api/online/rooms/:id/rematch', async (req, reply) => {
     const found = withSeat(req);
     if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
-    const err = lobby.rematch(found.room, found.seat);
+    let deck: RematchDeck | undefined;
+    if (req.body?.deckId !== undefined) {
+      const { format, spoilers, spoilerSet } = found.room.data;
+      const list = deckFor(req.body.deckId, format, false, seatRules({ ...playMode(format, spoilers !== false), ...(spoilerSet ? { spoilerSet } : {}) }));
+      if (isError(list)) return reply.code(list.code).send(list);
+      deck = { deckId: list.id!, deck: list };
+    }
+    const err = lobby.rematch(found.room, found.seat, deck);
     return err ? reply.code(err.code).send(err) : reply.code(204).send();
   });
 

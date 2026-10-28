@@ -298,7 +298,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     [seat.roomId, seat.token, watching],
   );
   const askRematch = useCallback(
-    () => api.online.rematch(seat.roomId, seat.token).catch((e) => setError(errorText(e))),
+    (deckId?: string) => api.online.rematch(seat.roomId, seat.token, deckId).catch((e) => setError(errorText(e))),
     [seat.roomId, seat.token],
   );
   const leave = useCallback(() => api.online.leave(seat.roomId, seat.token).catch(() => undefined), [seat.roomId, seat.token]);

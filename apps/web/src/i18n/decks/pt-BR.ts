@@ -145,6 +145,15 @@ const decksPtBR = {
   'decks.cleanup.deleted': '{n|# deck apagado|# decks apagados}.',
   'decks.cleanup.empty': 'Nada para limpar aqui.',
 
+  // ---- confirmação do deck antes da partida ----
+  'deckConfirm.title': 'Jogar com este deck?',
+  'deckConfirm.valid': 'Vale neste modo',
+  'deckConfirm.quickSwap': 'Trocar rápido',
+  'deckConfirm.allDecks': 'Todos os decks…',
+  'deckConfirm.dontAsk': 'Não perguntar de novo (dá para reativar nas configurações)',
+  'deckConfirm.rematch': 'Revanche',
+  'settings.confirmDeck': 'Confirmar o deck antes da partida',
+  'settings.confirmDeckHint': 'Antes de buscar partida, criar ou entrar numa sala, treinar contra o bot ou pedir revanche, mostra o deck que vai ser usado, com a opção de trocar.',
   // ---- erros do servidor ----
   'errors.deckLeaderRequired': 'Escolha um Líder antes de salvar o deck.',
   'errors.deckLeaderInvalid': '{id} não é um Líder.',

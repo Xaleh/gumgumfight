@@ -145,6 +145,15 @@ export default {
   'decks.cleanup.deleted': '{n|# mazo eliminado|# mazos eliminados}.',
   'decks.cleanup.empty': 'No hay nada que limpiar aquí.',
 
+  // ---- confirmación del mazo antes de la partida ----
+  'deckConfirm.title': '¿Jugar con este mazo?',
+  'deckConfirm.valid': 'Válido en este modo',
+  'deckConfirm.quickSwap': 'Cambio rápido',
+  'deckConfirm.allDecks': 'Todos los mazos…',
+  'deckConfirm.dontAsk': 'No volver a preguntar (puedes reactivarlo en la configuración)',
+  'deckConfirm.rematch': 'Revancha',
+  'settings.confirmDeck': 'Confirmar el mazo antes de la partida',
+  'settings.confirmDeckHint': 'Antes de buscar partida, crear o entrar en una sala, practicar contra el bot o pedir la revancha, muestra el mazo que vas a usar, con la opción de cambiarlo.',
   // ---- errores del servidor ----
   'errors.deckLeaderRequired': 'Elige un Líder antes de guardar el mazo.',
   'errors.deckLeaderInvalid': '{id} no es un Líder.',

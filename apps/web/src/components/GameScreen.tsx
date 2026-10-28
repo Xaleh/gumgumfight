@@ -19,18 +19,20 @@ import {
   type MsgParts,
   type Pending,
   type PlayerId,
+  spoilerRule,
   translateToPt,
   zoneOf,
 } from '@gumgum/engine';
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { api, isAdmin, type LiveRoom, type OnlineSeat, type RoomDecks, type WatchTarget } from '../api';
+import { api, currentSpoilerSet, isAdmin, type LiveRoom, modeLabel, type OnlineSeat, type RoomDecks, type WatchTarget, whyNotPlayable } from '../api';
 import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
 import { coachTip } from '../game/tutorial/coachTips';
 import type { EmbedLayout } from '../embed';
 import { useEmbedBridge } from '../game/useEmbedBridge';
+import { buildSetup } from '../game/setup';
 import { type GameSetup, useGame } from '../game/useGame';
 import { audio } from '../audio';
 import { type Translate, useT, useTryT } from '../i18n';
@@ -42,6 +44,7 @@ import { Board, HandFan, handIsKnown } from './Board';
 import { LateralBoard } from './LateralBoard';
 import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
 import { CardView, type Highlight, StaticCard } from './CardView';
+import { DeckConfirm } from './DeckConfirm';
 import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GameResult } from './GameResult';
@@ -205,8 +208,22 @@ export interface TableEmbed {
 }
 
 /** Partida no navegador: contra o bot ou replay. */
-export function GameScreen({ setup, onExit, onRematch, embed }: { setup: GameSetup; onExit: () => void; onRematch?: () => void; embed?: TableEmbed }) {
+export function GameScreen({
+  setup,
+  onExit,
+  onRematch,
+  embed,
+}: {
+  setup: GameSetup;
+  onExit: () => void;
+  /** Joga de novo (com `next`: outra partida montada aqui, com o deck trocado na confirmação). */
+  onRematch?: (next?: GameSetup) => void;
+  embed?: TableEmbed;
+}) {
+  const t = useT();
   const game = useGame(setup);
+  const { confirmDeck } = useSettings();
+  const [confirming, setConfirming] = useState(false);
   useEmbedBridge(game, embed ? embed.origins : null);
   // Registra o resultado no servidor (que refaz a partida a partir das ações). Replays não contam de novo.
   const saved = useRef(false);
@@ -231,17 +248,45 @@ export function GameScreen({ setup, onExit, onRematch, embed }: { setup: GameSet
   }, [game.state, setup, game.actions]);
   const human = game.human;
   const ownDeck = useCallback(() => Promise.resolve(localDeck(setup.config, human ?? 0)), [setup.config, human]);
+  // Revanche contra o bot: com o deck trocado na confirmação, monta a partida de novo (mesmo oponente e mesmas regras).
+  const rematchWith = async (deckId: string) => {
+    setConfirming(false);
+    if (deckId === setup.deckIds[0]) return onRematch?.();
+    try {
+      const { players, firstPlayer, chooseFirst } = setup.config;
+      const seed = Math.floor(Math.random() * 1_000_000);
+      const names: [string, string] = [players[0].name, players[1].name];
+      const next = await buildSetup('bot', [deckId, setup.deckIds[1]], names, seed, setup.format, firstPlayer, undefined, undefined, chooseFirst);
+      onRematch?.({ ...next, spoilers: setup.spoilers, botLevel: setup.botLevel });
+    } catch (e) {
+      game.setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const rules = { format: setup.format, spoilers: Boolean(setup.spoilers) };
   return (
-    <GameTable
-      game={{ ...game, downloadReplay: () => downloadReplay(game.exportReplay()) }}
-      kind={setup.mode}
-      matchId={matchId}
-      ownDeck={human !== null ? ownDeck : undefined}
-      onExit={onExit}
-      onRematch={onRematch}
-      startNotice={setup.notice}
-      embed={embed}
-    />
+    <>
+      <GameTable
+        game={{ ...game, downloadReplay: () => downloadReplay(game.exportReplay()) }}
+        kind={setup.mode}
+        matchId={matchId}
+        ownDeck={human !== null ? ownDeck : undefined}
+        onExit={onExit}
+        onRematch={onRematch && (setup.mode === 'bot' && confirmDeck ? () => setConfirming(true) : () => onRematch())}
+        startNotice={setup.notice}
+        embed={embed}
+      />
+      {confirming && (
+        <DeckConfirm
+          kicker={`${t('deckConfirm.rematch')} · ${modeLabel(rules)}`}
+          deckId={setup.deckIds[0]}
+          whyFor={(d) => whyNotPlayable(d, rules.format, spoilerRule(rules))}
+          confirmLabel={t('result.rematch')}
+          opponent={{ deckId: setup.deckIds[1], label: setup.config.players[1].deck.name ?? '' }}
+          onConfirm={(id) => void rematchWith(id)}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -261,6 +306,9 @@ export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat;
   const online = useOnlineGame(seat);
   const { state, room } = online;
   const [nextError, setNextError] = useState<string | null>(null);
+  const { confirmDeck } = useSettings();
+  /** Revanche esperando a confirmação do deck: o deck salvo desta partida. */
+  const [rematchDeck, setRematchDeck] = useState<string | null>(null);
   // Os dois pediram revanche: vai para a sala nova.
   useEffect(() => {
     if (online.rematch?.token) onSwitch({ roomId: online.rematch.roomId, token: online.rematch.token });
@@ -296,15 +344,38 @@ export function OnlineGameScreen({ seat, onExit, onSwitch }: { seat: OnlineSeat;
             .then(onSwitch)
             .catch((e) => setNextError(e instanceof Error ? e.message : String(e)))
       : undefined;
+  const roomRules = { format: room.format, spoilers: room.spoilers !== false };
+  // Sala privada: confirma o deck antes de pedir a revanche (o pedido já feito não pergunta de novo).
+  const askRematch = async () => {
+    if (!confirmDeck || room.you === null || room.rematch[room.you]) return online.askRematch();
+    const mine = await online.loadMyDeck().catch(() => null);
+    if (mine?.deckId) setRematchDeck(mine.deckId);
+    else await online.askRematch();
+  };
   return (
-    <GameTable
-      game={{ ...game, error: game.error ?? nextError, setError: (e) => (setNextError(null), game.setError(e)) }}
-      kind="online"
-      online={online}
-      onExit={onExit}
-      onRematch={room.queue === 'private' ? () => void online.askRematch() : nextGame}
-      rematchLabel={nextGame ? t('game.playGameN', { n: room.tournament!.game + 1 }) : undefined}
-    />
+    <>
+      <GameTable
+        game={{ ...game, error: game.error ?? nextError, setError: (e) => (setNextError(null), game.setError(e)) }}
+        kind="online"
+        online={online}
+        onExit={onExit}
+        onRematch={room.queue === 'private' ? () => void askRematch() : nextGame}
+        rematchLabel={nextGame ? t('game.playGameN', { n: room.tournament!.game + 1 }) : undefined}
+      />
+      {rematchDeck && (
+        <DeckConfirm
+          kicker={`${t('deckConfirm.rematch')} · ${modeLabel(room)}`}
+          deckId={rematchDeck}
+          whyFor={(d) => whyNotPlayable(d, room.format, spoilerRule(roomRules), room.spoilerSet ?? currentSpoilerSet())}
+          confirmLabel={t('game.askRematch')}
+          onConfirm={(id) => {
+            setRematchDeck(null);
+            void online.askRematch(id === rematchDeck ? undefined : id);
+          }}
+          onCancel={() => setRematchDeck(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -1982,47 +2053,47 @@ function CenterBand(props: {
 
   return (
     <>
-      <div
-        className={['turn-chip', mineTurn ? 'mine' : 'theirs', props.pulse ? 'pulse' : ''].join(' ')}
-        title={mineTurn ? t('game.yourTurnTitle') : t('game.opponentTurnTitle')}
-      >
-        <small>{t('game.turn')}</small>
-        <b>{state.phase === 'mulligan' ? '—' : state.turn}</b>
-      </div>
-      <div className={['band-middle', centerDecision ? 'with-decision' : ''].join(' ')}>
-        {middle}
-        {centerDecision && props.decision}
-      </div>
-      {centerDecision ? (
-        <span className="end-turn placeholder" aria-hidden="true" />
-      ) : props.decision ? (
-        props.decision
-      ) : human !== null ? (
-        <button className={['end-turn', props.pulse && props.canEnd ? 'pulse' : ''].join(' ')} disabled={!props.canEnd} onClick={props.onEnd}>
-          {endTurn1}
-          <br />
-          {endTurn2}
-        </button>
-      ) : watching && props.hands ? (
-        <button
-          className={['end-turn', 'watching', 'hands-toggle', props.hands.on ? 'on' : ''].join(' ')}
-          onClick={props.hands.onToggle}
-          aria-pressed={props.hands.on}
-          title={props.hands.on ? t('game.hideHands') : t('game.showHands')}
+        <div
+          className={['turn-chip', mineTurn ? 'mine' : 'theirs', props.pulse ? 'pulse' : ''].join(' ')}
+          title={mineTurn ? t('game.yourTurnTitle') : t('game.opponentTurnTitle')}
         >
-          <EyeIcon closed={!props.hands.on} />
-        </button>
-      ) : watching && props.streamer ? (
-        <span className="end-turn placeholder" aria-hidden="true" />
-      ) : watching ? (
-        <span className="end-turn watching" title={t('game.watching')}>
-          👁
-        </span>
-      ) : (
-        <button className="end-turn" onClick={props.onTogglePause}>
-          {props.paused ? '▶' : '❚❚'}
-        </button>
-      )}
+          <small>{t('game.turn')}</small>
+          <b>{state.phase === 'mulligan' ? '—' : state.turn}</b>
+        </div>
+        <div className={['band-middle', centerDecision ? 'with-decision' : ''].join(' ')}>
+          {middle}
+          {centerDecision && props.decision}
+        </div>
+        {centerDecision ? (
+          <span className="end-turn placeholder" aria-hidden="true" />
+        ) : props.decision ? (
+          props.decision
+        ) : human !== null ? (
+          <button className={['end-turn', props.pulse && props.canEnd ? 'pulse' : ''].join(' ')} disabled={!props.canEnd} onClick={props.onEnd}>
+            {endTurn1}
+            <br />
+            {endTurn2}
+          </button>
+        ) : watching && props.hands ? (
+          <button
+            className={['end-turn', 'watching', 'hands-toggle', props.hands.on ? 'on' : ''].join(' ')}
+            onClick={props.hands.onToggle}
+            aria-pressed={props.hands.on}
+            title={props.hands.on ? t('game.hideHands') : t('game.showHands')}
+          >
+            <EyeIcon closed={!props.hands.on} />
+          </button>
+        ) : watching && props.streamer ? (
+          <span className="end-turn placeholder" aria-hidden="true" />
+        ) : watching ? (
+          <span className="end-turn watching" title={t('game.watching')}>
+            👁
+          </span>
+        ) : (
+          <button className="end-turn" onClick={props.onTogglePause}>
+            {props.paused ? '▶' : '❚❚'}
+          </button>
+        )}
     </>
   );
 }
@@ -3089,40 +3160,40 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
   }, [state.log.length]);
   return (
     <>
-      <div className="log" ref={ref} onScroll={() => setHover(null)}>
-        {state.log.map((e, i) => (
-          <div
-            key={i}
-            className={[
-              'log-line',
-              e.player === null ? '' : `p${e.player}`,
-              e.text.startsWith('—') ? 'turn' : '',
-              fresh != null && i >= fresh ? 'fresh' : '',
-            ].join(' ')}
-          >
-            <LogText
-              text={logText(tryT, e)}
-              names={names}
-              onCard={(name) => {
-                const def = resolveLogCard(state, names, name, e.player);
-                if (!def) return;
-                setHover(null);
-                onCardZoom?.(def);
-              }}
-              onHover={
-                canHover
-                  ? (name, el) => {
-                      const def = el && resolveLogCard(state, names, name, e.player);
-                      setHover(def && el ? { def, anchor: el } : null);
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        ))}
-      </div>
-      {/* No body: o painel lateral tem backdrop-filter, que prenderia um elemento fixo dentro dele. */}
-      {canHover && hover && createPortal(<CardHoverPreview card={hover.def} anchor={hover.anchor} />, document.body)}
+        <div className="log" ref={ref} onScroll={() => setHover(null)}>
+          {state.log.map((e, i) => (
+            <div
+              key={i}
+              className={[
+                'log-line',
+                e.player === null ? '' : `p${e.player}`,
+                e.text.startsWith('—') ? 'turn' : '',
+                fresh != null && i >= fresh ? 'fresh' : '',
+              ].join(' ')}
+            >
+              <LogText
+                text={logText(tryT, e)}
+                names={names}
+                onCard={(name) => {
+                  const def = resolveLogCard(state, names, name, e.player);
+                  if (!def) return;
+                  setHover(null);
+                  onCardZoom?.(def);
+                }}
+                onHover={
+                  canHover
+                    ? (name, el) => {
+                        const def = el && resolveLogCard(state, names, name, e.player);
+                        setHover(def && el ? { def, anchor: el } : null);
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          ))}
+        </div>
+        {/* No body: o painel lateral tem backdrop-filter, que prenderia um elemento fixo dentro dele. */}
+        {canHover && hover && createPortal(<CardHoverPreview card={hover.def} anchor={hover.anchor} />, document.body)}
     </>
   );
 }
