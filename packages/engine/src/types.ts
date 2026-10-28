@@ -1316,6 +1316,8 @@ export type Frame =
       lifeCard?: string;
       answered?: boolean;
       lost?: number;
+      /** A Vida chegou a 0 durante este dano (mesmo que um [Trigger] a tenha recuperado depois). */
+      zero?: boolean;
       /** A substituição de dano já foi oferecida para este dano. */
       replaceAsked?: boolean;
     }
