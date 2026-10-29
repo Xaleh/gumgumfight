@@ -4384,6 +4384,12 @@ button.hint-pill::after,
 .zoom-backdrop.log-zoom {
   z-index: 90;
 }
+/* Carta ampliada a partir do visualizador de deck: acima da janela da lista (`.dk-viewer-backdrop`,
+   z-index 60) e presa à tela, porque a página atrás (biblioteca de decks) rola inteira. */
+.zoom-backdrop.dk-zoom {
+  position: fixed;
+  z-index: 70;
+}
 /* Cartas reveladas pelo oponente: por cima das escolhas pendentes, abaixo da carta ampliada. */
 .reveal-backdrop {
   z-index: 60;
