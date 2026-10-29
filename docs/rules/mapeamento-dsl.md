@@ -248,7 +248,7 @@ turn/End Phase"), `untilYourNextTurn` ("until the start of your next turn"), `en
 `power`); `getCost` :448 (mínimo 0); custo de jogar `playCost` :736 (`handCost`, `costReductions`, `handCostAura`).
 
 Estáticos de poder/custo (`Ability`): `staticPower`, `staticCost`, `staticBasePower` (número ou `'leader'`), `costPer`,
-`powerPer` (hand/restedDon/trash/trashEvents/distinctCharacters), `battleVsAttribute`, `handCost`, `handCostAura`,
+`powerPer` (hand/restedDon/trash/trashEvents/distinctCharacters/characters+filter, "for each of your [Kung Fu Jugon] Characters", OP18-005), `battleVsAttribute`, `handCost`, `handCostAura`,
 `handCounter`, `selfHandCounter`; auras (`Aura`, types.ts:386) com `power`, `cost`, `basePower`, `basePowerCopyLeader`.
 
 ### 2.8 Palavras-chave (Rush, Blocker, Double Attack, Banish, Unblockable, Rush: Character)
@@ -294,11 +294,12 @@ DON!! −X como custo: `AbilityCost.donMinus` (+`donMinusOpen`), pago em `payImm
 ### 2.11 Jogar cartas (mão, descarte, deck, Vida)
 | do | parâmetros | semântica | types | engine |
 |---|---|---|---|---|
-| `playFrom` | from deck/hand/trash/handOrTrash, upTo, filter, rested?, notColorOfLast? | Joga sem pagar (respeita `noPlayByEffect`, `noPlayCharacters`) | 699 | 3938 |
+| `playFrom` | from deck/hand/trash/handOrTrash/deckOrTrash, upTo, filter, rested?, notColorOfLast? | Joga sem pagar (respeita `noPlayByEffect`, `noPlayCharacters`); `deckOrTrash`: "from your deck or trash" (OP18-117) | 699 | 3938 |
 | `playThis` | rested? | [Trigger] "Play this card" / "Play this Character card from your trash" | 507 | 2315 |
 | `playRevealed` | filter?, rested? | Joga a carta revelada (deck ou Vida) | 661 | 2712 |
 | `opponentPlays` | upTo, filter | O oponente joga da própria mão | 546 | 3073 |
 | `activateEventFromHand` / `activateEventFromTrash` | filter | Ativa o [Main] de um Evento da mão/descarte | 510 / 558 | 3446 / 3445 |
+| `activateTriggerFromHand` | filter | "reveal up to 1 … from your hand and activate the [Trigger] effect of that card" (OP18-105 Spandam): revela, a carta fica na mão e o [Trigger] dela resolve como efeito dela | — | — |
 | `useMainEffect` / `useCounterEffect` / `useOwnEffect` | — / — / timing | Resolve outro efeito da própria carta ([Trigger]) | 503 / 693 / 725 | 3902 / 3904 / 3885 |
 
 Infra: `playFree` :1912 (Personagem → frame `play` com `byEffect`; Stage substitui o anterior), `stepPlay` :1643
@@ -378,7 +379,8 @@ Usadas em `Ability.condition` (habilidade inteira) e `EffectStep.if` (passo). To
   `anyCharactersWithCost`, `opponentCharacterKOThisTurn`.
 - **Líder (tipo/nome/cor/poder):** `leaderName`, `leaderNames`, `leaderNameIncludes`, `leaderHasType`,
   `leaderHasAnyType`, `leaderTypeIncludes`, `leaderTypeOrName`, `leaderColor`, `leaderMulticolor`, `leaderMonocolor`,
-  `leaderAttribute`, `leaderActive`, `leaderMinPower`, `leaderMaxPower`, `opponentLeaderMinPower`, `opponentLeaderAttribute`.
+  `leaderAttribute`, `leaderActive`, `leaderMinPower`, `leaderMaxPower`, `leaderMinDon` (DON!! anexados, OP18-027),
+  `opponentLeaderMinPower`, `opponentLeaderAttribute`.
 - **Vida:** `lifeMin`, `lifeMax`, `opponentLifeMin`, `opponentLifeMax`, `totalLifeMin`, `totalLifeMax`,
   `lifeLessThanOpponent`, `lifeLeqOpponent`, `lifeHandMax`, `faceUpLifeMin`.
 - **DON!!:** `minDonOnField`, `maxDonOnField`, `opponentMinDonOnField`, `opponentMaxDonOnField`, `opponentMoreDon`,
@@ -410,6 +412,7 @@ transforma em passo `payCost` no começo (parser.ts:3027-3030). Leitura: `parseC
 | Esta carta / Personagens para o fundo do deck | `selfToBottom` / `ownToBottom` | `selfToDeckBottom` / `ownToBottom` |
 | Personagem seu → Vida virada para cima | `ownToLife` | `ownToBottom{toLife}` |
 | Vida → mão / descarte / virar | `lifeToHand`(+`lifeChoice`) / `lifeToTrash` / `lifeFace` | idem |
+| Toda a Vida → mão / descarte ("add all of your Life cards to your hand", OP18-020; "trash all of your Life cards", OP18-117) | `lifeAll` (`hand`/`trash`; exige pelo menos 1 Vida) | `lifeToHand` / `lifeToTrash` com a Vida inteira |
 | Topo do deck → descarte | `mill` | `millDeck` |
 | Descarte → fundo do deck / deck | `trashToBottom` / `trashToDeck` | `trashToDeckBottom` (+`shuffleDeck`) |
 | −N de poder no Líder / nesta carta | `leaderPowerMinus` / `selfPowerMinus` | imediato / `power` |
@@ -436,7 +439,7 @@ Todos disparam habilidades `timing: 'event'` **de cartas em campo** (Líder, Per
 | `lifeRemoved` {whose} | "When a card is removed from your/your opponent's Life cards" | `lifeRemoved` :4440 (dano, `trashLife`, `lifeToHand`, `lifeToTrash`, `trashFaceUpLife`, `lifeOneToDeckTop`) |
 | `lifeZero` | "When your number of Life cards becomes 0" | `lifeRemoved` :4441 |
 | `restedByEffect` | "When/If a Character is rested by your effect" | `restCard` :1607 |
-| `handTrashedByEffect` {sourceType?} | "When a card is trashed from your hand by (your {X} type card's) effect" | `trashFromHand` :2339; `trashHand` :3162; `trashHandUntil` :3237 |
+| `handTrashedByEffect` {sourceType?, sourceLeader?} | "When a card is trashed from your hand by (your {X} type card's) effect"; `sourceLeader`: "When you trash a card from the effect of your [Marshall D. Teach] Leader" (OP18-080) | `trashFromHand` :2339; `trashHand` :3162; `trashHandUntil` :3237 |
 | `donGiven` | "When this Leader or 1 of your Characters is given a DON!! card" | `attachDon` :1265; `giveRestedDon` :2240; `giveActiveDon` :2824; `moveGivenDon` :2886 |
 | `damageTaken` / `damageDealt` | "When you take damage" / "When you deal damage to your opponent's Life" | `stepDamage` :1770-1771 (uma vez por frame de dano) |
 | `anyOf` {events} | "When X or Y" | (composição, `emit` :1496) |

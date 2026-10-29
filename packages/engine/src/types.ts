@@ -353,6 +353,8 @@ export interface Condition {
   anyDonGiven?: boolean;
   /** "If your Leader has any DON!! cards given" */
   leaderAnyDonGiven?: boolean;
+  /** "If your [Monkey.D.Luffy] Leader has 3 DON!! cards attached" (OP18-027) */
+  leaderMinDon?: number;
   /** "If this Character was played on this turn" */
   selfPlayedThisTurn?: boolean;
   /** "If you have N or more {X} type Characters" ("{X} or {Y}": `types` traz todos; `type` é o primeiro). */
@@ -557,8 +559,11 @@ export type GameEvent =
   | { kind: 'lifeRemoved'; whose: 'any' | 'own' | 'opponent' } // "a card is removed from your (or your opponent's) Life cards"
   | { kind: 'lifeZero' } // "When your number of Life cards becomes 0"
   | { kind: 'restedByEffect' } // "If a Character is rested by your effect"
-  /** "When a card is trashed from your hand by your {Navy} type card's effect" */
-  | { kind: 'handTrashedByEffect'; sourceType?: string }
+  /**
+   * "When a card is trashed from your hand by your {Navy} type card's effect"; `sourceLeader`: "When you trash a
+   * card from the effect of your [Marshall D. Teach] Leader" (OP18-080): o efeito é do seu Líder com esse nome.
+   */
+  | { kind: 'handTrashedByEffect'; sourceType?: string; sourceLeader?: string }
   | { kind: 'donGiven' } // "When this Leader or 1 of your Characters is given a DON!! card"
   | { kind: 'damageTaken' } // "When you take damage"
   | { kind: 'anyOf'; events: GameEvent[] }
@@ -658,6 +663,11 @@ type EffectStepBody =
   | { do: 'gainAttribute'; target: TargetRef; attribute: string; duration: Duration }
   /** "activate the [Main] effect of up to 1 Event card … in your trash" */
   | { do: 'activateEventFromTrash'; filter: CardFilter }
+  /**
+   * "reveal up to 1 … from your hand and activate the [Trigger] effect of that card" (OP18-105 Spandam): a carta
+   * revelada fica na mão; o [Trigger] dela resolve como efeito dela ("Play this card" a joga da mão).
+   */
+  | { do: 'activateTriggerFromHand'; filter: CardFilter }
   /** "If any of your Characters would be K.O.'d in battle during this turn, you may trash 1 card from your hand instead." */
   | { do: 'tempReplace'; by: 'battle' | 'any'; cost: AbilityCost }
   /** "If this Character would be rested by your opponent's Character's effect, you may … instead." */
@@ -817,7 +827,8 @@ type EffectStepBody =
   /** "Play up to N … from your deck/hand/trash" (sem pagar custo). */
   | {
       do: 'playFrom';
-      from: 'deck' | 'hand' | 'trash' | 'handOrTrash';
+      /** `deckOrTrash`: "from your deck or trash" (OP18-117 Buster Call). */
+      from: 'deck' | 'hand' | 'trash' | 'handOrTrash' | 'deckOrTrash';
       upTo: number;
       filter: CardFilter;
       rested?: boolean;
@@ -963,6 +974,11 @@ export interface AbilityCost {
   selfMinCost?: number;
   /** "rest your Leader or 1 [Corrida Coliseum]": substituição que vira a carta escolhida (ver either). */
   victimToLife?: boolean;
+  /**
+   * "You may add all of your Life cards to your hand" (OP18-020) / "You may trash all of your Life cards" (OP18-117).
+   * Sem Vida não há o que pagar: o custo exige pelo menos 1 carta.
+   */
+  lifeAll?: 'hand' | 'trash';
 }
 
 export interface Ability {
@@ -1035,7 +1051,8 @@ export interface Ability {
   /** "Give blue Events in your hand -1 cost", "The cost of playing … will be reduced by 1" */
   handCostAura?: { filter: CardFilter; amount: number };
   /** "This Character gains +N power for every M <coisas>" */
-  powerPer?: { power: number; every: number; what: 'hand' | 'restedDon' | 'trash' | 'trashEvents' | 'distinctCharacters' };
+  /** `characters`: "for each of your [Kung Fu Jugon] Characters" (OP18-005), os seus Personagens que batem com `filter`. */
+  powerPer?: { power: number; every: number; what: 'hand' | 'restedDon' | 'trash' | 'trashEvents' | 'distinctCharacters' | 'characters'; filter?: CardFilter };
   /** "When this Character battles {attribute} attribute Characters, this Character gains +N power". */
   battleVsAttribute?: { attribute: string; power: number };
   /** Para timing 'event': o acontecimento que dispara a habilidade. */
