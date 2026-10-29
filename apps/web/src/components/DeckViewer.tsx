@@ -278,7 +278,7 @@ export function DeckViewer({
           )}
         </div>
       </div>
-      {zoom && <StaticCardZoom card={zoom} onClose={closeZoom} />}
+      {zoom && <StaticCardZoom card={zoom} className="dk-zoom" onClose={closeZoom} />}
       {image && deck && (
         <Suspense fallback={null}>
           <MatchDeck data={savedDeckData(deck, byId, { images: showImages })} onClose={() => setImage(false)} />
