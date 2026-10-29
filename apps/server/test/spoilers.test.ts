@@ -245,6 +245,10 @@ describe('spoilers do optcgleaks', () => {
     expect(card).toMatchObject({ cost: 6, power: 6000, counter: 1000, life: undefined });
     expect(card.trigger).toBe("Rest up to 1 of your opponent's Characters with a cost of 6 or less.");
 
+    // Nome alternativo, como nas outras fontes (OP18-045 Mr. Prince).
+    const prince = { ...robin, id: 'OP18-045', name: 'Mr. Prince', effect: "Also treat this card's name as [Sanji] according to the rules.<br>This Character gains +1000 power for every 5 Events in your trash." };
+    expect(mapOptcgLeaksCard(prince, 'OP18')!.aliases).toEqual(['Sanji']);
+
     expect(mapOptcgLeaksCard(leaks.op18.cards[0], 'OP18')).toMatchObject({
       id: 'OP18-078',
       category: 'stage',

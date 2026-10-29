@@ -496,6 +496,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   if (cond.selfMinPower !== undefined && (!locate(state, source) || getPower(state, source) < cond.selfMinPower)) return false;
   if (cond.anyDonGiven && ![ps.leader, ...ps.characters].some((c) => c.don > 0)) return false;
   if (cond.leaderAnyDonGiven && ps.leader.don === 0) return false;
+  if (cond.leaderMinDon !== undefined && ps.leader.don < cond.leaderMinDon) return false;
   if (cond.selfPlayedThisTurn && locate(state, source)?.fc.playedOnTurn !== state.turn) return false;
   if (
     cond.minTypedCharacters &&
@@ -766,6 +767,9 @@ export function getPower(state: GameState, uid: string): number {
       const n =
         p.what === 'distinctCharacters'
           ? new Set(ps.characters.map((c) => cardDef(state, c.uid).name)).size
+          : p.what === 'characters'
+          ? // Pelos dados impressos (nome, tipo): contar pelo poder voltaria a este cálculo.
+            ps.characters.filter((c) => matchesFilter(cardDef(state, c.uid), p.filter ?? {})).length
           : p.what === 'hand'
           ? ps.hand.length
           : p.what === 'restedDon'
@@ -2062,6 +2066,7 @@ function eventMatches(state: GameState, e: GameEvent, ev: EmittedEvent, owner: P
     case 'restedByEffect':
       return ev.byPlayer === owner;
     case 'handTrashedByEffect':
+      if (e.sourceLeader && (ev.card !== state.players[owner].leader.uid || !hasName(cardDef(state, ev.card), e.sourceLeader))) return false;
       return ev.player === owner && (!e.sourceType || (ev.card !== undefined && hasType(cardDef(state, ev.card), e.sourceType)));
     case 'anyOf':
       return false;
@@ -2540,7 +2545,14 @@ function askCards(
   extra: { min?: number; intent?: 'help' | 'harm' | 'discard'; ordered?: boolean; hidden?: string } = {},
 ) {
   const none = extra.hidden && !options.length;
-  const noneKey = extra.hidden === 'da mão' ? 'noneFromHand' : extra.hidden === 'do deck' ? 'noneFromDeck' : 'noneFromHandOrTrash';
+  const noneKey =
+    extra.hidden === 'da mão'
+      ? 'noneFromHand'
+      : extra.hidden === 'do deck'
+        ? 'noneFromDeck'
+        : extra.hidden === 'do deck ou do descarte'
+          ? 'noneFromDeckOrTrash'
+          : 'noneFromHandOrTrash';
   // Olhar o deck (ou outra zona que o próprio jogador não vê) é informação ganha mesmo sem carta
   // à mostra ("não tem X no deck"): a ação deixa de ser cancelável. A própria mão ele já via.
   if (extra.hidden && extra.hidden !== 'da mão') markRevealed(state);
@@ -2703,6 +2715,7 @@ function payImmediateCost(state: GameState, player: PlayerId, source: string, co
   if (cost.returnOwn) steps.push({ do: 'returnOwn', ...cost.returnOwn });
   if (cost.lifeToHand) steps.push({ do: 'lifeToHand', count: cost.lifeToHand, choose: cost.lifeChoice });
   if (cost.lifeToTrash) steps.push({ do: 'lifeToTrash', ...cost.lifeToTrash });
+  if (cost.lifeAll) steps.push(cost.lifeAll === 'hand' ? { do: 'lifeToHand', count: ps.life.length } : { do: 'lifeToTrash', count: ps.life.length });
   if (cost.lifeFace) steps.push({ do: 'lifeFace', ...cost.lifeFace });
   if (cost.mill) steps.push({ do: 'millDeck', count: cost.mill });
   if (cost.trashToBottom) steps.push({ do: 'trashToDeckBottom', ...cost.trashToBottom });
@@ -2814,6 +2827,8 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
   if ((cost.handToBottom ?? 0) > ps.hand.length) return false;
   if ((cost.lifeToHand ?? 0) > ps.life.length) return false;
   if (cost.lifeToHand && restricted(state, ps.id, 'noLifeToHand')) return false;
+  if (cost.lifeAll && !ps.life.length) return false;
+  if (cost.lifeAll === 'hand' && restricted(state, ps.id, 'noLifeToHand')) return false;
   if (cost.leaderPowerMinusActive && ps.leader.rested) return false;
   if (cost.giveDon && (ps.donActive < cost.giveDon.count || !targetCandidates(state, ps.id, source, { ...cost.giveDon.spec, side: 'own' }).length)) return false;
   if (cost.ownToBottom && targetCandidates(state, ps.id, source, { ...cost.ownToBottom.spec, side: cost.ownToBottom.spec.side === 'any' ? 'any' : 'own' }).length < cost.ownToBottom.count) {
@@ -2935,6 +2950,8 @@ function costPieces(cost: AbilityCost): Prompt[] {
   if (cost.mill) c('mill', `descartar ${cost.mill} carta(s) do topo do deck`, { n: cost.mill });
   if (cost.trashToBottom) c('trashToBottom', `colocar ${cost.trashToBottom.count} carta(s) do descarte no fundo do deck`, { n: cost.trashToBottom.count });
   if (cost.lifeToTrash) c('lifeToTrash', `descartar ${cost.lifeToTrash.count} carta(s) da Vida`, { n: cost.lifeToTrash.count });
+  if (cost.lifeAll === 'hand') c('lifeAllToHand', 'colocar todas as cartas de Vida na mão');
+  if (cost.lifeAll === 'trash') c('lifeAllToTrash', 'descartar todas as cartas de Vida');
   if (cost.reveal) c('reveal', `revelar ${cost.reveal.count} carta(s) da mão`, { n: cost.reveal.count });
   if (cost.lifeFace) {
     const n = cost.lifeFace.count;
@@ -4759,6 +4776,30 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       (state.eventsThisTurn ??= []).push({ player: frame.controller, cost: def.cost ?? 0 });
       return false; // o índice já avançou
     }
+    case 'activateTriggerFromHand': {
+      // OP18-105 Spandam: a carta revelada continua na mão; o [Trigger] dela resolve como efeito dela
+      // ("Play this card" a joga da mão).
+      const options = ps.hand.filter((u) => {
+        const def = cardDef(state, u);
+        return matchesFilter(def, step.filter) && def.abilities.some((a) => a.timing === 'trigger');
+      });
+      if (!options.length && (!ps.hand.length || frame.choice)) return true;
+      if (!frame.choice) {
+        askCards(state, frame, options, 1, pr('chooseHandCardsToReveal', `${srcName}: escolha 1 carta(s) da mão para revelar.`, { source: srcName, n: 1 }), { hidden: 'da mão' });
+        return false;
+      }
+      const uid = frame.choice.find((u) => options.includes(u));
+      frame.i++;
+      frame.choice = undefined;
+      frame.memo = undefined;
+      if (!uid) return false;
+      const def = cardDef(state, uid);
+      log(state, frame.controller, lg('reveals', `${ps.name} revela ${def.name}.`, { player: ps.name, cards: def.name }), { uids: [uid], by: ps.id });
+      log(state, frame.controller, lg('triggerActivated', `[Trigger] ${def.name} ativado!`, { card: def.name }));
+      pushEffect(state, uid, frame.controller, def.abilities.find((a) => a.timing === 'trigger')!.steps);
+      emit(state, { kind: 'triggerActivated', player: frame.controller, card: uid });
+      return false; // o índice já avançou
+    }
     case 'trashAnyForPower': {
       const options = ps.hand.filter((u) => {
         const def = cardDef(state, u);
@@ -5302,7 +5343,15 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     }
     case 'playFrom': {
       const zone =
-        step.from === 'deck' ? ps.deck : step.from === 'hand' ? ps.hand : step.from === 'trash' ? ps.trash : [...ps.hand, ...ps.trash];
+        step.from === 'deck'
+          ? ps.deck
+          : step.from === 'hand'
+            ? ps.hand
+            : step.from === 'trash'
+              ? ps.trash
+              : step.from === 'deckOrTrash'
+                ? [...ps.deck, ...ps.trash]
+                : [...ps.hand, ...ps.trash];
       const donCap = step.filter.maxCostDon ? totalDonOnField(ps) : step.filter.maxCostOppDon ? totalDonOnField(state.players[opponent(frame.controller)]) : undefined;
       const filter = donCap !== undefined ? { ...step.filter, maxCost: Math.min(step.filter.maxCost ?? 99, donCap) } : step.filter;
       const lastColors = step.notColorOfLast && frame.last?.[0] ? cardDef(state, frame.last[0]).colors : [];
@@ -5321,12 +5370,28 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       });
       if (!frame.choice) {
         const where =
-          step.from === 'deck' ? 'do deck' : step.from === 'hand' ? 'da mão' : step.from === 'trash' ? 'do descarte' : 'da mão ou do descarte';
+          step.from === 'deck'
+            ? 'do deck'
+            : step.from === 'hand'
+              ? 'da mão'
+              : step.from === 'trash'
+                ? 'do descarte'
+                : step.from === 'deckOrTrash'
+                  ? 'do deck ou do descarte'
+                  : 'da mão ou do descarte';
         // Do descarte (público) pula sem opção; da mão ou do deck abre sempre (a zona vazia é pública).
-        const hidden = step.from !== 'trash' && (step.from === 'deck' ? ps.deck : ps.hand).length > 0;
+        const hidden = step.from !== 'trash' && (step.from === 'deck' || step.from === 'deckOrTrash' ? ps.deck : ps.hand).length > 0;
         if (!options.length && !hidden) return !!(frame.last = []);
         askCards(state, frame, options, step.upTo, pr(
-          step.from === 'deck' ? 'choosePlayFromDeck' : step.from === 'hand' ? 'choosePlayFromHand' : step.from === 'trash' ? 'choosePlayFromTrash' : 'choosePlayFromHandOrTrash',
+          step.from === 'deck'
+            ? 'choosePlayFromDeck'
+            : step.from === 'hand'
+              ? 'choosePlayFromHand'
+              : step.from === 'trash'
+                ? 'choosePlayFromTrash'
+                : step.from === 'deckOrTrash'
+                  ? 'choosePlayFromDeckOrTrash'
+                  : 'choosePlayFromHandOrTrash',
           `${srcName}: escolha até ${step.upTo} carta(s) ${where} para jogar.`,
           { source: srcName, n: step.upTo },
         ), {

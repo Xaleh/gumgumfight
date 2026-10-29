@@ -137,6 +137,10 @@ function clean(raw: string): string {
     .replace(/\[Activate: ?Main\]/gi, '[Activate: Main]')
     .replace(/\[DON!! ?[x×] ?(\d+)\]/gi, '[DON!! x$1]')
     .replace(/\[On your Opponent's Attack\]/g, "[On Your Opponent's Attack]")
+    // OP18-046 (Cardkaizoku): "[On Opponent's Attack]".
+    .replace(/\[On Opponent's Attack\]/g, "[On Your Opponent's Attack]")
+    // OP18-051 (Cardkaizoku): "DON!! x1 This Character …" sem os colchetes.
+    .replace(/^DON!! x(\d+) (?=[A-Z])/, '[DON!! x$1] ')
     .replace(/\bYou can (?=trash|rest|place|return|add)/g, 'You may ')
     .replace(/\{Supernova\}/g, '{Supernovas}')
     .replace(/\bPiratess\b/g, 'Pirates')
@@ -269,6 +273,8 @@ function clean(raw: string): string {
     .replace(/all of your Characters with (\d+) base power and the (\{[^}]+\}) type/gi, 'all of your $2 type Characters with $1 base power')
     // OP18-069: "you may DON!! -1 and rest this Character instead".
     .replace(/you may DON!! [−-](\d+) and /g, 'you may return $1 DON!! card from your field to your DON!! deck and ')
+    // OP18-068: "If this Character would be K.O.'d, you may DON!! -1 instead".
+    .replace(/you may DON!! [−-](\d+) instead\b/g, 'you may return $1 DON!! card from your field to your DON!! deck instead')
     // Spoilers (traduções de fãs): erros de digitação e frases fora do padrão oficial.
     .replace(/\bCharacetr\b/g, 'Character')
     .replace(/\brest your Leader (\[[^\]]+\])/g, 'rest your $1 Leader')
@@ -287,6 +293,41 @@ function clean(raw: string): string {
     .replace(/\b(\d+) cards? with the type (\{[^}]+\})/g, '$1 $2 type card')
     .replace(/\bThen, place the remaining cards into the trash\b/g, 'Then, trash the rest')
     .replace(/\bup to (\d+) of your Leader or up to \1 of your Characters\b/g, 'up to $1 of your Leader or Character cards')
+    // OP18: "your Leader or Characters with the type {East Blue}" → "… with the {East Blue} type".
+    .replace(/\bwith the type (\{[^}]+\})/g, 'with the $1 type')
+    .replace(/ until the end of (?:this|your) turn\b/g, ' during this turn')
+    .replace(/ for the battle\b/g, ' during this battle')
+    .replace(/\bplace this Character in your trash\b/g, 'trash this Character')
+    .replace(/\bplace the remaining cards at the bottom of your deck\b/g, 'place the rest at the bottom of your deck')
+    // A carta é "Nefeltari Vivi" (lista oficial); o Cardkaizoku escreve "Nefertari" nos textos do OP18.
+    .replace(/\[Nefertari Vivi\]/g, '[Nefeltari Vivi]')
+    .replace(/\bfor every of your (\[[^\]]+\])(?! Characters?\b)/g, 'for each of your $1 Characters')
+    .replace(/\bwith base (\d+) power\b/g, 'with $1 base power')
+    .replace(/\bwith an original power of (\d+)/gi, 'with a base power of $1')
+    .replace(/\bbecomes equal to (?=your opponent's Leader)/g, 'becomes the same as ')
+    .replace(/\battach up to (\d+) rested DON!! cards? to\b/g, 'give up to $1 rested DON!! card to')
+    .replace(/\brest (\d+) DON!! cards?(?=:| and )/g, 'rest $1 of your DON!! cards')
+    .replace(/\bdiscard (\d+) cards? from your hand with a type including "([^"]+)"/g, 'trash $1 card with a type including "$2" from your hand')
+    .replace(/\bdiscard (\d+) cards? from your hand\b/g, 'trash $1 card from your hand')
+    .replace(/\byour Leader includes "([^"]+)" in its type\b/gi, 'your Leader has a type including "$1"')
+    .replace(/\bK\.O\. or rest an? character\b/gi, 'K.O. or rest up to 1 Character')
+    .replace(/\b(draw) one card\b/gi, '$1 1 card')
+    .replace(/\bDON!! Card\b/g, 'DON!! card')
+    .replace(/ or lower\b/g, ' or less')
+    .replace(/\byour Leader is \{([^}]+)\}/gi, 'your Leader is [$1]')
+    // OP18-039 (Cardkaizoku): "Up to 1 of [Monkey.D.Luffy] gains …" sem o "your".
+    .replace(/\b([Uu]p to \d+) of (?=\[)/g, '$1 of your ')
+    // OP18-027 (optcgleaks): "Your active [X] Leader with 3 or more attached DON!!'s base power becomes 7000".
+    .replace(
+      /(^|\] )Your active (\[[^\]]+\]) Leader with (\d+) or more attached DON!!'s base power becomes (\d+)\.?$/,
+      '$1If your $2 Leader has $3 DON!! cards attached and is active, set its base power to $4.',
+    )
+    // OP18-049 (Cardkaizoku): busca numa frase só ("You may look at 5 … and add up to 1 … to your hand, then place the rest …").
+    // O "You may" fica de fora: olhar e não pegar nada dá no mesmo, menos a ordem do fundo do deck.
+    .replace(
+      /\b(?:You may )?look at (\d+) cards from the top of your deck and add up to (\d+) (.+?) to your hand, then (place the rest at the bottom of your deck in any order)/gi,
+      'Look at $1 cards from the top of your deck; reveal up to $2 $3 and add it to your hand. Then, $4',
+    )
     .replace(/’/g, "'");
 }
 
@@ -386,7 +427,8 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       (spec as CardFilter).maxCostDon = true;
     } else if ((m = rest.match(/^\s*(?:and )?without an? \[(On Play|When Attacking)\] effect/i)) && onField) {
       (spec as TargetSpec).withoutTiming = /Play/i.test(m[1]) ? 'onPlay' : 'whenAttacking';
-    } else if ((m = rest.match(/^\s*and the ((?:\{[^}]+\})(?:\s*(?:,|or)\s*\{[^}]+\})*) type/i))) {
+    } else if ((m = rest.match(/^\s*(?:and|with) the ((?:\{[^}]+\})(?:\s*(?:,|or)\s*\{[^}]+\})*) type/i))) {
+      // "and the {X} type"; "with the {X} type" (OP18-014, OP18-042, OP18-084).
       spec.hasAnyType = typesOf(m[1]);
     } else if ((m = rest.match(/^\s*and a (base )?cost of (\d+) or (less|more)/i))) {
       if (/less/i.test(m[3])) spec.maxCost = Number(m[2]);
@@ -759,6 +801,19 @@ export function parseCondition(text: string): Condition | null {
   if (/^this (?:Leader|Character) battles your opponent's Character during this turn$/i.test(t)) return { selfBattledCharacter: true };
   if ((m = t.match(/^you have (\d+) or less active DON!! cards$/i))) return { maxActiveDon: Number(m[1]) };
   if ((m = t.match(/^you have (\d+) or more rested DON!! cards$/i))) return { minRestedDon: Number(m[1]) };
+  // "If you do not have a Character with a base power of 7000 or more" (OP18-019).
+  if ((m = t.match(/^you (?:do not|don't) have (an? .+)$/i))) {
+    const inner = parseCondition(`you have ${m[1]}`);
+    if (inner) return { not: inner };
+  }
+  // "If all of your Characters have a cost of 12 or more" (OP18-087): nenhum com custo menor.
+  if ((m = t.match(/^all of your Characters have a cost of (\d+) or more$/i))) {
+    return { ownMatchingMax: { count: 0, spec: { side: 'own', kinds: ['character'], upTo: 99, maxCost: Number(m[1]) - 1 } } };
+  }
+  // "If your [Monkey.D.Luffy] Leader has 3 DON!! cards attached and is active" (OP18-027).
+  if ((m = t.match(/^your \[([^\]]+)\] Leader has (\d+)(?: or more)? DON!! cards? (?:attached|given)( and is active)?$/i))) {
+    return { leaderName: m[1], leaderMinDon: Number(m[2]), ...(m[3] ? { leaderActive: true } : {}) };
+  }
   if ((m = t.match(/^you do not have (\d+) (.+)$/i))) {
     const inner = parseCondition(`you have ${m[1]} or more ${m[2]}`);
     return inner ? { not: inner } : null;
@@ -817,7 +872,7 @@ export function parseCondition(text: string): Condition | null {
   if ((m = t.match(/^your opponent has (\d+) or more cards in their hand$/i))) return { opponentHandMin: Number(m[1]) };
   if ((m = t.match(/^this (?:Character|Leader) has (\d+) power or more$/i))) return { selfMinPower: Number(m[1]) };
   if (/^you have any DON!! cards given$/i.test(t)) return { anyDonGiven: true };
-  if (/^this Character was played on this turn$/i.test(t)) return { selfPlayedThisTurn: true };
+  if (/^this Character was played (?:on |during )?this turn$/i.test(t)) return { selfPlayedThisTurn: true };
   if ((m = t.match(/^your opponent has a Character with (\d+) power or more$/i))) return { opponentCharacterMinPower: Number(m[1]) };
   if ((m = t.match(/^you have (\d+) or more \{([^}]+)\} type Characters$/i))) {
     return { minTypedCharacters: { count: Number(m[1]), type: m[2] } };
@@ -836,6 +891,7 @@ export function parseCondition(text: string): Condition | null {
     return { leaderTypeOrName: { type: m[1], name: m[2] } };
   }
   if ((m = t.match(/^you have no other \[([^\]]+)\] Characters$/i))) return { noOtherNamed: m[1] };
+  if ((m = t.match(/^you do not have any other \[([^\]]+)\](?: Characters?)?$/i))) return { noOtherNamed: m[1] };
   if ((m = t.match(/^you have (\d+) or less Characters$/i))) return { maxCharacters: Number(m[1]) };
   if ((m = t.match(/^you have a total of (\d+) or more given DON!! cards$/i))) return { minGivenDon: Number(m[1]) };
   if (/^your opponent has any DON!! cards given$/i.test(t)) return { opponentAnyDonGiven: true };
@@ -945,6 +1001,9 @@ const durationOf = (d: string): Duration =>
 /** Durações escritas no fim das frases. */
 const DUR =
   "(during this turn|during this battle|until the end of your opponent's next turn|until the end of your opponent's next End Phase|until the start of your next turn|until the end of your next turn)";
+
+/** Palavras-chave que um efeito pode dar ("gains [Rush]"). */
+const KW_ALT = 'Rush: Character|Double Attack|Unblockable|Blocker|Banish|Rush';
 
 /**
  * Restrição a um jogador: "you cannot <body>" ou "your opponent cannot <body>", "during this turn" ou
@@ -1059,22 +1118,60 @@ const CLAUSES: ClauseRule[] = [
     (m) => [{ do: 'basePower', target: 'ownLeader', amount: Number(m[2]), duration: durationOf(m[3]), if: { leaderTypeIncludes: m[1] } }],
   ],
   [
+    // "Your Leader with the {Cross Guild} type or a type including "Baroque Works" gains [Unblockable] during this turn" (OP18-047)
+    new RegExp(`^Your Leader with (the .+? type.*?|a type including "[^"]+") gains \\[(${KW_ALT})\\] ${DUR}$`, 'i'),
+    (m) => {
+      const cond = parseCondition(`your Leader has ${m[1]}`);
+      return cond && [{ do: 'gainKeyword', target: 'ownLeader', keyword: KEYWORDS[m[2].toLowerCase()], duration: durationOf(m[3]), if: cond }];
+    },
+  ],
+  [
+    // "up to 1 of your opponent's Characters gains -3000 power during this turn" (OP18-072, optcgleaks)
+    new RegExp(`^(.+?) gains? [−-](\\d+) power ${DUR}$`, 'i'),
+    (m) => withTarget(m[1], (target) => ({ do: 'power', target, amount: -Number(m[2]), duration: durationOf(m[3]) })),
+  ],
+  [
+    // "Up to 1 of your opponent's Characters with … and up to 1 Character with … cannot attack until …" (OP18-064)
+    /^(up to \d+ .+?) and (up to \d+ .+?) cannot attack (until the end of your opponent's next (?:turn|End Phase)|during this turn)$/i,
+    (m) => {
+      const a = parseTarget(m[1]);
+      const b = parseTarget(m[2]);
+      if (!onlyCharacters(a) || !onlyCharacters(b)) return null;
+      const duration = durationOf(m[3]);
+      return [
+        { do: 'cannotAttack', target: a, duration },
+        { do: 'cannotAttack', target: b, duration },
+      ];
+    },
+  ],
+  [
+    // "reveal up to 1 card with a type including "CP" other than [Spandam] from your hand and activate the [Trigger] effect of that card" (OP18-105)
+    /^reveal (up to 1 .+?) from your hand and activate the \[Trigger\] effect of that card$/i,
+    (m) => {
+      const f = parseCardFilter(m[1]);
+      return f && [{ do: 'activateTriggerFromHand', filter: f.filter }];
+    },
+  ],
+  [/^trash all Characters$/i, () => [{ do: 'trashTarget', target: { side: 'any', kinds: ['character'], upTo: 99, all: true } }]],
+  [
     new RegExp(`^(.+?) becomes (\\d+) base power ${DUR}$`, 'i'),
     (m) => withTarget(m[1], (target) => ({ do: 'basePower', target, amount: Number(m[2]), duration: durationOf(m[3]) })),
   ],
   [
     // "add up to 1 card with a type including "CP" from your hand face-up to the top or bottom of your Life cards"
-    /^add (up to \d+ .+?) from your hand face-(up|down) to the top or bottom of your Life cards$/i,
+    // "Place up to 1 … from your hand to the top or bottom of your Life cards face-up" (OP18-099, OP18-101)
+    /^(?:add|place) (up to \d+ .+?) from your hand (?:face-(up|down) to the top or bottom of your Life cards|(?:to|at) the top or bottom of your Life cards face-(up|down))$/i,
     (m) => {
       const f = parseCardFilter(m[1]);
       if (!f) return null;
       const step: EffectStep = { do: 'handToLife', upTo: f.upTo, filter: f.filter, choose: true };
-      if (m[2].toLowerCase() === 'up') step.faceUp = true;
+      if ((m[2] ?? m[3]).toLowerCase() === 'up') step.faceUp = true;
       return [step];
     },
   ],
   [
-    new RegExp(`^(.+?) gains \\[(Double Attack|Banish|Blocker|Rush)\\], \\[(Double Attack|Banish|Blocker|Rush)\\] or \\[(Double Attack|Banish|Blocker|Rush)\\] ${DUR}$`, 'i'),
+    // "… gains [Rush], [Banish], or [Unblockable] during this turn" (OP18-085): uma delas, à escolha.
+    new RegExp(`^(.+?) gains \\[(${KW_ALT})\\], \\[(${KW_ALT})\\],? or \\[(${KW_ALT})\\] ${DUR}$`, 'i'),
     (m) => {
       const t = parseTarget(m[1]);
       if (!t) return null;
@@ -1826,7 +1923,8 @@ const CLAUSES: ClauseRule[] = [
   ],
   [/^play (?:that|the revealed) card( rested)?$/i, (m) => [m[1] ? { do: 'playRevealed', rested: true } : { do: 'playRevealed' }]],
   [/^place (?:the revealed card|the rest|that card) at the bottom of your deck$/i, () => [{ do: 'revealedToBottom' }]],
-  [/^Play this Character card from your trash( rested)?$/i, (m) => [m[1] ? { do: 'playThis', rested: true } : { do: 'playThis' }]],
+  // "[On K.O.] … Play this Character (from your trash)." (OP18-064, OP18-083)
+  [/^Play this Character(?: card)?(?: from your trash)?( rested)?$/i, (m) => [m[1] ? { do: 'playThis', rested: true } : { do: 'playThis' }]],
   [
     new RegExp(`^(.+?) cannot be rested ${DUR}$`, 'i'),
     (m) => withTarget(m[1], (target) => ({ do: 'cannotBeRested', target, duration: durationOf(m[2]) }), true),
@@ -1924,7 +2022,8 @@ const CLAUSES: ClauseRule[] = [
   ],
   [/^Trash (\d+) cards? from your hand$/i, (m) => [{ do: 'trashFromHand', count: Number(m[1]) }]],
   [
-    /^Add (?:up to )?(\d+) DON!! cards? from your DON!! deck and (set (?:it|them) as active|rest (?:it|them))$/i,
+    // "… as rested" (OP18-075, OP18-077)
+    /^Add (?:up to )?(\d+) DON!! cards? from your DON!! deck (?:and )?(set (?:it|them) as active|rest (?:it|them)|as rested|as active)$/i,
     (m) => [/rest/i.test(m[2]) ? { do: 'addDonFromDeck', count: Number(m[1]), rested: true } : { do: 'addDonFromDeck', count: Number(m[1]) }],
   ],
   [/^Play this card$/i, () => [{ do: 'playThis' }]],
@@ -1997,11 +2096,12 @@ const CLAUSES: ClauseRule[] = [
     },
   ],
   [
-    /^Play (.+?) from your (hand or trash|hand|deck|trash)( rested)?$/i,
+    /^Play (.+?) from your (hand or trash|deck or trash|hand|deck|trash)( rested)?$/i,
     (m) => {
       const f = parseCardFilter(m[1]);
       if (!f) return null;
-      const from = (m[2].toLowerCase() === 'hand or trash' ? 'handOrTrash' : m[2].toLowerCase()) as 'hand' | 'deck' | 'trash' | 'handOrTrash';
+      const where = m[2].toLowerCase();
+      const from = (where === 'hand or trash' ? 'handOrTrash' : where === 'deck or trash' ? 'deckOrTrash' : where) as 'hand' | 'deck' | 'trash' | 'handOrTrash' | 'deckOrTrash';
       const step: EffectStep = { do: 'playFrom', from, upTo: f.upTo, filter: f.filter };
       if (m[3]) step.rested = true;
       return [step];
@@ -2414,6 +2514,12 @@ function parseCostPart(part: string, cost: AbilityCost): boolean {
     else cost.selfPowerMinus = Number(m[1]);
     return true;
   }
+  // "add all of your Life cards to your hand" (OP18-020) / "trash all of your Life cards" (OP18-117)
+  if ((m = part.match(/^(add|trash) all (?:of your )?Life cards(?: to your hand)?$/i))) {
+    if (/^add/i.test(m[1]) !== / to your hand$/i.test(part)) return false;
+    cost.lifeAll = /^add/i.test(m[1]) ? 'hand' : 'trash';
+    return true;
+  }
   if ((m = part.match(/^return (\d+) cards from your trash to your deck and shuffle it$/i))) {
     cost.trashToDeck = Number(m[1]);
     return true;
@@ -2643,6 +2749,8 @@ function parseEvent(text: string): GameEvent | null {
   if ((m = t.match(/^a card is removed from (your or your opponent's|your opponent's|your) Life cards$/i))) {
     return { kind: 'lifeRemoved', whose: /or/i.test(m[1]) ? 'any' : /opponent/i.test(m[1]) ? 'opponent' : 'own' };
   }
+  // "When you trash a card from the effect of your [Marshall D. Teach] Leader" (OP18-080): o Líder descarta da mão.
+  if ((m = t.match(/^you trash a card (?:from|by) the effect of your \[([^\]]+)\] Leader$/i))) return { kind: 'handTrashedByEffect', sourceLeader: m[1] };
   if ((m = t.match(/^a card is trashed from your hand by (?:your \{([^}]+)\} type card's|an) effect$/i))) {
     return m[1] ? { kind: 'handTrashedByEffect', sourceType: m[1] } : { kind: 'handTrashedByEffect' };
   }
@@ -2747,6 +2855,22 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     if (h.don) ab.don = h.don;
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];
+  }
+  // "Apply each of the following effects based on this Character's power: • If it is 5000 or more, this Character
+  // gains [Rush]. • …" (OP18-004): uma habilidade por faixa de poder.
+  const tiers = body.trim().match(/^Apply each of the following effects based on this Character's power:\s*((?:•\s*If it is \d+ or more, this Character gains \[[^\]]+\]\.?\s*)+)$/i);
+  if (tiers) {
+    const out: Ability[] = [];
+    for (const t of tiers[1].matchAll(/If it is (\d+) or more, this Character gains \[([^\]]+)\]/gi)) {
+      const kw = KEYWORDS[t[2].toLowerCase()];
+      if (!kw) return null;
+      const ab: Ability = { timing: 'static', steps: [], staticKeyword: kw, condition: { selfMinPower: Number(t[1]) } };
+      if (h.don) ab.don = h.don;
+      if (h.yourTurn) ab.yourTurn = true;
+      if (h.opponentsTurn) ab.opponentsTurn = true;
+      out.push(ab);
+    }
+    return out;
   }
   let m0: RegExpMatchArray | null;
   if ((m0 = body.trim().replace(/\.$/, '').match(/^At the end of a battle in which this Character battles your opponent's Character(?: with (.+?))?, (.+)$/i))) {
@@ -2870,7 +2994,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   // Regras de construção / nome alternativo: não são efeitos de jogo (tratados na importação e no deck).
   if (/^Also treat this card's name as \[[^\]]+\] according to the rules$/i.test(s)) return [];
   if (/^Under the rules of this game, you may have any number of this card in your deck$/i.test(s)) return [];
-  if (/^Under the rules of this game, also treat this card's name as \[[^\]]+\] and \[[^\]]+\]$/i.test(s)) return [];
+  if (/^Under the rules of this game, also treat this card's name as \[[^\]]+\](?: and \[[^\]]+\])?$/i.test(s)) return [];
   const base: Ability = { timing: 'static', steps: [] };
   if (h.don) base.don = h.don;
   if (h.yourTurn) base.yourTurn = true;
@@ -3090,13 +3214,33 @@ function parseStatic(h: Header, body: string): Ability[] | null {
   }
   if ((m = s.match(POWER_SELF))) return [{ ...base, staticPower: Number(m[1]) }];
   m = s.match(
-    /^this (?:Character|Leader) gains \+(\d+) power for every (\d+ )?(?:of your )?(rested DON!! cards|cards? in your hand|cards? in your trash|Events? in your trash)$/i,
+    /^this (?:Character|Leader) gains \+(\d+) power for every (\d+ )?(?:of your )?(rested DON!! cards|cards? in your hand|cards? in your trash|Events?(?: cards?)? in your trash)$/i,
   );
   if (m) {
     const what = /DON/i.test(m[3]) ? 'restedDon' : /hand/i.test(m[3]) ? 'hand' : /Event/i.test(m[3]) ? 'trashEvents' : 'trash';
     return [{ ...base, powerPer: { power: Number(m[1]), every: Number(m[2] ?? 1), what } }];
   }
   if (/^this Character gains \[Rush: ?Character\]$/i.test(s)) return [{ ...base, staticKeyword: 'rushCharacter' }];
+  // "This Character gains +1000 power for each of your [Kung Fu Jugon] Characters" (OP18-005): conta esta carta também.
+  if ((m = s.match(/^this Character gains \+(\d+) power for each of your (.+? Characters)$/i))) {
+    const f = parseCardFilter(`1 ${m[2].replace(/ Characters$/i, ' Character')}`);
+    if (!f || f.filter.category !== 'character') return null;
+    return [{ ...base, powerPer: { power: Number(m[1]), every: 1, what: 'characters', filter: f.filter } }];
+  }
+  // "this Character gets -2000 power" / "it gains -2000 power" (OP18-030)
+  if ((m = s.match(/^(?:this Character|it) (?:gets|gains) [−-](\d+) power$/i))) return [{ ...base, staticPower: -Number(m[1]) }];
+  // "this Character gains [Double Attack] and [Blocker]" (OP18-081)
+  if ((m = s.match(/^this Character gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\] and \[(Rush|Blocker|Double Attack|Banish|Unblockable)\]$/i))) {
+    return [m[1], m[2]].map((k) => ({ ...base, staticKeyword: KEYWORDS[k.toLowerCase()] }));
+  }
+  // "this Character gains +2000 power and [Blocker]" (OP18-071)
+  if ((m = s.match(/^this Character gains \+(\d+) power and \[(Rush|Blocker|Double Attack|Banish|Unblockable)\]$/i))) {
+    return [{ ...base, staticPower: Number(m[1]) }, { ...base, staticKeyword: KEYWORDS[m[2].toLowerCase()] }];
+  }
+  // "set its base power to 7000" (OP18-027, depois de "If your [X] Leader …,"): o poder base do Líder.
+  if ((m = s.match(/^set its base power to (\d+)$/i)) && base.condition && (base.condition.leaderName || base.condition.leaderMinDon !== undefined)) {
+    return [{ ...base, aura: { kinds: ['leader'], power: 0, basePower: Number(m[1]) } }];
+  }
   if ((m = s.match(/^this (?:Character|card|Leader) gains \[(Rush|Blocker|Double Attack|Banish|Unblockable)\]$/i))) {
     return [{ ...base, staticKeyword: KEYWORDS[m[1].toLowerCase()] }];
   }

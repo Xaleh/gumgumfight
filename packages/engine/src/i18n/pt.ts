@@ -33,6 +33,7 @@ const TAGS: Array<[RegExp, string]> = [
 /** Textos de lembrete das palavras-chave, traduzidos inteiros. */
 const REMINDERS: Array<[RegExp, string]> = [
   [/\(This card can attack on the turn in which it is played\.\)/g, '(Esta carta pode atacar no turno em que for jogada.)'],
+  [/\(This Character can attack on the turn in which it is played\.\)/g, '(Este Personagem pode atacar no turno em que for jogado.)'],
   [
     /\(After your opponent declares an attack, you may rest this card to make it the new target of the attack\.\)/g,
     '(Depois que o oponente declarar um ataque, você pode virar esta carta para torná-la o novo alvo do ataque.)',
@@ -232,6 +233,10 @@ const SENTENCES: Rule[] = [
   [
     /^Under the rules of this game, also treat this card's name as (\[[^\]]+\]) and (\[[^\]]+\])\.?$/i,
     (_, a, b) => `Pelas regras do jogo, o nome desta carta também é considerado ${a} e ${b}.`,
+  ],
+  [
+    /^Under the rules of this game, also treat this card's name as (\[[^\]]+\])\.?$/i,
+    (_, n) => `Pelas regras do jogo, o nome desta carta também é considerado ${n}.`,
   ],
   [
     /^(.+?) cannot be K\.O\.'d in battle by "?(\w+)"? attribute (?:Characters|cards)\.?$/i,

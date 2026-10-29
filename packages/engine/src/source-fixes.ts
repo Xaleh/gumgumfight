@@ -180,6 +180,8 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   // Spoilers com erro de digitação (deduzidos; o leitor já tolerava).
   'EB05-039': [['{Vinsmoke Family}', '{The Vinsmoke Family}']], // Pink Hornet
   'EB05-048': [['with a cost of O cannot', 'with a cost of 0 cannot']], // Hedgehog Stinger
+  // Zoro & Sogeking: o optcgleaks traduz "will not become active"; o Cardkaizoku e a Señor Pink OP18-068 (mesmo efeito) trazem "cannot be rested".
+  'OP18-027': [["will not become active at the end of your opponent's next End Phase", "cannot be rested until the end of your opponent's next turn"]],
   // Promos com o texto do Cardkaizoku (tradução própria do site, fora do padrão das cartas), conferidas
   // em 22/10/2026. Com a carta na optcgapi, o texto é o dela (a lista oficial); sem ela, o efeito é o
   // mesmo na redação das cartas oficiais com o mesmo efeito.

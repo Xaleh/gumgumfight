@@ -409,7 +409,8 @@ function condition(c: Condition, ctx: Ctx): string {
         break;
       case 'ownMatchingMax': {
         const t = target({ ...c.ownMatchingMax!.spec, side: 'own', upTo: 2 }, ctx).replace(/^até \d+ dos seus /, '');
-        out.push(`você tiver ${c.ownMatchingMax!.count} ou menos ${t}`);
+        // count 0: "If all of your Characters have a cost of 12 or more" (OP18-087).
+        out.push(c.ownMatchingMax!.count === 0 ? `você não tiver ${t}` : `você tiver ${c.ownMatchingMax!.count} ou menos ${t}`);
         break;
       }
       case 'anyCharacterMinPower':
@@ -603,6 +604,9 @@ function condition(c: Condition, ctx: Ctx): string {
       case 'leaderAnyDonGiven':
         out.push('o seu Líder tiver algum DON!! anexado');
         break;
+      case 'leaderMinDon':
+        out.push(`o seu Líder tiver ${c.leaderMinDon} ou mais DON!! anexados`);
+        break;
       case 'selfPlayedThisTurn':
         out.push(`${ctx.self} tiver sido jogado neste turno`);
         break;
@@ -669,6 +673,7 @@ function event(e: GameEvent, ctx: Ctx): string {
           ? 'uma carta for removida das suas cartas de Vida'
           : 'uma carta for removida das cartas de Vida do oponente';
     case 'handTrashedByEffect':
+      if (e.sourceLeader) return `você descartar uma carta da sua mão pelo efeito do seu Líder [${e.sourceLeader}]`;
       return e.sourceType ? `uma carta for descartada da sua mão pelo efeito de uma carta sua do tipo {${e.sourceType}}` : 'uma carta for descartada da sua mão por um efeito';
     case 'anyOf':
       return e.events.map((x) => event(x, ctx)).join(' ou ');
@@ -784,6 +789,7 @@ function cost(c: AbilityCost, ctx: Ctx, verbal = false): string {
   if (c.giveOppDon) parts.push(`dar ${c.giveOppDon} DON!! ${plural(c.giveOppDon, 'virado', 'virados')} do oponente a 1 Personagem dele`);
   if (c.handToTop) parts.push(`colocar ${cards(c.handToTop)} da sua mão no topo do deck`);
   if (c.victimToLife) parts.push('colocar essa carta no topo da sua Vida, com a face para baixo');
+  if (c.lifeAll) parts.push(c.lifeAll === 'hand' ? 'colocar todas as suas cartas de Vida na mão' : 'descartar todas as suas cartas de Vida');
   const text = parts.length ? `Você pode ${parts.join(' e ')}` : '';
   return [...symbols, text].filter(Boolean).join(' ');
 }
@@ -877,7 +883,16 @@ function step(s: EffectStep, ctx: Ctx): string {
     case 'fromTrashToHand':
       return `Adicione ${filter(s.filter, s.upTo)} do seu descarte à sua mão.`;
     case 'playFrom': {
-      const from = s.from === 'deck' ? 'do seu deck' : s.from === 'hand' ? 'da sua mão' : s.from === 'trash' ? 'do seu descarte' : 'da sua mão ou do descarte';
+      const from =
+        s.from === 'deck'
+          ? 'do seu deck'
+          : s.from === 'hand'
+            ? 'da sua mão'
+            : s.from === 'trash'
+              ? 'do seu descarte'
+              : s.from === 'deckOrTrash'
+                ? 'do seu deck ou do descarte'
+                : 'da sua mão ou do descarte';
       return `Jogue ${filter(s.filter, s.upTo)} ${from}${s.notColorOfLast ? ' de uma cor diferente da do Personagem devolvido' : ''}${s.rested ? ', virado' : ''}.`;
     }
     case 'shuffleDeck':
@@ -1117,6 +1132,8 @@ function step(s: EffectStep, ctx: Ctx): string {
       return `${cap(target(s.target, ctx))} ganha o atributo ${s.attribute} ${dur(s.duration)}.`;
     case 'activateEventFromTrash':
       return `Ative o efeito [Principal] de até 1 ${filter(s.filter, 1, false).replace(/^1 /, '')} do seu descarte.`;
+    case 'activateTriggerFromHand':
+      return `Revele ${filter(s.filter, 1)} da sua mão e ative o [Trigger] dessa carta.`;
     case 'attackTax':
       if (s.target === 'chosen') return `Os Personagens escolhidos não podem atacar ${dur(s.duration)}, a menos que o oponente descarte ${cards(s.count)} da mão a cada ataque.`;
       return `${cap(target(s.target, ctx))} não pode atacar ${dur(s.duration)}, a menos que o oponente descarte ${cards(s.count)} da mão a cada ataque.`;
@@ -1242,6 +1259,7 @@ function staticParts(a: Ability, ctx: Ctx): string[] {
       trash: 'carta no seu descarte',
       trashEvents: 'Evento no seu descarte',
       distinctCharacters: 'Personagem seu com nome diferente',
+      characters: a.powerPer.filter?.name ? `Personagem [${a.powerPer.filter.name}] seu` : `${filter(a.powerPer.filter ?? {}, 1, false).replace(/^1 /, '')} seu`,
     }[a.powerPer.what];
     const whatMany = {
       hand: 'cartas na sua mão',
@@ -1249,6 +1267,7 @@ function staticParts(a: Ability, ctx: Ctx): string[] {
       trash: 'cartas no seu descarte',
       trashEvents: 'Eventos no seu descarte',
       distinctCharacters: 'Personagens seus com nomes diferentes',
+      characters: `${filter(a.powerPer.filter ?? {}, 2, false).replace(/^2 /, '')} seus`,
     }[a.powerPer.what];
     parts.push(`recebe +${a.powerPer.power} de poder para cada ${a.powerPer.every > 1 ? `${a.powerPer.every} ${whatMany}` : what}`);
   }

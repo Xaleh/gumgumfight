@@ -85,6 +85,8 @@ export function mapOptcgLeaksCard(raw: LeaksCard, set: string): CardData | null 
   const notes = [...effect.notes, ...trigger.notes];
   const image = raw.images?.find((i) => i.name === 'Base Art') ?? raw.images?.[0];
   const hasPower = category === 'leader' || category === 'character';
+  // "Also treat this card's name as [Sanji] according to the rules." (OP18-045), como nas outras fontes.
+  const aliases = [...split.text.matchAll(/[Aa]lso treat this card's name as \[([^\]]+)\](?: and \[([^\]]+)\])?/g)].flatMap((m) => m.slice(1).filter(Boolean));
 
   return {
     id,
@@ -102,6 +104,7 @@ export function mapOptcgLeaksCard(raw: LeaksCard, set: string): CardData | null 
     text: split.text,
     ...(triggerText ? { trigger: triggerText } : {}),
     ...(notes.length ? { notes } : {}),
+    ...(aliases.length ? { aliases } : {}),
     set: id.split('-')[0],
     ...(raw.rarity && raw.rarity !== '?' ? { rarity: raw.rarity } : {}),
     ...(image?.id ? { imageUrl: `${DATA_BASE}/${set.toLowerCase()}/images/${image.id}.webp` } : {}),
