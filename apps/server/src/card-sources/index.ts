@@ -1,6 +1,7 @@
 // Fontes das cartas e a ordem de prioridade de cada cadeia (deploy.env):
-//   CARD_SOURCES=cardkaizoku,optcgapi       cartas lançadas (padrão: optcgapi)
-//   SPOILER_SOURCES=cardkaizoku,optcgleaks  coleções anunciadas (padrão: optcgleaks)
+//   CARD_SOURCES=sweetapp,cardkaizoku,optcgapi       cartas lançadas (padrão: optcgapi)
+//   SPOILER_SOURCES=sweetapp,cardkaizoku,optcgleaks  coleções anunciadas (padrão: optcgleaks)
+// O sweetapp só entra com SWEETAPP_CARDS_URL (sweetapp.ts).
 // Como a cadeia junta as fontes: chain.ts.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -12,6 +13,7 @@ import { cardkaizokuSource } from './cardkaizoku';
 import type { CardSource, ChainReport, ResolvedCard, SourceKind } from './chain';
 import { optcgapiSource } from './optcgapi';
 import { optcgleaksSource } from './optcgleaks';
+import { sweetAppConfig, sweetAppSource } from './sweetapp';
 
 export * from './chain';
 
@@ -22,18 +24,33 @@ export interface ChainContext {
   /** Endereço da optcgapi (CARD_API_BASE). */
   base: string;
   fetchJson: FetchJson;
+  /** `fetch` das fontes que mandam headers (SweetApp); padrão: o global. */
+  fetchImpl?: typeof fetch;
+  /** Variáveis das fontes (SWEETAPP_*); padrão: process.env. */
+  env?: NodeJS.ProcessEnv;
   /** Respostas da optcgapi salvas em arquivo (cards:import --file). */
   files?: string[];
   onBody?: (label: string, entries: number) => void;
 }
 
-const FACTORIES: Record<string, { kinds: SourceKind[]; make: (ctx: ChainContext) => CardSource }> = {
+const FACTORIES: Record<
+  string,
+  {
+    kinds: SourceKind[];
+    make: (ctx: ChainContext) => CardSource;
+    /** Motivo de a fonte não poder entrar na cadeia neste ambiente (variável faltando); undefined = pode. */
+    missing?: (env: NodeJS.ProcessEnv) => string | undefined;
+  }
+> = {
   optcgapi: { kinds: ['official'], make: (ctx) => optcgapiSource(ctx) },
   cardkaizoku: { kinds: ['official', 'spoiler'], make: (ctx) => cardkaizokuSource(ctx.fetchJson) },
   optcgleaks: { kinds: ['spoiler'], make: (ctx) => optcgleaksSource(ctx.fetchJson) },
+  sweetapp: {
+    kinds: ['official', 'spoiler'],
+    make: (ctx) => sweetAppSource(sweetAppConfig(ctx.env)!, ctx.fetchImpl),
+    missing: (env) => (sweetAppConfig(env) ? undefined : 'SWEETAPP_CARDS_URL não configurada'),
+  },
 };
-/** Fontes previstas e ainda sem adaptador. */
-const PLANNED = ['sweetapp'];
 
 /** Nomes da cadeia lidos do ambiente; nomes desconhecidos viram aviso e, sem nenhum válido, vale o padrão. */
 export function chainNames(kind: SourceKind, env: NodeJS.ProcessEnv = process.env): { names: string[]; warnings: string[] } {
@@ -41,8 +58,10 @@ export function chainNames(kind: SourceKind, env: NodeJS.ProcessEnv = process.en
   const names: string[] = [];
   for (const name of (env[ENV_NAMES[kind]] ?? '').toLowerCase().split(/[\s,]+/).filter(Boolean)) {
     const factory = FACTORIES[name];
-    if (!factory) warnings.push(PLANNED.includes(name) ? `${name}: fonte ainda não disponível` : `${name}: fonte desconhecida`);
+    const missing = factory?.missing?.(env);
+    if (!factory) warnings.push(`${name}: fonte desconhecida`);
     else if (!factory.kinds.includes(kind)) warnings.push(`${name}: não serve para ${ENV_NAMES[kind]}`);
+    else if (missing) warnings.push(`${name}: ${missing}`);
     else if (!names.includes(name)) names.push(name);
   }
   if (warnings.length) warnings.unshift(`${ENV_NAMES[kind]}=${env[ENV_NAMES[kind]]}`);

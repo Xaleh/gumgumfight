@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import type { CardData } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import { HttpError } from '../src/card-import';
-import { type CardSource, chainNames, type Layer, resolveChain, saveDiffReport } from '../src/card-sources';
+import { buildChain, type CardSource, chainNames, type Layer, resolveChain, saveDiffReport } from '../src/card-sources';
+import { mapSweetAppCard, sweetAppConfig, sweetAppNext, sweetAppRows, sweetAppSource } from '../src/card-sources/sweetapp';
 import { cardkaizokuManifestUrl, cardkaizokuSource, type KaizokuCard, mapKaizokuCard } from '../src/card-sources/cardkaizoku';
 import { optcgleaksSource } from '../src/card-sources/optcgleaks';
 import { apiEndpoints } from '../src/card-sources/optcgapi';
@@ -248,12 +249,17 @@ describe('CARD_SOURCES e SPOILER_SOURCES', () => {
     expect(r.names).toEqual(['cardkaizoku']);
     expect(r.warnings).toEqual([
       'CARD_SOURCES=sweetapp,cardkaizoku,optcgleaks,xyz',
-      'sweetapp: fonte ainda não disponível',
+      'sweetapp: SWEETAPP_CARDS_URL não configurada',
       'optcgleaks: não serve para CARD_SOURCES',
       'xyz: fonte desconhecida',
     ]);
     // Nenhuma válida: vale o padrão.
     expect(chainNames('spoiler', { SPOILER_SOURCES: 'optcgapi' }).names).toEqual(['optcgleaks']);
+    // O SweetApp entra (nas duas cadeias) quando o endereço está configurado.
+    const env = { CARD_SOURCES: 'sweetapp,optcgapi', SPOILER_SOURCES: 'sweetapp,optcgleaks', SWEETAPP_CARDS_URL: 'https://api.sweet.test/cards' };
+    expect(chainNames('official', env)).toEqual({ names: ['sweetapp', 'optcgapi'], warnings: [] });
+    expect(chainNames('spoiler', env)).toEqual({ names: ['sweetapp', 'optcgleaks'], warnings: [] });
+    expect(buildChain(['sweetapp', 'optcgapi'], { base: BASE, fetchJson: async () => null, env }).map((s) => s.id)).toEqual(['sweetapp', 'optcgapi']);
   });
 
   it('promocionais da optcgapi ficam em /allPromos/', () => {
@@ -360,5 +366,106 @@ describe('spoilers pela cadeia Cardkaizoku > optcgleaks', () => {
       imageUrl: 'https://optcgapi.test/P-130.jpg',
     });
     expect(garp.spoiler).toBeUndefined();
+  });
+});
+
+describe('SweetApp: fonte da cadeia', () => {
+  /** Rede falsa com headers: URL -> corpo; o resto responde 404. */
+  function sweetNet(routes: Record<string, unknown>) {
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), headers: (init?.headers ?? {}) as Record<string, string> });
+      const body = routes[String(url)];
+      if (body === undefined) return new Response('not found', { status: 404, statusText: 'Not Found' });
+      return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    return { fetchImpl, calls };
+  }
+
+  it('mapeia os campos em inglês ou em português, cores e categorias traduzidas, [Trigger] e aliases', () => {
+    expect(
+      mapSweetAppCard({ numero: 'op01-001', nome: 'Roronoa Zoro', tipo: 'Líder', cores: 'Vermelho', vida: 5, poder: '5000', atributos: 'Slash', tracos: 'Supernovas/Straw Hat Crew', textEn: '[DON!! x1] [Your Turn] All of your Characters gain +1000 power.', raridade: 'L', colecao: 'OP-01', imagem: 'https://cdn.sweet.test/op01-001.png' }),
+    ).toEqual({
+      id: 'OP01-001',
+      name: 'Roronoa Zoro',
+      category: 'leader',
+      colors: ['red'],
+      life: 5,
+      power: 5000,
+      attributes: ['Slash'],
+      types: ['Supernovas', 'Straw Hat Crew'],
+      text: '[DON!! x1] [Your Turn] All of your Characters gain +1000 power.',
+      set: 'OP01',
+      rarity: 'L',
+      imageUrl: 'https://cdn.sweet.test/op01-001.png',
+    });
+    expect(
+      mapSweetAppCard({ id: 'OP01-016_p1', name: 'Nami', category: 'CHARACTER', colors: ['Blue', 'Yellow'], cost: 1, power: 1000, counter: '2000', attributes: ['Special'], types: ['Straw Hat Crew'], effect: '[On Play] Look at 5 cards.<br>[Trigger] Draw 1 card. Also treat this card\'s name as [Nami (Alt)].' }),
+    ).toMatchObject({ id: 'OP01-016', category: 'character', colors: ['blue', 'yellow'], cost: 1, counter: 2000, text: '[On Play] Look at 5 cards.', trigger: 'Draw 1 card. Also treat this card\'s name as [Nami (Alt)].', set: 'OP01' });
+    // Evento sem poder nem contador; counter 0 some; custo "–" vira vazio para a fonte seguinte completar.
+    expect(mapSweetAppCard({ code: 'ST01-014', name: 'Guard Point', type: 'event', color: 'Red', cost: '-', counter: 0, text: '-' })).toMatchObject({ category: 'event', text: '' });
+    expect(mapSweetAppCard({ code: 'ST01-014', name: 'Guard Point', type: 'event', color: 'Red', cost: '-' })).not.toHaveProperty('cost');
+    // Sem número, nome ou categoria conhecida: fora.
+    expect(mapSweetAppCard({ name: 'x', type: 'leader' })).toBeNull();
+    expect(mapSweetAppCard({ id: 'OP01-001', name: 'x', type: 'don' })).toBeNull();
+    expect(mapSweetAppCard({ id: 'OP01-001', type: 'leader' })).toBeNull();
+  });
+
+  it('aceita lista pura ou embrulhada e segue a paginação', () => {
+    expect(sweetAppRows([{ id: 1 }])).toEqual([{ id: 1 }]);
+    expect(sweetAppRows({ data: [{ id: 2 }], next: null })).toEqual([{ id: 2 }]);
+    expect(sweetAppRows({ cards: 'x' })).toBeNull();
+    expect(sweetAppNext({ next: '/cards?page=2' }, 'https://api.sweet.test/cards')).toBe('https://api.sweet.test/cards?page=2');
+    expect(sweetAppNext({ links: { next: 'https://api.sweet.test/cards?page=3' } }, 'https://api.sweet.test/cards')).toBe('https://api.sweet.test/cards?page=3');
+    expect(sweetAppNext({ next: 'https://api.sweet.test/cards' }, 'https://api.sweet.test/cards')).toBeNull();
+    expect(sweetAppNext([], 'https://api.sweet.test/cards')).toBeNull();
+    expect(sweetAppConfig({})).toBeNull();
+    expect(sweetAppConfig({ SWEETAPP_CARDS_URL: 'ftp://x' })).toBeNull();
+    expect(sweetAppConfig({ SWEETAPP_CARDS_URL: 'https://api.sweet.test/cards ', SWEETAPP_API_KEY: 'k' })).toEqual({ url: 'https://api.sweet.test/cards', apiKey: 'k', apiKeyHeader: 'x-api-key' });
+  });
+
+  it('um endereço só: baixa uma vez por rodada (com a chave no header), filtra por coleção e marca as lançadas', async () => {
+    const net = sweetNet({
+      'https://api.sweet.test/cards': { data: [{ id: 'OP01-001', name: 'Zoro', type: 'leader', color: 'Red', life: 5, power: 5000, text: '', released: true }], next: '/cards?page=2' },
+      'https://api.sweet.test/cards?page=2': { data: [{ id: 'OP18-001', name: 'Nova', type: 'leader', color: 'Red', life: 5, power: 5000, text: '' }, { id: 'OP18-001', name: 'Repetida', type: 'leader', color: 'Red', text: '' }] },
+    });
+    const src = sweetAppSource({ url: 'https://api.sweet.test/cards', apiKey: 'segredo', apiKeyHeader: 'x-api-key' }, net.fetchImpl);
+    expect(src).toMatchObject({ id: 'sweetapp', host: 'sweetapp.com.br', mixesSpoilers: true });
+    const op01 = await src.fetch({ sets: ['OP-01'] });
+    expect(op01.cards.map((c) => c.id)).toEqual(['OP01-001']);
+    expect(op01.released).toEqual(new Set(['OP01-001']));
+    const all = await src.fetch({});
+    expect(all.cards.map((c) => c.id)).toEqual(['OP01-001', 'OP18-001']);
+    expect(all.raw?.get('OP01-001')).toMatchObject({ name: 'Zoro' });
+    // As duas páginas, uma vez só, com a chave.
+    expect(net.calls.map((c) => c.url)).toEqual(['https://api.sweet.test/cards', 'https://api.sweet.test/cards?page=2']);
+    expect(net.calls[0].headers['x-api-key']).toBe('segredo');
+  });
+
+  it('endereço por coleção ({set}): uma requisição por coleção; 404 = a fonte não tem; outro erro derruba a fonte', async () => {
+    const net = sweetNet({
+      'https://api.sweet.test/cards?set=OP01': [{ id: 'OP01-001', name: 'Zoro', type: 'leader', color: 'Red', life: 5, power: 5000, text: '' }],
+    });
+    const src = sweetAppSource({ url: 'https://api.sweet.test/cards?set={set}' }, net.fetchImpl);
+    const got = await src.fetch({ sets: ['OP-01', 'OP18'] });
+    expect(got.cards.map((c) => c.id)).toEqual(['OP01-001']);
+    expect(net.calls.map((c) => c.url)).toEqual(['https://api.sweet.test/cards?set=OP01', 'https://api.sweet.test/cards?set=OP18']);
+    expect(net.calls[0].headers['x-api-key']).toBeUndefined();
+    await expect(src.fetch({})).rejects.toThrow(/exige as coleções/);
+    const broken = sweetAppSource({ url: 'https://api.sweet.test/cards?set={set}' }, (async () => new Response('x', { status: 500, statusText: 'Erro' })) as typeof fetch);
+    await expect(broken.fetch({ sets: ['OP01'] })).rejects.toThrow(/500/);
+  });
+
+  it('na cadeia: completa campos vazios da optcgapi e, como fonte oficial, só traz coleções confirmadas', () => {
+    const sweet = source('sweetapp', { mixesSpoilers: true });
+    const layers: Layer[] = [
+      { source: sweet, cards: [card('OP01-001', { attributes: ['Slash'], rarity: 'L' }), card('OP18-001', { name: 'Nova' })], released: new Set() },
+      { source: source('optcgapi'), cards: [card('OP01-001', { attributes: [], rarity: undefined })] },
+    ];
+    const { cards, report } = resolveChain(layers, { kind: 'official' });
+    expect(cards.map((c) => c.card.id)).toEqual(['OP01-001']);
+    expect(cards[0].source.id).toBe('sweetapp');
+    expect(cards[0].card).toMatchObject({ attributes: ['Slash'], rarity: 'L' });
+    expect(report.skipped).toEqual([{ id: 'OP18-001', source: 'sweetapp', reason: 'coleção sem fonte oficial (vai como spoiler)' }]);
   });
 });

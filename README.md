@@ -54,6 +54,8 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `CARD_API_BASE` | `https://optcgapi.com/api`    | API usada pelo importador                   |
 | `CARD_SOURCES`  | `optcgapi`                    | Fontes das cartas lançadas, em ordem de prioridade (ex.: `cardkaizoku,optcgapi`; veja [Cadeia de fontes](#cadeia-de-fontes)) |
 | `SPOILER_SOURCES` | `optcgleaks`                | Fontes dos spoilers, em ordem de prioridade (ex.: `cardkaizoku,optcgleaks`) |
+| `SWEETAPP_CARDS_URL` | (vazio)                    | Endereço da API de cartas do SweetApp (com `{set}` para uma requisição por coleção); vazio = a fonte `sweetapp` não entra na cadeia (veja [Integração SweetApp](docs/integracao-sweetapp.md)) |
+| `SWEETAPP_API_KEY` / `SWEETAPP_API_KEY_HEADER` | (vazio) / `x-api-key` | Chave da API do SweetApp e o header em que ela vai (segredo: só no `deploy.env`) |
 | `CARD_CDN_URL`  | (vazio)                       | Endereço público da CDN própria das imagens (ex.: `https://cards.gumgumfight.cloud`); vazio = imagens direto das fontes (veja [CDN própria](#cdn-própria-das-imagens-cloudflare-r2)) |
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | (vazio) | Conta (o Account ID ou o endpoint S3 inteiro), bucket e token do Cloudflare R2 da CDN (segredos: só no `deploy.env`) |
 | `R2_ENDPOINT`   | (vazio)                       | Só para bucket com jurisdição (ex.: `https://<id>.eu.r2.cloudflarestorage.com`) |
@@ -588,7 +590,9 @@ Sem `GOOGLE_CLIENT_ID`, o botão não aparece e `POST /api/auth/google` responde
 ## API para parceiros (apps que agem em nome do usuário)
 
 Um app parceiro (um construtor de decks, por exemplo) pode criar e atualizar os decks do usuário, ler as partidas e
-os replays dele e consultar as estatísticas pessoais, com autorização dele. A identidade vem num **token de acesso**
+os replays dele e consultar as estatísticas pessoais, com autorização dele. O desenho da integração com o SweetApp
+(cartas unificadas na CDN, o SweetApp como fonte de cartas e os torneios na tela dele) está em
+[`docs/integracao-sweetapp.md`](docs/integracao-sweetapp.md). A identidade vem num **token de acesso**
 enviado em `Authorization: Bearer <token>`: o token sempre aponta para uma conta Google e carrega **scopes** que
 limitam o que ele pode fazer. Sem login nada muda; quem não vincula nada também não. Código em
 `apps/server/src/partners/` (tokens e middleware, OAuth, webhook, partidas) e na tela "Apps conectados"
@@ -679,6 +683,21 @@ autorizou o app (com `matches:read`) é gravada, o servidor faz `POST <url>` com
 O aviso é só um sinal: os dados vêm pelas rotas acima, com o token do usuário. Entrega depois da resposta, timeout de
 5 s, sem seguir redirecionamentos; sem 2xx, tenta de novo 1 min e 10 min depois (em memória) e desiste com um log.
 Tokens pessoais não recebem webhook.
+
+### Torneios para parceiros (sem token)
+
+`GET /api/partners/tournaments?status=registration,running&format=standard&limit=50` lista os torneios num formato
+estável (`schemaVersion: 1`) para o parceiro mostrar na tela dele: `id, name, description, url` (a página do torneio
+no site, para inscrever), `format, spoilers, spoilerSet, structure, swissBestOf, topCut, status, round, totalRounds,
+players, maxPlayers, startsAt, checkIn, checkInOpensAt, organizer { name }, official, prize, sponsor, priorityUntil,
+createdAt, startedAt, finishedAt` e, nos encerrados, `champion { name, leader { id, name, colors, image } }`.
+`GET /api/partners/tournaments/:id` traz o mesmo mais `standings[]` (classificação com o Líder de cada um) e
+`rounds[]` (mesas, placares e resultados). Só o que a página pública do torneio já mostra: Líderes depois do início,
+nunca as listas dos decks, e-mails ou ids de conta.
+
+É público (sem token nem cookie), com `Access-Control-Allow-Origin: *` (pode ser chamado do navegador), cache de 30 s
+(lista) e 10 s (detalhe) invalidado a cada gravação, e ETag (`If-None-Match` → 304). Filtros inválidos respondem 400.
+Código em `apps/server/src/partners/tournaments.ts`; testes em `apps/server/test/partner-tournaments.test.ts`.
 
 ### Replay embutido (iframe)
 
@@ -900,8 +919,9 @@ CARD_SOURCES=cardkaizoku,optcgapi        # cartas lançadas (padrão: optcgapi)
 SPOILER_SOURCES=cardkaizoku,optcgleaks   # spoilers (padrão: optcgleaks)
 ```
 
-Fontes disponíveis: `optcgapi` (oficiais), `optcgleaks` (spoilers) e `cardkaizoku` (as duas). O `sweetapp` entra na
-frente quando o adaptador existir. Os adaptadores ficam em `apps/server/src/card-sources/`.
+Fontes disponíveis: `optcgapi` (oficiais), `optcgleaks` (spoilers), `cardkaizoku` (as duas) e `sweetapp` (as duas; só
+com `SWEETAPP_CARDS_URL`, veja [Integração SweetApp](docs/integracao-sweetapp.md)). Os adaptadores ficam em
+`apps/server/src/card-sources/`.
 
 - **Por carta:** vale a primeira fonte da cadeia que tem a carta (gravada em `cards.source`, ex.: `api:cardkaizoku.com`).
   Campo **vazio** (atributo `""`, Vida do Líder, tipo cortado) é completado pela fonte seguinte; valor **diferente** não é
@@ -996,6 +1016,11 @@ imagens, e o parceiro SweetApp pode usar a mesma CDN. Código em `apps/server/sr
   (`immutable`).
 - **Índice para parceiros:** `<CARD_CDN_URL>/index.json` (`schemaVersion: 1`): número da carta → nome, coleção, `spoiler`,
   imagem principal e artes, só das cartas que já estão na CDN. Atualizado a cada rodada que copia ou reaproveita imagens.
+- **Dados das cartas para parceiros:** `<CARD_CDN_URL>/cards/v1/manifest.json` (coleções, número de cartas, hash e o
+  endereço de cada arquivo) e `cards/v1/sets/<coleção>.json` (as cartas da coleção, já unificadas pela cadeia de
+  fontes, com erratas, tradução PT, imagens e a origem de cada uma). É o lugar único de onde o SweetApp lê as cartas,
+  sem depender de API externa nem do servidor do jogo. Publicado no fim de toda rodada da CDN (importação, spoilers,
+  `--images`); só os arquivos que mudaram são reenviados. Contrato em [`docs/integracao-sweetapp.md`](docs/integracao-sweetapp.md).
 - **Quando copia:** no fim de toda importação (`cards:import`), em cada rodada da sincronização dos spoilers (até 500
   imagens novas por rodada) e à mão com `npm run cards:import -- --images` (use para a primeira carga, ~5 mil imagens).
   Reimportar uma carta não baixa a imagem de novo (tabela `card_images`: endereço de origem → objeto no bucket).
@@ -1128,6 +1153,7 @@ pode chamar sem login nem token:
 | GET | `/api/stats/global?queue=` · `/api/stats/global/trend?queue=&weeks=` · `/api/stats/global/compare?queue=&format=` | Meta global (TCG Matchmaking): Líderes e matchups de uma fila, tendência e a comparação com as partidas daqui (404 sem a chave) |
 | GET | `/api/online/stats` · `/api/online/live` · `/api/online/rooms/:id` | Contadores do menu, partidas para assistir e o resumo de uma sala |
 | GET | `/api/tournaments` · `/api/tournaments/:id` | Torneios e o detalhe de um torneio (o que quem pede pode fazer vem na resposta) |
+| GET | `/api/partners/tournaments?status=&format=&limit=` · `/api/partners/tournaments/:id` | Torneios para apps parceiros (formato estável, CORS, ETag; veja [Torneios para parceiros](#torneios-para-parceiros-sem-token)) |
 | GET | `/api/sponsors` · `/api/support` · `/api/support/supporters` | Lojas parceiras, apoio ao projeto e lista pública de apoiadores |
 
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,

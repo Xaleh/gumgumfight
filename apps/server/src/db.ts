@@ -85,6 +85,14 @@ function migrate(db: DB) {
       PRIMARY KEY (region, series)
     );
 
+    -- Arquivos de dados publicados na CDN (card-cdn/data.ts): chave no bucket -> hash do conteúdo,
+    -- para só reenviar o que mudou.
+    CREATE TABLE IF NOT EXISTS cdn_published (
+      object_key   TEXT PRIMARY KEY,
+      hash         TEXT NOT NULL,
+      published_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS decks (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,

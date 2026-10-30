@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { type CardData, proxiedImageUrl, registerCardCdn } from '@gumgum/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
-import { cdnFromEnv, dirStore, mirrorCardImages, publishImageIndex, syncCardCdn } from '../src/card-cdn';
+import { cdnFromEnv, dirStore, mirrorCardImages, publishCardData, publishImageIndex, syncCardCdn } from '../src/card-cdn';
+import { upsertTranslations } from '../src/db';
 import { r2Client, r2Endpoint, signRequest } from '../src/card-cdn/r2';
 import { getCards, openDb, upsertCards } from '../src/db';
 
@@ -204,5 +205,86 @@ describe('R2 (API S3)', () => {
     ]);
     expect(calls[1].headers).toMatchObject({ 'content-type': 'image/jpeg', 'cache-control': 'public, max-age=60' });
     expect(calls[1].headers.authorization).toMatch(/\/auto\/s3\/aws4_request, SignedHeaders=cache-control;content-type;host;x-amz-content-sha256;x-amz-date,/);
+  });
+});
+
+describe('CDN dos dados das cartas (parceiros)', () => {
+  it('publica um arquivo por coleção e o manifesto; só reenvia o que mudou', async () => {
+    const { db, dir, store } = setup();
+    const puts: string[] = [];
+    const counting = { ...store, put: async (key: string, body: Buffer, type: string, cache: string) => (puts.push(key), store.put(key, body, type, cache)) };
+    upsertCards(
+      db,
+      [
+        card('OP01-016', { text: '[On Play] Draw 1 card.', attributes: ['Special'], types: ['Straw Hat Crew'], rarity: 'C', arts: [{ id: 'OP01-016_p1', imageUrl: `${CDN}/OP01/en/OP01-016_p1.png?v=1`, label: 'Parallel' }] }),
+        card('OP01-001', { name: 'Zoro', category: 'leader', cost: undefined, life: 5, power: 5000, text: '' }),
+        card('EB05-010', { imageUrl: 'https://images.optcgleaks.com/eb05/images/eb05-010_v2.webp', spoiler: { source: 'optcgleaks.com', url: 'https://optcgleaks.com/eb05' } }),
+      ],
+      { provisional: false, source: 'api:optcgapi.com' },
+    );
+    db.prepare("UPDATE cards SET provisional = 1, source = 'spoiler:feed:optcgleaks.com' WHERE id = 'EB05-010'").run();
+    upsertTranslations(db, 'pt', [{ id: 'OP01-016', text: '[Ao Jogar] Compre 1 carta.' }]);
+
+    const first = await publishCardData(db, counting, { now: () => new Date('2026-10-30T12:00:00Z') });
+    expect(first).toEqual({ sets: 2, cards: 3, uploaded: 3 });
+    expect(puts).toEqual(['cards/v1/sets/EB05.json', 'cards/v1/sets/OP01.json', 'cards/v1/manifest.json']);
+
+    const manifest = JSON.parse(readFileSync(join(dir, 'cards/v1/manifest.json'), 'utf8'));
+    expect(manifest).toMatchObject({ schemaVersion: 1, generatedAt: '2026-10-30T12:00:00.000Z', images: `${CDN}/index.json`, cards: 3 });
+    expect(manifest.sets.OP01).toMatchObject({ cards: 2, spoiler: false, url: expect.stringMatching(new RegExp(`^${CDN}/cards/v1/sets/OP01\\.json\\?v=[0-9a-f]{12}$`)) });
+    expect(manifest.sets.EB05).toMatchObject({ cards: 1, spoiler: true });
+    expect(manifest.sets.OP01.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+
+    const op01 = JSON.parse(readFileSync(join(dir, 'cards/v1/sets/OP01.json'), 'utf8'));
+    expect(op01).toMatchObject({ schemaVersion: 1, set: 'OP01' });
+    expect(op01.cards.map((c: { id: string }) => c.id)).toEqual(['OP01-001', 'OP01-016']);
+    const nami = op01.cards[1];
+    expect(nami).toMatchObject({
+      id: 'OP01-016',
+      name: 'Nami',
+      category: 'character',
+      colors: ['blue'],
+      cost: 1,
+      power: 1000,
+      attributes: ['Special'],
+      types: ['Straw Hat Crew'],
+      text: '[On Play] Draw 1 card.',
+      set: 'OP01',
+      rarity: 'C',
+      image: 'https://optcgapi.com/media/static/Card_Images/OP01-016.jpg',
+      arts: [{ id: 'OP01-016_p1', image: `${CDN}/OP01/en/OP01-016_p1.png?v=1`, label: 'Parallel' }],
+      i18n: { pt: { text: '[Ao Jogar] Compre 1 carta.', source: 'manual' } },
+      status: 'official',
+      source: 'api:optcgapi.com',
+    });
+    expect(nami).not.toHaveProperty('imageUrl');
+    expect(nami).not.toHaveProperty('counter');
+    expect(op01.cards[0]).toMatchObject({ category: 'leader', life: 5, i18n: { pt: { source: 'auto' } } });
+    const eb05 = JSON.parse(readFileSync(join(dir, 'cards/v1/sets/EB05.json'), 'utf8'));
+    expect(eb05.cards[0]).toMatchObject({ status: 'spoiler', source: 'spoiler:feed:optcgleaks.com', spoiler: { source: 'optcgleaks.com', url: 'https://optcgleaks.com/eb05' } });
+
+    // Nada mudou: nada é reenviado (nem o manifesto, apesar de generatedAt).
+    puts.length = 0;
+    expect(await publishCardData(db, counting, { now: () => new Date('2026-10-30T13:00:00Z') })).toEqual({ sets: 2, cards: 3, uploaded: 0 });
+    expect(puts).toEqual([]);
+
+    // Uma carta mudou: só a coleção dela e o manifesto (o hash e o ?v= acompanham).
+    upsertCards(db, [card('OP01-016', { text: '[On Play] Draw 2 cards.' })], { provisional: false, source: 'api:optcgapi.com' });
+    expect(await publishCardData(db, counting)).toMatchObject({ uploaded: 2 });
+    expect(puts).toEqual(['cards/v1/sets/OP01.json', 'cards/v1/manifest.json']);
+    const after = JSON.parse(readFileSync(join(dir, 'cards/v1/manifest.json'), 'utf8'));
+    expect(after.sets.OP01.hash).not.toBe(manifest.sets.OP01.hash);
+    expect(after.sets.EB05.hash).toBe(manifest.sets.EB05.hash);
+  });
+
+  it('a rodada da CDN publica os dados junto das imagens', async () => {
+    const { db, dir, store } = setup();
+    upsertCards(db, [card('OP01-016')], { provisional: false, source: 'api:test' });
+    const log: string[] = [];
+    await syncCardCdn(db, store, { fetchImpl: images().fetchImpl, log: (m) => log.push(m), officialRegions: [] });
+    expect(log.some((l) => l.startsWith('CDN dos dados: 2 arquivo(s)'))).toBe(true);
+    const op01 = JSON.parse(readFileSync(join(dir, 'cards/v1/sets/OP01.json'), 'utf8'));
+    // A carta já sai apontando para a imagem na CDN.
+    expect(op01.cards[0].image).toMatch(/^https:\/\/cards\.ggf\.test\/OP01\/en\/OP01-016\.png\?v=/);
   });
 });

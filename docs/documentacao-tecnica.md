@@ -139,15 +139,16 @@ gumgumfight/
 │   ├── src/config.ts, env.ts, paths.ts   variáveis de ambiente e caminhos
 │   ├── src/optcgapi.ts          mapeamento da optcgapi → CardData
 │   ├── src/card-import.ts, import-cards.ts   CLI de importação
-│   ├── src/card-sources/                     cadeia de fontes (optcgapi, optcgleaks, cardkaizoku) e resolução por carta
-│   ├── src/card-cdn/                         CDN própria das imagens (Cloudflare R2, SigV4 sem SDK), index.json e
-│   │                                         imagens oficiais da Bandai (official.ts: listas EN, Ásia e JP)
+│   ├── src/card-sources/                     cadeia de fontes (optcgapi, optcgleaks, cardkaizoku, sweetapp) e resolução por carta
+│   ├── src/card-cdn/                         CDN própria das imagens (Cloudflare R2, SigV4 sem SDK), index.json,
+│   │                                         imagens oficiais da Bandai (official.ts: listas EN, Ásia e JP) e os
+│   │                                         dados das cartas para parceiros (data.ts: cards/v1/)
 │   ├── src/spoiler-feed.ts, spoiler-sync.ts  optcgleaks + troca por cartas oficiais
 │   ├── src/official-cards.ts, check-official.ts, check-translations.ts  scripts de conferência
 │   ├── src/seed.ts, seed-cli.ts  decks prontos, cartas provisórias, traduções
 │   ├── src/present.ts           ApiCard: i18n e remoção de imagens
 │   ├── src/auth/                google.ts (JWKS/RS256), store.ts (users, sessions, roles), routes.ts
-│   ├── src/partners/            API para parceiros: store.ts (api_tokens, oauth_clients, oauth_codes), tokens.ts (middleware Bearer, /api/tokens), oauth.ts, webhook.ts, matches.ts
+│   ├── src/partners/            API para parceiros: store.ts (api_tokens, oauth_clients, oauth_codes), tokens.ts (middleware Bearer, /api/tokens), oauth.ts, webhook.ts, matches.ts, tournaments.ts (feed público de torneios)
 │   ├── src/oauth-client-cli.ts  cadastro dos clientes OAuth (npm run oauth:client)
 │   ├── src/decisions/           extrator de decisões dos replays (extract.ts), ajuste de pesos por imitação (tune.ts);
 │   │                            CLIs decisions-cli.ts e decisions-tune-cli.ts (npm run decisions, decisions:tune)
@@ -657,7 +658,10 @@ Fluxo do `npm run cards:import -- [coleções | --all | --file x.json] [--dry-ru
 0. Monta a cadeia de `CARD_SOURCES` (padrão `optcgapi`; com `--file`, só a optcgapi) e busca cada fonte em sequência.
    Uma fonte que falha é pulada (com aviso); sem nenhuma, a importação aborta. Os passos 1 a 4 são os da optcgapi
    (`card-sources/optcgapi.ts` + `optcgapi.ts`); o Cardkaizoku (`card-sources/cardkaizoku.ts`) lê
-   `https://cdn.cardkaizoku.com/manifest.json` → `cardData.current` (um JSON com todas as cartas).
+   `https://cdn.cardkaizoku.com/manifest.json` → `cardData.current` (um JSON com todas as cartas); o SweetApp
+   (`card-sources/sweetapp.ts`, só com `SWEETAPP_CARDS_URL`) lê a API do parceiro (lista pura ou embrulhada, paginação
+   por `next`, campos em inglês ou português, chave em `SWEETAPP_API_KEY_HEADER`) e, como o Cardkaizoku, é tratado
+   como fonte que mistura lançadas e anunciadas (`mixesSpoilers`). Contrato e decisões: `docs/integracao-sweetapp.md`.
 1. Uma requisição por endpoint, **em sequência**, `fetch` nativo com `user-agent: gumgumfight-importer`. Sem retry nem
    atraso.
 2. Monta o vocabulário de tipos (`data/card-types.json` + tipos citados nos textos).
@@ -679,6 +683,15 @@ Fluxo do `npm run cards:import -- [coleções | --all | --file x.json] [--dry-ru
 
 Em produção a importação roda na VPS: manualmente (`node release/server/import-cards.mjs` com o `DB_PATH`
 compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama o importador depois do deploy).
+
+### Dados das cartas na CDN (parceiros)
+
+`card-cdn/data.ts` (`publishCardData`) roda no fim de toda rodada da CDN (`syncCardCdn`: importação, sincronização
+dos spoilers e `--images`) e grava no bucket `cards/v1/manifest.json` e `cards/v1/sets/<coleção>.json`
+(`PartnerCard[]`: `CardData` com nomes estáveis, `image`/`arts[].image`, `i18n.pt` já calculada como no `present.ts`,
+`status` official/spoiler/provisional, `source` e `updatedAt`), com `fixCard` aplicado. A tabela `cdn_published`
+(`object_key`, `hash`) evita reenviar arquivo igual: o hash de cada coleção vai no manifesto (`?v=`), e o
+`generatedAt` fica fora do hash. É o lugar único de onde o SweetApp lê as cartas (`docs/integracao-sweetapp.md`).
 
 ### Cartas não oficiais
 
@@ -866,6 +879,12 @@ aqui, o desenho:
   não bloqueia o caminho, `ReplayEmbed.tsx` monta a partida (`setupFromReplay` com as cartas recebidas) e a
   `GameScreen` recebe `embed` (`bare` esconde menu, sair e baixar; `layout` liga a visão do Streamer em pé ou lateral;
   `useEmbedBridge` faz o postMessage `seek/play/pause` ↔ `ready/pos/ended`, conferindo `e.source === parent` e a origem).
+- **Torneios para parceiros** (`tournaments.ts`): `GET /api/partners/tournaments` (filtros `status`, `format`,
+  `limit`) e `GET /api/partners/tournaments/:id`, públicos e sem token, `Access-Control-Allow-Origin: *`,
+  `ResponseCache` próprio (30 s lista, 10 s detalhe, invalidado por `dataVersion`) com ETag e
+  `Cache-Control: public`. Resumo estável (`schemaVersion: 1`) com `url` = `<site>/?torneio=<id>` e o campeão nos
+  encerrados; o detalhe soma `standings` (via `pairing.standings`, com o Líder só depois do início) e `rounds`.
+  Nunca listas de deck nem ids de conta. Testes: `test/partner-tournaments.test.ts`.
 - **Nginx**: `PARTNER_IPS` no `deploy.env` tira os IPs dos parceiros do limite por IP (`geo`/`map` nos scripts de
   deploy); o limite real passa a ser o por token.
 - Testes: `apps/server/test/partners.test.ts` (tokens, allowlist, conflito, log, rate limit, partidas, OAuth completo,
@@ -1623,6 +1642,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/players/me` | Perfil de jogador (nome, recompensa, tier, `apprentice`) | Navegador; Token (`profile`) |
 | PUT | `/api/players/me` | Troca o nome público (`{ name }`) | Navegador |
 | GET | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador, mais novas primeiro, paginadas | Sessão; Token (`matches:read`) |
+| GET | `/api/partners/tournaments?status=&format=&limit=` · `/api/partners/tournaments/:id` | Torneios para apps parceiros: resumo estável com link para o site e, no detalhe, classificação e rodadas (CORS, ETag) | Pública |
 | GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
 | POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |

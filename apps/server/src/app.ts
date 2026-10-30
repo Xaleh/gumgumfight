@@ -41,6 +41,7 @@ import {
 } from './db';
 import { WEB_DIST } from './paths';
 import { registerPartnerMatchRoutes } from './partners/matches';
+import { registerPartnerTournamentRoutes } from './partners/tournaments';
 import { registerOAuthRoutes } from './partners/oauth';
 import { registerReplayLinkRoutes, replayLinkSecret } from './partners/replay-link';
 import { isoToSqlite, sqliteToIso } from './partners/store';
@@ -412,6 +413,7 @@ export function buildApp(
     fetchImpl: opts.fetchImpl,
   });
   registerPartnerMatchRoutes(app, { db, user: auth.viewer });
+  registerPartnerTournamentRoutes(app, { db, cardImages: server.cardImages, now: opts.now });
   registerTokenRoutes(app, { db, user: auth.viewer });
   const sendIndex = existsSync(WEB_DIST) ? (reply: FastifyReply) => reply.sendFile('index.html') : undefined;
   registerOAuthRoutes(app, { db, user: auth.viewer, now: opts.now, sendIndex });

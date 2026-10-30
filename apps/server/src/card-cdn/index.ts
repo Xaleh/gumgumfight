@@ -5,6 +5,7 @@
 //
 //   <CARD_CDN_URL>/<coleção>/<idioma>/<arte>.<ext>?v=<hash>     ex.: /OP01/en/OP01-016_p1.png?v=3f2a…
 //   <CARD_CDN_URL>/index.json                                    todas as cartas -> imagens (para parceiros)
+//   <CARD_CDN_URL>/cards/v1/manifest.json, cards/v1/sets/<coleção>.json   dados das cartas (data.ts)
 //
 // O objeto de uma arte fica sempre na mesma chave; o `?v=` (hash do conteúdo) muda quando a
 // imagem muda, então o cache pode ser eterno. Imagens do Cardkaizoku nunca entram (termos de uso).
@@ -19,7 +20,10 @@ import { CARD_IMAGE_ORIGINS, type CardArt, type CardData } from '@gumgum/engine'
 import { type DB, transaction } from '../db';
 import { artId } from '../optcgapi';
 import { type BandaiRegion, fillOfficialImages, type FetchText, imageLang, imageRegionsFromEnv } from './official';
+import { publishCardData } from './data';
 import { networkCause, type R2Config, R2Error, r2Client } from './r2';
+
+export { CARD_DATA_PREFIX, CARD_DATA_SCHEMA, type CardDataManifest, type PartnerCard, publishCardData, toPartnerCard } from './data';
 
 /** Onde as imagens ficam guardadas. */
 export interface ImageStore {
@@ -257,5 +261,14 @@ export async function syncCardCdn(
     );
   }
   if (r.uploaded || r.reused) opts.log(`CDN das imagens: índice com ${await publishImageIndex(db, store)} cartas.`);
+  // Os dados das cartas (um arquivo por coleção + manifesto) acompanham toda rodada: só o que mudou é reenviado.
+  if (!r.unavailable) {
+    try {
+      const d = await publishCardData(db, store);
+      if (d.uploaded) opts.log(`CDN dos dados: ${d.uploaded} arquivo(s) reenviado(s), ${d.sets} coleções e ${d.cards} cartas no manifesto.`);
+    } catch (err) {
+      opts.log(`CDN dos dados: falha ao publicar (${err instanceof Error ? err.message : err})`);
+    }
+  }
   return r;
 }
