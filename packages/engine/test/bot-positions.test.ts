@@ -37,6 +37,17 @@ const extraCards: CardData[] = [
     text: '[When Attacking] You may trash 1 card from your hand: Reveal 1 card from the top of your deck. If the revealed card\'s type includes "Rocks Pirates", draw 2 cards.',
   },
   { id: 'OP17-040', name: 'Edward.Newgate', category: 'character', colors: ['blue'], cost: 6, power: 8000, counter: 0, types: ['Rocks Pirates'], text: '[On Play] Draw 1 card.' },
+  {
+    id: 'OP08-051',
+    name: 'Buckin',
+    category: 'character',
+    colors: ['blue'],
+    cost: 1,
+    power: 2000,
+    counter: 1000,
+    types: ['Former Rocks Pirates'],
+    text: '[Your Turn] [On Play] Up to 1 of your [Edward Weevil] cards gains +2000 power during this turn.',
+  },
 ];
 const cards = [...baseCards, ...extraCards];
 
@@ -243,6 +254,37 @@ describe('bot com busca: fase principal', () => {
     expect(b.actions.some((x) => x.type === 'attack' && x.attacker === refuse.players[0].leader.uid)).toBe(true);
     expect(b.actions.some((x) => x.type === 'answer' && x.yes), 'não deveria pagar o custo do Xebec').toBe(false);
     expect(b.state.players[0].hand.length).toBe(3);
+  });
+
+  it('num deck que descarta da mão, guarda a carta de custo 1 como combustível em vez de baixá-la', () => {
+    // Xebec: Buckin (custo 1, 2000, Counter +1000, efeito sem alvo no deck) só serve de Counter ou de descarte para o
+    // Líder. Turno 1, 1 DON!!: baixá-la como corpo de 2000 gasta a carta que pagaria o Xebec; o bot a segura.
+    const xebec: typeof kid = { id: 'xebec', name: 'Xebec', leader: 'OP17-039', cards: [{ id: 'OP17-040', count: 50 }] };
+    const game = (turn: number) => {
+      let s = createGame({ seed: 1, firstPlayer: 0, cards, players: [{ name: 'Xebec', deck: xebec }, { name: 'Luffy', deck: luffy }] });
+      s = applyAction(s, { type: 'mulligan', player: 0, redraw: false });
+      s = applyAction(s, { type: 'mulligan', player: 1, redraw: false });
+      s = toTurn(s, turn);
+      clearHand(s, 0);
+      return s;
+    };
+    const first = game(1);
+    const buckin = inject(first, 0, 'OP08-051', 'hand');
+    inject(first, 0, 'OP17-040', 'hand');
+    const a = botTurn(first, 0);
+    expect(a.state.players[0].hand).toContain(buckin);
+
+    // Turno 5, Buckin e dois Newgate (custo 6) na mão: ao pagar o Xebec, o descarte é a Buckin, não um Newgate
+    // (que vale um turno inteiro de jogada); a Buckin em campo continuaria não valendo a carta.
+    const later = game(5);
+    later.players[0].donActive = 5;
+    const buckin2 = inject(later, 0, 'OP08-051', 'hand');
+    inject(later, 0, 'OP17-040', 'hand');
+    inject(later, 0, 'OP17-040', 'hand');
+    const b = botTurn(later, 0);
+    expect(b.actions.some((x) => x.type === 'answer' && x.yes), 'deveria pagar o custo do Xebec').toBe(true);
+    expect(b.state.players[0].trash).toContain(buckin2);
+    expect(b.state.players[0].characters.map((c) => c.uid)).not.toContain(buckin2);
   });
 
   it('acha o ataque fatal com vários atacantes pequenos', () => {

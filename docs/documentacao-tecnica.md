@@ -286,7 +286,9 @@ e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
 - O próprio deck é sorteado antes de simular (`determinize`, a partir de `unseen`): efeitos que leem o topo
   ("reveal 1 card from the top of your deck") valem o que o deck promete. As perguntas pagas e as escolhas de
   opção decididas de verdade saem da média de vários sorteios (`decideSampled`). Uma carta na mão cujo efeito de
-  entrada remove algo do oponente vale o efeito guardado (`handEffect`), para o bot não a baixar sem alvo.
+  entrada remove algo do oponente vale o efeito guardado (`handEffect`), para o bot não a baixar sem alvo; com
+  cartas em campo que se pagam descartando da mão, cada carta da mão vale o combustível (`handFuel`), e o custo de
+  um Personagem conta no valor dele na mão (`handCost`): descarta-se a de custo 1, não a de custo 6.
 
 Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
 [`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`; contra um
