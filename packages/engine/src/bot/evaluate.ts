@@ -54,13 +54,12 @@ export interface Weights {
   handEffect: number;
   handEffectSoft: number;
   /**
-   * Combustível: com cartas em campo (Líder, Personagens, Stage) cujas habilidades se pagam descartando da mão
-   * ("[When Attacking] You may trash 1 card from your hand: …"), cada carta da própria mão vale isso a mais por
-   * saída de descarte (até `handFuelOutlets` saídas). Um corpo inútil não compensa gastar a carta que pagaria o
-   * efeito; comprar cartas vale mais; usar o combustível como Counter custa mais.
+   * Combustível: com uma carta em campo (Líder, Personagem, Stage) cuja habilidade se paga descartando da mão
+   * ("[When Attacking] You may trash 1 card from your hand: …"), nenhuma carta da própria mão vale menos que isto,
+   * porque a saída de descarte a converte no efeito. Só muda o valor das cartas baratas: um corpo de custo 1 não
+   * compensa gastar a carta que pagaria o efeito, e é ela (não a carta cara) que vai para o descarte.
    */
   handFuel: number;
-  handFuelOutlets: number;
   /** Personagem em campo: por ponto de custo, fixo por corpo e por 1000 de poder base. */
   charCost: number;
   charBase: number;
@@ -124,15 +123,14 @@ export const DEFAULT_WEIGHTS: Weights = {
   lifeOppExtra: 3150,
   handCard: 2900,
   handCardOpp: 1600,
-  handCardBase: 1300,
-  handCost: 300,
+  handCardBase: 1200,
+  handCost: 450,
   handCounter: 1100,
   handCounterEvent: 550,
   handSoftCap: 7,
   handEffect: 3000,
   handEffectSoft: 1200,
-  handFuel: 1000,
-  handFuelOutlets: 2,
+  handFuel: 3400,
   charCost: 810,
   charBase: 1220,
   charPower: 590,
@@ -215,35 +213,34 @@ function trashesHand(ab: Ability): boolean {
 }
 
 /**
- * Saídas de descarte em campo: habilidades do Líder, dos Personagens e do Stage que se pagam com cartas da mão e
- * podem ser usadas de novo ([On Play] e [Trigger] são uma vez só e ficam de fora).
+ * Há saída de descarte em campo: uma habilidade do Líder, de um Personagem ou do Stage que se paga com cartas da
+ * mão e pode ser usada de novo ([On Play] e [Trigger] são uma vez só e ficam de fora)?
  */
-export function discardOutlets(state: GameState, ps: PlayerState): number {
-  let n = 0;
+export function hasDiscardOutlet(state: GameState, ps: PlayerState): boolean {
   for (const uid of [ps.leader.uid, ...ps.characters.map((c) => c.uid), ...(ps.stage ? [ps.stage.uid] : [])]) {
-    for (const ab of cardDef(state, uid).abilities) if (ab.timing !== 'onPlay' && ab.timing !== 'trigger' && trashesHand(ab)) n++;
+    for (const ab of cardDef(state, uid).abilities) if (ab.timing !== 'onPlay' && ab.timing !== 'trigger' && trashesHand(ab)) return true;
   }
-  return n;
+  return false;
 }
 
 /**
  * Valor da mão. A do oponente conta pelo tamanho; a própria, carta a carta: um Counter impresso defende, um
  * Evento [Counter] só vale se sobrar DON!! ativo para pagá-lo no turno do oponente (guardar DON!! é tempo), e
  * uma carta cujo efeito de entrada remove algo do oponente vale o efeito guardado (`handEffect`): jogá-la
- * como corpo sem alvo, ou descartá-la como custo, joga esse valor fora. `fuel`: o que cada carta vale a mais
- * como combustível das saídas de descarte em campo (`handFuel`; só na própria mão).
+ * como corpo sem alvo, ou descartá-la como custo, joga esse valor fora. `floor`: o mínimo que qualquer carta vale
+ * com uma saída de descarte em campo (`handFuel`; só na própria mão).
  */
-function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, fuel = 0): number {
+function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, floor = 0): number {
   let total = 0;
   const values = ps.hand.map((uid) => {
     const def = cardDef(state, uid);
-    if (def.id === HIDDEN_CARD) return hidden + fuel;
-    let v = w.handCardBase + (def.category === 'event' ? 0 : (def.cost ?? 0) * w.handCost) + (counterValue(state, uid) / 1000) * w.handCounter + fuel;
+    if (def.id === HIDDEN_CARD) return Math.max(hidden, floor);
+    let v = w.handCardBase + (def.category === 'event' ? 0 : (def.cost ?? 0) * w.handCost) + (counterValue(state, uid) / 1000) * w.handCounter;
     if (def.category === 'event' && def.abilities.some((a) => a.timing === 'counter') && playCost(state, uid) <= ps.donActive) v += w.handCounterEvent;
     const removal = entryRemoval(def);
     if (removal === 'hard') v += w.handEffect;
     else if (removal === 'soft') v += w.handEffectSoft;
-    return v;
+    return Math.max(v, floor);
   });
   values.sort((a, b) => b - a);
   values.forEach((v, i) => (total += i < w.handSoftCap ? v : v * 0.5));
@@ -269,7 +266,7 @@ function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number
       if (!c.rested && c.don && (c.playedOnTurn !== state.turn || hasKeyword(state, c.uid, 'rush'))) v += c.don * w.donReady;
     }
   }
-  v += handValue(state, w, ps, hidden, opp ? 0 : w.handFuel * Math.min(w.handFuelOutlets, discardOutlets(state, ps)));
+  v += handValue(state, w, ps, hidden, !opp && hasDiscardOutlet(state, ps) ? w.handFuel : 0);
   for (const c of ps.characters) {
     const cv = fieldCardValue(state, w, c.uid);
     v += cv;

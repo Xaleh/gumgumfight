@@ -207,15 +207,17 @@ rodada de pesos.
 Duas outras coisas que uma carta na mão vale, vistas num deck de Rocks.D.Xebec que baixava a Buckin (custo 1,
 2000, Counter +1000, efeito sem alvo no deck) no turno 1 "só para ter um Personagem em campo":
 
-- **Combustível.** Com cartas em campo cujas habilidades se pagam descartando da mão (o Líder Xebec, Newgate,
-  Shiki, Barbell, o Stage Fullalead: "You may trash 1 card from your hand: …"), cada carta da mão vale
-  `handFuel` (1 000) a mais por saída de descarte, até duas (`discardOutlets` conta as habilidades do Líder, dos
-  Personagens e do Stage que descartam da mão e podem ser usadas de novo). Um corpo de 2000 não compensa gastar a
-  carta que pagaria o Xebec; comprar cartas vale mais; usar o combustível como Counter custa mais.
+- **Combustível.** Com uma carta em campo cuja habilidade se paga descartando da mão (o Líder Xebec, Newgate,
+  Shiki, Barbell, o Stage Fullalead: "You may trash 1 card from your hand: …"; `hasDiscardOutlet` olha o Líder, os
+  Personagens e o Stage, fora [On Play] e [Trigger]), nenhuma carta da mão vale menos que `handFuel` (3 400): a
+  saída a converte no efeito. É um piso, não um bônus: só as cartas baratas mudam de valor. A primeira versão
+  (+1 000 por carta da mão, em toda a mão) deixava o bot passivo nos decks prontos com saída de descarte, e perdia
+  44,5% contra a avaliação sem o termo (200 partidas); como piso, a Buckin passa a valer mais que o corpo dela em
+  campo, e o resto da mão fica como estava.
 - **Custo.** Uma carta de custo 6 na mão (Newgate) é a jogada de um turno inteiro e não se repõe; uma de custo 1
   vale pouco mais que o Counter impresso. Sem isso o bot descartava o Newgate (sem Counter) e guardava a Buckin
-  (com Counter) ao pagar o Xebec. `handCost` (300 por ponto de custo, Personagens e Stages) entrou no valor da
-  carta, e `handCardBase` caiu de 1 500 para 1 300 para a carta média valer quase o mesmo. É também a direção que
+  (com Counter) ao pagar o Xebec. `handCost` (450 por ponto de custo, Personagens e Stages) entrou no valor da
+  carta, e `handCardBase` caiu de 1 500 para 1 200 para a carta média valer quase o mesmo. É também a direção que
   os replays apontavam (seção 11): com Vida alta as pessoas gastam os Personagens baratos como Counter, e o bot
   valia toda carta da mão só pelo Counter impresso.
 
@@ -224,7 +226,7 @@ Duas outras coisas que uma carta na mão vale, vistas num deck de Rocks.D.Xebec 
 | Carta na mão vale | `evaluate.ts`: `handCardBase`, `handCost`, `handCounter`, `handSoftCap` | `avaliação: carta na mão` |
 | Não jogar [On Play] sem alvo quando há alternativa | busca compara as linhas | `prefere a carta com efeito útil` |
 | Remoção guardada na mão | `evaluate.ts`: `entryRemoval`, `handEffect`, `handEffectSoft` | `usa o efeito da carta de remoção quando há alvo, e a segura quando não há`, `avaliação: carta na mão com efeito de remoção` |
-| Combustível das saídas de descarte | `evaluate.ts`: `discardOutlets`, `handFuel`, `handFuelOutlets` | `num deck que descarta da mão, guarda a carta de custo 1 como combustível em vez de baixá-la` |
+| Combustível das saídas de descarte | `evaluate.ts`: `hasDiscardOutlet`, `handFuel` | `num deck que descarta da mão, guarda a carta de custo 1 como combustível em vez de baixá-la` |
 
 ## 7a. O próprio deck: ordem desconhecida, composição conhecida
 
@@ -331,7 +333,8 @@ as perguntas pagas decididas pela média dos sorteios, e a mão passou a valer o
 | Etapa | Auto-jogo (300 partidas) | Humano fraco (100 partidas) |
 |---|---|---|
 | Remoção guardada + sorteio do deck | 152 x 148 (50,7%) | 83% (anterior: 79%) |
-| + combustível e custo na mão | (em medição) | (em medição) |
+| + combustível (+1 000 por carta) e custo (300): descartado | 138 x 162 (46,0%) | 81% |
+| + combustível como piso (3 400) e custo (450) | (em medição) | (em medição) |
 
 Tudo dentro do ruído, como nas rodadas anteriores: as situações são raras nos decks prontos, e o que muda é o que
 a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms
