@@ -334,10 +334,10 @@ as perguntas pagas decididas pela média dos sorteios, e a mão passou a valer o
 |---|---|---|
 | Remoção guardada + sorteio do deck | 152 x 148 (50,7%) | 83% (anterior: 79%) |
 | + combustível (+1 000 por carta) e custo (300): descartado | 138 x 162 (46,0%) | 81% |
-| + combustível como piso (3 400) e custo (450) | (em medição) | (em medição) |
+| + combustível como piso (3 400) e custo (450) | 198 x 202 (49,5%; pesos novos x sem os dois termos, 400 partidas) | 82% |
 
-Tudo dentro do ruído, como nas rodadas anteriores: as situações são raras nos decks prontos, e o que muda é o que
-a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms
+Fora a versão descartada do combustível, tudo dentro do ruído, como nas rodadas anteriores: as situações são raras
+nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms
 para ~65 ms (p95 de ~260 ms para ~295 ms), pelos sorteios nas perguntas pagas e nas escolhas de opção.
 
 ## 10. Humano fraco
