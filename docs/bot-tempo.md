@@ -204,11 +204,27 @@ recusar o custo do efeito ou descartá-la como custo joga o valor fora, e a busc
 valor é fixo por enquanto (o efeito em si não é simulado fora do contexto); ajustá-lo é trabalho da próxima
 rodada de pesos.
 
+Duas outras coisas que uma carta na mão vale, vistas num deck de Rocks.D.Xebec que baixava a Buckin (custo 1,
+2000, Counter +1000, efeito sem alvo no deck) no turno 1 "só para ter um Personagem em campo":
+
+- **Combustível.** Com cartas em campo cujas habilidades se pagam descartando da mão (o Líder Xebec, Newgate,
+  Shiki, Barbell, o Stage Fullalead: "You may trash 1 card from your hand: …"), cada carta da mão vale
+  `handFuel` (1 000) a mais por saída de descarte, até duas (`discardOutlets` conta as habilidades do Líder, dos
+  Personagens e do Stage que descartam da mão e podem ser usadas de novo). Um corpo de 2000 não compensa gastar a
+  carta que pagaria o Xebec; comprar cartas vale mais; usar o combustível como Counter custa mais.
+- **Custo.** Uma carta de custo 6 na mão (Newgate) é a jogada de um turno inteiro e não se repõe; uma de custo 1
+  vale pouco mais que o Counter impresso. Sem isso o bot descartava o Newgate (sem Counter) e guardava a Buckin
+  (com Counter) ao pagar o Xebec. `handCost` (300 por ponto de custo, Personagens e Stages) entrou no valor da
+  carta, e `handCardBase` caiu de 1 500 para 1 300 para a carta média valer quase o mesmo. É também a direção que
+  os replays apontavam (seção 11): com Vida alta as pessoas gastam os Personagens baratos como Counter, e o bot
+  valia toda carta da mão só pelo Counter impresso.
+
 | Conceito | Onde está | Teste |
 |---|---|---|
-| Carta na mão vale | `evaluate.ts`: `handCardBase`, `handCounter`, `handSoftCap` | `avaliação: carta na mão` |
+| Carta na mão vale | `evaluate.ts`: `handCardBase`, `handCost`, `handCounter`, `handSoftCap` | `avaliação: carta na mão` |
 | Não jogar [On Play] sem alvo quando há alternativa | busca compara as linhas | `prefere a carta com efeito útil` |
 | Remoção guardada na mão | `evaluate.ts`: `entryRemoval`, `handEffect`, `handEffectSoft` | `usa o efeito da carta de remoção quando há alvo, e a segura quando não há`, `avaliação: carta na mão com efeito de remoção` |
+| Combustível das saídas de descarte | `evaluate.ts`: `discardOutlets`, `handFuel`, `handFuelOutlets` | `num deck que descarta da mão, guarda a carta de custo 1 como combustível em vez de baixá-la` |
 
 ## 7a. O próprio deck: ordem desconhecida, composição conhecida
 
@@ -304,16 +320,22 @@ cada, `hard` x `hard` anterior e contra o "humano fraco" (seção 10): o auto-jo
 (50–54%, dentro do ruído), e o humano fraco perde para as duas (~83%). As correções ficam pelo raciocínio e
 pelos testes de posição, não por uma medida: o que falta é o relato de quem joga contra o bot.
 
-**Rodada 4 (efeitos desperdiçados).** Dois relatos de partidas contra o `hard`: o bot baixava cartas com
-[On Play] de remoção sem usar o efeito (Vander Decken IX como corpo vanilla) e recusava habilidades do Líder que
-só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2). As causas e as correções estão nas seções 7 e
-7a: o efeito guardado passou a valer na mão (`handEffect`), e o próprio deck passou a ser sorteado pela composição
-conhecida, com as perguntas pagas decididas pela média dos sorteios. Medidas, `hard` novo x `hard` anterior: 300
-partidas de auto-jogo (decks prontos sorteados, assentos trocados), 152 x 148 (50,7%); contra o humano fraco, 100
-partidas cada, 83% o novo e 79% o anterior. Tudo dentro do ruído, como nas rodadas anteriores: as duas situações
-são raras nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os dois
-casos. O custo é tempo: a decisão média subiu de ~45 ms para ~65 ms (p95 de ~260 ms para ~295 ms), pelos sorteios
-nas perguntas pagas e nas escolhas de opção.
+**Rodada 4 (efeitos desperdiçados).** Três relatos de partidas contra o `hard`: o bot baixava cartas com
+[On Play] de remoção sem usar o efeito (Vander Decken IX como corpo vanilla), recusava habilidades do Líder que
+só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2) e, no mesmo deck, baixava a Buckin no turno 1 em
+vez de guardá-la como Counter e combustível do Líder. As causas e as correções estão nas seções 7 e 7a: o efeito
+guardado passou a valer na mão (`handEffect`), o próprio deck passou a ser sorteado pela composição conhecida, com
+as perguntas pagas decididas pela média dos sorteios, e a mão passou a valer o combustível das saídas de descarte
+(`handFuel`) e o custo das cartas (`handCost`). Medidas, `hard` novo x `hard` anterior, nas duas etapas:
+
+| Etapa | Auto-jogo (300 partidas) | Humano fraco (100 partidas) |
+|---|---|---|
+| Remoção guardada + sorteio do deck | 152 x 148 (50,7%) | 83% (anterior: 79%) |
+| + combustível e custo na mão | (em medição) | (em medição) |
+
+Tudo dentro do ruído, como nas rodadas anteriores: as situações são raras nos decks prontos, e o que muda é o que
+a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms
+para ~65 ms (p95 de ~260 ms para ~295 ms), pelos sorteios nas perguntas pagas e nas escolhas de opção.
 
 ## 10. Humano fraco
 

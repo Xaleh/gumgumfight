@@ -21,7 +21,7 @@
 
 import { cardDef, counterValue, getPower, hasKeyword, opponent, playCost } from '../engine';
 import { HIDDEN_CARD } from '../view';
-import type { CardDef, EffectStep, GameState, PlayerId, PlayerState } from '../types';
+import type { Ability, AbilityCost, CardDef, EffectStep, GameState, PlayerId, PlayerState } from '../types';
 
 export interface Weights {
   /** Valor acumulado de ter N cartas de Vida (índice = N; além do fim, soma `lifeExtra` por carta). */
@@ -33,8 +33,13 @@ export interface Weights {
   /** Carta na própria mão que o bot não vê (ex.: a que acabou de sair da Vida) e carta na mão do oponente. */
   handCard: number;
   handCardOpp: number;
-  /** Carta visível na própria mão: valor fixo mais o Counter impresso (por 1000) e o bônus de Evento [Counter] pagável. */
+  /**
+   * Carta visível na própria mão: valor fixo, mais por ponto de custo de Personagem ou Stage (uma carta cara é a
+   * jogada de um turno inteiro e não se repõe; uma de custo 1 vale pouco mais que o Counter impresso: é a que se
+   * descarta e a que se usa de Counter primeiro), mais o Counter impresso (por 1000) e o bônus de Evento [Counter] pagável.
+   */
   handCardBase: number;
+  handCost: number;
   handCounter: number;
   handCounterEvent: number;
   /** Acima deste tamanho, cada carta a mais na mão vale metade (não dá para jogar tudo). */
@@ -48,6 +53,14 @@ export interface Weights {
    */
   handEffect: number;
   handEffectSoft: number;
+  /**
+   * Combustível: com cartas em campo (Líder, Personagens, Stage) cujas habilidades se pagam descartando da mão
+   * ("[When Attacking] You may trash 1 card from your hand: …"), cada carta da própria mão vale isso a mais por
+   * saída de descarte (até `handFuelOutlets` saídas). Um corpo inútil não compensa gastar a carta que pagaria o
+   * efeito; comprar cartas vale mais; usar o combustível como Counter custa mais.
+   */
+  handFuel: number;
+  handFuelOutlets: number;
   /** Personagem em campo: por ponto de custo, fixo por corpo e por 1000 de poder base. */
   charCost: number;
   charBase: number;
@@ -111,12 +124,15 @@ export const DEFAULT_WEIGHTS: Weights = {
   lifeOppExtra: 3150,
   handCard: 2900,
   handCardOpp: 1600,
-  handCardBase: 1500,
+  handCardBase: 1300,
+  handCost: 300,
   handCounter: 1100,
   handCounterEvent: 550,
   handSoftCap: 7,
   handEffect: 3000,
   handEffectSoft: 1200,
+  handFuel: 1000,
+  handFuelOutlets: 2,
   charCost: 810,
   charBase: 1220,
   charPower: 590,
@@ -184,18 +200,45 @@ export function entryRemoval(def: CardDef): 'hard' | 'soft' | null {
   return best;
 }
 
+/** O custo descarta cartas da própria mão ("trash 1 card from your hand", também dentro de "… or …")? */
+function costTrashesHand(cost: AbilityCost | undefined): boolean {
+  return Boolean(cost && ((cost.trashFromHand ?? 0) > 0 || cost.either?.some(costTrashesHand)));
+}
+
+/**
+ * A habilidade se paga descartando da mão: custo fixo (Barbell, "[Activate: Main] You may trash 1 card from your
+ * hand: …"), "pagar X?" no meio do efeito (Xebec, Shiki) ou "you may trash 1 card from your hand to activate this
+ * effect" (Newgate: pergunta e descarte como passos).
+ */
+function trashesHand(ab: Ability): boolean {
+  return costTrashesHand(ab.cost) || ab.steps.some((st) => st.do === 'trashFromHand' || (st.do === 'payCost' && costTrashesHand(st.cost)));
+}
+
+/**
+ * Saídas de descarte em campo: habilidades do Líder, dos Personagens e do Stage que se pagam com cartas da mão e
+ * podem ser usadas de novo ([On Play] e [Trigger] são uma vez só e ficam de fora).
+ */
+export function discardOutlets(state: GameState, ps: PlayerState): number {
+  let n = 0;
+  for (const uid of [ps.leader.uid, ...ps.characters.map((c) => c.uid), ...(ps.stage ? [ps.stage.uid] : [])]) {
+    for (const ab of cardDef(state, uid).abilities) if (ab.timing !== 'onPlay' && ab.timing !== 'trigger' && trashesHand(ab)) n++;
+  }
+  return n;
+}
+
 /**
  * Valor da mão. A do oponente conta pelo tamanho; a própria, carta a carta: um Counter impresso defende, um
  * Evento [Counter] só vale se sobrar DON!! ativo para pagá-lo no turno do oponente (guardar DON!! é tempo), e
  * uma carta cujo efeito de entrada remove algo do oponente vale o efeito guardado (`handEffect`): jogá-la
- * como corpo sem alvo, ou descartá-la como custo, joga esse valor fora.
+ * como corpo sem alvo, ou descartá-la como custo, joga esse valor fora. `fuel`: o que cada carta vale a mais
+ * como combustível das saídas de descarte em campo (`handFuel`; só na própria mão).
  */
-function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number): number {
+function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, fuel = 0): number {
   let total = 0;
   const values = ps.hand.map((uid) => {
     const def = cardDef(state, uid);
-    if (def.id === HIDDEN_CARD) return hidden;
-    let v = w.handCardBase + (counterValue(state, uid) / 1000) * w.handCounter;
+    if (def.id === HIDDEN_CARD) return hidden + fuel;
+    let v = w.handCardBase + (def.category === 'event' ? 0 : (def.cost ?? 0) * w.handCost) + (counterValue(state, uid) / 1000) * w.handCounter + fuel;
     if (def.category === 'event' && def.abilities.some((a) => a.timing === 'counter') && playCost(state, uid) <= ps.donActive) v += w.handCounterEvent;
     const removal = entryRemoval(def);
     if (removal === 'hard') v += w.handEffect;
@@ -226,7 +269,7 @@ function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number
       if (!c.rested && c.don && (c.playedOnTurn !== state.turn || hasKeyword(state, c.uid, 'rush'))) v += c.don * w.donReady;
     }
   }
-  v += handValue(state, w, ps, hidden);
+  v += handValue(state, w, ps, hidden, opp ? 0 : w.handFuel * Math.min(w.handFuelOutlets, discardOutlets(state, ps)));
   for (const c of ps.characters) {
     const cv = fieldCardValue(state, w, c.uid);
     v += cv;
