@@ -36,10 +36,17 @@ function checkView(state: GameState, viewer: PlayerId, aliases: Aliases) {
   expect(view.seed).toBe(0);
   expect(view.rng).toBe(0);
   expect(view.rng128).toBeUndefined();
-  // Definições: só as das cartas visíveis e as reveladas a todos no log.
+  // Definições: só as das cartas visíveis, as reveladas a todos no log e as do próprio deck (a lista é dele).
   const visibleIds = new Set([...vis].map((u) => state.cards[u].cardId));
   for (const e of state.log) for (const id of e.revealed ?? []) visibleIds.add(id);
-  for (const id of Object.keys(view.defs)) if (id !== HIDDEN_CARD) expect(visibleIds.has(id)).toBe(true);
+  const me = state.players[viewer];
+  const unseen: Record<string, number> = {};
+  for (const u of [...me.deck, ...me.life]) if (!vis.has(u)) unseen[state.cards[u].cardId] = (unseen[state.cards[u].cardId] ?? 0) + 1;
+  for (const id of Object.keys(view.defs)) if (id !== HIDDEN_CARD) expect(visibleIds.has(id) || id in unseen, `definição de ${id} vazou`).toBe(true);
+  // A composição do que o jogador não vê do próprio deck e da Vida vai na visão dele; a do oponente, nunca.
+  expect(view.players[viewer].unseen).toEqual(unseen);
+  expect(view.players[viewer === 0 ? 1 : 0].unseen).toBeUndefined();
+  expect(viewFor(state, null, aliases).players.map((p) => p.unseen)).toEqual([undefined, undefined]);
   // Mesmas quantidades em todas as zonas.
   for (const p of [0, 1] as const) {
     for (const z of ['hand', 'deck', 'life', 'trash'] as const) expect(view.players[p][z].length).toBe(state.players[p][z].length);

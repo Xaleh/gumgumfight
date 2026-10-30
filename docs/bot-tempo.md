@@ -193,15 +193,50 @@ Uma carta não jogada não é zero: é a jogada do próximo turno e, se tem Coun
 para quando houver alvo é uma decisão que o bot novo toma pela comparação das linhas (jogar agora vs.
 jogar outra coisa), não por regra.
 
+A comparação das linhas não basta quando a alternativa é "não jogar nada": o corpo em campo vale mais que a
+carta na mão (custo, poder), então o bot baixava um Vander Decken IX ("[On Play] descarte 1 {Fish-Man}: K.O. de
+1 Personagem virado") como um 2000 vanilla, sem alvo, só para gastar o DON!! do turno, e perdia a remoção que
+teria tirado um Personagem caro dois turnos depois. Por isso uma carta na mão cujo **efeito de entrada remove
+algo do oponente** ([On Play] de Personagem ou Stage, [Main] de Evento: K.O., devolver à mão, pôr no fundo do
+deck, descartar) vale o efeito guardado (`handEffect`, 3 000; metade para os efeitos que só preparam a remoção,
+como virar ou −poder). Jogá-la com alvo troca esse valor pela remoção, que a simulação pontua; jogá-la sem alvo,
+recusar o custo do efeito ou descartá-la como custo joga o valor fora, e a busca prefere baixar outra coisa. O
+valor é fixo por enquanto (o efeito em si não é simulado fora do contexto); ajustá-lo é trabalho da próxima
+rodada de pesos.
+
 | Conceito | Onde está | Teste |
 |---|---|---|
 | Carta na mão vale | `evaluate.ts`: `handCardBase`, `handCounter`, `handSoftCap` | `avaliação: carta na mão` |
 | Não jogar [On Play] sem alvo quando há alternativa | busca compara as linhas | `prefere a carta com efeito útil` |
+| Remoção guardada na mão | `evaluate.ts`: `entryRemoval`, `handEffect`, `handEffectSoft` | `usa o efeito da carta de remoção quando há alvo, e a segura quando não há`, `avaliação: carta na mão com efeito de remoção` |
+
+## 7a. O próprio deck: ordem desconhecida, composição conhecida
+
+O bot decide pela visão do jogador, em que o próprio deck é uma fila de cartas escondidas. Simulando com ela,
+um efeito que lê o topo do deck não vale nada: o Líder Rocks.D.Xebec ("[When Attacking] descarte 1 carta:
+revele o topo do deck; se for {Rocks Pirates}, compre 2") custava uma carta e nunca comprava, e o bot recusava
+sempre — abrindo mão da vantagem de cartas que é a razão de jogar o Líder. Um jogador de verdade não sabe a
+ordem, mas sabe a lista: com 35 {Rocks Pirates} em 40 cartas, pagar 1 por 2 é lucro quase certo.
+
+- A visão traz, só para o próprio jogador, a composição do que ele não vê (`PlayerState.unseen`: a lista do deck
+  menos o que está à vista, com as definições dessas cartas). O oponente e os espectadores não recebem nada.
+- Antes de simular, o planejador **sorteia um deck** com essa composição (`determinize`): cada carta escondida
+  do deck recebe uma carta sorteada sem reposição. Todas as linhas da busca em feixe usam o mesmo sorteio.
+- Uma pergunta paga ("pagar o custo?") ou uma escolha de opção decidida de verdade sai da **média de vários
+  sorteios** (`decideSampled`, até 6): o valor esperado do efeito, e não o resultado de um deck só. Se os dois
+  primeiros sorteios dão o mesmo resultado, o deck não pesa na decisão e os outros são pulados. O plano guardado
+  do turno, que veio de um sorteio, não responde essas perguntas: elas são decididas de novo.
+
+| Conceito | Onde está | Teste |
+|---|---|---|
+| Composição do próprio deck na visão | `view.ts`: `unseen` | `view.test.ts` (a do oponente nunca aparece) |
+| Efeito que lê o topo vale o que o deck promete | `planner.ts`: `determinize`, `decideSampled` | `paga o custo do Líder quando o deck faz o efeito valer (Rocks.D.Xebec)` |
 
 ## 8. O que o bot ainda não sabe
 
 - **Mão do oponente**: só o tamanho. Cartas reveladas por efeito não são lembradas de um turno para o outro.
-- **Contagem de cartas no deck** (quantos Counters ainda há) e **[Trigger]s** prováveis: nada.
+- **O próprio deck** entra por sorteio (seção 7a), mas a composição não é usada para mais nada: quantos Counters
+  ainda há e os **[Trigger]s** prováveis não pesam em decisão nenhuma.
 - **Sinergias de deck** além do que o texto das cartas faz quando simulado: nada. Um deck de combo
   precisa de leitura de várias jogadas à frente que a busca de um turno não alcança.
 - **Efeitos manuais (⚙)**: o bot só confirma; a simulação não aplica nada.
@@ -268,6 +303,17 @@ fatal com quatro atacantes pequenos (seção 4), encerrar o turno com o Líder a
 cada, `hard` x `hard` anterior e contra o "humano fraco" (seção 10): o auto-jogo não distingue as versões
 (50–54%, dentro do ruído), e o humano fraco perde para as duas (~83%). As correções ficam pelo raciocínio e
 pelos testes de posição, não por uma medida: o que falta é o relato de quem joga contra o bot.
+
+**Rodada 4 (efeitos desperdiçados).** Dois relatos de partidas contra o `hard`: o bot baixava cartas com
+[On Play] de remoção sem usar o efeito (Vander Decken IX como corpo vanilla) e recusava habilidades do Líder que
+só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2). As causas e as correções estão nas seções 7 e
+7a: o efeito guardado passou a valer na mão (`handEffect`), e o próprio deck passou a ser sorteado pela composição
+conhecida, com as perguntas pagas decididas pela média dos sorteios. Medidas, `hard` novo x `hard` anterior: 300
+partidas de auto-jogo (decks prontos sorteados, assentos trocados), 152 x 148 (50,7%); contra o humano fraco, 100
+partidas cada, 83% o novo e 79% o anterior. Tudo dentro do ruído, como nas rodadas anteriores: as duas situações
+são raras nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os dois
+casos. O custo é tempo: a decisão média subiu de ~45 ms para ~65 ms (p95 de ~260 ms para ~295 ms), pelos sorteios
+nas perguntas pagas e nas escolhas de opção.
 
 ## 10. Humano fraco
 

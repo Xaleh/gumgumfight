@@ -6,11 +6,39 @@ import { actingPlayer, legalActions } from '../src/actions';
 import { DEFAULT_WEIGHTS, evaluate, incomingThreat } from '../src/bot/evaluate';
 import { planAction, plannerOptions, resetPlanner } from '../src/bot/planner';
 import { chooseBotAction as simpleBot } from '../src/bot/simple';
-import { applyAction, cardDef } from '../src/engine';
+import { applyAction, cardDef, createGame } from '../src/engine';
 import type { Action, GameState, PlayerId } from '../src/types';
 import { buildCardDef } from '../src/cards';
 import { actionFromView, identityAliases, viewFor } from '../src/view';
-import { cards, fetchToHand, kid, luffy, started, toTurn } from './helpers';
+import type { CardData } from '../src/types';
+import { cards as baseCards, fetchToHand, kid, luffy, started, toTurn } from './helpers';
+
+// Cartas de fora dos decks prontos, com o texto oficial (optcgapi): os casos relatados em partidas contra o bot.
+const extraCards: CardData[] = [
+  {
+    id: 'OP06-033',
+    name: 'Vander Decken IX',
+    category: 'character',
+    colors: ['green'],
+    cost: 2,
+    power: 2000,
+    counter: 1000,
+    types: ['Fish-Man', 'Flying Pirates'],
+    text: '[On Play] You may trash 1 "Fish-Man" type card from your hand or 1 [The Ark Noah] from your hand or field: K.O. up to 1 of your opponent\'s rested Characters.',
+  },
+  {
+    id: 'OP17-039',
+    name: 'Rocks.D.Xebec',
+    category: 'leader',
+    colors: ['blue'],
+    life: 5,
+    power: 5000,
+    types: ['Rocks Pirates'],
+    text: '[When Attacking] You may trash 1 card from your hand: Reveal 1 card from the top of your deck. If the revealed card\'s type includes "Rocks Pirates", draw 2 cards.',
+  },
+  { id: 'OP17-040', name: 'Edward.Newgate', category: 'character', colors: ['blue'], cost: 6, power: 8000, counter: 0, types: ['Rocks Pirates'], text: '[On Play] Draw 1 card.' },
+];
+const cards = [...baseCards, ...extraCards];
 
 /** Busca determinística e sem teto de tempo (os testes não podem depender da máquina). */
 const OPTS = plannerOptions('hard', { random: () => 0.5, timeBudgetMs: 60_000 });
@@ -153,6 +181,70 @@ describe('bot com busca: fase principal', () => {
     expect(inTrash(state, 1, 'ST01-008')).toBe(true);
   });
 
+  it('usa o efeito da carta de remoção quando há alvo, e a segura quando não há', () => {
+    // Vander Decken IX ([On Play] descarte 1 {Fish-Man}: K.O. de 1 Personagem virado), um Jinbe vanilla ({Fish-Man},
+    // custo 2) e um Bege na mão, 4 DON!!; o Líder já atacou. Com o Kid (custo 7) virado do outro lado, só o Decken o
+    // alcança: o bot o joga pagando o custo (o Jinbe) e o nocauteia.
+    const setup = (kidRested: boolean, fishMan: boolean) => {
+      const s = position([kid, luffy], 7);
+      s.players[0].donActive = 4;
+      s.players[0].leader.rested = true;
+      const decken = inject(s, 0, 'OP06-033', 'hand');
+      if (fishMan) inject(s, 0, 'ST03-006', 'hand');
+      fetchToHand(s, 0, 'ST02-004');
+      inject(s, 1, 'ST02-013', 'field', { rested: kidRested });
+      return { s, decken };
+    };
+    const withTarget = setup(true, true);
+    const a = botTurn(withTarget.s, 0);
+    expect(a.actions.some((x) => x.type === 'answer' && x.yes)).toBe(true);
+    expect(inTrash(a.state, 1, 'ST02-013'), 'o Kid deveria ter sido nocauteado pelo Decken').toBe(true);
+    expect(inTrash(a.state, 0, 'ST03-006'), 'o Jinbe deveria ter sido o descarte').toBe(true);
+
+    // O mesmo Kid ativo: o efeito não tem alvo. Jogar o Decken como corpo de 2000 desperdiça a remoção;
+    // o bot baixa o resto (Jinbe e Bege) e guarda o Decken para quando houver um Personagem virado.
+    const noTarget = setup(false, true);
+    const b = botTurn(noTarget.s, 0);
+    expect(b.state.players[0].hand).toContain(noTarget.decken);
+    expect(b.actions.filter((x) => x.type === 'playCard').length).toBe(2);
+
+    // Sem {Fish-Man} para descartar (o custo não dá para pagar), idem: o Decken fica na mão.
+    const noCost = setup(true, false);
+    const c = botTurn(noCost.s, 0);
+    expect(c.state.players[0].hand).toContain(noCost.decken);
+  });
+
+  it('paga o custo do Líder quando o deck faz o efeito valer (Rocks.D.Xebec)', () => {
+    // Xebec: "[When Attacking] descarte 1 carta: revele o topo do deck; se for {Rocks Pirates}, compre 2". A visão
+    // esconde a ordem do deck, não a composição: com o deck cheio de {Rocks Pirates}, pagar 1 carta por 2 é lucro.
+    const xebec: typeof kid = { id: 'xebec', name: 'Xebec', leader: 'OP17-039', cards: [{ id: 'OP17-040', count: 50 }] };
+    const game = () => {
+      let s = createGame({ seed: 1, firstPlayer: 0, cards, players: [{ name: 'Xebec', deck: xebec }, { name: 'Luffy', deck: luffy }] });
+      s = applyAction(s, { type: 'mulligan', player: 0, redraw: false });
+      s = applyAction(s, { type: 'mulligan', player: 1, redraw: false });
+      s = toTurn(s, 7);
+      clearHand(s, 0);
+      return s;
+    };
+    const pay = game();
+    pay.players[0].donActive = 4;
+    for (let i = 0; i < 3; i++) inject(pay, 0, 'OP17-040', 'hand'); // custo 6: nada para jogar com 4 DON!!
+    const a = botTurn(pay, 0);
+    expect(a.actions.some((x) => x.type === 'attack' && x.attacker === pay.players[0].leader.uid)).toBe(true);
+    expect(a.actions.some((x) => x.type === 'answer' && x.yes), 'deveria pagar o custo do Xebec').toBe(true);
+    expect(a.state.players[0].hand.length).toBe(4); // 3 − 1 descartada + 2 compradas
+
+    // O mesmo deck sem nenhum {Rocks Pirates}: o descarte não rende nada, e o bot recusa.
+    const refuse = game();
+    refuse.players[0].donActive = 4;
+    for (let i = 0; i < 3; i++) inject(refuse, 0, 'OP17-040', 'hand');
+    for (const u of [...refuse.players[0].deck, ...refuse.players[0].life]) refuse.cards[u] = { ...refuse.cards[u], cardId: 'ST01-006' };
+    const b = botTurn(refuse, 0);
+    expect(b.actions.some((x) => x.type === 'attack' && x.attacker === refuse.players[0].leader.uid)).toBe(true);
+    expect(b.actions.some((x) => x.type === 'answer' && x.yes), 'não deveria pagar o custo do Xebec').toBe(false);
+    expect(b.state.players[0].hand.length).toBe(3);
+  });
+
   it('acha o ataque fatal com vários atacantes pequenos', () => {
     // Oponente com 2 de Vida e a mão vazia; o bot tem o Líder, quatro Personagens de 1000 a 6000 e 4 DON!!: três
     // acertos no Líder vencem, mas cada acerto vale menos que o K.O. do Zoro virado (a linha "tudo no Líder" e a
@@ -254,6 +346,22 @@ describe('avaliação', () => {
     const before = evaluate(s, 0, w);
     fetchToHand(s, 0, 'ST02-002');
     expect(evaluate(s, 0, w)).toBeGreaterThan(before);
+  });
+
+  it('carta na mão com efeito de remoção vale mais que o corpo dela', () => {
+    // Killer (custo 3, 3000, [On Play] K.O. de Personagem virado de custo ≤ 3) na mão vale o efeito guardado:
+    // mais que o Vito (custo 3, 5000, sem efeito), e mais que o próprio Killer em campo com o efeito já gasto.
+    const s = started(1, [kid, luffy]);
+    const base = evaluate(s, 0, w);
+    const killer = inject(s, 0, 'ST02-005', 'hand');
+    const withKiller = evaluate(s, 0, w) - base;
+    s.players[0].hand.pop();
+    inject(s, 0, 'ST02-002', 'hand');
+    const withVito = evaluate(s, 0, w) - base;
+    expect(withKiller).toBeGreaterThan(withVito);
+    s.players[0].hand.pop();
+    s.players[0].characters.push({ uid: killer, rested: false, don: 0, playedOnTurn: 0 });
+    expect(evaluate(s, 0, w) - base).toBeLessThan(withKiller);
   });
 
   it('Blocker', () => {

@@ -11,6 +11,11 @@
 //   (não dá para simular uma mão escondida) e responde às outras perguntas de forma neutra.
 // - A linha escolhida fica guardada: enquanto a partida seguir o previsto (o oponente não usou
 //   Counter, nenhum efeito surpreendeu), as próximas decisões saem do plano sem nova busca.
+// - O próprio deck: a visão esconde a ordem, não a composição (`unseen`). Antes de simular, o bot sorteia
+//   um deck com essa composição, para os efeitos que leem o topo ("reveal 1 card from the top of your
+//   deck; if it is X, draw 2") valerem o que valem em vez de nada. Nas perguntas pagas ("pagar o custo?")
+//   e nas escolhas de opção, a resposta final sai da média de vários sorteios: valor esperado, e não o
+//   resultado de um deck só.
 //
 // Quem chama decide o nível: `easy` é o bot heurístico (`simple.ts`), `normal` olha uma jogada à
 // frente, `hard` planeja o turno inteiro.
@@ -18,6 +23,7 @@
 import { legalActions } from '../actions';
 import { applyAction, cardDef, getPower, locate, opponent } from '../engine';
 import type { Action, GameState, Pending, PlayerId } from '../types';
+import { HIDDEN_CARD } from '../view';
 import { DEFAULT_WEIGHTS, evaluate, type Weights } from './evaluate';
 import { chooseBotAction as simpleBot } from './simple';
 
@@ -60,6 +66,12 @@ const NOISE = 20;
 const MAX_STEPS = 60;
 /** Filhos por jogada (variantes de DON!! do mesmo ataque) que entram no feixe a cada passo. */
 const SIBLINGS = 2;
+/**
+ * Sorteios do próprio deck numa pergunta paga ou escolha de opção decidida de verdade (não dentro de uma
+ * simulação): a resposta sai da média. Dois bastam para ver se o deck pesa na decisão; se os dois
+ * resultados forem iguais, não pesa e os outros sorteios são pulados.
+ */
+const SAMPLES = 6;
 
 /** Uma decisão do bot dentro de uma linha simulada: a chave do estado em que ela vale e a ação. */
 interface Step {
@@ -90,21 +102,97 @@ export function chooseBotAction(state: GameState, player: PlayerId, level: BotLe
 export function planAction(full: GameState, player: PlayerId, opts: PlannerOptions): Action {
   // O histórico e o checkpoint do "cancelar" não mudam nenhuma decisão, mas o motor copia o estado
   // inteiro a cada jogada simulada: sem eles, a busca simula o dobro de jogadas no mesmo tempo.
-  const state: GameState = { ...full, log: [], checkpoint: undefined };
-  const actions = legalActions(state, player);
+  const view: GameState = { ...full, log: [], checkpoint: undefined };
+  const actions = legalActions(view, player);
   if (!actions.length) throw new Error('O bot não tem ações legais.');
-  const planned = fromPlan(state, player);
-  if (planned) return planned;
-  const pending = state.pending;
+  const pending = view.pending;
+  // Uma pergunta paga ("descartar 1 carta: revelar o topo…") ou uma escolha de opção pode depender do que
+  // há no deck, e o plano guardado veio de um sorteio só: aqui a resposta é decidida de novo, pela média.
+  const sampled = pending && pending.player === player && (pending.kind === 'confirm' || pending.kind === 'option');
+  if (!sampled) {
+    const planned = fromPlan(view, player);
+    if (planned) return planned;
+  }
   if (pending) {
     // Mulligan e escolha de quem começa não têm o que simular. Quem começa: o segundo (compra na primeira vez e
     // tem 2 DON!! no primeiro turno); nos replays, os melhores colocados dos torneios escolhem jogar primeiro em
     // só 15% das vezes (docs/bot-tempo.md, seção 11).
     if (pending.kind === 'chooseFirst') return { type: 'answer', player, yes: false };
-    if (pending.kind === 'mulligan' || pending.kind === 'manual') return simpleBot(state, player);
-    return decidePending(state, player, actions, defenseOrPlan(state, player, opts), 2)?.action ?? simpleBot(state, player);
+    if (pending.kind === 'mulligan' || pending.kind === 'manual') return simpleBot(view, player);
+    const o = defenseOrPlan(view, player, opts);
+    if (!sampled) return decidePending(determinize(view, player, opts.random), player, actions, o, 2)?.action ?? simpleBot(view, player);
+    const chosen = decideSampled(view, player, actions, o) ?? simpleBot(view, player);
+    // O plano guardado continua se previa exatamente esta resposta; senão, a próxima decisão replaneja.
+    const steps = plans.get(gameKey(view, player));
+    if (steps?.length && steps[0].key === stateKey(view, player) && JSON.stringify(steps[0].action) === JSON.stringify(chosen)) savePlan(view, player, steps.slice(1));
+    else plans.delete(gameKey(view, player));
+    return chosen;
   }
-  return planTurn(state, player, defenseOrPlan(state, player, opts));
+  return planTurn(determinize(view, player, opts.random), player, defenseOrPlan(view, player, opts));
+}
+
+// ---------------------------------------------------------------------------
+// O próprio deck: sorteio com a composição conhecida
+// ---------------------------------------------------------------------------
+
+/**
+ * O deck do bot na visão é uma fila de cartas escondidas; a composição (`unseen`: a lista do deck menos o
+ * que está à vista) é conhecida. Devolve uma cópia em que cada carta escondida do deck recebe uma carta
+ * sorteada dessa composição, sem reposição (a Vida virada para baixo fica escondida: sai do mesmo
+ * sorteio, mas o bot não a lê). Sem `unseen` (estado completo, visões antigas), o estado volta como está.
+ */
+export function determinize(state: GameState, player: PlayerId, random: () => number): GameState {
+  const ps = state.players[player];
+  const unseen = ps.unseen;
+  if (!unseen) return state;
+  const hidden = ps.deck.filter((u) => state.cards[u]?.cardId === HIDDEN_CARD);
+  if (!hidden.length) return state;
+  const pool: string[] = [];
+  for (const [id, n] of Object.entries(unseen)) if (state.defs[id]) for (let i = 0; i < n; i++) pool.push(id);
+  if (pool.length < hidden.length) return state;
+  const cards = { ...state.cards };
+  for (const uid of hidden) {
+    const i = Math.floor(random() * pool.length);
+    const [id] = pool.splice(i, 1);
+    cards[uid] = { ...cards[uid], cardId: id };
+  }
+  return { ...state, cards };
+}
+
+/**
+ * Resposta a uma pergunta paga ou escolha de opção decidida de verdade: cada candidata é simulada em
+ * `SAMPLES` sorteios do próprio deck e vale a média (o valor esperado do efeito, e não o resultado de um
+ * deck só). Se os dois primeiros sorteios dão o mesmo resultado para todas as candidatas, o deck não pesa
+ * na decisão e os outros são pulados.
+ */
+function decideSampled(view: GameState, player: PlayerId, legal: Action[], opts: PlannerOptions): Action | undefined {
+  const candidates = pendingCandidates(view, player, legal, opts);
+  // As escolhas aninhadas dentro de cada sorteio são decididas sem ruído, para dois sorteios iguais darem o mesmo resultado.
+  const quiet: PlannerOptions = { ...opts, random: () => 0.5, onDecision: undefined };
+  const scores: number[][] = candidates.map(() => []);
+  for (let k = 0; k < SAMPLES; k++) {
+    const state = determinize(view, player, opts.random);
+    candidates.forEach((c, i) => {
+      const r = simulate(state, player, c, quiet, 2);
+      if (r) scores[i].push(evaluate(r.state, player, opts.weights) + r.penalty);
+    });
+    // Sem deck escondido (ou sem composição), um sorteio é igual ao outro.
+    if (state === view) break;
+    if (k === 1 && scores.every((sc) => sc.length !== 2 || Math.abs(sc[0] - sc[1]) < 1)) break;
+  }
+  let best: Action | undefined;
+  let bestScore = -Infinity;
+  candidates.forEach((c, i) => {
+    const sc = scores[i];
+    if (!sc.length) return;
+    const score = sc.reduce((a, b) => a + b, 0) / sc.length + opts.random() * NOISE;
+    opts.onDecision?.(`candidata ${JSON.stringify(c)}: ${score.toFixed(0)} (média de ${sc.length} sorteio(s))`, 2);
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  });
+  return best;
 }
 
 /**
