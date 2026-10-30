@@ -308,9 +308,12 @@ pelos testes de posição, não por uma medida: o que falta é o relato de quem 
 [On Play] de remoção sem usar o efeito (Vander Decken IX como corpo vanilla) e recusava habilidades do Líder que
 só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2). As causas e as correções estão nas seções 7 e
 7a: o efeito guardado passou a valer na mão (`handEffect`), e o próprio deck passou a ser sorteado pela composição
-conhecida, com as perguntas pagas decididas pela média dos sorteios. As duas situações são raras nos decks prontos
-(as medições de auto-jogo e contra o humano fraco estão na seção abaixo, quando concluídas): o que muda é o que a
-pessoa vê quando joga. Os testes de posição cobrem os dois casos.
+conhecida, com as perguntas pagas decididas pela média dos sorteios. Medidas, `hard` novo x `hard` anterior: 300
+partidas de auto-jogo (decks prontos sorteados, assentos trocados), 152 x 148 (50,7%); contra o humano fraco, 100
+partidas cada, 83% o novo e 79% o anterior. Tudo dentro do ruído, como nas rodadas anteriores: as duas situações
+são raras nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os dois
+casos. O custo é tempo: a decisão média subiu de ~45 ms para ~65 ms (p95 de ~260 ms para ~295 ms), pelos sorteios
+nas perguntas pagas e nas escolhas de opção.
 
 ## 10. Humano fraco
 
