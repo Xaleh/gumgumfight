@@ -21,7 +21,7 @@
 
 import { cardDef, counterValue, getPower, hasKeyword, opponent, playCost } from '../engine';
 import { HIDDEN_CARD } from '../view';
-import type { GameState, PlayerId, PlayerState } from '../types';
+import type { CardDef, EffectStep, GameState, PlayerId, PlayerState } from '../types';
 
 export interface Weights {
   /** Valor acumulado de ter N cartas de Vida (índice = N; além do fim, soma `lifeExtra` por carta). */
@@ -39,6 +39,15 @@ export interface Weights {
   handCounterEvent: number;
   /** Acima deste tamanho, cada carta a mais na mão vale metade (não dá para jogar tudo). */
   handSoftCap: number;
+  /**
+   * Carta na mão cujo efeito de entrada ([On Play] de Personagem ou Stage, [Main] de Evento) remove uma carta
+   * do oponente (K.O., devolver à mão, pôr no fundo do deck, descartar): vale isso a mais enquanto está na
+   * mão, pelo que o efeito ainda pode tirar do campo. Jogá-la sem alvo (ou recusar o custo do efeito) perde
+   * esse valor sem nada em troca; jogá-la com alvo troca-o pela remoção, que a simulação pontua. Metade
+   * (`handEffectSoft`) para efeitos que só preparam a remoção (virar, −poder): valem só com o ataque junto.
+   */
+  handEffect: number;
+  handEffectSoft: number;
   /** Personagem em campo: por ponto de custo, fixo por corpo e por 1000 de poder base. */
   charCost: number;
   charBase: number;
@@ -106,6 +115,8 @@ export const DEFAULT_WEIGHTS: Weights = {
   handCounter: 1100,
   handCounterEvent: 550,
   handSoftCap: 7,
+  handEffect: 3000,
+  handEffectSoft: 1200,
   charCost: 810,
   charBase: 1220,
   charPower: 590,
@@ -136,9 +147,48 @@ function lifeValue(w: Weights, n: number, opp = false): number {
   return table[table.length - 1] + (n - (table.length - 1)) * (opp ? w.lifeOppExtra : w.lifeExtra);
 }
 
+/** O passo tira uma carta do oponente do campo (ou da mão dele)? `soft`: só a prepara para o ataque (virar, −poder). */
+function removalStep(step: EffectStep): 'hard' | 'soft' | null {
+  if (!('target' in step) || typeof step.target !== 'object' || step.target.side === 'own') return null;
+  switch (step.do) {
+    case 'ko':
+    case 'returnToHand':
+    case 'toDeckBottom':
+    case 'trashTarget':
+      return 'hard';
+    case 'rest':
+      return 'soft';
+    case 'power':
+      return step.amount < 0 ? 'soft' : null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * O efeito de entrada da carta (o que acontece ao jogá-la da mão) remove algo do oponente? Olha o [On Play]
+ * de Personagem e Stage e o [Main] de Evento; o que a carta faz depois de estar em campo ([Activate: Main],
+ * [When Attacking]) não se perde ao jogá-la e fica de fora.
+ */
+export function entryRemoval(def: CardDef): 'hard' | 'soft' | null {
+  const timing = def.category === 'event' ? 'main' : 'onPlay';
+  let best: 'hard' | 'soft' | null = null;
+  for (const ab of def.abilities) {
+    if (ab.timing !== timing) continue;
+    for (const st of ab.steps) {
+      const r = removalStep(st);
+      if (r === 'hard') return 'hard';
+      if (r === 'soft') best = 'soft';
+    }
+  }
+  return best;
+}
+
 /**
  * Valor da mão. A do oponente conta pelo tamanho; a própria, carta a carta: um Counter impresso defende, um
- * Evento [Counter] só vale se sobrar DON!! ativo para pagá-lo no turno do oponente (guardar DON!! é tempo).
+ * Evento [Counter] só vale se sobrar DON!! ativo para pagá-lo no turno do oponente (guardar DON!! é tempo), e
+ * uma carta cujo efeito de entrada remove algo do oponente vale o efeito guardado (`handEffect`): jogá-la
+ * como corpo sem alvo, ou descartá-la como custo, joga esse valor fora.
  */
 function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number): number {
   let total = 0;
@@ -147,6 +197,9 @@ function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number
     if (def.id === HIDDEN_CARD) return hidden;
     let v = w.handCardBase + (counterValue(state, uid) / 1000) * w.handCounter;
     if (def.category === 'event' && def.abilities.some((a) => a.timing === 'counter') && playCost(state, uid) <= ps.donActive) v += w.handCounterEvent;
+    const removal = entryRemoval(def);
+    if (removal === 'hard') v += w.handEffect;
+    else if (removal === 'soft') v += w.handEffectSoft;
     return v;
   });
   values.sort((a, b) => b - a);

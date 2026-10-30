@@ -124,6 +124,21 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     });
   const field = <T extends { uid: string }>(fc: T): T => ({ ...fc, uid: ref(fc.uid) });
 
+  // O próprio deck: o jogador sabe o que há nele (é a lista dele), só não sabe a ordem. A composição do que ele
+  // não vê (deck e Vida virada para baixo) vai na visão dele, com as definições dessas cartas, para o bot
+  // simular os efeitos que leem o topo do deck. O oponente e os espectadores não recebem nada disso.
+  const unseenOf = (ps: PlayerState): Record<string, number> | undefined => {
+    if (ps.id !== viewer) return undefined;
+    const out: Record<string, number> = {};
+    for (const uid of [...ps.deck, ...ps.life]) {
+      if (vis.has(uid)) continue;
+      const id = state.cards[uid].cardId;
+      out[id] = (out[id] ?? 0) + 1;
+      defs[id] ??= state.defs[id];
+    }
+    return out;
+  };
+
   const players = state.players.map(
     (ps): PlayerState => ({
       ...ps,
@@ -135,6 +150,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
       trash: ps.trash.map(alias),
       life: zone(ps, 'life'),
       ...(ps.lifeFaceUp ? { lifeFaceUp: refs(ps.lifeFaceUp) } : {}),
+      ...(ps.id === viewer ? { unseen: unseenOf(ps) } : {}),
     }),
   ) as [PlayerState, PlayerState];
 

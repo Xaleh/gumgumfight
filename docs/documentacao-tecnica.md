@@ -238,8 +238,11 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
 ### Visão por jogador (`view.ts`)
 
 `viewFor(state, viewer, aliases, extra?)` devolve um `GameState` com: cartas fora de vista como `?`/`~` (com handle
-de posição `~dono:zona:índice`), `defs` só das cartas visíveis, `seed`/`rng` zerados, `rng128` e `checkpoint`
-removidos, passos de efeito do oponente esvaziados, `pending` do oponente sem opções, `log.secret` só para o dono.
+de posição `~dono:zona:índice`), `defs` só das cartas visíveis (e das do próprio deck), `seed`/`rng` zerados, `rng128`
+e `checkpoint` removidos, passos de efeito do oponente esvaziados, `pending` do oponente sem opções, `log.secret` só
+para o dono. Só o próprio jogador recebe `players[viewer].unseen`: a composição (id → quantidade) do que ele não vê
+do próprio deck e da Vida virada para baixo (a lista dele menos o que está à vista), que o bot usa para sortear o
+deck ao simular efeitos que leem o topo.
 `viewer = null` é o espectador (nada de mão). Os uids reais (`c1, c2…`) seguem a ordem do deck, por isso o servidor
 troca cada um por um apelido aleatório (`createAliases`, HMAC-SHA256 com salt da sala). `actionFromView` traduz de
 volta a ação feita sobre a visão.
@@ -280,6 +283,10 @@ e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
   for parado continuar pesando.
 - Para a simulação funcionar na visão, os frames de efeito **do próprio jogador** vão inteiros na visão (passos,
   escolhas, alvos, com uids apelidados); os do oponente seguem só com a carta de origem.
+- O próprio deck é sorteado antes de simular (`determinize`, a partir de `unseen`): efeitos que leem o topo
+  ("reveal 1 card from the top of your deck") valem o que o deck promete. As perguntas pagas e as escolhas de
+  opção decididas de verdade saem da média de vários sorteios (`decideSampled`). Uma carta na mão cujo efeito de
+  entrada remove algo do oponente vale o efeito guardado (`handEffect`), para o bot não a baixar sem alvo.
 
 Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
 [`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`; contra um

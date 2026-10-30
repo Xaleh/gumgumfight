@@ -1128,6 +1128,13 @@ export interface PlayerState {
   mulliganDone: boolean;
   /** Cartas de Vida viradas para cima. */
   lifeFaceUp?: string[];
+  /**
+   * Só na visão (`viewFor`), e só do próprio jogador: a composição das cartas dele que ele não vê (deck e Vida
+   * virada para baixo), por id de carta e quantidade. É a lista do deck menos o que está à vista: um jogador
+   * sabe o que há no próprio deck, só não sabe a ordem. O bot sorteia o deck a partir dela ao simular efeitos
+   * que leem o topo ("reveal 1 card from the top of your deck", "look at the top 5 cards").
+   */
+  unseen?: Record<string, number>;
 }
 
 export interface Modifier {
