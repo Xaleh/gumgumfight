@@ -70,6 +70,13 @@ export interface Weights {
   doubleAttack: number;
   /** Stage em campo. */
   stage: number;
+  /**
+   * Modificador de poder que dura além do turno ("until the end of your opponent's next End Phase") numa carta em
+   * campo, por 1000: o próprio soma, o do oponente desconta. Sem isso, "−1000 ao Líder do oponente" não vale nada
+   * no fim do turno (os ataques dele no turno seguinte e os do bot no próximo não são simulados), e o bot deixava
+   * de usar habilidades gratuitas como a da Jewelry Bonney EB05-001.
+   */
+  powerMod: number;
   /** Personagem virado quando o turno passa para o oponente (e ao alcance do Líder dele): fica exposto ao ataque. */
   exposed: number;
   /** DON!! em campo (área de custo + anexados), por unidade. */
@@ -138,6 +145,7 @@ export const DEFAULT_WEIGHTS: Weights = {
   rush: 210,
   doubleAttack: 800,
   stage: 1700,
+  powerMod: 800,
   exposed: 490,
   don: 2200,
   donReady: 300,
@@ -258,8 +266,16 @@ export function fieldCardValue(state: GameState, w: Weights, uid: string): numbe
   return v;
 }
 
+/** Soma dos modificadores de poder da carta que duram além deste turno (os "during this turn" já valem na simulação). */
+function lastingPowerMods(state: GameState, uid: string): number {
+  let sum = 0;
+  for (const m of state.modifiers) if (m.uid === uid && m.kind === 'power' && m.duration !== 'turn' && m.duration !== 'battle') sum += m.amount;
+  return sum;
+}
+
 function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, exposedToOpponent: boolean, opp: boolean): number {
   let v = lifeValue(w, ps.life.length, opp);
+  for (const c of [ps.leader, ...ps.characters]) v += (lastingPowerMods(state, c.uid) / 1000) * w.powerMod;
   const myTurn = state.activePlayer === ps.id;
   if (myTurn && state.turn > 2) {
     for (const c of [ps.leader, ...ps.characters]) {

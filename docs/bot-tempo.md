@@ -250,6 +250,24 @@ ordem, mas sabe a lista: com 35 {Rocks Pirates} em 40 cartas, pagar 1 por 2 é l
 | Composição do próprio deck na visão | `view.ts`: `unseen` | `view.test.ts` (a do oponente nunca aparece) |
 | Efeito que lê o topo vale o que o deck promete | `planner.ts`: `determinize`, `decideSampled` | `paga o custo do Líder quando o deck faz o efeito valer (Rocks.D.Xebec)` |
 
+## 7b. Efeito que dura até o turno do oponente
+
+A busca só olha o próprio turno (seção 8), então um efeito que vale **depois** dele não aparece em lugar nenhum:
+a Jewelry Bonney EB05-001 ("[Activate: Main] [Once Per Turn] −1000 a 1 Líder ou Personagem do oponente com 6000
+ou mais até o fim do próximo turno dele") ficava em campo sem nunca ser ativada, porque o −1000 só mudaria algo
+se o bot atacasse o alvo neste turno; no fim do turno a avaliação não via diferença, e o custo por ação (30)
+decidia contra. Um humano ativa sempre: é de graça, e o Líder do oponente ataca com 4000 no turno dele e é
+nocauteado com um DON!! a menos no próximo.
+
+Por isso um **modificador de poder que dura além do turno** ('nextOpponentTurn', 'untilYourNextTurn',
+'endOfYourNextTurn') vale `powerMod` (800) por 1000 na carta em campo: o próprio soma, o do oponente desconta
+(`lastingPowerMods` em `evaluate.ts`). Os "during this turn" ficam de fora: já valem na simulação dos ataques e
+somem no fim do turno (o motor os apaga no `endTurn`, antes da avaliação da linha).
+
+| Conceito | Onde está | Teste |
+|---|---|---|
+| −poder no oponente até o próximo turno dele | `evaluate.ts`: `lastingPowerMods`, `powerMod` | `usa a habilidade gratuita que enfraquece o oponente até o próximo turno dele (Jewelry Bonney)`, `avaliação: modificador de poder que dura até o próximo turno do oponente` |
+
 ## 8. O que o bot ainda não sabe
 
 - **Mão do oponente**: só o tamanho. Cartas reveladas por efeito não são lembradas de um turno para o outro.
@@ -322,19 +340,22 @@ cada, `hard` x `hard` anterior e contra o "humano fraco" (seção 10): o auto-jo
 (50–54%, dentro do ruído), e o humano fraco perde para as duas (~83%). As correções ficam pelo raciocínio e
 pelos testes de posição, não por uma medida: o que falta é o relato de quem joga contra o bot.
 
-**Rodada 4 (efeitos desperdiçados).** Três relatos de partidas contra o `hard`: o bot baixava cartas com
+**Rodada 4 (efeitos desperdiçados).** Quatro relatos de partidas contra o `hard`: o bot baixava cartas com
 [On Play] de remoção sem usar o efeito (Vander Decken IX como corpo vanilla), recusava habilidades do Líder que
-só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2) e, no mesmo deck, baixava a Buckin no turno 1 em
-vez de guardá-la como Counter e combustível do Líder. As causas e as correções estão nas seções 7 e 7a: o efeito
-guardado passou a valer na mão (`handEffect`), o próprio deck passou a ser sorteado pela composição conhecida, com
-as perguntas pagas decididas pela média dos sorteios, e a mão passou a valer o combustível das saídas de descarte
-(`handFuel`) e o custo das cartas (`handCost`). Medidas, `hard` novo x `hard` anterior, nas duas etapas:
+só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2), no mesmo deck baixava a Buckin no turno 1 em
+vez de guardá-la como Counter e combustível do Líder, e deixava a Jewelry Bonney em campo sem ativar o −1000. As
+causas e as correções estão nas seções 7, 7a e 7b: o efeito guardado passou a valer na mão (`handEffect`), o
+próprio deck passou a ser sorteado pela composição conhecida, com as perguntas pagas decididas pela média dos
+sorteios, a mão passou a valer o combustível das saídas de descarte (`handFuel`) e o custo das cartas
+(`handCost`), e o modificador de poder que dura até o turno do oponente passou a valer (`powerMod`). Medidas,
+`hard` novo x `hard` anterior, por etapa:
 
 | Etapa | Auto-jogo (300 partidas) | Humano fraco (100 partidas) |
 |---|---|---|
 | Remoção guardada + sorteio do deck | 152 x 148 (50,7%) | 83% (anterior: 79%) |
 | + combustível (+1 000 por carta) e custo (300): descartado | 138 x 162 (46,0%) | 81% |
 | + combustível como piso (3 400) e custo (450) | 198 x 202 (49,5%; pesos novos x sem os dois termos, 400 partidas) | 82% |
+| + modificador de poder duradouro (`powerMod`, Bonney) | (em medição) | (em medição) |
 
 Fora a versão descartada do combustível, tudo dentro do ruído, como nas rodadas anteriores: as situações são raras
 nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms

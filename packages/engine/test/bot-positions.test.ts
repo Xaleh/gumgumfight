@@ -38,6 +38,17 @@ const extraCards: CardData[] = [
   },
   { id: 'OP17-040', name: 'Edward.Newgate', category: 'character', colors: ['blue'], cost: 6, power: 8000, counter: 0, types: ['Rocks Pirates'], text: '[On Play] Draw 1 card.' },
   {
+    id: 'EB05-001',
+    name: 'Jewelry Bonney',
+    category: 'character',
+    colors: ['red'],
+    cost: 5,
+    power: 7000,
+    counter: 0,
+    types: ['Supernovas', 'Bonney Pirates'],
+    text: '[On Play] If your Leader has the {Supernovas} type, draw 2 cards and play up to 2 Character cards with 2000 power or less from your hand.\n[Activate: Main] [Once Per Turn] Give up to 1 of your opponent\'s Leader or Characters with 6000 power or more -1000 power until the end of your opponent\'s next End Phase.',
+  },
+  {
     id: 'OP08-051',
     name: 'Buckin',
     category: 'character',
@@ -287,6 +298,18 @@ describe('bot com busca: fase principal', () => {
     expect(b.state.players[0].characters.map((c) => c.uid)).not.toContain(buckin2);
   });
 
+  it('usa a habilidade gratuita que enfraquece o oponente até o próximo turno dele (Jewelry Bonney)', () => {
+    // Bonney EB05-001 em campo: "[Activate: Main] [Once Per Turn] −1000 a 1 Líder ou Personagem do oponente com 6000
+    // ou mais até o fim do próximo turno dele". O Franky (6000) ativo não pode ser atacado, mas o −1000 vale no turno
+    // do oponente (ataca com menos) e no próximo do bot (K.O. mais barato): a habilidade é de graça e o bot a usa.
+    const s = position([kid, luffy], 7);
+    const bonney = inject(s, 0, 'EB05-001', 'field');
+    inject(s, 1, 'ST01-010', 'field');
+    const { state, actions } = botTurn(s, 0);
+    expect(actions.some((a) => a.type === 'activate' && a.uid === bonney)).toBe(true);
+    expect(state.modifiers.some((m) => m.kind === 'power' && m.amount === -1000 && m.duration === 'nextOpponentTurn')).toBe(true);
+  });
+
   it('acha o ataque fatal com vários atacantes pequenos', () => {
     // Oponente com 2 de Vida e a mão vazia; o bot tem o Líder, quatro Personagens de 1000 a 6000 e 4 DON!!: três
     // acertos no Líder vencem, mas cada acerto vale menos que o K.O. do Zoro virado (a linha "tudo no Líder" e a
@@ -404,6 +427,18 @@ describe('avaliação', () => {
     s.players[0].hand.pop();
     s.players[0].characters.push({ uid: killer, rested: false, don: 0, playedOnTurn: 0 });
     expect(evaluate(s, 0, w) - base).toBeLessThan(withKiller);
+  });
+
+  it('modificador de poder que dura até o próximo turno do oponente', () => {
+    // −1000 no Líder do oponente até o fim do próximo turno dele vale; o mesmo só "durante este turno", não (já
+    // está na simulação dos ataques; no fim do turno some).
+    const s = started(1, [kid, luffy]);
+    const base = evaluate(s, 0, w);
+    const leader = s.players[1].leader.uid;
+    s.modifiers.push({ uid: leader, kind: 'power', amount: -1000, duration: 'nextOpponentTurn', untilTurn: s.turn + 1 });
+    expect(evaluate(s, 0, w)).toBeGreaterThan(base);
+    s.modifiers = [{ uid: leader, kind: 'power', amount: -1000, duration: 'turn' }];
+    expect(evaluate(s, 0, w)).toBe(base);
   });
 
   it('Blocker', () => {
