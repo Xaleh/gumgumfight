@@ -1,10 +1,11 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type CardData, proxiedImageUrl, registerCardCdn } from '@gumgum/engine';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { cdnFromEnv, dirStore, mirrorCardImages, publishImageIndex, syncCardCdn } from '../src/card-cdn';
+import { applyLocalImages, importLocalImages } from '../src/card-cdn/local';
 import { r2Client, r2Endpoint, signRequest } from '../src/card-cdn/r2';
 import { getCards, openDb, upsertCards } from '../src/db';
 
@@ -144,6 +145,108 @@ describe('CDN própria das imagens', () => {
     expect(cdnFromEnv(env)?.publicBase).toBe(CDN);
     expect(cdnFromEnv({ ...env, R2_SECRET_ACCESS_KEY: '' })).toBeNull();
     expect(cdnFromEnv({})).toBeNull();
+  });
+});
+
+describe('Imagens locais (--images-from)', () => {
+  const PNG2 = Buffer.concat([PNG, Buffer.from('-v2')]);
+  const promos = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'promos-'));
+    writeFileSync(join(dir, 'P-123.png'), PNG); // impressão base de uma carta sem imagem
+    writeFileSync(join(dir, 'P-123_cn1.png'), PNG2); // variante
+    writeFileSync(join(dir, 'op01-016.png'), PNG); // carta que já tem imagem: vira arte
+    writeFileSync(join(dir, 'P-124.png'), Buffer.from('nao e imagem'));
+    writeFileSync(join(dir, 'ZZ-999.png'), PNG); // carta que não existe
+    writeFileSync(join(dir, 'leia-me.txt'), 'x');
+    return dir;
+  };
+  const seed = (db: ReturnType<typeof openDb>) =>
+    upsertCards(db, [card('P-123', { imageUrl: undefined }), card('P-124', { imageUrl: undefined }), card('OP01-016')], { provisional: false, source: 'api:test' });
+
+  it('sobe a pasta para o bucket, vira imagem principal (carta sem imagem) ou arte, e entra no índice', async () => {
+    const { db, dir, store } = setup();
+    seed(db);
+    const logs: string[] = [];
+    const r = await importLocalImages(db, store, promos(), { lang: 'cn', label: 'Promo China', log: (m) => logs.push(m) });
+    expect(r).toMatchObject({ imported: 3, unchanged: 0 });
+    expect(r.skipped.map((s) => s.file)).toEqual(['P-124.png', 'ZZ-999.png', 'leia-me.txt']);
+    expect(r.skipped.map((s) => s.reason)).toEqual([
+      'não é PNG, JPEG nem WebP',
+      'carta ZZ-999 não está no banco',
+      'nome fora do padrão <número da carta>[_sufixo].png/jpg/webp',
+    ]);
+    expect(logs).toHaveLength(3);
+    expect(readFileSync(join(dir, 'P/cn/P-123.png'))).toEqual(PNG);
+    expect(readFileSync(join(dir, 'P/cn/P-123_cn1.png'))).toEqual(PNG2);
+    expect(existsSync(join(dir, 'OP01/cn/op01-016.png'))).toBe(true);
+    // Nada muda na carta até a rodada da CDN.
+    expect(getCards(db, ['P-123'])[0].imageUrl).toBeUndefined();
+
+    const net = images();
+    const sync = await syncCardCdn(db, store, { fetchImpl: net.fetchImpl, log: (m) => logs.push(m), officialRegions: [] });
+    expect(sync).toMatchObject({ uploaded: 1, failed: [] });
+    const [op, p] = getCards(db, ['OP01-016', 'P-123']);
+    expect(p.imageUrl).toMatch(/^https:\/\/cards\.ggf\.test\/P\/cn\/P-123\.png\?v=[0-9a-f]{12}$/);
+    expect(p.imageLang).toBe('cn');
+    expect(p.arts).toEqual([{ id: 'P-123_cn1', label: 'Promo China', imageUrl: expect.stringMatching(/\/P\/cn\/P-123_cn1\.png\?v=/) }]);
+    expect(op.imageUrl).toMatch(/\/OP01\/en\/OP01-016\.png\?v=/);
+    expect(op.imageLang).toBeUndefined();
+    expect(op.arts).toEqual([{ id: 'op01-016_cn', label: 'Promo China', imageUrl: expect.stringMatching(/\/OP01\/cn\/op01-016\.png\?v=/) }]);
+    const index = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8')) as { cards: Record<string, { image: string; arts?: unknown[] }> };
+    expect(index.cards['P-123'].image).toBe(p.imageUrl);
+    expect(index.cards['P-123'].arts).toHaveLength(1);
+    expect(index.cards['OP01-016'].arts).toHaveLength(1);
+    expect(logs.some((m) => /2 carta\(s\) com imagem local reaplicada/.test(m))).toBe(true);
+  });
+
+  it('reimportar a carta não perde a imagem; pasta igual não sobe de novo; arquivo mudado troca o ?v=', async () => {
+    const { db, dir, store } = setup();
+    seed(db);
+    const folder = promos();
+    await importLocalImages(db, store, folder, { lang: 'cn' });
+    expect(applyLocalImages(db, store)).toBe(2);
+    expect(applyLocalImages(db, store)).toBe(0);
+    const before = getCards(db, ['P-123'])[0];
+
+    // A reimportação volta sem imagem (a fonte não tem): a rodada seguinte reaplica.
+    seed(db);
+    expect(getCards(db, ['P-123'])[0].imageUrl).toBeUndefined();
+    await syncCardCdn(db, store, { fetchImpl: images().fetchImpl, log: () => {}, officialRegions: [] });
+    expect(getCards(db, ['P-123'])[0]).toMatchObject({ imageUrl: before.imageUrl, imageLang: 'cn', arts: before.arts });
+
+    // Mesma pasta de novo: nada sobe. Arquivo mudado: sobe e o endereço muda.
+    expect(await importLocalImages(db, store, folder, { lang: 'cn' })).toMatchObject({ imported: 0, unchanged: 3 });
+    writeFileSync(join(folder, 'P-123.png'), PNG2);
+    expect(await importLocalImages(db, store, folder, { lang: 'cn' })).toMatchObject({ imported: 1, unchanged: 2 });
+    expect(applyLocalImages(db, store)).toBe(1);
+    const after = getCards(db, ['P-123'])[0];
+    expect(after.imageUrl).not.toBe(before.imageUrl);
+    expect(after.imageUrl).toMatch(/\/P\/cn\/P-123\.png\?v=/);
+    expect(readFileSync(join(dir, 'P/cn/P-123.png'))).toEqual(PNG2);
+  });
+
+  it('quando a carta ganha imagem de uma fonte, a base local vira arte', async () => {
+    const { db, store } = setup();
+    seed(db);
+    await importLocalImages(db, store, promos(), { lang: 'cn' });
+    applyLocalImages(db, store);
+    upsertCards(db, [card('P-123')], { provisional: false, source: 'api:test' });
+    await syncCardCdn(db, store, { fetchImpl: images().fetchImpl, log: () => {}, officialRegions: [] });
+    const p = getCards(db, ['P-123'])[0];
+    expect(p.imageUrl).toMatch(/\/P\/en\/P-123\.png\?v=/);
+    expect(p.imageLang).toBeUndefined();
+    expect(p.arts?.map((a) => a.id).sort()).toEqual(['P-123_cn', 'P-123_cn1']);
+  });
+
+  it('idioma inválido e arte repetida na pasta', async () => {
+    const { db, store } = setup();
+    seed(db);
+    await expect(importLocalImages(db, store, promos(), { lang: 'chinês' })).rejects.toThrow(/idioma inválido/);
+    const dir = mkdtempSync(join(tmpdir(), 'promos-'));
+    writeFileSync(join(dir, 'P-123.png'), PNG);
+    writeFileSync(join(dir, 'P-123_cn.png'), PNG2);
+    const r = await importLocalImages(db, store, dir, { lang: 'cn' });
+    expect(r).toMatchObject({ imported: 1, skipped: [{ file: 'P-123_cn.png', reason: 'arte P-123_cn repetida na pasta' }] });
   });
 });
 

@@ -6,31 +6,25 @@
 //   <CARD_CDN_URL>/<coleção>/<idioma>/<arte>.<ext>?v=<hash>     ex.: /OP01/en/OP01-016_p1.png?v=3f2a…
 //   <CARD_CDN_URL>/index.json                                    todas as cartas -> imagens (para parceiros)
 //
+// Imagens que não têm fonte na rede (promos da China etc.) entram por `--images-from` (local.ts).
+//
 // O objeto de uma arte fica sempre na mesma chave; o `?v=` (hash do conteúdo) muda quando a
 // imagem muda, então o cache pode ser eterno. Imagens do Cardkaizoku nunca entram (termos de uso).
 //
 // Variáveis: CARD_CDN_URL (endereço público do bucket), R2_ACCOUNT_ID, R2_BUCKET,
 // R2_ACCESS_KEY_ID e R2_SECRET_ACCESS_KEY (token do R2 com leitura e escrita só nesse bucket).
 
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { CARD_IMAGE_ORIGINS, type CardArt, type CardData } from '@gumgum/engine';
 import { type DB, transaction } from '../db';
 import { artId } from '../optcgapi';
 import { type BandaiRegion, fillOfficialImages, type FetchText, imageLang, imageRegionsFromEnv } from './official';
+import { applyLocalImages } from './local';
 import { networkCause, type R2Config, R2Error, r2Client } from './r2';
+import { contentHash, EXT, IMMUTABLE, type ImageStore, MAX_BYTES, sniffImageType } from './store';
 
-/** Onde as imagens ficam guardadas. */
-export interface ImageStore {
-  /** Endereço público, sem barra no fim. */
-  publicBase: string;
-  has(key: string): Promise<boolean>;
-  put(key: string, body: Buffer, contentType: string, cacheControl: string): Promise<void>;
-}
-
-/** Cache das imagens: o endereço muda quando o conteúdo muda (`?v=`). */
-const IMMUTABLE = 'public, max-age=31536000, immutable';
+export { type ImageStore, sniffImageType } from './store';
 
 export function r2Store(cfg: R2Config & { publicBase: string }, fetchImpl?: typeof fetch): ImageStore {
   const client = r2Client(cfg, fetchImpl);
@@ -64,17 +58,6 @@ export function cdnFromEnv(env: NodeJS.ProcessEnv = process.env, fetchImpl?: typ
 
 /** Endereço público da CDN (CARD_CDN_URL), para o navegador e o proxy /card-img/cdn/. */
 export const cardCdnUrl = (env: NodeJS.ProcessEnv = process.env) => env.CARD_CDN_URL?.trim().replace(/\/+$/, '') || null;
-
-const MAX_BYTES = 4 * 1024 * 1024;
-const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
-
-/** Tipo pelo conteúdo: a optcgapi manda PNG com `content-type: image/jpeg`. */
-export function sniffImageType(body: Buffer): string | null {
-  if (body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
-  if (body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff) return 'image/jpeg';
-  if (body.subarray(0, 4).toString('latin1') === 'RIFF' && body.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
-  return null;
-}
 
 /** Só copia de origens conhecidas (as mesmas do /card-img/), nunca da própria CDN. */
 const allowedSource = (url: string) => Object.entries(CARD_IMAGE_ORIGINS).some(([k, base]) => k !== 'cdn' && url.startsWith(base));
@@ -165,7 +148,7 @@ export async function mirrorCardImages(
           remember.run(url, '', 'rejected', lang, res.headers.get('content-type') ?? '', body.length);
           throw new Error(`não é PNG, JPEG nem WebP (${res.headers.get('content-type') ?? 'sem tipo'})`);
         }
-        const hash = createHash('sha256').update(body).digest('hex').slice(0, 12);
+        const hash = contentHash(body);
         const key = `${set}/${lang}/${artId(url)}.${EXT[type]}`;
         await store.put(key, body, type, IMMUTABLE);
         remember.run(url, key, hash, lang, type, body.length);
@@ -247,6 +230,9 @@ export async function syncCardCdn(
   await fillOfficialImages(db, opts.officialRegions ?? imageRegionsFromEnv(), { fetchText: opts.fetchText, log: opts.log }).catch((err) =>
     opts.log(`Imagens oficiais: falha (${err instanceof Error ? err.message : err})`),
   );
+  // Imagens que vieram por fora (--images-from) voltam para as cartas, caso a reimportação as tenha tirado.
+  const local = applyLocalImages(db, store);
+  if (local) opts.log(`CDN das imagens: ${local} carta(s) com imagem local reaplicada.`);
   const r = await mirrorCardImages(db, store, opts);
   if (r.unavailable) opts.log(`CDN das imagens: bucket inacessível, nada copiado: ${r.unavailable}. Confira R2_ACCOUNT_ID e o token.`);
   if (r.uploaded || r.failed.length) {
@@ -256,6 +242,6 @@ export async function syncCardCdn(
         (r.skipped ? `, ${r.skipped} de origem desconhecida` : ''),
     );
   }
-  if (r.uploaded || r.reused) opts.log(`CDN das imagens: índice com ${await publishImageIndex(db, store)} cartas.`);
+  if (r.uploaded || r.reused || local) opts.log(`CDN das imagens: índice com ${await publishImageIndex(db, store)} cartas.`);
   return r;
 }

@@ -567,6 +567,9 @@ baixadas quando tocam) + `public/`.
 | `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
 | `card_engine_text_history` | `id` | Cada gravação (`action = set`, com o texto) e remoção (`remove`) do texto para o motor, com quem e quando | idem |
 | `card_gaps` | `card_id` | Cartas ⚙ (efeito parcial ou manual): `text_key` (hash do texto quando entrou), `first_seen`, `reviewed_at` (null = nova para o Dev). Na criação da tabela, as ⚙ que o banco já tinha entram como vistas | `recordCardGaps` (ao subir o servidor, na sincronização dos spoilers e no `cards:import`), `POST /api/dev/card-gaps/reviewed` |
+| `card_images` | `source_url` | CDN própria (`card-cdn/`): endereço de origem da imagem → `object_key`, `hash` (o `?v=`), `lang`, `content_type`, `bytes`; `hash = rejected` = não era imagem | `mirrorCardImages` (importação, sincronização dos spoilers, `--images`) |
+| `card_official_images`, `card_official_checks` | `(card_id, variant, region)`, `(region, series)` | Impressões vistas nas listas oficiais da Bandai (`image_url`, `lang`, `label`) e quando cada série foi consultada | `fillOfficialImages` (`card-cdn/official.ts`) |
+| `card_local_images` | `object_key` | Imagens que vieram por fora (`--images-from`): `card_id`, `art_id`, `lang`, `hash`, `main` (1 = impressão base), `label`, `content_type`, `bytes`. Reaplicadas nas cartas em toda rodada da CDN | `importLocalImages` / `applyLocalImages` (`card-cdn/local.ts`) |
 | `decks` | `id` (`st01-luffy`, `u-xxxxxxxx`) | `name`, `leader`, **`cards` (JSON `[{id,count}]`)**, `kind` (`builtin`/`user`), `owner_hash`, `updated_at` | seed (builtin), `POST/PUT /api/decks` |
 | `users` | `id` (`u-` + 12 hex) | `google_sub` (único), `email`, `name`, `picture`, `role` (`player/streamer/organizer/admin/dev`), `created_at`, `last_login_at` | login Google, admin |
 | `sessions` | `token_hash` | `user_id`, `created_at`, `expires_at` (60 dias) | login/logout |
@@ -1681,6 +1684,8 @@ npm run typecheck && npm test              # tipos; testes do motor (com 200 par
 npm run cards:import -- ST-01 OP-01        # importar coleções da optcgapi
 npm run cards:import -- --all              # tudo
 npm run cards:import -- --spoilers         # buscar spoilers e trocar por oficiais
+npm run cards:import -- --images           # copiar para a CDN própria as imagens que ainda estão fora
+npm run cards:import -- --images-from ./promos-cn --images-lang cn   # subir imagens de uma pasta para a CDN própria
 npm run db:seed                            # reaplicar decks prontos / cartas provisórias / traduções
 npm run oauth:client -- add sweetapp "sweetapp" --redirect https://… [--scopes "…"] [--webhook https://…]  # cliente OAuth (parceiros)
 npm run translations:check -w @gumgum/server

@@ -1016,6 +1016,25 @@ da Ásia (`asia-en.onepiece-cardgame.com`) e japonês (`www.onepiece-cardgame.co
 - Desenho provisório recusado fica registrado (não é baixado de novo) e, na rodada seguinte, a carta procura a oficial.
 - Tudo roda junto da cópia para a CDN (importação, sincronização dos spoilers e `--images`).
 
+**Imagens que vêm por fora** (`card-cdn/local.ts`): promos que nenhuma fonte tem (as da China, por exemplo) entram de
+uma pasta de PNG/JPEG/WebP:
+
+```bash
+npm run cards:import -- --images-from ./promos-cn --images-lang cn --images-label "Promo China"
+```
+
+- Nome do arquivo: `<número da carta>[_<sufixo>].png` (ou `.jpg`, `.webp`), ex.: `P-123.png` para a impressão base e
+  `P-123_cn1.png` para uma variante. A carta precisa já existir no banco; arquivo com nome fora do padrão, de carta
+  desconhecida, que não é imagem ou acima de 4 MB é ignorado (com aviso). `--images-lang` é o idioma da chave na CDN
+  (padrão `cn`); `--images-label` é o rótulo das artes (opcional).
+- Chave no bucket: `<coleção>/<idioma>/<nome>.<ext>` (ex.: `/P/cn/P-123.png`), com o mesmo cache de um ano e `?v=`.
+  Rodar de novo com a mesma pasta não sobe nada; um arquivo que mudou sobe e troca o `?v=`.
+- A impressão base vira a imagem da carta quando ela não tem nenhuma (a carta ganha `imageLang`); se a carta já tem
+  imagem (fonte de dados ou lista oficial da Bandai), vira arte alternativa, como as variantes. O id da arte é o nome
+  do arquivo (`P-123_cn1`), e `P-123_cn` para a base.
+- O que entrou fica em `card_local_images` e é reaplicado em toda rodada da CDN: reimportar a carta ou sincronizar os
+  spoilers não desfaz nada. O `index.json` dos parceiros passa a listar essas imagens na mesma rodada.
+
 **Configuração no Cloudflare (uma vez):**
 
 1. O domínio público do bucket precisa estar no Cloudflare. O `gumgumfight.app` usa o DNS da Hostinger; o caminho mais

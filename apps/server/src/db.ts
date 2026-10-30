@@ -68,6 +68,22 @@ function migrate(db: DB) {
       created_at   TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Imagens que vieram por fora (card-cdn/local.ts, --images-from): objeto no bucket -> carta e arte.
+    CREATE TABLE IF NOT EXISTS card_local_images (
+      object_key   TEXT PRIMARY KEY,
+      card_id      TEXT NOT NULL,
+      art_id       TEXT NOT NULL,
+      lang         TEXT NOT NULL,
+      hash         TEXT NOT NULL,
+      main         INTEGER NOT NULL DEFAULT 0,  -- 1 = impressão base (vira a imagem da carta sem imagem)
+      label        TEXT,
+      content_type TEXT NOT NULL,
+      bytes        INTEGER NOT NULL,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS card_local_images_card ON card_local_images(card_id);
+
     -- Impressões vistas nas listas oficiais da Bandai (card-cdn/official.ts) e quando cada coleção foi consultada.
     CREATE TABLE IF NOT EXISTS card_official_images (
       card_id   TEXT NOT NULL,

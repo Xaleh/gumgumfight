@@ -8,6 +8,8 @@
 //   npm run cards:import -- --dry-run ST-01  # só mostra o resultado, não grava
 //   npm run cards:import -- --spoilers       # baixa os spoilers e troca os que já saíram na API pelos oficiais
 //   npm run cards:import -- --images         # só copia para a CDN própria as imagens que ainda estão fora
+//   npm run cards:import -- --images-from ./promos-cn --images-lang cn [--images-label "Promo China"]
+//                                            # sobe para a CDN própria imagens de uma pasta (card-cdn/local.ts)
 //
 // Com a CDN própria configurada (CARD_CDN_URL + R2_*, veja card-cdn/), toda importação termina
 // copiando as imagens novas para ela.
@@ -17,6 +19,7 @@
 import { automationStatus, translateCardPt } from '@gumgum/engine';
 import { join } from 'node:path';
 import { cdnFromEnv, syncCardCdn } from './card-cdn';
+import { importLocalImages } from './card-cdn/local';
 import { fetchJson } from './card-import';
 import { buildChain, chainNames, formatReport, type Layer, resolveChain, saveDiffReport, writeOfficial } from './card-sources';
 import { hasOfficialCards, openDb, recordCardGaps } from './db';
@@ -30,9 +33,26 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const cdn = cdnFromEnv();
   const log = (msg: string) => console.log(msg);
-  if (args.includes('--images')) {
+  const option = (name: string) => {
+    const i = args.indexOf(name);
+    if (i < 0) return undefined;
+    const v = args[i + 1];
+    if (!v || v.startsWith('--')) throw new Error(`${name} precisa de um valor`);
+    return v;
+  };
+  const imagesFrom = option('--images-from');
+  if (args.includes('--images') || imagesFrom) {
     if (!cdn) throw new Error('CDN própria não configurada (CARD_CDN_URL, R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)');
-    const r = await syncCardCdn(openDb(), cdn, { log });
+    const db = openDb();
+    if (imagesFrom) {
+      const dir = fromUserCwd(imagesFrom);
+      const lang = option('--images-lang') ?? 'cn';
+      const local = await importLocalImages(db, cdn, dir, { lang, label: option('--images-label'), log }).catch((err: unknown) => {
+        throw new Error(`imagens locais (${dir}): ${err instanceof Error ? err.message : err}`);
+      });
+      console.log(`Imagens locais: ${local.imported} gravadas na CDN, ${local.unchanged} já estavam, ${local.skipped.length} ignoradas.`);
+    }
+    const r = await syncCardCdn(db, cdn, { log });
     if (r.unavailable) throw new Error('o bucket do R2 não respondeu (veja a linha acima)');
     // As que falharam são tentadas de novo na próxima rodada; o log mostra só algumas.
     for (const f of r.failed.slice(0, 20)) console.error(`Falhou: ${f.url} (${f.error})`);
