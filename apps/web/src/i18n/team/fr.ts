@@ -64,6 +64,7 @@ export default {
   'coach.term.deckLow': 'deck presque vide',
   'coach.term.deckLowOpp': 'deck de l\'adversaire presque vide',
   'coach.term.threat': 'menace de l\'adversaire',
+  'coach.term.nextTurn': 'coup du prochain tour en main',
   'coach.term.win': 'partie décidée',
   'menu.navTeamBot': 'Bot de l\'équipe',
   'admin.tabTeam': 'Bot de l\'équipe',

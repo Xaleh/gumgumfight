@@ -9,6 +9,8 @@
 //   --player <id>[,<id>…]                só estes perfis (players.id)
 //   --tournament <id|latest>             só os jogos deste torneio (latest: o último encerrado), com a colocação de cada um
 //   --split <N>                          com --tournament: repete o resumo só para os N primeiros e só para o resto
+//   --leader <número>                    só partidas em que um lado humano jogou com este Líder (ex.: OP17-039); o
+//                                        resumo traz a concordância por Líder de qualquer forma
 //   --limit <N>                          no máximo N partidas (padrão 200, as mais recentes)
 //   --bot <hard|normal|none>             nível do bot comparado em cada decisão (padrão hard; none = só extrai)
 //   --budget <ms>                        teto de tempo por decisão do bot (padrão 250)
@@ -67,6 +69,7 @@ if (tournament) console.log(`Torneio: ${tournament.name} (${tournament.id}) | ${
 const ids = selectMatches(db, {
   queue: opt('queue'),
   since: opt('since'),
+  leader: opt('leader'),
   tournament: tournament?.id,
   players: players.size ? [...players] : undefined,
   limit: num('limit', 200),

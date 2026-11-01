@@ -64,6 +64,7 @@ export default {
   'coach.term.deckLow': 'deck almost empty',
   'coach.term.deckLowOpp': 'opponent\'s deck almost empty',
   'coach.term.threat': 'opponent\'s threat',
+  'coach.term.nextTurn': 'next turn\'s play in hand',
   'coach.term.win': 'game decided',
   'menu.navTeamBot': 'Team Bot',
   'admin.tabTeam': 'Team Bot',

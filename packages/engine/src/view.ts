@@ -88,6 +88,8 @@ export function visibleCards(state: GameState, viewer: PlayerId | null, extra: I
   }
   // Cartas reveladas por efeitos em resolução ("reveal …").
   for (const f of state.stack) if (f.kind === 'effect') for (const u of f.revealed ?? []) out.add(u);
+  // Cartas da mão já reveladas (e que não saíram de lá): quem viu, lembra.
+  for (const u of state.knownHand ?? []) if (state.players.some((ps) => ps.hand.includes(u))) out.add(u);
   // A carta do [Trigger] em resolução, fora de qualquer área (10-1-5-3): foi revelada.
   for (const u of state.limbo ?? []) out.add(u);
   const p = state.pending;
@@ -191,6 +193,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     usedThisTurn: state.usedThisTurn.map(usedKey).filter((k): k is string => k !== null),
     battledCharacter: refs(state.battledCharacter),
     refreshSkipped: refs(state.refreshSkipped),
+    ...(state.knownHand ? { knownHand: refs(state.knownHand) } : {}),
     delayed: state.delayed?.filter((d) => vis.has(d.source)).map((d) => ({ ...d, source: alias(d.source), last: refs(d.last) })),
     tempReplacements: state.tempReplacements?.filter((t) => vis.has(t.source)).map((t) => ({ ...t, source: alias(t.source) })),
     log: state.log.map(viewLogEntry(viewer)),

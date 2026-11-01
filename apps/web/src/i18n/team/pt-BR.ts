@@ -67,6 +67,7 @@ const teamPtBR = {
   'coach.term.deckLow': 'deck quase vazio',
   'coach.term.deckLowOpp': 'deck do oponente quase vazio',
   'coach.term.threat': 'ameaça do oponente',
+  'coach.term.nextTurn': 'jogada do próximo turno na mão',
   'coach.term.win': 'partida decidida',
   // ---- tela "Bot do Time": decks do meta e caixa de correções ----
   'menu.navTeamBot': 'Bot do Time',

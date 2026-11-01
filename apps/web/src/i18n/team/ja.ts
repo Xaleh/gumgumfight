@@ -64,6 +64,7 @@ export default {
   'coach.term.deckLow': 'デッキ切れ間近',
   'coach.term.deckLowOpp': '相手のデッキ切れ間近',
   'coach.term.threat': '相手の脅威',
+  'coach.term.nextTurn': '次ターンのプレイが手札に',
   'coach.term.win': '勝負あり',
   'menu.navTeamBot': 'チームボット',
   'admin.tabTeam': 'チームボット',

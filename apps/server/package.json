@@ -13,9 +13,11 @@
     "test": "vitest run",
     "oauth:client": "tsx src/oauth-client-cli.ts",
     "decisions": "tsx src/decisions-cli.ts",
-    "decisions:tune": "tsx src/decisions-tune-cli.ts"
+    "decisions:tune": "tsx src/decisions-tune-cli.ts",
+    "bot:agent": "tsx src/bot-agent-cli.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@fastify/static": "^8.0.3",
     "@gumgum/engine": "*",
     "fastify": "^5.2.0",

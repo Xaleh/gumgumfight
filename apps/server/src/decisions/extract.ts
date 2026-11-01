@@ -67,6 +67,9 @@ export interface DecisionRecord {
   playedAt: string;
   /** Índice da ação no replay. */
   index: number;
+  /** O Líder do jogador e o do oponente (números de carta). */
+  leader: string;
+  oppLeader: string;
   turn: number;
   myTurn: boolean;
   kind: DecisionKind;
@@ -113,6 +116,8 @@ export interface MatchFilter {
   players?: string[];
   /** Só os jogos deste torneio (`tournaments.id`). */
   tournament?: string;
+  /** Só partidas em que um lado humano jogou com este Líder (número da carta). */
+  leader?: string;
   limit?: number;
 }
 
@@ -169,6 +174,10 @@ export function selectMatches(db: DB, f: MatchFilter = {}): number[] {
   if (f.players?.length) {
     seatWhere += ` AND s.player_id IN (${f.players.map(() => '?').join(',')})`;
     args.push(...f.players);
+  }
+  if (f.leader) {
+    seatWhere += ' AND s.leader = ?';
+    args.push(f.leader);
   }
   where.push(`EXISTS (SELECT 1 FROM match_seats s WHERE ${seatWhere})`);
   if (f.queue) {
@@ -551,6 +560,8 @@ function replayMatch(matchId: number, m: MatchRow, config: GameConfig, actions: 
           bounty: seat.bounty_before,
           playedAt: seat.played_at,
           index: i,
+          leader: state.cards[me.leader.uid].cardId,
+          oppLeader: state.cards[opp.leader.uid].cardId,
           turn: state.turn,
           myTurn: state.activePlayer === a.player,
           kind,
@@ -634,6 +645,8 @@ export interface Summary {
   decisions: number;
   /** Por tipo de decisão: quantas e em quantas o bot concordou. */
   kinds: Record<string, { n: number; agree: number; compared: number }>;
+  /** Por Líder do jogador: as decisões da fase principal e em quantas o bot concordou (o que o perfil de deck muda). */
+  byLeader: Record<string, { n: number; agree: number; compared: number }>;
   /** Defesa do Líder: taxa de Counter/bloqueio do humano e do bot, por Vida do defensor. */
   leaderDefense: Record<string, { n: number; human: number; bot: number; botCompared: number }>;
   /** Counter por margem exigida (em milhares), só nos ataques ao Líder. */
@@ -687,6 +700,7 @@ export function summarize(records: DecisionRecord[], matches: number, failed: nu
     failed,
     decisions: records.length,
     kinds: {},
+    byLeader: {},
     leaderDefense: {},
     counterByNeed: {},
     mainDisagreements: [],
@@ -707,6 +721,15 @@ export function summarize(records: DecisionRecord[], matches: number, failed: nu
         if (r.agree) row.agree++;
       }
     });
+    if (r.kind === 'main' && r.leader) {
+      bump(s.byLeader, r.leader, { n: 0, agree: 0, compared: 0 }, (row) => {
+        row.n++;
+        if (r.agree !== undefined) {
+          row.compared++;
+          if (r.agree) row.agree++;
+        }
+      });
+    }
     if ((r.kind === 'counter' || r.kind === 'block') && r.battle?.targetIsLeader && r.battle.need > 0) {
       const defended = (c: Choice) => (r.kind === 'counter' ? c.type === 'counter' : c.type === 'choose' && (c.cards?.length ?? 0) > 0);
       const add = (row: { n: number; human: number; bot: number; botCompared: number }) => {
@@ -823,6 +846,12 @@ export function formatSummary(s: Summary): string {
   out.push('Por tipo de decisão (concordância do bot, quando comparado):');
   for (const [kind, row] of Object.entries(s.kinds).sort((a, b) => b[1].n - a[1].n)) {
     out.push(`  ${kind.padEnd(14)} ${String(row.n).padStart(6)}   bot concorda ${pct(row.agree, row.compared)}`);
+  }
+  const byLeader = Object.entries(s.byLeader).sort((a, b) => b[1].n - a[1].n);
+  if (byLeader.length) {
+    out.push('');
+    out.push('Fase principal por Líder do jogador (concordância do bot): o que o perfil de deck muda');
+    for (const [leader, row] of byLeader.slice(0, 20)) out.push(`  ${leader.padEnd(14)} ${String(row.n).padStart(6)}   bot concorda ${pct(row.agree, row.compared)}`);
   }
   const defense = Object.entries(s.leaderDefense).sort();
   if (defense.length) {

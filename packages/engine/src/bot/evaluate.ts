@@ -143,6 +143,12 @@ export interface Weights {
   roleDefense: number;
   roleFuel: number;
   holdBonus: number;
+  /**
+   * A curva do deck (perfil, `plan`): no fim do próprio turno, ter na mão a jogada prevista para o DON!! do
+   * turno seguinte vale isto. É o que separa "desenvolver ou pressionar": jogar a mão fora hoje perde a jogada
+   * de amanhã. Sem `plan`, não pesa.
+   */
+  nextTurn: number;
   roles?: Record<string, CardRole>;
   hold?: Record<string, HoldRule>;
   /** A curva do deck (perfil): a jogada prevista por DON!! disponível (termo `nextTurn`). */
@@ -194,7 +200,21 @@ export const DEFAULT_WEIGHTS: Weights = {
   roleDefense: 700,
   roleFuel: 600,
   holdBonus: 2500,
+  nextTurn: 1500,
 };
+
+/**
+ * A jogada do próximo turno pelo plano do deck: o passo de maior DON!! que cabe no DON!! que o jogador terá
+ * no turno seguinte (os de campo mais 2, até o que o deck de DON!! ainda dá). Devolve as cartas previstas.
+ */
+export function nextTurnPlay(state: GameState, ps: PlayerState, plan: PlanStep[] | undefined): string[] | null {
+  if (!plan?.length) return null;
+  const inPlay = ps.donActive + ps.donRested + ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
+  const next = inPlay + Math.min(2, ps.donDeck);
+  let best: PlanStep | null = null;
+  for (const step of plan) if (step.don <= next && (!best || step.don > best.don)) best = step;
+  return best ? best.play : null;
+}
 
 function lifeValue(w: Weights, n: number, opp = false): number {
   const table = opp ? w.lifeOpp : w.life;
@@ -379,6 +399,14 @@ function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number
   const hv = handValue(state, w, ps, hidden, !opp && hasDiscardOutlet(state, ps) ? w.handFuel : 0);
   v += hv;
   t('hand', hv);
+  // A curva do deck (perfil): a jogada prevista para o turno seguinte já na mão (só o próprio lado, que vê a mão).
+  if (!opp && w.nextTurn) {
+    const play = nextTurnPlay(state, ps, w.plan);
+    if (play && ps.hand.some((u) => play.includes(cardDef(state, u).id))) {
+      v += w.nextTurn;
+      t('nextTurn', w.nextTurn);
+    }
+  }
   for (const c of ps.characters) {
     const cv = fieldCardValue(state, w, c.uid) * (1 - frozenFraction(state, w, c.uid, c.rested));
     v += cv;

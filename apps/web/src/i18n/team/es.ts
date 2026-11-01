@@ -64,6 +64,7 @@ export default {
   'coach.term.deckLow': 'mazo casi vacío',
   'coach.term.deckLowOpp': 'mazo del rival casi vacío',
   'coach.term.threat': 'amenaza del rival',
+  'coach.term.nextTurn': 'jugada del próximo turno en mano',
   'coach.term.win': 'partida decidida',
   'menu.navTeamBot': 'Bot del Equipo',
   'admin.tabTeam': 'Bot del Equipo',

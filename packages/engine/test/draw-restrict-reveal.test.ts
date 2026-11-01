@@ -226,10 +226,13 @@ describe('Carta revelada aparece para o oponente', () => {
     const line = s.log.find((l) => l.key === 'log.revealsAddsToHand')!;
     expect(line).toMatchObject({ revealed: ['DR-006'], revealedBy: 0 });
     const theirs = viewFor(s, 1, aliases(s));
-    // Na mão do jogador 0 a carta está escondida para o oponente…
-    expect(theirs.players[0].hand.some((u) => theirs.cards[u].cardId === 'DR-006')).toBe(false);
-    // …mas a linha do log e a definição chegam a ele.
+    // O oponente viu a carta ir para a mão: ela continua à vista dele enquanto estiver lá (`knownHand`), como
+    // um jogador de verdade lembra; a linha do log e a definição também chegam a ele.
+    expect(theirs.players[0].hand.some((u) => theirs.cards[u].cardId === 'DR-006')).toBe(true);
+    expect(s.knownHand).toEqual([ivan]);
     expect(theirs.log.find((l) => l.key === 'log.revealsAddsToHand')?.revealed).toEqual(['DR-006']);
     expect(theirs.defs['DR-006']?.name).toBe('Ivankov');
+    // Jogada a carta, ela sai da lista na ação seguinte e as outras cartas da mão seguem escondidas.
+    expect(theirs.players[0].hand.filter((u) => theirs.cards[u].cardId !== '?')).toHaveLength(1);
   });
 });

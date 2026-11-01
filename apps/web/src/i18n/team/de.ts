@@ -64,6 +64,7 @@ export default {
   'coach.term.deckLow': 'Deck fast leer',
   'coach.term.deckLowOpp': 'Deck des Gegners fast leer',
   'coach.term.threat': 'Bedrohung durch den Gegner',
+  'coach.term.nextTurn': 'Zug des nächsten Zuges auf der Hand',
   'coach.term.win': 'Partie entschieden',
   'menu.navTeamBot': 'Team-Bot',
   'admin.tabTeam': 'Team-Bot',

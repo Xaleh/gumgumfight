@@ -1,10 +1,10 @@
 // Perfil de deck do Bot do Time (docs/plano-bot-time.md): o conhecimento do deck entra na avaliação como valores.
 
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WEIGHTS, evaluate, evaluateTerms, fieldCardValue, handCardValue } from '../src/bot/evaluate';
+import { DEFAULT_WEIGHTS, evaluate, evaluateTerms, fieldCardValue, handCardValue, nextTurnPlay } from '../src/bot/evaluate';
 import { chooseBotAction } from '../src/bot/planner';
 import { ARCHETYPE_WEIGHTS, type DeckProfile, donInPlay, keepHand, profileWeights, validateProfile } from '../src/bot/profile';
-import { cardDef } from '../src/engine';
+import { applyAction, cardDef } from '../src/engine';
 import type { GameState } from '../src/types';
 import { identityAliases, viewFor } from '../src/view';
 import { fetchToHand, kid, luffy, newGame, started, toTurn } from './helpers';
@@ -132,5 +132,52 @@ describe('painel do treinador: explicação das decisões', () => {
     // Soma dos termos = avaliação.
     const terms = evaluateTerms(s, 0);
     expect(Object.values(terms).reduce((x, y) => x + y, 0)).toBeCloseTo(evaluate(s, 0), 3);
+  });
+});
+
+describe('fase 2: a curva do próximo turno e a memória das cartas reveladas', () => {
+  it('nextTurn: ter na mão a jogada prevista para o DON!! do turno seguinte vale o bônus (só com plano)', () => {
+    const s = started(3); // turno 1 do jogador 0: 1 DON!! em campo, 2 no próximo turno... o plano usa o DON!! do próximo turno
+    const plan = [
+      { don: 2, play: ['ST01-003'] },
+      { don: 4, play: ['ST01-010'] },
+    ];
+    const ps = s.players[0];
+    expect(nextTurnPlay(s, ps, undefined)).toBeNull();
+    const next = ps.donActive + ps.donRested + Math.min(2, ps.donDeck);
+    expect(nextTurnPlay(s, ps, plan)).toEqual(next >= 4 ? ['ST01-010'] : ['ST01-003']);
+    const w = { ...DEFAULT_WEIGHTS, plan };
+    const expected = nextTurnPlay(s, ps, plan)![0];
+    ps.deck.push(...ps.hand);
+    ps.hand = [];
+    const without = evaluate(s, 0, w);
+    fetchToHand(s, 0, expected);
+    const base = evaluate(s, 0, DEFAULT_WEIGHTS);
+    expect(evaluate(s, 0, w) - base).toBe(w.nextTurn);
+    expect(evaluate(s, 0, w)).toBeGreaterThan(without);
+    expect(evaluateTerms(s, 0, w).nextTurn).toBe(w.nextTurn);
+  });
+
+  it('knownHand: a carta da mão revelada fica à vista do oponente enquanto estiver na mão', () => {
+    let s = started(4);
+    const uid = s.players[1].hand[0];
+    const aliases = identityAliases(s);
+    expect(viewFor(s, 0, aliases).cards[uid]).toBeUndefined();
+    s.knownHand = [uid];
+    const view = viewFor(s, 0, aliases);
+    expect(view.cards[uid]?.cardId).toBe(s.cards[uid].cardId);
+    expect(view.players[1].hand).toContain(uid);
+    // Continua lembrada depois de uma ação que não mexe na carta.
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(s.knownHand).toEqual([uid]);
+    expect(viewFor(s, 0, identityAliases(s)).cards[uid]?.cardId).toBe(s.cards[uid].cardId);
+    // Saiu da mão (para o deck): a próxima ação a esquece; na mão de novo, continua escondida.
+    s.players[1].hand = s.players[1].hand.filter((u) => u !== uid);
+    s.players[1].deck.unshift(uid);
+    s = applyAction(s, { type: 'endTurn', player: 1 });
+    expect(s.knownHand).toBeUndefined();
+    s.players[1].deck = s.players[1].deck.filter((u) => u !== uid);
+    s.players[1].hand.push(uid);
+    expect(viewFor(s, 0, identityAliases(s)).cards[uid]).toBeUndefined();
   });
 });

@@ -104,13 +104,19 @@ export function defenseByLife(samples: Sample[], weights: BotWeights, level: Bot
 /** Parâmetros ajustados, em escala log: os 5 degraus da própria Vida e a ameaça do próximo ataque. */
 export type Theta = Record<string, number>;
 
-export function initialTheta(w: BotWeights = BOT_WEIGHTS, withHand = false): Theta {
+/** Os pesos de defesa que o ajuste sempre mexe; `extra` acrescenta outros escalares (ex.: os `weights` de um perfil de deck). */
+const FIXED_KEYS = ['threatHit', 'lethal'] as const;
+const isScalarKey = (w: BotWeights, k: string): k is keyof BotWeights => typeof (w as unknown as Record<string, unknown>)[k] === 'number' && (w as unknown as Record<string, number>)[k] > 0;
+
+export function initialTheta(w: BotWeights = BOT_WEIGHTS, withHand = false, extra: string[] = []): Theta {
   const t: Theta = { threatHit: Math.log(w.threatHit), lethal: Math.log(w.lethal) };
   for (let i = 1; i <= 5; i++) t[`life${i}`] = Math.log(w.life[i] - w.life[i - 1]);
   // Opcional: o valor da carta da própria mão que o bot não vê (a que sai da Vida no ataque que ele deixa passar,
   // a comprada por efeito). Pesa em toda defesa ("deixar passar dá uma carta"), mas também nos efeitos de compra
   // do próprio turno: confira no auto-jogo com mais cuidado.
   if (withHand) t.handCard = Math.log(w.handCard);
+  // Pesos escalares a mais (positivos; os de um perfil de deck, com `--profile`), em escala log como os outros.
+  for (const k of extra) if (isScalarKey(w, k) && !(k in t) && !k.startsWith('life')) t[k] = Math.log(w[k] as number);
   return t;
 }
 
@@ -118,19 +124,20 @@ export function initialTheta(w: BotWeights = BOT_WEIGHTS, withHand = false): The
 export function weightsOf(t: Theta, base: BotWeights = BOT_WEIGHTS): BotWeights {
   const life = [0];
   for (let i = 1; i <= 5; i++) life.push(Math.round(life[i - 1] + Math.exp(t[`life${i}`])));
-  return {
-    ...base,
-    life,
-    lifeExtra: Math.round(Math.exp(t.life5)),
-    threatHit: Math.round(Math.exp(t.threatHit)),
-    lethal: Math.round(Math.exp(t.lethal)),
-    ...(t.handCard !== undefined ? { handCard: Math.round(Math.exp(t.handCard)) } : {}),
-  };
+  const out: BotWeights = { ...base, life, lifeExtra: Math.round(Math.exp(t.life5)) };
+  for (const [k, v] of Object.entries(t)) {
+    if (k.startsWith('life')) continue;
+    // Chances (0 a 1) ficam com casas; os outros pesos são inteiros.
+    (out as unknown as Record<string, number>)[k] = (base as unknown as Record<string, number>)[k] < 2 ? Number(Math.exp(v).toPrecision(3)) : Math.round(Math.exp(v));
+  }
+  return out;
 }
 
-/** Só o que o ajuste muda (o json parcial que `duel.ts` e `vs-human.ts` aceitam). */
-export function partialWeights(w: BotWeights, withHand = false): Partial<BotWeights> {
-  return { life: w.life, lifeExtra: w.lifeExtra, threatHit: w.threatHit, lethal: w.lethal, ...(withHand ? { handCard: w.handCard } : {}) };
+/** Só o que o ajuste muda (o json parcial que `duel.ts` e `vs-human.ts` aceitam, e os `weights` de um perfil). */
+export function partialWeights(w: BotWeights, withHand = false, extra: string[] = []): Partial<BotWeights> {
+  const out: Partial<BotWeights> = { life: w.life, lifeExtra: w.lifeExtra, ...(withHand ? { handCard: w.handCard } : {}) };
+  for (const k of [...FIXED_KEYS, ...extra]) if (isScalarKey(w, k)) (out as unknown as Record<string, number>)[k] = w[k] as number;
+  return out;
 }
 
 export interface SpsaOptions {

@@ -1148,6 +1148,12 @@ export function applyAction(prev: GameState, action: Action): GameState {
   const { defs, ...rest } = prev;
   const state = cloneState(rest) as GameState;
   state.defs = defs;
+  // Cartas reveladas da mão que já saíram dela deixam de ser lembradas.
+  if (state.knownHand?.length) {
+    const kept = state.knownHand.filter((u) => state.players.some((ps) => ps.hand.includes(u)));
+    if (kept.length) state.knownHand = kept;
+    else delete state.knownHand;
+  }
   const p = action.player;
   const pending = state.pending;
 
@@ -6206,6 +6212,12 @@ function gameOver(state: GameState, winner: PlayerId | null, reason: Prompt) {
 function log(state: GameState, player: PlayerId | null, m: Prompt, reveal?: { uids: string[]; by?: PlayerId }) {
   const revealed = reveal?.uids.length ? { revealed: reveal.uids.map((u) => state.cards[u].cardId), ...(reveal.by !== undefined ? { revealedBy: reveal.by } : {}) } : {};
   state.log.push({ turn: state.turn, player, text: m.text, ...msgOf(m), ...revealed });
+  // Carta da mão revelada: o oponente a lembra enquanto ela ficar na mão (`knownHand`).
+  for (const u of reveal?.uids ?? []) {
+    if (!state.players.some((ps) => ps.hand.includes(u))) continue;
+    state.knownHand ??= [];
+    if (!state.knownHand.includes(u)) state.knownHand.push(u);
+  }
 }
 
 /**
