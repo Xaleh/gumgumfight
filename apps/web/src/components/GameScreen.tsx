@@ -1,6 +1,7 @@
 import {
   type Action,
   actingPlayer,
+  type BotLevel,
   cancelAllowed,
   type CardData,
   type CardDef,
@@ -25,7 +26,8 @@ import {
 } from '@gumgum/engine';
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { api, currentSpoilerSet, isAdmin, type LiveRoom, modeLabel, type OnlineSeat, type RoomDecks, type WatchTarget, whyNotPlayable } from '../api';
+import { api, currentSpoilerSet, type FeedbackMark, isAdmin, isTeam, type LiveRoom, modeLabel, type OnlineSeat, type RoomDecks, type WatchTarget, whyNotPlayable } from '../api';
+import { BotRating } from './BotFeedback';
 import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
@@ -269,6 +271,7 @@ export function GameScreen({
         game={{ ...game, downloadReplay: () => downloadReplay(game.exportReplay()) }}
         kind={setup.mode}
         matchId={matchId}
+        botLevel={setup.botLevel}
         ownDeck={human !== null ? ownDeck : undefined}
         onExit={onExit}
         onRematch={onRematch && (setup.mode === 'bot' && confirmDeck ? () => setConfirming(true) : () => onRematch())}
@@ -523,6 +526,7 @@ function Table({
   startNotice,
   tutorial,
   matchId,
+  botLevel,
   embed,
   ownDeck,
 }: {
@@ -555,6 +559,8 @@ function Table({
   tutorial?: TableTutorial;
   /** Partida contra o bot já gravada no servidor (o relato de bug aponta para ela; online vem da sala). */
   matchId?: number | null;
+  /** Partida contra o bot no navegador: o nível do bot (online vem da sala). */
+  botLevel?: BotLevel;
   /** Replay embutido num app parceiro. */
   embed?: TableEmbed;
   /** Partida no navegador: o deck de quem joga, para o painel de decklist (online vem da sala). */
@@ -750,6 +756,12 @@ function Table({
   const [deckOf, setDeckOf] = useState<PlayerId | null>(null);
   const recorded = isOnline ? (online?.room?.result?.matchId ?? null) : (matchId ?? null);
   const reportMatch = human !== null && !watching && !tutorial && !broadcast && kind !== 'replay' ? recorded : null;
+  // Bot do Time: a nota e as marcações, para quem é do Time, numa partida contra o bot (no navegador ou na sala do servidor).
+  const botMatch = kind === 'bot' || online?.room?.queue === 'bot';
+  const effectiveBotLevel: BotLevel | undefined = isOnline ? online?.room?.botLevel : botLevel;
+  /** Jogadas do bot marcadas durante a partida (painel do treinador); vão com a nota no fim. */
+  const [marks, setMarks] = useState<FeedbackMark[]>([]);
+  void setMarks;
   const reportCards = useMemo(
     () =>
       Object.values(state.defs)
@@ -793,6 +805,7 @@ function Table({
   // Espectador com a visão de um jogador (o streamer que transmite a própria partida): a mão dele embaixo.
   const bottom: PlayerId = human ?? online?.room?.pov ?? 0;
   const { user } = useAuth();
+  const feedbackMatch = botMatch && isTeam(user) && reportMatch !== null ? reportMatch : null;
   /** Streamer e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */
   const canBroadcast = Boolean(online?.room && !broadcast && !tutorial && user && (user.role === 'streamer' || isAdmin(user.role)));
   const sendToBroadcast = () =>
@@ -1825,6 +1838,7 @@ function Table({
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
             onReport={reportMatch !== null ? () => setReporting(true) : undefined}
             onDeck={setDeckOf}
+            feedback={feedbackMatch !== null ? <BotRating matchId={feedbackMatch} level={effectiveBotLevel} marks={marks} /> : undefined}
           />
         )}
         {deckOf !== null && state.phase === 'gameover' && (

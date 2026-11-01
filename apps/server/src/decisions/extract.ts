@@ -130,7 +130,7 @@ export interface ExtractOptions {
   onDecision?: (state: GameState, action: Action, rec: DecisionRecord) => void;
 }
 
-interface StoredReplay {
+export interface StoredReplay {
   seed: number;
   seed128?: number[];
   firstPlayer?: PlayerId;
@@ -142,7 +142,7 @@ interface StoredReplay {
   engineTexts?: Record<string, CardEngineText>;
 }
 
-interface MatchRow {
+export interface MatchRow {
   id: number;
   mode: string;
   format: string | null;
@@ -150,7 +150,7 @@ interface MatchRow {
   replay: string;
 }
 
-interface SeatRow {
+export interface SeatRow {
   seat: PlayerId;
   controller: string;
   player_id: string | null;
@@ -372,6 +372,75 @@ function botTurn(state: GameState, player: PlayerId, aliases: ReturnType<typeof 
 }
 
 /** Refaz uma partida e devolve as decisões dos lados humanos. */
+/** O replay de uma partida gravada, pronto para ser refeito: as tentativas (atual e, se preciso, atualizada). */
+export interface LoadedReplay {
+  match: MatchRow;
+  stored: StoredReplay;
+  seats: SeatRow[];
+  attempts: Array<{ config: GameConfig; actions: Action[] }>;
+}
+
+export function loadReplay(db: DB, matchId: number): LoadedReplay | { error: string } {
+  const m = db.prepare('SELECT id, mode, format, queue, replay FROM matches WHERE id = ?').get(matchId) as MatchRow | undefined;
+  if (!m?.replay) return { error: 'sem replay' };
+  let stored: StoredReplay;
+  try {
+    stored = JSON.parse(m.replay) as StoredReplay;
+  } catch {
+    return { error: 'replay ilegível' };
+  }
+  const seats = seatsOf(db, matchId);
+  const ids = [...new Set(stored.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
+  const cards = pinEngineTexts(getCards(db, ids) as CardData[], stored.engineTexts);
+  const config: GameConfig = {
+    seed: stored.seed,
+    seed128: stored.seed128,
+    firstPlayer: stored.firstPlayer,
+    chooseFirst: stored.chooseFirst,
+    legacySetup: stored.legacySetup,
+    cards,
+    players: [
+      { name: 'A', deck: stored.decks[0] },
+      { name: 'B', deck: stored.decks[1] },
+    ],
+  };
+  // Partidas do navegador gravadas antes de o replay guardar a versão: refeitas como atuais, param na primeira
+  // pergunta que o motor passou a fazer depois. Nesse caso, a segunda tentativa passa as ações pelo
+  // `upgradeReplayActions` (que insere as respostas que o motor antigo dava sozinho).
+  const version = stored.version ?? (stored.legacySetup ? 8 : REPLAY_VERSION);
+  const attempts: Array<{ config: GameConfig; actions: Action[] }> = [];
+  try {
+    if (version < REPLAY_VERSION) {
+      const c = replayConfig(config, version);
+      attempts.push({ config: c, actions: upgradeReplayActions(c, stored.actions) });
+    } else {
+      attempts.push({ config, actions: stored.actions });
+      if (stored.version === undefined) attempts.push({ config, actions: upgradeReplayActions(config, stored.actions) });
+    }
+  } catch (e) {
+    return { error: `replay da versão ${version} não refaz: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  return { match: m, stored, seats, attempts };
+}
+
+/** A posição de uma partida gravada antes da ação `index`: o estado completo e a ação (null se o replay não refaz). */
+export function positionAt(db: DB, matchId: number, index: number): { state: GameState; action: Action; stored: StoredReplay; seats: SeatRow[] } | null {
+  const loaded = loadReplay(db, matchId);
+  if ('error' in loaded) return null;
+  for (const { config, actions } of loaded.attempts) {
+    if (index < 0 || index >= actions.length) continue;
+    try {
+      let state = createGame(config);
+      for (let i = 0; i < index; i++) state = applyAction(state, actions[i]);
+      if (state.phase === 'gameover') continue;
+      return { state, action: actions[index], stored: loaded.stored, seats: loaded.seats };
+    } catch {
+      /* esta tentativa não refaz; a próxima pode */
+    }
+  }
+  return null;
+}
+
 export function extractMatch(db: DB, matchId: number, opts: ExtractOptions = {}): MatchExtraction {
   const m = db.prepare('SELECT id, mode, format, queue, replay FROM matches WHERE id = ?').get(matchId) as MatchRow | undefined;
   if (!m?.replay) return { records: [], turns: [], error: 'sem replay' };

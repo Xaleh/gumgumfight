@@ -1308,6 +1308,8 @@ export class Room {
       manual: !late && this.paused && this.data.manual ? { name: this.data.manual.name, at: this.data.manual.at } : null,
       result: over ? this.data.result : null,
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
+      /** Treino contra o bot: o nível do bot do servidor (a nota e as marcações do Time citam o nível). */
+      ...(this.data.botLevel ? { botLevel: this.data.botLevel } : {}),
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
       handsAllowed: this.handsAllowed,
       /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio com mãos ao vivo). */

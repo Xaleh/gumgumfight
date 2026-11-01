@@ -8,6 +8,7 @@ import {
   type DeckList,
   type FormatId,
   formatLabel,
+  type GameState,
   type LogEntry,
   type ManualOp,
   type Pending,
@@ -438,6 +439,49 @@ export interface AdminUser extends User {
   supporterSource: 'manual' | 'apoiase' | 'kofi' | null;
 }
 
+// ------------------------------------------------------------------ Bot do Time
+
+/** Marcação de uma jogada do bot: a posição no replay, o que ele deveria ter feito e um comentário. */
+export interface FeedbackMark {
+  index: number;
+  /** A jogada esperada (uma ação legal daquela posição, por números de carta) ou texto livre. */
+  expected?: Record<string, unknown> | string;
+  comment?: string;
+}
+export type FeedbackStatus = 'open' | 'test' | 'fixed' | 'dismissed';
+export const FEEDBACK_STATUSES: FeedbackStatus[] = ['open', 'test', 'fixed', 'dismissed'];
+export interface FeedbackItem {
+  id: number;
+  matchId: number;
+  userId: string;
+  userName: string | null;
+  kind: 'mark' | 'rating';
+  botLevel: string | null;
+  botSeat: number | null;
+  botDeck: string | null;
+  leader: string | null;
+  oppLeader: string | null;
+  actionIndex: number | null;
+  turn: number | null;
+  /** A jogada do bot e a esperada, por números de carta (`{type, card?, target?…}`) ou texto. */
+  botAction: Record<string, unknown> | null;
+  expected: Record<string, unknown> | string | null;
+  rating: number | null;
+  comment: string | null;
+  status: FeedbackStatus;
+  note: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+export interface FeedbackDeckSummary {
+  botDeck: string | null;
+  leader: string | null;
+  ratings: number;
+  avgRating: number | null;
+  openMarks: number;
+  marks: number;
+}
+
 // ------------------------------------------------------------------ apps parceiros (tokens e OAuth)
 
 /** Permissões de um token de parceiro; `profile` é sempre concedida. */
@@ -694,6 +738,15 @@ export const api = {
       get<{ replay: Record<string, unknown>; cards: ApiCard[]; origins: string[] }>(`/api/replay/${id}?t=${encodeURIComponent(token)}`),
     report: (id: number, form: ReportForm) => send<MatchReport>('POST', `/api/matches/${id}/report`, form),
   },
+  /** Bot do Time: correções (marcações de jogadas e notas) e a caixa de correções. */
+  bot: {
+    feedback: (matchId: number, form: { level?: BotLevel; rating?: number; comment?: string; marks?: FeedbackMark[] }) =>
+      send<{ ids: number[] }>('POST', '/api/bot/feedback', { matchId, ...form }),
+    feedbackList: (status: FeedbackStatus | 'all' = 'open') => get<{ items: FeedbackItem[] }>(`/api/bot/feedback?status=${status}`),
+    feedbackItem: (id: number) => get<FeedbackItem & { position: GameState | null }>(`/api/bot/feedback/${id}`),
+    feedbackSummary: () => get<{ decks: FeedbackDeckSummary[] }>('/api/bot/feedback/summary'),
+    setFeedbackStatus: (id: number, status: FeedbackStatus, note?: string) => send<FeedbackItem>('PUT', `/api/bot/feedback/${id}`, { status, note }),
+  },
   reports: {
     list: (opts: { tournament?: string; status?: 'open' | 'resolved' | 'all' } = {}) =>
       get<{ reports: MatchReport[] }>(
@@ -933,6 +986,8 @@ export interface OnlineRoomInfo {
     errorCode?: string;
   } | null;
   rematch: [boolean, boolean];
+  /** Treino contra o bot: o nível do bot do servidor (servidores antigos não mandam). */
+  botLevel?: BotLevel;
   /** Atraso da mesa desta conexão em ms (quem vê as mãos); 0 ou ausente = ao vivo. */
   delay?: number;
   /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */

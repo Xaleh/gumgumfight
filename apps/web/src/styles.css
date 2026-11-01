@@ -15186,3 +15186,53 @@ div.dk-tile-main {
 .mode-hint {
   margin: 4px 0 0;
 }
+/* Bot do Time: a nota no fim da partida. */
+.bot-rating {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+.bot-rating.sent {
+  margin: 0;
+  text-align: center;
+}
+.bot-rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.bot-rating-stars button {
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
+  padding: 2px 3px;
+  border: 0;
+  background: none;
+  color: var(--line);
+  cursor: pointer;
+}
+.bot-rating-stars button.on {
+  color: var(--gold);
+}
+.bot-rating-stars .muted {
+  margin-left: 8px;
+}
+.bot-rating textarea {
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+  resize: vertical;
+}
+.bot-rating-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}

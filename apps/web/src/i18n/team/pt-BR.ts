@@ -19,6 +19,17 @@ const teamPtBR = {
   'menu.botTeamTitle': 'Bot do Time: joga os decks do meta com o conhecimento do deck. Exclusivo de quem faz parte do Time.',
   'menu.botTeamServer': 'O Bot do Time joga no servidor; a partida aparece em "Assistir".',
   'errors.invalidBotLevel': 'Nível do bot inválido.',
+  // ---- nota do bot no fim da partida ----
+  'botFeedback.title': 'Avaliar o bot',
+  'botFeedback.star1': 'Jogou mal',
+  'botFeedback.star2': 'Abaixo do esperado',
+  'botFeedback.star3': 'Razoável',
+  'botFeedback.star4': 'Jogou bem',
+  'botFeedback.star5': 'Como um jogador forte',
+  'botFeedback.commentPlaceholder': 'O que ele fez de errado (ou de certo)? Cite o turno.',
+  'botFeedback.marks': '{n|# jogada marcada|# jogadas marcadas}',
+  'botFeedback.send': 'Enviar para o Time',
+  'botFeedback.sent': 'Obrigado! A avaliação foi para a caixa de correções do bot.',
   'errors.teamOnly': 'O Bot do Time é só para quem faz parte do Time.',
 } as const;
 

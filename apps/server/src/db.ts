@@ -141,6 +141,7 @@ function migrate(db: DB) {
   migrateCardGaps(db);
   migrateDecks(db);
   migrateGlobalStats(db);
+  migrateTeam(db);
 }
 
 /**
@@ -148,6 +149,42 @@ function migrate(db: DB) {
  * um resumo diário dos Líderes, para a tendência. O sync regrava a fila inteira; o histórico
  * tem uma linha por fila e dia.
  */
+/**
+ * Bot do Time (docs/plano-bot-time.md): as correções que o Time envia sobre as jogadas do bot. Cada linha é
+ * uma marcação ("nesta jogada ele deveria ter feito X") ou a nota da partida (1 a 5). A marcação guarda a
+ * visão do bot na posição (refeita do replay), a jogada que ele fez e a esperada: é a matéria-prima de um
+ * teste de posição (`packages/engine/test/bot-positions.test.ts`).
+ */
+function migrateTeam(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bot_feedback (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id     INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      user_id      TEXT NOT NULL REFERENCES users(id),
+      kind         TEXT NOT NULL,                 -- mark | rating
+      bot_level    TEXT,                          -- nível do bot na partida (team, hard…)
+      bot_seat     INTEGER,                       -- assento do bot
+      bot_deck     TEXT,                          -- deck do bot (decks.id, quando se sabe)
+      leader       TEXT,                          -- Líder do bot (número da carta)
+      opp_leader   TEXT,                          -- Líder do jogador
+      action_index INTEGER,                       -- marcação: posição da jogada no replay
+      turn         INTEGER,
+      bot_action   TEXT,                          -- marcação: a jogada do bot (JSON, por números de carta)
+      expected     TEXT,                          -- marcação: o que ele deveria ter feito (JSON Choice ou texto)
+      position     TEXT,                          -- marcação: a visão do bot na posição (JSON, sem o histórico)
+      rating       INTEGER,                       -- nota: 1 a 5
+      comment      TEXT,
+      status       TEXT NOT NULL DEFAULT 'open',  -- open | test | fixed | dismissed
+      note         TEXT,                          -- resposta de quem tratou
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at  TEXT,
+      resolved_by  TEXT
+    );
+    CREATE INDEX IF NOT EXISTS bot_feedback_status ON bot_feedback(status, created_at);
+    CREATE INDEX IF NOT EXISTS bot_feedback_match ON bot_feedback(match_id);
+  `);
+}
+
 function migrateGlobalStats(db: DB) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS global_stats_queues (

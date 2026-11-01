@@ -54,6 +54,7 @@ import { vapidKeys } from './push/store';
 import { deckHash } from './stats/derive';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
+import { registerTeamRoutes } from './team/routes';
 import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
@@ -454,6 +455,7 @@ export function buildApp(
   registerDeckCleanupRoutes(app, { db, user: auth.viewer, now: opts.now });
 
   registerReportRoutes(app, { db, user: auth.viewer, notifier });
+  registerTeamRoutes(app, { db, user: auth.viewer });
   registerSupportRoutes(app, {
     db,
     user: auth.viewer,

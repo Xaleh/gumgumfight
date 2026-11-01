@@ -26,10 +26,12 @@ interface Props {
   onReport?: () => void;
   /** Ver a decklist de um jogador (a do oponente; quem assiste vê as duas). */
   onDeck?: (player: PlayerId) => void;
+  /** Bot do Time: a nota e o envio das jogadas marcadas (só para o Time, numa partida contra o bot gravada). */
+  feedback?: ReactNode;
 }
 
 /** Resumo do fim da partida: resultado, carta do jogo e números. */
-export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra, onReport, onDeck }: Props) {
+export function GameResult({ state, human, actions, onExit, exitLabel, onRematch, rematchLabel, onReplay, onLog, onClose, extra, onReport, onDeck, feedback }: Props) {
   const t = useT();
   const tryT = useTryT();
   const me: PlayerId = human ?? state.winner ?? 0;
@@ -140,6 +142,7 @@ export function GameResult({ state, human, actions, onExit, exitLabel, onRematch
         </dl>
         {state.winReason && <p className="muted small result-reason">{winReasonText(tryT, state)}</p>}
         {extra}
+        {feedback}
 
         <div className="result-actions">
           {onRematch && (
