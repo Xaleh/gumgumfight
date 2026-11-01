@@ -2,8 +2,8 @@ export * from './types';
 export * from './engine';
 export * from './actions';
 export { chooseBotAction as chooseSimpleBotAction } from './bot/simple';
-export { BOT_LEVELS, type BotLevel, chooseBotAction, isBotLevel, LEVELS as BOT_LEVEL_OPTIONS, planAction, type PlannerOptions, plannerOptions, resetPlanner } from './bot/planner';
-export { DEFAULT_WEIGHTS as BOT_WEIGHTS, evaluate, type Weights as BotWeights } from './bot/evaluate';
+export { BOT_LEVELS, type BotExplanation, type BotLevel, chooseBotAction, isBotLevel, LEVELS as BOT_LEVEL_OPTIONS, planAction, type PlannerOptions, plannerOptions, resetPlanner } from './bot/planner';
+export { DEFAULT_WEIGHTS as BOT_WEIGHTS, type EvalTerms, evaluate, evaluateTerms, type Weights as BotWeights } from './bot/evaluate';
 export {
   ARCHETYPE_WEIGHTS,
   ARCHETYPES,

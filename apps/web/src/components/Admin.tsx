@@ -6,6 +6,7 @@ import { type MessageKey, useT } from '../i18n';
 import { PaymentsPanel, SponsorsPanel, SupporterEditor } from './AdminSupport';
 import { DeckCleanupPanel } from './DeckCleanup';
 import { ReportsPanel } from './Reports';
+import { TeamBotPanel } from './TeamBot';
 import { TutorialFunnelPanel } from './TutorialFunnel';
 
 /** O que cada perfil pode fazer: chave do dicionário. */
@@ -21,7 +22,7 @@ const ROLE_HELP: Record<Role, MessageKey> = {
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
   const t = useT();
   const { user, refresh } = useAuth();
-  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors' | 'decks'>('users');
+  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors' | 'decks' | 'team'>('users');
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +99,11 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
           <button className={tab === 'decks' ? 'on' : ''} onClick={() => setTab('decks')}>
             {t('decks.cleanup.tab')}
           </button>
+          <button className={tab === 'team' ? 'on' : ''} onClick={() => setTab('team')}>
+            {t('admin.tabTeam')}
+          </button>
         </div>
+        {tab === 'team' && <TeamBotPanel onReplay={onReplay} admin />}
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
         {tab === 'tutorial' && <TutorialFunnelPanel />}
         {tab === 'payments' && <PaymentsPanel />}

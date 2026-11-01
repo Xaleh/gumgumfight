@@ -1,7 +1,7 @@
 // Perfil de deck do Bot do Time (docs/plano-bot-time.md): o conhecimento do deck entra na avaliação como valores.
 
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WEIGHTS, handCardValue, fieldCardValue } from '../src/bot/evaluate';
+import { DEFAULT_WEIGHTS, evaluate, evaluateTerms, fieldCardValue, handCardValue } from '../src/bot/evaluate';
 import { chooseBotAction } from '../src/bot/planner';
 import { ARCHETYPE_WEIGHTS, type DeckProfile, donInPlay, keepHand, profileWeights, validateProfile } from '../src/bot/profile';
 import { cardDef } from '../src/engine';
@@ -108,5 +108,29 @@ describe('perfil de deck: decks prontos', () => {
   it('o Líder adversário vem da visão', () => {
     const s = started(1, [luffy, kid]);
     expect(cardDef(s, s.players[1].leader.uid).id).toBe('ST02-001');
+  });
+});
+
+describe('painel do treinador: explicação das decisões', () => {
+  it('a fase principal explica a linha escolhida (nota, termos e alternativas) e uma escolha pendente, a resposta', () => {
+    const s = toTurn(started(5), 3);
+    const got: import('../src/bot/planner').BotExplanation[] = [];
+    const aliases = identityAliases(s);
+    const a = chooseBotAction(viewFor(s, 0, aliases), 0, 'team', { explain: (e) => got.push(e), random: () => 0.5, timeBudgetMs: 60_000 });
+    expect(a.type).not.toBe('endTurn');
+    expect(got).toHaveLength(1);
+    const [e] = got;
+    expect(e.kind).toBe('turn');
+    expect(e.turn).toBe(3);
+    expect(e.actions[0]).toEqual(a);
+    expect(e.actions[e.actions.length - 1].type).toBe('endTurn');
+    expect(Number.isFinite(e.score)).toBe(true);
+    expect(e.terms.length).toBeGreaterThan(0);
+    for (const t of e.terms) expect(typeof t.key).toBe('string');
+    expect(e.alternatives.length).toBeGreaterThan(0);
+    for (const alt of e.alternatives) expect(alt.score).toBeLessThanOrEqual(e.score + 1);
+    // Soma dos termos = avaliação.
+    const terms = evaluateTerms(s, 0);
+    expect(Object.values(terms).reduce((x, y) => x + y, 0)).toBeCloseTo(evaluate(s, 0), 3);
   });
 });

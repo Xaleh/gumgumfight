@@ -3,6 +3,7 @@ import {
   actingPlayer,
   actionFromView,
   applyAction,
+  type BotExplanation,
   type BotLevel,
   type DeckProfile,
   type CardEngineText,
@@ -20,7 +21,7 @@ import {
   viewFor,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PlayFormat } from '../api';
+import type { CoachEntry, PlayFormat } from '../api';
 import { t } from '../i18n';
 import { motionWait } from './motion';
 
@@ -40,8 +41,8 @@ export interface GameSetup {
   botLevel?: BotLevel;
   /** Bot do Time no navegador: o perfil do deck que o bot joga (pesos, papéis das cartas, mulligan). */
   botProfile?: DeckProfile;
-  /** Replay: começa pausado (passo a passo) ou rodando, e em que velocidade. */
-  replayStart?: { paused: boolean; speed: number };
+  /** Replay: começa pausado (passo a passo) ou rodando, e em que velocidade; `at`: já na posição `at` do roteiro. */
+  replayStart?: { paused: boolean; speed: number; at?: number };
   /** Aviso mostrado na mesa ao começar (ex.: a transmissão não abriu e o treino roda no navegador). */
   notice?: string;
 }
@@ -101,9 +102,14 @@ const MAX_HISTORY = 400;
  * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
  * partida não travar.
  */
-function botAction(state: GameState, p: PlayerId, level: BotLevel, profile?: DeckProfile): Action {
+function botAction(state: GameState, p: PlayerId, level: BotLevel, profile?: DeckProfile, explain?: (e: BotExplanation) => void): Action {
   const aliases = identityAliases(state);
-  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, p, aliases), p, level, level === 'team' && profile ? { profile } : undefined));
+  const toReal = (a: Action): Action => {
+    const r = actionFromView(state, aliases, a);
+    return typeof r === 'string' ? a : r;
+  };
+  const over = level === 'team' && (profile || explain) ? { ...(profile ? { profile } : {}), ...(explain ? { explain: (e: BotExplanation) => explain({ ...e, actions: e.actions.map(toReal), alternatives: e.alternatives.map((alt) => ({ ...alt, actions: alt.actions.map(toReal) })) }) } : {}) } : undefined;
+  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, p, aliases), p, level, over));
   return typeof real === 'string' ? chooseSimpleBotAction(state, p) : real;
 }
 /** Faixa de tempo (ms) do bot nas decisões que escondem informação (Counter, carta da Vida). */
@@ -137,6 +143,8 @@ export function useGame(setup: GameSetup) {
   const [auto, setAuto] = useState(false);
   /** A mesa segura o bot (sorteio inicial na tela). */
   const [hold, setHold] = useState(false);
+  /** Bot do Time: as explicações das jogadas do bot (painel do treinador). */
+  const [coach, setCoach] = useState<CoachEntry[]>([]);
 
   const human: PlayerId | null = setup.mode === 'bot' ? 0 : null;
 
@@ -175,6 +183,13 @@ export function useGame(setup: GameSetup) {
 
   const canUndo = human !== null && entries.some((e) => e.action?.player === human);
 
+  // Replay aberto numa jogada (a caixa de correções do Bot do Time): pula para ela ao começar.
+  const startAt = setup.replayStart?.at;
+  useEffect(() => {
+    if (startAt !== undefined && cursorRef.current) seek(startAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startAt]);
+
   /** Replay: vai para a posição `n` do roteiro (0 = início da partida). */
   const seek = useCallback((n: number) => {
     const c = cursorRef.current;
@@ -203,7 +218,11 @@ export function useGame(setup: GameSetup) {
     if (cursor) {
       if (cursor.pos < cursor.end) next = cursor.actions[cursor.pos];
     } else if (p !== null && (state.players[p].isBot || (auto && p === human))) {
-      next = botAction(state, p, setup.botLevel ?? 'hard', state.players[p].isBot ? setup.botProfile : undefined);
+      const isBot = state.players[p].isBot;
+      // Bot do Time: a explicação da jogada vai para o painel do treinador (a posição é a da ação no replay).
+      const index = actionsRef.current.length;
+      const explain = isBot && setup.botLevel === 'team' ? (e: BotExplanation) => setCoach((list) => (list.some((x) => x.index === index) ? list : [...list, { ...e, index, seat: p }])) : undefined;
+      next = botAction(state, p, setup.botLevel ?? 'hard', isBot ? setup.botProfile : undefined, explain);
     }
     if (!next) return;
     // Espera as cartas pousarem antes da próxima jogada.
@@ -288,5 +307,6 @@ export function useGame(setup: GameSetup) {
     actions,
     replay,
     jumped: entries[entries.length - 1].jump ?? false,
+    coach,
   };
 }

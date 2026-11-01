@@ -344,30 +344,84 @@ function frozenFraction(state: GameState, w: Weights, uid: string, rested: boole
   return f;
 }
 
-function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, exposedToOpponent: boolean, opp: boolean): number {
+/**
+ * Os termos nomeados da avaliação (o painel do treinador mostra os que mais pesaram numa jogada):
+ * `life`, `hand`, `field`, `don`, `powerMod`, `donReady`, `exposed`, `stage`, `deckLow` (o próprio lado) e os
+ * mesmos com `Opp` (o lado do oponente, já com o sinal trocado), mais `threat` e `win`.
+ */
+export type EvalTerms = Record<string, number>;
+
+/** Soma `amount` em `terms[key]` (quando há um acumulador). */
+const add = (terms: EvalTerms | undefined, key: string, amount: number) => {
+  if (terms && amount) terms[key] = (terms[key] ?? 0) + amount;
+};
+
+function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, exposedToOpponent: boolean, opp: boolean, terms?: EvalTerms): number {
+  const suffix = opp ? 'Opp' : '';
+  const sign = opp ? -1 : 1;
+  const t = (key: string, amount: number) => add(terms, key + suffix, sign * amount);
   let v = lifeValue(w, ps.life.length, opp);
-  for (const c of [ps.leader, ...ps.characters]) v += (lastingPowerMods(state, c.uid) / 1000) * w.powerMod;
+  t('life', v);
+  for (const c of [ps.leader, ...ps.characters]) {
+    const pm = (lastingPowerMods(state, c.uid) / 1000) * w.powerMod;
+    v += pm;
+    t('powerMod', pm);
+  }
   const myTurn = state.activePlayer === ps.id;
   if (myTurn && state.turn > 2) {
     for (const c of [ps.leader, ...ps.characters]) {
-      if (!c.rested && c.don && (c.playedOnTurn !== state.turn || hasKeyword(state, c.uid, 'rush'))) v += c.don * w.donReady;
+      if (!c.rested && c.don && (c.playedOnTurn !== state.turn || hasKeyword(state, c.uid, 'rush'))) {
+        v += c.don * w.donReady;
+        t('donReady', c.don * w.donReady);
+      }
     }
   }
-  v += handValue(state, w, ps, hidden, !opp && hasDiscardOutlet(state, ps) ? w.handFuel : 0);
+  const hv = handValue(state, w, ps, hidden, !opp && hasDiscardOutlet(state, ps) ? w.handFuel : 0);
+  v += hv;
+  t('hand', hv);
   for (const c of ps.characters) {
-    const cv = fieldCardValue(state, w, c.uid);
-    v += cv * (1 - frozenFraction(state, w, c.uid, c.rested));
+    const cv = fieldCardValue(state, w, c.uid) * (1 - frozenFraction(state, w, c.uid, c.rested));
+    v += cv;
+    t('field', cv);
     // No turno do oponente, o Personagem virado pode ser atacado.
     if (exposedToOpponent && c.rested) {
       const threat = getPower(state, state.players[opponent(ps.id)].leader.uid) + 2000;
-      if (getPower(state, c.uid) <= threat) v -= w.exposed;
+      if (getPower(state, c.uid) <= threat) {
+        v -= w.exposed;
+        t('exposed', -w.exposed);
+      }
     }
   }
-  if (ps.stage) v += fieldCardValue(state, w, ps.stage.uid);
+  if (ps.stage) {
+    const sv = fieldCardValue(state, w, ps.stage.uid);
+    v += sv;
+    t('stage', sv);
+  }
   const attached = ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
-  v += (ps.donActive + ps.donRested + attached) * w.don;
-  if (ps.deck.length <= w.deckLowAt) v -= w.deckLow;
+  const dv = (ps.donActive + ps.donRested + attached) * w.don;
+  v += dv;
+  t('don', dv);
+  if (ps.deck.length <= w.deckLowAt) {
+    v -= w.deckLow;
+    t('deckLow', -w.deckLow);
+  }
   return v;
+}
+
+/** A avaliação separada em termos (ver `EvalTerms`); a soma dos termos é `evaluate`. */
+export function evaluateTerms(state: GameState, player: PlayerId, w: Weights = DEFAULT_WEIGHTS): EvalTerms {
+  const terms: EvalTerms = {};
+  if (state.phase === 'gameover') {
+    terms.win = state.winner === null ? 0 : state.winner === player ? w.win : -w.win;
+    return terms;
+  }
+  const me = state.players[player];
+  const opp = state.players[opponent(player)];
+  const oppTurn = state.activePlayer !== player;
+  sideValue(state, w, me, w.handCard, oppTurn, false, terms);
+  sideValue(state, w, opp, w.handCardOpp, !oppTurn, true, terms);
+  add(terms, 'threat', -incomingThreat(state, player, w));
+  return terms;
 }
 
 /** O +poder de um Evento [Counter] (0 se o efeito não dá poder). */

@@ -15236,3 +15236,182 @@ div.dk-tile-main {
   justify-content: flex-end;
   gap: 10px;
 }
+/* Painel do treinador (Bot do Time). */
+.coach-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 10px 16px;
+  overflow: auto;
+}
+.coach-hint {
+  margin: 0;
+}
+.coach-entry {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+}
+.coach-entry.marked {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.coach-entry header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.coach-line {
+  margin: 0;
+  font-size: 13px;
+}
+.coach-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.coach-term {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.coach-term.up {
+  border-color: color-mix(in srgb, var(--ok) 60%, transparent);
+}
+.coach-term.down {
+  border-color: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.coach-alts ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+.coach-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.coach-marked {
+  font-size: 12px;
+  font-weight: 700;
+}
+.coach-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+.coach-form label {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.coach-form input[type='text'],
+.coach-form input:not([type]),
+.coach-form textarea {
+  font: inherit;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+}
+.coach-form-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* Tela "Bot do Time": decks do meta e caixa de correções. */
+.teambot-detail pre {
+  white-space: pre-wrap;
+  font-size: 11px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 4px 0 0;
+}
+.teambot-detail-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 800px) {
+  .teambot-detail-cols {
+    grid-template-columns: 1fr;
+  }
+}
+.teambot-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.teambot-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.teambot-item.fixed,
+.teambot-item.dismissed {
+  opacity: 0.75;
+}
+.teambot-item header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.teambot-item header .role-tag {
+  margin-left: 0;
+}
+.teambot-status {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+}
+.teambot-stars {
+  margin: 0;
+  color: var(--gold);
+  font-size: 18px;
+}
+.teambot-mark {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  font-size: 13px;
+}
+.teambot-mark dd {
+  margin: 0;
+}
+.teambot-comment {
+  margin: 0;
+}
+.teambot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.teambot-actions select {
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+}

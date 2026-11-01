@@ -2,6 +2,7 @@ import { type MessageKey, type Params, t, type Translate, tryT } from './i18n';
 import {
   type Action,
   barredSpoilers,
+  type BotExplanation,
   type BotLevel,
   type CardData,
   type CardDef,
@@ -441,6 +442,9 @@ export interface AdminUser extends User {
 }
 
 // ------------------------------------------------------------------ Bot do Time
+
+/** A explicação de uma jogada do bot (painel do treinador): a posição da jogada no replay e o que o planejador explicou. */
+export type CoachEntry = BotExplanation & { index: number; seat: PlayerId };
 
 /** Um deck do meta (`data/decks/meta`): o estado do guia e do perfil. */
 export interface MetaDeckInfo {

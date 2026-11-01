@@ -1,6 +1,6 @@
 import type { Action, CardDef, GameState, LogEntry, PlayerId } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, ApiError, errorMessage, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
+import { api, ApiError, type CoachEntry, errorMessage, type OnlineRoomInfo, type OnlineSeat, type WatchTarget } from '../api';
 import { t } from '../i18n';
 
 /** Mensagem de erro de uma resposta do servidor: o `errorCode` traduzido, se o dicionário o conhece; senão o `error` que veio. */
@@ -98,6 +98,8 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   /** Última mensagem de texto de cada assento ainda em balão (some sozinha). */
   const [chatBubbles, setChatBubbles] = useState<ChatMessage[]>([]);
+  /** Bot do Time: as explicações das jogadas do bot (painel do treinador), na ordem das jogadas. */
+  const [coach, setCoach] = useState<CoachEntry[]>([]);
   /**
    * Jogador: silenciar o oponente só nesta partida (a configuração geral fica em Configurações).
    * Espectador: silenciar o chat dos dois jogadores só para si (lembrado neste navegador).
@@ -187,6 +189,11 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
         if (t.seat === 0 || t.seat === 1) setDiceThrows((cur) => (cur[t.seat] ? cur : (cur.map((x, i) => (i === t.seat ? t : x)) as typeof cur)));
       });
       es.addEventListener('rematch', (e) => setRematch(JSON.parse((e as MessageEvent).data) as RematchTarget));
+      // Bot do Time: a explicação de cada jogada do bot (só chega para quem é do Time).
+      es.addEventListener('coach', (e) => {
+        const entry = JSON.parse((e as MessageEvent).data) as CoachEntry;
+        setCoach((list) => (list.some((x) => x.index === entry.index) ? list : [...list, entry]));
+      });
       es.addEventListener('closed', () => {
         stopped = true;
         es?.close();
@@ -345,6 +352,7 @@ export function useOnlineGame(target: OnlineSeat | WatchTarget) {
     downloadReplay,
     actions,
     handsRefused,
+    coach,
   };
 }
 

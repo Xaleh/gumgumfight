@@ -288,6 +288,7 @@ export function Menu({
   onTournaments,
   onTournamentMatch,
   onAdmin,
+  onTeamBot,
   dev = false,
 }: {
   onStart: (s: GameSetup) => void;
@@ -309,6 +310,8 @@ export function Menu({
   onTournamentMatch: (seat: OnlineSeat, tournamentId: string) => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
+  /** Tela "Bot do Time" (só para quem é do Time): decks do meta e caixa de correções. */
+  onTeamBot?: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
@@ -644,6 +647,7 @@ export function Menu({
     { key: 'replay', label: t('menu.navReplay'), icon: 'play', onClick: () => setShowReplay(true) },
     ...(supportOn ? [{ key: 'support', label: t('support.nav'), icon: 'heart' as const, onClick: () => setShowSupport(true) }] : []),
     ...(onAdmin ? [{ key: 'admin', label: t('menu.navAdmin'), icon: 'shield' as const, onClick: onAdmin }] : []),
+    ...(onTeamBot ? [{ key: 'teambot', label: t('menu.navTeamBot'), icon: 'bot' as const, onClick: onTeamBot }] : []),
     ...(onCoverage
       ? [{ key: 'coverage', label: newGaps ? t('menu.navCoverageNew', { n: newGaps }) : t('menu.navCoverage'), icon: 'check' as const, onClick: onCoverage }]
       : []),

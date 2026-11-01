@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, isAdmin, isDev, type OnlineSeat, type WatchTarget } from './api';
+import { api, isAdmin, isDev, isTeam, type OnlineSeat, type WatchTarget } from './api';
 import { audio } from './audio';
 import { useAuth } from './auth';
 import { Admin } from './components/Admin';
@@ -13,6 +13,7 @@ import { Menu } from './components/Menu';
 import { OAuthConsent } from './components/OAuthConsent';
 import { ReplayEmbed } from './components/ReplayEmbed';
 import { Stats } from './components/Stats';
+import { TeamBot } from './components/TeamBot';
 import { Tournaments } from './components/Tournaments';
 import { Watch } from './components/Watch';
 import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
@@ -30,6 +31,7 @@ type Screen =
   | { name: 'coverage' }
   | { name: 'stats' }
   | { name: 'admin' }
+  | { name: 'team' }
   | { name: 'watch-list' }
   /** Tutorial "Aprender a jogar": a lista de lições e uma lição aberta. */
   | { name: 'learn' }
@@ -180,6 +182,15 @@ function MainApp() {
       />
     );
   }
+  if (screen.name === 'team' && isTeam(user)) {
+    return (
+      <TeamBot
+        admin={isAdmin(role)}
+        onExit={() => setScreen({ name: 'menu' })}
+        onReplay={(setup) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'team' } })}
+      />
+    );
+  }
   if (screen.name === 'tournaments') {
     return (
       <Tournaments
@@ -255,6 +266,7 @@ function MainApp() {
       onTournaments={(id) => setScreen({ name: 'tournaments', id })}
       onTournamentMatch={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
+      onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}
       dev={dev}
     />
   );

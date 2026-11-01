@@ -469,7 +469,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   });
 
   /** Abre o canal SSE de uma conexão (jogador ou espectador) com a sala. */
-  const stream = (req: FastifyRequest, reply: FastifyReply, room: Room, init: Pick<Connection, 'seat' | 'hands'>) => {
+  const stream = (req: FastifyRequest, reply: FastifyReply, room: Room, init: Pick<Connection, 'seat' | 'hands' | 'coach'>) => {
     reply.hijack();
     const res = reply.raw;
     res.writeHead(200, {
@@ -504,7 +504,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/events', (req, reply) => {
     const found = seatIn(req.params.id, req.query.t);
     if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
-    stream(req, reply, found.room, { seat: found.seat });
+    // Bot do Time: quem é do Time recebe a explicação de cada jogada do bot (painel do treinador).
+    const coach = found.room.data.queue === 'bot' && found.room.data.botLevel === 'team' && isTeam(user(req));
+    stream(req, reply, found.room, { seat: found.seat, ...(coach ? { coach: true } : {}) });
   });
 
   // ---------------------------------------------------------------- espectadores

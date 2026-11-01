@@ -1340,6 +1340,48 @@ describe('modo espectador', () => {
     expect((await open({ 'x-deck-owner': 'carol-0123456789abcdef', cookie: admin.cookie }, 'team')).statusCode).toBe(201);
   });
 
+  it('Bot do Time: quem é do Time recebe a explicação de cada jogada do bot (evento coach), com a posição no replay', async () => {
+    const { app, db } = setup();
+    const sanji = login(db, 'sanji');
+    setUserTeam(db, sanji.id, true);
+    // O bot começa: joga o turno 1 inteiro sozinho.
+    const r = await app.inject({ method: 'POST', url: '/api/online/bot', headers: { ...ALICE, cookie: sanji.cookie }, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb', first: 1, level: 'team' } });
+    expect(r.statusCode, r.body).toBe(201);
+    const { roomId, token } = r.json();
+    const room = getRoom(app, roomId);
+    const me = client(0);
+    me.conn.coach = true;
+    const watcher = client(null);
+    watcher.conn.coach = true; // espectador: nunca
+    room.attach(me.conn);
+    room.attach(watcher.conn);
+    expect(watcher.conn.coach).toBe(false);
+    // O humano responde ao que for dele (mulligan…) até o bot encerrar o primeiro turno dele.
+    for (let i = 0; i < 400 && !(me.view!.turn >= 2 && actingPlayer(me.view!) === 0 && !me.view!.pending); i++) {
+      const v = me.view!;
+      if (actingPlayer(v) === 0) {
+        const res = await act(app, roomId, token, v.actionCount, chooseBotAction(v, 0));
+        expect(res.statusCode, res.body).toBe(200);
+      } else await new Promise((done) => setTimeout(done, 1));
+    }
+    const coach = me.events.filter((e) => e.event === 'coach').map((e) => e.data);
+    expect(coach.length).toBeGreaterThan(0);
+    const turn = coach.find((c) => c.kind === 'turn');
+    expect(turn).toBeDefined();
+    expect(turn.seat).toBe(1);
+    expect(turn.actions[turn.actions.length - 1].type).toBe('endTurn');
+    // A posição é a da ação no replay: a jogada gravada ali é a primeira da linha.
+    expect(room.data.actions[turn.index]).toEqual(turn.actions[0]);
+    expect(Array.isArray(turn.terms)).toBe(true);
+    expect(watcher.events.some((e) => e.event === 'coach')).toBe(false);
+    // Quem reconecta recebe as explicações de novo.
+    const again = client(0);
+    again.conn.coach = true;
+    room.attach(again.conn);
+    expect(again.events.filter((e) => e.event === 'coach').length).toBe(coach.length);
+    for (const c of [me, watcher, again]) room.detach(c.conn);
+  }, 60_000);
+
   it('o bot do servidor joga a partida inteira e ela entra nas estatísticas como partida contra o bot', async () => {
     const { app, db } = setup();
     const r = await app.inject({ method: 'POST', url: '/api/online/bot', headers: { ...ALICE, cookie: login(db, 'zoro').cookie }, payload: { deckId: 'st03-crocodile', botDeckId: 'random', format: 'egb', first: 0 } });
