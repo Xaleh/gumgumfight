@@ -387,7 +387,7 @@ sorteios, a mão passou a valer o combustível das saídas de descarte (`handFue
 | + combustível (+1 000 por carta) e custo (300): descartado | 138 x 162 (46,0%) | 81% |
 | + combustível como piso (3 400) e custo (450) | 198 x 202 (49,5%; pesos novos x sem os dois termos, 400 partidas) | 82% |
 | + modificador de poder duradouro (`powerMod`, Bonney) | 101 x 99 (com x sem o termo, 200 partidas) | 81% |
-| + Personagem congelado (`frozen*`, Líder Shanks OP17-020) | (em medição) | (em medição) |
+| + Personagem congelado (`frozen*`, Líder Shanks OP17-020) | 101 x 99 (com x sem o termo, 200 partidas) | 85% |
 
 Fora a versão descartada do combustível, tudo dentro do ruído, como nas rodadas anteriores: as situações são raras
 nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms
