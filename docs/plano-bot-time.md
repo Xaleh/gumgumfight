@@ -1,8 +1,12 @@
 # Plano: Bot do Time (bot de alto nível, exclusivo para um grupo)
 
-> Status: **proposta** (01/11/2026). Parte do bot `hard` que existe (`packages/engine/src/bot/`), das lições
-> registradas em [`bot-tempo.md`](bot-tempo.md) e das ferramentas de medição que já temos (auto-jogo, humano fraco,
-> extrator de decisões dos replays). Nada aqui está implementado.
+> Status: **implementado** (01/11/2026), fases 0 a 3; a fase 4 (promover deck a deck para o `hard` público) é um
+> processo, não código. O que saiu diferente do plano: o guia e o perfil editados pela tela ficam no **banco**
+> (`meta_profiles`), por cima dos arquivos de `data/decks/meta` (a semente e o que vai para o repositório), porque o
+> deploy troca a pasta `data/`; a explicação das jogadas sai dos **termos da avaliação** (`evaluateTerms`), sem o
+> agente ao vivo; e as cartas reveladas da mão ficam lembradas (`GameState.knownHand`) pelo próprio motor. O README
+> ("Bot do Time"), a documentação técnica e a seção 12 do [`bot-tempo.md`](bot-tempo.md) descrevem o que existe. O texto
+> abaixo é o plano original.
 
 ## 1. O que é
 

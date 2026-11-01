@@ -293,6 +293,16 @@ e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
   Personagem congelado até o turno seguinte ("não desvira": `GameState.refreshSkipped`, preenchido na Renovação;
   "cannot be rested"; "cannot attack") vale uma fração a menos (`frozen*`): o bot usa o Líder Shanks OP17-020.
 
+**Nível `team` (Bot do Time)** (`docs/plano-bot-time.md`): o `hard` com mais feixe e relógio (`LEVELS.team`) e com o
+**perfil do deck** (`bot/profile.ts`, `DeckProfile`): `profileWeights` monta os pesos a partir de `DEFAULT_WEIGHTS` ←
+arquétipo (`ARCHETYPE_WEIGHTS`) ← `weights` do perfil ← confronto com o Líder adversário (`matchups`), e põe neles os
+papéis das cartas (`roles`), as regras de guardar (`hold`) e a curva (`plan`), que a avaliação lê carta a carta
+(`roleEngine`, `roleDefense`, `roleFuel`, `holdBonus`, `nextTurn`). O mulligan segue `mulligan.keep` (`keepHand`). O
+planejador explica cada decisão de verdade pelo gancho `explain` (`BotExplanation`: a linha ou a resposta, a nota, os
+termos de `evaluateTerms` que mais mudaram e as alternativas), que o servidor manda ao jogador do Time (evento SSE
+`coach`) e o navegador guarda (`useGame.coach`). `GameState.knownHand` lembra as cartas da mão reveladas ao oponente
+enquanto ficam lá (a visão as mostra; cada ação tira as que saíram).
+
 Os conceitos de tempo que a avaliação representa e os testes de posição que os cobrem estão em
 [`docs/bot-tempo.md`](bot-tempo.md). Medição: `npm run compare-bots -w @gumgum/engine -- 100 hard easy`; contra um
 "humano fraco" que defende como gente (`scripts/human.ts`): `npx tsx packages/engine/scripts/vs-human.ts 200 hard`.
@@ -560,7 +570,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (29)
+### Tabelas (31)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -592,6 +602,8 @@ baixadas quando tocam) + `public/`.
 | `oauth_codes` | `code_hash` | `client_id`, `user_id`, `scopes`, `redirect_uri`, `code_challenge` (S256), `expires_at` (5 min), `used_at`, `token_id` (refresh emitido; revogado se o code for reusado) | consentimento, `/api/oauth/token` |
 | `global_stats_queues` | `queue` (chave da fila na OPTCG Logpose API, ex. `lw`) | `name`, `sort`, `last_modified` (do JSON na API), `fetched_at`, **`body` (JSON `GlobalSnapshot`: Líderes e matchups normalizados)** | sync do meta global (`stats/global.ts`) |
 | `global_stats_history` | `(queue, day)` | `body` (JSON `[[leader, games, wins], …]`): resumo diário dos Líderes de cada fila, para a tendência | sync do meta global (um por dia) |
+| `bot_feedback` | `id` autoincrement | Correções do Bot do Time: `match_id`, `user_id`, `kind` (`mark`/`rating`), `bot_level`, `bot_seat`, `bot_deck`, `leader`, `opp_leader`, `action_index`, `turn`, `bot_action` (JSON), `expected` (JSON), **`position` (JSON: a visão do bot na jogada)**, `rating`, `comment`, `status` (`open/test/fixed/dismissed`), `note`, `resolved_at/by` | `POST /api/bot/feedback`, admin |
+| `meta_profiles` | `deck_id` | Guia (`guide`, markdown) e perfil (`profile`, JSON `DeckProfile`) de um deck do meta salvos pela tela "Bot do Time", por cima dos arquivos de `data/decks/meta` (a semente); `updated_by`, `updated_at` | `PUT /api/bot/profiles/:id` |
 | `sqlite_sequence` | — | interna (autoincrement) | — |
 
 Diagrama das relações principais:
@@ -801,6 +813,8 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
   navegador passam para `user:<id>`; o perfil de estatísticas é fundido (partidas reapontadas, perfil do navegador
   apagado se a conta já tinha um).
 - **Privacidade**: o nome da conta Google nunca aparece para outros; o nome público é o de `players.name`.
+- **Time** (`users.team`): marca à parte do perfil e do plano (a sincronização da Apoia.se não a toca): joga contra o Bot do
+  Time, vê a tela "Bot do Time" e envia correções (`isTeam`; admins também, para testar).
 - **Plano de apoio** (`users.supporter_tier`, `supporter_until`, `supporter_source`, `supporter_public`): Grumete,
   Tripulante, Capitão ou Almirante (`apps/server/src/support/tiers.ts`). Vem da Apoia.se (`support/apoiase.ts`): o
   servidor consulta `GET https://api.apoia.se/backers/charges/<e-mail>` no login, em `POST /api/support/apoiase/sync`
@@ -1598,6 +1612,14 @@ Quem chama, na coluna da direita:
 | GET | `/api/admin/users?q=` | Contas e perfis | Admin |
 | PUT | `/api/admin/users/:id/role` | Muda o perfil (`{ role }`; a si mesmo, só para `dev`) | Admin |
 | PUT | `/api/admin/users/:id/supporter` | Plano de apoio dado à mão (`{ tier, until }`) | Admin |
+| PUT | `/api/admin/users/:id/team` | Entra no (ou sai do) Time do bot (`{ team }`) | Admin |
+| GET | `/api/bot/profiles` · `/api/bot/profiles/:id` | Decks do meta (estado do guia e do perfil); um deck com o perfil e o guia | Time |
+| PUT | `/api/bot/profiles/:id` | Salva o guia e/ou o perfil (conferido) no banco (`{ guide?, profile? }`; null volta ao arquivo) | Admin |
+| GET | `/api/bot/agent` | O agente fora da partida está ligado | Time |
+| POST | `/api/bot/profiles/:id/generate` · `/api/bot/matches/:id/review` | Agente: guia → rascunho do perfil; partida do bot x guia → discrepâncias | Admin |
+| POST | `/api/bot/feedback` | Marcações de jogadas (`marks[]`: posição, esperado, comentário; a visão do bot é refeita do replay) e a nota (1–5) de uma partida contra o bot | Time |
+| GET | `/api/bot/feedback?status=` · `/summary` · `/:id` | Caixa de correções; resumo por deck do bot; uma correção com a posição | Time |
+| PUT | `/api/bot/feedback/:id` | Estado e resposta (`{ status, note }`) | Admin |
 | GET | `/api/admin/tutorial?days=` | Funil anônimo das lições do tutorial | Admin |
 | GET · POST · PUT · DELETE | `/api/admin/sponsors`, `/api/admin/sponsors/:id`, `/api/admin/sponsors/:id/logo` | Lojas parceiras | Admin |
 | GET | `/api/admin/support/payments` | Pagamentos recebidos (Apoia.se, Ko-fi) | Admin |

@@ -63,6 +63,8 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `GLOBAL_STATS_CLIENT` | `gumgum` | O `x-client-name` cadastrado junto com a chave |
 | `GLOBAL_STATS_API_URL` | `https://optcg-api.vercel.app` | Endereço da API |
 | `GLOBAL_STATS_SYNC` | `6` | Horas entre as buscas das filas do TCG Matchmaking; `off` desliga |
+| `BOT_AGENT_API_KEY` | (vazio) | Chave da API da Anthropic do agente do Bot do Time (guia → perfil, revisão de partidas; veja [Bot do Time](#bot-do-time)); vazio = agente desligado (segredo: só no `deploy.env`) |
+| `BOT_AGENT_MODEL` | `claude-opus-5-5` | Modelo usado pelo agente |
 | `GOOGLE_CLIENT_ID` | (vazio)                    | Client ID do login com Google; vazio = login desligado |
 | `ADMIN_EMAILS`  | (vazio)                       | E-mails (separados por vírgula) das contas Google que viram Admin ao entrar (um Dev continua Dev) |
 | `ONLINE_BOT_ROOMS` | `on`                       | Transmitir o treino contra o bot (o servidor joga pelo bot; exige login); `off` desliga |
@@ -437,6 +439,9 @@ no login (um Dev continua Dev). Em produção, crie a *Variable* `ADMIN_EMAILS` 
 o próximo deploy a grava em `shared/deploy.env`. Quem já estava logado precisa sair e entrar de novo. Um admin não
 muda o próprio perfil, exceto para se promover a Dev.
 
+Além do perfil, uma conta pode fazer parte do **Time** (interruptor na mesma tela, à parte do perfil e do plano de
+apoio): quem é do Time joga contra o **Bot do Time** e envia correções das jogadas dele (veja [Bot do Time](#bot-do-time)).
+
 ### Funções de desenvolvimento (só Dev)
 
 Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas funções aparecem apenas para o perfil
@@ -445,6 +450,34 @@ Para o público em geral o app esconde o que serve só ao desenvolvimento. Essas
 - A tela **Cobertura das cartas** (o endpoint `GET /api/coverage` continua público).
 - **Opções de teste** no menu (seed do embaralhamento). Baixar e assistir a um replay é para todos (um jogador pode
   mandar o replay a um Dev ao relatar um problema).
+
+## Bot do Time
+
+Um quarto nível do bot, **Time**, que só aparece em "Contra o bot" para quem faz parte do Time (e para admins). É o
+bot `difícil` com mais relógio e, o que importa, com o **perfil do deck** que ele joga: os decks do meta global ficam em
+`data/decks/meta/` (a lista, o guia em markdown e o perfil JSON que o bot lê; veja o
+[README da pasta](data/decks/meta/README.md)) e aparecem no grupo "Decks do meta" do seletor. O perfil entra na
+avaliação como valores (arquétipo, papel de cada carta, carta guardada até o DON!! certo, mulligan, a curva do deck e o
+modelo de Counter por Líder adversário), nunca como regras. Sem perfil, o deck joga como o `difícil`.
+
+- **No servidor sempre que dá**: o treino no nível Time abre uma sala de bot no servidor (aparece em "Assistir");
+  lotado, roda no navegador com o mesmo perfil.
+- **Painel do treinador** na mesa: cada jogada do bot com a nota, os termos da avaliação que mais pesaram e as
+  alternativas consideradas. Cada entrada pode ser **marcada** ("ele deveria ter feito X"); no fim, a **nota** (1 a 5)
+  e as marcações vão para a caixa de correções, com a visão exata do bot na jogada (refeita do replay), que é o que um
+  teste de posição precisa.
+- **Tela "Bot do Time"** (menu, para o Time; também uma aba da Administração): os decks do meta com o estado do guia
+  e do perfil, o editor de guia e perfil (admin; salvo no banco, por cima dos arquivos, e copiado para o repositório
+  quando estiver pronto) e a caixa de correções (estado, resposta, abrir o replay na jogada marcada).
+- **Agente fora da partida** (`BOT_AGENT_API_KEY`): escreve o rascunho do perfil a partir do guia e compara as jogadas
+  do bot numa partida com o guia (discrepâncias e o conceito genérico que falta). Na tela, os botões "Gerar perfil" e
+  "Revisar a partida"; no terminal, `npm run bot:agent -w @gumgum/server -- profile <deck> | review <matchId>`.
+- **Medir por deck**: `npm run decisions -w @gumgum/server -- --leader OP17-039` (concordância do bot com as pessoas
+  por Líder) e `npm run decisions:tune -w @gumgum/server -- --leader OP17-039 --profile op17-xebec` (ajusta os `weights`
+  do perfil por imitação).
+
+O plano completo, as telas e as fases estão em [`docs/plano-bot-time.md`](docs/plano-bot-time.md); os conceitos do bot,
+em [`docs/bot-tempo.md`](docs/bot-tempo.md).
 
 ## Torneios
 

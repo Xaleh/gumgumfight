@@ -12,7 +12,9 @@ Por deck, três arquivos com o mesmo nome:
 | `<id>.md` | O **guia** do deck em prosa: plano de jogo, mulligan, cartas-chave, matchups | o Time |
 | `<id>.profile.json` | O **perfil** do deck que o bot lê (`DeckProfile`, `packages/engine/src/bot/profile.ts`): arquétipo, curva, mulligan, papéis das cartas, pesos e matchups | gerado do guia pelo agente (`npm run bot:agent -w @gumgum/server -- profile <id>`) e revisado pelo Time |
 
-Só o `.json` entra no banco; o guia e o perfil são lidos do disco pelo servidor (aba "Bot do Time" da
-Administração e o planejador do bot). Deck sem perfil joga com os pesos padrão do `hard`.
+Só o `.json` entra no banco pela semente; o guia e o perfil são lidos do disco pelo servidor (tela "Bot do Time" e o
+planejador do bot). O que o admin salva pela tela fica na tabela `meta_profiles`, **por cima** destes arquivos (o
+deploy troca a pasta `data/`): quando o guia e o perfil estiverem prontos, copie-os para cá e faça o commit. Deck sem
+perfil joga com os pesos padrão do `hard`.
 
 As listas aqui são **pontos de partida**: substitua pela lista do guia quando ele chegar.

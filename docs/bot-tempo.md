@@ -324,14 +324,17 @@ O plano do Rocks.D.Xebec (OP17: quase sem Counter, compra pelo Líder, defesa pe
 
 ## 8. O que o bot ainda não sabe
 
-- **Mão do oponente**: só o tamanho. Cartas reveladas por efeito não são lembradas de um turno para o outro.
+- **Mão do oponente**: só o tamanho, mais as cartas que ele revelou e ainda não saíram da mão (`GameState.knownHand`,
+  seção 12); o resto da mão continua sendo só uma contagem.
 - **O próprio deck** entra por sorteio (seção 7a), mas a composição não é usada para mais nada: quantos Counters
   ainda há e os **[Trigger]s** prováveis não pesam em decisão nenhuma.
 - **Sinergias de deck** além do que o texto das cartas faz quando simulado: nada. Um deck de combo
   precisa de leitura de várias jogadas à frente que a busca de um turno não alcança.
 - **Efeitos manuais (⚙)**: o bot só confirma; a simulação não aplica nada.
 - **O turno seguinte**: o planejamento olha só o próprio turno. A ameaça do oponente entra apenas nas
-  decisões de defesa (seção 3a); no planejamento ela deixou o bot pior (seção 9).
+  decisões de defesa (seção 3a); no planejamento ela deixou o bot pior (seção 9). Com o perfil do deck, a jogada
+  prevista para o turno seguinte já na mão vale um bônus (`nextTurn`, seção 12): uma aproximação, não um
+  planejamento de dois turnos.
 - **Pesos**: otimizados em auto-jogo contra versões do próprio bot (seção 9). Um estilo de jogo muito
   diferente (um humano que segura Counters até o fim, por exemplo) pode explorar o que o auto-jogo não
   mostra: relatos de partidas reais são o melhor guia para a próxima rodada. O "humano fraco" de
@@ -550,6 +553,28 @@ Um quinto das posições fica de fora do ajuste e mede a concordância antes e d
 defesa do Líder por Vida (humano, bot atual, bot ajustado) e o json dos pesos. O resultado é um candidato: imitar a
 defesa dos melhores também imita os erros deles, então ele só vira padrão se não piorar no auto-jogo (`duel.ts`) nem
 contra o humano fraco (`vs-human.ts`).
+
+## 12. Bot do Time: o conhecimento do deck como valores
+
+O Bot do Time (`docs/plano-bot-time.md`) joga os decks do meta com um **perfil** (`packages/engine/src/bot/profile.ts`,
+`data/decks/meta/<id>.profile.json`), escrito a partir do guia do deck e revisado pelo Time. A arquitetura não muda: busca
++ avaliação; o perfil entra como termos e pesos, nunca como regra "se X faça Y". O que ele dá:
+
+| Conceito | Onde está | Teste |
+|---|---|---|
+| Arquétipo: aggro vale mais as últimas Vidas do oponente e menos a exposição; controle vale mais a mão | `profile.ts`: `ARCHETYPE_WEIGHTS`, `profileWeights` | `perfil de deck: pesos` |
+| Papel da carta: `engine` vale a mais em campo (e entra antes nas candidatas), `defense` vale a mais na mão, `fuel` vale a menos (sai primeiro no descarte) | `evaluate.ts`: `handCardValue`, `fieldCardValue`; `planner.ts`: `candidateMoves` | `a carta de defesa vale mais na mão…` |
+| Carta guardada até o DON!! certo (o Xebec de 10, o Shiki de 7): vale `holdBonus` na mão enquanto a regra vale | `profile.ts`: `holding`; `evaluate.ts`: `handCardValue` | `a carta guardada vale o bônus…` |
+| Mulligan pelo guia (as cartas que seguram a mão) | `profile.ts`: `keepHand`; `planner.ts`: `planAction` | `perfil de deck: mulligan` |
+| Confronto por Líder adversário: a chance de Counter escondido muda com o deck dele | `profile.ts`: `matchups` em `profileWeights` | `perfil de deck: pesos` |
+| A curva do próximo turno: ter na mão a jogada prevista para o DON!! seguinte vale `nextTurn` | `evaluate.ts`: `nextTurnPlay` | `nextTurn: ter na mão a jogada prevista…` |
+| Cartas da mão reveladas ficam lembradas enquanto estão na mão | `engine.ts`: `log` (reveal) e o começo de `applyAction`; `view.ts`: `visibleCards` | `knownHand: a carta da mão revelada…` |
+| A explicação de cada decisão (termos que mais mudaram, alternativas), para o painel do treinador | `evaluate.ts`: `evaluateTerms`; `planner.ts`: `explain` | `painel do treinador: explicação das decisões` |
+
+O ciclo de refinamento é o mesmo das rodadas anteriores, com mais fontes: as **marcações do Time** (`bot_feedback`,
+com a visão exata do bot na jogada) viram testes de posição; o extrator mede a concordância **por Líder**
+(`--leader`); o `decisions:tune --profile <deck>` ajusta os `weights` do perfil por imitação; e o agente
+(`npm run bot:agent`) escreve o rascunho do perfil a partir do guia e aponta, numa partida, onde o bot fugiu do plano.
 
 ## Como medir
 
