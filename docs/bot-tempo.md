@@ -313,8 +313,9 @@ O plano do Rocks.D.Xebec (OP17: quase sem Counter, compra pelo Líder, defesa pe
 - Um Evento [Counter] pagável valia um bônus fixo (`handCounterEvent`, 550) qualquer que fosse o +poder; os
   Eventos de +2000 por 0 DON!! são a defesa do deck e valem o +poder como um Counter impresso (`handCounter` por
   1000), além do bônus. O prêmio de remoção (`handEffect`) de um Evento vale metade: a remoção é o único uso da
-  carta, e o prêmio só pesa no descarte e no Counter. Abaixo do piso de combustível a carta vale o piso mais um
-  décimo do próprio valor: entre duas que só servem de descarte, sai a que valia menos.
+  carta, e o prêmio só pesa no descarte e no Counter. Abaixo do piso de combustível a carta vale quase o piso (90%
+  da distância até ele): entre duas que só servem de descarte, sai a que valia menos, e nenhuma passa à frente de
+  uma carta que já valia mais que o piso (a Linlin de custo 5 não sai antes da Buckin).
 
 | Conceito | Onde está | Teste |
 |---|---|---|

@@ -262,8 +262,7 @@ function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number
 /**
  * Valor de uma carta na própria mão (ver `handValue`). Um Evento [Counter] pagável vale o +poder dele como um
  * Counter impresso (um +2000 por 0 DON!! é a defesa do deck) mais o bônus fixo. Abaixo do piso de combustível,
- * a carta vale o piso mais um décimo do próprio valor: entre duas cartas que só servem de descarte, sai a que
- * valia menos.
+ * a carta vale quase o piso (90% da distância): entre duas cartas que só servem de descarte, sai a que valia menos.
  */
 export function handCardValue(state: GameState, w: Weights, ps: PlayerState, uid: string, hidden = w.handCard, floor = 0): number {
   const def = cardDef(state, uid);
@@ -276,7 +275,9 @@ export function handCardValue(state: GameState, w: Weights, ps: PlayerState, uid
   const removal = entryRemoval(def);
   const effect = removal === 'hard' ? w.handEffect : removal === 'soft' ? w.handEffectSoft : 0;
   v += def.category === 'event' ? effect / 2 : effect;
-  return v < floor ? floor + v * 0.1 : v;
+  // Abaixo do piso, fecha 90% da distância até ele: a ordem entre as cartas de descarte se mantém, e nenhuma
+  // passa à frente de uma carta que já valia mais que o piso.
+  return v < floor ? floor - (floor - v) * 0.1 : v;
 }
 
 /** Valor de um Personagem (ou Stage) em campo, pelos dados da carta e palavras-chave. */
