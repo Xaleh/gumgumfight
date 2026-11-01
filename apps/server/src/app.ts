@@ -54,6 +54,7 @@ import { vapidKeys } from './push/store';
 import { deckHash } from './stats/derive';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
+import { MetaProfiles } from './team/profiles';
 import { registerTeamRoutes } from './team/routes';
 import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
@@ -427,6 +428,8 @@ export function buildApp(
     now: opts.now,
     sendIndex,
   });
+  // Bot do Time: os decks do meta com guia e perfil (data/decks/meta).
+  const metaProfiles = new MetaProfiles();
   const lobby = registerOnlineRoutes(app, {
     db,
     viewerHash,
@@ -440,6 +443,7 @@ export function buildApp(
     onTournamentGame: (game) => reportFromGame(db, game),
     onMatch: (id) => webhooks.matchFinished(id),
     notifier,
+    botProfile: (deckId) => (deckId ? (metaProfiles.profile(deckId) ?? undefined) : undefined),
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
@@ -455,7 +459,7 @@ export function buildApp(
   registerDeckCleanupRoutes(app, { db, user: auth.viewer, now: opts.now });
 
   registerReportRoutes(app, { db, user: auth.viewer, notifier });
-  registerTeamRoutes(app, { db, user: auth.viewer });
+  registerTeamRoutes(app, { db, user: auth.viewer, profiles: metaProfiles });
   registerSupportRoutes(app, {
     db,
     user: auth.viewer,

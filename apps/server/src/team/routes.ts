@@ -1,5 +1,7 @@
 // Bot do Time (docs/plano-bot-time.md): as correções que o Time envia sobre o bot.
 //
+//   GET  /api/bot/profiles            os decks do meta com o estado do guia e do perfil (só o Time)
+//   GET  /api/bot/profiles/:id        o perfil (o que o bot lê) e o guia de um deck do meta
 //   POST /api/bot/feedback            marcações de jogadas e a nota de uma partida contra o bot (só o Time)
 //   GET  /api/bot/feedback?status=    a caixa de correções (o Time lê; admin trata)
 //   GET  /api/bot/feedback/summary    resumo por deck do bot (partidas avaliadas, nota média, marcações)
@@ -15,11 +17,13 @@ import { isAdmin, isTeam, type User } from '../auth/store';
 import type { DB } from '../db';
 import { describeAction, positionAt } from '../decisions/extract';
 import { fail } from '../errors';
+import type { MetaProfiles } from './profiles';
 import { createFeedback, feedbackByDeck, type FeedbackInput, getFeedback, isFeedbackStatus, listFeedback, setFeedbackStatus } from './store';
 
 interface Deps {
   db: DB;
   user: (req: FastifyRequest) => User | null;
+  profiles: MetaProfiles;
 }
 
 const MAX_TEXT = 2000;
@@ -29,7 +33,7 @@ const field = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? 
 
 type MatchRow = { id: number; mode: string; queue: string | null; deck0: string | null; deck1: string | null };
 
-export function registerTeamRoutes(app: FastifyInstance, { db, user }: Deps) {
+export function registerTeamRoutes(app: FastifyInstance, { db, user, profiles }: Deps) {
   /** Conta do Time (ou admin), ou responde 401/403. */
   const member = (req: FastifyRequest, reply: FastifyReply): User | null => {
     const u = user(req);
@@ -107,6 +111,20 @@ export function registerTeamRoutes(app: FastifyInstance, { db, user }: Deps) {
     }
     const ids = inputs.map((f) => createFeedback(db, f));
     return reply.code(201).send({ ids });
+  });
+
+  /** Os decks do meta, com o estado do guia e do perfil de cada um (a aba "Bot do Time"). */
+  app.get('/api/bot/profiles', async (req, reply) => {
+    if (!member(req, reply)) return reply;
+    return { decks: profiles.list() };
+  });
+
+  /** O perfil (o que o bot lê) e o guia de um deck do meta; o treino no navegador no nível Time usa o perfil. */
+  app.get<{ Params: { id: string } }>('/api/bot/profiles/:id', async (req, reply) => {
+    if (!member(req, reply)) return reply;
+    const info = profiles.list().find((d) => d.id === req.params.id);
+    if (!info) return reply.code(404).send(fail('notFound', 'Não encontrado'));
+    return { ...info, profile: profiles.profile(info.id), guide: profiles.guide(info.id) };
   });
 
   app.get<{ Querystring: { status?: string } }>('/api/bot/feedback', async (req, reply) => {

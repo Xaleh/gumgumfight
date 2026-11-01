@@ -525,7 +525,9 @@ export function Menu({
         /* sem armazenamento local */
       }
       const setup = await buildSetup('bot', [mine, opp], names, seed, botMode.format, firstPlayer);
-      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(notice ? { notice } : {}) });
+      // Bot do Time no navegador: o perfil do deck do bot (quando o deck do meta tem um).
+      const botProfile = botLevel === 'team' ? ((await api.bot.profile(opp).catch(() => null))?.profile ?? undefined) : undefined;
+      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(botProfile ? { botProfile } : {}), ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);
       setLoading(false);

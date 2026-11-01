@@ -3,7 +3,7 @@
 // gravação das salas no banco (para sobreviver a reinícios e deploys).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { type BotLevel, type CardData, cardImage, type PlayerId, type PlayMode } from '@gumgum/engine';
+import { type BotLevel, type CardData, cardImage, type DeckProfile, type PlayerId, type PlayMode } from '@gumgum/engine';
 import { DataVersion } from '../cache';
 import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId, type PlayFormat } from '../stats/catalog';
@@ -66,6 +66,8 @@ export interface LobbyDeps {
   botDelayMs?: number;
   /** Partida começou / vez de um jogador (notificações). */
   onRoomEvent?: (room: Room, event: RoomEvent) => void;
+  /** Bot do Time: o perfil do deck do bot, pelo id do deck. */
+  botProfile?: (deckId: string | null) => DeckProfile | undefined;
 }
 
 /** Partida em andamento na lista "Assistir". */
@@ -244,6 +246,7 @@ export class Lobby {
       rateLimit: this.deps.rateLimit,
       botDelayMs: this.deps.botDelayMs,
       onEvent: this.deps.onRoomEvent,
+      botProfile: this.deps.botProfile,
     });
     this.rooms.set(room.id, room);
     if (data.code) this.codes.set(data.code, room.id);

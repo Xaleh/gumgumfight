@@ -125,3 +125,40 @@ describe('Bot do Time: correções', () => {
     expect(res.json().errorCode).toBe('notBotMatch');
   });
 });
+
+describe('Bot do Time: decks do meta, guia e perfil', () => {
+  it('lista os decks de data/decks/meta com o estado do guia e do perfil; só o Time lê', async () => {
+    const { db, app } = setup();
+    const fan = login(db);
+    const member = login(db, 'player', true);
+    expect((await app.inject({ url: '/api/bot/profiles', headers: fan.headers })).statusCode).toBe(403);
+    const list = (await app.inject({ url: '/api/bot/profiles', headers: member.headers })).json().decks;
+    const xebec = list.find((d: { id: string }) => d.id === 'op17-xebec');
+    expect(xebec).toMatchObject({ leader: 'OP17-039', hasGuide: true, hasProfile: true, archetype: 'control', profileError: null });
+    const full = (await app.inject({ url: '/api/bot/profiles/op17-xebec', headers: member.headers })).json();
+    expect(full.profile).toMatchObject({ id: 'op17-xebec', archetype: 'control', hold: { 'OP17-118': { untilDon: 10 } } });
+    expect(full.guide).toMatch(/^# Rocks.D.Xebec/);
+    expect((await app.inject({ url: '/api/bot/profiles/nope', headers: member.headers })).statusCode).toBe(404);
+  });
+
+  it('o carregador relê o perfil quando o arquivo muda e recusa um perfil inválido', async () => {
+    const { mkdtempSync, writeFileSync, utimesSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { tmpdir } = await import('node:os');
+    const { MetaProfiles } = await import('../src/team/profiles');
+    const dir = mkdtempSync(join(tmpdir(), 'gg-meta-'));
+    writeFileSync(join(dir, 'x-deck.json'), JSON.stringify({ id: 'x-deck', name: 'X', leader: 'ST01-001', cards: [] }));
+    const profiles = new MetaProfiles(dir);
+    expect(profiles.list()).toMatchObject([{ id: 'x-deck', hasGuide: false, hasProfile: false, profileError: null }]);
+    expect(profiles.profile('x-deck')).toBeNull();
+    writeFileSync(join(dir, 'x-deck.profile.json'), JSON.stringify({ id: 'x-deck', leader: 'ST01-001', archetype: 'tempo' }));
+    expect(profiles.list()[0]).toMatchObject({ hasProfile: false, profileError: expect.stringMatching(/archetype/) });
+    const p = join(dir, 'x-deck.profile.json');
+    writeFileSync(p, JSON.stringify({ id: 'x-deck', leader: 'ST01-001', archetype: 'aggro', summary: 'bate' }));
+    utimesSync(p, new Date(Date.now() + 5000), new Date(Date.now() + 5000));
+    expect(profiles.list()[0]).toMatchObject({ hasProfile: true, archetype: 'aggro', summary: 'bate' });
+    writeFileSync(join(dir, 'x-deck.md'), '# guia');
+    expect(profiles.guide('x-deck')).toBe('# guia');
+    expect(profiles.guide('../x-deck')).toBeNull();
+  });
+});

@@ -26,6 +26,7 @@ import { applyAction, cardDef, getPower, locate, opponent } from '../engine';
 import type { Action, GameState, Pending, PlayerId } from '../types';
 import { HIDDEN_CARD } from '../view';
 import { DEFAULT_WEIGHTS, evaluate, handCardValue, hasDiscardOutlet, type Weights } from './evaluate';
+import { type DeckProfile, keepHand, opponentLeader, profileWeights } from './profile';
 import { chooseBotAction as simpleBot } from './simple';
 
 export type BotLevel = 'easy' | 'normal' | 'hard' | 'team';
@@ -49,6 +50,8 @@ export interface PlannerOptions {
   now: () => number;
   /** Depuração: recebe cada candidata avaliada numa escolha pendente e a linha escolhida na fase principal. */
   onDecision?: (info: string, depth: number) => void;
+  /** Perfil do próprio deck (Bot do Time): os pesos saem dele em `chooseBotAction`; o mulligan o lê aqui. */
+  profile?: DeckProfile;
 }
 
 export const LEVELS: Record<Exclude<BotLevel, 'easy'>, Pick<PlannerOptions, 'beamWidth' | 'maxDepth' | 'timeBudgetMs' | 'maxChoices'>> = {
@@ -100,7 +103,9 @@ interface Sim {
 /** Ação do bot no nível pedido (padrão `hard`). */
 export function chooseBotAction(state: GameState, player: PlayerId, level: BotLevel = 'hard', over?: Partial<PlannerOptions>): Action {
   if (level === 'easy') return simpleBot(state, player);
-  return planAction(state, player, plannerOptions(level, over));
+  // Com o perfil do deck, os pesos saem dele (arquétipo, ajustes do guia e o confronto com o Líder adversário).
+  const profiled = over?.profile ? { ...over, weights: profileWeights(over.profile, opponentLeader(state, player), over.weights ?? DEFAULT_WEIGHTS) } : over;
+  return planAction(state, player, plannerOptions(level, profiled));
 }
 
 export function planAction(full: GameState, player: PlayerId, opts: PlannerOptions): Action {
@@ -122,7 +127,9 @@ export function planAction(full: GameState, player: PlayerId, opts: PlannerOptio
     // tem 2 DON!! no primeiro turno); nos replays, os melhores colocados dos torneios escolhem jogar primeiro em
     // só 15% das vezes (docs/bot-tempo.md, seção 11).
     if (pending.kind === 'chooseFirst') return { type: 'answer', player, yes: false };
-    if (pending.kind === 'mulligan' || pending.kind === 'manual') return simpleBot(view, player);
+    // Mulligan: pelo perfil do deck (as cartas que seguram a mão), senão pela regra do bot heurístico.
+    if (pending.kind === 'mulligan') return { type: 'mulligan', player, redraw: !keepHand(view, player, opts.profile, (uid) => cardDef(view, uid)) };
+    if (pending.kind === 'manual') return simpleBot(view, player);
     const o = defenseOrPlan(view, player, opts);
     if (!sampled) return decidePending(determinize(view, player, opts.random), player, actions, o, 2)?.action ?? simpleBot(view, player);
     const chosen = decideSampled(view, player, actions, o) ?? simpleBot(view, player);
@@ -528,10 +535,12 @@ function dedupeKey(state: GameState, player: PlayerId): string {
  * a busca o descartaria antes de ver o ataque: por isso "anexar k DON!! e atacar" entra como uma jogada
  * composta, com k suficiente para empatar o poder do alvo, superá-lo e sobrar margem para Counter.
  */
-function candidateMoves(state: GameState, player: PlayerId): Action[][] {
+function candidateMoves(state: GameState, player: PlayerId, roles?: Weights['roles']): Action[][] {
   const legal = legalActions(state, player);
   const me = state.players[player];
   const out: Action[][] = [];
+  // Perfil do deck: as cartas motor entram antes (a ordem só pesa quando o relógio corta a busca).
+  if (roles) legal.sort((a, b) => Number(b.type === 'playCard' && roles[cardDef(state, b.uid).id] === 'engine') - Number(a.type === 'playCard' && roles[cardDef(state, a.uid).id] === 'engine'));
   const attacks = legal.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack');
   for (const a of legal) {
     switch (a.type) {
@@ -720,7 +729,7 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
       if (!expand) continue;
       // As linhas "tudo no Líder" só antes do primeiro ataque da linha.
       const attacked = node.trace.some((st) => st.action.type === 'attack');
-      const moves = [...candidateMoves(node.state, player).map((m) => ({ m, allOut: false })), ...(attacked ? [] : allOutLines(node.state, player).map((m) => ({ m, allOut: true })))];
+      const moves = [...candidateMoves(node.state, player, opts.weights.roles).map((m) => ({ m, allOut: false })), ...(attacked ? [] : allOutLines(node.state, player).map((m) => ({ m, allOut: true })))];
       // Variantes da mesma jogada (DON!! a mais no mesmo ataque) não podem encher o feixe sozinhas:
       // no máximo `SIBLINGS` filhos por jogada, para o feixe manter alternativas de verdade.
       const groups = new Map<string, Node[]>();

@@ -259,7 +259,7 @@ export function GameScreen({
       const seed = Math.floor(Math.random() * 1_000_000);
       const names: [string, string] = [players[0].name, players[1].name];
       const next = await buildSetup('bot', [deckId, setup.deckIds[1]], names, seed, setup.format, firstPlayer, undefined, undefined, chooseFirst);
-      onRematch?.({ ...next, spoilers: setup.spoilers, botLevel: setup.botLevel });
+      onRematch?.({ ...next, spoilers: setup.spoilers, botLevel: setup.botLevel, botProfile: setup.botProfile });
     } catch (e) {
       game.setError(e instanceof Error ? e.message : String(e));
     }

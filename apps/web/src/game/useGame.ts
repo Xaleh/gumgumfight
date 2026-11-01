@@ -4,6 +4,7 @@ import {
   actionFromView,
   applyAction,
   type BotLevel,
+  type DeckProfile,
   type CardEngineText,
   chooseBotAction,
   chooseSimpleBotAction,
@@ -37,6 +38,8 @@ export interface GameSetup {
   script?: Action[];
   /** Nível do bot (padrão `hard`). */
   botLevel?: BotLevel;
+  /** Bot do Time no navegador: o perfil do deck que o bot joga (pesos, papéis das cartas, mulligan). */
+  botProfile?: DeckProfile;
   /** Replay: começa pausado (passo a passo) ou rodando, e em que velocidade. */
   replayStart?: { paused: boolean; speed: number };
   /** Aviso mostrado na mesa ao começar (ex.: a transmissão não abriu e o treino roda no navegador). */
@@ -98,9 +101,9 @@ const MAX_HISTORY = 400;
  * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
  * partida não travar.
  */
-function botAction(state: GameState, p: PlayerId, level: BotLevel): Action {
+function botAction(state: GameState, p: PlayerId, level: BotLevel, profile?: DeckProfile): Action {
   const aliases = identityAliases(state);
-  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, p, aliases), p, level));
+  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, p, aliases), p, level, level === 'team' && profile ? { profile } : undefined));
   return typeof real === 'string' ? chooseSimpleBotAction(state, p) : real;
 }
 /** Faixa de tempo (ms) do bot nas decisões que escondem informação (Counter, carta da Vida). */
@@ -200,7 +203,7 @@ export function useGame(setup: GameSetup) {
     if (cursor) {
       if (cursor.pos < cursor.end) next = cursor.actions[cursor.pos];
     } else if (p !== null && (state.players[p].isBot || (auto && p === human))) {
-      next = botAction(state, p, setup.botLevel ?? 'hard');
+      next = botAction(state, p, setup.botLevel ?? 'hard', state.players[p].isBot ? setup.botProfile : undefined);
     }
     if (!next) return;
     // Espera as cartas pousarem antes da próxima jogada.

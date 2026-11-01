@@ -6,6 +6,7 @@ import {
   type CardData,
   type CardDef,
   type DeckList,
+  type DeckProfile,
   type FormatId,
   formatLabel,
   type GameState,
@@ -441,6 +442,20 @@ export interface AdminUser extends User {
 
 // ------------------------------------------------------------------ Bot do Time
 
+/** Um deck do meta (`data/decks/meta`): o estado do guia e do perfil. */
+export interface MetaDeckInfo {
+  id: string;
+  name: string;
+  leader: string;
+  hasGuide: boolean;
+  hasProfile: boolean;
+  archetype: string | null;
+  summary: string | null;
+  profileError: string | null;
+  updatedAt: string;
+}
+
+
 /** Marcação de uma jogada do bot: a posição no replay, o que ele deveria ter feito e um comentário. */
 export interface FeedbackMark {
   index: number;
@@ -738,8 +753,10 @@ export const api = {
       get<{ replay: Record<string, unknown>; cards: ApiCard[]; origins: string[] }>(`/api/replay/${id}?t=${encodeURIComponent(token)}`),
     report: (id: number, form: ReportForm) => send<MatchReport>('POST', `/api/matches/${id}/report`, form),
   },
-  /** Bot do Time: correções (marcações de jogadas e notas) e a caixa de correções. */
+  /** Bot do Time: os decks do meta (guia e perfil), as correções (marcações de jogadas e notas) e a caixa de correções. */
   bot: {
+    profiles: () => get<{ decks: MetaDeckInfo[] }>('/api/bot/profiles'),
+    profile: (id: string) => get<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>(`/api/bot/profiles/${encodeURIComponent(id)}`),
     feedback: (matchId: number, form: { level?: BotLevel; rating?: number; comment?: string; marks?: FeedbackMark[] }) =>
       send<{ ids: number[] }>('POST', '/api/bot/feedback', { matchId, ...form }),
     feedbackList: (status: FeedbackStatus | 'all' = 'open') => get<{ items: FeedbackItem[] }>(`/api/bot/feedback?status=${status}`),

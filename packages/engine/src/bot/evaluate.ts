@@ -22,6 +22,7 @@
 import { cardDef, counterValue, getPower, hasKeyword, opponent, playCost } from '../engine';
 import { HIDDEN_CARD } from '../view';
 import type { Ability, AbilityCost, CardDef, EffectStep, GameState, PlayerId, PlayerState } from '../types';
+import { type CardRole, type HoldRule, holding, type PlanStep } from './profile';
 
 export interface Weights {
   /** Valor acumulado de ter N cartas de Vida (índice = N; além do fim, soma `lifeExtra` por carta). */
@@ -131,6 +132,21 @@ export interface Weights {
   lethalPlan: number;
   /** Partida decidida. */
   win: number;
+  /**
+   * Conhecimento do deck (perfil, `profile.ts`): o papel de cada carta e as regras de guardar, lidos carta a
+   * carta. Sem perfil ficam vazios e os termos abaixo não pesam. `roleEngine`: a carta motor vale isto a mais
+   * em campo; `roleDefense`: a carta de defesa vale isto a mais na mão (não se descarta); `roleFuel`: a carta de
+   * descarte vale isto a menos na mão (sai primeiro); `holdBonus`: a carta guardada vale isto a mais na mão
+   * enquanto a regra de guardar vale (jogá-la cedo, ou descartá-la, perde o bônus).
+   */
+  roleEngine: number;
+  roleDefense: number;
+  roleFuel: number;
+  holdBonus: number;
+  roles?: Record<string, CardRole>;
+  hold?: Record<string, HoldRule>;
+  /** A curva do deck (perfil): a jogada prevista por DON!! disponível (termo `nextTurn`). */
+  plan?: PlanStep[];
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
@@ -174,6 +190,10 @@ export const DEFAULT_WEIGHTS: Weights = {
   winCap: 120_000,
   lethalPlan: 60_000,
   win: 10_000_000,
+  roleEngine: 600,
+  roleDefense: 700,
+  roleFuel: 600,
+  holdBonus: 2500,
 };
 
 function lifeValue(w: Weights, n: number, opp = false): number {
@@ -275,6 +295,13 @@ export function handCardValue(state: GameState, w: Weights, ps: PlayerState, uid
   const removal = entryRemoval(def);
   const effect = removal === 'hard' ? w.handEffect : removal === 'soft' ? w.handEffectSoft : 0;
   v += def.category === 'event' ? effect / 2 : effect;
+  // Conhecimento do deck (perfil): a carta de defesa não se descarta, a de combustível sai primeiro, e a carta
+  // guardada vale o bônus enquanto a regra de guardar vale.
+  const role = w.roles?.[def.id];
+  if (role === 'defense') v += w.roleDefense;
+  else if (role === 'fuel') v -= w.roleFuel;
+  const rule = w.hold?.[def.id];
+  if (rule && holding(state, ps, rule)) v += w.holdBonus;
   // Abaixo do piso, fecha 90% da distância até ele: a ordem entre as cartas de descarte se mantém, e nenhuma
   // passa à frente de uma carta que já valia mais que o piso.
   return v < floor ? floor - (floor - v) * 0.1 : v;
@@ -288,6 +315,8 @@ export function fieldCardValue(state: GameState, w: Weights, uid: string): numbe
   if (hasKeyword(state, uid, 'blocker')) v += w.blocker;
   if (hasKeyword(state, uid, 'rush')) v += w.rush;
   if (hasKeyword(state, uid, 'doubleAttack')) v += w.doubleAttack;
+  // Conhecimento do deck (perfil): a carta motor vale a mais em campo (o bot a desenvolve na curva).
+  if (w.roles?.[def.id] === 'engine') v += w.roleEngine;
   return v;
 }
 
