@@ -4,7 +4,7 @@
 import type { CardData } from '@gumgum/engine';
 import type { DeckSummary } from './api';
 
-export type DeckTab = 'recent' | 'favorites' | 'mine' | 'community' | 'builtin';
+export type DeckTab = 'recent' | 'favorites' | 'mine' | 'community' | 'meta' | 'builtin';
 export type DeckSort = 'recent' | 'updated' | 'name' | 'color' | 'leader' | 'games';
 
 /** Ordem das cores no filtro e na ordenação por cor. */
@@ -55,8 +55,10 @@ export function inTab(deck: DeckSummary, tab: DeckTab, local: ReadonlyMap<string
       return deck.kind === 'user' && deck.mine;
     case 'community':
       return deck.kind === 'user' && !deck.mine;
+    case 'meta':
+      return deck.kind === 'builtin' && Boolean(deck.meta);
     case 'builtin':
-      return deck.kind === 'builtin';
+      return deck.kind === 'builtin' && !deck.meta;
   }
 }
 
@@ -98,7 +100,7 @@ export function sortDecks(decks: DeckSummary[], sort: DeckSort, local: ReadonlyM
 export function initialTab(decks: DeckSummary[], local: ReadonlyMap<string, number>, current?: string): DeckTab {
   const chosen = current ? decks.find((d) => d.id === current) : undefined;
   if (chosen) {
-    const tab = (['recent', 'favorites', 'mine', 'community', 'builtin'] as const).find((t) => inTab(chosen, t, local));
+    const tab = (['recent', 'favorites', 'mine', 'community', 'meta', 'builtin'] as const).find((t) => inTab(chosen, t, local));
     if (tab) return tab;
   }
   if (decks.some((d) => lastUsed(d, local) > 0)) return 'recent';

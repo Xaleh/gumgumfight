@@ -126,6 +126,9 @@ function migrate(db: DB) {
   // Dono do deck: SHA-256 do código do navegador (nunca o código em si) ou
   // "user:<id>" quando o deck pertence a uma conta (ver auth/store.ts).
   if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
+  // deck_group: 'meta' para os decks prontos de data/decks/meta (os decks do meta global, com guia e perfil
+  // para o Bot do Time); null para os Starter Decks e os decks de jogadores.
+  if (!deckCols.includes('deck_group')) db.exec('ALTER TABLE decks ADD COLUMN deck_group TEXT');
   migrateStats(db);
   migrateAuth(db);
   migratePush(db);
@@ -438,6 +441,9 @@ function migrateSupport(db: DB) {
   if (!userCols.includes('supporter_source')) db.exec('ALTER TABLE users ADD COLUMN supporter_source TEXT');
   // supporter_public: a pessoa aceitou aparecer na lista de Apoiadores.
   if (!userCols.includes('supporter_public')) db.exec('ALTER TABLE users ADD COLUMN supporter_public INTEGER NOT NULL DEFAULT 0');
+  // team: faz parte do Time do bot (joga contra o Bot do Time e envia correções). Marca à parte do perfil
+  // e do plano: a sincronização da Apoia.se sobrescreve o plano, não esta coluna.
+  if (!userCols.includes('team')) db.exec('ALTER TABLE users ADD COLUMN team INTEGER NOT NULL DEFAULT 0');
   // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
   if (!userCols.includes('email_verified')) {
     db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
@@ -1169,15 +1175,17 @@ export function getTranslations(db: DB, lang: string, ids?: string[]): Map<strin
 
 /** builtin = vem de data/decks (recriado a cada início); user = montado pelo jogador. */
 export type DeckKind = 'builtin' | 'user';
-export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHash: string | null };
+/** Grupo de um deck pronto: 'meta' = deck do meta global (data/decks/meta), jogado pelo Bot do Time. */
+export type DeckGroup = 'meta';
+export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHash: string | null; group: DeckGroup | null };
 
 /** Grava um deck. O dono só é definido na criação (um update nunca troca o dono). */
-export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', ownerHash: string | null = null) {
+export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', ownerHash: string | null = null, group: DeckGroup | null = null) {
   db.prepare(`
-    INSERT INTO decks (id, name, leader, cards, arts, kind, owner_hash, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO decks (id, name, leader, cards, arts, kind, owner_hash, deck_group, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET name = excluded.name, leader = excluded.leader,
-      cards = excluded.cards, arts = excluded.arts, kind = excluded.kind, updated_at = excluded.updated_at
+      cards = excluded.cards, arts = excluded.arts, kind = excluded.kind, deck_group = excluded.deck_group, updated_at = excluded.updated_at
   `).run(
     deck.id,
     deck.name,
@@ -1186,6 +1194,7 @@ export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', o
     deck.arts && Object.keys(deck.arts).length ? JSON.stringify(deck.arts) : null,
     kind,
     ownerHash,
+    group,
   );
 }
 
@@ -1198,8 +1207,9 @@ type DeckRow = {
   kind: DeckKind;
   updated_at: string;
   owner_hash: string | null;
+  deck_group: string | null;
 };
-const DECK_COLS = 'id, name, leader, cards, arts, kind, updated_at, owner_hash';
+const DECK_COLS = 'id, name, leader, cards, arts, kind, updated_at, owner_hash, deck_group';
 const toDeck = (r: DeckRow): StoredDeck => ({
   id: r.id,
   name: r.name,
@@ -1209,6 +1219,7 @@ const toDeck = (r: DeckRow): StoredDeck => ({
   kind: r.kind,
   updatedAt: r.updated_at,
   ownerHash: r.owner_hash,
+  group: r.deck_group === 'meta' ? 'meta' : null,
 });
 
 export function listDecks(db: DB): StoredDeck[] {

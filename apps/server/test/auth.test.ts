@@ -213,6 +213,25 @@ describe('perfis (player, streamer, admin)', () => {
     expect(all.map((u: { role: string }) => u.role)).toEqual(['admin', 'streamer']);
   });
 
+  it('Time do bot: marca à parte do perfil e do plano, só o admin muda', async () => {
+    const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
+    const admin = await login(a, {});
+    const zoro = await login(a, { sub: '2002', email: 'zoro@example.com', name: 'Zoro' });
+    const zoroId = zoro.res.json().user.id;
+    expect(zoro.res.json().user.team).toBe(false);
+    const put = (id: string, team: unknown, headers = admin.cookie) => a.inject({ method: 'PUT', url: `/api/admin/users/${id}/team`, headers, payload: { team } });
+    expect((await put(zoroId, true, zoro.cookie)).statusCode).toBe(403);
+    expect((await put(zoroId, 'sim')).statusCode).toBe(400);
+    expect((await put('u-nope', true)).statusCode).toBe(404);
+    expect((await put(zoroId, true)).json()).toMatchObject({ id: zoroId, role: 'player', team: true });
+    expect((await a.inject({ url: '/api/auth/me', headers: zoro.cookie })).json().user.team).toBe(true);
+    // Mudar o perfil não tira do Time; quem é do Time vem antes dos outros jogadores na lista.
+    await a.inject({ method: 'PUT', url: `/api/admin/users/${zoroId}/role`, headers: admin.cookie, payload: { role: 'streamer' } });
+    const list = (await a.inject({ url: '/api/admin/users', headers: admin.cookie })).json();
+    expect(list.find((u: { id: string }) => u.id === zoroId)).toMatchObject({ role: 'streamer', team: true });
+    expect((await put(zoroId, false)).json().team).toBe(false);
+  });
+
   it('Dev: o admin só muda o próprio perfil para Dev; o Dev é admin e não volta a admin ao entrar', async () => {
     const { app: a } = setup(CLIENT_ID, ['nami@example.com']);
     const nami = await login(a, {});

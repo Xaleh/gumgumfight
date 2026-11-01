@@ -225,6 +225,8 @@ export function buildApp(
       id: deck.id,
       name: deck.name,
       kind: deck.kind,
+      /** Deck do meta global (data/decks/meta): o grupo "Decks do meta" e o Bot do Time. */
+      meta: deck.group === 'meta',
       leader: deck.leader,
       leaderName: leader?.name ?? null,
       leaderImage: (server.cardImages && leader && artImage(leader, deck.arts?.[leader.id])) || null,

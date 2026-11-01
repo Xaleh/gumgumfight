@@ -37,6 +37,7 @@ import {
   type CardData,
   type CardDef,
   type CardEngineText,
+  type BotLevel,
   chooseBotAction,
   createAliases,
   createGame,
@@ -191,6 +192,8 @@ export interface RoomData {
   tournament?: RoomTournament;
   /** Quem começa, quando não é sorteado (jogos 2+ de uma série de torneio). */
   firstPlayer?: PlayerId;
+  /** Treino contra o bot: o nível do bot do servidor (ausente = `hard`, o padrão das salas antigas). */
+  botLevel?: BotLevel;
   /**
    * Versão do motor (`REPLAY_VERSION`) em que a partida começou. Salas começadas antes da
    * versão 9 não têm o campo e são refeitas com a preparação antiga (`legacySetup`).
@@ -1006,7 +1009,7 @@ export class Room {
     try {
       // Decide pela visão do bot, como faria um jogador: sem espiar a mão do oponente.
       const view = viewFor(this.state, seat, this.aliases);
-      const real = actionFromView(this.state, this.aliases, chooseBotAction(view, seat));
+      const real = actionFromView(this.state, this.aliases, chooseBotAction(view, seat, this.data.botLevel ?? 'hard'));
       if (typeof real === 'string') throw new Error(real);
       this.commit(real);
     } catch (e) {

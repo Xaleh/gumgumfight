@@ -5,6 +5,7 @@ import support from './support/es';
 import tutorial from './tutorial/es';
 import recap from './recap/es';
 import decks from './decks/es';
+import team from './team/es';
 
 export default {
   // ---- general ----
@@ -2888,4 +2889,5 @@ export default {
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
   ...decks,
+  ...team,
 } satisfies Messages;

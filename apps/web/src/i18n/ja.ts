@@ -5,6 +5,7 @@ import support from './support/ja';
 import tutorial from './tutorial/ja';
 import recap from './recap/ja';
 import decks from './decks/ja';
+import team from './team/ja';
 
 export default {
   // ---- 全般 ----
@@ -2886,4 +2887,5 @@ export default {
   // ==== kit de divulgação dos torneios (i18n/recap) ====
   ...recap,
   ...decks,
+  ...team,
 } satisfies Messages;

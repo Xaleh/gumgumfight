@@ -3,7 +3,7 @@
 // gravação das salas no banco (para sobreviver a reinícios e deploys).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { type CardData, cardImage, type PlayerId, type PlayMode } from '@gumgum/engine';
+import { type BotLevel, type CardData, cardImage, type PlayerId, type PlayMode } from '@gumgum/engine';
 import { DataVersion } from '../cache';
 import { type ErrorParams, fail } from '../errors';
 import { FORMATS, type FormatId, type PlayFormat } from '../stats/catalog';
@@ -345,7 +345,7 @@ export class Lobby {
    * Treino contra o bot do servidor: começa na hora; a partida pode ser assistida.
    * `first`: quem começa (0 = o jogador, 1 = o bot); sem ele, o sorteio decide.
    */
-  createBotRoom(seat: SeatRequest, bot: SeatRequest, mode: PlayMode, first?: PlayerId): { room: Room; token: string } | LobbyError {
+  createBotRoom(seat: SeatRequest, bot: SeatRequest, mode: PlayMode, first?: PlayerId, level?: BotLevel): { room: Room; token: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
@@ -355,6 +355,7 @@ export class Lobby {
       newRoomData({ queue: 'bot', ...mode, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
     );
     if (first !== undefined) room.data.firstPlayer = first;
+    if (level) room.data.botLevel = level;
     room.start(0);
     return { room, token };
   }

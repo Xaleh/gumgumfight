@@ -23,6 +23,15 @@ export function seed(db: DB) {
     upsertDeck(db, JSON.parse(readFileSync(join(decksDir, f), 'utf8')) as DeckList);
     decks++;
   }
+  // Decks do meta global (data/decks/meta/<id>.json): os decks que o Bot do Time joga. O guia
+  // (<id>.md) e o perfil (<id>.profile.json) ficam na mesma pasta e não entram no banco.
+  const metaDir = join(decksDir, 'meta');
+  if (existsSync(metaDir)) {
+    for (const f of readdirSync(metaDir).filter((f) => f.endsWith('.json') && !f.endsWith('.profile.json'))) {
+      upsertDeck(db, JSON.parse(readFileSync(join(metaDir, f), 'utf8')) as DeckList, 'builtin', null, 'meta');
+      decks++;
+    }
+  }
   // Traduções manuais: data/translations/<lang>.json -> { "cards": { "ID": { "text", "trigger" } } }
   let translations = 0;
   const trDir = join(DATA_DIR, 'translations');

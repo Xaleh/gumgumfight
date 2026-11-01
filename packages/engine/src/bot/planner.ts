@@ -18,7 +18,8 @@
 //   resultado de um deck só.
 //
 // Quem chama decide o nível: `easy` é o bot heurístico (`simple.ts`), `normal` olha uma jogada à
-// frente, `hard` planeja o turno inteiro.
+// frente, `hard` planeja o turno inteiro. `team` (o Bot do Time) é o `hard` com mais relógio e feixe e,
+// quando o deck tem perfil (`profile.ts`), com os pesos e o conhecimento do deck na avaliação.
 
 import { legalActions } from '../actions';
 import { applyAction, cardDef, getPower, locate, opponent } from '../engine';
@@ -27,9 +28,10 @@ import { HIDDEN_CARD } from '../view';
 import { DEFAULT_WEIGHTS, evaluate, handCardValue, hasDiscardOutlet, type Weights } from './evaluate';
 import { chooseBotAction as simpleBot } from './simple';
 
-export type BotLevel = 'easy' | 'normal' | 'hard';
+export type BotLevel = 'easy' | 'normal' | 'hard' | 'team';
 
-export const BOT_LEVELS: BotLevel[] = ['easy', 'normal', 'hard'];
+export const BOT_LEVELS: BotLevel[] = ['easy', 'normal', 'hard', 'team'];
+export const isBotLevel = (v: unknown): v is BotLevel => BOT_LEVELS.includes(v as BotLevel);
 
 export interface PlannerOptions {
   /** Linhas mantidas a cada passo da busca em feixe. */
@@ -52,6 +54,8 @@ export interface PlannerOptions {
 export const LEVELS: Record<Exclude<BotLevel, 'easy'>, Pick<PlannerOptions, 'beamWidth' | 'maxDepth' | 'timeBudgetMs' | 'maxChoices'>> = {
   normal: { beamWidth: 1, maxDepth: 1, timeBudgetMs: 80, maxChoices: 6 },
   hard: { beamWidth: 6, maxDepth: 16, timeBudgetMs: 250, maxChoices: 10 },
+  // Mais feixe e relógio que o `hard`: no servidor só o Time joga contra ele (docs/plano-bot-time.md).
+  team: { beamWidth: 8, maxDepth: 20, timeBudgetMs: 600, maxChoices: 12 },
 };
 
 export function plannerOptions(level: Exclude<BotLevel, 'easy'>, over: Partial<PlannerOptions> = {}): PlannerOptions {

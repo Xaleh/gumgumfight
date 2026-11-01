@@ -167,6 +167,11 @@ function AccountBlock() {
                 ❤ {TIER_LABEL[user.supporter.tier]}
               </span>
             )}
+            {user.team && (
+              <span className="team-tag" title={t('team.tagTitle')}>
+                {t('team.tag')}
+              </span>
+            )}
           </strong>
           {user.email && <span className="muted small">{user.email}</span>}
           {picture.fileInput}

@@ -2,6 +2,7 @@ import { type MessageKey, type Params, t, type Translate, tryT } from './i18n';
 import {
   type Action,
   barredSpoilers,
+  type BotLevel,
   type CardData,
   type CardDef,
   type DeckList,
@@ -22,6 +23,8 @@ export interface DeckSummary {
   id: string;
   name: string;
   kind: 'builtin' | 'user';
+  /** Deck pronto do meta global (data/decks/meta): grupo "Decks do meta", jogado pelo Bot do Time (servidores antigos não mandam). */
+  meta?: boolean;
   leader: string;
   leaderName: string | null;
   /** Imagem do Líder (null quando o servidor desliga as imagens). */
@@ -137,7 +140,8 @@ export function deckGroups(decks: DeckSummary[]): Array<[MessageKey, DeckSummary
   return [
     ['labels.deckGroup.mine', decks.filter((d) => d.kind === 'user' && d.mine)],
     ['labels.deckGroup.community', decks.filter((d) => d.kind === 'user' && !d.mine)],
-    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin')],
+    ['labels.deckGroup.meta', decks.filter((d) => d.kind === 'builtin' && d.meta)],
+    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin' && !d.meta)],
   ];
 }
 
@@ -364,7 +368,12 @@ export interface User {
   role: Role;
   /** Plano de apoio ativo (null = sem plano). */
   supporter: SupporterState | null;
+  /** Faz parte do Time do bot: joga contra o Bot do Time e marca as jogadas dele. */
+  team: boolean;
 }
+
+/** Pode jogar contra o Bot do Time (admins também, para testar). */
+export const isTeam = (u: User | null | undefined) => Boolean(u && (u.team || isAdmin(u.role)));
 
 // ------------------------------------------------------------------ apoio ao projeto
 
@@ -549,6 +558,8 @@ export const api = {
     tutorial: (days = 30) => get<{ days: number; since: string; lessons: TutorialFunnel[] }>(`/api/admin/tutorial?days=${days}`),
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
     setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
+    /** Entra no (ou sai do) Time do bot. */
+    setTeam: (id: string, team: boolean) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/team`, { team }),
     /** Plano dado à mão; `until` "AAAA-MM-DD" ou null (sem prazo). */
     setSupporter: (id: string, tier: SupporterTier | null, until: string | null) =>
       send<Pick<AdminUser, 'id' | 'supporterTier' | 'supporterUntil' | 'supporterSource'>>('PUT', `/api/admin/users/${encodeURIComponent(id)}/supporter`, {
@@ -696,8 +707,14 @@ export const api = {
     /** Contadores do menu; a consulta também conta este navegador como conectado. */
     stats: () => get<OnlineStats>('/api/online/stats'),
     /** Treino contra o bot transmitido: o servidor joga pelo bot e a partida aparece em "Assistir" (exige login). */
-    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId) =>
-      send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, ...mode, ...(first !== undefined ? { first } : {}) }),
+    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId, level?: BotLevel) =>
+      send<{ roomId: string; token: string }>('POST', '/api/online/bot', {
+        deckId,
+        botDeckId,
+        ...mode,
+        ...(first !== undefined ? { first } : {}),
+        ...(level ? { level } : {}),
+      }),
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
