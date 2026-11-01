@@ -253,19 +253,31 @@ export function hasDiscardOutlet(state: GameState, ps: PlayerState): boolean {
  */
 function handValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, floor = 0): number {
   let total = 0;
-  const values = ps.hand.map((uid) => {
-    const def = cardDef(state, uid);
-    if (def.id === HIDDEN_CARD) return Math.max(hidden, floor);
-    let v = w.handCardBase + (def.category === 'event' ? 0 : (def.cost ?? 0) * w.handCost) + (counterValue(state, uid) / 1000) * w.handCounter;
-    if (def.category === 'event' && def.abilities.some((a) => a.timing === 'counter') && playCost(state, uid) <= ps.donActive) v += w.handCounterEvent;
-    const removal = entryRemoval(def);
-    if (removal === 'hard') v += w.handEffect;
-    else if (removal === 'soft') v += w.handEffectSoft;
-    return Math.max(v, floor);
-  });
+  const values = ps.hand.map((uid) => handCardValue(state, w, ps, uid, hidden, floor));
   values.sort((a, b) => b - a);
   values.forEach((v, i) => (total += i < w.handSoftCap ? v : v * 0.5));
   return total;
+}
+
+/**
+ * Valor de uma carta na própria mão (ver `handValue`). Um Evento [Counter] pagável vale o +poder dele como um
+ * Counter impresso (um +2000 por 0 DON!! é a defesa do deck) mais o bônus fixo. Abaixo do piso de combustível,
+ * a carta vale quase o piso (90% da distância): entre duas cartas que só servem de descarte, sai a que valia menos.
+ */
+export function handCardValue(state: GameState, w: Weights, ps: PlayerState, uid: string, hidden = w.handCard, floor = 0): number {
+  const def = cardDef(state, uid);
+  if (def.id === HIDDEN_CARD) return Math.max(hidden, floor);
+  let v = w.handCardBase + (def.category === 'event' ? 0 : (def.cost ?? 0) * w.handCost) + (counterValue(state, uid) / 1000) * w.handCounter;
+  if (def.category === 'event' && def.abilities.some((a) => a.timing === 'counter') && playCost(state, uid) <= ps.donActive) {
+    v += w.handCounterEvent + (counterEventPower(state, uid) / 1000) * w.handCounter;
+  }
+  // Evento: a remoção é o único uso da carta (ninguém o joga sem alvo), e o prêmio só pesa no descarte e no Counter: metade.
+  const removal = entryRemoval(def);
+  const effect = removal === 'hard' ? w.handEffect : removal === 'soft' ? w.handEffectSoft : 0;
+  v += def.category === 'event' ? effect / 2 : effect;
+  // Abaixo do piso, fecha 90% da distância até ele: a ordem entre as cartas de descarte se mantém, e nenhuma
+  // passa à frente de uma carta que já valia mais que o piso.
+  return v < floor ? floor - (floor - v) * 0.1 : v;
 }
 
 /** Valor de um Personagem (ou Stage) em campo, pelos dados da carta e palavras-chave. */
