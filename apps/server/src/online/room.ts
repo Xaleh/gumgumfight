@@ -37,6 +37,9 @@ import {
   type CardData,
   type CardDef,
   type CardEngineText,
+  type BotExplanation,
+  type BotLevel,
+  type DeckProfile,
   chooseBotAction,
   createAliases,
   createGame,
@@ -191,6 +194,8 @@ export interface RoomData {
   tournament?: RoomTournament;
   /** Quem começa, quando não é sorteado (jogos 2+ de uma série de torneio). */
   firstPlayer?: PlayerId;
+  /** Treino contra o bot: o nível do bot do servidor (ausente = `hard`, o padrão das salas antigas). */
+  botLevel?: BotLevel;
   /**
    * Versão do motor (`REPLAY_VERSION`) em que a partida começou. Salas começadas antes da
    * versão 9 não têm o campo e são refeitas com a preparação antiga (`legacySetup`).
@@ -249,6 +254,8 @@ export interface Connection {
   delay?: number;
   /** Judge do torneio (ou organizador): vê as duas mãos ao vivo, sem atraso, só nas salas de torneio. */
   judge?: boolean;
+  /** Bot do Time: o jogador (do Time) recebe a explicação de cada jogada do bot (`coach`). */
+  coach?: boolean;
   send: (event: string, data: unknown) => void;
   /**
    * Entrega um evento já serializado (o `state`, igual para todos os espectadores com a mesma
@@ -278,6 +285,8 @@ export interface RoomDeps {
   onEvent?: (room: Room, event: RoomEvent) => void;
   /** Uma conexão entrou ou saiu (o número de espectadores da lista "Assistir" mudou). */
   onPresence?: (room: Room) => void;
+  /** Bot do Time: o perfil do deck que o bot joga (`data/decks/meta/<id>.profile.json`), pelo id do deck. */
+  botProfile?: (deckId: string | null) => DeckProfile | undefined;
 }
 
 /**
@@ -287,6 +296,11 @@ export interface RoomDeps {
  * da tela), nunca quem acabou de entrar na sala.
  */
 export type RoomEvent = { type: 'start' | 'turn'; seats: PlayerId[] };
+
+/** A explicação de uma jogada do bot (evento `coach`): a posição da jogada no replay e o que o planejador explicou. */
+export type CoachEntry = BotExplanation & { index: number; seat: PlayerId };
+/** Quantas explicações ficam guardadas por sala (para quem reconecta). */
+const COACH_LOG_MAX = 200;
 
 /** Intervalo mínimo entre dois avisos de "sua vez" para o mesmo assento (ataques com Blocker e Counter em sequência). */
 export const TURN_NOTICE_MS = 30_000;
@@ -1005,8 +1019,24 @@ export class Room {
     if (!this.state || !this.aliases || this.state.phase === 'gameover' || this.running !== seat) return;
     try {
       // Decide pela visão do bot, como faria um jogador: sem espiar a mão do oponente.
-      const view = viewFor(this.state, seat, this.aliases);
-      const real = actionFromView(this.state, this.aliases, chooseBotAction(view, seat));
+      const state = this.state;
+      const aliases = this.aliases;
+      const view = viewFor(state, seat, aliases);
+      const level = this.data.botLevel ?? 'hard';
+      // O Bot do Time joga com o perfil do deck (pesos, papéis das cartas, mulligan e o confronto com o Líder adversário)
+      // e explica cada decisão para o painel do treinador (só quando alguém do Time está vendo).
+      const profile = level === 'team' ? this.deps.botProfile?.(this.data.seats[seat]?.deckId ?? null) : undefined;
+      const coached = level === 'team' && [...this.conns].some((c) => c.coach);
+      const explain = coached
+        ? (e: BotExplanation) => {
+            const toReal = (a: Action): Action => {
+              const r = actionFromView(state, aliases, a);
+              return typeof r === 'string' ? a : r;
+            };
+            this.emitCoach({ index: this.data.actions.length, seat, ...e, actions: e.actions.map(toReal), alternatives: e.alternatives.map((alt) => ({ ...alt, actions: alt.actions.map(toReal) })) });
+          }
+        : undefined;
+      const real = actionFromView(state, aliases, chooseBotAction(view, seat, level, profile || explain ? { ...(profile ? { profile } : {}), ...(explain ? { explain } : {}) } : undefined));
       if (typeof real === 'string') throw new Error(real);
       this.commit(real);
     } catch (e) {
@@ -1096,9 +1126,12 @@ export class Room {
       if (!this.ensureLate(this.delayOf(conn))) Object.assign(conn, { hands: false, as: undefined, delay: 0 });
     }
     const late = this.lateOf(conn);
+    // O painel do treinador é só do jogador do Time no treino contra o Bot do Time.
+    if (conn.coach && (conn.seat === null || this.data.queue !== 'bot' || this.data.botLevel !== 'team')) conn.coach = false;
     this.conns.add(conn);
     this.updatePresence();
     this.sendState([conn]);
+    if (conn.coach) for (const entry of this.coachLog) conn.send('coach', entry);
     // Quem chega durante o sorteio vê os dados já jogados (na mesa atrasada, os que já passaram do atraso).
     if ((late ? late.state : this.state)?.phase === 'mulligan') {
       const cutoff = this.deps.now() - (late?.delay ?? 0);
@@ -1130,6 +1163,17 @@ export class Room {
     this.recentEvents.push(e);
     for (const late of this.lates.values()) late.events.push(e);
     this.advanceLate();
+  }
+
+  /** Explicações das jogadas do bot nesta partida (painel do treinador): as últimas, para quem reconecta. */
+  private coachLog: CoachEntry[] = [];
+
+  /** Manda a explicação de uma jogada do bot para quem é do Time (e a guarda para quem reconectar). */
+  private emitCoach(entry: CoachEntry) {
+    this.coachLog.push(entry);
+    if (this.coachLog.length > COACH_LOG_MAX) this.coachLog.splice(0, this.coachLog.length - COACH_LOG_MAX);
+    const json = JSON.stringify(entry);
+    for (const c of this.conns) if (c.coach) this.deliver(c, 'coach', json);
   }
 
   /** Manda um evento agora para quem assiste ao vivo e, depois do atraso, para quem assiste atrasado. */
@@ -1305,6 +1349,8 @@ export class Room {
       manual: !late && this.paused && this.data.manual ? { name: this.data.manual.name, at: this.data.manual.at } : null,
       result: over ? this.data.result : null,
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
+      /** Treino contra o bot: o nível do bot do servidor (a nota e as marcações do Time citam o nível). */
+      ...(this.data.botLevel ? { botLevel: this.data.botLevel } : {}),
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
       handsAllowed: this.handsAllowed,
       /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio com mãos ao vivo). */

@@ -7,11 +7,11 @@ import { useMemo, useState } from 'react';
 import type { DeckSummary } from '../api';
 import { type DeckSort, type DeckTab, inTab, localRecent, matchesColors, matchesQuery, sortDecks } from '../deckLibrary';
 import { useT } from '../i18n';
-import { DeckTabs, DeckToolbar } from './DeckPicker';
+import { deckTabs, DeckTabs, DeckToolbar } from './DeckPicker';
 import { DeckTile } from './DeckTile';
 import { Icon } from './Icons';
 
-const TABS: DeckTab[] = ['mine', 'favorites', 'community', 'builtin'];
+const TABS: DeckTab[] = ['mine', 'favorites', 'community', 'meta', 'builtin'];
 const SORTS: DeckSort[] = ['updated', 'recent', 'name', 'color', 'leader', 'games'];
 
 export function DeckLibrary({
@@ -85,7 +85,7 @@ export function DeckLibrary({
       {error && <div className="error">{error}</div>}
 
       <div className="dk-library-filters">
-        <DeckTabs tabs={TABS.map((tb) => [tb, t(`decks.tab.${tb}`)] as [DeckTab, string])} value={tab} counts={counts} label={t('decks.tabsLabel')} onChange={setTab} />
+        <DeckTabs tabs={deckTabs(TABS, decks).map((tb) => [tb, t(`decks.tab.${tb}`)] as [DeckTab, string])} value={tab} counts={counts} label={t('decks.tabsLabel')} onChange={setTab} />
         <DeckToolbar query={query} onQuery={setQuery} sort={sort} sorts={SORTS} onSort={setSort} colors={colors} onColors={setColors} />
       </div>
 

@@ -13,12 +13,16 @@
 //   --batch <N>                posições por rodada (padrão 200)
 //   --level <hard|normal>      nível do bot (padrão hard)
 //   --with-hand                também ajusta `handCard` (o valor da carta que sai da Vida para a mão)
+//   --leader <número>          só posições de jogadores com este Líder (ex.: OP17-039)
+//   --profile <deck>           Bot do Time: parte dos pesos do perfil de data/decks/meta/<deck>.profile.json e ajusta
+//                              também os `weights` dele (use com --leader do mesmo deck)
 //
 // Saída: a concordância antes e depois (numa parte das posições que o ajuste não viu), a defesa do Líder por
 // Vida (humano, bot atual, bot ajustado) e o json dos pesos, para conferir com `duel.ts` e `vs-human.ts`.
 // Só lê o banco, mas usa CPU por minutos: rode numa cópia do banco ou fora do horário de pico.
 
-import { BOT_WEIGHTS, type BotLevel } from '@gumgum/engine';
+import { BOT_WEIGHTS, type BotLevel, profileWeights } from '@gumgum/engine';
+import { MetaProfiles } from './team/profiles';
 import { openDb } from './db';
 import { selectMatches, topRankedPlayers, topTournamentPlayers, tournamentInfo, type DecisionKind } from './decisions/extract';
 import { agreement, collectSamples, defenseByLife, initialTheta, partialWeights, spsa, weightsOf } from './decisions/tune';
@@ -48,10 +52,21 @@ if ((opt('top') || opt('tournament-top')) && !players.size) {
 
 const level = (opt('level') ?? 'hard') as BotLevel;
 const withHand = args.includes('--with-hand');
+// Bot do Time: ajusta também os `weights` do perfil de um deck do meta, partindo dos pesos do perfil (arquétipo e
+// ajustes do guia). As posições devem ser de jogos com esse Líder (`--leader`), senão o ajuste não diz nada sobre o deck.
+const profileId = opt('profile');
+const profile = profileId ? new MetaProfiles().profile(profileId) : null;
+if (profileId && !profile) {
+  console.error(`Perfil ${profileId} não encontrado (ou inválido) em data/decks/meta.`);
+  process.exit(1);
+}
+const baseWeights = profile ? profileWeights(profile, null) : BOT_WEIGHTS;
+const extraKeys = profile ? Object.keys(profile.weights ?? {}) : [];
 const kinds = (opt('kinds') ?? 'counter,block').split(',') as DecisionKind[];
 const ids = selectMatches(db, {
   queue: opt('queue'),
   since: opt('since'),
+  leader: opt('leader'),
   tournament: tournament?.id,
   players: players.size ? [...players] : undefined,
   limit: num('limit', 300),
@@ -77,24 +92,24 @@ const shuffled = [...samples].sort(() => Math.random() - 0.5);
 const holdout = shuffled.slice(0, Math.floor(shuffled.length / 5));
 const train = shuffled.slice(holdout.length);
 
-const before = agreement(holdout, BOT_WEIGHTS, level);
+const before = agreement(holdout, baseWeights, level);
 console.log(`Concordância com as pessoas antes (${holdout.length} posições fora do ajuste): ${(100 * before).toFixed(1)}%`);
-const theta = spsa(train, initialTheta(BOT_WEIGHTS, withHand), {
+const theta = spsa(train, initialTheta(baseWeights, withHand, extraKeys), {
   rounds: num('rounds', 80),
   batch: num('batch', 200),
   level,
   onRound: (round, plus, minus) => process.stdout.write(`\rrodada ${round + 1}: θ+ ${(100 * plus).toFixed(1)}% x ${(100 * minus).toFixed(1)}% θ−   `),
 });
-const tuned = weightsOf(theta);
+const tuned = weightsOf(theta, baseWeights);
 const after = agreement(holdout, tuned, level);
 console.log(`\nConcordância depois: ${(100 * after).toFixed(1)}% (antes ${(100 * before).toFixed(1)}%) | ${((Date.now() - t0) / 60000).toFixed(1)} min`);
 
 const pct = (a: number, b: number) => (b ? `${((100 * a) / b).toFixed(0)}%` : '-');
-const now = defenseByLife(holdout, BOT_WEIGHTS, level);
+const now = defenseByLife(holdout, baseWeights, level);
 const next = defenseByLife(holdout, tuned, level);
 console.log('\nDefesa do Líder por Vida (posições fora do ajuste): humano / bot atual / bot ajustado');
 for (const k of Object.keys(now).sort()) console.log(`  ${k.padEnd(14)} ${String(now[k].n).padStart(5)}   ${pct(now[k].human, now[k].n)} / ${pct(now[k].bot, now[k].n)} / ${pct(next[k].bot, next[k].n)}`);
 
-console.log('\nPesos ajustados (json parcial para duel.ts e vs-human.ts):');
-console.log(JSON.stringify(partialWeights(tuned, withHand)));
-console.log(`Atuais: ${JSON.stringify(partialWeights(BOT_WEIGHTS, withHand))}`);
+console.log(profile ? `\nPesos ajustados (json parcial para duel.ts e vs-human.ts; os de \`weights\` do perfil ${profile.id} entram no .profile.json):` : '\nPesos ajustados (json parcial para duel.ts e vs-human.ts):');
+console.log(JSON.stringify(partialWeights(tuned, withHand, extraKeys)));
+console.log(`Atuais: ${JSON.stringify(partialWeights(baseWeights, withHand, extraKeys))}`);

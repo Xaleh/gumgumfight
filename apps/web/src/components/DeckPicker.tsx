@@ -28,7 +28,9 @@ import { Icon } from './Icons';
 
 export const RANDOM_DECK = 'random';
 
-export const DECK_TABS: DeckTab[] = ['recent', 'favorites', 'mine', 'community', 'builtin'];
+export const DECK_TABS: DeckTab[] = ['recent', 'favorites', 'mine', 'community', 'meta', 'builtin'];
+/** As abas da lista: "Decks do meta" só quando o servidor tem algum. */
+export const deckTabs = (tabs: DeckTab[], decks: DeckSummary[]): DeckTab[] => tabs.filter((tb) => tb !== 'meta' || decks.some((d) => d.meta));
 const SORTS: DeckSort[] = ['recent', 'name', 'color', 'leader', 'games'];
 export const COLOR_LABEL: Record<string, MessageKey> = {
   red: 'deck.color.red',
@@ -198,7 +200,7 @@ export function DeckPicker({
   const detail = current ? details.get(current.id) : undefined;
   const numbers = detail ? deckNumbers(detail.list, detail.cards) : null;
   const leader = current && detail ? detail.cards.get(current.leader) : undefined;
-  const tabLabels = DECK_TABS.map((tb) => [tb, t(`decks.tab.${tb}`)] as [DeckTab, string]);
+  const tabLabels = deckTabs(DECK_TABS, decks).map((tb) => [tb, t(`decks.tab.${tb}`)] as [DeckTab, string]);
 
   return (
     <div className="modal-backdrop page-sheet dk-picker-backdrop" onClick={onClose}>

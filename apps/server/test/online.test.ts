@@ -15,7 +15,7 @@ import {
 } from '@gumgum/engine';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
-import { createSession, getUser, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
+import { createSession, getUser, type Role, setUserRole, setUserTeam, upsertGoogleUser } from '../src/auth/store';
 import { broadcastView, DEFAULT_SETTINGS, handsDelayFor } from '../src/online/broadcast';
 import type { ServerOptions } from '../src/config';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
@@ -1314,6 +1314,73 @@ describe('modo espectador', () => {
     expect(roll.state.pending?.kind).toBe('chooseFirst');
     expect((await app.inject('/api/online/live')).json().rooms).toHaveLength(3);
   });
+
+  it('nível do bot na sala: o Bot do Time só para quem é do Time; nível inválido recusado', async () => {
+    const { app, db } = setup();
+    const zoro = login(db, 'zoro');
+    const open = (headers: Record<string, string>, level: unknown) =>
+      app.inject({ method: 'POST', url: '/api/online/bot', headers, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb', first: 0, level } });
+    expect((await open({ ...ALICE, cookie: zoro.cookie }, 'easy')).statusCode).toBe(400);
+    expect((await open({ ...ALICE, cookie: zoro.cookie }, 'chefe')).statusCode).toBe(400);
+    const refused = await open({ ...ALICE, cookie: zoro.cookie }, 'team');
+    expect(refused.statusCode).toBe(403);
+    expect(refused.json().errorCode).toBe('teamOnly');
+    // Sem nível: o padrão (hard).
+    const plain = await open({ ...ALICE, cookie: zoro.cookie }, undefined);
+    expect(plain.statusCode, plain.body).toBe(201);
+    expect(getRoom(app, plain.json().roomId).data.botLevel).toBe('hard');
+    // No Time: o nível fica na sala (e sobrevive ao reinício, como o resto de RoomData).
+    const sanji = login(db, 'sanji');
+    setUserTeam(db, sanji.id, true);
+    const team = await open({ ...BOB, cookie: sanji.cookie }, 'team');
+    expect(team.statusCode, team.body).toBe(201);
+    expect(getRoom(app, team.json().roomId).data.botLevel).toBe('team');
+    // Admin também pode (para testar).
+    const admin = login(db, 'nami', 'admin');
+    expect((await open({ 'x-deck-owner': 'carol-0123456789abcdef', cookie: admin.cookie }, 'team')).statusCode).toBe(201);
+  });
+
+  it('Bot do Time: quem é do Time recebe a explicação de cada jogada do bot (evento coach), com a posição no replay', async () => {
+    const { app, db } = setup();
+    const sanji = login(db, 'sanji');
+    setUserTeam(db, sanji.id, true);
+    // O bot começa: joga o turno 1 inteiro sozinho.
+    const r = await app.inject({ method: 'POST', url: '/api/online/bot', headers: { ...ALICE, cookie: sanji.cookie }, payload: { deckId: 'st01-luffy', botDeckId: 'st02-kid', format: 'egb', first: 1, level: 'team' } });
+    expect(r.statusCode, r.body).toBe(201);
+    const { roomId, token } = r.json();
+    const room = getRoom(app, roomId);
+    const me = client(0);
+    me.conn.coach = true;
+    const watcher = client(null);
+    watcher.conn.coach = true; // espectador: nunca
+    room.attach(me.conn);
+    room.attach(watcher.conn);
+    expect(watcher.conn.coach).toBe(false);
+    // O humano responde ao que for dele (mulligan…) até o bot encerrar o primeiro turno dele.
+    for (let i = 0; i < 400 && !(me.view!.turn >= 2 && actingPlayer(me.view!) === 0 && !me.view!.pending); i++) {
+      const v = me.view!;
+      if (actingPlayer(v) === 0) {
+        const res = await act(app, roomId, token, v.actionCount, chooseBotAction(v, 0));
+        expect(res.statusCode, res.body).toBe(200);
+      } else await new Promise((done) => setTimeout(done, 1));
+    }
+    const coach = me.events.filter((e) => e.event === 'coach').map((e) => e.data);
+    expect(coach.length).toBeGreaterThan(0);
+    const turn = coach.find((c) => c.kind === 'turn');
+    expect(turn).toBeDefined();
+    expect(turn.seat).toBe(1);
+    expect(turn.actions[turn.actions.length - 1].type).toBe('endTurn');
+    // A posição é a da ação no replay: a jogada gravada ali é a primeira da linha.
+    expect(room.data.actions[turn.index]).toEqual(turn.actions[0]);
+    expect(Array.isArray(turn.terms)).toBe(true);
+    expect(watcher.events.some((e) => e.event === 'coach')).toBe(false);
+    // Quem reconecta recebe as explicações de novo.
+    const again = client(0);
+    again.conn.coach = true;
+    room.attach(again.conn);
+    expect(again.events.filter((e) => e.event === 'coach').length).toBe(coach.length);
+    for (const c of [me, watcher, again]) room.detach(c.conn);
+  }, 60_000);
 
   it('o bot do servidor joga a partida inteira e ela entra nas estatísticas como partida contra o bot', async () => {
     const { app, db } = setup();

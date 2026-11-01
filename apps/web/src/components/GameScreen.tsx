@@ -1,6 +1,7 @@
 import {
   type Action,
   actingPlayer,
+  type BotLevel,
   cancelAllowed,
   type CardData,
   type CardDef,
@@ -25,7 +26,9 @@ import {
 } from '@gumgum/engine';
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { api, currentSpoilerSet, isAdmin, type LiveRoom, modeLabel, type OnlineSeat, type RoomDecks, type WatchTarget, whyNotPlayable } from '../api';
+import { api, type CoachEntry, currentSpoilerSet, type FeedbackMark, isAdmin, isTeam, type LiveRoom, modeLabel, type OnlineSeat, type RoomDecks, type WatchTarget, whyNotPlayable } from '../api';
+import { BotRating } from './BotFeedback';
+import { CoachPanel } from './CoachPanel';
 import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { describeReplayAction } from '../game/replayCue';
@@ -115,9 +118,9 @@ interface Drag {
   /** Posições na fileira dos DON!! arrastados (ficam apagados enquanto o arrasto dura). */
   dons?: number[];
 }
-type Sheet = null | 'menu' | 'log' | 'hand' | { trash: PlayerId };
+type Sheet = null | 'menu' | 'log' | 'hand' | 'coach' | { trash: PlayerId };
 /** Painel lateral no desktop: do Streamer (histórico, partidas, decklists) ou de quem joga (histórico, a própria decklist). */
-type Panel = null | 'log' | 'matches' | 'deck';
+type Panel = null | 'log' | 'matches' | 'deck' | 'coach';
 
 type TryT = ReturnType<typeof useTryT>;
 /** Campos que o motor passa a mandar junto das perguntas e das habilidades: a chave do texto no dicionário e os parâmetros. */
@@ -193,6 +196,8 @@ export interface TableGame {
   replay?: ReplayControls;
   /** Replay: a última mudança foi um pulo (sem animação). */
   jumped?: boolean;
+  /** Bot do Time (navegador): as explicações das jogadas do bot (painel do treinador). */
+  coach?: CoachEntry[];
 }
 
 type TableKind = GameSetup['mode'] | 'online';
@@ -257,7 +262,7 @@ export function GameScreen({
       const seed = Math.floor(Math.random() * 1_000_000);
       const names: [string, string] = [players[0].name, players[1].name];
       const next = await buildSetup('bot', [deckId, setup.deckIds[1]], names, seed, setup.format, firstPlayer, undefined, undefined, chooseFirst);
-      onRematch?.({ ...next, spoilers: setup.spoilers, botLevel: setup.botLevel });
+      onRematch?.({ ...next, spoilers: setup.spoilers, botLevel: setup.botLevel, botProfile: setup.botProfile });
     } catch (e) {
       game.setError(e instanceof Error ? e.message : String(e));
     }
@@ -269,6 +274,7 @@ export function GameScreen({
         game={{ ...game, downloadReplay: () => downloadReplay(game.exportReplay()) }}
         kind={setup.mode}
         matchId={matchId}
+        botLevel={setup.botLevel}
         ownDeck={human !== null ? ownDeck : undefined}
         onExit={onExit}
         onRematch={onRematch && (setup.mode === 'bot' && confirmDeck ? () => setConfirming(true) : () => onRematch())}
@@ -523,6 +529,7 @@ function Table({
   startNotice,
   tutorial,
   matchId,
+  botLevel,
   embed,
   ownDeck,
 }: {
@@ -555,6 +562,8 @@ function Table({
   tutorial?: TableTutorial;
   /** Partida contra o bot já gravada no servidor (o relato de bug aponta para ela; online vem da sala). */
   matchId?: number | null;
+  /** Partida contra o bot no navegador: o nível do bot (online vem da sala). */
+  botLevel?: BotLevel;
   /** Replay embutido num app parceiro. */
   embed?: TableEmbed;
   /** Partida no navegador: o deck de quem joga, para o painel de decklist (online vem da sala). */
@@ -750,6 +759,13 @@ function Table({
   const [deckOf, setDeckOf] = useState<PlayerId | null>(null);
   const recorded = isOnline ? (online?.room?.result?.matchId ?? null) : (matchId ?? null);
   const reportMatch = human !== null && !watching && !tutorial && !broadcast && kind !== 'replay' ? recorded : null;
+  // Bot do Time: a nota e as marcações, para quem é do Time, numa partida contra o bot (no navegador ou na sala do servidor).
+  const botMatch = kind === 'bot' || online?.room?.queue === 'bot';
+  const effectiveBotLevel: BotLevel | undefined = isOnline ? online?.room?.botLevel : botLevel;
+  /** Jogadas do bot marcadas durante a partida (painel do treinador); vão com a nota no fim. */
+  const [marks, setMarks] = useState<FeedbackMark[]>([]);
+  const setMark = useCallback((index: number, mark: FeedbackMark | null) => setMarks((list) => [...list.filter((m) => m.index !== index), ...(mark ? [mark] : [])]), []);
+  const coachEntries = (isOnline ? online?.coach : game.coach) ?? [];
   const reportCards = useMemo(
     () =>
       Object.values(state.defs)
@@ -793,6 +809,9 @@ function Table({
   // Espectador com a visão de um jogador (o streamer que transmite a própria partida): a mão dele embaixo.
   const bottom: PlayerId = human ?? online?.room?.pov ?? 0;
   const { user } = useAuth();
+  const feedbackMatch = botMatch && isTeam(user) && reportMatch !== null ? reportMatch : null;
+  /** Painel do treinador: no treino contra o Bot do Time, para quem é do Time. */
+  const coachOn = botMatch && isTeam(user) && effectiveBotLevel === 'team' && human !== null && !watching && kind !== 'replay';
   /** Streamer e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */
   const canBroadcast = Boolean(online?.room && !broadcast && !tutorial && user && (user.role === 'streamer' || isAdmin(user.role)));
   const sendToBroadcast = () =>
@@ -1386,6 +1405,12 @@ function Table({
             {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
           </button>
         )}
+        {!wide && coachOn && (
+          <button className="round-btn coach-btn" onClick={() => setSheet('coach')} aria-label={t('coach.panel')} title={t('coach.panel')}>
+            <Icon name="bot" size={20} />
+            {coachEntries.length > 0 && <span className="corner-badge">{coachEntries.length > 99 ? '99+' : coachEntries.length}</span>}
+          </button>
+        )}
         {online && !watching && <ChatBar online={online} />}
       </>
     ) : null;
@@ -1776,6 +1801,11 @@ function Table({
             <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
           </SheetFrame>
         )}
+        {sheet === 'coach' && coachOn && (
+          <SheetFrame title={t('coach.panel')} onClose={() => setSheet(null)}>
+            <CoachPanel state={state} entries={coachEntries} marks={marks} onMark={setMark} />
+          </SheetFrame>
+        )}
 
         {sheet !== null && typeof sheet === 'object' && (
           <SheetFrame
@@ -1825,6 +1855,7 @@ function Table({
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
             onReport={reportMatch !== null ? () => setReporting(true) : undefined}
             onDeck={setDeckOf}
+            feedback={feedbackMatch !== null ? <BotRating matchId={feedbackMatch} level={effectiveBotLevel} marks={marks} /> : undefined}
           />
         )}
         {deckOf !== null && state.phase === 'gameover' && (
@@ -1889,12 +1920,18 @@ function Table({
         <aside className="side-panel tabbed-panel player-panel" aria-label={t('game.panelLabel')}>
           <div className="panel-tabs">
             <div className="seg small" role="tablist">
-              <button type="button" role="tab" aria-selected={panel !== 'deck'} className={panel !== 'deck' ? 'on' : ''} onClick={() => setPanel('log')}>
+              <button type="button" role="tab" aria-selected={panel !== 'deck' && panel !== 'coach'} className={panel !== 'deck' && panel !== 'coach' ? 'on' : ''} onClick={() => setPanel('log')}>
                 {t('game.log')}
               </button>
               {loadOwnDeck && (
                 <button type="button" role="tab" aria-selected={panel === 'deck'} className={panel === 'deck' ? 'on' : ''} onClick={() => setPanel('deck')}>
                   {t('game.decklist')}
+                </button>
+              )}
+              {coachOn && (
+                <button type="button" role="tab" aria-selected={panel === 'coach'} className={panel === 'coach' ? 'on' : ''} onClick={() => setPanel('coach')}>
+                  {t('coach.panel')}
+                  {coachEntries.length > 0 && <span className="dk-count">{coachEntries.length}</span>}
                 </button>
               )}
             </div>
@@ -1932,6 +1969,8 @@ function Table({
           )}
           {panel === 'deck' && loadOwnDeck ? (
             <DeckListPanel load={loadOwnDeck} onZoom={setDeckCard} />
+          ) : panel === 'coach' && coachOn ? (
+            <CoachPanel state={state} entries={coachEntries} marks={marks} onMark={setMark} />
           ) : (
             <>
               <CardDetail state={state} uid={detailUid} />

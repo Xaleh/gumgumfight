@@ -2,11 +2,15 @@ import { type MessageKey, type Params, t, type Translate, tryT } from './i18n';
 import {
   type Action,
   barredSpoilers,
+  type BotExplanation,
+  type BotLevel,
   type CardData,
   type CardDef,
   type DeckList,
+  type DeckProfile,
   type FormatId,
   formatLabel,
+  type GameState,
   type LogEntry,
   type ManualOp,
   type Pending,
@@ -22,6 +26,8 @@ export interface DeckSummary {
   id: string;
   name: string;
   kind: 'builtin' | 'user';
+  /** Deck pronto do meta global (data/decks/meta): grupo "Decks do meta", jogado pelo Bot do Time (servidores antigos não mandam). */
+  meta?: boolean;
   leader: string;
   leaderName: string | null;
   /** Imagem do Líder (null quando o servidor desliga as imagens). */
@@ -137,7 +143,8 @@ export function deckGroups(decks: DeckSummary[]): Array<[MessageKey, DeckSummary
   return [
     ['labels.deckGroup.mine', decks.filter((d) => d.kind === 'user' && d.mine)],
     ['labels.deckGroup.community', decks.filter((d) => d.kind === 'user' && !d.mine)],
-    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin')],
+    ['labels.deckGroup.meta', decks.filter((d) => d.kind === 'builtin' && d.meta)],
+    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin' && !d.meta)],
   ];
 }
 
@@ -364,7 +371,12 @@ export interface User {
   role: Role;
   /** Plano de apoio ativo (null = sem plano). */
   supporter: SupporterState | null;
+  /** Faz parte do Time do bot: joga contra o Bot do Time e marca as jogadas dele. */
+  team: boolean;
 }
+
+/** Pode jogar contra o Bot do Time (admins também, para testar). */
+export const isTeam = (u: User | null | undefined) => Boolean(u && (u.team || isAdmin(u.role)));
 
 // ------------------------------------------------------------------ apoio ao projeto
 
@@ -427,6 +439,68 @@ export interface AdminUser extends User {
   supporterTier: SupporterTier | null;
   supporterUntil: string | null;
   supporterSource: 'manual' | 'apoiase' | 'kofi' | null;
+}
+
+// ------------------------------------------------------------------ Bot do Time
+
+/** A explicação de uma jogada do bot (painel do treinador): a posição da jogada no replay e o que o planejador explicou. */
+export type CoachEntry = BotExplanation & { index: number; seat: PlayerId };
+
+/** Um deck do meta (`data/decks/meta`): o estado do guia e do perfil. */
+export interface MetaDeckInfo {
+  id: string;
+  name: string;
+  leader: string;
+  hasGuide: boolean;
+  hasProfile: boolean;
+  archetype: string | null;
+  summary: string | null;
+  profileError: string | null;
+  /** Guia ou perfil salvos pela tela (no banco), por cima dos arquivos de data/decks/meta. */
+  overridden?: boolean;
+  updatedAt: string;
+}
+
+
+/** Marcação de uma jogada do bot: a posição no replay, o que ele deveria ter feito e um comentário. */
+export interface FeedbackMark {
+  index: number;
+  /** A jogada esperada (uma ação legal daquela posição, por números de carta) ou texto livre. */
+  expected?: Record<string, unknown> | string;
+  comment?: string;
+}
+export type FeedbackStatus = 'open' | 'test' | 'fixed' | 'dismissed';
+export const FEEDBACK_STATUSES: FeedbackStatus[] = ['open', 'test', 'fixed', 'dismissed'];
+export interface FeedbackItem {
+  id: number;
+  matchId: number;
+  userId: string;
+  userName: string | null;
+  kind: 'mark' | 'rating';
+  botLevel: string | null;
+  botSeat: number | null;
+  botDeck: string | null;
+  leader: string | null;
+  oppLeader: string | null;
+  actionIndex: number | null;
+  turn: number | null;
+  /** A jogada do bot e a esperada, por números de carta (`{type, card?, target?…}`) ou texto. */
+  botAction: Record<string, unknown> | null;
+  expected: Record<string, unknown> | string | null;
+  rating: number | null;
+  comment: string | null;
+  status: FeedbackStatus;
+  note: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+export interface FeedbackDeckSummary {
+  botDeck: string | null;
+  leader: string | null;
+  ratings: number;
+  avgRating: number | null;
+  openMarks: number;
+  marks: number;
 }
 
 // ------------------------------------------------------------------ apps parceiros (tokens e OAuth)
@@ -549,6 +623,8 @@ export const api = {
     tutorial: (days = 30) => get<{ days: number; since: string; lessons: TutorialFunnel[] }>(`/api/admin/tutorial?days=${days}`),
     users: (q = '') => get<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(q)}`),
     setRole: (id: string, role: Role) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { role }),
+    /** Entra no (ou sai do) Time do bot. */
+    setTeam: (id: string, team: boolean) => send<User>('PUT', `/api/admin/users/${encodeURIComponent(id)}/team`, { team }),
     /** Plano dado à mão; `until` "AAAA-MM-DD" ou null (sem prazo). */
     setSupporter: (id: string, tier: SupporterTier | null, until: string | null) =>
       send<Pick<AdminUser, 'id' | 'supporterTier' | 'supporterUntil' | 'supporterSource'>>('PUT', `/api/admin/users/${encodeURIComponent(id)}/supporter`, {
@@ -683,6 +759,26 @@ export const api = {
       get<{ replay: Record<string, unknown>; cards: ApiCard[]; origins: string[] }>(`/api/replay/${id}?t=${encodeURIComponent(token)}`),
     report: (id: number, form: ReportForm) => send<MatchReport>('POST', `/api/matches/${id}/report`, form),
   },
+  /** Bot do Time: os decks do meta (guia e perfil), as correções (marcações de jogadas e notas) e a caixa de correções. */
+  bot: {
+    profiles: () => get<{ decks: MetaDeckInfo[] }>('/api/bot/profiles'),
+    profile: (id: string) => get<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>(`/api/bot/profiles/${encodeURIComponent(id)}`),
+    /** Salva o guia (markdown) e/ou o perfil (JSON; o servidor confere); null volta ao arquivo. Só admin. */
+    saveProfile: (id: string, patch: { guide?: string | null; profile?: unknown }) =>
+      send<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>('PUT', `/api/bot/profiles/${encodeURIComponent(id)}`, patch),
+    /** O agente fora da partida está ligado neste servidor. */
+    agent: () => get<{ enabled: boolean }>('/api/bot/agent'),
+    /** Agente: o guia vira um rascunho de perfil com as justificativas (não salva). Só admin. */
+    generateProfile: (id: string) => send<{ profile: DeckProfile; why: Record<string, string> }>('POST', `/api/bot/profiles/${encodeURIComponent(id)}/generate`, {}),
+    /** Agente: a partida do bot comparada com o guia do deck. Só admin. */
+    reviewMatch: (matchId: number) => send<{ deckId: string | null; review: string }>('POST', `/api/bot/matches/${matchId}/review`, {}),
+    feedback: (matchId: number, form: { level?: BotLevel; rating?: number; comment?: string; marks?: FeedbackMark[] }) =>
+      send<{ ids: number[] }>('POST', '/api/bot/feedback', { matchId, ...form }),
+    feedbackList: (status: FeedbackStatus | 'all' = 'open') => get<{ items: FeedbackItem[] }>(`/api/bot/feedback?status=${status}`),
+    feedbackItem: (id: number) => get<FeedbackItem & { position: GameState | null }>(`/api/bot/feedback/${id}`),
+    feedbackSummary: () => get<{ decks: FeedbackDeckSummary[] }>('/api/bot/feedback/summary'),
+    setFeedbackStatus: (id: number, status: FeedbackStatus, note?: string) => send<FeedbackItem>('PUT', `/api/bot/feedback/${id}`, { status, note }),
+  },
   reports: {
     list: (opts: { tournament?: string; status?: 'open' | 'resolved' | 'all' } = {}) =>
       get<{ reports: MatchReport[] }>(
@@ -696,8 +792,14 @@ export const api = {
     /** Contadores do menu; a consulta também conta este navegador como conectado. */
     stats: () => get<OnlineStats>('/api/online/stats'),
     /** Treino contra o bot transmitido: o servidor joga pelo bot e a partida aparece em "Assistir" (exige login). */
-    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId) =>
-      send<{ roomId: string; token: string }>('POST', '/api/online/bot', { deckId, botDeckId, ...mode, ...(first !== undefined ? { first } : {}) }),
+    botRoom: (deckId: string, botDeckId: string, mode: PlayMode, first?: PlayerId, level?: BotLevel) =>
+      send<{ roomId: string; token: string }>('POST', '/api/online/bot', {
+        deckId,
+        botDeckId,
+        ...mode,
+        ...(first !== undefined ? { first } : {}),
+        ...(level ? { level } : {}),
+      }),
     live: () => get<{ rooms: LiveRoom[]; hands: boolean }>('/api/online/live'),
     byCode: (code: string) => get<LiveRoom>(`/api/online/watch/${encodeURIComponent(code)}`),
     room: (roomId: string) => get<LiveRoom>(`/api/online/rooms/${encodeURIComponent(roomId)}`),
@@ -916,6 +1018,8 @@ export interface OnlineRoomInfo {
     errorCode?: string;
   } | null;
   rematch: [boolean, boolean];
+  /** Treino contra o bot: o nível do bot do servidor (servidores antigos não mandam). */
+  botLevel?: BotLevel;
   /** Atraso da mesa desta conexão em ms (quem vê as mãos); 0 ou ausente = ao vivo. */
   delay?: number;
   /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */

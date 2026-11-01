@@ -53,7 +53,12 @@ export interface User {
   supporterSource: SupporterSource | null;
   /** Aceitou aparecer na lista pública de Apoiadores. */
   supporterPublic: boolean;
+  /** Faz parte do Time do bot: joga contra o Bot do Time (nível `team`) e envia correções das jogadas. */
+  team: boolean;
 }
+
+/** Pode jogar contra o Bot do Time e marcar as jogadas dele (admins também, para testar). */
+export const isTeam = (u: User | null | undefined) => Boolean(u && (u.team || isAdmin(u.role)));
 
 /** Benefícios de apoiador também valem para quem administra o site (para testar e moderar). */
 export const hasSupporterPerk = (u: User | null | undefined, min: SupporterTier) => Boolean(u && (isAdmin(u.role) || atLeast(u.supporterTier, min)));
@@ -79,8 +84,9 @@ type UserRow = {
   supporter_until: string | null;
   supporter_source: string | null;
   supporter_public: number;
+  team: number;
 };
-const USER_COLS = 'id, email, name, picture, custom_picture_at, role, supporter_tier, supporter_until, supporter_source, supporter_public';
+const USER_COLS = 'id, email, name, picture, custom_picture_at, role, supporter_tier, supporter_until, supporter_source, supporter_public, team';
 /** Endereço da foto enviada; a versão no endereço deixa o navegador guardar a imagem para sempre. */
 const customPictureUrl = (id: string, version: number) => `/api/users/${encodeURIComponent(id)}/picture?v=${version}`;
 
@@ -99,6 +105,7 @@ const toUser = (r: UserRow): User => ({
   supporterUntil: r.supporter_until,
   supporterSource: isSupporterSource(r.supporter_source) ? r.supporter_source : null,
   supporterPublic: Boolean(r.supporter_public),
+  team: Boolean(r.team),
 });
 
 /**
@@ -164,6 +171,11 @@ export function getCustomPicture(db: DB, id: string): { data: Uint8Array; type: 
 
 export function setUserRole(db: DB, id: string, role: Role): boolean {
   return Number(db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, id).changes) > 0;
+}
+
+/** Entra no (ou sai do) Time do bot. */
+export function setUserTeam(db: DB, id: string, team: boolean): boolean {
+  return Number(db.prepare('UPDATE users SET team = ? WHERE id = ?').run(team ? 1 : 0, id).changes) > 0;
 }
 
 /**
@@ -252,7 +264,7 @@ export function listUsers(db: DB, query = '', limit = 50): UserListItem[] {
       `SELECT ${USER_COLS}, created_at, last_login_at FROM users
        WHERE COALESCE(name, '') LIKE ? ESCAPE '\\' OR COALESCE(email, '') LIKE ? ESCAPE '\\'
        ORDER BY CASE role WHEN 'dev' THEN 0 WHEN 'admin' THEN 0 WHEN 'organizer' THEN 1 WHEN 'streamer' THEN 2 ELSE 3 END,
-         supporter_tier IS NULL, last_login_at DESC
+         team = 0, supporter_tier IS NULL, last_login_at DESC
        LIMIT ?`,
     )
     .all(q, q, limit) as Array<UserRow & { created_at: string; last_login_at: string }>;

@@ -13,6 +13,8 @@
 
 import { randomInt } from 'node:crypto';
 import {
+  type DeckProfile,
+  isBotLevel,
   buildCardDef,
   type CardData,
   cardLegality,
@@ -30,7 +32,7 @@ import {
   validateDeck,
 } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { accountOwnerKey, seesHands, type User } from '../auth/store';
+import { accountOwnerKey, isTeam, seesHands, type User } from '../auth/store';
 import { type DB, deleteLiveMatch, getCards, getDeck, listDecks, listLeaders, listLiveMatches, saveLiveMatch } from '../db';
 import { ResponseCache } from '../cache';
 import { fail } from '../errors';
@@ -90,6 +92,8 @@ interface Deps {
   onMatch?: (matchId: number) => void;
   /** Notificações no celular (partida começou, sua vez). */
   notifier?: Notifier;
+  /** Bot do Time: o perfil do deck do bot, pelo id do deck (`team/profiles.ts`). */
+  botProfile?: (deckId: string | null) => DeckProfile | undefined;
 }
 
 /**
@@ -258,6 +262,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     limits: deps.limits,
     log: (msg) => app.log.warn(msg),
     onRoomEvent: (room, event) => roomNotice(deps.notifier ?? noNotifier, room, event),
+    botProfile: deps.botProfile,
   });
   const botRooms = deps.botRooms ?? true;
   lobby.restore(
@@ -425,10 +430,15 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    * "Assistir". Só com login (sem conta, o treino roda no navegador).
    * `botDeckId` ausente ou "random": um deck pronto sorteado entre os permitidos no formato.
    * `first`: 0 = o jogador começa, 1 = o bot começa; ausente ou "random" = sorteio.
+   * `level`: nível do bot (ausente = `hard`); `team` (o Bot do Time) só para quem é do Time.
    */
-  app.post<{ Body: RoomBody & { botDeckId?: unknown; first?: unknown } }>('/api/online/bot', async (req, reply) => {
+  app.post<{ Body: RoomBody & { botDeckId?: unknown; first?: unknown; level?: unknown } }>('/api/online/bot', async (req, reply) => {
     if (!botRooms) return reply.code(404).send(fail('botRoomsOff', 'O treino online contra o bot está desligado neste servidor.'));
-    if (!user(req)) return reply.code(401).send(fail('botRoomLoginRequired', 'Para transmitir o treino contra o bot, entre com a conta Google.'));
+    const u = user(req);
+    if (!u) return reply.code(401).send(fail('botRoomLoginRequired', 'Para transmitir o treino contra o bot, entre com a conta Google.'));
+    const level = req.body?.level === undefined ? 'hard' : req.body.level;
+    if (!isBotLevel(level) || level === 'easy') return reply.code(400).send(fail('invalidBotLevel', 'Nível do bot inválido.'));
+    if (level === 'team' && !isTeam(u)) return reply.code(403).send(fail('teamOnly', 'O Bot do Time é só para quem faz parte do Time.'));
     const mode = modeOf(req.body);
     const { format } = mode;
     const seat = seatFor(req, req.body, false, format, seatRules(mode));
@@ -437,7 +447,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (limit) return reply.code(limit.code).send(limit);
     let botDeckId = req.body?.botDeckId;
     if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
-      const pool = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false, seatRules(mode))));
+      const builtin = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false, seatRules(mode))));
+      // O Bot do Time sorteia entre os decks do meta, quando há algum permitido nas regras.
+      const meta = level === 'team' ? builtin.filter((d) => d.group === 'meta') : [];
+      const pool = meta.length ? meta : builtin;
       if (!pool.length) return reply.code(400).send(fail('noBuiltinDeckInFormat', `Nenhum deck pronto é permitido no ${formatLabel(format)}.`, { format: formatLabel(format) }));
       botDeckId = pool[randomInt(pool.length)].id;
     }
@@ -449,14 +462,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     }
     const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: botDeck.id!, deck: botDeck };
     const first = req.body?.first;
-    const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined);
+    const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined, level);
     if (isError(r)) return reply.code(r.code).send(r);
     lobby.tagIp(r.room.id, req.ip);
     return reply.code(201).send({ roomId: r.room.id, token: r.token });
   });
 
   /** Abre o canal SSE de uma conexão (jogador ou espectador) com a sala. */
-  const stream = (req: FastifyRequest, reply: FastifyReply, room: Room, init: Pick<Connection, 'seat' | 'hands'>) => {
+  const stream = (req: FastifyRequest, reply: FastifyReply, room: Room, init: Pick<Connection, 'seat' | 'hands' | 'coach'>) => {
     reply.hijack();
     const res = reply.raw;
     res.writeHead(200, {
@@ -491,7 +504,9 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   app.get<{ Params: { id: string }; Querystring: { t?: string } }>('/api/online/rooms/:id/events', (req, reply) => {
     const found = seatIn(req.params.id, req.query.t);
     if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
-    stream(req, reply, found.room, { seat: found.seat });
+    // Bot do Time: quem é do Time recebe a explicação de cada jogada do bot (painel do treinador).
+    const coach = found.room.data.queue === 'bot' && found.room.data.botLevel === 'team' && isTeam(user(req));
+    stream(req, reply, found.room, { seat: found.seat, ...(coach ? { coach: true } : {}) });
   });
 
   // ---------------------------------------------------------------- espectadores

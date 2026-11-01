@@ -18,18 +18,21 @@
 //   resultado de um deck só.
 //
 // Quem chama decide o nível: `easy` é o bot heurístico (`simple.ts`), `normal` olha uma jogada à
-// frente, `hard` planeja o turno inteiro.
+// frente, `hard` planeja o turno inteiro. `team` (o Bot do Time) é o `hard` com mais relógio e feixe e,
+// quando o deck tem perfil (`profile.ts`), com os pesos e o conhecimento do deck na avaliação.
 
 import { legalActions } from '../actions';
 import { applyAction, cardDef, getPower, locate, opponent } from '../engine';
 import type { Action, GameState, Pending, PlayerId } from '../types';
 import { HIDDEN_CARD } from '../view';
-import { DEFAULT_WEIGHTS, evaluate, handCardValue, hasDiscardOutlet, type Weights } from './evaluate';
+import { DEFAULT_WEIGHTS, evaluate, evaluateTerms, handCardValue, hasDiscardOutlet, type Weights } from './evaluate';
+import { type DeckProfile, keepHand, opponentLeader, profileWeights } from './profile';
 import { chooseBotAction as simpleBot } from './simple';
 
-export type BotLevel = 'easy' | 'normal' | 'hard';
+export type BotLevel = 'easy' | 'normal' | 'hard' | 'team';
 
-export const BOT_LEVELS: BotLevel[] = ['easy', 'normal', 'hard'];
+export const BOT_LEVELS: BotLevel[] = ['easy', 'normal', 'hard', 'team'];
+export const isBotLevel = (v: unknown): v is BotLevel => BOT_LEVELS.includes(v as BotLevel);
 
 export interface PlannerOptions {
   /** Linhas mantidas a cada passo da busca em feixe. */
@@ -47,11 +50,43 @@ export interface PlannerOptions {
   now: () => number;
   /** Depuração: recebe cada candidata avaliada numa escolha pendente e a linha escolhida na fase principal. */
   onDecision?: (info: string, depth: number) => void;
+  /** Perfil do próprio deck (Bot do Time): os pesos saem dele em `chooseBotAction`; o mulligan o lê aqui. */
+  profile?: DeckProfile;
+  /** Painel do treinador: recebe a explicação de cada decisão de verdade (a linha ou a resposta escolhida, a nota e os termos). */
+  explain?: (e: BotExplanation) => void;
+}
+
+/** A explicação de uma decisão do bot, para o painel do treinador (as ações estão nos uids da visão). */
+export interface BotExplanation {
+  /** `turn`: a linha da fase principal; `pending`: a resposta a uma escolha pendente. */
+  kind: 'turn' | 'pending';
+  turn: number;
+  /** A linha escolhida (até o `endTurn`) ou a resposta. */
+  actions: Action[];
+  score: number;
+  /** Os termos da avaliação que mais mudaram entre a posição de agora e o fim da linha (os maiores em módulo). */
+  terms: Array<{ key: string; delta: number }>;
+  /** As outras linhas (ou respostas) consideradas, da melhor para a pior, com a nota. */
+  alternatives: Array<{ actions: Action[]; score: number }>;
+}
+
+/** Os termos que mais mudaram de `before` para `after` (até `n`, em ordem de módulo). */
+function termDeltas(before: GameState, after: GameState, player: PlayerId, w: Weights, n = 4): BotExplanation['terms'] {
+  const a = evaluateTerms(before, player, w);
+  const b = evaluateTerms(after, player, w);
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys]
+    .map((key) => ({ key, delta: Math.round((b[key] ?? 0) - (a[key] ?? 0)) }))
+    .filter((d) => Math.abs(d.delta) >= 50)
+    .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
+    .slice(0, n);
 }
 
 export const LEVELS: Record<Exclude<BotLevel, 'easy'>, Pick<PlannerOptions, 'beamWidth' | 'maxDepth' | 'timeBudgetMs' | 'maxChoices'>> = {
   normal: { beamWidth: 1, maxDepth: 1, timeBudgetMs: 80, maxChoices: 6 },
   hard: { beamWidth: 6, maxDepth: 16, timeBudgetMs: 250, maxChoices: 10 },
+  // Mais feixe e relógio que o `hard`: no servidor só o Time joga contra ele (docs/plano-bot-time.md).
+  team: { beamWidth: 8, maxDepth: 20, timeBudgetMs: 600, maxChoices: 12 },
 };
 
 export function plannerOptions(level: Exclude<BotLevel, 'easy'>, over: Partial<PlannerOptions> = {}): PlannerOptions {
@@ -96,7 +131,9 @@ interface Sim {
 /** Ação do bot no nível pedido (padrão `hard`). */
 export function chooseBotAction(state: GameState, player: PlayerId, level: BotLevel = 'hard', over?: Partial<PlannerOptions>): Action {
   if (level === 'easy') return simpleBot(state, player);
-  return planAction(state, player, plannerOptions(level, over));
+  // Com o perfil do deck, os pesos saem dele (arquétipo, ajustes do guia e o confronto com o Líder adversário).
+  const profiled = over?.profile ? { ...over, weights: profileWeights(over.profile, opponentLeader(state, player), over.weights ?? DEFAULT_WEIGHTS) } : over;
+  return planAction(state, player, plannerOptions(level, profiled));
 }
 
 export function planAction(full: GameState, player: PlayerId, opts: PlannerOptions): Action {
@@ -118,9 +155,11 @@ export function planAction(full: GameState, player: PlayerId, opts: PlannerOptio
     // tem 2 DON!! no primeiro turno); nos replays, os melhores colocados dos torneios escolhem jogar primeiro em
     // só 15% das vezes (docs/bot-tempo.md, seção 11).
     if (pending.kind === 'chooseFirst') return { type: 'answer', player, yes: false };
-    if (pending.kind === 'mulligan' || pending.kind === 'manual') return simpleBot(view, player);
+    // Mulligan: pelo perfil do deck (as cartas que seguram a mão), senão pela regra do bot heurístico.
+    if (pending.kind === 'mulligan') return { type: 'mulligan', player, redraw: !keepHand(view, player, opts.profile, (uid) => cardDef(view, uid)) };
+    if (pending.kind === 'manual') return simpleBot(view, player);
     const o = defenseOrPlan(view, player, opts);
-    if (!sampled) return decidePending(determinize(view, player, opts.random), player, actions, o, 2)?.action ?? simpleBot(view, player);
+    if (!sampled) return decidePending(determinize(view, player, opts.random), player, actions, o, 2, true)?.action ?? simpleBot(view, player);
     const chosen = decideSampled(view, player, actions, o) ?? simpleBot(view, player);
     // O plano guardado continua se previa exatamente esta resposta; senão, a próxima decisão replaneja.
     const steps = plans.get(gameKey(view, player));
@@ -182,16 +221,29 @@ function decideSampled(view: GameState, player: PlayerId, legal: Action[], opts:
   }
   let best: Action | undefined;
   let bestScore = -Infinity;
+  const scored: Array<{ action: Action; score: number }> = [];
   candidates.forEach((c, i) => {
     const sc = scores[i];
     if (!sc.length) return;
     const score = sc.reduce((a, b) => a + b, 0) / sc.length + opts.random() * NOISE;
     opts.onDecision?.(`candidata ${JSON.stringify(c)}: ${score.toFixed(0)} (média de ${sc.length} sorteio(s))`, 2);
+    scored.push({ action: c, score });
     if (score > bestScore) {
       bestScore = score;
       best = c;
     }
   });
+  if (opts.explain && best) {
+    const chosen = best;
+    opts.explain({
+      kind: 'pending',
+      turn: view.turn,
+      actions: [chosen],
+      score: Math.round(bestScore),
+      terms: [],
+      alternatives: scored.filter((s) => s.action !== chosen).sort((a, b) => b.score - a.score).slice(0, 3).map((o) => ({ actions: [o.action], score: Math.round(o.score) })),
+    });
+  }
   return best;
 }
 
@@ -457,18 +509,33 @@ function pendingCandidates(state: GameState, player: PlayerId, legal: Action[], 
 }
 
 /** Escolhe a resposta a uma pergunta pendente simulando cada candidata. null = nenhuma simulável. */
-function decidePending(state: GameState, player: PlayerId, legal: Action[], opts: PlannerOptions, depth: number): (Sim & { action: Action }) | null {
+function decidePending(state: GameState, player: PlayerId, legal: Action[], opts: PlannerOptions, depth: number, explain = false): (Sim & { action: Action }) | null {
   let best: (Sim & { action: Action }) | null = null;
   let bestScore = -Infinity;
+  const scored: Array<{ action: Action; score: number; end: GameState }> = [];
   for (const c of pendingCandidates(state, player, legal, opts)) {
     const r = simulate(state, player, c, opts, depth);
     if (!r) continue;
     const score = evaluate(r.state, player, opts.weights) + r.penalty + opts.random() * NOISE;
     opts.onDecision?.(`candidata ${JSON.stringify(c)}: ${score.toFixed(0)} (risco ${r.penalty.toFixed(0)})`, depth);
+    if (explain) scored.push({ action: c, score, end: r.state });
     if (score > bestScore) {
       bestScore = score;
       best = { ...r, action: c };
     }
+  }
+  if (explain && opts.explain && best) {
+    const chosen = best;
+    const others = scored.filter((s) => s.action !== chosen.action).sort((a, b) => b.score - a.score).slice(0, 3);
+    const end = scored.find((s) => s.action === chosen.action)?.end ?? state;
+    opts.explain({
+      kind: 'pending',
+      turn: state.turn,
+      actions: [chosen.action],
+      score: Math.round(bestScore),
+      terms: termDeltas(state, end, player, opts.weights),
+      alternatives: others.map((o) => ({ actions: [o.action], score: Math.round(o.score) })),
+    });
   }
   return best;
 }
@@ -524,10 +591,12 @@ function dedupeKey(state: GameState, player: PlayerId): string {
  * a busca o descartaria antes de ver o ataque: por isso "anexar k DON!! e atacar" entra como uma jogada
  * composta, com k suficiente para empatar o poder do alvo, superá-lo e sobrar margem para Counter.
  */
-function candidateMoves(state: GameState, player: PlayerId): Action[][] {
+function candidateMoves(state: GameState, player: PlayerId, roles?: Weights['roles']): Action[][] {
   const legal = legalActions(state, player);
   const me = state.players[player];
   const out: Action[][] = [];
+  // Perfil do deck: as cartas motor entram antes (a ordem só pesa quando o relógio corta a busca).
+  if (roles) legal.sort((a, b) => Number(b.type === 'playCard' && roles[cardDef(state, b.uid).id] === 'engine') - Number(a.type === 'playCard' && roles[cardDef(state, a.uid).id] === 'engine'));
   const attacks = legal.filter((a): a is Extract<Action, { type: 'attack' }> => a.type === 'attack');
   for (const a of legal) {
     switch (a.type) {
@@ -689,9 +758,13 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
   const score = (s: GameState, penalty: number, depth: number) => evaluate(s, player, opts.weights) + penalty - depth * ACTION_COST + noise();
 
   let beam: Node[] = [{ state, trace: [], depth: 0, penalty: 0, hits: [], score: evaluate(state, player, opts.weights) }];
-  let best: { score: number; trace: Step[]; complete: boolean } | null = null;
-  const offer = (candidate: { score: number; trace: Step[]; complete: boolean }) => {
+  type Offer = { score: number; trace: Step[]; complete: boolean; end: GameState };
+  let best: Offer | null = null;
+  /** As linhas oferecidas (para a explicação: as melhores alternativas); só com o painel do treinador ligado. */
+  const offers: Offer[] = [];
+  const offer = (candidate: Offer) => {
     opts.onDecision?.(`oferta (${candidate.score.toFixed(0)}): ${candidate.trace.map((st) => JSON.stringify(st.action)).join(' → ')}`, 1);
+    if (opts.explain) offers.push(candidate);
     if (!best || candidate.score > best.score) best = candidate;
   };
 
@@ -704,6 +777,7 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
       score: value + node.penalty - node.depth * ACTION_COST + noise(),
       trace: [...node.trace, ...(r?.trace ?? [{ key: stateKey(node.state, player), action: end }])],
       complete,
+      end: r?.state ?? node.state,
     });
   };
 
@@ -716,7 +790,7 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
       if (!expand) continue;
       // As linhas "tudo no Líder" só antes do primeiro ataque da linha.
       const attacked = node.trace.some((st) => st.action.type === 'attack');
-      const moves = [...candidateMoves(node.state, player).map((m) => ({ m, allOut: false })), ...(attacked ? [] : allOutLines(node.state, player).map((m) => ({ m, allOut: true })))];
+      const moves = [...candidateMoves(node.state, player, opts.weights.roles).map((m) => ({ m, allOut: false })), ...(attacked ? [] : allOutLines(node.state, player).map((m) => ({ m, allOut: true })))];
       // Variantes da mesma jogada (DON!! a mais no mesmo ataque) não podem encher o feixe sozinhas:
       // no máximo `SIBLINGS` filhos por jogada, para o feixe manter alternativas de verdade.
       const groups = new Map<string, Node[]>();
@@ -729,7 +803,7 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
         // Partida decidida, ou a simulação parou numa pergunta que a profundidade não cobriu: a linha
         // termina aqui (o que vier depois é replanejado na hora).
         if (r.state.phase === 'gameover' || r.state.pending || r.state.activePlayer !== player) {
-          offer({ score: score(r.state, penalty, d), trace, complete: true });
+          offer({ score: score(r.state, penalty, d), trace, complete: true, end: r.state });
           continue;
         }
         const child: Node = { state: r.state, trace, depth: d, penalty, hits: r.hits, score: score(r.state, penalty, d) };
@@ -765,6 +839,19 @@ function planTurn(state: GameState, player: PlayerId, opts: PlannerOptions): Act
   const chosen = best!;
   const steps = chosen.trace;
   opts.onDecision?.(`linha escolhida (${chosen.score.toFixed(0)}): ${steps.map((st) => JSON.stringify(st.action)).join(' → ')}`, 0);
+  if (opts.explain) {
+    const line = (o: Offer) => o.trace.map((st) => st.action);
+    const key = (o: Offer) => JSON.stringify(line(o));
+    const seen = new Set([key(chosen)]);
+    const alternatives: BotExplanation['alternatives'] = [];
+    for (const o of offers.sort((a, b) => b.score - a.score)) {
+      if (seen.has(key(o))) continue;
+      seen.add(key(o));
+      alternatives.push({ actions: line(o), score: Math.round(o.score) });
+      if (alternatives.length >= 3) break;
+    }
+    opts.explain({ kind: 'turn', turn: state.turn, actions: line(chosen), score: Math.round(chosen.score), terms: termDeltas(state, chosen.end, player, opts.weights), alternatives });
+  }
   // Linha cortada pela profundidade ou pelo tempo: o `endTurn` do fim não foi comparado com
   // continuar jogando, então fica de fora do plano (a próxima decisão replaneja).
   const rest = chosen.complete ? steps.slice(1) : steps.slice(1).filter((st) => st.action.type !== 'endTurn');

@@ -6,6 +6,7 @@ import { type MessageKey, useT } from '../i18n';
 import { PaymentsPanel, SponsorsPanel, SupporterEditor } from './AdminSupport';
 import { DeckCleanupPanel } from './DeckCleanup';
 import { ReportsPanel } from './Reports';
+import { TeamBotPanel } from './TeamBot';
 import { TutorialFunnelPanel } from './TutorialFunnel';
 
 /** O que cada perfil pode fazer: chave do dicionário. */
@@ -21,7 +22,7 @@ const ROLE_HELP: Record<Role, MessageKey> = {
 export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (setup: GameSetup) => void }) {
   const t = useT();
   const { user, refresh } = useAuth();
-  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors' | 'decks'>('users');
+  const [tab, setTab] = useState<'users' | 'reports' | 'tutorial' | 'payments' | 'sponsors' | 'decks' | 'team'>('users');
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +49,20 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
       const saved = await api.admin.setRole(u.id, role);
       setUsers((list) => list?.map((x) => (x.id === u.id ? { ...x, role: saved.role } : x)) ?? null);
       // Promoveu a si mesmo a Dev: a barra de conta e o menu passam a mostrar as funções de desenvolvimento.
+      if (u.id === user?.id) await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const changeTeam = async (u: AdminUser, team: boolean) => {
+    setSaving(u.id);
+    setError(null);
+    try {
+      const saved = await api.admin.setTeam(u.id, team);
+      setUsers((list) => list?.map((x) => (x.id === u.id ? { ...x, team: saved.team } : x)) ?? null);
       if (u.id === user?.id) await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -84,7 +99,11 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
           <button className={tab === 'decks' ? 'on' : ''} onClick={() => setTab('decks')}>
             {t('decks.cleanup.tab')}
           </button>
+          <button className={tab === 'team' ? 'on' : ''} onClick={() => setTab('team')}>
+            {t('admin.tabTeam')}
+          </button>
         </div>
+        {tab === 'team' && <TeamBotPanel onReplay={onReplay} admin />}
         {tab === 'reports' && <ReportsPanel onReplay={onReplay} />}
         {tab === 'tutorial' && <TutorialFunnelPanel />}
         {tab === 'payments' && <PaymentsPanel />}
@@ -100,6 +119,9 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
               ))}
               <li>
                 <b>{t('admin.supportHelpLabel')}</b>: {t('admin.supportHelp')}
+              </li>
+              <li>
+                <b>{t('admin.teamHelpLabel')}</b>: {t('admin.teamHelp')}
               </li>
             </ul>
             <input className="admin-search" value={query} placeholder={t('admin.searchPlaceholder')} onChange={(e) => setQuery(e.target.value)} />
@@ -118,6 +140,7 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
                       </span>
                     )}
                     <span className={['role-tag', u.role].join(' ')}>{t(ROLE_LABEL[u.role])}</span>
+                    {u.team && <span className="team-tag admin-user-team">{t('team.tag')}</span>}
                     <b className="admin-user-name">{u.name ?? t('admin.googleAccount')}</b>
                   </span>
                   <div className="admin-user-body">
@@ -135,6 +158,10 @@ export function Admin({ onExit, onReplay }: { onExit: () => void; onReplay: (set
                           </option>
                         ))}
                       </select>
+                    </label>
+                    <label className="admin-user-role admin-team muted small" title={t('admin.teamHelp')}>
+                      <input type="checkbox" checked={u.team} disabled={saving === u.id} onChange={(e) => changeTeam(u, e.target.checked)} />
+                      {t('admin.team')}
                     </label>
                     <SupporterEditor
                       key={`${u.supporterTier}-${u.supporterUntil}`}

@@ -126,6 +126,9 @@ function migrate(db: DB) {
   // Dono do deck: SHA-256 do código do navegador (nunca o código em si) ou
   // "user:<id>" quando o deck pertence a uma conta (ver auth/store.ts).
   if (!deckCols.includes('owner_hash')) db.exec('ALTER TABLE decks ADD COLUMN owner_hash TEXT');
+  // deck_group: 'meta' para os decks prontos de data/decks/meta (os decks do meta global, com guia e perfil
+  // para o Bot do Time); null para os Starter Decks e os decks de jogadores.
+  if (!deckCols.includes('deck_group')) db.exec('ALTER TABLE decks ADD COLUMN deck_group TEXT');
   migrateStats(db);
   migrateAuth(db);
   migratePush(db);
@@ -138,6 +141,7 @@ function migrate(db: DB) {
   migrateCardGaps(db);
   migrateDecks(db);
   migrateGlobalStats(db);
+  migrateTeam(db);
 }
 
 /**
@@ -145,6 +149,52 @@ function migrate(db: DB) {
  * um resumo diário dos Líderes, para a tendência. O sync regrava a fila inteira; o histórico
  * tem uma linha por fila e dia.
  */
+/**
+ * Bot do Time (docs/plano-bot-time.md): as correções que o Time envia sobre as jogadas do bot. Cada linha é
+ * uma marcação ("nesta jogada ele deveria ter feito X") ou a nota da partida (1 a 5). A marcação guarda a
+ * visão do bot na posição (refeita do replay), a jogada que ele fez e a esperada: é a matéria-prima de um
+ * teste de posição (`packages/engine/test/bot-positions.test.ts`).
+ */
+function migrateTeam(db: DB) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bot_feedback (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id     INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      user_id      TEXT NOT NULL REFERENCES users(id),
+      kind         TEXT NOT NULL,                 -- mark | rating
+      bot_level    TEXT,                          -- nível do bot na partida (team, hard…)
+      bot_seat     INTEGER,                       -- assento do bot
+      bot_deck     TEXT,                          -- deck do bot (decks.id, quando se sabe)
+      leader       TEXT,                          -- Líder do bot (número da carta)
+      opp_leader   TEXT,                          -- Líder do jogador
+      action_index INTEGER,                       -- marcação: posição da jogada no replay
+      turn         INTEGER,
+      bot_action   TEXT,                          -- marcação: a jogada do bot (JSON, por números de carta)
+      expected     TEXT,                          -- marcação: o que ele deveria ter feito (JSON Choice ou texto)
+      position     TEXT,                          -- marcação: a visão do bot na posição (JSON, sem o histórico)
+      rating       INTEGER,                       -- nota: 1 a 5
+      comment      TEXT,
+      status       TEXT NOT NULL DEFAULT 'open',  -- open | test | fixed | dismissed
+      note         TEXT,                          -- resposta de quem tratou
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at  TEXT,
+      resolved_by  TEXT
+    );
+    CREATE INDEX IF NOT EXISTS bot_feedback_status ON bot_feedback(status, created_at);
+    CREATE INDEX IF NOT EXISTS bot_feedback_match ON bot_feedback(match_id);
+
+    -- Guia e perfil de um deck do meta salvos pela tela "Bot do Time" (por cima dos arquivos de data/decks/meta,
+    -- que são a semente e o que vai para o repositório). Sobrevivem ao deploy, que troca a pasta data/.
+    CREATE TABLE IF NOT EXISTS meta_profiles (
+      deck_id    TEXT PRIMARY KEY,
+      guide      TEXT,
+      profile    TEXT,
+      updated_by TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+}
+
 function migrateGlobalStats(db: DB) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS global_stats_queues (
@@ -438,6 +488,9 @@ function migrateSupport(db: DB) {
   if (!userCols.includes('supporter_source')) db.exec('ALTER TABLE users ADD COLUMN supporter_source TEXT');
   // supporter_public: a pessoa aceitou aparecer na lista de Apoiadores.
   if (!userCols.includes('supporter_public')) db.exec('ALTER TABLE users ADD COLUMN supporter_public INTEGER NOT NULL DEFAULT 0');
+  // team: faz parte do Time do bot (joga contra o Bot do Time e envia correções). Marca à parte do perfil
+  // e do plano: a sincronização da Apoia.se sobrescreve o plano, não esta coluna.
+  if (!userCols.includes('team')) db.exec('ALTER TABLE users ADD COLUMN team INTEGER NOT NULL DEFAULT 0');
   // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
   if (!userCols.includes('email_verified')) {
     db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
@@ -1169,15 +1222,17 @@ export function getTranslations(db: DB, lang: string, ids?: string[]): Map<strin
 
 /** builtin = vem de data/decks (recriado a cada início); user = montado pelo jogador. */
 export type DeckKind = 'builtin' | 'user';
-export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHash: string | null };
+/** Grupo de um deck pronto: 'meta' = deck do meta global (data/decks/meta), jogado pelo Bot do Time. */
+export type DeckGroup = 'meta';
+export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHash: string | null; group: DeckGroup | null };
 
 /** Grava um deck. O dono só é definido na criação (um update nunca troca o dono). */
-export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', ownerHash: string | null = null) {
+export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', ownerHash: string | null = null, group: DeckGroup | null = null) {
   db.prepare(`
-    INSERT INTO decks (id, name, leader, cards, arts, kind, owner_hash, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO decks (id, name, leader, cards, arts, kind, owner_hash, deck_group, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET name = excluded.name, leader = excluded.leader,
-      cards = excluded.cards, arts = excluded.arts, kind = excluded.kind, updated_at = excluded.updated_at
+      cards = excluded.cards, arts = excluded.arts, kind = excluded.kind, deck_group = excluded.deck_group, updated_at = excluded.updated_at
   `).run(
     deck.id,
     deck.name,
@@ -1186,6 +1241,7 @@ export function upsertDeck(db: DB, deck: DeckList, kind: DeckKind = 'builtin', o
     deck.arts && Object.keys(deck.arts).length ? JSON.stringify(deck.arts) : null,
     kind,
     ownerHash,
+    group,
   );
 }
 
@@ -1198,8 +1254,9 @@ type DeckRow = {
   kind: DeckKind;
   updated_at: string;
   owner_hash: string | null;
+  deck_group: string | null;
 };
-const DECK_COLS = 'id, name, leader, cards, arts, kind, updated_at, owner_hash';
+const DECK_COLS = 'id, name, leader, cards, arts, kind, updated_at, owner_hash, deck_group';
 const toDeck = (r: DeckRow): StoredDeck => ({
   id: r.id,
   name: r.name,
@@ -1209,6 +1266,7 @@ const toDeck = (r: DeckRow): StoredDeck => ({
   kind: r.kind,
   updatedAt: r.updated_at,
   ownerHash: r.owner_hash,
+  group: r.deck_group === 'meta' ? 'meta' : null,
 });
 
 export function listDecks(db: DB): StoredDeck[] {

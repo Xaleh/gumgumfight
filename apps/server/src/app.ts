@@ -54,6 +54,9 @@ import { vapidKeys } from './push/store';
 import { deckHash } from './stats/derive';
 import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
+import { type Complete, sdkCompleter } from './team/agent';
+import { MetaProfiles } from './team/profiles';
+import { registerTeamRoutes } from './team/routes';
 import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
@@ -86,6 +89,8 @@ export function buildApp(
     pushSend?: PushSender;
     /** Testes: esperas entre as tentativas do webhook dos parceiros (ms). */
     webhookRetryMs?: number[];
+    /** Testes: o modelo do agente do Bot do Time (sem ele, o SDK com BOT_AGENT_API_KEY). */
+    agentComplete?: Complete | null;
   } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
@@ -225,6 +230,8 @@ export function buildApp(
       id: deck.id,
       name: deck.name,
       kind: deck.kind,
+      /** Deck do meta global (data/decks/meta): o grupo "Decks do meta" e o Bot do Time. */
+      meta: deck.group === 'meta',
       leader: deck.leader,
       leaderName: leader?.name ?? null,
       leaderImage: (server.cardImages && leader && artImage(leader, deck.arts?.[leader.id])) || null,
@@ -424,6 +431,10 @@ export function buildApp(
     now: opts.now,
     sendIndex,
   });
+  // Bot do Time: os decks do meta com guia e perfil (data/decks/meta, e o que a tela salvou no banco).
+  const metaProfiles = new MetaProfiles(undefined, db);
+  // O agente fora da partida: só com a chave (BOT_AGENT_API_KEY); os testes passam um `complete` falso.
+  const agentComplete = opts.agentComplete ?? (server.botAgent ? sdkCompleter(server.botAgent) : null);
   const lobby = registerOnlineRoutes(app, {
     db,
     viewerHash,
@@ -437,6 +448,7 @@ export function buildApp(
     onTournamentGame: (game) => reportFromGame(db, game),
     onMatch: (id) => webhooks.matchFinished(id),
     notifier,
+    botProfile: (deckId) => (deckId ? (metaProfiles.profile(deckId) ?? undefined) : undefined),
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
@@ -452,6 +464,7 @@ export function buildApp(
   registerDeckCleanupRoutes(app, { db, user: auth.viewer, now: opts.now });
 
   registerReportRoutes(app, { db, user: auth.viewer, notifier });
+  registerTeamRoutes(app, { db, user: auth.viewer, profiles: metaProfiles, complete: agentComplete });
   registerSupportRoutes(app, {
     db,
     user: auth.viewer,

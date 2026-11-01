@@ -8,6 +8,7 @@ import {
   currentSpoilerSet,
   type DeckSummary,
   type FormatId,
+  isTeam,
   modeLabel,
   type OnlineSeat,
   type QueueKind,
@@ -79,7 +80,7 @@ function saveRules(key: string, rules: Rules) {
 function savedBotLevel(): BotLevel {
   try {
     const v = localStorage.getItem(LAST_BOT_LEVEL);
-    return v === 'easy' || v === 'normal' ? v : 'hard';
+    return v === 'easy' || v === 'normal' || v === 'team' ? v : 'hard';
   } catch {
     return 'hard';
   }
@@ -287,6 +288,7 @@ export function Menu({
   onTournaments,
   onTournamentMatch,
   onAdmin,
+  onTeamBot,
   dev = false,
 }: {
   onStart: (s: GameSetup) => void;
@@ -308,6 +310,8 @@ export function Menu({
   onTournamentMatch: (seat: OnlineSeat, tournamentId: string) => void;
   /** Perfis das contas (só para admin). */
   onAdmin?: () => void;
+  /** Tela "Bot do Time" (só para quem é do Time): decks do meta e caixa de correções. */
+  onTeamBot?: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
@@ -327,7 +331,10 @@ export function Menu({
   const [deck1, setDeck1] = useState('');
   const [seed, setSeed] = useState(randomSeed());
   const [first, setFirst] = useState<'random' | '0' | '1'>('random');
-  const [botLevel, setBotLevel] = useState<BotLevel>(savedBotLevel);
+  const [savedLevel, setBotLevel] = useState<BotLevel>(savedBotLevel);
+  /** O nível Time (o Bot do Time) só vale para quem é do Time; para os outros, o guardado vira "difícil". */
+  const team = isTeam(user);
+  const botLevel: BotLevel = savedLevel === 'team' && !team ? 'hard' : savedLevel;
   const [format, setFormat] = useState<FormatId>(savedFormat);
   const [privateRules, setPrivateRules] = useState<Rules>(() => savedRules(LAST_PRIVATE_RULES));
   const [botRules, setBotRules] = useState<Rules>(() => savedRules(LAST_BOT_RULES));
@@ -496,14 +503,18 @@ export function Menu({
     try {
       // Sem apelido: um nome que funcione nas frases do log, que são em terceira pessoa ("You kept their hand" não).
       const names: [string, string] = [nickname ?? t('menu.youName'), t('menu.botName')];
-      const pool = decks.filter((d) => playsIn(d, botMode) && d.kind === 'builtin');
+      const builtin = decks.filter((d) => playsIn(d, botMode) && d.kind === 'builtin');
+      // O Bot do Time sorteia entre os decks do meta, quando há algum que vale nas regras.
+      const meta = botLevel === 'team' ? builtin.filter((d) => d.meta) : [];
+      const pool = meta.length ? meta : builtin;
       if (deck1 === RANDOM && !pool.length) throw new Error(t('menu.noBuiltinDeck', { format: modeLabel(botMode) }));
       const opp = deck1 === RANDOM ? pool[Math.floor(Math.random() * pool.length)].id : deck1;
       const firstPlayer = first === 'random' ? undefined : (Number(first) as PlayerId);
       let notice: string | undefined;
-      if (broadcasting) {
+      // O Bot do Time joga no servidor sempre que dá (o perfil do deck e o relógio maior ficam lá).
+      if (broadcasting || (botLevel === 'team' && botRooms && user)) {
         try {
-          onOnline(await api.online.botRoom(mine, opp, botMode, firstPlayer));
+          onOnline(await api.online.botRoom(mine, opp, botMode, firstPlayer, botLevel === 'easy' ? undefined : botLevel));
           return;
         } catch (e) {
           // Servidor lotado: o treino roda no navegador, sem transmissão.
@@ -517,7 +528,9 @@ export function Menu({
         /* sem armazenamento local */
       }
       const setup = await buildSetup('bot', [mine, opp], names, seed, botMode.format, firstPlayer);
-      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(notice ? { notice } : {}) });
+      // Bot do Time no navegador: o perfil do deck do bot (quando o deck do meta tem um).
+      const botProfile = botLevel === 'team' ? ((await api.bot.profile(opp).catch(() => null))?.profile ?? undefined) : undefined;
+      onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(botProfile ? { botProfile } : {}), ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);
       setLoading(false);
@@ -634,6 +647,7 @@ export function Menu({
     { key: 'replay', label: t('menu.navReplay'), icon: 'play', onClick: () => setShowReplay(true) },
     ...(supportOn ? [{ key: 'support', label: t('support.nav'), icon: 'heart' as const, onClick: () => setShowSupport(true) }] : []),
     ...(onAdmin ? [{ key: 'admin', label: t('menu.navAdmin'), icon: 'shield' as const, onClick: onAdmin }] : []),
+    ...(onTeamBot ? [{ key: 'teambot', label: t('menu.navTeamBot'), icon: 'bot' as const, onClick: onTeamBot }] : []),
     ...(onCoverage
       ? [{ key: 'coverage', label: newGaps ? t('menu.navCoverageNew', { n: newGaps }) : t('menu.navCoverage'), icon: 'check' as const, onClick: onCoverage }]
       : []),
@@ -896,7 +910,7 @@ export function Menu({
               title={t('menu.vsBot')}
               badge={modeLabel(botMode)}
               desc={t('menu.botDesc')}
-              live={broadcasting && stats ? <Live>{t('menu.botLive', { n: stats.playing.bot })}</Live> : <Live off>{t('menu.botLocal')}</Live>}
+              live={(broadcasting || (botLevel === 'team' && botRooms && user)) && stats ? <Live>{t('menu.botLive', { n: stats.playing.bot })}</Live> : <Live off>{t('menu.botLocal')}</Live>}
               note={!d0 || botReady ? null : t('menu.bothDecksValid', { format: modeLabel(botMode) })}
               action={loading ? t('common.loading') : t('menu.battle')}
               disabled={!botReady || loading}
@@ -947,14 +961,23 @@ export function Menu({
                         ['easy', 'menu.botEasy'],
                         ['normal', 'menu.botNormal'],
                         ['hard', 'menu.botHard'],
+                        ...(team ? ([['team', 'menu.botTeam']] as const) : []),
                       ] as const
                     ).map(([v, label]) => (
-                      <button key={v} type="button" className={botLevel === v ? 'on' : ''} aria-pressed={botLevel === v} onClick={() => setBotLevel(v)}>
+                      <button
+                        key={v}
+                        type="button"
+                        className={[botLevel === v ? 'on' : '', v === 'team' ? 'team' : ''].join(' ')}
+                        aria-pressed={botLevel === v}
+                        title={v === 'team' ? t('menu.botTeamTitle') : undefined}
+                        onClick={() => setBotLevel(v)}
+                      >
                         {t(label)}
                       </button>
                     ))}
                   </div>
                 </div>
+                {botLevel === 'team' && botRooms && user && <p className="muted small mode-hint">{t('menu.botTeamServer')}</p>}
                 {botRooms && (
                   <label className={['check', user ? '' : 'disabled'].join(' ')} title={user ? t('menu.broadcastTitle') : undefined}>
                     <input type="checkbox" checked={broadcasting} disabled={!user} onChange={(e) => setBroadcast(e.target.checked)} />

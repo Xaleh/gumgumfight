@@ -1446,6 +1446,12 @@ export interface GameState {
    * bloquear (o bot avalia isso). Zerado no fim do turno.
    */
   refreshSkipped?: string[];
+  /**
+   * Cartas da mão reveladas ao oponente por efeito ("reveal …") e que ainda não saíram da mão: ficam à vista
+   * dele (e do bot) enquanto estiverem lá. Um jogador lembra o que viu; a visão esconderia de novo no turno
+   * seguinte. Cada ação tira da lista o que já saiu da mão.
+   */
+  knownHand?: string[];
   /** Eventos ativados neste turno (custo base), para "if you have activated an Event … during this turn". */
   eventsThisTurn?: Array<{ player: PlayerId; cost: number }>;
   /** Efeitos adiados para o fim do turno ("at the end of this turn"). */

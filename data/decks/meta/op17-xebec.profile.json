@@ -1,0 +1,38 @@
+{
+  "id": "op17-xebec",
+  "leader": "OP17-039",
+  "archetype": "control",
+  "summary": "Midrange que vira controle pela mão: o Líder ataca todo turno e compra 2 descartando 1; a defesa são os Eventos de custo 0 com [Counter] e as habilidades de Newgate e Linlin; fecha com o Xebec de custo 10 e o Shiki.",
+  "plan": [
+    { "don": 2, "play": ["OP17-050", "OP17-045"], "note": "Streusen arruma o topo para o Líder revelar Rocks Pirates; Kyo compra 1" },
+    { "don": 4, "play": ["OP17-054", "OP17-042", "OP17-041"], "note": "Buckin trava o atacante; Kaido e Wang Zhi são os Blockers" },
+    { "don": 6, "play": ["OP17-049", "OP17-040"], "note": "Linlin e Newgate: a vantagem de cartas" },
+    { "don": 8, "play": ["OP17-048", "OP17-040"], "note": "Shiki (Rush, -3000) ou Newgate + 2 DON!! no Líder" },
+    { "don": 10, "play": ["OP17-118"], "note": "Rocks.D.Xebec: compra 1 e baixa até 2 Rocks Pirates da mão" }
+  ],
+  "mulligan": { "keep": ["OP17-050", "OP17-045"], "minCheap": 2 },
+  "roles": {
+    "OP17-050": "engine",
+    "OP17-045": "engine",
+    "OP17-040": "engine",
+    "OP17-049": "engine",
+    "OP17-118": "finisher",
+    "OP17-048": "finisher",
+    "OP17-055": "defense",
+    "OP17-056": "defense",
+    "OP17-057": "defense",
+    "OP17-042": "blocker",
+    "OP17-041": "blocker",
+    "OP17-054": "removal",
+    "OP17-052": "tech",
+    "OP17-044": "tech",
+    "OP17-043": "tech"
+  },
+  "hold": { "OP17-118": { "untilDon": 10 }, "OP17-048": { "untilDon": 7 } },
+  "weights": { "handFuel": 3600 },
+  "matchups": {
+    "OP17-039": { "counterCard": 0.25, "counterBig": 0.9, "note": "espelho: quase sem Counter impresso, só os Eventos de +2000" },
+    "OP10-099": { "counterCard": 0.72, "note": "Kid amarelo (aggro): atacar com margem; os Blockers seguram o Kid" }
+  },
+  "notes": "Rascunho de exemplo escrito à mão a partir do guia op17-xebec.md; o Time revisa."
+}

@@ -2,8 +2,24 @@ export * from './types';
 export * from './engine';
 export * from './actions';
 export { chooseBotAction as chooseSimpleBotAction } from './bot/simple';
-export { BOT_LEVELS, type BotLevel, chooseBotAction, LEVELS as BOT_LEVEL_OPTIONS, planAction, type PlannerOptions, plannerOptions, resetPlanner } from './bot/planner';
-export { DEFAULT_WEIGHTS as BOT_WEIGHTS, evaluate, type Weights as BotWeights } from './bot/evaluate';
+export { BOT_LEVELS, type BotExplanation, type BotLevel, chooseBotAction, isBotLevel, LEVELS as BOT_LEVEL_OPTIONS, planAction, type PlannerOptions, plannerOptions, resetPlanner } from './bot/planner';
+export { DEFAULT_WEIGHTS as BOT_WEIGHTS, type EvalTerms, evaluate, evaluateTerms, nextTurnPlay, type Weights as BotWeights } from './bot/evaluate';
+export {
+  ARCHETYPE_WEIGHTS,
+  ARCHETYPES,
+  type Archetype,
+  CARD_ROLES,
+  type CardRole,
+  type DeckProfile,
+  donInPlay,
+  type HoldRule,
+  keepHand,
+  type MatchupRule,
+  opponentLeader,
+  type PlanStep,
+  profileWeights,
+  validateProfile,
+} from './bot/profile';
 export {
   automationStatus,
   buildCardDef,

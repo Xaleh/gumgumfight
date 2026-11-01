@@ -53,6 +53,9 @@ describe('extrator de decisões', () => {
 
     expect(selectMatches(db)).toEqual([matchId]);
     expect(selectMatches(db, { queue: 'ranked' })).toEqual([]);
+    // Por Líder do lado humano (o assento 0 joga o ST01).
+    expect(selectMatches(db, { leader: 'ST01-001' })).toEqual([matchId]);
+    expect(selectMatches(db, { leader: 'ST02-001' })).toEqual([]);
     expect(topRankedPlayers(db, 5)).toEqual([]); // ninguém jogou ranqueada
 
     const { records, turns, error } = extractMatch(db, matchId, { bot: 'normal', budgetMs: 30 });
@@ -85,6 +88,9 @@ describe('extrator de decisões', () => {
     const s = summarize(records, 1, 0, turns);
     expect(s.decisions).toBe(records.length);
     expect(s.kinds.main.n).toBeGreaterThan(0);
+    expect(records.every((d) => d.leader === 'ST01-001' && d.oppLeader === 'ST02-001')).toBe(true);
+    expect(s.byLeader['ST01-001'].n).toBe(s.kinds.main.n);
+    expect(formatSummary(s)).toContain('por Líder do jogador');
     expect(s.turns?.n).toBe(turns.length);
     const text = formatSummary(s);
     expect(text).toContain('Partidas: 1 (0 não refizeram)');

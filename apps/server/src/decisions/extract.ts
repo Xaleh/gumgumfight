@@ -67,6 +67,9 @@ export interface DecisionRecord {
   playedAt: string;
   /** Índice da ação no replay. */
   index: number;
+  /** O Líder do jogador e o do oponente (números de carta). */
+  leader: string;
+  oppLeader: string;
   turn: number;
   myTurn: boolean;
   kind: DecisionKind;
@@ -113,6 +116,8 @@ export interface MatchFilter {
   players?: string[];
   /** Só os jogos deste torneio (`tournaments.id`). */
   tournament?: string;
+  /** Só partidas em que um lado humano jogou com este Líder (número da carta). */
+  leader?: string;
   limit?: number;
 }
 
@@ -130,7 +135,7 @@ export interface ExtractOptions {
   onDecision?: (state: GameState, action: Action, rec: DecisionRecord) => void;
 }
 
-interface StoredReplay {
+export interface StoredReplay {
   seed: number;
   seed128?: number[];
   firstPlayer?: PlayerId;
@@ -142,7 +147,7 @@ interface StoredReplay {
   engineTexts?: Record<string, CardEngineText>;
 }
 
-interface MatchRow {
+export interface MatchRow {
   id: number;
   mode: string;
   format: string | null;
@@ -150,7 +155,7 @@ interface MatchRow {
   replay: string;
 }
 
-interface SeatRow {
+export interface SeatRow {
   seat: PlayerId;
   controller: string;
   player_id: string | null;
@@ -169,6 +174,10 @@ export function selectMatches(db: DB, f: MatchFilter = {}): number[] {
   if (f.players?.length) {
     seatWhere += ` AND s.player_id IN (${f.players.map(() => '?').join(',')})`;
     args.push(...f.players);
+  }
+  if (f.leader) {
+    seatWhere += ' AND s.leader = ?';
+    args.push(f.leader);
   }
   where.push(`EXISTS (SELECT 1 FROM match_seats s WHERE ${seatWhere})`);
   if (f.queue) {
@@ -372,6 +381,75 @@ function botTurn(state: GameState, player: PlayerId, aliases: ReturnType<typeof 
 }
 
 /** Refaz uma partida e devolve as decisões dos lados humanos. */
+/** O replay de uma partida gravada, pronto para ser refeito: as tentativas (atual e, se preciso, atualizada). */
+export interface LoadedReplay {
+  match: MatchRow;
+  stored: StoredReplay;
+  seats: SeatRow[];
+  attempts: Array<{ config: GameConfig; actions: Action[] }>;
+}
+
+export function loadReplay(db: DB, matchId: number): LoadedReplay | { error: string } {
+  const m = db.prepare('SELECT id, mode, format, queue, replay FROM matches WHERE id = ?').get(matchId) as MatchRow | undefined;
+  if (!m?.replay) return { error: 'sem replay' };
+  let stored: StoredReplay;
+  try {
+    stored = JSON.parse(m.replay) as StoredReplay;
+  } catch {
+    return { error: 'replay ilegível' };
+  }
+  const seats = seatsOf(db, matchId);
+  const ids = [...new Set(stored.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
+  const cards = pinEngineTexts(getCards(db, ids) as CardData[], stored.engineTexts);
+  const config: GameConfig = {
+    seed: stored.seed,
+    seed128: stored.seed128,
+    firstPlayer: stored.firstPlayer,
+    chooseFirst: stored.chooseFirst,
+    legacySetup: stored.legacySetup,
+    cards,
+    players: [
+      { name: 'A', deck: stored.decks[0] },
+      { name: 'B', deck: stored.decks[1] },
+    ],
+  };
+  // Partidas do navegador gravadas antes de o replay guardar a versão: refeitas como atuais, param na primeira
+  // pergunta que o motor passou a fazer depois. Nesse caso, a segunda tentativa passa as ações pelo
+  // `upgradeReplayActions` (que insere as respostas que o motor antigo dava sozinho).
+  const version = stored.version ?? (stored.legacySetup ? 8 : REPLAY_VERSION);
+  const attempts: Array<{ config: GameConfig; actions: Action[] }> = [];
+  try {
+    if (version < REPLAY_VERSION) {
+      const c = replayConfig(config, version);
+      attempts.push({ config: c, actions: upgradeReplayActions(c, stored.actions) });
+    } else {
+      attempts.push({ config, actions: stored.actions });
+      if (stored.version === undefined) attempts.push({ config, actions: upgradeReplayActions(config, stored.actions) });
+    }
+  } catch (e) {
+    return { error: `replay da versão ${version} não refaz: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  return { match: m, stored, seats, attempts };
+}
+
+/** A posição de uma partida gravada antes da ação `index`: o estado completo e a ação (null se o replay não refaz). */
+export function positionAt(db: DB, matchId: number, index: number): { state: GameState; action: Action; stored: StoredReplay; seats: SeatRow[] } | null {
+  const loaded = loadReplay(db, matchId);
+  if ('error' in loaded) return null;
+  for (const { config, actions } of loaded.attempts) {
+    if (index < 0 || index >= actions.length) continue;
+    try {
+      let state = createGame(config);
+      for (let i = 0; i < index; i++) state = applyAction(state, actions[i]);
+      if (state.phase === 'gameover') continue;
+      return { state, action: actions[index], stored: loaded.stored, seats: loaded.seats };
+    } catch {
+      /* esta tentativa não refaz; a próxima pode */
+    }
+  }
+  return null;
+}
+
 export function extractMatch(db: DB, matchId: number, opts: ExtractOptions = {}): MatchExtraction {
   const m = db.prepare('SELECT id, mode, format, queue, replay FROM matches WHERE id = ?').get(matchId) as MatchRow | undefined;
   if (!m?.replay) return { records: [], turns: [], error: 'sem replay' };
@@ -482,6 +560,8 @@ function replayMatch(matchId: number, m: MatchRow, config: GameConfig, actions: 
           bounty: seat.bounty_before,
           playedAt: seat.played_at,
           index: i,
+          leader: state.cards[me.leader.uid].cardId,
+          oppLeader: state.cards[opp.leader.uid].cardId,
           turn: state.turn,
           myTurn: state.activePlayer === a.player,
           kind,
@@ -565,6 +645,8 @@ export interface Summary {
   decisions: number;
   /** Por tipo de decisão: quantas e em quantas o bot concordou. */
   kinds: Record<string, { n: number; agree: number; compared: number }>;
+  /** Por Líder do jogador: as decisões da fase principal e em quantas o bot concordou (o que o perfil de deck muda). */
+  byLeader: Record<string, { n: number; agree: number; compared: number }>;
   /** Defesa do Líder: taxa de Counter/bloqueio do humano e do bot, por Vida do defensor. */
   leaderDefense: Record<string, { n: number; human: number; bot: number; botCompared: number }>;
   /** Counter por margem exigida (em milhares), só nos ataques ao Líder. */
@@ -618,6 +700,7 @@ export function summarize(records: DecisionRecord[], matches: number, failed: nu
     failed,
     decisions: records.length,
     kinds: {},
+    byLeader: {},
     leaderDefense: {},
     counterByNeed: {},
     mainDisagreements: [],
@@ -638,6 +721,15 @@ export function summarize(records: DecisionRecord[], matches: number, failed: nu
         if (r.agree) row.agree++;
       }
     });
+    if (r.kind === 'main' && r.leader) {
+      bump(s.byLeader, r.leader, { n: 0, agree: 0, compared: 0 }, (row) => {
+        row.n++;
+        if (r.agree !== undefined) {
+          row.compared++;
+          if (r.agree) row.agree++;
+        }
+      });
+    }
     if ((r.kind === 'counter' || r.kind === 'block') && r.battle?.targetIsLeader && r.battle.need > 0) {
       const defended = (c: Choice) => (r.kind === 'counter' ? c.type === 'counter' : c.type === 'choose' && (c.cards?.length ?? 0) > 0);
       const add = (row: { n: number; human: number; bot: number; botCompared: number }) => {
@@ -754,6 +846,12 @@ export function formatSummary(s: Summary): string {
   out.push('Por tipo de decisão (concordância do bot, quando comparado):');
   for (const [kind, row] of Object.entries(s.kinds).sort((a, b) => b[1].n - a[1].n)) {
     out.push(`  ${kind.padEnd(14)} ${String(row.n).padStart(6)}   bot concorda ${pct(row.agree, row.compared)}`);
+  }
+  const byLeader = Object.entries(s.byLeader).sort((a, b) => b[1].n - a[1].n);
+  if (byLeader.length) {
+    out.push('');
+    out.push('Fase principal por Líder do jogador (concordância do bot): o que o perfil de deck muda');
+    for (const [leader, row] of byLeader.slice(0, 20)) out.push(`  ${leader.padEnd(14)} ${String(row.n).padStart(6)}   bot concorda ${pct(row.agree, row.compared)}`);
   }
   const defense = Object.entries(s.leaderDefense).sort();
   if (defense.length) {

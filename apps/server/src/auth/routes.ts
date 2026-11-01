@@ -21,6 +21,7 @@ import {
   sessionUser,
   setCustomPicture,
   setUserRole,
+  setUserTeam,
   upsertGoogleUser,
   type User,
 } from './store';
@@ -67,6 +68,7 @@ const publicUser = (u: User) => ({
   customPicture: u.customPicture,
   role: u.role,
   supporter: u.supporterTier ? { tier: u.supporterTier, until: u.supporterUntil, source: u.supporterSource, public: u.supporterPublic } : null,
+  team: u.team,
 });
 
 /** Maior foto aceita (o navegador já manda a imagem reduzida, com poucas dezenas de KB). */
@@ -217,6 +219,15 @@ export function registerAuth(app: FastifyInstance, { db, clientId, keys, browser
       return reply.code(409).send(fail('selfRoleOnlyDev', 'Você só pode mudar o seu próprio perfil para Dev.'));
     }
     if (!setUserRole(db, req.params.id, role)) return reply.code(404).send(fail('accountNotFound', 'Conta não encontrada.'));
+    return publicUser(getUser(db, req.params.id)!);
+  });
+
+  /** Time do bot: entra ou sai (só admin). Marca à parte do perfil e do plano de apoio. */
+  app.put<{ Params: { id: string }; Body: { team?: unknown } }>('/api/admin/users/:id/team', async (req, reply) => {
+    if (!admin(req, reply)) return reply;
+    const team = req.body?.team;
+    if (typeof team !== 'boolean') return reply.code(400).send(fail('invalidTeam', 'Informe se a conta entra ou sai do Time.'));
+    if (!setUserTeam(db, req.params.id, team)) return reply.code(404).send(fail('accountNotFound', 'Conta não encontrada.'));
     return publicUser(getUser(db, req.params.id)!);
   });
 

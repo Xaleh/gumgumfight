@@ -56,6 +56,24 @@ export interface ServerOptions {
    * fica desligado e o escopo "Global" some das Estatísticas.
    */
   globalStats?: GlobalStatsOptions | null;
+  /**
+   * Bot do Time: o agente fora da partida (guia → perfil, revisão de partidas, explicações) pelo SDK da
+   * Anthropic (BOT_AGENT_API_KEY, BOT_AGENT_MODEL). Sem a chave, os botões somem e o CLI avisa.
+   */
+  botAgent?: BotAgentOptions | null;
+}
+
+export interface BotAgentOptions {
+  /** BOT_AGENT_API_KEY: chave da API da Anthropic (segredo: só no `deploy.env`). */
+  apiKey: string;
+  /** BOT_AGENT_MODEL: modelo (padrão claude-opus-5-5). */
+  model: string;
+}
+
+export function botAgentOptions(env = process.env): BotAgentOptions | null {
+  const apiKey = env.BOT_AGENT_API_KEY?.trim();
+  if (!apiKey) return null;
+  return { apiKey, model: env.BOT_AGENT_MODEL?.trim() || 'claude-opus-5-5' };
 }
 
 export interface GlobalStatsOptions {
@@ -186,6 +204,7 @@ export const serverOptions: ServerOptions = {
   replayEmbedOrigins: parseOrigins(process.env.REPLAY_EMBED_ORIGINS),
   replayLinkSecret: process.env.REPLAY_LINK_SECRET?.trim() || null,
   globalStats: globalStatsOptions(),
+  botAgent: botAgentOptions(),
 };
 
 /**

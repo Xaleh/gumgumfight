@@ -24,6 +24,13 @@ describe('API de decks', () => {
     expect(d).toMatchObject({ kind: 'builtin', valid: true, size: 50, leaderName: 'Monkey.D.Luffy', colors: ['red'] });
   });
 
+  it('decks do meta (data/decks/meta): prontos, no grupo "meta"', async () => {
+    const list = (await app().inject('/api/decks')).json();
+    const xebec = list.find((x: { id: string }) => x.id === 'op17-xebec');
+    expect(xebec).toMatchObject({ kind: 'builtin', meta: true, leader: 'OP17-039' });
+    expect(list.find((x: { id: string }) => x.id === 'st01-luffy').meta).toBe(false);
+  });
+
   it('informa em quais formatos cada deck pode ser usado', async () => {
     const list = (await app().inject('/api/decks')).json();
     const byId = (id: string) => list.find((x: { id: string }) => x.id === id);
