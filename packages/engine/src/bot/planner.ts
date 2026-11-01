@@ -24,7 +24,7 @@ import { legalActions } from '../actions';
 import { applyAction, cardDef, getPower, locate, opponent } from '../engine';
 import type { Action, GameState, Pending, PlayerId } from '../types';
 import { HIDDEN_CARD } from '../view';
-import { DEFAULT_WEIGHTS, evaluate, type Weights } from './evaluate';
+import { DEFAULT_WEIGHTS, evaluate, handCardValue, hasDiscardOutlet, type Weights } from './evaluate';
 import { chooseBotAction as simpleBot } from './simple';
 
 export type BotLevel = 'easy' | 'normal' | 'hard';
@@ -427,12 +427,14 @@ function pendingCandidates(state: GameState, player: PlayerId, legal: Action[], 
       // "Até N": também a escolha cheia.
       out.push({ type: 'choose', player, uids: byValue.slice(0, Math.min(pending.max, byValue.length)) });
     }
-    // Escolhas de uma carta só: as de maior valor primeiro (o corte abaixo fica com as melhores).
-    out.sort((a, b) => {
-      const va = a.type === 'choose' && a.uids.length === 1 ? staticValue(state, a.uids[0]) : -1;
-      const vb = b.type === 'choose' && b.uids.length === 1 ? staticValue(state, b.uids[0]) : -1;
-      return vb - va;
-    });
+    // Escolhas de uma carta só: as de maior valor primeiro (o corte abaixo fica com as melhores). Num descarte da
+    // própria mão é o contrário: as que valem menos na mão primeiro, pelo valor da avaliação (custo, Counter,
+    // efeito guardado, combustível), senão o corte deixava de fora justamente a Buckin e os Eventos de custo 0.
+    const me = state.players[player];
+    const floor = hasDiscardOutlet(state, me) ? opts.weights.handFuel : 0;
+    const single = (a: Action) => (a.type === 'choose' && a.uids.length === 1 ? a.uids[0] : null);
+    const value = (u: string | null) => (u === null ? -1 : pending.intent === 'discard' && me.hand.includes(u) ? -handCardValue(state, opts.weights, me, u, opts.weights.handCard, floor) : staticValue(state, u));
+    out.sort((a, b) => value(single(b)) - value(single(a)));
   }
   if (pending.kind === 'counter' && state.battle) {
     // O valor de Counter de um Personagem pode ir para outro alvo (o Líder, ou quem está em batalha).

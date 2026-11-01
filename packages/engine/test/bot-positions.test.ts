@@ -307,6 +307,17 @@ describe('bot com busca: fase principal', () => {
     expect(b.actions.some((x) => x.type === 'answer' && x.yes), 'deveria pagar o custo do Xebec').toBe(true);
     expect(b.state.players[0].trash).toContain(buckin2);
     expect(b.state.players[0].characters.map((c) => c.uid)).not.toContain(buckin2);
+
+    // Mão grande (12 cartas, a Buckin por último) e nenhum DON!! ativo (nada a jogar, só o ataque do Líder): as
+    // candidatas ao descarte são cortadas em `maxChoices`; a ordem tem de deixar as mais baratas, não as mais
+    // caras, senão a Buckin fica de fora e sai um Newgate.
+    const big = game(5);
+    big.players[0].donActive = 0;
+    for (let i = 0; i < 11; i++) inject(big, 0, 'OP17-040', 'hand');
+    const buckin3 = inject(big, 0, 'OP08-051', 'hand');
+    const c = botTurn(big, 0);
+    expect(c.actions.some((x) => x.type === 'answer' && x.yes), 'deveria pagar o custo do Xebec').toBe(true);
+    expect(c.state.players[0].trash).toContain(buckin3);
   });
 
   it('usa a habilidade gratuita que enfraquece o oponente até o próximo turno dele (Jewelry Bonney)', () => {

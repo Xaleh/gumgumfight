@@ -296,7 +296,30 @@ a arquitetura é busca + avaliação, e uma regra "se X, faça Y" para um deck q
 **gabarito**: monta-se o deck (`scripts`/rascunhos com as cartas da base), o bot joga partidas rastreadas com ele, e
 cada decisão que foge do plano aponta um conceito genérico que falta na avaliação. Foi assim com o Shanks Verde de
 OP17 (controle: buscar {Red-Haired Pirates}, congelar com o Líder, fechar com o Shanks de custo 10): a busca e o
-Shanks de 10 já saíam certos; o Líder nunca era ativado, e a correção (7c) vale para todo efeito que congela.
+Shanks de 10 já saíam certos; o Líder nunca era ativado, e a correção (7c) vale para todo efeito que congela. No
+Rocks.D.Xebec (compra pelo Líder, sem Counter, defesa por Eventos e habilidades), o Líder, Shiki e Linlin já eram
+usados como o plano pede; o que fugia era a escolha do descarte (7e).
+
+## 7e. Qual carta descartar
+
+O plano do Rocks.D.Xebec (OP17: quase sem Counter, compra pelo Líder, defesa pelos Eventos de custo 0 com
+[Counter] +2000 e pelas habilidades) mostrou dois erros no descarte que paga o Líder:
+
+- As candidatas de uma escolha pendente são cortadas em `maxChoices` (10), e a ordem era "as de maior valor
+  primeiro", certa para alvos de dano ou de ajuda e errada para um descarte da própria mão: com 11 cartas na mão,
+  a Buckin e os Eventos de custo 0 ficavam de fora, e saía um Newgate. Num descarte, as candidatas vão em ordem
+  **crescente do valor na mão** (`handCardValue`, o mesmo da avaliação: custo, Counter, efeito guardado, piso de
+  combustível).
+- Um Evento [Counter] pagável valia um bônus fixo (`handCounterEvent`, 550) qualquer que fosse o +poder; os
+  Eventos de +2000 por 0 DON!! são a defesa do deck e valem o +poder como um Counter impresso (`handCounter` por
+  1000), além do bônus. O prêmio de remoção (`handEffect`) de um Evento vale metade: a remoção é o único uso da
+  carta, e o prêmio só pesa no descarte e no Counter. Abaixo do piso de combustível a carta vale o piso mais um
+  décimo do próprio valor: entre duas que só servem de descarte, sai a que valia menos.
+
+| Conceito | Onde está | Teste |
+|---|---|---|
+| Descarte: as mais baratas primeiro | `planner.ts`: `pendingCandidates` | `num deck que descarta da mão…` (mão de 12 cartas, sem DON!!) |
+| Evento [Counter] vale o +poder | `evaluate.ts`: `handCardValue` | `avaliação: carta na mão` |
 
 ## 8. O que o bot ainda não sabe
 
@@ -374,8 +397,9 @@ pelos testes de posição, não por uma medida: o que falta é o relato de quem 
 [On Play] de remoção sem usar o efeito (Vander Decken IX como corpo vanilla), recusava habilidades do Líder que
 só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2), no mesmo deck baixava a Buckin no turno 1 em
 vez de guardá-la como Counter e combustível do Líder, deixava a Jewelry Bonney em campo sem ativar o −1000 e nunca
-usava o "não desvira" do Líder Shanks OP17-020 (a partir de um plano de jogo do deck, seção 7d). As causas e as
-correções estão nas seções 7, 7a, 7b e 7c: o efeito guardado passou a valer na mão (`handEffect`), o
+usava o "não desvira" do Líder Shanks OP17-020 (a partir de um plano de jogo do deck, seção 7d) e, no plano do
+Xebec, descartava um Newgate com a Buckin na mão (seção 7e). As causas e as correções estão nas seções 7, 7a, 7b,
+7c e 7e: o efeito guardado passou a valer na mão (`handEffect`), o
 próprio deck passou a ser sorteado pela composição conhecida, com as perguntas pagas decididas pela média dos
 sorteios, a mão passou a valer o combustível das saídas de descarte (`handFuel`) e o custo das cartas
 (`handCost`), e o modificador de poder que dura até o turno do oponente passou a valer (`powerMod`). Medidas,
@@ -388,6 +412,7 @@ sorteios, a mão passou a valer o combustível das saídas de descarte (`handFue
 | + combustível como piso (3 400) e custo (450) | 198 x 202 (49,5%; pesos novos x sem os dois termos, 400 partidas) | 82% |
 | + modificador de poder duradouro (`powerMod`, Bonney) | 101 x 99 (com x sem o termo, 200 partidas) | 81% |
 | + Personagem congelado (`frozen*`, Líder Shanks OP17-020) | 101 x 99 (com x sem o termo, 200 partidas) | 85% |
+| + descarte em ordem crescente e Evento [Counter] pelo +poder (plano do Xebec) | (em medição) | (em medição) |
 
 Fora a versão descartada do combustível, tudo dentro do ruído, como nas rodadas anteriores: as situações são raras
 nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms
