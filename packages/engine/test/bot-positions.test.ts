@@ -38,6 +38,17 @@ const extraCards: CardData[] = [
   },
   { id: 'OP17-040', name: 'Edward.Newgate', category: 'character', colors: ['blue'], cost: 6, power: 8000, counter: 0, types: ['Rocks Pirates'], text: '[On Play] Draw 1 card.' },
   {
+    id: 'OP17-020',
+    name: 'Shanks',
+    category: 'leader',
+    colors: ['green'],
+    life: 5,
+    power: 5000,
+    attributes: ['Slash'],
+    types: ['Red-Haired Pirates', 'The Four Emperors'],
+    text: "[Activate: Main] [Once Per Turn] You may trash 1 card from your hand or rest 1 of your DON!! cards: Up to 1 of your opponent's rested Characters will not become active in your opponent's next Refresh Phase.",
+  },
+  {
     id: 'EB05-001',
     name: 'Jewelry Bonney',
     category: 'character',
@@ -310,6 +321,27 @@ describe('bot com busca: fase principal', () => {
     expect(state.modifiers.some((m) => m.kind === 'power' && m.amount === -1000 && m.duration === 'nextOpponentTurn')).toBe(true);
   });
 
+  it('congela o Personagem virado do oponente com a habilidade do Líder (Shanks OP17-020)', () => {
+    // Shanks: "[Activate: Main] [Once Per Turn] descarte 1 carta ou vire 1 DON!!: até 1 Personagem virado do oponente não
+    // desvira na próxima Renovação dele". O Líder já atacou; o Kid (custo 7, 7000) virado do outro lado continuaria
+    // virado: não ataca, não bloqueia e segue ao alcance no próximo turno. Com DON!! sobrando, vale virar um.
+    const shanks: typeof kid = { id: 'shanks', name: 'Shanks', leader: 'OP17-020', cards: [{ id: 'ST01-010', count: 50 }] };
+    let s = createGame({ seed: 1, firstPlayer: 0, cards, players: [{ name: 'Shanks', deck: shanks }, { name: 'Luffy', deck: luffy }] });
+    s = applyAction(s, { type: 'mulligan', player: 0, redraw: false });
+    s = applyAction(s, { type: 'mulligan', player: 1, redraw: false });
+    s = toTurn(s, 7);
+    clearHand(s, 0);
+    s.players[0].donActive = 3;
+    s.players[0].leader.rested = true;
+    const target = inject(s, 1, 'ST02-013', 'field', { rested: true });
+    const { state, actions } = botTurn(s, 0);
+    expect(actions.some((a) => a.type === 'activate' && a.uid === s.players[0].leader.uid)).toBe(true);
+    // No turno do oponente, o Kid continua virado (o "não desvira" foi consumido na Renovação dele).
+    expect(state.activePlayer).toBe(1);
+    expect(state.refreshSkipped).toContain(target);
+    expect(state.players[1].characters.find((c) => c.uid === target)?.rested).toBe(true);
+  });
+
   it('acha o ataque fatal com vários atacantes pequenos', () => {
     // Oponente com 2 de Vida e a mão vazia; o bot tem o Líder, quatro Personagens de 1000 a 6000 e 4 DON!!: três
     // acertos no Líder vencem, mas cada acerto vale menos que o K.O. do Zoro virado (a linha "tudo no Líder" e a
@@ -439,6 +471,14 @@ describe('avaliação', () => {
     expect(evaluate(s, 0, w)).toBeGreaterThan(base);
     s.modifiers = [{ uid: leader, kind: 'power', amount: -1000, duration: 'turn' }];
     expect(evaluate(s, 0, w)).toBe(base);
+  });
+
+  it('Personagem do oponente congelado até o turno seguinte vale menos', () => {
+    const s = started(1, [kid, luffy]);
+    const franky = inject(s, 1, 'ST01-010', 'field', { rested: true });
+    const base = evaluate(s, 0, w);
+    s.modifiers.push({ uid: franky, kind: 'skipRefresh', amount: 0, duration: 'nextOpponentTurn', untilTurn: s.turn + 1 });
+    expect(evaluate(s, 0, w)).toBeGreaterThan(base);
   });
 
   it('Blocker', () => {

@@ -1735,6 +1735,7 @@ function refreshDrawDon(state: GameState) {
     // "will not become active in your opponent's next Refresh Phase"
     const skip = state.modifiers.some((m) => m.uid === fc.uid && m.kind === 'skipRefresh') || noRefreshByAura(state, fc.uid);
     if (!skip) fc.rested = false;
+    else if (fc.rested) (state.refreshSkipped ??= []).push(fc.uid);
   }
   state.modifiers = state.modifiers.filter((m) => !(m.kind === 'skipRefresh' && fieldCards.some((fc) => fc.uid === m.uid)));
   const keep = Math.min(ps.donRested, (state.donSkipRefresh ?? []).filter((d) => d.player === ps.id).reduce((n, d) => n + d.count, 0));
@@ -1795,6 +1796,7 @@ function endTurn(state: GameState) {
   state.restrictions = (state.restrictions ?? []).filter((r) => (r.untilTurn ?? 0) > state.turn);
   state.costReductions = [];
   state.battledCharacter = [];
+  state.refreshSkipped = [];
   state.koThisTurn = [];
   state.tempReplacements = [];
   state.handTrashedThisTurn = [];
