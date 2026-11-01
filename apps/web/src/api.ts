@@ -456,6 +456,8 @@ export interface MetaDeckInfo {
   archetype: string | null;
   summary: string | null;
   profileError: string | null;
+  /** Guia ou perfil salvos pela tela (no banco), por cima dos arquivos de data/decks/meta. */
+  overridden?: boolean;
   updatedAt: string;
 }
 
@@ -761,6 +763,15 @@ export const api = {
   bot: {
     profiles: () => get<{ decks: MetaDeckInfo[] }>('/api/bot/profiles'),
     profile: (id: string) => get<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>(`/api/bot/profiles/${encodeURIComponent(id)}`),
+    /** Salva o guia (markdown) e/ou o perfil (JSON; o servidor confere); null volta ao arquivo. Só admin. */
+    saveProfile: (id: string, patch: { guide?: string | null; profile?: unknown }) =>
+      send<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>('PUT', `/api/bot/profiles/${encodeURIComponent(id)}`, patch),
+    /** O agente fora da partida está ligado neste servidor. */
+    agent: () => get<{ enabled: boolean }>('/api/bot/agent'),
+    /** Agente: o guia vira um rascunho de perfil com as justificativas (não salva). Só admin. */
+    generateProfile: (id: string) => send<{ profile: DeckProfile; why: Record<string, string> }>('POST', `/api/bot/profiles/${encodeURIComponent(id)}/generate`, {}),
+    /** Agente: a partida do bot comparada com o guia do deck. Só admin. */
+    reviewMatch: (matchId: number) => send<{ deckId: string | null; review: string }>('POST', `/api/bot/matches/${matchId}/review`, {}),
     feedback: (matchId: number, form: { level?: BotLevel; rating?: number; comment?: string; marks?: FeedbackMark[] }) =>
       send<{ ids: number[] }>('POST', '/api/bot/feedback', { matchId, ...form }),
     feedbackList: (status: FeedbackStatus | 'all' = 'open') => get<{ items: FeedbackItem[] }>(`/api/bot/feedback?status=${status}`),

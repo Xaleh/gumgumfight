@@ -182,6 +182,16 @@ function migrateTeam(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS bot_feedback_status ON bot_feedback(status, created_at);
     CREATE INDEX IF NOT EXISTS bot_feedback_match ON bot_feedback(match_id);
+
+    -- Guia e perfil de um deck do meta salvos pela tela "Bot do Time" (por cima dos arquivos de data/decks/meta,
+    -- que são a semente e o que vai para o repositório). Sobrevivem ao deploy, que troca a pasta data/.
+    CREATE TABLE IF NOT EXISTS meta_profiles (
+      deck_id    TEXT PRIMARY KEY,
+      guide      TEXT,
+      profile    TEXT,
+      updated_by TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 }
 

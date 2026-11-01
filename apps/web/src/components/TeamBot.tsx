@@ -56,14 +56,16 @@ export function TeamBotPanel({ onReplay, admin }: { onReplay: (setup: GameSetup)
   const t = useT();
   const [decks, setDecks] = useState<MetaDeckInfo[] | null>(null);
   const [summary, setSummary] = useState<FeedbackDeckSummary[]>([]);
+  const [agent, setAgent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let stop = false;
-    Promise.all([api.bot.profiles(), api.bot.feedbackSummary()])
-      .then(([p, s]) => {
+    Promise.all([api.bot.profiles(), api.bot.feedbackSummary(), api.bot.agent().catch(() => ({ enabled: false }))])
+      .then(([p, s, a]) => {
         if (stop) return;
         setDecks(p.decks);
         setSummary(s.decks);
+        setAgent(a.enabled);
       })
       .catch((e) => !stop && setError(errorText(e)));
     return () => {
@@ -78,14 +80,16 @@ export function TeamBotPanel({ onReplay, admin }: { onReplay: (setup: GameSetup)
         {error && <div className="error">{error}</div>}
         {decks === null && !error && <p className="muted">{t('common.loading')}</p>}
         {decks?.length === 0 && <p className="muted">{t('teambot.noDecks')}</p>}
-        {decks && decks.length > 0 && <DeckTable decks={decks} summary={summary} />}
+        {decks && decks.length > 0 && (
+          <DeckTable decks={decks} summary={summary} admin={admin} agent={agent} onSaved={(d) => setDecks((list) => list?.map((x) => (x.id === d.id ? { ...x, ...d } : x)) ?? null)} />
+        )}
       </section>
-      <Inbox onReplay={onReplay} admin={admin} />
+      <Inbox onReplay={onReplay} admin={admin} agent={agent} />
     </>
   );
 }
 
-function DeckTable({ decks, summary }: { decks: MetaDeckInfo[]; summary: FeedbackDeckSummary[] }) {
+function DeckTable({ decks, summary, admin, agent, onSaved }: { decks: MetaDeckInfo[]; summary: FeedbackDeckSummary[]; admin: boolean; agent: boolean; onSaved: (d: MetaDeckInfo) => void }) {
   const t = useT();
   const locale = useLocale();
   const [open, setOpen] = useState<string | null>(null);
@@ -143,16 +147,32 @@ function DeckTable({ decks, summary }: { decks: MetaDeckInfo[]; summary: Feedbac
               <td colSpan={7}>
                 {d.summary && <p>{d.summary}</p>}
                 {d.profileError && <p className="error small">{d.profileError}</p>}
-                <div className="teambot-detail-cols">
-                  <div>
-                    <b className="small">{t('teambot.guide')}</b>
-                    <pre>{dd ? (dd.guide ?? t('teambot.noGuide')) : t('common.loading')}</pre>
+                {d.overridden && <p className="muted small">{t('teambot.overridden')}</p>}
+                {!dd ? (
+                  <p className="muted">{t('common.loading')}</p>
+                ) : admin ? (
+                  <DeckEditor
+                    deck={d}
+                    guide={dd.guide}
+                    profile={dd.profile}
+                    agent={agent}
+                    onSaved={(saved) => {
+                      setDetail((m) => ({ ...m, [d.id]: { guide: saved.guide, profile: saved.profile } }));
+                      onSaved(saved);
+                    }}
+                  />
+                ) : (
+                  <div className="teambot-detail-cols">
+                    <div>
+                      <b className="small">{t('teambot.guide')}</b>
+                      <pre>{dd.guide ?? t('teambot.noGuide')}</pre>
+                    </div>
+                    <div>
+                      <b className="small">{t('teambot.profile')}</b>
+                      <pre>{dd.profile ? JSON.stringify(dd.profile, null, 2) : t('teambot.noProfile')}</pre>
+                    </div>
                   </div>
-                  <div>
-                    <b className="small">{t('teambot.profile')}</b>
-                    <pre>{dd ? (dd.profile ? JSON.stringify(dd.profile, null, 2) : t('teambot.noProfile')) : t('common.loading')}</pre>
-                  </div>
-                </div>
+                )}
               </td>
             </tr>,
           ];
@@ -162,7 +182,106 @@ function DeckTable({ decks, summary }: { decks: MetaDeckInfo[]; summary: Feedbac
   );
 }
 
-function Inbox({ onReplay, admin }: { onReplay: (setup: GameSetup) => void; admin: boolean }) {
+/** Admin: edita o guia (markdown) e o perfil (JSON), gera o rascunho do perfil com o agente e salva no servidor. */
+function DeckEditor({
+  deck,
+  guide,
+  profile,
+  agent,
+  onSaved,
+}: {
+  deck: MetaDeckInfo;
+  guide: string | null;
+  profile: unknown;
+  agent: boolean;
+  onSaved: (d: MetaDeckInfo & { guide: string | null; profile: unknown }) => void;
+}) {
+  const t = useT();
+  const [guideText, setGuideText] = useState(guide ?? '');
+  const [profileText, setProfileText] = useState(profile ? JSON.stringify(profile, null, 2) : '');
+  const [why, setWhy] = useState<Record<string, string> | null>(null);
+  const [busy, setBusy] = useState<'save' | 'generate' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const dirty = guideText !== (guide ?? '') || profileText !== (profile ? JSON.stringify(profile, null, 2) : '');
+  const save = async () => {
+    setBusy('save');
+    setError(null);
+    setSaved(false);
+    try {
+      let parsed: unknown = null;
+      if (profileText.trim()) {
+        try {
+          parsed = JSON.parse(profileText);
+        } catch (e) {
+          throw new Error(t('teambot.profileJsonError', { message: errorText(e) }));
+        }
+      }
+      const r = await api.bot.saveProfile(deck.id, { guide: guideText.trim() ? guideText : null, profile: parsed });
+      onSaved(r);
+      setSaved(true);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const generate = async () => {
+    setBusy('generate');
+    setError(null);
+    setWhy(null);
+    try {
+      const r = await api.bot.generateProfile(deck.id);
+      setProfileText(JSON.stringify(r.profile, null, 2));
+      setWhy(r.why);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <div className="teambot-editor">
+      <p className="muted small">{t('teambot.editorHelp')}</p>
+      <div className="teambot-detail-cols">
+        <label>
+          <b className="small">{t('teambot.guide')}</b>
+          <textarea value={guideText} rows={14} maxLength={60000} placeholder={t('teambot.guidePlaceholder')} onChange={(e) => setGuideText(e.target.value)} />
+        </label>
+        <label>
+          <b className="small">{t('teambot.profile')}</b>
+          <textarea value={profileText} rows={14} spellCheck={false} placeholder={t('teambot.profilePlaceholder')} onChange={(e) => setProfileText(e.target.value)} />
+        </label>
+      </div>
+      {why && (
+        <details className="teambot-why" open>
+          <summary>{t('teambot.why')}</summary>
+          <ul>
+            {Object.entries(why).map(([k, v]) => (
+              <li key={k}>
+                <b>{k}</b>: {v}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div className="teambot-actions">
+        {agent && (
+          <button className="btn small" disabled={busy !== null || !guideText.trim()} onClick={generate} title={t('teambot.generateTitle')}>
+            {busy === 'generate' ? t('teambot.generating') : t('teambot.generate')}
+          </button>
+        )}
+        <button className="btn small primary" disabled={busy !== null || !dirty} onClick={save}>
+          {busy === 'save' ? t('common.saving') : t('common.save')}
+        </button>
+        {saved && !dirty && <span className="muted small">{t('teambot.saved')}</span>}
+        {error && <span className="error small">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+function Inbox({ onReplay, admin, agent }: { onReplay: (setup: GameSetup) => void; admin: boolean; agent: boolean }) {
   const t = useT();
   const locale = useLocale();
   const [status, setStatus] = useState<FeedbackStatus | 'all'>('open');
@@ -192,6 +311,21 @@ function Inbox({ onReplay, admin }: { onReplay: (setup: GameSetup) => void; admi
       setError(errorText(e));
     } finally {
       setBusy(null);
+    }
+  };
+  /** Revisão do agente por partida (markdown em texto). */
+  const [reviews, setReviews] = useState<Record<number, string>>({});
+  const [reviewing, setReviewing] = useState<number | null>(null);
+  const review = async (f: FeedbackItem) => {
+    setReviewing(f.matchId);
+    setError(null);
+    try {
+      const r = await api.bot.reviewMatch(f.matchId);
+      setReviews((m) => ({ ...m, [f.matchId]: r.review }));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setReviewing(null);
     }
   };
   const replayAt = async (f: FeedbackItem) => {
@@ -252,10 +386,16 @@ function Inbox({ onReplay, admin }: { onReplay: (setup: GameSetup) => void; admi
                 {t('teambot.noteLabel')} {f.note}
               </p>
             )}
+            {reviews[f.matchId] && <pre className="teambot-review">{reviews[f.matchId]}</pre>}
             <div className="teambot-actions">
               <button className="btn small" onClick={() => replayAt(f)}>
                 {t('teambot.openReplay')}
               </button>
+              {admin && agent && (
+                <button className="btn small" disabled={reviewing === f.matchId} onClick={() => review(f)} title={t('teambot.reviewTitle')}>
+                  {reviewing === f.matchId ? t('teambot.reviewing') : t('teambot.review')}
+                </button>
+              )}
               {admin && edit?.id !== f.id && (
                 <button className="btn small" disabled={busy === f.id} onClick={() => setEdit({ id: f.id, status: f.status, note: f.note ?? '' })}>
                   {t('teambot.treat')}

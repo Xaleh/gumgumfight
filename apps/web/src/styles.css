@@ -15415,3 +15415,38 @@ div.dk-tile-main {
   background: var(--panel);
   color: inherit;
 }
+.teambot-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.teambot-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.teambot-editor textarea {
+  font: inherit;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: inherit;
+  resize: vertical;
+}
+.teambot-why ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.teambot-review {
+  white-space: pre-wrap;
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  margin: 0;
+}

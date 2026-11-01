@@ -1,11 +1,14 @@
 // Bot do Time: as correções do Time sobre as jogadas do bot (marcações com a posição exata e a nota da partida).
 
 import { type Action, actingPlayer, applyAction, type CardData, chooseSimpleBotAction as chooseBotAction, createGame, type DeckList } from '@gumgum/engine';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { createSession, type Role, setUserRole, setUserTeam, upsertGoogleUser } from '../src/auth/store';
 import { type DB, openDb } from '../src/db';
 import { positionAt } from '../src/decisions/extract';
+import { DATA_DIR } from '../src/paths';
 import { seed } from '../src/seed';
 
 function setup() {
@@ -160,5 +163,77 @@ describe('Bot do Time: decks do meta, guia e perfil', () => {
     writeFileSync(join(dir, 'x-deck.md'), '# guia');
     expect(profiles.guide('x-deck')).toBe('# guia');
     expect(profiles.guide('../x-deck')).toBeNull();
+  });
+});
+
+describe('Bot do Time: editor de guia e perfil, e o agente fora da partida', () => {
+  const fakeComplete = (answers: string[]) => {
+    const calls: Array<{ system: string; user: string }> = [];
+    const complete = async (system: string, user: string) => {
+      calls.push({ system, user });
+      return answers.shift() ?? '';
+    };
+    return { complete, calls };
+  };
+
+  it('o admin salva guia e perfil no banco (por cima dos arquivos) e o perfil é conferido', async () => {
+    const { db, app } = setup();
+    const member = login(db, 'player', true);
+    const admin = login(db, 'admin');
+    const put = (who: { headers: Record<string, string> }, payload: object) => app.inject({ method: 'PUT', url: '/api/bot/profiles/op17-xebec', headers: who.headers, payload });
+    expect((await put(member, { guide: 'x' })).statusCode).toBe(403);
+    expect((await put(admin, {})).statusCode).toBe(400);
+    expect((await put(admin, { profile: { id: 'op17-xebec', leader: 'OP17-039', archetype: 'tempo' } })).json().errorCode).toBe('invalidProfile');
+    expect((await put(admin, { profile: { id: 'outro', leader: 'OP17-039', archetype: 'aggro' } })).json().errorCode).toBe('invalidProfile');
+    const saved = (await put(admin, { guide: '# Guia novo', profile: JSON.stringify({ id: 'op17-xebec', leader: 'OP17-039', archetype: 'aggro', summary: 'bate' }) })).json();
+    expect(saved).toMatchObject({ id: 'op17-xebec', hasGuide: true, hasProfile: true, archetype: 'aggro', overridden: true, guide: '# Guia novo' });
+    expect(saved.profile.summary).toBe('bate');
+    // O arquivo continua como estava; o banco é o que vale no servidor.
+    expect(JSON.parse(readFileSync(join(DATA_DIR, 'decks', 'meta', 'op17-xebec.profile.json'), 'utf8')).archetype).toBe('control');
+    const got = (await app.inject({ url: '/api/bot/profiles/op17-xebec', headers: member.headers })).json();
+    expect(got.profile.archetype).toBe('aggro');
+    // Voltar ao arquivo: null nos dois.
+    const back = (await put(admin, { guide: null, profile: null })).json();
+    expect(back).toMatchObject({ archetype: 'control', overridden: false });
+    expect(back.guide).toMatch(/^# Rocks.D.Xebec/);
+  });
+
+  it('sem a chave, o agente está desligado (503); com ela, o guia vira um rascunho de perfil e a partida é revisada', async () => {
+    const off = setup();
+    const admin0 = login(off.db, 'admin');
+    expect((await off.app.inject({ url: '/api/bot/agent', headers: admin0.headers })).json()).toEqual({ enabled: false });
+    expect((await off.app.inject({ method: 'POST', url: '/api/bot/profiles/op17-xebec/generate', headers: admin0.headers, payload: {} })).statusCode).toBe(503);
+
+    const db = openDb(':memory:');
+    seed(db);
+    const { complete, calls } = fakeComplete([
+      'texto solto { "profile": { "leader": "OP17-039", "archetype": "cheio" } }',
+      '```json\n{ "profile": { "id": "ignorado", "leader": "OP17-039", "archetype": "control", "roles": { "OP17-118": "finisher" }, "hold": { "OP17-118": { "untilDon": 10 } } }, "why": { "archetype": "o guia fala em mão como recurso" } }\n```',
+      '- Turno 3: Fez: baixou o Newgate. Guia: Buckin primeiro. Conceito: travar o atacante antes de desenvolver.',
+    ]);
+    const app = buildApp(db, { server: { cardImages: true }, agentComplete: complete });
+    const admin = login(db, 'admin');
+    const member = login(db, 'player', true);
+    expect((await app.inject({ url: '/api/bot/agent', headers: member.headers })).json()).toEqual({ enabled: true });
+    expect((await app.inject({ method: 'POST', url: '/api/bot/profiles/op17-xebec/generate', headers: member.headers, payload: {} })).statusCode).toBe(403);
+    // A primeira resposta é inválida: o agente tenta de novo com o motivo; a segunda vale (o id é o do deck).
+    const gen = await app.inject({ method: 'POST', url: '/api/bot/profiles/op17-xebec/generate', headers: admin.headers, payload: {} });
+    expect(gen.statusCode, gen.body).toBe(200);
+    expect(gen.json().profile).toMatchObject({ id: 'op17-xebec', archetype: 'control', hold: { 'OP17-118': { untilDon: 10 } } });
+    expect(gen.json().why.archetype).toMatch(/mão/);
+    expect(calls).toHaveLength(2);
+    expect(calls[0].user).toContain('GUIA:');
+    expect(calls[0].user).toContain('OP17-039');
+    expect(calls[1].user).toMatch(/recusada: perfil inválido: archetype/);
+    // Revisão de uma partida contra o bot: o traço vai turno a turno com os nomes das cartas.
+    const { matchId } = await recordBotMatch(app, member);
+    const review = await app.inject({ method: 'POST', url: `/api/bot/matches/${matchId}/review`, headers: admin.headers, payload: { deckId: 'op17-xebec' } });
+    expect(review.statusCode, review.body).toBe(200);
+    expect(review.json()).toMatchObject({ deckId: 'op17-xebec' });
+    expect(review.json().review).toMatch(/Turno 3/);
+    expect(calls[2].user).toMatch(/TURNO \d+ \(bot\)/);
+    expect(calls[2].user).toMatch(/ataca|baixa|encerra o turno/);
+    // Sem guia para o deck do bot (ST02): 400.
+    expect((await app.inject({ method: 'POST', url: `/api/bot/matches/${matchId}/review`, headers: admin.headers, payload: {} })).json().errorCode).toBe('noGuide');
   });
 });
