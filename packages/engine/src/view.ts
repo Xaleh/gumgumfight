@@ -190,6 +190,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     modifiers: state.modifiers.filter((m) => vis.has(m.uid)).map((m) => ({ ...m, uid: alias(m.uid) })),
     usedThisTurn: state.usedThisTurn.map(usedKey).filter((k): k is string => k !== null),
     battledCharacter: refs(state.battledCharacter),
+    refreshSkipped: refs(state.refreshSkipped),
     delayed: state.delayed?.filter((d) => vis.has(d.source)).map((d) => ({ ...d, source: alias(d.source), last: refs(d.last) })),
     tempReplacements: state.tempReplacements?.filter((t) => vis.has(t.source)).map((t) => ({ ...t, source: alias(t.source) })),
     log: state.log.map(viewLogEntry(viewer)),

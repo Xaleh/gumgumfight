@@ -1440,6 +1440,12 @@ export interface GameState {
   onPlayNegated?: Array<{ player: PlayerId; untilTurn: number }>;
   /** Cartas que batalharam com um Personagem do oponente neste turno. */
   battledCharacter?: string[];
+  /**
+   * Cartas do jogador do turno que ficaram viradas na Renovação deste turno ("will not become active in your
+   * opponent's next Refresh Phase"): o efeito já foi consumido, mas a carta passa o turno sem atacar nem
+   * bloquear (o bot avalia isso). Zerado no fim do turno.
+   */
+  refreshSkipped?: string[];
   /** Eventos ativados neste turno (custo base), para "if you have activated an Event … during this turn". */
   eventsThisTurn?: Array<{ player: PlayerId; cost: number }>;
   /** Efeitos adiados para o fim do turno ("at the end of this turn"). */

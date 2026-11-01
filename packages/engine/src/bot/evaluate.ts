@@ -77,6 +77,16 @@ export interface Weights {
    * de usar habilidades gratuitas como a da Jewelry Bonney EB05-001.
    */
   powerMod: number;
+  /**
+   * Personagem "congelado" até o turno seguinte, como fração do valor dele em campo: `frozenRested` para o
+   * virado que não desvira na próxima Renovação ("will not become active", Líder Shanks OP17-020: não ataca, não
+   * bloqueia e continua virado para ser atacado); `frozenActive` para o que não pode ser virado ("cannot be
+   * rested", Oden ST32-002: não ataca nem bloqueia, mas fica ativo, fora do alcance); `frozenNoAttack` para o que
+   * só não pode atacar (ainda bloqueia). O próprio desconta, o do oponente desconta do lado dele.
+   */
+  frozenRested: number;
+  frozenActive: number;
+  frozenNoAttack: number;
   /** Personagem virado quando o turno passa para o oponente (e ao alcance do Líder dele): fica exposto ao ataque. */
   exposed: number;
   /** DON!! em campo (área de custo + anexados), por unidade. */
@@ -146,6 +156,9 @@ export const DEFAULT_WEIGHTS: Weights = {
   doubleAttack: 800,
   stage: 1700,
   powerMod: 800,
+  frozenRested: 0.5,
+  frozenActive: 0.35,
+  frozenNoAttack: 0.25,
   exposed: 490,
   don: 2200,
   donReady: 300,
@@ -273,6 +286,23 @@ function lastingPowerMods(state: GameState, uid: string): number {
   return sum;
 }
 
+/**
+ * Quanto do valor do Personagem em campo está "congelado" até o turno seguinte por um modificador que dura
+ * além deste turno (os "during this turn" já valem na simulação). O "não desvira" é consumido na Renovação do
+ * dono, por isso depois dela vale pela lista `refreshSkipped` do estado: a carta passa o turno virada.
+ */
+function frozenFraction(state: GameState, w: Weights, uid: string, rested: boolean): number {
+  let f = 0;
+  if (rested && state.refreshSkipped?.includes(uid)) f = w.frozenRested;
+  for (const m of state.modifiers) {
+    if (m.uid !== uid || m.duration === 'turn' || m.duration === 'battle') continue;
+    if (m.kind === 'skipRefresh' && rested) f = Math.max(f, w.frozenRested);
+    else if (m.kind === 'cannotBeRested' && !rested) f = Math.max(f, w.frozenActive);
+    else if (m.kind === 'cannotAttack') f = Math.max(f, w.frozenNoAttack);
+  }
+  return f;
+}
+
 function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number, exposedToOpponent: boolean, opp: boolean): number {
   let v = lifeValue(w, ps.life.length, opp);
   for (const c of [ps.leader, ...ps.characters]) v += (lastingPowerMods(state, c.uid) / 1000) * w.powerMod;
@@ -285,7 +315,7 @@ function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number
   v += handValue(state, w, ps, hidden, !opp && hasDiscardOutlet(state, ps) ? w.handFuel : 0);
   for (const c of ps.characters) {
     const cv = fieldCardValue(state, w, c.uid);
-    v += cv;
+    v += cv * (1 - frozenFraction(state, w, c.uid, c.rested));
     // No turno do oponente, o Personagem virado pode ser atacado.
     if (exposedToOpponent && c.rested) {
       const threat = getPower(state, state.players[opponent(ps.id)].leader.uid) + 2000;

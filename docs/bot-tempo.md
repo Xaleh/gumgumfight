@@ -268,6 +268,36 @@ somem no fim do turno (o motor os apaga no `endTurn`, antes da avaliação da li
 |---|---|---|
 | −poder no oponente até o próximo turno dele | `evaluate.ts`: `lastingPowerMods`, `powerMod` | `usa a habilidade gratuita que enfraquece o oponente até o próximo turno dele (Jewelry Bonney)`, `avaliação: modificador de poder que dura até o próximo turno do oponente` |
 
+## 7c. Personagem congelado até o turno seguinte
+
+O mesmo ponto cego, com outro efeito: o Líder Shanks OP17-020 ("[Activate: Main] [Once Per Turn] descarte 1 carta
+ou vire 1 DON!!: até 1 Personagem virado do oponente não desvira na próxima Renovação dele") nunca era usado. O
+Personagem congelado passa o turno do oponente sem atacar nem bloquear e continua virado, ao alcance, no turno
+seguinte do bot; nada disso aparece na simulação do próprio turno. Pior: o "não desvira" é **consumido** na
+Renovação do oponente, que o motor executa dentro do mesmo `endTurn`, então no fim da linha nem o modificador
+existia mais. O motor passou a registrar as cartas que ficaram viradas na Renovação (`GameState.refreshSkipped`,
+zerado no fim do turno; vai na visão), e a avaliação desconta uma fração do valor do Personagem congelado:
+
+- `frozenRested` (0,5): virado e não desvira (Shanks OP17-020, Arlong OP15-023): não ataca, não bloqueia, e segue
+  virado para ser atacado;
+- `frozenActive` (0,35): "cannot be rested" (Oden ST32-002): não ataca nem bloqueia, mas fica ativo, fora do alcance;
+- `frozenNoAttack` (0,25): "cannot attack" (Stussy OP17-054): ainda bloqueia.
+
+Só modificadores que duram além do turno contam. O próprio Personagem congelado desconta do próprio lado.
+
+| Conceito | Onde está | Teste |
+|---|---|---|
+| Congelar o Personagem virado do oponente | `evaluate.ts`: `frozenFraction`; `engine.ts`: `refreshSkipped` | `congela o Personagem virado do oponente com a habilidade do Líder (Shanks OP17-020)`, `avaliação: Personagem do oponente congelado até o turno seguinte vale menos` |
+
+## 7d. Planos de jogo como gabarito
+
+Um plano de jogo de um deck (como o Líder e a lista funcionam, o que fazer em cada fase) não vira regra no bot:
+a arquitetura é busca + avaliação, e uma regra "se X, faça Y" para um deck quebra em outro. O que o plano dá é o
+**gabarito**: monta-se o deck (`scripts`/rascunhos com as cartas da base), o bot joga partidas rastreadas com ele, e
+cada decisão que foge do plano aponta um conceito genérico que falta na avaliação. Foi assim com o Shanks Verde de
+OP17 (controle: buscar {Red-Haired Pirates}, congelar com o Líder, fechar com o Shanks de custo 10): a busca e o
+Shanks de 10 já saíam certos; o Líder nunca era ativado, e a correção (7c) vale para todo efeito que congela.
+
 ## 8. O que o bot ainda não sabe
 
 - **Mão do oponente**: só o tamanho. Cartas reveladas por efeito não são lembradas de um turno para o outro.
@@ -343,8 +373,9 @@ pelos testes de posição, não por uma medida: o que falta é o relato de quem 
 **Rodada 4 (efeitos desperdiçados).** Quatro relatos de partidas contra o `hard`: o bot baixava cartas com
 [On Play] de remoção sem usar o efeito (Vander Decken IX como corpo vanilla), recusava habilidades do Líder que
 só davam vantagem (Rocks.D.Xebec: pagar 1 carta para comprar 2), no mesmo deck baixava a Buckin no turno 1 em
-vez de guardá-la como Counter e combustível do Líder, e deixava a Jewelry Bonney em campo sem ativar o −1000. As
-causas e as correções estão nas seções 7, 7a e 7b: o efeito guardado passou a valer na mão (`handEffect`), o
+vez de guardá-la como Counter e combustível do Líder, deixava a Jewelry Bonney em campo sem ativar o −1000 e nunca
+usava o "não desvira" do Líder Shanks OP17-020 (a partir de um plano de jogo do deck, seção 7d). As causas e as
+correções estão nas seções 7, 7a, 7b e 7c: o efeito guardado passou a valer na mão (`handEffect`), o
 próprio deck passou a ser sorteado pela composição conhecida, com as perguntas pagas decididas pela média dos
 sorteios, a mão passou a valer o combustível das saídas de descarte (`handFuel`) e o custo das cartas
 (`handCost`), e o modificador de poder que dura até o turno do oponente passou a valer (`powerMod`). Medidas,
@@ -356,6 +387,7 @@ sorteios, a mão passou a valer o combustível das saídas de descarte (`handFue
 | + combustível (+1 000 por carta) e custo (300): descartado | 138 x 162 (46,0%) | 81% |
 | + combustível como piso (3 400) e custo (450) | 198 x 202 (49,5%; pesos novos x sem os dois termos, 400 partidas) | 82% |
 | + modificador de poder duradouro (`powerMod`, Bonney) | 101 x 99 (com x sem o termo, 200 partidas) | 81% |
+| + Personagem congelado (`frozen*`, Líder Shanks OP17-020) | (em medição) | (em medição) |
 
 Fora a versão descartada do combustível, tudo dentro do ruído, como nas rodadas anteriores: as situações são raras
 nos decks prontos, e o que muda é o que a pessoa vê quando joga. Os testes de posição cobrem os casos. O custo é tempo: a decisão média subiu de ~45 ms
