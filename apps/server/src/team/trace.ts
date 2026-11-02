@@ -2,9 +2,10 @@
 // jogadas do assento do bot por nome de carta, com a mão, os DON!! e a Vida dos dois lados no começo de cada
 // turno dele. É o que o modelo compara com o guia.
 
-import { type Action, applyAction, cardDef, createGame, type GameState, type PlayerId } from '@gumgum/engine';
-import type { DB } from '../db';
+import { type Action, applyAction, type CardData, cardDef, createGame, type DeckList, type GameConfig, type GameState, type PlayerId, REPLAY_VERSION, replayConfig, upgradeReplayActions } from '@gumgum/engine';
+import { type DB, getCards } from '../db';
 import { loadReplay } from '../decisions/extract';
+import { pinEngineTexts } from '../online/room';
 
 const name = (s: GameState, uid: string) => (s.cards[uid] ? cardDef(s, uid).name : '?');
 
@@ -42,7 +43,61 @@ export function describePlay(s: GameState, a: Action): string | null {
 export function matchTrace(db: DB, matchId: number, seat: PlayerId): string | null {
   const loaded = loadReplay(db, matchId);
   if ('error' in loaded) return null;
-  for (const { config, actions } of loaded.attempts) {
+  return buildTrace(loaded.attempts, seat);
+}
+
+/** O arquivo de replay que a tela baixa ("Baixar replay") e os parceiros recebem. */
+export interface ReplayFileInput {
+  seed: number;
+  seed128?: number[];
+  firstPlayer?: PlayerId;
+  chooseFirst?: boolean;
+  legacySetup?: boolean;
+  version?: number;
+  decks: [DeckList, DeckList];
+  actions: Action[];
+  names?: string[];
+  engineTexts?: Record<string, never>;
+}
+
+/**
+ * O traço a partir de um arquivo de replay (as cartas vêm do banco, que precisa tê-las): para revisar uma partida
+ * fora do servidor, sem a chave do agente (`npm run bot:agent -- trace replay.json`).
+ */
+export function fileTrace(db: DB, file: ReplayFileInput, seat: PlayerId): string | null {
+  if (!Array.isArray(file.decks) || file.decks.length !== 2 || !Array.isArray(file.actions)) return null;
+  const ids = [...new Set(file.decks.flatMap((d) => [d.leader, ...d.cards.map((c) => c.id)]))];
+  const cards = pinEngineTexts(getCards(db, ids) as CardData[], file.engineTexts as Parameters<typeof pinEngineTexts>[1]);
+  const config: GameConfig = {
+    seed: file.seed,
+    seed128: file.seed128,
+    firstPlayer: file.firstPlayer,
+    chooseFirst: file.chooseFirst,
+    legacySetup: file.legacySetup,
+    cards,
+    players: [
+      { name: file.names?.[0] ?? 'A', deck: file.decks[0] },
+      { name: file.names?.[1] ?? 'B', deck: file.decks[1] },
+    ],
+  };
+  const version = file.version ?? (file.legacySetup ? 8 : REPLAY_VERSION);
+  const attempts: Array<{ config: GameConfig; actions: Action[] }> = [];
+  try {
+    if (version < REPLAY_VERSION) {
+      const c = replayConfig(config, version);
+      attempts.push({ config: c, actions: upgradeReplayActions(c, file.actions) });
+    } else {
+      attempts.push({ config, actions: file.actions });
+      if (file.version === undefined) attempts.push({ config, actions: upgradeReplayActions(config, file.actions) });
+    }
+  } catch {
+    return null;
+  }
+  return buildTrace(attempts, seat);
+}
+
+function buildTrace(attempts: Array<{ config: GameConfig; actions: Action[] }>, seat: PlayerId): string | null {
+  for (const { config, actions } of attempts) {
     try {
       let s = createGame(config);
       const lines: string[] = [];

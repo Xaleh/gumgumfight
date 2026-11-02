@@ -471,7 +471,9 @@ modelo de Counter por Líder adversário), nunca como regras. Sem perfil, o deck
   quando estiver pronto) e a caixa de correções (estado, resposta, abrir o replay na jogada marcada).
 - **Agente fora da partida** (`BOT_AGENT_API_KEY`): escreve o rascunho do perfil a partir do guia e compara as jogadas
   do bot numa partida com o guia (discrepâncias e o conceito genérico que falta). Na tela, os botões "Gerar perfil" e
-  "Revisar a partida"; no terminal, `npm run bot:agent -w @gumgum/server -- profile <deck> | review <matchId>`.
+  "Revisar a partida"; no terminal, `npm run bot:agent -w @gumgum/server -- profile <deck> | review <matchId>`. Sem a chave,
+  `npm run bot:agent -w @gumgum/server -- trace <matchId|replay.json>` imprime só o traço da partida (turno a turno, por
+  nome de carta) para revisar à mão ou colar numa conversa com o Claude: o mesmo trabalho, sem a API.
 - **Medir por deck**: `npm run decisions -w @gumgum/server -- --leader OP17-039` (concordância do bot com as pessoas
   por Líder) e `npm run decisions:tune -w @gumgum/server -- --leader OP17-039 --profile op17-xebec` (ajusta os `weights`
   do perfil por imitação).
