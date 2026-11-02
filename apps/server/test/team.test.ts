@@ -237,3 +237,20 @@ describe('Bot do Time: editor de guia e perfil, e o agente fora da partida', () 
     expect((await app.inject({ method: 'POST', url: `/api/bot/matches/${matchId}/review`, headers: admin.headers, payload: {} })).json().errorCode).toBe('noGuide');
   });
 });
+
+describe('Bot do Time: traço de uma partida a partir do arquivo de replay (sem a chave)', () => {
+  it('o replay baixado vira o mesmo traço da partida gravada', async () => {
+    const { db, app } = setup();
+    const member = login(db, 'player', true);
+    const { matchId } = await recordBotMatch(app, member);
+    const { fileTrace, matchTrace } = await import('../src/team/trace');
+    const { matchReplay } = await import('../src/reports/store');
+    const file = matchReplay(db, matchId)!;
+    const fromDb = matchTrace(db, matchId, 1)!;
+    const fromFile = fileTrace(db, file as never, 1)!;
+    expect(fromFile).toBe(fromDb);
+    expect(fromFile).toMatch(/TURNO \d+ \(bot\)/);
+    expect(fromFile).toMatch(/FIM: o bot (venceu|perdeu)/);
+    expect(fileTrace(db, { ...(file as object), decks: [] } as never, 1)).toBeNull();
+  });
+});
