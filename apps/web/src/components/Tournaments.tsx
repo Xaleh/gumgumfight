@@ -84,6 +84,14 @@ const remaining = (tr: Translate, deadline: string, now: number) => {
 /** Minutos de um intervalo em ms ("30 min"). */
 const minutes = (tr: Translate, ms: number) => tr('tour.minutes', { n: Math.round(ms / 60_000) });
 
+/** O que segura a próxima rodada no início automático, em texto ("2 relatos não resolvidos; 1 chamado de Judge aberto"). */
+const holdReasons = (tr: Translate, hold: NonNullable<TournamentDetail['autoNextHold']>) =>
+  [
+    ...(hold.reports ? [tr('tour.holdReports', { n: hold.reports })] : []),
+    ...(hold.calls ? [tr('tour.holdCalls', { n: hold.calls })] : []),
+    ...(hold.warnings.length ? [tr('tour.holdWarnings', { names: hold.warnings.join(', ') })] : []),
+  ].join('; ');
+
 /** 1050000 → "17min30s". */
 const clock = (tr: Translate, ms: number) => {
   const s = Math.round(ms / 1000);
@@ -1100,6 +1108,11 @@ function TournamentPage({
                   </button>
                 </div>
                 {t.status === 'running' && !t.roundStartedAt && <p className="muted small">{tr('tour.beginRoundHint')}</p>}
+                {t.status === 'running' && t.autoStart && (
+                  <p className="muted small">
+                    {t.autoNextHold ? tr(t.roundComplete ? 'tour.autoNextHeld' : 'tour.autoNextHold', { reasons: holdReasons(tr, t.autoNextHold) }) : tr('tour.autoNextHint')}
+                  </p>
+                )}
                 {t.warningsPending.length > 0 && (
                   <WarningsPending t={t} busy={busy} run={run} />
                 )}

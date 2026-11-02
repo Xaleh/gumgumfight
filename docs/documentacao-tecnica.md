@@ -1046,7 +1046,8 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   (`registration → running → finished`), `round`, `round_at` (quando a rodada atual foi gerada), `round_wo` (a
   varredura de ausentes da rodada já foi feita), `round_started_at` (quando o organizador **iniciou** a rodada atual:
   as salas abrem e a tolerância conta daqui; null = pareamentos gerados, à espera do início), `auto_start` (com
-  `check_in`: começa sozinho na hora marcada; opção para quando o organizador não está), `max_warnings` (warnings por
+  `check_in`: começa sozinho na hora marcada e as rodadas seguintes saem sozinhas; opção para quando o organizador não
+  está), `auto_hold_round` (rodada completa cuja próxima o início automático deixou à espera e cujo aviso já saiu), `max_warnings` (warnings por
   jogador até o organizador ter de decidir a eliminação; null = sem regra), `checkin_notice` (`starts_at` cujo aviso de check-in já saiu por
   notificação), `late_entry` (inscrição atrasada liberada: `*` = qualquer um, ou o id da conta; null = fechada),
   `organizer_id`.
@@ -1172,6 +1173,14 @@ com relógio injetado nos testes não roda sozinho e é chamado por `app.tournam
 - **Início automático** (só com `auto_start`; sem ele, **o organizador dá o start mesmo com a hora atingida**): em
   `starts_at` (até 1 h depois, se o servidor estava fora do ar; passado isso, o organizador começa à mão), com ≥ 2
   inscritos, `beginTournament` sorteia e grava a rodada 1 entre **todos** os inscritos e `startRound` já a inicia.
+- **Rodadas seguintes sozinhas** (também só com `auto_start`): com o torneio `running` e todas as partidas da rodada
+  atual com resultado (`roundComplete`), o relógio chama `advanceRound` (a mesma lógica de `POST /next`: suíço, top
+  cut, próxima fase ou `finishTournament`) e `startRound` na hora. Antes, `autoNextHold` confere o que segura: relatos
+  do torneio não resolvidos (`match_reports`), chamados de Judge abertos (`tournament_calls`) e warnings à espera da
+  decisão do organizador (`pendingWarnings`). Com algo pendente a rodada fica à espera, o organizador e os Judges
+  recebem um aviso uma vez por rodada (`auto_hold_round`) e o relógio volta a tentar a cada passo: resolvido tudo, a
+  rodada sai sozinha; ou o organizador gera à mão por `next` (que só trava por warnings). `GET /api/tournaments/:id`
+  devolve `autoNextHold` (para Judge e organizador) com os motivos. Sem `auto_start`, o relógio não gera rodadas.
 - **W.O. por ausência**: `round_started_at + tolerance_min` depois de cada rodada **iniciada**, cada partida pendente com placar 0 x 0 é
   conferida: presença = entrou na sala (`p1_in`/`p2_in`, gravado em `play`) ou, na rodada 1, fez check-in. O ausente
   perde (`reported_by = noshow`) e sai (`dropped`); os dois ausentes = `result = none` e os dois saem. A sala em espera
@@ -1179,8 +1188,9 @@ com relógio injetado nos testes não roda sozinho e é chamado por `app.tournam
   zerar/corrigir depois sem que o W.O. volte. Na chave, `singleNextRound` dá bye a quem avançaria contra uma mesa sem
   vencedor; sem ninguém para avançar, `next` encerra.
 - **Notificações** (para quem ligou os avisos de torneios): check-in aberto (uma vez por `starts_at`, só para quem não
-  confirmou), rodada nova em `start`, `next` e no início automático (oponente e prazo de tolerância, ou bye) e, em
-  `play`, "oponente esperando na sala" para o outro jogador quando a sala do jogo é criada.
+  confirmou), rodada nova em `start`, `next` e no início automático (oponente e prazo de tolerância, ou bye), rodada
+  completa à espera no início automático (para o organizador e os Judges, com os motivos) e, em `play`, "oponente
+  esperando na sala" para o outro jogador quando a sala do jogo é criada.
 - **Atalho da tela inicial**: `GET /api/tournaments/me` (a cada 10 s, só logado) devolve os torneios em que a conta está
   em jogo agora (check-in aberto ou `running`), com a partida da rodada, o oponente, a situação da sala e o prazo.
 
