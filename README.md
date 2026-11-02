@@ -493,6 +493,11 @@ inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia q
   - Na hora marcada o torneio **começa sozinho**: a rodada 1 é sorteada entre todos os inscritos e a sala de cada mesa
     fica pronta para os dois jogadores (o atalho da tela inicial vira **Entrar na sala**). O organizador ainda pode
     começar antes à mão.
+  - Com o início automático, **as rodadas seguintes também saem sozinhas**: assim que todas as partidas de uma rodada
+    têm resultado, a próxima rodada (o suíço, o top cut, a próxima fase da chave ou o encerramento) é gerada e já
+    iniciada. Ela fica à espera se houver **relatos não resolvidos**, **chamados de Judge abertos** ou **warnings à
+    espera da decisão do organizador**: o organizador e os Judges são avisados uma vez, e o torneio segue sozinho
+    quando tudo for resolvido (ou o organizador gera a rodada à mão).
   - Em cada rodada, cada jogador tem a **tolerância escolhida pelo organizador** (1 a 60 minutos; padrão 5) para
     entrar na sala. Quem não entra **perde por W.O.** e sai do torneio; se nenhum dos dois entra, **os dois perdem**
     (W.O. duplo: na chave, a mesa seguinte fica com bye). Na rodada 1, o check-in feito antes já vale como presença.

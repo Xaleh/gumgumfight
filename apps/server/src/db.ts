@@ -685,6 +685,9 @@ function migrateTournaments(db: DB) {
     db.exec('ALTER TABLE tournaments ADD COLUMN auto_start INTEGER NOT NULL DEFAULT 0');
     db.exec("UPDATE tournaments SET auto_start = 1 WHERE check_in = 1 AND status = 'registration'");
   }
+  // auto_hold_round: rodada completa cuja próxima rodada o início automático deixou de gerar (relatos, chamados
+  // de Judge ou warnings pendentes) e cujo aviso ao organizador já saiu (ver tournaments/clock.ts).
+  if (!tCols.includes('auto_hold_round')) db.exec('ALTER TABLE tournaments ADD COLUMN auto_hold_round INTEGER');
   // max_warnings: warnings até a eliminação (null = o organizador decide caso a caso).
   if (!tCols.includes('max_warnings')) db.exec('ALTER TABLE tournaments ADD COLUMN max_warnings INTEGER');
   // live_hands: o organizador libera as mãos ao vivo para quem transmite (sem o atraso mínimo de 1 min).

@@ -1736,6 +1736,11 @@ export interface TournamentDetail {
   next: 'swiss' | 'cut' | 'elim' | 'finish' | null;
   /** Relatos abertos dos jogadores (só para quem gerencia). */
   openReports: number;
+  /**
+   * Início automático, para o Judge e o organizador: o que segura a próxima rodada quando esta terminar
+   * (relatos não resolvidos, chamados de Judge abertos, warnings à espera); null = nada segura, ou sem início automático.
+   */
+  autoNextHold: { reports: number; calls: number; warnings: string[] } | null;
 }
 
 /** Vitórias necessárias numa melhor de N. */

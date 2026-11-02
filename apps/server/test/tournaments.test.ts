@@ -5,7 +5,7 @@ import { dataVersion } from '../src/cache';
 import { proxiedImageUrl } from '../src/card-images';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
-import { listFinished, registerPlayer } from '../src/tournaments/store';
+import { createCall, listFinished, registerPlayer, resolveCalls } from '../src/tournaments/store';
 import { listReports, matchReplay } from '../src/reports/store';
 import type { Lobby } from '../src/online/lobby';
 import type { Connection } from '../src/online/room';
@@ -623,7 +623,7 @@ describe('torneios: rotas', () => {
     const checkin = (p: ReturnType<typeof login>) => req(app, 'POST', `/api/tournaments/${t.id}/checkin`, p);
     expect((await checkin(ps[0])).statusCode).toBe(409);
     expect((await req(app, 'GET', '/api/tournaments/me', ps[0])).json().entries).toEqual([]);
-    expect(tick(app)).toEqual({ started: [], removed: [], checkIns: [], noShows: [] });
+    expect(tick(app)).toEqual({ started: [], removed: [], checkIns: [], noShows: [], advanced: [], held: [] });
     expect((await req(app, 'GET', `/api/tournaments/${t.id}`)).json().status).toBe('registration');
 
     // 19:30: check-in aberto para os inscritos (e só para eles).
@@ -1716,6 +1716,82 @@ describe('torneios: Judge, chamados, warnings e início das rodadas', () => {
     expect(view).toMatchObject({ status: 'running', roundStartedAt: startsAt, deadline: '2026-10-10T20:05:00.000Z' });
     const m = view.rounds[0].matches[0];
     expect((await play(app, t.id, who(m.p1.userId), m)).statusCode).toBe(200);
+  });
+
+  it('início automático: a rodada seguinte sai gerada e iniciada sozinha quando a rodada termina; relatos, chamados de Judge e warnings pendentes a seguram (aviso uma vez) e o torneio encerra sozinho no fim', async () => {
+    let now = Date.parse('2026-10-10T20:00:00Z');
+    const { db, app } = setup(() => now);
+    const startsAt = '2026-10-10T20:00:00.000Z';
+    const { org, t, who, lobby } = await arena(app, db, { startsAt, checkIn: true, autoStart: true, maxWarnings: 1 });
+    expect(tick(app)!.started).toEqual([t.id]);
+    const get = async () => (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    const result = (m: { id: number }, value: unknown) => req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, org, { result: value });
+    let view = await get();
+    expect(view.autoNextHold).toBeNull();
+    const [m1, m2] = view.rounds[0].matches;
+    // Mesa 1 joga no site: quem está no segundo assento desiste (fica um jogo gravado, para o relato).
+    const seatA = (await play(app, t.id, who(m1.p1.userId), m1)).json();
+    const seatB = (await play(app, t.id, who(m1.p2.userId), m1)).json();
+    const room = lobby.get(seatA.roomId)!;
+    await app.inject({ method: 'POST', url: `/api/online/rooms/${room.id}/action`, payload: { t: seatB.token, seq: 0, action: { type: 'concede', player: room.seatOf(seatB.token)! } } });
+    // Rodada incompleta: o relógio não mexe.
+    let r = tick(app)!;
+    expect([r.advanced, r.held]).toEqual([[], []]);
+    // Quem perdeu relata um problema no jogo; a rodada termina, mas a próxima fica à espera (o organizador é avisado uma vez).
+    const { stats_match_id: statsId } = db.prepare('SELECT stats_match_id FROM tournament_games WHERE tournament_id = ?').get(t.id) as { stats_match_id: number };
+    expect((await req(app, 'POST', `/api/matches/${statsId}/report`, who(m1.p2.userId), { text: 'A carta não fez o efeito' })).statusCode).toBe(201);
+    view = (await result(m2, 'p1')).json();
+    expect(view).toMatchObject({ round: 1, roundComplete: true, autoNextHold: { reports: 1, calls: 0, warnings: [] } });
+    r = tick(app)!;
+    expect(r.advanced).toEqual([]);
+    expect(r.held).toEqual([{ tournamentId: t.id, round: 1, hold: { reports: 1, calls: 0, warnings: [] } }]);
+    expect(tick(app)!.held).toEqual([]);
+    expect((await get()).round).toBe(1);
+    // Um chamado de Judge aberto (de uma mesa já decidida) também segura; a lista mostra os dois motivos.
+    createCall(db, t.id, { matchId: m2.id, roomId: null, game: 1, openedBy: m2.p1.userId, at: new Date(now).toISOString(), reason: 'rules' });
+    expect((await get()).autoNextHold).toEqual({ reports: 1, calls: 1, warnings: [] });
+    expect([tick(app)!.advanced, tick(app)!.held]).toEqual([[], []]);
+    resolveCalls(db, t.id, m2.id, org.id, new Date(now).toISOString(), null, { outcome: 'rules', fix: null });
+    // O organizador resolve o relato: no passo seguinte do relógio a rodada 2 sai gerada e já iniciada.
+    const reportId = (await req(app, 'GET', `/api/reports?tournament=${t.id}`, org)).json().reports[0].id;
+    expect((await req(app, 'PUT', `/api/reports/${reportId}`, org, { resolved: true })).statusCode).toBe(200);
+    expect((await get()).autoNextHold).toBeNull();
+    now += 60_000;
+    r = tick(app)!;
+    expect(r.advanced).toEqual([{ tournamentId: t.id, round: 2, step: 'swiss', finished: false }]);
+    view = await get();
+    const at = new Date(now).toISOString();
+    expect(view).toMatchObject({ status: 'running', round: 2, roundAt: at, roundStartedAt: at, deadline: new Date(now + TOLERANCE_MS_T).toISOString(), roundComplete: false });
+    expect(view.rounds[1].matches).toHaveLength(2);
+    // Rodada 2 (a última): warnings à espera da decisão seguram o encerramento; decidido, o torneio encerra sozinho.
+    const [n1, n2] = view.rounds[1].matches;
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/players/${n1.p1.userId}/warnings`, org, { reason: 'Demora excessiva' })).statusCode).toBe(200);
+    await result(n1, 'p2');
+    view = (await result(n2, 'p1')).json();
+    expect(view.autoNextHold).toEqual({ reports: 0, calls: 0, warnings: [n1.p1.name] });
+    r = tick(app)!;
+    expect(r.held).toEqual([{ tournamentId: t.id, round: 2, hold: { reports: 0, calls: 0, warnings: [n1.p1.name] } }]);
+    expect((await get()).status).toBe('running');
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/players/${n1.p1.userId}/warnings/keep`, org)).statusCode).toBe(200);
+    r = tick(app)!;
+    expect(r.advanced).toEqual([{ tournamentId: t.id, round: 2, step: 'finish', finished: true }]);
+    view = await get();
+    expect(view).toMatchObject({ status: 'finished', round: 2 });
+    expect(view.standings[0].rank).toBe(1);
+    // Encerrado, o relógio o deixa em paz.
+    expect([tick(app)!.advanced, tick(app)!.held]).toEqual([[], []]);
+  });
+
+  it('sem início automático, a rodada completa espera o organizador (o relógio não gera a próxima)', async () => {
+    let now = Date.parse('2026-10-10T20:00:00Z');
+    const { db, app } = setup(() => now);
+    const { org, t } = await arena(app, db, { startsAt: '2026-10-10T20:00:00.000Z', checkIn: true, autoStart: false });
+    let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
+    for (const m of view.rounds[0].matches) await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, org, { result: 'p1' });
+    now += 60_000;
+    expect([tick(app)!.advanced, tick(app)!.held]).toEqual([[], []]);
+    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
+    expect(view).toMatchObject({ round: 1, roundComplete: true, autoNextHold: null });
   });
 });
 

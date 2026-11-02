@@ -62,6 +62,11 @@ export interface Tournament {
   roundStartedAt: string | null;
   /** A varredura de ausentes da rodada atual já foi feita. */
   roundSwept: boolean;
+  /**
+   * Rodada completa cuja próxima rodada o início automático deixou de gerar (relatos, chamados de Judge ou
+   * warnings pendentes) e cujo aviso ao organizador já saiu (null = nenhum; ver clock.ts).
+   */
+  autoHoldRound: number | null;
   /** Hora de início (`startsAt`) cujo aviso de check-in já saiu por notificação. */
   checkInNotice: string | null;
   organizerId: string;
@@ -163,6 +168,7 @@ type TournamentRow = {
   round_at: string | null;
   round_started_at: string | null;
   round_wo: number;
+  auto_hold_round: number | null;
   checkin_notice: string | null;
   organizer_id: string;
   organizer_name: string | null;
@@ -202,6 +208,7 @@ const toTournament = (r: TournamentRow): Tournament => ({
   roundAt: r.round_at,
   roundStartedAt: r.round_started_at ?? null,
   roundSwept: Boolean(r.round_wo),
+  autoHoldRound: r.auto_hold_round ?? null,
   checkInNotice: r.checkin_notice ?? null,
   organizerId: r.organizer_id,
   organizerName: r.organizer_name,
@@ -616,6 +623,12 @@ export function setReady(db: DB, tournamentId: string, id: number, side: 'p1' | 
 /** Marca que o aviso de check-in para a hora de início `startsAt` já foi enviado. */
 export function markCheckInNotice(db: DB, id: string, startsAt: string) {
   db.prepare('UPDATE tournaments SET checkin_notice = ? WHERE id = ?').run(startsAt, id);
+}
+
+/** O início automático avisou que a rodada `round` terminou sem a próxima ser gerada (ver clock.ts). */
+export function markAutoHold(db: DB, id: string, round: number) {
+  dataVersion.bump();
+  db.prepare('UPDATE tournaments SET auto_hold_round = ? WHERE id = ?').run(round, id);
 }
 
 /** Marca que a varredura de ausentes da rodada atual foi feita. */

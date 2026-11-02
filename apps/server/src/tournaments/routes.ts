@@ -53,15 +53,20 @@ import { pushText, roundName } from '../push/messages';
 import { noNotifier, type Notifier } from '../push/routes';
 import {
   absentSides,
+  advanceRound,
+  type AutoHold,
+  autoNextHold,
   beginTournament,
   CHECK_IN_MS,
   checkInOpen,
   checkInOpensAt,
   DEFAULT_TOLERANCE_MIN,
   deckIssue,
-  elimRound,
   MAX_TOLERANCE_MIN,
   MIN_TOLERANCE_MIN,
+  nextStep,
+  pendingWarnings,
+  roundComplete,
   roundDeadline,
   staleDecks,
   toleranceMs,
@@ -70,11 +75,9 @@ import {
 import {
   elimLabel,
   losersOf,
-  singleFirstRound,
   singleNextRound,
   singleRounds,
   standings,
-  swissPairings,
   swissRounds,
   winnerOf,
   winsNeeded,
@@ -102,7 +105,6 @@ import {
   getMatch,
   getTournament,
   type InterventionRole,
-  insertRound,
   lateRegister,
   listCalls,
   listGames,
@@ -505,6 +507,25 @@ export function registerTournamentRoutes(
     }
   };
 
+  /** Os motivos que seguram a próxima rodada, em texto, para o aviso ao organizador e aos Judges. */
+  const holdReasons = (locale: string, hold: AutoHold) =>
+    [
+      ...(hold.reports ? [pushText(locale, 'holdReports', { n: hold.reports })] : []),
+      ...(hold.calls ? [pushText(locale, 'holdCalls', { n: hold.calls })] : []),
+      ...(hold.warnings.length ? [pushText(locale, 'holdWarnings', { names: hold.warnings.join(', ') })] : []),
+    ].join('; ');
+
+  /** Início automático: a rodada terminou, mas a próxima ficou à espera; o organizador e os Judges são avisados. */
+  const notifyHold = (id: string, round: number, hold: AutoHold) => {
+    const t = getTournament(db, id);
+    if (!t || t.status !== 'running') return;
+    const matches = listMatches(db, t.id).filter((m) => m.round === round);
+    const stage = matches[0]?.stage ?? 'swiss';
+    for (const userId of judgeIds(t)) {
+      tournamentNotice(t, userId, (locale) => pushText(locale, 'autoNextHoldBody', { round: roundName(locale, stage, round, matches.length), reasons: holdReasons(locale, hold) }), 3600);
+    }
+  };
+
   /** Check-in aberto: avisa quem está inscrito e ainda não confirmou presença. */
   const notifyCheckIn = (id: string) => {
     const t = getTournament(db, id);
@@ -528,6 +549,17 @@ export function registerTournamentRoutes(
         notifyRound(id, true);
       }
       for (const w of r.noShows) app.log.info(`torneio ${w.tournamentId}: W.O. na partida ${w.matchId} (${w.absent.join(', ')} ausente)`);
+      for (const a of r.advanced) {
+        if (a.finished) app.log.info(`torneio ${a.tournamentId}: encerrado sozinho (última rodada completa)`);
+        else {
+          app.log.info(`torneio ${a.tournamentId}: rodada ${a.round} gerada e iniciada sozinha (${a.step})`);
+          notifyRound(a.tournamentId, true);
+        }
+      }
+      for (const h of r.held) {
+        app.log.info(`torneio ${h.tournamentId}: rodada ${h.round} completa, a próxima espera (relatos: ${h.hold.reports}, chamados: ${h.hold.calls}, warnings: ${h.hold.warnings.join(', ') || '-'})`);
+        notifyHold(h.tournamentId, h.round, h.hold);
+      }
       return r;
     } catch (err) {
       app.log.error(err, 'relógio dos torneios');
@@ -642,13 +674,6 @@ export function registerTournamentRoutes(
     return { t, me };
   };
 
-  /** Jogadores com decisão de warnings pendente (atingiram o limite e o organizador ainda não decidiu). */
-  const pendingWarnings = (t: Tournament, players: TournamentPlayer[]) => {
-    if (t.maxWarnings === null) return [];
-    const all = listWarnings(db, t.id);
-    return players.filter((p) => warningStatus(t, p, all.filter((w) => w.userId === p.userId)).pending);
-  };
-
   /** Rodadas previstas: suíço (+ top cut) ou a chave inteira. */
   const plannedRounds = (t: Tournament, players: number) =>
     t.structure === 'single'
@@ -709,17 +734,6 @@ export function registerTournamentRoutes(
       buildMeta(db, { format, days: period, now: now(), present }),
     );
   });
-
-  const roundComplete = (t: Tournament, matches: TournamentMatch[]) => matches.filter((m) => m.round === t.round).every((m) => m.result);
-
-  /** Próximo passo depois da rodada atual: outra rodada do suíço, o top cut, a próxima fase ou o fim. */
-  const nextStep = (t: Tournament, players: TournamentPlayer[], matches: TournamentMatch[]): 'swiss' | 'cut' | 'elim' | 'finish' => {
-    const current = matches.filter((m) => m.round === t.round);
-    const active = players.filter((p) => !p.dropped).length;
-    if (current[0]?.stage === 'elim') return current.length <= 1 ? 'finish' : 'elim';
-    if (t.round < (t.rounds ?? 0) && active >= 2) return 'swiss';
-    return t.topCut && active >= 2 ? 'cut' : 'finish';
-  };
 
   /** Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer. */
   const detail = (t: Tournament, u: User | null) => {
@@ -806,7 +820,7 @@ export function registerTournamentRoutes(
     const current = me && t.status === 'running' ? matches.find((m) => m.round === t.round && (m.p1 === me.userId || m.p2 === me.userId)) : undefined;
     const currentRound = matches.filter((m) => m.round === t.round);
     const tables = currentRound.filter((m) => m.p2 && !m.result);
-    const pending = manage || judge ? pendingWarnings(t, players) : [];
+    const pending = manage || judge ? pendingWarnings(db, t, players) : [];
     /** Warnings de um inscrito: a contagem é pública; os motivos, só para o Judge, o organizador e o próprio jogador. */
     const warningsOf = (p: TournamentPlayer) => {
       const mine = warnings.filter((w) => w.userId === p.userId);
@@ -961,6 +975,11 @@ export function registerTournamentRoutes(
       next: t.status === 'running' ? nextStep(t, players, matches) : null,
       /** Relatos abertos dos jogadores (só para quem gerencia; a lista vem de GET /api/reports?tournament=). */
       openReports: manage ? listReports(db, { tournamentId: t.id, status: 'open' }).length : 0,
+      /**
+       * Início automático, para o Judge e o organizador: o que segura a próxima rodada quando esta terminar
+       * (relatos não resolvidos, chamados de Judge abertos, warnings à espera); null = nada segura, ou sem início automático.
+       */
+      autoNextHold: judge && t.autoStart && t.status === 'running' ? autoNextHold(db, t, players) : null,
     };
   };
 
@@ -1073,7 +1092,7 @@ export function registerTournamentRoutes(
       viewer: { userId: u?.id ?? null, manage, judge },
       judges: judges.map((j) => ({ userId: j.userId, name: j.name })),
       /** Para o Judge e o organizador: decisões de warnings pendentes. */
-      warningsPending: judge ? pendingWarnings(t, players).map((p) => ({ userId: p.userId, name: p.name })) : [],
+      warningsPending: judge ? pendingWarnings(db, t, players).map((p) => ({ userId: p.userId, name: p.name })) : [],
       players: players.map((p) => entry(p.userId)),
       tables,
       pendingTables: pending.length,
@@ -1247,7 +1266,9 @@ export function registerTournamentRoutes(
   /**
    * Com a rodada atual completa: gera a próxima rodada (do suíço, o top cut ou a próxima fase) ou
    * encerra. Travada enquanto algum jogador que atingiu o limite de warnings espera a decisão do
-   * organizador (manter ou eliminar). `{ begin: true }`: já inicia a rodada gerada.
+   * organizador (manter ou eliminar). `{ begin: true }`: já inicia a rodada gerada. Com início
+   * automático, o relógio faz o mesmo sozinho quando a rodada termina (ver clock.ts); esta rota
+   * serve para o organizador passar por cima de relatos ou chamados pendentes.
    */
   app.post<{ Params: { id: string }; Body: { begin?: unknown } }>('/api/tournaments/:id/next', async (req, reply) => {
     const found = managed(req, reply);
@@ -1257,29 +1278,14 @@ export function registerTournamentRoutes(
     const matches = listMatches(db, t.id);
     if (!roundComplete(t, matches)) return reply.code(409).send(fail('roundIncomplete', 'Ainda há partidas da rodada sem resultado.'));
     const players = listPlayers(db, t.id);
-    const pending = pendingWarnings(t, players);
+    const pending = pendingWarnings(db, t, players);
     if (pending.length) {
       const names = pending.map((p) => p.name).join(', ');
       return reply
         .code(409)
         .send(fail('warningsPending', `Decida antes o que fazer com quem atingiu o limite de warnings: ${names} (manter ou eliminar).`, { names }));
     }
-    const step = nextStep(t, players, matches);
-    const round = t.round + 1;
-    const at = nowIso();
-    if (step === 'swiss') {
-      insertRound(db, t.id, { round, stage: 'swiss', bestOf: t.swissBestOf, pairings: swissPairings(players, matches) }, at);
-    } else if (step === 'cut') {
-      // Os melhores do suíço (quem desistiu fica de fora), semeados pela classificação.
-      const ranked = standings(players, matches).filter((s) => !s.dropped);
-      const cut = ranked.slice(0, Math.min(t.topCut!, ranked.length)).map((s, i) => ({ userId: s.userId, seed: i + 1, dropped: false }));
-      insertRound(db, t.id, elimRound(t, round, singleFirstRound(cut)), at);
-    } else if (step === 'elim') {
-      const pairings = singleNextRound(players, matches.filter((m) => m.round === t.round));
-      // Sem ninguém para avançar (W.O. duplo nas mesas que restavam): acabou.
-      if (pairings.length) insertRound(db, t.id, elimRound(t, round, pairings), at);
-      else finishTournament(db, t.id);
-    } else finishTournament(db, t.id);
+    advanceRound(db, t, players, matches, nowIso());
     const after = getTournament(db, t.id)!;
     if (after.status === 'running' && req.body?.begin) beginRound(after, true);
     else notifyRound(t.id, false);
