@@ -9,7 +9,7 @@
 
 import { MAX_CHARACTERS, type GameState, type PlayerId } from '@gumgum/engine';
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { baseOrder, type BaseItem, type EffectiveLayout, measureLayout, SIZE_K } from '../game/boardLayout';
+import { baseOrder, type BaseItem, type EffectiveLayout, measureLayout, SIZE_K, WIDE } from '../game/boardLayout';
 import { useT } from '../i18n';
 import {
   type BoardHandlers,
@@ -111,6 +111,16 @@ function Half({
     );
   };
   const zh: ZoneHandlers = h;
+  const trashPile = (className = 'wm-trash') => (
+    <div key="trash" className={className}>
+      <small className="wm-label">{t('layout.trashLabel')}</small>
+      <TrashPile state={state} player={player} h={h} />
+    </div>
+  );
+  // Descarte junto dos DON!!: na fileira de DON!!, na ponta oposta à do deck de DON!! (fora da .don-row, que é
+  // alvo do arrasto dos DON!!; ocupa a mesma faixa da grade, por cima da coluna livre).
+  const trashInRow = layout.don.position === 'row' && layout.trash.position === 'don';
+  const trashEdge = deckOuter !== top ? 'right' : 'left';
   const item = (id: BaseItem, edge: 'left' | 'right') => {
     switch (id) {
       case 'DON':
@@ -125,12 +135,7 @@ function Half({
           </div>
         );
       case 'trash':
-        return (
-          <div key="trash" className="wm-trash">
-            <small className="wm-label">{t('layout.trashLabel')}</small>
-            <TrashPile state={state} player={player} h={h} />
-          </div>
-        );
+        return trashPile();
       case 'life':
         return (
           <div key="life" className="wm-life-base">
@@ -174,6 +179,7 @@ function Half({
         <div className="wm-base-r">{right.map((id) => item(id, 'right'))}</div>
       </div>
       {layout.don.position === 'row' && donGroup('row')}
+      {trashInRow && trashPile(`wm-trash wm-trash-don ${trashEdge}`)}
     </section>
   );
 }
@@ -324,6 +330,8 @@ export function WideBoard({
     const middle = where === 'left' ? sideLeft : sideRight;
     return (
       <div className={['wm-side', where, mine ? 'with-hand' : ''].join(' ')}>
+        {/* Os botões do canto no topo da lateral esquerda, para não cobrirem o hover nem a mão do oponente. */}
+        {where === 'left' && corner && <div className="corner wm-corner">{corner}</div>}
         {oppSide === where && oppHand}
         <div className={['wm-middle', mine ? '' : 'centered'].join(' ')}>{middle}</div>
         {mine && myHandBlock('corner')}
@@ -337,6 +345,8 @@ export function WideBoard({
     '--fixed': `${m.fixedPx}px`,
     '--bwu': m.boardW,
     '--side': m.side,
+    '--side-max': m.side > 0 ? WIDE.sideMax : 0,
+    '--maxboard': WIDE.maxBoard,
     '--k-don': SIZE_K[layout.don.size],
     '--k-hand': SIZE_K[layout.hand.size],
     '--k-life': SIZE_K[layout.life.size],
@@ -351,7 +361,7 @@ export function WideBoard({
 
   return (
     <div ref={root} className={['mat', 'wide-mat', inert ? 'inert' : ''].join(' ')} style={style}>
-      {corner && <div className="corner">{corner}</div>}
+      {corner && !sides && <div className="corner">{corner}</div>}
       <div className="wm-col">
         {handBottom && !sides && <div className="wm-strip top">{oppHand}</div>}
         <div className="wm-board" data-drop="field" data-anchor="arena">

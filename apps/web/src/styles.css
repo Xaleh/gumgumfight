@@ -15500,6 +15500,15 @@ div.dk-tile-main {
   --cwb: var(--cw);
   --ch: calc(var(--cw) * 1.396);
   --hcw: calc(var(--cw) * 1.2);
+  /*
+   * As laterais: no mínimo o que o layout pede (--side); a sobra da largura, além de uma mesa de --maxboard
+   * cartas, vai para elas (o texto do hover e o histórico ficam legíveis), até --side-max cartas cada.
+   */
+  --sidew: clamp(
+    calc(var(--side) * var(--cw)),
+    calc((var(--bw, 100vw) - var(--maxboard) * var(--cw)) / 2 - 16px),
+    calc(var(--side-max) * var(--cw))
+  );
   width: 100%;
   height: 100%;
   margin: 0;
@@ -15522,7 +15531,7 @@ div.dk-tile-main {
 }
 /* a coluna do meio: a mesa (e, se for o caso, a mão embaixo dela) centralizada na altura */
 .wm-col {
-  --boardw: max(calc(var(--cw) * var(--bwu)), calc(100% - 2 * var(--side) * var(--cw) - 32px));
+  --boardw: max(calc(var(--cw) * var(--bwu)), calc(100% - 2 * var(--sidew) - 32px));
   position: relative;
   width: 100%;
   height: 100%;
@@ -15746,6 +15755,17 @@ div.dk-tile-main {
   grid-row: 1;
   justify-self: end;
 }
+/* o Descarte junto dos DON!!: na mesma faixa da fileira de DON!!, na ponta oposta à do deck de DON!! */
+.wm-trash-don {
+  grid-area: don;
+  z-index: 1;
+}
+.wm-trash-don.left {
+  justify-self: start;
+}
+.wm-trash-don.right {
+  justify-self: end;
+}
 /* a faixa do meio: a etiqueta do oponente, o turno e os botões, a sua etiqueta */
 .wm-center {
   display: grid;
@@ -15836,7 +15856,7 @@ div.dk-tile-main {
   position: absolute;
   top: 8px;
   bottom: 8px;
-  width: calc(var(--side) * var(--cw));
+  width: var(--sidew);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -15845,6 +15865,12 @@ div.dk-tile-main {
 }
 .wm-side.left {
   left: 8px;
+}
+.wm-side > .wm-corner {
+  position: relative;
+  left: auto;
+  top: auto;
+  flex: none;
 }
 .wm-side.right {
   right: 8px;
@@ -15872,20 +15898,24 @@ div.dk-tile-main {
 }
 .wm-side .detail .detail-text {
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 .wm-side .detail.empty {
   align-items: center;
 }
 .wm-side .detail-card {
-  --cw: calc(var(--cwb) * 2 * var(--k-hover));
+  --cw: min(calc(var(--cwb) * 2.4 * var(--k-hover)), calc(var(--sidew) * 0.6));
   align-self: center;
 }
 .wm-side .detail-text {
   width: 100%;
 }
+/* o histórico ao lado da mesa: um quadro na lateral (no meio dela, se a sua mão não estiver ali), rola por dentro */
 .wm-side .log {
   flex: 0 1 auto;
+  height: var(--sidew);
   min-height: 0;
   max-height: 100%;
   font-size: calc(12px * var(--k-log));

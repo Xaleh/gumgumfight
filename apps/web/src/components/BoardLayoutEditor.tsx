@@ -37,7 +37,7 @@ const POSITIONS: { [K in BlockId]?: readonly string[] } = {
   hand: ['corner-left', 'corner-right', 'bottom'],
   life: ['col-left', 'col-right', 'base'],
   stage: ['left', 'right'],
-  trash: ['left', 'right'],
+  trash: ['left', 'right', 'don'],
   donDeck: ['outer', 'inner'],
   deck: ['left', 'right'],
   log: ['panel', 'side'],
