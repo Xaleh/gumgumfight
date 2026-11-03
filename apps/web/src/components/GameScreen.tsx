@@ -1415,7 +1415,7 @@ function Table({
 
   // Histórico e chat ficam ao lado do seu deck e lixo, perto de onde o olho repousa.
   const sideTools =
-    !broadcast && (!wide || (online && !watching)) ? (
+    !broadcast && (!wide || (online && !watching) || coachOn) ? (
       <>
         {!wide && (
           <button className="round-btn log-btn" onClick={() => setSheet('log')} aria-label={t('game.logLabel')} title={t('game.log')}>
@@ -1423,8 +1423,18 @@ function Table({
             {logNew > 0 && <span className="corner-badge">{logNew > 99 ? '99+' : logNew}</span>}
           </button>
         )}
-        {!wide && coachOn && (
-          <button className="round-btn coach-btn" onClick={() => setSheet('coach')} aria-label={t('coach.panel')} title={t('coach.panel')}>
+        {/*
+          Painel do treinador (marcar jogada errada do bot): em toda mesa, ao lado do chat. No desktop com o painel
+          lateral ele abre a aba do painel; na mesa larga sem painel lateral (onde a aba não tinha como abrir), a folha.
+        */}
+        {coachOn && (
+          <button
+            className={['round-btn', 'coach-btn', shownPanel === 'coach' ? 'on' : ''].join(' ')}
+            onClick={() => (playerPanel && panelLogOn ? setPanel(panel === 'coach' ? null : 'coach') : setSheet('coach'))}
+            aria-label={t('coach.panel')}
+            aria-pressed={shownPanel === 'coach'}
+            title={t('coach.panel')}
+          >
             <Icon name="bot" size={20} />
             {coachEntries.length > 0 && <span className="corner-badge">{coachEntries.length > 99 ? '99+' : coachEntries.length}</span>}
           </button>
