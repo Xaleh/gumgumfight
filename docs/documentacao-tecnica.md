@@ -166,6 +166,9 @@ gumgumfight/
 │   ├── src/audio.ts             efeitos e música (Web Audio); src/assets/audio/ com os MP3 e CREDITS.md
 │   ├── src/game/useMatchAudio.ts   sons derivados das mudanças de estado da partida
 │   ├── src/game/useGame.ts      partida local (motor + bot no navegador, undo, replay)
+│   ├── src/game/botWorker.ts    Web Worker do bot (botClient.ts pede a jogada; botMove.ts é a conta, também usada sem worker)
+│   ├── src/game/preloadImages.ts   baixa antes, com o navegador ocioso, as imagens das cartas já visíveis
+│   ├── src/hooks/useBoardSize.ts   mede a coluna da mesa (--bw/--bh, data-landscape/data-narrow) no lugar da container query
 │   ├── src/game/useOnlineGame.ts   canal SSE, reconexão, fila de ações
 │   ├── src/pwa.ts               service worker, convite de instalação, Wake Lock, inscrição nas notificações
 │   ├── src/service-worker.js    fonte do /sw.js (o plugin em vite.config.ts preenche versão e arquivos)
@@ -264,8 +267,11 @@ frase). Resultado `complete: boolean` → o servidor marca `i18n.pt.source = man
 ### Bot (`bot/`)
 
 Três níveis (`BotLevel`), escolhidos no menu "Contra o bot"; o servidor (treino transmitido, `queue: 'bot'`) usa o `hard`.
-Todos decidem pela **visão** do jogador (`viewFor`): no navegador, `useGame.ts` monta a visão com `identityAliases`
-e traduz a jogada de volta com `actionFromView`, como o servidor já fazia.
+Todos decidem pela **visão** do jogador (`viewFor`): no navegador, `game/botMove.ts` monta a visão com `identityAliases`
+e traduz a jogada de volta com `actionFromView`, como o servidor já fazia. A conta roda num **Web Worker**
+(`game/botWorker.ts`, pedido por `game/botClient.ts`): a busca do `hard`/`team` leva até 250/600 ms (mais num
+celular) e, na página, travava a tela no começo de cada voo das cartas. O plano guardado do bot vive no worker.
+Sem worker (navegador antigo, arquivo indisponível, testes), a mesma conta roda na página, numa tarefa à parte.
 
 - **`easy`** (`simple.ts`): heurístico (valor = custo × 1000 + poder): joga a carta mais cara, anexa DON!! até superar
   o Líder inimigo, ataca para K.O. de custo ≥ 3 ou o Líder, bloqueia/conta só quando vale a pena. Rápido (< 1 ms);
@@ -450,7 +456,8 @@ deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `s
 
 ### Partida contra o bot
 
-Roda **inteira no navegador** (`useGame.ts`): `createGame`, `applyAction`, `chooseBotAction` com atrasos de 500–2000 ms
+Roda **inteira no navegador** (`useGame.ts`): `createGame`, `applyAction`, `chooseBotAction` (no Web Worker do bot,
+que pensa enquanto as cartas voam; a jogada sai depois do atraso ou quando a conta termina) com atrasos de 500–2000 ms
 para parecer humano, undo com até 400 estados, replay `.json`. No fim, `POST /api/matches` envia `{mode, format,
 seed, firstPlayer, chooseFirst, deckIds, decks, actions}`; o servidor refaz e grava (seção 9).
 
