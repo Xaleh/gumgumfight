@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { dataVersion } from '../src/cache';
 import { proxiedImageUrl } from '../src/card-images';
-import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
+import { createSession, getUser, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
 import { type DB, getCards, getDeck, openDb, upsertCards } from '../src/db';
 import { createCall, listFinished, registerPlayer, resolveCalls } from '../src/tournaments/store';
 import { listReports, matchReplay } from '../src/reports/store';
@@ -169,6 +169,21 @@ function login(db: DB, role: Role = 'player') {
 
 const req = (app: App, method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, who?: { headers: Record<string, string> }, payload?: object) =>
   app.inject({ method, url, headers: who?.headers ?? {}, payload });
+
+/**
+ * GET /api/tournaments/:id para jogadores e visitantes sai da parte comum (montada uma vez por
+ * torneio): tem de dar o mesmo que o torneio montado só para quem pede. O ETag repete enquanto nada muda.
+ */
+async function sameAsFull(app: App, db: DB, tId: string, viewers: Array<ReturnType<typeof login> | null>) {
+  const full = (app as unknown as { tournamentDetail: (id: string, u: unknown) => unknown }).tournamentDetail;
+  for (const who of viewers) {
+    const res = await req(app, 'GET', `/api/tournaments/${tId}`, who ?? undefined);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(JSON.parse(JSON.stringify(full(tId, who ? getUser(db, who.id) : null))));
+    const again = await app.inject({ method: 'GET', url: `/api/tournaments/${tId}`, headers: { ...(who?.headers ?? {}), 'if-none-match': String(res.headers.etag) } });
+    expect(again.statusCode).toBe(304);
+  }
+}
 
 describe('torneios: rotas', () => {
   it('só organizadores e admins criam; o organizador gerencia o próprio torneio', async () => {
@@ -486,8 +501,13 @@ describe('torneios: rotas', () => {
     const t = (await req(app, 'POST', '/api/tournaments', org, body)).json();
     expect(t).toMatchObject({ topCut: 4, bo3From: 4, bo5From: 2, swissBestOf: 1 });
     for (const [i, p] of ps.entries()) await req(app, 'POST', `/api/tournaments/${t.id}/register`, p, { deckId: DECKS[i % DECKS.length] });
+    const outsider = login(db);
+    await sameAsFull(app, db, t.id, [null, outsider, ...ps]);
     let view = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, org, { begin: true })).json();
     expect(view.totalRounds).toBe(4); // 2 do suíço + semifinal + final
+    // Warning: a contagem é pública, o motivo só para o próprio jogador.
+    expect((await req(app, 'POST', `/api/tournaments/${t.id}/players/${ps[0].id}/warnings`, org, { reason: 'Demora excessiva' })).statusCode).toBe(200);
+    await sameAsFull(app, db, t.id, [null, outsider, ...ps]);
     const result = (m: { id: number }, payload: object) => req(app, 'PUT', `/api/tournaments/${t.id}/matches/${m.id}/result`, org, payload);
     for (let r = 0; r < 2; r++) {
       expect(view.rounds[r].bestOf).toBe(1);
@@ -533,6 +553,7 @@ describe('torneios: rotas', () => {
     await playGame(s1.p2.userId);
     view = (await req(app, 'GET', `/api/tournaments/${t.id}`, org)).json();
     expect(view.rounds[2].matches[0]).toMatchObject({ wins: [2, 1], result: 'p1', winner: s1.p1.userId, reportedBy: 'game' });
+    await sameAsFull(app, db, t.id, [null, outsider, ...ps]);
 
     // Semifinal 2 lançada pelo organizador: placar parcial, impossível e final.
     const s2 = semis.matches[1];
@@ -550,6 +571,13 @@ describe('torneios: rotas', () => {
     expect(view.status).toBe('finished');
     expect(view.standings.slice(0, 2).map((s: any) => s.userId)).toEqual([s1.p1.userId, s2.p2.userId]);
     expect(view.standings.slice(0, 4).every((s: any) => s.inElim)).toBe(true);
+    // No fim, cada jogador vê os replays das próprias partidas (e só delas).
+    await sameAsFull(app, db, t.id, [null, outsider, ...ps]);
+    const mine = (await req(app, 'GET', `/api/tournaments/${t.id}`, who(s1.p1.userId))).json();
+    const semi = mine.rounds[2].matches[0];
+    expect(semi.games.every((g: { statsMatchId: unknown }) => g.statsMatchId !== null)).toBe(true);
+    const other = (await req(app, 'GET', `/api/tournaments/${t.id}`, outsider)).json();
+    expect(other.rounds[2].matches[0].games.every((g: { statsMatchId: unknown }) => g.statsMatchId === null)).toBe(true);
   });
 
   it('banimento com data: o deck precisa valer no início do torneio; quem ficou com deck proibido é barrado', async () => {

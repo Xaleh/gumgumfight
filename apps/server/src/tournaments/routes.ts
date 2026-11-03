@@ -33,6 +33,7 @@
 // decidiu a partida da rodada atual, ela pode voltar a ficar pendente) e inscrição
 // atrasada (só no suíço, durante a rodada 1: quem entra começa a rodada 2 com uma derrota).
 
+import { createHash } from 'node:crypto';
 import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, playMode, playModeLabel, spoilerRule } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
@@ -141,10 +142,12 @@ import {
   startRound,
   type Tournament,
   type TournamentCall,
+  type TournamentGame,
   type TournamentInput,
   type TournamentMatch,
   type TournamentPlayer,
   type TournamentPrize,
+  type TournamentWarning,
   tournamentsOf,
   unregisterPlayer,
   updatePrize,
@@ -735,115 +738,212 @@ export function registerTournamentRoutes(
     );
   });
 
-  /** Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer. */
-  const detail = (t: Tournament, u: User | null) => {
+  /** Leituras do torneio que não dependem de quem pede. */
+  const detailData = (t: Tournament) => {
     const players = listPlayers(db, t.id);
     const matches = listMatches(db, t.id);
-    const games = listGames(db, t.id);
-    const manage = canManage(t, u);
-    const judge = isJudge(t, u);
-    const judges = listJudges(db, t.id);
-    const warnings = listWarnings(db, t.id);
+    const gamesByMatch = new Map<number, TournamentGame[]>();
+    for (const g of listGames(db, t.id)) {
+      const list = gamesByMatch.get(g.matchId);
+      if (list) list.push(g);
+      else gamesByMatch.set(g.matchId, [g]);
+    }
+    const warningsByUser = new Map<string, TournamentWarning[]>();
+    for (const w of listWarnings(db, t.id)) {
+      const list = warningsByUser.get(w.userId);
+      if (list) list.push(w);
+      else warningsByUser.set(w.userId, [w]);
+    }
     const calls = listCalls(db, t.id);
-    const tiers = supporterTiers(db, players.map((p) => p.userId));
-    const judgeName = (id: string) => (id === t.organizerId ? (t.organizerName ?? '?') : (judges.find((j) => j.userId === id)?.name ?? findPlayer(db, accountOwnerKey(id))?.name ?? '?'));
-    // Nas inscrições, só o organizador e o próprio jogador veem qual deck (Líder) cada
-    // um inscreveu: o deck e a lista ficam congelados quando o torneio começa, e é aí
-    // que o Líder aparece para todos (ninguém escolhe o deck olhando os dos outros).
-    // As listas completas ficam escondidas até o fim (só o organizador e o próprio jogador as veem).
-    const showLeader = (userId: string) => manage || t.status !== 'registration' || userId === u?.id;
-    const showDeck = (userId: string) => manage || t.status === 'finished' || userId === u?.id;
+    return {
+      t,
+      players,
+      matches,
+      gamesByMatch,
+      warningsByUser,
+      calls,
+      /** Chamado de Judge aberto de cada partida. */
+      openCallByMatch: calls.reduce((map, c) => (c.resolvedAt || map.has(c.matchId) ? map : map.set(c.matchId, c)), new Map<number, TournamentCall>()),
+      judges: listJudges(db, t.id),
+      tiers: supporterTiers(db, players.map((p) => p.userId)),
+      name: new Map(players.map((p) => [p.userId, p.name])),
+    };
+  };
+  type DetailData = ReturnType<typeof detailData>;
+  /** Quem pede o torneio. `manage`/`judge` falsos com `u` qualquer = a mesma visão de quem não entrou, salvo o que é da própria conta. */
+  interface DetailViewer {
+    u: User | null;
+    manage: boolean;
+    judge: boolean;
+  }
+  const viewerOf = (t: Tournament, u: User | null): DetailViewer => ({ u, manage: canManage(t, u), judge: isJudge(t, u) });
+
+  const judgeNameIn = (d: DetailData, id: string) =>
+    id === d.t.organizerId ? (d.t.organizerName ?? '?') : (d.judges.find((j) => j.userId === id)?.name ?? findPlayer(db, accountOwnerKey(id))?.name ?? '?');
+  const refIn = (d: DetailData, id: string | null) => (id ? { userId: id, name: d.name.get(id) ?? '?' } : null);
+  // Nas inscrições, só o organizador e o próprio jogador veem qual deck (Líder) cada
+  // um inscreveu: o deck e a lista ficam congelados quando o torneio começa, e é aí
+  // que o Líder aparece para todos (ninguém escolhe o deck olhando os dos outros).
+  // As listas completas ficam escondidas até o fim (só o organizador e o próprio jogador as veem).
+  const showLeaderTo = (d: DetailData, v: DetailViewer, userId: string) => v.manage || d.t.status !== 'registration' || userId === v.u?.id;
+  const showDeckTo = (d: DetailData, v: DetailViewer, userId: string) => v.manage || d.t.status === 'finished' || userId === v.u?.id;
+  /** Cartas (Líder e lista) que `v` vê destes inscritos. */
+  const detailCards = (d: DetailData, v: DetailViewer, players: TournamentPlayer[]) => {
     const ids = players.flatMap((p) => [
-      ...(showLeader(p.userId) ? [p.deck.leader] : []),
-      ...(showDeck(p.userId) ? p.deck.cards.map((c) => c.id) : []),
+      ...(showLeaderTo(d, v, p.userId) ? [p.deck.leader] : []),
+      ...(showDeckTo(d, v, p.userId) ? p.deck.cards.map((c) => c.id) : []),
     ]);
-    const cards = new Map(present(getCards(db, [...new Set(ids)])).map((c) => [c.id, c] as const));
-    const name = new Map(players.map((p) => [p.userId, p.name]));
-    const ref = (id: string | null) => (id ? { userId: id, name: name.get(id) ?? '?' } : null);
-    const rounds = Array.from({ length: t.round }, (_, i) => {
-      const ms = matches.filter((m) => m.round === i + 1);
-      return {
-        round: i + 1,
-        stage: ms[0]?.stage ?? 'swiss',
-        label: roundLabel(matches, i + 1),
-        bestOf: ms[0]?.bestOf ?? 1,
-        matches: ms.map((m) => {
-          const absent = absentSides(t, m, players);
-          /**
-           * O replay de cada jogo (com as duas listas): para quem audita e, quando o torneio
-           * termina, para os dois jogadores (até lá, as listas ficam fechadas).
-           */
-          const seesReplays = manage || judge || (t.status === 'finished' && (m.p1 === u?.id || m.p2 === u?.id));
-          const call = calls.find((c) => c.matchId === m.id && !c.resolvedAt) ?? null;
-          return {
-            id: m.id,
-            table: m.table,
-            p1: ref(m.p1)!,
-            p2: ref(m.p2),
-            bestOf: m.bestOf,
-            wins: m.wins,
-            result: m.result,
-            winner: winnerOf(m),
-            /** Quem lançou: game (salas online), bye, drop (desistência), noshow (W.O. automático), late (inscrição atrasada) ou organizer. */
-            reportedBy: m.reportedBy === null || ['game', 'bye', 'drop', 'noshow', 'late'].includes(m.reportedBy) ? m.reportedBy : 'organizer',
-            roomId: m.roomId,
-            room: m.roomId ? (lobby.get(m.roomId)?.status ?? null) : null,
-            /** Jogo da série em disputa agora (1, 2, 3…). */
-            game: m.wins[0] + m.wins[1] + 1,
-            /** Cada jogador já entrou na sala desta série (ou, na rodada 1, fez check-in). */
-            present: m.p2 ? [!absent.includes('p1'), !absent.includes('p2')] : [true, false],
-            /** "Estou pronto" de cada jogador (antes de a rodada começar). */
-            ready: m.ready,
-            /** Chamado de Judge aberto: a sala está pausada à espera dele. */
-            call: call ? { id: call.id, openedAt: call.openedAt, byName: name.get(call.openedBy) ?? judgeName(call.openedBy) } : null,
-            /** Jogos disputados nas salas desta série (auditoria): todos ficam gravados, com o replay. */
-            games: games
-              .filter((g) => g.matchId === m.id)
-              .map((g) => ({
-                game: g.game,
-                winner: ref(g.winner),
-                counted: g.counted,
-                playedAt: g.playedAt,
-                statsMatchId: seesReplays ? g.statsMatchId : null,
-              })),
-          };
-        }),
-      };
-    });
-    const me = u ? players.find((p) => p.userId === u.id) : undefined;
-    const reinstate = (userId: string) => {
-      if (!manage || t.status !== 'running') return null;
-      const r = reinstateOptions(t, players, matches, userId);
+    return new Map(present(getCards(db, [...new Set(ids)])).map((c) => [c.id, c] as const));
+  };
+
+  /** Uma partida da lista de rodadas. */
+  const matchEntry = (d: DetailData, v: DetailViewer, m: TournamentMatch) => {
+    const { t, players } = d;
+    const absent = absentSides(t, m, players);
+    /**
+     * O replay de cada jogo (com as duas listas): para quem audita e, quando o torneio
+     * termina, para os dois jogadores (até lá, as listas ficam fechadas).
+     */
+    const seesReplays = v.manage || v.judge || (t.status === 'finished' && (m.p1 === v.u?.id || m.p2 === v.u?.id));
+    const call = d.openCallByMatch.get(m.id) ?? null;
+    return {
+      id: m.id,
+      table: m.table,
+      p1: refIn(d, m.p1)!,
+      p2: refIn(d, m.p2),
+      bestOf: m.bestOf,
+      wins: m.wins,
+      result: m.result,
+      winner: winnerOf(m),
+      /** Quem lançou: game (salas online), bye, drop (desistência), noshow (W.O. automático), late (inscrição atrasada) ou organizer. */
+      reportedBy: m.reportedBy === null || ['game', 'bye', 'drop', 'noshow', 'late'].includes(m.reportedBy) ? m.reportedBy : 'organizer',
+      roomId: m.roomId,
+      room: m.roomId ? (lobby.get(m.roomId)?.status ?? null) : null,
+      /** Jogo da série em disputa agora (1, 2, 3…). */
+      game: m.wins[0] + m.wins[1] + 1,
+      /** Cada jogador já entrou na sala desta série (ou, na rodada 1, fez check-in). */
+      present: m.p2 ? [!absent.includes('p1'), !absent.includes('p2')] : [true, false],
+      /** "Estou pronto" de cada jogador (antes de a rodada começar). */
+      ready: m.ready,
+      /** Chamado de Judge aberto: a sala está pausada à espera dele. */
+      call: call ? { id: call.id, openedAt: call.openedAt, byName: d.name.get(call.openedBy) ?? judgeNameIn(d, call.openedBy) } : null,
+      /** Jogos disputados nas salas desta série (auditoria): todos ficam gravados, com o replay. */
+      games: (d.gamesByMatch.get(m.id) ?? []).map((g) => ({
+        game: g.game,
+        winner: refIn(d, g.winner),
+        counted: g.counted,
+        playedAt: g.playedAt,
+        statsMatchId: seesReplays ? g.statsMatchId : null,
+      })),
+    };
+  };
+
+  /** Rodadas (sem as partidas) e as partidas de cada uma, na ordem da lista. */
+  const detailRounds = (d: DetailData) => {
+    const byRound = Array.from({ length: d.t.round }, () => [] as TournamentMatch[]);
+    for (const m of d.matches) byRound[m.round - 1]?.push(m);
+    return byRound.map((ms, i) => ({
+      head: { round: i + 1, stage: ms[0]?.stage ?? 'swiss', label: roundLabel(d.matches, i + 1), bestOf: ms[0]?.bestOf ?? 1 },
+      matches: ms,
+    }));
+  };
+
+  /** Warnings de um inscrito: a contagem é pública; os motivos, só para o Judge, o organizador e o próprio jogador. */
+  const warningsEntry = (d: DetailData, v: DetailViewer, p: TournamentPlayer) => {
+    const { t } = d;
+    const mine = d.warningsByUser.get(p.userId) ?? [];
+    const st = warningStatus(t, p, mine);
+    const detailed = v.manage || v.judge || p.userId === v.u?.id;
+    return {
+      count: st.count,
+      max: t.maxWarnings,
+      limitReached: st.limitReached,
+      /** Para quem gerencia: o jogador atingiu o limite e falta decidir (manter ou eliminar). */
+      pending: v.manage || v.judge ? st.pending : false,
+      list: detailed
+        ? mine.map((w) => ({
+            id: w.id,
+            reason: w.reason,
+            givenAt: w.givenAt,
+            round: w.round,
+            byName: judgeNameIn(d, w.givenBy),
+            revoked: Boolean(w.revokedAt),
+          }))
+        : null,
+    };
+  };
+
+  /** Um inscrito da lista de jogadores. */
+  const playerEntry = (d: DetailData, v: DetailViewer, cards: Map<string, ApiCard>, p: TournamentPlayer) => {
+    const { t } = d;
+    const showLeader = showLeaderTo(d, v, p.userId);
+    const leader = showLeader ? cards.get(p.deck.leader) : undefined;
+    const reinstate = () => {
+      if (!v.manage || t.status !== 'running') return null;
+      const r = reinstateOptions(t, d.players, d.matches, p.userId);
       return 'code' in r ? null : r.restore;
     };
-    const lateName = t.lateEntry && t.lateEntry !== '*' ? (findPlayer(db, accountOwnerKey(t.lateEntry))?.name ?? '?') : null;
+    return {
+      userId: p.userId,
+      name: p.name,
+      /** Plano de apoio ativo (selo ao lado do nome). */
+      supporter: d.tiers.get(p.userId) ?? null,
+      seed: t.status === 'registration' ? null : p.seed,
+      dropped: p.dropped,
+      /** Para quem gerencia: o jogador que saiu pode voltar (e se a partida da rodada pode ou precisa ser devolvida). */
+      reinstate: p.dropped ? reinstate() : null,
+      checkedIn: Boolean(p.checkedInAt),
+      warnings: warningsEntry(d, v, p),
+      /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
+      leader: showLeader ? p.deck.leader : null,
+      leaderName: leader?.name ?? null,
+      leaderImage: (cardImages && leader && artImage(leader, p.deck.arts?.[leader.id])) || null,
+      colors: leader?.colors ?? [],
+      deck: showDeckTo(d, v, p.userId)
+        ? { name: p.deck.name, leader: p.deck.leader, cards: p.deck.cards.map((c) => ({ ...c, name: cards.get(c.id)?.name ?? null })) }
+        : null,
+    };
+  };
+
+  /** O que é só da conta que pede (fora da lista de jogadores e das rodadas). */
+  const personalFields = (d: DetailData, v: DetailViewer) => {
+    const { t, players, matches, judges } = d;
+    const u = v.u;
+    const me = u ? players.find((p) => p.userId === u.id) : undefined;
     const current = me && t.status === 'running' ? matches.find((m) => m.round === t.round && (m.p1 === me.userId || m.p2 === me.userId)) : undefined;
+    return {
+      /** Limite de jogadores dos torneios da cota de apoiador (para o formulário de edição). */
+      maxPlayersCap: t.quota && !isAdmin(u?.role) && !createsTournaments(u?.role) ? SUPPORTER_MAX_PLAYERS : MAX_PLAYERS,
+      canRegister: canRegisterNow(t, u) || Boolean(u && t.status === 'registration' && players.some((p) => p.userId === u.id) && !judges.some((j) => j.userId === u.id)),
+      /** Inscrição atrasada liberada para quem pede (entra na rodada 2 com uma derrota). */
+      canLateRegister: !me && lateAllowed(t, u),
+      me: me
+        ? {
+            deckId: me.deckId,
+            deckName: me.deck.name,
+            leader: me.deck.leader,
+            dropped: me.dropped,
+            matchId: current?.id ?? null,
+            /** "Estou pronto" na partida da rodada. */
+            ready: current ? current.ready[current.p1 === me.userId ? 0 : 1] : false,
+            checkedInAt: me.checkedInAt,
+            warnings: warningsEntry(d, v, me),
+            /** Antes do início: por que a lista inscrita não vai valer no torneio (null = vale). */
+            deckIssue: t.status === 'registration' ? issueOut(deckIssue(db, me.deck, t, legalAt(t))) : null,
+          }
+        : null,
+    };
+  };
+
+  /** O resto do torneio: igual para todos os que não gerenciam nem são Judge. */
+  const commonFields = (d: DetailData, v: DetailViewer) => {
+    const { t, players, matches, judges, calls, name } = d;
+    const manage = v.manage;
+    const judge = v.judge;
+    const lateName = t.lateEntry && t.lateEntry !== '*' ? (findPlayer(db, accountOwnerKey(t.lateEntry))?.name ?? '?') : null;
     const currentRound = matches.filter((m) => m.round === t.round);
     const tables = currentRound.filter((m) => m.p2 && !m.result);
     const pending = manage || judge ? pendingWarnings(db, t, players) : [];
-    /** Warnings de um inscrito: a contagem é pública; os motivos, só para o Judge, o organizador e o próprio jogador. */
-    const warningsOf = (p: TournamentPlayer) => {
-      const mine = warnings.filter((w) => w.userId === p.userId);
-      const st = warningStatus(t, p, mine);
-      const detailed = manage || judge || p.userId === u?.id;
-      return {
-        count: st.count,
-        max: t.maxWarnings,
-        limitReached: st.limitReached,
-        /** Para quem gerencia: o jogador atingiu o limite e falta decidir (manter ou eliminar). */
-        pending: manage || judge ? st.pending : false,
-        list: detailed
-          ? mine.map((w) => ({
-              id: w.id,
-              reason: w.reason,
-              givenAt: w.givenAt,
-              round: w.round,
-              byName: judgeName(w.givenBy),
-              revoked: Boolean(w.revokedAt),
-            }))
-          : null,
-      };
-    };
     return {
       id: t.id,
       name: t.name,
@@ -860,7 +960,7 @@ export function registerTournamentRoutes(
       status: t.status,
       round: t.round,
       /** Fase da rodada atual. */
-      stage: matches.find((m) => m.round === t.round)?.stage ?? null,
+      stage: currentRound[0]?.stage ?? null,
       /** Rodadas previstas (suíço + top cut, ou a chave). */
       totalRounds: plannedRounds(t, players.length),
       /** Rodadas do suíço (só no suíço). */
@@ -904,8 +1004,6 @@ export function registerTournamentRoutes(
       /** Inscrição antecipada: até esta hora só Almirantes se inscrevem. */
       priorityUntil: t.priorityUntil,
       priorityOpen: priorityOpen(t),
-      /** Limite de jogadores dos torneios da cota de apoiador (para o formulário de edição). */
-      maxPlayersCap: t.quota && !isAdmin(u?.role) && !createsTournaments(u?.role) ? SUPPORTER_MAX_PLAYERS : MAX_PLAYERS,
       canManage: manage,
       /** Quem pede é Judge deste torneio (ou organizador/admin): entra nas salas vendo as mãos, retoma partidas e dá warnings. */
       isJudge: judge,
@@ -922,53 +1020,11 @@ export function registerTournamentRoutes(
               return { id: c.id, matchId: c.matchId, table: m?.table ?? 0, roomId: c.roomId, openedAt: c.openedAt, names: m ? [name.get(m.p1) ?? '?', name.get(m.p2 ?? '') ?? '?'] : [] };
             })
         : [],
-      canRegister: canRegisterNow(t, u) || Boolean(u && t.status === 'registration' && players.some((p) => p.userId === u.id) && !judges.some((j) => j.userId === u.id)),
-      /** Inscrição atrasada liberada para quem pede (entra na rodada 2 com uma derrota). */
-      canLateRegister: !me && lateAllowed(t, u),
       /** Para quem gerencia: a janela da inscrição atrasada está aberta (suíço, rodada 1) e a quem ela foi liberada. */
       lateWindow: manage && lateWindow(t),
       lateEntry: manage && lateWindow(t) && t.lateEntry ? { all: t.lateEntry === '*', name: lateName } : null,
-      me: me
-        ? {
-            deckId: me.deckId,
-            deckName: me.deck.name,
-            leader: me.deck.leader,
-            dropped: me.dropped,
-            matchId: current?.id ?? null,
-            /** "Estou pronto" na partida da rodada. */
-            ready: current ? current.ready[current.p1 === me.userId ? 0 : 1] : false,
-            checkedInAt: me.checkedInAt,
-            warnings: warningsOf(me),
-            /** Antes do início: por que a lista inscrita não vai valer no torneio (null = vale). */
-            deckIssue: t.status === 'registration' ? issueOut(deckIssue(db, me.deck, t, legalAt(t))) : null,
-          }
-        : null,
       /** Para quem gerencia, antes do início: inscritos cujo deck não vai valer no torneio. */
       staleDecks: manage && t.status === 'registration' ? staleDecks(db, t, players, legalAt(t)).map((p) => p.name) : [],
-      players: players.map((p) => {
-        const leader = showLeader(p.userId) ? cards.get(p.deck.leader) : undefined;
-        return {
-          userId: p.userId,
-          name: p.name,
-          /** Plano de apoio ativo (selo ao lado do nome). */
-          supporter: tiers.get(p.userId) ?? null,
-          seed: t.status === 'registration' ? null : p.seed,
-          dropped: p.dropped,
-          /** Para quem gerencia: o jogador que saiu pode voltar (e se a partida da rodada pode ou precisa ser devolvida). */
-          reinstate: p.dropped ? reinstate(p.userId) : null,
-          checkedIn: Boolean(p.checkedInAt),
-          warnings: warningsOf(p),
-          /** Líder do deck: null enquanto as inscrições estão abertas (só o organizador e o próprio jogador o veem). */
-          leader: showLeader(p.userId) ? p.deck.leader : null,
-          leaderName: leader?.name ?? null,
-          leaderImage: (cardImages && leader && artImage(leader, p.deck.arts?.[leader.id])) || null,
-          colors: leader?.colors ?? [],
-          deck: showDeck(p.userId)
-            ? { name: p.deck.name, leader: p.deck.leader, cards: p.deck.cards.map((c) => ({ ...c, name: cards.get(c.id)?.name ?? null })) }
-            : null,
-        };
-      }),
-      rounds,
       standings: t.status === 'registration' ? [] : standings(players, matches).map((s) => ({ ...s, name: name.get(s.userId) ?? '?' })),
       roundComplete: t.status === 'running' && roundComplete(t, matches),
       /** O que o botão de avançar faz agora. */
@@ -983,15 +1039,132 @@ export function registerTournamentRoutes(
     };
   };
 
+  /** Torneio completo: inscritos, rodadas, classificação e o que quem pede pode fazer. */
+  const detail = (t: Tournament, u: User | null) => {
+    const d = detailData(t);
+    const v = viewerOf(t, u);
+    const cards = detailCards(d, v, d.players);
+    return {
+      ...commonFields(d, v),
+      ...personalFields(d, v),
+      players: d.players.map((p) => playerEntry(d, v, cards, p)),
+      rounds: detailRounds(d).map((r) => ({ ...r.head, matches: r.matches.map((m) => matchEntry(d, v, m)) })),
+    };
+  };
+  // Exposto para os testes (o caminho comum de GET /api/tournaments/:id tem de dar o mesmo).
+  app.decorate('tournamentDetail', (id: string, u: User | null) => detail(getTournament(db, id)!, u));
+
   /**
-   * A página do torneio consulta esta rota a cada 5 s por jogador: a resposta fica em
-   * cache (por torneio e conta, invalidado a cada gravação) e sai como 304 quando o
-   * navegador já a tem.
+   * Parte comum do torneio para quem não gerencia nem é Judge (quase todos os que consultam):
+   * montada e serializada uma vez por torneio e versão dos dados, e não uma vez por jogador.
+   * Cada jogador e cada partida ficam em JSON à parte para trocar só o que é da conta que pede
+   * (o próprio deck e, no fim, os replays das próprias partidas). `tag`: hash do conteúdo, para o ETag.
+   */
+  interface SharedDetail {
+    version: number;
+    at: number;
+    data: DetailData;
+    common: string;
+    players: string[];
+    playerIndex: Map<string, number>;
+    rounds: Array<{ head: string; matches: string[] }>;
+    /** Posição de cada partida em `rounds` ([rodada, partida]). */
+    matchPos: Map<number, [number, number]>;
+    tag: string;
+  }
+  const sharedDetails = new Map<string, SharedDetail>();
+  const sha1 = (s: string) => createHash('sha1').update(s).digest('base64url');
+  const sharedDetail = (t: Tournament, key: string): SharedDetail => {
+    const hit = sharedDetails.get(key);
+    const at = now();
+    if (hit && hit.version === dataVersion.current && at - hit.at < DETAIL_TTL_MS) return hit;
+    const version = dataVersion.current;
+    const d = detailData(t);
+    const v: DetailViewer = { u: null, manage: false, judge: false };
+    const cards = detailCards(d, v, d.players);
+    const common = JSON.stringify({ ...commonFields(d, v) });
+    const players = d.players.map((p) => JSON.stringify(playerEntry(d, v, cards, p)));
+    const matchPos = new Map<number, [number, number]>();
+    const rounds = detailRounds(d).map((r, i) => ({
+      head: JSON.stringify(r.head),
+      matches: r.matches.map((m, j) => {
+        matchPos.set(m.id, [i, j]);
+        return JSON.stringify(matchEntry(d, v, m));
+      }),
+    }));
+    const hash = createHash('sha1').update(common);
+    for (const p of players) hash.update(p);
+    for (const r of rounds) for (const m of [r.head, ...r.matches]) hash.update(m);
+    const entry: SharedDetail = {
+      version,
+      at,
+      data: d,
+      common,
+      players,
+      playerIndex: new Map(d.players.map((p, i) => [p.userId, i])),
+      rounds,
+      matchPos,
+      tag: hash.digest('base64url'),
+    };
+    // Entradas vencidas de outros torneios saem aqui (são poucos torneios ao mesmo tempo).
+    for (const [k, e] of sharedDetails) if (at - e.at >= DETAIL_TTL_MS) sharedDetails.delete(k);
+    sharedDetails.set(key, entry);
+    return entry;
+  };
+
+  /**
+   * O torneio para quem não gerencia nem é Judge, a partir da parte comum: troca só o próprio
+   * inscrito (deck e motivos dos warnings) e, no fim, as próprias partidas (com os replays).
+   * O ETag sai do hash da parte comum e do que é da conta, antes de montar a resposta: quando
+   * nada mudou para ela, o 304 sai sem serializar nem copiar o torneio inteiro.
+   */
+  const sendSharedDetail = (req: FastifyRequest, reply: FastifyReply, t: Tournament, u: User | null) => {
+    const open = checkInOpen(t, now()) ? 'open' : '';
+    const s = sharedDetail(t, `${t.id}:${open}`);
+    const d = s.data;
+    const v: DetailViewer = { u, manage: false, judge: false };
+    const personal = JSON.stringify(personalFields(d, v));
+    const mine = u ? s.playerIndex.get(u.id) : undefined;
+    const ownPlayer = mine === undefined ? null : JSON.stringify(playerEntry(d, v, detailCards(d, v, [d.players[mine]]), d.players[mine]));
+    /** As próprias partidas, por rodada e posição (só no fim, quando os jogadores veem os próprios replays). */
+    const ownMatches = new Map<number, Map<number, string>>();
+    const ownJson: string[] = [];
+    if (u && d.t.status === 'finished') {
+      for (const m of d.matches) {
+        const pos = s.matchPos.get(m.id);
+        if (!pos || (m.p1 !== u.id && m.p2 !== u.id)) continue;
+        const json = JSON.stringify(matchEntry(d, v, m));
+        ownJson.push(json);
+        const round = ownMatches.get(pos[0]) ?? new Map<number, string>();
+        ownMatches.set(pos[0], round.set(pos[1], json));
+      }
+    }
+    const etag = `"${sha1(`${s.tag}|${personal}|${ownPlayer ?? ''}|${ownJson.join(',')}`)}"`;
+    reply.header('etag', etag).header('cache-control', 'private, no-cache');
+    if (req.headers['if-none-match'] === etag) return reply.code(304).send();
+    const players = mine === undefined ? s.players : s.players.map((p, i) => (i === mine ? ownPlayer! : p));
+    const rounds = s.rounds.map((r, i) => {
+      const own = ownMatches.get(i);
+      const matches = own ? r.matches.map((m, j) => own.get(j) ?? m) : r.matches;
+      return `${r.head.slice(0, -1)},"matches":[${matches.join(',')}]}`;
+    });
+    const body = `${s.common.slice(0, -1)},${personal.slice(1, -1)},"players":[${players.join(',')}],"rounds":[${rounds.join(',')}]}`;
+    return reply.type('application/json; charset=utf-8').send(body);
+  };
+
+  /**
+   * A página do torneio consulta esta rota a cada 5 s por jogador. Para os jogadores e
+   * visitantes, a parte comum sai de `sharedDetail` (uma vez por torneio e versão dos
+   * dados), e o 304 é decidido antes de montar a resposta; para quem gerencia ou é Judge,
+   * a resposta fica em cache por conta (invalidado a cada gravação).
    */
   app.get<{ Params: { id: string } }>('/api/tournaments/:id', async (req, reply) => {
     const t = getTournament(db, req.params.id);
     if (!t) return reply.code(404).send(fail('tourNotFound', 'Torneio não encontrado.'));
     const u = user(req);
+    // Jogadores e visitantes: a parte comum, montada uma vez para todos (ver `sendSharedDetail`).
+    if (!canManage(t, u) && !isJudge(t, u)) return sendSharedDetail(req, reply, t, u);
+    // Quem gerencia ou é Judge (poucas contas) vê o torneio inteiro, montado só para ele.
     // A abertura do check-in muda a resposta sem gravação: entra na chave do cache.
     const open = checkInOpen(t, now()) ? 'open' : '';
     return cache.send(req, reply, `tournament:${t.id}:${u?.id ?? '-'}:${open}`, DETAIL_TTL_MS, () => detail(t, u));
