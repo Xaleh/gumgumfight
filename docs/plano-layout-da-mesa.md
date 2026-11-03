@@ -53,7 +53,7 @@ oposto. A pessoa configura só a própria metade.
 
 | Bloco | Ocultar | Tamanho | Posição |
 |-------|---------|---------|---------|
-| DON!! (área de custo: ativos, descansados, contadores) | não | P · M · G | à esquerda (padrão) · à direita do Líder, na fileira do Líder · embaixo da mesa (fileira inteira, como hoje; a mão então vai para um canto) |
+| DON!! (área de custo: ativos, descansados, contadores) | não | P · M · G | à esquerda (padrão) · à direita do Líder, na fileira do Líder · fileira abaixo do Líder (terceira fileira **dentro do playmat**, como hoje; espelhada acima da metade do oponente; a mão então vai para um canto) |
 | Cartas na mão | não, mas **recolhe** (pilha com a contagem, abre ao clicar; reaproveita `MiniHand`/`HandFan`) | P · M · G | canto esquerdo (padrão) · canto direito · embaixo da mesa (gasta altura: a mesa encolhe; só se os DON!! não estiverem lá) |
 | Vida | **não** (faz parte do campo: há Vida virada para cima e efeitos que a olham) | P · M · G | coluna à esquerda do campo (padrão) · coluna à direita · junto do Líder (pilha pequena, como hoje) |
 | Líder | não | P · M · G | fixo no centro da fileira |
@@ -73,12 +73,18 @@ Regras:
 - Ordem na fileira do Líder, do Líder para fora: Stage, Deck, Descarte; a área de custo (com o deck de DON!!) ocupa
   o outro lado. Blocos do mesmo lado seguem essa ordem.
 - **Nada extravasa a tela, em nenhuma configuração.** O `--cw` é calculado a partir do que está ligado e do tamanho
-  de cada bloco: `rows` (altura da mesa mais as faixas da mão e dos DON!! embaixo, ou a altura das laterais, a que for
-  maior) e `cols` (largura da mesa mais as duas laterais), em larguras de carta;
-  `--cw = min((100cqh - 24px) / rows, (100cqw - painel - 24px) / cols, 150px)`. Mais blocos grandes = cartas um pouco
-  menores, nunca corte. A área de custo comprime os DON!! quando são muitos (como `.don-cards` já faz).
-- **Mão e DON!! nunca se sobrepõem.** Só um dos dois pode ficar "embaixo da mesa": a opção do outro fica desabilitada
-  no editor, com o motivo no `title`, e `load()` resolve um JSON conflitante mandando a mão para o canto esquerdo.
+  de cada bloco: `rows` (altura da mesa mais a faixa da mão embaixo, ou a altura das laterais, a que for maior) e
+  `cols` (largura da mesa mais as duas laterais), em larguras de carta;
+  `--cw = min((100cqh - 24px) / rows, (100cqw - painel - 24px) / cols, 150px)`. Como rede de segurança, depois de
+  renderizar a mesa mede a própria `board-col` (`scrollHeight`/`scrollWidth` contra `clientHeight`/`clientWidth`) e,
+  se algo passou, aperta `rows`/`cols` na proporção e renderiza de novo (até três vezes; um `ResizeObserver` refaz a
+  conta ao redimensionar a janela). Mais blocos grandes = cartas um pouco menores, nunca corte. A área de custo
+  comprime os DON!! quando são muitos (como `.don-cards` já faz).
+- **Mão e DON!! nunca se sobrepõem.** Com a fileira de DON!! na borda de baixo do playmat, a mão não pode ficar
+  embaixo da mesa (e vice-versa): a opção do outro fica desabilitada no editor, com o motivo no `title`, e `load()`
+  resolve um JSON conflitante mandando a mão para o canto esquerdo.
+- **O Líder fica sempre no centro da fileira**, mesmo quando os DON!! saem dela: a fileira é um grid `1fr auto 1fr`
+  e cada lado espalha o que tem.
 - **Mão do oponente** sempre na parte de cima: no canto superior oposto ao da sua; quando a sua fica embaixo da mesa,
   no canto superior direito (numa faixa acima da mesa só se não houver lateral nenhuma). Nunca rouba altura da mesa
   quando há um canto disponível. DON!! embaixo da mesa espelha numa faixa acima da metade do oponente.
@@ -111,7 +117,7 @@ Entra em `Settings` (`settings.tsx`), salvo no `localStorage` com as demais (`gu
 ```ts
 export type BlockSize = 'small' | 'medium' | 'large';
 export interface BoardLayout {
-  don: { size: BlockSize; position: 'left' | 'right' | 'bottom' };
+  don: { size: BlockSize; position: 'left' | 'right' | 'row' };
   hand: { size: BlockSize; position: 'corner-left' | 'corner-right' | 'bottom'; collapsed: boolean };
   life: { size: BlockSize; position: 'col-left' | 'col-right' | 'base' };
   leader: { size: BlockSize };
