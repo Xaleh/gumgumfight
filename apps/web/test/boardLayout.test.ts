@@ -36,19 +36,38 @@ describe('layout da mesa: leitura do que foi salvo', () => {
   it('o padrão não muda ao ser lido e devolvido', () => {
     expect(parseLayout(JSON.parse(JSON.stringify(DEFAULT_LAYOUT)))).toEqual(DEFAULT_LAYOUT);
   });
+
+  it('quem ficou no padrão antigo (tudo no painel, DON!! à esquerda) passa ao novo; o resto continua como está', () => {
+    const legacy = {
+      don: { size: 'medium', position: 'left' },
+      hand: { size: 'medium', position: 'corner-left', collapsed: false },
+      life: { size: 'medium', position: 'col-left' },
+      leader: { size: 'medium' },
+      stage: { size: 'medium', position: 'right' },
+      trash: { size: 'medium', position: 'right' },
+      donDeck: { size: 'medium', position: 'outer' },
+      deck: { size: 'medium', position: 'right' },
+      log: { show: true, size: 'medium', position: 'panel' },
+      hover: { show: true, size: 'medium', position: 'panel' },
+    };
+    expect(parseLayout(legacy)).toEqual(DEFAULT_LAYOUT);
+    const custom = { ...legacy, leader: { size: 'large' } };
+    expect(parseLayout(custom).don.position).toBe('left');
+    expect(parseLayout(custom).leader.size).toBe('large');
+  });
 });
 
 describe('layout da mesa: regras de conflito', () => {
   it('painel aberto puxa o outro bloco "ao lado da mesa" para o painel', () => {
-    const e = effectiveLayout(parseLayout({ hover: { position: 'side' } }));
+    const e = effectiveLayout(parseLayout({ hover: { position: 'side' }, log: { position: 'panel' } }));
     expect(e.panelOn).toBe(true);
     expect(e.hover.position).toBe('panel');
     expect(e.sideHover).toBe(false);
-    expect(blockedPositions(parseLayout({ hover: { position: 'side' } }), 'hover')).toEqual({ side: 'panelLog' });
+    expect(blockedPositions(parseLayout({ hover: { position: 'side' }, log: { position: 'panel' } }), 'hover')).toEqual({ side: 'panelLog' });
   });
 
   it('centro da mesa e junto da carta convivem com o painel do histórico', () => {
-    const e = effectiveLayout(parseLayout({ hover: { position: 'center' } }));
+    const e = effectiveLayout(parseLayout({ hover: { position: 'center' }, log: { position: 'panel' } }));
     expect(e.hover.position).toBe('center');
     expect(e.panelOn).toBe(true);
   });
@@ -68,9 +87,31 @@ describe('layout da mesa: regras de conflito', () => {
   });
 });
 
+describe('layout da mesa: padrão', () => {
+  it('hover e histórico nas laterais (painel fechado), DON!! numa fileira abaixo do Líder, Descarte junto dos DON!!', () => {
+    const e = effectiveLayout(DEFAULT_LAYOUT);
+    expect(e.panelOn).toBe(false);
+    expect(e.sideHover).toBe(true);
+    expect(e.sideLog).toBe(true);
+    expect(e.hand.position).toBe('corner-left');
+    expect(e.life.position).toBe('col-left');
+    expect(e.don.position).toBe('row');
+    expect(e.trash.position).toBe('don');
+    expect(baseOrder(DEFAULT_LAYOUT)).toEqual(['leader', 'stage', 'deck']);
+  });
+});
+
 describe('layout da mesa: fileira do Líder', () => {
-  it('padrão: DON!! à esquerda, Líder, Stage, Deck, Descarte', () => {
-    expect(baseOrder(DEFAULT_LAYOUT)).toEqual(['DON', 'leader', 'stage', 'deck', 'trash']);
+  it('DON!! à esquerda: DON!!, Líder, Stage, Deck, Descarte', () => {
+    expect(baseOrder(parseLayout({ don: { position: 'left' }, trash: { position: 'right' } }))).toEqual(['DON', 'leader', 'stage', 'deck', 'trash']);
+  });
+
+  it('Descarte junto dos DON!! sem a fileira de DON!!: do lado dos DON!!, colado neles', () => {
+    const l = parseLayout({ don: { position: 'left' }, trash: { position: 'don' } });
+    expect(baseOrder(l)).toEqual(['DON', 'trash', 'leader', 'stage', 'deck']);
+    expect(effectiveLayout(l).trash.position).toBe('left');
+    const r = parseLayout({ don: { position: 'right' }, trash: { position: 'don' } });
+    expect(baseOrder(r)).toEqual(['leader', 'stage', 'deck', 'trash', 'DON']);
   });
 
   it('do Líder para fora: Stage, Deck, Descarte; a Vida junto do Líder do lado oposto aos DON!!', () => {
@@ -79,7 +120,7 @@ describe('layout da mesa: fileira do Líder', () => {
   });
 
   it('fileira de DON!! própria: a fileira do Líder fica sem os DON!!', () => {
-    expect(baseOrder(parseLayout({ don: { position: 'row' } }))).toEqual(['leader', 'stage', 'deck', 'trash']);
+    expect(baseOrder(parseLayout({ don: { position: 'row' }, trash: { position: 'right' } }))).toEqual(['leader', 'stage', 'deck', 'trash']);
   });
 });
 
@@ -89,8 +130,11 @@ describe('layout da mesa: medidas e predefinições', () => {
     const big = measureLayout(effectiveLayout(presetLayout('bigcards')));
     expect(big.rows).toBeGreaterThan(base.rows);
     expect(big.cols).toBeGreaterThan(base.cols);
-    const bottom = measureLayout(effectiveLayout(parseLayout({ hand: { position: 'bottom' } })));
-    expect(bottom.rows).toBeGreaterThan(base.rows);
+    // A mesma mesa (DON!! na fileira do Líder, tudo no painel), com a mão no canto e embaixo dela.
+    const panelOnly = { don: { position: 'left' }, log: { position: 'panel' }, hover: { position: 'panel' } };
+    const corner = measureLayout(effectiveLayout(parseLayout(panelOnly)));
+    const bottom = measureLayout(effectiveLayout(parseLayout({ ...panelOnly, hand: { position: 'bottom' } })));
+    expect(bottom.rows).toBeGreaterThan(corner.rows);
     expect(bottom.side).toBe(0);
     expect(base.side).toBeGreaterThan(0);
   });

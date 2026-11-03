@@ -11,6 +11,8 @@ export type DonPosition = 'left' | 'right' | 'row';
 export type HandPosition = 'corner-left' | 'corner-right' | 'bottom';
 export type LifePosition = 'col-left' | 'col-right' | 'base';
 export type SidePosition = 'left' | 'right';
+/** O Descarte também pode ir junto dos DON!! (na fileira de DON!!, na ponta oposta à do deck de DON!!). */
+export type TrashPosition = SidePosition | 'don';
 export type DonDeckPosition = 'outer' | 'inner';
 export type LogPosition = 'panel' | 'side';
 export type HoverPosition = 'panel' | 'center' | 'side' | 'tooltip';
@@ -24,7 +26,7 @@ export interface BoardLayout {
   life: { size: BlockSize; position: LifePosition };
   leader: { size: BlockSize };
   stage: { size: BlockSize; position: SidePosition };
-  trash: { size: BlockSize; position: SidePosition };
+  trash: { size: BlockSize; position: TrashPosition };
   /** De onde os DON!! entram na área de custo: na ponta de fora dela ou na de dentro (junto do Líder). */
   donDeck: { size: BlockSize; position: DonDeckPosition };
   deck: { size: BlockSize; position: SidePosition };
@@ -37,7 +39,26 @@ export interface BoardLayout {
 export type BlockId = keyof BoardLayout;
 export const BLOCK_IDS: readonly BlockId[] = ['don', 'hand', 'life', 'leader', 'stage', 'trash', 'donDeck', 'deck', 'log', 'hover'];
 
+/**
+ * O padrão: o hover e a sua mão numa lateral, o histórico no meio da outra (painel fechado); a Vida em
+ * coluna à esquerda dos Personagens; Stage e Deck à direita do Líder; os DON!! numa fileira abaixo do
+ * Líder, com o deck de DON!! na borda e o Descarte na outra ponta.
+ */
 export const DEFAULT_LAYOUT: BoardLayout = {
+  don: { size: 'medium', position: 'row' },
+  hand: { size: 'medium', position: 'corner-left', collapsed: false },
+  life: { size: 'medium', position: 'col-left' },
+  leader: { size: 'medium' },
+  stage: { size: 'medium', position: 'right' },
+  trash: { size: 'medium', position: 'don' },
+  donDeck: { size: 'medium', position: 'outer' },
+  deck: { size: 'medium', position: 'right' },
+  log: { show: true, size: 'medium', position: 'side' },
+  hover: { show: true, size: 'medium', position: 'side' },
+};
+
+/** O padrão da primeira versão (tudo no painel, DON!! à esquerda do Líder): quem ficou nele passa ao novo. */
+const LEGACY_DEFAULT: BoardLayout = {
   don: { size: 'medium', position: 'left' },
   hand: { size: 'medium', position: 'corner-left', collapsed: false },
   life: { size: 'medium', position: 'col-left' },
@@ -73,7 +94,14 @@ export function presetLayout(preset: LayoutPreset): BoardLayout {
     case 'bigcards':
       return withPatch(DEFAULT_LAYOUT, { leader: { size: 'large' }, hand: { size: 'large' }, log: { show: false }, hover: { position: 'center', size: 'large' } });
     case 'open':
-      return withPatch(DEFAULT_LAYOUT, { life: { size: 'large' }, hand: { position: 'bottom' }, log: { position: 'side', size: 'small' }, hover: { position: 'side' } });
+      // A mão embaixo da mesa não divide o lugar com a fileira de DON!!: os DON!! voltam para a fileira do Líder.
+      return withPatch(DEFAULT_LAYOUT, {
+        don: { position: 'left' },
+        trash: { position: 'right' },
+        life: { size: 'large' },
+        hand: { position: 'bottom' },
+        log: { size: 'small' },
+      });
     default:
       return cloneLayout(DEFAULT_LAYOUT);
   }
@@ -100,7 +128,7 @@ const POSITIONS: { [K in BlockId]: readonly string[] | null } = {
   life: ['col-left', 'col-right', 'base'],
   leader: null,
   stage: ['left', 'right'],
-  trash: ['left', 'right'],
+  trash: ['left', 'right', 'don'],
   donDeck: ['outer', 'inner'],
   deck: ['left', 'right'],
   log: ['panel', 'side'],
@@ -126,7 +154,7 @@ export function parseLayout(raw: unknown): BoardLayout {
     if ('show' in block && typeof v.show === 'boolean') block.show = v.show;
     if ('collapsed' in block && typeof v.collapsed === 'boolean') block.collapsed = v.collapsed;
   }
-  return out;
+  return sameLayout(out, LEGACY_DEFAULT) ? cloneLayout(DEFAULT_LAYOUT) : out;
 }
 
 // ------------------------------------------------------------------ regras de conflito
@@ -143,7 +171,8 @@ export interface EffectiveLayout extends BoardLayout {
 /**
  * O layout que vale de fato, depois das regras:
  * - painel lateral: se o histórico ou o hover está nele, o outro "ao lado da mesa" entra nele também;
- * - mão e DON!!: com a fileira de DON!! abaixo do Líder a mão não fica embaixo da mesa (vai para o canto esquerdo).
+ * - mão e DON!!: com a fileira de DON!! abaixo do Líder a mão não fica embaixo da mesa (vai para o canto esquerdo);
+ * - Descarte junto dos DON!!: sem a fileira de DON!!, fica na fileira do Líder do lado dos DON!!.
  */
 export function effectiveLayout(l: BoardLayout): EffectiveLayout {
   const e = cloneLayout(l) as EffectiveLayout;
@@ -151,6 +180,7 @@ export function effectiveLayout(l: BoardLayout): EffectiveLayout {
   if (panelOn && e.hover.position === 'side') e.hover.position = 'panel';
   if (panelOn && e.log.position === 'side') e.log.position = 'panel';
   if (l.don.position === 'row' && e.hand.position === 'bottom') e.hand.position = 'corner-left';
+  if (l.trash.position === 'don' && l.don.position !== 'row') e.trash.position = l.don.position;
   e.panelOn = panelOn;
   e.sideHover = e.hover.show && e.hover.position === 'side';
   e.sideLog = e.log.show && e.log.position === 'side';
@@ -176,11 +206,19 @@ export type BaseItem = 'DON' | 'stage' | 'deck' | 'trash' | 'life' | 'leader';
 /**
  * A fileira do Líder de quem joga, da esquerda para a direita (o oponente recebe a mesma lista invertida).
  * Do Líder para fora: Stage, Deck, Descarte; a Vida "junto do Líder" fica do lado oposto aos DON!!.
+ * O Descarte junto dos DON!! vai para o lado deles (ou, com a fileira de DON!!, sai da fileira do Líder).
  */
 export function baseOrder(l: BoardLayout): BaseItem[] {
   const left: BaseItem[] = [];
   const right: BaseItem[] = [];
-  for (const id of ['stage', 'deck', 'trash'] as const) (l[id].position === 'left' ? left : right).push(id);
+  for (const id of ['stage', 'deck', 'trash'] as const) {
+    let pos = l[id].position;
+    if (pos === 'don') {
+      if (l.don.position === 'row') continue;
+      pos = l.don.position;
+    }
+    (pos === 'left' ? left : right).push(id);
+  }
   if (l.life.position === 'base') (l.don.position === 'left' ? right : left).push('life');
   let row: BaseItem[] = left.slice().reverse();
   if (l.don.position === 'left') row = ['DON', ...row];
@@ -198,7 +236,7 @@ export const WIDE = {
   stage: 0.9,
   pile: 0.72,
   /** Vida em coluna (ao lado dos Personagens) e junto do Líder. */
-  lifeCol: 0.74,
+  lifeCol: 0.99,
   lifeBase: 0.56,
   /** Um DON!! na área de custo; a área comprime os DON!! para caber em `costW` DON!!. */
   don: 0.5,
@@ -211,7 +249,7 @@ export const WIDE = {
   /** Carta da mão do oponente (sempre em cima). */
   oppHand: 0.62,
   /** Carta do hover ao lado da mesa e no painel. */
-  hoverSide: 2.0,
+  hoverSide: 2.4,
   /** Largura das laterais, em `--cw`: mão no canto, hover, histórico. */
   sideHand: 2.8,
   sideHandCollapsed: 1.6,
@@ -219,6 +257,12 @@ export const WIDE = {
   sideLog: 2.6,
   /** Largura mínima da mesa (os Personagens e as folgas), em `--cw`. */
   minBoard: 7.4,
+  /**
+   * Com laterais, a mesa não passa desta largura: a sobra da tela vai para as laterais (o texto do hover
+   * e o histórico ficam legíveis), até `sideMax` cada uma.
+   */
+  maxBoard: 14,
+  sideMax: 7.5,
   /** Proporção altura/largura de uma carta. */
   ratio: 1.396,
 } as const;
@@ -232,7 +276,7 @@ export interface LayoutMeasure {
   cols: number;
   /** Largura mínima da mesa, em `--cw`. */
   boardW: number;
-  /** Largura de cada lateral, em `--cw` (0 = sem laterais). */
+  /** Largura mínima de cada lateral, em `--cw` (0 = sem laterais); a sobra da tela as alarga até `WIDE.sideMax`. */
   side: number;
 }
 
@@ -244,11 +288,16 @@ export interface LayoutMeasure {
 export function measureLayout(e: EffectiveLayout): LayoutMeasure {
   const k = (id: BlockId) => SIZE_K[e[id].size];
   const R = WIDE.ratio;
-  const lifeColH = e.life.position !== 'base' ? WIDE.lifeCol * k('life') * (0.71 + 4 * 0.3) + 0.4 : 0;
-  const fieldH = Math.max(R, lifeColH);
-  const baseH = Math.max(WIDE.leader * k('leader') * R, WIDE.don * k('don') * R + 0.6, WIDE.pile * Math.max(k('deck'), k('trash')) * R + 0.35) + 0.1;
-  let half = 0.3 + fieldH + 0.12 + baseH;
-  if (e.don.position === 'row') half += WIDE.don * k('don') * R + 0.65;
+  // A Vida em coluna ocupa a altura dos Personagens e da fileira do Líder: só pede altura se não couber nela.
+  const lifeCol = e.life.position !== 'base';
+  const lifeColH = lifeCol ? WIDE.lifeCol * k('life') * (0.71 + 4 * 0.3) + 0.4 : 0;
+  const fieldH = R;
+  const donRow = e.don.position === 'row';
+  const trashInRow = donRow && e.trash.position === 'don';
+  const pileH = (id: 'deck' | 'trash') => WIDE.pile * k(id) * R + 0.35;
+  const baseH = Math.max(WIDE.leader * k('leader') * R, WIDE.don * k('don') * R + 0.6, pileH('deck'), trashInRow ? 0 : pileH('trash')) + 0.1;
+  let half = 0.3 + Math.max(fieldH + 0.12 + baseH, lifeColH);
+  if (donRow) half += Math.max(WIDE.don * k('don') * R + 0.65, trashInRow ? pileH('trash') + 0.1 : 0) + 0.16;
   let rows = 2 * half + 0.2;
   let fixedPx = 78; // faixa do meio (turno, botões) e folgas
   const handH = e.hand.collapsed ? 1.0 : (e.hand.position === 'bottom' ? WIDE.handBottom : WIDE.handCorner) * k('hand') * R + 0.5;
@@ -262,12 +311,14 @@ export function measureLayout(e: EffectiveLayout): LayoutMeasure {
     WIDE.leader * k('leader') +
     WIDE.stage * k('stage') +
     WIDE.pile * k('deck') +
-    WIDE.pile * k('trash') +
-    (e.life.position === 'base' ? WIDE.lifeBase * k('life') + 0.12 : 0) +
+    (trashInRow ? 0 : WIDE.pile * k('trash')) +
+    (e.life.position === 'base' ? WIDE.lifeBase * k('life') + 0.12 : 2 * (WIDE.lifeCol * k('life') + 0.12)) +
     donW +
     5 * 0.12;
-  const fieldW = 0.3 + 5 + 4 * 0.1 + (e.life.position !== 'base' ? WIDE.lifeCol * k('life') + 0.12 : 0);
-  const boardW = Math.max(baseW, fieldW, WIDE.minBoard);
+  // A fileira de DON!!: a área de custo no centro, o deck de DON!! e o Descarte (se estiver nela) nas pontas.
+  const donRowW = donRow ? WIDE.don * k('don') * WIDE.costRowW + 2 * (Math.max(0.58 * k('donDeck'), trashInRow ? WIDE.pile * k('trash') : 0) + 0.45) + 0.6 : 0;
+  const fieldW = 0.3 + 5 + 4 * 0.1 + (lifeCol ? WIDE.lifeCol * k('life') + 0.12 : 0);
+  const boardW = Math.max(baseW, fieldW, donRowW, WIDE.minBoard);
   let side = 0;
   if (e.hand.position !== 'bottom') side = Math.max(side, e.hand.collapsed ? WIDE.sideHandCollapsed : WIDE.sideHand * k('hand'));
   if (e.sideHover) side = Math.max(side, WIDE.sideHover * k('hover'));
@@ -276,7 +327,7 @@ export function measureLayout(e: EffectiveLayout): LayoutMeasure {
   if (e.hand.position === 'bottom' && side === 0) rows += WIDE.oppHand * R + 0.4;
   // As laterais também têm altura: a mão do oponente, o hover/histórico e a sua mão.
   let sideH = 0;
-  if (side > 0) sideH += WIDE.oppHand * R + 0.5;
+  if (side > 0) sideH += WIDE.oppHand * R + 0.5 + 0.8; // e os botões do canto, no topo da lateral esquerda
   if (e.sideHover) sideH += WIDE.hoverSide * k('hover') * R + 2;
   if (e.hand.position !== 'bottom') sideH += handH + 0.4;
   rows = Math.max(rows, sideH);
