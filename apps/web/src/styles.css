@@ -15601,11 +15601,46 @@ div.dk-tile-main {
   align-items: center;
   justify-content: center;
 }
+/*
+ * A Vida em coluna ocupa a altura dos Personagens e da fileira do Líder (da borda da mesa até um pouco antes
+ * da fileira de DON!!). A fileira do Líder continua de ponta a ponta, com folga dos dois lados do tamanho da
+ * coluna, para o Líder seguir no centro.
+ */
+.wm-half.with-lcol {
+  --lifew: calc(var(--cwb) * 0.99 * var(--k-life));
+}
+.wm-half.bottom .wm-lcol,
+.wm-half.top:not(.with-don) .wm-lcol {
+  grid-area: 1 / 1 / 3 / 2;
+}
+.wm-half.bottom .wm-rcol,
+.wm-half.top:not(.with-don) .wm-rcol {
+  grid-area: 1 / 3 / 3 / 4;
+}
+.wm-half.top.with-don .wm-lcol {
+  grid-area: 2 / 1 / 4 / 2;
+}
+.wm-half.top.with-don .wm-rcol {
+  grid-area: 2 / 3 / 4 / 4;
+}
+.wm-half.with-lcol .wm-lcol,
+.wm-half.with-lcol .wm-rcol {
+  align-self: stretch;
+  min-height: 0;
+}
+.wm-half.with-lcol .wm-base {
+  padding-inline: calc(var(--lifew) + var(--cw) * 0.12);
+}
 .wm-field {
   grid-area: field;
   justify-content: space-evenly;
   width: 100%;
   min-width: 0;
+}
+/* o lugar dos Personagens vazio não é desenhado (o lugar continua: as cartas não mudam de posição) */
+.wm-field .slot-empty {
+  background: none;
+  border-color: transparent;
 }
 /* a fileira do Líder: o Líder sempre no centro exato; cada lado espalha o que tem */
 .wm-base {
@@ -15675,18 +15710,35 @@ div.dk-tile-main {
   z-index: 4;
   margin: 0;
 }
-/* a Vida: na coluna, a pilha maior e mais aberta; junto do Líder, a pilha pequena de sempre */
+/*
+ * a Vida: na coluna, cartas grandes que se espalham pela altura toda (a contagem fica do lado da fileira de
+ * DON!!); junto do Líder, a pilha pequena de sempre
+ */
 .wm-lcol .life-zone,
 .wm-rcol .life-zone {
-  --cw: calc(var(--cwb) * 1.2 * var(--k-life));
+  --cw: calc(var(--cwb) * 1.6 * var(--k-life));
+  height: 100%;
+  min-height: 0;
+}
+.wm-half.top .wm-lcol .life-zone,
+.wm-half.top .wm-rcol .life-zone {
+  flex-direction: column-reverse;
 }
 .wm-lcol .life-stack,
 .wm-rcol .life-stack {
-  height: calc(var(--cw) * 0.44 + 4 * var(--cw) * 0.3);
+  flex: 1 1 0;
+  height: auto;
+  min-height: calc(var(--cw) * 0.44);
 }
 .wm-lcol .life-card,
 .wm-rcol .life-card {
-  top: calc(var(--i) * var(--cw) * 0.3);
+  top: calc(var(--i) * (100% - var(--lh)) / max(var(--n) - 1, 4));
+}
+/* o oponente, espelhado: a pilha cresce a partir do lado do centro da mesa */
+.wm-half.top .wm-lcol .life-card,
+.wm-half.top .wm-rcol .life-card {
+  top: auto;
+  bottom: calc((var(--n) - 1 - var(--i)) * (100% - var(--lh)) / max(var(--n) - 1, 4));
 }
 .wm-life-base .life-zone {
   --cw: calc(var(--cwb) * 0.9 * var(--k-life));
@@ -15754,6 +15806,19 @@ div.dk-tile-main {
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
+}
+/* o deck de DON!! e o Descarte nas pontas da fileira de DON!!: com folga dos cantos da mesa */
+.wm-don-rowfull .don-deck,
+.wm-trash-don {
+  margin-inline: calc(var(--cw) * 0.45);
+}
+.wm-half.bottom .wm-don-rowfull .don-deck,
+.wm-half.bottom .wm-trash-don {
+  margin-bottom: calc(var(--cw) * 0.16);
+}
+.wm-half.top .wm-don-rowfull .don-deck,
+.wm-half.top .wm-trash-don {
+  margin-top: calc(var(--cw) * 0.16);
 }
 /* o Descarte junto dos DON!!: na mesma faixa da fileira de DON!!, na ponta oposta à do deck de DON!! */
 .wm-trash-don {

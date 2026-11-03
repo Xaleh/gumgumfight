@@ -236,7 +236,7 @@ export const WIDE = {
   stage: 0.9,
   pile: 0.72,
   /** Vida em coluna (ao lado dos Personagens) e junto do Líder. */
-  lifeCol: 0.74,
+  lifeCol: 0.99,
   lifeBase: 0.56,
   /** Um DON!! na área de custo; a área comprime os DON!! para caber em `costW` DON!!. */
   don: 0.5,
@@ -288,14 +288,16 @@ export interface LayoutMeasure {
 export function measureLayout(e: EffectiveLayout): LayoutMeasure {
   const k = (id: BlockId) => SIZE_K[e[id].size];
   const R = WIDE.ratio;
-  const lifeColH = e.life.position !== 'base' ? WIDE.lifeCol * k('life') * (0.71 + 4 * 0.3) + 0.4 : 0;
-  const fieldH = Math.max(R, lifeColH);
+  // A Vida em coluna ocupa a altura dos Personagens e da fileira do Líder: só pede altura se não couber nela.
+  const lifeCol = e.life.position !== 'base';
+  const lifeColH = lifeCol ? WIDE.lifeCol * k('life') * (0.71 + 4 * 0.3) + 0.4 : 0;
+  const fieldH = R;
   const donRow = e.don.position === 'row';
   const trashInRow = donRow && e.trash.position === 'don';
   const pileH = (id: 'deck' | 'trash') => WIDE.pile * k(id) * R + 0.35;
   const baseH = Math.max(WIDE.leader * k('leader') * R, WIDE.don * k('don') * R + 0.6, pileH('deck'), trashInRow ? 0 : pileH('trash')) + 0.1;
-  let half = 0.3 + fieldH + 0.12 + baseH;
-  if (donRow) half += Math.max(WIDE.don * k('don') * R + 0.65, trashInRow ? pileH('trash') + 0.1 : 0);
+  let half = 0.3 + Math.max(fieldH + 0.12 + baseH, lifeColH);
+  if (donRow) half += Math.max(WIDE.don * k('don') * R + 0.65, trashInRow ? pileH('trash') + 0.1 : 0) + 0.16;
   let rows = 2 * half + 0.2;
   let fixedPx = 78; // faixa do meio (turno, botões) e folgas
   const handH = e.hand.collapsed ? 1.0 : (e.hand.position === 'bottom' ? WIDE.handBottom : WIDE.handCorner) * k('hand') * R + 0.5;
@@ -310,12 +312,12 @@ export function measureLayout(e: EffectiveLayout): LayoutMeasure {
     WIDE.stage * k('stage') +
     WIDE.pile * k('deck') +
     (trashInRow ? 0 : WIDE.pile * k('trash')) +
-    (e.life.position === 'base' ? WIDE.lifeBase * k('life') + 0.12 : 0) +
+    (e.life.position === 'base' ? WIDE.lifeBase * k('life') + 0.12 : 2 * (WIDE.lifeCol * k('life') + 0.12)) +
     donW +
     5 * 0.12;
   // A fileira de DON!!: a área de custo no centro, o deck de DON!! e o Descarte (se estiver nela) nas pontas.
-  const donRowW = donRow ? WIDE.don * k('don') * WIDE.costRowW + 2 * Math.max(0.58 * k('donDeck'), trashInRow ? WIDE.pile * k('trash') : 0) + 0.6 : 0;
-  const fieldW = 0.3 + 5 + 4 * 0.1 + (e.life.position !== 'base' ? WIDE.lifeCol * k('life') + 0.12 : 0);
+  const donRowW = donRow ? WIDE.don * k('don') * WIDE.costRowW + 2 * (Math.max(0.58 * k('donDeck'), trashInRow ? WIDE.pile * k('trash') : 0) + 0.45) + 0.6 : 0;
+  const fieldW = 0.3 + 5 + 4 * 0.1 + (lifeCol ? WIDE.lifeCol * k('life') + 0.12 : 0);
   const boardW = Math.max(baseW, fieldW, donRowW, WIDE.minBoard);
   let side = 0;
   if (e.hand.position !== 'bottom') side = Math.max(side, e.hand.collapsed ? WIDE.sideHandCollapsed : WIDE.sideHand * k('hand'));

@@ -154,6 +154,7 @@ function Half({
         isActive ? 'active-side' : '',
         h.fieldDrop(player) ? 'drop-ok' : '',
         layout.don.position === 'row' ? 'with-don' : '',
+        lifeCol ? 'with-lcol' : '',
       ].join(' ')}
     >
       {lifeCol === 'left' && (
