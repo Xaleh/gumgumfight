@@ -213,8 +213,8 @@ export const WIDE = {
   /** Carta do hover ao lado da mesa e no painel. */
   hoverSide: 2.0,
   /** Largura das laterais, em `--cw`: mão no canto, hover, histórico. */
-  sideHand: 1.7,
-  sideHandCollapsed: 1.4,
+  sideHand: 2.8,
+  sideHandCollapsed: 1.6,
   sideHover: 2.3,
   sideLog: 2.6,
   /** Largura mínima da mesa (os Personagens e as folgas), em `--cw`. */

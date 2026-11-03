@@ -15618,6 +15618,10 @@ div.dk-tile-main {
 .wm-half .leader-zone {
   --cw-leader: calc(var(--cw) * 1.3 * var(--k-leader));
 }
+/* carta virada: só deitada, do mesmo tamanho (a mesa em coluna encolhe para caber; aqui há espaço) */
+.wide-mat .field-card > .card.rested {
+  transform: rotate(90deg);
+}
 .wm-half .stage-zone {
   --sw: calc(var(--cwb) * 0.9 * var(--k-stage));
   width: var(--sw);

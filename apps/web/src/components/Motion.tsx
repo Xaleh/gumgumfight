@@ -214,10 +214,12 @@ function capture(root: Element | null): Boxes {
     const b = measure(el);
     if (!b) return;
     const rested = el.classList.contains('rested');
-    // Carta virada: rotate(90deg) scale(0.72) no CSS.
+    // Carta virada: rotate(90deg) no CSS, com ou sem scale (a mesa em coluna encolhe para 72%; a mesa
+    // larga mantém o tamanho): a escala real sai da caixa na tela (deitada, a altura é a largura da carta).
+    const k = rested ? Math.min(1, Math.max(0.5, el.getBoundingClientRect().height / (el.offsetWidth || 1))) : 1;
     m.set(`field:${el.dataset.uid}`, {
       ...b,
-      ...(rested ? { w: b.w * 0.72, h: b.h * 0.72, rot: true } : {}),
+      ...(rested ? { w: b.w * k, h: b.h * k, rot: true } : {}),
       face: !el.classList.contains('back'),
     });
   });
