@@ -36,7 +36,11 @@ oposto. A pessoa configura só a própria metade.
 └──────────┴────────────────────────────────────────────────────────────────┴──────────────┘
 ```
 
-- **Largura:** 8 larguras de carta (`--cw`); altura: duas metades de 3,6 `--cw` mais a faixa do meio, uns 7,9 `--cw`.
+- **A mesa é o jogo; a lateral é secundária.** As laterais têm largura fixa e pequena (uns 1,7 `--cw` para uma mão no
+  canto, 2,3 para o hover, 2,6 para o histórico) e a mesa fica com **todo o resto da largura**: as zonas de cada
+  fileira se espalham (`justify-content: space-evenly`), como no playmat, em vez de a mesa encolher para uma coluna
+  no meio. A largura mínima da mesa é a do conteúdo (uns 7,4 `--cw`); altura: duas metades de 3,6 `--cw` mais a
+  faixa do meio, uns 7,9 `--cw`.
   Numa tela 1920×1080 com o painel aberto isso dá cartas de uns 115 px (hoje: 95 px na coluna, e só porque o teto é
   112 px); em 1366×768, 80 px contra 64 px.
 - **Faixa do meio:** etiqueta de cada jogador (nome, corações, relógio), a situação do turno no centro. Substitui os
@@ -75,8 +79,9 @@ Regras:
   menores, nunca corte. A área de custo comprime os DON!! quando são muitos (como `.don-cards` já faz).
 - **Mão e DON!! nunca se sobrepõem.** Só um dos dois pode ficar "embaixo da mesa": a opção do outro fica desabilitada
   no editor, com o motivo no `title`, e `load()` resolve um JSON conflitante mandando a mão para o canto esquerdo.
-- **Mão do oponente** sempre na parte de cima: no canto oposto ao da sua (ou numa faixa acima da mesa quando a sua
-  fica embaixo). DON!! embaixo da mesa espelha numa faixa acima da metade do oponente.
+- **Mão do oponente** sempre na parte de cima: no canto superior oposto ao da sua; quando a sua fica embaixo da mesa,
+  no canto superior direito (numa faixa acima da mesa só se não houver lateral nenhuma). Nunca rouba altura da mesa
+  quando há um canto disponível. DON!! embaixo da mesa espelha numa faixa acima da metade do oponente.
 - **Painel lateral.** Se o Hover ou o Histórico está no painel, os dois entram nele ("ao lado da mesa" do outro vira
   "painel"), as laterais de hover/histórico deixam de existir e a mesa ocupa todo o espaço ao lado do painel (sobram só
   os cantos das mãos). Com o painel fechado e a mão embaixo da mesa, hover e histórico "ao lado da mesa" ficam
@@ -140,8 +145,9 @@ export interface BoardLayout {
    A `Board.tsx` atual continua intacta para o celular, o Streamer e o tutorial.
 3. **`styles.css`**: `.wide-board`, `.half`, `.base`, `.lcol/.rcol`, `.cost-area`, `.side-area`, `.hand.corner`,
    `.center-row` (etiquetas + situação do turno). `--cw` da `board-col` no modo largo:
-   `min((100cqh - 24px) / 7.9, (100cqw - 24px) / 12, 150px)` (12 = 8 da mesa + 2 por lado para as mãos). Cada bloco
-   multiplica pelo seu `--k-*`. Painel: `--panel-w` em `.game.wide` (hoje fixo em 340 px) × 0,8/1/1,2.
+   `min((100cqh - 24px) / rows, (100cqw - 24px) / cols, 150px)`, com `rows`/`cols` vindos de `measure(layout)`
+   (altura e largura mínima em larguras de carta). A mesa mede `max(cw * bw, 100% - 2 * side * cw)`: cresce até
+   encostar nas laterais fixas. Cada bloco multiplica pelo seu `--k-*`. Painel: `--panel-w` em `.game.wide` (hoje fixo em 340 px) × 0,8/1/1,2.
 4. **`GameScreen.tsx`**: lê `boardLayout`; em `wide && !streamer && !broadcast && !tutorial && !embed` renderiza
    `WideBoard` no lugar de `Board` e monta as laterais (mãos nos cantos, hover/histórico "ao lado da mesa") e o
    painel (turno e dica, detalhe, histórico, Encerrar turno) conforme `log`/`hover`; `hover.position === 'center'` é
