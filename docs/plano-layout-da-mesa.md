@@ -20,15 +20,15 @@ O lado do oponente **espelha** o do jogador, como hoje (`PlayerSide` com `positi
 | Bloco | Ocultar | Tamanho | Posição |
 |-------|---------|---------|---------|
 | DON!! (fileira: ativos, descansados, contadores) | não | P · M · G | esquerda (atual) · centro · direita da fileira |
-| Cartas na mão | não, mas **recolhe** (pilha com a contagem, abre ao clicar, reaproveita `MiniHand`/`HandFan`) | P · M · G | esquerda · centro (atual) · direita |
+| Cartas na mão | não, mas **recolhe** (pilha com a contagem, abre ao clicar, reaproveita `MiniHand`/`HandFan`) | P · M · G | embaixo da mesa (atual) · canto inferior esquerdo · canto inferior direito, fora da coluna da mesa |
 | Vida | **sim** (a faixa do jogador já mostra os corações, `PlayerBanner`) | P · M · G | lado esquerdo do Líder (atual) · lado direito · coluna de fora (reaproveita `life-col` do Streamer) |
 | Líder | não | P · M · G | fixo no centro |
 | Stage | não | P · M · G | lado esquerdo (atual) · lado direito |
 | Descarte | não | P · M · G | lado esquerdo · lado direito (atual) |
 | Deck de DON!! | não | P · M · G | início (atual) · fim da fileira de DON!! |
 | Deck | não | P · M · G | lado esquerdo · lado direito (atual) · ponta de fora (reaproveita `side-aux`) |
-| Histórico (`LogPanel`) | **sim** | P · M · G (largura do painel: 280 · 340 · 420 px) | painel lateral (atual) · flutuante sobre a mesa (caixa semitransparente no canto) |
-| Hover de carta (`CardDetail`) | **sim** | P · M · G (carta: 150 · 190 · 240 px) | painel lateral, acima do histórico (atual) · junto da carta (reaproveita `CardHoverPreview`) |
+| Histórico (`LogPanel`) | **sim** | P · M · G (largura do painel: 280 · 340 · 420 px) | painel lateral (atual) · ao lado da mesa, no espaço livre à direita |
+| Hover de carta (`CardDetail`) | **sim** | P · M · G (carta: 150 · 190 · 240 px) | painel lateral, acima do histórico (atual) · ao lado da mesa, grande, no espaço livre à esquerda · junto da carta (reaproveita `CardHoverPreview`) |
 
 Regras:
 
@@ -36,7 +36,12 @@ Regras:
 - **Posição por encaixe, não por pixel.** Cada bloco escolhe entre poucas posições válidas. É o que mantém a mesa
   responsiva (o `--cw` é calculado pelo tamanho do contêiner), as âncoras das animações (`data-anchor`) e a seta de
   ataque funcionando, e evita blocos sobrepostos. Arrastar livremente fica como ideia de v2 (ver o fim).
-- **Histórico e Hover ocultos** fecham o painel lateral (`no-panel`, já existe): a mesa ocupa a tela toda.
+- **Numa tela 16:9 a altura manda.** O `--cw` da `board-col` é limitado pela altura (`(100cqh - 136px) / 9.9`), a
+  mesa vira uma coluna de 7,2 `--cw` no centro e sobra espaço dos dois lados. É isso que hoje faz a mesa do PC parecer
+  a do celular com bordas pretas. A proposta usa essas laterais: a mão no canto inferior (fora da coluna da mesa), o
+  hover à esquerda e o histórico à direita. Tirar a mão da coluna ainda libera altura, e todas as cartas da mesa
+  crescem.
+- **Histórico e Hover fora do painel ou ocultos** fecham o painel lateral (`no-panel`, já existe).
 - Ordem dos blocos ao redor do Líder, de dentro para fora: Stage, Deck, Descarte, Vida. Dois blocos do mesmo lado
   seguem essa ordem (é o que a mesa já faz: Vida fora e Stage dentro, à esquerda; Deck e Descarte à direita).
 
@@ -63,15 +68,15 @@ Entra em `Settings` (`settings.tsx`), salvo no `localStorage` com as demais (`gu
 export type BlockSize = 'small' | 'medium' | 'large';
 export interface BoardLayout {
   don: { size: BlockSize; align: 'left' | 'center' | 'right' };
-  hand: { size: BlockSize; align: 'left' | 'center' | 'right'; collapsed: boolean };
+  hand: { size: BlockSize; position: 'bottom' | 'corner-left' | 'corner-right'; collapsed: boolean };
   life: { show: boolean; size: BlockSize; position: 'left' | 'right' | 'aside' };
   leader: { size: BlockSize };
   stage: { size: BlockSize; position: 'left' | 'right' };
   trash: { size: BlockSize; position: 'left' | 'right' };
   donDeck: { size: BlockSize; position: 'start' | 'end' };
   deck: { size: BlockSize; position: 'left' | 'right' | 'aside' };
-  log: { show: boolean; size: BlockSize; position: 'panel' | 'overlay' };
-  hover: { show: boolean; size: BlockSize; position: 'panel' | 'tooltip' };
+  log: { show: boolean; size: BlockSize; position: 'panel' | 'side' };
+  hover: { show: boolean; size: BlockSize; position: 'panel' | 'side' | 'tooltip' };
 }
 ```
 
@@ -88,17 +93,20 @@ export interface BoardLayout {
    - `PlayerSide` monta `base-row` a partir da ordem calculada (lado + ordem de dentro para fora) em vez do JSX fixo;
      `life.position === 'aside'` e `deck.position === 'aside'` reaproveitam `life-col`/`side-aux` do `lifeAside`.
    - `don-row` recebe a classe de alinhamento e a ordem deck/cartas/contadores.
-   - `Hand` recebe o alinhamento; `hand.collapsed` troca por `MiniHand` + `HandFan` (já existem).
+   - `Hand` nos cantos sai da `bottom-strip` e vai para a `board-col`, posicionada no canto de baixo (a `bottom-strip`
+     fica só com a faixa do jogador, e a conta de altura do `--cw` perde a altura da mão); `hand.collapsed` troca por
+     `MiniHand` + `HandFan` (já existem).
    - A `section.mat` recebe `data-*` e variáveis CSS: `--k-don`, `--k-hand`, `--k-life`, `--k-leader`, `--k-stage`,
      `--k-trash`, `--k-dondeck`, `--k-deck`.
 3. **`styles.css`**: cada bloco multiplica pelo seu `--k-*` (padrão 1) nos `calc()` que já existem
    (`.leader-zone --cw-leader`, `.stage-zone`, `.pile --cw-pile`, `.life-zone`, `.don-row --dw`, `.board-col --hcw`).
    Painel: `--panel-w` em `.game.wide` (hoje fixo em 340 px) e `--detail-w` em `.side-panel .detail-card`.
-   Novo: `.log-overlay` (histórico flutuante sobre a arena).
+   Novo: `.side-area` (as duas laterais livres da `board-col`, à esquerda e à direita da mesa), onde entram o hover
+   grande, o histórico e a mão nos cantos.
 4. **`GameScreen.tsx`**: lê `boardLayout` das configurações; passa `layout` ao `Board` só quando
    `wide && !streamer && !broadcast && !tutorial && !embed`; monta o painel com histórico e/ou detalhe conforme
    `log`/`hover`; em `hover.position === 'tooltip'`, mostra `CardHoverPreview` num portal (como já faz nas folhas);
-   em `log.position === 'overlay'`, o `LogPanel` dentro de `.log-overlay` na `board-col`.
+   em `'side'`, `CardDetail` e `LogPanel` vão para as `.side-area` da `board-col`.
 5. **`components/BoardLayoutEditor.tsx`** (novo): a tela, com a prévia (estado de exemplo de `game/setup.ts`) e os
    cartões. Aberta pelo `SettingsModal` e pelo menu da partida.
 6. **i18n**: chaves `settings.boardLayout*` e `layout.*` (nomes dos blocos, posições, predefinições) nos seis idiomas.
@@ -110,7 +118,8 @@ Riscos e cuidados:
   funcionando em qualquer encaixe; vale conferir as animações de Vida e de DON!! com os blocos "de fora".
 - Tamanho "grande" em tudo ao mesmo tempo não cabe em telas de 1000–1200 px. O `--cw` já é limitado pela altura e
   largura do contêiner, então a mesa encolhe inteira para caber. A prévia deixa isso visível antes de salvar.
-- O histórico flutuante cobre parte da mesa do oponente: fica com no máximo 1/3 da altura e some ao arrastar uma carta.
+- As laterais só existem em telas largas de verdade. Entre 1000 e 1300 px a `side-area` fica estreita: abaixo de uma
+  largura mínima (uns 180 px), os blocos "ao lado da mesa" voltam para o painel e a mão volta para baixo da mesa.
 
 Esforço estimado: modelo + Board + CSS (2 dias), painel/hover/overlay no GameScreen (1 dia), editor com prévia
 (1,5 dia), i18n + docs + testes do `load()` (0,5 dia).
