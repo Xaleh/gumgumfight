@@ -59,7 +59,7 @@ oposto. A pessoa configura só a própria metade.
 | Líder | não | P · M · G | fixo no centro da fileira |
 | Stage | não | P · M · G | esquerda · direita (padrão) do Líder |
 | Descarte | não | P · M · G | esquerda · direita (padrão) |
-| Deck de DON!! | não | P · M · G | ponta de fora da área de custo (padrão) · junto do Líder |
+| Deck de DON!! | não | P · M · G | ponta de fora da área de custo (padrão) · ponta de dentro. Na fileira abaixo do Líder, a área de custo fica **centralizada** sob o Líder e o deck de DON!! na lateral do playmat (de fora ou de dentro, conforme a opção) |
 | Deck | não | P · M · G | esquerda · direita (padrão) |
 | Histórico (`LogPanel`) | **sim** | P · M · G (largura do painel: 0,8× · 1× · 1,2×) | painel lateral (padrão) · ao lado da mesa, à direita (só com o painel fechado) |
 | Hover de carta (`CardDetail`) | **sim** | P · M · G | painel lateral (padrão) · centro da mesa (grande, por cima, só enquanto o mouse está na carta) · ao lado da mesa, à esquerda (só com o painel fechado) · junto da carta (`CardHoverPreview`) |
@@ -84,7 +84,8 @@ Regras:
   embaixo da mesa (e vice-versa): a opção do outro fica desabilitada no editor, com o motivo no `title`, e `load()`
   resolve um JSON conflitante mandando a mão para o canto esquerdo.
 - **O Líder fica sempre no centro da fileira**, mesmo quando os DON!! saem dela: a fileira é um grid `1fr auto 1fr`
-  e cada lado espalha o que tem.
+  e cada lado espalha o que tem. A fileira de DON!! abaixo do Líder usa o mesmo grid: área de custo no meio, deck de
+  DON!! encostado na lateral.
 - **Mão do oponente** sempre na parte de cima: no canto superior oposto ao da sua; quando a sua fica embaixo da mesa,
   no canto superior direito (numa faixa acima da mesa só se não houver lateral nenhuma). Nunca rouba altura da mesa
   quando há um canto disponível. DON!! embaixo da mesa espelha numa faixa acima da metade do oponente.
