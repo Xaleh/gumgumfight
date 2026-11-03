@@ -94,17 +94,12 @@ export function FieldCard({
   );
 }
 
-function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SideProps) {
+/** Pilha de Vida de um jogador (as viradas para cima mostram a carta). */
+export function LifeZone({ state, player, h }: { state: GameState; player: PlayerId; h: Pick<BoardHandlers, 'onCard' | 'onHover'> }) {
   const t = useT();
   const ps = state.players[player];
-  const isActive = state.activePlayer === player && state.phase === 'main';
-  const trashTop = ps.trash[ps.trash.length - 1];
-  const slots = Array.from({ length: MAX_CHARACTERS }, (_, i) => ps.characters[i] ?? null);
   const maxLife = cardDef(state, ps.leader.uid).life ?? ps.life.length;
-
-  const fieldCard = (uid: string, fc: FieldState) => <FieldCard key={uid} state={state} uid={uid} fc={fc} h={h} />;
-
-  const life = (
+  return (
     <div className="zone life-zone" title={t('board.lifeTitle', { n: ps.life.length })}>
       <div className="life-stack" key={ps.life.length} data-anchor={`life-${player}`} style={vars({ '--n': ps.life.length })}>
         {ps.life.map((uid, i) => {
@@ -132,33 +127,51 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
       </span>
     </div>
   );
+}
 
-  const stage = (
+type FieldHandlers = Pick<BoardHandlers, 'canDragAttached' | 'onCard' | 'highlight' | 'onHover' | 'canDragAttacker'>;
+
+export function StageZone({ state, player, h }: { state: GameState; player: PlayerId; h: FieldHandlers }) {
+  const t = useT();
+  const ps = state.players[player];
+  return (
     <div className="zone stage-zone">
-      {ps.stage ? fieldCard(ps.stage.uid, ps.stage) : <div className="slot-empty">{t('board.stageSlot')}</div>}
+      {ps.stage ? <FieldCard key={ps.stage.uid} state={state} uid={ps.stage.uid} fc={ps.stage} h={h} /> : <div className="slot-empty">{t('board.stageSlot')}</div>}
     </div>
   );
+}
 
-  const leader = (
+export function LeaderZone({ state, player, h }: { state: GameState; player: PlayerId; h: FieldHandlers }) {
+  const ps = state.players[player];
+  const isActive = state.activePlayer === player && state.phase === 'main';
+  return (
     <div className={['zone', 'leader-zone', isActive ? 'active' : ''].join(' ')}>
-      {fieldCard(ps.leader.uid, ps.leader)}
+      <FieldCard key={ps.leader.uid} state={state} uid={ps.leader.uid} fc={ps.leader} h={h} />
     </div>
   );
+}
 
-  const canDragDon = h.canDragDon(player);
-  const donGlow = h.donHighlight(player);
-  const donDrop = h.donDrop(player);
-  const picked = h.donPicked(player);
-  const attached = ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
-  const onField = ps.donActive + ps.donRested;
-  // Deck de DON!! fixo à esquerda; os DON!! entram à direita dele.
-  const donDeck = (
+/** Deck de DON!! (de onde os DON!! entram na área de custo). */
+export function DonDeck({ state, player }: { state: GameState; player: PlayerId }) {
+  const ps = state.players[player];
+  return (
     <div className="don-deck" data-anchor={`dondeck-${player}`}>
       {ps.donDeck > 0 ? <span className="don-card back" /> : <span className="don-card empty" />}
       <span className="pile-count">{ps.donDeck}</span>
     </div>
   );
-  const donCards = (
+}
+
+type DonHandlers = Pick<BoardHandlers, 'onDon' | 'donPicked' | 'donHighlight' | 'canDragDon'>;
+
+/** Os DON!! ativos e descansados na área de custo. */
+export function DonCards({ state, player, h }: { state: GameState; player: PlayerId; h: DonHandlers }) {
+  const ps = state.players[player];
+  const canDragDon = h.canDragDon(player);
+  const donGlow = h.donHighlight(player);
+  const picked = h.donPicked(player);
+  const onField = ps.donActive + ps.donRested;
+  return (
     <div className="don-cards" style={vars({ '--n': Math.max(onField, 1) })} data-anchor={`don-${player}`}>
         {Array.from({ length: ps.donActive }, (_, i) => (
           <span
@@ -178,7 +191,18 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
         ))}
       </div>
   );
-  const donStats = (
+}
+
+export function donAttached(ps: GameState['players'][number]): number {
+  return ps.leader.don + ps.characters.reduce((n, c) => n + c.don, 0) + (ps.stage?.don ?? 0);
+}
+
+/** Contadores de DON!!: deck, ativos, descansados, anexados. */
+export function DonStats({ state, player }: { state: GameState; player: PlayerId }) {
+  const t = useT();
+  const ps = state.players[player];
+  const attached = donAttached(ps);
+  return (
       <dl className="don-stats" aria-label="DON!!">
         <div>
           <dt>{t('board.donDeck')}</dt>
@@ -198,29 +222,54 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
         </div>
       </dl>
   );
-  const donRow = (children: ReactNode) => (
+}
+
+/** A fileira de DON!! (área de custo): recebe de volta um DON!! anexado arrastado e acende quando dá para anexar. */
+export function DonRow({
+  state,
+  player,
+  position,
+  className,
+  h,
+  children,
+}: {
+  state: GameState;
+  player: PlayerId;
+  position: 'top' | 'bottom';
+  className?: string;
+  h: Pick<BoardHandlers, 'donHighlight' | 'donDrop'>;
+  children: ReactNode;
+}) {
+  const t = useT();
+  const ps = state.players[player];
+  const donGlow = h.donHighlight(player);
+  const donDrop = h.donDrop(player);
+  return (
     <div
-      className={['don-row', position, donGlow ? 'glow' : '', donDrop ? 'drop' : ''].join(' ')}
-      title={t('board.donTitle', { deck: ps.donDeck, active: ps.donActive, rested: ps.donRested, attached })}
+      className={['don-row', position, donGlow ? 'glow' : '', donDrop ? 'drop' : '', className ?? ''].join(' ')}
+      title={t('board.donTitle', { deck: ps.donDeck, active: ps.donActive, rested: ps.donRested, attached: donAttached(ps) })}
     >
       {children}
     </div>
   );
-  const don = donRow(
-    <>
-      {donDeck}
-      {donCards}
-      {donStats}
-    </>,
-  );
+}
 
-  const deckPile = (
+export function DeckPile({ state, player }: { state: GameState; player: PlayerId }) {
+  const t = useT();
+  const ps = state.players[player];
+  return (
     <div className="pile" title={t('board.deckTitle', { n: ps.deck.length })} data-anchor={`deck-${player}`}>
       <CardBack />
       <span className="pile-count">{ps.deck.length}</span>
     </div>
   );
-  const trashPile = (
+}
+
+export function TrashPile({ state, player, h }: { state: GameState; player: PlayerId; h: Pick<BoardHandlers, 'onTrash'> }) {
+  const t = useT();
+  const ps = state.players[player];
+  const trashTop = ps.trash[ps.trash.length - 1];
+  return (
     <div
       className="pile clickable"
       data-anchor={`trash-${player}`}
@@ -231,6 +280,37 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
       <span className="pile-count">{ps.trash.length}</span>
     </div>
   );
+}
+
+function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SideProps) {
+  const ps = state.players[player];
+  const isActive = state.activePlayer === player && state.phase === 'main';
+  const slots = Array.from({ length: MAX_CHARACTERS }, (_, i) => ps.characters[i] ?? null);
+
+  const fieldCard = (uid: string, fc: FieldState) => <FieldCard key={uid} state={state} uid={uid} fc={fc} h={h} />;
+
+  const life = <LifeZone state={state} player={player} h={h} />;
+  const stage = <StageZone state={state} player={player} h={h} />;
+  const leader = <LeaderZone state={state} player={player} h={h} />;
+  // Deck de DON!! fixo à esquerda; os DON!! entram à direita dele.
+  const donDeck = <DonDeck state={state} player={player} />;
+  const donCards = <DonCards state={state} player={player} h={h} />;
+  const donStats = <DonStats state={state} player={player} />;
+  const donRow = (children: ReactNode) => (
+    <DonRow state={state} player={player} position={position} h={h}>
+      {children}
+    </DonRow>
+  );
+  const don = donRow(
+    <>
+      {donDeck}
+      {donCards}
+      {donStats}
+    </>,
+  );
+
+  const deckPile = <DeckPile state={state} player={player} />;
+  const trashPile = <TrashPile state={state} player={player} h={h} />;
   // Mesa de quem transmite (`lifeAside`): só o descarte fica ao lado do Líder; o deck vai para a ponta, grande.
   const piles = (
     <div className="zone piles">

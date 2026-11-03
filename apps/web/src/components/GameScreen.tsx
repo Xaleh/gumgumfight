@@ -45,7 +45,10 @@ import { listText, logText, msgText } from '../game/engineText';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, PLAYMATS, SettingsControls, useSettings } from '../settings';
-import { Board, HandFan, handIsKnown } from './Board';
+import { Board, HandFan, handIsKnown, vars } from './Board';
+import { WideBoard } from './WideBoard';
+import { BoardLayoutEditor } from './BoardLayoutEditor';
+import { effectiveLayout, panelWidth } from '../game/boardLayout';
 import { LateralBoard } from './LateralBoard';
 import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
 import { CardView, type Highlight, StaticCard } from './CardView';
@@ -120,7 +123,7 @@ interface Drag {
   /** Posições na fileira dos DON!! arrastados (ficam apagados enquanto o arrasto dura). */
   dons?: number[];
 }
-type Sheet = null | 'menu' | 'log' | 'hand' | 'coach' | { trash: PlayerId };
+type Sheet = null | 'menu' | 'log' | 'hand' | 'coach' | 'layout' | { trash: PlayerId };
 /** Painel lateral no desktop: do Streamer (histórico, partidas, decklists) ou de quem joga (histórico, a própria decklist). */
 type Panel = null | 'log' | 'matches' | 'deck' | 'coach';
 
@@ -657,12 +660,18 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, update: updateSettings } = useSettings();
+  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, boardLayout, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
   const canOpenHands = Boolean(online?.hands || spectator?.canHands || kind === 'replay');
   const bare = Boolean(embed?.bare);
+  /**
+   * A mesa larga de quem joga no desktop, bloco a bloco como escolhido em Configurações › Layout da mesa.
+   * Streamer, transmissão, tutorial e replay embutido ficam com a mesa em coluna.
+   */
+  const wideBoard = wide && !streamer && !broadcast && !tutorial && !embed;
+  const layout = useMemo(() => effectiveLayout(boardLayout), [boardLayout]);
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
   const animate = animations;
@@ -732,8 +741,10 @@ function Table({
     setPanelState(p);
     if (playerPanel) updateSettings({ sidePanel: p !== null });
   };
+  /** Na mesa larga o histórico e o hover só moram no painel se o layout os puser lá; sem nada nele, o painel fecha. */
+  const panelLogOn = !wideBoard || layout.panelOn;
   /** O painel na tela agora (no celular não há painel: o histórico abre numa folha). */
-  const shownPanel = streamer || playerPanel ? panel : null;
+  const shownPanel = streamer || playerPanel ? (panel === 'log' && !panelLogOn ? null : panel) : null;
   const openPanel = (p: Panel) => {
     setPanel(p);
     setSheet(null);
@@ -1246,7 +1257,7 @@ function Table({
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
       if (!el) return { over: null };
       if (d.kind === 'hand') {
-        if (el.closest('.bottom-strip')) return { over: 'hand', insert: handSlot(x) };
+        if (el.closest('.bottom-strip, [data-drop="hand"]')) return { over: 'hand', insert: handSlot(x) };
         return { over: el.closest('[data-drop="field"]') && dropValidRef.current(d, 'field') ? 'field' : null };
       }
       if (d.kind === 'attached') {
@@ -1375,8 +1386,8 @@ function Table({
         {/* Desktop (Streamer e quem joga): o histórico abre e fecha o painel lateral, a partir do botão ao lado do menu. */}
         {(streamer || playerPanel) && (
           <button
-            className={['round-btn', 'log-btn', panel === 'log' ? 'on' : ''].join(' ')}
-            onClick={() => setPanel(panel === 'log' ? null : 'log')}
+            className={['round-btn', 'log-btn', shownPanel === 'log' ? 'on' : ''].join(' ')}
+            onClick={() => (panelLogOn ? setPanel(panel === 'log' ? null : 'log') : setSheet('log'))}
             aria-label={t('game.logLabel')}
             aria-pressed={panel === 'log'}
             title={t('game.log')}
@@ -1475,8 +1486,10 @@ function Table({
         streamer ? 'streamer' : '',
         lateral ? `lateral playmat-${streamerPlaymat}` : '',
         streamer && panel ? 'with-panel' : '',
-        playerPanel && !panel ? 'no-panel' : '',
+        playerPanel && !shownPanel ? 'no-panel' : '',
+        wideBoard ? 'wide-board' : '',
       ].join(' ')}
+      style={wideBoard ? vars({ '--panel-w': `${panelWidth(layout)}px` }) : undefined}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
@@ -1490,6 +1503,29 @@ function Table({
             center={centerBand}
             bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
             miniHands={{ open: openHands, canOpen: canOpenHands, onToggle: toggleHand }}
+            {...handlers}
+          />
+        ) : wideBoard ? (
+          <WideBoard
+            state={state}
+            bottom={bottom}
+            revealBottom={!handsSecret}
+            revealTop={showBotHand && !handsSecret}
+            layout={layout}
+            corner={corner}
+            tools={sideTools}
+            bannerExtra={online ? (p) => <OnlineBanner online={online} player={p} /> : undefined}
+            handOrder={handView}
+            onExpandHand={human !== null && !handsSecret ? () => setSheet('hand') : undefined}
+            onSortHand={human !== null && !handsSecret && myHand.length > 1 ? sortHand : undefined}
+            turnPulse={animate && myTurnIdle}
+            handHint={handHint}
+            lifted={lifted}
+            ghost={drag?.kind === 'hand' ? drag.uid : null}
+            center={centerBand}
+            sideLeft={layout.sideHover ? <CardDetail state={state} uid={detailUid} /> : undefined}
+            sideRight={layout.sideLog ? <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} /> : undefined}
+            overlay={layout.hover.show && layout.hover.position === 'center' && hovered ? <CardDetail state={state} uid={hovered} /> : undefined}
             {...handlers}
           />
         ) : (
@@ -1604,6 +1640,8 @@ function Table({
 
         <AttackArrow state={state} drag={drag} mode={mode} hovered={hovered} legal={legal} />
 
+        {wideBoard && layout.hover.show && layout.hover.position === 'tooltip' && hovered && !drag && <HoverTip state={state} uid={hovered} />}
+
         {drag && drag.kind !== 'attacker' && (
           <div
             className={['drag-ghost', `ghost-${drag.kind}`, drag.over ? 'over' : ''].join(' ')}
@@ -1661,9 +1699,14 @@ function Table({
                   {game.paused ? t('game.resume') : t('game.pause')}
                 </button>
               )}
-              <button className="btn" onClick={() => (streamer || playerPanel ? openPanel('log') : setSheet('log'))}>
+              <button className="btn" onClick={() => (streamer || (playerPanel && panelLogOn) ? openPanel('log') : setSheet('log'))}>
                 {t('game.logBtn')}
               </button>
+              {wideBoard && (
+                <button className="btn" onClick={() => setSheet('layout')}>
+                  {t('game.layoutBtn')}
+                </button>
+              )}
               {playerPanel && loadOwnDeck && (
                 <button className="btn" onClick={() => openPanel('deck')}>
                   {t('game.decklistBtn')}
@@ -1753,6 +1796,8 @@ function Table({
             </div>
           </SheetFrame>
         )}
+
+        {sheet === 'layout' && <BoardLayoutEditor state={state} onClose={() => setSheet(null)} />}
 
         {sheet === 'hand' && human !== null && !handsSecret && (
           <SheetFrame title={t('game.yourHand', { n: orderedHand.length })} onClose={() => setSheet(null)}>
@@ -1923,7 +1968,7 @@ function Table({
           {panel === 'deck' && spectator?.roomId && <DeckPanel roomId={spectator.roomId} onZoom={setDeckCard} />}
         </aside>
       )}
-      {playerPanel && panel && (
+      {playerPanel && shownPanel && (
         <aside className="side-panel tabbed-panel player-panel" aria-label={t('game.panelLabel')}>
           <div className="panel-tabs">
             <div className="seg small" role="tablist">
@@ -1980,8 +2025,8 @@ function Table({
             <CoachPanel state={state} entries={coachEntries} marks={marks} onMark={setMark} />
           ) : (
             <>
-              <CardDetail state={state} uid={detailUid} />
-              <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
+              {(!wideBoard || (layout.hover.show && layout.hover.position === 'panel')) && <CardDetail state={state} uid={detailUid} />}
+              {(!wideBoard || (layout.log.show && layout.log.position === 'panel')) && <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />}
             </>
           )}
         </aside>
@@ -3097,6 +3142,16 @@ function CardZoom(props: {
       </div>
     </div>
   );
+}
+
+/** Mesa larga, hover "junto da carta": a carta ampliada ao lado da carta sob o mouse (a mesma caixa dos nomes no histórico). */
+function HoverTip({ state, uid }: { state: GameState; uid: string }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setAnchor(document.querySelector<HTMLElement>(`.mat .card[data-uid="${CSS.escape(uid)}"]`));
+  }, [uid]);
+  if (!anchor) return null;
+  return createPortal(<CardHoverPreview card={cardDef(state, uid)} anchor={anchor} />, document.body);
 }
 
 function CardDetail({ state, uid }: { state: GameState; uid: string | null }) {
