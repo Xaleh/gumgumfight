@@ -49,16 +49,16 @@ oposto. A pessoa configura só a própria metade.
 
 | Bloco | Ocultar | Tamanho | Posição |
 |-------|---------|---------|---------|
-| DON!! (área de custo: ativos, descansados, contadores) | não | P · M · G | à esquerda (padrão) · à direita do Líder, na fileira do Líder |
-| Cartas na mão | não, mas **recolhe** (pilha com a contagem, abre ao clicar; reaproveita `MiniHand`/`HandFan`) | P · M · G | canto esquerdo (padrão) · canto direito · embaixo da mesa (gasta altura: a mesa encolhe) |
-| Vida | **sim** (a etiqueta do jogador já mostra os corações) | P · M · G | coluna à esquerda do campo (padrão) · coluna à direita · junto do Líder (pilha pequena, como hoje) |
+| DON!! (área de custo: ativos, descansados, contadores) | não | P · M · G | à esquerda (padrão) · à direita do Líder, na fileira do Líder · embaixo da mesa (fileira inteira, como hoje; a mão então vai para um canto) |
+| Cartas na mão | não, mas **recolhe** (pilha com a contagem, abre ao clicar; reaproveita `MiniHand`/`HandFan`) | P · M · G | canto esquerdo (padrão) · canto direito · embaixo da mesa (gasta altura: a mesa encolhe; só se os DON!! não estiverem lá) |
+| Vida | **não** (faz parte do campo: há Vida virada para cima e efeitos que a olham) | P · M · G | coluna à esquerda do campo (padrão) · coluna à direita · junto do Líder (pilha pequena, como hoje) |
 | Líder | não | P · M · G | fixo no centro da fileira |
 | Stage | não | P · M · G | esquerda · direita (padrão) do Líder |
 | Descarte | não | P · M · G | esquerda · direita (padrão) |
 | Deck de DON!! | não | P · M · G | ponta de fora da área de custo (padrão) · junto do Líder |
 | Deck | não | P · M · G | esquerda · direita (padrão) |
-| Histórico (`LogPanel`) | **sim** | P · M · G (largura do painel: 0,8× · 1× · 1,2×) | painel lateral (padrão) · ao lado da mesa, à direita |
-| Hover de carta (`CardDetail`) | **sim** | P · M · G | painel lateral (padrão) · centro da mesa (grande, por cima, só enquanto o mouse está na carta) · ao lado da mesa, à esquerda · junto da carta (`CardHoverPreview`) |
+| Histórico (`LogPanel`) | **sim** | P · M · G (largura do painel: 0,8× · 1× · 1,2×) | painel lateral (padrão) · ao lado da mesa, à direita (só com o painel fechado) |
+| Hover de carta (`CardDetail`) | **sim** | P · M · G | painel lateral (padrão) · centro da mesa (grande, por cima, só enquanto o mouse está na carta) · ao lado da mesa, à esquerda (só com o painel fechado) · junto da carta (`CardHoverPreview`) |
 
 Regras:
 
@@ -68,7 +68,19 @@ Regras:
   dois blocos nunca se sobrepõem. Arrastar livremente fica como ideia de v2.
 - Ordem na fileira do Líder, do Líder para fora: Stage, Deck, Descarte; a área de custo (com o deck de DON!!) ocupa
   o outro lado. Blocos do mesmo lado seguem essa ordem.
-- **Histórico e Hover fora do painel ou ocultos** fecham o painel lateral (`no-panel`, já existe) e a mesa cresce.
+- **Nada extravasa a tela, em nenhuma configuração.** O `--cw` é calculado a partir do que está ligado e do tamanho
+  de cada bloco: `rows` (altura da mesa mais as faixas da mão e dos DON!! embaixo, ou a altura das laterais, a que for
+  maior) e `cols` (largura da mesa mais as duas laterais), em larguras de carta;
+  `--cw = min((100cqh - 24px) / rows, (100cqw - painel - 24px) / cols, 150px)`. Mais blocos grandes = cartas um pouco
+  menores, nunca corte. A área de custo comprime os DON!! quando são muitos (como `.don-cards` já faz).
+- **Mão e DON!! nunca se sobrepõem.** Só um dos dois pode ficar "embaixo da mesa": a opção do outro fica desabilitada
+  no editor, com o motivo no `title`, e `load()` resolve um JSON conflitante mandando a mão para o canto esquerdo.
+- **Mão do oponente** sempre na parte de cima: no canto oposto ao da sua (ou numa faixa acima da mesa quando a sua
+  fica embaixo). DON!! embaixo da mesa espelha numa faixa acima da metade do oponente.
+- **Painel lateral.** Se o Hover ou o Histórico está no painel, os dois entram nele ("ao lado da mesa" do outro vira
+  "painel"), as laterais de hover/histórico deixam de existir e a mesa ocupa todo o espaço ao lado do painel (sobram só
+  os cantos das mãos). Com o painel fechado e a mão embaixo da mesa, hover e histórico "ao lado da mesa" ficam
+  centralizados na vertical.
 - A área de custo comprime os DON!! quando são muitos (como `.don-cards` já faz), então a fileira do Líder cabe
   sempre nas 8 larguras de carta.
 
@@ -94,9 +106,9 @@ Entra em `Settings` (`settings.tsx`), salvo no `localStorage` com as demais (`gu
 ```ts
 export type BlockSize = 'small' | 'medium' | 'large';
 export interface BoardLayout {
-  don: { size: BlockSize; position: 'left' | 'right' };
+  don: { size: BlockSize; position: 'left' | 'right' | 'bottom' };
   hand: { size: BlockSize; position: 'corner-left' | 'corner-right' | 'bottom'; collapsed: boolean };
-  life: { show: boolean; size: BlockSize; position: 'col-left' | 'col-right' | 'base' };
+  life: { size: BlockSize; position: 'col-left' | 'col-right' | 'base' };
   leader: { size: BlockSize };
   stage: { size: BlockSize; position: 'left' | 'right' };
   trash: { size: BlockSize; position: 'left' | 'right' };
@@ -109,6 +121,9 @@ export interface BoardLayout {
 
 - `DEFAULT_LAYOUT` = a mesa larga padrão. `load()` valida campo a campo (como faz com `streamerPlaymat`): valor
   desconhecido volta ao padrão, então um JSON antigo ou editado à mão nunca quebra a mesa.
+- `effectiveLayout(layout)` (função pura, testada) aplica as regras de conflito antes de renderizar: painel aberto
+  puxa o outro bloco para o painel; DON!! embaixo manda a mão para o canto. O editor mostra o que vale de fato e
+  desabilita a opção bloqueada.
 - `sidePanel` (painel aberto/fechado) passa a derivar de `log`/`hover` no painel; o botão de histórico ao lado do
   deck continua abrindo e fechando o painel, gravando nesses campos.
 - Por navegador, como as outras configurações. Sincronizar com a conta fica para depois.
@@ -142,8 +157,8 @@ Riscos e cuidados:
   largura mínima (uns 2 `--cw`), a mão volta para baixo da mesa e os blocos "ao lado da mesa" voltam para o painel.
 - As lições do tutorial e as dicas do treinador apontam para zonas da mesa em coluna; no modo largo as zonas têm os
   mesmos `data-anchor`, mas vale conferir os textos que dizem "à esquerda do Líder".
-- Tamanho "grande" em tudo ao mesmo tempo estoura as 8 larguras da fileira do Líder: o editor avisa e a fileira
-  comprime a área de custo primeiro.
+- Tamanho "grande" em tudo ao mesmo tempo não estoura nada: `cols`/`rows` crescem e o `--cw` diminui. O editor
+  mostra o resultado na prévia, que é a única forma honesta de avisar que ficou pequeno.
 
 Esforço estimado: modelo + `WideBoard` + CSS (3 dias), painel/laterais/hover no GameScreen (1 dia), editor com
 prévia (1,5 dia), i18n + docs + testes do `load()` (0,5 dia).
