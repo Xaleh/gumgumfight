@@ -192,6 +192,9 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     modifiers: state.modifiers.filter((m) => vis.has(m.uid)).map((m) => ({ ...m, uid: alias(m.uid) })),
     usedThisTurn: state.usedThisTurn.map(usedKey).filter((k): k is string => k !== null),
     battledCharacter: refs(state.battledCharacter),
+    ...(state.onPlayNegated
+      ? { onPlayNegated: state.onPlayNegated.map(({ source, ...n }) => (source && vis.has(source) ? { ...n, source: alias(source) } : n)) }
+      : {}),
     refreshSkipped: refs(state.refreshSkipped),
     ...(state.knownHand ? { knownHand: refs(state.knownHand) } : {}),
     delayed: state.delayed?.filter((d) => vis.has(d.source)).map((d) => ({ ...d, source: alias(d.source), last: refs(d.last) })),

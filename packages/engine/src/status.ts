@@ -20,6 +20,8 @@ export type CardStatusKind =
   | 'skipRefresh'
   | 'cannotBlock'
   | 'negated'
+  | 'noOnPlay'
+  | 'effectUsed'
   | 'keyword'
   | 'attribute'
   | 'cannotBeKO'
@@ -262,8 +264,49 @@ export function cardStatuses(state: GameState, uid: string): CardStatus[] {
     fromMods(['negated'], 'negated', () => negated);
     if (!out.has('negated')) add('negated', 99, { ...negated, ...AURA_UNTIL });
   }
+  // "[On Play] effects are negated" (Líder [Marshall.D.Teach]): o Líder do jogador afetado fica marcado
+  // "SEM ON PLAY" e a carta que anulou, "EFEITO USADO", enquanto a anulação durar. Sem isso não dá para
+  // saber, olhando a mesa, se o efeito já foi usado neste turno.
+  const negations = (state.onPlayNegated ?? []).filter((n) => n.untilTurn >= state.turn);
+  const negationUntil = (n: { untilTurn: number }) => modifierUntilInfo(state, { duration: 'nextOpponentTurn', untilTurn: n.untilTurn });
+  if (loc.zone === 'leader') {
+    for (const n of negations) {
+      if (n.player !== loc.player) continue;
+      const name = state.players[n.player].name;
+      add('noOnPlay', n.untilTurn, {
+        kind: 'noOnPlay',
+        icon: '🔇',
+        label: 'Sem On Play',
+        tag: 'SEM ON PLAY',
+        tagKey: 'status.noOnPlayTag',
+        text: `Os efeitos [Ao Jogar] de ${name} estão anulados`,
+        textKey: 'status.noOnPlay',
+        textParams: { name },
+        ...negationUntil(n),
+        tone: 'bad',
+        onCard: true,
+      });
+    }
+  }
 
   // Ganhos.
+  for (const n of negations) {
+    if (n.source !== uid) continue;
+    const name = state.players[n.player].name;
+    add('effectUsed', n.untilTurn, {
+      kind: 'effectUsed',
+      icon: '✅',
+      label: 'Efeito usado',
+      tag: 'EFEITO USADO',
+      tagKey: 'status.effectUsedTag',
+      text: `Efeito usado: os [Ao Jogar] de ${name} estão anulados`,
+      textKey: 'status.effectUsed',
+      textParams: { name },
+      ...negationUntil(n),
+      tone: 'good',
+      onCard: true,
+    });
+  }
   for (const kw of Object.keys(KEYWORD) as Keyword[]) {
     if (def.keywords.includes(kw) || !hasKeyword(state, uid, kw)) continue;
     // O nome da palavra-chave e a etiqueta ficam em inglês, como no jogo.

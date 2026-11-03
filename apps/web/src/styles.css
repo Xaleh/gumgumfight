@@ -3540,6 +3540,8 @@ button.hint-pill.undo-pill {
 .tag-skipRefresh { --tag: #7b3fb8; --tag-ink: #3a1a5c; }
 .tag-cannotBlock { --tag: #c75a00; --tag-ink: #5e2a00; }
 .tag-negated { --tag: #5a5a6a; --tag-ink: #26262e; }
+.tag-noOnPlay { --tag: #6d4c9f; --tag-ink: #2f1d4a; }
+.tag-effectUsed { --tag: #2e7d32; --tag-ink: #123d15; }
 .tag-attribute { --tag: #6b7a1e; --tag-ink: #33390c; }
 .tag-cannotBeKO { --tag: #1f8a4c; --tag-ink: #0d4224; }
 .tag-canAttackActive { --tag: #1d6fd1; --tag-ink: #0d3566; }

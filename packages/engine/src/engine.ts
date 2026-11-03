@@ -4528,7 +4528,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       const who = step.who === 'self' ? frame.controller : opponent(frame.controller);
       const mine = state.activePlayer === frame.controller;
       const untilTurn = step.duration === 'nextOpponentTurn' ? state.turn + (mine ? 1 : 2) : state.turn;
-      (state.onPlayNegated ??= []).push({ player: who, untilTurn });
+      (state.onPlayNegated ??= []).push({ player: who, untilTurn, source: frame.source });
       log(state, frame.controller, lg('playerOnPlayNegated', `Os efeitos [Ao Jogar] de ${state.players[who].name} estão anulados.`, { player: state.players[who].name }));
       return true;
     }

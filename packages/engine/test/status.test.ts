@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyAction } from '../src/engine';
+import { applyAction, createGame } from '../src/engine';
 import { cardStatuses, modifierUntil } from '../src/status';
-import type { GameState, Modifier } from '../src/types';
+import type { CardData, DeckList, GameState, Modifier } from '../src/types';
 import { createAliases, viewFor } from '../src/view';
-import { putOnField, started, toTurn } from './helpers';
+import { cards, putOnField, started, toTurn } from './helpers';
 
 // Marcadores de estado nas cartas (Trello): tudo o que o motor guarda de temporário sobre uma carta em campo,
 // com texto e até quando vale, igual para os dois jogadores e para o espectador.
@@ -21,6 +23,15 @@ function mod(s: GameState, controller: 0 | 1, m: Omit<Modifier, 'untilTurn'>): M
 }
 
 const kinds = (s: GameState, uid: string) => cardStatuses(s, uid).map((x) => x.kind);
+
+/** Teach (OP09-081, ST27) contra Kid: A começa. */
+function teachVsKid(): GameState {
+  const st27 = JSON.parse(readFileSync(join(__dirname, '../../../data/cards/st27.json'), 'utf8')).cards as CardData[];
+  const deck = (leader: string): DeckList => ({ id: leader, name: leader, leader, cards: [{ id: 'ST01-006', count: 50 }] });
+  let s = createGame({ seed: 7, firstPlayer: 0, cards: [...cards, ...st27], players: [{ name: 'A', deck: deck('OP09-081') }, { name: 'B', deck: deck('ST02-001') }] });
+  s = applyAction(s, { type: 'mulligan', player: 0, redraw: false });
+  return applyAction(s, { type: 'mulligan', player: 1, redraw: false });
+}
 
 describe('cardStatuses', () => {
   it('fora do campo não há estados; em campo sem efeitos também não', () => {
@@ -116,5 +127,65 @@ describe('cardStatuses', () => {
       expect(cardStatuses(v, aliases.toAlias[s.players[1].leader.uid])).toEqual(cardStatuses(s, s.players[1].leader.uid));
     }
     expect(kinds(s, kidChar)).toEqual(['cannotAttackLeader', 'cannotRest', 'keyword']);
+  });
+
+  it('Teach (OP09-081): "EFEITO USADO" no Líder que anulou e "SEM ON PLAY" no Líder afetado, até o fim do próximo turno do oponente', () => {
+    let s = toTurn(teachVsKid(), 3); // turno de A (Teach)
+    const teach = s.players[0].leader.uid;
+    const kid = s.players[1].leader.uid;
+    expect(kinds(s, teach)).toEqual([]);
+    expect(kinds(s, kid)).toEqual([]);
+
+    s = applyAction(s, { type: 'activate', player: 0, uid: teach, ability: 1 });
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [s.players[0].hand[0]] });
+    expect(s.pending).toBeNull();
+    expect(s.onPlayNegated).toEqual([{ player: 1, untilTurn: 4, source: teach }]);
+
+    const used = cardStatuses(s, teach);
+    expect(used).toHaveLength(1);
+    expect(used[0]).toMatchObject({
+      kind: 'effectUsed',
+      tag: 'EFEITO USADO',
+      tagKey: 'status.effectUsedTag',
+      text: 'Efeito usado: os [Ao Jogar] de B estão anulados',
+      textKey: 'status.effectUsed',
+      textParams: { name: 'B' },
+      until: 'até o fim do próximo turno de B',
+      untilKey: 'status.untilEndOfNextTurn',
+      tone: 'good',
+      onCard: true,
+    });
+    const no = cardStatuses(s, kid);
+    expect(no).toHaveLength(1);
+    expect(no[0]).toMatchObject({
+      kind: 'noOnPlay',
+      tag: 'SEM ON PLAY',
+      tagKey: 'status.noOnPlayTag',
+      text: 'Os efeitos [Ao Jogar] de B estão anulados',
+      textKey: 'status.noOnPlay',
+      textParams: { name: 'B' },
+      until: 'até o fim do próximo turno de B',
+      tone: 'bad',
+      onCard: true,
+    });
+    // Só nos Líderes: os Personagens de B não ganham a tag.
+    const ch = putOnField(s, 1, 'ST01-006');
+    expect(kinds(s, ch)).toEqual([]);
+
+    // As visões dos dois jogadores e do espectador mostram o mesmo.
+    const aliases = createAliases(s, randomId);
+    for (const viewer of [0, 1, null] as const) {
+      const v = viewFor(s, viewer, aliases);
+      expect(cardStatuses(v, aliases.toAlias[teach])).toEqual(cardStatuses(s, teach));
+      expect(cardStatuses(v, aliases.toAlias[kid])).toEqual(cardStatuses(s, kid));
+    }
+
+    // No turno de B ainda vale ("até o fim deste turno"); depois dele, some dos dois.
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    expect(cardStatuses(s, kid)[0]).toMatchObject({ kind: 'noOnPlay', until: 'até o fim deste turno' });
+    expect(kinds(s, teach)).toEqual(['effectUsed']);
+    s = applyAction(s, { type: 'endTurn', player: 1 });
+    expect(kinds(s, teach)).toEqual([]);
+    expect(kinds(s, kid)).toEqual([]);
   });
 });

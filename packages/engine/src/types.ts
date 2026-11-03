@@ -1436,8 +1436,11 @@ export interface GameState {
   restrictions?: Restriction[];
   /** "The next time you play X from your hand during this turn, the cost will be reduced by N." */
   costReductions?: Array<{ player: PlayerId; filter: CardFilter; amount: number }>;
-  /** "[On Play] effects are negated" até o turno indicado (inclusive). */
-  onPlayNegated?: Array<{ player: PlayerId; untilTurn: number }>;
+  /**
+   * "[On Play] effects are negated" até o turno indicado (inclusive). `source` é a carta cujo efeito anulou
+   * (o Líder [Marshall.D.Teach], OP09-081): a interface marca nela "efeito usado" e no Líder de `player` "sem On Play".
+   */
+  onPlayNegated?: Array<{ player: PlayerId; untilTurn: number; source?: string }>;
   /** Cartas que batalharam com um Personagem do oponente neste turno. */
   battledCharacter?: string[];
   /**
