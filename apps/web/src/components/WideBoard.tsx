@@ -179,7 +179,7 @@ function Half({
 }
 
 /** Até quantas vezes a mesa aperta a conta quando, mesmo assim, algo passou da tela. */
-const FIT_PASSES = 3;
+const FIT_PASSES = 4;
 
 export function WideBoard({
   state,
@@ -221,14 +221,22 @@ export function WideBoard({
   useEffect(() => {
     const el = root.current;
     const col = el?.parentElement;
-    if (!el || !col || !col.style.getPropertyValue('--bh')) return;
+    if (!el || !col) return;
+    // A coluna ainda sem medida (montada depois do useBoardSize dela): mede aqui, senão o --cw sairia da janela inteira.
+    if (!col.style.getPropertyValue('--bh')) {
+      col.style.setProperty('--bw', `${col.clientWidth}px`);
+      col.style.setProperty('--bh', `${col.clientHeight}px`);
+      col.toggleAttribute('data-landscape', col.clientWidth >= col.clientHeight);
+      setFit((f) => ({ ...f }));
+      return;
+    }
     // Sem espaço de verdade (a caixa ainda sem altura, uma aba escondida), não há o que medir.
     if (fit.pass >= FIT_PASSES || el.clientHeight < 120 || el.clientWidth < 240) return;
     const overH = el.scrollHeight - el.clientHeight;
     const overW = el.scrollWidth - el.clientWidth;
     if (overH <= 1 && overW <= 1) return;
     // Aperta na proporção do que passou (no máximo o dobro por vez).
-    const by = (over: number, size: number) => Math.min(2, 1 + over / size) * 1.01;
+    const by = (over: number, size: number) => Math.min(2, 1 + over / size) * 1.02;
     setFit((f) => ({
       rows: overH > 1 ? f.rows * by(overH, el.clientHeight) : f.rows,
       cols: overW > 1 ? f.cols * by(overW, el.clientWidth) : f.cols,

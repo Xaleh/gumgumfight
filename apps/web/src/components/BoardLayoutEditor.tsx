@@ -304,11 +304,12 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
     );
   });
 
-  let preview: ReactNode;
-  if (sample) {
-    preview = (
-      <div className={['wm-preview', eff.panelOn ? '' : 'no-panel'].join(' ')} style={{ ['--panel-w' as string]: `${panelWidth(eff)}px` }}>
-        <div className="board-col wm-preview-col" ref={previewCol}>
+  // A coluna da prévia existe desde o primeiro render (mesmo sem a partida de exemplo ainda): o useBoardSize
+  // mede a coluna ao montar e só avisa de novo quando o tamanho muda; se ela surgisse depois, ficaria sem medida.
+  const preview: ReactNode = (
+    <div className={['wm-preview', eff.panelOn && sample ? '' : 'no-panel'].join(' ')} style={{ ['--panel-w' as string]: `${panelWidth(eff)}px` }}>
+      <div className="board-col wm-preview-col" ref={previewCol}>
+        {sample ? (
           <WideBoard
             state={sample}
             bottom={bottom}
@@ -322,13 +323,13 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
             inert
             {...INERT}
           />
-        </div>
-        {eff.panelOn && <PanelPreview state={sample} layout={eff} />}
+        ) : (
+          <div className="wm-preview-wait">{failed ? t('layout.previewFailed') : t('common.loading')}</div>
+        )}
       </div>
-    );
-  } else {
-    preview = <div className="wm-preview placeholder">{failed ? t('layout.previewFailed') : t('common.loading')}</div>;
-  }
+      {eff.panelOn && sample && <PanelPreview state={sample} layout={eff} />}
+    </div>
+  );
 
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>

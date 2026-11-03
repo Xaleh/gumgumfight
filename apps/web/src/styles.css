@@ -15947,6 +15947,8 @@ div.dk-tile-main {
   gap: 8px;
   width: 100%;
   aspect-ratio: 16 / 9;
+  /* A prévia não toma a folha inteira: sobra tela para os cartões dos blocos logo abaixo. */
+  max-height: 56vh;
   padding: 8px;
   border-radius: 14px;
   background: var(--bg);
@@ -15956,7 +15958,9 @@ div.dk-tile-main {
 .wm-preview.no-panel {
   grid-template-columns: minmax(0, 1fr);
 }
-.wm-preview.placeholder {
+.wm-preview-wait {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
   color: var(--muted);
