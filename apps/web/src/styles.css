@@ -2013,7 +2013,8 @@ input[type='number'] {
   box-shadow: 0 3px 10px rgba(var(--shadow-rgb), 0.3);
 }
 /* Atalho do histórico no celular: ao lado do seu deck, com a conta de linhas novas desde a última leitura. */
-.round-btn.log-btn {
+.round-btn.log-btn,
+.round-btn.coach-btn {
   position: relative;
   color: #fff;
 }
@@ -11850,7 +11851,8 @@ a.sponsor-card:hover {
 .game.streamer .side-panel {
   position: relative;
 }
-.round-btn.log-btn.on {
+.round-btn.log-btn.on,
+.round-btn.coach-btn.on {
   background: var(--blue);
 }
 .tabbed-panel {
