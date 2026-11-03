@@ -475,6 +475,26 @@ escrito. Pausado (passo a passo), contorno e legenda ficam parados em "Próxima 
 configuração `replayCues` ("Cliques no replay", em `settings.tsx`; também na folha de abrir o replay e no botão 👆 da
 `ReplayBar`) desliga tudo.
 
+### Layout da mesa (desktop)
+
+No PC (`wide`, ≥ 1000 px) quem joga vê a **mesa larga** (`WideBoard.tsx`), no lugar da mesa em coluna (`Board.tsx`,
+que segue no celular, no tutorial, na transmissão, no replay embutido e na visão do Streamer). Cada metade tem os
+Personagens (com a Vida numa coluna ao lado), a fileira do Líder (área de custo dos DON!!, Stage, Deck, Descarte) e,
+se o jogador quiser, uma fileira de DON!! própria; as mãos ficam nos cantos, fora da mesa, e o hover de carta e o
+histórico moram no painel lateral ou nas laterais da mesa. O que fica onde, e de que tamanho, é o `boardLayout` das
+configurações (`game/boardLayout.ts`): dez blocos (DON!!, mão, Vida, Líder, Stage, Descarte, deck de DON!!, Deck,
+histórico, hover), cada um com tamanho (P · M · G = 0,8× · 1× · 1,25×), posição por encaixe e, nos dois de que o jogo
+não depende (histórico e hover), se aparece. `parseLayout` valida campo a campo o que está salvo; `effectiveLayout`
+aplica as regras de conflito (se o histórico ou o hover está no painel, o outro "ao lado da mesa" entra nele; com a
+fileira de DON!! abaixo do Líder a mão não fica embaixo da mesa); `measureLayout` estima `rows`/`cols` em larguras de
+carta e o CSS faz `--cw = min((altura - fixa) / rows, largura / cols, 150px)`, então nada sai da tela; a mesa ainda mede
+a própria caixa depois de renderizar e aperta a conta se algo passou (até três vezes). O markup das zonas é o mesmo da
+mesa em coluna (`LifeZone`, `DonRow`, `DeckPile`... exportados de `Board.tsx`), então as animações (`data-anchor`), a
+seta de ataque e o arrasto (`data-drop`, `.don-row.bottom`, `.hand.bottom`) não mudam. A tela de personalização
+(`BoardLayoutEditor.tsx`, em Configurações › Layout da mesa › Personalizar e no menu da partida) mostra a prévia viva
+(a própria partida, ou uma de exemplo montada com `createScenario` a partir do primeiro deck pronto) e um cartão por
+bloco, com quatro predefinições; as opções que outra escolha bloqueia ficam desabilitadas com o motivo no `title`.
+
 ### Partida online e espectador
 
 `useOnlineGame.ts` abre um `EventSource` (`/events?t=<token>` para jogador, `/watch[?hands=1]` para espectador),

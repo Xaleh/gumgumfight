@@ -1,6 +1,6 @@
 # Layout da mesa configurável (proposta)
 
-> Status: proposta, ainda não implementada. Protótipo interativo da tela: https://claude.ai/artifact/JJvoLdEjZ7gNMZfAqB468j
+> Status: **implementado** (`WideBoard.tsx`, `BoardLayoutEditor.tsx`, `game/boardLayout.ts`; ver a seção "Layout da mesa (desktop)" em `documentacao-tecnica.md`). Este documento é a proposta que guiou a implementação; o protótipo da tela: https://claude.ai/artifact/JJvoLdEjZ7gNMZfAqB468j
 
 Duas coisas, que andam juntas:
 

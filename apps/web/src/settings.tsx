@@ -2,9 +2,11 @@ import { registerCardCdn } from '@gumgum/engine';
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { audio } from './audio';
+import { BoardLayoutEditor } from './components/BoardLayoutEditor';
 import { ConnectedApps } from './components/ConnectedApps';
 import { Flag } from './components/Flags';
 import { InstallButton } from './components/Install';
+import { type BoardLayout, DEFAULT_LAYOUT, parseLayout } from './game/boardLayout';
 import { DEFAULT_LOCALE, detectLocale, I18nProvider, isLocale, type Locale, LOCALES, type MessageKey, useT } from './i18n';
 import { notificationPermission, pushSupport, syncPush, useInstallMode, wakeLockSupported } from './pwa';
 
@@ -46,6 +48,8 @@ export interface Settings {
   streamerPlaymat: Playmat;
   /** Partida no desktop: o painel lateral (histórico e decklist) aberto; fechado, a mesa ocupa a tela toda. */
   sidePanel: boolean;
+  /** Partida no desktop: a mesa larga, bloco a bloco (tamanho, posição, o que aparece); ver `game/boardLayout.ts`. */
+  boardLayout: BoardLayout;
   /** Volume dos efeitos sonoros (0 = mudo … 1). */
   sfxVolume: number;
   /** Volume da música de fundo (0 = mudo … 1). */
@@ -76,6 +80,7 @@ const EDITABLE: Editable[] = [
   'streamerLayout',
   'streamerPlaymat',
   'sidePanel',
+  'boardLayout',
   'sfxVolume',
   'musicVolume',
   'keepAwake',
@@ -107,6 +112,7 @@ const DEFAULTS: Settings = {
   streamerLayout: 'lateral',
   streamerPlaymat: 'navy',
   sidePanel: true,
+  boardLayout: DEFAULT_LAYOUT,
   sfxVolume: 0.8,
   musicVolume: 0.5,
   keepAwake: true,
@@ -150,6 +156,7 @@ function load(): Settings {
       streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
       streamerPlaymat: PLAYMATS.includes(saved.streamerPlaymat as Playmat) ? (saved.streamerPlaymat as Playmat) : 'navy',
       sidePanel: saved.sidePanel !== false,
+      boardLayout: parseLayout(saved.boardLayout),
       serverImages: false,
       pushKey: null,
       sfxVolume: volume(saved.sfxVolume, DEFAULTS.sfxVolume),
@@ -585,11 +592,14 @@ function InstallRow() {
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   const s = useSettings();
   const t = useT();
+  /** Layout da mesa: a tela de personalização por cima das configurações (Esc fecha só ela). */
+  const [layoutOpen, setLayoutOpen] = useState(false);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !layoutOpen && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, layoutOpen]);
+  if (layoutOpen) return <BoardLayoutEditor onClose={() => setLayoutOpen(false)} />;
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
       <div className="sheet settings-sheet" role="dialog" aria-label={t('settings.dialog')} onClick={(e) => e.stopPropagation()}>
@@ -627,6 +637,11 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </OptionRow>
             <OptionRow title={t('settings.coachTips')} hint={t('settings.coachTipsHint')}>
               <Switch on={s.coachTips} label={t('settings.coachTips')} onChange={(on) => s.update({ coachTips: on })} />
+            </OptionRow>
+            <OptionRow title={t('settings.boardLayout')} hint={t('settings.boardLayoutHint')}>
+              <button type="button" className="btn small" onClick={() => setLayoutOpen(true)}>
+                {t('settings.boardLayoutBtn')}
+              </button>
             </OptionRow>
             <OptionRow title={t('settings.confirmDeck')} hint={t('settings.confirmDeckHint')}>
               <Switch on={s.confirmDeck} label={t('settings.confirmDeck')} onChange={(on) => s.update({ confirmDeck: on })} />
