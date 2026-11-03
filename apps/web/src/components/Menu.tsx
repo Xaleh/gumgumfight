@@ -955,7 +955,7 @@ export function Menu({
                   <span className="mode-field-label" id="bot-level-label">
                     {t('menu.botLevel')}
                   </span>
-                  <div className="seg small" role="group" aria-labelledby="bot-level-label">
+                  <div className="seg small level-seg" role="group" aria-labelledby="bot-level-label">
                     {(
                       [
                         ['easy', 'menu.botEasy'],
