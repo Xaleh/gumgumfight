@@ -3,7 +3,7 @@
 // exemplo) ou no menu da partida (com a própria partida). As escolhas só valem ao salvar.
 
 import { type CardData, cardDef, createScenario, type GameState, type PlayerId } from '@gumgum/engine';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import {
   BLOCK_IDS,
@@ -23,6 +23,7 @@ import {
   sameLayout,
 } from '../game/boardLayout';
 import { buildSetup } from '../game/setup';
+import { useBoardSize } from '../hooks/useBoardSize';
 import { type MessageKey, useT } from '../i18n';
 import { Switch, useSettings } from '../settings';
 import type { BoardHandlers } from './Board';
@@ -232,6 +233,9 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
   }, [toast]);
 
   const eff = useMemo(() => effectiveLayout(draft), [draft]);
+  // A prévia mede a própria coluna (--bw/--bh), como a mesa de verdade faz no GameScreen.
+  const previewCol = useRef<HTMLDivElement>(null);
+  useBoardSize(previewCol);
   const preset = matchingPreset(draft);
   const dirty = !sameLayout(draft, settings.boardLayout);
   const key = (k: string) => k as MessageKey;
@@ -304,7 +308,7 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
   if (sample) {
     preview = (
       <div className={['wm-preview', eff.panelOn ? '' : 'no-panel'].join(' ')} style={{ ['--panel-w' as string]: `${panelWidth(eff)}px` }}>
-        <div className="board-col wm-preview-col">
+        <div className="board-col wm-preview-col" ref={previewCol}>
           <WideBoard
             state={sample}
             bottom={bottom}

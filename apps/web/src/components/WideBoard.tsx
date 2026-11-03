@@ -8,7 +8,7 @@
 // `.hand.bottom`) continuam os mesmos.
 
 import { MAX_CHARACTERS, type GameState, type PlayerId } from '@gumgum/engine';
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { baseOrder, type BaseItem, type EffectiveLayout, measureLayout, SIZE_K } from '../game/boardLayout';
 import { useT } from '../i18n';
 import {
@@ -216,10 +216,14 @@ export function WideBoard({
     lastKey.current = fitKey;
     if (fit.pass !== 0) setFit({ rows: 1, cols: 1, pass: 0 });
   }
-  useLayoutEffect(() => {
+  // Depois dos layout effects do pai: a coluna da mesa já mediu e gravou --bw/--bh (useBoardSize), que o
+  // --cw usa; antes disso a conta sairia do tamanho da janela inteira e apertaria à toa.
+  useEffect(() => {
     const el = root.current;
+    const col = el?.parentElement;
+    if (!el || !col || !col.style.getPropertyValue('--bh')) return;
     // Sem espaço de verdade (a caixa ainda sem altura, uma aba escondida), não há o que medir.
-    if (!el || fit.pass >= FIT_PASSES || el.clientHeight < 120 || el.clientWidth < 240) return;
+    if (fit.pass >= FIT_PASSES || el.clientHeight < 120 || el.clientWidth < 240) return;
     const overH = el.scrollHeight - el.clientHeight;
     const overW = el.scrollWidth - el.clientWidth;
     if (overH <= 1 && overW <= 1) return;
@@ -323,7 +327,7 @@ export function WideBoard({
     '--rows': m.rows * fit.rows,
     '--cols': m.cols * fit.cols,
     '--fixed': `${m.fixedPx}px`,
-    '--bw': m.boardW,
+    '--bwu': m.boardW,
     '--side': m.side,
     '--k-don': SIZE_K[layout.don.size],
     '--k-hand': SIZE_K[layout.hand.size],
