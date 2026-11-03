@@ -15218,6 +15218,15 @@ div.dk-tile-main {
 .mode-card .seg.small button.team.on {
   background: color-mix(in srgb, var(--accent) 35%, var(--panel));
 }
+/* Com o nível Time são quatro opções: numa carta estreita (PC com as cinco cartas lado a lado) elas não cabem
+   numa linha e o "Time" ficava cortado pelo overflow do .seg. Aqui o que não cabe desce para uma segunda linha. */
+.mode-card .seg.level-seg {
+  flex-wrap: wrap;
+  border-radius: 18px;
+}
+.mode-card .seg.level-seg button {
+  flex: 1 1 auto;
+}
 .mode-hint {
   margin: 4px 0 0;
 }
