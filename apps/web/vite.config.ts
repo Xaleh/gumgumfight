@@ -28,7 +28,8 @@ function serviceWorker(): Plugin {
     },
     generateBundle(_options, bundle) {
       const files = Object.values(bundle)
-        .filter((f) => (f.type === 'chunk' ? f.isEntry : /\.(css|webp|jpg|png|svg)$/.test(f.fileName)))
+        // O Web Worker do bot (game/botWorker.ts) também: offline, a partida contra o bot o usa.
+        .filter((f) => (f.type === 'chunk' ? f.isEntry : /\.(css|webp|jpg|png|svg)$/.test(f.fileName) || /\/botWorker-[^/]*\.js$/.test(f.fileName)))
         .map((f) => `/${f.fileName}`);
       const icons = readdirSync(join(__dirname, 'public/icons'))
         .filter((f) => !f.includes('1024'))

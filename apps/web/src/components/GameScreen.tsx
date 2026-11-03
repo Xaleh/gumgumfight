@@ -31,6 +31,8 @@ import { BotRating } from './BotFeedback';
 import { CoachPanel } from './CoachPanel';
 import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
+import { usePreloadCardImages } from '../game/preloadImages';
+import { useBoardSize } from '../hooks/useBoardSize';
 import { describeReplayAction } from '../game/replayCue';
 import { coachTip } from '../game/tutorial/coachTips';
 import type { EmbedLayout } from '../embed';
@@ -655,7 +657,7 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, update: updateSettings } = useSettings();
+  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -668,12 +670,17 @@ function Table({
   const allActions = game.actions();
   // Replay: os pulos (voltar, ir para uma ação) e a velocidade máxima mudam a mesa sem animação.
   const replay = game.replay;
+  // Tamanho da mesa para o CSS (--bw/--bh, deitada ou em pé), medido só quando muda.
+  const boardCol = useRef<HTMLDivElement>(null);
+  useBoardSize(boardCol);
   const motion = useBoardMotion(state, {
     enabled: animate && !game.jumped && !(replay && game.speed >= 8),
     tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
     lastAction: allActions[allActions.length - 1],
     lang: locale,
   });
+  // As imagens das cartas já conhecidas baixam antes de a carta aparecer (e voar) na mesa.
+  usePreloadCardImages(state, showImages);
   // Sons da mesa e música da partida (os mesmos pontos que as animações; valem sem elas também).
   useMatchAudio(state, {
     enabled: !game.jumped && !(replay && game.speed >= 8),
@@ -1474,7 +1481,7 @@ function Table({
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="board-col">
+      <div className="board-col" ref={boardCol}>
         {lateral ? (
           <LateralBoard
             state={state}

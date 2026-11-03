@@ -1,28 +1,23 @@
 import {
   type Action,
   actingPlayer,
-  actionFromView,
   applyAction,
-  type BotExplanation,
   type BotLevel,
-  type DeckProfile,
   type CardEngineText,
-  chooseBotAction,
-  chooseSimpleBotAction,
+  type DeckProfile,
   createGame,
   type DeckList,
   type GameConfig,
   type GameState,
   hiddenDecision,
-  identityAliases,
   type PlayerId,
   REPLAY_VERSION,
   ReplayCursor,
-  viewFor,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CoachEntry, PlayFormat } from '../api';
 import { t } from '../i18n';
+import { thinkBot } from './botClient';
 import { motionWait } from './motion';
 
 export type GameMode = 'bot' | 'replay';
@@ -97,21 +92,6 @@ interface Entry {
 
 const MAX_HISTORY = 400;
 
-/**
- * Jogada do bot a partir da visão dele (como no servidor): ele não enxerga a mão nem o deck do humano.
- * Se a tradução de volta falhar (não deveria), o bot heurístico decide pelo estado completo para a
- * partida não travar.
- */
-function botAction(state: GameState, p: PlayerId, level: BotLevel, profile?: DeckProfile, explain?: (e: BotExplanation) => void): Action {
-  const aliases = identityAliases(state);
-  const toReal = (a: Action): Action => {
-    const r = actionFromView(state, aliases, a);
-    return typeof r === 'string' ? a : r;
-  };
-  const over = level === 'team' && (profile || explain) ? { ...(profile ? { profile } : {}), ...(explain ? { explain: (e: BotExplanation) => explain({ ...e, actions: e.actions.map(toReal), alternatives: e.alternatives.map((alt) => ({ ...alt, actions: alt.actions.map(toReal) })) }) } : {}) } : undefined;
-  const real = actionFromView(state, aliases, chooseBotAction(viewFor(state, p, aliases), p, level, over));
-  return typeof real === 'string' ? chooseSimpleBotAction(state, p) : real;
-}
 /** Faixa de tempo (ms) do bot nas decisões que escondem informação (Counter, carta da Vida). */
 const HIDDEN_DECISION_MS = [800, 2000] as const;
 
@@ -214,17 +194,9 @@ export function useGame(setup: GameSetup) {
     if (state.phase === 'gameover' || paused || hold) return;
     const cursor = cursorRef.current;
     const p = actingPlayer(state);
-    let next: Action | undefined;
-    if (cursor) {
-      if (cursor.pos < cursor.end) next = cursor.actions[cursor.pos];
-    } else if (p !== null && (state.players[p].isBot || (auto && p === human))) {
-      const isBot = state.players[p].isBot;
-      // Bot do Time: a explicação da jogada vai para o painel do treinador (a posição é a da ação no replay).
-      const index = actionsRef.current.length;
-      const explain = isBot && setup.botLevel === 'team' ? (e: BotExplanation) => setCoach((list) => (list.some((x) => x.index === index) ? list : [...list, { ...e, index, seat: p }])) : undefined;
-      next = botAction(state, p, setup.botLevel ?? 'hard', isBot ? setup.botProfile : undefined, explain);
-    }
-    if (!next) return;
+    const scripted = cursor && cursor.pos < cursor.end ? cursor.actions[cursor.pos] : undefined;
+    const bot = !cursor && p !== null && (state.players[p].isBot || (auto && p === human));
+    if (!scripted && !bot) return;
     // Espera as cartas pousarem antes da próxima jogada.
     // A escolha de quem começa demora um pouco mais (dá tempo de ver quem venceu o sorteio).
     // Counter, carta da Vida, "pagar X?" e escolhas na mão ou no deck: tempo aleatório, para a
@@ -240,12 +212,45 @@ export function useGame(setup: GameSetup) {
             : 800;
     // No replay, depois de as cartas pousarem ainda há tempo de ver o clique do jogador (ReplayCue).
     const delay = Math.max(base / speed, motionWait() + 120 + (cursor ? 420 / speed : 0));
-    // A mesa mostra o clique do jogador (ReplayCue) sincronizado com este momento.
-    if (cursor) dueRef.current = performance.now() + delay;
-    const t = setTimeout(() => (cursor ? seek(cursor.pos + 1) : dispatch(next!)), delay);
+    if (cursor) {
+      // A mesa mostra o clique do jogador (ReplayCue) sincronizado com este momento.
+      dueRef.current = performance.now() + delay;
+      const t = setTimeout(() => seek(cursor.pos + 1), delay);
+      return () => {
+        clearTimeout(t);
+        dueRef.current = null;
+      };
+    }
+    // O bot pensa no Web Worker enquanto as cartas voam (a busca na página travava a animação) e a
+    // jogada sai no mesmo momento de antes: depois da espera, ou assim que a conta terminar, se demorar mais.
+    const seat = p!;
+    const isBot = state.players[seat].isBot;
+    // Bot do Time: a explicação da jogada vai para o painel do treinador (a posição é a da ação no replay).
+    const index = actionsRef.current.length;
+    const due = performance.now() + delay;
+    const job = thinkBot({
+      state,
+      player: seat,
+      level: setup.botLevel ?? 'hard',
+      ...(isBot && setup.botProfile ? { profile: setup.botProfile } : {}),
+      explain: isBot && setup.botLevel === 'team',
+    });
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    job.result.then(
+      ({ action, explanations }) => {
+        if (!live) return;
+        for (const e of explanations) setCoach((list) => (list.some((x) => x.index === index) ? list : [...list, { ...e, index, seat }]));
+        timer = setTimeout(() => dispatch(action), Math.max(0, due - performance.now()));
+      },
+      (e) => {
+        if (live) setError(e instanceof Error ? e.message : String(e));
+      },
+    );
     return () => {
-      clearTimeout(t);
-      dueRef.current = null;
+      live = false;
+      job.cancel();
+      clearTimeout(timer);
     };
   }, [state, paused, hold, speed, setup, dispatch, seek, auto, human]);
   const dueAt = useCallback(() => dueRef.current, []);
