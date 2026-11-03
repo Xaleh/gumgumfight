@@ -2,62 +2,89 @@
 
 > Status: proposta, ainda não implementada. Protótipo interativo da tela: https://claude.ai/artifact/JJvoLdEjZ7gNMZfAqB468j
 
-O jogador abre, nas Configurações, a tela **Layout da mesa › Personalizar** e ajusta cada bloco da mesa de quem joga:
-tamanho (pequeno, médio = o atual, grande), posição e, para os blocos de que o jogo não depende, se aparece ou não.
+Duas coisas, que andam juntas:
+
+1. **Uma mesa larga para o PC.** A mesa de hoje é uma coluna estreita no meio de uma tela 16:9, com bordas escuras
+   sem uso dos dois lados, porque o tamanho das cartas é limitado pela altura e a coluna empilha nove fileiras
+   (mão do oponente, DON!!, base, campo, faixa do meio, campo, base, DON!!, mão). A proposta é uma mesa com **duas
+   fileiras por metade**, como nos simuladores de referência: os personagens (com a Vida numa coluna ao lado) e a
+   fileira do Líder, que reúne a área de custo dos DON!!, o Stage, o Deck e o Descarte. As mãos ficam nos cantos,
+   fora da mesa. A mesa fica baixa e larga, e as cartas quase dobram de tamanho.
+2. **A tela Configurações › Layout da mesa › Personalizar**, onde o jogador ajusta cada bloco dessa mesa: tamanho
+   (pequeno, médio, grande), posição e, nos blocos de que o jogo não depende, se aparece ou não.
 
 ## Escopo
 
 | Vale para | Fica como está |
 |-----------|----------------|
-| A mesa de quem joga (`Board.tsx`) no desktop (`wide`, ≥ 1000 px): treino contra o bot, online, torneio, replay próprio | Celular e tablet (a mesa já usa cada pixel; o layout fixo continua) |
+| A mesa de quem joga no desktop (`wide`, ≥ 1000 px): treino contra o bot, online, torneio, replay próprio | Celular e tablet em pé (a mesa em coluna de hoje) |
 | | Visão do Streamer em pé e lateral (`lifeAside`, `LateralBoard.tsx`), transmissão (`broadcast`) e replay embutido (`embed`) |
-| | Tutorial (as lições apontam para as zonas; o layout padrão garante que a dica aponte para o lugar certo) |
+| | Tutorial (as lições apontam para as zonas; usa a mesa em coluna, que elas conhecem) |
 
-O lado do oponente **espelha** o do jogador, como hoje (`PlayerSide` com `position: 'top'`): a pessoa configura só a própria metade.
+O lado do oponente **espelha** o do jogador: a fileira do Líder invertida, a Vida na coluna oposta, a mão no canto
+oposto. A pessoa configura só a própria metade.
+
+## A mesa larga
+
+```
+┌──────────┬───────────────────────────── mesa ─────────────────────────────┬──────────────┐
+│ (livre:  │ [Descarte][Deck][Stage][LÍDER][área de custo: DON!!][Deck DON] │ mão do       │
+│  hover   │ [ Pers ][ Pers ][ Pers ][ Pers ][ Pers ]              [Vida]   │ oponente     │
+│  grande) │ Bullnard ♥♥♥♥♥ ⏱        Turno 8 · Sua vez        Você ♥♥♥♥ ⏱ │              │
+│          │ [Vida]  [ Pers ][ Pers ][ Pers ][ Pers ][ Pers ]               │ (livre:      │  painel
+│ sua mão  │ [Deck DON][área de custo: DON!!][LÍDER][Stage][Deck][Descarte] │  histórico)  │  lateral
+└──────────┴────────────────────────────────────────────────────────────────┴──────────────┘
+```
+
+- **Largura:** 8 larguras de carta (`--cw`); altura: duas metades de 3,6 `--cw` mais a faixa do meio, uns 7,9 `--cw`.
+  Numa tela 1920×1080 com o painel aberto isso dá cartas de uns 115 px (hoje: 95 px na coluna, e só porque o teto é
+  112 px); em 1366×768, 80 px contra 64 px.
+- **Faixa do meio:** etiqueta de cada jogador (nome, corações, relógio), a situação do turno no centro. Substitui os
+  `PlayerBanner` das pontas de cima e de baixo.
+- **Laterais:** o espaço que sobra da `board-col` dos dois lados da mesa. Embaixo, nos cantos, as mãos; em cima,
+  opcionalmente, o hover grande (esquerda) e o histórico (direita).
+- **Painel lateral** (direita, como hoje): turno e dica, hover de carta, histórico, botão Encerrar turno.
 
 ## Blocos
 
 | Bloco | Ocultar | Tamanho | Posição |
 |-------|---------|---------|---------|
-| DON!! (fileira: ativos, descansados, contadores) | não | P · M · G | esquerda (atual) · centro · direita da fileira |
-| Cartas na mão | não, mas **recolhe** (pilha com a contagem, abre ao clicar, reaproveita `MiniHand`/`HandFan`) | P · M · G | embaixo da mesa (atual) · canto inferior esquerdo · canto inferior direito, fora da coluna da mesa |
-| Vida | **sim** (a faixa do jogador já mostra os corações, `PlayerBanner`) | P · M · G | lado esquerdo do Líder (atual) · lado direito · coluna de fora (reaproveita `life-col` do Streamer) |
-| Líder | não | P · M · G | fixo no centro |
-| Stage | não | P · M · G | lado esquerdo (atual) · lado direito |
-| Descarte | não | P · M · G | lado esquerdo · lado direito (atual) |
-| Deck de DON!! | não | P · M · G | início (atual) · fim da fileira de DON!! |
-| Deck | não | P · M · G | lado esquerdo · lado direito (atual) · ponta de fora (reaproveita `side-aux`) |
-| Histórico (`LogPanel`) | **sim** | P · M · G (largura do painel: 280 · 340 · 420 px) | painel lateral (atual) · ao lado da mesa, no espaço livre à direita |
-| Hover de carta (`CardDetail`) | **sim** | P · M · G (carta: 150 · 190 · 240 px) | painel lateral, acima do histórico (atual) · ao lado da mesa, grande, no espaço livre à esquerda · junto da carta (reaproveita `CardHoverPreview`) |
+| DON!! (área de custo: ativos, descansados, contadores) | não | P · M · G | à esquerda (padrão) · à direita do Líder, na fileira do Líder |
+| Cartas na mão | não, mas **recolhe** (pilha com a contagem, abre ao clicar; reaproveita `MiniHand`/`HandFan`) | P · M · G | canto esquerdo (padrão) · canto direito · embaixo da mesa (gasta altura: a mesa encolhe) |
+| Vida | **sim** (a etiqueta do jogador já mostra os corações) | P · M · G | coluna à esquerda do campo (padrão) · coluna à direita · junto do Líder (pilha pequena, como hoje) |
+| Líder | não | P · M · G | fixo no centro da fileira |
+| Stage | não | P · M · G | esquerda · direita (padrão) do Líder |
+| Descarte | não | P · M · G | esquerda · direita (padrão) |
+| Deck de DON!! | não | P · M · G | ponta de fora da área de custo (padrão) · junto do Líder |
+| Deck | não | P · M · G | esquerda · direita (padrão) |
+| Histórico (`LogPanel`) | **sim** | P · M · G (largura do painel: 0,8× · 1× · 1,2×) | painel lateral (padrão) · ao lado da mesa, à direita |
+| Hover de carta (`CardDetail`) | **sim** | P · M · G | painel lateral (padrão) · centro da mesa (grande, por cima, só enquanto o mouse está na carta) · ao lado da mesa, à esquerda · junto da carta (`CardHoverPreview`) |
 
 Regras:
 
-- **Médio é o tamanho de hoje.** Pequeno = 0,8×; Grande = 1,25×. Os blocos só multiplicam o `--cw` que já define tudo.
-- **Posição por encaixe, não por pixel.** Cada bloco escolhe entre poucas posições válidas. É o que mantém a mesa
-  responsiva (o `--cw` é calculado pelo tamanho do contêiner), as âncoras das animações (`data-anchor`) e a seta de
-  ataque funcionando, e evita blocos sobrepostos. Arrastar livremente fica como ideia de v2 (ver o fim).
-- **Numa tela 16:9 a altura manda.** O `--cw` da `board-col` é limitado pela altura (`(100cqh - 136px) / 9.9`), a
-  mesa vira uma coluna de 7,2 `--cw` no centro e sobra espaço dos dois lados. É isso que hoje faz a mesa do PC parecer
-  a do celular com bordas pretas. A proposta usa essas laterais: a mão no canto inferior (fora da coluna da mesa), o
-  hover à esquerda e o histórico à direita. Tirar a mão da coluna ainda libera altura, e todas as cartas da mesa
-  crescem.
-- **Histórico e Hover fora do painel ou ocultos** fecham o painel lateral (`no-panel`, já existe).
-- Ordem dos blocos ao redor do Líder, de dentro para fora: Stage, Deck, Descarte, Vida. Dois blocos do mesmo lado
-  seguem essa ordem (é o que a mesa já faz: Vida fora e Stage dentro, à esquerda; Deck e Descarte à direita).
+- **Médio é o tamanho de referência.** Pequeno = 0,8×; Grande = 1,25×. Cada bloco multiplica o `--cw` por um `--k-*`.
+- **Posição por encaixe, não por pixel.** Cada bloco escolhe entre poucas posições válidas. A mesa continua se
+  ajustando ao tamanho da janela, as âncoras das animações (`data-anchor`) e a seta de ataque seguem funcionando, e
+  dois blocos nunca se sobrepõem. Arrastar livremente fica como ideia de v2.
+- Ordem na fileira do Líder, do Líder para fora: Stage, Deck, Descarte; a área de custo (com o deck de DON!!) ocupa
+  o outro lado. Blocos do mesmo lado seguem essa ordem.
+- **Histórico e Hover fora do painel ou ocultos** fecham o painel lateral (`no-panel`, já existe) e a mesa cresce.
+- A área de custo comprime os DON!! quando são muitos (como `.don-cards` já faz), então a fileira do Líder cabe
+  sempre nas 8 larguras de carta.
 
-Predefinições na própria tela, para quem não quer mexer bloco a bloco: **Padrão**, **Compacta** (tudo pequeno),
-**Cartas grandes** (Líder e mão grandes, histórico oculto, hover junto da carta) e **Playmat** (Vida e Deck nas
-pontas, mão recolhida, histórico flutuante). Cada predefinição é só um `BoardLayout` pronto.
+Predefinições na própria tela: **Padrão** (a mesa larga como acima), **Compacta** (tudo pequeno, hover junto da
+carta), **Cartas grandes** (Líder e mão grandes, histórico oculto, hover no centro da mesa) e **Mesa aberta** (sem
+painel: hover e histórico ao lado da mesa). Cada predefinição é só um `BoardLayout` pronto.
 
 ## A tela
 
-- **Entrada:** em Configurações, uma linha "Layout da mesa" com o botão **Personalizar** (abaixo de "Painel lateral",
-  que ela absorve). No menu da partida, o mesmo botão, para ajustar olhando a mesa de verdade.
-- **Esquerda:** prévia viva. É o próprio `Board` renderizado com um estado de exemplo (o `game/setup.ts` monta um estado
-  com um starter deck; handlers inertes) e o layout em edição. Passar o mouse num bloco da lista realça a zona na prévia;
-  clicar numa zona da prévia rola até o bloco. Aberta dentro da partida, a prévia é a partida.
-- **Direita:** um cartão por bloco: nome, interruptor (travado com "obrigatório" nos que não podem sumir),
-  Tamanho (P · M · G) e Posição (segmentado com as opções do bloco). Mão tem ainda "Recolhida".
+- **Entrada:** em Configurações, a linha "Layout da mesa" com o botão **Personalizar** (abaixo de "Painel lateral",
+  que ela absorve). No menu da partida, o mesmo botão.
+- **Em cima:** prévia 16:9 da tela do PC, viva: o próprio `Board` largo renderizado com um estado de exemplo
+  (`game/setup.ts` monta um com um starter deck; handlers inertes) e o layout em edição. Passar o mouse num bloco
+  realça a zona na prévia; clicar numa zona rola até o bloco. Aberta dentro da partida, a prévia é a partida.
+- **Embaixo:** um cartão por bloco: nome, interruptor (travado com "obrigatório" nos que não podem sumir),
+  Tamanho (P · M · G) e Posição. Mão tem ainda "Recolhida".
 - **Rodapé:** Restaurar padrão · Cancelar · Salvar. As mudanças só valem ao salvar.
 
 ## Modelo e persistência
@@ -67,67 +94,62 @@ Entra em `Settings` (`settings.tsx`), salvo no `localStorage` com as demais (`gu
 ```ts
 export type BlockSize = 'small' | 'medium' | 'large';
 export interface BoardLayout {
-  don: { size: BlockSize; align: 'left' | 'center' | 'right' };
-  hand: { size: BlockSize; position: 'bottom' | 'corner-left' | 'corner-right'; collapsed: boolean };
-  life: { show: boolean; size: BlockSize; position: 'left' | 'right' | 'aside' };
+  don: { size: BlockSize; position: 'left' | 'right' };
+  hand: { size: BlockSize; position: 'corner-left' | 'corner-right' | 'bottom'; collapsed: boolean };
+  life: { show: boolean; size: BlockSize; position: 'col-left' | 'col-right' | 'base' };
   leader: { size: BlockSize };
   stage: { size: BlockSize; position: 'left' | 'right' };
   trash: { size: BlockSize; position: 'left' | 'right' };
-  donDeck: { size: BlockSize; position: 'start' | 'end' };
-  deck: { size: BlockSize; position: 'left' | 'right' | 'aside' };
+  donDeck: { size: BlockSize; position: 'outer' | 'inner' };
+  deck: { size: BlockSize; position: 'left' | 'right' };
   log: { show: boolean; size: BlockSize; position: 'panel' | 'side' };
-  hover: { show: boolean; size: BlockSize; position: 'panel' | 'side' | 'tooltip' };
+  hover: { show: boolean; size: BlockSize; position: 'panel' | 'center' | 'side' | 'tooltip' };
 }
 ```
 
-- `DEFAULT_LAYOUT` = a mesa de hoje. `load()` valida campo a campo (como faz com `streamerPlaymat`): valor
+- `DEFAULT_LAYOUT` = a mesa larga padrão. `load()` valida campo a campo (como faz com `streamerPlaymat`): valor
   desconhecido volta ao padrão, então um JSON antigo ou editado à mão nunca quebra a mesa.
-- `sidePanel` (painel aberto/fechado) passa a derivar de `log.show || hover.show`; o botão de histórico ao lado do
-  deck continua abrindo e fechando o painel, só que agora grava nesses dois campos.
-- Por navegador, como as outras configurações. Sincronizar com a conta fica para depois, se fizer sentido.
+- `sidePanel` (painel aberto/fechado) passa a derivar de `log`/`hover` no painel; o botão de histórico ao lado do
+  deck continua abrindo e fechando o painel, gravando nesses campos.
+- Por navegador, como as outras configurações. Sincronizar com a conta fica para depois.
 
 ## Como entra no código
 
 1. **`settings.tsx`**: tipo, padrão, validação em `load()`, `update({ boardLayout })`.
-2. **`Board.tsx`**: prop `layout?: BoardLayout` (ausente = padrão, o que mantém Streamer, broadcast e tutorial iguais).
-   - `PlayerSide` monta `base-row` a partir da ordem calculada (lado + ordem de dentro para fora) em vez do JSX fixo;
-     `life.position === 'aside'` e `deck.position === 'aside'` reaproveitam `life-col`/`side-aux` do `lifeAside`.
-   - `don-row` recebe a classe de alinhamento e a ordem deck/cartas/contadores.
-   - `Hand` nos cantos sai da `bottom-strip` e vai para a `board-col`, posicionada no canto de baixo (a `bottom-strip`
-     fica só com a faixa do jogador, e a conta de altura do `--cw` perde a altura da mão); `hand.collapsed` troca por
-     `MiniHand` + `HandFan` (já existem).
-   - A `section.mat` recebe `data-*` e variáveis CSS: `--k-don`, `--k-hand`, `--k-life`, `--k-leader`, `--k-stage`,
-     `--k-trash`, `--k-dondeck`, `--k-deck`.
-3. **`styles.css`**: cada bloco multiplica pelo seu `--k-*` (padrão 1) nos `calc()` que já existem
-   (`.leader-zone --cw-leader`, `.stage-zone`, `.pile --cw-pile`, `.life-zone`, `.don-row --dw`, `.board-col --hcw`).
-   Painel: `--panel-w` em `.game.wide` (hoje fixo em 340 px) e `--detail-w` em `.side-panel .detail-card`.
-   Novo: `.side-area` (as duas laterais livres da `board-col`, à esquerda e à direita da mesa), onde entram o hover
-   grande, o histórico e a mão nos cantos.
-4. **`GameScreen.tsx`**: lê `boardLayout` das configurações; passa `layout` ao `Board` só quando
-   `wide && !streamer && !broadcast && !tutorial && !embed`; monta o painel com histórico e/ou detalhe conforme
-   `log`/`hover`; em `hover.position === 'tooltip'`, mostra `CardHoverPreview` num portal (como já faz nas folhas);
-   em `'side'`, `CardDetail` e `LogPanel` vão para as `.side-area` da `board-col`.
+2. **`components/WideBoard.tsx`** (novo): a mesa larga. Recebe o mesmo `BoardHandlers` do `Board` e o `layout`.
+   Reaproveita `FieldCard`, `CardView`, `CardBack`, `MiniHand`, `HandFan` e os mesmos `data-anchor`
+   (`life-`, `deck-`, `trash-`, `don-`, `dondeck-`, `hand-`, `arena`), então as animações do `Motion.tsx` e a seta
+   de ataque não mudam. Estrutura por metade: `grid` com áreas `lcol field rcol` / `base base base` (invertidas para
+   o oponente); a fileira do Líder é montada a partir da ordem calculada (lado + ordem de dentro para fora); a área
+   de custo é a `.don-row` de hoje com largura fixa e os DON!! comprimidos.
+   A `Board.tsx` atual continua intacta para o celular, o Streamer e o tutorial.
+3. **`styles.css`**: `.wide-board`, `.half`, `.base`, `.lcol/.rcol`, `.cost-area`, `.side-area`, `.hand.corner`,
+   `.center-row` (etiquetas + situação do turno). `--cw` da `board-col` no modo largo:
+   `min((100cqh - 24px) / 7.9, (100cqw - 24px) / 12, 150px)` (12 = 8 da mesa + 2 por lado para as mãos). Cada bloco
+   multiplica pelo seu `--k-*`. Painel: `--panel-w` em `.game.wide` (hoje fixo em 340 px) × 0,8/1/1,2.
+4. **`GameScreen.tsx`**: lê `boardLayout`; em `wide && !streamer && !broadcast && !tutorial && !embed` renderiza
+   `WideBoard` no lugar de `Board` e monta as laterais (mãos nos cantos, hover/histórico "ao lado da mesa") e o
+   painel (turno e dica, detalhe, histórico, Encerrar turno) conforme `log`/`hover`; `hover.position === 'center'` é
+   um portal centrado na `board-col`, `'tooltip'` reaproveita `CardHoverPreview`.
 5. **`components/BoardLayoutEditor.tsx`** (novo): a tela, com a prévia (estado de exemplo de `game/setup.ts`) e os
    cartões. Aberta pelo `SettingsModal` e pelo menu da partida.
 6. **i18n**: chaves `settings.boardLayout*` e `layout.*` (nomes dos blocos, posições, predefinições) nos seis idiomas.
-7. **Docs**: seção em `documentacao-tecnica.md` (configurações) e nota no tutorial de que a lição usa o layout padrão.
+7. **Docs**: seção em `documentacao-tecnica.md` (mesa larga e configurações) e nota no tutorial.
 
 Riscos e cuidados:
 
-- Os `data-anchor` das animações e as consultas `.mat .card[data-uid]` da seta de ataque usam o DOM, então seguem
-  funcionando em qualquer encaixe; vale conferir as animações de Vida e de DON!! com os blocos "de fora".
-- Tamanho "grande" em tudo ao mesmo tempo não cabe em telas de 1000–1200 px. O `--cw` já é limitado pela altura e
-  largura do contêiner, então a mesa encolhe inteira para caber. A prévia deixa isso visível antes de salvar.
 - As laterais só existem em telas largas de verdade. Entre 1000 e 1300 px a `side-area` fica estreita: abaixo de uma
-  largura mínima (uns 180 px), os blocos "ao lado da mesa" voltam para o painel e a mão volta para baixo da mesa.
+  largura mínima (uns 2 `--cw`), a mão volta para baixo da mesa e os blocos "ao lado da mesa" voltam para o painel.
+- As lições do tutorial e as dicas do treinador apontam para zonas da mesa em coluna; no modo largo as zonas têm os
+  mesmos `data-anchor`, mas vale conferir os textos que dizem "à esquerda do Líder".
+- Tamanho "grande" em tudo ao mesmo tempo estoura as 8 larguras da fileira do Líder: o editor avisa e a fileira
+  comprime a área de custo primeiro.
 
-Esforço estimado: modelo + Board + CSS (2 dias), painel/hover/overlay no GameScreen (1 dia), editor com prévia
-(1,5 dia), i18n + docs + testes do `load()` (0,5 dia).
+Esforço estimado: modelo + `WideBoard` + CSS (3 dias), painel/laterais/hover no GameScreen (1 dia), editor com
+prévia (1,5 dia), i18n + docs + testes do `load()` (0,5 dia).
 
 ## Depois (v2, se valer a pena)
 
-- Arrastar blocos livremente na prévia (posição em % da mesa, com grade de encaixe e colisão). Exige trocar o flex da
-  mesa por posicionamento absoluto por bloco e tratar cada tamanho de tela; a v1 por encaixes cobre o que os
-  jogadores pedem (Vida do outro lado, mão menor, histórico fora) sem esse custo.
+- Arrastar blocos livremente na prévia (posição em % da mesa, com grade de encaixe e colisão).
 - Guardar o layout na conta, para valer em qualquer navegador.
 - Layout do celular (só tamanho da mão e do histórico).
