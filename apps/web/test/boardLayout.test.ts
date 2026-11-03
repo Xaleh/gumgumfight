@@ -130,10 +130,11 @@ describe('layout da mesa: medidas e predefinições', () => {
     const big = measureLayout(effectiveLayout(presetLayout('bigcards')));
     expect(big.rows).toBeGreaterThan(base.rows);
     expect(big.cols).toBeGreaterThan(base.cols);
-    const bottom = measureLayout(
-      effectiveLayout(parseLayout({ don: { position: 'left' }, hand: { position: 'bottom' }, log: { position: 'panel' }, hover: { position: 'panel' } })),
-    );
-    expect(bottom.rows).toBeGreaterThan(base.rows);
+    // A mesma mesa (DON!! na fileira do Líder, tudo no painel), com a mão no canto e embaixo dela.
+    const panelOnly = { don: { position: 'left' }, log: { position: 'panel' }, hover: { position: 'panel' } };
+    const corner = measureLayout(effectiveLayout(parseLayout(panelOnly)));
+    const bottom = measureLayout(effectiveLayout(parseLayout({ ...panelOnly, hand: { position: 'bottom' } })));
+    expect(bottom.rows).toBeGreaterThan(corner.rows);
     expect(bottom.side).toBe(0);
     expect(base.side).toBeGreaterThan(0);
   });
