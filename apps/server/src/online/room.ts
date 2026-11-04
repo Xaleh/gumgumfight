@@ -1351,6 +1351,8 @@ export class Room {
       rematch: over ? (this.data.rematch ?? [false, false]) : [false, false],
       /** Treino contra o bot: o nível do bot do servidor (a nota e as marcações do Time citam o nível). */
       ...(this.data.botLevel ? { botLevel: this.data.botLevel } : {}),
+      /** Treino contra o bot: o deck que o bot joga (relatório do Bot do Time; os decks prontos não são segredo). */
+      ...(this.data.queue === 'bot' ? { botDeckId: this.data.seats.find((s) => s.bot)?.deckId ?? null } : {}),
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
       handsAllowed: this.handsAllowed,
       /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio com mãos ao vivo). */

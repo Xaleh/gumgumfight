@@ -192,7 +192,29 @@ function migrateTeam(db: DB) {
       updated_by TEXT,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Relatório de uma partida contra o Bot do Time: o texto que a mesa monta com as jogadas marcadas como erradas
+    -- (e a nota e o comentário), pronto para ir num pacote com o guia, o perfil e o replay.
+    CREATE TABLE IF NOT EXISTS bot_reports (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      match_id   INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      user_id    TEXT NOT NULL REFERENCES users(id),
+      bot_level  TEXT,
+      bot_deck   TEXT,                    -- deck do bot (decks.id)
+      leader     TEXT,                    -- Líder do bot
+      opp_leader TEXT,                    -- Líder do jogador
+      rating     INTEGER,                 -- 1 a 5 (opcional)
+      marks      INTEGER NOT NULL,        -- jogadas marcadas como erradas
+      report     TEXT NOT NULL,           -- o relatório (markdown)
+      used_at    TEXT,                    -- já foi usado para melhorar o bot (enviado ao Claude)
+      used_by    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS bot_reports_created ON bot_reports(created_at);
   `);
+  // step: qual passo da linha do bot foi marcado como errado (0 = o primeiro); a posição é a do começo da linha.
+  const cols = (db.prepare('PRAGMA table_info(bot_feedback)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!cols.includes('step')) db.exec('ALTER TABLE bot_feedback ADD COLUMN step INTEGER');
 }
 
 function migrateGlobalStats(db: DB) {

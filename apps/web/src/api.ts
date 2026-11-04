@@ -465,34 +465,27 @@ export interface MetaDeckInfo {
 /** Marcação de uma jogada do bot: a posição no replay, o que ele deveria ter feito e um comentário. */
 export interface FeedbackMark {
   index: number;
+  /** Qual passo da linha do bot foi marcado como errado (0 = o primeiro). */
+  step?: number;
   /** A jogada esperada (uma ação legal daquela posição, por números de carta) ou texto livre. */
   expected?: Record<string, unknown> | string;
   comment?: string;
 }
-export type FeedbackStatus = 'open' | 'test' | 'fixed' | 'dismissed';
-export const FEEDBACK_STATUSES: FeedbackStatus[] = ['open', 'test', 'fixed', 'dismissed'];
-export interface FeedbackItem {
+/** Relatório de uma partida contra o Bot do Time (o texto que a mesa monta com as jogadas marcadas). */
+export interface BotReportItem {
   id: number;
   matchId: number;
   userId: string;
   userName: string | null;
-  kind: 'mark' | 'rating';
   botLevel: string | null;
-  botSeat: number | null;
   botDeck: string | null;
   leader: string | null;
   oppLeader: string | null;
-  actionIndex: number | null;
-  turn: number | null;
-  /** A jogada do bot e a esperada, por números de carta (`{type, card?, target?…}`) ou texto. */
-  botAction: Record<string, unknown> | null;
-  expected: Record<string, unknown> | string | null;
   rating: number | null;
-  comment: string | null;
-  status: FeedbackStatus;
-  note: string | null;
+  marks: number;
+  report: string;
+  usedAt: string | null;
   createdAt: string;
-  resolvedAt: string | null;
 }
 export interface FeedbackDeckSummary {
   botDeck: string | null;
@@ -772,12 +765,15 @@ export const api = {
     generateProfile: (id: string) => send<{ profile: DeckProfile; why: Record<string, string> }>('POST', `/api/bot/profiles/${encodeURIComponent(id)}/generate`, {}),
     /** Agente: a partida do bot comparada com o guia do deck. Só admin. */
     reviewMatch: (matchId: number) => send<{ deckId: string | null; review: string }>('POST', `/api/bot/matches/${matchId}/review`, {}),
-    feedback: (matchId: number, form: { level?: BotLevel; rating?: number; comment?: string; marks?: FeedbackMark[] }) =>
-      send<{ ids: number[] }>('POST', '/api/bot/feedback', { matchId, ...form }),
-    feedbackList: (status: FeedbackStatus | 'all' = 'open') => get<{ items: FeedbackItem[] }>(`/api/bot/feedback?status=${status}`),
-    feedbackItem: (id: number) => get<FeedbackItem & { position: GameState | null }>(`/api/bot/feedback/${id}`),
+    feedback: (matchId: number, form: { level?: BotLevel; rating?: number; comment?: string; marks?: FeedbackMark[]; report?: string }) =>
+      send<{ ids: number[]; reportId: number | null }>('POST', '/api/bot/feedback', { matchId, ...form }),
+    /** Relatórios das partidas (`used`: false = só os ainda não usados). */
+    reports: (used?: boolean) => get<{ reports: BotReportItem[] }>(`/api/bot/reports${used === undefined ? '' : `?used=${used ? 1 : 0}`}`),
+    /** Marca (ou desmarca) um relatório como já usado para melhorar o bot. Só admin. */
+    setReportUsed: (id: number, used: boolean) => send<BotReportItem>('PUT', `/api/bot/reports/${id}`, { used }),
+    /** O pacote para o Claude: os relatórios, o guia e o perfil dos decks e os replays (markdown). */
+    reportPackage: (ids: number[]) => get<{ filename: string; content: string }>(`/api/bot/reports/package?ids=${ids.join(',')}`),
     feedbackSummary: () => get<{ decks: FeedbackDeckSummary[] }>('/api/bot/feedback/summary'),
-    setFeedbackStatus: (id: number, status: FeedbackStatus, note?: string) => send<FeedbackItem>('PUT', `/api/bot/feedback/${id}`, { status, note }),
   },
   reports: {
     list: (opts: { tournament?: string; status?: 'open' | 'resolved' | 'all' } = {}) =>
@@ -1020,6 +1016,8 @@ export interface OnlineRoomInfo {
   rematch: [boolean, boolean];
   /** Treino contra o bot: o nível do bot do servidor (servidores antigos não mandam). */
   botLevel?: BotLevel;
+  /** Treino contra o bot: o deck que o bot joga (relatório do Bot do Time). */
+  botDeckId?: string | null;
   /** Atraso da mesa desta conexão em ms (quem vê as mãos); 0 ou ausente = ao vivo. */
   delay?: number;
   /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */

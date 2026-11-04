@@ -6,7 +6,10 @@
 //   GET  /api/bot/agent               o agente fora da partida está ligado (BOT_AGENT_API_KEY)
 //   POST /api/bot/profiles/:id/generate   agente: guia → rascunho do perfil, para revisar (só admin)
 //   POST /api/bot/matches/:id/review      agente: traço da partida x guia → discrepâncias (só admin)
-//   POST /api/bot/feedback            marcações de jogadas e a nota de uma partida contra o bot (só o Time)
+//   POST /api/bot/feedback            marcações de jogadas, a nota e o relatório de uma partida contra o bot (só o Time)
+//   GET  /api/bot/reports?used=0|1    os relatórios das partidas (o texto que a mesa monta)
+//   PUT  /api/bot/reports/:id         marca como usado (só admin)
+//   GET  /api/bot/reports/package?ids=  pacote para o Claude: relatórios + guia + perfil + replay (markdown)
 //   GET  /api/bot/feedback?status=    a caixa de correções (o Time lê; admin trata)
 //   GET  /api/bot/feedback/summary    resumo por deck do bot (partidas avaliadas, nota média, marcações)
 //   GET  /api/bot/feedback/:id        uma correção com a posição (a visão do bot) para virar teste
@@ -24,7 +27,9 @@ import { fail } from '../errors';
 import { type Complete, draftProfile, reviewMatch } from './agent';
 import type { MetaProfiles } from './profiles';
 import { matchTrace } from './trace';
-import { createFeedback, feedbackByDeck, type FeedbackInput, getFeedback, isFeedbackStatus, listFeedback, setFeedbackStatus } from './store';
+import { buildPackage, packageName } from './package';
+import { matchReplay } from '../reports/store';
+import { createFeedback, feedbackByDeck, type FeedbackInput, getFeedback, getReports, isFeedbackStatus, listFeedback, listReports, saveReport, setFeedbackStatus, setReportUsed } from './store';
 
 interface Deps {
   db: DB;
@@ -35,6 +40,9 @@ interface Deps {
 }
 
 const MAX_TEXT = 2000;
+/** Tamanho máximo do relatório (markdown) e relatórios por pacote. */
+const MAX_REPORT = 60_000;
+const MAX_PACKAGE = 20;
 const MAX_MARKS = 40;
 
 const field = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
@@ -63,7 +71,7 @@ export function registerTeamRoutes(app: FastifyInstance, { db, user, profiles, c
     return u;
   };
 
-  app.post<{ Body: { matchId?: unknown; level?: unknown; rating?: unknown; comment?: unknown; marks?: unknown } }>('/api/bot/feedback', async (req, reply) => {
+  app.post<{ Body: { matchId?: unknown; level?: unknown; rating?: unknown; comment?: unknown; marks?: unknown; report?: unknown } }>('/api/bot/feedback', async (req, reply) => {
     const me = member(req, reply);
     if (!me) return reply;
     const matchId = Number(req.body?.matchId);
@@ -81,7 +89,9 @@ export function registerTeamRoutes(app: FastifyInstance, { db, user, profiles, c
     const marks = Array.isArray(req.body?.marks) ? (req.body.marks as unknown[]) : [];
     if (marks.length > MAX_MARKS) return reply.code(400).send(fail('tooManyMarks', `No máximo ${MAX_MARKS} marcações por partida.`));
     const comment = field(req.body?.comment, MAX_TEXT);
-    if (rating === null && !marks.length) return reply.code(400).send(fail('feedbackEmpty', 'Envie a nota ou pelo menos uma marcação.'));
+    // O relatório da partida (markdown montado pela mesa com as jogadas marcadas), para o pacote do Claude.
+    const report = typeof req.body?.report === 'string' && req.body.report.trim() ? req.body.report.trim().slice(0, MAX_REPORT) : null;
+    if (rating === null && !marks.length && !report) return reply.code(400).send(fail('feedbackEmpty', 'Envie a nota ou pelo menos uma marcação.'));
 
     const base = {
       matchId,
@@ -94,9 +104,11 @@ export function registerTeamRoutes(app: FastifyInstance, { db, user, profiles, c
     };
     const inputs: FeedbackInput[] = [];
     for (const raw of marks) {
-      const mk = raw as { index?: unknown; expected?: unknown; comment?: unknown };
+      const mk = raw as { index?: unknown; step?: unknown; expected?: unknown; comment?: unknown };
       const index = Number(mk?.index);
       if (!Number.isInteger(index) || index < 0) return reply.code(400).send(fail('invalidMark', 'Marcação inválida: posição da jogada.'));
+      const step = mk.step === undefined || mk.step === null ? null : Number(mk.step);
+      if (step !== null && !(Number.isInteger(step) && step >= 0 && step < 60)) return reply.code(400).send(fail('invalidMark', 'Marcação inválida: posição da jogada.'));
       const pos = positionAt(db, matchId, index);
       if (!pos) return reply.code(422).send(fail('markNotReplayable', 'O replay desta partida não refaz até essa jogada.'));
       if (pos.action.player !== botSeat.seat) return reply.code(400).send(fail('markNotBotAction', 'A jogada marcada não é do bot.'));
@@ -113,6 +125,7 @@ export function registerTeamRoutes(app: FastifyInstance, { db, user, profiles, c
         ...base,
         kind: 'mark',
         actionIndex: index,
+        step,
         turn: pos.state.turn,
         botAction: JSON.stringify(describeAction(pos.state, pos.action as Action)),
         expected: expectedJson,
@@ -125,7 +138,39 @@ export function registerTeamRoutes(app: FastifyInstance, { db, user, profiles, c
       inputs.push({ ...base, kind: 'rating', actionIndex: null, turn: null, botAction: null, expected: null, position: null, rating, comment });
     }
     const ids = inputs.map((f) => createFeedback(db, f));
-    return reply.code(201).send({ ids });
+    const reportId = report
+      ? saveReport(db, { matchId, userId: me.id, botLevel: level, botDeck: base.botDeck, leader: base.leader, oppLeader: base.oppLeader, rating, marks: marks.length, report })
+      : null;
+    return reply.code(201).send({ ids, reportId });
+  });
+
+  /** Os relatórios das partidas (`used=0`: só os ainda não usados). */
+  app.get<{ Querystring: { used?: string } }>('/api/bot/reports', async (req, reply) => {
+    if (!member(req, reply)) return reply;
+    const used = req.query.used === '0' ? false : req.query.used === '1' ? true : undefined;
+    return { reports: listReports(db, { used }) };
+  });
+
+  /** Marca (ou desmarca) um relatório como já usado para melhorar o bot. Só admin. */
+  app.put<{ Params: { id: string }; Body: { used?: unknown } }>('/api/bot/reports/:id', async (req, reply) => {
+    const me = member(req, reply);
+    if (!me) return reply;
+    if (!isAdmin(me.role)) return reply.code(403).send(fail('adminOnly', 'Só administradores tratam as correções.'));
+    if (typeof req.body?.used !== 'boolean') return reply.code(400).send(fail('invalidStatus', 'Estado inválido.'));
+    if (!setReportUsed(db, Number(req.params.id), req.body.used, me.id)) return reply.code(404).send(fail('notFound', 'Não encontrado'));
+    return getReports(db, [Number(req.params.id)])[0];
+  });
+
+  /**
+   * O pacote para o Claude (markdown): os relatórios escolhidos e, por deck do bot, o guia e o perfil atuais, e o replay
+   * de cada partida. `ids`: até 20, separados por vírgula.
+   */
+  app.get<{ Querystring: { ids?: string } }>('/api/bot/reports/package', async (req, reply) => {
+    if (!member(req, reply)) return reply;
+    const ids = [...new Set(String(req.query.ids ?? '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_PACKAGE);
+    const reports = getReports(db, ids);
+    if (!reports.length) return reply.code(404).send(fail('notFound', 'Não encontrado'));
+    return { filename: packageName(reports), content: buildPackage(reports, (id) => ({ guide: profiles.guide(id), profile: profiles.profile(id) }), (id) => matchReplay(db, id)) };
   });
 
   /** Os decks do meta, com o estado do guia e do perfil de cada um (a aba "Bot do Time"). */

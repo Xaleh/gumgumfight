@@ -1,75 +1,131 @@
 // Painel "Treinador do bot" (Bot do Time): a cada jogada do bot, a linha (ou a resposta) escolhida, a nota, os
-// termos da avaliação que mais pesaram e as alternativas consideradas. Cada entrada pode ser marcada ("ele
-// deveria ter feito X"); as marcações vão junto com a nota no fim da partida (`BotRating`).
+// termos da avaliação que mais pesaram e as alternativas consideradas. Cada passo da linha é um botão: um toque marca
+// o passo como errado e ele entra no relatório da partida (o texto no alto do painel), que vai no fim da partida para
+// a tela "Bot do Time" e para o pacote do Claude. "O certo era" (uma das alternativas) e "por quê" são opcionais.
 
 import { type Action, type GameState } from '@gumgum/engine';
 import { useState } from 'react';
-import type { CoachEntry, FeedbackMark } from '../api';
+import type { CoachEntry } from '../api';
+import { type CoachMark, distinctAlternatives, sameMark } from '../game/botReport';
 import { describeReplayAction } from '../game/replayCue';
 import { hasKey, type MessageKey, useLocale, useT } from '../i18n';
 import { fmtNumber } from '../i18n/format';
 
-/** A jogada por números de carta (o mesmo formato do extrator no servidor), para a marcação. */
-function choiceOf(state: GameState, a: Action): Record<string, unknown> {
-  const id = (uid: string) => state.cards[uid]?.cardId ?? uid;
-  switch (a.type) {
-    case 'playCard':
-    case 'activate':
-      return { type: a.type, card: id(a.uid) };
-    case 'attachDon':
-    case 'detachDon':
-      return { type: a.type, target: id(a.target) };
-    case 'attack':
-      return { type: a.type, card: id(a.attacker), target: id(a.target) };
-    case 'counter':
-      return { type: a.type, card: id(a.uid), ...(a.target ? { target: id(a.target) } : {}) };
-    case 'choose':
-      return { type: a.type, cards: a.uids.map(id).sort() };
-    case 'answer':
-      return { type: a.type, yes: a.yes };
-    case 'option':
-      return { type: a.type, index: a.index };
-    case 'mulligan':
-      return { type: a.type, redraw: a.redraw };
-    default:
-      return { type: a.type };
+const signed = (n: number, locale: Parameters<typeof fmtNumber>[1]) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNumber(Math.abs(n), locale)}`;
+
+/** Copia o texto e diz se deu certo (o navegador pode negar a área de transferência). */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
   }
 }
-
-const signed = (n: number, locale: Parameters<typeof fmtNumber>[1]) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmtNumber(Math.abs(n), locale)}`;
 
 export function CoachPanel({
   state,
   entries,
   marks,
-  onMark,
+  report,
+  onToggle,
+  onUpdate,
 }: {
   state: GameState;
   entries: CoachEntry[];
-  marks: FeedbackMark[];
-  /** Guarda (ou tira, com null) a marcação da jogada `index`. */
-  onMark: (index: number, mark: FeedbackMark | null) => void;
+  marks: CoachMark[];
+  /** O relatório da partida até aqui (markdown), para a prévia e o botão de copiar. */
+  report: string;
+  /** Marca (ou desmarca) o passo `step` da decisão `index` como errado. */
+  onToggle: (index: number, step: number) => void;
+  /** Muda o "o certo era" ou o "por quê" de um passo marcado. */
+  onUpdate: (index: number, step: number, patch: Partial<Pick<CoachMark, 'alt' | 'why'>>) => void;
 }) {
   const t = useT();
   const locale = useLocale();
-  const [open, setOpen] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
   const title = (a: Action) => describeReplayAction(state, a, locale).title;
   const line = (actions: Action[]) => actions.map(title).join(' → ');
   const termLabel = (key: string) => (hasKey(`coach.term.${key}`) ? t(`coach.term.${key}` as MessageKey) : key);
   const sorted = [...entries].sort((a, b) => b.index - a.index);
+  const copy = async () => {
+    if (await copyText(report)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
   return (
     <div className="coach-panel">
       <p className="muted small coach-hint">{t('coach.hint')}</p>
+      {marks.length > 0 && (
+        <details className="coach-report">
+          <summary>{t('coach.report', { n: marks.length })}</summary>
+          <pre>{report}</pre>
+          <button type="button" className="btn small" onClick={copy}>
+            {copied ? t('coach.copied') : t('coach.copy')}
+          </button>
+        </details>
+      )}
       {!sorted.length && <p className="muted small">{t('coach.empty')}</p>}
       {sorted.map((e) => {
-        const mark = marks.find((m) => m.index === e.index);
+        const mine = marks.filter((m) => m.index === e.index);
+        const alts = distinctAlternatives(e, title);
         return (
-          <article key={e.index} className={['coach-entry', mark ? 'marked' : ''].join(' ')}>
+          <article key={e.index} className={['coach-entry', mine.length ? 'marked' : ''].join(' ')}>
             <header>
               <b>{e.kind === 'turn' ? t('coach.turnLine', { n: e.turn }) : t('coach.answer', { n: e.turn })}</b>
               <span className="muted small">{t('coach.score', { n: fmtNumber(e.score, locale) })}</span>
             </header>
-            <p className="coach-line">{line(e.actions)}</p>
+            <div className="coach-steps" role="group" aria-label={t('coach.stepsLabel')}>
+              {e.actions.map((a, step) => {
+                const wrong = mine.some((m) => sameMark(m, { index: e.index, step }));
+                return (
+                  <button
+                    key={step}
+                    type="button"
+                    className={['coach-step', wrong ? 'wrong' : ''].join(' ')}
+                    aria-pressed={wrong}
+                    title={wrong ? t('coach.unmarkStep') : t('coach.markStep')}
+                    onClick={() => onToggle(e.index, step)}
+                  >
+                    {wrong && <span aria-hidden="true">✗ </span>}
+                    {title(a)}
+                  </button>
+                );
+              })}
+            </div>
+            {mine
+              .sort((a, b) => a.step - b.step)
+              .map((m) => (
+                <div key={m.step} className="coach-mark">
+                  <span className="small">
+                    <b>✗ {title(e.actions[m.step] ?? e.actions[0])}</b>
+                  </span>
+                  {alts.length > 0 && (
+                    <div className="coach-alts-pick">
+                      <span className="muted small">{t('coach.rightWas')}</span>
+                      {alts.map((alt) => (
+                        <button
+                          key={alt.i}
+                          type="button"
+                          className={['coach-alt', m.alt === alt.i ? 'on' : ''].join(' ')}
+                          aria-pressed={m.alt === alt.i}
+                          onClick={() => onUpdate(e.index, m.step, { alt: m.alt === alt.i ? undefined : alt.i })}
+                        >
+                          {alt.text}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    className="coach-why"
+                    value={m.why ?? ''}
+                    maxLength={500}
+                    placeholder={t('coach.why')}
+                    onChange={(ev) => onUpdate(e.index, m.step, { why: ev.target.value })}
+                  />
+                </div>
+              ))}
             {e.terms.length > 0 && (
               <div className="coach-terms">
                 <span className="muted small">{t('coach.terms')}</span>
@@ -80,97 +136,21 @@ export function CoachPanel({
                 ))}
               </div>
             )}
-            {e.alternatives.length > 0 && (
+            {alts.length > 0 && !mine.length && (
               <div className="coach-alts">
                 <span className="muted small">{t('coach.alternatives')}</span>
                 <ul>
-                  {e.alternatives.map((alt, i) => (
-                    <li key={i}>
-                      {line(alt.actions)} <span className="muted small">({fmtNumber(alt.score, locale)})</span>
+                  {alts.map((alt) => (
+                    <li key={alt.i}>
+                      {alt.text} <span className="muted small">({fmtNumber(alt.score, locale)})</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-            <div className="coach-actions">
-              {mark && <span className="coach-marked">✓ {t('coach.marked')}</span>}
-              <button type="button" className="btn small" onClick={() => setOpen(open === e.index ? null : e.index)}>
-                {mark ? t('coach.editMark') : t('coach.mark')}
-              </button>
-              {mark && (
-                <button type="button" className="btn small" onClick={() => onMark(e.index, null)}>
-                  {t('coach.unmark')}
-                </button>
-              )}
-            </div>
-            {open === e.index && (
-              <MarkForm
-                entry={e}
-                state={state}
-                initial={mark}
-                describe={line}
-                onSave={(m) => {
-                  onMark(e.index, m);
-                  setOpen(null);
-                }}
-                onCancel={() => setOpen(null)}
-              />
-            )}
           </article>
         );
       })}
-    </div>
-  );
-}
-
-function MarkForm({
-  entry,
-  state,
-  initial,
-  describe,
-  onSave,
-  onCancel,
-}: {
-  entry: CoachEntry;
-  state: GameState;
-  initial?: FeedbackMark;
-  describe: (actions: Action[]) => string;
-  onSave: (m: FeedbackMark) => void;
-  onCancel: () => void;
-}) {
-  const t = useT();
-  /** Índice da alternativa escolhida, ou -1 para "outra". */
-  const [pick, setPick] = useState<number>(initial && typeof initial.expected === 'string' ? -1 : 0);
-  const [other, setOther] = useState(initial && typeof initial.expected === 'string' ? initial.expected : '');
-  const [comment, setComment] = useState(initial?.comment ?? '');
-  const alts = entry.alternatives;
-  const save = () => {
-    const expected = pick >= 0 && alts[pick] ? choiceOf(state, alts[pick].actions[0]) : other.trim() || undefined;
-    onSave({ index: entry.index, ...(expected ? { expected } : {}), ...(comment.trim() ? { comment: comment.trim() } : {}) });
-  };
-  return (
-    <div className="coach-form">
-      <b className="small">{t('coach.expected')}</b>
-      {alts.map((alt, i) => (
-        <label key={i} className="small">
-          <input type="radio" name={`mark-${entry.index}`} checked={pick === i} onChange={() => setPick(i)} />
-          {describe(alt.actions)}
-        </label>
-      ))}
-      <label className="small">
-        <input type="radio" name={`mark-${entry.index}`} checked={pick === -1} onChange={() => setPick(-1)} />
-        {t('coach.expectedOther')}
-      </label>
-      {pick === -1 && <input value={other} maxLength={500} placeholder={t('coach.expectedPlaceholder')} onChange={(e) => setOther(e.target.value)} />}
-      <textarea value={comment} rows={2} maxLength={2000} placeholder={t('coach.commentPlaceholder')} onChange={(e) => setComment(e.target.value)} />
-      <div className="coach-form-row">
-        <button type="button" className="btn small" onClick={onCancel}>
-          {t('common.cancel')}
-        </button>
-        <button type="button" className="btn small primary" disabled={pick === -1 && !other.trim() && !comment.trim()} onClick={save}>
-          {t('coach.save')}
-        </button>
-      </div>
     </div>
   );
 }
