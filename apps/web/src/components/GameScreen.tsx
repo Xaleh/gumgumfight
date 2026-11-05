@@ -283,6 +283,7 @@ export function GameScreen({
         matchId={matchId}
         botLevel={setup.botLevel}
         botDeckId={setup.deckIds[1]}
+        botDeckName={setup.config.players[1].deck.name}
         ownDeck={human !== null ? ownDeck : undefined}
         onExit={onExit}
         onRematch={onRematch && (setup.mode === 'bot' && confirmDeck ? () => setConfirming(true) : () => onRematch())}
@@ -542,6 +543,7 @@ function Table({
   matchId,
   botLevel,
   botDeckId,
+  botDeckName,
   embed,
   ownDeck,
 }: {
@@ -578,6 +580,7 @@ function Table({
   botLevel?: BotLevel;
   /** Partida contra o bot no navegador: o deck que o bot joga (online vem da sala). */
   botDeckId?: string;
+  botDeckName?: string;
   /** Replay embutido num app parceiro. */
   embed?: TableEmbed;
   /** Partida no navegador: o deck de quem joga, para o painel de decklist (online vem da sala). */
@@ -864,7 +867,11 @@ function Table({
         describe: (a) => describeReplayAction(state, a, locale).title,
         termLabel: (key) => tr(`coach.term.${key}`),
         num: (n) => fmtNumber(n, locale),
-        bot: { deckId: (isOnline ? online?.room?.botDeckId : botDeckId) ?? null, ...leaderOf(botSeat) },
+        bot: {
+          deckId: (isOnline ? online?.room?.botDeckId : botDeckId) ?? null,
+          deckName: (isOnline ? online?.room?.botDeckName : botDeckName) ?? null,
+          ...leaderOf(botSeat),
+        },
         opponent: { name: state.players[human].name, ...leaderOf(human) },
         result: { turn: state.turn, over: state.phase === 'gameover', ...(state.phase === 'gameover' ? { botWon: state.winner === null ? null : state.winner === botSeat } : {}) },
         matchId: reportMatch,
@@ -873,7 +880,7 @@ function Table({
         comment,
       });
     },
-    [human, state, coachEntries, marks, t, locale, isOnline, online?.room?.botDeckId, botDeckId, reportMatch, effectiveBotLevel],
+    [human, state, coachEntries, marks, t, locale, isOnline, online?.room?.botDeckId, online?.room?.botDeckName, botDeckId, botDeckName, reportMatch, effectiveBotLevel],
   );
   const coachReport = useMemo(() => (coachOn ? buildBotReport() : ''), [coachOn, buildBotReport]);
   /** Streamer e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */

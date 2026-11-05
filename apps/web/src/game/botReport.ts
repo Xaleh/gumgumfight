@@ -51,7 +51,7 @@ export interface ReportInput {
   termLabel: (key: string) => string;
   /** Número formatado no idioma (para as notas e os termos). */
   num: (n: number) => string;
-  bot: { deckId: string | null; leaderName: string; leaderId: string };
+  bot: { deckId: string | null; deckName?: string | null; leaderName: string; leaderId: string };
   opponent: { name: string; leaderName: string; leaderId: string };
   /** `botWon`: null = empate; ausente = a partida não terminou. */
   result: { turn: number; over: boolean; botWon?: boolean | null };
@@ -66,7 +66,8 @@ const signed = (n: number, num: (n: number) => string) => `${n > 0 ? '+' : n < 0
 export function buildReport(r: ReportInput): string {
   const { tr } = r;
   const out: string[] = [`# ${tr('report.title')}`, ''];
-  out.push(`- ${tr('report.botDeck', { deck: r.bot.deckId ?? '?', leader: r.bot.leaderName, id: r.bot.leaderId })}`);
+  const deck = r.bot.deckName ? `${r.bot.deckName} (${r.bot.deckId ?? '?'})` : (r.bot.deckId ?? '?');
+  out.push(`- ${tr('report.botDeck', { deck, leader: r.bot.leaderName, id: r.bot.leaderId })}`);
   out.push(`- ${tr('report.opponent', { name: r.opponent.name, leader: r.opponent.leaderName, id: r.opponent.leaderId })}`);
   const res = r.result;
   out.push(
