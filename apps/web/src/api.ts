@@ -1020,6 +1020,7 @@ export interface OnlineRoomInfo {
   botLevel?: BotLevel;
   /** Treino contra o bot: o deck que o bot joga (relatório do Bot do Time). */
   botDeckId?: string | null;
+  botDeckName?: string | null;
   /** Atraso da mesa desta conexão em ms (quem vê as mãos); 0 ou ausente = ao vivo. */
   delay?: number;
   /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */

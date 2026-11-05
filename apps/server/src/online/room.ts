@@ -1027,15 +1027,10 @@ export class Room {
       // e explica cada decisão para o painel do treinador (só quando alguém do Time está vendo).
       const profile = level === 'team' ? this.deps.botProfile?.(this.data.seats[seat]?.deckId ?? null) : undefined;
       const coached = level === 'team' && [...this.conns].some((c) => c.coach);
-      const explain = coached
-        ? (e: BotExplanation) => {
-            const toReal = (a: Action): Action => {
-              const r = actionFromView(state, aliases, a);
-              return typeof r === 'string' ? a : r;
-            };
-            this.emitCoach({ index: this.data.actions.length, seat, ...e, actions: e.actions.map(toReal), alternatives: e.alternatives.map((alt) => ({ ...alt, actions: alt.actions.map(toReal) })) });
-          }
-        : undefined;
+      // As jogadas da explicação vão como o bot as viu, com os apelidos das cartas: são os mesmos da visão de quem
+      // joga (a sala tem um mapa só), então a mesa dá o nome de cada carta que ela já vê. Carta que só o bot vê (a mão
+      // dele) fica "desconhecida" até aparecer; os uids de verdade nunca saem da sala.
+      const explain = coached ? (e: BotExplanation) => this.emitCoach({ index: this.data.actions.length, seat, ...e }) : undefined;
       const real = actionFromView(state, aliases, chooseBotAction(view, seat, level, profile || explain ? { ...(profile ? { profile } : {}), ...(explain ? { explain } : {}) } : undefined));
       if (typeof real === 'string') throw new Error(real);
       this.commit(real);
@@ -1352,7 +1347,7 @@ export class Room {
       /** Treino contra o bot: o nível do bot do servidor (a nota e as marcações do Time citam o nível). */
       ...(this.data.botLevel ? { botLevel: this.data.botLevel } : {}),
       /** Treino contra o bot: o deck que o bot joga (relatório do Bot do Time; os decks prontos não são segredo). */
-      ...(this.data.queue === 'bot' ? { botDeckId: this.data.seats.find((s) => s.bot)?.deckId ?? null } : {}),
+      ...(this.data.queue === 'bot' ? { botDeckId: this.data.seats.find((s) => s.bot)?.deckId ?? null, botDeckName: this.data.seats.find((s) => s.bot)?.deck.name ?? null } : {}),
       /** As mãos dos jogadores podem aparecer para quem transmite (torneio ou sala privada liberada). */
       handsAllowed: this.handsAllowed,
       /** As mãos podem aparecer ao vivo, sem o atraso mínimo (torneio com mãos ao vivo). */

@@ -1370,8 +1370,14 @@ describe('modo espectador', () => {
     expect(turn).toBeDefined();
     expect(turn.seat).toBe(1);
     expect(turn.actions[turn.actions.length - 1].type).toBe('endTurn');
-    // A posição é a da ação no replay: a jogada gravada ali é a primeira da linha.
-    expect(room.data.actions[turn.index]).toEqual(turn.actions[0]);
+    // A posição é a da ação no replay: a jogada gravada ali é a primeira da linha. As jogadas vêm com os apelidos da
+    // visão de quem joga (nunca os uids do motor), e cada carta já à vista dele tem nome na mesa.
+    expect(turn.actions[0].type).toBe(room.data.actions[turn.index].type);
+    const view = me.view!;
+    const uidsOf = (a: Record<string, unknown>) => ['uid', 'attacker', 'target'].map((k) => a[k]).filter((u): u is string => typeof u === 'string');
+    for (const a of turn.actions) for (const u of uidsOf(a)) expect(u).not.toMatch(/^c\d+$/);
+    const seen = turn.actions.flatMap(uidsOf).filter((u: string) => view.cards[u]);
+    expect(seen.length).toBe(turn.actions.flatMap(uidsOf).length);
     expect(Array.isArray(turn.terms)).toBe(true);
     expect(watcher.events.some((e) => e.event === 'coach')).toBe(false);
     // Quem reconecta recebe as explicações de novo.

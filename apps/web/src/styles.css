@@ -4151,7 +4151,13 @@ button.hint-pill::after,
 }
 .sheet {
   width: 100%;
+  /*
+   * Em unidades da tela: a folha mora numa grade cuja linha cresce com o conteúdo, e lá uma porcentagem não limita nada
+   * (o painel do treinador numa partida longa passava de 2.000 px e, alinhado embaixo, saía da tela inteiro).
+   */
   max-height: 86%;
+  max-height: 86vh;
+  max-height: 86dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg2);
@@ -4179,6 +4185,7 @@ button.hint-pill::after,
 }
 .sheet-body {
   overflow-y: auto;
+  min-height: 0;
   padding: 4px 16px 18px;
   display: flex;
   flex-direction: column;
