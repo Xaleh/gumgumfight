@@ -48,6 +48,8 @@ export interface DeckSummary {
   deckHash?: string;
   /** Deck criado por você (na sua conta ou, sem login, neste navegador). Só o dono edita/apaga. */
   mine: boolean;
+  /** A lista exata, só nos seus decks (`mine`); servidores antigos não mandam. */
+  cards?: Array<{ id: string; count: number }>;
   /** Favorito seu (da conta ou, sem login, deste navegador); servidores antigos não mandam. */
   favorite?: boolean;
   /** Partidas jogadas com o deck por pessoas (não pelo robô); servidores antigos não mandam. */

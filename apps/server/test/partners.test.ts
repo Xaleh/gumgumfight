@@ -121,6 +121,14 @@ describe('tokens pessoais e middleware Bearer', () => {
     expect(mine.map((d: { id: string }) => d.id)).toEqual([deck.id]);
     const viaToken = (await a.inject({ url: '/api/decks?mine=1', headers: tk.bearer })).json();
     expect(viaToken.map((d: { id: string }) => d.id)).toEqual([deck.id]);
+    // O app importa os decks a partir da lista: ela traz as cartas dos decks de quem pede.
+    expect(viaToken[0].cards).toEqual(luffy.cards);
+    expect(deck.cards).toEqual(luffy.cards);
+    // Os decks prontos (de ninguém) seguem só com o resumo na lista pública.
+    const all = (await a.inject({ url: '/api/decks', headers: tk.bearer })).json();
+    const builtin = all.find((d: { id: string }) => d.id === 'st01-luffy');
+    expect(builtin.size).toBe(50);
+    expect(builtin.cards).toBeUndefined();
     // Cookie e navegador são ignorados na requisição com token: o dono é sempre a conta do token.
     const other = await login(a, ZORO);
     const mixed = await a.inject({ method: 'POST', url: '/api/decks', headers: { ...tk.bearer, ...other.cookie, ...BROWSER }, payload: { name: 'Misto', leader: 'ST01-001', cards: [] } });

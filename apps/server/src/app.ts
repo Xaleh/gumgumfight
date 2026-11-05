@@ -253,6 +253,11 @@ export function buildApp(
       /** Hash da lista exata (o mesmo de `deckHash` nas partidas), para parceiros casarem deck e partida. */
       deckHash: deckHash(deck),
       mine: isMine(deck, viewer),
+      /**
+       * A lista exata (`{ id, count }`), só nos decks de quem pede: um app parceiro importa os
+       * decks do usuário a partir de `GET /api/decks?mine=1` sem buscar um a um em `/api/decks/:id`.
+       */
+      ...(isMine(deck, viewer) ? { cards: deck.cards } : {}),
       /** Favorito de quem pede (conta ou navegador). */
       favorite: usage.favorites.has(deck.id),
       /** Partidas jogadas com este deck (por pessoas, não pelo robô). */

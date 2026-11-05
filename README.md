@@ -659,7 +659,7 @@ ativos por conta), vê o que cada app pode fazer e quando foi usado pela última
 | Scope | Libera |
 |---|---|
 | `profile` | `GET /api/auth/me` (só `{ user: { id, role: 'player' }, player: { id, name, bounty, tier } }`: nunca e-mail, nome ou foto do Google) e `GET /api/players/me` |
-| `decks:read` | `GET /api/decks?mine=1` (os próprios, com `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos) |
+| `decks:read` | `GET /api/decks?mine=1` (os próprios, com a lista `cards` (`{ id, count }`), `size`, `updatedAt`, `deckHash` e a validação por formato), `GET /api/decks/:id` (os próprios e os prontos, com as definições das cartas) |
 | `decks:write` | `POST /api/decks`, `PUT /api/decks/:id`, `DELETE /api/decks/:id` (só os próprios) |
 | `matches:read` | `GET /api/players/me/matches`, `GET /api/matches/:id`, `GET /api/matches/:id/replay` e `POST /api/matches/:id/replay-link` (só partidas que o usuário jogou) |
 | `stats:read` | `GET /api/stats*` (com `mine=1`, as próprias; sem ele, as consultas públicas de sempre) |
