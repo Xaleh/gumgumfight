@@ -874,7 +874,7 @@ aqui, o desenho:
   cookie; `last_used_at` é gravado no máximo 1×/min por token. O logger do Fastify tem `redact` em
   `req.headers.authorization`.
 - **Rotas liberadas** (`config: { scope }`): `profile` → `/api/auth/me` (resposta reduzida), `/api/players/me`;
-  `decks:read` → `GET /api/decks` (`mine=1` filtra por dono), `GET /api/decks/:id` (os próprios e os prontos);
+  `decks:read` → `GET /api/decks` (`mine=1` filtra por dono; os decks de quem pede trazem a lista `cards`), `GET /api/decks/:id` (os próprios e os prontos);
   `decks:write` → `POST/PUT/DELETE /api/decks` (o `PUT` aceita `expectedUpdatedAt`/`If-Unmodified-Since` e responde
   409 `deck_conflict` com a versão atual; o resumo dos decks ganhou `deckHash`); `matches:read` →
   `GET /api/players/me/matches` (`matches.ts`: `match_seats` por `player_id`, `since`, `cursor` = `match_id`, até 100),
@@ -1664,7 +1664,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/admin/tutorial?days=` | Funil anônimo das lições do tutorial | Admin |
 | GET · POST · PUT · DELETE | `/api/admin/sponsors`, `/api/admin/sponsors/:id`, `/api/admin/sponsors/:id/logo` | Lojas parceiras | Admin |
 | GET | `/api/admin/support/payments` | Pagamentos recebidos (Apoia.se, Ko-fi) | Admin |
-| GET | `/api/decks?mine=1` | Lista decks com validação; `mine=1`: só os de quem pede | Pública; Token (`decks:read`) |
+| GET | `/api/decks?mine=1` | Lista decks com validação (os de quem pede trazem `cards`); `mine=1`: só os de quem pede | Pública; Token (`decks:read`) |
 | GET | `/api/decks/:id` | Deck + definições das cartas usadas (com token: só os próprios e os prontos) | Pública; Token (`decks:read`) |
 | POST | `/api/decks` | Cria um deck (`{ name, leader, cards, arts? }`) | Navegador; Token (`decks:write`) |
 | PUT | `/api/decks/:id` | Atualiza um deck (`expectedUpdatedAt` ou `If-Unmodified-Since`: 409 `deck_conflict` se mudou depois) | Dono; Token (`decks:write`) |
