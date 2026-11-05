@@ -68,6 +68,10 @@ Um painel lateral recolhível (reaproveita o visual do `Coach.tsx` do tutorial),
   mesmo `bot_feedback`.
 - Link para o replay com as marcações já em cima.
 
+> Atualização (04/11/2026): a marcação ficou de um toque por passo da jogada (com "o certo era" e "por quê"
+> opcionais), as marcações viram um relatório em texto, e a caixa de correções (estado e resposta) deu lugar à lista
+> de relatórios com o **pacote para o Claude** (relatório + guia + perfil + replay), que substitui o agente sem a API.
+
 ### 3.4 Tela "Bot do Time" (aba nova no Admin; o Time vê em modo leitura)
 
 - **Decks do meta**: um card por deck com Líder, se o guia foi enviado, se o perfil foi gerado e revisado, quantos

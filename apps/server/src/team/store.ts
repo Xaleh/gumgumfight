@@ -17,6 +17,8 @@ export interface FeedbackInput {
   leader: string | null;
   oppLeader: string | null;
   actionIndex: number | null;
+  /** Qual passo da linha do bot foi marcado (a posição `actionIndex` é a do começo da linha). */
+  step?: number | null;
   turn: number | null;
   /** JSON da jogada do bot (por números de carta). */
   botAction: string | null;
@@ -113,11 +115,11 @@ const toItem = (r: Row): FeedbackItem => ({
 export function createFeedback(db: DB, f: FeedbackInput): number {
   const r = db
     .prepare(
-      `INSERT INTO bot_feedback (match_id, user_id, kind, bot_level, bot_seat, bot_deck, leader, opp_leader, action_index, turn,
+      `INSERT INTO bot_feedback (match_id, user_id, kind, bot_level, bot_seat, bot_deck, leader, opp_leader, action_index, step, turn,
          bot_action, expected, position, rating, comment)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(f.matchId, f.userId, f.kind, f.botLevel, f.botSeat, f.botDeck, f.leader, f.oppLeader, f.actionIndex, f.turn, f.botAction, f.expected, f.position, f.rating, f.comment);
+    .run(f.matchId, f.userId, f.kind, f.botLevel, f.botSeat, f.botDeck, f.leader, f.oppLeader, f.actionIndex, f.step ?? null, f.turn, f.botAction, f.expected, f.position, f.rating, f.comment);
   return Number(r.lastInsertRowid);
 }
 
@@ -154,4 +156,95 @@ export function feedbackByDeck(db: DB): Array<{ botDeck: string | null; leader: 
       )
       .all() as Array<{ bot_deck: string | null; leader: string | null; ratings: number; avg_rating: number | null; open_marks: number; marks: number }>
   ).map((r) => ({ botDeck: r.bot_deck, leader: r.leader, ratings: r.ratings, avgRating: r.avg_rating, openMarks: r.open_marks, marks: r.marks }));
+}
+
+// ------------------------------------------------------------------ relatórios das partidas
+
+export interface ReportInput {
+  matchId: number;
+  userId: string;
+  botLevel: string | null;
+  botDeck: string | null;
+  leader: string | null;
+  oppLeader: string | null;
+  rating: number | null;
+  marks: number;
+  report: string;
+}
+
+export interface ReportItem extends Omit<ReportInput, 'userId'> {
+  id: number;
+  userId: string;
+  userName: string | null;
+  usedAt: string | null;
+  createdAt: string;
+}
+
+type ReportRow = {
+  id: number;
+  match_id: number;
+  user_id: string;
+  user_name: string | null;
+  bot_level: string | null;
+  bot_deck: string | null;
+  leader: string | null;
+  opp_leader: string | null;
+  rating: number | null;
+  marks: number;
+  report: string;
+  used_at: string | null;
+  created_at: string;
+};
+
+const REPORT_COLS = `r.id, r.match_id, r.user_id, u.name AS user_name, r.bot_level, r.bot_deck, r.leader, r.opp_leader, r.rating, r.marks,
+  r.report, r.used_at, r.created_at`;
+
+const toReport = (r: ReportRow): ReportItem => ({
+  id: r.id,
+  matchId: r.match_id,
+  userId: r.user_id,
+  userName: r.user_name,
+  botLevel: r.bot_level,
+  botDeck: r.bot_deck,
+  leader: r.leader,
+  oppLeader: r.opp_leader,
+  rating: r.rating,
+  marks: r.marks,
+  report: r.report,
+  usedAt: r.used_at,
+  createdAt: r.created_at,
+});
+
+/** Grava o relatório; um segundo envio da mesma pessoa para a mesma partida substitui o anterior. */
+export function saveReport(db: DB, r: ReportInput): number {
+  db.prepare('DELETE FROM bot_reports WHERE match_id = ? AND user_id = ?').run(r.matchId, r.userId);
+  const res = db
+    .prepare(
+      `INSERT INTO bot_reports (match_id, user_id, bot_level, bot_deck, leader, opp_leader, rating, marks, report)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(r.matchId, r.userId, r.botLevel, r.botDeck, r.leader, r.oppLeader, r.rating, r.marks, r.report);
+  return Number(res.lastInsertRowid);
+}
+
+/** Relatórios, os mais novos primeiro. `used`: false = só os ainda não usados. */
+export function listReports(db: DB, opts: { used?: boolean; limit?: number } = {}): ReportItem[] {
+  const where = opts.used === false ? 'WHERE r.used_at IS NULL' : opts.used === true ? 'WHERE r.used_at IS NOT NULL' : '';
+  return (
+    db.prepare(`SELECT ${REPORT_COLS} FROM bot_reports r LEFT JOIN users u ON u.id = r.user_id ${where} ORDER BY r.created_at DESC, r.id DESC LIMIT ?`).all(opts.limit ?? 200) as ReportRow[]
+  ).map(toReport);
+}
+
+export function getReports(db: DB, ids: number[]): ReportItem[] {
+  if (!ids.length) return [];
+  return (
+    db.prepare(`SELECT ${REPORT_COLS} FROM bot_reports r LEFT JOIN users u ON u.id = r.user_id WHERE r.id IN (${ids.map(() => '?').join(',')}) ORDER BY r.created_at, r.id`).all(...ids) as ReportRow[]
+  ).map(toReport);
+}
+
+export function setReportUsed(db: DB, id: number, used: boolean, by: string): boolean {
+  const res = used
+    ? db.prepare("UPDATE bot_reports SET used_at = datetime('now'), used_by = ? WHERE id = ?").run(by, id)
+    : db.prepare('UPDATE bot_reports SET used_at = NULL, used_by = NULL WHERE id = ?').run(id);
+  return Number(res.changes) > 0;
 }

@@ -597,7 +597,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (31)
+### Tabelas (32)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -629,7 +629,8 @@ baixadas quando tocam) + `public/`.
 | `oauth_codes` | `code_hash` | `client_id`, `user_id`, `scopes`, `redirect_uri`, `code_challenge` (S256), `expires_at` (5 min), `used_at`, `token_id` (refresh emitido; revogado se o code for reusado) | consentimento, `/api/oauth/token` |
 | `global_stats_queues` | `queue` (chave da fila na OPTCG Logpose API, ex. `lw`) | `name`, `sort`, `last_modified` (do JSON na API), `fetched_at`, **`body` (JSON `GlobalSnapshot`: Líderes e matchups normalizados)** | sync do meta global (`stats/global.ts`) |
 | `global_stats_history` | `(queue, day)` | `body` (JSON `[[leader, games, wins], …]`): resumo diário dos Líderes de cada fila, para a tendência | sync do meta global (um por dia) |
-| `bot_feedback` | `id` autoincrement | Correções do Bot do Time: `match_id`, `user_id`, `kind` (`mark`/`rating`), `bot_level`, `bot_seat`, `bot_deck`, `leader`, `opp_leader`, `action_index`, `turn`, `bot_action` (JSON), `expected` (JSON), **`position` (JSON: a visão do bot na jogada)**, `rating`, `comment`, `status` (`open/test/fixed/dismissed`), `note`, `resolved_at/by` | `POST /api/bot/feedback`, admin |
+| `bot_feedback` | `id` autoincrement | Correções do Bot do Time: `match_id`, `user_id`, `kind` (`mark`/`rating`), `bot_level`, `bot_seat`, `bot_deck`, `leader`, `opp_leader`, `action_index`, `step` (o passo da linha marcado), `turn`, `bot_action` (JSON), `expected` (JSON), **`position` (JSON: a visão do bot na jogada)**, `rating`, `comment`, `status` (`open/test/fixed/dismissed`), `note`, `resolved_at/by` | `POST /api/bot/feedback`, admin |
+| `bot_reports` | `id` autoincrement | Relatório de uma partida contra o Bot do Time (o texto que a mesa monta com os passos marcados como errados): `match_id`, `user_id`, `bot_level`, `bot_deck`, `leader`, `opp_leader`, `rating`, `marks`, **`report` (markdown)**, `used_at/by`, `created_at`; um por pessoa e partida (o reenvio substitui) | `POST /api/bot/feedback`, admin |
 | `meta_profiles` | `deck_id` | Guia (`guide`, markdown) e perfil (`profile`, JSON `DeckProfile`) de um deck do meta salvos pela tela "Bot do Time", por cima dos arquivos de `data/decks/meta` (a semente); `updated_by`, `updated_at` | `PUT /api/bot/profiles/:id` |
 | `sqlite_sequence` | — | interna (autoincrement) | — |
 
@@ -1654,7 +1655,10 @@ Quem chama, na coluna da direita:
 | PUT | `/api/bot/profiles/:id` | Salva o guia e/ou o perfil (conferido) no banco (`{ guide?, profile? }`; null volta ao arquivo) | Admin |
 | GET | `/api/bot/agent` | O agente fora da partida está ligado | Time |
 | POST | `/api/bot/profiles/:id/generate` · `/api/bot/matches/:id/review` | Agente: guia → rascunho do perfil; partida do bot x guia → discrepâncias | Admin |
-| POST | `/api/bot/feedback` | Marcações de jogadas (`marks[]`: posição, esperado, comentário; a visão do bot é refeita do replay) e a nota (1–5) de uma partida contra o bot | Time |
+| POST | `/api/bot/feedback` | Marcações de jogadas (`marks[]`: posição, passo, esperado, comentário; a visão do bot é refeita do replay), a nota (1–5) e o relatório (`report`, markdown) de uma partida contra o bot; devolve `reportId` | Time |
+| GET | `/api/bot/reports?used=0\|1` | Relatórios das partidas | Time |
+| PUT | `/api/bot/reports/:id` | Marca como usado (`{ used }`) | Admin |
+| GET | `/api/bot/reports/package?ids=` | Pacote para o Claude (`{ filename, content }`): os relatórios, o guia e o perfil de cada deck do bot e os replays (até 20) | Time |
 | GET | `/api/bot/feedback?status=` · `/summary` · `/:id` | Caixa de correções; resumo por deck do bot; uma correção com a posição | Time |
 | PUT | `/api/bot/feedback/:id` | Estado e resposta (`{ status, note }`) | Admin |
 | GET | `/api/admin/tutorial?days=` | Funil anônimo das lições do tutorial | Admin |

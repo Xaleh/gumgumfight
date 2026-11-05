@@ -463,12 +463,17 @@ modelo de Counter por Líder adversário), nunca como regras. Sem perfil, o deck
 - **No servidor sempre que dá**: o treino no nível Time abre uma sala de bot no servidor (aparece em "Assistir");
   lotado, roda no navegador com o mesmo perfil.
 - **Painel do treinador** na mesa: cada jogada do bot com a nota, os termos da avaliação que mais pesaram e as
-  alternativas consideradas. Cada entrada pode ser **marcada** ("ele deveria ter feito X"); no fim, a **nota** (1 a 5)
-  e as marcações vão para a caixa de correções, com a visão exata do bot na jogada (refeita do replay), que é o que um
-  teste de posição precisa.
-- **Tela "Bot do Time"** (menu, para o Time; também uma aba da Administração): os decks do meta com o estado do guia
-  e do perfil, o editor de guia e perfil (admin; salvo no banco, por cima dos arquivos, e copiado para o repositório
-  quando estiver pronto) e a caixa de correções (estado, resposta, abrir o replay na jogada marcada).
+  alternativas consideradas. Cada **passo** da jogada é um botão: um toque o marca como errado, e "o certo era" (uma
+  das alternativas) e "por quê" são opcionais. As marcações vão montando o **relatório da partida** (texto em
+  markdown, com prévia e "Copiar" no alto do painel).
+- **Fim da partida**: o relatório com nota (1 a 5) e comentário opcionais. "Salvar e baixar o pacote" grava o
+  relatório (e, por marcação, a visão exata do bot na jogada, refeita do replay, que é o que um teste de posição
+  precisa) e baixa o **pacote para o Claude**: um markdown com o relatório, o guia e o perfil atuais do deck e o replay.
+  Esse pacote, colado numa conversa com o Claude no repositório, faz o trabalho do agente sem a API.
+- **Tela "Bot do Time"** (menu, para o Time; também uma aba da Administração): os decks do meta com o guia (à esquerda)
+  e o perfil (à direita), o editor de guia e perfil (admin; salvo no banco, por cima dos arquivos, e copiado para o
+  repositório quando estiver pronto) e os **relatórios das partidas**: ver, copiar, baixar o pacote de um relatório ou
+  de vários selecionados (o guia e o perfil de cada deck vão uma vez só) e marcar como usado (admin).
 - **Agente fora da partida** (`BOT_AGENT_API_KEY`): escreve o rascunho do perfil a partir do guia e compara as jogadas
   do bot numa partida com o guia (discrepâncias e o conceito genérico que falta). Na tela, os botões "Gerar perfil" e
   "Revisar a partida"; no terminal, `npm run bot:agent -w @gumgum/server -- profile <deck> | review <matchId>`. Sem a chave,

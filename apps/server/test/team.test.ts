@@ -254,3 +254,78 @@ describe('Bot do Time: traço de uma partida a partir do arquivo de replay (sem 
     expect(fileTrace(db, { ...(file as object), decks: [] } as never, 1)).toBeNull();
   });
 });
+
+describe('Bot do Time: relatório da partida e pacote para o Claude', () => {
+  it('o relatório vai junto das marcações; a lista e o pacote (relatório + guia + perfil + replay) saem para o Time', async () => {
+    const { db, app } = setup();
+    const fan = login(db);
+    const member = login(db, 'player', true);
+    const admin = login(db, 'admin');
+    const { matchId, actions } = await recordBotMatch(app, member);
+    const bot = actions.findIndex((a, i) => i > 10 && a.player === 1 && (a.type === 'attack' || a.type === 'playCard'));
+    const report = '# Bot do Time: relatório da partida\n\n## Jogadas erradas (1)\n\n### 1. Turno 4\n- Jogada errada: ataca o Líder';
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/api/bot/feedback',
+      headers: member.headers,
+      payload: { matchId, level: 'team', marks: [{ index: bot, step: 2, comment: 'cedo demais' }], report },
+    });
+    expect(sent.statusCode, sent.body).toBe(201);
+    expect(sent.json().reportId).toBeGreaterThan(0);
+    // O passo marcado fica gravado na marcação.
+    expect((db.prepare('SELECT step FROM bot_feedback WHERE kind = ?').get('mark') as { step: number }).step).toBe(2);
+    // Passo inválido: recusado.
+    expect((await app.inject({ method: 'POST', url: '/api/bot/feedback', headers: member.headers, payload: { matchId, marks: [{ index: bot, step: -1 }] } })).statusCode).toBe(400);
+    // Só o relatório (sem nota nem marcação) também vale; um segundo envio da mesma pessoa substitui o primeiro.
+    const again = await app.inject({ method: 'POST', url: '/api/bot/feedback', headers: member.headers, payload: { matchId, report: `${report}\n\n## Comentário geral\nok` } });
+    expect(again.statusCode, again.body).toBe(201);
+
+    expect((await app.inject({ url: '/api/bot/reports', headers: fan.headers })).statusCode).toBe(403);
+    const list = (await app.inject({ url: '/api/bot/reports', headers: member.headers })).json().reports;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ matchId, userId: member.id, botDeck: 'st02-kid', leader: 'ST02-001', oppLeader: 'ST01-001', marks: 0, usedAt: null });
+    expect(list[0].report).toMatch(/Comentário geral/);
+
+    // O pacote: o relatório (com os títulos um nível abaixo), o guia e o perfil do deck do bot, e o replay.
+    const pkg = (await app.inject({ url: `/api/bot/reports/package?ids=${list[0].id}`, headers: member.headers })).json();
+    expect(pkg.filename).toBe(`bot-do-time-st02-kid-partida-${matchId}.md`);
+    expect(pkg.content).toMatch(/^# Pacote do Bot do Time/);
+    expect(pkg.content).toContain('## Bot do Time: relatório da partida');
+    expect(pkg.content).toContain('## Deck do bot: st02-kid');
+    expect(pkg.content).toContain('(este deck ainda não tem guia)');
+    expect(pkg.content).toContain(`### Partida #${matchId}`);
+    expect(pkg.content).toContain('"format":"gumgumfight-replay"');
+    expect((await app.inject({ url: '/api/bot/reports/package?ids=999', headers: member.headers })).statusCode).toBe(404);
+
+    // Marcar como usado: só admin; o filtro esconde os usados.
+    expect((await app.inject({ method: 'PUT', url: `/api/bot/reports/${list[0].id}`, headers: member.headers, payload: { used: true } })).statusCode).toBe(403);
+    const used = (await app.inject({ method: 'PUT', url: `/api/bot/reports/${list[0].id}`, headers: admin.headers, payload: { used: true } })).json();
+    expect(used.usedAt).toBeTruthy();
+    expect((await app.inject({ url: '/api/bot/reports?used=0', headers: member.headers })).json().reports).toHaveLength(0);
+    expect((await app.inject({ url: '/api/bot/reports?used=1', headers: member.headers })).json().reports).toHaveLength(1);
+  });
+
+  it('o pacote de um deck do meta traz o guia e o perfil, e vários relatórios saem juntos', async () => {
+    const { buildPackage, packageName } = await import('../src/team/package');
+    const base = { userId: 'u', userName: 'T', botLevel: 'team', leader: 'OP17-039', oppLeader: 'ST01-001', rating: null, marks: 1, usedAt: null, createdAt: '' };
+    const reports = [
+      { ...base, id: 1, matchId: 10, botDeck: 'op17-xebec', report: '# Relatório A\n## Jogadas erradas (1)' },
+      { ...base, id: 2, matchId: 11, botDeck: 'op17-xebec', report: '# Relatório B' },
+    ];
+    const content = buildPackage(
+      reports,
+      () => ({ guide: '# Guia do Xebec\n\n## Plano\ntexto com ```crases```', profile: { id: 'op17-xebec', leader: 'OP17-039', archetype: 'control' } }),
+      (id) => ({ format: 'gumgumfight-replay', id }),
+    );
+    expect(packageName(reports)).toBe('bot-do-time-op17-xebec-2-partidas.md');
+    expect(content).toContain('## Relatório A');
+    expect(content).toContain('### Jogadas erradas (1)');
+    // O guia vai uma vez só, com os títulos abaixo de "### Guia".
+    expect(content.match(/^### Guia/gm)).toHaveLength(1);
+    expect(content).toContain('#### Guia do Xebec');
+    expect(content).toContain('##### Plano');
+    expect(content).toContain('"archetype": "control"');
+    // O bloco do perfil não fecha antes da hora mesmo com crases no conteúdo.
+    expect(content).toContain('### Partida #11');
+  });
+});

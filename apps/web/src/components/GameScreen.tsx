@@ -26,13 +26,14 @@ import {
 } from '@gumgum/engine';
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { api, type CoachEntry, currentSpoilerSet, type FeedbackMark, isAdmin, isTeam, type LiveRoom, modeLabel, type OnlineSeat, type RoomDecks, type WatchTarget, whyNotPlayable } from '../api';
-import { BotRating } from './BotFeedback';
+import { api, type CoachEntry, currentSpoilerSet, isAdmin, isTeam, type LiveRoom, modeLabel, type OnlineSeat, type RoomDecks, type WatchTarget, whyNotPlayable } from '../api';
+import { BotReport } from './BotFeedback';
 import { CoachPanel } from './CoachPanel';
 import { useAuth } from '../auth';
 import { abilityCostLabel, abilityText, abilityTitle } from '../game/abilityText';
 import { usePreloadCardImages } from '../game/preloadImages';
 import { useBoardSize } from '../hooks/useBoardSize';
+import { buildReport, type CoachMark, feedbackMarks, sameMark } from '../game/botReport';
 import { describeReplayAction } from '../game/replayCue';
 import { coachTip } from '../game/tutorial/coachTips';
 import type { EmbedLayout } from '../embed';
@@ -40,7 +41,8 @@ import { useEmbedBridge } from '../game/useEmbedBridge';
 import { buildSetup } from '../game/setup';
 import { type GameSetup, useGame } from '../game/useGame';
 import { audio } from '../audio';
-import { type Translate, useT, useTryT } from '../i18n';
+import { hasKey, type MessageKey, type Translate, useT, useTryT } from '../i18n';
+import { fmtNumber } from '../i18n/format';
 import { listText, logText, msgText } from '../game/engineText';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
@@ -280,6 +282,7 @@ export function GameScreen({
         kind={setup.mode}
         matchId={matchId}
         botLevel={setup.botLevel}
+        botDeckId={setup.deckIds[1]}
         ownDeck={human !== null ? ownDeck : undefined}
         onExit={onExit}
         onRematch={onRematch && (setup.mode === 'bot' && confirmDeck ? () => setConfirming(true) : () => onRematch())}
@@ -518,6 +521,9 @@ export interface TableTutorial {
   floatAt?: 'top' | 'bottom';
 }
 
+/** Nome de cada nível do bot (o relatório do Bot do Time cita o nível). */
+const BOT_LEVEL_LABEL: Record<BotLevel, MessageKey> = { easy: 'menu.botEasy', normal: 'menu.botNormal', hard: 'menu.botHard', team: 'menu.botTeam' };
+
 /** Para onde o botão de sair da mesa leva: o torneio, o menu ou a tela anterior (ex.: a lista "Assistir"). */
 type ExitTo = 'tournament' | 'menu' | 'back';
 
@@ -535,6 +541,7 @@ function Table({
   tutorial,
   matchId,
   botLevel,
+  botDeckId,
   embed,
   ownDeck,
 }: {
@@ -569,6 +576,8 @@ function Table({
   matchId?: number | null;
   /** Partida contra o bot no navegador: o nível do bot (online vem da sala). */
   botLevel?: BotLevel;
+  /** Partida contra o bot no navegador: o deck que o bot joga (online vem da sala). */
+  botDeckId?: string;
   /** Replay embutido num app parceiro. */
   embed?: TableEmbed;
   /** Partida no navegador: o deck de quem joga, para o painel de decklist (online vem da sala). */
@@ -780,9 +789,18 @@ function Table({
   // Bot do Time: a nota e as marcações, para quem é do Time, numa partida contra o bot (no navegador ou na sala do servidor).
   const botMatch = kind === 'bot' || online?.room?.queue === 'bot';
   const effectiveBotLevel: BotLevel | undefined = isOnline ? online?.room?.botLevel : botLevel;
-  /** Jogadas do bot marcadas durante a partida (painel do treinador); vão com a nota no fim. */
-  const [marks, setMarks] = useState<FeedbackMark[]>([]);
-  const setMark = useCallback((index: number, mark: FeedbackMark | null) => setMarks((list) => [...list.filter((m) => m.index !== index), ...(mark ? [mark] : [])]), []);
+  /** Passos das jogadas do bot marcados como errados (painel do treinador); viram o relatório da partida. */
+  const [marks, setMarks] = useState<CoachMark[]>([]);
+  const toggleMark = useCallback(
+    (index: number, step: number) =>
+      setMarks((list) => (list.some((m) => sameMark(m, { index, step })) ? list.filter((m) => !sameMark(m, { index, step })) : [...list, { index, step }])),
+    [],
+  );
+  const updateMark = useCallback(
+    (index: number, step: number, patch: Partial<Pick<CoachMark, 'alt' | 'why'>>) =>
+      setMarks((list) => list.map((m) => (sameMark(m, { index, step }) ? { ...m, ...patch } : m))),
+    [],
+  );
   const coachEntries = (isOnline ? online?.coach : game.coach) ?? [];
   const reportCards = useMemo(
     () =>
@@ -827,9 +845,37 @@ function Table({
   // Espectador com a visão de um jogador (o streamer que transmite a própria partida): a mão dele embaixo.
   const bottom: PlayerId = human ?? online?.room?.pov ?? 0;
   const { user } = useAuth();
-  const feedbackMatch = botMatch && isTeam(user) && reportMatch !== null ? reportMatch : null;
   /** Painel do treinador: no treino contra o Bot do Time, para quem é do Time. */
-  const coachOn = botMatch && isTeam(user) && effectiveBotLevel === 'team' && human !== null && !watching && kind !== 'replay';
+  const coachOn = botMatch && isTeam(user) && effectiveBotLevel === 'team' && human !== null && !watching && kind !== 'replay' && !tutorial;
+  /** O relatório da partida (markdown) com as jogadas marcadas; `rating`/`comment` vêm do bloco do fim da partida. */
+  const buildBotReport = useCallback(
+    (rating = 0, comment = '') => {
+      if (human === null) return '';
+      const botSeat: PlayerId = human === 0 ? 1 : 0;
+      const leaderOf = (p: PlayerId) => {
+        const uid = state.players[p].leader.uid;
+        return { leaderName: state.cards[uid] ? cardDef(state, uid).name : '?', leaderId: state.cards[uid]?.cardId ?? '?' };
+      };
+      const tr = (key: string, params?: Record<string, string | number>) => (hasKey(key) ? t(key, params) : key);
+      return buildReport({
+        entries: coachEntries,
+        marks,
+        tr,
+        describe: (a) => describeReplayAction(state, a, locale).title,
+        termLabel: (key) => tr(`coach.term.${key}`),
+        num: (n) => fmtNumber(n, locale),
+        bot: { deckId: (isOnline ? online?.room?.botDeckId : botDeckId) ?? null, ...leaderOf(botSeat) },
+        opponent: { name: state.players[human].name, ...leaderOf(human) },
+        result: { turn: state.turn, over: state.phase === 'gameover', ...(state.phase === 'gameover' ? { botWon: state.winner === null ? null : state.winner === botSeat } : {}) },
+        matchId: reportMatch,
+        level: effectiveBotLevel ? t(BOT_LEVEL_LABEL[effectiveBotLevel]) : null,
+        rating,
+        comment,
+      });
+    },
+    [human, state, coachEntries, marks, t, locale, isOnline, online?.room?.botDeckId, botDeckId, reportMatch, effectiveBotLevel],
+  );
+  const coachReport = useMemo(() => (coachOn ? buildBotReport() : ''), [coachOn, buildBotReport]);
   /** Streamer e Admin mandam a partida aberta para a tela de transmissão (menu da partida). */
   const canBroadcast = Boolean(online?.room && !broadcast && !tutorial && user && (user.role === 'streamer' || isAdmin(user.role)));
   const sendToBroadcast = () =>
@@ -1865,7 +1911,7 @@ function Table({
         )}
         {sheet === 'coach' && coachOn && (
           <SheetFrame title={t('coach.panel')} onClose={() => setSheet(null)}>
-            <CoachPanel state={state} entries={coachEntries} marks={marks} onMark={setMark} />
+            <CoachPanel state={state} entries={coachEntries} marks={marks} report={coachReport} onToggle={toggleMark} onUpdate={updateMark} />
           </SheetFrame>
         )}
 
@@ -1917,7 +1963,16 @@ function Table({
             extra={online ? <OnlineResultInfo online={online} /> : undefined}
             onReport={reportMatch !== null ? () => setReporting(true) : undefined}
             onDeck={setDeckOf}
-            feedback={feedbackMatch !== null ? <BotRating matchId={feedbackMatch} level={effectiveBotLevel} marks={marks} /> : undefined}
+            feedback={
+              coachOn ? (
+                <BotReport
+                  matchId={reportMatch}
+                  level={effectiveBotLevel}
+                  marks={feedbackMarks(marks, coachEntries, (a) => describeReplayAction(state, a, locale).title)}
+                  build={buildBotReport}
+                />
+              ) : undefined
+            }
           />
         )}
         {deckOf !== null && state.phase === 'gameover' && (
@@ -2032,7 +2087,7 @@ function Table({
           {panel === 'deck' && loadOwnDeck ? (
             <DeckListPanel load={loadOwnDeck} onZoom={setDeckCard} />
           ) : panel === 'coach' && coachOn ? (
-            <CoachPanel state={state} entries={coachEntries} marks={marks} onMark={setMark} />
+            <CoachPanel state={state} entries={coachEntries} marks={marks} report={coachReport} onToggle={toggleMark} onUpdate={updateMark} />
           ) : (
             <>
               {(!wideBoard || (layout.hover.show && layout.hover.position === 'panel')) && <CardDetail state={state} uid={detailUid} />}

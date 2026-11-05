@@ -1,37 +1,16 @@
-// "Bot do Time" (docs/plano-bot-time.md, tela 3.4): os decks do meta com o estado do guia e do perfil, e a caixa
-// de correções (marcações de jogadas e notas que o Time enviou). O Time lê; o admin trata cada correção
-// (estado e resposta) e abre o replay na jogada marcada.
+// "Bot do Time" (docs/plano-bot-time.md, tela 3.4): os decks do meta com o guia (à esquerda) e o perfil (à direita), e
+// os relatórios das partidas (as jogadas que o Time marcou como erradas), com o pacote para o Claude.
 
 import { useEffect, useState } from 'react';
-import { api, FEEDBACK_STATUSES, type FeedbackDeckSummary, type FeedbackItem, type FeedbackStatus, type MetaDeckInfo } from '../api';
+import { api, type BotReportItem, type FeedbackDeckSummary, type MetaDeckInfo } from '../api';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, useLocale, useT } from '../i18n';
 import { fmtDateTime, fmtNumber } from '../i18n/format';
+import { saveFile } from '../recap/export';
+import { copyText } from './CoachPanel';
 import { openReplay } from './Reports';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-const STATUS_KEY: Record<FeedbackStatus, MessageKey> = {
-  open: 'teambot.status.open',
-  test: 'teambot.status.test',
-  fixed: 'teambot.status.fixed',
-  dismissed: 'teambot.status.dismissed',
-};
-
-/** A jogada por números de carta, numa linha ("attack ST01-013 → ST02-001"). */
-function choiceText(c: unknown): string {
-  if (!c) return '';
-  if (typeof c === 'string') return c;
-  const o = c as Record<string, unknown>;
-  const parts = [String(o.type ?? '')];
-  if (o.card) parts.push(String(o.card));
-  if (Array.isArray(o.cards)) parts.push(o.cards.join(', '));
-  if (o.target) parts.push(`→ ${String(o.target)}`);
-  if (o.yes !== undefined) parts.push(o.yes ? 'sim' : 'não');
-  if (o.index !== undefined) parts.push(`#${String(o.index)}`);
-  if (o.redraw !== undefined) parts.push(o.redraw ? 'trocar' : 'manter');
-  return parts.join(' ');
-}
 
 /** Tela inteira (menu "Bot do Time", para quem é do Time). */
 export function TeamBot({ onExit, onReplay, admin }: { onExit: () => void; onReplay: (setup: GameSetup) => void; admin: boolean }) {
@@ -84,7 +63,7 @@ export function TeamBotPanel({ onReplay, admin }: { onReplay: (setup: GameSetup)
           <DeckTable decks={decks} summary={summary} admin={admin} agent={agent} onSaved={(d) => setDecks((list) => list?.map((x) => (x.id === d.id ? { ...x, ...d } : x)) ?? null)} />
         )}
       </section>
-      <Inbox onReplay={onReplay} admin={admin} agent={agent} />
+      <Reports onReplay={onReplay} admin={admin} agent={agent} />
     </>
   );
 }
@@ -281,143 +260,159 @@ function DeckEditor({
   );
 }
 
-function Inbox({ onReplay, admin, agent }: { onReplay: (setup: GameSetup) => void; admin: boolean; agent: boolean }) {
+/**
+ * Os relatórios das partidas: o texto que a mesa monta com as jogadas marcadas como erradas. Cada um pode ser copiado
+ * ou baixado num pacote para o Claude (o relatório, o guia e o perfil do deck e o replay); vários selecionados saem
+ * num pacote só. O admin marca o que já foi usado e pode abrir o replay ou pedir a revisão do agente.
+ */
+function Reports({ onReplay, admin, agent }: { onReplay: (setup: GameSetup) => void; admin: boolean; agent: boolean }) {
   const t = useT();
   const locale = useLocale();
-  const [status, setStatus] = useState<FeedbackStatus | 'all'>('open');
-  const [items, setItems] = useState<FeedbackItem[] | null>(null);
+  const [filter, setFilter] = useState<'new' | 'used' | 'all'>('new');
+  const [reports, setReports] = useState<BotReportItem[] | null>(null);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [open, setOpen] = useState<number | null>(null);
+  const [copied, setCopied] = useState<number | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<number | null>(null);
-  const [edit, setEdit] = useState<{ id: number; status: FeedbackStatus; note: string } | null>(null);
+  /** Revisão do agente por partida (markdown em texto). */
+  const [reviews, setReviews] = useState<Record<number, string>>({});
   useEffect(() => {
     let stop = false;
-    setItems(null);
+    setReports(null);
+    setSelected([]);
     api.bot
-      .feedbackList(status)
-      .then((r) => !stop && (setItems(r.items), setError(null)))
+      .reports(filter === 'all' ? undefined : filter === 'used')
+      .then((r) => !stop && (setReports(r.reports), setError(null)))
       .catch((e) => !stop && setError(errorText(e)));
     return () => {
       stop = true;
     };
-  }, [status]);
-  const save = async () => {
-    if (!edit) return;
-    setBusy(edit.id);
+  }, [filter]);
+  const download = async (ids: number[]) => {
+    setBusy(`pkg:${ids.join(',')}`);
+    setError(null);
     try {
-      const saved = await api.bot.setFeedbackStatus(edit.id, edit.status, edit.note.trim() || undefined);
-      setItems((list) => list?.map((x) => (x.id === saved.id ? saved : x)) ?? null);
-      setEdit(null);
+      const pkg = await api.bot.reportPackage(ids);
+      saveFile(new Blob([pkg.content], { type: 'text/markdown' }), pkg.filename);
     } catch (e) {
       setError(errorText(e));
     } finally {
       setBusy(null);
     }
   };
-  /** Revisão do agente por partida (markdown em texto). */
-  const [reviews, setReviews] = useState<Record<number, string>>({});
-  const [reviewing, setReviewing] = useState<number | null>(null);
-  const review = async (f: FeedbackItem) => {
-    setReviewing(f.matchId);
-    setError(null);
+  const copy = async (r: BotReportItem) => {
+    if (await copyText(r.report)) {
+      setCopied(r.id);
+      setTimeout(() => setCopied(null), 2000);
+    }
+  };
+  const toggleUsed = async (r: BotReportItem) => {
+    setBusy(`used:${r.id}`);
     try {
-      const r = await api.bot.reviewMatch(f.matchId);
-      setReviews((m) => ({ ...m, [f.matchId]: r.review }));
+      const saved = await api.bot.setReportUsed(r.id, !r.usedAt);
+      // Fora do filtro escolhido, o relatório sai da lista.
+      setReports((list) => list?.flatMap((x) => (x.id !== r.id ? [x] : filter === 'all' ? [saved] : [])) ?? null);
+      setSelected((ids) => ids.filter((id) => id !== r.id));
     } catch (e) {
       setError(errorText(e));
     } finally {
-      setReviewing(null);
+      setBusy(null);
     }
   };
-  const replayAt = async (f: FeedbackItem) => {
+  const replayAt = async (r: BotReportItem) => {
     try {
-      await openReplay(f.matchId, (setup) => onReplay({ ...setup, replayStart: { paused: true, speed: 1, ...(f.actionIndex !== null ? { at: f.actionIndex } : {}) } }));
+      await openReplay(r.matchId, (setup) => onReplay({ ...setup, replayStart: { paused: true, speed: 1 } }));
     } catch (e) {
       setError(errorText(e));
+    }
+  };
+  const review = async (r: BotReportItem) => {
+    setBusy(`review:${r.id}`);
+    setError(null);
+    try {
+      const res = await api.bot.reviewMatch(r.matchId);
+      setReviews((m) => ({ ...m, [r.matchId]: res.review }));
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(null);
     }
   };
   return (
     <section className="menu-card">
-      <h3>{t('teambot.inbox')}</h3>
-      <div className="seg small">
-        {([...FEEDBACK_STATUSES, 'all'] as const).map((k) => (
-          <button key={k} className={status === k ? 'on' : ''} onClick={() => setStatus(k)}>
-            {k === 'all' ? t('teambot.filterAll') : t(STATUS_KEY[k])}
+      <h3>{t('teambot.reports')}</h3>
+      <p className="muted small">{t('teambot.reportsHelp')}</p>
+      <div className="teambot-reports-bar">
+        <div className="seg small">
+          {(
+            [
+              ['new', 'teambot.filterNew'],
+              ['used', 'teambot.filterUsed'],
+              ['all', 'teambot.filterAll'],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>
+              {t(label)}
+            </button>
+          ))}
+        </div>
+        {selected.length > 0 && (
+          <button className="btn small primary" disabled={busy !== null} onClick={() => download(selected)}>
+            {t('teambot.packageSelected', { n: selected.length })}
           </button>
-        ))}
+        )}
       </div>
       {error && <div className="error">{error}</div>}
-      {items === null && !error && <p className="muted">{t('common.loading')}</p>}
-      {items?.length === 0 && <p className="muted">{t('teambot.empty')}</p>}
+      {reports === null && !error && <p className="muted">{t('common.loading')}</p>}
+      {reports?.length === 0 && <p className="muted">{t('teambot.reportsEmpty')}</p>}
       <div className="teambot-items">
-        {items?.map((f) => (
-          <article key={f.id} className={['teambot-item', f.kind, f.status].join(' ')}>
+        {reports?.map((r) => (
+          <article key={r.id} className={['teambot-item', r.usedAt ? 'used' : ''].join(' ')}>
             <header>
-              <span className={['role-tag', f.kind === 'mark' ? 'organizer' : ''].join(' ')}>{f.kind === 'mark' ? t('teambot.kindMark') : t('teambot.kindRating')}</span>
+              <label className="teambot-select" title={t('teambot.select')}>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(r.id)}
+                  onChange={(e) => setSelected((ids) => (e.target.checked ? [...ids, r.id] : ids.filter((id) => id !== r.id)))}
+                />
+              </label>
+              <b>
+                {r.botDeck ?? '?'} × {r.oppLeader ?? '?'}
+              </b>
               <span className="muted small">
-                #{f.matchId} · {f.leader ?? '?'} × {f.oppLeader ?? '?'}
-                {f.botLevel ? ` · ${f.botLevel}` : ''}
-                {f.turn !== null ? ` · ${t('teambot.turn', { n: f.turn })}` : ''}
+                #{r.matchId} · {r.userName ?? '—'} · {fmtDateTime(r.createdAt, locale)}
               </span>
-              <span className="muted small">
-                {f.userName ?? '—'} · {fmtDateTime(f.createdAt, locale)}
-              </span>
-              <span className="teambot-status">{t(STATUS_KEY[f.status])}</span>
+              <span className="role-tag organizer">{t('teambot.reportMarks', { n: r.marks })}</span>
+              {r.rating ? <span className="teambot-stars">{'★'.repeat(r.rating)}</span> : null}
+              {r.usedAt && <span className="teambot-status">✓ {t('teambot.used')}</span>}
             </header>
-            {f.kind === 'rating' && <p className="teambot-stars">{'★'.repeat(f.rating ?? 0)}</p>}
-            {f.kind === 'mark' && (
-              <dl className="teambot-mark">
-                <dt>{t('teambot.botDid')}</dt>
-                <dd>
-                  <code>{choiceText(f.botAction)}</code>
-                </dd>
-                {f.expected !== null && (
-                  <>
-                    <dt>{t('teambot.expected')}</dt>
-                    <dd>
-                      <code>{choiceText(f.expected)}</code>
-                    </dd>
-                  </>
-                )}
-              </dl>
-            )}
-            {f.comment && <p className="teambot-comment">{f.comment}</p>}
-            {f.note && (
-              <p className="muted small">
-                {t('teambot.noteLabel')} {f.note}
-              </p>
-            )}
-            {reviews[f.matchId] && <pre className="teambot-review">{reviews[f.matchId]}</pre>}
+            {open === r.id && <pre className="teambot-review">{r.report}</pre>}
+            {reviews[r.matchId] && <pre className="teambot-review">{reviews[r.matchId]}</pre>}
             <div className="teambot-actions">
-              <button className="btn small" onClick={() => replayAt(f)}>
-                {t('teambot.openReplay')}
+              <button className="btn small" onClick={() => setOpen(open === r.id ? null : r.id)}>
+                {open === r.id ? t('teambot.hideReport') : t('teambot.showReport')}
               </button>
+              <button className="btn small" onClick={() => copy(r)}>
+                {copied === r.id ? t('coach.copied') : t('coach.copy')}
+              </button>
+              <button className="btn small primary" disabled={busy !== null} onClick={() => download([r.id])} title={t('teambot.packageTitle')}>
+                {t('teambot.package')}
+              </button>
+              {admin && (
+                <button className="btn small" onClick={() => replayAt(r)}>
+                  {t('teambot.openReplay')}
+                </button>
+              )}
               {admin && agent && (
-                <button className="btn small" disabled={reviewing === f.matchId} onClick={() => review(f)} title={t('teambot.reviewTitle')}>
-                  {reviewing === f.matchId ? t('teambot.reviewing') : t('teambot.review')}
+                <button className="btn small" disabled={busy !== null} onClick={() => review(r)} title={t('teambot.reviewTitle')}>
+                  {busy === `review:${r.id}` ? t('teambot.reviewing') : t('teambot.review')}
                 </button>
               )}
-              {admin && edit?.id !== f.id && (
-                <button className="btn small" disabled={busy === f.id} onClick={() => setEdit({ id: f.id, status: f.status, note: f.note ?? '' })}>
-                  {t('teambot.treat')}
+              {admin && (
+                <button className="btn small" disabled={busy !== null} onClick={() => toggleUsed(r)}>
+                  {r.usedAt ? t('teambot.unmarkUsed') : t('teambot.markUsed')}
                 </button>
-              )}
-              {admin && edit?.id === f.id && (
-                <>
-                  <select value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value as FeedbackStatus })}>
-                    {FEEDBACK_STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {t(STATUS_KEY[s])}
-                      </option>
-                    ))}
-                  </select>
-                  <input className="admin-search report-note" placeholder={t('teambot.notePlaceholder')} maxLength={2000} value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} />
-                  <button className="btn small primary" disabled={busy === f.id} onClick={save}>
-                    {t('common.save')}
-                  </button>
-                  <button className="btn small" onClick={() => setEdit(null)}>
-                    {t('common.cancel')}
-                  </button>
-                </>
               )}
             </div>
           </article>
