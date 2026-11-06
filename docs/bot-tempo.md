@@ -337,6 +337,10 @@ cartas, o corte é de 36%: levá-lo de 2 a 0 vale 33 mil em vez de 52 mil, e o K
 volta a competir. Com a mão pequena nada muda, e a linha fatal continua valendo a vitória (`win`): o corte mexe
 só na posição que sobra quando o oponente não perde.
 
+Medida (nível `hard`, decks prontos sorteados, assentos trocados): contra os pesos sem o corte, 135 x 105 (56%) em
+240 partidas (`duel.ts`, sementes 1 a 4); contra o humano cuidadoso (`HUMAN=careful vs-human.ts 120`), 100 x 20
+(83%), o mesmo da seção 10.
+
 | Conceito | Onde está | Teste |
 |---|---|---|
 | Os últimos degraus de Vida do oponente dependem da mão dele | `evaluate.ts`: `lifeValue` (`lifeOppHand*`) | `com a mão do oponente cheia, controla o campo…` (12 cartas: ataca o Kid virado; 1 carta: vai na Vida) |
