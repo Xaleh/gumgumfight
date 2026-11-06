@@ -453,7 +453,7 @@ export function buildApp(
     onTournamentGame: (game) => reportFromGame(db, game),
     onMatch: (id) => webhooks.matchFinished(id),
     notifier,
-    botProfile: (deckId) => (deckId ? (metaProfiles.profile(deckId) ?? undefined) : undefined),
+    botProfile: (deckId, leader) => metaProfiles.profileFor(deckId, leader)?.profile,
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);

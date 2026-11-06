@@ -1,0 +1,33 @@
+{
+  "id": "op17-green-shanks",
+  "leader": "OP17-020",
+  "archetype": "control",
+  "summary": "Controle e tempo: virar os Personagens do oponente, travá-los com o Líder e nocauteá-los; a Vida dele só vira alvo com o campo controlado; fecha com o Shanks de custo 10.",
+  "plan": [
+    { "don": 2, "play": ["OP17-032", "OP12-034", "OP17-026"], "note": "Limejuice e Perona buscam; Fugar vira um de custo 2 ou menos ao atacar" },
+    { "don": 4, "play": ["OP17-028", "OP06-033"], "note": "Bonk Punch (Blocker, K.O. de um virado) ou Vander Decken com mais uma carta barata" },
+    { "don": 5, "play": ["OP17-031", "ST32-002"], "note": "Yasopp ou Oden: compram 1 e viram ou travam um Personagem" },
+    { "don": 7, "play": ["OP17-027", "OP17-036"], "note": "Benn.Beckman vira 2, ou Withdraw Now nocauteia 2 virados" },
+    { "don": 9, "play": ["ST16-004"], "note": "Shanks de 9: K.O. de um virado" },
+    { "don": 10, "play": ["OP17-022"], "note": "Shanks de 10: Rush, desvira 2 DON!! e vira o campo inteiro do oponente" }
+  ],
+  "mulligan": { "keep": ["OP17-032", "OP12-034", "OP17-037"], "minCheap": 2 },
+  "roles": {
+    "OP17-032": "engine",
+    "OP12-034": "engine",
+    "OP17-031": "engine",
+    "ST32-002": "engine",
+    "OP17-027": "engine",
+    "OP17-022": "finisher",
+    "ST16-004": "finisher",
+    "OP17-036": "removal",
+    "OP06-033": "removal",
+    "OP17-028": "blocker",
+    "OP17-037": "defense",
+    "OP12-023": "defense",
+    "OP17-026": "tech",
+    "OP13-031": "tech"
+  },
+  "hold": { "OP17-022": { "untilDon": 10 }, "ST16-004": { "untilDon": 9 }, "OP17-027": { "untilDon": 7 } },
+  "notes": "Primeira versão, escrita à mão a partir do guia op17-green-shanks.md e da partida #903; o Time revisa."
+}

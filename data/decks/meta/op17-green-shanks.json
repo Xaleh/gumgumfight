@@ -1,0 +1,21 @@
+{
+  "id": "op17-green-shanks",
+  "name": "Shanks Verde (OP17)",
+  "leader": "OP17-020",
+  "cards": [
+    { "id": "OP17-032", "count": 4 },
+    { "id": "OP12-034", "count": 4 },
+    { "id": "OP17-026", "count": 4 },
+    { "id": "OP06-033", "count": 4 },
+    { "id": "OP17-037", "count": 4 },
+    { "id": "OP17-036", "count": 3 },
+    { "id": "OP17-028", "count": 2 },
+    { "id": "OP17-031", "count": 4 },
+    { "id": "ST32-002", "count": 4 },
+    { "id": "OP12-023", "count": 4 },
+    { "id": "OP13-031", "count": 3 },
+    { "id": "OP17-027", "count": 4 },
+    { "id": "ST16-004", "count": 2 },
+    { "id": "OP17-022", "count": 4 }
+  ]
+}

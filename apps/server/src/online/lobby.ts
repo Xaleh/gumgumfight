@@ -67,7 +67,7 @@ export interface LobbyDeps {
   /** Partida começou / vez de um jogador (notificações). */
   onRoomEvent?: (room: Room, event: RoomEvent) => void;
   /** Bot do Time: o perfil do deck do bot, pelo id do deck. */
-  botProfile?: (deckId: string | null) => DeckProfile | undefined;
+  botProfile?: (deckId: string | null, leader: string | null) => DeckProfile | undefined;
 }
 
 /** Partida em andamento na lista "Assistir". */

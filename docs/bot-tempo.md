@@ -591,6 +591,7 @@ O Bot do Time (`docs/plano-bot-time.md`) joga os decks do meta com um **perfil**
 | A curva do próximo turno: ter na mão a jogada prevista para o DON!! seguinte vale `nextTurn` | `evaluate.ts`: `nextTurnPlay` | `nextTurn: ter na mão a jogada prevista…` |
 | Cartas da mão reveladas ficam lembradas enquanto estão na mão | `engine.ts`: `log` (reveal) e o começo de `applyAction`; `view.ts`: `visibleCards` | `knownHand: a carta da mão revelada…` |
 | A explicação de cada decisão (termos que mais mudaram, alternativas), para o painel do treinador | `evaluate.ts`: `evaluateTerms`; `planner.ts`: `explain` | `painel do treinador: explicação das decisões` |
+| Deck de jogador escolhido para o bot (o "G Shanks" da partida #903): joga com o perfil do deck do meta de mesmo Líder | `team/profiles.ts`: `profileFor`; `online/room.ts` e `GET /api/bot/profiles/:id?leader=` | `o bot joga o deck de um jogador com o perfil do deck do meta de mesmo Líder` |
 
 O ciclo de refinamento é o mesmo das rodadas anteriores, com mais fontes: as **marcações do Time** (`bot_feedback`,
 com a visão exata do bot na jogada) viram testes de posição; o extrator mede a concordância **por Líder**

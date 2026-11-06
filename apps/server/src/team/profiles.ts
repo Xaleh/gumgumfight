@@ -39,6 +39,7 @@ type OverrideRow = { deck_id: string; guide: string | null; profile: string | nu
 export class MetaProfiles {
   private profiles = new Map<string, Cached<DeckProfile | string | null>>();
   private guides = new Map<string, Cached<string | null>>();
+  private leaders = new Map<string, Cached<string | null>>();
 
   /** `db`: a tela "Bot do Time" salva guia e perfil no banco, por cima dos arquivos (que são a semente). */
   constructor(
@@ -116,6 +117,40 @@ export class MetaProfiles {
       });
     }
     return out;
+  }
+
+  /** O Líder de um deck do meta (`<id>.json`), relido quando o arquivo muda. */
+  private leaderOf(id: string): string | null {
+    const path = join(this.dir, `${id}.json`);
+    const mtime = this.mtime(path);
+    const hit = this.leaders.get(id);
+    if (hit && hit.mtime === mtime) return hit.value;
+    let value: string | null = null;
+    try {
+      value = mtime ? ((JSON.parse(readFileSync(path, 'utf8')) as { leader?: string }).leader ?? null) : null;
+    } catch {
+      value = null;
+    }
+    this.leaders.set(id, { mtime, value });
+    return value;
+  }
+
+  /**
+   * O perfil com que o bot joga um deck: o do próprio deck do meta ou, num deck que não é do meta (o deck de um
+   * jogador escolhido para o bot), o do primeiro deck do meta (em ordem de id) com o mesmo Líder e perfil válido.
+   * Devolve também de qual deck do meta o perfil veio.
+   */
+  profileFor(deckId: string | null, leader: string | null): { id: string; profile: DeckProfile } | null {
+    const own = deckId ? this.profile(deckId) : null;
+    if (deckId && own) return { id: deckId, profile: own };
+    if (!leader || !existsSync(this.dir)) return null;
+    for (const f of readdirSync(this.dir).filter((f) => f.endsWith('.json') && !f.endsWith('.profile.json')).sort()) {
+      const id = f.replace(/\.json$/, '');
+      if (!SAFE_ID.test(id) || this.leaderOf(id) !== leader) continue;
+      const profile = this.profile(id);
+      if (profile) return { id, profile };
+    }
+    return null;
   }
 
   /** O perfil válido de um deck (null se não há, ou se não passou na validação). */

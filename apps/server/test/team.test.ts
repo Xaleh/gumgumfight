@@ -142,6 +142,21 @@ describe('Bot do Time: decks do meta, guia e perfil', () => {
     expect(full.profile).toMatchObject({ id: 'op17-xebec', archetype: 'control', hold: { 'OP17-118': { untilDon: 10 } } });
     expect(full.guide).toMatch(/^# Rocks.D.Xebec/);
     expect((await app.inject({ url: '/api/bot/profiles/nope', headers: member.headers })).statusCode).toBe(404);
+    // Shanks Verde: o perfil de controle da partida #903 é válido.
+    expect(list.find((d: { id: string }) => d.id === 'op17-green-shanks')).toMatchObject({ leader: 'OP17-020', hasGuide: true, hasProfile: true, archetype: 'control', profileError: null });
+    // Um deck de jogador com o mesmo Líder recebe o perfil do deck do meta (`?leader=`); sem Líder conhecido, 404.
+    const borrowed = (await app.inject({ url: '/api/bot/profiles/u-2f2fa9ed?leader=OP17-020', headers: member.headers })).json();
+    expect(borrowed).toMatchObject({ id: 'op17-green-shanks', profile: { id: 'op17-green-shanks', hold: { 'OP17-022': { untilDon: 10 } } } });
+    expect((await app.inject({ url: '/api/bot/profiles/u-2f2fa9ed?leader=ST01-001', headers: member.headers })).statusCode).toBe(404);
+  });
+
+  it('o bot joga o deck de um jogador com o perfil do deck do meta de mesmo Líder', async () => {
+    const { MetaProfiles } = await import('../src/team/profiles');
+    const profiles = new MetaProfiles();
+    expect(profiles.profileFor('op17-xebec', 'OP17-039')?.id).toBe('op17-xebec');
+    expect(profiles.profileFor('u-2f2fa9ed', 'OP17-020')?.id).toBe('op17-green-shanks');
+    expect(profiles.profileFor('u-2f2fa9ed', 'ST01-001')).toBeNull();
+    expect(profiles.profileFor(null, null)).toBeNull();
   });
 
   it('o carregador relê o perfil quando o arquivo muda e recusa um perfil inválido', async () => {

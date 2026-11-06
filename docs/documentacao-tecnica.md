@@ -1651,7 +1651,7 @@ Quem chama, na coluna da direita:
 | PUT | `/api/admin/users/:id/role` | Muda o perfil (`{ role }`; a si mesmo, só para `dev`) | Admin |
 | PUT | `/api/admin/users/:id/supporter` | Plano de apoio dado à mão (`{ tier, until }`) | Admin |
 | PUT | `/api/admin/users/:id/team` | Entra no (ou sai do) Time do bot (`{ team }`) | Admin |
-| GET | `/api/bot/profiles` · `/api/bot/profiles/:id` | Decks do meta (estado do guia e do perfil); um deck com o perfil e o guia | Time |
+| GET | `/api/bot/profiles` · `/api/bot/profiles/:id` | Decks do meta (estado do guia e do perfil); um deck com o perfil e o guia (`?leader=`: num deck de jogador, o do deck do meta de mesmo Líder) | Time |
 | PUT | `/api/bot/profiles/:id` | Salva o guia e/ou o perfil (conferido) no banco (`{ guide?, profile? }`; null volta ao arquivo) | Admin |
 | GET | `/api/bot/agent` | O agente fora da partida está ligado | Time |
 | POST | `/api/bot/profiles/:id/generate` · `/api/bot/matches/:id/review` | Agente: guia → rascunho do perfil; partida do bot x guia → discrepâncias | Admin |
