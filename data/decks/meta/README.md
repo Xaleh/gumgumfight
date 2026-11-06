@@ -17,4 +17,8 @@ planejador do bot). O que o admin salva pela tela fica na tabela `meta_profiles`
 deploy troca a pasta `data/`): quando o guia e o perfil estiverem prontos, copie-os para cá e faça o commit. Deck sem
 perfil joga com os pesos padrão do `hard`.
 
+Quando o bot joga um deck que não é desta pasta (o deck de um jogador escolhido para o bot), ele usa o perfil do
+primeiro deck do meta (em ordem de id) com o mesmo Líder: o "G Shanks" de um jogador joga com o perfil de
+`op17-green-shanks`. As cartas do perfil que o deck não tem simplesmente não pesam.
+
 As listas aqui são **pontos de partida**: substitua pela lista do guia quando ele chegar.

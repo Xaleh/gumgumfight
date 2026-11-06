@@ -757,7 +757,11 @@ export const api = {
   /** Bot do Time: os decks do meta (guia e perfil), as correções (marcações de jogadas e notas) e a caixa de correções. */
   bot: {
     profiles: () => get<{ decks: MetaDeckInfo[] }>('/api/bot/profiles'),
-    profile: (id: string) => get<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>(`/api/bot/profiles/${encodeURIComponent(id)}`),
+    /** `leader`: num deck que não é do meta, o perfil do deck do meta com o mesmo Líder. */
+    profile: (id: string, leader?: string) =>
+      get<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>(
+        `/api/bot/profiles/${encodeURIComponent(id)}${leader ? `?leader=${encodeURIComponent(leader)}` : ''}`,
+      ),
     /** Salva o guia (markdown) e/ou o perfil (JSON; o servidor confere); null volta ao arquivo. Só admin. */
     saveProfile: (id: string, patch: { guide?: string | null; profile?: unknown }) =>
       send<MetaDeckInfo & { profile: DeckProfile | null; guide: string | null }>('PUT', `/api/bot/profiles/${encodeURIComponent(id)}`, patch),

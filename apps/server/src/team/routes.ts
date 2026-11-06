@@ -179,10 +179,16 @@ export function registerTeamRoutes(app: FastifyInstance, { db, user, profiles, c
     return { decks: profiles.list() };
   });
 
-  /** O perfil (o que o bot lê) e o guia de um deck do meta; o treino no navegador no nível Time usa o perfil. */
-  app.get<{ Params: { id: string } }>('/api/bot/profiles/:id', async (req, reply) => {
+  /**
+   * O perfil (o que o bot lê) e o guia de um deck do meta; o treino no navegador no nível Time usa o perfil. Com
+   * `?leader=`, um deck que não é do meta (o de um jogador) recebe o do deck do meta com o mesmo Líder.
+   */
+  app.get<{ Params: { id: string }; Querystring: { leader?: string } }>('/api/bot/profiles/:id', async (req, reply) => {
     if (!member(req, reply)) return reply;
-    const info = profiles.list().find((d) => d.id === req.params.id);
+    const list = profiles.list();
+    const leader = typeof req.query.leader === 'string' ? req.query.leader : null;
+    const id = list.some((d) => d.id === req.params.id) ? req.params.id : (profiles.profileFor(null, leader)?.id ?? req.params.id);
+    const info = list.find((d) => d.id === id);
     if (!info) return reply.code(404).send(fail('notFound', 'Não encontrado'));
     return { ...info, profile: profiles.profile(info.id), guide: profiles.guide(info.id) };
   });

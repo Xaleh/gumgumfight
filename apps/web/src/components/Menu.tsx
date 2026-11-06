@@ -528,8 +528,10 @@ export function Menu({
         /* sem armazenamento local */
       }
       const setup = await buildSetup('bot', [mine, opp], names, seed, botMode.format, firstPlayer);
-      // Bot do Time no navegador: o perfil do deck do bot (quando o deck do meta tem um).
-      const botProfile = botLevel === 'team' ? ((await api.bot.profile(opp).catch(() => null))?.profile ?? undefined) : undefined;
+      // Bot do Time no navegador: o perfil do deck do bot (o do deck do meta, ou, num deck de jogador, o do deck do meta
+      // com o mesmo Líder).
+      const oppLeader = decks.find((d) => d.id === opp)?.leader;
+      const botProfile = botLevel === 'team' ? ((await api.bot.profile(opp, oppLeader).catch(() => null))?.profile ?? undefined) : undefined;
       onStart({ ...setup, spoilers: botMode.spoilers, botLevel, ...(botProfile ? { botProfile } : {}), ...(notice ? { notice } : {}) });
     } catch (e) {
       fail(e);

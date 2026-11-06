@@ -285,8 +285,11 @@ export interface RoomDeps {
   onEvent?: (room: Room, event: RoomEvent) => void;
   /** Uma conexão entrou ou saiu (o número de espectadores da lista "Assistir" mudou). */
   onPresence?: (room: Room) => void;
-  /** Bot do Time: o perfil do deck que o bot joga (`data/decks/meta/<id>.profile.json`), pelo id do deck. */
-  botProfile?: (deckId: string | null) => DeckProfile | undefined;
+  /**
+   * Bot do Time: o perfil do deck que o bot joga (`data/decks/meta/<id>.profile.json`), pelo id do deck; num deck que
+   * não é do meta, o do deck do meta com o mesmo Líder.
+   */
+  botProfile?: (deckId: string | null, leader: string | null) => DeckProfile | undefined;
 }
 
 /**
@@ -1025,7 +1028,7 @@ export class Room {
       const level = this.data.botLevel ?? 'hard';
       // O Bot do Time joga com o perfil do deck (pesos, papéis das cartas, mulligan e o confronto com o Líder adversário)
       // e explica cada decisão para o painel do treinador (só quando alguém do Time está vendo).
-      const profile = level === 'team' ? this.deps.botProfile?.(this.data.seats[seat]?.deckId ?? null) : undefined;
+      const profile = level === 'team' ? this.deps.botProfile?.(this.data.seats[seat]?.deckId ?? null, this.data.seats[seat]?.deck.leader ?? null) : undefined;
       const coached = level === 'team' && [...this.conns].some((c) => c.coach);
       // As jogadas da explicação vão como o bot as viu, com os apelidos das cartas: são os mesmos da visão de quem
       // joga (a sala tem um mapa só), então a mesa dá o nome de cada carta que ela já vê. Carta que só o bot vê (a mão

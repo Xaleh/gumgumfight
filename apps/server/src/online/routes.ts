@@ -93,7 +93,7 @@ interface Deps {
   /** Notificações no celular (partida começou, sua vez). */
   notifier?: Notifier;
   /** Bot do Time: o perfil do deck do bot, pelo id do deck (`team/profiles.ts`). */
-  botProfile?: (deckId: string | null) => DeckProfile | undefined;
+  botProfile?: (deckId: string | null, leader: string | null) => DeckProfile | undefined;
 }
 
 /**
