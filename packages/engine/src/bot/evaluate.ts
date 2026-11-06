@@ -31,6 +31,14 @@ export interface Weights {
   /** O mesmo para a Vida do oponente. */
   lifeOpp: number[];
   lifeOppExtra: number;
+  /**
+   * Mão cheia do oponente: os dois últimos degraus de `lifeOpp` (de 2 para 0 Vida) valem menos quando ele tem mais
+   * de `lifeOppHandFrom` cartas na mão — cada carta a mais corta `lifeOppHand` desses degraus, até `lifeOppHandMax`.
+   * Deixá-lo em 0 de Vida com 12 cartas não é deixá-lo perto de perder: o último acerto esbarra nos Counters dele.
+   */
+  lifeOppHandFrom: number;
+  lifeOppHand: number;
+  lifeOppHandMax: number;
   /** Carta na própria mão que o bot não vê (ex.: a que acabou de sair da Vida) e carta na mão do oponente. */
   handCard: number;
   handCardOpp: number;
@@ -160,6 +168,9 @@ export const DEFAULT_WEIGHTS: Weights = {
   lifeExtra: 4150,
   lifeOpp: [0, 37400, 52000, 57100, 61550, 64700],
   lifeOppExtra: 3150,
+  lifeOppHandFrom: 6,
+  lifeOppHand: 0.06,
+  lifeOppHandMax: 0.5,
   handCard: 2900,
   handCardOpp: 1600,
   handCardBase: 1200,
@@ -216,9 +227,14 @@ export function nextTurnPlay(state: GameState, ps: PlayerState, plan: PlanStep[]
   return best ? best.play : null;
 }
 
-function lifeValue(w: Weights, n: number, opp = false): number {
+function lifeValue(w: Weights, n: number, opp = false, oppHand = 0): number {
   const table = opp ? w.lifeOpp : w.life;
-  if (n < table.length) return table[n];
+  if (n < table.length) {
+    if (!opp || n >= 2 || table.length < 3) return table[n];
+    // Mão cheia do oponente (ver `lifeOppHand`): a distância até o degrau de 2 Vidas encolhe.
+    const cut = Math.min(w.lifeOppHandMax, Math.max(0, oppHand - w.lifeOppHandFrom) * w.lifeOppHand);
+    return table[2] - (table[2] - table[n]) * (1 - cut);
+  }
   return table[table.length - 1] + (n - (table.length - 1)) * (opp ? w.lifeOppExtra : w.lifeExtra);
 }
 
@@ -380,7 +396,7 @@ function sideValue(state: GameState, w: Weights, ps: PlayerState, hidden: number
   const suffix = opp ? 'Opp' : '';
   const sign = opp ? -1 : 1;
   const t = (key: string, amount: number) => add(terms, key + suffix, sign * amount);
-  let v = lifeValue(w, ps.life.length, opp);
+  let v = lifeValue(w, ps.life.length, opp, ps.hand.length);
   t('life', v);
   for (const c of [ps.leader, ...ps.characters]) {
     const pm = (lastingPowerMods(state, c.uid) / 1000) * w.powerMod;

@@ -322,6 +322,25 @@ O plano do Rocks.D.Xebec (OP17: quase sem Counter, compra pelo Líder, defesa pe
 | Descarte: as mais baratas primeiro | `planner.ts`: `pendingCandidates` | `num deck que descarta da mão…` (mão de 12 cartas, sem DON!!) |
 | Evento [Counter] vale o +poder | `evaluate.ts`: `handCardValue` | `avaliação: carta na mão` |
 
+## 7f. Mão cheia do oponente: a Vida dele vale menos
+
+Na partida #903 (Shanks OP17-020 do bot contra Law OP01-002), o oponente estava com 2 de Vida e 12 cartas na mão
+no turno 8. O bot foi com tudo na Vida (a tabela dava +52000 por levá-lo de 2 a 0) e deixou o campo dele
+inteiro; dois turnos depois, perdeu para três atacantes. Com 12 cartas, deixar o oponente em 0 de Vida não o
+deixa perto de perder: o último acerto esbarra nos Counters dele, e cada acerto ainda lhe dá uma carta. A busca
+não era o problema: com feixe de 16 e 20 segundos, a linha de ataques na Vida continuava à frente da de
+controle (o "Withdraw Now" que nocauteia dois Personagens).
+
+Os dois últimos degraus de `lifeOpp` (de 2 para 1 e de 1 para 0) encolhem com a mão do oponente: cada carta
+acima de `lifeOppHandFrom` (6) corta `lifeOppHand` (6%) desses degraus, até `lifeOppHandMax` (50%). Com 12
+cartas, o corte é de 36%: levá-lo de 2 a 0 vale 33 mil em vez de 52 mil, e o K.O. de um Personagem caro virado
+volta a competir. Com a mão pequena nada muda, e a linha fatal continua valendo a vitória (`win`): o corte mexe
+só na posição que sobra quando o oponente não perde.
+
+| Conceito | Onde está | Teste |
+|---|---|---|
+| Os últimos degraus de Vida do oponente dependem da mão dele | `evaluate.ts`: `lifeValue` (`lifeOppHand*`) | `com a mão do oponente cheia, controla o campo…` (12 cartas: ataca o Kid virado; 1 carta: vai na Vida) |
+
 ## 8. O que o bot ainda não sabe
 
 - **Mão do oponente**: só o tamanho, mais as cartas que ele revelou e ainda não saíram da mão (`GameState.knownHand`,
@@ -339,11 +358,9 @@ O plano do Rocks.D.Xebec (OP17: quase sem Counter, compra pelo Líder, defesa pe
   diferente (um humano que segura Counters até o fim, por exemplo) pode explorar o que o auto-jogo não
   mostra: relatos de partidas reais são o melhor guia para a próxima rodada. O "humano fraco" de
   `scripts/human.ts` (seção 10) é a primeira tentativa de medir isso sem gente.
-- **Desenvolver ou pressionar**: com o oponente em 2 de Vida e a mão cheia, a avaliação ainda prefere três
-  ataques com margem a baixar duas cartas e atacar com o resto. As tabelas de Vida (seção 2) vieram do
-  auto-jogo, em que a pressão paga; contra quem usa Counter em todo ataque com Vida baixa, o que o bot ganha
-  é só drenar a mão. Se os relatos apontarem isso, o próximo passo é reduzir os dois últimos degraus de
-  `lifeOpp` ou condicioná-los ao tamanho da mão do oponente.
+- **Desenvolver ou pressionar**: com o oponente em 2 de Vida e a mão cheia, a avaliação preferia três ataques
+  com margem a baixar cartas e controlar o campo. Os dois últimos degraus de `lifeOpp` agora dependem do tamanho
+  da mão dele (seção 7f); o resto das tabelas de Vida continua vindo do auto-jogo, em que a pressão paga.
 
 ## 9. Como os pesos foram ajustados (e o que não funcionou)
 

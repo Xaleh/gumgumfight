@@ -5,6 +5,7 @@ import {
   type CardData,
   type CardDef,
   chooseSimpleBotAction as chooseBotAction,
+  createGame,
   deckOfPlayer,
   type GameState,
   HIDDEN_CARD,
@@ -159,6 +160,26 @@ describe('partidas online: salas privadas', () => {
     const replay = await app.inject(`/api/online/rooms/${roomId}/replay?t=${tokens[0]}`);
     expect(replay.statusCode).toBe(200);
     expect(replay.json().seed128).toHaveLength(4);
+    // O replay baixado refaz a partida inteira, a começar pela escolha do vencedor do sorteio.
+    const file = replay.json();
+    expect(file.chooseFirst).toBe(true);
+    const ids = [...new Set<string>(file.decks.flatMap((d: { leader: string; cards: { id: string }[] }) => [d.leader, ...d.cards.map((c) => c.id)]))];
+    let again = createGame({
+      seed: 0,
+      seed128: file.seed128,
+      chooseFirst: file.chooseFirst,
+      cards: getCards(db, ids) as CardData[],
+      players: [
+        { name: file.names[0], deck: file.decks[0] },
+        { name: file.names[1], deck: file.decks[1] },
+      ],
+    });
+    for (const a of file.actions as Action[]) again = applyAction(again, a);
+    expect(again.phase).toBe('gameover');
+    expect(again.winner).toBe(end.winner);
+    // O traço do Bot do Time a partir desse arquivo (`bot:agent trace`) também refaz a partida até o fim.
+    const { fileTrace } = await import('../src/team/trace');
+    expect(fileTrace(db, file, 0)).toMatch(/FIM: .* no turno \d+/);
 
     const seats = db.prepare("SELECT controller, opp_controller, queue FROM match_seats ORDER BY seat").all();
     expect(seats).toEqual([

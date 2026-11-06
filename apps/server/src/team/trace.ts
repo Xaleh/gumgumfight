@@ -71,7 +71,9 @@ export function fileTrace(db: DB, file: ReplayFileInput, seat: PlayerId): string
   const config: GameConfig = {
     seed: file.seed,
     seed128: file.seed128,
-    firstPlayer: file.firstPlayer,
+    // Com a escolha do vencedor do sorteio, o `firstPlayer` do arquivo baixado da mesa é só informativo (quem acabou
+    // começando): passado ao motor, ele pularia a escolha e a ação 0 do replay deixaria de valer.
+    firstPlayer: file.chooseFirst ? undefined : file.firstPlayer,
     chooseFirst: file.chooseFirst,
     legacySetup: file.legacySetup,
     cards,

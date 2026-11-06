@@ -371,6 +371,27 @@ describe('bot com busca: fase principal', () => {
     expect(state.winner).toBe(0);
   });
 
+  it('com a mão do oponente cheia, controla o campo em vez de ir só na Vida (partida #903)', () => {
+    // Oponente com 2 de Vida e 12 cartas na mão; do lado dele, o Kid (custo 7, 7000) virado. Levá-lo a 0 de Vida
+    // não o deixa perto de perder (o último acerto esbarra nos Counters dele); o K.O. do Kid tira um atacante.
+    const setup = (oppHand: number) => {
+      const s = position([kid, luffy], 9);
+      s.players[1].life = s.players[1].life.slice(0, 2);
+      clearHand(s, 1);
+      s.players[1].hand = s.players[1].deck.splice(0, oppHand);
+      s.players[0].donActive = 4;
+      const koby = inject(s, 0, 'ST02-006', 'field'); // Koby 6000
+      const target = inject(s, 1, 'ST02-013', 'field', { rested: true }); // Kid 7000, custo 7, virado
+      return { s, koby, target };
+    };
+    const hitsTarget = (oppHand: number) => {
+      const { s, target } = setup(oppHand);
+      return botTurn(s, 0).actions.some((a) => a.type === 'attack' && a.target === target);
+    };
+    expect(hitsTarget(12)).toBe(true);
+    expect(hitsTarget(1)).toBe(false);
+  });
+
   it('conta com o Blocker do oponente', () => {
     // Oponente com 0 de Vida e um Chopper [Blocker] ativo; o bot tem Líder e Zoro ativos: um ataque leva o bloqueio, o outro vence.
     const s = position([kid, luffy], 5);
