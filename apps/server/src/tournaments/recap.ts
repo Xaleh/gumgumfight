@@ -113,7 +113,10 @@ interface Options {
   sponsor: PublicSponsorInfo | null;
   /** O torneio chegou ao fim pelas rodadas previstas (false = encerrado antes, por /finish). */
   naturalEnd: boolean;
+  /** Quem jogou (Sala do Tempo: inscritos e virtuais); sem isto, os inscritos. */
+  players?: TournamentPlayer[];
 }
+
 
 /** Data do SQLite ("2026-10-14 02:06:46", em UTC) em ISO; as que já são ISO ficam como estão. */
 export const iso = (d: string | null) => (d && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(d) ? `${d.replace(' ', 'T')}Z` : d);
@@ -147,8 +150,8 @@ const record = (ms: TournamentMatch[], userId: string): RecapRecord | null => {
   return r;
 };
 
-export function buildRecap(db: DB, t: Tournament, { present, cardImages, sponsor, naturalEnd }: Options): TournamentRecap {
-  const players = listPlayers(db, t.id);
+export function buildRecap(db: DB, t: Tournament, { present, cardImages, sponsor, naturalEnd, players = listPlayers(db, t.id) }: Options): TournamentRecap {
+
   const matches = listMatches(db, t.id);
   const games = listGames(db, t.id);
   const table = standings(players, matches);

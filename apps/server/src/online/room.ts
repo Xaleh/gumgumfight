@@ -123,7 +123,13 @@ export interface RoomTournament {
   firstUserId?: string | null;
   /** O organizador liberou as mãos ao vivo para quem transmite (sem o atraso mínimo; ver `Room.handsLive`). */
   liveHands?: boolean;
+  /**
+   * Sala do Tempo: a mesa é contra um jogador virtual, jogado pelo bot do servidor; este é o id dele no
+   * torneio (`v:17`), que entra como vencedor ou perdedor no placar da série (o assento do bot não tem conta).
+   */
+  virtualId?: string;
 }
+
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 export interface SeatInfo {

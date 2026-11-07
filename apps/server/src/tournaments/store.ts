@@ -86,6 +86,10 @@ export interface Tournament {
    * '*' = qualquer um; senão, o id da conta liberada; null = fechada.
    */
   lateEntry: string | null;
+  /** Sala do Tempo: o id do preset do evento simulado (`data/chamber/<id>.json`); null = torneio comum. */
+  chamber: string | null;
+  /** Sala do Tempo: jogadores do evento simulado (humanos + virtuais). */
+  chamberSize: number | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -178,6 +182,8 @@ type TournamentRow = {
   priority_until: string | null;
   quota: number;
   late_entry: string | null;
+  chamber: string | null;
+  chamber_size: number | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -218,6 +224,8 @@ const toTournament = (r: TournamentRow): Tournament => ({
   priorityUntil: r.priority_until,
   quota: Boolean(r.quota),
   lateEntry: r.late_entry ?? null,
+  chamber: r.chamber ?? null,
+  chamberSize: r.chamber_size ?? null,
   createdAt: r.created_at,
   startedAt: r.started_at,
   finishedAt: r.finished_at,
@@ -229,16 +237,23 @@ const TOURNAMENT_FROM = `FROM tournaments t LEFT JOIN players p ON p.owner_hash 
 
 /**
  * `quota`: criado pela cota mensal de apoiador (`at` = quando, para contar o mês).
+ * `chamber`: Sala do Tempo (o preset do evento simulado e o número de jogadores dele).
  */
-export function createTournament(db: DB, input: TournamentInput, organizerId: string, quota: { at: string } | null = null): Tournament {
+export function createTournament(
+  db: DB,
+  input: TournamentInput,
+  organizerId: string,
+  quota: { at: string } | null = null,
+  chamber: { preset: string; size: number } | null = null,
+): Tournament {
   dataVersion.bump();
   const id = `t-${randomBytes(5).toString('hex')}`;
   db.prepare(
     `INSERT INTO tournaments (id, name, description, format, structure, rounds, swiss_best_of, top_cut, bo3_from, bo5_from,
        max_players, starts_at, check_in, tolerance_min, official, prize, sponsor_id, priority_until, spoilers, auto_start, max_warnings,
-       live_hands, organizer_id, quota)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, ...inputValues(input), organizerId, quota ? 1 : 0);
+       live_hands, organizer_id, quota, chamber, chamber_size)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, ...inputValues(input), organizerId, quota ? 1 : 0, chamber?.preset ?? null, chamber?.size ?? null);
   if (quota) db.prepare('INSERT INTO tournament_quota (tournament_id, organizer_id, created_at) VALUES (?, ?, ?)').run(id, organizerId, quota.at);
   return getTournament(db, id)!;
 }
@@ -318,12 +333,13 @@ export function listTournaments(db: DB, limit = 100): Array<Tournament & { playe
 /**
  * Torneios encerrados (painel do meta), do mais recente ao mais antigo. `since`: encerrados a partir desta data do SQLite.
  * Só Standard e EGB puros: o Livre e os torneios com spoilers ficam fora do meta, como das estatísticas.
+ * A Sala do Tempo (torneio simulado) também fica fora: os resultados das mesas virtuais são sorteados.
  */
 export function listFinished(db: DB, opts: { format?: FormatId; since?: string } = {}): Tournament[] {
   const rows = db
     .prepare(
       `SELECT ${TOURNAMENT_COLS} ${TOURNAMENT_FROM}
-       WHERE t.status = 'finished' AND t.format IN ('standard', 'egb') AND t.spoilers = 0
+       WHERE t.status = 'finished' AND t.format IN ('standard', 'egb') AND t.spoilers = 0 AND t.chamber IS NULL
          AND (? IS NULL OR t.format = ?) AND (? IS NULL OR t.finished_at >= ?)
        ORDER BY t.finished_at DESC, t.rowid DESC`,
     )
@@ -337,8 +353,9 @@ export function listOpen(db: DB, opts: { format?: FormatId; limit: number }): Ar
     .prepare(
       `SELECT ${TOURNAMENT_COLS}, (SELECT COUNT(*) FROM tournament_players tp WHERE tp.tournament_id = t.id) AS players
        ${TOURNAMENT_FROM}
-       WHERE t.status <> 'finished' AND (? IS NULL OR t.format = ?)
+       WHERE t.status <> 'finished' AND t.chamber IS NULL AND (? IS NULL OR t.format = ?)
        ORDER BY CASE t.status WHEN 'running' THEN 0 ELSE 1 END, t.starts_at IS NULL, t.starts_at, t.created_at
+
        LIMIT ?`,
     )
     .all(opts.format ?? null, opts.format ?? null, opts.limit) as Array<TournamentRow & { players: number }>;
@@ -435,6 +452,42 @@ export function unregisterPlayer(db: DB, tournamentId: string, userId: string): 
 export function countPlayers(db: DB, tournamentId: string): number {
   return Number((db.prepare('SELECT COUNT(*) AS n FROM tournament_players WHERE tournament_id = ?').get(tournamentId) as { n: number }).n);
 }
+
+// ------------------------------------------------------------------ Sala do Tempo: jogadores virtuais
+
+/** Ids dos jogadores virtuais da Sala do Tempo (`v:17`), que entram nas partidas como os de um inscrito. */
+export const VIRTUAL_PREFIX = 'v:';
+export const isVirtualId = (id: string | null | undefined): boolean => typeof id === 'string' && id.startsWith(VIRTUAL_PREFIX);
+
+export interface TournamentVirtual {
+  id: string;
+  name: string;
+  leader: string;
+  /** Deck pronto que o bot joga por ele (do meta, quando há um com o Líder). */
+  deckId: string;
+  /** Força sorteada (desvios-padrão em torno de zero): decide, com o confronto dos Líderes, as mesas estatísticas. */
+  skill: number;
+  seed: number;
+}
+
+type VirtualRow = { id: string; name: string; leader: string; deck_id: string; skill: number; seed: number | null };
+
+export function listVirtuals(db: DB, tournamentId: string): TournamentVirtual[] {
+  const rows = db
+    .prepare('SELECT id, name, leader, deck_id, skill, seed FROM tournament_virtuals WHERE tournament_id = ? ORDER BY COALESCE(seed, 1e9), id')
+    .all(tournamentId) as VirtualRow[];
+  return rows.map((r, i) => ({ id: r.id, name: r.name, leader: r.leader, deckId: r.deck_id, skill: r.skill, seed: r.seed ?? i + 1 }));
+}
+
+/** Grava os virtuais sorteados no início da Sala do Tempo (a ordem sorteada vem depois, em `startTournament`). */
+export function insertVirtuals(db: DB, tournamentId: string, virtuals: Array<Omit<TournamentVirtual, 'seed'>>) {
+  dataVersion.bump();
+  transaction(db, () => {
+    const write = db.prepare('INSERT INTO tournament_virtuals (tournament_id, id, name, leader, deck_id, skill) VALUES (?, ?, ?, ?, ?, ?)');
+    for (const v of virtuals) write.run(tournamentId, v.id, v.name, v.leader, v.deckId, v.skill);
+  });
+}
+
 
 /** Conta (com perfil público) pelo apelido, sem diferenciar maiúsculas: todas as que usam o nome. */
 export function accountsByName(db: DB, name: string): Array<{ userId: string; name: string }> {
@@ -586,7 +639,9 @@ export function startTournament(db: DB, id: string, seeds: string[], rounds: num
   dataVersion.bump();
   transaction(db, () => {
     const seed = db.prepare('UPDATE tournament_players SET seed = ? WHERE tournament_id = ? AND user_id = ?');
-    seeds.forEach((userId, i) => seed.run(i + 1, id, userId));
+    // Sala do Tempo: os virtuais entram na mesma ordem sorteada (a atualização não acha nada nos torneios comuns).
+    const virtualSeed = db.prepare('UPDATE tournament_virtuals SET seed = ? WHERE tournament_id = ? AND id = ?');
+    seeds.forEach((userId, i) => (isVirtualId(userId) ? virtualSeed : seed).run(i + 1, id, userId));
     db.prepare("UPDATE tournaments SET status = 'running', rounds = ?, started_at = ?, spoiler_set = ? WHERE id = ?").run(rounds, at, spoilerSet, id);
     writeRound(db, id, first, at);
   });

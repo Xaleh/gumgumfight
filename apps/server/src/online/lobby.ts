@@ -347,16 +347,31 @@ export class Lobby {
   /**
    * Treino contra o bot do servidor: começa na hora; a partida pode ser assistida.
    * `first`: quem começa (0 = o jogador, 1 = o bot); sem ele, o sorteio decide.
+   * `tournament`: Sala do Tempo, a mesa do torneio contra um jogador virtual (o fim do jogo entra no placar da série).
    */
-  createBotRoom(seat: SeatRequest, bot: SeatRequest, mode: PlayMode, first?: PlayerId, level?: BotLevel): { room: Room; token: string } | LobbyError {
+  createBotRoom(
+    seat: SeatRequest,
+    bot: SeatRequest,
+    mode: PlayMode,
+    first?: PlayerId,
+    level?: BotLevel,
+    tournament?: RoomTournament,
+  ): { room: Room; token: string } | LobbyError {
     const busy = this.busy(seat.ownerHash);
     if (busy) return busy;
     for (const r of this.activeFor(seat.ownerHash)) if (r.status === 'waiting') this.close(r.roomId);
     this.leaveQueue(seat.ownerHash);
     const token = randomToken();
     const room = this.makeRoom(
-      newRoomData({ queue: 'bot', ...mode, code: null, seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }] }),
+      newRoomData({
+        queue: 'bot',
+        ...mode,
+        code: null,
+        ...(tournament ? { tournament } : {}),
+        seats: [{ ...seat, token }, { ...bot, token: randomToken(), bot: true }],
+      }),
     );
+
     if (first !== undefined) room.data.firstPlayer = first;
     if (level) room.data.botLevel = level;
     room.start(0);
