@@ -597,7 +597,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (32)
+### Tabelas (33)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -620,6 +620,8 @@ baixadas quando tocam) + `public/`.
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
 | `tournament_players` | `(tournament_id, user_id)` | `name`, `deck_id`, **`deck` (JSON `DeckList` congelado)**, `seed`, `dropped` | inscrição, início, drop |
+| `tournament_virtuals` | `(tournament_id, id)` | Sala do Tempo: `name`, `leader`, `deck_id`, `skill`, `seed` dos jogadores virtuais (`id` = `v:17`, usado em `tournament_matches`) | início da Sala do Tempo |
+
 | `supporter_payments` | `id` (`apoiase:<conta>:<mês>` ou transação do Ko-fi) | `email`, `kind`, `tier`, `amount`, `currency`, `paid_at`, `user_id` | consulta à Apoia.se, webhook do Ko-fi |
 | `tournament_quota` | `tournament_id` | `organizer_id`, `created_at`: torneios criados pela cota de apoiador | criação de torneio |
 | `sponsors` | `id` (`sp-` + 8 hex) | `name`, `url`, `offer`, `placements`, `starts_at`, `ends_at`, `sort`, `logo` (BLOB), `logo_type` | admin |
@@ -1339,9 +1341,34 @@ Líder primeiro, quantidade em selo e código; `drawMatchDeck` em `recap/draw.ts
 - O componente, o desenho e os carregadores de imagens, fontes e logo (`recap/assets.ts`, compartilhados com o kit)
   ficam no chunk do kit, carregado só ao abrir.
 
+### Sala do Tempo (`tournaments/chamber.ts`)
+
+Torneio simulado do Time ([`docs/plano-sala-do-tempo.md`](plano-sala-do-tempo.md)): um torneio suíço com
+`tournaments.chamber` (id do preset de `data/chamber/`) e `chamber_size`, cujas vagas que os humanos não ocupam são
+preenchidas no início por **jogadores virtuais** (`tournament_virtuals`: `id` = `v:17`, `leader`, `deck_id`, `skill`,
+`seed`), sorteados pela distribuição de Líderes do preset (`spawnVirtuals`; o deck de cada Líder por `chamberDecks`: o do
+preset, senão o do meta, senão um deck pronto com o Líder, só válidos no formato). Os ids dos virtuais entram em
+`tournament_matches.p1/p2`; `entrants` (inscritos + virtuais, com o deck pronto de cada um) é a lista do pareamento, da
+classificação, do lobby, dos nomes e do kit, enquanto `listPlayers` segue só com os humanos.
+
+- `beginChamber`/`advanceChamber` geram a rodada com todos e, em seguida, `resolveVirtualTables` lança o placar das mesas
+  com dois virtuais (`reported_by = 'sim'`): por jogo, chance = sigmoide(logit(`matchupRate` do preset, 50% sem o par)
+  + 0,6 × (`skill` A − `skill` B)); jogos até a maioria (`simulateSeries`). As mesas com humano ficam pendentes.
+- `POST …/matches/:m/play` com oponente virtual abre `lobby.createBotRoom(…, 'team', tournament)` com o deck do virtual
+  (`queue = 'bot'`; o jogo entra nas estatísticas como partida contra o bot) e `RoomTournament.virtualId`; `finishMatch`
+  reporta o virtual como vencedor/perdedor e `reportFromGame` soma na série. Voltar à mesa devolve o mesmo assento.
+- Rotas: `GET /api/tournaments/chamber/presets` (Time) e `POST /api/tournaments/chamber` (`{ preset, name?, players?,
+  rounds?, topCut?, bo3From?, bo5From? }`; Time, com `ONLINE_BOT_ROOMS` ligado). Quem abriu gerencia (`canManage`); só o
+  Time se inscreve (`chamberTeamOnly`); a sala não se edita (`chamberNoEdit`); basta um inscrito para começar.
+- Detalhe enxuto: só as mesas com humano em cada rodada (`tables`/`virtualTables` na rodada), classificação com os 32
+  primeiros + humanos + oponentes + vizinhos (`standingsTotal`), refs das mesas e da classificação com `virtual` e o
+  Líder, e o bloco `chamber` (preset, distribuição com deck e contagem por Líder, "outros", `botRooms`, `presetMissing`).
+  `listFinished`/`listOpen` ignoram a sala (fora do meta); a lista só a mostra ao Time (`canChamber`).
+
 ---
 
 ## 13. Infraestrutura: build, CI/CD, VPS
+
 
 ### Pacote de produção (`scripts/build-release.sh`)
 

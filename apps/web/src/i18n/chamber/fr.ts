@@ -1,0 +1,52 @@
+// Textes de la Salle du Temps (français).
+
+import type chamberPtBR from './pt-BR';
+
+const chamber: Record<keyof typeof chamberPtBR, string> = {
+  'chamber.title': 'Salle du Temps',
+  'chamber.open': '⏳ Salle du Temps',
+  'chamber.badge': 'Salle du Temps',
+  'chamber.intro':
+    "Entraînement de l’Équipe dans un tournoi simulé : les places que l’Équipe n’occupe pas sont remplies par des joueurs virtuels, tirés selon la répartition des Leaders de l’événement. Humain contre humain joue dans la salle habituelle ; humain contre virtuel affronte le Bot de l’Équipe avec le deck du Leader tiré ; les tables entre virtuels sont décidées par tirage. Celui qui ouvre la salle génère et lance chaque ronde, au rythme du groupe.",
+  'chamber.newTitle': 'Nouvelle Salle du Temps',
+  'chamber.event': 'Événement',
+  'chamber.eventHelp': 'Les événements viennent de data/chamber/*.json sur le serveur : répartition des Leaders, taille et rondes suggérées.',
+  'chamber.noPresets': 'Aucun événement enregistré sur le serveur (dossier data/chamber).',
+  'chamber.botRoomsOff': "L’entraînement contre le bot du serveur est désactivé : la Salle du Temps ne peut pas ouvrir.",
+  'chamber.nameLabel': 'Nom de la salle (facultatif)',
+  'chamber.players': "Joueurs de l’événement",
+  'chamber.playersHelp': "Humains de l’Équipe + virtuels ({min} à {max}). Les rondes suggérées suivent la taille.",
+  'chamber.rounds': 'Rondes suisses',
+  'chamber.create': 'Ouvrir la salle',
+  'chamber.distribution': 'Répartition des Leaders',
+  'chamber.distributionHelp': "Part des joueurs de l’événement sur chaque Leader et le deck que le bot joue pour lui.",
+  'chamber.metaDeck': 'deck du méta',
+  'chamber.starterDeck': 'deck prêt',
+  'chamber.noDeck': 'aucun deck valide : passe dans « autres »',
+  'chamber.others': 'Autres',
+  'chamber.othersShare': '{pct}% tirés parmi {n|# deck prêt|# decks prêts} valides dans le format',
+  'chamber.othersDrawn': 'Autres (decks prêts tirés)',
+  'chamber.virtualsLine': "{humans|# de l’Équipe|# de l’Équipe} + {virtuals|# virtuel|# virtuels} = {total} joueurs",
+  'chamber.pilot': 'Pilote {n}',
+  'chamber.virtualTag': 'virtuel',
+  'chamber.tableVsVirtual': 'Table {table} : contre {opp}, un virtuel avec {leader}',
+  'chamber.playBot': "Jouer contre le Bot de l’Équipe",
+  'chamber.botHint': "Le Bot de l’Équipe joue le deck du virtuel sur le serveur. Quitter la table, c’est abandonner la partie.",
+  'chamber.virtualTables': '{n|# table entre virtuels décidée par tirage|# tables entre virtuels décidées par tirage}',
+  'chamber.standingsNote': "Classement de {total} joueurs : les 32 premiers, l’Équipe, ses adversaires et voisins.",
+  'chamber.colLeader': 'Leader',
+  'chamber.startHint': "Au départ, {n|# place est remplie|# places sont remplies} par des virtuels tirés selon la répartition de l’événement.",
+  'chamber.confirmStart': "Lancer la Salle du Temps avec {humans|# de l’Équipe|# de l’Équipe} et {virtuals|# virtuel|# virtuels} ?",
+  'chamber.presetMissing': "L’événement de cette salle n’est plus sur le serveur (data/chamber) : elle ne peut pas démarrer.",
+  'chamber.teamOnlyRegister': "Seuls les membres de l’Équipe entrent dans la Salle du Temps.",
+  'chamber.opponentRecord': "{wins}-{losses} dans l’événement",
+  'tour.reported.sim': 'décidée par tirage',
+  'errors.chamberTeamOnly': "La Salle du Temps est réservée aux membres de l’Équipe.",
+  'errors.chamberNeedsBotRooms': "La Salle du Temps a besoin de l’entraînement contre le bot du serveur, qui est désactivé.",
+  'errors.chamberPresetNotFound': 'Événement introuvable.',
+  'errors.invalidChamberPlayers': "Joueurs de l’événement : de {min} à {max}.",
+  'errors.chamberNoEdit': "La Salle du Temps suit l’événement choisi : supprimez-la et ouvrez-en une autre pour changer les règles.",
+  'errors.chamberNoDecks': 'Aucun deck prêt n’est valide dans ce format : impossible de tirer les virtuels.',
+};
+
+export default chamber;

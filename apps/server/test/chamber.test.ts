@@ -96,13 +96,16 @@ describe('Sala do Tempo: preset e mesas estatísticas', () => {
     const vs = spawnVirtuals(db, p, t as never, 16, new Date());
     expect(vs).toHaveLength(16);
     expect(new Set(vs.map((v) => v.id)).size).toBe(16);
+    // As fatias viram contagens (8, 4 e 1); os 3 que sobram ("outros") sorteiam entre todos os decks prontos, inclusive
+    // os destes Líderes, por isso "pelo menos".
     const by = (leader: string) => vs.filter((v) => v.leader === leader);
-    expect(by('ST01-001')).toHaveLength(8);
-    expect(by('ST02-001')).toHaveLength(4);
-    expect(by('ST02-001').every((v) => v.deckId === 'st02-kid')).toBe(true);
-    expect(by('ST09-001')).toHaveLength(1);
-    // Os 3 que sobram ("outros") têm algum deck pronto válido.
+    expect(by('ST01-001').length).toBeGreaterThanOrEqual(8);
+    expect(by('ST02-001').length).toBeGreaterThanOrEqual(4);
+    expect(by('ST02-001').filter((v) => v.deckId === 'st02-kid').length).toBeGreaterThanOrEqual(4);
+    expect(by('ST09-001').length).toBeGreaterThanOrEqual(1);
+    expect(by('ST01-001').length + by('ST02-001').length + by('ST09-001').length).toBeLessThanOrEqual(16);
     expect(vs.every((v) => v.deckId)).toBe(true);
+
     expect(vs.some((v) => v.skill !== 0)).toBe(true);
   });
 });
@@ -163,24 +166,22 @@ describe('Sala do Tempo: rotas', () => {
   it('o evento inteiro: virtuais completam as vagas, mesas só de virtuais saem no sorteio, a mesa contra o virtual é contra o Bot do Time', async () => {
     const { db, app } = setup();
     const host = login(db, 'player', true);
-    const mate = login(db, 'player', true);
     const t = (await req(app, 'POST', '/api/tournaments/chamber', host, { preset: 'regional' })).json();
-    // Um humano já basta para começar (os virtuais completam), mas aqui entram dois.
+    // Um humano já basta para começar: os virtuais completam o evento (e a mesa dele é sempre contra um virtual).
     await req(app, 'POST', `/api/tournaments/${t.id}/register`, host, { deckId: 'st01-luffy' });
-    await req(app, 'POST', `/api/tournaments/${t.id}/register`, mate, { deckId: 'st03-crocodile' });
     const started = (await req(app, 'POST', `/api/tournaments/${t.id}/start`, host, {})).json();
     expect(started).toMatchObject({ status: 'running', round: 1, totalRounds: 5, swissRounds: 3, standingsTotal: 16 });
-    expect(started.chamber.virtuals).toBe(14);
-    expect(started.chamber.leaders.reduce((s: number, l: { count: number }) => s + l.count, 0) + started.chamber.others.reduce((s: number, l: { count: number }) => s + l.count, 0)).toBe(14);
+    expect(started.chamber.virtuals).toBe(15);
+    expect(started.chamber.leaders.reduce((s: number, l: { count: number }) => s + l.count, 0) + started.chamber.others.reduce((s: number, l: { count: number }) => s + l.count, 0)).toBe(15);
     // Os virtuais entraram na ordem sorteada junto com os humanos.
     const virtuals = listVirtuals(db, t.id);
-    expect(virtuals).toHaveLength(14);
+    expect(virtuals).toHaveLength(15);
     expect(new Set([...virtuals.map((v) => v.seed), ...started.players.map((p: { seed: number }) => p.seed)]).size).toBe(16);
     // Os inscritos continuam só os humanos; a rodada lista só as mesas com humano e diz quantas foram sorteadas.
-    expect(started.players).toHaveLength(2);
+    expect(started.players).toHaveLength(1);
     const r1 = started.rounds[0];
-    expect(r1).toMatchObject({ tables: 8, virtualTables: 6 });
-    expect(r1.matches).toHaveLength(2);
+    expect(r1).toMatchObject({ tables: 8, virtualTables: 7 });
+    expect(r1.matches).toHaveLength(1);
     for (const m of r1.matches) {
       expect(m.result).toBeNull();
       expect([m.p1.virtual, m.p2.virtual].filter(Boolean)).toHaveLength(1);
@@ -188,14 +189,14 @@ describe('Sala do Tempo: rotas', () => {
     }
     // As mesas só de virtuais já têm resultado (lançado pelo sorteio).
     const sim = db.prepare("SELECT COUNT(*) AS n FROM tournament_matches WHERE tournament_id = ? AND round = 1 AND reported_by = 'sim'").get(t.id) as { n: number };
-    expect(sim.n).toBe(6);
+    expect(sim.n).toBe(7);
     expect(started.roundComplete).toBe(false);
     // A classificação apresentada é um recorte (os 32 primeiros aqui são todos) com o Líder de cada um.
     expect(started.standings).toHaveLength(16);
-    expect(started.standings.filter((s: { virtual: boolean }) => s.virtual)).toHaveLength(14);
+    expect(started.standings.filter((s: { virtual: boolean }) => s.virtual)).toHaveLength(15);
     // Antes de iniciar a rodada, o virtual já conta como pronto.
-    expect(started.tables).toBe(2);
-    const mine = r1.matches.find((m: { p1: { userId: string }; p2: { userId: string } }) => m.p1.userId === host.id || m.p2.userId === host.id);
+    expect(started.tables).toBe(1);
+    const mine = r1.matches[0];
     expect(mine.ready.filter(Boolean)).toHaveLength(1);
 
     // Quem abriu inicia a rodada; a mesa contra o virtual abre uma sala do Bot do Time com o deck do virtual.
@@ -222,11 +223,9 @@ describe('Sala do Tempo: rotas', () => {
     expect(db.prepare('SELECT COUNT(*) AS n FROM tournament_games WHERE tournament_id = ?').get(t.id)).toEqual({ n: 1 });
     expect((db.prepare('SELECT mode FROM matches').get() as { mode: string }).mode).toBe('bot');
 
-    // A outra mesa: quem gerencia lança o placar; a rodada fecha e a seguinte sai com as mesas virtuais já decididas.
-    const other = r1.matches.find((x: { id: number }) => x.id !== mine.id);
-    await req(app, 'PUT', `/api/tournaments/${t.id}/matches/${other.id}/result`, host, { result: 'p1' });
-    view = (await req(app, 'GET', `/api/tournaments/${t.id}`, host)).json();
+    // Com a única mesa humana decidida, a rodada fecha e a seguinte sai com as mesas virtuais já decididas.
     expect(view.roundComplete).toBe(true);
+
     const next = (round: number) =>
       req(app, 'POST', `/api/tournaments/${t.id}/next`, host, { begin: true }).then(async (r) => {
         expect(r.statusCode, r.body).toBe(200);

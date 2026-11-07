@@ -1,0 +1,52 @@
+// Texte des Raums von Geist und Zeit (Deutsch).
+
+import type chamberPtBR from './pt-BR';
+
+const chamber: Record<keyof typeof chamberPtBR, string> = {
+  'chamber.title': 'Raum von Geist und Zeit',
+  'chamber.open': '⏳ Raum von Geist und Zeit',
+  'chamber.badge': 'Raum von Geist und Zeit',
+  'chamber.intro':
+    'Teamtraining in einem simulierten Turnier: Plätze, die das Team nicht belegt, füllen virtuelle Spieler, die nach der Leader-Verteilung des Events gezogen werden. Mensch gegen Mensch spielt im gewohnten Raum; Mensch gegen Virtuellen spielt gegen den Team-Bot mit dem Deck des gezogenen Leaders; Tische nur mit Virtuellen werden per Los entschieden. Wer den Raum öffnet, erzeugt und startet jede Runde im Tempo der Gruppe.',
+  'chamber.newTitle': 'Neuer Raum von Geist und Zeit',
+  'chamber.event': 'Event',
+  'chamber.eventHelp': 'Die Events kommen aus data/chamber/*.json auf dem Server: Leader-Verteilung, Größe und empfohlene Runden.',
+  'chamber.noPresets': 'Kein Event auf dem Server hinterlegt (Ordner data/chamber).',
+  'chamber.botRoomsOff': 'Das Bot-Training auf dem Server ist aus: der Raum von Geist und Zeit kann nicht öffnen.',
+  'chamber.nameLabel': 'Name des Raums (optional)',
+  'chamber.players': 'Spieler des Events',
+  'chamber.playersHelp': 'Menschen des Teams + Virtuelle ({min} bis {max}). Die empfohlenen Runden folgen der Größe.',
+  'chamber.rounds': 'Schweizer Runden',
+  'chamber.create': 'Raum öffnen',
+  'chamber.distribution': 'Leader-Verteilung',
+  'chamber.distributionHelp': 'Anteil der Event-Spieler je Leader und das Deck, das der Bot dafür spielt.',
+  'chamber.metaDeck': 'Meta-Deck',
+  'chamber.starterDeck': 'fertiges Deck',
+  'chamber.noDeck': 'kein gültiges Deck: wird zu „Sonstige“',
+  'chamber.others': 'Sonstige',
+  'chamber.othersShare': '{pct}% gezogen aus {n|# fertigen Deck|# fertigen Decks}, die im Format gültig sind',
+  'chamber.othersDrawn': 'Sonstige (gezogene fertige Decks)',
+  'chamber.virtualsLine': '{humans|# aus dem Team|# aus dem Team} + {virtuals|# Virtueller|# Virtuelle} = {total} Spieler',
+  'chamber.pilot': 'Pilot {n}',
+  'chamber.virtualTag': 'virtuell',
+  'chamber.tableVsVirtual': 'Tisch {table}: gegen {opp}, einen Virtuellen mit {leader}',
+  'chamber.playBot': 'Gegen den Team-Bot spielen',
+  'chamber.botHint': 'Der Team-Bot spielt das Deck des Virtuellen auf dem Server. Den Tisch zu verlassen bedeutet aufzugeben.',
+  'chamber.virtualTables': '{n|# Tisch nur mit Virtuellen per Los entschieden|# Tische nur mit Virtuellen per Los entschieden}',
+  'chamber.standingsNote': 'Tabelle von {total} Spielern: die ersten 32, das Team, seine Gegner und Nachbarn.',
+  'chamber.colLeader': 'Leader',
+  'chamber.startHint': 'Beim Start {n|wird # Platz|werden # Plätze} mit Virtuellen gefüllt, die nach der Verteilung des Events gezogen werden.',
+  'chamber.confirmStart': 'Den Raum von Geist und Zeit mit {humans|# aus dem Team|# aus dem Team} und {virtuals|# Virtuellen|# Virtuellen} starten?',
+  'chamber.presetMissing': 'Das Event dieses Raums ist nicht mehr auf dem Server (data/chamber): er kann nicht starten.',
+  'chamber.teamOnlyRegister': 'Nur Teammitglieder betreten den Raum von Geist und Zeit.',
+  'chamber.opponentRecord': '{wins}-{losses} im Event',
+  'tour.reported.sim': 'per Los entschieden',
+  'errors.chamberTeamOnly': 'Der Raum von Geist und Zeit ist nur für Teammitglieder.',
+  'errors.chamberNeedsBotRooms': 'Der Raum von Geist und Zeit braucht das Bot-Training auf dem Server, das aus ist.',
+  'errors.chamberPresetNotFound': 'Event nicht gefunden.',
+  'errors.invalidChamberPlayers': 'Spieler des Events: von {min} bis {max}.',
+  'errors.chamberNoEdit': 'Der Raum von Geist und Zeit folgt dem gewählten Event: lösche ihn und öffne einen neuen, um die Regeln zu ändern.',
+  'errors.chamberNoDecks': 'Kein fertiges Deck ist in diesem Format gültig: die Virtuellen können nicht gezogen werden.',
+};
+
+export default chamber;

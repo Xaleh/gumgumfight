@@ -1327,8 +1327,12 @@ export class Room {
             matchId: this.data.tournament.matchId,
             game: this.data.tournament.game,
             bestOf: this.data.tournament.bestOf,
-            /** Placar da série antes deste jogo, na ordem dos assentos. */
-            score: this.data.seats.map((s) => (s.userId ? (this.data.tournament!.wins[s.userId] ?? 0) : 0)),
+            /** Placar da série antes deste jogo, na ordem dos assentos (o bot da Sala do Tempo joga pelo virtual). */
+            score: this.data.seats.map((s) => {
+              const id = s.bot ? this.data.tournament!.virtualId : s.userId;
+              return id ? (this.data.tournament!.wins[id] ?? 0) : 0;
+            }),
+
           }
         : null,
       status: late ? (over ? 'finished' : 'playing') : this.status,

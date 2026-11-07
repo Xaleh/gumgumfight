@@ -1025,7 +1025,9 @@ export function registerTournamentRoutes(
     const preset = presetOf(t);
     const virtuals = all.filter((p) => p.virtual);
     const decks = preset ? chamberDecks(db, preset, t, legalAt(t)) : null;
-    const card = (leader: string) => d.leaderCards?.get(leader);
+    // As cartas dos Líderes do preset (antes do início nenhum virtual existe ainda) e dos virtuais sorteados.
+    const presetCards = new Map(present(getCards(db, [...new Set((decks?.leaders ?? []).map((l) => l.leader))])).map((c) => [c.id, c] as const));
+    const card = (leader: string) => presetCards.get(leader) ?? d.leaderCards?.get(leader);
     const counts = new Map<string, number>();
     for (const v of virtuals) counts.set(v.deck.leader, (counts.get(v.deck.leader) ?? 0) + 1);
     const listed = new Set(decks?.leaders.map((l) => l.leader) ?? []);
@@ -1039,7 +1041,10 @@ export function registerTournamentRoutes(
       virtuals: virtuals.length,
       /** O treino contra o bot do servidor está ligado (sem ele, as mesas contra os virtuais não abrem). */
       botRooms,
+      /** Decks prontos válidos no formato entre os quais a fatia "outros" sorteia. */
+      otherDecks: decks?.others.length ?? 0,
       leaders: (decks?.leaders ?? []).map((l) => ({
+
         leader: l.leader,
         leaderName: card(l.leader)?.name ?? null,
         leaderImage: (cardImages && card(l.leader) && artImage(card(l.leader)!, undefined)) || null,

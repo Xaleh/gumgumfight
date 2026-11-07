@@ -1,0 +1,52 @@
+// Textos de la Sala del Tiempo (español).
+
+import type chamberPtBR from './pt-BR';
+
+const chamber: Record<keyof typeof chamberPtBR, string> = {
+  'chamber.title': 'Sala del Tiempo',
+  'chamber.open': '⏳ Sala del Tiempo',
+  'chamber.badge': 'Sala del Tiempo',
+  'chamber.intro':
+    'Entrenamiento del Equipo en un torneo simulado: las plazas que el Equipo no ocupe las llenan jugadores virtuales, sorteados según la distribución de Líderes del evento. Humano contra humano juega en la sala de siempre; humano contra virtual juega contra el Bot del Equipo con el mazo del Líder sorteado; las mesas solo de virtuales se deciden por sorteo. Quien abre la sala genera e inicia cada ronda, al ritmo del grupo.',
+  'chamber.newTitle': 'Nueva Sala del Tiempo',
+  'chamber.event': 'Evento',
+  'chamber.eventHelp': 'Los eventos vienen de data/chamber/*.json en el servidor: distribución de Líderes, tamaño y rondas sugeridas.',
+  'chamber.noPresets': 'Ningún evento registrado en el servidor (carpeta data/chamber).',
+  'chamber.botRoomsOff': 'El entrenamiento contra el bot del servidor está apagado: la Sala del Tiempo no abre.',
+  'chamber.nameLabel': 'Nombre de la sala (opcional)',
+  'chamber.players': 'Jugadores del evento',
+  'chamber.playersHelp': 'Humanos del Equipo + virtuales ({min} a {max}). Las rondas sugeridas siguen el tamaño.',
+  'chamber.rounds': 'Rondas del suizo',
+  'chamber.create': 'Abrir la sala',
+  'chamber.distribution': 'Distribución de Líderes',
+  'chamber.distributionHelp': 'Fracción de los jugadores del evento con cada Líder y el mazo que el bot juega por él.',
+  'chamber.metaDeck': 'mazo del meta',
+  'chamber.starterDeck': 'mazo predefinido',
+  'chamber.noDeck': 'sin mazo válido: pasa a "otros"',
+  'chamber.others': 'Otros',
+  'chamber.othersShare': '{pct}% sorteados entre {n|# mazo predefinido|# mazos predefinidos} válidos en el formato',
+  'chamber.othersDrawn': 'Otros (mazos predefinidos sorteados)',
+  'chamber.virtualsLine': '{humans|# del Equipo|# del Equipo} + {virtuals|# virtual|# virtuales} = {total} jugadores',
+  'chamber.pilot': 'Piloto {n}',
+  'chamber.virtualTag': 'virtual',
+  'chamber.tableVsVirtual': 'Mesa {table}: contra {opp}, un virtual con {leader}',
+  'chamber.playBot': 'Jugar contra el Bot del Equipo',
+  'chamber.botHint': 'El Bot del Equipo juega el mazo del virtual en el servidor. Salir de la mesa es rendirse.',
+  'chamber.virtualTables': '{n|# mesa solo de virtuales decidida por sorteo|# mesas solo de virtuales decididas por sorteo}',
+  'chamber.standingsNote': 'Clasificación de {total} jugadores: los 32 primeros, el Equipo, sus rivales y vecinos.',
+  'chamber.colLeader': 'Líder',
+  'chamber.startHint': 'Al empezar, {n|# plaza se llena|# plazas se llenan} con virtuales sorteados según la distribución del evento.',
+  'chamber.confirmStart': '¿Empezar la Sala del Tiempo con {humans|# del Equipo|# del Equipo} y {virtuals|# virtual|# virtuales}?',
+  'chamber.presetMissing': 'El evento de esta sala ya no está en el servidor (data/chamber): no puede empezar.',
+  'chamber.teamOnlyRegister': 'Solo quien forma parte del Equipo entra en la Sala del Tiempo.',
+  'chamber.opponentRecord': '{wins}-{losses} en el evento',
+  'tour.reported.sim': 'decidida por sorteo',
+  'errors.chamberTeamOnly': 'La Sala del Tiempo es solo para quien forma parte del Equipo.',
+  'errors.chamberNeedsBotRooms': 'La Sala del Tiempo necesita el entrenamiento contra el bot del servidor, que está apagado.',
+  'errors.chamberPresetNotFound': 'Evento no encontrado.',
+  'errors.invalidChamberPlayers': 'Jugadores del evento: de {min} a {max}.',
+  'errors.chamberNoEdit': 'La Sala del Tiempo sigue el evento elegido: bórrala y abre otra para cambiar las reglas.',
+  'errors.chamberNoDecks': 'Ningún mazo predefinido vale en este formato: no hay cómo sortear los virtuales.',
+};
+
+export default chamber;

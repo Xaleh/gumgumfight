@@ -1,0 +1,52 @@
+// 精神と時の部屋のテキスト（日本語）。
+
+import type chamberPtBR from './pt-BR';
+
+const chamber: Record<keyof typeof chamberPtBR, string> = {
+  'chamber.title': '精神と時の部屋',
+  'chamber.open': '⏳ 精神と時の部屋',
+  'chamber.badge': '精神と時の部屋',
+  'chamber.intro':
+    'チームの模擬大会での練習です。チームが埋めない席は、イベントのリーダー分布から抽選した仮想プレイヤーが埋めます。人間同士はいつもの部屋で対戦し、人間対仮想は抽選されたリーダーのデッキを使うチームボットと対戦し、仮想同士の卓は抽選で決まります。部屋を開いた人が各ラウンドを生成して開始します。',
+  'chamber.newTitle': '新しい精神と時の部屋',
+  'chamber.event': 'イベント',
+  'chamber.eventHelp': 'イベントはサーバーの data/chamber/*.json から読み込まれます（リーダー分布、人数、推奨ラウンド数）。',
+  'chamber.noPresets': 'サーバーにイベントが登録されていません（data/chamber フォルダー）。',
+  'chamber.botRoomsOff': 'サーバーのボット練習が無効のため、精神と時の部屋は開けません。',
+  'chamber.nameLabel': '部屋の名前（任意）',
+  'chamber.players': 'イベントの参加人数',
+  'chamber.playersHelp': 'チームの人間＋仮想プレイヤー（{min}〜{max}）。推奨ラウンド数は人数に従います。',
+  'chamber.rounds': 'スイス式のラウンド数',
+  'chamber.create': '部屋を開く',
+  'chamber.distribution': 'リーダーの分布',
+  'chamber.distributionHelp': '各リーダーを使う参加者の割合と、ボットがそのリーダーで使うデッキ。',
+  'chamber.metaDeck': 'メタデッキ',
+  'chamber.starterDeck': '内蔵デッキ',
+  'chamber.noDeck': '有効なデッキなし：「その他」になります',
+  'chamber.others': 'その他',
+  'chamber.othersShare': '{pct}% はフォーマットで有効な {n|# 個の内蔵デッキ|# 個の内蔵デッキ} から抽選',
+  'chamber.othersDrawn': 'その他（抽選された内蔵デッキ）',
+  'chamber.virtualsLine': 'チーム {humans|# 人|# 人} ＋ 仮想 {virtuals|# 人|# 人} ＝ {total} 人',
+  'chamber.pilot': 'パイロット {n}',
+  'chamber.virtualTag': '仮想',
+  'chamber.tableVsVirtual': '卓 {table}：{opp}（{leader} の仮想プレイヤー）と対戦',
+  'chamber.playBot': 'チームボットと対戦',
+  'chamber.botHint': 'チームボットがサーバーで仮想プレイヤーのデッキを使います。卓を離れると投了になります。',
+  'chamber.virtualTables': '仮想同士の卓 {n|# 卓|# 卓} は抽選で決定',
+  'chamber.standingsNote': '{total} 人の順位表：上位32人、チーム、その対戦相手と前後。',
+  'chamber.colLeader': 'リーダー',
+  'chamber.startHint': '開始時に {n|# 席|# 席} がイベントの分布から抽選した仮想プレイヤーで埋まります。',
+  'chamber.confirmStart': 'チーム {humans|# 人|# 人} と仮想 {virtuals|# 人|# 人} で精神と時の部屋を始めますか？',
+  'chamber.presetMissing': 'この部屋のイベントはサーバー（data/chamber）にありません。開始できません。',
+  'chamber.teamOnlyRegister': 'チームのメンバーだけが精神と時の部屋に入れます。',
+  'chamber.opponentRecord': 'イベントで {wins}-{losses}',
+  'tour.reported.sim': '抽選で決定',
+  'errors.chamberTeamOnly': '精神と時の部屋はチームのメンバー専用です。',
+  'errors.chamberNeedsBotRooms': '精神と時の部屋にはサーバーのボット練習が必要ですが、無効になっています。',
+  'errors.chamberPresetNotFound': 'イベントが見つかりません。',
+  'errors.invalidChamberPlayers': 'イベントの参加人数は {min}〜{max} です。',
+  'errors.chamberNoEdit': '精神と時の部屋は選んだイベントに従います。ルールを変えるには削除して開き直してください。',
+  'errors.chamberNoDecks': 'このフォーマットで有効な内蔵デッキがなく、仮想プレイヤーを抽選できません。',
+};
+
+export default chamber;
