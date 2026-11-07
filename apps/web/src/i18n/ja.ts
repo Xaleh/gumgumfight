@@ -6,6 +6,7 @@ import tutorial from './tutorial/ja';
 import recap from './recap/ja';
 import decks from './decks/ja';
 import team from './team/ja';
+import chamber from './chamber/ja';
 
 export default {
   // ---- 全般 ----
@@ -2980,4 +2981,6 @@ export default {
   ...recap,
   ...decks,
   ...team,
+  ...chamber,
 } satisfies Messages;
+

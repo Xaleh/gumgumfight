@@ -123,7 +123,13 @@ export interface RoomTournament {
   firstUserId?: string | null;
   /** O organizador liberou as mãos ao vivo para quem transmite (sem o atraso mínimo; ver `Room.handsLive`). */
   liveHands?: boolean;
+  /**
+   * Sala do Tempo: a mesa é contra um jogador virtual, jogado pelo bot do servidor; este é o id dele no
+   * torneio (`v:17`), que entra como vencedor ou perdedor no placar da série (o assento do bot não tem conta).
+   */
+  virtualId?: string;
 }
+
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 export interface SeatInfo {
@@ -1321,8 +1327,12 @@ export class Room {
             matchId: this.data.tournament.matchId,
             game: this.data.tournament.game,
             bestOf: this.data.tournament.bestOf,
-            /** Placar da série antes deste jogo, na ordem dos assentos. */
-            score: this.data.seats.map((s) => (s.userId ? (this.data.tournament!.wins[s.userId] ?? 0) : 0)),
+            /** Placar da série antes deste jogo, na ordem dos assentos (o bot da Sala do Tempo joga pelo virtual). */
+            score: this.data.seats.map((s) => {
+              const id = s.bot ? this.data.tournament!.virtualId : s.userId;
+              return id ? (this.data.tournament!.wins[id] ?? 0) : 0;
+            }),
+
           }
         : null,
       status: late ? (over ? 'finished' : 'playing') : this.status,

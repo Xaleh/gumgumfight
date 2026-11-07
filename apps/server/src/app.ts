@@ -56,6 +56,8 @@ import { registerStatsRoutes } from './stats/routes';
 import { registerReportRoutes } from './reports/routes';
 import { type Complete, sdkCompleter } from './team/agent';
 import { MetaProfiles } from './team/profiles';
+import { ChamberPresets } from './tournaments/chamber';
+
 import { registerTeamRoutes } from './team/routes';
 import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
@@ -91,6 +93,8 @@ export function buildApp(
     webhookRetryMs?: number[];
     /** Testes: o modelo do agente do Bot do Time (sem ele, o SDK com BOT_AGENT_API_KEY). */
     agentComplete?: Complete | null;
+    /** Testes: a pasta dos presets da Sala do Tempo (sem ela, `data/chamber`). */
+    chamberDir?: string;
   } = {},
 ) {
   // trustProxy: em produção o servidor fica atrás do Nginx.
@@ -458,7 +462,18 @@ export function buildApp(
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
-  registerTournamentRoutes(app, { db, user: auth.viewer, present, lobby, cardImages: server.cardImages, now: opts.now, tickMs: opts.now ? 0 : undefined, notifier });
+  registerTournamentRoutes(app, {
+    db,
+    user: auth.viewer,
+    present,
+    lobby,
+    cardImages: server.cardImages,
+    now: opts.now,
+    tickMs: opts.now ? 0 : undefined,
+    notifier,
+    botRooms: server.onlineBotRooms ?? true,
+    ...(opts.chamberDir ? { chamberPresets: new ChamberPresets(opts.chamberDir) } : {}),
+  });
 
   // Imagens das cartas pelo mesmo domínio (kit de divulgação; em produção o Nginx atende antes).
   // A CDN própria entra como origem "cdn" do /card-img/ (e das URLs reescritas do kit de divulgação).

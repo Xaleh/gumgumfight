@@ -6,6 +6,7 @@ import tutorialPtBR from './tutorial/pt-BR';
 import recapPtBR from './recap/pt-BR';
 import decksPtBR from './decks/pt-BR';
 import teamPtBR from './team/pt-BR';
+import chamberPtBR from './chamber/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -2988,7 +2989,10 @@ const ptBR = {
   ...decksPtBR,
   // ==== Bot do Time: perfil Time, nível Time, marcação de jogadas, treinador (i18n/team) ====
   ...teamPtBR,
+  // ==== Sala do Tempo: torneio simulado do Time com jogadores virtuais (i18n/chamber) ====
+  ...chamberPtBR,
 } as const;
+
 
 export type MessageKey = keyof typeof ptBR;
 export type Messages = Record<MessageKey, string>;

@@ -238,14 +238,17 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
   onMatch?.(matchId);
   if (t) {
     const winner = room.state?.winner ?? null;
+    // Sala do Tempo: o assento do bot joga por um jogador virtual do torneio, que é quem ganha ou perde a série.
+    const idOf = (p: PlayerId) => (room.data.seats[p].bot ? (t.virtualId ?? null) : room.data.seats[p].userId);
     onTournamentGame?.({
       tournamentId: t.id,
       matchId: t.matchId,
       roomId: room.id,
-      winner: winner === null ? null : room.data.seats[winner].userId,
+      winner: winner === null ? null : idOf(winner),
       statsMatchId: matchId,
     });
   }
+
   return { matchId, bounty: matchBounties(db, matchId) };
 }
 

@@ -6,6 +6,7 @@ import tutorial from './tutorial/fr';
 import recap from './recap/fr';
 import decks from './decks/fr';
 import team from './team/fr';
+import chamber from './chamber/fr';
 
 export default {
   // ---- general ----
@@ -2982,4 +2983,6 @@ export default {
   ...recap,
   ...decks,
   ...team,
+  ...chamber,
 } satisfies Messages;
+

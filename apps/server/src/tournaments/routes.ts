@@ -36,10 +36,10 @@
 import { createHash } from 'node:crypto';
 import { artImage, type CardData, type DeckList, type FormatIssue, formatIssues, playMode, playModeLabel, spoilerRule } from '@gumgum/engine';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { accountOwnerKey, createsTournaments, isAdmin, supporterTiers, type User } from '../auth/store';
+import { accountOwnerKey, createsTournaments, isAdmin, isTeam, supporterTiers, type User } from '../auth/store';
 import { atLeast, DEFAULT_PRIORITY_HOURS, SUPPORTER_MAX_PLAYERS, SUPPORTER_TOURNAMENTS_PER_MONTH } from '../support/tiers';
 import { dataVersion, ResponseCache } from '../cache';
-import { type DB, getCards } from '../db';
+import { type DB, getCards, getDeck } from '../db';
 import { fail, isPlayerError, type PlayerError } from '../errors';
 import type { Lobby } from '../online/lobby';
 import { playableDeck } from '../online/routes';
@@ -98,6 +98,8 @@ import {
   checkInPlayer,
   createCall,
   countPlayers,
+  isVirtualId,
+  listVirtuals,
   createTournament,
   deletePrize,
   deleteTournament,
@@ -156,6 +158,19 @@ import {
   warningStatus,
 } from './store';
 import { fixTicket, pointedText } from './calls';
+import {
+  advanceChamber,
+  beginChamber,
+  chamberDecks,
+  type ChamberEntrant,
+  type ChamberPreset,
+  ChamberPresets,
+  entrants,
+  humanTable,
+  MAX_CHAMBER_PLAYERS,
+  MIN_CHAMBER_PLAYERS,
+  SIM_REPORTER,
+} from './chamber';
 import { buildMeta } from './meta';
 import { buildRecap } from './recap';
 import { isApprentice } from '../tutorial/store';
@@ -173,6 +188,10 @@ interface Deps {
   tickMs?: number;
   /** Notificações no celular (check-in aberto, rodada nova, oponente esperando na sala). */
   notifier?: Notifier;
+  /** Sala do Tempo: o treino contra o bot do servidor está ligado (ONLINE_BOT_ROOMS); sem ele, a sala não abre. */
+  botRooms?: boolean;
+  /** Sala do Tempo: os presets dos eventos (`data/chamber`; os testes passam outra pasta). */
+  chamberPresets?: ChamberPresets;
 }
 
 export const MAX_PLAYERS = 256;
@@ -373,7 +392,8 @@ function parseScore(body: { wins?: unknown; result?: unknown } | undefined, best
  * Janela da inscrição atrasada: suíço com pelo menos 2 rodadas, enquanto a rodada 1
  * está em andamento (gerar a rodada 2 fecha a janela sozinho).
  */
-const lateWindow = (t: Tournament) => t.status === 'running' && t.structure === 'swiss' && t.round === 1 && (t.rounds ?? 0) >= 2;
+const lateWindow = (t: Tournament) =>
+  t.status === 'running' && t.structure === 'swiss' && t.round === 1 && (t.rounds ?? 0) >= 2 && t.chamber === null;
 
 /** A conta pode se inscrever atrasada agora (liberada para todos ou só para ela). */
 const lateAllowed = (t: Tournament, u: User | null) => Boolean(u && lateWindow(t) && (t.lateEntry === '*' || t.lateEntry === u.id));
@@ -421,10 +441,14 @@ const META_TTL_MS = 60_000;
 
 export function registerTournamentRoutes(
   app: FastifyInstance,
-  { db, user, present, lobby, cardImages, now = Date.now, tickMs = 5_000, notifier = noNotifier }: Deps,
+  { db, user, present, lobby, cardImages, now = Date.now, tickMs = 5_000, notifier = noNotifier, botRooms = true, chamberPresets = new ChamberPresets() }: Deps,
 ) {
   const cache = new ResponseCache();
   const nowIso = () => new Date(now()).toISOString();
+  /** Sala do Tempo: inscritos e virtuais juntos (nos torneios comuns, só os inscritos). */
+  const entrantsOf = (t: Tournament, players: TournamentPlayer[]): ChamberEntrant[] => entrants(db, t, players);
+  /** O preset da Sala do Tempo, ou null (torneio comum ou preset apagado da pasta). */
+  const presetOf = (t: Tournament): ChamberPreset | null => (t.chamber ? chamberPresets.get(t.chamber) : null);
 
   /**
    * Data em que os decks do torneio precisam valer: o início marcado, se ainda não chegou.
@@ -436,6 +460,7 @@ export function registerTournamentRoutes(
   const issueOut = (i: FormatIssue | null) => (i ? { message: i.message, code: i.code, params: i.params } : null);
   /** Aviso de torneio para uma conta (tocar abre a página do torneio, ou `url`). Avisos novos do mesmo torneio substituem os antigos. */
   const tournamentNotice = (t: Tournament, userId: string, body: (locale: string) => string, ttl: number, url?: string) =>
+    isVirtualId(userId) ||
     void notifier.notify(
       { userIds: [userId] },
       {
@@ -584,9 +609,9 @@ export function registerTournamentRoutes(
     return u;
   };
   // O criador gerencia o próprio torneio se é Organizador ou se o criou pela cota de apoiador
-  // (mesmo que o plano vença depois, para não deixar o torneio sem dono).
+  // (mesmo que o plano vença depois, para não deixar o torneio sem dono). A Sala do Tempo é de quem a abriu.
   const canManage = (t: Tournament, u: User | null) =>
-    Boolean(u && (isAdmin(u.role) || (u.id === t.organizerId && (createsTournaments(u.role) || t.quota))));
+    Boolean(u && (isAdmin(u.role) || (u.id === t.organizerId && (createsTournaments(u.role) || t.quota || t.chamber !== null))));
 
   /** Judge do torneio: a lista do organizador, o próprio organizador e quem administra. */
   const isJudge = (t: Tournament, u: User | null) => Boolean(u && (canManage(t, u) || actsAsJudge(db, t, u)));
@@ -709,6 +734,9 @@ export function registerTournamentRoutes(
       prize: t.prize,
       sponsor: sponsorOf(t.sponsorId),
       priorityUntil: t.priorityUntil,
+      /** Sala do Tempo (torneio simulado do Time): o tamanho do evento simulado. */
+      chamber: t.chamber !== null,
+      chamberSize: t.chamberSize,
     };
   };
 
@@ -716,13 +744,20 @@ export function registerTournamentRoutes(
     const u = user(req);
     const mine = u ? tournamentsOf(db, u.id) : new Set<string>();
     const limits = organizeLimits(u);
+    // A Sala do Tempo só aparece para quem é do Time (a página de cada uma continua pública pelo link).
+    const team = isTeam(u);
     return {
-      tournaments: listTournaments(db).map((t) => summary(t, mine)),
+      tournaments: listTournaments(db)
+        .filter((t) => team || t.chamber === null)
+        .map((t) => summary(t, mine)),
       canCreate: Boolean(limits && (limits.perMonth === null || limits.used < limits.perMonth)),
       /** Limites de quem pede (null = não organiza): a tela mostra "3 de 5 este mês". */
       organize: limits,
+      /** Quem é do Time abre a Sala do Tempo (com o treino contra o bot do servidor ligado). */
+      canChamber: team && botRooms,
     };
   });
+
 
   /**
    * Painel do meta: torneios encerrados (no formato e nos últimos `days` dias, se pedidos),
@@ -741,6 +776,8 @@ export function registerTournamentRoutes(
   /** Leituras do torneio que não dependem de quem pede. */
   const detailData = (t: Tournament) => {
     const players = listPlayers(db, t.id);
+    /** Sala do Tempo: inscritos e virtuais (o pareamento, a classificação e os nomes das mesas valem para todos). */
+    const all = entrantsOf(t, players);
     const matches = listMatches(db, t.id);
     const gamesByMatch = new Map<number, TournamentGame[]>();
     for (const g of listGames(db, t.id)) {
@@ -766,7 +803,11 @@ export function registerTournamentRoutes(
       openCallByMatch: calls.reduce((map, c) => (c.resolvedAt || map.has(c.matchId) ? map : map.set(c.matchId, c)), new Map<number, TournamentCall>()),
       judges: listJudges(db, t.id),
       tiers: supporterTiers(db, players.map((p) => p.userId)),
-      name: new Map(players.map((p) => [p.userId, p.name])),
+      name: new Map(all.map((p) => [p.userId, p.name])),
+      all,
+      /** Sala do Tempo: o Líder de cada um (humano ou virtual), para as mesas e a classificação. */
+      leaderOf: new Map(all.map((p) => [p.userId, p.deck.leader])),
+      leaderCards: t.chamber ? new Map(present(getCards(db, [...new Set(all.map((p) => p.deck.leader))])).map((c) => [c.id, c] as const)) : null,
     };
   };
   type DetailData = ReturnType<typeof detailData>;
@@ -780,7 +821,15 @@ export function registerTournamentRoutes(
 
   const judgeNameIn = (d: DetailData, id: string) =>
     id === d.t.organizerId ? (d.t.organizerName ?? '?') : (d.judges.find((j) => j.userId === id)?.name ?? findPlayer(db, accountOwnerKey(id))?.name ?? '?');
-  const refIn = (d: DetailData, id: string | null) => (id ? { userId: id, name: d.name.get(id) ?? '?' } : null);
+  /** Líder de um jogador para a Sala do Tempo (os Líderes são públicos assim que o torneio começa). */
+  const leaderRef = (d: DetailData, id: string) => {
+    if (!d.leaderCards) return {};
+    const leader = d.leaderOf.get(id);
+    const card = leader ? d.leaderCards.get(leader) : undefined;
+    return { leader: leader ?? null, leaderName: card?.name ?? null, leaderImage: (cardImages && card && artImage(card, undefined)) || null, colors: card?.colors ?? [] };
+  };
+  const refIn = (d: DetailData, id: string | null) =>
+    id ? { userId: id, name: d.name.get(id) ?? '?', ...(d.t.chamber ? { virtual: isVirtualId(id), ...leaderRef(d, id) } : {}) } : null;
   // Nas inscrições, só o organizador e o próprio jogador veem qual deck (Líder) cada
   // um inscreveu: o deck e a lista ficam congelados quando o torneio começa, e é aí
   // que o Líder aparece para todos (ninguém escolhe o deck olhando os dos outros).
@@ -815,16 +864,16 @@ export function registerTournamentRoutes(
       wins: m.wins,
       result: m.result,
       winner: winnerOf(m),
-      /** Quem lançou: game (salas online), bye, drop (desistência), noshow (W.O. automático), late (inscrição atrasada) ou organizer. */
-      reportedBy: m.reportedBy === null || ['game', 'bye', 'drop', 'noshow', 'late'].includes(m.reportedBy) ? m.reportedBy : 'organizer',
+      /** Quem lançou: game (salas online), bye, drop (desistência), noshow (W.O. automático), late (inscrição atrasada), sim (mesa estatística) ou organizer. */
+      reportedBy: m.reportedBy === null || ['game', 'bye', 'drop', 'noshow', 'late', SIM_REPORTER].includes(m.reportedBy) ? m.reportedBy : 'organizer',
       roomId: m.roomId,
       room: m.roomId ? (lobby.get(m.roomId)?.status ?? null) : null,
       /** Jogo da série em disputa agora (1, 2, 3…). */
       game: m.wins[0] + m.wins[1] + 1,
-      /** Cada jogador já entrou na sala desta série (ou, na rodada 1, fez check-in). */
-      present: m.p2 ? [!absent.includes('p1'), !absent.includes('p2')] : [true, false],
-      /** "Estou pronto" de cada jogador (antes de a rodada começar). */
-      ready: m.ready,
+      /** Cada jogador já entrou na sala desta série (ou, na rodada 1, fez check-in). O virtual está sempre presente. */
+      present: m.p2 ? [!absent.includes('p1') || isVirtualId(m.p1), !absent.includes('p2') || isVirtualId(m.p2)] : [true, false],
+      /** "Estou pronto" de cada jogador (antes de a rodada começar). O virtual está sempre pronto. */
+      ready: [m.ready[0] || isVirtualId(m.p1), m.ready[1] || isVirtualId(m.p2)],
       /** Chamado de Judge aberto: a sala está pausada à espera dele. */
       call: call ? { id: call.id, openedAt: call.openedAt, byName: d.name.get(call.openedBy) ?? judgeNameIn(d, call.openedBy) } : null,
       /** Jogos disputados nas salas desta série (auditoria): todos ficam gravados, com o replay. */
@@ -838,15 +887,27 @@ export function registerTournamentRoutes(
     };
   };
 
-  /** Rodadas (sem as partidas) e as partidas de cada uma, na ordem da lista. */
+  /**
+   * Rodadas (sem as partidas) e as partidas de cada uma, na ordem da lista. Na Sala do Tempo só as mesas
+   * com humano vão na lista (as outras centenas são um passo estatístico: a rodada diz quantas foram).
+   */
   const detailRounds = (d: DetailData) => {
     const byRound = Array.from({ length: d.t.round }, () => [] as TournamentMatch[]);
     for (const m of d.matches) byRound[m.round - 1]?.push(m);
     return byRound.map((ms, i) => ({
-      head: { round: i + 1, stage: ms[0]?.stage ?? 'swiss', label: roundLabel(d.matches, i + 1), bestOf: ms[0]?.bestOf ?? 1 },
-      matches: ms,
+      head: {
+        round: i + 1,
+        stage: ms[0]?.stage ?? 'swiss',
+        label: roundLabel(d.matches, i + 1),
+        bestOf: ms[0]?.bestOf ?? 1,
+        /** Mesas da rodada (todas, inclusive as só de virtuais) e quantas foram decididas no sorteio. */
+        tables: ms.length,
+        virtualTables: d.t.chamber ? ms.filter((m) => !humanTable(m)).length : 0,
+      },
+      matches: d.t.chamber ? ms.filter(humanTable) : ms,
     }));
   };
+
 
   /** Warnings de um inscrito: a contagem é pública; os motivos, só para o Judge, o organizador e o próprio jogador. */
   const warningsEntry = (d: DetailData, v: DetailViewer, p: TournamentPlayer) => {
@@ -935,14 +996,83 @@ export function registerTournamentRoutes(
     };
   };
 
+  /**
+   * Classificação apresentada. Sala do Tempo: dos centenas de jogadores, só os 32 primeiros, os humanos,
+   * os oponentes deles e os vizinhos de cada humano (a posição de cada um continua a do evento inteiro).
+   */
+  const standingsOut = (d: DetailData) => {
+    const { t, matches, all, name } = d;
+    if (t.status === 'registration') return [];
+    const table = standings(all, matches);
+    const entry = (s: (typeof table)[number]) => ({ ...s, name: name.get(s.userId) ?? '?', ...(t.chamber ? { virtual: isVirtualId(s.userId), ...leaderRef(d, s.userId) } : {}) });
+    if (!t.chamber) return table.map(entry);
+    const keep = new Set<string>();
+    const humans = new Set(all.filter((p) => !p.virtual).map((p) => p.userId));
+    for (const m of matches) {
+      if (humans.has(m.p1) && m.p2) keep.add(m.p2);
+      if (m.p2 && humans.has(m.p2)) keep.add(m.p1);
+    }
+    table.forEach((s, i) => {
+      if (humans.has(s.userId)) for (const j of [i - 1, i, i + 1]) if (table[j]) keep.add(table[j].userId);
+    });
+    return table.filter((s, i) => i < 32 || keep.has(s.userId)).map(entry);
+  };
+
+  /** Sala do Tempo: o evento simulado (preset, distribuição dos Líderes com o deck que o bot joga por cada um, virtuais vivos). */
+  const chamberFields = (d: DetailData) => {
+    const { t, all } = d;
+    if (!t.chamber) return null;
+    const preset = presetOf(t);
+    const virtuals = all.filter((p) => p.virtual);
+    const decks = preset ? chamberDecks(db, preset, t, legalAt(t)) : null;
+    // As cartas dos Líderes do preset (antes do início nenhum virtual existe ainda) e dos virtuais sorteados.
+    const presetCards = new Map(present(getCards(db, [...new Set((decks?.leaders ?? []).map((l) => l.leader))])).map((c) => [c.id, c] as const));
+    const card = (leader: string) => presetCards.get(leader) ?? d.leaderCards?.get(leader);
+    const counts = new Map<string, number>();
+    for (const v of virtuals) counts.set(v.deck.leader, (counts.get(v.deck.leader) ?? 0) + 1);
+    const listed = new Set(decks?.leaders.map((l) => l.leader) ?? []);
+    return {
+      preset: t.chamber,
+      presetName: preset?.name ?? t.chamber,
+      description: preset?.description ?? '',
+      /** O preset sumiu da pasta: a sala ainda não iniciada não pode começar. */
+      presetMissing: preset === null,
+      size: t.chamberSize,
+      virtuals: virtuals.length,
+      /** O treino contra o bot do servidor está ligado (sem ele, as mesas contra os virtuais não abrem). */
+      botRooms,
+      /** Decks prontos válidos no formato entre os quais a fatia "outros" sorteia. */
+      otherDecks: decks?.others.length ?? 0,
+      leaders: (decks?.leaders ?? []).map((l) => ({
+
+        leader: l.leader,
+        leaderName: card(l.leader)?.name ?? null,
+        leaderImage: (cardImages && card(l.leader) && artImage(card(l.leader)!, undefined)) || null,
+        colors: card(l.leader)?.colors ?? [],
+        share: l.share,
+        deckId: l.deckId,
+        deckName: l.deckName,
+        meta: l.meta,
+        /** Virtuais com este Líder (depois do início). */
+        count: counts.get(l.leader) ?? 0,
+      })),
+      /** Virtuais fora da distribuição do preset ("outros": decks prontos sorteados), por Líder. */
+      others: [...counts]
+        .filter(([leader]) => !listed.has(leader))
+        .map(([leader, count]) => ({ leader, leaderName: card(leader)?.name ?? null, colors: card(leader)?.colors ?? [], count }))
+        .sort((a, b) => b.count - a.count),
+    };
+  };
+
   /** O resto do torneio: igual para todos os que não gerenciam nem são Judge. */
   const commonFields = (d: DetailData, v: DetailViewer) => {
-    const { t, players, matches, judges, calls, name } = d;
+    const { t, players, matches, judges, calls, name, all } = d;
     const manage = v.manage;
     const judge = v.judge;
     const lateName = t.lateEntry && t.lateEntry !== '*' ? (findPlayer(db, accountOwnerKey(t.lateEntry))?.name ?? '?') : null;
     const currentRound = matches.filter((m) => m.round === t.round);
-    const tables = currentRound.filter((m) => m.p2 && !m.result);
+    // Sala do Tempo: as mesas que faltam são as com humano (as só de virtuais já saíram decididas).
+    const tables = currentRound.filter((m) => m.p2 && !m.result && humanTable(m));
     const pending = manage || judge ? pendingWarnings(db, t, players) : [];
     return {
       id: t.id,
@@ -961,10 +1091,10 @@ export function registerTournamentRoutes(
       round: t.round,
       /** Fase da rodada atual. */
       stage: currentRound[0]?.stage ?? null,
-      /** Rodadas previstas (suíço + top cut, ou a chave). */
-      totalRounds: plannedRounds(t, players.length),
+      /** Rodadas previstas (suíço + top cut, ou a chave). Sala do Tempo: pelo tamanho do evento. */
+      totalRounds: plannedRounds(t, t.chamber ? (t.chamberSize ?? all.length) : players.length),
       /** Rodadas do suíço (só no suíço). */
-      swissRounds: t.structure === 'swiss' ? (t.rounds ?? swissRounds(players.length)) : null,
+      swissRounds: t.structure === 'swiss' ? (t.rounds ?? swissRounds(t.chamber ? (t.chamberSize ?? all.length) : players.length)) : null,
       roundsAuto: t.rounds === null,
       /** Relógio de cada jogador em cada jogo: quem zera o tempo perde. */
       clockMs: TIME_BANK_MS,
@@ -987,9 +1117,9 @@ export function registerTournamentRoutes(
       roundAt: t.roundAt,
       /** A rodada atual foi iniciada pelo organizador (as salas estão abertas); null = pareamentos à espera do início. */
       roundStartedAt: t.roundStartedAt,
-      /** Mesas da rodada atual ainda por jogar e quantas têm os dois jogadores prontos. */
+      /** Mesas da rodada atual ainda por jogar e quantas têm os dois jogadores prontos (o virtual está sempre pronto). */
       tables: tables.length,
-      readyTables: tables.filter((m) => m.ready[0] && m.ready[1]).length,
+      readyTables: tables.filter((m) => (m.ready[0] || isVirtualId(m.p1)) && (m.ready[1] || isVirtualId(m.p2))).length,
       deadline: roundDeadline(t),
       createdAt: t.createdAt,
       startedAt: t.startedAt,
@@ -1025,10 +1155,15 @@ export function registerTournamentRoutes(
       lateEntry: manage && lateWindow(t) && t.lateEntry ? { all: t.lateEntry === '*', name: lateName } : null,
       /** Para quem gerencia, antes do início: inscritos cujo deck não vai valer no torneio. */
       staleDecks: manage && t.status === 'registration' ? staleDecks(db, t, players, legalAt(t)).map((p) => p.name) : [],
-      standings: t.status === 'registration' ? [] : standings(players, matches).map((s) => ({ ...s, name: name.get(s.userId) ?? '?' })),
+      standings: standingsOut(d),
+      /** Jogadores classificados (Sala do Tempo: a lista acima é um recorte). */
+      standingsTotal: t.status === 'registration' ? 0 : all.length,
       roundComplete: t.status === 'running' && roundComplete(t, matches),
       /** O que o botão de avançar faz agora. */
-      next: t.status === 'running' ? nextStep(t, players, matches) : null,
+      next: t.status === 'running' ? nextStep(t, all, matches) : null,
+      /** Sala do Tempo (torneio simulado do Time); null nos torneios comuns. */
+      chamber: chamberFields(d),
+
       /** Relatos abertos dos jogadores (só para quem gerencia; a lista vem de GET /api/reports?tournament=). */
       openReports: manage ? listReports(db, { tournamentId: t.id, status: 'open' }).length : 0,
       /**
@@ -1183,13 +1318,14 @@ export function registerTournamentRoutes(
     const manage = canManage(t, u);
     const judge = isJudge(t, u);
     const players = listPlayers(db, t.id);
+    const all = entrantsOf(t, players);
     const matches = listMatches(db, t.id);
     const warnings = listWarnings(db, t.id);
     const calls = listCalls(db, t.id).filter((c) => !c.resolvedAt);
     const judges = listJudges(db, t.id);
     const showLeader = manage || judge || t.status !== 'registration';
-    const cards = new Map(present(getCards(db, [...new Set(players.map((p) => p.deck.leader))])).map((c) => [c.id, c] as const));
-    const byId = new Map(players.map((p) => [p.userId, p]));
+    const cards = new Map(present(getCards(db, [...new Set(all.map((p) => p.deck.leader))])).map((c) => [c.id, c] as const));
+    const byId = new Map(all.map((p) => [p.userId, p]));
     const entry = (userId: string) => {
       const p = byId.get(userId);
       const leader = p && showLeader ? cards.get(p.deck.leader) : undefined;
@@ -1203,10 +1339,13 @@ export function registerTournamentRoutes(
         checkedIn: Boolean(p?.checkedInAt),
         dropped: Boolean(p?.dropped),
         warnings: st ? { count: st.count, max: t.maxWarnings, pending: judge ? st.pending : false } : null,
+        /** Sala do Tempo: jogador virtual (o bot joga por ele). */
+        virtual: isVirtualId(userId),
       };
     };
     const round = matches.filter((m) => m.round === t.round);
-    const tables = round.map((m) => {
+    // Sala do Tempo: só as mesas com humano (as só de virtuais já saíram decididas no sorteio).
+    const tables = round.filter((m) => !t.chamber || humanTable(m)).map((m) => {
       const room = m.roomId ? lobby.get(m.roomId) : null;
       const absent = absentSides(t, m, players);
       const call = calls.find((c) => c.matchId === m.id) ?? null;
@@ -1217,8 +1356,8 @@ export function registerTournamentRoutes(
         const seat = room ? seatOf(userId) : -1;
         return {
           ...entry(userId),
-          ready: m.ready[i],
-          present: !absent.includes(i === 0 ? 'p1' : 'p2'),
+          ready: m.ready[i] || isVirtualId(userId),
+          present: !absent.includes(i === 0 ? 'p1' : 'p2') || isVirtualId(userId),
           /** Só para o Judge e o organizador: conectado à sala e o tempo que resta. */
           connected: judge && room && (seat === 0 || seat === 1) ? room.connected(seat) : null,
           remaining: clock && (seat === 0 || seat === 1) ? clock.remaining[seat] : null,
@@ -1261,6 +1400,8 @@ export function registerTournamentRoutes(
       checkInOpen: checkInOpen(t, now()),
       checkedIn: players.filter((p) => p.checkedInAt).length,
       roundComplete: t.status === 'running' && roundComplete(t, matches),
+      /** Sala do Tempo: mesas da rodada (todas) e quantas foram decididas no sorteio. */
+      chamber: t.chamber ? { tables: round.length, virtualTables: round.filter((m) => !humanTable(m)).length } : null,
       /** Quem pede: gerencia o torneio, é Judge dele (vê relógios e chamados) e a conta. */
       viewer: { userId: u?.id ?? null, manage, judge },
       judges: judges.map((j) => ({ userId: j.userId, name: j.name })),
@@ -1293,7 +1434,8 @@ export function registerTournamentRoutes(
           const matches = t.status === 'running' ? listMatches(db, t.id) : [];
           const m = matches.find((x) => x.round === t.round && (x.p1 === u.id || x.p2 === u.id));
           const oppId = m ? (m.p1 === u.id ? m.p2 : m.p1) : null;
-          const name = oppId ? (listPlayers(db, t.id).find((p) => p.userId === oppId)?.name ?? '?') : null;
+          const name = oppId ? (entrantsOf(t, listPlayers(db, t.id)).find((p) => p.userId === oppId)?.name ?? '?') : null;
+
           return {
             id: t.id,
             name: t.name,
@@ -1352,10 +1494,93 @@ export function registerTournamentRoutes(
     return reply.code(201).send(detail(t, me));
   });
 
+  // ---------------------------------------------------------------- Sala do Tempo
+
+  /** Os eventos simuláveis (presets) com, por Líder, o deck que o bot joga por ele. Só para quem é do Time. */
+  app.get('/api/tournaments/chamber/presets', async (req, reply) => {
+    const me = account(req, reply);
+    if (!me) return reply;
+    if (!isTeam(me)) return reply.code(403).send(fail('chamberTeamOnly', 'A Sala do Tempo é só para quem faz parte do Time.'));
+    const at = new Date(now());
+    const presets = chamberPresets.list().map((p) => {
+      const { leaders, others } = chamberDecks(db, p, { format: p.format, spoilers: p.spoilers }, at);
+      const cards = new Map(present(getCards(db, [...new Set(leaders.map((l) => l.leader))])).map((c) => [c.id, c] as const));
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        format: p.format,
+        spoilers: p.spoilers,
+        spoilerSet: tournamentSpoilerSet(db, { format: p.format, spoilers: p.spoilers }),
+        players: p.players,
+        rounds: p.rounds,
+        topCut: p.topCut,
+        bo3From: p.bo3From,
+        bo5From: p.bo5From,
+        leaders: leaders.map((l) => ({
+          leader: l.leader,
+          leaderName: cards.get(l.leader)?.name ?? null,
+          colors: cards.get(l.leader)?.colors ?? [],
+          share: l.share,
+          deckId: l.deckId,
+          deckName: l.deckName,
+          meta: l.meta,
+        })),
+        /** Decks prontos válidos no formato entre os quais a fatia "outros" sorteia. */
+        others: others.length,
+      };
+    });
+    return { presets, botRooms, minPlayers: MIN_CHAMBER_PLAYERS, maxPlayers: MAX_CHAMBER_PLAYERS };
+  });
+
+  type ChamberBody = { preset?: unknown; name?: unknown; players?: unknown; rounds?: unknown; topCut?: unknown; bo3From?: unknown; bo5From?: unknown; swissBestOf?: unknown };
+
+  /**
+   * Abre uma Sala do Tempo a partir de um preset: um torneio suíço do Time, sem hora marcada nem check-in,
+   * cujas vagas que os humanos não ocuparem serão preenchidas por virtuais no início. Quem abre gerencia.
+   */
+  app.post<{ Body: ChamberBody }>('/api/tournaments/chamber', async (req, reply) => {
+    const me = account(req, reply);
+    if (!me) return reply;
+    if (!isTeam(me)) return reply.code(403).send(fail('chamberTeamOnly', 'A Sala do Tempo é só para quem faz parte do Time.'));
+    if (!botRooms) return reply.code(409).send(fail('chamberNeedsBotRooms', 'A Sala do Tempo precisa do treino contra o bot do servidor, que está desligado.'));
+    const b = req.body ?? {};
+    const preset = typeof b.preset === 'string' ? chamberPresets.get(b.preset) : null;
+    if (!preset) return reply.code(404).send(fail('chamberPresetNotFound', 'Evento não encontrado.'));
+    const parsed = parseInput({
+      name: typeof b.name === 'string' && b.name.trim() ? b.name : preset.name,
+      description: preset.description,
+      format: preset.format,
+      spoilers: preset.spoilers,
+      structure: 'swiss',
+      rounds: b.rounds === undefined ? preset.rounds : b.rounds,
+      swissBestOf: b.swissBestOf ?? 1,
+      topCut: b.topCut === undefined ? preset.topCut : b.topCut,
+      bo3From: b.bo3From === undefined ? preset.bo3From : b.bo3From,
+      bo5From: b.bo5From === undefined ? preset.bo5From : b.bo5From,
+      maxPlayers: null,
+      startsAt: null,
+      checkIn: false,
+      toleranceMin: DEFAULT_TOLERANCE_MIN,
+    });
+    if (isPlayerError(parsed)) return reply.code(400).send(parsed);
+    const size = b.players === undefined ? preset.players : Number(b.players);
+    if (!Number.isInteger(size) || size < MIN_CHAMBER_PLAYERS || size > MAX_CHAMBER_PLAYERS) {
+      return reply.code(400).send(fail('invalidChamberPlayers', `Jogadores do evento: de ${MIN_CHAMBER_PLAYERS} a ${MAX_CHAMBER_PLAYERS}.`, { min: MIN_CHAMBER_PLAYERS, max: MAX_CHAMBER_PLAYERS }));
+    }
+    if (parsed.topCut !== null && parsed.topCut > size) return reply.code(400).send(fail('invalidTopCut', 'Top cut maior que o evento.'));
+    const { priority: _priority, ...input } = parsed;
+    ensurePlayer(db, accountOwnerKey(me.id));
+    const t = createTournament(db, { ...input, maxPlayers: size }, me.id, null, { preset: preset.id, size });
+    app.log.info(`sala do tempo ${t.id}: aberta por ${me.id} (${preset.id}, ${size} jogadores)`);
+    return reply.code(201).send(detail(t, me));
+  });
+
   app.put<{ Params: { id: string }; Body: Body }>('/api/tournaments/:id', async (req, reply) => {
     const found = managed(req, reply);
     if (!found) return reply;
     if (found.t.status !== 'registration') return reply.code(409).send(fail('tourStartedNoEdit', 'O torneio já começou: não dá para mudar as regras.'));
+    if (found.t.chamber) return reply.code(409).send(fail('chamberNoEdit', 'A Sala do Tempo segue o evento escolhido: apague-a e abra outra para mudar as regras.'));
     const parsed = parseInput(req.body);
     if (isPlayerError(parsed)) return reply.code(400).send(parsed);
     const input = officialFields(parsed, found.me, found.t);
@@ -1412,7 +1637,7 @@ export function registerTournamentRoutes(
     const { t, me } = found;
     if (t.status !== 'registration') return reply.code(409).send(fail('tourStarted', 'O torneio já começou.'));
     const players = listPlayers(db, t.id);
-    if (players.length < 2) return reply.code(400).send(fail('tourNeedsTwoPlayers', 'São precisos pelo menos 2 inscritos.'));
+    if (players.length < (t.chamber ? 1 : 2)) return reply.code(400).send(fail('tourNeedsTwoPlayers', 'São precisos pelo menos 2 inscritos.'));
     // Deck que deixou de valer depois da inscrição (banimento com data, spoiler de outra coleção): o organizador
     // decide, pedindo a troca do deck (nova inscrição) ou tirando o jogador.
     const stale = staleDecks(db, t, players, new Date(now()));
@@ -1429,7 +1654,16 @@ export function registerTournamentRoutes(
           ),
         );
     }
-    beginTournament(db, t, players, nowIso());
+    if (t.chamber) {
+      // Sala do Tempo: os virtuais completam o evento; basta um humano.
+      const preset = presetOf(t);
+      if (!preset) return reply.code(409).send(fail('chamberPresetNotFound', 'Evento não encontrado.'));
+      if (!botRooms) return reply.code(409).send(fail('chamberNeedsBotRooms', 'A Sala do Tempo precisa do treino contra o bot do servidor, que está desligado.'));
+      const need = (t.chamberSize ?? preset.players) - players.length;
+      const virtuals = beginChamber(db, t, preset, players, nowIso());
+      if (need > 0 && !virtuals.length) return reply.code(409).send(fail('chamberNoDecks', 'Nenhum deck pronto vale neste formato: não há como sortear os virtuais.'));
+      app.log.info(`sala do tempo ${t.id}: começou com ${players.length} do Time e ${virtuals.length} virtuais`);
+    } else beginTournament(db, t, players, nowIso());
     const begin = Boolean(req.body?.begin);
     if (begin) beginRound(getTournament(db, t.id)!, true);
     else notifyRound(t.id, false);
@@ -1458,7 +1692,9 @@ export function registerTournamentRoutes(
         .code(409)
         .send(fail('warningsPending', `Decida antes o que fazer com quem atingiu o limite de warnings: ${names} (manter ou eliminar).`, { names }));
     }
-    advanceRound(db, t, players, matches, nowIso());
+    const preset = presetOf(t);
+    if (preset) advanceChamber(db, t, preset, entrantsOf(t, players), matches, nowIso());
+    else advanceRound(db, t, entrantsOf(t, players), matches, nowIso());
     const after = getTournament(db, t.id)!;
     if (after.status === 'running' && req.body?.begin) beginRound(after, true);
     else notifyRound(t.id, false);
@@ -1925,12 +2161,13 @@ export function registerTournamentRoutes(
     if (!found) return reply;
     const { t } = found;
     if (t.status !== 'finished') return reply.code(409).send(fail('tourNotFinished', 'O kit de divulgação sai quando o torneio termina.'));
-    return buildRecap(db, t, { present, cardImages, sponsor: sponsorOf(t.sponsorId), naturalEnd: endedNaturally(t) });
+    return buildRecap(db, t, { present, cardImages, sponsor: sponsorOf(t.sponsorId), naturalEnd: endedNaturally(t), players: entrantsOf(t, listPlayers(db, t.id)) });
+
   });
 
   /** O torneio terminou pelas rodadas previstas (e não por "encerrar agora"). */
   const endedNaturally = (t: Tournament) => {
-    const players = listPlayers(db, t.id);
+    const players = entrantsOf(t, listPlayers(db, t.id));
     const matches = listMatches(db, t.id);
     if (!matches.length || !roundComplete(t, matches)) return false;
     const step = nextStep(t, players, matches);
@@ -2129,6 +2366,7 @@ export function registerTournamentRoutes(
     if (!already && listJudges(db, t.id).some((j) => j.userId === me.id)) {
       return reply.code(409).send(fail('judgeCannotRegister', 'Você é Judge deste torneio: um Judge não joga o torneio.'));
     }
+    if (t.chamber && !isTeam(me)) return reply.code(403).send(fail('chamberTeamOnly', 'A Sala do Tempo é só para quem faz parte do Time.'));
     // Inscrição atrasada (liberada pelo organizador na rodada 1 do suíço): entra com uma derrota.
     const late = t.status === 'running' && !already && lateAllowed(t, me);
     if (t.status !== 'registration' && !late) return reply.code(409).send(fail('registrationClosed', 'As inscrições deste torneio já fecharam.'));
@@ -2223,36 +2461,62 @@ export function registerTournamentRoutes(
     if (!t.roundStartedAt) return reply.code(409).send(fail('roundNotStarted', 'A rodada ainda não foi iniciada pelo organizador.'));
     const player = listPlayers(db, t.id).find((p) => p.userId === me.id)!;
     if (player.dropped) return reply.code(409).send(fail('youDropped', 'Você saiu do torneio.'));
-    const limit = lobby.admit(req.ip, 'tournament');
+    const opp = m.p1 === me.id ? m.p2 : m.p1;
+    const virtual = isVirtualId(opp) ? listVirtuals(db, t.id).find((v) => v.id === opp) : undefined;
+    const limit = lobby.admit(req.ip, virtual ? 'bot' : 'tournament');
     if (limit) return reply.code(limit.code).send(limit);
     const ownerHash = accountOwnerKey(me.id);
     const profile = ensurePlayer(db, ownerHash);
-    const r = lobby.tournamentRoom(
-      {
-        ownerHash,
-        userId: me.id,
-        name: profile.name,
-        bounty: profile.bounty,
-        tier: tierFor(profile.bounty).id,
-        apprentice: isApprentice(db, ownerHash),
-        deckId: player.deckId,
-        deck: player.deck,
-      },
-      { format: t.format, spoilers: t.spoilers, ...(t.spoilerSet ? { spoilerSet: t.spoilerSet } : {}) },
-      {
-        id: t.id,
-        name: t.name,
-        round: m.round,
-        label: roundLabel(listMatches(db, t.id), m.round),
-        matchId: m.id,
-        game: m.wins[0] + m.wins[1] + 1,
-        bestOf: m.bestOf,
-        wins: { [m.p1]: m.wins[0], [m.p2]: m.wins[1] },
-        firstUserId: m.nextFirst,
-        liveHands: t.liveHands,
-      },
-    );
+    const seat = {
+      ownerHash,
+      userId: me.id,
+      name: profile.name,
+      bounty: profile.bounty,
+      tier: tierFor(profile.bounty).id,
+      apprentice: isApprentice(db, ownerHash),
+      deckId: player.deckId,
+      deck: player.deck,
+    };
+    const mode = { format: t.format, spoilers: t.spoilers, ...(t.spoilerSet ? { spoilerSet: t.spoilerSet } : {}) };
+    const roomTournament = {
+      id: t.id,
+      name: t.name,
+      round: m.round,
+      label: roundLabel(listMatches(db, t.id), m.round),
+      matchId: m.id,
+      game: m.wins[0] + m.wins[1] + 1,
+      bestOf: m.bestOf,
+      wins: { [m.p1]: m.wins[0], [m.p2]: m.wins[1] },
+      firstUserId: m.nextFirst,
+      liveHands: t.liveHands,
+    };
+    let r: ReturnType<typeof lobby.tournamentRoom>;
+    if (virtual) {
+      // Sala do Tempo: a mesa contra um virtual é uma sala de treino contra o Bot do Time, com o deck do
+      // virtual, ligada à série do torneio. Voltar à sala em andamento devolve o mesmo assento.
+      const open = m.roomId ? lobby.get(m.roomId) : null;
+      const mine = open && open.status !== 'finished' ? open.data.seats.find((s) => s.ownerHash === ownerHash) : undefined;
+      if (open && mine) r = { room: open, token: mine.token };
+      else {
+        if (!botRooms) return reply.code(409).send(fail('chamberNeedsBotRooms', 'A Sala do Tempo precisa do treino contra o bot do servidor, que está desligado.'));
+        const stored = getDeck(db, virtual.deckId);
+        if (!stored) return reply.code(409).send(fail('chamberNoDecks', 'O deck do jogador virtual não existe mais.'));
+        const bot = {
+          ownerHash: 'bot',
+          userId: null,
+          name: virtual.name,
+          bounty: 0,
+          tier: tierFor(0).id,
+          deckId: stored.id,
+          deck: { id: stored.id, name: stored.name, leader: stored.leader, cards: stored.cards, ...(stored.arts ? { arts: stored.arts } : {}) },
+        };
+        // Quem perdeu o jogo anterior da série começa; no primeiro, o sorteio.
+        const first = m.nextFirst === me.id ? 0 : m.nextFirst === virtual.id ? 1 : undefined;
+        r = lobby.createBotRoom(seat, bot, mode, first, 'team', { ...roomTournament, virtualId: virtual.id });
+      }
+    } else r = lobby.tournamentRoom(seat, mode, roomTournament);
     if ('error' in r) return reply.code(r.code).send(r);
+
     lobby.tagIp(r.room.id, req.ip);
     if (m.roomId !== r.room.id) {
       setMatchRoom(db, t.id, m.id, r.room.id);

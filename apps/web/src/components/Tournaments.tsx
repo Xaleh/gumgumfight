@@ -8,6 +8,7 @@ import {
   currentSpoilerSet,
   type DeckSummary,
   isAdmin,
+  isTeam,
   type JudgePlays,
   type OnlineSeat,
   type OrganizeLimits,
@@ -52,6 +53,9 @@ const TournamentRecap = lazy(() => import('./TournamentRecap'));
 const TournamentLobby = lazy(() => import('./TournamentLobby'));
 /** Painel do meta (aba "Meta" da lista): carregado quando aberto. */
 const TournamentMeta = lazy(() => import('./TournamentMeta'));
+/** Sala do Tempo: o formulário e o painel do evento (só quem é do Time abre; carregados quando precisam). */
+const ChamberForm = lazy(() => import('./Chamber').then((m) => ({ default: m.ChamberForm })));
+const ChamberPanel = lazy(() => import('./Chamber').then((m) => ({ default: m.ChamberPanel })));
 
 // Neste arquivo `t` costuma ser o torneio; a função de tradução (`useT()`) se chama `tr`.
 
@@ -100,7 +104,14 @@ const clock = (tr: Translate, ms: number) => {
 
 /** Fases da eliminatória que o organizador pode escolher (vagas; 256 = toda a eliminatória). */
 const PHASES = [256, 32, 16, 8, 4, 2];
-const TOP_CUTS = [2, 4, 8, 16, 32, 64];
+export const TOP_CUTS = [2, 4, 8, 16, 32, 64];
+
+/** Sala do Tempo: "Piloto 17" no idioma da interface (o servidor grava o nome em português); os humanos ficam como são. */
+export function virtualName(tr: Translate, p: { userId: string; name: string; virtual?: boolean }): string {
+  if (!p.virtual) return p.name;
+  const n = Number(p.userId.slice(2));
+  return Number.isInteger(n) ? tr('chamber.pilot', { n }) : p.name;
+}
 
 /** Nome da fase da eliminatória pelo número de vagas (mesma regra do servidor). */
 export function phaseName(tr: Translate, size: number): string {
@@ -112,7 +123,7 @@ export function phaseName(tr: Translate, size: number): string {
 }
 
 /** A fase em minúsculas, no meio de uma frase ("quartas de final"). */
-function phaseLower(tr: Translate, size: number): string {
+export function phaseLower(tr: Translate, size: number): string {
   if (size <= 2) return tr('tour.phaseLow.final');
   if (size === 4) return tr('tour.phaseLow.semi');
   if (size === 8) return tr('tour.phaseLow.quarter');
@@ -139,14 +150,14 @@ function shortPhase(tr: Translate, size: number): string {
   return tr('tour.phaseShort.roundOf', { n: size });
 }
 
-/** Vagas da fase eliminatória de uma rodada (cada mesa tem 2 vagas). */
-const roundSize = (r: { matches: unknown[] }) => r.matches.length * 2;
+/** Vagas da fase eliminatória de uma rodada (cada mesa tem 2 vagas; na Sala do Tempo a lista traz só as mesas com humano, `tables` conta todas). */
+const roundSize = (r: { matches: unknown[]; tables?: number }) => (r.tables ?? r.matches.length) * 2;
 
 /**
  * Rótulo da rodada, no idioma da interface. Mesma regra do `label` que o servidor manda
  * (fase pelo nº de mesas na eliminatória; "Rodada N" no suíço).
  */
-const roundLabel = (tr: Translate, r: { round: number; stage: TournamentStage; matches: unknown[] }) =>
+const roundLabel = (tr: Translate, r: { round: number; stage: TournamentStage; matches: unknown[]; tables?: number }) =>
   r.stage === 'elim' ? phaseName(tr, roundSize(r)) : tr('tour.roundN', { n: r.round });
 
 /** "Melhor de 3" (ou "Jogo único"). */
@@ -182,12 +193,29 @@ export function Tournaments({
   /** Abre o replay gravado de um jogo (auditoria). */
   onReplay: (setup: GameSetup, tournamentId: string) => void;
 }) {
+  const tr = useT();
   const [openId, setOpenId] = useState<string | null>(initialId ?? null);
   /** Criando um torneio: o limite de jogadores de quem cria (null = não está criando). */
   const [creating, setCreating] = useState<number | null>(null);
+  /** Abrindo uma Sala do Tempo (só quem é do Time). */
+  const [chamber, setChamber] = useState(false);
   /** Torneio que acabou de ser criado: a página abre com o convite para os grupos em destaque. */
   const [createdId, setCreatedId] = useState<string | null>(null);
 
+  if (chamber) {
+    return (
+      <Suspense fallback={<p className="muted">{tr('common.loading')}</p>}>
+        <ChamberForm
+          onCancel={() => setChamber(false)}
+          onSaved={(t) => {
+            setChamber(false);
+            setCreatedId(t.id);
+            setOpenId(t.id);
+          }}
+        />
+      </Suspense>
+    );
+  }
   if (creating !== null) {
     return (
       <TournamentForm
@@ -216,7 +244,7 @@ export function Tournaments({
       />
     );
   }
-  return <TournamentList onExit={onExit} onOpen={setOpenId} onCreate={setCreating} />;
+  return <TournamentList onExit={onExit} onOpen={setOpenId} onCreate={setCreating} onChamber={() => setChamber(true)} />;
 }
 
 // ------------------------------------------------------------------ divulgação
@@ -330,11 +358,22 @@ export function SponsorsStrip({ placement, hideEmpty }: { placement: 'tournament
 
 // ------------------------------------------------------------------ lista
 
-function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOpen: (id: string) => void; onCreate: (cap: number) => void }) {
+function TournamentList({
+  onExit,
+  onOpen,
+  onCreate,
+  onChamber,
+}: {
+  onExit: () => void;
+  onOpen: (id: string) => void;
+  onCreate: (cap: number) => void;
+  /** Abre o formulário da Sala do Tempo (só quem é do Time vê o botão). */
+  onChamber: () => void;
+}) {
   const { user, config } = useAuth();
   const tr = useT();
   const locale = useLocale();
-  const [data, setData] = useState<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null } | null>(null);
+  const [data, setData] = useState<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null; canChamber?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSupport, setShowSupport] = useState(false);
   const [view, setView] = useState<'list' | 'meta'>('list');
@@ -358,6 +397,11 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
           {tr('tour.backMenu')}
         </button>
         <h2>{tr('tour.title')}</h2>
+        {data?.canChamber && (
+          <button className="btn small tour-create chamber-open" title={tr('chamber.title')} onClick={onChamber}>
+            {tr('chamber.open')}
+          </button>
+        )}
         {data?.canCreate && (
           <button className="btn small primary tour-create" onClick={() => onCreate(data.organize?.maxPlayers ?? 256)}>
             {tr('tour.create')}
@@ -398,9 +442,12 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
             {data?.tournaments.length === 0 && <p className="muted">{tr(data.canCreate ? 'tour.emptyCreate' : 'tour.emptyOrganizer')}</p>}
             <div className="tour-list">
               {data?.tournaments.map((t) => (
-                <button key={t.id} className={['tour-card', t.official ? 'official' : ''].join(' ')} onClick={() => onOpen(t.id)}>
+                <button key={t.id} className={['tour-card', t.official ? 'official' : '', t.chamber ? 'chamber' : ''].join(' ')} onClick={() => onOpen(t.id)}>
                   <div className="tour-card-head">
-                    <strong>{t.name}</strong>
+                    <strong>
+                      {t.name}
+                      {t.chamber && <span className="tour-badge chamber">⏳ {tr('chamber.badge')}</span>}
+                    </strong>
                     <span className={['tour-status', t.status].join(' ')}>{tr(TOURNAMENT_STATUS_LABEL[t.status])}</span>
                   </div>
                   <OfficialBadges t={t} />
@@ -408,8 +455,13 @@ function TournamentList({ onExit, onOpen, onCreate }: { onExit: () => void; onOp
                     {dots(
                       modeLabel(t),
                       t.topCut ? tr('tour.plusTopCut', { text: tr(STRUCTURE_LABEL[t.structure]), n: t.topCut }) : tr(STRUCTURE_LABEL[t.structure]),
-                      t.maxPlayers ? tr('tour.playersOfMax', { n: t.players, max: t.maxPlayers }) : tr('tour.playersCount', { n: t.players }),
+                      t.chamber && t.chamberSize
+                        ? tr('chamber.virtualsLine', { humans: t.players, virtuals: Math.max(0, t.chamberSize - t.players), total: t.chamberSize })
+                        : t.maxPlayers
+                          ? tr('tour.playersOfMax', { n: t.players, max: t.maxPlayers })
+                          : tr('tour.playersCount', { n: t.players }),
                       t.status === 'running' &&
+
                         (t.totalRounds ? tr('tour.roundOfTotalShort', { n: t.round, total: t.totalRounds }) : tr('tour.roundN', { n: t.round })),
                     )}
                   </span>
@@ -943,7 +995,10 @@ function TournamentPage({
         <button className="btn small" onClick={onBack}>
           {tr('tour.backList')}
         </button>
-        <h2>{t?.name ?? tr('tour.tournament')}</h2>
+        <h2>
+          {t?.name ?? tr('tour.tournament')}
+          {t?.chamber && <span className="tour-badge chamber">⏳ {tr('chamber.badge')}</span>}
+        </h2>
         <button className="btn small header-menu" onClick={onExit}>
           {tr('tour.menu')}
         </button>
@@ -969,9 +1024,15 @@ function TournamentPage({
                 {dots(
                   modeLabel(t),
                   structureText(t),
-                  t.maxPlayers
-                    ? tr('tour.registeredOfMax', { n: t.players.length, max: t.maxPlayers })
-                    : tr('tour.registeredCount', { n: t.players.length }),
+                  t.chamber
+                    ? tr('chamber.virtualsLine', {
+                        humans: t.players.length,
+                        virtuals: t.status === 'registration' ? Math.max(0, (t.chamber.size ?? 0) - t.players.length) : t.chamber.virtuals,
+                        total: t.status === 'registration' ? (t.chamber.size ?? t.players.length) : t.players.length + t.chamber.virtuals,
+                      })
+                    : t.maxPlayers
+                      ? tr('tour.registeredOfMax', { n: t.players.length, max: t.maxPlayers })
+                      : tr('tour.registeredCount', { n: t.players.length }),
                   t.organizerName && tr('tour.organizedBy', { name: t.organizerName }),
                   t.startsAt && t.status === 'registration' && tr('tour.startsAt', { date: dateTime(t.startsAt, locale) }),
                 )}
@@ -1030,7 +1091,13 @@ function TournamentPage({
               )}
             </section>
 
-            <Prizes t={t} busy={busy} run={run} onSaved={setT} />
+            {t.chamber && (
+              <Suspense fallback={null}>
+                <ChamberPanel t={t} chamber={t.chamber} />
+              </Suspense>
+            )}
+
+            {!t.chamber && <Prizes t={t} busy={busy} run={run} onSaved={setT} />}
 
             <MyArea t={t} busy={busy} run={run} onPlay={onPlay} setError={setError} />
 
@@ -1043,15 +1110,22 @@ function TournamentPage({
                 <div className="btn-row">
                   {t.status === 'registration' && (
                     <>
-                      <button className="btn" disabled={busy} onClick={() => setEditing(true)}>
-                        {tr('tour.edit')}
-                      </button>
+                      {!t.chamber && (
+                        <button className="btn" disabled={busy} onClick={() => setEditing(true)}>
+                          {tr('tour.edit')}
+                        </button>
+                      )}
                       <button
                         className="btn primary"
-                        disabled={busy || t.players.length < 2}
-                        title={t.players.length < 2 ? tr('tour.needTwo') : undefined}
+                        disabled={busy || t.players.length < (t.chamber ? 1 : 2) || Boolean(t.chamber?.presetMissing) || t.chamber?.botRooms === false}
+                        title={t.players.length < 2 && !t.chamber ? tr('tour.needTwo') : undefined}
                         onClick={() =>
-                          run(() => api.tournaments.start(t.id), tr('tour.confirmStart', { n: t.players.length })).then(() => {
+                          run(
+                            () => api.tournaments.start(t.id),
+                            t.chamber
+                              ? tr('chamber.confirmStart', { humans: t.players.length, virtuals: Math.max(0, (t.chamber.size ?? 0) - t.players.length) })
+                              : tr('tour.confirmStart', { n: t.players.length }),
+                          ).then(() => {
                             setTab('rounds');
                             setViewRound(null);
                           })
@@ -1184,6 +1258,10 @@ function TournamentPage({
                     <span className="muted small"> · {bestOfLabel(tr, t.rounds[shownRound - 1].bestOf)}</span>
                   </h3>
                 )}
+                {t.chamber && (t.rounds[shownRound - 1]?.virtualTables ?? 0) > 0 && (
+                  <p className="muted small chamber-sim-line">⏳ {tr('chamber.virtualTables', { n: t.rounds[shownRound - 1]!.virtualTables! })}</p>
+                )}
+
                 <div className="tour-matches">
                   {t.rounds[shownRound - 1]?.matches.map((m) => (
                     <MatchRow
@@ -1303,6 +1381,15 @@ function MyArea({
         <p className="small">{tr('errors.judgeCannotRegister')}</p>
       </section>
     );
+  }
+
+  // Sala do Tempo: só quem é do Time se inscreve.
+  if (t.chamber && !t.me && !isTeam(user)) {
+    return t.status === 'registration' ? (
+      <section className="menu-card tour-me">
+        <p className="small">{tr('chamber.teamOnlyRegister')}</p>
+      </section>
+    ) : null;
   }
 
   if (t.status === 'registration' || late) {
@@ -1430,6 +1517,8 @@ function MyArea({
   const m = round?.matches.find((x) => x.id === t.me!.matchId);
   const opp = m && (m.p1.userId === user.id ? m.p2 : m.p1);
   const mine = m && (m.p1.userId === user.id ? 0 : 1);
+  /** Sala do Tempo: a campanha do oponente virtual no evento. */
+  const oppRecord = opp?.virtual ? t.standings.find((s) => s.userId === opp.userId) : undefined;
   return (
     <section className="menu-card tour-me">
       <h2>
@@ -1449,7 +1538,10 @@ function MyArea({
       ) : (
         <>
           <p>
-            {rich(tr('tour.tableVs', { table: m.table }), { opp: <b>{opp.name}</b> })}
+            {opp.virtual
+              ? rich(tr('chamber.tableVsVirtual', { table: m.table, leader: opp.leaderName ?? opp.leader ?? '?' }), { opp: <b>{virtualName(tr, opp)}</b> })
+              : rich(tr('tour.tableVs', { table: m.table }), { opp: <b>{opp.name}</b> })}
+            {oppRecord && <span className="muted small"> · {tr('chamber.opponentRecord', { wins: oppRecord.wins, losses: oppRecord.losses })}</span>}
             {m.bestOf > 1 && (
               <>
                 {' · '}
@@ -1485,7 +1577,7 @@ function MyArea({
                 {t.me.ready ? tr('tour.readyOn') : tr('tour.readyBtn')}
               </button>
               <p className="muted small">
-                {m.ready?.[1 - mine!] ? tr('tour.oppReady', { name: opp.name }) : tr('tour.oppNotReady', { name: opp.name })}
+                {m.ready?.[1 - mine!] ? tr('tour.oppReady', { name: virtualName(tr, opp) }) : tr('tour.oppNotReady', { name: virtualName(tr, opp) })}
               </p>
             </>
           ) : (
@@ -1500,12 +1592,14 @@ function MyArea({
                   })
                 }
               >
-                {m.room === 'playing' ? tr('tour.backToGame') : m.bestOf > 1 ? tr('tour.playGameN', { n: m.game }) : tr('tour.playMatch')}
+                {m.room === 'playing' ? tr('tour.backToGame') : m.bestOf > 1 ? tr('tour.playGameN', { n: m.game }) : opp.virtual ? tr('chamber.playBot') : tr('tour.playMatch')}
               </button>
               <p className="muted small">
-                {m.room === 'waiting'
-                  ? tr('tour.someoneWaiting')
-                  : [tr('tour.enterHint'), m.bestOf > 1 ? tr('tour.seriesHint', { n: winsNeeded(m.bestOf) }) : null].filter(Boolean).join(' ')}
+                {opp.virtual
+                  ? [tr('chamber.botHint'), m.bestOf > 1 ? tr('tour.seriesHint', { n: winsNeeded(m.bestOf) }) : null].filter(Boolean).join(' ')
+                  : m.room === 'waiting'
+                    ? tr('tour.someoneWaiting')
+                    : [tr('tour.enterHint'), m.bestOf > 1 ? tr('tour.seriesHint', { n: winsNeeded(m.bestOf) }) : null].filter(Boolean).join(' ')}
               </p>
             </>
           )}
@@ -1527,6 +1621,7 @@ const REPORTED: Record<NonNullable<TournamentMatchInfo['reportedBy']>, MessageKe
   drop: 'tour.reported.drop',
   noshow: 'tour.reported.noshow',
   late: 'tour.reported.late',
+  sim: 'tour.reported.sim',
   organizer: 'tour.reported.organizer',
 };
 
@@ -1687,7 +1782,13 @@ function MatchRow({
   const tr = useT();
   const locale = useLocale();
   const name = (p: TournamentMatchInfo['p1'] | null, won: boolean) =>
-    p ? <span className={['tour-player', won ? 'won' : m.result ? 'lost' : ''].join(' ')}>{p.name}</span> : null;
+    p ? (
+      <span className="tour-side">
+        <span className={['tour-player', won ? 'won' : m.result ? 'lost' : ''].join(' ')}>{virtualName(tr, p)}</span>
+        {p.virtual && <span className="tour-badge chamber-virtual">{tr('chamber.virtualTag')}</span>}
+        {p.leaderName && <span className="muted small chamber-leader-tag">{p.leaderName}</span>}
+      </span>
+    ) : null;
   const [askDouble, setAskDouble] = useState(false);
   const [dropBoth, setDropBoth] = useState(false);
   const played = m.wins[0] + m.wins[1] > 0;
@@ -1821,6 +1922,7 @@ function Standings({ t }: { t: TournamentDetail }) {
           <tr>
             <th>#</th>
             <th>{tr('tour.colPlayer')}</th>
+            {t.chamber && <th>{tr('chamber.colLeader')}</th>}
             <th>{tr('tour.colPoints')}</th>
             <th>{tr('tour.colRecord')}</th>
             <th title={tr('tour.omwTitle')}>{tr('tour.colOmw')}</th>
@@ -1829,15 +1931,17 @@ function Standings({ t }: { t: TournamentDetail }) {
         </thead>
         <tbody>
           {t.standings.map((s) => (
-            <tr key={s.userId} className={s.dropped ? 'muted' : ''}>
+            <tr key={s.userId} className={[s.dropped ? 'muted' : '', s.virtual ? 'chamber-virtual-row' : t.chamber ? 'chamber-human-row' : ''].join(' ')}>
               <td>{s.rank}</td>
               <td>
-                {s.name}
+                {virtualName(tr, s)}
+                {s.virtual && <span className="tour-badge chamber-virtual">{tr('chamber.virtualTag')}</span>}
                 {s.userId === champion && <span className="tour-badge gold">{tr('tour.badgeChampion')}</span>}
                 {s.dropped && <span className="tour-badge">{tr('tour.badgeDropped')}</span>}
                 {t.topCut && s.inElim && s.userId !== champion && <span className="tour-badge">{tr('tour.badgeTopCut', { n: t.topCut })}</span>}
                 {s.inElim && !s.alive && !s.dropped && t.status === 'running' && <span className="tour-badge">{tr('tour.badgeEliminated')}</span>}
               </td>
+              {t.chamber && <td className="small">{s.leaderName ?? s.leader ?? '?'}</td>}
               <td>{s.points}</td>
               <td>
                 {s.wins}-{s.losses}
@@ -1848,7 +1952,9 @@ function Standings({ t }: { t: TournamentDetail }) {
           ))}
         </tbody>
       </table>
+      {t.chamber && (t.standingsTotal ?? 0) > t.standings.length && <p className="muted small">{tr('chamber.standingsNote', { total: t.standingsTotal })}</p>}
       {t.structure === 'swiss' && (
+
         <p className="muted small">{[tr('tour.swissTiebreak'), t.topCut ? tr('tour.topCutAbove', { n: t.topCut }) : null].filter(Boolean).join(' ')}</p>
       )}
     </section>

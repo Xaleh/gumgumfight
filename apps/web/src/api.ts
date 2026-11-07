@@ -650,7 +650,10 @@ export const api = {
       send<{ isBacker: boolean; isPaidThisMonth: boolean; tier: SupporterTier | null; until: string | null }>('POST', '/api/support/apoiase/sync'),
   },
   tournaments: {
-    list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null }>('/api/tournaments'),
+    list: () => get<{ tournaments: TournamentSummary[]; canCreate: boolean; organize: OrganizeLimits | null; canChamber?: boolean }>('/api/tournaments'),
+    /** Sala do Tempo: os eventos simuláveis (só para quem é do Time). */
+    chamberPresets: () => get<{ presets: ChamberPreset[]; botRooms: boolean; minPlayers: number; maxPlayers: number }>('/api/tournaments/chamber/presets'),
+    createChamber: (input: ChamberInput) => send<TournamentDetail>('POST', '/api/tournaments/chamber', input),
     /** Painel do meta: torneios encerrados no formato e nos últimos `days` dias (sem: todos). */
     meta: (q: { format?: FormatId; days?: number } = {}) =>
       get<TournamentMeta>(`/api/tournaments/meta?${new URLSearchParams({ ...(q.format ? { format: q.format } : {}), ...(q.days ? { days: String(q.days) } : {}) })}`),
@@ -1113,6 +1116,69 @@ export interface TournamentSummary {
   sponsor: PublicSponsor | null;
   /** Até quando só Almirantes se inscrevem. */
   priorityUntil: string | null;
+  /** Sala do Tempo (torneio simulado do Time) e o tamanho do evento simulado. */
+  chamber?: boolean;
+  chamberSize?: number | null;
+}
+
+/** Sala do Tempo: um evento simulável (preset de `data/chamber`), com o deck que o bot joga por cada Líder. */
+export interface ChamberPreset {
+  id: string;
+  name: string;
+  description: string;
+  format: PlayFormat;
+  spoilers: boolean;
+  spoilerSet: string | null;
+  players: number;
+  rounds: number | null;
+  topCut: number | null;
+  bo3From: number | null;
+  bo5From: number | null;
+  leaders: ChamberLeaderInfo[];
+  /** Decks prontos válidos no formato entre os quais a fatia "outros" sorteia. */
+  others: number;
+}
+
+export interface ChamberLeaderInfo {
+  leader: string;
+  leaderName: string | null;
+  leaderImage?: string | null;
+  colors: string[];
+  /** Fração dos jogadores do evento (0..1). */
+  share: number;
+  /** Deck que o bot joga por este Líder (null = nenhum deck pronto válido: vira "outros"). */
+  deckId: string | null;
+  deckName: string | null;
+  /** O deck é do grupo "Decks do meta" (guia e perfil do Bot do Time). */
+  meta: boolean;
+  /** Virtuais com este Líder (depois do início). */
+  count?: number;
+}
+
+/** Sala do Tempo na página do torneio. */
+export interface ChamberInfo {
+  preset: string;
+  presetName: string;
+  description: string;
+  presetMissing: boolean;
+  size: number | null;
+  virtuals: number;
+  botRooms: boolean;
+  /** Decks prontos válidos no formato entre os quais a fatia "outros" sorteia. */
+  otherDecks: number;
+  leaders: ChamberLeaderInfo[];
+
+  others: Array<{ leader: string; leaderName: string | null; colors: string[]; count: number }>;
+}
+
+export interface ChamberInput {
+  preset: string;
+  name?: string;
+  players?: number;
+  rounds?: number | null;
+  topCut?: number | null;
+  bo3From?: number | null;
+  bo5From?: number | null;
 }
 
 /** Torneio encerrado no painel do meta. */
@@ -1411,6 +1477,12 @@ export type JudgeAnswer =
 export interface TournamentPlayerRef {
   userId: string;
   name: string;
+  /** Sala do Tempo: jogador virtual (o bot joga por ele) e o Líder de cada lado (públicos desde o início). */
+  virtual?: boolean;
+  leader?: string | null;
+  leaderName?: string | null;
+  leaderImage?: string | null;
+  colors?: string[];
 }
 
 export interface TournamentMatchInfo {
@@ -1427,8 +1499,8 @@ export interface TournamentMatchInfo {
   /** none = derrota dupla (W.O. duplo ou lançada pelo organizador); loss = inscrição atrasada (derrota sem oponente). */
   result: TournamentResult | 'bye' | 'none' | 'loss' | null;
   winner: string | null;
-  /** game = sala online; drop = desistência; noshow = W.O. automático; late = inscrição atrasada. */
-  reportedBy: 'game' | 'bye' | 'drop' | 'noshow' | 'late' | 'organizer' | null;
+  /** game = sala online; drop = desistência; noshow = W.O. automático; late = inscrição atrasada; sim = mesa só de virtuais (Sala do Tempo). */
+  reportedBy: 'game' | 'bye' | 'drop' | 'noshow' | 'late' | 'sim' | 'organizer' | null;
   roomId: string | null;
   /** Situação da sala online (null = nenhuma sala aberta agora). */
   room: 'waiting' | 'playing' | 'finished' | null;
@@ -1516,6 +1588,12 @@ export interface TournamentStanding {
   inElim: boolean;
   elimWins: number;
   alive: boolean;
+  /** Sala do Tempo: jogador virtual e o Líder de cada um. */
+  virtual?: boolean;
+  leader?: string | null;
+  leaderName?: string | null;
+  leaderImage?: string | null;
+  colors?: string[];
 }
 
 export type TournamentStage = 'swiss' | 'elim';
@@ -1733,8 +1811,22 @@ export interface TournamentDetail {
     /** Lista do deck: só para o organizador, o próprio jogador e, no fim, para todos. */
     deck: { name: string; leader: string; cards: Array<{ id: string; count: number; name: string | null }> } | null;
   }>;
-  rounds: Array<{ round: number; stage: TournamentStage; label: string; bestOf: number; matches: TournamentMatchInfo[] }>;
+  rounds: Array<{
+    round: number;
+    stage: TournamentStage;
+    label: string;
+    bestOf: number;
+    /** Mesas da rodada (todas) e, na Sala do Tempo, quantas só de virtuais saíram no sorteio (a lista traz só as com humano). */
+    tables?: number;
+    virtualTables?: number;
+    matches: TournamentMatchInfo[];
+  }>;
   standings: TournamentStanding[];
+  /** Jogadores classificados (Sala do Tempo: `standings` é um recorte). */
+  standingsTotal?: number;
+  /** Sala do Tempo (torneio simulado do Time); null nos torneios comuns. */
+  chamber?: ChamberInfo | null;
+
   /** Todas as partidas da rodada atual têm resultado. */
   roundComplete: boolean;
   /** O que o botão de avançar faz: outra rodada do suíço, o top cut, a próxima fase da chave ou encerrar. */

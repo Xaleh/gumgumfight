@@ -725,6 +725,26 @@ function migrateTournaments(db: DB) {
   // p1_ready / p2_ready: "Estou pronto" de cada jogador na rodada (sinal para o organizador iniciar).
   if (!mCols.includes('p1_ready')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p1_ready INTEGER NOT NULL DEFAULT 0');
   if (!mCols.includes('p2_ready')) db.exec('ALTER TABLE tournament_matches ADD COLUMN p2_ready INTEGER NOT NULL DEFAULT 0');
+  // Sala do Tempo (docs/plano-sala-do-tempo.md): torneio simulado do Time. chamber = id do preset do evento
+  // (data/chamber/<id>.json; null = torneio comum); chamber_size = jogadores do evento simulado, humanos + virtuais.
+  if (!tCols.includes('chamber')) db.exec('ALTER TABLE tournaments ADD COLUMN chamber TEXT');
+  if (!tCols.includes('chamber_size')) db.exec('ALTER TABLE tournaments ADD COLUMN chamber_size INTEGER');
+  db.exec(`
+    -- Jogadores virtuais da Sala do Tempo: preenchem as vagas do evento simulado. O id (v:17) entra em
+    -- tournament_matches.p1/p2 como o de um inscrito; deck_id é o deck pronto que o bot joga por ele
+    -- (do meta, quando há) e skill a força sorteada (desvios-padrão) das mesas estatísticas.
+    CREATE TABLE IF NOT EXISTS tournament_virtuals (
+      tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      id            TEXT NOT NULL,
+      name          TEXT NOT NULL,
+      leader        TEXT NOT NULL,
+      deck_id       TEXT NOT NULL,
+      skill         REAL NOT NULL DEFAULT 0,
+      seed          INTEGER,
+      PRIMARY KEY (tournament_id, id)
+    );
+  `);
+
   db.exec(`
     -- Judges de um torneio (escolhidos pelo organizador; sem nenhum, o organizador é o Judge).
     CREATE TABLE IF NOT EXISTS tournament_judges (

@@ -486,7 +486,30 @@ modelo de Counter por Líder adversário), nunca como regras. Sem perfil, o deck
 O plano completo, as telas e as fases estão em [`docs/plano-bot-time.md`](docs/plano-bot-time.md); os conceitos do bot,
 em [`docs/bot-tempo.md`](docs/bot-tempo.md).
 
+## Sala do Tempo
+
+Um **torneio simulado** para o Time treinar como num evento real (um Regional de 700 jogadores, por exemplo): em
+**Torneios**, quem é do Time abre uma Sala do Tempo a partir de um **evento** (`data/chamber/<id>.json`: formato, tamanho,
+rodadas e top cut sugeridos e a **distribuição dos Líderes**; veja o [README da pasta](data/chamber/README.md)). Só o Time
+se inscreve; quem abriu gerencia e **gera e inicia cada rodada** no ritmo do grupo (sem relógio nem W.O. automático).
+
+- **Ao começar**, as vagas que o Time não ocupou são preenchidas por **jogadores virtuais** sorteados pela distribuição do
+  evento, cada um com o deck que o bot joga por aquele Líder (o deck do meta com guia e perfil, quando há; senão um deck
+  pronto com o Líder) e uma força sorteada. Basta um humano.
+- **O suíço pareia todos juntos**: quem vai bem cai contra os decks que também vão bem, como no evento. Humano x humano
+  joga na sala de torneio de sempre; **humano x virtual joga contra o Bot do Time** com o deck do virtual (o resultado
+  entra na série sozinho; a partida conta nas estatísticas como partida contra o bot); mesa só de virtuais é decidida no
+  sorteio (confronto dos Líderes pela matriz do evento e diferença de força), sem jogo.
+- A página do torneio mostra a distribuição com o deck de cada Líder, quantos virtuais há de cada um, só as mesas com
+  humano (e quantas foram decididas no sorteio), a classificação do evento inteiro (os 32 primeiros, o Time, seus
+  oponentes e vizinhos) e, em "Sua partida", o Líder e a campanha do virtual da vez. Top cut e kit de divulgação valem.
+- A Sala do Tempo fica fora do painel do meta e só aparece na lista para o Time. Precisa do treino contra o bot do
+  servidor ligado (`ONLINE_BOT_ROOMS`).
+
+O desenho e os limites estão em [`docs/plano-sala-do-tempo.md`](docs/plano-sala-do-tempo.md).
+
 ## Torneios
+
 
 Em **Torneios** (no menu), contas com perfil **Organizador** ou **Admin** criam torneios; qualquer conta Google se
 inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia qualquer um.

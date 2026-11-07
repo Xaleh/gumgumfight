@@ -1,0 +1,52 @@
+// Time Chamber texts (English).
+
+import type chamberPtBR from './pt-BR';
+
+const chamber: Record<keyof typeof chamberPtBR, string> = {
+  'chamber.title': 'Time Chamber',
+  'chamber.open': '⏳ Time Chamber',
+  'chamber.badge': 'Time Chamber',
+  'chamber.intro':
+    "Team practice in a simulated tournament: the seats the Team doesn't fill are taken by virtual players drawn from the event's leader distribution. Human vs human plays in the usual room; human vs virtual plays the Team Bot with the drawn leader's deck; virtual-only tables are decided by the draw. Whoever opens the chamber generates and starts each round, at the group's pace.",
+  'chamber.newTitle': 'New Time Chamber',
+  'chamber.event': 'Event',
+  'chamber.eventHelp': 'Events come from data/chamber/*.json on the server: leader distribution, size and suggested rounds.',
+  'chamber.noPresets': 'No event registered on the server (data/chamber folder).',
+  'chamber.botRoomsOff': 'Server bot training is off: the Time Chamber cannot open.',
+  'chamber.nameLabel': 'Chamber name (optional)',
+  'chamber.players': 'Event players',
+  'chamber.playersHelp': 'Team humans + virtuals ({min} to {max}). Suggested rounds follow the size.',
+  'chamber.rounds': 'Swiss rounds',
+  'chamber.create': 'Open the chamber',
+  'chamber.distribution': 'Leader distribution',
+  'chamber.distributionHelp': 'Share of event players on each leader, and the deck the bot plays for it.',
+  'chamber.metaDeck': 'meta deck',
+  'chamber.starterDeck': 'built-in deck',
+  'chamber.noDeck': 'no valid deck: becomes "others"',
+  'chamber.others': 'Others',
+  'chamber.othersShare': '{pct}% drawn among {n|# built-in deck|# built-in decks} valid in the format',
+  'chamber.othersDrawn': 'Others (drawn built-in decks)',
+  'chamber.virtualsLine': '{humans|# from the Team|# from the Team} + {virtuals|# virtual|# virtuals} = {total} players',
+  'chamber.pilot': 'Pilot {n}',
+  'chamber.virtualTag': 'virtual',
+  'chamber.tableVsVirtual': 'Table {table}: vs {opp}, a virtual on {leader}',
+  'chamber.playBot': 'Play the Team Bot',
+  'chamber.botHint': "The Team Bot plays the virtual's deck on the server. Leaving the table concedes the game.",
+  'chamber.virtualTables': '{n|# virtual-only table decided by the draw|# virtual-only tables decided by the draw}',
+  'chamber.standingsNote': 'Standings of {total} players: top 32, the Team, their opponents and neighbours.',
+  'chamber.colLeader': 'Leader',
+  'chamber.startHint': 'On start, {n|# seat is filled|# seats are filled} by virtuals drawn from the event distribution.',
+  'chamber.confirmStart': 'Start the Time Chamber with {humans|# from the Team|# from the Team} and {virtuals|# virtual|# virtuals}?',
+  'chamber.presetMissing': "This chamber's event is no longer on the server (data/chamber): it cannot start.",
+  'chamber.teamOnlyRegister': 'Only Team members can enter the Time Chamber.',
+  'chamber.opponentRecord': '{wins}-{losses} in the event',
+  'tour.reported.sim': 'decided by the draw',
+  'errors.chamberTeamOnly': 'The Time Chamber is for Team members only.',
+  'errors.chamberNeedsBotRooms': 'The Time Chamber needs server bot training, which is off.',
+  'errors.chamberPresetNotFound': 'Event not found.',
+  'errors.invalidChamberPlayers': 'Event players: from {min} to {max}.',
+  'errors.chamberNoEdit': 'The Time Chamber follows the chosen event: delete it and open another to change the rules.',
+  'errors.chamberNoDecks': 'No built-in deck is valid in this format: the virtuals cannot be drawn.',
+};
+
+export default chamber;

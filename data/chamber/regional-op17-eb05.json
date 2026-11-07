@@ -1,0 +1,24 @@
+{
+  "name": "Regional · OP17 + EB05",
+  "description": "Simulação de um Regional no formato OP17 + EB05 (Standard). A distribuição dos Líderes é um ponto de partida a trocar pelos números do Regional de Sydney: edite as fatias (share) e, se quiser, a matriz de confrontos (matchups).",
+  "format": "standard",
+  "spoilers": false,
+  "players": 700,
+  "rounds": 9,
+  "topCut": 16,
+  "bo3From": null,
+  "bo5From": null,
+  "leaders": [
+    { "leader": "OP17-039", "share": 0.2, "deck": "op17-xebec" },
+    { "leader": "OP17-020", "share": 0.14, "deck": "op17-green-shanks" },
+    { "leader": "OP10-099", "share": 0.08 },
+    { "leader": "OP12-040", "share": 0.07 },
+    { "leader": "OP12-020", "share": 0.06 },
+    { "leader": "OP13-004", "share": 0.06 },
+    { "leader": "OP11-062", "share": 0.05 },
+    { "leader": "OP09-081", "share": 0.04 }
+  ],
+  "matchups": {
+    "OP17-039": { "OP17-020": 0.52 }
+  }
+}
