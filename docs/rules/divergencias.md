@@ -489,6 +489,12 @@ Card do Trello "Testar as funcionalidades das cartas em busca de bugs" (09/10/20
 - Correção: o leitor marca os passos de um "Then, …" que segue um "If X, …" (`EffectStep.afterIf`, também numa cadeia de "Then"); o motor guarda no frame se o último "if" da carta falhou (`ifFailed`; "If you do" não conta) e pula esses passos. Cartas afetadas nas bases locais: OP01-002, OP02-070, OP09-078, OP09-089, OP09-098, OP11-066, OP12-020, OP12-118, OP14-020, OP14-112, ST22-015, ST24-005, ST34-002, EB02-011, EB05-033 e P-151.
 - Testes: `packages/engine/test/card-audit.test.ts` (Bonney com 7 e com 10 cartas viradas) e `trello-bugs.test.ts` (Arlong EB02-011 sem Líder {Fish-Man}/{East Blue}).
 
+**DV-47. "Look at N … place them at the top or bottom of your deck in any order": o motor deixava dividir e a pergunta confundia** — médio — **corrigido**
+- Relato de jogador (11/2026): com o Streusen OP17-050 ("Look at 2 cards from the top of your deck, reorganize them in any order and place them at the top or bottom of your deck. Then, draw 1 card.") "não conseguia passar para baixo"; a pergunta era "escolha as que vão para o fundo (na ordem); as demais ficam no topo", com os botões "Não escolher" e "Confirmar (0/2)", e nada dizia que tocar na carta significava mandá-la para o fundo.
+- Regra: Q&A OP01-073 Doflamingo (também OP17-050 e OP15-066): todas as cartas vão para o topo ou todas para o fundo, na ordem escolhida; não se divide (CR 1-3-7). O passo `arrangeTop` (Kuma ST03-010, Doflamingo OP01-073, Streusen OP17-050 e "place the rest at the top or bottom" depois de revelar e jogar) permitia qualquer divisão.
+- Correção: o passo pergunta primeiro **"Ficam no topo ou vão para o fundo do deck?"** (`option`, com as cartas à mostra e os botões "Topo do deck" / "Fundo do deck", como já fazia "reveal 1 card … place it at the top or bottom") e, com 2 ou mais cartas, a ordem (as não escolhidas mantêm a ordem; botão "Manter a ordem"). Olhar o deck torna a jogada não cancelável. Replays até a versão 13: a escolha gravada com todas as cartas vira "fundo"; outra vira "topo" (`upgradeReplayActions`, versão 14).
+- Testes: `packages/engine/test/arrange-top.test.ts` (leitor da Streusen, topo, fundo, "Manter a ordem", 1 carta no deck, conversão de replays), `st03.test.ts` (Kuma, topo e fundo) e `parsed-engine.test.ts` (busca com o resto no topo ou no fundo).
+
 ---
 
 ## Itens a confirmar (sem ruling oficial claro)

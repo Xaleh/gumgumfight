@@ -305,11 +305,13 @@ describe('efeitos lidos automaticamente', () => {
     expect(s.players[1].trash).toContain(st);
   });
 
-  it('busca com o resto "no topo ou no fundo": em seguida o jogador ordena', () => {
+  it('busca com o resto "no topo ou no fundo": em seguida o jogador escolhe topo ou fundo e ordena', () => {
     let s = toTurn(game(), 3);
     s = applyAction(s, { type: 'playCard', player: 0, uid: give(s, 0, 'PX-016') });
-    if (s.pending?.kind === 'selectTargets' && s.pending.ordered !== true) s = applyAction(s, { type: 'choose', player: 0, uids: [] });
-    expect(s.pending).toMatchObject({ kind: 'selectTargets', ordered: true });
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [] });
+    expect(s.pending).toMatchObject({ kind: 'option', promptKey: 'engine.arrangeTopOrBottom' });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', ordered: true, promptKey: 'engine.arrangeTopOrder' });
   });
 
   it('aura por "type including"', () => {

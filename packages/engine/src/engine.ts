@@ -1418,6 +1418,14 @@ function handlePendingResponse(state: GameState, action: Action) {
         throw new IllegalActionError(`Escolha entre ${pending.min} e ${pending.max} alvo(s).`);
       }
       if (uids.some((u) => !pending.options.includes(u))) throw new IllegalActionError('Alvo inválido.');
+      // "Até N" deixado em branco com cartas à escolha: fica no histórico, senão para o oponente (e no
+      // replay) parece que o efeito falhou ("[Trigger] Absalom ativado!" e nada acontece). Não numa
+      // escolha escondida (da mão, do deck): a linha contaria ao oponente que havia carta válida.
+      if (!uids.length && pending.options.length && pending.max > 0 && !pending.hidden) {
+        const src = cardDef(state, pending.source).name;
+        const name = state.players[p].name;
+        log(state, p, lg('skipChoice', `${src}: ${name} não escolheu nenhuma carta.`, { source: src, player: name }));
+      }
       const top = state.stack[state.stack.length - 1];
       if (top.kind === 'effect') top.choice = uids;
       else if (top.kind === 'play') top.replaceChoice = uids;
@@ -5432,51 +5440,64 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       log(state, frame.controller, lg('shuffles', `${ps.name} embaralha o deck.`, { player: ps.name }));
       return true;
     case 'arrangeTop': {
-      // 1ª escolha: cartas que vão para o fundo. 2ª (se sobrar 2+ no topo): ordem do topo.
+      // "Look at N cards from the top of your deck and place them at the top or bottom of your deck in any
+      // order": todas vão para o topo ou todas para o fundo, sem dividir (Q&A OP01-073; CR 1-3-7). 1ª pergunta:
+      // topo ou fundo, com as cartas à mostra; 2ª (com 2 ou mais cartas): a ordem. `memo` = [destino, ...cartas].
       if (!frame.memo) {
         const top = ps.deck.slice(0, step.look);
         if (!top.length) return true;
+        let where: 'top' | 'bottom' = 'top';
         // "place them at the top of your deck in any order": só a ordem.
-        if (step.topOnly && !frame.choice) frame.choice = [];
-        if (!frame.choice) {
+        if (!step.topOnly) {
+          if (!frame.choice) {
+            // Olhar o deck é informação ganha: a ação deixa de ser cancelável.
+            markRevealed(state);
+            askOption(
+              state,
+              frame,
+              frame.controller,
+              pr('arrangeTopOrBottom', `${srcName}: estas são as ${top.length} cartas do topo. Ficam no topo ou vão para o fundo do deck?`, {
+                source: srcName,
+                count: top.length,
+              }),
+              ['Topo do deck', 'Fundo do deck'],
+              DECK_TOP_BOTTOM,
+              undefined,
+              top,
+            );
+            return false;
+          }
+          where = frame.choice[0] === '1' ? 'bottom' : 'top';
+        }
+        frame.memo = [where, ...top];
+        frame.choice = undefined;
+        if (top.length > 1) {
           askCards(
             state,
             frame,
             top,
             top.length,
-            pr('arrangeTopPickBottom', `${srcName}: estas são as ${top.length} cartas do topo. Escolha as que vão para o fundo do deck (na ordem); as demais ficam no topo.`, {
-              source: srcName,
-              count: top.length,
-            }),
+            where === 'top'
+              ? pr('arrangeTopOrder', `${srcName}: clique nas cartas na ordem em que ficarão no topo (a primeira fica por cima; as que não escolher mantêm a ordem).`, { source: srcName })
+              : pr('arrangeBottomOrder', `${srcName}: clique nas cartas na ordem em que irão para o fundo (a última escolhida fica por baixo de tudo; as que não escolher mantêm a ordem).`, {
+                  source: srcName,
+                }),
             { ordered: true },
           );
           return false;
         }
-        const bottom = frame.choice.filter((u) => top.includes(u));
-        const keep = top.filter((u) => !bottom.includes(u));
-        // As que ficam continuam no topo (visíveis) até a escolha da ordem.
-        for (const uid of bottom) removeFrom(ps.deck, uid);
-        ps.deck.push(...bottom);
-        if (bottom.length) log(state, frame.controller, lg('placesAtBottom', `${ps.name} coloca ${bottom.length} carta(s) no fundo do deck.`, { player: ps.name, n: bottom.length }));
-        if (keep.length <= 1) return true;
-        frame.memo = keep;
-        frame.choice = undefined;
-        askCards(
-          state,
-          frame,
-          keep,
-          keep.length,
-          pr('arrangeTopOrder', `${srcName}: clique nas cartas na ordem em que ficarão no topo (a primeira fica por cima).`, { source: srcName }),
-          { min: keep.length, ordered: true },
-        );
-        return false;
       }
-      const keep = frame.memo;
-      const chosen = (frame.choice ?? []).filter((u) => keep.includes(u));
-      const order = [...chosen, ...keep.filter((u) => !chosen.includes(u))];
+      const [where, ...cards] = frame.memo;
+      const chosen = (frame.choice ?? []).filter((u) => cards.includes(u));
+      const order = [...chosen, ...cards.filter((u) => !chosen.includes(u))];
       for (const uid of order) removeFrom(ps.deck, uid);
-      ps.deck.unshift(...order);
-      log(state, frame.controller, lg('returnsToDeckTop', `${ps.name} devolve ${order.length} carta(s) ao topo do deck.`, { player: ps.name, n: order.length }));
+      if (where === 'bottom') {
+        ps.deck.push(...order);
+        log(state, frame.controller, lg('placesAtBottom', `${ps.name} coloca ${order.length} carta(s) no fundo do deck.`, { player: ps.name, n: order.length }));
+      } else {
+        ps.deck.unshift(...order);
+        log(state, frame.controller, lg('returnsToDeckTop', `${ps.name} devolve ${order.length} carta(s) ao topo do deck.`, { player: ps.name, n: order.length }));
+      }
       return true;
     }
   }

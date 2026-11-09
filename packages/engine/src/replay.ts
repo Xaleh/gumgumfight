@@ -4,7 +4,7 @@ import { applyAction, createGame } from './engine';
 import type { Action, GameConfig, GameState } from './types';
 
 /** Versão atual dos replays (`ReplayFile.version`). */
-export const REPLAY_VERSION = 13;
+export const REPLAY_VERSION = 14;
 
 /**
  * Configuração para refazer um replay da versão `version`: até a versão 8, a preparação antiga
@@ -67,7 +67,12 @@ export function replayConfig<T extends GameConfig>(config: T, version: number | 
  * declaração do ataque, no mesmo lote do "When your Leader … attacks"; a escolha da ordem que o roteiro
  * antigo não tem fica com a primeira opção, o efeito que antes resolvia primeiro.) Até a versão 12, "set up
  * to N of your DON!! cards as active" desvirava N sem perguntar (Cavendish EB01-012); a pergunta "quantos?"
- * é respondida com a quantidade máxima. Uma jogada que o motor de hoje recusa encerra a conversão: dali em
+ * é respondida com a quantidade máxima. Até a versão 13, "look at N cards from the top of your deck and place
+ * them at the top or bottom" (`arrangeTop`) pedia quais cartas iam para o fundo (as demais ficavam no topo);
+ * hoje pergunta "topo ou fundo?" para todas (Q&A OP01-073: não se divide) e depois a ordem. A escolha gravada
+ * com todas as cartas vira "fundo" e segue como a ordem; qualquer outra vira "topo" e é descartada (a ordem
+ * gravada em seguida, se houver, vale como hoje; uma divisão não é mais possível e a partida pode tomar outro
+ * rumo). Uma jogada que o motor de hoje recusa encerra a conversão: dali em
  * diante o roteiro fica como estava, e quem o refaz para nela (o replay abre até ali).
  */
 export function upgradeReplayActions(config: GameConfig, actions: Action[]): Action[] {
@@ -142,6 +147,18 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     out.push(a);
   };
   /**
+   * Versão 14: a escolha gravada para o `arrangeTop` antigo (quais cartas vão para o fundo) responde à pergunta
+   * "topo ou fundo?" de hoje. Devolve true quando a ação gravada já foi consumida por essa resposta.
+   */
+  const legacyArrangeTop = (a: Action): boolean => {
+    const p = state.pending;
+    if (p?.kind !== 'option' || a.type !== 'choose' || a.player !== p.player || currentStep()?.do !== 'arrangeTop') return false;
+    const all = (p.shown?.length ?? 0) > 0 && p.shown!.every((u) => a.uids.includes(u));
+    step({ type: 'option', player: p.player, index: all ? 1 : 0 });
+    // Todas para o fundo: a mesma escolha vale como a ordem. Topo (ou divisão): a escolha gravada não serve mais.
+    return !all;
+  };
+  /**
    * Escolha gravada com menos alvos do que o mínimo atual: antes de a escolha sem "up to" passar a
    * ser obrigatória (8-4-4-1), dava para escolher 0. Completa com as primeiras opções para o
    * replay continuar carregando (dali em diante a partida pode tomar outro rumo).
@@ -158,6 +175,7 @@ export function upgradeReplayActions(config: GameConfig, actions: Action[]): Act
     try {
       for (let i = implicit(a); i; i = implicit(a)) step(i);
       if (state.phase === 'gameover') break;
+      if (legacyArrangeTop(a)) continue;
       if (!fits(a)) continue;
       step(completed(a));
     } catch {

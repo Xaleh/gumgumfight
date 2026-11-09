@@ -160,6 +160,7 @@ function PlayRow({
 }) {
   const t = useT();
   const tryT = useTryT();
+  const locale = useLocale();
   const p = play.pending;
   const ask = p ? askText(tryT, p) : null;
   const source = p && 'source' in p ? citedName(data, p.source) : null;
@@ -167,6 +168,9 @@ function PlayRow({
   const picked = new Set(chosen(play.action));
   const seen = p && (p.kind === 'selectTargets' || p.kind === 'option') ? (p.shown ?? []).filter((u) => !options.includes(u)) : [];
   const life = p?.kind === 'lifeCard' ? citedName(data, p.card) : null;
+  // Resposta vazia com cartas à escolha, logo depois da jogada anterior: provável toque duplo no celular.
+  const quickSkip =
+    play.action.type === 'choose' && play.action.uids.length === 0 && p?.kind === 'selectTargets' && options.length > 0 && play.sinceMs !== undefined && play.sinceMs < 1500;
   return (
     <>
       {turnStart && <li className="plays-turn">{t('judge.playsTurn', { n: play.turn })}</li>}
@@ -176,6 +180,14 @@ function PlayRow({
           <span className="plays-n">#{play.count + 1}</span>
           <b>{data.names[play.player]}</b>
           <span>{title}</span>
+          {play.sinceMs !== undefined && (
+            <span
+              className={['plays-since', quickSkip ? 'fast' : ''].join(' ')}
+              title={quickSkip ? t('judge.playsQuickSkip') : t('judge.playsSinceTitle')}
+            >
+              {t('judge.playsSince', { s: (play.sinceMs / 1000).toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
+            </span>
+          )}
         </div>
         {play.by && <div className="plays-by small">{t('judge.playsBy', { by: play.by, name: data.names[play.player] })}</div>}
         {(source || ask) && (
