@@ -180,6 +180,8 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   // Spoilers com erro de digitação (deduzidos; o leitor já tolerava).
   'EB05-039': [['{Vinsmoke Family}', '{The Vinsmoke Family}']], // Pink Hornet
   'EB05-048': [['with a cost of O cannot', 'with a cost of 0 cannot']], // Hedgehog Stinger
+  'EB05-056': [['trash 1 card with a Trigger from your hand', 'trash 1 card with a [Trigger] from your hand']], // Nico Olvia: "[Trigger]" sem colchetes
+  'EB05-057': [['If your have 2 or less Life cards', 'If you have 2 or less Life cards']], // Nojiko: "your have" (no [Trigger])
   // Zoro & Sogeking: o optcgleaks traduz "will not become active"; o Cardkaizoku e a Señor Pink OP18-068 (mesmo efeito) trazem "cannot be rested".
   'OP18-027': [["will not become active at the end of your opponent's next End Phase", "cannot be rested until the end of your opponent's next turn"]],
   // Promos com o texto do Cardkaizoku (tradução própria do site, fora do padrão das cartas), conferidas
@@ -268,7 +270,7 @@ export function applySourceFixes<T extends CardData>(card: T): T {
   const types = fix?.types ?? card.types;
   const attributes = fix?.attributes ?? split;
   const text = textFix && signed ? patchText(signed, textFix) : signed;
-  const trigger = signedTrigger;
+  const trigger = textFix && signedTrigger ? patchText(signedTrigger, textFix) : signedTrigger;
   const sameList = (a: string[] | undefined, b: string[] | undefined) => a === b || (a !== undefined && b !== undefined && a.length === b.length && a.every((t, i) => t === b[i]));
   const sameTypes = sameList(types, card.types);
   const sameAttributes = sameList(attributes, card.attributes);

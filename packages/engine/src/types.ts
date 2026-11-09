@@ -595,7 +595,7 @@ type EffectStepBody =
   | { do: 'giveRestedDon'; target: TargetRef; count: number; fromOpponent?: boolean; fromOwner?: boolean; anyState?: boolean }
   /** "Draw N cards"; com `upTo` ("draw up to N cards", 4-5-4), uma por vez, podendo parar antes de cada uma. */
   | { do: 'draw'; count: number; upTo?: true }
-  | { do: 'addDonFromDeck'; count: number; rested?: boolean }
+  | { do: 'addDonFromDeck'; count: number; rested?: boolean; /** "Add up to N": o texto diz "até". */ upTo?: true }
   | { do: 'restOpponentDon'; count: number }
   | { do: 'returnToHand'; target: TargetRef }
   /** A batalha atual não permite [Blocker] (opcionalmente só de quem tem >= minPower). */
@@ -607,8 +607,8 @@ type EffectStepBody =
   /** Efeito ainda não automatizado: o jogador aplica à mão com as ferramentas manuais. */
   | { do: 'manual'; text: string }
   /** "Play this card" (ex.: [Trigger]): joga a própria carta, sem custo. */
-  | { do: 'playThis'; rested?: boolean }
-  | { do: 'revealedToHand'; filter?: CardFilter }
+  | { do: 'playThis'; rested?: boolean; /** "from your trash" no texto (só para a tradução). */ fromTrash?: true }
+  | { do: 'revealedToHand'; filter?: CardFilter; /** "add up to 1": adicionar é opcional. */ upTo?: true }
   | { do: 'lookOpponentTop' }
   | { do: 'activateEventFromHand'; filter: CardFilter }
   | { do: 'revealLifeTop' }
@@ -864,7 +864,7 @@ type EffectStepBody =
   /** "Give up to 1 of your opponent's Characters −2 cost during this turn." */
   | { do: 'cost'; target: TargetRef; amount: number; duration: Duration }
   /** "Your opponent chooses N cards from their hand and trashes them." (quem escolhe é o oponente) */
-  | { do: 'opponentDiscards'; count: number }
+  | { do: 'opponentDiscards'; count: number; /** "… and reveals their hand" (só para a tradução). */ reveal?: true }
   /** "Trash N cards from the top of your deck." */
   | { do: 'millDeck'; count: number }
   /** "Activate this card's [On Play] effect." (usado por [Trigger]) */
@@ -1030,6 +1030,8 @@ export interface Ability {
   costPer?: { cost: number; every: number; what: 'trash' };
   /** [On K.O.] só quando nocauteado por efeito (do oponente). */
   koBy?: 'effect' | 'opponentEffect';
+  /** `battlesCharacter` de "At the end of a battle in which this Character battles…": resolve no fim da batalha. */
+  battleEnd?: true;
   /** "If this Character is rested, your opponent cannot attack any card other than this Character." */
   staticTaunt?: boolean;
   /** "This card in your hand cannot be played by effects." */

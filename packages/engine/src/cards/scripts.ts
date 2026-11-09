@@ -481,7 +481,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         timing: 'onPlay',
         steps: [
           { do: 'payCost', cost: { trashFromHand: 1 } },
-          { do: 'addDonFromDeck', count: 1 },
+          { do: 'addDonFromDeck', count: 1, upTo: true },
         ],
       },
     ],
@@ -507,7 +507,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         timing: 'main',
         steps: [
           { do: 'draw', count: 1 },
-          { do: 'addDonFromDeck', count: 1 },
+          { do: 'addDonFromDeck', count: 1, upTo: true },
         ],
       },
       { timing: 'trigger', steps: [{ do: 'useMainEffect' }] },
@@ -521,10 +521,10 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         timing: 'main',
         steps: [
           { do: 'ko', target: oppChar({ maxCost: 6 }) },
-          { do: 'addDonFromDeck', count: 1 },
+          { do: 'addDonFromDeck', count: 1, upTo: true },
         ],
       },
-      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },
+      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1, upTo: true }] },
     ],
   },
   'ST04-016': {
@@ -549,7 +549,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         label: 'Virar: +1 DON!! virado',
         labelKey: 'engine.labelRestAddRestedDon',
         labelParams: { n: 1 },
-        steps: [{ do: 'addDonFromDeck', count: 1, rested: true, if: { leaderHasType: 'Animal Kingdom Pirates' } }],
+        steps: [{ do: 'addDonFromDeck', count: 1, rested: true, upTo: true, if: { leaderHasType: 'Animal Kingdom Pirates' } }],
       },
     ],
   },
@@ -579,7 +579,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
   },
   'ST05-002': {
     // [On Play] Add up to 1 DON!! card from your DON!! deck and rest it.
-    abilities: [{ timing: 'onPlay', steps: [{ do: 'addDonFromDeck', count: 1, rested: true }] }],
+    abilities: [{ timing: 'onPlay', steps: [{ do: 'addDonFromDeck', count: 1, rested: true, upTo: true }] }],
   },
   'ST05-004': {
     // [Blocker] / [On Block] DON!! −1: Rest up to 1 of your opponent's Characters with a cost of 5 or less.
@@ -687,7 +687,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
           { do: 'ko', target: oppChar({ maxCost: 5 }) },
         ],
       },
-      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },
+      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1, upTo: true }] },
     ],
   },
   'ST05-017': {
@@ -702,7 +702,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
           { do: 'cannotBeKO', target: 'chosen', duration: 'turn', if: { chosenMatches: { category: 'character' } } },
         ],
       },
-      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1 }] },
+      { timing: 'trigger', steps: [{ do: 'addDonFromDeck', count: 1, upTo: true }] },
     ],
   },
   // ------------------------------------------------------------ Cartas com estrutura própria
