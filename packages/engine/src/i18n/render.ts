@@ -216,14 +216,21 @@ function target(ref: TargetRef, ctx: Ctx): string {
   let head: string;
   if (spec.name || spec.names) {
     const n = spec.names ? spec.names.map((x) => `[${x}]`).join(' ou ') : `[${spec.name}]`;
+    // O substantivo diz o que o efeito alcança: "[Nico Robin] Leader" (OP09-106) só o Líder,
+    // "[Luffy] Characters" só Personagens; "[X] cards" (Líder ou Personagem, regra 2-1) é "carta".
+    // "Até 1 carta sua [Nico Robin]" para um efeito só de Líder fazia o jogador procurar o Personagem.
+    const k = [...spec.kinds].sort().join('+');
+    const one = k === 'leader' ? 'Líder seu' : k === 'character' ? 'Personagem seu' : 'carta sua';
+    const some = k === 'leader' ? 'Líderes seus' : k === 'character' ? 'Personagens seus' : 'cartas suas';
+    const allOwn = k === 'leader' ? 'todos os seus Líderes' : k === 'character' ? 'todos os seus Personagens' : 'todas as suas cartas';
     head = spec.all
-      ? `todas as suas cartas ${n}`
+      ? `${allOwn} ${n}`
       : anyNumber
         ? spec.side === 'own'
-          ? `cartas suas ${n}`
+          ? `${some} ${n}`
           : `cartas ${n}${spec.side === 'opponent' ? ' do oponente' : ''}`
         : spec.side === 'own'
-          ? `até ${spec.upTo} ${plural(spec.upTo, 'carta sua', 'cartas suas')} ${n}`
+          ? `até ${spec.upTo} ${plural(spec.upTo, one, some)} ${n}`
           : `até ${spec.upTo} ${n}`;
     return [head, ...adj, ...limits(spec, many)].join(' ');
   }

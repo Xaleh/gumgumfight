@@ -139,7 +139,24 @@ describe('tradução: listas de nomes e alvos com nome', () => {
     expect(
       pt('OP16-087', '[On Play] You may trash this Character: If your Leader has the {Land of Wano} type, draw 1 card and up to 1 of your [Kouzuki Momonosuke] gains +20 cost during this turn.'),
     ).toBe(
-      '[Ao Jogar] Você pode descartar este Personagem: Se o seu Líder tiver o tipo {Land of Wano}, compre 1 carta e até 1 carta sua [Kouzuki Momonosuke] recebe +20 de custo durante este turno.',
+      '[Ao Jogar] Você pode descartar este Personagem: Se o seu Líder tiver o tipo {Land of Wano}, compre 1 carta e até 1 Personagem seu [Kouzuki Momonosuke] recebe +20 de custo durante este turno.',
+    );
+  });
+
+  // O substantivo do alvo com nome diz o que o efeito alcança: "carta sua [X]" para um efeito só de
+  // Líder fazia o jogador procurar o Personagem [Nico Robin] (que o motor, certo, não oferecia).
+  it('OP09-106 Nico Olvia: "up to 1 of your [Nico Robin] Leader" é "Líder seu", não "carta sua"', () => {
+    expect(pt('OP09-106', '[On Play] Up to 1 of your [Nico Robin] Leader gains +3000 power during this turn.')).toBe(
+      '[Ao Jogar] Até 1 Líder seu [Nico Robin] recebe +3000 de poder durante este turno.',
+    );
+  });
+
+  it('alvo com nome: "[X] Characters" é "Personagem seu"; "[X] cards" (Líder ou Personagem) segue "carta sua"', () => {
+    expect(pt('PX-001', '[On Play] Up to 1 of your [Nico Robin] Characters gains +3000 power during this turn.')).toBe(
+      '[Ao Jogar] Até 1 Personagem seu [Nico Robin] recebe +3000 de poder durante este turno.',
+    );
+    expect(pt('PX-002', '[On Play] Up to 1 of your [Nico Robin] cards gains +3000 power during this turn.')).toBe(
+      '[Ao Jogar] Até 1 carta sua [Nico Robin] recebe +3000 de poder durante este turno.',
     );
   });
 });
