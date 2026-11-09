@@ -4032,6 +4032,14 @@ button.hint-pill::after,
   place-items: center;
   margin: 14px 0 4px;
 }
+/* Várias cartas à mostra numa pergunta (ex.: "estas são as 5 cartas do topo: topo ou fundo?"): lado a lado. */
+.modal-feature.several {
+  --cw: min(130px, 28vw);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
 .source-line {
   display: inline-flex;
   align-items: center;
@@ -16084,8 +16092,11 @@ div.dk-tile-main {
 .wm-overlay .detail-text {
   width: 100%;
 }
-/* o painel lateral com a largura do bloco que mora nele */
-.game.wide {
+/*
+ * O painel lateral com a largura do bloco que mora nele. Só na mesa larga: na visão do Streamer a mesa
+ * ocupa a tela toda sem painel (`.game.streamer`) e encolhe quando ele abre (`.with-panel`).
+ */
+.game.wide-board {
   grid-template-columns: 1fr var(--panel-w, 340px);
 }
 

@@ -63,8 +63,10 @@ export interface ReplayFile {
    * 12: "turn N cards from the top of your Life cards face-up" só olha as N do topo (não pula a já virada);
    *    nos antigos, a pergunta que o roteiro não tem é recusada (`answer`).
    * 13: "set up to N of your DON!! cards as active" pergunta quantos (`option`); nos antigos, o máximo.
+   * 14: "look at N … place them at the top or bottom" pergunta topo ou fundo para todas (`option`) e depois a
+   *    ordem; nos antigos, a escolha de "quais vão para o fundo" vira "fundo" (todas) ou "topo" (as demais).
    */
-  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+  version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
   seed: number;
   /** Partidas online: seed de 128 bits. */
   seed128?: number[];

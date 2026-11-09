@@ -35,6 +35,28 @@ const extra: CardData[] = [
     text: '[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Okama} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.',
   },
   { id: 'DR-006', name: 'Ivankov', category: 'character', colors: ['yellow'], cost: 4, power: 5000, types: ['Okama'], text: '' },
+  // OP16-021 Moby Dick: "add up to 1 card to your hand" (sem "reveal"): o oponente não vê a carta.
+  {
+    id: 'DR-007',
+    name: 'Quiet Seeker',
+    category: 'character',
+    colors: ['yellow'],
+    cost: 1,
+    power: 2000,
+    types: [],
+    text: '[On Play] Look at 3 cards from the top of your deck and add up to 1 card to your hand. Then, place the rest at the bottom of your deck in any order.',
+  },
+  // OP16-119 Marshall.D.Teach: "add up to 1 card to the top of your Life cards" (virada para baixo, sem "reveal").
+  {
+    id: 'DR-008',
+    name: 'Life Seeker',
+    category: 'character',
+    colors: ['yellow'],
+    cost: 1,
+    power: 2000,
+    types: [],
+    text: '[On Play] Look at 3 cards from the top of your deck; add up to 1 card to the top of your Life cards. Then, place the rest at the bottom of your deck in any order.',
+  },
 ];
 const cards = [...baseCards, ...op02, ...st13, ...extra];
 
@@ -234,5 +256,49 @@ describe('Carta revelada aparece para o oponente', () => {
     expect(theirs.defs['DR-006']?.name).toBe('Ivankov');
     // Jogada a carta, ela sai da lista na ação seguinte e as outras cartas da mão seguem escondidas.
     expect(theirs.players[0].hand.filter((u) => theirs.cards[u].cardId !== '?')).toHaveLength(1);
+  });
+});
+
+describe('Busca sem "reveal" não mostra a carta ao oponente (OP16-021, OP16-119)', () => {
+  /** Põe `cardId` no topo do deck do jogador 0, joga `seeker` e escolhe a carta do topo. */
+  function pick(cardId: string, seeker: string): { s: GameState; uid: string } {
+    let s = toTurn(started(), 3);
+    const uid = take(s, 0, cardId);
+    const deck = s.players[0].deck;
+    deck.splice(deck.indexOf(uid), 1);
+    deck.unshift(uid);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: toHand(s, 0, seeker) });
+    expect(s.pending?.kind).toBe('selectTargets');
+    return { s, uid };
+  }
+
+  it('"add up to 1 card to your hand": a carta vai para a mão sem nome no log, sem `revealed` e sem `knownHand`', () => {
+    let { s, uid } = pick('DR-006', 'DR-007');
+    expect((s.pending as { promptKey: string }).promptKey).toBe('engine.searchToHand');
+    s = applyAction(s, { type: 'choose', player: 0, uids: [uid] });
+    while (s.pending?.player === 0 && s.pending.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: (s.pending as { options: string[] }).options });
+    expect(s.players[0].hand).toContain(uid);
+    expect(s.log.find((l) => l.key === 'log.addsOneToHand')).toMatchObject({ params: { player: s.players[0].name } });
+    expect(s.log.some((l) => l.key === 'log.revealsAddsToHand')).toBe(false);
+    expect(s.log.some((l) => /Ivankov/.test(l.text))).toBe(false);
+    expect(s.log.some((l) => l.revealed)).toBe(false);
+    expect(s.knownHand ?? []).toEqual([]);
+    const theirs = viewFor(s, 1, aliases(s));
+    expect(theirs.players[0].hand.every((u) => theirs.cards[u].cardId === '?')).toBe(true);
+    expect(theirs.defs['DR-006']).toBeUndefined();
+  });
+
+  it('"add up to 1 card to the top of your Life cards": pergunta fala em Vida; a carta entra virada para baixo, sem nome', () => {
+    let { s, uid } = pick('DR-006', 'DR-008');
+    expect((s.pending as { promptKey: string }).promptKey).toBe('engine.searchToLife');
+    const life = s.players[0].life.length;
+    s = applyAction(s, { type: 'choose', player: 0, uids: [uid] });
+    while (s.pending?.player === 0 && s.pending.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: (s.pending as { options: string[] }).options });
+    expect(s.players[0].life.length).toBe(life + 1);
+    expect(s.players[0].life.at(-1)).toBe(uid);
+    expect(s.players[0].lifeFaceUp ?? []).not.toContain(uid);
+    expect(s.log.find((l) => l.key === 'log.addsOneToLife')).toBeTruthy();
+    expect(s.log.some((l) => /Ivankov/.test(l.text))).toBe(false);
+    expect(s.log.some((l) => l.revealed)).toBe(false);
   });
 });

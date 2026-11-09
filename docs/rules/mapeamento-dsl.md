@@ -139,7 +139,7 @@ Colunas: **types** = linha em types.ts; **engine** = `case` em `execStep`.
 | `opponentDraws` | count | O oponente compra N | 567 | 3151 |
 | `search` | look, upTo, filter, rest: bottom/trash/topOrBottom, play?, toLife?, lifeFaceDown?, rested?, toTrash? | "Look at N…; reveal up to M … and add it to your hand. Then, place the rest…" (também jogar/Vida/descarte) | 625 | 2351 |
 | `tutor` | upTo, filter | Procura no deck inteiro e adiciona à mão | 627 | 2547 |
-| `arrangeTop` | look, topOnly? | Olha N e devolve ao topo/fundo em qualquer ordem | 703 | 3980 |
+| `arrangeTop` | look, topOnly? | Olha N; pergunta topo ou fundo para todas (sem dividir, Q&A OP01-073) e depois a ordem | 703 | 3980 |
 | `revealTop` | — | Revela o topo do deck (vira `chosen`/`revealed`) | 659 | 2705 |
 | `revealedToHand` | filter? | A revelada vai para a mão (se casar) | 508 | 2721 |
 | `revealedToBottom` | — | A revelada vai para o fundo | 663 | 3573 |

@@ -49,6 +49,7 @@ import {
   IllegalActionError,
   type LogEntry,
   type ManualOp,
+  motionHoldMs,
   type Pending,
   type PlayerId,
   REPLAY_VERSION,
@@ -215,10 +216,11 @@ export interface RoomData {
    */
   engineTexts?: Record<string, CardEngineText>;
   /**
-   * Quando cada ação de `actions` aconteceu (ms) e o tempo dos dois jogadores logo depois dela:
-   * é o que a mesa atrasada de quem vê as mãos reproduz. Salas gravadas antes do campo não o têm.
+   * Quando cada ação de `actions` aconteceu (ms), o tempo dos dois jogadores logo depois dela e a
+   * espera da animação dela (ms, ver `commit`): é o que a mesa atrasada de quem vê as mãos reproduz.
+   * Salas gravadas antes do campo não o têm (e antes da espera, não têm o 4º valor).
    */
-  timeline?: Array<[at: number, left0: number, left1: number]>;
+  timeline?: Array<[at: number, left0: number, left1: number, hold?: number]>;
   /** Quando a partida começou (ms). */
   startedAt?: number;
   /** Sala privada: quem criou liberou as mãos dos jogadores para quem transmite (streamer e admin, com atraso). */
@@ -475,6 +477,10 @@ export class Room {
   private running: PlayerId | null = null;
   /** Pausada pelo Judge: o relógio não corre e as jogadas são recusadas (`data.pause`). */
   private paused = false;
+  /**
+   * Desde quando o tempo do jogador da vez conta (ms). Logo depois de uma jogada fica no futuro: a
+   * espera da animação dela (`motionHoldMs`) não é cobrada de ninguém (ver `commit`).
+   */
   private since = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
@@ -657,10 +663,10 @@ export class Room {
     this.driveBot();
   }
 
-  /** Desconta do jogador da vez o tempo desde a última mudança (nada durante a pausa). */
+  /** Desconta do jogador da vez o tempo desde a última mudança (nada durante a pausa nem na espera da animação). */
   private settle() {
     const now = this.deps.now();
-    if (this.running !== null && !this.paused) this.data.remaining[this.running] = Math.max(0, this.data.remaining[this.running] - (now - this.since));
+    if (this.running !== null && !this.paused) this.data.remaining[this.running] = Math.max(0, this.data.remaining[this.running] - Math.max(0, now - this.since));
     this.since = now;
   }
 
@@ -702,7 +708,6 @@ export class Room {
     if (lastAt !== undefined) play.sinceMs = now - lastAt;
     this.plays_.push(play);
     this.data.actions.push(action);
-    (this.data.timeline ??= []).push([now, this.data.remaining[0], this.data.remaining[1]]);
     // Escolha vazia logo depois da jogada anterior, com cartas à escolha: provável toque duplo (relatos
     // de "o efeito não funcionou" no celular). Fica no log do servidor e, pelo `sinceMs`, nas jogadas do Judge.
     if (action.type === 'choose' && !action.uids.length && prev.pending?.kind === 'selectTargets' && prev.pending.options.length && play.sinceMs !== undefined && play.sinceMs < QUICK_SKIP_MS) {
@@ -712,6 +717,15 @@ export class Room {
     this.lastAction = action;
     const before = this.running;
     this.running = this.state.phase === 'gameover' ? null : actingPlayer(this.state);
+    /**
+     * A espera da animação: enquanto a mesa anima esta jogada (cartas voando, DON!!, o ataque ou a
+     * habilidade em destaque), quem está na vez não consegue agir, então o tempo dele só volta a
+     * contar quando ela acaba. É o mesmo para os dois, com ou sem animação, e sai do estado (não do
+     * navegador): ninguém ganha tempo desligando a animação nem pedindo mais espera.
+     */
+    const hold = this.running === null ? 0 : Math.round(motionHoldMs(prev, this.state, action));
+    this.since += hold;
+    (this.data.timeline ??= []).push([this.since - hold, this.data.remaining[0], this.data.remaining[1], hold]);
     if (this.running === null || this.connected(this.running)) this.awaySince = null;
     else this.awaySince ??= this.deps.now();
     this.schedule();
@@ -1284,15 +1298,17 @@ export class Room {
     const next = timeline[late.count];
     const remaining: [number, number] = [prev[1], prev[2]];
     const running = late.state.phase === 'gameover' ? null : actingPlayer(late.state);
+    // A espera da animação da ação anterior (o tempo só conta depois dela).
+    const hold = prev[3] ?? 0;
     if (running !== null) {
       // O tempo parado pelo Judge entre a ação anterior e este instante não conta.
       let pausedMs = 0;
       for (const [from, to] of this.data.pauses ?? []) pausedMs += Math.max(0, Math.min(to ?? this.deps.now(), at) - Math.max(from, prev[0]));
       // Nunca abaixo do que ele tinha na ação seguinte (o servidor pode ter ficado fora do ar no meio).
-      remaining[running] = Math.max(next ? next[1 + running] : 0, remaining[running] - Math.max(0, at - prev[0] - pausedMs));
+      remaining[running] = Math.max(next ? (running === 0 ? next[1] : next[2]) : 0, remaining[running] - Math.max(0, at - prev[0] - hold - pausedMs));
     }
     const pausedAt = this.data.pause && this.data.pause.at <= at ? this.data.pause : null;
-    return { remaining, running, total: TIME_BANK_MS, awaySince: null, paused: Boolean(pausedAt) };
+    return { remaining, running, total: TIME_BANK_MS, awaySince: null, paused: Boolean(pausedAt), hold: running !== null && !pausedAt ? Math.max(0, prev[0] + hold - at) : 0 };
   }
 
   private updatePresence() {
@@ -1319,11 +1335,13 @@ export class Room {
     this.sendState([...this.conns].filter((c) => !this.isLate(c)));
   }
 
+  /** O relógio agora. `hold`: por quantos ms o tempo do jogador da vez ainda fica parado pela animação da última jogada. */
   clock() {
     const now = this.deps.now();
     const remaining = [...this.data.remaining] as [number, number];
-    if (this.running !== null && !this.paused) remaining[this.running] = Math.max(0, remaining[this.running] - (now - this.since));
-    return { remaining, running: this.running, total: TIME_BANK_MS, awaySince: this.awaySince, paused: this.paused };
+    const on = this.running !== null && !this.paused;
+    if (on) remaining[this.running!] = Math.max(0, remaining[this.running!] - Math.max(0, now - this.since));
+    return { remaining, running: this.running, total: TIME_BANK_MS, awaySince: this.awaySince, paused: this.paused, hold: on ? Math.max(0, this.since - now) : 0 };
   }
 
   /**

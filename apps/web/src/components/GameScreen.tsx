@@ -2537,7 +2537,8 @@ function targetsDecision(t: Translate, prompt: string, pending: Extract<Pending,
   }
   if (n === 0 && need === 0) {
     return {
-      label: t('game.skipChoice'),
+      // Ordenação opcional ("clique na ordem …"): sem marcar nada, as cartas ficam como estão.
+      label: pending.ordered ? t('game.keepOrder') : t('game.skipChoice'),
       sub: t('game.noneMarkedUpTo', { max }),
       title: t('game.promptSkip', { prompt }),
       pulse: false,
@@ -2856,15 +2857,22 @@ function Prompt(props: {
       const blocked = shown ? shown.filter((u) => !pending.options.includes(u)).length : 0;
       // "Não escolher" numa linha própria, à esquerda e acima: longe do "Confirmar" (embaixo, à direita, na
       // zona do polegar), para o toque sem querer não sair como escolha vazia.
+      // Numa escolha ordenada (pôr as cartas de volta), "Manter a ordem" é a resposta comum: sem a proteção.
       const skipRow = pending.max > 0 && pending.min === 0 && (
         <div className="btn-row skip-row">
-          <button
-            className={['btn', 'skip', skip.armed ? 'armed' : ''].join(' ')}
-            onClick={() => skip.press(() => onDispatch({ type: 'choose', player: human, uids: [] }))}
-          >
-            {skip.armed ? t('game.skipChoiceArmed') : t('game.skipChoice')}
-            {skip.armed && <small>{t('game.skipChoiceArmedSub')}</small>}
-          </button>
+          {pending.ordered ? (
+            <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+              {t('game.keepOrder')}
+            </button>
+          ) : (
+            <button
+              className={['btn', 'skip', skip.armed ? 'armed' : ''].join(' ')}
+              onClick={() => skip.press(() => onDispatch({ type: 'choose', player: human, uids: [] }))}
+            >
+              {skip.armed ? t('game.skipChoiceArmed') : t('game.skipChoice')}
+              {skip.armed && <small>{t('game.skipChoiceArmedSub')}</small>}
+            </button>
+          )}
         </div>
       );
       const confirm = (
@@ -3008,7 +3016,7 @@ function Prompt(props: {
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
             {pending.shown?.length ? (
-              <div className="modal-feature">
+              <div className={`modal-feature${pending.shown.length > 1 ? ' several' : ''}`}>
                 {pending.shown.map((uid) => (
                   <CardView key={uid} state={state} uid={uid} onClick={() => props.onCard(uid)} />
                 ))}

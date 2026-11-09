@@ -169,14 +169,15 @@ function clean(raw: string): string {
       'rest any number of your DON!! cards for +$2 power to $1',
     )
     .replace(/, or when your opponent plays a Character using a Character's effect/g, " or your opponent plays a Character using a Character's effect")
+    // "look at N … and add up to 1 X to …" (sem "reveal"): a carta vai escondida; o leitor da busca distingue.
     .replace(
       /look at (\d+) cards from the top of your deck and add up to (\d+) (.+?) to the top of your Life cards face-up/gi,
-      'look at $1 cards from the top of your deck; reveal up to $2 $3 and add it to the top of your Life cards face-up',
+      'look at $1 cards from the top of your deck; add up to $2 $3 to the top of your Life cards face-up',
     )
     .replace(/(\{[^}]+\} type (?:Character )?cards?) or "([^"]+)"/g, '$1 or [$2]')
     .replace(
       /look at (\d+) cards from the top of your deck and add up to (\d+) cards? to your hand/gi,
-      'look at $1 cards from the top of your deck; reveal up to $2 card and add it to your hand',
+      'look at $1 cards from the top of your deck; add up to $2 card to your hand',
     )
     // "up to 1 of your Leader with a type including "X" or up to 1 of your Characters with a type including "X""
     .replace(
@@ -211,7 +212,7 @@ function clean(raw: string): string {
     .replace(/(your Leader has the \{[^}]+\} type) and have /g, '$1 and you have ')
     .replace(/(you have \d+ or (?:more|less) DON!! cards on your field) and (\d+ or (?:more|less) cards in your hand)/g, '$1 and you have $2')
     .replace(/\bgive -(\d+) power during this turn to (up to .+?)(?=\.|$)/g, 'give $2 -$1 power during this turn')
-    .replace(/(Look at \d+ cards from the top of your deck); add up to (\d+) cards? to the top of your Life cards\b/g, '$1; reveal up to $2 card and add it to the top of your Life cards')
+    .replace(/(Look at \d+ cards from the top of your deck); add up to (\d+) cards? to the top of your Life cards\b/g, '$1; add up to $2 card to the top of your Life cards')
     // Lote final: textos com estrutura diferente do padrão.
     .replace(/(Look at \d+ cards from the top of your deck) and play up to/gi, '$1; play up to')
     .replace(/reveal (?:up to )?a total of (?:up to )?(\d+)/gi, 'reveal up to $1')
@@ -326,7 +327,7 @@ function clean(raw: string): string {
     // O "You may" fica de fora: olhar e não pegar nada dá no mesmo, menos a ordem do fundo do deck.
     .replace(
       /\b(?:You may )?look at (\d+) cards from the top of your deck and add up to (\d+) (.+?) to your hand, then (place the rest at the bottom of your deck in any order)/gi,
-      'Look at $1 cards from the top of your deck; reveal up to $2 $3 and add it to your hand. Then, $4',
+      'Look at $1 cards from the top of your deck; add up to $2 $3 to your hand. Then, $4',
     )
     .replace(/’/g, "'");
 }
@@ -2363,6 +2364,11 @@ export function parseBody(body: string): EffectStep[] | null {
       s = `${oneSentence[1]} and add it to your hand`;
       sentences.splice(i + 1, 0, `Then, ${oneSentence[2]}.`);
     }
+    // "Look at N cards…; add up to 1 card to your hand / to the top of your Life cards" (OP16-021, OP16-119):
+    // sem o "reveal", a carta escolhida não é mostrada ao oponente (só o "reveal" do texto revela).
+    const addOnly = s.match(/^(Look at (?:up to )?\d+ cards from the top of your deck); add up to (\d+) (.+?) to (your hand|the top of your Life cards(?: face-up)?)$/i);
+    const noReveal = Boolean(addOnly);
+    if (addOnly) s = `${addOnly[1]}; reveal up to ${addOnly[2]} ${addOnly[3]} and add it to ${addOnly[4]}`;
     const look =
       s.match(/^Look at (?:up to )?(\d+) cards from the top of your deck; reveal up to (\d+) (.+?) and add (?:it|them) to (?:your hand|the top of your Life cards(?: face-up)?)$/i) ??
       s.match(/^Look at (\d+) cards from the top of your deck; (play) up to (\d+) (.+?)$/i) ??
@@ -2397,6 +2403,7 @@ export function parseBody(body: string): EffectStep[] | null {
       if (play) search.play = true;
       if (restedPlay) search.rested = true;
       if (toTrash) search.toTrash = true;
+      if (noReveal) search.noReveal = true;
       if (/Life cards face-up$/i.test(s)) search.toLife = true;
       else if (/Life cards$/i.test(s)) {
         search.toLife = true;
