@@ -13,6 +13,10 @@
 //
 // Também anima os DON!! (deck de DON!! → área de custo → cartas) e o impacto do
 // dano no Líder. O tempo total fica em `holdMotion` para o bot esperar.
+//
+// O servidor refaz estas contas de tempo só pelo estado (`motionHoldMs`, packages/engine/src/motion.ts)
+// para não cobrar a animação do relógio de quem joga online: ao mudar um tempo, um grupo ou um limite
+// aqui (`plan`, `spotPlan`, `donPlan`), mude lá também.
 
 import { type Action, cardDef, type GameState, getPower, hasKeyword, HIDDEN_CARD, type PlayerId } from '@gumgum/engine';
 import { type CSSProperties, type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';

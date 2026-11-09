@@ -1010,7 +1010,8 @@ export interface OnlineRoomInfo {
   pov?: PlayerId | null;
   players: Array<{ name: string; userId?: string | null; bounty: number; tier: string; leader: string; connected: boolean; bot: boolean; apprentice?: boolean }>;
   spectators: number;
-  clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null; paused?: boolean };
+  /** `hold`: por quantos ms (a partir deste estado) o tempo do jogador da vez ainda fica parado pela animação da última jogada. */
+  clock: { remaining: [number, number]; running: PlayerId | null; total: number; awaySince: number | null; paused?: boolean; hold?: number };
   /** Partida de torneio pausada por um chamado de Judge (`by`: assento que chamou; null = o Judge/organizador). */
   pause?: { by: PlayerId | null; at: number } | null;
   /** Modo manual do Judge: quem está corrigindo a mesa (a partida fica pausada). */
