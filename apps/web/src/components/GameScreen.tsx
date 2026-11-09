@@ -2528,7 +2528,8 @@ function targetsDecision(t: Translate, prompt: string, pending: Extract<Pending,
   }
   if (n === 0 && need === 0) {
     return {
-      label: t('game.skipChoice'),
+      // Ordenação opcional ("clique na ordem …"): sem marcar nada, as cartas ficam como estão.
+      label: pending.ordered ? t('game.keepOrder') : t('game.skipChoice'),
       sub: t('game.noneMarkedUpTo', { max }),
       title: t('game.promptSkip', { prompt }),
       pulse: false,
@@ -2817,7 +2818,7 @@ function Prompt(props: {
             <>
               {pending.min === 0 && (
                 <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-                  {t('game.skipChoice')}
+                  {pending.ordered ? t('game.keepOrder') : t('game.skipChoice')}
                 </button>
               )}
               <button
@@ -2948,7 +2949,7 @@ function Prompt(props: {
           <div className="modal-card">
             <SourceLine state={state} uid={pending.source} />
             {pending.shown?.length ? (
-              <div className="modal-feature">
+              <div className={`modal-feature${pending.shown.length > 1 ? ' several' : ''}`}>
                 {pending.shown.map((uid) => (
                   <CardView key={uid} state={state} uid={uid} onClick={() => props.onCard(uid)} />
                 ))}

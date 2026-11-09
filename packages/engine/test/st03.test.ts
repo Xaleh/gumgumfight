@@ -109,19 +109,33 @@ describe('ST03 — The Seven Warlords of the Sea', () => {
     expect(() => applyAction(s, { type: 'activate', player: 0, uid: sentomaru, ability: 0 })).toThrow(/Condições/);
   });
 
-  it('Bartholomew Kuma olha 3 do topo: escolhe as do fundo e a ordem das que ficam', () => {
+  it('Bartholomew Kuma olha 3 do topo: escolhe topo ou fundo para as três (Q&A OP01-073) e depois a ordem', () => {
     let s = begin(3);
     const kuma = fetchToHand(s, 0, 'ST03-010');
     const [a, b, c] = s.players[0].deck.slice(0, 3);
     s = applyAction(s, { type: 'playCard', player: 0, uid: kuma });
-    expect(s.pending).toMatchObject({ kind: 'selectTargets', ordered: true, min: 0, max: 3 });
-    s = applyAction(s, { type: 'choose', player: 0, uids: [b] });
-    expect(s.pending).toMatchObject({ kind: 'selectTargets', ordered: true, min: 2, max: 2 });
-    expect(s.players[0].deck.slice(0, 2)).toEqual([a, c]); // continuam visíveis no topo
+    expect(s.pending).toMatchObject({ kind: 'option', promptKey: 'engine.arrangeTopOrBottom', shown: [a, b, c], options: ['Topo do deck', 'Fundo do deck'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 }); // topo
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', promptKey: 'engine.arrangeTopOrder', ordered: true, min: 0, max: 3, options: [a, b, c] });
+    expect(s.players[0].deck.slice(0, 3)).toEqual([a, b, c]); // continuam visíveis no topo
     s = applyAction(s, { type: 'choose', player: 0, uids: [c, a] });
     const deck = s.players[0].deck;
-    expect(deck.slice(0, 2)).toEqual([c, a]);
-    expect(deck[deck.length - 1]).toBe(b);
+    expect(deck.slice(0, 3)).toEqual([c, a, b]); // as não escolhidas mantêm a ordem, depois das escolhidas
+    expect(s.pending).toBeNull();
+    expect(countCards(s, 0)).toBe(51);
+  });
+
+  it('Bartholomew Kuma: "fundo" leva as três para o fundo, a última escolhida por baixo de tudo', () => {
+    let s = begin(3);
+    const kuma = fetchToHand(s, 0, 'ST03-010');
+    const [a, b, c] = s.players[0].deck.slice(0, 3);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: kuma });
+    s = applyAction(s, { type: 'option', player: 0, index: 1 }); // fundo
+    expect(s.pending).toMatchObject({ kind: 'selectTargets', promptKey: 'engine.arrangeBottomOrder', ordered: true, min: 0, max: 3 });
+    s = applyAction(s, { type: 'choose', player: 0, uids: [b, c, a] });
+    const deck = s.players[0].deck;
+    expect(deck.slice(-3)).toEqual([b, c, a]);
+    expect(deck.slice(0, 3)).not.toContain(a);
     expect(s.pending).toBeNull();
     expect(countCards(s, 0)).toBe(51);
   });
