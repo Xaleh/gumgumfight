@@ -50,3 +50,4 @@ export * from './replay';
 export { createScenario, passiveAction, type ScenarioCard, type ScenarioSide, type ScenarioSpec } from './scenario';
 export { applyErrata, errataFor, ERRATA, type Errata, fixCard } from './errata';
 export { applySourceFixes, SOURCE_FIXES, SOURCE_TEXT_FIXES, type SourceFix } from './source-fixes';
+export { freshTrigger, MOTION_SPOT_MS, motionHoldMs, type TriggerHit } from './motion';

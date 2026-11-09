@@ -506,7 +506,7 @@ bloco, com quatro predefinições; as opções que outra escolha bloqueia ficam 
 
 `useOnlineGame.ts` abre um `EventSource` (`/events?t=<token>` para jogador, `/watch[?hands=1]` para espectador),
 acumula `defs` e `log` incrementalmente, envia ações por `POST /action` com `seq = actionCount` numa fila de um por vez,
-mostra relógio local (`clock.remaining` − tempo desde o último snapshot). Reconexão: se o `EventSource` fecha e a
+mostra relógio local (`clock.remaining` − tempo desde o último snapshot, descontada a espera da animação `clock.hold`). Reconexão: se o `EventSource` fecha e a
 partida não acabou, espera 3 s, consulta `/api/online/active` (jogador) ou `/api/online/rooms/:id` (espectador) e
 reabre; watchdog de 10 s reconecta se não chega nada há 50 s. Detalhes do protocolo na seção 11.
 
@@ -969,6 +969,12 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
    **faz broadcast** (um `state` por conexão, cada um com a própria visão).
 4. **Relógio**: 17:30 por jogador, corre só para `actingPlayer`. Um `setTimeout` por sala agenda o próximo vencimento
    (tempo ou abandono: 2 min sem conexão do jogador da vez). Vencimento aplica a ação `timeout`.
+   **Espera da animação**: a cada jogada o servidor calcula quanto a mesa leva animando a passagem de um estado ao
+   outro (`motionHoldMs`, `packages/engine/src/motion.ts`: as mesmas contas do plano de `Motion.tsx`, só pelo estado)
+   e o tempo de quem fica na vez só volta a contar depois disso (`Room.since` no futuro; `clock.hold` diz quanto
+   falta). Vale igual para os dois, com ou sem animação, e sai do estado, não do navegador: ninguém ganha tempo
+   desligando a animação nem pedindo mais espera. A `timeline` guarda a espera de cada ação (4º valor) para a mesa
+   atrasada (`lateClock`).
 5. **Fim**: `phase === 'gameover'` → `finishMatch` refaz o replay (`deriveMatch`), grava em `matches`/`match_seats`/
    `match_cards`/`deck_lists`, atualiza bounty na ranqueada, avisa o torneio (`reportFromGame`). A sala fica 15 min para
    tela de resultado, replay (`GET /replay`, só depois do fim) e revanche; depois o varredor apaga sala e linha.
@@ -994,7 +1000,7 @@ ações. Isso atravessa Nginx e Nginx Proxy Manager sem configuração especial 
 | `ping` | `{}` | a cada 20 s (keep-alive) |
 
 `room` inclui: id, código, fila, formato, torneio (nome, fase, jogo, placar), `status`, `you`, jogadores (nome, bounty,
-tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, total, awaySince}`, `result`, `rematch`.
+tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, total, awaySince, paused, hold}`, `result`, `rematch`.
 
 ### Espectador ("transmissão")
 

@@ -362,7 +362,8 @@ export type OnlineGame = ReturnType<typeof useOnlineGame>;
 export function remainingNow(room: OnlineRoomInfo, clockAt: number, now = performance.now()): [number, number] {
   const r = [...room.clock.remaining] as [number, number];
   if (room.clock.running !== null && room.status === 'playing' && !room.clock.paused) {
-    r[room.clock.running] = Math.max(0, r[room.clock.running] - (now - clockAt));
+    // O servidor não cobra a animação da última jogada (`clock.hold`): o relógio fica parado até ela acabar.
+    r[room.clock.running] = Math.max(0, r[room.clock.running] - Math.max(0, now - clockAt - (room.clock.hold ?? 0)));
   }
   return r;
 }

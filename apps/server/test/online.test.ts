@@ -11,6 +11,7 @@ import {
   HIDDEN_CARD,
   legalActions,
   type LogEntry,
+  motionHoldMs,
   type PlayerId,
   REPLAY_VERSION,
 } from '@gumgum/engine';
@@ -884,6 +885,52 @@ describe('partidas online: relógio', () => {
     expect(room.state!.phase).toBe('gameover');
     expect(room.state!.winner).toBe(first);
     expect(room.state!.winReason).toContain('sem tempo');
+    l.dispose();
+  });
+
+  it('a animação da jogada não é cobrada de quem está na vez', () => {
+    vi.useFakeTimers();
+    let t = 1_000_000;
+    const db = freshDb();
+    const l = lobby(db, () => t);
+    const r = l.createPrivate(seat('a', 'st01-luffy', db), { format: 'standard', spoilers: true });
+    if ('error' in r) throw new Error(r.error);
+    const j = l.joinPrivate(r.room.data.code!, seat('b', 'st02-kid', db));
+    if ('error' in j) throw new Error(j.error);
+    const room = r.room;
+    const c0 = client(0);
+    const c1 = client(1);
+    room.attach(c0.conn);
+    room.attach(c1.conn);
+    const first = actingPlayer(c0.view!)!;
+    const other = (1 - first) as PlayerId;
+    room.act(first, 0, { type: 'answer', player: first, yes: true });
+    room.act(first, 1, { type: 'mulligan', player: first, redraw: false });
+    // Com o mulligan do outro, a Vida dos dois sai do deck e o primeiro compra e recebe DON!!. A mesa anima
+    // tudo isso antes de o primeiro poder jogar: o tempo dele espera a animação acabar.
+    const before = room.state!;
+    room.act(other, 2, { type: 'mulligan', player: other, redraw: false });
+    const hold = motionHoldMs(before, room.state!, room.data.actions[2]);
+    expect(hold).toBeGreaterThan(1000);
+    expect(room.clock()).toMatchObject({ running: first, hold });
+    expect(c0.room.clock.hold).toBe(hold);
+    expect(room.data.timeline![2][3]).toBe(hold);
+
+    // No meio da animação nada foi cobrado; depois dela, só o que passou além.
+    t += Math.floor(hold / 2);
+    expect(room.clock().remaining[first]).toBe(TIME_BANK_MS);
+    expect(room.clock().hold).toBe(hold - Math.floor(hold / 2));
+    t += hold - Math.floor(hold / 2) + 5_000;
+    expect(room.clock()).toMatchObject({ remaining: first === 0 ? [TIME_BANK_MS - 5_000, TIME_BANK_MS] : [TIME_BANK_MS, TIME_BANK_MS - 5_000], hold: 0 });
+
+    // O fim por tempo também espera a animação: o relógio vence `hold` depois do que venceria.
+    t += TIME_BANK_MS - 5_000 - 1;
+    vi.advanceTimersByTime(TIME_BANK_MS + hold - 1);
+    expect(room.state!.phase).not.toBe('gameover');
+    t += 2;
+    vi.advanceTimersByTime(10);
+    expect(room.state!.phase).toBe('gameover');
+    expect(room.state!.winner).toBe(other);
     l.dispose();
   });
 
