@@ -43,7 +43,7 @@ describe('tradução: números internos do leitor não aparecem no texto', () =>
 
   it('OP03-091 Helmeppo: "Set the cost of … to 0"', () => {
     expect(pt('OP03-091', "[On Play] Set the cost of up to 1 of your opponent's Characters with no base effect to 0 during this turn.")).toBe(
-      '[Ao Jogar] O custo de até 1 Personagem do oponente sem efeito passa a ser 0 durante este turno.',
+      '[Ao Jogar] O custo de até 1 Personagem do oponente sem efeito base passa a ser 0 durante este turno.',
     );
   });
 
@@ -139,7 +139,118 @@ describe('tradução: listas de nomes e alvos com nome', () => {
     expect(
       pt('OP16-087', '[On Play] You may trash this Character: If your Leader has the {Land of Wano} type, draw 1 card and up to 1 of your [Kouzuki Momonosuke] gains +20 cost during this turn.'),
     ).toBe(
-      '[Ao Jogar] Você pode descartar este Personagem: Se o seu Líder tiver o tipo {Land of Wano}, compre 1 carta e até 1 carta sua [Kouzuki Momonosuke] recebe +20 de custo durante este turno.',
+      '[Ao Jogar] Você pode descartar este Personagem: Se o seu Líder tiver o tipo {Land of Wano}, compre 1 carta e até 1 dos seus Personagens [Kouzuki Momonosuke] recebe +20 de custo durante este turno.',
     );
+  });
+
+  // O substantivo do alvo com nome diz o que o efeito alcança: "carta sua [X]" para um efeito só de
+  // Líder fazia o jogador procurar o Personagem [Nico Robin] (que o motor, certo, não oferecia).
+  it('OP09-106 Nico Olvia: "up to 1 of your [Nico Robin] Leader" é "o seu Líder", não "carta sua"', () => {
+    expect(pt('OP09-106', '[On Play] Up to 1 of your [Nico Robin] Leader gains +3000 power during this turn.')).toBe(
+      '[Ao Jogar] O seu Líder [Nico Robin] recebe +3000 de poder durante este turno.',
+    );
+  });
+
+  it('alvo com nome: "[X] Characters" é "dos seus Personagens"; "[X] cards" (Líder ou Personagem) é "das suas cartas"', () => {
+    expect(pt('PX-001', '[On Play] Up to 1 of your [Nico Robin] Characters gains +3000 power during this turn.')).toBe(
+      '[Ao Jogar] Até 1 dos seus Personagens [Nico Robin] recebe +3000 de poder durante este turno.',
+    );
+    expect(pt('PX-002', '[On Play] Up to 1 of your [Nico Robin] cards gains +3000 power during this turn.')).toBe(
+      '[Ao Jogar] Até 1 das suas cartas [Nico Robin] recebe +3000 de poder durante este turno.',
+    );
+  });
+});
+
+// Auditoria das traduções (11/2026): classes de erro apontadas pelos jogadores, uma carta real de cada.
+describe('tradução: auditoria de 11/2026', () => {
+  it('"If one of your Characters would be removed" é "um Personagem seu", não "todos os seus Personagens" (OP16-014)', () => {
+    expect(pt('OP16-014', "If one of your Characters would be removed from the field by your opponent's effect, you may K.O. this character instead.")).toBe(
+      'Se um Personagem seu for removido do campo por um efeito do oponente, você pode nocautear este Personagem em vez disso.',
+    );
+  });
+
+  it('a condição antes do custo fica antes do custo (OP11-100 Otohime)', () => {
+    expect(pt('OP11-100', '[On Play] If your Leader is [Shirahoshi], you may turn 1 card from the top of your Life cards face-down: Draw 1 card.')).toBe(
+      '[Ao Jogar] Se o seu Líder for [Shirahoshi], você pode virar para baixo 1 carta do topo da sua Vida: Compre 1 carta.',
+    );
+  });
+
+  it('quantidade sem "up to" é obrigatória: sem "até" (OP01-002, P-008, P-010); com "up to", "até" (OP17-073)', () => {
+    expect(pt('OP01-002', '[Main] If you have 5 Characters, return 1 of your Characters to the owner\'s hand.')).toBe(
+      '[Principal] Se você tiver 5 Personagens, devolva 1 dos seus Personagens à mão do dono.',
+    );
+    expect(pt('P-008', "[Activate:Main] You may rest this Character: Rest 1 of your opponent's Characters with a cost of 2 or less.")).toBe(
+      '[Ativar: Principal] Você pode virar este Personagem: Vire 1 Personagem do oponente com custo 2 ou menos.',
+    );
+    expect(pt('P-010', '[End of Your Turn] Add 1 DON!! card from your DON!! deck and set it as active.')).toBe('[Fim do Seu Turno] Adicione 1 DON!! do seu deck de DON!! ativo.');
+    expect(pt('OP17-073', '[On Play] Add up to 1 DON!! card as active from your DON!! deck.')).toBe('[Ao Jogar] Adicione até 1 DON!! do seu deck de DON!! ativo.');
+  });
+
+  it('um jogador só tem um Líder: "o seu Líder", "o seu Líder do tipo {X}", "o seu Líder ou Stage" (OP04-088, OP15-033, OP10-095)', () => {
+    expect(pt('OP04-088', "[Activate:Main] You may rest your 1 Leader: Give up to 1 of your opponent's Characters -4 cost during this turn.")).toBe(
+      '[Ativar: Principal] Você pode virar o seu Líder: Dê −4 de custo a até 1 Personagem do oponente durante este turno.',
+    );
+    expect(pt('OP15-033', '[On Play] Set your {Fish-Man} type Leader as active.')).toBe('[Ao Jogar] Deixe o seu Líder do tipo {Fish-Man} ativo.');
+    expect(pt('OP10-095', "[On Play] You may rest 1 of your {Dressrosa} type Leader or Stage cards: Draw 1 card.")).toBe(
+      '[Ao Jogar] Você pode virar o seu Líder ou Stage do tipo {Dressrosa}: Compre 1 carta.',
+    );
+  });
+
+  it('concordância: plural ("recebem", "ficam ativos", "não podem"), feminino ("nocauteada", "das suas cartas"), cores (OP08-018, OP08-022, OP02-118, OP14-029, OP07-009)', () => {
+    expect(pt('OP08-018', '[Main] Up to 3 of your Characters gain +1000 power during this turn.')).toBe('[Principal] Até 3 dos seus Personagens recebem +1000 de poder durante este turno.');
+    expect(pt('OP08-022', "[On Play] Up to 2 of your opponent's rested Characters with a cost of 5 or less will not become active in your opponent's next Refresh Phase.")).toBe(
+      '[Ao Jogar] Até 2 Personagens virados do oponente com custo 5 ou menos não ficam ativos na próxima Fase de Renovação do oponente.',
+    );
+    expect(pt('OP02-118', "[Counter] Select up to 1 of your Characters. The selected Character cannot be K.O.'d during this battle.")).toBe(
+      '[Counter] Escolha até 1 dos seus Personagens. O Personagem escolhido não pode ser nocauteado durante esta batalha.',
+    );
+    expect(pt('OP14-029', '[Activate: Main] You may rest 2 of your cards: This Character gains +2000 power during this turn.')).toBe(
+      '[Ativar: Principal] Você pode virar 2 das suas cartas: Este Personagem recebe +2000 de poder durante este turno.',
+    );
+    expect(pt('OP07-009', '[On Play] Up to 1 of your red Characters with a cost of 1 gains [Double Attack] during this turn.')).toBe(
+      '[Ao Jogar] Até 1 dos seus Personagens vermelhos com custo 1 ganha [Double Attack] durante este turno.',
+    );
+  });
+
+  it('"reveal 1 card and play up to 1 …": jogar é opcional e o resto volta ao deck (OP08-052)', () => {
+    expect(pt('OP08-052', '[On Play] Reveal 1 card from the top of your deck and play up to 1 Character card with a cost of 4 or less. Then, place the rest at the top or bottom of your deck.')).toBe(
+      '[Ao Jogar] Revele 1 carta do topo do seu deck. Depois, se for um Personagem com custo 4 ou menos, você pode jogá-la. Depois, coloque o resto no topo ou no fundo do seu deck.',
+    );
+  });
+
+  it('faixa de custo, "igual ou menor que", "exceto [A], ou [B]" e "ou" sem repetir o sujeito (OP05-091, OP05-102, OP12-086, OP13-051)', () => {
+    expect(pt('OP05-091', '[On Play] Add up to 1 black Character card with a cost of 3 to 7 from your trash to your hand.')).toBe(
+      '[Ao Jogar] Adicione até 1 Personagem preto com custo de 3 a 7 do seu descarte à sua mão.',
+    );
+    expect(pt('OP05-102', "[On Play] K.O. up to 1 of your opponent's Characters with a cost equal to or less than the number of your opponent's Life cards.")).toBe(
+      '[Ao Jogar] Nocauteie (K.O.) até 1 Personagem do oponente com custo igual ou menor que o número de cartas de Vida do oponente.',
+    );
+    expect(pt('OP12-086', '[On Play] Look at 3 cards from the top of your deck; reveal up to 1 {Revolutionary Army} type card other than [Koala] or up to 1 [Nico Robin] and add it to your hand. Then, trash the rest.')).toBe(
+      '[Ao Jogar] Olhe as 3 cartas do topo do seu deck; revele até 1 carta do tipo {Revolutionary Army} exceto [Koala], ou [Nico Robin] e adicione à sua mão. Depois, descarte o resto.',
+    );
+    expect(pt('OP13-051', '[On K.O.] If your Leader is [Boa Hancock] or multicolored, draw 2 cards.')).toBe('[Ao ser Nocauteado] Se o seu Líder for [Boa Hancock] ou multicolorido, compre 2 cartas.');
+  });
+
+  it('"base" nunca se perde: custo base e poder base fora do campo, "sem efeito base" (OP12-041, OP14-041, OP02-045, OP12-031)', () => {
+    expect(pt('OP12-041', '[Activate: Main] [Once Per Turn] DON!! -1: Activate up to 1 {Straw Hat Crew} type Event with a base cost of 3 or less from your hand.')).toBe(
+      '[Ativar: Principal] [Uma Vez por Turno] DON!! −1: Ative até 1 Evento do tipo {Straw Hat Crew} com custo base 3 ou menos da sua mão.',
+    );
+    expect(pt('OP14-041', "[Once Per Turn] When one of your {Amazon Lily} or {Kuja Pirates} type Characters with 5000 base power or more is K.O.'d add up to 1 card from the top of your opponent's Life cards to the owner's hand.")).toBe(
+      '[Uma Vez por Turno] Quando um Personagem seu do tipo {Amazon Lily} ou {Kuja Pirates} com 5000 de poder base ou mais for nocauteado, o oponente coloca até 1 carta do topo da Vida dele na mão.',
+    );
+    expect(pt('OP02-045', '[Counter] Up to 1 of your Leader or Character cards gains +6000 power during this battle. Then, play up to 1 Character card with a cost of 3 or less and no base effect from your hand.', 'event')).toBe(
+      '[Counter] Até 1 dos seus Líderes ou Personagens recebe +6000 de poder durante esta batalha. Depois, jogue até 1 Personagem com custo 3 ou menos e sem efeito base da sua mão.',
+    );
+    expect(pt('OP12-031', "[On Play] Rest up to 1 of your opponent's Characters with a base cost of 6 or less. Then, give up to 3 rested DON!! cards to your [Roronoa Zoro] Leader.")).toBe(
+      '[Ao Jogar] Vire até 1 Personagem do oponente com custo base 6 ou menos. Depois, dê até 3 DON!! virados ao seu Líder [Roronoa Zoro].',
+    );
+  });
+
+  it('o oponente é quem coloca a Vida dele na mão; "do seu descarte" no [On K.O.] do Marco; "e revela a mão" (OP13-108, OP16-014, OP07-090)', () => {
+    expect(pt('OP13-108', '[On Play] Your opponent adds 1 card from the top of their Life cards to their hand.')).toBe('[Ao Jogar] O oponente coloca 1 carta do topo da Vida dele na mão.');
+    expect(pt('OP16-014b', '[On K.O.] You may trash 1 Character card with 8000 power from your hand: Play this Character card from your trash.')).toBe(
+      '[Ao ser Nocauteado] Você pode descartar 1 Personagem com 8000 de poder da sua mão: Jogue esta carta do seu descarte.',
+    );
+    expect(pt('OP07-090', '[On Play] Your opponent trashes 1 card from their hand and reveals their hand.')).toBe('[Ao Jogar] O oponente escolhe 1 carta da própria mão e a descarta, e depois revela a mão.');
   });
 });

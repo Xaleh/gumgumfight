@@ -481,7 +481,7 @@ const PHRASES: Rule[] = [
     (_, n, t) => `até ${n} dos seus Personagens do tipo ${typeList(t)}`,
   ],
   [/ with a type including "([^"]+)"/gi, (_, t) => ` com um tipo que inclua "${t}"`],
-  [/ and no base effect/gi, ' e sem efeito'],
+  [/ and no base effect/gi, ' e sem efeito base'],
   [
     /(red|green|blue|purple|black|yellow) ((?:\{[^}]+\})(?:\s*(?:,|or|and)\s*\{[^}]+\})*) type (Character|Event) cards?/gi,
     (_, c, t, k) => `${k === 'Event' ? 'Evento' : 'Personagem'} ${COLOR_PT[c.toLowerCase()]} do tipo ${typeList(t)}`,

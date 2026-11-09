@@ -362,19 +362,19 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       spec.maxCost = Number(m[2]);
       // "or less than [Gecko Moria]": erro da API para "or less other than [Gecko Moria]".
       if (m[3]) spec.excludeName = m[3];
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with a cost equal to or less than the (?:number|total) of (your opponent's|your|your and your opponent's) Life cards/i)) && onField) {
       (spec as TargetSpec).maxCostDynamic = /and/i.test(m[1]) ? 'totalLife' : /opponent/i.test(m[1]) ? 'opponentLife' : 'ownLife';
     } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+) to (\d+)/i))) {
       spec.minCost = Number(m[2]);
       spec.maxCost = Number(m[3]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+) or more/i))) {
       spec.minCost = Number(m[2]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+)(?! or)/i))) {
       spec.minCost = spec.maxCost = Number(m[2]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with (?:a )?(base )?power of (\d+) or less|^\s*with (\d+) (base )?power or less/i)) && onField) {
       (spec as TargetSpec).maxPower = Number(m[2] ?? m[3]);
       if (m[1] || m[4]) (spec as TargetSpec).base = true;
@@ -434,7 +434,7 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
     } else if ((m = rest.match(/^\s*and a (base )?cost of (\d+) or (less|more)/i))) {
       if (/less/i.test(m[3])) spec.maxCost = Number(m[2]);
       else spec.minCost = Number(m[2]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*that is either \[([^\]]+)\] or has the "(\w+)" attribute/i)) && !onField) {
       (spec as CardFilter).orName = m[1];
       (spec as CardFilter).attribute = m[2];
@@ -443,7 +443,7 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
     } else if ((m = rest.match(/^\s*and (\d+) (base )?power or (more|less)/i))) {
       if (/more/i.test(m[3])) spec.minPower = Number(m[1]);
       else spec.maxPower = Number(m[1]);
-      if (m[2] && onField) (spec as TargetSpec).base = true;
+      if (m[2]) spec.base = true;
     } else if ((m = rest.match(/^\s*with different card names/i)) && !onField) {
       (spec as CardFilter).distinctNames = true;
     } else if ((m = rest.match(/^\s*and (?=with )/i))) {
@@ -465,6 +465,7 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
     } else if ((m = rest.match(/^\s*with (\d+) base power or (less|more)/i)) && !onField) {
       if (/less/i.test(m[2])) (spec as CardFilter).maxPower = Number(m[1]);
       else (spec as CardFilter).minPower = Number(m[1]);
+      spec.base = true;
     } else if ((m = rest.match(/^\s*with (\d+) power or less/i)) && !onField) {
       (spec as CardFilter).maxPower = Number(m[1]);
     } else if ((m = rest.match(/^\s*with (\d+) power or more/i)) && !onField) {
@@ -986,7 +987,7 @@ const withTarget = (phrase: string, make: (t: TargetRef) => EffectStep, characte
 const donTarget = (t: TargetRef): TargetRef => {
   if (typeof t !== 'object' || !t.required) return t;
   const { required: _r, ...rest } = t;
-  return rest;
+  return { ...rest, exactInText: true };
 };
 
 const durationOf = (d: string): Duration =>
@@ -1379,7 +1380,7 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^Your opponent trashes (\d+) cards? from their hand and reveals their hand$/i,
-    (m) => [{ do: 'opponentDiscards', count: Number(m[1]) }],
+    (m) => [{ do: 'opponentDiscards', count: Number(m[1]), reveal: true }],
   ],
   [
     /^(up to \d+ of your .+?) can attack Characters on the turn in which (?:it is|they are) played$/i,
@@ -1686,7 +1687,7 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^add up to (\d+) DON!! cards? as active from your DON!! deck$/i,
-    (m) => [{ do: 'addDonFromDeck', count: Number(m[1]) }],
+    (m) => [{ do: 'addDonFromDeck', count: Number(m[1]), upTo: true }],
   ],
   [
     /^add (\d+) cards? from the top or bottom of your Life cards to your hand$/i,
@@ -1730,7 +1731,7 @@ const CLAUSES: ClauseRule[] = [
     /^Reveal 1 card from the top of your deck and add (up to 1 .+) to your hand$/i,
     (m) => {
       const f = parseCardFilter(m[1]);
-      return f && [{ do: 'revealTop' }, { do: 'revealedToHand', filter: f.filter }];
+      return f && [{ do: 'revealTop' }, { do: 'revealedToHand', filter: f.filter, upTo: true }];
     },
   ],
   [/^Look at 1 card from the top of your opponent's deck$/i, () => [{ do: 'lookOpponentTop' }]],
@@ -1920,12 +1921,12 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^add up to (\d+) DON!! cards? from your DON!! deck and set (?:it|them) as active, and add up to (\d+) additional DON!! cards? and rest (?:it|them)$/i,
-    (m) => [{ do: 'addDonFromDeck', count: Number(m[1]) }, { do: 'addDonFromDeck', count: Number(m[2]), rested: true }],
+    (m) => [{ do: 'addDonFromDeck', count: Number(m[1]), upTo: true }, { do: 'addDonFromDeck', count: Number(m[2]), rested: true, upTo: true }],
   ],
   [/^play (?:that|the revealed) card( rested)?$/i, (m) => [m[1] ? { do: 'playRevealed', rested: true } : { do: 'playRevealed' }]],
   [/^place (?:the revealed card|the rest|that card) at the bottom of your deck$/i, () => [{ do: 'revealedToBottom' }]],
   // "[On K.O.] … Play this Character (from your trash)." (OP18-064, OP18-083)
-  [/^Play this Character(?: card)?(?: from your trash)?( rested)?$/i, (m) => [m[1] ? { do: 'playThis', rested: true } : { do: 'playThis' }]],
+  [/^Play this Character(?: card)?( from your trash)?( rested)?$/i, (m) => [{ do: 'playThis', ...(m[1] ? { fromTrash: true as const } : {}), ...(m[2] ? { rested: true } : {}) }]],
   [
     new RegExp(`^(.+?) cannot be rested ${DUR}$`, 'i'),
     (m) => withTarget(m[1], (target) => ({ do: 'cannotBeRested', target, duration: durationOf(m[2]) }), true),
@@ -1940,7 +1941,7 @@ const CLAUSES: ClauseRule[] = [
   ],
   [
     /^add up to (\d+) DON!! cards? as rested from your DON!! deck$/i,
-    (m) => [{ do: 'addDonFromDeck', count: Number(m[1]), rested: true }],
+    (m) => [{ do: 'addDonFromDeck', count: Number(m[1]), rested: true, upTo: true }],
   ],
   [
     new RegExp(`^(.+?) gains? \\+(\\d+) cost ${DUR}$`, 'i'),
@@ -2024,8 +2025,8 @@ const CLAUSES: ClauseRule[] = [
   [/^Trash (\d+) cards? from your hand$/i, (m) => [{ do: 'trashFromHand', count: Number(m[1]) }]],
   [
     // "… as rested" (OP18-075, OP18-077)
-    /^Add (?:up to )?(\d+) DON!! cards? from your DON!! deck (?:and )?(set (?:it|them) as active|rest (?:it|them)|as rested|as active)$/i,
-    (m) => [/rest/i.test(m[2]) ? { do: 'addDonFromDeck', count: Number(m[1]), rested: true } : { do: 'addDonFromDeck', count: Number(m[1]) }],
+    /^Add (up to )?(\d+) DON!! cards? from your DON!! deck (?:and )?(set (?:it|them) as active|rest (?:it|them)|as rested|as active)$/i,
+    (m) => [{ do: 'addDonFromDeck', count: Number(m[2]), ...(/rest/i.test(m[3]) ? { rested: true } : {}), ...(m[1] ? { upTo: true as const } : {}) }],
   ],
   [/^Play this card$/i, () => [{ do: 'playThis' }]],
   // "[On K.O.] You may add this Character card to your hand" (P-071): a carta já está no trash.
@@ -2885,7 +2886,7 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     if (m0[1] && !f) return null;
     const steps = parseBody(capitalizeFirst(m0[2]));
     if (!steps) return null;
-    const ab: Ability = { timing: 'battlesCharacter', ...(h.don ? { don: h.don } : {}), ...(h.yourTurn ? { yourTurn: true } : {}), steps: f ? steps.map((st) => ({ ...st, if: { ...st.if, chosenMatches: f.filter } })) : steps };
+    const ab: Ability = { timing: 'battlesCharacter', battleEnd: true, ...(h.don ? { don: h.don } : {}), ...(h.yourTurn ? { yourTurn: true } : {}), steps: f ? steps.map((st) => ({ ...st, if: { ...st.if, chosenMatches: f.filter } })) : steps };
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];
   }

@@ -944,9 +944,13 @@ export function costInHand(state: GameState, uid: string): number {
   return Math.max(0, cost);
 }
 
-/** A definição da carta com o custo que ela tem na mão (para filtros "with a cost of N or less" de efeitos que jogam da mão). */
-function handDef(state: GameState, uid: string): CardDef {
+/**
+ * A definição da carta com o custo que ela tem na mão (para filtros "with a cost of N or less" de efeitos que
+ * jogam da mão). Com "base cost" no filtro (OP12-041 Sanji, OP15-014 Bartolomeo), vale o custo impresso.
+ */
+function handDef(state: GameState, uid: string, filter?: CardFilter): CardDef {
   const def = cardDef(state, uid);
+  if (filter?.base) return def;
   const cost = costInHand(state, uid);
   return cost === (def.cost ?? 0) ? def : { ...def, cost };
 }
@@ -2873,7 +2877,7 @@ export function canPayCost(state: GameState, player: PlayerId, source: string, c
     return false;
   }
   if ((cost.trashToDeck ?? 0) > ps.trash.length) return false;
-  if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(handDef(state, u), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
+  if (cost.playFromHand && !ps.hand.some((u) => matchesFilter(handDef(state, u, cost.playFromHand), cost.playFromHand!) && !playBlocked(state, player, cardDef(state, u)))) return false;
   if (cost.giveOppDon && (state.players[opponent(player)].donRested < cost.giveOppDon || !state.players[opponent(player)].characters.length)) return false;
   if ((cost.handToTop ?? 0) > ps.hand.length) return false;
   if (cost.koSelf && (locate(state, source)?.zone !== 'character' || koProtected(state, source, false, source, player))) return false;
@@ -4142,7 +4146,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
     case 'handPlayOrLife': {
       if (!frame.memo) {
         const fromTrash = step.from === 'trash';
-        const options = (fromTrash ? ps.trash : ps.hand).filter((u) => matchesFilter(fromTrash ? cardDef(state, u) : handDef(state, u), step.filter));
+        const options = (fromTrash ? ps.trash : ps.hand).filter((u) => matchesFilter(fromTrash ? cardDef(state, u) : handDef(state, u, step.filter), step.filter));
         // Do descarte (público) pula sem opção; da mão abre sempre.
         if (!options.length && (fromTrash || !ps.hand.length || frame.choice)) return true;
         if (!frame.choice) {
@@ -5383,7 +5387,7 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           (def.category === 'character' || def.category === 'stage') &&
           !def.abilities.some((a) => a.noPlayByEffect) &&
           // Da mão, vale o custo que a carta tem na mão ("give this card in your hand −3 cost", Q&A OP11-023).
-          matchesFilter(ps.hand.includes(u) ? handDef(state, u) : def, filter) &&
+          matchesFilter(ps.hand.includes(u) ? handDef(state, u, filter) : def, filter) &&
           !playBlocked(state, frame.controller, def) &&
           !def.colors.some((c) => lastColors.includes(c))
         );
