@@ -188,7 +188,7 @@ function limits(f: CardFilter & Partial<TargetSpec>, many: boolean): string[] {
     if (f.minPower !== undefined) out.push(`com ${f.minPower} de poder${base} ou mais`);
   }
   if (f.typeIncludes) out.push(`${out.length ? 'e ' : ''}com um tipo que inclua "${f.typeIncludes}"`);
-  if (f.noEffect) out.push('sem efeito base');
+  if (f.noEffect) out.push(out.length ? 'e sem efeito base' : 'sem efeito base');
   if (f.hasTrigger) out.push(out.length ? 'e com [Trigger]' : 'com [Trigger]');
   if (f.hasAllTypes?.length) out.push(`com os tipos ${f.hasAllTypes.map((t) => `{${t}}`).join(' e ')}`);
   if (f.withoutKeyword) out.push(`sem ${KW[f.withoutKeyword]}`);

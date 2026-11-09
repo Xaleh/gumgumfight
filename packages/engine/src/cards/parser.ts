@@ -362,19 +362,19 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
       spec.maxCost = Number(m[2]);
       // "or less than [Gecko Moria]": erro da API para "or less other than [Gecko Moria]".
       if (m[3]) spec.excludeName = m[3];
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with a cost equal to or less than the (?:number|total) of (your opponent's|your|your and your opponent's) Life cards/i)) && onField) {
       (spec as TargetSpec).maxCostDynamic = /and/i.test(m[1]) ? 'totalLife' : /opponent/i.test(m[1]) ? 'opponentLife' : 'ownLife';
     } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+) to (\d+)/i))) {
       spec.minCost = Number(m[2]);
       spec.maxCost = Number(m[3]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+) or more/i))) {
       spec.minCost = Number(m[2]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with a (base )?cost of (\d+)(?! or)/i))) {
       spec.minCost = spec.maxCost = Number(m[2]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*with (?:a )?(base )?power of (\d+) or less|^\s*with (\d+) (base )?power or less/i)) && onField) {
       (spec as TargetSpec).maxPower = Number(m[2] ?? m[3]);
       if (m[1] || m[4]) (spec as TargetSpec).base = true;
@@ -434,7 +434,7 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
     } else if ((m = rest.match(/^\s*and a (base )?cost of (\d+) or (less|more)/i))) {
       if (/less/i.test(m[3])) spec.maxCost = Number(m[2]);
       else spec.minCost = Number(m[2]);
-      if (m[1] && onField) (spec as TargetSpec).base = true;
+      if (m[1]) spec.base = true;
     } else if ((m = rest.match(/^\s*that is either \[([^\]]+)\] or has the "(\w+)" attribute/i)) && !onField) {
       (spec as CardFilter).orName = m[1];
       (spec as CardFilter).attribute = m[2];
@@ -443,7 +443,7 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
     } else if ((m = rest.match(/^\s*and (\d+) (base )?power or (more|less)/i))) {
       if (/more/i.test(m[3])) spec.minPower = Number(m[1]);
       else spec.maxPower = Number(m[1]);
-      if (m[2] && onField) (spec as TargetSpec).base = true;
+      if (m[2]) spec.base = true;
     } else if ((m = rest.match(/^\s*with different card names/i)) && !onField) {
       (spec as CardFilter).distinctNames = true;
     } else if ((m = rest.match(/^\s*and (?=with )/i))) {
@@ -465,6 +465,7 @@ function applyTrailing(p: string, spec: TargetSpec | CardFilter, onField: boolea
     } else if ((m = rest.match(/^\s*with (\d+) base power or (less|more)/i)) && !onField) {
       if (/less/i.test(m[2])) (spec as CardFilter).maxPower = Number(m[1]);
       else (spec as CardFilter).minPower = Number(m[1]);
+      spec.base = true;
     } else if ((m = rest.match(/^\s*with (\d+) power or less/i)) && !onField) {
       (spec as CardFilter).maxPower = Number(m[1]);
     } else if ((m = rest.match(/^\s*with (\d+) power or more/i)) && !onField) {

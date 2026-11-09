@@ -51,6 +51,7 @@ const extra: CardData[] = [
   { id: 'PX-041', name: 'NoBlock', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "[On Play] Up to 1 of your opponent's Characters with 4000 power or less cannot activate [Blocker] during this turn." },
   { id: 'PX-042', name: 'Shield', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: "Your Characters with a cost of 3 or less other than [Shield] cannot be K.O.'d by your opponent's effects." },
   { id: 'PX-024', name: 'Law', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[Activate: Main] [Once Per Turn] If you have 0 DON!! cards on your field or 8 or more DON!! cards on your field, draw 1 card.' },
+  { id: 'PX-045', name: 'BaseKoala', category: 'character', colors: ['red'], cost: 1, power: 2000, types: [], text: '[On Play] Play up to 1 Character card with a base cost of 1 or less from your hand.' },
 ];
 const cards = [...baseCards, ...extra];
 const deck = (leader: string, fill: string): DeckList => ({
@@ -524,6 +525,19 @@ describe('efeitos lidos automaticamente', () => {
     expect(playCost(s, cheap)).toBe(3);
     s.players[0].life = s.players[0].life.slice(0, 1);
     expect(playCost(s, cheap)).toBe(1);
+  });
+
+  it('"with a cost of 1 or less from your hand" vê o custo na mão; "with a base cost of 1 or less" vê o impresso', () => {
+    for (const [player, sees] of [['PX-021', true], ['PX-045', false]] as const) {
+      const s = toTurn(game(), 3);
+      const who = give(s, 0, player);
+      const cheap = s.players[0].hand[1];
+      s.cards[cheap] = { ...s.cards[cheap], cardId: 'PX-036' };
+      s.players[0].life = s.players[0].life.slice(0, 1); // Cheap custa 1 na mão (impresso 3)
+      const t = applyAction(s, { type: 'playCard', player: 0, uid: who });
+      expect(t.pending).toMatchObject({ kind: 'selectTargets', player: 0 });
+      expect((t.pending as { options: string[] }).options.includes(cheap)).toBe(sees);
+    }
   });
 
   it('poder base do Líder passa a ser N', () => {

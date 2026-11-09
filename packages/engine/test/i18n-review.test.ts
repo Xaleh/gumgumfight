@@ -231,6 +231,21 @@ describe('tradução: auditoria de 11/2026', () => {
     expect(pt('OP13-051', '[On K.O.] If your Leader is [Boa Hancock] or multicolored, draw 2 cards.')).toBe('[Ao ser Nocauteado] Se o seu Líder for [Boa Hancock] ou multicolorido, compre 2 cartas.');
   });
 
+  it('"base" nunca se perde: custo base e poder base fora do campo, "sem efeito base" (OP12-041, OP14-041, OP02-045, OP12-031)', () => {
+    expect(pt('OP12-041', '[Activate: Main] [Once Per Turn] DON!! -1: Activate up to 1 {Straw Hat Crew} type Event with a base cost of 3 or less from your hand.')).toBe(
+      '[Ativar: Principal] [Uma Vez por Turno] DON!! −1: Ative até 1 Evento do tipo {Straw Hat Crew} com custo base 3 ou menos da sua mão.',
+    );
+    expect(pt('OP14-041', "[Once Per Turn] When one of your {Amazon Lily} or {Kuja Pirates} type Characters with 5000 base power or more is K.O.'d add up to 1 card from the top of your opponent's Life cards to the owner's hand.")).toBe(
+      '[Uma Vez por Turno] Quando um Personagem seu do tipo {Amazon Lily} ou {Kuja Pirates} com 5000 de poder base ou mais for nocauteado, o oponente coloca até 1 carta do topo da Vida dele na mão.',
+    );
+    expect(pt('OP02-045', '[Counter] Up to 1 of your Leader or Character cards gains +6000 power during this battle. Then, play up to 1 Character card with a cost of 3 or less and no base effect from your hand.', 'event')).toBe(
+      '[Counter] Até 1 dos seus Líderes ou Personagens recebe +6000 de poder durante esta batalha. Depois, jogue até 1 Personagem com custo 3 ou menos e sem efeito base da sua mão.',
+    );
+    expect(pt('OP12-031', "[On Play] Rest up to 1 of your opponent's Characters with a base cost of 6 or less. Then, give up to 3 rested DON!! cards to your [Roronoa Zoro] Leader.")).toBe(
+      '[Ao Jogar] Vire até 1 Personagem do oponente com custo base 6 ou menos. Depois, dê até 3 DON!! virados ao seu Líder [Roronoa Zoro].',
+    );
+  });
+
   it('o oponente é quem coloca a Vida dele na mão; "do seu descarte" no [On K.O.] do Marco; "e revela a mão" (OP13-108, OP16-014, OP07-090)', () => {
     expect(pt('OP13-108', '[On Play] Your opponent adds 1 card from the top of their Life cards to their hand.')).toBe('[Ao Jogar] O oponente coloca 1 carta do topo da Vida dele na mão.');
     expect(pt('OP16-014b', '[On K.O.] You may trash 1 Character card with 8000 power from your hand: Play this Character card from your trash.')).toBe(

@@ -194,6 +194,11 @@ export interface CardFilter {
   hasAllTypes?: string[];
   /** "without [Blocker]" */
   withoutKeyword?: Keyword;
+  /**
+   * "base cost"/"base power": o valor impresso. Fora do campo só muda para cartas na mão (o custo na mão
+   * inclui "give this card in your hand −N cost"); no texto, "custo base"/"poder base".
+   */
+  base?: boolean;
 }
 
 /**
