@@ -2854,25 +2854,30 @@ function Prompt(props: {
       const shown = pending.shown?.length ? pending.shown : null;
       const offBoard = shown ?? pending.options.filter((u) => OFF_TABLE.includes(zoneOf(state, u) ?? ''));
       const blocked = shown ? shown.filter((u) => !pending.options.includes(u)).length : 0;
+      // "Não escolher" numa linha própria, à esquerda e acima: longe do "Confirmar" (embaixo, à direita, na
+      // zona do polegar), para o toque sem querer não sair como escolha vazia.
+      const skipRow = pending.max > 0 && pending.min === 0 && (
+        <div className="btn-row skip-row">
+          <button
+            className={['btn', 'skip', skip.armed ? 'armed' : ''].join(' ')}
+            onClick={() => skip.press(() => onDispatch({ type: 'choose', player: human, uids: [] }))}
+          >
+            {skip.armed ? t('game.skipChoiceArmed') : t('game.skipChoice')}
+            {skip.armed && <small>{t('game.skipChoiceArmedSub')}</small>}
+          </button>
+        </div>
+      );
       const confirm = (
-        <div className="btn-row">
-          {peekButton}
-          {cancel}
-          {pending.max === 0 ? (
-            <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-              {t('game.continue')}
-            </button>
-          ) : (
-            <>
-              {pending.min === 0 && (
-                <button
-                  className={['btn', 'skip', skip.armed ? 'armed' : ''].join(' ')}
-                  onClick={() => skip.press(() => onDispatch({ type: 'choose', player: human, uids: [] }))}
-                >
-                  {skip.armed ? t('game.skipChoiceArmed') : t('game.skipChoice')}
-                  {skip.armed && <small>{t('game.skipChoiceArmedSub')}</small>}
-                </button>
-              )}
+        <>
+          {skipRow}
+          <div className="btn-row">
+            {peekButton}
+            {cancel}
+            {pending.max === 0 ? (
+              <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+                {t('game.continue')}
+              </button>
+            ) : (
               <button
                 className="btn primary"
                 // Sem nada marcado, "Confirmar" seria outro jeito de seguir sem escolher: só o "Não escolher" faz isso.
@@ -2881,9 +2886,9 @@ function Prompt(props: {
               >
                 {pending.max > 1 ? t('game.confirmCount', { n: picked.length, max: pending.max }) : t('game.confirm')}
               </button>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       );
       const order = pending.ordered && picked.length > 0 && (
         <p className="muted small">{t('game.order', { order: orderText(t, state, picked) })}</p>
