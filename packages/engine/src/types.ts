@@ -745,7 +745,8 @@ type EffectStepBody =
   /** "Set up to N of your DON!! cards as active." (`upTo`: o jogador escolhe quantos, de 0 a N) */
   | { do: 'setDonActive'; count: number; upTo?: true }
   /** "Look at N cards from the top of your deck; reveal up to M … and add it to your hand. Then, place the rest…" */
-  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean; lifeFaceDown?: boolean; rested?: boolean; toTrash?: boolean }
+  /** `noReveal`: o texto só diz "add" (sem "reveal"): a carta escolhida não é mostrada ao oponente. */
+  | { do: 'search'; look: number; upTo: number; filter: CardFilter; rest: 'bottom' | 'trash' | 'topOrBottom'; play?: boolean; toLife?: boolean; lifeFaceDown?: boolean; rested?: boolean; toTrash?: boolean; noReveal?: boolean }
   /** "Reveal up to 1 [X] from your deck and add it to your hand." (procura no deck inteiro) */
   | { do: 'tutor'; upTo: number; filter: CardFilter }
   /** "add 1 card from the top or bottom of your Life cards to your hand" (choose = o jogador escolhe topo/fundo) */

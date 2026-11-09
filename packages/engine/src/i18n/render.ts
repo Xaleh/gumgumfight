@@ -868,15 +868,27 @@ function step(s: EffectStep, ctx: Ctx): string {
       if (s.count >= 99) return 'Deixe todos os seus DON!! ativos.';
       return `Deixe ${qty(s.count)} dos seus DON!! ${plural(s.count, 'ativo', 'ativos')}.`;
     case 'search': {
-      const verb = s.play ? 'jogue' : 'revele';
-      const tail = s.play ? '' : s.toLife ? ` e coloque-a no topo da sua Vida${s.lifeFaceDown ? '' : ', com a face para cima'}` : ' e adicione à sua mão';
+      const what = filter(s.filter, s.upTo);
+      const life = `no topo da sua Vida${s.lifeFaceDown ? '' : ', com a face para cima'}`;
+      // Sem "reveal" no texto ("add up to 1 card to your hand / to the top of your Life cards"), a carta não é revelada.
+      const pick = s.play
+        ? `jogue ${what}`
+        : s.toTrash
+          ? `descarte ${what}`
+          : s.noReveal
+          ? s.toLife
+            ? `coloque ${what} ${life}`
+            : `adicione ${what} à sua mão`
+          : s.toLife
+            ? `revele ${what} e coloque-a ${life}`
+            : `revele ${what} e adicione à sua mão`;
       const rest =
         s.rest === 'bottom'
           ? 'Depois, coloque o resto no fundo do seu deck em qualquer ordem.'
           : s.rest === 'trash'
             ? 'Depois, descarte o resto.'
             : 'Depois, coloque o resto no topo ou no fundo do deck, em qualquer ordem.';
-      return `Olhe as ${s.look} cartas do topo do seu deck; ${verb} ${filter(s.filter, s.upTo)}${tail}. ${rest}`;
+      return `Olhe as ${s.look} cartas do topo do seu deck; ${pick}. ${rest}`;
     }
     case 'tutor':
       return `Revele ${filter(s.filter, s.upTo)} do seu deck e adicione à sua mão. Embaralhe o seu deck.`;

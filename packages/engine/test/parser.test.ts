@@ -95,6 +95,23 @@ describe('modelos de frase', () => {
     ]);
   });
 
+  it('"look at N …; add up to 1 card to …" sem "reveal" (OP16-021, OP16-119): a carta vai escondida', () => {
+    // Moby Dick OP16-021: "add up to 1 card to your hand" (não "reveal … and add").
+    expect(
+      steps(
+        '[On Play] If your Leader has the {Whitebeard Pirates} type, look at 3 cards from the top of your deck and add up to 1 card to your hand. Then, place the rest at the bottom of your deck in any order.',
+      ),
+    ).toEqual([[{ do: 'search', look: 3, upTo: 1, filter: {}, rest: 'bottom', noReveal: true, if: { leaderHasType: 'Whitebeard Pirates' } }]]);
+    // Marshall.D.Teach OP16-119: "add up to 1 card to the top of your Life cards" (virada para baixo, sem revelar).
+    expect(
+      steps('[On Play] Look at 3 cards from the top of your deck; add up to 1 card to the top of your Life cards. Then, place the rest at the bottom of your deck in any order.'),
+    ).toEqual([[{ do: 'search', look: 3, upTo: 1, filter: {}, rest: 'bottom', noReveal: true, toLife: true, lifeFaceDown: true }]]);
+    // Com "reveal" no texto, continua revelando.
+    expect(
+      steps('[On Play] Look at 5 cards from the top of your deck; reveal up to 1 {Okama} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.'),
+    ).toEqual([[{ do: 'search', look: 5, upTo: 1, filter: { hasAnyType: ['Okama'] }, rest: 'bottom' }]]);
+  });
+
   it('efeitos contínuos: custo, "cannot attack", proteção contra efeitos', () => {
     const p = parseCard(card('If your Leader has the {Elbaph} type, this Character gains +12 cost.'));
     expect(p.abilities).toEqual([{ timing: 'static', steps: [], condition: { leaderHasType: 'Elbaph' }, staticCost: 12 }]);

@@ -3366,8 +3366,8 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             ...promptOf(
               options.length
                 ? pr(
-                    step.play ? 'searchPlay' : step.toTrash ? 'searchTrash' : 'searchToHand',
-                    `${srcName}: olhe as ${top.length} cartas do topo e escolha até ${step.upTo} para ${step.play ? 'jogar' : step.toTrash ? 'descartar' : 'adicionar à mão'}.`,
+                    step.play ? 'searchPlay' : step.toTrash ? 'searchTrash' : step.toLife ? 'searchToLife' : 'searchToHand',
+                    `${srcName}: olhe as ${top.length} cartas do topo e escolha até ${step.upTo} para ${step.play ? 'jogar' : step.toTrash ? 'descartar' : step.toLife ? 'colocar no topo da Vida' : 'adicionar à mão'}.`,
                     { source: srcName, count: top.length, max: step.upTo },
                   )
                 : pr('searchNone', `${srcName}: nenhuma das ${top.length} cartas do topo pode ser escolhida.`, { source: srcName, count: top.length }),
@@ -3416,6 +3416,10 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
           // "play up to 1 … Then, place the rest at the bottom": joga a carta (o resto vai para o fundo antes).
           ps.hand.push(uid);
           playFree(state, uid, step.rested, frame.source, true); // vem do deck (só passa pela mão)
+        } else if (step.noReveal) {
+          // "add up to 1 card to your hand" (sem "reveal", OP16-021): o oponente não vê a carta.
+          ps.hand.push(uid);
+          log(state, frame.controller, lg('addsOneToHand', `${ps.name} adiciona 1 carta à mão.`, { player: ps.name }));
         } else {
           ps.hand.push(uid);
           log(state, frame.controller, lg('revealsAddsToHand', `${ps.name} revela ${cardDef(state, uid).name} e adiciona à mão.`, { player: ps.name, card: cardDef(state, uid).name }), { uids: [uid], by: ps.id });
