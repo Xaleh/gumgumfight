@@ -238,6 +238,30 @@ a {
   border-color: var(--danger-line);
   color: var(--danger-text);
 }
+/* "Não escolher" com cartas à escolha: discreto ao lado de "Confirmar"; armado, pede o segundo toque */
+.btn.skip {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+.btn.skip.armed {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  border-style: solid;
+  color: var(--danger-text);
+  display: inline-grid;
+  line-height: 1.15;
+}
+.btn.skip.armed small {
+  font-weight: 500;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.end-turn.defense.skip.armed {
+  background: var(--danger-bg);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
+}
 .btn.attack {
   background: linear-gradient(180deg, #ff8a5c 0%, #f0532a 100%);
   border-color: #e04a20;
