@@ -986,7 +986,7 @@ const withTarget = (phrase: string, make: (t: TargetRef) => EffectStep, characte
 const donTarget = (t: TargetRef): TargetRef => {
   if (typeof t !== 'object' || !t.required) return t;
   const { required: _r, ...rest } = t;
-  return rest;
+  return { ...rest, exactInText: true };
 };
 
 const durationOf = (d: string): Duration =>

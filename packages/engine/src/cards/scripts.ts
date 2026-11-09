@@ -40,7 +40,7 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         label: 'Dar 1 DON!! virado',
         labelKey: 'engine.labelGiveRestedDon',
         labelParams: { n: 1 },
-        steps: [{ do: 'giveRestedDon', target: ownLeaderOrChar(), count: 1 }],
+        steps: [{ do: 'giveRestedDon', target: ownLeaderOrChar({ exactInText: true }), count: 1 }],
       },
     ],
   },
@@ -76,13 +76,13 @@ export const CARD_SCRIPTS: Record<string, CardScript> = {
         label: 'Dar 1 DON!! virado',
         labelKey: 'engine.labelGiveRestedDon',
         labelParams: { n: 1 },
-        steps: [{ do: 'giveRestedDon', target: ownLeaderOrChar(), count: 1 }],
+        steps: [{ do: 'giveRestedDon', target: ownLeaderOrChar({ exactInText: true }), count: 1 }],
       },
     ],
   },
   'ST01-011': {
     // [On Play] Give up to 2 rested DON!! cards to your Leader or 1 of your Characters.
-    abilities: [{ timing: 'onPlay', steps: [{ do: 'giveRestedDon', target: ownLeaderOrChar(), count: 2 }] }],
+    abilities: [{ timing: 'onPlay', steps: [{ do: 'giveRestedDon', target: ownLeaderOrChar({ exactInText: true }), count: 2 }] }],
   },
   'ST01-012': {
     // [Rush] / [DON!! x2] [When Attacking] Your opponent cannot activate [Blocker] during this battle.

@@ -275,7 +275,7 @@ function target(ref: TargetRef, ctx: Ctx): string {
     const allOwn = k === 'leader' ? 'o seu Líder' : k === 'character' ? 'todos os seus Personagens' : 'todas as suas cartas';
     // Sem "up to" ("return 1 of your [X]"), a quantidade é obrigatória: sem "até". Um jogador só tem
     // um Líder: "your [X] Leader" é "o seu Líder [X]".
-    const upTo = spec.required ? `${spec.upTo}` : `até ${spec.upTo}`;
+    const upTo = spec.required || spec.exactInText ? `${spec.upTo}` : `até ${spec.upTo}`;
     head = spec.all
       ? `${allOwn} ${n}`
       : anyNumber
@@ -295,7 +295,7 @@ function target(ref: TargetRef, ctx: Ctx): string {
   const pl = noun(spec.kinds, true);
   const fem = pl === 'cartas';
   // Sem "up to" ("rest 1 of your opponent's Characters"), a quantidade é obrigatória: sem "até".
-  const upTo = spec.required ? `${spec.upTo}` : `até ${spec.upTo}`;
+  const upTo = spec.required || spec.exactInText ? `${spec.upTo}` : `até ${spec.upTo}`;
   // Adjetivos no plural (e no feminino, para "cartas"): "Personagens vermelhos", "cartas viradas".
   const adjMany = adj.map((x) =>
     x === 'virado' ? (fem ? 'viradas' : 'virados') : x === 'ativo' ? (fem ? 'ativas' : 'ativos') : spec.color && x === COLOR_M[spec.color][0] ? (fem ? COLOR_F[spec.color][1] : COLOR_M[spec.color][1]) : x,
@@ -311,7 +311,7 @@ function target(ref: TargetRef, ctx: Ctx): string {
         ? `${pl} ${fem ? 'suas' : 'seus'}`
         : single
           ? `o seu ${noun(spec.kinds, false)}`
-          : k === 'character+leader' && spec.required && spec.upTo === 1
+          : k === 'character+leader' && (spec.required || spec.exactInText) && spec.upTo === 1
             ? 'o seu Líder ou 1 dos seus Personagens'
             : `${upTo} ${fem ? 'das suas' : 'dos seus'} ${pl}`;
     return [head, ...(single ? adj : adjMany), ...limits(spec, !single)].join(' ');

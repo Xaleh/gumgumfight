@@ -96,6 +96,11 @@ export interface TargetSpec {
    * o jogador escolhe o máximo possível até `upTo`, não pode escolher menos (8-4-4-1).
    */
   required?: boolean;
+  /**
+   * Só para o texto: a quantidade veio sem "up to" ("give up to 1 DON!! to 1 of your Characters"), mas o
+   * alvo é opcional junto com o DON!! (`donTarget`): o texto não põe "até" no alvo, o motor não obriga.
+   */
+  exactInText?: true;
   maxPower?: number;
   maxCost?: number;
   rested?: boolean; // true = somente virados; false = somente ativos
