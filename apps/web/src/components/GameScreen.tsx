@@ -2413,11 +2413,18 @@ function DecisionButton({
 }) {
   const t = useT();
   const tryT = useTryT();
-  const d =
+  const skip = useSkipGuard(pending);
+  const base =
     pending.kind === 'selectTargets' ? targetsDecision(t, promptText(tryT, pending), pending, picked) : defenseDecision(t, state, pending, picked);
-  if (!d) return null;
+  if (!base) return null;
+  // "Não escolher" com cartas à escolha: armado, o botão pede o segundo toque (useSkipGuard).
+  const d: Decision = base.skip && skip.armed ? { ...base, label: t('game.skipChoiceArmed'), sub: t('game.skipChoiceArmedSub') } : base;
   const act = () => {
-    for (const a of [d.action(human)].flat()) onDispatch(a);
+    const run = () => {
+      for (const a of [d.action(human)].flat()) onDispatch(a);
+    };
+    if (d.skip) skip.press(run);
+    else run();
   };
   return (
     <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
@@ -2428,7 +2435,7 @@ function DecisionButton({
         </button>
       )}
       <button
-        className={['end-turn', 'defense', d.pulse && !d.disabled ? 'pulse' : ''].join(' ')}
+        className={['end-turn', 'defense', d.pulse && !d.disabled ? 'pulse' : '', d.skip ? 'skip' : '', d.skip && skip.armed ? 'armed' : ''].join(' ')}
         onClick={act}
         disabled={d.disabled}
         title={d.title}
@@ -2450,6 +2457,8 @@ interface Decision {
   disabled?: boolean;
   /** Várias ações saem em sequência (os Counters marcados e o fim da etapa). */
   action: (player: PlayerId) => Action | Action[];
+  /** "Não escolher" com cartas à escolha: protegido contra o toque sem querer (useSkipGuard). */
+  skip?: true;
 }
 
 /**
@@ -2534,6 +2543,7 @@ function targetsDecision(t: Translate, prompt: string, pending: Extract<Pending,
       title: t('game.promptSkip', { prompt }),
       pulse: false,
       action: (player) => ({ type: 'choose', player, uids: [] }),
+      ...(pending.options.length ? { skip: true } : {}),
     };
   }
   const missing = need - n;
@@ -2700,6 +2710,43 @@ function AttackArrow({
 
 // ------------------------------------------------------------------ prompts
 
+/** Depois de a pergunta aparecer, o "Não escolher" não reage por este tempo (toque duplo vindo do botão anterior). */
+const SKIP_GUARD_MS = 600;
+/** Armado ("toque de novo"), o "Não escolher" desarma sozinho depois deste tempo. */
+const SKIP_ARMED_MS = 3500;
+
+/**
+ * Proteção do "Não escolher" quando há cartas à escolha: no celular, o toque que respondeu a pergunta
+ * anterior (ex.: "Ativar [Trigger]") caía no botão da pergunta seguinte e a escolha saía vazia sem querer.
+ * O botão fica inerte nos primeiros instantes e o primeiro toque só arma ("Seguir sem escolher?"); o
+ * segundo confirma. `reset`: muda quando a pergunta muda (desarma e reinicia a espera).
+ */
+function useSkipGuard(reset: unknown): { armed: boolean; press: (skip: () => void) => void } {
+  const [armed, setArmed] = useState(false);
+  const shownAt = useRef(performance.now());
+  useEffect(() => {
+    shownAt.current = performance.now();
+    setArmed(false);
+  }, [reset]);
+  useEffect(() => {
+    if (!armed) return;
+    const id = setTimeout(() => setArmed(false), SKIP_ARMED_MS);
+    return () => clearTimeout(id);
+  }, [armed]);
+  const press = useCallback(
+    (skip: () => void) => {
+      if (performance.now() - shownAt.current < SKIP_GUARD_MS) return;
+      if (!armed) {
+        setArmed(true);
+        return;
+      }
+      skip();
+    },
+    [armed],
+  );
+  return { armed, press };
+}
+
 function Prompt(props: {
   /** Ainda não aparece (sorteio inicial na tela). */
   hidden?: boolean;
@@ -2723,6 +2770,8 @@ function Prompt(props: {
   // responder (ex.: usar ou não um efeito quando o oponente ataca). Volta sozinha quando a situação muda.
   const [peek, setPeek] = useState(false);
   useEffect(() => setPeek(false), [pending]);
+  // A espera do "Não escolher" conta de quando a pergunta aparece de fato (depois das animações, `hidden`).
+  const skip = useSkipGuard(props.hidden ? null : pending);
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
   const peekButton = (
     <button className="btn peek" onClick={() => setPeek(true)} title={t('game.peekTitle')}>
@@ -2806,31 +2855,48 @@ function Prompt(props: {
       const shown = pending.shown?.length ? pending.shown : null;
       const offBoard = shown ?? pending.options.filter((u) => OFF_TABLE.includes(zoneOf(state, u) ?? ''));
       const blocked = shown ? shown.filter((u) => !pending.options.includes(u)).length : 0;
-      const confirm = (
-        <div className="btn-row">
-          {peekButton}
-          {cancel}
-          {pending.max === 0 ? (
-            <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-              {t('game.continue')}
+      // "Não escolher" numa linha própria, à esquerda e acima: longe do "Confirmar" (embaixo, à direita, na
+      // zona do polegar), para o toque sem querer não sair como escolha vazia.
+      // Numa escolha ordenada (pôr as cartas de volta), "Manter a ordem" é a resposta comum: sem a proteção.
+      const skipRow = pending.max > 0 && pending.min === 0 && (
+        <div className="btn-row skip-row">
+          {pending.ordered ? (
+            <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+              {t('game.keepOrder')}
             </button>
           ) : (
-            <>
-              {pending.min === 0 && (
-                <button className="btn" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
-                  {pending.ordered ? t('game.keepOrder') : t('game.skipChoice')}
-                </button>
-              )}
+            <button
+              className={['btn', 'skip', skip.armed ? 'armed' : ''].join(' ')}
+              onClick={() => skip.press(() => onDispatch({ type: 'choose', player: human, uids: [] }))}
+            >
+              {skip.armed ? t('game.skipChoiceArmed') : t('game.skipChoice')}
+              {skip.armed && <small>{t('game.skipChoiceArmedSub')}</small>}
+            </button>
+          )}
+        </div>
+      );
+      const confirm = (
+        <>
+          {skipRow}
+          <div className="btn-row">
+            {peekButton}
+            {cancel}
+            {pending.max === 0 ? (
+              <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+                {t('game.continue')}
+              </button>
+            ) : (
               <button
                 className="btn primary"
-                disabled={picked.length < pending.min}
+                // Sem nada marcado, "Confirmar" seria outro jeito de seguir sem escolher: só o "Não escolher" faz isso.
+                disabled={picked.length < pending.min || (picked.length === 0 && pending.options.length > 0)}
                 onClick={() => onDispatch({ type: 'choose', player: human, uids: picked })}
               >
                 {pending.max > 1 ? t('game.confirmCount', { n: picked.length, max: pending.max }) : t('game.confirm')}
               </button>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       );
       const order = pending.ordered && picked.length > 0 && (
         <p className="muted small">{t('game.order', { order: orderText(t, state, picked) })}</p>
@@ -2849,6 +2915,7 @@ function Prompt(props: {
               <SourceLine state={state} uid={pending.source} />
               <h3>{prompt}</h3>
               <p className="muted small">
+                {pending.max > 0 && offBoard.length > 1 && `${t('game.optionsCount', { n: offBoard.length })} `}
                 {pending.max === 0
                   ? offBoard.length
                     ? t('game.tapToRead')

@@ -1414,6 +1414,14 @@ function handlePendingResponse(state: GameState, action: Action) {
         throw new IllegalActionError(`Escolha entre ${pending.min} e ${pending.max} alvo(s).`);
       }
       if (uids.some((u) => !pending.options.includes(u))) throw new IllegalActionError('Alvo inválido.');
+      // "Até N" deixado em branco com cartas à escolha: fica no histórico, senão para o oponente (e no
+      // replay) parece que o efeito falhou ("[Trigger] Absalom ativado!" e nada acontece). Não numa
+      // escolha escondida (da mão, do deck): a linha contaria ao oponente que havia carta válida.
+      if (!uids.length && pending.options.length && pending.max > 0 && !pending.hidden) {
+        const src = cardDef(state, pending.source).name;
+        const name = state.players[p].name;
+        log(state, p, lg('skipChoice', `${src}: ${name} não escolheu nenhuma carta.`, { source: src, player: name }));
+      }
       const top = state.stack[state.stack.length - 1];
       if (top.kind === 'effect') top.choice = uids;
       else if (top.kind === 'play') top.replaceChoice = uids;

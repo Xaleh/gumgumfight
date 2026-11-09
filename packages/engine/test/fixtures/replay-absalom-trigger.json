@@ -1,0 +1,1760 @@
+{
+ "note": "Replay de torneio (Yamato OP16-079 x Moria OP14-080) com as cartas reais da optcgapi: no turno 9 o [Trigger] do Absalom OP14-100 abre a escolha de 12 cartas do descarte e o jogador responde sem escolher nenhuma.",
+ "decks": [
+  {
+   "id": "u-18ac85d0",
+   "name": "Yamato",
+   "leader": "OP16-079",
+   "cards": [
+    {
+     "id": "EB05-042",
+     "count": 2
+    },
+    {
+     "id": "EB05-046",
+     "count": 2
+    },
+    {
+     "id": "OP16-081",
+     "count": 3
+    },
+    {
+     "id": "OP16-082",
+     "count": 4
+    },
+    {
+     "id": "OP16-084",
+     "count": 4
+    },
+    {
+     "id": "OP16-085",
+     "count": 4
+    },
+    {
+     "id": "OP16-087",
+     "count": 4
+    },
+    {
+     "id": "OP16-088",
+     "count": 1
+    },
+    {
+     "id": "OP16-091",
+     "count": 4
+    },
+    {
+     "id": "OP16-092",
+     "count": 4
+    },
+    {
+     "id": "OP16-096",
+     "count": 4
+    },
+    {
+     "id": "OP16-097",
+     "count": 4
+    },
+    {
+     "id": "OP16-098",
+     "count": 4
+    },
+    {
+     "id": "OP16-099",
+     "count": 4
+    },
+    {
+     "id": "OP17-095",
+     "count": 2
+    }
+   ],
+   "arts": {
+    "OP16-079": "OP16-079_p1_649YLmm",
+    "EB05-046": "EB05-046_p1",
+    "OP16-082": "OP16-082_p1_zfvdEUb",
+    "OP16-085": "OP16-085_p1_GF8c8fm",
+    "OP16-098": "OP16-098_p2"
+   }
+  },
+  {
+   "id": "u-d9672590",
+   "name": "MoriaBY Eb05",
+   "leader": "OP14-080",
+   "cards": [
+    {
+     "id": "EB05-043",
+     "count": 4
+    },
+    {
+     "id": "EB05-049",
+     "count": 3
+    },
+    {
+     "id": "OP06-090",
+     "count": 2
+    },
+    {
+     "id": "OP14-102",
+     "count": 4
+    },
+    {
+     "id": "OP14-104",
+     "count": 4
+    },
+    {
+     "id": "OP14-110",
+     "count": 4
+    },
+    {
+     "id": "OP14-111",
+     "count": 4
+    },
+    {
+     "id": "OP14-109",
+     "count": 1
+    },
+    {
+     "id": "OP15-084",
+     "count": 4
+    },
+    {
+     "id": "PRB02-013",
+     "count": 4
+    },
+    {
+     "id": "OP14-100",
+     "count": 3
+    },
+    {
+     "id": "OP14-112",
+     "count": 3
+    },
+    {
+     "id": "EB05-052",
+     "count": 2
+    },
+    {
+     "id": "OP17-109",
+     "count": 4
+    },
+    {
+     "id": "EB04-058",
+     "count": 2
+    },
+    {
+     "id": "OP17-114",
+     "count": 2
+    }
+   ],
+   "arts": {
+    "OP06-090": "Dr._Hogback_Premium_Card_Collection_-Best_Selection_Vol._3-_img",
+    "OP14-111": "OP14-111_p1_NcAFI0k",
+    "PRB02-013": "PRB02-013_p1",
+    "OP14-104": "OP14-104_p1_ZK1uyaO",
+    "EB05-043": "EB05-043_p1"
+   }
+  }
+ ],
+ "cards": [
+  {
+   "id": "OP06-090",
+   "name": "Dr. Hogback",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On Play] You may return 2 cards from your trash to the bottom of your deck in any order: Add up to 1 {Thriller Bark Pirates} type card other than [Dr. Hogback] from your trash to your hand.",
+   "set": "OP06",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP06-090.jpg"
+  },
+  {
+   "id": "PRB02-013",
+   "name": "Gecko Moria",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 6,
+   "power": 7000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "The Seven Warlords of the Sea",
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On Play] If your Leader has the {Thriller Bark Pirates} type, play up to 1 Character card with a cost of 4 or less from your trash rested. Then, give up to 1 rested DON!! card to your Leader or 1 of your Characters.",
+   "set": "PRB02",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/PRB02-013.jpg",
+   "arts": [
+    {
+     "id": "PRB02-013_p1",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/PRB02-013_p1.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP14-111",
+   "name": "Perona",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On Play]/[On K.O.] Up to 1 of your opponent's Characters with a cost of 6 or less cannot attack until the end of your opponent's next End Phase.",
+   "trigger": "Play up to 1 {Thriller Bark Pirates} type Character card with a cost of 4 or less from your trash rested.",
+   "set": "OP14",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-111_hWZq5nk.jpg",
+   "arts": [
+    {
+     "id": "OP14-111_p1_NcAFI0k",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-111_p1_NcAFI0k.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP14-112",
+   "name": "Boa Hancock",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 9,
+   "power": 10000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Kuja Pirates",
+    "The Seven Warlords of the Sea"
+   ],
+   "text": "[On Play] If your Leader has the {The Seven Warlords of the Sea} type, add up to 1 card from the top of your deck to the top of your Life cards. Then, add up to 1 card from the top of your opponent's Life cards to the owner's hand.",
+   "trigger": "Play up to 1 Character card with 6000 power or less and a [Trigger] from your hand.",
+   "set": "OP14",
+   "rarity": "SR",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-112_7Isffre.jpg",
+   "arts": [
+    {
+     "id": "OP14-112_p1_FuOrRQo",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-112_p1_FuOrRQo.jpg",
+     "label": "Alternate Art"
+    },
+    {
+     "id": "OP14-112_p2",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-112_p2.jpg",
+     "label": "SP"
+    }
+   ]
+  },
+  {
+   "id": "OP14-110",
+   "name": "Dr. Hogback",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On K.O.] Play up to 1 Character card with a cost of 4 or less and a [Trigger] other than [Dr. Hogback] from your trash.",
+   "trigger": "Play up to 1 {Thriller Bark Pirates} type Character card with a cost of 4 or less from your trash rested.",
+   "set": "OP14",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-110_jJN7dLQ.jpg"
+  },
+  {
+   "id": "OP14-104",
+   "name": "Gecko Moria",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 8,
+   "power": 10000,
+   "counter": 0,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "The Seven Warlords of the Sea",
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On Play] Select up to 1 {Thriller Bark Pirates} type Character with a cost of 4 or less from your trash and play it or add it to the top of your Life cards face-up.",
+   "trigger": "Play up to 1 Character card with a cost of 4 or less from your trash.",
+   "set": "OP14",
+   "rarity": "SR",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-104_oN07MEM.jpg",
+   "arts": [
+    {
+     "id": "OP14-104_p1_ZK1uyaO",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-104_p1_ZK1uyaO.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP14-100",
+   "name": "Absalom",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 5000,
+   "counter": 0,
+   "attributes": [
+    "Ranged"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On K.O.] Look at 3 cards from the top of your deck; reveal up to 1 {Thriller Bark Pirates} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "trigger": "Play up to 1 {Thriller Bark Pirates} type Character card with a cost of 4 or less from your trash rested.",
+   "set": "OP14",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-100_hiDs0zU.jpg"
+  },
+  {
+   "id": "OP14-109",
+   "name": "Victoria Cindry",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 1000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[Blocker]",
+   "trigger": "Play up to 1 {Thriller Bark Pirates} type Character card with a cost of 4 or less from your trash rested.",
+   "set": "OP14",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-109_4wYat9N.jpg"
+  },
+  {
+   "id": "OP14-080",
+   "name": "Gecko Moria",
+   "category": "leader",
+   "colors": [
+    "black",
+    "yellow"
+   ],
+   "life": 4,
+   "power": 5000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "The Seven Warlords of the Sea",
+    "Thriller Bark Pirates"
+   ],
+   "text": "[Activate: Main] [Once Per Turn] You may K.O. 1 of your {Thriller Bark Pirates} type Characters: Your Leader and all of your Characters gain +1000 power during this turn. [When Attacking] You may trash 3 cards from your hand: Add up to 1 card from the top of your deck to the top of your Life cards.",
+   "set": "OP14",
+   "rarity": "L",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-080_n6bp0Ge.jpg",
+   "arts": [
+    {
+     "id": "OP14-080_2oXrBR0",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-080_2oXrBR0.jpg",
+     "label": "The Azure Sea's Seven"
+    }
+   ]
+  },
+  {
+   "id": "OP14-102",
+   "name": "Kumacy",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 2000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "",
+   "trigger": "Play up to 1 {Thriller Bark Pirates} type Character card with a cost of 4 or less from your trash rested.",
+   "set": "OP14",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP14-102_zIuEXKV.jpg"
+  },
+  {
+   "id": "EB04-058",
+   "name": "Borsalino",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 5,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Navy",
+    "Egghead"
+   ],
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)\n[On Play] If you have 2 or less Life cards, add up to 1 card from the top of your deck to the top of your Life cards.",
+   "set": "EB04",
+   "rarity": "SR",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB04-058_LxNnvX2.jpg",
+   "arts": [
+    {
+     "id": "EB04-058_p1_a850zQT",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB04-058_p1_a850zQT.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP15-084",
+   "name": "Dr. Hogback",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On Play] If your Leader has the {Thriller Bark Pirates} type, trash 5 cards from the top of your deck.\n[On K.O.] If you have 6 or less cards in your hand, draw 1 card.",
+   "set": "OP15",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP15-084_NsxRq49.jpg"
+  },
+  {
+   "id": "OP16-091",
+   "name": "Nami",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Land of Wano",
+    "Straw Hat Crew"
+   ],
+   "text": "[On Play] If your Leader has the {Land of Wano} type, look at 4 cards from the top of your deck; reveal up to 1 {Land of Wano} type card other than [Nami] and add it to your hand. Then, trash the rest.",
+   "set": "OP16",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-091_lonYd1j.jpg"
+  },
+  {
+   "id": "OP16-098",
+   "name": "Yamato",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 6,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[On Play] Draw 1 card and trash 1 card from your hand.\n[Activate:Main] You may trash this Character: Play up to 1 black [Yamato] with a cost of 8 from your trash.",
+   "set": "OP16",
+   "rarity": "SR",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-098_9dRdXcD.jpg",
+   "arts": [
+    {
+     "id": "OP16-098_p1_MKyDUP9",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-098_p1_MKyDUP9.jpg",
+     "label": "Alternate Art"
+    },
+    {
+     "id": "OP16-098_p2",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-098_p2.jpg",
+     "label": "SP"
+    }
+   ]
+  },
+  {
+   "id": "OP16-088",
+   "name": "Shimotsuki Ushimaru",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 2,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)",
+   "set": "OP16",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-088_ZjPh991.jpg"
+  },
+  {
+   "id": "OP16-079",
+   "name": "Yamato",
+   "category": "leader",
+   "colors": [
+    "black"
+   ],
+   "life": 5,
+   "power": 5000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "When a {Land of Wano} type Character card is played from your trash, that Character gains [Rush] during this turn.\n(This card can attack on the turn in which it is played.)",
+   "set": "OP16",
+   "rarity": "L",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-079_9Me7LN0.jpg",
+   "arts": [
+    {
+     "id": "OP16-079_p1_649YLmm",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-079_p1_649YLmm.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP16-082",
+   "name": "Kin'emon",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 4,
+   "power": 6000,
+   "counter": 0,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Land of Wano",
+    "The Akazaya Nine"
+   ],
+   "text": "This Character gains +3 cost. [On Play] If your Leader has the {Land of Wano} type, look at 5 cards from the top of your deck; reveal up to 1 {Land of Wano} type card and add it to your hand. Then, trash the rest.",
+   "set": "OP16",
+   "rarity": "SR",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-082_ym7wiOG.jpg",
+   "arts": [
+    {
+     "id": "OP16-082_p1_zfvdEUb",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-082_p1_zfvdEUb.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP16-085",
+   "name": "Kouzuki Momonosuke",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 9,
+   "power": 6000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Land of Wano",
+    "Kouzuki Clan"
+   ],
+   "text": "[Blocker] [On Play] Play up to 1 {Land of Wano} type Character card with a cost of 6 or less other than [Kouzuki Momonosuke] from your trash.",
+   "set": "OP16",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-085_Mq3HpaM.jpg",
+   "arts": [
+    {
+     "id": "OP16-085_p1_GF8c8fm",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-085_p1_GF8c8fm.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP16-099",
+   "name": "I've Come Here... To Cut Those Chains!!!",
+   "category": "event",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[Main] You may rest 6 of your DON!! cards: Trash 5 cards from the top of your deck. Then, play up to 1 {Land of Wano} type Character card with a cost of 6 or less from your trash. [Counter] Your Leader gains +3000 power during this battle.",
+   "set": "OP16",
+   "rarity": "UC",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-099_ioohJH9.jpg"
+  },
+  {
+   "id": "OP16-084",
+   "name": "Kouzuki Momonosuke",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 5,
+   "power": 0,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Land of Wano",
+    "Kouzuki Clan"
+   ],
+   "text": "[Activate: Main] You may trash this Character with a cost of 20 or more: If you have 9 or more DON!! cards on your field, play up to 1 [Kouzuki Momonosuke] with a cost of 9 from your trash.",
+   "set": "OP16",
+   "rarity": "UC",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-084_t2DwSPj.jpg"
+  },
+  {
+   "id": "OP16-092",
+   "name": "Nico Robin",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "power": 2000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Land of Wano",
+    "Straw Hat Crew"
+   ],
+   "text": "[On Play] You may trash 1 Character card with a cost of 8 or more from your hand: Draw 2 cards.",
+   "set": "OP16",
+   "rarity": "UC",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-092_sgaCnPy.jpg"
+  },
+  {
+   "id": "OP16-081",
+   "name": "Otama",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 2,
+   "power": 0,
+   "counter": 2000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[Activate: Main] You may rest this Character: If you have a Character with a cost of 8 or more, give up to 1 of your opponent's Characters 2000 power during this turn.",
+   "set": "OP16",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-081_yyBVNXW.jpg"
+  },
+  {
+   "id": "OP16-087",
+   "name": "Shinobu",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 2,
+   "power": 1000,
+   "counter": 2000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[On Play] You may trash this Character: If your Leader has the {Land of Wano} type, draw 1 card and up to 1 of your [Kouzuki Momonosuke] gains +20 cost during this turn.",
+   "set": "OP16",
+   "rarity": "UC",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-087_imE9hNZ.jpg"
+  },
+  {
+   "id": "OP16-096",
+   "name": "Yamato",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 8,
+   "power": 8000,
+   "counter": 1000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[Unblockable] (This card cannot be blocked.) [On K.O.] Play up to 1 [Yamato] with a cost of 6 or less from your trash.",
+   "set": "OP16",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-096_rU3xjhR.jpg"
+  },
+  {
+   "id": "OP16-097",
+   "name": "Yamato",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 8,
+   "power": 8000,
+   "counter": 0,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[On Play] Add up to 1 {Land of Wano} type Character card with a cost of 6 or less from your trash to your hand. Then, play up to 1 Character card with a cost of 2 or less from your hand.",
+   "set": "OP16",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP16-097_p9eq1wc.jpg"
+  },
+  {
+   "id": "OP17-109",
+   "name": "Charlotte Pudding",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 3,
+   "power": 4000,
+   "counter": 1000,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Big Mom Pirates"
+   ],
+   "text": "[On Play] You may trash 1 card with a [Trigger] from your hand: Draw 3 cards.",
+   "trigger": "Look at 5 cards from the top of your deck; reveal up to 1 {Big Mom Pirates} type card and add it to your hand. Then, place the rest at the bottom of your deck in any order.",
+   "set": "OP17",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP17-109_brUDWS0.jpg",
+   "arts": [
+    {
+     "id": "OP17-109_p1_57Rbfn2",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP17-109_p1_57Rbfn2.jpg",
+     "label": "SP"
+    }
+   ]
+  },
+  {
+   "id": "OP17-114",
+   "name": "Sweet 3 Generals",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 6,
+   "power": 4000,
+   "counter": 1000,
+   "attributes": [
+    "Slash Strike"
+   ],
+   "types": [
+    "Big Mom Pirates"
+   ],
+   "text": "[Your Turn] [On Play] You may rest 2 of your DON!! cards: Draw 1 card and add up to 1 card from the top of your deck to the top of your Life cards. Then, give up to 2 of your opponent's Characters -3000 power during this turn.",
+   "trigger": "Play this card.",
+   "set": "OP17",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP17-114_tWIf95P.jpg",
+   "arts": [
+    {
+     "id": "OP17-114_p1_USqKnVi",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP17-114_p1_USqKnVi.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "OP17-095",
+   "name": "Roronoa Zoro",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 2,
+   "power": 2000,
+   "counter": 2000,
+   "attributes": [
+    "Slash"
+   ],
+   "types": [
+    "Straw Hat Crew",
+    "Elbaph"
+   ],
+   "text": "If there is a Character with a cost of 12 or more, this Character gains +3000 power.\nIf one of your Characters would be removed from the field by your opponent's effect, you may place 3 cards from your trash at the bottom of your deck in any order instead.",
+   "set": "OP17",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/OP17-095_xEqkpXR.jpg"
+  },
+  {
+   "id": "EB05-046",
+   "name": "Yamato",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 1000,
+   "attributes": [
+    "Strike"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "If your opponent has a Character with 8000 base power or more, this Character gains [Blocker] and +3000 power.\n[On Your Opponent's Attack] You may trash 1 card from your hand: If you have 10 or more cards in your trash, your Leader's base power becomes 7000 during this turn.",
+   "set": "EB05",
+   "rarity": "SR",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-046_EctTl5w.jpg",
+   "arts": [
+    {
+     "id": "EB05-046_p1_REztKEz",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-046_p1_REztKEz.jpg",
+     "label": "Super Rare Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "EB05-052",
+   "name": "Gloriosa",
+   "category": "character",
+   "colors": [
+    "yellow"
+   ],
+   "cost": 4,
+   "power": 6000,
+   "counter": 0,
+   "attributes": [
+    "Wisdom"
+   ],
+   "types": [
+    "Amazon Lily",
+    "Rocks Pirates"
+   ],
+   "text": "If you would take damage, you may trash this Character instead.",
+   "trigger": "Draw 2 cards and trash 1 card from your hand.",
+   "set": "EB05",
+   "rarity": "SR",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-052_NVjTA0X.jpg",
+   "arts": [
+    {
+     "id": "EB05-052_p1_VmAhKFL",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-052_p1_VmAhKFL.jpg",
+     "label": "Super Rare Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "EB05-043",
+   "name": "Perona",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 2000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[On K.O.] K.O. or rest up to 1 of your opponent's Characters with a cost of 6 or less.",
+   "set": "EB05",
+   "rarity": "R",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-043_KzeHlX6.jpg",
+   "arts": [
+    {
+     "id": "EB05-043_cAwYMcA",
+     "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-043_cAwYMcA.jpg",
+     "label": "Alternate Art"
+    }
+   ]
+  },
+  {
+   "id": "EB05-042",
+   "name": "Shinobu",
+   "category": "character",
+   "colors": [
+    "black"
+   ],
+   "cost": 4,
+   "power": 5000,
+   "counter": 2000,
+   "attributes": [
+    "Special"
+   ],
+   "types": [
+    "Land of Wano"
+   ],
+   "text": "[On Play] Draw 2 cards and trash 2 cards from your hand.",
+   "set": "EB05",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-042_qSRCJXE.jpg"
+  },
+  {
+   "id": "EB05-049",
+   "name": "Special Hollow",
+   "category": "event",
+   "colors": [
+    "black"
+   ],
+   "cost": 1,
+   "attributes": [],
+   "types": [
+    "Thriller Bark Pirates"
+   ],
+   "text": "[Main] You may K.O. 1 of your {Thriller Bark Pirates} type Characters: Give up to 1 of your opponent's Characters -3 cost during this turn.\n[Counter] You may K.O. 1 of your {Thriller Bark Pirates} type Characters: Up to 1 of your Leader or Characters gains +4000 power during this battle.",
+   "set": "EB05",
+   "rarity": "C",
+   "imageUrl": "https://optcgapi.com/media/static/Card_Images/EB05-049_MDkQqmE.jpg"
+  }
+ ],
+ "replay": {
+  "format": "gumgumfight-replay",
+  "version": 13,
+  "seed": 0,
+  "seed128": [
+   183213057,
+   -1650609647,
+   1408030780,
+   2002363902
+  ],
+  "firstPlayer": 0,
+  "chooseFirst": true,
+  "names": [
+   "Jogador 1",
+   "Jogador 2"
+  ],
+  "deckIds": [
+   "u-18ac85d0",
+   "u-d9672590"
+  ],
+  "actions": [
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "mulligan",
+    "player": 0,
+    "redraw": true
+   },
+   {
+    "type": "mulligan",
+    "player": 1,
+    "redraw": false
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c28"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c7"
+    ]
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c76"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c28"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c28"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c28"
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c28",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c80"
+   },
+   {
+    "type": "activate",
+    "player": 1,
+    "uid": "c52",
+    "ability": 0
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c80"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": false
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c98"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c72"
+    ]
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c9"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c40"
+    ]
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c32"
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c40"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c78",
+     "c93",
+     "c81"
+    ]
+   },
+   {
+    "type": "option",
+    "player": 1,
+    "index": 0
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c30"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c85"
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c72"
+    ]
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c98"
+    ]
+   },
+   {
+    "type": "activate",
+    "player": 1,
+    "uid": "c52",
+    "ability": 0
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c72"
+    ]
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c93"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c98",
+    "target": "c1"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c3"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c98"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c46"
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c42"
+    ]
+   },
+   {
+    "type": "option",
+    "player": 0,
+    "index": 0
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c10"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c42",
+    "target": "c52"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c77"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "activate",
+    "player": 0,
+    "uid": "c42",
+    "ability": 1
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c40"
+    ]
+   },
+   {
+    "type": "option",
+    "player": 0,
+    "index": 0
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c13"
+    ]
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c25"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c9",
+    "target": "c52"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c56"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c40",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c82"
+   },
+   {
+    "type": "activate",
+    "player": 1,
+    "uid": "c52",
+    "ability": 0
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": [
+     "c82"
+    ]
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c101"
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c85",
+    "target": "c9"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": []
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": []
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": false
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c93",
+    "target": "c1"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c25"
+    ]
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c74"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c47"
+   },
+   {
+    "type": "answer",
+    "player": 0,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c42"
+    ]
+   },
+   {
+    "type": "option",
+    "player": 0,
+    "index": 0
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c37"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c42",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": true
+   },
+   {
+    "type": "choose",
+    "player": 1,
+    "uids": []
+   },
+   {
+    "type": "activate",
+    "player": 0,
+    "uid": "c42",
+    "ability": 1
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c37"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c40",
+    "target": "c93"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c37"
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c37",
+    "target": "c85"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c64"
+   },
+   {
+    "type": "counter",
+    "player": 1,
+    "uid": "c100"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "endTurn",
+    "player": 0
+   },
+   {
+    "type": "playCard",
+    "player": 1,
+    "uid": "c92"
+   },
+   {
+    "type": "option",
+    "player": 1,
+    "index": 0
+   },
+   {
+    "type": "option",
+    "player": 1,
+    "index": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c85",
+    "target": "c1"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c48"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "attack",
+    "player": 1,
+    "attacker": "c52",
+    "target": "c1"
+   },
+   {
+    "type": "counter",
+    "player": 0,
+    "uid": "c45"
+   },
+   {
+    "type": "pass",
+    "player": 0
+   },
+   {
+    "type": "endTurn",
+    "player": 1
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c40"
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c40",
+    "target": "c85"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "playCard",
+    "player": 0,
+    "uid": "c43"
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c12"
+    ]
+   },
+   {
+    "type": "activate",
+    "player": 0,
+    "uid": "c43",
+    "ability": 1
+   },
+   {
+    "type": "choose",
+    "player": 0,
+    "uids": [
+     "c34"
+    ]
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c34",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c37",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   },
+   {
+    "type": "answer",
+    "player": 1,
+    "yes": false
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attachDon",
+    "player": 0,
+    "target": "c1"
+   },
+   {
+    "type": "attack",
+    "player": 0,
+    "attacker": "c1",
+    "target": "c52"
+   },
+   {
+    "type": "pass",
+    "player": 1
+   }
+  ]
+ }
+}

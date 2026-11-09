@@ -1449,6 +1449,8 @@ export interface JudgePlay {
   logFrom: number;
   /** Resposta dada pelo Judge no lugar do jogador: o nome de quem respondeu. */
   by?: string;
+  /** Milissegundos desde a jogada anterior (toque duplo: resposta vazia poucos centésimos depois). */
+  sinceMs?: number;
 }
 
 /** As jogadas de uma partida, com os nomes e textos só das cartas citadas (nunca a seed). */

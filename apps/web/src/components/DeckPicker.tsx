@@ -4,7 +4,8 @@
 // nas regras de quem pede ficam no fim, recolhidos, com o motivo escrito.
 
 import { type CardData, DECK_SIZE, FORMATS, withArt } from '@gumgum/engine';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, type DeckSummary } from '../api';
 import {
   DECK_COLORS,
@@ -32,6 +33,9 @@ export const DECK_TABS: DeckTab[] = ['recent', 'favorites', 'mine', 'community',
 /** As abas da lista: "Decks do meta" só quando o servidor tem algum. */
 export const deckTabs = (tabs: DeckTab[], decks: DeckSummary[]): DeckTab[] => tabs.filter((tb) => tb !== 'meta' || decks.some((d) => d.meta));
 const SORTS: DeckSort[] = ['recent', 'name', 'color', 'leader', 'games'];
+/** Onde um deck "mora" (as abas Recentes e Favoritos são atalhos): título do grupo na busca em todas as abas. */
+const HOME_TABS: DeckTab[] = ['mine', 'community', 'meta', 'builtin'];
+const homeTab = (d: DeckSummary, local: ReadonlyMap<string, number>): DeckTab => HOME_TABS.find((tb) => inTab(d, tb, local)) ?? 'builtin';
 export const COLOR_LABEL: Record<string, MessageKey> = {
   red: 'deck.color.red',
   green: 'deck.color.green',
@@ -162,12 +166,17 @@ export function DeckPicker({
   }, [onClose, viewing]);
 
   const counts = useMemo(() => Object.fromEntries(DECK_TABS.map((tb) => [tb, decks.filter((d) => inTab(d, tb, local)).length])), [decks, local]);
+  // Com texto na busca, procura em todos os decks (não só na aba aberta), agrupados por onde cada um está.
+  const searching = query.trim().length > 0;
   const visible = useMemo(
-    () => sortDecks(decks.filter((d) => inTab(d, tab, local) && matchesQuery(d, query) && matchesColors(d, colors)), sort, local),
-    [decks, tab, local, query, colors, sort],
+    () => sortDecks(decks.filter((d) => (searching || inTab(d, tab, local)) && matchesQuery(d, query) && matchesColors(d, colors)), sort, local),
+    [decks, tab, local, query, colors, sort, searching],
   );
   const usable = visible.filter(canUse);
   const blocked = visible.filter((d) => !canUse(d));
+  const groups: Array<[DeckTab | null, DeckSummary[]]> = searching
+    ? HOME_TABS.map((tb): [DeckTab, DeckSummary[]] => [tb, usable.filter((d) => homeTab(d, local) === tb)]).filter(([, list]) => list.length > 0)
+    : [[null, usable]];
   const current = selected === RANDOM_DECK ? undefined : decks.find((d) => d.id === selected);
   const currentOk = selected === RANDOM_DECK || (current ? canUse(current) : false);
 
@@ -202,7 +211,9 @@ export function DeckPicker({
   const leader = current && detail ? detail.cards.get(current.leader) : undefined;
   const tabLabels = deckTabs(DECK_TABS, decks).map((tb) => [tb, t(`decks.tab.${tb}`)] as [DeckTab, string]);
 
-  return (
+  // No `body`: dentro de um card com `backdrop-filter` (ex.: a inscrição do torneio) o `position: fixed`
+  // passa a valer em relação ao card, e o seletor ficava preso numa faixa pequena da página no celular.
+  return createPortal(
     <div className="modal-backdrop page-sheet dk-picker-backdrop" onClick={onClose}>
       <div className="dk-picker" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="dk-picker-head">
@@ -242,16 +253,26 @@ export function DeckPicker({
                   </button>
                 </article>
               )}
-              {usable.map((d) => (
-                <DeckTile
-                  key={d.id}
-                  deck={d}
-                  local={local}
-                  selected={d.id === selected}
-                  onSelect={() => setSelected(d.id)}
-                  onActivate={() => use(d.id)}
-                  onFavorite={onFavorite}
-                />
+              {groups.map(([tb, list]) => (
+                <Fragment key={tb ?? 'all'}>
+                  {tb && (
+                    <h4 className="dk-group">
+                      {t(`decks.tab.${tb}`)}
+                      <span className="dk-count">{list.length}</span>
+                    </h4>
+                  )}
+                  {list.map((d) => (
+                    <DeckTile
+                      key={d.id}
+                      deck={d}
+                      local={local}
+                      selected={d.id === selected}
+                      onSelect={() => setSelected(d.id)}
+                      onActivate={() => use(d.id)}
+                      onFavorite={onFavorite}
+                    />
+                  ))}
+                </Fragment>
               ))}
             </div>
             {!usable.length && !blocked.length && (
@@ -385,6 +406,7 @@ export function DeckPicker({
           />
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

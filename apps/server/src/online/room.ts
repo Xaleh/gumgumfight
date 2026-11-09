@@ -66,6 +66,8 @@ export const ABANDON_MS = 2 * 60_000;
 /** Limite de ações por assento numa janela de RATE_WINDOW_MS. */
 const RATE_LIMIT = 60;
 const RATE_WINDOW_MS = 10_000;
+/** Escolha vazia menos de tanto depois da jogada anterior: provável toque duplo (log do servidor). */
+const QUICK_SKIP_MS = 1500;
 const MAX_ACTIONS = 5000;
 /** Respostas que o Judge dá no lugar do jogador, no modo manual (`Room.judgeAct`). */
 const JUDGE_ANSWERS = ['choose', 'answer', 'option', 'pass', 'manualDone', 'endTurn'] as const;
@@ -358,6 +360,11 @@ export interface JudgePlay {
   logFrom: number;
   /** Resposta dada pelo Judge no lugar do jogador: o nome de quem respondeu. */
   by?: string;
+  /**
+   * Milissegundos desde a jogada anterior (da sala, de qualquer jogador). Uma resposta vazia poucos
+   * centésimos depois da anterior é toque duplo no celular, não decisão.
+   */
+  sinceMs?: number;
 }
 
 export interface JudgePlays {
@@ -621,7 +628,9 @@ export class Room {
     // Sem o instante das ações (sala gravada antes do campo, ou ações refeitas acima), elas contam
     // como feitas agora: a mesa atrasada nunca mostra as mãos de agora antes da hora.
     const now = this.deps.now();
-    if (this.data.timeline?.length !== this.data.actions.length) {
+    // O instante de cada jogada só vale para o intervalo entre elas se foi gravado de verdade.
+    const timed = this.data.timeline?.length === this.data.actions.length;
+    if (!timed) {
       this.data.timeline = this.data.actions.map(() => [now, this.data.remaining[0], this.data.remaining[1]]);
     }
     this.data.startedAt ??= now;
@@ -631,7 +640,9 @@ export class Room {
     for (const [i, a] of this.data.actions.entries()) {
       const before = state;
       state = applyAction(before, a);
-      plays.push(playOf(i, before, a, state));
+      const play = playOf(i, before, a, state);
+      if (timed && i > 0) play.sinceMs = this.data.timeline![i][0] - this.data.timeline![i - 1][0];
+      plays.push(play);
     }
     this.state = state;
     this.plays_ = plays;
@@ -691,8 +702,18 @@ export class Room {
     this.settle();
     const prev = this.state!;
     this.state = applyAction(prev, action);
-    this.plays_.push(playOf(this.data.actions.length, prev, action, this.state));
+    const now = this.deps.now();
+    const lastAt = this.data.timeline?.length ? this.data.timeline[this.data.timeline.length - 1][0] : undefined;
+    const play = playOf(this.data.actions.length, prev, action, this.state);
+    if (lastAt !== undefined) play.sinceMs = now - lastAt;
+    this.plays_.push(play);
     this.data.actions.push(action);
+    // Escolha vazia logo depois da jogada anterior, com cartas à escolha: provável toque duplo (relatos
+    // de "o efeito não funcionou" no celular). Fica no log do servidor e, pelo `sinceMs`, nas jogadas do Judge.
+    if (action.type === 'choose' && !action.uids.length && prev.pending?.kind === 'selectTargets' && prev.pending.options.length && play.sinceMs !== undefined && play.sinceMs < QUICK_SKIP_MS) {
+      const card = prev.defs[prev.cards[prev.pending.source]?.cardId]?.name ?? '?';
+      this.deps.log(`Partida online ${this.id}: escolha vazia ${play.sinceMs} ms depois da jogada anterior (${this.data.seats[action.player]?.name ?? action.player}, ${card}, ${prev.pending.options.length} opções).`);
+    }
     this.lastAction = action;
     const before = this.running;
     this.running = this.state.phase === 'gameover' ? null : actingPlayer(this.state);
