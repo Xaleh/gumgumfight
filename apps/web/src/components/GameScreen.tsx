@@ -672,17 +672,18 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, boardLayout, update: updateSettings } = useSettings();
+  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, boardStyle, boardLayout, update: updateSettings } = useSettings();
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
   const canOpenHands = Boolean(online?.hands || spectator?.canHands || kind === 'replay');
   const bare = Boolean(embed?.bare);
   /**
-   * A mesa larga de quem joga no desktop, bloco a bloco como escolhido em Configurações › Layout da mesa.
-   * Streamer, transmissão, tutorial e replay embutido ficam com a mesa em coluna.
+   * Quem joga no desktop escolhe a mesa em Configurações › Layout da mesa: a clássica (o padrão) ou a mesa
+   * larga, bloco a bloco. Streamer, transmissão, tutorial e replay embutido ficam sempre com a clássica.
    */
-  const wideBoard = wide && !streamer && !broadcast && !tutorial && !embed;
+  const layoutChoice = wide && !streamer && !broadcast && !tutorial && !embed;
+  const wideBoard = layoutChoice && boardStyle === 'custom';
   const layout = useMemo(() => effectiveLayout(boardLayout), [boardLayout]);
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
@@ -1765,7 +1766,7 @@ function Table({
               <button className="btn" onClick={() => (streamer || (playerPanel && panelLogOn) ? openPanel('log') : setSheet('log'))}>
                 {t('game.logBtn')}
               </button>
-              {wideBoard && (
+              {layoutChoice && (
                 <button className="btn" onClick={() => setSheet('layout')}>
                   {t('game.layoutBtn')}
                 </button>

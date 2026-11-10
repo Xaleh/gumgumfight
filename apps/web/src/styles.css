@@ -16157,6 +16157,40 @@ div.dk-tile-main {
   border-radius: 10px;
   overflow: hidden;
 }
+/* A mesa clássica na prévia: não responde a nada, e os DON!! no tamanho do desktop (como em `.game.wide`). */
+.wm-preview.classic .mat,
+.wm-preview.classic .mat * {
+  pointer-events: none !important;
+}
+.wm-preview.classic .don-row:where(.board-col[data-landscape] *),
+.wm-preview.classic .don-row.top:where(.board-col[data-landscape] *) {
+  --dw: calc(var(--cw) * 0.38);
+}
+.wm-preview.classic .don-stats:where(.board-col[data-landscape] *) {
+  font-size: max(11px, calc(var(--cw) * 0.12));
+  padding: 3px 8px;
+  column-gap: 10px;
+}
+.layout-classic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.layout-classic > div {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.layout-classic b {
+  font-size: 15px;
+}
 .wm-preview .wm-preview-panel {
   border-radius: 10px;
   overflow: hidden;

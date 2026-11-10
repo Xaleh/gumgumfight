@@ -8,6 +8,7 @@ import {
   matchingPreset,
   measureLayout,
   parseLayout,
+  parseStyle,
   presetLayout,
 } from '../src/game/boardLayout';
 
@@ -54,6 +55,27 @@ describe('layout da mesa: leitura do que foi salvo', () => {
     const custom = { ...legacy, leader: { size: 'large' } };
     expect(parseLayout(custom).don.position).toBe('left');
     expect(parseLayout(custom).leader.size).toBe('large');
+  });
+});
+
+describe('layout da mesa: clássica (padrão) ou larga', () => {
+  it('sem nada salvo, a mesa clássica', () => {
+    expect(parseStyle(undefined, undefined)).toBe('classic');
+    expect(parseStyle('wide', 'x')).toBe('classic');
+  });
+
+  it('a escolha salva vale, seja qual for o layout guardado', () => {
+    expect(parseStyle('custom', undefined)).toBe('custom');
+    expect(parseStyle('custom', DEFAULT_LAYOUT)).toBe('custom');
+    expect(parseStyle('classic', presetLayout('compact'))).toBe('classic');
+  });
+
+  it('salvo antes de a escolha existir: quem estava no padrão da mesa larga volta à clássica; quem tinha mexido continua na larga', () => {
+    expect(parseStyle(undefined, JSON.parse(JSON.stringify(DEFAULT_LAYOUT)))).toBe('classic');
+    // O padrão da primeira versão da mesa larga também era "não mexeu".
+    expect(parseStyle(undefined, { ...DEFAULT_LAYOUT, don: { size: 'medium', position: 'left' }, trash: { size: 'medium', position: 'right' }, log: { show: true, size: 'medium', position: 'panel' }, hover: { show: true, size: 'medium', position: 'panel' } })).toBe('classic');
+    expect(parseStyle(undefined, { ...DEFAULT_LAYOUT, leader: { size: 'large' } })).toBe('custom');
+    expect(parseStyle(undefined, presetLayout('open'))).toBe('custom');
   });
 });
 

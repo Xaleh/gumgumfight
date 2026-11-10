@@ -1,6 +1,7 @@
-// Configurações › Layout da mesa › Personalizar: a prévia da mesa larga (viva: muda a cada toque) e um
-// cartão por bloco com o que aparece, o tamanho e a posição. Aberto nas Configurações (com uma partida de
-// exemplo) ou no menu da partida (com a própria partida). As escolhas só valem ao salvar.
+// Configurações › Layout da mesa › Personalizar: a prévia da mesa (viva: muda a cada toque) e, na mesa
+// larga, um cartão por bloco com o que aparece, o tamanho e a posição; a mesa clássica (o padrão) não tem
+// ajustes. Aberto nas Configurações (com uma partida de exemplo) ou no menu da partida (com a própria
+// partida). As escolhas só valem ao salvar.
 
 import { type CardData, cardDef, createScenario, type GameState, type PlayerId } from '@gumgum/engine';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -11,9 +12,9 @@ import {
   type BlockId,
   type BlockSize,
   type BoardLayout,
+  type BoardStyle,
   blockedPositions,
   cloneLayout,
-  DEFAULT_LAYOUT,
   effectiveLayout,
   LAYOUT_PRESETS,
   type LayoutPreset,
@@ -26,7 +27,7 @@ import { buildSetup } from '../game/setup';
 import { useBoardSize } from '../hooks/useBoardSize';
 import { type MessageKey, useT } from '../i18n';
 import { Switch, useSettings } from '../settings';
-import type { BoardHandlers } from './Board';
+import { Board, type BoardHandlers } from './Board';
 import { CardTextInfo } from './CardInfo';
 import { CardView } from './CardView';
 import { WideBoard } from './WideBoard';
@@ -151,8 +152,11 @@ function Seg<T extends string>({
   );
 }
 
+/** Largura do painel lateral na mesa clássica (px), a mesma de `.game.wide`. */
+const CLASSIC_PANEL_W = 340;
+
 /** Prévia do painel lateral (o de verdade mora no GameScreen): a carta em detalhe e o histórico. */
-function PanelPreview({ state, layout }: { state: GameState; layout: ReturnType<typeof effectiveLayout> }) {
+function PanelPreview({ state, detail, log }: { state: GameState; detail: boolean; log: boolean }) {
   const t = useT();
   return (
     <aside className="side-panel tabbed-panel player-panel wm-preview-panel" aria-hidden="true">
@@ -164,8 +168,8 @@ function PanelPreview({ state, layout }: { state: GameState; layout: ReturnType<
           <button type="button">{t('game.decklist')}</button>
         </div>
       </div>
-      {layout.hover.show && layout.hover.position === 'panel' && <DetailPreview state={state} />}
-      {layout.log.show && layout.log.position === 'panel' && <LogPreview state={state} />}
+      {detail && <DetailPreview state={state} />}
+      {log && <LogPreview state={state} />}
     </aside>
   );
 }
@@ -206,6 +210,8 @@ function DetailPreview({ state }: { state: GameState }) {
 export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClose: () => void }) {
   const t = useT();
   const settings = useSettings();
+  /** A mesa em edição: a clássica (sem ajustes) ou a larga, com o `draft` dos blocos. */
+  const [style, setStyle] = useState<BoardStyle>(settings.boardStyle);
   const [draft, setDraft] = useState<BoardLayout>(() => cloneLayout(settings.boardLayout));
   const [sample, setSample] = useState<GameState | null>(state ?? null);
   const [failed, setFailed] = useState(false);
@@ -236,12 +242,13 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
   // A prévia mede a própria coluna (--bw/--bh), como a mesa de verdade faz no GameScreen.
   const previewCol = useRef<HTMLDivElement>(null);
   useBoardSize(previewCol);
-  const preset = matchingPreset(draft);
-  const dirty = !sameLayout(draft, settings.boardLayout);
+  const classic = style === 'classic';
+  const preset = classic ? null : matchingPreset(draft);
+  const dirty = style !== settings.boardStyle || !sameLayout(draft, settings.boardLayout);
   const key = (k: string) => k as MessageKey;
   const patch = <K extends BlockId>(id: K, p: Partial<BoardLayout[K]>) => setDraft((d) => ({ ...d, [id]: { ...d[id], ...p } }));
   const save = () => {
-    settings.update({ boardLayout: cloneLayout(draft) });
+    settings.update({ boardStyle: style, boardLayout: cloneLayout(draft) });
     setToast('layout.saved');
   };
   const bottom: PlayerId = 0;
@@ -306,17 +313,25 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
 
   // A coluna da prévia existe desde o primeiro render (mesmo sem a partida de exemplo ainda): o useBoardSize
   // mede a coluna ao montar e só avisa de novo quando o tamanho muda; se ela surgisse depois, ficaria sem medida.
+  const pill = sample && <span className="hint-pill soft">{t('layout.previewTurn', { n: sample.turn })}</span>;
+  // Na mesa clássica o painel lateral (carta em detalhe e histórico) abre e fecha pelo botão do histórico.
+  const panelShown = Boolean(sample) && (classic ? settings.sidePanel : eff.panelOn);
   const preview: ReactNode = (
-    <div className={['wm-preview', eff.panelOn && sample ? '' : 'no-panel'].join(' ')} style={{ ['--panel-w' as string]: `${panelWidth(eff)}px` }}>
+    <div
+      className={['wm-preview', classic ? 'classic' : '', panelShown ? '' : 'no-panel'].join(' ')}
+      style={{ ['--panel-w' as string]: `${classic ? CLASSIC_PANEL_W : panelWidth(eff)}px` }}
+    >
       <div className="board-col wm-preview-col" ref={previewCol}>
-        {sample ? (
+        {sample && classic ? (
+          <Board state={sample} bottom={bottom} revealBottom revealTop={false} corner={null} center={pill} {...INERT} />
+        ) : sample ? (
           <WideBoard
             state={sample}
             bottom={bottom}
             revealBottom
             revealTop={false}
             layout={eff}
-            center={<span className="hint-pill soft">{t('layout.previewTurn', { n: sample.turn })}</span>}
+            center={pill}
             sideLeft={eff.sideHover ? <DetailPreview state={sample} /> : undefined}
             sideRight={eff.sideLog ? <LogPreview state={sample} /> : undefined}
             overlay={eff.hover.show && eff.hover.position === 'center' ? <DetailPreview state={sample} /> : undefined}
@@ -327,9 +342,23 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
           <div className="wm-preview-wait">{failed ? t('layout.previewFailed') : t('common.loading')}</div>
         )}
       </div>
-      {eff.panelOn && sample && <PanelPreview state={sample} layout={eff} />}
+      {panelShown && sample && (
+        <PanelPreview
+          state={sample}
+          detail={classic || (eff.hover.show && eff.hover.position === 'panel')}
+          log={classic || (eff.log.show && eff.log.position === 'panel')}
+        />
+      )}
     </div>
   );
+  /** Escolher uma predefinição da mesa larga (ou mexer num bloco dela) sai da mesa clássica. */
+  const pickPreset = (p: LayoutPreset | 'classic' | '') => {
+    if (p === 'classic') return setStyle('classic');
+    if (!p) return;
+    setStyle('custom');
+    setDraft(presetLayout(p));
+  };
+  const presetName = classic ? t('layout.preset.classic') : preset ? t(key(`layout.preset.${preset}`)) : t('layout.custom');
 
   return (
     <div className="modal-backdrop sheet-backdrop page-sheet centered" onClick={onClose}>
@@ -338,11 +367,11 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
           <h3>{t('layout.title')}</h3>
           <div className="layout-presets">
             <span className="muted small">{t('layout.presets')}</span>
-            <Seg<LayoutPreset | ''>
+            <Seg<LayoutPreset | 'classic' | ''>
               label={t('layout.presets')}
-              value={preset ?? ''}
-              options={LAYOUT_PRESETS.map((p) => ({ id: p, label: t(key(`layout.preset.${p}`)) }))}
-              onPick={(p) => p && setDraft(presetLayout(p))}
+              value={classic ? 'classic' : (preset ?? '')}
+              options={(['classic', ...LAYOUT_PRESETS] as const).map((p) => ({ id: p, label: t(key(`layout.preset.${p}`)) }))}
+              onPick={pickPreset}
             />
           </div>
           <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
@@ -353,22 +382,41 @@ export function BoardLayoutEditor({ state, onClose }: { state?: GameState; onClo
           <div className="layout-preview-note muted small">
             <span>{t('layout.previewHint')}</span>
             <span>
-              {preset ? t(key(`layout.preset.${preset}`)) : t('layout.custom')}
+              {presetName}
               {dirty ? ` · ${t('layout.unsaved')}` : ''}
             </span>
           </div>
           {preview}
-          <div className="layout-blocks">{blocks}</div>
+          {classic ? (
+            <div className="layout-classic">
+              <div>
+                <b>{t('layout.classicTitle')}</b>
+                <p className="layout-hint">{t('layout.classicNote')}</p>
+              </div>
+              <button type="button" className="btn" onClick={() => setStyle('custom')}>
+                {t('layout.classicCustomize')}
+              </button>
+            </div>
+          ) : (
+            <div className="layout-blocks">{blocks}</div>
+          )}
         </div>
         <div className="sheet-foot layout-foot">
-          <button className="btn" onClick={() => setDraft(cloneLayout(DEFAULT_LAYOUT))} disabled={sameLayout(draft, DEFAULT_LAYOUT)}>
+          <button className="btn" onClick={() => setStyle('classic')} disabled={classic}>
             {t('layout.reset')}
           </button>
           <span className="layout-toast" role="status">
             {toast ? t(toast) : ''}
           </span>
           <div className="layout-actions">
-            <button className="btn" onClick={() => setDraft(cloneLayout(settings.boardLayout))} disabled={!dirty}>
+            <button
+              className="btn"
+              onClick={() => {
+                setStyle(settings.boardStyle);
+                setDraft(cloneLayout(settings.boardLayout));
+              }}
+              disabled={!dirty}
+            >
               {t('common.cancel')}
             </button>
             <button className="btn primary" onClick={save} disabled={!dirty}>
