@@ -7,6 +7,7 @@ import {
   type CardStatus,
   cardStatuses,
   counterValue,
+  eventCounterPower,
   type FieldCard,
   type GameState,
   costInHand,
@@ -23,10 +24,26 @@ import { useSettings } from '../settings';
 
 /**
  * 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. 'counter1' / 'counter2': opção da
- * etapa de Counter que vale +1000 (azul) ou +2000 ou mais (vermelho), com o valor numa etiqueta. 'inert': no seu
- * turno, a carta em pé que não pode atacar nem ativar nada (acabou de entrar, por exemplo), apagada.
+ * etapa de Counter que vale +1000 (azul) ou +2000 ou mais (vermelho), com o valor numa etiqueta. 'counterEvent':
+ * Evento [Counter] cujo efeito dá (ou tira do oponente) poder, em roxo, com esse valor na etiqueta. 'inert': no
+ * seu turno, a carta em pé que não pode atacar nem ativar nada (acabou de entrar, por exemplo), apagada.
  */
-export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | 'ready' | 'disabled' | 'counter1' | 'counter2' | 'inert' | null;
+export type Highlight =
+  | 'option'
+  | 'selected'
+  | 'attacker'
+  | 'target'
+  | 'playable'
+  | 'ready'
+  | 'disabled'
+  | 'counter1'
+  | 'counter2'
+  | 'counterEvent'
+  | 'inert'
+  | null;
+
+/** "+4000" / "−2000": o valor da etiqueta da etapa de Counter. */
+const signed = (n: number) => (n < 0 ? `−${-n}` : `+${n}`);
 
 // Nomes oficiais das palavras-chave, em inglês como no jogo (não se traduzem).
 const KEYWORD_LABEL: Record<Keyword, string> = {
@@ -149,8 +166,9 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
       )}
       <StatusMarkers statuses={statuses} spoiler={def} />
       {(highlight === 'counter1' || highlight === 'counter2') && (
-        <span className={['counter-chip', highlight].join(' ')}>+{counterValue(state, uid)}</span>
+        <span className={['counter-chip', highlight].join(' ')}>{signed(counterValue(state, uid))}</span>
       )}
+      {highlight === 'counterEvent' && <span className="counter-chip counterEvent">{signed(eventCounterPower(state, uid))}</span>}
     </div>
   );
 }

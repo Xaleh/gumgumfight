@@ -9,6 +9,7 @@ import {
   cardStatuses,
   counterTargets,
   counterValue,
+  eventCounterPower,
   type GameConfig,
   type GameState,
   getCost,
@@ -1123,11 +1124,13 @@ function Table({
         if (myPending.shown?.includes(uid)) return 'disabled';
       }
       if (myPending.kind === 'counter' && picked.includes(uid)) return 'selected';
-      // Etapa de Counter: o valor de cada carta salta à vista pela cor (+1000 azul, +2000 ou mais vermelho);
-      // o Evento [Counter], com custo e efeito próprios, fica com o destaque comum.
+      // Etapa de Counter: o valor de cada carta salta à vista pela cor (+1000 azul, +2000 ou mais vermelho). O
+      // Evento [Counter] vai em roxo com o poder que o efeito dá agora (ou tira do oponente); o que não é de
+      // poder (devolver à mão, virar…) fica com o destaque comum.
       if (myPending.kind === 'counter' && myPending.options.includes(uid)) {
         const value = counterValue(state, uid);
-        return value >= 2000 ? 'counter2' : value > 0 ? 'counter1' : 'option';
+        if (value > 0) return value >= 2000 ? 'counter2' : 'counter1';
+        return eventCounterPower(state, uid) !== 0 ? 'counterEvent' : 'option';
       }
       if (myPending.kind === 'block' && myPending.options.includes(uid)) return 'option';
     }

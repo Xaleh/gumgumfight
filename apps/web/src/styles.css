@@ -3697,8 +3697,9 @@ button.hint-pill.undo-pill {
   filter: grayscale(0.85);
 }
 /*
- * Etapa de Counter: o valor de cada carta pela cor (+1000 azul, +2000 ou mais vermelho) e, para não depender
- * só da cor, numa etiqueta no topo da carta (a parte que aparece no leque da mão).
+ * Etapa de Counter: o valor de cada carta pela cor (+1000 azul, +2000 ou mais vermelho, Evento roxo) e, para não
+ * depender só da cor, numa etiqueta no topo da carta (a parte que aparece no leque da mão). A do Evento é
+ * quadrada, e não em pílula: o valor vem do efeito dele (que tem custo), não de um Counter impresso.
  */
 .hl-counter1 {
   box-shadow: 0 0 0 3px var(--counter1), 0 0 20px 5px rgba(47, 124, 255, 0.75) !important;
@@ -3708,9 +3709,14 @@ button.hint-pill.undo-pill {
   box-shadow: 0 0 0 3px var(--counter2), 0 0 20px 5px rgba(240, 62, 62, 0.75) !important;
   cursor: pointer;
 }
+.hl-counterEvent {
+  box-shadow: 0 0 0 3px var(--counter-event), 0 0 20px 5px rgba(146, 72, 240, 0.75) !important;
+  cursor: pointer;
+}
 .card {
   --counter1: #2f7cff;
   --counter2: #f03e3e;
+  --counter-event: #9248f0;
 }
 .counter-chip {
   position: absolute;
@@ -3735,6 +3741,10 @@ button.hint-pill.undo-pill {
 }
 .counter-chip.counter2 {
   background: var(--counter2);
+}
+.counter-chip.counterEvent {
+  background: var(--counter-event);
+  border-radius: 0.3em;
 }
 /*
  * No seu turno: carta em pé que não pode atacar nem ativar nada (acabou de entrar em campo, primeiro turno,

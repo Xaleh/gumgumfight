@@ -288,6 +288,49 @@ export function counterValue(state: GameState, uid: string): number {
   return bonus && hasType(def, bonus.type) ? bonus.amount : 0;
 }
 
+/** Condições de passo que dependem do que o efeito já fez ("Then, if you did…"): antes de usar a carta não dá para saber. */
+const STEP_IFS_UNKNOWN_AHEAD = ['lastDone', 'searchMissed', 'lastKOd', 'revealedHasChosenCost', 'chosenMatches'] as const;
+
+/**
+ * Quanto o [Counter] de um Evento da mão vale na batalha, para a interface mostrar ao lado do Counter dos
+ * Personagens: o poder que ele dá a uma carta do dono ("Up to 1 of your Leader or Character cards gains +4000
+ * power during this battle" = 4000). Evento que só tira poder do oponente devolve o valor negativo
+ * ("give up to 1 of your opponent's Leader or Character cards −2000 power" = −2000). 0 = o efeito não é de
+ * poder (devolve à mão, vira, impede K.O.…) ou não dá para dizer o valor de antemão.
+ *
+ * Vale o que o efeito daria agora: um bônus com condição ("Then, if you have 2 or less Life cards, that card
+ * gains an additional +2000") só entra se a condição vale neste momento, e fica de fora o que depende de
+ * escolhas feitas durante o efeito ou de uma conta por carta ("+1000 for every…").
+ */
+export function eventCounterPower(state: GameState, uid: string): number {
+  const def = cardDef(state, uid);
+  if (def.category !== 'event') return 0;
+  const owner = ownerOf(state, uid);
+  const ability = def.abilities.find((a) => a.timing === 'counter');
+  if (!ability || !conditionHolds(state, owner, uid, ability.condition)) return 0;
+  let own = 0;
+  let theirs = 0;
+  // "that card" (`chosen`) é do lado do último alvo escolhido.
+  let chosenSide: 'own' | 'opponent' | 'any' = 'own';
+  let ifFailed = false;
+  for (const step of ability.steps) {
+    if (step.afterIf && ifFailed) continue;
+    if (step.if) {
+      const cond = step.if;
+      const met = !STEP_IFS_UNKNOWN_AHEAD.some((k) => cond[k] !== undefined) && conditionHolds(state, owner, uid, cond);
+      ifFailed = !met;
+      if (!met) continue;
+    }
+    const target = 'target' in step ? step.target : undefined;
+    if (typeof target === 'object') chosenSide = target.side;
+    if (step.do !== 'power' || step.per) continue;
+    const side = typeof step.target === 'object' ? step.target.side : step.target === 'chosen' ? chosenSide : 'own';
+    if (side === 'own' && step.amount > 0) own += step.amount;
+    else if (side === 'opponent' && step.amount < 0) theirs += step.amount;
+  }
+  return own || theirs;
+}
+
 export function cardDef(state: GameState, uid: string): CardDef {
   return state.defs[state.cards[uid].cardId];
 }
