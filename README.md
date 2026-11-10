@@ -852,7 +852,16 @@ administração, o funil anônimo das lições (onde as pessoas desistem). Detal
 - **Jogar carta:** clique duplo numa carta destacada em verde na mão, ou selecione e use o painel "Ações".
 - **DON!!:** clique na área de DON!! e depois no líder/personagem para anexar (+1000 de poder no seu turno).
 - **Atacar:** selecione o líder ou um personagem ativo, clique em "⚔ Atacar" e escolha o alvo (líder ou personagem virado).
-- **Defesa:** quando for atacado, o jogo pede Blocker, Counter e [Trigger] quando aplicável.
+- **Defesa:** quando for atacado, o jogo pede Blocker, Counter e [Trigger] quando aplicável. Na etapa de Counter, as
+  cartas da mão que servem de Counter ganham a cor do valor (**+1000 azul**, **+2000 ou mais vermelho**) e uma
+  etiqueta com o número; o Evento [Counter] fica com o destaque comum.
+- **Quem ainda pode agir:** no seu turno, quem pode atacar brilha em laranja; o Líder e os Personagens em pé que não
+  podem atacar nem ativar nada (acabaram de entrar em campo, é o primeiro turno, um efeito proíbe) ficam apagados.
+- **Mão cheia (mouse):** a carta erguida é a da faixa sob o ponteiro, então andar com o mouse pela mão passa por todas
+  as cartas, uma a uma. Na mesa larga, com a mão no canto, o leque abre por cima da mesa enquanto o mouse está nele.
+  "Ver mão" continua abrindo a mão inteira em tamanho grande.
+- **Animações** (Configurações ou menu da partida): **Completas**, **Suaves** (as cartas só vão de um lugar ao outro,
+  sem as paradas no centro da mesa nem a faixa animada de troca de turno) ou **Desligadas**.
 - **Desfazer** volta para antes da sua última ação. **Replay** baixa um `.json` com a seed, as listas dos decks e todas as ações.
 - **Assistir replay** (no topo da página inicial e no menu): carregue o `.json` (escolher ou arrastar), veja o resumo
   (jogadores, Líderes, ações, turnos e, se quiser, o resultado) e assista no modo **automático** ou **passo a passo**.

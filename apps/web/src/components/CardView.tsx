@@ -6,6 +6,7 @@ import {
   cardDef,
   type CardStatus,
   cardStatuses,
+  counterValue,
   type FieldCard,
   type GameState,
   costInHand,
@@ -20,8 +21,12 @@ import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, useT, useTryT } from '../i18n';
 import { useSettings } from '../settings';
 
-/** 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. */
-export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | 'ready' | 'disabled' | null;
+/**
+ * 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. 'counter1' / 'counter2': opção da
+ * etapa de Counter que vale +1000 (azul) ou +2000 ou mais (vermelho), com o valor numa etiqueta. 'inert': no seu
+ * turno, a carta em pé que não pode atacar nem ativar nada (acabou de entrar, por exemplo), apagada.
+ */
+export type Highlight = 'option' | 'selected' | 'attacker' | 'target' | 'playable' | 'ready' | 'disabled' | 'counter1' | 'counter2' | 'inert' | null;
 
 // Nomes oficiais das palavras-chave, em inglês como no jogo (não se traduzem).
 const KEYWORD_LABEL: Record<Keyword, string> = {
@@ -143,6 +148,9 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         </span>
       )}
       <StatusMarkers statuses={statuses} spoiler={def} />
+      {(highlight === 'counter1' || highlight === 'counter2') && (
+        <span className={['counter-chip', highlight].join(' ')}>+{counterValue(state, uid)}</span>
+      )}
     </div>
   );
 }

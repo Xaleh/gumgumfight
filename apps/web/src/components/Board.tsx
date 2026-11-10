@@ -1,5 +1,5 @@
 import { cardDef, cardImage, type GameState, HIDDEN_REF, MAX_CHARACTERS, type PlayerId } from '@gumgum/engine';
-import type { CSSProperties, ReactNode } from 'react';
+import { type CSSProperties, type PointerEvent, type ReactNode, useRef, useState } from 'react';
 import { useT } from '../i18n';
 import { CardBack, CardView, type Highlight, JollyRoger } from './CardView';
 
@@ -433,7 +433,15 @@ function PlayerSide({ state, player, position, tools, lifeAside, ...h }: SidePro
   );
 }
 
-/** Mão em leque (a do jogador de baixo fica grande; a de cima, pequena no topo). */
+/**
+ * Mão em leque (a do jogador de baixo fica grande; a de cima, pequena no topo).
+ *
+ * Com o mouse, a carta erguida na mão de baixo é a da faixa sob o ponteiro (`peek`), e não a que o navegador
+ * diz estar por baixo dele (`:hover`). No leque cada carta só mostra uma faixa à esquerda (a vizinha da direita
+ * cobre o resto); com `:hover`, a carta erguida passava para a frente e cobria as faixas das vizinhas, e numa
+ * mão cheia o ponteiro pulava cartas indo para a direita. Pela faixa, andar com o mouse passa por todas as
+ * cartas, uma a uma, nos dois sentidos. No toque nada muda (a carta sob o dedo sobe, ver `lifted`).
+ */
 export function Hand({
   state,
   player,
@@ -457,16 +465,51 @@ export function Hand({
 }) {
   const hand = order ?? state.players[player].hand;
   const n = hand.length;
+  const slots = position === 'bottom' && reveal;
+  const [peekUid, setPeekUid] = useState<string | null>(null);
+  const peeked = useRef<string | null>(null);
+  // Enquanto uma carta é arrastada, nenhuma fica erguida.
+  const peek = slots && !ghost && peekUid !== null && hand.includes(peekUid) ? peekUid : null;
+  const setPeek = (uid: string | null) => {
+    if (uid === peeked.current) return;
+    peeked.current = uid;
+    setPeekUid(uid);
+    // O painel de detalhes segue a carta erguida (o `onHover` da própria carta fica desligado nesta mão).
+    h.onHover(uid);
+  };
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    // No toque não há ponteiro parado em cima da carta: quem ergue é o dedo (`lifted`).
+    if (e.pointerType === 'touch') return;
+    // Botão apertado: é um arrasto (ou vai virar um); a carta erguida não muda no meio dele.
+    if (e.buttons !== 0) return;
+    const box = e.currentTarget;
+    const first = box.querySelector<HTMLElement>('.hand-card');
+    if (!first || !(e.target as HTMLElement).closest('.hand-card')) return setPeek(null);
+    // As mesmas contas do leque no CSS (`.hand-card`): a carta i começa em `left0 + i * step`.
+    const w = box.clientWidth;
+    const cw = first.offsetWidth;
+    const step = n > 1 ? Math.min(cw * 0.9, (w - cw - 34) / (n - 1)) : cw;
+    const x = e.clientX - (box.getBoundingClientRect().left + w / 2 - cw / 2 - ((n - 1) / 2) * step);
+    setPeek(hand[Math.max(0, Math.min(n - 1, Math.floor(x / Math.max(step, 1))))] ?? null);
+  };
   return (
-    <div className={['hand', position].join(' ')} style={vars({ '--n': n })} data-anchor={`hand-${player}`}>
+    <div
+      className={['hand', position].join(' ')}
+      style={vars({ '--n': n })}
+      data-anchor={`hand-${player}`}
+      onPointerMove={slots ? onPointerMove : undefined}
+      onPointerLeave={slots ? () => setPeek(null) : undefined}
+    >
       {hand.map((uid, i) => {
         const offset = i - (n - 1) / 2;
         return (
           <div
             key={uid}
-            className={['hand-card', uid === lifted ? 'lifted' : '', uid === ghost ? 'ghosted' : ''].join(' ')}
+            className={['hand-card', uid === lifted ? 'lifted' : '', uid === ghost ? 'ghosted' : '', uid === peek ? 'peek' : ''].join(' ')}
             data-hand-uid={uid}
             style={vars({ '--o': offset, '--a': Math.abs(offset), '--z': i })}
+            // A carta erguida deixa uma faixa do próprio lugar a descoberto (`::after` no CSS): o clique ali é nela.
+            onClick={slots ? (e) => e.target === e.currentTarget && h.onCard(uid) : undefined}
           >
             {reveal ? (
               <CardView
@@ -475,7 +518,7 @@ export function Hand({
                 highlight={h.highlight(uid)}
                 onClick={() => h.onCard(uid)}
                 onDoubleClick={() => h.onCardDouble(uid)}
-                onHover={h.onHover}
+                onHover={slots ? undefined : h.onHover}
                 drag={h.canDragHand(uid) ? 'hand' : undefined}
               />
             ) : (

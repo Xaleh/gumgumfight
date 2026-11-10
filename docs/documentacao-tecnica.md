@@ -241,7 +241,8 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
 ### Visão por jogador (`view.ts`)
 
 `viewFor(state, viewer, aliases, extra?)` devolve um `GameState` com: cartas fora de vista como `?`/`~` (com handle
-de posição `~dono:zona:índice`), `defs` só das cartas visíveis (e das do próprio deck), `seed`/`rng` zerados, `rng128`
+de posição `~dono:zona:índice`), `defs` só das cartas visíveis, das reveladas ou citadas pelo nome no histórico (como
+esse jogador o lê) e das do próprio deck, `seed`/`rng` zerados, `rng128`
 e `checkpoint` removidos, passos de efeito do oponente esvaziados, `pending` do oponente sem opções, `log.secret` só
 para o dono. Só o próprio jogador recebe `players[viewer].unseen`: a composição (id → quantidade) do que ele não vê
 do próprio deck e da Vida virada para baixo (a lista dele menos o que está à vista), que o bot usa para sortear o
@@ -402,7 +403,7 @@ numa notificação: a partida online, se ainda estiver em `/api/online/active`, 
 | Chave | Conteúdo |
 |---|---|
 | `localStorage.gumgum.owner` | token do dono dos decks/perfil (sem login) |
-| `localStorage.gumgum.settings` | `{locale, images, quickCounter, animations, replayCues, theme, opponentChat, sfxVolume, musicVolume, keepAwake, notify, notifyMatches, notifyTournaments}` (`lang: 'pt'\|'en'` antigo é migrado para `locale`) |
+| `localStorage.gumgum.settings` | `{locale, images, quickCounter, animations (`'full' \| 'soft' \| 'off'`; o `true`/`false` antigo é migrado), replayCues, theme, opponentChat, sfxVolume, musicVolume, keepAwake, notify, notifyMatches, notifyTournaments}` (`lang: 'pt'\|'en'` antigo é migrado para `locale`) |
 | `localStorage.gumgum.installDismissed` | quando o convite de instalação foi dispensado ("Agora não" esconde por 30 dias) |
 | Cache Storage `gumgum-<versão>` | casca do app guardada pelo service worker |
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |
@@ -432,6 +433,9 @@ deck), `status` (estados das cartas), `errors` (erros do servidor), `labels`, `s
   `Msg = { key, params?, parts? }` (`parts` = parâmetros que também são texto a traduzir, ex. a lista de custos, juntada por
   `log.listAnd`/`engine.cost.join`). Onde aparece:
   - `LogEntry.key/params/parts` (histórico, seção `log`; a linha secreta tem `secretKey…`, que `view.ts` só entrega ao dono);
+    `LogEntry.cards` traz os ids das cartas que a linha cita pelo nome, na ordem do texto (`secretCards` na linha
+    secreta): o nome sozinho não diz qual é a carta quando Líder e Personagem têm o mesmo nome, e é por esse campo
+    que o histórico abre a carta certa (`resolveLogCard` em `GameScreen.tsx`);
   - `GameState.winReasonKey/winReasonParams` (motivo do fim de jogo, `log.win*`);
   - `Pending.promptKey/promptParams/promptParts` e `optionKeys/optionParts` (perguntas de efeito, seção `engine`);
   - `Ability.labelKey/labelParams` (rótulos de habilidades roteirizadas);

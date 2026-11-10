@@ -104,7 +104,7 @@ function burst(name: 'draw' | 'play' | 'ko' | 'don', count: number, delay = 0) {
 export interface MatchAudioOptions {
   /** Desligado nos pulos do replay e no replay acelerado (a mesa muda sem animação). */
   enabled: boolean;
-  /** As animações estão ligadas: o impacto do ataque espera a carta atacante chegar ao centro. */
+  /** Animações completas: o impacto do ataque espera a carta atacante chegar ao centro (nas suaves ela não vai até lá). */
   animate: boolean;
   /** Velocidade das animações (1 = normal). */
   tempo: number;
