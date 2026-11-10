@@ -1401,6 +1401,15 @@ export interface LogEntry {
   secretParams?: PromptParams;
   secretParts?: MsgParts;
   /**
+   * As cartas citadas pelo nome nesta linha (ids de carta, não uids), na ordem em que o texto as cita. O nome
+   * sozinho não basta: Líder e Personagem de mesmo nome, ou duas edições da mesma carta, são cartas diferentes
+   * (`Counter: Boa Hancock dá +2000 a Boa Hancock`). São cartas que a linha já torna públicas pelo nome; as
+   * reveladas vêm em `revealed`. Linhas de partidas antigas não trazem o campo.
+   */
+  cards?: string[];
+  /** O mesmo para `secret`: as cartas que só o dono da linha vê (a visão do oponente as remove). */
+  secretCards?: string[];
+  /**
    * Cartas reveladas a todos nesta linha (ids de carta, não uids): a interface as mostra na mesa,
    * para não ser preciso procurá-las no histórico.
    */

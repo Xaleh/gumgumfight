@@ -9,7 +9,8 @@
 // - Cartas escondidas (mão do oponente, decks, Vida virada para baixo) aparecem
 //   como HIDDEN_CARD, com um identificador de posição ("~0:deck:3") que muda a cada
 //   visão; assim não dá para seguir uma carta depois que ela some de vista.
-// - Definições só das cartas que o jogador já pode ver; seed e RNG zerados.
+// - Definições só das cartas que o jogador já pode ver (as visíveis, as reveladas e as que o histórico dele cita
+//   pelo nome); seed e RNG zerados.
 // - Escolhas pendentes e a pilha do oponente sem os detalhes; log sem as linhas secretas.
 
 import type { Action, CardDef, EffectStep, Frame, GameState, LogEntry, ManualOp, Pending, PlayerId, PlayerState } from './types';
@@ -115,8 +116,13 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     cards[alias(uid)] = { uid: alias(uid), cardId: c.cardId, owner: c.owner, ...(c.art ? { art: c.art } : {}) };
     defs[c.cardId] = state.defs[c.cardId];
   }
-  // Cartas reveladas no log: públicas, mesmo que já tenham voltado para a mão ou o deck.
-  for (const e of state.log) for (const id of e.revealed ?? []) defs[id] ??= state.defs[id];
+  // Cartas reveladas ou citadas pelo nome no log (como este jogador o lê): públicas, mesmo que já tenham voltado
+  // para a mão ou o deck. As citadas só numa linha secreta chegam apenas ao dono da linha.
+  const log = state.log.map(viewLogEntry(viewer));
+  for (const e of log) {
+    for (const id of e.revealed ?? []) defs[id] ??= state.defs[id];
+    for (const id of e.cards ?? []) defs[id] ??= state.defs[id];
+  }
   const zone = (ps: PlayerState, name: Zone) =>
     ps[name].map((uid, i) => {
       if (vis.has(uid)) return alias(uid);
@@ -199,7 +205,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
     ...(state.knownHand ? { knownHand: refs(state.knownHand) } : {}),
     delayed: state.delayed?.filter((d) => vis.has(d.source)).map((d) => ({ ...d, source: alias(d.source), last: refs(d.last) })),
     tempReplacements: state.tempReplacements?.filter((t) => vis.has(t.source)).map((t) => ({ ...t, source: alias(t.source) })),
-    log: state.log.map(viewLogEntry(viewer)),
+    log,
     // A ação cancelável é pública (a interface mostra o botão); o estado guardado para restaurar, não.
     cancel: state.cancel ? { ...state.cancel, action: aliasAction(state.cancel.action, ref) } : undefined,
   };
@@ -282,15 +288,16 @@ function sanitizeFrame(state: GameState, f: Frame, viewer: PlayerId | null, ref:
  */
 function viewLogEntry(viewer: PlayerId | null) {
   return (entry: LogEntry): LogEntry => {
-    const { secret, secretKey, secretParams, secretParts, ...e } = entry;
+    const { secret, secretKey, secretParams, secretParts, secretCards, ...e } = entry;
     if (secret === undefined || viewer === null || e.player !== viewer) return e;
-    const { key: _k, params: _p, parts: _parts, ...rest } = e;
+    const { key: _k, params: _p, parts: _parts, cards: _c, ...rest } = e;
     return {
       ...rest,
       text: secret,
       ...(secretKey ? { key: secretKey } : {}),
       ...(secretParams ? { params: secretParams } : {}),
       ...(secretParts ? { parts: secretParts } : {}),
+      ...(secretCards ? { cards: secretCards } : {}),
     };
   };
 }
