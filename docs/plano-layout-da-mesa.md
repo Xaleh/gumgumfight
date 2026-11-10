@@ -1,6 +1,8 @@
 # Layout da mesa configurável (proposta)
 
 > Status: **implementado** (`WideBoard.tsx`, `BoardLayoutEditor.tsx`, `game/boardLayout.ts`; ver a seção "Layout da mesa (desktop)" em `documentacao-tecnica.md`). Este documento é a proposta que guiou a implementação; o protótipo da tela: https://claude.ai/artifact/JJvoLdEjZ7gNMZfAqB468j
+>
+> Mudou depois: a mesa larga deixou de ser o padrão do desktop. O padrão voltou a ser a mesa clássica (a `Board.tsx` deitada, cada lado numa faixa só e a mão embaixo), e a mesa larga descrita aqui é a opção de quem quer personalizar (predefinições e blocos em Configurações › Layout da mesa).
 
 Duas coisas, que andam juntas:
 

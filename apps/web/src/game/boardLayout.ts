@@ -1,6 +1,14 @@
-// Layout da mesa larga (desktop): o que o jogador escolhe em Configurações › Layout da mesa, as regras
-// de conflito entre os blocos e as medidas que dimensionam as cartas para a mesa nunca sair da tela.
-// Funções puras, sem React: a mesa (`WideBoard`) e o editor (`BoardLayoutEditor`) só leem daqui.
+// Layout da mesa no desktop: o que o jogador escolhe em Configurações › Layout da mesa. A mesa clássica
+// (`Board`, o padrão) não tem ajustes; a mesa larga (`WideBoard`) é montada bloco a bloco, e daqui saem as
+// regras de conflito entre os blocos e as medidas que dimensionam as cartas para ela nunca sair da tela.
+// Funções puras, sem React: a mesa e o editor (`BoardLayoutEditor`) só leem daqui.
+
+/**
+ * A mesa de quem joga no desktop: a clássica (cada lado numa faixa só, a mão embaixo; o padrão) ou a mesa
+ * larga, com cada bloco no tamanho e na posição do `BoardLayout`.
+ */
+export type BoardStyle = 'classic' | 'custom';
+export const DEFAULT_STYLE: BoardStyle = 'classic';
 
 export type BlockSize = 'small' | 'medium' | 'large';
 export const BLOCK_SIZES: readonly BlockSize[] = ['small', 'medium', 'large'];
@@ -40,7 +48,7 @@ export type BlockId = keyof BoardLayout;
 export const BLOCK_IDS: readonly BlockId[] = ['don', 'hand', 'life', 'leader', 'stage', 'trash', 'donDeck', 'deck', 'log', 'hover'];
 
 /**
- * O padrão: o hover e a sua mão numa lateral, o histórico no meio da outra (painel fechado); a Vida em
+ * O padrão da mesa larga: o hover e a sua mão numa lateral, o histórico no meio da outra (painel fechado); a Vida em
  * coluna à esquerda dos Personagens; Stage e Deck à direita do Líder; os DON!! numa fileira abaixo do
  * Líder, com o deck de DON!! na borda e o Descarte na outra ponta.
  */
@@ -155,6 +163,16 @@ export function parseLayout(raw: unknown): BoardLayout {
     if ('collapsed' in block && typeof v.collapsed === 'boolean') block.collapsed = v.collapsed;
   }
   return sameLayout(out, LEGACY_DEFAULT) ? cloneLayout(DEFAULT_LAYOUT) : out;
+}
+
+/**
+ * A mesa salva. Quem salvou antes de a escolha existir (quando a mesa larga era a única do desktop) só
+ * continua nela se tinha mexido no layout: quem estava no padrão volta à mesa clássica.
+ */
+export function parseStyle(raw: unknown, savedLayout: unknown): BoardStyle {
+  if (raw === 'classic' || raw === 'custom') return raw;
+  const customized = Boolean(savedLayout) && typeof savedLayout === 'object' && !sameLayout(parseLayout(savedLayout), DEFAULT_LAYOUT);
+  return customized ? 'custom' : DEFAULT_STYLE;
 }
 
 // ------------------------------------------------------------------ regras de conflito

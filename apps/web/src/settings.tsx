@@ -6,7 +6,7 @@ import { BoardLayoutEditor } from './components/BoardLayoutEditor';
 import { ConnectedApps } from './components/ConnectedApps';
 import { Flag } from './components/Flags';
 import { InstallButton } from './components/Install';
-import { type BoardLayout, DEFAULT_LAYOUT, parseLayout } from './game/boardLayout';
+import { type BoardLayout, type BoardStyle, DEFAULT_LAYOUT, DEFAULT_STYLE, parseLayout, parseStyle } from './game/boardLayout';
 import { DEFAULT_LOCALE, detectLocale, I18nProvider, isLocale, type Locale, LOCALES, type MessageKey, useT } from './i18n';
 import { notificationPermission, pushSupport, syncPush, useInstallMode, wakeLockSupported } from './pwa';
 
@@ -48,7 +48,9 @@ export interface Settings {
   streamerPlaymat: Playmat;
   /** Partida no desktop: o painel lateral (histórico e decklist) aberto; fechado, a mesa ocupa a tela toda. */
   sidePanel: boolean;
-  /** Partida no desktop: a mesa larga, bloco a bloco (tamanho, posição, o que aparece); ver `game/boardLayout.ts`. */
+  /** Partida no desktop: a mesa clássica (padrão) ou a mesa larga, personalizada pelo `boardLayout`. */
+  boardStyle: BoardStyle;
+  /** Partida no desktop, mesa larga: bloco a bloco (tamanho, posição, o que aparece); ver `game/boardLayout.ts`. */
   boardLayout: BoardLayout;
   /** Volume dos efeitos sonoros (0 = mudo … 1). */
   sfxVolume: number;
@@ -80,6 +82,7 @@ const EDITABLE: Editable[] = [
   'streamerLayout',
   'streamerPlaymat',
   'sidePanel',
+  'boardStyle',
   'boardLayout',
   'sfxVolume',
   'musicVolume',
@@ -112,6 +115,7 @@ const DEFAULTS: Settings = {
   streamerLayout: 'lateral',
   streamerPlaymat: 'navy',
   sidePanel: true,
+  boardStyle: DEFAULT_STYLE,
   boardLayout: DEFAULT_LAYOUT,
   sfxVolume: 0.8,
   musicVolume: 0.5,
@@ -156,6 +160,7 @@ function load(): Settings {
       streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
       streamerPlaymat: PLAYMATS.includes(saved.streamerPlaymat as Playmat) ? (saved.streamerPlaymat as Playmat) : 'navy',
       sidePanel: saved.sidePanel !== false,
+      boardStyle: parseStyle(saved.boardStyle, saved.boardLayout),
       boardLayout: parseLayout(saved.boardLayout),
       serverImages: false,
       pushKey: null,

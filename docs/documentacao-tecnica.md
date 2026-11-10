@@ -484,8 +484,15 @@ configuração `replayCues` ("Cliques no replay", em `settings.tsx`; também na 
 
 ### Layout da mesa (desktop)
 
-No PC (`wide`, ≥ 1000 px) quem joga vê a **mesa larga** (`WideBoard.tsx`), no lugar da mesa em coluna (`Board.tsx`,
-que segue no celular, no tutorial, na transmissão, no replay embutido e na visão do Streamer). Cada metade tem os
+No PC (`wide`, ≥ 1000 px) quem joga escolhe a mesa em Configurações › Layout da mesa (`boardStyle`, em
+`settings.tsx`). O padrão é a **mesa clássica** (`classic`): a `Board.tsx` deitada (`[data-landscape]`), cada lado
+numa faixa só (você = Vida · Stage · Líder · Deck, os cinco Personagens, os DON!!; o oponente espelhado), a mão
+embaixo e o painel lateral com a carta em detalhe e o histórico. Ela não tem ajustes. A outra é a **mesa larga**
+(`custom`, `WideBoard.tsx`), montada bloco a bloco. Celular, tutorial, transmissão, replay embutido e visão do
+Streamer ficam sempre com a `Board.tsx`. `parseStyle` lê a escolha salva; quem salvou as configurações quando a mesa
+larga era a única do desktop só continua nela se tinha mexido no layout (quem estava no padrão volta à clássica).
+
+Na mesa larga, cada metade tem os
 Personagens (com a Vida numa coluna ao lado), a fileira do Líder (área de custo dos DON!!, Stage, Deck, Descarte) e,
 se o jogador quiser, uma fileira de DON!! própria; as mãos ficam nos cantos, fora da mesa, e o hover de carta e o
 histórico moram no painel lateral ou nas laterais da mesa. O que fica onde, e de que tamanho, é o `boardLayout` das
@@ -499,8 +506,11 @@ a própria caixa depois de renderizar e aperta a conta se algo passou (até trê
 mesa em coluna (`LifeZone`, `DonRow`, `DeckPile`... exportados de `Board.tsx`), então as animações (`data-anchor`), a
 seta de ataque e o arrasto (`data-drop`, `.don-row.bottom`, `.hand.bottom`) não mudam. A tela de personalização
 (`BoardLayoutEditor.tsx`, em Configurações › Layout da mesa › Personalizar e no menu da partida) mostra a prévia viva
-(a própria partida, ou uma de exemplo montada com `createScenario` a partir do primeiro deck pronto) e um cartão por
-bloco, com quatro predefinições; as opções que outra escolha bloqueia ficam desabilitadas com o motivo no `title`.
+(a própria partida, ou uma de exemplo montada com `createScenario` a partir do primeiro deck pronto) e, nas
+predefinições, a **Clássica** e as quatro da mesa larga (Mesa larga, Compacta, Cartas grandes, Mesa aberta). Com a
+clássica escolhida não há cartões de bloco, só o botão que leva à mesa larga; nela, um cartão por bloco, e as opções
+que outra escolha bloqueia ficam desabilitadas com o motivo no `title`. "Restaurar padrão" volta à mesa clássica (o
+layout da mesa larga fica guardado para quando a pessoa voltar a ela).
 
 ### Partida online e espectador
 
