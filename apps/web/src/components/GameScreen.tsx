@@ -45,6 +45,7 @@ import { audio } from '../audio';
 import { hasKey, type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { fmtNumber } from '../i18n/format';
 import { listText, logText, msgText } from '../game/engineText';
+import { enteredWithoutRush } from '../game/freshCharacter';
 import { type LogNames, logCardNames, resolveLogCard } from '../game/logCards';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
@@ -1026,6 +1027,10 @@ function Table({
    * ativar: acabaram de entrar, é o primeiro turno, um efeito proíbe) ficam apagados, para os que ainda podem
    * agir saltarem à vista. A lista vem das ações legais; enquanto a jogada não está com você (um ataque em
    * andamento, um efeito resolvendo) vale a última deste turno, para a mesa não piscar a cada ataque.
+   *
+   * No turno do oponente (e, para quem assiste ou vê um replay, no de qualquer jogador) ficam apagados os
+   * Personagens dele que entraram em campo neste turno e não atacam nele; os com [Rush] não (ver
+   * `enteredWithoutRush`).
    */
   const actable = useMemo(() => {
     if (!myTurnIdle) return null;
@@ -1040,7 +1045,9 @@ function Table({
   if (actable) lastActable.current = { turn: state.turn, uids: actable };
   const canActNow = actable ?? (lastActable.current?.turn === state.turn ? lastActable.current.uids : null);
   const inert = (uid: string): Highlight => {
-    if (!canActNow || human === null || state.activePlayer !== human || state.phase !== 'main' || canActNow.has(uid)) return null;
+    if (state.phase !== 'main') return null;
+    if (state.activePlayer !== human) return enteredWithoutRush(state, uid) ? 'inert' : null;
+    if (!canActNow || canActNow.has(uid)) return null;
     const at = locate(state, uid);
     return at && at.player === human && at.zone !== 'stage' && !at.fc.rested ? 'inert' : null;
   };
