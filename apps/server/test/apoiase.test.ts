@@ -1,5 +1,5 @@
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app';
 import { createSession, setSupporter, upsertGoogleUser } from '../src/auth/store';
 import type { SupportOptions } from '../src/config';
@@ -19,6 +19,15 @@ function idToken(sub: string, email: string) {
 
 // 2026-10-20 12:00 em Brasília.
 const T0 = Date.parse('2026-10-20T15:00:00Z');
+// A data do sistema acompanha o relógio do teste. O serviço da Apoia.se recebe o relógio (`now`), mas quem lê o
+// plano que vale agora (`activeTier`, em auth/store.ts) e quem confere o token do Google usam `Date.now()`: com a
+// data de verdade, o plano de outubro deste teste "vencia" em 11/11/2026 e os testes passavam a falhar sozinhos.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'], now: T0 });
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 const SUPPORT: SupportOptions = {
   pixKey: 'chave-aleatoria',
   pixName: 'Fulano',
@@ -57,7 +66,11 @@ function setup(charges: Record<string, Charge> = {}, support: SupportOptions = S
     fetchImpl: api.fetchImpl,
     now: () => clock,
   });
-  return { db, app, calls: api.calls, setClock: (ms: number) => (clock = ms) };
+  const setClock = (ms: number) => {
+    clock = ms;
+    vi.setSystemTime(ms);
+  };
+  return { db, app, calls: api.calls, setClock };
 }
 
 let n = 0;
@@ -162,5 +175,10 @@ describe('Apoia.se: apoio mensal vira o plano da conta', () => {
     const me = async (who: { headers: Record<string, string> }) => (await app.inject({ url: '/api/auth/me', headers: who.headers })).json().user.supporter;
     expect(await me(stays)).toMatchObject({ tier: 'capitao', until: '2026-12-11T02:59:59.000Z' });
     expect(await me(leaves)).toMatchObject({ tier: 'capitao', until: '2026-11-11T02:59:59.000Z' });
+
+    // Passado o dia 10, o plano de quem parou some sozinho; o de quem pagou continua.
+    setClock(Date.parse('2026-11-12T15:00:00Z'));
+    expect(await me(leaves)).toBeNull();
+    expect(await me(stays)).toMatchObject({ tier: 'capitao', until: '2026-12-11T02:59:59.000Z' });
   });
 });
