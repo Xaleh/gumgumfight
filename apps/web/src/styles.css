@@ -3748,7 +3748,8 @@ button.hint-pill.undo-pill {
 }
 /*
  * No seu turno: carta em pé que não pode atacar nem ativar nada (acabou de entrar em campo, primeiro turno,
- * efeito que proíbe). Apagada, sem mexer no tamanho nem na posição, para as que ainda agem saltarem à vista.
+ * efeito que proíbe). No turno do oponente: o Personagem dele que entrou neste turno sem [Rush]. Apagada, sem
+ * mexer no tamanho nem na posição, para as que ainda agem saltarem à vista.
  */
 .card.hl-inert {
   filter: grayscale(0.55) brightness(0.74);

@@ -858,6 +858,8 @@ administração, o funil anônimo das lições (onde as pessoas desistem). Detal
   oponente, com o sinal de menos); o Evento cujo efeito não é de poder fica com o destaque comum.
 - **Quem ainda pode agir:** no seu turno, quem pode atacar brilha em laranja; o Líder e os Personagens em pé que não
   podem atacar nem ativar nada (acabaram de entrar em campo, é o primeiro turno, um efeito proíbe) ficam apagados.
+  No turno do oponente, ficam apagados os Personagens dele que entraram em campo neste turno e não atacam nele; os
+  com [Rush] (ou [Rush: Character]) seguem normais, porque ainda podem atacar.
 - **Mão cheia (mouse):** a carta erguida é a da faixa sob o ponteiro, então andar com o mouse pela mão passa por todas
   as cartas, uma a uma. Na mesa larga, com a mão no canto, o leque abre por cima da mesa enquanto o mouse está nele.
   "Ver mão" continua abrindo a mão inteira em tamanho grande.

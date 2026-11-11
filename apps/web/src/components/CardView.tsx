@@ -26,7 +26,8 @@ import { useSettings } from '../settings';
  * 'disabled': carta mostrada numa escolha, mas que não pode ser escolhida. 'counter1' / 'counter2': opção da
  * etapa de Counter que vale +1000 (azul) ou +2000 ou mais (vermelho), com o valor numa etiqueta. 'counterEvent':
  * Evento [Counter] cujo efeito dá (ou tira do oponente) poder, em roxo, com esse valor na etiqueta. 'inert': no
- * seu turno, a carta em pé que não pode atacar nem ativar nada (acabou de entrar, por exemplo), apagada.
+ * seu turno, a carta em pé que não pode atacar nem ativar nada (acabou de entrar, por exemplo), apagada; no do
+ * oponente, o Personagem dele que entrou neste turno sem [Rush].
  */
 export type Highlight =
   | 'option'
