@@ -135,6 +135,11 @@ interface PlanOptions {
   /** A ação que levou a este estado (para a vitrine de habilidade ativada). */
   lastAction?: Action;
   lang: Locale;
+  /**
+   * Animações suaves: as cartas só voam de um lugar ao outro, sem as paradas no centro da mesa (a vitrine da
+   * carta jogada e o destaque do ataque, da habilidade ativada e do [Trigger]).
+   */
+  calm?: boolean;
 }
 
 /** De onde para onde as cartas sem identidade costumam ir, em ordem de preferência. */
@@ -329,7 +334,7 @@ interface Planned {
 function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, root: Element, tempo: number, opts: PlanOptions): Item[] {
   // Desfazer volta o estado: só troca a mesa.
   if (next.log.length < prev.log.length) return [];
-  const spot = spotPlan(prev, next, before, after, root, tempo, opts);
+  const spot = opts.calm ? null : spotPlan(prev, next, before, after, root, tempo, opts);
   // Com uma carta em destaque, o resto da mesa espera ela voltar ao lugar.
   const lead = spot ? spot.duration - 100 * tempo : 0;
   const a = spots(prev);
@@ -380,7 +385,7 @@ function plan(prev: GameState, next: GameState, before: Boxes, after: Boxes, roo
           known(next, m.dst) &&
           (cardDef(next, m.dst).category === 'event' || prev.pending?.kind === 'counter')),
     );
-    const showcaseMove = showy.length === 1 && arena ? showy[0] : null;
+    const showcaseMove = showy.length === 1 && arena && !opts.calm ? showy[0] : null;
     // Cartas de Vida novas: cada voo pousa numa delas (escondida até lá).
     const lifeSlots = ([0, 1] as PlayerId[]).map((p) => {
       const els = Array.from(root.querySelectorAll<HTMLElement>(`[data-anchor="life-${p}"] .life-card`));
@@ -709,11 +714,11 @@ function hits(prev: GameState, next: GameState, after: Boxes, root: Element, del
  */
 export function useBoardMotion(
   state: GameState,
-  { enabled, tempo, lastAction, lang }: { enabled: boolean; tempo: number; lastAction?: Action; lang: Locale },
+  { enabled, tempo, lastAction, lang, calm }: { enabled: boolean; tempo: number; lastAction?: Action; lang: Locale; calm?: boolean },
 ): { layer: ReactNode; busy: boolean } {
   const [items, setItems] = useState<Item[]>([]);
-  const optsRef = useRef<PlanOptions>({ lastAction, lang });
-  optsRef.current = { lastAction, lang };
+  const optsRef = useRef<PlanOptions>({ lastAction, lang, calm });
+  optsRef.current = { lastAction, lang, calm };
   const last = useRef<GameState | null>(null);
   const transition = useRef<{ prev: GameState; next: GameState; boxes: Boxes } | null>(null);
 

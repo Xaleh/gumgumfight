@@ -2,9 +2,10 @@
 // texto em português, e a linha secreta não vaza a carta pela chave nem pelos parâmetros.
 
 import { describe, expect, it } from 'vitest';
-import { applyAction } from '../src/engine';
+import { applyAction, createGame } from '../src/engine';
+import type { CardData, DeckList } from '../src/types';
 import { createAliases, viewFor } from '../src/view';
-import { started } from './helpers';
+import { cards, started, toTurn } from './helpers';
 
 let seq = 0;
 const aliases = (s: Parameters<typeof createAliases>[0]) => createAliases(s, () => `a${++seq}`);
@@ -28,10 +29,13 @@ describe('chaves do histórico', () => {
     // Da mão para o topo do deck (manual): o oponente só fica sabendo que "uma carta" se moveu.
     s = applyAction(s, { type: 'manual', player: p, op: { op: 'move', uid, to: 'deckTop' } });
     const raw = s.log[s.log.length - 1];
-    expect(raw).toMatchObject({ key: 'log.manualMoveFromHand', secretKey: 'log.manualMove', secretParams: { card: name } });
+    const cardId = s.cards[uid].cardId;
+    expect(raw).toMatchObject({ key: 'log.manualMoveFromHand', secretKey: 'log.manualMove', secretParams: { card: name }, secretCards: [cardId] });
+    expect(raw.cards).toBeUndefined();
 
     const mine = viewFor(s, p, aliases(s)).log.at(-1)!;
-    expect(mine).toMatchObject({ text: raw.secret, key: 'log.manualMove', params: { card: name } });
+    expect(mine).toMatchObject({ text: raw.secret, key: 'log.manualMove', params: { card: name }, cards: [cardId] });
+    expect(mine).not.toHaveProperty('secretCards');
 
     for (const viewer of [p === 0 ? 1 : 0, null] as const) {
       const theirs = viewFor(s, viewer, aliases(s)).log.at(-1)!;
@@ -39,7 +43,40 @@ describe('chaves do histórico', () => {
       expect(JSON.stringify(theirs)).not.toContain(name);
       expect(theirs).not.toHaveProperty('secretKey');
       expect(theirs).not.toHaveProperty('secretParams');
+      expect(theirs).not.toHaveProperty('secretCards');
+      expect(theirs.cards).toBeUndefined();
     }
+  });
+
+  // Relato de jogador: contra um deck de Boa Hancock, o Counter com a Personagem Boa Hancock abria a Líder no
+  // histórico (mesmo nome). A linha diz de qual carta se trata, e não só o nome.
+  it('linha que cita cartas de mesmo nome diz qual é cada uma (Líder e Personagem homônimos)', () => {
+    const leader: CardData = { id: 'HM-L', name: 'Boa Hancock', category: 'leader', colors: ['blue'], life: 5, power: 5000, types: [], text: '' };
+    const twin: CardData = { id: 'HM-C', name: 'Boa Hancock', category: 'character', colors: ['blue'], cost: 1, power: 2000, counter: 2000, types: [], text: '' };
+    const deck: DeckList = { id: 'hm', name: 'hm', leader: 'HM-L', cards: [{ id: 'HM-C', count: 50 }] };
+    let s = createGame({
+      seed: 5,
+      firstPlayer: 0,
+      cards: [...cards, leader, twin],
+      players: [
+        { name: 'A', deck },
+        { name: 'B', deck },
+      ],
+    });
+    s = applyAction(s, { type: 'mulligan', player: 0, redraw: false });
+    s = applyAction(s, { type: 'mulligan', player: 1, redraw: false });
+    s = toTurn(s, 3);
+    s = applyAction(s, { type: 'playCard', player: 0, uid: s.players[0].hand[0] });
+    expect(s.log.find((e) => e.key === 'log.plays')).toMatchObject({ params: { card: 'Boa Hancock' }, cards: ['HM-C'] });
+
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    expect(s.log.at(-1)).toMatchObject({ key: 'log.attacks', cards: ['HM-L', 'HM-L'] });
+    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 1, uids: [] });
+    s = applyAction(s, { type: 'counter', player: 1, uid: s.players[1].hand[0] });
+    // "Counter: Boa Hancock dá +2000 a Boa Hancock.": a primeira é a Personagem da mão; a segunda, a Líder.
+    expect(s.log.at(-1)).toMatchObject({ key: 'log.counter', params: { card: 'Boa Hancock', target: 'Boa Hancock' }, cards: ['HM-C', 'HM-L'] });
+    // O oponente recebe a mesma linha, com as duas cartas.
+    expect(viewFor(s, 0, aliases(s)).log.at(-1)!.cards).toEqual(['HM-C', 'HM-L']);
   });
 
   it('motivo da vitória com chave e parâmetros', () => {

@@ -3340,11 +3340,21 @@ button.hint-pill.undo-pill {
 .hand.bottom .hand-card:has(.hl-option) {
   z-index: calc(var(--z) + 0);
 }
-@media (hover: hover) {
-  .hand.bottom .hand-card:hover {
-    transform: translateY(-22%) rotate(0deg) scale(1.06);
-    z-index: 50;
-  }
+/*
+ * Mouse: a carta erguida é a da faixa sob o ponteiro (`peek`, ver `Hand` em Board.tsx), e não `:hover`: a carta
+ * que sobe passa para a frente e cobriria as vizinhas, que deixariam de ser alcançadas. O `::after` mantém coberto
+ * o lugar de onde ela saiu, para o ponteiro parado ali continuar em cima dela (sem ele a carta desce, volta a ficar
+ * sob o ponteiro, sobe de novo… e pisca).
+ */
+.hand.bottom .hand-card.peek {
+  transform: translateY(var(--peek-lift, -22%)) rotate(0deg) scale(1.06);
+  z-index: 50;
+}
+.hand.bottom .hand-card.peek::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: calc(var(--peek-lift, -22%) * -1.2);
 }
 .hand.bottom .hand-card:has(.hl-selected) {
   transform: translateY(-18%) rotate(0deg);
@@ -3378,7 +3388,7 @@ button.hint-pill.undo-pill {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform 0.22s, box-shadow 0.18s;
+  transition: transform 0.22s, box-shadow 0.18s, filter 0.25s;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -3685,6 +3695,63 @@ button.hint-pill.undo-pill {
 .hl-disabled {
   opacity: 0.45;
   filter: grayscale(0.85);
+}
+/*
+ * Etapa de Counter: o valor de cada carta pela cor (+1000 azul, +2000 ou mais vermelho, Evento roxo) e, para não
+ * depender só da cor, numa etiqueta no topo da carta (a parte que aparece no leque da mão). A do Evento é
+ * quadrada, e não em pílula: o valor vem do efeito dele (que tem custo), não de um Counter impresso.
+ */
+.hl-counter1 {
+  box-shadow: 0 0 0 3px var(--counter1), 0 0 20px 5px rgba(47, 124, 255, 0.75) !important;
+  cursor: pointer;
+}
+.hl-counter2 {
+  box-shadow: 0 0 0 3px var(--counter2), 0 0 20px 5px rgba(240, 62, 62, 0.75) !important;
+  cursor: pointer;
+}
+.hl-counterEvent {
+  box-shadow: 0 0 0 3px var(--counter-event), 0 0 20px 5px rgba(146, 72, 240, 0.75) !important;
+  cursor: pointer;
+}
+.card {
+  --counter1: #2f7cff;
+  --counter2: #f03e3e;
+  --counter-event: #9248f0;
+}
+.counter-chip {
+  position: absolute;
+  top: 3%;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 3;
+  padding: 0.12em 0.5em 0.08em;
+  border-radius: 999px;
+  border: 1.5px solid #fff;
+  color: #fff;
+  font-family: Bangers, Impact, sans-serif;
+  font-size: max(11px, calc(var(--cw) * 0.15));
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.counter-chip.counter1 {
+  background: var(--counter1);
+}
+.counter-chip.counter2 {
+  background: var(--counter2);
+}
+.counter-chip.counterEvent {
+  background: var(--counter-event);
+  border-radius: 0.3em;
+}
+/*
+ * No seu turno: carta em pé que não pode atacar nem ativar nada (acabou de entrar em campo, primeiro turno,
+ * efeito que proíbe). Apagada, sem mexer no tamanho nem na posição, para as que ainda agem saltarem à vista.
+ */
+.card.hl-inert {
+  filter: grayscale(0.55) brightness(0.74);
 }
 .hl-playable {
   box-shadow: 0 0 0 2.5px #5fdcff, 0 0 16px 3px rgba(54, 200, 255, 0.65) !important;
@@ -5056,10 +5123,12 @@ button.hint-pill::after,
 .nickname .warn {
   flex-basis: 100%;
 }
-.nickname-setting {
+.nickname-setting,
+.animations-setting {
   flex-basis: 100%;
 }
-.nickname-setting .sheet-label {
+.nickname-setting .sheet-label,
+.animations-setting .sheet-label {
   margin-bottom: 4px;
 }
 .hero-link.nickname-link small {
@@ -6724,14 +6793,10 @@ tr.clickable:hover td {
   }
   .hand.bottom .hand-card {
     top: 4px;
+    --peek-lift: -34%;
   }
   .hand.bottom .hand-card.lifted {
     transform: translateY(-34%) rotate(0deg) scale(1.1);
-  }
-  @media (hover: hover) {
-    .hand.bottom .hand-card:hover {
-      transform: translateY(-34%) rotate(0deg) scale(1.06);
-    }
   }
 
   /* escolhas no canto de baixo à direita, sem cobrir a mesa do oponente */
@@ -16035,6 +16100,20 @@ div.dk-tile-main {
 }
 .wm-side .wm-hand.mine {
   margin-top: auto;
+}
+/*
+ * Mão no canto com muitas cartas: o leque fica apertado na lateral e cada carta mostra só uns pixels. Com o mouse
+ * em cima, ele abre por cima da mesa até cada carta mostrar metade da largura; ao sair, volta ao canto. No canto
+ * direito abre para a esquerda. (Só com mouse: no toque o `:hover` gruda, e ali a mão inteira abre em "Ver mão".)
+ */
+@media (hover: hover) and (pointer: fine) {
+  .wm-side .wm-hand.mine .hand.bottom:hover {
+    flex: none;
+    width: max(100%, min(calc(var(--bw, 100vw) - 48px), calc(var(--hcw) * (0.5 * (var(--n) - 1) + 1) + 34px)));
+  }
+  .wm-side .wm-hand.mine.corner-right .wm-hand-box {
+    justify-content: flex-end;
+  }
 }
 .wm-side .detail {
   flex: 0 1 auto;

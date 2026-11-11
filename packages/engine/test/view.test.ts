@@ -36,9 +36,15 @@ function checkView(state: GameState, viewer: PlayerId, aliases: Aliases) {
   expect(view.seed).toBe(0);
   expect(view.rng).toBe(0);
   expect(view.rng128).toBeUndefined();
-  // Definições: só as das cartas visíveis, as reveladas a todos no log e as do próprio deck (a lista é dele).
+  // Definições: só as das cartas visíveis, as reveladas a todos no log, as que uma linha pública cita pelo nome
+  // (ou uma linha secreta dele mesmo) e as do próprio deck (a lista é dele).
   const visibleIds = new Set([...vis].map((u) => state.cards[u].cardId));
-  for (const e of state.log) for (const id of e.revealed ?? []) visibleIds.add(id);
+  for (const e of state.log) {
+    for (const id of [...(e.revealed ?? []), ...(e.cards ?? [])]) visibleIds.add(id);
+    if (e.player === viewer) for (const id of e.secretCards ?? []) visibleIds.add(id);
+  }
+  // As cartas de uma linha secreta nunca chegam com esse nome (o dono as recebe em `cards`; os outros, não).
+  expect(json.includes('secretCards')).toBe(false);
   const me = state.players[viewer];
   const unseen: Record<string, number> = {};
   for (const u of [...me.deck, ...me.life]) if (!vis.has(u)) unseen[state.cards[u].cardId] = (unseen[state.cards[u].cardId] ?? 0) + 1;

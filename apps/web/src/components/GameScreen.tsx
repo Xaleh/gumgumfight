@@ -9,6 +9,7 @@ import {
   cardStatuses,
   counterTargets,
   counterValue,
+  eventCounterPower,
   type GameConfig,
   type GameState,
   getCost,
@@ -44,6 +45,7 @@ import { audio } from '../audio';
 import { hasKey, type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { fmtNumber } from '../i18n/format';
 import { listText, logText, msgText } from '../game/engineText';
+import { type LogNames, logCardNames, resolveLogCard } from '../game/logCards';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
 import { cardText, PLAYMATS, SettingsControls, useSettings } from '../settings';
@@ -637,8 +639,8 @@ function Table({
     if (game.jumped || tutorial || broadcast || (human === null && !spectator)) return;
     const lines = fresh.flatMap((e): RevealLine[] => {
       if (!e.revealed?.length || e.revealedBy === human) return [];
-      // [Trigger] do oponente: com as animações ligadas a carta já aparece no centro da mesa.
-      if (e.key === 'log.triggerActivated' && animate) return [];
+      // [Trigger] do oponente: com as animações completas a carta já aparece no centro da mesa.
+      if (e.key === 'log.triggerActivated' && showy) return [];
       const cards = e.revealed.map((id) => state.defs[id]).filter((d): d is CardDef => Boolean(d));
       return cards.length ? [{ text: logText(tryT, e), cards, count: 1 }] : [];
     });
@@ -687,7 +689,9 @@ function Table({
   const layout = useMemo(() => effectiveLayout(boardLayout), [boardLayout]);
   // Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
   // (economia de bateria) e as animações e os dados sumiriam sem o jogador saber por quê.
-  const animate = animations;
+  const animate = animations !== 'off';
+  /** Animações completas: com as paradas no centro da mesa e a faixa animada de troca de turno (ver `Animations`). */
+  const showy = animations === 'full';
   // Cartas voando entre as zonas (mais rápidas com o bot acelerado).
   const allActions = game.actions();
   // Replay: os pulos (voltar, ir para uma ação) e a velocidade máxima mudam a mesa sem animação.
@@ -700,13 +704,14 @@ function Table({
     tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
     lastAction: allActions[allActions.length - 1],
     lang: locale,
+    calm: !showy,
   });
   // As imagens das cartas já conhecidas baixam antes de a carta aparecer (e voar) na mesa.
   usePreloadCardImages(state, showImages);
   // Sons da mesa e música da partida (os mesmos pontos que as animações; valem sem elas também).
   useMatchAudio(state, {
     enabled: !game.jumped && !(replay && game.speed >= 8),
-    animate: animate && !game.jumped,
+    animate: showy && !game.jumped,
     tempo: Math.min(1.3, Math.max(0.35, 1 / game.speed)),
     human,
     lastAction: allActions[allActions.length - 1],
@@ -1016,6 +1021,29 @@ function Table({
   const canAttackWith = (uid: string) => myTurnIdle && has((a) => a.type === 'attack' && a.attacker === uid);
   /** Etapa de Counter: esta carta da mão pode ser usada como Counter agora? */
   const canCounter = (uid: string) => myPending?.kind === 'counter' && myPending.options.includes(uid);
+  /**
+   * No seu turno, o Líder e os Personagens em pé que não têm o que fazer (não atacam nem têm habilidade para
+   * ativar: acabaram de entrar, é o primeiro turno, um efeito proíbe) ficam apagados, para os que ainda podem
+   * agir saltarem à vista. A lista vem das ações legais; enquanto a jogada não está com você (um ataque em
+   * andamento, um efeito resolvendo) vale a última deste turno, para a mesa não piscar a cada ataque.
+   */
+  const actable = useMemo(() => {
+    if (!myTurnIdle) return null;
+    const out = new Set<string>();
+    for (const a of legal) {
+      if (a.type === 'attack') out.add(a.attacker);
+      else if (a.type === 'activate') out.add(a.uid);
+    }
+    return out;
+  }, [myTurnIdle, legal]);
+  const lastActable = useRef<{ turn: number; uids: Set<string> } | null>(null);
+  if (actable) lastActable.current = { turn: state.turn, uids: actable };
+  const canActNow = actable ?? (lastActable.current?.turn === state.turn ? lastActable.current.uids : null);
+  const inert = (uid: string): Highlight => {
+    if (!canActNow || human === null || state.activePlayer !== human || state.phase !== 'main' || canActNow.has(uid)) return null;
+    const at = locate(state, uid);
+    return at && at.player === human && at.zone !== 'stage' && !at.fc.rested ? 'inert' : null;
+  };
   /** Usa o Counter; sem `target`, o valor vai para o atacado (o caso comum, num clique só). */
   const useCounter = (uid: string, target?: string) => {
     dispatch({ type: 'counter', player: human!, uid, ...(target ? { target } : {}) });
@@ -1087,7 +1115,7 @@ function Table({
     if (drag) {
       if (uid === drag.uid) return 'selected';
       if (drag.kind !== 'hand' && dropValid(drag, uid)) return 'option';
-      return null;
+      return inert(uid);
     }
     if (myPending) {
       if (myPending.kind === 'selectTargets') {
@@ -1096,7 +1124,15 @@ function Table({
         if (myPending.shown?.includes(uid)) return 'disabled';
       }
       if (myPending.kind === 'counter' && picked.includes(uid)) return 'selected';
-      if ((myPending.kind === 'block' || myPending.kind === 'counter') && myPending.options.includes(uid)) return 'option';
+      // Etapa de Counter: o valor de cada carta salta à vista pela cor (+1000 azul, +2000 ou mais vermelho). O
+      // Evento [Counter] vai em roxo com o poder que o efeito dá agora (ou tira do oponente); o que não é de
+      // poder (devolver à mão, virar…) fica com o destaque comum.
+      if (myPending.kind === 'counter' && myPending.options.includes(uid)) {
+        const value = counterValue(state, uid);
+        if (value > 0) return value >= 2000 ? 'counter2' : 'counter1';
+        return eventCounterPower(state, uid) !== 0 ? 'counterEvent' : 'option';
+      }
+      if (myPending.kind === 'block' && myPending.options.includes(uid)) return 'option';
     }
     if (state.battle) {
       if (uid === state.battle.attacker) return 'attacker';
@@ -1105,7 +1141,7 @@ function Table({
     if (mode?.kind === 'attack') {
       if (uid === mode.attacker) return 'selected';
       if (has((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === uid)) return 'option';
-      return null;
+      return inert(uid);
     }
     // DON!! marcados: quem pode recebê-los brilha; o resto da mesa segue com os destaques normais.
     if (mode?.kind === 'don' && canReceiveDon(uid)) return 'option';
@@ -1113,7 +1149,7 @@ function Table({
     if (uid === selected) return 'selected';
     if (canPlay(uid)) return 'playable';
     if (canAttackWith(uid)) return 'ready';
-    return null;
+    return inert(uid);
   };
 
   const onCard = (uid: string) => {
@@ -1269,8 +1305,10 @@ function Table({
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     const el = e.target as HTMLElement;
-    const dragEl = el.closest<HTMLElement>('[data-drag]');
-    const cardEl = el.closest<HTMLElement>('[data-uid]');
+    // Na mão, a faixa que a carta erguida deixa a descoberto (o `::after` de `.hand-card.peek`) vale como a carta.
+    const inHand = el.matches('[data-hand-uid]') ? el.querySelector<HTMLElement>('[data-uid]') : null;
+    const dragEl = el.closest<HTMLElement>('[data-drag]') ?? (inHand?.dataset.drag ? inHand : null);
+    const cardEl = el.closest<HTMLElement>('[data-uid]') ?? inHand;
     if (!dragEl && !cardEl) return;
     const uid = (dragEl ?? cardEl)!.dataset.uid ?? null;
     const kind = (dragEl?.dataset.drag as DragKind | undefined) ?? null;
@@ -1634,7 +1672,7 @@ function Table({
           )}
 
         {banner && state.phase === 'main' && (
-          <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs', animate ? 'sweep' : ''].join(' ')}>
+          <div key={banner.key} className={['turn-banner', banner.mine ? 'mine' : 'theirs', showy ? 'sweep' : ''].join(' ')}>
             <div className="tb-stripe">
               <small>{banner.kicker}</small>
               <b>{banner.text}</b>
@@ -3416,16 +3454,16 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
               <LogText
                 text={logText(tryT, e)}
                 names={names}
-                onCard={(name) => {
-                  const def = resolveLogCard(state, names, name, e.player);
+                onCard={(name, nth) => {
+                  const def = resolveLogCard(state, names, e, name, nth);
                   if (!def) return;
                   setHover(null);
                   onCardZoom?.(def);
                 }}
                 onHover={
                   canHover
-                    ? (name, el) => {
-                        const def = el && resolveLogCard(state, names, name, e.player);
+                    ? (name, nth, el) => {
+                        const def = el && resolveLogCard(state, names, e, name, nth);
                         setHover(def && el ? { def, anchor: el } : null);
                       }
                     : undefined
@@ -3440,55 +3478,6 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
   );
 }
 
-interface LogNames {
-  /** Todos os nomes de carta da partida, do maior para o menor, como alternativas de uma regex. */
-  regex: RegExp | null;
-  /** Nome → ids das cartas com esse nome (reimpressões com o mesmo nome). */
-  byName: Map<string, string[]>;
-}
-
-/** Nomes das cartas conhecidas da partida, para achá-los nas linhas do histórico. */
-function logCardNames(defs: GameState['defs']): LogNames {
-  const byName = new Map<string, string[]>();
-  for (const def of Object.values(defs)) {
-    if (def.id === HIDDEN_CARD || !def.name) continue;
-    const ids = byName.get(def.name);
-    if (ids) ids.push(def.id);
-    else byName.set(def.name, [def.id]);
-  }
-  // Os nomes maiores primeiro: "Monkey.D.Luffy" antes de "Luffy".
-  const names = [...byName.keys()].sort((a, b) => b.length - a.length);
-  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  // Só nomes inteiros: nada de letra ou número colado antes ou depois.
-  const regex = names.length ? new RegExp(`(^|[^\\p{L}\\p{N}])(${escaped.join('|')})(?![\\p{L}\\p{N}])`, 'gu') : null;
-  return { regex, byName };
-}
-
-/** Onde a carta está vale mais que de quem é: líder antes de personagem/stage, depois descarte, depois o resto. */
-const LOG_ZONE_RANK: Record<string, number> = { leader: 0, character: 1, stage: 1, trash: 2 };
-
-/**
- * A carta por trás de um nome do histórico. Com homônimas (líder e personagem de mesmo nome, reimpressões),
- * a que está à vista na mesa; em empate, a de `player` (quem fez a jogada).
- */
-function resolveLogCard(state: GameState, names: LogNames, name: string, player: PlayerId | null): CardDef | null {
-  const ids = names.byName.get(name);
-  if (!ids?.length) return null;
-  let best = ids[0];
-  if (ids.length > 1) {
-    let bestScore = Infinity;
-    for (const c of Object.values(state.cards)) {
-      if (!ids.includes(c.cardId)) continue;
-      const score = (LOG_ZONE_RANK[zoneOf(state, c.uid) ?? ''] ?? 3) * 2 + (c.owner === player ? 0 : 1);
-      if (score < bestScore) {
-        bestScore = score;
-        best = c.cardId;
-      }
-    }
-  }
-  return state.defs[best] ?? null;
-}
-
 /** Linha do histórico com os nomes de carta como botões. */
 function LogText({
   text,
@@ -3498,24 +3487,28 @@ function LogText({
 }: {
   text: string;
   names: LogNames;
-  onCard: (name: string) => void;
-  onHover?: (name: string, el: HTMLElement | null) => void;
+  /** `nth`: quantas vezes o mesmo nome já apareceu antes na linha (0 = a primeira). */
+  onCard: (name: string, nth: number) => void;
+  onHover?: (name: string, nth: number, el: HTMLElement | null) => void;
 }) {
   if (!names.regex) return <>{text}</>;
   const out: ReactNode[] = [];
+  const seen = new Map<string, number>();
   let last = 0;
   for (const m of text.matchAll(names.regex)) {
     const start = (m.index ?? 0) + m[1].length;
     const name = m[2];
+    const nth = seen.get(name) ?? 0;
+    seen.set(name, nth + 1);
     if (start > last) out.push(text.slice(last, start));
     out.push(
       <button
         key={start}
         type="button"
         className="log-card"
-        onClick={() => onCard(name)}
-        onMouseEnter={onHover ? (e) => onHover(name, e.currentTarget) : undefined}
-        onMouseLeave={onHover ? () => onHover(name, null) : undefined}
+        onClick={() => onCard(name, nth)}
+        onMouseEnter={onHover ? (e) => onHover(name, nth, e.currentTarget) : undefined}
+        onMouseLeave={onHover ? () => onHover(name, nth, null) : undefined}
       >
         {name}
       </button>,

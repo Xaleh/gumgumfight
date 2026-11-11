@@ -14,6 +14,14 @@ export type { Locale };
 /** `system` segue o tema do aparelho (prefers-color-scheme). */
 export type Theme = 'system' | 'light' | 'dark';
 
+/**
+ * Animações da mesa. `full`: tudo (cartas voando, as paradas no centro da mesa para a carta jogada, o ataque
+ * que acertou, a habilidade ativada e o [Trigger], a faixa animada de troca de turno). `soft`: as cartas só vão
+ * de um lugar ao outro, sem as paradas no centro nem a faixa animada. `off`: a mesa muda na hora.
+ */
+export type Animations = 'full' | 'soft' | 'off';
+export const ANIMATIONS: readonly Animations[] = ['full', 'soft', 'off'];
+
 export type StreamerLayout = 'lateral' | 'upright';
 /** Cor do playmat da mesa lateral (todos com a bússola dourada no meio). */
 export type Playmat = 'navy' | 'red' | 'green' | 'white';
@@ -30,8 +38,8 @@ export interface Settings {
   quickCounter: boolean;
   /** DON!! em um toque: tocar no 3º DON!! marca os 3 primeiros (desligado, cada toque marca ou desmarca um só). */
   donQuickPick: boolean;
-  /** Cartas voando pela mesa, faixa de turno e sorteio com dados. */
-  animations: boolean;
+  /** Cartas voando pela mesa, destaques no centro, faixa de turno e sorteio com dados: tudo, só o essencial ou nada. */
+  animations: Animations;
   /** Replay: mostra o clique/seleção do jogador (contorno, toque e legenda) antes de cada ação. */
   replayCues: boolean;
   /** Treino contra o bot: dicas do treinador do tutorial na mesa (DON!! sobrando, Counter que salva...). */
@@ -106,7 +114,7 @@ const DEFAULTS: Settings = {
   serverImages: false,
   quickCounter: false,
   donQuickPick: false,
-  animations: true,
+  animations: 'full',
   replayCues: true,
   coachTips: false,
   theme: 'system',
@@ -146,6 +154,11 @@ function savedLocale(saved: Partial<Settings> & { lang?: unknown }): Locale {
   return detectLocale();
 }
 
+/** Animações salvas. Versões antigas guardavam só ligado/desligado (`true` / `false`). */
+function savedAnimations(v: unknown): Animations {
+  return v === false || v === 'off' ? 'off' : v === 'soft' ? 'soft' : 'full';
+}
+
 function load(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
@@ -157,6 +170,7 @@ function load(): Settings {
       ...saved,
       locale: savedLocale(saved),
       theme,
+      animations: savedAnimations(saved.animations),
       streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
       streamerPlaymat: PLAYMATS.includes(saved.streamerPlaymat as Playmat) ? (saved.streamerPlaymat as Playmat) : 'navy',
       sidePanel: saved.sidePanel !== false,
@@ -315,6 +329,24 @@ function ThemeSeg({ compact }: { compact?: boolean }) {
   );
 }
 
+const ANIMATION_LABEL: Record<Animations, MessageKey> = { full: 'settings.animFull', soft: 'settings.animSoft', off: 'settings.animOff' };
+const ANIMATION_TITLE: Record<Animations, MessageKey> = { full: 'settings.animFullTitle', soft: 'settings.animSoftTitle', off: 'settings.animOffTitle' };
+
+/** Animações: completas, suaves ou desligadas. */
+function AnimationsSeg() {
+  const s = useSettings();
+  const t = useT();
+  return (
+    <div className="seg small" role="group" aria-label={t('settings.animations')}>
+      {ANIMATIONS.map((a) => (
+        <button key={a} type="button" className={s.animations === a ? 'on' : ''} aria-pressed={s.animations === a} onClick={() => s.update({ animations: a })} title={t(ANIMATION_TITLE[a])}>
+          {t(ANIMATION_LABEL[a])}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Interruptor liga/desliga de uma opção. */
 export function Switch({ on, disabled, label, onChange }: { on: boolean; disabled?: boolean; label: string; onChange: (on: boolean) => void }) {
   return (
@@ -463,6 +495,10 @@ export function SettingsControls() {
       <div className="setting">
         <ThemeSeg compact />
       </div>
+      <div className="setting animations-setting" title={t('settings.animationsHint')}>
+        <label className="sheet-label">{t('settings.animations')}</label>
+        <AnimationsSeg />
+      </div>
       <label className={['check', s.serverImages ? '' : 'disabled'].join(' ')} title={s.serverImages ? '' : t('settings.imagesOffTitle')}>
         <input
           type="checkbox"
@@ -479,10 +515,6 @@ export function SettingsControls() {
       <label className="check" title={t('settings.donQuickPickHint')}>
         <input type="checkbox" checked={s.donQuickPick} onChange={(e) => s.update({ donQuickPick: e.target.checked })} />
         {t('settings.donQuickPick')}
-      </label>
-      <label className="check" title={t('settings.animationsHint')}>
-        <input type="checkbox" checked={s.animations} onChange={(e) => s.update({ animations: e.target.checked })} />
-        {t('settings.animations')}
       </label>
       <label className="check" title={t('settings.replayCuesTitle')}>
         <input type="checkbox" checked={s.replayCues} onChange={(e) => s.update({ replayCues: e.target.checked })} />
@@ -635,7 +667,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <Switch on={s.donQuickPick} label={t('settings.donQuickPick')} onChange={(on) => s.update({ donQuickPick: on })} />
             </OptionRow>
             <OptionRow title={t('settings.animations')} hint={t('settings.animationsHint')}>
-              <Switch on={s.animations} label={t('settings.animations')} onChange={(on) => s.update({ animations: on })} />
+              <AnimationsSeg />
             </OptionRow>
             <OptionRow title={t('settings.replayCues')} hint={t('settings.replayCuesHint')}>
               <Switch on={s.replayCues} label={t('settings.replayCues')} onChange={(on) => s.update({ replayCues: on })} />
