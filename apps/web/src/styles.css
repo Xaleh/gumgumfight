@@ -3607,6 +3607,32 @@ button.hint-pill.undo-pill {
 /* carta de spoiler (ainda não lançada): fora dos efeitos, sempre a última da pilha */
 .tag-spoiler { --tag: #7b2ff7; --tag-ink: #3a1078; }
 
+/* Escolha em que a ordem importa (as cartas da busca que voltam ao deck, a ordem da Vida…): o número da vez de
+   cada carta marcada, no estilo das tags de efeito e no dourado do destaque de carta marcada. Fica no topo, ao
+   centro, sem cobrir o custo nem o poder. */
+.status-tag.order-tag {
+  --tag: #f0a818;
+  --tag-ink: #6b4300;
+  position: absolute;
+  top: 3%;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 3;
+  justify-content: center;
+  min-width: 1.5em;
+  padding: 0 0.4em;
+  font-size: max(13px, calc(var(--cw) * 0.2));
+  line-height: 1.25;
+  pointer-events: none;
+  animation: order-tag-in 0.16s ease-out;
+}
+@keyframes order-tag-in {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+
 .card.back {
   /* Verso original das cartas de One Piece Card Game. */
   background: url('./assets/card-back.webp') center / 100% 100% no-repeat;

@@ -615,6 +615,7 @@ const ptBR = {
   'card.counterN': 'Counter +{n}',
   'card.trigger': '[Trigger]',
   'card.activeEffects': 'Efeitos ativos',
+  'card.orderTagTitle': '{n}ª carta na ordem escolhida',
   // ---- avisos (efeito manual, spoiler) ----
   'card.manualTitle': 'Efeito ainda não automatizado: não é aplicado na partida',
   'card.manualPartial': '⚠ Parte do efeito ainda não é automática (⚙ não é aplicada).',

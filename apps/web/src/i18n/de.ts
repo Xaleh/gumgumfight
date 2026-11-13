@@ -614,6 +614,7 @@ export default {
   'card.counterN': 'Counter +{n}',
   'card.trigger': '[Trigger]',
   'card.activeEffects': 'Aktive Effekte',
+  'card.orderTagTitle': 'Karte {n} in der gewählten Reihenfolge',
   // ---- Warnungen (manueller Effekt, Spoiler) ----
   'card.manualTitle': 'Effekt noch nicht automatisiert: Er wird in der Partie nicht angewendet',
   'card.manualPartial': '⚠ Ein Teil des Effekts ist noch nicht automatisiert (⚙ wird nicht angewendet).',
