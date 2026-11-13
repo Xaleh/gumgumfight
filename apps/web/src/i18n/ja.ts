@@ -614,6 +614,7 @@ export default {
   'card.counterN': 'カウンター+{n}',
   'card.trigger': '[Trigger]',
   'card.activeEffects': '適用中の効果',
+  'card.orderTagTitle': '選んだ順番の{n}枚目',
   // ---- 警告（手動効果、先行公開） ----
   'card.manualTitle': 'この効果はまだ自動処理されません：対戦では適用されません',
   'card.manualPartial': '⚠ 効果の一部はまだ自動処理されません（⚙は適用されません）。',

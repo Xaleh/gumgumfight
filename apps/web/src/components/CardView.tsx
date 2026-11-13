@@ -17,7 +17,7 @@ import {
   hasKeyword,
   type Keyword,
 } from '@gumgum/engine';
-import { type ReactNode, useMemo, useState } from 'react';
+import { createContext, type ReactNode, useContext, useMemo, useState } from 'react';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, useT, useTryT } from '../i18n';
 import { useSettings } from '../settings';
@@ -42,6 +42,12 @@ export type Highlight =
   | 'counterEvent'
   | 'inert'
   | null;
+
+/**
+ * Escolha em que a ordem importa (as cartas da busca que voltam para o fundo do deck, a ordem da Vida…): a
+ * posição de cada carta já marcada, a partir de 1. Fora de uma escolha dessas, `null`.
+ */
+export const PickOrderContext = createContext<ReadonlyMap<string, number> | null>(null);
 
 /** "+4000" / "−2000": o valor da etiqueta da etapa de Counter. */
 const signed = (n: number) => (n < 0 ? `−${-n}` : `+${n}`);
@@ -83,6 +89,14 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
   const def = cardDef(state, uid);
   const { showImages } = useSettings();
   const t = useT();
+  // Só a carta desenhada como marcada leva o número: a mesma carta no zoom ou numa animação fica sem ele.
+  const pickOrder = useContext(PickOrderContext);
+  const order = highlight === 'selected' ? pickOrder?.get(uid) : undefined;
+  const orderTag = order !== undefined && (
+    <span className="status-tag order-tag" key={order} title={t('card.orderTagTitle', { n: order })}>
+      {order}
+    </span>
+  );
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   // Com a arte alternativa escolhida no deck, se houver.
@@ -110,7 +124,9 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         className={['card', 'back', highlight ? `hl-${highlight}` : '', onClick ? 'clickable' : ''].join(' ')}
         onClick={onClick}
         data-uid={uid}
-      />
+      >
+        {orderTag}
+      </div>
     );
   }
 
@@ -170,6 +186,7 @@ export function CardView({ state, uid, fc, highlight, onClick, onDoubleClick, on
         <span className={['counter-chip', highlight].join(' ')}>{signed(counterValue(state, uid))}</span>
       )}
       {highlight === 'counterEvent' && <span className="counter-chip counterEvent">{signed(eventCounterPower(state, uid))}</span>}
+      {orderTag}
     </div>
   );
 }

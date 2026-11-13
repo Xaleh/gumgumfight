@@ -56,7 +56,7 @@ import { BoardLayoutEditor } from './BoardLayoutEditor';
 import { effectiveLayout, panelWidth } from '../game/boardLayout';
 import { LateralBoard } from './LateralBoard';
 import { CardHoverPreview, CardTextInfo, StaticCardZoom } from './CardInfo';
-import { CardView, type Highlight, StaticCard } from './CardView';
+import { CardView, type Highlight, PickOrderContext, StaticCard } from './CardView';
 import { DeckConfirm } from './DeckConfirm';
 import { DiceRoll } from './DiceRoll';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -848,6 +848,11 @@ function Table({
 
   const pending = state.pending;
   const myPending = pending && human !== null && pending.player === human ? pending : null;
+  // Escolha em que a ordem importa: cada carta marcada mostra uma tag com o número da sua vez.
+  const pickOrder = useMemo(
+    () => (myPending?.kind === 'selectTargets' && myPending.ordered ? new Map(picked.map((u, i) => [u, i + 1])) : null),
+    [myPending, picked],
+  );
   const legal = useMemo(() => (human !== null ? legalActions(state, human) : []), [state, human]);
   const myTurnIdle =
     human !== null && !game.auto && !pending && state.activePlayer === human && state.phase === 'main' && !state.stack.length;
@@ -1583,6 +1588,7 @@ function Table({
   const detailUid = hovered ?? selected;
 
   return (
+    <PickOrderContext.Provider value={pickOrder}>
     <div
       className={[
         'game',
@@ -2162,6 +2168,7 @@ function Table({
         />
       )}
     </div>
+    </PickOrderContext.Provider>
   );
 }
 
