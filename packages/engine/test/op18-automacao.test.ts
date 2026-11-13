@@ -223,6 +223,27 @@ describe('OP18: cartas que faltavam automatizar', () => {
     expect(s.log.some((l) => l.key === 'log.shuffles')).toBe(true);
   });
 
+  // Q&A oficial Q 1539 (13/11/2026): com 0 de Vida, ativar o [Main] não faz nada e a carta vai para o descarte.
+  it('Buster Call (OP18-117) com 0 de Vida: o Evento é usado e pago, mas nada acontece', () => {
+    let s = toTurn(game(['OP18-079', 'ST02-001']), 3);
+    const own = field(s, 0, 'ST01-006');
+    const enemy = field(s, 1, 'ST01-006');
+    const buster = hand(s, 0, 'OP18-117');
+    s.players[0].deck.push(take(s, 0, 'SPX-101'));
+    s.players[0].trash.push(...s.players[0].life.splice(0), take(s, 0, 'SPX-103'));
+    s.players[0].donActive = 10;
+    const deck = [...s.players[0].deck];
+    s = applyAction(s, { type: 'playCard', player: 0, uid: buster });
+    // Sem custo para pagar não há pergunta: o DON!! é gasto e a carta vai para o descarte.
+    expect(s.pending).toBeNull();
+    expect(s.players[0].donActive).toBe(0);
+    expect(s.players[0].trash).toContain(buster);
+    expect(s.players[0].characters.map((c) => c.uid)).toEqual([own]);
+    expect(s.players[1].characters.some((c) => c.uid === enemy)).toBe(true);
+    // Nem busca nem embaralha.
+    expect(s.players[0].deck).toEqual(deck);
+  });
+
   it('Saint Killingham (OP18-064): DON!! −1 e dois Personagens que não podem atacar', () => {
     let s = toTurn(game(), 3);
     const big = field(s, 1, 'ST01-006');
