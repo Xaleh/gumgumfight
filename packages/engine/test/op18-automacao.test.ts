@@ -135,16 +135,51 @@ describe('OP18: cartas que faltavam automatizar', () => {
     expect(getPower(s, enemy)).toBe(1000 - 5000);
   });
 
-  it('Stop Fighting! (OP18-020): sem Vida, o custo não pode ser pago', () => {
+  // Mesmo caso do Q&A oficial Q 1539 (OP18-117): sem Vida, ativar não faz nada e a carta vai para o descarte.
+  it('Stop Fighting! (OP18-020) com 0 de Vida: o Evento é usado e pago, mas nada acontece', () => {
     let s = toTurn(game(['ST01-001', 'OP04-001']), 3);
+    const enemy = field(s, 0, 'ST01-006');
     const stop = hand(s, 1, 'OP18-020');
+    // O texto do optcgleaks vem com o custo da carta (1).
+    s.defs['OP18-020'] = buildCardDef(fixCard(fixture.optcgleaks.find((c) => c.id === 'OP18-020')!));
+    expect(getCost(s, stop)).toBe(1);
     s.players[1].deck.push(...s.players[1].life.splice(0));
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
     if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 1, uids: [] });
     s.players[1].donActive = 5;
+    const handSize = s.players[1].hand.length;
     s = applyAction(s, { type: 'counter', player: 1, uid: stop });
-    if (s.pending?.kind === 'confirm' && s.pending.player === 1) s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    // Sem custo para pagar não há pergunta: volta para a etapa de Counter, com 1 DON!! gasto e a carta no descarte.
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 1 });
+    expect(s.players[1].donActive).toBe(4);
+    expect(s.players[1].trash).toContain(stop);
+    expect(s.players[1].hand).toHaveLength(handSize - 1);
     expect(getPower(s, s.players[0].leader.uid)).toBe(5000);
+    expect(getPower(s, enemy)).toBe(1000);
+  });
+
+  it('Stop Fighting!!! (OP18-020): o texto da carta impressa funciona igual ao dos spoilers', () => {
+    const printed: CardData = {
+      ...fixture.cards.find((c) => c.id === 'OP18-020')!,
+      name: 'Stop Fighting!!!',
+      cost: 1,
+      text: "[Counter] You may add all of your Life cards to your hand: If your Leader is [Nefeltari Vivi], give your opponent's Leader and all of their Characters −5000 power during this turn.",
+    };
+    expect(automationStatus(fixCard(printed))).toBe('auto');
+    expect(translateCardPt(fixCard(printed)).complete).toBe(true);
+    let s = toTurn(game(['ST01-001', 'OP04-001']), 3);
+    const enemy = field(s, 0, 'ST01-006');
+    const stop = hand(s, 1, 'OP18-020');
+    s.defs['OP18-020'] = buildCardDef(fixCard(printed));
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 1, uids: [] });
+    s.players[1].donActive = 5;
+    s = applyAction(s, { type: 'counter', player: 1, uid: stop });
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 1 });
+    s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    expect(s.players[1].life).toHaveLength(0);
+    expect(getPower(s, s.players[0].leader.uid)).toBe(0);
+    expect(getPower(s, enemy)).toBe(1000 - 5000);
   });
 
   it('Van Augur (OP18-080): compra quando o Líder [Marshall D. Teach] descarta da mão', () => {
@@ -221,6 +256,27 @@ describe('OP18: cartas que faltavam automatizar', () => {
     while (s.pending?.kind === 'confirm') s = applyAction(s, { type: 'answer', player: 0, yes: false });
     expect(s.players[0].characters.map((c) => c.uid).sort()).toEqual([garp, onigumo, momonga].sort());
     expect(s.log.some((l) => l.key === 'log.shuffles')).toBe(true);
+  });
+
+  // Q&A oficial Q 1539 (13/11/2026): com 0 de Vida, ativar o [Main] não faz nada e a carta vai para o descarte.
+  it('Buster Call (OP18-117) com 0 de Vida: o Evento é usado e pago, mas nada acontece', () => {
+    let s = toTurn(game(['OP18-079', 'ST02-001']), 3);
+    const own = field(s, 0, 'ST01-006');
+    const enemy = field(s, 1, 'ST01-006');
+    const buster = hand(s, 0, 'OP18-117');
+    s.players[0].deck.push(take(s, 0, 'SPX-101'));
+    s.players[0].trash.push(...s.players[0].life.splice(0), take(s, 0, 'SPX-103'));
+    s.players[0].donActive = 10;
+    const deck = [...s.players[0].deck];
+    s = applyAction(s, { type: 'playCard', player: 0, uid: buster });
+    // Sem custo para pagar não há pergunta: o DON!! é gasto e a carta vai para o descarte.
+    expect(s.pending).toBeNull();
+    expect(s.players[0].donActive).toBe(0);
+    expect(s.players[0].trash).toContain(buster);
+    expect(s.players[0].characters.map((c) => c.uid)).toEqual([own]);
+    expect(s.players[1].characters.some((c) => c.uid === enemy)).toBe(true);
+    // Nem busca nem embaralha.
+    expect(s.players[0].deck).toEqual(deck);
   });
 
   it('Saint Killingham (OP18-064): DON!! −1 e dois Personagens que não podem atacar', () => {
