@@ -1112,6 +1112,43 @@ function keepArts(card: CardData, storedData: string): CardData {
   return extra.length ? { ...card, arts: [...(card.arts ?? []), ...extra] } : card;
 }
 
+/**
+ * A imagem é uma das oficiais da Bandai dessa carta (card_official_images): o endereço da lista
+ * oficial ou a cópia dele na CDN própria (`…/<objeto>?v=<hash>`).
+ */
+export function isOfficialImage(db: DB, cardId: string, imageUrl: string | undefined): boolean {
+  if (!imageUrl) return false;
+  const row = db
+    .prepare(
+      `SELECT 1 FROM card_official_images o
+       LEFT JOIN card_images m ON m.source_url = o.image_url AND m.object_key <> ''
+       WHERE o.card_id = @id
+         AND (o.image_url = @url
+           OR substr(@url, -length('/' || m.object_key || '?v=' || m.hash)) = '/' || m.object_key || '?v=' || m.hash)
+       LIMIT 1`,
+    )
+    .get({ id: cardId, url: imageUrl });
+  return Boolean(row);
+}
+
+/**
+ * Carta provisória (spoiler) que já ganhou a imagem oficial fica com ela: o site de spoilers
+ * continua mandando a foto da revelação a cada rodada.
+ */
+function keepOfficialImage(db: DB, card: CardData, storedData: string): CardData {
+  let stored: CardData;
+  try {
+    stored = JSON.parse(storedData) as CardData;
+  } catch {
+    return card;
+  }
+  if (stored.imageUrl === card.imageUrl || !isOfficialImage(db, card.id, stored.imageUrl)) return card;
+  const kept: CardData = { ...card, imageUrl: stored.imageUrl };
+  if (stored.imageLang) kept.imageLang = stored.imageLang;
+  else delete kept.imageLang;
+  return kept;
+}
+
 export function upsertCards(
   db: DB,
   cards: CardData[],
@@ -1138,6 +1175,7 @@ export function upsertCards(
         continue;
       }
       if (row) c = keepArts(c, row.data);
+      if (row && opts.provisional) c = keepOfficialImage(db, c, row.data);
       write.run({
         id: c.id,
         set_code: c.set ?? c.id.split('-')[0],

@@ -1,5 +1,7 @@
 // Imagens oficiais da Bandai para as cartas que nenhuma fonte de dados traz com imagem (promos
-// japonesas, cartas que só o Cardkaizoku tem, desenhos provisórios da optcgapi).
+// japonesas, cartas que só o Cardkaizoku tem, desenhos provisórios da optcgapi) e para os spoilers:
+// a lista oficial publica a coleção antes do lançamento, e a imagem dela entra no lugar da foto
+// da revelação que o site de spoilers tem.
 //
 // As listas oficiais de cada região usam o mesmo sistema:
 //   <base>/cardlist/                  <select name="series"> com as coleções ("... [OP-17]", "Promotion card")
@@ -11,7 +13,7 @@
 // Só as coleções das cartas que faltam são consultadas, e cada coleção no máximo uma vez por dia.
 
 import { CARD_IMAGE_ORIGINS, type CardArt, type CardData } from '@gumgum/engine';
-import { type DB, transaction } from '../db';
+import { type DB, isOfficialImage, transaction } from '../db';
 import { networkCause } from './r2';
 
 export interface BandaiRegion {
@@ -123,8 +125,10 @@ export const fetchText: FetchText = async (url) => {
 };
 
 export interface OfficialImagesResult {
-  /** Cartas que ganharam imagem oficial nesta rodada. */
+  /** Cartas que ganharam imagem oficial nesta rodada (as sem imagem e os spoilers trocados). */
   filled: number;
+  /** Dessas, os spoilers que trocaram a foto do site de spoilers pela oficial. */
+  replaced: number;
   /** Cartas ainda sem imagem (nenhuma região tem). */
   missing: string[];
   /** Páginas de coleção consultadas nas listas oficiais. */
@@ -137,8 +141,9 @@ const isRejected = (db: DB, url: string) =>
   Boolean(db.prepare("SELECT 1 FROM card_images WHERE source_url = ? AND object_key = ''").get(url));
 
 /**
- * Dá a imagem oficial às cartas sem imagem (ou com uma imagem recusada). O que as listas oficiais
- * mostram fica guardado (card_official_images), então reimportar a carta não consulta a Bandai de novo.
+ * Dá a imagem oficial às cartas sem imagem (ou com uma imagem recusada) e aos spoilers que ainda
+ * estão com a imagem do site de spoilers. O que as listas oficiais mostram fica guardado
+ * (card_official_images), então reimportar a carta não consulta a Bandai de novo.
  */
 export async function fillOfficialImages(
   db: DB,
@@ -147,14 +152,18 @@ export async function fillOfficialImages(
 ): Promise<OfficialImagesResult> {
   const get = opts.fetchText ?? fetchText;
   const now = opts.now ?? new Date();
-  const result: OfficialImagesResult = { filled: 0, missing: [], pages: 0, errors: [] };
+  const result: OfficialImagesResult = { filled: 0, replaced: 0, missing: [], pages: 0, errors: [] };
   const rows = db.prepare('SELECT id, set_code, data FROM cards ORDER BY id').all() as Array<{ id: string; set_code: string; data: string }>;
+  // Sem imagem (ou recusada) e, à parte, spoilers com a imagem do site de spoilers: os dois procuram a oficial.
   const missing = new Map<string, CardData>();
+  const spoilers = new Map<string, CardData>();
   for (const r of rows) {
     const c = JSON.parse(r.data) as CardData;
     if (!c.imageUrl || isRejected(db, c.imageUrl)) missing.set(c.id, c);
+    else if (c.spoiler && !isOfficialImage(db, c.id, c.imageUrl)) spoilers.set(c.id, c);
   }
-  if (!missing.size || !regions.length) return { ...result, missing: [...missing.keys()] };
+  const wanted = new Map([...missing, ...spoilers]);
+  if (!wanted.size || !regions.length) return { ...result, missing: [...missing.keys()] };
 
   const known = db.prepare('SELECT variant, region, image_url, label FROM card_official_images WHERE card_id = ?');
   const found = (id: string) => known.all(id) as Array<{ variant: string; region: string; image_url: string; label: string | null }>;
@@ -168,7 +177,7 @@ export async function fillOfficialImages(
   const markChecked = db.prepare('INSERT OR REPLACE INTO card_official_checks (region, series, checked_at) VALUES (?, ?, ?)');
   const recheckMs = (opts.recheckHours ?? 24) * 3600_000;
   for (const region of regions) {
-    const sets = new Set([...missing.values()].filter((c) => !found(c.id).length).map((c) => c.set ?? c.id.split('-')[0]));
+    const sets = new Set([...wanted.values()].filter((c) => !found(c.id).length).map((c) => c.set ?? c.id.split('-')[0]));
     if (!sets.size) break;
     let series: BandaiSeries[];
     try {
@@ -199,12 +208,13 @@ export async function fillOfficialImages(
   const order = new Map(regions.map((r, i) => [r.id, i]));
   const update = db.prepare('UPDATE cards SET data = ? WHERE id = ?');
   transaction(db, () => {
-    for (const [id, c] of missing) {
+    for (const [id, c] of wanted) {
       const prints = found(id)
         .filter((p) => order.has(p.region))
         .sort((a, b) => order.get(a.region)! - order.get(b.region)!);
       if (!prints.length) {
-        result.missing.push(id);
+        // Spoiler que a lista oficial ainda não tem continua com a imagem do site de spoilers.
+        if (missing.has(id)) result.missing.push(id);
         continue;
       }
       const region = prints[0].region;
@@ -222,11 +232,14 @@ export async function fillOfficialImages(
       };
       update.run(JSON.stringify(card), id);
       result.filled++;
+      if (spoilers.has(id)) result.replaced++;
     }
   });
   if (result.filled || result.errors.length) {
     opts.log?.(
-      `Imagens oficiais: ${result.filled} cartas ganharam imagem, ${result.missing.length} ainda sem` +
+      `Imagens oficiais: ${result.filled} cartas ganharam imagem` +
+        (result.replaced ? ` (${result.replaced} spoilers trocaram a do site de spoilers pela oficial)` : '') +
+        `, ${result.missing.length} ainda sem` +
         (result.pages ? `, ${result.pages} páginas consultadas` : '') +
         (result.errors.length ? ` | erros: ${result.errors.slice(0, 3).join('; ')}` : ''),
     );
