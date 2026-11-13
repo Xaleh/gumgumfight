@@ -135,16 +135,51 @@ describe('OP18: cartas que faltavam automatizar', () => {
     expect(getPower(s, enemy)).toBe(1000 - 5000);
   });
 
-  it('Stop Fighting! (OP18-020): sem Vida, o custo não pode ser pago', () => {
+  // Mesmo caso do Q&A oficial Q 1539 (OP18-117): sem Vida, ativar não faz nada e a carta vai para o descarte.
+  it('Stop Fighting! (OP18-020) com 0 de Vida: o Evento é usado e pago, mas nada acontece', () => {
     let s = toTurn(game(['ST01-001', 'OP04-001']), 3);
+    const enemy = field(s, 0, 'ST01-006');
     const stop = hand(s, 1, 'OP18-020');
+    // O texto do optcgleaks vem com o custo da carta (1).
+    s.defs['OP18-020'] = buildCardDef(fixCard(fixture.optcgleaks.find((c) => c.id === 'OP18-020')!));
+    expect(getCost(s, stop)).toBe(1);
     s.players[1].deck.push(...s.players[1].life.splice(0));
     s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
     if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 1, uids: [] });
     s.players[1].donActive = 5;
+    const handSize = s.players[1].hand.length;
     s = applyAction(s, { type: 'counter', player: 1, uid: stop });
-    if (s.pending?.kind === 'confirm' && s.pending.player === 1) s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    // Sem custo para pagar não há pergunta: volta para a etapa de Counter, com 1 DON!! gasto e a carta no descarte.
+    expect(s.pending).toMatchObject({ kind: 'counter', player: 1 });
+    expect(s.players[1].donActive).toBe(4);
+    expect(s.players[1].trash).toContain(stop);
+    expect(s.players[1].hand).toHaveLength(handSize - 1);
     expect(getPower(s, s.players[0].leader.uid)).toBe(5000);
+    expect(getPower(s, enemy)).toBe(1000);
+  });
+
+  it('Stop Fighting!!! (OP18-020): o texto da carta impressa funciona igual ao dos spoilers', () => {
+    const printed: CardData = {
+      ...fixture.cards.find((c) => c.id === 'OP18-020')!,
+      name: 'Stop Fighting!!!',
+      cost: 1,
+      text: "[Counter] You may add all of your Life cards to your hand: If your Leader is [Nefeltari Vivi], give your opponent's Leader and all of their Characters −5000 power during this turn.",
+    };
+    expect(automationStatus(fixCard(printed))).toBe('auto');
+    expect(translateCardPt(fixCard(printed)).complete).toBe(true);
+    let s = toTurn(game(['ST01-001', 'OP04-001']), 3);
+    const enemy = field(s, 0, 'ST01-006');
+    const stop = hand(s, 1, 'OP18-020');
+    s.defs['OP18-020'] = buildCardDef(fixCard(printed));
+    s = applyAction(s, { type: 'attack', player: 0, attacker: s.players[0].leader.uid, target: s.players[1].leader.uid });
+    if (s.pending?.kind === 'block') s = applyAction(s, { type: 'choose', player: 1, uids: [] });
+    s.players[1].donActive = 5;
+    s = applyAction(s, { type: 'counter', player: 1, uid: stop });
+    expect(s.pending).toMatchObject({ kind: 'confirm', player: 1 });
+    s = applyAction(s, { type: 'answer', player: 1, yes: true });
+    expect(s.players[1].life).toHaveLength(0);
+    expect(getPower(s, s.players[0].leader.uid)).toBe(0);
+    expect(getPower(s, enemy)).toBe(1000 - 5000);
   });
 
   it('Van Augur (OP18-080): compra quando o Líder [Marshall D. Teach] descarta da mão', () => {
