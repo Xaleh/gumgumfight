@@ -1084,8 +1084,8 @@ imagens, e o parceiro SweetApp pode usar a mesma CDN. Código em `apps/server/sr
 - O kit de divulgação dos torneios continua usando `/card-img/` (origem `cdn`), com o cache do Nginx.
 
 **Imagens oficiais da Bandai** (`card-cdn/official.ts`): carta sem imagem em nenhuma fonte de dados (promos japonesas,
-cartas que só o Cardkaizoku tem) ou com um desenho provisório (o SVG que a optcgapi manda em algumas promos de evento)
-procura a imagem nas listas oficiais, na ordem de `CARD_IMAGE_SOURCES`: inglês (`en.onepiece-cardgame.com`), inglês
+cartas que só o Cardkaizoku tem), com um desenho provisório (o SVG que a optcgapi manda em algumas promos de evento)
+ou de spoiler (com a foto do site de spoilers) procura a imagem nas listas oficiais, na ordem de `CARD_IMAGE_SOURCES`: inglês (`en.onepiece-cardgame.com`), inglês
 da Ásia (`asia-en.onepiece-cardgame.com`) e japonês (`www.onepiece-cardgame.com`).
 
 - Só as coleções das cartas que faltam são consultadas (promocionais: as séries "Promotion card" e "Other Product
@@ -1094,6 +1094,10 @@ da Ásia (`asia-en.onepiece-cardgame.com`) e japonês (`www.onepiece-cardgame.co
 - A primeira região que tem a carta vence. A impressão base vira a imagem; as outras (`_p1`…) viram artes, com o
   produto de origem como rótulo. Imagem japonesa vai para a CDN como `/P/jp/P-152.png` e a carta ganha `imageLang: "jp"`.
 - Desenho provisório recusado fica registrado (não é baixado de novo) e, na rodada seguinte, a carta procura a oficial.
+- **Spoilers:** a lista oficial publica a coleção antes do lançamento (OP18: as 119 cartas uma semana antes). O spoiler
+  que a lista já tem troca a foto da revelação (optcgleaks) pela imagem oficial e fica com ela nas rodadas seguintes,
+  mesmo com o site de spoilers mandando a foto de novo; o que a lista ainda não tem continua com a do site. No
+  lançamento, a importação oficial manda a imagem dela, como sempre. Para trocar na hora: `npm run cards:import -- --images`.
 - Tudo roda junto da cópia para a CDN (importação, sincronização dos spoilers e `--images`).
 
 **Configuração no Cloudflare (uma vez):**

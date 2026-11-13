@@ -77,6 +77,61 @@ describe('listas oficiais da Bandai', () => {
   });
 });
 
+// A lista oficial publica a coleção antes do lançamento (OP-18 uma semana antes, com as 119 cartas).
+const OP18 = `<select name="series"><option value="569118">BOOSTER PACK <br class="spInline">-THE DOMINANCE OF GOD- [OP-18]</option></select>
+<dl class="modalCol" id="OP18-050"><dt></dt><dd><img class="lazy" data-src="../images/cardlist/card/OP18-050.png?261016"><div class="getInfo"><h3>Card Set(s)</h3>-THE DOMINANCE OF GOD- [OP-18]</div></dd></dl>`;
+const LEAK = 'https://images.optcgleaks.com/op18/images/op18-050.webp';
+const spoiler = { source: 'optcgleaks.com', url: 'https://optcgleaks.com/op18' };
+
+describe('spoilers trocam a foto do site de spoilers pela imagem oficial', () => {
+  const pages = { [`${EN.base}/cardlist/`]: OP18, [`${EN.base}/cardlist/?series=569118`]: OP18 };
+
+  it('só os spoilers que a lista oficial já tem; carta oficial e spoiler de outra coleção ficam como estão', async () => {
+    const db = openDb(':memory:');
+    const st37 = 'https://images.optcgleaks.com/st37/images/st37-001.webp';
+    upsertCards(db, [card('OP18-050', { imageUrl: LEAK, spoiler }), card('ST37-001', { imageUrl: st37, spoiler })], {
+      provisional: true,
+      source: 'spoiler:feed:optcgleaks.com',
+    });
+    upsertCards(db, [card('OP01-001', { imageUrl: 'https://optcgapi.com/media/x.jpg' })], { provisional: false, source: 'api:test' });
+    const net = site(pages);
+    const r = await fillOfficialImages(db, [EN], { fetchText: net.fetchText, delayMs: 0 });
+    expect(r).toMatchObject({ filled: 1, replaced: 1, missing: [], errors: [] });
+    expect(net.calls).toEqual([`${EN.base}/cardlist/`, `${EN.base}/cardlist/?series=569118`]);
+    const [released, op18, st] = getCards(db, ['OP01-001', 'OP18-050', 'ST37-001']);
+    expect(op18).toMatchObject({ imageUrl: `${EN.base}/images/cardlist/card/OP18-050.png`, spoiler });
+    expect(st.imageUrl).toBe(st37);
+    expect(released.imageUrl).toBe('https://optcgapi.com/media/x.jpg');
+
+    // Já está com a oficial: a rodada seguinte não troca de novo.
+    expect(await fillOfficialImages(db, [EN], { fetchText: site(pages).fetchText, delayMs: 0 })).toMatchObject({ filled: 0, replaced: 0 });
+  });
+
+  it('na CDN: a oficial fica mesmo com o site de spoilers mandando a foto de novo, até a carta sair na API', async () => {
+    const db = openDb(':memory:');
+    const feed = () => upsertCards(db, [card('OP18-050', { imageUrl: LEAK, spoiler })], { provisional: true, source: 'spoiler:feed:optcgleaks.com' });
+    feed();
+    const store = dirStore(mkdtempSync(join(tmpdir(), 'cdn-')), 'https://cards.ggf.test');
+    const fetchImpl = (async () => new Response(PNG, { headers: { 'content-type': 'image/png' } })) as unknown as typeof fetch;
+    const logs: string[] = [];
+    const opts = { fetchImpl, fetchText: site(pages).fetchText, officialRegions: [EN], log: (m: string) => logs.push(m) };
+    await syncCardCdn(db, store, opts);
+    const official = getCards(db, ['OP18-050'])[0].imageUrl;
+    expect(official).toMatch(/^https:\/\/cards\.ggf\.test\/OP18\/en\/OP18-050\.png\?v=/);
+    expect(logs.join('\n')).toContain('1 spoilers trocaram');
+
+    // Nova rodada dos spoilers: a carta é regravada com a foto, mas continua com a oficial.
+    feed();
+    expect(getCards(db, ['OP18-050'])[0].imageUrl).toBe(official);
+    expect(await syncCardCdn(db, store, opts)).toMatchObject({ uploaded: 0 });
+    expect(getCards(db, ['OP18-050'])[0].imageUrl).toBe(official);
+
+    // Lançamento: a importação oficial manda a imagem dela, como sempre.
+    upsertCards(db, [card('OP18-050', { imageUrl: 'https://optcgapi.com/media/OP18-050.jpg' })], { provisional: false, source: 'api:test' });
+    expect(getCards(db, ['OP18-050'])[0].imageUrl).toBe('https://optcgapi.com/media/OP18-050.jpg');
+  });
+});
+
 describe('cartas sem imagem ganham a oficial', () => {
   it('procura só nas coleções que faltam, região por região, e guarda para a próxima vez', async () => {
     const db = openDb(':memory:');
