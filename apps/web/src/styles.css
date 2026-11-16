@@ -4514,6 +4514,80 @@ button.hint-pill::after,
   font-weight: 900;
   margin-top: 6px;
 }
+/* Pesquisa no histórico: a lupa no canto do quadro; aberta, o campo fica preso no alto enquanto as linhas rolam. */
+.log-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.log-search-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+.log-search-btn:hover,
+.log-search-btn:focus-visible {
+  color: var(--text);
+}
+.log-search:not(.open) .log-search-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+.log-search.open {
+  /* encostado na borda do quadro: o preso conta a partir de dentro do respiro (padding) do `.log` */
+  top: -10px;
+  height: auto;
+  margin: -10px -10px 8px;
+  padding: 8px 8px 6px 10px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  background: var(--panel);
+  color: var(--muted);
+}
+.log-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.log-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+}
+.log-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.log-search-count {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.log-search-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+}
 /* Replay: as linhas da ação atual */
 .log-line.fresh {
   background: color-mix(in srgb, var(--accent) 16%, transparent);

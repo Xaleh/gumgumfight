@@ -828,6 +828,9 @@ function Table({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [state.defs],
   );
+  /** Históricos na tela com a pesquisa (a lupa) aberta: enquanto houver um, os atalhos de teclado não valem. */
+  const [logSearches, setLogSearches] = useState(0);
+  const onLogSearching = useCallback((on: boolean) => setLogSearches((n) => Math.max(0, n + (on ? 1 : -1))), []);
   /** Carta citada no histórico, ampliada (toque/clique no nome). */
   const [logCard, setLogCard] = useState<CardDef | null>(null);
   /** Carta da decklist (painel de quem transmite), ampliada por cima da mesa. */
@@ -1283,9 +1286,11 @@ function Table({
   const gameRef = useRef<HTMLDivElement>(null);
   /**
    * Janelas por cima da mesa com as próprias teclas (o menu, o histórico, o resumo do fim, o relato, a carta
-   * ampliada do histórico, as cartas reveladas…): enquanto uma delas está aberta, os atalhos não valem.
+   * ampliada do histórico, as cartas reveladas…): enquanto uma delas está aberta, os atalhos não valem. Com a
+   * pesquisa do histórico (a lupa) aberta também não, mesmo com o foco fora do campo.
    */
   const covered =
+    logSearches > 0 ||
     intro ||
     reporting ||
     calling ||
@@ -1812,7 +1817,7 @@ function Table({
             ghost={drag?.kind === 'hand' ? drag.uid : null}
             center={centerBand}
             sideLeft={layout.sideHover ? <CardDetail state={state} uid={detailUid} /> : undefined}
-            sideRight={layout.sideLog ? <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} /> : undefined}
+            sideRight={layout.sideLog ? <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} onSearching={onLogSearching} /> : undefined}
             overlay={layout.hover.show && layout.hover.position === 'center' && hovered ? <CardDetail state={state} uid={hovered} /> : undefined}
             {...handlers}
           />
@@ -2140,7 +2145,7 @@ function Table({
 
         {sheet === 'log' && (
           <SheetFrame title={t('game.log')} onClose={() => setSheet(null)}>
-            <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
+            <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} onSearching={onLogSearching} />
           </SheetFrame>
         )}
         {sheet === 'coach' && coachOn && (
@@ -2262,7 +2267,7 @@ function Table({
               ✕
             </button>
           </div>
-          {panel === 'log' && <LogPanel state={state} onCardZoom={setLogCard} />}
+          {panel === 'log' && <LogPanel state={state} onCardZoom={setLogCard} onSearching={onLogSearching} />}
           {panel === 'matches' && spectator?.onSwitchRoom && <MatchesPanel currentId={spectator.roomId ?? null} onWatch={spectator.onSwitchRoom} />}
           {panel === 'deck' && spectator?.roomId && <DeckPanel roomId={spectator.roomId} onZoom={setDeckCard} />}
         </aside>
@@ -2325,7 +2330,7 @@ function Table({
           ) : (
             <>
               {(!wideBoard || (layout.hover.show && layout.hover.position === 'panel')) && <CardDetail state={state} uid={detailUid} />}
-              {(!wideBoard || (layout.log.show && layout.log.position === 'panel')) && <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />}
+              {(!wideBoard || (layout.log.show && layout.log.position === 'panel')) && <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} onSearching={onLogSearching} />}
             </>
           )}
         </aside>
@@ -3636,23 +3641,106 @@ function RevealedCards({ lines, onCard, onClose }: { lines: RevealLine[]; onCard
   );
 }
 
+/** Texto sem acentos e em minúsculas, para a pesquisa do histórico achar "lider" em "Líder". */
+const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 /**
  * Histórico da partida. `fresh`: no replay, as linhas da ação atual (desta em diante) ficam destacadas.
  * Os nomes de cartas viram links: toque/clique abre a carta ampliada (`onCardZoom`); com mouse, passar por cima mostra a carta ao lado.
+ *
+ * `onSearching`: o histórico ganha a lupa, no canto. Aberta, um campo filtra as linhas pelo texto (sem diferenciar
+ * maiúsculas nem acentos), mantendo a linha do turno de cada uma, e a mesa é avisada enquanto a pesquisa está
+ * aberta (os atalhos de teclado param).
  */
-function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: number | null; onCardZoom?: (def: CardDef) => void }) {
+function LogPanel({
+  state,
+  fresh,
+  onCardZoom,
+  onSearching,
+}: {
+  state: GameState;
+  fresh?: number | null;
+  onCardZoom?: (def: CardDef) => void;
+  onSearching?: (on: boolean) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
   const [hover, setHover] = useState<{ def: CardDef; anchor: HTMLElement } | null>(null);
   const names = useMemo(() => logCardNames(state.defs), [state.defs]);
+  const t = useT();
   const tryT = useTryT();
+  const { shortcuts } = useSettings();
+  /** A pesquisa: `null` = lupa fechada. */
+  const [query, setQuery] = useState<string | null>(null);
+  const searching = query !== null;
+  useEffect(() => {
+    if (!searching || !onSearching) return;
+    onSearching(true);
+    return () => onSearching(false);
+  }, [searching, onSearching]);
+  const needle = fold(query?.trim() ?? '');
+  const { lines, found } = useMemo(() => {
+    const all = state.log.map((e, i) => ({ e, i, text: logText(tryT, e) }));
+    if (!needle) return { lines: all, found: all.length };
+    const lines: typeof all = [];
+    let found = 0;
+    /** A linha "— Turno N —" das linhas achadas depois dela entra junto, para dar o contexto. */
+    let turn: (typeof all)[number] | null = null;
+    for (const line of all) {
+      const hit = fold(line.text).includes(needle);
+      if (line.e.text.startsWith('—') && !hit) {
+        turn = line;
+        continue;
+      }
+      if (!hit) continue;
+      if (turn && !line.e.text.startsWith('—')) lines.push(turn);
+      turn = null;
+      lines.push(line);
+      found++;
+    }
+    return { lines, found };
+  }, [state.log, needle, tryT]);
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
-  }, [state.log.length]);
+  }, [state.log.length, needle]);
   return (
     <>
         <div className="log" ref={ref} onScroll={() => setHover(null)}>
-          {state.log.map((e, i) => (
+          {onSearching && (
+            <div className={['log-search', searching ? 'open' : ''].join(' ')}>
+              {searching ? (
+                <>
+                  <div className="log-search-row">
+                    <Icon name="search" size={16} />
+                    <input
+                      type="search"
+                      value={query}
+                      autoFocus
+                      placeholder={t('game.logSearchPlaceholder')}
+                      aria-label={t('game.logSearch')}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Escape') return;
+                        // O Esc fecha só a pesquisa (não a carta aberta nem a folha do histórico).
+                        e.stopPropagation();
+                        setQuery(null);
+                      }}
+                    />
+                    {needle && <span className="log-search-count">{found > 0 ? t('game.logSearchCount', { n: found }) : t('game.logSearchNone')}</span>}
+                    <button type="button" className="log-search-btn" onClick={() => setQuery(null)} aria-label={t('game.logSearchClose')} title={t('game.logSearchClose')}>
+                      <Icon name="close" size={14} />
+                    </button>
+                  </div>
+                  {shortcuts && <small className="log-search-note">{t('game.logSearchShortcuts')}</small>}
+                </>
+              ) : (
+                <button type="button" className="log-search-btn" onClick={() => setQuery('')} aria-label={t('game.logSearch')} title={t('game.logSearch')}>
+                  <Icon name="search" size={15} />
+                </button>
+              )}
+            </div>
+          )}
+          {lines.map(({ e, i, text }) => (
             <div
               key={i}
               className={[
@@ -3663,7 +3751,7 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
               ].join(' ')}
             >
               <LogText
-                text={logText(tryT, e)}
+                text={text}
                 names={names}
                 onCard={(name, nth) => {
                   const def = resolveLogCard(state, names, e, name, nth);

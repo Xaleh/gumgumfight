@@ -873,7 +873,7 @@ administração, o funil anônimo das lições (onde as pessoas desistem). Detal
   quantidade de DON!! (0 = 10), que vão para a carta da tecla seguinte, e respondem as perguntas com uma lista de
   opções. **M** é o **Ver a mesa** das perguntas que têm esse botão (de novo, volta à pergunta). **D** abre o seu
   descarte e **O** o do oponente. Exemplo: `Q`, `X`, `A`, `L` anexa todos os DON!! ao 1º
-  Personagem e ataca o Líder do oponente. Os atalhos não valem enquanto se escreve (chat, apelido) nem no tutorial.
+  Personagem e ataca o Líder do oponente. Os atalhos não valem enquanto se escreve (chat, apelido), com a pesquisa do histórico aberta nem no tutorial.
 - **Desfazer** volta para antes da sua última ação. **Replay** baixa um `.json` com a seed, as listas dos decks e todas as ações.
 - **Assistir replay** (no topo da página inicial e no menu): carregue o `.json` (escolher ou arrastar), veja o resumo
   (jogadores, Líderes, ações, turnos e, se quiser, o resultado) e assista no modo **automático** ou **passo a passo**.
