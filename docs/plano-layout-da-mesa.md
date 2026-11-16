@@ -78,10 +78,16 @@ Regras:
   de cada bloco: `rows` (altura da mesa mais a faixa da mão embaixo, ou a altura das laterais, a que for maior) e
   `cols` (largura da mesa mais as duas laterais), em larguras de carta;
   `--cw = min((100cqh - 24px) / rows, (100cqw - painel - 24px) / cols, 150px)`. Como rede de segurança, depois de
-  renderizar a mesa mede a própria `board-col` (`scrollHeight`/`scrollWidth` contra `clientHeight`/`clientWidth`) e,
-  se algo passou, aperta `rows`/`cols` na proporção e renderiza de novo (até três vezes; um `ResizeObserver` refaz a
-  conta ao redimensionar a janela). Mais blocos grandes = cartas um pouco menores, nunca corte. A área de custo
-  comprime os DON!! quando são muitos (como `.don-cards` já faz).
+  renderizar a mesa mede as caixas de layout dos blocos (a mesa e as faixas das mãos contra a coluna do meio, os
+  blocos de cada lateral contra a altura dela) e, se algo passou, aperta `rows`/`cols` na proporção e renderiza de
+  novo, antes de pintar (até quatro vezes; um `ResizeObserver` refaz a conta ao redimensionar a janela). Mais blocos
+  grandes = cartas um pouco menores, nunca corte. A área de custo comprime os DON!! quando são muitos (como
+  `.don-cards` já faz).
+- **O tamanho das cartas não muda no meio da partida.** A conta acima só é refeita quando o layout ou o tamanho da
+  janela mudam. A medição não usa `scrollHeight`/`scrollWidth`, que contam o que sai da caixa por `transform` (a
+  carta da mão erguida pelo mouse, o leque girado, uma carta em animação): com eles, passar o mouse na mão encolhia
+  a mesa inteira. A faixa do meio tem altura fixa (64 px, a do botão de decisão): o confronto e "Sem Counter" não
+  empurram os dois lados da mesa, na mesa larga nem na clássica.
 - **Mão e DON!! nunca se sobrepõem.** Com a fileira de DON!! na borda de baixo do playmat, a mão não pode ficar
   embaixo da mesa (e vice-versa): a opção do outro fica desabilitada no editor, com o motivo no `title`, e `load()`
   resolve um JSON conflitante mandando a mão para o canto esquerdo.

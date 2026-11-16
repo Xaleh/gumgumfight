@@ -3004,6 +3004,18 @@ button.hint-pill.undo-pill {
   gap: 18px;
   flex-wrap: wrap;
 }
+/*
+ * Desktop: a faixa do meio tem altura fixa, a do botão de decisão (o mais alto que mora nela). Antes ela
+ * crescia quando "Sem Counter" tomava o lugar de "Encerrar turno" (58 → 64 px) e os dois lados da mesa se
+ * mexiam a cada ataque; na mesa larga, se o confronto e o botão quebrassem em duas linhas, a mesa passava
+ * da tela e as cartas encolhiam (e voltavam a crescer na jogada seguinte). O que for mais alto que a faixa
+ * passa por cima das bordas dela, por igual em cima e embaixo, sem empurrar nada.
+ */
+.game.wide .center-band {
+  height: 64px;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
 .game.wide .end-turn.defense {
   min-width: 220px;
   max-width: 320px;
@@ -16006,16 +16018,29 @@ div.dk-tile-main {
   justify-self: end;
 }
 /* a faixa do meio: a etiqueta do oponente, o turno e os botões, a sua etiqueta */
+/* altura fixa (a mesma da faixa, ver `.game.wide .center-band`): o que aparece nela não muda a altura da mesa */
 .wm-center {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-height: 60px;
+  height: 64px;
   padding: 0 4px;
 }
 .wm-center .center-band {
   min-width: 0;
+}
+/*
+ * Com o botão de decisão no meio da faixa, o lugar de "Encerrar turno" não fica reservado: aqui a faixa
+ * é estreita (está entre as duas etiquetas) e essa largura é a que falta para o confronto e o botão
+ * caberem lado a lado, numa linha só.
+ */
+.wm-center .end-turn.placeholder {
+  display: none;
+}
+.wm-center .band-middle.with-decision {
+  gap: 12px;
 }
 .wm-center .banner {
   position: static;
