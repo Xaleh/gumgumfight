@@ -21,6 +21,7 @@ const GROUPS: { title: MessageKey; rows: Row[] }[] = [
       { keys: ['Enter'], text: 'shortcuts.confirm' },
       { keys: ['Esc'], text: 'shortcuts.cancel' },
       { keys: ['1', '9'], join: '…', text: 'shortcuts.options' },
+      { keys: ['M'], text: 'shortcuts.peek' },
     ],
   },
   {

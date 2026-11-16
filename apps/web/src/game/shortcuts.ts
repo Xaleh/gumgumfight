@@ -25,7 +25,9 @@ export type Shortcut =
   /** H: usa a habilidade da carta escolhida. */
   | { kind: 'ability' }
   /** X: anexa todos os DON!! ativos. */
-  | { kind: 'attachAll' };
+  | { kind: 'attachAll' }
+  /** M: "Ver a mesa" numa pergunta que tem esse botão (recolhe a pergunta); de novo, volta à pergunta. */
+  | { kind: 'peek' };
 
 /** O que os atalhos leem de um `KeyboardEvent`. */
 export interface KeyPress {
@@ -74,6 +76,8 @@ export function readShortcut(e: KeyPress): Shortcut | null {
       return { kind: 'ability' };
     case 'x':
       return { kind: 'attachAll' };
+    case 'm':
+      return { kind: 'peek' };
     default:
       return null;
   }

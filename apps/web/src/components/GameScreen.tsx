@@ -1306,7 +1306,8 @@ function Table({
    * As teclas de carta (Q W E R T e L) escolhem a carta sem abri-la; A, H e X agem sobre a carta escolhida (ou a
    * aberta). Numa escolha de alvo (ataque, efeito, bloqueio, DON!! marcados) a tecla vale como o toque na carta,
    * e passa para a do oponente quando a sua não é uma opção. Enter, o cancelar do Esc e os números numa lista de
-   * opções apertam o botão que está na tela (`data-hotkey`), para valerem só quando ele vale e com as mesmas proteções.
+   * opções e o M ("Ver a mesa") apertam o botão que está na tela (`data-hotkey`), para valerem só quando ele vale e
+   * com as mesmas proteções.
    */
   const onShortcut = (s: Shortcut): boolean => {
     const click = (selector: string) => {
@@ -1333,9 +1334,9 @@ function Table({
         return true;
       case 'confirm':
         // Vale para o que está por cima: a carta aberta, a folha da mão ou, sem nada aberto, a pergunta ou a faixa central.
-        if (zoom) return click('.zoom [data-hotkey="confirm"]');
-        if (sheet) return sheet === 'hand' && click('.sheet [data-hotkey="confirm"]');
-        return click('[data-hotkey="confirm"]');
+        if (zoom) return click('.zoom [data-hotkey~="confirm"]');
+        if (sheet) return sheet === 'hand' && click('.sheet [data-hotkey~="confirm"]');
+        return click('[data-hotkey~="confirm"]');
       case 'cancel':
         if (zoom || sheet || mode) {
           setMode(null);
@@ -1345,7 +1346,7 @@ function Table({
           return true;
         }
         setSelected(null);
-        return click('[data-hotkey="cancel"]') || selected !== null;
+        return click('[data-hotkey~="cancel"]') || selected !== null;
       case 'trash': {
         const player = s.opponent ? top : bottom;
         const open = sheet !== null && typeof sheet === 'object' && sheet.trash === player;
@@ -1356,7 +1357,7 @@ function Table({
       case 'number': {
         if (zoom || sheet) return false;
         // Pergunta com uma lista de opções (qual DON!! devolver, que efeito usar…): o número escolhe a opção.
-        const options = gameRef.current?.querySelectorAll<HTMLButtonElement>('[data-hotkey="option"]');
+        const options = gameRef.current?.querySelectorAll<HTMLButtonElement>('[data-hotkey~="option"]');
         if (options?.length) {
           options[s.n - 1]?.click();
           return s.n <= options.length;
@@ -1377,6 +1378,9 @@ function Table({
         if (marking === 0) return false;
         markDons(marking);
         return true;
+      case 'peek':
+        // "Ver a mesa" da pergunta aberta, ou "Voltar à pergunta" quando ela já está recolhida.
+        return !zoom && !sheet && click('[data-hotkey~="peek"]');
       case 'attack':
         if (sheet || !card || !canAttackWith(card)) return false;
         setMode({ kind: 'attack', attacker: card });
@@ -3001,7 +3005,7 @@ function Prompt(props: {
   const skip = useSkipGuard(props.hidden ? null : pending);
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
   const peekButton = (
-    <button className="btn peek" onClick={() => setPeek(true)} title={t('game.peekTitle')}>
+    <button className="btn peek" data-hotkey="peek" onClick={() => setPeek(true)} title={t('game.peekTitle')}>
       {t('game.peek')}
     </button>
   );
@@ -3012,7 +3016,7 @@ function Prompt(props: {
     return (
       <PromptPill title={title} subtitle={t('game.peekSub')}>
         <div className="btn-row center">
-          <button className="btn primary" data-hotkey="confirm" onClick={() => setPeek(false)}>
+          <button className="btn primary" data-hotkey="confirm peek" onClick={() => setPeek(false)}>
             {t('game.backToQuestion')}
           </button>
         </div>

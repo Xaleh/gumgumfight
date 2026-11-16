@@ -135,6 +135,7 @@ export default {
   'shortcuts.confirm': 'Bestätigt, indem der Hauptbutton auf dem Bildschirm gedrückt wird: „Bestätigen“ bei der Zielwahl, „Bezahlen und nutzen“, „[Trigger] aktivieren“, „Spielen“ auf der geöffneten Karte. In der Verteidigung ist es der große Button („Nicht blocken“, „Kein Counter“).',
   'shortcuts.cancel': 'Bricht ab: schließt die geöffnete Karte oder das Fenster und verlässt den Angriff oder die markierten DON!!. Ist nichts davon offen, wird die laufende Aktion rückgängig gemacht, solange das Spiel es erlaubt.',
   'shortcuts.options': 'Bei einer Frage mit einer Liste von Optionen (welches DON!! zurücklegen, welchen Effekt nutzen) wählt die Zahl die Option an dieser Stelle.',
+  'shortcuts.peek': 'Bei einer Frage mit dem Button „Tisch ansehen“ klappt die Frage ein, damit du Tisch und Hand ansehen kannst. Erneut drücken (oder Enter) führt zurück zur Frage.',
   'shortcuts.characters': 'Wählt einen deiner Charaktere, von links nach rechts. Erneut drücken öffnet die Karte.',
   'shortcuts.leader': 'Wählt deinen Leader.',
   'shortcuts.opponentCard': 'Die Karte des Gegners an derselben Position. Bei der Wahl eines Ziels (eines Angriffs oder eines Effekts) gilt die Taste allein schon für die Karte des Gegners, wenn deine keine Option ist.',

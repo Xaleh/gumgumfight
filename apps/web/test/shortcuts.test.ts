@@ -36,6 +36,10 @@ describe('atalhos de teclado da mesa', () => {
     expect(readShortcut(letter('x'))).toEqual({ kind: 'attachAll' });
   });
 
+  it('M é o "Ver a mesa" da pergunta', () => {
+    expect(readShortcut(letter('m'))).toEqual({ kind: 'peek' });
+  });
+
   it('Caps Lock ligado não muda a tecla', () => {
     expect(readShortcut(letter('A'))).toEqual({ kind: 'attack' });
     expect(readShortcut(letter('Q'))).toEqual({ kind: 'card', slot: 0, opponent: false });

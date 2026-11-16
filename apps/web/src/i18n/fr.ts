@@ -135,6 +135,7 @@ export default {
   'shortcuts.confirm': 'Confirme, en appuyant sur le bouton principal à l’écran : « Confirmer » pour le choix des cibles, « Payer et utiliser », « Activer le [Trigger] », « Jouer » sur la carte ouverte. En défense, c’est le grand bouton (« Ne pas bloquer », « Pas de Counter »).',
   'shortcuts.cancel': 'Annule : ferme la carte ou la fenêtre ouverte et quitte l’attaque ou les DON!! marquées. Sans rien de tout cela, annule l’action en cours, tant que le jeu le permet.',
   'shortcuts.options': 'Dans une question avec une liste d’options (quelle DON!! renvoyer, quel effet utiliser), choisit l’option à cette position.',
+  'shortcuts.peek': 'Dans une question avec le bouton « Voir la table », réduit la question pour que vous puissiez regarder la table et votre main. De nouveau (ou Enter), revient à la question.',
   'shortcuts.characters': 'Choisit l’un de vos Personnages, de gauche à droite. Appuyez de nouveau pour ouvrir la carte.',
   'shortcuts.leader': 'Choisit votre Leader.',
   'shortcuts.opponentCard': 'La carte de l’adversaire à la même position. Au moment de choisir une cible (d’une attaque ou d’un effet), la touche seule vaut déjà pour la carte de l’adversaire quand la vôtre n’est pas une option.',

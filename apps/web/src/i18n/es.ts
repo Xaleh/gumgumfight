@@ -135,6 +135,7 @@ export default {
   'shortcuts.confirm': 'Confirma, pulsando el botón principal que está en pantalla: "Confirmar" al elegir objetivos, "Pagar y usar", "Activar [Trigger]", "Jugar" en la carta abierta. Al defender es el botón grande ("No bloquear", "Sin Counter").',
   'shortcuts.cancel': 'Cancela: cierra la carta o la ventana abierta y sale del ataque o de los DON!! marcados. Sin nada de eso, deshace la acción en curso, mientras el juego lo permita.',
   'shortcuts.options': 'En una pregunta con una lista de opciones (qué DON!! devolver, qué efecto usar), elige la opción en esa posición.',
+  'shortcuts.peek': 'En una pregunta con el botón "Ver la mesa", pliega la pregunta para que veas la mesa y tu mano. De nuevo (o Enter), vuelve a la pregunta.',
   'shortcuts.characters': 'Elige uno de tus Personajes, de izquierda a derecha. Pulsar de nuevo abre la carta.',
   'shortcuts.leader': 'Elige tu Líder.',
   'shortcuts.opponentCard': 'La carta del rival en la misma posición. Al elegir un objetivo (de un ataque o de un efecto), la tecla sola ya vale para la carta del rival cuando la tuya no es una opción.',

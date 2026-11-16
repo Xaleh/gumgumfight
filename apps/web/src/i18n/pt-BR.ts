@@ -135,6 +135,7 @@ const ptBR = {
   'shortcuts.confirm': 'Confirma, apertando o botão principal que está na tela: "Confirmar" na escolha de alvos, "Pagar e usar", "Ativar [Trigger]", "Jogar" na carta aberta. Na defesa é o botão grande ("Não bloquear", "Não usar Counter").',
   'shortcuts.cancel': 'Cancela: fecha a carta ou a janela aberta e sai do ataque ou dos DON!! marcados. Sem nada disso, desfaz a ação em andamento, enquanto o jogo deixa.',
   'shortcuts.options': 'Numa pergunta com uma lista de opções (qual DON!! devolver, que efeito usar), escolhe a opção nessa posição.',
+  'shortcuts.peek': 'Numa pergunta com o botão "Ver a mesa", recolhe a pergunta para você olhar a mesa e a mão. De novo (ou Enter), volta à pergunta.',
   'shortcuts.characters': 'Escolhe um Personagem seu, da esquerda para a direita. Apertar de novo abre a carta.',
   'shortcuts.leader': 'Escolhe o seu Líder.',
   'shortcuts.opponentCard': 'A carta do oponente na mesma posição. Na hora de escolher um alvo (de um ataque ou de um efeito), a tecla sozinha já vale para a carta do oponente quando a sua não é uma opção.',

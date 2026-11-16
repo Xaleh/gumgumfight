@@ -135,6 +135,7 @@ export default {
   'shortcuts.confirm': 'Confirms by pressing the main button on screen: "Confirm" when choosing targets, "Pay and use", "Activate [Trigger]", "Play" on the open card. When defending it is the big button ("Don\'t block", "No Counter").',
   'shortcuts.cancel': 'Cancels: closes the open card or window and leaves the attack or the marked DON!!. With none of those, undoes the action in progress, while the game still allows it.',
   'shortcuts.options': 'In a question with a list of options (which DON!! to return, which effect to use), chooses the option in that position.',
+  'shortcuts.peek': 'In a question with the "See the table" button, collapses the question so you can look at the table and your hand. Press again (or Enter) to go back to the question.',
   'shortcuts.characters': 'Picks one of your Characters, from left to right. Press again to open the card.',
   'shortcuts.leader': 'Picks your Leader.',
   'shortcuts.opponentCard': "The opponent's card in the same position. When choosing a target (of an attack or an effect), the key alone already picks the opponent's card when yours is not an option.",
