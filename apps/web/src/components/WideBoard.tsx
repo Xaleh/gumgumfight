@@ -8,7 +8,7 @@
 // `.hand.bottom`) continuam os mesmos.
 
 import { MAX_CHARACTERS, type GameState, type PlayerId } from '@gumgum/engine';
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { baseOrder, type BaseItem, type EffectiveLayout, measureLayout, SIZE_K, WIDE } from '../game/boardLayout';
 import { useT } from '../i18n';
 import {
@@ -188,6 +188,32 @@ function Half({
 /** Até quantas vezes a mesa aperta a conta quando, mesmo assim, algo passou da tela. */
 const FIT_PASSES = 4;
 
+/**
+ * Quanto a mesa passou da tela, em px, pelas caixas de layout dos blocos: a coluna do meio (a mesa e as
+ * faixas das mãos) contra a altura e a largura dela, e cada lateral (os botões, as mãos) contra a altura dela.
+ *
+ * Não usa `scrollHeight` / `scrollWidth` porque eles contam o que sai da caixa por `transform`: a carta da
+ * mão erguida pelo mouse, o leque girado, uma carta em animação. Com eles, passar o mouse na mão encolhia
+ * a mesa inteira. O hover e o histórico (o meio da lateral) cedem espaço e também não entram na conta.
+ */
+function overflow(mat: HTMLElement): { h: number; w: number } {
+  let h = 0;
+  let w = 0;
+  const col = mat.querySelector<HTMLElement>(':scope > .wm-col');
+  if (col) {
+    const blocks = Array.from(col.children) as HTMLElement[];
+    const gap = parseFloat(getComputedStyle(col).rowGap) || 0;
+    h = blocks.reduce((sum, el) => sum + el.offsetHeight, gap * Math.max(0, blocks.length - 1)) - col.clientHeight;
+    w = Math.max(0, ...blocks.map((el) => el.offsetWidth)) - col.clientWidth;
+  }
+  mat.querySelectorAll<HTMLElement>(':scope > .wm-side').forEach((side) => {
+    // Os blocos da lateral empilham de cima para baixo: o último é o que passa da borda de baixo.
+    const last = side.lastElementChild as HTMLElement | null;
+    if (last) h = Math.max(h, last.offsetTop + last.offsetHeight - side.clientHeight);
+  });
+  return { h, w };
+}
+
 export function WideBoard({
   state,
   bottom,
@@ -215,46 +241,54 @@ export function WideBoard({
   const top = (bottom === 0 ? 1 : 0) as PlayerId;
   const m = measureLayout(layout);
   const root = useRef<HTMLDivElement>(null);
-  /** Rede de segurança: fator que aperta `rows`/`cols` quando a mesa medida passou da tela. */
+  /**
+   * Rede de segurança: fator que aperta `rows`/`cols` quando a mesa medida passou da tela. Só recomeça
+   * quando o layout ou o tamanho da coluna mudam: nada do que acontece na partida (cartas na mão, a etapa
+   * de Counter, o mouse numa carta) muda a altura dos blocos, então o tamanho das cartas não muda no meio dela.
+   */
   const [fit, setFit] = useState({ rows: 1, cols: 1, pass: 0 });
-  const fitKey = `${JSON.stringify(layout)}|${state.players[bottom].hand.length}|${state.players[top].hand.length}`;
+  const fitKey = JSON.stringify(layout);
   const lastKey = useRef(fitKey);
   if (lastKey.current !== fitKey) {
     lastKey.current = fitKey;
     if (fit.pass !== 0) setFit({ rows: 1, cols: 1, pass: 0 });
   }
-  // Depois dos layout effects do pai: a coluna da mesa já mediu e gravou --bw/--bh (useBoardSize), que o
-  // --cw usa; antes disso a conta sairia do tamanho da janela inteira e apertaria à toa.
-  useEffect(() => {
+  // Antes de pintar: as passadas do aperto não aparecem na tela como cartas encolhendo aos poucos.
+  useLayoutEffect(() => {
     const el = root.current;
     const col = el?.parentElement;
     if (!el || !col) return;
-    // A coluna ainda sem medida (montada depois do useBoardSize dela): mede aqui, senão o --cw sairia da janela inteira.
+    // A coluna ainda sem medida (o useBoardSize dela é do pai e roda depois deste efeito): mede aqui, senão o --cw sairia da janela inteira.
     if (!col.style.getPropertyValue('--bh')) {
       col.style.setProperty('--bw', `${col.clientWidth}px`);
       col.style.setProperty('--bh', `${col.clientHeight}px`);
       col.toggleAttribute('data-landscape', col.clientWidth >= col.clientHeight);
-      setFit((f) => ({ ...f }));
-      return;
     }
     // Sem espaço de verdade (a caixa ainda sem altura, uma aba escondida), não há o que medir.
     if (fit.pass >= FIT_PASSES || el.clientHeight < 120 || el.clientWidth < 240) return;
-    const overH = el.scrollHeight - el.clientHeight;
-    const overW = el.scrollWidth - el.clientWidth;
-    if (overH <= 1 && overW <= 1) return;
+    const over = overflow(el);
+    if (over.h <= 1 && over.w <= 1) return;
     // Aperta na proporção do que passou (no máximo o dobro por vez).
-    const by = (over: number, size: number) => Math.min(2, 1 + over / size) * 1.02;
+    const by = (px: number, size: number) => Math.min(2, 1 + px / size) * 1.02;
     setFit((f) => ({
-      rows: overH > 1 ? f.rows * by(overH, el.clientHeight) : f.rows,
-      cols: overW > 1 ? f.cols * by(overW, el.clientWidth) : f.cols,
+      rows: over.h > 1 ? f.rows * by(over.h, el.clientHeight) : f.rows,
+      cols: over.w > 1 ? f.cols * by(over.w, el.clientWidth) : f.cols,
       pass: f.pass + 1,
     }));
   });
-  // A janela mudou de tamanho: a conta recomeça do zero.
+  // A janela mudou de tamanho: a conta recomeça do zero (e mede de novo, mesmo sem aperto antes).
   useLayoutEffect(() => {
     const el = root.current?.parentElement;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => setFit((f) => (f.pass === 0 ? f : { rows: 1, cols: 1, pass: 0 })));
+    let w = el.clientWidth;
+    let h = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      // O observer avisa uma vez ao começar a observar, com o tamanho de sempre: não é mudança.
+      if (el.clientWidth === w && el.clientHeight === h) return;
+      w = el.clientWidth;
+      h = el.clientHeight;
+      setFit({ rows: 1, cols: 1, pass: 0 });
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
