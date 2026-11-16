@@ -865,6 +865,14 @@ administração, o funil anônimo das lições (onde as pessoas desistem). Detal
   "Ver mão" continua abrindo a mão inteira em tamanho grande.
 - **Animações** (Configurações ou menu da partida): **Completas**, **Suaves** (as cartas só vão de um lugar ao outro,
   sem as paradas no centro da mesa nem a faixa animada de troca de turno) ou **Desligadas**.
+- **Atalhos de teclado** (Configurações ou menu da partida, desligados por padrão; **Ver atalhos** mostra a lista):
+  **Espaço** encerra o turno, **Enter** confirma (o botão principal que está na tela) e **Esc** cancela. **Q W E R T**
+  escolhem os seus Personagens, da esquerda para a direita, e **L** o Líder (com **Shift**, a carta do oponente; na
+  escolha de um alvo a tecla sozinha já vale para a carta do oponente quando a sua não é uma opção). Com a carta
+  escolhida, **A** ataca, **H** usa a habilidade e **X** anexa todos os DON!! ativos. Os **números** marcam essa
+  quantidade de DON!! (0 = 10), que vão para a carta da tecla seguinte, e respondem as perguntas com uma lista de
+  opções. **D** abre o seu descarte e **O** o do oponente. Exemplo: `Q`, `X`, `A`, `L` anexa todos os DON!! ao 1º
+  Personagem e ataca o Líder do oponente. Os atalhos não valem enquanto se escreve (chat, apelido) nem no tutorial.
 - **Desfazer** volta para antes da sua última ação. **Replay** baixa um `.json` com a seed, as listas dos decks e todas as ações.
 - **Assistir replay** (no topo da página inicial e no menu): carregue o `.json` (escolher ou arrastar), veja o resumo
   (jogadores, Líderes, ações, turnos e, se quiser, o resultado) e assista no modo **automático** ou **passo a passo**.

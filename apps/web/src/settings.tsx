@@ -6,6 +6,7 @@ import { BoardLayoutEditor } from './components/BoardLayoutEditor';
 import { ConnectedApps } from './components/ConnectedApps';
 import { Flag } from './components/Flags';
 import { InstallButton } from './components/Install';
+import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { type BoardLayout, type BoardStyle, DEFAULT_LAYOUT, DEFAULT_STYLE, parseLayout, parseStyle } from './game/boardLayout';
 import { DEFAULT_LOCALE, detectLocale, I18nProvider, isLocale, type Locale, LOCALES, type MessageKey, useT } from './i18n';
 import { notificationPermission, pushSupport, syncPush, useInstallMode, wakeLockSupported } from './pwa';
@@ -43,6 +44,8 @@ export interface Settings {
   quickCounter: boolean;
   /** DON!! em um toque: tocar no 3º DON!! marca os 3 primeiros (desligado, cada toque marca ou desmarca um só). */
   donQuickPick: boolean;
+  /** Atalhos de teclado na mesa (Espaço encerra o turno, Q W E R T escolhem os Personagens…); ver `game/shortcuts.ts`. */
+  shortcuts: boolean;
   /** Cartas voando pela mesa, destaques no centro, faixa de turno e sorteio com dados: tudo, só o essencial ou nada. */
   animations: Animations;
   /** Replay: mostra o clique/seleção do jogador (contorno, toque e legenda) antes de cada ação. */
@@ -87,6 +90,7 @@ const EDITABLE: Editable[] = [
   'confirmActions',
   'quickCounter',
   'donQuickPick',
+  'shortcuts',
   'animations',
   'replayCues',
   'coachTips',
@@ -121,6 +125,7 @@ const DEFAULTS: Settings = {
   confirmActions: true,
   quickCounter: false,
   donQuickPick: false,
+  shortcuts: false,
   animations: 'full',
   replayCues: true,
   coachTips: false,
@@ -182,6 +187,7 @@ function load(): Settings {
       streamerPlaymat: PLAYMATS.includes(saved.streamerPlaymat as Playmat) ? (saved.streamerPlaymat as Playmat) : 'navy',
       sidePanel: saved.sidePanel !== false,
       confirmActions: saved.confirmActions !== false,
+      shortcuts: saved.shortcuts === true,
       boardStyle: parseStyle(saved.boardStyle, saved.boardLayout),
       boardLayout: parseLayout(saved.boardLayout),
       serverImages: false,
@@ -407,6 +413,21 @@ function VolumeControl({ kind }: { kind: 'sfxVolume' | 'musicVolume' }) {
   );
 }
 
+/** "Ver atalhos": abre a lista dos atalhos de teclado por cima de onde estiver (Configurações ou o menu da partida). */
+function ShortcutsButton({ className }: { className: string }) {
+  const s = useSettings();
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={className} onClick={() => setOpen(true)}>
+        {t('settings.shortcutsShow')}
+      </button>
+      {open && <ShortcutsHelp enabled={s.shortcuts} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 /** Uma opção do modal: título e explicação à esquerda, controle à direita. */
 function OptionRow({ title, hint, disabled, children }: { title: string; hint?: string; disabled?: boolean; children?: ReactNode }) {
   return (
@@ -487,6 +508,11 @@ export function NicknameField({ compact }: { compact?: boolean }) {
   );
 }
 
+/** O aparelho tem mouse ou trackpad (um PC): onde os atalhos de teclado fazem sentido. */
+function finePointer(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(any-pointer: fine)').matches;
+}
+
 /** Controles compactos de idioma, tema, imagens, Counter e animações (menu da partida). */
 export function SettingsControls() {
   const s = useSettings();
@@ -534,6 +560,16 @@ export function SettingsControls() {
         <input type="checkbox" checked={s.donQuickPick} onChange={(e) => s.update({ donQuickPick: e.target.checked })} />
         {t('settings.donQuickPick')}
       </label>
+      {/* Só onde há mouse (PC): no celular não há teclado para os atalhos. */}
+      {finePointer() && (
+        <span className="shortcuts-setting">
+          <label className="check" title={t('settings.shortcutsHint')}>
+            <input type="checkbox" checked={s.shortcuts} onChange={(e) => s.update({ shortcuts: e.target.checked })} />
+            {t('settings.shortcuts')}
+          </label>
+          <ShortcutsButton className="shortcuts-link" />
+        </span>
+      )}
       <label className="check" title={t('settings.replayCuesTitle')}>
         <input type="checkbox" checked={s.replayCues} onChange={(e) => s.update({ replayCues: e.target.checked })} />
         {t('settings.replayCues')}
@@ -692,6 +728,12 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </OptionRow>
             <OptionRow title={t('settings.donQuickPick')} hint={t('settings.donQuickPickHint')}>
               <Switch on={s.donQuickPick} label={t('settings.donQuickPick')} onChange={(on) => s.update({ donQuickPick: on })} />
+            </OptionRow>
+            <OptionRow title={t('settings.shortcuts')} hint={t('settings.shortcutsHint')}>
+              <div className="option-controls">
+                <ShortcutsButton className="btn small" />
+                <Switch on={s.shortcuts} label={t('settings.shortcuts')} onChange={(on) => s.update({ shortcuts: on })} />
+              </div>
             </OptionRow>
             <OptionRow title={t('settings.animations')} hint={t('settings.animationsHint')}>
               <AnimationsSeg />

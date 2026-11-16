@@ -403,7 +403,7 @@ numa notificação: a partida online, se ainda estiver em `/api/online/active`, 
 | Chave | Conteúdo |
 |---|---|
 | `localStorage.gumgum.owner` | token do dono dos decks/perfil (sem login) |
-| `localStorage.gumgum.settings` | `{locale, images, confirmActions (desligado: a escolha de alvos sai sem o botão "Confirmar" e o Counter é usado no toque), quickCounter, animations (`'full' \| 'soft' \| 'off'`; o `true`/`false` antigo é migrado), replayCues, theme, opponentChat, sfxVolume, musicVolume, keepAwake, notify, notifyMatches, notifyTournaments}` (`lang: 'pt'\|'en'` antigo é migrado para `locale`) |
+| `localStorage.gumgum.settings` | `{locale, images, confirmActions (desligado: a escolha de alvos sai sem o botão "Confirmar" e o Counter é usado no toque), quickCounter, shortcuts (atalhos de teclado na mesa, desligados por padrão; as teclas em `game/shortcuts.ts`, o que cada uma faz em `onShortcut` no `GameScreen.tsx`), animations (`'full' \| 'soft' \| 'off'`; o `true`/`false` antigo é migrado), replayCues, theme, opponentChat, sfxVolume, musicVolume, keepAwake, notify, notifyMatches, notifyTournaments}` (`lang: 'pt'\|'en'` antigo é migrado para `locale`) |
 | `localStorage.gumgum.installDismissed` | quando o convite de instalação foi dispensado ("Agora não" esconde por 30 dias) |
 | Cache Storage `gumgum-<versão>` | casca do app guardada pelo service worker |
 | `localStorage.gumgum.lastDecks`, `gumgum.format` | últimos decks e formato escolhidos |

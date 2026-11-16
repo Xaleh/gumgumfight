@@ -5215,6 +5215,113 @@ button.hint-pill::after,
 .option-row .seg.small {
   flex: none;
 }
+/* dois controles na mesma opção (ex.: "Ver atalhos" e o interruptor) */
+.option-controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* atalhos de teclado: a opção no menu da partida e a janela com a lista */
+.shortcuts-setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shortcuts-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* por cima da janela (ou do menu da partida) de onde foi aberta */
+.modal-backdrop.shortcuts-backdrop {
+  z-index: 70;
+}
+.page-sheet .sheet.shortcuts-sheet {
+  width: min(560px, 100%);
+}
+.shortcuts-group h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.shortcuts-group dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.shortcut-row:first-child {
+  border-top: 0;
+}
+.shortcut-row dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.shortcut-row dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.shortcut-join {
+  margin-right: 4px;
+  color: var(--muted);
+  font-weight: 800;
+}
+.shortcuts-sheet kbd {
+  display: inline-block;
+  min-width: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-bottom-width: 3px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+}
+.shortcuts-example,
+.shortcuts-off {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.shortcuts-off {
+  border: 1px solid var(--line);
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .shortcut-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
 .switch {
   position: relative;
   flex: none;
