@@ -1,7 +1,8 @@
 // Seletor de deck para jogar (menu, treino contra o robô, sala privada, torneio): abas
 // (recentes, favoritos, meus, comunidade, prontos), busca, filtro por cor e ordenação; ao lado,
-// a prévia do deck escolhido (Líder, formatos, curva, principais cartas). Os decks que não valem
-// nas regras de quem pede ficam no fim, recolhidos, com o motivo escrito.
+// a prévia do deck escolhido (Líder, formatos, curva, principais cartas). Abre em "Meus decks"
+// quando a pessoa tem algum. Os decks que não valem nas regras de quem pede ficam no fim,
+// recolhidos, com o motivo escrito.
 
 import { type CardData, DECK_SIZE, FORMATS, withArt } from '@gumgum/engine';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -148,7 +149,7 @@ export function DeckPicker({
 }) {
   const t = useT();
   const [local] = useState(() => new Map(localRecent()));
-  const [tab, setTab] = useState<DeckTab>(() => initialTab(decks, local, value));
+  const [tab, setTab] = useState<DeckTab>(() => initialTab(decks, local, value, !allowRandom));
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<DeckSort>('recent');
   const [colors, setColors] = useState<string[]>([]);

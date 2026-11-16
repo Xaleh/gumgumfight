@@ -1,11 +1,11 @@
 // Confirmação do deck antes de entrar na partida (filas, sala privada, treino contra o bot e
 // revanche): o deck que vai ser usado, se ele vale nas regras do modo, a curva e a troca rápida
-// pelos recentes ou pelo seletor completo. Desligável nas configurações (`confirmDeck`).
+// pelos decks de quem vai jogar ou pelo seletor completo. Desligável nas configurações (`confirmDeck`).
 
 import { type CardData } from '@gumgum/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type DeckSummary } from '../api';
-import { deckNumbers, type DeckNumbers, lastUsed, localRecent, rememberDeck, sortDecks } from '../deckLibrary';
+import { deckNumbers, type DeckNumbers, localRecent, quickSwap, rememberDeck } from '../deckLibrary';
 import { useT } from '../i18n';
 import { useSettings } from '../settings';
 import { DeckPicker } from './DeckPicker';
@@ -13,7 +13,7 @@ import { CostCurve, LeaderBanner, useFavoriteToggle } from './DeckTile';
 import { DeckViewer } from './DeckViewer';
 import { Icon } from './Icons';
 
-/** Quantos decks recentes aparecem na troca rápida. */
+/** Quantos decks aparecem na troca rápida. */
 const QUICK_SWAP = 3;
 
 export function DeckConfirm({
@@ -90,14 +90,7 @@ export function DeckConfirm({
   const current = decks.find((d) => d.id === selected);
   const why = current ? whyFor(current) : null;
   const rival = opponent?.deckId ? decks.find((d) => d.id === opponent.deckId) : undefined;
-  const recent = useMemo(() => {
-    const local = new Map(localRecent());
-    return sortDecks(
-      decks.filter((d) => d.id !== selected && lastUsed(d, local) > 0 && !whyFor(d)),
-      'recent',
-      local,
-    ).slice(0, QUICK_SWAP);
-  }, [decks, selected, whyFor]);
+  const recent = useMemo(() => quickSwap(decks, new Map(localRecent()), selected, (d) => !whyFor(d), QUICK_SWAP), [decks, selected, whyFor]);
 
   const confirm = () => {
     if (dontAsk) settings.update({ confirmDeck: false });
