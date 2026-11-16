@@ -675,7 +675,13 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, boardStyle, boardLayout, update: updateSettings } = useSettings();
+  const { quickCounter: quickCounterOn, confirmActions, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, boardStyle, boardLayout, update: updateSettings } = useSettings();
+  /**
+   * "Confirmar ações" desligado: a escolha de alvos sai assim que estiver completa (sem o botão "Confirmar") e o
+   * Counter é usado no toque. No tutorial as lições descrevem o botão: ali a confirmação fica sempre.
+   */
+  const quickChoice = !confirmActions && !tutorial;
+  const quickCounter = quickCounterOn || quickChoice;
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -1095,7 +1101,7 @@ function Table({
   const targetsHint = () => {
     const where = targetsInHand === targets!.options.length ? 'Hand' : targetsInHand > 0 ? 'BoardOrHand' : 'Board';
     const ordered = targets!.ordered ? 'Ordered' : '';
-    return t(`game.hintTargets${where}${ordered}` as const);
+    return t(`game.hintTargets${where}${ordered}${quickChoice ? 'Quick' : ''}` as const);
   };
   const handHint =
     defense?.kind === 'block'
@@ -1167,9 +1173,14 @@ function Table({
   const onCard = (uid: string) => {
     if (myPending) {
       if (myPending.kind === 'selectTargets' && myPending.options.includes(uid)) {
-        setPicked((p) =>
-          p.includes(uid) ? p.filter((x) => x !== uid) : myPending.max === 1 ? [uid] : p.length < myPending.max ? [...p, uid] : p,
-        );
+        const p = picked;
+        const next = p.includes(uid) ? p.filter((x) => x !== uid) : myPending.max === 1 ? [uid] : p.length < myPending.max ? [...p, uid] : p;
+        setPicked(next);
+        // Sem "Confirmar ações": a escolha completa (todos os alvos que dá para marcar) sai na hora. Com menos
+        // do que o máximo ("até 2", marcou 1), o botão de confirmar continua valendo.
+        if (quickChoice && next.length > p.length && next.length === Math.min(myPending.max, myPending.options.length)) {
+          dispatch({ type: 'choose', player: human!, uids: next });
+        }
         return;
       }
       if (myPending.kind === 'block' && myPending.options.includes(uid)) {
@@ -1749,6 +1760,7 @@ function Table({
           onDispatch={dispatch}
           onCancel={canCancel ? cancelAction : undefined}
           cancelHint={cancelHint}
+          quick={quickChoice}
           onCard={onCard}
           highlight={highlight}
         />
@@ -1788,6 +1800,7 @@ function Table({
               setSelected(null);
             }}
             donCount={mode?.kind === 'don' ? mode.picked.length : 0}
+            attachAll={!tutorial}
             onAttachDons={(target, n) => {
               attachDons(target, n);
               setMode(null);
@@ -2811,6 +2824,8 @@ function Prompt(props: {
   onCancel?: () => void;
   /** Por que não dá mais para cancelar (ex.: carta revelada). */
   cancelHint?: string | null;
+  /** "Confirmar ações" desligado: a escolha completa sai no toque (ver `quickChoice`). */
+  quick?: boolean;
   onCard: (uid: string) => void;
   highlight: (uid: string) => Highlight;
 }) {
@@ -2976,7 +2991,7 @@ function Prompt(props: {
                   : pending.ordered
                     ? t('game.tapInOrder')
                     : pending.max === 1
-                      ? t('game.tapOneConfirm')
+                      ? t(props.quick ? 'game.tapOneQuick' : 'game.tapOneConfirm')
                       : t('game.tapToChoose')}
                 {blocked > 0 && ` ${t('game.dimmedUnavailable')}`}
               </p>
@@ -3183,6 +3198,8 @@ function CardZoom(props: {
   onDispatch: (a: Action) => void;
   /** DON!! marcados na fileira: o botão de anexar passa a anexar todos eles nesta carta. */
   donCount: number;
+  /** Mostra também "Anexar todos os N DON!!" (fora do tutorial, que ensina um DON!! de cada vez). */
+  attachAll?: boolean;
   onAttachDons: (target: string, count: number) => void;
   onAttackMode: (attacker: string) => void;
 }) {
@@ -3200,6 +3217,7 @@ function CardZoom(props: {
   const detach = legal.find((a) => a.type === 'detachDon' && a.target === uid);
   const loose = loc?.fc.donLoose ?? 0;
   const owner = state.cards[uid].owner;
+  const donActive = state.players[owner].donActive;
   const isEvent = def.category === 'event';
   // Eventos: usar a carta (ou o Counter dela) é o texto dela, destacado sobre a carta.
   const eventPlay = isEvent ? play : undefined;
@@ -3311,6 +3329,12 @@ function CardZoom(props: {
               >
                 {props.donCount > 1 ? t('game.attachDons', { n: props.donCount }) : t('game.attachOneDon')}{' '}
                 <small>{t('game.donActiveCount', { n: state.players[owner].donActive })}</small>
+              </button>
+            )}
+            {/* Todos os DON!! ativos de uma vez nesta carta (some quando o botão de cima já faz isso). */}
+            {attach && props.attachAll && donActive > Math.max(1, props.donCount) && (
+              <button className={hasPlates ? 'btn small quiet' : 'btn don big'} onClick={() => props.onAttachDons(uid, donActive)}>
+                {t('game.attachAllDons', { n: donActive })}
               </button>
             )}
             {detach && (
