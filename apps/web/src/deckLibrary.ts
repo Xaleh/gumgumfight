@@ -52,7 +52,7 @@ export function inTab(deck: DeckSummary, tab: DeckTab, local: ReadonlyMap<string
     case 'favorites':
       return Boolean(deck.favorite);
     case 'mine':
-      return deck.kind === 'user' && deck.mine;
+      return isOwn(deck);
     case 'community':
       return deck.kind === 'user' && !deck.mine;
     case 'meta':
@@ -93,19 +93,38 @@ export function sortDecks(decks: DeckSummary[], sort: DeckSort, local: ReadonlyM
   return [...decks].sort(cmp[sort]);
 }
 
+/** Decks de quem está olhando (os que ele montou). */
+const isOwn = (d: DeckSummary) => d.kind === 'user' && d.mine;
+
 /**
- * Aba aberta de início: a que mostra o deck já escolhido (`current`), se houver; senão os
- * recentes; senão os meus; senão os prontos.
+ * Aba aberta de início. Escolhendo o próprio deck (`own`), "Meus decks" sempre que a pessoa tem
+ * algum. Sem deck próprio, ou escolhendo o deck do oponente do treino: a aba que mostra o deck
+ * já escolhido (`current`), se houver; senão os recentes; senão os meus; senão os prontos.
  */
-export function initialTab(decks: DeckSummary[], local: ReadonlyMap<string, number>, current?: string): DeckTab {
+export function initialTab(decks: DeckSummary[], local: ReadonlyMap<string, number>, current?: string, own = true): DeckTab {
+  if (own && decks.some(isOwn)) return 'mine';
   const chosen = current ? decks.find((d) => d.id === current) : undefined;
   if (chosen) {
     const tab = (['recent', 'favorites', 'mine', 'community', 'meta', 'builtin'] as const).find((t) => inTab(chosen, t, local));
     if (tab) return tab;
   }
   if (decks.some((d) => lastUsed(d, local) > 0)) return 'recent';
-  if (decks.some((d) => d.kind === 'user' && d.mine)) return 'mine';
+  if (decks.some(isOwn)) return 'mine';
   return 'builtin';
+}
+
+/**
+ * Troca rápida na confirmação do deck: os decks de quem vai jogar que valem no modo (`canUse`),
+ * o usado por último antes, sem o já escolhido. Quem não montou nenhum deck vê os que usou por
+ * último (prontos ou da comunidade).
+ */
+export function quickSwap(decks: DeckSummary[], local: ReadonlyMap<string, number>, selected: string, canUse: (d: DeckSummary) => boolean, n = 3): DeckSummary[] {
+  const pool = decks.some(isOwn) ? decks.filter(isOwn) : decks.filter((d) => lastUsed(d, local) > 0);
+  return sortDecks(
+    pool.filter((d) => d.id !== selected && canUse(d)),
+    'recent',
+    local,
+  ).slice(0, n);
 }
 
 /**

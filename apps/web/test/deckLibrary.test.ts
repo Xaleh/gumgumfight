@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { CardData } from '@gumgum/engine';
 import { describe, expect, it } from 'vitest';
 import type { DeckSummary } from '../src/api';
-import { deckNumbers, deckState, deckTime, initialTab, inTab, matchesColors, matchesQuery, sortDecks, topCards } from '../src/deckLibrary';
+import { deckNumbers, deckState, deckTime, initialTab, inTab, matchesColors, matchesQuery, quickSwap, sortDecks, topCards } from '../src/deckLibrary';
 
 const deck = (over: Partial<DeckSummary>): DeckSummary => ({
   id: 'x',
@@ -54,10 +54,50 @@ describe('abas, busca e cores', () => {
     expect(matchesColors(other, [])).toBe(true);
   });
 
-  it('abre em Recentes quando há, senão Meus decks, senão Prontos', () => {
-    expect(initialTab([mine, other, builtin], NONE)).toBe('recent');
-    expect(initialTab([mine, other], NONE)).toBe('mine');
+  it('escolhendo o próprio deck, abre em Meus decks sempre que a pessoa tem algum', () => {
+    expect(initialTab([mine, other, builtin], NONE)).toBe('mine');
+    // Mesmo com um deck pronto equipado e usado há pouco.
+    expect(initialTab([mine, other, builtin], NONE, 'c')).toBe('mine');
+    expect(initialTab([mine, other], NONE, 'b')).toBe('mine');
+  });
+
+  it('sem deck próprio: a aba do deck escolhido, senão Recentes, senão Prontos', () => {
+    expect(initialTab([other, builtin], NONE, 'b')).toBe('favorites');
+    expect(initialTab([other, builtin], NONE)).toBe('recent');
     expect(initialTab([other], NONE)).toBe('builtin');
+  });
+
+  it('deck do oponente do treino: a aba do deck escolhido, senão Recentes, senão Meus decks', () => {
+    expect(initialTab([mine, other, builtin], NONE, 'c', false)).toBe('recent');
+    expect(initialTab([mine, other, builtin], NONE, undefined, false)).toBe('recent');
+    expect(initialTab([mine, other], NONE, undefined, false)).toBe('mine');
+  });
+});
+
+describe('troca rápida', () => {
+  const m1 = deck({ id: 'm1', name: 'Meu 1', lastPlayedAt: '2026-10-05 00:00:00' });
+  const m2 = deck({ id: 'm2', name: 'Meu 2', updatedAt: '2026-10-09 00:00:00' });
+  const m3 = deck({ id: 'm3', name: 'Meu 3', lastPlayedAt: '2026-10-08 00:00:00' });
+  const m4 = deck({ id: 'm4', name: 'Meu 4', valid: false });
+  const community = deck({ id: 'o', mine: false, lastPlayedAt: '2026-10-20 00:00:00' });
+  const builtin = deck({ id: 'p', kind: 'builtin', mine: false, lastPlayedAt: '2026-10-21 00:00:00' });
+  const valid = (d: DeckSummary) => d.valid;
+  const ids = (ds: DeckSummary[]) => ds.map((d) => d.id);
+
+  it('só os decks de quem vai jogar, o usado por último antes, sem o escolhido nem os que não valem', () => {
+    expect(ids(quickSwap([m1, m2, m3, m4, community, builtin], NONE, 'p', valid))).toEqual(['m3', 'm1', 'm2']);
+    expect(ids(quickSwap([m1, m2, m3, m4, community, builtin], NONE, 'm3', valid))).toEqual(['m1', 'm2']);
+    expect(ids(quickSwap([m1, m2, m3, community, builtin], NONE, 'p', valid, 2))).toEqual(['m3', 'm1']);
+  });
+
+  it('a escolha neste navegador conta como uso', () => {
+    const local = new Map([['m2', deckTime('2026-10-30 00:00:00')]]);
+    expect(ids(quickSwap([m1, m2, m3, community, builtin], local, 'p', valid))).toEqual(['m2', 'm3', 'm1']);
+  });
+
+  it('quem não montou nenhum deck vê os usados por último', () => {
+    const fresh = deck({ id: 'q', kind: 'builtin', mine: false });
+    expect(ids(quickSwap([community, builtin, fresh], NONE, 'q', valid))).toEqual(['p', 'o']);
   });
 });
 
