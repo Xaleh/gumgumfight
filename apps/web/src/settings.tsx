@@ -34,6 +34,11 @@ export interface Settings {
   images: boolean;
   /** O servidor permite imagens? (CARD_IMAGES) */
   serverImages: boolean;
+  /**
+   * Confirmar ações: a escolha de alvos de um efeito só vale no botão "Confirmar". Desligado, vale assim que
+   * estiver completa e a etapa de Counter se comporta como com `quickCounter`.
+   */
+  confirmActions: boolean;
   /** Etapa de Counter: tocar/arrastar usa a carta na hora, sem confirmar. */
   quickCounter: boolean;
   /** DON!! em um toque: tocar no 3º DON!! marca os 3 primeiros (desligado, cada toque marca ou desmarca um só). */
@@ -79,6 +84,7 @@ type Editable = Exclude<keyof Settings, 'serverImages' | 'pushKey'>;
 const EDITABLE: Editable[] = [
   'locale',
   'images',
+  'confirmActions',
   'quickCounter',
   'donQuickPick',
   'animations',
@@ -112,6 +118,7 @@ const DEFAULTS: Settings = {
   locale: DEFAULT_LOCALE,
   images: true,
   serverImages: false,
+  confirmActions: true,
   quickCounter: false,
   donQuickPick: false,
   animations: 'full',
@@ -174,6 +181,7 @@ function load(): Settings {
       streamerLayout: saved.streamerLayout === 'upright' ? 'upright' : 'lateral',
       streamerPlaymat: PLAYMATS.includes(saved.streamerPlaymat as Playmat) ? (saved.streamerPlaymat as Playmat) : 'navy',
       sidePanel: saved.sidePanel !== false,
+      confirmActions: saved.confirmActions !== false,
       boardStyle: parseStyle(saved.boardStyle, saved.boardLayout),
       boardLayout: parseLayout(saved.boardLayout),
       serverImages: false,
@@ -508,8 +516,18 @@ export function SettingsControls() {
         />
         {t('settings.images')}
       </label>
-      <label className="check" title={t('settings.quickCounterTitle')}>
-        <input type="checkbox" checked={s.quickCounter} onChange={(e) => s.update({ quickCounter: e.target.checked })} />
+      <label className="check" title={t('settings.confirmActionsHint')}>
+        <input type="checkbox" checked={s.confirmActions} onChange={(e) => s.update({ confirmActions: e.target.checked })} />
+        {t('settings.confirmActions')}
+      </label>
+      {/* Sem "Confirmar ações", o Counter já sai no toque: a opção fica marcada e travada. */}
+      <label className={['check', s.confirmActions ? '' : 'disabled'].join(' ')} title={t('settings.quickCounterTitle')}>
+        <input
+          type="checkbox"
+          checked={s.quickCounter || !s.confirmActions}
+          disabled={!s.confirmActions}
+          onChange={(e) => s.update({ quickCounter: e.target.checked })}
+        />
         {t('settings.quickCounter')}
       </label>
       <label className="check" title={t('settings.donQuickPickHint')}>
@@ -660,8 +678,17 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             <OptionRow title={t('settings.images')} hint={s.serverImages ? t('settings.imagesHint') : t('settings.imagesOff')} disabled={!s.serverImages}>
               <Switch on={s.showImages} disabled={!s.serverImages} label={t('settings.images')} onChange={(on) => s.update({ images: on })} />
             </OptionRow>
-            <OptionRow title={t('settings.quickCounter')} hint={t('settings.quickCounterHint')}>
-              <Switch on={s.quickCounter} label={t('settings.quickCounter')} onChange={(on) => s.update({ quickCounter: on })} />
+            <OptionRow title={t('settings.confirmActions')} hint={t('settings.confirmActionsHint')}>
+              <Switch on={s.confirmActions} label={t('settings.confirmActions')} onChange={(on) => s.update({ confirmActions: on })} />
+            </OptionRow>
+            {/* Sem "Confirmar ações", o Counter já sai no toque: a opção fica ligada e travada. */}
+            <OptionRow title={t('settings.quickCounter')} hint={t('settings.quickCounterHint')} disabled={!s.confirmActions}>
+              <Switch
+                on={s.quickCounter || !s.confirmActions}
+                disabled={!s.confirmActions}
+                label={t('settings.quickCounter')}
+                onChange={(on) => s.update({ quickCounter: on })}
+              />
             </OptionRow>
             <OptionRow title={t('settings.donQuickPick')} hint={t('settings.donQuickPickHint')}>
               <Switch on={s.donQuickPick} label={t('settings.donQuickPick')} onChange={(on) => s.update({ donQuickPick: on })} />
