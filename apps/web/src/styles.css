@@ -4514,6 +4514,80 @@ button.hint-pill::after,
   font-weight: 900;
   margin-top: 6px;
 }
+/* Pesquisa no histórico: a lupa no canto do quadro; aberta, o campo fica preso no alto enquanto as linhas rolam. */
+.log-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.log-search-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+}
+.log-search-btn:hover,
+.log-search-btn:focus-visible {
+  color: var(--text);
+}
+.log-search:not(.open) .log-search-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+.log-search.open {
+  /* encostado na borda do quadro: o preso conta a partir de dentro do respiro (padding) do `.log` */
+  top: -10px;
+  height: auto;
+  margin: -10px -10px 8px;
+  padding: 8px 8px 6px 10px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  background: var(--panel);
+  color: var(--muted);
+}
+.log-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.log-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+}
+.log-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.log-search-count {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.log-search-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+}
 /* Replay: as linhas da ação atual */
 .log-line.fresh {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
@@ -5214,6 +5288,113 @@ button.hint-pill::after,
 }
 .option-row .seg.small {
   flex: none;
+}
+/* dois controles na mesma opção (ex.: "Ver atalhos" e o interruptor) */
+.option-controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* atalhos de teclado: a opção no menu da partida e a janela com a lista */
+.shortcuts-setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.shortcuts-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* por cima da janela (ou do menu da partida) de onde foi aberta */
+.modal-backdrop.shortcuts-backdrop {
+  z-index: 70;
+}
+.page-sheet .sheet.shortcuts-sheet {
+  width: min(560px, 100%);
+}
+.shortcuts-group h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.shortcuts-group dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.shortcut-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.shortcut-row:first-child {
+  border-top: 0;
+}
+.shortcut-row dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.shortcut-row dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.shortcut-join {
+  margin-right: 4px;
+  color: var(--muted);
+  font-weight: 800;
+}
+.shortcuts-sheet kbd {
+  display: inline-block;
+  min-width: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-bottom-width: 3px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+}
+.shortcuts-example,
+.shortcuts-off {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.shortcuts-off {
+  border: 1px solid var(--line);
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .shortcut-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 }
 .switch {
   position: relative;

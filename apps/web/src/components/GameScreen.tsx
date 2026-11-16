@@ -49,6 +49,7 @@ import { enteredWithoutRush } from '../game/freshCharacter';
 import { type LogNames, logCardNames, resolveLogCard } from '../game/logCards';
 import { useMatchAudio } from '../game/useMatchAudio';
 import { type OnlineGame, useOnlineGame } from '../game/useOnlineGame';
+import { type Shortcut, useShortcuts } from '../game/shortcuts';
 import { cardText, PLAYMATS, SettingsControls, useSettings } from '../settings';
 import { Board, HandFan, handIsKnown, vars } from './Board';
 import { WideBoard } from './WideBoard';
@@ -675,13 +676,15 @@ function Table({
    */
   // O replay embutido com `layout=` usa a mesma visão (em pé ou lateral, conforme o link).
   const streamer = (watching || Boolean(embed?.layout)) && !broadcast && wide;
-  const { quickCounter: quickCounterOn, confirmActions, donQuickPick, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, boardStyle, boardLayout, update: updateSettings } = useSettings();
+  const { quickCounter: quickCounterOn, confirmActions, donQuickPick, shortcuts, animations, replayCues, coachTips, locale, streamerLayout, streamerPlaymat, sidePanel, showImages, boardStyle, boardLayout, update: updateSettings } = useSettings();
   /**
    * "Confirmar ações" desligado: a escolha de alvos sai assim que estiver completa (sem o botão "Confirmar") e o
    * Counter é usado no toque. No tutorial as lições descrevem o botão: ali a confirmação fica sempre.
    */
   const quickChoice = !confirmActions && !tutorial;
   const quickCounter = quickCounterOn || quickChoice;
+  /** Atalhos de teclado (ver `onShortcut`). No tutorial as lições descrevem os toques; na transmissão ninguém joga. */
+  const shortcutsOn = shortcuts && !tutorial && !broadcast;
   /** Visão do Streamer: a mesa lateral (jogadores à esquerda e à direita, vista de cima) é o padrão; o menu troca para a mesa em pé. */
   const lateral = streamer && (embed?.layout ? embed.layout === 'lateral' : streamerLayout === 'lateral');
   /** Visão do Streamer: as mãos minimizadas abrem ao clicar quando são conhecidas (no replay, as duas). */
@@ -825,6 +828,9 @@ function Table({
         .sort((a, b) => a.name.localeCompare(b.name)),
     [state.defs],
   );
+  /** Históricos na tela com a pesquisa (a lupa) aberta: enquanto houver um, os atalhos de teclado não valem. */
+  const [logSearches, setLogSearches] = useState(0);
+  const onLogSearching = useCallback((on: boolean) => setLogSearches((n) => Math.max(0, n + (on ? 1 : -1))), []);
   /** Carta citada no histórico, ampliada (toque/clique no nome). */
   const [logCard, setLogCard] = useState<CardDef | null>(null);
   /** Carta da decklist (painel de quem transmite), ampliada por cima da mesa. */
@@ -982,9 +988,11 @@ function Table({
       else if (picked.length !== mode.picked.length) setMode({ ...mode, picked });
     }
   }, [myTurnIdle, state, human, mode]);
+  /** Os atalhos de teclado estão valendo agora: o Esc passa a ser o deles (`onShortcut`). */
+  const shortcutsLive = useRef(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !shortcutsLive.current) {
         setMode(null);
         setSelected(null);
         setZoom(null);
@@ -1016,6 +1024,11 @@ function Table({
     // Só muda na troca de turno (não a cada ação).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turnKey, human]);
+
+  // Atalhos: a carta escolhida num turno não fica valendo para o A, o H e o X do turno seguinte.
+  useEffect(() => {
+    if (shortcutsOn) setSelected(null);
+  }, [turnKey, shortcutsOn]);
 
   // Mostra o resumo logo após o último golpe.
   const over = state.phase === 'gameover';
@@ -1163,7 +1176,8 @@ function Table({
     }
     // DON!! marcados: quem pode recebê-los brilha; o resto da mesa segue com os destaques normais.
     if (mode?.kind === 'don' && canReceiveDon(uid)) return 'option';
-    if (uid === selected && !wide) return null;
+    // Tela estreita: a carta tocada abre por cima da mesa e o contorno não aparece; com os atalhos, a tecla escolhe sem abrir.
+    if (uid === selected && !wide && !shortcutsOn) return null;
     if (uid === selected) return 'selected';
     if (canPlay(uid)) return 'playable';
     if (canAttackWith(uid)) return 'ready';
@@ -1266,6 +1280,158 @@ function Table({
   const donBar = mode?.kind === 'don' && human !== null ? <DonBar count={mode.picked.length} onCancel={() => setMode(null)} /> : null;
   const modeRef = useRef(mode);
   modeRef.current = mode;
+
+  // ------------------------------------------------------------ atalhos de teclado
+
+  const gameRef = useRef<HTMLDivElement>(null);
+  /**
+   * Janelas por cima da mesa com as próprias teclas (o menu, o histórico, o resumo do fim, o relato, a carta
+   * ampliada do histórico, as cartas reveladas…): enquanto uma delas está aberta, os atalhos não valem. Com a
+   * pesquisa do histórico (a lupa) aberta também não, mesmo com o foco fora do campo.
+   */
+  const covered =
+    logSearches > 0 ||
+    intro ||
+    reporting ||
+    calling ||
+    deckOf !== null ||
+    logCard !== null ||
+    deckCard !== null ||
+    reveals.length > 0 ||
+    (over && showResult) ||
+    sheet === 'menu' ||
+    sheet === 'layout' ||
+    sheet === 'log' ||
+    sheet === 'coach';
+  const shortcutsActive = shortcutsOn && !covered;
+  shortcutsLive.current = shortcutsActive;
+  /**
+   * Atalhos de teclado (opção "Atalhos de teclado"; a lista para quem joga está em `ShortcutsHelp`).
+   *
+   * As teclas de carta (Q W E R T e L) escolhem a carta sem abri-la; A, H e X agem sobre a carta escolhida (ou a
+   * aberta). Numa escolha de alvo (ataque, efeito, bloqueio, DON!! marcados) a tecla vale como o toque na carta,
+   * e passa para a do oponente quando a sua não é uma opção. Enter, o cancelar do Esc e os números numa lista de
+   * opções e o M ("Ver a mesa") apertam o botão que está na tela (`data-hotkey`), para valerem só quando ele vale e
+   * com as mesmas proteções.
+   */
+  const onShortcut = (s: Shortcut): boolean => {
+    const click = (selector: string) => {
+      const button = gameRef.current?.querySelector<HTMLButtonElement>(`${selector}:not(:disabled)`);
+      button?.click();
+      return Boolean(button);
+    };
+    const top: PlayerId = bottom === 0 ? 1 : 0;
+    const marking = human !== null && myTurnIdle && has((a) => a.type === 'attachDon') ? state.players[human].donActive : 0;
+    const markDons = (count: number) => {
+      audio.play('don-pick', { pitch: Math.min(6, count - 1) });
+      setMode({ kind: 'don', picked: Array.from({ length: count }, (_, i) => i) });
+    };
+    /** A carta sobre a qual o A, o H e o X agem: a aberta, ou a escolhida pela tecla ou pelo clique. */
+    const card = zoom ?? selected;
+    switch (s.kind) {
+      case 'endTurn':
+        if (!myTurnIdle) return false;
+        dispatch({ type: 'endTurn', player: human! });
+        setMode(null);
+        setSelected(null);
+        setZoom(null);
+        setSheet(null);
+        return true;
+      case 'confirm':
+        // Vale para o que está por cima: a carta aberta, a folha da mão ou, sem nada aberto, a pergunta ou a faixa central.
+        if (zoom) return click('.zoom [data-hotkey~="confirm"]');
+        if (sheet) return sheet === 'hand' && click('.sheet [data-hotkey~="confirm"]');
+        return click('[data-hotkey~="confirm"]');
+      case 'cancel':
+        if (zoom || sheet || mode) {
+          setMode(null);
+          setSelected(null);
+          setZoom(null);
+          setSheet(null);
+          return true;
+        }
+        setSelected(null);
+        return click('[data-hotkey~="cancel"]') || selected !== null;
+      case 'trash': {
+        const player = s.opponent ? top : bottom;
+        const open = sheet !== null && typeof sheet === 'object' && sheet.trash === player;
+        setZoom(null);
+        setSheet(open ? null : { trash: player });
+        return true;
+      }
+      case 'number': {
+        if (zoom || sheet) return false;
+        // Pergunta com uma lista de opções (qual DON!! devolver, que efeito usar…): o número escolhe a opção.
+        const options = gameRef.current?.querySelectorAll<HTMLButtonElement>('[data-hotkey~="option"]');
+        if (options?.length) {
+          options[s.n - 1]?.click();
+          return s.n <= options.length;
+        }
+        if (marking === 0) return false;
+        markDons(Math.min(s.n, marking));
+        return true;
+      }
+      case 'attachAll':
+        if (sheet || !myTurnIdle) return false;
+        if (card && canReceiveDon(card)) {
+          attachDons(card, state.players[human!].donActive);
+          setMode(null);
+          setZoom(null);
+          return true;
+        }
+        // Sem carta escolhida: marca todos, e a tecla da carta os anexa.
+        if (marking === 0) return false;
+        markDons(marking);
+        return true;
+      case 'peek':
+        // "Ver a mesa" da pergunta aberta, ou "Voltar à pergunta" quando ela já está recolhida.
+        return !zoom && !sheet && click('[data-hotkey~="peek"]');
+      case 'attack':
+        if (sheet || !card || !canAttackWith(card)) return false;
+        setMode({ kind: 'attack', attacker: card });
+        setZoom(null);
+        return true;
+      case 'ability': {
+        if (sheet) return false;
+        if (zoom) return click('.zoom .ability-plate');
+        if (!selected || !myTurnIdle) return false;
+        const abilities = legal.filter((a) => a.type === 'activate' && a.uid === selected);
+        if (abilities.length === 0) return false;
+        // Mais de uma habilidade: a carta abre para a escolha.
+        if (abilities.length > 1) setZoom(selected);
+        else {
+          dispatch(abilities[0]);
+          setSelected(null);
+        }
+        return true;
+      }
+      case 'card': {
+        if (sheet) return false;
+        const at = (p: PlayerId) => (s.slot === 'leader' ? state.players[p].leader.uid : (state.players[p].characters[s.slot]?.uid ?? null));
+        /** A carta é um dos alvos que o jogo espera agora (de um efeito, do bloqueio, do ataque ou dos DON!! marcados). */
+        const choosable = (uid: string | null): uid is string =>
+          uid !== null &&
+          (((myPending?.kind === 'selectTargets' || myPending?.kind === 'block') && myPending.options.includes(uid)) ||
+            (mode?.kind === 'attack' && has((a) => a.type === 'attack' && a.attacker === mode.attacker && a.target === uid)) ||
+            (mode?.kind === 'don' && canReceiveDon(uid)));
+        const mine = at(bottom);
+        const theirs = at(top);
+        const uid = s.opponent || (choosable(theirs) && !choosable(mine)) ? theirs : mine;
+        if (uid === null) return false;
+        if (choosable(uid)) {
+          setZoom(null);
+          onCard(uid);
+          return true;
+        }
+        // Fora de uma escolha a tecla só escolhe a carta (o toque também sai do modo de ataque); de novo, abre ou fecha a carta.
+        if (mode?.kind === 'attack') setMode(null);
+        setZoom(uid === selected && zoom !== uid ? uid : null);
+        setSelected(uid);
+        return true;
+      }
+    }
+  };
+  useShortcuts(shortcutsActive, human !== null, onShortcut);
 
   // ------------------------------------------------------------ gestos: toque longo e arrastar
 
@@ -1616,6 +1782,7 @@ function Table({
         wideBoard ? 'wide-board' : '',
       ].join(' ')}
       style={wideBoard ? vars({ '--panel-w': `${panelWidth(layout)}px` }) : undefined}
+      ref={gameRef}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       onContextMenu={(e) => e.preventDefault()}
@@ -1650,7 +1817,7 @@ function Table({
             ghost={drag?.kind === 'hand' ? drag.uid : null}
             center={centerBand}
             sideLeft={layout.sideHover ? <CardDetail state={state} uid={detailUid} /> : undefined}
-            sideRight={layout.sideLog ? <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} /> : undefined}
+            sideRight={layout.sideLog ? <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} onSearching={onLogSearching} /> : undefined}
             overlay={layout.hover.show && layout.hover.position === 'center' && hovered ? <CardDetail state={state} uid={hovered} /> : undefined}
             {...handlers}
           />
@@ -1978,7 +2145,7 @@ function Table({
 
         {sheet === 'log' && (
           <SheetFrame title={t('game.log')} onClose={() => setSheet(null)}>
-            <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />
+            <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} onSearching={onLogSearching} />
           </SheetFrame>
         )}
         {sheet === 'coach' && coachOn && (
@@ -2100,7 +2267,7 @@ function Table({
               ✕
             </button>
           </div>
-          {panel === 'log' && <LogPanel state={state} onCardZoom={setLogCard} />}
+          {panel === 'log' && <LogPanel state={state} onCardZoom={setLogCard} onSearching={onLogSearching} />}
           {panel === 'matches' && spectator?.onSwitchRoom && <MatchesPanel currentId={spectator.roomId ?? null} onWatch={spectator.onSwitchRoom} />}
           {panel === 'deck' && spectator?.roomId && <DeckPanel roomId={spectator.roomId} onZoom={setDeckCard} />}
         </aside>
@@ -2163,7 +2330,7 @@ function Table({
           ) : (
             <>
               {(!wideBoard || (layout.hover.show && layout.hover.position === 'panel')) && <CardDetail state={state} uid={detailUid} />}
-              {(!wideBoard || (layout.log.show && layout.log.position === 'panel')) && <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} />}
+              {(!wideBoard || (layout.log.show && layout.log.position === 'panel')) && <LogPanel state={state} fresh={replay?.logFrom} onCardZoom={setLogCard} onSearching={onLogSearching} />}
             </>
           )}
         </aside>
@@ -2495,13 +2662,14 @@ function DecisionButton({
   return (
     <div className={['defense-slot', sheet ? 'in-sheet' : ''].join(' ')}>
       {onCancel && pending.kind === 'selectTargets' && (
-        <button className="end-turn defense cancel side" onClick={onCancel} title={t('game.undoActionTitle')}>
+        <button className="end-turn defense cancel side" data-hotkey="cancel" onClick={onCancel} title={t('game.undoActionTitle')}>
           <b>{t('common.cancel')}</b>
           <small>{t('game.undoActionSub')}</small>
         </button>
       )}
       <button
         className={['end-turn', 'defense', d.pulse && !d.disabled ? 'pulse' : '', d.skip ? 'skip' : '', d.skip && skip.armed ? 'armed' : ''].join(' ')}
+        data-hotkey="confirm"
         onClick={act}
         disabled={d.disabled}
         title={d.title}
@@ -2842,7 +3010,7 @@ function Prompt(props: {
   const skip = useSkipGuard(props.hidden ? null : pending);
   if (props.hidden || state.phase === 'gameover' || !pending || human === null || pending.player !== human) return null;
   const peekButton = (
-    <button className="btn peek" onClick={() => setPeek(true)} title={t('game.peekTitle')}>
+    <button className="btn peek" data-hotkey="peek" onClick={() => setPeek(true)} title={t('game.peekTitle')}>
       {t('game.peek')}
     </button>
   );
@@ -2853,7 +3021,7 @@ function Prompt(props: {
     return (
       <PromptPill title={title} subtitle={t('game.peekSub')}>
         <div className="btn-row center">
-          <button className="btn primary" onClick={() => setPeek(false)}>
+          <button className="btn primary" data-hotkey="confirm peek" onClick={() => setPeek(false)}>
             {t('game.backToQuestion')}
           </button>
         </div>
@@ -2862,7 +3030,7 @@ function Prompt(props: {
   }
   /** Botão de desfazer a ação (quando o motor permite) ou o motivo de não dar mais. */
   const cancel = onCancel ? (
-    <button className="btn cancel" onClick={onCancel} title={t('game.undoActionTitle')}>
+    <button className="btn cancel" data-hotkey="cancel" onClick={onCancel} title={t('game.undoActionTitle')}>
       {t('common.cancel')}
     </button>
   ) : null;
@@ -2950,12 +3118,13 @@ function Prompt(props: {
             {peekButton}
             {cancel}
             {pending.max === 0 ? (
-              <button className="btn primary" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
+              <button className="btn primary" data-hotkey="confirm" onClick={() => onDispatch({ type: 'choose', player: human, uids: [] })}>
                 {t('game.continue')}
               </button>
             ) : (
               <button
                 className="btn primary"
+                data-hotkey="confirm"
                 // Sem nada marcado, "Confirmar" seria outro jeito de seguir sem escolher: só o "Não escolher" faz isso.
                 disabled={picked.length < pending.min || (picked.length === 0 && pending.options.length > 0)}
                 onClick={() => onDispatch({ type: 'choose', player: human, uids: picked })}
@@ -3029,7 +3198,7 @@ function Prompt(props: {
         <PromptPill title={t('game.manualTitle', { name })} subtitle={t('game.manualSub', { text })} clamp>
           <div className="btn-row">
             {cancel}
-            <button className="btn primary" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
+            <button className="btn primary" data-hotkey="confirm" onClick={() => onDispatch({ type: 'manualDone', player: human })}>
               {t('game.continue')}
             </button>
           </div>
@@ -3056,11 +3225,15 @@ function Prompt(props: {
             )}
             <div className="btn-row center">
               {trigger && (
-                <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                <button className="btn primary big" data-hotkey="confirm" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
                   {t('game.activateTrigger')}
                 </button>
               )}
-              <button className={`btn big${trigger ? '' : ' primary'}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+              <button
+                className={`btn big${trigger ? '' : ' primary'}`}
+                data-hotkey={trigger ? undefined : 'confirm'}
+                onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}
+              >
                 {trigger ? (
                   <>
                     {t('game.noActivate')} <small>{t('game.goesToHand')}</small>
@@ -3097,6 +3270,7 @@ function Prompt(props: {
                 <button
                   key={index}
                   className={`btn${index === 0 ? ' primary' : ''}`}
+                  data-hotkey="option"
                   onClick={() => onDispatch({ type: 'option', player: human, index })}
                 >
                   {(optionParts?.[index] ? listText(tryT, optionParts[index]!) : undefined) ??
@@ -3127,11 +3301,15 @@ function Prompt(props: {
             {pending.cannot && <p className="muted small">{t('game.opponentSeesQuestion')}</p>}
             <div className="btn-row center">
               {!pending.cannot && (
-                <button className="btn primary big" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
+                <button className="btn primary big" data-hotkey="confirm" onClick={() => onDispatch({ type: 'answer', player: human, yes: true })}>
                   {pending.drawUpTo ? t('game.drawOne') : t('game.payAndUse')}
                 </button>
               )}
-              <button className={`btn big${pending.cannot ? ' primary' : ''}`} onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}>
+              <button
+                className={`btn big${pending.cannot ? ' primary' : ''}`}
+                data-hotkey={pending.cannot ? 'confirm' : undefined}
+                onClick={() => onDispatch({ type: 'answer', player: human, yes: false })}
+              >
                 {pending.drawUpTo ? t('game.stop') : t('game.dontUse')}
               </button>
             </div>
@@ -3243,7 +3421,7 @@ function CardZoom(props: {
         {hasPlates && (
           <div className={['zoom-plates', `c-${color}`].join(' ')}>
             {eventCounter && (
-              <button className="ability-plate counter" onClick={eventCounter}>
+              <button className="ability-plate counter" data-hotkey="confirm" onClick={eventCounter}>
                 <div className="plate-title">
                   <span className="plate-icon">🛡</span>
                   {t('game.useEventCounter')}
@@ -3254,7 +3432,7 @@ function CardZoom(props: {
               </button>
             )}
             {eventPlay && (
-              <button className="ability-plate" onClick={() => props.onDispatch(eventPlay)}>
+              <button className="ability-plate" data-hotkey="confirm" onClick={() => props.onDispatch(eventPlay)}>
                 <div className="plate-title">
                   <span className="plate-icon">✦</span>
                   {t('game.useEvent')}
@@ -3291,7 +3469,7 @@ function CardZoom(props: {
         {hasActions && (
           <div className="zoom-actions">
             {props.onCounter && !eventCounter && (
-              <button className="btn primary big" onClick={props.onCounter}>
+              <button className="btn primary big" data-hotkey="confirm" onClick={props.onCounter}>
                 {t('game.useAsCounter')}
                 {counter > 0 && <span className="cost-chip">+{counter}</span>}
               </button>
@@ -3313,7 +3491,7 @@ function CardZoom(props: {
               </div>
             )}
             {play && !eventPlay && (
-              <button className="btn primary big" onClick={() => props.onDispatch(play)}>
+              <button className="btn primary big" data-hotkey="confirm" onClick={() => props.onDispatch(play)}>
                 {t('game.play')} <span className="cost-chip">{def.cost}</span>
               </button>
             )}
@@ -3463,23 +3641,106 @@ function RevealedCards({ lines, onCard, onClose }: { lines: RevealLine[]; onCard
   );
 }
 
+/** Texto sem acentos e em minúsculas, para a pesquisa do histórico achar "lider" em "Líder". */
+const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 /**
  * Histórico da partida. `fresh`: no replay, as linhas da ação atual (desta em diante) ficam destacadas.
  * Os nomes de cartas viram links: toque/clique abre a carta ampliada (`onCardZoom`); com mouse, passar por cima mostra a carta ao lado.
+ *
+ * `onSearching`: o histórico ganha a lupa, no canto. Aberta, um campo filtra as linhas pelo texto (sem diferenciar
+ * maiúsculas nem acentos), mantendo a linha do turno de cada uma, e a mesa é avisada enquanto a pesquisa está
+ * aberta (os atalhos de teclado param).
  */
-function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: number | null; onCardZoom?: (def: CardDef) => void }) {
+function LogPanel({
+  state,
+  fresh,
+  onCardZoom,
+  onSearching,
+}: {
+  state: GameState;
+  fresh?: number | null;
+  onCardZoom?: (def: CardDef) => void;
+  onSearching?: (on: boolean) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
   const [hover, setHover] = useState<{ def: CardDef; anchor: HTMLElement } | null>(null);
   const names = useMemo(() => logCardNames(state.defs), [state.defs]);
+  const t = useT();
   const tryT = useTryT();
+  const { shortcuts } = useSettings();
+  /** A pesquisa: `null` = lupa fechada. */
+  const [query, setQuery] = useState<string | null>(null);
+  const searching = query !== null;
+  useEffect(() => {
+    if (!searching || !onSearching) return;
+    onSearching(true);
+    return () => onSearching(false);
+  }, [searching, onSearching]);
+  const needle = fold(query?.trim() ?? '');
+  const { lines, found } = useMemo(() => {
+    const all = state.log.map((e, i) => ({ e, i, text: logText(tryT, e) }));
+    if (!needle) return { lines: all, found: all.length };
+    const lines: typeof all = [];
+    let found = 0;
+    /** A linha "— Turno N —" das linhas achadas depois dela entra junto, para dar o contexto. */
+    let turn: (typeof all)[number] | null = null;
+    for (const line of all) {
+      const hit = fold(line.text).includes(needle);
+      if (line.e.text.startsWith('—') && !hit) {
+        turn = line;
+        continue;
+      }
+      if (!hit) continue;
+      if (turn && !line.e.text.startsWith('—')) lines.push(turn);
+      turn = null;
+      lines.push(line);
+      found++;
+    }
+    return { lines, found };
+  }, [state.log, needle, tryT]);
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
-  }, [state.log.length]);
+  }, [state.log.length, needle]);
   return (
     <>
         <div className="log" ref={ref} onScroll={() => setHover(null)}>
-          {state.log.map((e, i) => (
+          {onSearching && (
+            <div className={['log-search', searching ? 'open' : ''].join(' ')}>
+              {searching ? (
+                <>
+                  <div className="log-search-row">
+                    <Icon name="search" size={16} />
+                    <input
+                      type="search"
+                      value={query}
+                      autoFocus
+                      placeholder={t('game.logSearchPlaceholder')}
+                      aria-label={t('game.logSearch')}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Escape') return;
+                        // O Esc fecha só a pesquisa (não a carta aberta nem a folha do histórico).
+                        e.stopPropagation();
+                        setQuery(null);
+                      }}
+                    />
+                    {needle && <span className="log-search-count">{found > 0 ? t('game.logSearchCount', { n: found }) : t('game.logSearchNone')}</span>}
+                    <button type="button" className="log-search-btn" onClick={() => setQuery(null)} aria-label={t('game.logSearchClose')} title={t('game.logSearchClose')}>
+                      <Icon name="close" size={14} />
+                    </button>
+                  </div>
+                  {shortcuts && <small className="log-search-note">{t('game.logSearchShortcuts')}</small>}
+                </>
+              ) : (
+                <button type="button" className="log-search-btn" onClick={() => setQuery('')} aria-label={t('game.logSearch')} title={t('game.logSearch')}>
+                  <Icon name="search" size={15} />
+                </button>
+              )}
+            </div>
+          )}
+          {lines.map(({ e, i, text }) => (
             <div
               key={i}
               className={[
@@ -3490,7 +3751,7 @@ function LogPanel({ state, fresh, onCardZoom }: { state: GameState; fresh?: numb
               ].join(' ')}
             >
               <LogText
-                text={logText(tryT, e)}
+                text={text}
                 names={names}
                 onCard={(name, nth) => {
                   const def = resolveLogCard(state, names, e, name, nth);
