@@ -502,7 +502,7 @@ function migratePartners(db: DB) {
  */
 function migrateSupport(db: DB) {
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
-  // supporter_tier: grumete | tripulante | capitao | almirante (null = sem plano).
+  // supporter_tier: grumete | capitao | almirante (null = sem plano).
   if (!userCols.includes('supporter_tier')) db.exec('ALTER TABLE users ADD COLUMN supporter_tier TEXT');
   // supporter_until: até quando o plano vale (ISO; null = sem prazo, dado à mão pelo admin).
   if (!userCols.includes('supporter_until')) db.exec('ALTER TABLE users ADD COLUMN supporter_until TEXT');
@@ -513,7 +513,7 @@ function migrateSupport(db: DB) {
   // team: faz parte do Time do bot (joga contra o Bot do Time e envia correções). Marca à parte do perfil
   // e do plano: a sincronização da Apoia.se sobrescreve o plano, não esta coluna.
   if (!userCols.includes('team')) db.exec('ALTER TABLE users ADD COLUMN team INTEGER NOT NULL DEFAULT 0');
-  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
+  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago).
   if (!userCols.includes('email_verified')) {
     db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
     // Contas de antes desta coluna: endereços do Gmail são sempre confirmados pelo Google; os outros
@@ -561,6 +561,9 @@ function migrateSupport(db: DB) {
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+  // O plano Tripulante (R$ 15) deixou de existir: pelo valor pago, quem o tinha fica no Grumete.
+  db.exec("UPDATE users SET supporter_tier = 'grumete' WHERE supporter_tier = 'tripulante'");
+  db.exec("UPDATE supporter_payments SET tier = 'grumete' WHERE tier = 'tripulante'");
   const tCols = (db.prepare('PRAGMA table_info(tournaments)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   // official: torneio do time (Torneio da Tripulação), marcado só por admin.
   if (!tCols.includes('official')) db.exec('ALTER TABLE tournaments ADD COLUMN official INTEGER NOT NULL DEFAULT 0');

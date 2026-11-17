@@ -19,11 +19,11 @@ function setup() {
   return { db, app: buildApp(db, { server: { cardImages: true, support: { coffeeUrl: 'https://ko-fi.com/x' } } }) };
 }
 
-/** Sessão de um apoiador Tripulante (Estatísticas Pro: ranqueada, torneios e faixas). */
+/** Sessão de um apoiador Capitão (Estatísticas Pro: ranqueada, torneios e faixas). */
 let supporters = 0;
 function proViewer(db: DB) {
   const u = upsertGoogleUser(db, { sub: `pro-${++supporters}`, email: `pro${supporters}@example.com`, emailVerified: true, name: 'Pro', picture: null });
-  setSupporter(db, u.id, 'tripulante', null);
+  setSupporter(db, u.id, 'capitao', null);
   return { cookie: `gg_session=${createSession(db, u.id)}` };
 }
 

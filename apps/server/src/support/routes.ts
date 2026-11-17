@@ -296,20 +296,6 @@ export function registerSupportRoutes(app: FastifyInstance, { db, user, options,
     return { ok: true, tier, applied };
   });
 
-  /**
-   * Consulta do plano pela homologação (ACCESS=supporters em outro servidor), com o
-   * mesmo INTERNAL_TOKEN dos dois lados. Só responde por e-mails confirmados.
-   */
-  app.get<{ Querystring: { email?: string } }>('/api/internal/supporter', async (req, reply) => {
-    if (!options.internalToken) return reply.code(404).send({ error: 'Não encontrado' });
-    const auth = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
-    if (!sameToken(auth, options.internalToken)) return reply.code(401).send({ error: 'Token inválido.' });
-    const email = typeof req.query.email === 'string' ? req.query.email.slice(0, 200) : '';
-    if (!email.includes('@')) return reply.code(400).send({ error: 'E-mail inválido.' });
-    const u = userByVerifiedEmail(db, email);
-    return { tier: u?.supporterTier ?? null, admin: Boolean(u && isAdmin(u.role)) };
-  });
-
   // ---------------------------------------------------------------- lojas patrocinadoras
 
   /** Lojas ativas (de um lugar do site, se pedido) e o contato para quem quer patrocinar. */

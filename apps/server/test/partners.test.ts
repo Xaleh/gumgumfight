@@ -500,17 +500,6 @@ describe('replay embutido (iframe com link assinado)', () => {
     const { app: closed } = setup();
     expect((await closed.inject({ url: '/replay/1' })).headers['content-security-policy']).toBe("frame-ancestors 'self'");
   });
-
-  it('homologação só para apoiadores: o replay com link assinado continua abrindo', async () => {
-    const db = openDb(':memory:');
-    seed(db);
-    const open = buildApp(db, { server: { cardImages: true } });
-    const gated = buildApp(db, { server: { cardImages: true, access: { mode: 'supporters' } } });
-    const saved = (await open.inject({ method: 'POST', url: '/api/matches', headers: BROWSER, payload: botMatch(db, 23) })).json();
-    const token = signReplayToken(replayLinkSecret(db), saved.id, Math.floor(Date.now() / 1000) + 600);
-    expect((await gated.inject({ url: `/api/replay/${saved.id}?t=${token}` })).statusCode).toBe(200);
-    expect((await gated.inject({ url: '/api/cards' })).statusCode).toBe(403);
-  });
 });
 
 // ------------------------------------------------------------------ OAuth

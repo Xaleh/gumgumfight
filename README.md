@@ -75,23 +75,20 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `VAPID_SUBJECT` | `https://gumgumfight.app`     | Contato do servidor para os serviços de push (`mailto:` ou `https:`) |
 | `PM2_MAX_MEMORY` | `1500M` (só no `deploy.env` da VM) | Memória a partir da qual o pm2 reinicia o app |
 | `SUPPORT_PIX_KEY` / `SUPPORT_PIX_NAME` / `SUPPORT_PIX_CITY` | (vazio) | Pix do "Doe um Cafezim": chave (de preferência aleatória), nome e cidade de quem recebe |
-| `SUPPORT_MONTHLY_URL` | (vazio) | Página da campanha mensal na Apoia.se (Grumete, Tripulante, Capitão, Almirante) |
+| `SUPPORT_MONTHLY_URL` | (vazio) | Página da campanha mensal na Apoia.se (Grumete, Capitão, Almirante) |
 | `APOIASE_API_KEY` / `APOIASE_API_SECRET` | (vazio) | Chave e segredo da API da Apoia.se: o plano vem de lá pelo e-mail da conta (segredos: só no `deploy.env`) |
 | `APOIASE_SYNC` | `6` | Horas entre as reconsultas de quem tem plano da Apoia.se; `off` desliga |
 | `SUPPORT_COFFEE_URL` | (vazio) | Opcional: página de doação com cartão (ex.: Ko-fi, para público de fora do Brasil) |
 | `SUPPORT_GOAL_BRL` | (vazio) | Custo mensal do site, mostrado como meta no "Apoiar o projeto" |
 | `SUPPORT_CONTACT_URL` | (vazio) | Contato para lojas que querem patrocinar (`mailto:` ou link) |
 | `KOFI_WEBHOOK_TOKEN` | (vazio) | Opcional: token do webhook do Ko-fi; vazio = desligado (segredo: só no `deploy.env`) |
-| `INTERNAL_TOKEN` | (vazio) | Token da consulta de plano entre homologação e produção (igual nos dois; segredo) |
-| `ACCESS` | `open` | `supporters`: o site só abre para apoiadores Tripulante ou acima e admins (homologação) |
-| `SUPPORT_SOURCE_URL` | (vazio) | Com `ACCESS=supporters`: site onde o plano é consultado (a produção) |
 | `PARTNER_IPS` | (vazio; só no `deploy.env` da VM) | IPs dos servidores de apps parceiros, separados por vírgula: ficam fora do limite por IP do Nginx (o app limita cada token) |
 | `REPLAY_EMBED_ORIGINS` | (vazio) | Sites que podem pôr o replay embutido (`/replay/<id>`) num iframe, separados por vírgula (ex.: `https://sweetapp.com.br`); vazio = só o próprio site |
 | `REPLAY_LINK_SECRET` | (gerado) | Segredo das assinaturas dos links de replay; sem ele, o servidor gera um na primeira vez e guarda no banco (trocar invalida os links abertos) |
 
 Sem nenhuma variável de apoio, o item "Apoiar o projeto" não aparece e as estatísticas ficam todas abertas, como
 antes. Com o apoio configurado, as Estatísticas Pro (ranqueada, torneios e filtro por faixa) passam a exigir o plano
-Tripulante. Detalhes, planos e o passo a passo estão em [`docs/apoio/`](docs/apoio/README.md).
+Capitão. Detalhes, planos e o passo a passo estão em [`docs/apoio/`](docs/apoio/README.md).
 
 O backup é só copiar o arquivo `.db`.
 
@@ -774,8 +771,7 @@ mexido ou de outra partida: `replay_link_invalid` (a página mostra o erro). Par
 Só `/replay/*` pode ir para um iframe, e só nos sites de `REPLAY_EMBED_ORIGINS`
 (`Content-Security-Policy: frame-ancestors 'self' <origens>`); o resto do site responde `frame-ancestors 'none'`
 e `X-Frame-Options: DENY`. Imagens, CSS e textos vêm do nosso domínio; o replay chega com as definições só das
-cartas usadas (`GET /api/replay/:id?t=`), então não há CORS. Na homologação só para apoiadores, o replay com link
-assinado abre sem login.
+cartas usadas (`GET /api/replay/:id?t=`), então não há CORS.
 
 **postMessage** (os dois lados conferem a origem): a página do app manda para o iframe
 `{ type: 'seek', pos }` (posição = número de ações já aplicadas, de 0 ao total), `{ type: 'play' }` e
@@ -1226,7 +1222,7 @@ pode chamar sem login nem token:
 Filtros de `/api/stats` e `/api/stats/cards`: `format` (standard, egb), `queue` (casual, ranked, tournament), `opponent` (bot,
 human), `by` (human = padrão, bot = simulações bot x bot de versões antigas), `tiers` (ids separados por vírgula), `leader`, `oppLeader`,
 `first` (first, second), `days`, `mine=1` e `deck`. Com o apoio configurado, a ranqueada e os torneios (`queue`) só saem para quem tem o
-plano Tripulante, salvo com `mine=1`.
+plano Capitão, salvo com `mine=1`.
 
 Para apps parceiros (tokens e OAuth), veja [API para parceiros](#api-para-parceiros-apps-que-agem-em-nome-do-usuário).
 

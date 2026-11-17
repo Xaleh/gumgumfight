@@ -39,9 +39,9 @@ describe('torneios: cota de apoiador', () => {
     expect(monthStart(Date.parse('2026-11-01T02:00:00Z'))).toBe('2026-10-01T03:00:00.000Z');
   });
 
-  it('Tripulante não organiza; Capitão cria até 5 por mês, de até 64 jogadores; apagar antes de começar devolve a vaga', async () => {
+  it('Grumete não organiza; Capitão cria até 5 por mês, de até 64 jogadores; apagar antes de começar devolve a vaga', async () => {
     const { db, app, setClock } = setup();
-    const trip = login(db, { tier: 'tripulante' });
+    const trip = login(db, { tier: 'grumete' });
     const cap = login(db, { tier: 'capitao' });
     const list = async (who: { headers: Record<string, string> }) => (await req(app, 'GET', '/api/tournaments', who)).json();
     expect((await list(trip)).organize).toBeNull();

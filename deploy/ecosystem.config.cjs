@@ -95,10 +95,6 @@ module.exports = {
         APOIASE_SYNC: env.APOIASE_SYNC || '',
         // Ko-fi (opcional, para quando houver público de fora do Brasil).
         KOFI_WEBHOOK_TOKEN: env.KOFI_WEBHOOK_TOKEN || '',
-        INTERNAL_TOKEN: env.INTERNAL_TOKEN || '',
-        // Homologação: ACCESS=supporters fecha o site para quem não é apoiador; o plano é consultado em SUPPORT_SOURCE_URL.
-        ACCESS: env.ACCESS || '',
-        SUPPORT_SOURCE_URL: env.SUPPORT_SOURCE_URL || '',
         // Replay embutido: sites que podem pôr /replay/<id> num iframe (vírgula); vazio = só o próprio site.
         REPLAY_EMBED_ORIGINS: env.REPLAY_EMBED_ORIGINS || '',
         // Segredo dos links de replay (vazio = gerado na primeira vez e guardado no banco).

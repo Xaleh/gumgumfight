@@ -4,8 +4,8 @@ A Apoia.se não tem integração com o Discord. Há dois caminhos, do mais simpl
 
 ## 1. Começo: cargos à mão (sem código)
 
-1. No servidor do Discord, crie os cargos `Grumete`, `Tripulante`, `Capitão`, `Almirante` e `Campeão do mês`.
-2. Crie o canal de enquetes do roadmap visível só para `Tripulante`, `Capitão` e `Almirante`.
+1. No servidor do Discord, crie os cargos `Grumete`, `Capitão`, `Almirante` e `Campeão do mês`.
+2. Crie o canal de enquetes do roadmap visível só para `Capitão` e `Almirante`.
 3. Uma vez por semana, confira Administração → Apoios recebidos e ajuste os cargos.
 
 Serve enquanto houver poucos apoiadores.
@@ -19,7 +19,7 @@ Como fica para o apoiador:
 
 1. No Discord, ele abre o menu do servidor → **Linked Roles** → GumGum Fight.
 2. O Discord abre o site; ele entra com a conta Google (a mesma do plano) e autoriza.
-3. O site manda ao Discord o nível do plano (`tier`: 1 Grumete, 2 Tripulante, 3 Capitão, 4 Almirante) e o Discord dá
+3. O site manda ao Discord o nível do plano (`tier`: 1 Grumete, 2 Capitão, 3 Almirante) e o Discord dá
    os cargos cuja exigência ele cumpre.
 4. Quando o plano muda ou vence (sincronização da Apoia.se, plano manual ou dia 10), o site atualiza o nível e o
    Discord tira ou troca o cargo sozinho.
@@ -32,7 +32,7 @@ O que é feito à mão, uma vez:
 3. Em **OAuth2**, adicionar o redirect `https://gumgumfight.app/api/discord/callback` e copiar Client ID e Client
    Secret; em **Bot**, gerar o token (usado só para registrar o campo `tier`).
 4. Colocar no `deploy.env` da produção: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`.
-5. No servidor do Discord, em cada cargo → **Links** → GumGum Fight → "tier é maior ou igual a" 1, 2, 3 ou 4.
+5. No servidor do Discord, em cada cargo → **Links** → GumGum Fight → "tier é maior ou igual a" 1, 2 ou 3.
 
 O que fica com o código (próxima etapa, depois que o servidor do Discord existir):
 

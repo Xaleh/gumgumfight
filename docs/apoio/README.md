@@ -13,8 +13,7 @@ português. O Ko-fi continua no código, desligado, para quando houver público 
 | Plano | Valor | O que libera |
 |---|---|---|
 | Grumete | R$ 5/mês | Nome na lista de Apoiadores (se a pessoa quiser) e badge no Discord |
-| Tripulante | R$ 15/mês | Tudo do Grumete, Estatísticas Pro (ranqueada, torneios e filtro por faixa de recompensa), homologação e voto no roadmap |
-| Capitão | R$ 30/mês | Tudo do Tripulante, organizar até 5 torneios por mês de até 64 jogadores e nome nos créditos |
+| Capitão | R$ 30/mês | Tudo do Grumete, Estatísticas Pro (ranqueada, torneios e filtro por faixa de recompensa), voto no roadmap, organizar até 5 torneios por mês de até 64 jogadores e nome nos créditos |
 | Almirante | R$ 50/mês | Tudo do Capitão, prioridade de inscrição nos torneios premiados do time e destaque na lista de Apoiadores |
 
 Os valores ficam em `apps/server/src/support/tiers.ts`; os textos da tela, em `apps/web/src/i18n/support/`.
@@ -33,7 +32,7 @@ Authorization: Bearer <APOIASE_API_SECRET>
 
 - **Quando o site pergunta:** no login, quando a pessoa toca em "Já apoio: verificar" no "Apoiar o projeto" (no
   máximo uma vez a cada 30 segundos) e, a cada 6 horas, para quem já tem plano da Apoia.se (`APOIASE_SYNC`).
-- **Qual plano:** o do valor pago no mês (R$ 5 Grumete, R$ 15 Tripulante, R$ 30 Capitão, R$ 50 Almirante; valores
+- **Qual plano:** o do valor pago no mês (R$ 5 Grumete, R$ 30 Capitão, R$ 50 Almirante; valores
   acima de um plano contam como esse plano).
 - **Até quando:** até o dia 10 do mês seguinte, às 23:59 de Brasília. A folga cobre o cartão, que é cobrado no 1º
   dia útil, e o boleto, que leva até 3 dias para compensar. No começo do mês a API pode responder "não pago" sem que o
