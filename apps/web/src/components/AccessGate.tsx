@@ -1,5 +1,5 @@
 // Homologação só para apoiadores (ACCESS=supporters no servidor): quem não tem o plano
-// Tripulante ou acima vê esta tela no lugar do site.
+// Capitão ou acima vê esta tela no lugar do site.
 
 import { type ReactNode, useEffect, useState } from 'react';
 import { api } from '../api';

@@ -39,7 +39,7 @@ export interface ServerOptions {
   /** Apoio ao projeto (Pix, Apoia.se, meta do mês). Sem nada configurado, o item "Apoiar" some do site. */
   support?: SupportOptions;
   /**
-   * ACCESS=supporters: o site só abre para apoiadores Tripulante ou acima (e admins).
+   * ACCESS=supporters: o site só abre para apoiadores Capitão ou acima (e admins).
    * Usado na homologação, que consulta o plano na produção (SUPPORT_SOURCE_URL).
    */
   access?: AccessOptions;

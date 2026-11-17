@@ -1,7 +1,7 @@
 # Textos para a campanha na Apoia.se
 
 Prontos para colar. A campanha precisa ser **recorrente** (apoio mensal). O site reconhece o plano pelo **valor** do
-apoio do mês, então os valores mínimos das recompensas precisam ser exatamente R$ 5, R$ 15, R$ 30 e R$ 50.
+apoio do mês, então os valores mínimos das recompensas precisam ser exatamente R$ 5, R$ 30 e R$ 50.
 
 ## Título e chamada
 
@@ -32,16 +32,12 @@ apoio do mês, então os valores mínimos das recompensas precisam ser exatament
 > Obrigado por embarcar! Seu apelido entra na lista de Apoiadores do site (se você quiser) e você ganha o badge de
 > apoiador no Discord.
 
-### Tripulante — a partir de R$ 15/mês
+### Capitão — a partir de R$ 30/mês
 
 > Tudo do Grumete, mais:
 > - **Estatísticas Pro**: o meta da ranqueada e dos torneios, filtro por faixa de recompensa (veja o que funciona
 >   entre os melhores), tendência semanal e desempenho carta a carta.
 > - **Voto no roadmap**: ajude a decidir o que vem a seguir.
-
-### Capitão — a partir de R$ 30/mês
-
-> Tudo do Tripulante, mais:
 > - **Organize seus torneios**: até 5 por mês, de até 64 jogadores, com suíço, top cut e melhor de 3 ou de 5.
 > - Seu nome nos créditos do projeto.
 

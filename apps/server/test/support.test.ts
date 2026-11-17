@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { createSession, type Role, setUserRole, upsertGoogleUser } from '../src/auth/store';
@@ -87,10 +90,32 @@ describe('apoio: planos', () => {
   it('reconhece o plano pelo nome (com ou sem acento) ou pelo valor em reais', () => {
     expect(tierFromPayment('Capitão', 0, 'USD')).toBe('capitao');
     expect(tierFromPayment('ALMIRANTE da frota', 0, 'BRL')).toBe('almirante');
-    expect(tierFromPayment('Apoio', 15, 'BRL')).toBe('tripulante');
+    // R$ 15 era o Tripulante (plano extinto): pelo valor, fica no Grumete, mesmo com o nome antigo.
+    expect(tierFromPayment('Apoio', 15, 'BRL')).toBe('grumete');
+    expect(tierFromPayment('Tripulante', 15, 'BRL')).toBe('grumete');
     expect(tierFromPayment(null, 49.99, 'BRL')).toBe('capitao');
     expect(tierFromPayment(null, 3, 'BRL')).toBeNull();
     expect(tierFromPayment(null, 50, 'USD')).toBeNull();
+  });
+
+  it('banco de antes: o plano Tripulante (extinto) vira Grumete, na conta e nos pagamentos', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gg-support-'));
+    try {
+      const file = join(dir, 'db.sqlite');
+      const old = openDb(file);
+      const fan = login(old);
+      old.prepare("UPDATE users SET supporter_tier = 'tripulante', supporter_source = 'manual' WHERE id = ?").run(fan.id);
+      old
+        .prepare("INSERT INTO supporter_payments (id, email, kind, tier, amount, currency, paid_at) VALUES ('tx-antigo', ?, 'Subscription', 'tripulante', 15, 'BRL', ?)")
+        .run(fan.email, new Date().toISOString());
+      old.close();
+      const db = openDb(file);
+      expect(db.prepare('SELECT supporter_tier AS tier FROM users WHERE id = ?').get(fan.id)).toEqual({ tier: 'grumete' });
+      expect(db.prepare("SELECT tier FROM supporter_payments WHERE id = 'tx-antigo'").get()).toEqual({ tier: 'grumete' });
+      db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('/api/support mostra Pix, links, planos e a meta; sem nada configurado, o apoio fica desligado', async () => {
@@ -100,7 +125,6 @@ describe('apoio: planos', () => {
     expect(s.pix.codes.map((c: { amount: number | null }) => c.amount)).toEqual([null, 5, 10, 25]);
     expect(s.tiers.map((t: { id: string; price: number }) => [t.id, t.price])).toEqual([
       ['grumete', 5],
-      ['tripulante', 15],
       ['capitao', 30],
       ['almirante', 50],
     ]);
@@ -127,7 +151,7 @@ describe('apoio: planos', () => {
     expect((await get(app, '/api/auth/me', fan)).json().user.supporter).toBeNull();
     expect((await get(app, '/api/support')).json().covered).toBe(0);
     // Tirar o plano.
-    await put(admin, { tier: 'tripulante' });
+    await put(admin, { tier: 'grumete' });
     await put(admin, { tier: null });
     expect((await get(app, '/api/auth/me', fan)).json().user.supporter).toBeNull();
   });
@@ -139,7 +163,7 @@ describe('apoio: planos', () => {
     for (const [who, tier] of [
       [a, 'grumete'],
       [b, 'almirante'],
-      [c, 'tripulante'],
+      [c, 'capitao'],
     ] as const) {
       await app.inject({ method: 'PUT', url: `/api/admin/users/${who.id}/supporter`, headers: admin.headers, payload: { tier } });
       // O nome público vem do perfil de estatísticas.
@@ -158,10 +182,10 @@ describe('apoio: webhook do Ko-fi', () => {
   it('assinatura liga o plano na conta do mesmo e-mail (confirmado) por 35 dias; reenvio não duplica', async () => {
     const { db, app } = setup();
     const fan = login(db, 'player', { email: 'Fan@Example.com' });
-    const res = await kofi(app, { email: 'fan@example.com', tier_name: 'Tripulante', kofi_transaction_id: 'tx-fixo' });
-    expect(res.json()).toMatchObject({ ok: true, tier: 'tripulante', applied: true });
+    const res = await kofi(app, { email: 'fan@example.com', tier_name: 'Capitão', kofi_transaction_id: 'tx-fixo' });
+    expect(res.json()).toMatchObject({ ok: true, tier: 'capitao', applied: true });
     const me = (await get(app, '/api/auth/me', fan)).json().user.supporter;
-    expect(me).toMatchObject({ tier: 'tripulante', source: 'kofi' });
+    expect(me).toMatchObject({ tier: 'capitao', source: 'kofi' });
     const days = (Date.parse(me.until) - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(34);
     expect(days).toBeLessThan(36);
@@ -207,11 +231,11 @@ describe('apoio: consulta interna da homologação', () => {
     const { db, app } = setup();
     const admin = login(db, 'admin');
     const fan = login(db);
-    await app.inject({ method: 'PUT', url: `/api/admin/users/${fan.id}/supporter`, headers: admin.headers, payload: { tier: 'tripulante' } });
+    await app.inject({ method: 'PUT', url: `/api/admin/users/${fan.id}/supporter`, headers: admin.headers, payload: { tier: 'capitao' } });
     const ask = (email: string, token = INTERNAL) =>
       app.inject({ method: 'GET', url: `/api/internal/supporter?email=${encodeURIComponent(email)}`, headers: { authorization: `Bearer ${token}` } });
     expect((await ask(fan.email, 'errado')).statusCode).toBe(401);
-    expect((await ask(fan.email)).json()).toEqual({ tier: 'tripulante', admin: false });
+    expect((await ask(fan.email)).json()).toEqual({ tier: 'capitao', admin: false });
     expect((await ask(admin.email)).json()).toEqual({ tier: null, admin: true });
     expect((await ask('ninguem@example.com')).json()).toEqual({ tier: null, admin: false });
   });

@@ -4,7 +4,7 @@
 // estatísticas competitivas, organização de torneios e prioridade de inscrição
 // nos torneios premiados do time.
 
-export const SUPPORTER_TIERS = ['grumete', 'tripulante', 'capitao', 'almirante'] as const;
+export const SUPPORTER_TIERS = ['grumete', 'capitao', 'almirante'] as const;
 export type SupporterTier = (typeof SUPPORTER_TIERS)[number];
 export const isSupporterTier = (v: unknown): v is SupporterTier => SUPPORTER_TIERS.includes(v as SupporterTier);
 
@@ -37,17 +37,17 @@ export const TIER_INFO: Record<SupporterTier, TierInfo> = {
     price: 5,
     perks: ['Seu nome na lista de Apoiadores (se quiser)', 'Badge de apoiador no Discord'],
   },
-  tripulante: {
-    id: 'tripulante',
-    label: 'Tripulante',
-    price: 15,
-    perks: ['Tudo do Grumete', 'Estatísticas Pro: ranqueada, torneios e filtro por faixa de recompensa', 'Voto no roadmap'],
-  },
   capitao: {
     id: 'capitao',
     label: 'Capitão',
     price: 30,
-    perks: ['Tudo do Tripulante', `Organize até ${SUPPORTER_TOURNAMENTS_PER_MONTH} torneios por mês, de até ${SUPPORTER_MAX_PLAYERS} jogadores`, 'Nome nos créditos'],
+    perks: [
+      'Tudo do Grumete',
+      'Estatísticas Pro: ranqueada, torneios e filtro por faixa de recompensa',
+      'Voto no roadmap',
+      `Organize até ${SUPPORTER_TOURNAMENTS_PER_MONTH} torneios por mês, de até ${SUPPORTER_MAX_PLAYERS} jogadores`,
+      'Nome nos créditos',
+    ],
   },
   almirante: {
     id: 'almirante',
@@ -76,8 +76,8 @@ const fold = (s: string) =>
     .trim();
 
 /**
- * Plano de um pagamento: pelo nome do plano na plataforma (Grumete, Tripulante,
- * Capitão, Almirante, com ou sem acento) ou, se o nome não bater, pelo valor em reais.
+ * Plano de um pagamento: pelo nome do plano na plataforma (Grumete, Capitão,
+ * Almirante, com ou sem acento) ou, se o nome não bater, pelo valor em reais.
  */
 export function tierFromPayment(tierName: string | null | undefined, amount: number, currency: string): SupporterTier | null {
   if (tierName) {

@@ -1,4 +1,4 @@
-// ACCESS=supporters: o site inteiro só abre para apoiadores Tripulante ou acima (e para
+// ACCESS=supporters: o site inteiro só abre para apoiadores Capitão ou acima (e para
 // admins). Usado na homologação, onde as novidades chegam antes: o plano é consultado
 // na produção (SUPPORT_SOURCE_URL + INTERNAL_TOKEN), porque o banco da homologação é outro.
 //
@@ -13,7 +13,7 @@ import { fail } from '../errors';
 import { atLeast, isSupporterTier, type SupporterTier } from './tiers';
 
 /** Plano mínimo para entrar. */
-export const ACCESS_TIER: SupporterTier = 'tripulante';
+export const ACCESS_TIER: SupporterTier = 'capitao';
 /** Quanto tempo a resposta da produção vale (quem acabou de assinar espera no máximo isto). */
 const CACHE_OK_MS = 10 * 60_000;
 const CACHE_NO_MS = 2 * 60_000;
@@ -80,6 +80,6 @@ export function registerAccessGate(app: FastifyInstance, { db, user, access, fet
     const path = req.url.split('?')[0];
     if (!path.startsWith('/api/') || OPEN_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith('/') ? p : `${p}/`))) return;
     const { allowed } = await check(req);
-    if (!allowed) return reply.code(403).send({ ...fail('supportersOnly', 'Este ambiente é só para apoiadores Tripulante ou acima.'), code: 'supporters-only' });
+    if (!allowed) return reply.code(403).send({ ...fail('supportersOnly', 'Este ambiente é só para apoiadores Capitão ou acima.'), code: 'supporters-only' });
   });
 }

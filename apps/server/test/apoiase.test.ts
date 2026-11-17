@@ -110,7 +110,7 @@ describe('Apoia.se: apoio mensal vira o plano da conta', () => {
     const { db, app, setClock } = setup(charges);
     const fan = account(db, 'b@example.com');
     const first = await verify(app, fan);
-    expect(first.json()).toMatchObject({ isBacker: true, isPaidThisMonth: true, tier: 'tripulante' });
+    expect(first.json()).toMatchObject({ isBacker: true, isPaidThisMonth: true, tier: 'grumete' });
     expect((await verify(app, fan)).statusCode).toBe(429);
 
     // Subiu o apoio para R$ 50: vira Almirante.
@@ -148,7 +148,7 @@ describe('Apoia.se: apoio mensal vira o plano da conta', () => {
     // 3 de novembro: cartão ainda não cobrado. O plano de outubro segue até o dia 10.
     setClock(Date.parse('2026-11-03T15:00:00Z'));
     charges['g@example.com'] = { isBacker: true, isPaidThisMonth: false };
-    expect((await verify(app, fan)).json()).toMatchObject({ isPaidThisMonth: false, tier: 'tripulante', until: '2026-11-11T02:59:59.000Z' });
+    expect((await verify(app, fan)).json()).toMatchObject({ isPaidThisMonth: false, tier: 'grumete', until: '2026-11-11T02:59:59.000Z' });
 
     const vip = account(db, 'h@example.com');
     setSupporter(db, vip.id, 'almirante', null);

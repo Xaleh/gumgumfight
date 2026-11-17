@@ -860,12 +860,12 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
 - **Time** (`users.team`): marca à parte do perfil e do plano (a sincronização da Apoia.se não a toca): joga contra o Bot do
   Time, vê a tela "Bot do Time" e envia correções (`isTeam`; admins também, para testar).
 - **Plano de apoio** (`users.supporter_tier`, `supporter_until`, `supporter_source`, `supporter_public`): Grumete,
-  Tripulante, Capitão ou Almirante (`apps/server/src/support/tiers.ts`). Vem da Apoia.se (`support/apoiase.ts`): o
+  Capitão ou Almirante (`apps/server/src/support/tiers.ts`). Vem da Apoia.se (`support/apoiase.ts`): o
   servidor consulta `GET https://api.apoia.se/backers/charges/<e-mail>` no login, em `POST /api/support/apoiase/sync`
   e a cada 6 h para quem tem plano de lá; o plano sai do valor pago no mês e vale até o dia 10 do mês seguinte. Também
   pode vir do webhook do Ko-fi (opcional, `POST /api/support/kofi`) ou ser dado à mão pelo admin.
-  O que cada plano libera: Tripulante,
-  Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`); Capitão e Almirante,
+  O que cada plano libera: Capitão e Almirante,
+  Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`) e
   5 torneios por mês de até 64 jogadores (`tournament_quota`); Almirante, inscrição antecipada de 48 h nos torneios
   do time (`tournaments.priority_until`). O acesso à homologação não é mais um benefício anunciado; a trava
   `ACCESS=supporters` (`support/access.ts`) continua existindo como configuração do servidor.

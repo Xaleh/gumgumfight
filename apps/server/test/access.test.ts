@@ -56,11 +56,11 @@ describe('homologação só para apoiadores (ACCESS=supporters)', () => {
     }
   });
 
-  it('entra: admin, plano local Tripulante ou acima, ou plano consultado na produção (com cache)', async () => {
+  it('entra: admin, plano local Capitão ou acima, ou plano consultado na produção (com cache)', async () => {
     const { db, app, calls } = setup({ 'fan@example.com': { tier: 'capitao' }, 'grumete@example.com': { tier: 'grumete' } });
     const as = (headers: Record<string, string>) => app.inject({ url: '/api/decks', headers });
     expect((await as(login(db, { role: 'admin' }))).statusCode).toBe(200);
-    expect((await as(login(db, { tier: 'tripulante' }))).statusCode).toBe(200);
+    expect((await as(login(db, { tier: 'capitao' }))).statusCode).toBe(200);
     expect((await as(login(db, { tier: 'grumete' }))).statusCode).toBe(403);
     expect(calls).toHaveLength(1);
 

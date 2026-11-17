@@ -383,9 +383,9 @@ export const isTeam = (u: User | null | undefined) => Boolean(u && (u.team || is
 // ------------------------------------------------------------------ apoio ao projeto
 
 /** Planos de apoio mensal, do menor para o maior. */
-export type SupporterTier = 'grumete' | 'tripulante' | 'capitao' | 'almirante';
-export const SUPPORTER_TIERS: SupporterTier[] = ['grumete', 'tripulante', 'capitao', 'almirante'];
-export const TIER_LABEL: Record<SupporterTier, string> = { grumete: 'Grumete', tripulante: 'Tripulante', capitao: 'Capitão', almirante: 'Almirante' };
+export type SupporterTier = 'grumete' | 'capitao' | 'almirante';
+export const SUPPORTER_TIERS: SupporterTier[] = ['grumete', 'capitao', 'almirante'];
+export const TIER_LABEL: Record<SupporterTier, string> = { grumete: 'Grumete', capitao: 'Capitão', almirante: 'Almirante' };
 export const tierRank = (t: SupporterTier | null | undefined) => (t ? SUPPORTER_TIERS.indexOf(t) + 1 : 0);
 /** A conta tem o benefício do plano `min` (admins têm todos, para testar e moderar). */
 export const hasPerk = (u: User | null | undefined, min: SupporterTier) => Boolean(u && (isAdmin(u.role) || tierRank(u.supporter?.tier) >= tierRank(min)));
@@ -1921,7 +1921,7 @@ export interface WinCount {
 }
 
 export interface StatsMeta {
-  /** Estatísticas Pro liberadas para quem pede (plano Tripulante ou acima, ou servidor sem apoio configurado). */
+  /** Estatísticas Pro liberadas para quem pede (plano Capitão ou acima, ou servidor sem apoio configurado). */
   pro: boolean;
   /** O servidor separa as estatísticas gerais (casual) das Pro (ranqueada e torneios). */
   proGate: boolean;

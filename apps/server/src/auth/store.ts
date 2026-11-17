@@ -63,7 +63,7 @@ export const isTeam = (u: User | null | undefined) => Boolean(u && (u.team || is
 /** Benefícios de apoiador também valem para quem administra o site (para testar e moderar). */
 export const hasSupporterPerk = (u: User | null | undefined, min: SupporterTier) => Boolean(u && (isAdmin(u.role) || atLeast(u.supporterTier, min)));
 /** Estatísticas Pro: ranqueada, torneios e filtro por faixa de recompensa. */
-export const seesProStats = (u: User | null | undefined) => hasSupporterPerk(u, 'tripulante');
+export const seesProStats = (u: User | null | undefined) => hasSupporterPerk(u, 'capitao');
 
 /**
  * Chave de dono de uma conta, gravada em decks.owner_hash e players.owner_hash no

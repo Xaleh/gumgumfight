@@ -180,7 +180,7 @@ export function registerStatsRoutes(app: FastifyInstance, { db, viewerHash, user
       const { leaders } = statsDimensions(db);
       const decks = me ? myDecks(db, me.id) : [];
       return {
-        /** Estatísticas Pro liberadas (plano Tripulante ou acima). */
+        /** Estatísticas Pro liberadas (plano Capitão ou acima). */
         pro: pro(req),
         /** O servidor separa as estatísticas gerais das Pro (apoio configurado). */
         proGate,
