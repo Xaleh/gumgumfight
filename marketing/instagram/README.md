@@ -26,13 +26,33 @@ logo do app; as imagens das cartas aparecem só dentro das telas do app.
 | Link | `https://gumgumfight.app` |
 | Foto | [`perfil/avatar.png`](perfil/avatar.png) (o Instagram corta em círculo; a carta fica inteira) |
 
-Bio (148 de 150 caracteres):
+Bio (o limite é de 150 caracteres). Três opções:
+
+Completa (148), diz o que tem no app:
 
 ```
 🏴‍☠️ One Piece Card Game direto do navegador
 🎮 Grátis: bot, online, ranqueada e torneios
 ⚠️ Projeto de fã, sem vínculo com a Bandai
 👇 Jogue agora
+```
+
+Curta (121), para ler de relance:
+
+```
+One Piece Card Game no navegador 🏴‍☠️
+Grátis, no celular ou no PC
+Projeto de fã, sem vínculo com a Bandai
+👇 Jogue agora
+```
+
+Competitiva (144), para quem já joga:
+
+```
+🏴‍☠️ Simulador de One Piece Card Game
+⚔️ Treine, suba na ranqueada e dispute torneios
+🇧🇷 Feito por fã, sem vínculo com a Bandai
+👇 Bora jogar
 ```
 
 Destaques (as capas estão em `perfil/destaque-*.jpg`): **Jogar**, **Decks**, **Torneios**, **Aprender**,
