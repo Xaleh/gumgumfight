@@ -11,6 +11,7 @@ Tudo o que precisa para abrir o perfil e publicar as primeiras três semanas: im
 | [`posts/`](posts) | 2 carrosséis e 7 posts avulsos | 1080×1350 (4:5) |
 | [`stories/`](stories) | 5 stories | 1080×1920 (9:16) |
 | [`reels/`](reels) | 3 Reels, sem som | MP4 1080×1920, 30 fps |
+| [`banner/`](banner) | Banner horizontal e painel de três posts para a grade | 1080×566 e 3 × 1080×1350 |
 | [`src/`](src) | O que gera tudo isso (veja [Como refazer](#como-refazer)) | HTML, CSS e scripts |
 
 As telas e a partida são do app de verdade, gravadas no celular (tema escuro). As artes usam as cores, a fonte e o
@@ -261,7 +262,18 @@ O Instagram deixa escrever o texto alternativo em "Configurações avançadas �
 O Instagram cobre o topo e o rodapé dos stories com a própria interface; por isso as artes deixam livres os primeiros
 250 px e os últimos 340 px.
 
-## 6. Na hora de publicar
+## 6. Banners
+
+O Instagram não tem capa de perfil. O que faz esse papel:
+
+- **`banner/banner-horizontal.jpg`** (1080×566): o formato mais largo que o feed e os anúncios aceitam. Serve
+  também para o site, o Discord e os grupos, na hora de divulgar o perfil.
+- **Painel da grade** (`banner/grade-1-esquerda.jpg`, `grade-2-meio.jpg` e `grade-3-direita.jpg`): três posts que,
+  lado a lado no perfil, formam uma faixa só. Publique na ordem **3, 2, 1** (o da direita primeiro), um em seguida
+  do outro. Cada post novo empurra a grade; para a faixa não quebrar, publique sempre de três em três ou fixe os
+  três no topo do perfil. O `banner/grade.jpg` é a arte inteira, só para conferir.
+
+## 7. Na hora de publicar
 
 - **Som dos Reels:** os vídeos saem sem som. Escolha uma música no próprio Instagram ao publicar: ele já tem as
   licenças, e áudio em alta ajuda no alcance.

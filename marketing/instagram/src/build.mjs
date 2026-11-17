@@ -275,17 +275,54 @@ const slides = {
       <div class="chips" style="margin-top:30px"><span class="chip solid">Aberto e gratuito</span></div>
     </div>`,
   },
+
+  // ---------------------------------------------------------------- banners
+  // Horizontal (1,91:1): a imagem mais larga que o feed e os anúncios do Instagram aceitam.
+  'banner/banner-horizontal': {
+    cls: 'wide burst vignette',
+    html: `<div class="layer col" style="--bx:34%;--by:52%;padding:42px 54px;gap:0">
+      <img src="logo.svg" style="height:62px;align-self:flex-start" alt="">
+      <div class="eyebrow" style="font-size:23px;letter-spacing:5px;margin-top:26px">One Piece Card Game</div>
+      <div class="h" style="font-size:112px;-webkit-text-stroke-width:11px;text-shadow:6px 8px 0 var(--ink);margin-top:10px">Direto do<br><em>navegador</em></div>
+      <div class="chips" style="margin-top:26px;gap:12px"><span class="chip solid" style="font-size:23px;padding:9px 20px">Grátis</span><span class="chip solid" style="font-size:23px;padding:9px 20px">Sem instalar</span><span class="chip solid" style="font-size:23px;padding:9px 20px">Celular ou PC</span></div>
+    </div>
+    <div class="layer" style="left:auto;right:92px;top:44px;bottom:auto">${phone('mesa.jpg', { w: 318, rot: 5 })}</div>
+    <div class="layer" style="left:auto;right:40px;top:auto;bottom:34px;z-index:6"><div class="btn" style="font-size:44px;padding:13px 32px 10px;border-width:6px;border-radius:20px;box-shadow:0 8px 0 var(--ink)">${URL_TEXT}</div></div>`,
+  },
+  // Painel da grade: uma arte de 3240x1350 cortada em três posts que formam uma faixa no perfil.
+  // Cada terço também funciona sozinho no feed; só o fundo atravessa os cortes.
+  'banner/grade': {
+    cls: 'pano burst vignette',
+    split: ['banner/grade-1-esquerda', 'banner/grade-2-meio', 'banner/grade-3-direita'],
+    html: `<div class="layer" style="--bx:50%;--by:46%;display:grid;grid-template-columns:repeat(3,1080px)">
+      <div class="col center" style="padding:84px 80px;justify-content:center;gap:0">
+        <img src="mark.svg" style="height:470px;filter:drop-shadow(14px 18px 0 #1f0904)" alt="">
+        <div class="eyebrow" style="margin-top:56px">One Piece Card Game</div>
+        <div class="h h1" style="margin-top:20px">Direto do<br><em>navegador</em></div>
+      </div>
+      <div class="col center" style="padding:84px 60px;justify-content:center;gap:44px">
+        <img src="logo.svg" style="width:940px;filter:drop-shadow(0 16px 0 rgba(11,23,38,.55))" alt="">
+        <div class="lead" style="max-width:800px;margin-top:10px">Treine contra o bot, jogue online e dispute torneios.</div>
+        <div class="chips"><span class="chip solid">Grátis</span><span class="chip solid">Sem instalar</span><span class="chip solid">Celular ou PC</span></div>
+        <div class="btn" style="margin-top:16px">${URL_TEXT}</div>
+      </div>
+      <div class="col center" style="padding:84px 80px 0;justify-content:flex-start;gap:30px;overflow:hidden">
+        <div class="h h2 y">Bora jogar?</div>
+        ${phone('mesa.jpg', { w: 600, rot: 4 })}
+      </div>
+    </div>`,
+  },
 };
 
 const page = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"></head><body>
-${Object.entries(slides).map(([id, s]) => `<section class="slide ${s.cls}" data-out="${id}">${s.html}</section>`).join('\n')}
+${Object.entries(slides).map(([id, s]) => `<section class="slide ${s.cls}" data-out="${id}"${s.split ? ` data-split="${s.split.join(',')}"` : ''}>${s.html}</section>`).join('\n')}
 </body></html>`;
 writeFileSync(join(SRC, 'kit.html'), page);
 
 const filters = process.argv.slice(2);
 const { chromium } = require('playwright');
 const browser = await chromium.launch();
-const tab = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
+const tab = await browser.newPage({ viewport: { width: 3240, height: 1920 }, deviceScaleFactor: 1 });
 await tab.goto(pathToFileURL(join(SRC, 'kit.html')).href, { waitUntil: 'networkidle' });
 await tab.evaluate(() => document.fonts.ready);
 for (const el of await tab.locator('.slide').all()) {
@@ -297,5 +334,14 @@ for (const el of await tab.locator('.slide').all()) {
   mkdirSync(dirname(file), { recursive: true });
   await el.screenshot(png ? { path: file } : { path: file, type: 'jpeg', quality: 93 });
   console.log(id);
+  // Painel da grade: além da arte inteira, um arquivo por terço.
+  const split = (await el.getAttribute('data-split'))?.split(',') ?? [];
+  if (split.length) await el.evaluate((node) => node.scrollIntoView({ block: 'start' }));
+  const box = await el.boundingBox();
+  for (const [i, part] of split.entries()) {
+    const width = box.width / split.length;
+    await tab.screenshot({ path: join(OUT, `${part}.jpg`), type: 'jpeg', quality: 93, clip: { x: box.x + i * width, y: box.y, width, height: box.height } });
+    console.log(part);
+  }
 }
 await browser.close();

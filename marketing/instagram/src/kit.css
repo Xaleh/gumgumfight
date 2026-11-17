@@ -94,3 +94,6 @@ body { font-family: Nunito, 'M PLUS Rounded 1c', sans-serif; color: var(--cream)
 /* Painel em branco dos modelos de story: o texto é escrito no próprio Instagram. */
 .paper { background: var(--cream); border: 8px solid var(--brown); border-radius: 30px; box-shadow: 0 12px 0 var(--ink); }
 .mode .h2 { line-height: 1.1; }
+/* Banners: horizontal (1080x566) e painel de três posts (3240x1350). */
+.slide.wide { height: 566px; }
+.slide.pano { width: 3240px; }
