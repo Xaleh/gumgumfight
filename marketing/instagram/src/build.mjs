@@ -314,6 +314,22 @@ const slides = {
   },
 };
 
+// ------------------------------------------- série "Mihawk aprende a jogar"
+// Sobreposições com fundo transparente, para pôr por cima do vídeo do cosplay no editor.
+const MIHAWK_EPISODES = [
+  ['Para matar o tempo', 'O maior espadachim<br>do mundo<br><em>não sabe jogar cartas.</em>'],
+  ['O aluno', 'Quem ensina<br><em>o mestre?</em>'],
+  ['A faca pequena', 'Mihawk contra o bot.<br><em>No nível Fácil.</em>'],
+  ['Shichibukai no East Blue', 'De ฿ 3.590.000.000<br><em>para ฿ 0.</em>'],
+  ['Um oponente digno', 'Procura-se um<br><em>oponente digno.</em>'],
+];
+const sticker = (html) => ({ cls: 'clear', html: `<div class="col center" style="padding:44px 50px;gap:20px">${html}</div>` });
+slides['mihawk/sobreposicoes/selo-serie'] = sticker(`<div class="h h4 y" style="font-size:92px">Mihawk<br>aprende a jogar</div><img src="logo.svg" style="height:70px;margin-top:10px" alt="">`);
+MIHAWK_EPISODES.forEach(([title, hook], i) => {
+  slides[`mihawk/sobreposicoes/ep-${i + 1}`] = sticker(`<span class="swipe" style="font-size:46px;padding:16px 40px;border-width:6px">Ep. ${i + 1} · ${title}</span>`);
+  slides[`mihawk/sobreposicoes/gancho-ep${i + 1}`] = sticker(`<div class="h h3" style="font-size:${hook.length > 60 ? 96 : 112}px">${hook}</div>`);
+});
+
 const page = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"></head><body>
 ${Object.entries(slides).map(([id, s]) => `<section class="slide ${s.cls}" data-out="${id}"${s.split ? ` data-split="${s.split.join(',')}"` : ''}>${s.html}</section>`).join('\n')}
 </body></html>`;
@@ -328,11 +344,12 @@ await tab.evaluate(() => document.fonts.ready);
 for (const el of await tab.locator('.slide').all()) {
   const id = await el.getAttribute('data-out');
   if (filters.length && !filters.some((f) => id.includes(f))) continue;
-  // O avatar sai em PNG; o resto em JPEG (o Instagram converte tudo para JPEG de qualquer jeito).
-  const png = id === 'perfil/avatar';
+  // O avatar e as sobreposições (fundo transparente) saem em PNG; o resto em JPEG.
+  const clear = id.includes('/sobreposicoes/');
+  const png = clear || id === 'perfil/avatar';
   const file = join(OUT, `${id}.${png ? 'png' : 'jpg'}`);
   mkdirSync(dirname(file), { recursive: true });
-  await el.screenshot(png ? { path: file } : { path: file, type: 'jpeg', quality: 93 });
+  await el.screenshot(png ? { path: file, omitBackground: clear } : { path: file, type: 'jpeg', quality: 93 });
   console.log(id);
   // Painel da grade: além da arte inteira, um arquivo por terço.
   const split = (await el.getAttribute('data-split'))?.split(',') ?? [];

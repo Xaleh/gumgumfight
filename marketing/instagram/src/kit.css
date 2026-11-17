@@ -97,3 +97,5 @@ body { font-family: Nunito, 'M PLUS Rounded 1c', sans-serif; color: var(--cream)
 /* Banners: horizontal (1080x566) e painel de três posts (3240x1350). */
 .slide.wide { height: 566px; }
 .slide.pano { width: 3240px; }
+/* Sobreposições de vídeo: sem fundo e com a altura do conteúdo. */
+.slide.clear { background: transparent; height: auto; }

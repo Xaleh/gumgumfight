@@ -3,7 +3,7 @@
 //   node marketing/instagram/src/reel.mjs reel-02    → só os que têm "reel-02" no nome
 // Cada quadro é desenhado no Chromium (as animações são avançadas à mão, então o vídeo sai
 // liso em qualquer máquina) e o ffmpeg junta tudo. Os trechos de partida vêm de
-// src/clips/partida.mp4, gravado com record.mjs (o arquivo não vai para o git).
+// src/clips/ (partida.mp4 é gravado com record.mjs; a pasta não vai para o git).
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,10 +13,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const SRC = dirname(fileURLToPath(import.meta.url));
-const OUT = join(SRC, '..', 'reels');
+const KIT = join(SRC, '..');
 const ICONS = JSON.parse(readFileSync(join(SRC, 'icons.json'), 'utf8'));
 const FPS = 30;
-const CLIP = join(SRC, 'clips', 'partida.mp4');
 const URL_TEXT = 'gumgumfight.app';
 
 const icon = (name) => `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`;
@@ -90,6 +89,52 @@ const fullClip = (start, dur, caption) => ({
     </div>`,
 });
 
+
+// ------------------------------------------------ série "Mihawk aprende a jogar"
+// Vídeos de apoio para intercalar com as gravações do cosplay: telas do app sem texto por cima,
+// cartelas e encerramentos. Os roteiros estão em mihawk/README.md.
+const MIHAWK = 'mihawk.mp4';
+/** Trecho de partida limpo, em tela cheia. */
+const raw = (start, dur, file = MIHAWK) => ({ dur, clip: { file, start, width: 1080 }, cls: 'deep', html: '<img data-clip class="full" alt="">' });
+/** Captura de tela alta, rolando de `from` a `to` (px). */
+const scroll = (img, from, to, dur) => ({ dur, cls: 'deep', html: `<img class="scroll" src="shots/${img}" style="--from:${from}px;--to:${to}px;animation-duration:${dur}s" alt="">` });
+/** Captura de tela parada (1080x1920), aproximando `to` vezes no ponto (cx, cy) e levando-o para o centro do quadro. */
+function zoom(img, dur, to, cx = 540, cy = 960) {
+  // O deslocamento é limitado para a imagem nunca descobrir as bordas do quadro.
+  const shift = (center, size) => Math.min(center * (to - 1), Math.max((size - center) * (1 - to), size / 2 - center));
+  const style = `--zt:${to};--tx:${shift(cx, 1080).toFixed(1)}px;--ty:${shift(cy, 1920).toFixed(1)}px;transform-origin:${cx}px ${cy}px;animation-duration:${dur}s`;
+  return { dur, cls: 'deep', html: `<img class="zoom" src="shots/${img}" style="${style}" alt="">` };
+}
+const timeCard = (text) => ({
+  dur: 2,
+  cls: 'deep',
+  html: `<div class="layer col center" style="justify-content:center;padding:0 70px 200px">${a('up', 0.08, `<div class="h h2" style="font-size:150px">${text}</div>`)}</div>`,
+});
+const episodeEnd = (n, title, next) => ({
+  dur: 3,
+  cls: 'deep burst spin vignette',
+  html: `<div class="layer col center" style="--by:44%;padding:0 70px 230px;justify-content:center;gap:30px">
+    ${a('up', 0.05, `<div class="eyebrow" style="font-size:38px">Mihawk aprende a jogar</div>`)}
+    ${a('pop', 0.15, `<div class="h h1 y">Ep. ${n}</div>`)}
+    ${a('up', 0.35, `<div class="lead" style="font-size:56px">${title}</div>`)}
+    ${a('up', 0.7, `<div class="chip" style="font-size:36px">${next}</div>`, 'margin-top:24px')}
+    ${a('pop', 0.9, `<div class="btn" style="font-size:58px">${URL_TEXT}</div>`, 'margin-top:14px')}
+    ${a('up', 1.1, `<img src="logo.svg" style="height:84px;margin-top:34px" alt="">`)}
+  </div>`,
+});
+const LEAGUES = [['Yonkou', '฿ 250.001+'], ['Shichibukai', '฿ 100.001+'], ['Supernova', '฿ 50.001+'], ['Novo Mundo', '฿ 20.001+'], ['Paradise', '฿ 5.001+'], ['East Blue', '฿ 0']];
+const leagues = () => ({
+  dur: 4.5,
+  cls: 'deep burst spin',
+  html: `<div class="layer col" style="--by:50%;padding:260px 80px 0;gap:26px">
+    ${a('up', 0.05, `<div class="eyebrow" style="font-size:36px">Ranqueada</div>`)}
+    ${a('pop', 0.12, `<div class="h h3">As <em>seis ligas</em></div>`)}
+    <div class="ladder big" style="margin-top:34px">
+      ${LEAGUES.map(([name, bounty], i) => a('up', 0.4 + (LEAGUES.length - 1 - i) * 0.32, `<div class="${name === 'Shichibukai' ? 'top' : name === 'East Blue' ? 'here' : ''}">${name}${name === 'East Blue' ? ' <i>você está aqui</i>' : ''}${name === 'Shichibukai' ? ' <i>o antigo título</i>' : ''} <span>${bounty}</span></div>`)).join('')}
+    </div>
+  </div>`,
+});
+
 const reels = {
   'reel-01-apresentacao': [
     intro('One Piece Card Game', 'Direto do<br><em>navegador</em>'),
@@ -114,7 +159,37 @@ const reels = {
     modeScene({ color: '#e6bb1e', ico: 'crown', tag: 'Eventos', title: 'Torneios', lead: 'Suíço, mata-mata e melhor de 3 ou de 5.' }),
     outro(3.0),
   ],
+  'mihawk/videos/app-01-abrindo': [scroll('mihawk-pan-inicio.jpg', 0, -700, 4)],
+  'mihawk/videos/app-02-carta-do-mihawk': [zoom('mihawk-deck.jpg', 4, 2.3, 917, 1097)],
+  'mihawk/videos/app-03-tutorial': [scroll('pan-aprender.jpg', 0, -760, 2.8), zoom('mihawk-licao1.jpg', 2.6, 1.08, 540, 230)],
+  'mihawk/videos/app-04-bot-facil': [zoom('mihawk-bot.jpg', 3.5, 1.09, 540, 800)],
+  'mihawk/videos/app-05-partida-inicio': [raw(0.4, 6)],
+  'mihawk/videos/app-06-partida-seu-turno': [raw(36.8, 7.4)],
+  'mihawk/videos/app-07-partida-zoro-ataca': [raw(29.3, 6)],
+  'mihawk/videos/app-08-partida-fim': [raw(137.3, 5.6), zoom('mihawk-derrota.jpg', 2.6, 1.06, 540, 420)],
+  'mihawk/videos/app-09-cartaz-east-blue': [zoom('mihawk-cartaz.jpg', 4, 1.9, 290, 400)],
+  'mihawk/videos/app-10-sala-privada': [zoom('mihawk-sala.jpg', 4, 1.09, 540, 700)],
+  'mihawk/videos/insert-57-minutos-depois': [timeCard('57 minutos<br><em>depois…</em>')],
+  'mihawk/videos/insert-algum-tempo-depois': [timeCard('Algum tempo<br><em>depois…</em>')],
+  'mihawk/videos/insert-ligas': [leagues()],
+  'mihawk/videos/fim-ep1': [episodeEnd(1, 'Para matar o tempo', 'No próximo: o tutorial')],
+  'mihawk/videos/fim-ep2': [episodeEnd(2, 'O aluno', 'No próximo: Mihawk contra o bot')],
+  'mihawk/videos/fim-ep3': [episodeEnd(3, 'A faca pequena', 'No próximo: a ranqueada')],
+  'mihawk/videos/fim-ep4': [episodeEnd(4, 'Shichibukai no East Blue', 'No próximo: o desafio')],
+  'mihawk/videos/fim-ep5': [episodeEnd(5, 'Um oponente digno', 'Aprenda você também')],
+  'mihawk/videos/fim-desafie-o-mihawk': [{
+    dur: 3.5,
+    cls: 'burst spin vignette',
+    html: `<div class="layer col center" style="--by:44%;padding:0 70px 230px;justify-content:center;gap:36px">
+      ${a('up', 0.05, `<div class="eyebrow" style="font-size:38px">Procura-se um oponente digno</div>`)}
+      ${a('pop', 0.15, `<div class="h h1">Desafie<br>o <em>Mihawk</em></div>`)}
+      ${a('up', 0.5, `<div class="lead" style="max-width:860px">Sala privada no GumGum Fight.<br>O código sai nos stories.</div>`)}
+      ${a('pop', 0.85, `<div class="btn" style="font-size:58px">${URL_TEXT}</div>`, 'margin-top:14px')}
+      ${a('up', 1.1, `<img src="logo.svg" style="height:84px;margin-top:34px" alt="">`)}
+    </div>`,
+  }],
 };
+
 
 const css = `
 html, body { width: 1080px; height: 1920px; overflow: hidden; background: #0b1726; }
@@ -131,20 +206,27 @@ img.full { position: absolute; inset: 0; width: 1080px; height: 1920px; }
 @keyframes up { from { opacity: 0; transform: translateY(70px); } to { opacity: 1; transform: none; } }
 @keyframes spin { to { transform: rotate(60deg); } }
 @keyframes pan { from { transform: translateY(var(--from)); } to { transform: translateY(var(--to)); } }
+img.scroll { position: absolute; left: 0; top: 0; width: 1080px; animation: pan cubic-bezier(0.45, 0, 0.55, 1) both; }
+img.zoom { position: absolute; inset: 0; width: 1080px; height: 1920px; animation: zoom cubic-bezier(0.3, 0, 0.3, 1) both; }
+@keyframes zoom { from { transform: none; } to { transform: translate(var(--tx), var(--ty)) scale(var(--zt)); } }
+.ladder.big > div > div { font-size: 54px; padding: 26px 34px; border-radius: 30px; }
+.ladder.big > div > div span { font-size: 40px; }
+.ladder.big i { font-style: normal; font-weight: 800; font-size: 28px; padding: 6px 16px; border-radius: 999px; background: var(--red); color: var(--cream); margin-left: 10px; vertical-align: middle; }
+.ladder.big .top i { background: var(--brown); }
+.ladder.big .here { border-color: var(--red); }
 `;
 
 const filters = process.argv.slice(2);
 const { chromium } = require('playwright');
 const browser = await chromium.launch();
 const tab = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
-mkdirSync(OUT, { recursive: true });
 
 for (const [name, scenes] of Object.entries(reels)) {
   if (filters.length && !filters.some((f) => name.includes(f))) continue;
   const tmp = mkdtempSync(join(tmpdir(), 'ggf-reel-'));
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>${css}</style></head><body>
 ${scenes.map((s, i) => `<section class="slide story scene ${s.cls}" id="s${i}">${s.html}</section>`).join('\n')}</body></html>`;
-  const file = join(SRC, `.${name}.html`);
+  const file = join(SRC, `.reel-${name.replace(/\//g, '-')}.html`);
   writeFileSync(file, html);
   await tab.goto(pathToFileURL(file).href, { waitUntil: 'networkidle' });
   await tab.evaluate(() => document.fonts.ready);
@@ -155,7 +237,7 @@ ${scenes.map((s, i) => `<section class="slide story scene ${s.cls}" id="s${i}">$
     if (scene.clip) {
       const dir = join(tmp, `clip${i}`);
       mkdirSync(dir);
-      execFileSync('ffmpeg', ['-loglevel', 'error', '-ss', String(scene.clip.start), '-t', String(scene.dur + 0.2), '-i', CLIP, '-vf', `fps=${FPS},scale=${scene.clip.width}:-2:flags=lanczos`, '-q:v', '2', join(dir, '%05d.jpg')]);
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-ss', String(scene.clip.start), '-t', String(scene.dur + 0.2), '-i', join(SRC, 'clips', scene.clip.file ?? 'partida.mp4'), '-vf', `fps=${FPS},scale=${scene.clip.width}:-2:flags=lanczos`, '-q:v', '2', join(dir, '%05d.jpg')]);
       clipFrames = readdirSync(dir).sort().map((f) => pathToFileURL(join(dir, f)).href);
     }
     await tab.evaluate((id) => { document.querySelectorAll('.scene').forEach((s) => s.classList.toggle('on', s.id === id)); }, `s${i}`);
@@ -169,9 +251,12 @@ ${scenes.map((s, i) => `<section class="slide story scene ${s.cls}" id="s${i}">$
     }
     console.log(name, `cena ${i + 1}/${scenes.length}`);
   }
+  // Um nome com pasta ("mihawk/videos/x") sai nessa pasta do kit; sem pasta, em reels/.
+  const target = join(KIT, name.includes('/') ? '' : 'reels', `${name}.mp4`);
+  mkdirSync(dirname(target), { recursive: true });
   // Trilha muda: o áudio é escolhido no próprio Instagram.
   execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-framerate', String(FPS), '-i', join(tmp, '%06d.jpg'), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-shortest', '-movflags', '+faststart', join(OUT, `${name}.mp4`)]);
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-shortest', '-movflags', '+faststart', target]);
   rmSync(tmp, { recursive: true, force: true });
   rmSync(file);
   console.log(name, 'pronto');

@@ -12,6 +12,7 @@ Tudo o que precisa para abrir o perfil e publicar as primeiras três semanas: im
 | [`stories/`](stories) | 5 stories | 1080×1920 (9:16) |
 | [`reels/`](reels) | 3 Reels, sem som | MP4 1080×1920, 30 fps |
 | [`banner/`](banner) | Banner horizontal e painel de três posts para a grade | 1080×566 e 3 × 1080×1350 |
+| [`mihawk/`](mihawk) | Série "Mihawk aprende a jogar": roteiros, legendas, vídeos de apoio e sobreposições para gravar com o cosplay | MP4 1080×1920 e PNG transparente |
 | [`src/`](src) | O que gera tudo isso (veja [Como refazer](#como-refazer)) | HTML, CSS e scripts |
 
 As telas e a partida são do app de verdade, gravadas no celular (tema escuro). As artes usam as cores, a fonte e o
