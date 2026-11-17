@@ -82,9 +82,6 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `SUPPORT_GOAL_BRL` | (vazio) | Custo mensal do site, mostrado como meta no "Apoiar o projeto" |
 | `SUPPORT_CONTACT_URL` | (vazio) | Contato para lojas que querem patrocinar (`mailto:` ou link) |
 | `KOFI_WEBHOOK_TOKEN` | (vazio) | Opcional: token do webhook do Ko-fi; vazio = desligado (segredo: só no `deploy.env`) |
-| `INTERNAL_TOKEN` | (vazio) | Token da consulta de plano entre homologação e produção (igual nos dois; segredo) |
-| `ACCESS` | `open` | `supporters`: o site só abre para apoiadores Capitão ou acima e admins (homologação) |
-| `SUPPORT_SOURCE_URL` | (vazio) | Com `ACCESS=supporters`: site onde o plano é consultado (a produção) |
 | `PARTNER_IPS` | (vazio; só no `deploy.env` da VM) | IPs dos servidores de apps parceiros, separados por vírgula: ficam fora do limite por IP do Nginx (o app limita cada token) |
 | `REPLAY_EMBED_ORIGINS` | (vazio) | Sites que podem pôr o replay embutido (`/replay/<id>`) num iframe, separados por vírgula (ex.: `https://sweetapp.com.br`); vazio = só o próprio site |
 | `REPLAY_LINK_SECRET` | (gerado) | Segredo das assinaturas dos links de replay; sem ele, o servidor gera um na primeira vez e guarda no banco (trocar invalida os links abertos) |
@@ -774,8 +771,7 @@ mexido ou de outra partida: `replay_link_invalid` (a página mostra o erro). Par
 Só `/replay/*` pode ir para um iframe, e só nos sites de `REPLAY_EMBED_ORIGINS`
 (`Content-Security-Policy: frame-ancestors 'self' <origens>`); o resto do site responde `frame-ancestors 'none'`
 e `X-Frame-Options: DENY`. Imagens, CSS e textos vêm do nosso domínio; o replay chega com as definições só das
-cartas usadas (`GET /api/replay/:id?t=`), então não há CORS. Na homologação só para apoiadores, o replay com link
-assinado abre sem login.
+cartas usadas (`GET /api/replay/:id?t=`), então não há CORS.
 
 **postMessage** (os dois lados conferem a origem): a página do app manda para o iframe
 `{ type: 'seek', pos }` (posição = número de ações já aplicadas, de 0 ao total), `{ type: 'play' }` e

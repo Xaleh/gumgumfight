@@ -60,15 +60,6 @@ export default {
   'support.perk.almirante.2': 'Prioridad de inscripción en los torneos con premio del equipo',
   'support.perk.almirante.3': 'Destacado en la lista de colaboradores',
 
-  'access.checking': 'Verificando el acceso…',
-  'access.title': 'Área de colaboradores',
-  'access.body': 'Aquí las novedades de GumGum Fight llegan antes que a nadie. El acceso es un beneficio de los planes Capitão y Almirante.',
-  'access.loginOff': 'El inicio de sesión está desactivado.',
-  'access.denied': 'Tu cuenta ({email}) todavía no tiene un plan que habilite esta área. Si acabas de apoyar, espera unos minutos y recarga la página.',
-  'access.unverified': 'Google no confirmó el correo de esta cuenta: entra con otra cuenta.',
-  'access.goHome': 'Ir al sitio y ver los planes',
-  'access.signOut': 'Salir',
-
   'stats.scopeLabel': 'Tipo de estadística',
   'stats.scopeGeneral': 'General',
   'stats.scopeGeneralSub': 'casual, bot y salas privadas',
@@ -151,7 +142,6 @@ export default {
   'errors.adminOnly': 'Solo los administradores pueden hacer esto.',
   'errors.invalidDate': 'Fecha inválida.',
   'errors.supporterInvalidTier': 'Plan inválido.',
-  'errors.supportersOnly': 'Esta área es solo para colaboradores Capitão o superiores.',
   'errors.apoiaseTooSoon': 'Espera unos segundos para verificar de nuevo.',
   'errors.apoiaseUnverifiedEmail': 'Google no confirmó el correo de esta cuenta.',
   'errors.apoiaseUnavailable': 'No se pudo consultar Apoia.se ahora. Inténtalo más tarde.',

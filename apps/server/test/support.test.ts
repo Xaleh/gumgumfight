@@ -11,7 +11,6 @@ import { crc16, pixPayload } from '../src/support/pix';
 import { tierFromPayment } from '../src/support/tiers';
 
 const KOFI = 'kofi-token-123';
-const INTERNAL = 'internal-token-456';
 const SUPPORT: SupportOptions = {
   pixKey: '123e4567-e89b-12d3-a456-426614174000',
   pixName: 'Fulano de Tal',
@@ -20,7 +19,6 @@ const SUPPORT: SupportOptions = {
   monthlyUrl: 'https://ko-fi.com/gumgum/tiers',
   goalBrl: 120,
   kofiToken: KOFI,
-  internalToken: INTERNAL,
 };
 
 function setup(server: Partial<ServerOptions> = {}) {
@@ -128,7 +126,7 @@ describe('apoio: planos', () => {
       ['capitao', 30],
       ['almirante', 50],
     ]);
-    expect((await get(app, '/api/config')).json()).toMatchObject({ support: true, access: 'open' });
+    expect((await get(app, '/api/config')).json()).toMatchObject({ support: true });
     const off = setup({ support: {} }).app;
     expect((await get(off, '/api/config')).json().support).toBe(false);
     expect((await get(off, '/api/support')).json()).toMatchObject({ enabled: false, pix: null });
@@ -223,20 +221,5 @@ describe('apoio: webhook do Ko-fi', () => {
     await app.inject({ method: 'PUT', url: `/api/admin/users/${fan.id}/supporter`, headers: admin.headers, payload: { tier: 'almirante' } });
     expect((await kofi(app, { email: fan.email, tier_name: 'Grumete', amount: '5' })).json().applied).toBe(false);
     expect((await get(app, '/api/auth/me', fan)).json().user.supporter.tier).toBe('almirante');
-  });
-});
-
-describe('apoio: consulta interna da homologação', () => {
-  it('responde o plano pelo e-mail confirmado, só com o token', async () => {
-    const { db, app } = setup();
-    const admin = login(db, 'admin');
-    const fan = login(db);
-    await app.inject({ method: 'PUT', url: `/api/admin/users/${fan.id}/supporter`, headers: admin.headers, payload: { tier: 'capitao' } });
-    const ask = (email: string, token = INTERNAL) =>
-      app.inject({ method: 'GET', url: `/api/internal/supporter?email=${encodeURIComponent(email)}`, headers: { authorization: `Bearer ${token}` } });
-    expect((await ask(fan.email, 'errado')).statusCode).toBe(401);
-    expect((await ask(fan.email)).json()).toEqual({ tier: 'capitao', admin: false });
-    expect((await ask(admin.email)).json()).toEqual({ tier: null, admin: true });
-    expect((await ask('ninguem@example.com')).json()).toEqual({ tier: null, admin: false });
   });
 });

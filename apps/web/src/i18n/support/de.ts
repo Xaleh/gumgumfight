@@ -60,15 +60,6 @@ export default {
   'support.perk.almirante.2': 'Vorrangige Anmeldung bei den Preisturnieren des Teams',
   'support.perk.almirante.3': 'Hervorhebung in der Unterstützerliste',
 
-  'access.checking': 'Zugang wird geprüft…',
-  'access.title': 'Bereich für Unterstützer',
-  'access.body': 'Hier kommen die Neuerungen von GumGum Fight vor allen anderen an. Der Zugang ist ein Vorteil der Stufen Capitão und Almirante.',
-  'access.loginOff': 'Die Anmeldung ist deaktiviert.',
-  'access.denied': 'Dein Konto ({email}) hat noch keine Stufe, die diesen Bereich freischaltet. Wenn du gerade unterstützt hast, warte ein paar Minuten und lade die Seite neu.',
-  'access.unverified': 'Google hat die E-Mail dieses Kontos nicht bestätigt: Melde dich mit einem anderen Konto an.',
-  'access.goHome': 'Zur Seite und zu den Stufen',
-  'access.signOut': 'Abmelden',
-
   'stats.scopeLabel': 'Art der Statistik',
   'stats.scopeGeneral': 'Allgemein',
   'stats.scopeGeneralSub': 'Casual, Bot und private Räume',
@@ -151,7 +142,6 @@ export default {
   'errors.adminOnly': 'Nur Administratoren können das tun.',
   'errors.invalidDate': 'Ungültiges Datum.',
   'errors.supporterInvalidTier': 'Ungültige Stufe.',
-  'errors.supportersOnly': 'Dieser Bereich ist nur für Unterstützer ab Capitão.',
   'errors.apoiaseTooSoon': 'Warte ein paar Sekunden, bevor du erneut prüfst.',
   'errors.apoiaseUnverifiedEmail': 'Google hat die E-Mail dieses Kontos nicht bestätigt.',
   'errors.apoiaseUnavailable': 'Apoia.se ist gerade nicht erreichbar. Versuch es später noch einmal.',

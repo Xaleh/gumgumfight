@@ -60,15 +60,6 @@ export default {
   'support.perk.almirante.2': "Priority registration in the team's prize tournaments",
   'support.perk.almirante.3': 'Highlight in the Supporters list',
 
-  'access.checking': 'Checking access…',
-  'access.title': 'Supporters area',
-  'access.body': 'This is where GumGum Fight news arrives before everyone else. Access is a perk of the Capitão and Almirante plans.',
-  'access.loginOff': 'Sign-in is turned off.',
-  'access.denied': "Your account ({email}) doesn't have a plan that unlocks this area yet. If you just subscribed, wait a few minutes and reload the page.",
-  'access.unverified': "Google hasn't verified this account's email: sign in with another account.",
-  'access.goHome': 'Go to the site and see the plans',
-  'access.signOut': 'Sign out',
-
   'stats.scopeLabel': 'Statistics type',
   'stats.scopeGeneral': 'General',
   'stats.scopeGeneralSub': 'casual, bot and private rooms',
@@ -151,7 +142,6 @@ export default {
   'errors.adminOnly': 'Only administrators can do this.',
   'errors.invalidDate': 'Invalid date.',
   'errors.supporterInvalidTier': 'Invalid plan.',
-  'errors.supportersOnly': 'This area is only for Capitão supporters or above.',
   'errors.apoiaseTooSoon': 'Wait a few seconds before checking again.',
   'errors.apoiaseUnverifiedEmail': "Google hasn't verified this account's email.",
   'errors.apoiaseUnavailable': "Couldn't reach Apoia.se right now. Try again later.",

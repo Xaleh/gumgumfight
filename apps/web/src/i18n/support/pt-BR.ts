@@ -1,5 +1,5 @@
 // Textos do apoio ao projeto (português do Brasil, referência das chaves): modal "Apoiar o
-// projeto", Apoia.se, Estatísticas Pro, torneios do time, lojas parceiras, homologação e a
+// projeto", Apoia.se, Estatísticas Pro, torneios do time, lojas parceiras e a
 // parte de apoio da Administração. Os nomes dos planos (Grumete, Capitão,
 // Almirante) são os mesmos da campanha na Apoia.se e não se traduzem.
 
@@ -63,16 +63,6 @@ const supportPtBR = {
   'support.perk.almirante.1': 'Tudo do Capitão',
   'support.perk.almirante.2': 'Prioridade de inscrição nos torneios premiados do time',
   'support.perk.almirante.3': 'Destaque na lista de Apoiadores',
-
-  // ---- homologação só para apoiadores ----
-  'access.checking': 'Verificando o acesso…',
-  'access.title': 'Ambiente dos apoiadores',
-  'access.body': 'Aqui as novidades do GumGum Fight chegam antes de todo mundo. O acesso é um benefício dos planos Capitão e Almirante.',
-  'access.loginOff': 'O login está desligado.',
-  'access.denied': 'Sua conta ({email}) ainda não tem um plano que libera este ambiente. Se acabou de apoiar, espere alguns minutos e recarregue a página.',
-  'access.unverified': 'O Google não confirmou o e-mail desta conta: entre com outra conta.',
-  'access.goHome': 'Ir para o site e ver os planos',
-  'access.signOut': 'Sair',
 
   // ---- Estatísticas Pro ----
   'stats.scopeLabel': 'Tipo de estatística',
@@ -161,7 +151,6 @@ const supportPtBR = {
   'errors.adminOnly': 'Só administradores podem fazer isso.',
   'errors.invalidDate': 'Data inválida.',
   'errors.supporterInvalidTier': 'Plano inválido.',
-  'errors.supportersOnly': 'Este ambiente é só para apoiadores Capitão ou acima.',
   'errors.apoiaseTooSoon': 'Espere alguns segundos para verificar de novo.',
   'errors.apoiaseUnverifiedEmail': 'O Google não confirmou o e-mail desta conta.',
   'errors.apoiaseUnavailable': 'Não deu para consultar a Apoia.se agora. Tente de novo mais tarde.',

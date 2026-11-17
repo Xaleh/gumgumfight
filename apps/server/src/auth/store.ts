@@ -215,7 +215,7 @@ export function applySupporterPayment(db: DB, userId: string, tier: SupporterTie
   return applySupporterPlan(db, userId, tier, new Date(Date.parse(paidAt) + PAYMENT_GRACE_DAYS * 86_400_000).toISOString(), 'kofi');
 }
 
-/** Conta com este e-mail confirmado pelo Google (para aplicar pagamentos e responder à homologação). */
+/** Conta com este e-mail confirmado pelo Google (para aplicar pagamentos). */
 export function userByVerifiedEmail(db: DB, email: string): User | null {
   const r = db
     .prepare(`SELECT ${USER_COLS} FROM users WHERE lower(email) = ? AND email_verified = 1 ORDER BY last_login_at DESC LIMIT 1`)

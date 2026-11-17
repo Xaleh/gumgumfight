@@ -59,15 +59,6 @@ export default {
   'support.perk.almirante.2': 'チーム主催の賞品付き大会への優先登録',
   'support.perk.almirante.3': 'サポーター一覧で目立つ表示',
 
-  'access.checking': 'アクセスを確認中…',
-  'access.title': 'サポーター専用エリア',
-  'access.body': 'ここでは GumGum Fight の新機能を誰よりも早く試せます。アクセスは Capitão、Almirante プランの特典です。',
-  'access.loginOff': 'ログインは無効になっています。',
-  'access.denied': 'あなたのアカウント（{email}）には、まだこのエリアを開くプランがありません。支援したばかりなら、数分待ってからページを再読み込みしてください。',
-  'access.unverified': 'このアカウントのメールアドレスは Google で確認されていません。別のアカウントでログインしてください。',
-  'access.goHome': 'サイトでプランを見る',
-  'access.signOut': 'ログアウト',
-
   'stats.scopeLabel': '統計の種類',
   'stats.scopeGeneral': '一般',
   'stats.scopeGeneralSub': 'カジュアル、ボット、プライベートルーム',
@@ -149,7 +140,6 @@ export default {
   'errors.adminOnly': '管理者だけが実行できます。',
   'errors.invalidDate': '日付が正しくありません。',
   'errors.supporterInvalidTier': 'プランが正しくありません。',
-  'errors.supportersOnly': 'このエリアは Capitão 以上のサポーター専用です。',
   'errors.apoiaseTooSoon': '数秒待ってからもう一度確認してください。',
   'errors.apoiaseUnverifiedEmail': 'このアカウントのメールアドレスは Google で確認されていません。',
   'errors.apoiaseUnavailable': '現在 Apoia.se に問い合わせできません。後でもう一度お試しください。',

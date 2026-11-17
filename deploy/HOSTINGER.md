@@ -157,8 +157,6 @@ APOIASE_API_SECRET=<segredo (Bearer) enviado pela Apoia.se>
 # Meta do mês e contato das lojas
 SUPPORT_GOAL_BRL=120
 SUPPORT_CONTACT_URL=mailto:<seu-email>
-# Consulta de plano pela homologação (o mesmo texto nos dois servidores)
-INTERNAL_TOKEN=<texto aleatório longo>
 # Meta global (TCG Matchmaking): chave e nome de cliente dados pelo mantenedor da OPTCG Logpose API
 GLOBAL_STATS_API_KEY=<x-api-key>
 GLOBAL_STATS_CLIENT=gumgum
@@ -173,16 +171,6 @@ pm2 startOrReload ~/apps/gumgumfight/current/deploy/ecosystem.config.cjs --updat
 Com a chave da Apoia.se, o site consulta o apoio no login, no botão "Já apoio: verificar" e a cada 6 horas
 (`APOIASE_SYNC=off` desliga a rodada periódica). O passo a passo completo está em
 [`docs/apoio/README.md`](../docs/apoio/README.md).
-
-Na homologação (`gumgumfight.duckdns.org`), para abrir o site só para apoiadores:
-
-```ini
-ACCESS=supporters
-SUPPORT_SOURCE_URL=https://gumgumfight.app
-INTERNAL_TOKEN=<o mesmo da produção>
-```
-
-Rodar o `setup-vm.sh` de novo mantém essas linhas.
 
 ## 8. API para parceiros (opcional)
 

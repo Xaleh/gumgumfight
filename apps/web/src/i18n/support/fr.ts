@@ -60,15 +60,6 @@ export default {
   'support.perk.almirante.2': 'Inscription prioritaire aux tournois dotés de l’équipe',
   'support.perk.almirante.3': 'Mise en avant dans la liste des soutiens',
 
-  'access.checking': 'Vérification de l’accès…',
-  'access.title': 'Espace des soutiens',
-  'access.body': 'Ici, les nouveautés de GumGum Fight arrivent avant tout le monde. L’accès est un avantage des formules Capitão et Almirante.',
-  'access.loginOff': 'La connexion est désactivée.',
-  'access.denied': 'Votre compte ({email}) n’a pas encore de formule qui ouvre cet espace. Si vous venez de souscrire, attendez quelques minutes puis rechargez la page.',
-  'access.unverified': 'Google n’a pas confirmé l’e-mail de ce compte : connectez-vous avec un autre compte.',
-  'access.goHome': 'Aller sur le site et voir les formules',
-  'access.signOut': 'Se déconnecter',
-
   'stats.scopeLabel': 'Type de statistiques',
   'stats.scopeGeneral': 'Général',
   'stats.scopeGeneralSub': 'occasionnel, bot et salons privés',
@@ -151,7 +142,6 @@ export default {
   'errors.adminOnly': 'Seuls les administrateurs peuvent faire cela.',
   'errors.invalidDate': 'Date invalide.',
   'errors.supporterInvalidTier': 'Formule invalide.',
-  'errors.supportersOnly': 'Cet espace est réservé aux soutiens Capitão ou plus.',
   'errors.apoiaseTooSoon': 'Attendez quelques secondes avant de vérifier à nouveau.',
   'errors.apoiaseUnverifiedEmail': 'Google n’a pas confirmé l’e-mail de ce compte.',
   'errors.apoiaseUnavailable': 'Impossible de consulter Apoia.se pour le moment. Réessayez plus tard.',

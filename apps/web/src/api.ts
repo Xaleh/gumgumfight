@@ -527,8 +527,6 @@ export interface AppConfig {
   googleClientId: string | null;
   /** O apoio está configurado: o item "Apoiar o projeto" aparece. */
   support: boolean;
-  /** supporters: o site só abre para apoiadores (homologação). */
-  access: 'open' | 'supporters';
   /** Chave pública para as notificações (null = desligadas no servidor). */
   pushKey?: string | null;
   /** Próxima coleção a ser lançada, a dos modos "+ spoilers" fora do Livre (servidores antigos não mandam). */
@@ -636,11 +634,6 @@ export const api = {
   },
   sponsors: (placement?: 'tournaments' | 'home') =>
     get<{ sponsors: PublicSponsor[]; contactUrl: string | null }>(`/api/sponsors${placement ? `?placement=${placement}` : ''}`),
-  /** Acesso ao site (homologação só para apoiadores). */
-  access: () =>
-    get<{ mode: 'open' | 'supporters'; allowed: boolean; reason: 'open' | 'login' | 'admin' | 'supporter' | 'remote' | 'denied' | 'unverified'; homeUrl: string | null }>(
-      '/api/access',
-    ),
   support: {
     info: () => get<SupportInfo>('/api/support'),
     supporters: () => get<Array<{ name: string; tier: SupporterTier }>>('/api/support/supporters'),

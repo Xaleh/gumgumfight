@@ -867,8 +867,7 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
   O que cada plano libera: Capitão e Almirante,
   Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`) e
   5 torneios por mês de até 64 jogadores (`tournament_quota`); Almirante, inscrição antecipada de 48 h nos torneios
-  do time (`tournaments.priority_until`). O acesso à homologação não é mais um benefício anunciado; a trava
-  `ACCESS=supporters` (`support/access.ts`) continua existindo como configuração do servidor.
+  do time (`tournaments.priority_until`).
   Admins têm todos os benefícios. Sem nenhuma variável `SUPPORT_*`, nada disso é exigido (estatísticas abertas).
 - **Lojas parceiras** (`sponsors`, logo em BLOB validado pelos bytes, só PNG/JPEG/WebP): `GET /api/sponsors`,
   cadastro em `/api/admin/sponsors`. O torneio do time (`tournaments.official`, `prize`, `sponsor_id`) é marcado só
@@ -919,13 +918,13 @@ aqui, o desenho:
   `GET /api/matches/:id/replay` (`replayDenied` em `reports/routes.ts`) e devolve `/replay/<id>?t=<token>&embed=1`
   (+ `lang`, `layout`). Token `<exp base 36>.<HMAC-SHA256 base64url de "replay:<id>:<exp>">`, 1 h, segredo em
   `REPLAY_LINK_SECRET` ou `server_keys` (`replay_link`, gerado na primeira vez); conferido com `timingSafeEqual`.
-  `GET /api/replay/:id?t=` (sem `config.scope`: Bearer recebe 403; aberto no `ACCESS=supporters`) confere o token,
+  `GET /api/replay/:id?t=` (sem `config.scope`: Bearer recebe 403) confere o token,
   fecha torneio em andamento (403 `replayTournamentRunning` mesmo com link válido) e responde
   `{ replay, cards, origins }` com só as cartas usadas. `GET /replay/:id` entrega o `index.html` com
   `frame-ancestors 'self' <REPLAY_EMBED_ORIGINS>` e `Referrer-Policy: no-referrer`; um hook `onSend` em `app.ts` põe
   `frame-ancestors 'none'` + `X-Frame-Options: DENY` em toda resposta que não definiu a própria CSP. No web,
-  `embed.ts` lê o endereço e os comandos, `main.tsx` pula o service worker e aplica o `lang` do link, o `AccessGate`
-  não bloqueia o caminho, `ReplayEmbed.tsx` monta a partida (`setupFromReplay` com as cartas recebidas) e a
+  `embed.ts` lê o endereço e os comandos, `main.tsx` pula o service worker e aplica o `lang` do link,
+  `ReplayEmbed.tsx` monta a partida (`setupFromReplay` com as cartas recebidas) e a
   `GameScreen` recebe `embed` (`bare` esconde menu, sair e baixar; `layout` liga a visão do Streamer em pé ou lateral;
   `useEmbedBridge` faz o postMessage `seek/play/pause` ↔ `ready/pos/ended`, conferindo `e.source === parent` e a origem).
 - **Nginx**: `PARTNER_IPS` no `deploy.env` tira os IPs dos parceiros do limite por IP (`geo`/`map` nos scripts de
@@ -1675,8 +1674,7 @@ Quem chama, na coluna da direita:
 | Método | Rota | Descrição | Quem chama |
 |--------|------|-----------|------------|
 | GET | `/api/health` | Verificação de saúde | Pública |
-| GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio, acesso) | Pública |
-| GET | `/api/access` | Acesso ao site na homologação só para apoiadores (`{ allowed, reason }`) | Pública |
+| GET | `/api/config` | Configurações públicas (imagens, Client ID do Google, chave das notificações, apoio) | Pública |
 | GET | `/api/cards?set=` · `/api/cards/:id` | Cartas (por coleção) e uma carta | Pública |
 | GET | `/api/coverage` | Cobertura dos efeitos automatizados por coleção | Pública |
 | GET | `/api/translations/pending` | Cartas com tradução automática parcial | Pública |
@@ -1782,7 +1780,6 @@ Quem chama, na coluna da direita:
 | PUT | `/api/support/me` | Aparecer na lista de apoiadores (`{ public }`) | Sessão |
 | POST | `/api/support/apoiase/sync` | Consulta agora o apoio na Apoia.se | Sessão |
 | POST | `/api/support/kofi` | Webhook do Ko-fi (token de verificação no corpo) | Ko-fi (`KOFI_WEBHOOK_TOKEN`) |
-| GET | `/api/internal/supporter?email=` | Plano de uma conta, consultado pela homologação | `INTERNAL_TOKEN` em `Authorization: Bearer` |
 
 Corpos, filtros, erros e o fluxo OAuth dos parceiros estão descritos no `README.md` (seções "API" e "API para parceiros").
 

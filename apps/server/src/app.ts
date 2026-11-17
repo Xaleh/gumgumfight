@@ -59,7 +59,6 @@ import { MetaProfiles } from './team/profiles';
 import { ChamberPresets } from './tournaments/chamber';
 
 import { registerTeamRoutes } from './team/routes';
-import { registerAccessGate } from './support/access';
 import { apoiaseSyncHours, registerSupportRoutes, supportEnabled } from './support/routes';
 import { registerTournamentRoutes } from './tournaments/routes';
 import { registerEngineTextRoutes } from './card-engine-texts';
@@ -85,7 +84,7 @@ export function buildApp(
     onlineRateLimit?: number;
     botDelayMs?: number;
     onlineLimits?: Partial<LobbyLimits>;
-    /** Testes: fetch usado na consulta do plano à produção (ACCESS=supporters). */
+    /** Testes: fetch usado nas consultas a serviços de fora (Apoia.se, imagens, webhooks). */
     fetchImpl?: typeof fetch;
     /** Testes: envio das notificações (sem ele, vai para o serviço de push de verdade). */
     pushSend?: PushSender;
@@ -125,8 +124,6 @@ export function buildApp(
     googleClientId: server.googleClientId ?? null,
     /** O apoio está configurado: o item "Apoiar o projeto" aparece no menu. */
     support: supportEnabled(server.support),
-    /** supporters: o site só abre para apoiadores (homologação). */
-    access: server.access?.mode ?? 'open',
     /** Chave pública VAPID para o navegador se inscrever nas notificações (null = desligadas). */
     pushKey: pushKeys?.publicKey ?? null,
     /** Próxima coleção a ser lançada: a dos modos "+ spoilers" fora do Livre ("Standard + EB05"); null = nenhuma. */
@@ -190,8 +187,6 @@ export function buildApp(
     adminEmails: server.adminEmails,
     afterLogin,
   });
-  // Homologação só para apoiadores (ACCESS=supporters): antes de todas as outras rotas.
-  registerAccessGate(app, { db, user: auth.viewer, access: server.access ?? { mode: 'open' }, fetchImpl: opts.fetchImpl, now: opts.now });
 
   /**
    * Dono dos decks e do perfil: a conta Google, se houver sessão; sem login, o

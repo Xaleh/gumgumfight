@@ -513,7 +513,7 @@ function migrateSupport(db: DB) {
   // team: faz parte do Time do bot (joga contra o Bot do Time e envia correções). Marca à parte do perfil
   // e do plano: a sincronização da Apoia.se sobrescreve o plano, não esta coluna.
   if (!userCols.includes('team')) db.exec('ALTER TABLE users ADD COLUMN team INTEGER NOT NULL DEFAULT 0');
-  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago ou consultado pela homologação).
+  // email_verified: o Google confirmou o e-mail (só e-mails confirmados recebem plano pago).
   if (!userCols.includes('email_verified')) {
     db.exec('ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
     // Contas de antes desta coluna: endereços do Gmail são sempre confirmados pelo Google; os outros
