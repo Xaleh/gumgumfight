@@ -1,7 +1,7 @@
 # Kit de Instagram do GumGum Fight
 
 Tudo o que precisa para abrir o perfil e publicar as primeiras três semanas: imagens de perfil, 9 posts
-(19 imagens), 5 stories, 3 Reels e as legendas prontas para colar.
+(19 imagens), 5 stories, 3 Reels, as legendas prontas para colar e o [planejamento](planejamento.md).
 
 ![Prévia dos posts e dos stories](previa.jpg)
 
@@ -38,25 +38,10 @@ Bio (148 de 150 caracteres):
 Destaques (as capas estão em `perfil/destaque-*.jpg`): **Jogar**, **Decks**, **Torneios**, **Aprender**,
 **Novidades** e **Apoiar**. Publique um story, salve no destaque e escolha a capa em "Editar capa".
 
-## 2. Calendário das três primeiras semanas
+## 2. Planejamento
 
-Três a quatro publicações por semana. O Reel de apresentação abre o perfil e fica fixado, junto com o carrossel 01.
-
-| Dia | Publicação | Arquivo | Story do dia |
-|---|---|---|---|
-| Seg, semana 1 | Reel: apresentação | `reels/reel-01-apresentacao.mp4` | `stories/01-chegamos.jpg` |
-| Qua | Carrossel: o que é o GumGum Fight | `posts/01-apresentacao-1…6.jpg` | Compartilhe o carrossel no story |
-| Sex | Post: aprenda do zero | `posts/03-aprenda-do-zero.jpg` | `stories/04-aprenda-a-jogar.jpg` com link |
-| Dom | Reel: partida | `reels/reel-02-partida.mp4` | `stories/02-bora-jogar.jpg` com link |
-| Ter, semana 2 | Carrossel: 5 jeitos de jogar | `posts/02-modos-1…6.jpg` | `stories/03-enquete-lider.jpg` com enquete |
-| Qui | Post: ranqueada e bounty | `posts/04-ranqueada-bounty.jpg` | Print do seu cartaz de procurado |
-| Sáb | Post: monte seu deck | `posts/05-monte-seu-deck.jpg` | Caixa de perguntas: "manda sua lista" |
-| Seg, semana 3 | Reel: modos de jogo | `reels/reel-03-modos-de-jogo.mp4` | `stories/02-bora-jogar.jpg` com link |
-| Qua | Post: instale no celular | `posts/07-instale-no-celular.jpg` | Passo a passo gravado na tela |
-| Sex | Post: assista e reveja | `posts/08-assista-e-reveja.jpg` | Link de um replay |
-| Dom | Post: 6 idiomas | `posts/06-idiomas.jpg` | |
-| Quando houver torneio | Story de torneio | `stories/05-torneio-modelo.jpg` | Escreva data, horário e formato no painel |
-| Quando a campanha de apoio abrir | Post: projeto de fã | `posts/09-projeto-de-fa.jpg` | Link do "Apoiar o projeto" |
+O calendário com datas, a lista do que fazer antes do lançamento, os quadros fixos para depois que o kit acabar e
+o que medir estão em [`planejamento.md`](planejamento.md).
 
 ## 3. Legendas
 
