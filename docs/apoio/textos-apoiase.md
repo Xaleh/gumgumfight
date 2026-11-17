@@ -37,7 +37,6 @@ apoio do mês, então os valores mínimos das recompensas precisam ser exatament
 > Tudo do Grumete, mais:
 > - **Estatísticas Pro**: o meta da ranqueada e dos torneios, filtro por faixa de recompensa (veja o que funciona
 >   entre os melhores), tendência semanal e desempenho carta a carta.
-> - **Ambiente de homologação**: as novidades antes de todo mundo.
 > - **Voto no roadmap**: ajude a decidir o que vem a seguir.
 
 ### Capitão — a partir de R$ 30/mês

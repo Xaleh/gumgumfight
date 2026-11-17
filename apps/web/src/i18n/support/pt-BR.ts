@@ -57,8 +57,7 @@ const supportPtBR = {
   'support.perk.grumete.2': 'Badge de apoiador no Discord',
   'support.perk.tripulante.1': 'Tudo do Grumete',
   'support.perk.tripulante.2': 'Estatísticas Pro: ranqueada, torneios e filtro por faixa de recompensa',
-  'support.perk.tripulante.3': 'Ambiente de homologação: novidades antes de todos',
-  'support.perk.tripulante.4': 'Voto no roadmap',
+  'support.perk.tripulante.3': 'Voto no roadmap',
   'support.perk.capitao.1': 'Tudo do Tripulante',
   'support.perk.capitao.2': 'Organize até {n} torneios por mês, de até {max} jogadores',
   'support.perk.capitao.3': 'Nome nos créditos',
@@ -122,7 +121,7 @@ const supportPtBR = {
   'admin.tabSponsors': 'Lojas parceiras',
   'admin.supportHelpLabel': 'Apoio',
   'admin.supportHelp':
-    'plano de apoiador da conta. Vem da Apoia.se (pelo e-mail da conta Google) ou é dado aqui à mão (Pix mensal, parceria, cortesia). Tripulante libera as Estatísticas Pro e a homologação; Capitão e Almirante organizam até 5 torneios por mês; Almirante tem prioridade nos torneios do time.',
+    'plano de apoiador da conta. Vem da Apoia.se (pelo e-mail da conta Google) ou é dado aqui à mão (Pix mensal, parceria, cortesia). Tripulante libera as Estatísticas Pro; Capitão e Almirante organizam até 5 torneios por mês; Almirante tem prioridade nos torneios do time.',
   'admin.supporter': 'Apoio',
   'admin.noPlan': 'Sem plano',
   'admin.until': 'até',

@@ -53,8 +53,7 @@ export default {
   'support.perk.grumete.2': 'Unterstützer-Abzeichen auf Discord',
   'support.perk.tripulante.1': 'Alles aus Grumete',
   'support.perk.tripulante.2': 'Pro-Statistiken: Ranked, Turniere und Filter nach Kopfgeld-Stufe',
-  'support.perk.tripulante.3': 'Testserver: Neuerungen vor allen anderen',
-  'support.perk.tripulante.4': 'Abstimmung über die Roadmap',
+  'support.perk.tripulante.3': 'Abstimmung über die Roadmap',
   'support.perk.capitao.1': 'Alles aus Tripulante',
   'support.perk.capitao.2': 'Bis zu {n} Turniere im Monat mit je bis zu {max} Spielern ausrichten',
   'support.perk.capitao.3': 'Name in den Credits',
@@ -114,7 +113,7 @@ export default {
   'admin.tabSponsors': 'Partnerläden',
   'admin.supportHelpLabel': 'Unterstützung',
   'admin.supportHelp':
-    'Unterstützer-Stufe des Kontos. Sie kommt von Apoia.se (über die E-Mail des Google-Kontos) oder wird hier von Hand vergeben (monatlicher Pix, Partnerschaft, Gefälligkeit). Tripulante schaltet Pro-Statistiken und den Testserver frei; Capitão und Almirante richten bis zu 5 Turniere im Monat aus; Almirante hat Vorrang bei den Team-Turnieren.',
+    'Unterstützer-Stufe des Kontos. Sie kommt von Apoia.se (über die E-Mail des Google-Kontos) oder wird hier von Hand vergeben (monatlicher Pix, Partnerschaft, Gefälligkeit). Tripulante schaltet Pro-Statistiken frei; Capitão und Almirante richten bis zu 5 Turniere im Monat aus; Almirante hat Vorrang bei den Team-Turnieren.',
   'admin.supporter': 'Unterstützung',
   'admin.noPlan': 'Keine Stufe',
   'admin.until': 'bis',

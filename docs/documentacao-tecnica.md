@@ -865,9 +865,10 @@ não conta para nenhum relógio. Salas que não puderem ser refeitas (motor mudo
   e a cada 6 h para quem tem plano de lá; o plano sai do valor pago no mês e vale até o dia 10 do mês seguinte. Também
   pode vir do webhook do Ko-fi (opcional, `POST /api/support/kofi`) ou ser dado à mão pelo admin.
   O que cada plano libera: Tripulante,
-  Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`) e homologação
-  (`ACCESS=supporters`, `support/access.ts`); Capitão e Almirante, 5 torneios por mês de até 64 jogadores
-  (`tournament_quota`); Almirante, inscrição antecipada de 48 h nos torneios do time (`tournaments.priority_until`).
+  Estatísticas Pro (`/api/stats*` restringe a `queue=casual` sem o plano, salvo `mine=1`); Capitão e Almirante,
+  5 torneios por mês de até 64 jogadores (`tournament_quota`); Almirante, inscrição antecipada de 48 h nos torneios
+  do time (`tournaments.priority_until`). O acesso à homologação não é mais um benefício anunciado; a trava
+  `ACCESS=supporters` (`support/access.ts`) continua existindo como configuração do servidor.
   Admins têm todos os benefícios. Sem nenhuma variável `SUPPORT_*`, nada disso é exigido (estatísticas abertas).
 - **Lojas parceiras** (`sponsors`, logo em BLOB validado pelos bytes, só PNG/JPEG/WebP): `GET /api/sponsors`,
   cadastro em `/api/admin/sponsors`. O torneio do time (`tournaments.official`, `prize`, `sponsor_id`) é marcado só

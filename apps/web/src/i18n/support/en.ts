@@ -53,8 +53,7 @@ export default {
   'support.perk.grumete.2': 'Supporter badge on Discord',
   'support.perk.tripulante.1': 'Everything in Grumete',
   'support.perk.tripulante.2': 'Pro Statistics: ranked, tournaments and bounty tier filter',
-  'support.perk.tripulante.3': 'Staging server: new features before everyone',
-  'support.perk.tripulante.4': 'Vote on the roadmap',
+  'support.perk.tripulante.3': 'Vote on the roadmap',
   'support.perk.capitao.1': 'Everything in Tripulante',
   'support.perk.capitao.2': 'Run up to {n} tournaments a month, up to {max} players each',
   'support.perk.capitao.3': 'Name in the credits',
@@ -114,7 +113,7 @@ export default {
   'admin.tabSponsors': 'Partner shops',
   'admin.supportHelpLabel': 'Support',
   'admin.supportHelp':
-    "the account's supporter plan. It comes from Apoia.se (by the Google account email) or is given here by hand (monthly Pix, partnership, courtesy). Tripulante unlocks Pro Statistics and the staging server; Capitão and Almirante run up to 5 tournaments a month; Almirante gets priority in team tournaments.",
+    "the account's supporter plan. It comes from Apoia.se (by the Google account email) or is given here by hand (monthly Pix, partnership, courtesy). Tripulante unlocks Pro Statistics; Capitão and Almirante run up to 5 tournaments a month; Almirante gets priority in team tournaments.",
   'admin.supporter': 'Support',
   'admin.noPlan': 'No plan',
   'admin.until': 'until',

@@ -13,7 +13,7 @@ português. O Ko-fi continua no código, desligado, para quando houver público 
 | Plano | Valor | O que libera |
 |---|---|---|
 | Grumete | R$ 5/mês | Nome na lista de Apoiadores (se a pessoa quiser) e badge no Discord |
-| Tripulante | R$ 15/mês | Tudo do Grumete, Estatísticas Pro (ranqueada, torneios e filtro por faixa de recompensa), homologação e voto no roadmap |
+| Tripulante | R$ 15/mês | Tudo do Grumete, Estatísticas Pro (ranqueada, torneios e filtro por faixa de recompensa) e voto no roadmap |
 | Capitão | R$ 30/mês | Tudo do Tripulante, organizar até 5 torneios por mês de até 64 jogadores e nome nos créditos |
 | Almirante | R$ 50/mês | Tudo do Capitão, prioridade de inscrição nos torneios premiados do time e destaque na lista de Apoiadores |
 

@@ -53,8 +53,7 @@ export default {
   'support.perk.grumete.2': 'Insignia de colaborador en Discord',
   'support.perk.tripulante.1': 'Todo lo de Grumete',
   'support.perk.tripulante.2': 'Estadísticas Pro: clasificatoria, torneos y filtro por rango de recompensa',
-  'support.perk.tripulante.3': 'Servidor de pruebas: novedades antes que nadie',
-  'support.perk.tripulante.4': 'Voto en la hoja de ruta',
+  'support.perk.tripulante.3': 'Voto en la hoja de ruta',
   'support.perk.capitao.1': 'Todo lo de Tripulante',
   'support.perk.capitao.2': 'Organiza hasta {n} torneos al mes, de hasta {max} jugadores',
   'support.perk.capitao.3': 'Nombre en los créditos',
@@ -114,7 +113,7 @@ export default {
   'admin.tabSponsors': 'Tiendas asociadas',
   'admin.supportHelpLabel': 'Apoyo',
   'admin.supportHelp':
-    'plan de colaborador de la cuenta. Viene de Apoia.se (por el correo de la cuenta de Google) o se da aquí a mano (Pix mensual, alianza, cortesía). Tripulante habilita las Estadísticas Pro y el servidor de pruebas; Capitão y Almirante organizan hasta 5 torneos al mes; Almirante tiene prioridad en los torneos del equipo.',
+    'plan de colaborador de la cuenta. Viene de Apoia.se (por el correo de la cuenta de Google) o se da aquí a mano (Pix mensual, alianza, cortesía). Tripulante habilita las Estadísticas Pro; Capitão y Almirante organizan hasta 5 torneos al mes; Almirante tiene prioridad en los torneos del equipo.',
   'admin.supporter': 'Apoyo',
   'admin.noPlan': 'Sin plan',
   'admin.until': 'hasta',

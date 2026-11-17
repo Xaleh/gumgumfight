@@ -1,8 +1,8 @@
 // Planos de apoio (assinatura mensal) e o que cada um destrava.
 //
 // Nenhum plano dá vantagem dentro da partida: os benefícios são reconhecimento,
-// acesso antecipado (homologação), estatísticas competitivas, organização de
-// torneios e prioridade de inscrição nos torneios premiados do time.
+// estatísticas competitivas, organização de torneios e prioridade de inscrição
+// nos torneios premiados do time.
 
 export const SUPPORTER_TIERS = ['grumete', 'tripulante', 'capitao', 'almirante'] as const;
 export type SupporterTier = (typeof SUPPORTER_TIERS)[number];
@@ -41,7 +41,7 @@ export const TIER_INFO: Record<SupporterTier, TierInfo> = {
     id: 'tripulante',
     label: 'Tripulante',
     price: 15,
-    perks: ['Tudo do Grumete', 'Estatísticas Pro: ranqueada, torneios e filtro por faixa de recompensa', 'Ambiente de homologação: novidades antes de todos', 'Voto no roadmap'],
+    perks: ['Tudo do Grumete', 'Estatísticas Pro: ranqueada, torneios e filtro por faixa de recompensa', 'Voto no roadmap'],
   },
   capitao: {
     id: 'capitao',

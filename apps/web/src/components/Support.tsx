@@ -13,7 +13,7 @@ import { Icon } from './Icons';
 /** Benefícios de cada plano (os textos ficam no dicionário; o servidor manda o id e o preço). */
 const PERKS: Record<SupporterTier, MessageKey[]> = {
   grumete: ['support.perk.grumete.1', 'support.perk.grumete.2'],
-  tripulante: ['support.perk.tripulante.1', 'support.perk.tripulante.2', 'support.perk.tripulante.3', 'support.perk.tripulante.4'],
+  tripulante: ['support.perk.tripulante.1', 'support.perk.tripulante.2', 'support.perk.tripulante.3'],
   capitao: ['support.perk.capitao.1', 'support.perk.capitao.2', 'support.perk.capitao.3'],
   almirante: ['support.perk.almirante.1', 'support.perk.almirante.2', 'support.perk.almirante.3'],
 };

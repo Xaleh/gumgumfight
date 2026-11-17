@@ -52,8 +52,7 @@ export default {
   'support.perk.grumete.2': 'Discord のサポーターバッジ',
   'support.perk.tripulante.1': 'Grumete の特典すべて',
   'support.perk.tripulante.2': 'Pro 統計：ランクマッチ、大会、懸賞金ランクでの絞り込み',
-  'support.perk.tripulante.3': 'テストサーバー：新機能をいち早く',
-  'support.perk.tripulante.4': 'ロードマップへの投票',
+  'support.perk.tripulante.3': 'ロードマップへの投票',
   'support.perk.capitao.1': 'Tripulante の特典すべて',
   'support.perk.capitao.2': '毎月 {n} 大会まで主催（各 {max} 人まで）',
   'support.perk.capitao.3': 'クレジットに名前を掲載',
@@ -112,7 +111,7 @@ export default {
   'admin.tabSponsors': '協力ショップ',
   'admin.supportHelpLabel': '支援',
   'admin.supportHelp':
-    'アカウントのサポータープラン。Apoia.se（Google アカウントのメールアドレス）から反映されるか、ここで手動で付与します（毎月の Pix、提携、優待）。Tripulante は Pro 統計とテストサーバー、Capitão と Almirante は毎月 5 大会まで主催、Almirante はチーム大会で優先されます。',
+    'アカウントのサポータープラン。Apoia.se（Google アカウントのメールアドレス）から反映されるか、ここで手動で付与します（毎月の Pix、提携、優待）。Tripulante は Pro 統計、Capitão と Almirante は毎月 5 大会まで主催、Almirante はチーム大会で優先されます。',
   'admin.supporter': '支援',
   'admin.noPlan': 'プランなし',
   'admin.until': '期限',

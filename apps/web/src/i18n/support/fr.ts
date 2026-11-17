@@ -53,8 +53,7 @@ export default {
   'support.perk.grumete.2': 'Badge de soutien sur Discord',
   'support.perk.tripulante.1': 'Tout ce qu’offre Grumete',
   'support.perk.tripulante.2': 'Statistiques Pro : classé, tournois et filtre par palier de prime',
-  'support.perk.tripulante.3': 'Serveur de test : les nouveautés avant tout le monde',
-  'support.perk.tripulante.4': 'Vote sur la feuille de route',
+  'support.perk.tripulante.3': 'Vote sur la feuille de route',
   'support.perk.capitao.1': 'Tout ce qu’offre Tripulante',
   'support.perk.capitao.2': 'Organisez jusqu’à {n} tournois par mois, jusqu’à {max} joueurs',
   'support.perk.capitao.3': 'Nom dans les crédits',
@@ -114,7 +113,7 @@ export default {
   'admin.tabSponsors': 'Boutiques partenaires',
   'admin.supportHelpLabel': 'Soutien',
   'admin.supportHelp':
-    'formule de soutien du compte. Elle vient d’Apoia.se (par l’e-mail du compte Google) ou est donnée ici à la main (Pix mensuel, partenariat, geste). Tripulante débloque les Statistiques Pro et le serveur de test ; Capitão et Almirante organisent jusqu’à 5 tournois par mois ; Almirante est prioritaire dans les tournois de l’équipe.',
+    'formule de soutien du compte. Elle vient d’Apoia.se (par l’e-mail du compte Google) ou est donnée ici à la main (Pix mensuel, partenariat, geste). Tripulante débloque les Statistiques Pro ; Capitão et Almirante organisent jusqu’à 5 tournois par mois ; Almirante est prioritaire dans les tournois de l’équipe.',
   'admin.supporter': 'Soutien',
   'admin.noPlan': 'Aucune formule',
   'admin.until': 'jusqu’au',
