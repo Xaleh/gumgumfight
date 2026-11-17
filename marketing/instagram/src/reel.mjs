@@ -159,22 +159,31 @@ const reels = {
     modeScene({ color: '#e6bb1e', ico: 'crown', tag: 'Eventos', title: 'Torneios', lead: 'Suíço, mata-mata e melhor de 3 ou de 5.' }),
     outro(3.0),
   ],
+  'mihawk/videos/insert-banido': [{
+    dur: 2.5,
+    cls: 'deep burst spin vignette',
+    html: `<div class="layer col center" style="--by:46%;justify-content:center;padding:0 80px 220px">
+      ${a('pop', 0.04, `<div class="notice"><div class="k">Lista de banidas</div><div class="t">Líder<br>Dracule Mihawk</div><div class="s">OP14-020 · todos os formatos<br>desde 12/10/2026</div></div>`)}
+      ${a('stamp', 0.75, `<div class="stamp">Banido</div>`, 'position:absolute;left:0;right:0;top:985px;display:flex;justify-content:center')}
+    </div>`,
+  }],
   'mihawk/videos/app-01-abrindo': [scroll('mihawk-pan-inicio.jpg', 0, -700, 4)],
-  'mihawk/videos/app-02-carta-do-mihawk': [zoom('mihawk-deck.jpg', 4, 2.3, 917, 1097)],
-  'mihawk/videos/app-03-tutorial': [scroll('pan-aprender.jpg', 0, -760, 2.8), zoom('mihawk-licao1.jpg', 2.6, 1.08, 540, 230)],
-  'mihawk/videos/app-04-bot-facil': [zoom('mihawk-bot.jpg', 3.5, 1.09, 540, 800)],
-  'mihawk/videos/app-05-partida-inicio': [raw(0.4, 6)],
-  'mihawk/videos/app-06-partida-seu-turno': [raw(36.8, 7.4)],
-  'mihawk/videos/app-07-partida-zoro-ataca': [raw(29.3, 6)],
-  'mihawk/videos/app-08-partida-fim': [raw(137.3, 5.6), zoom('mihawk-derrota.jpg', 2.6, 1.06, 540, 420)],
-  'mihawk/videos/app-09-cartaz-east-blue': [zoom('mihawk-cartaz.jpg', 4, 1.9, 290, 400)],
-  'mihawk/videos/app-10-sala-privada': [zoom('mihawk-sala.jpg', 4, 1.09, 540, 700)],
+  'mihawk/videos/app-02-deck-do-buggy': [zoom('mihawk-deck-buggy.jpg', 3.5, 1.08, 540, 690)],
+  'mihawk/videos/app-03-carta-crocodile-e-mihawk': [zoom('mihawk-deck.jpg', 4, 2.3, 666, 1322)],
+  'mihawk/videos/app-04-tutorial': [scroll('pan-aprender.jpg', 0, -760, 2.8), zoom('mihawk-licao1.jpg', 2.6, 1.08, 540, 230)],
+  'mihawk/videos/app-05-bot-facil': [zoom('mihawk-bot.jpg', 3.5, 1.09, 540, 800)],
+  'mihawk/videos/app-06-partida-inicio': [raw(0.4, 6)],
+  'mihawk/videos/app-07-partida-ataques': [raw(35.4, 7.2)],
+  'mihawk/videos/app-08-partida-zoro': [raw(30.6, 4.8)],
+  'mihawk/videos/app-09-partida-fim': [raw(180.3, 5.5), zoom('mihawk-resultado.jpg', 2.6, 1.06, 540, 420)],
+  'mihawk/videos/app-10-cartaz-east-blue': [zoom('mihawk-cartaz.jpg', 4, 1.9, 290, 400)],
+  'mihawk/videos/app-11-sala-privada': [zoom('mihawk-sala.jpg', 4, 1.09, 540, 700)],
   'mihawk/videos/insert-57-minutos-depois': [timeCard('57 minutos<br><em>depois…</em>')],
   'mihawk/videos/insert-algum-tempo-depois': [timeCard('Algum tempo<br><em>depois…</em>')],
   'mihawk/videos/insert-ligas': [leagues()],
-  'mihawk/videos/fim-ep1': [episodeEnd(1, 'Para matar o tempo', 'No próximo: o tutorial')],
-  'mihawk/videos/fim-ep2': [episodeEnd(2, 'O aluno', 'No próximo: Mihawk contra o bot')],
-  'mihawk/videos/fim-ep3': [episodeEnd(3, 'A faca pequena', 'No próximo: a ranqueada')],
+  'mihawk/videos/fim-ep1': [episodeEnd(1, 'Banido', 'No próximo: o tutorial')],
+  'mihawk/videos/fim-ep2': [episodeEnd(2, 'O aluno', 'No próximo: Mihawk joga de Buggy')],
+  'mihawk/videos/fim-ep3': [episodeEnd(3, 'Ordens do palhaço', 'No próximo: a ranqueada')],
   'mihawk/videos/fim-ep4': [episodeEnd(4, 'Shichibukai no East Blue', 'No próximo: o desafio')],
   'mihawk/videos/fim-ep5': [episodeEnd(5, 'Um oponente digno', 'Aprenda você também')],
   'mihawk/videos/fim-desafie-o-mihawk': [{
@@ -203,6 +212,14 @@ img.full { position: absolute; inset: 0; width: 1080px; height: 1920px; }
 .a-pop { animation: pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.25) both; animation-delay: var(--d, 0s); }
 .a-up { animation: up 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
 @keyframes pop { 0% { opacity: 0; transform: scale(0.6) rotate(-6deg); } 100% { opacity: 1; transform: none; } }
+/* Cartela "Banido": aviso em papel e carimbo. */
+.notice { width: 900px; background: #f6e7c1; border: 10px solid var(--brown); border-radius: 26px; padding: 64px 40px 330px; color: var(--brown); text-align: center; box-shadow: 16px 20px 0 var(--ink); transform: rotate(-3deg); }
+.notice .k { font-weight: 900; font-size: 38px; letter-spacing: 8px; text-transform: uppercase; }
+.notice .t { font-family: Bangers, sans-serif; font-size: 126px; line-height: 1; margin: 26px 0 30px; white-space: nowrap; }
+.notice .s { font-weight: 800; font-size: 40px; line-height: 1.35; }
+.stamp { font-family: Bangers, sans-serif; font-size: 190px; line-height: 1; letter-spacing: 8px; color: var(--red); border: 18px solid var(--red); border-radius: 28px; padding: 14px 44px 4px; transform: rotate(-13deg); background: rgba(246, 231, 193, 0.82); text-transform: uppercase; }
+.a-stamp { animation: stamp 0.16s cubic-bezier(0.4, 0, 0.9, 0.3) both; animation-delay: var(--d, 0s); }
+@keyframes stamp { from { opacity: 0; transform: scale(2.6); } to { opacity: 1; transform: none; } }
 @keyframes up { from { opacity: 0; transform: translateY(70px); } to { opacity: 1; transform: none; } }
 @keyframes spin { to { transform: rotate(60deg); } }
 @keyframes pan { from { transform: translateY(var(--from)); } to { transform: translateY(var(--to)); } }

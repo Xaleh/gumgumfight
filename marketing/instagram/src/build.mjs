@@ -317,9 +317,9 @@ const slides = {
 // ------------------------------------------- série "Mihawk aprende a jogar"
 // Sobreposições com fundo transparente, para pôr por cima do vídeo do cosplay no editor.
 const MIHAWK_EPISODES = [
-  ['Para matar o tempo', 'O maior espadachim<br>do mundo<br><em>não sabe jogar cartas.</em>'],
+  ['Banido', 'Baniram o Líder Mihawk.<br><em>Sobrou o palhaço.</em>'],
   ['O aluno', 'Quem ensina<br><em>o mestre?</em>'],
-  ['A faca pequena', 'Mihawk contra o bot.<br><em>No nível Fácil.</em>'],
+  ['Ordens do palhaço', 'Mihawk joga de Buggy.<br><em>Contra o Zoro.</em>'],
   ['Shichibukai no East Blue', 'De ฿ 3.590.000.000<br><em>para ฿ 0.</em>'],
   ['Um oponente digno', 'Procura-se um<br><em>oponente digno.</em>'],
 ];
