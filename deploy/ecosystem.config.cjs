@@ -61,6 +61,8 @@ module.exports = {
         // Listas oficiais da Bandai para as cartas sem imagem (vazio = inglês, inglês da Ásia e japonês; off desliga).
         CARD_IMAGE_SOURCES: env.CARD_IMAGE_SOURCES || '',
         SPOILER_SOURCES: env.SPOILER_SOURCES || '',
+        // No dia do lançamento, a coleção que a optcgapi ainda não publicou vira oficial pela lista da Bandai (off desliga).
+        CARD_RELEASE_SOURCE: env.CARD_RELEASE_SOURCE || '',
         // Horas entre as buscas dos spoilers (padrão 6); off desliga.
         SPOILER_SYNC: env.SPOILER_SYNC || '',
         // Meta global (TCG Matchmaking pela OPTCG Logpose API): chave (segredo, só aqui), x-client-name,

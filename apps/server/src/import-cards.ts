@@ -48,6 +48,7 @@ async function main() {
     if (!r.sync.pending.length) return console.log('Nenhuma carta de spoiler pendente.');
     console.log(`Coleções com spoilers: ${r.sync.pending.join(', ')}`);
     console.log(`Cartas gravadas da API: ${r.sync.imported} | spoilers que viraram oficiais: ${r.sync.official.length}`);
+    if (r.sync.fromList.length) console.log(`Oficiais pela lista da Bandai (a optcgapi ainda não publicou): ${r.sync.fromList.join(', ')}`);
     if (r.sync.official.length) console.log(r.sync.official.join(' '));
     for (const e of r.sync.errors) console.error(`Erro: ${e}`);
     return;

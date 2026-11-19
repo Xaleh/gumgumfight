@@ -121,7 +121,9 @@ export const STANDARD_BLOCK_1_EXCEPTIONS: ReadonlySet<string> = new Set([
  * desde 2019), e não das 21h do dia 11, como seria em UTC.
  */
 const BRASILIA_OFFSET_MS = 3 * 3_600_000;
-const today = (now: Date) => new Date(now.getTime() - BRASILIA_OFFSET_MS).toISOString().slice(0, 10);
+/** A data (AAAA-MM-DD) no horário de Brasília: também vale para o dia de lançamento de uma coleção. */
+export const brasiliaDate = (now: Date = new Date()) => new Date(now.getTime() - BRASILIA_OFFSET_MS).toISOString().slice(0, 10);
+const today = brasiliaDate;
 const inEffect = (since: string | undefined, now: Date) => !since || since <= today(now);
 
 /** Número de bloco impresso na carta, quando dá para saber pelo número da coleção. */

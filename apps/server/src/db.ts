@@ -84,6 +84,13 @@ function migrate(db: DB) {
       checked_at TEXT NOT NULL,
       PRIMARY KEY (region, series)
     );
+    -- Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento, antes de a
+    -- optcgapi as publicar: a sincronização continua procurando na API e sai daqui quando acha.
+    CREATE TABLE IF NOT EXISTS set_releases (
+      set_code    TEXT PRIMARY KEY,
+      source      TEXT NOT NULL,
+      released_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
     CREATE TABLE IF NOT EXISTS decks (
       id         TEXT PRIMARY KEY,
@@ -1116,12 +1123,48 @@ function keepArts(card: CardData, storedData: string, from: { official: boolean;
   }
   if (!stored?.length) return card;
   // Pelo id da arte, não pela URL: a mesma arte já copiada para a CDN própria tem outro endereço.
-  const seen = new Set([card.imageUrl, ...(card.arts ?? []).flatMap((a) => [a.imageUrl, a.id])]);
-  let extra = stored.filter((a) => !seen.has(a.imageUrl) && !seen.has(a.id));
-  const storedIds = new Set(stored.map((a) => a.id));
-  const newOfficialArt = from.official && (card.arts ?? []).some((a) => !a.spoiler && !storedIds.has(a.id));
+  const seen = new Set([card.imageUrl, ...(card.arts ?? []).flatMap((a) => [a.imageUrl, a.id, printKey(a.id)])]);
+  let extra = stored.filter((a) => !seen.has(a.imageUrl) && !seen.has(a.id) && !seen.has(printKey(a.id)));
+  const storedIds = new Set(stored.flatMap((a) => [a.id, printKey(a.id)]));
+  const newOfficialArt = from.official && (card.arts ?? []).some((a) => !a.spoiler && !storedIds.has(a.id) && !storedIds.has(printKey(a.id)));
   if (newOfficialArt || from.feed) extra = extra.filter((a) => !a.spoiler);
   return extra.length ? { ...card, arts: [...(card.arts ?? []), ...extra] } : card;
+}
+
+/**
+ * A impressão de uma arte pelo identificador: a optcgapi às vezes põe um sufixo aleatório no nome do
+ * arquivo ("OP17-119_p1_leUYdJN"), e a mesma impressão na lista oficial é "OP17-119_p1".
+ */
+function printKey(id: string): string {
+  const m = id.match(/^([A-Z]+\d*-\d+(?:_[a-z]+\d+)?)_[A-Za-z0-9]{7}$/);
+  return m ? m[1] : id;
+}
+
+/**
+ * Imagem (e artes) que a importação traz com o endereço de origem e que já estão copiadas na CDN
+ * própria: fica o endereço da CDN que a carta já tinha, sem esperar a próxima cópia.
+ */
+function keepMirrored(db: DB, card: CardData, storedData: string): CardData {
+  let stored: CardData;
+  try {
+    stored = JSON.parse(storedData) as CardData;
+  } catch {
+    return card;
+  }
+  const mirror = db.prepare("SELECT object_key, hash FROM card_images WHERE source_url = ? AND object_key <> ''");
+  const copyOf = (url: string | undefined, candidates: Array<string | undefined>) => {
+    if (!url) return undefined;
+    const m = mirror.get(url) as { object_key: string; hash: string } | undefined;
+    return m && candidates.find((c) => c?.endsWith(`/${m.object_key}?v=${m.hash}`));
+  };
+  const storedUrls = [stored.imageUrl, ...(stored.arts ?? []).map((a) => a.imageUrl)];
+  const imageUrl = copyOf(card.imageUrl, storedUrls);
+  const arts = card.arts?.map((a) => {
+    const url = copyOf(a.imageUrl, storedUrls);
+    return url ? { ...a, imageUrl: url } : a;
+  });
+  const changed = imageUrl || arts?.some((a, i) => a !== card.arts![i]);
+  return changed ? { ...card, ...(imageUrl ? { imageUrl } : {}), ...(arts ? { arts } : {}) } : card;
 }
 
 /**
@@ -1137,8 +1180,8 @@ function addArts(storedData: string, arts: CardArt[]): string | null {
     return null;
   }
   // A imagem principal também pelo id: a cópia na CDN própria tem outro endereço e o mesmo nome de arquivo.
-  const have = new Set([stored.imageUrl, stored.imageUrl && artId(stored.imageUrl), ...(stored.arts ?? []).flatMap((a) => [a.imageUrl, a.id])]);
-  const fresh = arts.filter((a) => !have.has(a.imageUrl) && !have.has(a.id));
+  const have = new Set([stored.imageUrl, stored.imageUrl && artId(stored.imageUrl), ...(stored.arts ?? []).flatMap((a) => [a.imageUrl, a.id, printKey(a.id)])]);
+  const fresh = arts.filter((a) => !have.has(a.imageUrl) && !have.has(a.id) && !have.has(printKey(a.id)));
   if (!fresh.length) return null;
   const official = fresh.some((a) => !a.spoiler);
   const kept = (stored.arts ?? []).filter((a) => !official || !a.spoiler);
@@ -1250,6 +1293,11 @@ export function upsertCards(
      * (`CardArt.spoiler`) que o feed não traz mais saem da carta. Sem isto, ficam as já gravadas.
      */
     feedArts?: boolean;
+    /**
+     * A fonte não traz imagem (a lista oficial sem a CDN própria: as imagens dela não abrem em outro
+     * site): a carta que entra sem imagem fica com a que já tinha, e com as artes dela.
+     */
+    keepImage?: boolean;
   },
 ): { written: number; skipped: number } {
   const existing = db.prepare('SELECT provisional, data FROM cards WHERE id = ?');
@@ -1288,8 +1336,13 @@ export function upsertCards(
         const { arts: _arts, ...rest } = c;
         c = (arts?.length ? { ...rest, arts } : rest) as typeof c;
       }
+      if (row && opts.keepImage && !c.imageUrl) {
+        const stored = JSON.parse(row.data) as CardData;
+        if (stored.imageUrl) c = { ...c, imageUrl: stored.imageUrl, ...(stored.imageLang ? { imageLang: stored.imageLang } : {}) };
+      }
       if (row) c = keepArts(c, row.data, from);
       if (row && opts.provisional) c = keepOfficialImage(db, c, row.data);
+      else if (row) c = keepMirrored(db, c, row.data);
       write.run({
         id: c.id,
         set_code: c.set ?? c.id.split('-')[0],
@@ -1304,6 +1357,18 @@ export function upsertCards(
     }
   });
   return { written, skipped };
+}
+
+/** Coleções oficiais pela lista da Bandai que a optcgapi ainda não publicou (coleção -> origem). */
+export function listReleases(db: DB): Map<string, string> {
+  const rows = db.prepare('SELECT set_code, source FROM set_releases ORDER BY set_code').all() as unknown as Array<{ set_code: string; source: string }>;
+  return new Map(rows.map((r) => [r.set_code, r.source]));
+}
+
+/** A coleção virou oficial pela lista (`source`) e fica esperando a API; `null` = a API já a publicou. */
+export function setListRelease(db: DB, set: string, source: string | null): void {
+  if (source === null) db.prepare('DELETE FROM set_releases WHERE set_code = ?').run(set);
+  else db.prepare('INSERT INTO set_releases (set_code, source) VALUES (?, ?) ON CONFLICT(set_code) DO UPDATE SET source = excluded.source').run(set, source);
 }
 
 /** Origem das cartas de spoiler (data/spoilers). Elas são provisórias: a API oficial as substitui. */

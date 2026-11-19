@@ -611,11 +611,12 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (33)
+### Tabelas (34)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
 | `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
+| `set_releases` | `set_code` | Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento e que a optcgapi ainda não publicou: `source` (domínio da lista), `released_at` | `syncSpoilers` (entra quando a lista torna oficial, sai quando a API publica) |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
 | `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
 | `card_engine_text_history` | `id` | Cada gravação (`action = set`, com o texto) e remoção (`remove`) do texto para o motor, com quem e quando | idem |
@@ -771,6 +772,17 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
   `/sets/card/<primeiro id>/` e, achando, busca as demais uma a uma; promos pendentes buscam `/allPromos/`. 404 = "ainda
   não publicada". O que vier passa pela cadeia de `CARD_SOURCES` (as outras fontes só nas coleções que a API publicou)
   e é importado como oficial (`provisional = 0`); a etiqueta SPOILER some sem mexer nos decks (o número não muda).
+- **Lista oficial no lançamento** (`officialList`; `CARD_RELEASE_SOURCE`, padrão ligado): para a coleção que a API não
+  trouxe, com `release` (arquivo de spoilers) menor ou igual à data de hoje em Brasília (`brasiliaDate`) e ainda sem
+  cartas oficiais, `bandaiSource` (`card-sources/bandai.ts`) lê `<lista>/cardlist/` e a página `?series=<id>` da coleção;
+  cada `<dl class="modalCol">` vira uma linha no formato da optcgapi (`parseListRows`: Vida do Líder, poder "-" de
+  Personagem = 0, `[Trigger]` no fim do texto, "−" → "-", "(Alternate Art)"/"(SP)"/"(TR)" no nome das impressões
+  `_p*`) e passa por `mapApiBodies`, como uma resposta da API. A camada da lista entra logo depois da optcgapi em
+  `resolveChain` e a coleção fica em `set_releases`. Sem a CDN própria a fonte não traz imagem nem artes (a lista
+  responde `Cross-Origin-Resource-Policy: same-site`) e `upsertCards(keepImage)` mantém as que a carta tinha. Coleções
+  em `set_releases` continuam sendo procuradas na API (pela primeira carta oficial delas) e relidas da lista a cada
+  rodada; quando a API publica, a importação dela vale e a linha sai. Tráfego: 2 requisições à lista por rodada
+  enquanto há coleção esperando, com 1 s entre elas.
 - Agendamento: dentro do processo da API, 15 s após subir e depois a cada `SPOILER_SYNC` horas (padrão 6, `off`
   desliga). Tráfego: ~2 requisições ao optcgleaks + 2 à optcgapi por rodada (mais uma por carta pendente quando a
   coleção aparece). Também executável à mão: `npm run cards:import -- --spoilers`.
@@ -1656,6 +1668,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | `CARD_IMAGES` | `on` | `off` remove as URLs de imagem das respostas |
 | `CARD_API_BASE` | `https://optcgapi.com/api` | importador e sync |
 | `SPOILER_SYNC` | `6` (horas) | `off` desliga; nunca roda em testes |
+| `CARD_RELEASE_SOURCE` | `bandai` | `off`: a coleção só vira oficial quando a optcgapi a publica |
 | `GOOGLE_CLIENT_ID` | vazio (login desligado) | OAuth Web client |
 | `ADMIN_EMAILS` | vazio | contas que viram Admin ao entrar |
 | `ONLINE_BOT_ROOMS` | `on` | transmitir o treino contra o bot (servidor joga pelo bot; exige login) |
