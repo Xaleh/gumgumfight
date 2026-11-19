@@ -1057,20 +1057,24 @@ promos) nunca é a próxima coleção.
   continuam iguais, porque o número da carta não muda. Coleções já oficiais não são mais buscadas no site de spoilers.
   Para fazer tudo na hora: `npm run cards:import -- --spoilers`.
 - **No dia do lançamento, sem esperar a optcgapi** (`CARD_RELEASE_SOURCE`, ligado por padrão): a optcgapi copia a lista
-  oficial da Bandai e costuma publicar a coleção dias depois. Quando a data `release` do arquivo chega (meia-noite no
+  oficial da Bandai e costuma publicar a coleção dias depois. Quando a data de lançamento chega (meia-noite no
   horário de Brasília) e a API ainda não tem a coleção, a sincronização lê a página dela na
   [lista oficial em inglês](https://en.onepiece-cardgame.com/cardlist/) e as cartas viram oficiais com os dados e o
   texto da carta impressa (`cards.source = api:en.onepiece-cardgame.com`). A lista entra no lugar da optcgapi na
   [cadeia](#cadeia-de-fontes), então as outras fontes continuam valendo na ordem configurada.
-  - Coleção sem `release` (starters, promocionais) e carta que a lista ainda não tem continuam em spoiler.
+  - **A data de lançamento** é a "Release Date" da [página de produtos da Bandai](https://en.onepiece-cardgame.com/products/)
+    (boosters e starter decks), lida a cada rodada enquanto a coleção está em spoiler: um adiamento ou uma
+    antecipação vale sem mexer em nada. O `release` do arquivo só vale quando a página está fora do ar ou não tem a
+    coleção; se as duas datas divergem, o log avisa. Sem data em nenhum dos dois (promocionais), a coleção continua
+    em spoiler, assim como a carta que a lista ainda não tem.
   - As imagens da lista só abrem no site dela: com a [CDN própria](#cdn-própria-das-imagens-cloudflare-r2) a carta
     fica com a imagem oficial e as paralelas da lista viram artes; sem a CDN, fica com a imagem e as artes que já
     tinha (as do site de spoilers).
   - Enquanto a API não publica, a cada rodada a lista é relida (as paralelas e as correções entram depois do
     lançamento) e a API continua sendo consultada. Quando ela publica, a importação dela vale, como sempre, e a lista
     não é mais consultada para essa coleção.
-  - Além das rodadas de `SPOILER_SYNC`, o servidor marca uma rodada para 00:01 (Brasília) de cada dia de lançamento,
-    então a coleção vira oficial no primeiro minuto do dia.
+  - Além das rodadas de `SPOILER_SYNC`, o servidor marca uma rodada para 00:01 (Brasília) de cada dia de lançamento
+    (as datas dos arquivos e, depois de cada rodada, as da página), então a coleção vira oficial no primeiro minuto do dia.
 - Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
 - No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
 - Deck com spoiler não entra na ranqueada nem em torneio, sala privada ou treino sem spoilers (veja [Formatos](#formatos)),

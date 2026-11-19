@@ -106,6 +106,47 @@ export function parseListRows(html: string, series: Pick<BandaiSeries, 'label'>,
 /** "OP-18" | "op18" -> "OP18". */
 const setCode = (s: string) => s.trim().toUpperCase().replace('-', '');
 
+// ------------------------------------------------------------------ datas de lançamento
+//
+// A lista de cartas não diz quando a coleção sai; a página de produtos do mesmo site diz:
+//   <base>/products/?subcategory=boosters&page=1   (starter decks em subcategory=decks)
+//   <li class="linkListColBox"> … <h4 class="linkListColTitle">BOOSTER PACK -…- [OP-18]</h4>
+//     <p class="linkListColDate">… <time class="newsDate" datetime="2026-11-20">November 20, 2026</time>
+// Os produtos vêm do mais novo para o mais antigo, 12 por página: as coleções ainda não lançadas
+// estão sempre na primeira.
+
+/** Data de lançamento (AAAA-MM-DD) de cada coleção de uma página de produtos ("OP15-EB04" vale para as duas). */
+export function parseReleaseDates(html: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of html.matchAll(/<li class="linkListColBox"[^>]*>([\s\S]*?)<\/li>/g)) {
+    const title = decode(decode(m[1].match(/<h4 class="linkListColTitle">([\s\S]*?)<\/h4>/)?.[1] ?? ''));
+    const date = m[1].match(/<p class="linkListColDate">[\s\S]*?<time[^>]*datetime="(\d{4}-\d{2}-\d{2})"/)?.[1];
+    if (!date) continue;
+    for (const c of seriesCode(title).matchAll(/([A-Z]+)-?(\d+)/g)) {
+      const set = `${c[1]}${c[2]}`;
+      // O mesmo código em dois produtos: vale a data mais cedo.
+      if (!out.has(set) || date < out.get(set)!) out.set(set, date);
+    }
+  }
+  return out;
+}
+
+/** Quem busca as datas de lançamento das coleções pedidas na página de produtos (uma ou duas páginas). */
+export function officialReleaseDates(opts: { fetchText?: FetchText; region?: BandaiRegion; delayMs?: number } = {}) {
+  const get = opts.fetchText ?? defaultFetchText;
+  const base = (opts.region ?? BANDAI_LIST).base;
+  return async (sets: string[]): Promise<Map<string, string>> => {
+    const wanted = new Set(sets.map(setCode));
+    const pages = [...new Set([...wanted].map((s) => (s.startsWith('ST') ? 'decks' : 'boosters')))].sort();
+    const out = new Map<string, string>();
+    for (const [i, page] of pages.entries()) {
+      if (i && opts.delayMs !== 0) await new Promise((r) => setTimeout(r, opts.delayMs ?? 1000));
+      for (const [set, date] of parseReleaseDates(await get(`${base}/products/?subcategory=${page}&page=1`))) if (wanted.has(set)) out.set(set, date);
+    }
+    return out;
+  };
+}
+
 export function bandaiSource(
   opts: {
     fetchText?: FetchText;

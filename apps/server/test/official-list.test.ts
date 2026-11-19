@@ -13,7 +13,7 @@ vi.hoisted(() => {
 });
 
 import { HttpError } from '../src/card-import';
-import { BANDAI_LIST, bandaiSource, parseListRows } from '../src/card-sources/bandai';
+import { BANDAI_LIST, bandaiSource, officialReleaseDates, parseListRows, parseReleaseDates } from '../src/card-sources/bandai';
 import { cardkaizokuManifestUrl, cardkaizokuSource } from '../src/card-sources/cardkaizoku';
 import type { CardSource } from '../src/card-sources/chain';
 import { releaseFromOfficialList } from '../src/config';
@@ -23,7 +23,13 @@ import { releaseDates, releaseRoundDelays, spoilerRound, syncSpoilers } from '..
 const BASE = 'https://api.test/api';
 const LIST = BANDAI_LIST.base;
 const IMG = `${LIST}/images/cardlist/card`;
-const sample = JSON.parse(readFileSync(join(__dirname, 'fixtures/bandai-cardlist-sample.json'), 'utf8')) as { index: string; op18: string; op17: string };
+const sample = JSON.parse(readFileSync(join(__dirname, 'fixtures/bandai-cardlist-sample.json'), 'utf8')) as {
+  index: string;
+  op18: string;
+  op17: string;
+  productsBoosters: string;
+  productsDecks: string;
+};
 const IDS = ['OP18-001', 'OP18-004', 'OP18-005', 'OP18-021', 'OP18-059', 'OP18-065', 'OP18-099'];
 
 /** A lista oficial falsa: o índice e as páginas das coleções; o resto dá erro. */
@@ -324,10 +330,112 @@ describe('coleção oficial pela lista da Bandai no dia do lançamento', () => {
   });
 
   it('há uma rodada marcada para o primeiro minuto do dia de lançamento (horário de Brasília)', () => {
-    const releases = new Map([['OP18', '2026-11-20'], ['EB06', '2026-11-20'], ['OP19', '2027-02-20'], ['EB05', '2026-10-30']]);
+    const dates = ['2026-11-20', '2026-11-20', '2027-02-20', '2026-10-30', '2026-11-21'];
     // 19/11 às 21:00 em Brasília: faltam 3 h e 1 min; a data que já passou e a distante demais ficam de fora.
-    expect(releaseRoundDelays(releases, new Date('2026-11-20T00:00:00Z'))).toEqual([3 * 3600_000 + 60_000]);
-    expect(releaseRoundDelays(releases, new Date('2026-11-20T03:01:00Z'))).toEqual([]);
+    expect(releaseRoundDelays(dates, new Date('2026-11-20T00:00:00Z'))).toEqual([
+      ['2026-11-20', 3 * 3600_000 + 60_000],
+      ['2026-11-21', 27 * 3600_000 + 60_000],
+    ]);
+    expect(releaseRoundDelays(['2026-11-20'], new Date('2026-11-20T03:01:00Z'))).toEqual([]);
+  });
+});
+
+describe('data de lançamento pela página de produtos da Bandai', () => {
+  /** A página de produtos falsa (boosters e decks). */
+  function fakeProducts(pages: { boosters?: string | Error; decks?: string | Error } = { boosters: sample.productsBoosters, decks: sample.productsDecks }) {
+    const calls: string[] = [];
+    const fetchText = async (url: string) => {
+      calls.push(url.replace(LIST, ''));
+      const body = url.includes('subcategory=decks') ? pages.decks : pages.boosters;
+      if (body === undefined) throw new Error(`${url} respondeu 404`);
+      if (body instanceof Error) throw body;
+      return body;
+    };
+    return { calls, dates: officialReleaseDates({ fetchText, delayMs: 0 }) };
+  }
+  /** A mesma página com outra data para o OP-18. */
+  const moved = (date: string) => sample.productsBoosters.replace('datetime="2026-11-20"', `datetime="${date}"`);
+  const run = (db: ReturnType<typeof withSpoilers>, products: ReturnType<typeof fakeProducts>, now: Date, releases = RELEASES) =>
+    syncSpoilers(db, { base: BASE, fetchJson: fakeApi().fetchJson, officialList: { ...list(fakeList(), false, now), releases, officialReleases: products.dates } });
+
+  it('lê a "Release Date" de cada coleção (a coleção dupla vale para as duas)', () => {
+    expect([...parseReleaseDates(sample.productsBoosters)].sort()).toEqual([
+      ['EB04', '2026-04-03'],
+      ['EB05', '2026-10-30'],
+      ['EB06', '2027-01-29'],
+      ['OP15', '2026-04-03'],
+      ['OP18', '2026-11-20'],
+    ]);
+    // Produto sem código de coleção ("Learn Together Deck Set") fica de fora.
+    expect([...parseReleaseDates(sample.productsDecks)].sort()).toEqual([
+      ['ST37', '2026-12-18'],
+      ['ST38', '2026-12-18'],
+    ]);
+  });
+
+  it('busca só as páginas das coleções pedidas (starter decks ficam em outra)', async () => {
+    const boosters = fakeProducts();
+    expect([...(await boosters.dates(['OP18', 'OP99']))]).toEqual([['OP18', '2026-11-20']]);
+    expect(boosters.calls).toEqual(['/products/?subcategory=boosters&page=1']);
+    const both = fakeProducts();
+    expect([...(await both.dates(['ST-37', 'OP18']))].sort()).toEqual([['OP18', '2026-11-20'], ['ST37', '2026-12-18']]);
+    expect(both.calls).toEqual(['/products/?subcategory=boosters&page=1', '/products/?subcategory=decks&page=1']);
+  });
+
+  it('lançamento adiado: vale a data da página, não a do arquivo', async () => {
+    const db = withSpoilers();
+    const products = fakeProducts({ boosters: moved('2026-11-27') });
+    // O arquivo diz 20/11; a Bandai adiou para 27/11.
+    const r = await run(db, products, LAUNCH);
+    expect(r).toMatchObject({ official: [], fromList: [], errors: [], releases: [{ set: 'OP18', date: '2026-11-27', official: '2026-11-27', file: '2026-11-20' }] });
+    expect(pendingSpoilers(db)).toHaveLength(8);
+    // No dia 27 a coleção vira oficial.
+    expect((await run(db, products, new Date('2026-11-27T15:00:00Z'))).fromList).toEqual(['OP18']);
+  });
+
+  it('lançamento antecipado ou coleção sem data no arquivo: a página basta', async () => {
+    const early = await run(withSpoilers(), fakeProducts({ boosters: moved('2026-11-13') }), new Date('2026-11-13T15:00:00Z'));
+    expect(early.fromList).toEqual(['OP18']);
+    const noFile = await run(withSpoilers(), fakeProducts(), LAUNCH, new Map());
+    expect(noFile).toMatchObject({ fromList: ['OP18'], releases: [{ set: 'OP18', date: '2026-11-20', official: '2026-11-20' }] });
+    expect(noFile.releases[0].file).toBeUndefined();
+  });
+
+  it('página fora do ar ou sem a coleção: vale a data do arquivo', async () => {
+    const down = await run(withSpoilers(), fakeProducts({ boosters: new Error('ECONNRESET') }), LAUNCH);
+    expect(down).toMatchObject({ fromList: ['OP18'], errors: ['bandai (datas de lançamento): ECONNRESET'], releases: [{ set: 'OP18', date: '2026-11-20', file: '2026-11-20' }] });
+    const missing = await run(withSpoilers(), fakeProducts({ boosters: '<html></html>' }), LAUNCH);
+    expect(missing).toMatchObject({ fromList: ['OP18'], errors: [] });
+    // Sem data em lugar nenhum, a coleção continua em spoiler.
+    const none = await run(withSpoilers(), fakeProducts({ boosters: '<html></html>' }), LAUNCH, new Map());
+    expect(none).toMatchObject({ fromList: [], releases: [{ set: 'OP18' }] });
+  });
+
+  it('a página só é consultada enquanto há coleção esperando o lançamento', async () => {
+    const db = withSpoilers();
+    const products = fakeProducts();
+    await run(db, products, LAUNCH);
+    expect(products.calls).toHaveLength(1);
+    // Depois de oficial pela lista (sobrou um spoiler que a lista não tem), a data não é mais procurada.
+    const r = await run(db, products, LAUNCH);
+    expect(r).toMatchObject({ fromList: ['OP18'], releases: [] });
+    expect(products.calls).toHaveLength(1);
+  });
+
+  it('a rodada completa avisa no log quando a data do arquivo e a da página divergem', async () => {
+    const db = withSpoilers();
+    const dir = mkdtempSync(join(tmpdir(), 'release-'));
+    writeFileSync(join(dir, 'op18.json'), JSON.stringify({ set: 'OP18', release: '2026-11-20', cards: [] }));
+    const log: string[] = [];
+    const r = await spoilerRound(db, {
+      base: BASE,
+      dir,
+      log: (m) => log.push(m),
+      fetchJson: fakeApi().fetchJson,
+      officialList: { source: bandaiSource({ fetchText: fakeList().fetchText, delayMs: 0 }), now: LAUNCH, officialReleases: fakeProducts({ boosters: moved('2026-11-27') }).dates },
+    });
+    expect(r.sync.fromList).toEqual([]);
+    expect(log).toContain('Lançamento do OP18: a página de produtos da Bandai diz 2026-11-27 e o arquivo de spoilers diz 2026-11-20; vale a da página.');
   });
 
   it('CARD_RELEASE_SOURCE: ligado por padrão, "off" desliga', () => {

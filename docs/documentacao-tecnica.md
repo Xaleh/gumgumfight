@@ -773,16 +773,21 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
   não publicada". O que vier passa pela cadeia de `CARD_SOURCES` (as outras fontes só nas coleções que a API publicou)
   e é importado como oficial (`provisional = 0`); a etiqueta SPOILER some sem mexer nos decks (o número não muda).
 - **Lista oficial no lançamento** (`officialList`; `CARD_RELEASE_SOURCE`, padrão ligado): para a coleção que a API não
-  trouxe, com `release` (arquivo de spoilers) menor ou igual à data de hoje em Brasília (`brasiliaDate`) e ainda sem
-  cartas oficiais, `bandaiSource` (`card-sources/bandai.ts`) lê `<lista>/cardlist/` e a página `?series=<id>` da coleção;
+  trouxe, com data de lançamento menor ou igual à data de hoje em Brasília (`brasiliaDate`) e ainda sem cartas
+  oficiais. A data vem de `officialReleaseDates` (`<lista>/products/?subcategory=boosters&page=1`, e `decks` para os
+  `ST`: o `datetime` do `<time class="newsDate">` de cada `<li class="linkListColBox">`, pelo código entre colchetes
+  do título), consultada só enquanto há coleção em spoiler esperando; sem a página ou sem a coleção nela, vale o
+  `release` do arquivo de spoilers (`SpoilerSyncResult.releases` traz as duas, e a rodada avisa no log quando
+  divergem). Com a data vencida, `bandaiSource` (`card-sources/bandai.ts`) lê `<lista>/cardlist/` e a página `?series=<id>` da coleção;
   cada `<dl class="modalCol">` vira uma linha no formato da optcgapi (`parseListRows`: Vida do Líder, poder "-" de
   Personagem = 0, `[Trigger]` no fim do texto, "−" → "-", "(Alternate Art)"/"(SP)"/"(TR)" no nome das impressões
   `_p*`) e passa por `mapApiBodies`, como uma resposta da API. A camada da lista entra logo depois da optcgapi em
   `resolveChain` e a coleção fica em `set_releases`. Sem a CDN própria a fonte não traz imagem nem artes (a lista
   responde `Cross-Origin-Resource-Policy: same-site`) e `upsertCards(keepImage)` mantém as que a carta tinha. Coleções
   em `set_releases` continuam sendo procuradas na API (pela primeira carta oficial delas) e relidas da lista a cada
-  rodada; quando a API publica, a importação dela vale e a linha sai. Tráfego: 2 requisições à lista por rodada
-  enquanto há coleção esperando, com 1 s entre elas.
+  rodada; quando a API publica, a importação dela vale e a linha sai. Tráfego por rodada: 1 ou 2 páginas de produtos
+  enquanto há coleção em spoiler com lançamento por vir, e 2 requisições à lista de cartas (com 1 s entre elas)
+  enquanto há coleção lançada esperando a API.
 - Agendamento: dentro do processo da API, 15 s após subir e depois a cada `SPOILER_SYNC` horas (padrão 6, `off`
   desliga). Tráfego: ~2 requisições ao optcgleaks + 2 à optcgapi por rodada (mais uma por carta pendente quando a
   coleção aparece). Também executável à mão: `npm run cards:import -- --spoilers`.

@@ -37,7 +37,7 @@ import {
 import { type ImageStore, syncCardCdn } from './card-cdn';
 import type { CardArt } from '@gumgum/engine';
 import { brasiliaDate } from '@gumgum/engine';
-import { bandaiSource } from './card-sources/bandai';
+import { bandaiSource, officialReleaseDates } from './card-sources/bandai';
 import { releaseFromOfficialList } from './config';
 import {
   type DB,
@@ -152,14 +152,24 @@ export interface SpoilerSyncResult {
   imported: number;
   /** Coleções oficiais pela lista oficial nesta rodada (a API ainda não as publicou). */
   fromList: string[];
+  /**
+   * Coleções em spoiler que esperam o dia do lançamento: a data que vale (`date`), a da página de
+   * produtos da Bandai (`official`) e a do arquivo de spoilers (`file`). Sem data, não viram oficiais pela lista.
+   */
+  releases: Array<{ set: string; date?: string; official?: string; file?: string }>;
   errors: string[];
 }
 
 /** A lista oficial da Bandai no lugar da API para as coleções lançadas que ela ainda não publicou. */
 export interface OfficialListOptions {
   source: CardSource;
-  /** Data de lançamento de cada coleção (AAAA-MM-DD; `release` do arquivo de spoilers). */
+  /** Data de lançamento de cada coleção (AAAA-MM-DD; `release` do arquivo de spoilers): vale quando a página oficial não a tem. */
   releases: ReadonlyMap<string, string>;
+  /**
+   * Datas de lançamento da página de produtos da Bandai, para as coleções pedidas: têm prioridade
+   * sobre as do arquivo (um adiamento ou antecipação vale sem mexer no arquivo).
+   */
+  officialReleases?: (sets: string[]) => Promise<ReadonlyMap<string, string>>;
   /** A fonte traz imagens (com a CDN própria); sem elas, a carta fica com a imagem que já tinha. */
   images: boolean;
   now?: Date;
@@ -196,7 +206,7 @@ export async function syncSpoilers(
   const before = pendingSpoilers(db);
   const pendingBySet = new Map<string, string[]>();
   for (const id of before) pendingBySet.set(setOf(id), [...(pendingBySet.get(setOf(id)) ?? []), id]);
-  const result: SpoilerSyncResult = { pending: [...pendingBySet.keys()], official: [], imported: 0, fromList: [], errors: [] };
+  const result: SpoilerSyncResult = { pending: [...pendingBySet.keys()], official: [], imported: 0, fromList: [], releases: [], errors: [] };
   // Coleções já oficiais pela lista também são procuradas na API, pelas cartas que o banco tem delas
   // (as oficiais primeiro: a que sobrou em spoiler pode nem existir).
   const awaiting = listReleases(db);
@@ -266,10 +276,27 @@ export async function syncSpoilers(
   // pela lista é relida a cada rodada (as paralelas e as correções chegam depois do lançamento).
   const official = opts.officialList;
   const today = brasiliaDate(official?.now);
-  // Coleção que já tem cartas oficiais sem ter vindo da lista (a API já a publicou e sobrou um spoiler
-  // que ela não tem) fica de fora: a lista não passa por cima da API.
-  const released = (set: string) => (official!.releases.get(set) ?? '9999') <= today && !hasOfficialCards(db, set);
-  const due = official ? [...bySet.keys()].filter((set) => set !== PROMO_SET && !apiSets.has(set) && (awaiting.has(set) || released(set))) : [];
+  // Esperam o dia do lançamento: em spoiler, sem a API. Coleção que já tem cartas oficiais sem ter vindo
+  // da lista (a API já a publicou e sobrou um spoiler que ela não tem) fica de fora: a lista não passa por cima da API.
+  const waiting = official
+    ? [...pendingBySet.keys()].filter((set) => set !== PROMO_SET && !apiSets.has(set) && !awaiting.has(set) && !hasOfficialCards(db, set))
+    : [];
+  // A data é a da página de produtos da Bandai; sem ela (página fora do ar, coleção que não está lá), a do arquivo.
+  let page: ReadonlyMap<string, string> = new Map();
+  if (official?.officialReleases && waiting.length) {
+    try {
+      page = await official.officialReleases(waiting);
+    } catch (err) {
+      result.errors.push(`${official.source.id} (datas de lançamento): ${errorText(err)}`);
+    }
+  }
+  for (const set of waiting) {
+    const [fromPage, file] = [page.get(set), official!.releases.get(set)];
+    const date = fromPage ?? file;
+    result.releases.push({ set, ...(date ? { date } : {}), ...(fromPage ? { official: fromPage } : {}), ...(file ? { file } : {}) });
+  }
+  const released = new Set(result.releases.filter((r) => r.date && r.date <= today).map((r) => r.set));
+  const due = [...bySet.keys()].filter((set) => !apiSets.has(set) && (awaiting.has(set) ? Boolean(official) : released.has(set)));
   let list: Layer | undefined;
   const listSets = new Set<string>();
   if (official && due.length) {
@@ -322,7 +349,7 @@ export async function spoilerRound(
     cdn?: ImageStore | null;
     cdnMaxDownloads?: number;
     /** Lista oficial para as coleções já lançadas (padrão: a da Bandai, conforme CARD_RELEASE_SOURCE); null desliga. */
-    officialList?: Pick<OfficialListOptions, 'source' | 'now'> | null;
+    officialList?: Pick<OfficialListOptions, 'source' | 'now' | 'officialReleases'> | null;
   },
 ) {
   const cache = new Map<string, CardSource>();
@@ -350,7 +377,8 @@ export async function spoilerRound(
   }
   // As imagens da lista oficial só abrem pela CDN própria: sem ela, a lista só traz os dados.
   const images = Boolean(opts.cdn);
-  const list = opts.officialList === undefined ? (releaseFromOfficialList() ? { source: bandaiSource({ images }) } : null) : opts.officialList;
+  const list: typeof opts.officialList =
+    opts.officialList === undefined ? (releaseFromOfficialList() ? { source: bandaiSource({ images }), officialReleases: officialReleaseDates() } : null) : opts.officialList;
   const sync = await syncSpoilers(db, {
     base: opts.base,
     fetchJson: opts.fetchJson,
@@ -359,6 +387,12 @@ export async function spoilerRound(
     officialList: list && { ...list, images, releases: releaseDates(opts.dir) },
   });
   if (sync.fromList.length) opts.log(`Oficiais pela lista da Bandai (a optcgapi ainda não publicou): ${sync.fromList.join(', ')}`);
+  // A data do arquivo de spoilers ficou diferente da oficial (adiamento, antecipação ou erro de digitação).
+  for (const r of sync.releases) {
+    if (r.official && r.file && r.official !== r.file) {
+      opts.log(`Lançamento do ${r.set}: a página de produtos da Bandai diz ${r.official} e o arquivo de spoilers diz ${r.file}; vale a da página.`);
+    }
+  }
   // Cartas que chegaram com efeito que o leitor não entende: aviso ao Dev (tela de Cobertura).
   const gaps = recordCardGaps(db);
   if (gaps.added) opts.log(`Cobertura: ${gaps.added} carta(s) nova(s) com efeito parcial ou manual (⚙)`);
@@ -371,32 +405,43 @@ export async function spoilerRound(
  * horário de Brasília (UTC−3): 00:01 de 20/11 = 03:01 UTC. Datas além do limite do `setTimeout`
  * (~24 dias) ficam para depois de um reinício.
  */
-export function releaseRoundDelays(releases: ReadonlyMap<string, string>, now: Date = new Date()): number[] {
-  const out: number[] = [];
-  for (const date of new Set(releases.values())) {
+export function releaseRoundDelays(dates: Iterable<string>, now: Date = new Date()): Array<[date: string, wait: number]> {
+  const out: Array<[string, number]> = [];
+  for (const date of new Set(dates)) {
     const wait = Date.parse(`${date}T03:01:00Z`) - now.getTime();
-    if (wait > 0 && wait < 2 ** 31) out.push(wait);
+    if (wait > 0 && wait < 2 ** 31) out.push([date, wait]);
   }
-  return out.sort((a, b) => a - b);
+  return out.sort((a, b) => a[1] - b[1]);
 }
 
 /**
  * Busca os spoilers e troca pelos oficiais ao iniciar e depois a cada `hours` horas.
  * A primeira rodada espera alguns segundos para não atrasar a subida do servidor.
  * Com a lista oficial ligada (CARD_RELEASE_SOURCE), há também uma rodada logo depois da
- * meia-noite de cada dia de lançamento: a coleção vira oficial sem esperar o intervalo.
+ * meia-noite de cada dia de lançamento: a coleção vira oficial sem esperar o intervalo. As datas
+ * são as dos arquivos de spoilers e, depois de cada rodada, as da página de produtos da Bandai.
  */
 export function scheduleSpoilerSync(
   db: DB,
   opts: { base: string; dir: string; hours: number; log: (msg: string) => void; cdn?: ImageStore | null },
 ) {
   let running = false;
+  const planned = new Set<string>();
+  const plan = (dates: Iterable<string>) => {
+    if (!releaseFromOfficialList()) return;
+    for (const [date, wait] of releaseRoundDelays(dates)) {
+      if (planned.has(date)) continue;
+      planned.add(date);
+      setTimeout(run, wait).unref();
+    }
+  };
   const run = async () => {
     // A primeira cópia das imagens para a CDN pode demorar mais que o intervalo.
     if (running) return;
     running = true;
     try {
       const { sync: r } = await spoilerRound(db, { ...opts, cdnMaxDownloads: 500 });
+      plan(r.releases.flatMap((x) => (x.date ? [x.date] : [])));
       if (!r.pending.length) return;
       opts.log(
         `Spoilers (${r.pending.join(', ')}): ${r.official.length} carta(s) agora oficiais` +
@@ -410,5 +455,5 @@ export function scheduleSpoilerSync(
   };
   setTimeout(run, 15_000).unref();
   setInterval(run, opts.hours * 3600_000).unref();
-  if (releaseFromOfficialList()) for (const wait of releaseRoundDelays(releaseDates(opts.dir))) setTimeout(run, wait).unref();
+  plan(releaseDates(opts.dir).values());
 }
