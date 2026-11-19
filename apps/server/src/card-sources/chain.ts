@@ -10,7 +10,7 @@
 // - Imagem e artes vêm da primeira fonte que tem imagem (as do Cardkaizoku só abrem no site dele).
 // - As divergências entre fontes vão para o relatório (log e var/card-source-diff.json).
 
-import { type CardCategory, type CardData, parseCard } from '@gumgum/engine';
+import { type CardArt, type CardCategory, type CardData, parseCard } from '@gumgum/engine';
 
 export type SourceKind = 'official' | 'spoiler';
 
@@ -20,6 +20,16 @@ export interface SourceCards {
   raw?: Map<string, unknown>;
   /** Fontes que misturam spoilers: cartas que a fonte sabe que já foram lançadas (à venda). */
   released?: Set<string>;
+  /**
+   * Cartas de que a resposta só traz impressões de outra coleção (a SP de uma carta antiga dentro da
+   * coleção nova): valem pelas artes; os dados e a imagem da carta já gravada não mudam.
+   */
+  artOnly?: Set<string>;
+  /**
+   * Fontes de spoilers: artes novas de cartas de outras coleções reimpressas na coleção pedida
+   * (número da carta -> artes), para juntar às da carta já gravada.
+   */
+  extraArts?: Map<string, CardArt[]>;
 }
 
 /** Campos comparados e completados entre as fontes. */
@@ -53,6 +63,8 @@ export interface ResolvedCard {
   /** Fonte vencedora. */
   source: CardSource;
   raw?: unknown;
+  /** Nenhuma fonte trouxe a carta inteira (só impressões de outra coleção): vale pelas artes. */
+  artOnly?: boolean;
 }
 
 export interface CardDiff {
@@ -210,7 +222,8 @@ export function resolveChain(
     const set = out.set;
     const bySource = (report.bySet[set] ??= {});
     bySource[winner.layer.source.id] = (bySource[winner.layer.source.id] ?? 0) + 1;
-    cards.push({ card: out, source: winner.layer.source, raw: winner.layer.raw?.get(id) });
+    const artOnly = entries.every((e) => e.layer.artOnly?.has(id));
+    cards.push({ card: out, source: winner.layer.source, raw: winner.layer.raw?.get(id), ...(artOnly ? { artOnly } : {}) });
   }
   cards.sort((a, b) => (a.card.id < b.card.id ? -1 : a.card.id > b.card.id ? 1 : 0));
   return { cards, report };

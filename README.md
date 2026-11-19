@@ -1036,7 +1036,9 @@ promos) nunca é a próxima coleção.
 - **Busca automática** (`"feed": true`; arquivos antigos com `"feed": "optcgleaks"` também valem): o servidor baixa as
   cartas reveladas das fontes de `SPOILER_SOURCES`, juntadas pela [cadeia](#cadeia-de-fontes):
   - [optcgleaks.com](https://optcgleaks.com/) (`https://images.optcgleaks.com/<coleção>/<coleção>.json`), com textos em
-    inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX") e as reimpressões de outras coleções.
+    inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX"). As outras imagens de cada carta ("Alt-Art",
+    "Treasure Rare"…) e as cartas de outras coleções reimpressas com arte nova (`sp_cards`) entram como
+    [artes alternativas](#artes-alternativas).
   - [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) (`https://cdn.cardkaizoku.com/manifest.json` aponta o arquivo
     com todas as cartas do site), sem imagens. Carta com o texto ainda não revelado fica de fora.
 
@@ -1135,6 +1137,15 @@ arte alternativa em todas as cartas do deck que têm uma, e o ícone de paleta n
 Líder) abre o seletor para trocar uma por uma. A escolha é salva no deck (`decks.arts`), não muda o deck nas
 estatísticas e aparece na mesa para os dois jogadores (o oponente só vê a arte das cartas que estão à vista).
 Com `CARD_IMAGES=off`, as artes somem junto com as imagens.
+
+- **Carta antiga reimpressa numa coleção nova** (a SP do Loki OP17-119 dentro do OP-18): a resposta da coleção nova traz
+  só essa impressão, sem a original. A carta que já está no banco fica como está (dados e imagem) e só ganha a arte;
+  as outras fontes da cadeia não são consultadas para a coleção dela.
+- **Coleção ainda em spoiler:** as artes vêm do optcgleaks (hoje, OP18: 35 artes em 29 cartas da coleção e 7 em 6
+  cartas antigas) e ficam marcadas como provisórias (`CardArt.spoiler`, a coleção do feed). A cada rodada valem as que
+  o site tem. Quando a importação oficial traz arte nova da carta, as do site saem (a mesma arte chega com o
+  identificador oficial, e um deck que tinha a do site volta para a imagem normal); enquanto a fonte oficial não tem
+  as artes da carta, as do site continuam.
 
 ### Textos em português
 

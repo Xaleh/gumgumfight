@@ -30,14 +30,18 @@ import {
   writeOfficial,
 } from './card-sources';
 import { type ImageStore, syncCardCdn } from './card-cdn';
-import { type DB, hasOfficialCards, pendingSpoilers, pruneSpoilers, recordCardGaps, SPOILER_SOURCE, upsertCards } from './db';
+import type { CardArt } from '@gumgum/engine';
+import { type DB, hasOfficialCards, pendingSpoilers, pruneSpoilers, recordCardGaps, SPOILER_SOURCE, syncSpoilerArts, upsertCards } from './db';
 import { DEFAULT_API_BASE, rowsOf } from './optcgapi';
 import { readSpoilerFiles } from './seed';
 import { OPTCGLEAKS } from './spoiler-feed';
 
 export interface SpoilerFeedResult {
-  /** Por coleção: cartas gravadas e removidas (saíram do site). */
-  sets: Array<{ set: string; written: number; removed: number }>;
+  /**
+   * Por coleção: cartas gravadas e removidas (saíram do site) e, das cartas de outras coleções
+   * reimpressas nela com arte nova, quantas artes entraram e saíram (`arts`, só quando mudou algo).
+   */
+  sets: Array<{ set: string; written: number; removed: number; arts?: { cards: number; added: number; removed: number } }>;
   errors: string[];
 }
 
@@ -99,17 +103,23 @@ export async function refreshSpoilerFeeds(db: DB, dir: string, opts: FetchJson |
     result.errors.push(...errors);
     const { cards, report } = resolveChain(layers, { kind: 'spoiler' });
     if (!cards.length) continue;
+    // Cartas de outras coleções reimpressas nesta com arte nova: as artes vão para a carta já gravada.
+    // Vale a primeira fonte que traz as artes da carta (como a imagem).
+    const extraArts = new Map<string, CardArt[]>();
+    for (const l of layers) for (const [id, arts] of l.extraArts ?? []) if (!extraArts.has(id)) extraArts.set(id, arts);
     o.onReport?.(set, report, chain);
     let written = 0;
     for (const source of new Set(cards.map((r) => r.source))) {
       const list = cards
         .filter((r) => r.source === source)
         .map((r) => ({ ...r.card, spoiler: { source: source.host, ...(source.pageUrl ? { url: source.pageUrl(set) } : {}) } }));
-      written += upsertCards(db, list, { provisional: true, source: feedSource(source.host) }).written;
+      written += upsertCards(db, list, { provisional: true, source: feedSource(source.host), feedArts: !errors.length }).written;
     }
     // Só apaga as cartas que sumiram quando todas as fontes responderam.
     const removed = errors.length ? 0 : pruneSpoilers(db, cards.map((r) => r.card.id), { source: feedSource('%'), set });
-    result.sets.push({ set, written, removed });
+    // Sem nenhuma fonte de artes na rodada (fora do ar, ou a fonte não as tem), nada muda.
+    const arts = layers.some((l) => l.extraArts) ? syncSpoilerArts(db, set, extraArts, { prune: !errors.length }) : { cards: 0, added: 0, removed: 0 };
+    result.sets.push({ set, written, removed, ...(arts.cards ? { arts } : {}) });
   }
   return result;
 }
@@ -202,7 +212,9 @@ export async function syncSpoilers(
   // só nas coleções que ela publicou, cada uma na sua posição (sem a optcgapi na cadeia, ela fica no fim).
   const mapped = mapApiBodies(bodies);
   const api: Layer = { source: { id: 'optcgapi', host: new URL(base).host, fetch: async () => mapped }, ...mapped };
-  const sets = [...new Set(mapped.cards.map((c) => c.set ?? c.id.split('-')[0]))];
+  // Só as coleções que a API trouxe inteiras: uma carta antiga reimpressa na coleção nova (SP) vem só
+  // pelas artes, e buscar a coleção dela nas outras fontes regravaria a coleção toda sem a optcgapi.
+  const sets = [...new Set(mapped.cards.filter((c) => !mapped.artOnly.has(c.id)).map((c) => c.set ?? c.id.split('-')[0]))];
   const configured = opts.chain ?? chainFromEnv('official', { base, fetchJson: get });
   const layers: Layer[] = [];
   for (const source of configured) {
@@ -252,7 +264,9 @@ export async function spoilerRound(
   if (feed.sets.length || feed.errors.length) {
     opts.log(
       `Spoilers (${spoilerChain.map((s) => s.host).join(' > ')}): ` +
-        feed.sets.map((s) => `${s.set} ${s.written} cartas${s.removed ? `, ${s.removed} removidas` : ''}`).join(' | ') +
+        feed.sets
+          .map((s) => `${s.set} ${s.written} cartas${s.removed ? `, ${s.removed} removidas` : ''}${s.arts?.added ? `, ${s.arts.added} artes em ${s.arts.cards} cartas de outras coleções` : ''}`)
+          .join(' | ') +
         (feed.errors.length ? ` | erros: ${feed.errors.join('; ')}` : ''),
     );
   }

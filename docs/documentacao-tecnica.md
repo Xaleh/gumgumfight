@@ -692,7 +692,7 @@ limite relevante é o tempo das consultas de estatísticas (seção 15).
 | Efeito automatizado (DSL) | **não é gravado**: `buildCardDef` calcula a partir do texto (parser) ou de `CARD_SCRIPTS` em tempo de execução | — |
 | Erratas e correções de fonte | código (`errata.ts`, `source-fixes.ts`), aplicadas ao ler e ao gravar (`fixCard`) | — |
 | Imagem | **não é armazenada**: só a URL em `data.imageUrl`; o navegador baixa do site de origem | URL |
-| Artes alternativas | `data.arts` (`CardArt[]`: `id` = nome do arquivo da imagem, `imageUrl`, `label`); a importação parcial junta às já gravadas (`keepArts`) | JSON |
+| Artes alternativas | `data.arts` (`CardArt[]`: `id` = nome do arquivo da imagem, `imageUrl`, `label`, `spoiler` = coleção do feed de spoilers de onde veio, se veio de um); a importação parcial junta às já gravadas (`keepArts`) | JSON |
 | Arte escolhida no deck | `decks.arts` (número da carta -> `CardArt.id`), fora de `decks.cards` (não muda o `deckHash`) | JSON |
 | Cartas provisórias (antes da primeira importação) | `data/cards/*.json` (750 cartas escritas de memória, `provisional: true`) | JSON `{set, title, provisional, note, cards: CardData[]}` |
 | Tipos conhecidos | `data/card-types.json` (172) | JSON |
@@ -733,8 +733,14 @@ Fluxo do `npm run cards:import -- [coleções | --all | --file x.json] [--dry-ru
    imagem e artes da primeira fonte com imagem. Fonte que mistura spoilers (Cardkaizoku) só traz coleções confirmadas
    por outra fonte oficial ou pelo banco, e promos que outra fonte tem ou que estão à venda (`products` não vazio).
    Relatório (fonte por coleção, campos completados, divergências) no console e em `card-source-diff.json` ao lado do banco.
-6. `upsertCards(provisional: false, source: 'api:<fonte vencedora>', raw)` numa transação. Cartas oficiais **substituem**
-   provisórias e spoilers; o inverso nunca acontece.
+6. `upsertCards(provisional: false, source: 'api:<fonte vencedora>', raw, artOnly)` numa transação. Cartas oficiais
+   **substituem** provisórias e spoilers; o inverso nunca acontece.
+7. **Impressões de outra coleção** (`artOnly`): a resposta de uma coleção só traz as cartas antigas reimpressas nela com
+   arte nova (SP) sem a impressão original (grupo sem linha `primary` nem `ownSet`). `mapApiResponse` devolve esses
+   números em `artOnly`, com todas as artes em `arts`; `resolveChain` mantém a marca quando nenhuma fonte tem a carta
+   inteira. No `upsertCards`, a carta que já é oficial só ganha as artes novas (`addArts`: dados, imagem e `source` não
+   mudam); a que o banco não tem (ou só como provisória) entra inteira. Uma arte oficial nova tira as de spoiler
+   (`CardArt.spoiler`) da carta, tanto no `addArts` quanto no `keepArts`.
 
 Em produção a importação roda na VPS: manualmente (`node release/server/import-cards.mjs` com o `DB_PATH`
 compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama o importador depois do deploy).
@@ -749,9 +755,14 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
 - Arquivo: `{set, title, release, feed: true, source, url, cards: []}` (`feed: "optcgleaks"` dos arquivos antigos também liga). `cards` aceita cartas escritas à mão
   (mesmo `CardData`), com prioridade sobre o feed; cartas sem id válido (`/^[A-Z]+\d*-\d+$/`), nome ou categoria são
   ignoradas e logadas.
-- Feed: `https://images.optcgleaks.com/<set>/<set>.json`. Só o array `cards` é usado (`sp_cards` e `unknown_id_cards`
-  ficam de fora). Mapeamento em `spoiler-feed.ts`: entidades HTML, `<br>`, `NOTE:` → `notes`, `<Blocker>` → `[Blocker]`,
-  imagem `https://images.optcgleaks.com/<set>/images/<image.id>.webp`, `spoiler: {source: 'optcgleaks.com', url}`.
+- Feed: `https://images.optcgleaks.com/<set>/<set>.json`. As cartas vêm do array `cards` (`unknown_id_cards` fica de
+  fora). Mapeamento em `spoiler-feed.ts`: entidades HTML, aspas tipográficas, `<br>`, `NOTE:` → `notes`, `<Blocker>` →
+  `[Blocker]`, imagem `https://images.optcgleaks.com/<set>/images/<image.id>.webp` (a "Base Art"),
+  `spoiler: {source: 'optcgleaks.com', url}`. As outras imagens de `images` viram `arts` com `spoiler: '<SET>'`
+  ("Alt-Art" → `label` "Alternate Art", "SP Alt-Art" → "SP"). `sp_cards` (cartas reimpressas na coleção com arte nova):
+  a da própria coleção soma a arte à carta; as de outras coleções saem em `extraArts` e `syncSpoilerArts` as põe na
+  carta já gravada (oficial ou não), sem mexer no resto. Uma rodada completa tira as artes de spoiler que o site não
+  traz mais; com uma fonte fora do ar, nada sai.
 - `refreshSpoilerFeeds`: busca a coleção em cada fonte de `SPOILER_SOURCES` (404 = a fonte não tem) e junta com
   `resolveChain`; pula a coleção se já há cartas oficiais dela (menos `P`, que sai carta a carta); resposta vazia ou
   qualquer fonte com erro não apaga nada; grava com `provisional = 1`, `source = 'spoiler:feed:<fonte vencedora>'` e

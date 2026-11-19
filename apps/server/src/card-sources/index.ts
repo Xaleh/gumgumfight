@@ -65,7 +65,8 @@ export function writeOfficial(db: DB, resolved: ResolvedCard[]): number {
   let written = 0;
   for (const [source, list] of bySource) {
     const raw = new Map(list.filter((r) => r.raw !== undefined).map((r) => [r.card.id, r.raw]));
-    written += upsertCards(db, list.map((r) => r.card), { provisional: false, source: `api:${source.host}`, raw }).written;
+    const artOnly = new Set(list.filter((r) => r.artOnly).map((r) => r.card.id));
+    written += upsertCards(db, list.map((r) => r.card), { provisional: false, source: `api:${source.host}`, raw, artOnly }).written;
   }
   return written;
 }

@@ -299,6 +299,50 @@ describe('spoilers pela cadeia Cardkaizoku > optcgleaks', () => {
     expect(getCards(db, ['EB05-016'])[0].spoiler?.source).toBe('optcgleaks.com');
   });
 
+  it('as artes alternativas vêm da fonte da imagem e não se perdem com ela fora do ar', async () => {
+    const db = openDb(':memory:');
+    upsertCards(db, [card('OP01-016', { name: 'Nami', imageUrl: 'https://optcgapi.test/OP01-016.jpg' })], { provisional: false, source: 'api:test' });
+    const dir = feedDir({ 'eb05.json': { set: 'EB05', feed: true } });
+    const r = await refreshSpoilerFeeds(db, dir, { chain: chain(fakeNet({ ...kaizokuRoutes(rows), [optcgLeaksDataUrl('EB05')]: leaks.eb05 })) });
+    expect(r.sets).toEqual([{ set: 'EB05', written: 4, removed: 0, arts: { cards: 1, added: 1, removed: 0 } }]);
+    // A carta é a do Cardkaizoku; a imagem e as artes, do optcgleaks.
+    const artIds = () => getCards(db, ['EB05-010', 'OP01-016']).map((c) => c.arts?.map((a) => a.id));
+    expect(getCards(db, ['EB05-010'])[0].spoiler?.source).toBe('cardkaizoku.com');
+    expect(artIds()).toEqual([['eb05-010a'], ['op01-016sp_v2']]);
+    const down = fakeNet({ ...kaizokuRoutes(rows), [optcgLeaksDataUrl('EB05')]: new Error('ECONNRESET') });
+    await refreshSpoilerFeeds(db, dir, { chain: chain(down) });
+    expect(artIds()).toEqual([['eb05-010a'], ['op01-016sp_v2']]);
+  });
+
+  it('no lançamento, a carta antiga reimpressa (SP) não faz as outras fontes regravarem a coleção dela', async () => {
+    const db = openDb(':memory:');
+    // Coleção antiga já oficial, com imagem (a da optcgapi) e arte.
+    const old = [card('OP01-016', { name: 'Nami', imageUrl: 'https://optcgapi.test/OP01-016.jpg' }), card('OP01-017', { name: 'Usopp', imageUrl: 'https://optcgapi.test/OP01-017.jpg' })];
+    upsertCards(db, old, { provisional: false, source: 'api:optcgapi.test' });
+    const row = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
+      card_set_id: id, card_image_id: id, card_name: name, set_id: 'EB-05', card_type: 'Character', card_color: 'Red', card_cost: '1', card_power: '2000',
+      counter_amount: '1000', sub_types: 'Alabasta', card_text: '[On Play] Draw 1 card.', card_image: `https://optcgapi.test/${id}.jpg`, ...extra,
+    });
+    const net = fakeNet({
+      // O Cardkaizoku tem a coleção nova e a antiga (sem imagens, com o texto dele).
+      ...kaizokuRoutes([kz('EB05-099', { cardName: 'Nova' }), kz('OP01-016', { cardName: 'Nami', text: 'Texto do Cardkaizoku.' }), kz('OP01-017', { cardName: 'Usopp', text: 'Texto do Cardkaizoku.' })]),
+      [optcgLeaksDataUrl('EB05')]: leaks.eb05,
+      [`${BASE}/allSets/`]: [{ set_id: 'EB-05' }],
+      [`${BASE}/allDecks/`]: [],
+      [`${BASE}/sets/EB-05/`]: [row('EB05-099', 'Nova'), row('OP01-016', 'Nami (OP01-016) (SP)', { card_image_id: 'OP01-016_p4', card_image: 'https://optcgapi.test/OP01-016_p4.jpg' })],
+    });
+    const dir = feedDir({ 'eb05.json': { set: 'EB05', feed: true } });
+    await refreshSpoilerFeeds(db, dir, { chain: chain(net) });
+    const r = await syncSpoilers(db, { base: BASE, fetchJson: net.fetchJson, chain: [cardkaizokuSource(net.fetchJson), source('optcgapi')] });
+    expect(r.errors).toEqual([]);
+    expect(r.official).toContain('EB05-099');
+    const [nami, usopp] = getCards(db, ['OP01-016', 'OP01-017']);
+    // A coleção antiga fica como estava (imagem e texto); a Nami só ganha a arte oficial, no lugar da do site.
+    expect(usopp).toMatchObject({ imageUrl: 'https://optcgapi.test/OP01-017.jpg', text: '[On Play] Draw 1 card.' });
+    expect(nami).toMatchObject({ imageUrl: 'https://optcgapi.test/OP01-016.jpg', text: '[On Play] Draw 1 card.' });
+    expect(nami.arts).toEqual([{ id: 'OP01-016_p4', imageUrl: 'https://optcgapi.test/OP01-016_p4.jpg', label: 'SP' }]);
+  });
+
   it('com uma fonte fora do ar, grava o que veio e não apaga nada', async () => {
     const db = openDb(':memory:');
     const dir = feedDir({ 'eb05.json': { set: 'EB05', feed: true } });

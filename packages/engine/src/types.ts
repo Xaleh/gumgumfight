@@ -63,6 +63,11 @@ export interface CardArt {
   imageUrl: string;
   /** Versão da impressão ("Parallel", "Manga", "Winner Pack Vol. 5"…), em inglês, como vem da fonte. */
   label?: string;
+  /**
+   * Arte vinda de um site de spoilers: a coleção do feed em que saiu ("OP18"). É provisória: sai
+   * quando a fonte oficial traz as artes novas da carta (a mesma arte chega com outro identificador).
+   */
+  spoiler?: string;
 }
 
 export interface CardSpoiler {
