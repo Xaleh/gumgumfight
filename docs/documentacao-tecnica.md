@@ -611,11 +611,12 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (33)
+### Tabelas (34)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
 | `cards` | `id` (ex. `OP01-001`) | `set_code`, `name`, `category`, **`data` (JSON `CardData`)**, `provisional` (0/1), `source`, `raw` (JSON da API), `updated_at`. Índice `cards_set`. | importador, seed, sync de spoilers |
+| `set_releases` | `set_code` | Coleções que viraram oficiais pela lista oficial da Bandai no dia do lançamento e que a optcgapi ainda não publicou: `source` (domínio da lista), `released_at` | `syncSpoilers` (entra quando a lista torna oficial, sai quando a API publica) |
 | `card_translations` | `(card_id, lang)` | `text`, `trigger` revisados à mão | seed (de `data/translations`) |
 | `card_engine_texts` | `card_id` | Texto para o motor: `text`, `trigger`, `base_key` (hash do texto oficial quando foi escrito; diferente = não vale), `author_id`, `author_name`, `updated_at` | `PUT/DELETE /api/dev/engine-texts/:id` |
 | `card_engine_text_history` | `id` | Cada gravação (`action = set`, com o texto) e remoção (`remove`) do texto para o motor, com quem e quando | idem |
@@ -692,7 +693,7 @@ limite relevante é o tempo das consultas de estatísticas (seção 15).
 | Efeito automatizado (DSL) | **não é gravado**: `buildCardDef` calcula a partir do texto (parser) ou de `CARD_SCRIPTS` em tempo de execução | — |
 | Erratas e correções de fonte | código (`errata.ts`, `source-fixes.ts`), aplicadas ao ler e ao gravar (`fixCard`) | — |
 | Imagem | **não é armazenada**: só a URL em `data.imageUrl`; o navegador baixa do site de origem | URL |
-| Artes alternativas | `data.arts` (`CardArt[]`: `id` = nome do arquivo da imagem, `imageUrl`, `label`); a importação parcial junta às já gravadas (`keepArts`) | JSON |
+| Artes alternativas | `data.arts` (`CardArt[]`: `id` = nome do arquivo da imagem, `imageUrl`, `label`, `spoiler` = coleção do feed de spoilers de onde veio, se veio de um); a importação parcial junta às já gravadas (`keepArts`) | JSON |
 | Arte escolhida no deck | `decks.arts` (número da carta -> `CardArt.id`), fora de `decks.cards` (não muda o `deckHash`) | JSON |
 | Cartas provisórias (antes da primeira importação) | `data/cards/*.json` (750 cartas escritas de memória, `provisional: true`) | JSON `{set, title, provisional, note, cards: CardData[]}` |
 | Tipos conhecidos | `data/card-types.json` (172) | JSON |
@@ -733,8 +734,14 @@ Fluxo do `npm run cards:import -- [coleções | --all | --file x.json] [--dry-ru
    imagem e artes da primeira fonte com imagem. Fonte que mistura spoilers (Cardkaizoku) só traz coleções confirmadas
    por outra fonte oficial ou pelo banco, e promos que outra fonte tem ou que estão à venda (`products` não vazio).
    Relatório (fonte por coleção, campos completados, divergências) no console e em `card-source-diff.json` ao lado do banco.
-6. `upsertCards(provisional: false, source: 'api:<fonte vencedora>', raw)` numa transação. Cartas oficiais **substituem**
-   provisórias e spoilers; o inverso nunca acontece.
+6. `upsertCards(provisional: false, source: 'api:<fonte vencedora>', raw, artOnly)` numa transação. Cartas oficiais
+   **substituem** provisórias e spoilers; o inverso nunca acontece.
+7. **Impressões de outra coleção** (`artOnly`): a resposta de uma coleção só traz as cartas antigas reimpressas nela com
+   arte nova (SP) sem a impressão original (grupo sem linha `primary` nem `ownSet`). `mapApiResponse` devolve esses
+   números em `artOnly`, com todas as artes em `arts`; `resolveChain` mantém a marca quando nenhuma fonte tem a carta
+   inteira. No `upsertCards`, a carta que já é oficial só ganha as artes novas (`addArts`: dados, imagem e `source` não
+   mudam); a que o banco não tem (ou só como provisória) entra inteira. Uma arte oficial nova tira as de spoiler
+   (`CardArt.spoiler`) da carta, tanto no `addArts` quanto no `keepArts`.
 
 Em produção a importação roda na VPS: manualmente (`node release/server/import-cards.mjs` com o `DB_PATH`
 compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama o importador depois do deploy).
@@ -749,9 +756,14 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
 - Arquivo: `{set, title, release, feed: true, source, url, cards: []}` (`feed: "optcgleaks"` dos arquivos antigos também liga). `cards` aceita cartas escritas à mão
   (mesmo `CardData`), com prioridade sobre o feed; cartas sem id válido (`/^[A-Z]+\d*-\d+$/`), nome ou categoria são
   ignoradas e logadas.
-- Feed: `https://images.optcgleaks.com/<set>/<set>.json`. Só o array `cards` é usado (`sp_cards` e `unknown_id_cards`
-  ficam de fora). Mapeamento em `spoiler-feed.ts`: entidades HTML, `<br>`, `NOTE:` → `notes`, `<Blocker>` → `[Blocker]`,
-  imagem `https://images.optcgleaks.com/<set>/images/<image.id>.webp`, `spoiler: {source: 'optcgleaks.com', url}`.
+- Feed: `https://images.optcgleaks.com/<set>/<set>.json`. As cartas vêm do array `cards` (`unknown_id_cards` fica de
+  fora). Mapeamento em `spoiler-feed.ts`: entidades HTML, aspas tipográficas, `<br>`, `NOTE:` → `notes`, `<Blocker>` →
+  `[Blocker]`, imagem `https://images.optcgleaks.com/<set>/images/<image.id>.webp` (a "Base Art"),
+  `spoiler: {source: 'optcgleaks.com', url}`. As outras imagens de `images` viram `arts` com `spoiler: '<SET>'`
+  ("Alt-Art" → `label` "Alternate Art", "SP Alt-Art" → "SP"). `sp_cards` (cartas reimpressas na coleção com arte nova):
+  a da própria coleção soma a arte à carta; as de outras coleções saem em `extraArts` e `syncSpoilerArts` as põe na
+  carta já gravada (oficial ou não), sem mexer no resto. Uma rodada completa tira as artes de spoiler que o site não
+  traz mais; com uma fonte fora do ar, nada sai.
 - `refreshSpoilerFeeds`: busca a coleção em cada fonte de `SPOILER_SOURCES` (404 = a fonte não tem) e junta com
   `resolveChain`; pula a coleção se já há cartas oficiais dela (menos `P`, que sai carta a carta); resposta vazia ou
   qualquer fonte com erro não apaga nada; grava com `provisional = 1`, `source = 'spoiler:feed:<fonte vencedora>'` e
@@ -760,6 +772,22 @@ compartilhado) ou pelo input `import_sets` do workflow (`remote-deploy.sh` chama
   `/sets/card/<primeiro id>/` e, achando, busca as demais uma a uma; promos pendentes buscam `/allPromos/`. 404 = "ainda
   não publicada". O que vier passa pela cadeia de `CARD_SOURCES` (as outras fontes só nas coleções que a API publicou)
   e é importado como oficial (`provisional = 0`); a etiqueta SPOILER some sem mexer nos decks (o número não muda).
+- **Lista oficial no lançamento** (`officialList`; `CARD_RELEASE_SOURCE`, padrão ligado): para a coleção que a API não
+  trouxe, com data de lançamento menor ou igual à data de hoje em Brasília (`brasiliaDate`) e ainda sem cartas
+  oficiais. A data vem de `officialReleaseDates` (`<lista>/products/?subcategory=boosters&page=1`, e `decks` para os
+  `ST`: o `datetime` do `<time class="newsDate">` de cada `<li class="linkListColBox">`, pelo código entre colchetes
+  do título), consultada só enquanto há coleção em spoiler esperando; sem a página ou sem a coleção nela, vale o
+  `release` do arquivo de spoilers (`SpoilerSyncResult.releases` traz as duas, e a rodada avisa no log quando
+  divergem). Com a data vencida, `bandaiSource` (`card-sources/bandai.ts`) lê `<lista>/cardlist/` e a página `?series=<id>` da coleção;
+  cada `<dl class="modalCol">` vira uma linha no formato da optcgapi (`parseListRows`: Vida do Líder, poder "-" de
+  Personagem = 0, `[Trigger]` no fim do texto, "−" → "-", "(Alternate Art)"/"(SP)"/"(TR)" no nome das impressões
+  `_p*`) e passa por `mapApiBodies`, como uma resposta da API. A camada da lista entra logo depois da optcgapi em
+  `resolveChain` e a coleção fica em `set_releases`. Sem a CDN própria a fonte não traz imagem nem artes (a lista
+  responde `Cross-Origin-Resource-Policy: same-site`) e `upsertCards(keepImage)` mantém as que a carta tinha. Coleções
+  em `set_releases` continuam sendo procuradas na API (pela primeira carta oficial delas) e relidas da lista a cada
+  rodada; quando a API publica, a importação dela vale e a linha sai. Tráfego por rodada: 1 ou 2 páginas de produtos
+  enquanto há coleção em spoiler com lançamento por vir, e 2 requisições à lista de cartas (com 1 s entre elas)
+  enquanto há coleção lançada esperando a API.
 - Agendamento: dentro do processo da API, 15 s após subir e depois a cada `SPOILER_SYNC` horas (padrão 6, `off`
   desliga). Tráfego: ~2 requisições ao optcgleaks + 2 à optcgapi por rodada (mais uma por carta pendente quando a
   coleção aparece). Também executável à mão: `npm run cards:import -- --spoilers`.
@@ -1645,6 +1673,7 @@ salas contam dentro das 400 do teto geral. As medições não foram feitas na KV
 | `CARD_IMAGES` | `on` | `off` remove as URLs de imagem das respostas |
 | `CARD_API_BASE` | `https://optcgapi.com/api` | importador e sync |
 | `SPOILER_SYNC` | `6` (horas) | `off` desliga; nunca roda em testes |
+| `CARD_RELEASE_SOURCE` | `bandai` | `off`: a coleção só vira oficial quando a optcgapi a publica |
 | `GOOGLE_CLIENT_ID` | vazio (login desligado) | OAuth Web client |
 | `ADMIN_EMAILS` | vazio | contas que viram Admin ao entrar |
 | `ONLINE_BOT_ROOMS` | `on` | transmitir o treino contra o bot (servidor joga pelo bot; exige login) |

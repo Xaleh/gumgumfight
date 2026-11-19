@@ -196,6 +196,15 @@ export function globalStatsSyncHours(env = process.env): number | null {
  * SPOILER_SYNC: de quantas em quantas horas o servidor procura na API as cartas de
  * spoiler que viraram oficiais (padrão 6). "off" desliga. Nunca roda nos testes.
  */
+/**
+ * CARD_RELEASE_SOURCE: no dia do lançamento, a coleção que a optcgapi ainda não publicou vira
+ * oficial pela lista oficial da Bandai em inglês (padrão "bandai"). "off" desliga: a coleção
+ * continua em spoiler até a optcgapi publicar.
+ */
+export function releaseFromOfficialList(env = process.env): boolean {
+  return !off(env.CARD_RELEASE_SOURCE);
+}
+
 export function spoilerSyncHours(env = process.env): number | null {
   if (off(env.SPOILER_SYNC) || env.NODE_ENV === 'test' || env.VITEST) return null;
   const hours = Number(env.SPOILER_SYNC ?? 6);

@@ -35,7 +35,7 @@ export const fetchJson: FetchJson = async (url) => {
 };
 
 /** Mapeia respostas da API (o vocabulário de tipos vem de todas juntas). */
-export function mapApiBodies(bodies: unknown[]): { cards: CardData[]; raw: Map<string, unknown>; ignored: number } {
+export function mapApiBodies(bodies: unknown[]): { cards: CardData[]; raw: Map<string, unknown>; ignored: number; artOnly: Set<string> } {
   // Todas as linhas juntas: a mesma carta aparece em vários corpos (coleção e starter deck
   // que a reimprime), e a escolha da versão certa precisa ver todas (mergeRows).
   const rows = bodies.flatMap(rowsOf);
@@ -44,7 +44,7 @@ export function mapApiBodies(bodies: unknown[]): { cards: CardData[]; raw: Map<s
 
 /** Mapeia respostas da API e grava como cartas oficiais. */
 export function importBodies(db: DB, bodies: unknown[], source: string): CardData[] {
-  const { cards: list, raw } = mapApiBodies(bodies);
-  if (list.length) upsertCards(db, list, { provisional: false, source, raw });
+  const { cards: list, raw, artOnly } = mapApiBodies(bodies);
+  if (list.length) upsertCards(db, list, { provisional: false, source, raw, artOnly });
   return list;
 }

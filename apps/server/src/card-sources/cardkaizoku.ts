@@ -114,7 +114,7 @@ export function mapKaizokuCard(raw: KaizokuCard): CardData | null {
 }
 
 /** Todas as cartas do site (o arquivo atual do manifesto). */
-export async function fetchKaizokuCards(fetchJson: FetchJson): Promise<Required<SourceCards>> {
+export async function fetchKaizokuCards(fetchJson: FetchJson): Promise<Required<Pick<SourceCards, 'cards' | 'raw' | 'released'>>> {
   const manifest = (await fetchJson(cardkaizokuManifestUrl)) as { cardData?: { current?: string } };
   const current = manifest?.cardData?.current;
   if (!current || !/^[\w./-]+\.json$/.test(current)) throw new Error(`${cardkaizokuManifestUrl}: manifesto sem cardData.current`);

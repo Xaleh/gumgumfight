@@ -184,6 +184,30 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   'EB05-057': [['If your have 2 or less Life cards', 'If you have 2 or less Life cards']], // Nojiko: "your have" (no [Trigger])
   // Zoro & Sogeking: o optcgleaks traduz "will not become active"; o Cardkaizoku e a Señor Pink OP18-068 (mesmo efeito) trazem "cannot be rested".
   'OP18-027': [["will not become active at the end of your opponent's next End Phase", "cannot be rested until the end of your opponent's next turn"]],
+  // OP18 no optcgleaks (tradução do site, fora do padrão das cartas): o trecho vira o da carta impressa
+  // (lista oficial em inglês, conferida em 19/11/2026).
+  'OP18-030': [['If this character is rested, give it -2000 power.', 'If this Character is rested, give this Character -2000 power.']], // Nami
+  'OP18-049': [ // Mr.2.Bon.Kurei(Bentham)
+    [
+      'You may look at 5 cards from the top of your deck and add up to 1 card with the {Baroque Works} type to your hand, then place the rest at the bottom of your deck in any order. Then you may attach up to 1 rested DON!! card to your Leader or one of your Characters.',
+      'Look at 5 cards from the top of your deck; reveal up to 1 card with a type including "Baroque Works", add it to your hand and place the rest at the bottom of your deck in any order. Then, give up to 1 rested DON!! card to your Leader or 1 of your Characters.',
+    ],
+  ],
+  'OP18-071': [ // Trebol: o site perde o [Once Per Turn] e escreve o tipo errado ("Donquijote pirates" não acha carta nenhuma)
+    [
+      'If one of your characters with the {Donquijote pirates} type would be removed from the field by your opponents effect, you may return one DON!! from your field to your DON!! deck instead.',
+      "[Once Per Turn] If your {Donquixote Pirates} type Character would be removed from the field by your opponent's effect, you may DON!! -1 instead.",
+    ],
+    ['If your leader is [Sugar] this character gains +2000 power and [Blocker]$', 'If your Leader is [Sugar], this Character gains [Blocker] and +2000 power.'],
+  ],
+  'OP18-072': [ // The Franky Family
+    [
+      "You may K.O. one of your stages with a cost of 5 or less: If this character was played this turn, give up to one of your opponent's characters -3000 power during this turn.",
+      "You may K.O. 1 of your Stages with a cost of 5 or less: If this Character was played on this turn, give up to 1 of your opponent's Characters -3000 power during this turn.",
+    ],
+  ],
+  // Can You Please Sail on the Ship I Made?!
+  'OP18-074': [['up to 1 of your Leaders or Characters gain +4000 power until the end of this battle.', 'up to 1 of your Leader or Characters gains +4000 power during this battle.']],
   // Promos com o texto do Cardkaizoku (tradução própria do site, fora do padrão das cartas), conferidas
   // em 22/10/2026. Com a carta na optcgapi, o texto é o dela (a lista oficial); sem ela, o efeito é o
   // mesmo na redação das cartas oficiais com o mesmo efeito.
@@ -202,7 +226,8 @@ export const SOURCE_TEXT_FIXES: Readonly<Record<string, ReadonlyArray<readonly [
   ],
   'P-118': [['play from your hand up to 1 Character card with a cost of 5 or less that has the {Egghead} type or has a [Trigger]', 'play up to 1 {Egghead} type Character card or Character card with a [Trigger] with a cost of 5 or less from your hand']], // Lilith
   'P-120': [["If your opponent's Life has had a card removed this turn,", "If a card has been removed from your opponent's Life cards during this turn,"]], // Sanji
-  'P-122': [['Give up to 1 of your {Sabo}, up to 1 of your {Portgas D. Ace}, and up to 1 of your {Monkey D. Luffy} each +2000 power for this turn.', 'Up to 1 each of your [Sabo], [Portgas.D.Ace] and [Monkey.D.Luffy] gain +2000 power during this turn.']], // Ace & Sabo & Luffy
+  // Ace & Sabo & Luffy: +1000 (lista oficial japonesa, conferida em 19/11/2026; o site trazia +2000 até outubro).
+  'P-122': [['Give up to 1 of your {Sabo}, up to 1 of your {Portgas D. Ace}, and up to 1 of your {Monkey D. Luffy} each +1000 power for this turn.', 'Up to 1 each of your [Sabo], [Portgas.D.Ace] and [Monkey.D.Luffy] gain +1000 power during this turn.']],
   'P-126': [['You may rest 1 DON!!: Give this Character and up to one of your [Monkey.D.Luffy] and [Portgas.D.Ace] with a base power of 6000 [Rush] during this turn.', 'You may rest 1 of your DON!! cards: This Character and up to 1 of your [Monkey.D.Luffy] or [Portgas.D.Ace] with 6000 base power gain [Rush] during this turn.']], // Sabo
   'P-128': [["If you have a character named [Sabo] or [Monkey.D.Luffy] in play, give up to one of your opponent's characters -3000 during this turn.", "If you have a [Sabo] or [Monkey.D.Luffy] Character, give up to 1 of your opponent's Characters -3000 power during this turn."]], // Portgas.D.Ace
   'P-129': [['Give up to one of your Characters with an original power of 6000 +2000 power during this turn.', 'Up to 1 of your Characters with 6000 base power gains +2000 power during this turn.']], // Makino

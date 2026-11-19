@@ -364,7 +364,7 @@ describe('promos do Cardkaizoku: o que o leitor passou a entender', () => {
     expect(costInHand(s, sanji)).toBe(6);
   });
 
-  it('P-122 Ace & Sabo & Luffy: +2000 para até 1 de cada nome', () => {
+  it('P-122 Ace & Sabo & Luffy: +1000 para até 1 de cada nome', () => {
     let s = toTurn(started(), 3);
     setLeader(s, 0, 'P-122');
     const [sabo, ace, luffy] = ['P-126', 'P-128', 'P-132'].map((id) => onField(s, 0, id));
@@ -373,7 +373,7 @@ describe('promos do Cardkaizoku: o que o leitor passou a entender', () => {
       expect(s.pending).toMatchObject({ kind: 'selectTargets', options: [uid] });
       s = choose(s, [uid]);
     }
-    for (const uid of [sabo, ace, luffy]) expect(getPower(s, uid)).toBe(8000);
+    for (const uid of [sabo, ace, luffy]) expect(getPower(s, uid)).toBe(7000);
   });
 
   it('P-126 Sabo: virando 1 DON!!, ele e até 1 [Monkey.D.Luffy] ou [Portgas.D.Ace] com 6000 de poder base ganham [Rush]', () => {

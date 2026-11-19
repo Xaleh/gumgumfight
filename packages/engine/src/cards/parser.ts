@@ -302,7 +302,8 @@ function clean(raw: string): string {
     .replace(/\bplace the remaining cards at the bottom of your deck\b/g, 'place the rest at the bottom of your deck')
     // A carta é "Nefeltari Vivi" (lista oficial); o Cardkaizoku escreve "Nefertari" nos textos do OP18.
     .replace(/\[Nefertari Vivi\]/g, '[Nefeltari Vivi]')
-    .replace(/\bfor every of your (\[[^\]]+\])(?! Characters?\b)/g, 'for each of your $1 Characters')
+    // OP18-005 (carta impressa): "for every [Kung Fu Jugon]" (em japonês, "os seus"); "for every of your [X]" no Cardkaizoku.
+    .replace(/\bfor every (?:of your )?(\[[^\]]+\])(?! Characters?\b)/g, 'for each of your $1 Characters')
     .replace(/\bwith base (\d+) power\b/g, 'with $1 base power')
     .replace(/\bwith an original power of (\d+)/gi, 'with a base power of $1')
     .replace(/\bbecomes equal to (?=your opponent's Leader)/g, 'becomes the same as ')
@@ -323,6 +324,19 @@ function clean(raw: string): string {
       /(^|\] )Your active (\[[^\]]+\]) Leader with (\d+) or more attached DON!!'s base power becomes (\d+)\.?$/,
       '$1If your $2 Leader has $3 DON!! cards attached and is active, set its base power to $4.',
     )
+    // OP18-027 (carta impressa): "The base power of your active [X] Leader with 3 or more DON!! cards given becomes 7000".
+    .replace(
+      /(^|\] )The base power of your active (\[[^\]]+\]) Leader with (\d+) or more DON!! cards given becomes (\d+)\.?$/,
+      '$1If your $2 Leader has $3 DON!! cards attached and is active, set its base power to $4.',
+    )
+    // OP18-046 (carta impressa): "The base power of your Leader with a type including "X" becomes 7000 during this turn".
+    .replace(/\bThe base power of your (Leader with a type including "[^"]+") becomes (\d+) (?=during this (?:turn|battle))/g, 'Your $1 becomes $2 base power ')
+    // OP18-071 (carta impressa): "this Characters gains".
+    .replace(/\bthis Characters gains\b/g, 'this Character gains')
+    // OP18-105 (carta impressa): o [Trigger] da carta revelada em duas frases.
+    .replace(/ from your hand\. Activate the \[Trigger\] effect of the revealed card\b/g, ' from your hand and activate the [Trigger] effect of that card')
+    // OP18-117 (carta impressa): "play up to a total of 5 … with different card names".
+    .replace(/\bplay up to a total of (\d+) /gi, 'play up to $1 ')
     // OP18-049 (Cardkaizoku): busca numa frase só ("You may look at 5 … and add up to 1 … to your hand, then place the rest …").
     // O "You may" fica de fora: olhar e não pegar nada dá no mesmo, menos a ordem do fundo do deck.
     .replace(
@@ -809,7 +823,8 @@ export function parseCondition(text: string): Condition | null {
     if (inner) return { not: inner };
   }
   // "If all of your Characters have a cost of 12 or more" (OP18-087): nenhum com custo menor.
-  if ((m = t.match(/^all of your Characters have a cost of (\d+) or more$/i))) {
+  // Na carta impressa: "If you only have Characters with a cost of 12 or more".
+  if ((m = t.match(/^all of your Characters have a cost of (\d+) or more$/i) ?? t.match(/^you only have Characters with a cost of (\d+) or more$/i))) {
     return { ownMatchingMax: { count: 0, spec: { side: 'own', kinds: ['character'], upTo: 99, maxCost: Number(m[1]) - 1 } } };
   }
   // "If your [Monkey.D.Luffy] Leader has 3 DON!! cards attached and is active" (OP18-027).
@@ -1217,7 +1232,8 @@ const CLAUSES: ClauseRule[] = [
   [/^your opponent may add (\d+) DON!! cards? from their DON!! deck and set (?:it|them) as active$/i, (m) => [{ do: 'opponentAddDon', count: Number(m[1]), may: true }]],
   [/^return DON!! cards from your field to your DON!! deck until you have the same number of DON!! cards on your field as your opponent$/i, () => [{ do: 'donMatchOpponent' }]],
   [
-    /^at the end of this (turn|battle), (.+)$/i,
+    // "at the end of your turn" (ST37-001, no [When Attacking]): o seu turno é este.
+    /^at the end of (?:this|your) (turn|battle), (.+)$/i,
     (m) => {
       const steps = parseClause(m[2]);
       return steps && [{ do: 'delayed', steps, ...(/battle/i.test(m[1]) ? { when: 'battle' as const } : {}) }];
@@ -2157,7 +2173,7 @@ function parseClause(clause: string): EffectStep[] | null {
     const first = parseClause(addSelf[1]);
     return first && [...first, { do: 'addThisToHand' }];
   }
-  // "Up to 1 each of your [A], [B] and [C] gain +2000 power during this turn" (P-122): um passo por nome.
+  // "Up to 1 each of your [A], [B] and [C] gain +1000 power during this turn" (P-122): um passo por nome.
   const each = c.match(/^up to (\d+) each of your ((?:\[[^\]]+\],? )+and \[[^\]]+\])(.*?) gains? (.+)$/i);
   if (each) {
     const parts = [...each[2].matchAll(/\[([^\]]+)\]/g)].map((x) => parseClause(`Up to ${each[1]} of your [${x[1]}]${each[3]} gains ${each[4]}`));
@@ -2758,7 +2774,10 @@ function parseEvent(text: string): GameEvent | null {
     return { kind: 'lifeRemoved', whose: /or/i.test(m[1]) ? 'any' : /opponent/i.test(m[1]) ? 'opponent' : 'own' };
   }
   // "When you trash a card from the effect of your [Marshall D. Teach] Leader" (OP18-080): o Líder descarta da mão.
-  if ((m = t.match(/^you trash a card (?:from|by) the effect of your \[([^\]]+)\] Leader$/i))) return { kind: 'handTrashedByEffect', sourceLeader: m[1] };
+  // Na carta impressa: "When a card is trashed from your hand by your [Marshall.D.Teach] Leader's effect".
+  if ((m = t.match(/^you trash a card (?:from|by) the effect of your \[([^\]]+)\] Leader$/i) ?? t.match(/^a card is trashed from your hand by your \[([^\]]+)\] Leader's effect$/i))) {
+    return { kind: 'handTrashedByEffect', sourceLeader: m[1] };
+  }
   if ((m = t.match(/^a card is trashed from your hand by (?:your \{([^}]+)\} type card's|an) effect$/i))) {
     return m[1] ? { kind: 'handTrashedByEffect', sourceType: m[1] } : { kind: 'handTrashedByEffect' };
   }
@@ -2817,7 +2836,8 @@ function parseRule(t: string): LeaderRule[] | null {
   if ((m = t.match(/^Under the rules of this game, your DON!! deck consists of (\d+) cards$/i))) return [{ kind: 'donDeck', size: Number(m[1]) }];
   if (/^When your deck is reduced to 0, you win the game instead of losing(?:, according to the rules)?$/i.test(t)) return [{ kind: 'deckOutWin' }];
   // P-117 Nami: "Under the rules of this game, you can only include {East Blue} type cards in your deck and when your deck is reduced to 0, …"
-  if ((m = t.match(/^Under the rules of this game, you can only include \{([^}]+)\} type cards in your deck(?: and (.+))?$/i))) {
+  // ST37-001 Monkey.D.Luffy: "…, you may only include {Alabasta} type cards in your deck".
+  if ((m = t.match(/^Under the rules of this game, you (?:can|may) only include \{([^}]+)\} type cards in your deck(?: and (.+))?$/i))) {
     const more = m[2] ? parseRule(m[2].charAt(0).toUpperCase() + m[2].slice(1)) : [];
     return more && [{ kind: 'deckOnlyType', type: m[1] }, ...more];
   }
@@ -2864,12 +2884,12 @@ function parseStatic(h: Header, body: string): Ability[] | null {
     if (h.oncePerTurn) ab.oncePerTurn = true;
     return [ab];
   }
-  // "Apply each of the following effects based on this Character's power: • If it is 5000 or more, this Character
-  // gains [Rush]. • …" (OP18-004): uma habilidade por faixa de poder.
-  const tiers = body.trim().match(/^Apply each of the following effects based on this Character's power:\s*((?:•\s*If it is \d+ or more, this Character gains \[[^\]]+\]\.?\s*)+)$/i);
+  // "Apply each of the following effects based on this Character's power: • If it has 5000 power or more, this
+  // Character gains [Rush]. • …" (OP18-004; "If it is 5000 or more" nas traduções de fã): uma habilidade por faixa de poder.
+  const tiers = body.trim().match(/^Apply each of the following effects based on this Character's power:\s*((?:•\s*If it (?:is|has) \d+(?: power)? or more, this Character gains \[[^\]]+\]\.?\s*)+)$/i);
   if (tiers) {
     const out: Ability[] = [];
-    for (const t of tiers[1].matchAll(/If it is (\d+) or more, this Character gains \[([^\]]+)\]/gi)) {
+    for (const t of tiers[1].matchAll(/If it (?:is|has) (\d+)(?: power)? or more, this Character gains \[([^\]]+)\]/gi)) {
       const kw = KEYWORDS[t[2].toLowerCase()];
       if (!kw) return null;
       const ab: Ability = { timing: 'static', steps: [], staticKeyword: kw, condition: { selfMinPower: Number(t[1]) } };

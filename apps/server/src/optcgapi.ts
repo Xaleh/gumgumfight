@@ -312,7 +312,7 @@ function artRow(raw: Raw, card: CardData): ArtRow | null {
 }
 
 /** Artes alternativas da carta: sem a imagem principal, sem repetir imagem, na ordem de `ArtRow.rank`. */
-function collectArts(card: CardData, rows: ArtRow[]): CardArt[] | undefined {
+function collectArts(card: Pick<CardData, 'imageUrl'>, rows: ArtRow[]): CardArt[] | undefined {
   const seen = new Set(card.imageUrl ? [card.imageUrl] : []);
   const out: CardArt[] = [];
   const sorted = rows.map((r, i) => ({ ...r, i })).sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.i - b.i);
@@ -407,7 +407,7 @@ function mergeEntries(group: Entry[]): Entry {
 export function mapApiResponse(
   body: unknown,
   vocab?: Set<string>,
-): { cards: CardData[]; raw: Map<string, unknown>; ignored: number } {
+): { cards: CardData[]; raw: Map<string, unknown>; ignored: number; artOnly: Set<string> } {
   const rows = rowsOf(body);
   const types = vocab ?? typeVocabulary(rows);
   const groups = new Map<string, Entry[]>();
@@ -438,12 +438,18 @@ export function mapApiResponse(
   }
   const cards: CardData[] = [];
   const raw = new Map<string, unknown>();
+  const artOnly = new Set<string>();
   for (const group of groups.values()) {
     const e = mergeEntries(group);
-    const arts = collectArts(e.card, artRows.get(e.card.id) ?? []);
+    // Só impressões de outra coleção (a SP de uma carta antiga, a reimpressão num starter deck): a
+    // resposta não tem a impressão original, então a imagem que sobrou não é a da carta. As artes
+    // saem todas em `arts` e quem grava decide (`upsertCards`: carta já oficial só ganha as artes).
+    const foreign = !group.some((g) => g.primary || g.ownSet);
+    const arts = collectArts(foreign ? {} : e.card, artRows.get(e.card.id) ?? []);
     if (arts) e.card.arts = arts;
+    if (foreign) artOnly.add(e.card.id);
     cards.push(e.card);
     raw.set(e.card.id, e.raw);
   }
-  return { cards, raw, ignored };
+  return { cards, raw, ignored, artOnly };
 }

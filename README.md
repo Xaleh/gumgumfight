@@ -58,6 +58,7 @@ DB_PATH=/caminho/gumgum.db WEB_DIST=$PWD/release/web DATA_DIR=$PWD/release/data 
 | `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | (vazio) | Conta (o Account ID ou o endpoint S3 inteiro), bucket e token do Cloudflare R2 da CDN (segredos: só no `deploy.env`) |
 | `R2_ENDPOINT`   | (vazio)                       | Só para bucket com jurisdição (ex.: `https://<id>.eu.r2.cloudflarestorage.com`) |
 | `CARD_IMAGE_SOURCES` | `bandai-en,bandai-asia,bandai-jp` | Listas oficiais da Bandai onde procurar a imagem das cartas sem imagem, em ordem (com a CDN ligada); `off` desliga |
+| `CARD_RELEASE_SOURCE` | `bandai`                | No dia do lançamento, a coleção que a optcgapi ainda não publicou vira oficial pela lista oficial da Bandai (veja [Spoilers](#spoilers-coleções-ainda-não-lançadas)); `off` desliga |
 | `SPOILER_SYNC`  | `6`                           | Horas entre as buscas dos spoilers na API oficial; `off` desliga |
 | `GLOBAL_STATS_API_KEY` | (vazio) | Chave da OPTCG Logpose API (meta global do TCG Matchmaking; veja [Meta global](#meta-global-tcg-matchmaking)); vazio = escopo Global desligado (segredo: só no `deploy.env`) |
 | `GLOBAL_STATS_CLIENT` | `gumgum` | O `x-client-name` cadastrado junto com a chave |
@@ -1013,7 +1014,7 @@ frente quando o adaptador existir. Os adaptadores ficam em `apps/server/src/card
 
 A optcgapi só publica uma coleção depois do lançamento. As cartas já anunciadas (hoje EB05 e OP18; com o Cardkaizoku na cadeia,
 também ST37, ST38 e promocionais ainda sem versão em inglês) entram no jogo como **spoilers**, com a etiqueta **SPOILER**, e viram cartas oficiais sozinhas
-quando a API publica a coleção.
+quando a API publica a coleção ou, no dia do lançamento, pela lista oficial da Bandai (o que vier primeiro).
 
 Cada coleção futura tem um arquivo `data/spoilers/<coleção>.json`:
 
@@ -1036,7 +1037,9 @@ promos) nunca é a próxima coleção.
 - **Busca automática** (`"feed": true`; arquivos antigos com `"feed": "optcgleaks"` também valem): o servidor baixa as
   cartas reveladas das fontes de `SPOILER_SOURCES`, juntadas pela [cadeia](#cadeia-de-fontes):
   - [optcgleaks.com](https://optcgleaks.com/) (`https://images.optcgleaks.com/<coleção>/<coleção>.json`), com textos em
-    inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX") e as reimpressões de outras coleções.
+    inglês e imagens. Ficam de fora as cartas ainda sem número ("EB05-XXX"). As outras imagens de cada carta ("Alt-Art",
+    "Treasure Rare"…) e as cartas de outras coleções reimpressas com arte nova (`sp_cards`) entram como
+    [artes alternativas](#artes-alternativas).
   - [cardkaizoku.com](https://www.cardkaizoku.com/spoilers) (`https://cdn.cardkaizoku.com/manifest.json` aponta o arquivo
     com todas as cartas do site), sem imagens. Carta com o texto ainda não revelado fica de fora.
 
@@ -1053,6 +1056,25 @@ promos) nunca é a próxima coleção.
   imagem oficiais substituem os do spoiler e a etiqueta some. Os decks
   continuam iguais, porque o número da carta não muda. Coleções já oficiais não são mais buscadas no site de spoilers.
   Para fazer tudo na hora: `npm run cards:import -- --spoilers`.
+- **No dia do lançamento, sem esperar a optcgapi** (`CARD_RELEASE_SOURCE`, ligado por padrão): a optcgapi copia a lista
+  oficial da Bandai e costuma publicar a coleção dias depois. Quando a data de lançamento chega (meia-noite no
+  horário de Brasília) e a API ainda não tem a coleção, a sincronização lê a página dela na
+  [lista oficial em inglês](https://en.onepiece-cardgame.com/cardlist/) e as cartas viram oficiais com os dados e o
+  texto da carta impressa (`cards.source = api:en.onepiece-cardgame.com`). A lista entra no lugar da optcgapi na
+  [cadeia](#cadeia-de-fontes), então as outras fontes continuam valendo na ordem configurada.
+  - **A data de lançamento** é a "Release Date" da [página de produtos da Bandai](https://en.onepiece-cardgame.com/products/)
+    (boosters e starter decks), lida a cada rodada enquanto a coleção está em spoiler: um adiamento ou uma
+    antecipação vale sem mexer em nada. O `release` do arquivo só vale quando a página está fora do ar ou não tem a
+    coleção; se as duas datas divergem, o log avisa. Sem data em nenhum dos dois (promocionais), a coleção continua
+    em spoiler, assim como a carta que a lista ainda não tem.
+  - As imagens da lista só abrem no site dela: com a [CDN própria](#cdn-própria-das-imagens-cloudflare-r2) a carta
+    fica com a imagem oficial e as paralelas da lista viram artes; sem a CDN, fica com a imagem e as artes que já
+    tinha (as do site de spoilers).
+  - Enquanto a API não publica, a cada rodada a lista é relida (as paralelas e as correções entram depois do
+    lançamento) e a API continua sendo consultada. Quando ela publica, a importação dela vale, como sempre, e a lista
+    não é mais consultada para essa coleção.
+  - Além das rodadas de `SPOILER_SYNC`, o servidor marca uma rodada para 00:01 (Brasília) de cada dia de lançamento
+    (as datas dos arquivos e, depois de cada rodada, as da página), então a coleção vira oficial no primeiro minuto do dia.
 - Uma carta que já veio da API nunca é sobrescrita por um spoiler, então não é preciso limpar os arquivos depois do lançamento.
 - No construtor de decks, o filtro de coleção tem a opção "Só spoilers" e marca as coleções com "(spoilers)".
 - Deck com spoiler não entra na ranqueada nem em torneio, sala privada ou treino sem spoilers (veja [Formatos](#formatos)),
@@ -1135,6 +1157,15 @@ arte alternativa em todas as cartas do deck que têm uma, e o ícone de paleta n
 Líder) abre o seletor para trocar uma por uma. A escolha é salva no deck (`decks.arts`), não muda o deck nas
 estatísticas e aparece na mesa para os dois jogadores (o oponente só vê a arte das cartas que estão à vista).
 Com `CARD_IMAGES=off`, as artes somem junto com as imagens.
+
+- **Carta antiga reimpressa numa coleção nova** (a SP do Loki OP17-119 dentro do OP-18): a resposta da coleção nova traz
+  só essa impressão, sem a original. A carta que já está no banco fica como está (dados e imagem) e só ganha a arte;
+  as outras fontes da cadeia não são consultadas para a coleção dela.
+- **Coleção ainda em spoiler:** as artes vêm do optcgleaks (hoje, OP18: 35 artes em 29 cartas da coleção e 7 em 6
+  cartas antigas) e ficam marcadas como provisórias (`CardArt.spoiler`, a coleção do feed). A cada rodada valem as que
+  o site tem. Quando a importação oficial traz arte nova da carta, as do site saem (a mesma arte chega com o
+  identificador oficial, e um deck que tinha a do site volta para a imagem normal); enquanto a fonte oficial não tem
+  as artes da carta, as do site continuam.
 
 ### Textos em português
 
