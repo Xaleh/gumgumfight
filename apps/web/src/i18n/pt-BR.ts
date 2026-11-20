@@ -543,6 +543,7 @@ const ptBR = {
   'deck.storageSignIn': 'Entre com o Google no menu para guardá-los na sua conta.',
   // ---- catálogo e filtros ----
   'deck.searchPlaceholder': 'Buscar por nome, número, tipo ou texto…',
+  'deck.searchTips': 'Atalhos: c3 = custo 3 · c2000 = Counter +2000 · c3 c2000 = custo 3 com Counter +2000',
   'deck.filters': 'Filtros',
   'deck.color.red': 'Vermelho',
   'deck.color.green': 'Verde',

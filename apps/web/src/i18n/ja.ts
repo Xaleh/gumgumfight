@@ -542,6 +542,7 @@ export default {
   'deck.storageSignIn': 'アカウントに保存するには、メニューからGoogleでログインしてください。',
   // ---- カード一覧とフィルター ----
   'deck.searchPlaceholder': 'カード名、番号、特徴、テキストで検索…',
+  'deck.searchTips': 'ショートカット：c3＝コスト3 · c2000＝カウンター+2000 · c3 c2000＝コスト3でカウンター+2000',
   'deck.filters': 'フィルター',
   'deck.color.red': '赤',
   'deck.color.green': '緑',

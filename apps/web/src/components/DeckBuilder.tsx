@@ -23,6 +23,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type ApiCard, ApiError, type DeckDuplicate, type DeckSummary, isAdmin, spoilerText } from '../api';
 import { useAuth } from '../auth';
+import { matchesCardQuery, parseCardQuery } from '../cardSearch';
 import { deckNumbers } from '../deckLibrary';
 import type { DeckLink } from '../deeplink';
 import { useLongPress } from '../hooks/useLongPress';
@@ -237,7 +238,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const choosingLeader = !draft.leader;
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = parseCardQuery(query);
     return allCards
       .filter((c) => {
         if (choosingLeader && c.category !== 'leader') return false;
@@ -248,11 +249,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         if (set === SPOILERS ? !c.spoiler : set && (c.set ?? c.id.split('-')[0]) !== set) return false;
         if (onlyCompatible && leader && c.category !== 'leader' && (!isColorCompatible(leader, c) || !leaderAllows(leader, c))) return false;
         if (onlyAutomated && needsManual(c)) return false;
-        if (q) {
-          const hay = `${c.id} ${c.name} ${c.types.join(' ')} ${c.text} ${c.i18n?.pt?.text ?? ''}`.toLowerCase();
-          if (!hay.includes(q)) return false;
-        }
-        return true;
+        return matchesCardQuery(c, q);
       })
       .sort((a, b) => a.id.localeCompare(b.id));
   }, [allCards, query, colors, category, cost, set, onlyCompatible, onlyAutomated, leader, choosingLeader]);
@@ -710,6 +707,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               <input
                 className="search"
                 placeholder={t('deck.searchPlaceholder')}
+                title={t('deck.searchTips')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />

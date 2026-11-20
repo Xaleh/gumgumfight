@@ -542,6 +542,7 @@ export default {
   'deck.storageSignIn': 'Inicia sesión con Google desde el menú para guardarlos en tu cuenta.',
   // ---- catálogo y filtros ----
   'deck.searchPlaceholder': 'Busca por nombre, número, tipo o texto…',
+  'deck.searchTips': 'Atajos: c3 = coste 3 · c2000 = Counter +2000 · c3 c2000 = coste 3 con Counter +2000',
   'deck.filters': 'Filtros',
   'deck.color.red': 'Rojo',
   'deck.color.green': 'Verde',

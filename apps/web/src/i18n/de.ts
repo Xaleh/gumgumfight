@@ -542,6 +542,7 @@ export default {
   'deck.storageSignIn': 'Melde dich im Menü mit Google an, um sie in deinem Konto zu behalten.',
   // ---- Katalog und Filter ----
   'deck.searchPlaceholder': 'Suche nach Name, Nummer, Typ oder Text…',
+  'deck.searchTips': 'Kürzel: c3 = Kosten 3 · c2000 = Counter +2000 · c3 c2000 = Kosten 3 mit Counter +2000',
   'deck.filters': 'Filter',
   'deck.color.red': 'Rot',
   'deck.color.green': 'Grün',

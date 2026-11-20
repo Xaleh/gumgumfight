@@ -542,6 +542,7 @@ export default {
   'deck.storageSignIn': 'Sign in with Google from the menu to keep them in your account.',
   // ---- catalog and filters ----
   'deck.searchPlaceholder': 'Search by name, number, type or text…',
+  'deck.searchTips': 'Shortcuts: c3 = cost 3 · c2000 = Counter +2000 · c3 c2000 = cost 3 with Counter +2000',
   'deck.filters': 'Filters',
   'deck.color.red': 'Red',
   'deck.color.green': 'Green',
