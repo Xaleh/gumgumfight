@@ -187,6 +187,9 @@ Na barra do topo (ou no menu ☰, no celular), **Montar decks** abre o construto
 2. Clique nas cartas para adicionar e use o botão direito (ou os botões −/+ na lista) para remover. Por padrão
    aparecem só cartas com a cor do Líder. Dá para filtrar por nome/texto, cor, tipo, custo e coleção (no
    celular, atrás do botão **Filtros**; a busca e os filtros ficam presos no topo enquanto o catálogo rola).
+   A busca também aceita atalhos, que se combinam: `c3` (custo 3), `c2000` (Counter +2000), `p5000` (poder),
+   `c3+`/`c2-4` (faixas), `red`/`azul` (cor), `blocker`, `onplay`, `-blocker` (exclui), `"straw hat"` (frase
+   exata), `n:luffy` (só no nome) e outros; o botão **?** ao lado da busca lista todos.
    Com o mouse sobre uma carta (no catálogo, no Líder ou na lista do deck), ela aparece ampliada ao lado, com
    o texto do efeito; no toque, segure o dedo na carta para abri-la ampliada.
 3. O painel à direita mostra o total, a curva de custo, os Counters e os problemas do deck. **Salvar** grava
