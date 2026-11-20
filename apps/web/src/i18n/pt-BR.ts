@@ -556,7 +556,7 @@ const ptBR = {
   'deck.searchHelp.noCounter': 'Sem Counter',
   'deck.searchHelp.power': 'Poder 5000 · 6000 ou mais (p5 também vale)',
   'deck.searchHelp.life': 'Líder com 4 de vida',
-  'deck.searchHelp.color': 'Cor, também em português (vermelho, azul…) ou pela letra: r g b p k y. Duas cores trazem só as bicolores',
+  'deck.searchHelp.color': 'Cor, também em português (vermelho, azul…) ou pela letra: r, g, u (azul), p, b (preto), y. Duas cores trazem só as bicolores',
   'deck.searchHelp.category': 'Categoria',
   'deck.searchHelp.attribute': 'Atributo',
   'deck.searchHelp.rarity': 'Raridade',

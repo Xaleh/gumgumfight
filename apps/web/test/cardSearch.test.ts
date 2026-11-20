@@ -111,9 +111,13 @@ describe('características da carta', () => {
     expect(search('green')).toEqual(['ST02-007', 'OP06-022']);
     expect(search('verde')).toEqual(['ST02-007', 'OP06-022']);
     expect(search('g')).toEqual(['ST02-007', 'OP06-022']);
-    expect(search('b')).toEqual(['ST03-004', 'OP18-023']);
+    // Convenção dos card games: u é azul, b é preto.
+    expect(search('r')).toEqual(search('red'));
     expect(search('u')).toEqual(['ST03-004', 'OP18-023']);
-    expect(search('k')).toEqual(['OP09-093']);
+    expect(search('p')).toEqual(['ST04-011']);
+    expect(search('b')).toEqual(['OP09-093']);
+    expect(search('y')).toEqual(['OP06-022']);
+    expect(search('g y')).toEqual(['OP06-022']);
   });
 
   it('duas cores trazem só as cartas com as duas', () => {

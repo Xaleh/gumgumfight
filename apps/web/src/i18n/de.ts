@@ -555,7 +555,7 @@ export default {
   'deck.searchHelp.noCounter': 'Ohne Counter',
   'deck.searchHelp.power': 'Stärke 5000 · 6000 oder mehr (p5 geht auch)',
   'deck.searchHelp.life': 'Leader mit 4 Leben',
-  'deck.searchHelp.color': 'Farbe, auch auf Deutsch (rot, blau…) oder als Buchstabe: r g b p k y. Zwei Farben zeigen nur die zweifarbigen Karten',
+  'deck.searchHelp.color': 'Farbe, auch auf Deutsch (rot, blau…) oder als Buchstabe: r, g, u (blau), p, b (schwarz), y. Zwei Farben zeigen nur die zweifarbigen Karten',
   'deck.searchHelp.category': 'Kartenart',
   'deck.searchHelp.attribute': 'Attribut',
   'deck.searchHelp.rarity': 'Seltenheit',

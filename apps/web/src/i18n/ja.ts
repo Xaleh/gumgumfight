@@ -555,7 +555,7 @@ export default {
   'deck.searchHelp.noCounter': 'カウンターなし',
   'deck.searchHelp.power': 'パワー5000 · 6000以上（p5でも可）',
   'deck.searchHelp.life': 'ライフ4のリーダー',
-  'deck.searchHelp.color': '色。日本語（赤、青…）や頭文字 r g b p k y でも可。2色を指定すると2色カードのみ',
+  'deck.searchHelp.color': '色。日本語（赤、青…）や頭文字 r、g、u（青）、p、b（黒）、y でも可。2色を指定すると2色カードのみ',
   'deck.searchHelp.category': 'カードの種類',
   'deck.searchHelp.attribute': '属性',
   'deck.searchHelp.rarity': 'レアリティ',

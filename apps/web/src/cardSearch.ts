@@ -7,7 +7,7 @@
 //   p5000 ou p5   poder 5000
 //   v4 ou l4      Líder com 4 de vida
 // Carta
-//   red, azul, r  cor (r g b p k y; duas cores = carta com as duas)
+//   red, azul, r  cor (r g u p b y: u é azul, b é preto; duas cores = carta com as duas)
 //   char event stage leader      categoria
 //   slash strike ranged special wisdom   atributo
 //   sr sec uc rare common promo  raridade (ou r:sr, r:l…)
@@ -127,12 +127,12 @@ const def = (names: string, shortcut: Shortcut) => {
 };
 
 const color = (c: Color): Shortcut => ({ test: (card) => card.colors.includes(c) });
-// Uma letra: r g b p y, mais k para preto (b é azul) e u, o azul de quem vem de outros card games.
+// Uma letra, na convenção dos card games: r vermelho, g verde, u azul, p roxo, b preto, y amarelo.
 def('red vermelho r', color('red'));
 def('green verde g', color('green'));
-def('blue azul b u', color('blue'));
+def('blue azul u', color('blue'));
 def('purple roxo p', color('purple'));
-def('black preto k', color('black'));
+def('black preto b', color('black'));
 def('yellow amarelo y', color('yellow'));
 
 const category = (c: CardData['category']): Shortcut => ({ group: 'category', test: (card) => card.category === c, leaders: c === 'leader' });

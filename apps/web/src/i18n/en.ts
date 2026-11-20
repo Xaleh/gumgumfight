@@ -555,7 +555,7 @@ export default {
   'deck.searchHelp.noCounter': 'No Counter',
   'deck.searchHelp.power': 'Power 5000 · 6000 or more (p5 works too)',
   'deck.searchHelp.life': 'Leader with 4 Life',
-  'deck.searchHelp.color': 'Color, or its letter: r g b p k y. Two colors show only the two-color cards',
+  'deck.searchHelp.color': 'Color, or its letter: r, g, u (blue), p, b (black), y. Two colors show only the two-color cards',
   'deck.searchHelp.category': 'Card type',
   'deck.searchHelp.attribute': 'Attribute',
   'deck.searchHelp.rarity': 'Rarity',

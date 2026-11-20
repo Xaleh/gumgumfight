@@ -555,7 +555,7 @@ export default {
   'deck.searchHelp.noCounter': 'Sans Counter',
   'deck.searchHelp.power': 'Puissance 5000 · 6000 ou plus (p5 marche aussi)',
   'deck.searchHelp.life': 'Leader avec 4 de vie',
-  'deck.searchHelp.color': 'Couleur, aussi en français (rouge, bleu…) ou par la lettre : r g b p k y. Deux couleurs : seulement les bicolores',
+  'deck.searchHelp.color': 'Couleur, aussi en français (rouge, bleu…) ou par la lettre : r, g, u (bleu), p, b (noir), y. Deux couleurs : seulement les bicolores',
   'deck.searchHelp.category': 'Type de carte',
   'deck.searchHelp.attribute': 'Attribut',
   'deck.searchHelp.rarity': 'Rareté',
