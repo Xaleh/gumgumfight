@@ -29,6 +29,7 @@ import type { DeckLink } from '../deeplink';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, fillSlots, StaticCardZoom } from './CardInfo';
+import { CardSearchHelp } from './CardSearchHelp';
 import { StaticCard } from './CardView';
 import { DeckLibrary } from './DeckLibrary';
 import { CostCurve, useFavoriteToggle } from './DeckTile';
@@ -133,6 +134,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   /** Tela estreita: os filtros ficam escondidos atrás do botão "Filtros" para sobrar espaço para as cartas. */
   const narrow = useMediaQuery('(max-width: 1100px)');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Painel com os atalhos da busca (c3, c2000, blocker…). */
+  const [searchHelpOpen, setSearchHelpOpen] = useState(false);
   // Toque longo numa linha do deck atual: abre a carta dela (um só handler para a lista toda).
   const entryPress = useLongPress<HTMLDivElement>((e) => {
     const id = (e.target as HTMLElement).closest<HTMLElement>('.entry')?.dataset.card;
@@ -237,22 +240,31 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   /** Sem Líder escolhido, a lista mostra só Líderes. */
   const choosingLeader = !draft.leader;
 
+  /** Nomes das cores e das categorias no idioma em vigor também valem como atalho da busca ("rouge", "eventos"). */
+  const searchAliases = useMemo(() => {
+    const aliases: Record<string, string> = {};
+    for (const c of COLORS) aliases[t(c.label)] = c.id;
+    for (const cat of ['leader', 'character', 'event', 'stage'] as const) aliases[t(CATEGORY_LABEL[cat])] = cat;
+    return aliases;
+  }, [t]);
+
   const filtered = useMemo(() => {
-    const q = parseCardQuery(query);
+    const q = parseCardQuery(query, searchAliases);
+    const ctx = { inDeck: (id: string) => id === draft.leader || draft.cards.has(id) };
     return allCards
       .filter((c) => {
         if (choosingLeader && c.category !== 'leader') return false;
         if (!choosingLeader && category && c.category !== category) return false;
-        if (!choosingLeader && !category && c.category === 'leader') return false;
+        if (!choosingLeader && !category && c.category === 'leader' && !q.wantsLeaders) return false;
         if (colors.length && !c.colors.some((col) => colors.includes(col))) return false;
         if (cost !== '' && (cost === '10' ? (c.cost ?? -1) < 10 : c.cost !== Number(cost))) return false;
         if (set === SPOILERS ? !c.spoiler : set && (c.set ?? c.id.split('-')[0]) !== set) return false;
         if (onlyCompatible && leader && c.category !== 'leader' && (!isColorCompatible(leader, c) || !leaderAllows(leader, c))) return false;
         if (onlyAutomated && needsManual(c)) return false;
-        return matchesCardQuery(c, q);
+        return matchesCardQuery(c, q, ctx);
       })
       .sort((a, b) => a.id.localeCompare(b.id));
-  }, [allCards, query, colors, category, cost, set, onlyCompatible, onlyAutomated, leader, choosingLeader]);
+  }, [allCards, query, searchAliases, colors, category, cost, set, onlyCompatible, onlyAutomated, leader, choosingLeader, draft.leader, draft.cards]);
 
   const deckList = useMemo(
     () => ({
@@ -707,10 +719,19 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               <input
                 className="search"
                 placeholder={t('deck.searchPlaceholder')}
-                title={t('deck.searchTips')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
+              <button
+                type="button"
+                className={['btn small search-help-toggle', searchHelpOpen ? 'on' : ''].join(' ')}
+                aria-expanded={searchHelpOpen}
+                aria-label={t('deck.searchHelp')}
+                title={t('deck.searchHelp')}
+                onClick={() => setSearchHelpOpen((v) => !v)}
+              >
+                ?
+              </button>
               {narrow && (
                 <button
                   type="button"
@@ -774,6 +795,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
             </label>
             </div>
           </div>
+
+          {searchHelpOpen && <CardSearchHelp query={query} onQuery={setQuery} />}
 
           <div className="catalog-hint muted small">
             {choosingLeader
