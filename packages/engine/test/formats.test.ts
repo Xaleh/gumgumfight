@@ -75,6 +75,25 @@ describe('formatos (Standard e Extra Grand Battle)', () => {
     expect(formatIssues({ leader: 'OP11-040', cards: [{ id: 'OP11-070', count: 4 }] }, 'egb', NOW)).toEqual([]);
   });
 
+  it('par proibido com data marcada só vale a partir da data (Bonney EB05 com Luffy e Law)', () => {
+    const before = new Date('2026-11-26T12:00:00Z');
+    const after = new Date('2026-11-27T12:00:00Z');
+    const bonney = [{ id: 'EB05-001', count: 4 }];
+    const luffyDeck = { leader: 'OP13-001', cards: bonney };
+    const lawDeck = { leader: 'OP01-002', cards: bonney };
+    expect(formatIssues(luffyDeck, 'egb', before)).toEqual([]);
+    expect(formatIssues(lawDeck, 'egb', before)).toEqual([]);
+    for (const f of ['standard', 'egb'] as const) {
+      expect(formatIssues(luffyDeck, f, after).map((i) => i.code)).toEqual(['rules.bannedPair']);
+    }
+    expect(formatIssues(lawDeck, 'egb', after).map((i) => i.message)).toEqual([expect.stringMatching(/EB05-001 e OP01-002/)]);
+    // A data é a de Brasília: 23h59 do dia 26 ainda vale; meia-noite do dia 27 já não.
+    expect(formatIssues(luffyDeck, 'egb', new Date('2026-11-27T02:59:00Z'))).toEqual([]);
+    expect(formatIssues(luffyDeck, 'egb', new Date('2026-11-27T03:00:00Z'))).toHaveLength(1);
+    // A Bonney segue valendo com qualquer outro Líder.
+    expect(formatIssues({ leader: 'OP11-040', cards: bonney }, 'egb', after)).toEqual([]);
+  });
+
   it('o deck do ST-01 só vale no EGB', () => {
     expect(legalFormats(luffy, NOW)).toEqual(['egb']);
     expect(validateDeck(luffy, byId).valid).toBe(true);

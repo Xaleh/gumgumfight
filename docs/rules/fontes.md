@@ -13,7 +13,7 @@ Tudo o que foi lido para montar esta base, com a data de cada arquivo (a data va
 | Página de regras | — | <https://en.onepiece-cardgame.com/rules/> |
 | Página de Q&A | — | <https://en.onepiece-cardgame.com/rules/faq/> |
 | Errata | última entrada 16/05/2025 (avisos posteriores saem em News, ver abaixo) | <https://en.onepiece-cardgame.com/rules/errata_card/> |
-| Banidas e restritas | vigente a partir de 12/10/2026 | <https://en.onepiece-cardgame.com/news/restriction.html> |
+| Banidas e restritas | vigente a partir de 27/11/2026 | <https://en.onepiece-cardgame.com/news/restriction.html> |
 
 A Bandai não publica changelog das Comprehensive Rules e o site só guarda a versão atual. As diferenças entre as versões 1.1.x, 1.2.0 e 1.2.1 estão em [interacoes/14-comunidade-e-simuladores.md](interacoes/14-comunidade-e-simuladores.md).
 
@@ -70,10 +70,10 @@ A Bandai não publica changelog das Comprehensive Rules e o site só guarda a ve
 
 ## Banidas, restritas e errata
 
-### Lista vigente (efetiva a partir de **12/10/2026**, anunciada em 24/09/2026)
-Fonte: [OFICIAL] https://en.onepiece-cardgame.com/news/restriction.html e detalhes em https://en.onepiece-cardgame.com/news/restriction-261001.html
+### Lista vigente (efetiva a partir de **27/11/2026**, anunciada em 17/11/2026)
+Fonte: [OFICIAL] https://en.onepiece-cardgame.com/news/restriction.html e detalhes em https://en.onepiece-cardgame.com/news/restriction-2611.html
 - **Banned** (não pode estar em nenhum deck):
-  - **OP14-020 Dracule Mihawk** (Leader; parallels incluídas). **Novo em 12/10/2026.** A Bandai vai distribuir um substituto, **P-163 Dracule Mihawk**, em eventos.
+  - **OP14-020 Dracule Mihawk** (Leader; parallels incluídas). Desde 12/10/2026. A Bandai vai distribuir um substituto, **P-163 Dracule Mihawk**, em eventos.
   - OP06-047 Charlotte Pudding
   - OP03-040 Nami
   - OP06-086 Gecko Moria
@@ -81,6 +81,8 @@ Fonte: [OFICIAL] https://en.onepiece-cardgame.com/news/restriction.html e detalh
   - OP06-116 Reject
 - **Restricted**: nenhuma.
 - **Banned Pairs** (Card A e Card B não podem estar no mesmo deck):
+  - **EB05-001 Jewelry Bonney + OP13-001 Monkey.D.Luffy** (Leader; parallels incluídas). **Novo em 27/11/2026.**
+  - **EB05-001 Jewelry Bonney + OP01-002 Trafalgar Law** (Leader; parallels incluídas). **Novo em 27/11/2026.** Na prática só muda o Extra Regulation: o OP01-002 é de bloco ① e já não vale no Standard.
   - OP07-115 I Re-Quasar Helllp!! + EB04-058 Borsalino
   - OP11-040 Monkey.D.Luffy + OP11-067 Charlotte Katakuri
   - OP11-040 Monkey.D.Luffy + OP08-069 Charlotte Linlin
@@ -89,6 +91,7 @@ Fonte: [OFICIAL] https://en.onepiece-cardgame.com/news/restriction.html e detalh
 ### Histórico recente
 | Efetivo | Mudança | Fonte |
 |---|---|---|
+| 27/11/2026 | Banned pairs EB05-001 Bonney × OP13-001 Luffy e × OP01-002 Law ("exceptionally high advantage over other decks"; jogos unilaterais) | [OFICIAL] https://en.onepiece-cardgame.com/news/restriction-2611.html (17/11/2026) |
 | 12/10/2026 | Ban OP14-020 Mihawk (Leader); substituto P-163 | [OFICIAL] restriction-261001.html |
 | 10/04/2026 (NA/EU/LATAM/OC) | Banned pair OP07-115 + EB04-058 ("game times have become significantly longer than expected") | [COMUNIDADE] https://onepiece.gg/banned-restricted-cards-effective-from-april-10-2026/ ; data regional: https://onepiece.gg/emergency-ban-to-be-announced-march-31-2026/ . Uma fonte (tcgtalk, via snippet) fala em "May 1, 2026", talvez para outra região. **Incerto.** O link oficial antigo foi sobrescrito por restriction.html. |
 | 01/04/2026 | Ban OP06-047 Pudding. **Unban**: OP07-045 Jinbe, EB01-059 Kingdom Come, ST06-015 Great Eruption, OP02-024 Moby Dick, OP03-098 Enies Lobby, OP02-117 Ice Age | [OFICIAL] https://en.onepiece-cardgame.com/topics/029.php (16/03/2026) |
@@ -125,7 +128,7 @@ Para o simulador: as erratas **OP13-119** e **OP09-058** mudam o comportamento d
 
 ### Situação no repositório
 
-- A lista de banidas e de pares proibidos de `packages/engine/src/formats.ts` bate com a lista oficial vigente (6 banidas, 3 pares, OP14-020 a partir de 12/10/2026).
+- A lista de banidas e de pares proibidos de `packages/engine/src/formats.ts` bate com a lista oficial vigente (6 banidas, 5 pares; OP14-020 a partir de 12/10/2026 e os dois pares da EB05-001 a partir de 27/11/2026).
 - As erratas que a fonte de cartas (optcgapi) ainda não traz são aplicadas pela tabela `packages/engine/src/errata.ts`, no motor e no servidor (gravação e leitura do banco). Ver [divergencias.md](divergencias.md) (DV-34).
 - A importação completa lê três listas da optcgapi: `/api/allSetCards/`, `/api/allSTCards/` e `/api/allPromos/` (promocionais P-xxx). Ver [divergencias.md](divergencias.md) (DV-37).
 

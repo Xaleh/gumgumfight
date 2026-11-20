@@ -7,7 +7,7 @@
 //    (Super Parallel/Manga com bloco X e cartas tratadas como bloco ④).
 //
 // Desde 1º/04/2026 a lista de banidas e de pares proibidos é a mesma nos dois formatos.
-// Fontes: en.onepiece-cardgame.com/news/restriction-261001.html e
+// Fontes: en.onepiece-cardgame.com/news/restriction.html (último aviso: restriction-2611.html) e
 // en.onepiece-cardgame.com/news/blockicon-card.html. Para atualizar, é só mexer aqui.
 //
 // Spoilers (cartas anunciadas que ainda não foram lançadas) não são de formato nenhum:
@@ -84,6 +84,9 @@ export const BANNED_PAIRS: ReadonlyArray<{ cards: [string, string]; since?: stri
   { cards: ['OP11-040', 'OP11-067'] },
   { cards: ['OP11-040', 'OP08-069'] },
   { cards: ['OP07-115', 'EB04-058'] },
+  // Jewelry Bonney (EB05, vermelha) com os Líderes vermelho/verde Luffy e Law.
+  { cards: ['EB05-001', 'OP13-001'], since: '2026-11-27' },
+  { cards: ['EB05-001', 'OP01-002'], since: '2026-11-27' },
 ];
 
 /** Coleções cujas cartas têm o ícone de bloco ①. */
