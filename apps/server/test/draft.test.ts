@@ -130,8 +130,10 @@ describe('Draft: escolher e passar', () => {
     // Bob escolhe do dele e recebe o que Alice passou.
     const b2 = (await pick(app, pod.id, BOB, b0.pack![0])).json() as PodView;
     expect(b2.pack).toEqual(a0.pack!.filter((id) => id !== a0.pack![2]));
-    // Carta que não está no booster da mão é recusada.
-    expect((await pick(app, pod.id, BOB, b0.pack![0])).json().errorCode).toBe('draftCardNotInPack');
+    // Carta que não está no booster da mão é recusada. (A mesma carta pode sair em dois boosters, então
+    // a do booster que Bob já passou adiante só serve de exemplo se não estiver também no que chegou.)
+    const gone = b0.pack!.find((id) => !b2.pack!.includes(id))!;
+    expect((await pick(app, pod.id, BOB, gone)).json().errorCode).toBe('draftCardNotInPack');
     expect((await pick(app, pod.id, BOB, 'OP02-001')).json().errorCode).toBe('draftCardNotInPack');
   });
 
