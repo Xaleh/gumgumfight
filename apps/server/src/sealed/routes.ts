@@ -4,7 +4,7 @@
 //
 //   GET    /api/sealed/sets              coleções em que dá para abrir boosters
 //   GET    /api/sealed/pools             as coleções abertas de quem pede (resumo)
-//   POST   /api/sealed/pools             { set } abre 6 boosters
+//   POST   /api/sealed/pools             { set } abre 6 boosters de uma coleção; { sets: [...] } abre um Pack Rush
 //   GET    /api/sealed/pools/:id         os boosters e o deck
 //   PUT    /api/sealed/pools/:id/deck    { leader, cards } salva o deck (mesmo incompleto)
 //   DELETE /api/sealed/pools/:id
@@ -12,7 +12,7 @@
 //
 // Dono = conta ou navegador (`viewerHash`), como nos decks. Não exige login.
 
-import { type DeckList, LIMITED_DECK_SIZE, SEALED_PACKS } from '@gumgum/engine';
+import { type DeckList, LIMITED_DECK_SIZE, RUSH_MAX_SETS, RUSH_MIN_SETS, SEALED_PACKS } from '@gumgum/engine';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { DB } from '../db';
 import { fail } from '../errors';
@@ -62,6 +62,8 @@ export function registerSealedRoutes(app: FastifyInstance, { db, viewerHash }: D
     return {
       ...summary(pool),
       packs: pool.packs,
+      /** A coleção de cada booster (no Pack Rush elas variam). */
+      packSets: pool.packSets,
       deck: pool.deck,
       issues: (report?.issues ?? []).map(({ level, message, code, params, cardId }) => ({ level, message, code, params, ...(cardId ? { cardId } : {}) })),
     };
@@ -74,7 +76,13 @@ export function registerSealedRoutes(app: FastifyInstance, { db, viewerHash }: D
   };
   const notFound = fail('sealedPoolNotFound', 'Coleção do Selado não encontrada.');
 
-  app.get('/api/sealed/sets', async () => ({ packs: SEALED_PACKS, deckSize: LIMITED_DECK_SIZE, sets: sealedSets(db) }));
+  app.get('/api/sealed/sets', async () => ({
+    packs: SEALED_PACKS,
+    deckSize: LIMITED_DECK_SIZE,
+    /** Pack Rush: quantas coleções dá para escolher. */
+    rush: { min: RUSH_MIN_SETS, max: RUSH_MAX_SETS },
+    sets: sealedSets(db),
+  }));
 
   app.get('/api/sealed/pools', async (req) => {
     const owner = viewerHash(req);
@@ -82,17 +90,26 @@ export function registerSealedRoutes(app: FastifyInstance, { db, viewerHash }: D
   });
 
   const opens = new Map<string, { start: number; n: number }>();
-  app.post<{ Body: { set?: unknown } }>('/api/sealed/pools', async (req, reply) => {
+  app.post<{ Body: { set?: unknown; sets?: unknown } }>('/api/sealed/pools', async (req, reply) => {
     const owner = viewerHash(req);
     if (!owner) return reply.code(400).send(noOwner);
+    // `sets` (Pack Rush): as coleções escolhidas; `set`: uma só.
+    const list = Array.isArray(req.body?.sets) ? req.body.sets.filter((s): s is string => typeof s === 'string') : null;
+    if (list && [...new Set(list.map((s) => s.toUpperCase()))].length < RUSH_MIN_SETS) {
+      return reply.code(400).send(fail('sealedRushFewSets', `O Pack Rush precisa de pelo menos ${RUSH_MIN_SETS} coleções.`, { n: RUSH_MIN_SETS }));
+    }
+    if (list && list.length > RUSH_MAX_SETS) {
+      return reply.code(400).send(fail('sealedRushManySets', `O Pack Rush aceita até ${RUSH_MAX_SETS} coleções.`, { n: RUSH_MAX_SETS }));
+    }
     const set = typeof req.body?.set === 'string' ? req.body.set : '';
+    const sets = list ?? [set];
     const now = Date.now();
     const w = opens.get(owner);
     if (!w || now - w.start > WINDOW_MS) opens.set(owner, { start: now, n: 1 });
     else if (++w.n > OPENS_PER_WINDOW) return reply.code(429).send(fail('sealedTooManyOpens', 'Muitas aberturas em pouco tempo. Tente de novo em alguns minutos.'));
     if (opens.size > 5000) for (const [k, v] of opens) if (now - v.start > WINDOW_MS) opens.delete(k);
-    const pool = createPool(db, owner, set);
-    if (!pool) return reply.code(400).send(fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: set.toUpperCase() }));
+    const pool = createPool(db, owner, sets);
+    if (!pool) return reply.code(400).send(fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: sets.join(' + ').toUpperCase() }));
     return reply.code(201).send(full(pool));
   });
 

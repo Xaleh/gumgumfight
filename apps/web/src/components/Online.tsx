@@ -372,7 +372,13 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
               <h2>{t('online.privateRoom')}</h2>
               {/* Sala de Selado: quem recebe o convite precisa saber a coleção, porque só entra com um deck dela. */}
               {room.format === 'sealed' && <p className="home-chip gold">{modeLabel(room)}</p>}
-              <p className="muted">{room.format === 'sealed' ? t('sealed.roomHint', { set: room.sealedSet ?? '' }) : t('online.privateHint')}</p>
+              <p className="muted">
+                {room.format !== 'sealed'
+                  ? t('online.privateHint')
+                  : room.sealedSet?.includes('+')
+                    ? t('sealed.roomHintRush', { sets: room.sealedSet.split('+').join(' + ') })
+                    : t('sealed.roomHint', { set: room.sealedSet ?? '' })}
+              </p>
               <div className="room-code">{room.code}</div>
               {room.handsAllowed && <p className="small">{t('online.handsSharedHint')}</p>}
               <div className="btn-row center">

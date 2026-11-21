@@ -8,14 +8,19 @@ import { validateDeck } from '../src/deck';
 import { applyAction, createGame, hasName, hasType, LIMITED_DECK_SIZE } from '../src/engine';
 import { cardLegality, formatIssues, formatLabel, playMode, playModeLabel, rarityCode, SEALED_LEADER_ID, spoilerRule } from '../src/formats';
 import {
+  anyLeaderAllowed,
   autoBuildLimited,
   boosterCards,
   boosterReady,
   boosterSize,
   boosterStock,
   isBoosterSet,
+  isRush,
   openBoosters,
+  openMixedBoosters,
   poolCounts,
+  rushKey,
+  rushSets,
   SEALED_PACKS,
   sealedLeaders,
   validateLimitedDeck,
@@ -195,5 +200,82 @@ describe('Selado: o deck de 40', () => {
     const deck = auto();
     const short: DeckList = { ...deck, cards: deck.cards.slice(1) };
     expect(() => createGame({ seed: 1, cards: all, players: [{ name: 'A', deck: short }, { name: 'B', deck }] })).toThrow(/precisa de 50, ou de 40 no Selado/);
+  });
+});
+
+describe('Pack Rush: Selado com várias coleções', () => {
+  const op02 = boosterCards(all, 'OP02');
+  const sources = [
+    { set: 'OP01', cards: op01 },
+    { set: 'op02', cards: op02 },
+  ];
+  const opened = openMixedBoosters(sources, 5);
+  const pool = poolCounts(opened.packs);
+  const rules = { leaders: 'any' as const, sets: ['OP01', 'OP02'] };
+  const deck = (leader?: string): DeckList => ({ id: 'sealed:rush', name: 'Pack Rush', ...autoBuildLimited(pool, byId, leader) });
+
+  it('cada booster é de uma das coleções escolhidas, sorteada na hora', () => {
+    expect(opened.packs).toHaveLength(SEALED_PACKS);
+    expect(opened.sets).toHaveLength(SEALED_PACKS);
+    opened.packs.forEach((pack, i) => {
+      expect(['OP01', 'OP02']).toContain(opened.sets[i]);
+      expect(pack).toHaveLength(boosterSize());
+      // O booster inteiro é da coleção sorteada: as coleções não se misturam dentro dele.
+      expect(pack.every((id) => id.startsWith(`${opened.sets[i]}-`))).toBe(true);
+    });
+    expect(openMixedBoosters(sources, 5)).toEqual(opened);
+    expect(openMixedBoosters(sources, 6)).not.toEqual(opened);
+  });
+
+  it('as coleções saem em proporções parecidas, e um jogador pode abrir a mesma mais de uma vez', () => {
+    const many = openMixedBoosters(sources, 99, 2000).sets;
+    const share = many.filter((s) => s === 'OP01').length / many.length;
+    expect(share).toBeGreaterThan(0.45);
+    expect(share).toBeLessThan(0.55);
+    // Em 6 boosters de 2 coleções, alguma se repete; e há seeds em que uma coleção nem aparece.
+    expect(new Set(opened.sets).size).toBeLessThanOrEqual(2);
+    const sixes = Array.from({ length: 300 }, (_, seed) => new Set(openMixedBoosters(sources, seed).sets).size);
+    expect(sixes).toContain(1);
+    expect(sixes).toContain(2);
+  });
+
+  it('a chave das coleções não depende da ordem nem de maiúsculas', () => {
+    expect(rushKey(['op02', 'OP01'])).toBe('OP01+OP02');
+    expect(rushKey(['OP10', 'OP02', 'EB01', 'OP02'])).toBe('EB01+OP02+OP10');
+    expect(rushSets('EB01+OP02+OP10')).toEqual(['EB01', 'OP02', 'OP10']);
+    expect([isRush('OP01+OP02'), isRush('OP01')]).toEqual([true, false]);
+    expect(rushSets('OP01')).toEqual(['OP01']);
+  });
+
+  it('vale qualquer Líder do jogo, inclusive um banido e o de 6 cores', () => {
+    const errors = (leader: string) => validateLimitedDeck(deck(leader), byId, pool, rules).issues.filter((i) => i.level === 'error').map((i) => i.code);
+    const outside = all.find((c) => c.category === 'leader' && c.id.startsWith('ST') && !pool.has(c.id))!;
+    expect(errors(outside.id)).toEqual([]);
+    expect(errors('ST10-001')).toEqual([]); // Law, banido nos formatos oficiais
+    expect(errors(SEALED_LEADER_ID)).toEqual([]);
+    // No Selado de uma coleção, o mesmo Líder de fora é recusado.
+    expect(validateLimitedDeck(deck(outside.id), byId, pool).issues.map((i) => i.code)).toContain('rules.leaderNotInPool');
+    // Continua precisando ser um Líder, e as cartas continuam saindo só dos boosters.
+    const notLeader = all.find((c) => c.category === 'character')!;
+    expect(errors(notLeader.id)).toEqual(['rules.notLeader']);
+    const stray = all.find((c) => c.id.startsWith('ST01-') && c.category === 'character')!;
+    const d = deck();
+    expect(validateLimitedDeck({ ...d, cards: [{ id: stray.id, count: d.cards[0].count }, ...d.cards.slice(1)] }, byId, pool, rules).issues.map((i) => i.code)).toContain('rules.notInPool');
+  });
+
+  it('Líder de spoiler só vale se a coleção dele estiver entre as escolhidas', () => {
+    const spoiler = { id: 'OP99-001', category: 'leader' as const, spoiler: { source: 'x' } as CardData['spoiler'] };
+    expect(anyLeaderAllowed(spoiler, ['OP01', 'OP02'])).toBe(false);
+    expect(anyLeaderAllowed(spoiler, ['OP01', 'op99'])).toBe(true);
+    expect(anyLeaderAllowed({ id: 'OP01-001', category: 'leader' }, [])).toBe(true);
+    expect(anyLeaderAllowed({ id: 'OP01-004', category: 'character' }, ['OP01'])).toBe(false);
+    const catalog = new Map(byId).set('OP99-001', { ...byId.get('OP01-001')!, id: 'OP99-001', set: 'OP99', spoiler: spoiler.spoiler });
+    expect(validateLimitedDeck(deck('OP99-001'), catalog, pool, rules).issues.map((i) => i.code)).toContain('rules.leaderSpoilerSet');
+    expect(validateLimitedDeck(deck('OP99-001'), catalog, pool, { leaders: 'any', sets: ['OP01', 'OP99'] }).valid).toBe(true);
+  });
+
+  it('o rótulo da partida diz que é Pack Rush e de quais coleções', () => {
+    expect(playModeLabel({ format: 'sealed', sealedSet: 'OP01+OP02' })).toBe('Pack Rush OP01 + OP02');
+    expect(playModeLabel({ format: 'sealed', sealedSet: 'OP01' })).toBe('Selado OP01');
   });
 });

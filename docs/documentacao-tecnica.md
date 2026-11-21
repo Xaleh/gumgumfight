@@ -278,7 +278,10 @@ rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatI
 (`SEALED_LEADER_ID`) tem `CardDef.wild` (qualquer nome, tipo e atributo em `hasName`/`hasType`/`hasAttribute`) e é
 `eventOnly` nos formatos de deck construído. No servidor (`sealed/store.ts`, `sealed/routes.ts`), a tabela
 `sealed_pools` guarda dono, coleção, seed, boosters, deck e placar; nas salas, o `deckId` de um assento do Selado é
-`sealed:<id>` e o deck é conferido contra as cartas abertas (`sealedDeckFor`, em `online/routes.ts`).
+`sealed:<id>` e o deck é conferido contra as cartas abertas (`sealedDeckFor`, em `online/routes.ts`). **Pack Rush**
+(`kind = 'rush'`): `openMixedBoosters` sorteia a coleção de cada booster entre as escolhidas, `rushKey` dá a chave
+("OP01+OP05", gravada em `set_code` e usada como `sealedSet` da sala) e `LimitedRules.leaders = 'any'` libera qualquer
+Líder (`anyLeaderAllowed`: os de spoiler, só das coleções da chave); `pack_sets` guarda a coleção de cada booster.
 
 ### Tradução
 

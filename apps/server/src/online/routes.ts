@@ -326,16 +326,18 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    * Deck do Selado de quem senta: a coleção aberta é dele, é da coleção da sala (`set`) e o deck
    * fecha 40 só com cartas que saíram.
    */
+  /** A coleção da sala para as mensagens: no Pack Rush, as coleções da chave ("OP01 + OP05"). */
+  const setName = (set: string) => set.split('+').join(' + ');
   const sealedDeckFor = (poolRef: unknown, ownerHash: string, set?: string): DeckList | LobbyError => {
     const id = poolIdOf(poolRef);
     const pool = id ? getSealedPool(db, id) : null;
     if (!pool || pool.ownerHash !== ownerHash) {
       // Quem chega pelo convite com um deck construído: a sala é de Selado, e o deck sai dos boosters dessa coleção.
       return set
-        ? { code: 400, ...fail('sealedRoomNeedsDeck', `Esta sala é de Selado ${set}. Abra o Selado, monte um deck dessa coleção e entre com o código por lá.`, { set }) }
+        ? { code: 400, ...fail('sealedRoomNeedsDeck', `Esta sala é de Selado ${setName(set)}. Abra o Selado, monte um deck dessa coleção e entre com o código por lá.`, { set: setName(set) }) }
         : { code: 400, ...fail('sealedPoolNotFound', 'Deck do Selado não encontrado.') };
     }
-    if (set && pool.set !== set) return { code: 400, ...fail('sealedSetMismatch', `Esta sala é de Selado ${set}: use um deck aberto dessa coleção.`, { set }) };
+    if (set && pool.set !== set) return { code: 400, ...fail('sealedSetMismatch', `Esta sala é de Selado ${setName(set)}: use um deck aberto dessa coleção.`, { set: setName(set) }) };
     const deck = poolDeck(pool);
     if (!deck || !checkSealedDeck(db, pool, deck).valid) {
       return { code: 400, ...fail('sealedDeckIncomplete', 'Termine de montar o deck do Selado (40 cartas) antes de jogar.') };

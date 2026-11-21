@@ -143,7 +143,10 @@ export function modeLabel(
   tr: Translate = t,
 ): string {
   if (m.format === 'free') return tr('mode.free');
-  if (m.format === 'sealed') return m.sealedSet ? tr('mode.sealedSet', { set: m.sealedSet }) : tr('mode.sealed');
+  if (m.format === 'sealed') {
+    if (m.sealedSet?.includes('+')) return tr('mode.packRush', { sets: m.sealedSet.split('+').join(' + ') });
+    return m.sealedSet ? tr('mode.sealedSet', { set: m.sealedSet }) : tr('mode.sealed');
+  }
   const format = formatLabel(m.format as FormatId);
   if (!m.spoilers) return format;
   return m.spoilerSet ? tr('mode.withSpoilerSet', { format, set: m.spoilerSet }) : tr('mode.withSpoilers', { format });
@@ -297,6 +300,7 @@ export type SealedDeck = { leader: string; cards: Array<{ id: string; count: num
 /** Resumo de uma coleção aberta (lista "seus decks selados"). */
 export interface SealedPoolSummary {
   id: string;
+  /** A coleção; no Pack Rush, a chave das coleções escolhidas ("OP01+OP05"). */
   set: string;
   createdAt: string;
   updatedAt: string;
@@ -310,6 +314,8 @@ export interface SealedPoolSummary {
 export interface SealedPool extends SealedPoolSummary {
   /** Os boosters, na ordem em que foram sorteados no servidor. */
   packs: string[][];
+  /** A coleção de cada booster (no Pack Rush elas variam; servidores antigos não mandam). */
+  packSets?: string[];
   deck: SealedDeck | null;
   issues: Array<{ level: 'error' | 'warning'; message: string; code: string; params: Params; cardId?: string }>;
 }
@@ -649,9 +655,10 @@ export const api = {
     get<GlobalCompare>(`/api/stats/global/compare?queue=${encodeURIComponent(queue)}${format ? `&format=${encodeURIComponent(format)}` : ''}`),
   /** Selado (Pré-release): os boosters abertos de quem pede e o deck montado com eles. */
   sealed: {
-    sets: () => get<{ packs: number; deckSize: number; sets: SealedSetInfo[] }>('/api/sealed/sets'),
+    sets: () => get<{ packs: number; deckSize: number; rush?: { min: number; max: number }; sets: SealedSetInfo[] }>('/api/sealed/sets'),
     pools: () => get<SealedPoolSummary[]>('/api/sealed/pools'),
-    open: (set: string) => send<SealedPool>('POST', '/api/sealed/pools', { set }),
+    /** Uma coleção: Selado. Várias: Pack Rush (cada booster sorteado entre elas). */
+    open: (sets: string[]) => send<SealedPool>('POST', '/api/sealed/pools', sets.length > 1 ? { sets } : { set: sets[0] }),
     pool: (id: string) => get<SealedPool>(`/api/sealed/pools/${encodeURIComponent(id)}`),
     saveDeck: (id: string, deck: SealedDeck) => send<SealedPool>('PUT', `/api/sealed/pools/${encodeURIComponent(id)}/deck`, deck),
     remove: (id: string) => send<void>('DELETE', `/api/sealed/pools/${encodeURIComponent(id)}`),

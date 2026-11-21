@@ -309,11 +309,29 @@ boosters que o jogador abre na hora.
 - **Placar e estatísticas:** as partidas do Selado ficam **fora das estatísticas e do meta**. Cada deck selado tem o
   próprio placar (vitórias e derrotas), que conta as partidas entre pessoas nas salas privadas; os treinos contra o
   bot não contam.
-- **Ainda não tem:** fila de Selado, torneio de Selado, Draft, Pack Rush e Cubo (veja
+- **Ainda não tem:** fila de Selado, torneio de Selado, Draft e Cubo (veja
   [`docs/plano-modos-de-jogo.md`](docs/plano-modos-de-jogo.md)). O modelo do booster é o padrão do motor
   (`DEFAULT_BOOSTER`, em `packages/engine/src/sealed.ts`), igual para todas as coleções.
 - Código: `packages/engine/src/sealed.ts` (boosters, validação do deck de 40 e montagem automática),
   `apps/server/src/sealed/` (tabela e rotas `/api/sealed`) e `apps/web/src/components/Sealed.tsx`.
+
+### Pack Rush
+
+Na mesma tela, **Pack Rush** é o Selado com **várias coleções**: quem abre escolhe de 2 a 12 coleções, e **cada um
+dos 6 boosters é sorteado entre elas** na hora. O booster inteiro é de uma coleção só (as coleções não se misturam
+dentro dele), a mesma coleção pode sair mais de uma vez e alguma pode não sair. O resto é o Selado: deck de 40,
+qualquer cor, sem limite de cópias e sem banidas.
+
+- **Líder:** com mais de uma coleção, vale **qualquer Líder do jogo**, inclusive os banidos nos formatos oficiais e o
+  Luffy de 6 cores. "Escolher qualquer Líder", na montagem, abre todos, com busca e filtro por cor; os primeiros são os
+  que mais combinam com os tipos das cartas abertas. Líder de coleção ainda não lançada só vale se a coleção dele
+  estiver entre as escolhidas.
+- **Sala privada:** os dois precisam ter aberto **as mesmas coleções** (a ordem da escolha não importa). Quem abriu
+  só uma delas, ou outra combinação, recebe o aviso com as coleções da sala.
+- **Bot:** abre os próprios boosters, sorteados entre as mesmas coleções.
+- No banco, o deck de Pack Rush é uma linha de `sealed_pools` com `kind = 'rush'`, a chave das coleções em `set_code`
+  ("OP01+OP05", em ordem) e a coleção de cada booster em `pack_sets`. Nas salas, essa chave vai em `sealedSet`.
+- O Draft de Pack Rush entra junto com o Draft.
 
 ## Estatísticas
 

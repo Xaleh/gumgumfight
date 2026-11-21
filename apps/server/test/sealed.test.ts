@@ -31,6 +31,8 @@ interface Pool {
   id: string;
   set: string;
   packs: string[][];
+  packSets: string[];
+  leader: string | null;
   deck: { leader: string; cards: Array<{ id: string; count: number }> } | null;
   size: number;
   ready: boolean;
@@ -40,10 +42,10 @@ interface Pool {
 }
 
 /** Abre os boosters e salva o deck do "Montar sozinho" (o mesmo cálculo da tela). */
-async function readyPool(app: App, db: DB, headers: Headers, set = 'OP01', leader?: string): Promise<Pool> {
-  const opened = (await call(app, 'POST', '/api/sealed/pools', headers, { set })).json() as Pool;
+async function readyPool(app: App, db: DB, headers: Headers, set: string | string[] = 'OP01', leader?: string): Promise<Pool> {
+  const opened = (await call(app, 'POST', '/api/sealed/pools', headers, Array.isArray(set) ? { sets: set } : { set })).json() as Pool;
   const pool = poolCounts(opened.packs);
-  const catalog = new Map((getCards(db, [...pool.keys(), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]));
+  const catalog = new Map((getCards(db, [...pool.keys(), SEALED_LEADER_ID, ...(leader ? [leader] : [])]) as CardData[]).map((c) => [c.id, c]));
   const saved = await call(app, 'PUT', `/api/sealed/pools/${opened.id}/deck`, headers, autoBuildLimited(pool, catalog, leader));
   expect(saved.statusCode).toBe(200);
   return saved.json() as Pool;
@@ -233,5 +235,90 @@ describe('Selado: partidas', () => {
     expect(deck.formatCodes.allblue.map((c: { code: string }) => c.code)).toContain('rules.eventOnly');
     expect((await call(app, 'POST', '/api/online/rooms', ALICE, { deckId: deck.id, format: 'egb' })).json().errorCode).toBe('deckNotAllowedInFormat');
     expect((await call(app, 'POST', '/api/online/rooms', ALICE, { deckId: deck.id, format: 'free' })).statusCode).toBe(201);
+  });
+});
+
+describe('Pack Rush: Selado com várias coleções', () => {
+  const lobbyOf = (app: App) => (app as unknown as { onlineLobby: Lobby }).onlineLobby;
+  const CAROL = { 'x-deck-owner': 'carol-0123456789abcdef' };
+
+  it('abre 6 boosters sorteados entre as coleções escolhidas e diz de qual é cada um', async () => {
+    const { app } = setup();
+    expect((await app.inject('/api/sealed/sets')).json().rush).toEqual({ min: 2, max: 12 });
+    const res = await call(app, 'POST', '/api/sealed/pools', ALICE, { sets: ['op02', 'OP01'] });
+    expect(res.statusCode).toBe(201);
+    const pool = res.json() as Pool;
+    // A chave não depende da ordem em que as coleções foram escolhidas.
+    expect(pool.set).toBe('OP01+OP02');
+    expect(pool.packs).toHaveLength(6);
+    expect(pool.packSets).toHaveLength(6);
+    pool.packs.forEach((pack, i) => {
+      expect(['OP01', 'OP02']).toContain(pool.packSets[i]);
+      expect(pack).toHaveLength(12);
+      expect(pack.every((id) => id.startsWith(`${pool.packSets[i]}-`))).toBe(true);
+    });
+    expect((await call(app, 'GET', `/api/sealed/pools/${pool.id}`, ALICE)).json()).toMatchObject({ set: 'OP01+OP02', packSets: pool.packSets });
+    // O Selado de uma coleção continua dizendo a coleção de cada booster (todas iguais).
+    const single = (await call(app, 'POST', '/api/sealed/pools', ALICE, { set: 'OP01' })).json() as Pool;
+    expect(single.packSets).toEqual(Array(6).fill('OP01'));
+  });
+
+  it('precisa de 2 a 12 coleções, todas disponíveis no Selado', async () => {
+    const { app } = setup();
+    const post = (sets: unknown) => call(app, 'POST', '/api/sealed/pools', ALICE, { sets });
+    expect((await post(['OP01'])).json()).toMatchObject({ errorCode: 'sealedRushFewSets', errorParams: { n: 2 } });
+    expect((await post(['OP01', 'op01'])).json().errorCode).toBe('sealedRushFewSets');
+    expect((await post([])).json().errorCode).toBe('sealedRushFewSets');
+    expect((await post(['OP01', 'ST01'])).json()).toMatchObject({ errorCode: 'sealedSetUnavailable' });
+    expect((await post(Array.from({ length: 13 }, (_, i) => `OP${String(i + 1).padStart(2, '0')}`))).json().errorCode).toBe('sealedRushManySets');
+  });
+
+  it('vale qualquer Líder do jogo; no Selado de uma coleção, não', async () => {
+    const { app, db } = setup();
+    // Law ST10-001: Líder de starter (fora dos boosters) e banido nos formatos oficiais.
+    const rush = await readyPool(app, db, ALICE, ['OP01', 'OP02'], 'ST10-001');
+    expect(rush).toMatchObject({ ready: true, leader: 'ST10-001', size: 40 });
+    const single = (await call(app, 'POST', '/api/sealed/pools', BOB, { set: 'OP01' })).json() as Pool;
+    const cards = autoBuildLimited(poolCounts(single.packs), new Map((getCards(db, [...new Set(single.packs.flat()), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]))).cards;
+    const refused = await call(app, 'PUT', `/api/sealed/pools/${single.id}/deck`, BOB, { leader: 'ST10-001', cards });
+    expect(refused.json().errorParams.issueCode).toBe('rules.leaderNotInPool');
+    // Mesmo no Pack Rush, as cartas do deck só saem dos boosters.
+    const [first, ...rest] = rush.deck!.cards;
+    const outside = await call(app, 'PUT', `/api/sealed/pools/${rush.id}/deck`, ALICE, { leader: 'ST10-001', cards: [{ id: 'ST01-002', count: first.count }, ...rest] });
+    expect(outside.json().errorParams.issueCode).toBe('rules.notInPool');
+  });
+
+  it('sala privada: os dois precisam ter aberto as mesmas coleções', async () => {
+    const { app, db } = setup();
+    const a = await readyPool(app, db, ALICE, ['OP01', 'OP02']);
+    const created = await call(app, 'POST', '/api/online/rooms', ALICE, { deckId: a.id, format: 'sealed' });
+    expect(created.statusCode).toBe(201);
+    const { code, roomId } = created.json();
+    expect(lobbyOf(app).get(roomId)!.data).toMatchObject({ format: 'sealed', sealedSet: 'OP01+OP02' });
+    // Deck de uma coleção só não entra, mesmo sendo uma das duas.
+    const single = await readyPool(app, db, BOB, 'OP01');
+    expect((await call(app, 'POST', '/api/online/rooms/join', BOB, { code, deckId: single.id })).json()).toMatchObject({
+      errorCode: 'sealedSetMismatch',
+      errorParams: { set: 'OP01 + OP02' },
+    });
+    // Mesmas coleções, escolhidas em outra ordem: entra.
+    const b = await readyPool(app, db, BOB, ['OP02', 'OP01']);
+    expect((await call(app, 'POST', '/api/online/rooms/join', BOB, { code, deckId: b.id })).statusCode).toBe(200);
+    const room = lobbyOf(app).get(roomId)!;
+    expect(room.data.seats.map((s) => s.deck.name)).toEqual(['Pack Rush OP01 + OP02', 'Pack Rush OP01 + OP02']);
+    expect(lobbyOf(app).summary(room)).toMatchObject({ format: 'sealed', sealedSet: 'OP01+OP02' });
+  });
+
+  it('o bot abre os próprios boosters entre as mesmas coleções', async () => {
+    const { app, db } = setup();
+    const pool = await readyPool(app, db, CAROL, ['OP01', 'OP02']);
+    const sets = new Set<string>();
+    for (let i = 0; i < 6; i++) {
+      const bot = (await call(app, 'POST', `/api/sealed/pools/${pool.id}/bot`, CAROL)).json();
+      expect(bot.name).toBe('Pack Rush OP01 + OP02');
+      expect(bot.cards.reduce((n: number, c: { count: number }) => n + c.count, 0)).toBe(40);
+      for (const c of bot.cards as Array<{ id: string }>) sets.add(c.id.split('-')[0]);
+    }
+    expect([...sets].sort()).toEqual(['OP01', 'OP02']);
   });
 });

@@ -12,9 +12,16 @@ import {
   type CardData,
   type DeckList,
   isBoosterSet,
+  isRush,
+  type LimitedRules,
   needsManual,
   openBoosters,
+  openMixedBoosters,
+  playModeLabel,
   poolCounts,
+  RUSH_MAX_SETS,
+  rushKey,
+  rushSets,
   SEALED_LEADER_ID,
   validateLimitedDeck,
 } from '@gumgum/engine';
@@ -28,9 +35,12 @@ export const SEALED_MAX_POOLS = 12;
 export interface SealedPool {
   id: string;
   ownerHash: string;
+  /** A coleção; no Pack Rush, a chave das coleções escolhidas ("OP01+OP05", `rushKey`). */
   set: string;
   /** Os boosters, na ordem em que foram sorteados. */
   packs: string[][];
+  /** A coleção de cada booster (no Selado de uma coleção, todas iguais). */
+  packSets: string[];
   /** O deck montado (pode estar incompleto: o jogador salva enquanto monta). */
   deck: Pick<DeckList, 'leader' | 'cards'> | null;
   wins: number;
@@ -44,6 +54,7 @@ interface PoolRow {
   owner_hash: string;
   set_code: string;
   packs: string;
+  pack_sets: string | null;
   deck: string | null;
   wins: number;
   losses: number;
@@ -51,12 +62,16 @@ interface PoolRow {
   updated_at: string;
 }
 
-const COLS = 'id, owner_hash, set_code, packs, deck, wins, losses, created_at, updated_at';
-const toPool = (r: PoolRow): SealedPool => ({
+const COLS = 'id, owner_hash, set_code, packs, pack_sets, deck, wins, losses, created_at, updated_at';
+const toPool = (r: PoolRow): SealedPool => {
+  const packs = JSON.parse(r.packs) as string[][];
+  return { ...poolBase(r, packs), packSets: r.pack_sets ? (JSON.parse(r.pack_sets) as string[]) : packs.map(() => r.set_code) };
+};
+const poolBase = (r: PoolRow, packs: string[][]) => ({
   id: r.id,
   ownerHash: r.owner_hash,
   set: r.set_code,
-  packs: JSON.parse(r.packs),
+  packs,
   deck: r.deck ? JSON.parse(r.deck) : null,
   wins: r.wins,
   losses: r.losses,
@@ -70,7 +85,7 @@ export function migrateSealed(db: DB) {
       id         TEXT PRIMARY KEY,
       owner_hash TEXT NOT NULL,
       set_code   TEXT NOT NULL,
-      kind       TEXT NOT NULL DEFAULT 'sealed',  -- 'sealed' = Pré-release (6 boosters de uma coleção)
+      kind       TEXT NOT NULL DEFAULT 'sealed',  -- 'sealed' = Pré-release (6 boosters de uma coleção); 'rush' = Pack Rush (várias)
       seed       TEXT NOT NULL,                   -- JSON: as 4 palavras do sfc32 que abriram os boosters
       packs      TEXT NOT NULL,                   -- JSON: string[][], os boosters sorteados
       deck       TEXT,                            -- JSON { leader, cards }: o deck montado (ou em montagem)
@@ -81,6 +96,9 @@ export function migrateSealed(db: DB) {
     );
     CREATE INDEX IF NOT EXISTS sealed_pools_owner ON sealed_pools(owner_hash, created_at);
   `);
+  // Pack Rush: a coleção de cada booster (JSON string[]); no Selado de uma coleção fica nulo.
+  const cols = (db.prepare('PRAGMA table_info(sealed_pools)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
+  if (!cols.includes('pack_sets')) db.exec('ALTER TABLE sealed_pools ADD COLUMN pack_sets TEXT');
 }
 
 export interface SealedSet {
@@ -135,14 +153,38 @@ export const forgetSealedSets = () => {
 
 const setCards = (db: DB, set: string) => boosterCards(listCards(db, set.toUpperCase()) as CardData[], set);
 
-/** Abre 6 boosters da coleção para o jogador e grava. A coleção mais antiga sai se ele já tem o teto. */
-export function createPool(db: DB, ownerHash: string, set: string): SealedPool | null {
-  const code = set.toUpperCase();
-  if (!sealedSets(db).some((s) => s.set === code)) return null;
+/** Sorteia os 6 boosters da coleção, ou do Pack Rush (cada booster de uma das coleções da chave). */
+function drawPacks(db: DB, key: string, seed: number[]): { sets: string[]; packs: string[][] } {
+  const sets = rushSets(key);
+  if (sets.length === 1) {
+    const packs = openBoosters(setCards(db, key), seed);
+    return { sets: packs.map(() => key), packs };
+  }
+  return openMixedBoosters(sets.map((set) => ({ set, cards: setCards(db, set) })), seed);
+}
+
+/**
+ * Abre 6 boosters para o jogador e grava: de uma coleção (Selado) ou, com várias, um Pack Rush
+ * (cada booster sorteado entre elas). Todas precisam estar disponíveis no Selado. O deck selado
+ * mais antigo sai se o jogador já tem o teto.
+ */
+export function createPool(db: DB, ownerHash: string, sets: readonly string[]): SealedPool | null {
+  const key = rushKey(sets);
+  const chosen = rushSets(key);
+  const available = new Set(sealedSets(db).map((s) => s.set));
+  if (!chosen.length || chosen.length > RUSH_MAX_SETS || chosen.some((s) => !available.has(s))) return null;
   const seed = Array.from({ length: 4 }, () => randomInt(0, 0x1_0000_0000));
-  const packs = openBoosters(setCards(db, code), seed);
+  const drawn = drawPacks(db, key, seed);
   const id = randomBytes(9).toString('base64url');
-  db.prepare('INSERT INTO sealed_pools (id, owner_hash, set_code, seed, packs) VALUES (?, ?, ?, ?, ?)').run(id, ownerHash, code, JSON.stringify(seed), JSON.stringify(packs));
+  db.prepare('INSERT INTO sealed_pools (id, owner_hash, set_code, kind, seed, packs, pack_sets) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    id,
+    ownerHash,
+    key,
+    isRush(key) ? 'rush' : 'sealed',
+    JSON.stringify(seed),
+    JSON.stringify(drawn.packs),
+    isRush(key) ? JSON.stringify(drawn.sets) : null,
+  );
   const mine = db.prepare('SELECT id FROM sealed_pools WHERE owner_hash = ? ORDER BY created_at DESC, rowid DESC').all(ownerHash) as unknown as Array<{ id: string }>;
   for (const old of mine.slice(SEALED_MAX_POOLS)) db.prepare('DELETE FROM sealed_pools WHERE id = ?').run(old.id);
   return getPool(db, id);
@@ -162,16 +204,22 @@ export function deletePool(db: DB, id: string) {
   db.prepare('DELETE FROM sealed_pools WHERE id = ?').run(id);
 }
 
-/** As cartas do catálogo que aparecem na coleção aberta (e o Líder de 6 cores, que todo jogador tem). */
+/** As cartas do catálogo que aparecem na coleção aberta (e o Líder de 6 cores, que todo jogador tem); `extra`: o Líder de fora, no Pack Rush. */
 export function poolCatalog(db: DB, pool: SealedPool, extra: string[] = []): Map<string, CardData> {
   const ids = [...new Set([...pool.packs.flat(), SEALED_LEADER_ID, ...extra])];
   return new Map((getCards(db, ids) as CardData[]).map((c) => [c.id, c]));
 }
 
+/** Regras do Líder: no Pack Rush (várias coleções), qualquer Líder do jogo; numa coleção só, os que saíram. */
+export const poolRules = (pool: Pick<SealedPool, 'set'>): LimitedRules => (isRush(pool.set) ? { leaders: 'any', sets: rushSets(pool.set) } : {});
+
+/** Nome do deck nas partidas: "Selado OP01" ou "Pack Rush OP01 + OP05". */
+export const poolName = (pool: Pick<SealedPool, 'set'>) => playModeLabel({ format: 'sealed', sealedSet: pool.set });
+
 /** Confere o deck contra a coleção aberta. */
 export function checkDeck(db: DB, pool: SealedPool, deck: Pick<DeckList, 'leader' | 'cards'>) {
-  const list: DeckList = { id: sealedDeckId(pool.id), name: `Selado ${pool.set}`, leader: deck.leader, cards: deck.cards };
-  return validateLimitedDeck(list, poolCatalog(db, pool, [deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean)), poolCounts(pool.packs));
+  const list: DeckList = { id: sealedDeckId(pool.id), name: poolName(pool), leader: deck.leader, cards: deck.cards };
+  return validateLimitedDeck(list, poolCatalog(db, pool, [deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean)), poolCounts(pool.packs), poolRules(pool));
 }
 
 export function saveDeck(db: DB, id: string, deck: Pick<DeckList, 'leader' | 'cards'>) {
@@ -191,18 +239,18 @@ export const poolIdOf = (deckId: unknown): string | null =>
 
 /** O deck do jogador como lista de partida (com o id "sealed:…" e o nome da coleção). */
 export const poolDeck = (pool: SealedPool): DeckList | null =>
-  pool.deck ? { id: sealedDeckId(pool.id), name: `Selado ${pool.set}`, leader: pool.deck.leader, cards: pool.deck.cards } : null;
+  pool.deck ? { id: sealedDeckId(pool.id), name: poolName(pool), leader: pool.deck.leader, cards: pool.deck.cards } : null;
 
 /**
  * Deck do bot no Selado: ele abre os próprios 6 boosters da mesma coleção e monta sozinho, como o
  * "Montar sozinho" do jogador. Não fica gravado.
  */
 export function botDeck(db: DB, set: string): DeckList | null {
-  const cards = setCards(db, set);
-  if (!boosterReady(cards)) return null;
+  const key = rushKey(rushSets(set));
+  if (rushSets(key).some((s) => !boosterReady(setCards(db, s)))) return null;
   const seed = Array.from({ length: 4 }, () => randomInt(0, 0x1_0000_0000));
-  const pool = poolCounts(openBoosters(cards, seed));
+  const pool = poolCounts(drawPacks(db, key, seed).packs);
   const catalog = new Map((getCards(db, [...pool.keys(), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]));
-  const deck: DeckList = { id: `${SEALED_DECK_PREFIX}bot`, name: `Selado ${set.toUpperCase()}`, ...autoBuildLimited(pool, catalog) };
-  return validateLimitedDeck(deck, catalog, pool).valid ? deck : null;
+  const deck: DeckList = { id: `${SEALED_DECK_PREFIX}bot`, name: poolName({ set: key }), ...autoBuildLimited(pool, catalog) };
+  return validateLimitedDeck(deck, catalog, pool, poolRules({ set: key })).valid ? deck : null;
 }

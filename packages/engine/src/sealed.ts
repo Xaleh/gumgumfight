@@ -6,6 +6,9 @@
 //  - o Líder é um dos que saíram nos boosters ou o Luffy de 6 cores, que todo jogador tem;
 //  - não há lista de banidas, pares proibidos nem rotação (`formats.ts`, formato `sealed`).
 //
+// Pack Rush é o mesmo Selado com várias coleções: cada um dos 6 boosters é sorteado entre as
+// coleções escolhidas por quem abre, e o Líder pode ser qualquer Líder do jogo (`leaders: 'any'`).
+//
 // Tudo aqui é função pura. O sorteio usa o RNG com seed do motor: a mesma seed abre os mesmos
 // boosters, então o servidor grava a seed e as cartas, e o navegador só revela.
 
@@ -95,6 +98,42 @@ function draw(holder: RngHolder, from: readonly string[], n: number, taken: Set<
   return out;
 }
 
+/** As cartas de uma coleção separadas por vaga do booster. */
+interface BoosterSource {
+  C: string[];
+  UC: string[];
+  R: string[];
+  SR: string[];
+  SEC: string[];
+  leaders: string[];
+  any: string[];
+}
+
+function boosterSource(setCards: readonly CardData[]): BoosterSource {
+  const by = (r: string) => setCards.filter((c) => c.category !== 'leader' && rarityCode(c.rarity) === r).map((c) => c.id);
+  const src = { C: by('C'), UC: by('UC'), R: by('R'), SR: by('SR'), SEC: by('SEC') };
+  return { ...src, leaders: setCards.filter((c) => c.category === 'leader').map((c) => c.id), any: [...src.C, ...src.UC, ...src.R] };
+}
+
+/** Um booster da coleção. Nenhuma carta se repete dentro dele. */
+function openBooster(holder: RngHolder, src: BoosterSource, model: BoosterModel): string[] {
+  const taken = new Set<string>();
+  const pack = [...draw(holder, src.C, model.commons, taken), ...draw(holder, src.UC, model.uncommons, taken)];
+  // Rara ou melhor, pelos pesos das raridades que a coleção tem.
+  const hits = (['R', 'SR', 'SEC'] as const).filter((r) => src[r].length && model.hits[r] > 0);
+  if (hits.length) {
+    let roll = nextRandom(holder) * hits.reduce((n, r) => n + model.hits[r], 0);
+    const rarity = hits.find((r) => (roll -= model.hits[r]) < 0) ?? hits[0];
+    pack.push(...draw(holder, src[rarity], 1, taken));
+  }
+  // Última vaga: um Líder ou mais uma incomum.
+  if (src.leaders.length && nextRandom(holder) < model.leaderChance) pack.push(...draw(holder, src.leaders, 1, taken));
+  else pack.push(...draw(holder, src.UC.length > model.uncommons ? src.UC : src.any, 1, taken));
+  // Coleção pequena demais para alguma vaga: completa com o que houver.
+  pack.push(...draw(holder, src.any, boosterSize(model) - pack.length, taken));
+  return pack;
+}
+
 /**
  * Abre `packs` boosters da coleção. `seed`: número (32 bits) ou as 4 palavras do sfc32 (o servidor
  * usa esta, com `crypto`, para ninguém prever o que sai). Dentro de um booster nenhuma carta se
@@ -103,30 +142,40 @@ function draw(holder: RngHolder, from: readonly string[], n: number, taken: Set<
  */
 export function openBoosters(setCards: readonly CardData[], seed: number | readonly number[], packs = SEALED_PACKS, model: BoosterModel = DEFAULT_BOOSTER): string[][] {
   const holder = holderOf(seed);
-  const by = (r: string) => setCards.filter((c) => c.category !== 'leader' && rarityCode(c.rarity) === r).map((c) => c.id);
-  const pool = { C: by('C'), UC: by('UC'), R: by('R'), SR: by('SR'), SEC: by('SEC') };
-  const leaders = setCards.filter((c) => c.category === 'leader').map((c) => c.id);
-  const any = [...pool.C, ...pool.UC, ...pool.R];
-  const hits = (['R', 'SR', 'SEC'] as const).filter((r) => pool[r].length && model.hits[r] > 0);
-  const out: string[][] = [];
+  const src = boosterSource(setCards);
+  return Array.from({ length: packs }, () => openBooster(holder, src, model));
+}
+
+/** Coleções de um Pack Rush: no mínimo duas (com uma só é o Selado comum) e um teto para a lista caber na tela. */
+export const RUSH_MIN_SETS = 2;
+export const RUSH_MAX_SETS = 12;
+
+/**
+ * Pack Rush: cada booster é de uma das coleções de `sources`, sorteada na hora (a mesma coleção
+ * pode sair mais de uma vez, e alguma pode não sair). Devolve os boosters e a coleção de cada um.
+ */
+export function openMixedBoosters(
+  sources: ReadonlyArray<{ set: string; cards: readonly CardData[] }>,
+  seed: number | readonly number[],
+  packs = SEALED_PACKS,
+  model: BoosterModel = DEFAULT_BOOSTER,
+): { sets: string[]; packs: string[][] } {
+  const holder = holderOf(seed);
+  const built = sources.map((s) => ({ set: s.set.toUpperCase(), src: boosterSource(s.cards) }));
+  const out = { sets: [] as string[], packs: [] as string[][] };
   for (let p = 0; p < packs; p++) {
-    const taken = new Set<string>();
-    const pack = [...draw(holder, pool.C, model.commons, taken), ...draw(holder, pool.UC, model.uncommons, taken)];
-    // Rara ou melhor, pelos pesos das raridades que a coleção tem.
-    if (hits.length) {
-      let roll = nextRandom(holder) * hits.reduce((n, r) => n + model.hits[r], 0);
-      const rarity = hits.find((r) => (roll -= model.hits[r]) < 0) ?? hits[0];
-      pack.push(...draw(holder, pool[rarity], 1, taken));
-    }
-    // Última vaga: um Líder ou mais uma incomum.
-    if (leaders.length && nextRandom(holder) < model.leaderChance) pack.push(...draw(holder, leaders, 1, taken));
-    else pack.push(...draw(holder, pool.UC.length > model.uncommons ? pool.UC : any, 1, taken));
-    // Coleção pequena demais para alguma vaga: completa com o que houver.
-    pack.push(...draw(holder, any, boosterSize(model) - pack.length, taken));
-    out.push(pack);
+    const pick = built[Math.floor(nextRandom(holder) * built.length)];
+    out.sets.push(pick.set);
+    out.packs.push(openBooster(holder, pick.src, model));
   }
   return out;
 }
+
+/** Chave das coleções de um Pack Rush ("OP01+OP05+EB02"): em ordem, para duas escolhas iguais darem a mesma. */
+export const rushKey = (sets: readonly string[]): string => [...new Set(sets.map((s) => s.toUpperCase()))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).join('+');
+/** As coleções de uma chave; uma só = Selado comum. */
+export const rushSets = (key: string): string[] => key.split('+').filter(Boolean);
+export const isRush = (key: string): boolean => key.includes('+');
 
 /** Quantas cópias de cada carta o jogador abriu. */
 export function poolCounts(packs: ReadonlyArray<readonly string[]>): Map<string, number> {
@@ -145,12 +194,27 @@ export function sealedLeaders(pool: ReadonlyMap<string, number>, cards: Catalog)
 }
 
 /**
- * Confere um deck do Selado contra as cartas que o jogador abriu (`pool`): 1 Líder (dos que
- * saíram, ou o de 6 cores), exatamente 40 cartas e nenhuma carta além das cópias abertas. A cor do
- * Líder não limita o deck e não há limite de cópias. As regras de deck escritas no próprio Líder
- * ("you cannot include cards with a cost of 5 or more") continuam valendo.
+ * Quem pode ser o Líder. `pool` (Selado de uma coleção): os que saíram nos boosters ou o de 6
+ * cores. `any` (Pack Rush e os outros modos com várias coleções): qualquer Líder do jogo; os de
+ * spoiler, só se a coleção deles estiver entre as do modo (`sets`).
  */
-export function validateLimitedDeck(deck: DeckList, cards: Catalog, pool: ReadonlyMap<string, number>): DeckReport {
+export interface LimitedRules {
+  leaders?: 'pool' | 'any';
+  sets?: readonly string[];
+}
+
+/** Se o Líder vale num modo de qualquer Líder (`LimitedRules.leaders: 'any'`). */
+export function anyLeaderAllowed(leader: Pick<CardData, 'id' | 'set' | 'category' | 'spoiler'>, sets: readonly string[] = []): boolean {
+  return leader.category === 'leader' && (!leader.spoiler || sets.map((s) => s.toUpperCase()).includes(setOf(leader)));
+}
+
+/**
+ * Confere um deck do Selado contra as cartas que o jogador abriu (`pool`): 1 Líder (dos que
+ * saíram, ou o de 6 cores; no Pack Rush, qualquer um), exatamente 40 cartas e nenhuma carta além
+ * das cópias abertas. A cor do Líder não limita o deck e não há limite de cópias. As regras de
+ * deck escritas no próprio Líder ("you cannot include cards with a cost of 5 or more") continuam valendo.
+ */
+export function validateLimitedDeck(deck: DeckList, cards: Catalog, pool: ReadonlyMap<string, number>, rules: LimitedRules = {}): DeckReport {
   const get = getter(cards);
   const issues: DeckIssue[] = [];
   const unscripted = new Set<string>();
@@ -163,7 +227,11 @@ export function validateLimitedDeck(deck: DeckList, cards: Catalog, pool: Readon
   else if (!leader) error(`Líder desconhecido: ${deck.leader}.`, 'unknownLeader', { id: deck.leader }, deck.leader);
   else if (leader.category !== 'leader') error(`${leader.name} não é um Líder.`, 'notLeader', { name: leader.name }, leader.id);
   else {
-    if (leader.id !== SEALED_LEADER_ID && !pool.has(leader.id)) {
+    if (rules.leaders === 'any') {
+      if (!anyLeaderAllowed(leader, rules.sets)) {
+        error(`${leader.name} ainda não foi lançado e a coleção dele não está neste Pack Rush.`, 'leaderSpoilerSet', { name: leader.name }, leader.id);
+      }
+    } else if (leader.id !== SEALED_LEADER_ID && !pool.has(leader.id)) {
       error(`${leader.name} não saiu nos seus boosters: use um Líder que saiu ou o Luffy de 6 cores.`, 'leaderNotInPool', { name: leader.name }, leader.id);
     }
     if (needsManual(leader)) unscripted.add(leader.id);

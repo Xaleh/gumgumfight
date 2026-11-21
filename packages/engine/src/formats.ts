@@ -68,7 +68,10 @@ export interface PlayMode {
   spoilers: boolean;
   /** Com spoilers (fora do Livre), a coleção aceita: a próxima a ser lançada quando a sala ou o torneio foi criado. */
   spoilerSet?: string;
-  /** No Selado, a coleção dos boosters: os dois decks precisam sair dela. */
+  /**
+   * No Selado, a coleção dos boosters: os dois decks precisam sair dela. No Pack Rush, a chave das
+   * coleções escolhidas ("OP01+OP05", `rushKey`): os dois decks precisam ser da mesma escolha.
+   */
   sealedSet?: string;
 }
 
@@ -86,7 +89,7 @@ export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ 
  * "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"…
  */
 export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null }): string =>
-  m.format === 'sealed' ? `Selado${m.sealedSet ? ` ${m.sealedSet}` : ''}` : m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
+  m.format === 'sealed' ? (m.sealedSet?.includes('+') ? `Pack Rush ${m.sealedSet.split('+').join(' + ')}` : `Selado${m.sealedSet ? ` ${m.sealedSet}` : ''}`) : m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
 
 /**
  * Se a partida entra nas estatísticas: só Standard e EGB puros. Fica de fora o Livre, o

@@ -16988,6 +16988,41 @@ div.dk-tile-main {
   border-color: var(--brand-yellow);
   background: var(--note-bg);
 }
+.sealed-set {
+  position: relative;
+}
+/* Pack Rush: marca da coleção escolhida. */
+.sealed-set-check {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--brand-yellow);
+  color: var(--brown);
+  border: 2px solid var(--brown);
+  font-weight: 900;
+  font-size: 13px;
+}
+/* Pack Rush: a folha com todos os Líderes do jogo. */
+.page-sheet .sheet.sealed-leader-sheet {
+  width: min(1100px, 100%);
+}
+.sealed-leader-sheet .leader-search {
+  flex: 1 1 240px;
+}
+.sealed-leader-grid {
+  --cw: 92px;
+}
+.sealed-leader-grid .grid-caption {
+  max-width: calc(var(--cw) + 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sealed-set-info {
   display: flex;
   flex-direction: column;

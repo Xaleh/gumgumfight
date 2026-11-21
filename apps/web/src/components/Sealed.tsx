@@ -7,13 +7,17 @@
 // enquanto o jogador monta, e o servidor o confere de novo antes de cada partida.
 
 import {
+  anyLeaderAllowed,
   autoBuildLimited,
   type CardData,
   type Color,
   type DeckList,
+  isRush,
   LIMITED_DECK_SIZE,
+  type LimitedRules,
   needsManual,
   poolCounts,
+  rushSets,
   SEALED_LEADER_ID,
   sealedLeaders,
   validateLimitedDeck,
@@ -22,7 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type OnlineSeat, type SealedPool, type SealedPoolSummary, type SealedSetInfo } from '../api';
 import { buildSetup } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
-import { type MessageKey, useT, useTryT } from '../i18n';
+import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, StaticCardZoom } from './CardInfo';
 import { StaticCard } from './CardView';
 import { Icon } from './Icons';
@@ -78,6 +82,11 @@ function useMediaQuery(query: string) {
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** As coleções de um deck selado para mostrar: "OP01" ou, no Pack Rush, "OP01 + OP05". */
+const setsText = (set: string) => rushSets(set).join(' + ');
+/** Nome do deck selado: "Selado OP01" ou "Pack Rush OP01 + OP05". */
+const poolTitle = (set: string, t: Translate) => (isRush(set) ? t('sealed.rushName', { sets: setsText(set) }) : t('sealed.poolName', { set }));
+
 export function Sealed({
   onExit,
   onStart,
@@ -99,6 +108,10 @@ export function Sealed({
   const [pool, setPool] = useState<SealedPool | null>(null);
   const [view, setView] = useState<'hub' | 'packs' | 'build'>('hub');
   const [picked, setPicked] = useState<string>('');
+  /** Pack Rush: várias coleções, e cada booster é sorteado entre elas. */
+  const [rush, setRush] = useState(false);
+  const [mix, setMix] = useState<string[]>([]);
+  const [rushLimits, setRushLimits] = useState({ min: 2, max: 12 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,6 +126,7 @@ export function Sealed({
       .then((r) => {
         setSets(r.sets);
         setPacksPerPool(r.packs);
+        if (r.rush) setRushLimits(r.rush);
         setPicked((p) => p || r.sets[0]?.set || '');
       })
       .catch((e: unknown) => setError(errorText(e)));
@@ -146,12 +160,14 @@ export function Sealed({
     if (openId) void resume(openId);
   }, [openId, resume]);
 
+  const canOpen = rush ? mix.length >= rushLimits.min : Boolean(picked);
+  const toggleMix = (set: string) => setMix((m) => (m.includes(set) ? m.filter((x) => x !== set) : m.length < rushLimits.max ? [...m, set] : m));
   const openNew = async () => {
-    if (!picked || busy) return;
+    if (!canOpen || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const p = await api.sealed.open(picked);
+      const p = await api.sealed.open(rush ? mix : [picked]);
       writeOpened(p.id, 0);
       setPool(p);
       setView('packs');
@@ -185,7 +201,7 @@ export function Sealed({
   if (pool && cards && view === 'packs') {
     return (
       <div className="sealed">
-        {header(t('sealed.poolName', { set: pool.set }), toHub)}
+        {header(poolTitle(pool.set, t), toHub)}
         <Packs pool={pool} byId={byId} onBuild={() => setView('build')} />
       </div>
     );
@@ -193,7 +209,7 @@ export function Sealed({
   if (pool && cards && view === 'build') {
     return (
       <div className="sealed">
-        {header(t('sealed.poolName', { set: pool.set }), toHub)}
+        {header(poolTitle(pool.set, t), toHub)}
         <Build pool={pool} byId={byId} cards={cards} onPool={setPool} onPacks={() => setView('packs')} onStart={onStart} onOnline={onOnline} />
       </div>
     );
@@ -211,7 +227,7 @@ export function Sealed({
           <ul className="home-chips">
             <li className="home-chip">{t('sealed.ruleDeck', { n: LIMITED_DECK_SIZE })}</li>
             <li className="home-chip">{t('sealed.ruleColors')}</li>
-            <li className="home-chip">{t('sealed.ruleLeader')}</li>
+            <li className="home-chip">{rush ? t('sealed.ruleLeaderAny') : t('sealed.ruleLeader')}</li>
             <li className="home-chip">{t('sealed.ruleBans')}</li>
           </ul>
         </section>
@@ -219,30 +235,54 @@ export function Sealed({
         {error && <div className="error">{error}</div>}
 
         <section className="sealed-panel">
-          <h3 className="sealed-h3">{t('sealed.pickSet')}</h3>
+          <div className="section-head">
+            <h3 className="sealed-h3">{rush ? t('sealed.pickSets') : t('sealed.pickSet')}</h3>
+            <div className="seg format-seg" role="group" aria-label={t('sealed.sourceLabel')}>
+              <button type="button" className={!rush ? 'on' : ''} aria-pressed={!rush} onClick={() => setRush(false)}>
+                {t('sealed.sourceOne')}
+              </button>
+              <button type="button" className={rush ? 'on' : ''} aria-pressed={rush} onClick={() => setRush(true)} disabled={(sets?.length ?? 0) < rushLimits.min}>
+                {t('sealed.sourceRush')}
+              </button>
+            </div>
+          </div>
+          {rush && <p className="muted small">{t('sealed.rushIntro', { n: packsPerPool, min: rushLimits.min, max: rushLimits.max })}</p>}
           {sets === null ? (
             <p className="muted">{t('common.loading')}</p>
           ) : sets.length === 0 ? (
             <p className="muted">{t('sealed.noSets')}</p>
           ) : (
             <>
-              <div className="sealed-sets" role="group" aria-label={t('sealed.pickSet')}>
-                {sets.map((s) => (
-                  <button key={s.set} type="button" className={['sealed-set', picked === s.set ? 'on' : ''].join(' ')} aria-pressed={picked === s.set} onClick={() => setPicked(s.set)}>
-                    <Booster set={s.set} small />
-                    <span className="sealed-set-info">
-                      <b>{s.set}</b>
-                      <small>{t('sealed.setCards', { cards: s.cards, leaders: s.leaders })}</small>
-                      {s.spoiler && <span className="home-chip gold">{t('sealed.setSpoiler')}</span>}
-                    </span>
-                  </button>
-                ))}
+              <div className="sealed-sets" role="group" aria-label={rush ? t('sealed.pickSets') : t('sealed.pickSet')}>
+                {sets.map((s) => {
+                  const on = rush ? mix.includes(s.set) : picked === s.set;
+                  return (
+                    <button key={s.set} type="button" className={['sealed-set', on ? 'on' : ''].join(' ')} aria-pressed={on} onClick={() => (rush ? toggleMix(s.set) : setPicked(s.set))}>
+                      <Booster set={s.set} small />
+                      <span className="sealed-set-info">
+                        <b>{s.set}</b>
+                        <small>{t('sealed.setCards', { cards: s.cards, leaders: s.leaders })}</small>
+                        {s.spoiler && <span className="home-chip gold">{t('sealed.setSpoiler')}</span>}
+                      </span>
+                      {rush && on && <span className="sealed-set-check">✓</span>}
+                    </button>
+                  );
+                })}
               </div>
               <div className="sealed-open-row">
-                <button type="button" className="mode-btn sealed-cta" onClick={() => void openNew()} disabled={!picked || busy}>
+                <button type="button" className="mode-btn sealed-cta" onClick={() => void openNew()} disabled={!canOpen || busy}>
                   {busy ? t('sealed.opening') : t('sealed.open', { n: packsPerPool })}
                 </button>
-                {chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>}
+                {rush ? (
+                  <>
+                    <span className="muted small">{mix.length < rushLimits.min ? t('sealed.rushPickMore', { n: rushLimits.min }) : t('sealed.rushPicked', { sets: [...mix].sort().join(' + ') })}</span>
+                    <button type="button" className="text-link" onClick={() => setMix(mix.length ? [] : sets.slice(0, rushLimits.max).map((x) => x.set))}>
+                      {mix.length ? t('sealed.rushNone') : t('sealed.rushAll')}
+                    </button>
+                  </>
+                ) : (
+                  chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>
+                )}
               </div>
             </>
           )}
@@ -266,7 +306,7 @@ export function Sealed({
                   <li key={p.id} className="sealed-pool">
                     <Booster set={p.set} small />
                     <span className="sealed-pool-info">
-                      <b>{t('sealed.poolName', { set: p.set })}</b>
+                      <b>{poolTitle(p.set, t)}</b>
                       <small className="muted">
                         {p.leader && byId.get(p.leader) ? `${byId.get(p.leader)!.name} · ` : ''}
                         {status}
@@ -293,10 +333,12 @@ export function Sealed({
 /** Desenho de um booster (sem a arte do produto): a cor sai do código da coleção. */
 function Booster({ set, small, state }: { set: string; small?: boolean; state?: 'open' | 'current' }) {
   // Coleções vizinhas com cores bem diferentes: o número da coleção anda de 47 em 47 graus.
-  const hue = (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
+  // O deck de Pack Rush (várias coleções) tem um booster próprio, dourado.
+  const mixed = isRush(set);
+  const hue = mixed ? 42 : (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
   return (
     <span className={['sealed-pack', small ? 'small' : '', state ?? ''].join(' ')} style={{ ['--h' as string]: hue }} aria-hidden="true">
-      <b>{set}</b>
+      <b>{mixed ? 'RUSH' : set}</b>
     </span>
   );
 }
@@ -345,6 +387,9 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
   const leaders = [...new Set(revealed.filter((id) => byId.get(id)?.category === 'leader'))];
   const byColor = COLORS.map((c) => ({ ...c, n: revealed.filter((id) => byId.get(id)?.category !== 'leader' && byId.get(id)?.colors.includes(c.id)).length }));
   const pack = opened > 0 ? pool.packs[shown] : [];
+  /** No Pack Rush cada booster é de uma coleção: ela só aparece depois de aberto. */
+  const mixed = isRush(pool.set);
+  const packSet = (i: number) => pool.packSets?.[i] ?? pool.set;
 
   return (
     <div className="sealed-wrap sealed-packs">
@@ -360,7 +405,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
               onClick={() => setShown(i)}
               title={i < opened ? t('sealed.packN', { n: i + 1 }) : t('sealed.packSealed')}
             >
-              <Booster set={pool.set} state={i >= opened ? undefined : i === shown ? 'current' : 'open'} />
+              <Booster set={i >= opened ? pool.set : packSet(i)} state={i >= opened ? undefined : i === shown ? 'current' : 'open'} />
               <small>{i < opened ? t('sealed.packN', { n: i + 1 }) : t('sealed.packSealed')}</small>
             </button>
           ))}
@@ -368,11 +413,14 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
 
         <section className="sealed-panel sealed-reveal">
           {opened === 0 ? (
-            <p className="sealed-empty">{t('sealed.packsReady', { n: total, set: pool.set })}</p>
+            <p className="sealed-empty">{mixed ? t('sealed.rushPacksReady', { n: total, sets: setsText(pool.set) }) : t('sealed.packsReady', { n: total, set: pool.set })}</p>
           ) : (
             <>
               <div className="section-head">
-                <h3 className="sealed-h3">{t('sealed.packOf', { n: shown + 1, total })}</h3>
+                <h3 className="sealed-h3">
+                  {t('sealed.packOf', { n: shown + 1, total })}
+                  {mixed ? ` · ${packSet(shown)}` : ''}
+                </h3>
                 <span className="muted small">{peek.canHover ? t('sealed.peekMouse') : t('sealed.peekTouch')}</span>
               </div>
               <div className="card-grid sealed-grid" key={shown}>
@@ -433,7 +481,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
               ) : null;
             })}
           </div>
-          <p className="muted small">{t('sealed.leadersHint')}</p>
+          <p className="muted small">{mixed ? t('sealed.rushLeadersHint') : t('sealed.leadersHint')}</p>
         </div>
         <div>
           <div className="kicker">{t('sealed.byColor')}</div>
@@ -486,12 +534,16 @@ function Build({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState('');
+  const [pickingLeader, setPickingLeader] = useState(false);
+  /** Pack Rush (várias coleções): vale qualquer Líder do jogo. */
+  const mixed = isRush(pool.set);
+  const rules = useMemo<LimitedRules>(() => (mixed ? { leaders: 'any', sets: rushSets(pool.set) } : {}), [mixed, pool.set]);
 
   const total = [...deck.values()].reduce((n, c) => n + c, 0);
   const list = useMemo(() => ({ leader, cards: [...deck].map(([id, count]) => ({ id, count })).sort((a, b) => a.id.localeCompare(b.id)) }), [leader, deck]);
   const report = useMemo(
-    () => validateLimitedDeck({ id: `sealed:${pool.id}`, name: pool.set, ...list }, byId, have),
-    [list, byId, have, pool.id, pool.set],
+    () => validateLimitedDeck({ id: `sealed:${pool.id}`, name: pool.set, ...list }, byId, have, rules),
+    [list, byId, have, pool.id, pool.set, rules],
   );
 
   // Salva sozinho, um pouco depois da última mudança. `pending` guarda a lista ainda não enviada.
@@ -555,7 +607,13 @@ function Build({
     });
   const clear = () => change(() => setDeck(new Map()));
 
-  const leaders = useMemo(() => sealedLeaders(have, byId), [have, byId]);
+  // Os Líderes à mão: os que saíram e o de 6 cores; no Pack Rush, também o escolhido de fora, na frente.
+  const leaders = useMemo(() => {
+    const own = sealedLeaders(have, byId);
+    return mixed && leader && !own.includes(leader) ? [leader, ...own] : own;
+  }, [have, byId, mixed, leader]);
+  /** Todos os Líderes que valem no Pack Rush (os de spoiler, só das coleções escolhidas). */
+  const allLeaders = useMemo(() => (mixed ? cards.filter((c) => anyLeaderAllowed(c, rules.sets)) : []), [mixed, cards, rules]);
   const owned = useMemo(
     () =>
       [...have.keys()]
@@ -596,7 +654,7 @@ function Build({
   const vsBot = () =>
     play(async () => {
       const bot = await api.sealed.botDeck(pool.id);
-      const mine: DeckList = { id: `sealed:${pool.id}`, name: t('sealed.poolName', { set: pool.set }), ...latest.current };
+      const mine: DeckList = { id: `sealed:${pool.id}`, name: poolTitle(pool.set, t), ...latest.current };
       const opp: DeckList = { id: 'sealed:bot', name: bot.name, leader: bot.leader, cards: bot.cards };
       const seed = Math.floor(Math.random() * 1_000_000);
       const setup = await buildSetup('bot', [mine.id, opp.id], [t('menu.youName'), t('menu.botName')], seed, 'sealed', undefined, undefined, { decks: [mine, opp] }, true, undefined, cards);
@@ -682,6 +740,11 @@ function Build({
               ) : null;
             })}
           </div>
+          {mixed && (
+            <button type="button" className="btn small" onClick={() => setPickingLeader(true)}>
+              {t('sealed.anyLeader')}
+            </button>
+          )}
         </div>
 
         <div className="sealed-count">
@@ -727,7 +790,7 @@ function Build({
           <button type="button" className="mode-btn sealed-cta" onClick={() => void vsBot()} disabled={!ready || busy}>
             {t('sealed.vsBot')}
           </button>
-          <p className="muted small">{t('sealed.vsBotHint', { set: pool.set })}</p>
+          <p className="muted small">{mixed ? t('sealed.rushBotHint', { sets: setsText(pool.set) }) : t('sealed.vsBotHint', { set: pool.set })}</p>
           <button type="button" className="btn" onClick={() => void createRoom()} disabled={!ready || busy}>
             {t('sealed.createRoom')}
           </button>
@@ -737,7 +800,7 @@ function Build({
               {t('sealed.joinRoom')}
             </button>
           </div>
-          <p className="muted small">{t('sealed.roomHint', { set: pool.set })}</p>
+          <p className="muted small">{mixed ? t('sealed.roomHintRush', { sets: setsText(pool.set) }) : t('sealed.roomHint', { set: pool.set })}</p>
           {pool.wins + pool.losses > 0 && <p className="muted small">{t('sealed.record', { w: pool.wins, l: pool.losses })}</p>}
         </div>
         <div className="sealed-list">
@@ -765,7 +828,110 @@ function Build({
         </div>
 
       </aside>
+      {pickingLeader && (
+        <LeaderSheet
+          leaders={allLeaders}
+          owned={owned}
+          have={have}
+          value={leader}
+          onPick={(id) => {
+            change(() => setLeader(id));
+            setPickingLeader(false);
+          }}
+          onClose={() => setPickingLeader(false)}
+        />
+      )}
       {peek.layer}
+    </div>
+  );
+}
+
+/**
+ * Pack Rush: a folha com todos os Líderes do jogo. São mais de cem, então os primeiros são os
+ * sugeridos: os que mais combinam com o que o jogador abriu (tipos das cartas, e a cor como desempate).
+ */
+function LeaderSheet({
+  leaders,
+  owned,
+  have,
+  value,
+  onPick,
+  onClose,
+}: {
+  leaders: CardData[];
+  /** As cartas abertas (sem os Líderes) e quantas cópias de cada. */
+  owned: CardData[];
+  have: ReadonlyMap<string, number>;
+  value: string;
+  onPick: (id: string) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [search, setSearch] = useState('');
+  const [color, setColor] = useState<Color | null>(null);
+  const suggested = useMemo(() => {
+    const types = new Map<string, number>();
+    const colors = new Map<string, number>();
+    for (const c of owned) {
+      const n = have.get(c.id) ?? 0;
+      for (const ty of c.types) types.set(ty, (types.get(ty) ?? 0) + n);
+      for (const col of c.colors) colors.set(col, (colors.get(col) ?? 0) + n);
+    }
+    const score = (l: CardData) => l.types.reduce((n, ty) => n + (types.get(ty) ?? 0), 0) * 3 + l.colors.reduce((n, col) => n + (colors.get(col) ?? 0), 0) / l.colors.length;
+    return leaders
+      .filter((l) => l.id !== SEALED_LEADER_ID && !needsManual(l))
+      .map((l) => ({ l, score: score(l) }))
+      .sort((a, b) => b.score - a.score || a.l.id.localeCompare(b.l.id))
+      .slice(0, 8)
+      .map((x) => x.l);
+  }, [leaders, owned, have]);
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return leaders
+      .filter((l) => (!color || l.colors.includes(color)) && (!q || l.name.toLowerCase().includes(q) || l.id.toLowerCase().includes(q) || l.types.some((ty) => ty.toLowerCase().includes(q))))
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  }, [leaders, search, color]);
+  const cell = (l: CardData) => (
+    <div key={l.id} className="grid-cell">
+      <StaticCard card={l} highlight={l.id === value ? 'selected' : null} onClick={() => onPick(l.id)} />
+      <div className="grid-caption" title={l.name}>
+        {l.name}
+      </div>
+    </div>
+  );
+  const filtering = Boolean(search.trim()) || color !== null;
+  return (
+    <div className="modal-backdrop sheet-backdrop page-sheet" onClick={onClose}>
+      <div className="sheet sealed-leader-sheet" role="dialog" aria-modal="true" aria-label={t('sealed.anyLeaderTitle')} onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h3>{t('sealed.anyLeaderTitle')}</h3>
+          <button className="zoom-close static" onClick={onClose} aria-label={t('common.close')}>
+            ✕
+          </button>
+        </div>
+        <div className="sheet-body">
+          <p className="muted small">{t('sealed.anyLeaderHint')}</p>
+          <div className="sealed-toolbar">
+            <input className="leader-search" type="search" value={search} placeholder={t('sealed.leaderSearch')} aria-label={t('sealed.leaderSearch')} onChange={(e) => setSearch(e.target.value)} />
+            <div className="color-chips">
+              {COLORS.map((c) => (
+                <button key={c.id} type="button" className={['chip', `c-${c.id}`, color === c.id ? 'on' : ''].join(' ')} aria-pressed={color === c.id} onClick={() => setColor((v) => (v === c.id ? null : c.id))}>
+                  {t(c.label)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {!filtering && suggested.length > 0 && (
+            <>
+              <div className="entry-group">{t('sealed.leaderSuggested')}</div>
+              <div className="card-grid sealed-leader-grid">{suggested.map(cell)}</div>
+            </>
+          )}
+          <div className="entry-group">{t('sealed.leaderAll', { n: shown.length })}</div>
+          <div className="card-grid sealed-leader-grid">{shown.map(cell)}</div>
+          {!shown.length && <p className="muted small">{t('sealed.leaderNone')}</p>}
+        </div>
+      </div>
     </div>
   );
 }
