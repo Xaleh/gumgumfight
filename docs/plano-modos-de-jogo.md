@@ -113,8 +113,9 @@ ou em sala privada, com o servidor sorteando e conferindo tudo. Ficou para os pr
 - **Fila do Selado** e **torneio de Selado** (hoje só bot e sala privada).
 - **Abertura de coleção de spoiler por um Admin:** hoje a coleção entra sozinha quando está completa no banco e com
   70% dos efeitos automatizados.
-- **Modelo de booster por coleção** (`data/boosters/`): hoje todas usam o padrão do motor (7 C, 3 UC, 1 rara ou
-  melhor, 1 Líder em 1/3 dos boosters).
+- **Modelo de booster por coleção:** feito por linha de produto (primeiras coleções, principal de hoje e Extra
+  Booster), com as taxas de aberturas de caixas registradas pela comunidade; veja "Os boosters" no README. Ficou no
+  código (`BOOSTER_MODELS`), e não em `data/boosters/`. A arte do produto e a animação de abrir também entraram.
 - **Relógio de montagem** (30 minutos): só faz sentido em evento; sozinho, o jogador monta no próprio tempo.
 - A carta do Luffy de 6 cores não tem número na lista oficial (o P-047 é outro Luffy), então entrou com id próprio
   (`SEALED-001`).
@@ -162,9 +163,9 @@ cartas. Por isso Pack Rush e Cubo custam pouco depois que Selado e Draft existem
 | Draft | Pod de 4 a 8, **4 boosters** por jogador, 12 cartas cada (48 escolhas) | Sem regra oficial. Com 3 boosters não dá para chegar a 40. |
 | Tempo | 30 min para montar; no Draft, 45 s por escolha, caindo conforme o booster esvazia | Sem escolha no tempo, o servidor escolhe. |
 
-**Modelo do booster** (por coleção, em `data/boosters/<coleção>.json`, não no código): 7 comuns, 3 incomuns, 1 vaga de
-rara ou melhor (R, SR ou SEC, com pesos) e 1 vaga variável (Líder ou carta extra). As proporções de cada produto
-precisam ser conferidas na ficha da coleção. Um modelo padrão vale para as coleções sem arquivo próprio.
+**Modelo do booster:** um por linha de produto (primeiras coleções, principal de hoje e Extra Booster), com vagas
+fixas, uma vaga de destaque (rara, SR ou SEC) e o Líder no lugar de uma comum. A Bandai não publica as taxas; as usadas
+vêm de aberturas de caixas registradas pela comunidade ("Os boosters", no README).
 
 O **pré-release de verdade** sai de graça daqui: a coleção de spoiler que o app já acompanha (`data/spoilers`, hoje
 EB05 e OP18) vira opção quando estiver completa o bastante. Quem decide que ela abriu é um Admin.

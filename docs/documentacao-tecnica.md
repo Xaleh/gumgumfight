@@ -269,8 +269,12 @@ regras especiais do Líder.
 ### Selado (`sealed.ts`)
 
 Modo limitado (Pré-release): `openBoosters(cartas da coleção, seed, 6)` sorteia os boosters com o RNG do motor (seed de
-32 bits ou as 4 palavras do sfc32) pelo `BoosterModel` (7 C, 3 UC, 1 de R/SR/SEC por pesos, 1 Líder ou incomum);
-`boosterReady` diz se a coleção está completa no banco; `validateLimitedDeck(deck, catálogo, cartas abertas)` confere
+32 bits ou as 4 palavras do sfc32) pelo `BoosterModel` da coleção (`boosterModelOf`: `BOOSTER_MODELS.early` para OP01 a
+OP03, `.extra` para EB, `.main` para o resto): vagas fixas de C, UC e R, uma vaga de destaque (SR ou SEC com as chances de
+`hits`, senão R) e o Líder no lugar de uma comum (`leaderChance`; com `leaderTakesHit`, Líder e destaque são fatias do
+mesmo sorteio e não saem juntos; `leaderChancePerLeader` limita a chance nas coleções com poucos Líderes). Todo modelo dá
+12 cartas (`boosterSize`), e `boosterOdds` devolve as chances que a tela mostra (`pack`, em `/api/sealed/sets`).
+`boosterReady(cartas, modelo)` diz se a coleção está completa no banco; `validateLimitedDeck(deck, catálogo, cartas abertas)` confere
 40 cartas (`LIMITED_DECK_SIZE`), Líder que saiu ou o de 6 cores, e nenhuma carta além das cópias abertas, sem cor e sem
 limite de cópias; `autoBuildLimited` monta um deck por nota e curva de custo (o "Montar sozinho" e o deck do bot).
 `createGame` aceita deck de 50 ou de 40. O formato da partida é `sealed` (`PlayFormat`, fora de `isPlayFormat`: só as
@@ -1823,7 +1827,7 @@ Quem chama, na coluna da direita:
 | GET | `/api/players/me` | Perfil de jogador (nome, recompensa, tier, `apprentice`) | Navegador; Token (`profile`) |
 | PUT | `/api/players/me` | Troca o nome público (`{ name }`) | Navegador |
 | GET | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador, mais novas primeiro, paginadas | Sessão; Token (`matches:read`) |
-| GET | `/api/sealed/sets` | Coleções disponíveis no Selado (cartas, Líderes, parte automatizada) | Pública |
+| GET | `/api/sealed/sets` | Coleções disponíveis no Selado (cartas, Líderes, parte automatizada, vagas e chances do booster) | Pública |
 | GET | `/api/sealed/pools` · POST | Decks selados de quem pede; `{ set }` abre 6 boosters | Navegador |
 | GET | `/api/sealed/pools/:id` · DELETE | Os boosters e o deck de uma abertura | Dono |
 | PUT | `/api/sealed/pools/:id/deck` | Salva o deck (`{ leader, cards }`), conferido contra as cartas abertas | Dono |

@@ -298,6 +298,8 @@ export interface SealedSetInfo {
   automated: number;
   /** Coleção ainda não lançada (pré-release de verdade). */
   spoiler: boolean;
+  /** O booster da coleção: as vagas e a chance (0 a 1) de vir uma SR, uma SEC e um Líder (servidores antigos não mandam). */
+  pack?: { commons: number; uncommons: number; rares: number; sr: number; sec: number; leader: number };
 }
 export type SealedDeck = { leader: string; cards: Array<{ id: string; count: number }> };
 /** Resumo de uma coleção aberta (lista "seus decks selados"). */

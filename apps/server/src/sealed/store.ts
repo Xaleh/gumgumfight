@@ -7,6 +7,8 @@ import { randomBytes, randomInt } from 'node:crypto';
 import {
   autoBuildLimited,
   boosterCards,
+  boosterModelOf,
+  boosterOdds,
   boosterReady,
   boosterStock,
   type CardData,
@@ -26,6 +28,7 @@ import {
   rushKey,
   rushSets,
   SEALED_LEADER_ID,
+  SEALED_PACKS,
   validateLimitedDeck,
 } from '@gumgum/engine';
 import { type DB, getCards, listCards } from '../db';
@@ -131,6 +134,8 @@ export interface SealedSet {
   automated: number;
   /** Coleção ainda não lançada (cartas de spoiler): o pré-release de verdade. */
   spoiler: boolean;
+  /** O booster da coleção: as vagas e a chance (0 a 1) de vir uma SR, uma SEC e um Líder. */
+  pack: { commons: number; uncommons: number; rares: number; sr: number; sec: number; leader: number };
 }
 
 let setsMemo: { at: number; db: DB; sets: SealedSet[] } | null = null;
@@ -153,12 +158,22 @@ export function sealedSets(db: DB, now = Date.now()): SealedSet[] {
   }
   const sets: SealedSet[] = [];
   for (const [set, cards] of bySet) {
-    if (!boosterReady(cards)) continue;
+    const model = boosterModelOf(set);
+    if (!boosterReady(cards, model)) continue;
     const stock = boosterStock(cards);
     const pack = cards.filter((c) => c.category !== 'leader');
     const automated = pack.filter((c) => !needsManual(c)).length / pack.length;
     if (automated < SEALED_MIN_AUTOMATED) continue;
-    sets.push({ set, cards: pack.length, leaders: stock.leaders, automated: Math.round(automated * 100) / 100, spoiler: cards.some((c) => c.spoiler) });
+    const odds = boosterOdds(model, stock.leaders);
+    const round = (n: number) => Math.round(n * 1000) / 1000;
+    sets.push({
+      set,
+      cards: pack.length,
+      leaders: stock.leaders,
+      automated: Math.round(automated * 100) / 100,
+      spoiler: cards.some((c) => c.spoiler),
+      pack: { commons: model.commons, uncommons: model.uncommons, rares: model.rares, sr: round(odds.SR), sec: round(odds.SEC), leader: round(odds.leader) },
+    });
   }
   // A mais nova primeiro: boosters principais (OP) pelo número, depois os extras.
   const rank = (s: string) => (s.startsWith('OP') ? 0 : s.startsWith('EB') ? 1 : 2);
@@ -178,7 +193,7 @@ const setCards = (db: DB, set: string) => boosterCards(listCards(db, set.toUpper
 function drawPacks(db: DB, key: string, seed: number[]): { sets: string[]; packs: string[][] } {
   const sets = rushSets(key);
   if (sets.length === 1) {
-    const packs = openBoosters(setCards(db, key), seed);
+    const packs = openBoosters(setCards(db, key), seed, SEALED_PACKS, boosterModelOf(key));
     return { sets: packs.map(() => key), packs };
   }
   return openMixedBoosters(sets.map((set) => ({ set, cards: setCards(db, set) })), seed);
@@ -297,7 +312,7 @@ export function botDeck(db: DB, set: string, podId: string | null = null): DeckL
     return validateLimitedDeck(deck, catalog, pool, poolRules({ set })).valid ? deck : null;
   }
   const key = rushKey(rushSets(set));
-  if (rushSets(key).some((s) => !boosterReady(setCards(db, s)))) return null;
+  if (rushSets(key).some((s) => !boosterReady(setCards(db, s), boosterModelOf(s)))) return null;
   const pool = poolCounts(drawPacks(db, key, seed).packs);
   const catalog = new Map((getCards(db, [...pool.keys(), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]));
   const deck: DeckList = { id: `${SEALED_DECK_PREFIX}bot`, name: poolName({ set: key }), ...autoBuildLimited(pool, catalog) };

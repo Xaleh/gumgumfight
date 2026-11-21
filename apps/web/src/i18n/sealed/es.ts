@@ -217,6 +217,10 @@ const sealed = {
   'cube.sourceTitle': 'De dónde sale la lista',
   'cube.sourceText': 'De las listas de {decks} mazos en {tournaments} torneos online de One Piece, del {from} al {to}. Entran las más usadas de cada color, con costes variados. Los Líderes y las cartas con efecto aún no automatizado (⚙) quedan fuera.',
   'errors.cubeUnavailable': 'El Cubo no está disponible en este servidor.',
+  'sealed.openingPack': 'Abriendo el sobre {n} de {total}',
+  'sealed.packMix': 'Sobre de {n} cartas: {c} comunes, {uc} infrecuentes y {r|# rara o mejor|# raras o mejores}.',
+  'sealed.packMixNoUc': 'Sobre de {n} cartas: {c} comunes y {r|# rara o mejor|# raras o mejores}.',
+  'sealed.packOdds': 'SR en el {sr}% de los sobres, SEC en el {sec}% y Líder en el {leader}%. Las tasas salen de aperturas de cajas: Bandai no publica las suyas.',
 };
 
 export default sealed;

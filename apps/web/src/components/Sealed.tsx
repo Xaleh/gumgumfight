@@ -28,6 +28,8 @@ import { api, type CubeInfo, type OnlineSeat, type SealedPool, type SealedPoolSu
 import { buildSetup } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
+import { useSettings } from '../settings';
+import { Booster, BoosterOpening } from './BoosterPack';
 import { CardHoverPreview, StaticCardZoom } from './CardInfo';
 import { CubeList } from './Cube';
 import { StaticCard } from './CardView';
@@ -389,6 +391,17 @@ export function Sealed({
                   chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>
                 )}
               </div>
+              {!rush && chosen?.pack && (
+                <p className="muted small sealed-odds">
+                  {t(chosen.pack.uncommons ? 'sealed.packMix' : 'sealed.packMixNoUc', {
+                    n: chosen.pack.commons + chosen.pack.uncommons + chosen.pack.rares + 1,
+                    c: chosen.pack.commons,
+                    uc: chosen.pack.uncommons,
+                    r: chosen.pack.rares + 1,
+                  })}{' '}
+                  {t('sealed.packOdds', { sr: Math.round(chosen.pack.sr * 100), sec: Math.round(chosen.pack.sec * 100), leader: Math.round(chosen.pack.leader * 100) })}
+                </p>
+              )}
               {draftRow}
             </>
           )}
@@ -436,20 +449,6 @@ export function Sealed({
   );
 }
 
-/** Desenho de um booster (sem a arte do produto): a cor sai do código da coleção. */
-function Booster({ set, small, state, draft }: { set: string; small?: boolean; state?: 'open' | 'current'; draft?: boolean }) {
-  // Coleções vizinhas com cores bem diferentes: o número da coleção anda de 47 em 47 graus.
-  // O deck de Pack Rush (várias coleções) tem um booster próprio, dourado; o de Draft, roxo.
-  const mixed = isRush(set);
-  const cube = isCube(set);
-  const hue = cube ? 168 : draft ? 280 : mixed ? 42 : (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
-  return (
-    <span className={['sealed-pack', small ? 'small' : '', state ?? ''].join(' ')} style={{ ['--h' as string]: hue }} aria-hidden="true">
-      <b>{cube ? 'CUBO' : draft ? 'DRAFT' : mixed ? 'RUSH' : set}</b>
-    </span>
-  );
-}
-
 /** Popover e zoom de carta, como no construtor de decks. */
 function useCardPeek() {
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
@@ -484,11 +483,33 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
   const [opened, setOpened] = useState(() => Math.min(total, readOpened()[pool.id] ?? (pool.deck ? total : 0)));
   const [shown, setShown] = useState(() => Math.max(0, opened - 1));
   const peek = useCardPeek();
+  const { animations } = useSettings();
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  /** Animações completas: cada booster é aberto na tela antes de as cartas aparecerem. */
+  const showy = animations === 'full' && !reducedMotion;
+  /** Boosters sendo abertos agora, um de cada vez: do `at` (o que está na tela) até o `to`. */
+  const [opening, setOpening] = useState<{ at: number; to: number; many: boolean } | null>(null);
   const reveal = (n: number) => {
     const next = Math.min(total, n);
     setOpened(next);
     setShown(Math.max(0, next - 1));
     writeOpened(pool.id, next);
+  };
+  const open = (n: number) => {
+    const to = Math.min(total, n);
+    if (opening || to <= opened) return;
+    if (showy) setOpening({ at: opened, to, many: to - opened > 1 });
+    else reveal(to);
+  };
+  const openedOne = () => {
+    if (!opening) return;
+    reveal(opening.at + 1);
+    setOpening(opening.at + 1 < opening.to ? { ...opening, at: opening.at + 1 } : null);
+  };
+  const skipOpening = () => {
+    if (!opening) return;
+    reveal(opening.to);
+    setOpening(null);
   };
   const revealed = pool.packs.slice(0, opened).flat();
   const leaders = [...new Set(revealed.filter((id) => byId.get(id)?.category === 'leader'))];
@@ -530,7 +551,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
                 </h3>
                 <span className="muted small">{peek.canHover ? t('sealed.peekMouse') : t('sealed.peekTouch')}</span>
               </div>
-              <div className="card-grid sealed-grid" key={shown}>
+              <div className={['card-grid sealed-grid', animations === 'off' ? 'still' : ''].join(' ')} key={shown}>
                 {pack.map((id, i) => {
                   const card = byId.get(id);
                   if (!card) return null;
@@ -551,11 +572,11 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
           {opened < total ? (
             <>
               {opened > 0 && (
-                <button type="button" className="btn" onClick={() => reveal(total)}>
+                <button type="button" className="btn" onClick={() => open(total)} disabled={Boolean(opening)}>
                   {t('sealed.openAll', { n: total - opened })}
                 </button>
               )}
-              <button type="button" className="mode-btn sealed-cta" onClick={() => reveal(opened + 1)}>
+              <button type="button" className="mode-btn sealed-cta" onClick={() => open(opened + 1)} disabled={Boolean(opening)}>
                 {opened === 0 ? t('sealed.openFirst') : t('sealed.openNext')}
               </button>
             </>
@@ -605,6 +626,16 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
         <p className="sealed-note">{t('sealed.serverNote')}</p>
       </aside>
       {peek.layer}
+      {opening && (
+        <BoosterOpening
+          key={opening.at}
+          set={packSet(opening.at)}
+          label={t('sealed.openingPack', { n: opening.at + 1, total })}
+          fast={opening.many}
+          onDone={openedOne}
+          onSkip={skipOpening}
+        />
+      )}
     </div>
   );
 }
