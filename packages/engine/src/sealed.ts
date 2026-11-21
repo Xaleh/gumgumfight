@@ -84,7 +84,8 @@ export function boosterReady(setCards: readonly CardData[]): boolean {
   return s.C >= BOOSTER_MIN.C && s.UC >= BOOSTER_MIN.UC && s.R >= BOOSTER_MIN.R && s.unknown * 10 <= setCards.length;
 }
 
-const holderOf = (seed: number | readonly number[]): RngHolder => (typeof seed === 'number' ? { rng: seed | 0 } : { rng: 0, rng128: seedRng128(seed) });
+/** O RNG de um sorteio a partir da seed: um número (32 bits) ou as 4 palavras do sfc32. */
+export const holderOf = (seed: number | readonly number[]): RngHolder => (typeof seed === 'number' ? { rng: seed | 0 } : { rng: 0, rng128: seedRng128(seed) });
 
 /** `n` cartas diferentes de `from` (ou todas, se houver menos). */
 function draw(holder: RngHolder, from: readonly string[], n: number, taken: Set<string>): string[] {

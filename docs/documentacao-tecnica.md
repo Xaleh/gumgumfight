@@ -300,6 +300,25 @@ desfaz. `view` devolve a cada jogador só o booster da frente da própria fila. 
 dos bots (`autoBuildLimited`), que ficam no pod para o treino (`podBotDecks`). Nas salas, `PlayMode.sealedPod` leva o
 id do pod: `sealedDeckFor` só aceita deck com o mesmo `pod_id` (`sealedRoomIsDraft` / `sealedRoomNotDraft`).
 
+### Draft Cubo (`cube.ts`)
+
+O Cubo usa o lugar da coleção nos modos limitados com uma chave própria: `cubeKey('T1')` = `"CUBE:T1"` (`isCube`,
+em `formats.ts`), que vai em `draft_pods`, `sealed_pools.set_code` e `PlayMode.sealedSet`. `openCubeBoosters` embaralha
+a lista e a reparte (`packs[rodada][assento]`, o formato de `openDraftBoosters`), então nenhuma carta se repete no
+pod; `cubeCardsNeeded(8, 4)` = 384. `pickCube(uso, cartas, formato)` escolhe a lista: por cor, o mínimo de cada faixa
+de custo, depois as de maior uso dentro dos tetos (`DEFAULT_CUBE_SHAPE`: 70 por cor, 14 Eventos, 2 Stages), e os
+tetos cedem se a cor não tem cartas usadas o bastante. `cubeEligible` deixa de fora Líder e carta com `needsManual`.
+Em `draftChoice`, o quinto argumento (`usage`) troca o bônus de raridade pelo uso da carta.
+
+No servidor, `draft/cubes.ts` lê `data/cubes/*.json` (`CubeFile`), fica com as cartas que o banco tem e que são
+`cubeEligible`, e descarta o Cubo que não dá um pod (`cubes`, memo de 1 minuto; `currentCube` = `publishedAt` mais
+recente; `setCubeDir` para os testes). `DraftPods.create(..., { cube: true })` abre o pod com a chave do Cubo em uso;
+`begin` sorteia com `openCubeBoosters`; `poolRules` devolve `{ leaders: 'any', sets: [] }` para chave de Cubo, e
+`botDeck` sem bots do pod tira 48 cartas do Cubo. A lista é gerada por `cube-cli.ts` (`npm run cube:build`), com
+`draft/cube-source.ts`: `listTournaments` e `tournamentDecks` (API do Limitless, cache em disco só com as cartas de
+cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores de cada trimestre) e `usageByCard`
+(fração de decks por trimestre; a nota é a média dos `USAGE_BEST_QUARTERS` melhores).
+
 ### Tradução
 
 `translateCardPt` monta o português a partir da DSL; o que o parser não entendeu passa por `translateToPt` (regras de
@@ -1810,7 +1829,8 @@ Quem chama, na coluna da direita:
 | PUT | `/api/sealed/pools/:id/deck` | Salva o deck (`{ leader, cards }`), conferido contra as cartas abertas | Dono |
 | POST | `/api/sealed/pools/:id/bot` | Deck do bot para o treino no navegador (boosters próprios da mesma coleção; num deck de Draft, o de um bot do pod) | Dono |
 | GET | `/api/draft/active` | O pod de Draft em que quem pede está (esperando ou draftando), ou `null` | Navegador |
-| POST | `/api/draft/pods` | Abre um pod (`{ sets }`: uma coleção, ou várias no Pack Rush draft) | Navegador |
+| GET | `/api/draft/cube` | O Cubo em uso: nome, fonte e a lista com o uso de cada carta (ou `null`) | Pública |
+| POST | `/api/draft/pods` | Abre um pod (`{ sets }`: uma coleção, ou várias no Pack Rush draft; `{ cube: true }`: Draft Cubo) | Navegador |
 | POST | `/api/draft/pods/join` | Entra num pod à espera pelo código (`{ code }`) | Navegador |
 | GET | `/api/draft/pods/:id` | O pod como quem pede o vê: lugares, o booster na mão, prazo e escolhas | Quem está no pod |
 | POST | `/api/draft/pods/:id/start` | Começa o draft; os lugares vazios viram bots | Quem criou |

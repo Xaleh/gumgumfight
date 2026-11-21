@@ -12,6 +12,7 @@ import {
   type CardData,
   type Color,
   type DeckList,
+  isCube,
   isRush,
   LIMITED_DECK_SIZE,
   type LimitedRules,
@@ -23,11 +24,12 @@ import {
   validateLimitedDeck,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type OnlineSeat, type SealedPool, type SealedPoolSummary, type SealedSetInfo } from '../api';
+import { api, type CubeInfo, type OnlineSeat, type SealedPool, type SealedPoolSummary, type SealedSetInfo } from '../api';
 import { buildSetup } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, StaticCardZoom } from './CardInfo';
+import { CubeList } from './Cube';
 import { StaticCard } from './CardView';
 import { Icon } from './Icons';
 
@@ -84,9 +86,9 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** As coleções de um deck selado para mostrar: "OP01" ou, no Pack Rush, "OP01 + OP05". */
 const setsText = (set: string) => rushSets(set).join(' + ');
-/** Nome do deck selado: "Selado OP01", "Pack Rush OP01 + OP05" ou, vindo de um pod, "Draft OP01". */
+/** Nome do deck selado: "Selado OP01", "Pack Rush OP01 + OP05" ou, vindo de um pod, "Draft OP01" ou "Draft Cubo". */
 const poolTitle = (pool: { set: string; draft?: boolean }, t: Translate) =>
-  pool.draft ? t('sealed.draftName', { sets: setsText(pool.set) }) : isRush(pool.set) ? t('sealed.rushName', { sets: setsText(pool.set) }) : t('sealed.poolName', { set: pool.set });
+  isCube(pool.set) ? t('sealed.cubeName') : pool.draft ? t('sealed.draftName', { sets: setsText(pool.set) }) : isRush(pool.set) ? t('sealed.rushName', { sets: setsText(pool.set) }) : t('sealed.poolName', { set: pool.set });
 
 export function Sealed({
   onExit,
@@ -110,10 +112,14 @@ export function Sealed({
   const [pools, setPools] = useState<SealedPoolSummary[] | null>(null);
   const [cards, setCards] = useState<CardData[] | null>(null);
   const [pool, setPool] = useState<SealedPool | null>(null);
-  const [view, setView] = useState<'hub' | 'packs' | 'build'>('hub');
+  const [view, setView] = useState<'hub' | 'packs' | 'build' | 'cube'>('hub');
   const [picked, setPicked] = useState<string>('');
   /** Pack Rush: várias coleções, e cada booster é sorteado entre elas. */
-  const [rush, setRush] = useState(false);
+  const [source, setSource] = useState<'one' | 'rush' | 'cube'>('one');
+  const rush = source === 'rush';
+  /** Draft Cubo: os boosters saem do Cubo da temporada, não de uma coleção. */
+  const cubeMode = source === 'cube';
+  const [cube, setCube] = useState<CubeInfo | null>(null);
   const [mix, setMix] = useState<string[]>([]);
   const [rushLimits, setRushLimits] = useState({ min: 2, max: 12 });
   const [busy, setBusy] = useState(false);
@@ -142,6 +148,10 @@ export function Sealed({
     api.draft
       .active()
       .then((r) => setActivePod(r.pod))
+      .catch(() => undefined);
+    api.draft
+      .cube()
+      .then((r) => setCube(r.cube))
       .catch(() => undefined);
   }, [reload]);
 
@@ -173,6 +183,7 @@ export function Sealed({
   }, [openId, resume]);
 
   const canOpen = rush ? mix.length >= rushLimits.min : Boolean(picked);
+  const canDraft = cubeMode ? Boolean(cube) : canOpen;
   const toggleMix = (set: string) => setMix((m) => (m.includes(set) ? m.filter((x) => x !== set) : m.length < rushLimits.max ? [...m, set] : m));
   const openNew = async () => {
     if (!canOpen || busy) return;
@@ -191,11 +202,11 @@ export function Sealed({
   };
   /** Cria um pod de Draft com as coleções escolhidas, ou entra num pelo código. */
   const draft = async (join?: string) => {
-    if (busy || (!join && !canOpen)) return;
+    if (busy || (!join && !canDraft)) return;
     setBusy(true);
     setError(null);
     try {
-      const pod = join ? await api.draft.join(join) : await api.draft.create(rush ? mix : [picked]);
+      const pod = join ? await api.draft.join(join) : await api.draft.create(rush ? mix : [picked], cubeMode);
       onDraft(pod.id);
     } catch (e) {
       setError(errorText(e));
@@ -242,6 +253,41 @@ export function Sealed({
   }
 
   const chosen = sets?.find((s) => s.set === picked);
+  /** Criar um pod de Draft (das coleções marcadas, ou do Cubo) ou entrar num pelo código. */
+  const draftRow = (
+    <div className="sealed-draft-row">
+      <div>
+        <div className="kicker">{cubeMode ? t('sealed.cubeName') : t('sealed.draftKicker')}</div>
+        <p className="muted small">{t('sealed.draftIntro')}</p>
+      </div>
+      <button type="button" className="btn" onClick={() => void draft()} disabled={!canDraft || busy || Boolean(activePod)}>
+        {cubeMode ? t('cube.create') : t('sealed.draftCreate')}
+      </button>
+      <div className="code-row">
+        <input value={podCode} onChange={(e) => setPodCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} aria-label={t('sealed.draftCode')} />
+        <button type="button" className="btn" onClick={() => void draft(podCode.trim())} disabled={busy || podCode.trim().length !== 6}>
+          {t('sealed.draftJoin')}
+        </button>
+      </div>
+    </div>
+  );
+  if (cube && cards && view === 'cube') {
+    return (
+      <div className="sealed">
+        {header(t('cube.title'), () => setView('hub'))}
+        {error && <div className="error sealed-wrap">{error}</div>}
+        <CubeList
+          cube={cube}
+          byId={byId}
+          action={
+            <button type="button" className="mode-btn sealed-cta" onClick={() => void draft()} disabled={busy || Boolean(activePod)}>
+              {t('cube.create')}
+            </button>
+          }
+        />
+      </div>
+    );
+  }
   return (
     <div className="sealed">
       {header(t('sealed.title'), onExit)}
@@ -253,7 +299,7 @@ export function Sealed({
           <ul className="home-chips">
             <li className="home-chip">{t('sealed.ruleDeck', { n: LIMITED_DECK_SIZE })}</li>
             <li className="home-chip">{t('sealed.ruleColors')}</li>
-            <li className="home-chip">{rush ? t('sealed.ruleLeaderAny') : t('sealed.ruleLeader')}</li>
+            <li className="home-chip">{rush || cubeMode ? t('sealed.ruleLeaderAny') : t('sealed.ruleLeader')}</li>
             <li className="home-chip">{t('sealed.ruleBans')}</li>
           </ul>
         </section>
@@ -271,18 +317,42 @@ export function Sealed({
 
         <section className="sealed-panel">
           <div className="section-head">
-            <h3 className="sealed-h3">{rush ? t('sealed.pickSets') : t('sealed.pickSet')}</h3>
+            <h3 className="sealed-h3">{cubeMode ? t('cube.title') : rush ? t('sealed.pickSets') : t('sealed.pickSet')}</h3>
             <div className="seg format-seg" role="group" aria-label={t('sealed.sourceLabel')}>
-              <button type="button" className={!rush ? 'on' : ''} aria-pressed={!rush} onClick={() => setRush(false)}>
+              <button type="button" className={source === 'one' ? 'on' : ''} aria-pressed={source === 'one'} onClick={() => setSource('one')}>
                 {t('sealed.sourceOne')}
               </button>
-              <button type="button" className={rush ? 'on' : ''} aria-pressed={rush} onClick={() => setRush(true)} disabled={(sets?.length ?? 0) < rushLimits.min}>
+              <button type="button" className={rush ? 'on' : ''} aria-pressed={rush} onClick={() => setSource('rush')} disabled={(sets?.length ?? 0) < rushLimits.min}>
                 {t('sealed.sourceRush')}
               </button>
+              {cube && (
+                <button type="button" className={cubeMode ? 'on' : ''} aria-pressed={cubeMode} onClick={() => setSource('cube')}>
+                  {t('sealed.sourceCube')}
+                </button>
+              )}
             </div>
           </div>
           {rush && <p className="muted small">{t('sealed.rushIntro', { n: packsPerPool, min: rushLimits.min, max: rushLimits.max })}</p>}
-          {sets === null ? (
+          {cubeMode && cube ? (
+            <>
+              <div className="sealed-cube">
+                <Booster set={cube.key} />
+                <div className="sealed-cube-info">
+                  <b>{cube.name}</b>
+                  <p className="muted small">{t('cube.intro', { n: cube.cards.length, perColor: cube.perColor })}</p>
+                  <ul className="home-chips">
+                    <li className="home-chip">{t('cube.chipCards', { n: cube.cards.length })}</li>
+                    <li className="home-chip">{t('cube.chipPerColor', { n: cube.perColor })}</li>
+                    <li className="home-chip">{t('cube.chipNoSealed')}</li>
+                  </ul>
+                </div>
+                <button type="button" className="btn" onClick={() => setView('cube')} disabled={!cards}>
+                  {t('cube.seeList')}
+                </button>
+              </div>
+              {draftRow}
+            </>
+          ) : sets === null ? (
             <p className="muted">{t('common.loading')}</p>
           ) : sets.length === 0 ? (
             <p className="muted">{t('sealed.noSets')}</p>
@@ -319,21 +389,7 @@ export function Sealed({
                   chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>
                 )}
               </div>
-              <div className="sealed-draft-row">
-                <div>
-                  <div className="kicker">{t('sealed.draftKicker')}</div>
-                  <p className="muted small">{t('sealed.draftIntro')}</p>
-                </div>
-                <button type="button" className="btn" onClick={() => void draft()} disabled={!canOpen || busy || Boolean(activePod)}>
-                  {t('sealed.draftCreate')}
-                </button>
-                <div className="code-row">
-                  <input value={podCode} onChange={(e) => setPodCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} aria-label={t('sealed.draftCode')} />
-                  <button type="button" className="btn" onClick={() => void draft(podCode.trim())} disabled={busy || podCode.trim().length !== 6}>
-                    {t('sealed.draftJoin')}
-                  </button>
-                </div>
-              </div>
+              {draftRow}
             </>
           )}
         </section>
@@ -385,10 +441,11 @@ function Booster({ set, small, state, draft }: { set: string; small?: boolean; s
   // Coleções vizinhas com cores bem diferentes: o número da coleção anda de 47 em 47 graus.
   // O deck de Pack Rush (várias coleções) tem um booster próprio, dourado; o de Draft, roxo.
   const mixed = isRush(set);
-  const hue = draft ? 280 : mixed ? 42 : (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
+  const cube = isCube(set);
+  const hue = cube ? 168 : draft ? 280 : mixed ? 42 : (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
   return (
     <span className={['sealed-pack', small ? 'small' : '', state ?? ''].join(' ')} style={{ ['--h' as string]: hue }} aria-hidden="true">
-      <b>{draft ? 'DRAFT' : mixed ? 'RUSH' : set}</b>
+      <b>{cube ? 'CUBO' : draft ? 'DRAFT' : mixed ? 'RUSH' : set}</b>
     </span>
   );
 }
@@ -585,9 +642,9 @@ function Build({
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState('');
   const [pickingLeader, setPickingLeader] = useState(false);
-  /** Pack Rush (várias coleções): vale qualquer Líder do jogo. */
-  const mixed = isRush(pool.set);
-  const rules = useMemo<LimitedRules>(() => (mixed ? { leaders: 'any', sets: rushSets(pool.set) } : {}), [mixed, pool.set]);
+  /** Pack Rush (várias coleções) e Draft Cubo: vale qualquer Líder do jogo. */
+  const mixed = isRush(pool.set) || isCube(pool.set);
+  const rules = useMemo<LimitedRules>(() => (mixed ? { leaders: 'any', sets: isCube(pool.set) ? [] : rushSets(pool.set) } : {}), [mixed, pool.set]);
 
   const total = [...deck.values()].reduce((n, c) => n + c, 0);
   const list = useMemo(() => ({ leader, cards: [...deck].map(([id, count]) => ({ id, count })).sort((a, b) => a.id.localeCompare(b.id)) }), [leader, deck]);

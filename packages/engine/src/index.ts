@@ -44,6 +44,7 @@ export * from './deck';
 export * from './formats';
 export * from './sealed';
 export * from './draft';
+export * from './cube';
 export type { RngHolder } from './rng';
 export { normalizeTypeQuotes } from './text';
 export * from './view';

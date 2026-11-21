@@ -11,6 +11,7 @@ import {
   type FormatId,
   formatLabel,
   type GameState,
+  isCube,
   type LogEntry,
   type ManualOp,
   type Pending,
@@ -144,6 +145,7 @@ export function modeLabel(
 ): string {
   if (m.format === 'free') return tr('mode.free');
   if (m.format === 'sealed') {
+    if (isCube(m.sealedSet)) return tr('mode.draftCube');
     if (m.sealedPod) return tr('mode.draft', { sets: (m.sealedSet ?? '').split('+').join(' + ') });
     if (m.sealedSet?.includes('+')) return tr('mode.packRush', { sets: m.sealedSet.split('+').join(' + ') });
     return m.sealedSet ? tr('mode.sealedSet', { set: m.sealedSet }) : tr('mode.sealed');
@@ -315,11 +317,24 @@ export interface SealedPoolSummary {
   draft?: boolean;
 }
 
+/** O Cubo em uso no Draft Cubo: a lista da temporada, com o uso que pôs cada carta nela. */
+export interface CubeInfo {
+  /** A chave do modo ("CUBE:T1"): é a "coleção" dos pods e dos decks de Draft Cubo. */
+  key: string;
+  id: string;
+  name: string;
+  publishedAt: string;
+  source: { name: string; url: string; tournaments: number; decks: number; from: string; to: string };
+  perColor: number;
+  /** `usage`: parte dos decks que jogava a carta no melhor ano dela (0 a 1). */
+  cards: Array<{ id: string; usage: number; decks: number }>;
+}
+
 /** O que o jogador vê de um pod de Draft. */
 export interface DraftPod {
   id: string;
   code: string;
-  /** A coleção, ou a chave das coleções no Pack Rush draft ("OP01+OP05"). */
+  /** A coleção, a chave das coleções no Pack Rush draft ("OP01+OP05") ou a do Cubo ("CUBE:T1"). */
   sets: string;
   status: 'waiting' | 'drafting' | 'done';
   host: boolean;
@@ -696,7 +711,9 @@ export const api = {
   /** Draft: pod de 8 (bots nos lugares vazios); cada um fica com uma carta do booster e passa o resto. */
   draft: {
     active: () => get<{ pod: Pick<DraftPod, 'id' | 'code' | 'sets' | 'status'> | null }>('/api/draft/active'),
-    create: (sets: string[]) => send<DraftPod>('POST', '/api/draft/pods', { sets }),
+    cube: () => get<{ cube: CubeInfo | null }>('/api/draft/cube'),
+    /** `cube`: Draft Cubo (os boosters saem do Cubo em uso, e `sets` não conta). */
+    create: (sets: string[], cube = false) => send<DraftPod>('POST', '/api/draft/pods', cube ? { cube: true } : { sets }),
     join: (code: string) => send<DraftPod>('POST', '/api/draft/pods/join', { code }),
     pod: (id: string) => get<DraftPod>(`/api/draft/pods/${encodeURIComponent(id)}`),
     start: (id: string) => send<DraftPod>('POST', `/api/draft/pods/${encodeURIComponent(id)}/start`),

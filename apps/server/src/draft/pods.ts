@@ -15,6 +15,7 @@ import {
   boosterSize,
   type CardData,
   createDraft,
+  cubeKey,
   DRAFT_ROUNDS,
   DRAFT_SEATS,
   draftChoice,
@@ -27,6 +28,8 @@ import {
   draftPicks,
   type DraftState,
   type DeckList,
+  isCube,
+  openCubeBoosters,
   openDraftBoosters,
   poolCounts,
   RUSH_MAX_SETS,
@@ -39,6 +42,7 @@ import {
 import { type DB, getCards, listCards } from '../db';
 import { fail, type PlayerError } from '../errors';
 import { createDraftPool, poolRules, sealedSets } from '../sealed/store';
+import { cubeByKey, currentCube } from './cubes';
 
 export type PodError = PlayerError & { code: number };
 export const isPodError = (v: unknown): v is PodError => typeof v === 'object' && v !== null && 'errorCode' in v;
@@ -76,7 +80,7 @@ interface PodSeat {
 interface PodData {
   id: string;
   code: string;
-  /** Chave das coleções ("OP01" ou, no Pack Rush draft, "OP01+OP05"). */
+  /** Chave das coleções ("OP01" ou, no Pack Rush draft, "OP01+OP05"); no Draft Cubo, a do Cubo ("CUBE:T1"). */
   sets: string;
   hostHash: string;
   status: 'waiting' | 'drafting' | 'done';
@@ -141,12 +145,20 @@ export class DraftPods {
   // ---------------------------------------------------------------- entrada
 
   /** Abre um pod: quem cria escolhe as coleções (uma, ou várias no Pack Rush draft) e ocupa o primeiro lugar. */
-  create(ownerHash: string, name: string, sets: readonly string[]): PodData | PodError {
-    const key = rushKey(sets);
-    const chosen = rushSets(key);
-    const available = new Set(sealedSets(this.db).map((s) => s.set));
-    if (!chosen.length || chosen.length > RUSH_MAX_SETS || chosen.some((s) => !available.has(s))) {
-      return { code: 400, ...fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: chosen.join(' + ') }) };
+  create(ownerHash: string, name: string, sets: readonly string[], opts: { cube?: boolean } = {}): PodData | PodError {
+    let key: string;
+    if (opts.cube) {
+      // Draft Cubo: sempre o Cubo publicado mais recente.
+      const cube = currentCube(this.db);
+      if (!cube) return { code: 400, ...fail('cubeUnavailable', 'O Cubo não está disponível neste servidor.') };
+      key = cubeKey(cube.file.id);
+    } else {
+      key = rushKey(sets);
+      const chosen = rushSets(key);
+      const available = new Set(sealedSets(this.db).map((s) => s.set));
+      if (!chosen.length || chosen.length > RUSH_MAX_SETS || chosen.some((s) => !available.has(s))) {
+        return { code: 400, ...fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: chosen.join(' + ') }) };
+      }
     }
     const busy = this.busy(ownerHash);
     if (busy) return busy;
@@ -223,17 +235,27 @@ export class DraftPods {
   start(pod: PodData, ownerHash: string): PodError | null {
     if (pod.hostHash !== ownerHash) return { code: 403, ...fail('draftHostOnly', 'Só quem criou o pod começa o draft.') };
     if (pod.status !== 'waiting') return { code: 409, ...fail('draftPodStarted', 'Esse draft já começou.') };
-    this.begin(pod);
-    return null;
+    return this.begin(pod) ? null : { code: 400, ...fail('cubeUnavailable', 'O Cubo não está disponível neste servidor.') };
   }
 
-  private begin(pod: PodData) {
+  private begin(pod: PodData): boolean {
     for (let n = 1; pod.seats.length < DRAFT_SEATS; n++) pod.seats.push({ ownerHash: null, name: `Bot ${n}` });
-    const sources = rushSets(pod.sets).map((set) => ({ set, cards: boosterCards(listCards(this.db, set) as CardData[], set) }));
     const seed = Array.from({ length: 4 }, () => randomInt(0, 0x1_0000_0000));
-    pod.draft = createDraft(openDraftBoosters(sources, seed, DRAFT_SEATS, DRAFT_ROUNDS));
+    if (isCube(pod.sets)) {
+      // O Cubo foi conferido ao criar o pod; se saiu do ar nesse meio tempo, o pod não tem como começar.
+      const cube = cubeByKey(this.db, pod.sets);
+      if (!cube) {
+        pod.seats = pod.seats.filter((s) => s.ownerHash !== null);
+        return false;
+      }
+      pod.draft = createDraft(openCubeBoosters(cube.cards, seed, DRAFT_SEATS, DRAFT_ROUNDS, pod.sets));
+    } else {
+      const sources = rushSets(pod.sets).map((set) => ({ set, cards: boosterCards(listCards(this.db, set) as CardData[], set) }));
+      pod.draft = createDraft(openDraftBoosters(sources, seed, DRAFT_SEATS, DRAFT_ROUNDS));
+    }
     pod.status = 'drafting';
     this.advance(pod);
+    return true;
   }
 
   // ---------------------------------------------------------------- escolhas
@@ -276,6 +298,11 @@ export class DraftPods {
     return c ?? new Map();
   }
 
+  /** No Draft Cubo, o uso de cada carta (a nota dos bots no lugar da raridade). */
+  private usage(pod: PodData): ReadonlyMap<string, number> | undefined {
+    return isCube(pod.sets) ? cubeByKey(this.db, pod.sets)?.usage : undefined;
+  }
+
   /**
    * Depois de cada mudança: bots e lugares ausentes escolhem na hora (enquanto houver booster na
    * mão de algum), quem recebeu booster ganha prazo, e o draft fecha quando as rodadas acabam.
@@ -283,13 +310,14 @@ export class DraftPods {
   private advance(pod: PodData) {
     if (!pod.draft) return;
     const cards = this.catalog(pod);
+    const usage = this.usage(pod);
     const holder: RngHolder = { rng: pod.rng };
     for (let guard = 0; guard < 2000 && !draftDone(pod.draft); guard++) {
       const seat = pod.seats.findIndex((s, i) => (s.ownerHash === null || s.away) && draftPack(pod.draft!, i));
       if (seat < 0) break;
       const s = pod.seats[seat];
       // O bot varia um pouco; a escolha no lugar de uma pessoa ausente é a melhor carta, sem acaso.
-      pod.draft = draftPick(pod.draft, seat, draftChoice(draftPack(pod.draft, seat)!, draftPicks(pod.draft, seat), cards, s.ownerHash === null ? holder : undefined));
+      pod.draft = draftPick(pod.draft, seat, draftChoice(draftPack(pod.draft, seat)!, draftPicks(pod.draft, seat), cards, s.ownerHash === null ? holder : undefined, usage));
       s.deadline = null;
     }
     pod.rng = holder.rng;
@@ -316,7 +344,7 @@ export class DraftPods {
           if (s.ownerHash === null || !s.deadline || s.deadline > now || !pod.draft) return;
           const pack = draftPack(pod.draft, i);
           if (!pack) return;
-          pod.draft = draftPick(pod.draft, i, draftChoice(pack, draftPicks(pod.draft, i), this.catalog(pod)));
+          pod.draft = draftPick(pod.draft, i, draftChoice(pack, draftPicks(pod.draft, i), this.catalog(pod), undefined, this.usage(pod)));
           s.deadline = null;
           s.timeouts = (s.timeouts ?? 0) + 1;
           if (s.timeouts >= AWAY_AFTER_TIMEOUTS && now - (s.seenAt ?? 0) > AWAY_UNSEEN_MS) s.away = true;

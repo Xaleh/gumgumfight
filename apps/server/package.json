@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "db:seed": "tsx src/seed-cli.ts",
     "cards:import": "tsx src/import-cards.ts",
+    "cube:build": "tsx src/cube-cli.ts",
     "cards:check-official": "tsx src/check-official.ts",
     "cards:check-rarity": "tsx src/check-rarity.ts",
     "translations:check": "tsx src/check-translations.ts",

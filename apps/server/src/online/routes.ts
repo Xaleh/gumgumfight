@@ -337,13 +337,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
         ? { code: 400, ...fail('sealedRoomNeedsDeck', `Esta sala é de Selado ${setName(set)}. Abra o Selado, monte um deck dessa coleção e entre com o código por lá.`, { set: setName(set) }) }
         : { code: 400, ...fail('sealedPoolNotFound', 'Deck do Selado não encontrado.') };
     }
-    if (set && pool.set !== set) return { code: 400, ...fail('sealedSetMismatch', `Esta sala é de Selado ${setName(set)}: use um deck aberto dessa coleção.`, { set: setName(set) }) };
     // Deck de Draft só enfrenta deck do mesmo pod; deck de Selado não entra em sala de Draft, nem o contrário.
+    // Vem antes da coleção: numa sala de Draft (ou de Draft Cubo), o que importa é o pod.
     if (set && (pool.podId ?? null) !== (pod ?? null)) {
       return pod
         ? { code: 400, ...fail('sealedRoomIsDraft', 'Esta sala é de um Draft: só entra quem draftou no mesmo pod.') }
         : { code: 400, ...fail('sealedRoomNotDraft', 'Esta sala é de Selado: um deck de Draft não entra.') };
     }
+    if (set && pool.set !== set) return { code: 400, ...fail('sealedSetMismatch', `Esta sala é de Selado ${setName(set)}: use um deck aberto dessa coleção.`, { set: setName(set) }) };
     const deck = poolDeck(pool);
     if (!deck || !checkSealedDeck(db, pool, deck).valid) {
       return { code: 400, ...fail('sealedDeckIncomplete', 'Termine de montar o deck do Selado (40 cartas) antes de jogar.') };

@@ -77,6 +77,12 @@ export interface PlayMode {
   sealedPod?: string;
 }
 
+/** Chave de um Cubo onde os outros modos limitados têm a coleção (`PlayMode.sealedSet`): "CUBE:T1" (`cube.ts`). */
+export const CUBE_PREFIX = 'CUBE:';
+export const cubeKey = (id: string): string => `${CUBE_PREFIX}${id.toUpperCase()}`;
+export const isCube = (key: string | null | undefined): boolean => Boolean(key?.startsWith(CUBE_PREFIX));
+export const cubeIdOf = (key: string): string => key.slice(CUBE_PREFIX.length);
+
 /**
  * Formatos de quem cria um torneio, uma sala privada ou um treino contra o bot. Com a escolha
  * dos spoilers, cada formato tem a versão pura e a "+ spoilers"; o Livre sempre aceita.
@@ -91,7 +97,7 @@ export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ 
  * "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"…
  */
 export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null; sealedPod?: string | null }): string =>
-  m.format === 'sealed' && m.sealedPod ? `Draft ${(m.sealedSet ?? '').split('+').join(' + ')}`.trim() : m.format === 'sealed' ? (m.sealedSet?.includes('+') ? `Pack Rush ${m.sealedSet.split('+').join(' + ')}` : `Selado${m.sealedSet ? ` ${m.sealedSet}` : ''}`) : m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
+  m.format === 'sealed' && isCube(m.sealedSet) ? 'Draft Cubo' : m.format === 'sealed' && m.sealedPod ? `Draft ${(m.sealedSet ?? '').split('+').join(' + ')}`.trim() : m.format === 'sealed' ? (m.sealedSet?.includes('+') ? `Pack Rush ${m.sealedSet.split('+').join(' + ')}` : `Selado${m.sealedSet ? ` ${m.sealedSet}` : ''}`) : m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
 
 /**
  * Se a partida entra nas estatísticas: só Standard e EGB puros. Fica de fora o Livre, o

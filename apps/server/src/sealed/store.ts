@@ -10,12 +10,15 @@ import {
   boosterReady,
   boosterStock,
   type CardData,
+  cubeCardsNeeded,
   type DeckList,
   isBoosterSet,
+  isCube,
   isRush,
   type LimitedRules,
   needsManual,
   openBoosters,
+  openCubeBoosters,
   openMixedBoosters,
   playModeLabel,
   poolCounts,
@@ -26,6 +29,7 @@ import {
   validateLimitedDeck,
 } from '@gumgum/engine';
 import { type DB, getCards, listCards } from '../db';
+import { cubeByKey } from '../draft/cubes';
 
 /** Parte mínima de cartas com efeito automatizado para a coleção entrar no Selado. */
 export const SEALED_MIN_AUTOMATED = 0.7;
@@ -240,9 +244,10 @@ export function poolCatalog(db: DB, pool: SealedPool, extra: string[] = []): Map
 }
 
 /** Regras do Líder: no Pack Rush (várias coleções), qualquer Líder do jogo; numa coleção só, os que saíram. */
-export const poolRules = (pool: Pick<SealedPool, 'set'>): LimitedRules => (isRush(pool.set) ? { leaders: 'any', sets: rushSets(pool.set) } : {});
+export const poolRules = (pool: Pick<SealedPool, 'set'>): LimitedRules =>
+  isCube(pool.set) ? { leaders: 'any', sets: [] } : isRush(pool.set) ? { leaders: 'any', sets: rushSets(pool.set) } : {};
 
-/** Nome do deck nas partidas: "Selado OP01", "Pack Rush OP01 + OP05" ou "Draft OP01". */
+/** Nome do deck nas partidas: "Selado OP01", "Pack Rush OP01 + OP05", "Draft OP01" ou "Draft Cubo". */
 export const poolName = (pool: Pick<SealedPool, 'set'> & { podId?: string | null }) => playModeLabel({ format: 'sealed', sealedSet: pool.set, sealedPod: pool.podId });
 
 /** Confere o deck contra a coleção aberta. */
@@ -281,14 +286,26 @@ export function botDeck(db: DB, set: string, podId: string | null = null): DeckL
     const pick = drafted[randomInt(drafted.length)];
     return { id: `${SEALED_DECK_PREFIX}bot`, name: poolName({ set, podId }), leader: pick.leader, cards: pick.cards };
   }
+  const seed = Array.from({ length: 4 }, () => randomInt(0, 0x1_0000_0000));
+  // Draft Cubo sem bots no pod (ou já apagado): o bot fica com 4 boosters sorteados do Cubo.
+  if (isCube(set)) {
+    const cube = cubeByKey(db, set);
+    if (!cube || cube.cards.length < cubeCardsNeeded(1, DRAFT_ROUNDS_FOR_BOT)) return null;
+    const pool = poolCounts(openCubeBoosters(cube.cards, seed, 1, DRAFT_ROUNDS_FOR_BOT, set).packs.flat());
+    const catalog = new Map((getCards(db, [...pool.keys(), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]));
+    const deck: DeckList = { id: `${SEALED_DECK_PREFIX}bot`, name: poolName({ set, podId }), ...autoBuildLimited(pool, catalog) };
+    return validateLimitedDeck(deck, catalog, pool, poolRules({ set })).valid ? deck : null;
+  }
   const key = rushKey(rushSets(set));
   if (rushSets(key).some((s) => !boosterReady(setCards(db, s)))) return null;
-  const seed = Array.from({ length: 4 }, () => randomInt(0, 0x1_0000_0000));
   const pool = poolCounts(drawPacks(db, key, seed).packs);
   const catalog = new Map((getCards(db, [...pool.keys(), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]));
   const deck: DeckList = { id: `${SEALED_DECK_PREFIX}bot`, name: poolName({ set: key }), ...autoBuildLimited(pool, catalog) };
   return validateLimitedDeck(deck, catalog, pool, poolRules({ set: key })).valid ? deck : null;
 }
+
+/** Boosters que o bot abre do Cubo quando não há deck de bot do pod: os mesmos 4 de quem drafta. */
+const DRAFT_ROUNDS_FOR_BOT = 4;
 
 /** Os decks que os bots de um pod de Draft montaram com o que escolheram (vazio: pod só de pessoas, ou já apagado). */
 export function podBotDecks(db: DB, podId: string): Array<Pick<DeckList, 'leader' | 'cards'>> {

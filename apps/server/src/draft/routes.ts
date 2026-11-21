@@ -1,7 +1,8 @@
 // Rotas do Draft (pod de 8, com bots nos lugares vazios).
 //
 //   GET  /api/draft/active            o pod em que quem pede está (ou null)
-//   POST /api/draft/pods              { sets: [...] } abre um pod (uma coleção, ou várias no Pack Rush draft)
+//   GET  /api/draft/cube              o Cubo em uso: a lista inteira, com o uso de cada carta (ou null)
+//   POST /api/draft/pods              { sets: [...] } abre um pod (uma coleção, ou várias no Pack Rush draft); { cube: true } = Draft Cubo
 //   POST /api/draft/pods/join         { code } entra (ou volta) num pod pelo código
 //   GET  /api/draft/pods/:id          o que quem pede vê: lugares, o booster na mão, as próprias escolhas
 //   POST /api/draft/pods/:id/start    quem criou começa (os lugares vazios viram bots)
@@ -15,6 +16,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { DB } from '../db';
 import { fail } from '../errors';
 import { ensurePlayer } from '../stats/store';
+import { currentCube } from './cubes';
 import { DraftPods, isPodError } from './pods';
 
 interface Deps {
@@ -46,11 +48,19 @@ export function registerDraftRoutes(app: FastifyInstance, { db, viewerHash, now 
     return { pod: pod && owner ? { id: pod.id, code: pod.code, sets: pod.sets, status: pod.status } : null };
   });
 
-  app.post<{ Body: { sets?: unknown; set?: unknown } }>('/api/draft/pods', async (req, reply) => {
+  app.get('/api/draft/cube', async () => {
+    const cube = currentCube(db);
+    if (!cube) return { cube: null };
+    const { id, name, publishedAt, source, perColor } = cube.file;
+    const info = new Map(cube.file.cards.map((c) => [c.id, c]));
+    return { cube: { key: cube.key, id, name, publishedAt, source, perColor, cards: cube.cards.map((cardId) => info.get(cardId)!) } };
+  });
+
+  app.post<{ Body: { sets?: unknown; set?: unknown; cube?: unknown } }>('/api/draft/pods', async (req, reply) => {
     const owner = viewerHash(req);
     if (!owner) return reply.code(400).send(noOwner);
     const sets = Array.isArray(req.body?.sets) ? req.body.sets.filter((s): s is string => typeof s === 'string') : typeof req.body?.set === 'string' ? [req.body.set] : [];
-    const pod = pods.create(owner, ensurePlayer(db, owner).name, sets);
+    const pod = pods.create(owner, ensurePlayer(db, owner).name, sets, { cube: req.body?.cube === true });
     if (isPodError(pod)) return reply.code(pod.code).send(pod);
     return reply.code(201).send(pods.view(pod, owner));
   });

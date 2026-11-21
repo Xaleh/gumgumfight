@@ -98,20 +98,29 @@ export const draftPicks = (s: DraftState, seat: number): string[] => s.picks[sea
 export const draftPickSeconds = (cardsInPack: number): number => 10 + 3 * Math.max(1, cardsInPack);
 
 const RARITY_BONUS: Record<string, number> = { R: 0.7, SR: 2, SEC: 3 };
+/** No Cubo, o bônus da carta é o uso dela: 30% de uso vale o mesmo que uma SEC num booster comum. */
+const CUBE_USAGE_BONUS = 10;
 
 /**
  * A carta que um bot pega do booster (e a escolha automática de quem deixou o tempo acabar): a de
  * melhor nota para um deck de Selado, com um bônus pela raridade. Líder, só o primeiro (o de 6
  * cores está sempre disponível). `holder`: um pouco de acaso, para os bots não escolherem todos igual.
+ * `usage` (Draft Cubo): o uso de cada carta (0 a 1) entra no lugar da raridade, que no Cubo não diz nada.
  */
-export function draftChoice(pack: readonly string[], picked: readonly string[], cards: ReadonlyMap<string, CardData>, holder?: RngHolder): string {
+export function draftChoice(
+  pack: readonly string[],
+  picked: readonly string[],
+  cards: ReadonlyMap<string, CardData>,
+  holder?: RngHolder,
+  usage?: ReadonlyMap<string, number>,
+): string {
   const hasLeader = picked.some((id) => cards.get(id)?.category === 'leader');
   let best = pack[0];
   let bestScore = -Infinity;
   for (const id of pack) {
     const card = cards.get(id);
     let score = -100;
-    if (card) score = card.category === 'leader' ? (hasLeader ? -10 : 3.5) : limitedScore(card) + (RARITY_BONUS[rarityCode(card.rarity) ?? ''] ?? 0);
+    if (card) score = card.category === 'leader' ? (hasLeader ? -10 : 3.5) : limitedScore(card) + (usage ? Math.min(3, (usage.get(id) ?? 0) * CUBE_USAGE_BONUS) : (RARITY_BONUS[rarityCode(card.rarity) ?? ''] ?? 0));
     if (holder) score += nextRandom(holder) * 1.2;
     if (score > bestScore || (score === bestScore && id < best)) {
       best = id;

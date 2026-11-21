@@ -362,9 +362,55 @@ começa quando quiser, e **os lugares vazios viram bots**: dá para draftar sozi
   mão dele. O pod fica gravado (`draft_pods`), então um deploy no meio não perde o draft: ele volta com os prazos
   zerados. Pod que não começa fecha em 2 horas; o servidor aceita até 300 pods abertos ao mesmo tempo.
 - **Ainda não tem:** chave ou rodadas entre os 8 do pod (cada um chama quem quiser pela sala privada), fila pública
-  para achar pod, link de convite (hoje é o código), torneio de Draft e o Draft Cubo.
+  para achar pod, link de convite (hoje é o código) e torneio de Draft.
 - Código: `packages/engine/src/draft.ts` (rodízio e escolha dos bots), `apps/server/src/draft/` (pods e rotas
   `/api/draft`) e `apps/web/src/components/Draft.tsx`. A tela consulta o pod a cada segundo.
+
+### Draft Cubo
+
+Na tela do Selado, a opção **Cubo** troca as coleções pelo **Cubo GumGum**: uma lista fixa de **420 cartas, uma cópia
+de cada, 70 por cor**, com as cartas mais usadas de One Piece em todas as coleções. "Ver a lista" mostra as 420, por
+cor, com o uso de cada uma; "Criar pod de Draft Cubo" abre um pod igual ao do Draft (8 lugares, bots nos vazios,
+código para chamar os amigos, 4 boosters de 12, o mesmo relógio).
+
+- **Boosters:** a lista é embaralhada e repartida, sem vaga de raridade. **Nenhuma carta se repete no pod**: os 8
+  lugares usam 384 das 420.
+- **Líder:** qualquer Líder do jogo (inclusive os banidos nos formatos oficiais e o Luffy de 6 cores), escolhido na
+  montagem. O Cubo não tem Líderes. Líder de coleção ainda não lançada não vale.
+- **Deck e partidas:** como no Draft: 40 cartas, qualquer cor, sala privada só entre decks do mesmo pod, e o treino é
+  contra um dos bots que draftaram com você. Não existe Selado de Cubo: as cartas só saem num pod.
+- **Bots:** no Cubo a raridade não diz nada, então a nota do bot soma o **uso da carta** no lugar dela.
+- **De onde sai a lista:** das **decklists de torneios do mundo todo**, e não das partidas daqui. O meta global que o
+  app já baixa (TCG Matchmaking) só tem Líderes, sem as cartas dos decks; por isso a fonte do Cubo é a plataforma de
+  torneios online do **Limitless TCG**, pela [API pública](https://docs.limitlesstcg.com/developer.html) deles (sem
+  chave). A Temporada 1 saiu de **30.420 decks em 87 torneios**, de junho de 2023 a novembro de 2026: os 6 maiores
+  torneios de cada trimestre, com 32 jogadores ou mais.
+- **A conta do uso:** em cada trimestre, a fração dos decks que jogaram a carta. A nota é a **média dos 4 melhores
+  trimestres** dela (uma carta que existe há menos tempo é medida pelos trimestres que tem). Assim entram tanto as
+  bases de 2023 quanto as de hoje. É essa porcentagem que aparece na lista.
+- **A escolha das 420:** por cor, as de maior nota, com no máximo 14 Eventos e 2 Stages, e faixas de custo para o
+  booster ter carta de toda fase da partida (custo 0 a 2: 18 a 26 cartas; 3 e 4: 20 a 28; 5 e 6: 10 a 18; 7 ou mais:
+  4 a 10). **Líderes e cartas com efeito ainda não automatizado ficam de fora.** Carta de duas cores conta na primeira.
+- **O arquivo:** `data/cubes/t1.json`, com os ids, a nota (`usage`) e os decks de cada carta. É **editável à mão**:
+  troque cartas e o servidor passa a usar a lista nova (ele relê a pasta a cada minuto). O Cubo em uso é o de
+  `publishedAt` mais recente; carta que o banco do servidor não tem some da lista sem quebrar nada, e um Cubo com
+  menos de 384 cartas válidas não aparece.
+- **Gerar uma temporada nova:**
+
+  ```bash
+  npm run cards:import -- --all                         # o banco precisa ter todas as coleções
+  npm run cube:build -- --id T2 --name "Temporada 2"    # grava data/cubes/t2.json
+  npm run cube:build -- --id T2 --dry-run               # só mostra o resumo por cor
+  ```
+
+  Opções: `--per-quarter N` (torneios por trimestre, padrão 6), `--min-players N` (padrão 32) e `--cache PASTA` (as
+  decklists baixadas ficam guardadas, sem nome nem país de jogador). O comando respeita o limite de pedidos da API e
+  leva poucos minutos.
+- **Ainda não tem:** uma tela de Admin para revisar e publicar a lista (hoje é o arquivo), Cubos com mais de uma
+  lista ao mesmo tempo e o histórico das temporadas na tela.
+- Código: `packages/engine/src/cube.ts` (boosters do Cubo e a escolha da lista), `apps/server/src/draft/cubes.ts`
+  (arquivos), `apps/server/src/draft/cube-source.ts` e `apps/server/src/cube-cli.ts` (a coleta e o comando) e
+  `apps/web/src/components/Cube.tsx` (a lista).
 
 ## Estatísticas
 

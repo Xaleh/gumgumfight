@@ -4,7 +4,7 @@
 // cada um; esta tela consulta o pod a cada segundo. No fim, as escolhas viram um deck selado e a
 // montagem é a do Selado.
 
-import { type CardData, type Color, needsManual, rushSets, SEALED_LEADER_ID } from '@gumgum/engine';
+import { type CardData, type Color, isCube, needsManual, rushSets, SEALED_LEADER_ID } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError, type DraftPod } from '../api';
 import { type MessageKey, useT } from '../i18n';
@@ -110,7 +110,7 @@ export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () =>
       <button className="btn small" onClick={pod?.status === 'done' ? onExit : leave}>
         {pod?.status === 'done' ? t('common.back') : t('draft.leave')}
       </button>
-      <h2>{pod ? t('draft.title', { sets: rushSets(pod.sets).join(' + ') }) : t('draft.titlePlain')}</h2>
+      <h2>{!pod ? t('draft.titlePlain') : isCube(pod.sets) ? t('sealed.cubeName') : t('draft.title', { sets: rushSets(pod.sets).join(' + ') })}</h2>
     </header>
   );
 
@@ -326,7 +326,7 @@ export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () =>
                   ) : null;
                 })}
               </div>
-              <p className="muted small">{rushSets(pod.sets).length > 1 ? t('draft.leaderHintAny') : t('draft.leaderHint')}</p>
+              <p className="muted small">{rushSets(pod.sets).length > 1 || isCube(pod.sets) ? t('draft.leaderHintAny') : t('draft.leaderHint')}</p>
             </div>
             <div>
               <div className="kicker">{t('draft.colors')}</div>

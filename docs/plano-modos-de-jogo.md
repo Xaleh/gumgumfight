@@ -1,7 +1,7 @@
 # Plano: novos modos de jogo (All Blue, Selado, Pack Rush, Cubo e Yonko)
 
-> Status (21/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft) e Draft
-> implementados**; o README (seções "All Blue", "Selado", "Pack Rush" e "Draft") descreve o que existe. Os outros modos seguem como proposta, na ordem da
+> Status (21/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft), Draft e Draft Cubo
+> implementados**; o README (seções "All Blue", "Selado", "Pack Rush", "Draft" e "Draft Cubo") descreve o que existe. Os outros modos seguem como proposta, na ordem da
 > seção 1.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
@@ -14,7 +14,7 @@
 | **Selado: Pré-release** ✅ | O jogador abre 6 boosters de uma coleção e monta um deck de 40 com o que saiu. | Médio | Pouco (tamanho do deck) | Fidelidade do booster e cartas ⚙ na coleção |
 | **Selado: Draft** ✅ | Pod de 8 (bots nos lugares vazios): cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
 | **Pack Rush** ✅ (selado e draft) | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
-| **Draft Cubo** | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
+| **Draft Cubo** ✅ | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
 | **Yonko** | Mesa de 4, todos contra todos, formato da comunidade inspirado no Commander. | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
 
 Em esforço relativo, com o All Blue valendo 1: Pré-release ≈ 3, Draft ≈ +2, Pack Rush ≈ +1, Cubo ≈ +1,5 e Yonko ≈ 8
@@ -78,7 +78,20 @@ Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha
 ![Cubo](mockups/modos-de-jogo/11-cubo.webp)
 ![Escolha do Líder](mockups/modos-de-jogo/12-lider-modos-mistos.webp)
 
-### O que já existe (Pré-release, Pack Rush e Draft)
+### O que já existe (Pré-release, Pack Rush, Draft e Draft Cubo)
+
+O **Draft Cubo** entrou como a terceira opção da tela do Selado ("Uma coleção", "Pack Rush", "Cubo"): a lista da
+Temporada 1 (420 cartas, 70 por cor, uma cópia de cada), a página da lista com o uso de cada carta e o pod que drafta
+dela, com qualquer Líder na montagem. Diferenças para a proposta e para a tela 11:
+
+- **A fonte do uso mudou.** O plano dizia "o meta global do TCG Matchmaking, que o app já baixa", mas esse meta só tem
+  Líderes, não as cartas dos decks. A lista saiu das decklists de torneios online do Limitless TCG (API pública):
+  30.420 decks em 87 torneios, de 2023 a 2026. Não entram as partidas do GumGum Fight.
+- A porcentagem de cada carta é o uso no melhor ano dela (média dos 4 melhores trimestres), e não "nos últimos 90
+  dias" nem "dos decks da cor".
+- Não há "Exportar lista", o aviso de carta banida nem "Entrar num pod" público; o pod é pelo código, como no Draft.
+- A revisão por um Admin é editar o arquivo `data/cubes/t1.json` (ou gerar outro com `npm run cube:build`); a tela de
+  Admin ficou para depois.
 
 O **Draft** entrou com pod de 8 e bots nos lugares vazios (decisão 3): código de 6 letras para chamar os amigos, 4
 boosters de 12 cartas por jogador, prazo por escolha (46 s caindo até 13 s) com escolha automática do servidor, e o
@@ -86,7 +99,7 @@ Pack Rush draft pelas coleções marcadas. As escolhas viram um deck selado, e a
 decks do mesmo pod. Diferenças para as telas 5 a 7: não há link de convite (é o código), a tela consulta o servidor a
 cada segundo em vez de ficar numa conexão aberta, e depois do draft não há chave entre os 8: cada um joga com quem
 quiser do pod, ou contra um dos bots que draftaram. Ficou para depois: fila pública de pods, rodadas ou chave dentro
-do pod, torneio de Draft e o Draft Cubo.
+do pod e torneio de Draft.
 
 O Pack Rush selado entrou na mesma tela: escolher de 2 a 12 coleções, 6 boosters sorteados entre elas, qualquer Líder
 do jogo (com a folha de escolha da tela 12) e sala privada entre decks das mesmas coleções. Diferenças para a tela 10:
@@ -172,9 +185,9 @@ EB05 e OP18) vira opção quando estiver completa o bastante. Quem decide que el
 
 - O **Cubo** é uma lista fixa em `data/cubes/<id>.json`: 420 cartas, **uma cópia de cada**, 70 por cor, com curva de
   custo equilibrada. Sem Líderes (o Líder é livre).
-- **De onde sai a lista:** das **estatísticas de uso globais** (o meta global do TCG Matchmaking, que o app já
-  baixa), e não só das partidas do GumGum Fight. Um script gera a lista (mais usadas por cor), publicada como
-  "temporada". Cartas ⚙ (efeito não automatizado) não entram. Uma lista montada à mão por você fica para depois; o
+- **De onde sai a lista:** das **estatísticas de uso globais**, e não das partidas do GumGum Fight: as decklists de
+  torneios online do Limitless TCG (o meta do TCG Matchmaking que o app baixa só tem Líderes). Um script
+  (`npm run cube:build`) gera a lista (mais usadas por cor), publicada como "temporada". Cartas ⚙ (efeito não automatizado) não entram. Uma lista montada à mão por você fica para depois; o
   arquivo da temporada já é editável.
 - **Os boosters** são 12 cartas sorteadas do Cubo, sem vaga de raridade e sem repetir carta no pod. Um pod de 8 usa 384
   das 420.
