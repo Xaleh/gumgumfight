@@ -1,7 +1,7 @@
 import type { PlayerId } from '@gumgum/engine';
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '../audio';
-import { errorMessage, type OnlineRoomInfo, type RoomQueue } from '../api';
+import { errorMessage, modeLabel, type OnlineRoomInfo, type RoomQueue } from '../api';
 import { formatClock, type OnlineGame, remainingNow } from '../game/useOnlineGame';
 import { type MessageKey, type Translate, useLocale, useT, useTryT } from '../i18n';
 import { fmtBerries, fmtNumber } from '../i18n/format';
@@ -370,7 +370,9 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
           ) : room?.status === 'waiting' ? (
             <>
               <h2>{t('online.privateRoom')}</h2>
-              <p className="muted">{t('online.privateHint')}</p>
+              {/* Sala de Selado: quem recebe o convite precisa saber a coleção, porque só entra com um deck dela. */}
+              {room.format === 'sealed' && <p className="home-chip gold">{modeLabel(room)}</p>}
+              <p className="muted">{room.format === 'sealed' ? t('sealed.roomHint', { set: room.sealedSet ?? '' }) : t('online.privateHint')}</p>
               <div className="room-code">{room.code}</div>
               {room.handsAllowed && <p className="small">{t('online.handsSharedHint')}</p>}
               <div className="btn-row center">

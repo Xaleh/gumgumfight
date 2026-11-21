@@ -79,6 +79,8 @@ export interface LiveRoom {
   spoilers?: boolean;
   /** Com spoilers (fora do Livre), a coleção aceita. */
   spoilerSet?: string;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -328,7 +330,9 @@ export class Lobby {
    */
   privateMode(code: string): PlayMode | null {
     const data = this.waitingRoom(code)?.data;
-    return data ? { format: data.format, spoilers: data.spoilers ?? true, ...(data.spoilerSet ? { spoilerSet: data.spoilerSet } : {}) } : null;
+    return data
+      ? { format: data.format, spoilers: data.spoilers ?? true, ...(data.spoilerSet ? { spoilerSet: data.spoilerSet } : {}), ...(data.sealedSet ? { sealedSet: data.sealedSet } : {}) }
+      : null;
   }
 
   joinPrivate(code: string, seat: SeatRequest): { room: Room; token: string } | LobbyError {
@@ -449,6 +453,7 @@ export class Lobby {
       format: room.data.format,
       ...(room.data.spoilers !== undefined ? { spoilers: room.data.spoilers } : {}),
       ...(room.data.spoilerSet ? { spoilerSet: room.data.spoilerSet } : {}),
+      ...(room.data.sealedSet ? { sealedSet: room.data.sealedSet } : {}),
       status: room.status === 'finished' ? 'finished' : 'playing',
       players: room.data.seats.map((s, i) => ({
         name: s.name,
@@ -691,7 +696,7 @@ export class Lobby {
       // Quem foi o segundo assento passa a ser o primeiro (quem começa é sorteado).
       const picked = room.data.rematchDecks ?? [null, null];
       const seats = ([1, 0] as const).map((i) => ({ ...room.data.seats[i], ...picked[i], token: randomToken() }));
-      const data = newRoomData({ queue: 'private', format: room.data.format, spoilers: room.data.spoilers, spoilerSet: room.data.spoilerSet, code: null, seats });
+      const data = newRoomData({ queue: 'private', format: room.data.format, spoilers: room.data.spoilers, spoilerSet: room.data.spoilerSet, sealedSet: room.data.sealedSet, code: null, seats });
       // A revanche segue com a mesma escolha de quem criou a sala.
       if (room.data.showHands) data.showHands = true;
       const next = this.makeRoom(data);

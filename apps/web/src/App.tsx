@@ -10,6 +10,7 @@ import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/Game
 import { Learn } from './components/Learn';
 import { Lesson } from './components/Lesson';
 import { Menu } from './components/Menu';
+import { Sealed } from './components/Sealed';
 import { OAuthConsent } from './components/OAuthConsent';
 import { ReplayEmbed } from './components/ReplayEmbed';
 import { Stats } from './components/Stats';
@@ -45,7 +46,10 @@ type Screen =
   | { name: 'tournaments'; id?: string; lobby?: boolean }
   /** `back`: tela para onde "Voltar" leva (replay aberto da página de um torneio ou da administração). */
   | { name: 'game'; setup: GameSetup; key: number; back?: Screen }
-  | { name: 'online'; seat: OnlineSeat; tournament?: string; lobby?: boolean };
+  /** `sealed`: sala de Selado aberta pela tela do Selado (e volta para o deck dele). */
+  | { name: 'online'; seat: OnlineSeat; tournament?: string; lobby?: boolean; sealed?: string }
+  /** Selado (Pré-release): abrir boosters, montar o deck de 40 e jogar. `pool`: abre direto esse deck. */
+  | { name: 'sealed'; pool?: string };
 
 /** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
 const OPEN_MATCH = 'gumgum.openMatch';
@@ -228,8 +232,23 @@ function MainApp() {
       <OnlineGameScreen
         key={screen.seat.roomId}
         seat={screen.seat}
-        onExit={() => setScreen(screen.tournament ? { name: 'tournaments', id: screen.tournament, lobby: screen.lobby } : { name: 'menu' })}
+        onExit={() =>
+          setScreen(
+            screen.tournament ? { name: 'tournaments', id: screen.tournament, lobby: screen.lobby } : screen.sealed ? { name: 'sealed', pool: screen.sealed } : { name: 'menu' },
+          )
+        }
         onSwitch={(seat) => setScreen({ ...screen, seat })}
+      />
+    );
+  }
+  if (screen.name === 'sealed') {
+    return (
+      <Sealed
+        key={screen.pool ?? 'hub'}
+        openId={screen.pool}
+        onExit={() => setScreen({ name: 'menu' })}
+        onStart={(setup, pool) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'sealed', pool } })}
+        onOnline={(seat, pool) => setScreen({ name: 'online', seat, sealed: pool })}
       />
     );
   }
@@ -267,6 +286,7 @@ function MainApp() {
       onTournamentMatch={(seat, tournament) => setScreen({ name: 'online', seat, tournament })}
       onAdmin={isAdmin(role) ? () => setScreen({ name: 'admin' }) : undefined}
       onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}
+      onSealed={() => setScreen({ name: 'sealed' })}
       dev={dev}
     />
   );

@@ -65,6 +65,7 @@ import { registerEngineTextRoutes } from './card-engine-texts';
 import { registerCardGapRoutes } from './card-gaps';
 import { registerDeckCleanupRoutes } from './decks/cleanup';
 import { registerCardImageRoutes } from './card-images';
+import { registerSealedRoutes } from './sealed/routes';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
 import { currentSpoilerSet } from './spoiler-set';
@@ -492,6 +493,7 @@ export function buildApp(
     syncHours: opts.now ? 0 : apoiaseSyncHours(),
   });
   registerTutorialRoutes(app, { db, viewerHash, user: auth.viewer, now: opts.now });
+  registerSealedRoutes(app, { db, viewerHash });
 
   app.get('/api/matches', async () => recentMatches(db));
 

@@ -7,6 +7,7 @@ import recap from './recap/es';
 import decks from './decks/es';
 import team from './team/es';
 import chamber from './chamber/es';
+import sealed from './sealed/es';
 
 export default {
   // ---- general ----
@@ -3090,5 +3091,6 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
 } satisfies Messages;
 

@@ -13,6 +13,7 @@ import { type CardArt, type CardData, type DeckList, fixCard, needsManual } from
 import { DatabaseSync } from 'node:sqlite';
 import { artId, baseCardId } from './optcgapi';
 import { DB_PATH } from './paths';
+import { migrateSealed } from './sealed/store';
 
 export type DB = DatabaseSync;
 
@@ -143,6 +144,7 @@ function migrate(db: DB) {
   migrateCardIds(db);
   migrateSupport(db);
   migrateTutorial(db);
+  migrateSealed(db);
   migratePartners(db);
   migrateEngineTexts(db);
   migrateCardGaps(db);

@@ -290,6 +290,7 @@ export function Menu({
   onTournamentMatch,
   onAdmin,
   onTeamBot,
+  onSealed,
   dev = false,
 }: {
   onStart: (s: GameSetup) => void;
@@ -313,6 +314,8 @@ export function Menu({
   onAdmin?: () => void;
   /** Tela "Bot do Time" (só para quem é do Time): decks do meta e caixa de correções. */
   onTeamBot?: () => void;
+  /** Abre o Selado (boosters e deck de 40). */
+  onSealed: () => void;
   /** Funções de desenvolvimento (só para Dev): opções de teste. */
   dev?: boolean;
 }) {
@@ -337,6 +340,14 @@ export function Menu({
   const team = isTeam(user);
   const botLevel: BotLevel = savedLevel === 'team' && !team ? 'hard' : savedLevel;
   const [format, setFormat] = useState<FormatId>(savedFormat);
+  /** Coleções disponíveis no Selado (null: ainda não se sabe, ou o servidor é antigo). */
+  const [sealedSets, setSealedSets] = useState<number | null>(null);
+  useEffect(() => {
+    api.sealed
+      .sets()
+      .then((r) => setSealedSets(r.sets.length))
+      .catch(() => setSealedSets(null));
+  }, []);
   const [privateRules, setPrivateRules] = useState<Rules>(() => savedRules(LAST_PRIVATE_RULES));
   const [botRules, setBotRules] = useState<Rules>(() => savedRules(LAST_BOT_RULES));
   const [loading, setLoading] = useState(false);
@@ -1005,6 +1016,31 @@ export function Menu({
               live={tournaments ? <Live off={!openTournaments && !runningTournaments}>{t('menu.tourLive', { n: openTournaments, running: runningTournaments })}</Live> : <Live off>{t('menu.counting')}</Live>}
               action={t('menu.seeTournaments')}
               onAction={() => onTournaments()}
+            />
+          </div>
+        </section>
+
+        <section className="home-section" aria-labelledby="home-special">
+          <div className="section-head">
+            <h2 className="home-h2" id="home-special">
+              {t('sealed.special')}
+            </h2>
+            <span className="muted">{t('sealed.specialHint')}</span>
+          </div>
+          <div className="mode-grid special">
+            <ModeCard
+              mode="sealed"
+              color="teal"
+              icon="store"
+              kicker={t('sealed.homeKicker')}
+              title={t('sealed.title')}
+              badge={t('sealed.homeBadge')}
+              desc={t('sealed.homeDesc')}
+              chips={[t('sealed.homeChipPacks'), t('sealed.homeChipDeck'), t('sealed.homeChipPlay')]}
+              live={sealedSets === null ? null : <Live off={!sealedSets}>{t('sealed.homeLive', { n: sealedSets })}</Live>}
+              action={t('sealed.homeAction')}
+              onAction={onSealed}
+              disabled={sealedSets === 0}
             />
           </div>
         </section>

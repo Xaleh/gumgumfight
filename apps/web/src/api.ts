@@ -109,6 +109,8 @@ export const setCurrentSpoilerSet = (set: string | null | undefined) => {
  * lançadas também impedem.
  */
 export function canPlay(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all', spoilerSet = currentSpoilerSet()): boolean {
+  // O Selado não usa os decks salvos: o deck sai dos boosters (tela do Selado).
+  if (format === 'sealed') return false;
   return (
     deck.valid && !(format !== 'free' && deck.formats?.[format]?.length) && !barredSpoilers(deck.spoilers ?? [], spoilers, spoilerSet).length
   );
@@ -117,6 +119,7 @@ export function canPlay(deck: DeckSummary, format: PlayFormat, spoilers: Spoiler
 /** Por que o deck não pode ser usado no formato (null = pode). */
 export function whyNotPlayable(deck: DeckSummary, format: PlayFormat, spoilers: SpoilerRule = 'all', spoilerSet = currentSpoilerSet()): string | null {
   if (!deck.valid) return t('labels.deckIncomplete', { size: deck.size });
+  if (format === 'sealed') return t('sealed.onlySealedDecks');
   const issues = (format !== 'free' && deck.formats?.[format]) || [];
   const codes = format !== 'free' ? deck.formatCodes?.[format] : undefined;
   if (issues.length) return issues.map((text, i) => tryT(codes?.[i]?.code, codes?.[i]?.params) ?? text).join('\n');
@@ -135,8 +138,12 @@ export function spoilerText(ids: string[], rule: SpoilerRule = 'none', spoilerSe
  * Nome das regras de cartas de um torneio ou sala: "Standard", "Standard + EB05" (a coleção de
  * spoiler aceita), "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"… (traduzido).
  */
-export function modeLabel(m: { format: PlayFormat | string; spoilers?: boolean; spoilerSet?: string | null }, tr: Translate = t): string {
+export function modeLabel(
+  m: { format: PlayFormat | string; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null },
+  tr: Translate = t,
+): string {
   if (m.format === 'free') return tr('mode.free');
+  if (m.format === 'sealed') return m.sealedSet ? tr('mode.sealedSet', { set: m.sealedSet }) : tr('mode.sealed');
   const format = formatLabel(m.format as FormatId);
   if (!m.spoilers) return format;
   return m.spoilerSet ? tr('mode.withSpoilerSet', { format, set: m.spoilerSet }) : tr('mode.withSpoilers', { format });
@@ -275,6 +282,37 @@ export interface CoverageRow {
 export type DeckInput = Pick<DeckList, 'name' | 'leader' | 'cards' | 'arts'>;
 
 export type ApiCard = CardData & { provisional?: boolean };
+
+/** Coleção em que dá para abrir boosters no Selado. */
+export interface SealedSetInfo {
+  set: string;
+  cards: number;
+  leaders: number;
+  /** Parte das cartas com efeito automatizado (0 a 1). */
+  automated: number;
+  /** Coleção ainda não lançada (pré-release de verdade). */
+  spoiler: boolean;
+}
+export type SealedDeck = { leader: string; cards: Array<{ id: string; count: number }> };
+/** Resumo de uma coleção aberta (lista "seus decks selados"). */
+export interface SealedPoolSummary {
+  id: string;
+  set: string;
+  createdAt: string;
+  updatedAt: string;
+  wins: number;
+  losses: number;
+  leader: string | null;
+  size: number;
+  /** Deck completo e conferido no servidor: dá para jogar. */
+  ready: boolean;
+}
+export interface SealedPool extends SealedPoolSummary {
+  /** Os boosters, na ordem em que foram sorteados no servidor. */
+  packs: string[][];
+  deck: SealedDeck | null;
+  issues: Array<{ level: 'error' | 'warning'; message: string; code: string; params: Params; cardId?: string }>;
+}
 
 /** Corpo de uma resposta de erro do servidor: `error` em português e `errorCode` (+ `errorParams`) para traduzir. */
 type ErrorBody = { error?: string; errorCode?: string; errorParams?: Record<string, unknown> } & Record<string, unknown>;
@@ -609,6 +647,17 @@ export const api = {
   /** O mesmo Líder nas partidas daqui (no formato da fila) e na fila deles. */
   globalCompare: (queue: string, format?: string) =>
     get<GlobalCompare>(`/api/stats/global/compare?queue=${encodeURIComponent(queue)}${format ? `&format=${encodeURIComponent(format)}` : ''}`),
+  /** Selado (Pré-release): os boosters abertos de quem pede e o deck montado com eles. */
+  sealed: {
+    sets: () => get<{ packs: number; deckSize: number; sets: SealedSetInfo[] }>('/api/sealed/sets'),
+    pools: () => get<SealedPoolSummary[]>('/api/sealed/pools'),
+    open: (set: string) => send<SealedPool>('POST', '/api/sealed/pools', { set }),
+    pool: (id: string) => get<SealedPool>(`/api/sealed/pools/${encodeURIComponent(id)}`),
+    saveDeck: (id: string, deck: SealedDeck) => send<SealedPool>('PUT', `/api/sealed/pools/${encodeURIComponent(id)}/deck`, deck),
+    remove: (id: string) => send<void>('DELETE', `/api/sealed/pools/${encodeURIComponent(id)}`),
+    /** Deck do bot para o treino no navegador: ele abre os próprios boosters da mesma coleção. */
+    botDeck: (id: string) => send<SealedDeck & { name: string }>('POST', `/api/sealed/pools/${encodeURIComponent(id)}/bot`),
+  },
   tutorial: {
     progress: () => get<TutorialProgressDto>('/api/tutorial/progress'),
     saveProgress: (p: { done: string[]; dismissed: boolean; completed: boolean; reset?: boolean }) => send<TutorialProgressDto>('PUT', '/api/tutorial/progress', p),
@@ -920,6 +969,8 @@ export interface LiveRoom {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -988,6 +1039,8 @@ export interface OnlineRoomInfo {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
   /** Jogo de uma partida de torneio; `score`: placar da série antes deste jogo, na ordem dos assentos. */
   tournament: {
     id: string;
@@ -1093,6 +1146,8 @@ export interface TournamentSummary {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
   structure: TournamentStructure;
   topCut: number | null;
   status: TournamentStatus;
@@ -1701,6 +1756,8 @@ export interface TournamentDetail {
   spoilers?: boolean;
   /** Com spoilers, a coleção aceita ("Standard + EB05"); servidores antigos não mandam. */
   spoilerSet?: string | null;
+  /** No Selado, a coleção dos boosters. */
+  sealedSet?: string | null;
   structure: TournamentStructure;
   swissBestOf: number;
   topCut: number | null;

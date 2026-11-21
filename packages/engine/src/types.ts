@@ -1102,6 +1102,8 @@ export interface CardDef extends CardData {
   scripted: boolean;
   /** Tem efeito resolvido manualmente (sem script). */
   manual: boolean;
+  /** "Treated as a card with all card names, types, and attributes" (o Líder de 6 cores do Selado). */
+  wild?: boolean;
 }
 
 // ---------------------------------------------------------------------------

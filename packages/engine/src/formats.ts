@@ -33,8 +33,17 @@ import type { CardData, DeckList } from './types';
 /** Formatos com fila e selo no deck: os dois oficiais da Bandai e o All Blue (da comunidade). */
 export type FormatId = 'standard' | 'egb' | 'allblue';
 
-/** Formato de uma partida: um oficial ou o Livre (torneios, salas privadas e bot). */
-export type PlayFormat = FormatId | 'free';
+/**
+ * Formato de uma partida: um dos formatos de deck construído, o Livre (torneios, salas privadas e
+ * bot) ou o Selado (`sealed`: o deck sai dos boosters abertos; regras em `sealed.ts`).
+ */
+export type PlayFormat = FormatId | 'free' | 'sealed';
+
+/**
+ * O Luffy de 6 cores dos eventos Sealed Battle: sem número na carta, por isso o id é nosso. "This
+ * Leader can only be used in designated events": só vale no Selado (e no Livre, que vale tudo).
+ */
+export const SEALED_LEADER_ID = 'SEALED-001';
 
 export const FORMATS: ReadonlyArray<{ id: FormatId; label: string }> = [
   { id: 'standard', label: 'Standard' },
@@ -49,8 +58,9 @@ export const isOfficialFormat = (v: unknown): boolean => OFFICIAL_FORMATS.some((
 export const hasRanked = (f: PlayFormat): boolean => isOfficialFormat(f);
 
 export const isFormat = (v: unknown): v is FormatId => FORMATS.some((f) => f.id === v);
-export const isPlayFormat = (v: unknown): v is PlayFormat => v === 'free' || isFormat(v);
-export const formatLabel = (f: PlayFormat): string => (f === 'free' ? 'Livre' : (FORMATS.find((x) => x.id === f)?.label ?? f));
+/** Formato de deck construído que quem cria a partida pode pedir (o Selado tem as rotas dele). */
+export const isPlayFormat = (v: unknown): v is Exclude<PlayFormat, 'sealed'> => v === 'free' || isFormat(v);
+export const formatLabel = (f: PlayFormat): string => (f === 'free' ? 'Livre' : f === 'sealed' ? 'Selado' : (FORMATS.find((x) => x.id === f)?.label ?? f));
 
 /** Regras de cartas de uma partida: o formato e se aceita spoilers (o Livre sempre aceita). */
 export interface PlayMode {
@@ -58,6 +68,8 @@ export interface PlayMode {
   spoilers: boolean;
   /** Com spoilers (fora do Livre), a coleção aceita: a próxima a ser lançada quando a sala ou o torneio foi criado. */
   spoilerSet?: string;
+  /** No Selado, a coleção dos boosters: os dois decks precisam sair dela. */
+  sealedSet?: string;
 }
 
 /**
@@ -67,14 +79,14 @@ export interface PlayMode {
 export const PLAY_FORMATS: ReadonlyArray<PlayFormat> = ['standard', 'egb', 'allblue', 'free'];
 
 /** Regras pedidas por quem cria, normalizadas: o Livre sempre aceita spoilers. */
-export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ format, spoilers: format === 'free' || spoilers });
+export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ format, spoilers: format === 'free' || format === 'sealed' || spoilers });
 
 /**
  * Nome das regras de cartas: "Standard", "Standard + EB05" (a coleção de spoiler aceita),
  * "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"…
  */
-export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoilerSet?: string | null }): string =>
-  m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
+export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null }): string =>
+  m.format === 'sealed' ? `Selado${m.sealedSet ? ` ${m.sealedSet}` : ''}` : m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
 
 /**
  * Se a partida entra nas estatísticas: só Standard e EGB puros. Fica de fora o Livre, o
@@ -194,16 +206,19 @@ const cardIn = (cards: FormatCards | undefined, id: string): FormatCard | undefi
 
 /**
  * `rarity`: a raridade da carta não vale no formato (SR e SEC no All Blue) ou não é conhecida
- * (sem a carta do catálogo, não dá para liberar).
+ * (sem a carta do catálogo, não dá para liberar). `eventOnly`: carta só de evento (o Luffy de 6
+ * cores do Selado), fora de todo formato de deck construído.
  */
-export type CardLegality = 'legal' | 'banned' | 'rotated' | 'rarity';
+export type CardLegality = 'legal' | 'banned' | 'rotated' | 'rarity' | 'eventOnly';
 
 /**
  * Se a carta vale no formato. `card` (a carta do catálogo) só é lido no All Blue, que depende da
  * raridade; nos formatos oficiais basta o número.
  */
 export function cardLegality(id: string, format: PlayFormat, now = new Date(), card?: FormatCard): CardLegality {
-  if (format === 'free') return 'legal';
+  // No Selado não há lista de restrições: vale o que saiu nos boosters (conferido em `sealed.ts`).
+  if (format === 'free' || format === 'sealed') return 'legal';
+  if (id === SEALED_LEADER_ID) return 'eventOnly';
   if (format === 'allblue') {
     if (ALL_BLUE_BANNED.some((b) => b.id === id && inEffect(b.since, now))) return 'banned';
     if (card?.category === 'leader') return 'legal';
@@ -233,14 +248,16 @@ export interface FormatIssue {
  * nele ou não tem raridade conhecida não vale.
  */
 export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: PlayFormat, now = new Date(), cards?: FormatCards): FormatIssue[] {
-  if (format === 'free') return [];
+  if (format === 'free' || format === 'sealed') return [];
   const issues: FormatIssue[] = [];
   const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean))];
   const label = formatLabel(format);
   for (const id of ids) {
     const card = cardIn(cards, id);
     const legality = cardLegality(id, format, now, card);
-    if (legality === 'banned' && format === 'allblue') {
+    if (legality === 'eventOnly') {
+      issues.push({ message: `${id} só pode ser usada no Selado.`, code: 'rules.eventOnly', params: { id }, cardId: id });
+    } else if (legality === 'banned' && format === 'allblue') {
       issues.push({ message: `${id} está banida no ${label}.`, code: 'rules.bannedIn', params: { id, format: label }, cardId: id });
     } else if (legality === 'banned') {
       issues.push({ message: `${id} está banida (não vale no Standard nem no Extra Grand Battle).`, code: 'rules.banned', params: { id }, cardId: id });
@@ -294,7 +311,7 @@ export type SpoilerRule = 'all' | 'next' | 'none';
 
 /** Regra de spoilers de um torneio, sala privada ou treino: o Livre aceita todas; com spoilers, só a próxima coleção. */
 export const spoilerRule = (m: { format: PlayFormat; spoilers?: boolean }): SpoilerRule =>
-  m.format === 'free' ? 'all' : m.spoilers ? 'next' : 'none';
+  m.format === 'free' || m.format === 'sealed' ? 'all' : m.spoilers ? 'next' : 'none';
 
 /** Das cartas de spoiler, as que a regra não aceita (`nextSet`: a próxima coleção, para `next`). */
 export const barredSpoilers = (ids: readonly string[], rule: SpoilerRule, nextSet: string | null = null): string[] =>

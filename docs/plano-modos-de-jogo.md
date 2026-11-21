@@ -1,7 +1,7 @@
 # Plano: novos modos de jogo (All Blue, Selado, Pack Rush, Cubo e Yonko)
 
-> Status (21/11/2026): **All Blue implementado** (o README, seção "All Blue", descreve o que existe). Os outros modos
-> seguem como proposta, na ordem da seção 1.
+> Status (21/11/2026): **All Blue e Pré-release (Selado de uma coleção) implementados**; o README (seções "All Blue" e
+> "Selado") descreve o que existe. Os outros modos seguem como proposta, na ordem da seção 1.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
 
@@ -10,7 +10,7 @@
 | Modo | O que é | Tamanho | Mexe no motor? | Maior risco |
 |---|---|---|---|---|
 | **All Blue** ✅ | Formato da comunidade no estilo Pauper: só cartas C, UC, R e promos (sem SR e sem SEC). Partida 1x1 normal. | Pequeno | Não | Qualidade do campo `rarity` das cartas |
-| **Selado: Pré-release** | O jogador abre 6 boosters de uma coleção e monta um deck de 40 com o que saiu. | Médio | Pouco (tamanho do deck) | Fidelidade do booster e cartas ⚙ na coleção |
+| **Selado: Pré-release** ✅ | O jogador abre 6 boosters de uma coleção e monta um deck de 40 com o que saiu. | Médio | Pouco (tamanho do deck) | Fidelidade do booster e cartas ⚙ na coleção |
 | **Selado: Draft** | Pod de 4 a 8: cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
 | **Pack Rush** | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
 | **Draft Cubo** | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
@@ -77,6 +77,20 @@ Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha
 ![Cubo](mockups/modos-de-jogo/11-cubo.webp)
 ![Escolha do Líder](mockups/modos-de-jogo/12-lider-modos-mistos.webp)
 
+### O que já existe (Pré-release)
+
+Abrir 6 boosters de uma coleção, montar o deck de 40 (com "Montar sozinho"), o Líder de 6 cores e jogar contra o bot
+ou em sala privada, com o servidor sorteando e conferindo tudo. Ficou para os próximos passos:
+
+- **Fila do Selado** e **torneio de Selado** (hoje só bot e sala privada).
+- **Abertura de coleção de spoiler por um Admin:** hoje a coleção entra sozinha quando está completa no banco e com
+  70% dos efeitos automatizados.
+- **Modelo de booster por coleção** (`data/boosters/`): hoje todas usam o padrão do motor (7 C, 3 UC, 1 rara ou
+  melhor, 1 Líder em 1/3 dos boosters).
+- **Relógio de montagem** (30 minutos): só faz sentido em evento; sozinho, o jogador monta no próprio tempo.
+- A carta do Luffy de 6 cores não tem número na lista oficial (o P-047 é outro Luffy), então entrou com id próprio
+  (`SEALED-001`).
+
 ### Os cinco modos são duas escolhas
 
 Todos saem da mesma tela: primeiro **de onde vêm as cartas**, depois **como o jogador monta**.
@@ -109,9 +123,8 @@ cartas. Por isso Pack Rush e Cubo custam pouco depois que Selado e Draft existem
   pegou (tela 12).
 - Com o Luffy garantido, o booster simulado **não precisa mais trazer um Líder por pacote**: pode seguir a
   distribuição do produto real.
-- **A conferir antes de implementar:** o número, a Vida e o texto do Luffy de 6 cores. A página do evento confirma que
-  a carta existe e para que serve, mas não traz os dados dela, e não sei se ela já está no banco do app. Se não
-  estiver, entra como carta especial desses modos.
+- **A carta:** Vida 5, 5000, Strike, Straw Hat Crew, "treated as a card with all card names, types, and attributes".
+  Não tem número impresso; no app é `SEALED-001`.
 
 ### Selado e Draft com uma coleção
 

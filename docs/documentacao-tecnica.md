@@ -266,6 +266,20 @@ formato + `spoilers` (`playMode` liga os spoilers no Livre); `countsInStats` diz
 do bloco ① em Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 20 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
 regras especiais do Líder.
 
+### Selado (`sealed.ts`)
+
+Modo limitado (Pré-release): `openBoosters(cartas da coleção, seed, 6)` sorteia os boosters com o RNG do motor (seed de
+32 bits ou as 4 palavras do sfc32) pelo `BoosterModel` (7 C, 3 UC, 1 de R/SR/SEC por pesos, 1 Líder ou incomum);
+`boosterReady` diz se a coleção está completa no banco; `validateLimitedDeck(deck, catálogo, cartas abertas)` confere
+40 cartas (`LIMITED_DECK_SIZE`), Líder que saiu ou o de 6 cores, e nenhuma carta além das cópias abertas, sem cor e sem
+limite de cópias; `autoBuildLimited` monta um deck por nota e curva de custo (o "Montar sozinho" e o deck do bot).
+`createGame` aceita deck de 50 ou de 40. O formato da partida é `sealed` (`PlayFormat`, fora de `isPlayFormat`: só as
+rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatIssues` aceitam tudo. O Líder de 6 cores
+(`SEALED_LEADER_ID`) tem `CardDef.wild` (qualquer nome, tipo e atributo em `hasName`/`hasType`/`hasAttribute`) e é
+`eventOnly` nos formatos de deck construído. No servidor (`sealed/store.ts`, `sealed/routes.ts`), a tabela
+`sealed_pools` guarda dono, coleção, seed, boosters, deck e placar; nas salas, o `deckId` de um assento do Selado é
+`sealed:<id>` e o deck é conferido contra as cartas abertas (`sealedDeckFor`, em `online/routes.ts`).
+
 ### Tradução
 
 `translateCardPt` monta o português a partir da DSL; o que o parser não entendeu passa por `translateToPt` (regras de
@@ -1770,6 +1784,11 @@ Quem chama, na coluna da direita:
 | GET | `/api/players/me` | Perfil de jogador (nome, recompensa, tier, `apprentice`) | Navegador; Token (`profile`) |
 | PUT | `/api/players/me` | Troca o nome público (`{ name }`) | Navegador |
 | GET | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador, mais novas primeiro, paginadas | Sessão; Token (`matches:read`) |
+| GET | `/api/sealed/sets` | Coleções disponíveis no Selado (cartas, Líderes, parte automatizada) | Pública |
+| GET | `/api/sealed/pools` · POST | Decks selados de quem pede; `{ set }` abre 6 boosters | Navegador |
+| GET | `/api/sealed/pools/:id` · DELETE | Os boosters e o deck de uma abertura | Dono |
+| PUT | `/api/sealed/pools/:id/deck` | Salva o deck (`{ leader, cards }`), conferido contra as cartas abertas | Dono |
+| POST | `/api/sealed/pools/:id/bot` | Deck do bot para o treino no navegador (boosters próprios da mesma coleção) | Dono |
 | GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
 | POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |

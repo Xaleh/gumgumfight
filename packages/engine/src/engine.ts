@@ -90,6 +90,8 @@ const DECK_TOP_BOTTOM = ['engine.optDeckTop', 'engine.optDeckBottom'];
 export const MAX_CHARACTERS = 5;
 export const DON_DECK_SIZE = 10;
 export const DECK_SIZE = 50;
+/** Deck do Selado (regra oficial dos eventos Sealed Battle). */
+export const LIMITED_DECK_SIZE = 40;
 export const HAND_SIZE = 5;
 
 export class IllegalActionError extends Error {}
@@ -141,8 +143,10 @@ export function createGame(config: GameConfig): GameState {
     for (const entry of setup.deck.cards) {
       for (let i = 0; i < entry.count; i++) deck.push(makeInstance(entry.id, id, setup.deck.arts?.[entry.id]));
     }
-    if (deck.length !== DECK_SIZE) {
-      throw new Error(`O deck ${setup.deck.name} tem ${deck.length} cartas (precisa de ${DECK_SIZE})`);
+    // 50 no deck construído, 40 no Selado. Qual dos dois vale em cada partida é conferido antes
+    // (`validateDeck`, `validateLimitedDeck`); aqui só se recusa o que não é nenhum deles.
+    if (deck.length !== DECK_SIZE && deck.length !== LIMITED_DECK_SIZE) {
+      throw new Error(`O deck ${setup.deck.name} tem ${deck.length} cartas (precisa de ${DECK_SIZE}, ou de ${LIMITED_DECK_SIZE} no Selado)`);
     }
     shuffleInPlace(holder, deck);
     const p: PlayerState = {
@@ -416,7 +420,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
   }
   const wc = cond.charactersWithCost;
   if (wc && ps.characters.filter((c) => getCost(state, c.uid) >= wc.cost).length < wc.count) return false;
-  if (cond.opponentLeaderAttribute && !(cardDef(state, opp.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.opponentLeaderAttribute!.toLowerCase())) {
+  if (cond.opponentLeaderAttribute && !hasAttribute(cardDef(state, opp.leader.uid), cond.opponentLeaderAttribute)) {
     return false;
   }
   if (cond.selfRested && !locate(state, source)?.fc.rested) return false;
@@ -499,7 +503,7 @@ function evalCondition(state: GameState, controller: PlayerId, source: string, c
     return false;
   }
   if (cond.faceUpLifeMin !== undefined && ps.life.filter((u) => ps.lifeFaceUp?.includes(u)).length < cond.faceUpLifeMin) return false;
-  if (cond.leaderAttribute && !(cardDef(state, ps.leader.uid).attributes ?? []).some((a) => a.toLowerCase() === cond.leaderAttribute!.toLowerCase())) {
+  if (cond.leaderAttribute && !hasAttribute(cardDef(state, ps.leader.uid), cond.leaderAttribute)) {
     return false;
   }
   // "If you have [Jewelry Bonney]" / "… [Merry Go] on your field": qualquer carta sua com o nome (Líder, Personagem
@@ -636,7 +640,7 @@ function ownCost(state: GameState, uid: string): number {
 
 /** Nome da carta (ou nome alternativo, "Also treat this card's name as …"). */
 export function hasName(def: CardDef, name: string): boolean {
-  if (def.name === name || def.aliases?.includes(name)) return true;
+  if (def.name === name || def.aliases?.includes(name) || def.wild) return true;
   // O texto às vezes grafa o nome com outra pontuação ("other than [Mr.2.Bon.Kurei.(Bentham)]" na
   // carta "Mr.2.Bon.Kurei(Bentham)"): pontos e espaços não distinguem nomes.
   const key = nameKey(name);
@@ -670,7 +674,7 @@ function currentChosen(state: GameState): string[] {
   return top?.kind === 'effect' ? (top.last ?? []) : [];
 }
 
-const hasAttribute = (def: CardDef, a: string) => (def.attributes ?? []).some((x) => x.toLowerCase() === a.toLowerCase());
+const hasAttribute = (def: CardDef, a: string) => def.wild === true || (def.attributes ?? []).some((x) => x.toLowerCase() === a.toLowerCase());
 
 /**
  * "with no base effect": carta sem texto. [Blocker] é efeito, e uma carta só com [Trigger] também tem
@@ -849,8 +853,8 @@ export function hasKeyword(state: GameState, uid: string, kw: Keyword): boolean 
  * Verifica o tipo ({Straw Hat Crew}). Tolera listas mal separadas vindas de APIs
  * (ex.: "Supernovas Straw Hat Crew" como um único item).
  */
-export function hasType(def: Pick<CardDef, 'types'>, type: string): boolean {
-  if (def.types.includes(type)) return true;
+export function hasType(def: Pick<CardDef, 'types' | 'wild'>, type: string): boolean {
+  if (def.types.includes(type) || def.wild) return true;
   // Sem diferenciar maiúsculas: a API traz "Film" nos tipos e "{FILM}" nos textos.
   return ` ${def.types.join(' ')} `.toLowerCase().includes(` ${type.toLowerCase()} `);
 }

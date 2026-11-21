@@ -7,6 +7,7 @@ import recapPtBR from './recap/pt-BR';
 import decksPtBR from './decks/pt-BR';
 import teamPtBR from './team/pt-BR';
 import chamberPtBR from './chamber/pt-BR';
+import sealedPtBR from './sealed/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -3097,6 +3098,8 @@ const ptBR = {
   ...teamPtBR,
   // ==== Sala do Tempo: torneio simulado do Time com jogadores virtuais (i18n/chamber) ====
   ...chamberPtBR,
+  // ==== Selado: boosters, deck de 40 e as partidas com ele (i18n/sealed) ====
+  ...sealedPtBR,
 } as const;
 
 

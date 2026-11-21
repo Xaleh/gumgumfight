@@ -208,6 +208,7 @@ começar uma partida online e antes de gravar uma partida nas estatísticas.
 - **Extra Grand Battle (EGB):** todas as cartas lançadas, menos as banidas.
 - **Standard:** além das banidas, ficam de fora as cartas com o ícone de bloco ① (OP-01 a OP-04 e ST-01 a ST-09),
   que rotacionaram em 1º/04/2026, salvo as exceções oficiais (bloco X e cartas tratadas como bloco ④).
+- **Selado:** não é um formato de deck construído: o deck sai dos boosters. Veja [Selado](#selado-pré-release).
 - **All Blue:** formato da comunidade, no estilo Pauper. Só valem cartas **comuns (C), incomuns (UC), raras (R) e
   promocionais (P)**; SR e SEC ficam de fora, e o **Líder é livre**. Veja [All Blue](#all-blue).
 
@@ -278,6 +279,41 @@ Sem login, cada navegador recebe um código aleatório (guardado no navegador) e
 que criou; limpar os dados do site faz perder a edição deles. Decks de outros jogadores aparecem em "Decks da
 comunidade": dá para jogar com eles e duplicá-los.
 **Exportar/Importar lista** usa o formato de texto da comunidade (`4xOP01-016`, uma carta por linha).
+
+## Selado (Pré-release)
+
+Na tela inicial, em **Modos especiais**, o **Selado** é o modo limitado: o deck não vem dos decks salvos, sai dos
+boosters que o jogador abre na hora.
+
+1. **Escolha a coleção e abra 6 boosters.** Cada booster tem 12 cartas: 7 comuns, 3 incomuns, 1 rara ou melhor (R, SR
+   ou SEC) e mais uma carta, que é um Líder em cerca de 1 a cada 3 boosters e uma incomum nos outros. Dá para abrir um
+   por vez ou todos de uma vez.
+2. **Monte um deck de 40 cartas** com o que saiu. Vale **qualquer cor com qualquer Líder**, não há limite de cópias
+   (vale o que você abriu) e **não há lista de banidas, pares proibidos nem rotação**. **Montar sozinho** preenche um
+   deck jogável (curva de custo, Counters e alguns Eventos). O deck é salvo sozinho enquanto você monta.
+3. **Jogue:** contra o bot (ele abre os próprios 6 boosters da mesma coleção e monta sozinho; a partida roda no
+   navegador) ou numa **sala privada** de Selado. Quem entra na sala precisa de um deck aberto **da mesma coleção**;
+   quem chega pelo convite com um deck construído recebe o aviso de montar um deck selado antes.
+
+- **Líder:** um dos que saíram nos boosters ou o **Luffy de 6 cores**, que todo jogador tem sempre. É o Líder dos
+  eventos Sealed Battle da Bandai (Vida 5, 5000, "treated as a card with all card names, types, and attributes"): o
+  motor trata o Líder como tendo qualquer nome, tipo e atributo. A carta não tem número impresso, então o id é nosso
+  (`SEALED-001`, em `data/cards/sealed.json`, com a imagem em `apps/web/public/cards/`). Ela **só vale no Selado** (e
+  no Livre): num deck construído, o aviso é "só pode ser usada no Selado".
+- **Coleções disponíveis:** as de booster (OP, EB e PRB) que estão completas no banco (cartas comuns, incomuns e raras
+  suficientes, com raridade conhecida) e com pelo menos 70% dos efeitos automatizados. Uma coleção de spoiler entra
+  sozinha quando fica completa, com o selo "Pré-release".
+- **O servidor é a autoridade:** ele sorteia os boosters (seed do `crypto`), grava as cartas na tabela `sealed_pools`
+  e confere o deck contra elas ao salvar e antes de cada partida. Recarregar a página não muda o que saiu. Cada
+  jogador (conta ou navegador) guarda os 12 decks selados mais recentes.
+- **Placar e estatísticas:** as partidas do Selado ficam **fora das estatísticas e do meta**. Cada deck selado tem o
+  próprio placar (vitórias e derrotas), que conta as partidas entre pessoas nas salas privadas; os treinos contra o
+  bot não contam.
+- **Ainda não tem:** fila de Selado, torneio de Selado, Draft, Pack Rush e Cubo (veja
+  [`docs/plano-modos-de-jogo.md`](docs/plano-modos-de-jogo.md)). O modelo do booster é o padrão do motor
+  (`DEFAULT_BOOSTER`, em `packages/engine/src/sealed.ts`), igual para todas as coleções.
+- Código: `packages/engine/src/sealed.ts` (boosters, validação do deck de 40 e montagem automática),
+  `apps/server/src/sealed/` (tabela e rotas `/api/sealed`) e `apps/web/src/components/Sealed.tsx`.
 
 ## Estatísticas
 
