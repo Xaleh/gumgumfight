@@ -358,8 +358,10 @@ cartas), e cada linha de produto tem o seu booster (`BOOSTER_MODELS`, em `packag
   uma coleção nova, basta pôr o arquivo na pasta. Pack Rush fechado, Draft e Cubo têm boosters próprios, desenhados.
 - **Abrir um booster** tem animação: ele treme, o topo rasga e as cartas sobem, e só então a tela revela o que saiu
   (1,7 s; 1 s cada quando são vários; clique, toque, Esc, Enter ou Espaço pulam). No Draft, o booster de cada rodada
-  abre do mesmo jeito. Segue a opção **Animações** das configurações: "completo" mostra a abertura, "suave" só a
-  virada das cartas, "desligado" nada. Com "reduzir movimento" ligado no sistema, a abertura também não aparece.
+  abre do mesmo jeito. Segue a opção **Animações** das configurações: "Completas" mostra a abertura inteira,
+  "Suaves" a versão curta (1 s) e "Desligadas" nada (as cartas aparecem direto, sem a virada). Como no resto do app,
+  só essa opção decide: o "reduzir movimento" do sistema não desliga a abertura, porque muitos celulares o ligam
+  sozinhos na economia de bateria.
 
 ### Pack Rush
 

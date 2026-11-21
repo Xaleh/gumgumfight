@@ -44,8 +44,8 @@ export const OPENING_MS = { full: 1700, fast: 1000 } as const;
 
 /**
  * Um booster sendo aberto, por cima da tela. Termina sozinho (`onDone`); clicar, tocar ou apertar
- * Esc, Enter ou Espaço pula (`onSkip`, ou `onDone` se não houver). Quem chama decide se mostra:
- * só com as animações completas ligadas nas configurações.
+ * Esc, Enter ou Espaço pula (`onSkip`, ou `onDone` se não houver). Quem chama decide se mostra
+ * (com as animações ligadas nas configurações) e se usa a versão curta (`fast`).
  */
 export function BoosterOpening({ set, draft, label, fast, onDone, onSkip }: { set: string; draft?: boolean; label: string; fast?: boolean; onDone: () => void; onSkip?: () => void }) {
   const done = useRef(onDone);
