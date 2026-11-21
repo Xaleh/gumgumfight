@@ -99,6 +99,9 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
 .c .cn { position: absolute; left: 0; right: 0; bottom: 0; padding: 5cqw 4cqw 6cqw; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 11.5cqw; font-weight: 800; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
 .c .cr { position: absolute; right: 4%; bottom: 20%; font-size: 10cqw; font-weight: 900; padding: 1cqw 5cqw; border-radius: 99px; background: rgba(0, 0, 0, 0.6); color: #fff; z-index: 1; }
 .c.rSR .cr, .c.rSEC .cr { background: linear-gradient(90deg, #ffd76a, #ff9ad5, #7fd4ff); color: #2a1206; }
+.c.two { background: linear-gradient(115deg, var(--k) 0 50%, var(--k2) 50% 100%); }
+.c.rainbow { --k: #6b5a3a; background: linear-gradient(115deg, var(--red) 0 17%, var(--green) 17% 34%, var(--blue-card) 34% 50%, var(--purple) 50% 67%, #3a3a44 67% 83%, var(--yellow) 83% 100%); border-color: var(--cream); }
+.c .tag { position: absolute; left: 0; right: 0; top: 17%; background: var(--cream); color: var(--brown); font-size: 9.5cqw; font-weight: 900; text-align: center; padding: 2cqw 0; letter-spacing: 0.3px; z-index: 2; }
 .c.f-lead .cc { display: none; } .c.f-lead { border-color: var(--brand-yellow); }
 .c .cx { position: absolute; left: 4%; bottom: 20%; font-size: 11cqw; font-weight: 900; padding: 1cqw 6cqw; border-radius: 99px; background: var(--cream); color: var(--brown); z-index: 1; }
 .c.f-lock { --k: #4a5566; }
@@ -148,7 +151,7 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
 .li.bad { border-color: rgba(255, 120, 120, 0.6); background: rgba(255, 90, 90, 0.12); }
 
 /* Boosters */
-.pack { width: 118px; aspect-ratio: 63 / 100; border-radius: 10px; background: linear-gradient(160deg, #2b6fd0, #14365f 60%, #0c2440); border: 2px solid #0a1d33; position: relative; display: grid; place-items: center; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4); flex: none; }
+.pack { width: 118px; aspect-ratio: 63 / 100; border-radius: 10px; background: linear-gradient(160deg, hsl(var(--h, 214) 62% 49%), hsl(var(--h, 214) 64% 23%) 60%, hsl(var(--h, 214) 68% 15%)); border: 2px solid #0a1d33; position: relative; display: grid; place-items: center; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4); flex: none; }
 .pack::before, .pack::after { content: ''; position: absolute; left: 0; right: 0; height: 9px; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0 3px, transparent 3px 6px); }
 .pack::before { top: 0; } .pack::after { bottom: 0; }
 .pack b { font-family: var(--display); font-size: 30px; letter-spacing: 1px; color: var(--cream); text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4); text-align: center; line-height: 1; }
@@ -204,6 +207,22 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
 .set.on { border-color: var(--brand-yellow); background: rgba(247, 205, 72, 0.08); }
 .set b { font-family: var(--display); font-weight: 400; font-size: 22px; letter-spacing: 1px; }
 .set small { display: block; font-size: 11px; color: var(--muted); }
+.src { border-radius: 20px; padding: 16px 18px; background: var(--panel); border: 2px solid var(--line); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.src.on { border-color: var(--brand-yellow); background: rgba(247, 205, 72, 0.08); }
+.src .h3 { font-size: 28px; }
+.src p { color: var(--muted); font-size: 13px; }
+.tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px 8px; border-radius: 14px; background: var(--panel); border: 2px solid var(--line); font-size: 12px; }
+.tile.on { border-color: var(--brand-yellow); background: rgba(247, 205, 72, 0.08); }
+.tile .n { position: absolute; top: -8px; right: -8px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 99px; background: var(--brand-yellow); color: var(--brown); display: grid; place-items: center; font-weight: 900; font-size: 13px; border: 2px solid var(--brown); }
+.tile small { color: var(--muted); font-size: 10.5px; }
+.seq { display: flex; gap: 8px; }
+.seq > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); min-width: 0; }
+.use { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
+.use .cst { width: 22px; height: 22px; border-radius: 50%; background: var(--k); display: grid; place-items: center; font-size: 11px; font-weight: 900; color: #fff; flex: none; }
+.use .bar { flex: none; width: 150px; height: 8px; border-radius: 99px; background: var(--panel2); overflow: hidden; }
+.use .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--sky), var(--blue-card)); }
+.use .pc { width: 44px; text-align: right; font-weight: 900; color: var(--brand-yellow); }
+.modal { border-radius: 24px; background: #14263c; border: 2px solid var(--brand-yellow); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); padding: 22px; }
 </style>
 </head>
 <body>
@@ -233,9 +252,9 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
   <header class="doc-head">
     <div class="k">GumGum Fight · proposta de telas</div>
     <h1>Novos modos de jogo</h1>
-    <p>All Blue, Selado (Pré-release e Draft) e Yonko. As telas usam o tema escuro e os componentes que o app já tem. As cartas são ilustrativas (sem arte) e os números são de exemplo. O plano de implementação está em <code>docs/plano-modos-de-jogo.md</code>.</p>
+    <p>All Blue, Selado (Pré-release, Draft, Pack Rush e Cubo) e Yonko. As telas usam o tema escuro e os componentes que o app já tem. As cartas são ilustrativas (sem arte) e os números são de exemplo. O plano de implementação está em <code>docs/plano-modos-de-jogo.md</code>.</p>
     <nav class="doc-nav">
-      <a href="#t1"><b>01</b>Tela inicial</a><a href="#t2"><b>02</b>All Blue no construtor</a><a href="#t3"><b>03</b>Selado: entrada</a><a href="#t4"><b>04</b>Abertura de boosters</a><a href="#t5"><b>05</b>Deck selado</a><a href="#t6"><b>06</b>Draft</a><a href="#t7"><b>07</b>Yonko: sala</a><a href="#t8"><b>08</b>Yonko: mesa</a><a href="#t9"><b>09</b>No celular</a>
+      <a href="#t1"><b>01</b>Tela inicial</a><a href="#t2"><b>02</b>All Blue no construtor</a><a href="#t3"><b>03</b>Selado: entrada</a><a href="#t4"><b>04</b>Abertura de boosters</a><a href="#t5"><b>05</b>Deck selado</a><a href="#t6"><b>06</b>Draft</a><a href="#t7"><b>07</b>Yonko: sala</a><a href="#t8"><b>08</b>Yonko: mesa</a><a href="#t9"><b>09</b>No celular</a><a href="#t10"><b>10</b>Pack Rush</a><a href="#t11"><b>11</b>Cubo</a><a href="#t12"><b>12</b>Líder nos modos mistos</a>
     </nav>
   </header>
 
@@ -282,10 +301,10 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
           <div class="row" style="margin-bottom:14px"><span class="h2">MODOS ESPECIAIS</span><span class="chip new">NOVO</span><span class="sp grow"></span><span class="muted" style="font-size:13px">Regras próprias de deck ou de mesa</span></div>
           <div class="special-grid">
             <div class="mode hl" style="--mode:var(--teal)">
-              <div class="mt"><span class="mi"><svg class="i"><use href="#i-pack"/></svg></span><span class="mb">Pré-release e Draft</span></div>
+              <div class="mt"><span class="mi"><svg class="i"><use href="#i-pack"/></svg></span><span class="mb">Selado e Draft</span></div>
               <div><div class="mk">Limitado</div><div class="mn">SELADO</div></div>
-              <p class="md">Abra boosters, monte um deck de 40 com o que vier e jogue. Vale qualquer cor com qualquer Líder.</p>
-              <div class="row wrapx" style="gap:6px"><span class="chip">Pré-release · 6 boosters</span><span class="chip">Draft · pod de 4 a 8</span><span class="chip gold">OP18 disponível</span></div>
+              <p class="md">Abra boosters, monte um deck de 40 com o que vier e jogue. Uma coleção, várias (Pack Rush) ou o Cubo das cartas mais usadas.</p>
+              <div class="row wrapx" style="gap:6px"><span class="chip">Pré-release</span><span class="chip">Draft</span><span class="chip">Pack Rush</span><span class="chip">Cubo</span><span class="chip gold">OP18 disponível</span></div>
               <div class="mf"><div class="ml"><i class="dot"></i>2 pods montando · 14 decks selados ativos</div><span class="cta">ABRIR BOOSTERS</span></div>
             </div>
             <div class="mode" style="--mode:var(--crimson)">
@@ -339,7 +358,7 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
         <div class="panel" style="display:flex;flex-direction:column;gap:14px">
           <div class="row"><span class="avatar" style="--c:var(--blue-card)">N</span><div class="grow"><div class="kick">Líder</div><div class="h3">NAMI AZUL DE BOLSO</div></div><span class="h3" style="color:var(--brand-yellow)">50/50</span></div>
           <div class="row wrapx" style="gap:6px"><span class="chip bad">Não vale no All Blue</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Standard</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>EGB</span></div>
-          <div class="err"><b>OP06-047 Sanji é SR:</b> não vale no All Blue. Troque por uma carta C, UC, R ou promo.</div>
+          <div class="err"><b>OP01-067 Crocodile é SR:</b> não vale no All Blue. Troque por uma carta C, UC, R ou promo.</div>
           <div>
             <div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="kick">Raridades do deck</span><span class="muted" style="font-size:12px">29 C · 12 UC · 7 R · 2 SR</span></div>
             <div class="rar-bar"><i style="width:58%;background:#7f93ad"></i><i style="width:24%;background:var(--sky)"></i><i style="width:14%;background:var(--gold)"></i><i style="width:4%;background:var(--danger)"></i></div>
@@ -350,7 +369,7 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
             <div class="li"><span class="q">4</span><span class="cst" style="--k:var(--blue-card)">2</span>Nojiko<span class="r">C</span></div>
             <div class="li"><span class="q">4</span><span class="cst" style="--k:var(--blue-card)">2</span>Gum-Gum Rain<span class="r">UC</span></div>
             <div class="li"><span class="q">3</span><span class="cst" style="--k:var(--blue-card)">3</span>Bartholomew Kuma<span class="r">R</span></div>
-            <div class="li bad"><span class="q">2</span><span class="cst" style="--k:var(--blue-card)">4</span>Sanji<span class="r" style="color:#ff9a9a">SR · fora</span></div>
+            <div class="li bad"><span class="q">2</span><span class="cst" style="--k:var(--blue-card)">5</span>Crocodile<span class="r" style="color:#ff9a9a">SR · fora</span></div>
             <div class="li"><span class="q">4</span><span class="cst" style="--k:var(--blue-card)">4</span>Jinbe<span class="r">R</span></div>
             <div class="li muted" style="justify-content:center;border-style:dashed">+ 29 cartas</div>
           </div>
@@ -362,7 +381,7 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
 
   <!-- 03 ───────────────────────────────────────────────────────────── -->
   <section class="shot" id="t3">
-    <div class="shot-label"><span class="n">03</span><div><h2>Selado: escolha da coleção e do jeito de jogar</h2><p>Uma porta só para os dois modos limitados. O jogador escolhe a coleção, depois Pré-release (abre 6 boosters sozinho) ou Draft (escolhe carta a carta num pod). Os decks selados em andamento ficam à mão.</p></div></div>
+    <div class="shot-label"><span class="n">03</span><div><h2>Selado: de onde vêm as cartas e como montar</h2><p>Uma porta só para todos os modos limitados. Primeiro a fonte das cartas (uma coleção, várias no Pack Rush, ou o Cubo), depois o jeito de montar (abrir sozinho ou draftar num pod). Os decks selados em andamento ficam à mão.</p></div></div>
     <div class="frame" id="f3">
       <div class="top">
         <span class="logo">GUMGUM <em>FIGHT!</em></span>
@@ -374,15 +393,26 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
       <div class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:22px">
         <div>
           <div class="kick" style="color:var(--teal)">Jogar › Selado</div>
-          <div class="row" style="align-items:flex-end;gap:18px"><span class="h2" style="font-size:52px">SELADO</span><p class="muted" style="max-width:640px;padding-bottom:6px">Todo mundo começa do zero: o deck sai dos boosters que você abrir. Deck de 40 cartas, qualquer cor com qualquer Líder, sem limite de cópias e sem lista de banidas.</p></div>
+          <div class="row" style="align-items:flex-end;gap:18px"><span class="h2" style="font-size:52px">SELADO</span><p class="muted" style="max-width:640px;padding-bottom:6px">Todo mundo começa do zero: o deck sai dos boosters que você abrir. Deck de 40 cartas, qualquer cor, sem limite de cópias. Banidas e pares proibidos valem aqui.</p></div>
         </div>
         <div>
-          <div class="kick" style="margin-bottom:8px">1 · Coleção</div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-            <div class="set on"><span class="pack sm"><b>OP18</b></span><div><b>OP18</b><small>The Dominance of God</small><span class="chip gold" style="margin-top:4px">Pré-release</span></div></div>
-            <div class="set"><span class="pack sm" style="background:linear-gradient(160deg,#c44a8a,#5f1f48 60%,#3a1230)"><b>EB05</b></span><div><b>EB05</b><small>Heroines Edition vol.2</small></div></div>
-            <div class="set"><span class="pack sm" style="background:linear-gradient(160deg,#3e9b5b,#1b4c2c 60%,#10301b)"><b>OP17</b></span><div><b>OP17</b><small>Coleção anterior</small></div></div>
-            <div class="set" style="justify-content:center;color:var(--muted)">Todas as coleções ▾</div>
+          <div class="kick" style="margin-bottom:8px">1 · De onde vêm as cartas</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+            <div class="src on">
+              <div class="row"><span class="h3">UMA COLEÇÃO</span><span class="grow"></span><span class="chip gold">Pré-release</span></div>
+              <p>Todos os boosters da mesma coleção, como no evento de loja.</p>
+              <div class="row"><span class="pack sm"><b>OP18</b></span><div class="grow"><b>OP18 · The Dominance of God</b><div class="muted" style="font-size:12px">Líder: os que você abrir ou o Luffy de 6 cores</div></div><span class="btn sm">Trocar ▾</span></div>
+            </div>
+            <div class="src">
+              <div class="row"><span class="h3">PACK RUSH</span><span class="grow"></span><span class="chip new">NOVO</span></div>
+              <p>Boosters de coleções variadas. Quem abre o pod escolhe quais entram.</p>
+              <div class="row"><span class="pack xs" style="--h:214"><b>OP01</b></span><span class="pack xs" style="--h:150;margin-left:-10px"><b>OP05</b></span><span class="pack xs" style="--h:280;margin-left:-10px"><b>OP09</b></span><span class="pack xs" style="--h:20;margin-left:-10px"><b>OP13</b></span><span class="pack xs" style="--h:325;margin-left:-10px"><b>EB02</b></span><div class="grow muted" style="font-size:12px;margin-left:8px">Líder: qualquer um do jogo</div></div>
+            </div>
+            <div class="src">
+              <div class="row"><span class="h3">CUBO</span><span class="grow"></span><span class="chip">Só Draft</span></div>
+              <p>Um conjunto fixo com as cartas mais usadas de One Piece, de todas as coleções.</p>
+              <div class="row"><span class="pack xs" style="--h:45"><b>CUBO</b></span><div class="grow"><b>Cubo GumGum · 420 cartas</b><div class="muted" style="font-size:12px">Líder: qualquer um do jogo</div></div><span class="link" style="font-size:13px">Ver lista</span></div>
+            </div>
           </div>
         </div>
         <div>
@@ -429,16 +459,16 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
             <span class="pack"><b>OP18<small>BOOSTER</small></b></span><span class="pack"><b>OP18<small>BOOSTER</small></b></span>
           </div>
           <div class="mat" style="padding:22px">
-            <div class="row" style="margin-bottom:16px"><span class="h3">BOOSTER 4</span><span class="chip">7 comuns</span><span class="chip">3 incomuns</span><span class="chip gold">1 rara ou melhor</span><span class="chip" style="border-color:var(--brand-yellow)">1 Líder</span><span class="grow"></span><span class="muted" style="font-size:12px">Toque numa carta para ver o texto</span></div>
+            <div class="row" style="margin-bottom:16px"><span class="h3">BOOSTER 4</span><span class="chip">7 comuns</span><span class="chip">3 incomuns</span><span class="chip gold">1 rara ou melhor</span><span class="chip" style="border-color:var(--brand-yellow)">1 Líder neste booster</span><span class="grow"></span><span class="muted" style="font-size:12px">Toque numa carta para ver o texto</span></div>
             <div class="cards" style="--cols:6;--gap:16px" data-cards="y1:Charlotte Anana:2000:C|p2:Sheepshead:3000:C|b3:Hyogoro:4000:C|r2:Koby:3000:C|g1:Kikunojo:2000:C|u3:Scratchmen Apoo:4000:C|y4:Charlotte Smoothie:6000:C|p3:Ulti:4000:UC|g4:Denjiro:5000:UC|r5:Smoker:6000:UC|b7:Rob Lucci:8000:SR:glow|y0:Charlotte Linlin:5000:L:lead,glow"></div>
           </div>
           <div class="row" style="justify-content:center;gap:12px"><span class="btn" style="min-height:52px">Abrir os 2 que faltam</span><span class="cta auto" style="--mode:var(--teal);min-width:300px">ABRIR O PRÓXIMO</span></div>
         </div>
         <div class="panel" style="display:flex;flex-direction:column;gap:16px">
           <div><div class="kick">Sua coleção</div><div class="row" style="align-items:baseline"><span class="h2" style="font-size:44px;color:var(--brand-yellow)">48</span><span class="muted">de 72 cartas reveladas</span></div></div>
-          <div><div class="kick" style="margin-bottom:8px">Líderes que saíram</div>
-            <div class="cards" style="--cols:4;--gap:8px" data-cards="y0:Linlin:5000:L:lead|p0:Kaido:5000:L:lead|g0:Yamato:5000:L:lead|y0:Linlin:5000:L:lead"></div>
-            <p class="muted" style="font-size:12px;margin-top:8px">No Selado você joga com qualquer Líder que abrir. A cor do Líder não limita o deck.</p>
+          <div><div class="kick" style="margin-bottom:8px">Seus Líderes</div>
+            <div class="cards" style="--cols:4;--gap:8px" data-cards="y0:Linlin:5000:L:lead|p0:Kaido:5000:L:lead|x0:Luffy 6 cores:5000:L:lead:SEMPRE"></div>
+            <p class="muted" style="font-size:12px;margin-top:8px">Você joga com um Líder que abrir ou com o Luffy de 6 cores, que todo mundo tem. A cor do Líder não limita o deck.</p>
           </div>
           <div><div class="kick" style="margin-bottom:8px">Por cor</div>
             <div class="list">
@@ -477,10 +507,10 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
           <p class="muted" style="font-size:12px">Cartas apagadas já estão no deck. O número na carta é quantas cópias você abriu.</p>
         </div>
         <div class="panel" style="display:flex;flex-direction:column;gap:14px">
-          <div><div class="kick" style="margin-bottom:8px">Seu Líder (um dos que você abriu)</div>
-            <div class="cards" style="--cols:4;--gap:8px;padding-top:10px" data-cards="y0:Linlin:5000:L:lead,sel|p0:Kaido:5000:L:lead|g0:Yamato:5000:L:lead|u0:Hawkins:5000:L:lead"></div>
+          <div><div class="kick" style="margin-bottom:8px">Seu Líder (dos que você abriu, ou o Luffy de 6 cores)</div>
+            <div class="cards" style="--cols:4;--gap:8px;padding-top:10px" data-cards="y0:Linlin:5000:L:lead,sel|p0:Kaido:5000:L:lead|g0:Yamato:5000:L:lead|x0:Luffy 6 cores:5000:L:lead:SEMPRE"></div>
           </div>
-          <div class="row" style="align-items:baseline"><span class="h2" style="font-size:44px;color:var(--brand-yellow)">31</span><span class="muted" style="white-space:nowrap">de 40 cartas</span><span class="grow"></span><span class="chip">Qualquer cor</span><span class="chip">Sem limite de cópias</span></div>
+          <div class="row" style="align-items:baseline"><span class="h2" style="font-size:44px;color:var(--brand-yellow)">31</span><span class="muted" style="white-space:nowrap">de 40 cartas</span><span class="grow"></span><span class="chip">Qualquer cor</span><span class="chip">Banidas valem</span></div>
           <div><div class="kick" style="margin-bottom:20px">Curva de custo</div><div class="bars" style="margin-bottom:18px"><div style="height:30%" data-v="5" data-l="1"></div><div style="height:48%" data-v="7" data-l="2"></div><div style="height:54%" data-v="8" data-l="3"></div><div style="height:36%" data-v="5" data-l="4"></div><div style="height:24%" data-v="3" data-l="5"></div><div style="height:12%" data-v="2" data-l="6"></div><div style="height:8%" data-v="1" data-l="7+"></div></div></div>
           <div class="row wrapx" style="gap:6px"><span class="chip">Counter +1000: 14</span><span class="chip">Counter +2000: 3</span><span class="chip">Blocker: 4</span><span class="chip">[Trigger]: 6</span></div>
           <div class="list">
@@ -519,8 +549,8 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
             <div class="row"><div class="panel grow" style="padding:12px 14px;border-radius:14px"><b>King</b> <span class="muted">· Personagem roxo · custo 6 · 7000 · Animal Kingdom Pirates</span><div class="muted" style="font-size:13px;margin-top:2px">[On Play] DON!! −2: K.O. até 1 Personagem do oponente com custo 4 ou menos.</div></div><span class="cta auto" style="--mode:var(--purple);min-width:260px">PEGAR KING</span></div>
           </div>
           <div class="panel" style="display:flex;flex-direction:column;gap:12px">
-            <div class="row"><span class="h3">SEU LÍDER</span><span class="grow"></span><span class="muted" style="font-size:12px">escolhido antes do draft</span></div>
-            <div class="row" style="align-items:flex-start;gap:12px"><div style="width:74px;flex:none"><div class="c purple f-lead"><span class="cp">5000</span><span class="ca"></span><span class="cn">Kaido</span><span class="cr">L</span></div></div><p class="muted" style="font-size:12.5px">Cada jogador recebe 3 Líderes da coleção e fica com 1. Como a cor não limita o deck, o Líder guia as escolhas, não as trava.</p></div>
+            <div class="row"><span class="h3">LÍDER</span><span class="grow"></span><span class="muted" style="font-size:12px">você escolhe na montagem</span></div>
+            <div class="row" style="align-items:flex-start;gap:10px"><div class="cards" style="--cols:2;--gap:8px;width:136px;flex:none" data-cards="p0:Kaido:5000:L:lead:PEGO|x0:Luffy 6 cores:5000:L:lead:SEMPRE"></div><p class="muted" style="font-size:12.5px">Vale um Líder que você pegar no draft ou o Luffy de 6 cores. A cor não limita o deck, então o Líder guia as escolhas, não as trava.</p></div>
             <div class="kick">Cores que você pegou</div>
             <div class="rar-bar" style="height:18px"><i style="width:44%;background:var(--purple)"></i><i style="width:25%;background:var(--yellow)"></i><i style="width:19%;background:var(--red)"></i><i style="width:12%;background:var(--black)"></i></div>
             <div class="kick" style="margin-top:4px;margin-bottom:16px">Curva até agora</div>
@@ -719,6 +749,137 @@ svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width:
       </div>
     </div>
   </section>
+
+  <!-- 10 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t10">
+    <div class="shot-label"><span class="n">10</span><div><h2>Pack Rush: quem abre o pod escolhe as coleções</h2><p>Selado ou Draft com boosters de coleções variadas. Quem cria monta a sequência de boosters, e ela é a mesma para todos os jogadores. No Draft, cada rodada abre a coleção daquela posição. Com mais de uma coleção, o jogador usa qualquer Líder do jogo.</p></div></div>
+    <div class="frame" id="f10">
+      <div class="top"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="nav on"><svg class="i"><use href="#i-swords"/></svg>Jogar</span><span class="nav"><svg class="i"><use href="#i-deck"/></svg>Montar decks</span><span class="sp"></span><span class="pill"><svg class="i"><use href="#i-user"/></svg>Alex</span></div>
+      <div class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:20px">
+        <div class="row" style="align-items:flex-end;gap:18px">
+          <div><div class="kick" style="color:var(--teal)">Jogar › Selado › Pack Rush</div><span class="h2" style="font-size:52px">PACK RUSH</span></div>
+          <p class="muted" style="max-width:560px;padding-bottom:6px">Monte o seu próprio produto: escolha as coleções que entram e quantos boosters de cada uma.</p>
+          <span class="grow"></span>
+          <span class="seg" style="margin-bottom:6px"><span>Selado · 6 boosters</span><span class="on">Draft · 4 boosters</span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 400px;gap:18px">
+          <div class="panel">
+            <div class="row" style="margin-bottom:14px"><span class="h3">COLEÇÕES</span><span class="chip">4 de 4 boosters escolhidos</span><span class="grow"></span><span class="seg"><span class="on">Todas</span><span>Boosters</span><span>Extras</span><span>Com spoilers</span></span><span class="btn sm"><svg class="i"><use href="#i-dice"/></svg>Sortear</span></div>
+            <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:14px 12px">
+              <div class="tile on"><span class="n">1</span><span class="pack sm" style="--h:214"><b>OP01</b></span><b>OP01</b></div>
+              <div class="tile"><span class="pack sm" style="--h:0"><b>OP02</b></span><b>OP02</b></div>
+              <div class="tile"><span class="pack sm" style="--h:35"><b>OP03</b></span><b>OP03</b></div>
+              <div class="tile"><span class="pack sm" style="--h:190"><b>OP04</b></span><b>OP04</b></div>
+              <div class="tile on"><span class="n">1</span><span class="pack sm" style="--h:150"><b>OP05</b></span><b>OP05</b></div>
+              <div class="tile"><span class="pack sm" style="--h:260"><b>OP06</b></span><b>OP06</b></div>
+              <div class="tile"><span class="pack sm" style="--h:100"><b>OP07</b></span><b>OP07</b></div>
+              <div class="tile"><span class="pack sm" style="--h:340"><b>OP08</b></span><b>OP08</b></div>
+              <div class="tile on"><span class="n">1</span><span class="pack sm" style="--h:280"><b>OP09</b></span><b>OP09</b></div>
+              <div class="tile"><span class="pack sm" style="--h:55"><b>OP10</b></span><b>OP10</b></div>
+              <div class="tile"><span class="pack sm" style="--h:170"><b>OP11</b></span><b>OP11</b></div>
+              <div class="tile"><span class="pack sm" style="--h:230"><b>OP12</b></span><b>OP12</b></div>
+              <div class="tile on"><span class="n">1</span><span class="pack sm" style="--h:20"><b>OP13</b></span><b>OP13</b></div>
+              <div class="tile"><span class="pack sm" style="--h:300"><b>OP14</b></span><b>OP14</b></div>
+              <div class="tile"><span class="pack sm" style="--h:125"><b>OP15</b></span><b>OP15</b></div>
+              <div class="tile"><span class="pack sm" style="--h:200"><b>OP16</b></span><b>OP16</b></div>
+              <div class="tile"><span class="pack sm" style="--h:80"><b>OP17</b></span><b>OP17</b></div>
+              <div class="tile"><span class="pack sm" style="--h:245"><b>OP18</b></span><b>OP18</b><small>spoiler</small></div>
+              <div class="tile"><span class="pack sm" style="--h:325"><b>EB01</b></span><b>EB01</b><small>extra</small></div>
+              <div class="tile"><span class="pack sm" style="--h:310"><b>EB02</b></span><b>EB02</b><small>extra</small></div>
+              <div class="tile"><span class="pack sm" style="--h:290"><b>EB03</b></span><b>EB03</b><small>extra</small></div>
+              <div class="tile"><span class="pack sm" style="--h:270"><b>EB04</b></span><b>EB04</b><small>extra</small></div>
+              <div class="tile"><span class="pack sm" style="--h:330"><b>EB05</b></span><b>EB05</b><small>extra</small></div>
+              <div class="tile"><span class="pack sm" style="--h:45"><b>PRB01</b></span><b>PRB01</b><small>premium</small></div>
+            </div>
+            <p class="muted" style="font-size:12px;margin-top:14px">Toque numa coleção para somar um booster dela; toque de novo no número para tirar. Só entram coleções com o booster configurado e com cobertura de efeitos suficiente.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="panel">
+              <div class="h3" style="margin-bottom:12px">SEQUÊNCIA DOS BOOSTERS</div>
+              <div class="seq">
+                <div><span class="pack sm" style="--h:214"><b>OP01</b></span>1ª rodada</div>
+                <div><span class="pack sm" style="--h:150"><b>OP05</b></span>2ª rodada</div>
+                <div><span class="pack sm" style="--h:280"><b>OP09</b></span>3ª rodada</div>
+                <div><span class="pack sm" style="--h:20"><b>OP13</b></span>4ª rodada</div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-top:10px">Todos os jogadores abrem a mesma sequência. Arraste para mudar a ordem.</p>
+            </div>
+            <div class="panel">
+              <div class="h3" style="margin-bottom:4px">REGRAS DESTE POD</div>
+              <div class="opt"><div class="t">Jogadores<small>Lugares vazios viram bots.</small></div><span class="seg"><span>4</span><span>6</span><span class="on">8</span></span></div>
+              <div class="opt"><div class="t">Líder<small>Mais de uma coleção: vale qualquer Líder do jogo, e o Luffy de 6 cores.</small></div><span class="chip ok">Qualquer Líder</span></div>
+              <div class="opt"><div class="t">Banidas e pares proibidos<small>Modo fora do oficial: as restrições da Bandai não se aplicam.</small></div><span class="chip ok">Valem</span></div>
+              <div class="opt"><div class="t">Deck<small>40 cartas, qualquer cor, sem limite de cópias.</small></div><span class="chip">Padrão do Selado</span></div>
+            </div>
+            <div class="row"><span class="btn" style="flex:1;min-height:52px">Só com código</span><span class="cta" style="flex:1.4;--mode:var(--teal)">ABRIR O POD</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t11">
+    <div class="shot-label"><span class="n">11</span><div><h2>Cubo: o draft das cartas mais usadas</h2><p>O Cubo é uma lista fixa de cartas, uma cópia de cada, montada a partir das cartas mais jogadas e revisada à mão. Os boosters do draft são sorteados dela, sem vaga de raridade. A página mostra a lista inteira antes de o jogador entrar num pod.</p></div></div>
+    <div class="frame" id="f11">
+      <div class="top"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="nav on"><svg class="i"><use href="#i-swords"/></svg>Jogar</span><span class="nav"><svg class="i"><use href="#i-deck"/></svg>Montar decks</span><span class="sp"></span><span class="pill"><svg class="i"><use href="#i-user"/></svg>Alex</span></div>
+      <div class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:20px">
+        <div class="row" style="align-items:flex-end;gap:18px">
+          <div><div class="kick" style="color:var(--gold)">Jogar › Selado › Cubo</div><span class="h2" style="font-size:52px">CUBO GUMGUM</span></div>
+          <div class="row wrapx" style="padding-bottom:8px;gap:6px"><span class="chip gold">Temporada 1</span><span class="chip">420 cartas · 1 cópia de cada</span><span class="chip">70 por cor</span><span class="chip">Atualizado em 20/11/2026</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 400px;gap:18px">
+          <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+            <div class="row"><span class="h3">A LISTA</span><span class="grow"></span><span class="seg"><span>Todas</span><span><i class="dot" style="background:var(--red);box-shadow:none"></i>70</span><span><i class="dot" style="background:var(--green);box-shadow:none"></i>70</span><span class="on"><i class="dot" style="background:var(--blue-card);box-shadow:none"></i>70</span><span><i class="dot" style="background:var(--purple);box-shadow:none"></i>70</span><span><i class="dot" style="background:var(--black);box-shadow:none"></i>70</span><span><i class="dot" style="background:var(--yellow);box-shadow:none"></i>70</span></span><span class="btn sm">Exportar lista</span></div>
+            <div class="cards" style="--cols:10;--gap:10px" data-cards="u1:Nami:2000:C|u2:Gum-Gum Rain:0:UC|u3:Kuma:4000:R|u4:Jinbe:5000:R|u5:Crocodile:6000:SR|u6:Mihawk:8000:SR|u5:Hancock:6000:SR|u7:Newgate:9000:SEC|u4:Sanji:6000:SR|u2:Kaya:0:UC|u1:Sand Storm:0:C|u3:Mr.3:3000:C|u4:Hina:5000:R|u5:Marco:6000:R|u8:Kaido:10000:SR|u2:Pudding:2000:R:glow:BANIDA|u3:Bon Kurei:4000:UC|u4:Ivankov:5000:R|u2:Coby:3000:C|u1:Tashigi:2000:C|u2:Nojiko:2000:C|u2:Otama:1000:UC|u3:Usopp:4000:C|u2:Chopper:3000:C|u3:Love-Love Mellow:0:UC|u6:Doflamingo:7000:SR|u1:Apis:1000:UC|u4:Aokiji:5000:R|u9:Teach:10000:SEC|u3:Buggy:4000:R"></div>
+            <div class="kick">As mais jogadas do azul nos últimos 90 dias</div>
+            <div class="list" style="gap:6px">
+              <div class="use"><span class="cst" style="--k:var(--blue-card)">2</span><b class="grow">Gum-Gum Rain</b><span class="muted" style="font-size:12px">em 71% dos decks azuis</span><span class="bar"><i style="width:71%"></i></span><span class="pc">71%</span></div>
+              <div class="use"><span class="cst" style="--k:var(--blue-card)">5</span><b class="grow">Boa Hancock</b><span class="muted" style="font-size:12px">em 64% dos decks azuis</span><span class="bar"><i style="width:64%"></i></span><span class="pc">64%</span></div>
+              <div class="use"><span class="cst" style="--k:var(--blue-card)">2</span><b class="grow">Charlotte Pudding</b><span class="chip bad" style="font-size:10px">banida no construído · vale no Cubo</span><span class="bar"><i style="width:58%"></i></span><span class="pc">58%</span></div>
+              <div class="use"><span class="cst" style="--k:var(--blue-card)">4</span><b class="grow">Jinbe</b><span class="muted" style="font-size:12px">em 52% dos decks azuis</span><span class="bar"><i style="width:52%"></i></span><span class="pc">52%</span></div>
+              <div class="use"><span class="cst" style="--k:var(--blue-card)">1</span><b class="grow">Nami</b><span class="muted" style="font-size:12px">em 47% dos decks azuis</span><span class="bar"><i style="width:47%"></i></span><span class="pc">47%</span></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div class="panel">
+              <div class="h3" style="margin-bottom:4px">COMO É O DRAFT DE CUBO</div>
+              <div class="opt"><div class="t">Boosters<small>4 por jogador, 12 cartas cada, sorteadas do Cubo. Um pod de 8 usa 384 das 420.</small></div><span class="chip">4 × 12</span></div>
+              <div class="opt"><div class="t">Líder<small>Qualquer Líder do jogo, escolhido na montagem. O Luffy de 6 cores também vale.</small></div><span class="chip ok">Qualquer Líder</span></div>
+              <div class="opt"><div class="t">Banidas<small>Podem estar no Cubo e podem ser jogadas.</small></div><span class="chip ok">Valem</span></div>
+              <div class="opt"><div class="t">Deck<small>40 cartas, qualquer cor.</small></div><span class="chip">Padrão do Selado</span></div>
+            </div>
+            <div class="panel">
+              <div class="h3" style="margin-bottom:8px">DE ONDE SAI A LISTA</div>
+              <p class="muted" style="font-size:13px">Das cartas mais jogadas nas partidas do GumGum Fight e no meta global, 70 por cor, com curva de custo equilibrada. Um Admin revisa e publica cada temporada. Cartas sem efeito automatizado (⚙) não entram.</p>
+            </div>
+            <div class="row wrapx" style="gap:6px"><i class="dot"></i><span style="font-size:13px">Pod de Cubo montando: 3 de 8</span></div>
+            <div class="row"><span class="btn" style="flex:1;min-height:52px">Criar pod com código</span><span class="cta gold" style="flex:1.3">ENTRAR NUM POD</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t12">
+    <div class="shot-label"><span class="n">12</span><div><h2>Escolha do Líder no Pack Rush e no Cubo</h2><p>Nos modos com mais de uma coleção, a montagem do deck abre o seletor com todos os Líderes do jogo. Para o jogador não se perder em mais de cem opções, o seletor sugere primeiro os Líderes das cores que ele mais pegou. O Luffy de 6 cores aparece sempre.</p></div></div>
+    <div class="frame" id="f12" style="padding:40px 150px;background:radial-gradient(900px 400px at 50% 0%, #1d2b48 0%, transparent 70%), #070f1b">
+      <div class="modal" style="display:flex;flex-direction:column;gap:16px">
+        <div class="row"><div class="grow"><div class="kick" style="color:var(--teal)">Draft · Pack Rush OP01 + OP05 + OP09 + OP13</div><span class="h2" style="font-size:40px;display:block;margin-top:8px">ESCOLHA O SEU LÍDER</span></div><span class="chip ok">Qualquer Líder do jogo</span><span class="chip">Banidos valem</span><span class="btn sm">Fechar ✕</span></div>
+        <div class="row"><span class="input grow">Buscar Líder por nome, tipo ou texto</span><span class="seg"><span class="on">Todas as cores</span><span><i class="dot" style="background:var(--red);box-shadow:none"></i></span><span><i class="dot" style="background:var(--green);box-shadow:none"></i></span><span><i class="dot" style="background:var(--blue-card);box-shadow:none"></i></span><span><i class="dot" style="background:var(--purple);box-shadow:none"></i></span><span><i class="dot" style="background:var(--black);box-shadow:none"></i></span><span><i class="dot" style="background:var(--yellow);box-shadow:none"></i></span></span><span class="btn">Vida ▾</span></div>
+        <div>
+          <div class="row" style="margin-bottom:10px"><span class="kick" style="color:var(--brand-yellow)">Sugeridos para o que você pegou</span><span class="muted" style="font-size:12px">44% roxo · 25% amarelo · tipos mais comuns: Animal Kingdom Pirates, Big Mom Pirates</span></div>
+          <div class="cards" style="--cols:9;--gap:12px;padding-top:10px" data-cards="x0:Luffy 6 cores:5000:L:lead:SEMPRE|p0:Kaido:5000:L:lead,sel|py0:Charlotte Linlin:5000:L:lead|p0:King:5000:L:lead|y0:Katakuri:5000:L:lead|py0:Nico Robin:5000:L:lead|p0:Magellan:5000:L:lead|rp0:Eustass Kid:5000:L:lead|y0:Enel:5000:L:lead"></div>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom:10px"><span class="kick">Todos os Líderes</span><span class="muted" style="font-size:12px">128 Líderes · os banidos do construído aparecem marcados e podem ser usados</span></div>
+          <div class="cards" style="--cols:12;--gap:10px" data-cards="r0:Zoro:5000:L:lead|rg0:Law:5000:L:lead|r0:Luffy:5000:L:lead|g0:Kin'emon:5000:L:lead|gu0:Doflamingo:5000:L:lead|u0:Nami:5000:L:lead:BANIDA|u0:Crocodile:5000:L:lead|p0:Kaido:5000:L:lead|b0:Smoker:5000:L:lead|by0:Lucci:5000:L:lead|y0:Yamato:5000:L:lead|rb0:Sabo:5000:L:lead|r0:Shanks:5000:L:lead|g0:Zoro:5000:L:lead|u0:Buggy:5000:L:lead|rp0:Law:5000:L:lead:BANIDA|b0:Teach:5000:L:lead|gy0:Shirahoshi:5000:L:lead|g0:Mihawk:5000:L:lead:BANIDA|r0:Ace:5000:L:lead|uy0:Hancock:5000:L:lead|p0:Enel:5000:L:lead|b0:Yamato:5000:L:lead|u0:Xebec:5000:L:lead"></div>
+        </div>
+        <div class="row"><div class="panel grow" style="padding:12px 14px;border-radius:14px"><b>Kaido</b> <span class="muted">· Líder roxo · Vida 4 · 5000 · Animal Kingdom Pirates / The Four Emperors</span><div class="muted" style="font-size:13px;margin-top:2px">No Selado a cor do Líder não limita o deck. Escolha pelo efeito e pela Vida.</div></div><span class="cta auto" style="--mode:var(--teal);min-width:280px">USAR KAIDO</span></div>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -727,13 +888,17 @@ const COLORS = { r: 'red', g: 'green', u: 'blue', p: 'purple', b: 'black', y: 'y
 for (const el of document.querySelectorAll('[data-cards]')) {
   const extra = [...el.children];
   for (const raw of el.dataset.cards.split('|')) {
-    const [head, name, power, rarity = '', flags = ''] = raw.trim().split(':');
+    const [head, name, power, rarity = '', flags = '', tag = ''] = raw.trim().split(':');
     const marks = flags ? flags.split(',') : [];
     const card = document.createElement('div');
     const count = marks.find((m) => /^x\d/.test(m));
-    card.className = ['c', COLORS[head[0]], 'r' + rarity, ...marks.filter((m) => m !== count).map((m) => 'f-' + m)].join(' ');
+    const [, letters, cost] = head.match(/^([a-z]+)(\d+)$/);
+    const colors = letters === 'x' ? ['rainbow'] : [...letters].map((l) => COLORS[l]);
+    card.className = ['c', colors[0], colors[1] ? 'two' : '', 'r' + rarity, ...marks.filter((m) => m !== count).map((m) => 'f-' + m)].join(' ');
+    if (colors[1]) card.style.setProperty('--k2', `var(--${colors[1] === 'blue' ? 'blue-card' : colors[1]})`);
     card.innerHTML =
-      `<span class="cc">${head.slice(1)}</span>` +
+      (tag ? `<span class="tag">${tag}</span>` : '') +
+      `<span class="cc">${cost}</span>` +
       (Number(power) ? `<span class="cp">${power}</span>` : '') +
       `<span class="ca"></span><span class="cn">${name}</span>` +
       (rarity ? `<span class="cr">${rarity}</span>` : '') +

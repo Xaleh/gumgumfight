@@ -1,4 +1,4 @@
-# Plano: novos modos de jogo (All Blue, Selado e Yonko)
+# Plano: novos modos de jogo (All Blue, Selado, Pack Rush, Cubo e Yonko)
 
 > Status: **proposta** (21/11/2026), à espera da decisão de seguir. Nada aqui está implementado.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
@@ -11,18 +11,19 @@
 | **All Blue** | Formato da comunidade no estilo Pauper: só cartas C, UC, R e promos (sem SR e sem SEC). Partida 1x1 normal. | Pequeno | Não | Qualidade do campo `rarity` das cartas |
 | **Selado: Pré-release** | O jogador abre 6 boosters de uma coleção e monta um deck de 40 com o que saiu. | Médio | Pouco (tamanho do deck) | Fidelidade do booster e cartas ⚙ na coleção |
 | **Selado: Draft** | Pod de 4 a 8: cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
+| **Pack Rush** | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
+| **Draft Cubo** | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
 | **Yonko** | Mesa de 4, todos contra todos, formato da comunidade inspirado no Commander. | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
 
-Em esforço relativo, com o All Blue valendo 1: Pré-release ≈ 3, Draft ≈ +2 (reaproveita o Pré-release) e Yonko ≈ 8 ou
-mais. O Yonko é o único que muda o motor de regras; os outros três são regras de deck e telas novas em volta da partida
+Em esforço relativo, com o All Blue valendo 1: Pré-release ≈ 3, Draft ≈ +2, Pack Rush ≈ +1, Cubo ≈ +1,5 e Yonko ≈ 8
+ou mais. O Yonko é o único que muda o motor de regras; os outros são regras de deck e telas novas em volta da partida
 que já existe.
 
-**Ordem sugerida:** All Blue → Pré-release → Draft → Selado nos torneios → Yonko. Cada passo é entregável sozinho, e dá
-para parar depois de qualquer um.
+**Ordem sugerida:** All Blue → Pré-release → Pack Rush selado → Draft (já com Pack Rush) → Cubo → Selado nos torneios →
+Yonko. Cada passo é entregável sozinho, e dá para parar depois de qualquer um.
 
-De onde vêm as regras: All Blue e Yonko são formatos de fã, definidos por você nesta conversa (não achei um regulamento
-público de nenhum dos dois). O Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha
-encontrado, então a proposta é nossa.
+De onde vêm as regras: All Blue, Pack Rush, Cubo e Yonko são formatos de fã, definidos por você nesta conversa. O
+Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha encontrado, então a proposta é nossa.
 
 ## 2. All Blue
 
@@ -47,7 +48,7 @@ contra o bot, os torneios, o selo "Válido no All Blue" no construtor e o menu q
 
 - **`formats.ts`:** `cardLegality` e `formatIssues` hoje olham só o número da carta. Para o All Blue precisam da
   raridade, então passam a receber o catálogo (`Map<string, CardData>`), como `validateDeck` já recebe. Nova
-  legalidade `'rarity'` e nova mensagem `rules.rarity` ("OP06-047 é SR: não vale no All Blue").
+  legalidade `'rarity'` e nova mensagem `rules.rarity` ("OP01-067 é SR: não vale no All Blue").
 - **Construtor (`DeckBuilder.tsx`, `cardSearch.ts`):** selo do formato, cartas SR/SEC apagadas no catálogo quando o
   formato de montagem é All Blue, e a barra de raridades do deck. O filtro de raridade já existe na busca (`r:uc`, `sr`).
 - **Fila e contadores (`online/lobby.ts`):** as filas já são por `FormatId`; a ranqueada do All Blue fica desligada no
@@ -59,90 +60,155 @@ contra o bot, os torneios, o selo "Válido no All Blue" no construtor e o menu q
 
 ### Decisões que são suas
 
-1. **Base de cartas:** todas as coleções (como o EGB) com a lista de banidas oficial. É o que as telas assumem. A
-   alternativa é seguir a rotação do Standard.
-2. **Lista de banidas própria:** começar vazia e ajustar pelo meta que aparecer?
+1. **Banidas:** você definiu que as restrições da Bandai não valem nos modos limitados, por não serem oficiais. O All
+   Blue também não é oficial: a lista de banidas da Bandai vale nele ou não? Três das seis banidas de hoje são Líderes
+   (Nami, Law e Mihawk), que o corte de raridade não barra, então a resposta muda o formato. As telas assumem que a
+   lista **vale**, até você decidir.
+2. **Base de cartas e lista própria:** todas as coleções, sem rotação, e uma lista de banidas do All Blue que começa
+   vazia e se ajusta pelo meta que aparecer?
 3. **Ranqueada:** só casual no lançamento (recomendado) ou já com bounty?
 
-## 3. Selado (Pré-release e Draft)
+## 3. Modos limitados: Selado, Draft, Pack Rush e Cubo
 
 ![Entrada do Selado](mockups/modos-de-jogo/03-selado-entrada.webp)
 ![Abertura dos boosters](mockups/modos-de-jogo/04-selado-boosters.webp)
 ![Deck selado](mockups/modos-de-jogo/05-selado-deck.webp)
 ![Draft](mockups/modos-de-jogo/06-draft-escolha.webp)
+![Pack Rush](mockups/modos-de-jogo/10-pack-rush.webp)
+![Cubo](mockups/modos-de-jogo/11-cubo.webp)
+![Escolha do Líder](mockups/modos-de-jogo/12-lider-modos-mistos.webp)
 
-### Regras
+### Os cinco modos são duas escolhas
 
-O que a Bandai define para o Selado (Tournament Rules Manual e regras de Sealed Battle):
+Todos saem da mesma tela: primeiro **de onde vêm as cartas**, depois **como o jogador monta**.
 
-- Deck de **40 cartas** + 1 Líder + 10 DON!!, só com cartas dos boosters abertos.
-- **A cor do Líder não limita o deck.**
-- Sem lista de banidas.
+| De onde vêm as cartas | Selado (abre sozinho) | Draft (pod, pega 1 e passa) | Líder |
+|---|---|---|---|
+| **Uma coleção** | Pré-release | Draft | Os que o jogador abrir ou pegar, ou o **Luffy de 6 cores** |
+| **Pack Rush** (várias coleções, escolhidas por quem abre o pod) | Pack Rush selado | Pack Rush draft | **Qualquer Líder do jogo** |
+| **Cubo** (as cartas mais usadas) | não existe | Draft Cubo | **Qualquer Líder do jogo** |
 
-O que é escolha nossa (a regra oficial varia por evento ou não existe):
+Por baixo é um motor só: uma "fonte de boosters" (coleção, lista de coleções ou cubo) e duas formas de distribuir as
+cartas. Por isso Pack Rush e Cubo custam pouco depois que Selado e Draft existem.
+
+### Regras comuns a todos
+
+- Deck de **40 cartas** + 1 Líder + 10 DON!!, só com as cartas abertas ou draftadas.
+- **A cor do Líder não limita o deck** e não há limite de cópias.
+- **Banidas e pares proibidos valem.** Nenhum desses modos é formato oficial de torneio, então a lista de restrições da
+  Bandai (`BANNED_CARDS`, `BANNED_PAIRS`) e a rotação do Standard não se aplicam. Uma carta banida pode sair num
+  booster, estar no Cubo e ser jogada; um Líder banido pode ser escolhido no Pack Rush e no Cubo.
+- As partidas ficam fora das estatísticas e do meta do construído.
+
+### Líder
+
+- **Uma coleção (Pré-release e Draft):** o jogador usa um Líder que abriu ou pegou no draft, ou o **Luffy de 6 cores**,
+  que todo jogador tem sempre. É a regra dos eventos Sealed Battle da Bandai: o Líder de 6 cores existe para ninguém
+  ficar sem Líder, seja qual for a cor que sair.
+- **Mais de uma coleção (Pack Rush e Cubo):** vale **qualquer Líder do jogo**, escolhido na montagem do deck, além do
+  Luffy de 6 cores. Como são mais de cem Líderes, o seletor sugere primeiro os das cores e dos tipos que o jogador mais
+  pegou (tela 12).
+- Com o Luffy garantido, o booster simulado **não precisa mais trazer um Líder por pacote**: pode seguir a
+  distribuição do produto real.
+- **A conferir antes de implementar:** o número, a Vida e o texto do Luffy de 6 cores. A página do evento confirma que
+  a carta existe e para que serve, mas não traz os dados dela, e não sei se ela já está no banco do app. Se não
+  estiver, entra como carta especial desses modos.
+
+### Selado e Draft com uma coleção
 
 | Ponto | Proposta | Observação |
 |---|---|---|
-| Boosters no Pré-release | 6 por jogador (72 cartas) | É o número usual dos eventos de loja. |
-| Limite de cópias | Sem limite | O evento oficial "5 Packs Battle" declara isso por escrito; no Selado, na prática, quase não importa. |
-| Líder no Pré-release | Qualquer Líder que sair nos boosters; cada booster simulado traz 1 Líder | No booster real o Líder não vem em todo pacote. Garantir um por booster evita coleção sem Líder jogável. |
-| Draft | Pod de 4 a 8, **4 boosters** por jogador, 12 cartas cada (48 escolhas), deck de 40 | Sem regra oficial. Com 3 boosters não dá para chegar a 40. |
-| Líder no Draft | Antes do draft, cada jogador recebe 3 Líderes da coleção e fica com 1; os boosters do Draft não trazem Líder | Evita gastar escolhas com Líder e ninguém fica sem. |
+| Boosters no Pré-release | 6 por jogador (72 cartas) | É o número dos eventos Sealed Battle oficiais. |
+| Draft | Pod de 4 a 8, **4 boosters** por jogador, 12 cartas cada (48 escolhas) | Sem regra oficial. Com 3 boosters não dá para chegar a 40. |
 | Tempo | 30 min para montar; no Draft, 45 s por escolha, caindo conforme o booster esvazia | Sem escolha no tempo, o servidor escolhe. |
 
-**Modelo do booster** (por coleção, configurável em dados): 7 comuns, 3 incomuns, 1 vaga de rara ou melhor (R, SR ou
-SEC, com pesos) e 1 vaga de Líder (Pré-release) ou de carta extra (Draft). As proporções exatas de cada produto
-precisam ser conferidas na ficha da coleção antes de fechar; fica num arquivo `data/boosters/<coleção>.json`, não no
-código.
-
-### Como o jogador joga com o deck selado
-
-Depois de montar, o deck selado é um deck de verdade, mas preso àquela coleção de cartas:
-
-- **Contra o bot** e **sala privada**, na hora.
-- **Fila do Selado:** pareia só decks selados da mesma coleção.
-- **Pod do Draft:** os jogadores do pod se enfrentam (pod de 4: semifinal e final; pod de 8: 3 rodadas de suíço),
-  reaproveitando o módulo de torneios.
-- **Evento** (fase seguinte): o organizador cria um torneio com "deck: Selado OP18"; no início, cada inscrito recebe os
-  boosters, há a fase de montagem com relógio e o deck congela, como já congela a lista na inscrição hoje.
+**Modelo do booster** (por coleção, em `data/boosters/<coleção>.json`, não no código): 7 comuns, 3 incomuns, 1 vaga de
+rara ou melhor (R, SR ou SEC, com pesos) e 1 vaga variável (Líder ou carta extra). As proporções de cada produto
+precisam ser conferidas na ficha da coleção. Um modelo padrão vale para as coleções sem arquivo próprio.
 
 O **pré-release de verdade** sai de graça daqui: a coleção de spoiler que o app já acompanha (`data/spoilers`, hoje
-EB05 e OP18) vira opção do Selado quando estiver completa o bastante. Quem decide que ela abriu é um Admin.
+EB05 e OP18) vira opção quando estiver completa o bastante. Quem decide que ela abriu é um Admin.
+
+### Pack Rush
+
+- **Quem abre o pod escolhe as coleções** e quantos boosters de cada uma (tela 10): 6 no selado, 4 no draft. Há um
+  botão de sortear.
+- **A sequência é a mesma para todos os jogadores.** No draft isso é obrigatório (na rodada 2 todo mundo abre a mesma
+  coleção); no selado, é o que deixa a disputa justa.
+- Pack Rush é sempre um pod ou uma sala criada por alguém. Para jogar sozinho contra o bot, o jogador abre um pod só
+  dele.
+- Só entram na lista as coleções com booster configurado e cobertura de efeitos acima do piso. É aqui que mora o custo
+  do Pack Rush: o Selado de uma coleção só exige cuidar da coleção nova; o Pack Rush exige cuidar de todas.
+- Coleções de spoiler podem entrar se quem abre o pod marcar; os Líderes de spoiler só valem nesse caso.
+
+### Draft Cubo
+
+- O **Cubo** é uma lista fixa em `data/cubes/<id>.json`: 420 cartas, **uma cópia de cada**, 70 por cor, com curva de
+  custo equilibrada. Sem Líderes (o Líder é livre).
+- **De onde sai a lista:** das cartas mais jogadas. O app já guarda cada carta de cada deck jogado (`match_cards`) e o
+  meta global do TCG Matchmaking. Um script gera a proposta (mais usadas por cor nos últimos 90 dias), um Admin revisa
+  e publica como "temporada". Cartas ⚙ (efeito não automatizado) não entram.
+- **Os boosters** são 12 cartas sorteadas do Cubo, sem vaga de raridade e sem repetir carta no pod. Um pod de 8 usa 384
+  das 420.
+- A página do Cubo (tela 11) mostra a lista inteira e o uso de cada carta antes de o jogador entrar.
+
+### Como o jogador joga com o deck
+
+Depois de montar, o deck selado é um deck de verdade, mas preso àquelas cartas:
+
+- **Contra o bot** e **sala privada**, na hora.
+- **Fila do Selado:** pareia só decks da mesma fonte (mesma coleção; Pack Rush e Cubo jogam dentro do pod).
+- **Pod:** os jogadores do pod se enfrentam (pod de 4: semifinal e final; pod de 8: 3 rodadas de suíço),
+  reaproveitando o módulo de torneios.
+- **Evento** (fase seguinte): o organizador cria um torneio com "deck: Selado OP18", "Pack Rush" ou "Cubo"; no início,
+  cada inscrito recebe os boosters ou entra no draft, há a fase de montagem com relógio e o deck congela, como já
+  congela a lista na inscrição hoje.
 
 ### O que muda no código
 
-- **Geração dos boosters (`packages/engine/src/sealed.ts`, novo):** função pura com seed
-  (`openPacks(set, n, seed, modelo)`), testável e reproduzível como o resto do motor.
-- **Servidor é a autoridade (`apps/server/src/sealed/`, novo):** a coleção de cartas de cada jogador é sorteada e
-  gravada no servidor (`sealed_pools`: dono, coleção, seed, cartas, tipo; `sealed_decks`: a lista de 40). O cliente só
-  revela. Antes de cada partida o servidor confere que o deck sai daquela coleção.
-- **Regras de construção (`deck.ts`):** `validateDeck` ganha um perfil de regras (`constructed` ou `sealed`): tamanho
-  40, sem cor, sem limite de cópias, cartas ⊆ coleção, Líder ∈ coleção.
+- **Fonte de boosters (`packages/engine/src/sealed.ts`, novo):** função pura com seed. Três fontes com a mesma
+  interface: `set` (modelo do booster da coleção), `mix` (uma coleção por posição) e `cube` (sorteio sem reposição).
+- **Servidor é a autoridade (`apps/server/src/sealed/`, novo):** as cartas de cada jogador são sorteadas e gravadas no
+  servidor (`sealed_pools`: dono, fonte, seed, cartas, tipo; `sealed_decks`: a lista de 40). O cliente só revela. Antes
+  de cada partida o servidor confere que o deck sai daquelas cartas.
+- **Regras de construção (`deck.ts`, `formats.ts`):** `validateDeck` ganha um perfil de regras (`constructed` ou
+  `limited`): tamanho 40, sem cor, sem limite de cópias, cartas ⊆ as do jogador, e a regra do Líder (`pool` = Líder
+  aberto ou Luffy de 6 cores; `any` = qualquer Líder). No perfil `limited`, `formatIssues` não roda: nem banidas, nem
+  pares, nem rotação.
 - **Motor (`engine.ts`):** `createGame` recusa deck diferente de 50 (`DECK_SIZE`). Passa a aceitar o tamanho pela
   configuração da partida. É a única mudança no motor; replays e partidas antigas não mudam.
 - **Construtor:** um modo "coleção" do `DeckBuilder` (catálogo = suas cartas, com contador de cópias) em vez de uma
-  tela nova. "Montar sozinho" usa uma heurística simples (curva, Counters, cor dominante).
+  tela nova, mais o seletor de Líder. "Montar sozinho" usa uma heurística simples (curva, Counters, cor dominante).
 - **Draft (`apps/server/src/draft/`, novo):** sala em tempo real pelo mesmo transporte das partidas (SSE + POST):
   lugares, boosters em rodízio, relógio por escolha, reconexão, e retomada depois de deploy (gravar o estado, como
-  `live_matches`). Bots de draft escolhem por uma nota simples (raridade, custo, poder, palavra-chave).
-- **Estatísticas:** partidas do Selado ficam fora do meta do construído (`countsInStats`). Um placar próprio por deck
-  selado (vitórias e derrotas) basta.
+  `live_matches`). Bots de draft escolhem por uma nota simples (raridade, custo, poder, palavra-chave; no Cubo, o uso
+  da carta).
+- **Cubo:** o script que gera a proposta a partir das estatísticas, o arquivo da temporada, a página da lista e uma
+  tela de Admin para revisar e publicar.
 - **Idiomas:** todo texto novo nos seis idiomas da interface.
 
 ### Riscos
 
 - **Cartas ⚙ (efeito não automatizado):** no construído o jogador evita; no Selado elas saem no booster. Proposta:
-  a coleção só entra no Selado acima de um piso de cobertura, e a carta ⚙ aparece marcada na abertura.
+  a coleção só entra acima de um piso de cobertura, e a carta ⚙ aparece marcada na abertura. No Cubo elas ficam de fora.
+- **Qualquer Líder com qualquer cor:** sem a trava de cor, alguns Líderes ficam muito acima dos outros no Pack Rush e
+  no Cubo. É esperado num modo por diversão; se virar problema, dá para ter uma lista de Líderes fora desses modos.
 - **Coleção de spoiler incompleta:** sem todas as cartas e raridades não dá para montar booster. Por isso a abertura é
   uma decisão de Admin, não automática.
 - **Bot com deck de 40 sem perfil:** o bot genérico joga qualquer lista, mas pior que com os decks do meta. Aceitável
   para treino.
 
-### Decisões que são suas
+### Decisões
 
-4. **Líder:** como na tabela (1 por booster no Pré-release; 1 de 3 no Draft), ou outra regra?
-5. **Draft:** pod de 8 com bots completando, ou só pods de 4 para encher mais rápido?
-6. **Vida do deck selado:** jogar à vontade enquanto a coleção estiver no ar (o que as telas mostram), ou formato de
+Já decididas por você: Líder (Luffy de 6 cores nos modos de uma coleção; qualquer Líder nos de várias) e banidas (valem
+em todos os modos limitados).
+
+4. **Pack Rush:** a mesma sequência de boosters para todos (proposta), ou cada jogador recebe boosters sorteados entre
+   as coleções escolhidas?
+5. **Cubo:** 420 cartas com uma cópia de cada serve? E a lista sai das estatísticas do próprio app, do meta global, ou
+   você prefere montar à mão?
+6. **Draft:** pod de 8 com bots completando, ou só pods de 4 para encher mais rápido?
+7. **Vida do deck selado:** jogar à vontade enquanto a fonte estiver no ar (o que as telas mostram), ou formato de
    "corrida" que termina com X derrotas?
 
 ## 4. Yonko (mesa de 4)
@@ -215,10 +281,10 @@ Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot 
 
 ### Decisões que são suas
 
-7. **Regra dos efeitos:** as três regras acima servem, ou a sua mesa joga diferente (por exemplo, efeitos em área
+8. **Regra dos efeitos:** as três regras acima servem, ou a sua mesa joga diferente (por exemplo, efeitos em área
    atingindo todos os oponentes)?
-8. **Recompensa por eliminação:** comprar 1 carta, outra coisa, ou nada?
-9. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos?
+9. **Recompensa por eliminação:** comprar 1 carta, outra coisa, ou nada?
+10. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos?
 
 ## 5. O que não muda
 
@@ -229,9 +295,10 @@ Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot 
 
 ## 6. Fontes
 
-- Selado e formatos de evento: [Tournament Rules Manual](https://en.onepiece-cardgame.com/pdf/tournament_rules_manual.pdf?20260116)
-  e [5 Packs Battle Rules](https://asia-en.onepiece-cardgame.com/pdf/rule_5packs-battle.pdf) (Bandai). O PDF
-  `rule_sealed.pdf` não abriu daqui; vale conferir o número de boosters e a regra do Líder nele antes de fechar.
+- Selado: as páginas dos eventos [Sealed Battle 2023 Vol.1](https://en.onepiece-cardgame.com/events/2023/sealed_battle_vol1/)
+  e [Sealed Battle 2024 Vol.1](https://en.onepiece-cardgame.com/events/2024/sealed_battle_vol1/) confirmam os 6
+  boosters e o Líder de 6 cores. Regras de deck: [Tournament Rules Manual](https://en.onepiece-cardgame.com/pdf/tournament_rules_manual.pdf?20260116)
+  e [5 Packs Battle Rules](https://asia-en.onepiece-cardgame.com/pdf/rule_5packs-battle.pdf) (Bandai).
 - Regras para mais de 2 jogadores: as [Comprehensive Rules](https://en.onepiece-cardgame.com/pdf/rule_comprehensive.pdf)
   dizem que o jogo é para dois e que não há regra oficial para três ou mais. O Yonko é regra da casa.
 - Eventos temáticos oficiais (referência para listas de Líderes): [Pirates Party 2026 Vol. 3](https://en.onepiece-cardgame.com/events/pirates-party-vol3-2026.html).
