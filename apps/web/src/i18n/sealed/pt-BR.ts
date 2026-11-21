@@ -218,6 +218,7 @@ const sealedPtBR = {
   'cube.sourceTitle': 'De onde sai a lista',
   'cube.sourceText': 'Das decklists de {decks} decks em {tournaments} torneios online de One Piece, de {from} a {to}. Entram as mais usadas de cada cor, com custos variados. Líderes e cartas com efeito ainda não automatizado (⚙) ficam de fora.',
   'errors.cubeUnavailable': 'O Cubo não está disponível neste servidor.',
+  'sealed.openingPack': 'Abrindo o booster {n} de {total}',
 };
 
 export default sealedPtBR;

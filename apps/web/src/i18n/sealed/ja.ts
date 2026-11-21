@@ -217,6 +217,7 @@ const sealed = {
   'cube.sourceTitle': 'リストの出どころ',
   'cube.sourceText': '{from}から{to}までのワンピースのオンライン大会{tournaments}件、{decks}デッキのデッキリストから作りました。色ごとに最も使われたカードを、コストが偏らないように選んでいます。リーダーと、効果がまだ自動化されていないカード（⚙）は入りません。',
   'errors.cubeUnavailable': 'このサーバーではキューブを利用できません。',
+  'sealed.openingPack': 'ブースター {n}/{total} を開封中',
 };
 
 export default sealed;

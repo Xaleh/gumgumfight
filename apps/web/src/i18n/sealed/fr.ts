@@ -217,6 +217,7 @@ const sealed = {
   'cube.sourceTitle': 'D’où vient la liste',
   'cube.sourceText': 'Des decklists de {decks} decks dans {tournaments} tournois en ligne de One Piece, du {from} au {to}. Les plus jouées de chaque couleur sont retenues, avec des coûts variés. Les Leaders et les cartes dont l’effet n’est pas encore automatisé (⚙) sont exclus.',
   'errors.cubeUnavailable': 'Le Cube n’est pas disponible sur ce serveur.',
+  'sealed.openingPack': 'Ouverture du booster {n} sur {total}',
 };
 
 export default sealed;

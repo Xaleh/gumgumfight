@@ -10,6 +10,7 @@ import { api, ApiError, type DraftPod } from '../api';
 import { type MessageKey, useT } from '../i18n';
 import { poll } from '../poll';
 import { cardText, useSettings } from '../settings';
+import { BoosterOpening } from './BoosterPack';
 import { CardHoverPreview, StaticCardZoom } from './CardInfo';
 import { StaticCard } from './CardView';
 
@@ -31,7 +32,10 @@ const clock = (ms: number) => {
 
 export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () => void; onBuild: (poolId: string) => void }) {
   const t = useT();
-  const { locale } = useSettings();
+  const { locale, animations } = useSettings();
+  /** Rodada cujo booster está sendo aberto na tela (animações completas ligadas). */
+  const [openingRound, setOpeningRound] = useState<number | null>(null);
+  const openedRound = useRef<number | null>(null);
   const [pod, setPod] = useState<DraftPod | null>(null);
   const [cards, setCards] = useState<CardData[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +87,14 @@ export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () =>
       setHovered(null);
     }
   }, [packKey]);
+
+  // Booster novo e cheio na mão: é o da rodada que começou. Abre na tela uma vez por rodada.
+  const freshRound = pod?.status === 'drafting' && pod.pack?.length === pod.packSize ? pod.round : null;
+  useEffect(() => {
+    if (freshRound === null || openedRound.current === freshRound) return;
+    openedRound.current = freshRound;
+    if (animations === 'full' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) setOpeningRound(freshRound);
+  }, [freshRound, animations]);
 
   const byId = useMemo(() => new Map((cards ?? []).map((c) => [c.id, c])), [cards]);
   const act = async (fn: () => Promise<DraftPod | void>) => {
@@ -347,6 +359,9 @@ export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () =>
       </div>
       {canHover && hovered && !zoom && <CardHoverPreview card={hovered.card} anchor={hovered.anchor} />}
       {zoom && <StaticCardZoom card={zoom} onClose={() => setZoom(null)} />}
+      {openingRound !== null && (
+        <BoosterOpening key={openingRound} set={pod.packSet ?? pod.sets} label={t('draft.round', { n: openingRound, total: pod.rounds })} fast onDone={() => setOpeningRound(null)} />
+      )}
     </div>
   );
 }

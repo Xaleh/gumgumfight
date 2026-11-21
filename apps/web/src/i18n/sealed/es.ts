@@ -217,6 +217,7 @@ const sealed = {
   'cube.sourceTitle': 'De dónde sale la lista',
   'cube.sourceText': 'De las listas de {decks} mazos en {tournaments} torneos online de One Piece, del {from} al {to}. Entran las más usadas de cada color, con costes variados. Los Líderes y las cartas con efecto aún no automatizado (⚙) quedan fuera.',
   'errors.cubeUnavailable': 'El Cubo no está disponible en este servidor.',
+  'sealed.openingPack': 'Abriendo el sobre {n} de {total}',
 };
 
 export default sealed;

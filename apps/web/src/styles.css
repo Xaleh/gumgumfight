@@ -16941,6 +16941,37 @@ div.dk-tile-main {
   color: var(--cream);
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
 }
+/* Com a arte do produto: a imagem do booster ocupa o lugar do desenho. */
+.sealed-pack img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(var(--shadow-rgb), 0.35));
+}
+.sealed-pack.art {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+.sealed-pack.art::before,
+.sealed-pack.art::after,
+.sealed-pack.art b {
+  display: none;
+}
+.sealed-pack.big {
+  width: min(230px, 46vw);
+  border-radius: 14px;
+}
+.sealed-pack.big b {
+  font-size: 54px;
+}
+.sealed-pack.big::before,
+.sealed-pack.big::after {
+  height: 14px;
+}
 .sealed-pack.small {
   width: 54px;
   border-radius: 7px;
@@ -17147,6 +17178,10 @@ div.dk-tile-main {
 .sealed-reveal-card {
   animation: sealed-flip 0.34s ease-out backwards;
   animation-delay: calc(var(--i, 0) * 45ms);
+}
+/* Animações desligadas nas configurações: as cartas aparecem de uma vez. */
+.sealed-grid.still .sealed-reveal-card {
+  animation: none;
 }
 .sealed-reveal-card.hit .card {
   box-shadow: 0 0 22px rgba(247, 205, 72, 0.6);
@@ -17666,5 +17701,162 @@ div.dk-tile-main {
     --cw: 88px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px 4px;
+  }
+}
+
+/* ---- Abrindo um booster: treme, o topo rasga, as cartas sobem ---- */
+.pack-opening {
+  --dur: 1700ms;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  background: radial-gradient(circle at 50% 45%, rgba(10, 20, 36, 0.86), rgba(4, 9, 18, 0.95));
+  cursor: pointer;
+  animation: pack-veil var(--dur) ease-in-out both;
+}
+.pack-opening.fast {
+  --dur: 1000ms;
+}
+.pack-opening-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  animation: pack-shake var(--dur) ease-in-out both;
+}
+.pack-opening-body,
+.pack-opening-top {
+  grid-area: 1 / 1;
+  position: relative;
+}
+/* O corpo fica com tudo abaixo do corte; o topo, com a tira de cima, que sai voando. */
+.pack-opening-body {
+  clip-path: inset(11% -30% -30% -30%);
+  z-index: 2;
+}
+.pack-opening-top {
+  clip-path: inset(-30% -30% 89% -30%);
+  z-index: 3;
+  transform-origin: 85% 11%;
+  animation: pack-tear var(--dur) cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+.pack-opening-glow {
+  grid-area: 1 / 1;
+  align-self: start;
+  width: 150%;
+  aspect-ratio: 1;
+  margin-top: -52%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 236, 170, 0.95), rgba(247, 205, 72, 0.45) 35%, transparent 68%);
+  z-index: 0;
+  animation: pack-glow var(--dur) ease-out both;
+}
+.pack-opening-cards {
+  grid-area: 1 / 1;
+  position: relative;
+  width: 74%;
+  aspect-ratio: 63 / 88;
+  z-index: 1;
+}
+.pack-opening-cards i {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: url('./assets/card-back.webp') center / 100% 100% no-repeat;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --spread: calc((var(--i) - 2) * 1);
+  animation: pack-cards var(--dur) cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.pack-opening-label {
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 26px;
+  letter-spacing: 1.5px;
+  color: var(--cream);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+}
+@keyframes pack-veil {
+  0% {
+    opacity: 0;
+  }
+  10%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pack-shake {
+  0% {
+    transform: translateY(40px) scale(0.86);
+  }
+  12% {
+    transform: translateY(0) scale(1);
+  }
+  18% {
+    transform: rotate(-3deg);
+  }
+  24% {
+    transform: rotate(3deg);
+  }
+  30% {
+    transform: rotate(-2.5deg) scale(1.03);
+  }
+  36% {
+    transform: rotate(2.5deg) scale(1.03);
+  }
+  42%,
+  100% {
+    transform: rotate(0) scale(1.03);
+  }
+}
+@keyframes pack-tear {
+  0%,
+  40% {
+    transform: none;
+    opacity: 1;
+  }
+  52% {
+    transform: translate(4%, -6%) rotate(8deg);
+    opacity: 1;
+  }
+  75%,
+  100% {
+    transform: translate(60%, -90%) rotate(48deg);
+    opacity: 0;
+  }
+}
+@keyframes pack-glow {
+  0%,
+  40% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+@keyframes pack-cards {
+  0%,
+  46% {
+    transform: translateY(6%) scale(0.92);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  86%,
+  100% {
+    transform: translate(calc(var(--spread) * 34%), calc(-62% + (var(--spread) * var(--spread)) * 5%)) rotate(calc(var(--spread) * 9deg)) scale(1);
+    opacity: 1;
   }
 }
