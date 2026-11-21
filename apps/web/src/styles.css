@@ -17193,11 +17193,6 @@ div.dk-tile-main {
     transform: translateY(14px) rotateY(70deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .sealed-reveal-card {
-    animation: none;
-  }
-}
 .sealed-actions {
   display: flex;
   flex-wrap: wrap;

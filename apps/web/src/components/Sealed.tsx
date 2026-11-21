@@ -486,9 +486,10 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
   const [shown, setShown] = useState(() => Math.max(0, opened - 1));
   const peek = useCardPeek();
   const { animations } = useSettings();
-  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
-  /** Animações completas: cada booster é aberto na tela antes de as cartas aparecerem. */
-  const showy = animations === 'full' && !reducedMotion;
+  // Com as animações ligadas, cada booster é aberto na tela antes de as cartas aparecerem (nas suaves,
+  // na versão curta). Só a opção do app decide: muitos celulares ligam "reduzir movimento" sozinhos
+  // (economia de bateria) e a abertura sumiria sem o jogador saber por quê, como na mesa (GameScreen).
+  const showy = animations !== 'off';
   /** Boosters sendo abertos agora, um de cada vez: do `at` (o que está na tela) até o `to`. */
   const [opening, setOpening] = useState<{ at: number; to: number; many: boolean } | null>(null);
   const reveal = (n: number) => {
@@ -633,7 +634,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
           key={opening.at}
           set={packSet(opening.at)}
           label={t('sealed.openingPack', { n: opening.at + 1, total })}
-          fast={opening.many}
+          fast={opening.many || animations === 'soft'}
           onDone={openedOne}
           onSkip={skipOpening}
         />

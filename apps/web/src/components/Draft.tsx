@@ -33,7 +33,7 @@ const clock = (ms: number) => {
 export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () => void; onBuild: (poolId: string) => void }) {
   const t = useT();
   const { locale, animations } = useSettings();
-  /** Rodada cujo booster está sendo aberto na tela (animações completas ligadas). */
+  /** Rodada cujo booster está sendo aberto na tela (animações ligadas). */
   const [openingRound, setOpeningRound] = useState<number | null>(null);
   const openedRound = useRef<number | null>(null);
   const [pod, setPod] = useState<DraftPod | null>(null);
@@ -93,7 +93,8 @@ export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () =>
   useEffect(() => {
     if (freshRound === null || openedRound.current === freshRound) return;
     openedRound.current = freshRound;
-    if (animations === 'full' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) setOpeningRound(freshRound);
+    // Só a opção do app decide (não o "reduzir movimento" do sistema), como na mesa.
+    if (animations !== 'off') setOpeningRound(freshRound);
   }, [freshRound, animations]);
 
   const byId = useMemo(() => new Map((cards ?? []).map((c) => [c.id, c])), [cards]);
