@@ -7,6 +7,7 @@ import recapPtBR from './recap/pt-BR';
 import decksPtBR from './decks/pt-BR';
 import teamPtBR from './team/pt-BR';
 import chamberPtBR from './chamber/pt-BR';
+import sealedPtBR from './sealed/pt-BR';
 
 const ptBR = {
   // ---- geral ----
@@ -356,6 +357,8 @@ const ptBR = {
   'menu.chipNoManual': 'Sem efeitos manuais',
   'menu.chipReleasedOnly': 'Só cartas lançadas',
   'menu.rankedNeedsLogin': 'Entre com o Google para jogar a ranqueada.',
+  'menu.rankedNotInFormat': 'O {format} não tem ranqueada. Jogue na partida rápida.',
+  'menu.allBlueChip': 'Só C, UC, R e promo',
   'menu.rankedSpoilers': '{n|O deck tem # carta de spoiler, ainda não lançada: a ranqueada só aceita cartas lançadas.|O deck tem # cartas de spoiler, ainda não lançadas: a ranqueada só aceita cartas lançadas.}',
   'menu.rankedManualCards':
     '{n|O deck tem # carta com efeito manual (⚙), que a ranqueada não permite.|O deck tem # cartas com efeito manual (⚙), que a ranqueada não permite.}',
@@ -567,6 +570,7 @@ const ptBR = {
   'deck.searchHelp.vanilla': 'Sem efeito',
   'deck.searchHelp.indeck': 'Já está no deck',
   'deck.searchHelp.legality': 'No Standard: banida · permitida · rotacionada',
+  'deck.searchHelp.allBlue': 'Vale no All Blue (C, UC, R e promo)',
   'deck.searchHelp.new': 'Ainda não lançada (spoiler)',
   'deck.searchHelp.not': 'Tira o que casar',
   'deck.searchHelp.phrase': 'Frase exata',
@@ -598,7 +602,7 @@ const ptBR = {
   'deck.manualTitle': 'Efeito ainda não automatizado',
   'deck.showMore': 'Mostrar mais ({n})',
   'deck.loadingCards': 'Carregando cartas…',
-  'deck.bannedTitle': 'Banida: não vale em nenhum formato',
+  'deck.bannedTitle': 'Banida: não vale no Standard nem no Extra Grand Battle',
   'deck.rotatedTitle': 'Bloco ①: rotacionada, vale só no Extra Grand Battle',
   // ---- deck atual ----
   'deck.leader': 'Líder',
@@ -613,6 +617,9 @@ const ptBR = {
   'deck.entryManual': '⚙ manual',
   'deck.entryRotated': '① rotacionada (só EGB)',
   'deck.entryBanned': '🚫 banida',
+  'deck.entryNotAllBlue': 'fora do All Blue',
+  'deck.onlyAllBlue': 'Montar para o All Blue',
+  'deck.onlyAllBlueTitle': 'Mostra só as cartas que valem no All Blue (C, UC, R e promo; Líder livre) e marca na lista as que não valem.',
   'deck.removeOne': 'Remover uma',
   'deck.addOne': 'Adicionar uma',
   'deck.allowedIn': 'Permitido no {format}',
@@ -2849,6 +2856,7 @@ const ptBR = {
   'errors.tooManyRoomsRecently': 'Você abriu partidas demais em pouco tempo; espere alguns minutos.',
   'errors.alreadyPlaying': 'Você já está numa partida online.',
   'errors.rankedLoginRequired': 'A ranqueada é só para quem entrou com a conta Google.',
+  'errors.rankedNotInFormat': 'O {format} não tem fila ranqueada.',
   'errors.invalidRoomCode': 'Código de sala inválido.',
   'errors.roomNotFound': 'Sala não encontrada ou já começou.',
   'errors.ownRoom': 'Esta sala é sua: envie o código para outra pessoa.',
@@ -2992,6 +3000,7 @@ const ptBR = {
   'labels.deckGroup.mine': 'Meus decks',
   'labels.deckGroup.community': 'Decks da comunidade',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'Decks do All Blue',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Quartas de final',
@@ -3016,9 +3025,12 @@ const ptBR = {
   'rules.leaderColor': '{name} ({id}) não tem a cor do Líder.',
   'rules.unscripted': '{n|# carta|# cartas} com efeito ainda não automatizado (aplicado à mão, com as ferramentas manuais).',
   // ---- formatos (formatIssues) ----
-  'rules.banned': '{id} está banida (não vale em nenhum formato).',
+  'rules.banned': '{id} está banida (não vale no Standard nem no Extra Grand Battle).',
   'rules.rotated': '{id} tem o bloco ① e rotacionou: não vale no {format}.',
   'rules.bannedPair': '{a} e {b} não podem ser usadas juntas no mesmo deck.',
+  'rules.bannedIn': '{id} está banida no {format}.',
+  'rules.rarity': '{id} é {rarity}: não vale no {format} (só C, UC, R e promo).',
+  'rules.rarityUnknown': '{id} não tem raridade conhecida: não vale no {format}.',
   'rules.spoiler': '{n|Carta ainda não lançada (spoiler)|Cartas ainda não lançadas (spoilers)}: {ids}. Spoilers só valem na fila casual e nas salas privadas, treinos contra o bot e torneios com spoilers.',
   'rules.spoilerNotNext': '{n|Carta de spoiler de outra coleção|Cartas de spoiler de outras coleções}: {ids}. Com spoilers, fora do Livre, só vale a próxima coleção a ser lançada ({set}); as demais, só no Livre.',
   // ---- lista em texto (parseDeckList) ----
@@ -3086,6 +3098,8 @@ const ptBR = {
   ...teamPtBR,
   // ==== Sala do Tempo: torneio simulado do Time com jogadores virtuais (i18n/chamber) ====
   ...chamberPtBR,
+  // ==== Selado: boosters, deck de 40 e as partidas com ele (i18n/sealed) ====
+  ...sealedPtBR,
 } as const;
 
 

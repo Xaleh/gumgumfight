@@ -88,11 +88,11 @@ export function deckIssue(
   t: Pick<Tournament, 'format' | 'spoilers'> & Partial<Pick<Tournament, 'spoilerSet' | 'status'>>,
   at: Date,
 ): FormatIssue | null {
-  const issue = formatIssues(deck, t.format, at)[0];
-  const rule = spoilerRule(t);
-  if (issue || rule === 'all') return issue ?? null;
   const ids = [deck.leader, ...deck.cards.map((c) => c.id)];
   const cards = new Map(getCards(db, ids).map((c) => [c.id, c as CardData]));
+  const issue = formatIssues(deck, t.format, at, cards)[0];
+  const rule = spoilerRule(t);
+  if (issue || rule === 'all') return issue ?? null;
   return spoilerIssues(deck, cards, rule, tournamentSpoilerSet(db, t))[0] ?? null;
 }
 

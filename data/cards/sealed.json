@@ -1,0 +1,22 @@
+{
+  "set": "SEALED",
+  "title": "Selado: Líder de 6 cores dos eventos Sealed Battle",
+  "provisional": false,
+  "note": "Carta de evento sem número impresso (só \"P\"): o id é nosso. A imagem fica em apps/web/public/cards. Só vale no Selado e no Livre (formats.ts, SEALED_LEADER_ID).",
+  "cards": [
+    {
+      "id": "SEALED-001",
+      "name": "Monkey.D.Luffy",
+      "category": "leader",
+      "colors": ["red", "green", "blue", "purple", "black", "yellow"],
+      "life": 5,
+      "power": 5000,
+      "attributes": ["Strike"],
+      "types": ["Straw Hat Crew"],
+      "text": "This Leader can only be used in designated events according to the rules.\nThis Leader is treated as a card with all card names, types, and attributes according to the rules.",
+      "set": "SEALED",
+      "rarity": "L",
+      "imageUrl": "/cards/SEALED-001.webp"
+    }
+  ]
+}

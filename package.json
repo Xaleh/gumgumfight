@@ -16,6 +16,7 @@
     "typecheck": "tsc -p packages/engine && tsc -p apps/server && tsc -p apps/web",
     "db:seed": "npm run db:seed -w @gumgum/server --",
     "cards:import": "npm run cards:import -w @gumgum/server --",
+    "cube:build": "npm run cube:build -w @gumgum/server --",
     "build:release": "bash scripts/build-release.sh",
     "oauth:client": "npm run oauth:client -w @gumgum/server --"
   },

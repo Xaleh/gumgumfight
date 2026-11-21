@@ -634,7 +634,7 @@ describe('partidas online: contadores do menu', () => {
       online: 0,
       playing: { private: 0, casual: 0, ranked: 0, bot: 0, tournament: 0 },
       waiting: 0,
-      queue: { casual: { standard: 0, egb: 0 }, ranked: { standard: 0, egb: 0 } },
+      queue: { casual: { standard: 0, egb: 0, allblue: 0 }, ranked: { standard: 0, egb: 0, allblue: 0 } },
       spectators: 0,
     });
 

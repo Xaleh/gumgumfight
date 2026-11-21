@@ -220,6 +220,19 @@ describe('ligados ao deck', () => {
     expect(ids('-legal')).toEqual(['ST10-001', 'OP01-006']);
   });
 
+  it('allblue traz o que vale no All Blue: C, UC, R, promo e os Líderes', () => {
+    const ids = (query: string) => CARDS.filter((c) => matchesCardQuery(c, parseCardQuery(query))).map((c) => c.id);
+    const out = CARDS.filter((c) => c.rarity === 'SR' || c.rarity === 'SEC').map((c) => c.id);
+    expect(out.length).toBeGreaterThan(0);
+    expect(ids('-allblue leader char event stage').sort()).toEqual([...out].sort());
+    expect(ids('allblue sr')).toEqual([]);
+    // Os Líderes entram na busca quando pedidos; no All Blue todos valem.
+    expect(ids('allblue leader')).toEqual(CARDS.filter((c) => c.category === 'leader').map((c) => c.id));
+    // A promo vale; a banida pela Bandai também (a lista dela não se aplica ao All Blue).
+    expect(ids('allblue promo')).toEqual(['P-041']);
+    expect(matchesCardQuery(card({ id: 'OP06-116', rarity: 'R', category: 'event' }), parseCardQuery('allblue'))).toBe(true);
+  });
+
   it('new traz as cartas ainda não lançadas', () => {
     expect(search('new')).toEqual(['OP18-023']);
     expect(search('spoiler')).toEqual(['OP18-023']);

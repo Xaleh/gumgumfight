@@ -65,6 +65,8 @@ import { registerEngineTextRoutes } from './card-engine-texts';
 import { registerCardGapRoutes } from './card-gaps';
 import { registerDeckCleanupRoutes } from './decks/cleanup';
 import { registerCardImageRoutes } from './card-images';
+import { registerDraftRoutes } from './draft/routes';
+import { registerSealedRoutes } from './sealed/routes';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
 import { currentSpoilerSet } from './spoiler-set';
@@ -224,13 +226,15 @@ export function buildApp(
   const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null, usage: DeckUsage = usageFor(viewer)) => {
     const report = validateDeck(deck, cards);
     const leader = cards.get(deck.leader);
-    const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id)] as const);
+    const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id, undefined, cards)] as const);
     return {
       id: deck.id,
       name: deck.name,
       kind: deck.kind,
       /** Deck do meta global (data/decks/meta): o grupo "Decks do meta" e o Bot do Time. */
       meta: deck.group === 'meta',
+      /** Deck pronto do All Blue (data/decks/allblue): só entra no sorteio do oponente nesse formato. */
+      allBlue: deck.group === 'allblue',
       leader: deck.leader,
       leaderName: leader?.name ?? null,
       leaderImage: (server.cardImages && leader && artImage(leader, deck.arts?.[leader.id])) || null,
@@ -490,6 +494,9 @@ export function buildApp(
     syncHours: opts.now ? 0 : apoiaseSyncHours(),
   });
   registerTutorialRoutes(app, { db, viewerHash, user: auth.viewer, now: opts.now });
+  registerSealedRoutes(app, { db, viewerHash });
+  // Exposto para os testes (os prazos das escolhas e os bots ficam na memória do servidor).
+  app.decorate('draftPods', registerDraftRoutes(app, { db, viewerHash, now: opts.now }));
 
   app.get('/api/matches', async () => recentMatches(db));
 

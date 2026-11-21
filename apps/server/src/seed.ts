@@ -32,6 +32,15 @@ export function seed(db: DB) {
       decks++;
     }
   }
+  // Decks prontos do All Blue (data/decks/allblue/<id>.json): só cartas C, UC, R e promo. Ficam num
+  // grupo à parte para não entrarem no sorteio do oponente nem na Sala do Tempo dos outros formatos.
+  const allBlueDir = join(decksDir, 'allblue');
+  if (existsSync(allBlueDir)) {
+    for (const f of readdirSync(allBlueDir).filter((f) => f.endsWith('.json'))) {
+      upsertDeck(db, JSON.parse(readFileSync(join(allBlueDir, f), 'utf8')) as DeckList, 'builtin', null, 'allblue');
+      decks++;
+    }
+  }
   // Traduções manuais: data/translations/<lang>.json -> { "cards": { "ID": { "text", "trigger" } } }
   let translations = 0;
   const trDir = join(DATA_DIR, 'translations');

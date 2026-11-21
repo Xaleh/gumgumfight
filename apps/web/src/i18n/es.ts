@@ -7,6 +7,7 @@ import recap from './recap/es';
 import decks from './decks/es';
 import team from './team/es';
 import chamber from './chamber/es';
+import sealed from './sealed/es';
 
 export default {
   // ---- general ----
@@ -356,6 +357,8 @@ export default {
   'menu.chipNoManual': 'Sin efectos manuales',
   'menu.chipReleasedOnly': 'Solo cartas lanzadas',
   'menu.rankedNeedsLogin': 'Inicia sesión con Google para jugar clasificatoria.',
+  'menu.rankedNotInFormat': '{format} no tiene clasificatoria. Juégalo en partida rápida.',
+  'menu.allBlueChip': 'Solo C, UC, R y promo',
   'menu.rankedSpoilers': '{n|El mazo tiene # carta de spoiler aún no lanzada: la clasificatoria solo admite cartas lanzadas.|El mazo tiene # cartas de spoiler aún no lanzadas: la clasificatoria solo admite cartas lanzadas.}',
   'menu.rankedManualCards':
     '{n|El mazo tiene # carta con efecto manual (⚙), algo que la clasificatoria no permite.|El mazo tiene # cartas con efectos manuales (⚙), algo que la clasificatoria no permite.}',
@@ -566,6 +569,7 @@ export default {
   'deck.searchHelp.vanilla': 'Sin efecto',
   'deck.searchHelp.indeck': 'Ya está en el mazo',
   'deck.searchHelp.legality': 'En Standard: prohibida · válida · rotada',
+  'deck.searchHelp.allBlue': 'Válida en All Blue (C, UC, R y promo)',
   'deck.searchHelp.new': 'Sin lanzar (spoiler)',
   'deck.searchHelp.not': 'Quita lo que coincida',
   'deck.searchHelp.phrase': 'Frase exacta',
@@ -597,7 +601,7 @@ export default {
   'deck.manualTitle': 'Efecto aún no automatizado',
   'deck.showMore': 'Mostrar más ({n})',
   'deck.loadingCards': 'Cargando cartas…',
-  'deck.bannedTitle': 'Prohibida: no es válida en ningún formato',
+  'deck.bannedTitle': 'Prohibida: no es válida en Standard ni en Extra Grand Battle',
   'deck.rotatedTitle': 'Bloque ①: rotada, solo válida en Extra Grand Battle',
   // ---- mazo actual ----
   'deck.leader': 'Líder',
@@ -612,6 +616,9 @@ export default {
   'deck.entryManual': '⚙ manual',
   'deck.entryRotated': '① rotada (solo EGB)',
   'deck.entryBanned': '🚫 prohibida',
+  'deck.entryNotAllBlue': 'fuera de All Blue',
+  'deck.onlyAllBlue': 'Construir para All Blue',
+  'deck.onlyAllBlueTitle': 'Muestra solo las cartas válidas en All Blue (C, UC, R y promo; Líder libre) y marca en la lista las que no lo son.',
   'deck.removeOne': 'Quitar una',
   'deck.addOne': 'Añadir una',
   'deck.allowedIn': 'Válido en {format}',
@@ -2845,6 +2852,7 @@ export default {
   'errors.tooManyRoomsRecently': 'Abriste demasiadas partidas en poco tiempo; espera unos minutos.',
   'errors.alreadyPlaying': 'Ya estás en una partida online.',
   'errors.rankedLoginRequired': 'La clasificatoria es solo para jugadores con sesión iniciada en una cuenta de Google.',
+  'errors.rankedNotInFormat': '{format} no tiene cola clasificatoria.',
   'errors.invalidRoomCode': 'Código de sala no válido.',
   'errors.roomNotFound': 'Sala no encontrada o ya empezada.',
   'errors.ownRoom': 'Esta es tu sala: envía el código a otra persona.',
@@ -2988,6 +2996,7 @@ export default {
   'labels.deckGroup.mine': 'Mis mazos',
   'labels.deckGroup.community': 'Mazos de la comunidad',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'Mazos de All Blue',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Cuartos de final',
@@ -3012,9 +3021,12 @@ export default {
   'rules.leaderColor': '{name} ({id}) no comparte ningún color con el Líder.',
   'rules.unscripted': '{n|# carta|# cartas} con efecto aún no automatizado (se aplica a mano, con las herramientas manuales).',
   // ---- formatos (formatIssues) ----
-  'rules.banned': '{id} está prohibida (no es válida en ningún formato).',
+  'rules.banned': '{id} está prohibida (no es válida en Standard ni en Extra Grand Battle).',
   'rules.rotated': '{id} es del bloque ① y rotó: no es válida en {format}.',
   'rules.bannedPair': '{a} y {b} no se pueden usar juntas en el mismo mazo.',
+  'rules.bannedIn': '{id} está prohibida en {format}.',
+  'rules.rarity': '{id} es {rarity}: no es válida en {format} (solo C, UC, R y promo).',
+  'rules.rarityUnknown': '{id} no tiene rareza conocida: no es válida en {format}.',
   'rules.spoiler': '{n|Carta aún no lanzada (spoiler)|Cartas aún no lanzadas (spoilers)}: {ids}. Los spoilers solo valen en la cola casual y en salas privadas, entrenamientos contra el bot y torneos con spoilers.',
   'rules.spoilerNotNext': '{n|Carta de spoiler de otra colección|Cartas de spoiler de otras colecciones}: {ids}. Con spoilers, fuera de Libre, solo vale la próxima colección en salir ({set}); las demás, solo en Libre.',
   // ---- lista de texto (parseDeckList) ----
@@ -3079,5 +3091,6 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
 } satisfies Messages;
 

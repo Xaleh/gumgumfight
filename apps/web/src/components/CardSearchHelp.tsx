@@ -40,6 +40,7 @@ const GROUPS: Array<{ title: MessageKey; rows: Array<{ codes: string[]; text: Me
     rows: [
       { codes: ['indeck'], text: 'deck.searchHelp.indeck' },
       { codes: ['banned', 'legal', 'rotated'], text: 'deck.searchHelp.legality' },
+      { codes: ['allblue'], text: 'deck.searchHelp.allBlue' },
       { codes: ['new'], text: 'deck.searchHelp.new' },
     ],
   },

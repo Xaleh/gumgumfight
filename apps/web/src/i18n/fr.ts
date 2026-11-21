@@ -7,6 +7,7 @@ import recap from './recap/fr';
 import decks from './decks/fr';
 import team from './team/fr';
 import chamber from './chamber/fr';
+import sealed from './sealed/fr';
 
 export default {
   // ---- general ----
@@ -356,6 +357,8 @@ export default {
   'menu.chipNoManual': 'Sans effets manuels',
   'menu.chipReleasedOnly': 'Cartes sorties uniquement',
   'menu.rankedNeedsLogin': 'Connectez-vous avec Google pour jouer en classée.',
+  'menu.rankedNotInFormat': '{format} n’a pas de classée. Jouez-le en partie rapide.',
+  'menu.allBlueChip': 'C, UC, R et promo uniquement',
   'menu.rankedSpoilers': '{n|Le deck contient # carte spoiler pas encore sortie : la classée n’accepte que les cartes sorties.|Le deck contient # cartes spoilers pas encore sorties : la classée n’accepte que les cartes sorties.}',
   'menu.rankedManualCards':
     '{n|Le deck contient # carte à effet manuel (⚙), ce que la classée n’autorise pas.|Le deck contient # cartes à effet manuel (⚙), ce que la classée n’autorise pas.}',
@@ -566,6 +569,7 @@ export default {
   'deck.searchHelp.vanilla': 'Sans effet',
   'deck.searchHelp.indeck': 'Déjà dans le deck',
   'deck.searchHelp.legality': 'En Standard : bannie · légale · sortie de la rotation',
+  'deck.searchHelp.allBlue': 'Légale en All Blue (C, UC, R et promo)',
   'deck.searchHelp.new': 'Non sortie (spoiler)',
   'deck.searchHelp.not': 'Retire ce qui correspond',
   'deck.searchHelp.phrase': 'Expression exacte',
@@ -597,7 +601,7 @@ export default {
   'deck.manualTitle': 'Effet pas encore automatisé',
   'deck.showMore': 'Afficher plus ({n})',
   'deck.loadingCards': 'Chargement des cartes…',
-  'deck.bannedTitle': 'Bannie : légale dans aucun format',
+  'deck.bannedTitle': 'Bannie : légale ni en Standard ni en Extra Grand Battle',
   'deck.rotatedTitle': 'Bloc ① : sortie de la rotation, légale uniquement en Extra Grand Battle',
   // ---- current deck ----
   'deck.leader': 'Leader',
@@ -612,6 +616,9 @@ export default {
   'deck.entryManual': '⚙ manuel',
   'deck.entryRotated': '① hors rotation (EGB seulement)',
   'deck.entryBanned': '🚫 bannie',
+  'deck.entryNotAllBlue': 'hors All Blue',
+  'deck.onlyAllBlue': 'Construire pour All Blue',
+  'deck.onlyAllBlueTitle': 'Affiche uniquement les cartes légales en All Blue (C, UC, R et promo ; Leader libre) et signale dans la liste celles qui ne le sont pas.',
   'deck.removeOne': 'En retirer une',
   'deck.addOne': 'En ajouter une',
   'deck.allowedIn': 'Légal en {format}',
@@ -2845,6 +2852,7 @@ export default {
   'errors.tooManyRoomsRecently': 'Vous avez ouvert trop de parties en peu de temps ; attendez quelques minutes.',
   'errors.alreadyPlaying': 'Vous êtes déjà dans une partie en ligne.',
   'errors.rankedLoginRequired': 'La classée est réservée aux joueurs connectés avec un compte Google.',
+  'errors.rankedNotInFormat': '{format} n’a pas de file classée.',
   'errors.invalidRoomCode': 'Code de salon invalide.',
   'errors.roomNotFound': 'Salon introuvable ou déjà commencé.',
   'errors.ownRoom': 'C’est votre salon : envoyez le code à quelqu’un d’autre.',
@@ -2988,6 +2996,7 @@ export default {
   'labels.deckGroup.mine': 'Mes decks',
   'labels.deckGroup.community': 'Decks de la communauté',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'Decks All Blue',
   'labels.phase.final': 'Finale',
   'labels.phase.semifinal': 'Demi-finale',
   'labels.phase.quarterfinal': 'Quarts de finale',
@@ -3012,9 +3021,12 @@ export default {
   'rules.leaderColor': '{name} ({id}) n’a aucune couleur en commun avec le Leader.',
   'rules.unscripted': '{n|# carte|# cartes} avec un effet pas encore automatisé (appliqué à la main, avec les outils manuels).',
   // ---- formats (formatIssues) ----
-  'rules.banned': '{id} est bannie (légale dans aucun format).',
+  'rules.banned': '{id} est bannie (légale ni en Standard ni en Extra Grand Battle).',
   'rules.rotated': '{id} est du bloc ① et sortie de la rotation : non légale en {format}.',
   'rules.bannedPair': '{a} et {b} ne peuvent pas être utilisées ensemble dans le même deck.',
+  'rules.bannedIn': '{id} est bannie en {format}.',
+  'rules.rarity': '{id} est {rarity} : pas légale en {format} (C, UC, R et promo uniquement).',
+  'rules.rarityUnknown': '{id} n’a pas de rareté connue : pas légale en {format}.',
   'rules.spoiler': '{n|Carte pas encore sortie (spoiler)|Cartes pas encore sorties (spoilers)} : {ids}. Les spoilers ne sont autorisés que dans la file occasionnelle et dans les salons privés, entraînements contre le bot et tournois avec spoilers.',
   'rules.spoilerNotNext': '{n|Carte spoiler d’une autre extension|Cartes spoilers d’autres extensions} : {ids}. Avec spoilers, hors Libre, seule la prochaine extension à sortir est autorisée ({set}) ; les autres, seulement en Libre.',
   // ---- text list (parseDeckList) ----
@@ -3079,5 +3091,6 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
 } satisfies Messages;
 

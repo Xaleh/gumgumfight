@@ -7,6 +7,7 @@ import recap from './recap/en';
 import decks from './decks/en';
 import team from './team/en';
 import chamber from './chamber/en';
+import sealed from './sealed/en';
 
 export default {
   // ---- general ----
@@ -356,6 +357,8 @@ export default {
   'menu.chipNoManual': 'No manual effects',
   'menu.chipReleasedOnly': 'Released cards only',
   'menu.rankedNeedsLogin': 'Sign in with Google to play ranked.',
+  'menu.rankedNotInFormat': '{format} has no ranked queue. Play it in quick match.',
+  'menu.allBlueChip': 'C, UC, R and promo only',
   'menu.rankedSpoilers': "{n|This deck has # spoiler card that isn't released yet: ranked only allows released cards.|This deck has # spoiler cards that aren't released yet: ranked only allows released cards.}",
   'menu.rankedManualCards':
     '{n|The deck has # card with a manual effect (⚙), which ranked does not allow.|The deck has # cards with manual effects (⚙), which ranked does not allow.}',
@@ -566,6 +569,7 @@ export default {
   'deck.searchHelp.vanilla': 'No effect',
   'deck.searchHelp.indeck': 'Already in the deck',
   'deck.searchHelp.legality': 'In Standard: banned · legal · rotated out',
+  'deck.searchHelp.allBlue': 'Legal in All Blue (C, UC, R and promo)',
   'deck.searchHelp.new': 'Unreleased (spoiler)',
   'deck.searchHelp.not': 'Leaves out what matches',
   'deck.searchHelp.phrase': 'Exact phrase',
@@ -597,7 +601,7 @@ export default {
   'deck.manualTitle': 'Effect not automated yet',
   'deck.showMore': 'Show more ({n})',
   'deck.loadingCards': 'Loading cards…',
-  'deck.bannedTitle': 'Banned: not legal in any format',
+  'deck.bannedTitle': 'Banned: not legal in Standard or Extra Grand Battle',
   'deck.rotatedTitle': 'Block ①: rotated out, legal only in Extra Grand Battle',
   // ---- current deck ----
   'deck.leader': 'Leader',
@@ -612,6 +616,9 @@ export default {
   'deck.entryManual': '⚙ manual',
   'deck.entryRotated': '① rotated (EGB only)',
   'deck.entryBanned': '🚫 banned',
+  'deck.entryNotAllBlue': 'not in All Blue',
+  'deck.onlyAllBlue': 'Build for All Blue',
+  'deck.onlyAllBlueTitle': 'Shows only cards legal in All Blue (C, UC, R and promo; any Leader) and flags the ones in your list that are not.',
   'deck.removeOne': 'Remove one',
   'deck.addOne': 'Add one',
   'deck.allowedIn': 'Legal in {format}',
@@ -2845,6 +2852,7 @@ export default {
   'errors.tooManyRoomsRecently': 'You opened too many matches in a short time; wait a few minutes.',
   'errors.alreadyPlaying': "You're already in an online match.",
   'errors.rankedLoginRequired': 'Ranked is only for players signed in with a Google account.',
+  'errors.rankedNotInFormat': '{format} has no ranked queue.',
   'errors.invalidRoomCode': 'Invalid room code.',
   'errors.roomNotFound': 'Room not found or already started.',
   'errors.ownRoom': 'This is your room: send the code to someone else.',
@@ -2988,6 +2996,7 @@ export default {
   'labels.deckGroup.mine': 'My decks',
   'labels.deckGroup.community': 'Community decks',
   'labels.deckGroup.builtin': 'Starter Decks',
+  'labels.deckGroup.allBlue': 'All Blue decks',
   'labels.phase.final': 'Final',
   'labels.phase.semifinal': 'Semifinal',
   'labels.phase.quarterfinal': 'Quarterfinals',
@@ -3012,9 +3021,12 @@ export default {
   'rules.leaderColor': '{name} ({id}) does not share a color with the Leader.',
   'rules.unscripted': '{n|# card|# cards} with an effect not automated yet (applied by hand, with the manual tools).',
   // ---- formats (formatIssues) ----
-  'rules.banned': '{id} is banned (not legal in any format).',
+  'rules.banned': '{id} is banned (not legal in Standard or Extra Grand Battle).',
   'rules.rotated': '{id} has block ① and rotated out: not legal in {format}.',
   'rules.bannedPair': '{a} and {b} cannot be used together in the same deck.',
+  'rules.bannedIn': '{id} is banned in {format}.',
+  'rules.rarity': '{id} is {rarity}: not legal in {format} (C, UC, R and promo only).',
+  'rules.rarityUnknown': '{id} has no known rarity: not legal in {format}.',
   'rules.spoiler': '{n|Card not released yet (spoiler)|Cards not released yet (spoilers)}: {ids}. Spoilers are only allowed in the casual queue and in private rooms, bot practice and tournaments with spoilers.',
   'rules.spoilerNotNext': '{n|Spoiler card from another set|Spoiler cards from other sets}: {ids}. With spoilers, outside Free, only the next set to be released is allowed ({set}); the others are Free only.',
   // ---- text list (parseDeckList) ----
@@ -3079,5 +3091,6 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
 } satisfies Messages;
 

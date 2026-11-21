@@ -2,7 +2,7 @@
 // com a curva, os counters e os formatos em que vale. Copia a lista, baixa a imagem da
 // decklist e leva para o construtor ou para a partida.
 
-import { type CardData, DECK_SIZE, type DeckList, FORMATS, formatDeckList, formatIssues, withArt } from '@gumgum/engine';
+import { type CardData, DECK_SIZE, type DeckList, FORMATS, formatDeckList, formatIssues, isOfficialFormat, withArt } from '@gumgum/engine';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { api, type DeckSummary, spoilerText } from '../api';
 import { deckNumbers } from '../deckLibrary';
@@ -116,14 +116,15 @@ export function DeckViewer({
     () =>
       deck
         ? FORMATS.map((f) => {
-            const issues = loaded?.summary ? (loaded.summary.formatCodes?.[f.id] ?? []) : formatIssues(deck, f.id);
+            const issues = loaded?.summary ? (loaded.summary.formatCodes?.[f.id] ?? []) : formatIssues(deck, f.id, undefined, byId);
             const texts = loaded?.summary
-              ? loaded.summary.formats[f.id].map((text, i) => tryT(issues[i]?.code, issues[i]?.params) ?? text)
-              : formatIssues(deck, f.id).map((i) => tryT(i.code, i.params) ?? i.message);
+              ? (loaded.summary.formats[f.id] ?? []).map((text, i) => tryT(issues[i]?.code, issues[i]?.params) ?? text)
+              : formatIssues(deck, f.id, undefined, byId).map((i) => tryT(i.code, i.params) ?? i.message);
             return { ...f, ok: !texts.length, texts };
-          })
+            // O All Blue (formato da comunidade) só aparece quando o deck vale nele: o selo vermelho em todo deck comum seria ruído.
+          }).filter((f) => f.ok || isOfficialFormat(f.id))
         : [],
-    [deck, loaded, tryT],
+    [deck, loaded, byId, tryT],
   );
   const text = deck ? formatDeckList({ leader: deck.leader, cards: deck.cards }) : '';
   const shown = (card: CardData) => withArt(card, deck?.arts?.[card.id]);

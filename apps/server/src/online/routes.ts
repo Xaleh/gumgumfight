@@ -23,6 +23,7 @@ import {
   type DeckList,
   formatIssues,
   formatLabel,
+  hasRanked,
   type PlayerId,
   playMode,
   type PlayMode,
@@ -41,6 +42,7 @@ import type { ApiCard } from '../present';
 import { type FormatId, isFormat, isPlayFormat, type PlayFormat, tierFor } from '../stats/catalog';
 import { deriveMatch } from '../stats/derive';
 import { ensurePlayer, matchBounties, recordMatch } from '../stats/store';
+import { botDeck as sealedBotDeck, checkDeck as checkSealedDeck, getPool as getSealedPool, poolDeck, poolIdOf, recordResult as recordSealedResult } from '../sealed/store';
 import { isApprentice } from '../tutorial/store';
 import { actsAsJudge, getTournament } from '../tournaments/store';
 import { pushText } from '../push/messages';
@@ -145,6 +147,9 @@ export interface DeckRules {
   at?: Date;
 }
 
+/** Regras de quem senta numa sala: as de spoilers e, no Selado, a coleção dos boosters. */
+type SeatRules = Pick<DeckRules, 'spoilers' | 'spoilerSet'> & { sealedSet?: string; sealedPod?: string };
+
 /** Regras da ranqueada: só cartas lançadas e nenhum efeito manual. */
 export const RANKED_RULES: DeckRules = { noManual: true, spoilers: 'none' };
 
@@ -158,7 +163,7 @@ export function playableDeck(db: DB, deckId: unknown, format: PlayFormat, rules:
   const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
   const report = validateDeck(deck, cards);
   if (!report.valid) return { code: 400, ...fail('deckInvalid', 'Esse deck não é válido para jogar.') };
-  const banned = formatIssues(deck, format, rules.at);
+  const banned = formatIssues(deck, format, rules.at, cards);
   if (banned.length) {
     // `issue` em português; `issueCode` + `issueParams` para o cliente traduzir o motivo (chave `rules.…`).
     const { message: issue, code: issueCode, params: issueParams } = banned[0];
@@ -236,6 +241,14 @@ function finishMatch(db: DB, room: Room, onTournamentGame: Deps['onTournamentGam
   const listed = countsInStats(room.data.format, { spoilerMode, spoilerCards: cards.some((c) => c.spoiler) });
   const matchId = recordMatch(db, { mode, format: room.data.format, queue, listed, replay, seats: [seat(0), seat(1)] }, facts);
   onMatch?.(matchId);
+  // Selado: o placar de cada deck conta as partidas entre pessoas (salas privadas), não os treinos.
+  const sealedWinner = room.state?.winner ?? null;
+  if (room.data.format === 'sealed' && room.data.queue === 'private' && sealedWinner !== null) {
+    for (const p of [0, 1] as const) {
+      const poolId = room.data.seats[p].bot ? null : poolIdOf(room.data.seats[p].deckId);
+      if (poolId) recordSealedResult(db, poolId, sealedWinner === p);
+    }
+  }
   if (t) {
     const winner = room.state?.winner ?? null;
     // Sala do Tempo: o assento do bot joga por um jogador virtual do torneio, que é quem ganha ou perde a série.
@@ -287,13 +300,14 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     body: { deckId?: unknown } | undefined,
     ranked: boolean,
     format: PlayFormat,
-    spoilers: Pick<DeckRules, 'spoilers' | 'spoilerSet'> = {},
+    spoilers: SeatRules = {},
   ): SeatRequest | LobbyError => {
     const ownerHash = viewerHash(req);
     if (!ownerHash) return { code: 400, ...fail('noOwner', 'Navegador sem código de dono (header x-deck-owner).') };
     const account = user(req);
     if (ranked && !account) return { code: 401, ...fail('rankedLoginRequired', 'A ranqueada é só para quem entrou com a conta Google.') };
-    const deck = deckFor(body?.deckId, format, ranked, spoilers);
+    // No Selado, `deckId` é a coleção aberta do jogador: o deck sai dela e é conferido contra ela.
+    const deck = format === 'sealed' ? sealedDeckFor(body?.deckId, ownerHash, spoilers.sealedSet, spoilers.sealedPod) : deckFor(body?.deckId, format, ranked, spoilers);
     if (isError(deck)) return deck;
     const profile = ensurePlayer(db, ownerHash);
     return {
@@ -308,6 +322,36 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     };
   };
 
+  /**
+   * Deck do Selado de quem senta: a coleção aberta é dele, é da coleção da sala (`set`) e o deck
+   * fecha 40 só com cartas que saíram.
+   */
+  /** A coleção da sala para as mensagens: no Pack Rush, as coleções da chave ("OP01 + OP05"). */
+  const setName = (set: string) => set.split('+').join(' + ');
+  const sealedDeckFor = (poolRef: unknown, ownerHash: string, set?: string, pod?: string): DeckList | LobbyError => {
+    const id = poolIdOf(poolRef);
+    const pool = id ? getSealedPool(db, id) : null;
+    if (!pool || pool.ownerHash !== ownerHash) {
+      // Quem chega pelo convite com um deck construído: a sala é de Selado, e o deck sai dos boosters dessa coleção.
+      return set
+        ? { code: 400, ...fail('sealedRoomNeedsDeck', `Esta sala é de Selado ${setName(set)}. Abra o Selado, monte um deck dessa coleção e entre com o código por lá.`, { set: setName(set) }) }
+        : { code: 400, ...fail('sealedPoolNotFound', 'Deck do Selado não encontrado.') };
+    }
+    // Deck de Draft só enfrenta deck do mesmo pod; deck de Selado não entra em sala de Draft, nem o contrário.
+    // Vem antes da coleção: numa sala de Draft (ou de Draft Cubo), o que importa é o pod.
+    if (set && (pool.podId ?? null) !== (pod ?? null)) {
+      return pod
+        ? { code: 400, ...fail('sealedRoomIsDraft', 'Esta sala é de um Draft: só entra quem draftou no mesmo pod.') }
+        : { code: 400, ...fail('sealedRoomNotDraft', 'Esta sala é de Selado: um deck de Draft não entra.') };
+    }
+    if (set && pool.set !== set) return { code: 400, ...fail('sealedSetMismatch', `Esta sala é de Selado ${setName(set)}: use um deck aberto dessa coleção.`, { set: setName(set) }) };
+    const deck = poolDeck(pool);
+    if (!deck || !checkSealedDeck(db, pool, deck).valid) {
+      return { code: 400, ...fail('sealedDeckIncomplete', 'Termine de montar o deck do Selado (40 cartas) antes de jogar.') };
+    }
+    return deck;
+  };
+
   /** Deck pronto para jogar no formato (na ranqueada, também sem cartas manuais nem spoilers). */
   const deckFor = (deckId: unknown, format: PlayFormat, ranked: boolean, spoilers: Pick<DeckRules, 'spoilers' | 'spoilerSet'> = {}) =>
     playableDeck(db, deckId, format, ranked ? RANKED_RULES : spoilers);
@@ -318,13 +362,19 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    * (apps de antes da escolha), aceita spoilers, como antes. Com spoilers fora do Livre, grava a
    * coleção aceita: a próxima a ser lançada agora.
    */
-  const modeOf = (b: { format?: unknown; spoilers?: unknown } | undefined): PlayMode => {
+  const modeOf = (b: { format?: unknown; spoilers?: unknown; deckId?: unknown } | undefined): PlayMode => {
+    // Selado: a coleção da sala é a do deck de quem cria (quem entra precisa de um deck da mesma).
+    if (b?.format === 'sealed') {
+      const id = poolIdOf(b.deckId);
+      const pool = id ? getSealedPool(db, id) : null;
+      return { ...playMode('sealed', true), ...(pool ? { sealedSet: pool.set } : {}), ...(pool?.podId ? { sealedPod: pool.podId } : {}) };
+    }
     const mode = playMode(isPlayFormat(b?.format) ? b.format : 'standard', b?.spoilers !== false);
     const set = spoilerRule(mode) === 'next' ? currentSpoilerSet(db) : null;
     return set ? { ...mode, spoilerSet: set } : mode;
   };
   /** Regra de spoilers da sala para o deck de quem senta. */
-  const seatRules = (mode: PlayMode): Pick<DeckRules, 'spoilers' | 'spoilerSet'> => ({ spoilers: spoilerRule(mode), spoilerSet: mode.spoilerSet });
+  const seatRules = (mode: PlayMode): SeatRules => ({ spoilers: spoilerRule(mode), spoilerSet: mode.spoilerSet, ...(mode.sealedSet ? { sealedSet: mode.sealedSet } : {}), ...(mode.sealedPod ? { sealedPod: mode.sealedPod } : {}) });
 
   /** Sala + assento a partir do token (query `t` ou corpo). */
   const seatIn = (id: string, token: unknown): { room: Room; seat: PlayerId } | null => {
@@ -379,7 +429,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   });
 
   /** Líderes permitidos no formato, para escolher o oponente na fila casual. */
-  const formatLeaders = (format: FormatId) => listLeaders(db).filter((c) => cardLegality(c.id, format) === 'legal');
+  const formatLeaders = (format: FormatId) => listLeaders(db).filter((c) => cardLegality(c.id, format, undefined, c) === 'legal');
 
   /**
    * Líderes que dá para escolher na fila casual do formato, com quantos jogadores
@@ -406,7 +456,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const format = formatOf(req.body?.format);
     const leader = queue === 'casual' && typeof req.body?.leader === 'string' && req.body.leader ? req.body.leader : null;
     const pick = leader ? getCards(db, [leader])[0] : null;
-    if (leader && (pick?.category !== 'leader' || cardLegality(leader, format) !== 'legal')) {
+    if (queue === 'ranked' && !hasRanked(format)) {
+      return reply.code(400).send(fail('rankedNotInFormat', `O ${formatLabel(format)} não tem fila ranqueada.`, { format: formatLabel(format) }));
+    }
+    if (leader && (pick?.category !== 'leader' || cardLegality(leader, format, undefined, pick) !== 'legal')) {
       return reply.code(400).send(fail('invalidLeaderPick', 'Esse Líder não pode ser escolhido neste formato.', { format: formatLabel(format) }));
     }
     const seat = seatFor(req, req.body, queue === 'ranked', format);
@@ -449,8 +502,22 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const limit = lobby.admit(req.ip, 'bot');
     if (limit) return reply.code(limit.code).send(limit);
     let botDeckId = req.body?.botDeckId;
+    if (format === 'sealed') {
+      // O bot abre os próprios boosters da mesma coleção e monta sozinho.
+      const deck = mode.sealedSet ? sealedBotDeck(db, mode.sealedSet, mode.sealedPod ?? null) : null;
+      if (!deck) return reply.code(400).send(fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: mode.sealedSet ?? '' }));
+      const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: deck.id!, deck };
+      const first = req.body?.first;
+      const r = lobby.createBotRoom(seat, bot, mode, first === 0 || first === 1 ? first : undefined, level);
+      if (isError(r)) return reply.code(r.code).send(r);
+      lobby.tagIp(r.room.id, req.ip);
+      return reply.code(201).send({ roomId: r.room.id, token: r.token });
+    }
     if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
-      const builtin = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false, seatRules(mode))));
+      // Os decks prontos do All Blue só entram no sorteio do próprio formato.
+      const builtin = listDecks(db).filter(
+        (d) => d.kind === 'builtin' && (format === 'allblue' || d.group !== 'allblue') && !isError(deckFor(d.id, format, false, seatRules(mode))),
+      );
       // O Bot do Time sorteia entre os decks do meta, quando há algum permitido nas regras.
       const meta = level === 'team' ? builtin.filter((d) => d.group === 'meta') : [];
       const pool = meta.length ? meta : builtin;
@@ -748,8 +815,11 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     let deck: RematchDeck | undefined;
     if (req.body?.deckId !== undefined) {
-      const { format, spoilers, spoilerSet } = found.room.data;
-      const list = deckFor(req.body.deckId, format, false, seatRules({ ...playMode(format, spoilers !== false), ...(spoilerSet ? { spoilerSet } : {}) }));
+      const { format, spoilers, spoilerSet, sealedSet, sealedPod } = found.room.data;
+      const list =
+        format === 'sealed'
+          ? sealedDeckFor(req.body.deckId, found.room.data.seats[found.seat].ownerHash, sealedSet, sealedPod)
+          : deckFor(req.body.deckId, format, false, seatRules({ ...playMode(format, spoilers !== false), ...(spoilerSet ? { spoilerSet } : {}) }));
       if (isError(list)) return reply.code(list.code).send(list);
       deck = { deckId: list.id!, deck: list };
     }

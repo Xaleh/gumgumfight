@@ -120,7 +120,7 @@ gumgumfight/
 │   ├── src/rng.ts               mulberry32 (32 bits) e sfc32 (128 bits)
 │   ├── src/replay.ts            REPLAY_VERSION, upgrade de replays antigos
 │   ├── src/deck.ts              validateDeck, parse/format de listas
-│   ├── src/formats.ts           Standard / Extra Grand Battle, banidas, rotação
+│   ├── src/formats.ts           Standard / Extra Grand Battle / All Blue, banidas, rotação
 │   ├── src/errata.ts, source-fixes.ts   correções de dados (errata oficial / erros da optcgapi)
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
 │   ├── src/cards/scripts.ts     scripts escritos à mão (62 cartas, prioridade sobre o parser)
@@ -253,12 +253,71 @@ volta a ação feita sobre a visão.
 
 ### Formatos (`formats.ts`)
 
-`standard` e `egb` (`FormatId`, os oficiais: filas, selos do deck e estatísticas) e `free`, o Livre (`PlayFormat`: só
-torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `PlayMode` =
+`standard`, `egb` e `allblue` (`FormatId`: os que têm fila e selo no deck) e `free`, o Livre (`PlayFormat`: só
+torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `standard` e `egb`
+são os oficiais (`OFFICIAL_FORMATS`): só eles têm ranqueada (`hasRanked`) e estatísticas. O `allblue` é o All Blue,
+formato da comunidade: valem C, UC, R e promo (`ALL_BLUE_RARITIES`, lidas com `rarityCode`) e qualquer Líder; as
+banidas, os pares e a rotação da Bandai não se aplicam (lista própria `ALL_BLUE_BANNED`, vazia). Como a regra depende
+da raridade, `cardLegality(id, formato, agora, carta)` e `formatIssues(deck, formato, agora, catálogo)` recebem as
+cartas, e carta sem raridade conhecida não vale (`rules.rarityUnknown`). Os decks prontos do All Blue
+(`data/decks/allblue`) entram no banco com `deck_group = 'allblue'`. `PlayMode` =
 formato + `spoilers` (`playMode` liga os spoilers no Livre); `countsInStats` diz se a partida entra nas estatísticas
-(só Standard e EGB puros, sem spoilers). Banidas (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
+(só Standard e EGB puros, sem spoilers). Banidas dos formatos oficiais (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
 do bloco ① em Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 20 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
 regras especiais do Líder.
+
+### Selado (`sealed.ts`)
+
+Modo limitado (Pré-release): `openBoosters(cartas da coleção, seed, 6)` sorteia os boosters com o RNG do motor (seed de
+32 bits ou as 4 palavras do sfc32) pelo `BoosterModel` (7 C, 3 UC, 1 de R/SR/SEC por pesos, 1 Líder ou incomum);
+`boosterReady` diz se a coleção está completa no banco; `validateLimitedDeck(deck, catálogo, cartas abertas)` confere
+40 cartas (`LIMITED_DECK_SIZE`), Líder que saiu ou o de 6 cores, e nenhuma carta além das cópias abertas, sem cor e sem
+limite de cópias; `autoBuildLimited` monta um deck por nota e curva de custo (o "Montar sozinho" e o deck do bot).
+`createGame` aceita deck de 50 ou de 40. O formato da partida é `sealed` (`PlayFormat`, fora de `isPlayFormat`: só as
+rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatIssues` aceitam tudo. O Líder de 6 cores
+(`SEALED_LEADER_ID`) tem `CardDef.wild` (qualquer nome, tipo e atributo em `hasName`/`hasType`/`hasAttribute`) e é
+`eventOnly` nos formatos de deck construído. No servidor (`sealed/store.ts`, `sealed/routes.ts`), a tabela
+`sealed_pools` guarda dono, coleção, seed, boosters, deck e placar; nas salas, o `deckId` de um assento do Selado é
+`sealed:<id>` e o deck é conferido contra as cartas abertas (`sealedDeckFor`, em `online/routes.ts`). **Pack Rush**
+(`kind = 'rush'`): `openMixedBoosters` sorteia a coleção de cada booster entre as escolhidas, `rushKey` dá a chave
+("OP01+OP05", gravada em `set_code` e usada como `sealedSet` da sala) e `LimitedRules.leaders = 'any'` libera qualquer
+Líder (`anyLeaderAllowed`: os de spoiler, só das coleções da chave); `pack_sets` guarda a coleção de cada booster.
+
+### Draft (`draft.ts`)
+
+`openDraftBoosters` abre os boosters de todos os lugares (`DRAFT_SEATS = 8`, `DRAFT_ROUNDS = 4`; no Pack Rush, uma
+coleção sorteada por rodada, igual para o pod). `DraftState` é o rodízio puro: cada lugar tem uma fila de boosters;
+`draftPick` tira a carta do booster da frente e o põe na fila do vizinho (`draftPassTo`: o sentido inverte a cada
+rodada), e a rodada seguinte abre quando todos os boosters acabam. `draftChoice` é a escolha dos bots e a automática
+(`limitedScore` + bônus de raridade + acaso do RNG do motor; só um Líder). `draftPickSeconds(n) = 10 + 3n`.
+
+No servidor, `DraftPods` (`draft/pods.ts`) guarda os pods em memória e em `draft_pods` (estado inteiro em JSON, para
+voltar depois de um deploy com prazos novos). `advance` faz os bots e os lugares ausentes escolherem e dá prazo a quem
+recebeu booster; `tick` (a cada segundo) escolhe por quem deixou o prazo acabar. Um lugar vira `away` depois de
+`AWAY_AFTER_TIMEOUTS` prazos seguidos só se a pessoa não consulta o pod há `AWAY_UNSEEN_MS`; `touch` (toda consulta)
+desfaz. `view` devolve a cada jogador só o booster da frente da própria fila. No fim, `finish` cria uma linha de
+`sealed_pools` por pessoa (`kind = 'draft'`, `pod_id`, as escolhas por rodada no lugar dos boosters) e monta os decks
+dos bots (`autoBuildLimited`), que ficam no pod para o treino (`podBotDecks`). Nas salas, `PlayMode.sealedPod` leva o
+id do pod: `sealedDeckFor` só aceita deck com o mesmo `pod_id` (`sealedRoomIsDraft` / `sealedRoomNotDraft`).
+
+### Draft Cubo (`cube.ts`)
+
+O Cubo usa o lugar da coleção nos modos limitados com uma chave própria: `cubeKey('T1')` = `"CUBE:T1"` (`isCube`,
+em `formats.ts`), que vai em `draft_pods`, `sealed_pools.set_code` e `PlayMode.sealedSet`. `openCubeBoosters` embaralha
+a lista e a reparte (`packs[rodada][assento]`, o formato de `openDraftBoosters`), então nenhuma carta se repete no
+pod; `cubeCardsNeeded(8, 4)` = 384. `pickCube(uso, cartas, formato)` escolhe a lista: por cor, o mínimo de cada faixa
+de custo, depois as de maior uso dentro dos tetos (`DEFAULT_CUBE_SHAPE`: 70 por cor, 14 Eventos, 2 Stages), e os
+tetos cedem se a cor não tem cartas usadas o bastante. `cubeEligible` deixa de fora Líder e carta com `needsManual`.
+Em `draftChoice`, o quinto argumento (`usage`) troca o bônus de raridade pelo uso da carta.
+
+No servidor, `draft/cubes.ts` lê `data/cubes/*.json` (`CubeFile`), fica com as cartas que o banco tem e que são
+`cubeEligible`, e descarta o Cubo que não dá um pod (`cubes`, memo de 1 minuto; `currentCube` = `publishedAt` mais
+recente; `setCubeDir` para os testes). `DraftPods.create(..., { cube: true })` abre o pod com a chave do Cubo em uso;
+`begin` sorteia com `openCubeBoosters`; `poolRules` devolve `{ leaders: 'any', sets: [] }` para chave de Cubo, e
+`botDeck` sem bots do pod tira 48 cartas do Cubo. A lista é gerada por `cube-cli.ts` (`npm run cube:build`), com
+`draft/cube-source.ts`: `listTournaments` e `tournamentDecks` (API do Limitless, cache em disco só com as cartas de
+cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores de cada trimestre) e `usageByCard`
+(fração de decks por trimestre; a nota é a média dos `USAGE_BEST_QUARTERS` melhores).
 
 ### Tradução
 
@@ -1764,6 +1823,19 @@ Quem chama, na coluna da direita:
 | GET | `/api/players/me` | Perfil de jogador (nome, recompensa, tier, `apprentice`) | Navegador; Token (`profile`) |
 | PUT | `/api/players/me` | Troca o nome público (`{ name }`) | Navegador |
 | GET | `/api/players/me/matches?since=&limit=&cursor=` | Partidas do jogador, mais novas primeiro, paginadas | Sessão; Token (`matches:read`) |
+| GET | `/api/sealed/sets` | Coleções disponíveis no Selado (cartas, Líderes, parte automatizada) | Pública |
+| GET | `/api/sealed/pools` · POST | Decks selados de quem pede; `{ set }` abre 6 boosters | Navegador |
+| GET | `/api/sealed/pools/:id` · DELETE | Os boosters e o deck de uma abertura | Dono |
+| PUT | `/api/sealed/pools/:id/deck` | Salva o deck (`{ leader, cards }`), conferido contra as cartas abertas | Dono |
+| POST | `/api/sealed/pools/:id/bot` | Deck do bot para o treino no navegador (boosters próprios da mesma coleção; num deck de Draft, o de um bot do pod) | Dono |
+| GET | `/api/draft/active` | O pod de Draft em que quem pede está (esperando ou draftando), ou `null` | Navegador |
+| GET | `/api/draft/cube` | O Cubo em uso: nome, fonte e a lista com o uso de cada carta (ou `null`) | Pública |
+| POST | `/api/draft/pods` | Abre um pod (`{ sets }`: uma coleção, ou várias no Pack Rush draft; `{ cube: true }`: Draft Cubo) | Navegador |
+| POST | `/api/draft/pods/join` | Entra num pod à espera pelo código (`{ code }`) | Navegador |
+| GET | `/api/draft/pods/:id` | O pod como quem pede o vê: lugares, o booster na mão, prazo e escolhas | Quem está no pod |
+| POST | `/api/draft/pods/:id/start` | Começa o draft; os lugares vazios viram bots | Quem criou |
+| POST | `/api/draft/pods/:id/pick` | Fica com uma carta do booster na mão (`{ card }`) | Quem está no pod |
+| POST | `/api/draft/pods/:id/leave` | Sai do pod (no meio do draft, o lugar passa a escolher sozinho) | Quem está no pod |
 | GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
 | POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |

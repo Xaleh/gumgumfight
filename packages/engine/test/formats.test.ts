@@ -1,6 +1,15 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { needsManual } from '../src/cards';
 import { validateDeck } from '../src/deck';
 import {
+  ALL_BLUE_BANNED,
+  FORMATS,
+  hasRanked,
+  isOfficialFormat,
+  PLAY_FORMATS,
+  rarityCode,
   barredSpoilers,
   cardBlock,
   cardLegality,
@@ -211,5 +220,90 @@ describe('estatísticas: só Standard e EGB puros', () => {
     expect(countsInStats('free')).toBe(false);
     expect(countsInStats('egb', { spoilerMode: true })).toBe(false);
     expect(countsInStats('standard', { spoilerCards: true })).toBe(false);
+  });
+});
+
+describe('All Blue (formato da comunidade: só C, UC, R e promo)', () => {
+  const DATA = join(__dirname, '../../../data');
+  const allBlueDecks = readdirSync(join(DATA, 'decks/allblue')).map((f) => JSON.parse(readFileSync(join(DATA, 'decks/allblue', f), 'utf8')) as DeckList);
+  const catalog = new Map<string, CardData>(
+    readdirSync(join(DATA, 'cards')).flatMap((f) => (JSON.parse(readFileSync(join(DATA, 'cards', f), 'utf8')).cards as CardData[]).map((c) => [c.id, c] as const)),
+  );
+  const legal = (card: Pick<CardData, 'rarity' | 'category'>) => cardLegality('X-001', 'allblue', NOW, card);
+
+  it('C, UC, R e promo valem; SR e SEC não; o Líder é livre', () => {
+    for (const rarity of ['C', 'UC', 'R', 'P', 'PR']) expect(legal({ rarity, category: 'character' })).toBe('legal');
+    for (const rarity of ['SR', 'SEC']) expect(legal({ rarity, category: 'event' })).toBe('rarity');
+    expect(legal({ rarity: 'L', category: 'leader' })).toBe('legal');
+    // Líder é livre mesmo sem a raridade (spoilers costumam vir sem ela).
+    expect(legal({ category: 'leader' })).toBe('legal');
+    expect(cardLegality('ST01-002', 'allblue', NOW, byId.get('ST01-002'))).toBe('legal');
+    expect(cardLegality('ST01-012', 'allblue', NOW, byId.get('ST01-012'))).toBe('rarity');
+  });
+
+  it('sem a carta do catálogo ou sem raridade conhecida, não vale', () => {
+    expect(cardLegality('ST01-002', 'allblue', NOW)).toBe('rarity');
+    for (const rarity of [undefined, '', '?', 'SP', 'SP CARD', 'TR']) expect(legal({ rarity, category: 'character' })).toBe('rarity');
+    expect(formatIssues({ leader: 'ST01-001', cards: [{ id: 'ST01-002', count: 4 }] }, 'allblue', NOW).map((i) => i.code)).toEqual(['rules.rarityUnknown', 'rules.rarityUnknown']);
+  });
+
+  it('rarityCode: código curto, promo num só e o resto desconhecido', () => {
+    expect(['C', 'uc', ' R ', 'SR', 'SEC', 'L', 'P', 'PR'].map(rarityCode)).toEqual(['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P', 'P']);
+    expect(['Common', 'Uncommon', 'Rare', 'Super Rare', 'Secret Rare', 'Leader', 'Promo'].map(rarityCode)).toEqual(['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P']);
+    expect(['SP', 'SP CARD', 'TR', '?', '', undefined, null].map(rarityCode)).toEqual([null, null, null, null, null, null, null]);
+  });
+
+  it('o starter tem SR e não vale: um aviso por carta, com a raridade', () => {
+    const issues = formatIssues(luffy, 'allblue', NOW, byId);
+    expect(issues.map((i) => [i.code, i.cardId, i.params.rarity])).toEqual([
+      ['rules.rarity', 'ST01-012', 'SR'],
+      ['rules.rarity', 'ST01-013', 'SR'],
+    ]);
+    expect(issues[0].message).toBe('ST01-012 é SR: não vale no All Blue (só C, UC, R e promo).');
+    expect(validateDeck(luffy, byId, { format: 'allblue', now: NOW }).valid).toBe(false);
+    // Aceita o catálogo como objeto também, como `validateDeck`.
+    expect(formatIssues(luffy, 'allblue', NOW, Object.fromEntries(byId))).toHaveLength(2);
+  });
+
+  it('as banidas, os pares proibidos e a rotação da Bandai não se aplicam', () => {
+    expect(ALL_BLUE_BANNED).toEqual([]);
+    // Law ST10-001 (Líder banido) e uma carta do bloco ①.
+    expect(cardLegality('ST10-001', 'egb', NOW)).toBe('banned');
+    expect(cardLegality('ST10-001', 'allblue', NOW, byId.get('ST10-001'))).toBe('legal');
+    expect(cardLegality('ST01-002', 'standard', NOW)).toBe('rotated');
+    // Par proibido nos formatos oficiais (OP11-040 com OP11-067).
+    const pair = { leader: 'OP11-040', cards: [{ id: 'OP11-067', count: 4 }] };
+    const fake = new Map([
+      ['OP11-040', { rarity: 'L', category: 'leader' as const }],
+      ['OP11-067', { rarity: 'R', category: 'character' as const }],
+    ]);
+    expect(formatIssues(pair, 'egb', NOW).map((i) => i.code)).toEqual(['rules.bannedPair']);
+    expect(formatIssues(pair, 'allblue', NOW, fake)).toEqual([]);
+  });
+
+  it('os decks prontos do All Blue valem no formato e não têm carta ⚙', () => {
+    expect(allBlueDecks.map((d) => d.id).sort()).toEqual(['allblue-crocodile', 'allblue-kaido', 'allblue-kid', 'allblue-luffy', 'allblue-sakazuki', 'allblue-yamato']);
+    for (const d of allBlueDecks) {
+      const report = validateDeck(d, catalog, { format: 'allblue', now: NOW });
+      expect(report.issues, d.id).toEqual([]);
+      expect(report.total).toBe(50);
+      expect([d.leader, ...d.cards.map((c) => c.id)].filter((id) => needsManual(catalog.get(id)!)), d.id).toEqual([]);
+    }
+    // São starters do bloco ①: valem no EGB e no All Blue, não no Standard.
+    expect(legalFormats(allBlueDecks.find((d) => d.id === 'allblue-luffy')!, NOW, catalog)).toEqual(['egb', 'allblue']);
+  });
+
+  it('tem fila e selo como os oficiais, mas sem ranqueada e fora das estatísticas', () => {
+    expect(FORMATS.map((f) => f.id)).toEqual(['standard', 'egb', 'allblue']);
+    expect(PLAY_FORMATS).toEqual(['standard', 'egb', 'allblue', 'free']);
+    expect([isOfficialFormat('standard'), isOfficialFormat('egb'), isOfficialFormat('allblue'), isOfficialFormat('free')]).toEqual([true, true, false, false]);
+    expect([hasRanked('standard'), hasRanked('egb'), hasRanked('allblue'), hasRanked('free')]).toEqual([true, true, false, false]);
+    expect(countsInStats('allblue')).toBe(false);
+    expect(playModeLabel({ format: 'allblue' })).toBe('All Blue');
+    expect(playModeLabel({ format: 'allblue', spoilers: true, spoilerSet: 'OP18' })).toBe('All Blue + OP18');
+  });
+
+  it('toda carta dos dados do repositório tem raridade conhecida (senão ficaria fora do All Blue)', () => {
+    expect([...catalog.values()].filter((c) => rarityCode(c.rarity) === null).map((c) => c.id)).toEqual([]);
   });
 });

@@ -184,6 +184,8 @@ const legality = (status: ReturnType<typeof cardLegality>): Shortcut => ({ test:
 def('banned banida banidas', legality('banned'));
 def('legal', legality('legal'));
 def('rotated rotacionada rotacionadas', legality('rotated'));
+// All Blue: a raridade vem da própria carta (C, UC, R e promo valem; o Líder é livre).
+def('allblue', { test: (card, ctx) => cardLegality(card.id, 'allblue', ctx.now, card) === 'legal' });
 def('new nova novas spoiler spoilers', { test: (card) => Boolean(card.spoiler) });
 
 const cardSet = (card: CardData) => (card.set ?? card.id.split('-')[0] ?? '').toLowerCase();

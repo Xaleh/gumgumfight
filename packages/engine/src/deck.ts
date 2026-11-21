@@ -144,7 +144,7 @@ export function validateDeck(
   }
 
   if (options.format) {
-    for (const i of formatIssues(deck, options.format, options.now)) issues.push({ level: 'error', ...i });
+    for (const i of formatIssues(deck, options.format, options.now, cards)) issues.push({ level: 'error', ...i });
   }
 
   if (unscripted.size) {

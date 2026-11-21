@@ -37,8 +37,9 @@ describe('API de decks', () => {
     // ST-01 tem o bloco ①: só vale no Extra Grand Battle.
     expect(byId('st01-luffy').formats.egb).toEqual([]);
     expect(byId('st01-luffy').formats.standard.length).toBeGreaterThan(0);
-    expect(byId('st13-ace').formats).toEqual({ standard: [], egb: [] });
-    // O Líder ST10-001 (Law) está banido: não vale em nenhum formato.
+    // Vale nos dois formatos oficiais; no All Blue, as quatro SR do starter impedem.
+    expect(byId('st13-ace').formats).toEqual({ standard: [], egb: [], allblue: [expect.stringMatching(/ST13-008 é SR/), expect.any(String), expect.any(String), expect.any(String)] });
+    // O Líder ST10-001 (Law) está banido: não vale em nenhum formato oficial.
     expect(byId('st10-law').formats.standard).toEqual([expect.stringMatching(/ST10-001 está banida/)]);
     expect(byId('st10-law').formats.egb).toEqual([expect.stringMatching(/ST10-001 está banida/)]);
   });

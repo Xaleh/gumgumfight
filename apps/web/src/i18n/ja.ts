@@ -7,6 +7,7 @@ import recap from './recap/ja';
 import decks from './decks/ja';
 import team from './team/ja';
 import chamber from './chamber/ja';
+import sealed from './sealed/ja';
 
 export default {
   // ---- 全般 ----
@@ -356,6 +357,8 @@ export default {
   'menu.chipNoManual': '手動効果なし',
   'menu.chipReleasedOnly': '発売済みカードのみ',
   'menu.rankedNeedsLogin': 'ランクマッチをプレイするにはGoogleでログインしてください。',
+  'menu.rankedNotInFormat': '{format}にランクマッチはありません。クイックマッチでプレイしてください。',
+  'menu.allBlueChip': 'C・UC・R・プロモのみ',
   'menu.rankedSpoilers': 'このデッキには未発売のスポイラーカードが{n|#枚}あります。ランクマッチでは発売済みのカードしか使えません。',
   'menu.rankedManualCards':
     '{n|デッキに手動効果（⚙）のカードが#枚あります。ランクマッチでは使用できません。}',
@@ -566,6 +569,7 @@ export default {
   'deck.searchHelp.vanilla': '効果なし',
   'deck.searchHelp.indeck': 'デッキに入っているカード',
   'deck.searchHelp.legality': 'スタンダードで：禁止 · 使用可能 · ローテーション落ち',
+  'deck.searchHelp.allBlue': 'All Blueで使用可能（C・UC・R・プロモ）',
   'deck.searchHelp.new': '未発売（先行公開）',
   'deck.searchHelp.not': '一致するものを除外',
   'deck.searchHelp.phrase': '完全一致のフレーズ',
@@ -597,7 +601,7 @@ export default {
   'deck.manualTitle': 'この効果はまだ自動処理されません',
   'deck.showMore': 'もっと見る（{n}）',
   'deck.loadingCards': 'カードを読み込み中…',
-  'deck.bannedTitle': '禁止カード：どのフォーマットでも使用不可',
+  'deck.bannedTitle': '禁止カード：スタンダードとエクストラグランドバトルでは使用不可',
   'deck.rotatedTitle': 'ブロック①：ローテーション落ち。エクストラ・グランドバトルでのみ使用可能',
   // ---- 現在のデッキ ----
   'deck.leader': 'リーダー',
@@ -612,6 +616,9 @@ export default {
   'deck.entryManual': '⚙ 手動',
   'deck.entryRotated': '① ローテ落ち（EGBのみ）',
   'deck.entryBanned': '🚫 禁止',
+  'deck.entryNotAllBlue': 'All Blue対象外',
+  'deck.onlyAllBlue': 'All Blue用に構築',
+  'deck.onlyAllBlueTitle': 'All Blueで使用できるカード（C・UC・R・プロモ、リーダーは自由）だけを表示し、リスト内の使用できないカードに印を付けます。',
   'deck.removeOne': '1枚減らす',
   'deck.addOne': '1枚増やす',
   'deck.allowedIn': '{format}で使用可能',
@@ -2843,6 +2850,7 @@ export default {
   'errors.tooManyRoomsRecently': '短時間に対戦を開きすぎました。数分お待ちください。',
   'errors.alreadyPlaying': 'すでにオンライン対戦に参加しています。',
   'errors.rankedLoginRequired': 'ランクマッチはGoogleアカウントでログインしたプレイヤー専用です。',
+  'errors.rankedNotInFormat': '{format}にランクマッチのキューはありません。',
   'errors.invalidRoomCode': '無効なルームコードです。',
   'errors.roomNotFound': 'ルームが見つからないか、すでに始まっています。',
   'errors.ownRoom': 'これはあなたのルームです。コードを他の人に送ってください。',
@@ -2986,6 +2994,7 @@ export default {
   'labels.deckGroup.mine': '自分のデッキ',
   'labels.deckGroup.community': 'コミュニティのデッキ',
   'labels.deckGroup.builtin': 'スタートデッキ',
+  'labels.deckGroup.allBlue': 'All Blueのデッキ',
   'labels.phase.final': '決勝',
   'labels.phase.semifinal': '準決勝',
   'labels.phase.quarterfinal': '準々決勝',
@@ -3010,9 +3019,12 @@ export default {
   'rules.leaderColor': '{name}（{id}）はリーダーと同じ色を持っていません。',
   'rules.unscripted': 'まだ自動処理されない効果のカードが{n|#枚}あります（手動ツールで処理します）。',
   // ---- フォーマット（formatIssues） ----
-  'rules.banned': '{id}は禁止カードです（どのフォーマットでも使用不可）。',
+  'rules.banned': '{id}は禁止カードです（スタンダードとエクストラグランドバトルでは使用不可）。',
   'rules.rotated': '{id}はブロック①でローテーション落ちしています：{format}では使用不可。',
   'rules.bannedPair': '{a}と{b}は同じデッキに一緒に入れられません。',
+  'rules.bannedIn': '{id}は{format}で禁止されています。',
+  'rules.rarity': '{id}は{rarity}です：{format}では使用できません（C・UC・R・プロモのみ）。',
+  'rules.rarityUnknown': '{id}はレアリティが不明です：{format}では使用できません。',
   'rules.spoiler': '未発売のカード（スポイラー）：{ids}。スポイラーはカジュアル、およびスポイラー可のプライベートルーム・ボット練習・大会でのみ使用できます。',
   'rules.spoilerNotNext': 'ほかのセットのスポイラーカード：{ids}。フリー以外のスポイラー可では、次に発売されるセット（{set}）のみ使用でき、それ以外はフリーのみです。',
   // ---- テキストのリスト（parseDeckList） ----
@@ -3077,5 +3089,6 @@ export default {
   ...decks,
   ...team,
   ...chamber,
+  ...sealed,
 } satisfies Messages;
 
