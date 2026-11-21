@@ -1,4 +1,4 @@
-import { type BotLevel, cardLegality, FORMATS, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
+import { type BotLevel, cardLegality, FORMATS, hasRanked, isFormat, type PlayerId, playMode, type PlayMode, spoilerRule } from '@gumgum/engine';
 import { type ReactNode, type Ref, useCallback, useEffect, useRef, useState } from 'react';
 import {
   type ActiveRoom,
@@ -88,7 +88,8 @@ function savedBotLevel(): BotLevel {
 
 function savedFormat(): FormatId {
   try {
-    return localStorage.getItem(LAST_FORMAT) === 'egb' ? 'egb' : 'standard';
+    const saved = localStorage.getItem(LAST_FORMAT);
+    return isFormat(saved) ? saved : 'standard';
   } catch {
     return 'standard';
   }
@@ -349,7 +350,7 @@ export function Menu({
   const [pickingLeader, setPickingLeader] = useState(false);
   // Trocar de formato desfaz a escolha de um Líder que não vale no formato novo.
   useEffect(() => {
-    setCasualLeader((l) => (l && cardLegality(l.id, format) !== 'legal' ? null : l));
+    setCasualLeader((l) => (l && cardLegality(l.id, format, undefined, { category: 'leader' }) !== 'legal' ? null : l));
   }, [format]);
   const [code, setCode] = useState(URL_ROOM_CODE ?? '');
   const userId = user?.id;
@@ -442,7 +443,8 @@ export function Menu({
             /* sem armazenamento */
           }
           const valid = d.filter((x) => canPlay(x, format)).map((x) => x.id);
-          const builtin = d.filter((x) => canPlay(x, format) && x.kind === 'builtin').map((x) => x.id);
+          // Os decks prontos do All Blue só são sugeridos nesse formato.
+          const builtin = d.filter((x) => canPlay(x, format) && x.kind === 'builtin' && (format === 'allblue' || !x.allBlue)).map((x) => x.id);
           setDeck0(valid.includes(last[0]) ? last[0] : (builtin[0] ?? valid[0] ?? ''));
           setDeck1(last[1] === RANDOM || valid.includes(last[1]) ? last[1] : (builtin[1] ?? valid[1] ?? valid[0] ?? ''));
         })
@@ -503,7 +505,7 @@ export function Menu({
     try {
       // Sem apelido: um nome que funcione nas frases do log, que são em terceira pessoa ("You kept their hand" não).
       const names: [string, string] = [nickname ?? t('menu.youName'), t('menu.botName')];
-      const builtin = decks.filter((d) => playsIn(d, botMode) && d.kind === 'builtin');
+      const builtin = decks.filter((d) => playsIn(d, botMode) && d.kind === 'builtin' && (botMode.format === 'allblue' || !d.allBlue));
       // O Bot do Time sorteia entre os decks do meta, quando há algum que vale nas regras.
       const meta = botLevel === 'team' ? builtin.filter((d) => d.meta) : [];
       const pool = meta.length ? meta : builtin;
@@ -581,6 +583,7 @@ export function Menu({
   /** Cartas de spoiler (ainda não lançadas) no deck: a ranqueada só aceita cartas lançadas. */
   const spoilerCards = d0?.spoilers?.length ?? 0;
   const rankedNote =
+    (!hasRanked(format) ? t('menu.rankedNotInFormat', { format: fmt }) : null) ??
     onlineNote ??
     (!user
       ? t('menu.rankedNeedsLogin')
@@ -782,6 +785,7 @@ export function Menu({
                     {t('menu.notAllowedIn', { format: fmt })}
                   </li>
                 )}
+                {format === 'allblue' && <li className="home-chip">{t('menu.allBlueChip')}</li>}
                 {d0.unscripted > 0 && (
                   <li className="home-chip" title={t('menu.unscriptedTitle')}>
                     {t('menu.unscriptedChip', { n: d0.unscripted })}

@@ -120,7 +120,7 @@ gumgumfight/
 │   ├── src/rng.ts               mulberry32 (32 bits) e sfc32 (128 bits)
 │   ├── src/replay.ts            REPLAY_VERSION, upgrade de replays antigos
 │   ├── src/deck.ts              validateDeck, parse/format de listas
-│   ├── src/formats.ts           Standard / Extra Grand Battle, banidas, rotação
+│   ├── src/formats.ts           Standard / Extra Grand Battle / All Blue, banidas, rotação
 │   ├── src/errata.ts, source-fixes.ts   correções de dados (errata oficial / erros da optcgapi)
 │   ├── src/cards/parser.ts      texto da carta → habilidades (DSL) (3.180 linhas)
 │   ├── src/cards/scripts.ts     scripts escritos à mão (62 cartas, prioridade sobre o parser)
@@ -253,10 +253,16 @@ volta a ação feita sobre a visão.
 
 ### Formatos (`formats.ts`)
 
-`standard` e `egb` (`FormatId`, os oficiais: filas, selos do deck e estatísticas) e `free`, o Livre (`PlayFormat`: só
-torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `PlayMode` =
+`standard`, `egb` e `allblue` (`FormatId`: os que têm fila e selo no deck) e `free`, o Livre (`PlayFormat`: só
+torneios, salas privadas e treino contra o bot), em que `cardLegality`/`formatIssues` aceitam tudo. `standard` e `egb`
+são os oficiais (`OFFICIAL_FORMATS`): só eles têm ranqueada (`hasRanked`) e estatísticas. O `allblue` é o All Blue,
+formato da comunidade: valem C, UC, R e promo (`ALL_BLUE_RARITIES`, lidas com `rarityCode`) e qualquer Líder; as
+banidas, os pares e a rotação da Bandai não se aplicam (lista própria `ALL_BLUE_BANNED`, vazia). Como a regra depende
+da raridade, `cardLegality(id, formato, agora, carta)` e `formatIssues(deck, formato, agora, catálogo)` recebem as
+cartas, e carta sem raridade conhecida não vale (`rules.rarityUnknown`). Os decks prontos do All Blue
+(`data/decks/allblue`) entram no banco com `deck_group = 'allblue'`. `PlayMode` =
 formato + `spoilers` (`playMode` liga os spoilers no Livre); `countsInStats` diz se a partida entra nas estatísticas
-(só Standard e EGB puros, sem spoilers). Banidas (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
+(só Standard e EGB puros, sem spoilers). Banidas dos formatos oficiais (6 cartas, uma com `since: 2026-10-12`), 3 pares proibidos, rotação
 do bloco ① em Standard (`/^(OP0[1-4]|ST0[1-9])-/`, exceto 20 ids). `validateDeck` confere 50 cartas, 4 cópias, cor do Líder e
 regras especiais do Líder.
 

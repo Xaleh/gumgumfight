@@ -23,6 +23,7 @@ import {
   type DeckList,
   formatIssues,
   formatLabel,
+  hasRanked,
   type PlayerId,
   playMode,
   type PlayMode,
@@ -158,7 +159,7 @@ export function playableDeck(db: DB, deckId: unknown, format: PlayFormat, rules:
   const cards = new Map(getCards(db, [deck.leader, ...deck.cards.map((c) => c.id)]).map((c) => [c.id, c as CardData]));
   const report = validateDeck(deck, cards);
   if (!report.valid) return { code: 400, ...fail('deckInvalid', 'Esse deck não é válido para jogar.') };
-  const banned = formatIssues(deck, format, rules.at);
+  const banned = formatIssues(deck, format, rules.at, cards);
   if (banned.length) {
     // `issue` em português; `issueCode` + `issueParams` para o cliente traduzir o motivo (chave `rules.…`).
     const { message: issue, code: issueCode, params: issueParams } = banned[0];
@@ -379,7 +380,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
   });
 
   /** Líderes permitidos no formato, para escolher o oponente na fila casual. */
-  const formatLeaders = (format: FormatId) => listLeaders(db).filter((c) => cardLegality(c.id, format) === 'legal');
+  const formatLeaders = (format: FormatId) => listLeaders(db).filter((c) => cardLegality(c.id, format, undefined, c) === 'legal');
 
   /**
    * Líderes que dá para escolher na fila casual do formato, com quantos jogadores
@@ -406,7 +407,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const format = formatOf(req.body?.format);
     const leader = queue === 'casual' && typeof req.body?.leader === 'string' && req.body.leader ? req.body.leader : null;
     const pick = leader ? getCards(db, [leader])[0] : null;
-    if (leader && (pick?.category !== 'leader' || cardLegality(leader, format) !== 'legal')) {
+    if (queue === 'ranked' && !hasRanked(format)) {
+      return reply.code(400).send(fail('rankedNotInFormat', `O ${formatLabel(format)} não tem fila ranqueada.`, { format: formatLabel(format) }));
+    }
+    if (leader && (pick?.category !== 'leader' || cardLegality(leader, format, undefined, pick) !== 'legal')) {
       return reply.code(400).send(fail('invalidLeaderPick', 'Esse Líder não pode ser escolhido neste formato.', { format: formatLabel(format) }));
     }
     const seat = seatFor(req, req.body, queue === 'ranked', format);
@@ -450,7 +454,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (limit) return reply.code(limit.code).send(limit);
     let botDeckId = req.body?.botDeckId;
     if (typeof botDeckId !== 'string' || !botDeckId || botDeckId === 'random') {
-      const builtin = listDecks(db).filter((d) => d.kind === 'builtin' && !isError(deckFor(d.id, format, false, seatRules(mode))));
+      // Os decks prontos do All Blue só entram no sorteio do próprio formato.
+      const builtin = listDecks(db).filter(
+        (d) => d.kind === 'builtin' && (format === 'allblue' || d.group !== 'allblue') && !isError(deckFor(d.id, format, false, seatRules(mode))),
+      );
       // O Bot do Time sorteia entre os decks do meta, quando há algum permitido nas regras.
       const meta = level === 'team' ? builtin.filter((d) => d.group === 'meta') : [];
       const pool = meta.length ? meta : builtin;

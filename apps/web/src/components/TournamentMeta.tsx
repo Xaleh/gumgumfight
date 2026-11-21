@@ -2,7 +2,7 @@
 // e campeão, próximos torneios, Líderes em destaque, distribuição do meta, ranking de
 // jogadores e torneios recentes. Os dados vêm de GET /api/tournaments/meta.
 
-import { FORMATS } from '@gumgum/engine';
+import { OFFICIAL_FORMATS } from '@gumgum/engine';
 import { useEffect, useState } from 'react';
 import { api, type CardInfo, type FormatId, type TournamentMeta as Meta, modeLabel } from '../api';
 import { useLocale, useT } from '../i18n';
@@ -53,7 +53,8 @@ export default function TournamentMeta({ onOpen }: { onOpen: (id: string) => voi
           <button className={format === null ? 'on' : ''} onClick={() => setFormat(null)}>
             {tr('tmeta.formatAll')}
           </button>
-          {FORMATS.map((f) => (
+          {/* Só os formatos oficiais: o painel do meta não inclui torneios de All Blue (`listFinished`). */}
+          {OFFICIAL_FORMATS.map((f) => (
             <button key={f.id} className={format === f.id ? 'on' : ''} onClick={() => setFormat(f.id)}>
               {modeLabel({ format: f.id })}
             </button>

@@ -1485,7 +1485,8 @@ export function getTranslations(db: DB, lang: string, ids?: string[]): Map<strin
 /** builtin = vem de data/decks (recriado a cada início); user = montado pelo jogador. */
 export type DeckKind = 'builtin' | 'user';
 /** Grupo de um deck pronto: 'meta' = deck do meta global (data/decks/meta), jogado pelo Bot do Time. */
-export type DeckGroup = 'meta';
+/** `meta`: decks do meta global (data/decks/meta); `allblue`: decks prontos do All Blue (data/decks/allblue). */
+export type DeckGroup = 'meta' | 'allblue';
 export type StoredDeck = DeckList & { kind: DeckKind; updatedAt: string; ownerHash: string | null; group: DeckGroup | null };
 
 /** Grava um deck. O dono só é definido na criação (um update nunca troca o dono). */
@@ -1528,7 +1529,7 @@ const toDeck = (r: DeckRow): StoredDeck => ({
   kind: r.kind,
   updatedAt: r.updated_at,
   ownerHash: r.owner_hash,
-  group: r.deck_group === 'meta' ? 'meta' : null,
+  group: r.deck_group === 'meta' || r.deck_group === 'allblue' ? r.deck_group : null,
 });
 
 export function listDecks(db: DB): StoredDeck[] {

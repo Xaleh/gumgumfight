@@ -1,10 +1,10 @@
 // Peças comuns das listas de decks: o cartão de um deck (arte do Líder, nome, estado e a
 // estrela de favorito), o selo de estado, a curva de custo e a marcação de favoritos.
 
-import { DECK_SIZE } from '@gumgum/engine';
+import { DECK_SIZE, formatLabel } from '@gumgum/engine';
 import { type Dispatch, type ReactNode, type SetStateAction, useCallback, useState } from 'react';
 import { api, type DeckSummary } from '../api';
-import { deckState, deckTime, lastUsed } from '../deckLibrary';
+import { allBlueLegal, deckState, deckTime, lastUsed } from '../deckLibrary';
 import { type Translate, useLocale, useT } from '../i18n';
 import { fmtAgo } from '../i18n/format';
 import { useSettings } from '../settings';
@@ -34,14 +34,18 @@ export function LeaderBanner({ deck, big, children }: { deck: Pick<DeckSummary, 
   );
 }
 
-/** Selo: Standard, só EGB, proibido ou rascunho com o tamanho. */
+/** Selo: Standard, só EGB, só All Blue, proibido ou rascunho com o tamanho; e o do All Blue, quando o deck também vale nele. */
 export function DeckStateChip({ deck }: { deck: DeckSummary }) {
   const t = useT();
   const state = deckState(deck);
   return (
-    <span className={['dk-chip', state === 'standard' ? 'ok' : state === 'egb' ? 'warn' : 'bad'].join(' ')}>
-      {state === 'draft' ? t('decks.state.draft', { size: deck.size, max: DECK_SIZE }) : t(`decks.state.${state}`)}
-    </span>
+    <>
+      <span className={['dk-chip', state === 'standard' || state === 'allblue' ? 'ok' : state === 'egb' ? 'warn' : 'bad'].join(' ')}>
+        {state === 'draft' ? t('decks.state.draft', { size: deck.size, max: DECK_SIZE }) : state === 'allblue' ? formatLabel('allblue') : t(`decks.state.${state}`)}
+      </span>
+      {/* Deck de formato oficial que também vale no All Blue (só C, UC, R e promo). */}
+      {state !== 'allblue' && allBlueLegal(deck) && <span className="dk-chip ok">{formatLabel('allblue')}</span>}
+    </>
   );
 }
 

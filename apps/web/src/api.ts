@@ -28,6 +28,8 @@ export interface DeckSummary {
   kind: 'builtin' | 'user';
   /** Deck pronto do meta global (data/decks/meta): grupo "Decks do meta", jogado pelo Bot do Time (servidores antigos não mandam). */
   meta?: boolean;
+  /** Deck pronto do All Blue (data/decks/allblue): só entra no sorteio do oponente nesse formato. */
+  allBlue?: boolean;
   leader: string;
   leaderName: string | null;
   /** Imagem do Líder (null quando o servidor desliga as imagens). */
@@ -146,7 +148,8 @@ export function deckGroups(decks: DeckSummary[]): Array<[MessageKey, DeckSummary
     ['labels.deckGroup.mine', decks.filter((d) => d.kind === 'user' && d.mine)],
     ['labels.deckGroup.community', decks.filter((d) => d.kind === 'user' && !d.mine)],
     ['labels.deckGroup.meta', decks.filter((d) => d.kind === 'builtin' && d.meta)],
-    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin' && !d.meta)],
+    ['labels.deckGroup.allBlue', decks.filter((d) => d.kind === 'builtin' && d.allBlue)],
+    ['labels.deckGroup.builtin', decks.filter((d) => d.kind === 'builtin' && !d.meta && !d.allBlue)],
   ];
 }
 

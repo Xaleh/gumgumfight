@@ -16,14 +16,22 @@
 // quer dizer só a próxima coleção a ser lançada (`nextSpoilerSet`): hoje "Standard + EB05";
 // quando a EB05 sai, passa sozinho a "Standard + OP18". As outras coleções, só no Livre.
 //
+// All Blue é um formato da comunidade, no estilo Pauper: só valem cartas comuns (C), incomuns
+// (UC), raras (R) e promocionais (P); SR e SEC ficam de fora, e o Líder é livre. Como não é
+// formato da Bandai, as banidas, os pares proibidos e a rotação NÃO se aplicam: a lista de
+// banidas dele é própria (`ALL_BLUE_BANNED`, vazia até o meta pedir). Tem fila casual, sala
+// privada, treino e torneio, mas não tem ranqueada (`hasRanked`) nem entra nas estatísticas
+// do construído (`countsInStats`). A raridade vem do catálogo: `cardLegality` e `formatIssues`
+// recebem as cartas, e carta sem raridade conhecida fica de fora até ser corrigida.
+//
 // Livre ("vale tudo") não é formato oficial: vale toda carta, inclusive as banidas, os
 // pares proibidos e os spoilers. Só existe nos torneios, nas salas privadas e contra o
 // bot, e as partidas não entram nas estatísticas (ver `countsInStats`).
 
 import type { CardData, DeckList } from './types';
 
-/** Formatos oficiais: os das filas, dos selos do deck e das estatísticas. */
-export type FormatId = 'standard' | 'egb';
+/** Formatos com fila e selo no deck: os dois oficiais da Bandai e o All Blue (da comunidade). */
+export type FormatId = 'standard' | 'egb' | 'allblue';
 
 /** Formato de uma partida: um oficial ou o Livre (torneios, salas privadas e bot). */
 export type PlayFormat = FormatId | 'free';
@@ -31,7 +39,14 @@ export type PlayFormat = FormatId | 'free';
 export const FORMATS: ReadonlyArray<{ id: FormatId; label: string }> = [
   { id: 'standard', label: 'Standard' },
   { id: 'egb', label: 'Extra Grand Battle' },
+  { id: 'allblue', label: 'All Blue' },
 ];
+
+/** Formatos oficiais da Bandai: os da ranqueada e das estatísticas. */
+export const OFFICIAL_FORMATS: ReadonlyArray<{ id: FormatId; label: string }> = FORMATS.filter((f) => f.id !== 'allblue');
+export const isOfficialFormat = (v: unknown): boolean => OFFICIAL_FORMATS.some((f) => f.id === v);
+/** Se o formato tem fila ranqueada (o All Blue começa só no casual). */
+export const hasRanked = (f: PlayFormat): boolean => isOfficialFormat(f);
 
 export const isFormat = (v: unknown): v is FormatId => FORMATS.some((f) => f.id === v);
 export const isPlayFormat = (v: unknown): v is PlayFormat => v === 'free' || isFormat(v);
@@ -47,9 +62,9 @@ export interface PlayMode {
 
 /**
  * Formatos de quem cria um torneio, uma sala privada ou um treino contra o bot. Com a escolha
- * dos spoilers no Standard e no EGB, são cinco opções: os dois puros, os dois + spoilers e o Livre.
+ * dos spoilers, cada formato tem a versão pura e a "+ spoilers"; o Livre sempre aceita.
  */
-export const PLAY_FORMATS: ReadonlyArray<PlayFormat> = ['standard', 'egb', 'free'];
+export const PLAY_FORMATS: ReadonlyArray<PlayFormat> = ['standard', 'egb', 'allblue', 'free'];
 
 /** Regras pedidas por quem cria, normalizadas: o Livre sempre aceita spoilers. */
 export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ format, spoilers: format === 'free' || spoilers });
@@ -63,13 +78,14 @@ export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoil
 
 /**
  * Se a partida entra nas estatísticas: só Standard e EGB puros. Fica de fora o Livre, o
- * torneio que aceita spoilers (`spoilerMode`) e a partida com carta de spoiler em algum
- * deck (`spoilerCards`): a coleção ainda pode estar incompleta.
+ * All Blue (para não misturar com o meta do construído), o torneio que aceita spoilers
+ * (`spoilerMode`) e a partida com carta de spoiler em algum deck (`spoilerCards`): a coleção
+ * ainda pode estar incompleta.
  */
 export const countsInStats = (format: PlayFormat, opts: { spoilerMode?: boolean; spoilerCards?: boolean } = {}): boolean =>
-  format !== 'free' && !opts.spoilerMode && !opts.spoilerCards;
+  isOfficialFormat(format) && !opts.spoilerMode && !opts.spoilerCards;
 
-/** Cartas banidas em todos os formatos. `since` = data em que a proibição passa a valer. */
+/** Cartas banidas nos formatos oficiais (Standard e EGB). `since` = data em que a proibição passa a valer. */
 export const BANNED_CARDS: ReadonlyArray<{ id: string; name: string; since?: string }> = [
   { id: 'OP03-040', name: 'Nami' },
   { id: 'OP06-047', name: 'Charlotte Pudding' },
@@ -79,7 +95,7 @@ export const BANNED_CARDS: ReadonlyArray<{ id: string; name: string; since?: str
   { id: 'OP14-020', name: 'Dracule Mihawk', since: '2026-10-12' },
 ];
 
-/** Pares que não podem estar juntos no mesmo deck (Líder incluso), em todos os formatos. */
+/** Pares que não podem estar juntos no mesmo deck (Líder incluso), nos formatos oficiais. */
 export const BANNED_PAIRS: ReadonlyArray<{ cards: [string, string]; since?: string }> = [
   { cards: ['OP11-040', 'OP11-067'] },
   { cards: ['OP11-040', 'OP08-069'] },
@@ -134,10 +150,66 @@ export function cardBlock(id: string): number | null {
   return BLOCK_1_SET.test(id) ? 1 : null;
 }
 
-export type CardLegality = 'legal' | 'banned' | 'rotated';
+// ---------------------------------------------------------------------------
+// All Blue
+// ---------------------------------------------------------------------------
 
-export function cardLegality(id: string, format: PlayFormat, now = new Date()): CardLegality {
+/** Raridades que valem no All Blue (o Líder é livre). */
+export const ALL_BLUE_RARITIES: ReadonlySet<string> = new Set(['C', 'UC', 'R', 'P']);
+
+/**
+ * Banidas do All Blue: lista própria, vazia no lançamento. A lista da Bandai não vale aqui; uma
+ * carta só entra se desbalancear o formato. `since` = data em que a proibição passa a valer.
+ */
+export const ALL_BLUE_BANNED: ReadonlyArray<{ id: string; name: string; since?: string }> = [];
+
+const RARITY_NAMES: Record<string, string> = {
+  COMMON: 'C',
+  UNCOMMON: 'UC',
+  RARE: 'R',
+  'SUPER RARE': 'SR',
+  'SECRET RARE': 'SEC',
+  LEADER: 'L',
+  PROMO: 'P',
+  PR: 'P',
+};
+
+/**
+ * Raridade da carta no código curto (C, UC, R, SR, SEC, L, P); null = desconhecida. As fontes
+ * mandam "PR" e "P" para promo; "SP", "TR" e "?" são de impressões especiais, não da carta.
+ */
+export function rarityCode(rarity: string | undefined | null): string | null {
+  const r = (rarity ?? '').trim().toUpperCase();
+  const code = RARITY_NAMES[r] ?? r;
+  return ['C', 'UC', 'R', 'SR', 'SEC', 'L', 'P'].includes(code) ? code : null;
+}
+
+/** O que as regras de formato leem de uma carta além do número. */
+export type FormatCard = Pick<CardData, 'rarity' | 'category'>;
+/** Catálogo para as regras que dependem da carta (a raridade, no All Blue). */
+export type FormatCards = ReadonlyMap<string, FormatCard> | Readonly<Record<string, FormatCard>>;
+
+const cardIn = (cards: FormatCards | undefined, id: string): FormatCard | undefined =>
+  cards instanceof Map ? cards.get(id) : (cards as Readonly<Record<string, FormatCard>> | undefined)?.[id];
+
+/**
+ * `rarity`: a raridade da carta não vale no formato (SR e SEC no All Blue) ou não é conhecida
+ * (sem a carta do catálogo, não dá para liberar).
+ */
+export type CardLegality = 'legal' | 'banned' | 'rotated' | 'rarity';
+
+/**
+ * Se a carta vale no formato. `card` (a carta do catálogo) só é lido no All Blue, que depende da
+ * raridade; nos formatos oficiais basta o número.
+ */
+export function cardLegality(id: string, format: PlayFormat, now = new Date(), card?: FormatCard): CardLegality {
   if (format === 'free') return 'legal';
+  if (format === 'allblue') {
+    if (ALL_BLUE_BANNED.some((b) => b.id === id && inEffect(b.since, now))) return 'banned';
+    if (card?.category === 'leader') return 'legal';
+    const rarity = rarityCode(card?.rarity);
+    return rarity === 'L' || (rarity !== null && ALL_BLUE_RARITIES.has(rarity)) ? 'legal' : 'rarity';
+  }
   if (BANNED_CARDS.some((b) => b.id === id && inEffect(b.since, now))) return 'banned';
   if (format === 'standard' && cardBlock(id) === 1 && !STANDARD_BLOCK_1_EXCEPTIONS.has(id)) return 'rotated';
   return 'legal';
@@ -155,20 +227,36 @@ export interface FormatIssue {
   cardId?: string;
 }
 
-/** Motivos de o deck não valer no formato (vazio = permitido). Só olha os números das cartas. */
-export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: PlayFormat, now = new Date()): FormatIssue[] {
+/**
+ * Motivos de o deck não valer no formato (vazio = permitido). Nos formatos oficiais só olha os
+ * números das cartas; no All Blue lê a raridade em `cards` (o catálogo), e carta que não está
+ * nele ou não tem raridade conhecida não vale.
+ */
+export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: PlayFormat, now = new Date(), cards?: FormatCards): FormatIssue[] {
   if (format === 'free') return [];
   const issues: FormatIssue[] = [];
   const ids = [...new Set([deck.leader, ...deck.cards.map((c) => c.id)].filter(Boolean))];
   const label = formatLabel(format);
   for (const id of ids) {
-    const legality = cardLegality(id, format, now);
-    if (legality === 'banned') {
-      issues.push({ message: `${id} está banida (não vale em nenhum formato).`, code: 'rules.banned', params: { id }, cardId: id });
+    const card = cardIn(cards, id);
+    const legality = cardLegality(id, format, now, card);
+    if (legality === 'banned' && format === 'allblue') {
+      issues.push({ message: `${id} está banida no ${label}.`, code: 'rules.bannedIn', params: { id, format: label }, cardId: id });
+    } else if (legality === 'banned') {
+      issues.push({ message: `${id} está banida (não vale no Standard nem no Extra Grand Battle).`, code: 'rules.banned', params: { id }, cardId: id });
     } else if (legality === 'rotated') {
       issues.push({ message: `${id} tem o bloco ① e rotacionou: não vale no ${label}.`, code: 'rules.rotated', params: { id, format: label }, cardId: id });
+    } else if (legality === 'rarity') {
+      const rarity = rarityCode(card?.rarity);
+      issues.push(
+        rarity
+          ? { message: `${id} é ${rarity}: não vale no ${label} (só C, UC, R e promo).`, code: 'rules.rarity', params: { id, rarity, format: label }, cardId: id }
+          : { message: `${id} não tem raridade conhecida: não vale no ${label}.`, code: 'rules.rarityUnknown', params: { id, format: label }, cardId: id },
+      );
     }
   }
+  // As banidas e os pares proibidos da Bandai não valem no All Blue.
+  if (format === 'allblue') return issues;
   const has = new Set(ids);
   for (const { cards: [a, b], since } of BANNED_PAIRS) {
     if (has.has(a) && has.has(b) && inEffect(since, now)) {
@@ -178,9 +266,9 @@ export function formatIssues(deck: Pick<DeckList, 'leader' | 'cards'>, format: P
   return issues;
 }
 
-/** Formatos em que o deck pode ser usado. */
-export function legalFormats(deck: Pick<DeckList, 'leader' | 'cards'>, now = new Date()): FormatId[] {
-  return FORMATS.filter((f) => formatIssues(deck, f.id, now).length === 0).map((f) => f.id);
+/** Formatos em que o deck pode ser usado (`cards`: o catálogo, para o All Blue). */
+export function legalFormats(deck: Pick<DeckList, 'leader' | 'cards'>, now = new Date(), cards?: FormatCards): FormatId[] {
+  return FORMATS.filter((f) => formatIssues(deck, f.id, now, cards).length === 0).map((f) => f.id);
 }
 
 /** Coleção pelo número da carta ("OP18-001" → "OP18"). */

@@ -1,6 +1,7 @@
 # Plano: novos modos de jogo (All Blue, Selado, Pack Rush, Cubo e Yonko)
 
-> Status: **proposta** (21/11/2026), à espera da decisão de seguir. Nada aqui está implementado.
+> Status (21/11/2026): **All Blue implementado** (o README, seção "All Blue", descreve o que existe). Os outros modos
+> seguem como proposta, na ordem da seção 1.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
 
@@ -8,7 +9,7 @@
 
 | Modo | O que é | Tamanho | Mexe no motor? | Maior risco |
 |---|---|---|---|---|
-| **All Blue** | Formato da comunidade no estilo Pauper: só cartas C, UC, R e promos (sem SR e sem SEC). Partida 1x1 normal. | Pequeno | Não | Qualidade do campo `rarity` das cartas |
+| **All Blue** ✅ | Formato da comunidade no estilo Pauper: só cartas C, UC, R e promos (sem SR e sem SEC). Partida 1x1 normal. | Pequeno | Não | Qualidade do campo `rarity` das cartas |
 | **Selado: Pré-release** | O jogador abre 6 boosters de uma coleção e monta um deck de 40 com o que saiu. | Médio | Pouco (tamanho do deck) | Fidelidade do booster e cartas ⚙ na coleção |
 | **Selado: Draft** | Pod de 4 a 8: cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
 | **Pack Rush** | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
@@ -34,39 +35,37 @@ Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha
 
 - Vale toda carta lançada com raridade **C, UC, R ou promo (P/PR)**. **SR e SEC ficam de fora.**
 - O Líder (raridade L) é livre.
+- **Nenhuma carta banida.** As banidas, os pares proibidos e a rotação da Bandai não se aplicam. A lista de banidas do
+  All Blue é própria e começa vazia; uma carta entra nela se as reclamações mostrarem que ela desbalanceia o formato.
 - O resto é o jogo normal: 1 Líder, 50 cartas, até 4 cópias, cor do Líder.
 - A raridade é a do número da carta. Arte alternativa (Parallel, SP, Manga) não muda nada: uma SR com arte promocional
   continua SR.
 
-### Onde entra
+### Como ficou
 
-All Blue vira um terceiro `FormatId`, ao lado de `standard` e `egb` (`packages/engine/src/formats.ts`). Com isso ele
-herda quase tudo o que um formato já tem: o seletor da tela inicial, a fila casual própria, as salas privadas, o treino
-contra o bot, os torneios, o selo "Válido no All Blue" no construtor e o menu que desabilita decks que não valem.
+- **Formato novo (`allblue`) em `packages/engine/src/formats.ts`:** `cardLegality` e `formatIssues` passaram a receber
+  o catálogo, porque a regra depende da raridade. Carta sem raridade conhecida fica fora (`rules.rarityUnknown`), para
+  uma SR não passar por falta de dado. `ALL_BLUE_BANNED` é a lista própria, vazia.
+- **Onde se joga:** fila casual própria, sala privada, treino contra o bot e torneios. Sem ranqueada (`hasRanked`) e
+  fora das estatísticas do construído (`countsInStats`).
+- **Decks prontos:** seis em `data/decks/allblue/` (os primeiros starters sem as SR), num grupo à parte para não
+  entrarem no sorteio do oponente nem na Sala do Tempo dos outros formatos.
+- **Interface:** terceiro formato na tela inicial, selo "All Blue" nos decks que valem, "Montar para o All Blue" no
+  construtor (filtra o catálogo e marca o que não vale) e o atalho `allblue` na busca. Textos nos seis idiomas.
+- **Auditoria:** `npm run cards:check-rarity -w @gumgum/server` lista as cartas sem raridade conhecida.
 
-### O que muda no código
+### Diferenças para as telas da proposta
 
-- **`formats.ts`:** `cardLegality` e `formatIssues` hoje olham só o número da carta. Para o All Blue precisam da
-  raridade, então passam a receber o catálogo (`Map<string, CardData>`), como `validateDeck` já recebe. Nova
-  legalidade `'rarity'` e nova mensagem `rules.rarity` ("OP01-067 é SR: não vale no All Blue").
-- **Construtor (`DeckBuilder.tsx`, `cardSearch.ts`):** selo do formato, cartas SR/SEC apagadas no catálogo quando o
-  formato de montagem é All Blue, e a barra de raridades do deck. O filtro de raridade já existe na busca (`r:uc`, `sr`).
-- **Fila e contadores (`online/lobby.ts`):** as filas já são por `FormatId`; a ranqueada do All Blue fica desligada no
-  começo.
-- **Bot:** 4 a 6 decks prontos em `data/decks/allblue/`, para o treino ter oponente e o jogador novo ter por onde começar.
-- **Estatísticas:** meta próprio por formato (as tabelas já separam por formato) ou fora das estatísticas no começo.
-- **Auditoria de raridade:** um script que lista cartas sem `rarity` ou com valor fora do esperado. Carta sem raridade
-  conhecida fica **fora** do All Blue até ser corrigida (aparece na tela de Cobertura), para o formato não vazar SR.
+- O construtor não tem o seletor "Montando para" com os três formatos nem a barra de raridades do deck: ficou uma
+  opção só, "Montar para o All Blue", que esconde do catálogo o que não vale (em vez de mostrar apagado).
+- A tela inicial não tem o cartão explicativo do All Blue na fileira de modos especiais (essa fileira entra com o
+  Selado e o Yonko). Com o formato escolhido, a faixa do deck mostra "Só C, UC, R e promo".
 
-### Decisões que são suas
+### Em aberto
 
-1. **Banidas:** você definiu que as restrições da Bandai não valem nos modos limitados, por não serem oficiais. O All
-   Blue também não é oficial: a lista de banidas da Bandai vale nele ou não? Três das seis banidas de hoje são Líderes
-   (Nami, Law e Mihawk), que o corte de raridade não barra, então a resposta muda o formato. As telas assumem que a
-   lista **vale**, até você decidir.
-2. **Base de cartas e lista própria:** todas as coleções, sem rotação, e uma lista de banidas do All Blue que começa
-   vazia e se ajusta pelo meta que aparecer?
-3. **Ranqueada:** só casual no lançamento (recomendado) ou já com bounty?
+1. **Ranqueada:** ficou só casual, como recomendado. Abrir uma ranqueada do All Blue é ligar o formato em `hasRanked`.
+2. **Estatísticas:** as partidas são gravadas, mas fora das telas de estatísticas. Um meta próprio do All Blue pede uma
+   aba separada, para não misturar com Standard e EGB.
 
 ## 3. Modos limitados: Selado, Draft, Pack Rush e Cubo
 
@@ -131,10 +130,10 @@ EB05 e OP18) vira opção quando estiver completa o bastante. Quem decide que el
 
 ### Pack Rush
 
-- **Quem abre o pod escolhe as coleções** e quantos boosters de cada uma (tela 10): 6 no selado, 4 no draft. Há um
-  botão de sortear.
-- **A sequência é a mesma para todos os jogadores.** No draft isso é obrigatório (na rodada 2 todo mundo abre a mesma
-  coleção); no selado, é o que deixa a disputa justa.
+- **Quem abre o pod escolhe as coleções** que entram (tela 10).
+- **Cada jogador recebe boosters sorteados entre as coleções escolhidas** (6 no selado, 4 no draft): dois jogadores do
+  mesmo pod podem abrir coleções diferentes. No draft, o booster passa de mão em mão normalmente; só muda que os
+  boosters de uma mesma rodada podem ser de coleções diferentes.
 - Pack Rush é sempre um pod ou uma sala criada por alguém. Para jogar sozinho contra o bot, o jogador abre um pod só
   dele.
 - Só entram na lista as coleções com booster configurado e cobertura de efeitos acima do piso. É aqui que mora o custo
@@ -145,9 +144,10 @@ EB05 e OP18) vira opção quando estiver completa o bastante. Quem decide que el
 
 - O **Cubo** é uma lista fixa em `data/cubes/<id>.json`: 420 cartas, **uma cópia de cada**, 70 por cor, com curva de
   custo equilibrada. Sem Líderes (o Líder é livre).
-- **De onde sai a lista:** das cartas mais jogadas. O app já guarda cada carta de cada deck jogado (`match_cards`) e o
-  meta global do TCG Matchmaking. Um script gera a proposta (mais usadas por cor nos últimos 90 dias), um Admin revisa
-  e publica como "temporada". Cartas ⚙ (efeito não automatizado) não entram.
+- **De onde sai a lista:** das **estatísticas de uso globais** (o meta global do TCG Matchmaking, que o app já
+  baixa), e não só das partidas do GumGum Fight. Um script gera a lista (mais usadas por cor), publicada como
+  "temporada". Cartas ⚙ (efeito não automatizado) não entram. Uma lista montada à mão por você fica para depois; o
+  arquivo da temporada já é editável.
 - **Os boosters** são 12 cartas sorteadas do Cubo, sem vaga de raridade e sem repetir carta no pod. Um pod de 8 usa 384
   das 420.
 - A página do Cubo (tela 11) mostra a lista inteira e o uso de cada carta antes de o jogador entrar.
@@ -200,15 +200,12 @@ Depois de montar, o deck selado é um deck de verdade, mas preso àquelas cartas
 
 ### Decisões
 
-Já decididas por você: Líder (Luffy de 6 cores nos modos de uma coleção; qualquer Líder nos de várias) e banidas (valem
-em todos os modos limitados).
+Já decididas por você: Líder (Luffy de 6 cores nos modos de uma coleção; qualquer Líder nos de várias), banidas (valem
+em todos os modos limitados), Pack Rush (boosters sorteados por jogador entre as coleções escolhidas) e Cubo (uma cópia
+de cada, lista pelas estatísticas globais).
 
-4. **Pack Rush:** a mesma sequência de boosters para todos (proposta), ou cada jogador recebe boosters sorteados entre
-   as coleções escolhidas?
-5. **Cubo:** 420 cartas com uma cópia de cada serve? E a lista sai das estatísticas do próprio app, do meta global, ou
-   você prefere montar à mão?
-6. **Draft:** pod de 8 com bots completando, ou só pods de 4 para encher mais rápido?
-7. **Vida do deck selado:** jogar à vontade enquanto a fonte estiver no ar (o que as telas mostram), ou formato de
+3. **Draft:** pod de 8 com bots completando, ou só pods de 4 para encher mais rápido?
+4. **Vida do deck selado:** jogar à vontade enquanto a fonte estiver no ar (o que as telas mostram), ou formato de
    "corrida" que termina com X derrotas?
 
 ## 4. Yonko (mesa de 4)
@@ -281,10 +278,10 @@ Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot 
 
 ### Decisões que são suas
 
-8. **Regra dos efeitos:** as três regras acima servem, ou a sua mesa joga diferente (por exemplo, efeitos em área
+5. **Regra dos efeitos:** as três regras acima servem, ou a sua mesa joga diferente (por exemplo, efeitos em área
    atingindo todos os oponentes)?
-9. **Recompensa por eliminação:** comprar 1 carta, outra coisa, ou nada?
-10. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos?
+6. **Recompensa por eliminação:** comprar 1 carta, outra coisa, ou nada?
+7. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos?
 
 ## 5. O que não muda
 

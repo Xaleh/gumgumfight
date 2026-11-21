@@ -208,9 +208,11 @@ começar uma partida online e antes de gravar uma partida nas estatísticas.
 - **Extra Grand Battle (EGB):** todas as cartas lançadas, menos as banidas.
 - **Standard:** além das banidas, ficam de fora as cartas com o ícone de bloco ① (OP-01 a OP-04 e ST-01 a ST-09),
   que rotacionaram em 1º/04/2026, salvo as exceções oficiais (bloco X e cartas tratadas como bloco ④).
+- **All Blue:** formato da comunidade, no estilo Pauper. Só valem cartas **comuns (C), incomuns (UC), raras (R) e
+  promocionais (P)**; SR e SEC ficam de fora, e o **Líder é livre**. Veja [All Blue](#all-blue).
 
 As cartas banidas (com data de início, quando a proibição ainda não vale), os pares proibidos e as exceções da
-rotação ficam em `packages/engine/src/formats.ts`: atualizar a lista é só mexer lá. A data de início conta a partir da
+rotação valem para os dois formatos oficiais (Standard e EGB) e ficam em `packages/engine/src/formats.ts`: atualizar a lista é só mexer lá. A data de início conta a partir da
 meia-noite no horário de Brasília. Para uma carta voltar ao jogo, basta tirá-la da lista.
 
 Nos torneios, o deck precisa valer **no início do torneio**: com data de início marcada depois de um banimento, a
@@ -221,17 +223,41 @@ canceladas (com aviso por notificação). O construtor mostra em quais
 formatos o deck vale, marca no catálogo as cartas banidas (🚫) e rotacionadas (①), e o menu desabilita os decks que
 não valem no formato escolhido.
 
+#### All Blue
+
+O All Blue não é formato da Bandai: é um formato de fã para decks baratos e meta variado.
+
+- **Cartas:** C, UC, R e promo (P ou PR) de qualquer coleção. SR e SEC não valem. A raridade é a do número da carta:
+  uma arte alternativa (Parallel, SP, Manga) não muda nada. O Líder é livre.
+- **Sem a lista da Bandai:** as banidas, os pares proibidos e a rotação **não se aplicam**. O All Blue tem uma lista
+  de banidas própria (`ALL_BLUE_BANNED`, em `formats.ts`), **vazia no lançamento**: uma carta só entra nela se
+  desbalancear o formato.
+- **Onde se joga:** fila casual própria (quem espera no All Blue só é pareado com quem também escolheu All Blue), sala
+  privada, treino contra o bot e torneios. **Não tem ranqueada** e as partidas **não entram nas estatísticas** nem no
+  meta do construído.
+- **Decks prontos:** seis versões dos primeiros starters sem as cartas SR, em `data/decks/allblue/` ("Luffy Vermelho
+  (All Blue)", Kid, Crocodile, Kaido, Sakazuki e Yamato). São os decks que o bot usa no formato; eles não entram no
+  sorteio do oponente nem na Sala do Tempo dos outros formatos.
+- **No construtor:** o deck ganha o selo "All Blue" quando vale no formato. A opção **Montar para o All Blue** (nos
+  filtros) mostra só as cartas que valem, marca na lista as que não valem e troca os avisos pelos do formato. Na busca,
+  `allblue` filtra as cartas que valem e `-allblue` as que não valem.
+- **Raridade desconhecida:** a regra depende do campo `rarity` das cartas. Carta sem raridade conhecida fica **fora** do
+  All Blue até ser corrigida, para uma SR não passar por falta de dado. `npm run cards:check-rarity -w @gumgum/server`
+  lista quantas cartas há de cada raridade e quais estão sem; vale rodar depois de importar uma coleção nova.
+
 **Spoilers** (cartas anunciadas e ainda não lançadas, veja [Spoilers](#spoilers-coleções-ainda-não-lançadas)) não fazem
 parte de formato nenhum: valem na fila casual, mas **nunca na ranqueada**, que só aceita cartas já lançadas. Nos
-torneios, nas salas privadas e no treino contra o bot, quem cria escolhe entre cinco opções:
+torneios, nas salas privadas e no treino contra o bot, quem cria escolhe o formato e se aceita spoilers:
 
-| Opção | Banidas | Rotacionadas (bloco ①) | Spoilers | Estatísticas e meta |
-|---|---|---|---|---|
-| **Extra Grand Battle** | não | sim | não | sim |
-| **Extra Grand Battle + EB05** (próxima coleção) | não | sim | só a próxima coleção | não |
-| **Standard** | não | não | não | sim |
-| **Standard + EB05** (próxima coleção) | não | não | só a próxima coleção | não |
-| **Livre (vale tudo)** | sim | sim | sim | não |
+| Opção | Banidas (Bandai) | Rotacionadas (bloco ①) | SR e SEC | Spoilers | Estatísticas e meta |
+|---|---|---|---|---|---|
+| **Extra Grand Battle** | não | sim | sim | não | sim |
+| **Extra Grand Battle + EB05** (próxima coleção) | não | sim | sim | só a próxima coleção | não |
+| **Standard** | não | não | sim | não | sim |
+| **Standard + EB05** (próxima coleção) | não | não | sim | só a próxima coleção | não |
+| **All Blue** | sim | sim | não | não | não |
+| **All Blue + EB05** (próxima coleção) | sim | sim | não | só a próxima coleção | não |
+| **Livre (vale tudo)** | sim | sim | sim | sim | não |
 
 Fora do Livre, "+ spoilers" quer dizer **só a próxima coleção a ser lançada**, e as telas mostram o nome dela no lugar
 de "spoilers" ("Standard + EB05"). A próxima coleção sai sozinha dos arquivos `data/spoilers` (campo `release`): entre as
@@ -242,7 +268,7 @@ privada guarda a coleção de quando foi criada, e o torneio grava a dele ao com
 "+ EB05"); antes de começar, vale a próxima de agora. O servidor informa a coleção em `/api/config` (`spoilerSet`).
 
 O **Livre** não é formato oficial: vale toda carta, inclusive as banidas e os pares proibidos. É só por diversão e não
-existe nas filas. No menu, o formato (Standard ou EGB) vale para todos os modos, e as salas privadas e o treino contra
+existe nas filas. No menu, o formato (Standard, EGB ou All Blue) vale para todos os modos, e as salas privadas e o treino contra
 o bot têm a escolha **Cartas**: lançadas, + a próxima coleção (ex.: "+ EB05") ou Livre. Quem entra numa sala privada joga nas regras de quem a
 criou. O servidor confere na fila ranqueada, na sala privada e na inscrição do torneio; o construtor avisa quando o
 deck tem spoilers e o menu desabilita a ranqueada para ele.
@@ -354,8 +380,8 @@ está na fila e os espectadores também contam.
 - **Relógio:** cada jogador tem **17:30** na partida inteira. O tempo só corre quando a ação ou a decisão (incluindo
   mulligan, Blocker, Counter e escolhas de efeitos) é daquele jogador. Sem tempo, ele perde. Se o jogador da vez ficar
   2 minutos desconectado, perde por abandono.
-- **Ranqueada:** só com login Google e só com decks sem cartas ⚙ (efeito ainda não automatizado). O pareamento junta
-  recompensas parecidas e a faixa abre com o tempo de espera.
+- **Ranqueada:** só com login Google, só nos formatos oficiais (o All Blue não tem ranqueada) e só com decks sem
+  cartas ⚙ (efeito ainda não automatizado). O pareamento junta recompensas parecidas e a faixa abre com o tempo de espera.
 - **Sem desfazer, Auto ou pausa** no online. Chat da partida (mensagens curtas, com palavrões censurados no servidor, e
   emotes de uma lista fixa; em Configurações dá para esconder o que o oponente manda), revanche nas salas privadas e
   o replay completo para baixar no fim.
@@ -515,7 +541,7 @@ O desenho e os limites estão em [`docs/plano-sala-do-tempo.md`](docs/plano-sala
 Em **Torneios** (no menu), contas com perfil **Organizador** ou **Admin** criam torneios; qualquer conta Google se
 inscreve. O organizador que criou o torneio gerencia o dele; um Admin gerencia qualquer um.
 
-- **Criação:** nome, descrição e regras, formato (Standard, Extra Grand Battle ou Livre) e se aceita spoilers (veja
+- **Criação:** nome, descrição e regras, formato (Standard, Extra Grand Battle, All Blue ou Livre) e se aceita spoilers (veja
   [Formatos](#formatos); o Livre sempre aceita), estrutura, limite de jogadores e
   início previsto. Dá para editar tudo enquanto as inscrições estão abertas.
 - **Check-in, início automático e W.O. por ausência** (torneios com data de início; ligado por padrão ao criar):

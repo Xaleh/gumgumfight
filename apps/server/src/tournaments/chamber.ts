@@ -177,7 +177,10 @@ export function chamberDecks(
   t: Pick<Tournament, 'format' | 'spoilers'> & Partial<Pick<Tournament, 'spoilerSet' | 'status'>>,
   at: Date,
 ): { leaders: ChamberLeaderDeck[]; others: StoredDeck[] } {
-  const builtin = listDecks(db).filter((d) => d.kind === 'builtin' && deckIssue(db, d, t, at) === null);
+  // Os decks prontos do All Blue só valem como oponente numa Sala do Tempo desse formato.
+  const builtin = listDecks(db).filter(
+    (d) => d.kind === 'builtin' && (t.format === 'allblue' || d.group !== 'allblue') && deckIssue(db, d, t, at) === null,
+  );
   const byId = new Map(builtin.map((d) => [d.id, d]));
   const rank = (d: StoredDeck) => (d.group === 'meta' ? 0 : 1);
   const leaders = preset.leaders.map((l): ChamberLeaderDeck => {

@@ -165,6 +165,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const [set, setSet] = useState('');
   const [onlyCompatible, setOnlyCompatible] = useState(true);
   const [onlyAutomated, setOnlyAutomated] = useState(false);
+  /** Montando para o All Blue: o catálogo só mostra o que vale nele e a lista marca o que não vale. */
+  const [allBlue, setAllBlue] = useState(false);
   const [limit, setLimit] = useState(PAGE);
 
   const byId = useMemo(() => new Map(allCards.map((c) => [c.id, c])), [allCards]);
@@ -211,11 +213,12 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
     }
     setDraft({ id: null, name: l.name ?? t('deck.newDeckName'), leader: parsed.leader ?? '', cards: new Map(parsed.cards.map((c) => [c.id, c.count])), arts: new Map(), kind: 'user' });
     setDirty(true);
+    if (l.format === 'allblue') setAllBlue(true);
     setNotice(l.format ? t('deck.linkImportedFormat', { format: formatLabel(l.format) }) : t('deck.linkImported'));
     setError(errors.length ? errors.join('\n') : null);
   };
 
-  useEffect(() => setLimit(PAGE), [query, colors, category, cost, set, onlyCompatible, onlyAutomated, draft.leader]);
+  useEffect(() => setLimit(PAGE), [query, colors, category, cost, set, onlyCompatible, onlyAutomated, allBlue, draft.leader]);
 
   // Avisa antes de sair com alterações não salvas.
   useEffect(() => {
@@ -233,7 +236,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
 
   const sets = useMemo(() => [...new Set(allCards.map((c) => c.set ?? c.id.split('-')[0]))].sort(), [allCards]);
   /** Quantos filtros estão fora do padrão (selo do botão "Filtros" no celular). */
-  const activeFilters = [colors.length > 0, category !== '', cost !== '', set !== '', !onlyCompatible, onlyAutomated].filter(Boolean).length;
+  const activeFilters = [colors.length > 0, category !== '', cost !== '', set !== '', !onlyCompatible, onlyAutomated, allBlue].filter(Boolean).length;
   /** Coleções que ainda têm cartas de spoiler (não lançadas na API oficial). */
   const spoilerSets = useMemo(() => new Set(allCards.filter((c) => c.spoiler).map((c) => c.set ?? c.id.split('-')[0])), [allCards]);
 
@@ -261,10 +264,11 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         if (set === SPOILERS ? !c.spoiler : set && (c.set ?? c.id.split('-')[0]) !== set) return false;
         if (onlyCompatible && leader && c.category !== 'leader' && (!isColorCompatible(leader, c) || !leaderAllows(leader, c))) return false;
         if (onlyAutomated && needsManual(c)) return false;
+        if (allBlue && cardLegality(c.id, 'allblue', undefined, c) !== 'legal') return false;
         return matchesCardQuery(c, q, ctx);
       })
       .sort((a, b) => a.id.localeCompare(b.id));
-  }, [allCards, query, searchAliases, colors, category, cost, set, onlyCompatible, onlyAutomated, leader, choosingLeader, draft.leader, draft.cards]);
+  }, [allCards, query, searchAliases, colors, category, cost, set, onlyCompatible, onlyAutomated, allBlue, leader, choosingLeader, draft.leader, draft.cards]);
 
   const deckList = useMemo(
     () => ({
@@ -284,16 +288,19 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const legality = useMemo(
     () =>
       FORMATS.map((f) => {
-        const issues = formatIssues(deckList, f.id);
+        const issues = formatIssues(deckList, f.id, undefined, byId);
         return { ...f, issues, texts: issues.map((i) => tryT(i.code, i.params) ?? i.message) };
       }),
-    [deckList, tryT],
+    [deckList, byId, tryT],
   );
   /** Cartas de spoiler (ainda não lançadas): o deck não vale na ranqueada nem em torneio sem spoilers. */
   const spoilers = useMemo(() => spoilerCards(deckList, byId), [deckList, byId]);
   const formatProblems = useMemo(
-    () => [...new Set([...legality.flatMap((f) => f.texts), ...(spoilers.length ? [spoilerText(spoilers)] : [])])],
-    [legality, spoilers],
+    // Montando para o All Blue, só os avisos dele (banidas e rotação da Bandai não valem lá); fora
+    // disso, só os dos formatos oficiais: num deck comum, cada SR viraria um aviso (o selo do
+    // formato continua dizendo o motivo).
+    () => [...new Set([...legality.filter((f) => (f.id === 'allblue') === allBlue).flatMap((f) => f.texts), ...(spoilers.length ? [spoilerText(spoilers)] : [])])],
+    [legality, spoilers, allBlue],
   );
 
   // ------------------------------------------------------------------ edição
@@ -610,6 +617,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   }, [entries]);
 
   const errorIds = new Set(report.issues.filter((i) => i.level === 'error' && i.cardId).map((i) => i.cardId));
+  /** Montando para o All Blue: a carta do deck que não vale nele (SR, SEC ou sem raridade conhecida). */
+  const notAllBlue = (id: string) => allBlue && cardLegality(id, 'allblue', undefined, byId.get(id)) !== 'legal';
   const numbers = useMemo(() => deckNumbers(deckList.cards, byId), [deckList, byId]);
   const toggleFavorite = useFavoriteToggle(setDecks, setError);
   const storageHint = auth.user ? t('deck.storageAccount') : `${t('deck.storageBrowser')}${auth.clientId ? ` ${t('deck.storageSignIn')}` : ''}`;
@@ -793,6 +802,10 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               <input type="checkbox" checked={onlyAutomated} onChange={(e) => setOnlyAutomated(e.target.checked)} />
               {t('deck.onlyAutomated')}
             </label>
+            <label className="check" title={t('deck.onlyAllBlueTitle')}>
+              <input type="checkbox" checked={allBlue} onChange={(e) => setAllBlue(e.target.checked)} />
+              {t('deck.onlyAllBlue')}
+            </label>
             </div>
           </div>
 
@@ -832,7 +845,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                             ⚙
                           </span>
                         )}
-                        <LegalityBadge id={c.id} />
+                        {!allBlue && <LegalityBadge id={c.id} />}
                       </>
                     }
                   />
@@ -930,7 +943,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               {entries.length === 0 && <div className="muted small">{canHover ? t('deck.emptyMouse') : t('deck.emptyTouch')}</div>}
               {entries.map((e) =>
                 e.card ? (
-                  <div key={e.id} className={['dk-deck-cell', errorIds.has(e.id) ? 'bad' : ''].join(' ')}>
+                  <div key={e.id} className={['dk-deck-cell', errorIds.has(e.id) || notAllBlue(e.id) ? 'bad' : ''].join(' ')}>
                     <StaticCard card={shown(e.card)} onHover={setHovered} onLongPress={setZoom} onContextMenu={() => remove(e.id)} />
                     <div className="dk-qty">
                       <button type="button" onClick={() => remove(e.id)} aria-label={t('deck.removeOne')}>
@@ -983,7 +996,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                     <div className="entry-group">{t(CATEGORY_LABEL[e.card.category])}</div>
                   )}
                   <div
-                    className={['entry', errorIds.has(e.id) || cardLegality(e.id, 'egb') === 'banned' ? 'bad' : ''].join(' ')}
+                    className={['entry', errorIds.has(e.id) || (allBlue ? notAllBlue(e.id) : cardLegality(e.id, 'egb') === 'banned') ? 'bad' : ''].join(' ')}
                     data-card={e.id}
                     onMouseEnter={(ev) => e.card && setHovered(shown(e.card), ev.currentTarget)}
                     onMouseLeave={() => setHovered(null)}
@@ -994,7 +1007,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
                       <small>
                         {e.id}
                         {e.card && needsManual(e.card) ? ` · ${t('deck.entryManual')}` : ''}
-                        {legalityNote(cardLegality(e.id, 'standard'), t)}
+                        {allBlue ? (notAllBlue(e.id) ? ` · ${t('deck.entryNotAllBlue')}` : '') : legalityNote(cardLegality(e.id, 'standard'), t)}
                       </small>
                     </span>
                     {e.card?.arts?.length ? (
@@ -1166,8 +1179,8 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
 }
 
 /** Nota na linha do deck atual para carta rotacionada ou banida (no Standard). */
-function legalityNote(legality: 'legal' | 'rotated' | 'banned', t: Translate): string {
-  return legality === 'legal' ? '' : ` · ${t(legality === 'rotated' ? 'deck.entryRotated' : 'deck.entryBanned')}`;
+function legalityNote(legality: ReturnType<typeof cardLegality>, t: Translate): string {
+  return legality === 'rotated' ? ` · ${t('deck.entryRotated')}` : legality === 'banned' ? ` · ${t('deck.entryBanned')}` : '';
 }
 
 /** Selo no catálogo para cartas banidas ou rotacionadas (bloco ①). */

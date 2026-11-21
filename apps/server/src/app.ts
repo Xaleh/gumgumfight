@@ -224,13 +224,15 @@ export function buildApp(
   const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null, usage: DeckUsage = usageFor(viewer)) => {
     const report = validateDeck(deck, cards);
     const leader = cards.get(deck.leader);
-    const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id)] as const);
+    const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id, undefined, cards)] as const);
     return {
       id: deck.id,
       name: deck.name,
       kind: deck.kind,
       /** Deck do meta global (data/decks/meta): o grupo "Decks do meta" e o Bot do Time. */
       meta: deck.group === 'meta',
+      /** Deck pronto do All Blue (data/decks/allblue): só entra no sorteio do oponente nesse formato. */
+      allBlue: deck.group === 'allblue',
       leader: deck.leader,
       leaderName: leader?.name ?? null,
       leaderImage: (server.cardImages && leader && artImage(leader, deck.arts?.[leader.id])) || null,
