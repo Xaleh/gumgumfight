@@ -285,9 +285,9 @@ comunidade": dá para jogar com eles e duplicá-los.
 Na tela inicial, em **Modos especiais**, o **Selado** é o modo limitado: o deck não vem dos decks salvos, sai dos
 boosters que o jogador abre na hora.
 
-1. **Escolha a coleção e abra 6 boosters.** Cada booster tem 12 cartas: 7 comuns, 3 incomuns, 1 rara ou melhor (R, SR
-   ou SEC) e mais uma carta, que é um Líder em cerca de 1 a cada 3 boosters e uma incomum nos outros. Dá para abrir um
-   por vez ou todos de uma vez.
+1. **Escolha a coleção e abra 6 boosters.** Cada booster tem 12 cartas, com as vagas e as taxas do booster daquela
+   linha de produto (veja [Os boosters](#os-boosters)); a tela mostra a composição e as chances da coleção marcada. Dá
+   para abrir um por vez ou todos de uma vez.
 2. **Monte um deck de 40 cartas** com o que saiu. Vale **qualquer cor com qualquer Líder**, não há limite de cópias
    (vale o que você abriu) e **não há lista de banidas, pares proibidos nem rotação**. **Montar sozinho** preenche um
    deck jogável (curva de custo, Counters e alguns Eventos). O deck é salvo sozinho enquanto você monta.
@@ -300,8 +300,9 @@ boosters que o jogador abre na hora.
   motor trata o Líder como tendo qualquer nome, tipo e atributo. A carta não tem número impresso, então o id é nosso
   (`SEALED-001`, em `data/cards/sealed.json`, com a imagem em `apps/web/public/cards/`). Ela **só vale no Selado** (e
   no Livre): num deck construído, o aviso é "só pode ser usada no Selado".
-- **Coleções disponíveis:** as de booster (OP, EB e PRB) que estão completas no banco (cartas comuns, incomuns e raras
-  suficientes, com raridade conhecida) e com pelo menos 70% dos efeitos automatizados. Uma coleção de spoiler entra
+- **Coleções disponíveis:** as de booster (OP e EB) que estão completas no banco (cartas comuns, raras e, onde o
+  booster leva, incomuns suficientes, com raridade conhecida) e com pelo menos 70% dos efeitos automatizados. Os
+  Premium Boosters (PRB) ficam de fora: são reimpressões, e o banco só tem as cartas novas deles. Uma coleção de spoiler entra
   sozinha quando fica completa, com o selo "Pré-release".
 - **O servidor é a autoridade:** ele sorteia os boosters (seed do `crypto`), grava as cartas na tabela `sealed_pools`
   e confere o deck contra elas ao salvar e antes de cada partida. Recarregar a página não muda o que saiu. Cada
@@ -310,10 +311,50 @@ boosters que o jogador abre na hora.
   próprio placar (vitórias e derrotas), que conta as partidas entre pessoas nas salas privadas; os treinos contra o
   bot não contam.
 - **Ainda não tem:** fila de Selado, torneio de Selado e Cubo (veja
-  [`docs/plano-modos-de-jogo.md`](docs/plano-modos-de-jogo.md)). O modelo do booster é o padrão do motor
-  (`DEFAULT_BOOSTER`, em `packages/engine/src/sealed.ts`), igual para todas as coleções.
+  [`docs/plano-modos-de-jogo.md`](docs/plano-modos-de-jogo.md)).
 - Código: `packages/engine/src/sealed.ts` (boosters, validação do deck de 40 e montagem automática),
   `apps/server/src/sealed/` (tabela e rotas `/api/sealed`) e `apps/web/src/components/Sealed.tsx`.
+
+### Os boosters
+
+A Bandai **não publica as taxas** dos boosters: as páginas oficiais dizem só quantas cartas de cada raridade a coleção
+tem. As taxas daqui vêm de **aberturas de caixas registradas pela comunidade** (caixa em inglês, 24 boosters de 12
+cartas), e cada linha de produto tem o seu booster (`BOOSTER_MODELS`, em `packages/engine/src/sealed.ts`):
+
+| Booster | Vagas (12 cartas) | SR | SEC | Líder |
+|---|---|---|---|---|
+| **Principal de hoje** (OP04 em diante) | 7 comuns, 3 incomuns, 1 rara e 1 vaga de destaque (rara, SR ou SEC) | 32,5% dos boosters (7,8 por caixa) | 3,3% (0,8 por caixa) | 34,7% (8,3 por caixa) |
+| **Primeiras coleções** (OP01 a OP03) | 8 comuns, 3 incomuns e 1 vaga de destaque | 30,4% (7,3 por caixa) | 2,3% (0,55 por caixa) | 33,3% (8 por caixa) |
+| **Extra Booster** (EB) | 10 comuns, 1 rara e 1 vaga de destaque; não tem incomuns | 30% (7,2 por caixa) | 2,9% (0,7 por caixa) | 2 por caixa para cada Líder da coleção (EB01: 25%; as de um Líder só: 8,3%) |
+
+- **O Líder entra no lugar de uma comum.** Nos boosters de hoje, o que traz Líder fica com duas raras: Líder e SR não
+  saem juntos. Nas primeiras coleções, o Líder é sorteado à parte e pode vir com SR.
+- **Artes alternativas contam como a carta que são.** Por caixa, os registros dão 7 SR, 2 SEC a cada 3 caixas e 4
+  artes alternativas a cada 3 caixas (mais um Líder de arte alternativa a cada 3). As artes alternativas foram
+  repartidas em 60% SR, 30% R e 10% SEC, que é uma estimativa.
+- **O DON!! do booster não é carta de deck.** Nas três primeiras coleções todo booster trazia um DON!!: aqui entra
+  uma comum no lugar, para o booster ter 12 cartas de deck. O DON!! de arte alternativa dos boosters de hoje (2 por
+  caixa) vira uma rara.
+- **O que é sólido e o que é estimativa:** 7 SR e 8 Líderes por caixa e as SEC dos boosters de hoje aparecem em
+  registros de vários casos (centenas de caixas). As taxas das três primeiras coleções e dos Extra Boosters têm menos
+  dados; as de Líder dos EB02 a EB05 e todas as do EB05 não foram encontradas e seguem a regra do EB01.
+- **O que não segue o produto:** em inglês, o EB04 saiu dentro dos boosters OP14 e OP15; aqui o OP14 e o OP15 abrem só
+  as próprias cartas, e o EB04 é um booster à parte. A partir do OP17 a quantidade de destaques por caixa varia mais;
+  o modelo usa a média.
+- **Fontes:** as páginas de produto da Bandai ([OP01](https://en.onepiece-cardgame.com/products/boosters/op01.php),
+  [EB01](https://en.onepiece-cardgame.com/products/boosters/eb01.php)) para a composição das coleções; registros de
+  caixas no r/OnePieceTCG ([20+ caixas](https://www.reddit.com/r/OnePieceTCG/comments/1jgnfii/),
+  [14 casos de OP14](https://www.reddit.com/r/OnePieceTCG/comments/1q8k8dd/),
+  [6 casos de OP16](https://www.reddit.com/r/OnePieceTCG/comments/1txjolt/),
+  [Extra Boosters](https://www.reddit.com/r/OnePieceTCG/comments/1kby34v/)) e o
+  [guia do OP17 do TCG Talk](https://tcgtalk.com/guides/op17-pull-rates-case-opening) para as taxas.
+- **A arte dos boosters** é a do produto em inglês (`apps/web/public/boosters/<COLEÇÃO>.webp`, das páginas da Bandai;
+  o EB04 usa a do produto japonês, o único que existe). Coleção sem arquivo aparece com um booster desenhado; para
+  uma coleção nova, basta pôr o arquivo na pasta. Pack Rush fechado, Draft e Cubo têm boosters próprios, desenhados.
+- **Abrir um booster** tem animação: ele treme, o topo rasga e as cartas sobem, e só então a tela revela o que saiu
+  (1,7 s; 1 s cada quando são vários; clique, toque, Esc, Enter ou Espaço pulam). No Draft, o booster de cada rodada
+  abre do mesmo jeito. Segue a opção **Animações** das configurações: "completo" mostra a abertura, "suave" só a
+  virada das cartas, "desligado" nada. Com "reduzir movimento" ligado no sistema, a abertura também não aparece.
 
 ### Pack Rush
 
@@ -341,7 +382,8 @@ começa quando quiser, e **os lugares vazios viram bots**: dá para draftar sozi
 
 - **Como é:** cada um abre um booster de 12 cartas, **fica com 1** e passa o resto para o vizinho, até o booster
   acabar. São **4 boosters por jogador (48 escolhas)**, e o sentido do rodízio inverte a cada booster. No Pack Rush,
-  a coleção de cada rodada é sorteada entre as escolhidas, e todo mundo abre a mesma coleção naquela rodada.
+  a coleção de cada booster é sorteada entre as escolhidas, lugar por lugar: numa mesma rodada, cada um pode abrir
+  uma coleção diferente.
 - **Tempo:** cada escolha tem um prazo que encurta com o booster (10 s + 3 s por carta: 46 s com 12 cartas, 13 s com
   a última). Sem escolha no prazo, o **servidor escolhe** pela pessoa, com a mesma nota dos bots. Depois de dois
   prazos perdidos seguidos **com a tela fechada**, o lugar passa a escolher sozinho na hora, para não segurar o pod;

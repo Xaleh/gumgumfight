@@ -391,6 +391,17 @@ export function Sealed({
                   chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>
                 )}
               </div>
+              {!rush && chosen?.pack && (
+                <p className="muted small sealed-odds">
+                  {t(chosen.pack.uncommons ? 'sealed.packMix' : 'sealed.packMixNoUc', {
+                    n: chosen.pack.commons + chosen.pack.uncommons + chosen.pack.rares + 1,
+                    c: chosen.pack.commons,
+                    uc: chosen.pack.uncommons,
+                    r: chosen.pack.rares + 1,
+                  })}{' '}
+                  {t('sealed.packOdds', { sr: Math.round(chosen.pack.sr * 100), sec: Math.round(chosen.pack.sec * 100), leader: Math.round(chosen.pack.leader * 100) })}
+                </p>
+              )}
               {draftRow}
             </>
           )}

@@ -23,21 +23,71 @@ import type { CardData, DeckList } from './types';
 export const SEALED_PACKS = 6;
 
 /**
- * Montagem de um booster. `hits`: peso de cada raridade na vaga de "rara ou melhor". `leaderChance`:
- * chance de a última carta ser um Líder (senão, mais uma incomum). As proporções do produto real
- * mudam de coleção para coleção; este é o padrão, e uma coleção pode ter o seu.
+ * Montagem de um booster: as vagas fixas (comuns, incomuns, raras) e uma vaga de destaque, que é
+ * uma SR ou uma SEC com as chances de `hits` e, no resto das vezes, uma rara. `leaderChance`:
+ * chance de o booster trazer um Líder, que entra no lugar de uma comum.
+ *
+ * A Bandai não publica as taxas; os números vêm de aberturas de caixas registradas pela comunidade
+ * (caixa em inglês de 24 boosters; as fontes estão no README), por isso aparecem como "tantos por
+ * caixa" divididos por 24. As artes alternativas contam como a carta que são (a de uma SR é uma SR).
+ * O DON!! que vem em alguns boosters não é carta de deck: no lugar dele entra uma comum (OP01 a
+ * OP03, um por booster) ou uma rara (o DON!! de arte alternativa, 2 por caixa nos boosters de hoje).
  */
 export interface BoosterModel {
   commons: number;
   uncommons: number;
-  hits: Readonly<Record<'R' | 'SR' | 'SEC', number>>;
+  rares: number;
+  /** Chance de a vaga de destaque de um booster ser uma SR e de ser uma SEC (0 a 1). */
+  hits: Readonly<Record<'SR' | 'SEC', number>>;
   leaderChance: number;
+  /** Booster com Líder tem sempre uma rara na vaga de destaque (os de hoje: Líder e SR não saem juntos). */
+  leaderTakesHit: boolean;
+  /** Teto da chance de Líder por Líder que a coleção tem (Extra Booster com um Líder só traz poucos por caixa). */
+  leaderChancePerLeader?: number;
 }
 
-export const DEFAULT_BOOSTER: BoosterModel = { commons: 7, uncommons: 3, hits: { R: 0.8, SR: 0.17, SEC: 0.03 }, leaderChance: 1 / 3 };
+/**
+ * Booster principal de hoje (OP04 em diante), por caixa de 24: 8 com Líder (mais 1 a cada 3 caixas com
+ * o Líder de arte alternativa), 7 com SR, 2 SEC a cada 3 caixas e 4 artes alternativas a cada 3
+ * caixas (repartidas aqui em 60% SR, 30% R, 10% SEC); os outros trazem duas raras.
+ */
+const MAIN_BOOSTER: BoosterModel = { commons: 7, uncommons: 3, rares: 1, hits: { SR: 7.8 / 24, SEC: 0.8 / 24 }, leaderChance: 8.33 / 24, leaderTakesHit: true };
+/**
+ * Booster das primeiras coleções (OP01 a OP03): 7 comuns, 3 incomuns, uma vaga de destaque e um
+ * DON!! (aqui, a oitava comum). 7 SR por caixa e cerca de um destaque (SEC ou arte alternativa).
+ */
+const EARLY_BOOSTER: BoosterModel = { commons: 8, uncommons: 3, rares: 0, hits: { SR: 7.3 / 24, SEC: 0.55 / 24 }, leaderChance: 8 / 24, leaderTakesHit: false };
+/**
+ * Extra Booster (EB): não tem incomuns. Por caixa: 6 SR, perto de 2 artes alternativas e 1 SEC a
+ * cada 2 caixas. Líder: 2 por caixa para cada Líder da coleção (EB01, com 3 Líderes, traz 6).
+ */
+const EXTRA_BOOSTER: BoosterModel = { commons: 10, uncommons: 0, rares: 1, hits: { SR: 7.2 / 24, SEC: 0.7 / 24 }, leaderChance: 6 / 24, leaderTakesHit: true, leaderChancePerLeader: 2 / 24 };
 
-/** Cartas por booster no modelo (7 comuns + 3 incomuns + 1 rara ou melhor + 1 Líder ou incomum). */
-export const boosterSize = (model: BoosterModel = DEFAULT_BOOSTER): number => model.commons + model.uncommons + 2;
+export const BOOSTER_MODELS = { main: MAIN_BOOSTER, early: EARLY_BOOSTER, extra: EXTRA_BOOSTER } as const;
+export const DEFAULT_BOOSTER: BoosterModel = MAIN_BOOSTER;
+
+/** O modelo do booster de uma coleção: Extra Booster, as três primeiras coleções ou o booster principal de hoje. */
+export function boosterModelOf(set: string): BoosterModel {
+  const code = set.toUpperCase();
+  if (code.startsWith('EB')) return EXTRA_BOOSTER;
+  if (/^OP0?[123]$/.test(code)) return EARLY_BOOSTER;
+  return MAIN_BOOSTER;
+}
+
+/** Cartas por booster no modelo (as vagas fixas e a de destaque; o Líder entra no lugar de uma comum). */
+export const boosterSize = (model: BoosterModel = DEFAULT_BOOSTER): number => model.commons + model.uncommons + model.rares + 1;
+
+/** A chance de Líder de um booster numa coleção com `leaders` Líderes. */
+const leaderChanceOf = (model: BoosterModel, leaders: number): number =>
+  leaders ? Math.min(model.leaderChance, model.leaderChancePerLeader === undefined ? 1 : model.leaderChancePerLeader * leaders) : 0;
+
+/**
+ * As chances de um booster, para mostrar ao jogador: de trazer uma SR, uma SEC e um Líder (0 a 1).
+ * `leaders`: quantos Líderes a coleção tem.
+ */
+export function boosterOdds(model: BoosterModel = DEFAULT_BOOSTER, leaders = 1): { SR: number; SEC: number; leader: number } {
+  return { SR: model.hits.SR, SEC: model.hits.SEC, leader: leaderChanceOf(model, leaders) };
+}
 
 /** Coleções vendidas em booster (OP, EB e PRB): starters e promos não têm booster. */
 export const isBoosterSet = (set: string): boolean => /^(OP|EB|PRB)\d+$/i.test(set);
@@ -78,10 +128,13 @@ export function boosterStock(setCards: readonly CardData[]): BoosterStock {
 /** Mínimo de cartas para a coleção entrar no Selado: abaixo disso ela está incompleta no banco. */
 export const BOOSTER_MIN = { C: 20, UC: 10, R: 5 } as const;
 
-/** Se dá para abrir boosters da coleção: tem comuns, incomuns e raras o bastante, com raridade conhecida. */
-export function boosterReady(setCards: readonly CardData[]): boolean {
+/**
+ * Se dá para abrir boosters da coleção: tem comuns, raras e (quando o booster dela leva incomuns)
+ * incomuns o bastante, com raridade conhecida.
+ */
+export function boosterReady(setCards: readonly CardData[], model: BoosterModel = DEFAULT_BOOSTER): boolean {
   const s = boosterStock(setCards);
-  return s.C >= BOOSTER_MIN.C && s.UC >= BOOSTER_MIN.UC && s.R >= BOOSTER_MIN.R && s.unknown * 10 <= setCards.length;
+  return s.C >= BOOSTER_MIN.C && (model.uncommons === 0 || s.UC >= BOOSTER_MIN.UC) && s.R >= BOOSTER_MIN.R && s.unknown * 10 <= setCards.length;
 }
 
 /** O RNG de um sorteio a partir da seed: um número (32 bits) ou as 4 palavras do sfc32. */
@@ -119,17 +172,23 @@ function boosterSource(setCards: readonly CardData[]): BoosterSource {
 /** Um booster da coleção. Nenhuma carta se repete dentro dele. */
 function openBooster(holder: RngHolder, src: BoosterSource, model: BoosterModel): string[] {
   const taken = new Set<string>();
-  const pack = [...draw(holder, src.C, model.commons, taken), ...draw(holder, src.UC, model.uncommons, taken)];
-  // Rara ou melhor, pelos pesos das raridades que a coleção tem.
-  const hits = (['R', 'SR', 'SEC'] as const).filter((r) => src[r].length && model.hits[r] > 0);
-  if (hits.length) {
-    let roll = nextRandom(holder) * hits.reduce((n, r) => n + model.hits[r], 0);
-    const rarity = hits.find((r) => (roll -= model.hits[r]) < 0) ?? hits[0];
-    pack.push(...draw(holder, src[rarity], 1, taken));
-  }
-  // Última vaga: um Líder ou mais uma incomum.
-  if (src.leaders.length && nextRandom(holder) < model.leaderChance) pack.push(...draw(holder, src.leaders, 1, taken));
-  else pack.push(...draw(holder, src.UC.length > model.uncommons ? src.UC : src.any, 1, taken));
+  // Um sorteio decide o booster. Nos de hoje, Líder, SR e SEC são fatias separadas dele (não saem
+  // juntos); nos das primeiras coleções, o Líder é sorteado à parte da vaga de destaque.
+  const chance = leaderChanceOf(model, src.leaders.length);
+  const roll = nextRandom(holder);
+  const leader = model.leaderTakesHit ? roll < chance : nextRandom(holder) < chance;
+  const at = model.leaderTakesHit ? roll - chance : roll;
+  // Coleção sem SEC: a fatia dela vira SR; sem SR, rara.
+  const wanted = leader && model.leaderTakesHit ? 'R' : at < model.hits.SEC ? 'SEC' : at < model.hits.SEC + model.hits.SR ? 'SR' : 'R';
+  const rarity = wanted === 'SEC' && !src.SEC.length ? (src.SR.length ? 'SR' : 'R') : wanted === 'SR' && !src.SR.length ? 'R' : wanted;
+  const pack = [
+    ...draw(holder, src.C, model.commons - (leader ? 1 : 0), taken),
+    ...draw(holder, src.UC, model.uncommons, taken),
+    ...draw(holder, src.R, model.rares, taken),
+  ];
+  // A vaga de destaque.
+  pack.push(...draw(holder, src[rarity], 1, taken));
+  if (leader) pack.push(...draw(holder, src.leaders, 1, taken));
   // Coleção pequena demais para alguma vaga: completa com o que houver.
   pack.push(...draw(holder, src.any, boosterSize(model) - pack.length, taken));
   return pack;
@@ -139,7 +198,7 @@ function openBooster(holder: RngHolder, src: BoosterSource, model: BoosterModel)
  * Abre `packs` boosters da coleção. `seed`: número (32 bits) ou as 4 palavras do sfc32 (o servidor
  * usa esta, com `crypto`, para ninguém prever o que sai). Dentro de um booster nenhuma carta se
  * repete; entre boosters, sim. Coleção sem carta de alguma raridade: a vaga é preenchida com a
- * raridade mais próxima.
+ * raridade mais próxima. `model`: o booster da coleção (`boosterModelOf`).
  */
 export function openBoosters(setCards: readonly CardData[], seed: number | readonly number[], packs = SEALED_PACKS, model: BoosterModel = DEFAULT_BOOSTER): string[][] {
   const holder = holderOf(seed);
@@ -159,15 +218,15 @@ export function openMixedBoosters(
   sources: ReadonlyArray<{ set: string; cards: readonly CardData[] }>,
   seed: number | readonly number[],
   packs = SEALED_PACKS,
-  model: BoosterModel = DEFAULT_BOOSTER,
+  model?: BoosterModel,
 ): { sets: string[]; packs: string[][] } {
   const holder = holderOf(seed);
-  const built = sources.map((s) => ({ set: s.set.toUpperCase(), src: boosterSource(s.cards) }));
+  const built = sources.map((s) => ({ set: s.set.toUpperCase(), src: boosterSource(s.cards), model: model ?? boosterModelOf(s.set) }));
   const out = { sets: [] as string[], packs: [] as string[][] };
   for (let p = 0; p < packs; p++) {
     const pick = built[Math.floor(nextRandom(holder) * built.length)];
     out.sets.push(pick.set);
-    out.packs.push(openBooster(holder, pick.src, model));
+    out.packs.push(openBooster(holder, pick.src, pick.model));
   }
   return out;
 }
@@ -182,10 +241,10 @@ export function openDraftBoosters(
   seed: number | readonly number[],
   seats: number,
   rounds: number,
-  model: BoosterModel = DEFAULT_BOOSTER,
+  model?: BoosterModel,
 ): { sets: string[][]; packs: string[][][] } {
   const holder = holderOf(seed);
-  const built = sources.map((s) => ({ set: s.set.toUpperCase(), src: boosterSource(s.cards) }));
+  const built = sources.map((s) => ({ set: s.set.toUpperCase(), src: boosterSource(s.cards), model: model ?? boosterModelOf(s.set) }));
   const out = { sets: [] as string[][], packs: [] as string[][][] };
   for (let r = 0; r < rounds; r++) {
     const sets: string[] = [];
@@ -193,7 +252,7 @@ export function openDraftBoosters(
     for (let seat = 0; seat < seats; seat++) {
       const pick = built.length === 1 ? built[0] : built[Math.floor(nextRandom(holder) * built.length)];
       sets.push(pick.set);
-      packs.push(openBooster(holder, pick.src, model));
+      packs.push(openBooster(holder, pick.src, pick.model));
     }
     out.sets.push(sets);
     out.packs.push(packs);

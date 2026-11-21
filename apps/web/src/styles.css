@@ -16952,6 +16952,7 @@ div.dk-tile-main {
   filter: drop-shadow(0 6px 10px rgba(var(--shadow-rgb), 0.35));
 }
 .sealed-pack.art {
+  aspect-ratio: 3 / 5;
   background: none;
   border-color: transparent;
   box-shadow: none;
@@ -17859,4 +17860,8 @@ div.dk-tile-main {
     transform: translate(calc(var(--spread) * 34%), calc(-62% + (var(--spread) * var(--spread)) * 5%)) rotate(calc(var(--spread) * 9deg)) scale(1);
     opacity: 1;
   }
+}
+
+.sealed-odds {
+  margin: 0;
 }

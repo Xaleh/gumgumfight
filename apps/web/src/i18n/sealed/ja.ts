@@ -218,6 +218,9 @@ const sealed = {
   'cube.sourceText': '{from}から{to}までのワンピースのオンライン大会{tournaments}件、{decks}デッキのデッキリストから作りました。色ごとに最も使われたカードを、コストが偏らないように選んでいます。リーダーと、効果がまだ自動化されていないカード（⚙）は入りません。',
   'errors.cubeUnavailable': 'このサーバーではキューブを利用できません。',
   'sealed.openingPack': 'ブースター {n}/{total} を開封中',
+  'sealed.packMix': '{n}枚入りブースター：コモン{c}枚、アンコモン{uc}枚、レア以上{r}枚。',
+  'sealed.packMixNoUc': '{n}枚入りブースター：コモン{c}枚、レア以上{r}枚。',
+  'sealed.packOdds': 'SRは{sr}%、SECは{sec}%、リーダーは{leader}%のブースターに入っています。封入率はボックス開封の集計によるもので、バンダイは公表していません。',
 };
 
 export default sealed;

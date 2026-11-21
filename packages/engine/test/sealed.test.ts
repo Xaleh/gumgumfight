@@ -10,10 +10,14 @@ import { cardLegality, formatIssues, formatLabel, playMode, playModeLabel, rarit
 import {
   anyLeaderAllowed,
   autoBuildLimited,
+  BOOSTER_MODELS,
   boosterCards,
+  boosterModelOf,
+  boosterOdds,
   boosterReady,
   boosterSize,
   boosterStock,
+  DEFAULT_BOOSTER,
   isBoosterSet,
   isRush,
   openBoosters,
@@ -48,21 +52,78 @@ describe('Selado: boosters', () => {
     expect(boosterStock(op01).leaders).toBeGreaterThan(0);
   });
 
-  it('6 boosters de 12: 7 comuns, 3 incomuns, 1 rara ou melhor e 1 Líder ou incomum, sem repetir carta no booster', () => {
-    const packs = openBoosters(op01, 42);
-    expect(packs).toHaveLength(SEALED_PACKS);
+  /** Quantas cartas de cada tipo um booster tem. */
+  const mix = (pack: string[]) => ({
+    C: pack.filter((id) => !isLeader(id) && rarity(id) === 'C').length,
+    UC: pack.filter((id) => !isLeader(id) && rarity(id) === 'UC').length,
+    R: pack.filter((id) => !isLeader(id) && rarity(id) === 'R').length,
+    SR: pack.filter((id) => !isLeader(id) && rarity(id) === 'SR').length,
+    SEC: pack.filter((id) => !isLeader(id) && rarity(id) === 'SEC').length,
+    L: pack.filter(isLeader).length,
+  });
+
+  it('cada linha de produto tem o seu booster: as três primeiras coleções, o principal de hoje e o Extra Booster', () => {
+    expect(boosterModelOf('OP01')).toBe(BOOSTER_MODELS.early);
+    expect(boosterModelOf('op03')).toBe(BOOSTER_MODELS.early);
+    expect(boosterModelOf('OP04')).toBe(BOOSTER_MODELS.main);
+    expect(boosterModelOf('OP18')).toBe(BOOSTER_MODELS.main);
+    expect(boosterModelOf('EB02')).toBe(BOOSTER_MODELS.extra);
+    expect(DEFAULT_BOOSTER).toBe(BOOSTER_MODELS.main);
+    // Todo booster tem 12 cartas de deck.
+    expect([boosterSize(BOOSTER_MODELS.early), boosterSize(BOOSTER_MODELS.main), boosterSize(BOOSTER_MODELS.extra)]).toEqual([12, 12, 12]);
+  });
+
+  it('booster principal de hoje: 7 comuns, 3 incomuns e duas vagas de rara (uma pode ser SR ou SEC); o Líder entra no lugar de uma comum, sem SR', () => {
+    const packs = openBoosters(op01, 42, 400, BOOSTER_MODELS.main);
     for (const pack of packs) {
-      expect(pack).toHaveLength(boosterSize());
+      expect(pack).toHaveLength(12);
       expect(new Set(pack).size).toBe(pack.length);
       expect(pack.every((id) => id.startsWith('OP01-'))).toBe(true);
-      const cards = pack.filter((id) => !isLeader(id));
-      expect(cards.filter((id) => rarity(id) === 'C')).toHaveLength(7);
-      expect(cards.filter((id) => ['R', 'SR', 'SEC'].includes(rarity(id)!))).toHaveLength(1);
-      // A última vaga é um Líder ou mais uma incomum.
-      const leaders = pack.filter(isLeader).length;
-      expect(leaders).toBeLessThanOrEqual(1);
-      expect(cards.filter((id) => rarity(id) === 'UC')).toHaveLength(leaders ? 3 : 4);
+      const m = mix(pack);
+      expect(m.L).toBeLessThanOrEqual(1);
+      expect(m.C).toBe(m.L ? 6 : 7);
+      expect(m.UC).toBe(3);
+      expect(m.R + m.SR + m.SEC).toBe(2);
+      expect(m.R).toBeGreaterThanOrEqual(1);
+      // Líder e destaque não saem no mesmo booster.
+      if (m.L) expect(m.R).toBe(2);
     }
+  });
+
+  it('booster das primeiras coleções: 8 comuns (a oitava no lugar do DON!!), 3 incomuns e uma vaga de destaque; o Líder pode vir com SR', () => {
+    const packs = openBoosters(op01, 42, 600, boosterModelOf('OP01'));
+    for (const pack of packs) {
+      expect(pack).toHaveLength(12);
+      expect(new Set(pack).size).toBe(pack.length);
+      const m = mix(pack);
+      expect(m.C).toBe(m.L ? 7 : 8);
+      expect(m.UC).toBe(3);
+      expect(m.R + m.SR + m.SEC).toBe(1);
+    }
+    expect(packs.some((p) => mix(p).L === 1 && mix(p).SR === 1)).toBe(true);
+  });
+
+  it('Extra Booster: sem incomuns (10 comuns e duas vagas de rara), e poucos Líderes quando a coleção só tem um', () => {
+    // Um "EB" de teste: a OP01 sem incomuns e com um Líder só.
+    const leader = op01.find((c) => c.category === 'leader')!;
+    const eb = op01.filter((c) => (c.category === 'leader' ? c.id === leader.id : rarityCode(c.rarity) !== 'UC'));
+    expect(boosterReady(eb)).toBe(false);
+    expect(boosterReady(eb, BOOSTER_MODELS.extra)).toBe(true);
+    const packs = openBoosters(eb, 9, 3000, BOOSTER_MODELS.extra);
+    for (const pack of packs.slice(0, 300)) {
+      const m = mix(pack);
+      expect(pack).toHaveLength(12);
+      expect(m.UC).toBe(0);
+      expect(m.C).toBe(m.L ? 9 : 10);
+      expect(m.R + m.SR + m.SEC).toBe(2);
+    }
+    // 2 Líderes por caixa de 24 para cada Líder da coleção: 1 em 12 boosters.
+    const withLeader = packs.filter((p) => mix(p).L).length / packs.length;
+    expect(withLeader).toBeGreaterThan(0.06);
+    expect(withLeader).toBeLessThan(0.11);
+    expect(boosterOdds(BOOSTER_MODELS.extra, 1).leader).toBeCloseTo(2 / 24);
+    expect(boosterOdds(BOOSTER_MODELS.extra, 3).leader).toBeCloseTo(6 / 24);
+    expect(boosterOdds(BOOSTER_MODELS.extra, 0).leader).toBe(0);
   });
 
   it('a mesma seed abre os mesmos boosters; outra seed, outros (também com a seed de 128 bits do servidor)', () => {
@@ -73,18 +134,39 @@ describe('Selado: boosters', () => {
     expect(openBoosters(op01, words)).not.toEqual(openBoosters(op01, [1, 2, 3, 5]));
   });
 
-  it('as raridades saem perto dos pesos: a maioria rara, algumas SR e poucas SEC; Líder em cerca de 1 a cada 3', () => {
-    const packs = openBoosters(op01, 2026, 3000);
-    const hits = packs.map((p) => p.find((id) => !isLeader(id) && ['R', 'SR', 'SEC'].includes(rarity(id)!))!).map(rarity);
-    const share = (r: string) => hits.filter((x) => x === r).length / hits.length;
-    expect(share('R')).toBeGreaterThan(0.75);
-    expect(share('R')).toBeLessThan(0.85);
-    expect(share('SR')).toBeGreaterThan(0.13);
-    expect(share('SEC')).toBeGreaterThan(0.01);
-    expect(share('SEC')).toBeLessThan(0.06);
-    const withLeader = packs.filter((p) => p.some(isLeader)).length / packs.length;
-    expect(withLeader).toBeGreaterThan(0.28);
-    expect(withLeader).toBeLessThan(0.39);
+  it('as taxas por caixa de 24 boosters batem com as registradas: 7 a 8 SR, menos de 1 SEC e 8 Líderes', () => {
+    const boxes = 250;
+    const perBox = (packs: string[][], pick: (m: ReturnType<typeof mix>) => number) => packs.reduce((n, p) => n + pick(mix(p)), 0) / boxes;
+    // Principal de hoje: 7 SR + as artes alternativas de SR (perto de 7,8), 0,8 SEC e 8,3 Líderes.
+    const main = openBoosters(op01, 2026, boxes * 24, BOOSTER_MODELS.main);
+    expect(perBox(main, (m) => m.SR)).toBeGreaterThan(7.3);
+    expect(perBox(main, (m) => m.SR)).toBeLessThan(8.3);
+    expect(perBox(main, (m) => m.SEC)).toBeGreaterThan(0.55);
+    expect(perBox(main, (m) => m.SEC)).toBeLessThan(1.05);
+    expect(perBox(main, (m) => m.L)).toBeGreaterThan(7.8);
+    expect(perBox(main, (m) => m.L)).toBeLessThan(8.9);
+    // As raras passam de 30 por caixa (uma fixa por booster, mais as da vaga de destaque).
+    expect(perBox(main, (m) => m.R)).toBeGreaterThan(36);
+    expect(perBox(main, (m) => m.R)).toBeLessThan(41);
+    // Primeiras coleções: 7 SR e pouco, perto de meia SEC, 8 Líderes; uma rara só nos boosters sem destaque.
+    const early = openBoosters(op01, 2026, boxes * 24, BOOSTER_MODELS.early);
+    expect(perBox(early, (m) => m.SR)).toBeGreaterThan(6.8);
+    expect(perBox(early, (m) => m.SR)).toBeLessThan(7.8);
+    expect(perBox(early, (m) => m.SEC)).toBeGreaterThan(0.35);
+    expect(perBox(early, (m) => m.SEC)).toBeLessThan(0.8);
+    expect(perBox(early, (m) => m.L)).toBeGreaterThan(7.5);
+    expect(perBox(early, (m) => m.L)).toBeLessThan(8.5);
+    expect(perBox(early, (m) => m.R)).toBeLessThan(17);
+  });
+
+  it('as chances mostradas ao jogador saem do mesmo modelo', () => {
+    const main = boosterOdds(BOOSTER_MODELS.main, 6);
+    expect(main.leader).toBeCloseTo(8.33 / 24);
+    expect(main.SR).toBeCloseTo(7.8 / 24, 2);
+    expect(main.SEC).toBeCloseTo(0.8 / 24, 2);
+    const early = boosterOdds(BOOSTER_MODELS.early, 8);
+    expect(early.SR).toBeCloseTo(7.3 / 24);
+    expect(early.leader).toBeCloseTo(1 / 3);
   });
 });
 

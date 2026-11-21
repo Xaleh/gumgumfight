@@ -66,6 +66,11 @@ describe('Selado: coleções e abertura', () => {
     expect(op01.cards).toBeGreaterThan(100);
     expect(op01.leaders).toBeGreaterThan(0);
     expect(op01.automated).toBeGreaterThan(0.7);
+    // O booster de cada coleção vai junto: a OP01 é das primeiras (8 comuns, 3 incomuns e uma vaga de destaque).
+    expect(op01.pack).toMatchObject({ commons: 8, uncommons: 3, rares: 0 });
+    expect(op01.pack.sr).toBeCloseTo(7.3 / 24, 2);
+    expect(op01.pack.sec).toBeCloseTo(0.55 / 24, 2);
+    expect(op01.pack.leader).toBeCloseTo(1 / 3, 2);
   });
 
   it('abre 6 boosters de 12 cartas da coleção e guarda para o dono', async () => {

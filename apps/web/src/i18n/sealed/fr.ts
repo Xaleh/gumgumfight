@@ -218,6 +218,9 @@ const sealed = {
   'cube.sourceText': 'Des decklists de {decks} decks dans {tournaments} tournois en ligne de One Piece, du {from} au {to}. Les plus jouées de chaque couleur sont retenues, avec des coûts variés. Les Leaders et les cartes dont l’effet n’est pas encore automatisé (⚙) sont exclus.',
   'errors.cubeUnavailable': 'Le Cube n’est pas disponible sur ce serveur.',
   'sealed.openingPack': 'Ouverture du booster {n} sur {total}',
+  'sealed.packMix': 'Booster de {n} cartes : {c} communes, {uc} peu communes et {r|# rare ou mieux|# rares ou mieux}.',
+  'sealed.packMixNoUc': 'Booster de {n} cartes : {c} communes et {r|# rare ou mieux|# rares ou mieux}.',
+  'sealed.packOdds': 'SR dans {sr} % des boosters, SEC dans {sec} % et un Leader dans {leader} %. Les taux viennent d’ouvertures de boîtes : Bandai ne publie pas les siens.',
 };
 
 export default sealed;
