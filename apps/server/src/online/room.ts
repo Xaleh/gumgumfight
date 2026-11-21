@@ -185,6 +185,8 @@ export interface RoomData {
   spoilerSet?: string;
   /** No Selado (`format: 'sealed'`), a coleção dos boosters: os dois decks saem dela. */
   sealedSet?: string;
+  /** Sala de decks de Draft: o pod em que foram draftados (só entram decks do mesmo pod). */
+  sealedPod?: string;
   createdAt: number;
   seats: SeatInfo[];
   seed128: number[] | null;
@@ -450,13 +452,14 @@ function handsOf(state: GameState): string[] {
 }
 
 export function newRoomData(
-  init: Pick<RoomData, 'queue' | 'format' | 'spoilers' | 'spoilerSet' | 'sealedSet' | 'code' | 'tournament'> & { id?: string; seats: SeatInfo[] },
+  init: Pick<RoomData, 'queue' | 'format' | 'spoilers' | 'spoilerSet' | 'sealedSet' | 'sealedPod' | 'code' | 'tournament'> & { id?: string; seats: SeatInfo[] },
 ): RoomData {
   return {
     ...(init.tournament ? { tournament: init.tournament } : {}),
     ...(init.spoilers !== undefined ? { spoilers: init.spoilers } : {}),
     ...(init.spoilerSet ? { spoilerSet: init.spoilerSet } : {}),
     ...(init.sealedSet ? { sealedSet: init.sealedSet } : {}),
+    ...(init.sealedPod ? { sealedPod: init.sealedPod } : {}),
     id: init.id ?? randomBytes(9).toString('base64url'),
     code: init.code,
     queue: init.queue,
@@ -1361,6 +1364,7 @@ export class Room {
       ...(this.data.spoilers !== undefined ? { spoilers: this.data.spoilers } : {}),
       ...(this.data.spoilerSet ? { spoilerSet: this.data.spoilerSet } : {}),
       ...(this.data.sealedSet ? { sealedSet: this.data.sealedSet } : {}),
+      ...(this.data.sealedPod ? { sealedPod: this.data.sealedPod } : {}),
       tournament: this.data.tournament
         ? {
             id: this.data.tournament.id,

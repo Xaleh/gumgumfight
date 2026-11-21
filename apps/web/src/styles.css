@@ -17316,3 +17316,210 @@ div.dk-tile-main {
     --cw: 92px;
   }
 }
+
+/* ---- Draft: o pod, o relógio da escolha e as cartas escolhidas ---- */
+.sealed-active-pod {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  border-color: var(--note-line);
+  background: var(--note-bg);
+}
+.sealed-draft-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+.sealed-draft-row > div:first-child {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.sealed-draft-row p {
+  margin: 2px 0 0;
+}
+.sealed-draft-row .code-row {
+  flex: 0 1 300px;
+}
+.sealed-draft-row .btn,
+.sealed-draft-row .btn-outline {
+  white-space: nowrap;
+  flex: none;
+}
+.draft-wrap {
+  width: min(1480px, 100%);
+}
+.draft-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.draft-timer {
+  font-family: Bangers, Impact, sans-serif;
+  font-size: 34px;
+  letter-spacing: 1px;
+  line-height: 1;
+  color: var(--gold);
+}
+.draft-timer.low {
+  color: var(--danger);
+}
+.draft-pod {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+.draft-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  min-width: 0;
+  font-size: 12px;
+  text-align: center;
+}
+.draft-seat b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.draft-seat small {
+  color: var(--muted);
+  font-weight: 800;
+}
+.draft-seat.me {
+  border-color: var(--brand-yellow);
+  background: var(--note-bg);
+}
+.draft-seat.done small {
+  color: var(--ok);
+}
+.draft-seat.empty {
+  border-style: dashed;
+  background: none;
+  color: var(--muted);
+}
+.draft-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  font-weight: 900;
+}
+.draft-seat.me .draft-avatar {
+  border-color: var(--brand-yellow);
+}
+.draft-code {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.draft-code b {
+  font-family: Bangers, Impact, sans-serif;
+  font-weight: 400;
+  font-size: 30px;
+  letter-spacing: 4px;
+  line-height: 1;
+  color: var(--gold);
+}
+.draft-grid {
+  padding: 0;
+}
+.draft-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.draft-picked span {
+  white-space: pre-line;
+}
+.draft-picked {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.draft-colors {
+  display: flex;
+  height: 16px;
+  margin-top: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--panel2);
+}
+.draft-colors i {
+  display: block;
+  height: 100%;
+  background: var(--card-color);
+}
+.draft-picks {
+  --cw: 70px;
+  gap: 8px 4px;
+}
+@media (max-width: 900px) {
+  .draft-pod {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .draft-picks {
+    --cw: 56px;
+  }
+  .draft-timer {
+    font-size: 28px;
+  }
+}
+@media (max-width: 600px) {
+  /* No celular o booster cabe em 3 colunas e o botão de pegar fica sempre à vista. */
+  .sealed-reveal .draft-pack {
+    --cw: 88px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 4px;
+  }
+  .draft-confirm {
+    position: sticky;
+    bottom: 8px;
+    z-index: 3;
+    gap: 8px;
+    padding: 8px;
+    margin: 0 -8px;
+    border-radius: 16px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+  .draft-confirm .draft-picked {
+    flex-basis: 100%;
+    padding: 0 4px;
+    border: 0;
+    background: none;
+    max-height: 4.6em;
+    overflow-y: auto;
+  }
+  .draft-confirm .sealed-cta {
+    width: 100%;
+  }
+  .draft-seat {
+    padding: 6px 2px;
+    font-size: 11px;
+  }
+  .draft-wrap .draft-avatar {
+    display: none;
+  }
+}

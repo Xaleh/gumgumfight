@@ -1,7 +1,7 @@
 # Plano: novos modos de jogo (All Blue, Selado, Pack Rush, Cubo e Yonko)
 
-> Status (21/11/2026): **All Blue, Pré-release (Selado de uma coleção) e Pack Rush selado implementados**; o README
-> (seções "All Blue", "Selado" e "Pack Rush") descreve o que existe. Os outros modos seguem como proposta, na ordem da
+> Status (21/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft) e Draft
+> implementados**; o README (seções "All Blue", "Selado", "Pack Rush" e "Draft") descreve o que existe. Os outros modos seguem como proposta, na ordem da
 > seção 1.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
@@ -12,8 +12,8 @@
 |---|---|---|---|---|
 | **All Blue** ✅ | Formato da comunidade no estilo Pauper: só cartas C, UC, R e promos (sem SR e sem SEC). Partida 1x1 normal. | Pequeno | Não | Qualidade do campo `rarity` das cartas |
 | **Selado: Pré-release** ✅ | O jogador abre 6 boosters de uma coleção e monta um deck de 40 com o que saiu. | Médio | Pouco (tamanho do deck) | Fidelidade do booster e cartas ⚙ na coleção |
-| **Selado: Draft** | Pod de 4 a 8: cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
-| **Pack Rush** ✅ (selado) | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
+| **Selado: Draft** ✅ | Pod de 8 (bots nos lugares vazios): cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
+| **Pack Rush** ✅ (selado e draft) | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
 | **Draft Cubo** | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
 | **Yonko** | Mesa de 4, todos contra todos, formato da comunidade inspirado no Commander. | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
 
@@ -78,12 +78,20 @@ Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha
 ![Cubo](mockups/modos-de-jogo/11-cubo.webp)
 ![Escolha do Líder](mockups/modos-de-jogo/12-lider-modos-mistos.webp)
 
-### O que já existe (Pré-release e Pack Rush selado)
+### O que já existe (Pré-release, Pack Rush e Draft)
+
+O **Draft** entrou com pod de 8 e bots nos lugares vazios (decisão 3): código de 6 letras para chamar os amigos, 4
+boosters de 12 cartas por jogador, prazo por escolha (46 s caindo até 13 s) com escolha automática do servidor, e o
+Pack Rush draft pelas coleções marcadas. As escolhas viram um deck selado, e a sala privada desse deck só aceita
+decks do mesmo pod. Diferenças para as telas 5 a 7: não há link de convite (é o código), a tela consulta o servidor a
+cada segundo em vez de ficar numa conexão aberta, e depois do draft não há chave entre os 8: cada um joga com quem
+quiser do pod, ou contra um dos bots que draftaram. Ficou para depois: fila pública de pods, rodadas ou chave dentro
+do pod, torneio de Draft e o Draft Cubo.
 
 O Pack Rush selado entrou na mesma tela: escolher de 2 a 12 coleções, 6 boosters sorteados entre elas, qualquer Líder
 do jogo (com a folha de escolha da tela 12) e sala privada entre decks das mesmas coleções. Diferenças para a tela 10:
 não há "pod" com vários jogadores nem o botão de sortear coleções; cada jogador abre os próprios boosters e a sala
-privada confere que os dois escolheram as mesmas coleções. O pod de verdade (e o Pack Rush draft) vem com o Draft.
+privada confere que os dois escolheram as mesmas coleções. O pod de verdade existe no Draft.
 
 
 Abrir 6 boosters de uma coleção, montar o deck de 40 (com "Montar sozinho"), o Líder de 6 cores e jogar contra o bot
@@ -222,9 +230,8 @@ Depois de montar, o deck selado é um deck de verdade, mas preso àquelas cartas
 
 Já decididas por você: Líder (Luffy de 6 cores nos modos de uma coleção; qualquer Líder nos de várias), banidas (valem
 em todos os modos limitados), Pack Rush (boosters sorteados por jogador entre as coleções escolhidas) e Cubo (uma cópia
-de cada, lista pelas estatísticas globais).
+de cada, lista pelas estatísticas globais) e Draft (pod de 8 com bots completando os lugares vazios).
 
-3. **Draft:** pod de 8 com bots completando, ou só pods de 4 para encher mais rápido?
 4. **Vida do deck selado:** jogar à vontade enquanto a fonte estiver no ar (o que as telas mostram), ou formato de
    "corrida" que termina com X derrotas?
 

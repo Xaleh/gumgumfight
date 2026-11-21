@@ -65,6 +65,7 @@ import { registerEngineTextRoutes } from './card-engine-texts';
 import { registerCardGapRoutes } from './card-gaps';
 import { registerDeckCleanupRoutes } from './decks/cleanup';
 import { registerCardImageRoutes } from './card-images';
+import { registerDraftRoutes } from './draft/routes';
 import { registerSealedRoutes } from './sealed/routes';
 import { registerTutorialRoutes } from './tutorial/routes';
 import { reportFromGame } from './tournaments/store';
@@ -494,6 +495,8 @@ export function buildApp(
   });
   registerTutorialRoutes(app, { db, viewerHash, user: auth.viewer, now: opts.now });
   registerSealedRoutes(app, { db, viewerHash });
+  // Exposto para os testes (os prazos das escolhas e os bots ficam na memória do servidor).
+  app.decorate('draftPods', registerDraftRoutes(app, { db, viewerHash, now: opts.now }));
 
   app.get('/api/matches', async () => recentMatches(db));
 

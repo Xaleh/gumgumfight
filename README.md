@@ -309,7 +309,7 @@ boosters que o jogador abre na hora.
 - **Placar e estatísticas:** as partidas do Selado ficam **fora das estatísticas e do meta**. Cada deck selado tem o
   próprio placar (vitórias e derrotas), que conta as partidas entre pessoas nas salas privadas; os treinos contra o
   bot não contam.
-- **Ainda não tem:** fila de Selado, torneio de Selado, Draft e Cubo (veja
+- **Ainda não tem:** fila de Selado, torneio de Selado e Cubo (veja
   [`docs/plano-modos-de-jogo.md`](docs/plano-modos-de-jogo.md)). O modelo do booster é o padrão do motor
   (`DEFAULT_BOOSTER`, em `packages/engine/src/sealed.ts`), igual para todas as coleções.
 - Código: `packages/engine/src/sealed.ts` (boosters, validação do deck de 40 e montagem automática),
@@ -331,7 +331,40 @@ qualquer cor, sem limite de cópias e sem banidas.
 - **Bot:** abre os próprios boosters, sorteados entre as mesmas coleções.
 - No banco, o deck de Pack Rush é uma linha de `sealed_pools` com `kind = 'rush'`, a chave das coleções em `set_code`
   ("OP01+OP05", em ordem) e a coleção de cada booster em `pack_sets`. Nas salas, essa chave vai em `sealedSet`.
-- O Draft de Pack Rush entra junto com o Draft.
+- O Pack Rush também vale no Draft (abaixo): com "Pack Rush" marcado, o pod drafta as coleções escolhidas.
+
+### Draft
+
+Na tela do Selado, **Criar pod de Draft** abre um **pod de 8 lugares** com a coleção marcada (ou, no Pack Rush, com
+as coleções marcadas). Quem criou recebe um **código de 6 letras**; os outros entram por "Entrar no pod". Quem criou
+começa quando quiser, e **os lugares vazios viram bots**: dá para draftar sozinho contra 7 bots.
+
+- **Como é:** cada um abre um booster de 12 cartas, **fica com 1** e passa o resto para o vizinho, até o booster
+  acabar. São **4 boosters por jogador (48 escolhas)**, e o sentido do rodízio inverte a cada booster. No Pack Rush,
+  a coleção de cada rodada é sorteada entre as escolhidas, e todo mundo abre a mesma coleção naquela rodada.
+- **Tempo:** cada escolha tem um prazo que encurta com o booster (10 s + 3 s por carta: 46 s com 12 cartas, 13 s com
+  a última). Sem escolha no prazo, o **servidor escolhe** pela pessoa, com a mesma nota dos bots. Depois de dois
+  prazos perdidos seguidos **com a tela fechada**, o lugar passa a escolher sozinho na hora, para não segurar o pod;
+  voltar à tela devolve o controle. Quem só está devagar, com a tela aberta, não perde o lugar.
+- **Bots:** escolhem na hora, pela nota que a montagem automática usa (custo, poder, Counter, palavras-chave) mais um
+  bônus de raridade e um pouco de acaso. Pegam no máximo um Líder.
+- **Sair e voltar:** sair no meio deixa o lugar escolhendo sozinho, e o deck fica guardado. Recarregar a página ou
+  fechar o app não tira ninguém: a tela do Selado mostra "Você está num pod de Draft" com o botão para voltar. Cada
+  jogador fica em **um pod por vez**.
+- **O deck:** no fim, as 48 escolhas viram um deck selado (aparece na lista "Seus decks selados" como "Draft OP01") e
+  a montagem é a do Selado: 40 cartas, qualquer cor, "Montar sozinho". O Líder é um dos que você pegou ou o Luffy de 6
+  cores; no Pack Rush draft, qualquer Líder do jogo.
+- **Jogar:** a **sala privada** de um deck de Draft só aceita decks **do mesmo pod**. **Contra o bot**, o oponente é
+  um dos bots que draftaram com você, com o deck que ele montou das próprias escolhas (os decks dos bots ficam
+  guardados por 14 dias; depois disso, ou se o pod só tinha pessoas, o
+  bot abre boosters da coleção, como no Selado).
+- **O servidor é a autoridade:** ele sorteia os 32 boosters, guarda todos e manda a cada um só o booster que está na
+  mão dele. O pod fica gravado (`draft_pods`), então um deploy no meio não perde o draft: ele volta com os prazos
+  zerados. Pod que não começa fecha em 2 horas; o servidor aceita até 300 pods abertos ao mesmo tempo.
+- **Ainda não tem:** chave ou rodadas entre os 8 do pod (cada um chama quem quiser pela sala privada), fila pública
+  para achar pod, link de convite (hoje é o código), torneio de Draft e o Draft Cubo.
+- Código: `packages/engine/src/draft.ts` (rodízio e escolha dos bots), `apps/server/src/draft/` (pods e rotas
+  `/api/draft`) e `apps/web/src/components/Draft.tsx`. A tela consulta o pod a cada segundo.
 
 ## Estatísticas
 

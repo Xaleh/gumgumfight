@@ -375,7 +375,9 @@ export function OnlineWaiting({ online, onCancel }: { online: OnlineGame; onCanc
               <p className="muted">
                 {room.format !== 'sealed'
                   ? t('online.privateHint')
-                  : room.sealedSet?.includes('+')
+                  : room.sealedPod
+                    ? t('sealed.roomHintDraft')
+                    : room.sealedSet?.includes('+')
                     ? t('sealed.roomHintRush', { sets: room.sealedSet.split('+').join(' + ') })
                     : t('sealed.roomHint', { set: room.sealedSet ?? '' })}
               </p>

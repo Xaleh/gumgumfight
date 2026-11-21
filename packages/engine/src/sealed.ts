@@ -171,6 +171,35 @@ export function openMixedBoosters(
   return out;
 }
 
+/**
+ * Boosters de um Draft: `rounds` rodadas, um booster por assento em cada uma. Com mais de uma
+ * coleção (Pack Rush draft), a de cada booster é sorteada entre elas, como no Pack Rush selado.
+ * Devolve `packs[rodada][assento]` e a coleção de cada um.
+ */
+export function openDraftBoosters(
+  sources: ReadonlyArray<{ set: string; cards: readonly CardData[] }>,
+  seed: number | readonly number[],
+  seats: number,
+  rounds: number,
+  model: BoosterModel = DEFAULT_BOOSTER,
+): { sets: string[][]; packs: string[][][] } {
+  const holder = holderOf(seed);
+  const built = sources.map((s) => ({ set: s.set.toUpperCase(), src: boosterSource(s.cards) }));
+  const out = { sets: [] as string[][], packs: [] as string[][][] };
+  for (let r = 0; r < rounds; r++) {
+    const sets: string[] = [];
+    const packs: string[][] = [];
+    for (let seat = 0; seat < seats; seat++) {
+      const pick = built.length === 1 ? built[0] : built[Math.floor(nextRandom(holder) * built.length)];
+      sets.push(pick.set);
+      packs.push(openBooster(holder, pick.src, model));
+    }
+    out.sets.push(sets);
+    out.packs.push(packs);
+  }
+  return out;
+}
+
 /** Chave das coleções de um Pack Rush ("OP01+OP05+EB02"): em ordem, para duas escolhas iguais darem a mesma. */
 export const rushKey = (sets: readonly string[]): string => [...new Set(sets.map((s) => s.toUpperCase()))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).join('+');
 /** As coleções de uma chave; uma só = Selado comum. */
@@ -303,7 +332,7 @@ const KEYWORD_BONUS: Array<[RegExp, number]> = [
 ];
 
 /** Nota de uma carta para um deck de Selado: corpo pelo custo, Counter, palavras-chave e efeito automatizado. */
-function limitedScore(card: CardData): number {
+export function limitedScore(card: CardData): number {
   const cost = card.cost ?? 0;
   const text = `${card.text ?? ''} ${card.trigger ?? ''}`;
   let score = KEYWORD_BONUS.reduce((n, [re, bonus]) => n + (re.test(text) ? bonus : 0), 0);

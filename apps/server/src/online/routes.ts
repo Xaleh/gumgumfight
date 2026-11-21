@@ -148,7 +148,7 @@ export interface DeckRules {
 }
 
 /** Regras de quem senta numa sala: as de spoilers e, no Selado, a coleção dos boosters. */
-type SeatRules = Pick<DeckRules, 'spoilers' | 'spoilerSet'> & { sealedSet?: string };
+type SeatRules = Pick<DeckRules, 'spoilers' | 'spoilerSet'> & { sealedSet?: string; sealedPod?: string };
 
 /** Regras da ranqueada: só cartas lançadas e nenhum efeito manual. */
 export const RANKED_RULES: DeckRules = { noManual: true, spoilers: 'none' };
@@ -307,7 +307,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     const account = user(req);
     if (ranked && !account) return { code: 401, ...fail('rankedLoginRequired', 'A ranqueada é só para quem entrou com a conta Google.') };
     // No Selado, `deckId` é a coleção aberta do jogador: o deck sai dela e é conferido contra ela.
-    const deck = format === 'sealed' ? sealedDeckFor(body?.deckId, ownerHash, spoilers.sealedSet) : deckFor(body?.deckId, format, ranked, spoilers);
+    const deck = format === 'sealed' ? sealedDeckFor(body?.deckId, ownerHash, spoilers.sealedSet, spoilers.sealedPod) : deckFor(body?.deckId, format, ranked, spoilers);
     if (isError(deck)) return deck;
     const profile = ensurePlayer(db, ownerHash);
     return {
@@ -328,7 +328,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
    */
   /** A coleção da sala para as mensagens: no Pack Rush, as coleções da chave ("OP01 + OP05"). */
   const setName = (set: string) => set.split('+').join(' + ');
-  const sealedDeckFor = (poolRef: unknown, ownerHash: string, set?: string): DeckList | LobbyError => {
+  const sealedDeckFor = (poolRef: unknown, ownerHash: string, set?: string, pod?: string): DeckList | LobbyError => {
     const id = poolIdOf(poolRef);
     const pool = id ? getSealedPool(db, id) : null;
     if (!pool || pool.ownerHash !== ownerHash) {
@@ -338,6 +338,12 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
         : { code: 400, ...fail('sealedPoolNotFound', 'Deck do Selado não encontrado.') };
     }
     if (set && pool.set !== set) return { code: 400, ...fail('sealedSetMismatch', `Esta sala é de Selado ${setName(set)}: use um deck aberto dessa coleção.`, { set: setName(set) }) };
+    // Deck de Draft só enfrenta deck do mesmo pod; deck de Selado não entra em sala de Draft, nem o contrário.
+    if (set && (pool.podId ?? null) !== (pod ?? null)) {
+      return pod
+        ? { code: 400, ...fail('sealedRoomIsDraft', 'Esta sala é de um Draft: só entra quem draftou no mesmo pod.') }
+        : { code: 400, ...fail('sealedRoomNotDraft', 'Esta sala é de Selado: um deck de Draft não entra.') };
+    }
     const deck = poolDeck(pool);
     if (!deck || !checkSealedDeck(db, pool, deck).valid) {
       return { code: 400, ...fail('sealedDeckIncomplete', 'Termine de montar o deck do Selado (40 cartas) antes de jogar.') };
@@ -359,15 +365,15 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     // Selado: a coleção da sala é a do deck de quem cria (quem entra precisa de um deck da mesma).
     if (b?.format === 'sealed') {
       const id = poolIdOf(b.deckId);
-      const set = (id && getSealedPool(db, id)?.set) || undefined;
-      return { ...playMode('sealed', true), ...(set ? { sealedSet: set } : {}) };
+      const pool = id ? getSealedPool(db, id) : null;
+      return { ...playMode('sealed', true), ...(pool ? { sealedSet: pool.set } : {}), ...(pool?.podId ? { sealedPod: pool.podId } : {}) };
     }
     const mode = playMode(isPlayFormat(b?.format) ? b.format : 'standard', b?.spoilers !== false);
     const set = spoilerRule(mode) === 'next' ? currentSpoilerSet(db) : null;
     return set ? { ...mode, spoilerSet: set } : mode;
   };
   /** Regra de spoilers da sala para o deck de quem senta. */
-  const seatRules = (mode: PlayMode): SeatRules => ({ spoilers: spoilerRule(mode), spoilerSet: mode.spoilerSet, ...(mode.sealedSet ? { sealedSet: mode.sealedSet } : {}) });
+  const seatRules = (mode: PlayMode): SeatRules => ({ spoilers: spoilerRule(mode), spoilerSet: mode.spoilerSet, ...(mode.sealedSet ? { sealedSet: mode.sealedSet } : {}), ...(mode.sealedPod ? { sealedPod: mode.sealedPod } : {}) });
 
   /** Sala + assento a partir do token (query `t` ou corpo). */
   const seatIn = (id: string, token: unknown): { room: Room; seat: PlayerId } | null => {
@@ -497,7 +503,7 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     let botDeckId = req.body?.botDeckId;
     if (format === 'sealed') {
       // O bot abre os próprios boosters da mesma coleção e monta sozinho.
-      const deck = mode.sealedSet ? sealedBotDeck(db, mode.sealedSet) : null;
+      const deck = mode.sealedSet ? sealedBotDeck(db, mode.sealedSet, mode.sealedPod ?? null) : null;
       if (!deck) return reply.code(400).send(fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: mode.sealedSet ?? '' }));
       const bot: SeatRequest = { ownerHash: 'bot', userId: null, name: 'Bot', bounty: 0, tier: tierFor(0).id, deckId: deck.id!, deck };
       const first = req.body?.first;
@@ -808,10 +814,10 @@ export function registerOnlineRoutes(app: FastifyInstance, deps: Deps) {
     if (!found) return reply.code(404).send(fail('matchNotFound', 'Partida não encontrada.'));
     let deck: RematchDeck | undefined;
     if (req.body?.deckId !== undefined) {
-      const { format, spoilers, spoilerSet, sealedSet } = found.room.data;
+      const { format, spoilers, spoilerSet, sealedSet, sealedPod } = found.room.data;
       const list =
         format === 'sealed'
-          ? sealedDeckFor(req.body.deckId, found.room.data.seats[found.seat].ownerHash, sealedSet)
+          ? sealedDeckFor(req.body.deckId, found.room.data.seats[found.seat].ownerHash, sealedSet, sealedPod)
           : deckFor(req.body.deckId, format, false, seatRules({ ...playMode(format, spoilers !== false), ...(spoilerSet ? { spoilerSet } : {}) }));
       if (isError(list)) return reply.code(list.code).send(list);
       deck = { deckId: list.id!, deck: list };

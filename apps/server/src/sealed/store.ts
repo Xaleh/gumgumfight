@@ -41,6 +41,8 @@ export interface SealedPool {
   packs: string[][];
   /** A coleção de cada booster (no Selado de uma coleção, todas iguais). */
   packSets: string[];
+  /** Deck de Draft: o pod em que as cartas foram escolhidas (`packs` são as escolhas de cada rodada). */
+  podId: string | null;
   /** O deck montado (pode estar incompleto: o jogador salva enquanto monta). */
   deck: Pick<DeckList, 'leader' | 'cards'> | null;
   wins: number;
@@ -55,6 +57,7 @@ interface PoolRow {
   set_code: string;
   packs: string;
   pack_sets: string | null;
+  pod_id: string | null;
   deck: string | null;
   wins: number;
   losses: number;
@@ -62,10 +65,10 @@ interface PoolRow {
   updated_at: string;
 }
 
-const COLS = 'id, owner_hash, set_code, packs, pack_sets, deck, wins, losses, created_at, updated_at';
+const COLS = 'id, owner_hash, set_code, packs, pack_sets, pod_id, deck, wins, losses, created_at, updated_at';
 const toPool = (r: PoolRow): SealedPool => {
   const packs = JSON.parse(r.packs) as string[][];
-  return { ...poolBase(r, packs), packSets: r.pack_sets ? (JSON.parse(r.pack_sets) as string[]) : packs.map(() => r.set_code) };
+  return { ...poolBase(r, packs), packSets: r.pack_sets ? (JSON.parse(r.pack_sets) as string[]) : packs.map(() => r.set_code), podId: r.pod_id };
 };
 const poolBase = (r: PoolRow, packs: string[][]) => ({
   id: r.id,
@@ -99,6 +102,20 @@ export function migrateSealed(db: DB) {
   // Pack Rush: a coleção de cada booster (JSON string[]); no Selado de uma coleção fica nulo.
   const cols = (db.prepare('PRAGMA table_info(sealed_pools)').all() as unknown as Array<{ name: string }>).map((c) => c.name);
   if (!cols.includes('pack_sets')) db.exec('ALTER TABLE sealed_pools ADD COLUMN pack_sets TEXT');
+  // Draft: o pod em que o deck foi draftado (kind = 'draft'); nulo no Selado e no Pack Rush.
+  if (!cols.includes('pod_id')) db.exec('ALTER TABLE sealed_pools ADD COLUMN pod_id TEXT');
+  db.exec(`
+    -- Pods de Draft (draft/pods.ts): o estado inteiro em JSON, regravado a cada escolha, para o
+    -- draft continuar depois de um deploy.
+    CREATE TABLE IF NOT EXISTS draft_pods (
+      id         TEXT PRIMARY KEY,
+      code       TEXT NOT NULL,
+      status     TEXT NOT NULL,                   -- waiting | drafting | done
+      data       TEXT NOT NULL,                   -- JSON PodData
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 }
 
 export interface SealedSet {
@@ -190,6 +207,18 @@ export function createPool(db: DB, ownerHash: string, sets: readonly string[]): 
   return getPool(db, id);
 }
 
+/**
+ * Grava o que um jogador escolheu num Draft como um deck selado (`kind = 'draft'`): as cartas de
+ * cada rodada entram no lugar dos boosters, e o resto (montagem, conferência, partidas) é o do Selado.
+ */
+export function createDraftPool(db: DB, ownerHash: string, key: string, picksByRound: string[][], podId: string): SealedPool {
+  const id = randomBytes(9).toString('base64url');
+  db.prepare("INSERT INTO sealed_pools (id, owner_hash, set_code, kind, seed, packs, pod_id) VALUES (?, ?, ?, 'draft', '[]', ?, ?)").run(id, ownerHash, key, JSON.stringify(picksByRound), podId);
+  const mine = db.prepare('SELECT id FROM sealed_pools WHERE owner_hash = ? ORDER BY created_at DESC, rowid DESC').all(ownerHash) as unknown as Array<{ id: string }>;
+  for (const old of mine.slice(SEALED_MAX_POOLS)) db.prepare('DELETE FROM sealed_pools WHERE id = ?').run(old.id);
+  return getPool(db, id)!;
+}
+
 export function getPool(db: DB, id: string): SealedPool | null {
   const row = db.prepare(`SELECT ${COLS} FROM sealed_pools WHERE id = ?`).get(id) as unknown as PoolRow | undefined;
   return row ? toPool(row) : null;
@@ -213,8 +242,8 @@ export function poolCatalog(db: DB, pool: SealedPool, extra: string[] = []): Map
 /** Regras do Líder: no Pack Rush (várias coleções), qualquer Líder do jogo; numa coleção só, os que saíram. */
 export const poolRules = (pool: Pick<SealedPool, 'set'>): LimitedRules => (isRush(pool.set) ? { leaders: 'any', sets: rushSets(pool.set) } : {});
 
-/** Nome do deck nas partidas: "Selado OP01" ou "Pack Rush OP01 + OP05". */
-export const poolName = (pool: Pick<SealedPool, 'set'>) => playModeLabel({ format: 'sealed', sealedSet: pool.set });
+/** Nome do deck nas partidas: "Selado OP01", "Pack Rush OP01 + OP05" ou "Draft OP01". */
+export const poolName = (pool: Pick<SealedPool, 'set'> & { podId?: string | null }) => playModeLabel({ format: 'sealed', sealedSet: pool.set, sealedPod: pool.podId });
 
 /** Confere o deck contra a coleção aberta. */
 export function checkDeck(db: DB, pool: SealedPool, deck: Pick<DeckList, 'leader' | 'cards'>) {
@@ -245,7 +274,13 @@ export const poolDeck = (pool: SealedPool): DeckList | null =>
  * Deck do bot no Selado: ele abre os próprios 6 boosters da mesma coleção e monta sozinho, como o
  * "Montar sozinho" do jogador. Não fica gravado.
  */
-export function botDeck(db: DB, set: string): DeckList | null {
+export function botDeck(db: DB, set: string, podId: string | null = null): DeckList | null {
+  // Deck de Draft: o oponente é um dos bots que draftaram no mesmo pod (se houve algum).
+  const drafted = podId ? podBotDecks(db, podId) : [];
+  if (drafted.length) {
+    const pick = drafted[randomInt(drafted.length)];
+    return { id: `${SEALED_DECK_PREFIX}bot`, name: poolName({ set, podId }), leader: pick.leader, cards: pick.cards };
+  }
   const key = rushKey(rushSets(set));
   if (rushSets(key).some((s) => !boosterReady(setCards(db, s)))) return null;
   const seed = Array.from({ length: 4 }, () => randomInt(0, 0x1_0000_0000));
@@ -253,4 +288,15 @@ export function botDeck(db: DB, set: string): DeckList | null {
   const catalog = new Map((getCards(db, [...pool.keys(), SEALED_LEADER_ID]) as CardData[]).map((c) => [c.id, c]));
   const deck: DeckList = { id: `${SEALED_DECK_PREFIX}bot`, name: poolName({ set: key }), ...autoBuildLimited(pool, catalog) };
   return validateLimitedDeck(deck, catalog, pool, poolRules({ set: key })).valid ? deck : null;
+}
+
+/** Os decks que os bots de um pod de Draft montaram com o que escolheram (vazio: pod só de pessoas, ou já apagado). */
+export function podBotDecks(db: DB, podId: string): Array<Pick<DeckList, 'leader' | 'cards'>> {
+  const row = db.prepare('SELECT data FROM draft_pods WHERE id = ?').get(podId) as unknown as { data: string } | undefined;
+  if (!row) return [];
+  try {
+    return (JSON.parse(row.data) as { botDecks?: Array<Pick<DeckList, 'leader' | 'cards'>> }).botDecks ?? [];
+  } catch {
+    return [];
+  }
 }

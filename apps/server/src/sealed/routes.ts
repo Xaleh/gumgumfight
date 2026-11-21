@@ -51,6 +51,8 @@ export function registerSealedRoutes(app: FastifyInstance, { db, viewerHash }: D
       updatedAt: pool.updatedAt,
       wins: pool.wins,
       losses: pool.losses,
+      /** Deck de Draft (as cartas foram escolhidas num pod). */
+      draft: Boolean(pool.podId),
       leader: pool.deck?.leader || null,
       size: report?.total ?? 0,
       /** Deck completo e conferido: dá para jogar. */
@@ -142,7 +144,7 @@ export function registerSealedRoutes(app: FastifyInstance, { db, viewerHash }: D
   app.post<{ Params: { id: string } }>('/api/sealed/pools/:id/bot', async (req, reply) => {
     const pool = mine(req, req.params.id);
     if (!pool) return reply.code(404).send(notFound);
-    const deck = botDeck(db, pool.set);
+    const deck = botDeck(db, pool.set, pool.podId);
     if (!deck) return reply.code(400).send(fail('sealedSetUnavailable', 'Essa coleção não está disponível no Selado.', { set: pool.set }));
     return { name: deck.name, leader: deck.leader, cards: deck.cards };
   });

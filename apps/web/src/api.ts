@@ -139,11 +139,12 @@ export function spoilerText(ids: string[], rule: SpoilerRule = 'none', spoilerSe
  * spoiler aceita), "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"… (traduzido).
  */
 export function modeLabel(
-  m: { format: PlayFormat | string; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null },
+  m: { format: PlayFormat | string; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null; sealedPod?: string | null },
   tr: Translate = t,
 ): string {
   if (m.format === 'free') return tr('mode.free');
   if (m.format === 'sealed') {
+    if (m.sealedPod) return tr('mode.draft', { sets: (m.sealedSet ?? '').split('+').join(' + ') });
     if (m.sealedSet?.includes('+')) return tr('mode.packRush', { sets: m.sealedSet.split('+').join(' + ') });
     return m.sealedSet ? tr('mode.sealedSet', { set: m.sealedSet }) : tr('mode.sealed');
   }
@@ -310,6 +311,33 @@ export interface SealedPoolSummary {
   size: number;
   /** Deck completo e conferido no servidor: dá para jogar. */
   ready: boolean;
+  /** Deck de Draft: as cartas foram escolhidas num pod (`packs` são as escolhas de cada rodada). */
+  draft?: boolean;
+}
+
+/** O que o jogador vê de um pod de Draft. */
+export interface DraftPod {
+  id: string;
+  code: string;
+  /** A coleção, ou a chave das coleções no Pack Rush draft ("OP01+OP05"). */
+  sets: string;
+  status: 'waiting' | 'drafting' | 'done';
+  host: boolean;
+  you: number;
+  seats: Array<{ name: string; bot: boolean; you: boolean; away: boolean; picked: number; choosing: boolean }>;
+  capacity: number;
+  rounds: number;
+  round: number;
+  packSize: number;
+  /** O booster na mão (null: esperando o vizinho passar). */
+  pack: string[] | null;
+  packSet: string | null;
+  /** Milissegundos até o servidor escolher por você. */
+  timeLeft: number | null;
+  passTo: string | null;
+  picks: string[][];
+  /** No fim: o deck selado com as escolhas. */
+  poolId: string | null;
 }
 export interface SealedPool extends SealedPoolSummary {
   /** Os boosters, na ordem em que foram sorteados no servidor. */
@@ -665,6 +693,16 @@ export const api = {
     /** Deck do bot para o treino no navegador: ele abre os próprios boosters da mesma coleção. */
     botDeck: (id: string) => send<SealedDeck & { name: string }>('POST', `/api/sealed/pools/${encodeURIComponent(id)}/bot`),
   },
+  /** Draft: pod de 8 (bots nos lugares vazios); cada um fica com uma carta do booster e passa o resto. */
+  draft: {
+    active: () => get<{ pod: Pick<DraftPod, 'id' | 'code' | 'sets' | 'status'> | null }>('/api/draft/active'),
+    create: (sets: string[]) => send<DraftPod>('POST', '/api/draft/pods', { sets }),
+    join: (code: string) => send<DraftPod>('POST', '/api/draft/pods/join', { code }),
+    pod: (id: string) => get<DraftPod>(`/api/draft/pods/${encodeURIComponent(id)}`),
+    start: (id: string) => send<DraftPod>('POST', `/api/draft/pods/${encodeURIComponent(id)}/start`),
+    pick: (id: string, card: string) => send<DraftPod>('POST', `/api/draft/pods/${encodeURIComponent(id)}/pick`, { card }),
+    leave: (id: string) => send<void>('POST', `/api/draft/pods/${encodeURIComponent(id)}/leave`),
+  },
   tutorial: {
     progress: () => get<TutorialProgressDto>('/api/tutorial/progress'),
     saveProgress: (p: { done: string[]; dismissed: boolean; completed: boolean; reset?: boolean }) => send<TutorialProgressDto>('PUT', '/api/tutorial/progress', p),
@@ -978,6 +1016,8 @@ export interface LiveRoom {
   spoilerSet?: string | null;
   /** No Selado, a coleção dos boosters. */
   sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   status: 'playing' | 'finished';
   players: Array<{
     name: string;
@@ -1048,6 +1088,8 @@ export interface OnlineRoomInfo {
   spoilerSet?: string | null;
   /** No Selado, a coleção dos boosters. */
   sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   /** Jogo de uma partida de torneio; `score`: placar da série antes deste jogo, na ordem dos assentos. */
   tournament: {
     id: string;
@@ -1155,6 +1197,8 @@ export interface TournamentSummary {
   spoilerSet?: string | null;
   /** No Selado, a coleção dos boosters. */
   sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   structure: TournamentStructure;
   topCut: number | null;
   status: TournamentStatus;
@@ -1765,6 +1809,8 @@ export interface TournamentDetail {
   spoilerSet?: string | null;
   /** No Selado, a coleção dos boosters. */
   sealedSet?: string | null;
+  /** Sala de decks de Draft: o pod. */
+  sealedPod?: string | null;
   structure: TournamentStructure;
   swissBestOf: number;
   topCut: number | null;

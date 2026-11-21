@@ -84,16 +84,20 @@ const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** As coleções de um deck selado para mostrar: "OP01" ou, no Pack Rush, "OP01 + OP05". */
 const setsText = (set: string) => rushSets(set).join(' + ');
-/** Nome do deck selado: "Selado OP01" ou "Pack Rush OP01 + OP05". */
-const poolTitle = (set: string, t: Translate) => (isRush(set) ? t('sealed.rushName', { sets: setsText(set) }) : t('sealed.poolName', { set }));
+/** Nome do deck selado: "Selado OP01", "Pack Rush OP01 + OP05" ou, vindo de um pod, "Draft OP01". */
+const poolTitle = (pool: { set: string; draft?: boolean }, t: Translate) =>
+  pool.draft ? t('sealed.draftName', { sets: setsText(pool.set) }) : isRush(pool.set) ? t('sealed.rushName', { sets: setsText(pool.set) }) : t('sealed.poolName', { set: pool.set });
 
 export function Sealed({
   onExit,
   onStart,
   onOnline,
+  onDraft,
   openId,
 }: {
   onExit: () => void;
+  /** Abre a tela de um pod de Draft. */
+  onDraft: (podId: string) => void;
   /** Treino contra o bot (roda no navegador); `poolId`: para voltar ao deck depois da partida. */
   onStart: (setup: GameSetup, poolId: string) => void;
   onOnline: (seat: OnlineSeat, poolId: string) => void;
@@ -114,6 +118,9 @@ export function Sealed({
   const [rushLimits, setRushLimits] = useState({ min: 2, max: 12 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Pod de Draft em que o jogador já está (esperando ou draftando). */
+  const [activePod, setActivePod] = useState<{ id: string; code: string } | null>(null);
+  const [podCode, setPodCode] = useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -132,6 +139,10 @@ export function Sealed({
       .catch((e: unknown) => setError(errorText(e)));
     void reload();
     api.cards().then(setCards).catch((e: unknown) => setError(errorText(e)));
+    api.draft
+      .active()
+      .then((r) => setActivePod(r.pod))
+      .catch(() => undefined);
   }, [reload]);
 
   const byId = useMemo(() => new Map((cards ?? []).map((c) => [c.id, c])), [cards]);
@@ -139,7 +150,8 @@ export function Sealed({
   /** Abre uma coleção já sorteada: na abertura dos boosters, se ainda há o que revelar; senão, na montagem. */
   const openPool = useCallback((p: SealedPool) => {
     setPool(p);
-    const opened = readOpened()[p.id] ?? (p.deck ? p.packs.length : 0);
+    // Deck de Draft: as cartas já foram escolhidas uma a uma, não há booster para abrir.
+    const opened = p.draft ? p.packs.length : (readOpened()[p.id] ?? (p.deck ? p.packs.length : 0));
     setView(opened >= p.packs.length ? 'build' : 'packs');
   }, []);
   const resume = useCallback(
@@ -177,6 +189,20 @@ export function Sealed({
       setBusy(false);
     }
   };
+  /** Cria um pod de Draft com as coleções escolhidas, ou entra num pelo código. */
+  const draft = async (join?: string) => {
+    if (busy || (!join && !canOpen)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const pod = join ? await api.draft.join(join) : await api.draft.create(rush ? mix : [picked]);
+      onDraft(pod.id);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   const remove = async (id: string) => {
     if (!window.confirm(t('sealed.deleteConfirm'))) return;
     await api.sealed.remove(id).catch(() => undefined);
@@ -201,7 +227,7 @@ export function Sealed({
   if (pool && cards && view === 'packs') {
     return (
       <div className="sealed">
-        {header(poolTitle(pool.set, t), toHub)}
+        {header(poolTitle(pool, t), toHub)}
         <Packs pool={pool} byId={byId} onBuild={() => setView('build')} />
       </div>
     );
@@ -209,7 +235,7 @@ export function Sealed({
   if (pool && cards && view === 'build') {
     return (
       <div className="sealed">
-        {header(poolTitle(pool.set, t), toHub)}
+        {header(poolTitle(pool, t), toHub)}
         <Build pool={pool} byId={byId} cards={cards} onPool={setPool} onPacks={() => setView('packs')} onStart={onStart} onOnline={onOnline} />
       </div>
     );
@@ -233,6 +259,15 @@ export function Sealed({
         </section>
 
         {error && <div className="error">{error}</div>}
+
+        {activePod && (
+          <section className="sealed-panel sealed-active-pod">
+            <span>{t('sealed.draftActive', { code: activePod.code })}</span>
+            <button type="button" className="btn primary" onClick={() => onDraft(activePod.id)}>
+              {t('sealed.draftBack')}
+            </button>
+          </section>
+        )}
 
         <section className="sealed-panel">
           <div className="section-head">
@@ -284,6 +319,21 @@ export function Sealed({
                   chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>
                 )}
               </div>
+              <div className="sealed-draft-row">
+                <div>
+                  <div className="kicker">{t('sealed.draftKicker')}</div>
+                  <p className="muted small">{t('sealed.draftIntro')}</p>
+                </div>
+                <button type="button" className="btn" onClick={() => void draft()} disabled={!canOpen || busy || Boolean(activePod)}>
+                  {t('sealed.draftCreate')}
+                </button>
+                <div className="code-row">
+                  <input value={podCode} onChange={(e) => setPodCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} aria-label={t('sealed.draftCode')} />
+                  <button type="button" className="btn" onClick={() => void draft(podCode.trim())} disabled={busy || podCode.trim().length !== 6}>
+                    {t('sealed.draftJoin')}
+                  </button>
+                </div>
+              </div>
             </>
           )}
         </section>
@@ -304,9 +354,9 @@ export function Sealed({
                 const status = p.ready ? t('sealed.statusReady') : opened < packsPerPool && !p.size ? t('sealed.statusOpening') : t('sealed.statusBuilding', { size: p.size, max: LIMITED_DECK_SIZE });
                 return (
                   <li key={p.id} className="sealed-pool">
-                    <Booster set={p.set} small />
+                    <Booster set={p.set} small draft={p.draft} />
                     <span className="sealed-pool-info">
-                      <b>{poolTitle(p.set, t)}</b>
+                      <b>{poolTitle(p, t)}</b>
                       <small className="muted">
                         {p.leader && byId.get(p.leader) ? `${byId.get(p.leader)!.name} · ` : ''}
                         {status}
@@ -331,14 +381,14 @@ export function Sealed({
 }
 
 /** Desenho de um booster (sem a arte do produto): a cor sai do código da coleção. */
-function Booster({ set, small, state }: { set: string; small?: boolean; state?: 'open' | 'current' }) {
+function Booster({ set, small, state, draft }: { set: string; small?: boolean; state?: 'open' | 'current'; draft?: boolean }) {
   // Coleções vizinhas com cores bem diferentes: o número da coleção anda de 47 em 47 graus.
-  // O deck de Pack Rush (várias coleções) tem um booster próprio, dourado.
+  // O deck de Pack Rush (várias coleções) tem um booster próprio, dourado; o de Draft, roxo.
   const mixed = isRush(set);
-  const hue = mixed ? 42 : (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
+  const hue = draft ? 280 : mixed ? 42 : (Number(set.replace(/\D/g, '')) * 47 + (set.startsWith('EB') ? 150 : set.startsWith('PRB') ? 270 : 190)) % 360;
   return (
     <span className={['sealed-pack', small ? 'small' : '', state ?? ''].join(' ')} style={{ ['--h' as string]: hue }} aria-hidden="true">
-      <b>{mixed ? 'RUSH' : set}</b>
+      <b>{draft ? 'DRAFT' : mixed ? 'RUSH' : set}</b>
     </span>
   );
 }
@@ -654,7 +704,7 @@ function Build({
   const vsBot = () =>
     play(async () => {
       const bot = await api.sealed.botDeck(pool.id);
-      const mine: DeckList = { id: `sealed:${pool.id}`, name: poolTitle(pool.set, t), ...latest.current };
+      const mine: DeckList = { id: `sealed:${pool.id}`, name: poolTitle(pool, t), ...latest.current };
       const opp: DeckList = { id: 'sealed:bot', name: bot.name, leader: bot.leader, cards: bot.cards };
       const seed = Math.floor(Math.random() * 1_000_000);
       const setup = await buildSetup('bot', [mine.id, opp.id], [t('menu.youName'), t('menu.botName')], seed, 'sealed', undefined, undefined, { decks: [mine, opp] }, true, undefined, cards);
@@ -721,9 +771,11 @@ function Build({
             </section>
           );
         })}
-        <button type="button" className="text-link" onClick={onPacks}>
-          {t('sealed.backToPacks')}
-        </button>
+        {!pool.draft && (
+          <button type="button" className="text-link" onClick={onPacks}>
+            {t('sealed.backToPacks')}
+          </button>
+        )}
       </div>
 
       <aside className="sealed-side sealed-panel">
@@ -790,7 +842,7 @@ function Build({
           <button type="button" className="mode-btn sealed-cta" onClick={() => void vsBot()} disabled={!ready || busy}>
             {t('sealed.vsBot')}
           </button>
-          <p className="muted small">{mixed ? t('sealed.rushBotHint', { sets: setsText(pool.set) }) : t('sealed.vsBotHint', { set: pool.set })}</p>
+          <p className="muted small">{pool.draft ? t('sealed.draftBotHint') : mixed ? t('sealed.rushBotHint', { sets: setsText(pool.set) }) : t('sealed.vsBotHint', { set: pool.set })}</p>
           <button type="button" className="btn" onClick={() => void createRoom()} disabled={!ready || busy}>
             {t('sealed.createRoom')}
           </button>
@@ -800,7 +852,7 @@ function Build({
               {t('sealed.joinRoom')}
             </button>
           </div>
-          <p className="muted small">{mixed ? t('sealed.roomHintRush', { sets: setsText(pool.set) }) : t('sealed.roomHint', { set: pool.set })}</p>
+          <p className="muted small">{pool.draft ? t('sealed.roomHintDraft') : mixed ? t('sealed.roomHintRush', { sets: setsText(pool.set) }) : t('sealed.roomHint', { set: pool.set })}</p>
           {pool.wins + pool.losses > 0 && <p className="muted small">{t('sealed.record', { w: pool.wins, l: pool.losses })}</p>}
         </div>
         <div className="sealed-list">

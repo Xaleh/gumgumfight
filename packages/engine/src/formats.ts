@@ -73,6 +73,8 @@ export interface PlayMode {
    * coleções escolhidas ("OP01+OP05", `rushKey`): os dois decks precisam ser da mesma escolha.
    */
   sealedSet?: string;
+  /** Deck de Draft: o pod em que foi draftado. Só se enfrentam decks do mesmo pod. */
+  sealedPod?: string;
 }
 
 /**
@@ -88,8 +90,8 @@ export const playMode = (format: PlayFormat, spoilers: boolean): PlayMode => ({ 
  * Nome das regras de cartas: "Standard", "Standard + EB05" (a coleção de spoiler aceita),
  * "Standard + spoilers" (sem saber qual), "Livre (vale tudo)"…
  */
-export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null }): string =>
-  m.format === 'sealed' ? (m.sealedSet?.includes('+') ? `Pack Rush ${m.sealedSet.split('+').join(' + ')}` : `Selado${m.sealedSet ? ` ${m.sealedSet}` : ''}`) : m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
+export const playModeLabel = (m: { format: PlayFormat; spoilers?: boolean; spoilerSet?: string | null; sealedSet?: string | null; sealedPod?: string | null }): string =>
+  m.format === 'sealed' && m.sealedPod ? `Draft ${(m.sealedSet ?? '').split('+').join(' + ')}`.trim() : m.format === 'sealed' ? (m.sealedSet?.includes('+') ? `Pack Rush ${m.sealedSet.split('+').join(' + ')}` : `Selado${m.sealedSet ? ` ${m.sealedSet}` : ''}`) : m.format === 'free' ? 'Livre (vale tudo)' : m.spoilers ? `${formatLabel(m.format)} + ${m.spoilerSet || 'spoilers'}` : formatLabel(m.format);
 
 /**
  * Se a partida entra nas estatísticas: só Standard e EGB puros. Fica de fora o Livre, o

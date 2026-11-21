@@ -283,6 +283,23 @@ rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatI
 ("OP01+OP05", gravada em `set_code` e usada como `sealedSet` da sala) e `LimitedRules.leaders = 'any'` libera qualquer
 Líder (`anyLeaderAllowed`: os de spoiler, só das coleções da chave); `pack_sets` guarda a coleção de cada booster.
 
+### Draft (`draft.ts`)
+
+`openDraftBoosters` abre os boosters de todos os lugares (`DRAFT_SEATS = 8`, `DRAFT_ROUNDS = 4`; no Pack Rush, uma
+coleção sorteada por rodada, igual para o pod). `DraftState` é o rodízio puro: cada lugar tem uma fila de boosters;
+`draftPick` tira a carta do booster da frente e o põe na fila do vizinho (`draftPassTo`: o sentido inverte a cada
+rodada), e a rodada seguinte abre quando todos os boosters acabam. `draftChoice` é a escolha dos bots e a automática
+(`limitedScore` + bônus de raridade + acaso do RNG do motor; só um Líder). `draftPickSeconds(n) = 10 + 3n`.
+
+No servidor, `DraftPods` (`draft/pods.ts`) guarda os pods em memória e em `draft_pods` (estado inteiro em JSON, para
+voltar depois de um deploy com prazos novos). `advance` faz os bots e os lugares ausentes escolherem e dá prazo a quem
+recebeu booster; `tick` (a cada segundo) escolhe por quem deixou o prazo acabar. Um lugar vira `away` depois de
+`AWAY_AFTER_TIMEOUTS` prazos seguidos só se a pessoa não consulta o pod há `AWAY_UNSEEN_MS`; `touch` (toda consulta)
+desfaz. `view` devolve a cada jogador só o booster da frente da própria fila. No fim, `finish` cria uma linha de
+`sealed_pools` por pessoa (`kind = 'draft'`, `pod_id`, as escolhas por rodada no lugar dos boosters) e monta os decks
+dos bots (`autoBuildLimited`), que ficam no pod para o treino (`podBotDecks`). Nas salas, `PlayMode.sealedPod` leva o
+id do pod: `sealedDeckFor` só aceita deck com o mesmo `pod_id` (`sealedRoomIsDraft` / `sealedRoomNotDraft`).
+
 ### Tradução
 
 `translateCardPt` monta o português a partir da DSL; o que o parser não entendeu passa por `translateToPt` (regras de
@@ -1791,7 +1808,14 @@ Quem chama, na coluna da direita:
 | GET | `/api/sealed/pools` · POST | Decks selados de quem pede; `{ set }` abre 6 boosters | Navegador |
 | GET | `/api/sealed/pools/:id` · DELETE | Os boosters e o deck de uma abertura | Dono |
 | PUT | `/api/sealed/pools/:id/deck` | Salva o deck (`{ leader, cards }`), conferido contra as cartas abertas | Dono |
-| POST | `/api/sealed/pools/:id/bot` | Deck do bot para o treino no navegador (boosters próprios da mesma coleção) | Dono |
+| POST | `/api/sealed/pools/:id/bot` | Deck do bot para o treino no navegador (boosters próprios da mesma coleção; num deck de Draft, o de um bot do pod) | Dono |
+| GET | `/api/draft/active` | O pod de Draft em que quem pede está (esperando ou draftando), ou `null` | Navegador |
+| POST | `/api/draft/pods` | Abre um pod (`{ sets }`: uma coleção, ou várias no Pack Rush draft) | Navegador |
+| POST | `/api/draft/pods/join` | Entra num pod à espera pelo código (`{ code }`) | Navegador |
+| GET | `/api/draft/pods/:id` | O pod como quem pede o vê: lugares, o booster na mão, prazo e escolhas | Quem está no pod |
+| POST | `/api/draft/pods/:id/start` | Começa o draft; os lugares vazios viram bots | Quem criou |
+| POST | `/api/draft/pods/:id/pick` | Fica com uma carta do booster na mão (`{ card }`) | Quem está no pod |
+| POST | `/api/draft/pods/:id/leave` | Sai do pod (no meio do draft, o lugar passa a escolher sozinho) | Quem está no pod |
 | GET | `/api/tutorial/progress` · PUT | Progresso do tutorial (`{ done, dismissed, completed, reset? }`) | Navegador |
 | POST | `/api/tutorial/events` | Evento anônimo de lição (`{ lesson, step?, event }`) | Pública |
 | GET | `/api/stats/meta` | Opções dos filtros: formatos, filas, tiers, Líderes e o perfil de quem pede | Pública; Token (`stats:read`) |

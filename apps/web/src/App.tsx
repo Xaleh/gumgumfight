@@ -9,6 +9,7 @@ import { DeckBuilder } from './components/DeckBuilder';
 import { GameScreen, OnlineGameScreen, WatchGameScreen } from './components/GameScreen';
 import { Learn } from './components/Learn';
 import { Lesson } from './components/Lesson';
+import { Draft } from './components/Draft';
 import { Menu } from './components/Menu';
 import { Sealed } from './components/Sealed';
 import { OAuthConsent } from './components/OAuthConsent';
@@ -49,7 +50,9 @@ type Screen =
   /** `sealed`: sala de Selado aberta pela tela do Selado (e volta para o deck dele). */
   | { name: 'online'; seat: OnlineSeat; tournament?: string; lobby?: boolean; sealed?: string }
   /** Selado (Pré-release): abrir boosters, montar o deck de 40 e jogar. `pool`: abre direto esse deck. */
-  | { name: 'sealed'; pool?: string };
+  | { name: 'sealed'; pool?: string }
+  /** Pod de Draft: sala de espera, escolhas e, no fim, a ida para a montagem do deck (tela do Selado). */
+  | { name: 'draft'; pod: string };
 
 /** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
 const OPEN_MATCH = 'gumgum.openMatch';
@@ -249,8 +252,12 @@ function MainApp() {
         onExit={() => setScreen({ name: 'menu' })}
         onStart={(setup, pool) => setScreen({ name: 'game', setup, key: Date.now(), back: { name: 'sealed', pool } })}
         onOnline={(seat, pool) => setScreen({ name: 'online', seat, sealed: pool })}
+        onDraft={(pod) => setScreen({ name: 'draft', pod })}
       />
     );
+  }
+  if (screen.name === 'draft') {
+    return <Draft key={screen.pod} podId={screen.pod} onExit={() => setScreen({ name: 'sealed' })} onBuild={(pool) => setScreen({ name: 'sealed', pool })} />;
   }
   if (screen.name === 'game') {
     const { setup } = screen;
