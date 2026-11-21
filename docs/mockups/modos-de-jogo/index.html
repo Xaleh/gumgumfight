@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GumGum Fight · Telas dos novos modos (proposta)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+/* Telas de proposta: usam os tokens do tema escuro de apps/web/src/styles.css. Nada aqui é código do app. */
+:root {
+  --navy: #12304b; --brown: #3d1308; --cream: #fdf5e0; --brand-yellow: #f7cd48; --brand-red: #c9322b;
+  --bg: #0b1726; --bg2: #122238; --panel: #182c44; --panel2: #1f3650; --line: #2f4863; --text: #f3e9d2; --muted: #a9b6c6;
+  --gold: #f2b733; --accent: #ff8a5c; --blue: #5aa3ff; --sky: #4fd3ff; --ok: #3bc985; --danger: #ff6b6f;
+  --red: #d23b2e; --green: #239062; --blue-card: #2f6db5; --purple: #7d3c98; --black: #50505e; --yellow: #d3a80d;
+  --teal: #1aa39a; --crimson: #e0503a;
+  --glass: rgba(24, 44, 68, 0.86); --glass-line: rgba(255, 255, 255, 0.08);
+  --mat-1: #131b2f; --mat-top: rgba(78, 38, 44, 0.85); --mat-bottom: rgba(20, 44, 84, 0.9);
+  --slot-bg: rgba(255, 255, 255, 0.05); --slot-line: rgba(255, 255, 255, 0.2);
+  --font: Nunito, 'M PLUS Rounded 1c', system-ui, sans-serif; --display: Bangers, Impact, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: #060d17; }
+body { margin: 0; font-family: var(--font); font-weight: 700; color: var(--text); font-size: 14px; line-height: 1.4; }
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; }
+svg.i { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Página do documento */
+.doc { max-width: 1520px; margin: 0 auto; padding: 40px 40px 80px; }
+.doc-head { padding: 8px 0 28px; border-bottom: 1px solid var(--line); margin-bottom: 36px; }
+.doc-head .k { font-size: 12px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: var(--brand-yellow); }
+.doc-head h1 { font-family: var(--display); font-weight: 400; font-size: 56px; letter-spacing: 2px; line-height: 1; margin: 6px 0 10px; text-shadow: 0 4px 0 var(--brown); color: var(--cream); }
+.doc-head p { color: var(--muted); max-width: 820px; font-size: 15px; }
+.doc-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.doc-nav a { color: var(--text); text-decoration: none; font-size: 13px; font-weight: 800; padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+.doc-nav a b { color: var(--brand-yellow); margin-right: 6px; }
+.shot { margin-bottom: 64px; }
+.shot-label { display: flex; gap: 16px; align-items: baseline; margin-bottom: 14px; }
+.shot-label .n { font-family: var(--display); font-size: 40px; color: var(--brand-yellow); line-height: 1; letter-spacing: 1px; }
+.shot-label h2 { font-family: var(--display); font-weight: 400; font-size: 30px; letter-spacing: 1px; }
+.shot-label p { color: var(--muted); font-size: 14px; max-width: 900px; }
+.frame { width: 1440px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: radial-gradient(1200px 500px at 20% -10%, #1d2b48 0%, transparent 60%), var(--bg); position: relative; }
+.wrap { padding: 0 144px; }
+.pad { padding: 24px; }
+
+/* Barra do topo do app */
+.top { display: flex; align-items: center; gap: 10px; height: 68px; padding: 0 144px; background: var(--navy); border-bottom: 1px solid rgba(253, 245, 224, 0.12); }
+.top.full { padding: 0 24px; }
+.logo { font-family: var(--display); font-size: 27px; letter-spacing: 1px; color: var(--brand-yellow); text-shadow: 0 2px 0 var(--brown); margin-right: 14px; white-space: nowrap; font-style: italic; }
+.logo em { color: #ff5a3c; font-style: normal; }
+.nav { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 999px; color: var(--cream); font-weight: 800; font-size: 14px; white-space: nowrap; }
+.nav.on { background: linear-gradient(180deg, #fbda6a, var(--brand-yellow)); color: var(--brown); box-shadow: inset 0 0 0 2px var(--brown); font-weight: 900; }
+.top .sp { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(253, 245, 224, 0.2); font-size: 13px; font-weight: 800; color: var(--cream); white-space: nowrap; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px rgba(59, 201, 133, 0.22); flex: none; }
+.dot.off { background: var(--muted); box-shadow: none; }
+.dot.warn { background: var(--gold); box-shadow: 0 0 0 3px rgba(242, 183, 51, 0.22); }
+
+/* Peças comuns */
+.h2 { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: 1px; line-height: 1; }
+.h3 { font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: 1px; line-height: 1; }
+.kick { font-size: 11px; font-weight: 900; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.row { display: flex; align-items: center; gap: 10px; }
+.wrapx { flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.panel { background: var(--glass); border: 1px solid var(--glass-line); border-radius: 22px; padding: 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); white-space: nowrap; }
+.chip.ok { background: color-mix(in srgb, var(--ok) 15%, var(--panel)); border-color: transparent; color: color-mix(in srgb, var(--ok) 70%, var(--text)); }
+.chip.bad { background: rgba(255, 90, 90, 0.14); border-color: rgba(255, 120, 120, 0.45); color: #ff9a9a; }
+.chip.gold { background: rgba(242, 193, 78, 0.14); border-color: rgba(242, 193, 78, 0.4); color: var(--gold); }
+.chip.new { background: var(--brand-red); border-color: transparent; color: var(--cream); letter-spacing: 0.8px; font-weight: 900; font-size: 10px; padding: 2px 7px; }
+.seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+.seg span { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.seg span.on { background: linear-gradient(180deg, #fbda6a, var(--brand-yellow)); color: var(--brown); box-shadow: inset 0 0 0 2px var(--brown); font-weight: 900; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 14px; background: var(--panel); border: 2px solid var(--line); font-weight: 800; white-space: nowrap; }
+.btn.sm { min-height: 34px; padding: 0 12px; border-radius: 10px; font-size: 13px; }
+.cta { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; border-radius: 16px; background: var(--mode, var(--brand-yellow)); border: 3px solid var(--brown); color: var(--cream); text-shadow: 0 2px 0 var(--brown); font-family: var(--display); font-size: 24px; letter-spacing: 1.5px; white-space: nowrap; padding: 0 18px; }
+.cta.gold { background: linear-gradient(180deg, #fbda6a, var(--brand-yellow)); color: var(--brown); text-shadow: none; }
+.cta.off { opacity: 0.45; }
+.cta.auto { width: auto; }
+.link { color: var(--blue); font-weight: 800; }
+.input { display: flex; align-items: center; height: 44px; padding: 0 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); color: var(--muted); font-weight: 800; }
+.note { background: rgba(242, 193, 78, 0.12); border: 1px solid rgba(242, 193, 78, 0.4); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+.err { background: rgba(255, 90, 90, 0.14); border: 1px solid rgba(255, 120, 120, 0.45); color: #ffb3b3; border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--c, var(--purple)); border: 2px solid var(--cream); display: grid; place-items: center; font-family: var(--display); font-size: 17px; color: var(--cream); flex: none; }
+.avatar.lg { width: 72px; height: 72px; font-size: 34px; border-width: 3px; }
+
+/* Cartas (ilustrativas: sem arte) */
+.cards { display: grid; grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr)); gap: var(--gap, 10px); }
+.cards.flow { display: flex; flex-wrap: wrap; }
+.cards.flow .c { width: var(--cw, 70px); }
+.c { --k: var(--red); position: relative; aspect-ratio: 63 / 88; border-radius: 7%; background: linear-gradient(160deg, color-mix(in srgb, var(--k) 88%, #fff) 0%, var(--k) 45%, color-mix(in srgb, var(--k) 60%, #000) 100%); border: 2px solid color-mix(in srgb, var(--k) 55%, #000); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35); container-type: inline-size; overflow: hidden; }
+.c.red { --k: var(--red); } .c.green { --k: var(--green); } .c.blue { --k: var(--blue-card); } .c.purple { --k: var(--purple); } .c.black { --k: var(--black); } .c.yellow { --k: var(--yellow); }
+.c .ca { position: absolute; inset: 14% 8% 26% 8%; border-radius: 6%; background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.5) 0 17%, transparent 18%), radial-gradient(ellipse at 50% 108%, rgba(255, 255, 255, 0.42) 0 44%, transparent 45%), repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0 6px, transparent 6px 12px), rgba(0, 0, 0, 0.22); }
+.c .cc { position: absolute; top: 4%; left: 5%; width: 24cqw; height: 24cqw; border-radius: 50%; background: var(--cream); color: var(--brown); display: grid; place-items: center; font-weight: 900; font-size: 15cqw; z-index: 1; }
+.c .cp { position: absolute; top: 5%; right: 6%; font-weight: 900; font-size: 13cqw; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); z-index: 1; }
+.c .cn { position: absolute; left: 0; right: 0; bottom: 0; padding: 5cqw 4cqw 6cqw; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 11.5cqw; font-weight: 800; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.1; }
+.c .cr { position: absolute; right: 4%; bottom: 20%; font-size: 10cqw; font-weight: 900; padding: 1cqw 5cqw; border-radius: 99px; background: rgba(0, 0, 0, 0.6); color: #fff; z-index: 1; }
+.c.rSR .cr, .c.rSEC .cr { background: linear-gradient(90deg, #ffd76a, #ff9ad5, #7fd4ff); color: #2a1206; }
+.c.f-lead .cc { display: none; } .c.f-lead { border-color: var(--brand-yellow); }
+.c .cx { position: absolute; left: 4%; bottom: 20%; font-size: 11cqw; font-weight: 900; padding: 1cqw 6cqw; border-radius: 99px; background: var(--cream); color: var(--brown); z-index: 1; }
+.c.f-lock { --k: #4a5566; }
+.c.f-lock::before { content: ''; position: absolute; inset: 0; background: rgba(8, 14, 24, 0.58); z-index: 2; }
+.c.f-lock::after { content: 'FORA DO ALL BLUE'; position: absolute; left: -20%; right: -20%; top: 40%; transform: rotate(-16deg); background: var(--brand-red); color: var(--cream); text-align: center; font-size: 9.5cqw; font-weight: 900; letter-spacing: 0.5px; padding: 4cqw 0; z-index: 3; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.c.f-dim { opacity: 0.32; }
+.c.f-sel { outline: 4px solid var(--brand-yellow); outline-offset: 2px; transform: translateY(-8px); box-shadow: 0 14px 26px rgba(247, 205, 72, 0.35); }
+.c.f-tgt { outline: 3px solid var(--danger); outline-offset: 2px; box-shadow: 0 0 18px rgba(255, 107, 111, 0.7); }
+.c.f-atk { outline: 3px solid var(--brand-yellow); outline-offset: 2px; box-shadow: 0 0 18px rgba(247, 205, 72, 0.7); }
+.c.f-rest { transform: rotate(90deg) scale(0.71); }
+.c.f-back { background: repeating-linear-gradient(45deg, #1d3a5c 0 8px, #17304d 8px 16px); border-color: #0d2238; }
+.c.f-back > * { display: none; }
+.c.f-glow { box-shadow: 0 0 0 2px #fff3, 0 0 22px rgba(255, 215, 106, 0.75); }
+.slot { aspect-ratio: 63 / 88; border-radius: 7%; border: 2px dashed var(--slot-line); background: var(--slot-bg); }
+
+/* Cartões de modo */
+.mode-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.mode { --mode: var(--red); --soft: color-mix(in srgb, var(--mode) 14%, var(--panel)); --ink: color-mix(in srgb, var(--mode) 78%, var(--text)); display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 22px; background: var(--glass); border: 1px solid var(--glass-line); border-top: 6px solid var(--mode); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); min-width: 0; }
+.mode.hl { box-shadow: 0 0 0 3px var(--mode), 0 20px 40px color-mix(in srgb, var(--mode) 25%, transparent); }
+.mode .mt { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.mode .mi { width: 46px; height: 46px; border-radius: 14px; background: var(--soft); color: var(--mode); display: grid; place-items: center; font-size: 24px; }
+.mode .mb { font-size: 11px; font-weight: 900; letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: var(--soft); color: var(--ink); }
+.mode .mk { font-size: 11px; font-weight: 900; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink); }
+.mode .mn { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: 1px; line-height: 1; }
+.mode .md { color: var(--muted); line-height: 1.45; }
+.mode .mf { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+.mode .ml { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 13px; font-weight: 800; }
+.mode.compact .mn { font-size: 26px; } .mode.compact .cta { min-height: 44px; font-size: 20px; }
+.special-grid { display: grid; grid-template-columns: 1.15fr 1.15fr 1fr; gap: 16px; }
+
+/* Faixa do deck */
+.strip { display: flex; align-items: center; gap: 18px; padding: 16px 20px; border-radius: 24px; background: var(--glass); border: 1px solid var(--glass-line); }
+.strip .nm { font-family: var(--display); font-size: 32px; letter-spacing: 1px; line-height: 1.05; margin-bottom: 6px; }
+
+/* Barras */
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 74px; }
+.bars div { flex: 1; background: linear-gradient(180deg, var(--sky), var(--blue-card)); border-radius: 6px 6px 2px 2px; position: relative; min-height: 4px; }
+.bars div::after { content: attr(data-l); position: absolute; left: 0; right: 0; bottom: -18px; text-align: center; font-size: 11px; color: var(--muted); }
+.bars div::before { content: attr(data-v); position: absolute; left: 0; right: 0; top: -16px; text-align: center; font-size: 11px; }
+.rar-bar { display: flex; height: 14px; border-radius: 99px; overflow: hidden; background: var(--panel2); }
+.rar-bar i { display: block; height: 100%; }
+.list { display: flex; flex-direction: column; gap: 4px; }
+.li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
+.li .q { width: 22px; text-align: center; font-weight: 900; color: var(--brand-yellow); }
+.li .cst { width: 20px; height: 20px; border-radius: 50%; background: var(--k, var(--red)); display: grid; place-items: center; font-size: 11px; font-weight: 900; color: #fff; flex: none; }
+.li .r { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 900; }
+.li.bad { border-color: rgba(255, 120, 120, 0.6); background: rgba(255, 90, 90, 0.12); }
+
+/* Boosters */
+.pack { width: 118px; aspect-ratio: 63 / 100; border-radius: 10px; background: linear-gradient(160deg, #2b6fd0, #14365f 60%, #0c2440); border: 2px solid #0a1d33; position: relative; display: grid; place-items: center; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4); flex: none; }
+.pack::before, .pack::after { content: ''; position: absolute; left: 0; right: 0; height: 9px; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0 3px, transparent 3px 6px); }
+.pack::before { top: 0; } .pack::after { bottom: 0; }
+.pack b { font-family: var(--display); font-size: 30px; letter-spacing: 1px; color: var(--cream); text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4); text-align: center; line-height: 1; }
+.pack b small { display: block; font-family: var(--font); font-size: 10px; letter-spacing: 1.5px; font-weight: 900; opacity: 0.8; margin-top: 4px; }
+.pack.open { opacity: 0.35; filter: grayscale(0.6); }
+.pack.cur { outline: 4px solid var(--brand-yellow); outline-offset: 3px; transform: translateY(-6px); }
+.pack.sm { width: 64px; border-radius: 7px; } .pack.sm b { font-size: 17px; } .pack.sm b small { display: none; }
+.pack.xs { width: 38px; border-radius: 5px; box-shadow: -3px 0 6px rgba(0, 0, 0, 0.35); } .pack.xs b { font-size: 11px; letter-spacing: 0; } .pack.xs::before, .pack.xs::after { height: 5px; }
+
+/* Mesa */
+.mat { border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); background: linear-gradient(180deg, #152444, #101a31); }
+.opp { --pc: var(--purple); border-radius: 18px; border: 2px solid color-mix(in srgb, var(--pc) 55%, #0000); background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 22%, #121c33), #111a2f); padding: 12px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+.opp.focus { box-shadow: 0 0 0 3px var(--danger), 0 14px 34px rgba(255, 107, 111, 0.28); border-color: var(--danger); }
+.opp-head { display: flex; align-items: center; gap: 8px; }
+.ord { min-width: 28px; height: 24px; padding: 0 5px; border-radius: 8px; background: var(--pc); color: #fff; display: grid; place-items: center; font-weight: 900; font-size: 12.5px; flex: none; }
+.pips { display: flex; gap: 3px; }
+.pips i { width: 13px; height: 18px; border-radius: 3px; background: var(--brand-yellow); border: 1px solid var(--brown); }
+.pips i.x { background: transparent; border: 1px dashed var(--slot-line); }
+.pips i.b { background: var(--sky); }
+.stat { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 900; padding: 3px 8px; border-radius: 8px; background: rgba(0, 0, 0, 0.3); white-space: nowrap; }
+.don { display: flex; gap: 4px; flex-wrap: wrap; }
+.don i { width: 22px; height: 30px; border-radius: 4px; background: linear-gradient(160deg, #f4f4f4, #b9c2d0); border: 1px solid #0b1726; display: grid; place-items: center; font-size: 8px; font-weight: 900; color: #1a2738; font-style: normal; }
+.don i.r { opacity: 0.38; transform: rotate(90deg) scale(0.8); }
+.banner { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 14px; background: rgba(22, 36, 56, 0.96); border: 2px solid var(--brand-yellow); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45); }
+.log { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+.log p { padding: 6px 8px; border-radius: 8px; background: var(--panel); border-left: 3px solid var(--pc, var(--line)); }
+.turn-li { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+.turn-li.on { border-color: var(--brand-yellow); background: rgba(247, 205, 72, 0.1); }
+.seat { border-radius: 18px; border: 2px solid var(--line); background: var(--panel); padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
+.seat.empty { border-style: dashed; background: transparent; color: var(--muted); justify-content: center; }
+.opt { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+.opt:last-child { border-bottom: 0; }
+.opt .t { flex: 1; } .opt .t small { display: block; color: var(--muted); font-size: 12px; font-weight: 700; }
+.step { display: inline-flex; align-items: center; gap: 0; border-radius: 10px; border: 2px solid var(--line); overflow: hidden; }
+.step span { min-width: 34px; height: 34px; display: grid; place-items: center; font-weight: 900; }
+.step span.v { background: var(--panel2); min-width: 46px; color: var(--brand-yellow); }
+.phone { width: 390px; border-radius: 34px; border: 8px solid #05080e; background: var(--bg); overflow: hidden; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); flex: none; }
+.phone .top { padding: 0 14px; height: 52px; }
+.phone .logo { font-size: 21px; }
+.timer { font-family: var(--display); font-size: 30px; letter-spacing: 1px; color: var(--brand-yellow); line-height: 1; }
+.pod { display: flex; gap: 6px; }
+.pod .p { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 11px; min-width: 0; }
+.pod .p.me { border-color: var(--brand-yellow); background: rgba(247, 205, 72, 0.1); }
+.pod .p .st { font-size: 10px; font-weight: 900; color: var(--muted); white-space: nowrap; }
+.pod .p .st.ok { color: var(--ok); }
+.pod .arrow { align-self: center; color: var(--muted); font-size: 14px; }
+.choice .h2 { margin-top: 8px; }
+.choice { border-radius: 24px; padding: 22px; border: 1px solid var(--glass-line); border-top: 6px solid var(--mode); background: var(--glass); display: flex; flex-direction: column; gap: 14px; }
+.steps { display: flex; gap: 8px; }
+.steps span { flex: 1; padding: 8px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; }
+.steps span b { display: block; font-family: var(--display); font-size: 18px; font-weight: 400; color: var(--mode); letter-spacing: 0.5px; }
+.set { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px; background: var(--panel); border: 2px solid var(--line); min-width: 0; }
+.set.on { border-color: var(--brand-yellow); background: rgba(247, 205, 72, 0.08); }
+.set b { font-family: var(--display); font-weight: 400; font-size: 22px; letter-spacing: 1px; }
+.set small { display: block; font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-swords" viewBox="0 0 24 24"><path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2"/></symbol>
+    <symbol id="i-deck" viewBox="0 0 24 24"><rect x="7" y="3" width="13" height="18" rx="2"/><path d="M4 6v13a2 2 0 0 0 2 2"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 24"><path d="m3 7 4 5 5-7 5 7 4-5-2 12H5L3 7Z"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4M9 20v-8M14 20V8M19 20v-5M3 20h18"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/></symbol>
+    <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13v2M15 13v2"/></symbol>
+    <symbol id="i-pack" viewBox="0 0 24 24"><path d="M6 3h12v18H6zM6 7h12M6 17h12M10 11l2 2 2-2"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 8c2.5-3 5-3 7.5 0s5 3 7.5 0 3.500-2 5-1M2 14c2.5-3 5-3 7.5 0s5 3 7.5 0 3.500-2 5-1M2 20c2.5-3 5-3 7.5 0s5 3 7.5 0 3.500-2 5-1"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><rect x="3" y="6" width="9" height="13" rx="1.500" transform="rotate(-10 7 12)"/><rect x="11" y="5" width="9" height="13" rx="1.500" transform="rotate(10 16 12)"/></symbol>
+    <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 15h.01M15 9h.01M9 15h.01M12 12h.01"/></symbol>
+    <symbol id="i-skull" viewBox="0 0 24 24"><path d="M12 3a8 8 0 0 0-5 14v3h10v-3a8 8 0 0 0-5-14ZM9 12h.01M15 12h.01M10 20v-2M14 20v-2"/></symbol>
+  </defs>
+</svg>
+
+<div class="doc">
+  <header class="doc-head">
+    <div class="k">GumGum Fight · proposta de telas</div>
+    <h1>Novos modos de jogo</h1>
+    <p>All Blue, Selado (Pré-release e Draft) e Yonko. As telas usam o tema escuro e os componentes que o app já tem. As cartas são ilustrativas (sem arte) e os números são de exemplo. O plano de implementação está em <code>docs/plano-modos-de-jogo.md</code>.</p>
+    <nav class="doc-nav">
+      <a href="#t1"><b>01</b>Tela inicial</a><a href="#t2"><b>02</b>All Blue no construtor</a><a href="#t3"><b>03</b>Selado: entrada</a><a href="#t4"><b>04</b>Abertura de boosters</a><a href="#t5"><b>05</b>Deck selado</a><a href="#t6"><b>06</b>Draft</a><a href="#t7"><b>07</b>Yonko: sala</a><a href="#t8"><b>08</b>Yonko: mesa</a><a href="#t9"><b>09</b>No celular</a>
+    </nav>
+  </header>
+
+  <!-- 01 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t1">
+    <div class="shot-label"><span class="n">01</span><div><h2>Tela inicial com os novos modos</h2><p>All Blue entra como um terceiro formato na faixa do deck e vale para todos os modos 1 contra 1. Selado e Yonko ganham uma fileira própria, porque não usam o deck equipado do mesmo jeito.</p></div></div>
+    <div class="frame" id="f1">
+      <div class="top">
+        <span class="logo">GUMGUM <em>FIGHT!</em></span>
+        <span class="nav on"><svg class="i"><use href="#i-swords"/></svg>Jogar</span>
+        <span class="nav"><svg class="i"><use href="#i-deck"/></svg>Montar decks</span>
+        <span class="nav"><svg class="i"><use href="#i-crown"/></svg>Torneios</span>
+        <span class="nav"><svg class="i"><use href="#i-eye"/></svg>Assistir</span>
+        <span class="nav"><svg class="i"><use href="#i-chart"/></svg>Estatísticas</span>
+        <span class="sp"></span>
+        <span class="pill"><i class="dot"></i>42 conectados</span>
+        <span class="pill"><svg class="i"><use href="#i-user"/></svg>Alex</span>
+      </div>
+      <div class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:24px">
+        <div class="strip">
+          <span class="avatar lg" style="--c:var(--blue-card)">N</span>
+          <div class="grow">
+            <div class="kick">Deck equipado</div>
+            <div class="nm">NAMI AZUL DE BOLSO</div>
+            <div class="row wrapx" style="gap:6px"><span class="chip">Líder: Nami</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Válido no All Blue</span><span class="chip">50 cartas · 31 C · 12 UC · 7 R</span></div>
+          </div>
+          <span class="btn">Trocar deck ▾</span>
+          <span class="seg"><span>Standard</span><span>Extra Grand Battle</span><span class="on"><svg class="i"><use href="#i-wave"/></svg>All Blue</span></span>
+          <span class="link">Montar decks</span>
+        </div>
+
+        <div>
+          <div class="row" style="justify-content:space-between;margin-bottom:14px"><span class="h2">MODOS DE JOGO</span><span class="muted" style="font-size:13px">Contadores ao vivo, atualizados a cada 10 s</span></div>
+          <div class="mode-grid">
+            <div class="mode compact" style="--mode:var(--red)"><div class="mt"><span class="mi"><svg class="i"><use href="#i-trophy"/></svg></span><span class="mb">All Blue</span></div><div><div class="mk">Competitivo</div><div class="mn">RANQUEADA</div></div><p class="md">Vale bounty. O All Blue começa só no casual.</p><div class="mf"><div class="ml"><i class="dot off"></i>Sem ranqueada no All Blue</div><span class="cta off">BUSCAR PARTIDA</span></div></div>
+            <div class="mode compact" style="--mode:var(--green)"><div class="mt"><span class="mi"><svg class="i"><use href="#i-swords"/></svg></span><span class="mb">All Blue</span></div><div><div class="mk">Casual</div><div class="mn">PARTIDA RÁPIDA</div></div><p class="md">Fila própria do All Blue, contra outros decks do formato.</p><div class="mf"><div class="ml"><i class="dot"></i>3 partidas · 2 na fila</div><span class="cta">BUSCAR PARTIDA</span></div></div>
+            <div class="mode compact" style="--mode:var(--blue-card)"><div class="mt"><span class="mi"><svg class="i"><use href="#i-key"/></svg></span><span class="mb">All Blue</span></div><div><div class="mk">Com amigos</div><div class="mn">SALA PRIVADA</div></div><p class="md">A sala guarda o formato de quem criou.</p><div class="mf"><div class="ml"><i class="dot"></i>1 sala esperando</div><span class="cta">CRIAR SALA</span></div></div>
+            <div class="mode compact" style="--mode:var(--purple)"><div class="mt"><span class="mi"><svg class="i"><use href="#i-bot"/></svg></span><span class="mb">All Blue</span></div><div><div class="mk">Treino</div><div class="mn">CONTRA O BOT</div></div><p class="md">O bot escolhe entre os decks prontos do All Blue.</p><div class="mf"><div class="ml"><i class="dot off"></i>Roda no seu navegador</div><span class="cta">BATALHAR!</span></div></div>
+            <div class="mode compact" style="--mode:var(--brand-yellow)"><div class="mt"><span class="mi"><svg class="i"><use href="#i-crown"/></svg></span><span class="mb">Suíço e mata-mata</span></div><div><div class="mk">Eventos</div><div class="mn">TORNEIOS</div></div><p class="md">O organizador escolhe All Blue ou Selado ao criar.</p><div class="mf"><div class="ml"><i class="dot"></i>2 abertos · 1 em andamento</div><span class="cta gold">VER TORNEIOS</span></div></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="row" style="margin-bottom:14px"><span class="h2">MODOS ESPECIAIS</span><span class="chip new">NOVO</span><span class="sp grow"></span><span class="muted" style="font-size:13px">Regras próprias de deck ou de mesa</span></div>
+          <div class="special-grid">
+            <div class="mode hl" style="--mode:var(--teal)">
+              <div class="mt"><span class="mi"><svg class="i"><use href="#i-pack"/></svg></span><span class="mb">Pré-release e Draft</span></div>
+              <div><div class="mk">Limitado</div><div class="mn">SELADO</div></div>
+              <p class="md">Abra boosters, monte um deck de 40 com o que vier e jogue. Vale qualquer cor com qualquer Líder.</p>
+              <div class="row wrapx" style="gap:6px"><span class="chip">Pré-release · 6 boosters</span><span class="chip">Draft · pod de 4 a 8</span><span class="chip gold">OP18 disponível</span></div>
+              <div class="mf"><div class="ml"><i class="dot"></i>2 pods montando · 14 decks selados ativos</div><span class="cta">ABRIR BOOSTERS</span></div>
+            </div>
+            <div class="mode" style="--mode:var(--crimson)">
+              <div class="mt"><span class="mi"><svg class="i"><use href="#i-crown"/></svg></span><span class="mb">Mesa de 4</span></div>
+              <div><div class="mk">Todos contra todos</div><div class="mn">YONKO</div></div>
+              <p class="md">Quatro capitães na mesma mesa, cada um por si. Vida +2, ataque em qualquer oponente, o último de pé vence.</p>
+              <div class="row" style="gap:8px"><span class="input grow" style="letter-spacing:2px">ABC123</span><span class="btn" style="border-color:var(--crimson)">Entrar</span></div>
+              <div class="mf"><div class="ml"><i class="dot"></i>1 mesa esperando · 3 de 4 lugares</div><span class="cta">CRIAR MESA</span></div>
+            </div>
+            <div class="mode" style="--mode:var(--blue-card)">
+              <div class="mt"><span class="mi"><svg class="i"><use href="#i-wave"/></svg></span><span class="mb">Formato</span></div>
+              <div><div class="mk">Da comunidade</div><div class="mn">ALL BLUE</div></div>
+              <p class="md">Só comuns, incomuns, raras e promos. Sem SR e sem SEC: deck barato e meta variado.</p>
+              <div class="row wrapx" style="gap:6px"><span class="chip">C · UC · R · P</span><span class="chip">Líder livre</span></div>
+              <div class="mf"><div class="ml"><i class="dot off"></i>6 decks prontos para começar</div><span class="cta">MONTAR DECK</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t2">
+    <div class="shot-label"><span class="n">02</span><div><h2>All Blue no construtor de decks</h2><p>O construtor ganha o selo do formato e um filtro de raridade travado. As cartas SR e SEC continuam visíveis, apagadas, para o jogador entender o corte. O painel aponta a carta que invalida o deck.</p></div></div>
+    <div class="frame" id="f2">
+      <div class="top full">
+        <span class="logo">GUMGUM <em>FIGHT!</em></span>
+        <span class="nav"><svg class="i"><use href="#i-swords"/></svg>Jogar</span>
+        <span class="nav on"><svg class="i"><use href="#i-deck"/></svg>Montar decks</span>
+        <span class="nav"><svg class="i"><use href="#i-crown"/></svg>Torneios</span>
+        <span class="sp"></span>
+        <span class="pill"><svg class="i"><use href="#i-user"/></svg>Alex</span>
+      </div>
+      <div class="pad" style="display:grid;grid-template-columns:1fr 384px;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+          <div class="row">
+            <span class="input grow">Buscar: nome, texto ou atalho (c3, blocker, r:uc…)</span>
+            <span class="btn">Cor: Azul ▾</span><span class="btn">Tipo ▾</span><span class="btn">Coleção ▾</span>
+          </div>
+          <div class="row wrapx">
+            <span class="kick">Montando para</span>
+            <span class="seg"><span>Standard</span><span>Extra Grand Battle</span><span class="on"><svg class="i"><use href="#i-wave"/></svg>All Blue</span></span>
+            <span class="kick" style="margin-left:10px">Raridade</span>
+            <span class="chip ok">C</span><span class="chip ok">UC</span><span class="chip ok">R</span><span class="chip ok">Promo</span>
+            <span class="chip bad"><svg class="i"><use href="#i-lock"/></svg>SR</span><span class="chip bad"><svg class="i"><use href="#i-lock"/></svg>SEC</span>
+            <span class="grow"></span><span class="muted" style="font-size:12px">412 cartas azuis valem no All Blue · 61 ficam de fora</span>
+          </div>
+          <div class="cards" style="--cols:8;--gap:12px" data-cards="u1:Nami:2000:C|u1:Kaya:0:UC|u2:Nojiko:2000:C|u2:Otama:1000:UC|u3:Bartholomew Kuma:4000:R|u3:Mr.3:3000:C|u4:Jinbe:5000:R|u4:Sanji:6000:SR:lock|u5:Crocodile:6000:SR:lock|u3:Usopp:4000:C|u2:Gum-Gum Rain:0:UC|u4:Hina:5000:R|u5:Boa Hancock:6000:R|u7:Edward Newgate:9000:SEC:lock|u1:Sand Storm:0:C|u2:Chopper:3000:C|u6:Dracule Mihawk:8000:SR:lock|u3:Mr.2 Bon Kurei:4000:UC|u4:Ivankov:5000:R|u2:Coby:3000:C|u5:Marco:6000:R|u8:Kaido:10000:SR:lock|u1:Tashigi:2000:C|u3:Love-Love Mellow:0:UC"></div>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+          <div class="row"><span class="avatar" style="--c:var(--blue-card)">N</span><div class="grow"><div class="kick">Líder</div><div class="h3">NAMI AZUL DE BOLSO</div></div><span class="h3" style="color:var(--brand-yellow)">50/50</span></div>
+          <div class="row wrapx" style="gap:6px"><span class="chip bad">Não vale no All Blue</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Standard</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>EGB</span></div>
+          <div class="err"><b>OP06-047 Sanji é SR:</b> não vale no All Blue. Troque por uma carta C, UC, R ou promo.</div>
+          <div>
+            <div class="row" style="justify-content:space-between;margin-bottom:6px"><span class="kick">Raridades do deck</span><span class="muted" style="font-size:12px">29 C · 12 UC · 7 R · 2 SR</span></div>
+            <div class="rar-bar"><i style="width:58%;background:#7f93ad"></i><i style="width:24%;background:var(--sky)"></i><i style="width:14%;background:var(--gold)"></i><i style="width:4%;background:var(--danger)"></i></div>
+          </div>
+          <div><div class="kick" style="margin-bottom:20px">Curva de custo</div><div class="bars" style="margin-bottom:18px"><div style="height:38%" data-v="8" data-l="1"></div><div style="height:72%" data-v="14" data-l="2"></div><div style="height:58%" data-v="11" data-l="3"></div><div style="height:44%" data-v="9" data-l="4"></div><div style="height:26%" data-v="5" data-l="5"></div><div style="height:12%" data-v="2" data-l="6"></div><div style="height:6%" data-v="1" data-l="7+"></div></div></div>
+          <div class="list">
+            <div class="li"><span class="q">4</span><span class="cst" style="--k:var(--blue-card)">1</span>Nami<span class="r">C</span></div>
+            <div class="li"><span class="q">4</span><span class="cst" style="--k:var(--blue-card)">2</span>Nojiko<span class="r">C</span></div>
+            <div class="li"><span class="q">4</span><span class="cst" style="--k:var(--blue-card)">2</span>Gum-Gum Rain<span class="r">UC</span></div>
+            <div class="li"><span class="q">3</span><span class="cst" style="--k:var(--blue-card)">3</span>Bartholomew Kuma<span class="r">R</span></div>
+            <div class="li bad"><span class="q">2</span><span class="cst" style="--k:var(--blue-card)">4</span>Sanji<span class="r" style="color:#ff9a9a">SR · fora</span></div>
+            <div class="li"><span class="q">4</span><span class="cst" style="--k:var(--blue-card)">4</span>Jinbe<span class="r">R</span></div>
+            <div class="li muted" style="justify-content:center;border-style:dashed">+ 29 cartas</div>
+          </div>
+          <span class="cta gold" style="margin-top:auto">SALVAR</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t3">
+    <div class="shot-label"><span class="n">03</span><div><h2>Selado: escolha da coleção e do jeito de jogar</h2><p>Uma porta só para os dois modos limitados. O jogador escolhe a coleção, depois Pré-release (abre 6 boosters sozinho) ou Draft (escolhe carta a carta num pod). Os decks selados em andamento ficam à mão.</p></div></div>
+    <div class="frame" id="f3">
+      <div class="top">
+        <span class="logo">GUMGUM <em>FIGHT!</em></span>
+        <span class="nav on"><svg class="i"><use href="#i-swords"/></svg>Jogar</span>
+        <span class="nav"><svg class="i"><use href="#i-deck"/></svg>Montar decks</span>
+        <span class="nav"><svg class="i"><use href="#i-crown"/></svg>Torneios</span>
+        <span class="sp"></span><span class="pill"><svg class="i"><use href="#i-user"/></svg>Alex</span>
+      </div>
+      <div class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:22px">
+        <div>
+          <div class="kick" style="color:var(--teal)">Jogar › Selado</div>
+          <div class="row" style="align-items:flex-end;gap:18px"><span class="h2" style="font-size:52px">SELADO</span><p class="muted" style="max-width:640px;padding-bottom:6px">Todo mundo começa do zero: o deck sai dos boosters que você abrir. Deck de 40 cartas, qualquer cor com qualquer Líder, sem limite de cópias e sem lista de banidas.</p></div>
+        </div>
+        <div>
+          <div class="kick" style="margin-bottom:8px">1 · Coleção</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+            <div class="set on"><span class="pack sm"><b>OP18</b></span><div><b>OP18</b><small>The Dominance of God</small><span class="chip gold" style="margin-top:4px">Pré-release</span></div></div>
+            <div class="set"><span class="pack sm" style="background:linear-gradient(160deg,#c44a8a,#5f1f48 60%,#3a1230)"><b>EB05</b></span><div><b>EB05</b><small>Heroines Edition vol.2</small></div></div>
+            <div class="set"><span class="pack sm" style="background:linear-gradient(160deg,#3e9b5b,#1b4c2c 60%,#10301b)"><b>OP17</b></span><div><b>OP17</b><small>Coleção anterior</small></div></div>
+            <div class="set" style="justify-content:center;color:var(--muted)">Todas as coleções ▾</div>
+          </div>
+        </div>
+        <div>
+          <div class="kick" style="margin-bottom:8px">2 · Como você quer montar</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div class="choice" style="--mode:var(--teal)">
+              <div class="row" style="min-height:62px"><div class="grow"><div class="kick" style="color:var(--teal)">Sozinho, no seu tempo</div><div class="h2" style="font-size:40px">PRÉ-RELEASE</div></div><div class="row" style="gap:0"><span class="pack xs"><b>OP18</b></span><span class="pack xs" style="margin-left:-14px"><b>OP18</b></span><span class="pack xs" style="margin-left:-14px"><b>OP18</b></span><span class="chip" style="margin-left:8px">× 6</span></div></div>
+              <p class="muted">Você abre 6 boosters, fica com as 72 cartas e monta o melhor deck de 40 que conseguir. É o formato dos eventos de pré-lançamento das lojas.</p>
+              <div class="steps"><span><b>6</b>boosters só seus</span><span><b>30:00</b>para montar</span><span><b>40</b>cartas no deck</span></div>
+              <div class="row"><span class="cta" style="flex:1.4">ABRIR 6 BOOSTERS</span><span class="btn" style="flex:1;min-height:52px">Contra o bot</span></div>
+              <div class="row wrapx" style="gap:6px"><span class="muted" style="font-size:12px">Depois de montar:</span><span class="chip">Fila do Selado</span><span class="chip">Sala privada</span><span class="chip">Bot</span><span class="chip">Evento</span></div>
+            </div>
+            <div class="choice" style="--mode:var(--purple)">
+              <div class="row" style="min-height:62px"><div class="grow"><div class="kick" style="color:#c99be0">Em grupo, ao vivo</div><div class="h2" style="font-size:40px">DRAFT</div></div><div class="pod" style="width:210px"><span class="p me"><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--blue-card)">A</span></span><span class="p"><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--red)">K</span></span><span class="p"><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--green)">Z</span></span><span class="p" style="border-style:dashed"><span class="muted">+</span></span></div></div>
+              <p class="muted">Cada jogador abre um booster, fica com 1 carta e passa o resto para o vizinho. Quatro boosters por pessoa. Lugares vazios são preenchidos por bots.</p>
+              <div class="steps"><span><b>4 a 8</b>jogadores no pod</span><span><b>48</b>escolhas, 4 boosters</span><span><b>40</b>cartas no deck</span></div>
+              <div class="row"><span class="cta" style="flex:1.4">ENTRAR NUM POD</span><span class="btn" style="flex:1;min-height:52px">Criar pod com código</span></div>
+              <div class="row wrapx" style="gap:6px"><i class="dot"></i><span style="font-size:13px">Pod OP18 montando: 5 de 8 · começa em 1:40 ou quando encher</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="row" style="margin-bottom:12px"><span class="h3">SEUS DECKS SELADOS</span><span class="grow"></span><span class="muted" style="font-size:12px">Cada deck vale enquanto a coleção estiver no ar · não entra nas estatísticas do construído</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div class="li" style="padding:12px"><span class="avatar" style="--c:var(--yellow)">L</span><div class="grow"><b>Pré-release OP18</b><div class="muted" style="font-size:12px">Líder: Charlotte Linlin · 3 vitórias, 1 derrota</div></div><span class="btn sm">Jogar</span></div>
+            <div class="li" style="padding:12px"><span class="avatar" style="--c:var(--green)">Z</span><div class="grow"><b>Draft OP17 · pod de 8</b><div class="muted" style="font-size:12px">Final do pod: você x Kaio</div></div><span class="btn sm" style="border-color:var(--brand-yellow)">Entrar na sala</span></div>
+            <div class="li" style="padding:12px;border-style:dashed"><span class="avatar" style="--c:var(--panel2)">?</span><div class="grow"><b>Pré-release EB05</b><div class="muted" style="font-size:12px">Boosters abertos · deck 22/40</div></div><span class="btn sm">Continuar</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t4">
+    <div class="shot-label"><span class="n">04</span><div><h2>Pré-release: abertura dos boosters</h2><p>O servidor sorteia os 6 boosters e guarda a coleção de cartas; a tela só revela. Dá para abrir um a um ou todos de uma vez. O resumo ao lado mostra os Líderes que saíram e a divisão por cor.</p></div></div>
+    <div class="frame" id="f4">
+      <div class="top full"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="pill" style="border-color:var(--teal);color:#7fe0d8">Selado · Pré-release OP18</span><span class="sp"></span><span class="pill">Booster 4 de 6</span><span class="btn sm">Sair e continuar depois</span></div>
+      <div class="pad" style="display:grid;grid-template-columns:1fr 320px;gap:22px">
+        <div style="display:flex;flex-direction:column;gap:22px;min-width:0">
+          <div class="row" style="justify-content:center;gap:18px;padding-top:8px">
+            <span class="pack open"><b>OP18<small>ABERTO</small></b></span><span class="pack open"><b>OP18<small>ABERTO</small></b></span><span class="pack open"><b>OP18<small>ABERTO</small></b></span>
+            <span class="pack cur"><b>OP18<small>ABRINDO</small></b></span>
+            <span class="pack"><b>OP18<small>BOOSTER</small></b></span><span class="pack"><b>OP18<small>BOOSTER</small></b></span>
+          </div>
+          <div class="mat" style="padding:22px">
+            <div class="row" style="margin-bottom:16px"><span class="h3">BOOSTER 4</span><span class="chip">7 comuns</span><span class="chip">3 incomuns</span><span class="chip gold">1 rara ou melhor</span><span class="chip" style="border-color:var(--brand-yellow)">1 Líder</span><span class="grow"></span><span class="muted" style="font-size:12px">Toque numa carta para ver o texto</span></div>
+            <div class="cards" style="--cols:6;--gap:16px" data-cards="y1:Charlotte Anana:2000:C|p2:Sheepshead:3000:C|b3:Hyogoro:4000:C|r2:Koby:3000:C|g1:Kikunojo:2000:C|u3:Scratchmen Apoo:4000:C|y4:Charlotte Smoothie:6000:C|p3:Ulti:4000:UC|g4:Denjiro:5000:UC|r5:Smoker:6000:UC|b7:Rob Lucci:8000:SR:glow|y0:Charlotte Linlin:5000:L:lead,glow"></div>
+          </div>
+          <div class="row" style="justify-content:center;gap:12px"><span class="btn" style="min-height:52px">Abrir os 2 que faltam</span><span class="cta auto" style="--mode:var(--teal);min-width:300px">ABRIR O PRÓXIMO</span></div>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;gap:16px">
+          <div><div class="kick">Sua coleção</div><div class="row" style="align-items:baseline"><span class="h2" style="font-size:44px;color:var(--brand-yellow)">48</span><span class="muted">de 72 cartas reveladas</span></div></div>
+          <div><div class="kick" style="margin-bottom:8px">Líderes que saíram</div>
+            <div class="cards" style="--cols:4;--gap:8px" data-cards="y0:Linlin:5000:L:lead|p0:Kaido:5000:L:lead|g0:Yamato:5000:L:lead|y0:Linlin:5000:L:lead"></div>
+            <p class="muted" style="font-size:12px;margin-top:8px">No Selado você joga com qualquer Líder que abrir. A cor do Líder não limita o deck.</p>
+          </div>
+          <div><div class="kick" style="margin-bottom:8px">Por cor</div>
+            <div class="list">
+              <div class="li"><span class="cst" style="--k:var(--red)"></span>Vermelho<span class="r">9</span></div>
+              <div class="li"><span class="cst" style="--k:var(--green)"></span>Verde<span class="r">8</span></div>
+              <div class="li"><span class="cst" style="--k:var(--blue-card)"></span>Azul<span class="r">6</span></div>
+              <div class="li"><span class="cst" style="--k:var(--purple)"></span>Roxo<span class="r">10</span></div>
+              <div class="li"><span class="cst" style="--k:var(--black)"></span>Preto<span class="r">7</span></div>
+              <div class="li"><span class="cst" style="--k:var(--yellow)"></span>Amarelo<span class="r">8</span></div>
+            </div>
+          </div>
+          <div class="note">Os boosters são sorteados no servidor e ficam gravados: recarregar a página não muda o que saiu.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t5">
+    <div class="shot-label"><span class="n">05</span><div><h2>Montagem do deck selado (40 cartas)</h2><p>Mesma tela para Pré-release e Draft. À esquerda, só as cartas que o jogador tem; à direita, o deck. O construtor troca as regras: 40 cartas, sem restrição de cor, sem limite de cópias. "Montar sozinho" preenche um deck jogável para quem não quer otimizar.</p></div></div>
+    <div class="frame" id="f5">
+      <div class="top full"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="pill" style="border-color:var(--teal);color:#7fe0d8">Selado · Pré-release OP18</span><span class="sp"></span><svg class="i" style="font-size:22px;color:var(--brand-yellow)"><use href="#i-clock"/></svg><span class="timer">24:13</span><span class="muted" style="font-size:12px;max-width:150px;line-height:1.2">No fim do tempo o deck é completado sozinho</span></div>
+      <div class="pad" style="display:grid;grid-template-columns:1fr 400px;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+          <div class="row wrapx">
+            <span class="h3">SUA COLEÇÃO</span><span class="chip">72 cartas</span><span class="chip">41 fora do deck</span><span class="grow"></span>
+            <span class="seg"><span class="on">Todas</span><span><i class="dot" style="background:var(--red);box-shadow:none"></i>12</span><span><i class="dot" style="background:var(--green);box-shadow:none"></i>11</span><span><i class="dot" style="background:var(--blue-card);box-shadow:none"></i>10</span><span><i class="dot" style="background:var(--purple);box-shadow:none"></i>14</span><span><i class="dot" style="background:var(--black);box-shadow:none"></i>12</span><span><i class="dot" style="background:var(--yellow);box-shadow:none"></i>13</span></span>
+            <span class="btn sm">Ordenar: custo ▾</span>
+          </div>
+          <div class="kick">Custo 1 a 2</div>
+          <div class="cards" style="--cols:9;--gap:10px" data-cards="y1:Anana:2000:C:x2|g1:Kikunojo:2000:C|r1:Helmeppo:2000:C:dim|p1:Page One:2000:C|b1:Kaku:2000:UC:dim|u1:Tama:1000:C|p2:Sheepshead:3000:C:x2|r2:Koby:3000:C:dim|y2:Pudding:2000:UC"></div>
+          <div class="kick">Custo 3 a 4</div>
+          <div class="cards" style="--cols:9;--gap:10px" data-cards="b3:Hyogoro:4000:C:dim|u3:Apoo:4000:C|p3:Ulti:4000:UC:dim|y3:Oven:4000:C|g3:Kawamatsu:4000:C:x2|r3:Tashigi:4000:UC|y4:Smoothie:6000:C:dim|g4:Denjiro:5000:UC:dim|p4:Queen:5000:R"></div>
+          <div class="kick">Custo 5 ou mais</div>
+          <div class="cards" style="--cols:9;--gap:10px" data-cards="r5:Smoker:6000:UC|y5:Katakuri:7000:R:dim|p6:King:7000:R:dim|g6:Kin'emon:7000:R|b7:Rob Lucci:8000:SR:dim|u7:Hawkins:8000:R|y8:Big Mom:10000:SR:dim|p9:Kaido:11000:SEC:dim|r6:Akainu:8000:SR"></div>
+          <p class="muted" style="font-size:12px">Cartas apagadas já estão no deck. O número na carta é quantas cópias você abriu.</p>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+          <div><div class="kick" style="margin-bottom:8px">Seu Líder (um dos que você abriu)</div>
+            <div class="cards" style="--cols:4;--gap:8px;padding-top:10px" data-cards="y0:Linlin:5000:L:lead,sel|p0:Kaido:5000:L:lead|g0:Yamato:5000:L:lead|u0:Hawkins:5000:L:lead"></div>
+          </div>
+          <div class="row" style="align-items:baseline"><span class="h2" style="font-size:44px;color:var(--brand-yellow)">31</span><span class="muted" style="white-space:nowrap">de 40 cartas</span><span class="grow"></span><span class="chip">Qualquer cor</span><span class="chip">Sem limite de cópias</span></div>
+          <div><div class="kick" style="margin-bottom:20px">Curva de custo</div><div class="bars" style="margin-bottom:18px"><div style="height:30%" data-v="5" data-l="1"></div><div style="height:48%" data-v="7" data-l="2"></div><div style="height:54%" data-v="8" data-l="3"></div><div style="height:36%" data-v="5" data-l="4"></div><div style="height:24%" data-v="3" data-l="5"></div><div style="height:12%" data-v="2" data-l="6"></div><div style="height:8%" data-v="1" data-l="7+"></div></div></div>
+          <div class="row wrapx" style="gap:6px"><span class="chip">Counter +1000: 14</span><span class="chip">Counter +2000: 3</span><span class="chip">Blocker: 4</span><span class="chip">[Trigger]: 6</span></div>
+          <div class="list">
+            <div class="li"><span class="q">2</span><span class="cst" style="--k:var(--yellow)">1</span>Charlotte Anana<span class="r">C</span></div>
+            <div class="li"><span class="q">1</span><span class="cst" style="--k:var(--purple)">3</span>Ulti<span class="r">UC</span></div>
+            <div class="li"><span class="q">1</span><span class="cst" style="--k:var(--black)">7</span>Rob Lucci<span class="r">SR</span></div>
+            <div class="li"><span class="q">1</span><span class="cst" style="--k:var(--purple)">9</span>Kaido<span class="r">SEC</span></div>
+            <div class="li muted" style="justify-content:center;border-style:dashed">+ 26 cartas</div>
+          </div>
+          <div class="row" style="margin-top:auto"><span class="btn" style="flex:1;min-height:52px">Montar sozinho</span><span class="cta off" style="flex:1.2;--mode:var(--teal)">FALTAM 9</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t6">
+    <div class="shot-label"><span class="n">06</span><div><h2>Draft: a escolha da carta</h2><p>A tela nova de verdade do Draft. No centro, o booster que chegou; embaixo, o que o jogador já pegou. A faixa do pod mostra quem já escolheu e para que lado os boosters andam. Sem escolha no tempo, o servidor pega uma carta sozinho.</p></div></div>
+    <div class="frame" id="f6">
+      <div class="top full"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="pill" style="border-color:var(--purple);color:#d9b3ee">Draft OP18 · pod de 8</span><span class="sp"></span><span class="pill">Booster 2 de 4</span><span class="pill">Escolha 5 de 12</span><svg class="i" style="font-size:22px;color:var(--brand-yellow)"><use href="#i-clock"/></svg><span class="timer">0:32</span></div>
+      <div class="pad" style="display:flex;flex-direction:column;gap:18px">
+        <div class="pod">
+          <span class="p me"><span class="avatar" style="--c:var(--blue-card)">A</span><b>Você</b><span class="st">escolhendo</span></span><span class="arrow">◀</span>
+          <span class="p"><span class="avatar" style="--c:var(--red)">K</span><b>Kaio</b><span class="st ok">✓ escolheu</span></span><span class="arrow">◀</span>
+          <span class="p"><span class="avatar" style="--c:var(--green)">Z</span><b>Zeca</b><span class="st">escolhendo</span></span><span class="arrow">◀</span>
+          <span class="p"><span class="avatar" style="--c:var(--purple)">M</span><b>Mari</b><span class="st ok">✓ escolheu</span></span><span class="arrow">◀</span>
+          <span class="p"><span class="avatar" style="--c:var(--black)">B</span><b>Bot Crocus</b><span class="st ok">✓ escolheu</span></span><span class="arrow">◀</span>
+          <span class="p"><span class="avatar" style="--c:var(--yellow)">R</span><b>Rafa</b><span class="st">escolhendo</span></span><span class="arrow">◀</span>
+          <span class="p"><span class="avatar" style="--c:var(--black)">B</span><b>Bot Laboon</b><span class="st ok">✓ escolheu</span></span><span class="arrow">◀</span>
+          <span class="p"><span class="avatar" style="--c:var(--teal)">T</span><b>Tina</b><span class="st" style="color:var(--gold)">ausente · 0:12</span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 330px;gap:20px">
+          <div class="mat" style="padding:22px;display:flex;flex-direction:column;gap:18px">
+            <div class="row"><span class="h3">ESCOLHA 1 CARTA</span><span class="muted">8 cartas neste booster · o resto vai para Kaio, à sua esquerda</span></div>
+            <div class="cards" style="--cols:8;--gap:14px" data-cards="p3:Ulti:4000:UC|y4:Smoothie:6000:C|g4:Denjiro:5000:UC|r5:Smoker:6000:UC|p6:King:7000:R:sel|u3:Apoo:4000:C|b1:Kaku:2000:C|g1:Kikunojo:2000:C"></div>
+            <div class="row"><div class="panel grow" style="padding:12px 14px;border-radius:14px"><b>King</b> <span class="muted">· Personagem roxo · custo 6 · 7000 · Animal Kingdom Pirates</span><div class="muted" style="font-size:13px;margin-top:2px">[On Play] DON!! −2: K.O. até 1 Personagem do oponente com custo 4 ou menos.</div></div><span class="cta auto" style="--mode:var(--purple);min-width:260px">PEGAR KING</span></div>
+          </div>
+          <div class="panel" style="display:flex;flex-direction:column;gap:12px">
+            <div class="row"><span class="h3">SEU LÍDER</span><span class="grow"></span><span class="muted" style="font-size:12px">escolhido antes do draft</span></div>
+            <div class="row" style="align-items:flex-start;gap:12px"><div style="width:74px;flex:none"><div class="c purple f-lead"><span class="cp">5000</span><span class="ca"></span><span class="cn">Kaido</span><span class="cr">L</span></div></div><p class="muted" style="font-size:12.5px">Cada jogador recebe 3 Líderes da coleção e fica com 1. Como a cor não limita o deck, o Líder guia as escolhas, não as trava.</p></div>
+            <div class="kick">Cores que você pegou</div>
+            <div class="rar-bar" style="height:18px"><i style="width:44%;background:var(--purple)"></i><i style="width:25%;background:var(--yellow)"></i><i style="width:19%;background:var(--red)"></i><i style="width:12%;background:var(--black)"></i></div>
+            <div class="kick" style="margin-top:4px;margin-bottom:16px">Curva até agora</div>
+            <div class="bars" style="height:56px;margin-bottom:16px"><div style="height:40%" data-v="3" data-l="1"></div><div style="height:66%" data-v="5" data-l="2"></div><div style="height:52%" data-v="4" data-l="3"></div><div style="height:26%" data-v="2" data-l="4"></div><div style="height:26%" data-v="2" data-l="5+"></div></div>
+          </div>
+        </div>
+        <div class="panel" style="padding:14px 18px">
+          <div class="row" style="margin-bottom:10px"><span class="h3">SUAS ESCOLHAS</span><span class="chip">16 de 48</span><span class="grow"></span><span class="muted" style="font-size:12px">Só você vê as suas cartas</span></div>
+          <div class="cards flow" style="--cw:66px;--gap:8px" data-cards="p1:Page One:2000:C|p2:Sheepshead:3000:C|p2:Sasaki:3000:UC|p3:Black Maria:4000:R|p4:Queen:5000:R|p5:Jack:6000:UC|p9:Kaido:11000:SEC|y1:Anana:2000:C|y2:Pudding:2000:UC|y3:Oven:4000:C|y5:Katakuri:7000:R|r1:Helmeppo:2000:C|r2:Koby:3000:C|r3:Tashigi:4000:UC|b3:Hyogoro:4000:C|b7:Rob Lucci:8000:SR"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t7">
+    <div class="shot-label"><span class="n">07</span><div><h2>Yonko: sala de espera da mesa</h2><p>A sala privada de hoje, com quatro lugares e as regras da mesa. Quem cria escolhe os ajustes do formato da comunidade (vida extra, compensação de quem joga depois, recompensa por eliminação). A ordem sai no dado quando a mesa enche.</p></div></div>
+    <div class="frame" id="f7">
+      <div class="top"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="nav on"><svg class="i"><use href="#i-swords"/></svg>Jogar</span><span class="nav"><svg class="i"><use href="#i-deck"/></svg>Montar decks</span><span class="sp"></span><span class="pill"><svg class="i"><use href="#i-user"/></svg>Alex</span></div>
+      <div class="wrap" style="padding-top:28px;padding-bottom:40px;display:flex;flex-direction:column;gap:20px">
+        <div class="row" style="align-items:flex-end">
+          <div class="grow"><div class="kick" style="color:var(--crimson)">Jogar › Yonko · todos contra todos</div><span class="h2" style="font-size:52px">MESA DOS 4 IMPERADORES</span></div>
+          <div class="panel row" style="padding:10px 14px;border-radius:16px"><div><div class="kick">Código da mesa</div><div class="h3" style="letter-spacing:4px;color:var(--brand-yellow)">YNK4EV</div></div><span class="btn sm">Copiar link</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+          <div class="seat" style="border-color:var(--brand-yellow)"><span class="avatar lg" style="--c:var(--blue-card)">A</span><div><div class="h3">ALEX</div><div class="muted" style="font-size:12px">dono da mesa</div></div><span class="chip">Nami azul/amarelo</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Pronto</span></div>
+          <div class="seat"><span class="avatar lg" style="--c:var(--purple)">K</span><div><div class="h3">KAIO</div><div class="muted" style="font-size:12px">conectado</div></div><span class="chip">Kaido roxo</span><span class="chip ok"><svg class="i"><use href="#i-check"/></svg>Pronto</span></div>
+          <div class="seat"><span class="avatar lg" style="--c:var(--red)">M</span><div><div class="h3">MARI</div><div class="muted" style="font-size:12px">escolhendo o deck</div></div><span class="chip">Shanks vermelho</span><span class="chip gold">Aguardando</span></div>
+          <div class="seat empty"><span class="avatar lg" style="--c:transparent;border-style:dashed;border-color:var(--line);color:var(--muted)">?</span><div>Lugar vazio</div><span class="btn sm">Convidar</span><span class="btn sm">Completar com bot</span></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:16px">
+          <div class="panel">
+            <div class="row" style="margin-bottom:6px"><span class="h3">REGRAS DA MESA</span><span class="chip">Padrão GumGum v1</span><span class="grow"></span><span class="muted" style="font-size:12px">Só o dono da mesa altera</span></div>
+            <div class="opt"><div class="t">Vida extra<small>Somada à Vida impressa do Líder, para ninguém cair antes de jogar.</small></div><span class="step"><span>−</span><span class="v">+2</span><span>+</span></span></div>
+            <div class="opt"><div class="t">Compensação de início<small>O 1º não compra e não ataca no primeiro turno. Do 3º em diante, o jogador escolhe um bônus.</small></div><span class="seg"><span class="on">Carta ou DON!!</span><span>Só carta</span><span>Nenhuma</span></span></div>
+            <div class="opt"><div class="t">Efeitos em "seu oponente"<small>Fora de batalha, quem usa o efeito escolhe um oponente. Na batalha, vale quem está nela.</small></div><span class="chip">Fixo na v1</span></div>
+            <div class="opt"><div class="t">Recompensa por eliminação<small>Quem dá o golpe final compra cartas.</small></div><span class="step"><span>−</span><span class="v">1</span><span>+</span></span></div>
+            <div class="opt"><div class="t">Cartas<small>O mesmo formato vale para os quatro decks.</small></div><span class="seg"><span>Standard</span><span class="on">Extra Grand Battle</span><span>All Blue</span><span>Livre</span></span></div>
+            <div class="opt"><div class="t">Relógio<small>Por jogador, na partida inteira. Só corre quando a decisão é dele.</small></div><span class="seg"><span>17:30</span><span class="on">25:00</span><span>35:00</span></span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div class="panel">
+              <div class="row" style="margin-bottom:10px"><svg class="i" style="font-size:22px;color:var(--brand-yellow)"><use href="#i-dice"/></svg><span class="h3">ORDEM DOS TURNOS</span></div>
+              <p class="muted" style="font-size:13px">Quando os quatro estiverem prontos, cada um rola o dado. O maior número começa e a mesa segue no sentido horário.</p>
+              <div class="row" style="margin-top:12px;gap:8px"><span class="chip">1º sem compra · 1 DON!!</span><span class="chip">2º normal</span><span class="chip gold">3º e 4º com bônus</span></div>
+            </div>
+            <div class="panel">
+              <div class="h3" style="margin-bottom:8px">COMO SE VENCE</div>
+              <p class="muted" style="font-size:13px">Um jogador é eliminado ao levar dano no Líder sem Vida ou ao ficar sem deck. As cartas dele saem da mesa. O último que sobrar vence; os outros ficam em 2º, 3º e 4º pela ordem de queda.</p>
+            </div>
+            <span class="cta off" style="--mode:var(--crimson)">ESPERANDO 1 JOGADOR</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t8">
+    <div class="shot-label"><span class="n">08</span><div><h2>Yonko: a mesa de 4</h2><p>A tela mais cara do pacote. Os três oponentes ficam em painéis compactos no alto, com tudo o que é informação pública (Líder, Vida, DON!!, mão, Personagens). A sua mesa segue como é hoje. Ao atacar, os alvos válidos acendem nas três mesas.</p></div></div>
+    <div class="frame" id="f8">
+      <div class="top full" style="height:52px"><span class="logo" style="font-size:22px">GUMGUM <em>FIGHT!</em></span><span class="pill" style="border-color:var(--crimson);color:#ffb3a3">Yonko · mesa YNK4EV</span><span class="pill">Rodada 5 · turno de Alex</span><span class="sp"></span><span class="pill"><svg class="i"><use href="#i-eye"/></svg>3 assistindo</span><svg class="i" style="font-size:20px;color:var(--brand-yellow)"><use href="#i-clock"/></svg><span class="timer" style="font-size:26px">18:42</span></div>
+      <div class="pad" style="display:grid;grid-template-columns:1fr 286px;gap:16px;padding:16px">
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <!-- Oponentes -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+            <div class="opp" style="--pc:var(--purple)">
+              <div class="opp-head"><span class="ord">2º</span><b>Kaio</b><span class="muted" style="font-size:12px">Kaido</span><span class="grow"></span><span class="stat"><svg class="i"><use href="#i-clock"/></svg>21:10</span></div>
+              <div class="row" style="align-items:flex-start;gap:10px">
+                <div style="width:62px;flex:none"><div class="c purple f-lead"><span class="cp">5000</span><span class="ca"></span><span class="cn">Kaido</span><span class="cr">L</span></div></div>
+                <div class="grow" style="display:flex;flex-direction:column;gap:6px">
+                  <div class="row" style="gap:6px"><span class="kick">Vida 5/7</span><span class="pips"><i></i><i></i><i></i><i class="b"></i><i class="b"></i><i class="x"></i><i class="x"></i></span></div>
+                  <div class="row wrapx" style="gap:5px"><span class="stat"><svg class="i"><use href="#i-hand"/></svg>6 na mão</span><span class="stat">DON!! 7 · 2 ativos</span><span class="stat">Deck 33</span></div>
+                </div>
+              </div>
+              <div class="cards" style="--cols:5;--gap:8px" data-cards="p2:Sasaki:3000:UC|p4:Queen:5000:R:rest|p6:King:7000:R|p3:Ulti:4000:UC:rest"><div class="slot"></div></div>
+            </div>
+            <div class="opp focus" style="--pc:var(--red)">
+              <div class="opp-head"><span class="ord">3º</span><b>Mari</b><span class="muted" style="font-size:12px">Shanks</span><span class="chip bad" style="font-size:10px">ALVO</span><span class="grow"></span><span class="stat"><svg class="i"><use href="#i-clock"/></svg>19:55</span></div>
+              <div class="row" style="align-items:flex-start;gap:10px">
+                <div style="width:62px;flex:none"><div class="c red f-lead f-tgt"><span class="cp">5000</span><span class="ca"></span><span class="cn">Shanks</span><span class="cr">L</span></div></div>
+                <div class="grow" style="display:flex;flex-direction:column;gap:6px">
+                  <div class="row" style="gap:6px"><span class="kick">Vida 2/7</span><span class="pips"><i></i><i></i><i class="x"></i><i class="x"></i><i class="x"></i><i class="x"></i><i class="x"></i></span></div>
+                  <div class="row wrapx" style="gap:5px"><span class="stat"><svg class="i"><use href="#i-hand"/></svg>3 na mão</span><span class="stat">DON!! 8 · 0 ativos</span><span class="stat">Deck 29</span></div>
+                </div>
+              </div>
+              <div class="cards" style="--cols:5;--gap:8px" data-cards="r3:Benn Beckman:5000:R:rest,tgt|r2:Koby:3000:C|r5:Yasopp:6000:UC:rest,tgt"><div class="slot"></div><div class="slot"></div></div>
+            </div>
+            <div class="opp" style="--pc:var(--green)">
+              <div class="opp-head"><span class="ord">4º</span><b>Bot Laboon</b><span class="muted" style="font-size:12px">Zoro</span><span class="grow"></span><span class="stat"><svg class="i"><use href="#i-clock"/></svg>23:31</span></div>
+              <div class="row" style="align-items:flex-start;gap:10px">
+                <div style="width:62px;flex:none"><div class="c green f-lead f-tgt"><span class="cp">5000</span><span class="ca"></span><span class="cn">Zoro</span><span class="cr">L</span></div></div>
+                <div class="grow" style="display:flex;flex-direction:column;gap:6px">
+                  <div class="row" style="gap:6px"><span class="kick">Vida 6/7</span><span class="pips"><i></i><i></i><i></i><i></i><i class="b"></i><i class="b"></i><i class="x"></i></span></div>
+                  <div class="row wrapx" style="gap:5px"><span class="stat"><svg class="i"><use href="#i-hand"/></svg>5 na mão</span><span class="stat">DON!! 6 · 1 ativo</span><span class="stat">Deck 35</span></div>
+                </div>
+              </div>
+              <div class="cards" style="--cols:5;--gap:8px" data-cards="g1:Kikunojo:2000:C|g3:Kawamatsu:4000:C|g4:Denjiro:5000:UC|g6:Kin'emon:7000:R:rest,tgt|g2:Usopp:3000:C"></div>
+            </div>
+          </div>
+          <!-- Aviso de decisão -->
+          <div class="banner"><svg class="i" style="font-size:22px;color:var(--brand-yellow)"><use href="#i-swords"/></svg><div class="grow"><b>Jinbe ataca com 7000.</b> <span class="muted">Escolha o alvo em qualquer mesa: um Líder ou um Personagem virado.</span></div><span class="chip">6 alvos válidos</span><span class="btn sm">Cancelar</span></div>
+          <!-- Minha mesa -->
+          <div class="mat" style="padding:14px;display:grid;grid-template-columns:150px 1fr 150px;gap:14px;border-color:rgba(90,163,255,0.5);background:linear-gradient(180deg,#16305a,#101a31)">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div class="row" style="gap:6px"><span class="ord" style="--pc:var(--blue-card)">1º</span><b>Você</b></div>
+              <div class="row" style="align-items:flex-start;gap:8px">
+                <div style="width:82px;flex:none"><div class="c blue f-lead"><span class="cp">5000</span><span class="ca"></span><span class="cn">Nami</span><span class="cr">L</span></div></div>
+                <div><div class="kick" style="margin-bottom:4px">Vida 4/6</div><div class="pips" style="flex-direction:column"><i style="width:44px;height:11px"></i><i style="width:44px;height:11px"></i><i style="width:44px;height:11px" class="b"></i><i style="width:44px;height:11px" class="b"></i><i style="width:44px;height:11px" class="x"></i><i style="width:44px;height:11px" class="x"></i></div></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+              <div class="cards" style="--cols:7;--gap:12px" data-cards="u4:Jinbe:7000:R:atk|u3:Kuma:4000:R|u2:Nojiko:2000:C:rest|u5:Hancock:6000:R"><div class="slot"></div><div class="slot" style="visibility:hidden"></div><div class="slot" style="border-style:solid;display:grid;place-items:center;font-size:10px;color:var(--muted)">STAGE</div></div>
+              <div class="row"><span class="kick">DON!! 9</span><span class="don"><i>DON</i><i>DON</i><i>DON</i><i>DON</i><i class="r">DON</i><i class="r">DON</i><i class="r">DON</i></span><span class="stat">+2 anexados no Jinbe</span><span class="grow"></span><span class="btn sm">Encerrar turno</span></div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;align-items:flex-start">
+              <div style="width:62px;text-align:center"><div class="c f-back"></div><div class="kick" style="margin-top:4px">Deck 31</div></div>
+              <div style="width:62px;text-align:center"><div class="c blue"><span class="cc">1</span><span class="ca"></span><span class="cn">Sand Storm</span></div><div class="kick" style="margin-top:4px">Trash 8</div></div>
+            </div>
+          </div>
+          <!-- Mão -->
+          <div class="row" style="justify-content:center;gap:10px"><span class="kick">Sua mão · 6</span><div class="cards flow" style="--cw:84px;--gap:10px" data-cards="u1:Nami:2000:C|u2:Gum-Gum Rain:0:UC|u4:Hina:5000:R|u5:Marco:6000:R|y2:Pudding:2000:UC|y4:Smoothie:6000:C"></div></div>
+        </div>
+        <!-- Lateral -->
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="panel" style="padding:14px">
+            <div class="h3" style="margin-bottom:10px">ORDEM DOS TURNOS</div>
+            <div class="list" style="gap:6px">
+              <div class="turn-li on"><span class="ord" style="--pc:var(--blue-card)">1º</span><b class="grow">Você</b><span class="stat">▶ jogando</span></div>
+              <div class="turn-li"><span class="ord" style="--pc:var(--purple)">2º</span><b class="grow">Kaio</b><span class="stat">Vida 5</span></div>
+              <div class="turn-li"><span class="ord" style="--pc:var(--red)">3º</span><b class="grow">Mari</b><span class="stat" style="color:#ff9a9a">Vida 2</span></div>
+              <div class="turn-li"><span class="ord" style="--pc:var(--green)">4º</span><b class="grow">Bot Laboon</b><span class="stat">Vida 6</span></div>
+            </div>
+          </div>
+          <div class="panel grow" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="h3">REGISTRO</div>
+            <div class="log">
+              <p style="--pc:var(--green)"><b>Bot Laboon</b> atacou o Líder de <b>Mari</b> com Kin'emon. 1 de dano.</p>
+              <p style="--pc:var(--red)"><b>Mari</b> ativou [Trigger] de Yasopp.</p>
+              <p style="--pc:var(--blue-card)"><b>Você</b> jogou Hancock e escolheu <b>Kaio</b> como oponente do efeito.</p>
+              <p style="--pc:var(--blue-card)"><b>Você</b> anexou 2 DON!! em Jinbe.</p>
+              <p style="--pc:var(--blue-card)"><b>Você</b> declarou ataque com Jinbe.</p>
+            </div>
+            <div class="grow"></div>
+            <div class="row wrapx" style="gap:6px"><span class="chip">Aliança?</span><span class="chip">Boa!</span><span class="chip">Ops</span><span class="chip">GG</span></div>
+            <span class="input">Mensagem para a mesa…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 ───────────────────────────────────────────────────────────── -->
+  <section class="shot" id="t9">
+    <div class="shot-label"><span class="n">09</span><div><h2>No celular: Yonko e Draft</h2><p>As duas telas que não cabem como estão. No Yonko, os oponentes viram abas com o resumo sempre visível e uma mesa aberta por vez. No Draft, o booster ocupa a tela e as escolhas ficam numa gaveta.</p></div></div>
+    <div class="frame" id="f9" style="padding:36px;display:flex;gap:48px;justify-content:center;align-items:flex-start">
+      <!-- Yonko mobile -->
+      <div class="phone">
+        <div class="top"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="sp"></span><svg class="i" style="font-size:16px;color:var(--brand-yellow)"><use href="#i-clock"/></svg><span class="timer" style="font-size:22px">18:42</span></div>
+        <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+            <div class="turn-li" style="flex-direction:column;align-items:flex-start;gap:3px;padding:7px"><div class="row" style="gap:5px"><span class="ord" style="--pc:var(--purple);width:20px;height:20px;font-size:12px">2º</span><b style="font-size:12px">Kaio</b></div><span class="muted" style="font-size:10.5px">Vida 5 · mão 6</span></div>
+            <div class="turn-li on" style="flex-direction:column;align-items:flex-start;gap:3px;padding:7px;border-color:var(--danger);background:rgba(255,107,111,0.12)"><div class="row" style="gap:5px"><span class="ord" style="--pc:var(--red);width:20px;height:20px;font-size:12px">3º</span><b style="font-size:12px">Mari</b></div><span style="font-size:10.5px;color:#ff9a9a">Vida 2 · mão 3</span></div>
+            <div class="turn-li" style="flex-direction:column;align-items:flex-start;gap:3px;padding:7px"><div class="row" style="gap:5px"><span class="ord" style="--pc:var(--green);width:20px;height:20px;font-size:12px">4º</span><b style="font-size:12px">Laboon</b></div><span class="muted" style="font-size:10.5px">Vida 6 · mão 5</span></div>
+          </div>
+          <div class="opp focus" style="--pc:var(--red);padding:9px;gap:8px">
+            <div class="row" style="gap:8px"><div style="width:48px;flex:none"><div class="c red f-lead f-tgt"><span class="cp">5000</span><span class="ca"></span><span class="cn">Shanks</span></div></div><div class="grow"><div class="row" style="gap:6px"><b>Mesa de Mari</b><span class="chip bad" style="font-size:10px">ALVO</span></div><div class="pips" style="margin:4px 0"><i></i><i></i><i class="x"></i><i class="x"></i><i class="x"></i><i class="x"></i><i class="x"></i></div><span class="muted" style="font-size:11px">DON!! 8 · 0 ativos · deck 29</span></div></div>
+            <div class="cards" style="--cols:5;--gap:6px" data-cards="r3:Beckman:5000:R:rest,tgt|r2:Koby:3000:C|r5:Yasopp:6000:UC:rest,tgt"><div class="slot"></div><div class="slot"></div></div>
+          </div>
+          <div class="banner" style="padding:8px 10px;gap:8px;font-size:12px;border-radius:12px"><svg class="i" style="font-size:16px;color:var(--brand-yellow)"><use href="#i-swords"/></svg><div class="grow"><b>Jinbe ataca.</b> Toque no alvo. Deslize para ver outra mesa.</div></div>
+          <div class="mat" style="padding:9px;display:flex;flex-direction:column;gap:8px;border-color:rgba(90,163,255,0.5)">
+            <div class="row" style="gap:8px"><div style="width:48px;flex:none"><div class="c blue f-lead"><span class="cp">5000</span><span class="ca"></span><span class="cn">Nami</span></div></div><div class="grow"><b>Você</b> <span class="muted" style="font-size:11px">· Vida 4/6</span><div class="pips" style="margin-top:4px"><i></i><i></i><i class="b"></i><i class="b"></i><i class="x"></i><i class="x"></i></div></div><span class="stat">DON!! 4/9</span></div>
+            <div class="cards" style="--cols:5;--gap:6px" data-cards="u4:Jinbe:7000:R:atk|u3:Kuma:4000:R|u2:Nojiko:2000:C:rest|u5:Hancock:6000:R"><div class="slot"></div></div>
+          </div>
+          <div class="cards flow" style="--cw:54px;--gap:5px;justify-content:center" data-cards="u1:Nami:2000:C|u2:Rain:0:UC|u4:Hina:5000:R|u5:Marco:6000:R|y2:Pudding:2000:UC|y4:Smoothie:6000:C"></div>
+          <div class="row"><span class="btn sm grow">Registro</span><span class="btn sm grow">Chat</span><span class="btn sm grow" style="border-color:var(--brand-yellow)">Encerrar turno</span></div>
+        </div>
+      </div>
+      <!-- Draft mobile -->
+      <div class="phone">
+        <div class="top"><span class="logo">GUMGUM <em>FIGHT!</em></span><span class="sp"></span><svg class="i" style="font-size:16px;color:var(--brand-yellow)"><use href="#i-clock"/></svg><span class="timer" style="font-size:22px">0:32</span></div>
+        <div style="padding:10px;display:flex;flex-direction:column;gap:10px">
+          <div class="row"><span class="pill" style="height:30px;font-size:11px;border-color:var(--purple);color:#d9b3ee">Draft OP18</span><span class="pill" style="height:30px;font-size:11px">Booster 2/4</span><span class="pill" style="height:30px;font-size:11px">Escolha 5/12</span></div>
+          <div class="row" style="gap:5px"><span class="kick">Pod</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--blue-card);border-color:var(--brand-yellow)">A</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--red);opacity:.5">K</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--green)">Z</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--purple);opacity:.5">M</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--black);opacity:.5">B</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--yellow)">R</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--black);opacity:.5">B</span><span class="avatar" style="width:24px;height:24px;font-size:12px;--c:var(--teal)">T</span><span class="grow"></span><span class="muted" style="font-size:11px">4 de 8 escolheram</span></div>
+          <div class="mat" style="padding:12px">
+            <div class="h3" style="font-size:20px;margin-bottom:10px">ESCOLHA 1 CARTA</div>
+            <div class="cards" style="--cols:4;--gap:10px" data-cards="p3:Ulti:4000:UC|y4:Smoothie:6000:C|g4:Denjiro:5000:UC|r5:Smoker:6000:UC|p6:King:7000:R:sel|u3:Apoo:4000:C|b1:Kaku:2000:C|g1:Kikunojo:2000:C"></div>
+          </div>
+          <div class="panel" style="padding:10px 12px;border-radius:14px;font-size:12.5px"><b>King</b> <span class="muted">· roxo · custo 6 · 7000</span><div class="muted">[On Play] DON!! −2: K.O. até 1 Personagem do oponente com custo 4 ou menos.</div></div>
+          <span class="cta" style="--mode:var(--purple)">PEGAR KING</span>
+          <div class="panel" style="padding:10px 12px;border-radius:16px 16px 0 0;margin-bottom:-10px">
+            <div class="row" style="margin-bottom:8px"><b>Suas escolhas · 16</b><span class="grow"></span><span class="link" style="font-size:12px">Abrir ▴</span></div>
+            <div class="rar-bar"><i style="width:44%;background:var(--purple)"></i><i style="width:25%;background:var(--yellow)"></i><i style="width:19%;background:var(--red)"></i><i style="width:12%;background:var(--black)"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Monta as cartas a partir de "cor custo : nome : poder : raridade : marcas".
+const COLORS = { r: 'red', g: 'green', u: 'blue', p: 'purple', b: 'black', y: 'yellow' };
+for (const el of document.querySelectorAll('[data-cards]')) {
+  const extra = [...el.children];
+  for (const raw of el.dataset.cards.split('|')) {
+    const [head, name, power, rarity = '', flags = ''] = raw.trim().split(':');
+    const marks = flags ? flags.split(',') : [];
+    const card = document.createElement('div');
+    const count = marks.find((m) => /^x\d/.test(m));
+    card.className = ['c', COLORS[head[0]], 'r' + rarity, ...marks.filter((m) => m !== count).map((m) => 'f-' + m)].join(' ');
+    card.innerHTML =
+      `<span class="cc">${head.slice(1)}</span>` +
+      (Number(power) ? `<span class="cp">${power}</span>` : '') +
+      `<span class="ca"></span><span class="cn">${name}</span>` +
+      (rarity ? `<span class="cr">${rarity}</span>` : '') +
+      (count ? `<span class="cx">${count}</span>` : '');
+    el.append(card);
+  }
+  el.append(...extra);
+}
+</script>
+</body>
+</html>
