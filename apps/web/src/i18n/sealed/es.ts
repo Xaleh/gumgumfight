@@ -221,6 +221,9 @@ const sealed = {
   'sealed.packMix': 'Sobre de {n} cartas: {c} comunes, {uc} infrecuentes y {r|# rara o mejor|# raras o mejores}.',
   'sealed.packMixNoUc': 'Sobre de {n} cartas: {c} comunes y {r|# rara o mejor|# raras o mejores}.',
   'sealed.packOdds': 'SR en el {sr}% de los sobres, SEC en el {sec}% y Líder en el {leader}%. Las tasas salen de aperturas de cajas: Bandai no publica las suyas.',
+  'sealed.filterShowing': 'Mostrando {n} de {total}',
+  'sealed.filterClear': 'Quitar filtros',
+  'sealed.filterNone': 'Ninguna de tus cartas pasa por esos filtros.',
 };
 
 export default sealed;

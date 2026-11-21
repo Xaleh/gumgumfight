@@ -221,6 +221,9 @@ const sealed = {
   'sealed.packMix': '{n}枚入りブースター：コモン{c}枚、アンコモン{uc}枚、レア以上{r}枚。',
   'sealed.packMixNoUc': '{n}枚入りブースター：コモン{c}枚、レア以上{r}枚。',
   'sealed.packOdds': 'SRは{sr}%、SECは{sec}%、リーダーは{leader}%のブースターに入っています。封入率はボックス開封の集計によるもので、バンダイは公表していません。',
+  'sealed.filterShowing': '{total}枚中{n}枚を表示',
+  'sealed.filterClear': 'フィルターを解除',
+  'sealed.filterNone': 'この条件に合うカードはありません。',
 };
 
 export default sealed;
