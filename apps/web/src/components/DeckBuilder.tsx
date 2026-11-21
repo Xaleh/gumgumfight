@@ -29,7 +29,7 @@ import type { DeckLink } from '../deeplink';
 import { useLongPress } from '../hooks/useLongPress';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { CardHoverPreview, fillSlots, StaticCardZoom } from './CardInfo';
-import { CardSearchHelp } from './CardSearchHelp';
+import { CardFilterBar, SPOILER_SET as SPOILERS } from './CardFilterBar';
 import { StaticCard } from './CardView';
 import { DeckLibrary } from './DeckLibrary';
 import { CostCurve, useFavoriteToggle } from './DeckTile';
@@ -71,8 +71,6 @@ const CATEGORY_LABEL: Record<CardData['category'], MessageKey> = {
 };
 
 const PAGE = 60;
-/** Valor do filtro de coleção que mostra só as cartas de spoiler. */
-const SPOILERS = '__spoilers';
 
 /** Carta sob o mouse e o elemento dela (âncora do popover ampliado). */
 interface Hovered {
@@ -133,9 +131,6 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const canHover = useMediaQuery('(hover: hover) and (pointer: fine)');
   /** Tela estreita: os filtros ficam escondidos atrás do botão "Filtros" para sobrar espaço para as cartas. */
   const narrow = useMediaQuery('(max-width: 1100px)');
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  /** Painel com os atalhos da busca (c3, c2000, blocker…). */
-  const [searchHelpOpen, setSearchHelpOpen] = useState(false);
   // Toque longo numa linha do deck atual: abre a carta dela (um só handler para a lista toda).
   const entryPress = useLongPress<HTMLDivElement>((e) => {
     const id = (e.target as HTMLElement).closest<HTMLElement>('.entry')?.dataset.card;
@@ -235,8 +230,6 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
   const canDelete = draft.id !== null && (draft.kind === 'user' || renaming);
 
   const sets = useMemo(() => [...new Set(allCards.map((c) => c.set ?? c.id.split('-')[0]))].sort(), [allCards]);
-  /** Quantos filtros estão fora do padrão (selo do botão "Filtros" no celular). */
-  const activeFilters = [colors.length > 0, category !== '', cost !== '', set !== '', !onlyCompatible, onlyAutomated, allBlue].filter(Boolean).length;
   /** Coleções que ainda têm cartas de spoiler (não lançadas na API oficial). */
   const spoilerSets = useMemo(() => new Set(allCards.filter((c) => c.spoiler).map((c) => c.set ?? c.id.split('-')[0])), [allCards]);
 
@@ -723,75 +716,21 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
         {/* ------------------------------------------------ catálogo */}
         <section className="builder-catalog">
           <div className="catalog-top">
-          <div className="filters">
-            <div className="search-row">
-              <input
-                className="search"
-                placeholder={t('deck.searchPlaceholder')}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <button
-                type="button"
-                className={['btn small search-help-toggle', searchHelpOpen ? 'on' : ''].join(' ')}
-                aria-expanded={searchHelpOpen}
-                aria-label={t('deck.searchHelp')}
-                title={t('deck.searchHelp')}
-                onClick={() => setSearchHelpOpen((v) => !v)}
-              >
-                ?
-              </button>
-              {narrow && (
-                <button
-                  type="button"
-                  className={['btn small filters-toggle', filtersOpen ? 'on' : ''].join(' ')}
-                  aria-expanded={filtersOpen}
-                  onClick={() => setFiltersOpen((v) => !v)}
-                >
-                  {t('deck.filters')}
-                  {activeFilters > 0 && <span className="filters-count">{activeFilters}</span>}
-                </button>
-              )}
-            </div>
-            <div className={['filters-more', narrow && !filtersOpen ? 'hidden' : ''].join(' ')}>
-            <div className="color-chips">
-              {COLORS.map((c) => (
-                <button
-                  key={c.id}
-                  className={['chip', `c-${c.id}`, colors.includes(c.id) ? 'on' : ''].join(' ')}
-                  title={t(c.label)}
-                  onClick={() => setColors((cs) => (cs.includes(c.id) ? cs.filter((x) => x !== c.id) : [...cs, c.id]))}
-                >
-                  {t(c.label)}
-                </button>
-              ))}
-            </div>
-            {!choosingLeader && (
-              <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
-                <option value="">{t('deck.allCategories')}</option>
-                <option value="character">{t('deck.cat.character')}</option>
-                <option value="event">{t('deck.cat.event')}</option>
-                <option value="stage">{t('deck.cat.stage')}</option>
-                <option value="leader">{t('deck.cat.leader')}</option>
-              </select>
-            )}
-            <select value={cost} onChange={(e) => setCost(e.target.value)}>
-              <option value="">{t('deck.anyCost')}</option>
-              {Array.from({ length: 11 }, (_, i) => (
-                <option key={i} value={String(i)}>
-                  {t('deck.costOption', { n: i === 10 ? '10+' : i })}
-                </option>
-              ))}
-            </select>
-            <select value={set} onChange={(e) => setSet(e.target.value)}>
-              <option value="">{t('deck.allSets')}</option>
-              {spoilerSets.size > 0 && <option value={SPOILERS}>{t('deck.onlySpoilers')}</option>}
-              {sets.map((s) => (
-                <option key={s} value={s}>
-                  {spoilerSets.has(s) ? t('deck.setWithSpoilers', { set: s }) : s}
-                </option>
-              ))}
-            </select>
+          <CardFilterBar
+            value={{ query, colors, category, cost, set }}
+            onChange={(p) => {
+              if (p.query !== undefined) setQuery(p.query);
+              if (p.colors !== undefined) setColors(p.colors);
+              if (p.category !== undefined) setCategory(p.category);
+              if (p.cost !== undefined) setCost(p.cost);
+              if (p.set !== undefined) setSet(p.set);
+            }}
+            narrow={narrow}
+            categories={choosingLeader ? [] : ['character', 'event', 'stage', 'leader']}
+            sets={sets}
+            spoilerSets={spoilerSets}
+            extraActive={[!onlyCompatible, onlyAutomated, allBlue].filter(Boolean).length}
+          >
             {leader && (
               <label className="check">
                 <input type="checkbox" checked={onlyCompatible} onChange={(e) => setOnlyCompatible(e.target.checked)} />
@@ -806,10 +745,7 @@ export function DeckBuilder({ onExit, link, linkInvalid, openId }: { onExit: () 
               <input type="checkbox" checked={allBlue} onChange={(e) => setAllBlue(e.target.checked)} />
               {t('deck.onlyAllBlue')}
             </label>
-            </div>
-          </div>
-
-          {searchHelpOpen && <CardSearchHelp query={query} onQuery={setQuery} />}
+          </CardFilterBar>
 
           <div className="catalog-hint muted small">
             {choosingLeader

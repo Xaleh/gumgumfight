@@ -221,6 +221,9 @@ const sealed = {
   'sealed.packMix': 'Booster mit {n} Karten: {c} Commons, {uc} Uncommons und {r|# Rare oder besser|# Rares oder besser}.',
   'sealed.packMixNoUc': 'Booster mit {n} Karten: {c} Commons und {r|# Rare oder besser|# Rares oder besser}.',
   'sealed.packOdds': 'SR in {sr} % der Booster, SEC in {sec} % und ein Leader in {leader} %. Die Raten stammen aus Box-Öffnungen: Bandai veröffentlicht keine eigenen.',
+  'sealed.filterShowing': '{n} von {total} angezeigt',
+  'sealed.filterClear': 'Filter zurücksetzen',
+  'sealed.filterNone': 'Keine deiner Karten passt zu diesen Filtern.',
 };
 
 export default sealed;

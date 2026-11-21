@@ -287,6 +287,11 @@ rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatI
 ("OP01+OP05", gravada em `set_code` e usada como `sealedSet` da sala) e `LimitedRules.leaders = 'any'` libera qualquer
 Líder (`anyLeaderAllowed`: os de spoiler, só das coleções da chave); `pack_sets` guarda a coleção de cada booster.
 
+A busca e os filtros de cartas são um componente só (`apps/web/src/components/CardFilterBar.tsx`), usado no construtor
+de decks e na montagem do Selado: `CardFilterBar` (a barra, com o painel de atalhos), `CardFilters` (o estado, guardado
+por quem usa), `matchesCardFilters` (cores, categoria, custo, coleção e a busca de `cardSearch.ts`) e `useSearchAliases`
+(nomes de cores e categorias no idioma em vigor). O construtor acrescenta as caixas dele como `children`.
+
 ### Draft (`draft.ts`)
 
 `openDraftBoosters` abre os boosters de todos os lugares (`DRAFT_SEATS = 8`, `DRAFT_ROUNDS = 4`; no Pack Rush, uma

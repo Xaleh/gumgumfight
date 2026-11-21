@@ -290,7 +290,12 @@ boosters que o jogador abre na hora.
    para abrir um por vez ou todos de uma vez.
 2. **Monte um deck de 40 cartas** com o que saiu. Vale **qualquer cor com qualquer Líder**, não há limite de cópias
    (vale o que você abriu) e **não há lista de banidas, pares proibidos nem rotação**. **Montar sozinho** preenche um
-   deck jogável (curva de custo, Counters e alguns Eventos). O deck é salvo sozinho enquanto você monta.
+   deck jogável (curva de custo, Counters e alguns Eventos). O deck é salvo sozinho enquanto você monta. Para achar
+   carta entre as que saíram, a montagem tem **a mesma busca e os mesmos filtros do construtor de decks**: o texto com
+   os atalhos (`c3`, `c2000`, `blocker`, `-indeck`…) e o painel "?" que os explica, as cores (mais de uma ao mesmo
+   tempo), o tipo de carta, o custo e, quando há mais de uma coleção (Pack Rush, Cubo), a coleção. A barra fica presa
+   no topo enquanto as cartas rolam e, no celular, os filtros ficam atrás do botão "Filtros". Vale também para os decks
+   de Draft e de Draft Cubo, que usam a mesma tela.
 3. **Jogue:** contra o bot (ele abre os próprios 6 boosters da mesma coleção e monta sozinho; a partida roda no
    navegador) ou numa **sala privada** de Selado. Quem entra na sala precisa de um deck aberto **da mesma coleção**;
    quem chega pelo convite com um deck construído recebe o aviso de montar um deck selado antes.

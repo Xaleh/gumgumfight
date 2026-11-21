@@ -24,12 +24,14 @@ import {
   validateLimitedDeck,
 } from '@gumgum/engine';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { parseCardQuery } from '../cardSearch';
 import { api, type CubeInfo, type OnlineSeat, type SealedPool, type SealedPoolSummary, type SealedSetInfo } from '../api';
 import { buildSetup } from '../game/setup';
 import type { GameSetup } from '../game/useGame';
 import { type MessageKey, type Translate, useT, useTryT } from '../i18n';
 import { useSettings } from '../settings';
 import { Booster, BoosterOpening } from './BoosterPack';
+import { activeFilterCount, CardFilterBar, type CardFilters, cardSetOf, matchesCardFilters, NO_FILTERS, useSearchAliases } from './CardFilterBar';
 import { CardHoverPreview, StaticCardZoom } from './CardInfo';
 import { CubeList } from './Cube';
 import { StaticCard } from './CardView';
@@ -667,7 +669,10 @@ function Build({
   const have = useMemo(() => poolCounts(pool.packs), [pool.packs]);
   const [leader, setLeader] = useState(pool.deck?.leader ?? '');
   const [deck, setDeck] = useState(() => new Map((pool.deck?.cards ?? []).map((c) => [c.id, c.count])));
-  const [color, setColor] = useState<Color | null>(null);
+  /** A mesma busca e os mesmos filtros do construtor de decks, sobre as cartas que o jogador abriu. */
+  const [filters, setFilters] = useState<CardFilters>(NO_FILTERS);
+  const searchAliases = useSearchAliases();
+  const narrow = useMediaQuery('(max-width: 1100px)');
   const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -760,7 +765,14 @@ function Build({
         .sort((a, b) => (a.cost ?? 0) - (b.cost ?? 0) || a.id.localeCompare(b.id)),
     [have, byId],
   );
-  const visible = color ? owned.filter((c) => c.colors.includes(color)) : owned;
+  const visible = useMemo(() => {
+    const q = parseCardQuery(filters.query, searchAliases);
+    const ctx = { inDeck: (id: string) => deck.has(id) };
+    return owned.filter((c) => matchesCardFilters(c, filters, q, ctx));
+  }, [owned, filters, searchAliases, deck]);
+  const filtering = filters.query.trim() !== '' || activeFilterCount(filters) > 0;
+  /** As coleções das cartas abertas: o seletor só aparece quando há mais de uma (Pack Rush, Cubo). */
+  const poolSets = useMemo(() => [...new Set(owned.map(cardSetOf))].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })), [owned]);
   const poolSize = owned.reduce((n, c) => n + (have.get(c.id) ?? 0), 0);
 
   const entries = [...deck]
@@ -811,16 +823,23 @@ function Build({
         <div className="sealed-toolbar">
           <h3 className="sealed-h3">{t('sealed.pool')}</h3>
           <span className="muted small">{t('sealed.poolCount', { n: poolSize, out: poolSize - total })}</span>
-          <span className="sealed-spacer" />
-          <div className="color-chips">
-            {COLORS.map((c) => (
-              <button key={c.id} type="button" className={['chip', `c-${c.id}`, color === c.id ? 'on' : ''].join(' ')} aria-pressed={color === c.id} onClick={() => setColor((v) => (v === c.id ? null : c.id))}>
-                {t(c.label)}
+          {filtering && (
+            <>
+              <span className="sealed-spacer" />
+              <span className="muted small" role="status">
+                {t('sealed.filterShowing', { n: visible.length, total: owned.length })}
+              </span>
+              <button type="button" className="text-link small" onClick={() => setFilters(NO_FILTERS)}>
+                {t('sealed.filterClear')}
               </button>
-            ))}
-          </div>
+            </>
+          )}
+        </div>
+        <div className="sealed-filters">
+          <CardFilterBar value={filters} onChange={(patch) => setFilters((f) => ({ ...f, ...patch }))} narrow={narrow} categories={['character', 'event', 'stage']} sets={poolSets} />
         </div>
         <p className="muted small">{peek.canHover ? t('sealed.hintMouse') : t('sealed.hintTouch')}</p>
+        {filtering && visible.length === 0 && <p className="sealed-empty">{t('sealed.filterNone')}</p>}
         {BANDS.map((band) => {
           const inBand = visible.filter((c) => band.fits(c.cost ?? 0));
           if (!inBand.length) return null;

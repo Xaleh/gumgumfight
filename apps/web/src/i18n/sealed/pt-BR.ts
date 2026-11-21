@@ -222,6 +222,9 @@ const sealedPtBR = {
   'sealed.packMix': 'Booster de {n} cartas: {c} comuns, {uc} incomuns e {r|# rara ou melhor|# raras ou melhor}.',
   'sealed.packMixNoUc': 'Booster de {n} cartas: {c} comuns e {r|# rara ou melhor|# raras ou melhor}.',
   'sealed.packOdds': 'SR em {sr}% dos boosters, SEC em {sec}% e Líder em {leader}%. As taxas vêm de aberturas de caixas: a Bandai não publica as dela.',
+  'sealed.filterShowing': 'Mostrando {n} de {total}',
+  'sealed.filterClear': 'Limpar filtros',
+  'sealed.filterNone': 'Nenhuma das suas cartas passa por esses filtros.',
 };
 
 export default sealedPtBR;
