@@ -361,7 +361,7 @@ export function Sealed({
           <ul className="home-chips">
             <li className="home-chip">{t('sealed.ruleDeck', { n: LIMITED_DECK_SIZE })}</li>
             <li className="home-chip">{t('sealed.ruleColors')}</li>
-            <li className="home-chip">{rush || cubeMode ? t('sealed.ruleLeaderAny') : t('sealed.ruleLeader')}</li>
+            <li className="home-chip">{isDraft && (rush || cubeMode) ? t('sealed.ruleLeaderAny') : t('sealed.ruleLeader')}</li>
             <li className="home-chip">{t('sealed.ruleBans')}</li>
           </ul>
         </section>
@@ -670,7 +670,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
               ) : null;
             })}
           </div>
-          <p className="muted small">{mixed ? t('sealed.rushLeadersHint') : t('sealed.leadersHint')}</p>
+          <p className="muted small">{t('sealed.leadersHint')}</p>
         </div>
         <div>
           <div className="kicker">{t('sealed.byColor')}</div>
@@ -741,8 +741,10 @@ function Build({
   const [code, setCode] = useState('');
   const [pickingLeader, setPickingLeader] = useState(false);
   /** Pack Rush (várias coleções) e Draft Cubo: vale qualquer Líder do jogo. */
-  const mixed = isRush(pool.set) || isCube(pool.set);
-  const rules = useMemo<LimitedRules>(() => (mixed ? { leaders: 'any', sets: isCube(pool.set) ? [] : rushSets(pool.set) } : {}), [mixed, pool.set]);
+  const rush = isRush(pool.set);
+  /** Draft de Pack Rush e Draft Cubo: os boosters não trazem Líder, então vale qualquer Líder do jogo. */
+  const anyLeader = isCube(pool.set) || (rush && Boolean(pool.draft));
+  const rules = useMemo<LimitedRules>(() => (anyLeader ? { leaders: 'any', sets: isCube(pool.set) ? [] : rushSets(pool.set) } : {}), [anyLeader, pool.set]);
 
   const total = [...deck.values()].reduce((n, c) => n + c, 0);
   const list = useMemo(() => ({ leader, cards: [...deck].map(([id, count]) => ({ id, count })).sort((a, b) => a.id.localeCompare(b.id)) }), [leader, deck]);
@@ -815,10 +817,10 @@ function Build({
   // Os Líderes à mão: os que saíram e o de 6 cores; no Pack Rush, também o escolhido de fora, na frente.
   const leaders = useMemo(() => {
     const own = sealedLeaders(have, byId);
-    return mixed && leader && !own.includes(leader) ? [leader, ...own] : own;
-  }, [have, byId, mixed, leader]);
+    return anyLeader && leader && !own.includes(leader) ? [leader, ...own] : own;
+  }, [have, byId, anyLeader, leader]);
   /** Todos os Líderes que valem no Pack Rush (os de spoiler, só das coleções escolhidas). */
-  const allLeaders = useMemo(() => (mixed ? cards.filter((c) => anyLeaderAllowed(c, rules.sets)) : []), [mixed, cards, rules]);
+  const allLeaders = useMemo(() => (anyLeader ? cards.filter((c) => anyLeaderAllowed(c, rules.sets)) : []), [anyLeader, cards, rules]);
   const owned = useMemo(
     () =>
       [...have.keys()]
@@ -961,7 +963,7 @@ function Build({
               ) : null;
             })}
           </div>
-          {mixed && (
+          {anyLeader && (
             <button type="button" className="btn small" onClick={() => setPickingLeader(true)}>
               {t('sealed.anyLeader')}
             </button>
@@ -1011,7 +1013,7 @@ function Build({
           <button type="button" className="mode-btn sealed-cta" onClick={() => void vsBot()} disabled={!ready || busy}>
             {t('sealed.vsBot')}
           </button>
-          <p className="muted small">{pool.draft ? t('sealed.draftBotHint') : mixed ? t('sealed.rushBotHint', { sets: setsText(pool.set) }) : t('sealed.vsBotHint', { set: pool.set })}</p>
+          <p className="muted small">{pool.draft ? t('sealed.draftBotHint') : rush ? t('sealed.rushBotHint', { sets: setsText(pool.set) }) : t('sealed.vsBotHint', { set: pool.set })}</p>
           <button type="button" className="btn" onClick={() => void createRoom()} disabled={!ready || busy}>
             {t('sealed.createRoom')}
           </button>
@@ -1021,7 +1023,7 @@ function Build({
               {t('sealed.joinRoom')}
             </button>
           </div>
-          <p className="muted small">{pool.draft ? t('sealed.roomHintDraft') : mixed ? t('sealed.roomHintRush', { sets: setsText(pool.set) }) : t('sealed.roomHint', { set: pool.set })}</p>
+          <p className="muted small">{pool.draft ? t('sealed.roomHintDraft') : rush ? t('sealed.roomHintRush', { sets: setsText(pool.set) }) : t('sealed.roomHint', { set: pool.set })}</p>
           {pool.wins + pool.losses > 0 && <p className="muted small">{t('sealed.record', { w: pool.wins, l: pool.losses })}</p>}
         </div>
         <div className="sealed-list">

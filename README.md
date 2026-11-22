@@ -381,12 +381,15 @@ dos 6 boosters é sorteado entre elas** na hora. O booster inteiro é de uma col
 dentro dele), a mesma coleção pode sair mais de uma vez e alguma pode não sair. O resto é o Selado: deck de 40,
 qualquer cor, sem limite de cópias e sem banidas.
 
-- **Os boosters não trazem Líder:** como vale qualquer Líder do jogo, a vaga do Líder fica com outra carta da
-  coleção (a comum que ele tiraria do lugar). SR e SEC saem nas mesmas taxas. Vale no Pack Rush selado e no draft.
-- **Líder:** com mais de uma coleção, vale **qualquer Líder do jogo**, inclusive os banidos nos formatos oficiais e o
-  Luffy de 6 cores. "Escolher qualquer Líder", na montagem, abre todos, com busca e filtro por cor; os primeiros são os
-  que mais combinam com os tipos das cartas abertas. Líder de coleção ainda não lançada só vale se a coleção dele
-  estiver entre as escolhidas.
+- **Líder no Pack Rush selado:** como no Selado de uma coleção, é **um dos que saírem nos boosters ou o Luffy de 6
+  cores**. Os boosters trazem Líder normalmente.
+- **Líder no Draft de Pack Rush (e no Draft Cubo):** vale **qualquer Líder do jogo**, inclusive os banidos nos formatos
+  oficiais e o Luffy de 6 cores, escolhido ao fim do draft, na montagem. Por isso **os boosters desse draft não trazem
+  Líder**: a vaga fica com outra carta da coleção (a comum que ele tiraria do lugar), e SR e SEC saem nas mesmas
+  taxas. "Escolher qualquer Líder" abre todos, com busca e filtro por cor; os primeiros são os que mais combinam com
+  os tipos das cartas escolhidas. Líder de coleção ainda não lançada só vale se a coleção dele estiver entre as do
+  draft.
+- **O Luffy de 6 cores vale em todos os modos especiais** (Selado, Pack Rush, Draft e Draft Cubo).
 - **Sala privada:** os dois precisam ter aberto **as mesmas coleções** (a ordem da escolha não importa). Quem abriu
   só uma delas, ou outra combinação, recebe o aviso com as coleções da sala.
 - **Bot:** abre os próprios boosters, sorteados entre as mesmas coleções.

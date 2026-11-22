@@ -170,8 +170,8 @@ function boosterSource(setCards: readonly CardData[]): BoosterSource {
 }
 
 /**
- * Um booster da coleção. Nenhuma carta se repete dentro dele. `leaders: false` (Pack Rush, em que
- * vale qualquer Líder do jogo): o booster não traz Líder, e a carta que ele tiraria do lugar fica.
+ * Um booster da coleção. Nenhuma carta se repete dentro dele. `leaders: false` (Draft de Pack Rush,
+ * em que vale qualquer Líder do jogo): o booster não traz Líder, e a carta que ele tiraria do lugar fica.
  */
 function openBooster(holder: RngHolder, src: BoosterSource, model: BoosterModel, leaders = true): string[] {
   const taken = new Set<string>();
@@ -216,8 +216,8 @@ export const RUSH_MAX_SETS = 12;
 /**
  * Pack Rush: cada booster é de uma das coleções de `sources`, sorteada na hora (a mesma coleção
  * pode sair mais de uma vez, e alguma pode não sair). Devolve os boosters e a coleção de cada um.
- * Como no Pack Rush vale qualquer Líder do jogo, os boosters não trazem Líder: no lugar vem outra
- * carta da coleção.
+ * Os boosters trazem Líder como os de uma coleção só: no Pack Rush selado o Líder do deck é um dos
+ * que saírem (ou o de 6 cores).
  */
 export function openMixedBoosters(
   sources: ReadonlyArray<{ set: string; cards: readonly CardData[] }>,
@@ -231,15 +231,16 @@ export function openMixedBoosters(
   for (let p = 0; p < packs; p++) {
     const pick = built[Math.floor(nextRandom(holder) * built.length)];
     out.sets.push(pick.set);
-    out.packs.push(openBooster(holder, pick.src, pick.model, built.length < 2));
+    out.packs.push(openBooster(holder, pick.src, pick.model));
   }
   return out;
 }
 
 /**
  * Boosters de um Draft: `rounds` rodadas, um booster por assento em cada uma. Com mais de uma
- * coleção (Pack Rush draft), a de cada booster é sorteada entre elas e nenhum traz Líder, como no
- * Pack Rush selado. Devolve `packs[rodada][assento]` e a coleção de cada um.
+ * coleção (Pack Rush draft), a de cada booster é sorteada entre elas e nenhum traz Líder: nesse
+ * draft vale qualquer Líder do jogo, então a vaga fica com outra carta da coleção. Devolve
+ * `packs[rodada][assento]` e a coleção de cada um.
  */
 export function openDraftBoosters(
   sources: ReadonlyArray<{ set: string; cards: readonly CardData[] }>,
@@ -288,9 +289,10 @@ export function sealedLeaders(pool: ReadonlyMap<string, number>, cards: Catalog)
 }
 
 /**
- * Quem pode ser o Líder. `pool` (Selado de uma coleção): os que saíram nos boosters ou o de 6
- * cores. `any` (Pack Rush e os outros modos com várias coleções): qualquer Líder do jogo; os de
- * spoiler, só se a coleção deles estiver entre as do modo (`sets`).
+ * Quem pode ser o Líder. `pool` (Selado, de uma coleção ou Pack Rush, e Draft de uma coleção): os
+ * que saíram nos boosters ou o de 6 cores. `any` (Draft de Pack Rush e Draft Cubo): qualquer Líder
+ * do jogo; os de spoiler, só se a coleção deles estiver entre as do modo (`sets`). O Líder de 6
+ * cores vale em todos.
  */
 export interface LimitedRules {
   leaders?: 'pool' | 'any';
