@@ -102,6 +102,20 @@ export function validateYonkoDeck(deck: DeckList, cards: Map<string, CardData> |
 }
 
 /**
+ * O deck que vai para a mesa do Yonko: um deck de 60 que fecha as regras do formato vai como está; um deck
+ * comum completo (50) vira o deck de teste de `yonkoDeckFrom`. `test` diz qual dos dois. `null`: o deck não
+ * serve (incompleto, ou sem cartas que cheguem para 60).
+ */
+export function yonkoTableDeck(deck: DeckList, cards: Iterable<CardData>, seed: number): { deck: DeckList; test: boolean } | null {
+  const byId = new Map<string, CardData>();
+  for (const c of cards) byId.set(c.id, c);
+  if (validateYonkoDeck(deck, byId).valid) return { deck, test: false };
+  if (!validateDeck(deck, byId).valid) return null;
+  const made = yonkoDeckFrom(deck, byId.values(), seed);
+  return made ? { deck: made, test: true } : null;
+}
+
+/**
  * Deck de Yonko montado a partir de um deck comum, para experimentar a mesa enquanto o construtor não monta os
  * de 60: o Líder do deck e uma cópia de cada carta dele, completado até 60 com cartas sorteadas de `cards` que
  * o Líder aceita (cor e regra do Líder), sem Líderes e sem cartas de efeito ainda não automatizado. O sorteio

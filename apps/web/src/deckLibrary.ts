@@ -131,15 +131,19 @@ export function quickSwap(decks: DeckSummary[], local: ReadonlyMap<string, numbe
  * Selo de estado: rascunho (tamanho), Standard, só Extra Grand Battle, só All Blue ou proibido. É o resumo
  * genérico; quem escolhe um deck para jogar diz se ele vale nas regras da partida.
  */
-export type DeckState = 'draft' | 'standard' | 'egb' | 'allblue' | 'banned';
+export type DeckState = 'draft' | 'standard' | 'egb' | 'allblue' | 'banned' | 'yonko';
 export function deckState(d: DeckSummary): DeckState {
-  if (!d.valid) return 'draft';
+  // Deck de 60, uma cópia de cada: não vale no 1 contra 1, só na mesa do Yonko.
+  if (!d.valid) return yonkoLegal(d) ? 'yonko' : 'draft';
   if (!d.formats.standard.length) return 'standard';
   if (!d.formats.egb.length) return 'egb';
   // Fora dos formatos oficiais (carta banida pela Bandai), mas vale no All Blue, que não usa essa lista.
   if (allBlueLegal(d)) return 'allblue';
   return 'banned';
 }
+
+/** Deck de 60 cartas, uma cópia de cada, pronto para o Yonko (servidores antigos não mandam: aí não vale). */
+export const yonkoLegal = (d: DeckSummary): boolean => d.yonko?.length === 0;
 
 /** Deck completo que vale no All Blue (servidores antigos não mandam o formato: aí não vale). */
 export const allBlueLegal = (d: DeckSummary): boolean => d.valid && d.formats.allblue?.length === 0;

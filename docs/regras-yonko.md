@@ -11,7 +11,7 @@ O formato: quatro capitães, todos contra todos, deck de 60 cartas sem repetiç�
 
 | Regra do manual | No motor |
 |---|---|
-| Deck de **60 cartas**. | `validateYonkoDeck` (`deck.ts`); `YONKO_DECK_SIZE`. `createGame` aceita 60 nas mesas com mais de dois. |
+| Deck de **60 cartas**. | `validateYonkoDeck` (`deck.ts`); `YONKO_DECK_SIZE`. `createGame` aceita 60 nas mesas com mais de dois. No construtor, "Montar para o Yonko". Um deck de 50 vira deck de teste na mesa (`yonkoTableDeck`): é uma facilidade nossa, fora do manual, e a sala avisa a todos. |
 | **Singleton**: 1 cópia de cada carta. A carta é o **número** dela (o código no canto), não o nome: dois Roronoa Zoro de números diferentes cabem juntos; duas artes do mesmo número, não. | `validateYonkoDeck` conta por número (a lista do deck já junta as artes num número só). |
 | Só cartas da(s) **cor(es) do Líder**. | A regra de sempre (`isColorCompatible`). |
 | Vida = a impressa no Líder **+2**. | `TableRules.extraLife` (2 em `YONKO_TABLE`). |
@@ -70,6 +70,9 @@ Decisões tomadas para o motor funcionar. Todas fáceis de mudar; as três prime
    troca o alvo do ataque para um Personagem dele (ST36-005) deve fazer dele o defensor daquela batalha: o motor
    tira o defensor do alvo atual do ataque. Ainda não há um teste dedicado a esse caso.
 10. **Mesa de 3.** O manual fala em 4 capitães; o motor aceita de 3 a 4 com as mesmas regras.
+11. **Relógio e ausência (mesa online).** O manual não tem relógio. Na mesa online cada um tem 25 minutos para a
+    partida inteira, correndo só nas próprias decisões; sem tempo, ou 2 minutos desconectado na própria decisão, o
+    jogador sai da mesa como quem desiste.
 
 ## 5. O que mudou em relação à primeira versão da fase 1
 

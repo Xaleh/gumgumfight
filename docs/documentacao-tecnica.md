@@ -331,8 +331,8 @@ cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores d
 
 ### Mesa com mais de dois jogadores (Yonko)
 
-O motor e uma mesa local (fases 1 e 3 de `docs/plano-modos-de-jogo.md`, seção 4): servidor, replay e o bot com busca
-continuam de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
+O motor, a mesa local e a mesa online (fases 1 a 3 de `docs/plano-modos-de-jogo.md`, seção 4; o servidor está em
+"Mesas do Yonko", na seção 11): replay, espectador e o bot com busca continuam de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
 é interpretação nossa. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
 `players`) e a ordem dos turnos segue os lugares. Com mais de dois (`isMultiplayer`), o estado ganha `table`
 (`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`; `YONKO_TABLE` é o do manual), `eliminated` (ordem de
@@ -365,6 +365,10 @@ nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`
   pelo caminho normal). `locate` não encontra o Líder de quem saiu; `alivePlayers` é a lista para percorrer a
   mesa. O último a cair não é marcado `out`: a partida acabou e a mesa fica como estava. `concede` e `timeout`
   eliminam (e seguem com `run`) em vez de encerrar.
+- **Deck**: `validateYonkoDeck` (60, uma cópia de cada, cor do Líder) e `yonkoTableDeck` (o deck que vai para a mesa:
+  o de 60 como está, ou o de teste de `yonkoDeckFrom` a partir de um de 50). O resumo dos decks no servidor traz
+  `yonko`/`yonkoCodes`, e o construtor tem o modo "Montar para o Yonko".
+- **Visão**: as referências a cartas escondidas (`~lugar:zona:posição`) aceitam qualquer lugar (`actionFromView`).
 - **Etiquetas de duração** (`status.ts`): `modifierUntilInfo` lê `untilStartOf`/`untilEndOf` e diz de quem é o turno
   que encerra o efeito.
 - **Telas** (`apps/web`): `components/Yonko.tsx` (a sala) monta o `GameConfig` com `yonkoDeckFrom` (deck de teste de
@@ -727,7 +731,7 @@ baixadas quando tocam) + `public/`.
 - **Transações**: `transaction(db, fn)` (BEGIN/COMMIT/ROLLBACK) nas gravações compostas (importar cartas, gravar
   partida, iniciar torneio, migrar dados do navegador para a conta).
 
-### Tabelas (34)
+### Tabelas (35)
 
 | Tabela | Chave | Conteúdo | Quem escreve |
 |---|---|---|---|
@@ -747,6 +751,7 @@ baixadas quando tocam) + `public/`.
 | `match_seats` | `(match_id, seat)` | tabela de **fatos** das estatísticas (uma linha por lado): `controller`, `player_id`, `deck_id`, `deck_hash`, `leader`, `opp_leader`, `opp_controller`, `tier`, `bounty_before/after`, `went_first`, `won`, `mulligan`, `format`, `queue`, `played_at`, `listed` (0 = fora das estatísticas: Livre ou spoilers). Índices `seats_dims`, `seats_matchup`, `seats_player`. | gravação de partida |
 | `match_cards` | `(match_id, seat, card_id)` `WITHOUT ROWID` | `copies`, `opening`, `drawn`, `played` por carta do deck. Índice `match_cards_card`. | gravação de partida |
 | `live_matches` | `id` (sala) | **`data` (JSON `RoomData`)**: tudo para refazer uma sala online após reinício (inclui `engineTexts`, os textos para o motor do começo da partida, para refazer e derivar as estatísticas com as mesmas regras) | lobby (a cada ação) |
+| `yonko_tables` | `id` (mesa) | **`data` (JSON `YonkoTableData`)**: regras, lugares (com os decks), seed de 128 bits e ações de uma mesa do Yonko aberta ou em andamento, para refazê-la após reinício | `YonkoTables` (a cada mudança; apagada quando a mesa fecha) |
 | `push_subscriptions` | `endpoint` | `p256dh`, `auth` (chaves do navegador), `owner_hash` (navegador), `user_id` (conta, se logado), `locale`, `matches`, `tournaments` (avisos escolhidos). Índices por dono e por conta. | `PUT/DELETE /api/push/subscription`; apagada quando o serviço de push responde 404/410 |
 | `server_keys` | `name` | `value`: par de chaves VAPID gerado na primeira vez (`vapid`) | servidor |
 | `tournaments` | `id` (`t-` + 10 hex) | configuração, `status`, `round`, `organizer_id` | organizador |
@@ -1228,6 +1233,32 @@ tier, Líder, conectado, bot), espectadores, `clock {remaining[2], running, tota
   `MAX_ACTIONS = 5000` por partida.
 
 ---
+
+### Mesas do Yonko (`yonko/`)
+
+A mesa de todos contra todos tem sala e rotas próprias, separadas do `Lobby`/`Room` de dois jogadores:
+`yonko/table.ts` (`YonkoTable`: sala de espera, partida, relógio, bots e visões) e `yonko/routes.ts` (`YonkoTables`,
+o mapa das mesas e dos códigos, e as rotas `/api/yonko/...`). O transporte é o mesmo (SSE `events?t=token` e POST com
+o token no corpo); o evento `state` traz `room` (lugares, regras, `problem`, relógio, `player` = o `PlayerId` de quem
+recebe), `view` (`viewFor` do lugar; null na espera), as definições e as linhas do registro que a conexão ainda não
+tem, e `lastAction`.
+
+- **Lugares:** `seats` (4, na sala de espera) e, na partida, `players` (os ocupados, na ordem dos lugares) com
+  `seatOf`. O token identifica o lugar; bots não têm token. `tokenOf(ownerHash, userId)` devolve o lugar de quem já
+  está na mesa (entrar de novo pelo código volta para ele).
+- **Deck:** `tableDeck` lê o deck salvo e chama `yonkoTableDeck` com todas as cartas (relidas no máximo a cada
+  minuto): o deck de 60 como está, ou o deck de teste (`test: true`).
+- **Partida:** `start` sorteia `seed128` e o sal dos apelidos, grava os textos para o motor (`engineTexts`) e
+  `rebuild` cria o jogo (`table` = as regras da mesa) e refaz as ações. O relógio (`remaining`, por jogador) só corre
+  para a pessoa da vez; `tick` aplica `timeout` sem tempo ou depois de `YONKO_ABANDON_MS` sem conexão
+  (`abandoned`). Bots jogam com `chooseSimpleBotAction` sobre a própria visão (`identityAliases`) e a jogada volta
+  por `actionFromView`; sem pessoas na partida, sem espera.
+- **Faxina:** `sweep` (a cada minuto) fecha espera e fim sem ninguém conectado há 30 minutos e partidas sem
+  conexão há 6 horas. `reopen` (quem criou) volta a mesa terminada para a espera com os mesmos lugares.
+- **No app:** `components/Yonko.tsx` (entrada: deck, regras, criar/entrar, mesa local), `components/YonkoOnline.tsx`
+  (sala de espera e mesa online), `components/YonkoRules.tsx` (painel de regras), `game/useYonkoOnline.ts` (o canal
+  e as jogadas) e `components/YonkoTable.tsx` (a mesa, comum à local e à online). A tela `yonko-online` fica em
+  `sessionStorage` (recarregar volta para ela) e `/?yonko=CÓDIGO` abre a entrada com o código preenchido.
 
 ## 12. Torneios
 

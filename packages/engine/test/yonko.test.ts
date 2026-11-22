@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { actingPlayer, legalActions } from '../src/actions';
 import { chooseBotAction } from '../src/bot/simple';
-import { isColorCompatible, validateYonkoDeck, yonkoDeckFrom } from '../src/deck';
+import { isColorCompatible, validateYonkoDeck, yonkoDeckFrom, yonkoTableDeck } from '../src/deck';
 import {
   applyAction,
   attackError,
@@ -235,6 +235,15 @@ describe('Yonko: o deck (60 cartas, uma cópia de cada)', () => {
     expect(yonkoDeckFrom(luffy, base.values(), 8)).not.toEqual(made);
     // Sem cartas que cheguem para 60, não há deck.
     expect(yonkoDeckFrom(luffy, [base.get(luffy.leader)!, ...luffy.cards.map((c) => base.get(c.id)!)], 7)).toBeNull();
+  });
+
+  it('`yonkoTableDeck`: deck de 60 vai como está; deck de 50 vira deck de teste; incompleto não serve', () => {
+    const sixty = deck(pool.slice(0, YONKO_DECK_SIZE));
+    expect(yonkoTableDeck(sixty, base.values(), 1)).toEqual({ deck: sixty, test: false });
+    const made = yonkoTableDeck(luffy, base.values(), 1)!;
+    expect(made.test).toBe(true);
+    expect(validateYonkoDeck(made.deck, base).valid).toBe(true);
+    expect(yonkoTableDeck({ ...luffy, cards: luffy.cards.slice(0, 3) }, base.values(), 1)).toBeNull();
   });
 
   it('o motor aceita o deck de 60 na mesa, e não no jogo de dois', () => {

@@ -3,7 +3,8 @@
 // celular os oponentes viram abas, com uma mesa aberta por vez.
 //
 // É uma tela própria, não uma adaptação da mesa de dois jogadores (`GameScreen`): aqui tudo é por clique
-// (sem arrastar e sem as animações de voo), e a partida roda no navegador contra bots (`useYonkoGame`).
+// (sem arrastar e sem as animações de voo). A mesa recebe o jogo de fora: a partida local contra bots
+// (`useYonkoGame`, em `LocalYonkoTable`) ou a mesa online (`useYonkoOnline`, em `YonkoOnline.tsx`).
 
 import {
   type Action,
@@ -35,7 +36,36 @@ import { CardView, type Highlight, PickOrderContext } from './CardView';
 import { Icon } from './Icons';
 
 type TryT = ReturnType<typeof useTryT>;
-type Game = ReturnType<typeof useYonkoGame>;
+/** O que a mesa precisa do jogo: a visão de quem joga, a jogada e o último erro. */
+export interface TableGame {
+  state: GameState;
+  dispatch: (action: Action) => void;
+  error: string | null;
+  /** Segura os bots enquanto a pessoa lê o registro ou uma carta (só na mesa local). */
+  setPaused?: (paused: boolean) => void;
+}
+
+/** Na mesa online: o relógio e a conexão de cada jogador (para os painéis e a ordem dos turnos). */
+export interface SeatStatus {
+  /** Tempo que resta, já formatado ("21:10"); sem relógio, nada. */
+  clock?: string;
+  /** Menos de 2 minutos. */
+  low?: boolean;
+  /** O relógio dele está correndo agora. */
+  ticking?: boolean;
+  /** Sem conexão com a mesa. */
+  away?: boolean;
+}
+
+export interface TableExtras {
+  /** O texto da pílula do topo ("Yonko · mesa ABC123"). */
+  pill?: string;
+  status?: (id: PlayerId) => SeatStatus;
+  /** Aviso na faixa do meio (conexão caiu, tentando de novo…). */
+  notice?: string | null;
+  /** No fim: sem "Jogar de novo" (quem não criou a mesa espera), com este aviso no lugar. */
+  rematchNote?: string;
+}
 
 const COLOR_VAR: Record<string, string> = {
   red: 'var(--red)',
@@ -166,6 +196,21 @@ interface CardHandlers {
   onHover: (uid: string | null) => void;
 }
 
+/** O relógio e a conexão de um jogador, no canto do painel dele (só na mesa online). */
+function SeatClock({ status, t }: { status?: SeatStatus; t: Translate }) {
+  if (!status) return null;
+  return (
+    <>
+      {status.away && <span className="yk-tag away">{t('yonko.away')}</span>}
+      {status.clock && (
+        <span className={['yk-clock', status.low ? 'low' : '', status.ticking ? 'ticking' : ''].join(' ')} title={t('yonko.clockTitle')}>
+          <Icon name="clock" size={13} /> {status.clock}
+        </span>
+      )}
+    </>
+  );
+}
+
 /** Painel de um oponente: tudo o que é informação pública dele. */
 function Opponent({
   s,
@@ -176,9 +221,11 @@ function Opponent({
   playing,
   hidden,
   t,
+  status,
 }: {
   s: GameState;
   id: PlayerId;
+  status?: SeatStatus;
   /** Posição na ordem dos turnos (1 = quem começou). */
   place: number;
   h: CardHandlers;
@@ -205,6 +252,7 @@ function Opponent({
         <b className="yk-name">{ps.name}</b>
         <span className="yk-leader-name">{leader.name}</span>
         {ps.out ? <span className="yk-tag out">{t('yonko.tagOut')}</span> : targeted ? <span className="yk-tag">{t('yonko.tagTarget')}</span> : playing ? <span className="yk-tag turn">{t('yonko.tagTurn')}</span> : null}
+        {!ps.out && <SeatClock status={status} t={t} />}
       </header>
       {ps.out ? (
         <p className="yk-out-note">{t('yonko.outNote')}</p>
@@ -273,7 +321,25 @@ function CardPanel({ s, uid, t }: { s: GameState; uid: string | null; t: Transla
 }
 
 /** Fim da partida: quem venceu e a classificação pela ordem de queda. */
-function Result({ s, me, t, tryT, onExit, onRematch, onClose }: { s: GameState; me: PlayerId; t: Translate; tryT: TryT; onExit: () => void; onRematch: () => void; onClose: () => void }) {
+function Result({
+  s,
+  me,
+  t,
+  tryT,
+  onExit,
+  onRematch,
+  rematchNote,
+  onClose,
+}: {
+  s: GameState;
+  me: PlayerId;
+  t: Translate;
+  tryT: TryT;
+  onExit: () => void;
+  onRematch?: () => void;
+  rematchNote?: string;
+  onClose: () => void;
+}) {
   const fallen = [...(s.eliminated ?? [])].reverse();
   const ranked = [...(s.winner !== null ? [s.winner] : []), ...fallen.filter((id) => id !== s.winner)];
   // "You win the game" encerra a mesa com gente ainda de pé: esses ficam sem posição.
@@ -300,10 +366,13 @@ function Result({ s, me, t, tryT, onExit, onRematch, onClose }: { s: GameState; 
             </li>
           ))}
         </ol>
+        {rematchNote && <p className="muted small">{rematchNote}</p>}
         <div className="yk-result-actions">
-          <button type="button" className="yk-btn primary" onClick={onRematch}>
-            {t('yonko.rematch')}
-          </button>
+          {onRematch && (
+            <button type="button" className="yk-btn primary" onClick={onRematch}>
+              {t('yonko.rematch')}
+            </button>
+          )}
           <button type="button" className="yk-btn" onClick={onExit}>
             {t('yonko.exit')}
           </button>
@@ -313,13 +382,30 @@ function Result({ s, me, t, tryT, onExit, onRematch, onClose }: { s: GameState; 
   );
 }
 
-export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; onExit: () => void; onRematch: () => void }) {
+/** A partida local: uma pessoa contra bots, no navegador. */
+export function LocalYonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; onExit: () => void; onRematch: () => void }) {
   const game = useYonkoGame(setup);
+  return <YonkoTable game={game} me={setup.human} onExit={onExit} onRematch={onRematch} />;
+}
+
+export function YonkoTable({
+  game,
+  me,
+  onExit,
+  onRematch,
+  extras = {},
+}: {
+  game: TableGame;
+  /** O jogador de quem está na tela. */
+  me: PlayerId;
+  onExit: () => void;
+  onRematch?: () => void;
+  extras?: TableExtras;
+}) {
   const { state: s, dispatch } = game;
   const t = useT();
   const tryT = useTryT();
   const locale = useLocale();
-  const me = setup.human;
   const mine = s.players[me];
 
   /** Carta própria selecionada (na mão ou em campo), com a vez livre. */
@@ -351,7 +437,7 @@ export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; on
 
   // A leitura de uma carta ou do registro (celular) segura os bots.
   useEffect(() => {
-    game.setPaused(sheet !== null);
+    game.setPaused?.(sheet !== null);
   }, [sheet]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Celular: a aba acompanha a batalha (a mesa atacada, ou a de quem ataca quando o alvo é quem joga).
@@ -596,7 +682,7 @@ export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; on
           <span className="yk-logo" aria-hidden="true">
             GUMGUM <em>FIGHT!</em>
           </span>
-          <span className="yk-pill mode">{t('yonko.pillTable')}</span>
+          <span className="yk-pill mode">{extras.pill ?? t('yonko.pillTable')}</span>
           {s.phase === 'main' && <span className="yk-pill">{s.activePlayer === me ? t('yonko.pillTurnMine', { round }) : t('yonko.pillTurn', { round, name: s.players[s.activePlayer].name })}</span>}
           <span className="yk-sp" />
           {s.phase === 'gameover' && !resultOpen && (
@@ -630,7 +716,18 @@ export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; on
 
             <div className="yk-opps" style={vars({ '--n': opponents.length })}>
               {opponents.map((id) => (
-                <Opponent key={id} s={s} id={id} place={placeOf(id)} h={h} targeted={targeted(id)} playing={s.phase === 'main' && s.activePlayer === id} hidden={id !== openTab} t={t} />
+                <Opponent
+                  key={id}
+                  s={s}
+                  id={id}
+                  place={placeOf(id)}
+                  h={h}
+                  targeted={targeted(id)}
+                  playing={s.phase === 'main' && s.activePlayer === id}
+                  hidden={id !== openTab}
+                  t={t}
+                  status={extras.status?.(id)}
+                />
               ))}
             </div>
 
@@ -654,9 +751,9 @@ export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; on
                     })}
                   </p>
                 )}
-                {game.error && (
+                {(game.error || extras.notice) && (
                   <p className="yk-error" role="alert">
-                    {game.error}
+                    {game.error ?? extras.notice}
                   </p>
                 )}
                 {banner.tray && (
@@ -682,6 +779,7 @@ export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; on
                 <header className="yk-opp-head">
                   <span className="yk-ord">{t('yonko.place', { n: placeOf(me) })}</span>
                   <b className="yk-name">{t('yonko.you')}</b>
+                  {!mine.out && <SeatClock status={extras.status?.(me)} t={t} />}
                 </header>
                 <div className="yk-me-leader">
                   {fieldCard(mine.leader)}
@@ -741,6 +839,7 @@ export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; on
                     <li key={id} className={[on ? 'on' : '', ps.out ? 'out' : ''].join(' ')} style={vars({ '--pc': seatColor(s, id) })}>
                       <span className="yk-ord">{t('yonko.place', { n: i + 1 })}</span>
                       <b>{who(id)}</b>
+                      {!ps.out && <SeatClock status={extras.status?.(id)} t={t} />}
                       <span className="yk-stat">{ps.out ? t('yonko.tagOut') : on ? t('yonko.playing') : t('yonko.lifeShort', { n: lifeNow(s, id) })}</span>
                     </li>
                   );
@@ -784,7 +883,9 @@ export function YonkoTable({ setup, onExit, onRematch }: { setup: YonkoSetup; on
           </div>
         )}
 
-        {s.phase === 'gameover' && resultOpen && <Result s={s} me={me} t={t} tryT={tryT} onExit={onExit} onRematch={onRematch} onClose={() => setResultOpen(false)} />}
+        {s.phase === 'gameover' && resultOpen && (
+          <Result s={s} me={me} t={t} tryT={tryT} onExit={onExit} onRematch={onRematch} rematchNote={extras.rematchNote} onClose={() => setResultOpen(false)} />
+        )}
       </div>
     </PickOrderContext.Provider>
   );

@@ -11,6 +11,7 @@ import {
   parseArts,
   spoilerCards,
   validateDeck,
+  validateYonkoDeck,
   registerCardCdn,
 } from '@gumgum/engine';
 import Fastify from 'fastify';
@@ -48,6 +49,7 @@ import { registerBearerAuth, registerTokenRoutes } from './partners/tokens';
 import { WebhookDispatcher } from './partners/webhook';
 import { type ApiCard, presentCards } from './present';
 import type { LobbyLimits } from './online/lobby';
+import { registerYonkoRoutes } from './yonko/routes';
 import { registerOnlineRoutes } from './online/routes';
 import { type PushSender, registerPushRoutes } from './push/routes';
 import { vapidKeys } from './push/store';
@@ -225,6 +227,8 @@ export function buildApp(
   /** Deck com resumo de validação (usado nas listas). */
   const summarize = (deck: StoredDeck, cards: Map<string, CardData>, viewer: string | null, usage: DeckUsage = usageFor(viewer)) => {
     const report = validateDeck(deck, cards);
+    // Yonko (mesa de todos contra todos): 60 cartas, uma cópia de cada (docs/regras-yonko.md).
+    const yonko = validateYonkoDeck(deck, cards).issues.filter((i) => i.level === 'error');
     const leader = cards.get(deck.leader);
     const byFormat = FORMATS.map((f) => [f.id, formatIssues(deck, f.id, undefined, cards)] as const);
     return {
@@ -249,6 +253,9 @@ export function buildApp(
         FormatId,
         Array<{ code: string; params: Record<string, string | number> }>
       >,
+      /** O que impede o deck de ser usado no Yonko (vazio = deck de 60 pronto para a mesa de todos contra todos). */
+      yonko: yonko.map((i) => i.message),
+      yonkoCodes: yonko.map(({ code, params }) => ({ code, params: params ?? {} })),
       unscripted: report.unscripted.length,
       /** Cartas de spoiler (ainda não lançadas): o deck não vale na ranqueada nem em torneio sem spoilers. */
       spoilers: spoilerCards(deck, cards),
@@ -303,7 +310,8 @@ export function buildApp(
     const name = typeof b.name === 'string' ? b.name.trim().slice(0, 60) : '';
     if (!name) return fail('deckNameRequired', 'Dê um nome ao deck.');
     const leader = typeof b.leader === 'string' ? b.leader.trim().toUpperCase() : '';
-    if (!Array.isArray(b.cards) || b.cards.length > 60) return fail('invalidCardList', 'Lista de cartas inválida.');
+    // Até 80 linhas: um deck do Yonko tem 60 cartas diferentes, e o rascunho pode passar disso enquanto é montado.
+    if (!Array.isArray(b.cards) || b.cards.length > 80) return fail('invalidCardList', 'Lista de cartas inválida.');
     const cards: DeckList['cards'] = [];
     for (const c of b.cards as Array<{ id?: unknown; count?: unknown }>) {
       if (typeof c?.id !== 'string' || !Number.isInteger(c.count) || (c.count as number) < 1 || (c.count as number) > 50) {
@@ -460,6 +468,18 @@ export function buildApp(
   });
   // Exposto para os testes (o estado das salas fica só na memória do servidor).
   app.decorate('onlineLobby', lobby);
+  // Mesas do Yonko (todos contra todos): sala com código, bots nos lugares vagos e partida de 3 ou 4 (yonko/).
+  const yonkoTables = registerYonkoRoutes(app, {
+    db,
+    viewerHash,
+    user: auth.viewer,
+    present,
+    now: opts.now,
+    botDelayMs: opts.botDelayMs,
+    rateLimit: opts.onlineRateLimit,
+    sweepMs: opts.now ? 0 : undefined,
+  });
+  app.decorate('yonkoTables', yonkoTables);
   // Com relógio injetado (testes), o relógio dos torneios não roda sozinho: os testes chamam `app.tournamentTick()`.
   registerTournamentRoutes(app, {
     db,

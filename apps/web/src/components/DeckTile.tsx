@@ -1,7 +1,7 @@
 // Peças comuns das listas de decks: o cartão de um deck (arte do Líder, nome, estado e a
 // estrela de favorito), o selo de estado, a curva de custo e a marcação de favoritos.
 
-import { DECK_SIZE, formatLabel } from '@gumgum/engine';
+import { DECK_SIZE, formatLabel, YONKO_DECK_SIZE } from '@gumgum/engine';
 import { type Dispatch, type ReactNode, type SetStateAction, useCallback, useState } from 'react';
 import { api, type DeckSummary } from '../api';
 import { allBlueLegal, deckState, deckTime, lastUsed } from '../deckLibrary';
@@ -40,8 +40,12 @@ export function DeckStateChip({ deck }: { deck: DeckSummary }) {
   const state = deckState(deck);
   return (
     <>
-      <span className={['dk-chip', state === 'standard' || state === 'allblue' ? 'ok' : state === 'egb' ? 'warn' : 'bad'].join(' ')}>
-        {state === 'draft' ? t('decks.state.draft', { size: deck.size, max: DECK_SIZE }) : state === 'allblue' ? formatLabel('allblue') : t(`decks.state.${state}`)}
+      <span className={['dk-chip', state === 'standard' || state === 'allblue' || state === 'yonko' ? 'ok' : state === 'egb' ? 'warn' : 'bad'].join(' ')}>
+        {state === 'draft'
+          ? t('decks.state.draft', { size: deck.size, max: deck.size > DECK_SIZE ? YONKO_DECK_SIZE : DECK_SIZE })
+          : state === 'allblue'
+            ? formatLabel('allblue')
+            : t(`decks.state.${state}`)}
       </span>
       {/* Deck de formato oficial que também vale no All Blue (só C, UC, R e promo). */}
       {state !== 'allblue' && allBlueLegal(deck) && <span className="dk-chip ok">{formatLabel('allblue')}</span>}

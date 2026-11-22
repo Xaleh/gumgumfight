@@ -231,6 +231,12 @@ const PATHS = {
     </>
   ),
   trash: <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />,
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   grid: (
     <>
