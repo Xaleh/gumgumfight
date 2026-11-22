@@ -135,6 +135,28 @@ const leagues = () => ({
   </div>`,
 });
 
+// ------------------------------------------------------- novos modos de jogo
+// Gravações em src/clips/modos-*.mp4, feitas com record-modos.mjs.
+const TEAL = '#35c9b6';
+/** Amostra sem texto: um trecho da gravação cortado direto pelo ffmpeg (sem passar pelo navegador). */
+const sample = (file, start, dur) => ({ cut: { file: `modos-${file}.mp4`, start, dur } });
+/** Título em cima e o celular grande com um trecho da gravação. `link` põe o botão do link (stories). */
+function showcase({ dur, eyebrow, title, lead, file, start, link = false, color = TEAL }) {
+  return {
+    dur,
+    clip: { file: `modos-${file}.mp4`, start, width: 720 },
+    cls: 'deep burst spin',
+    html: `<div class="layer col center" style="padding:${link ? 262 : 238}px 60px 0;gap:14px">
+      ${a('up', 0.04, `<div class="eyebrow" style="color:${color}">${eyebrow}</div>`)}
+      ${a('pop', 0.1, `<div class="h h3">${title}</div>`)}
+      ${a('up', 0.26, `<div class="lead sm" style="max-width:940px">${lead}</div>`)}
+      ${a('pop', 0.16, `<div class="phone" style="--pw:${link ? 640 : 720}px;--rot:0deg"><div><img data-clip alt=""></div></div>`, 'margin-top:26px')}
+    </div>
+    ${link ? `<div class="layer col center" style="top:auto;bottom:350px;z-index:6;gap:18px">${a('up', 0.7, '<span class="swipe">toque no link ↓</span>')}${a('pop', 0.85, `<div class="btn" style="font-size:58px">${URL_TEXT}</div>`)}</div>` : ''}`,
+  };
+}
+const story = (opts) => showcase({ ...opts, link: true });
+
 const reels = {
   'reel-01-apresentacao': [
     intro('One Piece Card Game', 'Direto do<br><em>navegador</em>'),
@@ -197,7 +219,71 @@ const reels = {
       ${a('up', 1.1, `<img src="logo.svg" style="height:84px;margin-top:34px" alt="">`)}
     </div>`,
   }],
+  // Amostras sem texto, para montar posts, stories e Reels à mão.
+  'novos-modos/amostras/selado-01-colecoes': sample('selado', 0.3, 5.5),
+  'novos-modos/amostras/selado-02-abrindo-o-booster': sample('selado', 6.2, 10),
+  'novos-modos/amostras/selado-03-abrindo-os-outros': sample('selado', 17.6, 10.4),
+  'novos-modos/amostras/selado-04-montando-o-deck': sample('selado-deck', 1, 12.3),
+  'novos-modos/amostras/selado-05-partida': sample('selado-deck', 13.6, 14),
+  'novos-modos/amostras/pack-rush-01-colecoes': sample('packrush', 0.4, 9),
+  'novos-modos/amostras/pack-rush-02-abrindo-o-booster': sample('packrush', 9.8, 9.8),
+  'novos-modos/amostras/pack-rush-03-abrindo-os-outros': sample('packrush', 20, 10.5),
+  'novos-modos/amostras/draft-01-criando-o-pod': sample('draft', 0.3, 7.7),
+  'novos-modos/amostras/draft-02-escolhas': sample('draft', 8, 13.5),
+  'novos-modos/amostras/draft-03-suas-escolhas': sample('draft', 21.5, 3.7),
+  'novos-modos/amostras/draft-04-montando-o-deck': sample('draft-fim', 0.2, 8.6),
+  'novos-modos/amostras/cubo-01-a-lista': sample('cubo', 0.3, 10.7),
+  'novos-modos/amostras/cubo-02-escolhas': sample('cubo', 11.2, 11),
+  'novos-modos/amostras/all-blue-01-formato-e-decks': sample('allblue', 0.3, 9.2),
+  'novos-modos/amostras/all-blue-02-partida': sample('allblue', 11.3, 15.7),
+
+  'novos-modos/reels/reel-novos-modos': [
+    intro('Novidade no GumGum Fight', '5 modos<br><em>novos</em>', 2.2),
+    showcase({ dur: 4.2, eyebrow: 'Limitado', title: '<em>Selado</em>', lead: 'Abra 6 boosters e monte um deck de 40.', file: 'selado', start: 7.5 }),
+    showcase({ dur: 3.8, eyebrow: 'Limitado', title: 'Pack <em>Rush</em>', lead: 'Seis boosters sorteados entre várias coleções.', file: 'packrush', start: 11.4 }),
+    showcase({ dur: 4, eyebrow: 'Pod de 8', title: '<em>Draft</em>', lead: 'Pegue 1 carta e passe o resto.', file: 'draft', start: 9.2 }),
+    showcase({ dur: 3.8, eyebrow: 'Draft', title: 'Draft <em>Cubo</em>', lead: 'As 420 cartas mais usadas, uma de cada.', file: 'cubo', start: 12.9 }),
+    showcase({ dur: 3.8, eyebrow: 'Formato da comunidade', title: 'All <em>Blue</em>', lead: 'Só C, UC, R e promo. O Líder é livre.', file: 'allblue', start: 5.6, color: '#6aa9ff' }),
+    outro(3.2),
+  ],
+  'novos-modos/reels/reel-selado': [
+    showcase({ dur: 6.8, eyebrow: 'Novo modo: Selado', title: 'Abra <em>6 boosters</em>', lead: 'Escolha a coleção e abra na hora.', file: 'selado', start: 7.3 }),
+    showcase({ dur: 3.4, eyebrow: 'Novo modo: Selado', title: 'Vire <em>as cartas</em>', lead: 'Uma a uma, ou todas de uma vez.', file: 'selado', start: 13.3 }),
+    showcase({ dur: 4.4, eyebrow: 'Novo modo: Selado', title: 'Monte um <em>deck de 40</em>', lead: 'Qualquer cor, com qualquer Líder.', file: 'selado-deck', start: 5.3 }),
+    showcase({ dur: 4.6, eyebrow: 'Novo modo: Selado', title: 'E <em>jogue</em>', lead: 'Contra o bot ou numa sala privada.', file: 'selado-deck', start: 22.6 }),
+    outro(3.2),
+  ],
+  'novos-modos/reels/reel-pack-rush': [
+    showcase({ dur: 5, eyebrow: 'Novo modo: Pack Rush', title: 'Misture <em>as coleções</em>', lead: 'Escolha de 2 a 12 coleções.', file: 'packrush', start: 2.7 }),
+    showcase({ dur: 8.6, eyebrow: 'Novo modo: Pack Rush', title: 'Cada booster, <em>um sorteio</em>', lead: 'Você só descobre a coleção quando abre.', file: 'packrush', start: 10.4 }),
+    outro(3),
+  ],
+  'novos-modos/reels/reel-draft': [
+    showcase({ dur: 4.6, eyebrow: 'Novo modo: Draft', title: 'Pod <em>de 8</em>', lead: 'Chame os amigos: os lugares vazios viram bots.', file: 'draft', start: 4.3 }),
+    showcase({ dur: 8.4, eyebrow: 'Novo modo: Draft', title: 'Pegue 1, <em>passe o resto</em>', lead: '4 boosters por jogador: 48 escolhas.', file: 'draft', start: 8.3 }),
+    showcase({ dur: 4.6, eyebrow: 'Novo modo: Draft', title: 'Monte <em>e jogue</em>', lead: 'As escolhas viram um deck de 40.', file: 'draft-fim', start: 3.6 }),
+    outro(3),
+  ],
+  'novos-modos/reels/reel-draft-cubo': [
+    showcase({ dur: 5.4, eyebrow: 'Novo modo: Draft Cubo', title: 'Cubo <em>GumGum</em>', lead: 'As 420 cartas mais usadas, uma cópia de cada.', file: 'cubo', start: 3.4 }),
+    showcase({ dur: 8.4, eyebrow: 'Novo modo: Draft Cubo', title: 'Nada <em>se repete</em>', lead: 'E no Cubo vale qualquer Líder do jogo.', file: 'cubo', start: 12.6 }),
+    outro(3),
+  ],
+  'novos-modos/reels/reel-all-blue': [
+    showcase({ dur: 3.2, eyebrow: 'Novo formato', title: 'All <em>Blue</em>', lead: 'Só C, UC, R e promo. SR e SEC ficam de fora.', file: 'allblue', start: 3, color: '#6aa9ff' }),
+    showcase({ dur: 3.8, eyebrow: 'Novo formato', title: 'Líder <em>livre</em>', lead: 'E seis decks prontos para começar.', file: 'allblue', start: 6.2, color: '#6aa9ff' }),
+    showcase({ dur: 6, eyebrow: 'Novo formato', title: 'Deck barato, <em>jogo de verdade</em>', lead: 'Fila casual, sala privada, bot e torneios.', file: 'allblue', start: 21, color: '#6aa9ff' }),
+    outro(3),
+  ],
+
+  // Stories em vídeo: o modo em poucos segundos, com o botão do link.
+  'novos-modos/stories/story-selado': [story({ dur: 8, eyebrow: 'Novo modo', title: '<em>Selado</em>', lead: 'Abra 6 boosters, monte um deck de 40 e jogue.', file: 'selado', start: 7.3 })],
+  'novos-modos/stories/story-pack-rush': [story({ dur: 8, eyebrow: 'Novo modo', title: 'Pack <em>Rush</em>', lead: 'Seis boosters sorteados entre as coleções que você escolher.', file: 'packrush', start: 10.6 })],
+  'novos-modos/stories/story-draft': [story({ dur: 8, eyebrow: 'Novo modo', title: '<em>Draft</em>', lead: 'Pod de 8. Pegue 1 carta e passe o resto.', file: 'draft', start: 8.3 })],
+  'novos-modos/stories/story-draft-cubo': [story({ dur: 8, eyebrow: 'Novo modo', title: 'Draft <em>Cubo</em>', lead: 'As 420 cartas mais usadas, uma cópia de cada.', file: 'cubo', start: 12.6 })],
+  'novos-modos/stories/story-all-blue': [story({ dur: 7.5, eyebrow: 'Novo formato', title: 'All <em>Blue</em>', lead: 'Só C, UC, R e promo. O Líder é livre.', file: 'allblue', start: 5.6, color: '#6aa9ff' })],
 };
+
 
 
 const css = `
@@ -240,6 +326,15 @@ const tab = await browser.newPage({ viewport: { width: 1080, height: 1920 }, dev
 
 for (const [name, scenes] of Object.entries(reels)) {
   if (filters.length && !filters.some((f) => name.includes(f))) continue;
+  if (!Array.isArray(scenes)) {
+    // Amostra: corte direto da gravação, com a taxa limitada para o arquivo não pesar.
+    const out = join(KIT, `${name}.mp4`);
+    mkdirSync(dirname(out), { recursive: true });
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-ss', String(scenes.cut.start), '-t', String(scenes.cut.dur), '-i', join(SRC, 'clips', scenes.cut.file), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+      '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-maxrate', '4500k', '-bufsize', '9000k', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-c:a', 'aac', '-b:a', '96k', '-shortest', '-movflags', '+faststart', out]);
+    console.log(name, 'pronto');
+    continue;
+  }
   const tmp = mkdtempSync(join(tmpdir(), 'ggf-reel-'));
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="kit.css"><style>${css}</style></head><body>
 ${scenes.map((s, i) => `<section class="slide story scene ${s.cls}" id="s${i}">${s.html}</section>`).join('\n')}</body></html>`;
@@ -273,7 +368,7 @@ ${scenes.map((s, i) => `<section class="slide story scene ${s.cls}" id="s${i}">$
   mkdirSync(dirname(target), { recursive: true });
   // Trilha muda: o áudio é escolhido no próprio Instagram.
   execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-framerate', String(FPS), '-i', join(tmp, '%06d.jpg'), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-shortest', '-movflags', '+faststart', target]);
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '21', '-maxrate', '6000k', '-bufsize', '12000k', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-shortest', '-movflags', '+faststart', target]);
   rmSync(tmp, { recursive: true, force: true });
   rmSync(file);
   console.log(name, 'pronto');

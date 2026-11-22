@@ -314,6 +314,42 @@ const slides = {
   },
 };
 
+// ------------------------------------------------------- novos modos de jogo
+const MODOS = 7;
+const modo = (opts, i) => ({ cls: i % 2 ? 'deep burst' : 'burst', html: phoneSlide({ ...opts, n: [i, MODOS] }) });
+Object.assign(slides, {
+  'novos-modos/posts/novos-modos-1': {
+    cls: 'burst vignette',
+    html: `<div class="layer pad col center" style="--by:30%;justify-content:flex-start;gap:0">
+      <div style="display:flex;align-items:flex-end;height:470px;margin-top:10px">
+        <img src="boosters/RUSH.webp" style="height:400px;transform:rotate(-11deg) translate(34px,14px);filter:drop-shadow(10px 14px 0 #1f0904)" alt="">
+        <img src="boosters/DRAFT.webp" style="height:460px;position:relative;z-index:2;filter:drop-shadow(10px 14px 0 #1f0904)" alt="">
+        <img src="boosters/CUBE.webp" style="height:400px;transform:rotate(11deg) translate(-34px,14px);filter:drop-shadow(10px 14px 0 #1f0904)" alt="">
+      </div>
+      <div class="eyebrow" style="margin-top:52px">Novidade no GumGum Fight</div>
+      <div class="h h1" style="margin-top:20px"><em>5 modos</em><br>novos</div>
+      <div class="chips" style="margin-top:44px;gap:12px">${['Selado', 'Pack Rush', 'Draft', 'Draft Cubo', 'All Blue'].map((c) => `<span class="chip solid" style="font-size:29px;padding:11px 22px">${c}</span>`).join('')}</div>
+    </div>
+    ${foot('<span class="swipe">arrasta ➜</span>')}`,
+  },
+  'novos-modos/posts/novos-modos-2': modo({ eyebrow: 'Limitado · Pré-release', title: '<em>Selado</em>', lead: 'Abra 6 boosters de uma coleção, monte um deck de 40 e jogue.', list: ['Qualquer cor', 'Qualquer Líder', 'Sem lista de banidas'], img: 'modos-selado.jpg' }, 2),
+  'novos-modos/posts/novos-modos-3': modo({ eyebrow: 'Limitado', title: 'Pack <em>Rush</em>', lead: 'O Selado com várias coleções: cada booster é sorteado entre as que você escolher.', list: ['De 2 a 12 coleções', '6 boosters', 'Deck de 40'], img: 'modos-rush.jpg' }, 3),
+  'novos-modos/posts/novos-modos-4': modo({ eyebrow: 'Limitado · Pod de 8', title: '<em>Draft</em>', lead: 'Cada um abre um booster, fica com 1 carta e passa o resto.', list: ['4 boosters por jogador', '48 escolhas', 'Lugar vazio vira bot'], img: 'modos-draft.jpg' }, 4),
+  'novos-modos/posts/novos-modos-5': modo({ eyebrow: 'Draft', title: 'Draft <em>Cubo</em>', lead: 'O Cubo GumGum: as 420 cartas mais usadas de One Piece, uma cópia de cada.', list: ['70 por cor', 'Nada se repete no pod', 'Qualquer Líder do jogo'], img: 'modos-cubo.jpg' }, 5),
+  'novos-modos/posts/novos-modos-6': modo({ eyebrow: 'Formato da comunidade', title: 'All <em>Blue</em>', lead: 'Só cartas C, UC, R e promo. As SR e as SEC ficam de fora.', list: ['Líder livre', 'Fila casual própria', 'Bot, salas e torneios'], img: 'modos-allblue.jpg' }, 6),
+  'novos-modos/posts/novos-modos-7': {
+    cls: 'burst vignette',
+    html: `<div class="layer pad col center" style="--by:40%;justify-content:center;gap:40px;padding-bottom:230px">
+      <div class="h h2 y">Qual você joga<br>primeiro?</div>
+      <div class="lead" style="max-width:820px">Os cinco já estão no app.<br>É de graça.</div>
+      <div class="btn" style="margin-top:14px">${URL_TEXT}</div>
+      <div class="chip" style="margin-top:6px">Link na bio</div>
+    </div>
+    ${count(MODOS, MODOS)}
+    <div class="foot" style="justify-content:center;flex-direction:column;gap:22px"><img src="logo.svg" alt=""><div class="note">${DISCLAIMER}</div></div>`,
+  },
+});
+
 // ------------------------------------------- série "Mihawk aprende a jogar"
 // Sobreposições com fundo transparente, para pôr por cima do vídeo do cosplay no editor.
 const MIHAWK_EPISODES = [
