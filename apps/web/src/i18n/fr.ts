@@ -2460,6 +2460,10 @@ export default {
   'engine.optPeekOpponentLife': 'Regarder la Vie adverse',
   'engine.optDontPeek': 'Ne pas regarder',
   // ---- table à plus de deux joueurs (Yonko) ----
+  'engine.whoseDonToRest': '{source}: incliner 1 DON!! redressée de quel adversaire ?',
+  'engine.whoseDonSkipsRefresh': '{source}: la DON!! inclinée de quel adversaire ne se redresse pas ?',
+  'engine.optRestDonOf': 'Incliner 1 DON!! redressée de {player}',
+  'engine.optSkipRefreshDonOf': '1 DON!! inclinée de {player}',
   'engine.startCurve': '{player} : choisissez votre départ.',
   'engine.optCurveOdd': '1 DON!! au premier tour et piocher 1 carte (1, 3, 5, 7, 9, 10)',
   'engine.optCurveEven': '2 DON!! au premier tour, sans piocher (2, 4, 6, 8, 10)',

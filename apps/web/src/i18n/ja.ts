@@ -2458,6 +2458,10 @@ export default {
   'engine.optPeekOpponentLife': '相手のライフを見る',
   'engine.optDontPeek': '見ない',
   // ---- 3人以上の卓（四皇） ----
+  'engine.whoseDonToRest': '{source}：どの相手のアクティブのドン!!を1枚レストにしますか？',
+  'engine.whoseDonSkipsRefresh': '{source}：どの相手のレストのドン!!をアクティブにしませんか？',
+  'engine.optRestDonOf': '{player}のアクティブのドン!!を1枚レストにする',
+  'engine.optSkipRefreshDonOf': '{player}のレストのドン!!1枚',
   'engine.startCurve': '{player}：スタートを選んでください。',
   'engine.optCurveOdd': '最初のターンにドン!!1枚、カードを1枚引く（1, 3, 5, 7, 9, 10）',
   'engine.optCurveEven': '最初のターンにドン!!2枚、ドローなし（2, 4, 6, 8, 10）',

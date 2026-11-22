@@ -2460,6 +2460,10 @@ export default {
   'engine.optPeekOpponentLife': 'Leben des Gegners ansehen',
   'engine.optDontPeek': 'Nicht ansehen',
   // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
+  'engine.whoseDonToRest': '{source}: Von welchem Gegner 1 aktive DON!! erschöpfen?',
+  'engine.whoseDonSkipsRefresh': '{source}: Bei welchem Gegner bleibt die erschöpfte DON!! erschöpft?',
+  'engine.optRestDonOf': '1 aktive DON!! von {player} erschöpfen',
+  'engine.optSkipRefreshDonOf': '1 erschöpfte DON!! von {player}',
   'engine.startCurve': '{player}: Wähle deinen Start.',
   'engine.optCurveOdd': '1 DON!! im ersten Zug und 1 Karte ziehen (1, 3, 5, 7, 9, 10)',
   'engine.optCurveEven': '2 DON!! im ersten Zug, ohne zu ziehen (2, 4, 6, 8, 10)',

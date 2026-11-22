@@ -25,7 +25,7 @@ import {
 import type { CardData, DeckList, EffectStep, GameState, PlayerId, TableRules } from '../src/types';
 import { cardStatuses } from '../src/status';
 import { HIDDEN_REF, identityAliases, viewFor } from '../src/view';
-import { countCards, countDon, crocodile, fetchToHand, kaido, kid, luffy, putOnField } from './helpers';
+import { countCards, countDon, crocodile, fetchToHand, kaido, kid, luffy, putOnField, returnDonInOrder } from './helpers';
 
 const DATA = join(__dirname, '../../../data/cards');
 const base = new Map<string, CardData>();
@@ -92,7 +92,19 @@ const AMAZON: CardData = {
   types: ['Sky Island'],
   text: "[On Your Opponent's Attack] You may rest this Character: Your opponent may trash 1 card from the top of their Life cards. If they do not, give up to 1 of your opponent's Leader or Character cards −2000 power during this turn.",
 };
-const all: CardData[] = [...new Map([...base, ...[LEADER, GRUNT, BRUTE, LINLIN_10, PUDDING, REIJU, ENEL, AMAZON].map((c) => [c.id, c] as const)]).values()];
+// Versões enxutas de textos reais que mexem nos DON!! do oponente.
+const DON_RESTER: CardData = { id: 'YK-R', name: 'Virador', category: 'character', colors: ['green'], cost: 2, power: 3000, types: [], text: "[On Play] Rest up to 2 of your opponent's DON!! cards." };
+const DON_MATCHER: CardData = {
+  id: 'YK-M',
+  name: 'Igualador',
+  category: 'character',
+  colors: ['purple'],
+  cost: 2,
+  power: 3000,
+  types: [],
+  text: '[On Play] Return DON!! cards from your field to your DON!! deck until you have the same number of DON!! cards on your field as your opponent.',
+};
+const all: CardData[] = [...new Map([...base, ...[LEADER, GRUNT, BRUTE, LINLIN_10, PUDDING, REIJU, ENEL, AMAZON, DON_RESTER, DON_MATCHER].map((c) => [c.id, c] as const)]).values()];
 
 const JET_PISTOL = 'ST01-015'; // [Main] K.O. up to 1 of your opponent's Characters with 6000 power or less.
 const ACE = 'OP02-013'; // [On Play] Give up to 2 of your opponent's Characters −3000 power during this turn.
@@ -106,6 +118,8 @@ const LAW = 'ST10-010'; // [On Play] DON!! −1: If your opponent has 7 or more 
 const SANJI = 'ST10-004'; // [On Play] If your opponent has a Character with 5000 or more power, this Character gains [Rush].
 const PUNK_GIBSON = 'OP01-058'; // [Counter] Up to 1 of your Leader or Character cards gains +4000 … Then, rest up to 1 of your opponent's Characters with a cost of 4 or less.
 const LUFFY_10 = 'ST10-006'; // [Once Per Turn] When your opponent activates a [Blocker], K.O. up to 1 of your opponent's Characters with 8000 power or less.
+const MAGELLAN = 'OP02-085'; // [On Play] DON!! −1: Your opponent returns 1 DON!! card from their field to their DON!! deck.
+const CHOPPER = 'ST26-002'; // [On Play] DON!! −2: Rest up to 1 of your opponent's DON!! cards or Characters with a cost of 1 or less.
 const BONNEY = 'OP07-019'; // Líder: [On Your Opponent's Attack] [Once Per Turn] ①: Rest up to 1 of your opponent's Leader or Character cards.
 
 const mix = (leader = LEADER.id): DeckList => ({
@@ -119,6 +133,16 @@ const mix = (leader = LEADER.id): DeckList => ({
     ...[JET_PISTOL, ACE, ROBIN, KUZAN, BARTOLOMEO, NEWGATE, MR3, LINLIN_7, LAW, SANJI, PUNK_GIBSON, LUFFY_10, LINLIN_10.id, PUDDING.id, REIJU.id].map((id) => ({ id, count: id === BARTOLOMEO || id === PUNK_GIBSON ? 1 : 2 })),
   ],
 });
+
+/** O deck de teste com as cartas que mexem nos DON!! do oponente no lugar de quatro Recrutas. */
+const donMix = (): DeckList => {
+  const d = mix();
+  return {
+    ...d,
+    id: 'mix-don',
+    cards: [...d.cards.map((c) => (c.id === GRUNT.id ? { ...c, count: c.count - 4 } : c)), ...[MAGELLAN, CHOPPER, DON_RESTER.id, DON_MATCHER.id].map((id) => ({ id, count: 1 }))],
+  };
+};
 
 interface TableOpts {
   seed?: number;
@@ -520,11 +544,95 @@ describe('Yonko: mão e Vida "do oponente" (vale para cada oponente)', () => {
     expect(eachOpponent(step({ do: 'takeDamage', count: 1, opponent: true }))).toBe(true);
     expect(eachOpponent(step({ do: 'handAllToDeck', who: 'opponent' }))).toBe(true);
     expect(eachOpponent(step({ do: 'chooseOne', chooser: 'opponent', labels: [], options: [] }))).toBe(true);
+    expect(eachOpponent(step({ do: 'opponentReturnsDon', count: 1 }))).toBe(true);
+    expect(eachOpponent(step({ do: 'skipRefreshDon', count: 1, atMainPhase: true }))).toBe(true);
     // Alvo em campo: um só, de qualquer oponente. E o que só mexe com quem usa o efeito.
     expect(eachOpponent(step({ do: 'ko', target: { side: 'opponent', kinds: ['character'], upTo: 1 } }))).toBe(false);
     expect(eachOpponent(step({ do: 'trashLife', side: 'own', count: 1 }))).toBe(false);
     expect(eachOpponent(step({ do: 'chooseOne', chooser: 'self', labels: [], options: [] }))).toBe(false);
     expect(eachOpponent(step({ do: 'draw', count: 1, if: { opponentLifeMax: 3 } }))).toBe(false);
+    // DON!! que a carta manda virar é um alvo de um oponente; quem usa o efeito escolhe qual.
+    expect(eachOpponent(step({ do: 'restOpponentDon', count: 1 }))).toBe(false);
+    expect(eachOpponent(step({ do: 'skipRefreshDon', count: 1 }))).toBe(false);
+  });
+});
+
+describe('Yonko: DON!! do oponente (segue o texto da carta)', () => {
+  /** Mesa no turno 5 com o deck de DON!! no lugar 0 e os DON!! de cada oponente como pedido. */
+  const donTable = (don: Array<[active: number, rested: number]>) => {
+    const s = toTurn(ready({ decks: [donMix(), mix(), mix(), mix()] }), 5);
+    don.forEach(([active, rested], i) => {
+      s.players[i + 1].donActive = active;
+      s.players[i + 1].donRested = rested;
+    });
+    return s;
+  };
+  const onField = (s: GameState, p: PlayerId) => countDon(s, p) - s.players[p].donDeck;
+  /** Resolve as perguntas restantes com a primeira opção (ou "sim"), de quem for. */
+  const settle = (s: GameState) => {
+    for (let guard = 0; guard < 20 && s.pending; guard++) {
+      const p = s.pending;
+      if (p.kind === 'confirm') s = applyAction(s, { type: 'answer', player: p.player, yes: true });
+      else if (p.kind === 'option') s = applyAction(s, { type: 'option', player: p.player, index: 0 });
+      else break;
+    }
+    return s;
+  };
+
+  it('"your opponent returns 1 DON!!" (Magellan): cada oponente devolve 1', () => {
+    let s = donTable([[2, 1], [0, 3], [4, 0]]);
+    const before = [1, 2, 3].map((p) => onField(s, p));
+    s = settle(play(s, MAGELLAN));
+    expect(isIdle(s)).toBe(true);
+    expect([1, 2, 3].map((p) => onField(s, p))).toEqual(before.map((n) => n - 1));
+  });
+
+  it('"rest up to 2 of your opponent\'s DON!! cards": cada DON!! é um alvo, e quem usa escolhe de qual oponente', () => {
+    let s = donTable([[3, 0], [0, 2], [2, 0]]);
+    s = play(s, DON_RESTER.id);
+    // O lugar 2 não tem DON!! ativo: só o 1 e o 3 são opção.
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, promptKey: 'engine.whoseDonToRest', options: ['J1', 'J3'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 0 });
+    expect(s.pending).toMatchObject({ kind: 'option', player: 0, promptKey: 'engine.whoseDonToRest', options: ['J1', 'J3'] });
+    s = applyAction(s, { type: 'option', player: 0, index: 1 });
+    expect(isIdle(s)).toBe(true);
+    expect([1, 2, 3].map((p) => [s.players[p].donActive, s.players[p].donRested])).toEqual([[2, 1], [0, 2], [1, 1]]);
+  });
+
+  it('"rest up to 2…": com um oponente só com DON!! ativo, não há pergunta; os dois DON!! são dele', () => {
+    let s = donTable([[0, 3], [0, 0], [3, 0]]);
+    s = play(s, DON_RESTER.id);
+    expect(isIdle(s)).toBe(true);
+    expect([1, 2, 3].map((p) => s.players[p].donActive)).toEqual([0, 0, 1]);
+  });
+
+  it('"rest up to 1 of your opponent\'s DON!! cards or Characters" (Chopper): uma opção de DON!! por oponente', () => {
+    let s = donTable([[1, 0], [0, 2], [1, 0]]);
+    const grunt = putOnField(s, 2, GRUNT.id);
+    s = play(s, CHOPPER);
+    // Paga o DON!! −2 (as perguntas do custo) até a escolha do que virar.
+    for (let guard = 0; guard < 6 && s.pending && !(s.pending.kind === 'option' && s.pending.promptKey === 'engine.whatToRest'); guard++) {
+      s = s.pending.kind === 'confirm' ? applyAction(s, { type: 'answer', player: 0, yes: true }) : returnDonInOrder(s);
+    }
+    expect(s.pending).toMatchObject({
+      kind: 'option',
+      player: 0,
+      promptKey: 'engine.whatToRest',
+      optionKeys: [null, null, 'engine.optRestOpponentCharacter', 'engine.optNone'],
+      optionParts: [{ items: [{ key: 'engine.optRestDonOf', params: { player: 'J1' } }] }, { items: [{ key: 'engine.optRestDonOf', params: { player: 'J3' } }] }, null, null],
+    });
+    s = applyAction(s, { type: 'option', player: 0, index: 1 });
+    expect(isIdle(s)).toBe(true);
+    expect([1, 3].map((p) => s.players[p].donActive)).toEqual([1, 0]);
+    expect(locate(s, grunt)?.fc.rested).toBe(false);
+  });
+
+  it('"the same number of DON!! cards … as your opponent": basta igualar a um oponente (o que tem mais)', () => {
+    let s = donTable([[3, 0], [4, 2], [4, 0]]);
+    s = settle(play(s, DON_MATCHER.id));
+    expect(isIdle(s)).toBe(true);
+    expect(onField(s, 0)).toBe(6);
+    expect([1, 2, 3].map((p) => onField(s, p))).toEqual([3, 6, 4]);
   });
 });
 

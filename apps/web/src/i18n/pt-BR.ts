@@ -2462,6 +2462,10 @@ const ptBR = {
   'engine.optPeekOpponentLife': 'Olhar a Vida do oponente',
   'engine.optDontPeek': 'Não olhar',
   // ---- mesa com mais de dois jogadores (Yonko) ----
+  'engine.whoseDonToRest': '{source}: virar 1 DON!! ativo de qual oponente?',
+  'engine.whoseDonSkipsRefresh': '{source}: o DON!! virado de qual oponente não desvira?',
+  'engine.optRestDonOf': 'Virar 1 DON!! ativo de {player}',
+  'engine.optSkipRefreshDonOf': '1 DON!! virado de {player}',
   'engine.startCurve': '{player}: escolha a sua largada.',
   'engine.optCurveOdd': '1 DON!! no primeiro turno e comprar 1 carta (1, 3, 5, 7, 9, 10)',
   'engine.optCurveEven': '2 DON!! no primeiro turno, sem comprar (2, 4, 6, 8, 10)',

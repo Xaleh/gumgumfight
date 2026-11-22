@@ -349,6 +349,12 @@ nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`
   esse oponente fixado (`withOpponent`), a condição `if` dela inclusive; os passos que ela insere e os efeitos que
   empilha herdam o oponente (`vs` nos passos, `focus` no frame). `opponentOf(state, p)` devolve o oponente fixado
   (`fixedOpponent`: a cópia em execução, o `focus` do frame ou o único oponente vivo).
+- **DON!! do oponente** segue o texto da carta. Entram em `eachOpponent` os passos em que o oponente age
+  (`opponentReturnsDon`, `opponentAddDon`, `skipRefreshDon` com `atMainPhase`…). Os que viram DON!! do oponente são
+  um alvo: `restOpponentDon` pergunta, para cada DON!!, de qual oponente (`donTargetOpponent`, chave
+  `engine.whoseDonToRest`); `skipRefreshDon` sem `atMainPhase` faz o mesmo (`engine.whoseDonSkipsRefresh`);
+  `restDonOrCharacter` põe uma opção por oponente com DON!! (`engine.optRestDonOf`, memória `don:<id>`).
+  `donMatchOpponent` compara com o oponente que tem mais DON!! em campo.
 - **Condições**: `conditionHolds` sem oponente fixado vale se algum oponente cumpre (`anyOpponent`).
 - **Batalha**: o defensor é o dono do alvo atual. Só ele usa Counter. Com `TableRules.bystanderCounter` (desligado
   por padrão), `stepBattle` percorre antes `battle.bystanders` (os oponentes do atacante que não são o defensor) e

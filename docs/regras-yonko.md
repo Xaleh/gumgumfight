@@ -42,12 +42,23 @@ O formato: quatro capitães, todos contra todos, deck de 60 cartas sem repetiç�
 
 ## 4. Onde o manual não chega (interpretação nossa)
 
-Decisões tomadas para o motor funcionar. Todas fáceis de mudar; as três primeiras merecem a sua confirmação.
+Decisões tomadas para o motor funcionar. Todas fáceis de mudar.
 
-1. **DON!! do oponente conta como "mão ou Vida" (regra 6).** O manual só cita mão e Vida. O motor trata do mesmo
-   jeito tudo o que não é alvo em campo: DON!! ("your opponent returns 1 DON!!", "rest up to 1 of your opponent's
-   DON!! cards"), deck e descarte do oponente valem para **cada** oponente. Isso deixa cartas como o Magellan
-   (OP02-085) três vezes mais fortes numa mesa de 4. A alternativa seria quem usa o efeito escolher um oponente.
+1. **DON!! do oponente: vale o texto da carta.** Decisão da casa (22/11/2026), no espírito do manual, que lê cada
+   carta pela letra. O motor separa pelo que a carta diz:
+   - **"Your opponent returns/adds/may return … DON!!"** (Magellan, OP02-085): o oponente é quem age, então vale
+     para **cada** oponente, como mão e Vida (regra 6).
+   - **"Rest up to N of your opponent's DON!! cards"** (ST02-008, OP06-112, P-060): cada DON!! é um alvo, como um
+     Personagem (regra 1); quem usa o efeito escolhe **de qual oponente** é cada um. Com um oponente só com DON!!
+     ativo, não há pergunta.
+   - **"Up to 1 of your opponent's rested DON!! cards will not become active"**: um alvo, de um oponente à escolha.
+     A versão "your opponent's DON!! do not become active in their next Refresh Phase" vale para cada um.
+   - **"Rest up to 1 of your opponent's DON!! cards or Characters"** (Chopper, ST26-002): um alvo só; cada oponente
+     com DON!! ativo vira uma opção ("Virar 1 DON!! ativo de Fulano"), ao lado dos Personagens.
+   - **"Until you have the same number of DON!! cards on your field as your opponent"**: patamar (regra 10), basta
+     igualar a um oponente; vale o que tem mais DON!!, o que obriga a devolver menos.
+
+   Deck e descarte "do oponente" seguem a regra 6: valem para cada oponente.
 2. **Counter de quem está de fora: desligado.** Decisão da casa (22/11/2026): por ora só quem foi atacado usa
    Counter, ao contrário do manual. O código da regra do manual continua no motor, atrás de
    `TableRules.bystanderCounter`: ligado, os de fora respondem primeiro (na ordem dos turnos) e o defensor por

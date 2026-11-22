@@ -2460,6 +2460,10 @@ export default {
   'engine.optPeekOpponentLife': 'Mirar la Vida de tu rival',
   'engine.optDontPeek': 'No mirar',
   // ---- mesa con más de dos jugadores (Yonko) ----
+  'engine.whoseDonToRest': '{source}: ¿girar 1 DON!! activo de qué rival?',
+  'engine.whoseDonSkipsRefresh': '{source}: ¿el DON!! girado de qué rival no se endereza?',
+  'engine.optRestDonOf': 'Girar 1 DON!! activo de {player}',
+  'engine.optSkipRefreshDonOf': '1 DON!! girado de {player}',
   'engine.startCurve': '{player}: elige tu salida.',
   'engine.optCurveOdd': '1 DON!! en el primer turno y robar 1 carta (1, 3, 5, 7, 9, 10)',
   'engine.optCurveEven': '2 DON!! en el primer turno, sin robar (2, 4, 6, 8, 10)',

@@ -325,8 +325,9 @@ Cada regra do manual tem a linha correspondente em [`regras-yonko.md`](regras-yo
 - **Ataque e batalha.** O alvo pode ser o Líder ou um Personagem de qualquer oponente. Só o defensor bloqueia e usa
   o valor de Counter. Na etapa de Counter, os outros oponentes do atacante podem usar Eventos [Counter] antes do
   defensor (`counter` com `bystander`), e [On Your Opponent's Attack] dispara para todos os oponentes do atacante.
-- **"Seu oponente".** Alvo em campo: as cartas de todos os oponentes. Mão, Vida, DON!! e deck "do oponente": o
-  passo roda uma vez contra cada oponente (`eachOpponent`), com a condição dele conferida contra cada um. Condição
+- **"Seu oponente".** Alvo em campo: as cartas de todos os oponentes. Mão, Vida, deck e o que o oponente faz com
+  os próprios DON!! ("your opponent returns 1 DON!!"): o passo roda uma vez contra cada oponente (`eachOpponent`),
+  com a condição dele conferida contra cada um. DON!! que o efeito vira é um alvo: quem usa escolhe o oponente. Condição
   num efeito que não atinge o oponente: basta um (`anyOpponent`). Auras e [Opponent's Turn]: todos os oponentes.
 - **Durações.** "Until the end of your opponent's next turn" vale até o seu turno recomeçar. O motor guarda de quem
   é o turno que encerra o efeito (`Expiry`), porque com eliminações não dá para saber o número do turno de antemão.
@@ -421,8 +422,9 @@ Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot 
 
 O manual fechou as antigas decisões 5 (regra dos efeitos) e 6 (recompensa por eliminação: não há). Ficam:
 
-5. **DON!! do oponente:** o manual só fala em mão e Vida. O motor trata os DON!! do mesmo jeito ("your opponent
-   returns 1 DON!!" vale para cada oponente). Mantém, ou nesses efeitos quem usa escolhe um oponente só?
+5. **DON!! do oponente:** *decidido (22/11/2026): vale o texto da carta. "Your opponent returns 1 DON!!" vale para
+   cada oponente; "rest up to N of your opponent's DON!! cards" é um alvo, e quem usa escolhe de qual oponente;
+   comparação de DON!! basta um oponente. Detalhes no item 1 da seção 4 de [`regras-yonko.md`](regras-yonko.md).*
 6. **Counter de quem está de fora:** *decidido (22/11/2026): só quem foi atacado usa Counter por enquanto; a regra
    do manual fica no motor, desligada (`TableRules.bystanderCounter`).*
 7. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos? *Implementado: quem cria a

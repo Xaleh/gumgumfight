@@ -2460,6 +2460,10 @@ export default {
   'engine.optPeekOpponentLife': "Look at your opponent's Life",
   'engine.optDontPeek': "Don't look",
   // ---- table with more than two players (Yonko) ----
+  'engine.whoseDonToRest': '{source}: rest 1 active DON!! of which opponent?',
+  'engine.whoseDonSkipsRefresh': "{source}: which opponent's rested DON!! stays rested?",
+  'engine.optRestDonOf': "Rest 1 of {player}'s active DON!!",
+  'engine.optSkipRefreshDonOf': "1 of {player}'s rested DON!!",
   'engine.startCurve': '{player}: choose your start.',
   'engine.optCurveOdd': '1 DON!! on the first turn and draw a card (1, 3, 5, 7, 9, 10)',
   'engine.optCurveEven': '2 DON!! on the first turn, no draw (2, 4, 6, 8, 10)',

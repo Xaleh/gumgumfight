@@ -3030,30 +3030,29 @@ function stepEffect(state: GameState, frame: EffectFrame) {
 
 /** Passos que agem sobre "o oponente" (a mão, a Vida, os DON!!, o deck dele) sem escolher um alvo em campo. */
 const EACH_OPPONENT_STEPS = new Set<EffectStep['do']>([
-  'restOpponentDon',
   'opponentDiscards',
   'trashRandomFromOpponentHand',
   'opponentTrashToBottom',
-  'restDonOrCharacter',
   'revealOpponentTop',
   'revealOpponentHand',
   'lookOpponentTop',
   'opponentLifeToBottom',
   'opponentLifeToHand',
   'opponentHandToBottom',
-  'skipRefreshDon',
   'opponentMay',
   'opponentPlays',
   'opponentAddDon',
-  'donMatchOpponent',
   'opponentDraws',
   'opponentChoosesOwn',
   'opponentReturnsDon',
 ]);
 
 /**
- * Mesa com mais de dois: o passo vale para cada oponente? É o que o manual chama de "effects that
- * interact with an opponent's hand/life": "trash up to 1 card from the top of your opponent's Life
+ * Mesa com mais de dois: o passo vale para cada oponente? Segue o texto da carta, como o manual. "Your
+ * opponent returns/adds/may return … DON!!" é o oponente fazendo algo, como "your opponent returns all cards
+ * in their hand" (Pudding): vale para cada um. Já "rest up to N of your opponent's DON!! cards" é escrito como
+ * um alvo: um DON!! de um oponente, escolhido por quem usa o efeito (`donTargetOpponent`). E o que é "effects
+ * that interact with an opponent's hand/life": "trash up to 1 card from the top of your opponent's Life
  * cards" tira 1 Vida de cada oponente; "Your opponent chooses one" pergunta a cada um; "If your
  * opponent has 7 or more cards in their hand, trash 2…" só atinge quem tem 7 ou mais (a condição do
  * passo é conferida contra cada um). Não entram aqui os passos com alvo em campo ("up to 1 of your
@@ -3079,6 +3078,10 @@ export function eachOpponent(step: EffectStep): boolean {
       return Boolean(step.both);
     case 'basePower':
       return step.copy === 'opponentLeader';
+    // "your opponent rests 1 of their active DON!! cards at the start of their next Main Phase": o oponente faz.
+    // Já "up to 1 of your opponent's rested DON!! cards will not become active" é um alvo (`donTargetOpponent`).
+    case 'skipRefreshDon':
+      return Boolean(step.atMainPhase);
     case 'chooseOne':
       return step.chooser === 'opponent';
     default:
@@ -3332,6 +3335,34 @@ function askOption(
     ...(optionParts ? { optionParts } : {}),
     ...(shown?.length ? { shown } : {}),
   };
+}
+
+/**
+ * Mesa com mais de dois: de qual oponente sai o DON!! de um efeito escrito como alvo ("rest up to 1 of your
+ * opponent's DON!! cards"). Cada DON!! é um alvo, de qualquer oponente, como um Personagem (regra 1 do manual).
+ * `candidates`: os oponentes que têm um DON!! que serve. Devolve o oponente, null (nenhum serve) ou undefined
+ * (abriu a pergunta). Com dois jogadores, ou com o oponente já fixado (um passo "para cada oponente"), não pergunta.
+ * Usa `frame.memo[0] = 'donOf'` enquanto espera a resposta.
+ */
+function donTargetOpponent(state: GameState, frame: EffectFrame, candidates: PlayerId[], prompt: Prompt): PlayerId | null | undefined {
+  if (frame.memo?.[0] === 'donOf' && frame.choice) {
+    const id = Number(frame.memo[1 + Number(frame.choice[0])]);
+    frame.memo = undefined;
+    frame.choice = undefined;
+    return Number.isInteger(id) && candidates.includes(id) ? id : null;
+  }
+  if (!candidates.length) return null;
+  if (candidates.length === 1) return candidates[0];
+  askOption(
+    state,
+    frame,
+    frame.controller,
+    prompt,
+    candidates.map((id) => state.players[id].name),
+    candidates.map(() => null),
+  );
+  frame.memo = ['donOf', ...candidates.map(String)];
+  return undefined;
 }
 
 /** Interrompe o efeito: os passos restantes não acontecem. */
@@ -3924,6 +3955,33 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'restOpponentDon': {
+      if (isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined) {
+        // "Rest up to N of your opponent's DON!! cards": cada DON!! é um alvo, de qualquer oponente.
+        const done = Number(frame.choice ? (frame.memo?.[frame.memo.length - 1] ?? 0) : (frame.memo?.[0] === 'restN' ? frame.memo[1] : 0));
+        let left = step.count - done;
+        let n = done;
+        while (left > 0) {
+          const id = donTargetOpponent(
+            state,
+            frame,
+            opponentSides(state, frame.controller).filter((o) => state.players[o].donActive > 0),
+            pr('whoseDonToRest', `${srcName}: virar 1 DON!! ativo de qual oponente?`, { source: srcName }),
+          );
+          if (id === undefined) {
+            // Guarda quantos já foram virados no fim da memória da pergunta.
+            frame.memo!.push(String(n));
+            return false;
+          }
+          if (id === null) break;
+          const o = state.players[id];
+          o.donActive--;
+          o.donRested++;
+          log(state, frame.controller, lg('donRested', `1 DON!! de ${o.name} é virado.`, { n: 1, player: o.name }));
+          n++;
+          left--;
+        }
+        return true;
+      }
       const o = state.players[opponentOf(state, frame.controller)];
       const n = Math.min(step.count, o.donActive);
       o.donActive -= n;
@@ -4626,17 +4684,48 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'restDonOrCharacter': {
-      const opp = state.players[opponentOf(state, frame.controller)];
       const skip = Boolean(step.skipRefresh);
       // skipRefresh: só cartas viradas que ainda não vão ficar viradas; DON!! virados que ainda não vão ficar.
-      const skippedDon = (state.donSkipRefresh ?? []).filter((d) => d.player === opp.id).reduce((n, d) => n + d.count, 0);
-      const donAvailable = skip ? opp.donRested > skippedDon : opp.donActive > 0;
+      const skippedDon = (id: PlayerId) => (state.donSkipRefresh ?? []).filter((d) => d.player === id).reduce((n, d) => n + d.count, 0);
+      const hasDon = (id: PlayerId) => (skip ? state.players[id].donRested > skippedDon(id) : state.players[id].donActive > 0);
+      // Mesa com mais de dois: "1 of your opponent's DON!! cards or Characters" é um alvo de qualquer oponente;
+      // cada oponente com DON!! que sirva vira uma opção.
+      const many = isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined;
+      const donOwners = (many ? opponentSides(state, frame.controller) : [opponentOf(state, frame.controller)]).filter(hasDon);
+      const opp = state.players[donOwners[0] ?? opponentOf(state, frame.controller)];
+      const donAvailable = donOwners.length > 0;
       const spec: TargetSpec = { ...step.spec, side: 'opponent', upTo: 1 };
       const chars = targetCandidates(state, frame.controller, frame.source, spec).filter((u) =>
         skip ? !state.modifiers.some((m) => m.uid === u && m.kind === 'skipRefresh') : !locate(state, u)?.fc.rested,
       );
       const onlyChars = spec.kinds.every((k) => k === 'character');
       const cardLabel = onlyChars ? 'um Personagem do oponente' : 'uma carta do oponente (Líder, Personagem ou Stage)';
+      if (!frame.memo && many && donOwners.length > 1) {
+        if (!chars.length && !donAvailable) return true;
+        // Uma opção de DON!! por oponente ("Virar 1 DON!! ativo de Fulano").
+        const name = (id: PlayerId) => state.players[id].name;
+        const donText = (id: PlayerId) => (skip ? `1 DON!! virado de ${name(id)}` : `Virar 1 DON!! ativo de ${name(id)}`);
+        const donPart = (id: PlayerId): MsgList => ({ items: [{ key: skip ? 'engine.optSkipRefreshDonOf' : 'engine.optRestDonOf', params: { player: name(id) } }] });
+        const charText = skip
+          ? onlyChars
+            ? 'Um Personagem virado do oponente'
+            : 'Uma carta virada do oponente (Líder, Personagem ou Stage)'
+          : `Virar ${cardLabel}`;
+        const charKey = skip ? (onlyChars ? 'engine.optSkipRefreshCharacter' : 'engine.optSkipRefreshCard') : onlyChars ? 'engine.optRestOpponentCharacter' : 'engine.optRestOpponentCard';
+        askOption(
+          state,
+          frame,
+          frame.controller,
+          skip
+            ? pr('whatSkipsRefresh', `${srcName}: o que não desvira na próxima Renovação do oponente?`, { source: srcName })
+            : pr('whatToRest', `${srcName}: o que virar?`, { source: srcName }),
+          [...donOwners.map(donText), ...(chars.length ? [charText] : []), 'Nenhum'],
+          [...donOwners.map(() => null), ...(chars.length ? [charKey] : []), 'engine.optNone'],
+          [...donOwners.map(donPart), ...(chars.length ? [null] : []), null],
+        );
+        frame.memo = ['pick', ...donOwners.map((id) => `don:${id}`), ...(chars.length ? ['char'] : [])];
+        return false;
+      }
       if (!frame.memo) {
         if (!donAvailable && !chars.length) return true;
         if (!frame.choice) {
@@ -4664,13 +4753,16 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
             opts,
             optKeys,
           );
-          frame.memo = ['pick', ...(donAvailable ? ['don'] : []), ...(chars.length ? ['char'] : [])];
+          frame.memo = ['pick', ...(donAvailable ? [many ? `don:${opp.id}` : 'don'] : []), ...(chars.length ? ['char'] : [])];
           return false;
         }
       }
       if (frame.memo?.[0] === 'pick') {
-        const pick = frame.memo[1 + Number(frame.choice?.[0])];
+        const raw = frame.memo[1 + Number(frame.choice?.[0])];
         frame.choice = undefined;
+        // 'don' (o único oponente) ou 'don:<lugar>' (mesa com mais de dois).
+        const pick = raw?.startsWith('don:') ? 'don' : raw;
+        const opp = raw?.startsWith('don:') ? state.players[Number(raw.slice(4))] : state.players[opponentOf(state, frame.controller)];
         if (pick === 'don') {
           if (skip) {
             (state.donSkipRefresh ??= []).push({ player: opp.id, count: 1 });
@@ -4931,8 +5023,22 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
         log(state, frame.controller, lg('oppWillRestDon', `${opp.name} vai virar ${step.count} DON!! ativo(s) no início da próxima Fase Principal.`, { player: opp.name, n: step.count }));
         return true;
       }
-      (state.donSkipRefresh ??= []).push({ player: opp.id, count: step.count });
-      log(state, frame.controller, lg('donSkipsRefresh', `${step.count} DON!! de ${opp.name} não fica(m) ativo(s) na próxima Renovação.`, { n: step.count, player: opp.name }));
+      let target = opp;
+      if (isMultiplayer(state) && fixedOpponent(state, frame.controller) === undefined) {
+        // "Up to 1 of your opponent's rested DON!! cards will not become active": um alvo, de qualquer oponente.
+        const skipped = (id: PlayerId) => (state.donSkipRefresh ?? []).filter((d) => d.player === id).reduce((k, d) => k + d.count, 0);
+        const id = donTargetOpponent(
+          state,
+          frame,
+          opponentSides(state, frame.controller).filter((o) => state.players[o].donRested > skipped(o)),
+          pr('whoseDonSkipsRefresh', `${srcName}: o DON!! virado de qual oponente não desvira?`, { source: srcName }),
+        );
+        if (id === undefined) return false;
+        if (id === null) return true;
+        target = state.players[id];
+      }
+      (state.donSkipRefresh ??= []).push({ player: target.id, count: step.count });
+      log(state, frame.controller, lg('donSkipsRefresh', `${step.count} DON!! de ${target.name} não fica(m) ativo(s) na próxima Renovação.`, { n: step.count, player: target.name }));
       return true;
     }
     case 'replaceRest': {
@@ -5038,7 +5144,9 @@ function execStep(state: GameState, frame: EffectFrame, step: EffectStep): boole
       return true;
     }
     case 'donMatchOpponent': {
-      const extra = totalDonOnField(ps) - totalDonOnField(state.players[opponentOf(state, frame.controller)]);
+      // "until you have the same number of DON!! cards on your field as your opponent": com mais de dois, basta
+      // um oponente (regra 10 do manual): vale o que tem mais DON!! (o que obriga a devolver menos).
+      const extra = totalDonOnField(ps) - Math.max(...opponentSides(state, frame.controller).map((o) => totalDonOnField(state.players[o])));
       if (extra > 0) frame.steps.splice(frame.i + 1, 0, { do: 'returnDon', count: extra });
       return true;
     }
