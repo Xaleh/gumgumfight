@@ -230,6 +230,18 @@ const sealed = {
   'sealed.openHintMouse': 'Click a card to flip it',
   'sealed.openHintTouch': 'Tap a card to flip it',
   'sealed.openFaceDown': 'Card {n}, face down',
+  // ---- Draft com cartão e entrada próprios ----
+  'draft.hubKicker': 'Limited · pod of 8',
+  'draft.homeBadge': 'Pod of 8',
+  'draft.homeDesc': 'Everyone opens a booster, keeps 1 card and passes the rest. Play with friends: empty seats become bots.',
+  'draft.homeChipPacks': '4 boosters per player',
+  'draft.homeChipSource': 'One set, Pack Rush or Cube',
+  'draft.homeAction': 'Draft',
+  'draft.rushIntro': 'Pick {min} to {max} sets. Each seat’s booster, in each round, is drawn among them. Any Leader in the game is allowed.',
+  'draft.joinTitle': 'Got a code?',
+  'draft.joinHint': 'Join the pod a friend created.',
+  'draft.myDecks': 'Your Draft decks',
+  'draft.noDecks': 'You have not finished a draft yet.',
 };
 
 export default sealed;

@@ -230,6 +230,18 @@ const sealed = {
   'sealed.openHintMouse': 'Haz clic en una carta para girarla',
   'sealed.openHintTouch': 'Toca una carta para girarla',
   'sealed.openFaceDown': 'Carta {n}, boca abajo',
+  // ---- Draft com cartão e entrada próprios ----
+  'draft.hubKicker': 'Limitado · pod de 8',
+  'draft.homeBadge': 'Pod de 8',
+  'draft.homeDesc': 'Cada uno abre un sobre, se queda con 1 carta y pasa el resto. Juega con amigos: los lugares vacíos se llenan con bots.',
+  'draft.homeChipPacks': '4 sobres por jugador',
+  'draft.homeChipSource': 'Colección, Pack Rush o Cubo',
+  'draft.homeAction': 'Draftear',
+  'draft.rushIntro': 'Elige de {min} a {max} colecciones. El sobre de cada lugar, en cada ronda, se sortea entre ellas. Vale cualquier Líder del juego.',
+  'draft.joinTitle': '¿Tienes un código?',
+  'draft.joinHint': 'Entra al pod que creó un amigo.',
+  'draft.myDecks': 'Tus mazos de Draft',
+  'draft.noDecks': 'Todavía no has terminado ningún draft.',
 };
 
 export default sealed;

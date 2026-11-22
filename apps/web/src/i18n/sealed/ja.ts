@@ -230,6 +230,18 @@ const sealed = {
   'sealed.openHintMouse': 'カードをクリックして表にする',
   'sealed.openHintTouch': 'カードをタップして表にする',
   'sealed.openFaceDown': 'カード{n}（裏向き）',
+  // ---- Draft com cartão e entrada próprios ----
+  'draft.hubKicker': 'リミテッド · 8人ポッド',
+  'draft.homeBadge': '8人ポッド',
+  'draft.homeDesc': '各自がブースターを開けて1枚取り、残りを隣に渡します。友達と遊べて、空席はボットが埋めます。',
+  'draft.homeChipPacks': '1人4パック',
+  'draft.homeChipSource': '1弾・パックラッシュ・キューブ',
+  'draft.homeAction': 'ドラフトする',
+  'draft.rushIntro': '{min}〜{max}弾を選びます。各席のブースターは、ラウンドごとにその中から抽選されます。ゲーム内のどのリーダーでも使えます。',
+  'draft.joinTitle': 'コードをお持ちですか？',
+  'draft.joinHint': '友達が作ったポッドに参加します。',
+  'draft.myDecks': 'ドラフトのデッキ',
+  'draft.noDecks': 'まだドラフトを完了していません。',
 };
 
 export default sealed;

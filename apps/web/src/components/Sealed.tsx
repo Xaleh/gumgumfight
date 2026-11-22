@@ -100,7 +100,10 @@ export function Sealed({
   onOnline,
   onDraft,
   openId,
+  hub: startHub = 'sealed',
 }: {
+  /** Qual entrada mostrar: a do Selado (abrir 6 boosters) ou a do Draft (pods). As duas têm cartão próprio no menu. */
+  hub?: 'sealed' | 'draft';
   onExit: () => void;
   /** Abre a tela de um pod de Draft. */
   onDraft: (podId: string) => void;
@@ -117,12 +120,14 @@ export function Sealed({
   const [cards, setCards] = useState<CardData[] | null>(null);
   const [pool, setPool] = useState<SealedPool | null>(null);
   const [view, setView] = useState<'hub' | 'packs' | 'build' | 'cube'>('hub');
+  const [hub, setHub] = useState(startHub);
+  const isDraft = hub === 'draft';
   const [picked, setPicked] = useState<string>('');
   /** Pack Rush: várias coleções, e cada booster é sorteado entre elas. */
   const [source, setSource] = useState<'one' | 'rush' | 'cube'>('one');
   const rush = source === 'rush';
   /** Draft Cubo: os boosters saem do Cubo da temporada, não de uma coleção. */
-  const cubeMode = source === 'cube';
+  const cubeMode = source === 'cube' && hub === 'draft';
   const [cube, setCube] = useState<CubeInfo | null>(null);
   const [mix, setMix] = useState<string[]>([]);
   const [rushLimits, setRushLimits] = useState({ min: 2, max: 12 });
@@ -225,6 +230,10 @@ export function Sealed({
     void reload();
   };
   const toHub = () => {
+    // Saindo de um deck, a entrada é a do tipo dele: deck de Draft volta para o Draft.
+    if (pool) setHub(pool.draft ? 'draft' : 'sealed');
+    // O Cubo só existe no Draft: voltando para o Selado, a fonte marcada volta a ser uma coleção.
+    if (pool && !pool.draft && source === 'cube') setSource('one');
     setPool(null);
     setView('hub');
     void reload();
@@ -257,24 +266,6 @@ export function Sealed({
   }
 
   const chosen = sets?.find((s) => s.set === picked);
-  /** Criar um pod de Draft (das coleções marcadas, ou do Cubo) ou entrar num pelo código. */
-  const draftRow = (
-    <div className="sealed-draft-row">
-      <div>
-        <div className="kicker">{cubeMode ? t('sealed.cubeName') : t('sealed.draftKicker')}</div>
-        <p className="muted small">{t('sealed.draftIntro')}</p>
-      </div>
-      <button type="button" className="btn" onClick={() => void draft()} disabled={!canDraft || busy || Boolean(activePod)}>
-        {cubeMode ? t('cube.create') : t('sealed.draftCreate')}
-      </button>
-      <div className="code-row">
-        <input value={podCode} onChange={(e) => setPodCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} aria-label={t('sealed.draftCode')} />
-        <button type="button" className="btn" onClick={() => void draft(podCode.trim())} disabled={busy || podCode.trim().length !== 6}>
-          {t('sealed.draftJoin')}
-        </button>
-      </div>
-    </div>
-  );
   if (cube && cards && view === 'cube') {
     return (
       <div className="sealed">
@@ -292,14 +283,71 @@ export function Sealed({
       </div>
     );
   }
+  /** Os decks desta entrada: os de Draft no Draft, os de boosters abertos no Selado. */
+  const myPools = pools?.filter((p) => Boolean(p.draft) === isDraft) ?? null;
+  const setsGrid = sets && sets.length > 0 && (
+    <div className="sealed-sets" role="group" aria-label={rush ? t('sealed.pickSets') : t('sealed.pickSet')}>
+      {sets.map((s) => {
+        const on = rush ? mix.includes(s.set) : picked === s.set;
+        return (
+          <button key={s.set} type="button" className={['sealed-set', on ? 'on' : ''].join(' ')} aria-pressed={on} onClick={() => (rush ? toggleMix(s.set) : setPicked(s.set))}>
+            <Booster set={s.set} small />
+            <span className="sealed-set-info">
+              <b>{s.set}</b>
+              <small>{t('sealed.setCards', { cards: s.cards, leaders: s.leaders })}</small>
+              {s.spoiler && <span className="home-chip gold">{t('sealed.setSpoiler')}</span>}
+            </span>
+            {rush && on && <span className="sealed-set-check">✓</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+  /** Ao lado do botão principal: as coleções do Pack Rush, ou a parte automatizada da coleção marcada. */
+  const pickedInfo = rush ? (
+    <>
+      <span className="muted small">{mix.length < rushLimits.min ? t('sealed.rushPickMore', { n: rushLimits.min }) : t('sealed.rushPicked', { sets: [...mix].sort().join(' + ') })}</span>
+      <button type="button" className="text-link" onClick={() => setMix(mix.length ? [] : (sets ?? []).slice(0, rushLimits.max).map((x) => x.set))}>
+        {mix.length ? t('sealed.rushNone') : t('sealed.rushAll')}
+      </button>
+    </>
+  ) : (
+    chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>
+  );
+  const odds = !rush && chosen?.pack && (
+    <p className="muted small sealed-odds">
+      {t(chosen.pack.uncommons ? 'sealed.packMix' : 'sealed.packMixNoUc', {
+        n: chosen.pack.commons + chosen.pack.uncommons + chosen.pack.rares + 1,
+        c: chosen.pack.commons,
+        uc: chosen.pack.uncommons,
+        r: chosen.pack.rares + 1,
+      })}{' '}
+      {t('sealed.packOdds', { sr: Math.round(chosen.pack.sr * 100), sec: Math.round(chosen.pack.sec * 100), leader: Math.round(chosen.pack.leader * 100) })}
+    </p>
+  );
+  /** Draft: entrar no pod de um amigo pelo código. */
+  const joinRow = (
+    <div className="sealed-draft-row">
+      <div>
+        <div className="kicker">{t('draft.joinTitle')}</div>
+        <p className="muted small">{t('draft.joinHint')}</p>
+      </div>
+      <div className="code-row">
+        <input value={podCode} onChange={(e) => setPodCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} aria-label={t('sealed.draftCode')} />
+        <button type="button" className="btn" onClick={() => void draft(podCode.trim())} disabled={busy || podCode.trim().length !== 6}>
+          {t('sealed.draftJoin')}
+        </button>
+      </div>
+    </div>
+  );
   return (
     <div className="sealed">
-      {header(t('sealed.title'), onExit)}
+      {header(isDraft ? t('draft.titlePlain') : t('sealed.title'), onExit)}
       <div className="sealed-wrap">
         <section className="sealed-hero">
-          <div className="hero-kicker">{t('sealed.kicker')}</div>
-          <h1 className="hero-title">{t('sealed.title')}</h1>
-          <p className="hero-sub">{t('sealed.intro', { n: packsPerPool, size: LIMITED_DECK_SIZE })}</p>
+          <div className="hero-kicker">{isDraft ? t('draft.hubKicker') : t('sealed.kicker')}</div>
+          <h1 className="hero-title">{isDraft ? t('draft.titlePlain') : t('sealed.title')}</h1>
+          <p className="hero-sub">{isDraft ? t('sealed.draftIntro') : t('sealed.intro', { n: packsPerPool, size: LIMITED_DECK_SIZE })}</p>
           <ul className="home-chips">
             <li className="home-chip">{t('sealed.ruleDeck', { n: LIMITED_DECK_SIZE })}</li>
             <li className="home-chip">{t('sealed.ruleColors')}</li>
@@ -329,14 +377,14 @@ export function Sealed({
               <button type="button" className={rush ? 'on' : ''} aria-pressed={rush} onClick={() => setSource('rush')} disabled={(sets?.length ?? 0) < rushLimits.min}>
                 {t('sealed.sourceRush')}
               </button>
-              {cube && (
+              {isDraft && cube && (
                 <button type="button" className={cubeMode ? 'on' : ''} aria-pressed={cubeMode} onClick={() => setSource('cube')}>
                   {t('sealed.sourceCube')}
                 </button>
               )}
             </div>
           </div>
-          {rush && <p className="muted small">{t('sealed.rushIntro', { n: packsPerPool, min: rushLimits.min, max: rushLimits.max })}</p>}
+          {rush && <p className="muted small">{isDraft ? t('draft.rushIntro', { min: rushLimits.min, max: rushLimits.max }) : t('sealed.rushIntro', { n: packsPerPool, min: rushLimits.min, max: rushLimits.max })}</p>}
           {cubeMode && cube ? (
             <>
               <div className="sealed-cube">
@@ -347,80 +395,61 @@ export function Sealed({
                   <ul className="home-chips">
                     <li className="home-chip">{t('cube.chipCards', { n: cube.cards.length })}</li>
                     <li className="home-chip">{t('cube.chipPerColor', { n: cube.perColor })}</li>
-                    <li className="home-chip">{t('cube.chipNoSealed')}</li>
                   </ul>
                 </div>
                 <button type="button" className="btn" onClick={() => setView('cube')} disabled={!cards}>
                   {t('cube.seeList')}
                 </button>
               </div>
-              {draftRow}
+              <div className="sealed-open-row">
+                <button type="button" className="mode-btn sealed-cta" onClick={() => void draft()} disabled={busy || Boolean(activePod)}>
+                  {t('cube.create')}
+                </button>
+              </div>
+              {joinRow}
             </>
           ) : sets === null ? (
             <p className="muted">{t('common.loading')}</p>
           ) : sets.length === 0 ? (
             <p className="muted">{t('sealed.noSets')}</p>
+          ) : isDraft ? (
+            <>
+              {setsGrid}
+              <div className="sealed-open-row">
+                <button type="button" className="mode-btn sealed-cta" onClick={() => void draft()} disabled={!canOpen || busy || Boolean(activePod)}>
+                  {t('sealed.draftCreate')}
+                </button>
+                {pickedInfo}
+              </div>
+              {odds}
+              {joinRow}
+            </>
           ) : (
             <>
-              <div className="sealed-sets" role="group" aria-label={rush ? t('sealed.pickSets') : t('sealed.pickSet')}>
-                {sets.map((s) => {
-                  const on = rush ? mix.includes(s.set) : picked === s.set;
-                  return (
-                    <button key={s.set} type="button" className={['sealed-set', on ? 'on' : ''].join(' ')} aria-pressed={on} onClick={() => (rush ? toggleMix(s.set) : setPicked(s.set))}>
-                      <Booster set={s.set} small />
-                      <span className="sealed-set-info">
-                        <b>{s.set}</b>
-                        <small>{t('sealed.setCards', { cards: s.cards, leaders: s.leaders })}</small>
-                        {s.spoiler && <span className="home-chip gold">{t('sealed.setSpoiler')}</span>}
-                      </span>
-                      {rush && on && <span className="sealed-set-check">✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
+              {setsGrid}
               <div className="sealed-open-row">
                 <button type="button" className="mode-btn sealed-cta" onClick={() => void openNew()} disabled={!canOpen || busy}>
                   {busy ? t('sealed.opening') : t('sealed.open', { n: packsPerPool })}
                 </button>
-                {rush ? (
-                  <>
-                    <span className="muted small">{mix.length < rushLimits.min ? t('sealed.rushPickMore', { n: rushLimits.min }) : t('sealed.rushPicked', { sets: [...mix].sort().join(' + ') })}</span>
-                    <button type="button" className="text-link" onClick={() => setMix(mix.length ? [] : sets.slice(0, rushLimits.max).map((x) => x.set))}>
-                      {mix.length ? t('sealed.rushNone') : t('sealed.rushAll')}
-                    </button>
-                  </>
-                ) : (
-                  chosen && <span className="muted small">{t('sealed.setAutomated', { pct: Math.round(chosen.automated * 100) })}</span>
-                )}
+                {pickedInfo}
               </div>
-              {!rush && chosen?.pack && (
-                <p className="muted small sealed-odds">
-                  {t(chosen.pack.uncommons ? 'sealed.packMix' : 'sealed.packMixNoUc', {
-                    n: chosen.pack.commons + chosen.pack.uncommons + chosen.pack.rares + 1,
-                    c: chosen.pack.commons,
-                    uc: chosen.pack.uncommons,
-                    r: chosen.pack.rares + 1,
-                  })}{' '}
-                  {t('sealed.packOdds', { sr: Math.round(chosen.pack.sr * 100), sec: Math.round(chosen.pack.sec * 100), leader: Math.round(chosen.pack.leader * 100) })}
-                </p>
-              )}
-              {draftRow}
+              {odds}
             </>
           )}
         </section>
 
         <section className="sealed-panel">
           <div className="section-head">
-            <h3 className="sealed-h3">{t('sealed.myDecks')}</h3>
+            <h3 className="sealed-h3">{isDraft ? t('draft.myDecks') : t('sealed.myDecks')}</h3>
             <span className="muted small">{t('sealed.myDecksHint')}</span>
           </div>
-          {pools === null ? (
+          {myPools === null ? (
             <p className="muted">{t('common.loading')}</p>
-          ) : pools.length === 0 ? (
-            <p className="muted">{t('sealed.noDecks')}</p>
+          ) : myPools.length === 0 ? (
+            <p className="muted">{isDraft ? t('draft.noDecks') : t('sealed.noDecks')}</p>
           ) : (
             <ul className="sealed-pools">
-              {pools.map((p) => {
+              {myPools.map((p) => {
                 const opened = readOpened()[p.id] ?? (p.size ? packsPerPool : 0);
                 const status = p.ready ? t('sealed.statusReady') : opened < packsPerPool && !p.size ? t('sealed.statusOpening') : t('sealed.statusBuilding', { size: p.size, max: LIMITED_DECK_SIZE });
                 return (
