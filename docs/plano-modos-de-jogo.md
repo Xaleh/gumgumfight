@@ -2,8 +2,8 @@
 
 > Status (22/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft), Draft e Draft Cubo
 > implementados**; o README (seções "All Blue", "Selado", "Pack Rush", "Draft" e "Draft Cubo") descreve o que existe.
-> **Yonko: fase 1 feita** (o motor com até 4 jogadores, sem tela; ver "Fase 1: como ficou" na seção 4). Sala, mesa e
-> bot do Yonko seguem como proposta.
+> **Yonko: fase 1 feita** (o motor com até 4 jogadores, sem tela, pelas regras do manual do formato; ver "Fase 1:
+> como ficou" na seção 4 e [`regras-yonko.md`](regras-yonko.md)). Sala, mesa e bot do Yonko seguem como proposta.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
 
@@ -16,7 +16,7 @@
 | **Selado: Draft** ✅ | Pod de 8 (bots nos lugares vazios): cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
 | **Pack Rush** ✅ (selado e draft) | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
 | **Draft Cubo** ✅ | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
-| **Yonko** 🚧 (fase 1 de 4) | Mesa de 4, todos contra todos, formato da comunidade inspirado no Commander. | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
+| **Yonko** 🚧 (fase 1 de 4) | Mesa de 4, todos contra todos, deck de 60 sem repetição: o formato da comunidade "Four Emperors". | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
 
 Em esforço relativo, com o All Blue valendo 1: Pré-release ≈ 3, Draft ≈ +2, Pack Rush ≈ +1, Cubo ≈ +1,5 e Yonko ≈ 8
 ou mais. O Yonko é o único que muda o motor de regras; os outros são regras de deck e telas novas em volta da partida
@@ -25,8 +25,9 @@ que já existe.
 **Ordem sugerida:** All Blue → Pré-release → Pack Rush selado → Draft (já com Pack Rush) → Cubo → Selado nos torneios →
 Yonko. Cada passo é entregável sozinho, e dá para parar depois de qualquer um.
 
-De onde vêm as regras: All Blue, Pack Rush, Cubo e Yonko são formatos de fã, definidos por você nesta conversa. O
-Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha encontrado, então a proposta é nossa.
+De onde vêm as regras: All Blue, Pack Rush e Cubo são formatos de fã, definidos por você nesta conversa. O Yonko
+segue o manual do formato da comunidade ("Four Emperors Play Sheet", resumido em [`regras-yonko.md`](regras-yonko.md)).
+O Selado segue o que a Bandai publica; o Draft não tem regra oficial que eu tenha encontrado, então a proposta é nossa.
 
 ## 2. All Blue
 
@@ -256,44 +257,35 @@ de cada, lista pelas estatísticas globais) e Draft (pod de 8 com bots completan
 ![Mesa de 4](mockups/modos-de-jogo/08-yonko-mesa.webp)
 ![No celular](mockups/modos-de-jogo/09-celular.webp)
 
-### Regras propostas ("Padrão GumGum v1")
+### Regras
 
-Partindo do que você descreveu, fechando os pontos que o formato da comunidade deixa em aberto:
+As regras são as do manual do formato, "Four Emperors Play Sheet". O resumo, regra a regra, com o que o motor faz
+em cada uma e o que é interpretação nossa, está em [`regras-yonko.md`](regras-yonko.md). Em poucas linhas:
 
-- **4 jogadores**, cada um com um deck construído normal (50 cartas), todos no mesmo formato.
-- **Ordem:** cada um rola o dado (o `DiceRoll` que já existe); o maior começa e a mesa segue no sentido horário.
-- **Início:** o 1º não compra no primeiro turno e recebe 1 DON!!, como hoje. Ninguém ataca no próprio primeiro turno.
-  O 3º e o 4º escolhem um bônus: **+1 carta na mão inicial** ou **+1 DON!! no primeiro turno**.
+- **4 jogadores**, deck de **60 cartas, uma cópia de cada** (a carta é o número dela), só da cor do Líder.
+- **Ordem:** sorteio de quem começa; a mesa segue no sentido horário.
+- **Largada:** antes das mãos, cada um escolhe o próprio primeiro turno: **1 DON!! e comprar 1 carta**, ou **2 DON!!
+  sem comprar**. Depois, mão inicial, mulligan normal e a Vida.
 - **Vida:** a impressa no Líder **+2**.
-- **Ataque:** cada ataque escolhe o alvo em qualquer mesa (Líder ou Personagem virado de qualquer oponente). Só o
-  defensor usa Blocker e Counter.
-- **Eliminação:** dano no Líder sem Vida, ou deck vazio. As cartas do eliminado saem do jogo e os efeitos dele acabam.
-  Quem deu o golpe final compra 1 carta. O último de pé vence; os outros ficam em 2º, 3º e 4º pela ordem de queda.
-- **Relógio:** 25 minutos por jogador (hoje são 17:30 no 1x1), correndo só nas decisões dele. Sem tempo ou 2 minutos
-  desconectado na própria decisão: eliminado, e a mesa segue.
+- **Ataque:** o alvo pode ser de qualquer oponente. O valor de Counter e o [Blocker] são só de quem foi atacado; quem
+  está de fora pode jogar Evento [Counter] e reage a ataques e bloqueios dos oponentes.
+- **Efeitos em "seu oponente":** alvo em campo é qualquer alvo legal de qualquer oponente; o que mexe na mão ou na
+  Vida vale para cada oponente; efeitos contínuos valem para todos; condição precisa de um oponente só.
+- **Duração:** "até o fim do turno do seu oponente" vira "até o começo do seu turno".
+- **Fim:** "you win the game" encerra a partida; fora isso, vence o último de pé.
 
-Vida extra, bônus de início, recompensa e relógio são opções da sala, com esses valores como padrão.
+O manual não fala de eliminação, relógio nem recompensa. No motor, quem leva dano no Líder sem Vida, fica sem deck,
+desiste ou estoura o tempo sai da mesa (as cartas dele saem do jogo) e a mesa segue. O relógio é assunto da fase 2:
+a proposta é 25 minutos por jogador (hoje são 17:30 no 1x1), correndo só nas decisões dele.
 
-### A regra dos efeitos em "seu oponente"
-
-É o ponto que decide o tamanho do trabalho. As cartas foram escritas para dois jogadores, e reescrever efeito por
-efeito não é viável. A proposta são três regras gerais, aplicadas pelo motor a qualquer carta:
-
-1. **Em batalha**, "seu oponente" é o outro jogador da batalha.
-2. **Fora de batalha**, quem usa o efeito **escolhe um oponente** quando o efeito começa a resolver. Todo "seu
-   oponente" daquele efeito (condições, alvos, descartes) aponta para o escolhido.
-3. **Efeitos contínuos** e **[Opponent's Turn]** valem para todos os oponentes e para o turno de qualquer um deles.
-
-Com dois jogadores as três regras dão o mesmo resultado de hoje, então o 1x1 não muda (replays, testes e
-estatísticas continuam idênticos).
+> A primeira versão da fase 1 seguia três regras propostas aqui antes de o manual chegar (quem usa o efeito
+> escolhia um oponente; em batalha só valia o outro jogador da batalha; bônus de +1 carta ou +1 DON!! para o 3º e o
+> 4º; deck de 50; comprar 1 por eliminação). O manual manda diferente e o motor foi ajustado: a tabela do "antes e
+> agora" está no fim de `regras-yonko.md`.
 
 ### O que muda no código
 
-- **Motor (`packages/engine`):** `PlayerId` deixa de ser `0 | 1` e o estado passa a ter N jogadores. A função
-  `opponent(p)` tem 56 usos em `engine.ts`; cada um vira uma de três funções (`battleOpponent`, `focusOpponent`,
-  `opponents`), conforme as regras acima. Entram: a decisão nova `chooseOpponent` (só abre com mais de um oponente
-  vivo), a ordem de turno que pula eliminados, a eliminação com limpeza das zonas, e a visão por jogador (`view.ts`)
-  para N lugares.
+- **Motor (`packages/engine`):** feito na fase 1 (ver abaixo).
 - **Servidor (`online/room.ts`, `lobby.ts`):** a sala assume 2 lugares (`seats.length !== 2`). Passa a N lugares, com
   relógio, reconexão, abandono que elimina em vez de encerrar, e a gravação para retomar depois de deploy.
 - **Interface:** uma mesa nova (`YonkoBoard`), não uma adaptação de `Board`/`WideBoard`: três oponentes compactos em
@@ -317,50 +309,49 @@ estatísticas continuam idênticos).
 ### Fase 1: como ficou
 
 Tudo no motor (`packages/engine`); servidor e interface não mudaram, e nada disso aparece para o jogador ainda.
+Cada regra do manual tem a linha correspondente em [`regras-yonko.md`](regras-yonko.md).
 
 - **Mesa de 2 a 4 lugares.** `createGame` aceita até `MAX_PLAYERS` (4) jogadores e as regras da mesa em
-  `GameConfig.table` (`TableRules`: `extraLife`, `lateBonus`, `eliminationDraw`). `YONKO_TABLE` traz o "Padrão GumGum
-  v1" (+2 de Vida, bônus do 3º e do 4º, comprar 1 por eliminação). Com dois jogadores `table` é ignorado.
-- **Preparação e turnos.** Sem `firstPlayer`, o sorteio escolhe um lugar e a ordem segue os lugares. Mulligans na
-  ordem dos turnos; depois o 3º e o 4º escolhem o bônus (uma escolha `option` com `startBonus`). Ninguém ataca no
-  próprio primeiro turno (`turnsTaken`), e a ordem pula quem saiu.
-- **Ataque.** O alvo pode ser o Líder ou um Personagem de qualquer oponente (`legalActions` lista todos). Só o
-  defensor bloqueia, usa Counter e dispara [On Your Opponent's Attack].
-- **"Seu oponente".** `opponentOf(state, p)` aplica as três regras: o outro jogador da batalha; o oponente escolhido
-  para o efeito (`focus` no frame, por uma escolha `option` com `opponents`, que só abre com mais de um oponente
-  vivo); e, sem contexto, todos os oponentes (auras, [Opponent's Turn]) ou "algum oponente cumpre" (condições).
-  Dois refinamentos que saíram dos testes, para não perguntar à toa:
-  - A escolha só abre quando o efeito **faz algo** com o oponente (`mentionsOpponent`). "If your opponent has 3 or
-    less Life cards, draw…" não pergunta: vale se algum oponente cumpre.
-  - "Up to 1 Leader or Character card" (sem "your opponent's") alcança as cartas de toda a mesa.
-- **Durações.** "Until the end of your opponent's next turn", usado no seu turno, vale até o seu turno recomeçar
-  (cobre o próximo turno de cada oponente); usado no turno de um oponente, até o fim do próximo turno dele. "Until
-  the start of your next turn" segue igual. O motor guarda de quem é o turno que encerra o efeito (`Expiry`), porque
-  com eliminações não dá para saber o número do turno de antemão.
+  `GameConfig.table` (`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`). `YONKO_TABLE` traz as do manual
+  (+2 de Vida e a escolha da largada). Com dois jogadores `table` é ignorado.
+- **Deck.** `validateYonkoDeck`: 60 cartas, uma cópia de cada número, cor do Líder.
+- **Preparação e turnos.** Sem `firstPlayer`, o sorteio escolhe um lugar e a ordem segue os lugares. Antes das mãos,
+  cada um escolhe a largada (uma escolha `option` com `curve`); depois as mãos, os mulligans na ordem e a Vida.
+  Ninguém ataca no próprio primeiro turno (`turnsTaken`), e a ordem pula quem saiu.
+- **Ataque e batalha.** O alvo pode ser o Líder ou um Personagem de qualquer oponente. Só o defensor bloqueia e usa
+  o valor de Counter. Na etapa de Counter, os outros oponentes do atacante podem usar Eventos [Counter] antes do
+  defensor (`counter` com `bystander`), e [On Your Opponent's Attack] dispara para todos os oponentes do atacante.
+- **"Seu oponente".** Alvo em campo: as cartas de todos os oponentes. Mão, Vida, DON!! e deck "do oponente": o
+  passo roda uma vez contra cada oponente (`eachOpponent`), com a condição dele conferida contra cada um. Condição
+  num efeito que não atinge o oponente: basta um (`anyOpponent`). Auras e [Opponent's Turn]: todos os oponentes.
+- **Durações.** "Until the end of your opponent's next turn" vale até o seu turno recomeçar. O motor guarda de quem
+  é o turno que encerra o efeito (`Expiry`), porque com eliminações não dá para saber o número do turno de antemão.
 - **Eliminação.** Dano no Líder sem Vida, deck vazio, desistência ou tempo esgotado tiram o jogador da mesa
   (`PlayerState.out`): as cartas dele saem do jogo, os efeitos dele acabam, a batalha em que estava termina e, se
-  era a vez dele, o turno passa. Quem deu o golpe final compra a recompensa (desistência e deck vazio não são golpe
-  de ninguém). `state.eliminated` guarda a ordem de queda; o último de pé vence, e a mesa do fim fica à vista.
-  "You win the game" (efeito ou regra do Líder) continua encerrando a partida na hora.
+  era a vez dele, o turno passa. `state.eliminated` guarda a ordem de queda; o último de pé vence, e a mesa do fim
+  fica à vista. "You win the game" (efeito ou regra do Líder) encerra a partida na hora.
 - **O 1x1 não mudou.** Os 787 testes antigos passam, e 1.300 partidas 1x1 de bots (700 com as coleções do
   repositório e 600 com a base completa do site) dão exatamente o mesmo estado antes e depois da mudança (comparado
   a cada 25 ações e no fim de cada partida).
 
 **Simulação** (`npm run simulate:yonko -w @gumgum/engine -- [cartas] [partidas] [aleatoriedade] [jogadores]`): mesas
-de 4 bots simples com decks aleatórios válidos, conferindo a cada ação as cartas e os DON!! de cada jogador, o
-limite de Personagens e que o motor nunca espera a decisão de um eliminado. Com a base completa do site (3.025
-cartas, 155 Líderes) e 25% de ações aleatórias, 2.700 mesas (duas rodadas, de 1.500 e 1.200) terminaram sem travar,
+de 4 bots simples com decks aleatórios de 60 cartas sem repetição, conferindo a cada ação as cartas e os DON!! de
+cada jogador, o limite de Personagens e que o motor nunca espera a decisão de um eliminado.
+Com a base completa do site (3.025 cartas, 155 Líderes) e 25% de ações aleatórias, 1.500 mesas terminaram sem travar,
 sem laço infinito e sem quebra de invariante: **nenhuma carta entrou na lista de problemáticas**. Média de 36
-turnos (9 por jogador) e 10 escolhas de oponente por partida. Vitórias pela posição na ordem, do 1º ao 4º: 706 /
-637 / 674 / 683 (26%, 24%, 25% e 25%), isto é, com o bônus do 3º e do 4º a ordem pesa pouco (os bots são fracos;
-vale medir de novo com gente jogando). Cerca de 1 mesa em 150 acaba por "you win the game" com oponentes ainda de pé.
+turnos (9 por jogador). Vitórias pela posição na ordem, do 1º ao 4º: 389 / 350 / 388 / 373 (26%, 23%, 26% e 25%; os
+bots escolhem sempre a largada de 1 DON!! com compra e jogam mal, então vale medir de novo com gente jogando). A vez
+de Counter abriu para quem não era o defensor 6 vezes por partida, e 13 mesas (1 em 115) acabaram por "you win the
+game" com oponentes ainda de pé.
 
 O que a simulação **não** mede: se cada efeito faz o que um jogador esperaria numa mesa de 4. Ela prova que nada
-quebra; a leitura das cartas segue as três regras, e os casos estranhos vão aparecer jogando.
+quebra; a leitura das cartas segue o manual, e os casos estranhos vão aparecer jogando. O bot simples também não usa
+Evento [Counter] na batalha dos outros; essa parte é exercitada só pelas ações aleatórias.
 
-**Ficou para as próximas fases:** sala e relógio no servidor (fase 2); a mesa (fase 3); o bot com busca, o replay,
-o espectador e o editor de cenários, que continuam de dois jogadores (`bot/planner.ts`, `replay.ts`, `motion.ts`,
-`status.ts`, `scenario.ts`). O bot simples (`bot/simple.ts`) já joga em mesa: mira quem tem menos Vida.
+**Ficou para as próximas fases:** sala e relógio no servidor (fase 2); a mesa (fase 3); o construtor de decks de 60
+no site; o bot com busca, o replay, o espectador e o editor de cenários, que continuam de dois jogadores
+(`bot/planner.ts`, `replay.ts`, `motion.ts`, `status.ts`, `scenario.ts`). O bot simples (`bot/simple.ts`) já joga
+em mesa: mira quem tem menos Vida.
 
 ### Fora da v1
 
@@ -368,13 +359,15 @@ Mesa de 3, fila pública, torneio de Yonko, alianças formais, 2 contra 2 e bot 
 
 ### Decisões que são suas
 
-A fase 1 seguiu a proposta nas duas primeiras; as duas são fáceis de mudar (a 6 é uma opção da mesa).
+O manual fechou as antigas decisões 5 (regra dos efeitos) e 6 (recompensa por eliminação: não há). Ficam:
 
-5. **Regra dos efeitos:** as três regras acima servem, ou a sua mesa joga diferente (por exemplo, efeitos em área
-   atingindo todos os oponentes)? *Implementado: as três regras, com os dois refinamentos de "Fase 1: como ficou".*
-6. **Recompensa por eliminação:** comprar 1 carta, outra coisa, ou nada? *Implementado: comprar 1 carta
-   (`eliminationDraw`), só para golpe final de ataque ou de efeito.*
+5. **DON!! do oponente:** o manual só fala em mão e Vida. O motor trata os DON!! do mesmo jeito ("your opponent
+   returns 1 DON!!" vale para cada oponente). Mantém, ou nesses efeitos quem usa escolhe um oponente só?
+6. **Counter de quem está de fora:** a vez dele só abre quando ele tem um Evento [Counter] que pode pagar (o jogo
+   anda, mas a pausa revela que ele tem um). A alternativa é abrir sempre para os três, em todo ataque.
 7. **Bot na v1:** aceitar o bot fraco para completar mesa, ou lançar só para 4 humanos?
+
+As outras interpretações, menores, estão na seção 4 de [`regras-yonko.md`](regras-yonko.md).
 
 ## 5. O que não muda
 

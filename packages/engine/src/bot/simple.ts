@@ -95,8 +95,6 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
 
     case 'option': {
       if (pending.don) return { type: 'option', player, index: pickDonToReturn(state, player, pending.don) };
-      // Mesa com mais de dois: o efeito atinge o oponente que o bot já mira.
-      if (pending.opponents) return { type: 'option', player, index: Math.max(0, pending.opponents.indexOf(rivalOf(state, player))) };
       // Opções do próprio efeito: a primeira; escolhendo pelo oponente ("Your opponent chooses one"): a última.
       const own = state.cards[pending.source]?.owner === player;
       return { type: 'option', player, index: own ? 0 : pending.options.length - 1 };
@@ -130,6 +128,8 @@ function choosePending(state: GameState, player: PlayerId, actions: Action[]): A
     }
 
     case 'counter': {
+      // Mesa com mais de dois: o bot não se mete na batalha dos outros.
+      if (pending.bystander) return { type: 'pass', player };
       const b = state.battle!;
       const ap = getPower(state, b.attacker);
       const tp = getPower(state, b.target);

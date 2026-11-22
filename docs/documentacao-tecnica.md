@@ -332,33 +332,41 @@ cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores d
 ### Mesa com mais de dois jogadores (Yonko)
 
 Só o motor (fase 1 de `docs/plano-modos-de-jogo.md`, seção 4): servidor, interface, replay e o bot com busca continuam
-de dois jogadores. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
+de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
+é interpretação nossa. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
 `players`) e a ordem dos turnos segue os lugares. Com mais de dois (`isMultiplayer`), o estado ganha `table`
-(`TableRules`: `extraLife`, `lateBonus`, `eliminationDraw`; `YONKO_TABLE` é o padrão), `eliminated` (ordem de queda),
-`turnsTaken` (ninguém ataca no próprio primeiro turno) e `bonusDon`/`bonusChosen`. Com dois, nenhum desses campos
-existe e o caminho do código é o de sempre (`opponent(p)`, `untilTurn` numérico): uma partida 1x1 dá o mesmo estado
-que dava antes.
+(`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`; `YONKO_TABLE` é o do manual), `eliminated` (ordem de
+queda), `turnsTaken` (ninguém ataca no próprio primeiro turno), `curve` (a largada de cada um) e `dealt`. Com dois,
+nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`, `untilTurn` numérico): uma partida
+1x1 dá o mesmo estado que dava antes.
 
-- **"Your opponent"**: `opponentOf(state, p)`. Pela ordem (`fixedOpponent`): o outro jogador da batalha; o `focus`
-  do frame de efeito de `p` em resolução; o único oponente vivo. Sem nenhum, `targetCandidates` olha todos os
-  oponentes (`opponentSides`) e `conditionHolds` vale se algum oponente cumpre (`anyOpponent`). `side: 'any'` são as
-  cartas de toda a mesa. As auras `side: 'opponent'` e os eventos "do oponente" já comparavam dono com dono, então
-  valem para todos os oponentes sem mudança.
-- **Escolha do oponente**: em `stepEffect`, antes do primeiro passo que faz algo com o oponente (`mentionsOpponent`,
-  que lê os dados do passo: campos e valores com "opp", menos a condição `if` e a duração), `askOpponent` abre uma
-  escolha `option` com `opponents`; a resposta grava `frame.focus`. Frames aninhados do mesmo jogador herdam o foco.
+- **Deck**: `validateYonkoDeck` (`deck.ts`) é `validateDeck` com `size: 60` e `maxCopies: 1`.
+- **Alvos**: `targetCandidates` com `side: 'opponent'` junta as cartas de todos os oponentes (`opponentSides`);
+  `side: 'any'` são as cartas de toda a mesa. As auras `side: 'opponent'` e os eventos "do oponente" já comparavam
+  dono com dono, então valem para todos os oponentes sem mudança.
+- **Mão, Vida, DON!! e deck "do oponente"**: em `stepEffect`, um passo `eachOpponent` (lista explícita de tipos de
+  passo) é trocado por uma cópia para cada oponente vivo, na ordem dos turnos, cada uma com `vs`. A cópia roda com
+  esse oponente fixado (`withOpponent`), a condição `if` dela inclusive; os passos que ela insere e os efeitos que
+  empilha herdam o oponente (`vs` nos passos, `focus` no frame). `opponentOf(state, p)` devolve o oponente fixado
+  (`fixedOpponent`: a cópia em execução, o `focus` do frame ou o único oponente vivo).
+- **Condições**: `conditionHolds` sem oponente fixado vale se algum oponente cumpre (`anyOpponent`).
+- **Batalha**: o defensor é o dono do alvo atual. Em `stepBattle`, a etapa de Counter percorre `battle.bystanders`
+  (os oponentes do atacante que não são o defensor) antes do defensor: abre `counter` com `bystander` para quem tem
+  Evento [Counter] pagável (`bystanderCounterOptions`). [On Your Opponent's Attack] é empilhado para todos os
+  oponentes do atacante.
 - **Durações**: `setExpiry` (em `addModifier`, `restrict`, `negateOnPlay`). Na mesa, `untilTurn` fica em `FAR_TURN` e
   `untilStartOf`/`untilEndOf` dizem de quem é o turno que encerra o efeito; `turnExpiries`, no começo de cada turno,
   remove os primeiros e converte os segundos no número do turno em curso.
-- **Preparação**: `continueSetup` (mulligans na ordem, bônus `startBonus` do 3º e do 4º, Vida, primeiro turno).
+- **Preparação**: `continueSetup` (largadas com a escolha `option`/`curve`, mãos, "at the start of the game",
+  mulligans na ordem, Vida, primeiro turno); `refreshDrawDon` lê a largada no primeiro turno de cada um.
 - **Eliminação**: `eliminate` substitui o antigo `defeat` (com dois jogadores, chama `gameOver` como antes).
   `removePlayer` marca `out`, esvazia as áreas, encerra a batalha e os frames/efeitos do jogador, corta as cartas
-  dele das escolhas abertas dos outros, paga a recompensa a `by` e, se era a vez dele, deixa só um frame `endTurn`
-  na pilha (o turno fecha pelo caminho normal). `locate` não encontra o Líder de quem saiu; `alivePlayers` é a
-  lista para percorrer a mesa. O último a cair não é marcado `out`: a partida acabou e a mesa fica como estava.
-  `concede` e `timeout` eliminam (e seguem com `run`) em vez de encerrar.
-- **Diagnóstico**: `setOpponentProbe` avisa quando um passo consulta o oponente sem contexto (um campo que
-  `mentionsOpponent` ainda não conhece). `scripts/simulate-yonko.ts` usa isso e confere os invariantes por jogador.
+  dele das escolhas abertas dos outros e, se era a vez dele, deixa só um frame `endTurn` na pilha (o turno fecha
+  pelo caminho normal). `locate` não encontra o Líder de quem saiu; `alivePlayers` é a lista para percorrer a
+  mesa. O último a cair não é marcado `out`: a partida acabou e a mesa fica como estava. `concede` e `timeout`
+  eliminam (e seguem com `run`) em vez de encerrar.
+- **Diagnóstico**: `setOpponentProbe` avisa quando um passo consulta "o oponente" sem um fixado (um tipo de passo que
+  `eachOpponent` ainda não conhece). `scripts/simulate-yonko.ts` usa isso e confere os invariantes por jogador.
 
 ### Tradução
 

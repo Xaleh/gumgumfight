@@ -914,7 +914,16 @@ type EffectStepBody =
  * `afterIf`: o passo vem de um "Then, …" depois de um "If X, …": se o último "if" do efeito
  * falhou, ele também não acontece (CR 4-10-2).
  */
-export type EffectStep = EffectStepBody & { if?: StepCondition; afterIf?: true };
+export type EffectStep = EffectStepBody & {
+  if?: StepCondition;
+  afterIf?: true;
+  /**
+   * Mesa com mais de dois jogadores: o oponente contra o qual esta cópia do passo roda. O motor a cria
+   * durante a resolução, uma por oponente, para os passos que valem para cada um (`eachOpponent`); as
+   * cartas não trazem o campo.
+   */
+  vs?: PlayerId;
+};
 
 
 
@@ -1231,6 +1240,11 @@ export interface BattleState {
   endFired?: boolean;
   /** "at the end of this battle, …" */
   after?: Array<{ controller: PlayerId; source: string; steps: EffectStep[]; last?: string[] }>;
+  /**
+   * Mesa com mais de dois jogadores, na etapa de Counter: os oponentes do atacante que não são o defensor e
+   * ainda não passaram a vez de usar um Evento [Counter] (o defensor decide depois deles).
+   */
+  bystanders?: PlayerId[];
 }
 
 /** De onde sai um DON!! do campo: área de custo (ativo ou virado) ou a carta (uid) a que está dado. */
@@ -1300,7 +1314,16 @@ export type Pending =
    * Etapa de Counter do defensor. Abre sempre, mesmo sem carta de Counter na mão
    * (`options` vazio): pular a etapa contaria ao atacante que a mão não tem Counter.
    */
-  | { kind: 'counter'; player: PlayerId; options: string[] }
+  | {
+      kind: 'counter';
+      player: PlayerId;
+      options: string[];
+      /**
+       * Mesa com mais de dois jogadores: quem responde não é o defensor. Só pode usar Eventos [Counter]
+       * (as opções), não o valor de Counter das cartas; `pass` devolve a vez.
+       */
+      bystander?: true;
+    }
   /**
    * Carta que saiu da Vida, mostrada só ao dono. `answer` yes ativa o [Trigger] (só
    * vale quando a carta tem um); no coloca a carta na mão. Abre para toda carta de
@@ -1339,12 +1362,10 @@ export type Pending =
       don?: DonSource[];
       shown?: string[];
       /**
-       * Mesa com mais de dois jogadores: a escolha de qual oponente o efeito de `source` atinge (ver
-       * `opponentOf` no motor). Cada opção é o nome de um oponente; aqui, o lugar dele.
+       * Mesa com mais de dois jogadores: a largada de `player`, escolhida antes das mãos iniciais. Opção 0 =
+       * 1 DON!! no primeiro turno e comprar 1 carta (curva 1, 3, 5…); 1 = 2 DON!! sem comprar (2, 4, 6…).
        */
-      opponents?: PlayerId[];
-      /** Mesa com mais de dois jogadores: o bônus de quem joga depois (opção 0 = +1 carta, 1 = +1 DON!!). */
-      startBonus?: true;
+      curve?: true;
     }
   /** O jogador aplica à mão o efeito `text` da carta `source` e depois confirma. */
   | { kind: 'manual'; player: PlayerId; source: string; text: string };
@@ -1376,8 +1397,9 @@ export type Frame =
       /** O último passo com condição da carta ("If X, …") não a cumpriu (para o "Then" seguinte, CR 4-10-2). */
       ifFailed?: boolean;
       /**
-       * Mesa com mais de dois jogadores: o oponente que este efeito atinge, escolhido por quem o usa quando o
-       * efeito começa a resolver. Todo "your opponent" do efeito aponta para ele (ver `opponentOf` no motor).
+       * Mesa com mais de dois jogadores: o único oponente a que este efeito se refere. São os passos que um
+       * oponente escolheu em "Your opponent chooses one", ou os que um passo `vs` empilhou: todo "your
+       * opponent" deles aponta para esse jogador.
        */
       focus?: PlayerId;
       /**
@@ -1545,17 +1567,20 @@ export interface GameState {
   donRestAtMain?: Array<{ player: PlayerId; count: number }>;
   /**
    * Regras da mesa com mais de dois jogadores (`GameConfig.table`); ausente no jogo normal. Os campos seguintes
-   * (`eliminated`, `turnsTaken`, `bonusDon`) também só existem nessas mesas.
+   * (`eliminated`, `turnsTaken`, `curve`, `dealt`) também só existem nessas mesas.
    */
   table?: TableRules;
   /** Eliminados, na ordem em que caíram (o primeiro da lista ficou em último lugar). */
   eliminated?: PlayerId[];
   /** Turnos que cada jogador já começou (ninguém ataca no próprio primeiro turno). */
   turnsTaken?: number[];
-  /** Quem escolheu +1 DON!! no primeiro turno e ainda não o recebeu. */
-  bonusDon?: PlayerId[];
-  /** Quem já escolheu o bônus de quem joga depois. */
-  bonusChosen?: PlayerId[];
+  /**
+   * A largada que cada jogador escolheu (`TableRules.curveChoice`), pelo lugar: 'odd' = 1 DON!! no primeiro
+   * turno e a compra; 'even' = 2 DON!! sem comprar. null = ainda não escolheu.
+   */
+  curve?: Array<'odd' | 'even' | null>;
+  /** As mãos iniciais já foram compradas (na mesa, só depois das escolhas de largada). */
+  dealt?: true;
   /** Vencedor. Com `phase` 'gameover', null é empate (derrota simultânea, 9-2-1; laço infinito, 11-1). */
   winner: PlayerId | null;
   winReason: string | null;
@@ -1693,15 +1718,20 @@ export interface PlayerSetup {
 }
 
 /**
- * Regras da mesa de todos contra todos (o formato Yonko). São opções da sala: o motor aplica o que vier aqui, e
- * `YONKO_TABLE` traz os valores padrão. Sem um campo, a regra correspondente fica desligada.
+ * Regras da mesa de todos contra todos (o formato Yonko, "Four Emperors"). São opções da sala: o motor aplica
+ * o que vier aqui, e `YONKO_TABLE` traz as do manual do formato. Sem um campo, a regra correspondente fica
+ * desligada.
  */
 export interface TableRules {
-  /** Vida a mais que a impressa no Líder. */
+  /** Vida a mais que a impressa no Líder (manual: +2). */
   extraLife?: number;
-  /** O 3º e o 4º da ordem escolhem um bônus: +1 carta na mão inicial ou +1 DON!! no primeiro turno. */
-  lateBonus?: boolean;
-  /** Cartas que compra quem dá o golpe final num oponente. */
+  /**
+   * Antes das mãos iniciais, cada jogador escolhe a própria largada: 1 DON!! no primeiro turno e comprar 1
+   * carta, ou 2 DON!! sem comprar (manual). Desligado, vale o do jogo normal: quem começa não compra e recebe
+   * 1 DON!!; os outros compram e recebem 2.
+   */
+  curveChoice?: boolean;
+  /** Cartas que compra quem dá o golpe final num oponente (regra da casa; o manual não tem recompensa). */
   eliminationDraw?: number;
 }
 
