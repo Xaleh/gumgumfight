@@ -17,11 +17,14 @@ import { ReplayEmbed } from './components/ReplayEmbed';
 import { Stats } from './components/Stats';
 import { TeamBot } from './components/TeamBot';
 import { Tournaments } from './components/Tournaments';
+import { Yonko } from './components/Yonko';
+import { YonkoTable } from './components/YonkoTable';
 import { Watch } from './components/Watch';
 import { DECK_LINK_PARAMS, type DeckLink, parseDeckLink } from './deeplink';
 import { isReplayPath } from './embed';
 import { syncTutorialProgress } from './game/tutorial/progress';
 import type { GameSetup } from './game/useGame';
+import type { YonkoSetup } from './game/useYonkoGame';
 import { usePushSync, useWakeLock } from './pwa';
 import { useSettings } from './settings';
 
@@ -52,7 +55,10 @@ type Screen =
   /** Selado (Pré-release): abrir boosters, montar o deck de 40 e jogar. `pool`: abre direto esse deck. */
   | { name: 'sealed'; pool?: string; hub?: 'sealed' | 'draft' }
   /** Pod de Draft: sala de espera, escolhas e, no fim, a ida para a montagem do deck (tela do Selado). */
-  | { name: 'draft'; pod: string };
+  | { name: 'draft'; pod: string }
+  /** Yonko: a sala (`again`: volta de uma mesa com o mesmo deck) e a mesa local contra bots. */
+  | { name: 'yonko'; again?: YonkoSetup }
+  | { name: 'yonko-game'; setup: YonkoSetup; key: number };
 
 /** Partida online aberta nesta aba: ao recarregar a página, volta direto para ela. */
 const OPEN_MATCH = 'gumgum.openMatch';
@@ -104,7 +110,7 @@ function MainApp() {
     }
   }, [screen]);
   // Música do menu em toda tela fora da mesa (a mesa troca para a música da partida ao abrir).
-  const inMatch = screen.name === 'game' || screen.name === 'online' || screen.name === 'watch' || screen.name === 'lesson';
+  const inMatch = screen.name === 'game' || screen.name === 'online' || screen.name === 'watch' || screen.name === 'lesson' || screen.name === 'yonko-game';
   useEffect(() => {
     if (!inMatch) audio.music('menu');
   }, [inMatch]);
@@ -260,6 +266,20 @@ function MainApp() {
   if (screen.name === 'draft') {
     return <Draft key={screen.pod} podId={screen.pod} onExit={() => setScreen({ name: 'sealed', hub: 'draft' })} onBuild={(pool) => setScreen({ name: 'sealed', pool })} />;
   }
+  if (screen.name === 'yonko') {
+    return (
+      <Yonko
+        again={screen.again}
+        onExit={() => setScreen({ name: 'menu' })}
+        onBuildDecks={() => setScreen({ name: 'builder' })}
+        onStart={(setup) => setScreen({ name: 'yonko-game', setup, key: Date.now() })}
+      />
+    );
+  }
+  if (screen.name === 'yonko-game') {
+    const { setup } = screen;
+    return <YonkoTable key={screen.key} setup={setup} onExit={() => setScreen({ name: 'yonko' })} onRematch={() => setScreen({ name: 'yonko', again: setup })} />;
+  }
   if (screen.name === 'game') {
     const { setup } = screen;
     return (
@@ -296,6 +316,7 @@ function MainApp() {
       onTeamBot={isTeam(user) ? () => setScreen({ name: 'team' }) : undefined}
       onSealed={() => setScreen({ name: 'sealed', hub: 'sealed' })}
       onDraft={() => setScreen({ name: 'sealed', hub: 'draft' })}
+      onYonko={() => setScreen({ name: 'yonko' })}
       dev={dev}
     />
   );

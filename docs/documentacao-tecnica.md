@@ -331,8 +331,8 @@ cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores d
 
 ### Mesa com mais de dois jogadores (Yonko)
 
-Só o motor (fase 1 de `docs/plano-modos-de-jogo.md`, seção 4): servidor, interface, replay e o bot com busca continuam
-de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
+O motor e uma mesa local (fases 1 e 3 de `docs/plano-modos-de-jogo.md`, seção 4): servidor, replay e o bot com busca
+continuam de dois jogadores. As regras são as do manual do formato, resumidas em `docs/regras-yonko.md`, que traz também o que
 é interpretação nossa. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
 `players`) e a ordem dos turnos segue os lugares. Com mais de dois (`isMultiplayer`), o estado ganha `table`
 (`TableRules`: `extraLife`, `curveChoice`, `eliminationDraw`; `YONKO_TABLE` é o do manual), `eliminated` (ordem de
@@ -365,6 +365,14 @@ nenhum desses campos existe e o caminho do código é o de sempre (`opponent(p)`
   pelo caminho normal). `locate` não encontra o Líder de quem saiu; `alivePlayers` é a lista para percorrer a
   mesa. O último a cair não é marcado `out`: a partida acabou e a mesa fica como estava. `concede` e `timeout`
   eliminam (e seguem com `run`) em vez de encerrar.
+- **Etiquetas de duração** (`status.ts`): `modifierUntilInfo` lê `untilStartOf`/`untilEndOf` e diz de quem é o turno
+  que encerra o efeito.
+- **Telas** (`apps/web`): `components/Yonko.tsx` (a sala) monta o `GameConfig` com `yonkoDeckFrom` (deck de teste de
+  60 a partir de um deck comum) e as regras escolhidas; `game/useYonkoGame.ts` roda a partida no navegador
+  (`createGame`/`applyAction`), faz os bots jogarem com `chooseSimpleBotAction` sobre a visão do lugar deles e
+  entrega à mesa a visão de quem joga (`viewFor`); `components/YonkoTable.tsx` é a mesa, por clique, sem as
+  animações de `Motion.tsx`. Os estilos ficam no fim de `styles.css` (prefixo `.yk-`), sempre no tema escuro; os
+  textos em `i18n/yonko/`.
 - **Diagnóstico**: `setOpponentProbe` avisa quando um passo consulta "o oponente" sem um fixado (um tipo de passo que
   `eachOpponent` ainda não conhece). `scripts/simulate-yonko.ts` usa isso e confere os invariantes por jogador.
 

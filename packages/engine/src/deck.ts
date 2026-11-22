@@ -12,6 +12,7 @@
 import { buildCardDef, needsManual } from './cards';
 import { DECK_SIZE, hasType, YONKO_DECK_SIZE } from './engine';
 import { formatIssues, type PlayFormat, type RuleParams } from './formats';
+import { nextRandom } from './rng';
 import type { CardData, DeckList, GameState, LeaderRule, PlayerId } from './types';
 import { HIDDEN_CARD, HIDDEN_REF } from './view';
 
@@ -98,6 +99,38 @@ export interface ValidateOptions {
  */
 export function validateYonkoDeck(deck: DeckList, cards: Map<string, CardData> | Record<string, CardData>, options: ValidateOptions = {}): DeckReport {
   return validateDeck(deck, cards, { ...options, size: YONKO_DECK_SIZE, maxCopies: 1 });
+}
+
+/**
+ * Deck de Yonko montado a partir de um deck comum, para experimentar a mesa enquanto o construtor não monta os
+ * de 60: o Líder do deck e uma cópia de cada carta dele, completado até 60 com cartas sorteadas de `cards` que
+ * o Líder aceita (cor e regra do Líder), sem Líderes e sem cartas de efeito ainda não automatizado. O sorteio
+ * sai da `seed`: mesma seed, mesmo deck. `null` quando não há cartas diferentes que cheguem para 60.
+ */
+export function yonkoDeckFrom(deck: Pick<DeckList, 'leader' | 'cards' | 'name' | 'id'> & { arts?: DeckList['arts'] }, cards: Iterable<CardData>, seed: number): DeckList | null {
+  const byId = new Map<string, CardData>();
+  for (const c of cards) byId.set(c.id, c);
+  const leader = byId.get(deck.leader);
+  if (!leader || leader.category !== 'leader') return null;
+  const fits = (c: CardData | undefined): c is CardData => Boolean(c && c.category !== 'leader' && isColorCompatible(leader, c) && leaderAllows(leader, c));
+  const picked: string[] = [];
+  for (const entry of deck.cards) {
+    if (picked.length < YONKO_DECK_SIZE && !picked.includes(entry.id) && fits(byId.get(entry.id))) picked.push(entry.id);
+  }
+  const pool = [...byId.values()]
+    .filter((c) => fits(c) && !picked.includes(c.id) && !needsManual(c))
+    .map((c) => c.id)
+    .sort();
+  if (picked.length + pool.length < YONKO_DECK_SIZE) return null;
+  const rng = { rng: seed | 0 };
+  while (picked.length < YONKO_DECK_SIZE) picked.push(pool.splice(Math.floor(nextRandom(rng) * pool.length), 1)[0]);
+  return {
+    id: deck.id,
+    name: deck.name,
+    leader: deck.leader,
+    cards: picked.map((id) => ({ id, count: 1 })),
+    ...(deck.arts ? { arts: deck.arts } : {}),
+  };
 }
 
 export function validateDeck(

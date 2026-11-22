@@ -2,8 +2,9 @@
 
 > Status (22/11/2026): **All Blue, Pré-release (Selado de uma coleção), Pack Rush (selado e draft), Draft e Draft Cubo
 > implementados**; o README (seções "All Blue", "Selado", "Pack Rush", "Draft" e "Draft Cubo") descreve o que existe.
-> **Yonko: fase 1 feita** (o motor com até 4 jogadores, sem tela, pelas regras do manual do formato; ver "Fase 1:
-> como ficou" na seção 4 e [`regras-yonko.md`](regras-yonko.md)). Sala, mesa e bot do Yonko seguem como proposta.
+> **Yonko: fases 1 e 3 feitas** (o motor com até 4 jogadores, pelas regras do manual do formato, e as telas: a sala
+> e a mesa, no computador e no celular, numa **mesa local contra bots**; ver a seção 4, [`regras-yonko.md`](regras-yonko.md)
+> e a seção "Yonko" do README). Falta a fase 2 (sala online para 4 pessoas) e o que depende dela.
 > As telas estão em [`docs/mockups/modos-de-jogo/`](mockups/modos-de-jogo/index.html) (abra o `index.html` no navegador;
 > as imagens `.webp` da pasta são as mesmas telas). As cartas das telas são ilustrativas e os números são de exemplo.
 
@@ -16,7 +17,7 @@
 | **Selado: Draft** ✅ | Pod de 8 (bots nos lugares vazios): cada um abre um booster, pega 1 carta e passa o resto. Deck de 40. | Médio para grande (em cima do Pré-release) | Não | Sala em tempo real nova e bots que escolhem |
 | **Pack Rush** ✅ (selado e draft) | Selado ou Draft com boosters de **coleções variadas**; quem abre o pod escolhe quais entram. | Pequeno (em cima do Selado e do Draft) | Não | Booster configurado e cobertura de efeitos em **todas** as coleções, não só na mais nova |
 | **Draft Cubo** ✅ | Draft num conjunto fixo com as **cartas mais usadas** de One Piece, de todas as coleções. | Pequeno para médio (em cima do Draft) | Não | Manter a lista boa: curadoria a cada temporada |
-| **Yonko** 🚧 (fase 1 de 4) | Mesa de 4, todos contra todos, deck de 60 sem repetição: o formato da comunidade "Four Emperors". | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
+| **Yonko** 🚧 (motor e telas; falta o online) | Mesa de 4, todos contra todos, deck de 60 sem repetição: o formato da comunidade "Four Emperors". | Muito grande | **Sim**, bastante | O motor, a mesa e o bot foram feitos para 2 jogadores |
 
 Em esforço relativo, com o All Blue valendo 1: Pré-release ≈ 3, Draft ≈ +2, Pack Rush ≈ +1, Cubo ≈ +1,5 e Yonko ≈ 8
 ou mais. O Yonko é o único que muda o motor de regras; os outros são regras de deck e telas novas em volta da partida
@@ -303,8 +304,9 @@ a proposta é 25 minutos por jogador (hoje são 17:30 no 1x1), correndo só nas 
    partidas de 4 bots simples para achar cartas que quebram. **Ponto de decisão:** se a lista de cartas problemáticas
    for longa demais, paramos aqui sem ter gasto com tela. (Resultado abaixo: a lista veio vazia.)
 2. **Sala e servidor** para 4 humanos (sala privada com código).
-3. **Mesa** no computador e no celular.
-4. **Bot** para completar mesa, espectador e replay.
+3. ✅ **Mesa** no computador e no celular (feita antes da fase 2, como mesa local contra bots; ver "Fase 3: como
+   ficou").
+4. **Bot** para completar mesa (o bot simples já completa a mesa local), espectador e replay.
 
 ### Fase 1: como ficou
 
@@ -348,10 +350,35 @@ O que a simulação **não** mede: se cada efeito faz o que um jogador esperaria
 quebra; a leitura das cartas segue o manual, e os casos estranhos vão aparecer jogando. O bot simples também não usa
 Evento [Counter] na batalha dos outros; essa parte é exercitada só pelas ações aleatórias.
 
-**Ficou para as próximas fases:** sala e relógio no servidor (fase 2); a mesa (fase 3); o construtor de decks de 60
-no site; o bot com busca, o replay, o espectador e o editor de cenários, que continuam de dois jogadores
-(`bot/planner.ts`, `replay.ts`, `motion.ts`, `status.ts`, `scenario.ts`). O bot simples (`bot/simple.ts`) já joga
+**Ficou para as próximas fases:** sala e relógio no servidor (fase 2); o construtor de decks de 60 no site; o bot
+com busca, o replay, o espectador e o editor de cenários, que continuam de dois jogadores (`bot/planner.ts`,
+`replay.ts`, `motion.ts`, `scenario.ts`). O bot simples (`bot/simple.ts`) já joga
 em mesa: mira quem tem menos Vida.
+
+### Fase 3: como ficou
+
+As telas foram feitas antes do servidor, para o modo poder ser jogado e visto: a mesa roda no navegador, com uma
+pessoa e três bots simples (`game/useYonkoGame.ts`). O README (seção "Yonko") descreve o que o jogador encontra.
+
+- **Tela inicial:** o cartão **Yonko** na fileira dos modos especiais, ao lado de Selado e Draft.
+- **Sala (`components/Yonko.tsx`):** os quatro lugares, o deck de quem joga (pelo seletor de decks de sempre) e
+  as regras da mesa. Diferenças para a tela da proposta: não há código nem convite (é local); as regras são as do
+  manual (Vida extra, largada, recompensa como regra da casa) e não as da proposta antiga; não há formato de
+  cartas nem relógio, que são do online.
+- **Deck de teste (`yonkoDeckFrom`, no motor):** o formato pede 60 cartas sem repetição e o construtor monta 50.
+  Até o construtor aprender o formato, a mesa monta o deck a partir do Líder e das cartas do deck escolhido.
+- **Mesa (`components/YonkoTable.tsx`):** uma tela própria, como o plano previa, e não uma adaptação da mesa de
+  dois: três painéis de oponente, a faixa de ação, a mesa de quem joga, a mão e a coluna com ordem dos turnos,
+  registro e carta em destaque. Reusa `CardView`, os textos traduzidos do motor e o painel de texto da carta. No
+  celular os oponentes viram abas. Diferenças para a tela da proposta: sem chat, sem contagem de espectadores e
+  sem relógio por jogador (online); no lugar do chat fica a carta em destaque.
+- **Idiomas:** os textos das telas estão nos seis idiomas (`i18n/yonko/`).
+- **Conferido no navegador:** partidas inteiras jogadas por roteiro, no computador (1440×900) e no celular
+  (390×844), da largada à classificação final. Um erro apareceu assim e foi corrigido no motor: as etiquetas de
+  duração dos efeitos (`status.ts`) ainda supunham dois jogadores.
+
+**Ficou de fora desta versão:** arrastar cartas, animações de voo e som; ver o descarte carta a carta; dar o valor
+de Counter a outra carta que não a atacada; desfazer além do "cancelar" do motor; replay e estatísticas.
 
 ### Fora da v1
 

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { actingPlayer, legalActions } from '../src/actions';
 import { chooseBotAction } from '../src/bot/simple';
-import { isColorCompatible, validateYonkoDeck } from '../src/deck';
+import { isColorCompatible, validateYonkoDeck, yonkoDeckFrom } from '../src/deck';
 import {
   applyAction,
   attackError,
@@ -23,6 +23,7 @@ import {
   YONKO_TABLE,
 } from '../src/engine';
 import type { CardData, DeckList, EffectStep, GameState, PlayerId, TableRules } from '../src/types';
+import { cardStatuses } from '../src/status';
 import { HIDDEN_REF, identityAliases, viewFor } from '../src/view';
 import { countCards, countDon, crocodile, fetchToHand, kaido, kid, luffy, putOnField } from './helpers';
 
@@ -221,6 +222,19 @@ describe('Yonko: o deck (60 cartas, uma cópia de cada)', () => {
     expect(validateYonkoDeck(deck(ids.slice(0, 50)), base).issues).toContainEqual(expect.objectContaining({ code: 'rules.tooFewCards', params: { total: 50, missing: 10 } }));
     const offColor = [...base.values()].find((c) => c.category === 'character' && !isColorCompatible(leader, c))!.id;
     expect(validateYonkoDeck(deck([...ids.slice(0, 59), offColor]), base).issues).toContainEqual(expect.objectContaining({ code: 'rules.leaderColor', cardId: offColor }));
+  });
+
+  it('`yonkoDeckFrom`: um deck comum vira um deck de Yonko com as cartas dele e o resto sorteado', () => {
+    const made = yonkoDeckFrom(luffy, base.values(), 7)!;
+    expect(validateYonkoDeck(made, base)).toMatchObject({ valid: true, total: 60 });
+    expect(made.leader).toBe(luffy.leader);
+    const ids = new Set(made.cards.map((c) => c.id));
+    for (const c of luffy.cards) expect(ids.has(c.id)).toBe(true);
+    // Mesma seed, mesmo deck; outra seed, outro.
+    expect(yonkoDeckFrom(luffy, base.values(), 7)).toEqual(made);
+    expect(yonkoDeckFrom(luffy, base.values(), 8)).not.toEqual(made);
+    // Sem cartas que cheguem para 60, não há deck.
+    expect(yonkoDeckFrom(luffy, [base.get(luffy.leader)!, ...luffy.cards.map((c) => base.get(c.id)!)], 7)).toBeNull();
   });
 
   it('o motor aceita o deck de 60 na mesa, e não no jogo de dois', () => {
@@ -649,6 +663,19 @@ describe('Yonko: duração dos efeitos', () => {
     expect(s.modifiers.filter((m) => m.uid === leader)).toEqual([]);
   });
 
+  it('a etiqueta do efeito na carta diz de quem é o turno que o encerra', () => {
+    let s = toTurn(ready(), 5);
+    s = play(s, NEWGATE);
+    if (s.pending?.kind === 'selectTargets') s = applyAction(s, { type: 'choose', player: 0, uids: [leaderOf(s, 0)] });
+    const power = () => cardStatuses(s, leaderOf(s, 0)).find((x) => x.kind === 'power');
+    expect(power()).toMatchObject({ untilKey: 'status.untilStartOfNextTurn', untilParams: { name: 'J0' } });
+    // No turno de qualquer oponente a etiqueta continua a mesma (e a carta não quebra a tela).
+    s = applyAction(s, { type: 'endTurn', player: 0 });
+    s = applyAction(s, { type: 'endTurn', player: 1 });
+    expect(power()).toMatchObject({ untilKey: 'status.untilStartOfNextTurn', untilParams: { name: 'J0' } });
+    for (const ps of s.players) for (const fc of [ps.leader, ...ps.characters]) expect(() => cardStatuses(s, fc.uid)).not.toThrow();
+  });
+
   it('"until the end of your opponent\'s next turn" vale até o começo do seu turno', () => {
     let s = toTurn(ready(), 5);
     const victim = putOnField(s, 2, GRUNT.id);
@@ -854,6 +881,8 @@ describe('Yonko: partidas entre bots', () => {
       expect(s.players[p].out).toBeUndefined();
       expect(legalActions(s, p).length).toBeGreaterThan(0);
       s = applyAction(s, chooseBotAction(s, p));
+      // O que a mesa consulta para desenhar cada carta não pode quebrar com mais de dois jogadores.
+      if (i % 4 === 0) for (const ps of s.players) for (const fc of [ps.leader, ...ps.characters]) cardStatuses(s, fc.uid);
       for (const ps of s.players) {
         if (ps.out) {
           expect(countCards(s, ps.id)).toBe(1);

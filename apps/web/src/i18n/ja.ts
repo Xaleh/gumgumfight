@@ -8,6 +8,7 @@ import decks from './decks/ja';
 import team from './team/ja';
 import chamber from './chamber/ja';
 import sealed from './sealed/ja';
+import yonko from './yonko/ja';
 
 export default {
   // ---- 全般 ----
@@ -3100,5 +3101,6 @@ export default {
   ...team,
   ...chamber,
   ...sealed,
+  ...yonko,
 } satisfies Messages;
 

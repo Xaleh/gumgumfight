@@ -475,6 +475,38 @@ código para chamar os amigos, 4 boosters de 12, o mesmo relógio).
   (arquivos), `apps/server/src/draft/cube-source.ts` e `apps/server/src/cube-cli.ts` (a coleta e o comando) e
   `apps/web/src/components/Cube.tsx` (a lista).
 
+## Yonko (mesa de 4, todos contra todos)
+
+Na tela inicial, o cartão **Yonko** abre a **Mesa dos 4 Imperadores**: o formato da comunidade "Four Emperors", em
+que quatro capitães jogam cada um por si e vence o último de pé. As regras seguem o manual do formato, resumido em
+[`docs/regras-yonko.md`](docs/regras-yonko.md).
+
+Por enquanto a mesa é **local**: você contra três bots, no próprio navegador, sem servidor e sem entrar nas
+estatísticas. A sala online com código, para quatro pessoas, ainda não existe.
+
+- **Sala:** os quatro lugares (você e três bots, com decks sorteados entre os prontos), o seu deck e as regras da
+  mesa: Vida extra (+2 no manual), a largada (cada um escolhe 1 DON!! e comprar, ou 2 DON!! sem comprar) e a
+  recompensa por eliminação (regra da casa, desligada no manual). O selo diz se a mesa está no manual ou em regra
+  da casa.
+- **Deck:** o formato pede 60 cartas, uma cópia de cada. Como o construtor ainda monta decks de 50, a mesa usa um
+  **deck de teste**: o Líder e uma cópia de cada carta do deck escolhido, completado até 60 com cartas sorteadas da
+  mesma cor (sem as de efeito ainda não automatizado).
+- **Mesa:** os três oponentes ficam em painéis no alto, com tudo o que é público (Líder, Vida, mão, DON!!, deck,
+  descarte, Personagens e Stage); a sua mesa fica embaixo, e ao lado vêm a ordem dos turnos, o registro e a carta
+  em destaque. Tudo é por clique: toque numa carta da mão para jogar, numa carta sua em campo para atacar, dar DON!!
+  ou ativar. Ao atacar, os alvos válidos acendem nas três mesas. A faixa do meio mostra a pergunta da vez
+  (largada, mulligan, alvos, bloqueio, Counter, carta da Vida) com os botões de resposta.
+- **Fora da batalha:** quando outro jogador é atacado e você tem um Evento [Counter] que pode pagar, a faixa abre
+  a sua vez de usá-lo antes de o defensor decidir.
+- **No celular:** os oponentes viram abas (com Vida e mão sempre à vista) e uma mesa abre por vez; a aba com um alvo
+  válido fica marcada. O registro e a carta abrem em gavetas; tocar e segurar numa carta mostra o texto dela.
+- **Fim:** quem cai sai da mesa e as cartas dele saem do jogo; a tela final mostra a classificação pela ordem de
+  queda.
+
+O que esta primeira versão **não** tem: mesa online, relógio, espectador e replay; arrastar cartas, animações e
+som da mesa de dois; ver o descarte carta a carta; dar o valor de Counter a outra carta que não a atacada; e o bot
+com busca (os bots da mesa são o bot simples, que completa a mesa mas joga mal).
+
 ## Estatísticas
 
 No menu, **📈 Estatísticas** mostra vitórias por Líder, por matchup (Líder x Líder) e por carta, com filtros por
