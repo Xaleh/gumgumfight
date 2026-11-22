@@ -2458,6 +2458,11 @@ export default {
   'engine.optPeekOwnLife': 'Look at your Life',
   'engine.optPeekOpponentLife': "Look at your opponent's Life",
   'engine.optDontPeek': "Don't look",
+  // ---- table with more than two players (Yonko) ----
+  'engine.chooseOpponent': '{source}: choose the opponent this effect applies to.',
+  'engine.startBonus': '{player}: choose your bonus for going later.',
+  'engine.optBonusCard': '+1 card in the opening hand',
+  'engine.optBonusDon': '+1 DON!! on the first turn',
   'engine.optYesLifeTrash': 'Yes, trash {n|# card|# cards} from the top of my Life',
   'engine.optYesDiscard': 'Yes, trash {n|# card|# cards} from my hand',
   'engine.optYesReturnDon': 'Yes, return {n|# active DON!!|# active DON!!}',
@@ -2548,6 +2553,14 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Both players ended the turn with no cards in their decks.',
   'log.winDeckOutLeaderRule': "{player} ran out of cards in their deck and wins by their Leader's rule.",
   'log.winBothDeckOutLeaderRule': "Both players ran out of cards in their decks and win by their Leader's rule.",
+  // ---- table with more than two players (Yonko) ----
+  'log.winAllOut': 'All remaining players were defeated at the same time.',
+  'log.eliminated': '{player} was eliminated. {reason}',
+  'log.eliminationReward': '{player} draws {n|# card|# cards} for eliminating {target}.',
+  'log.choosesOpponent': '{source}: {player} chooses {target} as the opponent.',
+  'log.startBonusCard': '{player} chooses +1 card in their opening hand.',
+  'log.startBonusDon': '{player} chooses +1 DON!! on their first turn.',
+  'log.startBonusDonGiven': '{player} gets +1 DON!! (bonus for going later).',
   // ---- undo ----
   'log.cancelPlay': '{player} undoes playing {card} (the card returns to their hand).',
   'log.cancelActivate': "{player} undoes activating {card}.",

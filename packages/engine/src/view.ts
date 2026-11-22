@@ -160,7 +160,7 @@ export function viewFor(state: GameState, viewer: PlayerId | null, aliases: Alia
       ...(ps.lifeFaceUp ? { lifeFaceUp: refs(ps.lifeFaceUp) } : {}),
       ...(ps.id === viewer ? { unseen: unseenOf(ps) } : {}),
     }),
-  ) as [PlayerState, PlayerState];
+  );
 
   const usedKey = (k: string) => {
     const i = k.lastIndexOf(':');

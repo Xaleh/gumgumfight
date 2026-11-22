@@ -2458,6 +2458,11 @@ export default {
   'engine.optPeekOwnLife': 'Mirar tu Vida',
   'engine.optPeekOpponentLife': 'Mirar la Vida de tu rival',
   'engine.optDontPeek': 'No mirar',
+  // ---- mesa con más de dos jugadores (Yonko) ----
+  'engine.chooseOpponent': '{source}: elige al oponente al que afecta el efecto.',
+  'engine.startBonus': '{player}: elige tu bonificación por jugar después.',
+  'engine.optBonusCard': '+1 carta en la mano inicial',
+  'engine.optBonusDon': '+1 DON!! en el primer turno',
   'engine.optYesLifeTrash': 'Sí, descartar {n|# carta|# cartas} de la parte superior de mi Vida',
   'engine.optYesDiscard': 'Sí, descartar {n|# carta|# cartas} de mi mano',
   'engine.optYesReturnDon': 'Sí, devolver {n|# DON!! activo|# DON!! activos}',
@@ -2548,6 +2553,14 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Ambos jugadores terminaron el turno sin cartas en el mazo.',
   'log.winDeckOutLeaderRule': '{player} se quedó sin cartas en el mazo y gana por la regla de su Líder.',
   'log.winBothDeckOutLeaderRule': 'Ambos jugadores se quedaron sin cartas en el mazo y ganan por la regla de su Líder.',
+  // ---- mesa con más de dos jugadores (Yonko) ----
+  'log.winAllOut': 'Todos los jugadores que quedaban fueron derrotados al mismo tiempo.',
+  'log.eliminated': '{player} fue eliminado. {reason}',
+  'log.eliminationReward': '{player} roba {n|# carta|# cartas} por eliminar a {target}.',
+  'log.choosesOpponent': '{source}: {player} elige a {target} como oponente.',
+  'log.startBonusCard': '{player} elige +1 carta en la mano inicial.',
+  'log.startBonusDon': '{player} elige +1 DON!! en su primer turno.',
+  'log.startBonusDonGiven': '{player} recibe +1 DON!! (bonificación por jugar después).',
   // ---- deshacer ----
   'log.cancelPlay': '{player} deshace la jugada de {card} (la carta vuelve a su mano).',
   'log.cancelActivate': '{player} deshace la activación de {card}.',

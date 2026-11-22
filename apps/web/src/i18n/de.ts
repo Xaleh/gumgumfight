@@ -2458,6 +2458,11 @@ export default {
   'engine.optPeekOwnLife': 'Dein Leben ansehen',
   'engine.optPeekOpponentLife': 'Leben des Gegners ansehen',
   'engine.optDontPeek': 'Nicht ansehen',
+  // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
+  'engine.chooseOpponent': '{source}: Wähle den Gegner, den der Effekt betrifft.',
+  'engine.startBonus': '{player}: Wähle deinen Bonus für späteres Spielen.',
+  'engine.optBonusCard': '+1 Karte auf der Starthand',
+  'engine.optBonusDon': '+1 DON!! im ersten Zug',
   'engine.optYesLifeTrash': 'Ja, {n|# Karte|# Karten} von oben aus meinem Leben ablegen',
   'engine.optYesDiscard': 'Ja, {n|# Karte|# Karten} von meiner Hand ablegen',
   'engine.optYesReturnDon': 'Ja, {n|# aktive DON!!|# aktive DON!!} zurücklegen',
@@ -2548,6 +2553,14 @@ export default {
   'log.winBothDeckOutEndOfTurn': 'Beide Spieler haben den Zug ohne Karten im Deck beendet.',
   'log.winDeckOutLeaderRule': '{player} hat keine Karten mehr im Deck und gewinnt durch die Regel seines Leaders.',
   'log.winBothDeckOutLeaderRule': 'Beide Spieler haben keine Karten mehr im Deck und gewinnen durch die Regel ihres Leaders.',
+  // ---- Tisch mit mehr als zwei Spielern (Yonko) ----
+  'log.winAllOut': 'Alle verbliebenen Spieler wurden gleichzeitig besiegt.',
+  'log.eliminated': '{player} ist ausgeschieden. {reason}',
+  'log.eliminationReward': '{player} zieht {n|# Karte|# Karten} für das Ausschalten von {target}.',
+  'log.choosesOpponent': '{source}: {player} wählt {target} als Gegner.',
+  'log.startBonusCard': '{player} wählt +1 Karte auf der Starthand.',
+  'log.startBonusDon': '{player} wählt +1 DON!! im ersten Zug.',
+  'log.startBonusDonGiven': '{player} erhält +1 DON!! (Bonus für späteres Spielen).',
   // ---- Rückgängig ----
   'log.cancelPlay': '{player} macht das Spielen von {card} rückgängig (die Karte kehrt auf die Hand zurück).',
   'log.cancelActivate': '{player} macht das Aktivieren von {card} rückgängig.',

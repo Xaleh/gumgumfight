@@ -2460,6 +2460,11 @@ const ptBR = {
   'engine.optPeekOwnLife': 'Olhar a sua Vida',
   'engine.optPeekOpponentLife': 'Olhar a Vida do oponente',
   'engine.optDontPeek': 'Não olhar',
+  // ---- mesa com mais de dois jogadores (Yonko) ----
+  'engine.chooseOpponent': '{source}: escolha o oponente que o efeito atinge.',
+  'engine.startBonus': '{player}: escolha o bônus de quem joga depois.',
+  'engine.optBonusCard': '+1 carta na mão inicial',
+  'engine.optBonusDon': '+1 DON!! no primeiro turno',
   'engine.optYesLifeTrash': 'Sim, descartar {n|# carta|# cartas} do topo da Vida',
   'engine.optYesDiscard': 'Sim, descartar {n|# carta|# cartas} da mão',
   'engine.optYesReturnDon': 'Sim, devolver {n|# DON!! ativo|# DON!! ativos}',
@@ -2551,6 +2556,14 @@ const ptBR = {
   'log.winBothDeckOutEndOfTurn': 'Os dois terminaram o turno sem cartas no deck.',
   'log.winDeckOutLeaderRule': '{player} ficou sem cartas no deck e vence pela regra do Líder.',
   'log.winBothDeckOutLeaderRule': 'Os dois ficaram sem cartas no deck e vencem pela regra do Líder.',
+  // ---- mesa com mais de dois jogadores (Yonko) ----
+  'log.winAllOut': 'Todos os jogadores que restavam foram derrotados ao mesmo tempo.',
+  'log.eliminated': '{player} foi eliminado. {reason}',
+  'log.eliminationReward': '{player} compra {n|# carta|# cartas} por eliminar {target}.',
+  'log.choosesOpponent': '{source}: {player} escolhe {target} como oponente.',
+  'log.startBonusCard': '{player} escolhe +1 carta na mão inicial.',
+  'log.startBonusDon': '{player} escolhe +1 DON!! no primeiro turno.',
+  'log.startBonusDonGiven': '{player} recebe +1 DON!! (bônus de quem joga depois).',
   // ---- desfazer ----
   'log.cancelPlay': '{player} cancela a jogada de {card} (a carta volta para a mão).',
   'log.cancelActivate': '{player} cancela a ativação de {card}.',

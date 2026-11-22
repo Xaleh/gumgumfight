@@ -2456,6 +2456,11 @@ export default {
   'engine.optPeekOwnLife': '自分のライフを見る',
   'engine.optPeekOpponentLife': '相手のライフを見る',
   'engine.optDontPeek': '見ない',
+  // ---- 3人以上の卓（四皇） ----
+  'engine.chooseOpponent': '{source}：効果の対象となる相手を選んでください。',
+  'engine.startBonus': '{player}：後手ボーナスを選んでください。',
+  'engine.optBonusCard': '初期手札+1枚',
+  'engine.optBonusDon': '最初のターンにドン!!+1枚',
   'engine.optYesLifeTrash': 'はい、ライフの上から{n|#枚}をトラッシュに置く',
   'engine.optYesDiscard': 'はい、手札を{n|#枚}トラッシュに置く',
   'engine.optYesReturnDon': 'はい、アクティブのドン!!を{n|#枚}戻す',
@@ -2546,6 +2551,14 @@ export default {
   'log.winBothDeckOutEndOfTurn': '両プレイヤーがデッキ0枚でターンを終了しました。',
   'log.winDeckOutLeaderRule': '{player}のデッキが0枚になり、リーダーのルールにより勝利します。',
   'log.winBothDeckOutLeaderRule': '両プレイヤーのデッキが0枚になり、リーダーのルールにより勝利します。',
+  // ---- 3人以上の卓（四皇） ----
+  'log.winAllOut': '残っていたプレイヤー全員が同時に敗北しました。',
+  'log.eliminated': '{player}が脱落しました。{reason}',
+  'log.eliminationReward': '{player}は{target}を脱落させたため、カードを{n}枚引きます。',
+  'log.choosesOpponent': '{source}：{player}は{target}を相手に選びました。',
+  'log.startBonusCard': '{player}は初期手札+1枚を選びました。',
+  'log.startBonusDon': '{player}は最初のターンのドン!!+1枚を選びました。',
+  'log.startBonusDonGiven': '{player}はドン!!を1枚追加で得ます（後手ボーナス）。',
   // ---- 取り消し ----
   'log.cancelPlay': '{player}は{card}のプレイを取り消します（カードは手札に戻ります）。',
   'log.cancelActivate': '{player}は{card}の発動を取り消します。',

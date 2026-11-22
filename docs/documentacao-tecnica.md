@@ -195,7 +195,7 @@ Tamanho do código (linhas, sem testes): motor ≈ 14.400, servidor ≈ 5.600, w
 ### Modelo
 
 - **Estado** (`GameState`, `types.ts:1200`): JSON puro, sem classes. Campos principais: `turn`, `firstPlayer`,
-  `activePlayer`, `phase` (`mulligan | main | gameover`), `players[2]` (líder, personagens, stage, mão, deck, lixo,
+  `activePlayer`, `phase` (`mulligan | main | gameover`), `players` (dois; até quatro na mesa de Yonko: líder, personagens, stage, mão, deck, lixo,
   Vida, DON!! ativos/virados/no deck), `cards` (instâncias `uid → {cardId, owner}`), `defs` (definições das cartas
   usadas), `stack` (frames de efeito/batalha/dano), `pending` (decisão esperada: alvo, bloqueio, counter, carta de
   Vida, confirmação, opção, mulligan, quem começa), `modifiers`, `log`, `winner`, `winReason`, `actionCount`,
@@ -328,6 +328,37 @@ recente; `setCubeDir` para os testes). `DraftPods.create(..., { cube: true })` a
 `draft/cube-source.ts`: `listTournaments` e `tournamentDecks` (API do Limitless, cache em disco só com as cartas de
 cada deck, cabeçalho `ratelimit` respeitado), `sampleTournaments` (os maiores de cada trimestre) e `usageByCard`
 (fração de decks por trimestre; a nota é a média dos `USAGE_BEST_QUARTERS` melhores).
+
+### Mesa com mais de dois jogadores (Yonko)
+
+Só o motor (fase 1 de `docs/plano-modos-de-jogo.md`, seção 4): servidor, interface, replay e o bot com busca continuam
+de dois jogadores. `createGame` aceita de 2 a `MAX_PLAYERS` (4) em `players`; `PlayerId` é o lugar (índice em
+`players`) e a ordem dos turnos segue os lugares. Com mais de dois (`isMultiplayer`), o estado ganha `table`
+(`TableRules`: `extraLife`, `lateBonus`, `eliminationDraw`; `YONKO_TABLE` é o padrão), `eliminated` (ordem de queda),
+`turnsTaken` (ninguém ataca no próprio primeiro turno) e `bonusDon`/`bonusChosen`. Com dois, nenhum desses campos
+existe e o caminho do código é o de sempre (`opponent(p)`, `untilTurn` numérico): uma partida 1x1 dá o mesmo estado
+que dava antes.
+
+- **"Your opponent"**: `opponentOf(state, p)`. Pela ordem (`fixedOpponent`): o outro jogador da batalha; o `focus`
+  do frame de efeito de `p` em resolução; o único oponente vivo. Sem nenhum, `targetCandidates` olha todos os
+  oponentes (`opponentSides`) e `conditionHolds` vale se algum oponente cumpre (`anyOpponent`). `side: 'any'` são as
+  cartas de toda a mesa. As auras `side: 'opponent'` e os eventos "do oponente" já comparavam dono com dono, então
+  valem para todos os oponentes sem mudança.
+- **Escolha do oponente**: em `stepEffect`, antes do primeiro passo que faz algo com o oponente (`mentionsOpponent`,
+  que lê os dados do passo: campos e valores com "opp", menos a condição `if` e a duração), `askOpponent` abre uma
+  escolha `option` com `opponents`; a resposta grava `frame.focus`. Frames aninhados do mesmo jogador herdam o foco.
+- **Durações**: `setExpiry` (em `addModifier`, `restrict`, `negateOnPlay`). Na mesa, `untilTurn` fica em `FAR_TURN` e
+  `untilStartOf`/`untilEndOf` dizem de quem é o turno que encerra o efeito; `turnExpiries`, no começo de cada turno,
+  remove os primeiros e converte os segundos no número do turno em curso.
+- **Preparação**: `continueSetup` (mulligans na ordem, bônus `startBonus` do 3º e do 4º, Vida, primeiro turno).
+- **Eliminação**: `eliminate` substitui o antigo `defeat` (com dois jogadores, chama `gameOver` como antes).
+  `removePlayer` marca `out`, esvazia as áreas, encerra a batalha e os frames/efeitos do jogador, corta as cartas
+  dele das escolhas abertas dos outros, paga a recompensa a `by` e, se era a vez dele, deixa só um frame `endTurn`
+  na pilha (o turno fecha pelo caminho normal). `locate` não encontra o Líder de quem saiu; `alivePlayers` é a
+  lista para percorrer a mesa. O último a cair não é marcado `out`: a partida acabou e a mesa fica como estava.
+  `concede` e `timeout` eliminam (e seguem com `run`) em vez de encerrar.
+- **Diagnóstico**: `setOpponentProbe` avisa quando um passo consulta o oponente sem contexto (um campo que
+  `mentionsOpponent` ainda não conhece). `scripts/simulate-yonko.ts` usa isso e confere os invariantes por jogador.
 
 ### Tradução
 
