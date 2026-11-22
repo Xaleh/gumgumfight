@@ -297,7 +297,7 @@ export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () =>
                             ) : undefined
                           }
                         />
-                        <div className="grid-caption">{card.category === 'leader' ? t('deck.cat.leader') : (card.rarity ?? '')}</div>
+                        <div className="grid-caption">{card.category === 'leader' ? t('card.cat.leader') : (card.rarity ?? '')}</div>
                       </div>
                     );
                   })}
@@ -361,7 +361,7 @@ export function Draft({ podId, onExit, onBuild }: { podId: string; onExit: () =>
       {canHover && hovered && !zoom && <CardHoverPreview card={hovered.card} anchor={hovered.anchor} />}
       {zoom && <StaticCardZoom card={zoom} onClose={() => setZoom(null)} />}
       {openingRound !== null && (
-        <BoosterOpening key={openingRound} set={pod.packSet ?? pod.sets} label={t('draft.round', { n: openingRound, total: pod.rounds })} fast onDone={() => setOpeningRound(null)} />
+        <BoosterOpening key={openingRound} set={pod.packSet ?? pod.sets} label={t('draft.round', { n: openingRound, total: pod.rounds })} mode="burst" quick={animations === 'soft'} onDone={() => setOpeningRound(null)} />
       )}
     </div>
   );

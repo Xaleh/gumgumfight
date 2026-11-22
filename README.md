@@ -302,7 +302,8 @@ boosters que o jogador abre na hora.
 
 - **Líder:** um dos que saíram nos boosters ou o **Luffy de 6 cores**, que todo jogador tem sempre. É o Líder dos
   eventos Sealed Battle da Bandai (Vida 5, 5000, "treated as a card with all card names, types, and attributes"): o
-  motor trata o Líder como tendo qualquer nome, tipo e atributo. A carta não tem número impresso, então o id é nosso
+  motor trata o Líder como tendo qualquer nome, tipo e atributo, inclusive nas condições do tipo "o tipo do seu Líder
+  inclui "CP"" (os [Trigger] do Jabra e do Kumadori, por exemplo). A carta não tem número impresso, então o id é nosso
   (`SEALED-001`, em `data/cards/sealed.json`, com a imagem em `apps/web/public/cards/`). Ela **só vale no Selado** (e
   no Livre): num deck construído, o aviso é "só pode ser usada no Selado".
 - **Coleções disponíveis:** as de booster (OP e EB) que estão completas no banco (cartas comuns, raras e, onde o
@@ -356,12 +357,17 @@ cartas), e cada linha de produto tem o seu booster (`BOOSTER_MODELS`, em `packag
 - **A arte dos boosters** é a do produto em inglês (`apps/web/public/boosters/<COLEÇÃO>.webp`, das páginas da Bandai;
   o EB04 usa a do produto japonês, o único que existe). Coleção sem arquivo aparece com um booster desenhado; para
   uma coleção nova, basta pôr o arquivo na pasta. Pack Rush fechado, Draft e Cubo têm boosters próprios, desenhados.
-- **Abrir um booster** tem animação: ele treme, o topo rasga e as cartas sobem, e só então a tela revela o que saiu
-  (1,7 s; 1 s cada quando são vários; clique, toque, Esc, Enter ou Espaço pulam). No Draft, o booster de cada rodada
-  abre do mesmo jeito. Segue a opção **Animações** das configurações: "Completas" mostra a abertura inteira,
-  "Suaves" a versão curta (1 s) e "Desligadas" nada (as cartas aparecem direto, sem a virada). Como no resto do app,
-  só essa opção decide: o "reduzir movimento" do sistema não desliga a abertura, porque muitos celulares o ligam
-  sozinhos na economia de bateria.
+- **Abrir um booster** é uma cena: ele vem ao centro com um brilho, treme e gira carregando, **estoura em raios de
+  luz** enquanto a embalagem rasga em duas, a pilha de cartas sobe e as cartas **voam para a mesa viradas para baixo**.
+  As de destaque já chegam brilhando (SR e Líder em dourado, SEC em arco-íris). Aí o jogador **vira as cartas**, uma a
+  uma ou com "Revelar tudo", e segue com "Continuar". Tem som em cada etapa (usa o volume dos efeitos).
+  - "Abrir os que faltam" passa booster por booster numa versão mais rápida, com as cartas virando sozinhas (uns 3 s
+    cada). "Pular" e Esc pulam tudo; Enter e Espaço fazem o botão da vez.
+  - No Draft, o booster de cada rodada estoura numa versão curta, sem a mesa (o relógio da escolha já está correndo).
+  - Segue a opção **Animações** das configurações: "Completas" mostra a cena inteira, "Suaves" só o estouro curto
+    (e as cartas viram na tela dos boosters) e "Desligadas" nada. Como no resto do app, só essa opção decide: o
+    "reduzir movimento" do sistema não desliga a abertura, porque muitos celulares o ligam sozinhos na economia de
+    bateria.
 
 ### Pack Rush
 

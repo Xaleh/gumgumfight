@@ -224,6 +224,12 @@ const sealed = {
   'sealed.filterShowing': 'Showing {n} of {total}',
   'sealed.filterClear': 'Clear filters',
   'sealed.filterNone': 'None of your cards match these filters.',
+  'sealed.openSkip': 'Skip',
+  'sealed.openRevealAll': 'Reveal all',
+  'sealed.openContinue': 'Continue',
+  'sealed.openHintMouse': 'Click a card to flip it',
+  'sealed.openHintTouch': 'Tap a card to flip it',
+  'sealed.openFaceDown': 'Card {n}, face down',
 };
 
 export default sealed;

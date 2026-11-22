@@ -554,7 +554,8 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
                 </h3>
                 <span className="muted small">{peek.canHover ? t('sealed.peekMouse') : t('sealed.peekTouch')}</span>
               </div>
-              <div className={['card-grid sealed-grid', animations === 'off' ? 'still' : ''].join(' ')} key={shown}>
+              {/* Com as animações completas, as cartas já foram viradas na abertura; a virada aqui fica para as suaves. */}
+              <div className={['card-grid sealed-grid', animations === 'soft' ? '' : 'still'].join(' ')} key={shown}>
                 {pack.map((id, i) => {
                   const card = byId.get(id);
                   if (!card) return null;
@@ -562,7 +563,7 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
                   return (
                     <div key={`${id}-${i}`} className={['grid-cell sealed-reveal-card', hit ? 'hit' : ''].join(' ')} style={{ ['--i' as string]: i }}>
                       <StaticCard card={card} highlight={hit ? 'selected' : null} onHover={peek.setHovered} onLongPress={peek.setZoom} onClick={() => peek.setZoom(card)} />
-                      <div className="grid-caption">{card.category === 'leader' ? t('deck.cat.leader') : (card.rarity ?? '')}</div>
+                      <div className="grid-caption">{card.category === 'leader' ? t('card.cat.leader') : (card.rarity ?? '')}</div>
                     </div>
                   );
                 })}
@@ -634,7 +635,9 @@ function Packs({ pool, byId, onBuild }: { pool: SealedPool; byId: ReadonlyMap<st
           key={opening.at}
           set={packSet(opening.at)}
           label={t('sealed.openingPack', { n: opening.at + 1, total })}
-          fast={opening.many || animations === 'soft'}
+          cards={pool.packs[opening.at].map((id) => byId.get(id)).filter((c): c is CardData => Boolean(c))}
+          mode={animations === 'soft' ? 'burst' : opening.many ? 'auto' : 'reveal'}
+          quick={animations === 'soft'}
           onDone={openedOne}
           onSkip={skipOpening}
         />

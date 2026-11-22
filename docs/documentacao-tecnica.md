@@ -279,7 +279,8 @@ mesmo sorteio e não saem juntos; `leaderChancePerLeader` limita a chance nas co
 limite de cópias; `autoBuildLimited` monta um deck por nota e curva de custo (o "Montar sozinho" e o deck do bot).
 `createGame` aceita deck de 50 ou de 40. O formato da partida é `sealed` (`PlayFormat`, fora de `isPlayFormat`: só as
 rotas do Selado o criam), com `PlayMode.sealedSet`; nele `cardLegality`/`formatIssues` aceitam tudo. O Líder de 6 cores
-(`SEALED_LEADER_ID`) tem `CardDef.wild` (qualquer nome, tipo e atributo em `hasName`/`hasType`/`hasAttribute`) e é
+(`SEALED_LEADER_ID`) tem `CardDef.wild` (qualquer nome, tipo e atributo em `hasName`/`hasType`/`hasAttribute`, e também em
+`typeIncludes`/`nameIncludes`, as condições "type includes"/"name includes") e é
 `eventOnly` nos formatos de deck construído. No servidor (`sealed/store.ts`, `sealed/routes.ts`), a tabela
 `sealed_pools` guarda dono, coleção, seed, boosters, deck e placar; nas salas, o `deckId` de um assento do Selado é
 `sealed:<id>` e o deck é conferido contra as cartas abertas (`sealedDeckFor`, em `online/routes.ts`). **Pack Rush**

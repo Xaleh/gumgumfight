@@ -224,6 +224,12 @@ const sealed = {
   'sealed.filterShowing': '{n} sur {total} affichées',
   'sealed.filterClear': 'Effacer les filtres',
   'sealed.filterNone': 'Aucune de vos cartes ne correspond à ces filtres.',
+  'sealed.openSkip': 'Passer',
+  'sealed.openRevealAll': 'Tout révéler',
+  'sealed.openContinue': 'Continuer',
+  'sealed.openHintMouse': 'Cliquez sur une carte pour la retourner',
+  'sealed.openHintTouch': 'Touchez une carte pour la retourner',
+  'sealed.openFaceDown': 'Carte {n}, face cachée',
 };
 
 export default sealed;
